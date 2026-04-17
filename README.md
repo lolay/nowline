@@ -131,6 +131,19 @@ item auth "Auth refactor"
   link: https://…           // URL
 ```
 
+### Roadmap start date
+
+A `roadmap` may carry an optional `start:YYYY-MM-DD` property that anchors the timeline baseline:
+
+```nowline
+roadmap platform-2026 "Platform 2026" start:2026-01-06
+```
+
+- If the roadmap contains any `anchor` declaration, or any `milestone` with a `date:` property, `start:` is **required**.
+- Every such date must be on or after `start:`.
+- A roadmap with no dates at all (schedules built purely from `duration:` and `after:`) does not need `start:`.
+- Across `include`s that don't use `roadmap:ignore`, the parent and any included roadmap must agree on `start:` — both absent, or both present with the same value. Mismatches are errors, not silent overrides.
+
 ### Includes
 
 ```nowline

@@ -89,6 +89,25 @@ const KEBAB_RE = /^[a-z][a-z0-9]*(-[a-z0-9]+)*$/;
 
 const INCLUDE_MODES = new Set(['merge', 'ignore', 'isolate']);
 
+type StartState =
+    | { kind: 'valid'; iso: string; date: Date }
+    | { kind: 'invalid' }
+    | { kind: 'missing' };
+
+function resolveLocalStart(file: NowlineFile | undefined): StartState {
+    const prop = file?.roadmapDecl?.properties.find((p) => p.key === 'start');
+    if (!prop) return { kind: 'missing' };
+    const raw = prop.value;
+    if (!raw || !DATE_RE.test(raw)) return { kind: 'invalid' };
+    const d = new Date(raw);
+    if (isNaN(d.getTime())) return { kind: 'invalid' };
+    return { kind: 'valid', iso: raw, date: d };
+}
+
+function displayName(node: { name?: string; title?: string }): string {
+    return node.name ?? node.title ?? '<unnamed>';
+}
+
 export function registerValidationChecks(services: NowlineServices): void {
     const registry = services.validation.ValidationRegistry;
     const validator = services.validation.NowlineValidator;
@@ -107,6 +126,7 @@ export function registerValidationChecks(services: NowlineServices): void {
         AnchorDeclaration: [
             validator.checkEntityIdOrTitle,
             validator.checkAnchorDate,
+            validator.checkAnchorAgainstStart,
         ],
         SwimlaneDeclaration: [validator.checkEntityIdOrTitle],
         ItemDeclaration: [
@@ -121,7 +141,10 @@ export function registerValidationChecks(services: NowlineServices): void {
             validator.checkGroupMinChildren,
             validator.checkNoComputedProperties,
         ],
-        MilestoneDeclaration: [validator.checkEntityIdOrTitle],
+        MilestoneDeclaration: [
+            validator.checkEntityIdOrTitle,
+            validator.checkMilestoneAgainstStart,
+        ],
         FootnoteDeclaration: [
             validator.checkEntityIdOrTitle,
             validator.checkFootnoteOn,
@@ -326,8 +349,9 @@ export class NowlineValidator {
             }
 
             case 'date':
-                if (val && !DATE_RE.test(val)) {
-                    accept('error', `Invalid date "${val}". Use ISO 8601 format: YYYY-MM-DD.`, {
+            case 'start':
+                if (val && (!DATE_RE.test(val) || isNaN(new Date(val).getTime()))) {
+                    accept('error', `Invalid ${key} "${val}". Use ISO 8601 format: YYYY-MM-DD.`, {
                         node: prop,
                         property: 'value',
                     });
@@ -390,6 +414,63 @@ export class NowlineValidator {
                 node: anchor,
                 property: 'date',
             });
+        }
+    }
+
+    // --- R2 + R3: anchor must not precede roadmap start; dated roadmap requires start: ---
+    checkAnchorAgainstStart(anchor: AnchorDeclaration, accept: ValidationAcceptor): void {
+        if (!DATE_RE.test(anchor.date)) return;
+        const anchorDate = new Date(anchor.date);
+        if (isNaN(anchorDate.getTime())) return;
+
+        const start = resolveLocalStart(anchor.$container);
+        switch (start.kind) {
+            case 'invalid':
+                return;
+            case 'missing':
+                accept('error', `Anchor "${displayName(anchor)}" has a date but the roadmap is missing "start:". Add start:YYYY-MM-DD to the roadmap.`, {
+                    node: anchor,
+                    property: 'date',
+                });
+                return;
+            case 'valid':
+                if (anchorDate < start.date) {
+                    accept('error', `Anchor "${displayName(anchor)}" date ${anchor.date} is before roadmap start ${start.iso}.`, {
+                        node: anchor,
+                        property: 'date',
+                    });
+                }
+                return;
+        }
+    }
+
+    // --- R2 + R3: dated milestone must not precede roadmap start; dated roadmap requires start: ---
+    checkMilestoneAgainstStart(milestone: MilestoneDeclaration, accept: ValidationAcceptor): void {
+        const dateProp = milestone.properties.find((p) => p.key === 'date');
+        if (!dateProp || !dateProp.value) return;
+        const raw = dateProp.value;
+        if (!DATE_RE.test(raw)) return;
+        const milestoneDate = new Date(raw);
+        if (isNaN(milestoneDate.getTime())) return;
+
+        const start = resolveLocalStart(milestone.$container);
+        switch (start.kind) {
+            case 'invalid':
+                return;
+            case 'missing':
+                accept('error', `Milestone "${displayName(milestone)}" has a date but the roadmap is missing "start:". Add start:YYYY-MM-DD to the roadmap.`, {
+                    node: dateProp,
+                    property: 'value',
+                });
+                return;
+            case 'valid':
+                if (milestoneDate < start.date) {
+                    accept('error', `Milestone "${displayName(milestone)}" date ${raw} is before roadmap start ${start.iso}.`, {
+                        node: dateProp,
+                        property: 'value',
+                    });
+                }
+                return;
         }
     }
 

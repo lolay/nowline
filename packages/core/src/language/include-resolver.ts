@@ -40,6 +40,30 @@ import {
 
 export type IncludeMode = 'merge' | 'ignore' | 'isolate';
 
+const DATE_RE = /^\d{4}-\d{2}-\d{2}$/;
+
+function readStartProp(decl: RoadmapDeclaration | undefined): string | undefined {
+    const prop = decl?.properties.find((p) => p.key === 'start');
+    if (!prop || !prop.value) return undefined;
+    if (!DATE_RE.test(prop.value)) return undefined;
+    if (isNaN(new Date(prop.value).getTime())) return undefined;
+    return prop.value;
+}
+
+function formatStartMismatch(
+    childRelPath: string,
+    parentStart: string | undefined,
+    childStart: string | undefined,
+): string {
+    if (parentStart && childStart) {
+        return `Included "${childRelPath}" declares start:${childStart}, which doesn't match this file's start:${parentStart}. Both files must declare the same start date, or neither should.`;
+    }
+    if (parentStart) {
+        return `Included "${childRelPath}" has no start:, but this file declares start:${parentStart}. Both files must declare the same start date, or neither should.`;
+    }
+    return `Included "${childRelPath}" declares start:${childStart}, but this file has no start:. Both files must declare the same start date, or neither should.`;
+}
+
 export interface ResolvedConfig {
     scale?: ScaleDeclaration;
     units: Map<string, UnitDeclaration>;
@@ -225,6 +249,22 @@ async function resolveFile(
                 sourcePath: absPath,
                 line: inc.$cstNode?.range.start.line,
             });
+        }
+
+        // R5: non-ignored includes with a child roadmap must agree on start: with the parent.
+        // Deliberate divergence from the usual "parent wins with warning" merge behaviour
+        // because start: defines the shared timeline baseline.
+        if (roadmapMode !== 'ignore' && childFile.roadmapDecl) {
+            const parentStart = readStartProp(file.roadmapDecl);
+            const childStart = readStartProp(childFile.roadmapDecl);
+            if (parentStart !== childStart) {
+                ctx.diagnostics.push({
+                    severity: 'error',
+                    message: formatStartMismatch(childRelPath, parentStart, childStart),
+                    sourcePath: absPath,
+                    line: inc.$cstNode?.range.start.line,
+                });
+            }
         }
     }
 

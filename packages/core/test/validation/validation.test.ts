@@ -134,4 +134,133 @@ describe('validation rules', () => {
         // BadLabel is a valid ID but not kebab-case. Our impl only warns if not kebab — since PascalCase is a valid ID but fails kebab regex.
         expect(warningMessages(r.diagnostics).some((m) => /kebab/i.test(m))).toBe(true);
     });
+
+    // --- R1: roadmap start: format ---
+
+    it('R1: roadmap start with invalid format is an error', async () => {
+        const r = await parse(
+            `roadmap r start:not-a-date\nswimlane s\n  item a duration:1w\n`,
+        );
+        expect(hasError(errorMessages(r.diagnostics), /start.*ISO 8601|Invalid start/i)).toBe(true);
+    });
+
+    it('R1: roadmap start with calendar-invalid value is an error', async () => {
+        const r = await parse(
+            `roadmap r start:2026-13-45\nswimlane s\n  item a duration:1w\n`,
+        );
+        expect(hasError(errorMessages(r.diagnostics), /start|Invalid/i)).toBe(true);
+    });
+
+    it('R1: valid roadmap start is accepted', async () => {
+        const r = await parse(
+            `roadmap r start:2026-01-06\nswimlane s\n  item a duration:1w\n`,
+        );
+        expect(errorMessages(r.diagnostics)).toEqual([]);
+    });
+
+    // --- R2: dated roadmap requires start: (per offender) ---
+
+    it('R2: a single anchor without roadmap start is an error on the anchor', async () => {
+        const r = await parse(
+            `roadmap r\nanchor kickoff 2026-01-06\nswimlane s\n  item a duration:1w\n`,
+        );
+        const matches = errorMessages(r.diagnostics).filter((m) => /missing "start:"|missing start/i.test(m));
+        expect(matches.length).toBe(1);
+        expect(matches[0]).toMatch(/Anchor/i);
+    });
+
+    it('R2: a dated milestone without roadmap start is an error on the milestone', async () => {
+        const r = await parse(
+            `roadmap r\nswimlane s\n  item a duration:1w\nmilestone ga "GA" date:2026-06-01\n`,
+        );
+        const matches = errorMessages(r.diagnostics).filter((m) => /missing "start:"|missing start/i.test(m));
+        expect(matches.length).toBe(1);
+        expect(matches[0]).toMatch(/Milestone/i);
+    });
+
+    it('R2: two anchors and a dated milestone without start produce three errors', async () => {
+        const r = await parse(
+            `roadmap r\nanchor kickoff 2026-01-06\nanchor midyear 2026-07-01\nswimlane s\n  item a duration:1w\nmilestone ga "GA" date:2026-12-01\n`,
+        );
+        const matches = errorMessages(r.diagnostics).filter((m) => /missing "start:"|missing start/i.test(m));
+        expect(matches.length).toBe(3);
+    });
+
+    it('R2: undated milestone in a roadmap without start is not flagged', async () => {
+        const r = await parse(
+            `roadmap r\nswimlane s\n  item a duration:1w\nmilestone beta "Beta" depends:a\n`,
+        );
+        expect(errorMessages(r.diagnostics).some((m) => /missing "start:"/i.test(m))).toBe(false);
+    });
+
+    // --- R3: dated entities must not precede start: (per offender) ---
+
+    it('R3: anchor before roadmap start is an error', async () => {
+        const r = await parse(
+            `roadmap r start:2026-02-01\nanchor kickoff 2026-01-06\nswimlane s\n  item a duration:1w\n`,
+        );
+        const matches = errorMessages(r.diagnostics).filter((m) => /before roadmap start/i.test(m));
+        expect(matches.length).toBe(1);
+        expect(matches[0]).toMatch(/Anchor/i);
+    });
+
+    it('R3: dated milestone before roadmap start is an error', async () => {
+        const r = await parse(
+            `roadmap r start:2026-02-01\nswimlane s\n  item a duration:1w\nmilestone ga "GA" date:2026-01-15\n`,
+        );
+        const matches = errorMessages(r.diagnostics).filter((m) => /before roadmap start/i.test(m));
+        expect(matches.length).toBe(1);
+        expect(matches[0]).toMatch(/Milestone/i);
+    });
+
+    it('R3: one anchor and one milestone both before start produce two errors', async () => {
+        const r = await parse(
+            `roadmap r start:2026-02-01\nanchor kickoff 2026-01-06\nswimlane s\n  item a duration:1w\nmilestone ga "GA" date:2026-01-15\n`,
+        );
+        const matches = errorMessages(r.diagnostics).filter((m) => /before roadmap start/i.test(m));
+        expect(matches.length).toBe(2);
+    });
+
+    it('R3: anchor equal to start is accepted', async () => {
+        const r = await parse(
+            `roadmap r start:2026-01-06\nanchor kickoff 2026-01-06\nswimlane s\n  item a duration:1w\n`,
+        );
+        expect(errorMessages(r.diagnostics)).toEqual([]);
+    });
+
+    it('R3: anchor after start is accepted', async () => {
+        const r = await parse(
+            `roadmap r start:2026-01-01\nanchor kickoff 2026-01-06\nswimlane s\n  item a duration:1w\n`,
+        );
+        expect(errorMessages(r.diagnostics)).toEqual([]);
+    });
+
+    it('R3: dated milestone after start is accepted', async () => {
+        const r = await parse(
+            `roadmap r start:2026-01-01\nswimlane s\n  item a duration:1w\nmilestone ga "GA" date:2026-06-01\n`,
+        );
+        expect(errorMessages(r.diagnostics)).toEqual([]);
+    });
+
+    // --- R4: no cascade when start: is malformed ---
+
+    it('R4: malformed start does not cascade to missing/ordering errors', async () => {
+        const r = await parse(
+            `roadmap r start:not-a-date\nanchor kickoff 2000-01-01\nswimlane s\n  item a duration:1w\n`,
+        );
+        const errors = errorMessages(r.diagnostics);
+        expect(errors.length).toBe(1);
+        expect(errors[0]).toMatch(/start/i);
+        expect(errors[0]).not.toMatch(/before roadmap start|missing "start:"/i);
+    });
+
+    // --- R6: pure-relative roadmaps stay valid ---
+
+    it('R6: pure-relative roadmap without start: or dates is valid', async () => {
+        const r = await parse(
+            `roadmap r\nswimlane s\n  item a duration:2w\n  item b duration:1w after:a\n`,
+        );
+        expect(errorMessages(r.diagnostics)).toEqual([]);
+        expect(warningMessages(r.diagnostics)).toEqual([]);
+    });
 });
