@@ -1,0 +1,35 @@
+nowline v1
+
+roadmap teams-2026 "Teams Roadmap 2026"
+
+person sam "Sam Chen" link:https://github.com/samchen
+person jen "Jennifer Wu"
+person alex "Alex Rivera"
+
+team engineering "Engineering"
+  team platform "Platform Team"
+    person sam
+    person jen
+  team mobile "Mobile Team"
+    person alex
+
+anchor kickoff 2026-01-06
+anchor mid-year 2026-07-01
+anchor eoy "End of Year" 2026-12-15
+
+swimlane platform owner:platform
+  item auth "Auth refactor" duration:1m after:kickoff owner:sam status:done
+  item api-v2 "API v2" duration:2w owner:jen status:in-progress remaining:40%
+
+swimlane mobile owner:mobile
+  item offline "Offline mode" duration:1m after:kickoff owner:alex status:at-risk remaining:60%
+  item push "Push notifications" duration:2w owner:alex
+
+milestone beta "Beta" depends:[auth, api-v2]
+milestone ga "GA" date:2026-12-01 depends:[offline, push]
+
+footnote "Mobile team capacity risk" on:mobile
+  description "Mobile team is understaffed through Q2."
+
+footnote vendor-dep "Vendor dependency" on:[auth, api-v2]
+  description "Blocked until vendor contract is signed."

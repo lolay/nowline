@@ -1,0 +1,25 @@
+node_modules/
+dist/
+out/
+*.tsbuildinfo
+.scratch/
+
+# Langium generated
+**/src/generated/
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Test coverage
+coverage/
+
+# Logs
+*.log

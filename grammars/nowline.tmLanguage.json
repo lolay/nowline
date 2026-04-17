@@ -1,0 +1,144 @@
+{
+  "$schema": "https://raw.githubusercontent.com/martinring/tmlanguage/master/tmlanguage.json",
+  "name": "Nowline",
+  "scopeName": "source.nowline",
+  "fileTypes": ["nowline"],
+  "patterns": [
+    { "include": "#comments" },
+    { "include": "#directive" },
+    { "include": "#keywords" },
+    { "include": "#properties" },
+    { "include": "#strings" },
+    { "include": "#dates" },
+    { "include": "#urls" },
+    { "include": "#lists" },
+    { "include": "#numerics" },
+    { "include": "#identifiers" }
+  ],
+  "repository": {
+    "comments": {
+      "patterns": [
+        {
+          "name": "comment.line.double-slash.nowline",
+          "match": "//.*$"
+        },
+        {
+          "name": "comment.block.nowline",
+          "begin": "/\\*",
+          "end": "\\*/"
+        }
+      ]
+    },
+    "directive": {
+      "patterns": [
+        {
+          "match": "^\\s*(nowline)\\s+(v\\d+)\\s*$",
+          "captures": {
+            "1": { "name": "keyword.control.directive.nowline" },
+            "2": { "name": "constant.numeric.version.nowline" }
+          }
+        }
+      ]
+    },
+    "keywords": {
+      "patterns": [
+        {
+          "name": "keyword.control.nowline",
+          "match": "\\b(config|roadmap|include|person|team|anchor|swimlane|item|parallel|group|milestone|footnote|label|style|status|scale|unit|estimates|defaults|description)\\b"
+        }
+      ]
+    },
+    "properties": {
+      "patterns": [
+        {
+          "match": "\\b(status|owner|after|before|duration|remaining|labels|link|style|depends|date|on)\\s*(:)",
+          "captures": {
+            "1": { "name": "entity.other.attribute-name.nowline" },
+            "2": { "name": "punctuation.separator.key-value.nowline" }
+          }
+        },
+        {
+          "match": "\\b(config|roadmap)\\s*(:)\\s*(merge|ignore|isolate)\\b",
+          "captures": {
+            "1": { "name": "entity.other.attribute-name.include-mode.nowline" },
+            "2": { "name": "punctuation.separator.key-value.nowline" },
+            "3": { "name": "constant.language.include-mode.nowline" }
+          }
+        },
+        {
+          "match": "\\b(bg|fg|text|border|icon|shadow|font|weight|italic|text-size|padding|spacing|header-height|corner-radius|bracket|author)\\s*(:)",
+          "captures": {
+            "1": { "name": "entity.other.attribute-name.style.nowline" },
+            "2": { "name": "punctuation.separator.key-value.nowline" }
+          }
+        },
+        {
+          "name": "constant.language.status.nowline",
+          "match": "\\b(planned|in-progress|done|at-risk|blocked)\\b"
+        },
+        {
+          "name": "constant.language.enum.nowline",
+          "match": "\\b(solid|dashed|dotted|subtle|fuzzy|hard|sans|serif|mono|thin|light|normal|bold|true|false|none|xs|sm|md|lg|xl|full)\\b"
+        }
+      ]
+    },
+    "strings": {
+      "name": "string.quoted.double.nowline",
+      "begin": "\"",
+      "end": "\"",
+      "patterns": [
+        {
+          "name": "constant.character.escape.nowline",
+          "match": "\\\\."
+        }
+      ]
+    },
+    "dates": {
+      "name": "constant.numeric.date.nowline",
+      "match": "\\b\\d{4}-\\d{2}-\\d{2}\\b"
+    },
+    "urls": {
+      "name": "markup.underline.link.nowline",
+      "match": "https?://[^\\s\\[\\],]+"
+    },
+    "lists": {
+      "begin": "\\[",
+      "end": "\\]",
+      "beginCaptures": {
+        "0": { "name": "punctuation.definition.list.begin.nowline" }
+      },
+      "endCaptures": {
+        "0": { "name": "punctuation.definition.list.end.nowline" }
+      },
+      "name": "meta.structure.list.nowline",
+      "patterns": [
+        { "include": "#identifiers" },
+        { "include": "#strings" },
+        {
+          "name": "punctuation.separator.list.nowline",
+          "match": ","
+        }
+      ]
+    },
+    "numerics": {
+      "patterns": [
+        {
+          "name": "constant.numeric.duration.nowline",
+          "match": "\\b\\d+[dwmy]\\b"
+        },
+        {
+          "name": "constant.numeric.percentage.nowline",
+          "match": "\\b\\d+%"
+        },
+        {
+          "name": "constant.numeric.color.nowline",
+          "match": "#[0-9a-fA-F]{3,8}\\b"
+        }
+      ]
+    },
+    "identifiers": {
+      "name": "variable.other.nowline",
+      "match": "\\b[a-zA-Z_][a-zA-Z0-9_-]*\\b"
+    }
+  }
+}

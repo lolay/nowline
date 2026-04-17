@@ -1,0 +1,62 @@
+nowline v1
+
+config
+
+scale weeks
+unit sprints = 2w
+estimates xs=1d s=3d m=1w l=2w xl=1m
+
+status awaiting-review
+status in-review
+
+style enterprise "Enterprise readiness"
+  bg: blue
+  fg: navy
+  text: white
+  border: solid
+
+style risky
+  border: dashed
+  fg: orange
+
+style subtle
+  bg: gray
+
+defaults
+  item duration:m status:planned shadow:subtle
+  swimlane padding:sm spacing:none
+  roadmap padding:md header-height:md font:sans
+  parallel bracket:none
+
+label enterprise "Enterprise readiness" style:enterprise
+label security "Security hardening" style:enterprise bg:red
+label low-confidence style:risky border:dotted
+
+roadmap platform-2026 "Platform 2026" author:"Acme Engineering"
+
+person sam "Sam Chen"
+person jen "Jennifer Wu"
+
+anchor kickoff 2026-01-06
+anchor code-freeze "Code Freeze" 2026-05-01
+anchor ga-date "GA Date" 2026-06-01
+
+swimlane platform
+  item auth-refactor "Auth refactor" duration:l after:kickoff status:done owner:sam labels:enterprise link:https://linear.app/acme/issue/ENG-123
+  parallel after:auth-refactor
+    group audit-track "Audit Track" labels:security
+      item audit-log "Audit log v2" duration:xl before:code-freeze remaining:30% labels:[enterprise, security]
+        description "Comprehensive audit trail for all admin actions"
+      item audit-ui "Audit UI" duration:m
+    item sso "SSO plugins" duration:m labels:[enterprise, low-confidence]
+  item platform-qa "Platform QA" duration:s
+
+swimlane mobile
+  item offline "Offline mode" duration:l after:kickoff owner:jen status:at-risk remaining:60% link:https://github.com/acme/mobile/pull/87
+  item push-v2 "Push notifications v2" duration:m
+
+milestone beta "Beta" depends:auth-refactor
+milestone ga-launch "GA launch" date:2026-06-01 depends:[auth-refactor, audit-log]
+
+footnote "Vendor dependency" on:audit-log
+  description "Blocked until vendor contract is signed. Expected March resolution."

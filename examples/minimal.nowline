@@ -1,0 +1,8 @@
+nowline v1
+
+roadmap minimal "Minimal Example"
+
+swimlane build "Build"
+  item design "Design" duration:1w status:done
+  item implement "Implement" duration:2w status:in-progress
+  item ship "Ship" duration:3d status:planned
