@@ -13,9 +13,9 @@ team engineering "Engineering"
   team mobile "Mobile Team"
     person alex
 
-anchor kickoff 2026-01-06
-anchor mid-year 2026-07-01
-anchor eoy "End of Year" 2026-12-15
+anchor kickoff date:2026-01-06
+anchor mid-year date:2026-07-01
+anchor eoy "End of Year" date:2026-12-15
 
 swimlane platform owner:platform
   item auth "Auth refactor" duration:1m after:kickoff owner:sam status:done
@@ -25,10 +25,10 @@ swimlane mobile owner:mobile
   item offline "Offline mode" duration:1m after:kickoff owner:alex status:at-risk remaining:60%
   item push "Push notifications" duration:2w owner:alex
 
-milestone beta "Beta" depends:[auth, api-v2]
-milestone ga "GA" date:2026-12-01 depends:[offline, push]
+milestone beta "Beta" after:[auth, api-v2]
+milestone ga "GA" date:2026-12-01 after:[offline, push]
 
-footnote "Mobile team capacity risk" on:mobile
+footnote eng-capacity "Mobile team capacity risk" on:mobile
   description "Mobile team is understaffed through Q2."
 
 footnote vendor-dep "Vendor dependency" on:[auth, api-v2]

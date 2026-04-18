@@ -2,12 +2,16 @@ nowline v1
 
 config
 
-scale weeks
-unit sprints = 2w
-estimates xs=1d s=3d m=1w l=2w xl=1m
+scale
+  name: weeks
+  label-every: 2
+  label: "W{n}"
 
-status awaiting-review
-status in-review
+calendar
+  days-per-week: 5
+  days-per-month: 22
+  days-per-quarter: 65
+  days-per-year: 260
 
 style enterprise "Enterprise readiness"
   bg: blue
@@ -22,41 +26,49 @@ style risky
 style subtle
   bg: gray
 
-defaults
-  item duration:m status:planned shadow:subtle
-  swimlane padding:sm spacing:none
-  roadmap padding:md header-height:md font:sans
-  parallel bracket:none
+default item shadow:subtle
+default swimlane padding:sm spacing:none
+default roadmap padding:md header-height:md font:sans
+default parallel bracket:none
 
-label enterprise "Enterprise readiness" style:enterprise
-label security "Security hardening" style:enterprise bg:red
-label low-confidence style:risky border:dotted
-
-roadmap platform-2026 "Platform 2026" author:"Acme Engineering" start:2026-01-01
+roadmap platform-2026 "Platform 2026" author:"Acme Engineering" start:2026-01-01 calendar:custom
 
 person sam "Sam Chen"
 person jen "Jennifer Wu"
 
-anchor kickoff 2026-01-06
-anchor code-freeze "Code Freeze" 2026-05-01
-anchor ga-date "GA Date" 2026-06-01
+duration xs length:1d
+duration sm length:3d
+duration md length:1w
+duration lg length:2w
+duration xl length:1m
+
+status awaiting-review
+status in-review
+
+label enterprise "Enterprise readiness" style:enterprise
+label security "Security hardening" style:enterprise
+label low-confidence style:risky
+
+anchor kickoff date:2026-01-06
+anchor code-freeze "Code Freeze" date:2026-05-01
+anchor ga-date "GA Date" date:2026-06-01
 
 swimlane platform
-  item auth-refactor "Auth refactor" duration:l after:kickoff status:done owner:sam labels:enterprise link:https://linear.app/acme/issue/ENG-123
+  item auth-refactor "Auth refactor" duration:lg after:kickoff status:done owner:sam labels:enterprise link:https://linear.app/acme/issue/ENG-123
   parallel after:auth-refactor
     group audit-track "Audit Track" labels:security
       item audit-log "Audit log v2" duration:xl before:code-freeze remaining:30% labels:[enterprise, security]
         description "Comprehensive audit trail for all admin actions"
-      item audit-ui "Audit UI" duration:m
-    item sso "SSO plugins" duration:m labels:[enterprise, low-confidence]
-  item platform-qa "Platform QA" duration:s
+      item audit-ui "Audit UI" duration:md
+    item sso "SSO plugins" duration:md labels:[enterprise, low-confidence]
+  item platform-qa "Platform QA" duration:sm
 
 swimlane mobile
-  item offline "Offline mode" duration:l after:kickoff owner:jen status:at-risk remaining:60% link:https://github.com/acme/mobile/pull/87
-  item push-v2 "Push notifications v2" duration:m
+  item offline "Offline mode" duration:lg after:kickoff owner:jen status:at-risk remaining:60% link:https://github.com/acme/mobile/pull/87
+  item push-v2 "Push notifications v2" duration:md
 
-milestone beta "Beta" depends:auth-refactor
-milestone ga-launch "GA launch" date:2026-06-01 depends:[auth-refactor, audit-log]
+milestone beta "Beta" after:auth-refactor
+milestone ga-launch "GA launch" date:2026-06-01 after:[auth-refactor, audit-log]
 
-footnote "Vendor dependency" on:audit-log
+footnote vendor-footnote "Vendor dependency" on:audit-log
   description "Blocked until vendor contract is signed. Expected March resolution."

@@ -44,14 +44,14 @@
       "patterns": [
         {
           "name": "keyword.control.nowline",
-          "match": "\\b(config|roadmap|include|person|team|anchor|swimlane|item|parallel|group|milestone|footnote|label|style|status|scale|unit|estimates|defaults|description)\\b"
+          "match": "\\b(config|roadmap|include|person|team|anchor|swimlane|item|parallel|group|milestone|footnote|label|style|status|duration|scale|calendar|default|description)\\b"
         }
       ]
     },
     "properties": {
       "patterns": [
         {
-          "match": "\\b(status|owner|after|before|duration|remaining|labels|link|style|depends|date|on)\\s*(:)",
+          "match": "\\b(status|owner|after|before|duration|remaining|labels|link|style|date|on|start|scale|calendar|length|name|label-every|days-per-week|days-per-month|days-per-quarter|days-per-year|author)\\s*(:)",
           "captures": {
             "1": { "name": "entity.other.attribute-name.nowline" },
             "2": { "name": "punctuation.separator.key-value.nowline" }
@@ -66,7 +66,7 @@
           }
         },
         {
-          "match": "\\b(bg|fg|text|border|icon|shadow|font|weight|italic|text-size|padding|spacing|header-height|corner-radius|bracket|author)\\s*(:)",
+          "match": "\\b(bg|fg|text|border|icon|shadow|font|weight|italic|text-size|padding|spacing|header-height|corner-radius|bracket)\\s*(:)",
           "captures": {
             "1": { "name": "entity.other.attribute-name.style.nowline" },
             "2": { "name": "punctuation.separator.key-value.nowline" }
@@ -78,7 +78,7 @@
         },
         {
           "name": "constant.language.enum.nowline",
-          "match": "\\b(solid|dashed|dotted|subtle|fuzzy|hard|sans|serif|mono|thin|light|normal|bold|true|false|none|xs|sm|md|lg|xl|full)\\b"
+          "match": "\\b(solid|dashed|dotted|subtle|fuzzy|hard|sans|serif|mono|thin|light|normal|bold|true|false|none|xs|sm|md|lg|xl|full|business|full|custom|merge|ignore|isolate)\\b"
         }
       ]
     },
@@ -124,7 +124,7 @@
       "patterns": [
         {
           "name": "constant.numeric.duration.nowline",
-          "match": "\\b\\d+[dwmy]\\b"
+          "match": "\\b\\d+[dwmqy]\\b"
         },
         {
           "name": "constant.numeric.percentage.nowline",

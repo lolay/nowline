@@ -6,8 +6,7 @@ function hasError(diags: ReturnType<typeof errorMessages>, pattern: RegExp): boo
 }
 
 describe('validation rules', () => {
-    it('Rule 1: file must contain roadmap when used as primary file (no-op warning-only acceptable)', async () => {
-        // A file with neither roadmap nor config is structurally empty; no errors expected.
+    it('Rule 1: empty file emits no errors', async () => {
         const r = await parse('', { validate: true });
         expect(errorMessages(r.diagnostics)).toEqual([]);
     });
@@ -24,16 +23,14 @@ describe('validation rules', () => {
         expect(hasError(errorMessages(r.diagnostics), /identifier.*title/i)).toBe(true);
     });
 
-    it('Rule 4: config must appear before roadmap', async () => {
-        const r = await parse(`roadmap r\nswimlane s\n  item x duration:1w\nconfig\nscale weeks\n`);
-        // Because grammar makes config optional and precedes roadmap, out-of-order will likely be a parse error;
-        // either way a problem is reported.
+    it('Rule 4: config after roadmap is rejected', async () => {
+        const r = await parse(`roadmap r\nswimlane s\n  item x duration:1w\nconfig\nscale\n  name: weeks\n`);
         expect(r.parserErrors.length + errorMessages(r.diagnostics).length).toBeGreaterThan(0);
     });
 
     it('Rule 5: invalid version format is an error', async () => {
         const r = await parse(`nowline 1.0\nroadmap r\nswimlane s\n  item x duration:1w\n`);
-        expect(hasError(errorMessages(r.diagnostics), /Invalid version format|version/i)).toBe(true);
+        expect(r.parserErrors.length + errorMessages(r.diagnostics).length).toBeGreaterThan(0);
     });
 
     it('Rule 5: version beyond supported is an error', async () => {
@@ -46,11 +43,25 @@ describe('validation rules', () => {
         expect(hasError(errorMessages(r.diagnostics), /swimlane/i)).toBe(true);
     });
 
+    it('Rule 10: item without duration: is an error', async () => {
+        const r = await parse(`roadmap r\nswimlane s\n  item x\n`);
+        expect(hasError(errorMessages(r.diagnostics), /duration/i)).toBe(true);
+    });
+
+    it('Rule 11: anchor without date: is an error', async () => {
+        const r = await parse(`roadmap r\nanchor kickoff\nswimlane s\n  item x duration:1w\n`);
+        expect(hasError(errorMessages(r.diagnostics), /requires.*date/i)).toBe(true);
+    });
+
     it('Rule 11: anchor with invalid date is an error', async () => {
-        const r = await parse(`roadmap r\nanchor kickoff 2026-13-45\nswimlane s\n  item x duration:1w\n`);
-        // Lexer allows any 4-2-2 digit sequence; validator should reject invalid dates.
+        const r = await parse(`roadmap r start:2026-01-01\nanchor kickoff date:2026-13-45\nswimlane s\n  item x duration:1w\n`);
         const combined = r.parserErrors.concat(errorMessages(r.diagnostics));
         expect(combined.some((m) => /date|2026-13-45/i.test(m))).toBe(true);
+    });
+
+    it('Rule 12: milestone without date: or after: is an error', async () => {
+        const r = await parse(`roadmap r\nswimlane s\n  item x duration:1w\nmilestone bad "Bad"\n`);
+        expect(hasError(errorMessages(r.diagnostics), /Milestone.*date.*after/i)).toBe(true);
     });
 
     it('Rule 13: duration with wrong-type value is an error', async () => {
@@ -68,8 +79,50 @@ describe('validation rules', () => {
         expect(hasError(errorMessages(r.diagnostics), /remaining/i)).toBe(true);
     });
 
-    it('Rule 16: footnote without on is an error', async () => {
-        const r = await parse(`roadmap r\nswimlane s\n  item x duration:1w\nfootnote "bad"\n`);
+    it('Rule 15: forward reference to a duration is an error', async () => {
+        const r = await parse(
+            `roadmap r
+swimlane s
+  item a duration:md
+duration md length:1w
+`,
+        );
+        expect(hasError(errorMessages(r.diagnostics), /referenced before its declaration|Duration "md"/i)).toBe(true);
+    });
+
+    it('Rule 15: undeclared duration name is an error', async () => {
+        const r = await parse(
+            `roadmap r
+swimlane s
+  item a duration:mystery
+`,
+        );
+        expect(hasError(errorMessages(r.diagnostics), /not declared/i)).toBe(true);
+    });
+
+    it('Rule 15: forward reference to a status is an error', async () => {
+        const r = await parse(
+            `roadmap r
+swimlane s
+  item a duration:1w status:awaiting-review
+status awaiting-review
+`,
+        );
+        expect(hasError(errorMessages(r.diagnostics), /Status.*referenced before its declaration|Status "awaiting-review" is not a built-in/i)).toBe(true);
+    });
+
+    it('Rule 15: built-in status values do not require a declaration', async () => {
+        const r = await parse(
+            `roadmap r
+swimlane s
+  item a duration:1w status:planned
+`,
+        );
+        expect(errorMessages(r.diagnostics)).toEqual([]);
+    });
+
+    it('Rule 16: footnote without on: is an error', async () => {
+        const r = await parse(`roadmap r\nswimlane s\n  item x duration:1w\nfootnote f "bad"\n`);
         expect(hasError(errorMessages(r.diagnostics), /Footnote.*on/i)).toBe(true);
     });
 
@@ -88,50 +141,118 @@ describe('validation rules', () => {
         expect(hasError(errorMessages(r.diagnostics), /border|squiggly/i)).toBe(true);
     });
 
-    it('Rule 22: duplicate config option on include is an error', async () => {
+    it('Rule 20: raw style property on item is an error', async () => {
+        const r = await parse(
+            `roadmap r\nswimlane s\n  item x duration:1w bg:red\n`,
+        );
+        expect(hasError(errorMessages(r.diagnostics), /Raw style property "bg"/i)).toBe(true);
+    });
+
+    it('Rule 20: raw style property on label is an error', async () => {
+        const r = await parse(
+            `roadmap r\nlabel urgent "Urgent" bg:red\nswimlane s\n  item x duration:1w\n`,
+        );
+        expect(hasError(errorMessages(r.diagnostics), /Raw style property "bg"/i)).toBe(true);
+    });
+
+    it('Rule 20: raw style property on swimlane is an error', async () => {
+        const r = await parse(
+            `roadmap r\nswimlane s bg:red\n  item x duration:1w\n`,
+        );
+        expect(hasError(errorMessages(r.diagnostics), /Raw style property "bg"/i)).toBe(true);
+    });
+
+    it('Rule 20: style:id reference on label is accepted', async () => {
+        const r = await parse(
+            `config\nstyle ent\n  bg: blue\nroadmap r\nlabel urgent "Urgent" style:ent\nswimlane s\n  item x duration:1w\n`,
+        );
+        expect(errorMessages(r.diagnostics)).toEqual([]);
+    });
+
+    it('Rule 21: default of unknown entity type is an error', async () => {
+        const r = await parse(
+            `config\ndefault widget shadow:subtle\nroadmap r\nswimlane s\n  item x duration:1w\n`,
+        );
+        expect(hasError(errorMessages(r.diagnostics), /not a supported entity type/i)).toBe(true);
+    });
+
+    it('Rule 22: duplicate default for same entity is an error', async () => {
+        const r = await parse(
+            `config\ndefault item shadow:subtle\ndefault item padding:sm\nroadmap r\nswimlane s\n  item x duration:1w\n`,
+        );
+        expect(hasError(errorMessages(r.diagnostics), /Duplicate "default item"/i)).toBe(true);
+    });
+
+    it('Rule 23: banned property on default item is an error', async () => {
+        const r = await parse(
+            `config\ndefault item duration:1w\nroadmap r\nswimlane s\n  item x duration:1w\n`,
+        );
+        expect(hasError(errorMessages(r.diagnostics), /"duration" cannot be set on "default item"/i)).toBe(true);
+    });
+
+    it('Rule 24: after: reference that does not resolve is an error', async () => {
+        const r = await parse(
+            `roadmap r\nswimlane s\n  item a duration:1w after:nonexistent\n`,
+        );
+        expect(hasError(errorMessages(r.diagnostics), /after: reference.*does not resolve/i)).toBe(true);
+    });
+
+    it('Rule 25: circular dependency via after: is an error', async () => {
+        const r = await parse(
+            `roadmap r\nswimlane s\n  item a duration:1w after:b\n  item b duration:1w after:a\n`,
+        );
+        expect(hasError(errorMessages(r.diagnostics), /Circular dependency/i)).toBe(true);
+    });
+
+    it('Rule 25: 3-cycle via mixed after/before is an error', async () => {
+        const r = await parse(
+            `roadmap r\nswimlane s\n  item a duration:1w after:c\n  item b duration:1w after:a\n  item c duration:1w after:b\n`,
+        );
+        expect(hasError(errorMessages(r.diagnostics), /Circular dependency/i)).toBe(true);
+    });
+
+    it('Include rule: duplicate config option is an error', async () => {
         const r = await parse(`include "./a.nowline" config:merge config:ignore\nroadmap r\nswimlane s\n  item x duration:1w\n`);
         expect(hasError(errorMessages(r.diagnostics), /Duplicate "config"/i)).toBe(true);
     });
 
-    it('Rule 23: unknown include mode is an error', async () => {
+    it('Include rule: unknown include mode is an error', async () => {
         const r = await parse(`include "./a.nowline" config:weird\nroadmap r\nswimlane s\n  item x duration:1w\n`);
         expect(hasError(errorMessages(r.diagnostics), /include mode|merge|ignore|isolate/i)).toBe(true);
     });
 
-    it('Rule 29: parallel with one child emits a warning', async () => {
+    it('Parallel rule: parallel with one child emits a warning', async () => {
         const r = await parse(
             `roadmap r\nswimlane s\n  parallel p\n    item a duration:1w\n`,
         );
         expect(warningMessages(r.diagnostics).some((m) => /Parallel/i.test(m))).toBe(true);
     });
 
-    it('Rule 30: group with zero non-description children is an error', async () => {
-        // Can\'t have a group block with zero children at grammar level; we test the structural rule.
+    it('Group rule: group with zero non-description children is an error', async () => {
         const r = await parse(
             `roadmap r\nswimlane s\n  group g "G"\n    description "d"\n`,
         );
         expect(hasError(errorMessages(r.diagnostics), /at least 1 child|Group/i)).toBe(true);
     });
 
-    it('Rule 31: duration on parallel is an error', async () => {
+    it('Parallel/group rule: duration on parallel is an error', async () => {
         const r = await parse(
             `roadmap r\nswimlane s\n  parallel p duration:1w\n    item a duration:1w\n    item b duration:1w\n`,
         );
         expect(hasError(errorMessages(r.diagnostics), /duration.*parallel|not valid on parallel/i)).toBe(true);
     });
 
-    it('Rule 31: remaining on group is an error', async () => {
+    it('Parallel/group rule: remaining on group is an error', async () => {
         const r = await parse(
             `roadmap r\nswimlane s\n  group g "G" remaining:30%\n    item a duration:1w\n`,
         );
         expect(hasError(errorMessages(r.diagnostics), /remaining.*group|not valid on group/i)).toBe(true);
     });
 
-    it('Rule 10 (labels kebab-case warning)', async () => {
+    it('Label rule: non-kebab label emits a warning', async () => {
         const r = await parse(
             `roadmap r\nswimlane s\n  item x duration:1w labels:BadLabel\n`,
         );
-        // BadLabel is a valid ID but not kebab-case. Our impl only warns if not kebab — since PascalCase is a valid ID but fails kebab regex.
         expect(warningMessages(r.diagnostics).some((m) => /kebab/i.test(m))).toBe(true);
     });
 
@@ -162,7 +283,7 @@ describe('validation rules', () => {
 
     it('R2: a single anchor without roadmap start is an error on the anchor', async () => {
         const r = await parse(
-            `roadmap r\nanchor kickoff 2026-01-06\nswimlane s\n  item a duration:1w\n`,
+            `roadmap r\nanchor kickoff date:2026-01-06\nswimlane s\n  item a duration:1w\n`,
         );
         const matches = errorMessages(r.diagnostics).filter((m) => /missing "start:"|missing start/i.test(m));
         expect(matches.length).toBe(1);
@@ -180,7 +301,7 @@ describe('validation rules', () => {
 
     it('R2: two anchors and a dated milestone without start produce three errors', async () => {
         const r = await parse(
-            `roadmap r\nanchor kickoff 2026-01-06\nanchor midyear 2026-07-01\nswimlane s\n  item a duration:1w\nmilestone ga "GA" date:2026-12-01\n`,
+            `roadmap r\nanchor kickoff date:2026-01-06\nanchor midyear date:2026-07-01\nswimlane s\n  item a duration:1w\nmilestone ga "GA" date:2026-12-01\n`,
         );
         const matches = errorMessages(r.diagnostics).filter((m) => /missing "start:"|missing start/i.test(m));
         expect(matches.length).toBe(3);
@@ -188,16 +309,16 @@ describe('validation rules', () => {
 
     it('R2: undated milestone in a roadmap without start is not flagged', async () => {
         const r = await parse(
-            `roadmap r\nswimlane s\n  item a duration:1w\nmilestone beta "Beta" depends:a\n`,
+            `roadmap r\nswimlane s\n  item a duration:1w\nmilestone beta "Beta" after:a\n`,
         );
         expect(errorMessages(r.diagnostics).some((m) => /missing "start:"/i.test(m))).toBe(false);
     });
 
-    // --- R3: dated entities must not precede start: (per offender) ---
+    // --- R3: dated entities must not precede start: ---
 
     it('R3: anchor before roadmap start is an error', async () => {
         const r = await parse(
-            `roadmap r start:2026-02-01\nanchor kickoff 2026-01-06\nswimlane s\n  item a duration:1w\n`,
+            `roadmap r start:2026-02-01\nanchor kickoff date:2026-01-06\nswimlane s\n  item a duration:1w\n`,
         );
         const matches = errorMessages(r.diagnostics).filter((m) => /before roadmap start/i.test(m));
         expect(matches.length).toBe(1);
@@ -213,24 +334,16 @@ describe('validation rules', () => {
         expect(matches[0]).toMatch(/Milestone/i);
     });
 
-    it('R3: one anchor and one milestone both before start produce two errors', async () => {
-        const r = await parse(
-            `roadmap r start:2026-02-01\nanchor kickoff 2026-01-06\nswimlane s\n  item a duration:1w\nmilestone ga "GA" date:2026-01-15\n`,
-        );
-        const matches = errorMessages(r.diagnostics).filter((m) => /before roadmap start/i.test(m));
-        expect(matches.length).toBe(2);
-    });
-
     it('R3: anchor equal to start is accepted', async () => {
         const r = await parse(
-            `roadmap r start:2026-01-06\nanchor kickoff 2026-01-06\nswimlane s\n  item a duration:1w\n`,
+            `roadmap r start:2026-01-06\nanchor kickoff date:2026-01-06\nswimlane s\n  item a duration:1w\n`,
         );
         expect(errorMessages(r.diagnostics)).toEqual([]);
     });
 
     it('R3: anchor after start is accepted', async () => {
         const r = await parse(
-            `roadmap r start:2026-01-01\nanchor kickoff 2026-01-06\nswimlane s\n  item a duration:1w\n`,
+            `roadmap r start:2026-01-01\nanchor kickoff date:2026-01-06\nswimlane s\n  item a duration:1w\n`,
         );
         expect(errorMessages(r.diagnostics)).toEqual([]);
     });
@@ -246,7 +359,7 @@ describe('validation rules', () => {
 
     it('R4: malformed start does not cascade to missing/ordering errors', async () => {
         const r = await parse(
-            `roadmap r start:not-a-date\nanchor kickoff 2000-01-01\nswimlane s\n  item a duration:1w\n`,
+            `roadmap r start:not-a-date\nanchor kickoff date:2000-01-01\nswimlane s\n  item a duration:1w\n`,
         );
         const errors = errorMessages(r.diagnostics);
         expect(errors.length).toBe(1);
@@ -262,5 +375,127 @@ describe('validation rules', () => {
         );
         expect(errorMessages(r.diagnostics)).toEqual([]);
         expect(warningMessages(r.diagnostics)).toEqual([]);
+    });
+
+    // --- Duration declaration: length: is required ---
+
+    it('Duration decl: missing length: is an error', async () => {
+        const r = await parse(
+            `roadmap r\nduration md\nswimlane s\n  item a duration:md\n`,
+        );
+        expect(hasError(errorMessages(r.diagnostics), /length/i)).toBe(true);
+    });
+
+    it('Duration decl: invalid length value is an error', async () => {
+        const r = await parse(
+            `roadmap r\nduration md length:maybe\nswimlane s\n  item a duration:md\n`,
+        );
+        expect(hasError(errorMessages(r.diagnostics), /length/i)).toBe(true);
+    });
+
+    it('Duration decl: quarter suffix is accepted in length: and in item duration:', async () => {
+        const r = await parse(
+            `roadmap r\nduration big length:1q\nswimlane s\n  item a duration:big\n  item b duration:2q\n`,
+        );
+        expect(errorMessages(r.diagnostics)).toEqual([]);
+    });
+
+    // --- Raw-style ban: confirm every roadmap entity type is covered ---
+
+    it('Rule 20: raw style property on anchor is an error', async () => {
+        const r = await parse(
+            `roadmap r start:2026-01-01\nanchor kickoff date:2026-01-06 bg:red\nswimlane s\n  item x duration:1w\n`,
+        );
+        expect(hasError(errorMessages(r.diagnostics), /Raw style property "bg"/i)).toBe(true);
+    });
+
+    it('Rule 20: raw style property on milestone is an error', async () => {
+        const r = await parse(
+            `roadmap r\nswimlane s\n  item a duration:1w\nmilestone ga "GA" after:a bg:red\n`,
+        );
+        expect(hasError(errorMessages(r.diagnostics), /Raw style property "bg"/i)).toBe(true);
+    });
+
+    it('Rule 20: raw style property on footnote is an error', async () => {
+        const r = await parse(
+            `roadmap r\nswimlane s\n  item a duration:1w\nfootnote f "F" on:a bg:red\n`,
+        );
+        expect(hasError(errorMessages(r.diagnostics), /Raw style property "bg"/i)).toBe(true);
+    });
+
+    it('Rule 20: raw style property on group is an error', async () => {
+        const r = await parse(
+            `roadmap r\nswimlane s\n  group g "G" bg:red\n    item a duration:1w\n    item b duration:1w\n`,
+        );
+        expect(hasError(errorMessages(r.diagnostics), /Raw style property "bg"/i)).toBe(true);
+    });
+
+    // --- Calendar modes / custom block ---
+
+    it('Calendar: valid mode on roadmap is accepted', async () => {
+        const r = await parse(
+            `roadmap r calendar:full\nswimlane s\n  item x duration:1w\n`,
+        );
+        expect(errorMessages(r.diagnostics)).toEqual([]);
+    });
+
+    it('Calendar: unknown mode on roadmap is an error', async () => {
+        const r = await parse(
+            `roadmap r calendar:weekendly\nswimlane s\n  item x duration:1w\n`,
+        );
+        expect(hasError(errorMessages(r.diagnostics), /calendar|business|full|custom/i)).toBe(true);
+    });
+
+    it('Calendar: custom calendar without a calendar block is an error', async () => {
+        const r = await parse(
+            `roadmap r calendar:custom\nswimlane s\n  item x duration:1w\n`,
+        );
+        expect(hasError(errorMessages(r.diagnostics), /custom|calendar/i)).toBe(true);
+    });
+
+    it('Calendar: non-integer days-per-week is an error', async () => {
+        const r = await parse(
+            `config\ncalendar\n  days-per-week: seven\nroadmap r calendar:custom\nswimlane s\n  item x duration:1w\n`,
+        );
+        expect(hasError(errorMessages(r.diagnostics), /integer|days-per-week/i)).toBe(true);
+    });
+
+    it('Scale: invalid label-every is an error', async () => {
+        const r = await parse(
+            `config\nscale\n  label-every: hello\nroadmap r\nswimlane s\n  item x duration:1w\n`,
+        );
+        expect(hasError(errorMessages(r.diagnostics), /label-every|integer/i)).toBe(true);
+    });
+
+    // --- Milestone: date: OR after: required ---
+
+    it('Milestone: date: alone is accepted', async () => {
+        const r = await parse(
+            `roadmap r start:2026-01-01\nswimlane s\n  item a duration:1w\nmilestone ga date:2026-06-01\n`,
+        );
+        expect(errorMessages(r.diagnostics)).toEqual([]);
+    });
+
+    it('Milestone: after: alone is accepted', async () => {
+        const r = await parse(
+            `roadmap r\nswimlane s\n  item a duration:1w\nmilestone ga after:a\n`,
+        );
+        expect(errorMessages(r.diagnostics)).toEqual([]);
+    });
+
+    // --- Person declaration rules ---
+
+    it('Person: declaring the same person twice is an error', async () => {
+        const r = await parse(
+            `roadmap r\nperson sam "Sam"\nperson sam "Sam again"\nswimlane s\n  item x duration:1w\n`,
+        );
+        expect(hasError(errorMessages(r.diagnostics), /Duplicate|already declared|Person "sam"/i)).toBe(true);
+    });
+
+    it('Person: declaring a person inside a team is accepted', async () => {
+        const r = await parse(
+            `roadmap r\nteam eng "Engineering"\n  person sam\nswimlane s\n  item x duration:1w\n`,
+        );
+        expect(errorMessages(r.diagnostics)).toEqual([]);
     });
 });

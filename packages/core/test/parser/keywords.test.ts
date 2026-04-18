@@ -2,58 +2,58 @@ import { describe, it, expect } from 'vitest';
 import { parse } from '../helpers.js';
 
 describe('every keyword', () => {
-    it('parses anchor with bare id + date', async () => {
-        const r = await parse(`roadmap r
-anchor kickoff 2026-01-06
+    it('parses anchor with bare id + date:', async () => {
+        const r = await parse(`roadmap r start:2026-01-01
+anchor kickoff date:2026-01-06
 swimlane s
-  item x
+  item x duration:1w
 `, { validate: false });
         expect(r.parserErrors).toEqual([]);
     });
 
-    it('parses anchor with title + date', async () => {
-        const r = await parse(`roadmap r
-anchor kickoff "Kickoff" 2026-01-06
+    it('parses anchor with title + date:', async () => {
+        const r = await parse(`roadmap r start:2026-01-01
+anchor kickoff "Kickoff" date:2026-01-06
 swimlane s
-  item x
+  item x duration:1w
 `, { validate: false });
         expect(r.parserErrors).toEqual([]);
     });
 
-    it('parses milestone without date', async () => {
+    it('parses milestone with after:', async () => {
         const r = await parse(`roadmap r
 swimlane s
-  item x
-milestone beta "Beta" depends:x
+  item x duration:1w
+milestone beta "Beta" after:x
 `, { validate: false });
         expect(r.parserErrors).toEqual([]);
     });
 
-    it('parses milestone with date and multiple depends', async () => {
-        const r = await parse(`roadmap r
+    it('parses milestone with date and multiple after:', async () => {
+        const r = await parse(`roadmap r start:2026-01-01
 swimlane s
-  item x
-  item y
-milestone ga "GA" date:2026-06-01 depends:[x, y]
+  item x duration:1w
+  item y duration:1w
+milestone ga "GA" date:2026-06-01 after:[x, y]
 `, { validate: false });
         expect(r.parserErrors).toEqual([]);
     });
 
-    it('parses footnote with single on', async () => {
+    it('parses footnote with single on:', async () => {
         const r = await parse(`roadmap r
 swimlane s
-  item x
-footnote "Note" on:x
+  item x duration:1w
+footnote note "Note" on:x
 `, { validate: false });
         expect(r.parserErrors).toEqual([]);
     });
 
-    it('parses footnote with multiple on', async () => {
+    it('parses footnote with multiple on:', async () => {
         const r = await parse(`roadmap r
 swimlane s
-  item x
-  item y
-footnote "Note" on:[x, y]
+  item x duration:1w
+  item y duration:1w
+footnote note "Note" on:[x, y]
 `, { validate: false });
         expect(r.parserErrors).toEqual([]);
     });
@@ -97,27 +97,41 @@ team eng "Engineering"
     person sam
   team mobile "Mobile"
 swimlane s
-  item x
+  item x duration:1w
 `, { validate: false });
         expect(r.parserErrors).toEqual([]);
     });
 
     it('parses nowline directive variants', async () => {
         for (const version of ['v1', 'v2', 'v10']) {
-            const r = await parse(`nowline ${version}\nroadmap r\nswimlane s\n  item x\n`, { validate: false });
+            const r = await parse(`nowline ${version}\nroadmap r\nswimlane s\n  item x duration:1w\n`, { validate: false });
             expect(r.parserErrors).toEqual([]);
             expect(r.ast.directive?.version).toBe(version);
         }
     });
 
-    it('parses unit and estimates declarations', async () => {
+    it('parses scale block', async () => {
         const r = await parse(`config
-scale weeks
-unit sprints = 2w
-estimates xs=1d s=3d m=1w l=2w xl=1m
+scale
+  name: weeks
+  label-every: 2
 roadmap r
 swimlane s
-  item x
+  item x duration:1w
+`, { validate: false });
+        expect(r.parserErrors).toEqual([]);
+    });
+
+    it('parses calendar block', async () => {
+        const r = await parse(`config
+calendar
+  days-per-week: 5
+  days-per-month: 22
+  days-per-quarter: 65
+  days-per-year: 260
+roadmap r calendar:custom
+swimlane s
+  item x duration:1w
 `, { validate: false });
         expect(r.parserErrors).toEqual([]);
     });
@@ -130,19 +144,29 @@ style enterprise "Enterprise"
   border: solid
 roadmap r
 swimlane s
-  item x
+  item x duration:1w
 `, { validate: false });
         expect(r.parserErrors).toEqual([]);
     });
 
-    it('parses defaults block', async () => {
+    it('parses flat default declarations', async () => {
         const r = await parse(`config
-defaults
-  item duration:m status:planned
-  swimlane padding:sm
+default item shadow:subtle
+default swimlane padding:sm
 roadmap r
 swimlane s
-  item x
+  item x duration:1w
+`, { validate: false });
+        expect(r.parserErrors).toEqual([]);
+    });
+
+    it('parses roadmap-section duration/status/label declarations', async () => {
+        const r = await parse(`roadmap r
+duration xs length:1d
+status awaiting-review
+label security "Security"
+swimlane s
+  item x duration:xs status:awaiting-review labels:security
 `, { validate: false });
         expect(r.parserErrors).toEqual([]);
     });

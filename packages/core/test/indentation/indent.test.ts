@@ -25,7 +25,7 @@ describe('indentation', () => {
 
     it('handles multiple DEDENTs at once (deeply nested to top-level)', async () => {
         const r = await parse(
-            `roadmap r\nswimlane s\n  parallel p\n    group g\n      item a duration:1w\n      item b duration:1w\nmilestone m "M" depends:a\n`,
+            `roadmap r\nswimlane s\n  parallel p\n    group g\n      item a duration:1w\n      item b duration:1w\nmilestone m "M" after:a\n`,
             { validate: false },
         );
         expect(r.parserErrors).toEqual([]);

@@ -3,10 +3,14 @@ import type {
     LangiumCoreServices,
     LangiumSharedCoreServices,
     PartialLangiumCoreServices,
+    CstNode,
+    GrammarAST,
+    ValueType,
 } from 'langium';
 import {
     createDefaultCoreModule,
     createDefaultSharedCoreModule,
+    DefaultValueConverter,
     EmptyFileSystem,
     inject,
     IndentationAwareTokenBuilder,
@@ -18,6 +22,24 @@ import {
 } from '../generated/module.js';
 import type { NowlineTerminalNames, NowlineKeywordNames, NowlineAstType } from '../generated/ast.js';
 import { NowlineValidator, registerValidationChecks } from './nowline-validator.js';
+
+// Strip trailing ':' from property key tokens so AST nodes carry clean keys
+// (e.g. `duration` instead of `duration:`). The grammar uses a single key-with-colon
+// terminal to resolve lexer ambiguity between bare keywords like `duration` and
+// property keys like `duration:`; this converter keeps that token-level workaround
+// out of the AST surface.
+class NowlinePropertyKeyValueConverter extends DefaultValueConverter {
+    protected override runConverter(
+        rule: GrammarAST.AbstractRule,
+        input: string,
+        cstNode: CstNode,
+    ): ValueType {
+        if (rule.name === 'PROPERTY_KEY_WITH_COLON' || rule.name === 'INCLUDE_OPTION_KEY') {
+            return input.endsWith(':') ? input.slice(0, -1) : input;
+        }
+        return super.runConverter(rule, input, cstNode);
+    }
+}
 
 export type NowlineAddedServices = {
     validation: {
@@ -42,6 +64,7 @@ export const NowlineModule: Module<NowlineServices, PartialLangiumCoreServices &
         ParserConfig: () => ({
             maxLookahead: 4,
         }),
+        ValueConverter: () => new NowlinePropertyKeyValueConverter(),
     },
     validation: {
         NowlineValidator: () => new NowlineValidator(),

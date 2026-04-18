@@ -40,7 +40,7 @@ describe('include resolver', () => {
     it('ignores config and roadmap when mode:ignore', async () => {
         const files = {
             'main.nowline': `include "./a.nowline" config:ignore roadmap:ignore\nroadmap r "R"\nswimlane s\n  item x duration:1w\n`,
-            'a.nowline': `config\nscale weeks\nroadmap r2 "Child"\nperson sam "Sam"\n`,
+            'a.nowline': `config\nscale\n  name: weeks\nroadmap r2 "Child"\nperson sam "Sam"\n`,
         };
         const { Nowline } = getServices();
         const main = await parseAtPath(files['main.nowline'], '/root/main.nowline');

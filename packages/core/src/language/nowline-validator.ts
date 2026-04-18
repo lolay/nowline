@@ -19,12 +19,19 @@ import type {
     StyleDeclaration,
     StyleProperty,
     LabelDeclaration,
-    DefaultsEntry,
+    DurationDeclaration,
+    StatusDeclaration,
+    DefaultDeclaration,
+    CalendarBlock,
+    ScaleBlock,
+    BlockProperty,
     RoadmapEntry,
     ConfigEntry,
     SwimlaneContent,
     GroupContent,
     ParallelContent,
+    TeamContent,
+    DefaultEntityType,
 } from '../generated/ast.js';
 import {
     isItemDeclaration,
@@ -41,6 +48,10 @@ import {
     isStyleDeclaration,
     isStatusDeclaration,
     isLabelDeclaration,
+    isDurationDeclaration,
+    isScaleBlock,
+    isCalendarBlock,
+    isDefaultDeclaration,
 } from '../generated/ast.js';
 
 const SUPPORTED_VERSION = 'v1';
@@ -53,12 +64,10 @@ const BUILTIN_STATUSES = new Set([
     'blocked',
 ]);
 
-const BUILTIN_SCALES = new Set([
-    'days',
-    'weeks',
-    'months',
-    'quarters',
-    'years',
+const STYLE_PROP_KEYS = new Set([
+    'bg', 'fg', 'text', 'border', 'icon', 'shadow', 'font', 'weight',
+    'italic', 'text-size', 'padding', 'spacing', 'header-height',
+    'corner-radius', 'bracket',
 ]);
 
 const STYLE_PROP_ENUMS: Record<string, Set<string>> = {
@@ -80,12 +89,47 @@ const COLOR_NAMES = new Set([
     'gray', 'navy', 'white', 'none',
 ]);
 
-const DURATION_RE = /^\d+[dwmy]$/;
+const CALENDAR_MODES = new Set(['business', 'full', 'custom']);
+
+const CALENDAR_FIELDS = new Set([
+    'days-per-week',
+    'days-per-month',
+    'days-per-quarter',
+    'days-per-year',
+]);
+
+const SCALE_FIELDS = new Set(['name', 'label-every', 'label']);
+
+const DEFAULT_ENTITY_TYPES = new Set([
+    'item', 'label', 'swimlane', 'roadmap', 'milestone',
+    'footnote', 'anchor', 'parallel', 'group',
+]);
+
+// Banned properties per entity type on `default <entity>` lines.
+const DEFAULT_BANNED: Record<DefaultEntityType, Set<string>> = {
+    item: new Set(['duration', 'after', 'before', 'remaining', 'link', 'description', 'owner']),
+    milestone: new Set(['date', 'after', 'link', 'description']),
+    anchor: new Set(['date', 'link', 'description']),
+    footnote: new Set(['on', 'link', 'description']),
+    label: new Set(['link', 'description']),
+    swimlane: new Set(),
+    roadmap: new Set(),
+    parallel: new Set(),
+    group: new Set(),
+};
+
+function propKey(prop: { key: string }): string {
+    return prop.key.endsWith(':') ? prop.key.slice(0, -1) : prop.key;
+}
+
+const DURATION_RE = /^\d+[dwmqy]$/;
 const PERCENTAGE_RE = /^\d+%$/;
 const DATE_RE = /^\d{4}-\d{2}-\d{2}$/;
 const HEX_COLOR_RE = /^#[0-9a-fA-F]{3,8}$/;
 const VERSION_RE = /^v\d+$/;
 const KEBAB_RE = /^[a-z][a-z0-9]*(-[a-z0-9]+)*$/;
+const INTEGER_RE = /^\d+$/;
+const BARE_DURATION_SUFFIX_RE = /^[dwmqy]$/;
 
 const INCLUDE_MODES = new Set(['merge', 'ignore', 'isolate']);
 
@@ -95,7 +139,7 @@ type StartState =
     | { kind: 'missing' };
 
 function resolveLocalStart(file: NowlineFile | undefined): StartState {
-    const prop = file?.roadmapDecl?.properties.find((p) => p.key === 'start');
+    const prop = file?.roadmapDecl?.properties.find((p) => propKey(p) === 'start');
     if (!prop) return { kind: 'missing' };
     const raw = prop.value;
     if (!raw || !DATE_RE.test(raw)) return { kind: 'invalid' };
@@ -117,53 +161,93 @@ export function registerValidationChecks(services: NowlineServices): void {
             validator.checkUniqueIdentifiers,
             validator.checkSwimlaneRequired,
             validator.checkIndentationConsistency,
+            validator.checkRoadmapOnlyKeywordsPosition,
+            validator.checkForwardReferences,
+            validator.checkReferenceResolution,
+            validator.checkCircularDependencies,
+            validator.checkDuplicateDurationIds,
+            validator.checkCalendarBlockConsistency,
+            validator.checkPersonDeclarations,
         ],
         NowlineDirective: [validator.checkDirectiveVersion],
         IncludeOption: [validator.checkIncludeMode],
         IncludeDeclaration: [validator.checkIncludeDuplicateOptions],
         EntityProperty: [validator.checkPropertyValues],
-        RoadmapDeclaration: [validator.checkEntityIdOrTitle],
+        RoadmapDeclaration: [
+            validator.checkEntityIdOrTitle,
+            validator.checkRoadmapProperties,
+            validator.checkNoRawStyleProperties,
+        ],
         AnchorDeclaration: [
             validator.checkEntityIdOrTitle,
-            validator.checkAnchorDate,
+            validator.checkAnchorRequiredDate,
             validator.checkAnchorAgainstStart,
+            validator.checkNoRawStyleProperties,
         ],
-        SwimlaneDeclaration: [validator.checkEntityIdOrTitle],
+        SwimlaneDeclaration: [
+            validator.checkEntityIdOrTitle,
+            validator.checkNoRawStyleProperties,
+        ],
         ItemDeclaration: [
             validator.checkEntityIdOrTitle,
-            validator.checkItemProperties,
+            validator.checkItemRequiredDuration,
+            validator.checkNoRawStyleProperties,
         ],
         ParallelBlock: [
             validator.checkParallelMinChildren,
             validator.checkNoComputedProperties,
+            validator.checkNoRawStyleProperties,
         ],
         GroupBlock: [
             validator.checkGroupMinChildren,
             validator.checkNoComputedProperties,
+            validator.checkNoRawStyleProperties,
         ],
         MilestoneDeclaration: [
             validator.checkEntityIdOrTitle,
+            validator.checkMilestoneRequirement,
             validator.checkMilestoneAgainstStart,
+            validator.checkNoRawStyleProperties,
         ],
         FootnoteDeclaration: [
             validator.checkEntityIdOrTitle,
             validator.checkFootnoteOn,
+            validator.checkNoRawStyleProperties,
         ],
-        PersonDeclaration: [validator.checkEntityIdOrTitle],
-        TeamDeclaration: [validator.checkEntityIdOrTitle],
-        StyleDeclaration: [
+        PersonDeclaration: [
             validator.checkEntityIdOrTitle,
-            validator.checkStylePropertyValues,
+            validator.checkNoRawStyleProperties,
         ],
+        TeamDeclaration: [
+            validator.checkEntityIdOrTitle,
+            validator.checkNoRawStyleProperties,
+        ],
+        StyleDeclaration: [validator.checkEntityIdOrTitle],
         StyleProperty: [validator.checkStylePropertyEnum],
-        LabelDeclaration: [validator.checkEntityIdOrTitle],
+        LabelDeclaration: [
+            validator.checkEntityIdOrTitle,
+            validator.checkNoRawStyleProperties,
+        ],
+        DurationDeclaration: [
+            validator.checkEntityIdOrTitle,
+            validator.checkDurationDeclaration,
+            validator.checkNoRawStyleProperties,
+        ],
+        StatusDeclaration: [
+            validator.checkEntityIdOrTitle,
+            validator.checkStatusDeclaration,
+            validator.checkNoRawStyleProperties,
+        ],
+        DefaultDeclaration: [validator.checkDefaultDeclaration],
+        CalendarBlock: [validator.checkCalendarBlock],
+        ScaleBlock: [validator.checkScaleBlock],
     };
     registry.register(checks, validator);
 }
 
 export class NowlineValidator {
 
-    // --- Rule 4: Section order ---
+    // --- Structural Rule 4: Section order ---
     checkFileStructure(file: NowlineFile, accept: ValidationAcceptor): void {
         if (file.roadmapDecl && file.hasConfig) {
             const roadmapNode = file.roadmapDecl.$cstNode;
@@ -196,6 +280,14 @@ export class NowlineValidator {
                 }
             }
         }
+    }
+
+    // --- Structural Rules 8/9/10: label/duration/status must live in roadmap section ---
+    // Parser enforces this by construction (these keywords are only valid as RoadmapEntry),
+    // so we mainly need to forbid custom statuses referenced before their declaration (rule 15).
+    checkRoadmapOnlyKeywordsPosition(_file: NowlineFile, _accept: ValidationAcceptor): void {
+        // No-op: the grammar places label/duration/status under RoadmapEntry.
+        // Any attempt to declare them before `roadmap` surfaces as a parse error.
     }
 
     // --- Rule 5: Directive version ---
@@ -253,7 +345,7 @@ export class NowlineValidator {
         }
     }
 
-    // --- Rule 5: Mixed tabs and spaces in indentation ---
+    // --- Rule 7: Mixed tabs and spaces in indentation ---
     checkIndentationConsistency(file: NowlineFile, accept: ValidationAcceptor): void {
         const text = file.$document?.textDocument.getText() ?? file.$cstNode?.text;
         if (!text) return;
@@ -283,7 +375,7 @@ export class NowlineValidator {
         }
     }
 
-    // --- Rules 23-24: Include mode values ---
+    // --- Include rules 5/6: mode values ---
     checkIncludeMode(option: IncludeOption, accept: ValidationAcceptor): void {
         if (!INCLUDE_MODES.has(option.value)) {
             accept('error', `Invalid include mode "${option.value}". Must be merge, ignore, or isolate.`, {
@@ -293,7 +385,7 @@ export class NowlineValidator {
         }
     }
 
-    // --- Rule 22 (partial): Duplicate include options ---
+    // --- Include rule 4 (partial): Duplicate include options ---
     checkIncludeDuplicateOptions(inc: IncludeDeclaration, accept: ValidationAcceptor): void {
         const keys = new Set<string>();
         for (const opt of inc.options) {
@@ -305,23 +397,30 @@ export class NowlineValidator {
         }
     }
 
-    // --- Rules 11-18: Property value validation ---
+    // --- Property value validation (general) ---
     checkPropertyValues(prop: EntityProperty, accept: ValidationAcceptor): void {
-        const key = prop.key;
+        const key = propKey(prop);
         const val = prop.value;
         const vals = prop.values;
         const allValues = val ? [val] : vals;
 
         switch (key) {
             case 'status':
-                if (val && !BUILTIN_STATUSES.has(val)) {
-                    // Custom statuses validated later against config
-                }
+                // Forward/resolution validated at file scope (checkForwardReferences).
                 break;
 
             case 'duration':
                 if (val && !DURATION_RE.test(val) && !isIdentifier(val)) {
-                    accept('error', `Invalid duration "${val}". Use format like 2w, 3d, 1m or a config-defined name.`, {
+                    accept('error', `Invalid duration "${val}". Use format like 2w, 3d, 1m, 2q or a declared duration name.`, {
+                        node: prop,
+                        property: 'value',
+                    });
+                }
+                break;
+
+            case 'length':
+                if (val && !DURATION_RE.test(val)) {
+                    accept('error', `Invalid length "${val}". Use a raw duration literal like 2w, 3d, 1m, 2q.`, {
                         node: prop,
                         property: 'value',
                     });
@@ -358,6 +457,24 @@ export class NowlineValidator {
                 }
                 break;
 
+            case 'scale':
+                if (val && !DURATION_RE.test(val)) {
+                    accept('error', `Invalid scale "${val}". Use a raw duration literal like 1w, 2w, 1q (no name lookup).`, {
+                        node: prop,
+                        property: 'value',
+                    });
+                }
+                break;
+
+            case 'calendar':
+                if (val && !CALENDAR_MODES.has(val)) {
+                    accept('error', `Invalid calendar "${val}". Must be business, full, or custom.`, {
+                        node: prop,
+                        property: 'value',
+                    });
+                }
+                break;
+
             case 'labels':
                 for (const v of allValues) {
                     if (v && isIdentifier(v) && !KEBAB_RE.test(v)) {
@@ -369,7 +486,8 @@ export class NowlineValidator {
                 break;
 
             case 'on':
-            case 'depends':
+            case 'after':
+            case 'before':
                 if (allValues.length === 0) {
                     accept('error', `Property "${key}" requires at least one reference.`, {
                         node: prop,
@@ -378,49 +496,45 @@ export class NowlineValidator {
                 break;
 
             default:
-                if (key in STYLE_PROP_ENUMS) {
-                    const allowed = STYLE_PROP_ENUMS[key];
-                    if (val && !allowed.has(val) && !isColorValue(val)) {
-                        accept('error', `Invalid value "${val}" for "${key}". Allowed: ${[...allowed].join(', ')}.`, {
-                            node: prop,
-                            property: 'value',
-                        });
-                    }
-                }
-                if (key === 'bg' || key === 'fg' || key === 'text') {
-                    if (val && !isColorValue(val)) {
-                        accept('error', `Invalid color "${val}" for "${key}". Use a named color, hex value, or "none".`, {
-                            node: prop,
-                            property: 'value',
-                        });
+                if (STYLE_PROP_KEYS.has(key)) {
+                    if (key === 'bg' || key === 'fg' || key === 'text') {
+                        if (val && !isColorValue(val)) {
+                            accept('error', `Invalid color "${val}" for "${key}". Use a named color, hex value, or "none".`, {
+                                node: prop,
+                                property: 'value',
+                            });
+                        }
+                    } else if (key in STYLE_PROP_ENUMS) {
+                        const allowed = STYLE_PROP_ENUMS[key];
+                        if (val && !allowed.has(val) && !isColorValue(val)) {
+                            accept('error', `Invalid value "${val}" for "${key}". Allowed: ${[...allowed].join(', ')}.`, {
+                                node: prop,
+                                property: 'value',
+                            });
+                        }
                     }
                 }
                 break;
         }
     }
 
-    // --- Rule 11: Anchor dates ---
-    checkAnchorDate(anchor: AnchorDeclaration, accept: ValidationAcceptor): void {
-        if (!DATE_RE.test(anchor.date)) {
-            accept('error', `Invalid anchor date "${anchor.date}". Use ISO 8601 format: YYYY-MM-DD.`, {
+    // --- Rule 11: Anchor requires date: ---
+    checkAnchorRequiredDate(anchor: AnchorDeclaration, accept: ValidationAcceptor): void {
+        const dateProp = anchor.properties.find((p) => propKey(p) === 'date');
+        if (!dateProp) {
+            accept('error', `Anchor "${displayName(anchor)}" requires a "date:" property.`, {
                 node: anchor,
-                property: 'date',
-            });
-            return;
-        }
-        const d = new Date(anchor.date);
-        if (isNaN(d.getTime())) {
-            accept('error', `Invalid date "${anchor.date}".`, {
-                node: anchor,
-                property: 'date',
             });
         }
     }
 
     // --- R2 + R3: anchor must not precede roadmap start; dated roadmap requires start: ---
     checkAnchorAgainstStart(anchor: AnchorDeclaration, accept: ValidationAcceptor): void {
-        if (!DATE_RE.test(anchor.date)) return;
-        const anchorDate = new Date(anchor.date);
+        const dateProp = anchor.properties.find((p) => propKey(p) === 'date');
+        if (!dateProp || !dateProp.value) return;
+        const raw = dateProp.value;
+        if (!DATE_RE.test(raw)) return;
+        const anchorDate = new Date(raw);
         if (isNaN(anchorDate.getTime())) return;
 
         const start = resolveLocalStart(anchor.$container);
@@ -429,24 +543,35 @@ export class NowlineValidator {
                 return;
             case 'missing':
                 accept('error', `Anchor "${displayName(anchor)}" has a date but the roadmap is missing "start:". Add start:YYYY-MM-DD to the roadmap.`, {
-                    node: anchor,
-                    property: 'date',
+                    node: dateProp,
+                    property: 'value',
                 });
                 return;
             case 'valid':
                 if (anchorDate < start.date) {
-                    accept('error', `Anchor "${displayName(anchor)}" date ${anchor.date} is before roadmap start ${start.iso}.`, {
-                        node: anchor,
-                        property: 'date',
+                    accept('error', `Anchor "${displayName(anchor)}" date ${raw} is before roadmap start ${start.iso}.`, {
+                        node: dateProp,
+                        property: 'value',
                     });
                 }
                 return;
         }
     }
 
-    // --- R2 + R3: dated milestone must not precede roadmap start; dated roadmap requires start: ---
+    // --- Rule 12: Milestone requires date: or after: ---
+    checkMilestoneRequirement(milestone: MilestoneDeclaration, accept: ValidationAcceptor): void {
+        const hasDate = milestone.properties.some((p) => propKey(p) === 'date');
+        const hasAfter = milestone.properties.some((p) => propKey(p) === 'after');
+        if (!hasDate && !hasAfter) {
+            accept('error', `Milestone "${displayName(milestone)}" requires at least one of "date:" or "after:".`, {
+                node: milestone,
+            });
+        }
+    }
+
+    // --- R2 + R3: dated milestone must not precede roadmap start ---
     checkMilestoneAgainstStart(milestone: MilestoneDeclaration, accept: ValidationAcceptor): void {
-        const dateProp = milestone.properties.find((p) => p.key === 'date');
+        const dateProp = milestone.properties.find((p) => propKey(p) === 'date');
         if (!dateProp || !dateProp.value) return;
         const raw = dateProp.value;
         if (!DATE_RE.test(raw)) return;
@@ -474,9 +599,9 @@ export class NowlineValidator {
         }
     }
 
-    // --- Rule 16: Footnote requires on ---
+    // --- Rule 13: Footnote requires on ---
     checkFootnoteOn(footnote: FootnoteDeclaration, accept: ValidationAcceptor): void {
-        const hasOn = footnote.properties.some((p) => p.key === 'on');
+        const hasOn = footnote.properties.some((p) => propKey(p) === 'on');
         if (!hasOn) {
             accept('error', 'Footnote requires an "on:" property referencing one or more entities.', {
                 node: footnote,
@@ -484,18 +609,29 @@ export class NowlineValidator {
         }
     }
 
-    // --- Rule 31: duration/remaining not valid on parallel/group ---
+    // --- Rule 10: Item requires duration: ---
+    checkItemRequiredDuration(item: ItemDeclaration, accept: ValidationAcceptor): void {
+        const hasDuration = item.properties.some((p) => propKey(p) === 'duration');
+        if (!hasDuration) {
+            accept('error', `Item "${displayName(item)}" requires a "duration:" property.`, {
+                node: item,
+            });
+        }
+    }
+
+    // --- Parallel/group rule 3: duration/remaining not valid on parallel/group ---
     checkNoComputedProperties(node: ParallelBlock | GroupBlock, accept: ValidationAcceptor): void {
         for (const prop of node.properties) {
-            if (prop.key === 'duration' || prop.key === 'remaining') {
-                accept('error', `"${prop.key}" is not valid on ${node.$type === 'ParallelBlock' ? 'parallel' : 'group'} (computed from children).`, {
+            const key = propKey(prop);
+            if (key === 'duration' || key === 'remaining') {
+                accept('error', `"${key}" is not valid on ${node.$type === 'ParallelBlock' ? 'parallel' : 'group'} (computed from children).`, {
                     node: prop,
                 });
             }
         }
     }
 
-    // --- Rule 29: Parallel requires ≥ 2 children ---
+    // --- Parallel/group rule 1: Parallel requires >= 2 children ---
     checkParallelMinChildren(node: ParallelBlock, accept: ValidationAcceptor): void {
         const children = node.content.filter((c) => !isDescriptionDirective(c));
         if (children.length === 0) {
@@ -505,7 +641,7 @@ export class NowlineValidator {
         }
     }
 
-    // --- Rule 30: Group requires ≥ 1 child ---
+    // --- Parallel/group rule 2: Group requires >= 1 child ---
     checkGroupMinChildren(node: GroupBlock, accept: ValidationAcceptor): void {
         const children = node.content.filter((c) => !isDescriptionDirective(c));
         if (children.length === 0) {
@@ -513,20 +649,38 @@ export class NowlineValidator {
         }
     }
 
-    // --- Item-specific property checks ---
-    checkItemProperties(_item: ItemDeclaration, _accept: ValidationAcceptor): void {
-        // Placeholder for future item-specific validation
+    // --- Rule 20: Raw style properties banned on roadmap-section entities ---
+    checkNoRawStyleProperties(
+        node: {
+            $type: string;
+            properties: EntityProperty[];
+            name?: string;
+            title?: string;
+        },
+        accept: ValidationAcceptor,
+    ): void {
+        for (const prop of node.properties) {
+            const key = propKey(prop);
+            if (STYLE_PROP_KEYS.has(key)) {
+                accept('error',
+                    `Raw style property "${key}" is not allowed on ${describeNode(node)}. ` +
+                    `Declare a named style in config and reference it via "style:id".`,
+                    { node: prop },
+                );
+            }
+        }
+    }
+
+    // --- Roadmap declaration specific property checks ---
+    // Property-level validation of start:/date: lives in the generic EntityProperty check;
+    // this hook is kept for future roadmap-scoped rules (and to make registration symmetric).
+    checkRoadmapProperties(_roadmap: RoadmapDeclaration, _accept: ValidationAcceptor): void {
+        // intentionally empty
     }
 
     // --- Rule 18: Style property enum values ---
-    checkStylePropertyValues(style: StyleDeclaration, _accept: ValidationAcceptor): void {
-        // Individual style properties checked via checkStylePropertyEnum
-        void style;
-    }
-
-    // --- Rule 18: Individual style property enum ---
     checkStylePropertyEnum(prop: StyleProperty, accept: ValidationAcceptor): void {
-        const key = prop.key;
+        const key = propKey(prop);
         const val = prop.value;
 
         if (key === 'bg' || key === 'fg' || key === 'text') {
@@ -544,8 +698,394 @@ export class NowlineValidator {
                     property: 'value',
                 });
             }
+        } else if (key !== 'icon' && !STYLE_PROP_KEYS.has(key)) {
+            accept('error', `Unknown style property "${key}".`, {
+                node: prop,
+                property: 'key',
+            });
         }
-        // icon: any identifier is valid — no enum check
+    }
+
+    // --- Duration declaration: rule 4 (length: required), rule 3 (id format) ---
+    checkDurationDeclaration(decl: DurationDeclaration, accept: ValidationAcceptor): void {
+        const lengthProp = decl.properties.find((p) => propKey(p) === 'length');
+        if (!lengthProp) {
+            accept('error', `Duration "${displayName(decl)}" requires a "length:" property.`, {
+                node: decl,
+            });
+        }
+
+        if (decl.name) {
+            if (DURATION_RE.test(decl.name) || BARE_DURATION_SUFFIX_RE.test(decl.name)) {
+                accept('error',
+                    `Duration id "${decl.name}" collides with the raw duration pattern. Choose a different kebab-case name (e.g. "xs", "small", "quarter").`,
+                    { node: decl, property: 'name' });
+            }
+            if (!KEBAB_RE.test(decl.name)) {
+                accept('warning', `Duration id "${decl.name}" is not kebab-case.`, {
+                    node: decl,
+                    property: 'name',
+                });
+            }
+        }
+    }
+
+    // --- Status declaration: id format ---
+    checkStatusDeclaration(decl: StatusDeclaration, accept: ValidationAcceptor): void {
+        if (decl.name) {
+            if (BUILTIN_STATUSES.has(decl.name)) {
+                accept('error',
+                    `Status id "${decl.name}" collides with the built-in status value. Built-ins: ${[...BUILTIN_STATUSES].join(', ')}.`,
+                    { node: decl, property: 'name' });
+            }
+            if (!KEBAB_RE.test(decl.name)) {
+                accept('warning', `Status id "${decl.name}" is not kebab-case.`, {
+                    node: decl,
+                    property: 'name',
+                });
+            }
+        }
+    }
+
+    // --- Rule 5: Duplicate duration ids ---
+    checkDuplicateDurationIds(file: NowlineFile, accept: ValidationAcceptor): void {
+        const seen = new Map<string, DurationDeclaration>();
+        for (const entry of file.roadmapEntries) {
+            if (isDurationDeclaration(entry) && entry.name) {
+                const existing = seen.get(entry.name);
+                if (existing) {
+                    accept('error',
+                        `Duplicate duration id "${entry.name}". First declared at ${locationOf(existing)}.`,
+                        { node: entry, property: 'name' });
+                } else {
+                    seen.set(entry.name, entry);
+                }
+            }
+        }
+    }
+
+    // --- Defaults rules 21-23: entity-type whitelist, duplicate-per-entity, banned props ---
+    checkDefaultDeclaration(decl: DefaultDeclaration, accept: ValidationAcceptor): void {
+        if (!DEFAULT_ENTITY_TYPES.has(decl.entityType)) {
+            accept('error',
+                `"${decl.entityType}" is not a supported entity type for default. Allowed: ${[...DEFAULT_ENTITY_TYPES].join(', ')}.`,
+                { node: decl, property: 'entityType' });
+            return;
+        }
+
+        // Duplicate default <entity> within the same file.
+        const file = decl.$container;
+        let firstIdx = -1;
+        for (let i = 0; i < file.configEntries.length; i++) {
+            const other = file.configEntries[i];
+            if (isDefaultDeclaration(other) && other.entityType === decl.entityType) {
+                if (firstIdx < 0) {
+                    firstIdx = i;
+                } else if (other === decl) {
+                    accept('error',
+                        `Duplicate "default ${decl.entityType}" declaration. Only one is allowed per entity type per file.`,
+                        { node: decl });
+                    break;
+                }
+            }
+        }
+
+        const banned = DEFAULT_BANNED[decl.entityType];
+        if (banned) {
+            for (const prop of decl.properties) {
+                const key = propKey(prop);
+                if (banned.has(key)) {
+                    accept('error',
+                        `"${key}" cannot be set on "default ${decl.entityType}". Identity-defining, sizing, sequencing, reference, and prose properties must be explicit on each entity.`,
+                        { node: prop });
+                }
+            }
+        }
+    }
+
+    // --- Rule 7 (calendar): calendar block only valid when roadmap calendar:custom ---
+    // Rule 8: custom calendar requires all four fields.
+    checkCalendarBlockConsistency(file: NowlineFile, accept: ValidationAcceptor): void {
+        const calendarBlocks = file.configEntries.filter(isCalendarBlock);
+        const calendarProp = file.roadmapDecl?.properties.find((p) => propKey(p) === 'calendar');
+        const calendarMode = calendarProp?.value;
+
+        if (calendarBlocks.length > 0 && calendarMode !== 'custom') {
+            for (const block of calendarBlocks) {
+                accept('error',
+                    `A "calendar" config block is only valid when the roadmap declares calendar:custom.`,
+                    { node: block });
+            }
+        }
+
+        if (calendarMode === 'custom' && calendarBlocks.length === 0) {
+            accept('error',
+                `calendar:custom requires a "calendar" config block with days-per-week, days-per-month, days-per-quarter, and days-per-year.`,
+                { node: file.roadmapDecl!, property: 'properties' });
+        }
+
+        if (calendarMode === 'custom' && calendarBlocks.length > 0) {
+            for (const block of calendarBlocks) {
+                const presentKeys = new Set(block.properties.map((p) => propKey(p)));
+                for (const field of CALENDAR_FIELDS) {
+                    if (!presentKeys.has(field)) {
+                        accept('error',
+                            `calendar:custom requires "${field}" in the calendar config block.`,
+                            { node: block });
+                    }
+                }
+            }
+        }
+    }
+
+    // --- Rule 9: calendar block property values must be positive integers ---
+    checkCalendarBlock(block: CalendarBlock, accept: ValidationAcceptor): void {
+        const seen = new Set<string>();
+        for (const prop of block.properties) {
+            const key = propKey(prop);
+            if (!CALENDAR_FIELDS.has(key)) {
+                accept('error',
+                    `Unknown calendar property "${key}". Allowed: ${[...CALENDAR_FIELDS].join(', ')}.`,
+                    { node: prop, property: 'key' });
+                continue;
+            }
+            if (seen.has(key)) {
+                accept('error', `Duplicate calendar property "${key}".`, {
+                    node: prop,
+                    property: 'key',
+                });
+            }
+            seen.add(key);
+
+            if (!INTEGER_RE.test(prop.value) || parseInt(prop.value, 10) <= 0) {
+                accept('error',
+                    `"${key}" must be a positive integer, got "${prop.value}".`,
+                    { node: prop, property: 'value' });
+            }
+        }
+    }
+
+    // --- Scale block property validation ---
+    checkScaleBlock(block: ScaleBlock, accept: ValidationAcceptor): void {
+        const seen = new Set<string>();
+        for (const prop of block.properties) {
+            const key = propKey(prop);
+            if (!SCALE_FIELDS.has(key)) {
+                accept('error',
+                    `Unknown scale property "${key}". Allowed: ${[...SCALE_FIELDS].join(', ')}.`,
+                    { node: prop, property: 'key' });
+                continue;
+            }
+            if (seen.has(key)) {
+                accept('error', `Duplicate scale property "${key}".`, {
+                    node: prop,
+                    property: 'key',
+                });
+            }
+            seen.add(key);
+
+            if (key === 'label-every') {
+                if (!INTEGER_RE.test(prop.value) || parseInt(prop.value, 10) <= 0) {
+                    accept('error',
+                        `"label-every" must be a positive integer, got "${prop.value}".`,
+                        { node: prop, property: 'value' });
+                }
+            }
+        }
+    }
+
+    // --- Rule 15: duration:/status: references resolve to earlier declarations ---
+    checkForwardReferences(file: NowlineFile, accept: ValidationAcceptor): void {
+        // Declarations in source order across the file.
+        const durationOrder = new Map<string, number>();
+        const statusOrder = new Map<string, number>();
+
+        for (let i = 0; i < file.roadmapEntries.length; i++) {
+            const entry = file.roadmapEntries[i];
+            if (isDurationDeclaration(entry) && entry.name) {
+                if (!durationOrder.has(entry.name)) durationOrder.set(entry.name, i);
+            } else if (isStatusDeclaration(entry) && entry.name) {
+                if (!statusOrder.has(entry.name)) statusOrder.set(entry.name, i);
+            }
+        }
+
+        for (let i = 0; i < file.roadmapEntries.length; i++) {
+            const entry = file.roadmapEntries[i];
+            visitPropertiesDeep(entry, (prop) => {
+                const key = propKey(prop);
+                if (key === 'duration' && prop.value) {
+                    const val = prop.value;
+                    if (DURATION_RE.test(val)) return;
+                    const declIdx = durationOrder.get(val);
+                    if (declIdx === undefined) {
+                        accept('error',
+                            `Duration "${val}" is not declared. Add "duration ${val} length:<literal>" earlier in the roadmap section.`,
+                            { node: prop, property: 'value' });
+                    } else if (declIdx >= i) {
+                        accept('error',
+                            `Duration "${val}" is referenced before its declaration. Move "duration ${val}" above this entity.`,
+                            { node: prop, property: 'value' });
+                    }
+                } else if (key === 'status' && prop.value) {
+                    const val = prop.value;
+                    if (BUILTIN_STATUSES.has(val)) return;
+                    const declIdx = statusOrder.get(val);
+                    if (declIdx === undefined) {
+                        accept('error',
+                            `Status "${val}" is not a built-in and has no declaration. Add "status ${val}" earlier in the roadmap section.`,
+                            { node: prop, property: 'value' });
+                    } else if (declIdx >= i) {
+                        accept('error',
+                            `Status "${val}" is referenced before its declaration. Move "status ${val}" above this entity.`,
+                            { node: prop, property: 'value' });
+                    }
+                }
+            });
+        }
+    }
+
+    // --- Rules 24/1 (reference): after/before/on must resolve to declared ids ---
+    checkReferenceResolution(file: NowlineFile, accept: ValidationAcceptor): void {
+        const declaredIds = collectReferenceableIds(file);
+
+        const visit = (entry: RoadmapEntry) => {
+            visitPropertiesDeep(entry, (prop) => {
+                const key = propKey(prop);
+                if (key !== 'after' && key !== 'before' && key !== 'on' && key !== 'owner') return;
+                const vals = prop.value ? [prop.value] : prop.values;
+                for (const v of vals) {
+                    if (!v) continue;
+                    if (!declaredIds.has(v)) {
+                        accept('error',
+                            `${key}: reference "${v}" does not resolve to any declared entity in this file.`,
+                            { node: prop });
+                    }
+                }
+            });
+        };
+
+        for (const entry of file.roadmapEntries) {
+            visit(entry);
+        }
+    }
+
+    // --- Rule 25: circular dependencies in after/before graph ---
+    checkCircularDependencies(file: NowlineFile, accept: ValidationAcceptor): void {
+        // Build forward-edge graph: id -> set of ids that must finish before id can start.
+        // `after:x` on entity y means y depends on x (edge y -> x).
+        // `before:y` on entity x means x must finish before y starts, so y depends on x (edge y -> x).
+        const deps = new Map<string, Set<string>>();
+        const addDep = (node: string, dep: string) => {
+            if (!deps.has(node)) deps.set(node, new Set());
+            deps.get(node)!.add(dep);
+        };
+
+        const indexDependents = (idName: string | undefined, props: EntityProperty[], file: NowlineFile) => {
+            if (!idName) return;
+            for (const prop of props) {
+                const key = propKey(prop);
+                if (key === 'after') {
+                    const refs = prop.value ? [prop.value] : prop.values;
+                    for (const r of refs) if (r) addDep(idName, r);
+                } else if (key === 'before') {
+                    const refs = prop.value ? [prop.value] : prop.values;
+                    for (const r of refs) if (r) addDep(r, idName);
+                }
+            }
+            void file;
+        };
+
+        const visitEntry = (entry: AstNode): void => {
+            const id = (entry as { name?: string }).name;
+            const props = (entry as { properties?: EntityProperty[] }).properties ?? [];
+            indexDependents(id, props, file);
+
+            if (isSwimlaneDeclaration(entry)) {
+                for (const c of entry.content) visitEntry(c);
+            } else if (isParallelBlock(entry) || isGroupBlock(entry)) {
+                for (const c of entry.content) visitEntry(c);
+            }
+        };
+
+        for (const entry of file.roadmapEntries) visitEntry(entry);
+
+        // DFS for cycles.
+        const WHITE = 0, GRAY = 1, BLACK = 2;
+        const color = new Map<string, number>();
+        for (const id of deps.keys()) color.set(id, WHITE);
+
+        const reported = new Set<string>();
+        const dfs = (node: string, path: string[]): void => {
+            color.set(node, GRAY);
+            path.push(node);
+            for (const dep of deps.get(node) ?? []) {
+                const c = color.get(dep) ?? WHITE;
+                if (c === GRAY) {
+                    const cycleStart = path.indexOf(dep);
+                    const cycle = path.slice(cycleStart).concat(dep);
+                    const key = [...cycle].sort().join('→');
+                    if (!reported.has(key)) {
+                        reported.add(key);
+                        accept('error',
+                            `Circular dependency detected: ${cycle.join(' → ')}.`,
+                            { node: file.roadmapDecl ?? file });
+                    }
+                } else if (c === WHITE) {
+                    dfs(dep, path);
+                }
+            }
+            path.pop();
+            color.set(node, BLACK);
+        };
+
+        for (const node of deps.keys()) {
+            if ((color.get(node) ?? WHITE) === WHITE) dfs(node, []);
+        }
+    }
+
+    // --- Rules 30-32: Person declare-once + bare top-level warning ---
+    checkPersonDeclarations(file: NowlineFile, accept: ValidationAcceptor): void {
+        type DeclSite = { node: PersonDeclaration; isDeclaration: boolean };
+        const declarations = new Map<string, DeclSite[]>();
+
+        const isRealDeclaration = (p: PersonDeclaration): boolean => {
+            return Boolean(p.title) || p.properties.length > 0 || p.description !== undefined;
+        };
+
+        const visitPerson = (p: PersonDeclaration) => {
+            if (!p.name) return;
+            const isDecl = isRealDeclaration(p);
+            if (!declarations.has(p.name)) declarations.set(p.name, []);
+            declarations.get(p.name)!.push({ node: p, isDeclaration: isDecl });
+            if (!isDecl && p.$container.$type === 'NowlineFile') {
+                accept('warning',
+                    `Bare "person ${p.name}" at roadmap top level has no declaration. Either add properties (title, link, etc.) or remove the line.`,
+                    { node: p });
+            }
+        };
+
+        const visitTeam = (t: TeamDeclaration) => {
+            for (const c of t.content) {
+                if (isPersonDeclaration(c)) visitPerson(c);
+                else if (isTeamDeclaration(c)) visitTeam(c);
+            }
+        };
+
+        for (const entry of file.roadmapEntries) {
+            if (isPersonDeclaration(entry)) visitPerson(entry);
+            else if (isTeamDeclaration(entry)) visitTeam(entry);
+        }
+
+        for (const [name, sites] of declarations) {
+            const decls = sites.filter((s) => s.isDeclaration);
+            if (decls.length > 1) {
+                for (let i = 1; i < decls.length; i++) {
+                    accept('error',
+                        `Person "${name}" is declared more than once. First declaration at ${locationOf(decls[0].node)}.`,
+                        { node: decls[i].node });
+                }
+            }
+        }
     }
 }
 
@@ -574,6 +1114,12 @@ function findKeywordOffset(file: NowlineFile, keyword: string): number | undefin
     return idx >= 0 ? idx : undefined;
 }
 
+function describeNode(node: { $type: string; name?: string; title?: string }): string {
+    const kind = node.$type.replace(/Declaration$|Block$/, '').toLowerCase();
+    const label = node.name ?? node.title;
+    return label ? `${kind} "${label}"` : kind;
+}
+
 function registerEntity(
     entry: RoadmapEntry,
     register: (name: string | undefined, node: AstNode) => void,
@@ -593,6 +1139,12 @@ function registerEntity(
         register(entry.name, entry);
     } else if (isFootnoteDeclaration(entry)) {
         register(entry.name, entry);
+    } else if (isLabelDeclaration(entry)) {
+        register(entry.name, entry);
+    } else if (isDurationDeclaration(entry)) {
+        register(entry.name, entry);
+    } else if (isStatusDeclaration(entry)) {
+        register(entry.name, entry);
     }
 }
 
@@ -605,7 +1157,7 @@ function registerTeam(
         if (isTeamDeclaration(member)) {
             registerTeam(member, register);
         }
-        // PersonMemberRef is a reference, not a declaration — skip
+        // PersonMemberRef and bare person <id> are references, not declarations — skip.
     }
 }
 
@@ -626,4 +1178,48 @@ function registerSwimlaneContent(
             registerSwimlaneContent(gc, register);
         }
     }
+}
+
+function visitPropertiesDeep(node: AstNode, visit: (prop: EntityProperty) => void): void {
+    const walk = (n: AstNode) => {
+        const props = (n as unknown as { properties?: EntityProperty[] }).properties;
+        if (Array.isArray(props)) {
+            for (const p of props) visit(p);
+        }
+        if (isSwimlaneDeclaration(n)) {
+            for (const c of n.content) walk(c);
+        } else if (isParallelBlock(n) || isGroupBlock(n)) {
+            for (const c of n.content) walk(c);
+        } else if (isTeamDeclaration(n)) {
+            for (const c of n.content) {
+                if (isTeamDeclaration(c) || isPersonDeclaration(c)) walk(c);
+            }
+        }
+    };
+    walk(node);
+}
+
+function collectReferenceableIds(file: NowlineFile): Set<string> {
+    const ids = new Set<string>();
+    if (file.roadmapDecl?.name) ids.add(file.roadmapDecl.name);
+
+    const addEntry = (entry: AstNode): void => {
+        const name = (entry as { name?: string }).name;
+        if (name) ids.add(name);
+        if (isSwimlaneDeclaration(entry)) {
+            for (const c of entry.content) addEntry(c);
+        } else if (isParallelBlock(entry) || isGroupBlock(entry)) {
+            for (const c of entry.content) addEntry(c);
+        } else if (isTeamDeclaration(entry)) {
+            for (const c of entry.content) {
+                if (isTeamDeclaration(c) || isPersonDeclaration(c)) addEntry(c);
+                else if (isPersonMemberRef(c)) {
+                    // Don't register member refs — they reference persons declared elsewhere.
+                }
+            }
+        }
+    };
+
+    for (const entry of file.roadmapEntries) addEntry(entry);
+    return ids;
 }

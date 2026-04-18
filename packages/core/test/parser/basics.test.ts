@@ -63,16 +63,16 @@ describe('parser basics', () => {
         expect(item.title).toBe('Quick cleanup');
     });
 
-    it('parses anchor with date positional argument', async () => {
+    it('parses anchor with date: property', async () => {
         const { parserErrors, ast } = await parse(
-            `roadmap r "R"\nanchor kickoff 2026-01-06\nswimlane s\n  item x duration:1w\n`,
+            `roadmap r "R" start:2026-01-01\nanchor kickoff date:2026-01-06\nswimlane s\n  item x duration:1w\n`,
             { validate: false },
         );
         expect(parserErrors).toEqual([]);
         const anchor = ast.roadmapEntries[0];
         if (!isAnchorDeclaration(anchor)) throw new Error('expected anchor');
         expect(anchor.name).toBe('kickoff');
-        expect(anchor.date).toBe('2026-01-06');
+        expect(anchor.properties.find((p) => p.key === 'date')?.value).toBe('2026-01-06');
     });
 
     it('parses parallel with groups', async () => {
@@ -101,21 +101,21 @@ describe('parser basics', () => {
         expect(group.content).toHaveLength(2);
     });
 
-    it('parses milestones with depends list', async () => {
+    it('parses milestones with after list', async () => {
         const { parserErrors, ast } = await parse(
-            `roadmap r "R"\nswimlane s\n  item a duration:1w\n  item b duration:1w\nmilestone m "M" depends:[a, b]\n`,
+            `roadmap r "R"\nswimlane s\n  item a duration:1w\n  item b duration:1w\nmilestone m "M" after:[a, b]\n`,
             { validate: false },
         );
         expect(parserErrors).toEqual([]);
         const milestone = ast.roadmapEntries[1];
         if (!isMilestoneDeclaration(milestone)) throw new Error('expected milestone');
-        const depends = milestone.properties.find((p) => p.key === 'depends');
-        expect(depends?.values.map((v) => v)).toEqual(['a', 'b']);
+        const after = milestone.properties.find((p) => p.key === 'after');
+        expect(after?.values.map((v) => v)).toEqual(['a', 'b']);
     });
 
     it('parses footnote with on and description', async () => {
         const { parserErrors, ast } = await parse(
-            `roadmap r "R"\nswimlane s\n  item audit duration:1w\nfootnote "Risk" on:audit\n  description "Stuff."\n`,
+            `roadmap r "R"\nswimlane s\n  item audit duration:1w\nfootnote note "Risk" on:audit\n  description "Stuff."\n`,
             { validate: false },
         );
         expect(parserErrors).toEqual([]);

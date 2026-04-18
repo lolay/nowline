@@ -21,50 +21,33 @@ IncludeOption:
 // --- Config Entries ---
 
 ConfigEntry:
-    ScaleDeclaration | UnitDeclaration | EstimatesDeclaration |
-    StatusDeclaration | StyleDeclaration | LabelDeclaration |
-    DefaultsDeclaration;
+    ScaleBlock | CalendarBlock | StyleDeclaration | DefaultDeclaration;
 
-ScaleDeclaration:
-    'scale' value=ID;
+ScaleBlock:
+    'scale'
+    (INDENT properties+=BlockProperty+ DEDENT)?;
 
-UnitDeclaration:
-    'unit' name=ID '=' value=DURATION_LITERAL;
+CalendarBlock:
+    'calendar'
+    (INDENT properties+=BlockProperty+ DEDENT)?;
 
-EstimatesDeclaration:
-    'estimates' mappings+=EstimateMapping+;
-
-EstimateMapping:
-    name=ID '=' value=DURATION_LITERAL;
-
-StatusDeclaration:
-    'status' name=ID;
+BlockPropertyValue returns string:
+    ID | INTEGER | STRING | DURATION_LITERAL;
 
 StyleDeclaration:
     'style' (name=ID)? (title=STRING)?
     (INDENT properties+=StyleProperty+ DEDENT)?;
 
-StyleProperty:
-    key=PropertyKey ':' value=StylePropertyValue;
-
 StylePropertyValue returns string:
     ID | COLOR_HEX;
 
-LabelDeclaration:
-    'label' (name=ID)? (title=STRING)?
+DefaultDeclaration:
+    'default' entityType=DefaultEntityType
     (properties+=EntityProperty)*;
 
-DefaultsDeclaration:
-    'defaults'
-    INDENT entries+=DefaultsEntry+ DEDENT;
-
-DefaultsEntry:
-    entityType=DefaultsEntityType
-    (properties+=EntityProperty)*;
-
-DefaultsEntityType returns string:
+DefaultEntityType returns string:
     'item' | 'label' | 'swimlane' | 'roadmap' | 'milestone' |
-    'footnote' | 'anchor' | 'parallel' | 'group' | 'person' | 'team';
+    'footnote' | 'anchor' | 'parallel' | 'group';
 
 // --- Roadmap ---
 
@@ -74,6 +57,7 @@ RoadmapDeclaration:
 
 RoadmapEntry:
     PersonDeclaration | TeamDeclaration | AnchorDeclaration |
+    LabelDeclaration | DurationDeclaration | StatusDeclaration |
     SwimlaneDeclaration | MilestoneDeclaration | FootnoteDeclaration;
 
 PersonDeclaration:
@@ -93,8 +77,24 @@ PersonMemberRef:
     'person' ref=ID;
 
 AnchorDeclaration:
-    'anchor' (name=ID)? (title=STRING)? date=DATE_LITERAL
-    (properties+=EntityProperty)*;
+    'anchor' (name=ID)? (title=STRING)?
+    (properties+=EntityProperty)*
+    (INDENT description=DescriptionDirective DEDENT)?;
+
+LabelDeclaration:
+    'label' (name=ID)? (title=STRING)?
+    (properties+=EntityProperty)*
+    (INDENT description=DescriptionDirective DEDENT)?;
+
+DurationDeclaration:
+    'duration' (name=ID)? (title=STRING)?
+    (properties+=EntityProperty)*
+    (INDENT description=DescriptionDirective DEDENT)?;
+
+StatusDeclaration:
+    'status' (name=ID)? (title=STRING)?
+    (properties+=EntityProperty)*
+    (INDENT description=DescriptionDirective DEDENT)?;
 
 SwimlaneDeclaration:
     'swimlane' (name=ID)? (title=STRING)?
@@ -127,7 +127,8 @@ GroupContent:
 
 MilestoneDeclaration:
     'milestone' (name=ID)? (title=STRING)?
-    (properties+=EntityProperty)*;
+    (properties+=EntityProperty)*
+    (INDENT description=DescriptionDirective DEDENT)?;
 
 FootnoteDeclaration:
     'footnote' (name=ID)? (title=STRING)?
@@ -139,17 +140,23 @@ DescriptionDirective:
 
 // --- Properties ---
 
+// EntityProperty uses a single "key:" token so that keywords like `status`, `duration`,
+// `label`, `style`, etc. still parse unambiguously as property keys when followed by `:`.
+// The validator strips the trailing `:` and validates the key text.
 EntityProperty:
-    key=PropertyKey ':' (
+    key=PROPERTY_KEY_WITH_COLON (
         value=PropertyAtom |
         '[' values+=PropertyAtom (',' values+=PropertyAtom)* ']'
     );
 
-PropertyKey returns string:
-    PROPERTY_KEY | 'status' | 'style';
+BlockProperty:
+    key=PROPERTY_KEY_WITH_COLON value=BlockPropertyValue;
+
+StyleProperty:
+    key=PROPERTY_KEY_WITH_COLON value=StylePropertyValue;
 
 PropertyAtom returns string:
-    ID | STRING | DURATION_LITERAL | PERCENTAGE | URL | DATE_LITERAL | COLOR_HEX;
+    ID | STRING | DURATION_LITERAL | PERCENTAGE | URL | DATE_LITERAL | COLOR_HEX | INTEGER;
 
 // --- Terminals ---
 // INDENT/DEDENT must be declared before ID to avoid Chevrotain unreachable-token errors.
@@ -166,13 +173,15 @@ terminal INCLUDE_OPTION_KEY: /(config|roadmap):/;
 terminal URL: /https?:\/\/[^\s\[\],]+/;
 terminal STRING: /"([^"\\]|\\.)*"/;
 terminal DATE_LITERAL: /\d{4}-\d{2}-\d{2}/;
-terminal DURATION_LITERAL: /\d+[dwmy]/;
+terminal DURATION_LITERAL: /\d+[dwmqy]/;
 terminal PERCENTAGE: /\d+%/;
 terminal COLOR_HEX: /#[0-9a-fA-F]{3,8}/;
-// PROPERTY_KEY matches an identifier that is immediately followed by a colon (non-consuming).
-// This lets us disambiguate `parallel after:foo` — `after:` is a property key, not a name.
-// Declared before ID so the lexer prefers it when the lookahead matches.
-terminal PROPERTY_KEY: /[a-zA-Z_][a-zA-Z0-9_-]*(?=:)/;
+terminal INTEGER: /\d+/;
+// PROPERTY_KEY_WITH_COLON matches `name:` as a single token. Because it is longer than any
+// bare keyword, the lexer prefers it over keywords when a colon immediately follows — letting
+// us use `duration:`, `status:`, `label:`, `style:` etc. as property keys without shadowing
+// those words as declaration keywords.
+terminal PROPERTY_KEY_WITH_COLON: /[a-zA-Z_][a-zA-Z0-9_-]*:/;
 terminal ID: /[a-zA-Z_][a-zA-Z0-9_-]*/;
 
 hidden terminal WS: /[\t ]+/;
