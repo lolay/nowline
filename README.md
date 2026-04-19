@@ -44,10 +44,22 @@ This repository is an OSS monorepo of the Nowline language tooling.
 | Package | Purpose |
 |---|---|
 | [`@nowline/core`](./packages/core) | Parser, typed AST, and validator. Pure TypeScript; no DOM, no Node-specific APIs in the hot path. |
+| [`@nowline/cli`](./packages/cli) | `nowline` command: validate, convert (text ↔ JSON), init. Ships as an npm package and as standalone binaries. |
 
-Planned packages live in the roadmap (renderer, CLI, VS Code extension, language server).
+Planned packages live in the roadmap (renderer, VS Code extension, language server).
 
 ## Install
+
+### Command-line tool (`nowline`)
+
+| Platform | Install |
+|---|---|
+| macOS / Linux / WSL (Homebrew) | `brew install lolay/tap/nowline` |
+| Debian / Ubuntu | [download `nowline_<version>_amd64.deb`](https://github.com/lolay/nowline/releases/latest) + `sudo dpkg -i` |
+| Windows (`.exe`) | [download from GitHub Releases](https://github.com/lolay/nowline/releases/latest) (unsigned; see [SmartScreen notes](./packages/cli/README.md#windows-smartscreen-walkthrough)) |
+| Any platform (npm/npx) | `npm install -g @nowline/cli` |
+
+### Library (`@nowline/core`)
 
 ```bash
 pnpm add @nowline/core

@@ -1,0 +1,101 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+jobs:
+  build-test:
+    name: Build & test (${{ matrix.os }})
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, macos-latest, windows-latest]
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install pnpm
+        uses: pnpm/action-setup@v4
+        with:
+          version: 9
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: pnpm
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Build all packages
+        run: pnpm -r build
+
+      - name: Lint
+        run: pnpm -r lint --if-present
+        continue-on-error: false
+
+      - name: Test
+        run: pnpm -r test
+
+  compile-smoke:
+    name: Bun compile smoke (${{ matrix.os }})
+    runs-on: ${{ matrix.os }}
+    needs: build-test
+    strategy:
+      matrix:
+        include:
+          - os: ubuntu-latest
+            target: bun-linux-x64
+          - os: macos-latest
+            target: bun-darwin-arm64
+          - os: windows-latest
+            target: bun-windows-x64
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install pnpm
+        uses: pnpm/action-setup@v4
+        with:
+          version: 9
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: pnpm
+
+      - name: Install Bun
+        uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: latest
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Build all packages
+        run: pnpm -r build
+
+      - name: Compile single target (smoke)
+        working-directory: packages/cli
+        run: node scripts/compile.mjs --target=${{ matrix.target }}
+
+      - name: Smoke test compiled binary (Linux/macOS)
+        if: runner.os != 'Windows'
+        working-directory: packages/cli
+        run: |
+          BIN="$(ls dist-bin/nowline-* | head -n 1)"
+          chmod +x "$BIN"
+          "$BIN" version
+          "$BIN" validate ../../examples/minimal.nowline
+
+      - name: Smoke test compiled binary (Windows)
+        if: runner.os == 'Windows'
+        working-directory: packages/cli
+        shell: pwsh
+        run: |
+          $bin = (Get-ChildItem dist-bin/nowline-*.exe | Select-Object -First 1).FullName
+          & $bin version
+          & $bin validate ../../examples/minimal.nowline
