@@ -59,6 +59,7 @@ nowline/
 ├── examples/          # .nowline files used by both tests and `nowline init` templates
 ├── grammars/          # TextMate grammar for editor syntax highlighting
 ├── scripts/           # Repo-wide scripts: .deb build, Homebrew tap seed
+├── specs/             # Design specs for the DSL, renderer, CLI, IDE integrations, and OSS milestones
 ├── .github/workflows/ # CI and release pipelines
 ├── branding/          # Logos and marks
 └── pnpm-workspace.yaml
@@ -71,6 +72,16 @@ Packages have a shared version and are published together. The dependency graph 
 ```
 
 No upward or sideways imports. Future packages (`@nowline/layout`, `@nowline/renderer`, etc.) will extend this graph without breaking it.
+
+### Design docs
+
+Before making a non-trivial change, skim the specs under [`specs/`](./specs) — they describe the intended shape of the product and are the best reference for "why" questions:
+
+- [`specs/principles.md`](./specs/principles.md) for what's in scope (and what's deliberately not).
+- [`specs/dsl.md`](./specs/dsl.md) for the canonical language design — if you're touching the grammar, parser, or validator, start here.
+- [`specs/architecture.md`](./specs/architecture.md) for the package graph, tech choices, and the `AssetResolver` contract.
+
+The specs live in-repo so PRs can update them alongside code when behavior changes.
 
 ## Common tasks
 
@@ -209,7 +220,7 @@ If the bug is a crash, attach the stack trace. If it's a wrong diagnostic (false
 
 ## Proposing features
 
-Open an issue first. For anything non-trivial, a short design sketch — what changes, how the user sees it, what breaks — speeds up review significantly. The project has an opinionated scope (see `README.md` § Status); features that don't fit the core DSL/tooling remit may be better implemented as external consumers of `@nowline/core`.
+Open an issue first. For anything non-trivial, a short design sketch — what changes, how the user sees it, what breaks — speeds up review significantly. The project has an opinionated scope (see `README.md` § Status and [`specs/principles.md`](./specs/principles.md)); features that don't fit the core DSL/tooling remit may be better implemented as external consumers of `@nowline/core`.
 
 ## Licensing
 

@@ -39,7 +39,7 @@ milestone beta "Beta" after:[auth-refactor, audit-log]
 
 ## Status
 
-Nowline is pre-release. Nothing is published to package registries, Homebrew, or GitHub Releases yet — the toolchain runs from source. Stable releases will land with the milestones tracked in [`nowline-commercial/specs/milestones.md`](../nowline-commercial/specs/milestones.md) (private). The parser, validator, and CLI (validate / convert / init) are usable today.
+Nowline is pre-release. Nothing is published to package registries, Homebrew, or GitHub Releases yet — the toolchain runs from source. Stable releases will land with the milestones tracked in [`specs/milestones.md`](./specs/milestones.md). The parser, validator, and CLI (validate / convert / init) are usable today.
 
 ## Packages
 
@@ -51,6 +51,22 @@ This repository is an OSS monorepo of the Nowline language tooling.
 | [`@nowline/cli`](./packages/cli) | `nowline` command: `validate`, `convert` (text ↔ JSON), `init`. |
 
 Planned: a layout engine and SVG renderer (`render` / `serve` commands), a browser embed script, and an LSP / VS Code extension.
+
+## Design
+
+Design specs for the DSL, renderer, CLI, IDE integrations, and OSS milestones live under [`specs/`](./specs). Start here if you want to understand how Nowline is shaped before touching code.
+
+| Spec | Scope |
+|------|-------|
+| [`specs/principles.md`](./specs/principles.md) | What Nowline is and isn't — scope, guiding principles, design constraints |
+| [`specs/architecture.md`](./specs/architecture.md) | Monorepo layout, package dependency graph, tech choices |
+| [`specs/dsl.md`](./specs/dsl.md) | The `.nowline` language — full grammar reference |
+| [`specs/cli.md`](./specs/cli.md) | CLI surface (`validate`, `convert`, `init`, `render`, `serve`) |
+| [`specs/rendering.md`](./specs/rendering.md) | Positioned model and SVG renderer |
+| [`specs/ide.md`](./specs/ide.md) | LSP and editor integrations (VS Code, Obsidian, Neovim, JetBrains) |
+| [`specs/embed.md`](./specs/embed.md) | Browser embed script and GitHub Action |
+| [`specs/features.md`](./specs/features.md) | Scoring rubric + feature tables (m1–m4b) |
+| [`specs/milestones.md`](./specs/milestones.md) | OSS roadmap (m1–m4b) |
 
 ## Try it from source
 
