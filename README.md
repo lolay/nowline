@@ -48,9 +48,11 @@ This repository is an OSS monorepo of the Nowline language tooling.
 | Package | Purpose |
 |---|---|
 | [`@nowline/core`](./packages/core) | Parser, typed AST, and validator. Pure TypeScript; no DOM, no Node-specific APIs in the hot path. |
-| [`@nowline/cli`](./packages/cli) | `nowline` command: `validate`, `convert` (text ↔ JSON), `init`. |
+| [`@nowline/layout`](./packages/layout) | Layout engine — AST → positioned model (themes, style resolution, calendar, timeline). |
+| [`@nowline/renderer`](./packages/renderer) | SVG renderer — positioned model → deterministic SVG string. |
+| [`@nowline/cli`](./packages/cli) | `nowline` command: `validate`, `convert`, `init`, `render`, `serve`. |
 
-Planned: a layout engine and SVG renderer (`render` / `serve` commands), a browser embed script, and an LSP / VS Code extension.
+Planned: a browser embed script and an LSP / VS Code extension.
 
 ## Design
 
@@ -84,6 +86,8 @@ That produces `packages/cli/dist/index.js` with a `#!/usr/bin/env node` shebang.
 ```bash
 node packages/cli/dist/index.js validate examples/minimal.nowline
 node packages/cli/dist/index.js convert  examples/minimal.nowline
+node packages/cli/dist/index.js render   examples/minimal.nowline -o minimal.svg
+node packages/cli/dist/index.js serve    examples/minimal.nowline
 node packages/cli/dist/index.js init --template=minimal
 ```
 
@@ -120,6 +124,30 @@ nowline convert roadmap.nowline | jq '.ast.roadmapDecl.name'
 ```
 
 The emitted JSON carries a top-level `"$nowlineSchema": "1"` so downstream tools can detect schema changes. Comments are not preserved across round-trips — see [`packages/cli/README.md`](./packages/cli/README.md) for the canonical printer rules.
+
+### Render
+
+Render a `.nowline` file to SVG. The pipeline is `@nowline/core` parse → `@nowline/layout` layout → `@nowline/renderer` SVG.
+
+```bash
+nowline render roadmap.nowline                         # SVG to stdout
+nowline render roadmap.nowline -o roadmap.svg
+nowline render roadmap.nowline --theme dark --today 2026-03-15
+nowline render roadmap.nowline --asset-root ./brand --no-links --strict
+```
+
+Output is byte-for-byte deterministic for the same input, theme, and `--today`. Only `svg` is produced in m2b; `png` and `pdf` land in m2c.
+
+### Serve
+
+Run a live-reload preview in the browser. Great while authoring.
+
+```bash
+nowline serve roadmap.nowline                          # http://127.0.0.1:4318
+nowline serve roadmap.nowline --port 4400 --theme dark
+```
+
+The server re-parses, re-validates, re-lays-out, and re-renders on every file change; connected clients refresh automatically via Server-Sent Events. Validation errors are displayed as an overlay on top of the most recent successful render.
 
 ### Init
 
@@ -251,11 +279,13 @@ A TextMate grammar is at [`grammars/nowline.tmLanguage.json`](./grammars/nowline
 
 ## Examples
 
-Three progressively-richer examples are included:
+Progressively-richer examples are included:
 
 - [`examples/minimal.nowline`](./examples/minimal.nowline) — smallest complete file.
 - [`examples/teams.nowline`](./examples/teams.nowline) — persons, teams, anchors, milestones, footnotes.
 - [`examples/product.nowline`](./examples/product.nowline) — full config, styles, labels, parallels, groups, descriptions.
+- [`examples/long.nowline`](./examples/long.nowline) — stress test: eight swimlanes, ~160 items, parallels, groups, anchors, milestones, footnotes, cross-cutting labels. Used for layout/render perf.
+- [`examples/nested.nowline`](./examples/nested.nowline) + [`examples/nested/`](./examples/nested) — parent Security swimlane plus five isolated per-team roadmap includes (iOS, Android, Web, Platform, Data). Demonstrates `roadmap:isolate`.
 
 ## Contributing
 

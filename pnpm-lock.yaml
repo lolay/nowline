@@ -23,6 +23,12 @@ importers:
       '@nowline/core':
         specifier: workspace:*
         version: link:../core
+      '@nowline/layout':
+        specifier: workspace:*
+        version: link:../layout
+      '@nowline/renderer':
+        specifier: workspace:*
+        version: link:../renderer
       chalk:
         specifier: ^5.6.0
         version: 5.6.2
@@ -64,6 +70,44 @@ importers:
       langium-cli:
         specifier: ~4.2.0
         version: 4.2.0
+      typescript:
+        specifier: ~5.7.0
+        version: 5.7.3
+      vitest:
+        specifier: ^3.1.0
+        version: 3.2.4(@types/node@22.19.17)
+
+  packages/layout:
+    dependencies:
+      '@nowline/core':
+        specifier: workspace:*
+        version: link:../core
+    devDependencies:
+      '@nowline/renderer':
+        specifier: workspace:*
+        version: link:../renderer
+      langium:
+        specifier: ~4.2.2
+        version: 4.2.2
+      typescript:
+        specifier: ~5.7.0
+        version: 5.7.3
+      vitest:
+        specifier: ^3.1.0
+        version: 3.2.4(@types/node@22.19.17)
+
+  packages/renderer:
+    dependencies:
+      '@nowline/layout':
+        specifier: workspace:*
+        version: link:../layout
+    devDependencies:
+      '@nowline/core':
+        specifier: workspace:*
+        version: link:../core
+      langium:
+        specifier: ~4.2.2
+        version: 4.2.2
       typescript:
         specifier: ~5.7.0
         version: 5.7.3

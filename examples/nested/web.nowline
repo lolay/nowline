@@ -1,0 +1,52 @@
+nowline v1
+
+config
+
+scale
+  name: weeks
+  label-every: 4
+  label: "W{n}"
+
+style tech-debt-style
+  bg: gray
+  text: white
+
+style near-term
+  bg: blue
+  text: white
+  border: solid
+
+style long-term
+  bg: green
+  text: white
+  border: solid
+
+default item shadow:subtle
+default swimlane padding:sm spacing:none
+
+roadmap web-nested "Web (nested)" author:"Web Team" start:2026-01-01
+
+duration sm length:3d
+duration md length:1w
+duration lg length:2w
+duration xl length:1m
+
+label tech-debt "Tech debt" style:tech-debt-style
+label agent "Agent" style:near-term
+label self-service "Self-service" style:long-term
+
+anchor kickoff date:2026-01-06
+
+swimlane web
+  item web-spa-upgrade "SPA framework upgrade" duration:xl after:kickoff status:in-progress remaining:30% labels:tech-debt
+  item web-design-system "Design system v3" duration:lg
+  item web-agent-console "Agent console" duration:md labels:agent
+  item web-agent-playground "Agent playground" duration:md labels:agent
+  item web-ss-portal "Self-service portal" duration:lg labels:self-service
+  item web-ss-docs "Self-service docs" duration:md labels:self-service
+  item web-ss-onboarding "Self-service onboarding" duration:md labels:self-service
+  item web-a11y "Accessibility pass" duration:md
+  item web-perf-budget "Perf budget tooling" duration:md
+  item web-search "Search v2" duration:md
+
+milestone web-beta "Web Beta" after:[web-spa-upgrade, web-agent-console]

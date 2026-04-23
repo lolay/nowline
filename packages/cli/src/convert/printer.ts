@@ -19,6 +19,7 @@ const KEY_ORDER = [
     'start',
     'scale',
     'calendar',
+    'header-position',
 ];
 
 const INDENT = '  ';

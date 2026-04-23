@@ -44,4 +44,16 @@ describe('canonical printer rules', () => {
         );
         expect(out).toMatch(/\n    description "hello"/);
     });
+
+    it('orders header-position after calendar on default roadmap', async () => {
+        const out = await canonical(
+            `config\ndefault roadmap header-position:above calendar:full\nroadmap r "R"\nswimlane s "S"\n  item x "X" duration:1w\n`,
+        );
+        const defaultLine = out.split('\n').find((l) => l.includes('default roadmap'));
+        expect(defaultLine).toBeDefined();
+        const calIdx = defaultLine!.indexOf('calendar:');
+        const hpIdx = defaultLine!.indexOf('header-position:');
+        expect(calIdx).toBeGreaterThan(-1);
+        expect(hpIdx).toBeGreaterThan(calIdx);
+    });
 });

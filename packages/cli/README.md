@@ -31,6 +31,8 @@ npm install -g @nowline/cli
 | `nowline validate <input\|-> [--format text\|json]` | Parse and validate |
 | `nowline convert <input> [-o path] [-f json\|nowline]` | Bidirectional text ↔ JSON |
 | `nowline init [--name ...] [--template minimal\|teams\|product] [--force]` | Scaffold a starter file |
+| `nowline render <input\|-> [-o path] [-f svg] [--theme light\|dark] [--today YYYY-MM-DD] [--asset-root dir] [--no-links] [--strict] [--width N] [--force]` | Render a roadmap to SVG |
+| `nowline serve <input> [--port N] [--host host] [--theme light\|dark] [--today YYYY-MM-DD] [--asset-root dir]` | Live-reload preview in a browser |
 
 ### Exit codes
 
@@ -38,7 +40,7 @@ npm install -g @nowline/cli
 |------|---------|
 | 0 | Success |
 | 1 | Validation error |
-| 2 | File not found or unreadable |
+| 2 | File not found, unreadable, or unsupported option |
 | 3 | Output error (cannot write to destination) |
 
 ## Arg parser choice
@@ -176,6 +178,48 @@ When serializing an AST JSON back to `.nowline` text, the printer enforces a can
 - **Comments:** **not preserved** across round-trips. The m1 AST does not currently carry trivia. Documented limitation; a follow-up grammar ticket will add trivia support so that future `convert` runs round-trip comments as well.
 
 Round-trip property: for every file in `examples/`, `text → json → text` and `json → text → json` are idempotent modulo comment loss. Enforced by the test suite.
+
+## `render`
+
+Produce an SVG from a `.nowline` file. The renderer pipeline is `@nowline/core` parse → `@nowline/layout` layout → `@nowline/renderer` SVG.
+
+```bash
+nowline render examples/minimal.nowline                # stdout
+nowline render examples/minimal.nowline -o out.svg
+nowline render - -o out.svg < examples/minimal.nowline
+nowline render roadmap.nowline --theme dark --today 2026-03-15
+nowline render roadmap.nowline --asset-root ./brand --no-links --strict
+```
+
+Flags:
+
+- `-o, --output <path>` — Write to a file. Refuses to overwrite unless `--force`.
+- `-f, --format <svg>` — Output format. Only `svg` ships in m2b; `png` / `pdf` arrive in m2c.
+- `--theme light|dark` — Color theme (default: `light`).
+- `--today YYYY-MM-DD` — Override today for the now-line. Useful for deterministic snapshots.
+- `--asset-root <dir>` — Directory from which `logo:` and image assets may be loaded. Assets outside the root are rejected.
+- `--no-links` — Strip link icons from rendered items. Useful for static exports.
+- `--strict` — Promote asset and sanitizer warnings to errors (exit 1).
+- `--width <N>` — Canvas width in px (default: 1280).
+
+Output is byte-for-byte deterministic for identical input.
+
+## `serve`
+
+Live-reload preview. Opens a minimal HTML shell at `http://<host>:<port>/` that fetches `/svg` and subscribes to `/events` (SSE). On file changes, the server re-parses, re-validates, re-lays-out, and re-renders; clients refresh automatically. Validation errors are shown as an overlay on top of the most recent successful render.
+
+```bash
+nowline serve roadmap.nowline
+nowline serve roadmap.nowline --port 4400 --theme dark
+```
+
+Flags:
+
+- `--port <N>` — Port to bind (default: `4318`).
+- `--host <host>` — Interface (default: `127.0.0.1`). Binding to `0.0.0.0` exposes the server on the LAN — don't do that with sensitive data.
+- `--theme`, `--today`, `--asset-root` — Same semantics as `render`.
+
+`serve` is intended for local authoring only. It is not a production preview service.
 
 ## `init`
 

@@ -1,0 +1,63 @@
+nowline v1
+
+include "./nested/platform.nowline" roadmap:isolate
+include "./nested/ios.nowline" roadmap:isolate
+include "./nested/android.nowline" roadmap:isolate
+include "./nested/web.nowline" roadmap:isolate
+include "./nested/data.nowline" roadmap:isolate
+
+config
+
+scale
+  name: weeks
+  label-every: 4
+  label: "W{n}"
+
+style tech-debt-style
+  bg: gray
+  text: white
+
+style near-term
+  bg: blue
+  text: white
+  border: solid
+
+style long-term
+  bg: green
+  text: white
+  border: solid
+
+default item shadow:subtle
+default swimlane padding:sm spacing:none
+default roadmap padding:md header-height:md font:sans
+
+roadmap nested-2026 "Nested Example 2026" author:"Acme Security" start:2026-01-01
+
+duration sm length:3d
+duration md length:1w
+duration lg length:2w
+duration xl length:1m
+
+label tech-debt "Tech debt" style:tech-debt-style
+label agent "Agent" style:near-term
+label self-service "Self-service" style:long-term
+
+anchor kickoff date:2026-01-06
+anchor eoy "End of Year" date:2026-12-14
+
+swimlane security
+  item sec-audit-log "Audit log v2" duration:xl after:kickoff status:at-risk remaining:25% labels:tech-debt
+  item sec-sso "SSO hardening" duration:lg
+  item sec-mfa "MFA rollout" duration:md
+  item sec-rbac "RBAC v2" duration:lg
+  item sec-agent-auth "Agent auth hardening" duration:md labels:agent
+  item sec-agent-secrets "Agent secrets isolation" duration:md labels:agent
+  item sec-secrets "Secrets manager migration" duration:md
+  item sec-compliance-soc2 "SOC 2 Type II" duration:lg
+  item sec-zero-trust "Zero-trust rollout" duration:lg
+  item sec-dep-scan "Dependency scanning" duration:sm labels:tech-debt
+
+milestone security-ga "Security GA" date:2026-12-01 after:[sec-audit-log, sec-compliance-soc2]
+
+footnote vendor-dep "Vendor dependency" on:sec-audit-log
+  description "Blocked until vendor contract is signed. Expected March resolution."

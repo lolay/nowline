@@ -141,6 +141,38 @@ swimlane s
         expect(hasError(errorMessages(r.diagnostics), /border|squiggly/i)).toBe(true);
     });
 
+    it('Rule 18: header-position beside/above are accepted', async () => {
+        const rBeside = await parse(
+            `config\nstyle compact\n  header-position: beside\nroadmap r style:compact\nswimlane s\n  item x duration:1w\n`,
+        );
+        expect(errorMessages(rBeside.diagnostics)).toEqual([]);
+        const rAbove = await parse(
+            `config\nstyle wide\n  header-position: above\nroadmap r style:wide\nswimlane s\n  item x duration:1w\n`,
+        );
+        expect(errorMessages(rAbove.diagnostics)).toEqual([]);
+    });
+
+    it('Rule 18: header-position with invalid value is an error', async () => {
+        const r = await parse(
+            `config\nstyle bad\n  header-position: sideways\nroadmap r style:bad\nswimlane s\n  item x duration:1w\n`,
+        );
+        expect(hasError(errorMessages(r.diagnostics), /header-position|sideways/i)).toBe(true);
+    });
+
+    it('Rule 18: header-position on default roadmap is accepted', async () => {
+        const r = await parse(
+            `config\ndefault roadmap header-position:above\nroadmap r\nswimlane s\n  item x duration:1w\n`,
+        );
+        expect(errorMessages(r.diagnostics)).toEqual([]);
+    });
+
+    it('Rule 20: raw header-position on roadmap declaration is an error', async () => {
+        const r = await parse(
+            `roadmap r header-position:above\nswimlane s\n  item x duration:1w\n`,
+        );
+        expect(hasError(errorMessages(r.diagnostics), /Raw style property "header-position"/i)).toBe(true);
+    });
+
     it('Rule 20: raw style property on item is an error', async () => {
         const r = await parse(
             `roadmap r\nswimlane s\n  item x duration:1w bg:red\n`,

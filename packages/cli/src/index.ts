@@ -4,6 +4,8 @@ import { versionCommand } from './commands/version.js';
 import { validateCommand } from './commands/validate.js';
 import { convertCommand } from './commands/convert.js';
 import { initCommand } from './commands/init.js';
+import { renderCommand } from './commands/render.js';
+import { serveCommand } from './commands/serve.js';
 import { CLI_VERSION } from './version.js';
 import { CliError, ExitCode } from './io/exit-codes.js';
 
@@ -18,6 +20,8 @@ const main = defineCommand({
         validate: validateCommand,
         convert: convertCommand,
         init: initCommand,
+        render: renderCommand,
+        serve: serveCommand,
     },
 });
 

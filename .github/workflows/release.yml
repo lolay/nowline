@@ -63,6 +63,25 @@ jobs:
         working-directory: packages/cli
         run: node scripts/compile.mjs --target=${{ matrix.target }}
 
+      - name: Smoke test binary (render)
+        if: matrix.runner != 'windows-latest'
+        shell: bash
+        run: |
+          set -euo pipefail
+          bin=packages/cli/dist-bin/nowline-${{ matrix.suffix }}
+          if [[ "${{ matrix.runner }}" == "macos-latest" && "${{ matrix.target }}" != *"darwin"* ]]; then
+            echo "cross-target binary; skipping execution smoke"
+            exit 0
+          fi
+          if [[ "${{ matrix.runner }}" == "ubuntu-latest" && "${{ matrix.target }}" != *"linux-x64"* ]]; then
+            echo "cross-target binary; skipping execution smoke"
+            exit 0
+          fi
+          chmod +x "$bin"
+          "$bin" version
+          "$bin" render examples/minimal.nowline > /tmp/minimal.svg
+          head -c 4 /tmp/minimal.svg | grep -q "<svg"
+
       - name: Upload binary artifact
         uses: actions/upload-artifact@v4
         with:
@@ -127,6 +146,18 @@ jobs:
 
       - name: Publish @nowline/core
         working-directory: packages/core
+        run: pnpm publish --access public --no-git-checks
+        env:
+          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
+
+      - name: Publish @nowline/layout
+        working-directory: packages/layout
+        run: pnpm publish --access public --no-git-checks
+        env:
+          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
+
+      - name: Publish @nowline/renderer
+        working-directory: packages/renderer
         run: pnpm publish --access public --no-git-checks
         env:
           NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}

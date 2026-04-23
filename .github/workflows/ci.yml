@@ -90,6 +90,8 @@ jobs:
           chmod +x "$BIN"
           "$BIN" version
           "$BIN" validate ../../examples/minimal.nowline
+          "$BIN" render ../../examples/minimal.nowline > /tmp/minimal.svg
+          head -c 4 /tmp/minimal.svg | grep -q "<svg"
 
       - name: Smoke test compiled binary (Windows)
         if: runner.os == 'Windows'
@@ -99,3 +101,5 @@ jobs:
           $bin = (Get-ChildItem dist-bin/nowline-*.exe | Select-Object -First 1).FullName
           & $bin version
           & $bin validate ../../examples/minimal.nowline
+          $svg = & $bin render ../../examples/minimal.nowline
+          if (-not $svg.StartsWith("<svg")) { throw "render did not emit SVG" }

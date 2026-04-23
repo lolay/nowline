@@ -1,0 +1,231 @@
+nowline v1
+
+config
+
+scale
+  name: weeks
+  label-every: 4
+  label: "W{n}"
+
+style tech-debt-style
+  bg: gray
+  text: white
+
+style near-term
+  bg: blue
+  text: white
+  border: solid
+
+style long-term
+  bg: green
+  text: white
+  border: solid
+
+default item shadow:subtle
+default swimlane padding:sm spacing:none
+default roadmap padding:md header-height:md font:sans
+default parallel bracket:none
+
+roadmap long-2026 "Long Example 2026" author:"Acme Engineering" start:2026-01-01
+
+duration xs length:1d
+duration sm length:3d
+duration md length:1w
+duration lg length:2w
+duration xl length:1m
+
+label tech-debt "Tech debt" style:tech-debt-style
+label agent "Agent" style:near-term
+label self-service "Self-service" style:long-term
+
+anchor kickoff date:2026-01-06
+anchor mid-year "Mid-year Review" date:2026-07-01
+anchor eoy "End of Year" date:2026-12-14
+
+swimlane platform
+  item pf-auth-refactor "Auth refactor" duration:lg after:kickoff status:done labels:tech-debt
+  item pf-service-mesh "Service mesh" duration:xl after:pf-auth-refactor status:in-progress remaining:40% labels:agent
+  item pf-api-gateway "API gateway" duration:lg after:pf-service-mesh labels:agent
+  item pf-events "Event bus" duration:md
+  item pf-caching "Caching tier" duration:md
+  item pf-telemetry "Telemetry pipe" duration:md labels:tech-debt
+  item pf-rate-limit "Rate limit rewrite" duration:sm
+  item pf-logs "Log ingestion" duration:sm
+  item pf-metrics "Metrics v2" duration:md
+  item pf-tracing "Distributed tracing" duration:md labels:agent
+  parallel after:pf-tracing
+    group agent-platform-track "Agent platform track"
+      item pf-agent-runtime "Agent runtime" duration:md labels:agent
+      item pf-agent-sdk "Agent SDK" duration:md labels:agent
+      item pf-agent-auth "Agent auth" duration:md labels:agent
+      item pf-agent-observability "Agent observability" duration:md labels:[agent, tech-debt]
+      item pf-agent-eval "Agent eval harness" duration:md labels:agent
+    group self-service-framework "Self-service framework"
+      item pf-ss-catalog "Service catalog" duration:md labels:self-service
+      item pf-ss-onboarding "Self-service onboarding" duration:md labels:self-service
+      item pf-ss-templates "Project templates" duration:md labels:self-service
+      item pf-ss-quotas "Quota management" duration:md labels:self-service
+      item pf-ss-billing "Self-service billing" duration:md labels:self-service
+
+swimlane ios
+  item ios-offline "Offline mode" duration:lg after:kickoff status:at-risk remaining:60%
+  item ios-push "Push notifications" duration:md
+  item ios-widgets "Home-screen widgets" duration:md labels:tech-debt
+  item ios-deep-link "Deep linking" duration:sm
+  item ios-performance "Performance pass" duration:md
+  item ios-share "Share sheet" duration:sm
+  item ios-biometric "Biometric auth" duration:md
+  item ios-agent-surface "Agent entry point" duration:md labels:agent
+  item ios-agent-voice "Agent voice mode" duration:md labels:agent
+  item ios-watch "Watch companion" duration:lg
+  item ios-carplay "CarPlay support" duration:lg
+  item ios-ipad "iPad adaptation" duration:xl
+  item ios-a11y "Accessibility pass" duration:md
+  item ios-localization "Localization pass" duration:md
+  item ios-onboarding "Onboarding v2" duration:md
+  item ios-camera "Camera refactor" duration:md labels:tech-debt
+  item ios-notifications "Notification center" duration:sm
+  item ios-settings "Settings revamp" duration:md
+  item ios-crash "Crash hardening" duration:sm
+  item ios-agent-chat "Agent chat UI" duration:md labels:agent
+
+swimlane android
+  item and-offline "Offline sync" duration:lg after:kickoff status:in-progress remaining:55%
+  item and-push "Push notifications" duration:md
+  item and-material-you "Material You themes" duration:md
+  item and-deep-link "Deep linking" duration:sm
+  item and-performance "Performance pass" duration:md labels:tech-debt
+  item and-biometric "Biometric auth" duration:md
+  item and-agent-surface "Agent entry point" duration:md labels:agent
+  item and-agent-voice "Agent voice mode" duration:md labels:agent
+  item and-wear "Wear OS companion" duration:lg
+  item and-auto "Android Auto" duration:lg
+  item and-tablet "Tablet adaptation" duration:xl
+  item and-a11y "Accessibility pass" duration:md
+  item and-localization "Localization pass" duration:md
+  item and-onboarding "Onboarding v2" duration:md
+  item and-camera "Camera refactor" duration:md labels:tech-debt
+  item and-notifications "Notification center" duration:sm
+  item and-settings "Settings revamp" duration:md
+  item and-crash "Crash hardening" duration:sm
+  item and-widgets "Glanceable widgets" duration:md
+  item and-agent-chat "Agent chat UI" duration:md labels:agent
+
+swimlane web
+  item web-spa-upgrade "SPA framework upgrade" duration:xl after:kickoff status:in-progress remaining:30% labels:tech-debt
+  item web-design-system "Design system v3" duration:lg
+  item web-a11y "Accessibility pass" duration:md
+  item web-perf-budget "Perf budget tooling" duration:md
+  item web-ssr "SSR rollout" duration:lg
+  item web-edge-cache "Edge caching" duration:md
+  item web-agent-console "Agent console" duration:md labels:agent
+  item web-agent-playground "Agent playground" duration:md labels:agent
+  item web-ss-portal "Self-service portal" duration:lg labels:self-service
+  item web-ss-docs "Self-service docs" duration:md labels:self-service
+  item web-ss-onboarding "Self-service onboarding" duration:md labels:self-service
+  item web-auth-ui "Auth UI refresh" duration:md
+  item web-dashboards "Dashboards v2" duration:md
+  item web-billing-ui "Billing UI" duration:md
+  item web-notifications "In-app notifications" duration:sm
+  item web-localization "Localization pass" duration:md
+  item web-settings "Settings revamp" duration:md
+  item web-search "Search v2" duration:md
+  item web-admin "Admin console" duration:md
+  item web-pwa "PWA install flow" duration:sm
+
+swimlane data
+  item data-warehouse "Warehouse migration" duration:xl after:kickoff status:in-progress remaining:50% labels:tech-debt
+  item data-streaming "Streaming pipeline" duration:lg labels:agent
+  item data-catalog "Data catalog" duration:md
+  item data-lineage "Data lineage" duration:md
+  item data-governance "Governance policies" duration:md
+  item data-privacy "Privacy tooling" duration:md
+  item data-agent-features "Agent feature store" duration:md labels:agent
+  item data-agent-eval "Agent eval dataset" duration:md labels:agent
+  item data-ss-exports "Self-service exports" duration:md labels:self-service
+  item data-ss-sql "Self-service SQL editor" duration:lg labels:self-service
+  item data-reverse-etl "Reverse ETL" duration:md
+  item data-dq-alerts "Data quality alerts" duration:md
+  item data-pii-scan "PII scanner" duration:md
+  item data-contract "Data contracts" duration:md
+  item data-bi-integration "BI integration" duration:md
+  item data-notebook "Notebook hosting" duration:md
+  item data-replication "Cross-region replication" duration:lg
+  item data-metadata "Metadata service" duration:md
+  item data-backfills "Backfill tooling" duration:md
+  item data-ml-registry "ML registry" duration:md
+
+swimlane science
+  item sci-retrieval "Retrieval rewrite" duration:lg after:kickoff labels:agent
+  item sci-ranker "Ranker v2" duration:md labels:agent
+  item sci-embedding "Embedding model" duration:lg labels:agent
+  item sci-prompt-lib "Prompt library" duration:sm labels:agent
+  item sci-eval-bench "Eval benchmarks" duration:md labels:agent
+  item sci-red-team "Red-team suite" duration:md
+  item sci-hallucination "Hallucination guardrails" duration:md labels:agent
+  item sci-distillation "Model distillation" duration:lg labels:tech-debt
+  item sci-guardrails "Safety guardrails" duration:md
+  item sci-finetune "Fine-tune pipeline" duration:md
+  item sci-feedback "Feedback loop" duration:md
+  item sci-ab-tests "A/B eval harness" duration:md
+  item sci-routing "Model routing" duration:md
+  item sci-caching "Inference cache" duration:sm
+  item sci-latency "Latency optimization" duration:md
+  item sci-memory "Long-term memory" duration:md labels:agent
+  item sci-tools "Tool-use framework" duration:md labels:agent
+  item sci-multimodal "Multimodal pipeline" duration:lg
+  item sci-cost "Cost optimization" duration:md
+  item sci-refresh "Data refresh cadence" duration:sm
+
+swimlane security
+  item sec-audit-log "Audit log v2" duration:xl after:kickoff status:at-risk remaining:25% labels:tech-debt
+  item sec-sso "SSO hardening" duration:lg
+  item sec-mfa "MFA rollout" duration:md
+  item sec-rbac "RBAC v2" duration:lg
+  item sec-secrets "Secrets manager migration" duration:md
+  item sec-keys "Key rotation" duration:md
+  item sec-csp "CSP tightening" duration:sm labels:tech-debt
+  item sec-waf "WAF rules" duration:md
+  item sec-pentest-q1 "Q1 pentest response" duration:md
+  item sec-pentest-q3 "Q3 pentest response" duration:md
+  item sec-compliance-soc2 "SOC 2 Type II" duration:lg
+  item sec-compliance-iso "ISO 27001" duration:xl
+  item sec-vuln-scan "Vuln scanner rollout" duration:md
+  item sec-dep-scan "Dependency scanning" duration:sm
+  item sec-incident-runbooks "Incident runbooks" duration:md
+  item sec-siem "SIEM onboarding" duration:lg
+  item sec-zero-trust "Zero-trust rollout" duration:lg
+  item sec-device-posture "Device posture" duration:md
+  item sec-bug-bounty "Bug bounty program" duration:md
+  item sec-training "Security training" duration:sm
+
+swimlane infra
+  item infra-k8s "Kubernetes upgrade" duration:lg after:kickoff status:done labels:tech-debt
+  item infra-ci "CI pipeline rewrite" duration:lg labels:tech-debt
+  item infra-cost "Cost reduction" duration:md
+  item infra-multi-region "Multi-region rollout" duration:xl
+  item infra-dr "Disaster recovery" duration:lg
+  item infra-sre-runbooks "SRE runbooks" duration:md
+  item infra-observability "Observability stack" duration:md
+  item infra-tracing "Tracing backbone" duration:md
+  item infra-log-pipeline "Log pipeline" duration:md
+  item infra-metrics "Metrics backbone" duration:md
+  item infra-chaos "Chaos engineering" duration:md
+  item infra-backup "Backup/restore audit" duration:sm
+  item infra-tf-modules "Terraform module library" duration:md
+  item infra-secrets "Secrets plumbing" duration:sm
+  item infra-network "Network redesign" duration:lg
+  item infra-dns "DNS hardening" duration:sm
+  item infra-registry "Internal registry" duration:md
+  item infra-cdn "CDN strategy" duration:md
+  item infra-iac-drift "IaC drift detection" duration:md
+  item infra-runtime "Runtime modernization" duration:lg
+
+milestone beta "Beta" after:[pf-service-mesh, web-spa-upgrade]
+milestone ga-launch "GA Launch" date:2026-12-15 after:[pf-api-gateway, sec-audit-log, data-warehouse]
+
+footnote vendor-dep "Vendor dependency" on:sec-audit-log
+  description "Blocked until vendor contract is signed. Expected March resolution."
+
+footnote agent-rollout "Agent platform rollout" on:[pf-service-mesh, pf-agent-runtime, sci-retrieval]
+  description "Shared program milestone across platform and science for the agent launch."
