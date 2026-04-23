@@ -68,7 +68,7 @@ Everything else `nowline render` can emit. Each format is an adapter on top of t
 - XLSX — ExcelJS workbook (Roadmap, Items, Milestones, Anchors, People and Teams)
 - MS Project XML — lossy export for PM tool import
 
-Spec: [`specs/rendering.md`](./rendering.md) § Output Formats, [`specs/cli.md`](./cli.md)
+Spec: [`specs/rendering.md`](./rendering.md) § Output Formats, [`specs/cli.md`](./cli.md) | Handoff: [`specs/handoffs/m2c.md`](./handoffs/m2c.md)
 
 ### m3 — Embed
 
