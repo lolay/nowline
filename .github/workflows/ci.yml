@@ -88,9 +88,9 @@ jobs:
         run: |
           BIN="$(ls dist-bin/nowline-* | head -n 1)"
           chmod +x "$BIN"
-          "$BIN" version
-          "$BIN" validate ../../examples/minimal.nowline
-          "$BIN" render ../../examples/minimal.nowline > /tmp/minimal.svg
+          "$BIN" --version
+          "$BIN" ../../examples/minimal.nowline --dry-run
+          "$BIN" ../../examples/minimal.nowline -o - > /tmp/minimal.svg
           head -c 4 /tmp/minimal.svg | grep -q "<svg"
 
       - name: Smoke test compiled binary (Windows)
@@ -99,7 +99,7 @@ jobs:
         shell: pwsh
         run: |
           $bin = (Get-ChildItem dist-bin/nowline-*.exe | Select-Object -First 1).FullName
-          & $bin version
-          & $bin validate ../../examples/minimal.nowline
-          $svg = & $bin render ../../examples/minimal.nowline
+          & $bin --version
+          & $bin ../../examples/minimal.nowline --dry-run
+          $svg = & $bin ../../examples/minimal.nowline -o -
           if (-not $svg.StartsWith("<svg")) { throw "render did not emit SVG" }

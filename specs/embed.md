@@ -155,4 +155,4 @@ The action:
 
 ### How It Works Under the Hood
 
-The action installs the `nowline` CLI (from npm), then runs `nowline render` for each input. No Docker image required — it runs directly on the GitHub Actions runner.
+The action installs the `nowline` CLI (from npm), then runs `nowline <input>` (verbless) for each input. No Docker image required — it runs directly on the GitHub Actions runner.

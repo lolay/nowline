@@ -3,21 +3,44 @@ import * as path from 'node:path';
 import { CliError, ExitCode } from './exit-codes.js';
 
 export interface WriteOutputOptions {
-    force?: boolean;
+    /**
+     * Current working directory used to resolve relative output paths. Defaults
+     * to `process.cwd()`.
+     */
     cwd?: string;
+    /**
+     * Test seam: writes the output bytes to `absPath`. Defaults to
+     * `fs.writeFile`.
+     */
     writeFile?: (absPath: string, data: string | Uint8Array) => Promise<void>;
-    fileExists?: (absPath: string) => Promise<boolean>;
+    /**
+     * Test seam: stdout writer. Defaults to `process.stdout.write`.
+     */
     stdoutWrite?: (data: string | Uint8Array) => boolean;
+    /**
+     * Test seam: stdout-is-a-TTY override. Defaults to `process.stdout.isTTY`.
+     */
     stdoutIsTTY?: boolean;
 }
 
+export type OutputFormat = 'text' | 'binary';
+
+/**
+ * Writes `data` to either a file (`outputArg` is a path) or stdout (`outputArg`
+ * is `-` or `undefined` — though `undefined` is no longer the default; mode
+ * dispatch always resolves a concrete path now).
+ *
+ * Existing files are silently overwritten. m2b.5 removed the `--force` gate;
+ * matches POSIX redirection (`> file`) and every peer drawing CLI (mmdc, d2,
+ * prettier, tsc, pandoc).
+ */
 export async function writeOutput(
     outputArg: string | undefined,
     data: string | Uint8Array,
     format: OutputFormat,
     options: WriteOutputOptions = {},
 ): Promise<void> {
-    if (!outputArg) {
+    if (outputArg === undefined || outputArg === '-') {
         guardBinaryStdout(format, options);
         const write = options.stdoutWrite ?? ((chunk) => process.stdout.write(chunk));
         const payload = ensureTrailingNewline(data, format);
@@ -28,16 +51,6 @@ export async function writeOutput(
     const cwd = options.cwd ?? process.cwd();
     const absPath = path.resolve(cwd, outputArg);
 
-    if (!options.force) {
-        const exists = options.fileExists ?? defaultFileExists;
-        if (await exists(absPath)) {
-            throw new CliError(
-                ExitCode.OutputError,
-                `Refusing to overwrite ${outputArg} without --force`,
-            );
-        }
-    }
-
     const writeFile = options.writeFile ?? ((p, d) => fs.writeFile(p, d));
     try {
         await writeFile(absPath, data);
@@ -46,15 +59,13 @@ export async function writeOutput(
     }
 }
 
-export type OutputFormat = 'text' | 'binary';
-
 function guardBinaryStdout(format: OutputFormat, options: WriteOutputOptions): void {
     if (format !== 'binary') return;
     const isTTY = options.stdoutIsTTY ?? process.stdout.isTTY === true;
     if (isTTY) {
         throw new CliError(
-            ExitCode.OutputError,
-            'Refusing to write binary output to a terminal. Use -o <path> to write to a file.',
+            ExitCode.InputError,
+            'nowline: binary output to terminal refused; use -o <path> or pipe to a file.',
         );
     }
 }
@@ -77,13 +88,4 @@ function formatWriteError(outputArg: string, err: unknown): string {
 
 function isNodeError(err: unknown): err is NodeJS.ErrnoException {
     return err instanceof Error && typeof (err as { code?: unknown }).code === 'string';
-}
-
-async function defaultFileExists(absPath: string): Promise<boolean> {
-    try {
-        await fs.access(absPath);
-        return true;
-    } catch {
-        return false;
-    }
 }

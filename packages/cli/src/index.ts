@@ -1,61 +1,52 @@
 #!/usr/bin/env node
-import { defineCommand, runCommand, showUsage } from 'citty';
-import { versionCommand } from './commands/version.js';
-import { validateCommand } from './commands/validate.js';
-import { convertCommand } from './commands/convert.js';
-import { initCommand } from './commands/init.js';
-import { renderCommand } from './commands/render.js';
-import { serveCommand } from './commands/serve.js';
-import { CLI_VERSION } from './version.js';
+import { parseArgv } from './cli/args.js';
+import { renderHelp, renderVersion } from './cli/help.js';
+import { renderHandler } from './commands/render.js';
+import { serveHandler } from './commands/serve.js';
+import { initHandler } from './commands/init.js';
 import { CliError, ExitCode } from './io/exit-codes.js';
 
-const main = defineCommand({
-    meta: {
-        name: 'nowline',
-        version: CLI_VERSION,
-        description: 'Parse, validate, and convert .nowline roadmap files',
-    },
-    subCommands: {
-        version: versionCommand,
-        validate: validateCommand,
-        convert: convertCommand,
-        init: initCommand,
-        render: renderCommand,
-        serve: serveCommand,
-    },
-});
-
-// We intentionally bypass citty's runMain because it unconditionally calls
-// process.exit(1) on any thrown error, which clobbers our standardized exit
-// codes (see io/exit-codes.ts). This wrapper replicates runMain's --help and
-// --version handling, then routes thrown CliError instances to the exit code
-// they carry.
 async function run(): Promise<number> {
-    const rawArgs = process.argv.slice(2);
-    const helpFlags = ['--help', '-h'];
-    const versionFlags = ['--version', '-v'];
+    const argv = process.argv.slice(2);
 
-    if (rawArgs.some((arg) => helpFlags.includes(arg))) {
-        await showUsage(main);
+    let parsed;
+    try {
+        parsed = parseArgv(argv);
+    } catch (err) {
+        return handleError(err);
+    }
+
+    if (parsed.mode === 'help') {
+        process.stdout.write(renderHelp());
         return ExitCode.Success;
     }
-    if (rawArgs.length === 1 && versionFlags.includes(rawArgs[0])) {
-        process.stdout.write(`${CLI_VERSION}\n`);
+    if (parsed.mode === 'version') {
+        process.stdout.write(renderVersion());
         return ExitCode.Success;
     }
 
     try {
-        await runCommand(main, { rawArgs });
-        return ExitCode.Success;
-    } catch (err: unknown) {
-        if (err instanceof CliError) {
-            if (err.message) process.stderr.write(`${err.message}\n`);
-            return err.exitCode;
+        if (parsed.mode === 'init') {
+            await initHandler({ args: parsed });
+        } else if (parsed.mode === 'serve') {
+            await serveHandler({ args: parsed });
+        } else {
+            await renderHandler({ args: parsed });
         }
-        const message = err instanceof Error ? (err.stack ?? err.message) : String(err);
-        process.stderr.write(`${message}\n`);
-        return ExitCode.ValidationError;
+        return ExitCode.Success;
+    } catch (err) {
+        return handleError(err);
     }
+}
+
+function handleError(err: unknown): number {
+    if (err instanceof CliError) {
+        if (err.message) process.stderr.write(`${err.message}\n`);
+        return err.exitCode;
+    }
+    const message = err instanceof Error ? (err.stack ?? err.message) : String(err);
+    process.stderr.write(`${message}\n`);
+    return ExitCode.ValidationError;
 }
 
 run().then((code) => {

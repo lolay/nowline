@@ -39,7 +39,7 @@ milestone beta "Beta" after:[auth-refactor, audit-log]
 
 ## Status
 
-Nowline is pre-release. Nothing is published to package registries, Homebrew, or GitHub Releases yet — the toolchain runs from source. Stable releases will land with the milestones tracked in [`specs/milestones.md`](./specs/milestones.md). The parser, validator, and CLI (validate / convert / init) are usable today.
+Nowline is pre-release. Nothing is published to package registries, Homebrew, or GitHub Releases yet — the toolchain runs from source. Stable releases will land with the milestones tracked in [`specs/milestones.md`](./specs/milestones.md). The parser, validator, and CLI (verbless render, `--dry-run`, `--init`, `--serve`) are usable today.
 
 ## Packages
 
@@ -50,7 +50,7 @@ This repository is an OSS monorepo of the Nowline language tooling.
 | [`@nowline/core`](./packages/core) | Parser, typed AST, and validator. Pure TypeScript; no DOM, no Node-specific APIs in the hot path. |
 | [`@nowline/layout`](./packages/layout) | Layout engine — AST → positioned model (themes, style resolution, calendar, timeline). |
 | [`@nowline/renderer`](./packages/renderer) | SVG renderer — positioned model → deterministic SVG string. |
-| [`@nowline/cli`](./packages/cli) | `nowline` command: `validate`, `convert`, `init`, `render`, `serve`. |
+| [`@nowline/cli`](./packages/cli) | `nowline` command: verbless render with mode flags `--serve`, `--init`, `--dry-run`. |
 
 Planned: a browser embed script and an LSP / VS Code extension.
 
@@ -63,7 +63,7 @@ Design specs for the DSL, renderer, CLI, IDE integrations, and OSS milestones li
 | [`specs/principles.md`](./specs/principles.md) | What Nowline is and isn't — scope, guiding principles, design constraints |
 | [`specs/architecture.md`](./specs/architecture.md) | Monorepo layout, package dependency graph, tech choices |
 | [`specs/dsl.md`](./specs/dsl.md) | The `.nowline` language — full grammar reference |
-| [`specs/cli.md`](./specs/cli.md) | CLI surface (`validate`, `convert`, `init`, `render`, `serve`) |
+| [`specs/cli.md`](./specs/cli.md) | CLI surface (verbless render; `--serve`, `--init`, `--dry-run` mode flags) |
 | [`specs/rendering.md`](./specs/rendering.md) | Positioned model and SVG renderer |
 | [`specs/ide.md`](./specs/ide.md) | LSP and editor integrations (VS Code, Obsidian, Neovim, JetBrains) |
 | [`specs/embed.md`](./specs/embed.md) | Browser embed script and GitHub Action |
@@ -84,11 +84,10 @@ pnpm -r build
 That produces `packages/cli/dist/index.js` with a `#!/usr/bin/env node` shebang. Invoke it directly:
 
 ```bash
-node packages/cli/dist/index.js validate examples/minimal.nowline
-node packages/cli/dist/index.js convert  examples/minimal.nowline
-node packages/cli/dist/index.js render   examples/minimal.nowline -o minimal.svg
-node packages/cli/dist/index.js serve    examples/minimal.nowline
-node packages/cli/dist/index.js init --template=minimal
+node packages/cli/dist/index.js examples/minimal.nowline           # writes ./minimal.svg
+node packages/cli/dist/index.js examples/minimal.nowline --dry-run # validate only
+node packages/cli/dist/index.js examples/minimal.nowline --serve   # live preview
+node packages/cli/dist/index.js --init my-project                  # ./my-project.nowline
 ```
 
 Or expose it on your `PATH` with a local `npm link`:
@@ -96,69 +95,75 @@ Or expose it on your `PATH` with a local `npm link`:
 ```bash
 cd packages/cli
 npm link          # adds `nowline` to your PATH
-nowline validate examples/minimal.nowline
-nowline version
+nowline examples/minimal.nowline
+nowline --version
 ```
 
 ## Use the CLI
 
-### Validate
+`nowline` is **verbless**: rendering is the default. Other operations are flags on the same command.
 
-Parse a file and report errors and warnings. Exits `0` on success, `1` if any errors are emitted.
+### Render (default)
 
 ```bash
-nowline validate roadmap.nowline
-nowline validate - < roadmap.nowline               # read stdin
-nowline validate roadmap.nowline --format=json     # machine-readable output
+nowline roadmap.nowline                          # writes ./roadmap.svg
+nowline roadmap.nowline -f pdf                   # writes ./roadmap.pdf  (m2c)
+nowline roadmap.nowline -o roadmap.pdf           # format inferred from extension
+nowline roadmap.nowline -o -                     # SVG to stdout
+nowline roadmap.nowline --theme dark --today 2026-03-15
+nowline roadmap.nowline --asset-root ./brand --no-links --strict
+cat roadmap.nowline | nowline -                  # stdin → ./roadmap.svg
 ```
 
-### Convert
+The render pipeline is `@nowline/core` parse → `@nowline/layout` layout → `@nowline/renderer` SVG. Output is byte-for-byte deterministic for the same input, theme, and `--today`. Only `svg` is produced in m2b; `png`, `pdf`, `html`, `mermaid`, `xlsx`, and `msproj` land in m2c.
 
-Round-trip between canonical `.nowline` text and the AST as JSON. Either direction is inferred from file extensions, or chosen with `-f`.
+### Validate (`--dry-run`)
+
+Run the full pipeline (parse + validate + layout + format) without writing. Exits `0` on success, `1` if any errors are emitted.
 
 ```bash
-nowline convert roadmap.nowline                    # text → JSON to stdout
-nowline convert roadmap.nowline -o roadmap.json    # text → JSON to file
-nowline convert roadmap.json   -o roadmap.nowline  # JSON → text to file
-nowline convert roadmap.nowline | jq '.ast.roadmapDecl.name'
+nowline roadmap.nowline --dry-run
+nowline roadmap.nowline -n                          # short alias
+cat roadmap.nowline | nowline - --dry-run           # read stdin
+nowline roadmap.nowline -n --diagnostic-format json # machine-readable output
+```
+
+### Convert text ↔ JSON
+
+Convert is just `-f json` (or `-f nowline` to go the other way). Input format is inferred from the extension; `--input-format` overrides for unusual filenames.
+
+```bash
+nowline roadmap.nowline -f json -o roadmap.json    # text → JSON
+nowline roadmap.json -f nowline -o roadmap.nowline # JSON → text (canonical)
+nowline roadmap.nowline -f json -o - | jq '.ast.roadmapDecl.name'
 ```
 
 The emitted JSON carries a top-level `"$nowlineSchema": "1"` so downstream tools can detect schema changes. Comments are not preserved across round-trips — see [`packages/cli/README.md`](./packages/cli/README.md) for the canonical printer rules.
 
-### Render
-
-Render a `.nowline` file to SVG. The pipeline is `@nowline/core` parse → `@nowline/layout` layout → `@nowline/renderer` SVG.
-
-```bash
-nowline render roadmap.nowline                         # SVG to stdout
-nowline render roadmap.nowline -o roadmap.svg
-nowline render roadmap.nowline --theme dark --today 2026-03-15
-nowline render roadmap.nowline --asset-root ./brand --no-links --strict
-```
-
-Output is byte-for-byte deterministic for the same input, theme, and `--today`. Only `svg` is produced in m2b; `png` and `pdf` land in m2c.
-
-### Serve
+### Serve (`--serve`)
 
 Run a live-reload preview in the browser. Great while authoring.
 
 ```bash
-nowline serve roadmap.nowline                          # http://127.0.0.1:4318
-nowline serve roadmap.nowline --port 4400 --theme dark
+nowline roadmap.nowline --serve                    # http://127.0.0.1:4318
+nowline roadmap.nowline --serve -p 4400 -t dark --open
+nowline roadmap.nowline --serve -o latest.svg      # rewrite latest.svg on each rebuild
 ```
 
 The server re-parses, re-validates, re-lays-out, and re-renders on every file change; connected clients refresh automatically via Server-Sent Events. Validation errors are displayed as an overlay on top of the most recent successful render.
 
-### Init
+### Init (`--init`)
 
-Scaffold a new `.nowline` file from one of the bundled templates.
+Scaffold a new `.nowline` file in cwd. The positional argument is the **project name**, not a file path. `.nowline` is auto-appended.
 
 ```bash
-nowline init --template=minimal --name="Platform 2026"
-nowline init --template=teams   --name="Teams"   --force
+nowline --init                              # ./roadmap.nowline (default name)
+nowline --init my-project                   # ./my-project.nowline
+nowline --init my-plan.nowline              # ./my-plan.nowline (literal)
+nowline --init my-project --template=teams  # use the teams template
 ```
 
-`minimal`, `teams`, and `product` correspond to the files under [`examples/`](./examples).
+`minimal`, `teams`, and `product` correspond to the files under [`examples/`](./examples). Existing files are silently overwritten.
 
 ### Exit codes
 
@@ -166,7 +171,7 @@ nowline init --template=teams   --name="Teams"   --force
 |---|---|
 | 0 | Success |
 | 1 | Validation error (parse failure, invalid reference) |
-| 2 | Input error (file not found / unreadable / unsupported format) |
+| 2 | Usage error (missing input, bad flags, unsupported format, file not found, binary→TTY refusal) |
 | 3 | Output error (cannot write to destination) |
 
 ## Use the library

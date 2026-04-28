@@ -45,7 +45,7 @@ async function waitForReady(port: number, timeoutMs = 5000): Promise<void> {
     throw new Error(`serve never became ready on port ${port}`);
 }
 
-describeBuilt('`serve` integration (requires `pnpm build`)', () => {
+describeBuilt('--serve integration (requires `pnpm build`)', () => {
     it('serves HTML shell and rebuilds on file changes', async () => {
         await withTempDir(async (dir) => {
             const source = path.join(dir, 'sample.nowline');
@@ -62,7 +62,7 @@ describeBuilt('`serve` integration (requires `pnpm build`)', () => {
             const port = await pickPort();
             const child: ChildProcess = spawn(
                 process.execPath,
-                [distEntry, 'serve', source, '--port', String(port)],
+                [distEntry, '--serve', source, '--port', String(port)],
                 {
                     cwd: packageRoot,
                     env: { ...process.env, FORCE_COLOR: '0', NO_COLOR: '1' },
@@ -91,7 +91,6 @@ describeBuilt('`serve` integration (requires `pnpm build`)', () => {
                     '',
                 ].join('\n'));
 
-                // Allow the debounce + rebuild
                 let newSvg = svg;
                 const start = Date.now();
                 while (Date.now() - start < 3000) {
@@ -107,4 +106,11 @@ describeBuilt('`serve` integration (requires `pnpm build`)', () => {
             }
         });
     }, 15000);
+
+    it('--serve -o - is a usage error', async () => {
+        const { runCliBuilt } = await import('../helpers.js');
+        const r = await runCliBuilt(['--serve', 'foo.nowline', '-o', '-']);
+        expect(r.exitCode).toBe(2);
+        expect(r.stderr).toMatch(/stdout|-o -/i);
+    });
 });

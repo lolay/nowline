@@ -118,7 +118,7 @@ Logo resolution is a render-time concern:
 - **Corrupt / unparseable** — warning `logo could not be parsed: <path>`; render proceeds without the logo.
 - **Non-local URL** (`http://`, `https://`, `file://`, `data:`) — this is a parser error and never reaches the renderer; see `dsl.md`.
 
-`nowline render --strict` promotes all logo warnings to errors with a non-zero exit code.
+`nowline <input> --strict` promotes all logo warnings to errors with a non-zero exit code.
 
 ### Timeline Scale
 

@@ -450,7 +450,7 @@ roadmap platform-2026 "Platform 2026" author:"Acme Engineering" logo:"./brand/ac
 
 **Supported formats.** The renderer accepts `.svg`, `.png`, `.jpg` / `.jpeg`, and `.webp`. Format is determined by file extension; content-type is not sniffed. Any other extension is a validation error.
 
-**Asset resolution.** Logo resolution happens at render time, not at parse time, so a `.nowline` file referencing a missing logo is still a valid document (`nowline validate` does not require the asset to exist). At render time, when the asset is missing or has an unsupported extension the renderer emits a warning and renders the header without the logo; `nowline render --strict` (and the equivalent renderer option) promotes warnings to errors.
+**Asset resolution.** Logo resolution happens at render time, not at parse time, so a `.nowline` file referencing a missing logo is still a valid document (`nowline <input> --dry-run` does not require the asset to exist). At render time, when the asset is missing or has an unsupported extension the renderer emits a warning and renders the header without the logo; `nowline <input> --strict` (and the equivalent renderer option) promotes warnings to errors.
 
 **Portability.** Because `logo:` is a path, a `.nowline` file is not self-contained. To ship a self-contained artifact, inline the logo at export time (the renderer embeds SVG inline and raster formats as base64 `data:` URIs; see `rendering.md` § Roadmap Header). The DSL itself does not accept `data:` URIs to keep the text readable.
 

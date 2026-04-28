@@ -13,6 +13,7 @@ Commercial milestones (hosted editor, free viewer, MCP, enterprise, FedRAMP) are
 | m1 | DSL | Apache 2.0 | Grammar, parser, AST, validation, TextMate grammar |
 | m2a | CLI Core | Apache 2.0 | CLI scaffold, `validate`, `convert`, `init`, `version`, distribution pipeline |
 | m2b | Layout + SVG | Apache 2.0 | Layout engine, SVG renderer, `render` (SVG only), `serve` live-reload |
+| m2b.5 | CLI Redesign | Apache 2.0 | Verbless `nowline <input>` default; mode flags (`--serve`, `--init`, `--dry-run`); hard cut on old verbs |
 | m2c | Export Formats | Apache 2.0 | PNG, PDF, HTML, Markdown+Mermaid, XLSX, MS Project XML |
 | m3 | Embed | Apache 2.0 | Browser embed script, GitHub Action |
 | m4 | IDE | Apache 2.0 | LSP server, VS Code/Cursor extension with live preview |
@@ -57,9 +58,21 @@ The visual milestone: render a `.nowline` file to an SVG. This is what m3 (embed
 
 Spec: [`specs/rendering.md`](./rendering.md), [`specs/cli.md`](./cli.md) | Handoff: [`specs/handoffs/m2b.md`](./handoffs/m2b.md)
 
+### m2b.5 — CLI Redesign
+
+Verbless, all-flags CLI. Lands before m2c so the six new export formats inherit the new shape from day one.
+
+- Default mode: `nowline <input>` renders.
+- Mode flags (mutually exclusive): `--serve`, `--init`, `--dry-run`.
+- Standard flags: `-h/--help`, `-V/--version`, `-v/--verbose`, `-q/--quiet`.
+- Format resolution: `-f` flag → `-o` extension → `.nowlinerc defaultFormat` → `svg`.
+- Hard cut on every old verb (`render`, `serve`, `validate`, `convert`, `init`, `version`).
+
+Spec: [`specs/cli.md`](./cli.md) | Handoff: [`specs/handoffs/m2b.5.md`](./handoffs/m2b.5.md)
+
 ### m2c — Export Formats
 
-Everything else `nowline render` can emit. Each format is an adapter on top of the SVG renderer or the positioned model.
+Every other format the verbless render mode can emit. Each format is an adapter on top of the SVG renderer or the positioned model.
 
 - PNG — SVG → raster via resvg-js (WASM)
 - PDF — positioned model → vector PDF via PDFKit
@@ -104,9 +117,9 @@ Spec: [`specs/ide.md`](./ide.md)
 ## Dependency Chain
 
 ```
-m1 → m2a → m2b → m2c → m3 → m4
-                  ↘
-                   m4b (independent — depends only on m4)
+m1 → m2a → m2b → m2b.5 → m2c → m3 → m4
+                          ↘
+                           m4b (independent — depends only on m4)
 ```
 
 m1 is the critical foundation — every subsequent milestone depends on the DSL, parser, and typed AST it produces.

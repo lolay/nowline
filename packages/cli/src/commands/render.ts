@@ -1,6 +1,5 @@
 import * as path from 'node:path';
 import { promises as fs } from 'node:fs';
-import { defineCommand } from 'citty';
 import { readInput } from '../io/read.js';
 import { writeOutput } from '../io/write.js';
 import { CliError, ExitCode } from '../io/exit-codes.js';
@@ -9,144 +8,309 @@ import { resolveIncludes } from '@nowline/core';
 import { layoutRoadmap, type ThemeName } from '@nowline/layout';
 import { renderSvg, type AssetResolver } from '@nowline/renderer';
 import { formatDiagnostics, type DiagnosticSource } from '../diagnostics/index.js';
+import {
+    isBinaryFormat,
+    isInputFormat,
+    resolveFormat,
+    FormatResolutionError,
+    type OutputFormat,
+} from '../cli/formats.js';
+import { resolveRenderOutputPath } from '../cli/output-path.js';
+import { loadConfig } from '../io/config.js';
+import { serializeToJson } from '../convert/schema.js';
+import { printNowlineFile } from '../convert/printer.js';
+import { parseNowlineJson } from '../convert/parse-json.js';
+import type { ParsedArgs } from '../cli/args.js';
 
-export const renderCommand = defineCommand({
-    meta: {
-        name: 'render',
-        description: 'Render a .nowline file to SVG',
-    },
-    args: {
-        input: {
-            type: 'positional',
-            description: 'Path to .nowline file, or "-" for stdin',
-            required: true,
-        },
-        output: {
-            type: 'string',
-            alias: 'o',
-            description: 'Output file (default: stdout)',
-        },
-        format: {
-            type: 'string',
-            alias: 'f',
-            description: 'Output format (svg — other formats ship in m2c)',
-            default: 'svg',
-        },
-        theme: {
-            type: 'string',
-            description: 'Color theme: light or dark',
-            default: 'light',
-        },
-        today: {
-            type: 'string',
-            description: 'Override today for the now-line (YYYY-MM-DD)',
-        },
-        'asset-root': {
-            type: 'string',
-            description: 'Directory from which logo/image assets may be loaded',
-        },
-        'no-links': {
-            type: 'boolean',
-            description: 'Strip link icons from rendered items',
-            default: false,
-        },
-        strict: {
-            type: 'boolean',
-            description: 'Promote asset warnings to errors',
-            default: false,
-        },
-        width: {
-            type: 'string',
-            description: 'Canvas width in px (default: 1280)',
-        },
-        force: {
-            type: 'boolean',
-            description: 'Overwrite output file if it exists',
-            default: false,
-        },
-    },
-    async run({ args }) {
-        const format = String(args.format ?? 'svg').toLowerCase();
-        if (format !== 'svg') {
-            throw new CliError(
-                ExitCode.InputError,
-                `Format "${format}" is not supported in this release. PNG/PDF ship in m2c. Use --format svg.`,
-            );
-        }
+export interface RenderHandlerOptions {
+    args: ParsedArgs;
+    /** Test seam: cwd override. Defaults to `process.cwd()`. */
+    cwd?: string;
+}
 
-        const themeArg = String(args.theme ?? 'light').toLowerCase();
-        if (themeArg !== 'light' && themeArg !== 'dark') {
-            throw new CliError(
-                ExitCode.InputError,
-                `Invalid --theme: ${themeArg}. Expected 'light' or 'dark'.`,
-            );
-        }
-        const theme: ThemeName = themeArg;
+/**
+ * Default render handler. Produces output in the resolved format and writes
+ * it to the resolved path (file or stdout). Honors `--dry-run` (skip write
+ * step), `--input-format`, and `.json` AST input.
+ */
+export async function renderHandler(options: RenderHandlerOptions): Promise<void> {
+    const { args } = options;
+    const cwd = options.cwd ?? process.cwd();
 
-        const today = parseTodayArg(args.today as string | undefined);
-        const width = args.width ? parseInt(String(args.width), 10) : undefined;
-        if (args.width && (!width || width < 320)) {
-            throw new CliError(
-                ExitCode.InputError,
-                `Invalid --width: ${String(args.width)}. Must be an integer ≥ 320.`,
-            );
-        }
-
-        const input = await readInput(args.input);
-        const parse = await parseSource(input.contents, input.displayPath, { validate: true });
-        if (parse.hasErrors) {
-            emitDiagnostics(parse.diagnostics, parse.source, input.displayPath);
-            throw new CliError(ExitCode.ValidationError, '');
-        }
-
-        const filePath = input.isStdin ? path.resolve(process.cwd(), 'stdin.nowline') : input.path;
-        const resolved = await resolveIncludes(parse.ast, filePath, {
-            services: getServices().Nowline,
-        });
-        for (const diag of resolved.diagnostics) {
-            if (diag.severity === 'error') {
-                process.stderr.write(`${diag.sourcePath}: ${diag.message}\n`);
-            }
-        }
-        if (resolved.diagnostics.some((d) => d.severity === 'error')) {
-            throw new CliError(ExitCode.ValidationError, '');
-        }
-
-        const model = layoutRoadmap(parse.ast, resolved, { theme, today, width });
-
-        const assetRoot = args['asset-root']
-            ? path.resolve(String(args['asset-root']))
-            : path.dirname(filePath);
-        const resolver: AssetResolver = createAssetResolver(assetRoot);
-
-        const warnings: string[] = [];
-        const svg = await renderSvg(model, {
-            assetResolver: resolver,
-            noLinks: Boolean(args['no-links']),
-            strict: Boolean(args.strict),
-            warn: (msg) => warnings.push(msg),
-        });
-
-        for (const w of warnings) {
-            process.stderr.write(`warning: ${w}\n`);
-        }
-
-        await writeOutput(
-            typeof args.output === 'string' ? args.output : undefined,
-            svg,
-            'text',
-            { force: Boolean(args.force) },
+    if (!args.positional) {
+        throw new CliError(
+            ExitCode.InputError,
+            'nowline: missing input file. Pass a path, "-" for stdin, or run `nowline --help`.',
         );
-    },
-});
+    }
+
+    const isStdoutOutput = args.output === '-';
+    const config = await loadConfigFor(args.positional, cwd);
+
+    const format = resolveFormatOrThrow({
+        flag: args.format,
+        outputPath: args.output,
+        configFormat: typeof config?.defaultFormat === 'string' ? config.defaultFormat : undefined,
+        isStdout: isStdoutOutput,
+    });
+
+    if (args.logLevel === 'verbose') {
+        process.stderr.write(`nowline: format=${format} (resolved)\n`);
+    }
+
+    const resolvedOutput = resolveRenderOutputPath({
+        outputArg: args.output,
+        isStdout: isStdoutOutput,
+        inputArg: args.positional,
+        isStdin: args.positional === '-',
+        format,
+        cwd,
+    });
+
+    const inputFormat = resolveInputFormat(args.positional, args.inputFormat);
+
+    const input = await readInput(args.positional, { cwd });
+
+    const { rendered, isBinary } = await produce({
+        format,
+        inputFormat,
+        contents: input.contents,
+        displayPath: input.displayPath,
+        absInputPath: input.isStdin ? path.resolve(cwd, 'stdin.nowline') : input.path,
+        isStdin: input.isStdin,
+        theme: parseTheme(args.theme),
+        today: parseTodayArg(args.today),
+        width: parseWidthArg(args.width),
+        noLinks: args.noLinks,
+        strict: args.strict,
+        assetRoot: args.assetRoot,
+    });
+
+    if (args.dryRun) {
+        if (args.logLevel === 'verbose') {
+            process.stderr.write('nowline: --dry-run; skipping write\n');
+        }
+        return;
+    }
+
+    await writeOutput(
+        resolvedOutput.isStdout ? '-' : resolvedOutput.path,
+        rendered,
+        isBinary ? 'binary' : 'text',
+        { cwd },
+    );
+
+    if (args.logLevel === 'verbose' && !resolvedOutput.isStdout) {
+        process.stderr.write(`nowline: wrote ${resolvedOutput.path}\n`);
+    }
+}
+
+function resolveFormatOrThrow(inputs: {
+    flag?: string;
+    outputPath?: string;
+    configFormat?: string;
+    isStdout: boolean;
+}): OutputFormat {
+    try {
+        return resolveFormat({
+            flagFormat: inputs.flag,
+            outputPath: inputs.outputPath,
+            configFormat: inputs.configFormat,
+            isStdout: inputs.isStdout,
+        }).format;
+    } catch (err) {
+        if (err instanceof FormatResolutionError) {
+            throw new CliError(ExitCode.InputError, `nowline: ${err.message}`);
+        }
+        throw err;
+    }
+}
+
+function resolveInputFormat(inputArg: string, override: string | undefined): 'nowline' | 'json' {
+    if (override) {
+        const lower = override.toLowerCase();
+        if (!isInputFormat(lower)) {
+            throw new CliError(
+                ExitCode.InputError,
+                `nowline: invalid --input-format "${override}". Expected nowline or json.`,
+            );
+        }
+        return lower;
+    }
+    if (inputArg === '-') return 'nowline';
+    const ext = path.extname(inputArg).toLowerCase();
+    if (ext === '.json') return 'json';
+    return 'nowline';
+}
+
+interface ProduceArgs {
+    format: OutputFormat;
+    inputFormat: 'nowline' | 'json';
+    contents: string;
+    displayPath: string;
+    absInputPath: string;
+    isStdin: boolean;
+    theme: ThemeName;
+    today?: Date;
+    width?: number;
+    noLinks: boolean;
+    strict: boolean;
+    assetRoot?: string;
+}
+
+interface ProduceResult {
+    rendered: string | Uint8Array;
+    isBinary: boolean;
+}
+
+async function produce(args: ProduceArgs): Promise<ProduceResult> {
+    if (args.format === 'json') {
+        return { rendered: await produceJson(args), isBinary: false };
+    }
+    if (args.format === 'nowline') {
+        return { rendered: await produceCanonicalNowline(args), isBinary: false };
+    }
+    if (args.format === 'svg') {
+        return { rendered: await produceSvg(args), isBinary: false };
+    }
+
+    if (isBinaryFormat(args.format) || args.format === 'html' || args.format === 'mermaid' || args.format === 'msproj') {
+        throw new CliError(
+            ExitCode.InputError,
+            `nowline: format "${args.format}" is not yet available in this release (ships in m2c). Use -f svg.`,
+        );
+    }
+
+    throw new CliError(ExitCode.InputError, `nowline: unsupported format "${args.format}".`);
+}
+
+async function produceJson(args: ProduceArgs): Promise<string> {
+    if (args.inputFormat === 'json') {
+        // Re-parse JSON → DSL → JSON to canonicalize through @nowline/core.
+        const { ast } = parseNowlineJson(args.contents, args.displayPath);
+        const text = printNowlineFile(ast);
+        const parsed = await parseAndValidate(text, args.displayPath);
+        return JSON.stringify(serializeToJson(parsed.document, text), null, 2);
+    }
+    const parsed = await parseAndValidate(args.contents, args.displayPath);
+    return JSON.stringify(serializeToJson(parsed.document, args.contents), null, 2);
+}
+
+async function produceCanonicalNowline(args: ProduceArgs): Promise<string> {
+    if (args.inputFormat === 'json') {
+        const { ast } = parseNowlineJson(args.contents, args.displayPath);
+        return printNowlineFile(ast);
+    }
+    const parsed = await parseAndValidate(args.contents, args.displayPath);
+    const doc = serializeToJson(parsed.document, args.contents);
+    return printNowlineFile(doc.ast);
+}
+
+async function produceSvg(args: ProduceArgs): Promise<string> {
+    const parsed = await parseAndValidate(
+        args.inputFormat === 'json' ? jsonToNowlineText(args.contents, args.displayPath) : args.contents,
+        args.displayPath,
+    );
+    const resolved = await resolveIncludes(parsed.ast, args.absInputPath, {
+        services: getServices().Nowline,
+    });
+    for (const diag of resolved.diagnostics) {
+        if (diag.severity === 'error') {
+            process.stderr.write(`${diag.sourcePath}: ${diag.message}\n`);
+        }
+    }
+    if (resolved.diagnostics.some((d) => d.severity === 'error')) {
+        throw new CliError(ExitCode.ValidationError, '');
+    }
+
+    const model = layoutRoadmap(parsed.ast, resolved, {
+        theme: args.theme,
+        today: args.today,
+        width: args.width,
+    });
+
+    const assetRoot = args.assetRoot
+        ? path.resolve(args.assetRoot)
+        : path.dirname(args.absInputPath);
+    const resolver: AssetResolver = createAssetResolver(assetRoot);
+
+    const warnings: string[] = [];
+    const svg = await renderSvg(model, {
+        assetResolver: resolver,
+        noLinks: args.noLinks,
+        strict: args.strict,
+        warn: (msg) => warnings.push(msg),
+    });
+
+    for (const w of warnings) {
+        process.stderr.write(`warning: ${w}\n`);
+    }
+    return svg;
+}
+
+function jsonToNowlineText(contents: string, displayPath: string): string {
+    const { ast } = parseNowlineJson(contents, displayPath);
+    return printNowlineFile(ast);
+}
+
+async function parseAndValidate(contents: string, displayPath: string) {
+    const result = await parseSource(contents, displayPath, { validate: true });
+    if (result.hasErrors) {
+        emitDiagnostics(result.diagnostics, result.source, displayPath);
+        throw new CliError(ExitCode.ValidationError, '');
+    }
+    return result;
+}
+
+async function loadConfigFor(inputArg: string, cwd: string): Promise<{ defaultFormat?: string } | null> {
+    try {
+        if (inputArg === '-') {
+            const { config } = await loadConfig(cwd);
+            return config;
+        }
+        const abs = path.resolve(cwd, inputArg);
+        const dir = path.dirname(abs);
+        const { config } = await loadConfig(dir);
+        return config;
+    } catch {
+        return null;
+    }
+}
+
+function parseTheme(raw: string | undefined): ThemeName {
+    if (!raw) return 'light';
+    const lower = raw.toLowerCase();
+    if (lower !== 'light' && lower !== 'dark') {
+        throw new CliError(
+            ExitCode.InputError,
+            `nowline: invalid --theme "${raw}". Expected light or dark.`,
+        );
+    }
+    return lower;
+}
 
 function parseTodayArg(raw: string | undefined): Date | undefined {
     if (!raw) return undefined;
     const m = /^(\d{4})-(\d{2})-(\d{2})$/.exec(raw);
     if (!m) {
-        throw new CliError(ExitCode.InputError, `Invalid --today: ${raw}. Expected YYYY-MM-DD.`);
+        throw new CliError(
+            ExitCode.InputError,
+            `nowline: invalid --today "${raw}". Expected YYYY-MM-DD.`,
+        );
     }
     return new Date(Date.UTC(parseInt(m[1], 10), parseInt(m[2], 10) - 1, parseInt(m[3], 10)));
+}
+
+function parseWidthArg(raw: string | undefined): number | undefined {
+    if (!raw) return undefined;
+    const value = parseInt(raw, 10);
+    if (!Number.isFinite(value) || value < 320) {
+        throw new CliError(
+            ExitCode.InputError,
+            `nowline: invalid --width "${raw}". Must be an integer ≥ 320.`,
+        );
+    }
+    return value;
 }
 
 function emitDiagnostics(

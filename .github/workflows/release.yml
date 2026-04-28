@@ -78,8 +78,8 @@ jobs:
             exit 0
           fi
           chmod +x "$bin"
-          "$bin" version
-          "$bin" render examples/minimal.nowline > /tmp/minimal.svg
+          "$bin" --version
+          "$bin" examples/minimal.nowline -o - > /tmp/minimal.svg
           head -c 4 /tmp/minimal.svg | grep -q "<svg"
 
       - name: Upload binary artifact
@@ -252,7 +252,7 @@ jobs:
             end
 
             test do
-              system "#{bin}/nowline", "version"
+              system "#{bin}/nowline", "--version"
             end
           end
           EOF

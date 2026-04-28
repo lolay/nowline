@@ -2,7 +2,7 @@
 
 ## Scope
 
-Complete `nowline render` by adding every output format beyond SVG: **PNG, PDF, HTML, Markdown+Mermaid, XLSX, and MS Project XML.** Each format is an adapter on top of the positioned model from m2b — PNG rasterizes SVG, PDF walks the positioned model, HTML embeds SVG, Mermaid transpiles the AST, XLSX reshapes the AST into sheets, MS Project XML projects the AST into tasks. No new CLI commands, no new grammar. Seven new packages — one per format plus a shared `@nowline/export-core` — keep Node-only dependencies off the browser path, let third-party consumers install only the formats they use, and make the tiny / full CLI distribution split a package-list decision rather than a code refactor.
+Complete the verbless render command (m2b.5) by adding every output format beyond SVG: **PNG, PDF, HTML, Markdown+Mermaid, XLSX, and MS Project XML.** Each format is an adapter on top of the positioned model from m2b — PNG rasterizes SVG, PDF walks the positioned model, HTML embeds SVG, Mermaid transpiles the AST, XLSX reshapes the AST into sheets, MS Project XML projects the AST into tasks. No new CLI commands, no new grammar. Seven new packages — one per format plus a shared `@nowline/export-core` — keep Node-only dependencies off the browser path, let third-party consumers install only the formats they use, and make the tiny / full CLI distribution split a package-list decision rather than a code refactor.
 
 **Milestone:** m2c
 **Type:** Open source (Apache 2.0, Lolay, Inc.)
@@ -12,7 +12,8 @@ m2 continues:
 
 - **m2a (shipped)** — CLI scaffold + `validate` + `convert` + `init` + `version` + distribution pipeline
 - **m2b (shipped)** — `@nowline/layout` + `@nowline/renderer` + `nowline render` (SVG) + `nowline serve`
-- **m2c (this handoff)** — all other `nowline render` formats (PNG, PDF, HTML, Markdown+Mermaid, XLSX, MS Project XML)
+- **m2b.5 (shipped)** — verbless CLI redesign (`nowline <input>` is render; `--serve`, `--init`, `--dry-run` mode flags)
+- **m2c (this handoff)** — all other render formats (PNG, PDF, HTML, Markdown+Mermaid, XLSX, MS Project XML)
 
 ## What to Build
 
@@ -251,16 +252,16 @@ Contract (applies to every export-* package):
 - Dates: MS Project needs absolute start dates. When the Nowline roadmap is purely relative, use `options.startDate` (or the `--start` CLI flag defaulting to today) to anchor everything. Document that the export is not round-trippable.
 - Output is a string; the caller writes it as UTF-8 with a BOM (MSProject accepts both, but the BOM helps some Windows tools).
 
-### 9. CLI Wiring — extend `nowline render`
+### 9. CLI Wiring — extend the default render mode
 
-`packages/cli/src/commands/render.ts` already parses `-f`. m2b rejects every non-`svg` value. In m2c:
+`packages/cli/src/commands/render.ts` (the verbless render handler from m2b.5) already parses `-f`. m2b/m2b.5 rejects every non-`svg`/`json`/`nowline` value. In m2c:
 
 - Accept `svg, png, pdf, html, mermaid, xlsx, msproj` (plus alias `ms-project`). Reject anything else with the m2a-style "unknown format" error (exit 2).
 - Format resolution precedence:
   1. Explicit `-f` flag.
   2. `-o` extension (`.svg`, `.png`, `.pdf`, `.html`/`.htm`, `.md`/`.markdown`, `.xlsx`, `.xml`). `.xml` requires an explicit `-f msproj` since `.xml` is ambiguous; otherwise the CLI errors with a helpful message.
   3. Default `svg` (unchanged).
-- Add the `--scale N` flag documented in `specs/cli.md` § `nowline render`. Only honored for PNG; warn and ignore on other formats.
+- Add the `-s, --scale N` flag documented in `specs/cli.md`. Only honored for PNG; warn and ignore on other formats.
 - Add PDF page controls, only honored for `-f pdf` (warn and ignore on other formats):
   - `--page-size <value>` — preset name (`letter`, `legal`, `tabloid`, `ledger`, `a5`–`a1`, `b5`–`b3`), custom `WxHunit` (e.g. `8.5x11in`, `210x297mm`, `21x29.7cm`, `612x792pt`), or `content` (page = content dimensions; no scaling, no page ceiling). Default `letter`.
   - `--orientation <portrait|landscape|auto>` — default `auto`. Ignored with `--page-size content`.
@@ -273,8 +274,8 @@ Contract (applies to every export-* package):
   - `.nowlinerc` keys: `fontSans`, `fontMono`, `headlessFonts` (boolean).
 - stdout rules:
   - Text formats (SVG, HTML, Mermaid, MS Project XML): allowed on stdout. No trailing newline (consistent with m2b's m2a-compatible decision).
-  - Binary formats (PNG, PDF, XLSX): refuse to write to a TTY. The m2a stub in `packages/cli/src/io/write.ts` already guards this — extend the error message to point users at `-o <file>`. Binary to a piped stdout is allowed (for `nowline render … -f png | imgcat` etc.).
-- stdin rules: `nowline render -` reads `.nowline` from stdin for every format. No change from m2b.
+  - Binary formats (PNG, PDF, XLSX): refuse to write to a TTY. The m2a stub in `packages/cli/src/io/write.ts` already guards this — extend the error message to point users at `-o <file>` (curl-style). Binary to a piped stdout is allowed (for `nowline … -f png -o - | imgcat` etc.).
+- stdin rules: `nowline -` reads `.nowline` from stdin for every format. No change from m2b/m2b.5.
 - Add `--start YYYY-MM-DD` for MS Project anchoring (specific to that format; error when passed with any other `-f`).
 - Validation failures still exit 1. Asset/font warnings behave per m2b: warn by default, exit 1 under `--strict`.
 - Reuse the m2b render pipeline (`parseSource → resolveIncludes → layoutRoadmap → renderSvg`) and then branch on format after the SVG is in hand (PNG/HTML/PDF can share the SVG; Mermaid/XLSX/MSProj skip the renderer and go straight from AST to exporter).
@@ -419,7 +420,7 @@ Install 'nowline-full' from https://github.com/lolay/nowline/releases or:
 
 **CI coverage.** The compile smoke in `.github/workflows/ci.yml` and `release.yml` runs both variants for every OS/arch target:
 
-- Tiny smoke: `nowline version`, `nowline render examples/minimal.nowline` (SVG), `nowline render examples/minimal.nowline -f png -o /tmp/m.png` (PNG), `nowline render examples/minimal.nowline -f pdf -o /tmp/m.pdf` → assert exit 2 + the "nowline-full" error message.
+- Tiny smoke: `nowline --version`, `nowline examples/minimal.nowline -o -` (SVG), `nowline examples/minimal.nowline -f png -o /tmp/m.png` (PNG), `nowline examples/minimal.nowline -f pdf -o /tmp/m.pdf` → assert exit 2 + the "nowline-full" error message.
 - Full smoke: same as tiny plus `-f pdf`, `-f html`, `-f mermaid`, `-f xlsx`, `-f msproj` all exit 0 with non-empty output.
 
 **Binary-size ceiling.** 60 MB for tiny (unchanged from m2a); 65 MB for full. If the tiny binary ever breaches 60 MB, the next move is re-evaluating what belongs in it — m2c does not pre-commit to a third tier or a new name. The two-tier split is the shape we're shipping and the one we'll defend.
@@ -461,13 +462,13 @@ Use Vitest across all packages. Add:
   - Variable font: stub `SFNS.ttf` with a real-ish VF test fixture, assert `getVariation({ wght: 400 })` produces stable bytes across two resolver calls (no timestamp / random tag in the output).
   - `--strict` + bundled-fallback path → resolver returns `source: 'bundled'` and the CLI emits a single stderr warning; without `--strict` the warning is silent.
   - Alias resolution: `--font-sans sf` on macOS resolves to `SFNS.ttf`; `--font-sans dejavu` on any platform resolves to the bundled file.
-- **`nowline render` CLI integration tests**:
-  - stdout + `-f svg` (regression from m2b).
+- **CLI integration tests** (verbless render — `nowline <input>`):
+  - stdout via `-o -` + `-f svg` (regression from m2b/m2b.5).
   - `-o path.<ext>` for each format, with extension-inferred format.
-  - `-f png` + `--scale 3` writes a larger file than `--scale 1`.
-  - `-f xlsx` refuses to write to a TTY.
+  - `-f png` + `-s 3` writes a larger file than `-s 1`.
+  - `-f xlsx` to a TTY refuses with the curl-style "binary output … refused" message.
   - `-f msproj` with no `--start` produces a valid XML with today's date; with `--start 2026-01-06`, the first task's start matches.
-  - Ambiguous `.xml` extension without `-f` exits 2 with the expected message.
+  - Ambiguous `.xml` extension without `-f msproj` exits 2 with the expected message.
   - `-f pdf --strict` with a missing logo exits 1 (inherits m2b's strict behavior).
 - **Distribution smoke tests** — per § 11, compile smokes run **both** the tiny and full binaries for every OS / arch target. Tiny asserts `svg` + `png` succeed and `pdf` / `html` / `mermaid` / `xlsx` / `msproj` each exit 2 with the "nowline-full" error message. Full asserts every format exits 0 with non-empty output. Binary-size assertion: tiny ≤ 60 MB, full ≤ 65 MB, on all six targets.
 
@@ -477,9 +478,9 @@ Use Vitest across all packages. Add:
 - `packages/export-<format>/README.md` (six files — png / pdf / html / mermaid / xlsx / msproj) — one page each: install, dependency used, options shape, known limitations, determinism notes, how to regenerate snapshots. The tiny vs. full note lives on `export-pdf` / `-html` / `-mermaid` / `-xlsx` / `-msproj` so users who hit the runtime "not available in this build" error have a landing page with install instructions.
 - `packages/cli/README.md` — replace the m2b "ships in m2c" placeholders with full `-f` format documentation, document the tiny vs. full distinction (which formats live where, how to get `nowline-full`), the `.xml` ambiguity rule, and `--scale` / `--start` / `--page-size` / `--orientation` / `--margin` / `--font-sans` / `--font-mono` / `--headless` flags explicitly. Update the exit-code table if anything changed.
 - `packages/renderer/README.md` — brief note that PNG / PDF and other export formats live in `@nowline/export-*` packages rather than in the renderer, and why. Keeps intent visible for m3/m4 consumers.
-- Root `README.md` — update the "What you get" / examples section to mention the new formats. Add a one-line example: `nowline render roadmap.nowline -f pdf -o roadmap.pdf`.
+- Root `README.md` — update the "What you get" / examples section to mention the new formats. Add a one-line example: `nowline roadmap.nowline -f pdf -o roadmap.pdf`.
 - `specs/rendering.md` — add or update the XLSX/Mermaid/MSProj sections with any decisions taken during implementation (no spec drift — keep the spec the source of truth).
-- `specs/cli.md` § `nowline render` — add `--page-size`, `--orientation`, `--margin`, and `--start` to the canonical flag table, document the default (`letter` / `auto` / `36pt`), and list the supported preset names. Keep the handoff and the spec in sync.
+- `specs/cli.md` § Render options — add `--page-size`, `--orientation`, `--margin`, and `--start` to the canonical flag table, document the default (`letter` / `auto` / `36pt`), and list the supported preset names. Keep the handoff and the spec in sync.
 
 ## What NOT to Build
 
@@ -501,7 +502,7 @@ m2c is **one new package + six new exporters wired through one existing command*
 |------|------------------|
 | `specs/rendering.md` § Output Formats | Full format table, XLSX sheet definitions, Mermaid bridge rules, MS Project mapping conventions |
 | `specs/rendering.md` § XLSX Export | Per-sheet columns, conditional-format rules, MS Project column parity table |
-| `specs/cli.md` § `nowline render` | Format list, `--scale`, `--width`, stdin/stdout piping, exit codes |
+| `specs/cli.md` § Render options | Format list, `-s/--scale`, `-w/--width`, stdin/stdout piping, exit codes |
 | `specs/architecture.md` § Technology Choices | resvg-js / PDFKit / ExcelJS rationale, binary-size expectations |
 | `specs/architecture.md` § Local Asset Resolution | Asset resolver contract that PNG/PDF must honor when embedding logos |
 | `specs/features.md` § m2c | Features 13, 14, 15, 16, 18, 18b (scoring rubric + notes) |
@@ -515,7 +516,7 @@ m2c is **one new package + six new exporters wired through one existing command*
 - [ ] Dependency graph enforced per § 1: each `@nowline/export-*` package depends only on `@nowline/export-core` plus the minimum layer it actually consumes (renderer for png/html, layout for pdf, core+layout for mermaid/xlsx/msproj). Heavy deps (`@resvg/resvg-js`, `pdfkit`, `exceljs`) are direct dependencies of the single format package that needs them — never hoisted into `@nowline/export-core`. No sideways or upward imports.
 - [ ] `@nowline/renderer` remains browser-safe (no change from m2b). No `@nowline/export-*` package leaks into browser bundles.
 - [ ] `@nowline/cli` imports the six format packages via dynamic `import()` so the tiny build can exclude them via `bun build --external` without touching source code.
-- [ ] `nowline render -f <format>` works for all of: `svg`, `png`, `pdf`, `html`, `mermaid`, `xlsx`, `msproj`
+- [ ] `nowline <input> -f <format>` works for all of: `svg`, `png`, `pdf`, `html`, `mermaid`, `xlsx`, `msproj` (plus `json`, `nowline` from m2b.5)
 - [ ] `-o <path>` infers the format from the extension for every unambiguous case (`.svg`, `.png`, `.pdf`, `.html`, `.md`, `.xlsx`). `.xml` without `-f msproj` exits 2 with a helpful message.
 - [ ] Binary formats refuse to write to a TTY; piped binary stdout is allowed.
 - [ ] Each format is deterministic given the same input, same `--today`, and same pinned dependency versions. Enforced by snapshot/hash tests.
