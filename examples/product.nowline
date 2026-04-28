@@ -13,7 +13,7 @@ calendar
   days-per-quarter: 65
   days-per-year: 260
 
-style enterprise "Enterprise readiness"
+style enterprise-style "Enterprise readiness"
   bg: blue
   fg: navy
   text: white
@@ -45,8 +45,8 @@ duration xl length:1m
 status awaiting-review
 status in-review
 
-label enterprise "Enterprise readiness" style:enterprise
-label security "Security hardening" style:enterprise
+label enterprise "Enterprise readiness" style:enterprise-style
+label security "Security hardening" style:enterprise-style
 label low-confidence style:risky
 
 anchor kickoff date:2026-01-06
