@@ -23,3 +23,10 @@ coverage/
 
 # Logs
 *.log
+
+# Rendered example outputs (CLI artifacts, not source)
+examples/**/*.svg
+examples/**/*.png
+examples/**/*.pdf
+examples/**/*.html
+examples/**/*.xlsx
