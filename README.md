@@ -327,6 +327,10 @@ Progressively-richer examples are included:
 - [`examples/long.nowline`](./examples/long.nowline) — stress test: eight swimlanes, ~160 items, parallels, groups, anchors, milestones, footnotes, cross-cutting labels. Used for layout/render perf.
 - [`examples/nested.nowline`](./examples/nested.nowline) + [`examples/nested/`](./examples/nested) — parent Security swimlane plus five isolated per-team roadmap includes (iOS, Android, Web, Platform, Data). Demonstrates `roadmap:isolate`.
 
+## Visual reference
+
+Reference renderings the renderer aims to match live in [`specs/samples/`](./specs/samples). Open [`specs/samples/index.html`](./specs/samples/index.html) for a side-by-side gallery of the SVG outputs alongside their DSL snippets.
+
 ## Contributing
 
 Bug reports, feature requests, and pull requests are welcome. Start with [`CONTRIBUTING.md`](./CONTRIBUTING.md) for setup, build/test commands, and the expected workflow.

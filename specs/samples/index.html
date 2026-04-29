@@ -1,0 +1,484 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <title>Nowline — Rendering Samples</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <style>
+    :root {
+      --bg: #f8fafc;
+      --panel: #ffffff;
+      --border: #e2e8f0;
+      --ink: #0f172a;
+      --ink-muted: #475569;
+      --ink-dim: #64748b;
+      --accent: #e53e3e;
+    }
+    html, body {
+      margin: 0;
+      padding: 0;
+      background: var(--bg);
+      color: var(--ink);
+      font-family: -apple-system, "SF Pro Display", "Segoe UI", Helvetica, Arial, sans-serif;
+      line-height: 1.5;
+    }
+    .shell {
+      max-width: 1680px;
+      margin: 0 auto;
+      padding: 32px 32px 80px;
+    }
+    header.page {
+      display: flex;
+      align-items: baseline;
+      gap: 16px;
+      padding-bottom: 20px;
+      border-bottom: 1px solid var(--border);
+      margin-bottom: 32px;
+    }
+    header.page h1 {
+      font-size: 24px;
+      font-weight: 700;
+      margin: 0;
+      letter-spacing: -0.5px;
+    }
+    header.page .now {
+      display: inline-flex;
+      align-items: baseline;
+      font-size: 24px;
+      font-weight: 700;
+    }
+    header.page .now b { color: var(--accent); margin: 0 1px; font-weight: 700; }
+    header.page .tag {
+      font-size: 12px;
+      color: var(--ink-dim);
+      background: #f1f5f9;
+      padding: 3px 10px;
+      border-radius: 999px;
+      border: 1px solid var(--border);
+    }
+    header.page p {
+      color: var(--ink-muted);
+      margin: 0;
+      font-size: 13px;
+      flex: 1;
+    }
+
+    section.sample {
+      background: var(--panel);
+      border: 1px solid var(--border);
+      border-radius: 10px;
+      margin-bottom: 28px;
+      overflow: hidden;
+    }
+    section.sample > header {
+      padding: 14px 18px;
+      border-bottom: 1px solid var(--border);
+      display: flex;
+      align-items: center;
+      gap: 12px;
+    }
+    section.sample > header h2 {
+      margin: 0;
+      font-size: 15px;
+      font-weight: 700;
+    }
+    section.sample > header .chip {
+      font-size: 11px;
+      font-weight: 600;
+      padding: 3px 8px;
+      border-radius: 999px;
+      background: #f1f5f9;
+      color: var(--ink-muted);
+      border: 1px solid var(--border);
+      text-transform: uppercase;
+      letter-spacing: 0.4px;
+    }
+    section.sample > header p {
+      margin: 0;
+      color: var(--ink-dim);
+      font-size: 12px;
+      flex: 1;
+    }
+
+    .layout {
+      display: grid;
+      grid-template-columns: minmax(0, 1fr) 420px;
+      gap: 0;
+    }
+    @media (max-width: 1280px) {
+      .layout { grid-template-columns: minmax(0, 1fr); }
+    }
+    .render-pane {
+      padding: 16px 18px;
+      min-width: 0;
+    }
+    .render-pane.dark {
+      background: #0b1220;
+    }
+    .render-pane img {
+      display: block;
+      width: 100%;
+      height: auto;
+      border-radius: 6px;
+    }
+    .dsl-pane {
+      border-left: 1px solid var(--border);
+      background: #0f172a;
+      color: #e2e8f0;
+      font-family: "SF Mono", Menlo, Consolas, monospace;
+      font-size: 11.5px;
+      line-height: 1.55;
+      padding: 16px 18px;
+      overflow: auto;
+      max-height: 760px;
+    }
+    .dsl-pane h3 {
+      font-family: -apple-system, "SF Pro Display", "Segoe UI", Helvetica, Arial, sans-serif;
+      font-size: 11px;
+      color: #94a3b8;
+      font-weight: 600;
+      text-transform: uppercase;
+      letter-spacing: 0.6px;
+      margin: 0 0 10px;
+    }
+    .dsl-pane pre {
+      margin: 0;
+      white-space: pre;
+      tab-size: 2;
+    }
+    /* minimal syntax highlight via span classes */
+    .kw { color: #93c5fd; font-weight: 600; }
+    .id { color: #fbbf24; }
+    .str { color: #86efac; }
+    .prop { color: #c4b5fd; }
+    .num { color: #fca5a5; }
+    .cmt { color: #64748b; font-style: italic; }
+
+    .notes {
+      padding: 14px 18px;
+      border-top: 1px solid var(--border);
+      background: #f8fafc;
+      color: var(--ink-muted);
+      font-size: 12.5px;
+    }
+    .notes strong { color: var(--ink); }
+    .notes ul { margin: 6px 0 0; padding-left: 20px; }
+    .notes li { margin: 2px 0; }
+
+    footer.foot {
+      color: var(--ink-dim);
+      font-size: 12px;
+      margin-top: 32px;
+      padding-top: 16px;
+      border-top: 1px solid var(--border);
+    }
+  </style>
+</head>
+<body>
+<div class="shell">
+  <header class="page">
+    <span class="now">
+      <span style="font-weight:700">now</span><b>l</b><span style="font-weight:400">ine</span>
+    </span>
+    <h1>Rendering Samples</h1>
+    <span class="tag">pre-m2b · manual SVG</span>
+    <p>Five hand-drawn SVG roadmaps that stress the decisions in <code>specs/rendering.md</code>. These are for critique before the real layout engine lands — they are not generated from the DSL yet.</p>
+  </header>
+
+  <!-- =========================================================== -->
+  <section class="sample">
+    <header>
+      <span class="chip">01</span>
+      <h2>Minimal</h2>
+      <p>The baseline: single swimlane, three items, hero now-line. Tests whether a "boring" roadmap still feels crisp.</p>
+    </header>
+    <div class="layout">
+      <div class="render-pane">
+        <img src="01-minimal.svg" alt="Minimal roadmap sample">
+      </div>
+      <div class="dsl-pane">
+        <h3>DSL source</h3>
+<pre><span class="kw">nowline</span> <span class="num">v1</span>
+
+<span class="kw">roadmap</span> <span class="str">"Starter"</span> <span class="prop">start:</span><span class="num">2026-01-05</span> <span class="prop">scale:</span><span class="num">1w</span>
+
+<span class="kw">swimlane</span> <span class="id">engineering</span> <span class="str">"Engineering"</span>
+  <span class="kw">item</span> <span class="id">research</span> <span class="str">"Research"</span> <span class="prop">duration:</span><span class="num">1w</span> <span class="prop">status:</span>done
+  <span class="kw">item</span> <span class="id">design</span>   <span class="str">"Design"</span>   <span class="prop">duration:</span><span class="num">2w</span> <span class="prop">status:</span>in-progress <span class="prop">remaining:</span><span class="num">50%</span>
+  <span class="kw">item</span> <span class="id">build</span>    <span class="str">"Build"</span>    <span class="prop">duration:</span><span class="num">3w</span> <span class="prop">status:</span>planned</pre>
+      </div>
+    </div>
+    <div class="notes">
+      <strong>What this asks you to decide:</strong>
+      <ul>
+        <li><strong>Timeline header is bottom-aligned with the title block.</strong> The title card (220×58) and the timeline header (shorter) sit in the same top-left region but the timeline's <em>bottom edge matches the title card's bottom edge</em>. The row above the timeline header stays empty (used only by the now-line pill floating up into the gap). This feels cleaner than top-aligned because the first item row then sits flush under both the title card's baseline and the timeline tick row.</li>
+        <li><strong>Item bars sit inset inside each column (symmetric gutter).</strong> Each time-block (1w = 120px here) reserves its logical column, but the item's visual bar is inset <em>6px on each side</em> for a 12px gap between back-to-back items. The gutter width matches the item's own internal text padding, so the chart feels evenly padded left-to-right. Sequentially abutting items (Research → Design → Build) show a clear visible gap instead of touching edge-to-edge. Dependencies and milestones still attach to <em>logical</em> column edges for date-accuracy; only the item's visual bar is shrunk.</li>
+        <li><strong>Nowline attribution mark lives at the bottom-right of the drawing.</strong> When a footnote panel exists, the mark sits at the bottom-right of the panel; otherwise it sits at the bottom-right of the last swimlane (this sample: bottom-right of the Engineering lane). The mark is always the <em>last</em> thing drawn so it overlays its container and never extends below the overall drawing bounds. It's a small "now|ine" wordmark (scale 0.22), inset 12px from the container's bottom-right corner.</li>
+        <li>How prominent should the <em>now-line</em> be? Current: 2.25px red, "now" badge floating up into the row above the timeline header, no shadow.</li>
+        <li>Status dots sit in the <strong>upper-right</strong> corner of each item bar — out of the way of the title/subtitle text. Do we want a secondary glyph (check / clock / hourglass) for accessibility, or is color + position sufficient?</li>
+        <li>Progress stripe placement — bottom edge (current) vs. fill inside the bar. Bottom edge reads cleaner but is subtle.</li>
+        <li>Built-in status text (<code>done</code>/<code>in-progress</code>/<code>planned</code>) is <em>not rendered</em>; only the colored dot + duration/remaining. The dot's color carries the status name.</li>
+        <li>Single-swimlane panels don't alternate; is the lone PlantUML-style "tab" enough lane identity?</li>
+      </ul>
+    </div>
+  </section>
+
+  <!-- =========================================================== -->
+  <section class="sample">
+    <header>
+      <span class="chip">02</span>
+      <h2>Platform 2026 — the full example</h2>
+      <p>The canonical DSL sample: header logo, anchors, milestones, parallel + styled group, labels, footnotes, statuses, owners, links.</p>
+    </header>
+    <div class="layout">
+      <div class="render-pane">
+        <img src="02-platform-2026.svg" alt="Platform 2026 roadmap sample">
+      </div>
+      <div class="dsl-pane">
+        <h3>DSL source</h3>
+<pre><span class="kw">nowline</span> <span class="num">v1</span>
+
+<span class="kw">config</span>
+
+<span class="kw">style</span> <span class="id">enterprise</span> <span class="str">"Enterprise readiness"</span>
+  <span class="prop">bg:</span> blue
+  <span class="prop">text:</span> white
+<span class="kw">style</span> <span class="id">risky</span>
+  <span class="prop">border:</span> dashed
+  <span class="prop">fg:</span> orange
+<span class="kw">style</span> <span class="id">concurrent</span>
+  <span class="prop">bracket:</span> solid
+
+<span class="kw">default</span> <span class="kw">item</span> <span class="prop">shadow:</span>subtle
+<span class="kw">default</span> <span class="kw">label</span> <span class="prop">style:</span>subtle
+
+<span class="kw">roadmap</span> <span class="id">platform-2026</span> <span class="str">"Platform 2026"</span> <span class="prop">author:</span><span class="str">"Acme Engineering"</span> <span class="prop">logo:</span><span class="str">"./brand/acme.svg"</span> <span class="prop">start:</span><span class="num">2026-01-06</span> <span class="prop">scale:</span><span class="num">2w</span> <span class="prop">calendar:</span>business
+
+<span class="kw">person</span> <span class="id">sam</span> <span class="str">"Sam Chen"</span>
+<span class="kw">person</span> <span class="id">jen</span> <span class="str">"Jennifer Wu"</span>
+
+<span class="kw">team</span> <span class="id">platform</span> <span class="str">"Platform Team"</span>
+<span class="kw">team</span> <span class="id">mobile</span> <span class="str">"Mobile Team"</span>
+
+<span class="kw">anchor</span> <span class="id">kickoff</span>     <span class="prop">date:</span><span class="num">2026-01-06</span>
+<span class="kw">anchor</span> <span class="id">code-freeze</span> <span class="str">"Code Freeze"</span> <span class="prop">date:</span><span class="num">2026-05-01</span>
+<span class="kw">anchor</span> <span class="id">ga-date</span>     <span class="str">"GA Date"</span>     <span class="prop">date:</span><span class="num">2026-06-01</span>
+
+<span class="kw">duration</span> <span class="id">m</span>  <span class="prop">length:</span><span class="num">1w</span>
+<span class="kw">duration</span> <span class="id">l</span>  <span class="prop">length:</span><span class="num">2w</span>
+<span class="kw">duration</span> <span class="id">xl</span> <span class="prop">length:</span><span class="num">1m</span>
+
+<span class="kw">label</span> <span class="id">enterprise</span>     <span class="prop">style:</span>enterprise
+<span class="kw">label</span> <span class="id">security</span>       <span class="prop">style:</span>enterprise
+<span class="kw">label</span> <span class="id">low-confidence</span> <span class="prop">style:</span>risky
+
+<span class="kw">status</span> <span class="id">handoff</span> <span class="str">"Handoff"</span>  <span class="cmt">// custom status</span>
+
+<span class="kw">swimlane</span> <span class="id">platform</span> <span class="prop">owner:</span>platform
+  <span class="kw">item</span> <span class="id">auth-refactor</span> <span class="str">"Auth refactor"</span> <span class="prop">duration:</span>l <span class="prop">after:</span>kickoff \
+    <span class="prop">status:</span>done <span class="prop">owner:</span>sam <span class="prop">labels:</span>enterprise \
+    <span class="prop">link:</span>https://linear.app/acme/issue/ENG-123
+  <span class="kw">parallel</span> <span class="prop">after:</span>auth-refactor
+    <span class="kw">group</span> <span class="id">audit-track</span> <span class="str">"Audit Track"</span> <span class="prop">labels:</span>security
+      <span class="kw">parallel</span>  <span class="cmt">// audit-log and audit-ui run concurrently inside the group</span>
+        <span class="kw">item</span> <span class="id">audit-log</span> <span class="str">"Audit log v2"</span> <span class="prop">duration:</span>l <span class="prop">before:</span>code-freeze \
+          <span class="prop">remaining:</span><span class="num">30%</span> <span class="prop">labels:</span>[enterprise, security] \
+          <span class="prop">link:</span>https://wiki.acme.com/audit
+        <span class="kw">item</span> <span class="id">audit-ui</span> <span class="str">"Audit UI"</span> <span class="prop">duration:</span>m
+    <span class="kw">item</span> <span class="id">sso</span> <span class="str">"SSO plugins"</span> <span class="prop">duration:</span>m <span class="prop">labels:</span>[enterprise, low-confidence]
+  <span class="kw">item</span> <span class="id">platform-qa</span> <span class="str">"Platform QA"</span> <span class="prop">duration:</span>s <span class="prop">status:</span>handoff
+
+<span class="kw">swimlane</span> <span class="id">mobile</span> <span class="prop">owner:</span>mobile
+  <span class="kw">item</span> <span class="id">offline</span> <span class="str">"Offline mode"</span> <span class="prop">duration:</span>l <span class="prop">after:</span>kickoff \
+    <span class="prop">owner:</span>jen <span class="prop">status:</span>at-risk <span class="prop">remaining:</span><span class="num">60%</span>
+  <span class="kw">item</span> <span class="id">push-v2</span> <span class="str">"Push notifications v2"</span> <span class="prop">duration:</span>m <span class="prop">owner:</span>mobile
+
+<span class="kw">milestone</span> <span class="id">beta</span>      <span class="str">"Beta"</span>      <span class="prop">after:</span>auth-refactor
+<span class="kw">milestone</span> <span class="id">v1-ga</span>     <span class="str">"v1 GA"</span>     <span class="prop">after:</span>[auth-refactor, audit-log]
+<span class="kw">milestone</span> <span class="id">ga-launch</span> <span class="str">"GA launch"</span> <span class="prop">date:</span><span class="num">2026-06-01</span>
+
+<span class="kw">footnote</span> <span class="str">"Vendor dependency"</span> <span class="prop">on:</span>audit-log
+  <span class="kw">description</span> <span class="str">"Blocked until vendor contract is signed."</span>
+<span class="kw">footnote</span> <span class="id">capacity-risk</span> <span class="str">"Team capacity risk"</span> <span class="prop">on:</span>[mobile, platform]
+  <span class="kw">description</span> <span class="str">"Mobile team is down to 2 engineers through Q2."</span></pre>
+      </div>
+    </div>
+    <div class="notes">
+      <strong>What this asks you to decide:</strong>
+      <ul>
+        <li><strong>Anchors and milestones share a single marker row.</strong> Both live on the same horizontal band above the week-tick row, diamonds on the same baseline. Anchors are open diamonds, milestones are filled diamonds — two distinct glyphs in one row.</li>
+        <li><strong>Collision rule: anchor-on-top.</strong> When two markers would occupy the same x-column (here: GA Date anchor + GA launch milestone both at Mar 16), the header row expands upward at that column: the <em>anchor is bumped up</em> into the slim band above, and the milestone stays in-row. Result: anchor diamond/label sits above, milestone diamond/label sits below, same column. This keeps labels readable and preserves the "anchor = input, milestone = output" mental model with anchor visually "earlier" than milestone.</li>
+        <li><strong>Milestone verticals are prominent dashed ink.</strong> They read as "a hard gate that cuts the timeline": indigo-ink stroke (#1e1b4b) at 2px weight with a 6/4 dash pattern and round caps. Thicker and darker than the swimlane fills so they stay visible through a full-height traversal — clearly stronger than anchor verticals, which stay subtle dashed neutral (1px, 1/3 dash). A milestone whose predecessor overruns its line turns the dashed stroke deep red (#b91c1c) instead. Both milestones and anchors are drawn <em>after</em> the swimlane fills (like the now-line) so they overlay the lane background all the way down, emerging from the bottom tip of the marker-row diamond. Items still sit <em>above</em> the lines.</li>
+        <li><strong>A date-driven milestone</strong> (GA launch, Mar 16) sits at its date. An <code>after:</code>-driven milestone sits at the rightmost predecessor's end — <em>Beta</em> at auth-refactor's end, <em>v1 GA</em> at audit-log's end. Earlier predecessors get a dark dotted arrow rightward to the line (visible: auth-refactor → v1 GA).</li>
+        <li><strong>Anchor &amp; milestone labels bias <em>right</em> of the diamond by default,</strong> flipping to the left only if the label would overflow the timeline area.</li>
+        <li><strong>Symmetric column gutters on time-block items.</strong> Each item reserves its logical column width (1w = 70px here), but the rendered bar is inset <em>6px on each side</em> for a 12px gap between back-to-back items — matching the item's own 12px internal text padding so the chart feels evenly padded left-to-right. Sequentially abutting items (Auth refactor → parallel region; Offline mode → Push v2) show a clear visible gap. Dependency arrows attach to the <em>visual</em> bar edges (so arrowheads land on the bar, not in the gutter), while milestone lines and parallel rails still snap to <em>logical</em> column edges for date-accuracy.</li>
+        <li><strong>Nowline attribution mark lives at the bottom-right of the footnote panel.</strong> Since this sample has footnotes, the mark sits at the bottom-right of the footnote panel (not the last swimlane). It's the last thing drawn so it overlays panel content and never extends below the drawing bounds. Inset 12px from the panel's bottom-right corner.</li>
+        <li><strong>Parallel inside a group:</strong> Audit Track contains a nested <code>parallel</code> so <em>audit-log</em> and <em>audit-ui</em> both start at the group's left edge and stack vertically (same start time, different durations). The group's inner dashed orange rails show the nested parallel boundary. The <em>outer</em> parallel (group + sso) has no <code>style:</code> applied, so it resolves to <code>bracket:none</code> and renders with no visual connector — its structure is conveyed entirely by the two tracks stacking at a shared start x.</li>
+        <li><strong>Status dot moved to upper-right</strong> of every item bar; <strong>footnote superscript</strong> sits immediately to the <em>left</em> of the status dot (see "Audit log v2" — the red "1" and the blue status dot share the upper-right corner).</li>
+        <li><strong>Id → title resolution.</strong> Whenever a reference has a defined title, render the <em>title</em>, not the id. <code>owner: platform</code> renders as <code>owner: Platform Team</code>. <code>owner: sam</code> renders as <code>Sam Chen</code>. Anchors with a string title (<code>anchor code-freeze "Code Freeze"</code>) display "Code Freeze"; a title-less anchor (<code>anchor kickoff</code>) falls back to the id. Same rule for milestones, labels, groups, and swimlanes.</li>
+        <li><strong>Link icon is always the external-link glyph (↗).</strong> Same shape for every <code>link:</code> value. The <em>tile color</em> encodes the provider (Linear = indigo on auth-refactor, generic = ink on audit-log; would also support GitHub, Jira, Notion, etc.). One glyph, many tints — keeps the item bar legible and prevents a glyph-soup when providers multiply.</li>
+        <li><strong>Status display = colored dot only for built-ins.</strong> <code>done</code>, <code>in-progress</code>, <code>planned</code>, <code>at-risk</code>, <code>blocked</code> have universally-understood colors, so their names add noise to every item bar. The dot alone is sufficient. <strong>Custom statuses</strong> (user-declared via <code>status handoff "Handoff"</code>) still render their title as text next to the dot, since the user's custom color wouldn't be self-explanatory. Platform QA demonstrates the custom case — purple dot + "Handoff" label.</li>
+        <li><strong>Label chiclets have padding to the progress strip.</strong> The item bar has two zones: a content zone (title/subtitle/label/link) and a bottom 4px progress strip. Label chiclets sit inside the content zone with a small gap above the strip, so the chiclet never sits flush against the progress bar.</li>
+        <li>The <em>styled group</em> (Audit Track) uses an orange tab label on top. Competes with the in-bar label chiclets if we ever stack lots of groups.</li>
+        <li>Owner display in small text below the title — sufficient, or do we need an avatar/initials bubble?</li>
+      </ul>
+    </div>
+  </section>
+
+  <!-- =========================================================== -->
+  <section class="sample">
+    <header>
+      <span class="chip">03</span>
+      <h2>Platform 2026 — dark theme</h2>
+      <p>Same layout, dark palette. Now-line stays red by spec; everything else inverts. Good sanity check for contrast on chiclets and status dots.</p>
+    </header>
+    <div class="layout">
+      <div class="render-pane dark">
+        <img src="03-platform-2026-dark.svg" alt="Platform 2026 dark theme">
+      </div>
+      <div class="dsl-pane">
+        <h3>Theme difference only</h3>
+<pre><span class="cmt">// Same DSL as sample 02.</span>
+<span class="cmt">// Rendered with: nowline render roadmap.nowline --theme dark</span>
+
+<span class="cmt">// Light theme palette (for reference):</span>
+<span class="cmt">//   surface    = #f8fafc    panel      = #ffffff</span>
+<span class="cmt">//   ink        = #0f172a    ink-muted  = #64748b</span>
+<span class="cmt">//   grid       = #e2e8f0    now-line   = #e53e3e</span>
+
+<span class="cmt">// Dark theme palette:</span>
+<span class="cmt">//   surface    = #0b1220    panel      = #111a2e</span>
+<span class="cmt">//   ink        = #e2e8f0    ink-muted  = #94a3b8</span>
+<span class="cmt">//   grid       = #1f2a44    now-line   = #e53e3e</span>
+
+<span class="cmt">// Status dots & label bg colors keep the same hue,</span>
+<span class="cmt">// but item bar fills shift to darkened tints of the</span>
+<span class="cmt">// same hue (e.g. done = #064e3b instead of #ecfdf5).</span></pre>
+      </div>
+    </div>
+    <div class="notes">
+      <strong>What this asks you to decide:</strong>
+      <ul>
+        <li>The now-line red (#e53e3e) is the brand color — staying identical in dark mode makes sense, but is the contrast harsh? Alternative: slightly brightened #ef4444.</li>
+        <li>The orange "Audit Track" group tab picks up a saturated orange on a dark brown fill. Looks clean here but a pure-dark scheme might want a cooler orange variant.</li>
+        <li>Red overflow on the audit-log is in a deep #7f1d1d — still legible, still clearly "broken." Works?</li>
+        <li>Grid lines at <code>#1f2a44</code> vs. the panel at <code>#111a2e</code> — subtle enough? They largely disappear in this mockup, which might be intentional or too far.</li>
+      </ul>
+    </div>
+  </section>
+
+  <!-- =========================================================== -->
+  <section class="sample">
+    <header>
+      <span class="chip">04</span>
+      <h2>Dependencies, floating milestone &amp; overflow</h2>
+      <p>Cross-swimlane arrows, explicit <code>[ ]</code> brackets on the parallel block (with group-like padding), a <em>floating</em> milestone driven purely by <code>after:</code>, a dotted slack arrow from an earlier predecessor, and an item-level <code>before:</code> overflow rendered in red.</p>
+    </header>
+    <div class="layout">
+      <div class="render-pane">
+        <img src="04-dependencies.svg" alt="Dependency-heavy roadmap">
+      </div>
+      <div class="dsl-pane">
+        <h3>DSL source</h3>
+<pre><span class="kw">roadmap</span> <span class="str">"Dependency Demo"</span> <span class="prop">start:</span><span class="num">2026-01-05</span> <span class="prop">scale:</span><span class="num">1w</span>
+
+<span class="kw">anchor</span> <span class="id">kickoff</span>     <span class="prop">date:</span><span class="num">2026-01-05</span>
+<span class="kw">anchor</span> <span class="id">code-freeze</span> <span class="prop">date:</span><span class="num">2026-03-02</span>
+
+<span class="kw">swimlane</span> <span class="id">backend</span>
+  <span class="kw">item</span> <span class="id">api</span> <span class="str">"API v2"</span> <span class="prop">duration:</span><span class="num">2w</span> <span class="prop">after:</span>kickoff
+  <span class="kw">parallel</span> <span class="prop">style:</span>concurrent  <span class="cmt">// bracket:solid; no after: needed</span>
+    <span class="kw">item</span> <span class="id">search</span> <span class="str">"Search service"</span> <span class="prop">duration:</span><span class="num">3w</span>
+    <span class="kw">item</span> <span class="id">audit</span>  <span class="str">"Audit pipeline"</span> <span class="prop">duration:</span><span class="num">7w</span> \
+         <span class="prop">before:</span>code-freeze   <span class="cmt">// overflow → red</span>
+  <span class="kw">item</span> <span class="id">deploy</span> <span class="str">"Deploy"</span> <span class="prop">duration:</span><span class="num">1w</span>
+
+<span class="kw">swimlane</span> <span class="id">frontend</span>
+  <span class="kw">item</span> <span class="id">sdk</span> <span class="str">"SDK update"</span> <span class="prop">duration:</span><span class="num">2w</span> <span class="prop">after:</span>api
+  <span class="kw">item</span> <span class="id">ui</span>  <span class="str">"New console UI"</span> <span class="prop">duration:</span><span class="num">3w</span> \
+       <span class="prop">after:</span>[sdk, search]
+
+<span class="cmt">// No date: Beta floats to the rightmost predecessor's end.</span>
+<span class="kw">milestone</span> <span class="id">beta</span> <span class="str">"Beta"</span> <span class="prop">after:</span>[deploy, ui]</pre>
+      </div>
+    </div>
+    <div class="notes">
+      <strong>What this asks you to decide:</strong>
+      <ul>
+        <li><strong>Floating milestone (no date, only <code>after:</code>).</strong> When a milestone has no explicit <code>date:</code>, it <em>floats</em> to the rightmost predecessor's visual end. Beta has <code>after:[deploy, ui]</code>; <code>deploy</code> is the later predecessor, so Beta's diamond + vertical line land right at deploy's visual end (x=1264). No red — by definition there's no overrun when the milestone lands wherever its predecessors land. This differs from Sample 2, where milestones <em>with</em> dates can be overrun and turn red.</li>
+        <li><strong>Slack arrow from the earlier predecessor.</strong> <code>ui</code> finishes well before Beta. A dotted ink arrow from ui's visual right to the Beta line (at ui's row midline) communicates "ui finishes with slack; deploy is the binding predecessor." The arrow is dotted (not solid) specifically because it represents <em>waiting time</em>, not a data flow. We don't draw any arrow from <code>deploy</code> — its visual end coincides with Beta by construction.</li>
+        <li><strong>Redundant <code>after:</code> on the parallel block is omitted.</strong> The parallel block flows immediately after <code>api</code> simply because it's the next construct in the swimlane and api is its spatial predecessor. Writing <code>parallel after:api</code> would be redundant (and slightly misleading — <code>after:</code> on a parallel would imply the whole block waits for <em>all</em> of <code>api</code> which is already the case). We drop it.</li>
+        <li><strong>Parallel bracket = full <code>[ ]</code> with group-like padding.</strong> Both sides of the parallel render as proper brackets: <code>[</code> on the left at logical x=520, <code>]</code> on the right at logical x=1192. Each bracket has a short top and bottom serif. The brackets extend 12px above the topmost nested item (Search) and 12px below the bottommost (Audit pipeline) — the same vertical padding a styled group uses around its nested items. That framing makes fork + join visually explicit in a single glance, and mirrors the group's visual idiom so the two constructs feel kin.</li>
+        <li><strong>code-freeze anchor stays at its date (Mar 02), independent of Beta.</strong> With Beta floated to the right of deploy, there's no longer a collision between code-freeze and a Beta column (compare Sample 2, where GA Date anchor + GA launch milestone at the same column triggered anchor-on-top stacking). The code-freeze anchor sits in-row; its dashed gray vertical runs through the audit bar's amber→red transition (the bar still renders in red past code-freeze, independently of the milestone).</li>
+        <li><strong>Milestone line overlays the swimlane, prominently dashed.</strong> The Beta line uses the standard prominent treatment: indigo-ink (#1e1b4b) at 2px with a 6/4 dash pattern and round caps. It's drawn <em>after</em> the swimlane fills, so it appears just like the now-line. Deploy's right edge visually coincides with the Beta line (as expected, since Beta sits at deploy's end). Items render above lines, so deploy's solid right stroke wins over the dashed line at their intersection.</li>
+        <li><strong>api → sdk arrow routes <em>under</em> the parallel bracket.</strong> The arrow exits api's visual right (x=514), drops below the bracket's bottom serif (y=288), steps right, and drops into sdk. This keeps the arrow outside the parallel block visually (it's a flow that bypasses the parallel, not one that participates in it).</li>
+        <li><strong>Symmetric column gutters.</strong> 1w = 96px. Each item bar is inset 6px on each side, giving 12px between back-to-back items — matching the item's internal text padding. Dependency arrows attach to the <em>visual</em> bar edges. The red overflow zone on Audit pipeline keeps its <em>logical</em> extent so the visual overflow span tells the story.</li>
+        <li><strong>Nowline attribution mark at bottom-right of the last swimlane</strong> (no footnotes in this sample → Frontend lane's bottom-right corner, inset 12px, drawn last so it overlays lane content and never extends below the drawing).</li>
+        <li>The item-level <code>before:code-freeze</code> overflow renders as a red trailing region with a "past code-freeze" label. That communicates the overflow without needing a separate red arrow up to the anchor. Keep this convention for item-level <code>before:</code> overrun?</li>
+        <li>Status dots in upper-right keep the left edge of the bar clean for title/subtitle. Confirmed here across both lanes.</li>
+      </ul>
+    </div>
+  </section>
+
+  <!-- =========================================================== -->
+  <section class="sample">
+    <header>
+      <span class="chip">05</span>
+      <h2>Isolated include region</h2>
+      <p>Native swimlanes above and below, a third-party "partner" roadmap rendered inside a dashed-border region. Same timeline. Dependency arrows cross the boundary.</p>
+    </header>
+    <div class="layout">
+      <div class="render-pane">
+        <img src="05-isolate-include.svg" alt="Isolated include region">
+      </div>
+      <div class="dsl-pane">
+        <h3>DSL source</h3>
+<pre><span class="cmt">// primary.nowline</span>
+<span class="kw">roadmap</span> <span class="str">"Primary Release"</span> <span class="prop">start:</span><span class="num">2026-01-05</span> <span class="prop">scale:</span><span class="num">1w</span>
+
+<span class="kw">anchor</span> <span class="id">kickoff</span> <span class="prop">date:</span><span class="num">2026-01-05</span>
+
+<span class="cmt">// Native swimlanes render FIRST, in declaration order.</span>
+<span class="kw">swimlane</span> <span class="id">core</span> <span class="str">"Core"</span>
+  <span class="kw">item</span> <span class="id">core-api</span>   <span class="str">"Core API"</span>   <span class="prop">duration:</span><span class="num">3w</span> <span class="prop">after:</span>kickoff
+  <span class="kw">item</span> <span class="id">migrations</span> <span class="str">"Migrations"</span> <span class="prop">duration:</span><span class="num">2w</span> <span class="prop">after:</span>core-api
+
+<span class="kw">swimlane</span> <span class="id">integrations</span> <span class="str">"Integrations"</span>
+  <span class="kw">item</span> <span class="id">bridge</span> <span class="str">"Partner bridge"</span> <span class="prop">duration:</span><span class="num">2w</span> \
+       <span class="prop">after:</span>[migrations, partner.plugin-beta]
+
+<span class="kw">milestone</span> <span class="id">ga</span> <span class="str">"GA"</span> <span class="prop">after:</span>bridge
+
+<span class="cmt">// Isolated includes render LAST, below all native lanes, in include order.</span>
+<span class="kw">include</span> <span class="str">"partner.nowline"</span> <span class="prop">config:</span>isolate <span class="prop">roadmap:</span>isolate
+
+<span class="cmt">// partner.nowline (isolated — renders inside dashed region at bottom)</span>
+<span class="kw">roadmap</span> <span class="str">"Vendor plugin roadmap"</span> <span class="prop">start:</span><span class="num">2026-01-05</span>
+
+<span class="kw">swimlane</span> <span class="id">plugin</span> <span class="str">"Plugin"</span>
+  <span class="kw">item</span> <span class="id">plugin-alpha</span> <span class="str">"Plugin alpha"</span> <span class="prop">duration:</span><span class="num">4w</span> <span class="prop">after:</span>kickoff
+  <span class="kw">item</span> <span class="id">plugin-beta</span>  <span class="str">"Plugin beta"</span>  <span class="prop">duration:</span><span class="num">2w</span> <span class="prop">after:</span>plugin-alpha</pre>
+      </div>
+    </div>
+    <div class="notes">
+      <strong>What this asks you to decide:</strong>
+      <ul>
+        <li><strong>Render order.</strong> Native swimlanes of the parent file render first (Core, then Integrations). The isolated include region follows at the bottom, in include order. Multiple includes would stack in declaration order beneath the native content.</li>
+        <li><strong>Milestone and anchor lines cross the isolate region.</strong> The GA milestone's prominent dashed ink vertical (indigo-ink #1e1b4b, 2px, 6/4 dash) and the kickoff anchor's subtle dashed vertical (neutral gray, 1px) both run all the way from the marker row to the bottom of the chart — <em>through</em> the dashed isolate-region border and through its swimlanes. The isolate region is a visual container, not a timeline island: the primary roadmap's timeline still governs everything inside it.</li>
+        <li><strong>Symmetric column gutters.</strong> 1w = 90px. Every item bar is inset 6px on each side, so Core API → Migrations show a clear 12px gap (matching the item's internal text padding) even though they are back-to-back, and Plugin alpha → Plugin beta are visibly separated inside the isolate region. Dependency arrows route to the <em>visual</em> bar edges so arrowheads land on the bar, not in the gutter.</li>
+        <li><strong>Nowline attribution mark at bottom-right of the isolate region.</strong> No footnote panel, so the mark sits at the bottom-right of the last region — in this sample, that's the dashed isolate-include region (not the top Core lane). It renders on top of the region background, inset 12px from the bottom-right corner.</li>
+        <li>The dashed border uses a violet accent (<code>#8b5cf6</code>) to distinguish isolated content from native content. Is a distinct accent color the right treatment, or should the dashed border just use the neutral ink color?</li>
+        <li>The region label ("Partner · Vendor plugin roadmap") sits on the top edge of the dashed border with an external-link badge. Do we prefer a badge <em>inside</em> the region (like an icon watermark) instead of on the border?</li>
+        <li>Items inside the region render in the same style as native items but with a matching violet accent. That's a design choice — the spec doesn't dictate it. Worth codifying, or should we keep them visually identical to native items and let the border carry all the distinction?</li>
+        <li>Cross-region arrows (<code>plugin-beta → bridge</code>) cross the dashed border with no break. The long-haul <code>kickoff → plugin-alpha</code> arrow routes around the left edge of the isolate region to avoid piercing the Core API and Integrations bars. Keep that auto-routing behavior?</li>
+        <li>The GA milestone (after:bridge) renders as a solid black vertical — single predecessor, no overrun, no inbound connector arrows needed.</li>
+      </ul>
+    </div>
+  </section>
+
+  <footer class="foot">
+    Generated by hand, not by the layout engine. Open each SVG directly for pixel inspection, or use these as reference targets when implementing <code>@nowline/layout</code> and <code>@nowline/renderer</code> in m2b.
+  </footer>
+</div>
+</body>
+</html>

@@ -6,6 +6,8 @@ Nowline's OSS rendering path produces **static SVG** from a parsed roadmap. It i
 
 Downstream interactive renderers (e.g. a hosted editor with drag-and-drop and two-way sync) reuse the layout engine but ship in separate, proprietary projects and are out of scope here.
 
+Reference renderings the implementation should match live in [`samples/`](./samples) — open [`samples/index.html`](./samples/index.html) for the annotated gallery.
+
 ## Architecture
 
 ```

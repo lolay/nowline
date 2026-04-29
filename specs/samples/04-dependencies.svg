@@ -1,0 +1,297 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1280 560" width="1280" height="560" font-family="-apple-system, 'SF Pro Display', 'Segoe UI', Helvetica, Arial, sans-serif">
+  <!--
+    Sample 04 - Dependency-heavy roadmap
+    Demonstrates:
+      - Cross-swimlane after: arrows (orthogonal, rounded corners)
+      - Parallel block rendered with full [ ] brackets (explicit fork/join)
+        with group-like top+bottom padding around the nested items.
+      - before:code-freeze overflow on an item rendered in red (inside the
+        item's own bar), independent of the Beta milestone.
+      - A FLOATING milestone: Beta has `after:[deploy, ui]` with no explicit
+        date, so it floats to the rightmost predecessor's visual end
+        (deploy's visual right, x=1264). `ui` ends earlier - a dotted slack
+        arrow from ui's visual right to the Beta line communicates the slack.
+      - Status dots in the upper-right corner of each item bar
+
+    DSL gist:
+      roadmap "Dependency Demo" start:2026-01-05 scale:1w
+      anchor kickoff     date:2026-01-05
+      anchor code-freeze date:2026-03-02
+
+      swimlane backend
+        item api "API v2" duration:2w after:kickoff
+        parallel style:concurrent   # bracket:solid; no after: needed
+          item search "Search service" duration:3w
+          item audit "Audit pipeline" duration:7w before:code-freeze
+        item deploy "Deploy" duration:1w
+
+      swimlane frontend
+        item sdk "SDK update" duration:2w after:api
+        item ui "New console UI" duration:3w after:[sdk, search]
+
+      milestone beta "Beta" after:[deploy, ui]   # no date -> floats
+
+    Column: 1w = 96px. Timeline origin x=328. Ticks:
+      Jan05 328 / Jan12 424 / Jan19 520 / Jan26 616 / Feb02 712
+      Feb09 808 / Feb16 904 / Feb23 1000 / Mar02 1096 / Mar09 1192
+      (deploy logical end = 1288; visual end = 1264; Beta line @ x=1264)
+  -->
+
+  <defs>
+    <filter id="nl-shadow-subtle-4" x="-8%" y="-8%" width="116%" height="140%">
+      <feDropShadow dx="0" dy="1" stdDeviation="1.5" flood-color="#0f172a" flood-opacity="0.12"/>
+    </filter>
+    <marker id="nl-arrow-4" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto">
+      <path d="M 0 0 L 10 5 L 0 10 z" fill="#475569"/>
+    </marker>
+    <marker id="nl-arrow-dark-4" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto">
+      <path d="M 0 0 L 10 5 L 0 10 z" fill="#0f172a"/>
+    </marker>
+  </defs>
+
+  <rect width="1280" height="560" fill="#f8fafc"/>
+
+  <!-- Header -->
+  <g transform="translate(20,20)">
+    <rect width="240" height="88" rx="6" fill="#ffffff" stroke="#e2e8f0" filter="url(#nl-shadow-subtle-4)"/>
+    <text x="16" y="28" font-size="15" font-weight="700" fill="#0f172a">Dependency Demo</text>
+    <text x="16" y="46" font-size="10" fill="#64748b">Cross-lane deps, parallel [ ]</text>
+    <text x="16" y="60" font-size="10" fill="#64748b">bracket, floating milestone + slack</text>
+  </g>
+
+  <!-- Merged anchor + milestone row.
+       code-freeze anchor stays at x=1096 (Mar 02).
+       Beta milestone is date-less (`after:[deploy, ui]`) so it FLOATS to the
+       rightmost predecessor's end. deploy ends visually at x=1264 -> Beta
+       lands at x=1264. Since Beta is driven entirely by its dependencies
+       (no date collision, no overrun), it renders in the normal
+       filled-ink diamond style, not red. -->
+  <g>
+    <rect x="280" y="20" width="988" height="26" fill="#ffffff" stroke="#e2e8f0" rx="4"/>
+
+    <!-- kickoff anchor (x=328) - in-row -->
+    <g transform="translate(328,33)">
+      <polygon points="0,-6 6,0 0,6 -6,0" fill="#ffffff" stroke="#334155" stroke-width="1.25"/>
+    </g>
+    <text x="340" y="37" font-size="10" fill="#334155">kickoff</text>
+
+    <!-- code-freeze anchor (x=1096) - in-row, no longer colliding with Beta -->
+    <g transform="translate(1096,33)">
+      <polygon points="0,-6 6,0 0,6 -6,0" fill="#ffffff" stroke="#334155" stroke-width="1.25"/>
+    </g>
+    <text x="1108" y="37" font-size="10" fill="#334155">code-freeze</text>
+
+    <!-- Beta milestone floats to rightmost predecessor end (deploy visual right, x=1264).
+         Label biases LEFT here since the label would otherwise overflow the right edge. -->
+    <g transform="translate(1264,33)">
+      <polygon points="0,-6 6,0 0,6 -6,0" fill="#0f172a"/>
+    </g>
+    <text x="1260" y="37" font-size="10" font-weight="700" fill="#0f172a" text-anchor="end">Beta</text>
+  </g>
+
+  <!-- Tick labels (moved up to y=46..74 now that marker rows are merged) -->
+  <g transform="translate(280,46)">
+    <rect width="988" height="28" fill="#ffffff" stroke="#e2e8f0" rx="4"/>
+    <g font-size="10" fill="#64748b" text-anchor="middle">
+      <text x="48"  y="18">Jan 05</text>
+      <text x="144" y="18">Jan 12</text>
+      <text x="240" y="18">Jan 19</text>
+      <text x="336" y="18">Jan 26</text>
+      <text x="432" y="18">Feb 02</text>
+      <text x="528" y="18">Feb 09</text>
+      <text x="624" y="18">Feb 16</text>
+      <text x="720" y="18">Feb 23</text>
+      <text x="816" y="18">Mar 02</text>
+      <text x="912" y="18">Mar 09</text>
+    </g>
+  </g>
+
+  <!-- Grid lines -->
+  <g stroke="#e2e8f0" stroke-width="1" stroke-dasharray="2 3">
+    <line x1="424"  y1="108" x2="424"  y2="490"/>
+    <line x1="520"  y1="108" x2="520"  y2="490"/>
+    <line x1="616"  y1="108" x2="616"  y2="490"/>
+    <line x1="712"  y1="108" x2="712"  y2="490"/>
+    <line x1="808"  y1="108" x2="808"  y2="490"/>
+    <line x1="904"  y1="108" x2="904"  y2="490"/>
+    <line x1="1000" y1="108" x2="1000" y2="490"/>
+    <line x1="1192" y1="108" x2="1192" y2="490"/>
+  </g>
+
+  <!-- =========================
+       Backend swimlane
+       ========================= -->
+  <g>
+    <rect x="20" y="120" width="1248" height="210" fill="#ffffff" stroke="#e2e8f0"/>
+    <g>
+      <rect x="30" y="130" width="110" height="22" rx="4" fill="#f1f5f9" stroke="#cbd5e1"/>
+      <text x="40" y="145" font-size="12" font-weight="600" fill="#334155">Backend</text>
+    </g>
+
+    <!-- api (logical 2w=192, logical x=328..520).
+         6px inset each side -> visual x=334, width=180, 12px gutter on each side. -->
+    <g transform="translate(334,170)">
+      <rect width="180" height="48" rx="4" fill="#eff6ff" stroke="#3b82f6" filter="url(#nl-shadow-subtle-4)"/>
+      <text x="12" y="18" font-size="13" font-weight="600" fill="#1e3a8a">API v2</text>
+      <text x="12" y="34" font-size="10" fill="#1d4ed8">2w</text>
+      <circle cx="168" cy="10" r="5" fill="#3b82f6"/>
+    </g>
+
+    <!-- Parallel block [ ] brackets.
+         Semantics: fork at left bracket, join at right bracket. Both
+         brackets frame the nested parallel items with group-like vertical
+         padding (12px above topmost item, 12px below bottommost item).
+           Content y-extent: search (170..218) + audit (228..276) = 170..276.
+           Bracket y-extent:  158..288 (12px padding top + bottom).
+         Brackets snap to LOGICAL parallel edges (x=520, x=1192) so their
+         inset items (visual x=526, visual right of audit = 1186) sit just
+         inside the brackets with matching horizontal breathing room. -->
+    <g stroke="#334155" stroke-width="1.25" fill="none" stroke-linejoin="round">
+      <!-- left bracket [ -->
+      <path d="M 524 158 H 520 V 288 H 524"/>
+      <!-- right bracket ] -->
+      <path d="M 1188 158 H 1192 V 288 H 1188"/>
+    </g>
+
+    <!-- search: row 1, logical 3w=288 (logical x=520..808).
+         Visual x=526, width=276. -->
+    <g transform="translate(526,170)">
+      <rect width="276" height="48" rx="4" fill="#f0f9ff" stroke="#0ea5e9" filter="url(#nl-shadow-subtle-4)"/>
+      <text x="12" y="18" font-size="13" font-weight="600" fill="#0c4a6e">Search service</text>
+      <text x="12" y="34" font-size="10" fill="#0369a1">3w</text>
+      <circle cx="264" cy="10" r="5" fill="#94a3b8"/>
+    </g>
+
+    <!-- audit: row 2, logical 7w=672 (logical x=520..1192), before:code-freeze overflow.
+         Visual x=526, width=660 (logical 672 - 12).
+         Code-freeze milestone is at logical x=1096. In internal coords that's
+         1096 - 526 = 570, so main amber zone runs 0..570, red overflow runs 570..660. -->
+    <g transform="translate(526,228)">
+      <rect width="570" height="48" rx="4" fill="#fff7ed" stroke="#fb923c" filter="url(#nl-shadow-subtle-4)"/>
+      <rect x="570" y="0" width="90" height="48" rx="0" fill="#fee2e2" stroke="#ef4444"/>
+      <text x="12" y="18" font-size="13" font-weight="600" fill="#713f12">Audit pipeline</text>
+      <text x="12" y="34" font-size="10" fill="#a16207">7w - before:code-freeze (overflow)</text>
+      <text x="615" y="32" font-size="9" font-weight="700" fill="#b91c1c" text-anchor="middle">past code-freeze</text>
+      <circle cx="552" cy="10" r="5" fill="#eab308"/>
+    </g>
+
+    <!-- deploy (logical 1w=96, logical x=1192..1288).
+         Already uses a narrow label-based width; keep width=66 but apply
+         6px left inset -> visual x=1198. Deploy's logical end x=1288 is
+         past Beta line at x=1096 -> red milestone. -->
+    <g transform="translate(1198,194)">
+      <rect width="66" height="44" rx="4" fill="#f8fafc" stroke="#94a3b8" filter="url(#nl-shadow-subtle-4)"/>
+      <text x="8" y="17" font-size="11" font-weight="600" fill="#1e293b">Deploy</text>
+      <text x="8" y="30" font-size="9" fill="#64748b">1w</text>
+      <circle cx="56" cy="8" r="4" fill="#94a3b8"/>
+    </g>
+  </g>
+
+  <!-- =========================
+       Frontend swimlane
+       ========================= -->
+  <g>
+    <rect x="20" y="340" width="1248" height="150" fill="#fafafa" stroke="#e2e8f0"/>
+    <line x1="20" y1="340" x2="1260" y2="340" stroke="#cbd5e1"/>
+    <g>
+      <rect x="30" y="350" width="110" height="22" rx="4" fill="#fef3c7" stroke="#fcd34d"/>
+      <text x="40" y="365" font-size="12" font-weight="600" fill="#92400e">Frontend</text>
+    </g>
+
+    <!-- sdk (logical 2w=192, logical x=520..712), after:api.
+         Visual x=526, width=180. -->
+    <g transform="translate(526,390)">
+      <rect width="180" height="48" rx="4" fill="#f0f9ff" stroke="#0ea5e9" filter="url(#nl-shadow-subtle-4)"/>
+      <text x="12" y="18" font-size="13" font-weight="600" fill="#0c4a6e">SDK update</text>
+      <text x="12" y="34" font-size="10" fill="#0369a1">2w</text>
+      <circle cx="168" cy="10" r="5" fill="#94a3b8"/>
+    </g>
+
+    <!-- ui (logical 3w=288, logical x=808..1096), after:[sdk, search].
+         Visual x=814, width=276. Logical right edge (1096) still lines up
+         with the Beta milestone line. -->
+    <g transform="translate(814,390)">
+      <rect width="276" height="48" rx="4" fill="#f0f9ff" stroke="#0ea5e9" filter="url(#nl-shadow-subtle-4)"/>
+      <text x="12" y="18" font-size="13" font-weight="600" fill="#0c4a6e">New console UI</text>
+      <text x="12" y="34" font-size="10" fill="#0369a1">3w - after:[sdk, search]</text>
+      <circle cx="264" cy="10" r="5" fill="#94a3b8"/>
+    </g>
+  </g>
+
+  <!-- =========================
+       Dependency arrows - attach to VISUAL bar edges so arrows emerge
+       from and terminate on the actual bars, not in inter-column gutters.
+       ========================= -->
+  <g stroke="#475569" fill="none" stroke-width="1.1" marker-end="url(#nl-arrow-4)" stroke-linejoin="round">
+    <!-- kickoff anchor (x=328 logical) -> api visual top-left (x=334) -->
+    <path d="M 328 42 V 166 H 336"/>
+    <!-- api visual right (x=514) -> sdk visual left (x=524). Route UNDER the
+         parallel [ ] bracket (bracket bottom at y=288) so the arrow doesn't
+         visually pierce the parallel block. -->
+    <path d="M 514 194 V 320 H 524 V 412"/>
+    <!-- search visual right (x=802) -> ui visual left (x=814) -->
+    <path d="M 802 194 V 390 H 812"/>
+    <!-- sdk visual right (x=706) -> ui visual left (x=814) -->
+    <path d="M 706 414 H 812"/>
+  </g>
+
+  <!-- Milestone predecessor SLACK arrow (dark dotted).
+       Beta floats to the rightmost predecessor (deploy visual end, x=1264)
+       since Beta is defined as `after:[deploy, ui]` with no explicit date.
+       `ui` is the EARLIER predecessor - its visual end (x=1090) is well
+       before the Beta line, so we draw a dotted arrow from ui's visual
+       right to the Beta line at ui's row midline (y=414). The dotted
+       style + the horizontal gap communicates "ui finishes with slack
+       before Beta; deploy is the binding predecessor."
+       No arrow from `deploy` is needed: deploy ends exactly ON the Beta
+       line (it's what determines Beta's position). -->
+  <g stroke="#0f172a" fill="none" stroke-width="1.1" stroke-dasharray="3 3" stroke-linecap="round" marker-end="url(#nl-arrow-dark-4)">
+    <path d="M 1090 414 H 1258"/>
+  </g>
+
+  <!-- =========================
+       Anchor cut lines (dashed) - drawn late so they overlay swimlane fills.
+       kickoff @ x=328. code-freeze @ x=1096 (no longer sharing the Beta
+       column - Beta has floated right of deploy).
+       ========================= -->
+  <g stroke="#64748b" stroke-width="1" stroke-dasharray="1 3" fill="none">
+    <line x1="328" y1="39" x2="328" y2="490"/>
+    <line x1="1096" y1="39" x2="1096" y2="490"/>
+  </g>
+
+  <!-- =========================
+       Beta milestone cut line - floats to rightmost predecessor's visual end
+       (deploy's visual right, x=1264). Drawn late so it overlays swimlane
+       fills (like the now-line).
+       Prominent dashed indigo-ink - thicker stroke, visible dash pattern.
+       NOT red: Beta is `after:`-driven (no date), so by definition it lands
+       where its latest predecessor ends - there's no overrun.
+       ========================= -->
+  <line x1="1264" y1="39" x2="1264" y2="490" stroke="#1e1b4b" stroke-width="2" stroke-dasharray="6 4" stroke-linecap="round"/>
+
+  <!-- =========================
+       Now-line - Jan 26 (x=616)
+       ========================= -->
+  <g>
+    <line x1="616" y1="20" x2="616" y2="490" stroke="#e53e3e" stroke-width="2.25"/>
+    <g transform="translate(616,14)">
+      <rect x="-20" y="-14" width="40" height="18" rx="9" fill="#e53e3e"/>
+      <text x="0" y="-1" font-size="10" font-weight="700" fill="#ffffff" text-anchor="middle">now</text>
+    </g>
+  </g>
+
+  <!-- Nowline attribution mark - bottom-right of the last swimlane (Frontend,
+       x=[20,1268], y=[340,490]; no footnotes exist in this sample). Anchored
+       12px inside the bottom-right corner, drawn on top. -->
+  <g transform="translate(1223,467) scale(0.22)">
+    <text x="0" y="40" font-size="40" font-weight="700" fill="#94a3b8">now</text>
+    <rect x="92" y="12" width="5" height="40" fill="#e53e3e"/>
+    <text x="100" y="40" font-size="40" font-weight="400" fill="#94a3b8">ine</text>
+  </g>
+
+  <!-- Caption -->
+  <text x="20" y="518" font-size="11" fill="#64748b" font-style="italic">
+    Sample 04 - Dependency-heavy: cross-lane arrows, parallel [ ] brackets, floating milestone
+    (Beta floats to rightmost predecessor; dotted slack arrow from earlier predecessor).
+  </text>
+</svg>
