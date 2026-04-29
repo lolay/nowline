@@ -69,13 +69,17 @@ describeBuilt('verbless render (requires `pnpm build`)', () => {
         expect(r.stdout).toContain('data-layer="item"');
     });
 
-    it('rejects unsupported -f png with a helpful message', async () => {
-        const r = await runCliBuilt([
-            path.join(examplesDir, 'minimal.nowline'),
-            '-f', 'png',
-        ]);
-        expect(r.exitCode).toBe(2);
-        expect(r.stderr).toMatch(/m2c|svg/i);
+    it('-f png renders a PNG file (m2c)', async () => {
+        await withTempDir(async (dir) => {
+            const r = await runCliBuilt([
+                path.join(examplesDir, 'minimal.nowline'),
+                '-f', 'png',
+                '--headless',
+            ], { cwd: dir });
+            expect(r.exitCode).toBe(0);
+            const out = path.join(dir, 'minimal.png');
+            expect(existsSync(out)).toBe(true);
+        });
     });
 
     it('--today places the now-line in the output', async () => {
@@ -131,14 +135,18 @@ describeBuilt('verbless render (requires `pnpm build`)', () => {
         expect(parsed.$nowlineSchema).toBe('1');
     });
 
-    it('-o report -f pdf would auto-add .pdf extension (path resolution test)', async () => {
-        // PDF is m2c-only so we expect exit 2; the auto-add is verified via unit tests.
-        const r = await runCliBuilt([
-            path.join(examplesDir, 'minimal.nowline'),
-            '-o', 'report',
-            '-f', 'pdf',
-        ]);
-        expect(r.exitCode).toBe(2);
+    it('-o report -f pdf auto-adds the .pdf extension', async () => {
+        await withTempDir(async (dir) => {
+            const r = await runCliBuilt([
+                path.join(examplesDir, 'minimal.nowline'),
+                '-o', 'report',
+                '-f', 'pdf',
+                '--headless',
+            ], { cwd: dir });
+            expect(r.exitCode).toBe(0);
+            const out = path.join(dir, 'report.pdf');
+            expect(existsSync(out)).toBe(true);
+        });
     });
 
     it('-o report.svg writes SVG to that name', async () => {
@@ -153,13 +161,17 @@ describeBuilt('verbless render (requires `pnpm build`)', () => {
         });
     });
 
-    it('-f infers from .pdf extension and reports m2c-only', async () => {
-        const r = await runCliBuilt([
-            path.join(examplesDir, 'minimal.nowline'),
-            '-o', 'foo.pdf',
-        ]);
-        expect(r.exitCode).toBe(2);
-        expect(r.stderr).toMatch(/m2c|format/i);
+    it('-f infers from .pdf extension and writes a PDF', async () => {
+        await withTempDir(async (dir) => {
+            const r = await runCliBuilt([
+                path.join(examplesDir, 'minimal.nowline'),
+                '-o', 'foo.pdf',
+                '--headless',
+            ], { cwd: dir });
+            expect(r.exitCode).toBe(0);
+            const out = path.join(dir, 'foo.pdf');
+            expect(existsSync(out)).toBe(true);
+        });
     });
 
     it('-o foo.xml without -f msproj fails as ambiguous', async () => {

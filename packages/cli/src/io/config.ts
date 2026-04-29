@@ -8,6 +8,14 @@ export interface NowlineRc {
     theme?: string;
     defaultFormat?: string;
     width?: number;
+    // m2c export-format defaults — read by the render handler when the
+    // matching CLI flag is absent.
+    pdfPageSize?: string;
+    pdfOrientation?: string;
+    pdfMargin?: string;
+    fontSans?: string;
+    fontMono?: string;
+    headlessFonts?: boolean;
     [key: string]: unknown;
 }
 

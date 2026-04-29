@@ -39,18 +39,42 @@ milestone beta "Beta" after:[auth-refactor, audit-log]
 
 ## Status
 
-Nowline is pre-release. Nothing is published to package registries, Homebrew, or GitHub Releases yet — the toolchain runs from source. Stable releases will land with the milestones tracked in [`specs/milestones.md`](./specs/milestones.md). The parser, validator, and CLI (verbless render, `--dry-run`, `--init`, `--serve`) are usable today.
+Nowline is pre-release. Nothing is published to package registries, Homebrew, or GitHub Releases yet — the toolchain runs from source. Stable releases will land with the milestones tracked in [`specs/milestones.md`](./specs/milestones.md). The parser, validator, layout, renderer, every export format (SVG, PNG, PDF, HTML, Markdown+Mermaid, XLSX, MS Project XML), and CLI (verbless render, `--dry-run`, `--init`, `--serve`) are usable today.
 
 ## Packages
 
 This repository is an OSS monorepo of the Nowline language tooling.
+
+### Core layers
 
 | Package | Purpose |
 |---|---|
 | [`@nowline/core`](./packages/core) | Parser, typed AST, and validator. Pure TypeScript; no DOM, no Node-specific APIs in the hot path. |
 | [`@nowline/layout`](./packages/layout) | Layout engine — AST → positioned model (themes, style resolution, calendar, timeline). |
 | [`@nowline/renderer`](./packages/renderer) | SVG renderer — positioned model → deterministic SVG string. |
-| [`@nowline/cli`](./packages/cli) | `nowline` command: verbless render with mode flags `--serve`, `--init`, `--dry-run`. |
+
+### Export packages
+
+| Package | Purpose |
+|---|---|
+| [`@nowline/export-core`](./packages/export-core) | Shared types, unit converter, PDF page-size parser, 5-step font resolver, bundled DejaVu fonts. |
+| [`@nowline/export-png`](./packages/export-png) | PNG via [`@resvg/resvg-js`](https://github.com/yisibl/resvg-js) WASM. *Tiny + Full*. |
+| [`@nowline/export-pdf`](./packages/export-pdf) | Vector PDF via [`pdfkit`](https://github.com/foliojs/pdfkit) + `svg-to-pdfkit`. *Full only*. |
+| [`@nowline/export-html`](./packages/export-html) | Self-contained HTML page with inline pan/zoom JS. *Full only*. |
+| [`@nowline/export-mermaid`](./packages/export-mermaid) | Markdown + Mermaid `gantt` block. *Full only*. |
+| [`@nowline/export-xlsx`](./packages/export-xlsx) | Five-sheet workbook via [`exceljs`](https://github.com/exceljs/exceljs). *Full only*. |
+| [`@nowline/export-msproj`](./packages/export-msproj) | MS Project import XML. *Full only*. |
+
+### CLI
+
+| Package | Purpose |
+|---|---|
+| [`@nowline/cli`](./packages/cli) | `nowline` (tiny) — SVG + PNG + AST round-trip. ~50 MB binary. |
+| [`@nowline/cli-full`](./packages/cli-full) | `nowline-full` — every format. ~58–62 MB binary. |
+
+The tiny `nowline` build covers the common case (SVG + PNG sharing); the
+full `nowline-full` build adds PDF, HTML, Markdown+Mermaid, XLSX, and MS
+Project XML for users who need those workflow-specific formats.
 
 Planned: a browser embed script and an LSP / VS Code extension.
 
@@ -107,15 +131,26 @@ nowline --version
 
 ```bash
 nowline roadmap.nowline                          # writes ./roadmap.svg
-nowline roadmap.nowline -f pdf                   # writes ./roadmap.pdf  (m2c)
+nowline roadmap.nowline -f png                   # writes ./roadmap.png   (tiny + full)
+nowline roadmap.nowline -f pdf                   # writes ./roadmap.pdf   (full only)
+nowline roadmap.nowline -f html                  # writes ./roadmap.html  (full only)
+nowline roadmap.nowline -f mermaid               # writes ./roadmap.md    (full only)
+nowline roadmap.nowline -f xlsx                  # writes ./roadmap.xlsx  (full only)
+nowline roadmap.nowline -f msproj                # writes ./roadmap.xml   (full only)
 nowline roadmap.nowline -o roadmap.pdf           # format inferred from extension
 nowline roadmap.nowline -o -                     # SVG to stdout
 nowline roadmap.nowline --theme dark --today 2026-03-15
 nowline roadmap.nowline --asset-root ./brand --no-links --strict
+nowline roadmap.nowline -f pdf --page-size a4 --orientation landscape --margin 0.5in
 cat roadmap.nowline | nowline -                  # stdin → ./roadmap.svg
 ```
 
-The render pipeline is `@nowline/core` parse → `@nowline/layout` layout → `@nowline/renderer` SVG. Output is byte-for-byte deterministic for the same input, theme, and `--today`. Only `svg` is produced in m2b; `png`, `pdf`, `html`, `mermaid`, `xlsx`, and `msproj` land in m2c.
+The render pipeline is `@nowline/core` parse → `@nowline/layout` layout →
+`@nowline/renderer` SVG → format-specific exporter. Output is byte-for-byte
+deterministic for the same input, theme, and `--today`. The two binary
+distributions (tiny `nowline`, full `nowline-full`) cover the same source
+tree — see [`packages/cli/README.md`](./packages/cli/README.md#install)
+for the format / size split.
 
 ### Validate (`--dry-run`)
 

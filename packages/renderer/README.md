@@ -7,6 +7,19 @@ and emits a deterministic SVG string. It is palette-dumb (every color comes
 from the positioned model), browser-safe (no `fs`, `path`, `process`, or
 `Buffer`), and has no runtime dependencies beyond `@nowline/layout`.
 
+> **Other output formats live in dedicated packages.** PNG, PDF, HTML,
+> Mermaid, XLSX, and MS Project XML are produced by
+> [`@nowline/export-png`](../export-png), [`@nowline/export-pdf`](../export-pdf),
+> [`@nowline/export-html`](../export-html),
+> [`@nowline/export-mermaid`](../export-mermaid),
+> [`@nowline/export-xlsx`](../export-xlsx), and
+> [`@nowline/export-msproj`](../export-msproj) respectively. Each one takes
+> the renderer's SVG (or the AST) as input and adds *only* the runtime
+> dependency it needs — keeping the renderer browser-safe and the per-format
+> install footprint small. See
+> [`specs/handoffs/m2c.md`](../../specs/handoffs/m2c.md) § 1 for the
+> rationale.
+
 ## Install
 
 ```bash

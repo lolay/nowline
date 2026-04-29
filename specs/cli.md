@@ -69,6 +69,27 @@ Render options
   -w, --width <px>       Canvas width in pixels (default: 1280)
   --asset-root <dir>     Directory from which logo / image assets may be loaded
 
+Format-specific options
+  --page-size <size>     PDF page size: preset (letter | legal | tabloid |
+                         ledger | a1..a5 | b3..b5), `content` for auto-fit,
+                         or `WxHunit` for custom (e.g. 8.5x11in, 210x297mm).
+                         Default: letter.
+  --orientation <name>   PDF orientation: portrait | landscape | auto.
+                         Default: auto.
+  --margin <length>      PDF page margin. Bare numbers are points;
+                         length suffixes (in, mm, cm) are accepted.
+                         Default: 36pt (½ inch).
+  --font-sans <ref>      Sans font for PNG/PDF: TTF/OTF path, or alias
+                         (sf, helvetica, dejavu, etc.). Default: platform
+                         probe → bundled DejaVu fallback.
+  --font-mono <ref>      Mono font for PNG/PDF. Default: same as --font-sans
+                         resolution chain.
+  --headless             Skip platform font probe; force bundled DejaVu pair.
+                         Byte-stable across machines.
+  --start <date>         MS Project: anchor date (YYYY-MM-DD) for relative
+                         roadmaps. Default: --today, then deterministic
+                         fallback.
+
 Logging (mutually exclusive)
   -v, --verbose          Print extra diagnostics to stderr (config path,
                          pipeline timings, font resolution, fallback decisions)
