@@ -1,8 +1,11 @@
 node_modules/
 dist/
 out/
+dist-bin/
+dist-deb/
 *.tsbuildinfo
 .scratch/
+.pnpm-store/
 
 # Langium generated
 **/src/generated/

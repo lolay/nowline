@@ -32,6 +32,26 @@ export function isOutputFormat(value: string): value is OutputFormat {
     return (ALL_OUTPUT_FORMATS as readonly string[]).includes(value);
 }
 
+/**
+ * User-facing format aliases. The canonical token is `msproj` (matches the
+ * package name `@nowline/export-msproj`); `ms-project` and `mspx` are
+ * accepted shorthands documented in `specs/handoffs/m2c.md` § 8.
+ */
+const FORMAT_ALIASES: Readonly<Record<string, OutputFormat>> = {
+    'ms-project': 'msproj',
+    msproject: 'msproj',
+    mspx: 'msproj',
+    md: 'mermaid',
+    markdown: 'mermaid',
+    excel: 'xlsx',
+    'ms-excel': 'xlsx',
+};
+
+export function normalizeFormatAlias(raw: string): string {
+    const lower = raw.toLowerCase();
+    return FORMAT_ALIASES[lower] ?? lower;
+}
+
 export function isInputFormat(value: string): value is InputFormat {
     return value === 'nowline' || value === 'json';
 }
@@ -114,7 +134,7 @@ export interface FormatResolution {
  */
 export function resolveFormat(inputs: FormatResolutionInputs): FormatResolution {
     if (inputs.flagFormat) {
-        const flag = inputs.flagFormat.toLowerCase();
+        const flag = normalizeFormatAlias(inputs.flagFormat);
         if (!isOutputFormat(flag)) {
             throw new FormatResolutionError(
                 `Unknown --format "${inputs.flagFormat}". Expected one of: ${ALL_OUTPUT_FORMATS.join(', ')}.`,
@@ -139,7 +159,7 @@ export function resolveFormat(inputs: FormatResolutionInputs): FormatResolution 
     }
 
     if (inputs.configFormat) {
-        const cfg = inputs.configFormat.toLowerCase();
+        const cfg = normalizeFormatAlias(inputs.configFormat);
         if (!isOutputFormat(cfg)) {
             throw new FormatResolutionError(
                 `Invalid .nowlinerc defaultFormat "${inputs.configFormat}". Expected one of: ${ALL_OUTPUT_FORMATS.join(', ')}.`,

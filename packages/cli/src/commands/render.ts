@@ -7,6 +7,7 @@ import { parseSource, getServices } from '../core/parse.js';
 import { resolveIncludes } from '@nowline/core';
 import { layoutRoadmap, type ThemeName } from '@nowline/layout';
 import { renderSvg, type AssetResolver } from '@nowline/renderer';
+import { parseLength, lengthToPoints } from '@nowline/export-core';
 import { formatDiagnostics, type DiagnosticSource } from '../diagnostics/index.js';
 import {
     isBinaryFormat,
@@ -84,6 +85,16 @@ export async function renderHandler(options: RenderHandlerOptions): Promise<void
         noLinks: args.noLinks,
         strict: args.strict,
         assetRoot: args.assetRoot,
+        // m2c format-specific options. Strings get parsed inside the format
+        // dispatch; the CLI just passes them through.
+        pageSize: args.pageSize ?? stringFromConfig(config, 'pdfPageSize'),
+        orientation: args.orientation ?? stringFromConfig(config, 'pdfOrientation'),
+        margin: args.margin ?? stringFromConfig(config, 'pdfMargin'),
+        fontSans: args.fontSans ?? stringFromConfig(config, 'fontSans'),
+        fontMono: args.fontMono ?? stringFromConfig(config, 'fontMono'),
+        headless: args.headless || boolFromConfig(config, 'headlessFonts'),
+        scale: args.scale,
+        start: args.start,
     });
 
     if (args.dryRun) {
@@ -156,6 +167,15 @@ interface ProduceArgs {
     noLinks: boolean;
     strict: boolean;
     assetRoot?: string;
+    // m2c format-specific
+    pageSize?: string;
+    orientation?: string;
+    margin?: string;
+    fontSans?: string;
+    fontMono?: string;
+    headless: boolean;
+    scale?: string;
+    start?: string;
 }
 
 interface ProduceResult {
@@ -170,18 +190,99 @@ async function produce(args: ProduceArgs): Promise<ProduceResult> {
     if (args.format === 'nowline') {
         return { rendered: await produceCanonicalNowline(args), isBinary: false };
     }
-    if (args.format === 'svg') {
-        return { rendered: await produceSvg(args), isBinary: false };
-    }
 
-    if (isBinaryFormat(args.format) || args.format === 'html' || args.format === 'mermaid' || args.format === 'msproj') {
+    // The remaining formats all start from a positioned model + (sometimes) an
+    // SVG. Build them once and dispatch to the format-specific exporter via
+    // dynamic import so the tiny CLI build can `--external` the optional
+    // packages.
+    const stage = await stageRoadmap(args);
+
+    if (args.format === 'svg') {
+        return { rendered: stage.svg, isBinary: false };
+    }
+    try {
+        if (args.format === 'html') {
+            const mod = await import('@nowline/export-html');
+            const html = await mod.exportHtml(stage.exportInputs, stage.svg);
+            return { rendered: html, isBinary: false };
+        }
+        if (args.format === 'mermaid') {
+            const mod = await import('@nowline/export-mermaid');
+            const md = mod.exportMermaid(stage.exportInputs);
+            return { rendered: md, isBinary: false };
+        }
+        if (args.format === 'msproj') {
+            const mod = await import('@nowline/export-msproj');
+            const xml = mod.exportMsProjXml(stage.exportInputs, {
+                startDate: args.start,
+            });
+            return { rendered: xml, isBinary: false };
+        }
+        if (args.format === 'png') {
+            const fonts = await stage.fontPair();
+            const mod = await import('@nowline/export-png');
+            const png = await mod.exportPng(stage.exportInputs, stage.svg, {
+                scale: parseScale(args.scale),
+                fonts,
+            });
+            return { rendered: png, isBinary: true };
+        }
+        if (args.format === 'pdf') {
+            const fonts = await stage.fontPair();
+            const mod = await import('@nowline/export-pdf');
+            const pdf = await mod.exportPdf(stage.exportInputs, stage.svg, {
+                pageSize: args.pageSize,
+                orientation: parseOrientation(args.orientation),
+                marginPt: parseMargin(args.margin),
+                fonts,
+            });
+            return { rendered: pdf, isBinary: true };
+        }
+        if (args.format === 'xlsx') {
+            const mod = await import('@nowline/export-xlsx');
+            const xlsx = await mod.exportXlsx(stage.exportInputs, {
+                generated: args.today,
+            });
+            return { rendered: xlsx, isBinary: true };
+        }
+    } catch (err) {
+        if (err instanceof CliError) throw err;
+        if (isMissingExporterError(err, args.format)) {
+            throw new CliError(
+                ExitCode.InputError,
+                buildMissingExporterMessage(args.format),
+            );
+        }
+        const message = err instanceof Error ? err.message : String(err);
         throw new CliError(
-            ExitCode.InputError,
-            `nowline: format "${args.format}" is not yet available in this release (ships in m2c). Use -f svg.`,
+            ExitCode.OutputError,
+            `nowline: ${args.format} export failed: ${message}`,
         );
     }
 
     throw new CliError(ExitCode.InputError, `nowline: unsupported format "${args.format}".`);
+}
+
+/**
+ * True when `err` looks like Node's "module not found" error and the missing
+ * specifier is the `@nowline/export-*` package the CLI just tried to dynamic-
+ * import. Used to detect tiny-build runs where the optional packages were
+ * `--external`'d at compile time.
+ */
+export function isMissingExporterError(err: unknown, format: OutputFormat): boolean {
+    if (!(err instanceof Error)) return false;
+    const code = (err as NodeJS.ErrnoException).code;
+    if (code !== 'ERR_MODULE_NOT_FOUND' && code !== 'MODULE_NOT_FOUND') return false;
+    const expected = `@nowline/export-${format}`;
+    return err.message.includes(expected);
+}
+
+export function buildMissingExporterMessage(format: OutputFormat): string {
+    return [
+        `nowline: the '${format}' format is not available in this build.`,
+        "Install 'nowline-full' from https://github.com/lolay/nowline/releases or:",
+        '  npm install -g @nowline/cli-full',
+    ].join('\n');
 }
 
 async function produceJson(args: ProduceArgs): Promise<string> {
@@ -206,7 +307,14 @@ async function produceCanonicalNowline(args: ProduceArgs): Promise<string> {
     return printNowlineFile(doc.ast);
 }
 
-async function produceSvg(args: ProduceArgs): Promise<string> {
+interface StagedRoadmap {
+    svg: string;
+    exportInputs: import('@nowline/export-core').ExportInputs;
+    /** Lazy: only loads the resolved font pair when a format actually needs it. */
+    fontPair: () => Promise<import('@nowline/export-core').ResolvedFontPair>;
+}
+
+async function stageRoadmap(args: ProduceArgs): Promise<StagedRoadmap> {
     const parsed = await parseAndValidate(
         args.inputFormat === 'json' ? jsonToNowlineText(args.contents, args.displayPath) : args.contents,
         args.displayPath,
@@ -245,7 +353,43 @@ async function produceSvg(args: ProduceArgs): Promise<string> {
     for (const w of warnings) {
         process.stderr.write(`warning: ${w}\n`);
     }
-    return svg;
+
+    let cachedFonts: import('@nowline/export-core').ResolvedFontPair | undefined;
+    const fontPair = async () => {
+        if (cachedFonts) return cachedFonts;
+        const mod = await import('@nowline/export-core');
+        const result = await mod.resolveFonts({
+            fontSans: args.fontSans,
+            fontMono: args.fontMono,
+            headless: args.headless,
+        });
+        if (args.strict) {
+            if (result.sansFellBackToBundled) {
+                process.stderr.write(
+                    'warning: sans font fell back to bundled DejaVu (no platform font found)\n',
+                );
+            }
+            if (result.monoFellBackToBundled) {
+                process.stderr.write(
+                    'warning: mono font fell back to bundled DejaVu (no platform font found)\n',
+                );
+            }
+        }
+        cachedFonts = { sans: result.sans, mono: result.mono };
+        return cachedFonts;
+    };
+
+    return {
+        svg,
+        exportInputs: {
+            ast: parsed.ast,
+            resolved,
+            model,
+            sourcePath: args.displayPath,
+            today: args.today,
+        },
+        fontPair,
+    };
 }
 
 function jsonToNowlineText(contents: string, displayPath: string): string {
@@ -299,6 +443,60 @@ function parseTodayArg(raw: string | undefined): Date | undefined {
         );
     }
     return new Date(Date.UTC(parseInt(m[1], 10), parseInt(m[2], 10) - 1, parseInt(m[3], 10)));
+}
+
+function parseScale(raw: string | undefined): number | undefined {
+    if (!raw) return undefined;
+    const value = Number(raw);
+    if (!Number.isFinite(value) || value <= 0) {
+        throw new CliError(
+            ExitCode.InputError,
+            `nowline: invalid --scale "${raw}". Must be a positive number.`,
+        );
+    }
+    return value;
+}
+
+function parseOrientation(raw: string | undefined): 'portrait' | 'landscape' | 'auto' | undefined {
+    if (!raw) return undefined;
+    const lower = raw.toLowerCase();
+    if (lower === 'portrait' || lower === 'landscape' || lower === 'auto') return lower;
+    throw new CliError(
+        ExitCode.InputError,
+        `nowline: invalid --orientation "${raw}". Expected portrait, landscape, or auto.`,
+    );
+}
+
+function parseMargin(raw: string | undefined): number | undefined {
+    if (!raw) return undefined;
+    if (/^\d+(?:\.\d+)?$/.test(raw)) return Number(raw); // bare number → points
+    try {
+        return lengthToPoints(parseLength(raw));
+    } catch (err) {
+        const message = err instanceof Error ? err.message : String(err);
+        throw new CliError(
+            ExitCode.InputError,
+            `nowline: invalid --margin "${raw}": ${message}`,
+        );
+    }
+}
+
+function stringFromConfig(
+    config: { [key: string]: unknown } | null,
+    key: string,
+): string | undefined {
+    if (!config) return undefined;
+    const value = config[key];
+    return typeof value === 'string' ? value : undefined;
+}
+
+function boolFromConfig(
+    config: { [key: string]: unknown } | null,
+    key: string,
+): boolean {
+    if (!config) return false;
+    const value = config[key];
+    return value === true;
 }
 
 function parseWidthArg(raw: string | undefined): number | undefined {

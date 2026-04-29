@@ -29,13 +29,18 @@
     "test": "vitest run",
     "test:watch": "vitest",
     "lint": "eslint src/",
-    "compile": "node scripts/compile.mjs",
-    "compile:local": "node scripts/compile.mjs --target=local"
+    "compile": "node scripts/compile.mjs --variant=tiny",
+    "compile:tiny": "node scripts/compile.mjs --variant=tiny",
+    "compile:full": "node scripts/compile.mjs --variant=full",
+    "compile:local": "node scripts/compile.mjs --variant=tiny --target=local",
+    "compile:local:full": "node scripts/compile.mjs --variant=full --target=local"
   },
   "dependencies": {
     "@babel/code-frame": "^7.29.0",
     "@clack/prompts": "^0.11.0",
     "@nowline/core": "workspace:*",
+    "@nowline/export-core": "workspace:*",
+    "@nowline/export-png": "workspace:*",
     "@nowline/layout": "workspace:*",
     "@nowline/renderer": "workspace:*",
     "chalk": "^5.6.0",
@@ -45,6 +50,11 @@
     "langium": "~4.2.2"
   },
   "devDependencies": {
+    "@nowline/export-html": "workspace:*",
+    "@nowline/export-mermaid": "workspace:*",
+    "@nowline/export-msproj": "workspace:*",
+    "@nowline/export-pdf": "workspace:*",
+    "@nowline/export-xlsx": "workspace:*",
     "@types/babel__code-frame": "^7.0.6",
     "@types/js-yaml": "^4.0.9",
     "@types/node": "^22.0.0",

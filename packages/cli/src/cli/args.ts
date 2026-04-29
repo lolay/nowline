@@ -27,6 +27,15 @@ export interface ParsedArgs {
     width?: string;
     assetRoot?: string;
 
+    // Format-specific options (m2c)
+    pageSize?: string;
+    orientation?: string;
+    margin?: string;
+    fontSans?: string;
+    fontMono?: string;
+    headless: boolean;
+    start?: string;
+
     // Serve options
     port?: string;
     host?: string;
@@ -48,7 +57,15 @@ export interface ParsedArgs {
  */
 export function parseArgv(argv: readonly string[]): ParsedArgs {
     if (argv.length === 0) {
-        return { mode: 'help', dryRun: false, logLevel: 'normal', noLinks: false, strict: false, open: false };
+        return {
+            mode: 'help',
+            dryRun: false,
+            logLevel: 'normal',
+            noLinks: false,
+            strict: false,
+            open: false,
+            headless: false,
+        };
     }
 
     const config: ParseArgsConfig = {
@@ -84,6 +101,15 @@ export function parseArgv(argv: readonly string[]): ParsedArgs {
             'diagnostic-format': { type: 'string' },
 
             template: { type: 'string' },
+
+            // Format-specific (m2c)
+            'page-size': { type: 'string' },
+            orientation: { type: 'string' },
+            margin: { type: 'string' },
+            'font-sans': { type: 'string' },
+            'font-mono': { type: 'string' },
+            headless: { type: 'boolean' },
+            start: { type: 'string' },
         },
     };
 
@@ -99,10 +125,26 @@ export function parseArgv(argv: readonly string[]): ParsedArgs {
     const positionals = parsed.positionals;
 
     if (values.help === true) {
-        return { mode: 'help', dryRun: false, logLevel: 'normal', noLinks: false, strict: false, open: false };
+        return {
+            mode: 'help',
+            dryRun: false,
+            logLevel: 'normal',
+            noLinks: false,
+            strict: false,
+            open: false,
+            headless: false,
+        };
     }
     if (values.version === true) {
-        return { mode: 'version', dryRun: false, logLevel: 'normal', noLinks: false, strict: false, open: false };
+        return {
+            mode: 'version',
+            dryRun: false,
+            logLevel: 'normal',
+            noLinks: false,
+            strict: false,
+            open: false,
+            headless: false,
+        };
     }
 
     if (values.verbose === true && values.quiet === true) {
@@ -166,6 +208,13 @@ export function parseArgv(argv: readonly string[]): ParsedArgs {
         open: values.open === true,
         diagnosticFormat: stringOrUndefined(values['diagnostic-format']),
         template: stringOrUndefined(values.template),
+        pageSize: stringOrUndefined(values['page-size']),
+        orientation: stringOrUndefined(values.orientation),
+        margin: stringOrUndefined(values.margin),
+        fontSans: stringOrUndefined(values['font-sans']),
+        fontMono: stringOrUndefined(values['font-mono']),
+        headless: values.headless === true,
+        start: stringOrUndefined(values.start),
     };
 }
 

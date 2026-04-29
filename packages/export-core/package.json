@@ -1,0 +1,48 @@
+{
+  "name": "@nowline/export-core",
+  "version": "0.1.0",
+  "description": "Nowline export-core — shared types, font resolver, unit converter, PDF page-size types",
+  "license": "Apache-2.0",
+  "type": "module",
+  "main": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js"
+    },
+    "./fonts": {
+      "types": "./dist/fonts/index.d.ts",
+      "import": "./dist/fonts/index.js"
+    },
+    "./units": {
+      "types": "./dist/units.d.ts",
+      "import": "./dist/units.js"
+    },
+    "./pdf-page": {
+      "types": "./dist/pdf-page.d.ts",
+      "import": "./dist/pdf-page.js"
+    }
+  },
+  "files": [
+    "dist/",
+    "src/",
+    "assets/"
+  ],
+  "scripts": {
+    "build": "tsc -b tsconfig.json",
+    "watch": "tsc -b tsconfig.json --watch",
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "lint": "eslint src/"
+  },
+  "dependencies": {
+    "@nowline/core": "workspace:*",
+    "@nowline/layout": "workspace:*"
+  },
+  "devDependencies": {
+    "@types/node": "^22.0.0",
+    "typescript": "~5.7.0",
+    "vitest": "^3.1.0"
+  }
+}

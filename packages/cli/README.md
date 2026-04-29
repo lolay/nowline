@@ -7,21 +7,50 @@ The `nowline` command-line tool parses, validates, and renders `.nowline` roadma
 
 ## Install
 
-```bash
-# macOS / Linux / WSL
-brew install lolay/tap/nowline
+There are two distributions, **tiny** (`nowline`) and **full** (`nowline-full`):
 
-# Debian / Ubuntu (download .deb from GitHub Releases)
-curl -L -o nowline.deb https://github.com/lolay/nowline/releases/latest/download/nowline_amd64.deb
-sudo dpkg -i nowline.deb
+| Build         | Formats included                                        | Approx. size |
+|---------------|---------------------------------------------------------|--------------|
+| `nowline`     | `svg`, `png`, plus AST round-trip (`json`, `nowline`)   | ~50 MB       |
+| `nowline-full`| tiny + `pdf`, `html`, `mermaid`, `xlsx`, `msproj`       | ~58–62 MB    |
+
+If you only need SVG / PNG, use the tiny build (the default download).
+For PDF / HTML / Mermaid / XLSX / MS Project XML, install the full build.
+
+```bash
+# macOS / Linux / WSL — Homebrew
+brew install lolay/tap/nowline           # tiny
+brew install lolay/tap/nowline-full      # full (replaces nowline if installed)
+
+# Debian / Ubuntu — download .deb from GitHub Releases
+curl -L -o nowline.deb \
+  https://github.com/lolay/nowline/releases/latest/download/nowline_amd64.deb
+sudo dpkg -i nowline.deb                 # tiny
+# or: nowline-full_amd64.deb            # full
 
 # Windows — direct .exe download from GitHub Releases
+#   nowline-windows-x64.exe              # tiny
+#   nowline-full-windows-x64.exe         # full
 #   (unsigned; see SmartScreen walkthrough below)
 
 # npm (any platform)
-npm install -g @nowline/cli
+npm install -g @nowline/cli              # tiny
+npm install -g @nowline/cli-full         # full
 # or one-shot: npx @nowline/cli roadmap.nowline -o -
 ```
+
+If you ask the **tiny** binary for an unsupported format, it exits 2 with
+a clear message:
+
+```
+$ nowline roadmap.nowline -f pdf
+nowline: the 'pdf' format is not available in this build.
+Install 'nowline-full' from https://github.com/lolay/nowline/releases or:
+  npm install -g @nowline/cli-full
+```
+
+`nowline` and `nowline-full` are mutually exclusive — installing one over
+the other replaces the previous binary at `/usr/bin/nowline`.
 
 ## Usage
 
@@ -41,7 +70,12 @@ nowline                                # no args → print help
 
 ```bash
 nowline roadmap.nowline                          # writes ./roadmap.svg in cwd
-nowline roadmap.nowline -f pdf                   # writes ./roadmap.pdf in cwd  (m2c)
+nowline roadmap.nowline -f png                   # writes ./roadmap.png    (tiny + full)
+nowline roadmap.nowline -f pdf                   # writes ./roadmap.pdf    (full only)
+nowline roadmap.nowline -f html                  # writes ./roadmap.html   (full only)
+nowline roadmap.nowline -f mermaid               # writes ./roadmap.md     (full only)
+nowline roadmap.nowline -f xlsx                  # writes ./roadmap.xlsx   (full only)
+nowline roadmap.nowline -f msproj                # writes ./roadmap.xml    (full only)
 nowline roadmap.nowline -o roadmap.pdf           # format inferred from extension
 nowline roadmap.nowline -o -                     # SVG → stdout (Unix dash)
 nowline roadmap.json -f svg                      # JSON-AST input
@@ -52,6 +86,9 @@ nowline roadmap.nowline --serve -p 8080          # live preview on :8080
 nowline --init                                   # ./roadmap.nowline
 nowline --init my-project                        # ./my-project.nowline
 nowline roadmap.nowline -f pdf -o report         # auto-extension → report.pdf
+nowline roadmap.nowline -f pdf --page-size a4 --orientation landscape --margin 0.5in
+nowline roadmap.nowline -f png --scale 3         # 3x raster
+nowline roadmap.nowline --headless               # bundled DejaVu fonts (deterministic)
 ```
 
 ## Flags
@@ -79,10 +116,22 @@ nowline roadmap.nowline -f pdf -o report         # auto-extension → report.pdf
 | `-t, --theme <name>`  | `light`      | `light` \| `dark`.                          |
 | `--today YYYY-MM-DD`  | system today | Override the now-line anchor.               |
 | `--no-links`          | (off)        | Omit link icons from items.                 |
-| `-s, --scale <n>`     | `1`          | Raster scale (PNG only; m2c).               |
+| `-s, --scale <n>`     | `1`          | Raster scale (PNG only).                    |
 | `--strict`            | (off)        | Promote asset / sanitizer warnings to errors. |
 | `-w, --width <px>`    | `1280`       | Canvas width.                                |
 | `--asset-root <dir>`  | input dir    | Root for `logo:` / image refs.              |
+
+### Format-specific options
+
+| Flag                       | Default      | Applies to | Notes |
+|----------------------------|--------------|------------|-------|
+| `--page-size <size>`       | `letter`     | pdf        | Preset (`letter`, `legal`, `tabloid`, `ledger`, `a1`–`a5`, `b3`–`b5`), `content` for auto-fit, or `WxHunit` for custom (`8.5x11in`, `210x297mm`). |
+| `--orientation <name>`     | `auto`       | pdf        | `portrait` \| `landscape` \| `auto`. |
+| `--margin <length>`        | `36pt`       | pdf        | Page margin. Bare numbers are points; `0.5in`, `12mm`, `1cm` accepted. |
+| `--font-sans <path\|alias>` | platform-resolved | png, pdf | TTF/OTF path, or alias `sf`, `helvetica`, `dejavu`, etc. |
+| `--font-mono <path\|alias>` | platform-resolved | png, pdf | TTF/OTF path or alias for monospace. |
+| `--headless`               | (off)        | png, pdf   | Skip platform font probe; use bundled DejaVu pair. Byte-stable across machines. |
+| `--start YYYY-MM-DD`       | `today`       | msproj    | Anchor date for relative-only roadmaps. |
 
 ### Serve options
 
@@ -156,8 +205,8 @@ Mutual exclusivity rules (all exit 2 with a message):
 |------|---------|
 | 0    | Success |
 | 1    | Validation error |
-| 2    | Usage error (missing input, bad flags, unsupported format, file not found, binary→TTY refusal) |
-| 3    | Output error (cannot write to destination) |
+| 2    | Usage error (missing input, bad flags, unsupported format, file not found, binary→TTY refusal, format unavailable in tiny build) |
+| 3    | Output error (cannot write to destination, exporter failure, page too small for margin) |
 
 ## Configuration: `.nowlinerc`
 
@@ -168,13 +217,27 @@ On any operation that takes an `<input>` file, `nowline` walks up from the input
 theme: dark
 defaultFormat: svg
 width: 1200
+
+# m2c format defaults — override with CLI flags at any time
+pdfPageSize: a4            # --page-size
+pdfOrientation: landscape  # --orientation
+pdfMargin: 0.5in           # --margin
+fontSans: sf               # --font-sans  (alias or path)
+fontMono: sf-mono          # --font-mono
+headlessFonts: false       # --headless
 ```
 
 ```json
 {
   "theme": "dark",
   "defaultFormat": "svg",
-  "width": 1200
+  "width": 1200,
+  "pdfPageSize": "a4",
+  "pdfOrientation": "landscape",
+  "pdfMargin": "0.5in",
+  "fontSans": "sf",
+  "fontMono": "sf-mono",
+  "headlessFonts": false
 }
 ```
 
@@ -290,7 +353,25 @@ Supporting libraries:
 
 ## Distribution
 
-Binaries are produced with `bun compile` for six targets (macOS arm64/x64, Linux x64/arm64, Windows x64/arm64) and attached to every GitHub Release. Budget is **<60 MB** per binary; CI asserts on disk.
+Two compiled binaries ship for every release: `nowline` (tiny: SVG +
+PNG) and `nowline-full` (full: every format). Both are produced from the
+same source tree by toggling `bun build --external`:
+
+```text
+tiny  : externals = ['@nowline/export-pdf', '@nowline/export-html',
+                     '@nowline/export-mermaid', '@nowline/export-xlsx',
+                     '@nowline/export-msproj']
+full  : externals = []   (every export-* package bundled)
+```
+
+The CLI's format dispatch uses dynamic `import()` of the per-format
+package so excluded packages fail at runtime with the
+`install nowline-full` error rather than at compile time.
+
+Both variants ship across six targets (macOS arm64/x64, Linux x64/arm64,
+Windows x64/arm64) and are attached to every GitHub Release. Budgets:
+**< 60 MB** for tiny, **< 65 MB** for full; CI asserts on disk for every
+target.
 
 ### Windows SmartScreen walkthrough
 
