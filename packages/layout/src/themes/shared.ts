@@ -58,17 +58,29 @@ export const LOGO_SIZE_PX: Record<'xs' | 'sm' | 'md' | 'lg' | 'xl', number> = {
 };
 
 // Swimlane band row height (single item track height).
-export const ITEM_ROW_HEIGHT = 30;
+// m2d: bumped from 30 to 64 so each item bar can carry title + meta line +
+// upper-right status dot + bottom progress strip without the chrome crowding
+// the text. Bar height = ITEM_ROW_HEIGHT - 8.
+export const ITEM_ROW_HEIGHT = 64;
 
 // Minimum item bar width so zero-duration items remain visible.
 export const MIN_ITEM_WIDTH = 8;
+
+// Visual inset applied on each side of an item bar. Two adjacent (logically
+// chained) items therefore have a 2× ITEM_INSET_PX visible gutter between
+// them, leaving room for vertical drop-lines (dependency arrows, anchor /
+// milestone cuts, the now-line) to pass between bars without crossing them.
+export const ITEM_INSET_PX = 6;
 
 // Default pixel-per-day when no explicit scale is set. Calibrated so a
 // 26-week (180 day) roadmap fits a 1200 px content area.
 export const DEFAULT_PIXELS_PER_DAY = 5;
 
-// Header box defaults per position.
-export const HEADER_BESIDE_WIDTH_PX = 200;
+// Header box defaults per position. The beside-mode card width is dynamic
+// (sized to the title + author text, clamped to MIN..MAX with text wrap),
+// so the layout uses these bounds instead of a single fixed width.
+export const HEADER_BESIDE_MIN_WIDTH_PX = 120;
+export const HEADER_BESIDE_MAX_WIDTH_PX = 240;
 export const HEADER_ABOVE_HEIGHT_PX = 72;
 
 // Footnote area defaults.

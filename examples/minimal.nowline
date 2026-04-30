@@ -1,8 +1,8 @@
 nowline v1
 
-roadmap minimal "Minimal Example"
+roadmap minimal "Starter" start:2026-01-05 scale:1w author:"Engineering roadmap"
 
-swimlane build "Build"
-  item design "Design" duration:1w status:done
-  item implement "Implement" duration:2w status:in-progress
-  item ship "Ship" duration:3d status:planned
+swimlane engineering "Engineering"
+  item research "Research"  duration:3w status:done
+  item design   "Design"    duration:2w status:in-progress remaining:50%
+  item build    "Build"     duration:3w status:planned

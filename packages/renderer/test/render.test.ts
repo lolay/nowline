@@ -66,7 +66,8 @@ swimlane a "A"
         const model = await parseToModel(dsl, { today: new Date(Date.UTC(2026, 2, 1)) });
         const svg = await renderSvg(model);
         expect(svg).toContain('data-layer="nowline"');
-        expect(svg).toContain('Today');
+        // m2d: pill label reads the short-form "now" rather than "Today".
+        expect(svg).toContain('>now<');
     });
 
     it('embeds inline SVG logos via the asset resolver', async () => {
@@ -108,7 +109,10 @@ swimlane a "A"
     it('ships the Nowline attribution mark', async () => {
         const model = await parseToModel(BASIC_DSL);
         const svg = await renderSvg(model);
-        expect(svg).toContain('Made with Nowline');
+        // m2d: wordmark glyph replaces the "Made with Nowline" text. The
+        // accessible label preserves the original phrase for screen readers.
+        expect(svg).toContain('data-layer="attribution"');
+        expect(svg).toContain('aria-label="Made with Nowline"');
         expect(svg).toContain('https://nowline.io');
     });
 });

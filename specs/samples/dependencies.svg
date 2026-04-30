@@ -1,6 +1,6 @@
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1280 560" width="1280" height="560" font-family="-apple-system, 'SF Pro Display', 'Segoe UI', Helvetica, Arial, sans-serif">
   <!--
-    Sample 04 - Dependency-heavy roadmap
+    Sample - Dependency-heavy roadmap
     Demonstrates:
       - Cross-swimlane after: arrows (orthogonal, rounded corners)
       - Parallel block rendered with full [ ] brackets (explicit fork/join)
@@ -291,7 +291,7 @@
 
   <!-- Caption -->
   <text x="20" y="518" font-size="11" fill="#64748b" font-style="italic">
-    Sample 04 - Dependency-heavy: cross-lane arrows, parallel [ ] brackets, floating milestone
+    Sample - Dependency-heavy: cross-lane arrows, parallel [ ] brackets, floating milestone
     (Beta floats to rightmost predecessor; dotted slack arrow from earlier predecessor).
   </text>
 </svg>

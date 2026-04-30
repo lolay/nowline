@@ -1,6 +1,6 @@
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1200 600" width="1200" height="600" font-family="-apple-system, 'SF Pro Display', 'Segoe UI', Helvetica, Arial, sans-serif">
   <!--
-    Sample 05 - roadmap:isolate included region
+    Sample - roadmap:isolate included region
     Demonstrates:
       - Native swimlanes (Core, Integrations) come FIRST (in parent file order)
       - Included "Partner" roadmap follows, rendered inside a dashed-border region
@@ -218,7 +218,7 @@
 
   <!-- Caption -->
   <text x="20" y="558" font-size="11" fill="#64748b" font-style="italic">
-    Sample 05 - Isolate include: native swimlanes render first (Core, Integrations), then the included
+    Sample - Isolate include: native swimlanes render first (Core, Integrations), then the included
     "Partner" roadmap renders in a dashed-border region below them. Cross-region arrows pass through.
   </text>
 </svg>

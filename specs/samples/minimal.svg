@@ -1,6 +1,6 @@
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 960 260" width="960" height="260" font-family="-apple-system, 'SF Pro Display', 'Segoe UI', Helvetica, Arial, sans-serif">
   <!--
-    Sample 01 - Minimal
+    Sample - Minimal
     DSL gist:
       nowline v1
       roadmap "Starter" start:2026-01-05 scale:1w
@@ -143,6 +143,6 @@
 
   <!-- Caption -->
   <text x="24" y="248" font-size="11" fill="#64748b" font-style="italic">
-    Sample 01 - Minimal - single swimlane, three sequential items, hero now-line.
+    Sample - Minimal - single swimlane, three sequential items, hero now-line.
   </text>
 </svg>

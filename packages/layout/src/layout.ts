@@ -51,12 +51,16 @@ import {
     resolveScale,
     pixelsPerDay,
     xForDate,
+    daysPerUnit,
+    type ScaleConfig,
 } from './timeline.js';
 import {
     HEADER_ABOVE_HEIGHT_PX,
-    HEADER_BESIDE_WIDTH_PX,
+    HEADER_BESIDE_MIN_WIDTH_PX,
+    HEADER_BESIDE_MAX_WIDTH_PX,
     ITEM_ROW_HEIGHT,
     MIN_ITEM_WIDTH,
+    ITEM_INSET_PX,
     PADDING_PX,
     FOOTNOTE_ROW_HEIGHT,
     EDGE_CORNER_RADIUS,
@@ -114,6 +118,35 @@ function parseProgressFraction(raw: string | undefined): number {
     return Math.max(0, Math.min(100, parseInt(m[1], 10))) / 100;
 }
 
+// Resolve a duration property value to its literal length when it names a
+// declared duration alias. Returns the original string for raw literals
+// (`1w`, `3d`) and undefined for missing values.
+function resolveDurationLiteral(
+    raw: string | undefined,
+    ctx: { durations: Map<string, import('@nowline/core').DurationDeclaration> },
+): string | undefined {
+    if (!raw) return undefined;
+    if (/^\d+[dwmqy]$/.test(raw) || /^\d+%$/.test(raw)) return raw;
+    const dur = ctx.durations.get(raw);
+    if (!dur) return raw;
+    const lengthProp = dur.properties.find((p) =>
+        (p.key.endsWith(':') ? p.key.slice(0, -1) : p.key) === 'length',
+    );
+    return lengthProp?.value ?? raw;
+}
+
+// Resolve a person/team id to its declared title when present (id otherwise).
+function resolveActorDisplay(
+    raw: string | undefined,
+    ctx: {
+        teams: Map<string, import('@nowline/core').TeamDeclaration>;
+        persons: Map<string, import('@nowline/core').PersonDeclaration>;
+    },
+): string | undefined {
+    if (!raw) return undefined;
+    return ctx.teams.get(raw)?.title ?? ctx.persons.get(raw)?.title ?? raw;
+}
+
 function parseLinkIcon(link: string | undefined): { icon: LinkIconKind; href?: string } {
     if (!link) return { icon: 'none' };
     const lower = link.toLowerCase();
@@ -131,17 +164,20 @@ function buildLabelChip(
     ctx: StyleContext,
     x: number,
     y: number,
+    maxWidth?: number,
 ): PositionedLabelChip {
     const style = resolveLabelChipStyle(label, ctx);
-    const title = label.title ?? label.name ?? '';
-    // Rough chip metrics: ~7 px per char + 2 * padding.
+    // Prefer the short name (id) when it exists — chips inside an item bar
+    // are tight; the long title risks overflowing.
+    const text = label.name ?? label.title ?? '';
     const padKey = style.padding === 'none' ? 'xs' : style.padding;
     const pad = PADDING_PX[padKey as keyof typeof PADDING_PX];
-    const width = Math.max(24, title.length * 7 + pad * 2);
+    let width = Math.max(20, Math.round(text.length * 5.5 + pad * 2));
+    if (maxWidth !== undefined) width = Math.min(width, maxWidth);
     return {
-        text: title,
+        text,
         style,
-        box: { x, y, width, height: 16 },
+        box: { x, y, width, height: 13 },
     };
 }
 
@@ -194,33 +230,43 @@ function sequenceItem(
     }
 
     const naturalWidth = Math.max(MIN_ITEM_WIDTH, durationDays * ctx.timeline.pixelsPerDay);
-    let endX = startX + naturalWidth;
+    // Logical extent — what the item "owns" in time (used for chaining,
+    // `after:` lookups, dependency-arrow attach points).
+    const logicalLeft = startX;
+    const logicalRight = startX + naturalWidth;
 
     // Handle `before:` — item must end by the named anchor/milestone x
     let hasOverflow = false;
     let overflowBox: BoundingBox | undefined;
+    let overflowAnchorId: string | undefined;
     if (beforeRaw) {
         const beforeX = ctx.entityLeftEdges.get(beforeRaw);
         if (beforeX !== undefined) {
-            if (endX > beforeX) {
+            if (logicalRight > beforeX) {
                 // Flag the overflow tail; we still render the natural bar but
                 // the tail past beforeX is marked red by the renderer.
                 hasOverflow = true;
                 overflowBox = {
                     x: beforeX,
                     y: cursor.y,
-                    width: endX - beforeX,
-                    height: ITEM_ROW_HEIGHT - 6,
+                    width: logicalRight - beforeX,
+                    height: ITEM_ROW_HEIGHT - 8,
                 };
+                overflowAnchorId = beforeRaw;
             }
         }
     }
 
+    // Visual bar — inset on each side so adjacent (chained) items have a
+    // 2× ITEM_INSET_PX visual gutter between them. The logical extent stays
+    // unchanged (for chaining + arrow-attachment math), the bar just draws
+    // a little narrower than its column.
+    const visualWidth = Math.max(MIN_ITEM_WIDTH, naturalWidth - 2 * ITEM_INSET_PX);
     const itemBox: BoundingBox = {
-        x: startX,
+        x: logicalLeft + ITEM_INSET_PX,
         y: cursor.y,
-        width: Math.max(MIN_ITEM_WIDTH, endX - startX),
-        height: ITEM_ROW_HEIGHT - 6,
+        width: visualWidth,
+        height: ITEM_ROW_HEIGHT - 8,
     };
 
     // Progress fraction
@@ -228,21 +274,96 @@ function sequenceItem(
     const status = statusFromProp(statusRaw);
     let progress = parseProgressFraction(statusRaw);
     if (progress === 0 && status === 'done') progress = 1;
+    const remainingPctMatch = /^(\d{1,3})%$/.exec(propValue(props, 'remaining') ?? '');
+    if (progress === 0 && status === 'in-progress' && remainingPctMatch) {
+        const pct = Math.max(0, Math.min(100, parseInt(remainingPctMatch[1], 10))) / 100;
+        progress = 1 - pct;
+    }
     if (progress === 0 && status === 'in-progress' && remainingDays > 0 && durationDays > 0) {
         progress = Math.max(0, Math.min(1, 1 - remainingDays / durationDays));
     }
 
-    // Label chips laid out left → right along the right side of the item bar.
+    // Apply the status-tinted item background when the resolved bg is still
+    // theme-default. Authors who set explicit `bg:` keep their override.
+    // Per m2d handoff Resolution 3: layout owns this so the renderer stays
+    // palette-dumb.
+    const STATUS_TINT_LIGHT: Record<StatusKind, string> = {
+        done: '#ecfdf5',
+        'in-progress': '#eff6ff',
+        'at-risk': '#fffbeb',
+        blocked: '#fee2e2',
+        planned: '#f8fafc',
+        neutral: '#f8fafc',
+    };
+    const STATUS_TINT_DARK: Record<StatusKind, string> = {
+        done: '#052e16',
+        'in-progress': '#172554',
+        'at-risk': '#422006',
+        blocked: '#7f1d1d',
+        planned: '#1e293b',
+        neutral: '#1e293b',
+    };
+    const STATUS_BORDER: Record<StatusKind, string> = {
+        done: ctx.styleCtx.theme.status.done,
+        'in-progress': ctx.styleCtx.theme.status.inProgress,
+        'at-risk': ctx.styleCtx.theme.status.atRisk,
+        blocked: ctx.styleCtx.theme.status.blocked,
+        planned: ctx.styleCtx.theme.status.planned,
+        neutral: ctx.styleCtx.theme.status.neutral,
+    };
+    const isLight = ctx.styleCtx.theme.name === 'light';
+    const themeDefaultBg = isLight ? '#ffffff' : '#0f172a';
+    const themeDefaultFg = '#94a3b8';
+    if (style.bg === themeDefaultBg) {
+        style.bg = isLight ? STATUS_TINT_LIGHT[status] : STATUS_TINT_DARK[status];
+    }
+    if (style.fg === themeDefaultFg) {
+        style.fg = STATUS_BORDER[status];
+    }
+
+    // Pre-format the secondary line shown inside the item bar. If the
+    // duration is a named id (e.g. `lg`), resolve it to its declared length
+    // literal so the bar shows the duration ("2w") not the alias ("lg").
+    const durationRaw = propValue(props, 'duration');
+    const durationLiteral = resolveDurationLiteral(durationRaw, ctx);
+    const remainingRaw = propValue(props, 'remaining');
+    const remainingLiteral = resolveDurationLiteral(remainingRaw, ctx);
+    let metaText: string | undefined;
+    const ownerDisplay = resolveActorDisplay(ownerOverride ?? propValue(props, 'owner'), ctx);
+    if (status === 'in-progress' && remainingLiteral) {
+        if (ownerDisplay) {
+            metaText = `${ownerDisplay} — ${remainingLiteral} remaining`;
+        } else if (durationLiteral) {
+            metaText = `${durationLiteral} — ${remainingLiteral} remaining`;
+        } else {
+            metaText = `${remainingLiteral} remaining`;
+        }
+    } else if (status === 'in-progress' && progress > 0 && progress < 1) {
+        const pct = Math.round((1 - progress) * 100);
+        metaText = ownerDisplay
+            ? `${ownerDisplay} — ${pct}% remaining`
+            : durationLiteral ? `${durationLiteral} — ${pct}% remaining` : `${pct}% remaining`;
+    } else if (ownerDisplay) {
+        metaText = ownerDisplay;
+    } else if (durationLiteral) {
+        metaText = durationLiteral;
+    }
+
+    // Label chips laid out left → right INSIDE the item bar, sitting just
+    // above the bottom progress strip (4 px tall).
     const labelChips: PositionedLabelChip[] = [];
     const labelIds = propValues(props, 'labels');
-    let chipX = itemBox.x + itemBox.width + 4;
-    const chipY = itemBox.y + 2;
+    const chipY = itemBox.y + itemBox.height - 4 - 13 - 3;
+    let chipX = itemBox.x + 12;
+    const chipMaxRight = itemBox.x + itemBox.width - 12;
     for (const id of labelIds) {
         const label = ctx.labels.get(id);
         if (!label) continue;
-        const chip = buildLabelChip(label, ctx.styleCtx, chipX, chipY);
+        const remaining = Math.max(8, chipMaxRight - chipX);
+        const chip = buildLabelChip(label, ctx.styleCtx, chipX, chipY, remaining);
         labelChips.push(chip);
         chipX += chip.box.width + 4;
+        if (chipX >= chipMaxRight) break;
     }
 
     // Footnote superscript indicators
@@ -257,27 +378,41 @@ function sequenceItem(
     const linkRaw = propValue(props, 'link');
     const linkInfo = parseLinkIcon(linkRaw);
 
-    const owner = ownerOverride ?? propValue(props, 'owner');
+    const owner = ownerDisplay ?? ownerOverride ?? propValue(props, 'owner');
     const description = node.description?.text;
 
     const id = node.name;
     if (id) {
-        ctx.entityLeftEdges.set(id, itemBox.x);
-        ctx.entityRightEdges.set(id, itemBox.x + itemBox.width);
+        // Entity edges live in LOGICAL space so chained items / `after:`
+        // references / dependency-arrow attach points sit on the column
+        // boundary, not on the visually inset bar edge. The visible 12 px
+        // gutter between bars then becomes a clean attach corridor.
+        ctx.entityLeftEdges.set(id, logicalLeft);
+        ctx.entityRightEdges.set(id, logicalRight);
         ctx.entityMidpoints.set(id, {
-            x: itemBox.x + itemBox.width / 2,
+            x: (logicalLeft + logicalRight) / 2,
             y: itemBox.y + itemBox.height / 2,
         });
     }
 
-    cursor.x = itemBox.x + itemBox.width + 8;
+    cursor.x = logicalRight;
     cursor.maxX = Math.max(cursor.maxX, cursor.x);
     cursor.height = Math.max(cursor.height, ITEM_ROW_HEIGHT);
+
+    const titleStr = node.title ?? node.name ?? '';
+    // Title + meta are an atomic caption: spill BOTH outside the bar if
+    // either one would overflow the bar's inner padded width.
+    const innerWidth = Math.max(0, itemBox.width - 24);
+    const titleWidth = titleStr ? estimateTextWidth(titleStr, 13) : 0;
+    const metaWidth = metaText ? estimateTextWidth(metaText, 11) : 0;
+    const textSpills =
+        (titleStr.length > 0 && titleWidth > innerWidth) ||
+        (metaText !== undefined && metaWidth > innerWidth);
 
     const result: PositionedItem = {
         kind: 'item',
         id,
-        title: node.title ?? node.name ?? '',
+        title: titleStr,
         box: itemBox,
         status,
         progressFraction: progress,
@@ -287,8 +422,11 @@ function sequenceItem(
         linkHref: linkInfo.href,
         hasOverflow,
         overflowBox,
+        overflowAnchorId,
         owner,
         description,
+        metaText,
+        textSpills,
         style,
     };
     return result;
@@ -396,6 +534,73 @@ function sequenceOne(
     throw new Error(`Unknown swimlane child type: ${(node as { $type?: string }).$type ?? 'unknown'}`);
 }
 
+// Rough px-width estimate for sans-serif text. Intentionally pessimistic
+// (uses ~0.58 em per char) so we err toward "doesn't fit" and trigger a
+// row bump rather than draw an item with a clipped title.
+function estimateTextWidth(text: string, fontSize: number): number {
+    return text.length * fontSize * 0.58;
+}
+
+// Resolve the desired startX for a swimlane child, honoring `date:` (fixed
+// pin) > `start:` (fixed pin) > `after:` (chain after refs) > sequential
+// default (continue from `seqDefault`, which is the lane's rightmost time
+// cursor across all rows).
+function resolveChildStart(
+    props: EntityProperty[],
+    seqDefault: number,
+    laneLeftX: number,
+    ctx: LayoutContext,
+): number {
+    const explicitDate = parseDate(propValue(props, 'date')) ?? parseDate(propValue(props, 'start'));
+    if (explicitDate) {
+        const xd = xForDate(explicitDate, ctx.timeline);
+        if (xd !== null) return xd;
+    }
+    const afterRefs = propValues(props, 'after');
+    if (afterRefs.length > 0) {
+        let maxEnd = laneLeftX;
+        for (const ref of afterRefs) {
+            const endX = ctx.entityRightEdges.get(ref);
+            if (endX !== undefined) maxEnd = Math.max(maxEnd, endX);
+        }
+        return Math.max(laneLeftX, maxEnd);
+    }
+    return seqDefault;
+}
+
+// Returns the right edge (in canvas px) of the lane title tab, mirroring
+// the renderer's chiclet sizing in renderSwimlane. Used by the layout to
+// decide whether the first row of items can sit at the tab's y instead of
+// dropping below it. Keep these two formulas in sync.
+function computeLaneTabRightX(lane: SwimlaneDeclaration): number {
+    const title = lane.title ?? lane.name ?? '';
+    if (!title) return 0;
+    const ownerRaw = propValue(lane.properties, 'owner');
+    const titleWidth = Math.max(40, title.length * 7);
+    const ownerWidth = ownerRaw ? Math.max(60, ('owner: ' + ownerRaw).length * 5.6) : 0;
+    const padding = 24;
+    const tabX = 10;  // matches renderer: tabX = box.x + 10, box.x = 0
+    return tabX + titleWidth + ownerWidth + padding;
+}
+
+// Resolve the desired starting x for the first non-description child of a
+// lane (item, parallel, or group). Returns undefined when the lane has no
+// chartable children.
+function firstChildStartX(
+    lane: SwimlaneDeclaration,
+    laneLeftX: number,
+    ctx: LayoutContext,
+): number | undefined {
+    for (const child of lane.content) {
+        if (child.$type === 'DescriptionDirective') continue;
+        const props = isItemDeclaration(child)
+            ? child.properties
+            : (child as ParallelBlock | GroupBlock).properties ?? [];
+        return resolveChildStart(props, laneLeftX, laneLeftX, ctx);
+    }
+    return undefined;
+}
+
 function buildSwimlane(
     lane: SwimlaneDeclaration,
     y: number,
@@ -403,30 +608,136 @@ function buildSwimlane(
     ctx: LayoutContext,
 ): { positioned: PositionedSwimlane; usedHeight: number } {
     const style = resolveStyle('swimlane', lane.properties, ctx.styleCtx);
-    const contentLeftX = ctx.timeline.originX;
-    const cursor = newCursor(contentLeftX, y + 8);
+    const laneLeftX = ctx.timeline.originX;
+    // Title-tab geometry (mirrors the renderer; see renderSwimlane). The tab
+    // hugs the upper-left of the band and lives entirely in the gutter
+    // between the lane's left edge and the chart area.
+    const tabRightX = computeLaneTabRightX(lane);
+    const TAB_TOP_Y = 10;     // matches renderer: tabY = box.y + 10
+    const TAB_BOTTOM_Y = 38;  // tab (height 22) plus 6 px breathing room
+    // First-row Y: when the first child's desired x is past the title tab,
+    // we top-align the row with the tab and reclaim ~28 px of vertical
+    // space per lane. Otherwise (no title, or the first item starts
+    // before/under the tab) we fall back to the default drop-below-tab
+    // reservation. Subsequent rows always step down by ITEM_ROW_HEIGHT.
+    const TAB_GUTTER_PX = 8;
+    const firstChildDesiredX = firstChildStartX(lane, laneLeftX, ctx);
+    const canAlignFirstRowWithTab = !lane.title
+        || firstChildDesiredX === undefined
+        || firstChildDesiredX >= tabRightX + TAB_GUTTER_PX;
+    const startY = y + (canAlignFirstRowWithTab ? TAB_TOP_Y : TAB_BOTTOM_Y);
+
+    // Row-packing state: items in the same lane chain in time and pack onto
+    // the same row when they fit. The next item bumps to a fresh row when
+    //   (a) its desired start is left of the current row's right edge
+    //       (would overlap a sibling already drawn on this row), or
+    //   (b) the previous item's title spilled past its bar and would
+    //       overlap the next item's bar.
+    // Parallels and groups are block-level: they always own a fresh row.
+    let rowY = startY;          // top of the current row
+    let rowEndX = laneLeftX;    // rightmost x of the current row's last item
+    let timeCursorX = laneLeftX; // rightmost x in time across all rows (the
+                                 // "what comes next" anchor for sequential
+                                 // items, regardless of which row they land on)
+    let prevTitleSpillX = laneLeftX; // right edge of the previous title's
+                                     // visible glyphs (incl. spill past bar)
+
     const children: PositionedTrackChild[] = [];
     for (const child of lane.content) {
         if (child.$type === 'DescriptionDirective') continue;
-        // Reset x to contentLeftX for new rows so items don't trail the prior
-        // parallel/group (they will auto-compute startX via after/date anyway).
-        cursor.x = contentLeftX;
-        const positioned = sequenceOne(
-            child as ItemDeclaration | GroupBlock | ParallelBlock,
-            cursor,
-            ctx,
-        );
+
+        if (!isItemDeclaration(child)) {
+            // Parallel/group: always own a fresh row. Honor `after:` on the
+            // block itself; otherwise place at the timeCursor (continue
+            // from where the lane has progressed in time).
+            if (rowEndX > laneLeftX) {
+                rowY += ITEM_ROW_HEIGHT;
+            }
+            const blockProps = (child as ParallelBlock | GroupBlock).properties ?? [];
+            const blockStart = resolveChildStart(blockProps, timeCursorX, laneLeftX, ctx);
+            const cursor = newCursor(blockStart, rowY);
+            const positioned = sequenceOne(
+                child as ItemDeclaration | GroupBlock | ParallelBlock,
+                cursor,
+                ctx,
+            );
+            children.push(positioned);
+            const blockEnd = positioned.box.x + positioned.box.width;
+            rowY += Math.max(ITEM_ROW_HEIGHT, cursor.height);
+            rowEndX = laneLeftX;
+            timeCursorX = Math.max(timeCursorX, blockEnd);
+            prevTitleSpillX = laneLeftX;
+            continue;
+        }
+
+        // Item: determine where it wants to live in time, then decide which
+        // row it lands on.
+        const props = (child as ItemDeclaration).properties;
+        const desiredStart = resolveChildStart(props, timeCursorX, laneLeftX, ctx);
+
+        const collidesWithRow = desiredStart < rowEndX;
+        const collidesWithSpill = desiredStart < prevTitleSpillX;
+        if (collidesWithRow || collidesWithSpill) {
+            rowY += ITEM_ROW_HEIGHT;
+            rowEndX = laneLeftX;
+            prevTitleSpillX = laneLeftX;
+        }
+
+        const cursor = newCursor(desiredStart, rowY);
+        const positioned = sequenceItem(child as ItemDeclaration, cursor, ctx);
         children.push(positioned);
-        cursor.y += Math.max(ITEM_ROW_HEIGHT, cursor.height);
-        cursor.height = 0;
+
+        // Item end in LOGICAL space (one ITEM_INSET_PX past the visual bar's
+        // right edge). The next chained item starts here and lands edge-to-
+        // edge in time, with a 2 × ITEM_INSET_PX visible gutter between bars.
+        const itemLogicalEnd = positioned.box.x + positioned.box.width + ITEM_INSET_PX;
+        timeCursorX = Math.max(timeCursorX, itemLogicalEnd);
+        rowEndX = itemLogicalEnd;
+
+        // If the caption spills past the bar (computed in sequenceItem),
+        // the renderer will draw title + meta as an atomic block BESIDE
+        // the bar starting just past its visual right edge. Reserve enough
+        // space (max of title/meta width) so the next item bumps to a fresh
+        // row and the caption has empty room.
+        if (positioned.textSpills) {
+            const titleWidth = estimateTextWidth(positioned.title, 13);
+            const metaWidth = positioned.metaText
+                ? estimateTextWidth(positioned.metaText, 11)
+                : 0;
+            const visualRight = positioned.box.x + positioned.box.width;
+            prevTitleSpillX = visualRight + 6 + Math.max(titleWidth, metaWidth) + 6;
+        } else {
+            prevTitleSpillX = laneLeftX;
+        }
     }
-    const bandHeight = Math.max(ITEM_ROW_HEIGHT + 16, cursor.y - y);
+
+    const lastRowBottom = rowY + ITEM_ROW_HEIGHT;
+    const bandHeight = Math.max(ITEM_ROW_HEIGHT + 32, lastRowBottom - y + 16);
     const box: BoundingBox = {
         x: 0,
         y,
         width: ctx.chartRightX,
         height: bandHeight,
     };
+    // Owner display string: id → title for teams/people; falls back to id.
+    const ownerRaw = propValue(lane.properties, 'owner');
+    let ownerDisplay: string | undefined;
+    if (ownerRaw) {
+        const team = ctx.teams.get(ownerRaw);
+        const person = ctx.persons.get(ownerRaw);
+        ownerDisplay = team?.title ?? person?.title ?? ownerRaw;
+    }
+    // Footnote indicators that name this swimlane via `on:`.
+    const footnoteIndicators: number[] = [];
+    if (lane.name) {
+        for (const [fid, host] of ctx.footnoteHosts.entries()) {
+            if (host.includes(lane.name)) {
+                const n = ctx.footnoteIndex.get(fid);
+                if (n !== undefined) footnoteIndicators.push(n);
+            }
+        }
+        footnoteIndicators.sort((a, b) => a - b);
+    }
     return {
         positioned: {
             id: lane.name,
@@ -436,109 +747,282 @@ function buildSwimlane(
             children,
             nested: [],
             style,
+            owner: ownerDisplay,
+            footnoteIndicators,
         },
         usedHeight: bandHeight,
     };
 }
 
-function buildHeader(
-    file: NowlineFile,
-    ctx: LayoutContext,
-): PositionedHeader {
-    const roadmap = file.roadmapDecl;
-    const props = roadmap?.properties ?? [];
-    const style = resolveStyle('roadmap', props, ctx.styleCtx);
-    const title = roadmap?.title ?? roadmap?.name ?? '';
-    const author = propValue(props, 'author');
+// Card-sizing constants for beside-mode headers. Title and author both wrap
+// at MAX_CONTENT_WIDTH (= MAX header width minus 2 * padding). The card hugs
+// its content in the MIN..MAX range and grows vertically when wrapping is
+// needed. Title baselines step by TITLE_LINE_HEIGHT, author baselines by
+// AUTHOR_LINE_HEIGHT, with TITLE_TO_AUTHOR_GAP between the last title line
+// and the first author line.
+const HEADER_CARD_PADDING_X = 16;
+const HEADER_CARD_PADDING_TOP = 26;     // baseline of the first title line
+const HEADER_CARD_PADDING_BOTTOM = 14;  // descender padding below last line
+const HEADER_TITLE_LINE_HEIGHT = 20;
+const HEADER_AUTHOR_LINE_HEIGHT = 14;
+const HEADER_TITLE_TO_AUTHOR_GAP = 18;
+const HEADER_TITLE_FONT_SIZE = 16;
+const HEADER_AUTHOR_FONT_SIZE = 11;
+const HEADER_CARD_OUTER_PAD = 6;        // gap between card and box edge
 
-    const position = style.headerPosition;
-    const attributionBox: BoundingBox = {
-        x: ctx.chartRightX - 120,
-        y: 4,
-        width: 116,
-        height: 16,
-    };
-    if (position === 'beside') {
-        const box: BoundingBox = {
-            x: 0,
-            y: 0,
-            width: HEADER_BESIDE_WIDTH_PX,
-            height: ctx.chartBottomY,
-        };
-        return {
-            box,
-            position,
-            title,
-            author,
-            logo: undefined,   // m2b will inject when logo prop is present
-            style,
-            attributionBox,
-        };
+interface SizedHeader {
+    titleLines: string[];
+    authorLines: string[];
+    cardWidth: number;
+    cardHeight: number;
+    boxWidth: number;
+}
+
+// Word-wrap `text` so that no line wider than `maxWidth` (in px). Long single
+// words are kept on their own line even if they overflow — we never split a
+// word in the middle.
+function wrapText(text: string, maxWidth: number, fontSize: number): string[] {
+    if (!text) return [];
+    const words = text.split(/\s+/).filter((w) => w.length > 0);
+    if (words.length === 0) return [];
+    const lines: string[] = [];
+    let cur = '';
+    for (const word of words) {
+        const trial = cur ? `${cur} ${word}` : word;
+        if (cur && estimateTextWidth(trial, fontSize) > maxWidth) {
+            lines.push(cur);
+            cur = word;
+        } else {
+            cur = trial;
+        }
     }
-    const box: BoundingBox = {
-        x: 0,
-        y: 0,
-        width: ctx.chartRightX,
-        height: HEADER_ABOVE_HEIGHT_PX,
-    };
-    return {
-        box,
-        position,
-        title,
-        author,
-        logo: undefined,
-        style,
-        attributionBox,
-    };
+    if (cur) lines.push(cur);
+    return lines;
+}
+
+function sizeBesideHeader(title: string, author: string | undefined): SizedHeader {
+    const maxContentWidth = HEADER_BESIDE_MAX_WIDTH_PX - 2 * HEADER_CARD_PADDING_X;
+    const titleLines = wrapText(title, maxContentWidth, HEADER_TITLE_FONT_SIZE);
+    const authorLines = wrapText(author ?? '', maxContentWidth, HEADER_AUTHOR_FONT_SIZE);
+
+    let widest = 0;
+    for (const line of titleLines) widest = Math.max(widest, estimateTextWidth(line, HEADER_TITLE_FONT_SIZE));
+    for (const line of authorLines) widest = Math.max(widest, estimateTextWidth(line, HEADER_AUTHOR_FONT_SIZE));
+
+    const naturalCardWidth = widest + 2 * HEADER_CARD_PADDING_X;
+    const cardWidth = Math.max(
+        HEADER_BESIDE_MIN_WIDTH_PX - 2 * HEADER_CARD_OUTER_PAD,
+        Math.min(HEADER_BESIDE_MAX_WIDTH_PX - 2 * HEADER_CARD_OUTER_PAD, naturalCardWidth),
+    );
+
+    const titleBlockHeight = titleLines.length > 0
+        ? (titleLines.length - 1) * HEADER_TITLE_LINE_HEIGHT
+        : 0;
+    const authorBlockHeight = authorLines.length > 0
+        ? HEADER_TITLE_TO_AUTHOR_GAP + (authorLines.length - 1) * HEADER_AUTHOR_LINE_HEIGHT
+        : 0;
+    const cardHeight = HEADER_CARD_PADDING_TOP + titleBlockHeight + authorBlockHeight + HEADER_CARD_PADDING_BOTTOM;
+
+    const boxWidth = cardWidth + 2 * HEADER_CARD_OUTER_PAD;
+    return { titleLines, authorLines, cardWidth, cardHeight, boxWidth };
 }
 
 // Compute a sensible [startDate, endDate] window.
+//
+// Precedence:
+//   1. Explicit `length:` on the roadmap declaration wins.
+//   2. Otherwise we derive the end day from the actual content extent
+//      (latest item end, anchor date, milestone date/after, and today's
+//      now-line if it falls past the content). This keeps the rendered
+//      chart from defaulting to a 180-day desert when the content only
+//      spans a few weeks.
+//   3. As a last resort (no content + no length), fall back to a small
+//      4-week placeholder so an empty roadmap still draws a sensible axis.
 function computeDateWindow(
     file: NowlineFile,
     ctx: {
-        cal: { daysPerWeek: number; daysPerMonth: number; daysPerQuarter: number; daysPerYear: number };
+        cal: import('./calendar.js').CalendarConfig;
         durations: Map<string, import('@nowline/core').DurationDeclaration>;
     },
+    resolved: ResolveResult,
+    today: Date | undefined,
+    scale: ScaleConfig,
 ): { startDate: Date; endDate: Date } {
     const roadmap = file.roadmapDecl;
     const props = roadmap?.properties ?? [];
     const startRaw = propValue(props, 'start');
     const startDate = parseDate(startRaw) ?? new Date(Date.UTC(new Date().getUTCFullYear(), 0, 1));
     const lengthRaw = propValue(props, 'length');
-    // If explicit length, use it; else pick 180 days default.
-    let totalDays = 180;
     if (lengthRaw) {
-        const m = /^(\d+)([dwmqy])$/.exec(lengthRaw);
-        if (m) {
-            const n = parseInt(m[1], 10);
-            switch (m[2]) {
-                case 'd':
-                    totalDays = n;
-                    break;
-                case 'w':
-                    totalDays = n * ctx.cal.daysPerWeek;
-                    break;
-                case 'm':
-                    totalDays = n * ctx.cal.daysPerMonth;
-                    break;
-                case 'q':
-                    totalDays = n * ctx.cal.daysPerQuarter;
-                    break;
-                case 'y':
-                    totalDays = n * ctx.cal.daysPerYear;
-                    break;
-            }
+        const days = literalDays(lengthRaw, ctx.cal);
+        if (days > 0) {
+            return { startDate, endDate: addDays(startDate, days) };
         }
     }
-    const endDate = addDays(startDate, Math.max(1, totalDays));
-    return { startDate, endDate };
+    const contentDays = computeContentEndDay(resolved, ctx, startDate, today);
+    const tickDays = daysPerUnit(scale.unit, ctx.cal);
+    // Round up to the next tick boundary + one extra tick of trailing pad
+    // so the last tick label and any "ends on the deadline" item have a
+    // little visual breathing room.
+    const padded = contentDays > 0
+        ? Math.ceil((contentDays + 1) / tickDays) * tickDays + tickDays
+        : 4 * ctx.cal.daysPerWeek;
+    return { startDate, endDate: addDays(startDate, Math.max(1, padded)) };
+}
+
+function literalDays(literal: string, cal: import('./calendar.js').CalendarConfig): number {
+    const m = /^(\d+)([dwmqy])$/.exec(literal);
+    if (!m) return 0;
+    const n = parseInt(m[1], 10);
+    switch (m[2]) {
+        case 'd': return n;
+        case 'w': return n * cal.daysPerWeek;
+        case 'm': return n * cal.daysPerMonth;
+        case 'q': return n * cal.daysPerQuarter;
+        case 'y': return n * cal.daysPerYear;
+        default: return 0;
+    }
+}
+
+// Walk every dated/sequenced entity in the resolved content and return the
+// latest day-offset from `startDate`. Mirrors the sequencer's start-rules
+// (date: > start: > after: > previous-in-lane) without producing positions.
+function computeContentEndDay(
+    resolved: ResolveResult,
+    ctx: {
+        cal: import('./calendar.js').CalendarConfig;
+        durations: Map<string, import('@nowline/core').DurationDeclaration>;
+    },
+    startDate: Date,
+    today: Date | undefined,
+): number {
+    const itemEnd = new Map<string, number>();
+    const anchorEnd = new Map<string, number>();
+    const milestoneEnd = new Map<string, number>();
+    let maxDay = 0;
+
+    const refEndDay = (ref: string): number => {
+        if (itemEnd.has(ref)) return itemEnd.get(ref)!;
+        if (anchorEnd.has(ref)) return anchorEnd.get(ref)!;
+        if (milestoneEnd.has(ref)) return milestoneEnd.get(ref)!;
+        return 0;
+    };
+
+    // Pre-seed anchors fixed by `date:` so items that reference them get a
+    // valid end-day during the lane walk.
+    for (const anchor of resolved.content.anchors.values()) {
+        const d = parseDate(propValue(anchor.properties, 'date'));
+        if (d && anchor.name) {
+            const day = daysBetween(startDate, d);
+            anchorEnd.set(anchor.name, day);
+            maxDay = Math.max(maxDay, day);
+        }
+    }
+
+    const walkLane = (
+        children: SwimlaneDeclaration['content'],
+        baselineEnd: number,
+    ): number => {
+        let prevEnd = baselineEnd;
+        for (const child of children) {
+            if (child.$type === 'DescriptionDirective') continue;
+            prevEnd = walkNode(child as ItemDeclaration | GroupBlock | ParallelBlock, prevEnd);
+            maxDay = Math.max(maxDay, prevEnd);
+        }
+        return prevEnd;
+    };
+
+    const walkNode = (
+        node: ItemDeclaration | GroupBlock | ParallelBlock,
+        prevEnd: number,
+    ): number => {
+        if (isItemDeclaration(node)) {
+            const dur = resolveDuration(propValue(node.properties, 'duration'), ctx.durations, ctx.cal);
+            const dateProp = parseDate(propValue(node.properties, 'date'));
+            const startProp = parseDate(propValue(node.properties, 'start'));
+            const afterRefs = propValues(node.properties, 'after');
+            let start = prevEnd;
+            if (dateProp) {
+                start = daysBetween(startDate, dateProp);
+            } else if (startProp) {
+                start = daysBetween(startDate, startProp);
+            } else if (afterRefs.length > 0) {
+                start = Math.max(prevEnd, ...afterRefs.map(refEndDay));
+            }
+            const end = start + dur;
+            if (node.name) itemEnd.set(node.name, end);
+            return end;
+        }
+        if (isParallelBlock(node)) {
+            // All children share the parallel's start; the block's effective
+            // end is the maximum child end.
+            let parallelEnd = prevEnd;
+            for (const child of node.content) {
+                if (child.$type === 'DescriptionDirective') continue;
+                const childEnd = walkNode(child as ItemDeclaration | GroupBlock, prevEnd);
+                parallelEnd = Math.max(parallelEnd, childEnd);
+            }
+            return parallelEnd;
+        }
+        if (isGroupBlock(node)) {
+            return walkLane(node.content as SwimlaneDeclaration['content'], prevEnd);
+        }
+        return prevEnd;
+    };
+
+    for (const lane of resolved.content.swimlanes.values()) {
+        walkLane(lane.content, 0);
+    }
+
+    // Milestones (after items so `after:` references can resolve).
+    for (const ms of resolved.content.milestones.values()) {
+        const d = parseDate(propValue(ms.properties, 'date'));
+        if (d) {
+            const day = daysBetween(startDate, d);
+            if (ms.name) milestoneEnd.set(ms.name, day);
+            maxDay = Math.max(maxDay, day);
+            continue;
+        }
+        const after = propValues(ms.properties, 'after');
+        if (after.length > 0) {
+            const day = Math.max(0, ...after.map(refEndDay));
+            if (ms.name) milestoneEnd.set(ms.name, day);
+            maxDay = Math.max(maxDay, day);
+        }
+    }
+
+    // Isolated includes contribute their own content extent against the
+    // shared timeline.
+    for (const region of resolved.content.isolatedRegions) {
+        const nestedMax = computeContentEndDay(
+            { config: region.config, content: region.content, diagnostics: [], processedFiles: new Set() },
+            ctx,
+            startDate,
+            undefined,
+        );
+        maxDay = Math.max(maxDay, nestedMax);
+    }
+
+    if (today) {
+        const t = daysBetween(startDate, today);
+        if (t > 0) maxDay = Math.max(maxDay, t);
+    }
+
+    return maxDay;
 }
 
 function buildAnchors(
     anchors: Map<string, AnchorDeclaration>,
     ctx: LayoutContext,
+    milestoneXs: Set<number>,
 ): PositionedAnchor[] {
     const out: PositionedAnchor[] = [];
+    const inRowY = ctx.timeline.markerRow.y;
+    const collisionY = ctx.timeline.markerRow.collisionY;
+    // Cut lines drop from the BOTTOM of the marker row (= chart top) into
+    // the chart, so the anchor diamond sits visually on top of the line.
+    const cutTopY = ctx.chartTopY;
+    const cutBottomY = ctx.chartBottomY;
     for (const [id, a] of anchors) {
         const dateRaw = propValue(a.properties, 'date');
         const date = parseDate(dateRaw);
@@ -546,7 +1030,9 @@ function buildAnchors(
         const x = xForDate(date, ctx.timeline);
         if (x === null) continue;
         const style = resolveStyle('anchor', a.properties, ctx.styleCtx);
-        const center: Point = { x, y: ctx.chartTopY + 12 };
+        const bumpedUp = milestoneXs.has(x);
+        const y = bumpedUp ? collisionY : inRowY;
+        const center: Point = { x, y };
         ctx.entityLeftEdges.set(id, x);
         ctx.entityRightEdges.set(id, x);
         ctx.entityMidpoints.set(id, center);
@@ -554,9 +1040,12 @@ function buildAnchors(
             id,
             title: a.title ?? id,
             center,
-            radius: 8,
+            radius: 6,
             style,
             predecessorPoints: [],
+            cutTopY,
+            cutBottomY,
+            bumpedUp,
         });
     }
     return out;
@@ -567,6 +1056,9 @@ function buildMilestones(
     ctx: LayoutContext,
 ): PositionedMilestone[] {
     const out: PositionedMilestone[] = [];
+    const inRowY = ctx.timeline.markerRow.y;
+    const cutTopY = ctx.chartTopY;
+    const cutBottomY = ctx.chartBottomY;
     for (const [id, m] of milestones) {
         const style = resolveStyle('milestone', m.properties, ctx.styleCtx);
         const dateRaw = propValue(m.properties, 'date');
@@ -575,11 +1067,12 @@ function buildMilestones(
         let center: Point | null = null;
         let fixed = false;
         let slackX: number | undefined;
+        let slackY: number | undefined;
         let isOverrun = false;
         if (date) {
             const x = xForDate(date, ctx.timeline);
             if (x !== null) {
-                center = { x, y: ctx.chartTopY + 12 };
+                center = { x, y: inRowY };
                 fixed = true;
                 let maxEnd = 0;
                 for (const ref of afterRaw) {
@@ -592,13 +1085,25 @@ function buildMilestones(
                 }
             }
         } else if (afterRaw.length > 0) {
-            let maxEnd = ctx.timeline.originX;
+            // Track the binding (rightmost) and the next-latest non-binding
+            // predecessor — the latter drives the slack arrow.
+            type Pred = { ref: string; x: number; y: number };
+            const preds: Pred[] = [];
             for (const ref of afterRaw) {
                 const end = ctx.entityRightEdges.get(ref);
-                if (end !== undefined) maxEnd = Math.max(maxEnd, end);
+                if (end === undefined) continue;
+                const mid = ctx.entityMidpoints.get(ref);
+                preds.push({ ref, x: end, y: mid?.y ?? 0 });
             }
-            center = { x: maxEnd, y: ctx.chartTopY + 12 };
+            preds.sort((a, b) => b.x - a.x);
+            const maxEnd = preds[0]?.x ?? ctx.timeline.originX;
+            center = { x: maxEnd, y: inRowY };
             fixed = false;
+            const second = preds[1];
+            if (second && second.x < maxEnd && second.y > 0) {
+                slackX = second.x;
+                slackY = second.y;
+            }
         }
         if (!center) continue;
         ctx.entityLeftEdges.set(id, center.x);
@@ -608,26 +1113,32 @@ function buildMilestones(
             id,
             title: m.title ?? id,
             center,
-            radius: 10,
+            radius: 6,
             fixed,
             slackX,
+            slackY,
             isOverrun,
             style,
+            cutTopY,
+            cutBottomY,
         });
     }
     return out;
 }
 
-// Orthogonal (Manhattan) dep-edge routing: single elbow with rounded corner.
+// Orthogonal (Manhattan) dep-edge routing: source-right → vertical-elbow →
+// target-left, with a small horizontal stub before the elbow on each side
+// (10 px) so the renderer can draw rounded corners cleanly.
 function routeEdge(from: Point, to: Point): Point[] {
     if (Math.abs(from.y - to.y) < 0.5) {
         return [from, to];
     }
-    const midX = (from.x + to.x) / 2;
+    const stubOut = 10;
+    const elbowX = Math.max(from.x + stubOut, to.x - stubOut);
     return [
         from,
-        { x: midX, y: from.y },
-        { x: midX, y: to.y },
+        { x: elbowX, y: from.y },
+        { x: elbowX, y: to.y },
         to,
     ];
 }
@@ -663,13 +1174,15 @@ function buildFootnotes(
     footnotes: Map<string, FootnoteDeclaration>,
     ctx: LayoutContext,
     chartBottomY: number,
-): { area: PositionedFootnoteArea; index: Map<string, number> } {
+): { area: PositionedFootnoteArea; index: Map<string, number>; hosts: Map<string, string[]> } {
     const entries: PositionedFootnoteEntry[] = [];
     const index = new Map<string, number>();
+    const hosts = new Map<string, string[]>();
     const ordered = [...footnotes.entries()].sort(([a], [b]) => a.localeCompare(b));
     ordered.forEach(([id, f], i) => {
         const n = i + 1;
         index.set(id, n);
+        hosts.set(id, propValues(f.properties, 'on'));
         entries.push({
             number: n,
             title: f.title ?? id,
@@ -677,15 +1190,18 @@ function buildFootnotes(
             style: resolveStyle('footnote', f.properties, ctx.styleCtx),
         });
     });
+    // Footnote panel grows: 28px header + (entries × row height) + 16 padding.
+    const headerHeight = 28;
     const box: BoundingBox = {
-        x: 0,
+        x: 16,
         y: chartBottomY + 16,
-        width: ctx.chartRightX,
-        height: entries.length * FOOTNOTE_ROW_HEIGHT + 12,
+        width: ctx.chartRightX - 32,
+        height: entries.length === 0 ? 0 : headerHeight + entries.length * FOOTNOTE_ROW_HEIGHT + 16,
     };
     return {
         area: { box, entries },
         index,
+        hosts,
     };
 }
 
@@ -694,23 +1210,68 @@ function buildIncludeRegions(
     ctx: LayoutContext,
     startY: number,
 ): { regions: PositionedIncludeRegion[]; endY: number } {
-    let y = startY;
+    // Reserve room above the first region for the label tab so it doesn't
+    // collide with the previous swimlane's bottom edge.
+    const TAB_RESERVE = 18;
+    const REGION_INSET_TOP = 14;
+    const REGION_INSET_BOTTOM = 14;
+    const GAP_BETWEEN_REGIONS = 16;
+
+    let y = startY + TAB_RESERVE;
     const out: PositionedIncludeRegion[] = [];
     for (const region of regions) {
         const label = region.content.roadmap?.title ?? region.sourcePath;
+        const innerStartY = y + REGION_INSET_TOP;
+        // Lay out the included content's swimlanes against the parent timeline.
+        // The included roadmap shares originX / pixelsPerDay so dates align
+        // vertically with the tick row above the region.
+        const childCtx: LayoutContext = {
+            cal: ctx.cal,
+            styleCtx: {
+                theme: ctx.styleCtx.theme,
+                styles: region.config.styles,
+                defaults: region.config.defaults,
+                labels: region.content.labels,
+            },
+            durations: region.content.durations,
+            labels: region.content.labels,
+            teams: region.content.teams,
+            persons: region.content.persons,
+            footnoteIndex: new Map(),
+            footnoteHosts: new Map(),
+            timeline: ctx.timeline,
+            entityLeftEdges: new Map(),
+            entityRightEdges: new Map(),
+            entityMidpoints: new Map(),
+            chartTopY: innerStartY,
+            chartBottomY: innerStartY,
+            chartRightX: ctx.chartRightX,
+        };
+        const nestedSwimlanes: PositionedSwimlane[] = [];
+        let cursorY = innerStartY;
+        let bandIndex = 0;
+        for (const lane of region.content.swimlanes.values()) {
+            const { positioned, usedHeight } = buildSwimlane(lane, cursorY, bandIndex, childCtx);
+            nestedSwimlanes.push(positioned);
+            cursorY += usedHeight;
+            bandIndex++;
+        }
+        const innerEndY = cursorY;
+        const regionHeight = Math.max(56, innerEndY - y + REGION_INSET_BOTTOM);
         const box: BoundingBox = {
             x: 0,
             y,
             width: ctx.chartRightX,
-            height: 48,
+            height: regionHeight,
         };
         out.push({
             sourcePath: region.sourcePath,
             label,
             box,
+            nestedSwimlanes,
             style: resolveStyle('swimlane', [], ctx.styleCtx),
         });
-        y += 48 + 4;
+        y += regionHeight + GAP_BETWEEN_REGIONS;
     }
     return { regions: out, endY: y };
 }
@@ -722,10 +1283,17 @@ function buildNowline(
     if (!today) return null;
     const x = xForDate(today, ctx.timeline);
     if (x === null) return null;
+    // Pill row is the band reserved at the very top of the timeline area.
+    // The line drops from the bottom of the pill (top of the date headers)
+    // through any marker row and into the chart, so the pill and line stay
+    // visually connected.
+    const pillTopY = ctx.timeline.box.y;
+    const lineTopY = ctx.timeline.tickPanelY;
     return {
         x,
-        topY: ctx.chartTopY,
+        topY: lineTopY,
         bottomY: ctx.chartBottomY,
+        pillTopY,
         label: 'Today',
         style: resolveStyle('item', [], ctx.styleCtx),
     };
@@ -737,7 +1305,11 @@ interface LayoutContext {
     styleCtx: StyleContext;
     durations: Map<string, import('@nowline/core').DurationDeclaration>;
     labels: Map<string, LabelDeclaration>;
+    teams: Map<string, import('@nowline/core').TeamDeclaration>;
+    persons: Map<string, import('@nowline/core').PersonDeclaration>;
     footnoteIndex: Map<string, number>;
+    // For each footnote id, the list of `on:` host ids it references.
+    footnoteHosts: Map<string, string[]>;
     timeline: ReturnType<typeof buildTimelineScale>;
     entityLeftEdges: Map<string, number>;
     entityRightEdges: Map<string, number>;
@@ -800,32 +1372,76 @@ export function layoutRoadmap(
         labels: resolved.content.labels,
     };
 
-    // Date window + header geometry
-    const { startDate, endDate } = computeDateWindow(file, { cal, durations: resolved.content.durations });
+    // Date window + header geometry. The window is content-aware: when the
+    // roadmap declaration omits `length:`, we derive it from the latest
+    // dated/sequenced entity (item, anchor, milestone, today's now-line)
+    // instead of defaulting to a 180-day desert.
+    const { startDate, endDate } = computeDateWindow(
+        file,
+        { cal, durations: resolved.content.durations },
+        resolved,
+        options.today,
+        scale,
+    );
 
     // Determine header position via `default roadmap` / theme.
     const headerStyle = resolveStyle('roadmap', file.roadmapDecl?.properties ?? [], styleCtx);
     const isBeside = headerStyle.headerPosition === 'beside';
 
+    // Pre-size the beside-mode header card from its actual title + author
+    // text. Width = max line width + padding, clamped to MIN..MAX with
+    // word-wrap kicking in once the title would exceed MAX. Above-mode
+    // keeps the existing fixed-strip geometry (full canvas width, fixed
+    // height) since horizontal headers don't have the same wasted-space
+    // problem.
+    const titleStr = file.roadmapDecl?.title ?? file.roadmapDecl?.name ?? '';
+    const authorStr = propValue(file.roadmapDecl?.properties ?? [], 'author');
+    const sizedHeader = sizeBesideHeader(titleStr, authorStr);
+
+    // headerBox.width is patched after we know the final canvas width; for
+    // horizontal-above mode the header strip should match the canvas width,
+    // not the requested max.
     const headerBox = isBeside
-        ? { x: 0, y: 0, width: HEADER_BESIDE_WIDTH_PX, height: 0 }
-        : { x: 0, y: 0, width, height: HEADER_ABOVE_HEIGHT_PX };
+        ? { x: 0, y: 0, width: sizedHeader.boxWidth, height: 0 }
+        : { x: 0, y: 0, width: 0, height: HEADER_ABOVE_HEIGHT_PX };
 
-    const chartLeftX = isBeside ? HEADER_BESIDE_WIDTH_PX : 0;
+    const chartLeftX = isBeside ? sizedHeader.boxWidth : 0;
     const chartTopY = isBeside ? 8 : HEADER_ABOVE_HEIGHT_PX + 8;
-    const chartRightX = width;
 
-    // Pre-compute timeline to get pixels-per-day.
-    const chartWidthAvailable = chartRightX - chartLeftX - 24;
+    // `options.width` is treated as a *maximum* canvas width, not a fixed
+    // target. The chart sizes itself to the natural width of the content
+    // (date window × pixels-per-day) plus chrome padding, capped at the max.
+    // A small minimum keeps the header / attribution wordmark legible when
+    // content is very short.
+    const MIN_CANVAS_WIDTH = 480;
     const ppd = pixelsPerDay(scale, cal);
     const spanDays = Math.max(1, daysBetween(startDate, endDate));
     const naturalWidth = spanDays * ppd;
     const originX = chartLeftX + 16;
-    // Use scale/calendar natural width; renderer can clip; content may exceed viewBox width.
-    const totalChartWidth = Math.max(chartWidthAvailable, naturalWidth);
+    const totalChartWidth = naturalWidth;
+    const desiredCanvas = chartLeftX + 16 + totalChartWidth + 16;
+    const chartRightX = Math.max(MIN_CANVAS_WIDTH, Math.min(width, desiredCanvas));
+    const chartWidthAvailable = chartRightX - chartLeftX - 24;
 
-    const timelineHeightBudget = 32;
+    // Header layout (top → bottom):
+    //   1. Now-pill row    (16 px) — only when there's a now-line to draw
+    //   2. Tick-label panel (24 px) — always
+    //   3. Marker row       (26 px) — only when there are anchors/milestones
+    //   4. 8 px gap, then the chart begins
+    // The now-pill sits ABOVE the date headers; the vertical line drops
+    // from the pill bottom through the headers into the chart, so the
+    // pill and the line stay visually connected.
+    const willHaveNowline = options.today !== undefined
+        && options.today >= startDate
+        && options.today <= endDate;
+    const hasMarkerEntities = resolved.content.anchors.size + resolved.content.milestones.size > 0;
+    const pillRowHeight = willHaveNowline ? 16 : 0;
+    const tickPanelHeight = 24;
+    const markerRowHeight = hasMarkerEntities ? 26 : 0;
+    const timelineHeightBudget = pillRowHeight + tickPanelHeight + markerRowHeight + 8;
     const timelineY = chartTopY;
+    const tickPanelY = timelineY + pillRowHeight;
+    const markerRowY = tickPanelY + tickPanelHeight;
 
     const timeline = buildTimelineScale(
         startDate,
@@ -837,13 +1453,26 @@ export function layoutRoadmap(
         resolveStyle('roadmap', [], styleCtx),
     );
     timeline.box.y = timelineY;
+    timeline.pillRowHeight = pillRowHeight;
+    timeline.tickPanelY = tickPanelY;
+    timeline.tickPanelHeight = tickPanelHeight;
+    // Marker row sits BELOW the tick-label panel. When there are no
+    // markers, height is 0 and the renderer skips the panel entirely.
+    timeline.markerRow = {
+        y: markerRowY + 13,                  // in-row diamond center
+        height: markerRowHeight,
+        collisionY: markerRowY - 8,          // bumped-up diamond center (above the marker row)
+    };
 
     const ctx: LayoutContext = {
         cal,
         styleCtx,
         durations: resolved.content.durations,
         labels: resolved.content.labels,
+        teams: resolved.content.teams,
+        persons: resolved.content.persons,
         footnoteIndex: new Map(),
+        footnoteHosts: new Map(),
         timeline,
         entityLeftEdges: new Map(),
         entityRightEdges: new Map(),
@@ -856,6 +1485,7 @@ export function layoutRoadmap(
     // Footnotes index must be built before sequencing items reference them.
     const pre = buildFootnotes(resolved.content.footnotes, ctx, 0);
     ctx.footnoteIndex = pre.index;
+    ctx.footnoteHosts = pre.hosts;
 
     // Build swimlanes (order: declared order).
     const laneEntries = [...resolved.content.swimlanes.values()];
@@ -880,9 +1510,10 @@ export function layoutRoadmap(
     ctx.chartBottomY = y;
     timeline.box.height = ctx.chartBottomY - timeline.box.y;
 
-    // Anchors / milestones / dependency edges
-    const anchors = buildAnchors(resolved.content.anchors, ctx);
+    // Milestones first so anchors know which xs are occupied (for collision bumps).
     const milestones = buildMilestones(resolved.content.milestones, ctx);
+    const milestoneXs = new Set<number>(milestones.map((m) => m.center.x));
+    const anchors = buildAnchors(resolved.content.anchors, ctx, milestoneXs);
     const itemsMap = collectItems(laneEntries);
     const edges = buildDependencies(itemsMap, ctx);
 
@@ -892,14 +1523,32 @@ export function layoutRoadmap(
     // Finalize footnotes at the bottom
     const foot = buildFootnotes(resolved.content.footnotes, ctx, ctx.chartBottomY);
     ctx.footnoteIndex = foot.index;
+    ctx.footnoteHosts = foot.hosts;
 
-    // Header (depends on chart height when beside)
+    // Header (depends on chart height when beside, and on the final canvas
+    // width when above).
     headerBox.height = headerBox.height || ctx.chartBottomY;
+    if (!isBeside) headerBox.width = ctx.chartRightX;
+    // Build a card sub-box for beside-mode (the visible white panel inside
+    // headerBox). For above-mode the cardBox spans the full strip — the
+    // renderer ignores it and uses its existing horizontal layout.
+    const cardBox: BoundingBox = isBeside
+        ? {
+            x: 6,
+            y: 6,
+            width: sizedHeader.cardWidth,
+            height: sizedHeader.cardHeight,
+        }
+        : { x: 0, y: 0, width: ctx.chartRightX, height: HEADER_ABOVE_HEIGHT_PX };
+
     const header: PositionedHeader = {
         box: headerBox,
         position: headerStyle.headerPosition,
-        title: file.roadmapDecl?.title ?? file.roadmapDecl?.name ?? '',
-        author: propValue(file.roadmapDecl?.properties ?? [], 'author'),
+        title: titleStr,
+        author: authorStr,
+        titleLines: sizedHeader.titleLines,
+        authorLines: sizedHeader.authorLines,
+        cardBox,
         logo: undefined,
         style: headerStyle,
         attributionBox: {

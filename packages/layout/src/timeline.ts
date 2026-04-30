@@ -26,8 +26,36 @@ export function resolveScale(
     const scaleProp = file.roadmapDecl?.properties.find(
         (p) => stripColon(p.key) === 'scale',
     );
-    const unit: ScaleUnit = (scaleProp?.value as ScaleUnit) ?? 'weeks';
-    const defaultLabelEvery = LABEL_THINNING[unit] ?? 4;
+    // `scale:` accepts a unit name (`days`/`weeks`/`months`/`quarters`/`years`)
+    // OR a duration literal (`1w`, `2w`, `1m`, `1q`, `1y`). The literal form
+    // is the documented default in the DSL spec; it picks the unit and uses
+    // the literal's count to size the pixels-per-unit budget.
+    const rawScale = scaleProp?.value;
+    let unit: ScaleUnit = 'weeks';
+    let pixelsPerUnitOverride: number | undefined;
+    let labelEveryOverride: number | undefined;
+    if (rawScale) {
+        if (rawScale === 'days' || rawScale === 'weeks' || rawScale === 'months' || rawScale === 'quarters' || rawScale === 'years') {
+            unit = rawScale;
+        } else {
+            const dur = /^(\d+)([dwmqy])$/.exec(rawScale);
+            if (dur) {
+                const n = Math.max(1, parseInt(dur[1], 10));
+                switch (dur[2]) {
+                    case 'd': unit = 'days'; break;
+                    case 'w': unit = 'weeks'; break;
+                    case 'm': unit = 'months'; break;
+                    case 'q': unit = 'quarters'; break;
+                    case 'y': unit = 'years'; break;
+                }
+                pixelsPerUnitOverride = unitPx(unit) * n;
+                // A literal scale like `1w` says "I want exactly one label per
+                // unit." Override the default thinning so every tick is named.
+                labelEveryOverride = 1;
+            }
+        }
+    }
+    const defaultLabelEvery = labelEveryOverride ?? LABEL_THINNING[unit] ?? 4;
 
     if (scaleBlock) {
         const unitProp = scaleBlock.properties.find((p) => stripColon(p.key) === 'unit');
@@ -43,11 +71,11 @@ export function resolveScale(
             : defaultLabelEvery;
         const pixelsPerUnit = pxProp
             ? Math.max(1, parseInt(pxProp.value, 10) || unitPx(resolvedUnit))
-            : unitPx(resolvedUnit);
+            : (pixelsPerUnitOverride ?? unitPx(resolvedUnit));
         return { unit: resolvedUnit, labelEvery, pixelsPerUnit };
     }
 
-    return { unit, labelEvery: defaultLabelEvery, pixelsPerUnit: unitPx(unit) };
+    return { unit, labelEvery: defaultLabelEvery, pixelsPerUnit: pixelsPerUnitOverride ?? unitPx(unit) };
 }
 
 function unitPx(unit: ScaleUnit): number {
@@ -100,16 +128,24 @@ export function buildTimelineScale(
     const ppd = pixelsPerDay(scale, cal);
     const totalDays = Math.max(1, daysBetween(startDate, endDate));
     const dayPerTick = daysPerUnit(scale.unit, cal);
+    const stridePx = dayPerTick * ppd;
     const tickCount = Math.floor(totalDays / dayPerTick) + 1;
     const ticks: PositionedTick[] = [];
     for (let i = 0; i < tickCount; i++) {
         const days = i * dayPerTick;
         const x = originX + days * ppd;
         const isMajor = i % scale.labelEvery === 0;
+        // Label sits centered in the column starting at this tick. The
+        // last tick has no following column (no week after it), so its
+        // label is suppressed.
+        const isLast = i === tickCount - 1;
         ticks.push({
             x,
+            labelX: isLast ? undefined : x + stridePx / 2,
             major: isMajor,
-            label: isMajor ? formatTickLabel(scale.unit, addDays(startDate, days), i) : undefined,
+            label: isMajor && !isLast
+                ? formatTickLabel(scale.unit, addDays(startDate, days), i)
+                : undefined,
         });
     }
     return {
@@ -125,6 +161,15 @@ export function buildTimelineScale(
         startDate,
         endDate,
         labelStyle,
+        // Filled in by the layout caller after it knows the header budget.
+        pillRowHeight: 0,
+        tickPanelY: 0,
+        tickPanelHeight: 0,
+        markerRow: {
+            y: 0,
+            height: 0,
+            collisionY: 0,
+        },
     };
 }
 
@@ -132,8 +177,11 @@ function formatTickLabel(unit: ScaleUnit, date: Date, index: number): string {
     switch (unit) {
         case 'days':
             return `${date.getUTCMonth() + 1}/${date.getUTCDate()}`;
-        case 'weeks':
-            return `W${index + 1}`;
+        case 'weeks': {
+            const month = date.toLocaleString('en-US', { month: 'short', timeZone: 'UTC' });
+            const day = date.getUTCDate().toString().padStart(2, '0');
+            return `${month} ${day}`;
+        }
         case 'months':
             return date.toLocaleString('en-US', { month: 'short', timeZone: 'UTC' });
         case 'quarters': {

@@ -62,6 +62,16 @@ export interface PositionedHeader {
     position: HeaderPosition;   // 'beside' | 'above'
     title: string;              // empty string if no title set
     author?: string;
+    // Word-wrapped title and author lines, sized to the resolved card
+    // width (title text wraps when it exceeds HEADER_BESIDE_MAX_WIDTH_PX
+    // minus padding). The renderer stacks them inside `cardBox` and does
+    // not need to do any text measurement of its own.
+    titleLines: string[];
+    authorLines: string[];
+    // Bounding box of the visible white card inside `box`. The card hugs
+    // its content (width = max line width + padding, clamped to MIN..MAX;
+    // height grows for wrapped lines).
+    cardBox: BoundingBox;
     logo?: PositionedLogo;
     style: ResolvedStyle;
     // Attribution mark (Nowline wordmark + link) lives in the top-right.
@@ -69,8 +79,16 @@ export interface PositionedHeader {
 }
 
 // A single tick on the timeline scale (e.g. "W1", "Q2", "Feb").
+//
+// `x` is the tick's BOUNDARY position (the start of the column the tick
+// represents — also where the dotted grid line drops). `labelX` is where
+// the label TEXT sits, centered horizontally within the column (i.e.
+// halfway between this tick's x and the next tick's x). The final tick
+// has no following column, so its `labelX` is undefined and the renderer
+// skips drawing its label.
 export interface PositionedTick {
     x: number;
+    labelX?: number;
     label?: string;     // undefined for thinned ticks
     major: boolean;     // full-height major line vs short minor tick
 }
@@ -85,12 +103,36 @@ export interface PositionedTimelineScale {
     startDate: Date;
     endDate: Date;
     labelStyle: ResolvedStyle;
+    // Now-pill row sits at the very top of the timeline area (above the
+    // date labels). Height is 0 when there's no now-line to draw.
+    pillRowHeight: number;
+    // Tick-label panel (the date headers). Always rendered.
+    tickPanelY: number;
+    tickPanelHeight: number;
+    // Marker row sits BELOW the tick-label panel. Anchors + milestones live
+    // here. The collision band sits ABOVE the in-row baseline so an anchor
+    // colliding with a milestone can be bumped up. Height is 0 when there
+    // are no markers to render — the renderer then omits the panel
+    // entirely so we don't reserve dead space.
+    markerRow: {
+        y: number;          // y of the in-row diamond center
+        height: number;     // total height of the marker row band (in-row + collision)
+        collisionY: number; // y of the bumped-up diamond center
+    };
 }
 
 export interface PositionedNowline {
     x: number;
+    // Top of the vertical red line. Sits at the BOTTOM of the now-pill —
+    // just above the tick-label panel — so the line drops through the
+    // date headers and any marker row, into the chart.
     topY: number;
+    // Bottom of the vertical red line (chart bottom).
     bottomY: number;
+    // Top edge of the pill rectangle. Pill height is fixed in the
+    // renderer; the layout reserves the space at the very top of the
+    // timeline area so the pill sits ABOVE the date headers.
+    pillTopY: number;
     label: string;      // 'Today' by default
     style: ResolvedStyle;
 }
@@ -108,8 +150,23 @@ export interface PositionedItem {
     linkHref?: string;
     hasOverflow: boolean;       // true when before: forced the item past its natural end
     overflowBox?: BoundingBox;  // the offending tail, flagged red
+    // The id of the `before:` anchor/milestone the item overran. Used by the
+    // renderer to caption the overflow tail ("past <id>").
+    overflowAnchorId?: string;
     owner?: string;             // owner id (person/team) for annotation
     description?: string;
+    // Pre-formatted secondary line shown under the title inside the item bar
+    // (e.g. "1w" or "2w — 50% remaining"). Layout assembles this so the
+    // renderer stays palette-and-string-dumb.
+    metaText?: string;
+    // True when the title OR the meta line is wider than the bar's inner
+    // padded width. We treat title + meta as an atomic block: if either
+    // one wouldn't fit inside the bar, BOTH get drawn beside the bar
+    // (stacked, just past its right edge) so they read as one caption
+    // rather than splitting across the bar boundary. The layout also
+    // bumps the next item to a fresh row so the spilled caption has
+    // empty space to occupy.
+    textSpills: boolean;
     style: ResolvedStyle;
 }
 
@@ -151,16 +208,29 @@ export interface PositionedSwimlane {
     children: PositionedTrackChild[];
     nested: PositionedSwimlane[];   // recursive sub-swimlanes
     style: ResolvedStyle;
+    // Owner display string ("Platform Team", "Sam Chen") rendered inside
+    // the frame tab. Resolved from team/person id → title.
+    owner?: string;
+    // Footnote indicator numbers attached to this swimlane (via `on:` in the
+    // footnote declaration). Rendered in the upper-right of the frame tab.
+    footnoteIndicators: number[];
 }
 
 export interface PositionedAnchor {
     id?: string;
     title: string;
-    center: Point;         // diamond center
+    center: Point;         // diamond center (post-collision-resolution)
     radius: number;
     style: ResolvedStyle;
     // Non-binding predecessor edges: small arrows from prior items, drawn by renderer.
     predecessorPoints: Point[];
+    // Vertical span of the anchor's "cut line" through the swimlane area,
+    // drawn by the renderer after items so it overlays the lane fills.
+    cutTopY: number;
+    cutBottomY: number;
+    // True when this anchor was bumped above the in-row baseline because a
+    // milestone shares the same x-column.
+    bumpedUp: boolean;
 }
 
 export interface PositionedMilestone {
@@ -169,9 +239,13 @@ export interface PositionedMilestone {
     center: Point;
     radius: number;
     fixed: boolean;            // true for date: style, false for after: style
-    slackX?: number;           // for floating milestones, the x of the current "earliest can start"
+    slackX?: number;           // x of the non-binding predecessor's visual end
+    slackY?: number;           // y midline of that predecessor (drawn at row height)
     isOverrun: boolean;        // true when the aggregated predecessor end exceeds `date:`
     style: ResolvedStyle;
+    // Vertical span of the milestone's cut line through the swimlane area.
+    cutTopY: number;
+    cutBottomY: number;
 }
 
 export interface PositionedDependencyEdge {
@@ -206,9 +280,10 @@ export interface PositionedIncludeRegion {
     sourcePath: string;    // relative to the parent file
     label: string;         // e.g. the child roadmap's title or basename
     box: BoundingBox;
-    // The include's own mini-layout is NOT materialized here (out of scope for
-    // m2b). The renderer draws a dashed-bordered region with the label and a
-    // link badge; a future milestone can nest a full PositionedRoadmap.
+    // Nested swimlanes laid out inside the region. They share the parent's
+    // timeline (originX, pixelsPerDay) so cross-region dates align with the
+    // tick row above the region.
+    nestedSwimlanes: PositionedSwimlane[];
     style: ResolvedStyle;
 }
 
