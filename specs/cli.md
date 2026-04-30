@@ -62,7 +62,10 @@ Mode flags (mutually exclusive)
 
 Render options
   -t, --theme <name>     light | dark
-  --today <date>         "Today" anchor for now-line / date math (YYYY-MM-DD)
+  --now <date>           "Now" anchor for now-line / date math (YYYY-MM-DD).
+                         Default: today (the OS calendar date in UTC).
+                         Pass `--now -` to suppress the now-line entirely
+                         (Unix-`-` sentinel; same convention as `-o -`).
   --no-links             Omit link icons from output
   -s, --scale <n>        Raster scale factor (PNG only; default 1)
   --strict               Promote asset / sanitizer warnings to errors
@@ -87,7 +90,7 @@ Format-specific options
   --headless             Skip platform font probe; force bundled DejaVu pair.
                          Byte-stable across machines.
   --start <date>         MS Project: anchor date (YYYY-MM-DD) for relative
-                         roadmaps. Default: --today, then deterministic
+                         roadmaps. Default: --now, then deterministic
                          fallback.
 
 Logging (mutually exclusive)

@@ -50,7 +50,7 @@ export async function serveHandler(options: ServeHandlerOptions): Promise<void> 
     const port = parsePort(args.port);
     const host = args.host ?? '127.0.0.1';
     const theme = parseTheme(args.theme);
-    const today = parseToday(args.today);
+    const today = resolveNowArg(args);
 
     const inputPath = path.resolve(cwd, args.positional);
     try {
@@ -194,11 +194,17 @@ function parseTheme(raw: string | undefined): ThemeName {
     return lower;
 }
 
-function parseToday(raw: string | undefined): Date | undefined {
-    if (!raw) return undefined;
-    const m = /^(\d{4})-(\d{2})-(\d{2})$/.exec(raw);
-    if (!m) throw new CliError(ExitCode.InputError, `nowline: invalid --today "${raw}".`);
-    return new Date(Date.UTC(parseInt(m[1], 10), parseInt(m[2], 10) - 1, parseInt(m[3], 10)));
+// Mirrors render.ts: `--now -` disables the line, `--now <date>` overrides
+// it, and the default is today's UTC calendar date.
+function resolveNowArg(args: { now?: string }): Date | undefined {
+    if (args.now === '-') return undefined;
+    if (args.now) {
+        const m = /^(\d{4})-(\d{2})-(\d{2})$/.exec(args.now);
+        if (!m) throw new CliError(ExitCode.InputError, `nowline: invalid --now "${args.now}".`);
+        return new Date(Date.UTC(parseInt(m[1], 10), parseInt(m[2], 10) - 1, parseInt(m[3], 10)));
+    }
+    const t = new Date();
+    return new Date(Date.UTC(t.getUTCFullYear(), t.getUTCMonth(), t.getUTCDate()));
 }
 
 function sendEvent(res: http.ServerResponse, event: string, data: string): void {

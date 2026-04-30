@@ -1219,7 +1219,10 @@ function buildIncludeRegions(
 
     let y = startY + TAB_RESERVE;
     const out: PositionedIncludeRegion[] = [];
+    let isFirst = true;
     for (const region of regions) {
+        if (!isFirst) y += GAP_BETWEEN_REGIONS;
+        isFirst = false;
         const label = region.content.roadmap?.title ?? region.sourcePath;
         const innerStartY = y + REGION_INSET_TOP;
         // Lay out the included content's swimlanes against the parent timeline.
@@ -1271,7 +1274,7 @@ function buildIncludeRegions(
             nestedSwimlanes,
             style: resolveStyle('swimlane', [], ctx.styleCtx),
         });
-        y += regionHeight + GAP_BETWEEN_REGIONS;
+        y += regionHeight;
     }
     return { regions: out, endY: y };
 }
@@ -1438,10 +1441,22 @@ export function layoutRoadmap(
     const pillRowHeight = willHaveNowline ? 16 : 0;
     const tickPanelHeight = 24;
     const markerRowHeight = hasMarkerEntities ? 26 : 0;
-    const timelineHeightBudget = pillRowHeight + tickPanelHeight + markerRowHeight + 8;
-    const timelineY = chartTopY;
+    const headerRowsHeight = pillRowHeight + tickPanelHeight + markerRowHeight;
+    const timelineHeightBudget = headerRowsHeight + 8;
+    // In beside-mode we want the header card's BOTTOM to line up with the
+    // bottom of the header rows (so it visually anchors to the chart's top
+    // edge). When the card is taller than the natural header rows + a 4px
+    // top inset, push the timeline down so the card still has room without
+    // clipping above the canvas. Above-mode keeps its fixed strip layout
+    // and isn't affected.
+    const HEADER_CARD_TOP_INSET = 4;
+    const minHeaderRowsBottomForCard = isBeside
+        ? sizedHeader.cardHeight + HEADER_CARD_TOP_INSET
+        : 0;
+    const timelineY = Math.max(chartTopY, minHeaderRowsBottomForCard - headerRowsHeight);
     const tickPanelY = timelineY + pillRowHeight;
     const markerRowY = tickPanelY + tickPanelHeight;
+    const headerRowsBottomY = markerRowY + markerRowHeight;
 
     const timeline = buildTimelineScale(
         startDate,
@@ -1499,13 +1514,17 @@ export function layoutRoadmap(
         bandIndex++;
     }
 
-    // Include regions under the swimlanes.
-    const { regions: includes, endY: afterIncludesY } = buildIncludeRegions(
-        resolved.content.isolatedRegions,
-        ctx,
-        y + 8,
-    );
-    y = afterIncludesY;
+    // Include regions under the swimlanes. We only reserve the 8px gap +
+    // tab-reserve when there's at least one isolated region to render —
+    // otherwise the now-line and chart bottom would extend past the last
+    // swimlane into empty space.
+    const isolated = resolved.content.isolatedRegions;
+    let includes: PositionedIncludeRegion[] = [];
+    if (isolated.length > 0) {
+        const r = buildIncludeRegions(isolated, ctx, y + 8);
+        includes = r.regions;
+        y = r.endY;
+    }
 
     ctx.chartBottomY = y;
     timeline.box.height = ctx.chartBottomY - timeline.box.y;
@@ -1517,25 +1536,35 @@ export function layoutRoadmap(
     const itemsMap = collectItems(laneEntries);
     const edges = buildDependencies(itemsMap, ctx);
 
-    // Now-line (if today is within the window)
+    // Now-line (if today is within the window). Initially drops to the
+    // bottom of the chart area; if a footnote panel exists below, we extend
+    // it through the panel so the line still reads as a single sweep.
     const nowline = buildNowline(options.today, ctx);
 
     // Finalize footnotes at the bottom
     const foot = buildFootnotes(resolved.content.footnotes, ctx, ctx.chartBottomY);
     ctx.footnoteIndex = foot.index;
     ctx.footnoteHosts = foot.hosts;
+    if (nowline && foot.area.box.height > 0) {
+        nowline.bottomY = foot.area.box.y + foot.area.box.height;
+    }
 
     // Header (depends on chart height when beside, and on the final canvas
     // width when above).
     headerBox.height = headerBox.height || ctx.chartBottomY;
     if (!isBeside) headerBox.width = ctx.chartRightX;
     // Build a card sub-box for beside-mode (the visible white panel inside
-    // headerBox). For above-mode the cardBox spans the full strip — the
-    // renderer ignores it and uses its existing horizontal layout.
+    // headerBox). The card BOTTOM hugs the bottom of the header rows
+    // (date headers, or marker row when present) so the title block visually
+    // anchors to the chart's top edge regardless of which header rows are
+    // present. timelineY was already nudged down above to guarantee the card
+    // has at least HEADER_CARD_TOP_INSET clearance from the canvas top.
+    // For above-mode the cardBox spans the full strip — the renderer
+    // ignores it and uses its existing horizontal layout.
     const cardBox: BoundingBox = isBeside
         ? {
             x: 6,
-            y: 6,
+            y: headerRowsBottomY - sizedHeader.cardHeight,
             width: sizedHeader.cardWidth,
             height: sizedHeader.cardHeight,
         }

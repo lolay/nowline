@@ -139,15 +139,15 @@ nowline roadmap.nowline -f xlsx                  # writes ./roadmap.xlsx  (full 
 nowline roadmap.nowline -f msproj                # writes ./roadmap.xml   (full only)
 nowline roadmap.nowline -o roadmap.pdf           # format inferred from extension
 nowline roadmap.nowline -o -                     # SVG to stdout
-nowline roadmap.nowline --theme dark --today 2026-03-15
-nowline roadmap.nowline --asset-root ./brand --no-links --strict
+nowline roadmap.nowline --theme dark --now 2026-03-15
+nowline roadmap.nowline --now - --asset-root ./brand --no-links --strict
 nowline roadmap.nowline -f pdf --page-size a4 --orientation landscape --margin 0.5in
 cat roadmap.nowline | nowline -                  # stdin → ./roadmap.svg
 ```
 
 The render pipeline is `@nowline/core` parse → `@nowline/layout` layout →
 `@nowline/renderer` SVG → format-specific exporter. Output is byte-for-byte
-deterministic for the same input, theme, and `--today`. The two binary
+deterministic for the same input, theme, and `--now`. The two binary
 distributions (tiny `nowline`, full `nowline-full`) cover the same source
 tree — see [`packages/cli/README.md`](./packages/cli/README.md#install)
 for the format / size split.

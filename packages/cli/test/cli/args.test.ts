@@ -117,6 +117,24 @@ describe('parseArgv — mutual exclusivity', () => {
             expect(err).toBeInstanceOf(CliError);
         }
     });
+
+});
+
+describe('parseArgv — now-line flag', () => {
+    it('--now <date> populates `now`', () => {
+        const r = parseArgv(['foo.nowline', '--now', '2026-04-29']);
+        expect(r.now).toBe('2026-04-29');
+    });
+
+    it('--now - populates `now` with the literal "-" sentinel', () => {
+        const r = parseArgv(['foo.nowline', '--now', '-']);
+        expect(r.now).toBe('-');
+    });
+
+    it('omitting --now leaves now undefined (default-to-today happens downstream)', () => {
+        const r = parseArgv(['foo.nowline']);
+        expect(r.now).toBeUndefined();
+    });
 });
 
 describe('parseArgv — usage errors', () => {

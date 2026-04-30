@@ -34,7 +34,8 @@ MODE FLAGS (mutually exclusive)
 
 RENDER OPTIONS
   -t, --theme <name>      light | dark
-      --today <YYYY-MM-DD> Override today for the now-line.
+      --now <YYYY-MM-DD>  Date for the now-line. Default: today.
+                          Use --now - to suppress the now-line.
       --no-links          Omit link icons from rendered items.
   -s, --scale <n>         Raster scale factor (PNG only; default 1).
       --strict            Promote asset / sanitizer warnings to errors.

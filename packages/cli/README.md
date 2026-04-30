@@ -114,7 +114,7 @@ nowline roadmap.nowline --headless               # bundled DejaVu fonts (determi
 | Flag                  | Default      | Notes                                       |
 |-----------------------|--------------|---------------------------------------------|
 | `-t, --theme <name>`  | `light`      | `light` \| `dark`.                          |
-| `--today YYYY-MM-DD`  | system today | Override the now-line anchor.               |
+| `--now YYYY-MM-DD`    | today (UTC)  | Override the now-line anchor date. Use `--now -` to suppress it. |
 | `--no-links`          | (off)        | Omit link icons from items.                 |
 | `-s, --scale <n>`     | `1`          | Raster scale (PNG only).                    |
 | `--strict`            | (off)        | Promote asset / sanitizer warnings to errors. |
