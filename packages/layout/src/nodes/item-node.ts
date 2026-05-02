@@ -61,9 +61,13 @@ export interface PlacedItemGeometry {
     textSpills: boolean;
 }
 
-/** Approx. rendered width of `text` at `fontSizePx`. Same heuristic the production layout uses. */
+/**
+ * Approx. rendered width of `text` at `fontSizePx`. Matches the legacy
+ * `sequenceItem` heuristic (intentionally pessimistic at ~0.58 em/char so
+ * borderline-fitting captions trigger spill rather than clip).
+ */
 function estimateTextWidth(text: string, fontSizePx: number): number {
-    return text.length * fontSizePx * 0.55;
+    return text.length * fontSizePx * 0.58;
 }
 
 export class ItemNode implements Renderable<PlacedItemGeometry> {

@@ -1031,7 +1031,7 @@ function renderIncludeRegion(
 
     // Nested swimlanes (laid out by buildIncludeRegions against the parent's timeline).
     const nested = r.nestedSwimlanes
-        .map((s) => renderSwimlane(s, options, idPrefix, theme))
+        .map((s) => renderSwimlane(s, options, idPrefix, palette))
         .join('');
 
     return tag(
