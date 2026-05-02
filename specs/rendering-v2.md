@@ -6,7 +6,7 @@ This spec defines the **internal architecture** of the next-generation `@nowline
 
 The **public output** — what the renderer emits, what the embed script ships, what the GitHub Action commits — is unchanged. See [`rendering.md`](./rendering.md) for the output contract; this document covers what runs underneath.
 
-The reference implementation lives in [`layout-v2/`](../layout-v2) — a standalone prototype that validates the architecture against `examples/minimal.nowline` end-to-end. See [`layout-v2/findings.md`](../layout-v2/findings.md) for the prototype validation report.
+The architecture was validated end-to-end against `examples/minimal.nowline` in a standalone `layout-v2/` prototype during planning. The prototype was retired once the production port (m2.5a–c) landed; see commit `771127c` for the removal.
 
 ### What v2 is
 
@@ -223,7 +223,7 @@ The four phases ship as separate milestones, ordered low-risk to high-risk so ea
 
 **Risk and mitigation.** High — this is the rewrite that proves the architecture. Mitigation:
 
-1. Port one entity type at a time, starting with `ItemNode` and `SwimlaneNode` (already validated end-to-end in [`layout-v2/`](../layout-v2)).
+1. Port one entity type at a time, starting with `ItemNode` and `SwimlaneNode` (validated end-to-end in the prototype during planning).
 2. Keep the old code path live until each entity's tests pass on the new path.
 3. Use byte-stable sample regression as the gate at every PR — visual drift is a rejection criterion.
 4. Defer any "while we're here" simplifications; m2.5c is a faithful port, not a redesign.
@@ -265,20 +265,20 @@ The only **internal** API changes are inside `packages/layout/src/` (private to 
 
 ## Reference Implementation
 
-The full architecture is validated in [`layout-v2/`](../layout-v2), a standalone TypeScript project that runs `examples/minimal.nowline` end-to-end without touching the production packages. It validates all five primitives, exercises the measure/place tree on `Item` and `Swimlane`, and produces byte-stable output against `specs/samples/minimal.svg`.
+The architecture was first validated in a standalone `layout-v2/` TypeScript prototype that ran `examples/minimal.nowline` end-to-end without touching the production packages. It validated all five primitives, exercised the measure/place tree on `Item` and `Swimlane`, and produced byte-stable output against the minimal sample.
 
-Validation report and findings: [`layout-v2/findings.md`](../layout-v2/findings.md).
+The prototype's scope was intentionally limited to the `minimal.nowline` slice — `Item`, `Swimlane`, time header, now-line — so the architectural primitives could be validated in isolation. The m2.5a–c port proved they survive the full DSL surface (groups, parallels, anchors, milestones, footnotes, includes); the prototype was then retired (commit `771127c`).
 
-| Module | Lines | Production analog |
+The production code mirrors the prototype's layout module-for-module:
+
+| Production module | Prototype analog | Notes |
 |---|---|---|
-| `layout-v2/src/scales.ts` | 171 | `timeline.ts` |
-| `layout-v2/src/working-calendar.ts` | 119 | `calendar.ts` (extended) |
-| `layout-v2/src/view-preset.ts` | 273 | `LABEL_THINNING` + `formatTickLabel` |
-| `layout-v2/src/renderable.ts` | 408 | `layout.ts` per-entity blocks |
-| `layout-v2/src/build.ts` | 333 | `layoutRoadmap` composition root |
-| `layout-v2/src/positioned.ts` | 102 | `types.ts` (subset) |
-
-The prototype is intentionally limited to the `minimal.nowline` slice — `Item`, `Swimlane`, time header, now-line — so the architectural primitives could be validated in isolation. m2.5c proves they survive the full DSL surface (groups, parallels, anchors, milestones, footnotes, includes).
+| `packages/layout/src/time-scale.ts` | `layout-v2/src/scales.ts` | d3-scale wrapper |
+| `packages/layout/src/working-calendar.ts` | `layout-v2/src/working-calendar.ts` | Strategy interface |
+| `packages/layout/src/view-preset.ts` | `layout-v2/src/view-preset.ts` | Header tick generation |
+| `packages/layout/src/nodes/*.ts` | `layout-v2/src/renderable.ts` | One file per entity |
+| `packages/layout/src/nodes/roadmap-node.ts` | `layout-v2/src/build.ts` | Composition root |
+| `packages/layout/src/types.ts` | `layout-v2/src/positioned.ts` | Positioned model |
 
 ## Open Questions
 
@@ -294,5 +294,4 @@ These are deferred to the relevant phase's design pass and should not block plan
 - [`specs/rendering.md`](./rendering.md) — public output contract (unchanged by this work)
 - [`specs/milestones.md`](./milestones.md) — milestone summary and dependency chain
 - [`specs/architecture.md`](./architecture.md) — package boundaries (unchanged)
-- [`layout-v2/`](../layout-v2) — reference implementation
-- [`layout-v2/findings.md`](../layout-v2/findings.md) — prototype validation report
+- [`packages/layout/src/nodes/`](../packages/layout/src/nodes/) — production measure/place tree

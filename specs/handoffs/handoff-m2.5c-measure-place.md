@@ -1,9 +1,15 @@
 # m2.5c handoff — Measure/Place Tree
 
+> **Status: completed in commit `508e3bc`.** The full measure/place tree
+> port (steps 1–5) landed and `layout.ts` collapsed onto `RoadmapNode`.
+> The `layout-v2/` prototype was retired in commit `771127c`. This
+> handoff is preserved as a historical record; references below to the
+> prototype's source files no longer resolve.
+
 Captures the partial state of m2.5c after the unattended overnight session
-that completed prereqs, m2.5a, and m2.5b. m2.5c is intentionally split:
-this handoff explains what landed in the foundation commit and what the
-next session needs to deliver.
+that completed prereqs, m2.5a, and m2.5b. m2.5c was intentionally split:
+this handoff explained what landed in the foundation commit and what the
+follow-up session delivered.
 
 ## Where we are
 
@@ -11,8 +17,8 @@ next session needs to deliver.
 
 - [`packages/layout/src/renderable.ts`](../../packages/layout/src/renderable.ts) — `Renderable<TPositioned>`,
   `MeasureContext`, `PlaceContext`, `IntrinsicSize`, `Point` interfaces.
-  Mirrors the prototype's contract in [`layout-v2/src/renderable.ts`](../../layout-v2/src/renderable.ts) but
-  takes production's `TimeScale`, `BandScale`, `ResolvedStyle` as inputs.
+  Mirrors the prototype's contract but takes production's `TimeScale`,
+  `BandScale`, `ResolvedStyle` as inputs.
 - [`packages/layout/src/nodes/item-node.ts`](../../packages/layout/src/nodes/item-node.ts) — first node implementation.
   `measure` returns `{ width: logicalRight - logicalLeft, height: bands.bandwidth() }`;
   `place(origin, ctx)` returns the visual box, `textX`, and `textSpills`
@@ -39,8 +45,8 @@ Per [specs/rendering-v2.md §m2.5c](../rendering-v2.md#m25c--layout-v2-measurepl
    stay byte-stable.
 2. **Port the remaining entities into sibling node files:**
    - `swimlane-node.ts` — band height + tab geometry + row stacking.
-     The shelf-pack pattern is in [`layout-v2/src/renderable.ts`](../../layout-v2/src/renderable.ts) for
-     reference; production needs to handle parallels and groups too.
+     The prototype's shelf-pack pattern is the reference; production
+     needs to handle parallels and groups too.
    - `group-node.ts` — bracket + child stacking.
    - `parallel-node.ts` — parallel block geometry.
    - `anchor-node.ts`, `milestone-node.ts` — marker geometry.
@@ -130,8 +136,5 @@ Per [specs/rendering-v2.md §m2.5c](../rendering-v2.md#m25c--layout-v2-measurepl
 - [`packages/layout/src/renderable.ts`](../../packages/layout/src/renderable.ts) — the contract.
 - [`packages/layout/src/nodes/item-node.ts`](../../packages/layout/src/nodes/item-node.ts) — the
   template for how to size a node file.
-- [`layout-v2/src/renderable.ts`](../../layout-v2/src/renderable.ts) — prototype's full
-  ItemNode + SwimlaneNode + RoadmapNode wired end-to-end. Use as a
-  pattern reference for shelf-packing and tab geometry.
 - [`packages/layout/test/snapshot.test.ts`](../../packages/layout/test/snapshot.test.ts) — the byte-stable gate;
   re-run after every node port.

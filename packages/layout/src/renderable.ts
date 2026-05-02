@@ -14,9 +14,9 @@
 //      Recursively places children inside this call.
 //
 // `place` may invoke `measure` again — implementations should make
-// `measure` cheap. The current production layout-v2 nodes (ItemNode,
-// SwimlaneNode) follow this pattern: place re-measures, but measure
-// is O(content) without I/O.
+// `measure` cheap. The production nodes (`ItemNode`, `SwimlaneNode`,
+// etc. under `nodes/`) follow this pattern: place re-measures, but
+// measure is O(content) without I/O.
 
 import type { TimeScale } from './time-scale.js';
 import type { BandScale } from './band-scale.js';
