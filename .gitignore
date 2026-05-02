@@ -33,3 +33,4 @@ examples/**/*.png
 examples/**/*.pdf
 examples/**/*.html
 examples/**/*.xlsx
+.cursor/rules/personal-*.mdc
