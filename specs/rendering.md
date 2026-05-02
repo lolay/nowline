@@ -8,6 +8,8 @@ Downstream interactive renderers (e.g. a hosted editor with drag-and-drop and tw
 
 Reference renderings the implementation should match live in [`samples/`](./samples) — open [`samples/index.html`](./samples/index.html) for the annotated gallery.
 
+This document describes the public **output contract**. The internal layout-engine architecture (currently in flight under the m2.5a–m2.5d milestone chain) is specified separately in [`rendering-v2.md`](./rendering-v2.md).
+
 ## Architecture
 
 ```
