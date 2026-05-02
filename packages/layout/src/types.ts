@@ -292,6 +292,13 @@ export interface PositionedRoadmap {
     width: number;
     height: number;
     theme: 'light' | 'dark';
+    /**
+     * Resolved palette — every color the renderer reads. m2.5d moved
+     * theme resolution into the layout side, so the renderer no longer
+     * branches on `theme === 'dark'`. The `theme` field above stays for
+     * `data-theme` SVG attribution; all color decisions read `palette`.
+     */
+    palette: import('./themes/index.js').Theme;
     backgroundColor: string;    // resolved from theme.surface.page
     header: PositionedHeader;
     timeline: PositionedTimelineScale;

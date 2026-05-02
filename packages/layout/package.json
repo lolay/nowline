@@ -24,10 +24,14 @@
     "lint": "eslint src/"
   },
   "dependencies": {
-    "@nowline/core": "workspace:*"
+    "@nowline/core": "workspace:*",
+    "d3-scale": "^4.0.2",
+    "d3-time": "^3.1.0"
   },
   "devDependencies": {
     "@nowline/renderer": "workspace:*",
+    "@types/d3-scale": "^4.0.8",
+    "@types/d3-time": "^3.0.3",
     "langium": "~4.2.2",
     "typescript": "~5.7.0",
     "vitest": "^3.1.0"

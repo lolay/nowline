@@ -57,11 +57,10 @@ export const LOGO_SIZE_PX: Record<'xs' | 'sm' | 'md' | 'lg' | 'xl', number> = {
     xl: 72,
 };
 
-// Swimlane band row height (single item track height).
-// m2d: bumped from 30 to 64 so each item bar can carry title + meta line +
-// upper-right status dot + bottom progress strip without the chrome crowding
-// the text. Bar height = ITEM_ROW_HEIGHT - 8.
-export const ITEM_ROW_HEIGHT = 64;
+// Row pitch (formerly `ITEM_ROW_HEIGHT = 64`) and bar height (formerly
+// `ITEM_ROW_HEIGHT - 8 = 56`) are owned by `BandScale` as of m2.5b.
+// `defaultRowBand()` keeps the legacy 64/56 split byte-stable; new
+// callers should consume `bandScale.step()` and `bandScale.bandwidth()`.
 
 // Minimum item bar width so zero-duration items remain visible.
 export const MIN_ITEM_WIDTH = 8;

@@ -33,6 +33,7 @@ import type {
     PositionedFootnoteEntry,
     PositionedIncludeRegion,
     PositionedNowline,
+    PositionedTimelineScale,
     ResolvedStyle,
     Point,
     BoundingBox,
@@ -46,25 +47,21 @@ import {
     type StyleContext,
 } from './style-resolution.js';
 import { resolveCalendar, resolveDuration, addDays, daysBetween } from './calendar.js';
-import {
-    buildTimelineScale,
-    resolveScale,
-    pixelsPerDay,
-    xForDate,
-    daysPerUnit,
-    type ScaleConfig,
-} from './timeline.js';
+import { resolveScale, buildHeaderTicks, type ViewPreset } from './view-preset.js';
+import { TimeScale } from './time-scale.js';
+import { fromCalendarConfig, daysPerUnit, type WorkingCalendar } from './working-calendar.js';
 import {
     HEADER_ABOVE_HEIGHT_PX,
     HEADER_BESIDE_MIN_WIDTH_PX,
     HEADER_BESIDE_MAX_WIDTH_PX,
-    ITEM_ROW_HEIGHT,
     MIN_ITEM_WIDTH,
     ITEM_INSET_PX,
     PADDING_PX,
+    SPACING_PX,
     FOOTNOTE_ROW_HEIGHT,
     EDGE_CORNER_RADIUS,
 } from './themes/shared.js';
+import { BandScale, defaultRowBand } from './band-scale.js';
 
 export interface LayoutOptions {
     theme?: ThemeName;
@@ -218,7 +215,7 @@ function sequenceItem(
     let startX = cursor.x;
     const explicitDate = parseDate(dateRaw);
     if (explicitDate) {
-        const xd = xForDate(explicitDate, ctx.timeline);
+        const xd = ctx.scale.forwardWithinDomain(explicitDate);
         if (xd !== null) startX = xd;
     } else if (afterRaw.length > 0) {
         let maxEnd = cursor.x;
@@ -250,7 +247,7 @@ function sequenceItem(
                     x: beforeX,
                     y: cursor.y,
                     width: logicalRight - beforeX,
-                    height: ITEM_ROW_HEIGHT - 8,
+                    height: ctx.bandScale.bandwidth(),
                 };
                 overflowAnchorId = beforeRaw;
             }
@@ -266,7 +263,7 @@ function sequenceItem(
         x: logicalLeft + ITEM_INSET_PX,
         y: cursor.y,
         width: visualWidth,
-        height: ITEM_ROW_HEIGHT - 8,
+        height: ctx.bandScale.bandwidth(),
     };
 
     // Progress fraction
@@ -397,7 +394,7 @@ function sequenceItem(
 
     cursor.x = logicalRight;
     cursor.maxX = Math.max(cursor.maxX, cursor.x);
-    cursor.height = Math.max(cursor.height, ITEM_ROW_HEIGHT);
+    cursor.height = Math.max(cursor.height, ctx.bandScale.step());
 
     const titleStr = node.title ?? node.name ?? '';
     // Title + meta are an atomic caption: spill BOTH outside the bar if
@@ -449,7 +446,7 @@ function sequenceParallel(
         const subCursor = newCursor(startX, startY + accumulatedHeight);
         const positioned = sequenceOne(child as ItemDeclaration | GroupBlock, subCursor, ctx);
         children.push(positioned);
-        accumulatedHeight += Math.max(ITEM_ROW_HEIGHT, subCursor.height);
+        accumulatedHeight += Math.max(ctx.bandScale.step(), subCursor.height);
         maxRight = Math.max(maxRight, subCursor.maxX);
     }
 
@@ -503,7 +500,7 @@ function sequenceGroup(
         x: startX,
         y: startY,
         width: innerCursor.maxX - startX,
-        height: Math.max(ITEM_ROW_HEIGHT, innerCursor.height),
+        height: Math.max(ctx.bandScale.step(), innerCursor.height),
     };
     cursor.x = innerCursor.maxX + 8;
     cursor.maxX = Math.max(cursor.maxX, cursor.x);
@@ -553,7 +550,7 @@ function resolveChildStart(
 ): number {
     const explicitDate = parseDate(propValue(props, 'date')) ?? parseDate(propValue(props, 'start'));
     if (explicitDate) {
-        const xd = xForDate(explicitDate, ctx.timeline);
+        const xd = ctx.scale.forwardWithinDomain(explicitDate);
         if (xd !== null) return xd;
     }
     const afterRefs = propValues(props, 'after');
@@ -619,7 +616,7 @@ function buildSwimlane(
     // we top-align the row with the tab and reclaim ~28 px of vertical
     // space per lane. Otherwise (no title, or the first item starts
     // before/under the tab) we fall back to the default drop-below-tab
-    // reservation. Subsequent rows always step down by ITEM_ROW_HEIGHT.
+    // reservation. Subsequent rows always step down by bandScale.step().
     const TAB_GUTTER_PX = 8;
     const firstChildDesiredX = firstChildStartX(lane, laneLeftX, ctx);
     const canAlignFirstRowWithTab = !lane.title
@@ -651,7 +648,7 @@ function buildSwimlane(
             // block itself; otherwise place at the timeCursor (continue
             // from where the lane has progressed in time).
             if (rowEndX > laneLeftX) {
-                rowY += ITEM_ROW_HEIGHT;
+                rowY += ctx.bandScale.step();
             }
             const blockProps = (child as ParallelBlock | GroupBlock).properties ?? [];
             const blockStart = resolveChildStart(blockProps, timeCursorX, laneLeftX, ctx);
@@ -663,7 +660,7 @@ function buildSwimlane(
             );
             children.push(positioned);
             const blockEnd = positioned.box.x + positioned.box.width;
-            rowY += Math.max(ITEM_ROW_HEIGHT, cursor.height);
+            rowY += Math.max(ctx.bandScale.step(), cursor.height);
             rowEndX = laneLeftX;
             timeCursorX = Math.max(timeCursorX, blockEnd);
             prevTitleSpillX = laneLeftX;
@@ -678,7 +675,7 @@ function buildSwimlane(
         const collidesWithRow = desiredStart < rowEndX;
         const collidesWithSpill = desiredStart < prevTitleSpillX;
         if (collidesWithRow || collidesWithSpill) {
-            rowY += ITEM_ROW_HEIGHT;
+            rowY += ctx.bandScale.step();
             rowEndX = laneLeftX;
             prevTitleSpillX = laneLeftX;
         }
@@ -711,8 +708,8 @@ function buildSwimlane(
         }
     }
 
-    const lastRowBottom = rowY + ITEM_ROW_HEIGHT;
-    const bandHeight = Math.max(ITEM_ROW_HEIGHT + 32, lastRowBottom - y + 16);
+    const lastRowBottom = rowY + ctx.bandScale.step();
+    const bandHeight = Math.max(ctx.bandScale.step() + 32, lastRowBottom - y + 16);
     const box: BoundingBox = {
         x: 0,
         y,
@@ -846,7 +843,7 @@ function computeDateWindow(
     },
     resolved: ResolveResult,
     today: Date | undefined,
-    scale: ScaleConfig,
+    scale: ViewPreset,
 ): { startDate: Date; endDate: Date } {
     const roadmap = file.roadmapDecl;
     const props = roadmap?.properties ?? [];
@@ -1027,7 +1024,7 @@ function buildAnchors(
         const dateRaw = propValue(a.properties, 'date');
         const date = parseDate(dateRaw);
         if (!date) continue;
-        const x = xForDate(date, ctx.timeline);
+        const x = ctx.scale.forwardWithinDomain(date);
         if (x === null) continue;
         const style = resolveStyle('anchor', a.properties, ctx.styleCtx);
         const bumpedUp = milestoneXs.has(x);
@@ -1070,7 +1067,7 @@ function buildMilestones(
         let slackY: number | undefined;
         let isOverrun = false;
         if (date) {
-            const x = xForDate(date, ctx.timeline);
+            const x = ctx.scale.forwardWithinDomain(date);
             if (x !== null) {
                 center = { x, y: inRowY };
                 fixed = true;
@@ -1243,6 +1240,9 @@ function buildIncludeRegions(
             footnoteIndex: new Map(),
             footnoteHosts: new Map(),
             timeline: ctx.timeline,
+            scale: ctx.scale,
+            calendar: ctx.calendar,
+            bandScale: ctx.bandScale,
             entityLeftEdges: new Map(),
             entityRightEdges: new Map(),
             entityMidpoints: new Map(),
@@ -1284,7 +1284,7 @@ function buildNowline(
     ctx: LayoutContext,
 ): PositionedNowline | null {
     if (!today) return null;
-    const x = xForDate(today, ctx.timeline);
+    const x = ctx.scale.forwardWithinDomain(today);
     if (x === null) return null;
     // Pill row is the band reserved at the very top of the timeline area.
     // The line drops from the bottom of the pill (top of the date headers)
@@ -1313,7 +1313,10 @@ interface LayoutContext {
     footnoteIndex: Map<string, number>;
     // For each footnote id, the list of `on:` host ids it references.
     footnoteHosts: Map<string, string[]>;
-    timeline: ReturnType<typeof buildTimelineScale>;
+    timeline: PositionedTimelineScale;
+    scale: TimeScale;
+    calendar: WorkingCalendar;
+    bandScale: BandScale;
     entityLeftEdges: Map<string, number>;
     entityRightEdges: Map<string, number>;
     entityMidpoints: Map<string, Point>;
@@ -1417,7 +1420,8 @@ export function layoutRoadmap(
     // A small minimum keeps the header / attribution wordmark legible when
     // content is very short.
     const MIN_CANVAS_WIDTH = 480;
-    const ppd = pixelsPerDay(scale, cal);
+    const calendar = fromCalendarConfig(cal);
+    const ppd = scale.pixelsPerUnit / calendar.daysPerUnit(scale.unit);
     const spanDays = Math.max(1, daysBetween(startDate, endDate));
     const naturalWidth = spanDays * ppd;
     const originX = chartLeftX + 16;
@@ -1458,25 +1462,33 @@ export function layoutRoadmap(
     const markerRowY = tickPanelY + tickPanelHeight;
     const headerRowsBottomY = markerRowY + markerRowHeight;
 
-    const timeline = buildTimelineScale(
+    const timeScale = new TimeScale({
+        domain: [startDate, endDate],
+        range: [originX, originX + naturalWidth],
+        calendar,
+    });
+    const ticks = buildHeaderTicks(timeScale, scale, calendar);
+    const timeline: PositionedTimelineScale = {
+        box: {
+            x: originX,
+            y: timelineY,
+            width: naturalWidth,
+            height: 0,
+        },
+        ticks,
+        pixelsPerDay: ppd,
+        originX,
         startDate,
         endDate,
-        originX,
-        scale,
-        cal,
-        /* chartHeight filled in after swimlanes */ 0,
-        resolveStyle('roadmap', [], styleCtx),
-    );
-    timeline.box.y = timelineY;
-    timeline.pillRowHeight = pillRowHeight;
-    timeline.tickPanelY = tickPanelY;
-    timeline.tickPanelHeight = tickPanelHeight;
-    // Marker row sits BELOW the tick-label panel. When there are no
-    // markers, height is 0 and the renderer skips the panel entirely.
-    timeline.markerRow = {
-        y: markerRowY + 13,                  // in-row diamond center
-        height: markerRowHeight,
-        collisionY: markerRowY - 8,          // bumped-up diamond center (above the marker row)
+        labelStyle: resolveStyle('roadmap', [], styleCtx),
+        pillRowHeight,
+        tickPanelY,
+        tickPanelHeight,
+        markerRow: {
+            y: markerRowY + 13,
+            height: markerRowHeight,
+            collisionY: markerRowY - 8,
+        },
     };
 
     const ctx: LayoutContext = {
@@ -1489,6 +1501,9 @@ export function layoutRoadmap(
         footnoteIndex: new Map(),
         footnoteHosts: new Map(),
         timeline,
+        scale: timeScale,
+        calendar,
+        bandScale: defaultRowBand(),
         entityLeftEdges: new Map(),
         entityRightEdges: new Map(),
         entityMidpoints: new Map(),
@@ -1502,12 +1517,20 @@ export function layoutRoadmap(
     ctx.footnoteIndex = pre.index;
     ctx.footnoteHosts = pre.hosts;
 
-    // Build swimlanes (order: declared order).
+    // Build swimlanes (order: declared order). The inter-band gap is
+    // sourced from the swimlane default style's `spacing` bucket
+    // (m2.5b: surface `defaults > spacing`). With the legacy theme
+    // default of `spacing: none` the gap is 0 px and existing samples
+    // stay byte-stable; bumping to `md` introduces an 8 px gap.
     const laneEntries = [...resolved.content.swimlanes.values()];
+    const swimlaneDefaultStyle = resolveStyle('swimlane', [], styleCtx);
+    const interBandGapPx =
+        SPACING_PX[swimlaneDefaultStyle.spacing as keyof typeof SPACING_PX] ?? 0;
     const swimlanes: PositionedSwimlane[] = [];
     let y = ctx.chartTopY;
     let bandIndex = 0;
     for (const lane of laneEntries) {
+        if (bandIndex > 0) y += interBandGapPx;
         const { positioned, usedHeight } = buildSwimlane(lane, y, bandIndex, ctx);
         swimlanes.push(positioned);
         y += usedHeight;
@@ -1594,6 +1617,7 @@ export function layoutRoadmap(
         width: ctx.chartRightX,
         height,
         theme: themeName,
+        palette: theme,
         backgroundColor: theme.surface.page,
         header,
         timeline,

@@ -59,11 +59,63 @@ export interface Theme {
         separator: string;
         frameTabText: string;
         frameTabMuted: string;
+        // m2.5d: tokens lifted out of the renderer's inline `theme === 'dark'`
+        // branches in `renderSwimlane`.
+        border: string;
+        tabFill: string;
+        tabStroke: string;
+        tabText: string;
+        ownerText: string;
+        footnoteIndicator: string;
+        rowTintEven: string;  // alternating row tint (even rows)
+        rowTintOdd: string;   // alternating row tint (odd rows)
     };
     timeline: {
         gridLine: string;
         tickMark: string;
         labelText: string;
+        // m2.5d: lifted from renderTimeline.
+        panelFill: string;
+        border: string;
+    };
+    // m2.5d: all renderer-side palette tokens previously inlined as
+    // `theme === 'dark' ? darkColor : lightColor` ternaries. Each new
+    // token reads from one of the existing theme objects so the
+    // renderer becomes pure data → SVG.
+    header: {
+        cardBorder: string;
+        author: string;
+    };
+    item: {
+        overflowX: string;          // red X mark on overrun tail
+        linkIconFg: string;         // generic link icon color
+        overflowTailFill: string;
+        overflowTailStroke: string;
+        overflowCaption: string;    // "past <id>" caption color
+    };
+    parallel: {
+        bracketStroke: string;
+    };
+    anchorDiamond: {
+        fill: string;
+        stroke: string;
+        label: string;
+        cutLine: string;
+    };
+    milestoneDiamond: {
+        fill: string;
+        label: string;
+        cutLineNormal: string;
+        cutLineOverrun: string;
+        slack: string;
+    };
+    footnotePanel: {
+        fill: string;
+        border: string;
+        header: string;
+        title: string;
+        description: string;
+        number: string;
     };
     nowline: {
         stroke: string;
@@ -89,9 +141,36 @@ export interface Theme {
         border: string;
         label: string;
         badge: string;
+        // m2.5d: lifted from renderIncludeRegion.
+        fill: string;
+        tabFill: string;
+        tabStroke: string;
+        tabText: string;
+        badgeFill: string;
+        badgeStroke: string;
+        badgeText: string;
+    };
+    // m2.5d: lifted from renderEdge marker defs.
+    arrowhead: {
+        neutral: string;
+        light: string;
+        dark: string;
     };
     // Five built-in statuses plus neutral fallback for custom statuses.
     status: {
+        done: string;
+        inProgress: string;
+        atRisk: string;
+        blocked: string;
+        planned: string;
+        neutral: string;
+    };
+    /**
+     * Upper-right status-dot colors. Mirrors `status.*` for most
+     * themes; dark splits because the historical at-risk dot uses
+     * `#fbbf24` while the at-risk bg tint uses `#facc15`.
+     */
+    statusDot: {
         done: string;
         inProgress: string;
         atRisk: string;

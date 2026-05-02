@@ -15,6 +15,7 @@ import type {
     PositionedIncludeRegion,
     ResolvedStyle,
     Point,
+    Theme,
 } from '@nowline/layout';
 import { IdGenerator } from './ids.js';
 import { attrs, escAttr, escText, num, tag, textTag } from './xml.js';
@@ -88,7 +89,7 @@ function rectFrame(x: number, y: number, w: number, h: number, style: ResolvedSt
     });
 }
 
-function renderHeader(h: PositionedHeader, idPrefix: string, theme: 'light' | 'dark'): string {
+function renderHeader(h: PositionedHeader, idPrefix: string, palette: Theme): string {
     // The layout has already sized the card to its (wrapped) text content
     // and stashed the bounds in `h.cardBox`, with `h.titleLines` /
     // `h.authorLines` ready to render line-by-line. See sizeBesideHeader
@@ -98,7 +99,7 @@ function renderHeader(h: PositionedHeader, idPrefix: string, theme: 'light' | 'd
     const cardWidth = h.cardBox.width;
     const cardHeight = h.cardBox.height;
     const cardFill = h.style.bg === 'none' ? '#ffffff' : h.style.bg;
-    const borderColor = theme === 'dark' ? '#334155' : '#e2e8f0';
+    const borderColor = palette.header.cardBorder;
     const card = tag('rect', {
         x: num(cardX),
         y: num(cardY),
@@ -129,7 +130,7 @@ function renderHeader(h: PositionedHeader, idPrefix: string, theme: 'light' | 'd
     });
     const titleText = titleParts.join('');
     const lastTitleY = cardY + 26 + Math.max(0, h.titleLines.length - 1) * 20;
-    const authorColor = theme === 'dark' ? '#94a3b8' : '#64748b';
+    const authorColor = palette.header.author;
     const authorParts: string[] = [];
     h.authorLines.forEach((line, j) => {
         authorParts.push(textTag(
@@ -147,11 +148,11 @@ function renderHeader(h: PositionedHeader, idPrefix: string, theme: 'light' | 'd
     return tag('g', { 'data-layer': 'header', 'data-id': `${idPrefix}-header` }, card + titleText + authorText);
 }
 
-function renderTimeline(t: PositionedTimelineScale, theme: 'light' | 'dark'): string {
-    const panelFill = theme === 'dark' ? '#0f172a' : '#ffffff';
-    const borderColor = theme === 'dark' ? '#334155' : '#e2e8f0';
-    const gridColor = theme === 'dark' ? '#334155' : '#e2e8f0';
-    const labelColor = theme === 'dark' ? '#cbd5e1' : '#64748b';
+function renderTimeline(t: PositionedTimelineScale, palette: Theme): string {
+    const panelFill = palette.timeline.panelFill;
+    const borderColor = palette.timeline.border;
+    const gridColor = palette.timeline.gridLine;
+    const labelColor = palette.timeline.labelText;
     const parts: string[] = [];
     // Header layout from top: now-pill row → tick-label panel → marker row.
     // The pill row owns its space (no panel rect); the now-line crosses it
@@ -229,10 +230,10 @@ function renderTimeline(t: PositionedTimelineScale, theme: 'light' | 'dark'): st
     return tag('g', { 'data-layer': 'timeline' }, parts.join(''));
 }
 
-function renderNowline(n: PositionedNowline | null, theme: 'light' | 'dark'): string {
+function renderNowline(n: PositionedNowline | null, palette: Theme): string {
     if (!n) return '';
-    const color = theme === 'dark' ? '#f87171' : '#e53e3e';
-    const labelTextColor = theme === 'dark' ? '#0b1220' : '#ffffff';
+    const color = palette.nowline.stroke;
+    const labelTextColor = palette.nowline.labelText;
     // Line drops from `topY` (just below the pill / top of date headers)
     // through the headers into the chart, ending at `bottomY`.
     const line = tag('line', {
@@ -271,7 +272,7 @@ function renderNowline(n: PositionedNowline | null, theme: 'light' | 'dark'): st
     return tag('g', { 'data-layer': 'nowline' }, line + labelBg + label);
 }
 
-function renderItem(i: PositionedItem, options: RenderOptions, idPrefix: string, theme: 'light' | 'dark'): string {
+function renderItem(i: PositionedItem, options: RenderOptions, idPrefix: string, palette: Theme): string {
     const parts: string[] = [];
     const shadow = shadowFilterUrl(idPrefix, i.style.shadow);
     parts.push(
@@ -279,10 +280,19 @@ function renderItem(i: PositionedItem, options: RenderOptions, idPrefix: string,
             filter: shadow ?? null,
         }),
     );
-    // Status palette (also used for the upper-right dot).
-    const statusColors: Record<string, string> = theme === 'dark'
-        ? { done: '#34d399', 'in-progress': '#60a5fa', 'at-risk': '#fbbf24', blocked: '#f87171', planned: '#94a3b8', neutral: '#94a3b8' }
-        : { done: '#10b981', 'in-progress': '#3b82f6', 'at-risk': '#f59e0b', blocked: '#ef4444', planned: '#94a3b8', neutral: '#94a3b8' };
+    // Status palette for the upper-right dot. m2.5d: pulled from
+    // `palette.statusDot.*` so the renderer stays branch-free. The
+    // dot palette is intentionally separate from `palette.status.*`
+    // (which drives the bg tint) because dark theme historically uses
+    // `#fbbf24` for the at-risk dot vs. `#facc15` for the at-risk bg.
+    const statusColors: Record<string, string> = {
+        done: palette.statusDot.done,
+        'in-progress': palette.statusDot.inProgress,
+        'at-risk': palette.statusDot.atRisk,
+        blocked: palette.statusDot.blocked,
+        planned: palette.statusDot.planned,
+        neutral: palette.statusDot.neutral,
+    };
     const dotColor = statusColors[i.status] ?? statusColors.neutral;
     // Bottom progress strip — 4px tall along the bottom edge.
     if (i.progressFraction > 0) {
@@ -357,7 +367,7 @@ function renderItem(i: PositionedItem, options: RenderOptions, idPrefix: string,
                         'font-family': FONT_STACK.sans,
                         'font-size': 10,
                         'font-weight': 700,
-                        fill: theme === 'dark' ? '#f87171' : '#dc2626',
+                        fill: palette.item.overflowX,
                         'text-anchor': 'end',
                     },
                     String(n2),
@@ -372,7 +382,7 @@ function renderItem(i: PositionedItem, options: RenderOptions, idPrefix: string,
             linear: '#5e6ad2',
             github: '#0f172a',
             jira: '#0052cc',
-            generic: theme === 'dark' ? '#94a3b8' : '#0f172a',
+            generic: palette.item.linkIconFg,
         };
         const tile = tileColor[i.linkIcon] ?? tileColor.generic;
         const tileSize = 14;
@@ -406,9 +416,9 @@ function renderItem(i: PositionedItem, options: RenderOptions, idPrefix: string,
     }
     // Overflow tail — red fill + stroke + caption.
     if (i.hasOverflow && i.overflowBox) {
-        const tailFill = theme === 'dark' ? '#7f1d1d' : '#fee2e2';
-        const tailStroke = theme === 'dark' ? '#f87171' : '#ef4444';
-        const captionColor = theme === 'dark' ? '#fecaca' : '#b91c1c';
+        const tailFill = palette.item.overflowTailFill;
+        const tailStroke = palette.item.overflowTailStroke;
+        const captionColor = palette.item.overflowCaption;
         parts.push(
             tag('rect', {
                 x: num(i.overflowBox.x),
@@ -468,7 +478,7 @@ function renderItem(i: PositionedItem, options: RenderOptions, idPrefix: string,
     return tag('g', { 'data-layer': 'item', 'data-id': i.id ?? null }, parts.join(''));
 }
 
-function renderGroup(g: PositionedGroup, options: RenderOptions, idPrefix: string, theme: 'light' | 'dark'): string {
+function renderGroup(g: PositionedGroup, options: RenderOptions, idPrefix: string, palette: Theme): string {
     const parts: string[] = [];
     const hasFill = g.style.bg !== 'none' && g.style.bg !== '#ffffff';
     if (hasFill) {
@@ -548,13 +558,13 @@ function renderGroup(g: PositionedGroup, options: RenderOptions, idPrefix: strin
         }
     }
     for (const c of g.children) {
-        parts.push(renderTrackChild(c, options, idPrefix, theme));
+        parts.push(renderTrackChild(c, options, idPrefix, palette));
     }
-    void theme;
+    void palette;
     return tag('g', { 'data-layer': 'group', 'data-id': g.id ?? null }, parts.join(''));
 }
 
-function renderParallel(p: PositionedParallel, options: RenderOptions, idPrefix: string, theme: 'light' | 'dark'): string {
+function renderParallel(p: PositionedParallel, options: RenderOptions, idPrefix: string, palette: Theme): string {
     const parts: string[] = [];
     // `bracket: solid|dashed` parallels render explicit [ ] brackets framing
     // the nested tracks with 12 px vertical padding above/below.
@@ -565,7 +575,7 @@ function renderParallel(p: PositionedParallel, options: RenderOptions, idPrefix:
         const bottom = p.box.y + p.box.height + padding;
         const lx = p.box.x;
         const rx = p.box.x + p.box.width;
-        const stroke = theme === 'dark' ? '#cbd5e1' : '#334155';
+        const stroke = palette.parallel.bracketStroke;
         parts.push(
             tag('path', {
                 d: `M${num(lx + stub)} ${num(top)} H${num(lx)} V${num(bottom)} H${num(lx + stub)}`,
@@ -601,27 +611,25 @@ function renderParallel(p: PositionedParallel, options: RenderOptions, idPrefix:
         );
     }
     for (const c of p.children) {
-        parts.push(renderTrackChild(c, options, idPrefix, theme));
+        parts.push(renderTrackChild(c, options, idPrefix, palette));
     }
     return tag('g', { 'data-layer': 'parallel', 'data-id': p.id ?? null }, parts.join(''));
 }
 
-function renderTrackChild(c: PositionedTrackChild, options: RenderOptions, idPrefix: string, theme: 'light' | 'dark'): string {
-    if (c.kind === 'item') return renderItem(c, options, idPrefix, theme);
-    if (c.kind === 'group') return renderGroup(c, options, idPrefix, theme);
-    return renderParallel(c, options, idPrefix, theme);
+function renderTrackChild(c: PositionedTrackChild, options: RenderOptions, idPrefix: string, palette: Theme): string {
+    if (c.kind === 'item') return renderItem(c, options, idPrefix, palette);
+    if (c.kind === 'group') return renderGroup(c, options, idPrefix, palette);
+    return renderParallel(c, options, idPrefix, palette);
 }
 
-function renderSwimlane(s: PositionedSwimlane, options: RenderOptions, idPrefix: string, theme: 'light' | 'dark'): string {
-    const tint = theme === 'dark'
-        ? (s.bandIndex % 2 === 0 ? '#0f172a' : '#1e293b')
-        : (s.bandIndex % 2 === 0 ? '#ffffff' : '#f8fafc');
-    const borderColor = theme === 'dark' ? '#334155' : '#e2e8f0';
-    const tabFill = theme === 'dark' ? '#1e293b' : '#f1f5f9';
-    const tabStroke = theme === 'dark' ? '#475569' : '#cbd5e1';
-    const tabText = theme === 'dark' ? '#e2e8f0' : '#334155';
-    const ownerText = theme === 'dark' ? '#94a3b8' : '#64748b';
-    const footnoteColor = theme === 'dark' ? '#f87171' : '#dc2626';
+function renderSwimlane(s: PositionedSwimlane, options: RenderOptions, idPrefix: string, palette: Theme): string {
+    const tint = s.bandIndex % 2 === 0 ? palette.swimlane.rowTintEven : palette.swimlane.rowTintOdd;
+    const borderColor = palette.swimlane.border;
+    const tabFill = palette.swimlane.tabFill;
+    const tabStroke = palette.swimlane.tabStroke;
+    const tabText = palette.swimlane.tabText;
+    const ownerText = palette.swimlane.ownerText;
+    const footnoteColor = palette.swimlane.footnoteIndicator;
     const parts: string[] = [];
     parts.push(
         tag('rect', {
@@ -702,25 +710,24 @@ function renderSwimlane(s: PositionedSwimlane, options: RenderOptions, idPrefix:
         }
     }
     for (const c of s.children) {
-        parts.push(renderTrackChild(c, options, idPrefix, theme));
+        parts.push(renderTrackChild(c, options, idPrefix, palette));
     }
     return tag('g', { 'data-layer': 'swimlane', 'data-id': s.id ?? null }, parts.join(''));
 }
 
-function renderAnchor(a: PositionedAnchor, theme: 'light' | 'dark'): string {
+function renderAnchor(a: PositionedAnchor, palette: Theme): string {
     const size = a.radius;
     const cx = a.center.x;
     const cy = a.center.y;
-    // Anchors render as OPEN diamonds (white fill, slate stroke).
-    const fill = theme === 'dark' ? '#0f172a' : '#ffffff';
-    const stroke = theme === 'dark' ? '#cbd5e1' : '#334155';
+    const fill = palette.anchorDiamond.fill;
+    const stroke = palette.anchorDiamond.stroke;
     const diamond = tag('path', {
         d: `M${num(cx)} ${num(cy - size)} L${num(cx + size)} ${num(cy)} L${num(cx)} ${num(cy + size)} L${num(cx - size)} ${num(cy)} Z`,
         fill,
         stroke,
         'stroke-width': 1.25,
     });
-    const labelColor = theme === 'dark' ? '#cbd5e1' : '#334155';
+    const labelColor = palette.anchorDiamond.label;
     const label = a.title
         ? textTag(
             {
@@ -736,8 +743,8 @@ function renderAnchor(a: PositionedAnchor, theme: 'light' | 'dark'): string {
     return tag('g', { 'data-layer': 'anchor', 'data-id': a.id ?? null }, diamond + label);
 }
 
-function renderAnchorCutLine(a: PositionedAnchor, theme: 'light' | 'dark'): string {
-    const stroke = theme === 'dark' ? '#94a3b8' : '#64748b';
+function renderAnchorCutLine(a: PositionedAnchor, palette: Theme): string {
+    const stroke = palette.anchorDiamond.cutLine;
     return tag('line', {
         x1: num(a.center.x),
         y1: num(a.center.y + a.radius + 1),
@@ -749,19 +756,18 @@ function renderAnchorCutLine(a: PositionedAnchor, theme: 'light' | 'dark'): stri
     });
 }
 
-function renderMilestone(m: PositionedMilestone, theme: 'light' | 'dark'): string {
+function renderMilestone(m: PositionedMilestone, palette: Theme): string {
     const cx = m.center.x;
     const cy = m.center.y;
     const r = m.radius;
-    // Filled diamonds (ink in light, near-white in dark).
-    const fill = theme === 'dark' ? '#e2e8f0' : '#0f172a';
+    const fill = palette.milestoneDiamond.fill;
     const flag = tag('path', {
         d: `M${num(cx)} ${num(cy - r)} L${num(cx + r)} ${num(cy)} L${num(cx)} ${num(cy + r)} L${num(cx - r)} ${num(cy)} Z`,
         fill,
         stroke: fill,
         'stroke-width': 1,
     });
-    const labelColor = theme === 'dark' ? '#e2e8f0' : '#0f172a';
+    const labelColor = palette.milestoneDiamond.label;
     const label = m.title
         ? textTag(
             {
@@ -778,10 +784,10 @@ function renderMilestone(m: PositionedMilestone, theme: 'light' | 'dark'): strin
     return tag('g', { 'data-layer': 'milestone', 'data-id': m.id ?? null }, flag + label);
 }
 
-function renderMilestoneCutLine(m: PositionedMilestone, theme: 'light' | 'dark'): string {
+function renderMilestoneCutLine(m: PositionedMilestone, palette: Theme): string {
     const stroke = m.isOverrun
-        ? (theme === 'dark' ? '#ef4444' : '#b91c1c')
-        : (theme === 'dark' ? '#a5b4fc' : '#1e1b4b');
+        ? palette.milestoneDiamond.cutLineOverrun
+        : palette.milestoneDiamond.cutLineNormal;
     const parts: string[] = [];
     parts.push(
         tag('line', {
@@ -796,7 +802,7 @@ function renderMilestoneCutLine(m: PositionedMilestone, theme: 'light' | 'dark')
         }),
     );
     if (m.slackX !== undefined) {
-        const slackColor = theme === 'dark' ? '#cbd5e1' : '#0f172a';
+        const slackColor = palette.milestoneDiamond.slack;
         const y = m.slackY ?? m.center.y;
         parts.push(
             tag('path', {
@@ -813,10 +819,10 @@ function renderMilestoneCutLine(m: PositionedMilestone, theme: 'light' | 'dark')
     return parts.join('');
 }
 
-function renderEdge(e: PositionedDependencyEdge, theme: 'light' | 'dark'): string {
+function renderEdge(e: PositionedDependencyEdge, palette: Theme): string {
     const color = e.kind === 'overflow'
-        ? (theme === 'dark' ? '#ef5350' : '#d32f2f')
-        : (theme === 'dark' ? '#cbd5e1' : '#475569');
+        ? palette.dependency.overflowStroke
+        : palette.dependency.edgeStroke;
     const points = e.waypoints;
     if (points.length < 2) return '';
     return tag('path', {
@@ -864,14 +870,14 @@ function roundedOrthogonalPath(points: Point[], radius: number): string {
     return parts.join(' ');
 }
 
-function renderFootnotes(f: PositionedFootnoteArea, idPrefix: string, theme: 'light' | 'dark'): string {
+function renderFootnotes(f: PositionedFootnoteArea, idPrefix: string, palette: Theme): string {
     if (f.entries.length === 0) return '';
-    const panelFill = theme === 'dark' ? '#0f172a' : '#ffffff';
-    const borderColor = theme === 'dark' ? '#334155' : '#e2e8f0';
-    const headerColor = theme === 'dark' ? '#e2e8f0' : '#0f172a';
-    const titleColor = theme === 'dark' ? '#e2e8f0' : '#0f172a';
-    const descColor = theme === 'dark' ? '#94a3b8' : '#64748b';
-    const numberColor = theme === 'dark' ? '#f87171' : '#dc2626';
+    const panelFill = palette.footnotePanel.fill;
+    const borderColor = palette.footnotePanel.border;
+    const headerColor = palette.footnotePanel.header;
+    const titleColor = palette.footnotePanel.title;
+    const descColor = palette.footnotePanel.description;
+    const numberColor = palette.footnotePanel.number;
     const parts: string[] = [];
     parts.push(
         tag('rect', {
@@ -930,17 +936,16 @@ function renderIncludeRegion(
     r: PositionedIncludeRegion,
     options: RenderOptions,
     idPrefix: string,
-    theme: 'light' | 'dark',
+    palette: Theme,
 ): string {
-    // Slate / neutral palette tuned to match specs/samples/isolate-include.svg.
-    const border = theme === 'dark' ? '#475569' : '#94a3b8';
-    const fill = theme === 'dark' ? '#0b1220' : '#f8fafc';
-    const tabFill = theme === 'dark' ? '#111827' : '#ffffff';
-    const tabStroke = theme === 'dark' ? '#475569' : '#cbd5e1';
-    const tabText = theme === 'dark' ? '#e2e8f0' : '#0f172a';
-    const badgeFill = theme === 'dark' ? '#1e293b' : '#e2e8f0';
-    const badgeStroke = theme === 'dark' ? '#475569' : '#cbd5e1';
-    const badgeText = theme === 'dark' ? '#94a3b8' : '#475569';
+    const border = palette.includeRegion.border;
+    const fill = palette.includeRegion.fill;
+    const tabFill = palette.includeRegion.tabFill;
+    const tabStroke = palette.includeRegion.tabStroke;
+    const tabText = palette.includeRegion.tabText;
+    const badgeFill = palette.includeRegion.badgeFill;
+    const badgeStroke = palette.includeRegion.badgeStroke;
+    const badgeText = palette.includeRegion.badgeText;
 
     const rx = r.box.x + 8;
     const ry = r.box.y;
@@ -1040,9 +1045,8 @@ function renderIncludeRegion(
 // swimlane (or the footnote panel when present). Wrapped in <a> so it stays
 // clickable.
 function renderAttributionMark(model: PositionedRoadmap): string {
-    const theme = model.theme;
-    const muted = theme === 'dark' ? '#cbd5e1' : '#94a3b8';
-    const accent = theme === 'dark' ? '#f87171' : '#e53e3e';
+    const muted = model.palette.attribution.mark;
+    const accent = model.palette.attribution.link;
     // Choose an anchor: footnote panel if it has entries, else the last swimlane.
     let anchorBox: { x: number; y: number; width: number; height: number } | null = null;
     if (model.footnotes.entries.length > 0) {
@@ -1174,13 +1178,13 @@ export async function renderSvg(
     const ids = new IdGenerator(options.idPrefix ?? 'nl');
     const idPrefix = ids.next('root');
 
-    const theme = model.theme;
+    const palette = model.palette;
     const parts: string[] = [];
 
-    // <defs> — shadows + arrowhead markers (theme-aware fills baked in).
-    const arrowFillNeutral = theme === 'dark' ? '#94a3b8' : '#475569';
-    const arrowFillLight = theme === 'dark' ? '#64748b' : '#94a3b8';
-    const arrowFillDark = theme === 'dark' ? '#e2e8f0' : '#0f172a';
+    // <defs> — shadows + arrowhead markers (palette-driven fills baked in).
+    const arrowFillNeutral = palette.arrowhead.neutral;
+    const arrowFillLight = palette.arrowhead.light;
+    const arrowFillDark = palette.arrowhead.dark;
     const arrowDef = (id: string, fill: string): string =>
         `<marker id="${id}" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto"><path d="M 0 0 L 10 5 L 0 10 z" fill="${fill}"/></marker>`;
     const defs =
@@ -1203,33 +1207,33 @@ export async function renderSvg(
     );
 
     // Timeline (behind everything else in the chart)
-    parts.push(renderTimeline(model.timeline, theme));
+    parts.push(renderTimeline(model.timeline, palette));
 
     // Swimlanes
-    for (const s of model.swimlanes) parts.push(renderSwimlane(s, options, idPrefix, theme));
+    for (const s of model.swimlanes) parts.push(renderSwimlane(s, options, idPrefix, palette));
 
     // Include regions (drawn after own swimlanes so the dashed border + tab
     // overlay the chart, with their own nested swimlanes inside).
-    for (const r of model.includes) parts.push(renderIncludeRegion(r, options, idPrefix, theme));
+    for (const r of model.includes) parts.push(renderIncludeRegion(r, options, idPrefix, palette));
 
     // Dependency edges on top of items but below cut-lines / nowline
-    for (const e of model.edges) parts.push(renderEdge(e, theme));
+    for (const e of model.edges) parts.push(renderEdge(e, palette));
 
     // Anchor + milestone cut lines drawn AFTER items so they overlay the
     // swimlane fills.
-    for (const a of model.anchors) parts.push(renderAnchorCutLine(a, theme));
-    for (const m of model.milestones) parts.push(renderMilestoneCutLine(m, theme));
+    for (const a of model.anchors) parts.push(renderAnchorCutLine(a, palette));
+    for (const m of model.milestones) parts.push(renderMilestoneCutLine(m, palette));
 
     // Marker-row diamonds + labels.
-    for (const a of model.anchors) parts.push(renderAnchor(a, theme));
-    for (const m of model.milestones) parts.push(renderMilestone(m, theme));
+    for (const a of model.anchors) parts.push(renderAnchor(a, palette));
+    for (const m of model.milestones) parts.push(renderMilestone(m, palette));
 
     // Now-line
-    parts.push(renderNowline(model.nowline, theme));
+    parts.push(renderNowline(model.nowline, palette));
 
     // Footnotes + header last (always on top)
-    parts.push(renderFootnotes(model.footnotes, idPrefix, theme));
-    parts.push(renderHeader(model.header, idPrefix, theme));
+    parts.push(renderFootnotes(model.footnotes, idPrefix, palette));
+    parts.push(renderHeader(model.header, idPrefix, palette));
     parts.push(renderAttributionMark(model));
 
     // Logo (if header carries one)
@@ -1251,7 +1255,7 @@ export async function renderSvg(
         viewBox: `0 0 ${num(model.width)} ${num(model.height)}`,
         width: num(model.width),
         height: num(model.height),
-        'data-theme': theme,
+        'data-theme': model.theme,
         'data-generator': 'nowline',
     });
     return `<svg${svgAttrs}>${parts.join('')}</svg>`;

@@ -1,19 +1,36 @@
-// Timeline scale: compute pixel-per-day, origin, and ticks (major/minor +
-// label thinning).
+// ViewPreset — declarative configuration for the timeline header
+// (tick stride, label thinning, label format). Replaces the
+// imperative `for` loop and `formatTickLabel` switch in the legacy
+// `timeline.ts`.
+//
+// `resolveScale` parses the DSL `scale:` property (and any nested
+// `scale` block) into a `ViewPreset`. `buildHeaderTicks` produces
+// the `PositionedTick[]` byte-stable with the legacy generator: same
+// x positions, same labelX positions, same major/minor flags, same
+// label text.
 
 import type { NowlineFile, ScaleBlock } from '@nowline/core';
-import type { CalendarConfig } from './calendar.js';
-import { addDays, daysBetween } from './calendar.js';
-import type { ResolvedStyle, PositionedTick, PositionedTimelineScale } from './types.js';
+import { addDays } from './calendar.js';
 import { DEFAULT_PIXELS_PER_DAY, LABEL_THINNING } from './themes/shared.js';
+import type { PositionedTick } from './types.js';
+import type { TimeScale } from './time-scale.js';
+import type { WorkingCalendar } from './working-calendar.js';
 
 export type ScaleUnit = 'days' | 'weeks' | 'months' | 'quarters' | 'years';
 
-export interface ScaleConfig {
+export interface ViewPreset {
+    /** Tick stride unit (each tick is one `unit` apart). */
     unit: ScaleUnit;
+    /** Show a label every N ticks (1 = every tick gets a label). */
     labelEvery: number;
+    /** Pixels per `1 unit` worth of working days. */
     pixelsPerUnit: number;
 }
+
+// `ScaleConfig` is kept as an alias for source-compat with the few
+// callers that still spell the old name; new code should use
+// `ViewPreset`.
+export type ScaleConfig = ViewPreset;
 
 function stripColon(key: string): string {
     return key.endsWith(':') ? key.slice(0, -1) : key;
@@ -22,7 +39,7 @@ function stripColon(key: string): string {
 export function resolveScale(
     file: NowlineFile,
     scaleBlock: ScaleBlock | undefined,
-): ScaleConfig {
+): ViewPreset {
     const scaleProp = file.roadmapDecl?.properties.find(
         (p) => stripColon(p.key) === 'scale',
     );
@@ -95,82 +112,37 @@ function unitPx(unit: ScaleUnit): number {
     }
 }
 
-export function daysPerUnit(unit: ScaleUnit, cal: CalendarConfig): number {
-    switch (unit) {
-        case 'days':
-            return 1;
-        case 'weeks':
-            return cal.daysPerWeek;
-        case 'months':
-            return cal.daysPerMonth;
-        case 'quarters':
-            return cal.daysPerQuarter;
-        case 'years':
-            return cal.daysPerYear;
-    }
-}
-
-export function pixelsPerDay(scale: ScaleConfig, cal: CalendarConfig): number {
-    return scale.pixelsPerUnit / daysPerUnit(scale.unit, cal);
-}
-
-// Render tick marks spanning [startDate, endDate], producing major (labeled)
-// and minor (unlabeled) ticks. `originX` is the x of startDate.
-export function buildTimelineScale(
-    startDate: Date,
-    endDate: Date,
-    originX: number,
-    scale: ScaleConfig,
-    cal: CalendarConfig,
-    chartHeight: number,
-    labelStyle: ResolvedStyle,
-): PositionedTimelineScale {
-    const ppd = pixelsPerDay(scale, cal);
-    const totalDays = Math.max(1, daysBetween(startDate, endDate));
-    const dayPerTick = daysPerUnit(scale.unit, cal);
-    const stridePx = dayPerTick * ppd;
+/**
+ * Build header ticks for the chart. The ith tick sits at
+ * `originX + i * stridePx`. The last tick is rendered (so the chart
+ * has a closing edge) but its label is suppressed because there's no
+ * following column.
+ */
+export function buildHeaderTicks(
+    scale: TimeScale,
+    preset: ViewPreset,
+    calendar: WorkingCalendar,
+): PositionedTick[] {
+    const dayPerTick = calendar.daysPerUnit(preset.unit);
+    const stridePx = dayPerTick * scale.pixelsPerDay;
+    const totalDays = Math.max(1, Math.round(scale.widthPx / scale.pixelsPerDay));
     const tickCount = Math.floor(totalDays / dayPerTick) + 1;
     const ticks: PositionedTick[] = [];
     for (let i = 0; i < tickCount; i++) {
         const days = i * dayPerTick;
-        const x = originX + days * ppd;
-        const isMajor = i % scale.labelEvery === 0;
-        // Label sits centered in the column starting at this tick. The
-        // last tick has no following column (no week after it), so its
-        // label is suppressed.
+        const x = scale.originX + days * scale.pixelsPerDay;
+        const isMajor = i % preset.labelEvery === 0;
         const isLast = i === tickCount - 1;
         ticks.push({
             x,
             labelX: isLast ? undefined : x + stridePx / 2,
             major: isMajor,
             label: isMajor && !isLast
-                ? formatTickLabel(scale.unit, addDays(startDate, days), i)
+                ? formatTickLabel(preset.unit, addDays(scale.domain[0], days), i)
                 : undefined,
         });
     }
-    return {
-        box: {
-            x: originX,
-            y: 0,
-            width: totalDays * ppd,
-            height: chartHeight,
-        },
-        ticks,
-        pixelsPerDay: ppd,
-        originX,
-        startDate,
-        endDate,
-        labelStyle,
-        // Filled in by the layout caller after it knows the header budget.
-        pillRowHeight: 0,
-        tickPanelY: 0,
-        tickPanelHeight: 0,
-        markerRow: {
-            y: 0,
-            height: 0,
-            collisionY: 0,
-        },
-    };
+    return ticks;
 }
 
 function formatTickLabel(unit: ScaleUnit, date: Date, index: number): string {
@@ -191,14 +163,4 @@ function formatTickLabel(unit: ScaleUnit, date: Date, index: number): string {
         case 'years':
             return `${date.getUTCFullYear()}`;
     }
-}
-
-// x-coordinate for a given date (null when outside the roadmap range).
-export function xForDate(
-    date: Date,
-    timeline: PositionedTimelineScale,
-): number | null {
-    if (date < timeline.startDate || date > timeline.endDate) return null;
-    const days = daysBetween(timeline.startDate, date);
-    return timeline.originX + days * timeline.pixelsPerDay;
 }
