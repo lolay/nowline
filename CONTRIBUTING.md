@@ -41,11 +41,11 @@ No other global tooling is required.
 git clone https://github.com/lolay/nowline.git
 cd nowline
 pnpm install
-pnpm -r build
+pnpm build
 pnpm -r test
 ```
 
-`pnpm install` sets up the workspace. `pnpm -r build` walks every package in dependency order — it regenerates the Langium parser in `@nowline/core`, bundles templates in `@nowline/cli`, and type-checks everything. `pnpm -r test` runs the Vitest suites.
+`pnpm install` sets up the workspace. `pnpm build` walks every package in dependency order — it regenerates the Langium parser in `@nowline/core`, bundles templates in `@nowline/cli`, type-checks everything, and then renders every example under [`examples/`](./examples) and every renderer-validation fixture under [`tests/`](./tests) to sibling `.svg` files for inspection. Set `NOWLINE_SKIP_RENDER=1` to skip the render step (useful while iterating on a broken renderer). `pnpm -r test` runs the Vitest suites.
 
 If you want to work offline or have a pre-populated pnpm store, check the `.pnpm-store/` folder — the repo is set up so `pnpm install` uses a local store when present.
 
@@ -56,14 +56,17 @@ nowline/
 ├── packages/
 │   ├── core/          # @nowline/core — Langium grammar, parser, AST, validator
 │   └── cli/           # @nowline/cli  — `nowline` command-line tool
-├── examples/          # .nowline files used by both tests and `nowline init` templates
+├── examples/          # User-grounded .nowline files: tests, `nowline init` templates, sample-fidelity references
+├── tests/             # Renderer manual-validation fixtures: one stressed axis per file, gitignored SVG output
 ├── grammars/          # TextMate grammar for editor syntax highlighting
-├── scripts/           # Repo-wide scripts: .deb build, Homebrew tap seed
+├── scripts/           # Repo-wide scripts: .deb build, Homebrew tap seed, render-samples, render-tests, render aggregator
 ├── specs/             # Design specs for the DSL, renderer, CLI, IDE integrations, and OSS milestones
 ├── .github/workflows/ # CI and release pipelines
 ├── branding/          # Logos and marks
 └── pnpm-workspace.yaml
 ```
+
+The repo-level `tests/` folder (plural) holds renderer manual-validation fixtures and is distinct from each package's own `test/` folder (singular) which holds Vitest unit/integration tests.
 
 Packages have a shared version and are published together. The dependency graph is strictly:
 
@@ -90,12 +93,14 @@ Run these from the repo root. Most are simple pnpm re-runs across the workspace.
 | Task | Command |
 |---|---|
 | Install dependencies | `pnpm install` |
-| Build everything (regenerates grammar + bundles templates + tsc) | `pnpm -r build` |
+| Build everything (regenerates grammar + bundles templates + tsc + renders `examples/` and `tests/`) | `pnpm build` |
+| Build packages without rendering SVGs | `NOWLINE_SKIP_RENDER=1 pnpm build` (or `pnpm -r build`) |
+| Render `examples/` and `tests/` only (CLI must be built) | `pnpm render` |
 | Run all tests | `pnpm -r test` |
 | Run tests for one package | `pnpm --filter @nowline/core test` |
 | Watch tests for one package | `pnpm --filter @nowline/core test:watch` |
 | Lint | `pnpm -r lint` |
-| Type-check without emit | `pnpm -r build` (incremental; tsc -b handles this) |
+| Type-check without emit | `pnpm -r build` (incremental; tsc -b handles this; skips render) |
 | Regenerate Langium AST only | `pnpm langium:generate` |
 | Compile standalone binaries | `pnpm --filter @nowline/cli compile` (requires Bun) |
 | Compile only the host platform's binary | `pnpm --filter @nowline/cli compile:local` |
@@ -106,7 +111,7 @@ The pre-hooks (`prebuild`, `pretest`) handle code generation automatically — y
 
 During development you usually want to invoke the CLI against local changes without reinstalling. Three options:
 
-1. **Run the built JS directly.** After `pnpm -r build`:
+1. **Run the built JS directly.** After `pnpm build`:
 
     ```bash
     node packages/cli/dist/index.js validate examples/minimal.nowline
@@ -130,7 +135,7 @@ During development you usually want to invoke the CLI against local changes with
     node packages/cli/dist/index.js validate examples/minimal.nowline
     ```
 
-Because the CLI bundles example templates at build time, changes to files under `examples/` are picked up by `pnpm -r build` (the `prebuild` hook re-runs `bundle-templates.mjs`).
+Because the CLI bundles example templates at build time, changes to files under `examples/` are picked up by `pnpm build` (the `prebuild` hook re-runs `bundle-templates.mjs`).
 
 ## Working on the grammar
 
@@ -139,7 +144,7 @@ The DSL grammar lives in `packages/core/src/language/nowline.langium`. Langium g
 Typical workflow when changing the language:
 
 1. Edit `nowline.langium`.
-2. Run `pnpm langium:generate` (or just `pnpm -r build`).
+2. Run `pnpm langium:generate` (or just `pnpm build`).
 3. Update `packages/core/src/language/nowline-validator.ts` if the change introduces new validation rules.
 4. Add or update tests under `packages/core/test/`.
 5. If the visible `.nowline` syntax changed, update `grammars/nowline.tmLanguage.json` so editor highlighting keeps up.
@@ -166,8 +171,9 @@ All tests use [Vitest](https://vitest.dev/).
 
 - **Parser and validator tests** live in `packages/core/test/` — parse fixtures, assert expected diagnostics, verify AST shape.
 - **CLI unit tests** in `packages/cli/test/{validate,convert,init,config,exit-codes}/` cover individual modules directly.
-- **CLI integration tests** in `packages/cli/test/integration/` spawn the compiled `dist/index.js` and assert exit codes + stdout/stderr. These catch bundling bugs that unit tests miss (especially around `bun compile` and templated resources). They're skipped if `dist/index.js` is missing, so run `pnpm -r build` first.
+- **CLI integration tests** in `packages/cli/test/integration/` spawn the compiled `dist/index.js` and assert exit codes + stdout/stderr. These catch bundling bugs that unit tests miss (especially around `bun compile` and templated resources). They're skipped if `dist/index.js` is missing, so run `pnpm build` first.
 - **Round-trip tests** in `packages/cli/test/convert/roundtrip.test.ts` assert that every example file round-trips text → JSON → text and JSON → text → JSON without drift, modulo comment loss.
+- **Renderer manual-validation fixtures** under [`tests/`](./tests) are tiny `.nowline` files that each stress a single layout / rendering axis (sized titles, text-fit-vs-spill, etc.). They are *not* Vitest tests — `pnpm build` (or `pnpm render`) re-renders each fixture to a sibling `.svg` so you can eyeball the result. The byte-stable regression gate is the snapshot suite under `packages/layout/test/__snapshots__/`; the `tests/` fixtures complement it by making specific behaviors easy to spot when something drifts.
 
 When you add a feature, add at least one test that would fail without your change. When you fix a bug, add a regression test that reproduces it.
 
@@ -196,7 +202,7 @@ WIP
 
 1. **Fork** the repo (or branch, if you have write access) and create a feature branch: `git checkout -b feat/short-description`.
 2. Make your change. Keep the diff focused — one logical change per PR.
-3. **Run `pnpm -r build && pnpm -r lint && pnpm -r test` locally** before pushing. CI runs the same commands across Linux, macOS, and Windows.
+3. **Run `pnpm build && pnpm -r lint && pnpm -r test` locally** before pushing. CI runs the same commands across Linux, macOS, and Windows.
 4. **Update documentation** — package READMEs, the top-level `README.md`, inline comments — anywhere the change affects observable behavior.
 5. **Open a PR** against `main` with:
     - A clear summary of the change.

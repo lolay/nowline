@@ -33,4 +33,11 @@ examples/**/*.png
 examples/**/*.pdf
 examples/**/*.html
 examples/**/*.xlsx
+
+# Rendered tests/ harness outputs (CLI artifacts, not source)
+tests/**/*.svg
+tests/**/*.png
+tests/**/*.pdf
+tests/**/*.html
+tests/**/*.xlsx
 .cursor/rules/personal-*.mdc

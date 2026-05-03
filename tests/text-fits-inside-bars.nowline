@@ -1,0 +1,8 @@
+nowline v1
+
+roadmap text-fits-inside-bars "Starter" start:2026-01-05 scale:1w author:"Engineering roadmap"
+
+swimlane engineering "Engineering"
+  item plan "Plan" duration:5w status:done
+  item ship "Ship" duration:5w status:in-progress remaining:50%
+  item run  "Run"  duration:5w status:planned
