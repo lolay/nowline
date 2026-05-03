@@ -1,0 +1,8 @@
+nowline v1
+
+roadmap item-bumps-up "Starter" start:2026-01-05 scale:1w author:"Engineering roadmap"
+
+swimlane engineering "Engineering"
+  item research "Research"  duration:1w status:done
+  item design   "Design"    duration:3w status:in-progress remaining:50%
+  item build    "Build"     duration:1w status:planned

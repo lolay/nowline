@@ -21,6 +21,7 @@ Each file is a near-clone of [`examples/minimal.nowline`](../examples/minimal.no
 | [`large-swimlane-title.nowline`](large-swimlane-title.nowline) | Swimlane chiclet width with a long swimlane title — and any first-row top-pad collapse logic. |
 | [`text-fits-inside-bars.nowline`](text-fits-inside-bars.nowline) | Inside-bar layout branch: every item is wide enough that title + meta sit *inside* the bar (no spill). |
 | [`text-spills-right.nowline`](text-spills-right.nowline) | Right-spill branch: every item is too narrow for its title, so title + meta render to the right of the bar. |
+| [`item-bumps-up.nowline`](item-bumps-up.nowline) | Topmost-fit row packing: a long middle item pushes itself to row 2, but the trailing item bumps back up to row 1 alongside the first item instead of claiming a fresh row. |
 
 ## Adding a new fixture
 

@@ -27,6 +27,7 @@ const MANIFEST = [
     { slug: 'large-swimlane-title',  theme: 'light', now: '2026-01-22' },
     { slug: 'text-fits-inside-bars', theme: 'light', now: '2026-01-22' },
     { slug: 'text-spills-right',     theme: 'light', now: '2026-01-22' },
+    { slug: 'item-bumps-up',         theme: 'light', now: '2026-01-22' },
 ];
 
 function run(cmd, args, opts = {}) {
