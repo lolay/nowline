@@ -346,13 +346,28 @@ function sequenceItem(
         if (chipX >= chipMaxRight) break;
     }
 
-    // Footnote superscript indicators
+    // Footnote superscript indicators. Authors can attach a footnote to
+    // an item from either direction:
+    //   item foo footnote:[bar]            → forward reference on the item
+    //   footnote bar on:[foo]               → reverse reference on the footnote
+    // Both are equally valid per `specs/dsl.md`. Collect indices from both
+    // sides and deduplicate so an item that appears in both gets a single
+    // superscript.
     const footIds = propValues(props, 'footnote');
-    const footnoteIndicators: number[] = [];
+    const footnoteIndicatorSet = new Set<number>();
     for (const id of footIds) {
         const n = ctx.footnoteIndex.get(id);
-        if (n !== undefined) footnoteIndicators.push(n);
+        if (n !== undefined) footnoteIndicatorSet.add(n);
     }
+    if (node.name) {
+        for (const [fid, hosts] of ctx.footnoteHosts.entries()) {
+            if (hosts.includes(node.name)) {
+                const n = ctx.footnoteIndex.get(fid);
+                if (n !== undefined) footnoteIndicatorSet.add(n);
+            }
+        }
+    }
+    const footnoteIndicators = [...footnoteIndicatorSet].sort((a, b) => a - b);
 
     // Link icon
     const linkRaw = propValue(props, 'link');

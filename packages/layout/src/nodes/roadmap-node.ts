@@ -46,7 +46,7 @@ import {
     ATTRIBUTION_GLYPH_WIDTH,
     ATTRIBUTION_GLYPH_HEIGHT,
 } from '../themes/shared.js';
-import { propValue } from '../dsl-utils.js';
+import { propValue, parseDate } from '../dsl-utils.js';
 import { SwimlaneNode } from './swimlane-node.js';
 import { buildAnchors } from './anchor-node.js';
 import { buildMilestones } from './milestone-node.js';
@@ -230,6 +230,31 @@ export class RoadmapNode {
         const pre = buildFootnotes(resolved.content.footnotes, ctx, 0);
         ctx.footnoteIndex = pre.index;
         ctx.footnoteHosts = pre.hosts;
+
+        // Pre-position date-pinned anchors and milestones so items that
+        // reference them via `after:` can resolve to the correct x. Without
+        // this pass, `buildAnchors`/`buildMilestones` only run AFTER
+        // swimlanes are placed, so an item with `after:kickoff` would find
+        // an empty entityRightEdges entry and silently fall through to
+        // `cursor.x` (= the chart origin). We only pre-position entities
+        // that have an explicit `date:` — `after:`-only milestones still
+        // resolve later once their predecessors are known.
+        for (const [id, anchor] of resolved.content.anchors) {
+            const date = parseDate(propValue(anchor.properties, 'date'));
+            if (!date) continue;
+            const x = ctx.scale.forwardWithinDomain(date);
+            if (x === null) continue;
+            ctx.entityLeftEdges.set(id, x);
+            ctx.entityRightEdges.set(id, x);
+        }
+        for (const [id, milestone] of resolved.content.milestones) {
+            const date = parseDate(propValue(milestone.properties, 'date'));
+            if (!date) continue;
+            const x = ctx.scale.forwardWithinDomain(date);
+            if (x === null) continue;
+            ctx.entityLeftEdges.set(id, x);
+            ctx.entityRightEdges.set(id, x);
+        }
 
         // Build swimlanes (declared order). Inter-band gap comes from
         // the swimlane default style's `spacing` bucket. Default
