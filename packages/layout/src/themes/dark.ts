@@ -36,7 +36,7 @@ export const darkTheme: Theme = {
     surface: {
         page: '#0b1220',
         chart: '#111827',
-        headerBox: '#111827',
+        headerBox: '#1e293b',
     },
     entities: {
         roadmap: {
@@ -126,7 +126,7 @@ export const darkTheme: Theme = {
         border: '#334155',
     },
     header: {
-        cardBorder: '#334155',
+        cardBorder: '#475569',
         author: '#94a3b8',
     },
     item: {

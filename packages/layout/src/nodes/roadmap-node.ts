@@ -410,8 +410,103 @@ export class RoadmapNode {
         timeline.box.height = ctx.chartBottomY - timeline.box.y;
 
         // Milestones first so anchors know which xs are occupied (for
-        // collision bumps).
+        // collision bumps). Date-pinned milestones consult the
+        // pre-pack; after-only milestones get a provisional row=0
+        // placement which the re-pack below overwrites once their
+        // centerX is known.
         const milestones = buildMilestones(resolved.content.milestones, ctx);
+
+        // Unified marker re-pack. Every marker (date-pinned anchor,
+        // date-pinned milestone, after-only milestone) participates
+        // with its final centerX — so packMarkerRow can sort by tick
+        // and assign rows + label sides bottom-first. This is the
+        // single source of truth for `ctx.markerRowPlacements`; the
+        // pre-pack only existed to size the marker band before
+        // swimlanes ran.
+        const allMarkerEntries: MarkerEntity[] = datePinnedEntries.map((e) => ({
+            id: e.id,
+            centerX: e.centerX,
+            radius: e.radius,
+            title: e.title,
+            fontSize: e.fontSize,
+            bold: e.bold,
+        }));
+        for (const m of milestones) {
+            if (m.fixed) continue;
+            allMarkerEntries.push({
+                id: m.id ?? '',
+                centerX: m.center.x,
+                radius: m.radius,
+                title: m.title,
+                fontSize: 10,
+                bold: true,
+            });
+        }
+        const repacked = packMarkerRow(
+            allMarkerEntries,
+            chartLeftX,
+            ctx.chartRightX,
+            deps.estimateTextWidth,
+        );
+
+        ctx.markerRowPlacements.clear();
+        for (const [id, p] of repacked.placements) {
+            const centerY = markerRowY + 13 + p.rowIndex * 26;
+            ctx.markerRowPlacements.set(id, {
+                rowIndex: p.rowIndex,
+                centerY,
+                labelBox: { ...p.labelBox, y: centerY - 4 },
+                labelSide: p.labelSide,
+            });
+        }
+
+        // Push final placements back onto already-built milestones and
+        // every marker's entityMidpoints entry (used by edge routing
+        // and slack-arrow geometry).
+        for (const m of milestones) {
+            const placement = ctx.markerRowPlacements.get(m.id ?? '');
+            if (!placement) continue;
+            m.center = { x: m.center.x, y: placement.centerY };
+            m.labelBox = placement.labelBox;
+            m.labelSide = placement.labelSide;
+        }
+        for (const e of datePinnedEntries) {
+            const p = ctx.markerRowPlacements.get(e.id);
+            if (!p) continue;
+            ctx.entityMidpoints.set(e.id, { x: e.centerX, y: p.centerY });
+        }
+        for (const m of milestones) {
+            if (m.fixed) continue;
+            ctx.entityMidpoints.set(m.id ?? '', { x: m.center.x, y: m.center.y });
+        }
+
+        // If the unified pack needs more rows than we sized for, grow
+        // the marker band and translate every chart coordinate below
+        // it. Anchors, edges, nowline, footnotes, and the attribution
+        // mark are built AFTER this block so they pick up the new ctx
+        // values without further work.
+        const actualRowCount = hasMarkerEntities ? Math.max(1, repacked.rowCount) : 0;
+        if (actualRowCount > markerRowsCount) {
+            const deltaY = (actualRowCount - markerRowsCount) * 26;
+            ctx.timeline.markerRow.height = actualRowCount * 26;
+            ctx.timeline.box.height += deltaY;
+            ctx.chartTopY += deltaY;
+            ctx.chartBottomY += deltaY;
+            for (const lane of swimlanes) shiftSwimlaneY(lane, deltaY);
+            for (const inc of includes) shiftIncludeY(inc, deltaY);
+            // Item entityMidpoints were captured during swimlane
+            // place; markers live in markerRowPlacements with their
+            // own centerY that's already final.
+            for (const [id, m] of ctx.entityMidpoints) {
+                if (ctx.markerRowPlacements.has(id)) continue;
+                ctx.entityMidpoints.set(id, { x: m.x, y: m.y + deltaY });
+            }
+            for (const m of milestones) {
+                m.cutTopY = ctx.chartTopY;
+                m.cutBottomY = ctx.chartBottomY;
+            }
+        }
+
         const milestoneXs = new Set<number>(milestones.map((m) => m.center.x));
         const anchors = buildAnchors(resolved.content.anchors, ctx, milestoneXs);
         const itemsMap = deps.collectItems(laneEntries);
@@ -611,43 +706,53 @@ interface PackedPlacement {
 }
 
 /**
- * Decide where the title sits relative to the diamond and bound the
- * label rectangle. Default is RIGHT of the diamond; flips to LEFT when
- * the right-side label would overflow `chartRightX`. If neither side
- * fits cleanly we stick with right (rendering then clips at the canvas
- * — better than rendering a misleading left flip past the chart's left
- * edge).
+ * Translate every Y coordinate inside a swimlane subtree by `dy`. Used
+ * when the marker band has to grow after items are already placed —
+ * the shift cascades from the swimlane box through every track child,
+ * including parallels and groups (which are recursive `children`).
  */
-export function decideMarkerLabelBox(
-    centerX: number,
-    radius: number,
-    title: string,
-    fontSize: number,
-    bold: boolean,
-    chartLeftX: number,
-    chartRightX: number,
-    estimateTextWidth: (text: string, fontSize: number) => number,
-): { box: BoundingBox; side: 'left' | 'right' } {
-    const labelWidth = estimateTextWidth(title, fontSize) * (bold ? MARKER_BOLD_WIDTH_FACTOR : 1);
-    const naturalRightX = centerX + radius + MARKER_LABEL_GAP_PX;
-    const naturalLeftX = centerX - radius - MARKER_LABEL_GAP_PX - labelWidth;
-    const fitsRight = naturalRightX + labelWidth <= chartRightX;
-    const fitsLeft = naturalLeftX >= chartLeftX;
-    const side: 'left' | 'right' = fitsRight ? 'right' : (fitsLeft ? 'left' : 'right');
-    const xLeft = side === 'right' ? naturalRightX : naturalLeftX;
-    return {
-        box: { x: xLeft, y: 0, width: labelWidth, height: MARKER_LABEL_HEIGHT_PX },
-        side,
-    };
+function shiftSwimlaneY(lane: import('../types.js').PositionedSwimlane, dy: number): void {
+    lane.box.y += dy;
+    for (const child of lane.children) shiftTrackChildY(child, dy);
+    for (const nested of lane.nested) shiftSwimlaneY(nested, dy);
+}
+
+function shiftTrackChildY(child: import('../types.js').PositionedTrackChild, dy: number): void {
+    child.box.y += dy;
+    if (child.kind === 'item') {
+        if (child.overflowBox) child.overflowBox.y += dy;
+        for (const chip of child.labelChips) chip.box.y += dy;
+        return;
+    }
+    for (const c of child.children) shiftTrackChildY(c, dy);
+}
+
+function shiftIncludeY(region: import('../types.js').PositionedIncludeRegion, dy: number): void {
+    region.box.y += dy;
+    for (const lane of region.nestedSwimlanes) shiftSwimlaneY(lane, dy);
 }
 
 /**
- * Pack date-pinned anchors and milestones into marker rows. Walking in
- * declared order, each entity claims the topmost row whose existing
- * spans (diamond + label combined extent) don't overlap its candidate
- * extent. New rows are appended at the bottom on demand. Returns
- * row-relative placements (no centerY yet — caller fills that in once
- * `markerRowY` is known).
+ * Pack anchors + milestones into marker rows using a bottom-first
+ * tick-order strategy. Markers default to the row CLOSEST to the
+ * chart; conflicts push them UP toward the date ticks (the inverse of
+ * swimlane items which default to the top and push down).
+ *
+ * Walk order is left-to-right by `centerX` (tick order, not file
+ * declaration). For each marker:
+ *   1. Try the bottommost existing row (highest `rowIndex`), right
+ *      side first then left, working UP through the rows.
+ *   2. If neither side fits at any existing row, GROW: prepend a new
+ *      row at `rowIndex = 0`. Every previously-placed marker has its
+ *      `rowIndex` incremented by 1 so the bottom corridor stays
+ *      stable as the band expands upward toward the ticks.
+ *
+ * Returns row-relative placements (no centerY yet — caller fills that
+ * in once `markerRowY` is known). Row indices follow the existing
+ * convention: 0 = top of band (closest to ticks), `rowCount - 1` =
+ * bottom of band (closest to chart). The "bottom-first" preference
+ * lives entirely in the search order and grow direction; geometry
+ * stays anchored to `markerRowY` at the top.
  */
 export function packMarkerRow(
     entries: MarkerEntity[],
@@ -655,30 +760,71 @@ export function packMarkerRow(
     chartRightX: number,
     estimateTextWidth: (text: string, fontSize: number) => number,
 ): { placements: Map<string, PackedPlacement>; rowCount: number } {
+    const sorted = [...entries].sort((a, b) => a.centerX - b.centerX);
     const placements = new Map<string, PackedPlacement>();
     type Span = { left: number; right: number };
-    const rowSpans: Span[][] = [];
-    for (const e of entries) {
-        const { box, side } = decideMarkerLabelBox(
-            e.centerX, e.radius, e.title, e.fontSize, e.bold,
-            chartLeftX, chartRightX, estimateTextWidth,
-        );
+    let rowSpans: Span[][] = [];
+
+    type Side = 'left' | 'right';
+    for (const e of sorted) {
+        const labelWidth =
+            estimateTextWidth(e.title, e.fontSize) * (e.bold ? MARKER_BOLD_WIDTH_FACTOR : 1);
+        const naturalRightX = e.centerX + e.radius + MARKER_LABEL_GAP_PX;
+        const naturalLeftX = e.centerX - e.radius - MARKER_LABEL_GAP_PX - labelWidth;
+        const fitsRightCanvas = naturalRightX + labelWidth <= chartRightX;
+        const fitsLeftCanvas = naturalLeftX >= chartLeftX;
         const diamondLeft = e.centerX - e.radius;
         const diamondRight = e.centerX + e.radius;
-        const extLeft = Math.min(diamondLeft, box.x);
-        const extRight = Math.max(diamondRight, box.x + box.width);
-        let row = 0;
-        while (true) {
-            if (row >= rowSpans.length) {
-                rowSpans.push([]);
-                break;
+
+        const sideXLeft = (s: Side): number => (s === 'right' ? naturalRightX : naturalLeftX);
+        const sideFitsCanvas = (s: Side): boolean =>
+            s === 'right' ? fitsRightCanvas : fitsLeftCanvas;
+        const collidesAt = (xLeft: number, row: number): boolean => {
+            const extLeft = Math.min(diamondLeft, xLeft);
+            const extRight = Math.max(diamondRight, xLeft + labelWidth);
+            return rowSpans[row].some((s) => s.left < extRight && s.right > extLeft);
+        };
+
+        let placedRow = -1;
+        let placedSide: Side = 'right';
+        let placedXLeft = naturalRightX;
+
+        // Bottom-first: try the highest existing row first, working up
+        // toward row 0 (closest to the ticks).
+        outer: for (let row = rowSpans.length - 1; row >= 0; row--) {
+            for (const side of ['right', 'left'] as const) {
+                if (!sideFitsCanvas(side)) continue;
+                const xLeft = sideXLeft(side);
+                if (collidesAt(xLeft, row)) continue;
+                placedRow = row;
+                placedSide = side;
+                placedXLeft = xLeft;
+                break outer;
             }
-            const overlaps = rowSpans[row].some((s) => s.left < extRight && s.right > extLeft);
-            if (!overlaps) break;
-            row++;
         }
-        rowSpans[row].push({ left: extLeft, right: extRight });
-        placements.set(e.id, { rowIndex: row, labelBox: box, labelSide: side });
+
+        if (placedRow === -1) {
+            // No existing row fits — prepend a fresh top row and shift
+            // every previous placement DOWN by one slot (rowIndex += 1)
+            // so the bottom corridor stays stable.
+            for (const [id, p] of placements) {
+                placements.set(id, { ...p, rowIndex: p.rowIndex + 1 });
+            }
+            rowSpans = [[], ...rowSpans];
+            placedRow = 0;
+            placedSide = fitsRightCanvas ? 'right' : 'left';
+            placedXLeft = sideXLeft(placedSide);
+        }
+
+        const extLeft = Math.min(diamondLeft, placedXLeft);
+        const extRight = Math.max(diamondRight, placedXLeft + labelWidth);
+        rowSpans[placedRow].push({ left: extLeft, right: extRight });
+        placements.set(e.id, {
+            rowIndex: placedRow,
+            labelBox: { x: placedXLeft, y: 0, width: labelWidth, height: MARKER_LABEL_HEIGHT_PX },
+            labelSide: placedSide,
+        });
     }
+
     return { placements, rowCount: rowSpans.length };
 }

@@ -86,6 +86,10 @@ export interface ResolvedContent {
 }
 
 export interface IsolatedRegion {
+    // The path string as written in the parent's `include "..."` directive
+    // (e.g. "./partner.nowline"). Used as the user-facing label/badge in the
+    // rendered region. The resolver's internal caching/dedup uses the
+    // resolved absolute path, but that's never exposed to layout/render.
     sourcePath: string;
     config: ResolvedConfig;
     content: ResolvedContent;
@@ -238,6 +242,7 @@ async function resolveFile(
             childConfig,
             roadmapMode,
             childAbsPath,
+            childRelPath,
             ctx.diagnostics,
         );
 
@@ -326,6 +331,7 @@ function applyRoadmapMode(
     childConfig: ResolvedConfig,
     mode: IncludeMode,
     childPath: string,
+    childRelPath: string,
     diagnostics: ResolveDiagnostic[],
 ): void {
     if (mode === 'ignore') return;
@@ -333,7 +339,7 @@ function applyRoadmapMode(
     if (mode === 'isolate') {
         if (child.roadmap) {
             target.isolatedRegions.push({
-                sourcePath: childPath,
+                sourcePath: childRelPath,
                 config: childConfig,
                 content: child,
             });

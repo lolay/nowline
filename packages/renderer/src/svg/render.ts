@@ -109,7 +109,7 @@ function renderHeader(h: PositionedHeader, idPrefix: string, palette: Theme): st
     const cardY = h.box.y + h.cardBox.y;
     const cardWidth = h.cardBox.width;
     const cardHeight = h.cardBox.height;
-    const cardFill = h.style.bg === 'none' ? '#ffffff' : h.style.bg;
+    const cardFill = h.style.bg === 'none' ? palette.surface.headerBox : h.style.bg;
     const borderColor = palette.header.cardBorder;
     const card = tag('rect', {
         x: num(cardX),
