@@ -55,7 +55,6 @@ import { buildMilestones } from './milestone-node.js';
 import { buildFootnotes } from './footnote-node.js';
 import { buildIncludeRegions } from './include-node.js';
 
-const MIN_CANVAS_WIDTH = 480;
 const HEADER_CARD_TOP_INSET = 4;
 
 /** Sized output from the beside-mode header word-wrap pass. */
@@ -143,9 +142,9 @@ export class RoadmapNode {
 
         // `options.width` is treated as a *maximum* canvas width. The
         // chart sizes to natural content width (date window × ppd) plus
-        // chrome padding, capped at the max. A small minimum keeps the
-        // header / attribution wordmark legible when content is very
-        // short.
+        // chrome padding, capped at the max — no floor. The two
+        // `GUTTER_PX` insets keep the header card and attribution
+        // wordmark from butting against the canvas edges.
         const calendar = fromCalendarConfig(cal);
         const ppd = scale.pixelsPerUnit / calendar.daysPerUnit(scale.unit);
         const spanDays = Math.max(1, daysBetween(startDate, endDate));
@@ -153,7 +152,7 @@ export class RoadmapNode {
         const originX = chartLeftX + GUTTER_PX;
         const totalChartWidth = naturalWidth;
         const desiredCanvas = chartLeftX + GUTTER_PX + totalChartWidth + GUTTER_PX;
-        const chartRightX = Math.max(MIN_CANVAS_WIDTH, Math.min(width, desiredCanvas));
+        const chartRightX = Math.min(width, desiredCanvas);
 
         // Header layout (top → bottom):
         //   1. Now-pill row    (16 px) — only when there's a now-line
@@ -335,21 +334,23 @@ export class RoadmapNode {
         const interBandGapPx =
             SPACING_PX[swimlaneDefaultStyle.spacing as keyof typeof SPACING_PX] ?? 0;
 
-        const runSwimlaneLoop = (): { swimlanes: PositionedSwimlane[]; nextY: number } => {
+        const runSwimlaneLoop = (): { swimlanes: PositionedSwimlane[]; nextY: number; maxRightX: number } => {
             const out: PositionedSwimlane[] = [];
             let cursorY = ctx.chartTopY;
             let bIndex = 0;
+            let maxRightX = ctx.timeline.originX;
             for (const lane of laneEntries) {
                 if (bIndex > 0) cursorY += interBandGapPx;
-                const { positioned, usedHeight } = new SwimlaneNode(
+                const { positioned, usedHeight, usedRightX } = new SwimlaneNode(
                     { lane, bandIndex: bIndex },
                     deps,
                 ).place({ x: ctx.timeline.originX, y: cursorY }, ctx);
                 out.push(positioned);
                 cursorY += usedHeight;
+                if (usedRightX > maxRightX) maxRightX = usedRightX;
                 bIndex++;
             }
-            return { swimlanes: out, nextY: cursorY };
+            return { swimlanes: out, nextY: cursorY, maxRightX };
         };
 
         // Pass 1 — place items without corridor knowledge.
@@ -373,6 +374,24 @@ export class RoadmapNode {
             pass = runSwimlaneLoop();
             swimlanes = pass.swimlanes;
             y = pass.nextY;
+        }
+
+        // Expand the canvas to fit any caption that spilled past its bar
+        // (`textSpills`). Otherwise the long captions on narrow charts —
+        // e.g. `examples/minimal.svg` and `tests/text-spills-right.svg`
+        // — would land outside the SVG's viewBox and clip in browsers.
+        // Markers/anchors built below see the expanded width and pick a
+        // less aggressive label side.
+        const spillRightX = pass.maxRightX + GUTTER_PX;
+        if (spillRightX > ctx.chartRightX) ctx.chartRightX = spillRightX;
+
+        // Each swimlane band reads the canvas width once during its
+        // place pass, before the spill expansion above. Re-stretch every
+        // band so the lane background contains its own spilled captions
+        // (text-spills-right's "1w — 50% remaining" extends 22 px past
+        // the unstretched lane edge otherwise).
+        for (const lane of swimlanes) {
+            lane.box.width = ctx.chartRightX;
         }
 
         // Include regions under the swimlanes. Reserve the 8 px gap +

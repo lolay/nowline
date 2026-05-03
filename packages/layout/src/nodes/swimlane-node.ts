@@ -69,6 +69,8 @@ export interface SwimlaneNodeInput {
 export interface PlacedSwimlaneGeometry {
     positioned: PositionedSwimlane;
     usedHeight: number;
+    /** Rightmost x reached by any item or its spilled caption. */
+    usedRightX: number;
 }
 
 /** Anchor point passed to `SwimlaneNode.place`. */
@@ -270,6 +272,15 @@ export class SwimlaneNode {
 
         const lastRowBottom = rows[rows.length - 1].y + step;
         const bandHeight = Math.max(step + 32, lastRowBottom - origin.y + 16);
+        // Rightmost extent reached inside this lane — bar logical end OR
+        // caption spill, whichever is wider. Roadmap-node uses this to
+        // expand `ctx.chartRightX` so spilled captions don't get clipped
+        // by the canvas edge.
+        let usedRightX = laneLeftX;
+        for (const r of rows) {
+            if (r.rightEdge > usedRightX) usedRightX = r.rightEdge;
+            if (r.spillX > usedRightX) usedRightX = r.spillX;
+        }
         const box: BoundingBox = {
             x: 0,
             y: origin.y,
@@ -311,6 +322,7 @@ export class SwimlaneNode {
                 footnoteIndicators,
             },
             usedHeight: bandHeight,
+            usedRightX,
         };
     }
 }
