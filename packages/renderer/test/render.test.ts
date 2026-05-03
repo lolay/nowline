@@ -109,10 +109,12 @@ swimlane a "A"
     it('ships the Nowline attribution mark', async () => {
         const model = await parseToModel(BASIC_DSL);
         const svg = await renderSvg(model);
-        // m2d: wordmark glyph replaces the "Made with Nowline" text. The
-        // accessible label preserves the original phrase for screen readers.
+        // The mark renders as a "Powered by nowline" link in the canvas's
+        // bottom margin. The whole string sits inside one <a href> so the
+        // entire phrase is clickable and stays announced as a single link.
         expect(svg).toContain('data-layer="attribution"');
-        expect(svg).toContain('aria-label="Made with Nowline"');
+        expect(svg).toContain('aria-label="Powered by nowline"');
+        expect(svg).toContain('>Powered by</text>');
         expect(svg).toContain('https://nowline.io');
     });
 });

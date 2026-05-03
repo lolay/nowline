@@ -39,7 +39,13 @@ import { resolveScale, buildHeaderTicks } from '../view-preset.js';
 import { TimeScale } from '../time-scale.js';
 import { fromCalendarConfig } from '../working-calendar.js';
 import { defaultRowBand } from '../band-scale.js';
-import { HEADER_ABOVE_HEIGHT_PX, SPACING_PX } from '../themes/shared.js';
+import {
+    HEADER_ABOVE_HEIGHT_PX,
+    SPACING_PX,
+    GUTTER_PX,
+    ATTRIBUTION_GLYPH_WIDTH,
+    ATTRIBUTION_GLYPH_HEIGHT,
+} from '../themes/shared.js';
 import { propValue } from '../dsl-utils.js';
 import { SwimlaneNode } from './swimlane-node.js';
 import { buildAnchors } from './anchor-node.js';
@@ -142,9 +148,9 @@ export class RoadmapNode {
         const ppd = scale.pixelsPerUnit / calendar.daysPerUnit(scale.unit);
         const spanDays = Math.max(1, daysBetween(startDate, endDate));
         const naturalWidth = spanDays * ppd;
-        const originX = chartLeftX + 16;
+        const originX = chartLeftX + GUTTER_PX;
         const totalChartWidth = naturalWidth;
-        const desiredCanvas = chartLeftX + 16 + totalChartWidth + 16;
+        const desiredCanvas = chartLeftX + GUTTER_PX + totalChartWidth + GUTTER_PX;
         const chartRightX = Math.max(MIN_CANVAS_WIDTH, Math.min(width, desiredCanvas));
 
         // Header layout (top → bottom):
@@ -216,7 +222,7 @@ export class RoadmapNode {
             entityMidpoints: new Map(),
             chartTopY: timelineY + timelineHeightBudget,
             chartBottomY: 0,
-            chartRightX: Math.max(chartRightX, originX + totalChartWidth + 16),
+            chartRightX: Math.max(chartRightX, originX + totalChartWidth + GUTTER_PX),
         };
 
         // Footnotes index must be built before sequencing items reference
@@ -303,6 +309,31 @@ export class RoadmapNode {
             }
             : { x: 0, y: 0, width: ctx.chartRightX, height: HEADER_ABOVE_HEIGHT_PX };
 
+        // Attribution wordmark placement. Canvas grows by GUTTER_PX +
+        // glyph height + GUTTER_PX so the wordmark sits in a clean bottom
+        // margin below all content (last swimlane / footnote panel /
+        // include region). Today only the bottom-right slot fires, but
+        // the priority order is bottom-right → upper-right → bottom-left
+        // — when content density makes bottom-right disruptive in some
+        // future case, fall back to upper-right (above the timeline) and
+        // then bottom-left (under the header card in beside-mode).
+        //
+        // When there are no footnotes, `foot.area.box` still carries a 16 px
+        // top-of-panel offset; that's a placeholder for the footnote
+        // header gap and shouldn't push the attribution down. Use the
+        // bare `chartBottomY` in that case so the bottom margin is
+        // exactly `GUTTER_PX + glyphHeight + GUTTER_PX`.
+        const contentBottomY = foot.area.entries.length > 0
+            ? foot.area.box.y + foot.area.box.height
+            : ctx.chartBottomY;
+        const attributionBox: BoundingBox = {
+            x: ctx.chartRightX - GUTTER_PX - ATTRIBUTION_GLYPH_WIDTH,
+            y: contentBottomY + GUTTER_PX,
+            width: ATTRIBUTION_GLYPH_WIDTH,
+            height: ATTRIBUTION_GLYPH_HEIGHT,
+        };
+        const height = attributionBox.y + attributionBox.height + GUTTER_PX;
+
         const header: PositionedHeader = {
             box: headerBox,
             position: headerStyle.headerPosition,
@@ -313,15 +344,8 @@ export class RoadmapNode {
             cardBox,
             logo: undefined,
             style: headerStyle,
-            attributionBox: {
-                x: ctx.chartRightX - 120,
-                y: isBeside ? 4 : 4,
-                width: 116,
-                height: 16,
-            },
+            attributionBox,
         };
-
-        const height = (foot.area.box.y + foot.area.box.height) + 16;
 
         const model: PositionedRoadmap = {
             width: ctx.chartRightX,

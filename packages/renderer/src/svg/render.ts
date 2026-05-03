@@ -17,6 +17,17 @@ import type {
     Point,
     Theme,
 } from '@nowline/layout';
+import {
+    ATTRIBUTION_TEXT,
+    ATTRIBUTION_LINK,
+    ATTRIBUTION_SCALE,
+    ATTRIBUTION_WORDMARK_FONT_SIZE,
+    ATTRIBUTION_PREFIX_FONT_SIZE,
+    ATTRIBUTION_NOW_LOGICAL_X,
+    ATTRIBUTION_BAR_LOGICAL_X,
+    ATTRIBUTION_BAR_LOGICAL_WIDTH,
+    ATTRIBUTION_INE_LOGICAL_X,
+} from '@nowline/layout';
 import { IdGenerator } from './ids.js';
 import { attrs, escAttr, escText, num, tag, textTag } from './xml.js';
 import { allShadowDefs, shadowFilterUrl } from './shadow.js';
@@ -1041,64 +1052,58 @@ function renderIncludeRegion(
     );
 }
 
-// Anchor the now|ine wordmark to the bottom-right of the model's last
-// swimlane (or the footnote panel when present). Wrapped in <a> so it stays
-// clickable.
+// Paint the "Powered by nowline" attribution mark inside the
+// layout-supplied `attributionBox`. The whole mark — prefix text,
+// "now", red "l" bar, and "ine" — sits inside one <a href> so the
+// entire string is clickable. Glyph anatomy (positions, widths, scale)
+// lives in `themes/shared.ts` (`ATTRIBUTION_*`); the layout reserves a
+// box of exactly that size at canvas-bottom-right.
 function renderAttributionMark(model: PositionedRoadmap): string {
     const muted = model.palette.attribution.mark;
     const accent = model.palette.attribution.link;
-    // Choose an anchor: footnote panel if it has entries, else the last swimlane.
-    let anchorBox: { x: number; y: number; width: number; height: number } | null = null;
-    if (model.footnotes.entries.length > 0) {
-        anchorBox = model.footnotes.box;
-    } else if (model.swimlanes.length > 0) {
-        anchorBox = model.swimlanes[model.swimlanes.length - 1].box;
-    } else {
-        return '';
-    }
-    // Wordmark "now|ine" — the red bar IS the "l" of "nowline", so it
-    // needs to hug both sides equally rather than glue to "ine" alone.
-    //
-    // Logical units (before the 0.22 scale):
-    //   "now"  text:  font-size 40 bold, x=0,   3 chars × ~0.58 ≈ ends 72
-    //   red bar:                          x=74, width=5         → ends 79
-    //   "ine"  text:  font-size 40,       x=81,  3 chars × 0.58 ≈ ends 151
-    // 2-unit gutters on either side of the bar match the kerning of an "l"
-    // in the surrounding sans-serif and read as a single word. Bar bottom
-    // is y=12+40=52.
-    const scale = 0.22;
-    const glyphLogicalWidth = 81 + 3 * 40 * 0.58;   // 151 units, "ine" right edge
-    const glyphLogicalHeight = 12 + 40;             // 52 units, bar bottom
-    const glyphWidth = glyphLogicalWidth * scale;
-    const glyphHeight = glyphLogicalHeight * scale;
-    const padding = 12;
-    const tx = anchorBox.x + anchorBox.width - padding - glyphWidth;
-    const ty = anchorBox.y + anchorBox.height - padding - glyphHeight;
+    if (model.swimlanes.length === 0) return '';
+    const tx = model.header.attributionBox.x;
+    const ty = model.header.attributionBox.y;
+    // Both texts share the wordmark's baseline (y = wordmark font size)
+    // so the smaller "Powered by" sits visually above the wordmark's
+    // baseline without bumping the bar's bottom up.
+    const baselineY = ATTRIBUTION_WORDMARK_FONT_SIZE;
     const inner =
         textTag(
             {
                 x: '0',
-                y: '40',
+                y: baselineY,
                 'font-family': FONT_STACK.sans,
-                'font-size': 40,
+                'font-size': ATTRIBUTION_PREFIX_FONT_SIZE,
+                'font-weight': 400,
+                fill: muted,
+            },
+            ATTRIBUTION_TEXT,
+        ) +
+        textTag(
+            {
+                x: ATTRIBUTION_NOW_LOGICAL_X,
+                y: baselineY,
+                'font-family': FONT_STACK.sans,
+                'font-size': ATTRIBUTION_WORDMARK_FONT_SIZE,
                 'font-weight': 700,
                 fill: muted,
             },
             'now',
         ) +
         tag('rect', {
-            x: 74,
+            x: ATTRIBUTION_BAR_LOGICAL_X,
             y: 12,
-            width: 5,
-            height: 40,
+            width: ATTRIBUTION_BAR_LOGICAL_WIDTH,
+            height: ATTRIBUTION_WORDMARK_FONT_SIZE,
             fill: accent,
         }) +
         textTag(
             {
-                x: 81,
-                y: 40,
+                x: ATTRIBUTION_INE_LOGICAL_X,
+                y: baselineY,
                 'font-family': FONT_STACK.sans,
-                'font-size': 40,
+                'font-size': ATTRIBUTION_WORDMARK_FONT_SIZE,
                 'font-weight': 400,
                 fill: muted,
             },
@@ -1106,12 +1111,12 @@ function renderAttributionMark(model: PositionedRoadmap): string {
         );
     const group = tag(
         'g',
-        { transform: `translate(${num(tx)} ${num(ty)}) scale(${num(scale)})` },
+        { transform: `translate(${num(tx)} ${num(ty)}) scale(${num(ATTRIBUTION_SCALE)})` },
         inner,
     );
     return tag(
         'a',
-        { href: 'https://nowline.io', target: '_blank', rel: 'noopener', 'aria-label': 'Made with Nowline' },
+        { href: ATTRIBUTION_LINK, target: '_blank', rel: 'noopener', 'aria-label': 'Powered by nowline' },
         tag('g', { 'data-layer': 'attribution' }, group),
     );
 }

@@ -71,6 +71,20 @@ export const MIN_ITEM_WIDTH = 8;
 // milestone cuts, the now-line) to pass between bars without crossing them.
 export const ITEM_INSET_PX = 6;
 
+// Canonical content gutter — the rest-state spacing between adjacent
+// pieces of chart content. Used for:
+//   - the gap between two adjacent items in a track (= 2 × ITEM_INSET_PX),
+//   - the gap between the header card and the chart's left edge (originX
+//     offset from chartLeftX),
+//   - the bottom margin around the attribution wordmark.
+//
+// Future interactive layers (e.g. drag-and-drop authoring) may locally
+// inflate this gutter at the active drop site to reveal a target slot.
+// That's a runtime concern — the layout engine emits a static positioned
+// model and the interactive shell animates spacing on top. Keep this
+// constant as the rest-state baseline.
+export const GUTTER_PX = 2 * ITEM_INSET_PX;
+
 // Default pixel-per-day when no explicit scale is set. Calibrated so a
 // 26-week (180 day) roadmap fits a 1200 px content area.
 export const DEFAULT_PIXELS_PER_DAY = 5;
@@ -84,6 +98,51 @@ export const HEADER_ABOVE_HEIGHT_PX = 72;
 
 // Footnote area defaults.
 export const FOOTNOTE_ROW_HEIGHT = 18;
+
+// Attribution mark — a clickable "Powered by nowline" link that sits in
+// the canvas's bottom margin. Single source of truth for layout (which
+// reserves a glyph-sized slot at canvas-bottom-right) and the renderer
+// (which paints the glyph inside that slot at the same scale, so the
+// reserved box hugs the painted glyph 1:1).
+//
+// "Powered by" is rendered at 80% of the wordmark's font size so it
+// reads as a subdued tag rather than competing with the brand. Both
+// share the same baseline (y = wordmarkFontSize) so the tag's x-height
+// sits cleanly above the wordmark's baseline.
+//
+// Logical units (before `ATTRIBUTION_SCALE`):
+//   "Powered by"  text  ≈ 10 × 32 × 0.58 = 185.6  weight 400, x=0
+//   gap                                       10
+//   "now"         text  ≈ 3  × 40 × 0.58 = 69.6   weight 700, x=195.6
+//   bar (the "l")                                 x=195.6+74=269.6, w=5
+//   "ine"         text  ≈ 3  × 40 × 0.58 = 69.6   weight 400, x=195.6+81=276.6
+// Bar bottom is y = 12 + 40 = 52. The 74/81 internal offsets keep the
+// red bar reading as a single "l" between "now" and "ine".
+export const ATTRIBUTION_TEXT = 'Powered by';
+export const ATTRIBUTION_LINK = 'https://nowline.io';
+export const ATTRIBUTION_SCALE = 0.22;
+export const ATTRIBUTION_WORDMARK_FONT_SIZE = 40;
+export const ATTRIBUTION_PREFIX_FONT_SIZE = 32;
+
+const ATTR_CHAR_FACTOR = 0.58;
+export const ATTRIBUTION_PREFIX_LOGICAL_WIDTH =
+    ATTRIBUTION_TEXT.length * ATTRIBUTION_PREFIX_FONT_SIZE * ATTR_CHAR_FACTOR; // 185.6
+export const ATTRIBUTION_PREFIX_TO_WORDMARK_GAP = 10;
+export const ATTRIBUTION_NOW_LOGICAL_X =
+    ATTRIBUTION_PREFIX_LOGICAL_WIDTH + ATTRIBUTION_PREFIX_TO_WORDMARK_GAP; // 195.6
+export const ATTRIBUTION_BAR_LOGICAL_X = ATTRIBUTION_NOW_LOGICAL_X + 74;    // 269.6
+export const ATTRIBUTION_BAR_LOGICAL_WIDTH = 5;
+export const ATTRIBUTION_INE_LOGICAL_X = ATTRIBUTION_NOW_LOGICAL_X + 81;    // 276.6
+export const ATTRIBUTION_INE_LOGICAL_WIDTH =
+    3 * ATTRIBUTION_WORDMARK_FONT_SIZE * ATTR_CHAR_FACTOR;                  // 69.6
+export const ATTRIBUTION_GLYPH_LOGICAL_WIDTH =
+    ATTRIBUTION_INE_LOGICAL_X + ATTRIBUTION_INE_LOGICAL_WIDTH;              // 346.2
+export const ATTRIBUTION_GLYPH_LOGICAL_HEIGHT =
+    12 + ATTRIBUTION_WORDMARK_FONT_SIZE;                                    // 52
+export const ATTRIBUTION_GLYPH_WIDTH =
+    ATTRIBUTION_GLYPH_LOGICAL_WIDTH * ATTRIBUTION_SCALE;
+export const ATTRIBUTION_GLYPH_HEIGHT =
+    ATTRIBUTION_GLYPH_LOGICAL_HEIGHT * ATTRIBUTION_SCALE;
 
 // Dependency-edge rounded-corner radius (for Manhattan routing).
 export const EDGE_CORNER_RADIUS = 4;

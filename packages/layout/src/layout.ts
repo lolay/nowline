@@ -495,7 +495,12 @@ const HEADER_AUTHOR_LINE_HEIGHT = 14;
 const HEADER_TITLE_TO_AUTHOR_GAP = 18;
 const HEADER_TITLE_FONT_SIZE = 16;
 const HEADER_AUTHOR_FONT_SIZE = 11;
-const HEADER_CARD_OUTER_PAD = 6;        // gap between card and box edge
+// Left margin between the canvas's left edge and the visible card. The
+// matching right-side breathing room is owned by `GUTTER_PX` (the canonical
+// content gutter, applied between `chartLeftX` and `originX`), so the gap
+// from the card's right edge to the timeline strip is the same as the gap
+// between two adjacent items.
+const HEADER_CARD_OUTER_PAD = 6;
 
 interface SizedHeader {
     titleLines: string[];
@@ -537,9 +542,12 @@ function sizeBesideHeader(title: string, author: string | undefined): SizedHeade
     for (const line of authorLines) widest = Math.max(widest, estimateTextWidth(line, HEADER_AUTHOR_FONT_SIZE));
 
     const naturalCardWidth = widest + 2 * HEADER_CARD_PADDING_X;
+    // `HEADER_BESIDE_{MIN,MAX}_WIDTH_PX` bound the **boxWidth** (= cardWidth
+    // + left outer pad). Subtract one outer pad to derive the cardWidth
+    // bounds.
     const cardWidth = Math.max(
-        HEADER_BESIDE_MIN_WIDTH_PX - 2 * HEADER_CARD_OUTER_PAD,
-        Math.min(HEADER_BESIDE_MAX_WIDTH_PX - 2 * HEADER_CARD_OUTER_PAD, naturalCardWidth),
+        HEADER_BESIDE_MIN_WIDTH_PX - HEADER_CARD_OUTER_PAD,
+        Math.min(HEADER_BESIDE_MAX_WIDTH_PX - HEADER_CARD_OUTER_PAD, naturalCardWidth),
     );
 
     const titleBlockHeight = titleLines.length > 0
@@ -550,7 +558,11 @@ function sizeBesideHeader(title: string, author: string | undefined): SizedHeade
         : 0;
     const cardHeight = HEADER_CARD_PADDING_TOP + titleBlockHeight + authorBlockHeight + HEADER_CARD_PADDING_BOTTOM;
 
-    const boxWidth = cardWidth + 2 * HEADER_CARD_OUTER_PAD;
+    // `boxWidth` only includes the LEFT outer pad — the right-side breathing
+    // room between the card and the chart is owned by `GUTTER_PX` in
+    // `RoadmapNode`. So `boxWidth` doubles as `chartLeftX` (the card's right
+    // edge in canvas coordinates).
+    const boxWidth = cardWidth + HEADER_CARD_OUTER_PAD;
     return { titleLines, authorLines, cardWidth, cardHeight, boxWidth };
 }
 
@@ -588,11 +600,12 @@ function computeDateWindow(
     }
     const contentDays = computeContentEndDay(resolved, ctx, startDate, today);
     const tickDays = daysPerUnit(scale.unit, ctx.cal);
-    // Round up to the next tick boundary + one extra tick of trailing pad
-    // so the last tick label and any "ends on the deadline" item have a
-    // little visual breathing room.
+    // Round up to the smallest tick boundary that is `>= contentDays`. When
+    // the latest content lands exactly on a tick boundary the chart ends
+    // exactly there (no extra trailing tick); otherwise we extend to the
+    // next tick so the right edge always sits on a labelled column.
     const padded = contentDays > 0
-        ? Math.ceil((contentDays + 1) / tickDays) * tickDays + tickDays
+        ? Math.ceil(contentDays / tickDays) * tickDays
         : 4 * ctx.cal.daysPerWeek;
     return { startDate, endDate: addDays(startDate, Math.max(1, padded)) };
 }
