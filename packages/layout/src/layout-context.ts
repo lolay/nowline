@@ -15,6 +15,8 @@ import type {
     PositionedItem,
     PositionedTrackChild,
     Point,
+    SlackCorridor,
+    MarkerRowPlacement,
 } from './types.js';
 import type { resolveCalendar } from './calendar.js';
 import type { StyleContext } from './style-resolution.js';
@@ -60,6 +62,21 @@ export interface LayoutContext {
     entityLeftEdges: Map<string, number>;
     entityRightEdges: Map<string, number>;
     entityMidpoints: Map<string, Point>;
+    /**
+     * Horizontal arrow corridors that the swimlane row-packer must avoid.
+     * Empty during the first layout pass; populated from the first
+     * pass's milestones and consulted on the second pass so the binding
+     * predecessor (and any unrelated overlapping item) drops to a row
+     * whose Y does not match the corridor.
+     */
+    slackCorridors: SlackCorridor[];
+    /**
+     * Pre-computed marker-row placement (row index + label box + side)
+     * for every anchor and date-pinned milestone. After-only milestones
+     * pack against this map at build time; date-pinned entries are
+     * snapshot upstream so their (Y, label) survives swimlane reflows.
+     */
+    markerRowPlacements: Map<string, MarkerRowPlacement>;
     chartTopY: number;
     chartBottomY: number;
     chartRightX: number;

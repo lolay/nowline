@@ -79,6 +79,8 @@ export function buildIncludeRegions(
             entityLeftEdges: new Map(),
             entityRightEdges: new Map(),
             entityMidpoints: new Map(),
+            slackCorridors: [],
+            markerRowPlacements: new Map(),
             chartTopY: innerStartY,
             chartBottomY: innerStartY,
             chartRightX: ctx.chartRightX,

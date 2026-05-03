@@ -26,15 +26,17 @@ import type {
 } from '@nowline/core';
 import { isItemDeclaration } from '@nowline/core';
 import { resolveStyle } from '../style-resolution.js';
-import { ITEM_INSET_PX } from '../themes/shared.js';
+import { ITEM_INSET_PX, MIN_ITEM_WIDTH } from '../themes/shared.js';
 import type {
     PositionedSwimlane,
     PositionedTrackChild,
     PositionedItem,
     BoundingBox,
+    SlackCorridor,
 } from '../types.js';
 import type { LayoutContext, TrackCursor } from '../layout-context.js';
 import { propValue } from '../dsl-utils.js';
+import { resolveDuration } from '../calendar.js';
 
 /** Helpers that SwimlaneNode delegates to until the rest of m2.5c lands. */
 export interface SwimlaneNodeDeps {
@@ -131,6 +133,7 @@ export class SwimlaneNode {
         const { deps } = this;
         const style = resolveStyle('swimlane', lane.properties, ctx.styleCtx);
         const laneLeftX = origin.x;
+        const step = ctx.bandScale.step();
 
         // Title-tab geometry (mirrors the renderer; see renderSwimlane).
         const tabRightX = computeLaneTabRightX(lane);
@@ -144,27 +147,55 @@ export class SwimlaneNode {
             firstChildDesiredX >= tabRightX + TAB_GUTTER_PX;
         const startY = origin.y + (canAlignFirstRowWithTab ? TAB_TOP_Y : TAB_BOTTOM_Y);
 
-        // Row-packing state. See buildSwimlane history for the legacy
-        // formulation; the bump rules are preserved verbatim:
-        //   (a) item.desiredStart < currentRow.rightEdge — sibling collision
-        //   (b) item.desiredStart < prevTitleSpillX — caption-bleed collision
-        //   parallels / groups always own a fresh row.
-        let rowY = startY;
-        let rowEndX = laneLeftX;
+        // Topmost-fit row tracker. Each row records the rightmost edge
+        // reached by an item placed in that row plus a caption-spill
+        // reservation. A new item is placed in the FIRST row where its
+        // logical extent fits and no slack-arrow corridor crosses the
+        // row at the item's x-range; if no such row exists a fresh row
+        // is appended below. Parallel / group blocks always claim
+        // contiguous rows at the bottom of the stack — items declared
+        // after a block can still flow back into earlier rows.
+        interface Row {
+            y: number;
+            rightEdge: number;
+            spillX: number;
+        }
+        const rows: Row[] = [{ y: startY, rightEdge: laneLeftX, spillX: laneLeftX }];
         let timeCursorX = laneLeftX;
-        let prevTitleSpillX = laneLeftX;
+
+        function appendRow(): Row {
+            const last = rows[rows.length - 1];
+            const r: Row = { y: last.y + step, rightEdge: laneLeftX, spillX: laneLeftX };
+            rows.push(r);
+            return r;
+        }
+
+        function rowIntersectsCorridor(rowY: number, xs: number, xe: number, childId: string): boolean {
+            // A corridor sits at the slack pred's row midpoint. Match when
+            // that midpoint falls inside this row's vertical band.
+            return ctx.slackCorridors.some((c: SlackCorridor) =>
+                c.y >= rowY &&
+                c.y < rowY + step &&
+                xs < c.xEnd &&
+                xe > c.xStart &&
+                c.slackPredId !== childId,
+            );
+        }
 
         const children: PositionedTrackChild[] = [];
         for (const child of lane.content) {
             if (child.$type === 'DescriptionDirective') continue;
 
             if (!isItemDeclaration(child)) {
-                if (rowEndX > laneLeftX) {
-                    rowY += ctx.bandScale.step();
-                }
                 const blockProps = (child as ParallelBlock | GroupBlock).properties ?? [];
                 const blockStart = deps.resolveChildStart(blockProps, timeCursorX, laneLeftX, ctx);
-                const cursor = deps.newCursor(blockStart, rowY);
+                // Blocks claim a fresh row at the bottom of the stack so
+                // their inner sub-tracks have contiguous rows to expand
+                // into without colliding with previously-placed items.
+                const blockY = (rows[rows.length - 1].rightEdge > laneLeftX)
+                    ? appendRow().y
+                    : rows[rows.length - 1].y;
+                const cursor = deps.newCursor(blockStart, blockY);
                 const positioned = deps.sequenceOne(
                     child as ItemDeclaration | GroupBlock | ParallelBlock,
                     cursor,
@@ -172,25 +203,48 @@ export class SwimlaneNode {
                 );
                 children.push(positioned);
                 const blockEnd = positioned.box.x + positioned.box.width;
-                rowY += Math.max(ctx.bandScale.step(), cursor.height);
-                rowEndX = laneLeftX;
+                const blockHeight = Math.max(step, cursor.height);
+                const numClaimedRows = Math.max(1, Math.ceil(blockHeight / step));
+                const blockStartIdx = rows.findIndex((r) => r.y === blockY);
+                for (let i = 0; i < numClaimedRows; i++) {
+                    const idx = blockStartIdx + i;
+                    if (idx >= rows.length) appendRow();
+                    rows[idx].rightEdge = blockEnd;
+                    rows[idx].spillX = laneLeftX;
+                }
                 timeCursorX = Math.max(timeCursorX, blockEnd);
-                prevTitleSpillX = laneLeftX;
                 continue;
             }
 
             const props = (child as ItemDeclaration).properties;
             const desiredStart = deps.resolveChildStart(props, timeCursorX, laneLeftX, ctx);
+            // Predict the item's logical extent so the row-pack can decide
+            // BEFORE handing off to sequenceItem. The arithmetic mirrors
+            // the duration → width math in `sequenceItem` (see
+            // packages/layout/src/layout.ts).
+            const durationDays = resolveDuration(
+                propValue(props, 'duration'),
+                ctx.durations,
+                ctx.cal,
+            );
+            const naturalWidth = Math.max(
+                MIN_ITEM_WIDTH,
+                durationDays * ctx.timeline.pixelsPerDay,
+            );
+            const desiredEnd = desiredStart + naturalWidth;
+            const childId = (child as ItemDeclaration).name ?? '';
 
-            const collidesWithRow = desiredStart < rowEndX;
-            const collidesWithSpill = desiredStart < prevTitleSpillX;
-            if (collidesWithRow || collidesWithSpill) {
-                rowY += ctx.bandScale.step();
-                rowEndX = laneLeftX;
-                prevTitleSpillX = laneLeftX;
+            let row: Row | undefined;
+            for (const r of rows) {
+                if (desiredStart < r.rightEdge) continue;
+                if (desiredStart < r.spillX) continue;
+                if (rowIntersectsCorridor(r.y, desiredStart, desiredEnd, childId)) continue;
+                row = r;
+                break;
             }
+            if (!row) row = appendRow();
 
-            const cursor = deps.newCursor(desiredStart, rowY);
+            const cursor = deps.newCursor(desiredStart, row.y);
             const positioned = deps.sequenceItem(child as ItemDeclaration, cursor, ctx);
             children.push(positioned);
 
@@ -200,26 +254,22 @@ export class SwimlaneNode {
             // gutter between bars.
             const itemLogicalEnd = positioned.box.x + positioned.box.width + ITEM_INSET_PX;
             timeCursorX = Math.max(timeCursorX, itemLogicalEnd);
-            rowEndX = itemLogicalEnd;
+            row.rightEdge = itemLogicalEnd;
 
-            // If the caption spills past the bar (computed in
-            // sequenceItem), reserve enough horizontal room so the next
-            // item bumps to a fresh row instead of rendering under the
-            // floating caption.
             if (positioned.textSpills) {
                 const titleWidth = deps.estimateTextWidth(positioned.title, 13);
                 const metaWidth = positioned.metaText
                     ? deps.estimateTextWidth(positioned.metaText, 11)
                     : 0;
                 const visualRight = positioned.box.x + positioned.box.width;
-                prevTitleSpillX = visualRight + 6 + Math.max(titleWidth, metaWidth) + 6;
+                row.spillX = visualRight + 6 + Math.max(titleWidth, metaWidth) + 6;
             } else {
-                prevTitleSpillX = laneLeftX;
+                row.spillX = laneLeftX;
             }
         }
 
-        const lastRowBottom = rowY + ctx.bandScale.step();
-        const bandHeight = Math.max(ctx.bandScale.step() + 32, lastRowBottom - origin.y + 16);
+        const lastRowBottom = rows[rows.length - 1].y + step;
+        const bandHeight = Math.max(step + 32, lastRowBottom - origin.y + 16);
         const box: BoundingBox = {
             x: 0,
             y: origin.y,

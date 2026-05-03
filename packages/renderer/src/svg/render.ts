@@ -739,18 +739,26 @@ function renderAnchor(a: PositionedAnchor, palette: Theme): string {
         'stroke-width': 1.25,
     });
     const labelColor = palette.anchorDiamond.label;
-    const label = a.title
-        ? textTag(
-            {
-                x: num(cx + size + 6),
-                y: num(cy + 4),
-                'font-family': FONT_STACK.sans,
-                'font-size': 10,
-                fill: labelColor,
-            },
-            a.title,
-        )
-        : '';
+    // For left-flipped labels, anchor the text at its RIGHT edge using
+    // `text-anchor: end`. The layout's `labelBox.width` is intentionally
+    // pessimistic (0.58 em/char) so positioning by the box's left edge
+    // would leave a visible gap between the actual text right edge and
+    // the diamond. End-anchoring lets the browser size the glyph run
+    // exactly and put the rightmost glyph 6 px from the diamond — same
+    // rhythm the right-side labels already get from start-anchoring at
+    // `diamondRight + 6`.
+    const labelX = a.labelSide === 'left'
+        ? a.labelBox.x + a.labelBox.width
+        : a.labelBox.x;
+    const labelAttrs: Record<string, string | number | null | undefined> = {
+        x: num(labelX),
+        y: num(cy + 4),
+        'font-family': FONT_STACK.sans,
+        'font-size': 10,
+        fill: labelColor,
+    };
+    if (a.labelSide === 'left') labelAttrs['text-anchor'] = 'end';
+    const label = a.title ? textTag(labelAttrs, a.title) : '';
     return tag('g', { 'data-layer': 'anchor', 'data-id': a.id ?? null }, diamond + label);
 }
 
@@ -779,19 +787,22 @@ function renderMilestone(m: PositionedMilestone, palette: Theme): string {
         'stroke-width': 1,
     });
     const labelColor = palette.milestoneDiamond.label;
-    const label = m.title
-        ? textTag(
-            {
-                x: num(cx + r + 6),
-                y: num(cy + 4),
-                'font-family': FONT_STACK.sans,
-                'font-size': 10,
-                'font-weight': 600,
-                fill: labelColor,
-            },
-            m.title,
-        )
-        : '';
+    // See renderAnchor — left-flipped labels use `text-anchor: end` so
+    // the visual right edge sits at `diamondLeft - 6`, matching the
+    // 6 px rhythm of right-side labels.
+    const labelX = m.labelSide === 'left'
+        ? m.labelBox.x + m.labelBox.width
+        : m.labelBox.x;
+    const labelAttrs: Record<string, string | number | null | undefined> = {
+        x: num(labelX),
+        y: num(cy + 4),
+        'font-family': FONT_STACK.sans,
+        'font-size': 10,
+        'font-weight': 600,
+        fill: labelColor,
+    };
+    if (m.labelSide === 'left') labelAttrs['text-anchor'] = 'end';
+    const label = m.title ? textTag(labelAttrs, m.title) : '';
     return tag('g', { 'data-layer': 'milestone', 'data-id': m.id ?? null }, flag + label);
 }
 
@@ -812,20 +823,21 @@ function renderMilestoneCutLine(m: PositionedMilestone, palette: Theme): string 
             'stroke-linecap': 'round',
         }),
     );
-    if (m.slackX !== undefined) {
+    if (m.slackArrows && m.slackArrows.length > 0) {
         const slackColor = palette.milestoneDiamond.slack;
-        const y = m.slackY ?? m.center.y;
-        parts.push(
-            tag('path', {
-                d: `M${num(m.slackX)} ${num(y)} H${num(m.center.x - 6)}`,
-                fill: 'none',
-                stroke: slackColor,
-                'stroke-width': 1.1,
-                'stroke-dasharray': '3 3',
-                'stroke-linecap': 'round',
-                'marker-end': 'url(#nl-arrow-dark)',
-            }),
-        );
+        for (const arrow of m.slackArrows) {
+            parts.push(
+                tag('path', {
+                    d: `M${num(arrow.x)} ${num(arrow.y)} H${num(m.center.x - 6)}`,
+                    fill: 'none',
+                    stroke: slackColor,
+                    'stroke-width': 1.1,
+                    'stroke-dasharray': '3 3',
+                    'stroke-linecap': 'round',
+                    'marker-end': 'url(#nl-arrow-dark)',
+                }),
+            );
+        }
     }
     return parts.join('');
 }

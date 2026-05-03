@@ -231,6 +231,13 @@ export interface PositionedAnchor {
     // True when this anchor was bumped above the in-row baseline because a
     // milestone shares the same x-column.
     bumpedUp: boolean;
+    // Resolved label placement. The marker-row packer decides whether the
+    // title sits to the right (default) or the left of the diamond, and
+    // whether the entity drops to a lower row to avoid colliding with
+    // earlier markers' label boxes. Renderer uses `labelBox.x/y` directly
+    // (start-anchored text) — no further geometry decisions.
+    labelBox: BoundingBox;
+    labelSide: 'left' | 'right';
 }
 
 export interface PositionedMilestone {
@@ -239,13 +246,48 @@ export interface PositionedMilestone {
     center: Point;
     radius: number;
     fixed: boolean;            // true for date: style, false for after: style
-    slackX?: number;           // x of the non-binding predecessor's visual end
-    slackY?: number;           // y midline of that predecessor (drawn at row height)
+    // One slack arrow per non-binding predecessor. Each entry's (x, y) is
+    // the predecessor's right-edge midpoint; the arrow runs horizontally
+    // from there to (center.x - 6) at y. Empty / undefined when the
+    // milestone has zero or one predecessor.
+    slackArrows?: Array<{ x: number; y: number }>;
     isOverrun: boolean;        // true when the aggregated predecessor end exceeds `date:`
     style: ResolvedStyle;
     // Vertical span of the milestone's cut line through the swimlane area.
     cutTopY: number;
     cutBottomY: number;
+    // See PositionedAnchor.labelBox — same packing logic applies.
+    labelBox: BoundingBox;
+    labelSide: 'left' | 'right';
+}
+
+/**
+ * Result of packing a marker-row entity (anchor or milestone) into the
+ * dynamic row stack. `rowIndex == 0` is the in-row baseline; positive
+ * indices push the diamond DOWN by `step` px each. The label box is
+ * absolute and already accounts for left/right side flipping when the
+ * preferred side would overflow the chart.
+ */
+export interface MarkerRowPlacement {
+    rowIndex: number;
+    centerY: number;
+    labelBox: BoundingBox;
+    labelSide: 'left' | 'right';
+}
+
+/**
+ * Horizontal corridor occupied by a milestone's slack arrow. Sits at
+ * the slack predecessor's row Y, running from the predecessor's right
+ * edge to the milestone's column. Items whose natural placement would
+ * intersect this band must drop to a row whose Y does not match `y`,
+ * so the arrow has clear horizontal space to travel.
+ */
+export interface SlackCorridor {
+    xStart: number;       // slack pred's right edge (logical chart x)
+    xEnd: number;         // binding pred's right edge / milestone center.x
+    y: number;            // slack pred's row midpoint
+    slackPredId: string;  // exempt from bumping (owns the arrow's origin)
+    milestoneId: string;
 }
 
 export interface PositionedDependencyEdge {
