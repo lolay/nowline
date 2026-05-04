@@ -118,4 +118,9 @@ export interface LayoutHelpers {
     ) => number;
     newCursor: (x: number, y: number) => TrackCursor;
     estimateTextWidth: (text: string, fontSize: number) => number;
+    /** Predict the extra height an item's wrapped label-chip rows will
+     *  add, so callers can size the row pitch BEFORE handing off to
+     *  `sequenceItem`. Returns 0 when the item's labels all fit on a
+     *  single chip row. */
+    predictItemChipExtraHeight: (item: ItemDeclaration, ctx: LayoutContext) => number;
 }

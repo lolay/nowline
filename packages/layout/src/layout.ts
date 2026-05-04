@@ -77,6 +77,10 @@ import {
 } from './header-card-geometry.js';
 import {
     ITEM_CAPTION_INSET_X_PX,
+    ITEM_CAPTION_META_BASELINE_OFFSET_PX,
+    ITEM_CAPTION_SPILL_GAP_PX,
+    ITEM_LINK_ICON_INSET_PX,
+    ITEM_LINK_ICON_TILE_SIZE_PX,
     LABEL_CHIP_HEIGHT_PX,
     LABEL_CHIP_GAP_ABOVE_PROGRESS_STRIP_PX,
     LABEL_CHIP_GAP_BETWEEN_PX,
@@ -228,7 +232,46 @@ function sequenceItem(
     const logicalLeft = startX;
     const logicalRight = startX + naturalWidth;
 
-    // Handle `before:` — item must end by the named anchor/milestone x
+    const linkRaw = propValue(props, 'link');
+    const linkInfo = parseLinkIcon(linkRaw);
+    const hasLinkIcon = linkInfo.icon !== 'none';
+
+    // Pre-compute the chip row geometry — every chip renders at its
+    // NATURAL text-fit width on a single horizontal row, never
+    // truncated. We only need the total row width here so we can
+    // decide whether the row fits inside the bar; concrete chip
+    // (x, y) placement comes after ItemNode resolves the visible
+    // bar box below.
+    //
+    // Chips sit at the bar's bottom (just above the progress strip)
+    // and the link icon (when present) sits in the bar's UPPER-LEFT
+    // corner, so they no longer share a vertical band — chips have
+    // the full caption-inset-bounded inner width regardless of
+    // whether a link icon is rendered. The link-icon column's
+    // horizontal cost is borne by the caption (title/meta) inset
+    // instead, see `ItemNode`.
+    const visualWidthPredict = Math.max(MIN_ITEM_WIDTH, naturalWidth - 2 * ITEM_INSET_PX);
+    const labelIds = propValues(props, 'labels');
+    const chipSamples: { label: LabelDeclaration; width: number }[] = [];
+    for (const labelId of labelIds) {
+        const label = ctx.labels.get(labelId);
+        if (!label) continue;
+        const sample = buildLabelChip(label, ctx.styleCtx, 0, 0);
+        chipSamples.push({ label, width: sample.box.width });
+    }
+    let chipRowWidth = 0;
+    for (let i = 0; i < chipSamples.length; i += 1) {
+        if (i > 0) chipRowWidth += LABEL_CHIP_GAP_BETWEEN_PX;
+        chipRowWidth += chipSamples[i].width;
+    }
+    const chipInsideAvailWidth = Math.max(
+        0,
+        visualWidthPredict - 2 * ITEM_CAPTION_INSET_X_PX,
+    );
+    const chipsOutside =
+        chipSamples.length > 0 && chipRowWidth > chipInsideAvailWidth;
+
+    // Handle `before:` — item must end by the named anchor/milestone x.
     let hasOverflow = false;
     let overflowBox: BoundingBox | undefined;
     let overflowAnchorId: string | undefined;
@@ -236,8 +279,6 @@ function sequenceItem(
         const beforeX = ctx.entityLeftEdges.get(beforeRaw);
         if (beforeX !== undefined) {
             if (logicalRight > beforeX) {
-                // Flag the overflow tail; we still render the natural bar but
-                // the tail past beforeX is marked red by the renderer.
                 hasOverflow = true;
                 overflowBox = {
                     x: beforeX,
@@ -341,6 +382,7 @@ function sequenceItem(
         logicalLeftX: logicalLeft,
         logicalRightX: logicalRight,
         metaText,
+        hasLinkIcon,
     }).place(
         { x: logicalLeft, y: cursor.y },
         { time: ctx.scale, bands: ctx.bandScale, style },
@@ -348,25 +390,45 @@ function sequenceItem(
     const itemBox = placed.box;
     const textSpills = placed.textSpills;
 
-    // Label chips laid out left → right INSIDE the item bar, sitting just
-    // above the bottom progress strip (`PROGRESS_STRIP_HEIGHT_PX`).
+    // Label chips lay out left → right on a SINGLE horizontal row.
+    // Each chip keeps its natural text-fit width — chips never
+    // truncate, never shrink, never wrap to a second row. When the
+    // row's total width exceeds the bar's effective inner width
+    // (`chipsOutside === true`) the entire row spills past the bar's
+    // right edge. Inside or outside, chips are LEFT-aligned.
+    //
+    // Chip row Y:
+    //   - inside the bar, or outside-with-no-caption-spill →
+    //     anchored just above the progress strip (the original
+    //     bottom-of-bar position).
+    //   - outside AND the caption (title/meta) ALSO spilled →
+    //     drop BELOW the meta baseline so the chip row stacks
+    //     under the spilled title + meta column at the same x
+    //     instead of colliding with the meta line.
     const labelChips: PositionedLabelChip[] = [];
-    const labelIds = propValues(props, 'labels');
-    const chipY = itemBox.y + itemBox.height
+    const baseChipY = itemBox.y + itemBox.height
         - PROGRESS_STRIP_HEIGHT_PX
         - LABEL_CHIP_HEIGHT_PX
         - LABEL_CHIP_GAP_ABOVE_PROGRESS_STRIP_PX;
-    let chipX = itemBox.x + ITEM_CAPTION_INSET_X_PX;
-    const chipMaxRight = itemBox.x + itemBox.width - ITEM_CAPTION_INSET_X_PX;
-    for (const id of labelIds) {
-        const label = ctx.labels.get(id);
-        if (!label) continue;
-        const remaining = Math.max(8, chipMaxRight - chipX);
-        const chip = buildLabelChip(label, ctx.styleCtx, chipX, chipY, remaining);
+    const captionStackChipY =
+        itemBox.y + ITEM_CAPTION_META_BASELINE_OFFSET_PX
+        + LABEL_CHIP_GAP_ABOVE_PROGRESS_STRIP_PX;
+    const chipY = chipsOutside && textSpills
+        ? captionStackChipY
+        : baseChipY;
+    const chipStartX = chipsOutside
+        ? itemBox.x + itemBox.width + ITEM_CAPTION_SPILL_GAP_PX
+        : itemBox.x + ITEM_CAPTION_INSET_X_PX;
+    let chipCursorX = chipStartX;
+    for (let i = 0; i < chipSamples.length; i += 1) {
+        const { label } = chipSamples[i];
+        const chip = buildLabelChip(label, ctx.styleCtx, chipCursorX, chipY);
         labelChips.push(chip);
-        chipX += chip.box.width + LABEL_CHIP_GAP_BETWEEN_PX;
-        if (chipX >= chipMaxRight) break;
+        chipCursorX += chip.box.width + LABEL_CHIP_GAP_BETWEEN_PX;
     }
+    const chipsRightX = chipSamples.length > 0
+        ? chipCursorX - LABEL_CHIP_GAP_BETWEEN_PX
+        : chipStartX;
 
     // Footnote superscript indicators. Authors can attach a footnote to
     // an item from either direction:
@@ -390,10 +452,6 @@ function sequenceItem(
         }
     }
     const footnoteIndicators = [...footnoteIndicatorSet].sort((a, b) => a - b);
-
-    // Link icon
-    const linkRaw = propValue(props, 'link');
-    const linkInfo = parseLinkIcon(linkRaw);
 
     const owner = ownerDisplay ?? ownerOverride ?? propValue(props, 'owner');
     const description = node.description?.text;
@@ -425,6 +483,10 @@ function sequenceItem(
 
     cursor.x = logicalRight;
     cursor.maxX = Math.max(cursor.maxX, cursor.x);
+    // The next row in a parallel/group/lane starts at
+    // `cursor.y + cursor.height`. Bars never grow vertically for
+    // labels — chips render on a single row inside or outside the
+    // bar — so this stays at `bandScale.step()`.
     cursor.height = Math.max(cursor.height, ctx.bandScale.step());
 
     const result: PositionedItem = {
@@ -436,6 +498,8 @@ function sequenceItem(
         progressFraction: progress,
         footnoteIndicators,
         labelChips,
+        chipsOutside,
+        chipsRightX,
         linkIcon: linkInfo.icon,
         linkHref: linkInfo.href,
         hasOverflow,
@@ -463,7 +527,14 @@ function sequenceGroup(
     cursor: TrackCursor,
     ctx: LayoutContext,
 ): PositionedGroup {
-    return new GroupNode(node, { sequenceOne, newCursor }).place(cursor, ctx);
+    return new GroupNode(node, {
+        sequenceItem,
+        sequenceOne,
+        resolveChildStart,
+        newCursor,
+        estimateTextWidth,
+        predictItemChipExtraHeight,
+    }).place(cursor, ctx);
 }
 
 function sequenceOne(
@@ -482,6 +553,20 @@ function sequenceOne(
 // row bump rather than draw an item with a clipped title.
 function estimateTextWidth(text: string, fontSize: number): number {
     return text.length * fontSize * 0.58;
+}
+
+/**
+ * Predict an item's extra vertical height (px) — kept on the
+ * dependency-injection chain for the row-packer, but always returns
+ * 0 in the current design: chip rows render in a single horizontal
+ * row inside or outside the bar (never wrapping vertically), so the
+ * bar's height never grows for labels.
+ */
+function predictItemChipExtraHeight(
+    _item: ItemDeclaration,
+    _ctx: LayoutContext,
+): number {
+    return 0;
 }
 
 // Resolve the desired startX for a swimlane child, honoring `date:` (fixed
@@ -525,6 +610,7 @@ function buildSwimlane(
             resolveChildStart,
             newCursor,
             estimateTextWidth,
+            predictItemChipExtraHeight,
         },
     ).place({ x: ctx.timeline.originX, y }, ctx);
 }
@@ -947,6 +1033,7 @@ export function layoutRoadmap(
         resolveChildStart,
         newCursor,
         estimateTextWidth,
+        predictItemChipExtraHeight,
         computeDateWindow,
         sizeBesideHeader,
         collectItems,

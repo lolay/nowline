@@ -16,6 +16,10 @@
 import type { BoundingBox } from '../types.js';
 import type { Renderable, MeasureContext, PlaceContext, IntrinsicSize, Point } from '../renderable.js';
 import { ITEM_INSET_PX, MIN_ITEM_WIDTH } from '../themes/shared.js';
+import {
+    ITEM_LINK_ICON_INSET_PX,
+    ITEM_LINK_ICON_TILE_SIZE_PX,
+} from '../item-bar-geometry.js';
 
 /**
  * Inner padding applied on each side of the title text — the bar's
@@ -45,6 +49,12 @@ export interface ItemNodeInput {
     logicalRightX: number;
     /** Caption text shown under the title (e.g. "1w - 50% remaining"). */
     metaText?: string;
+    /**
+     * True when the bar shows a link icon in its upper-left corner.
+     * Caption text indents past the icon column so the title doesn't
+     * collide with the icon.
+     */
+    hasLinkIcon?: boolean;
 }
 
 export interface PlacedItemGeometry {
@@ -93,10 +103,20 @@ export class ItemNode implements Renderable<PlacedItemGeometry> {
             x: boxX,
             y: origin.y,
             width: visualWidth,
-            height: ctx.bands.bandwidth(),
+            height: intrinsic.height,
         };
 
-        const innerWidth = Math.max(0, visualWidth - 2 * TEXT_INSET_PX);
+        // The link icon (when present) lives in the bar's upper-left
+        // and shares the title's vertical band. The caption indents
+        // past the icon so the title doesn't render on top of it.
+        const linkColumn = this.input.hasLinkIcon
+            ? ITEM_LINK_ICON_INSET_PX +
+              ITEM_LINK_ICON_TILE_SIZE_PX +
+              LINK_ICON_TO_CAPTION_GAP_PX -
+              TEXT_INSET_PX
+            : 0;
+        const captionLeftInset = TEXT_INSET_PX + Math.max(0, linkColumn);
+        const innerWidth = Math.max(0, visualWidth - captionLeftInset - TEXT_INSET_PX);
         const titleStr = this.input.title;
         const titleWidth = titleStr ? estimateTextWidth(titleStr, TITLE_FONT_SIZE_PX) : 0;
         const metaWidth = this.input.metaText
@@ -107,7 +127,7 @@ export class ItemNode implements Renderable<PlacedItemGeometry> {
             (this.input.metaText !== undefined && metaWidth > innerWidth);
         const textX = textSpills
             ? boxX + visualWidth + TEXT_OUTSIDE_GAP_PX
-            : boxX + TEXT_INSET_PX;
+            : boxX + captionLeftInset;
 
         return {
             id: this.input.id,
@@ -117,3 +137,9 @@ export class ItemNode implements Renderable<PlacedItemGeometry> {
         };
     }
 }
+
+/**
+ * Horizontal gap (px) between the link-icon tile's right edge and the
+ * start of the caption text when both render inside the bar.
+ */
+const LINK_ICON_TO_CAPTION_GAP_PX = 4;

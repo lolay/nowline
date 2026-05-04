@@ -235,10 +235,10 @@ swimlane platform
   item deploy "Deploy" duration:s
 ```
 
-- Items inside a group execute sequentially (same as swimlane behavior).
+- Items inside a group execute sequentially (same as swimlane behavior). The renderer uses the same row-pack engine swimlanes use, so an item whose desired start collides with a sibling's logical right edge, an upstream caption's spill reservation, or a slack-arrow corridor bumps to a new inner row inside the group's content area. The group's bounding box grows vertically to encompass every populated row.
 - Inside a swimlane (outside a parallel block), the group is sequential with respect to its siblings — `deploy` starts after `api-docs` finishes.
-- **Styled group** — when a group has `style:`, `labels:`, or other visual properties, it renders with a visible bounding box. Useful for visually bundling related items.
-- **Unstyled group** — when a group has no style or labels, it is purely structural. No visible artifact in the rendered output; it only governs sequencing.
+- **Styled group** — when a group has `style:`, `labels:`, or other visual properties, it renders with a visible bounding box plus a small title chiclet anchored flush in the box's upper-left corner. The chiclet sits entirely inside the box (no overhang) and the box reserves vertical pad above the first inner row plus a symmetric pad below the last row. See `specs/rendering.md` "Group (styled)" for the full chiclet contract.
+- **Unstyled group** — when a group has no style or labels, it is purely structural. No visible artifact in the rendered output; it only governs sequencing and inner row growth.
 
 #### `parallel` with `group` — parallel sequential tracks
 
@@ -307,7 +307,7 @@ These properties and directives are valid on every entity type: items, swimlanes
 
 | Property / Directive | Type          | Description                                                                                          |
 | -------------------- | ------------- | ---------------------------------------------------------------------------------------------------- |
-| `labels`             | list          | Tags for filtering and display. `labels:[enterprise, security]`.                                     |
+| `labels`             | list          | Tags for filtering and display. `labels:[enterprise, security]`. On an item, each label renders as an atomic chiclet inside the bar; chips that don't fit on a single row wrap to additional rows and the bar grows downward. See `specs/rendering.md` "Labels" for the wrapping contract. |
 | `link`               | URL           | Single URL to external content.                                                                      |
 | `style`              | identifier    | Single reference to a named style declared in config. `style:enterprise`. This is the only visual property allowed on an entity. |
 | `description`        | sub-directive | Indented under the entity. Longer explanatory text. `description "Details here"`                     |

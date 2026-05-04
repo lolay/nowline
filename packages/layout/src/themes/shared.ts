@@ -116,6 +116,43 @@ export const FRAME_TAB_HEIGHT_PX = 22;
 /** Baseline Y of the chiclet label relative to the tab's top edge. */
 export const FRAME_TAB_LABEL_BASELINE_OFFSET_PX = 15;
 
+// Group title chiclet — the small label tab anchored flush in the upper-left
+// corner of a styled group's bounding box. Smaller than the frame-tab so it
+// reads as a "container label" rather than a sibling of the swimlane tab.
+//
+// The chiclet's top edge aligns with the group box's top edge and its left
+// edge aligns with the box's left edge (no overhang). The group reserves
+// `GROUP_TITLE_TAB_HEIGHT_PX + GROUP_TITLE_TAB_GUTTER_PX` of vertical top
+// padding inside the box before the first child row begins, so the chiclet
+// never overlaps content. Bumping the height without re-tuning
+// `GROUP_TITLE_TAB_LABEL_BASELINE_OFFSET_PX` mis-centers the label.
+
+/** Height (px) of the group-title chiclet anchored at the box's upper-left. */
+export const GROUP_TITLE_TAB_HEIGHT_PX = 16;
+
+/** Horizontal padding (px) on each side of the title text inside the chiclet. */
+export const GROUP_TITLE_TAB_PAD_X_PX = 6;
+
+/** Vertical gap (px) between the chiclet's bottom edge and the first inner row. */
+export const GROUP_TITLE_TAB_GUTTER_PX = 4;
+
+/** Baseline Y of the chiclet label relative to the chiclet's top edge.
+ *  Tuned for a 9 pt bold glyph roughly vertically centered in a 16 px tab. */
+export const GROUP_TITLE_TAB_LABEL_BASELINE_OFFSET_PX = 11;
+
+/** Font size (px) of the group-title chiclet label. */
+export const GROUP_TITLE_TAB_LABEL_FONT_SIZE_PX = 9;
+
+/** Approximate per-character width factor used to size the chiclet to its
+ *  title text. Mirrors the constant used in the renderer's pre-port code
+ *  so the chiclet hugs short titles without clipping long ones. */
+export const GROUP_TITLE_TAB_CHAR_WIDTH_PX = 5.5;
+
+/** Padding (px) reserved on the inside-bottom of a styled group box before
+ *  its lower stroke. Symmetric with the chiclet gutter so children breathe
+ *  on both ends. */
+export const GROUP_BOTTOM_PAD_PX = 4;
+
 /**
  * Dashed-accent pattern (px on / px off) used for two nowline accents
  * that read as "structural emphasis": the milestone vertical cut line

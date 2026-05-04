@@ -150,11 +150,19 @@ The now-line is the hero visual element — the vertical line marking today on t
 
 ### Item Bars
 
-Each roadmap item renders as a horizontal bar. Width is determined by `duration`. Height is auto-computed from `text-size` + `padding` + content. Bar contents include title, status indicator, owner, label chiclets, and footnote indicators.
+Each roadmap item renders as a horizontal bar. Width is determined by `duration`. Height equals the band's `bandwidth()` — bars are uniform-height within a row regardless of label count. Bar contents include title, status indicator, owner, label chiclets, and footnote indicators.
 
 - **Status indicator:** Colored dot — green (done), blue (in-progress), yellow (at-risk), red (blocked), gray (planned). Custom statuses use a neutral indicator.
-- **Progress bar:** When `remaining` is set, the bar fills proportionally (e.g., `remaining:30%` → 70% filled). `status:done` fills the bar completely regardless of `remaining`.
-- **Link icon:** The renderer pattern-matches the URL domain to show a service icon: `linear.app` → Linear, `github.com` → GitHub, `jira.atlassian.net` → Jira, etc. Falls back to a generic link icon. Clicking the bar navigates to the link.
+- **Progress bar:** When `remaining` is set, the bar fills proportionally (e.g., `remaining:30%` → 70% filled). `status:done` fills the bar completely regardless of `remaining`. The strip sits at the bar's bottom.
+- **Link icon:** A 14×14 colored tile in the bar's UPPER-LEFT corner with a white outbound-arrow ↗ glyph. The glyph is the SAME for every link target — only the tile color changes by service:
+    - `linear.app` → **Linear** (purple tile)
+    - `github.com` → **GitHub** (slate tile)
+    - `*.atlassian.net` / `jira.*` → **Jira** (blue tile)
+    - any other URL → **Generic** (theme-neutral tile)
+
+  Item-level `link:` always means "navigates to this URL", regardless of whether the target is `.nowline` or anything else. When a link icon is rendered, the caption text indents past the icon column so the title and icon never overlap inside the bar. The visually-distinct stacked-sheets glyph is reserved for the file-level `include` region badge — see [Include Region](#include-region).
+- **Caption (title + meta) — no wrap, horizontal spill**: when the title or meta line is wider than the bar's inner area, the caption renders OUTSIDE the bar to the right (`textSpills=true`). Caption text never wraps to a second line. Caption spill reserves an x-extent on the row so the next chained item bumps to a fresh row instead of overlapping the spilled text.
+- **Label chips — single row, horizontal spill**: chips render at natural text width on a single row inside the bar, left-aligned to the caption inset. When the row's total width exceeds the bar's effective inner width, the entire chip row spills past the bar's right edge (same y as inside, still left-aligned). Bars never grow vertically for labels — see [Labels](#labels).
 
 #### Item Flow
 
@@ -269,13 +277,17 @@ When an entity has multiple labels with different styles, the first label's styl
 
 ### Labels
 
-Labels render as **chiclets** — small, pill-shaped badges (`corner-radius:full` by default). They appear inline on the entity they're attached to (typically inside the item bar, after the title text).
+Labels render as **chiclets** — small, pill-shaped badges (`corner-radius:full` by default). They appear inline on the entity they're attached to (typically inside the item bar, just above the bottom progress strip).
 
 - **Shape**: pill shape via `corner-radius:full` (system default for labels). Users can override to any `corner-radius` value.
 - **Colors**: background and text color from the label's resolved style (`bg`, `text`). If no style, use a neutral default (light gray bg, dark text).
 - **Text**: label title in a smaller text size than the entity title (auto-derived, similar to description text rules).
-- **Multiple labels**: render left-to-right in declaration order, with a small horizontal gap between chiclets.
-- **Overflow**: if labels don't fit within the item bar, they wrap to a second line or overflow to the right (renderer's discretion based on available space).
+- **Multiple labels**: render left-to-right in declaration order, with a small horizontal gap between chiclets, **left-aligned** to the bar's caption inset.
+- **Natural width, never truncated**: every chiclet renders at its natural text-fit width. Chips never shrink, never clip, never get capped to fit inside the bar.
+- **Single-row layout, no vertical wrap**: chips lay out on a SINGLE horizontal row, just above the bottom progress strip. They never wrap to a second row inside the bar, and the bar's height never grows for labels — `box.height` stays at `bandwidth()` regardless of label count.
+- **Horizontal spill outside the bar**: when the chip row's total natural width exceeds the bar's effective inner width (the inner area minus the link-icon column when present), the entire chip row spills past the bar's right edge starting at `bar.right + ITEM_CAPTION_SPILL_GAP_PX`, still left-aligned among each other. This mirrors how the title + meta caption already spill (see [Item Bars](#item-bars)). The chip row spill reserves an x-extent on the row so the next chained item bumps to a fresh row instead of overlapping the spilled chips. Caption spill (title/meta) and chip spill share that reservation — the row reserves the max of the two contributions past the bar edge.
+- **Spilled chip-row Y**: when chips spill but the title + meta caption stays inside the bar, the spilled chip row keeps its original Y (just above the bottom progress strip) — there is no caption text at the spill column to collide with. When BOTH the caption and the chip row spill, the chips drop below the meta baseline so the spilled stack reads as `title → meta → chips` at a single column to the right of the bar, never overlapping.
+- **Link-icon column adjustment**: when an item has a `link:`, the bar's bottom-right corner shows a square link-icon tile that vertically aligns with the chip row. The effective inner width used to decide spill subtracts that tile's footprint, so a chip whose natural width would collide with the icon spills outside instead of overlapping it. Chips small enough to fit alongside the icon stay inside the bar.
 
 ### Parallel and Group Rendering
 
@@ -294,15 +306,21 @@ Items and groups inside a `parallel` block render as parallel horizontal tracks 
 
 #### Group (styled)
 
-When a group has `style:`, `labels:`, or other visual properties, it renders as a visible bounding box around its sequential items. The box uses the resolved style (bg, border, corner-radius, shadow, label badges, etc.). The group's title, if present, renders as a label on the bounding box.
+When a group has `style:`, `labels:`, or other visual properties, it renders as a visible bounding box around its sequential items. The box uses the resolved style (bg, border, corner-radius, shadow, label badges, etc.).
+
+- **Title chiclet**: the group title renders as a small filled rounded-rectangle chiclet anchored **flush in the upper-left corner** of the bounding box. The chiclet's top edge aligns with the group box's top edge and its left edge aligns with the box's left edge — there is **no overhang**: the chiclet sits entirely *inside* the bounding box, never extending up or left of it. The chiclet hugs its title text width plus a small horizontal padding so short titles produce small chiclets and long titles produce wider ones.
+- **Top padding**: a styled group reserves vertical space inside its box equal to the chiclet height plus a small gutter before the first inner row begins, so the chiclet never overlaps with content.
+- **Bottom padding**: the group reserves a symmetric bottom pad before its lower stroke so children breathe at both ends of the box.
+- **Inner row-packing**: a group sequences children using the same row-pack engine as a swimlane. An item whose desired start collides with a sibling's logical right edge, an upstream caption's spill reservation, or a slack-arrow corridor bumps to a new inner row inside the group. The group's bounding box grows vertically to encompass every populated row plus the chiclet pad and bottom pad. Parallel/group blocks nested inside a group claim a fresh row at the bottom of the stack, just like inside a swimlane.
+- **Horizontal expansion for caption spill**: the painted box also grows *horizontally* to encompass any caption text that spills past the right edge of an inner item's bar (titles and meta render adjacent to the bar — see [Item Bars](#item-bars)). The orange tint visually "owns" the spilled title/meta so the captions read as belonging to the group rather than floating in empty whitespace. The painted box and the logical cursor advance are intentionally decoupled: the group reports the wide right edge in `box.width` (used by the renderer) but reports the compact right edge in the cursor channel (used by the parent for sequencing the next sibling). This keeps siblings to the right of the group positioned against the bars rather than the captions, while the orange tint still wraps the visible footprint. Because the cursor channel stays compact, the group's wide painted box can extend past the parent `parallel`'s logical right edge — the parallel renders no rect of its own, so the visual is owned by the inner group.
 
 #### Group (unstyled)
 
-When a group has no style or labels, it is purely structural — no visible border, background, or label. Items render sequentially as if the group weren't there visually. The group is invisible in the rendered output but still governs sequencing.
+When a group has no style or labels, it is purely structural — no visible border, background, no chiclet. Items render with the same row-pack flow as a styled group (so collisions still bump to new rows), but the box reserves no top/bottom pad and the renderer paints no border or background. The group is invisible in the rendered output but still governs sequencing and inner row growth.
 
 #### Parallel with Groups
 
-Each group inside a parallel block renders as its own horizontal sub-track. Styled groups show their bounding boxes; unstyled groups just show their items in a row. The parallel bracket and join line (when `bracket` is set) encompass all sub-tracks.
+Each group inside a parallel block renders as its own horizontal sub-track. Styled groups show their bounding boxes (with the upper-left chiclet); unstyled groups just show their items in a row. The parallel bracket and join line (when `bracket` is set) encompass all sub-tracks. A styled group inside a parallel reports its full grown height (chiclet pad + every inner row + bottom pad) so the parallel stacks subsequent sub-tracks below the group's painted footprint, not just its first row.
 
 ### Footnotes
 
@@ -320,13 +338,13 @@ Footnotes render in a footnote section rather than as floating callout boxes.
 - Footnotes are ordered sequentially by document order.
 - The footnote area respects the roadmap's `padding` for horizontal alignment with the chart above.
 
-### Included Roadmap Region (`roadmap:isolate`)
+### Included Roadmap Region (`roadmap:isolate`)<a id="include-region"></a>
 
 When a file is included with `roadmap:isolate`, all of its content renders inside a visually distinct region:
 
 - **Dashed border** — a dashed rectangle encloses all swimlanes, items, anchors, milestones, and footnotes originating from the included file.
 - **Region label** — the included roadmap's title is displayed at the top-left of the dashed border.
-- **Include indicator** — a small icon or badge (e.g., a link/external icon) appears next to the region label to mark it as externally included content.
+- **Include badge** — an 18×18 tile rendered just to the right of the region label tab, showing a **stacked-sheets glyph** (back rectangle peeking behind a front rectangle). This is intentionally a different glyph family from item-level `link:` icons so a viewer can tell at a glance whether they are looking at a content pull (one document brings in another) versus a navigation jump. The included file's source path renders to the right of the badge.
 - **Timeline alignment** — the region shares the parent roadmap's timeline scale and axis. No separate header row is rendered for the included content.
 - **Swimlane containment** — swimlanes within the region render normally but are visually contained within the dashed border.
 - **Cross-references** — dependency arrows and predecessor lines that cross the region boundary render normally, passing through the dashed border.

@@ -35,6 +35,11 @@ import {
     TIMELINE_TICK_LABEL_BASELINE_OFFSET_PX,
     FRAME_TAB_HEIGHT_PX,
     FRAME_TAB_LABEL_BASELINE_OFFSET_PX,
+    GROUP_TITLE_TAB_HEIGHT_PX,
+    GROUP_TITLE_TAB_PAD_X_PX,
+    GROUP_TITLE_TAB_LABEL_BASELINE_OFFSET_PX,
+    GROUP_TITLE_TAB_LABEL_FONT_SIZE_PX,
+    GROUP_TITLE_TAB_CHAR_WIDTH_PX,
     ACCENT_DASH_PATTERN,
     HEADER_CARD_PADDING_X,
     HEADER_CARD_PADDING_TOP,
@@ -519,7 +524,13 @@ function renderItem(i: PositionedItem, options: RenderOptions, idPrefix: string,
             fx -= ITEM_FOOTNOTE_INDICATOR_STEP_PX;
         }
     }
-    // Link icon — colored tile + white external-link glyph at bottom-right.
+    // Link icon — colored tile + white external-link glyph at the
+    // bar's UPPER-LEFT corner. The glyph is the same outbound-arrow
+    // ↗ for every link kind (linear / github / jira / generic) —
+    // they only differ in tile color. The include FILE-LEVEL region
+    // (`include "./other.nowline"`) uses a separate stacked-sheets
+    // glyph rendered by `renderIncludeRegion`, distinct from this
+    // item-level link icon.
     if (!options.noLinks && i.linkIcon && i.linkIcon !== 'none') {
         const tileColor: Record<string, string> = {
             linear: '#5e6ad2',
@@ -529,8 +540,8 @@ function renderItem(i: PositionedItem, options: RenderOptions, idPrefix: string,
         };
         const tile = tileColor[i.linkIcon] ?? tileColor.generic;
         const tileSize = ITEM_LINK_ICON_TILE_SIZE_PX;
-        const tileX = i.box.x + i.box.width - tileSize - ITEM_LINK_ICON_INSET_PX;
-        const tileY = i.box.y + i.box.height - tileSize - ITEM_LINK_ICON_INSET_PX;
+        const tileX = i.box.x + ITEM_LINK_ICON_INSET_PX;
+        const tileY = i.box.y + ITEM_LINK_ICON_INSET_PX;
         const tileRect = tag('rect', {
             x: num(tileX),
             y: num(tileY),
@@ -540,7 +551,6 @@ function renderItem(i: PositionedItem, options: RenderOptions, idPrefix: string,
             ry: 2,
             fill: tile,
         });
-        // External-link glyph: arrow ↗ inside a 14×14 tile.
         const gx = tileX;
         const gy = tileY;
         const glyph = tag('path', {
@@ -625,14 +635,15 @@ function renderGroup(g: PositionedGroup, options: RenderOptions, idPrefix: strin
     const parts: string[] = [];
     const hasFill = g.style.bg !== 'none' && g.style.bg !== '#ffffff';
     if (hasFill) {
-        // Filled-box style with a chiclet label tab overhanging the top.
-        const pad = 8;
+        // Filled-box style with a chiclet label flush in the upper-left
+        // corner. The painted box matches the layout-reported `box` 1:1
+        // (no overhang), so parents stack against the right rectangle.
         parts.push(
             tag('rect', {
-                x: num(g.box.x - pad),
-                y: num(g.box.y - 2),
-                width: num(g.box.width + pad * 2),
-                height: num(g.box.height + 4),
+                x: num(g.box.x),
+                y: num(g.box.y),
+                width: num(g.box.width),
+                height: num(g.box.height),
                 rx: 6,
                 ry: 6,
                 fill: g.style.bg,
@@ -643,31 +654,44 @@ function renderGroup(g: PositionedGroup, options: RenderOptions, idPrefix: strin
             }),
         );
         if (g.title) {
-            const tabW = Math.max(60, g.title.length * 7);
-            const tabH = 16;
-            const tabX = g.box.x - pad + 8;
-            const tabY = g.box.y - 2 - 9;
+            const tabW =
+                g.title.length * GROUP_TITLE_TAB_CHAR_WIDTH_PX +
+                2 * GROUP_TITLE_TAB_PAD_X_PX;
+            const tabX = g.box.x;
+            const tabY = g.box.y;
+            const tabH = GROUP_TITLE_TAB_HEIGHT_PX;
+            // Asymmetric corner shape: TOP-LEFT and BOTTOM-RIGHT are
+            // rounded (radius 6, matching the parent group box), while
+            // TOP-RIGHT and BOTTOM-LEFT are square. The TL roundness
+            // continues the group box's outer corner; the squared
+            // BL / TR sides "anchor" the tab into the box's left and
+            // top edges so it reads as a corner-mounted label rather
+            // than a floating pill.
+            const r = 6;
+            const tabPath =
+                `M${num(tabX + r)} ${num(tabY)}` +
+                `H${num(tabX + tabW)}` +
+                `V${num(tabY + tabH - r)}` +
+                `A${r} ${r} 0 0 1 ${num(tabX + tabW - r)} ${num(tabY + tabH)}` +
+                `H${num(tabX)}` +
+                `V${num(tabY + r)}` +
+                `A${r} ${r} 0 0 1 ${num(tabX + r)} ${num(tabY)}` +
+                `Z`;
             parts.push(
-                tag('rect', {
-                    x: num(tabX),
-                    y: num(tabY),
-                    width: num(tabW),
-                    height: tabH,
-                    rx: 3,
-                    ry: 3,
+                tag('path', {
+                    d: tabPath,
                     fill: g.style.fg,
                 }),
             );
             parts.push(
                 textTag(
                     {
-                        x: num(tabX + tabW / 2),
-                        y: num(tabY + 11),
+                        x: num(tabX + GROUP_TITLE_TAB_PAD_X_PX),
+                        y: num(tabY + GROUP_TITLE_TAB_LABEL_BASELINE_OFFSET_PX),
                         'font-family': FONT_STACK[g.style.font],
-                        'font-size': 9,
+                        'font-size': GROUP_TITLE_TAB_LABEL_FONT_SIZE_PX,
                         'font-weight': 600,
                         fill: '#ffffff',
-                        'text-anchor': 'middle',
                     },
                     g.title,
                 ),
@@ -1154,8 +1178,11 @@ function renderIncludeRegion(
         r.label,
     );
 
-    // External-link badge to the right of the tab. Mirrors the link-icon tile
-    // used in renderItem but inline in the region tab strip.
+    // Include badge to the right of the tab. The glyph here is the
+    // stacked-sheets icon, distinct from the item-level link-icon
+    // outbound-arrow: an `include` is a content pull (one document
+    // brings in another), conceptually different from a `link:` that
+    // navigates somewhere.
     const badgeSize = 18;
     const badgeX = tabX + tabWidth + 6;
     const badgeY = ry - badgeSize / 2;
@@ -1170,9 +1197,11 @@ function renderIncludeRegion(
         stroke: badgeStroke,
         'stroke-width': 1,
     });
-    // Glyph: small external-link arrow.
+    // Glyph: stacked sheets — back rectangle peeking behind front
+    // rectangle. Sized for the 18×18 badge tile.
     const glyph = tag('path', {
-        d: `M${num(badgeX + 5)} ${num(badgeY + 11)} L${num(badgeX + 13)} ${num(badgeY + 5)} M${num(badgeX + 9)} ${num(badgeY + 5)} L${num(badgeX + 13)} ${num(badgeY + 5)} L${num(badgeX + 13)} ${num(badgeY + 9)}`,
+        d: `M${num(badgeX + 7)} ${num(badgeY + 4)} H${num(badgeX + 14)} V${num(badgeY + 11)}` +
+            ` M${num(badgeX + 4)} ${num(badgeY + 7)} H${num(badgeX + 11)} V${num(badgeY + 14)} H${num(badgeX + 4)} Z`,
         stroke: badgeText,
         'stroke-width': 1.4,
         fill: 'none',

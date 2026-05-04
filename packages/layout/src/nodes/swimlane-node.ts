@@ -32,12 +32,12 @@ import type {
     PositionedTrackChild,
     PositionedItem,
     BoundingBox,
-    SlackCorridor,
 } from '../types.js';
 import type { LayoutContext, TrackCursor } from '../layout-context.js';
 import { propValue } from '../dsl-utils.js';
 import { resolveDuration } from '../calendar.js';
 import { frameTabGeometry } from '../frame-tab-geometry.js';
+import { RowPacker } from '../row-packer.js';
 
 /** Helpers that SwimlaneNode delegates to until the rest of m2.5c lands. */
 export interface SwimlaneNodeDeps {
@@ -60,6 +60,10 @@ export interface SwimlaneNodeDeps {
     ) => number;
     newCursor: (x: number, y: number) => TrackCursor;
     estimateTextWidth: (text: string, fontSize: number) => number;
+    /** Predict the extra vertical height an item's wrapped label-chip
+     *  rows will add to its bar; used to size the row-packer's row
+     *  pitch ahead of the call to `sequenceItem`. */
+    predictItemChipExtraHeight: (item: ItemDeclaration, ctx: LayoutContext) => number;
 }
 
 export interface SwimlaneNodeInput {
@@ -150,40 +154,16 @@ export class SwimlaneNode {
             firstChildDesiredX >= tabRightX + TAB_GUTTER_PX;
         const startY = origin.y + (canAlignFirstRowWithTab ? TAB_TOP_Y : TAB_BOTTOM_Y);
 
-        // Topmost-fit row tracker. Each row records the rightmost edge
-        // reached by an item placed in that row plus a caption-spill
-        // reservation. A new item is placed in the FIRST row where its
-        // logical extent fits and no slack-arrow corridor crosses the
-        // row at the item's x-range; if no such row exists a fresh row
-        // is appended below. Parallel / group blocks always claim
-        // contiguous rows at the bottom of the stack — items declared
-        // after a block can still flow back into earlier rows.
-        interface Row {
-            y: number;
-            rightEdge: number;
-            spillX: number;
-        }
-        const rows: Row[] = [{ y: startY, rightEdge: laneLeftX, spillX: laneLeftX }];
+        // Topmost-fit row pack. See `RowPacker` for the full contract.
+        // The packer owns the rows; we feed it children in DSL order and
+        // it returns each child's resolved (rowIndex, y).
+        const packer = new RowPacker({
+            laneLeftX,
+            originY: startY,
+            minRowHeight: step,
+            slackCorridors: ctx.slackCorridors,
+        });
         let timeCursorX = laneLeftX;
-
-        function appendRow(): Row {
-            const last = rows[rows.length - 1];
-            const r: Row = { y: last.y + step, rightEdge: laneLeftX, spillX: laneLeftX };
-            rows.push(r);
-            return r;
-        }
-
-        function rowIntersectsCorridor(rowY: number, xs: number, xe: number, childId: string): boolean {
-            // A corridor sits at the slack pred's row midpoint. Match when
-            // that midpoint falls inside this row's vertical band.
-            return ctx.slackCorridors.some((c: SlackCorridor) =>
-                c.y >= rowY &&
-                c.y < rowY + step &&
-                xs < c.xEnd &&
-                xe > c.xStart &&
-                c.slackPredId !== childId,
-            );
-        }
 
         const children: PositionedTrackChild[] = [];
         for (const child of lane.content) {
@@ -192,12 +172,7 @@ export class SwimlaneNode {
             if (!isItemDeclaration(child)) {
                 const blockProps = (child as ParallelBlock | GroupBlock).properties ?? [];
                 const blockStart = deps.resolveChildStart(blockProps, timeCursorX, laneLeftX, ctx);
-                // Blocks claim a fresh row at the bottom of the stack so
-                // their inner sub-tracks have contiguous rows to expand
-                // into without colliding with previously-placed items.
-                const blockY = (rows[rows.length - 1].rightEdge > laneLeftX)
-                    ? appendRow().y
-                    : rows[rows.length - 1].y;
+                const { rowIndex, y: blockY } = packer.placeBlock();
                 const cursor = deps.newCursor(blockStart, blockY);
                 const positioned = deps.sequenceOne(
                     child as ItemDeclaration | GroupBlock | ParallelBlock,
@@ -207,14 +182,12 @@ export class SwimlaneNode {
                 children.push(positioned);
                 const blockEnd = positioned.box.x + positioned.box.width;
                 const blockHeight = Math.max(step, cursor.height);
-                const numClaimedRows = Math.max(1, Math.ceil(blockHeight / step));
-                const blockStartIdx = rows.findIndex((r) => r.y === blockY);
-                for (let i = 0; i < numClaimedRows; i++) {
-                    const idx = blockStartIdx + i;
-                    if (idx >= rows.length) appendRow();
-                    rows[idx].rightEdge = blockEnd;
-                    rows[idx].spillX = laneLeftX;
-                }
+                packer.commitBlock({
+                    rowIndex,
+                    placed: positioned,
+                    blockHeight,
+                    blockEnd,
+                });
                 timeCursorX = Math.max(timeCursorX, blockEnd);
                 continue;
             }
@@ -237,17 +210,18 @@ export class SwimlaneNode {
             const desiredEnd = desiredStart + naturalWidth;
             const childId = (child as ItemDeclaration).name ?? '';
 
-            let row: Row | undefined;
-            for (const r of rows) {
-                if (desiredStart < r.rightEdge) continue;
-                if (desiredStart < r.spillX) continue;
-                if (rowIntersectsCorridor(r.y, desiredStart, desiredEnd, childId)) continue;
-                row = r;
-                break;
-            }
-            if (!row) row = appendRow();
+            const chipExtra = deps.predictItemChipExtraHeight(child as ItemDeclaration, ctx);
+            const { rowIndex, y: rowY } = packer.placeItem({
+                childId,
+                desiredStart,
+                desiredEnd,
+                // Row pitch = `step()` + extra chip-row height. Keeps
+                // the inter-row visible gap (= step - bandwidth) intact
+                // when an item's labels wrap and grow the bar.
+                predictedHeight: step + chipExtra,
+            });
 
-            const cursor = deps.newCursor(desiredStart, row.y);
+            const cursor = deps.newCursor(desiredStart, rowY);
             const positioned = deps.sequenceItem(child as ItemDeclaration, cursor, ctx);
             children.push(positioned);
 
@@ -257,31 +231,43 @@ export class SwimlaneNode {
             // gutter between bars.
             const itemLogicalEnd = positioned.box.x + positioned.box.width + ITEM_INSET_PX;
             timeCursorX = Math.max(timeCursorX, itemLogicalEnd);
-            row.rightEdge = itemLogicalEnd;
 
-            if (positioned.textSpills) {
-                const titleWidth = deps.estimateTextWidth(positioned.title, 13);
-                const metaWidth = positioned.metaText
+            let spillReservation: number | null = null;
+            if (positioned.textSpills || positioned.chipsOutside) {
+                const titleWidth = positioned.textSpills
+                    ? deps.estimateTextWidth(positioned.title, 13)
+                    : 0;
+                const metaWidth = positioned.textSpills && positioned.metaText
                     ? deps.estimateTextWidth(positioned.metaText, 11)
                     : 0;
                 const visualRight = positioned.box.x + positioned.box.width;
-                row.spillX = visualRight + 6 + Math.max(titleWidth, metaWidth) + 6;
-            } else {
-                row.spillX = laneLeftX;
+                // Chips already encode their absolute right via
+                // `chipsRightX`; subtract `visualRight + spillGap` to
+                // get the chip-row's contribution past the bar edge.
+                const chipsContribution = positioned.chipsOutside
+                    ? Math.max(0, positioned.chipsRightX - (visualRight + 6))
+                    : 0;
+                const captionContribution = Math.max(titleWidth, metaWidth);
+                spillReservation =
+                    visualRight + 6 +
+                    Math.max(captionContribution, chipsContribution) + 6;
             }
+
+            packer.commitItem({
+                rowIndex,
+                placed: positioned,
+                logicalEnd: itemLogicalEnd,
+                spillReservation,
+            });
         }
 
-        const lastRowBottom = rows[rows.length - 1].y + step;
-        const bandHeight = Math.max(step + 32, lastRowBottom - origin.y + 16);
-        // Rightmost extent reached inside this lane — bar logical end OR
-        // caption spill, whichever is wider. Roadmap-node uses this to
-        // expand `ctx.chartRightX` so spilled captions don't get clipped
-        // by the canvas edge.
-        let usedRightX = laneLeftX;
-        for (const r of rows) {
-            if (r.rightEdge > usedRightX) usedRightX = r.rightEdge;
-            if (r.spillX > usedRightX) usedRightX = r.spillX;
-        }
+        // `packer.usedHeight()` measures from `startY` (the first row,
+        // below the title tab); the swimlane band spans from `origin.y`
+        // (the band top, above the tab). Add the tab offset back so the
+        // band height covers everything the user sees.
+        const tabOffset = startY - origin.y;
+        const bandHeight = Math.max(step + 32, tabOffset + packer.usedHeight() + 16);
+        const usedRightX = packer.usedRightX();
         const box: BoundingBox = {
             x: 0,
             y: origin.y,

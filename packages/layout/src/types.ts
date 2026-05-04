@@ -168,6 +168,18 @@ export interface PositionedItem {
     progressFraction: number;   // 0..1; 1 == fully filled
     footnoteIndicators: number[];  // 1-based superscript numbers, empty when no footnotes
     labelChips: PositionedLabelChip[];
+    /** True when the chip row's natural total width exceeded the bar's
+     *  effective inner width and the whole row spilled past the bar's
+     *  right edge. The chips' `box.x` already reflects the spilled
+     *  position; this flag exists for the row-packer to reserve the
+     *  spilled extent and for the renderer / debug overlays to know
+     *  the row sits outside the bar's painted footprint. */
+    chipsOutside: boolean;
+    /** Logical right x reached by the chip row, INCLUDING the chips
+     *  whether painted inside or outside the bar. Equals the start x
+     *  when there are no chips. The row-packer's spill reservation
+     *  uses this to grow the chart canvas / bump siblings. */
+    chipsRightX: number;
     linkIcon?: LinkIconKind;
     linkHref?: string;
     hasOverflow: boolean;       // true when before: forced the item past its natural end
