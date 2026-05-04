@@ -88,6 +88,15 @@ export interface ItemCommitInput {
     /** Reserved spill x for captions that overflow the bar's right
      *  edge. `null` resets the row's spill reservation to `laneLeftX`. */
     spillReservation: number | null;
+    /** Total vertical reservation the placed item needs (e.g. bar
+     *  height plus a multi-row spilled chip column hanging below the
+     *  bar). When omitted, the row only grows to `placed.box.height`,
+     *  which is fine for items whose entire content fits inside the
+     *  bar. Set this to `predictedHeight` from `placeItem(...)` when
+     *  the item has a chip overhang so the row grows even if it
+     *  landed in an EXISTING row (where the placement step ignores
+     *  `predictedHeight`). */
+    rowHeight?: number;
 }
 
 /** Result of a `placeBlock` query (parallel/group as a child). */
@@ -166,7 +175,8 @@ export class RowPacker {
      */
     commitItem(input: ItemCommitInput): void {
         const row = this.rows[input.rowIndex];
-        this.growRowHeight(input.rowIndex, input.placed.box.height);
+        const target = Math.max(input.placed.box.height, input.rowHeight ?? 0);
+        this.growRowHeight(input.rowIndex, target);
         row.rightEdge = input.logicalEnd;
         row.spillX = input.spillReservation ?? this.opts.laneLeftX;
         row.placedChildren.push(input.placed);

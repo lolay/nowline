@@ -79,11 +79,14 @@ import {
     ITEM_CAPTION_INSET_X_PX,
     ITEM_CAPTION_META_BASELINE_OFFSET_PX,
     ITEM_CAPTION_SPILL_GAP_PX,
+    ITEM_CAPTION_TITLE_FONT_SIZE_PX,
     ITEM_LINK_ICON_INSET_PX,
     ITEM_LINK_ICON_TILE_SIZE_PX,
     LABEL_CHIP_HEIGHT_PX,
     LABEL_CHIP_GAP_ABOVE_PROGRESS_STRIP_PX,
     LABEL_CHIP_GAP_BETWEEN_PX,
+    LABEL_CHIP_ROW_STEP_PX,
+    packSpillChips,
 } from './item-bar-geometry.js';
 import { ItemNode } from './nodes/item-node.js';
 import { SwimlaneNode } from './nodes/swimlane-node.js';
@@ -252,12 +255,12 @@ function sequenceItem(
     // instead, see `ItemNode`.
     const visualWidthPredict = Math.max(MIN_ITEM_WIDTH, naturalWidth - 2 * ITEM_INSET_PX);
     const labelIds = propValues(props, 'labels');
-    const chipSamples: { label: LabelDeclaration; width: number }[] = [];
+    const chipSamples: { id: LabelDeclaration; width: number }[] = [];
     for (const labelId of labelIds) {
         const label = ctx.labels.get(labelId);
         if (!label) continue;
         const sample = buildLabelChip(label, ctx.styleCtx, 0, 0);
-        chipSamples.push({ label, width: sample.box.width });
+        chipSamples.push({ id: label, width: sample.box.width });
     }
     let chipRowWidth = 0;
     for (let i = 0; i < chipSamples.length; i += 1) {
@@ -389,46 +392,88 @@ function sequenceItem(
     );
     const itemBox = placed.box;
     const textSpills = placed.textSpills;
+    const bandwidth = ctx.bandScale.bandwidth();
 
-    // Label chips lay out left → right on a SINGLE horizontal row.
-    // Each chip keeps its natural text-fit width — chips never
-    // truncate, never shrink, never wrap to a second row. When the
-    // row's total width exceeds the bar's effective inner width
-    // (`chipsOutside === true`) the entire row spills past the bar's
-    // right edge. Inside or outside, chips are LEFT-aligned.
+    // Label chips lay out left → right at natural text width.
     //
-    // Chip row Y:
-    //   - inside the bar, or outside-with-no-caption-spill →
-    //     anchored just above the progress strip (the original
-    //     bottom-of-bar position).
-    //   - outside AND the caption (title/meta) ALSO spilled →
-    //     drop BELOW the meta baseline so the chip row stacks
-    //     under the spilled title + meta column at the same x
-    //     instead of colliding with the meta line.
+    // INSIDE the bar (chipsOutside === false): single row,
+    // left-aligned at the caption inset, anchored just above the
+    // bottom progress strip.
+    //
+    // OUTSIDE the bar (chipsOutside === true): the whole chip set
+    // moves to the spill column at `bar.right + 6`. Within the
+    // column, chips pack into rows capped at the bar's visual
+    // width — see `packSpillChips`. Row 0 sits at the same y the
+    // single-row would have used; subsequent rows stack DOWNWARD by
+    // one `LABEL_CHIP_ROW_STEP_PX`.
+    //
+    // When chips spill, the BAR ITSELF GROWS DOWNWARD so the chip
+    // column reads as enclosed by the bar — the painted footprint
+    // of the bar is `bandwidth + chipBarExtra` and the bottom
+    // progress strip moves with the new bottom edge. Chip Y is
+    // anchored to the ORIGINAL bandwidth (relative to the bar's
+    // top), not to the grown box.height, so row 0 stays where a
+    // single-row chip would naturally render and rows 1..N grow
+    // downward into the new bar area.
+    //
+    // When the caption ALSO spills (`textSpills && chipsOutside`),
+    // row 0's y drops below the meta baseline so the spilled stack
+    // reads `title → meta → chip-row-0 → chip-row-1 → ...` at a
+    // single column inside the (now-taller) bar.
+    let chipPack: ReturnType<typeof packSpillChips<LabelDeclaration>> | null = null;
+    if (chipsOutside) {
+        chipPack = packSpillChips(chipSamples, itemBox.width);
+    }
+    const chipRowCount = chipPack ? chipPack.rows.length : 0;
+    const chipBarExtra = computeChipBarExtra(
+        chipsOutside,
+        textSpills,
+        chipRowCount,
+        bandwidth,
+    );
+    if (chipBarExtra > 0) {
+        itemBox.height = bandwidth + chipBarExtra;
+    }
+
     const labelChips: PositionedLabelChip[] = [];
-    const baseChipY = itemBox.y + itemBox.height
+    const baseChipY = itemBox.y + bandwidth
         - PROGRESS_STRIP_HEIGHT_PX
         - LABEL_CHIP_HEIGHT_PX
         - LABEL_CHIP_GAP_ABOVE_PROGRESS_STRIP_PX;
     const captionStackChipY =
         itemBox.y + ITEM_CAPTION_META_BASELINE_OFFSET_PX
         + LABEL_CHIP_GAP_ABOVE_PROGRESS_STRIP_PX;
-    const chipY = chipsOutside && textSpills
+    const chipRow0Y = chipsOutside && textSpills
         ? captionStackChipY
         : baseChipY;
     const chipStartX = chipsOutside
         ? itemBox.x + itemBox.width + ITEM_CAPTION_SPILL_GAP_PX
         : itemBox.x + ITEM_CAPTION_INSET_X_PX;
-    let chipCursorX = chipStartX;
-    for (let i = 0; i < chipSamples.length; i += 1) {
-        const { label } = chipSamples[i];
-        const chip = buildLabelChip(label, ctx.styleCtx, chipCursorX, chipY);
-        labelChips.push(chip);
-        chipCursorX += chip.box.width + LABEL_CHIP_GAP_BETWEEN_PX;
+
+    let chipsRightX = chipStartX;
+    if (chipPack) {
+        for (let r = 0; r < chipPack.rows.length; r += 1) {
+            const rowY = chipRow0Y + r * LABEL_CHIP_ROW_STEP_PX;
+            let rowCursorX = chipStartX;
+            for (const sample of chipPack.rows[r]) {
+                const chip = buildLabelChip(sample.id, ctx.styleCtx, rowCursorX, rowY);
+                labelChips.push(chip);
+                rowCursorX += chip.box.width + LABEL_CHIP_GAP_BETWEEN_PX;
+            }
+            const rowRight = rowCursorX - LABEL_CHIP_GAP_BETWEEN_PX;
+            if (rowRight > chipsRightX) chipsRightX = rowRight;
+        }
+    } else {
+        let rowCursorX = chipStartX;
+        for (const sample of chipSamples) {
+            const chip = buildLabelChip(sample.id, ctx.styleCtx, rowCursorX, chipRow0Y);
+            labelChips.push(chip);
+            rowCursorX += chip.box.width + LABEL_CHIP_GAP_BETWEEN_PX;
+        }
+        chipsRightX = chipSamples.length > 0
+            ? rowCursorX - LABEL_CHIP_GAP_BETWEEN_PX
+            : chipStartX;
     }
-    const chipsRightX = chipSamples.length > 0
-        ? chipCursorX - LABEL_CHIP_GAP_BETWEEN_PX
-        : chipStartX;
 
     // Footnote superscript indicators. Authors can attach a footnote to
     // an item from either direction:
@@ -484,10 +529,12 @@ function sequenceItem(
     cursor.x = logicalRight;
     cursor.maxX = Math.max(cursor.maxX, cursor.x);
     // The next row in a parallel/group/lane starts at
-    // `cursor.y + cursor.height`. Bars never grow vertically for
-    // labels — chips render on a single row inside or outside the
-    // bar — so this stays at `bandScale.step()`.
-    cursor.height = Math.max(cursor.height, ctx.bandScale.step());
+    // `cursor.y + cursor.height`. Default pitch is `bandScale.step()`
+    // (bandwidth + inter-row gap). When the bar grew to enclose a
+    // spilled chip column, the pitch grows by the SAME amount so the
+    // inter-row gap stays constant — the next row's bar starts
+    // `step − bandwidth` px below the (now-taller) bar bottom.
+    cursor.height = Math.max(cursor.height, ctx.bandScale.step() + chipBarExtra);
 
     const result: PositionedItem = {
         kind: 'item',
@@ -556,17 +603,103 @@ function estimateTextWidth(text: string, fontSize: number): number {
 }
 
 /**
- * Predict an item's extra vertical height (px) — kept on the
- * dependency-injection chain for the row-packer, but always returns
- * 0 in the current design: chip rows render in a single horizontal
- * row inside or outside the bar (never wrapping vertically), so the
- * bar's height never grows for labels.
+ * Compute the extra vertical px the bar grows when its spilled chip
+ * column would otherwise extend below the (single-row) bottom. The
+ * bar's painted footprint becomes `bandwidth + chipBarExtra`, the
+ * progress strip rides the new bottom, and chip rows pack inside
+ * the taller bar (anchored from the bar TOP so row 0 doesn't shift
+ * when the bar grows).
+ *
+ * Returns 0 when chips fit inside the bar, when there are no chips,
+ * or when the spilled column happens to fit inside `bandwidth` (a
+ * single row with the caption inside, for instance).
+ *
+ * The same number is the row-pitch increase the swimlane / group
+ * row-packer needs to reserve so the next row clears the taller
+ * bar — `cursor.height = step + chipBarExtra` and the predict
+ * helper returns this verbatim.
+ */
+function computeChipBarExtra(
+    chipsOutside: boolean,
+    captionSpills: boolean,
+    chipRowCount: number,
+    bandwidth: number,
+): number {
+    if (!chipsOutside || chipRowCount === 0) return 0;
+    // Row 0 anchor relative to the bar's TOP. When the caption
+    // spills, row 0 sits below the meta baseline; otherwise it sits
+    // just above where the original (un-grown) progress strip would
+    // have been.
+    const chipRow0Top = captionSpills
+        ? ITEM_CAPTION_META_BASELINE_OFFSET_PX
+            + LABEL_CHIP_GAP_ABOVE_PROGRESS_STRIP_PX
+        : bandwidth
+            - PROGRESS_STRIP_HEIGHT_PX
+            - LABEL_CHIP_HEIGHT_PX
+            - LABEL_CHIP_GAP_ABOVE_PROGRESS_STRIP_PX;
+    const lastRowBottomTop =
+        chipRow0Top
+        + (chipRowCount - 1) * LABEL_CHIP_ROW_STEP_PX
+        + LABEL_CHIP_HEIGHT_PX;
+    // The bar must be tall enough to fit `lastRowBottomTop` plus a
+    // GAP above the progress strip plus the progress strip itself.
+    const requiredHeight =
+        lastRowBottomTop
+        + LABEL_CHIP_GAP_ABOVE_PROGRESS_STRIP_PX
+        + PROGRESS_STRIP_HEIGHT_PX;
+    return Math.max(0, requiredHeight - bandwidth);
+}
+
+/**
+ * Predict an item's bar growth (and therefore row-pitch growth) for
+ * a multi-row spilled chip column BEFORE the bar is sequenced. Used
+ * by the swimlane / group row-packer so neighboring rows on later
+ * rows are positioned correctly without a retroactive shift.
+ *
+ * Mirrors the chip-pack + caption-spill arithmetic in
+ * `sequenceItem` so prediction and placement agree byte-for-byte.
  */
 function predictItemChipExtraHeight(
-    _item: ItemDeclaration,
-    _ctx: LayoutContext,
+    item: ItemDeclaration,
+    ctx: LayoutContext,
 ): number {
-    return 0;
+    const props = item.properties;
+    const labelIds = propValues(props, 'labels');
+    if (labelIds.length === 0) return 0;
+    const durationDays = resolveDuration(
+        propValue(props, 'duration'),
+        ctx.durations,
+        ctx.cal,
+    );
+    const naturalWidth = Math.max(MIN_ITEM_WIDTH, durationDays * ctx.timeline.pixelsPerDay);
+    const visualWidth = Math.max(MIN_ITEM_WIDTH, naturalWidth - 2 * ITEM_INSET_PX);
+    const samples: { id: LabelDeclaration; width: number }[] = [];
+    for (const labelId of labelIds) {
+        const label = ctx.labels.get(labelId);
+        if (!label) continue;
+        const sample = buildLabelChip(label, ctx.styleCtx, 0, 0);
+        samples.push({ id: label, width: sample.box.width });
+    }
+    if (samples.length === 0) return 0;
+    let chipRowWidth = 0;
+    for (let i = 0; i < samples.length; i += 1) {
+        if (i > 0) chipRowWidth += LABEL_CHIP_GAP_BETWEEN_PX;
+        chipRowWidth += samples[i].width;
+    }
+    const insideAvail = Math.max(0, visualWidth - 2 * ITEM_CAPTION_INSET_X_PX);
+    const chipsOutside = chipRowWidth > insideAvail;
+    if (!chipsOutside) return 0;
+
+    const titleStr = item.title ?? item.name ?? '';
+    const titleW = titleStr ? estimateTextWidth(titleStr, ITEM_CAPTION_TITLE_FONT_SIZE_PX) : 0;
+    const captionSpills = titleW > insideAvail;
+    const pack = packSpillChips(samples, visualWidth);
+    return computeChipBarExtra(
+        chipsOutside,
+        captionSpills,
+        pack.rows.length,
+        ctx.bandScale.bandwidth(),
+    );
 }
 
 // Resolve the desired startX for a swimlane child, honoring `date:` (fixed

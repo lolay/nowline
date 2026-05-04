@@ -211,6 +211,7 @@ export class SwimlaneNode {
             const childId = (child as ItemDeclaration).name ?? '';
 
             const chipExtra = deps.predictItemChipExtraHeight(child as ItemDeclaration, ctx);
+            const predictedHeight = step + chipExtra;
             const { rowIndex, y: rowY } = packer.placeItem({
                 childId,
                 desiredStart,
@@ -218,7 +219,7 @@ export class SwimlaneNode {
                 // Row pitch = `step()` + extra chip-row height. Keeps
                 // the inter-row visible gap (= step - bandwidth) intact
                 // when an item's labels wrap and grow the bar.
-                predictedHeight: step + chipExtra,
+                predictedHeight,
             });
 
             const cursor = deps.newCursor(desiredStart, rowY);
@@ -258,6 +259,7 @@ export class SwimlaneNode {
                 placed: positioned,
                 logicalEnd: itemLogicalEnd,
                 spillReservation,
+                rowHeight: predictedHeight,
             });
         }
 

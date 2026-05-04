@@ -90,3 +90,94 @@ export const LABEL_CHIP_GAP_ABOVE_PROGRESS_STRIP_PX = 3;
 
 /** Horizontal gap (px) between consecutive chips in a row. */
 export const LABEL_CHIP_GAP_BETWEEN_PX = 4;
+
+/**
+ * Vertical gap (px) between two stacked chip rows when chips spill
+ * outside the bar and form a multi-row column to the right.
+ */
+export const LABEL_CHIP_ROW_GAP_PX = 4;
+
+/**
+ * Vertical row pitch (px) for a stacked chip column — chip height +
+ * inter-row gap.
+ */
+export const LABEL_CHIP_ROW_STEP_PX =
+    LABEL_CHIP_HEIGHT_PX + LABEL_CHIP_ROW_GAP_PX;
+
+/**
+ * Slack budget (fraction) applied ONCE per item when chips spill
+ * outside the bar. If a chip would overflow its row by less than
+ * `SPILL_ROW_SLACK_FRACTION × chip.width`, the row is allowed to
+ * stretch by the overflow amount and keep the chip on it instead of
+ * wrapping. This rescues "lonely chip" cases where one chip just
+ * barely overshoots; once the slack is consumed, no further row
+ * expansions happen for that item.
+ */
+export const SPILL_ROW_SLACK_FRACTION = 0.25;
+
+export interface ChipRowSample<T> {
+    id: T;
+    width: number;
+}
+
+export interface SpillChipPack<T> {
+    /** Rows ordered top-to-bottom — `rows[0]` sits at the chip
+     *  column's top y, `rows[1]` one `LABEL_CHIP_ROW_STEP_PX` below,
+     *  and so on. */
+    rows: ChipRowSample<T>[][];
+    /** True when the slack rule was used to keep an extra chip on
+     *  row 0 (or whichever row was being filled when the overflow
+     *  happened). At most one expansion per item. */
+    expanded: boolean;
+}
+
+/**
+ * Pack `chips` into rows for the SPILL column to the right of an
+ * item bar. Each row is capped at `barVisualWidth` (with gaps
+ * between chips). When a chip would overflow:
+ *
+ * - If the row is empty, place the chip anyway (a chip wider than
+ *   the cap occupies its own row).
+ * - Else if the slack rule applies (`overflow ≤ 0.25 × chip.width`)
+ *   AND the slack hasn't already been used for this item, expand
+ *   the current row by `overflow` and keep the chip on it.
+ * - Else wrap the chip to a fresh row.
+ */
+export function packSpillChips<T>(
+    chips: ChipRowSample<T>[],
+    barVisualWidth: number,
+): SpillChipPack<T> {
+    if (chips.length === 0) return { rows: [[]], expanded: false };
+    const rows: ChipRowSample<T>[][] = [[]];
+    let used = 0;
+    let rowCap = barVisualWidth;
+    let expanded = false;
+    for (const chip of chips) {
+        const row = rows[rows.length - 1];
+        const needed = (row.length === 0 ? 0 : LABEL_CHIP_GAP_BETWEEN_PX) + chip.width;
+        const wouldBe = used + needed;
+        if (wouldBe <= rowCap) {
+            row.push(chip);
+            used = wouldBe;
+            continue;
+        }
+        if (row.length === 0) {
+            row.push(chip);
+            used = chip.width;
+            continue;
+        }
+        const overflow = wouldBe - rowCap;
+        const slack = chip.width * SPILL_ROW_SLACK_FRACTION;
+        if (!expanded && overflow <= slack) {
+            row.push(chip);
+            used = wouldBe;
+            rowCap = wouldBe;
+            expanded = true;
+            continue;
+        }
+        rows.push([chip]);
+        used = chip.width;
+        rowCap = barVisualWidth;
+    }
+    return { rows, expanded };
+}
