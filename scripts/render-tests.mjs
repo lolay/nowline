@@ -37,6 +37,7 @@ const MANIFEST = [
     { slug: 'text-fits-inside-bars',   theme: 'light', now: NOW },
     { slug: 'text-spills-right',       theme: 'light', now: NOW },
     { slug: 'item-bumps-up',           theme: 'light', now: NOW },
+    { slug: 'isolate-include-multi',   theme: 'light', now: NOW },
     { slug: 'defaults-no-start-no-now', theme: 'light' },
 ];
 
