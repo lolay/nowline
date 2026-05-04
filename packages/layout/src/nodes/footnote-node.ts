@@ -6,7 +6,11 @@
 
 import type { FootnoteDeclaration } from '@nowline/core';
 import { resolveStyle } from '../style-resolution.js';
-import { FOOTNOTE_ROW_HEIGHT } from '../themes/shared.js';
+import {
+    FOOTNOTE_ROW_HEIGHT,
+    FOOTNOTE_HEADER_HEIGHT_PX,
+    FOOTNOTE_PANEL_PADDING_PX,
+} from '../themes/shared.js';
 import type {
     PositionedFootnoteArea,
     PositionedFootnoteEntry,
@@ -41,12 +45,15 @@ export function buildFootnotes(
             style: resolveStyle('footnote', f.properties, ctx.styleCtx),
         });
     });
-    const headerHeight = 28;
     const box: BoundingBox = {
-        x: 16,
-        y: chartBottomY + 16,
-        width: ctx.chartRightX - 32,
-        height: entries.length === 0 ? 0 : headerHeight + entries.length * FOOTNOTE_ROW_HEIGHT + 16,
+        x: FOOTNOTE_PANEL_PADDING_PX,
+        y: chartBottomY + FOOTNOTE_PANEL_PADDING_PX,
+        width: ctx.chartRightX - 2 * FOOTNOTE_PANEL_PADDING_PX,
+        height: entries.length === 0
+            ? 0
+            : FOOTNOTE_HEADER_HEIGHT_PX
+                + entries.length * FOOTNOTE_ROW_HEIGHT
+                + FOOTNOTE_PANEL_PADDING_PX,
     };
     return {
         area: { box, entries },

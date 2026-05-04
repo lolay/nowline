@@ -27,6 +27,41 @@ import {
     ATTRIBUTION_BAR_LOGICAL_X,
     ATTRIBUTION_BAR_LOGICAL_WIDTH,
     ATTRIBUTION_INE_LOGICAL_X,
+    PROGRESS_STRIP_HEIGHT_PX,
+    EDGE_CORNER_RADIUS,
+    TEXT_SIZE_PX,
+    CORNER_RADIUS_PX,
+    FONT_STACK,
+    TIMELINE_TICK_LABEL_BASELINE_OFFSET_PX,
+    FRAME_TAB_HEIGHT_PX,
+    FRAME_TAB_LABEL_BASELINE_OFFSET_PX,
+    ACCENT_DASH_PATTERN,
+    HEADER_CARD_PADDING_X,
+    HEADER_CARD_PADDING_TOP,
+    HEADER_TITLE_LINE_HEIGHT_PX,
+    HEADER_AUTHOR_LINE_HEIGHT_PX,
+    HEADER_TITLE_TO_AUTHOR_GAP_PX,
+    HEADER_TITLE_FONT_SIZE_PX,
+    HEADER_AUTHOR_FONT_SIZE_PX,
+    ITEM_CAPTION_INSET_X_PX,
+    ITEM_CAPTION_SPILL_GAP_PX,
+    ITEM_CAPTION_TITLE_BASELINE_OFFSET_PX,
+    ITEM_CAPTION_META_BASELINE_OFFSET_PX,
+    ITEM_CAPTION_TITLE_FONT_SIZE_PX,
+    ITEM_CAPTION_META_FONT_SIZE_PX,
+    ITEM_STATUS_DOT_INSET_RIGHT_PX,
+    ITEM_STATUS_DOT_INSET_TOP_PX,
+    ITEM_STATUS_DOT_RADIUS_PX,
+    ITEM_FOOTNOTE_INDICATOR_INSET_RIGHT_PX,
+    ITEM_FOOTNOTE_INDICATOR_BASELINE_OFFSET_PX,
+    ITEM_FOOTNOTE_INDICATOR_STEP_PX,
+    ITEM_LINK_ICON_TILE_SIZE_PX,
+    ITEM_LINK_ICON_INSET_PX,
+    FOOTNOTE_ROW_HEIGHT,
+    FOOTNOTE_HEADER_HEIGHT_PX,
+    FOOTNOTE_PANEL_PADDING_PX,
+    FOOTNOTE_HEADER_BASELINE_OFFSET_PX,
+    frameTabGeometry,
 } from '@nowline/layout';
 import { IdGenerator } from './ids.js';
 import { attrs, escAttr, escText, num, tag, textTag } from './xml.js';
@@ -52,25 +87,28 @@ export interface RenderOptions {
     idPrefix?: string;
 }
 
-const TEXT_SIZE_PX: Record<string, number> = {
-    none: 0, xs: 10, sm: 12, md: 14, lg: 18, xl: 24,
-};
-const CORNER_RADIUS_PX: Record<string, number> = {
-    none: 0, xs: 2, sm: 4, md: 8, lg: 12, xl: 20, full: 9999,
-};
-const FONT_STACK: Record<string, string> = {
-    sans: 'system-ui, -apple-system, "Segoe UI", Roboto, sans-serif',
-    serif: 'Georgia, "Times New Roman", serif',
-    mono: 'ui-monospace, SFMono-Regular, Menlo, Consolas, monospace',
-};
+// `TEXT_SIZE_PX`, `CORNER_RADIUS_PX`, `FONT_STACK` come from
+// `@nowline/layout` (themes/shared) so a typography or radius change
+// flows from one place to both layout and renderer.
+//
+// `WEIGHT_NUM` lives here only because no DSL `weight` table exists in
+// shared yet. If/when it does, hoist this alongside `FONT_STACK`.
 const WEIGHT_NUM: Record<string, number> = {
     thin: 100, light: 300, normal: 400, bold: 700,
 };
 
+// `style.textSize` is `SizeBucket` which includes `'full'`; the shared
+// `TEXT_SIZE_PX` table only carries the size buckets (no `'full'` —
+// that's a corner-radius-only value). Widen the lookup so a stray
+// `'full'` falls through to the `?? 14` fallback instead of compiling.
+function textSizePx(bucket: ResolvedStyle['textSize']): number {
+    return (TEXT_SIZE_PX as Record<string, number>)[bucket] ?? 14;
+}
+
 function fontAttrs(style: ResolvedStyle, overrideSize?: number): Record<string, string | number> {
     return {
         'font-family': FONT_STACK[style.font],
-        'font-size': overrideSize ?? TEXT_SIZE_PX[style.textSize] ?? 14,
+        'font-size': overrideSize ?? textSizePx(style.textSize),
         'font-weight': WEIGHT_NUM[style.weight] ?? 400,
         'font-style': style.italic ? 'italic' : 'normal',
         fill: style.text,
@@ -123,16 +161,17 @@ function renderHeader(h: PositionedHeader, idPrefix: string, palette: Theme): st
         'stroke-width': 1,
         filter: `url(#${idPrefix}-shadow-subtle)`,
     });
-    // Title lines stack with 20-px baseline-to-baseline spacing (matches
-    // sizeBesideHeader's HEADER_TITLE_LINE_HEIGHT).
+    // Title and author baselines come from `@nowline/layout`'s
+    // `header-card-geometry` module so the renderer paints with the
+    // exact metrics `sizeBesideHeader` sized the card to.
     const titleParts: string[] = [];
     h.titleLines.forEach((line, i) => {
         titleParts.push(textTag(
             {
-                x: num(cardX + 16),
-                y: num(cardY + 26 + i * 20),
+                x: num(cardX + HEADER_CARD_PADDING_X),
+                y: num(cardY + HEADER_CARD_PADDING_TOP + i * HEADER_TITLE_LINE_HEIGHT_PX),
                 'font-family': FONT_STACK[h.style.font],
-                'font-size': 16,
+                'font-size': HEADER_TITLE_FONT_SIZE_PX,
                 'font-weight': 600,
                 fill: h.style.text,
             },
@@ -140,16 +179,17 @@ function renderHeader(h: PositionedHeader, idPrefix: string, palette: Theme): st
         ));
     });
     const titleText = titleParts.join('');
-    const lastTitleY = cardY + 26 + Math.max(0, h.titleLines.length - 1) * 20;
+    const lastTitleY = cardY + HEADER_CARD_PADDING_TOP
+        + Math.max(0, h.titleLines.length - 1) * HEADER_TITLE_LINE_HEIGHT_PX;
     const authorColor = palette.header.author;
     const authorParts: string[] = [];
     h.authorLines.forEach((line, j) => {
         authorParts.push(textTag(
             {
-                x: num(cardX + 16),
-                y: num(lastTitleY + 18 + j * 14),
+                x: num(cardX + HEADER_CARD_PADDING_X),
+                y: num(lastTitleY + HEADER_TITLE_TO_AUTHOR_GAP_PX + j * HEADER_AUTHOR_LINE_HEIGHT_PX),
                 'font-family': FONT_STACK[h.style.font],
-                'font-size': 11,
+                'font-size': HEADER_AUTHOR_FONT_SIZE_PX,
                 fill: authorColor,
             },
             line,
@@ -214,7 +254,7 @@ function renderTimeline(t: PositionedTimelineScale, palette: Theme): string {
                 textTag(
                     {
                         x: num(tick.labelX),
-                        y: num(tickPanelY + 15),
+                        y: num(tickPanelY + TIMELINE_TICK_LABEL_BASELINE_OFFSET_PX),
                         'font-family': FONT_STACK.sans,
                         'font-size': 10,
                         fill: labelColor,
@@ -305,15 +345,17 @@ function renderItem(i: PositionedItem, options: RenderOptions, idPrefix: string,
         neutral: palette.statusDot.neutral,
     };
     const dotColor = statusColors[i.status] ?? statusColors.neutral;
-    // Bottom progress strip — 4px tall along the bottom edge.
+    // Bottom progress strip along the bottom edge. Height comes from
+    // `PROGRESS_STRIP_HEIGHT_PX` so layout's chip placement and the
+    // milestone slack-arrow attach Y stay in sync if it's ever bumped.
     if (i.progressFraction > 0) {
         const pw = Math.max(0, Math.min(i.box.width, i.box.width * i.progressFraction));
         parts.push(
             tag('rect', {
                 x: num(i.box.x),
-                y: num(i.box.y + i.box.height - 4),
+                y: num(i.box.y + i.box.height - PROGRESS_STRIP_HEIGHT_PX),
                 width: num(pw),
-                height: 4,
+                height: PROGRESS_STRIP_HEIGHT_PX,
                 fill: i.style.fg,
                 opacity: 0.55,
             }),
@@ -322,9 +364,9 @@ function renderItem(i: PositionedItem, options: RenderOptions, idPrefix: string,
     // Status dot — upper-right inset.
     parts.push(
         tag('circle', {
-            cx: num(i.box.x + i.box.width - 12),
-            cy: num(i.box.y + 12),
-            r: 5,
+            cx: num(i.box.x + i.box.width - ITEM_STATUS_DOT_INSET_RIGHT_PX),
+            cy: num(i.box.y + ITEM_STATUS_DOT_INSET_TOP_PX),
+            r: ITEM_STATUS_DOT_RADIUS_PX,
             fill: dotColor,
         }),
     );
@@ -334,16 +376,16 @@ function renderItem(i: PositionedItem, options: RenderOptions, idPrefix: string,
     // the same vertical positions they would occupy inside. When they
     // fit, both go inside at the bar's left padding.
     const captionX = i.textSpills
-        ? i.box.x + i.box.width + 6
-        : i.box.x + 12;
+        ? i.box.x + i.box.width + ITEM_CAPTION_SPILL_GAP_PX
+        : i.box.x + ITEM_CAPTION_INSET_X_PX;
     if (i.title) {
         parts.push(
             textTag(
                 {
                     x: num(captionX),
-                    y: num(i.box.y + 20),
+                    y: num(i.box.y + ITEM_CAPTION_TITLE_BASELINE_OFFSET_PX),
                     'font-family': FONT_STACK[i.style.font],
-                    'font-size': 13,
+                    'font-size': ITEM_CAPTION_TITLE_FONT_SIZE_PX,
                     'font-weight': 600,
                     fill: i.style.text,
                 },
@@ -356,9 +398,9 @@ function renderItem(i: PositionedItem, options: RenderOptions, idPrefix: string,
             textTag(
                 {
                     x: num(captionX),
-                    y: num(i.box.y + 38),
+                    y: num(i.box.y + ITEM_CAPTION_META_BASELINE_OFFSET_PX),
                     'font-family': FONT_STACK[i.style.font],
-                    'font-size': 11,
+                    'font-size': ITEM_CAPTION_META_FONT_SIZE_PX,
                     fill: i.style.fg,
                 },
                 i.metaText,
@@ -367,14 +409,14 @@ function renderItem(i: PositionedItem, options: RenderOptions, idPrefix: string,
     }
     // Footnote superscript indicators (just LEFT of the upper-right status dot).
     if (i.footnoteIndicators.length > 0) {
-        let fx = i.box.x + i.box.width - 22;
+        let fx = i.box.x + i.box.width - ITEM_FOOTNOTE_INDICATOR_INSET_RIGHT_PX;
         for (let k = i.footnoteIndicators.length - 1; k >= 0; k--) {
             const n2 = i.footnoteIndicators[k];
             parts.push(
                 textTag(
                     {
                         x: num(fx),
-                        y: num(i.box.y + 14),
+                        y: num(i.box.y + ITEM_FOOTNOTE_INDICATOR_BASELINE_OFFSET_PX),
                         'font-family': FONT_STACK.sans,
                         'font-size': 10,
                         'font-weight': 700,
@@ -384,7 +426,7 @@ function renderItem(i: PositionedItem, options: RenderOptions, idPrefix: string,
                     String(n2),
                 ),
             );
-            fx -= 8;
+            fx -= ITEM_FOOTNOTE_INDICATOR_STEP_PX;
         }
     }
     // Link icon — colored tile + white external-link glyph at bottom-right.
@@ -396,9 +438,9 @@ function renderItem(i: PositionedItem, options: RenderOptions, idPrefix: string,
             generic: palette.item.linkIconFg,
         };
         const tile = tileColor[i.linkIcon] ?? tileColor.generic;
-        const tileSize = 14;
-        const tileX = i.box.x + i.box.width - tileSize - 6;
-        const tileY = i.box.y + i.box.height - tileSize - 6;
+        const tileSize = ITEM_LINK_ICON_TILE_SIZE_PX;
+        const tileX = i.box.x + i.box.width - tileSize - ITEM_LINK_ICON_INSET_PX;
+        const tileY = i.box.y + i.box.height - tileSize - ITEM_LINK_ICON_INSET_PX;
         const tileRect = tag('rect', {
             x: num(tileX),
             y: num(tileY),
@@ -654,14 +696,15 @@ function renderSwimlane(s: PositionedSwimlane, options: RenderOptions, idPrefix:
         }),
     );
     // Frame-tab chiclet at the top-left of the band — auto-sized to fit
-    // title + owner.
+    // title + owner. Geometry comes from the shared `frameTabGeometry`
+    // helper that the layout's row-packer also calls, so the chiclet's
+    // visible footprint matches the collision box layout reserved for it.
     if (s.title) {
-        const titleWidth = Math.max(40, s.title.length * 7);
-        const ownerWidth = s.owner ? Math.max(60, ('owner: ' + s.owner).length * 5.6) : 0;
-        const padding = 24;
-        const tabW = titleWidth + ownerWidth + padding;
-        const tabH = 22;
-        const tabX = s.box.x + 10;
+        const tab = frameTabGeometry(s.box.x, s.title, s.owner);
+        const titleWidth = tab.titleWidth;
+        const tabW = tab.tabW;
+        const tabH = FRAME_TAB_HEIGHT_PX;
+        const tabX = tab.tabX;
         const tabY = s.box.y + 10;
         parts.push(
             tag('rect', {
@@ -680,7 +723,7 @@ function renderSwimlane(s: PositionedSwimlane, options: RenderOptions, idPrefix:
             textTag(
                 {
                     x: num(tabX + 12),
-                    y: num(tabY + 15),
+                    y: num(tabY + FRAME_TAB_LABEL_BASELINE_OFFSET_PX),
                     'font-family': FONT_STACK[s.style.font],
                     'font-size': 12,
                     'font-weight': 600,
@@ -694,7 +737,7 @@ function renderSwimlane(s: PositionedSwimlane, options: RenderOptions, idPrefix:
                 textTag(
                     {
                         x: num(tabX + 12 + titleWidth),
-                        y: num(tabY + 15),
+                        y: num(tabY + FRAME_TAB_LABEL_BASELINE_OFFSET_PX),
                         'font-family': FONT_STACK[s.style.font],
                         'font-size': 10,
                         fill: ownerText,
@@ -819,7 +862,7 @@ function renderMilestoneCutLine(m: PositionedMilestone, palette: Theme): string 
             y2: num(m.cutBottomY),
             stroke,
             'stroke-width': 2,
-            'stroke-dasharray': '6 4',
+            'stroke-dasharray': ACCENT_DASH_PATTERN,
             'stroke-linecap': 'round',
         }),
     );
@@ -849,7 +892,7 @@ function renderEdge(e: PositionedDependencyEdge, palette: Theme): string {
     const points = e.waypoints;
     if (points.length < 2) return '';
     return tag('path', {
-        d: roundedOrthogonalPath(points, 4),
+        d: roundedOrthogonalPath(points, EDGE_CORNER_RADIUS),
         fill: 'none',
         stroke: color,
         'stroke-width': 1.1,
@@ -919,8 +962,8 @@ function renderFootnotes(f: PositionedFootnoteArea, idPrefix: string, palette: T
     parts.push(
         textTag(
             {
-                x: num(f.box.x + 16),
-                y: num(f.box.y + 22),
+                x: num(f.box.x + FOOTNOTE_PANEL_PADDING_PX),
+                y: num(f.box.y + FOOTNOTE_HEADER_BASELINE_OFFSET_PX),
                 'font-family': FONT_STACK.sans,
                 'font-size': 12,
                 'font-weight': 700,
@@ -929,24 +972,29 @@ function renderFootnotes(f: PositionedFootnoteArea, idPrefix: string, palette: T
             'Footnotes',
         ),
     );
+    // First entry baseline = panel-top + header band + one panel padding
+    // (the gap between the header band and the first row).
+    const firstEntryBaselineY = f.box.y + FOOTNOTE_HEADER_HEIGHT_PX + FOOTNOTE_PANEL_PADDING_PX;
+    const numberX = f.box.x + FOOTNOTE_PANEL_PADDING_PX;
+    const titleX = numberX + FOOTNOTE_PANEL_PADDING_PX;
     f.entries.forEach((e, i) => {
-        const y = f.box.y + 44 + i * 18;
+        const y = firstEntryBaselineY + i * FOOTNOTE_ROW_HEIGHT;
         parts.push(
             textTag(
-                { x: num(f.box.x + 16), y: num(y), 'font-family': FONT_STACK.sans, 'font-size': 10, 'font-weight': 700, fill: numberColor },
+                { x: num(numberX), y: num(y), 'font-family': FONT_STACK.sans, 'font-size': 10, 'font-weight': 700, fill: numberColor },
                 String(e.number),
             ),
         );
         parts.push(
             textTag(
-                { x: num(f.box.x + 32), y: num(y), 'font-family': FONT_STACK.sans, 'font-size': 11, 'font-weight': 600, fill: titleColor },
+                { x: num(titleX), y: num(y), 'font-family': FONT_STACK.sans, 'font-size': 11, 'font-weight': 600, fill: titleColor },
                 e.title,
             ),
         );
         if (e.description) {
             parts.push(
                 textTag(
-                    { x: num(f.box.x + 32 + Math.max(120, e.title.length * 6)), y: num(y), 'font-family': FONT_STACK.sans, 'font-size': 11, fill: descColor },
+                    { x: num(titleX + Math.max(120, e.title.length * 6)), y: num(y), 'font-family': FONT_STACK.sans, 'font-size': 11, fill: descColor },
                     `— ${e.description}`,
                 ),
             );
@@ -985,11 +1033,11 @@ function renderIncludeRegion(
         fill,
         stroke: border,
         'stroke-width': 1,
-        'stroke-dasharray': '6 4',
+        'stroke-dasharray': ACCENT_DASH_PATTERN,
     });
 
     const tabPaddingX = 10;
-    const tabHeight = 22;
+    const tabHeight = FRAME_TAB_HEIGHT_PX;
     const tabWidth = Math.max(60, r.label.length * 6.5 + tabPaddingX * 2);
     const tabX = rx + 16;
     const tabY = ry - tabHeight / 2;
@@ -1007,7 +1055,7 @@ function renderIncludeRegion(
     const tabLabel = textTag(
         {
             x: num(tabX + tabPaddingX),
-            y: num(tabY + 15),
+            y: num(tabY + FRAME_TAB_LABEL_BASELINE_OFFSET_PX),
             'font-family': FONT_STACK.sans,
             'font-size': 11,
             'font-weight': 600,

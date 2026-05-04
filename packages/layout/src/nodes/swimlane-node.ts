@@ -37,6 +37,7 @@ import type {
 import type { LayoutContext, TrackCursor } from '../layout-context.js';
 import { propValue } from '../dsl-utils.js';
 import { resolveDuration } from '../calendar.js';
+import { frameTabGeometry } from '../frame-tab-geometry.js';
 
 /** Helpers that SwimlaneNode delegates to until the rest of m2.5c lands. */
 export interface SwimlaneNodeDeps {
@@ -84,18 +85,18 @@ const TAB_BOTTOM_Y = 38;  // tab (height 22) plus 6 px breathing room
 const TAB_GUTTER_PX = 8;
 
 /**
- * Right edge (canvas px) of the lane title tab. Mirrors the chiclet
- * sizing in `renderSwimlane`; keep the two formulas in sync.
+ * Right edge (canvas px) of the lane title tab. Delegates to the
+ * shared `frameTabGeometry` helper that the renderer also uses, so
+ * the chiclet's collision footprint and its painted footprint stay
+ * exactly in sync.
  */
 function computeLaneTabRightX(lane: SwimlaneDeclaration): number {
     const title = lane.title ?? lane.name ?? '';
     if (!title) return 0;
     const ownerRaw = propValue(lane.properties, 'owner');
-    const titleWidth = Math.max(40, title.length * 7);
-    const ownerWidth = ownerRaw ? Math.max(60, ('owner: ' + ownerRaw).length * 5.6) : 0;
-    const padding = 24;
-    const tabX = 10; // matches renderer: tabX = box.x + 10, box.x = 0
-    return tabX + titleWidth + ownerWidth + padding;
+    // Box is laid out at `box.x = 0` for top-level lanes; the helper
+    // adds the standard `FRAME_TAB_OFFSET_FROM_BOX_PX` itself.
+    return frameTabGeometry(0, title, ownerRaw ?? undefined).rightX;
 }
 
 /**

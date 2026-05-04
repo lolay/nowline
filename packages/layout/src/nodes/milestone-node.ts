@@ -17,10 +17,12 @@ import { resolveStyle } from '../style-resolution.js';
 import type { PositionedMilestone, Point, BoundingBox } from '../types.js';
 import type { LayoutContext } from '../layout-context.js';
 import { propValue, propValues, parseDate } from '../dsl-utils.js';
-
-const MARKER_LABEL_GAP_PX = 6;
-const MARKER_LABEL_HEIGHT_PX = 12;
-const MARKER_BOLD_WIDTH_FACTOR = 1.05;
+import {
+    MARKER_LABEL_GAP_PX,
+    MARKER_LABEL_HEIGHT_PX,
+    MARKER_BOLD_WIDTH_FACTOR,
+    MARKER_DIAMOND_RADIUS_PX,
+} from './marker-geometry.js';
 
 function decideLabelBoxForCanvas(
     centerX: number,
@@ -63,7 +65,7 @@ export class MilestoneNode {
         const afterRaw = propValues(m.properties, 'after');
         const date = parseDate(dateRaw);
         const inRowY = ctx.timeline.markerRow.y;
-        const radius = 6;
+        const radius = MARKER_DIAMOND_RADIUS_PX;
         const title = m.title ?? this.id;
 
         let centerX: number | null = null;
@@ -95,7 +97,12 @@ export class MilestoneNode {
                 if (end === undefined) continue;
                 if (end > maxEnd) {
                     maxEnd = end;
-                    maxY = ctx.entityMidpoints.get(ref)?.y ?? 0;
+                    // Items publish a slack-attach Y that drops to the bar's
+                    // bottom strip when the caption spills right; non-items
+                    // (anchors, other milestones) fall back to the row mid.
+                    maxY = ctx.itemSlackAttachY.get(ref)
+                        ?? ctx.entityMidpoints.get(ref)?.y
+                        ?? 0;
                 }
             }
             if (maxEnd > x) {
@@ -110,8 +117,10 @@ export class MilestoneNode {
             for (const ref of afterRaw) {
                 const end = ctx.entityRightEdges.get(ref);
                 if (end === undefined) continue;
-                const mid = ctx.entityMidpoints.get(ref);
-                preds.push({ ref, x: end, y: mid?.y ?? 0 });
+                const yAttach = ctx.itemSlackAttachY.get(ref)
+                    ?? ctx.entityMidpoints.get(ref)?.y
+                    ?? 0;
+                preds.push({ ref, x: end, y: yAttach });
             }
             preds.sort((a, b) => b.x - a.x);
             const maxEnd = preds[0]?.x ?? ctx.timeline.originX;

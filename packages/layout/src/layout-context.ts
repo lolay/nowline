@@ -63,6 +63,15 @@ export interface LayoutContext {
     entityRightEdges: Map<string, number>;
     entityMidpoints: Map<string, Point>;
     /**
+     * Y coordinate where milestone slack arrows attach for each item id.
+     * Defaults to the item's row midpoint; when an item's caption spills
+     * past the bar's right edge, drops to the progress-strip's vertical
+     * center (`box.y + box.height - PROGRESS_STRIP_HEIGHT_PX / 2`) so the
+     * arrow stays clear of the spilled title/meta line and visually
+     * aligns with the bottom-edge progress bar instead.
+     */
+    itemSlackAttachY: Map<string, number>;
+    /**
      * Horizontal arrow corridors that the swimlane row-packer must avoid.
      * Empty during the first layout pass; populated from the first
      * pass's milestones and consulted on the second pass so the binding

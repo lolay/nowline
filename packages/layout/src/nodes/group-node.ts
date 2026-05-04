@@ -16,6 +16,7 @@ import type {
     BoundingBox,
 } from '../types.js';
 import type { LayoutContext, TrackCursor } from '../layout-context.js';
+import { TRACK_BLOCK_TAIL_GUTTER_PX } from '../themes/shared.js';
 
 export interface GroupNodeDeps {
     sequenceOne: (
@@ -38,8 +39,9 @@ export class GroupNode {
 
     /**
      * Sequence children left-to-right inside a fresh inner cursor,
-     * advance the parent `cursor` past the group's right edge plus 8 px
-     * of breathing room, and return a `PositionedGroup`.
+     * advance the parent `cursor` past the group's right edge plus
+     * `TRACK_BLOCK_TAIL_GUTTER_PX` of breathing room, and return a
+     * `PositionedGroup`.
      */
     place(cursor: TrackCursor, ctx: LayoutContext): PositionedGroup {
         const { node } = this;
@@ -64,7 +66,7 @@ export class GroupNode {
             width: innerCursor.maxX - startX,
             height: Math.max(ctx.bandScale.step(), innerCursor.height),
         };
-        cursor.x = innerCursor.maxX + 8;
+        cursor.x = innerCursor.maxX + TRACK_BLOCK_TAIL_GUTTER_PX;
         cursor.maxX = Math.max(cursor.maxX, cursor.x);
         cursor.height = Math.max(cursor.height, box.height);
         const id = node.name;

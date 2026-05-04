@@ -65,6 +65,67 @@ export const LOGO_SIZE_PX: Record<'xs' | 'sm' | 'md' | 'lg' | 'xl', number> = {
 // Minimum item bar width so zero-duration items remain visible.
 export const MIN_ITEM_WIDTH = 8;
 
+// Height (px) of the bottom progress strip drawn along the item bar's
+// bottom edge. Single source of truth used by:
+//   - the renderer (strip rect height + bottom-edge offset)
+//   - layout (label-chip Y reservation above the strip)
+//   - milestone slack-arrow attach Y (when a predecessor's caption
+//     spills past the bar's right edge, the arrow drops to the strip's
+//     vertical center so it visually aligns with the progress bar
+//     instead of running through the spilled text)
+//
+// Bumping this updates all three call sites consistently — the strip
+// grows, chips lift, and the slack arrow stays centered on the strip.
+export const PROGRESS_STRIP_HEIGHT_PX = 4;
+
+// Timeline tick header band — a single row that holds the date labels
+// (e.g. "Jan 05", "Feb 14"). Layout sizes the panel; the renderer
+// paints the labels at a fixed baseline offset from the panel's top.
+//
+// Bumping the panel height without re-centering the baseline mis-centers
+// the dates — keep both knobs together so a change to either one is
+// visible at a glance.
+export const TIMELINE_TICK_PANEL_HEIGHT_PX = 24;
+
+/**
+ * Baseline Y of the tick-label text relative to the tick panel's top.
+ * Approximately vertically centers a 10 pt label in the panel.
+ */
+export const TIMELINE_TICK_LABEL_BASELINE_OFFSET_PX = 15;
+
+/**
+ * Horizontal breathing room (px) added to a track-block's right edge
+ * after sequencing. Applied to `group { ... }` and `parallel { ... }`
+ * blocks so successive blocks don't crowd each other. Items butt up
+ * against their neighbors (no gutter) — only block boundaries get this
+ * gutter.
+ */
+export const TRACK_BLOCK_TAIL_GUTTER_PX = 8;
+
+// Frame-tab chiclet — the rounded label tab that overhangs a swimlane
+// frame and the dashed include-region border. Both surfaces share the
+// same height + label baseline so the chiclets read as siblings.
+//
+// The `FRAME_TAB_LABEL_BASELINE_OFFSET_PX` is tuned for a 12 pt label
+// roughly vertically centered in the tab; bumping the height without
+// adjusting the baseline pushes labels off-center.
+
+/** Height (px) of the frame-tab chiclet (swimlane + include region). */
+export const FRAME_TAB_HEIGHT_PX = 22;
+
+/** Baseline Y of the chiclet label relative to the tab's top edge. */
+export const FRAME_TAB_LABEL_BASELINE_OFFSET_PX = 15;
+
+/**
+ * Dashed-accent pattern (px on / px off) used for two nowline accents
+ * that read as "structural emphasis": the milestone vertical cut line
+ * and the include-region's dashed border. Coupling them in one constant
+ * keeps both surfaces visually in sync.
+ *
+ * Mirrors the spec samples (`stroke-dasharray="6 4"`).
+ */
+export const ACCENT_DASH_PATTERN = '6 4';
+
 // Visual inset applied on each side of an item bar. Two adjacent (logically
 // chained) items therefore have a 2× ITEM_INSET_PX visible gutter between
 // them, leaving room for vertical drop-lines (dependency arrows, anchor /
@@ -96,7 +157,38 @@ export const HEADER_BESIDE_MIN_WIDTH_PX = 120;
 export const HEADER_BESIDE_MAX_WIDTH_PX = 240;
 export const HEADER_ABOVE_HEIGHT_PX = 72;
 
-// Footnote area defaults.
+// Footnote panel — fixed-position panel below the chart with a
+// "Footnotes" header and one row per entry. Layout sizes the panel
+// using these values; the renderer paints labels at offsets derived
+// from the same constants so a padding bump cascades to both surfaces.
+//
+//   ┌───────────────────────────────┐
+//   │  Footnotes              ↑     │   header band (HEADER_HEIGHT)
+//   │                         │     │
+//   ├─────────────────────────┘     │   gap = PANEL_PADDING
+//   │  N  Title — description       │   row N (ROW_HEIGHT each)
+//   │  N  …                         │
+//   │                               │
+//   └───────────────────────────────┘   bottom pad = PANEL_PADDING
+//
+// Total panel height (when entries.length > 0):
+//   HEADER_HEIGHT + entries × ROW_HEIGHT + PANEL_PADDING
+
+/** Height (px) of the header band above the entry rows. */
+export const FOOTNOTE_HEADER_HEIGHT_PX = 28;
+
+/**
+ * Single padding value (px) reused as: left/right text inset, bottom
+ * padding under the last row, gap between the header band and the
+ * first entry, and gap between the number column and the title column.
+ * Bumping it changes every footnote panel inset consistently.
+ */
+export const FOOTNOTE_PANEL_PADDING_PX = 16;
+
+/** Baseline Y of the "Footnotes" header text relative to the panel top. */
+export const FOOTNOTE_HEADER_BASELINE_OFFSET_PX = 22;
+
+/** Baseline-to-baseline spacing between footnote entry rows. */
 export const FOOTNOTE_ROW_HEIGHT = 18;
 
 // Attribution mark — a clickable "Powered by nowline" link that sits in

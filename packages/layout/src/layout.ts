@@ -60,8 +60,25 @@ import {
     SPACING_PX,
     FOOTNOTE_ROW_HEIGHT,
     EDGE_CORNER_RADIUS,
+    PROGRESS_STRIP_HEIGHT_PX,
 } from './themes/shared.js';
 import { BandScale, defaultRowBand } from './band-scale.js';
+import {
+    HEADER_CARD_PADDING_X,
+    HEADER_CARD_PADDING_TOP,
+    HEADER_CARD_PADDING_BOTTOM,
+    HEADER_TITLE_LINE_HEIGHT_PX,
+    HEADER_AUTHOR_LINE_HEIGHT_PX,
+    HEADER_TITLE_TO_AUTHOR_GAP_PX,
+    HEADER_TITLE_FONT_SIZE_PX,
+    HEADER_AUTHOR_FONT_SIZE_PX,
+} from './header-card-geometry.js';
+import {
+    ITEM_CAPTION_INSET_X_PX,
+    LABEL_CHIP_HEIGHT_PX,
+    LABEL_CHIP_GAP_ABOVE_PROGRESS_STRIP_PX,
+    LABEL_CHIP_GAP_BETWEEN_PX,
+} from './item-bar-geometry.js';
 import { ItemNode } from './nodes/item-node.js';
 import { SwimlaneNode } from './nodes/swimlane-node.js';
 import { ParallelNode } from './nodes/parallel-node.js';
@@ -163,7 +180,7 @@ function buildLabelChip(
     return {
         text,
         style,
-        box: { x, y, width, height: 13 },
+        box: { x, y, width, height: LABEL_CHIP_HEIGHT_PX },
     };
 }
 
@@ -330,19 +347,22 @@ function sequenceItem(
     const textSpills = placed.textSpills;
 
     // Label chips laid out left → right INSIDE the item bar, sitting just
-    // above the bottom progress strip (4 px tall).
+    // above the bottom progress strip (`PROGRESS_STRIP_HEIGHT_PX`).
     const labelChips: PositionedLabelChip[] = [];
     const labelIds = propValues(props, 'labels');
-    const chipY = itemBox.y + itemBox.height - 4 - 13 - 3;
-    let chipX = itemBox.x + 12;
-    const chipMaxRight = itemBox.x + itemBox.width - 12;
+    const chipY = itemBox.y + itemBox.height
+        - PROGRESS_STRIP_HEIGHT_PX
+        - LABEL_CHIP_HEIGHT_PX
+        - LABEL_CHIP_GAP_ABOVE_PROGRESS_STRIP_PX;
+    let chipX = itemBox.x + ITEM_CAPTION_INSET_X_PX;
+    const chipMaxRight = itemBox.x + itemBox.width - ITEM_CAPTION_INSET_X_PX;
     for (const id of labelIds) {
         const label = ctx.labels.get(id);
         if (!label) continue;
         const remaining = Math.max(8, chipMaxRight - chipX);
         const chip = buildLabelChip(label, ctx.styleCtx, chipX, chipY, remaining);
         labelChips.push(chip);
-        chipX += chip.box.width + 4;
+        chipX += chip.box.width + LABEL_CHIP_GAP_BETWEEN_PX;
         if (chipX >= chipMaxRight) break;
     }
 
@@ -388,6 +408,17 @@ function sequenceItem(
             x: (logicalLeft + logicalRight) / 2,
             y: itemBox.y + itemBox.height / 2,
         });
+        // Slack-arrow attach Y. Defaults to the bar's row midpoint; when
+        // the caption spills past the bar's right edge, drop to the
+        // progress-strip's vertical center so the arrow aligns with the
+        // bottom-edge progress bar instead of running through the
+        // adjacent title/meta text. The `/ 2` keeps the attach point on
+        // the strip's vertical center if `PROGRESS_STRIP_HEIGHT_PX` is
+        // ever bumped.
+        const slackAttachY = textSpills
+            ? itemBox.y + itemBox.height - PROGRESS_STRIP_HEIGHT_PX / 2
+            : itemBox.y + itemBox.height / 2;
+        ctx.itemSlackAttachY.set(id, slackAttachY);
     }
 
     cursor.x = logicalRight;
@@ -496,20 +527,13 @@ function buildSwimlane(
     ).place({ x: ctx.timeline.originX, y }, ctx);
 }
 
-// Card-sizing constants for beside-mode headers. Title and author both wrap
-// at MAX_CONTENT_WIDTH (= MAX header width minus 2 * padding). The card hugs
-// its content in the MIN..MAX range and grows vertically when wrapping is
-// needed. Title baselines step by TITLE_LINE_HEIGHT, author baselines by
-// AUTHOR_LINE_HEIGHT, with TITLE_TO_AUTHOR_GAP between the last title line
-// and the first author line.
-const HEADER_CARD_PADDING_X = 16;
-const HEADER_CARD_PADDING_TOP = 26;     // baseline of the first title line
-const HEADER_CARD_PADDING_BOTTOM = 14;  // descender padding below last line
-const HEADER_TITLE_LINE_HEIGHT = 20;
-const HEADER_AUTHOR_LINE_HEIGHT = 14;
-const HEADER_TITLE_TO_AUTHOR_GAP = 18;
-const HEADER_TITLE_FONT_SIZE = 16;
-const HEADER_AUTHOR_FONT_SIZE = 11;
+// Card-sizing constants for beside-mode headers live in
+// `header-card-geometry.ts` so the renderer can paint with the same
+// numbers the layout sized against. Title and author both wrap at
+// MAX_CONTENT_WIDTH (= MAX header width minus 2 * padding). The card
+// hugs its content in the MIN..MAX range and grows vertically when
+// wrapping is needed.
+//
 // Left margin between the canvas's left edge and the visible card. The
 // matching right-side breathing room is owned by `GUTTER_PX` (the canonical
 // content gutter, applied between `chartLeftX` and `originX`), so the gap
@@ -549,12 +573,12 @@ function wrapText(text: string, maxWidth: number, fontSize: number): string[] {
 
 function sizeBesideHeader(title: string, author: string | undefined): SizedHeader {
     const maxContentWidth = HEADER_BESIDE_MAX_WIDTH_PX - 2 * HEADER_CARD_PADDING_X;
-    const titleLines = wrapText(title, maxContentWidth, HEADER_TITLE_FONT_SIZE);
-    const authorLines = wrapText(author ?? '', maxContentWidth, HEADER_AUTHOR_FONT_SIZE);
+    const titleLines = wrapText(title, maxContentWidth, HEADER_TITLE_FONT_SIZE_PX);
+    const authorLines = wrapText(author ?? '', maxContentWidth, HEADER_AUTHOR_FONT_SIZE_PX);
 
     let widest = 0;
-    for (const line of titleLines) widest = Math.max(widest, estimateTextWidth(line, HEADER_TITLE_FONT_SIZE));
-    for (const line of authorLines) widest = Math.max(widest, estimateTextWidth(line, HEADER_AUTHOR_FONT_SIZE));
+    for (const line of titleLines) widest = Math.max(widest, estimateTextWidth(line, HEADER_TITLE_FONT_SIZE_PX));
+    for (const line of authorLines) widest = Math.max(widest, estimateTextWidth(line, HEADER_AUTHOR_FONT_SIZE_PX));
 
     const naturalCardWidth = widest + 2 * HEADER_CARD_PADDING_X;
     // `HEADER_BESIDE_{MIN,MAX}_WIDTH_PX` bound the **boxWidth** (= cardWidth
@@ -566,10 +590,10 @@ function sizeBesideHeader(title: string, author: string | undefined): SizedHeade
     );
 
     const titleBlockHeight = titleLines.length > 0
-        ? (titleLines.length - 1) * HEADER_TITLE_LINE_HEIGHT
+        ? (titleLines.length - 1) * HEADER_TITLE_LINE_HEIGHT_PX
         : 0;
     const authorBlockHeight = authorLines.length > 0
-        ? HEADER_TITLE_TO_AUTHOR_GAP + (authorLines.length - 1) * HEADER_AUTHOR_LINE_HEIGHT
+        ? HEADER_TITLE_TO_AUTHOR_GAP_PX + (authorLines.length - 1) * HEADER_AUTHOR_LINE_HEIGHT_PX
         : 0;
     const cardHeight = HEADER_CARD_PADDING_TOP + titleBlockHeight + authorBlockHeight + HEADER_CARD_PADDING_BOTTOM;
 

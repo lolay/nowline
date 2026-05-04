@@ -17,6 +17,7 @@ import type {
     BoundingBox,
 } from '../types.js';
 import type { LayoutContext, TrackCursor } from '../layout-context.js';
+import { TRACK_BLOCK_TAIL_GUTTER_PX } from '../themes/shared.js';
 
 export interface ParallelNodeDeps {
     sequenceOne: (
@@ -39,8 +40,9 @@ export class ParallelNode {
 
     /**
      * Sequence children into stacked sub-tracks, advance the parent
-     * `cursor` past the parallel's right edge plus 8 px of breathing
-     * room, and return a `PositionedParallel`.
+     * `cursor` past the parallel's right edge plus
+     * `TRACK_BLOCK_TAIL_GUTTER_PX` of breathing room, and return a
+     * `PositionedParallel`.
      */
     place(cursor: TrackCursor, ctx: LayoutContext): PositionedParallel {
         const { node } = this;
@@ -72,7 +74,7 @@ export class ParallelNode {
             height: accumulatedHeight,
         };
 
-        cursor.x = maxRight + 8;
+        cursor.x = maxRight + TRACK_BLOCK_TAIL_GUTTER_PX;
         cursor.maxX = Math.max(cursor.maxX, cursor.x);
         cursor.height = Math.max(cursor.height, accumulatedHeight);
 

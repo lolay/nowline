@@ -10,6 +10,11 @@ import { resolveStyle } from '../style-resolution.js';
 import type { PositionedAnchor, Point } from '../types.js';
 import type { LayoutContext } from '../layout-context.js';
 import { propValue, parseDate } from '../dsl-utils.js';
+import {
+    MARKER_DIAMOND_RADIUS_PX,
+    MARKER_LABEL_GAP_PX,
+    MARKER_LABEL_HEIGHT_PX,
+} from './marker-geometry.js';
 
 export class AnchorNode {
     constructor(
@@ -33,10 +38,10 @@ export class AnchorNode {
         const y = placement?.centerY ?? ctx.timeline.markerRow.y;
         const center: Point = { x, y };
         const labelBox = placement?.labelBox ?? {
-            x: x + 6 + 6,
+            x: x + MARKER_DIAMOND_RADIUS_PX + MARKER_LABEL_GAP_PX,
             y: y - 4,
             width: 0,
-            height: 12,
+            height: MARKER_LABEL_HEIGHT_PX,
         };
         const labelSide = placement?.labelSide ?? 'right';
         ctx.entityLeftEdges.set(this.id, x);
@@ -46,7 +51,7 @@ export class AnchorNode {
             id: this.id,
             title: this.anchor.title ?? this.id,
             center,
-            radius: 6,
+            radius: MARKER_DIAMOND_RADIUS_PX,
             style,
             predecessorPoints: [],
             cutTopY: ctx.chartTopY,

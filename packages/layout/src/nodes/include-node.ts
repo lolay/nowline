@@ -79,6 +79,7 @@ export function buildIncludeRegions(
             entityLeftEdges: new Map(),
             entityRightEdges: new Map(),
             entityMidpoints: new Map(),
+            itemSlackAttachY: new Map(),
             slackCorridors: [],
             markerRowPlacements: new Map(),
             chartTopY: innerStartY,
@@ -98,7 +99,13 @@ export function buildIncludeRegions(
             bandIndex++;
         }
         const innerEndY = cursorY;
-        const regionHeight = Math.max(56, innerEndY - y + REGION_INSET_BOTTOM);
+        // Floor the region height to one row's bandwidth so an empty or
+        // tiny include still presents as a visible band — `bandwidth()`
+        // tracks whatever the host theme uses for swimlane row height.
+        const regionHeight = Math.max(
+            ctx.bandScale.bandwidth(),
+            innerEndY - y + REGION_INSET_BOTTOM,
+        );
         const box: BoundingBox = {
             x: 0,
             y,

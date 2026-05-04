@@ -47,7 +47,16 @@ import {
     GUTTER_PX,
     ATTRIBUTION_GLYPH_WIDTH,
     ATTRIBUTION_GLYPH_HEIGHT,
+    TIMELINE_TICK_PANEL_HEIGHT_PX,
 } from '../themes/shared.js';
+import {
+    MARKER_LABEL_GAP_PX,
+    MARKER_LABEL_HEIGHT_PX,
+    MARKER_BOLD_WIDTH_FACTOR,
+    MARKER_DIAMOND_RADIUS_PX,
+    MARKER_ROW_PITCH_PX,
+    MARKER_ROW_CENTER_OFFSET_PX,
+} from './marker-geometry.js';
 import { propValue, propValues, parseDate } from '../dsl-utils.js';
 import { SwimlaneNode } from './swimlane-node.js';
 import { buildAnchors } from './anchor-node.js';
@@ -164,7 +173,7 @@ export class RoadmapNode {
         const hasMarkerEntities =
             resolved.content.anchors.size + resolved.content.milestones.size > 0;
         const pillRowHeight = willHaveNowline ? 16 : 0;
-        const tickPanelHeight = 24;
+        const tickPanelHeight = TIMELINE_TICK_PANEL_HEIGHT_PX;
 
         // Build the time scale up front — packMarkerRow needs it to
         // resolve date-pinned entity x positions before we can size the
@@ -191,7 +200,7 @@ export class RoadmapNode {
             datePinnedEntries.push({
                 id,
                 centerX: x,
-                radius: 6,
+                radius: MARKER_DIAMOND_RADIUS_PX,
                 title: anchor.title ?? id,
                 fontSize: 10,
                 bold: false,
@@ -207,7 +216,7 @@ export class RoadmapNode {
             datePinnedEntries.push({
                 id,
                 centerX: x,
-                radius: 6,
+                radius: MARKER_DIAMOND_RADIUS_PX,
                 title: milestone.title ?? id,
                 fontSize: 10,
                 bold: true,
@@ -225,7 +234,7 @@ export class RoadmapNode {
         // entry. The renderer reads `labelBox.x/y` directly.
         const packed = packMarkerRow(datePinnedEntries, chartLeftX, finalChartRightX, deps.estimateTextWidth);
         const markerRowsCount = hasMarkerEntities ? Math.max(1, packed.rowCount) : 0;
-        const markerRowHeight = markerRowsCount * 26;
+        const markerRowHeight = markerRowsCount * MARKER_ROW_PITCH_PX;
         const headerRowsHeight = pillRowHeight + tickPanelHeight + markerRowHeight;
         const timelineHeightBudget = headerRowsHeight + 8;
         // In beside-mode the header card's BOTTOM aligns with the bottom
@@ -254,7 +263,7 @@ export class RoadmapNode {
             tickPanelY,
             tickPanelHeight,
             markerRow: {
-                y: markerRowY + 13,
+                y: markerRowY + MARKER_ROW_CENTER_OFFSET_PX,
                 height: markerRowHeight,
                 collisionY: markerRowY - 8,
             },
@@ -267,7 +276,7 @@ export class RoadmapNode {
         // build time so they slot into the same rows where there's room.
         const markerRowPlacements = new Map<string, MarkerRowPlacement>();
         for (const [id, p] of packed.placements) {
-            const centerY = markerRowY + 13 + p.rowIndex * 26;
+            const centerY = markerRowY + MARKER_ROW_CENTER_OFFSET_PX + p.rowIndex * MARKER_ROW_PITCH_PX;
             markerRowPlacements.set(id, {
                 rowIndex: p.rowIndex,
                 centerY,
@@ -292,6 +301,7 @@ export class RoadmapNode {
             entityLeftEdges: new Map(),
             entityRightEdges: new Map(),
             entityMidpoints: new Map(),
+            itemSlackAttachY: new Map(),
             slackCorridors: [],
             markerRowPlacements,
             chartTopY: timelineY + timelineHeightBudget,
@@ -370,6 +380,10 @@ export class RoadmapNode {
             ctx.entityLeftEdges = new Map(baselineEntityLeft);
             ctx.entityRightEdges = new Map(baselineEntityRight);
             ctx.entityMidpoints = new Map(baselineEntityMid);
+            // itemSlackAttachY only ever holds item entries (markers
+            // never write to it), so a fresh map is the right reset —
+            // pass 2's items will repopulate.
+            ctx.itemSlackAttachY = new Map();
             ctx.slackCorridors = corridors;
             pass = runSwimlaneLoop();
             swimlanes = pass.swimlanes;
@@ -451,7 +465,7 @@ export class RoadmapNode {
 
         ctx.markerRowPlacements.clear();
         for (const [id, p] of repacked.placements) {
-            const centerY = markerRowY + 13 + p.rowIndex * 26;
+            const centerY = markerRowY + MARKER_ROW_CENTER_OFFSET_PX + p.rowIndex * MARKER_ROW_PITCH_PX;
             ctx.markerRowPlacements.set(id, {
                 rowIndex: p.rowIndex,
                 centerY,
@@ -487,8 +501,8 @@ export class RoadmapNode {
         // values without further work.
         const actualRowCount = hasMarkerEntities ? Math.max(1, repacked.rowCount) : 0;
         if (actualRowCount > markerRowsCount) {
-            const deltaY = (actualRowCount - markerRowsCount) * 26;
-            ctx.timeline.markerRow.height = actualRowCount * 26;
+            const deltaY = (actualRowCount - markerRowsCount) * MARKER_ROW_PITCH_PX;
+            ctx.timeline.markerRow.height = actualRowCount * MARKER_ROW_PITCH_PX;
             ctx.timeline.box.height += deltaY;
             ctx.chartTopY += deltaY;
             ctx.chartBottomY += deltaY;
@@ -501,9 +515,21 @@ export class RoadmapNode {
                 if (ctx.markerRowPlacements.has(id)) continue;
                 ctx.entityMidpoints.set(id, { x: m.x, y: m.y + deltaY });
             }
+            // itemSlackAttachY was sampled at the same pre-shift Y as
+            // the entity midpoints — keep the two in sync.
+            for (const [id, y] of ctx.itemSlackAttachY) {
+                ctx.itemSlackAttachY.set(id, y + deltaY);
+            }
             for (const m of milestones) {
                 m.cutTopY = ctx.chartTopY;
                 m.cutBottomY = ctx.chartBottomY;
+                // Slack arrows were baked with the pre-shift attach Y
+                // when buildMilestones ran above. Shift them now so
+                // they land on the same row band as the (now-shifted)
+                // predecessor bar.
+                if (m.slackArrows) {
+                    for (const arrow of m.slackArrows) arrow.y += deltaY;
+                }
             }
         }
 
@@ -640,7 +666,12 @@ function collectSlackCorridors(
                 if (end === undefined) continue;
                 if (end > maxEnd) {
                     maxEnd = end;
-                    maxY = ctx.entityMidpoints.get(ref)?.y ?? 0;
+                    // Mirror MilestoneNode's attach-Y choice so the
+                    // corridor sits on the same row band as the rendered
+                    // arrow.
+                    maxY = ctx.itemSlackAttachY.get(ref)
+                        ?? ctx.entityMidpoints.get(ref)?.y
+                        ?? 0;
                     maxRef = ref;
                 }
             }
@@ -661,8 +692,10 @@ function collectSlackCorridors(
         for (const ref of afterRaw) {
             const end = ctx.entityRightEdges.get(ref);
             if (end === undefined) continue;
-            const mid = ctx.entityMidpoints.get(ref);
-            preds.push({ ref, x: end, y: mid?.y ?? 0 });
+            const yAttach = ctx.itemSlackAttachY.get(ref)
+                ?? ctx.entityMidpoints.get(ref)?.y
+                ?? 0;
+            preds.push({ ref, x: end, y: yAttach });
         }
         preds.sort((a, b) => b.x - a.x);
         const maxEnd = preds[0]?.x;
@@ -682,13 +715,6 @@ function collectSlackCorridors(
     }
     return out;
 }
-
-const MARKER_LABEL_GAP_PX = 6;
-const MARKER_LABEL_HEIGHT_PX = 12;
-// Bold sans serifs (milestone labels) measure ~5% wider than regular at
-// the same em — `estimateTextWidth` is intentionally pessimistic at 0.58
-// so the small surcharge keeps overlap detection on the safe side.
-const MARKER_BOLD_WIDTH_FACTOR = 1.05;
 
 interface MarkerEntity {
     id: string;
