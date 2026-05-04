@@ -629,7 +629,16 @@ function computeDateWindow(
     const roadmap = file.roadmapDecl;
     const props = roadmap?.properties ?? [];
     const startRaw = propValue(props, 'start');
-    const startDate = parseDate(startRaw) ?? new Date(Date.UTC(new Date().getUTCFullYear(), 0, 1));
+    // Spec (`specs/dsl.md`): "A roadmap with no `start:` and no dates is
+    // purely relative — renderers choose their own reference date (e.g.
+    // the day of rendering)." Use the caller's `today` (the resolved
+    // `--now`) when present so the start lines up with the now-line, and
+    // fall back to actual today's UTC midnight otherwise. Either default
+    // is dangerous — output drifts day-to-day — but it's strictly better
+    // than the legacy "Jan 1 of the current year" fallback that drifted
+    // every January 1 by 365 days at once. Authors should set `start:`
+    // for any roadmap they want to be reproducible.
+    const startDate = parseDate(startRaw) ?? defaultStartDate(today);
     const lengthRaw = propValue(props, 'length');
     if (lengthRaw) {
         const days = literalDays(lengthRaw, ctx.cal);
@@ -647,6 +656,18 @@ function computeDateWindow(
         ? Math.ceil(contentDays / tickDays) * tickDays
         : 4 * ctx.cal.daysPerWeek;
     return { startDate, endDate: addDays(startDate, Math.max(1, padded)) };
+}
+
+/**
+ * Reference date used when a roadmap omits `start:`. Prefers the
+ * caller-supplied `today` (UTC midnight already, when it comes from
+ * the CLI); falls back to actual today's UTC midnight so the layout
+ * still produces a valid window for direct API callers that don't pass
+ * a `today`. Date components are taken in UTC to match `parseDate`.
+ */
+function defaultStartDate(today: Date | undefined): Date {
+    const ref = today ?? new Date();
+    return new Date(Date.UTC(ref.getUTCFullYear(), ref.getUTCMonth(), ref.getUTCDate()));
 }
 
 function literalDays(literal: string, cal: import('./calendar.js').CalendarConfig): number {

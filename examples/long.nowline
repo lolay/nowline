@@ -26,7 +26,7 @@ default swimlane padding:sm spacing:none
 default roadmap padding:md header-height:md font:sans
 default parallel bracket:none
 
-roadmap long-2026 "Long Example 2026" author:"Acme Engineering" start:2026-01-01
+roadmap long-2026 "Long Example 2026" author:"Acme Engineering" start:2026-01-05
 
 duration xs length:1d
 duration sm length:3d

@@ -31,7 +31,7 @@ default item shadow:subtle
 default swimlane padding:sm spacing:none
 default roadmap padding:md header-height:md font:sans
 
-roadmap nested-2026 "Nested Example 2026" author:"Acme Security" start:2026-01-01
+roadmap nested-2026 "Nested Example 2026" author:"Acme Security" start:2026-01-05
 
 duration sm length:3d
 duration md length:1w

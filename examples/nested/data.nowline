@@ -24,7 +24,7 @@ style long-term
 default item shadow:subtle
 default swimlane padding:sm spacing:none
 
-roadmap data-nested "Data (nested)" author:"Data Team" start:2026-01-01
+roadmap data-nested "Data (nested)" author:"Data Team" start:2026-01-05
 
 duration sm length:3d
 duration md length:1w

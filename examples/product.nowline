@@ -31,7 +31,7 @@ default swimlane padding:sm spacing:none
 default roadmap padding:md header-height:md font:sans
 default parallel bracket:none
 
-roadmap platform-2026 "Platform 2026" author:"Acme Engineering" start:2026-01-01 calendar:custom
+roadmap platform-2026 "Platform 2026" author:"Acme Engineering" start:2026-01-05 calendar:custom
 
 person sam "Sam Chen"
 person jen "Jennifer Wu"

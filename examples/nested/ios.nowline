@@ -19,7 +19,7 @@ style near-term
 default item shadow:subtle
 default swimlane padding:sm spacing:none
 
-roadmap ios-nested "iOS (nested)" author:"iOS Team" start:2026-01-01
+roadmap ios-nested "iOS (nested)" author:"iOS Team" start:2026-01-05
 
 duration sm length:3d
 duration md length:1w

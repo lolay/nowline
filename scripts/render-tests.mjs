@@ -20,14 +20,24 @@ const repoRoot = resolve(here, '..');
 const cliPath = resolve(repoRoot, 'packages/cli/dist/index.js');
 
 // `now` is pinned per-fixture so the now-line lands at a stable, useful spot
-// regardless of when the script runs. All starter fixtures share the
-// minimal.nowline timeline window (start:2026-01-05) so they share a `now`.
+// regardless of when the script runs. All starter fixtures share the same
+// canonical window as the demos in `scripts/render-samples.mjs`
+// (`start: 2026-01-05`, `now: 2026-02-09`) so a side-by-side compare lines
+// up date columns across the harness and the demos.
+//
+// `defaults-no-start-no-now` is the deliberate exception: it omits both
+// `start:` (in the source) and `now` (here) so the rendered output exercises
+// the layout's "no start \u2192 today" + renderer's "no --now \u2192 today"
+// defaults. Its rendered SVG drifts every day, so it's intentionally NOT a
+// snapshot fixture.
+const NOW = '2026-02-09';
 const MANIFEST = [
-    { slug: 'large-roadmap-title',   theme: 'light', now: '2026-01-22' },
-    { slug: 'large-swimlane-title',  theme: 'light', now: '2026-01-22' },
-    { slug: 'text-fits-inside-bars', theme: 'light', now: '2026-01-22' },
-    { slug: 'text-spills-right',     theme: 'light', now: '2026-01-22' },
-    { slug: 'item-bumps-up',         theme: 'light', now: '2026-01-22' },
+    { slug: 'large-roadmap-title',     theme: 'light', now: NOW },
+    { slug: 'large-swimlane-title',    theme: 'light', now: NOW },
+    { slug: 'text-fits-inside-bars',   theme: 'light', now: NOW },
+    { slug: 'text-spills-right',       theme: 'light', now: NOW },
+    { slug: 'item-bumps-up',           theme: 'light', now: NOW },
+    { slug: 'defaults-no-start-no-now', theme: 'light' },
 ];
 
 function run(cmd, args, opts = {}) {

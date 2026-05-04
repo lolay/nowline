@@ -38,10 +38,12 @@ const EXAMPLES_DIR = path.join(REPO_ROOT, 'examples');
 export const SNAPSHOT_DIR = path.join(import.meta.dirname, '__snapshots__');
 
 /**
- * Fixed "today" for snapshot rendering. Falls inside every sample's
- * timeline window so the now-line is present and stable.
+ * Fixed "today" for snapshot rendering. Aligned with the canonical
+ * `now: 2026-02-09` used by `scripts/render-samples.mjs` and
+ * `scripts/render-tests.mjs` so the snapshot output matches what
+ * `pnpm render` produces in `examples/<slug>.svg`.
  */
-export const FIXED_TODAY = new Date(Date.UTC(2026, 1, 15));
+export const FIXED_TODAY = new Date(Date.UTC(2026, 1, 9));
 
 export interface SampleSpec {
     /** Snapshot file name (without extension). */

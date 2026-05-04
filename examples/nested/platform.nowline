@@ -24,7 +24,7 @@ style long-term
 default item shadow:subtle
 default swimlane padding:sm spacing:none
 
-roadmap platform-nested "Platform (nested)" author:"Platform Team" start:2026-01-01
+roadmap platform-nested "Platform (nested)" author:"Platform Team" start:2026-01-05
 
 duration md length:1w
 duration lg length:2w
