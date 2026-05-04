@@ -155,11 +155,21 @@ export const NOW_PILL_LABEL_BASELINE_OFFSET_PX = NOW_PILL_HEIGHT_PX - 4;
 /**
  * Horizontal inset (px) of the "now" label from the pill's squared
  * edge in flag mode. In `flag-right` mode the label sits at
- * `nowX + INSET` (left-aligned past the line); in `flag-left` mode at
- * `nowX - INSET` (right-aligned before the line). Center mode ignores
- * this — the label sits at `nowX` with `text-anchor=middle`.
+ * `squaredEdgeX + INSET` (left-aligned past the line); in `flag-left`
+ * mode at `squaredEdgeX - INSET` (right-aligned before the line).
+ * Center mode ignores this — the label sits at `nowX` with
+ * `text-anchor=middle`.
  */
 export const NOW_PILL_LABEL_INSET_X_PX = 6;
+
+/**
+ * Stroke width (px) of the now-line. Shared between the line itself
+ * and the flag-mode pill geometry so the squared edge of the pill
+ * lines up with the OUTER edge of the line stroke (SVG strokes are
+ * centered on their geometry, so without this offset the line
+ * stroke peeks past the pill's squared edge by half-stroke).
+ */
+export const NOWLINE_STROKE_WIDTH_PX = 2.25;
 
 // Visual inset applied on each side of an item bar. Two adjacent (logically
 // chained) items therefore have a 2× ITEM_INSET_PX visible gutter between

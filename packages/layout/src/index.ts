@@ -39,6 +39,7 @@ export {
     NOW_PILL_LABEL_FONT_SIZE_PX,
     NOW_PILL_LABEL_BASELINE_OFFSET_PX,
     NOW_PILL_LABEL_INSET_X_PX,
+    NOWLINE_STROKE_WIDTH_PX,
 } from './themes/shared.js';
 export {
     HEADER_CARD_PADDING_X,

@@ -63,6 +63,7 @@ import {
     NOW_PILL_LABEL_FONT_SIZE_PX,
     NOW_PILL_LABEL_BASELINE_OFFSET_PX,
     NOW_PILL_LABEL_INSET_X_PX,
+    NOWLINE_STROKE_WIDTH_PX,
     FOOTNOTE_ROW_HEIGHT,
     FOOTNOTE_HEADER_HEIGHT_PX,
     FOOTNOTE_PANEL_PADDING_PX,
@@ -299,7 +300,7 @@ function renderNowline(n: PositionedNowline | null, palette: Theme): string {
         x2: num(n.x),
         y2: num(n.bottomY),
         stroke: color,
-        'stroke-width': 2.25,
+        'stroke-width': NOWLINE_STROKE_WIDTH_PX,
     });
     // Pill — sits above the date headers at `pillTopY`. Three modes
     // (decided by layout in `buildNowline`):
@@ -313,6 +314,28 @@ function renderNowline(n: PositionedNowline | null, palette: Theme): string {
     const pillBg = renderNowPillBg(n, color);
     const label = renderNowPillLabel(n, labelTextColor);
     return tag('g', { 'data-layer': 'nowline' }, line + pillBg + label);
+}
+
+/**
+ * X coordinate of the pill's squared edge in flag modes. SVG strokes
+ * are centered on their geometry, so a 2.25 px line at `n.x` actually
+ * paints from `n.x - 1.125` to `n.x + 1.125`. To make the pill's
+ * squared edge line up with the OUTER edge of the line stroke (so
+ * the line and the pill share a single continuous edge instead of
+ * the line peeking past the pill by half-stroke), we offset by
+ * `NOWLINE_STROKE_WIDTH_PX / 2` on the side the line is on.
+ *
+ *   flag-right: line on the LEFT  → squared edge at n.x - half-stroke
+ *   flag-left:  line on the RIGHT → squared edge at n.x + half-stroke
+ *
+ * Center mode doesn't apply — the line passes through the pill's
+ * vertical center, so a half-stroke offset would make things worse.
+ */
+function squaredEdgeX(n: PositionedNowline): number {
+    const halfStroke = NOWLINE_STROKE_WIDTH_PX / 2;
+    if (n.pillMode === 'flag-right') return n.x - halfStroke;
+    if (n.pillMode === 'flag-left') return n.x + halfStroke;
+    return n.x;
 }
 
 function renderNowPillBg(n: PositionedNowline, color: string): string {
@@ -330,29 +353,32 @@ function renderNowPillBg(n: PositionedNowline, color: string): string {
             fill: color,
         });
     }
+    const edgeX = squaredEdgeX(n);
     if (n.pillMode === 'flag-right') {
-        // Line at LEFT edge, rounded corners on the RIGHT.
-        const right = n.x + NOW_PILL_WIDTH_PX;
+        // Squared LEFT edge aligns with line's left outer stroke edge,
+        // rounded corners on the RIGHT.
+        const right = edgeX + NOW_PILL_WIDTH_PX;
         const d = [
-            `M ${num(n.x)} ${num(top)}`,
+            `M ${num(edgeX)} ${num(top)}`,
             `L ${num(right - r)} ${num(top)}`,
             `A ${r} ${r} 0 0 1 ${num(right)} ${num(top + r)}`,
             `L ${num(right)} ${num(bottom - r)}`,
             `A ${r} ${r} 0 0 1 ${num(right - r)} ${num(bottom)}`,
-            `L ${num(n.x)} ${num(bottom)}`,
+            `L ${num(edgeX)} ${num(bottom)}`,
             'Z',
         ].join(' ');
         return tag('path', { d, fill: color });
     }
-    // flag-left: line at RIGHT edge, rounded corners on the LEFT.
-    const left = n.x - NOW_PILL_WIDTH_PX;
+    // flag-left: squared RIGHT edge aligns with line's right outer
+    // stroke edge, rounded corners on the LEFT.
+    const left = edgeX - NOW_PILL_WIDTH_PX;
     const d = [
-        `M ${num(n.x)} ${num(top)}`,
+        `M ${num(edgeX)} ${num(top)}`,
         `L ${num(left + r)} ${num(top)}`,
         `A ${r} ${r} 0 0 0 ${num(left)} ${num(top + r)}`,
         `L ${num(left)} ${num(bottom - r)}`,
         `A ${r} ${r} 0 0 0 ${num(left + r)} ${num(bottom)}`,
-        `L ${num(n.x)} ${num(bottom)}`,
+        `L ${num(edgeX)} ${num(bottom)}`,
         'Z',
     ].join(' ');
     return tag('path', { d, fill: color });
@@ -360,16 +386,17 @@ function renderNowPillBg(n: PositionedNowline, color: string): string {
 
 function renderNowPillLabel(n: PositionedNowline, labelTextColor: string): string {
     const baselineY = n.pillTopY + NOW_PILL_LABEL_BASELINE_OFFSET_PX;
+    const edgeX = squaredEdgeX(n);
     let labelX: number;
     let textAnchor: 'start' | 'middle' | 'end';
     if (n.pillMode === 'center') {
         labelX = n.x;
         textAnchor = 'middle';
     } else if (n.pillMode === 'flag-right') {
-        labelX = n.x + NOW_PILL_LABEL_INSET_X_PX;
+        labelX = edgeX + NOW_PILL_LABEL_INSET_X_PX;
         textAnchor = 'start';
     } else {
-        labelX = n.x - NOW_PILL_LABEL_INSET_X_PX;
+        labelX = edgeX - NOW_PILL_LABEL_INSET_X_PX;
         textAnchor = 'end';
     }
     return textTag(
