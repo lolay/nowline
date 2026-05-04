@@ -207,13 +207,33 @@ export const lightTheme: Theme = {
         planned: '#94a3b8',
         neutral: '#94a3b8',
     },
+    // Status-dot palettes — the renderer picks one based on the
+    // bar's effective bg luminance.
+    //
+    // `onLight`: deep / 800-900 level. Used when the bar bg is
+    // light (pale status tint OR a label-driven light hue). High
+    // contrast against either.
+    //
+    // `onDark`: pale / 100 level. Used when the bar bg is dark or
+    // saturated mid-tone (e.g. `bg:blue` → `#1e88e5`). Still
+    // hue-tinted so the status meaning carries.
     statusDot: {
-        done: '#10b981',
-        inProgress: '#3b82f6',
-        atRisk: '#f59e0b',
-        blocked: '#ef4444',
-        planned: '#94a3b8',
-        neutral: '#94a3b8',
+        onLight: {
+            done: '#065f46',
+            inProgress: '#1e3a8a',
+            atRisk: '#92400e',
+            blocked: '#991b1b',
+            planned: '#334155',
+            neutral: '#334155',
+        },
+        onDark: {
+            done: '#d1fae5',
+            inProgress: '#dbeafe',
+            atRisk: '#fef3c7',
+            blocked: '#fee2e2',
+            planned: '#e2e8f0',
+            neutral: '#e2e8f0',
+        },
     },
     attribution: {
         mark: '#94a3b8',

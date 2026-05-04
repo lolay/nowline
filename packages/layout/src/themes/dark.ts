@@ -205,13 +205,28 @@ export const darkTheme: Theme = {
         planned: '#94a3b8',
         neutral: '#94a3b8',
     },
+    // Status-dot palettes — see `light.ts` for the contract. Same
+    // two palettes both themes; dark-theme bars come in BOTH dark
+    // (status-tint) and bright (label-driven) flavors, so a single
+    // palette can never satisfy both. The renderer picks per-bar
+    // based on the bar bg's relative luminance.
     statusDot: {
-        done: '#34d399',
-        inProgress: '#60a5fa',
-        atRisk: '#fbbf24',
-        blocked: '#f87171',
-        planned: '#94a3b8',
-        neutral: '#94a3b8',
+        onLight: {
+            done: '#065f46',
+            inProgress: '#1e3a8a',
+            atRisk: '#92400e',
+            blocked: '#991b1b',
+            planned: '#334155',
+            neutral: '#334155',
+        },
+        onDark: {
+            done: '#d1fae5',
+            inProgress: '#dbeafe',
+            atRisk: '#fef3c7',
+            blocked: '#fee2e2',
+            planned: '#e2e8f0',
+            neutral: '#e2e8f0',
+        },
     },
     attribution: {
         mark: '#cbd5e1',

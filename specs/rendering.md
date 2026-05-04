@@ -152,7 +152,7 @@ The now-line is the hero visual element — the vertical line marking today on t
 
 Each roadmap item renders as a horizontal bar. Width is determined by `duration`. Height equals the band's `bandwidth()` — bars are uniform-height within a row regardless of label count. Bar contents include title, status indicator, owner, label chiclets, and footnote indicators.
 
-- **Status indicator:** Colored dot — green (done), blue (in-progress), yellow (at-risk), red (blocked), gray (planned). Custom statuses use a neutral indicator.
+- **Status indicator:** Hue-tinted dot in the bar's upper-right — green (done), blue (in-progress), amber (at-risk), red (blocked), slate (planned). Custom statuses use a neutral slate indicator. The exact tone is picked PER-BAR based on the bar bg's relative luminance: pale or saturated mid-tone bars (label-driven `bg:blue` etc.) get the deep `onLight` palette (≈ 800-900-level), and dark bars (default dark-theme status tints like `#172554`) get the pale `onDark` palette (≈ 100-level). The two palettes cross over at `L_bar ≈ 0.24` so the dot never fades into the bar even when a label propagates a same-hue saturated bg.
 - **Progress bar:** When `remaining` is set, the bar fills proportionally (e.g., `remaining:30%` → 70% filled). `status:done` fills the bar completely regardless of `remaining`. The strip sits at the bar's bottom.
 - **Link icon:** A 14×14 colored tile in the bar's UPPER-LEFT corner with a white outbound-arrow ↗ glyph. The glyph is the SAME for every link target — only the tile color changes by service:
     - `linear.app` → **Linear** (purple tile)

@@ -133,6 +133,56 @@ function strokeDash(style: ResolvedStyle): string | undefined {
     return undefined;
 }
 
+/**
+ * sRGB → relative luminance per WCAG 2.x. Input may be `#rrggbb`,
+ * `#rgb`, or a non-hex token like `none` / `transparent`. Non-hex
+ * inputs return 1 (treated as light) so a transparent bar reuses
+ * the chart's light bg. Mostly used to choose between two
+ * status-dot palettes (`onLight` vs `onDark`) so the dot reads on
+ * any bar fill — see `pickStatusDotPalette` and
+ * `specs/rendering.md`'s status-dot section.
+ */
+function relativeLuminance(hex: string): number {
+    if (!hex || hex === 'none' || hex === 'transparent') return 1;
+    let h = hex.startsWith('#') ? hex.slice(1) : hex;
+    if (h.length === 3) {
+        h = h
+            .split('')
+            .map((c) => c + c)
+            .join('');
+    }
+    if (h.length !== 6) return 1;
+    const r = parseInt(h.slice(0, 2), 16) / 255;
+    const g = parseInt(h.slice(2, 4), 16) / 255;
+    const b = parseInt(h.slice(4, 6), 16) / 255;
+    const lin = (c: number): number =>
+        c <= 0.03928 ? c / 12.92 : Math.pow((c + 0.055) / 1.055, 2.4);
+    return 0.2126 * lin(r) + 0.7152 * lin(g) + 0.0722 * lin(b);
+}
+
+/**
+ * Pick the status-dot palette whose tone contrasts best with the
+ * given bar bg.
+ *
+ * The crossover threshold is the bar luminance at which a deep dot
+ * (avg luminance ≈ 0.045 across `onLight` palette entries) and a
+ * pale dot (avg ≈ 0.85 across `onDark` entries) give equal WCAG
+ * contrast. Solving `(L_bar + 0.05)² ≈ 0.86 × 0.095` gives
+ * `L_bar ≈ 0.24`, so:
+ *   - bars with luminance ≥ 0.24 (most label-driven mid-tones AND
+ *     all pale status-tint bars) → `onLight` deep dot
+ *   - bars with luminance < 0.24 (dark status-tint bars in dark
+ *     theme, e.g. `#172554`) → `onDark` pale dot
+ */
+function pickStatusDotPalette(
+    bg: string,
+    palette: Theme,
+): Theme['statusDot']['onLight'] {
+    return relativeLuminance(bg) >= 0.24
+        ? palette.statusDot.onLight
+        : palette.statusDot.onDark;
+}
+
 function rectFrame(x: number, y: number, w: number, h: number, style: ResolvedStyle, extra: Record<string, string | number | undefined | null | boolean> = {}): string {
     const rx = Math.min(CORNER_RADIUS_PX[style.cornerRadius] ?? 4, h / 2);
     return tag('rect', {
@@ -426,18 +476,22 @@ function renderItem(i: PositionedItem, options: RenderOptions, idPrefix: string,
             filter: shadow ?? null,
         }),
     );
-    // Status palette for the upper-right dot. m2.5d: pulled from
-    // `palette.statusDot.*` so the renderer stays branch-free. The
-    // dot palette is intentionally separate from `palette.status.*`
-    // (which drives the bg tint) because dark theme historically uses
-    // `#fbbf24` for the at-risk dot vs. `#facc15` for the at-risk bg.
+    // Status-dot color — the dot communicates status via hue, but
+    // the bar bg can range from pale status tints (`#eff6ff`) to
+    // saturated mid-tones (`#1e88e5` from `bg:blue` labels) to
+    // dark navies (`#172554` in dark theme), so a single palette
+    // can't keep contrast across all bars. Two palettes — `onLight`
+    // (deep tints, for pale bars) and `onDark` (pale tints, for
+    // saturated/dark bars) — are picked from based on the bar
+    // bg's relative luminance.
+    const dotPalette = pickStatusDotPalette(i.style.bg, palette);
     const statusColors: Record<string, string> = {
-        done: palette.statusDot.done,
-        'in-progress': palette.statusDot.inProgress,
-        'at-risk': palette.statusDot.atRisk,
-        blocked: palette.statusDot.blocked,
-        planned: palette.statusDot.planned,
-        neutral: palette.statusDot.neutral,
+        done: dotPalette.done,
+        'in-progress': dotPalette.inProgress,
+        'at-risk': dotPalette.atRisk,
+        blocked: dotPalette.blocked,
+        planned: dotPalette.planned,
+        neutral: dotPalette.neutral,
     };
     const dotColor = statusColors[i.status] ?? statusColors.neutral;
     // Bottom progress strip along the bottom edge. Height comes from
