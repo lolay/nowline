@@ -62,6 +62,7 @@ import {
     NOW_PILL_CORNER_RADIUS_PX,
     NOW_PILL_LABEL_FONT_SIZE_PX,
     NOW_PILL_LABEL_BASELINE_OFFSET_PX,
+    NOW_PILL_LABEL_INSET_X_PX,
     FOOTNOTE_ROW_HEIGHT,
     FOOTNOTE_HEADER_HEIGHT_PX,
     FOOTNOTE_PANEL_PADDING_PX,
@@ -300,33 +301,89 @@ function renderNowline(n: PositionedNowline | null, palette: Theme): string {
         stroke: color,
         'stroke-width': 2.25,
     });
-    // Pill label — sits above the date headers at `pillTopY`. Layout
-    // reserves the canvas's right margin against the same width so the
-    // pill never clips at the edge (see `growChartRightX` in
-    // roadmap-node.ts).
-    const pillText = 'now';
-    const labelBg = tag('rect', {
-        x: num(n.x - NOW_PILL_WIDTH_PX / 2),
-        y: num(n.pillTopY),
-        width: num(NOW_PILL_WIDTH_PX),
-        height: num(NOW_PILL_HEIGHT_PX),
-        rx: NOW_PILL_CORNER_RADIUS_PX,
-        ry: NOW_PILL_CORNER_RADIUS_PX,
-        fill: color,
-    });
-    const label = textTag(
+    // Pill — sits above the date headers at `pillTopY`. Three modes
+    // (decided by layout in `buildNowline`):
+    //   - center      → rounded rect centered on the line, label `middle`
+    //   - flag-right  → squared LEFT, rounded RIGHT, line at left edge,
+    //                   label `start` past the line
+    //   - flag-left   → rounded LEFT, squared RIGHT, line at right edge,
+    //                   label `end` before the line
+    // The squared edge IS the line; the rounded edge points into the
+    // chart, so the pill always hugs the line and never overflows.
+    const pillBg = renderNowPillBg(n, color);
+    const label = renderNowPillLabel(n, labelTextColor);
+    return tag('g', { 'data-layer': 'nowline' }, line + pillBg + label);
+}
+
+function renderNowPillBg(n: PositionedNowline, color: string): string {
+    const top = n.pillTopY;
+    const bottom = n.pillTopY + NOW_PILL_HEIGHT_PX;
+    const r = NOW_PILL_CORNER_RADIUS_PX;
+    if (n.pillMode === 'center') {
+        return tag('rect', {
+            x: num(n.x - NOW_PILL_WIDTH_PX / 2),
+            y: num(top),
+            width: num(NOW_PILL_WIDTH_PX),
+            height: num(NOW_PILL_HEIGHT_PX),
+            rx: r,
+            ry: r,
+            fill: color,
+        });
+    }
+    if (n.pillMode === 'flag-right') {
+        // Line at LEFT edge, rounded corners on the RIGHT.
+        const right = n.x + NOW_PILL_WIDTH_PX;
+        const d = [
+            `M ${num(n.x)} ${num(top)}`,
+            `L ${num(right - r)} ${num(top)}`,
+            `A ${r} ${r} 0 0 1 ${num(right)} ${num(top + r)}`,
+            `L ${num(right)} ${num(bottom - r)}`,
+            `A ${r} ${r} 0 0 1 ${num(right - r)} ${num(bottom)}`,
+            `L ${num(n.x)} ${num(bottom)}`,
+            'Z',
+        ].join(' ');
+        return tag('path', { d, fill: color });
+    }
+    // flag-left: line at RIGHT edge, rounded corners on the LEFT.
+    const left = n.x - NOW_PILL_WIDTH_PX;
+    const d = [
+        `M ${num(n.x)} ${num(top)}`,
+        `L ${num(left + r)} ${num(top)}`,
+        `A ${r} ${r} 0 0 0 ${num(left)} ${num(top + r)}`,
+        `L ${num(left)} ${num(bottom - r)}`,
+        `A ${r} ${r} 0 0 0 ${num(left + r)} ${num(bottom)}`,
+        `L ${num(n.x)} ${num(bottom)}`,
+        'Z',
+    ].join(' ');
+    return tag('path', { d, fill: color });
+}
+
+function renderNowPillLabel(n: PositionedNowline, labelTextColor: string): string {
+    const baselineY = n.pillTopY + NOW_PILL_LABEL_BASELINE_OFFSET_PX;
+    let labelX: number;
+    let textAnchor: 'start' | 'middle' | 'end';
+    if (n.pillMode === 'center') {
+        labelX = n.x;
+        textAnchor = 'middle';
+    } else if (n.pillMode === 'flag-right') {
+        labelX = n.x + NOW_PILL_LABEL_INSET_X_PX;
+        textAnchor = 'start';
+    } else {
+        labelX = n.x - NOW_PILL_LABEL_INSET_X_PX;
+        textAnchor = 'end';
+    }
+    return textTag(
         {
-            x: num(n.x),
-            y: num(n.pillTopY + NOW_PILL_LABEL_BASELINE_OFFSET_PX),
+            x: num(labelX),
+            y: num(baselineY),
             'font-family': FONT_STACK.sans,
             'font-size': NOW_PILL_LABEL_FONT_SIZE_PX,
             'font-weight': 700,
             fill: labelTextColor,
-            'text-anchor': 'middle',
+            'text-anchor': textAnchor,
         },
-        pillText,
+        'now',
     );
-    return tag('g', { 'data-layer': 'nowline' }, line + labelBg + label);
 }
 
 function renderItem(i: PositionedItem, options: RenderOptions, idPrefix: string, palette: Theme): string {

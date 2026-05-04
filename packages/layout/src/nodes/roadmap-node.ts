@@ -48,7 +48,6 @@ import {
     ATTRIBUTION_GLYPH_WIDTH,
     ATTRIBUTION_GLYPH_HEIGHT,
     TIMELINE_TICK_PANEL_HEIGHT_PX,
-    NOW_PILL_WIDTH_PX,
     NOW_PILL_HEIGHT_PX,
 } from '../themes/shared.js';
 import {
@@ -74,26 +73,20 @@ const HEADER_CARD_TOP_INSET = 4;
  * it wants the canvas to contain, with any breathing-room margin
  * (typically `GUTTER_PX`) baked in. Concentrating growth here makes
  * it trivial to grep for every contributor — today: item caption
- * spills + now-pill reservation; future: anchor/milestone label
- * spills, footnote panels wider than the chart, etc.
+ * spills; future: anchor/milestone label spills, footnote panels
+ * wider than the chart, etc.
  *
  * Initial seed lives at the start of `place(...)` (the natural date
- * window plus the now-pill's reach); everything that becomes known
- * after the swimlane pass calls through here.
+ * window with `GUTTER_PX` insets on each side); everything that
+ * becomes known after the swimlane pass calls through here.
+ *
+ * The now-pill is intentionally NOT a contributor — when the line
+ * lands close to either edge, `buildNowline` switches the pill to
+ * "flag" mode (squared edge against the line, rounded edge into the
+ * chart), so the pill always fits inside the natural canvas.
  */
 function growChartRightX(ctx: LayoutContext, rightX: number): void {
     if (rightX > ctx.chartRightX) ctx.chartRightX = rightX;
-}
-
-/**
- * The now-pill is centered on the now-line's x and extends
- * ±NOW_PILL_WIDTH_PX/2 past it. Returns the absolute X the canvas
- * must contain (with `GUTTER_PX` breathing room) so the pill never
- * clips at the right edge — or 0 when no now-line will be drawn.
- */
-function nowPillRightExtent(nowX: number | null): number {
-    if (nowX === null) return 0;
-    return nowX + NOW_PILL_WIDTH_PX / 2 + GUTTER_PX;
 }
 
 /** Sized output from the beside-mode header word-wrap pass. */
@@ -213,21 +206,12 @@ export class RoadmapNode {
             range: [originX, originX + naturalWidth],
             calendar,
         });
-        // Bake every right-edge contributor known up-front into the
-        // initial extent so the marker pack runs against the final
-        // width:
-        //   - natural date window (`desiredCanvas`)
-        //   - now-pill reservation (centered on the now-line, the pill
-        //     extends ±NOW_PILL_WIDTH_PX/2; reserved here so it never
-        //     clips when the now-line lands at the right edge)
-        // Item caption spills are unknown until the swimlane pass runs
-        // and grow the canvas via `growChartRightX` afterwards.
-        const nowX = willHaveNowline ? timeScale.forwardWithinDomain(options.today!) : null;
-        const finalChartRightX = Math.max(
-            chartRightX,
-            originX + totalChartWidth + GUTTER_PX,
-            nowPillRightExtent(nowX),
-        );
+        // Initial canvas extent = natural date window + canonical
+        // gutters. Item caption spills are unknown until the swimlane
+        // pass runs and grow the canvas via `growChartRightX`. The
+        // now-pill doesn't contribute here — `buildNowline` flips it to
+        // flag mode whenever a centered pill would clip an edge.
+        const finalChartRightX = Math.max(chartRightX, originX + totalChartWidth + GUTTER_PX);
 
         // Resolve each date-pinned anchor and milestone's x. Used both for
         // the marker-row pack and for `after:` resolution downstream — an

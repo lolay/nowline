@@ -58,9 +58,11 @@ import {
     ITEM_INSET_PX,
     PADDING_PX,
     SPACING_PX,
+    GUTTER_PX,
     FOOTNOTE_ROW_HEIGHT,
     EDGE_CORNER_RADIUS,
     PROGRESS_STRIP_HEIGHT_PX,
+    NOW_PILL_WIDTH_PX,
 } from './themes/shared.js';
 import { BandScale, defaultRowBand } from './band-scale.js';
 import {
@@ -868,11 +870,31 @@ function buildNowline(
     // visually connected.
     const pillTopY = ctx.timeline.box.y;
     const lineTopY = ctx.timeline.tickPanelY;
+    // The "chart's left edge" the pill must clear is `chartLeftX` (in
+    // beside-mode, the right edge of the header card; in above-mode,
+    // the canvas left edge at x=0). originX = chartLeftX + GUTTER_PX,
+    // so we recover chartLeftX as `originX - GUTTER_PX`.
+    const chartLeftX = ctx.timeline.originX - GUTTER_PX;
+    const halfPill = NOW_PILL_WIDTH_PX / 2;
+    let pillMode: 'center' | 'flag-right' | 'flag-left';
+    if (x - halfPill < chartLeftX) {
+        // Centered pill would intrude into the header card / past the
+        // canvas left edge — anchor the pill's LEFT side to the line
+        // and let it extend right into the chart.
+        pillMode = 'flag-right';
+    } else if (x + halfPill > ctx.chartRightX) {
+        // Centered pill would clip past the canvas right edge — anchor
+        // the pill's RIGHT side to the line and let it extend left.
+        pillMode = 'flag-left';
+    } else {
+        pillMode = 'center';
+    }
     return {
         x,
         topY: lineTopY,
         bottomY: ctx.chartBottomY,
         pillTopY,
+        pillMode,
         label: 'Today',
         style: resolveStyle('item', [], ctx.styleCtx),
     };

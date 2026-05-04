@@ -121,6 +121,26 @@ export interface PositionedTimelineScale {
     };
 }
 
+/**
+ * How the now-pill is positioned relative to the now-line.
+ *
+ *   - `center` — pill centered on the line (default). Used when both
+ *     edges have at least `NOW_PILL_WIDTH_PX/2` of clearance from the
+ *     chart's left/right edges.
+ *   - `flag-right` — line at the pill's left edge, pill extends to the
+ *     right with the right side rounded and the label left-aligned.
+ *     Used when the line lands close enough to `chartLeftX` that a
+ *     centered pill would overlap the header card / canvas left edge.
+ *   - `flag-left` — line at the pill's right edge, pill extends to the
+ *     left with the left side rounded and the label right-aligned.
+ *     Used when the line lands close enough to `chartRightX` that a
+ *     centered pill would clip past the canvas right edge.
+ *
+ * In both flag modes the squared edge IS the now-line, so the pill
+ * visually anchors to the line without growing the canvas.
+ */
+export type NowPillMode = 'center' | 'flag-right' | 'flag-left';
+
 export interface PositionedNowline {
     x: number;
     // Top of the vertical red line. Sits at the BOTTOM of the now-pill —
@@ -133,6 +153,8 @@ export interface PositionedNowline {
     // renderer; the layout reserves the space at the very top of the
     // timeline area so the pill sits ABOVE the date headers.
     pillTopY: number;
+    /** How the pill aligns to the line (see `NowPillMode`). */
+    pillMode: NowPillMode;
     label: string;      // 'Today' by default
     style: ResolvedStyle;
 }

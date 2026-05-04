@@ -152,6 +152,15 @@ export const NOW_PILL_LABEL_FONT_SIZE_PX = 10;
  *  Tuned to vertically center a 10 pt bold glyph in a 16 px pill. */
 export const NOW_PILL_LABEL_BASELINE_OFFSET_PX = NOW_PILL_HEIGHT_PX - 4;
 
+/**
+ * Horizontal inset (px) of the "now" label from the pill's squared
+ * edge in flag mode. In `flag-right` mode the label sits at
+ * `nowX + INSET` (left-aligned past the line); in `flag-left` mode at
+ * `nowX - INSET` (right-aligned before the line). Center mode ignores
+ * this — the label sits at `nowX` with `text-anchor=middle`.
+ */
+export const NOW_PILL_LABEL_INSET_X_PX = 6;
+
 // Visual inset applied on each side of an item bar. Two adjacent (logically
 // chained) items therefore have a 2× ITEM_INSET_PX visible gutter between
 // them, leaving room for vertical drop-lines (dependency arrows, anchor /
