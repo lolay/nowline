@@ -48,6 +48,8 @@ import {
     ATTRIBUTION_GLYPH_WIDTH,
     ATTRIBUTION_GLYPH_HEIGHT,
     TIMELINE_TICK_PANEL_HEIGHT_PX,
+    NOW_PILL_WIDTH_PX,
+    NOW_PILL_HEIGHT_PX,
 } from '../themes/shared.js';
 import {
     MARKER_LABEL_GAP_PX,
@@ -65,6 +67,34 @@ import { buildFootnotes } from './footnote-node.js';
 import { buildIncludeRegions } from './include-node.js';
 
 const HEADER_CARD_TOP_INSET = 4;
+
+/**
+ * Single mutator for the chart's right-edge extent. Every layout
+ * artifact that wants to push the canvas wider passes the absolute X
+ * it wants the canvas to contain, with any breathing-room margin
+ * (typically `GUTTER_PX`) baked in. Concentrating growth here makes
+ * it trivial to grep for every contributor — today: item caption
+ * spills + now-pill reservation; future: anchor/milestone label
+ * spills, footnote panels wider than the chart, etc.
+ *
+ * Initial seed lives at the start of `place(...)` (the natural date
+ * window plus the now-pill's reach); everything that becomes known
+ * after the swimlane pass calls through here.
+ */
+function growChartRightX(ctx: LayoutContext, rightX: number): void {
+    if (rightX > ctx.chartRightX) ctx.chartRightX = rightX;
+}
+
+/**
+ * The now-pill is centered on the now-line's x and extends
+ * ±NOW_PILL_WIDTH_PX/2 past it. Returns the absolute X the canvas
+ * must contain (with `GUTTER_PX` breathing room) so the pill never
+ * clips at the right edge — or 0 when no now-line will be drawn.
+ */
+function nowPillRightExtent(nowX: number | null): number {
+    if (nowX === null) return 0;
+    return nowX + NOW_PILL_WIDTH_PX / 2 + GUTTER_PX;
+}
 
 /** Sized output from the beside-mode header word-wrap pass. */
 export interface SizedHeader {
@@ -172,7 +202,7 @@ export class RoadmapNode {
             options.today !== undefined && options.today >= startDate && options.today <= endDate;
         const hasMarkerEntities =
             resolved.content.anchors.size + resolved.content.milestones.size > 0;
-        const pillRowHeight = willHaveNowline ? 16 : 0;
+        const pillRowHeight = willHaveNowline ? NOW_PILL_HEIGHT_PX : 0;
         const tickPanelHeight = TIMELINE_TICK_PANEL_HEIGHT_PX;
 
         // Build the time scale up front — packMarkerRow needs it to
@@ -183,7 +213,21 @@ export class RoadmapNode {
             range: [originX, originX + naturalWidth],
             calendar,
         });
-        const finalChartRightX = Math.max(chartRightX, originX + totalChartWidth + GUTTER_PX);
+        // Bake every right-edge contributor known up-front into the
+        // initial extent so the marker pack runs against the final
+        // width:
+        //   - natural date window (`desiredCanvas`)
+        //   - now-pill reservation (centered on the now-line, the pill
+        //     extends ±NOW_PILL_WIDTH_PX/2; reserved here so it never
+        //     clips when the now-line lands at the right edge)
+        // Item caption spills are unknown until the swimlane pass runs
+        // and grow the canvas via `growChartRightX` afterwards.
+        const nowX = willHaveNowline ? timeScale.forwardWithinDomain(options.today!) : null;
+        const finalChartRightX = Math.max(
+            chartRightX,
+            originX + totalChartWidth + GUTTER_PX,
+            nowPillRightExtent(nowX),
+        );
 
         // Resolve each date-pinned anchor and milestone's x. Used both for
         // the marker-row pack and for `after:` resolution downstream — an
@@ -395,9 +439,10 @@ export class RoadmapNode {
         // e.g. `examples/minimal.svg` and `tests/text-spills-right.svg`
         // — would land outside the SVG's viewBox and clip in browsers.
         // Markers/anchors built below see the expanded width and pick a
-        // less aggressive label side.
-        const spillRightX = pass.maxRightX + GUTTER_PX;
-        if (spillRightX > ctx.chartRightX) ctx.chartRightX = spillRightX;
+        // less aggressive label side. Routed through `growChartRightX`
+        // so this contribution sits beside the now-pill reservation
+        // (made at init) in the canvas-extent ledger.
+        growChartRightX(ctx, pass.maxRightX + GUTTER_PX);
 
         // Each swimlane band reads the canvas width once during its
         // place pass, before the spill expansion above. Re-stretch every

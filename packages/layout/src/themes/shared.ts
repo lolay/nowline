@@ -126,6 +126,32 @@ export const FRAME_TAB_LABEL_BASELINE_OFFSET_PX = 15;
  */
 export const ACCENT_DASH_PATTERN = '6 4';
 
+// Now-line pill — the rounded "now" chiclet that sits above the
+// timeline at the now-line's x. Layout reserves the pill row's height
+// in the timeline header AND uses NOW_PILL_WIDTH_PX/2 to keep the
+// canvas wide enough that the pill never clips at the right edge
+// (centered on the line, the pill extends ±half-width past it). The
+// renderer paints with the same constants so the layout's reservation
+// matches the painted glyph 1:1.
+
+/** Width (px) of the rounded "now" pill above the now-line. */
+export const NOW_PILL_WIDTH_PX = 36;
+
+/** Height (px) of the rounded "now" pill. Matches the pill row band
+ *  reserved at the top of the timeline. */
+export const NOW_PILL_HEIGHT_PX = 16;
+
+/** Corner radius (px) of the pill — half of `NOW_PILL_HEIGHT_PX` so
+ *  the rect renders as a fully-rounded chiclet. */
+export const NOW_PILL_CORNER_RADIUS_PX = NOW_PILL_HEIGHT_PX / 2;
+
+/** Font size (px) of the "now" label inside the pill. */
+export const NOW_PILL_LABEL_FONT_SIZE_PX = 10;
+
+/** Baseline offset (px) of the label text from the pill's top edge.
+ *  Tuned to vertically center a 10 pt bold glyph in a 16 px pill. */
+export const NOW_PILL_LABEL_BASELINE_OFFSET_PX = NOW_PILL_HEIGHT_PX - 4;
+
 // Visual inset applied on each side of an item bar. Two adjacent (logically
 // chained) items therefore have a 2× ITEM_INSET_PX visible gutter between
 // them, leaving room for vertical drop-lines (dependency arrows, anchor /

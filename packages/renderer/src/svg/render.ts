@@ -57,6 +57,11 @@ import {
     ITEM_FOOTNOTE_INDICATOR_STEP_PX,
     ITEM_LINK_ICON_TILE_SIZE_PX,
     ITEM_LINK_ICON_INSET_PX,
+    NOW_PILL_WIDTH_PX,
+    NOW_PILL_HEIGHT_PX,
+    NOW_PILL_CORNER_RADIUS_PX,
+    NOW_PILL_LABEL_FONT_SIZE_PX,
+    NOW_PILL_LABEL_BASELINE_OFFSET_PX,
     FOOTNOTE_ROW_HEIGHT,
     FOOTNOTE_HEADER_HEIGHT_PX,
     FOOTNOTE_PANEL_PADDING_PX,
@@ -295,25 +300,26 @@ function renderNowline(n: PositionedNowline | null, palette: Theme): string {
         stroke: color,
         'stroke-width': 2.25,
     });
-    // Pill label — sits above the date headers at `pillTopY`.
+    // Pill label — sits above the date headers at `pillTopY`. Layout
+    // reserves the canvas's right margin against the same width so the
+    // pill never clips at the edge (see `growChartRightX` in
+    // roadmap-node.ts).
     const pillText = 'now';
-    const bgWidth = 36;
-    const bgHeight = 16;
     const labelBg = tag('rect', {
-        x: num(n.x - bgWidth / 2),
+        x: num(n.x - NOW_PILL_WIDTH_PX / 2),
         y: num(n.pillTopY),
-        width: num(bgWidth),
-        height: num(bgHeight),
-        rx: 8,
-        ry: 8,
+        width: num(NOW_PILL_WIDTH_PX),
+        height: num(NOW_PILL_HEIGHT_PX),
+        rx: NOW_PILL_CORNER_RADIUS_PX,
+        ry: NOW_PILL_CORNER_RADIUS_PX,
         fill: color,
     });
     const label = textTag(
         {
             x: num(n.x),
-            y: num(n.pillTopY + bgHeight - 4),
+            y: num(n.pillTopY + NOW_PILL_LABEL_BASELINE_OFFSET_PX),
             'font-family': FONT_STACK.sans,
-            'font-size': 10,
+            'font-size': NOW_PILL_LABEL_FONT_SIZE_PX,
             'font-weight': 700,
             fill: labelTextColor,
             'text-anchor': 'middle',
