@@ -1095,12 +1095,30 @@ function renderIncludeRegion(
         'stroke-linecap': 'round',
         'stroke-linejoin': 'round',
     });
+    // Halo behind the source-path text. The text's baseline at `ry + 4`
+    // straddles the dashed region border (drawn at y = ry); without a
+    // backing rect the dashed stroke cuts through the text body. Matches
+    // how the tab and badge already mask the border where they cross it.
+    // Fill is `includeRegion.fill` — same cream/tint as the region, near
+    // the canvas surface above, so the halo disappears into both.
+    const sourceFontSize = 9;
+    const sourceCharWidth = 5.5; // approx px/char for 9pt mono
+    const sourceTextX = badgeX + badgeSize + 6;
+    const sourceTextY = ry + 4;
+    const sourceHaloPad = 3;
+    const sourceHalo = tag('rect', {
+        x: num(sourceTextX - sourceHaloPad),
+        y: num(sourceTextY - sourceFontSize),
+        width: num(r.sourcePath.length * sourceCharWidth + sourceHaloPad * 2),
+        height: sourceFontSize + sourceHaloPad * 2,
+        fill,
+    });
     const sourceText = textTag(
         {
-            x: num(badgeX + badgeSize + 6),
-            y: num(ry + 4),
+            x: num(sourceTextX),
+            y: num(sourceTextY),
             'font-family': FONT_STACK.mono,
-            'font-size': 9,
+            'font-size': sourceFontSize,
             fill: badgeText,
         },
         r.sourcePath,
@@ -1114,7 +1132,7 @@ function renderIncludeRegion(
     return tag(
         'g',
         { 'data-layer': 'include' },
-        region + nested + tab + tabLabel + badge + glyph + sourceText,
+        region + nested + tab + tabLabel + badge + glyph + sourceHalo + sourceText,
     );
 }
 
