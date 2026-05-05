@@ -9,8 +9,8 @@ Nowline provides first-class IDE support through a Language Server Protocol (LSP
 | Milestone | Scope |
 |-----------|-------|
 | m1 | TextMate grammar (syntax highlighting only, ships with the DSL) |
-| m4 | LSP server + VS Code/Cursor extension with live preview |
-| m4b | Obsidian plugin, Neovim LSP config, JetBrains plugin (timing TBD) |
+| m3 | LSP server + VS Code/Cursor extension with live preview |
+| m4.5 | Obsidian plugin, Neovim LSP config, JetBrains plugin (timing TBD) |
 
 ## TextMate Grammar (m1)
 
@@ -33,7 +33,7 @@ Ships in the OSS monorepo at `grammars/nowline.tmLanguage.json`.
 | Lists | `meta.structure.list.nowline` | `labels:[enterprise, security]`, `depends:[auth-refactor, audit-log]` |
 | Dates | `constant.numeric.date.nowline` | `2026-06-01` |
 
-## LSP Server (m4)
+## LSP Server (m3)
 
 Langium generates an LSP server from the grammar definition. The server runs as a standalone process and communicates over stdio or TCP.
 
@@ -58,7 +58,7 @@ The LSP server is available in two forms:
 1. **Bundled in the VS Code/Cursor extension** — the extension packages the Langium-generated LSP as a Node.js module. No CLI install required. The extension is fully self-contained.
 2. **Via the CLI** (`nowline lsp`) — for editors that cannot bundle Node.js modules (Neovim, JetBrains, Emacs). Requires the `nowline` CLI to be installed.
 
-## VS Code / Cursor Extension (m4)
+## VS Code / Cursor Extension (m3)
 
 **Repo:** `lolay/nowline-vscode` (OSS, Apache 2.0).
 **Marketplace:** Visual Studio Marketplace + Open VSX (for Cursor, VSCodium).
@@ -107,7 +107,7 @@ The preview panel is a VS Code webview that:
 
 The preview updates on every keystroke (debounced ~200ms) or on save, configurable via settings.
 
-## Obsidian Plugin (m4b)
+## Obsidian Plugin (m4.5)
 
 **Repo:** `lolay/nowline-obsidian` (OSS, Apache 2.0).
 **Marketplace:** Obsidian Community Plugins.
@@ -122,7 +122,7 @@ The preview updates on every keystroke (debounced ~200ms) or on save, configurab
 
 The plugin registers a markdown post-processor that finds ` ```nowline ` blocks and replaces them with rendered SVG. It bundles `@nowline/core`, `@nowline/layout`, and `@nowline/renderer` — the same stack as the embed script.
 
-## Neovim (m4b)
+## Neovim (m4.5)
 
 No separate plugin required. Neovim's built-in LSP client connects to the Nowline LSP server.
 
@@ -145,7 +145,7 @@ A TreeSitter grammar (future) could provide better highlighting than the TextMat
 
 A documentation page and a sample config — not a maintained plugin. The LSP server does the heavy lifting.
 
-## JetBrains (m4b)
+## JetBrains (m4.5)
 
 JetBrains IDEs (IntelliJ, WebStorm, etc.) support LSP via the built-in LSP client (2023.2+).
 
@@ -163,7 +163,7 @@ A JetBrains Marketplace plugin. Minimal custom code — mostly configuration wra
 
 ## LSP Subcommand
 
-The CLI gains a hidden `nowline lsp` command in m4b for editors that cannot bundle the LSP as a Node.js module:
+The CLI gains a hidden `nowline lsp` command in m4.5 for editors that cannot bundle the LSP as a Node.js module:
 
 ```
 nowline lsp [options]

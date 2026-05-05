@@ -2,7 +2,7 @@
 
 ## Overview
 
-The OSS tooling (`lolay/nowline` and its satellite repos) ships incrementally across milestones m1–m4b, with a four-phase layout-engine refactor (m2.5a–m2.5d) and a follow-on rendering-polish pass (m2i) sitting between the sample-fidelity work (m2h) and the public embed (m3). Each milestone has a clear scope and set of Apache-2.0 deliverables. Later milestones depend on earlier ones.
+The OSS tooling (`lolay/nowline` and its satellite repos) ships incrementally across milestones m1–m4.5, with a four-phase layout-engine refactor (m2.5a–m2.5d) and a follow-on rendering-polish pass (m2i) sitting between the sample-fidelity work (m2h) and IDE support (m3). The IDE work ships before the public embed (m4) so authors can edit `.nowline` files in VS Code / Cursor with live preview before the embed surface goes wide. Each milestone has a clear scope and set of Apache-2.0 deliverables. Later milestones depend on earlier ones.
 
 Commercial milestones (hosted editor, free viewer, MCP, enterprise, FedRAMP) are tracked in a separate, private spec and are out of scope here.
 
@@ -25,9 +25,9 @@ Commercial milestones (hosted editor, free viewer, MCP, enterprise, FedRAMP) are
 | ~~m2.5c~~ | ~~Layout v2: Measure/Place Tree~~ | Apache 2.0 | `Renderable` nodes per entity (item/swimlane/group/parallel/anchor/milestone/footnote/include) replace the monolithic `layout.ts` |
 | ~~m2.5d~~ | ~~Layout v2: Theme in Model~~ | Apache 2.0 | Resolved palette carried in the positioned model; renderer drops `theme === 'dark'` branches |
 | ~~m2i~~ | ~~Sample fidelity polish~~ | Apache 2.0 | Post-Layout-v2 rendering refinements: row-packing for items/markers/groups, caption + chip spill, narrow-bar decoration spill, luminance-aware status dots, now-pill flag mode, canvas growth helpers, geometry-constant centralization |
-| m3 | Embed | Apache 2.0 | Browser embed script, GitHub Action |
-| m4 | IDE | Apache 2.0 | LSP server, VS Code/Cursor extension with live preview |
-| m4b | IDE Expansion | Apache 2.0 | Obsidian, Neovim, JetBrains (timing TBD) |
+| m3 | IDE | Apache 2.0 | LSP server, VS Code/Cursor extension with live preview |
+| m4 | Embed | Apache 2.0 | Browser embed script, GitHub Action |
+| m4.5 | IDE Expansion | Apache 2.0 | Obsidian, Neovim, JetBrains (timing TBD) |
 
 ## Milestone Details
 
@@ -58,12 +58,12 @@ Spec: [`specs/cli.md`](./cli.md) | Handoff: [`specs/handoffs/m2a.md`](./handoffs
 
 ### ~~m2b — Layout + SVG~~
 
-The visual milestone: render a `.nowline` file to an SVG. This is what m3 (embed) and m4 (IDE live preview) both consume.
+The visual milestone: render a `.nowline` file to an SVG. This is what m3 (IDE live preview) and m4 (embed) both consume.
 
 - Layout engine (`@nowline/layout`) — AST → positioned model (pure, browser-safe)
 - SVG renderer (`@nowline/renderer`) — positioned model → SVG string
 - `nowline render` command with SVG output (all flags except format-specific ones)
-- `nowline serve` — local dev server that watches a file and live-reloads the SVG in the browser (originally slated for m4b; pulled forward because `serve` needs only SVG and unlocks preview for editors without a native panel)
+- `nowline serve` — local dev server that watches a file and live-reloads the SVG in the browser (originally slated for m4.5; pulled forward because `serve` needs only SVG and unlocks preview for editors without a native panel)
 - Light and dark themes
 
 Spec: [`specs/rendering.md`](./rendering.md), [`specs/cli.md`](./cli.md) | Handoff: [`specs/handoffs/m2b.md`](./handoffs/m2b.md)
@@ -154,7 +154,7 @@ Spec: [`specs/rendering.md`](./rendering.md) | Handoff: [`specs/handoffs/m2h.md`
 
 First phase of the layout-engine v2 refactor. Replaces the imperative tick math in [`packages/layout/src/timeline.ts`](../packages/layout/src/timeline.ts) with a declarative pair of primitives validated end-to-end in a standalone prototype during planning (now retired; see commit `771127c`).
 
-- `TimeScale` (d3-scale wrapper) replaces `buildTimelineScale` + `pixelsPerDay` + `xForDate`. Adds `forward(date)` / `invert(x)` / `ticks()` so m4's editor gets click-to-date for free.
+- `TimeScale` (d3-scale wrapper) replaces `buildTimelineScale` + `pixelsPerDay` + `xForDate`. Adds `forward(date)` / `invert(x)` / `ticks()` so m3's editor gets click-to-date for free.
 - `ViewPreset` replaces the `LABEL_THINNING` table and per-unit format functions. Multi-row time headers (year over month over day) drop out for free.
 - `WorkingCalendar` lands alongside `CalendarConfig` in [`packages/layout/src/calendar.ts`](../packages/layout/src/calendar.ts) as a strategy: `continuousCalendar()` (default), `weekendsOff()`, `withHolidays(...)`. The DSL's `business` calendar mode becomes a factory call.
 - `PositionedTimelineScale` shape stays stable so the renderer needs no changes.
@@ -194,7 +194,7 @@ Cosmetic but valuable for the embed bundle. Resolved palette tokens move into th
 
 - `PositionedItem.fill`, `PositionedItem.stroke`, etc. carry resolved color strings instead of palette tokens.
 - The renderer becomes pure data → SVG with no theming logic.
-- Bundle savings on the embed script (m3's primary artifact).
+- Bundle savings on the embed script (m4's primary artifact).
 
 Validation: `--theme dark` still emits the expected palette; renderer file shrinks measurably; no theme branches remain in the renderer.
 
@@ -238,7 +238,16 @@ Test harness:
 
 Spec: [`specs/rendering.md`](./rendering.md) (post-m2.5 sections covering item bars, narrow-bar spill, bracket-style groups, now-pill flag mode, row packing)
 
-### m3 — Embed
+### m3 — IDE
+
+First-class editing experience in VS Code and Cursor. Pulled ahead of the embed (m4) so authors can write `.nowline` files in their primary editor with live preview before the public embed surface ships.
+
+- Langium LSP server (autocomplete, validation, go-to-definition)
+- VS Code / Cursor extension (LSP + side panel live preview that re-renders on save/keystroke)
+
+Spec: [`specs/ide.md`](./ide.md)
+
+### m4 — Embed
 
 Roadmaps render anywhere on the web and in CI.
 
@@ -250,18 +259,9 @@ Roadmaps render anywhere on the web and in CI.
 
 Spec: [`specs/embed.md`](./embed.md)
 
-### m4 — IDE
+### m4.5 — IDE Expansion (timing TBD)
 
-First-class editing experience in VS Code and Cursor.
-
-- Langium LSP server (autocomplete, validation, go-to-definition)
-- VS Code / Cursor extension (LSP + side panel live preview that re-renders on save/keystroke)
-
-Spec: [`specs/ide.md`](./ide.md)
-
-### m4b — IDE Expansion (timing TBD)
-
-Extend IDE support beyond VS Code/Cursor.
+Extend IDE support beyond VS Code/Cursor. Depends on m3 (LSP server) and is independent of m4 (Embed); slots after m4 in the chain so the public embed ships before plugin work begins.
 
 - Obsidian plugin (edit + inline preview)
 - Neovim LSP config
@@ -274,11 +274,11 @@ Spec: [`specs/ide.md`](./ide.md)
 ```
 m1 → m2a → m2b → m2b.5 → m2c → m2d → m2e → m2f → m2g → m2h → m2.5a → m2.5b → m2.5c → m2.5d → m2i → m3 → m4
                                                                                                           ↘
-                                                                                                           m4b (independent — depends only on m4)
+                                                                                                           m4.5 (depends on m3 only; sequenced after m4)
 ```
 
 m1 is the critical foundation — every subsequent milestone depends on the DSL, parser, and typed AST it produces.
 
-## Beyond m4b
+## Beyond m4.5
 
 Hosted products (pro editor, free viewer, MCP server, enterprise, FedRAMP) consume these OSS packages via npm but are built in separate, proprietary repos. See the commercial roadmap for that scope.
