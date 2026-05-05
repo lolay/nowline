@@ -40,6 +40,7 @@ import {
     GROUP_TITLE_TAB_LABEL_BASELINE_OFFSET_PX,
     GROUP_TITLE_TAB_LABEL_FONT_SIZE_PX,
     GROUP_TITLE_TAB_CHAR_WIDTH_PX,
+    GROUP_BRACKET_LABEL_OVERHANG_PX,
     ACCENT_DASH_PATTERN,
     HEADER_CARD_PADDING_X,
     HEADER_CARD_PADDING_TOP,
@@ -830,13 +831,33 @@ function renderGroup(g: PositionedGroup, options: RenderOptions, idPrefix: strin
     } else {
         const bracketColor = g.style.fg;
         if (g.style.bracket !== 'none') {
+            // Bracket-style groups paint a left-side `[` glyph along
+            // `box.x`. When a title is present the layout has reserved
+            // `GROUP_BRACKET_LABEL_OVERHANG_PX` of vertical space ABOVE
+            // `box.y` (see GroupNode.place); the bracket extends up
+            // through that overhang and adds a top foot mirroring the
+            // bottom foot so the `[` visually wraps the title text that
+            // sits in the reserved region. Title-less bracket groups
+            // keep the historical asymmetric shape (vertical bar + a
+            // single bottom foot) since there's nothing above to wrap.
+            const stub = 4;
+            const bottom = g.box.y + g.box.height;
+            const dash = g.style.bracket === 'dashed' ? '3 2' : null;
+            const bracketPath = g.title
+                ? `M${num(g.box.x + stub)} ${num(g.box.y - GROUP_BRACKET_LABEL_OVERHANG_PX)}` +
+                  ` L${num(g.box.x)} ${num(g.box.y - GROUP_BRACKET_LABEL_OVERHANG_PX)}` +
+                  ` L${num(g.box.x)} ${num(bottom)}` +
+                  ` L${num(g.box.x + stub)} ${num(bottom)}`
+                : `M${num(g.box.x)} ${num(g.box.y)}` +
+                  ` L${num(g.box.x)} ${num(bottom)}` +
+                  ` L${num(g.box.x + stub)} ${num(bottom)}`;
             parts.push(
                 tag('path', {
-                    d: `M${num(g.box.x)} ${num(g.box.y)} L${num(g.box.x)} ${num(g.box.y + g.box.height)} L${num(g.box.x + 4)} ${num(g.box.y + g.box.height)}`,
+                    d: bracketPath,
                     fill: 'none',
                     stroke: bracketColor,
                     'stroke-width': 1,
-                    'stroke-dasharray': g.style.bracket === 'dashed' ? '3 2' : null,
+                    'stroke-dasharray': dash,
                 }),
             );
         }

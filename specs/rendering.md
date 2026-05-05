@@ -339,9 +339,15 @@ When a group has `style:`, `labels:`, or other visual properties, it renders as 
 
 When a group has no style or labels, it is purely structural — no visible border, background, no chiclet. Items render with the same row-pack flow as a styled group (so collisions still bump to new rows), but the box reserves no top/bottom pad and the renderer paints no border or background. The group is invisible in the rendered output but still governs sequencing and inner row growth.
 
+#### Group (bracket-style with title)
+
+A group with a `title` but **no fill** (no `style:` providing a colored bg, or `bg:none`) renders as a closed `[`-bracket that wraps both the title and the items. The bracket is a single path: top foot (4 px stub from `box.x` to `box.x + 4`) at `box.y - GROUP_BRACKET_LABEL_OVERHANG_PX`, vertical stroke down `box.x` to `box.y + box.height`, then bottom foot (4 px stub from `box.x` to `box.x + 4`) at the box bottom. The title text sits just above `box.y` (baseline at `box.y - 2`) inside the reserved overhang region — visually framed by the bracket on its left.
+The label glyph extent lives entirely ABOVE `box.y`, so the group reserves a fixed `GROUP_BRACKET_LABEL_OVERHANG_PX` of space above its content (mirroring the way a styled group's chiclet pad sits below `box.y`). Without that reservation, two bracket-titled groups stacked inside a parallel collide visually: the previous sibling's bracket-foot ends at its `box.bottom`, and the next sibling's label-top — and the next sibling's bracket top-foot — would render in the same gap. The group implements the reservation by shifting its own `box.y` down by the overhang amount and reporting `bracketLabelOverhang + box.height + interRowGap` as its cursor-height advance.
+Title-less bracket groups keep the historical asymmetric shape (vertical stroke + a single bottom foot, no top foot) since there is no label to enclose and no overhang is reserved.
+
 #### Parallel with Groups
 
-Each group inside a parallel block renders as its own horizontal sub-track. Styled groups show their bounding boxes (with the upper-left chiclet); unstyled groups just show their items in a row. The parallel bracket and join line (when `bracket` is set) encompass all sub-tracks. A styled group inside a parallel reports its full grown height (chiclet pad + every inner row + bottom pad) so the parallel stacks subsequent sub-tracks below the group's painted footprint, not just its first row.
+Each group inside a parallel block renders as its own horizontal sub-track. Styled groups show their bounding boxes (with the upper-left chiclet); unstyled groups just show their items in a row. The parallel bracket and join line (when `bracket` is set) encompass all sub-tracks. A styled group inside a parallel reports its full grown height (chiclet pad + every inner row + bottom pad) so the parallel stacks subsequent sub-tracks below the group's painted footprint, not just its first row. Bracket-titled groups additionally include their `GROUP_BRACKET_LABEL_OVERHANG_PX` reservation so the next sibling's label has clear vertical space above the previous bracket's bottom-foot.
 
 ### Footnotes
 

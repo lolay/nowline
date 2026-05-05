@@ -154,6 +154,23 @@ export const GROUP_TITLE_TAB_CHAR_WIDTH_PX = 5.5;
 export const GROUP_BOTTOM_PAD_PX = 4;
 
 /**
+ * Vertical space (px) reserved ABOVE a bracket-style (no-fill) group's
+ * box to host its overhanging title label. Bracket groups paint their
+ * label at `box.y - 2` (baseline) in the renderer — the glyph extent
+ * lives entirely ABOVE box.y. Without an explicit reservation, that
+ * overhang collides with the previous sibling's bracket-foot when two
+ * bracket-titled groups stack in a parallel (the foot ends right where
+ * the next label's top would render). The group shifts its own box.y
+ * down by this amount so the label has clear space above it; the
+ * caller advances by `bracketLabelOverhang + box.height + interRowGap`.
+ *
+ * Filled-style ("chiclet") groups use `GROUP_TITLE_TAB_HEIGHT_PX +
+ * GROUP_TITLE_TAB_GUTTER_PX` instead — the chiclet sits INSIDE the box,
+ * so they need no above-box reservation.
+ */
+export const GROUP_BRACKET_LABEL_OVERHANG_PX = 12;
+
+/**
  * Dashed-accent pattern (px on / px off) used for two nowline accents
  * that read as "structural emphasis": the milestone vertical cut line
  * and the include-region's dashed border. Coupling them in one constant
