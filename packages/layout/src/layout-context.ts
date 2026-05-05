@@ -49,7 +49,7 @@ export function newCursor(x: number, y: number): TrackCursor {
 export interface LayoutContext {
     cal: ReturnType<typeof resolveCalendar>;
     styleCtx: StyleContext;
-    durations: Map<string, import('@nowline/core').DurationDeclaration>;
+    sizes: Map<string, import('@nowline/core').SizeDeclaration>;
     labels: Map<string, LabelDeclaration>;
     teams: Map<string, import('@nowline/core').TeamDeclaration>;
     persons: Map<string, import('@nowline/core').PersonDeclaration>;

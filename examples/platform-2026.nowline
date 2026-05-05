@@ -29,9 +29,9 @@ anchor kickoff date:2026-01-05
 anchor code-freeze "Code Freeze" date:2026-03-02
 anchor ga-date "GA Date" date:2026-03-16
 
-duration med length:1w
-duration lg length:2w
-duration xl length:4w
+size med effort:1w
+size lg effort:2w
+size xl effort:4w
 
 label enterprise "Enterprise readiness" style:enterprise-style
 label security "Security" style:enterprise-style
@@ -40,17 +40,17 @@ label low-confidence "Low confidence" style:risky-style
 status handoff "Handoff"
 
 swimlane platform "Platform" owner:platform-team
-  item auth-refactor "Auth refactor" duration:lg after:kickoff status:done owner:sam labels:enterprise link:https://linear.app/acme/issue/ENG-123
+  item auth-refactor "Auth refactor" size:lg after:kickoff status:done owner:sam labels:enterprise link:https://linear.app/acme/issue/ENG-123
   parallel after:auth-refactor
     group audit-track "Audit Track" style:audit-track-style labels:security
-      item audit-log "Audit log v2" duration:lg before:code-freeze status:in-progress remaining:30% labels:[enterprise, security] link:https://wiki.acme.com/audit footnote:vendor-dep
-      item audit-ui "Audit UI" duration:med
-    item sso "SSO plugins" duration:med labels:[enterprise, low-confidence]
-  item platform-qa "Platform QA" duration:med status:handoff
+      item audit-log "Audit log v2" size:lg before:code-freeze status:in-progress remaining:30% labels:[enterprise, security] link:https://wiki.acme.com/audit footnote:vendor-dep
+      item audit-ui "Audit UI" size:med
+    item sso "SSO plugins" size:med labels:[enterprise, low-confidence]
+  item platform-qa "Platform QA" size:med status:handoff
 
 swimlane mobile "Mobile" owner:mobile-team
-  item offline "Offline mode" duration:lg after:kickoff owner:jen status:at-risk remaining:60% footnote:capacity-risk
-  item push-v2 "Push notifications v2" duration:med owner:mobile-team
+  item offline "Offline mode" size:lg after:kickoff owner:jen status:at-risk remaining:60% footnote:capacity-risk
+  item push-v2 "Push notifications v2" size:med owner:mobile-team
 
 milestone beta "Beta" after:auth-refactor
 milestone v1-ga "v1 GA" after:[auth-refactor, audit-log]

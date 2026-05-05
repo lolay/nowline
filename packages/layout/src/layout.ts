@@ -143,21 +143,22 @@ function parseProgressFraction(raw: string | undefined): number {
     return Math.max(0, Math.min(100, parseInt(m[1], 10))) / 100;
 }
 
-// Resolve a duration property value to its literal length when it names a
-// declared duration alias. Returns the original string for raw literals
-// (`1w`, `3d`) and undefined for missing values.
+// Resolve a `size:NAME` value to its size declaration's effort literal. Used
+// by displays that want the literal duration string (not days). Returns the
+// original string for raw literals (`1w`, `3d`) and undefined for missing
+// values. m5 will adjust callers to apply capacity-aware derivation.
 function resolveDurationLiteral(
     raw: string | undefined,
-    ctx: { durations: Map<string, import('@nowline/core').DurationDeclaration> },
+    ctx: { sizes: Map<string, import('@nowline/core').SizeDeclaration> },
 ): string | undefined {
     if (!raw) return undefined;
-    if (/^\d+[dwmqy]$/.test(raw) || /^\d+%$/.test(raw)) return raw;
-    const dur = ctx.durations.get(raw);
-    if (!dur) return raw;
-    const lengthProp = dur.properties.find((p) =>
-        (p.key.endsWith(':') ? p.key.slice(0, -1) : p.key) === 'length',
+    if (/^\d+(?:\.\d+)?[dwmqy]$/.test(raw) || /^\d+%$/.test(raw)) return raw;
+    const size = ctx.sizes.get(raw);
+    if (!size) return raw;
+    const effortProp = size.properties.find((p) =>
+        (p.key.endsWith(':') ? p.key.slice(0, -1) : p.key) === 'effort',
     );
-    return lengthProp?.value ?? raw;
+    return effortProp?.value ?? raw;
 }
 
 // Resolve a person/team id to its declared title when present (id otherwise).
@@ -217,13 +218,22 @@ function sequenceItem(
 ): PositionedItem {
     const props = node.properties;
     const style = resolveStyle('item', props, ctx.styleCtx);
-    const durationDays = resolveDuration(propValue(props, 'duration'), ctx.durations, ctx.cal);
+    // m2 transitional: items still drive their length from `duration:` or
+    // `size:`. Until m5, both are treated as a calendar literal — `size:NAME`
+    // resolves to its size declaration's `effort:` literal as if capacity = 1.
+    // m5 will switch sized items to `duration = effort / capacity` and reserve
+    // `duration:` for explicit overrides.
+    const durationDays = resolveDuration(
+        propValue(props, 'duration') ?? propValue(props, 'size'),
+        ctx.sizes,
+        ctx.cal,
+    );
     const afterRaw = propValues(props, 'after');
     const beforeRaw = propValue(props, 'before');
     const dateRaw = propValue(props, 'date');
     const remainingDays = resolveDuration(
         propValue(props, 'remaining'),
-        ctx.durations,
+        ctx.sizes,
         ctx.cal,
     );
 
@@ -359,10 +369,12 @@ function sequenceItem(
         style.fg = STATUS_BORDER[status];
     }
 
-    // Pre-format the secondary line shown inside the item bar. If the
-    // duration is a named id (e.g. `lg`), resolve it to its declared length
-    // literal so the bar shows the duration ("2w") not the alias ("lg").
-    const durationRaw = propValue(props, 'duration');
+    // Pre-format the secondary line shown inside the item bar. Until m5
+    // introduces capacity-aware derivation, both `duration:NAME`/`size:NAME`
+    // resolve to the declared size's `effort:` literal — so the bar shows
+    // ("2w") not the alias ("lg"). m5 will switch sized items to use
+    // `effort ÷ capacity` here instead.
+    const durationRaw = propValue(props, 'duration') ?? propValue(props, 'size');
     const durationLiteral = resolveDurationLiteral(durationRaw, ctx);
     const remainingRaw = propValue(props, 'remaining');
     const remainingLiteral = resolveDurationLiteral(remainingRaw, ctx);
@@ -849,8 +861,8 @@ function predictItemChipExtraHeight(
     const labelIds = propValues(props, 'labels');
     if (labelIds.length === 0) return 0;
     const durationDays = resolveDuration(
-        propValue(props, 'duration'),
-        ctx.durations,
+        propValue(props, 'duration') ?? propValue(props, 'size'),
+        ctx.sizes,
         ctx.cal,
     );
     const naturalWidth = Math.max(MIN_ITEM_WIDTH, durationDays * ctx.timeline.pixelsPerDay);
@@ -881,6 +893,7 @@ function predictItemChipExtraHeight(
     // they stay byte-stable).
     const hasMeta =
         propValue(props, 'duration') !== undefined ||
+        propValue(props, 'size') !== undefined ||
         propValue(props, 'owner') !== undefined ||
         propValue(props, 'remaining') !== undefined ||
         propValue(props, 'capacity') !== undefined;
@@ -1038,7 +1051,7 @@ function computeDateWindow(
     file: NowlineFile,
     ctx: {
         cal: import('./calendar.js').CalendarConfig;
-        durations: Map<string, import('@nowline/core').DurationDeclaration>;
+        sizes: Map<string, import('@nowline/core').SizeDeclaration>;
     },
     resolved: ResolveResult,
     today: Date | undefined,
@@ -1089,9 +1102,9 @@ function defaultStartDate(today: Date | undefined): Date {
 }
 
 function literalDays(literal: string, cal: import('./calendar.js').CalendarConfig): number {
-    const m = /^(\d+)([dwmqy])$/.exec(literal);
+    const m = /^(\d+(?:\.\d+)?)([dwmqy])$/.exec(literal);
     if (!m) return 0;
-    const n = parseInt(m[1], 10);
+    const n = parseFloat(m[1]);
     switch (m[2]) {
         case 'd': return n;
         case 'w': return n * cal.daysPerWeek;
@@ -1109,7 +1122,7 @@ function computeContentEndDay(
     resolved: ResolveResult,
     ctx: {
         cal: import('./calendar.js').CalendarConfig;
-        durations: Map<string, import('@nowline/core').DurationDeclaration>;
+        sizes: Map<string, import('@nowline/core').SizeDeclaration>;
     },
     startDate: Date,
     today: Date | undefined,
@@ -1155,7 +1168,11 @@ function computeContentEndDay(
         prevEnd: number,
     ): number => {
         if (isItemDeclaration(node)) {
-            const dur = resolveDuration(propValue(node.properties, 'duration'), ctx.durations, ctx.cal);
+            const dur = resolveDuration(
+                propValue(node.properties, 'duration') ?? propValue(node.properties, 'size'),
+                ctx.sizes,
+                ctx.cal,
+            );
             const dateProp = parseDate(propValue(node.properties, 'date'));
             const startProp = parseDate(propValue(node.properties, 'start'));
             const afterRefs = propValues(node.properties, 'after');

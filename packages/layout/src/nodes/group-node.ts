@@ -162,8 +162,8 @@ export class GroupNode {
             // collision before we hand off to `sequenceItem`. Mirrors
             // SwimlaneNode's pre-flight width math.
             const durationDays = resolveDuration(
-                propValue(props, 'duration'),
-                ctx.durations,
+                propValue(props, 'duration') ?? propValue(props, 'size'),
+                ctx.sizes,
                 ctx.cal,
             );
             const naturalWidth = Math.max(

@@ -333,7 +333,7 @@ function emitTaskRow(
         outlineLevel: outline,
         isSummary: false,
         isMilestone: false,
-        durationMinutes: durationToMsProjMinutes(getProp(item, 'duration')),
+        durationMinutes: durationToMsProjMinutes(getProp(item, 'duration') ?? getProp(item, 'size')),
         predecessors: getProps(item, 'after') as string[],
         nowlineId: item.name,
         ownerRefs: getProps(item, 'owner') as string[],

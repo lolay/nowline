@@ -300,8 +300,8 @@ export class SwimlaneNode {
             // the duration → width math in `sequenceItem` (see
             // packages/layout/src/layout.ts).
             const durationDays = resolveDuration(
-                propValue(props, 'duration'),
-                ctx.durations,
+                propValue(props, 'duration') ?? propValue(props, 'size'),
+                ctx.sizes,
                 ctx.cal,
             );
             const naturalWidth = Math.max(

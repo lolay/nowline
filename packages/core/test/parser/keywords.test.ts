@@ -160,13 +160,13 @@ swimlane s
         expect(r.parserErrors).toEqual([]);
     });
 
-    it('parses roadmap-section duration/status/label declarations', async () => {
+    it('parses roadmap-section size/status/label declarations', async () => {
         const r = await parse(`roadmap r
-duration xs length:1d
+size xs effort:1d
 status awaiting-review
 label security "Security"
 swimlane s
-  item x duration:xs status:awaiting-review labels:security
+  item x size:xs status:awaiting-review labels:security
 `, { validate: false });
         expect(r.parserErrors).toEqual([]);
     });

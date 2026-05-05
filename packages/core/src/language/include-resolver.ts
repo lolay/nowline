@@ -10,7 +10,7 @@ import type {
     StyleDeclaration,
     LabelDeclaration,
     StatusDeclaration,
-    DurationDeclaration,
+    SizeDeclaration,
     ScaleBlock,
     CalendarBlock,
     DefaultDeclaration,
@@ -27,7 +27,7 @@ import {
     isStyleDeclaration,
     isLabelDeclaration,
     isStatusDeclaration,
-    isDurationDeclaration,
+    isSizeDeclaration,
     isScaleBlock,
     isCalendarBlock,
     isDefaultDeclaration,
@@ -84,7 +84,7 @@ export interface ResolvedContent {
     teams: Map<string, TeamDeclaration>;
     anchors: Map<string, AnchorDeclaration>;
     labels: Map<string, LabelDeclaration>;
-    durations: Map<string, DurationDeclaration>;
+    sizes: Map<string, SizeDeclaration>;
     statuses: Map<string, StatusDeclaration>;
     swimlanes: Map<string, SwimlaneDeclaration>;
     milestones: Map<string, MilestoneDeclaration>;
@@ -138,7 +138,7 @@ function emptyContent(): ResolvedContent {
         teams: new Map(),
         anchors: new Map(),
         labels: new Map(),
-        durations: new Map(),
+        sizes: new Map(),
         statuses: new Map(),
         swimlanes: new Map(),
         milestones: new Map(),
@@ -367,7 +367,7 @@ function applyRoadmapMode(
     mergeMap(target.teams, child.teams, (name) => warn(name, 'Team'));
     mergeMap(target.anchors, child.anchors, (name) => warn(name, 'Anchor'));
     mergeMap(target.labels, child.labels, (name) => warn(name, 'Label'));
-    mergeMap(target.durations, child.durations, (name) => warn(name, 'Duration'));
+    mergeMap(target.sizes, child.sizes, (name) => warn(name, 'Size'));
     mergeMap(target.statuses, child.statuses, (name) => warn(name, 'Status'));
     mergeMap(target.swimlanes, child.swimlanes, (name) => warn(name, 'Swimlane'));
     mergeMap(target.milestones, child.milestones, (name) => warn(name, 'Milestone'));
@@ -447,9 +447,9 @@ function addRoadmapEntry(content: ResolvedContent, entry: RoadmapEntry): void {
         if (entry.name && !content.labels.has(entry.name)) {
             content.labels.set(entry.name, entry);
         }
-    } else if (isDurationDeclaration(entry)) {
-        if (entry.name && !content.durations.has(entry.name)) {
-            content.durations.set(entry.name, entry);
+    } else if (isSizeDeclaration(entry)) {
+        if (entry.name && !content.sizes.has(entry.name)) {
+            content.sizes.set(entry.name, entry);
         }
     } else if (isStatusDeclaration(entry)) {
         if (entry.name && !content.statuses.has(entry.name)) {

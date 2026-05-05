@@ -74,7 +74,7 @@ export function buildIncludeRegions(
                 defaults: region.config.defaults,
                 labels: region.content.labels,
             },
-            durations: region.content.durations,
+            sizes: region.content.sizes,
             labels: region.content.labels,
             teams: region.content.teams,
             persons: region.content.persons,

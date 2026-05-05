@@ -3,7 +3,7 @@
 // raw literal through `duration <id> length:<literal>`. The calendar block
 // controls how literal units translate into absolute days.
 
-import type { CalendarBlock, DurationDeclaration, NowlineFile } from '@nowline/core';
+import type { CalendarBlock, SizeDeclaration, NowlineFile } from '@nowline/core';
 
 export type CalendarMode = 'business' | 'full' | 'custom';
 
@@ -58,12 +58,13 @@ export function resolveCalendar(
     return { ...BUSINESS };
 }
 
-const DURATION_RE = /^(\d+)([dwmqy])$/;
+// Decimal-aware so `size xs effort:0.5d` and `duration:1.5w` round-trip cleanly.
+const DURATION_RE = /^(\d+(?:\.\d+)?)([dwmqy])$/;
 
 export function literalToDays(literal: string, cal: CalendarConfig): number {
     const m = DURATION_RE.exec(literal);
     if (!m) return 0;
-    const n = parseInt(m[1], 10);
+    const n = parseFloat(m[1]);
     switch (m[2]) {
         case 'd':
             return n;
@@ -82,16 +83,20 @@ export function literalToDays(literal: string, cal: CalendarConfig): number {
 
 export function resolveDuration(
     value: string | undefined,
-    durations: Map<string, DurationDeclaration>,
+    sizes: Map<string, SizeDeclaration>,
     cal: CalendarConfig,
 ): number {
     if (!value) return 0;
     if (DURATION_RE.test(value)) return literalToDays(value, cal);
-    const decl = durations.get(value);
+    const decl = sizes.get(value);
     if (!decl) return 0;
-    const lengthProp = decl.properties.find((p) => stripColon(p.key) === 'length');
-    if (!lengthProp?.value) return 0;
-    return literalToDays(lengthProp.value, cal);
+    // m2 transitional shape: read effort from the size declaration as the item's
+    // calendar duration. m5 will introduce capacity-aware derivation
+    // (`duration = effort / capacity`); until then, sized items behave as if
+    // capacity = 1, which matches every example file's pre-migration semantics.
+    const effortProp = decl.properties.find((p) => stripColon(p.key) === 'effort');
+    if (!effortProp?.value) return 0;
+    return literalToDays(effortProp.value, cal);
 }
 
 function stripColon(key: string): string {

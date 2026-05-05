@@ -68,7 +68,7 @@ RoadmapDeclaration:
 
 RoadmapEntry:
     PersonDeclaration | TeamDeclaration | AnchorDeclaration |
-    LabelDeclaration | DurationDeclaration | StatusDeclaration |
+    LabelDeclaration | SizeDeclaration | StatusDeclaration |
     SwimlaneDeclaration | MilestoneDeclaration | FootnoteDeclaration;
 
 PersonDeclaration:
@@ -97,8 +97,8 @@ LabelDeclaration:
     (properties+=EntityProperty)*
     (INDENT description=DescriptionDirective DEDENT)?;
 
-DurationDeclaration:
-    'duration' (name=ID)? (title=STRING)?
+SizeDeclaration:
+    'size' (name=ID)? (title=STRING)?
     (properties+=EntityProperty)*
     (INDENT description=DescriptionDirective DEDENT)?;
 
@@ -151,7 +151,7 @@ DescriptionDirective:
 
 // --- Properties ---
 
-// EntityProperty uses a single "key:" token so that keywords like `status`, `duration`,
+// EntityProperty uses a single "key:" token so that keywords like `status`, `size`,
 // `label`, `style`, etc. still parse unambiguously as property keys when followed by `:`.
 // The validator strips the trailing `:` and validates the key text.
 EntityProperty:
@@ -187,7 +187,7 @@ terminal INCLUDE_OPTION_KEY: /(config|roadmap):/;
 terminal URL: /https?:\/\/[^\s\[\],]+/;
 terminal STRING: /"([^"\\]|\\.)*"/;
 terminal DATE_LITERAL: /\d{4}-\d{2}-\d{2}/;
-terminal DURATION_LITERAL: /\d+[dwmqy]/;
+terminal DURATION_LITERAL: /\d+(\.\d+)?[dwmqy]/;
 terminal PERCENTAGE: /\d+(\.\d+)?%/;
 terminal COLOR_HEX: /#[0-9a-fA-F]{3,8}/;
 // DECIMAL must precede INTEGER so that "0.5" lexes as one token (max-munch handles this,
@@ -197,8 +197,9 @@ terminal DECIMAL: /\d+\.\d+/;
 terminal INTEGER: /\d+/;
 // PROPERTY_KEY_WITH_COLON matches `name:` as a single token. Because it is longer than any
 // bare keyword, the lexer prefers it over keywords when a colon immediately follows — letting
-// us use `duration:`, `status:`, `label:`, `style:` etc. as property keys without shadowing
-// those words as declaration keywords.
+// us use `size:`, `status:`, `label:`, `style:` etc. as property keys without shadowing
+// those words as declaration keywords. (`duration:` is also a property key — literal-only —
+// even though no `duration` declaration keyword exists.)
 terminal PROPERTY_KEY_WITH_COLON: /[a-zA-Z_][a-zA-Z0-9_-]*:/;
 terminal ID: /[a-zA-Z_][a-zA-Z0-9_-]*/;
 

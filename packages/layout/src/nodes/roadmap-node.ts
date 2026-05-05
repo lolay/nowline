@@ -106,7 +106,7 @@ export interface SizedHeader {
 export interface RoadmapNodeDeps extends LayoutHelpers {
     computeDateWindow: (
         file: NowlineFile,
-        ctx: { cal: CalendarConfig; durations: Map<string, import('@nowline/core').DurationDeclaration> },
+        ctx: { cal: CalendarConfig; sizes: Map<string, import('@nowline/core').SizeDeclaration> },
         resolved: ResolveResult,
         today: Date | undefined,
         scale: ViewPreset,
@@ -147,7 +147,7 @@ export class RoadmapNode {
         // now-line) instead of defaulting to a 180-day desert.
         const { startDate, endDate } = deps.computeDateWindow(
             file,
-            { cal, durations: resolved.content.durations },
+            { cal, sizes: resolved.content.sizes },
             resolved,
             options.today,
             scale,
@@ -336,7 +336,7 @@ export class RoadmapNode {
         const ctx: LayoutContext = {
             cal,
             styleCtx,
-            durations: resolved.content.durations,
+            sizes: resolved.content.sizes,
             labels: resolved.content.labels,
             teams: resolved.content.teams,
             persons: resolved.content.persons,

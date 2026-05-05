@@ -19,30 +19,30 @@ default roadmap padding:md header-height:md font:sans timeline-position:both min
 
 roadmap nested-both-headers "Bottom Timeline + Minor Grid" author:"Acme Platform" start:2026-01-05
 
-duration sm length:3d
-duration md length:1w
-duration lg length:2w
-duration xl length:1m
+size sm effort:3d
+size md effort:1w
+size lg effort:2w
+size xl effort:1m
 
 anchor kickoff date:2026-01-06
 milestone gtm-launch "GTM Launch" date:2026-09-14 after:[platform-api, mobile-android]
 
 swimlane platform "Platform"
-  item platform-api "API gateway" duration:xl after:kickoff status:in-progress remaining:60%
-  item platform-eventing "Eventing layer" duration:lg
-  item platform-search "Search v2" duration:lg
+  item platform-api "API gateway" size:xl after:kickoff status:in-progress remaining:60%
+  item platform-eventing "Eventing layer" size:lg
+  item platform-search "Search v2" size:lg
 
 swimlane mobile "Mobile"
-  item mobile-ios "iOS shell refresh" duration:lg after:platform-api
-  item mobile-android "Android parity" duration:lg after:mobile-ios
-  item mobile-offline "Offline mode" duration:md
+  item mobile-ios "iOS shell refresh" size:lg after:platform-api
+  item mobile-android "Android parity" size:lg after:mobile-ios
+  item mobile-offline "Offline mode" size:md
 
 swimlane web "Web"
-  item web-redesign "Web redesign" duration:xl after:kickoff
-  item web-billing "Billing portal" duration:md after:web-redesign
-  item web-admin "Admin console v2" duration:lg
+  item web-redesign "Web redesign" size:xl after:kickoff
+  item web-billing "Billing portal" size:md after:web-redesign
+  item web-admin "Admin console v2" size:lg
 
 swimlane data "Data"
-  item data-warehouse "Warehouse upgrade" duration:lg after:kickoff
-  item data-pipelines "Pipeline refactor" duration:lg after:data-warehouse
-  item data-bi "BI dashboards" duration:md
+  item data-warehouse "Warehouse upgrade" size:lg after:kickoff
+  item data-pipelines "Pipeline refactor" size:lg after:data-warehouse
+  item data-bi "BI dashboards" size:md

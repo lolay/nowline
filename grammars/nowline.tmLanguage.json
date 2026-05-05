@@ -44,14 +44,14 @@
       "patterns": [
         {
           "name": "keyword.control.nowline",
-          "match": "\\b(config|roadmap|include|person|team|anchor|swimlane|item|parallel|group|milestone|footnote|label|style|status|duration|scale|calendar|default|description)\\b"
+          "match": "\\b(config|roadmap|include|person|team|anchor|swimlane|item|parallel|group|milestone|footnote|label|style|status|size|scale|calendar|default|description)\\b"
         }
       ]
     },
     "properties": {
       "patterns": [
         {
-          "match": "\\b(status|owner|after|before|duration|remaining|labels|link|style|date|on|start|scale|calendar|length|name|label-every|days-per-week|days-per-month|days-per-quarter|days-per-year|author)\\s*(:)",
+          "match": "\\b(status|owner|after|before|size|duration|remaining|labels|link|style|date|on|start|scale|calendar|effort|name|label-every|days-per-week|days-per-month|days-per-quarter|days-per-year|author)\\s*(:)",
           "captures": {
             "1": { "name": "entity.other.attribute-name.nowline" },
             "2": { "name": "punctuation.separator.key-value.nowline" }
@@ -124,7 +124,7 @@
       "patterns": [
         {
           "name": "constant.numeric.duration.nowline",
-          "match": "\\b\\d+[dwmqy]\\b"
+          "match": "\\b\\d+(?:\\.\\d+)?[dwmqy]\\b"
         },
         {
           "name": "constant.numeric.percentage.nowline",

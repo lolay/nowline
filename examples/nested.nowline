@@ -33,10 +33,10 @@ default roadmap padding:md header-height:md font:sans
 
 roadmap nested-2026 "Nested Example 2026" author:"Acme Security" start:2026-01-05
 
-duration sm length:3d
-duration md length:1w
-duration lg length:2w
-duration xl length:1m
+size sm effort:3d
+size md effort:1w
+size lg effort:2w
+size xl effort:1m
 
 label tech-debt "Tech debt" style:tech-debt-style
 label agent "Agent" style:near-term
@@ -46,16 +46,16 @@ anchor kickoff date:2026-01-06
 anchor eoy "End of Year" date:2026-12-14
 
 swimlane security
-  item sec-audit-log "Audit log v2" duration:xl after:kickoff status:at-risk remaining:25% labels:tech-debt
-  item sec-sso "SSO hardening" duration:lg
-  item sec-mfa "MFA rollout" duration:md
-  item sec-rbac "RBAC v2" duration:lg
-  item sec-agent-auth "Agent auth hardening" duration:md labels:agent
-  item sec-agent-secrets "Agent secrets isolation" duration:md labels:agent
-  item sec-secrets "Secrets manager migration" duration:md
-  item sec-compliance-soc2 "SOC 2 Type II" duration:lg
-  item sec-zero-trust "Zero-trust rollout" duration:lg
-  item sec-dep-scan "Dependency scanning" duration:sm labels:tech-debt
+  item sec-audit-log "Audit log v2" size:xl after:kickoff status:at-risk remaining:25% labels:tech-debt
+  item sec-sso "SSO hardening" size:lg
+  item sec-mfa "MFA rollout" size:md
+  item sec-rbac "RBAC v2" size:lg
+  item sec-agent-auth "Agent auth hardening" size:md labels:agent
+  item sec-agent-secrets "Agent secrets isolation" size:md labels:agent
+  item sec-secrets "Secrets manager migration" size:md
+  item sec-compliance-soc2 "SOC 2 Type II" size:lg
+  item sec-zero-trust "Zero-trust rollout" size:lg
+  item sec-dep-scan "Dependency scanning" size:sm labels:tech-debt
 
 milestone security-ga "Security GA" date:2026-12-01 after:[sec-audit-log, sec-compliance-soc2]
 

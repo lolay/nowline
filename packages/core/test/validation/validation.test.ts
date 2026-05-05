@@ -79,22 +79,22 @@ describe('validation rules', () => {
         expect(hasError(errorMessages(r.diagnostics), /remaining/i)).toBe(true);
     });
 
-    it('Rule 15: forward reference to a duration is an error', async () => {
+    it('Rule 15: forward reference to a size is an error', async () => {
         const r = await parse(
             `roadmap r
 swimlane s
-  item a duration:md
-duration md length:1w
+  item a size:md
+size md effort:1w
 `,
         );
-        expect(hasError(errorMessages(r.diagnostics), /referenced before its declaration|Duration "md"/i)).toBe(true);
+        expect(hasError(errorMessages(r.diagnostics), /referenced before its declaration|Size "md"/i)).toBe(true);
     });
 
-    it('Rule 15: undeclared duration name is an error', async () => {
+    it('Rule 15: undeclared size name is an error', async () => {
         const r = await parse(
             `roadmap r
 swimlane s
-  item a duration:mystery
+  item a size:mystery
 `,
         );
         expect(hasError(errorMessages(r.diagnostics), /not declared/i)).toBe(true);
@@ -448,25 +448,25 @@ swimlane s
         expect(warningMessages(r.diagnostics)).toEqual([]);
     });
 
-    // --- Duration declaration: length: is required ---
+    // --- Size declaration: effort: is required ---
 
-    it('Duration decl: missing length: is an error', async () => {
+    it('Size decl: missing effort: is an error', async () => {
         const r = await parse(
-            `roadmap r\nduration md\nswimlane s\n  item a duration:md\n`,
+            `roadmap r\nsize md\nswimlane s\n  item a size:md\n`,
         );
-        expect(hasError(errorMessages(r.diagnostics), /length/i)).toBe(true);
+        expect(hasError(errorMessages(r.diagnostics), /effort/i)).toBe(true);
     });
 
-    it('Duration decl: invalid length value is an error', async () => {
+    it('Size decl: invalid effort value is an error', async () => {
         const r = await parse(
-            `roadmap r\nduration md length:maybe\nswimlane s\n  item a duration:md\n`,
+            `roadmap r\nsize md effort:maybe\nswimlane s\n  item a size:md\n`,
         );
-        expect(hasError(errorMessages(r.diagnostics), /length/i)).toBe(true);
+        expect(hasError(errorMessages(r.diagnostics), /effort/i)).toBe(true);
     });
 
-    it('Duration decl: quarter suffix is accepted in length: and in item duration:', async () => {
+    it('Size decl: quarter suffix is accepted in effort: and in item duration:', async () => {
         const r = await parse(
-            `roadmap r\nduration big length:1q\nswimlane s\n  item a duration:big\n  item b duration:2q\n`,
+            `roadmap r\nsize big effort:1q\nswimlane s\n  item a size:big\n  item b duration:2q\n`,
         );
         expect(errorMessages(r.diagnostics)).toEqual([]);
     });
