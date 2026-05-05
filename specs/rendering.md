@@ -177,6 +177,7 @@ Swimlanes render as sequential solid bands with alternating subtle background ti
 - Content flows **left-to-right** (sequential items along the timeline) and **top-to-bottom** when nesting or parallel flows require vertical stacking
 - **Frame label**: swimlane name renders in the top-left of the band, horizontally written, styled like a PlantUML frame tab but with a modern aesthetic — a small tab or badge that sits at the top-left edge of the band, not a full-width header
 - **Owner badge**: if the swimlane has `owner:`, the resolved owner title renders inline inside the frame tab, to the right of the swimlane name, in the tab's muted text color
+- **Capacity badge**: if the swimlane has `capacity:`, the value renders inline inside the frame tab, after the owner badge (or after the lane name if no owner), in the tab's muted text color. Format: `N[glyph]` where `N` is the capacity number (trailing zeros trimmed) and the glyph is determined by the resolved `capacity-icon` style property. Example with default `multiplier`: `Platform Team · Sam · 5×`. With `person`: `Platform Team · Sam · 5 [person]`. With `points`: `Platform Team · Sam · 5 ★`. See [Swimlane Capacity & Overload](#swimlane-capacity--overload) for the full contract.
 - **Footnote superscript**: footnote indicators attached to a swimlane render inside the **upper-right corner of the frame tab** (right-aligned, inset from the tab's right edge), not at the upper-right of the full band. This keeps the indicator co-located with the swimlane's own label instead of floating next to unrelated item bars on the far right of the chart
 - **Nested swimlane indentation**: child swimlanes are inset by the parent swimlane's `padding`. No separate indent property — padding stacking naturally creates visual nesting hierarchy
 - The swimlane band spans the full timeline width (from first to last tick mark, plus padding)
@@ -212,6 +213,61 @@ All dependency arrows use orthogonal routing — horizontal and vertical segment
 
 When an item has `before:anchor-id` and its duration would push past the anchor date, the overflowing portion of the item bar renders in red.
 
+### Swimlane Capacity & Overload
+
+`capacity:` annotations on swimlanes and items render as visual badges and (when concurrent item capacity exceeds the lane's budget) as an overload underline. None of these affect parser diagnostics — overload is a pure rendering signal.
+
+#### Item capacity suffix
+
+Items with `capacity:N` render the value as a suffix on their duration label: `2w 2×` (default `multiplier` glyph), `2w 2 [person]` (with `capacity-icon:person`), `2w 2 ★` (with `capacity-icon:points`), `2w 2 ⏱` (with `capacity-icon:time`). The suffix appears only when the resolved capacity is `> 0`. Items without `capacity:` render no suffix.
+
+The suffix uses the item's resolved text color and matches the duration label's font size and weight.
+
+#### Lane capacity badge
+
+Swimlanes with `capacity:N` render the value as `N[glyph]` inside the frame tab, after the owner badge (or after the lane name if no owner is present). Same glyph rules and formatting as the item suffix. The capacity-icon vocabulary supports `none`, `multiplier` (default), `person`, `people`, `points`, `time`, custom `glyph` declarations, and inline Unicode literals.
+
+#### Glyph formatting
+
+- **Order:** number first, glyph second (`5×`, `8 ★`, `12000 $`). Reads naturally as English ("five times", "eight points").
+- **Spacing:** SVG `<tspan dx="...">` between number and glyph for precise control.
+  - `multiplier` glyph: no gap (`5×`) — multiplication sign is a typographic operator that already includes side-bearing.
+  - All other built-in glyphs and custom/literal glyphs: `0.1em` gap (`5 [person]`, `8 ★`, `12000 $`) — small but visible separator.
+- **Number formatting:** integers render as integers (`5`, not `5.0`); decimals render with trailing zeros trimmed (`0.5`, `1.25`); percent literals already converted to decimals at parse time so they render in decimal form (`50%` author input → `0.5` rendered).
+- **ASCII fallback:** when SVG output is constrained to ASCII (e.g. CLI text mode export), substitute the glyph's `ascii:` value. Built-in glyph fallbacks: `multiplier` → `x`, `person` → `p`, `people` → `P`, `points` → `*`, `time` → `t`, `none` → `` (empty). Custom `glyph` declarations supply their own `ascii:` value (default `?` if absent).
+
+#### Built-in glyph table
+
+| Name         | Unicode (renderer-preferred SVG path) | ASCII fallback | Notes                                                  |
+| ------------ | ------------------------------------- | -------------- | ------------------------------------------------------ |
+| `none`       | (no glyph)                            | (none)         | Renders the bare number.                               |
+| `multiplier` | `×` (U+00D7) — emitted as `<text>`    | `x`            | Default. Reads as a quantity. No side spacing.         |
+| `person`     | curated SVG single-figure path        | `p`            | For people-based capacity (FTE, headcount).            |
+| `people`     | curated SVG paired-figure path        | `P`            | Plural variant; useful when each unit is a small team. |
+| `points`     | `★` curated SVG star path             | `*`            | For story-points-based capacity.                       |
+| `time`       | `⏱` curated SVG stopwatch path        | `t`            | For time/hours-based capacity.                         |
+
+#### Lane overload underline
+
+When the **sum of concurrent item capacities at any timestep** within a swimlane exceeds the lane's `capacity:`, the lane renders an **overload underline** along the bottom edge of the band:
+
+- Compute the load function `f(x) = Σ items[i].capacity for items active at x` per timestep, walking from the lane's start to the lane's end.
+- Identify contiguous x-ranges where `f(x) > lane.capacity`. The result is zero or more discontiguous intervals.
+- For each interval, emit a red rectangle along the bottom edge of the swimlane band.
+  - Color: red (matches the existing overrun visual language used by `before:` overflow and date-driven overrun milestone lines).
+  - Height: 2px. Same visual weight as the milestone-line stroke for consistency.
+  - Y-position: flush with the bottom edge of the lane band, inside the band (not below).
+  - X-positions: align to the timestep boundaries, not item-bar edges. The underline can span less than a full item bar (when a parallel block partially overlaps with another item).
+- The underline is purely visual — no parser warning, no CLI diagnostic, no log output.
+
+The underline is suppressed (not rendered) when:
+
+- The lane has no `capacity:` value.
+- The lane (or its applicable `default swimlane`) declares `overcapacity:hide`.
+- No timestep in the lane is over capacity.
+
+`overcapacity:hide` only suppresses this underline; it does not affect the lane's capacity badge in the frame tab nor any item-level capacity suffixes.
+
 ### Styles
 
 Styles defined in `config` control the visual appearance of entities. Style properties map to rendering as follows:
@@ -222,7 +278,7 @@ Styles defined in `config` control the visual appearance of entities. Style prop
 | `fg` | Border/outline color of the entity. `none` for no border. |
 | `text` | Color of text within the entity. `none` hides text. |
 | `border` | Border/connection line style: `solid` (default), `dashed`, `dotted` |
-| `icon` | Small icon rendered at the leading edge of the entity (e.g., shield, warning, lock) |
+| `icon` | Small icon rendered at the leading edge of the entity. Built-in identifiers (rendered from a curated SVG library, identical across platforms): `shield`, `warning`, `lock`, plus the capacity-icon vocabulary (`person`, `people`, `points`, `time`). Custom: any identifier declared by a `glyph` declaration in config. Inline: a double-quoted Unicode literal — font-dependent. |
 | `shadow` | Drop shadow beneath the entity: `none` (no shadow), `subtle` (tight, small offset), `fuzzy` (soft, larger offset), `hard` (solid, no blur, offset down-right). `subtle`/`fuzzy` rendered via SVG `<feDropShadow>`; `hard` rendered as a solid duplicate shape offset behind the entity. |
 | `font` | Font family for text within the entity. Named preset (`sans`, `serif`, `mono`) that maps to a cross-platform font stack. No font downloads required. |
 | `weight` | Font weight for the entity's primary text (title). Maps to SVG `font-weight`: `thin` (100), `light` (300), `normal` (400), `bold` (700). `thin` degrades gracefully if the font lacks that variant. |
@@ -233,8 +289,17 @@ Styles defined in `config` control the visual appearance of entities. Style prop
 | `header-height` | Height of the timeline scale header row. Roadmap-only. Named preset (`none`, `xs`, `sm`, `md`, `lg`, `xl`). |
 | `corner-radius` | Corner rounding for the entity's bounding shape. Maps to SVG `rx`/`ry`. Values: `none`, `xs`, `sm`, `md`, `lg`, `xl`, `full`. `full` computes radius as half the rendered height. |
 | `bracket` | Bracket/join line on parallel blocks. `none` (default), `solid`, `dashed`. Parallel-only — ignored on other entities. |
+| `capacity-icon` | Glyph used as the suffix to capacity numbers on lanes and items. Built-in names (`none`, `multiplier` (default — `×`), `person`, `people`, `points` (`★`), `time` (`⏱`)) render from the renderer's curated SVG glyph library — consistent across all platforms. Custom names from `glyph` declarations and inline Unicode literals (`"💰"`) are font-dependent. ASCII fallback per the glyph definition. |
 
 Text style properties (`font`, `weight`, `italic`, `text-size`) apply to the entity's primary text (title). Secondary text within an entity (owner badge, status label) follows its own rendering rules.
+
+#### Built-in Icon Library
+
+The renderer ships a curated SVG icon library backing both `icon:` and `capacity-icon:` built-in names. Each named icon is an inline SVG path emitted directly into the output — not a Unicode codepoint, not a font reference, not an external asset. This guarantees identical rendering across web (browser SVG), CLI (terminal-rendered SVG / image), and downstream exports.
+
+The library includes the entity-decoration set used by `icon:` (`shield`, `warning`, `lock`, etc.) and the capacity-suffix set used by `capacity-icon:` (`person`, `people`, `points`, `time`). `multiplier` is rendered as a `<text>×</text>` element rather than an SVG path because U+00D7 MULTIPLICATION SIGN is a basic typographic operator with consistent rendering across all standard fonts.
+
+When an author needs a glyph not in the library, the `glyph` config declaration (with `unicode:`) or an inline Unicode literal provides escape hatches — both font-dependent.
 
 #### Font Presets
 
