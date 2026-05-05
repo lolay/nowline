@@ -62,6 +62,7 @@ import {
     ITEM_FOOTNOTE_INDICATOR_STEP_PX,
     ITEM_LINK_ICON_TILE_SIZE_PX,
     ITEM_LINK_ICON_INSET_PX,
+    ITEM_DECORATION_SPILL_GAP_PX,
     NOW_PILL_WIDTH_PX,
     NOW_PILL_HEIGHT_PX,
     NOW_PILL_CORNER_RADIUS_PX,
@@ -131,6 +132,56 @@ function strokeDash(style: ResolvedStyle): string | undefined {
     if (style.border === 'dashed') return '4 3';
     if (style.border === 'dotted') return '1 3';
     return undefined;
+}
+
+/**
+ * sRGB → relative luminance per WCAG 2.x. Input may be `#rrggbb`,
+ * `#rgb`, or a non-hex token like `none` / `transparent`. Non-hex
+ * inputs return 1 (treated as light) so a transparent bar reuses
+ * the chart's light bg. Mostly used to choose between two
+ * status-dot palettes (`onLight` vs `onDark`) so the dot reads on
+ * any bar fill — see `pickStatusDotPalette` and
+ * `specs/rendering.md`'s status-dot section.
+ */
+function relativeLuminance(hex: string): number {
+    if (!hex || hex === 'none' || hex === 'transparent') return 1;
+    let h = hex.startsWith('#') ? hex.slice(1) : hex;
+    if (h.length === 3) {
+        h = h
+            .split('')
+            .map((c) => c + c)
+            .join('');
+    }
+    if (h.length !== 6) return 1;
+    const r = parseInt(h.slice(0, 2), 16) / 255;
+    const g = parseInt(h.slice(2, 4), 16) / 255;
+    const b = parseInt(h.slice(4, 6), 16) / 255;
+    const lin = (c: number): number =>
+        c <= 0.03928 ? c / 12.92 : Math.pow((c + 0.055) / 1.055, 2.4);
+    return 0.2126 * lin(r) + 0.7152 * lin(g) + 0.0722 * lin(b);
+}
+
+/**
+ * Pick the status-dot palette whose tone contrasts best with the
+ * given bar bg.
+ *
+ * The crossover threshold is the bar luminance at which a deep dot
+ * (avg luminance ≈ 0.045 across `onLight` palette entries) and a
+ * pale dot (avg ≈ 0.85 across `onDark` entries) give equal WCAG
+ * contrast. Solving `(L_bar + 0.05)² ≈ 0.86 × 0.095` gives
+ * `L_bar ≈ 0.24`, so:
+ *   - bars with luminance ≥ 0.24 (most label-driven mid-tones AND
+ *     all pale status-tint bars) → `onLight` deep dot
+ *   - bars with luminance < 0.24 (dark status-tint bars in dark
+ *     theme, e.g. `#172554`) → `onDark` pale dot
+ */
+function pickStatusDotPalette(
+    bg: string,
+    palette: Theme,
+): Theme['statusDot']['onLight'] {
+    return relativeLuminance(bg) >= 0.24
+        ? palette.statusDot.onLight
+        : palette.statusDot.onDark;
 }
 
 function rectFrame(x: number, y: number, w: number, h: number, style: ResolvedStyle, extra: Record<string, string | number | undefined | null | boolean> = {}): string {
@@ -426,18 +477,22 @@ function renderItem(i: PositionedItem, options: RenderOptions, idPrefix: string,
             filter: shadow ?? null,
         }),
     );
-    // Status palette for the upper-right dot. m2.5d: pulled from
-    // `palette.statusDot.*` so the renderer stays branch-free. The
-    // dot palette is intentionally separate from `palette.status.*`
-    // (which drives the bg tint) because dark theme historically uses
-    // `#fbbf24` for the at-risk dot vs. `#facc15` for the at-risk bg.
+    // Status-dot color — the dot communicates status via hue, but
+    // the bar bg can range from pale status tints (`#eff6ff`) to
+    // saturated mid-tones (`#1e88e5` from `bg:blue` labels) to
+    // dark navies (`#172554` in dark theme), so a single palette
+    // can't keep contrast across all bars. Two palettes — `onLight`
+    // (deep tints, for pale bars) and `onDark` (pale tints, for
+    // saturated/dark bars) — are picked from based on the bar
+    // bg's relative luminance.
+    const dotPalette = pickStatusDotPalette(i.style.bg, palette);
     const statusColors: Record<string, string> = {
-        done: palette.statusDot.done,
-        'in-progress': palette.statusDot.inProgress,
-        'at-risk': palette.statusDot.atRisk,
-        blocked: palette.statusDot.blocked,
-        planned: palette.statusDot.planned,
-        neutral: palette.statusDot.neutral,
+        done: dotPalette.done,
+        'in-progress': dotPalette.inProgress,
+        'at-risk': dotPalette.atRisk,
+        blocked: dotPalette.blocked,
+        planned: dotPalette.planned,
+        neutral: dotPalette.neutral,
     };
     const dotColor = statusColors[i.status] ?? statusColors.neutral;
     // Bottom progress strip along the bottom edge. Height comes from
@@ -456,10 +511,16 @@ function renderItem(i: PositionedItem, options: RenderOptions, idPrefix: string,
             }),
         );
     }
-    // Status dot — upper-right inset.
+    // Status dot — upper-right inset inside the bar, OR pushed into
+    // the spill column when the bar is too narrow to host the dot's
+    // full inset (`dotSpills`). Layout pre-computes `dotSpillCx` for
+    // the spilled case so the renderer stays geometry-dumb.
+    const dotCx = i.dotSpills && i.dotSpillCx !== null
+        ? i.dotSpillCx
+        : i.box.x + i.box.width - ITEM_STATUS_DOT_INSET_RIGHT_PX;
     parts.push(
         tag('circle', {
-            cx: num(i.box.x + i.box.width - ITEM_STATUS_DOT_INSET_RIGHT_PX),
+            cx: num(dotCx),
             cy: num(i.box.y + ITEM_STATUS_DOT_INSET_TOP_PX),
             r: ITEM_STATUS_DOT_RADIUS_PX,
             fill: dotColor,
@@ -470,9 +531,36 @@ function renderItem(i: PositionedItem, options: RenderOptions, idPrefix: string,
     // both lines BESIDE the bar (just past its right edge, stacked) at
     // the same vertical positions they would occupy inside. When they
     // fit, both go inside at the bar's left padding.
-    const captionX = i.textSpills
-        ? i.box.x + i.box.width + ITEM_CAPTION_SPILL_GAP_PX
-        : i.box.x + ITEM_CAPTION_INSET_X_PX;
+    //
+    // The spilled-decoration cluster reads `[bar] [icon?] [title]
+    // [footnote?] [dot?]` — the only decoration to the LEFT of the
+    // title is the link icon (the icon→title affordance must stay
+    // adjacent). The dot trails the title to mirror its in-bar
+    // upper-right position; the footnote walks alongside the title
+    // (between title and dot) just like its in-bar `text-anchor: end`
+    // placement at the upper-right.
+    let captionX: number;
+    if (i.textSpills) {
+        captionX = i.box.x + i.box.width + ITEM_CAPTION_SPILL_GAP_PX;
+        if (i.iconSpills) {
+            captionX +=
+                ITEM_LINK_ICON_TILE_SIZE_PX + ITEM_DECORATION_SPILL_GAP_PX;
+        }
+    } else {
+        captionX = i.box.x + ITEM_CAPTION_INSET_X_PX;
+    }
+    // When the caption spills outside the bar it renders on the
+    // chart / group bg instead of the bar fill — `i.style.text` is
+    // resolved against the bar (e.g. `enterprise-style` propagates
+    // `text:white` from a label and audit-log's title becomes
+    // white-on-blue inside, but white-on-peach when spilled onto
+    // the orange-tinted audit-track group). Use the theme's
+    // default item text color (always tuned for chart bg) when
+    // text spills, and the per-bar color when it stays inside.
+    const captionInsideTextColor = i.style.text;
+    const captionOutsideTextColor = palette.entities.item.text;
+    const titleColor = i.textSpills ? captionOutsideTextColor : captionInsideTextColor;
+    const metaColor = i.textSpills ? captionOutsideTextColor : i.style.fg;
     if (i.title) {
         parts.push(
             textTag(
@@ -482,7 +570,7 @@ function renderItem(i: PositionedItem, options: RenderOptions, idPrefix: string,
                     'font-family': FONT_STACK[i.style.font],
                     'font-size': ITEM_CAPTION_TITLE_FONT_SIZE_PX,
                     'font-weight': 600,
-                    fill: i.style.text,
+                    fill: titleColor,
                 },
                 i.title,
             ),
@@ -496,38 +584,78 @@ function renderItem(i: PositionedItem, options: RenderOptions, idPrefix: string,
                     y: num(i.box.y + ITEM_CAPTION_META_BASELINE_OFFSET_PX),
                     'font-family': FONT_STACK[i.style.font],
                     'font-size': ITEM_CAPTION_META_FONT_SIZE_PX,
-                    fill: i.style.fg,
+                    fill: metaColor,
                 },
                 i.metaText,
             ),
         );
     }
-    // Footnote superscript indicators (just LEFT of the upper-right status dot).
+    // Footnote superscript indicators. Two render modes:
+    //   - In-bar (default): glyphs walk LEFT from
+    //     `bar.right - ITEM_FOOTNOTE_INDICATOR_INSET_RIGHT_PX`,
+    //     anchored end. They sit on the bar fill, so use the bar's
+    //     resolved text color for contrast (a hardcoded red was
+    //     getting lost on saturated mid-tone bars from `bg:blue`
+    //     labels). The "footnote = red" attention cue lives on the
+    //     footnote PANEL's red number column at the bottom of the
+    //     chart where red reads cleanly against white.
+    //   - Spilled (narrow bars): the glyphs render in the spill
+    //     column to the right of the bar, walking RIGHT from
+    //     `footnoteSpillStartX` so they read in the same numerical
+    //     order as the in-bar case. They sit on the chart bg, so
+    //     use the chart-tuned default text color (same as spilled
+    //     captions).
     if (i.footnoteIndicators.length > 0) {
-        let fx = i.box.x + i.box.width - ITEM_FOOTNOTE_INDICATOR_INSET_RIGHT_PX;
-        for (let k = i.footnoteIndicators.length - 1; k >= 0; k--) {
-            const n2 = i.footnoteIndicators[k];
-            parts.push(
-                textTag(
-                    {
-                        x: num(fx),
-                        y: num(i.box.y + ITEM_FOOTNOTE_INDICATOR_BASELINE_OFFSET_PX),
-                        'font-family': FONT_STACK.sans,
-                        'font-size': 10,
-                        'font-weight': 700,
-                        fill: palette.item.overflowX,
-                        'text-anchor': 'end',
-                    },
-                    String(n2),
-                ),
-            );
-            fx -= ITEM_FOOTNOTE_INDICATOR_STEP_PX;
+        const footnoteY = i.box.y + ITEM_FOOTNOTE_INDICATOR_BASELINE_OFFSET_PX;
+        if (i.footnoteSpills && i.footnoteSpillStartX !== null) {
+            let fx = i.footnoteSpillStartX;
+            for (let k = 0; k < i.footnoteIndicators.length; k++) {
+                const n2 = i.footnoteIndicators[k];
+                parts.push(
+                    textTag(
+                        {
+                            x: num(fx),
+                            y: num(footnoteY),
+                            'font-family': FONT_STACK.sans,
+                            'font-size': 10,
+                            'font-weight': 700,
+                            fill: captionOutsideTextColor,
+                        },
+                        String(n2),
+                    ),
+                );
+                fx += ITEM_FOOTNOTE_INDICATOR_STEP_PX;
+            }
+        } else {
+            let fx = i.box.x + i.box.width - ITEM_FOOTNOTE_INDICATOR_INSET_RIGHT_PX;
+            for (let k = i.footnoteIndicators.length - 1; k >= 0; k--) {
+                const n2 = i.footnoteIndicators[k];
+                parts.push(
+                    textTag(
+                        {
+                            x: num(fx),
+                            y: num(footnoteY),
+                            'font-family': FONT_STACK.sans,
+                            'font-size': 10,
+                            'font-weight': 700,
+                            fill: i.style.text,
+                            'text-anchor': 'end',
+                        },
+                        String(n2),
+                    ),
+                );
+                fx -= ITEM_FOOTNOTE_INDICATOR_STEP_PX;
+            }
         }
     }
-    // Link icon — colored tile + white external-link glyph at the
-    // bar's UPPER-LEFT corner. The glyph is the same outbound-arrow
-    // ↗ for every link kind (linear / github / jira / generic) —
-    // they only differ in tile color. The include FILE-LEVEL region
+    // Link icon — colored tile + white external-link glyph. Default
+    // position is the bar's UPPER-LEFT corner; on a bar too narrow
+    // to host both the icon and the status-dot column with a gap
+    // between them, the icon spills out to the right of the bar
+    // (in front of the spilled title) so the icon→title affordance
+    // stays intact. The glyph is the same outbound-arrow ↗ for
+    // every link kind (linear / github / jira / generic) — they
+    // only differ in tile color. The include FILE-LEVEL region
     // (`include "./other.nowline"`) uses a separate stacked-sheets
     // glyph rendered by `renderIncludeRegion`, distinct from this
     // item-level link icon.
@@ -540,7 +668,9 @@ function renderItem(i: PositionedItem, options: RenderOptions, idPrefix: string,
         };
         const tile = tileColor[i.linkIcon] ?? tileColor.generic;
         const tileSize = ITEM_LINK_ICON_TILE_SIZE_PX;
-        const tileX = i.box.x + ITEM_LINK_ICON_INSET_PX;
+        const tileX = i.iconSpills && i.iconSpillX !== null
+            ? i.iconSpillX
+            : i.box.x + ITEM_LINK_ICON_INSET_PX;
         const tileY = i.box.y + ITEM_LINK_ICON_INSET_PX;
         const tileRect = tag('rect', {
             x: num(tileX),

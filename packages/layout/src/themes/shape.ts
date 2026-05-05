@@ -166,17 +166,34 @@ export interface Theme {
         neutral: string;
     };
     /**
-     * Upper-right status-dot colors. Mirrors `status.*` for most
-     * themes; dark splits because the historical at-risk dot uses
-     * `#fbbf24` while the at-risk bg tint uses `#facc15`.
+     * Upper-right status-dot colors. Two palettes — the renderer
+     * picks `onLight` for bars whose effective bg is light/pale and
+     * `onDark` for bars whose bg is dark/saturated. This lets the
+     * dot stay recognizably status-hued on the pale status-tint
+     * bars used by default AND on the saturated mid-tone bars that
+     * a label's `style:` ref can paint (e.g. `bg:blue` →
+     * `#1e88e5` in light theme, `#60a5fa` in dark theme). Both
+     * palettes appear in both themes — bar luminance is independent
+     * of overall theme, since a label can tint a bar bright or dark
+     * regardless of whether the chart background is light or dark.
      */
     statusDot: {
-        done: string;
-        inProgress: string;
-        atRisk: string;
-        blocked: string;
-        planned: string;
-        neutral: string;
+        onLight: {
+            done: string;
+            inProgress: string;
+            atRisk: string;
+            blocked: string;
+            planned: string;
+            neutral: string;
+        };
+        onDark: {
+            done: string;
+            inProgress: string;
+            atRisk: string;
+            blocked: string;
+            planned: string;
+            neutral: string;
+        };
     };
     attribution: {
         mark: string;

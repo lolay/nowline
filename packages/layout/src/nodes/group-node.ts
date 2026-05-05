@@ -183,21 +183,18 @@ export class GroupNode {
             timeCursorX = Math.max(timeCursorX, itemLogicalEnd);
 
             let spillReservation: number | null = null;
-            if (positioned.textSpills || positioned.chipsOutside) {
-                const titleWidth = positioned.textSpills
-                    ? deps.estimateTextWidth(positioned.title, 13)
-                    : 0;
-                const metaWidth = positioned.textSpills && positioned.metaText
-                    ? deps.estimateTextWidth(positioned.metaText, 11)
-                    : 0;
-                const visualRight = positioned.box.x + positioned.box.width;
-                const chipsContribution = positioned.chipsOutside
-                    ? Math.max(0, positioned.chipsRightX - (visualRight + 6))
-                    : 0;
-                const captionContribution = Math.max(titleWidth, metaWidth);
-                spillReservation =
-                    visualRight + 6 +
-                    Math.max(captionContribution, chipsContribution) + 6;
+            const hasAnySpill =
+                positioned.textSpills ||
+                positioned.chipsOutside ||
+                positioned.dotSpills ||
+                positioned.iconSpills ||
+                positioned.footnoteSpills;
+            if (hasAnySpill) {
+                const farRight = Math.max(
+                    positioned.decorationsRightX,
+                    positioned.chipsOutside ? positioned.chipsRightX : 0,
+                );
+                spillReservation = farRight + 6;
             }
 
             packer.commitItem({
@@ -233,7 +230,17 @@ export class GroupNode {
         };
         cursor.x = timeCursorX + TRACK_BLOCK_TAIL_GUTTER_PX;
         cursor.maxX = Math.max(cursor.maxX, cursor.x);
-        cursor.height = Math.max(cursor.height, box.height);
+        // The painted `box.height` is the group's tight visual
+        // footprint (chiclet + content + bottomPad). The cursor
+        // advance, however, must include one inter-row gap
+        // (`step - bandwidth`) so a sibling stacked below in a
+        // `parallel` (or any track-pack consumer) doesn't butt
+        // right up against the group's bottom edge. Items naturally
+        // include that gap because they report `cursor.height = step`
+        // (bandwidth + gap); groups need to add it explicitly since
+        // their painted height is gap-less.
+        const interRowGap = ctx.bandScale.step() - ctx.bandScale.bandwidth();
+        cursor.height = Math.max(cursor.height, box.height + interRowGap);
         const id = node.name;
         if (id) {
             ctx.entityLeftEdges.set(id, box.x);

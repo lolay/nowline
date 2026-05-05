@@ -201,6 +201,35 @@ export interface PositionedItem {
     // bumps the next item to a fresh row so the spilled caption has
     // empty space to occupy.
     textSpills: boolean;
+    /** True when the bar is too narrow to host the status dot inside
+     *  with its full inset (`MIN_BAR_WIDTH_FOR_DOT_PX`). The dot
+     *  renders in the spill column to the right of the bar instead
+     *  of overshooting the bar's left edge. */
+    dotSpills: boolean;
+    /** True when the bar is too narrow to host the link-icon tile
+     *  inside without colliding with the status dot column
+     *  (`MIN_BAR_WIDTH_FOR_LINK_AND_DOT_PX`). The icon spills out and
+     *  renders ahead of the (also-spilled) title so the icon stays
+     *  visually attached to the title text. Implies `textSpills`. */
+    iconSpills: boolean;
+    /** True when the bar is too narrow to host the footnote
+     *  superscript at its inset-right position. The indicator(s)
+     *  render in the spill column trailing the title text instead
+     *  of at the bar's upper-right corner. */
+    footnoteSpills: boolean;
+    /** Pre-computed x positions for the spilled decorations. `null`
+     *  when the matching `*Spills` flag is false (decoration stays
+     *  inside the bar at its inset-anchored position). */
+    dotSpillCx: number | null;
+    iconSpillX: number | null;
+    /** First footnote indicator's left edge in the spill column.
+     *  Subsequent indicators walk right by `ITEM_FOOTNOTE_INDICATOR_STEP_PX`. */
+    footnoteSpillStartX: number | null;
+    /** Right edge of the spilled-decoration cluster (inclusive of
+     *  spilled title and footnote glyphs). Used by the row-packer
+     *  to size the row's spill reservation so the next chained item
+     *  doesn't land underneath. */
+    decorationsRightX: number;
     style: ResolvedStyle;
 }
 
