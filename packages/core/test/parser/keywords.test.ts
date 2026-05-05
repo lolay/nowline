@@ -170,4 +170,58 @@ swimlane s
 `, { validate: false });
         expect(r.parserErrors).toEqual([]);
     });
+
+    it('parses capacity: integer/decimal/percent on items', async () => {
+        const r = await parse(`roadmap r
+swimlane s capacity:5
+  item a duration:1w capacity:2
+  item b duration:1w capacity:0.5
+  item c duration:1w capacity:50%
+  item d duration:1w capacity:12.5%
+`, { validate: false });
+        expect(r.lexerErrors).toEqual([]);
+        expect(r.parserErrors).toEqual([]);
+    });
+
+    it('parses overcapacity:show|hide on swimlane and default', async () => {
+        const r = await parse(`config
+default swimlane overcapacity:hide
+roadmap r
+swimlane platform capacity:5 overcapacity:show
+  item x duration:1w capacity:2
+swimlane mobile capacity:2 overcapacity:hide
+  item y duration:1w capacity:1
+`, { validate: false });
+        expect(r.lexerErrors).toEqual([]);
+        expect(r.parserErrors).toEqual([]);
+    });
+
+    it('parses capacity-icon: identifier and string forms in style + default', async () => {
+        const r = await parse(`config
+style finance
+  capacity-icon: budget
+style adhoc
+  capacity-icon: "⚙"
+default swimlane capacity-icon:person
+roadmap r
+swimlane s capacity:3
+  item x duration:1w capacity:1
+`, { validate: false });
+        expect(r.lexerErrors).toEqual([]);
+        expect(r.parserErrors).toEqual([]);
+    });
+
+    it('parses glyph declarations in config (inline + with description)', async () => {
+        const r = await parse(`config
+glyph budget "Budget" unicode:"💰" ascii:"$"
+glyph fte unicode:"\\u{1F464}" ascii:"@"
+glyph star unicode:"⭐"
+  description "Custom star glyph"
+roadmap r
+swimlane s
+  item x duration:1w
+`, { validate: false });
+        expect(r.lexerErrors).toEqual([]);
+        expect(r.parserErrors).toEqual([]);
+    });
 });
