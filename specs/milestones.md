@@ -2,7 +2,7 @@
 
 ## Overview
 
-The OSS tooling (`lolay/nowline` and its satellite repos) ships incrementally across milestones m1–m4b, with a four-phase layout-engine refactor (m2.5a–m2.5d) sitting between the sample-fidelity work (m2h) and the public embed (m3). Each milestone has a clear scope and set of Apache-2.0 deliverables. Later milestones depend on earlier ones.
+The OSS tooling (`lolay/nowline` and its satellite repos) ships incrementally across milestones m1–m4.5, with a four-phase layout-engine refactor (m2.5a–m2.5d) and a follow-on rendering-polish pass (m2i) sitting between the sample-fidelity work (m2h) and IDE support (m3). The IDE work ships before the public embed (m4) so authors can edit `.nowline` files in VS Code / Cursor with live preview before the embed surface goes wide. Each milestone has a clear scope and set of Apache-2.0 deliverables. Later milestones depend on earlier ones.
 
 Commercial milestones (hosted editor, free viewer, MCP, enterprise, FedRAMP) are tracked in a separate, private spec and are out of scope here.
 
@@ -20,13 +20,14 @@ Commercial milestones (hosted editor, free viewer, MCP, enterprise, FedRAMP) are
 | ~~m2f~~ | ~~Sample platform-2026-dark~~ | Apache 2.0 | Dark-theme palette tightened to match the dark reference sample |
 | ~~m2g~~ | ~~Sample dependencies~~ | Apache 2.0 | Cross-swimlane orthogonal edge routing, parallel `[ ]` brackets, `before:` overflow refinement, floating milestone slack arrow |
 | ~~m2h~~ | ~~Sample isolate-include~~ | Apache 2.0 | Dashed-bordered isolate region with label tab + external-link badge, cross-region arrows |
-| m2.5a | Layout v2: Time Axis | Apache 2.0 | `TimeScale` + `ViewPreset` + `WorkingCalendar` replace `timeline.ts`; multi-row headers, `invert()`, `weekendsOff()` |
-| m2.5b | Layout v2: Band Heights | Apache 2.0 | `BandScale` drives swimlane heights; `defaults > spacing` and item `text-size` + `padding` actually consulted |
-| m2.5c | Layout v2: Measure/Place Tree | Apache 2.0 | `Renderable` nodes per entity (item/swimlane/group/parallel/anchor/milestone/footnote/include) replace the monolithic `layout.ts` |
-| m2.5d | Layout v2: Theme in Model | Apache 2.0 | Resolved palette carried in the positioned model; renderer drops `theme === 'dark'` branches |
-| m3 | Embed | Apache 2.0 | Browser embed script, GitHub Action |
-| m4 | IDE | Apache 2.0 | LSP server, VS Code/Cursor extension with live preview |
-| m4b | IDE Expansion | Apache 2.0 | Obsidian, Neovim, JetBrains (timing TBD) |
+| ~~m2.5a~~ | ~~Layout v2: Time Axis~~ | Apache 2.0 | `TimeScale` + `ViewPreset` + `WorkingCalendar` replace `timeline.ts`; multi-row headers, `invert()`, `weekendsOff()` |
+| ~~m2.5b~~ | ~~Layout v2: Band Heights~~ | Apache 2.0 | `BandScale` drives swimlane heights; `defaults > spacing` and item `text-size` + `padding` actually consulted |
+| ~~m2.5c~~ | ~~Layout v2: Measure/Place Tree~~ | Apache 2.0 | `Renderable` nodes per entity (item/swimlane/group/parallel/anchor/milestone/footnote/include) replace the monolithic `layout.ts` |
+| ~~m2.5d~~ | ~~Layout v2: Theme in Model~~ | Apache 2.0 | Resolved palette carried in the positioned model; renderer drops `theme === 'dark'` branches |
+| ~~m2i~~ | ~~Sample fidelity polish~~ | Apache 2.0 | Post-Layout-v2 rendering refinements: row-packing for items/markers/groups, caption + chip spill, narrow-bar decoration spill, luminance-aware status dots, now-pill flag mode, canvas growth helpers, geometry-constant centralization |
+| m3 | IDE | Apache 2.0 | LSP server, VS Code/Cursor extension with live preview |
+| m4 | Embed | Apache 2.0 | Browser embed script, GitHub Action |
+| m4.5 | IDE Expansion | Apache 2.0 | Obsidian, Neovim, JetBrains (timing TBD) |
 
 ## Milestone Details
 
@@ -57,12 +58,12 @@ Spec: [`specs/cli.md`](./cli.md) | Handoff: [`specs/handoffs/m2a.md`](./handoffs
 
 ### ~~m2b — Layout + SVG~~
 
-The visual milestone: render a `.nowline` file to an SVG. This is what m3 (embed) and m4 (IDE live preview) both consume.
+The visual milestone: render a `.nowline` file to an SVG. This is what m3 (IDE live preview) and m4 (embed) both consume.
 
 - Layout engine (`@nowline/layout`) — AST → positioned model (pure, browser-safe)
 - SVG renderer (`@nowline/renderer`) — positioned model → SVG string
 - `nowline render` command with SVG output (all flags except format-specific ones)
-- `nowline serve` — local dev server that watches a file and live-reloads the SVG in the browser (originally slated for m4b; pulled forward because `serve` needs only SVG and unlocks preview for editors without a native panel)
+- `nowline serve` — local dev server that watches a file and live-reloads the SVG in the browser (originally slated for m4.5; pulled forward because `serve` needs only SVG and unlocks preview for editors without a native panel)
 - Light and dark themes
 
 Spec: [`specs/rendering.md`](./rendering.md), [`specs/cli.md`](./cli.md) | Handoff: [`specs/handoffs/m2b.md`](./handoffs/m2b.md)
@@ -149,11 +150,11 @@ The final sample-fidelity milestone. Pairs [`examples/isolate-include.nowline`](
 
 Spec: [`specs/rendering.md`](./rendering.md) | Handoff: [`specs/handoffs/m2h.md`](./handoffs/m2h.md)
 
-### m2.5a — Layout v2: Time Axis
+### ~~m2.5a — Layout v2: Time Axis~~
 
 First phase of the layout-engine v2 refactor. Replaces the imperative tick math in [`packages/layout/src/timeline.ts`](../packages/layout/src/timeline.ts) with a declarative pair of primitives validated end-to-end in a standalone prototype during planning (now retired; see commit `771127c`).
 
-- `TimeScale` (d3-scale wrapper) replaces `buildTimelineScale` + `pixelsPerDay` + `xForDate`. Adds `forward(date)` / `invert(x)` / `ticks()` so m4's editor gets click-to-date for free.
+- `TimeScale` (d3-scale wrapper) replaces `buildTimelineScale` + `pixelsPerDay` + `xForDate`. Adds `forward(date)` / `invert(x)` / `ticks()` so m3's editor gets click-to-date for free.
 - `ViewPreset` replaces the `LABEL_THINNING` table and per-unit format functions. Multi-row time headers (year over month over day) drop out for free.
 - `WorkingCalendar` lands alongside `CalendarConfig` in [`packages/layout/src/calendar.ts`](../packages/layout/src/calendar.ts) as a strategy: `continuousCalendar()` (default), `weekendsOff()`, `withHolidays(...)`. The DSL's `business` calendar mode becomes a factory call.
 - `PositionedTimelineScale` shape stays stable so the renderer needs no changes.
@@ -162,7 +163,7 @@ Validation: existing CLI render tests stay byte-stable on continuous calendars; 
 
 Spec: [`specs/rendering-v2.md`](./rendering-v2.md) § m2.5a
 
-### m2.5b — Layout v2: Band Heights
+### ~~m2.5b — Layout v2: Band Heights~~
 
 Wires `BandScale` (d3-scale-band wrapper) into the swimlane row sizing. Replaces the hardcoded `ITEM_ROW_HEIGHT` constant and the currently-ignored `defaults > spacing` parsing path in [`packages/layout/src/layout.ts`](../packages/layout/src/layout.ts).
 
@@ -173,7 +174,7 @@ Validation: bumping `defaults > spacing` from `none` to `md` widens the visible 
 
 Spec: [`specs/rendering-v2.md`](./rendering-v2.md) § m2.5b
 
-### m2.5c — Layout v2: Measure/Place Tree
+### ~~m2.5c — Layout v2: Measure/Place Tree~~
 
 The load-bearing rewrite. Replaces the monolithic [`layout.ts`](../packages/layout/src/layout.ts) (~1.6 KLOC) with a tree of `Renderable` nodes, one file per entity type:
 
@@ -185,21 +186,68 @@ The load-bearing rewrite. Replaces the monolithic [`layout.ts`](../packages/layo
 
 Validation: every existing sample (`minimal`, `platform-2026`, `platform-2026-dark`, `dependencies`, `isolate-include`) re-renders byte-stable. Adding a new entity type means a new node file with no edits to existing nodes.
 
-Spec: [`specs/rendering-v2.md`](./rendering-v2.md) § m2.5c
+Spec: [`specs/rendering-v2.md`](./rendering-v2.md) § m2.5c | Handoff: [`specs/handoffs/handoff-m2.5c-measure-place.md`](./handoffs/handoff-m2.5c-measure-place.md)
 
-### m2.5d — Layout v2: Theme in Model
+### ~~m2.5d — Layout v2: Theme in Model~~
 
 Cosmetic but valuable for the embed bundle. Resolved palette tokens move into the positioned model so [`packages/renderer/src/svg/render.ts`](../packages/renderer/src/svg/render.ts) drops every `theme === 'dark' ? ...` branch.
 
 - `PositionedItem.fill`, `PositionedItem.stroke`, etc. carry resolved color strings instead of palette tokens.
 - The renderer becomes pure data → SVG with no theming logic.
-- Bundle savings on the embed script (m3's primary artifact).
+- Bundle savings on the embed script (m4's primary artifact).
 
 Validation: `--theme dark` still emits the expected palette; renderer file shrinks measurably; no theme branches remain in the renderer.
 
 Spec: [`specs/rendering-v2.md`](./rendering-v2.md) § m2.5d
 
-### m3 — Embed
+### ~~m2i — Sample fidelity polish~~
+
+Post-Layout-v2 rendering refinements that landed once the measure/place tree was in place. Not planned as a discrete milestone up front — surfaced from sample reviews of `examples/long.nowline`, `examples/nested.nowline`, and `examples/platform-2026.nowline` as the v2 nodes exposed seams that the monolithic `layout.ts` had hidden. Recorded here so the milestone chain reflects what shipped before m3 begins.
+
+Item-bar geometry:
+- Restructured item-bar layout (groups, label chiclets, link icons in upper-left, footnote indicator)
+- Stack spilled label chips and grow the bar vertically to enclose them
+- Stack in-bar chips below the meta baseline and grow the bar to fit
+- Spill the status dot, link icon, and footnote past narrow item bars (with `MIN_BAR_WIDTH_FOR_*` thresholds + a reading-order spill column)
+- Wrap bracket-style group titles inside the bracket glyph (`GROUP_BRACKET_LABEL_OVERHANG_PX`)
+
+Group / parallel layout:
+- Reserve inter-row gap below a styled group inside parallel layouts
+- Pack markers + chart rows so anchor / milestone / item collisions bump out of the way (with `topmost-fit` row packer)
+- Repack markers tick-first
+
+Color & contrast:
+- Pick status-dot tone per-bar from a luminance-aware dual palette (`onLight` / `onDark`)
+- Deepen the status-dot palette so dots read on label-tinted bars
+- Use chart-tuned color for spilled captions and bar text for footnote indicators
+- Theme dark header card
+
+Now-pill & canvas:
+- Reserve canvas room for the now-pill via a single growth helper
+- Flag-mode the now-pill at chart edges instead of growing the canvas; align the flag-mode pill edge with the now-line's outer stroke edge
+- Fit canvas and lanes to spilled captions
+- Centralize layout geometry constants and reposition slack arrows
+- Standardize roadmap dates and default missing `start:` to today
+- Halo include-region source-path text to clear the dashed border
+- Refine output: gutter token, tighter trailing tick, attribution mark
+- Resolve `after:<anchor>` and reverse-side footnotes on items
+
+Test harness:
+- Add `tests/` harness for renderer manual validation; add `item-bumps-up` and `isolate-include-multi` fixtures
+- Strip dead `layout-v2/` links from spec + code; remove the layout-v2 prototype
+
+Spec: [`specs/rendering.md`](./rendering.md) (post-m2.5 sections covering item bars, narrow-bar spill, bracket-style groups, now-pill flag mode, row packing)
+
+### m3 — IDE
+
+First-class editing experience in VS Code and Cursor. Pulled ahead of the embed (m4) so authors can write `.nowline` files in their primary editor with live preview before the public embed surface ships.
+
+- Langium LSP server (autocomplete, validation, go-to-definition)
+- VS Code / Cursor extension (LSP + side panel live preview that re-renders on save/keystroke)
+
+Spec: [`specs/ide.md`](./ide.md)
+
+### m4 — Embed
 
 Roadmaps render anywhere on the web and in CI.
 
@@ -211,18 +259,9 @@ Roadmaps render anywhere on the web and in CI.
 
 Spec: [`specs/embed.md`](./embed.md)
 
-### m4 — IDE
+### m4.5 — IDE Expansion (timing TBD)
 
-First-class editing experience in VS Code and Cursor.
-
-- Langium LSP server (autocomplete, validation, go-to-definition)
-- VS Code / Cursor extension (LSP + side panel live preview that re-renders on save/keystroke)
-
-Spec: [`specs/ide.md`](./ide.md)
-
-### m4b — IDE Expansion (timing TBD)
-
-Extend IDE support beyond VS Code/Cursor.
+Extend IDE support beyond VS Code/Cursor. Depends on m3 (LSP server) and is independent of m4 (Embed); slots after m4 in the chain so the public embed ships before plugin work begins.
 
 - Obsidian plugin (edit + inline preview)
 - Neovim LSP config
@@ -233,13 +272,13 @@ Spec: [`specs/ide.md`](./ide.md)
 ## Dependency Chain
 
 ```
-m1 → m2a → m2b → m2b.5 → m2c → m2d → m2e → m2f → m2g → m2h → m2.5a → m2.5b → m2.5c → m2.5d → m3 → m4
-                                                                                                    ↘
-                                                                                                     m4b (independent — depends only on m4)
+m1 → m2a → m2b → m2b.5 → m2c → m2d → m2e → m2f → m2g → m2h → m2.5a → m2.5b → m2.5c → m2.5d → m2i → m3 → m4
+                                                                                                          ↘
+                                                                                                           m4.5 (depends on m3 only; sequenced after m4)
 ```
 
 m1 is the critical foundation — every subsequent milestone depends on the DSL, parser, and typed AST it produces.
 
-## Beyond m4b
+## Beyond m4.5
 
 Hosted products (pro editor, free viewer, MCP server, enterprise, FedRAMP) consume these OSS packages via npm but are built in separate, proprietary repos. See the commercial roadmap for that scope.

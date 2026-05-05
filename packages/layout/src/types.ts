@@ -10,6 +10,12 @@ export type FontFamily = 'sans' | 'serif' | 'mono';
 export type FontWeight = 'thin' | 'light' | 'normal' | 'bold';
 export type BracketKind = 'none' | 'solid' | 'dashed';
 export type HeaderPosition = 'beside' | 'above';
+// Where the timeline date strip is rendered. Roadmap-only style property.
+//   - `top` (default) — single strip above the chart (legacy behavior)
+//   - `bottom` — single strip below the chart, no top strip
+//   - `both` — strips at both ends; tall canvases stay readable from
+//     either edge of the viewport
+export type TimelinePosition = 'top' | 'bottom' | 'both';
 export type StatusKind =
     | 'planned'
     | 'in-progress'
@@ -18,7 +24,8 @@ export type StatusKind =
     | 'blocked'
     | 'neutral';
 
-// The 17 style properties from specs/dsl.md § Style Properties plus header-position.
+// The 17 style properties from specs/dsl.md § Style Properties plus header-position
+// and the two roadmap-only readability knobs (`timeline-position`, `minor-grid`).
 // Every one has a concrete value after resolution (theme + defaults fill gaps).
 export interface ResolvedStyle {
     bg: string;             // hex or 'none'
@@ -47,6 +54,8 @@ export interface ResolvedStyle {
      * Default `'multiplier'`.
      */
     capacityIcon: string;
+    timelinePosition: TimelinePosition;
+    minorGrid: boolean;
 }
 
 export interface BoundingBox {
@@ -54,6 +63,30 @@ export interface BoundingBox {
     y: number;
     width: number;
     height: number;
+}
+
+/**
+ * Calendar-resolved view of a `size NAME ["TITLE"] effort:LITERAL`
+ * declaration. Built once per layout from the AST `SizeDeclaration`s
+ * collected by the include-resolver and the active calendar (which
+ * decides how many days a literal like `2w` maps to). Items reference
+ * these via `LayoutContext.sizes` rather than walking the AST +
+ * calendar each time they need an effort.
+ *
+ * `effortLiteral` keeps the raw literal so callers can show the size's
+ * effort string (`"2w"`) on tooltips without re-formatting from
+ * `effortDays`.
+ *
+ * `title` is the optional author-provided display label. The on-bar
+ * size chip prefers `title` when present, falling back to `name` (the
+ * id) verbatim — both rendered with the case the author typed. See
+ * specs/rendering.md § Item size chip.
+ */
+export interface ResolvedSize {
+    name: string;
+    title?: string;
+    effortDays: number;
+    effortLiteral: string;
 }
 
 export interface Point {
@@ -116,19 +149,34 @@ export interface PositionedTimelineScale {
     // Now-pill row sits at the very top of the timeline area (above the
     // date labels). Height is 0 when there's no now-line to draw.
     pillRowHeight: number;
-    // Tick-label panel (the date headers). Always rendered.
+    // Tick-label panel (the date headers). Always rendered when
+    // `timelinePosition` is `top` or `both`; height is 0 when the
+    // roadmap requested `bottom`-only and no top strip is wanted.
     tickPanelY: number;
     tickPanelHeight: number;
-    // Marker row sits BELOW the tick-label panel. Anchors + milestones live
-    // here. The collision band sits ABOVE the in-row baseline so an anchor
-    // colliding with a milestone can be bumped up. Height is 0 when there
-    // are no markers to render — the renderer then omits the panel
+    // Marker row sits BELOW the top tick-label panel. Anchors + milestones
+    // live here. The collision band sits ABOVE the in-row baseline so an
+    // anchor colliding with a milestone can be bumped up. Height is 0 when
+    // there are no markers to render — the renderer then omits the panel
     // entirely so we don't reserve dead space.
     markerRow: {
         y: number;          // y of the in-row diamond center
         height: number;     // total height of the marker row band (in-row + collision)
         collisionY: number; // y of the bumped-up diamond center
     };
+    // Mirrored bottom tick-label panel. Populated when the roadmap's
+    // resolved `timelinePosition` is `bottom` or `both`. Width and
+    // x match the top panel (`box.x` / `box.width`); the renderer
+    // emits the same fill, border, label color, and tick labels at
+    // `bottomTickPanelY`. No now-pill, no marker row — the bottom strip
+    // is purely a date reference for tall canvases.
+    bottomTickPanelY?: number;
+    bottomTickPanelHeight?: number;
+    // When `true`, the renderer draws a faint dotted line at every tick
+    // boundary (not just major ticks) using `theme.timeline.minorGridLine`.
+    // Mirrors the roadmap's resolved `minor-grid` style property. Default
+    // `false` preserves byte-stable output for existing roadmaps.
+    minorGrid: boolean;
 }
 
 /**
@@ -252,6 +300,13 @@ export interface PositionedItem {
      * `×` text node, or an inline literal.
      */
     capacity: PositionedCapacity | null;
+    /**
+     * Resolved size when the item declared `size:NAME`. Null when the item
+     * sized itself with a literal `duration:` or didn't declare a size at
+     * all. Used by the renderer for the size chip on the meta line (m6) and
+     * by the layout for capacity-aware duration derivation (m5).
+     */
+    size: ResolvedSize | null;
     style: ResolvedStyle;
 }
 
@@ -339,6 +394,60 @@ export interface PositionedSwimlane {
      * want the badge fully hidden simply omit `capacity:`.
      */
     capacity: PositionedCapacity | null;
+    /**
+     * Tri-state utilization underline data when the lane declares
+     * `capacity:` AND has at least one item contributing load AND has not
+     * opted out of every color band via `utilization-*-at:none`. Null
+     * otherwise — the renderer paints no underline.
+     *
+     * Computed in m12 by `computeLaneUtilization` (see
+     * `lane-utilization.ts`) per specs/rendering.md § Lane utilization
+     * underline. The renderer paints one rectangle per coalesced segment
+     * along the bottom edge of the band, colored from the resolved theme's
+     * `swimlane.utilizationOk` / `…Warn` / `…Over` tokens.
+     */
+    utilization: PositionedLaneUtilization | null;
+}
+
+/**
+ * One classification for a lane utilization segment. `green` includes the
+ * zero-load case so the underline reads as a continuous health bar; the spec
+ * intentionally avoids a separate "idle" color.
+ */
+export type UtilizationClassification = 'green' | 'yellow' | 'red';
+
+/**
+ * One half-open `[startX, endX)` segment of the lane's utilization underline,
+ * pre-classified for the renderer. Adjacent same-classification segments are
+ * coalesced upstream so the renderer paints one rectangle per visible color
+ * band rather than per event boundary.
+ *
+ * `load` is the absolute concurrent capacity at this segment (sum of active
+ * items' `capacity:` values). Useful for tooltips and debug overlays; the
+ * paint color is determined by `classification` alone.
+ */
+export interface PositionedUtilizationSegment {
+    startX: number;
+    endX: number;
+    load: number;
+    classification: UtilizationClassification;
+}
+
+/**
+ * Resolved utilization model for a swimlane. Carries the segment list plus
+ * the resolved thresholds and capacity so downstream consumers (renderer,
+ * tooltips, exporters) can describe the model without re-resolving config.
+ *
+ * `warnFraction` / `overFraction`: each is either a positive fraction of
+ * `capacityValue` (the lane paints that color band when load reaches the
+ * fraction) or `null` to mean "this color band is opted out via
+ * `utilization-*-at:none`".
+ */
+export interface PositionedLaneUtilization {
+    segments: PositionedUtilizationSegment[];
+    capacityValue: number;
+    warnFraction: number | null;
+    overFraction: number | null;
 }
 
 export interface PositionedAnchor {
@@ -419,7 +528,18 @@ export interface PositionedDependencyEdge {
     fromId: string;
     toId: string;
     waypoints: Point[];    // first = source port; last = target port
-    kind: 'normal' | 'overflow';
+    /**
+     * - `normal`   — orthogonal arrow drawn AFTER swimlane / item /
+     *   marker fills so it sits on top of lane bands.
+     * - `overflow` — currently unused at construction; reserved for the
+     *   red `before:` overrun annotation arrow.
+     * - `underBar` — channel router could not find a clear vertical
+     *   gutter between the source and target columns; the arrow's
+     *   vertical leg crosses one or more item bars. The renderer paints
+     *   these edges BEFORE bar fills with a thinner stroke so the bar
+     *   stays the visual foreground.
+     */
+    kind: 'normal' | 'overflow' | 'underBar';
     style: ResolvedStyle;
 }
 

@@ -91,8 +91,8 @@ Design specs for the DSL, renderer, CLI, IDE integrations, and OSS milestones li
 | [`specs/rendering.md`](./specs/rendering.md) | Positioned model and SVG renderer |
 | [`specs/ide.md`](./specs/ide.md) | LSP and editor integrations (VS Code, Obsidian, Neovim, JetBrains) |
 | [`specs/embed.md`](./specs/embed.md) | Browser embed script and GitHub Action |
-| [`specs/features.md`](./specs/features.md) | Scoring rubric + feature tables (m1–m4b) |
-| [`specs/milestones.md`](./specs/milestones.md) | OSS roadmap (m1–m4b) |
+| [`specs/features.md`](./specs/features.md) | Scoring rubric + feature tables (m1–m4.5) |
+| [`specs/milestones.md`](./specs/milestones.md) | OSS roadmap (m1–m4.5) |
 
 ## Try it from source
 

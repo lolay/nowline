@@ -41,6 +41,7 @@ import {
     GROUP_TITLE_TAB_LABEL_BASELINE_OFFSET_PX,
     GROUP_TITLE_TAB_LABEL_FONT_SIZE_PX,
     GROUP_TITLE_TAB_CHAR_WIDTH_PX,
+    GROUP_BRACKET_LABEL_OVERHANG_PX,
     ACCENT_DASH_PATTERN,
     HEADER_CARD_PADDING_X,
     HEADER_CARD_PADDING_TOP,
@@ -375,30 +376,40 @@ function renderTimeline(t: PositionedTimelineScale, palette: Theme): string {
     const panelFill = palette.timeline.panelFill;
     const borderColor = palette.timeline.border;
     const gridColor = palette.timeline.gridLine;
+    const minorGridColor = palette.timeline.minorGridLine;
     const labelColor = palette.timeline.labelText;
     const parts: string[] = [];
     // Header layout from top: now-pill row → tick-label panel → marker row.
     // The pill row owns its space (no panel rect); the now-line crosses it
-    // visually. Marker row is omitted entirely when empty.
+    // visually. Marker row is omitted entirely when empty. The top tick
+    // panel is also omitted when the roadmap requested
+    // `timeline-position:bottom` (height 0). The optional bottom tick
+    // panel mirrors the top panel directly above the footnote area.
     const tickPanelY = t.tickPanelY;
     const tickPanelHeight = t.tickPanelHeight;
+    const hasTopTickPanel = tickPanelHeight > 0;
     const hasMarkerRow = t.markerRow.height > 0;
     const markerRowY = tickPanelY + tickPanelHeight;
     const markerRowHeight = t.markerRow.height;
+    const bottomTickPanelY = t.bottomTickPanelY;
+    const bottomTickPanelHeight = t.bottomTickPanelHeight ?? 0;
+    const hasBottomTickPanel = bottomTickPanelY !== undefined && bottomTickPanelHeight > 0;
 
-    parts.push(
-        tag('rect', {
-            x: num(t.box.x),
-            y: num(tickPanelY),
-            width: num(t.box.width),
-            height: num(tickPanelHeight),
-            rx: 4,
-            ry: 4,
-            fill: panelFill,
-            stroke: borderColor,
-            'stroke-width': 1,
-        }),
-    );
+    if (hasTopTickPanel) {
+        parts.push(
+            tag('rect', {
+                x: num(t.box.x),
+                y: num(tickPanelY),
+                width: num(t.box.width),
+                height: num(tickPanelHeight),
+                rx: 4,
+                ry: 4,
+                fill: panelFill,
+                stroke: borderColor,
+                'stroke-width': 1,
+            }),
+        );
+    }
     if (hasMarkerRow) {
         parts.push(
             tag('rect', {
@@ -414,41 +425,98 @@ function renderTimeline(t: PositionedTimelineScale, palette: Theme): string {
             }),
         );
     }
-    // Where the dotted grid lines start (just below the lowest header
-    // panel — date row alone, or marker row when present).
-    const gridTopY = hasMarkerRow ? markerRowY + markerRowHeight : tickPanelY + tickPanelHeight;
-    for (const tick of t.ticks) {
-        if (!tick.major) continue;
-        // Label sits at the COLUMN CENTER (tick.labelX), not at the tick
-        // boundary. The last tick has no following column → no label.
-        if (tick.label && tick.labelX !== undefined) {
-            parts.push(
-                textTag(
-                    {
-                        x: num(tick.labelX),
-                        y: num(tickPanelY + TIMELINE_TICK_LABEL_BASELINE_OFFSET_PX),
-                        'font-family': FONT_STACK.sans,
-                        'font-size': 10,
-                        fill: labelColor,
-                        'text-anchor': 'middle',
-                    },
-                    tick.label,
-                ),
-            );
-        }
-        // Dotted grid line drops from below the lowest header panel through
-        // the swimlane area, at the column BOUNDARY (tick.x).
+    if (hasBottomTickPanel) {
         parts.push(
-            tag('line', {
-                x1: num(tick.x),
-                y1: num(gridTopY),
-                x2: num(tick.x),
-                y2: num(t.box.y + t.box.height),
-                stroke: gridColor,
+            tag('rect', {
+                x: num(t.box.x),
+                y: num(bottomTickPanelY!),
+                width: num(t.box.width),
+                height: num(bottomTickPanelHeight),
+                rx: 4,
+                ry: 4,
+                fill: panelFill,
+                stroke: borderColor,
                 'stroke-width': 1,
-                'stroke-dasharray': '2 3',
             }),
         );
+    }
+    // Where the dotted grid lines start (just below the lowest header
+    // panel — date row alone, or marker row when present).
+    const gridTopY = hasMarkerRow
+        ? markerRowY + markerRowHeight
+        : tickPanelY + tickPanelHeight;
+    // Grid lines stop at the chart's bottom edge — which is the TOP of
+    // the bottom tick panel when one is present (so the panel reads as
+    // a clean strip rather than a column-cut zone).
+    const gridBottomY = t.box.y + t.box.height;
+    for (const tick of t.ticks) {
+        if (tick.major) {
+            // Label sits at the COLUMN CENTER (tick.labelX), not at the
+            // tick boundary. The last tick has no following column → no
+            // label.
+            if (tick.label && tick.labelX !== undefined) {
+                if (hasTopTickPanel) {
+                    parts.push(
+                        textTag(
+                            {
+                                x: num(tick.labelX),
+                                y: num(tickPanelY + TIMELINE_TICK_LABEL_BASELINE_OFFSET_PX),
+                                'font-family': FONT_STACK.sans,
+                                'font-size': 10,
+                                fill: labelColor,
+                                'text-anchor': 'middle',
+                            },
+                            tick.label,
+                        ),
+                    );
+                }
+                if (hasBottomTickPanel) {
+                    parts.push(
+                        textTag(
+                            {
+                                x: num(tick.labelX),
+                                y: num(bottomTickPanelY! + TIMELINE_TICK_LABEL_BASELINE_OFFSET_PX),
+                                'font-family': FONT_STACK.sans,
+                                'font-size': 10,
+                                fill: labelColor,
+                                'text-anchor': 'middle',
+                            },
+                            tick.label,
+                        ),
+                    );
+                }
+            }
+            // Dotted grid line drops from below the lowest header panel
+            // through the swimlane area, at the column BOUNDARY (tick.x).
+            parts.push(
+                tag('line', {
+                    x1: num(tick.x),
+                    y1: num(gridTopY),
+                    x2: num(tick.x),
+                    y2: num(gridBottomY),
+                    stroke: gridColor,
+                    'stroke-width': 1,
+                    'stroke-dasharray': '2 3',
+                }),
+            );
+        } else if (t.minorGrid) {
+            // Faint minor-tick grid line at every non-major boundary.
+            // Skip the very last tick since it has no following column —
+            // a line at the chart's right edge just doubles up the
+            // chart border.
+            if (tick.labelX === undefined) continue;
+            parts.push(
+                tag('line', {
+                    x1: num(tick.x),
+                    y1: num(gridTopY),
+                    x2: num(tick.x),
+                    y2: num(gridBottomY),
+                    stroke: minorGridColor,
+                    'stroke-width': 1,
+                    'stroke-dasharray': '1 4',
+                }),
+            );
+        }
     }
     return tag('g', { 'data-layer': 'timeline' }, parts.join(''));
 }
@@ -957,13 +1025,33 @@ function renderGroup(g: PositionedGroup, options: RenderOptions, idPrefix: strin
     } else {
         const bracketColor = g.style.fg;
         if (g.style.bracket !== 'none') {
+            // Bracket-style groups paint a left-side `[` glyph along
+            // `box.x`. When a title is present the layout has reserved
+            // `GROUP_BRACKET_LABEL_OVERHANG_PX` of vertical space ABOVE
+            // `box.y` (see GroupNode.place); the bracket extends up
+            // through that overhang and adds a top foot mirroring the
+            // bottom foot so the `[` visually wraps the title text that
+            // sits in the reserved region. Title-less bracket groups
+            // keep the historical asymmetric shape (vertical bar + a
+            // single bottom foot) since there's nothing above to wrap.
+            const stub = 4;
+            const bottom = g.box.y + g.box.height;
+            const dash = g.style.bracket === 'dashed' ? '3 2' : null;
+            const bracketPath = g.title
+                ? `M${num(g.box.x + stub)} ${num(g.box.y - GROUP_BRACKET_LABEL_OVERHANG_PX)}` +
+                  ` L${num(g.box.x)} ${num(g.box.y - GROUP_BRACKET_LABEL_OVERHANG_PX)}` +
+                  ` L${num(g.box.x)} ${num(bottom)}` +
+                  ` L${num(g.box.x + stub)} ${num(bottom)}`
+                : `M${num(g.box.x)} ${num(g.box.y)}` +
+                  ` L${num(g.box.x)} ${num(bottom)}` +
+                  ` L${num(g.box.x + stub)} ${num(bottom)}`;
             parts.push(
                 tag('path', {
-                    d: `M${num(g.box.x)} ${num(g.box.y)} L${num(g.box.x)} ${num(g.box.y + g.box.height)} L${num(g.box.x + 4)} ${num(g.box.y + g.box.height)}`,
+                    d: bracketPath,
                     fill: 'none',
                     stroke: bracketColor,
                     'stroke-width': 1,
-                    'stroke-dasharray': g.style.bracket === 'dashed' ? '3 2' : null,
+                    'stroke-dasharray': dash,
                 }),
             );
         }

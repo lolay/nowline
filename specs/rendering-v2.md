@@ -2,7 +2,7 @@
 
 ## Overview
 
-This spec defines the **internal architecture** of the next-generation `@nowline/layout` engine and the small carve-out from `@nowline/renderer` that lets the engine swap cleanly. It is the source of truth for milestones m2.5a through m2.5d, which sit between [m2h](./milestones.md#m2h--sample-isolate-include) and [m3](./milestones.md#m3--embed) in the milestone chain.
+This spec defines the **internal architecture** of the next-generation `@nowline/layout` engine and the small carve-out from `@nowline/renderer` that lets the engine swap cleanly. It is the source of truth for milestones m2.5a through m2.5d, which sit between [m2h](./milestones.md#m2h--sample-isolate-include) and the public-facing milestones [m3](./milestones.md#m3--ide) (IDE) and [m4](./milestones.md#m4--embed) (Embed) in the milestone chain.
 
 The **public output** — what the renderer emits, what the embed script ships, what the GitHub Action commits — is unchanged. See [`rendering.md`](./rendering.md) for the output contract; this document covers what runs underneath.
 
@@ -18,19 +18,19 @@ The architecture was validated end-to-end against `examples/minimal.nowline` in 
 
 - Not a DSL change. The grammar, parser, validation rules, and `@nowline/core`'s typed AST are unchanged.
 - Not a re-skin. The light and dark palettes, font stacks, sample fidelity, and entity geometries are preserved.
-- Not an interactive editor. v2 unlocks `TimeScale.invert()` for m4's editor work, but does not ship editing surfaces itself.
+- Not an interactive editor. v2 unlocks `TimeScale.invert()` for m3's editor work, but does not ship editing surfaces itself.
 - Not an edge-routing rewrite. The current orthogonal router from `layout.ts` carries forward unchanged through m2.5c; ELK / dagre integration is a separate future milestone.
 - Not a style-cascade rewrite. [`style-resolution.ts`](../packages/layout/src/style-resolution.ts) keeps its current shape; v2 nodes consume already-resolved styles.
 
-## Why before m3
+## Why before m3 / m4
 
-[m3](./milestones.md#m3--embed) ships the **first publicly distributed artifacts** that bundle `@nowline/layout` and `@nowline/renderer`: the browser embed script (CDN-distributed) and the GitHub Action (commits SVG/PNG into user repos). Both make engine internals externally visible in two ways:
+[m3](./milestones.md#m3--ide) ships the IDE extension (LSP + side-panel live preview that runs the layout engine on every keystroke) and [m4](./milestones.md#m4--embed) ships the **first publicly distributed artifacts** that bundle `@nowline/layout` and `@nowline/renderer` to outside consumers: the browser embed script (CDN-distributed) and the GitHub Action (commits SVG/PNG into user repos). Both surfaces make engine internals externally visible in two ways:
 
-1. **Bundle size.** Every embed script consumer downloads the engine on every page load. The current layout core (`layout.ts` 1.6 KLOC + `timeline.ts` + `calendar.ts` + `style-resolution.ts` + `types.ts` + themes ≈ 3,057 lines) and renderer (1,271 lines) are both materially larger than the v2 architecture target.
+1. **Bundle size.** Every embed script consumer downloads the engine on every page load (m4); the IDE extension downloads the engine on install and on update (m3). The current layout core (`layout.ts` 1.6 KLOC + `timeline.ts` + `calendar.ts` + `style-resolution.ts` + `types.ts` + themes ≈ 3,057 lines) and renderer (1,271 lines) are both materially larger than the v2 architecture target.
 
-2. **Output stability.** The Action commits SVGs to repository history. Engine swaps after public release create visual diff noise across versions and lock us into a backwards-compat constraint with every embed-script user.
+2. **Output stability.** The Action commits SVGs to repository history (m4). Engine swaps after public release create visual diff noise across versions and lock us into a backwards-compat constraint with every embed-script user.
 
-Doing m2.5 before m3 means the public release establishes its byte-stable baseline on the leaner engine, not on a foundation we already plan to replace.
+Doing m2.5 before m3 / m4 means both public surfaces establish their byte-stable baseline on the leaner engine, not on a foundation we already plan to replace.
 
 ## Architectural Primitives
 
@@ -64,7 +64,7 @@ interface TimeScale {
 }
 ```
 
-Replaces `buildTimelineScale` + `pixelsPerDay` + `xForDate` from [`timeline.ts`](../packages/layout/src/timeline.ts). Adds `invert()` for the m4 editor's click-to-date and `ticks()` for label generation.
+Replaces `buildTimelineScale` + `pixelsPerDay` + `xForDate` from [`timeline.ts`](../packages/layout/src/timeline.ts). Adds `invert()` for the m3 editor's click-to-date and `ticks()` for label generation.
 
 ### BandScale
 
@@ -257,7 +257,7 @@ The four phases ship as separate milestones, ordered low-risk to high-risk so ea
 The `PositionedRoadmap` interface stays stable across all four phases. New fields are added (m2.5d adds resolved colors), but no existing field is removed or renamed. Consequence:
 
 - `@nowline/cli` consumers see no API change.
-- `@nowline/embed` (m3) consumes the same model regardless of which engine produced it.
+- `@nowline/embed` (m4) consumes the same model regardless of which engine produced it.
 - The XLSX / PDF / PNG / Markdown adapters from m2c continue to work unchanged.
 - The `ResolveResult` → positioned model boundary is the migration surface, not the renderer.
 
@@ -286,7 +286,7 @@ These are deferred to the relevant phase's design pass and should not block plan
 
 - **Style resolution surfacing in `Renderable.measure`.** Today `style-resolution.ts` resolves a style upfront; v2 nodes accept `ResolvedStyle` as input. Whether `measure()` ever needs *unresolved* style input (for late-binding text-size from container context, for example) is a m2.5c open question.
 - **Edge routing eventually moving into the tree.** m2.5c keeps the existing router. If a future milestone moves orthogonal routing into the measure/place tree (e.g. via an `EdgeNode` that participates in collision detection), this spec gets a follow-up.
-- **`d3-scale` / `d3-time` bundle impact in the embed.** Estimated ~10 KB tree-shaken, but actual measurement happens in m2.5a's PR and informs whether m3's embed bundle stays under its target ceiling.
+- **`d3-scale` / `d3-time` bundle impact in the embed.** Estimated ~10 KB tree-shaken, but actual measurement happens in m2.5a's PR and informs whether m4's embed bundle stays under its target ceiling.
 - **`logo:` rendering inside `Renderable`.** The header is currently a special case; m2.5c decides whether the logo lives inside `RoadmapHeaderNode` or stays a renderer-side concern.
 
 ## References

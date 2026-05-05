@@ -2,7 +2,8 @@
 // layout-engine refactor.
 //
 // `renderSampleSvg` runs the full production pipeline (parse → resolve
-// → layoutRoadmap → renderSvg) on an `examples/*.nowline` file with a
+// → layoutRoadmap → renderSvg) on a `examples/*.nowline` or `tests/*.nowline`
+// file with a
 // fixed `today` so the output stays deterministic. The accompanying
 // `snapshot.test.ts` writes the SVG to `test/__snapshots__/` on first
 // run and asserts byte-equality on every subsequent run; refactors that
@@ -34,6 +35,7 @@ function getServices() {
 
 const REPO_ROOT = path.resolve(import.meta.dirname, '..', '..', '..');
 const EXAMPLES_DIR = path.join(REPO_ROOT, 'examples');
+const TESTS_DIR = path.join(REPO_ROOT, 'tests');
 
 export const SNAPSHOT_DIR = path.join(import.meta.dirname, '__snapshots__');
 
@@ -48,10 +50,16 @@ export const FIXED_TODAY = new Date(Date.UTC(2026, 1, 9));
 export interface SampleSpec {
     /** Snapshot file name (without extension). */
     name: string;
-    /** `examples/<file>.nowline` to read. */
+    /** Basename of the `.nowline` source under `dir`. */
     sourceFile: string;
+    /** `examples` (default) or `tests` — root for `sourceFile`. */
+    dir?: 'examples' | 'tests';
     /** Theme to render with. */
     theme: ThemeName;
+}
+
+function sourceRoot(spec: SampleSpec): string {
+    return spec.dir === 'tests' ? TESTS_DIR : EXAMPLES_DIR;
 }
 
 export const SAMPLES: SampleSpec[] = [
@@ -60,19 +68,23 @@ export const SAMPLES: SampleSpec[] = [
     { name: 'platform-2026-dark', sourceFile: 'platform-2026.nowline', theme: 'dark' },
     { name: 'dependencies', sourceFile: 'dependencies.nowline', theme: 'light' },
     { name: 'isolate-include', sourceFile: 'isolate-include.nowline', theme: 'light' },
-    // m6: pins the rendering of every shape of `capacity:` + `capacity-icon:`
-    // combination for items. The companion `capacity-items.nowline` example
-    // exercises default multiplier, built-in SVG icons, decimal/percent
-    // values, inline Unicode literals, and declared custom glyphs.
-    { name: 'capacity-items', sourceFile: 'capacity-items.nowline', theme: 'light' },
-    // m7: pins the rendering of lane-level `capacity:N` badges in the frame
-    // tab across the same icon matrix, plus owner-with-capacity stacking.
-    { name: 'capacity-lanes', sourceFile: 'capacity-lanes.nowline', theme: 'light' },
+    {
+        name: 'nested-both-headers',
+        sourceFile: 'nested-both-headers.nowline',
+        dir: 'tests',
+        theme: 'light',
+    },
+    // m6: pins every shape of `capacity:` + `capacity-icon:` for items (matrix in tests/).
+    { name: 'capacity-items', sourceFile: 'capacity-items.nowline', dir: 'tests', theme: 'light' },
+    // m7: lane-level `capacity:N` badges across the same icon matrix.
+    { name: 'capacity-lanes', sourceFile: 'capacity-lanes.nowline', dir: 'tests', theme: 'light' },
+    { name: 'capacity', sourceFile: 'capacity.nowline', theme: 'light' },
+    { name: 'sizing', sourceFile: 'sizing.nowline', theme: 'light' },
 ];
 
 export async function renderSampleSvg(spec: SampleSpec): Promise<string> {
     const { shared, Nowline } = getServices();
-    const absSource = path.join(EXAMPLES_DIR, spec.sourceFile);
+    const absSource = path.join(sourceRoot(spec), spec.sourceFile);
     const text = await fs.readFile(absSource, 'utf-8');
     const uri = URI.parse(`memory:///snapshot-${spec.name}.nowline`);
     const docFactory = shared.workspace.LangiumDocumentFactory;

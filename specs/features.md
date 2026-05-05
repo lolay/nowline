@@ -12,7 +12,7 @@ Each feature is scored on three dimensions using a **1-3-9 scale** (logarithmic,
 
 **Score = Identity x Demand x Effort.** Higher is better (high identity, high demand, low effort).
 
-Features are assigned to milestones: m1–m4b (OSS tooling tracked here) or m4b-deferred. Later commercial milestones are scoped in a separate roadmap and are out of scope for this file.
+Features are assigned to milestones: m1–m4.5 (OSS tooling tracked here) or m4.5-deferred. Later commercial milestones are scoped in a separate roadmap and are out of scope for this file.
 
 ## Feature Matrix
 
@@ -68,16 +68,7 @@ Features are assigned to milestones: m1–m4b (OSS tooling tracked here) or m4b-
 | 18 | XLSX output | 1 | 3 | 9 | 27 | Formatted Excel workbook — data table, future stacked-bar Gantt sheet |
 | 18b | MS Project XML output | 1 | 3 | 3 | 9 | `render -f msproj` — lossy export for PM tool import |
 
-### m3 — Embed
-
-| # | Feature | Identity | Demand | Effort | Score | Notes |
-|---|---------|----------|--------|--------|-------|-------|
-| 31 | Browser embed script | 9 | 9 | 3 | 243 | Mermaid-like embedding |
-| 32 | CDN hosting (jsDelivr) | 3 | 9 | 9 | 243 | Zero-cost distribution |
-| 35 | GitHub Action — file mode | 3 | 9 | 3 | 81 | CI rendering |
-| 36 | GitHub Action — markdown mode | 3 | 3 | 3 | 27 | README rendering |
-
-### m4 — IDE (VS Code / Cursor)
+### m3 — IDE (VS Code / Cursor)
 
 | # | Feature | Identity | Demand | Effort | Score | Notes |
 |---|---------|----------|--------|--------|-------|-------|
@@ -86,7 +77,16 @@ Features are assigned to milestones: m1–m4b (OSS tooling tracked here) or m4b-
 | 39 | VS Code extension | 3 | 9 | 3 | 81 | Largest editor market share |
 | 40 | Live preview side panel | 9 | 9 | 3 | 243 | Key differentiator for IDE |
 
-### m4b — IDE Expansion (timing TBD)
+### m4 — Embed
+
+| # | Feature | Identity | Demand | Effort | Score | Notes |
+|---|---------|----------|--------|--------|-------|-------|
+| 31 | Browser embed script | 9 | 9 | 3 | 243 | Mermaid-like embedding |
+| 32 | CDN hosting (jsDelivr) | 3 | 9 | 9 | 243 | Zero-cost distribution |
+| 35 | GitHub Action — file mode | 3 | 9 | 3 | 81 | CI rendering |
+| 36 | GitHub Action — markdown mode | 3 | 3 | 3 | 27 | README rendering |
+
+### m4.5 — IDE Expansion (timing TBD)
 
 | # | Feature | Identity | Demand | Effort | Score | Notes |
 |---|---------|----------|--------|--------|-------|-------|

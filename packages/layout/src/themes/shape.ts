@@ -77,6 +77,10 @@ export interface Theme {
     };
     timeline: {
         gridLine: string;
+        // Faint dotted line drawn at every tick boundary (not just majors)
+        // when the roadmap's resolved `minor-grid` style is `true`. A step
+        // lighter than `gridLine` so the major lines still dominate.
+        minorGridLine: string;
         tickMark: string;
         labelText: string;
         // m2.5d: lifted from renderTimeline.

@@ -2,7 +2,7 @@
 
 ## Overview
 
-Nowline's OSS rendering path produces **static SVG** from a parsed roadmap. It is used by the CLI (m2b) and the browser embed script (m3). Both consume the same positioned model from `@nowline/layout`.
+Nowline's OSS rendering path produces **static SVG** from a parsed roadmap. It is used by the CLI (m2b) and the browser embed script (m4). Both consume the same positioned model from `@nowline/layout`.
 
 Downstream interactive renderers (e.g. a hosted editor with drag-and-drop and two-way sync) reuse the layout engine but ship in separate, proprietary projects and are out of scope here.
 
@@ -76,9 +76,9 @@ If explicit description control is needed later, `desc-` prefixed properties (e.
 
 With `spacing:none` as the swimlane default, sibling swimlanes sit directly adjacent. A thin horizontal separator line renders between sibling swimlane bands for visual distinction. Users who prefer vertical gaps can set `spacing:` on a swimlane or in defaults.
 
-## SVG Renderer (m2b / m3)
+## SVG Renderer (m2b / m4)
 
-The pure SVG renderer takes the positioned model and produces an SVG string. It is used by the CLI (m2b) and the browser embed script (m3).
+The pure SVG renderer takes the positioned model and produces an SVG string. It is used by the CLI (m2b) and the browser embed script (m4).
 
 ### Roadmap Header
 
@@ -137,6 +137,8 @@ A single-row header displays the scale units (days, weeks, months, quarters, yea
   - Years: show every 5th
 - **Range**: the first tick mark aligns with the earliest item start or anchor date, with the roadmap's `padding` as whitespace before it. The last tick mark extends to the latest item end, anchor date, or milestone date, with the same padding after.
 - **Custom units**: custom units (e.g., `sprints = 2w`) map to their underlying duration for positioning; labels use the custom unit name
+- **Mirrored bottom strip**: when `timeline-position:bottom` or `timeline-position:both` is set on the roadmap, the renderer emits a second tick-label panel below the chart's last swimlane (and below any isolate-include regions), above the footnote panel. The mirrored strip shares the same fill, border, label color, and tick positions as the top strip — it has no now-pill and no marker row (anchors and milestones still belong to the top header). The default `timeline-position:top` keeps the existing single-strip layout.
+- **Minor-tick grid lines**: when `minor-grid:true` is set on the roadmap, every tick boundary (not just the labeled major ones) gets a thin dotted grid line drawn in the theme's `timeline.minorGridLine` color — fainter than the major grid lines so the major ticks still dominate. The minor lines drop from the same y as the major lines and stop at the same chart bottom. Default `minor-grid:false` keeps existing renders unchanged.
 
 ### The Now-Line
 
@@ -147,13 +149,14 @@ The now-line is the hero visual element — the vertical line marking today on t
 - Rendered **above** grid lines and milestone lines (highest z-order among vertical lines)
 - Label: **"now"** rendered at the top of the line in the header row — ties to the product branding (the "now" in Nowline)
 - When the current date falls outside the timeline range (before earliest or after latest content), the now-line is not rendered
+- When `timeline-position:bottom` or `timeline-position:both` is set, the line continues through the mirrored bottom tick panel so the "now" sweep ties the two date strips together. The line never extends into the footnote panel below — it stops at the bottom edge of the bottom tick panel (or, when no bottom panel is present, at the bottom of the last swimlane).
 
 ### Item Bars
 
 Each roadmap item renders as a horizontal bar. Width is determined by `duration`. Height equals the band's `bandwidth()` — bars are uniform-height within a row regardless of label count. Bar contents include title, status indicator, owner, label chiclets, and footnote indicators.
 
 - **Status indicator:** Hue-tinted dot in the bar's upper-right — green (done), blue (in-progress), amber (at-risk), red (blocked), slate (planned). Custom statuses use a neutral slate indicator. The exact tone is picked PER-BAR based on the bar bg's relative luminance: pale or saturated mid-tone bars (label-driven `bg:blue` etc.) get the deep `onLight` palette (≈ 800-900-level), and dark bars (default dark-theme status tints like `#172554`) get the pale `onDark` palette (≈ 100-level). The two palettes cross over at `L_bar ≈ 0.24` so the dot never fades into the bar even when a label propagates a same-hue saturated bg.
-- **Progress bar:** When `remaining` is set, the bar fills proportionally (e.g., `remaining:30%` → 70% filled). `status:done` fills the bar completely regardless of `remaining`. The strip sits at the bar's bottom.
+- **Progress bar:** When `remaining` is set, the bar fills proportionally (e.g., `remaining:30%` → 70% filled). `remaining:` accepts both percent and single-eng effort literal forms (`remaining:30%` and `remaining:0.6w` are equivalent on a `size:m` item with no capacity); both normalize to the same painted percent during layout. `status:done` fills the bar completely regardless of `remaining`. When the literal exceeds total effort, the painted bar clamps at 100% remaining and a soft warning is emitted (see `specs/dsl.md` rule 17). The strip sits at the bar's bottom.
 - **Link icon:** A 14×14 colored tile in the bar's UPPER-LEFT corner with a white outbound-arrow ↗ glyph. The glyph is the SAME for every link target — only the tile color changes by service:
     - `linear.app` → **Linear** (purple tile)
     - `github.com` → **GitHub** (slate tile)
@@ -193,25 +196,26 @@ Swimlanes render as sequential solid bands with alternating subtle background ti
 - Content flows **left-to-right** (sequential items along the timeline) and **top-to-bottom** when nesting or parallel flows require vertical stacking
 - **Frame label**: swimlane name renders in the top-left of the band, horizontally written, styled like a PlantUML frame tab but with a modern aesthetic — a small tab or badge that sits at the top-left edge of the band, not a full-width header
 - **Owner badge**: if the swimlane has `owner:`, the resolved owner title renders inline inside the frame tab, to the right of the swimlane name, in the tab's muted text color
-- **Capacity badge**: if the swimlane has `capacity:`, the value renders inline inside the frame tab, after the owner badge (or after the lane name if no owner), in the tab's muted text color. Format: `N[glyph]` where `N` is the capacity number (trailing zeros trimmed) and the glyph is determined by the resolved `capacity-icon` style property. Example with default `multiplier`: `Platform Team · Sam · 5×`. With `person`: `Platform Team · Sam · 5 [person]`. With `points`: `Platform Team · Sam · 5 ★`. See [Swimlane Capacity & Overload](#swimlane-capacity--overload) for the full contract.
+- **Capacity badge**: if the swimlane has `capacity:`, the value renders inline inside the frame tab, after the owner badge (or after the lane name if no owner), in the tab's muted text color. Format: `N[glyph]` where `N` is the capacity number (trailing zeros trimmed) and the glyph is determined by the resolved `capacity-icon` style property. Example with default `multiplier`: `Platform Team · Sam · 5×`. With `person`: `Platform Team · Sam · 5 [person]`. With `points`: `Platform Team · Sam · 5 ★`. See [Swimlane Capacity](#swimlane-capacity) for the full contract.
 - **Footnote superscript**: footnote indicators attached to a swimlane render inside the **upper-right corner of the frame tab** (right-aligned, inset from the tab's right edge), not at the upper-right of the full band. This keeps the indicator co-located with the swimlane's own label instead of floating next to unrelated item bars on the far right of the chart
 - **Nested swimlane indentation**: child swimlanes are inset by the parent swimlane's `padding`. No separate indent property — padding stacking naturally creates visual nesting hierarchy
 - The swimlane band spans the full timeline width (from first to last tick mark, plus padding)
 
 ### Anchors
 
-Anchors render as **diamonds** (Gantt milestone style). An anchor appears at its date position on the timeline, vertically aligned with the topmost item that references it. Items linked to an anchor via `after` or `before` show a Gantt-style predecessor line (arrow) connecting the item bar to the diamond. If multiple items reference the same anchor, they all draw predecessor lines to the single diamond.
+Anchors render as **diamonds** (Gantt milestone style). An anchor appears at its date position on the timeline, vertically aligned with the topmost item that references it. Items linked to an anchor via `after` or `before` show a Gantt-style predecessor arrow connecting the item bar to the anchor. The anchor's vertical cut line is the visible "stem" of the arrow: each `after:anchor` dependency draws a short horizontal stub from the cut line at the dependent item's row mid-Y to the item's left visual edge, and lands the arrowhead on that left edge. Multiple items referencing the same anchor each draw their own stub — the cut line itself does the through-chart work, no per-arrow vertical leg is needed. The cut line stops at the bottom of the last swimlane and does not invade the mirrored bottom tick panel when one is present — only the now-line and the major grid lines thread through that panel.
 
 ### Milestones
 
-Milestones render as a **diamond in the timeline header row** at the milestone's x-position, with a **prominent dashed vertical line** (ink-dark theme color, 2px stroke, 6/4 dash pattern, round caps) cutting down from the diamond's bottom tip through all swimlanes to the bottom of the chart.
+Milestones render as a **diamond in the timeline header row** at the milestone's x-position, with a **prominent dashed vertical line** (ink-dark theme color, 2px stroke, 6/4 dash pattern, round caps) cutting down from the diamond's bottom tip through all swimlanes to the bottom of the last swimlane. The cut line does not extend into the mirrored bottom tick panel when one is present — that panel is reserved for date labels, the now-line, and the major grid lines.
 
 - Line style: prominent dashed — distinct from grid lines (1px fine dots) and anchor lines (1px fine dashes). Drawn after swimlane fills so the dashed pattern stays visible across every swimlane band.
 - Line color: milestone's resolved `fg` color, or a system default (dark ink). Turns **red** for a **date-driven** milestone that is overrun by a predecessor (see below).
 - Milestone label renders adjacent to the diamond in the header (biased right; flips to the left of the diamond if right-side space is insufficient).
 - **Fixed (date-driven) milestone** (has `date:`) — positioned at that date. If any `after:` predecessor extends past the milestone line, the line, diamond, and label all render red; the overflowing predecessor bars also show their overflow in red. A red dotted arrow may be drawn from the overrunning predecessor's visual start back to the line to highlight the cause.
 - **Floating milestone** (no `date:`, only `after:`) — positioned at the **visual right** of the **rightmost predecessor**. By definition there is no overrun, so the line renders in the standard ink-dark prominent style (never red).
-  - **Slack arrows**: for each predecessor whose visual right is strictly earlier than the milestone line, draw a dotted ink arrow from that predecessor's visual right to the milestone line. The arrow attaches at the predecessor's **row midline** by default; when the predecessor's caption spills past the bar's right edge (the title/meta render *adjacent* to the bar instead of inside it) the attach point drops to the **vertical center of the bottom progress strip** (`box.bottom - PROGRESS_STRIP_HEIGHT_PX / 2`) so the arrow stays clear of the spilled text and visually aligns with the progress bar. The horizontal gap + dotted pattern reads as "waiting time / slack before the milestone." No arrow is drawn from the binding (latest) predecessor, since its visual end coincides with the line.
+  - **Slack arrows**: each non-binding predecessor draws one dotted ink arrow from its **visual right edge** to the milestone line. The arrow attaches at the predecessor's **row midline** by default; when the predecessor's caption spills past the bar's right edge (the title/meta render *adjacent* to the bar instead of inside it) the attach point drops to the **vertical center of the bottom progress strip** (`box.bottom - PROGRESS_STRIP_HEIGHT_PX / 2`) so the arrow stays clear of the spilled text and visually aligns with the progress bar. The horizontal gap + dotted pattern reads as "waiting time / slack before the milestone." No arrow is drawn from the binding (latest) predecessor, since its visual end coincides with the line.
+  - **Flow dedupe**: predecessors are grouped by their enclosing **flow** — the deepest single-track container they live in (a swimlane root, a sequential `group { ... }`, or one sub-track of a `parallel { ... }`). Within one flow, only the **latest** predecessor (rightmost x) draws a slack arrow; siblings to its left collapse silently because file order in a single-track container already encodes the chain (an arrow from each chained sibling would be redundant). Across flows (e.g. two predecessors that sit in different `parallel` sub-tracks), each flow's last entry contributes its own slack arrow.
 - If all `after:` predecessors have `status:done`, the milestone renders as complete.
 
 ### Dependency Arrows
@@ -222,22 +226,56 @@ All dependency arrows use orthogonal routing — horizontal and vertical segment
 - **Routing priority**: keep lines separated from each other; bias toward distinct paths rather than overlapping segments
 - **Overflow tolerance**: if routing around all items creates overly complex paths, lines may route below an item bar rather than taking a long detour. Prefer the simpler path.
 - **Separation**: when multiple arrows run parallel, offset them slightly so they remain visually distinct (no stacking on top of each other)
-- **Z-order**: arrows render above item bars and swimlane backgrounds, below the now-line
+- **Z-order**: normal arrows render above item bars and swimlane backgrounds, below the now-line. Under-bar arrows (see Channel Routing) render BEFORE bar fills so the bar stays the visual foreground.
 - Applies to: dependency arrows (`after`/`before`), anchor predecessor lines, milestone slack/predecessor connectors, and (when a parallel opts in via `bracket:solid`/`bracket:dashed`) the parallel's bracket strokes. There are **no implicit join arrows** from a parallel block's tracks into the next sequential item — the block's x-end and the following item's x-position encode that ordering on their own (see `Parallel`).
+
+#### Attach geometry
+
+Arrows attach to **visual** edges, never to logical column boundaries — the arrowhead lands on the painted bar edge so the inter-column gutter stays clean.
+
+- **Source** (where the arrow leaves a predecessor):
+    - **Item without overflow**: bar's **right edge** at the row midline (`(visualRight, midY)`).
+    - **Item with overflow text** (caption spills past the bar's right edge): bar's **right edge** at the **vertical center of the bottom progress strip** (`(visualRight, box.bottom - PROGRESS_STRIP_HEIGHT_PX / 2)`). Same X as the no-overflow case so the arrow still visually leaves the bar's side; Y drops to the strip so the arrow runs *underneath* the spilled title / meta rather than through it. Mirrors the milestone slack-arrow attach.
+    - **Anchor or milestone**: the marker's **vertical cut line** at the *target* item's row midline (`(marker.center.x, target.midY)`). The cut line acts as the visible stem; the arrow is the short horizontal stub from the line into the target's left visual edge.
+- **Target** (where the arrow terminates): the dependent item's **left visual edge** at its row midline (`(visualLeft, midY)`). The arrowhead never pierces the bar's interior.
+- Same-row immediate-successor chains (file-order chained items in one swimlane) skip drawing — the spatial flow already conveys ordering.
+
+#### Channel Routing
+
+The router drops the vertical leg in the cleanest **inter-column gutter** between source and target, treats item bars as **obstacles**, and falls back to **under-bar routing** (rendered behind the bars with a thinner stroke) when no clean detour exists. Containers (`group`, `parallel`) are NOT obstacles — endpoints inside a container route through the items-only obstacle map and use the under-bar fallback when needed. Looping arrows around container edges to dodge a single intersecting bar produced unsatisfying detours.
+
+- **Minimum stubs**: every left-to-right edge guarantees `MIN_SOURCE_STUB_PX` (6 px) of horizontal lead-out from the source AND `MIN_TARGET_STUB_PX` (6 px) of horizontal lead-in to the target's arrowhead. The router computes a **satisfiable range** `[from.x + MIN_SOURCE_STUB_PX, to.x - MIN_TARGET_STUB_PX]` and confines the elbow X to it. If the gutter is narrower than the combined stubs (range collapses or inverts), the router pins the elbow at `to.x - MIN_TARGET_STUB_PX` and forces `underBar` so the leg paints behind the bars while the visible arrowhead lead-in is preserved.
+- **Channel selection (left-to-right edge)**: start at the gutter midpoint clamped into the satisfiable range. If a bar overlaps the leg's Y span at that X, walk in 1 px steps inside the range; if the search exhausts the range, mark the edge `kind: 'underBar'` and use the clamped midpoint.
+- **Channel selection (right-to-left edge)**: try `from.x + STUB_OUT_PX` then `to.x - STUB_OUT_PX`. If both are blocked, fall back to under-bar at the source-side stub. Right-to-left edges don't apply the min-stub constraints — their geometry is fundamentally different and the stub-out probe already provides a reasonable lead-out.
+- **Bracket-clearance nudge**: visible parallel/group brackets (parallels with `bracket: solid|dashed`, bracket-style groups) are NOT obstacles, but the chosen elbow X is shifted at least `BRACKET_NUDGE_PX` (4 px) away from any bracket whose Y span overlaps the leg's Y span. The router models BOTH the vertical bracket bar AND the **inward foot tips** of `[ ]` parallel brackets — a 4 px-wide horizontal stroke at each `top/bottom` foot row — so a nudge from the vertical bar doesn't land squarely on the foot's far end. Nudge candidates are constrained to the satisfiable stub range; when neither side fits inside the range (or the candidate is itself within nudge distance of another bracket), the router signals `underBar`. Bracket strokes paint AFTER under-bar edges, so the bracket cleanly covers the colliding portion of the leg.
+- **Slot assignment**: edges sharing a channel (within 1 px) get distinct **slot indices** assigned by greedy interval coloring on their Y spans. Slots map to signed offsets around the channel centerline (0, +3, -3, +6, -6 px); past `±2` slots, additional edges collapse back to the centerline (rare; visual stacking accepted).
+- **Marker → item edges** bypass the router entirely. The cut line is the visible stem, so the path is always a 2-point horizontal stub from `(marker.center.x, target.midY)` to `(target.visualLeft, target.midY)`.
+- **Under-bar rendering**: edges with `kind: 'underBar'` paint BEFORE swimlane / item fills (so item bars cover the leg) and use a thinner stroke (0.8 px vs the standard 1.1 px) so the visual foreground stays with the bars; only the arrowhead and target-side stub stay crisply visible.
+- **Gutter width** stays fixed at `GUTTER_PX` (12 px). The router adapts to whatever width the rest of the layout produces — it does not push columns wider to manufacture room.
 
 ### Before Constraints
 
 When an item has `before:anchor-id` and its duration would push past the anchor date, the overflowing portion of the item bar renders in red.
 
-### Swimlane Capacity & Overload
+### Swimlane Capacity
 
-`capacity:` annotations on swimlanes and items render as visual badges and (when concurrent item capacity exceeds the lane's budget) as an overload underline. None of these affect parser diagnostics — overload is a pure rendering signal.
+`capacity:` annotations on swimlanes and items render as visual badges, and lanes with `capacity:` paint a tri-state utilization underline (green / yellow / red) per timestep based on concurrent item load. None of these affect parser diagnostics — the underline is a pure rendering signal.
+
+#### Item size chip
+
+The meta line shows a **single driver token** first: either the `duration:` literal (when present) or the size chip (when `size:` drives the bar). Both are never shown together — the bar's width already encodes calendar span for sized items.
+
+When `size:` drives, the chip text is the size declaration's `title` when one was provided, falling back to the id verbatim (case as typed): `size m "M" effort:1w` paints `M`, `size xs effort:0.5d` paints `xs`, `size med effort:1w` paints `med`. Authors who want the classic uppercased t-shirt look pin it via the title (`size m "M"`); the layout never folds case on its own. The chip uses the item's resolved meta color and the meta line font size; no separate background fill (it reads as inline text, not a tinted pill).
+
+When `size:` and `duration:` are both set, the explicit `duration:` literal wins for bar width **and** for the meta line: the chip is omitted — e.g. `2w` for an item with `size:lg duration:2w`. Items without `size:` render no chip (the driver is the duration literal only).
 
 #### Item capacity suffix
 
-Items with `capacity:N` render the value as a suffix on their duration label: `2w 2×` (default `multiplier` glyph), `2w 2 [person]` (with `capacity-icon:person`), `2w 2 ★` (with `capacity-icon:points`), `2w 2 ⏱` (with `capacity-icon:time`). The suffix appears only when the resolved capacity is `> 0`. Items without `capacity:` render no suffix.
+Items with `capacity:N` render the value as a suffix after the meta text: `m 2×` when `size:m capacity:2` drives (default `multiplier` glyph), `1w 2×` when `duration:1w capacity:2`, `m 2 [person]` (with `capacity-icon:person`), and similarly for `points` / `time`. The suffix appears only when the resolved capacity is `> 0`. Items without `capacity:` render no suffix.
 
-The suffix uses the item's resolved text color and matches the duration label's font size and weight.
+The suffix uses the item's resolved text color and matches the meta line's font size and weight.
+
+When driver and suffix are both present, the on-bar reading order is `[driver token] [capacity suffix]` — e.g. `m 2×` for a `size:m capacity:2` item (or `M 2×` if the size declares `title:"M"`). Optional `owner:` and `remaining` text compose between the driver and the suffix, e.g. `m Sam — 50% remaining 2×`.
 
 #### Lane capacity badge
 
@@ -263,26 +301,47 @@ Swimlanes with `capacity:N` render the value as `N[glyph]` inside the frame tab,
 | `points`     | `★` curated SVG star path             | `*`            | For story-points-based capacity.                       |
 | `time`       | `⏱` curated SVG stopwatch path        | `t`            | For time/hours-based capacity.                         |
 
-#### Lane overload underline
+#### Lane utilization underline
 
-When the **sum of concurrent item capacities at any timestep** within a swimlane exceeds the lane's `capacity:`, the lane renders an **overload underline** along the bottom edge of the band:
+Swimlanes with `capacity:` paint a **tri-state utilization underline** (green / yellow / red) along the bottom edge of the band. The underline is the visual surface for the lane's per-timestep load against capacity; it reads as a continuous health bar for the lane's lifetime, with color tracking utilization.
 
-- Compute the load function `f(x) = Σ items[i].capacity for items active at x` per timestep, walking from the lane's start to the lane's end.
-- Identify contiguous x-ranges where `f(x) > lane.capacity`. The result is zero or more discontiguous intervals.
-- For each interval, emit a red rectangle along the bottom edge of the swimlane band.
-  - Color: red (matches the existing overrun visual language used by `before:` overflow and date-driven overrun milestone lines).
-  - Height: 2px. Same visual weight as the milestone-line stroke for consistency.
-  - Y-position: flush with the bottom edge of the lane band, inside the band (not below).
-  - X-positions: align to the timestep boundaries, not item-bar edges. The underline can span less than a full item bar (when a parallel block partially overlaps with another item).
-- The underline is purely visual — no parser warning, no CLI diagnostic, no log output.
+**Load function and segmentation:**
 
-The underline is suppressed (not rendered) when:
+- Compute `f(x) = Σ items[i].capacity for items active at x` per timestep, walking from the lane's first item start to the lane's last item end. Items contribute their `capacity:` value (default `1` for sized items, `0` for duration-literal items with no explicit capacity — see `dsl.md` § Capacity → Default capacity).
+- Slice `f(x)` into half-open intervals `[t, t+δ)` at every event boundary (item start, item end). Within each interval the load is constant.
+- For each interval, compute the utilization fraction `u = f(x) / capacity` and classify against the lane's resolved thresholds (default `warn-at:80%`, `over-at:100%`):
+  - `u < warn-at` → **green** segment (healthy; includes the `u = 0` "idle" case, so the underline is continuous).
+  - `warn-at ≤ u < over-at` → **yellow** segment (approaching saturation).
+  - `u ≥ over-at` → **red** segment (over capacity).
+- Adjacent same-color segments coalesce into a single rectangle for fewer SVG nodes.
 
-- The lane has no `capacity:` value.
-- The lane (or its applicable `default swimlane`) declares `overcapacity:hide`.
-- No timestep in the lane is over capacity.
+**Geometry:**
 
-`overcapacity:hide` only suppresses this underline; it does not affect the lane's capacity badge in the frame tab nor any item-level capacity suffixes.
+- Height: 2px, matching the milestone-line stroke weight.
+- Y-position: flush with the bottom edge of the lane band, inside the band (not below).
+- X-positions: align to the timestep event boundaries (item start/end), not arbitrary day grid lines. Use `pixelsPerDay` arithmetic from the time scale.
+- The underline spans the full lane lifetime — from the first item's left edge to the last item's right edge — so adjacent green segments make the lane read as a continuous bar.
+
+**Theme tokens:**
+
+| Token                                  | Light default | Dark default | Notes                                         |
+| -------------------------------------- | ------------- | ------------ | --------------------------------------------- |
+| `theme.swimlane.utilizationOk`         | `#10b981`     | `#34d399`    | Green; healthy (load below `warn-at`).        |
+| `theme.swimlane.utilizationWarn`       | `#f59e0b`     | `#fbbf24`    | Yellow; warn band (load in `[warn, over)`).   |
+| `theme.swimlane.utilizationOver`       | `#ef4444`     | `#f87171`    | Red; over capacity (load `≥ over-at`).        |
+
+Authors can override these via the standard theme mechanism (out of scope here — see `themes.md` when it lands).
+
+**Threshold resolution order:** lane explicit > applicable `default swimlane` > built-in default (`warn-at:80%`, `over-at:100%`). The resolved values are independent — a lane can pin `warn-at:none` to skip the yellow band while leaving `over-at` at its default.
+
+**`none` and suppression:**
+
+- `utilization-warn-at:none` removes the yellow band; segments at or above `warn-at`'s effective coverage paint green until they reach `over-at`.
+- `utilization-over-at:none` removes the red band; segments at or above `over-at`'s effective coverage paint yellow (or green if `warn-at` is also `none`).
+- Setting both to `none` suppresses the underline entirely. Equivalent to opting out of the visual.
+- A lane without `capacity:` paints no underline regardless of threshold values (no denominator → undefined utilization). No diagnostic.
+
+The underline never affects parser diagnostics — it is purely a rendering signal — and it does not affect the lane's capacity badge in the frame tab nor any item-level capacity suffixes.
 
 ### Styles
 
@@ -306,6 +365,8 @@ Styles defined in `config` control the visual appearance of entities. Style prop
 | `corner-radius` | Corner rounding for the entity's bounding shape. Maps to SVG `rx`/`ry`. Values: `none`, `xs`, `sm`, `md`, `lg`, `xl`, `full`. `full` computes radius as half the rendered height. |
 | `bracket` | Bracket/join line on parallel blocks. `none` (default), `solid`, `dashed`. Parallel-only — ignored on other entities. |
 | `capacity-icon` | Glyph used as the suffix to capacity numbers on lanes and items. Built-in names (`none`, `multiplier` (default — `×`), `person`, `people`, `points` (`★`), `time` (`⏱`)) render from the renderer's curated SVG glyph library — consistent across all platforms. Custom names from `glyph` declarations and inline Unicode literals (`"💰"`) are font-dependent. ASCII fallback per the glyph definition. |
+| `timeline-position` | Where the timeline date strip is rendered. `top` (default), `bottom`, `both`. Roadmap-only. `both` mirrors the strip at the chart's bottom so the dates remain readable on tall canvases without scrolling back to the top. The mirrored strip shares fill, border, label color, and tick positions with the top strip; it has no now-pill and no marker row. The now-line and major grid lines thread through the mirrored strip so the timeline reads as a single sweep; milestone and anchor cut lines stop at the bottom of the last swimlane to keep the date labels uncluttered. |
+| `minor-grid` | When `true`, draws a faint dotted grid line at every tick boundary in addition to the major-tick lines. Roadmap-only. Uses `theme.timeline.minorGridLine` (a step lighter than `gridLine`) so the major lines still dominate. |
 
 Text style properties (`font`, `weight`, `italic`, `text-size`) apply to the entity's primary text (title). Secondary text within an entity (owner badge, status label) follows its own rendering rules.
 
@@ -366,7 +427,7 @@ Labels render as **chiclets** — small, pill-shaped badges (`corner-radius:full
 - **Multiple labels**: render left-to-right in declaration order, with a small horizontal gap between chiclets, **left-aligned** to the bar's caption inset.
 - **Natural width, never truncated**: every chiclet renders at its natural text-fit width. Chips never shrink, never clip, never get capped to fit inside the bar.
 - **Inside the bar — single row**: when the full chip row fits within the bar's effective inner width, every chip renders on a single horizontal row just above the bottom progress strip, left-aligned to the caption inset. The bar's height stays at `bandwidth()`.
-- **Meta clearance (in-bar chips with metadata)**: at the default bandwidth the natural chip Y (anchored to the bar's bottom, just above the progress strip) sits ABOVE the meta baseline (38 px from bar top), which would visually overlap the meta line. When the item carries metadata (`duration`, `owner`, `remaining`), the in-bar chip row drops to `meta-baseline + LABEL_CHIP_GAP_ABOVE_PROGRESS_STRIP_PX` and the bar grows downward by exactly the amount needed to keep the progress strip below the chip — the same arithmetic as the chip-spill grow rule. The result reads as `title → meta → chip → progress-strip` stacked vertically with no caption/chip overlap.
+- **Meta clearance (in-bar chips with metadata)**: at the default bandwidth the natural chip Y (anchored to the bar's bottom, just above the progress strip) sits ABOVE the meta baseline (38 px from bar top), which would visually overlap the meta line. When the item carries metadata (`size`, `duration`, `owner`, `remaining`, `capacity`), the in-bar chip row drops to `meta-baseline + LABEL_CHIP_GAP_ABOVE_PROGRESS_STRIP_PX` and the bar grows downward by exactly the amount needed to keep the progress strip below the chip — the same arithmetic as the chip-spill grow rule. The result reads as `title → meta → chip → progress-strip` stacked vertically with no caption/chip overlap.
 - **Outside the bar — bar-width-capped column**: when the chip row's total natural width exceeds the bar's effective inner width, the chips spill past the bar's right edge starting at `bar.right + ITEM_CAPTION_SPILL_GAP_PX`. Outside the bar the chips pack into one or more rows whose width is capped at the **bar's visual width** (multiple chips per row), with subsequent rows stacking DOWNWARD by `LABEL_CHIP_HEIGHT_PX + LABEL_CHIP_ROW_GAP_PX`. All rows in the spill column share the same left x; chips are left-aligned within each row.
 - **One-time row slack (25%)**: when packing a row outside the bar, if a chip would overflow the bar-width cap by **at most 25% of that chip's width**, the row stretches by exactly the overflow amount and the chip stays on the row (instead of wrapping to a fresh row). This rescues "one chip just barely overshoots" cases. The slack is **single-use per item** — once the slack has been consumed for one row, every subsequent row in the same item is packed strictly against the bar-width cap.
 - **Spilled chip-row Y**: when chips spill but the title + meta caption stays inside the bar, row 0 of the spilled column sits at the chip's original Y (just above the bottom progress strip). When BOTH the caption and the chip row spill, row 0 drops below the meta baseline so the spilled stack reads as `title → meta → chip-row-0 → chip-row-1 → …` at a single column to the right of the bar, never overlapping the meta line.
@@ -404,9 +465,15 @@ When a group has `style:`, `labels:`, or other visual properties, it renders as 
 
 When a group has no style or labels, it is purely structural — no visible border, background, no chiclet. Items render with the same row-pack flow as a styled group (so collisions still bump to new rows), but the box reserves no top/bottom pad and the renderer paints no border or background. The group is invisible in the rendered output but still governs sequencing and inner row growth.
 
+#### Group (bracket-style with title)
+
+A group with a `title` but **no fill** (no `style:` providing a colored bg, or `bg:none`) renders as a closed `[`-bracket that wraps both the title and the items. The bracket is a single path: top foot (4 px stub from `box.x` to `box.x + 4`) at `box.y - GROUP_BRACKET_LABEL_OVERHANG_PX`, vertical stroke down `box.x` to `box.y + box.height`, then bottom foot (4 px stub from `box.x` to `box.x + 4`) at the box bottom. The title text sits just above `box.y` (baseline at `box.y - 2`) inside the reserved overhang region — visually framed by the bracket on its left.
+The label glyph extent lives entirely ABOVE `box.y`, so the group reserves a fixed `GROUP_BRACKET_LABEL_OVERHANG_PX` of space above its content (mirroring the way a styled group's chiclet pad sits below `box.y`). Without that reservation, two bracket-titled groups stacked inside a parallel collide visually: the previous sibling's bracket-foot ends at its `box.bottom`, and the next sibling's label-top — and the next sibling's bracket top-foot — would render in the same gap. The group implements the reservation by shifting its own `box.y` down by the overhang amount and reporting `bracketLabelOverhang + box.height + interRowGap` as its cursor-height advance.
+Title-less bracket groups keep the historical asymmetric shape (vertical stroke + a single bottom foot, no top foot) since there is no label to enclose and no overhang is reserved.
+
 #### Parallel with Groups
 
-Each group inside a parallel block renders as its own horizontal sub-track. Styled groups show their bounding boxes (with the upper-left chiclet); unstyled groups just show their items in a row. The parallel bracket and join line (when `bracket` is set) encompass all sub-tracks. A styled group inside a parallel reports its full grown height (chiclet pad + every inner row + bottom pad) so the parallel stacks subsequent sub-tracks below the group's painted footprint, not just its first row.
+Each group inside a parallel block renders as its own horizontal sub-track. Styled groups show their bounding boxes (with the upper-left chiclet); unstyled groups just show their items in a row. The parallel bracket and join line (when `bracket` is set) encompass all sub-tracks. A styled group inside a parallel reports its full grown height (chiclet pad + every inner row + bottom pad) so the parallel stacks subsequent sub-tracks below the group's painted footprint, not just its first row. Bracket-titled groups additionally include their `GROUP_BRACKET_LABEL_OVERHANG_PX` reservation so the next sibling's label has clear vertical space above the previous bracket's bottom-foot.
 
 ### Footnotes
 
