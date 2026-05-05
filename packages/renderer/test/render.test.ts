@@ -328,3 +328,139 @@ describe('renderSvg — item size chip', () => {
         expect(itemMetaTextNode(svg, 'build')).toBe('1w');
     });
 });
+
+describe('renderSvg — lane utilization underline', () => {
+    // Light-theme palette anchors. Tests assert by hex so a token rename
+    // would surface as a deliberate, reviewable change.
+    const GREEN = '#10b981';
+    const YELLOW = '#f59e0b';
+    const RED = '#ef4444';
+
+    function laneUtilizationFragment(svg: string, laneId: string): string | null {
+        // Attribute order: `attrs()` sorts keys alphabetically, so
+        // `data-id` precedes `data-layer` in the emitted markup.
+        const m = svg.match(
+            new RegExp(
+                `<g data-id="${laneId}" data-layer="lane-utilization">[\\s\\S]*?<\\/g>`,
+            ),
+        );
+        return m ? m[0] : null;
+    }
+
+    it('paints a single green rect across a healthy single-item lane', async () => {
+        // Load = 1 item × capacity-default-1 = 1 against lane capacity:5,
+        // u = 0.2 → green for the whole span.
+        const dsl = `nowline v1\n\nconfig\nsize m effort:2w\n\nroadmap r1 "R" start:2026-01-05\n\nswimlane sprint "Sprint" capacity:5\n  item build "Build" size:m\n`;
+        const model = await parseToModel(dsl);
+        const svg = await renderSvg(model);
+        const fragment = laneUtilizationFragment(svg, 'sprint');
+        expect(fragment).not.toBeNull();
+        const rects = fragment!.match(/<rect [^/]*\/>/g) ?? [];
+        expect(rects).toHaveLength(1);
+        expect(rects[0]).toContain(`fill="${GREEN}"`);
+        expect(rects[0]).toContain('data-utilization="green"');
+        expect(rects[0]).toContain('height="2"');
+    });
+
+    it('paints yellow when load lands in `[warn-at, over-at)`', async () => {
+        // capacity:5 with one item carrying capacity:4 → u = 0.8 → yellow.
+        const dsl = `nowline v1\n\nroadmap r1 "R" start:2026-01-05\n\nswimlane sprint "Sprint" capacity:5\n  item build "Build" duration:2w capacity:4\n`;
+        const model = await parseToModel(dsl);
+        const svg = await renderSvg(model);
+        const fragment = laneUtilizationFragment(svg, 'sprint');
+        expect(fragment).not.toBeNull();
+        expect(fragment!).toContain(`fill="${YELLOW}"`);
+        expect(fragment!).toContain('data-utilization="yellow"');
+    });
+
+    it('paints red when load reaches or exceeds `over-at`', async () => {
+        // Two parallel items, each capacity:4 → load 8 against capacity:5
+        // → u = 1.6 → red.
+        const dsl = `nowline v1\n\nroadmap r1 "R" start:2026-01-05\n\nswimlane sprint "Sprint" capacity:5\n  parallel\n    item a "A" duration:2w capacity:4\n    item b "B" duration:2w capacity:4\n`;
+        const model = await parseToModel(dsl);
+        const svg = await renderSvg(model);
+        const fragment = laneUtilizationFragment(svg, 'sprint');
+        expect(fragment).not.toBeNull();
+        expect(fragment!).toContain(`fill="${RED}"`);
+        expect(fragment!).toContain('data-utilization="red"');
+    });
+
+    it('paints one rect per coalesced segment along the band bottom edge', async () => {
+        // Sequential items: green (1/5), then yellow when a parallel block
+        // bumps load to 4 (4/5 = 0.8), then green again when it ends.
+        const dsl = `nowline v1\n\nroadmap r1 "R" start:2026-01-05\n\nswimlane sprint "Sprint" capacity:5\n  item warmup "Warm" duration:1w capacity:1\n  parallel\n    item p1 "P1" duration:1w capacity:2\n    item p2 "P2" duration:1w capacity:2\n  item cooldown "Cool" duration:1w capacity:1\n`;
+        const model = await parseToModel(dsl);
+        const svg = await renderSvg(model);
+        const fragment = laneUtilizationFragment(svg, 'sprint');
+        expect(fragment).not.toBeNull();
+        const rects = fragment!.match(/<rect [^/]*\/>/g) ?? [];
+        // green → yellow → green: three coalesced segments.
+        expect(rects).toHaveLength(3);
+        expect(rects[0]).toContain('data-utilization="green"');
+        expect(rects[1]).toContain('data-utilization="yellow"');
+        expect(rects[2]).toContain('data-utilization="green"');
+        // All rects share the same y (band bottom edge).
+        const ys = rects.map((r) => r.match(/y="([^"]+)"/)![1]);
+        expect(new Set(ys).size).toBe(1);
+    });
+
+    it('omits the underline group when the lane has no capacity', async () => {
+        const dsl = `nowline v1\n\nroadmap r1 "R" start:2026-01-05\n\nswimlane sprint "Sprint"\n  item build "Build" duration:2w\n`;
+        const model = await parseToModel(dsl);
+        const svg = await renderSvg(model);
+        expect(svg).not.toContain('data-layer="lane-utilization"');
+    });
+
+    it('omits the underline when both thresholds are `none` (full opt-out)', async () => {
+        const dsl = `nowline v1\n\nroadmap r1 "R" start:2026-01-05\n\nswimlane sprint "Sprint" capacity:5 utilization-warn-at:none utilization-over-at:none\n  item build "Build" duration:2w capacity:8\n`;
+        const model = await parseToModel(dsl);
+        const svg = await renderSvg(model);
+        const fragment = laneUtilizationFragment(svg, 'sprint');
+        expect(fragment).toBeNull();
+    });
+
+    it('uses dark-theme tokens when the model theme is dark', async () => {
+        const dsl = `nowline v1\n\nroadmap r1 "R" start:2026-01-05\n\nswimlane sprint "Sprint" capacity:5\n  item build "Build" duration:2w capacity:4\n`;
+        const model = await parseToModel(dsl, { theme: 'dark' });
+        const svg = await renderSvg(model);
+        const fragment = laneUtilizationFragment(svg, 'sprint');
+        expect(fragment).not.toBeNull();
+        // Dark yellow token from themes/dark.ts.
+        expect(fragment!).toContain('fill="#fbbf24"');
+        // Light yellow must NOT appear in this fragment.
+        expect(fragment!).not.toContain(YELLOW);
+    });
+
+    it('respects custom `utilization-warn-at` / `utilization-over-at` thresholds', async () => {
+        // With warn:50% and over:90%, load 4/5 = 0.8 lands in the yellow
+        // band that the default (warn:80% / over:100%) would also call
+        // yellow — but here we move the thresholds so 0.8 sits clearly in
+        // the middle of [0.5, 0.9).
+        const dsl = `nowline v1\n\nroadmap r1 "R" start:2026-01-05\n\nswimlane sprint "Sprint" capacity:5 utilization-warn-at:50% utilization-over-at:90%\n  item build "Build" duration:2w capacity:4\n`;
+        const model = await parseToModel(dsl);
+        const svg = await renderSvg(model);
+        const fragment = laneUtilizationFragment(svg, 'sprint');
+        expect(fragment).not.toBeNull();
+        expect(fragment!).toContain('data-utilization="yellow"');
+    });
+
+    it('positions the underline rect at the lane band bottom edge', async () => {
+        // Sanity-check geometry: the rect's y + 2 should equal the lane
+        // box bottom. Locate the lane box via `data-id="sprint"
+        // data-layer="swimlane-bg"` (renderSwimlaneBg's rect).
+        const dsl = `nowline v1\n\nconfig\nsize m effort:2w\n\nroadmap r1 "R" start:2026-01-05\n\nswimlane sprint "Sprint" capacity:5\n  item build "Build" size:m\n`;
+        const model = await parseToModel(dsl);
+        const svg = await renderSvg(model);
+        const bg = svg.match(/<g data-id="sprint" data-layer="swimlane-bg">[\s\S]*?<\/g>/)?.[0];
+        expect(bg).toBeDefined();
+        const bgRect = bg!.match(/<rect ([^/]*)\/>/)![1];
+        const bgY = parseFloat(bgRect.match(/y="([^"]+)"/)![1]);
+        const bgH = parseFloat(bgRect.match(/height="([^"]+)"/)![1]);
+        const fragment = laneUtilizationFragment(svg, 'sprint');
+        expect(fragment).not.toBeNull();
+        const utilRect = fragment!.match(/<rect ([^/]*)\/>/)![1];
+        const utilY = parseFloat(utilRect.match(/y="([^"]+)"/)![1]);
+        // 2px tall, flush with band bottom.
+        expect(utilY + 2).toBeCloseTo(bgY + bgH, 5);
+    });
+});

@@ -1271,6 +1271,57 @@ function renderTrackChild(c: PositionedTrackChild, options: RenderOptions, idPre
 // chart-body grid lines so those lines visibly span the full chart width.
 // The frame tab (chiclet at top-left) and item content are emitted later,
 // in renderSwimlaneContent, so they appear on top of the grid.
+// Tri-state lane utilization underline. Painted along the bottom edge of
+// the band when the lane has `capacity:` AND at least one item contributing
+// load AND has not opted out of every color band via `utilization-*-at:none`.
+// Geometry per specs/rendering.md § Lane utilization underline:
+//   - height: 2px (matches the milestone-line stroke weight)
+//   - y: flush with the bottom edge of the band, fully inside it
+//   - x: aligned to the segment boundaries the layout already pre-coalesced
+// One <rect> per coalesced segment; classification → palette token mapping
+// is the only renderer-side decision.
+const LANE_UTILIZATION_HEIGHT_PX = 2;
+
+function utilizationColor(
+    classification: 'green' | 'yellow' | 'red',
+    palette: Theme,
+): string {
+    switch (classification) {
+        case 'green':
+            return palette.swimlane.utilizationOk;
+        case 'yellow':
+            return palette.swimlane.utilizationWarn;
+        case 'red':
+            return palette.swimlane.utilizationOver;
+    }
+}
+
+function renderLaneUtilization(s: PositionedSwimlane, palette: Theme): string {
+    if (!s.utilization || s.utilization.segments.length === 0) return '';
+    const y = s.box.y + s.box.height - LANE_UTILIZATION_HEIGHT_PX;
+    const rects = s.utilization.segments.map((seg) => {
+        const width = seg.endX - seg.startX;
+        if (width <= 0) return '';
+        return tag('rect', {
+            x: num(seg.startX),
+            y: num(y),
+            width: num(width),
+            height: LANE_UTILIZATION_HEIGHT_PX,
+            fill: utilizationColor(seg.classification, palette),
+            'data-utilization': seg.classification,
+            'data-load': num(seg.load),
+        });
+    });
+    return tag(
+        'g',
+        {
+            'data-layer': 'lane-utilization',
+            'data-id': s.id ?? null,
+        },
+        rects.join(''),
+    );
+}
+
 function renderSwimlaneBg(s: PositionedSwimlane, palette: Theme): string {
     const tint = s.bandIndex % 2 === 0 ? palette.swimlane.rowTintEven : palette.swimlane.rowTintOdd;
     const borderColor = palette.swimlane.border;
@@ -1408,6 +1459,11 @@ function renderSwimlane(s: PositionedSwimlane, options: RenderOptions, idPrefix:
     for (const c of s.children) {
         parts.push(renderTrackChild(c, options, idPrefix, palette));
     }
+    // m13: tri-state utilization underline along the band's bottom edge.
+    // Painted after items so it overlays any item that happens to extend
+    // to the band's bottom; under cut-lines / now-line which run as
+    // separate top-level passes.
+    parts.push(renderLaneUtilization(s, palette));
     return tag('g', { 'data-layer': 'swimlane', 'data-id': s.id ?? null }, parts.join(''));
 }
 

@@ -118,6 +118,9 @@ export const darkTheme: Theme = {
         footnoteIndicator: '#f87171',
         rowTintEven: '#0f172a',
         rowTintOdd: '#1e293b',
+        utilizationOk: '#34d399',
+        utilizationWarn: '#fbbf24',
+        utilizationOver: '#f87171',
     },
     timeline: {
         gridLine: '#475569',

@@ -74,6 +74,13 @@ export interface Theme {
         footnoteIndicator: string;
         rowTintEven: string;  // alternating row tint (even rows)
         rowTintOdd: string;   // alternating row tint (odd rows)
+        // m13: tri-state lane utilization underline. Each token paints one
+        // classification band along the bottom edge of the lane band when
+        // the lane has `capacity:` and at least one item contributing load.
+        // See specs/rendering.md § Lane utilization underline.
+        utilizationOk: string;     // green; load below `warn-at` (incl. zero)
+        utilizationWarn: string;   // yellow; load in `[warn-at, over-at)`
+        utilizationOver: string;   // red; load >= `over-at`
     };
     timeline: {
         gridLine: string;

@@ -44,6 +44,10 @@ import {
     resolveCapacityIcon,
     estimateCapacitySuffixWidth,
 } from '../capacity.js';
+import {
+    computeLaneUtilization,
+    resolveLaneUtilizationThresholds,
+} from '../lane-utilization.js';
 import type { PositionedCapacity } from '../types.js';
 
 /**
@@ -388,6 +392,26 @@ export class SwimlaneNode {
             ownerDisplay = team?.title ?? person?.title ?? ownerRaw;
         }
 
+        // Lane utilization underline (m12). Computed *after* children are
+        // positioned so the contributors carry their final box.x / box.width.
+        // Returns null when the lane has no `capacity:`, no contributing
+        // items, or has opted out of every color band — the renderer reads
+        // null as "paint nothing".
+        const utilization = capacity
+            ? (() => {
+                  const { warn, over } = resolveLaneUtilizationThresholds(
+                      lane,
+                      ctx.styleCtx.defaults,
+                  );
+                  return computeLaneUtilization({
+                      children,
+                      capacityValue: capacity.value,
+                      warnFraction: warn,
+                      overFraction: over,
+                  });
+              })()
+            : null;
+
         return {
             positioned: {
                 id: lane.name,
@@ -400,6 +424,7 @@ export class SwimlaneNode {
                 owner: ownerDisplay,
                 footnoteIndicators,
                 capacity,
+                utilization,
             },
             usedHeight: bandHeight,
             usedRightX,

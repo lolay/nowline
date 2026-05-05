@@ -196,6 +196,23 @@ swimlane mobile capacity:2 overcapacity:hide
         expect(r.parserErrors).toEqual([]);
     });
 
+    it('parses utilization-warn-at: and utilization-over-at: in percent, decimal, integer, and `none` forms on swimlane and default swimlane', async () => {
+        const r = await parse(`config
+default swimlane utilization-warn-at:80% utilization-over-at:100%
+roadmap r
+swimlane percent capacity:5 utilization-warn-at:75% utilization-over-at:120%
+  item a duration:1w capacity:2
+swimlane decimal capacity:5 utilization-warn-at:0.5 utilization-over-at:1.25
+  item b duration:1w capacity:2
+swimlane integer capacity:5 utilization-warn-at:80 utilization-over-at:100
+  item c duration:1w capacity:2
+swimlane opt-out capacity:5 utilization-warn-at:none utilization-over-at:none
+  item d duration:1w capacity:2
+`, { validate: false });
+        expect(r.lexerErrors).toEqual([]);
+        expect(r.parserErrors).toEqual([]);
+    });
+
     it('parses capacity-icon: identifier and string forms in style + default', async () => {
         const r = await parse(`config
 style finance

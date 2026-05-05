@@ -120,6 +120,9 @@ export const lightTheme: Theme = {
         footnoteIndicator: '#dc2626',
         rowTintEven: '#ffffff',
         rowTintOdd: '#f8fafc',
+        utilizationOk: '#10b981',
+        utilizationWarn: '#f59e0b',
+        utilizationOver: '#ef4444',
     },
     timeline: {
         gridLine: '#cbd5e1',

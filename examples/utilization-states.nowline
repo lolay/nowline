@@ -1,0 +1,58 @@
+nowline v1
+
+// Fixture exercising the tri-state lane utilization underline (m13).
+// Each lane has `capacity:` declared so the underline paints; the
+// segments along the band's bottom edge map to the lane's per-timestep
+// load against capacity:
+//
+//   green  — load < `utilization-warn-at` (default 80%)
+//   yellow — load in `[warn-at, over-at)`  (default warn 80%, over 100%)
+//   red    — load >= `utilization-over-at` (default 100%)
+//
+// Items use `duration:` literals (not `size:`) so each bar — and
+// therefore each underline segment — is the full lane width and the
+// color band is easy to read at a glance. See specs/rendering.md
+// § Lane utilization underline for the full model.
+
+roadmap r "Lane utilization states" start:2026-01-05 length:8w
+
+// Lane 1 — healthy. Single item at 2/5 = 40% load. Green for the
+// whole span (the underline reads as one continuous green rectangle).
+swimlane healthy "Healthy (40%)" capacity:5
+  item a "Build" duration:6w capacity:2
+
+// Lane 2 — warn. Single item at 4/5 = 80% load lands exactly on the
+// `warn-at` threshold. One yellow rectangle.
+swimlane stressed "At warn threshold (80%)" capacity:5
+  item b "Build" duration:6w capacity:4
+
+// Lane 3 — over. Two parallel items push load to 6/5 = 120%, painting
+// red for the whole span.
+swimlane overloaded "Over capacity (120%)" capacity:5
+  parallel
+    item c1 "Stream A" duration:6w capacity:4
+    item c2 "Stream B" duration:6w capacity:2
+
+// Lane 4 — segment coalescing demo. The underline transitions across
+// time as load changes:
+//   warmup alone  : 1/5 = 20% → green
+//   parallel block: 5/5 = 100% → red
+//   cooldown alone: 1/5 = 20% → green
+swimlane mixed "Coalesced segments (green-red-green)" capacity:5
+  item warmup "Warm" duration:1w capacity:1
+  parallel
+    item p1 "Burst A" duration:4w capacity:3
+    item p2 "Burst B" duration:4w capacity:2
+  item cooldown "Cool" duration:1w capacity:1
+
+// Lane 5 — custom thresholds. Tighter warn band (50%) and slack on
+// over (120%). Same 4-capacity item now reads yellow (80%) without
+// tipping red until load passes 120%.
+swimlane custom "Custom thresholds (warn:50% over:120%)" capacity:5 utilization-warn-at:50% utilization-over-at:120%
+  item d "Build" duration:6w capacity:4
+
+// Lane 6 — full opt-out. Lane has capacity but no underline paints.
+// Useful when the lane's capacity is a budget signal but the author
+// doesn't want the per-timestep visual.
+swimlane silent "Opt-out (warn:none over:none)" capacity:5 utilization-warn-at:none utilization-over-at:none
+  item e "Build" duration:6w capacity:8

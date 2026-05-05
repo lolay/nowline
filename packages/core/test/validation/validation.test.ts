@@ -671,29 +671,89 @@ swimlane s
         expect(hasError(errorMessages(r.diagnostics), /capacity.*not valid on group/i)).toBe(true);
     });
 
-    it('Rule 17d: overcapacity:show|hide on swimlane is accepted', async () => {
+    it('Rule 17d (removal): overcapacity:show|hide is rejected with a migration hint', async () => {
+        const r = await parse(
+            `roadmap r\nswimlane s capacity:5 overcapacity:hide\n  item x duration:1w\n`,
+        );
+        expect(hasError(errorMessages(r.diagnostics), /overcapacity.*was removed.*utilization-over-at:none/i)).toBe(true);
+    });
+
+    it('Rule 17d (removal): overcapacity:show is also rejected (no value carve-out)', async () => {
         const r = await parse(
             `roadmap r\nswimlane s capacity:5 overcapacity:show\n  item x duration:1w\n`,
         );
+        expect(hasError(errorMessages(r.diagnostics), /overcapacity.*was removed/i)).toBe(true);
+    });
+
+    it('Rule 17d: utilization-warn-at percent and decimal-fraction values are accepted on swimlane and default swimlane', async () => {
+        const r = await parse(
+            `config\ndefault swimlane utilization-warn-at:80% utilization-over-at:100%\nroadmap r\nswimlane s capacity:5 utilization-warn-at:75% utilization-over-at:120%\n  item x duration:1w\n`,
+        );
         expect(errorMessages(r.diagnostics)).toEqual([]);
         const r2 = await parse(
-            `roadmap r\nswimlane s capacity:5 overcapacity:hide\n  item x duration:1w\n`,
+            `roadmap r\nswimlane s capacity:5 utilization-warn-at:0.5 utilization-over-at:1.25\n  item x duration:1w\n`,
         );
         expect(errorMessages(r2.diagnostics)).toEqual([]);
     });
 
-    it('Rule 17d: overcapacity bad value is an error', async () => {
+    it('Rule 17d: utilization-*-at:none opts out of that color band', async () => {
         const r = await parse(
-            `roadmap r\nswimlane s overcapacity:maybe\n  item x duration:1w\n`,
+            `roadmap r\nswimlane s capacity:5 utilization-warn-at:none utilization-over-at:none\n  item x duration:1w\n`,
         );
-        expect(hasError(errorMessages(r.diagnostics), /overcapacity.*show.*hide/i)).toBe(true);
+        expect(errorMessages(r.diagnostics)).toEqual([]);
     });
 
-    it('Rule 17d: overcapacity on item is an error', async () => {
+    it('Rule 17d: bare integers are rejected with a disambiguation hint', async () => {
         const r = await parse(
-            `roadmap r\nswimlane s\n  item x duration:1w overcapacity:hide\n`,
+            `roadmap r\nswimlane s capacity:5 utilization-warn-at:80\n  item x duration:1w\n`,
         );
-        expect(hasError(errorMessages(r.diagnostics), /overcapacity.*only valid on.*swimlane/i)).toBe(true);
+        expect(hasError(errorMessages(r.diagnostics), /utilization-warn-at.*"80".*Use the percent form.*"80%".*decimal-fraction.*"0\.80"/i)).toBe(true);
+    });
+
+    it('Rule 17d: malformed values are rejected', async () => {
+        const r = await parse(
+            `roadmap r\nswimlane s capacity:5 utilization-over-at:maybe\n  item x duration:1w\n`,
+        );
+        expect(hasError(errorMessages(r.diagnostics), /utilization-over-at.*positive percent.*decimal fraction.*none/i)).toBe(true);
+    });
+
+    it('Rule 17d: utilization-warn-at on an item is an error', async () => {
+        const r = await parse(
+            `roadmap r\nswimlane s\n  item x duration:1w utilization-warn-at:50%\n`,
+        );
+        expect(hasError(errorMessages(r.diagnostics), /utilization-warn-at.*only valid on.*swimlane/i)).toBe(true);
+    });
+
+    it('Rule 17d (ordering): warn > over is an error', async () => {
+        const r = await parse(
+            `roadmap r\nswimlane s capacity:5 utilization-warn-at:120% utilization-over-at:100%\n  item x duration:1w\n`,
+        );
+        expect(hasError(errorMessages(r.diagnostics), /utilization-warn-at.*120%.*must be ≤.*utilization-over-at.*100%/i)).toBe(true);
+    });
+
+    it('Rule 17d (ordering): warn == over is allowed (binary indicator)', async () => {
+        const r = await parse(
+            `roadmap r\nswimlane s capacity:5 utilization-warn-at:100% utilization-over-at:100%\n  item x duration:1w\n`,
+        );
+        expect(errorMessages(r.diagnostics)).toEqual([]);
+    });
+
+    it('Rule 17d (ordering): `none` on either side skips the comparison', async () => {
+        const r = await parse(
+            `roadmap r\nswimlane s capacity:5 utilization-warn-at:none utilization-over-at:50%\n  item x duration:1w\n`,
+        );
+        expect(errorMessages(r.diagnostics)).toEqual([]);
+        const r2 = await parse(
+            `roadmap r\nswimlane s capacity:5 utilization-warn-at:200% utilization-over-at:none\n  item x duration:1w\n`,
+        );
+        expect(errorMessages(r2.diagnostics)).toEqual([]);
+    });
+
+    it('Rule 17d (ordering): default swimlane is also checked', async () => {
+        const r = await parse(
+            `config\ndefault swimlane utilization-warn-at:120% utilization-over-at:100%\nroadmap r\nswimlane s capacity:5\n  item x duration:1w\n`,
+        );
+        expect(hasError(errorMessages(r.diagnostics), /utilization-warn-at.*must be ≤.*utilization-over-at/i)).toBe(true);
     });
 
     it('default swimlane capacity is banned (rule: lane budgets must be explicit)', async () => {
