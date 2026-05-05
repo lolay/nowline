@@ -90,10 +90,11 @@ export function resolveDuration(
     if (DURATION_RE.test(value)) return literalToDays(value, cal);
     const decl = sizes.get(value);
     if (!decl) return 0;
-    // m2 transitional shape: read effort from the size declaration as the item's
-    // calendar duration. m5 will introduce capacity-aware derivation
-    // (`duration = effort / capacity`); until then, sized items behave as if
-    // capacity = 1, which matches every example file's pre-migration semantics.
+    // Sized items resolve to the size declaration's `effort:` literal as if
+    // capacity = 1. m5 will introduce capacity-aware derivation
+    // (`duration = effort / capacity`) at the call site; this helper stays
+    // capacity-agnostic so it can also serve as a generic effort-literal
+    // lookup.
     const effortProp = decl.properties.find((p) => stripColon(p.key) === 'effort');
     if (!effortProp?.value) return 0;
     return literalToDays(effortProp.value, cal);

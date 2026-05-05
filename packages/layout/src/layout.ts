@@ -143,10 +143,12 @@ function parseProgressFraction(raw: string | undefined): number {
     return Math.max(0, Math.min(100, parseInt(m[1], 10))) / 100;
 }
 
-// Resolve a `size:NAME` value to its size declaration's effort literal. Used
+// Resolve a `size:NAME` value to its size declaration's effort literal, used
 // by displays that want the literal duration string (not days). Returns the
 // original string for raw literals (`1w`, `3d`) and undefined for missing
-// values. m5 will adjust callers to apply capacity-aware derivation.
+// values. m5 will adjust callers to apply capacity-aware derivation when the
+// caller wants the calendar duration; this helper continues to expose the
+// raw effort/duration literal for chips, captions, and tooltips.
 function resolveDurationLiteral(
     raw: string | undefined,
     ctx: { sizes: Map<string, import('@nowline/core').SizeDeclaration> },
@@ -218,11 +220,11 @@ function sequenceItem(
 ): PositionedItem {
     const props = node.properties;
     const style = resolveStyle('item', props, ctx.styleCtx);
-    // m2 transitional: items still drive their length from `duration:` or
-    // `size:`. Until m5, both are treated as a calendar literal — `size:NAME`
-    // resolves to its size declaration's `effort:` literal as if capacity = 1.
-    // m5 will switch sized items to `duration = effort / capacity` and reserve
-    // `duration:` for explicit overrides.
+    // Until m5 introduces capacity-aware derivation, both `duration:` (a
+    // calendar literal) and `size:NAME` (an effort alias resolved via the
+    // sizes map) feed `resolveDuration` and produce the same result for
+    // capacity = 1. m5 will divide the size's effort by `capacity:` and let
+    // `duration:` remain an explicit literal override.
     const durationDays = resolveDuration(
         propValue(props, 'duration') ?? propValue(props, 'size'),
         ctx.sizes,
@@ -369,11 +371,11 @@ function sequenceItem(
         style.fg = STATUS_BORDER[status];
     }
 
-    // Pre-format the secondary line shown inside the item bar. Until m5
-    // introduces capacity-aware derivation, both `duration:NAME`/`size:NAME`
-    // resolve to the declared size's `effort:` literal — so the bar shows
-    // ("2w") not the alias ("lg"). m5 will switch sized items to use
-    // `effort ÷ capacity` here instead.
+    // Pre-format the secondary line shown inside the item bar. `duration:` is
+    // a literal; `size:NAME` resolves to the declared size's `effort:` literal
+    // — both shown as the same string ("2w"), not the alias ("lg"). m5 will
+    // adjust this for sized items so the displayed duration reflects
+    // `effort ÷ capacity` instead of the raw effort literal.
     const durationRaw = propValue(props, 'duration') ?? propValue(props, 'size');
     const durationLiteral = resolveDurationLiteral(durationRaw, ctx);
     const remainingRaw = propValue(props, 'remaining');

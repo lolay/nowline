@@ -471,6 +471,52 @@ swimlane s
         expect(errorMessages(r.diagnostics)).toEqual([]);
     });
 
+    it('Size decl: decimal effort is accepted (0.5d)', async () => {
+        const r = await parse(
+            `roadmap r\nsize tiny effort:0.5d\nswimlane s\n  item a size:tiny\n`,
+        );
+        expect(errorMessages(r.diagnostics)).toEqual([]);
+    });
+
+    // --- Item duration: literal-only ---
+
+    it('Item duration: identifier (alias-style) is an error — use size:NAME', async () => {
+        const r = await parse(
+            `roadmap r\nsize md effort:1w\nswimlane s\n  item a duration:md\n`,
+        );
+        expect(hasError(errorMessages(r.diagnostics), /Invalid duration "md".*size:NAME/i)).toBe(true);
+    });
+
+    it('Item duration: decimal literal is accepted (0.5d)', async () => {
+        const r = await parse(
+            `roadmap r\nswimlane s\n  item a duration:0.5d\n`,
+        );
+        expect(errorMessages(r.diagnostics)).toEqual([]);
+    });
+
+    // --- Item remaining: percent OR literal ---
+
+    it('Item remaining: duration literal is accepted (1w)', async () => {
+        const r = await parse(
+            `roadmap r\nswimlane s\n  item a duration:2w remaining:1w\n`,
+        );
+        expect(errorMessages(r.diagnostics)).toEqual([]);
+    });
+
+    it('Item remaining: decimal literal is accepted (0.5d)', async () => {
+        const r = await parse(
+            `roadmap r\nswimlane s\n  item a duration:1w remaining:0.5d\n`,
+        );
+        expect(errorMessages(r.diagnostics)).toEqual([]);
+    });
+
+    it('Item remaining: literal larger than duration is accepted at parse-time (overflow handled at layout)', async () => {
+        const r = await parse(
+            `roadmap r\nswimlane s\n  item a duration:1w remaining:4w\n`,
+        );
+        expect(errorMessages(r.diagnostics)).toEqual([]);
+    });
+
     // --- Raw-style ban: confirm every roadmap entity type is covered ---
 
     it('Rule 20: raw style property on anchor is an error', async () => {
