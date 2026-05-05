@@ -76,6 +76,48 @@ export const ITEM_LINK_ICON_TILE_SIZE_PX = 14;
 /** Distance (px) from the bar's right/bottom edges to the tile's edge. */
 export const ITEM_LINK_ICON_INSET_PX = 6;
 
+// ---- Narrow-bar decoration spill --------------------------------
+
+/**
+ * Horizontal gap (px) between consecutive decorations (status dot,
+ * link icon, footnote, title) when they spill into the column to
+ * the right of a bar that's too narrow to host them inside.
+ */
+export const ITEM_DECORATION_SPILL_GAP_PX = 4;
+
+/**
+ * Minimum bar width (px) needed to host the status dot inside the
+ * bar with its full inset. Below this, the dot would have to
+ * extend past the bar's left edge, so the dot spills into the
+ * caption column to the right of the bar instead.
+ */
+export const MIN_BAR_WIDTH_FOR_DOT_PX =
+    ITEM_STATUS_DOT_INSET_RIGHT_PX + ITEM_STATUS_DOT_RADIUS_PX;
+
+/**
+ * Minimum bar width (px) needed to host the link-icon tile AND the
+ * status dot inside the bar with at least
+ * `ITEM_DECORATION_SPILL_GAP_PX` of breathing room between them.
+ * Below this, the link icon would visually collide with (or push
+ * into) the dot's column, so the icon spills out and renders ahead
+ * of the (also-spilled) title.
+ */
+export const MIN_BAR_WIDTH_FOR_LINK_AND_DOT_PX =
+    ITEM_LINK_ICON_INSET_PX +
+    ITEM_LINK_ICON_TILE_SIZE_PX +
+    ITEM_DECORATION_SPILL_GAP_PX +
+    ITEM_STATUS_DOT_INSET_RIGHT_PX +
+    ITEM_STATUS_DOT_RADIUS_PX;
+
+/**
+ * Minimum bar width (px) needed to host the footnote indicator at
+ * its inset-right position without overshooting the bar's left
+ * edge or colliding with a leading link icon. Approximate width
+ * for one digit is 8px (font-size 10, bold).
+ */
+export const MIN_BAR_WIDTH_FOR_FOOTNOTE_PX =
+    ITEM_FOOTNOTE_INDICATOR_INSET_RIGHT_PX + 1;
+
 // ---- Label chips (along the bar's bottom) ------------------------
 
 /** Height (px) of a label chip rectangle. */

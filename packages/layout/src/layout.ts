@@ -80,12 +80,18 @@ import {
     ITEM_CAPTION_META_BASELINE_OFFSET_PX,
     ITEM_CAPTION_SPILL_GAP_PX,
     ITEM_CAPTION_TITLE_FONT_SIZE_PX,
+    ITEM_DECORATION_SPILL_GAP_PX,
+    ITEM_FOOTNOTE_INDICATOR_STEP_PX,
     ITEM_LINK_ICON_INSET_PX,
     ITEM_LINK_ICON_TILE_SIZE_PX,
+    ITEM_STATUS_DOT_RADIUS_PX,
     LABEL_CHIP_HEIGHT_PX,
     LABEL_CHIP_GAP_ABOVE_PROGRESS_STRIP_PX,
     LABEL_CHIP_GAP_BETWEEN_PX,
     LABEL_CHIP_ROW_STEP_PX,
+    MIN_BAR_WIDTH_FOR_DOT_PX,
+    MIN_BAR_WIDTH_FOR_FOOTNOTE_PX,
+    MIN_BAR_WIDTH_FOR_LINK_AND_DOT_PX,
     packSpillChips,
 } from './item-bar-geometry.js';
 import { ItemNode } from './nodes/item-node.js';
@@ -391,8 +397,27 @@ function sequenceItem(
         { time: ctx.scale, bands: ctx.bandScale, style },
     );
     const itemBox = placed.box;
-    const textSpills = placed.textSpills;
     const bandwidth = ctx.bandScale.bandwidth();
+
+    // Narrow-bar decoration spill — when a bar is too narrow to host
+    // the dot, link icon, or footnote with its full inset, those
+    // glyphs render in the same spill column as the (already-
+    // spilling) caption text, in reading order
+    // `[bar][dot][icon][title][footnote#…][meta]`. Each decoration's
+    // threshold is independent (a 20-px-wide bar can host the dot
+    // but not the icon, etc.); see the `MIN_BAR_WIDTH_FOR_*`
+    // constants in `item-bar-geometry`.
+    //
+    // Forcing `textSpills` when `iconSpills` keeps the icon and
+    // title visually adjacent — otherwise a spilled icon would
+    // float at `bar.right + 6` while the title stayed inside the
+    // bar, breaking the icon→title affordance.
+    const dotSpills = itemBox.width < MIN_BAR_WIDTH_FOR_DOT_PX;
+    const iconSpills =
+        hasLinkIcon && itemBox.width < MIN_BAR_WIDTH_FOR_LINK_AND_DOT_PX;
+    const footnoteSpillsForNarrow =
+        itemBox.width < MIN_BAR_WIDTH_FOR_FOOTNOTE_PX;
+    const textSpills = placed.textSpills || iconSpills;
 
     // Label chips lay out left → right at natural text width.
     //
@@ -501,6 +526,77 @@ function sequenceItem(
     const owner = ownerDisplay ?? ownerOverride ?? propValue(props, 'owner');
     const description = node.description?.text;
 
+    // Footnote glyphs only need to spill when there's at least one
+    // indicator AND the bar is too narrow to host them at the inset-
+    // right anchor. Compute the final boolean here once we know the
+    // indicator count.
+    const footnoteSpills =
+        footnoteIndicators.length > 0 && footnoteSpillsForNarrow;
+
+    // Spill-column x positions for the decorations. The cluster
+    // mirrors the in-bar reading order so users see the same visual
+    // hierarchy whether everything fits inside or trails off to the
+    // right:
+    //
+    //   In-bar (default):  [icon] [title]    [¹²]   [dot]
+    //   Spilled (narrow):  [bar] [icon?] [title][¹²?] [dot?]
+    //
+    // The dot lives at the trailing edge in BOTH cases — pushing it
+    // to the LEFT of the title (with the title trailing it) read as
+    // the dot belonging to the next item, not this one. A missing
+    // decoration just collapses out of the row; e.g. an item with
+    // no link AND a too-narrow bar gives `[bar] [title] [dot]`.
+    //
+    // `decorationsRightX` is the furthest right edge any spilled
+    // glyph reaches; the row-packer uses it (alongside spilled-chip
+    // width) to reserve x-extent so the next chained item bumps to
+    // a fresh row instead of landing under the spilled cluster.
+    const SPILL_COLUMN_X0 = itemBox.x + itemBox.width + ITEM_CAPTION_SPILL_GAP_PX;
+    let spillCursor = SPILL_COLUMN_X0;
+    // Advance the cursor by `gap` IFF something has already been
+    // placed in the column — keeps the cluster from leaving a
+    // dangling gap past its final glyph (which would over-reserve
+    // x-extent and shift downstream items).
+    let needGap = false;
+    let iconSpillX: number | null = null;
+    if (iconSpills) {
+        if (needGap) spillCursor += ITEM_DECORATION_SPILL_GAP_PX;
+        iconSpillX = spillCursor;
+        spillCursor = iconSpillX + ITEM_LINK_ICON_TILE_SIZE_PX;
+        needGap = true;
+    }
+    let captionSpillWidth = 0;
+    if (textSpills) {
+        if (needGap) spillCursor += ITEM_DECORATION_SPILL_GAP_PX;
+        const titleW = estimateTextWidth(
+            titleStr,
+            ITEM_CAPTION_TITLE_FONT_SIZE_PX,
+        );
+        const metaW = metaText ? estimateTextWidth(metaText, 11) : 0;
+        captionSpillWidth = Math.max(titleW, metaW);
+        spillCursor += captionSpillWidth;
+        needGap = true;
+    }
+    let footnoteSpillStartX: number | null = null;
+    if (footnoteSpills) {
+        if (needGap) spillCursor += ITEM_DECORATION_SPILL_GAP_PX;
+        footnoteSpillStartX = spillCursor;
+        spillCursor +=
+            footnoteIndicators.length * ITEM_FOOTNOTE_INDICATOR_STEP_PX;
+        needGap = true;
+    }
+    let dotSpillCx: number | null = null;
+    if (dotSpills) {
+        if (needGap) spillCursor += ITEM_DECORATION_SPILL_GAP_PX;
+        dotSpillCx = spillCursor + ITEM_STATUS_DOT_RADIUS_PX;
+        spillCursor = dotSpillCx + ITEM_STATUS_DOT_RADIUS_PX;
+        needGap = true;
+    }
+    const decorationsRightX = Math.max(
+        itemBox.x + itemBox.width,
+        spillCursor,
+    );
+
     const id = node.name;
     if (id) {
         // Entity edges live in LOGICAL space so chained items / `after:`
@@ -556,6 +652,13 @@ function sequenceItem(
         description,
         metaText,
         textSpills,
+        dotSpills,
+        iconSpills,
+        footnoteSpills,
+        dotSpillCx,
+        iconSpillX,
+        footnoteSpillStartX,
+        decorationsRightX,
         style,
     };
     return result;

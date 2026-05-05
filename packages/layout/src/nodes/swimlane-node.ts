@@ -234,24 +234,24 @@ export class SwimlaneNode {
             timeCursorX = Math.max(timeCursorX, itemLogicalEnd);
 
             let spillReservation: number | null = null;
-            if (positioned.textSpills || positioned.chipsOutside) {
-                const titleWidth = positioned.textSpills
-                    ? deps.estimateTextWidth(positioned.title, 13)
-                    : 0;
-                const metaWidth = positioned.textSpills && positioned.metaText
-                    ? deps.estimateTextWidth(positioned.metaText, 11)
-                    : 0;
-                const visualRight = positioned.box.x + positioned.box.width;
-                // Chips already encode their absolute right via
-                // `chipsRightX`; subtract `visualRight + spillGap` to
-                // get the chip-row's contribution past the bar edge.
-                const chipsContribution = positioned.chipsOutside
-                    ? Math.max(0, positioned.chipsRightX - (visualRight + 6))
-                    : 0;
-                const captionContribution = Math.max(titleWidth, metaWidth);
-                spillReservation =
-                    visualRight + 6 +
-                    Math.max(captionContribution, chipsContribution) + 6;
+            const hasAnySpill =
+                positioned.textSpills ||
+                positioned.chipsOutside ||
+                positioned.dotSpills ||
+                positioned.iconSpills ||
+                positioned.footnoteSpills;
+            if (hasAnySpill) {
+                // `decorationsRightX` already aggregates the spilled
+                // dot / icon / footnote / caption right edges from
+                // `sequenceItem`; the chip column tracks separately
+                // via `chipsRightX`. Add a 6-px buffer so the next
+                // chained item's bar leaves a visible gutter past
+                // the spilled cluster instead of butting against it.
+                const farRight = Math.max(
+                    positioned.decorationsRightX,
+                    positioned.chipsOutside ? positioned.chipsRightX : 0,
+                );
+                spillReservation = farRight + 6;
             }
 
             packer.commitItem({

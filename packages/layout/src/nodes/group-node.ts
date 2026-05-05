@@ -183,21 +183,18 @@ export class GroupNode {
             timeCursorX = Math.max(timeCursorX, itemLogicalEnd);
 
             let spillReservation: number | null = null;
-            if (positioned.textSpills || positioned.chipsOutside) {
-                const titleWidth = positioned.textSpills
-                    ? deps.estimateTextWidth(positioned.title, 13)
-                    : 0;
-                const metaWidth = positioned.textSpills && positioned.metaText
-                    ? deps.estimateTextWidth(positioned.metaText, 11)
-                    : 0;
-                const visualRight = positioned.box.x + positioned.box.width;
-                const chipsContribution = positioned.chipsOutside
-                    ? Math.max(0, positioned.chipsRightX - (visualRight + 6))
-                    : 0;
-                const captionContribution = Math.max(titleWidth, metaWidth);
-                spillReservation =
-                    visualRight + 6 +
-                    Math.max(captionContribution, chipsContribution) + 6;
+            const hasAnySpill =
+                positioned.textSpills ||
+                positioned.chipsOutside ||
+                positioned.dotSpills ||
+                positioned.iconSpills ||
+                positioned.footnoteSpills;
+            if (hasAnySpill) {
+                const farRight = Math.max(
+                    positioned.decorationsRightX,
+                    positioned.chipsOutside ? positioned.chipsRightX : 0,
+                );
+                spillReservation = farRight + 6;
             }
 
             packer.commitItem({
