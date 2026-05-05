@@ -16,11 +16,18 @@ import type { LayoutContext, TrackCursor } from '../layout-context.js';
 import type { PositionedItem, PositionedTrackChild } from '../types.js';
 import type { ItemDeclaration, GroupBlock, ParallelBlock, EntityProperty } from '@nowline/core';
 import { SwimlaneNode } from './swimlane-node.js';
+import { includeChromeGeometry } from '../include-chrome-geometry.js';
 
 const TAB_RESERVE = 18;
 const REGION_INSET_TOP = 14;
 const REGION_INSET_BOTTOM = 14;
 const GAP_BETWEEN_REGIONS = 16;
+
+// Visual breathing room added past the rightmost element when sizing
+// the include's bounding box. Keeps the dashed bracket from butting up
+// against an item's right edge while still trimming the wide
+// chart-width whitespace left over from full-width sizing.
+const INCLUDE_CONTENT_RIGHT_PAD_PX = 32;
 
 export interface IncludeNodeDeps {
     sequenceItem: (
@@ -91,14 +98,16 @@ export function buildIncludeRegions(
         const nestedSwimlanes: PositionedSwimlane[] = [];
         let cursorY = innerStartY;
         let bandIndex = 0;
+        let nestedContentRightX = childCtx.timeline.originX;
         for (const lane of region.content.swimlanes.values()) {
-            const { positioned, usedHeight } = new SwimlaneNode(
+            const { positioned, usedHeight, usedRightX } = new SwimlaneNode(
                 { lane, bandIndex },
                 deps,
             ).place({ x: childCtx.timeline.originX, y: cursorY }, childCtx);
             nestedSwimlanes.push(positioned);
             cursorY += usedHeight;
             bandIndex++;
+            if (usedRightX > nestedContentRightX) nestedContentRightX = usedRightX;
         }
         const innerEndY = cursorY;
         // Floor the region height to one row's bandwidth so an empty or
@@ -108,12 +117,27 @@ export function buildIncludeRegions(
             ctx.bandScale.bandwidth(),
             innerEndY - y + REGION_INSET_BOTTOM,
         );
+        // Shrink-wrap the include's bounding box to fit chrome + content
+        // (with a small right pad) instead of stretching to the full
+        // chart width. An include that reaches past the timeline still
+        // gets clamped to the chart's natural right edge so it never
+        // extends into the attribution / right-margin area.
+        const boxX = 0;
+        const { chromeRightX } = includeChromeGeometry(boxX, label, region.sourcePath);
+        const naturalRightX = Math.max(chromeRightX, nestedContentRightX) + INCLUDE_CONTENT_RIGHT_PAD_PX;
+        const boxWidth = Math.min(ctx.chartRightX - boxX, naturalRightX - boxX);
         const box: BoundingBox = {
-            x: 0,
+            x: boxX,
             y,
-            width: ctx.chartRightX,
+            width: boxWidth,
             height: regionHeight,
         };
+        // Mirror the shrunk width onto each nested swimlane band so the
+        // tinted background fits inside the dashed bracket instead of
+        // bleeding past it on the right.
+        for (const lane of nestedSwimlanes) {
+            lane.box.width = boxWidth;
+        }
         out.push({
             sourcePath: region.sourcePath,
             label,

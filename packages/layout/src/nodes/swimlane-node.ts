@@ -135,17 +135,49 @@ const TAB_GUTTER_PX = 8;
  * Right edge (canvas px) of the lane title tab. Delegates to the
  * shared `frameTabGeometry` helper that the renderer also uses, so
  * the chiclet's collision footprint and its painted footprint stay
- * exactly in sync. Capacity badge width is added when the lane
- * declares `capacity:` so the first-item collision math reserves
+ * exactly in sync. Capacity badge and footnote-indicator widths are
+ * added when present so the first-item collision math reserves
  * enough horizontal space for the (now-wider) chiclet.
  */
-function computeLaneTabRightX(lane: SwimlaneDeclaration, capacityBadgeWidthPx: number): number {
+function computeLaneTabRightX(
+    lane: SwimlaneDeclaration,
+    capacityBadgeWidthPx: number,
+    footnoteIndicatorWidthPx: number,
+): number {
     const title = lane.title ?? lane.name ?? '';
     if (!title) return 0;
     const ownerRaw = propValue(lane.properties, 'owner');
     // Box is laid out at `box.x = 0` for top-level lanes; the helper
     // adds the standard `FRAME_TAB_OFFSET_FROM_BOX_PX` itself.
-    return frameTabGeometry(0, title, ownerRaw ?? undefined, capacityBadgeWidthPx).rightX;
+    return frameTabGeometry(
+        0,
+        title,
+        ownerRaw ?? undefined,
+        capacityBadgeWidthPx,
+        footnoteIndicatorWidthPx,
+    ).rightX;
+}
+
+/**
+ * Footnote indicators (1-based numbers) that name this lane via `on:`,
+ * sorted ascending. Empty when the lane has no name or no matching
+ * footnote hosts. Computed up-front so the chiclet width reservation
+ * and the painted footnote text use the same numbers.
+ */
+function collectFootnoteIndicators(
+    lane: SwimlaneDeclaration,
+    ctx: LayoutContext,
+): number[] {
+    if (!lane.name) return [];
+    const out: number[] = [];
+    for (const [fid, host] of ctx.footnoteHosts.entries()) {
+        if (host.includes(lane.name)) {
+            const n = ctx.footnoteIndex.get(fid);
+            if (n !== undefined) out.push(n);
+        }
+    }
+    out.sort((a, b) => a - b);
+    return out;
 }
 
 /**
@@ -195,8 +227,24 @@ export class SwimlaneNode {
             style,
             ctx.glyphs,
         );
+        // Footnote indicators (the small "1, 2" red text in the upper
+        // right of the chiclet) need to be reserved in the chiclet's
+        // width too, otherwise they paint on top of the owner / badge
+        // for shrink-wrapped chiclets. Computed up front from the
+        // pre-resolved footnote index/host map.
+        const footnoteIndicators = collectFootnoteIndicators(lane, ctx);
+        const footnoteIndicatorWidthPx = footnoteIndicators.length > 0
+            ? deps.estimateTextWidth(
+                  footnoteIndicators.join(','),
+                  LANE_CAPACITY_BADGE_FONT_SIZE_PX,
+              )
+            : 0;
         // Title-tab geometry (mirrors the renderer; see renderSwimlane).
-        const tabRightX = computeLaneTabRightX(lane, badgeWidthPx);
+        const tabRightX = computeLaneTabRightX(
+            lane,
+            badgeWidthPx,
+            footnoteIndicatorWidthPx,
+        );
         // First-row Y: when the first child's desired x is past the title
         // tab, top-align with the tab and reclaim ~28 px per lane.
         // Otherwise drop below the tab.
@@ -322,7 +370,12 @@ export class SwimlaneNode {
         // band height covers everything the user sees.
         const tabOffset = startY - origin.y;
         const bandHeight = Math.max(step + 32, tabOffset + packer.usedHeight() + 16);
-        const usedRightX = packer.usedRightX();
+        // Include the chiclet's right edge in the lane's reported
+        // right-extent so empty lanes still report a non-zero right edge
+        // — `buildIncludeRegions` uses this to size the include's dashed
+        // bracket around its content, and a lane with only a chiclet
+        // (no items) should still fit visibly inside that bracket.
+        const usedRightX = Math.max(packer.usedRightX(), tabRightX);
         const box: BoundingBox = {
             x: 0,
             y: origin.y,
@@ -337,18 +390,6 @@ export class SwimlaneNode {
             const team = ctx.teams.get(ownerRaw);
             const person = ctx.persons.get(ownerRaw);
             ownerDisplay = team?.title ?? person?.title ?? ownerRaw;
-        }
-
-        // Footnote indicators that name this swimlane via `on:`.
-        const footnoteIndicators: number[] = [];
-        if (lane.name) {
-            for (const [fid, host] of ctx.footnoteHosts.entries()) {
-                if (host.includes(lane.name)) {
-                    const n = ctx.footnoteIndex.get(fid);
-                    if (n !== undefined) footnoteIndicators.push(n);
-                }
-            }
-            footnoteIndicators.sort((a, b) => a - b);
         }
 
         return {

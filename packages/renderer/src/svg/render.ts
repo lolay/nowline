@@ -77,6 +77,7 @@ import {
     FOOTNOTE_HEADER_BASELINE_OFFSET_PX,
     frameTabGeometry,
     estimateCapacitySuffixWidth,
+    includeChromeGeometry,
 } from '@nowline/layout';
 import { IdGenerator } from './ids.js';
 import { attrs, escAttr, escText, num, tag, textTag } from './xml.js';
@@ -1070,11 +1071,11 @@ function renderSwimlane(s: PositionedSwimlane, options: RenderOptions, idPrefix:
     // helper that the layout's row-packer also calls, so the chiclet's
     // visible footprint matches the collision box layout reserved for it.
     if (s.title) {
-        // Lane capacity badge sits inside the frame tab after the owner
-        // (or after the title if no owner). Compute its width up-front so
-        // `frameTabGeometry` can size the chiclet to fit it, then read
-        // the placement positions back out — no second placement pass in
-        // the renderer.
+        // Lane capacity badge + footnote indicator sit inside the frame
+        // tab after the owner (or after the title if no owner). Compute
+        // both widths up-front so `frameTabGeometry` can size the chiclet
+        // to fit them, then read the placement positions back out — no
+        // second placement pass in the renderer.
         const LANE_BADGE_FONT_SIZE_PX = 10;
         const capacityBadgeBareWidthPx = s.capacity
             ? estimateCapacitySuffixWidth(
@@ -1083,7 +1084,20 @@ function renderSwimlane(s: PositionedSwimlane, options: RenderOptions, idPrefix:
                   LANE_BADGE_FONT_SIZE_PX,
               )
             : 0;
-        const tab = frameTabGeometry(s.box.x, s.title, s.owner, capacityBadgeBareWidthPx);
+        // Footnote indicator is a comma-joined number list painted at
+        // 10 pt 700-weight; estimate via the shared caption helper.
+        const footnoteIndicatorText =
+            s.footnoteIndicators.length > 0 ? s.footnoteIndicators.join(',') : '';
+        const footnoteIndicatorWidthPx = footnoteIndicatorText
+            ? estimateCaptionWidthPx(footnoteIndicatorText, LANE_BADGE_FONT_SIZE_PX)
+            : 0;
+        const tab = frameTabGeometry(
+            s.box.x,
+            s.title,
+            s.owner,
+            capacityBadgeBareWidthPx,
+            footnoteIndicatorWidthPx,
+        );
         const tabH = FRAME_TAB_HEIGHT_PX;
         const tabY = s.box.y + 10;
         const labelY = tabY + FRAME_TAB_LABEL_BASELINE_OFFSET_PX;
@@ -1144,19 +1158,19 @@ function renderSwimlane(s: PositionedSwimlane, options: RenderOptions, idPrefix:
                 ),
             );
         }
-        if (s.footnoteIndicators.length > 0) {
+        if (footnoteIndicatorText) {
             parts.push(
                 textTag(
                     {
-                        x: num(tab.rightX - 8),
+                        x: num(tab.footnoteRightX),
                         y: num(tabY + 14),
                         'font-family': FONT_STACK.sans,
-                        'font-size': 10,
+                        'font-size': LANE_BADGE_FONT_SIZE_PX,
                         'font-weight': 700,
                         fill: footnoteColor,
                         'text-anchor': 'end',
                     },
-                    s.footnoteIndicators.join(','),
+                    footnoteIndicatorText,
                 ),
             );
         }
@@ -1434,15 +1448,17 @@ function renderIncludeRegion(
         'stroke-dasharray': ACCENT_DASH_PATTERN,
     });
 
-    const tabPaddingX = 10;
+    // Chrome geometry — single source of truth shared with the layout
+    // (`buildIncludeRegions` calls the same helper to size the dashed
+    // bracket so the chrome always fits inside it). All placement Xs
+    // come from the helper directly so the renderer stays declarative.
     const tabHeight = FRAME_TAB_HEIGHT_PX;
-    const tabWidth = Math.max(60, r.label.length * 6.5 + tabPaddingX * 2);
-    const tabX = rx + 16;
+    const chrome = includeChromeGeometry(r.box.x, r.label, r.sourcePath);
     const tabY = ry - tabHeight / 2;
     const tab = tag('rect', {
-        x: num(tabX),
+        x: num(chrome.tabX),
         y: num(tabY),
-        width: num(tabWidth),
+        width: num(chrome.tabWidth),
         height: tabHeight,
         rx: 4,
         ry: 4,
@@ -1452,7 +1468,7 @@ function renderIncludeRegion(
     });
     const tabLabel = textTag(
         {
-            x: num(tabX + tabPaddingX),
+            x: num(chrome.tabLabelX),
             y: num(tabY + FRAME_TAB_LABEL_BASELINE_OFFSET_PX),
             'font-family': FONT_STACK.sans,
             'font-size': 11,
@@ -1462,13 +1478,13 @@ function renderIncludeRegion(
         r.label,
     );
 
-    // Include badge to the right of the tab. The glyph here is the
+    // Content badge to the right of the tab. The glyph here is the
     // stacked-sheets icon, distinct from the item-level link-icon
     // outbound-arrow: an `include` is a content pull (one document
     // brings in another), conceptually different from a `link:` that
     // navigates somewhere.
-    const badgeSize = 18;
-    const badgeX = tabX + tabWidth + 6;
+    const badgeX = chrome.badgeX;
+    const badgeSize = chrome.badgeSize;
     const badgeY = ry - badgeSize / 2;
     const badge = tag('rect', {
         x: num(badgeX),
@@ -1499,20 +1515,17 @@ function renderIncludeRegion(
     // Fill is `includeRegion.fill` — same cream/tint as the region, near
     // the canvas surface above, so the halo disappears into both.
     const sourceFontSize = 9;
-    const sourceCharWidth = 5.5; // approx px/char for 9pt mono
-    const sourceTextX = badgeX + badgeSize + 6;
     const sourceTextY = ry + 4;
-    const sourceHaloPad = 3;
     const sourceHalo = tag('rect', {
-        x: num(sourceTextX - sourceHaloPad),
+        x: num(chrome.sourceHaloX),
         y: num(sourceTextY - sourceFontSize),
-        width: num(r.sourcePath.length * sourceCharWidth + sourceHaloPad * 2),
-        height: sourceFontSize + sourceHaloPad * 2,
+        width: num(chrome.sourceHaloWidth),
+        height: sourceFontSize + 6,
         fill,
     });
     const sourceText = textTag(
         {
-            x: num(sourceTextX),
+            x: num(chrome.sourceTextX),
             y: num(sourceTextY),
             'font-family': FONT_STACK.mono,
             'font-size': sourceFontSize,
