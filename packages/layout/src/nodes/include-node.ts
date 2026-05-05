@@ -17,6 +17,7 @@ import type { PositionedItem, PositionedTrackChild } from '../types.js';
 import type { ItemDeclaration, GroupBlock, ParallelBlock, EntityProperty } from '@nowline/core';
 import { SwimlaneNode } from './swimlane-node.js';
 import { includeChromeGeometry } from '../include-chrome-geometry.js';
+import { resolveSizes } from '../calendar.js';
 
 const TAB_RESERVE = 18;
 const REGION_INSET_TOP = 14;
@@ -74,7 +75,10 @@ export function buildIncludeRegions(
                 defaults: region.config.defaults,
                 labels: region.content.labels,
             },
-            sizes: region.content.sizes,
+            // Each include region declares its own sizes; resolve them under
+            // the parent's calendar so child sized items render at the same
+            // pixels-per-day scale as the host roadmap.
+            sizes: resolveSizes(region.content.sizes, ctx.cal),
             labels: region.content.labels,
             teams: region.content.teams,
             persons: region.content.persons,

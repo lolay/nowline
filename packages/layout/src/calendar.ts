@@ -1,9 +1,12 @@
-// Calendar and duration resolution. A DSL `duration:` is either a raw literal
-// (`1d`, `2w`, `3m`, `1q`, `1y`) or a named-duration id that resolves to a
-// raw literal through `duration <id> length:<literal>`. The calendar block
-// controls how literal units translate into absolute days.
+// Calendar and duration resolution. An item's `duration:` is a raw literal
+// (`1d`, `2w`, `3m`, `1q`, `1y`); `size:NAME` references a `size NAME
+// effort:<literal>` declaration whose effort literal is calendar-resolved
+// once into a `ResolvedSize`. The calendar block controls how literal units
+// translate into absolute days.
 
-import type { CalendarBlock, SizeDeclaration, NowlineFile } from '@nowline/core';
+import type { CalendarBlock, NowlineFile, SizeDeclaration } from '@nowline/core';
+
+import type { ResolvedSize } from './types.js';
 
 export type CalendarMode = 'business' | 'full' | 'custom';
 
@@ -81,23 +84,44 @@ export function literalToDays(literal: string, cal: CalendarConfig): number {
     }
 }
 
+/**
+ * Convert a `duration:` literal or a `size:NAME` reference into a calendar-
+ * resolved day count. Returns 0 for missing or unresolvable values; callers
+ * substitute their own minimum width when the result is zero. Stays
+ * capacity-agnostic so the same helper serves both literal-and-effort
+ * lookups; the m5 capacity-aware derivation lives at the call site so
+ * `duration:` literal overrides are honored.
+ */
 export function resolveDuration(
     value: string | undefined,
-    sizes: Map<string, SizeDeclaration>,
+    sizes: Map<string, ResolvedSize>,
     cal: CalendarConfig,
 ): number {
     if (!value) return 0;
     if (DURATION_RE.test(value)) return literalToDays(value, cal);
-    const decl = sizes.get(value);
-    if (!decl) return 0;
-    // Sized items resolve to the size declaration's `effort:` literal as if
-    // capacity = 1. m5 will introduce capacity-aware derivation
-    // (`duration = effort / capacity`) at the call site; this helper stays
-    // capacity-agnostic so it can also serve as a generic effort-literal
-    // lookup.
-    const effortProp = decl.properties.find((p) => stripColon(p.key) === 'effort');
-    if (!effortProp?.value) return 0;
-    return literalToDays(effortProp.value, cal);
+    return sizes.get(value)?.effortDays ?? 0;
+}
+
+/**
+ * Build the layout's `Map<string, ResolvedSize>` once the calendar is
+ * known. Skips sizes whose `effort:` literal is missing or unparseable —
+ * the validator already errors on those, so layout silently drops them
+ * rather than emitting NaN-laden positions.
+ */
+export function resolveSizes(
+    decls: Map<string, SizeDeclaration>,
+    cal: CalendarConfig,
+): Map<string, ResolvedSize> {
+    const out = new Map<string, ResolvedSize>();
+    for (const [name, decl] of decls) {
+        const effortProp = decl.properties.find((p) => stripColon(p.key) === 'effort');
+        const effortLiteral = effortProp?.value;
+        if (!effortLiteral) continue;
+        const effortDays = literalToDays(effortLiteral, cal);
+        if (effortDays <= 0) continue;
+        out.set(name, { name, effortDays, effortLiteral });
+    }
+    return out;
 }
 
 function stripColon(key: string): string {

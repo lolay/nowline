@@ -151,16 +151,11 @@ function parseProgressFraction(raw: string | undefined): number {
 // raw effort/duration literal for chips, captions, and tooltips.
 function resolveDurationLiteral(
     raw: string | undefined,
-    ctx: { sizes: Map<string, import('@nowline/core').SizeDeclaration> },
+    ctx: { sizes: Map<string, import('./types.js').ResolvedSize> },
 ): string | undefined {
     if (!raw) return undefined;
     if (/^\d+(?:\.\d+)?[dwmqy]$/.test(raw) || /^\d+%$/.test(raw)) return raw;
-    const size = ctx.sizes.get(raw);
-    if (!size) return raw;
-    const effortProp = size.properties.find((p) =>
-        (p.key.endsWith(':') ? p.key.slice(0, -1) : p.key) === 'effort',
-    );
-    return effortProp?.value ?? raw;
+    return ctx.sizes.get(raw)?.effortLiteral ?? raw;
 }
 
 // Resolve a person/team id to its declared title when present (id otherwise).
@@ -225,8 +220,10 @@ function sequenceItem(
     // sizes map) feed `resolveDuration` and produce the same result for
     // capacity = 1. m5 will divide the size's effort by `capacity:` and let
     // `duration:` remain an explicit literal override.
+    const sizeRef = propValue(props, 'size');
+    const sizeResolved = sizeRef ? ctx.sizes.get(sizeRef) ?? null : null;
     const durationDays = resolveDuration(
-        propValue(props, 'duration') ?? propValue(props, 'size'),
+        propValue(props, 'duration') ?? sizeRef,
         ctx.sizes,
         ctx.cal,
     );
@@ -733,6 +730,7 @@ function sequenceItem(
         footnoteSpillStartX,
         decorationsRightX,
         capacity,
+        size: sizeResolved,
         style,
     };
     return result;
@@ -1053,7 +1051,7 @@ function computeDateWindow(
     file: NowlineFile,
     ctx: {
         cal: import('./calendar.js').CalendarConfig;
-        sizes: Map<string, import('@nowline/core').SizeDeclaration>;
+        sizes: Map<string, import('./types.js').ResolvedSize>;
     },
     resolved: ResolveResult,
     today: Date | undefined,
@@ -1124,7 +1122,7 @@ function computeContentEndDay(
     resolved: ResolveResult,
     ctx: {
         cal: import('./calendar.js').CalendarConfig;
-        sizes: Map<string, import('@nowline/core').SizeDeclaration>;
+        sizes: Map<string, import('./types.js').ResolvedSize>;
     },
     startDate: Date,
     today: Date | undefined,

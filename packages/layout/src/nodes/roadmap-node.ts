@@ -36,7 +36,7 @@ import type { ViewPreset } from '../view-preset.js';
 import type { CalendarConfig } from '../calendar.js';
 import { themes, type Theme, type ThemeName } from '../themes/index.js';
 import { resolveStyle, type StyleContext } from '../style-resolution.js';
-import { resolveCalendar, daysBetween } from '../calendar.js';
+import { resolveCalendar, daysBetween, resolveSizes } from '../calendar.js';
 import { resolveScale, buildHeaderTicks } from '../view-preset.js';
 import { TimeScale } from '../time-scale.js';
 import { fromCalendarConfig } from '../working-calendar.js';
@@ -106,7 +106,7 @@ export interface SizedHeader {
 export interface RoadmapNodeDeps extends LayoutHelpers {
     computeDateWindow: (
         file: NowlineFile,
-        ctx: { cal: CalendarConfig; sizes: Map<string, import('@nowline/core').SizeDeclaration> },
+        ctx: { cal: CalendarConfig; sizes: Map<string, import('../types.js').ResolvedSize> },
         resolved: ResolveResult,
         today: Date | undefined,
         scale: ViewPreset,
@@ -133,6 +133,11 @@ export class RoadmapNode {
 
         const cal = resolveCalendar(file, resolved.config.calendar);
         const scale = resolveScale(file, resolved.config.scale);
+        // Build the resolved-size map once per layout. Sized items look up
+        // through this map (instead of the raw `SizeDeclaration`s the
+        // include-resolver collected) so item sequencing doesn't pay the
+        // literal-to-days conversion every time.
+        const sizes = resolveSizes(resolved.content.sizes, cal);
 
         const styleCtx: StyleContext = {
             theme,
@@ -147,7 +152,7 @@ export class RoadmapNode {
         // now-line) instead of defaulting to a 180-day desert.
         const { startDate, endDate } = deps.computeDateWindow(
             file,
-            { cal, sizes: resolved.content.sizes },
+            { cal, sizes },
             resolved,
             options.today,
             scale,
@@ -336,7 +341,7 @@ export class RoadmapNode {
         const ctx: LayoutContext = {
             cal,
             styleCtx,
-            sizes: resolved.content.sizes,
+            sizes,
             labels: resolved.content.labels,
             teams: resolved.content.teams,
             persons: resolved.content.persons,
