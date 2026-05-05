@@ -46,7 +46,14 @@ import {
     resolveLabelChipStyle,
     type StyleContext,
 } from './style-resolution.js';
-import { resolveCalendar, resolveDuration, addDays, daysBetween } from './calendar.js';
+import {
+    resolveCalendar,
+    resolveDuration,
+    deriveItemDurationDays,
+    deriveTotalEffortDays,
+    addDays,
+    daysBetween,
+} from './calendar.js';
 import { resolveScale, buildHeaderTicks, type ViewPreset } from './view-preset.js';
 import { TimeScale } from './time-scale.js';
 import { fromCalendarConfig, daysPerUnit, type WorkingCalendar } from './working-calendar.js';
@@ -215,18 +222,20 @@ function sequenceItem(
 ): PositionedItem {
     const props = node.properties;
     const style = resolveStyle('item', props, ctx.styleCtx);
-    // Until m5 introduces capacity-aware derivation, both `duration:` (a
-    // calendar literal) and `size:NAME` (an effort alias resolved via the
-    // sizes map) feed `resolveDuration` and produce the same result for
-    // capacity = 1. m5 will divide the size's effort by `capacity:` and let
-    // `duration:` remain an explicit literal override.
+    // Sizing precedence (specs/dsl.md § "Sizing precedence"):
+    //   1. `duration:LITERAL` wins as the calendar duration — `size:NAME`
+    //      becomes a pure annotation (chip only).
+    //   2. Otherwise, `size:NAME` derives `effort ÷ capacity` (default
+    //      capacity = 1).
+    // The validator requires one of the two on every item.
     const sizeRef = propValue(props, 'size');
     const sizeResolved = sizeRef ? ctx.sizes.get(sizeRef) ?? null : null;
-    const durationDays = resolveDuration(
-        propValue(props, 'duration') ?? sizeRef,
-        ctx.sizes,
-        ctx.cal,
-    );
+    const durationDays = deriveItemDurationDays(props, ctx.sizes, ctx.cal);
+    // Total work in single-engineer days, used below to normalize a literal
+    // `remaining:` value into a progress fraction. Stays per-engineer
+    // regardless of the item's `capacity:` so a `remaining:1w` always means
+    // "one engineer-week of work left".
+    const totalEffortDays = deriveTotalEffortDays(props, ctx.sizes, ctx.cal);
     const afterRaw = propValues(props, 'after');
     const beforeRaw = propValue(props, 'before');
     const dateRaw = propValue(props, 'date');
@@ -326,8 +335,14 @@ function sequenceItem(
         const pct = Math.max(0, Math.min(100, parseInt(remainingPctMatch[1], 10))) / 100;
         progress = 1 - pct;
     }
-    if (progress === 0 && status === 'in-progress' && remainingDays > 0 && durationDays > 0) {
-        progress = Math.max(0, Math.min(1, 1 - remainingDays / durationDays));
+    if (progress === 0 && status === 'in-progress' && remainingDays > 0 && totalEffortDays > 0) {
+        // `remaining:` literal is single-engineer days; `totalEffortDays`
+        // is also single-engineer days, so the ratio is unit-correct.
+        // Clamp to [0, 1] — the renderer paints 100% remaining when the
+        // author overshot, matching the spec's "warn-and-clamp" overflow
+        // behavior. (Validation defers the warn to layout-time today; a
+        // future diagnostics channel can surface it back to the user.)
+        progress = Math.max(0, Math.min(1, 1 - remainingDays / totalEffortDays));
     }
 
     // Apply the status-tinted item background when the resolved bg is still
@@ -860,11 +875,7 @@ function predictItemChipExtraHeight(
     const props = item.properties;
     const labelIds = propValues(props, 'labels');
     if (labelIds.length === 0) return 0;
-    const durationDays = resolveDuration(
-        propValue(props, 'duration') ?? propValue(props, 'size'),
-        ctx.sizes,
-        ctx.cal,
-    );
+    const durationDays = deriveItemDurationDays(props, ctx.sizes, ctx.cal);
     const naturalWidth = Math.max(MIN_ITEM_WIDTH, durationDays * ctx.timeline.pixelsPerDay);
     const visualWidth = Math.max(MIN_ITEM_WIDTH, naturalWidth - 2 * ITEM_INSET_PX);
     const samples: { id: LabelDeclaration; width: number }[] = [];
@@ -1168,11 +1179,7 @@ function computeContentEndDay(
         prevEnd: number,
     ): number => {
         if (isItemDeclaration(node)) {
-            const dur = resolveDuration(
-                propValue(node.properties, 'duration') ?? propValue(node.properties, 'size'),
-                ctx.sizes,
-                ctx.cal,
-            );
+            const dur = deriveItemDurationDays(node.properties, ctx.sizes, ctx.cal);
             const dateProp = parseDate(propValue(node.properties, 'date'));
             const startProp = parseDate(propValue(node.properties, 'start'));
             const afterRefs = propValues(node.properties, 'after');

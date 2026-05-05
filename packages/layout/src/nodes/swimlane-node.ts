@@ -35,7 +35,7 @@ import type {
 } from '../types.js';
 import type { LayoutContext, TrackCursor } from '../layout-context.js';
 import { propValue } from '../dsl-utils.js';
-import { resolveDuration } from '../calendar.js';
+import { deriveItemDurationDays } from '../calendar.js';
 import { frameTabGeometry } from '../frame-tab-geometry.js';
 import { RowPacker } from '../row-packer.js';
 import {
@@ -299,11 +299,7 @@ export class SwimlaneNode {
             // BEFORE handing off to sequenceItem. The arithmetic mirrors
             // the duration → width math in `sequenceItem` (see
             // packages/layout/src/layout.ts).
-            const durationDays = resolveDuration(
-                propValue(props, 'duration') ?? propValue(props, 'size'),
-                ctx.sizes,
-                ctx.cal,
-            );
+            const durationDays = deriveItemDurationDays(props, ctx.sizes, ctx.cal);
             const naturalWidth = Math.max(
                 MIN_ITEM_WIDTH,
                 durationDays * ctx.timeline.pixelsPerDay,

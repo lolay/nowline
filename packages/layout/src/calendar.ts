@@ -4,8 +4,10 @@
 // once into a `ResolvedSize`. The calendar block controls how literal units
 // translate into absolute days.
 
-import type { CalendarBlock, NowlineFile, SizeDeclaration } from '@nowline/core';
+import type { CalendarBlock, EntityProperty, NowlineFile, SizeDeclaration } from '@nowline/core';
 
+import { parseCapacityValue } from './capacity.js';
+import { propValue } from './dsl-utils.js';
 import type { ResolvedSize } from './types.js';
 
 export type CalendarMode = 'business' | 'full' | 'custom';
@@ -86,11 +88,11 @@ export function literalToDays(literal: string, cal: CalendarConfig): number {
 
 /**
  * Convert a `duration:` literal or a `size:NAME` reference into a calendar-
- * resolved day count. Returns 0 for missing or unresolvable values; callers
- * substitute their own minimum width when the result is zero. Stays
- * capacity-agnostic so the same helper serves both literal-and-effort
- * lookups; the m5 capacity-aware derivation lives at the call site so
- * `duration:` literal overrides are honored.
+ * resolved day count. Capacity-agnostic — used both for the duration
+ * literal lookup in `deriveItemDurationDays` and for the
+ * `remaining:` literal normalization in `sequenceItem`. Returns 0 for
+ * missing or unresolvable values; callers substitute their own minimum
+ * width when the result is zero.
  */
 export function resolveDuration(
     value: string | undefined,
@@ -100,6 +102,65 @@ export function resolveDuration(
     if (!value) return 0;
     if (DURATION_RE.test(value)) return literalToDays(value, cal);
     return sizes.get(value)?.effortDays ?? 0;
+}
+
+/**
+ * Derive an item's calendar duration in days from its properties.
+ * Precedence (matches specs/dsl.md § "Sizing precedence"):
+ *
+ *   1. Explicit `duration:LITERAL` wins. The literal IS the calendar
+ *      duration the bar paints; `size:NAME` (if also present) collapses
+ *      to a pure annotation rendered as the size chip.
+ *   2. Otherwise, `size:NAME` resolves to its size declaration's
+ *      `effort:` (single-engineer days) and we divide by the item's
+ *      capacity (default 1) to get the team's calendar duration.
+ *   3. With neither, returns 0 — the validator already errors on items
+ *      missing both `size:` and `duration:`, so this only happens in
+ *      transient malformed inputs.
+ */
+export function deriveItemDurationDays(
+    props: EntityProperty[],
+    sizes: Map<string, ResolvedSize>,
+    cal: CalendarConfig,
+): number {
+    const durationRaw = propValue(props, 'duration');
+    if (durationRaw && DURATION_RE.test(durationRaw)) {
+        return literalToDays(durationRaw, cal);
+    }
+    const sizeRef = propValue(props, 'size');
+    const size = sizeRef ? sizes.get(sizeRef) : undefined;
+    if (!size) return 0;
+    const capacity = parseCapacityValue(propValue(props, 'capacity')) ?? 1;
+    return size.effortDays / capacity;
+}
+
+/**
+ * Total work for the item in single-engineer days. Used to normalize a
+ * literal `remaining:` value (also single-engineer days per spec) into a
+ * 0..1 progress fraction.
+ *
+ *   - sized: `size.effortDays` directly (already per-engineer).
+ *   - duration-literal'd: `duration_days × capacity`. The literal sets
+ *     calendar duration; multiplying by the engineer count recovers the
+ *     equivalent single-engineer effort the lane is consuming.
+ *
+ * Returns 0 when neither `size:` nor `duration:` is set so callers can
+ * skip normalization safely.
+ */
+export function deriveTotalEffortDays(
+    props: EntityProperty[],
+    sizes: Map<string, ResolvedSize>,
+    cal: CalendarConfig,
+): number {
+    const sizeRef = propValue(props, 'size');
+    const size = sizeRef ? sizes.get(sizeRef) : undefined;
+    if (size) return size.effortDays;
+    const durationRaw = propValue(props, 'duration');
+    if (durationRaw && DURATION_RE.test(durationRaw)) {
+        const capacity = parseCapacityValue(propValue(props, 'capacity')) ?? 1;
+        return literalToDays(durationRaw, cal) * capacity;
+    }
+    return 0;
 }
 
 /**

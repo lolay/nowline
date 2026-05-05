@@ -36,7 +36,7 @@ import {
     MIN_ITEM_WIDTH,
 } from '../themes/shared.js';
 import { propValue } from '../dsl-utils.js';
-import { resolveDuration } from '../calendar.js';
+import { deriveItemDurationDays } from '../calendar.js';
 import { RowPacker } from '../row-packer.js';
 
 export interface GroupNodeDeps {
@@ -161,11 +161,7 @@ export class GroupNode {
             // Predict logical extent so the row-packer can bump on
             // collision before we hand off to `sequenceItem`. Mirrors
             // SwimlaneNode's pre-flight width math.
-            const durationDays = resolveDuration(
-                propValue(props, 'duration') ?? propValue(props, 'size'),
-                ctx.sizes,
-                ctx.cal,
-            );
+            const durationDays = deriveItemDurationDays(props, ctx.sizes, ctx.cal);
             const naturalWidth = Math.max(
                 MIN_ITEM_WIDTH,
                 durationDays * ctx.timeline.pixelsPerDay,
