@@ -29,6 +29,7 @@ const baseEntity: EntityStyle = {
     headerHeight: 'sm',
     cornerRadius: 'sm',
     bracket: 'none',
+    capacityIcon: 'multiplier',
 };
 
 export const darkTheme: Theme = {

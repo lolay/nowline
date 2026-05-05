@@ -271,4 +271,71 @@ describe('include resolver', () => {
             expect(mismatch).toEqual([]);
         });
     });
+
+    describe('glyphs in resolved config', () => {
+        it('collects glyph declarations into ResolvedConfig.glyphs', async () => {
+            const files = {
+                'main.nowline': `config\nglyph budget "Budget" unicode:"💰" ascii:"$"\nglyph fte unicode:"\\u{1F464}"\nroadmap r\nswimlane s\n  item x duration:1w\n`,
+            };
+            const { Nowline } = getServices();
+            const main = await parseAtPath(files['main.nowline'], '/root/main.nowline');
+            const result = await resolveIncludes(main, '/root/main.nowline', {
+                services: Nowline,
+                readFile: makeFs(files),
+            });
+            expect(result.diagnostics.filter((d) => d.severity === 'error')).toEqual([]);
+            expect(result.config.glyphs.size).toBe(2);
+            expect(result.config.glyphs.get('budget')?.title).toBe('Budget');
+            expect(result.config.glyphs.has('fte')).toBe(true);
+        });
+
+        it('merges child glyphs into the parent on config:merge (default)', async () => {
+            const files = {
+                'main.nowline': `include "./a.nowline"\nroadmap r\nswimlane s\n  item x duration:1w\n`,
+                'a.nowline': `config\nglyph budget unicode:"💰"\nglyph star unicode:"⭐"\n`,
+            };
+            const { Nowline } = getServices();
+            const main = await parseAtPath(files['main.nowline'], '/root/main.nowline');
+            const result = await resolveIncludes(main, '/root/main.nowline', {
+                services: Nowline,
+                readFile: makeFs(files),
+            });
+            expect(result.config.glyphs.size).toBe(2);
+            expect(result.config.glyphs.has('budget')).toBe(true);
+            expect(result.config.glyphs.has('star')).toBe(true);
+        });
+
+        it('parent glyphs shadow same-named child glyphs with a warning', async () => {
+            const files = {
+                'main.nowline': `include "./a.nowline"\nconfig\nglyph budget unicode:"💵"\nroadmap r\nswimlane s\n  item x duration:1w\n`,
+                'a.nowline': `config\nglyph budget unicode:"💰"\n`,
+            };
+            const { Nowline } = getServices();
+            const main = await parseAtPath(files['main.nowline'], '/root/main.nowline');
+            const result = await resolveIncludes(main, '/root/main.nowline', {
+                services: Nowline,
+                readFile: makeFs(files),
+            });
+            expect(result.config.glyphs.size).toBe(1);
+            // Parent's declaration wins.
+            const budgetUnicode = result.config.glyphs.get('budget')?.properties.find((p) => p.key.replace(/:$/, '') === 'unicode')?.value;
+            expect(budgetUnicode).toBe('💵');
+            const shadowWarn = result.diagnostics.filter((d) => d.severity === 'warning' && /Glyph "budget"/.test(d.message));
+            expect(shadowWarn).toHaveLength(1);
+        });
+
+        it('config:ignore drops child glyphs', async () => {
+            const files = {
+                'main.nowline': `include "./a.nowline" config:ignore\nroadmap r\nswimlane s\n  item x duration:1w\n`,
+                'a.nowline': `config\nglyph budget unicode:"💰"\n`,
+            };
+            const { Nowline } = getServices();
+            const main = await parseAtPath(files['main.nowline'], '/root/main.nowline');
+            const result = await resolveIncludes(main, '/root/main.nowline', {
+                services: Nowline,
+                readFile: makeFs(files),
+            });
+            expect(result.config.glyphs.size).toBe(0);
+        });
+    });
 });

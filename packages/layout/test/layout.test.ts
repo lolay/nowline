@@ -86,4 +86,46 @@ swimlane build "Build"
         expect(chip).toBeDefined();
         expect(chip.style.bg.toLowerCase()).toBe('#e53935');
     });
+
+    describe('capacity-icon precedence', () => {
+        it('defaults to multiplier when nothing overrides', async () => {
+            const src = `nowline v1\n\nroadmap r\n\nswimlane s\n  item x duration:1w\n`;
+            const { file, resolved } = await parseAndResolve(src);
+            const model = layoutRoadmap(file, resolved, { theme: 'light' });
+            expect(model.swimlanes[0].style.capacityIcon).toBe('multiplier');
+            expect(model.swimlanes[0].children[0].style.capacityIcon).toBe('multiplier');
+        });
+
+        it('default swimlane capacity-icon overrides the system default', async () => {
+            const src = `nowline v1\n\nconfig\ndefault swimlane capacity-icon:person\n\nroadmap r\n\nswimlane s\n  item x duration:1w\n`;
+            const { file, resolved } = await parseAndResolve(src);
+            const model = layoutRoadmap(file, resolved, { theme: 'light' });
+            expect(model.swimlanes[0].style.capacityIcon).toBe('person');
+            // No `default item capacity-icon` set, so item still resolves to system default.
+            expect(model.swimlanes[0].children[0].style.capacityIcon).toBe('multiplier');
+        });
+
+        it('style block capacity-icon flows through entity style refs', async () => {
+            const src = `nowline v1\n\nconfig\nstyle finance\n  capacity-icon: points\n\nroadmap r\n\nswimlane s style:finance\n  item x duration:1w\n`;
+            const { file, resolved } = await parseAndResolve(src);
+            const model = layoutRoadmap(file, resolved, { theme: 'light' });
+            expect(model.swimlanes[0].style.capacityIcon).toBe('points');
+        });
+
+        it('inline Unicode literal on default reaches ResolvedStyle as-is', async () => {
+            const src = `nowline v1\n\nconfig\ndefault swimlane capacity-icon:"⚙"\n\nroadmap r\n\nswimlane s\n  item x duration:1w\n`;
+            const { file, resolved } = await parseAndResolve(src);
+            const model = layoutRoadmap(file, resolved, { theme: 'light' });
+            expect(model.swimlanes[0].style.capacityIcon).toBe('⚙');
+        });
+
+        it('declared glyph id reaches ResolvedStyle and the glyph survives in ResolvedConfig', async () => {
+            const src = `nowline v1\n\nconfig\nglyph budget "Budget" unicode:"💰" ascii:"$"\nstyle finance\n  capacity-icon: budget\n\nroadmap r\n\nswimlane s style:finance\n  item x duration:1w\n`;
+            const { file, resolved } = await parseAndResolve(src);
+            const model = layoutRoadmap(file, resolved, { theme: 'light' });
+            expect(model.swimlanes[0].style.capacityIcon).toBe('budget');
+            expect(resolved.config.glyphs.has('budget')).toBe(true);
+            expect(resolved.config.glyphs.get('budget')?.title).toBe('Budget');
+        });
+    });
 });

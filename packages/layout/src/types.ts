@@ -18,7 +18,7 @@ export type StatusKind =
     | 'blocked'
     | 'neutral';
 
-// The 16 style properties from specs/dsl.md § Style Properties plus header-position.
+// The 17 style properties from specs/dsl.md § Style Properties plus header-position.
 // Every one has a concrete value after resolution (theme + defaults fill gaps).
 export interface ResolvedStyle {
     bg: string;             // hex or 'none'
@@ -37,6 +37,16 @@ export interface ResolvedStyle {
     cornerRadius: SizeBucket;   // 'none'..'xl'|'full'
     bracket: BracketKind;
     headerPosition: HeaderPosition;
+    /**
+     * Glyph used as the suffix on capacity numbers (`5×`, `5 [person]`, etc.).
+     * Stores the raw value as the author wrote it: a built-in icon name
+     * (`'multiplier'`, `'person'`, ...), a custom glyph id declared via
+     * `glyph` in config, or an inline Unicode literal (`'💰'`). The renderer
+     * resolves built-in vs custom vs literal at paint time using
+     * `ResolvedConfig.glyphs` and the `BUILTIN_CAPACITY_ICONS` set.
+     * Default `'multiplier'`.
+     */
+    capacityIcon: string;
 }
 
 export interface BoundingBox {

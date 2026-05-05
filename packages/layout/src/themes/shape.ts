@@ -30,6 +30,11 @@ export interface EntityStyle {
     headerHeight: 'none' | 'xs' | 'sm' | 'md' | 'lg' | 'xl';
     cornerRadius: 'none' | 'xs' | 'sm' | 'md' | 'lg' | 'xl' | 'full';
     bracket: BracketKind;
+    // Glyph used as the suffix on capacity numbers (lane badge / item suffix).
+    // Holds whatever the author wrote (built-in name, custom glyph id, or an
+    // inline Unicode literal) — interpretation is the renderer's job. Default
+    // is `multiplier` so unannotated capacity values render as `5×`.
+    capacityIcon: string;
 }
 
 export interface Theme {
