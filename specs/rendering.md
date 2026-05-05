@@ -156,7 +156,7 @@ The now-line is the hero visual element — the vertical line marking today on t
 Each roadmap item renders as a horizontal bar. Width is determined by `duration`. Height equals the band's `bandwidth()` — bars are uniform-height within a row regardless of label count. Bar contents include title, status indicator, owner, label chiclets, and footnote indicators.
 
 - **Status indicator:** Hue-tinted dot in the bar's upper-right — green (done), blue (in-progress), amber (at-risk), red (blocked), slate (planned). Custom statuses use a neutral slate indicator. The exact tone is picked PER-BAR based on the bar bg's relative luminance: pale or saturated mid-tone bars (label-driven `bg:blue` etc.) get the deep `onLight` palette (≈ 800-900-level), and dark bars (default dark-theme status tints like `#172554`) get the pale `onDark` palette (≈ 100-level). The two palettes cross over at `L_bar ≈ 0.24` so the dot never fades into the bar even when a label propagates a same-hue saturated bg.
-- **Progress bar:** When `remaining` is set, the bar fills proportionally (e.g., `remaining:30%` → 70% filled). `status:done` fills the bar completely regardless of `remaining`. The strip sits at the bar's bottom.
+- **Progress bar:** When `remaining` is set, the bar fills proportionally (e.g., `remaining:30%` → 70% filled). `remaining:` accepts both percent and single-eng effort literal forms (`remaining:30%` and `remaining:0.6w` are equivalent on a `size:m` item with no capacity); both normalize to the same painted percent during layout. `status:done` fills the bar completely regardless of `remaining`. When the literal exceeds total effort, the painted bar clamps at 100% remaining and a soft warning is emitted (see `specs/dsl.md` rule 17). The strip sits at the bar's bottom.
 - **Link icon:** A 14×14 colored tile in the bar's UPPER-LEFT corner with a white outbound-arrow ↗ glyph. The glyph is the SAME for every link target — only the tile color changes by service:
     - `linear.app` → **Linear** (purple tile)
     - `github.com` → **GitHub** (slate tile)
@@ -236,11 +236,19 @@ When an item has `before:anchor-id` and its duration would push past the anchor 
 
 `capacity:` annotations on swimlanes and items render as visual badges and (when concurrent item capacity exceeds the lane's budget) as an overload underline. None of these affect parser diagnostics — overload is a pure rendering signal.
 
+#### Item size chip
+
+Items declaring `size:NAME` render the size **id** (uppercased) as a small chip at the leading edge of the meta line, before the duration: `M 2w` for `size:m`, `XS 0.5d` for `size:xs`. The size declaration's title — used in legends, tooltips, and elsewhere — is intentionally not used here so the chip stays compact in t-shirt-code form. The chip uses the item's resolved meta color and the meta line font size; no separate background fill (it reads as inline text, not a tinted pill).
+
+When `size:` and `duration:` are both set, the explicit `duration:` literal wins for bar width and the size chip still renders as annotation: `L 2w` even when `duration:2w` overrode a `size:l` derivation. Items without `size:` render no chip.
+
 #### Item capacity suffix
 
 Items with `capacity:N` render the value as a suffix on their duration label: `2w 2×` (default `multiplier` glyph), `2w 2 [person]` (with `capacity-icon:person`), `2w 2 ★` (with `capacity-icon:points`), `2w 2 ⏱` (with `capacity-icon:time`). The suffix appears only when the resolved capacity is `> 0`. Items without `capacity:` render no suffix.
 
 The suffix uses the item's resolved text color and matches the duration label's font size and weight.
+
+When all three meta-line elements are present, the on-bar reading order is `[size chip] [duration] [capacity suffix]` — e.g. `M 2w 2×` for a `size:m capacity:2` item with the default `multiplier` glyph.
 
 #### Lane capacity badge
 
@@ -371,7 +379,7 @@ Labels render as **chiclets** — small, pill-shaped badges (`corner-radius:full
 - **Multiple labels**: render left-to-right in declaration order, with a small horizontal gap between chiclets, **left-aligned** to the bar's caption inset.
 - **Natural width, never truncated**: every chiclet renders at its natural text-fit width. Chips never shrink, never clip, never get capped to fit inside the bar.
 - **Inside the bar — single row**: when the full chip row fits within the bar's effective inner width, every chip renders on a single horizontal row just above the bottom progress strip, left-aligned to the caption inset. The bar's height stays at `bandwidth()`.
-- **Meta clearance (in-bar chips with metadata)**: at the default bandwidth the natural chip Y (anchored to the bar's bottom, just above the progress strip) sits ABOVE the meta baseline (38 px from bar top), which would visually overlap the meta line. When the item carries metadata (`duration`, `owner`, `remaining`), the in-bar chip row drops to `meta-baseline + LABEL_CHIP_GAP_ABOVE_PROGRESS_STRIP_PX` and the bar grows downward by exactly the amount needed to keep the progress strip below the chip — the same arithmetic as the chip-spill grow rule. The result reads as `title → meta → chip → progress-strip` stacked vertically with no caption/chip overlap.
+- **Meta clearance (in-bar chips with metadata)**: at the default bandwidth the natural chip Y (anchored to the bar's bottom, just above the progress strip) sits ABOVE the meta baseline (38 px from bar top), which would visually overlap the meta line. When the item carries metadata (`size`, `duration`, `owner`, `remaining`, `capacity`), the in-bar chip row drops to `meta-baseline + LABEL_CHIP_GAP_ABOVE_PROGRESS_STRIP_PX` and the bar grows downward by exactly the amount needed to keep the progress strip below the chip — the same arithmetic as the chip-spill grow rule. The result reads as `title → meta → chip → progress-strip` stacked vertically with no caption/chip overlap.
 - **Outside the bar — bar-width-capped column**: when the chip row's total natural width exceeds the bar's effective inner width, the chips spill past the bar's right edge starting at `bar.right + ITEM_CAPTION_SPILL_GAP_PX`. Outside the bar the chips pack into one or more rows whose width is capped at the **bar's visual width** (multiple chips per row), with subsequent rows stacking DOWNWARD by `LABEL_CHIP_HEIGHT_PX + LABEL_CHIP_ROW_GAP_PX`. All rows in the spill column share the same left x; chips are left-aligned within each row.
 - **One-time row slack (25%)**: when packing a row outside the bar, if a chip would overflow the bar-width cap by **at most 25% of that chip's width**, the row stretches by exactly the overflow amount and the chip stays on the row (instead of wrapping to a fresh row). This rescues "one chip just barely overshoots" cases. The slack is **single-use per item** — once the slack has been consumed for one row, every subsequent row in the same item is packed strictly against the bar-width cap.
 - **Spilled chip-row Y**: when chips spill but the title + meta caption stays inside the bar, row 0 of the spilled column sits at the chip's original Y (just above the bottom progress strip). When BOTH the caption and the chip row spill, row 0 drops below the meta baseline so the spilled stack reads as `title → meta → chip-row-0 → chip-row-1 → …` at a single column to the right of the bar, never overlapping the meta line.
