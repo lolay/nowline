@@ -122,6 +122,7 @@ export const lightTheme: Theme = {
     },
     timeline: {
         gridLine: '#e2e8f0',
+        minorGridLine: '#eef2f7',
         tickMark: '#cbd5e1',
         labelText: '#64748b',
         panelFill: '#ffffff',

@@ -56,6 +56,10 @@ function entityStyleToResolved(e: EntityStyle, theme: Theme): ResolvedStyle {
         // default `beside` applies. Roadmap entity's resolve step lifts this
         // from the 5-level chain.
         headerPosition: 'beside',
+        // Roadmap-only readability knobs. Defaults preserve the existing
+        // single-top-strip layout and keep the major-ticks-only grid.
+        timelinePosition: 'top',
+        minorGrid: false,
     };
 }
 
@@ -114,6 +118,14 @@ function applyProp(target: ResolvedStyle, key: string, value: string, theme: The
             break;
         case 'header-position':
             if (value === 'beside' || value === 'above') target.headerPosition = value;
+            break;
+        case 'timeline-position':
+            if (value === 'top' || value === 'bottom' || value === 'both') {
+                target.timelinePosition = value;
+            }
+            break;
+        case 'minor-grid':
+            target.minorGrid = value === 'true';
             break;
         default:
             break;

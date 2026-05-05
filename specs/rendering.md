@@ -2,7 +2,7 @@
 
 ## Overview
 
-Nowline's OSS rendering path produces **static SVG** from a parsed roadmap. It is used by the CLI (m2b) and the browser embed script (m3). Both consume the same positioned model from `@nowline/layout`.
+Nowline's OSS rendering path produces **static SVG** from a parsed roadmap. It is used by the CLI (m2b) and the browser embed script (m4). Both consume the same positioned model from `@nowline/layout`.
 
 Downstream interactive renderers (e.g. a hosted editor with drag-and-drop and two-way sync) reuse the layout engine but ship in separate, proprietary projects and are out of scope here.
 
@@ -76,9 +76,9 @@ If explicit description control is needed later, `desc-` prefixed properties (e.
 
 With `spacing:none` as the swimlane default, sibling swimlanes sit directly adjacent. A thin horizontal separator line renders between sibling swimlane bands for visual distinction. Users who prefer vertical gaps can set `spacing:` on a swimlane or in defaults.
 
-## SVG Renderer (m2b / m3)
+## SVG Renderer (m2b / m4)
 
-The pure SVG renderer takes the positioned model and produces an SVG string. It is used by the CLI (m2b) and the browser embed script (m3).
+The pure SVG renderer takes the positioned model and produces an SVG string. It is used by the CLI (m2b) and the browser embed script (m4).
 
 ### Roadmap Header
 
@@ -137,6 +137,8 @@ A single-row header displays the scale units (days, weeks, months, quarters, yea
   - Years: show every 5th
 - **Range**: the first tick mark aligns with the earliest item start or anchor date, with the roadmap's `padding` as whitespace before it. The last tick mark extends to the latest item end, anchor date, or milestone date, with the same padding after.
 - **Custom units**: custom units (e.g., `sprints = 2w`) map to their underlying duration for positioning; labels use the custom unit name
+- **Mirrored bottom strip**: when `timeline-position:bottom` or `timeline-position:both` is set on the roadmap, the renderer emits a second tick-label panel below the chart's last swimlane (and below any isolate-include regions), above the footnote panel. The mirrored strip shares the same fill, border, label color, and tick positions as the top strip — it has no now-pill and no marker row (anchors and milestones still belong to the top header). The default `timeline-position:top` keeps the existing single-strip layout.
+- **Minor-tick grid lines**: when `minor-grid:true` is set on the roadmap, every tick boundary (not just the labeled major ones) gets a thin dotted grid line drawn in the theme's `timeline.minorGridLine` color — fainter than the major grid lines so the major ticks still dominate. The minor lines drop from the same y as the major lines and stop at the same chart bottom. Default `minor-grid:false` keeps existing renders unchanged.
 
 ### The Now-Line
 
@@ -147,6 +149,7 @@ The now-line is the hero visual element — the vertical line marking today on t
 - Rendered **above** grid lines and milestone lines (highest z-order among vertical lines)
 - Label: **"now"** rendered at the top of the line in the header row — ties to the product branding (the "now" in Nowline)
 - When the current date falls outside the timeline range (before earliest or after latest content), the now-line is not rendered
+- When `timeline-position:bottom` or `timeline-position:both` is set, the line continues through the mirrored bottom tick panel (and the footnote panel below it) so the "now" sweep still reads as a single continuous line
 
 ### Item Bars
 
@@ -199,11 +202,11 @@ Swimlanes render as sequential solid bands with alternating subtle background ti
 
 ### Anchors
 
-Anchors render as **diamonds** (Gantt milestone style). An anchor appears at its date position on the timeline, vertically aligned with the topmost item that references it. Items linked to an anchor via `after` or `before` show a Gantt-style predecessor line (arrow) connecting the item bar to the diamond. If multiple items reference the same anchor, they all draw predecessor lines to the single diamond.
+Anchors render as **diamonds** (Gantt milestone style). An anchor appears at its date position on the timeline, vertically aligned with the topmost item that references it. Items linked to an anchor via `after` or `before` show a Gantt-style predecessor line (arrow) connecting the item bar to the diamond. If multiple items reference the same anchor, they all draw predecessor lines to the single diamond. When `timeline-position:bottom` or `timeline-position:both` is set, the anchor's vertical cut line extends through the mirrored bottom tick panel so the column tie-back stays continuous.
 
 ### Milestones
 
-Milestones render as a **diamond in the timeline header row** at the milestone's x-position, with a **prominent dashed vertical line** (ink-dark theme color, 2px stroke, 6/4 dash pattern, round caps) cutting down from the diamond's bottom tip through all swimlanes to the bottom of the chart.
+Milestones render as a **diamond in the timeline header row** at the milestone's x-position, with a **prominent dashed vertical line** (ink-dark theme color, 2px stroke, 6/4 dash pattern, round caps) cutting down from the diamond's bottom tip through all swimlanes to the bottom of the chart. When `timeline-position:bottom` or `timeline-position:both` is set, the cut line extends through the mirrored bottom tick panel.
 
 - Line style: prominent dashed — distinct from grid lines (1px fine dots) and anchor lines (1px fine dashes). Drawn after swimlane fills so the dashed pattern stays visible across every swimlane band.
 - Line color: milestone's resolved `fg` color, or a system default (dark ink). Turns **red** for a **date-driven** milestone that is overrun by a predecessor (see below).
@@ -249,6 +252,8 @@ Styles defined in `config` control the visual appearance of entities. Style prop
 | `header-height` | Height of the timeline scale header row. Roadmap-only. Named preset (`none`, `xs`, `sm`, `md`, `lg`, `xl`). |
 | `corner-radius` | Corner rounding for the entity's bounding shape. Maps to SVG `rx`/`ry`. Values: `none`, `xs`, `sm`, `md`, `lg`, `xl`, `full`. `full` computes radius as half the rendered height. |
 | `bracket` | Bracket/join line on parallel blocks. `none` (default), `solid`, `dashed`. Parallel-only — ignored on other entities. |
+| `timeline-position` | Where the timeline date strip is rendered. `top` (default), `bottom`, `both`. Roadmap-only. `both` mirrors the strip at the chart's bottom so the dates remain readable on tall canvases without scrolling back to the top. The mirrored strip shares fill, border, label color, and tick positions with the top strip; it has no now-pill and no marker row. Vertical lines (now-line, milestone cuts, anchor cuts) extend through the mirrored strip so they read as continuous. |
+| `minor-grid` | When `true`, draws a faint dotted grid line at every tick boundary in addition to the major-tick lines. Roadmap-only. Uses `theme.timeline.minorGridLine` (a step lighter than `gridLine`) so the major lines still dominate. |
 
 Text style properties (`font`, `weight`, `italic`, `text-size`) apply to the entity's primary text (title). Secondary text within an entity (owner badge, status label) follows its own rendering rules.
 

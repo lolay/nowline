@@ -173,6 +173,45 @@ swimlane s
         expect(hasError(errorMessages(r.diagnostics), /Raw style property "header-position"/i)).toBe(true);
     });
 
+    it('Rule 18: timeline-position top/bottom/both are accepted', async () => {
+        for (const value of ['top', 'bottom', 'both']) {
+            const r = await parse(
+                `config\ndefault roadmap timeline-position:${value}\nroadmap r\nswimlane s\n  item x duration:1w\n`,
+            );
+            expect(errorMessages(r.diagnostics)).toEqual([]);
+        }
+    });
+
+    it('Rule 18: timeline-position with invalid value is an error', async () => {
+        const r = await parse(
+            `config\ndefault roadmap timeline-position:sideways\nroadmap r\nswimlane s\n  item x duration:1w\n`,
+        );
+        expect(hasError(errorMessages(r.diagnostics), /timeline-position|sideways/i)).toBe(true);
+    });
+
+    it('Rule 18: minor-grid true/false are accepted', async () => {
+        for (const value of ['true', 'false']) {
+            const r = await parse(
+                `config\ndefault roadmap minor-grid:${value}\nroadmap r\nswimlane s\n  item x duration:1w\n`,
+            );
+            expect(errorMessages(r.diagnostics)).toEqual([]);
+        }
+    });
+
+    it('Rule 18: minor-grid with invalid value is an error', async () => {
+        const r = await parse(
+            `config\ndefault roadmap minor-grid:maybe\nroadmap r\nswimlane s\n  item x duration:1w\n`,
+        );
+        expect(hasError(errorMessages(r.diagnostics), /minor-grid|maybe/i)).toBe(true);
+    });
+
+    it('Rule 20: raw timeline-position on roadmap declaration is an error', async () => {
+        const r = await parse(
+            `roadmap r timeline-position:both\nswimlane s\n  item x duration:1w\n`,
+        );
+        expect(hasError(errorMessages(r.diagnostics), /Raw style property "timeline-position"/i)).toBe(true);
+    });
+
     it('Rule 20: raw style property on item is an error', async () => {
         const r = await parse(
             `roadmap r\nswimlane s\n  item x duration:1w bg:red\n`,

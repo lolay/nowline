@@ -312,7 +312,7 @@ These properties and directives are valid on every entity type: items, swimlanes
 | `style`              | identifier    | Single reference to a named style declared in config. `style:enterprise`. This is the only visual property allowed on an entity. |
 | `description`        | sub-directive | Indented under the entity. Longer explanatory text. `description "Details here"`                     |
 
-**Content vs. rendering separation.** Entities in the roadmap section carry only semantic information (identity, ownership, sequencing, sizing, state, categorisation) plus an optional single `style:id` reference. Raw style properties (`bg`, `fg`, `text`, `border`, `icon`, `shadow`, `font`, `weight`, `italic`, `text-size`, `padding`, `spacing`, `header-height`, `corner-radius`, `bracket`) may only appear in `style` blocks and `default <entity>` lines — both of which live in `config`. To flag an item in red, declare a named style in config (`style flagged` with `bg: red` properties indented beneath) and reference it (`item blocked-work style:flagged`).
+**Content vs. rendering separation.** Entities in the roadmap section carry only semantic information (identity, ownership, sequencing, sizing, state, categorisation) plus an optional single `style:id` reference. Raw style properties (`bg`, `fg`, `text`, `border`, `icon`, `shadow`, `font`, `weight`, `italic`, `text-size`, `padding`, `spacing`, `header-height`, `corner-radius`, `bracket`, `timeline-position`, `minor-grid`) may only appear in `style` blocks and `default <entity>` lines — both of which live in `config`. To flag an item in red, declare a named style in config (`style flagged` with `bg: red` properties indented beneath) and reference it (`item blocked-work style:flagged`).
 
 
 ### Item Properties
@@ -709,6 +709,8 @@ Style properties:
 | `header-height` | enum            | Timeline header row height. Roadmap-only: `none`, `xs`, `sm`, `md` (default), `lg`, `xl`.                                                               |
 | `corner-radius` | enum            | Corner rounding: `none`, `xs`, `sm`, `md`, `lg`, `xl`, `full`.                                                                                          |
 | `bracket`       | enum            | Bracket/join line on parallel blocks: `none` (default), `solid`, `dashed`. Parallel-only.                                                               |
+| `timeline-position` | enum        | Where the timeline date strip is rendered. Roadmap-only: `top` (default), `bottom`, `both`. `both` mirrors the strip at the chart bottom so dates stay readable on tall canvases.   |
+| `minor-grid`    | boolean         | When `true`, draws faint dotted grid lines at every tick boundary in addition to the standard major-tick grid. Roadmap-only: `true` or `false` (default).                          |
 
 
 All style properties are optional. Unset properties inherit from the system defaults.
@@ -915,8 +917,8 @@ The parser enforces these rules and produces clear error messages with file posi
 **Styles and content/rendering separation**
 
 18. `style:` references on entities and labels must resolve to a style declared in the applicable `config` scope.
-19. Style property values must be valid for their type: color properties (`bg`, `fg`, `text`) must be named colors, hex values, or `none`; `border` must be `solid`, `dashed`, or `dotted`; `shadow` must be `none`, `subtle`, `fuzzy`, or `hard`; `font` must be `sans`, `serif`, or `mono`; `weight` must be `thin`, `light`, `normal`, or `bold`; `italic` must be `true` or `false`; `text-size`, `padding`, `spacing`, `header-height` must be `none`, `xs`, `sm`, `md`, `lg`, or `xl`; `corner-radius` must be `none`, `xs`, `sm`, `md`, `lg`, `xl`, or `full`; `bracket` must be `none`, `solid`, or `dashed`.
-20. Raw style properties (`bg`, `fg`, `text`, `border`, `icon`, `shadow`, `font`, `weight`, `italic`, `text-size`, `padding`, `spacing`, `header-height`, `corner-radius`, `bracket`) may only appear in `style` blocks and `default <entity>` lines (both in config). Using them on any roadmap-section entity is an error.
+19. Style property values must be valid for their type: color properties (`bg`, `fg`, `text`) must be named colors, hex values, or `none`; `border` must be `solid`, `dashed`, or `dotted`; `shadow` must be `none`, `subtle`, `fuzzy`, or `hard`; `font` must be `sans`, `serif`, or `mono`; `weight` must be `thin`, `light`, `normal`, or `bold`; `italic` must be `true` or `false`; `text-size`, `padding`, `spacing`, `header-height` must be `none`, `xs`, `sm`, `md`, `lg`, or `xl`; `corner-radius` must be `none`, `xs`, `sm`, `md`, `lg`, `xl`, or `full`; `bracket` must be `none`, `solid`, or `dashed`; `timeline-position` must be `top`, `bottom`, or `both`; `minor-grid` must be `true` or `false`.
+20. Raw style properties (`bg`, `fg`, `text`, `border`, `icon`, `shadow`, `font`, `weight`, `italic`, `text-size`, `padding`, `spacing`, `header-height`, `corner-radius`, `bracket`, `timeline-position`, `minor-grid`) may only appear in `style` blocks and `default <entity>` lines (both in config). Using them on any roadmap-section entity is an error.
 
 **Defaults**
 

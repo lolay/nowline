@@ -60,6 +60,7 @@ export const SAMPLES: SampleSpec[] = [
     { name: 'platform-2026-dark', sourceFile: 'platform-2026.nowline', theme: 'dark' },
     { name: 'dependencies', sourceFile: 'dependencies.nowline', theme: 'light' },
     { name: 'isolate-include', sourceFile: 'isolate-include.nowline', theme: 'light' },
+    { name: 'nested-both-headers', sourceFile: 'nested-both-headers.nowline', theme: 'light' },
 ];
 
 export async function renderSampleSvg(spec: SampleSpec): Promise<string> {

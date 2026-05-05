@@ -68,6 +68,7 @@ const STYLE_PROP_KEYS = new Set([
     'bg', 'fg', 'text', 'border', 'icon', 'shadow', 'font', 'weight',
     'italic', 'text-size', 'padding', 'spacing', 'header-height',
     'corner-radius', 'bracket', 'header-position',
+    'timeline-position', 'minor-grid',
 ]);
 
 const STYLE_PROP_ENUMS: Record<string, Set<string>> = {
@@ -83,6 +84,8 @@ const STYLE_PROP_ENUMS: Record<string, Set<string>> = {
     'corner-radius': new Set(['none', 'xs', 'sm', 'md', 'lg', 'xl', 'full']),
     bracket: new Set(['none', 'solid', 'dashed']),
     'header-position': new Set(['beside', 'above']),
+    'timeline-position': new Set(['top', 'bottom', 'both']),
+    'minor-grid': new Set(['true', 'false']),
 };
 
 const COLOR_NAMES = new Set([

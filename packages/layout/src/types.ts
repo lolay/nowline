@@ -10,6 +10,12 @@ export type FontFamily = 'sans' | 'serif' | 'mono';
 export type FontWeight = 'thin' | 'light' | 'normal' | 'bold';
 export type BracketKind = 'none' | 'solid' | 'dashed';
 export type HeaderPosition = 'beside' | 'above';
+// Where the timeline date strip is rendered. Roadmap-only style property.
+//   - `top` (default) — single strip above the chart (legacy behavior)
+//   - `bottom` — single strip below the chart, no top strip
+//   - `both` — strips at both ends; tall canvases stay readable from
+//     either edge of the viewport
+export type TimelinePosition = 'top' | 'bottom' | 'both';
 export type StatusKind =
     | 'planned'
     | 'in-progress'
@@ -18,7 +24,8 @@ export type StatusKind =
     | 'blocked'
     | 'neutral';
 
-// The 16 style properties from specs/dsl.md § Style Properties plus header-position.
+// The 16 style properties from specs/dsl.md § Style Properties plus header-position
+// and the two roadmap-only readability knobs (`timeline-position`, `minor-grid`).
 // Every one has a concrete value after resolution (theme + defaults fill gaps).
 export interface ResolvedStyle {
     bg: string;             // hex or 'none'
@@ -37,6 +44,8 @@ export interface ResolvedStyle {
     cornerRadius: SizeBucket;   // 'none'..'xl'|'full'
     bracket: BracketKind;
     headerPosition: HeaderPosition;
+    timelinePosition: TimelinePosition;
+    minorGrid: boolean;
 }
 
 export interface BoundingBox {
@@ -106,19 +115,34 @@ export interface PositionedTimelineScale {
     // Now-pill row sits at the very top of the timeline area (above the
     // date labels). Height is 0 when there's no now-line to draw.
     pillRowHeight: number;
-    // Tick-label panel (the date headers). Always rendered.
+    // Tick-label panel (the date headers). Always rendered when
+    // `timelinePosition` is `top` or `both`; height is 0 when the
+    // roadmap requested `bottom`-only and no top strip is wanted.
     tickPanelY: number;
     tickPanelHeight: number;
-    // Marker row sits BELOW the tick-label panel. Anchors + milestones live
-    // here. The collision band sits ABOVE the in-row baseline so an anchor
-    // colliding with a milestone can be bumped up. Height is 0 when there
-    // are no markers to render — the renderer then omits the panel
+    // Marker row sits BELOW the top tick-label panel. Anchors + milestones
+    // live here. The collision band sits ABOVE the in-row baseline so an
+    // anchor colliding with a milestone can be bumped up. Height is 0 when
+    // there are no markers to render — the renderer then omits the panel
     // entirely so we don't reserve dead space.
     markerRow: {
         y: number;          // y of the in-row diamond center
         height: number;     // total height of the marker row band (in-row + collision)
         collisionY: number; // y of the bumped-up diamond center
     };
+    // Mirrored bottom tick-label panel. Populated when the roadmap's
+    // resolved `timelinePosition` is `bottom` or `both`. Width and
+    // x match the top panel (`box.x` / `box.width`); the renderer
+    // emits the same fill, border, label color, and tick labels at
+    // `bottomTickPanelY`. No now-pill, no marker row — the bottom strip
+    // is purely a date reference for tall canvases.
+    bottomTickPanelY?: number;
+    bottomTickPanelHeight?: number;
+    // When `true`, the renderer draws a faint dotted line at every tick
+    // boundary (not just major ticks) using `theme.timeline.minorGridLine`.
+    // Mirrors the roadmap's resolved `minor-grid` style property. Default
+    // `false` preserves byte-stable output for existing roadmaps.
+    minorGrid: boolean;
 }
 
 /**

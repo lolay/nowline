@@ -153,9 +153,21 @@ export class RoadmapNode {
             scale,
         );
 
-        // Determine header position via `default roadmap` / theme.
+        // Determine header position + timeline placement via `default roadmap`
+        // / theme. Raw style props (including `timeline-position` and
+        // `minor-grid`) are banned on the roadmap declaration itself, so the
+        // values come from the level-2 `default roadmap` line in config.
         const headerStyle = resolveStyle('roadmap', file.roadmapDecl?.properties ?? [], styleCtx);
         const isBeside = headerStyle.headerPosition === 'beside';
+        // `top` (default) keeps the legacy single-strip header; `bottom`
+        // suppresses the top tick panel (now-pill and marker row stay
+        // at the top because anchors / milestones live there); `both`
+        // mirrors the strip at the chart bottom too. See specs/dsl.md
+        // and specs/rendering.md § Timeline Scale.
+        const showTopTickPanel = headerStyle.timelinePosition !== 'bottom';
+        const showBottomTickPanel =
+            headerStyle.timelinePosition === 'bottom'
+            || headerStyle.timelinePosition === 'both';
 
         // Pre-size the beside-mode header card. Width = max line width +
         // padding, clamped to MIN..MAX with word-wrap once the title
@@ -196,7 +208,10 @@ export class RoadmapNode {
         const hasMarkerEntities =
             resolved.content.anchors.size + resolved.content.milestones.size > 0;
         const pillRowHeight = willHaveNowline ? NOW_PILL_HEIGHT_PX : 0;
-        const tickPanelHeight = TIMELINE_TICK_PANEL_HEIGHT_PX;
+        // When `timeline-position:bottom` is set, the top tick panel
+        // collapses to height 0 — the now-pill and marker row stack
+        // directly without the date strip between them.
+        const tickPanelHeight = showTopTickPanel ? TIMELINE_TICK_PANEL_HEIGHT_PX : 0;
 
         // Build the time scale up front — packMarkerRow needs it to
         // resolve date-pinned entity x positions before we can size the
@@ -295,6 +310,11 @@ export class RoadmapNode {
                 height: markerRowHeight,
                 collisionY: markerRowY - 8,
             },
+            // `bottomTickPanelY` / `bottomTickPanelHeight` are filled in
+            // AFTER swimlanes + includes are placed (and after the marker
+            // re-pack potentially grows the chart), so the panel sits
+            // directly above the footnote area.
+            minorGrid: headerStyle.minorGrid,
         };
 
         // Stitch packed placements together with their final centerY now
@@ -559,6 +579,26 @@ export class RoadmapNode {
                 if (m.slackArrows) {
                     for (const arrow of m.slackArrows) arrow.y += deltaY;
                 }
+            }
+        }
+
+        // Insert the mirrored bottom tick panel directly above the
+        // footnote area, BELOW the chart's last swimlane / include
+        // region. Done AFTER any marker-row-growth shift so the panel
+        // y honors the final chartBottomY. `timeline.box.height` stays
+        // anchored to the chart's bottom edge — grid lines therefore
+        // stop at the panel's TOP, not at its bottom — while the panel
+        // gets its own fill / border / labels in the renderer. The
+        // already-built milestones extend their cut lines through the
+        // panel; anchors picked up below see the bumped chartBottomY
+        // automatically.
+        if (showBottomTickPanel) {
+            const gapAbovePanel = 8;
+            ctx.timeline.bottomTickPanelY = ctx.chartBottomY + gapAbovePanel;
+            ctx.timeline.bottomTickPanelHeight = TIMELINE_TICK_PANEL_HEIGHT_PX;
+            ctx.chartBottomY += gapAbovePanel + TIMELINE_TICK_PANEL_HEIGHT_PX;
+            for (const m of milestones) {
+                m.cutBottomY = ctx.chartBottomY;
             }
         }
 

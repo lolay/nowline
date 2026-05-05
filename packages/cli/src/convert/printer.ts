@@ -20,6 +20,8 @@ const KEY_ORDER = [
     'scale',
     'calendar',
     'header-position',
+    'timeline-position',
+    'minor-grid',
 ];
 
 const INDENT = '  ';

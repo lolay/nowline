@@ -35,6 +35,7 @@ const MANIFEST = [
     { slug: 'isolate-include',     source: 'examples/isolate-include.nowline', theme: 'light', now: NOW },
     { slug: 'long',                source: 'examples/long.nowline',            theme: 'light', now: NOW },
     { slug: 'nested',              source: 'examples/nested.nowline',          theme: 'light', now: NOW },
+    { slug: 'nested-both-headers', source: 'examples/nested-both-headers.nowline', theme: 'light', now: NOW },
     { slug: 'partner',             source: 'examples/partner.nowline',         theme: 'light', now: NOW },
     { slug: 'product',             source: 'examples/product.nowline',         theme: 'light', now: NOW },
     { slug: 'teams',               source: 'examples/teams.nowline',           theme: 'light', now: NOW },
