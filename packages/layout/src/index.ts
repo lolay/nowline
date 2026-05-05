@@ -2,6 +2,13 @@ export { layoutRoadmap } from './layout.js';
 export type { LayoutOptions, LayoutResult } from './layout.js';
 export * from './types.js';
 export {
+    estimateCapacitySuffixWidth,
+    parseCapacityValue,
+    formatCapacityNumber,
+    resolveCapacityIcon,
+    type ResolvedCapacityIcon,
+} from './capacity.js';
+export {
     themes,
     lightTheme,
     darkTheme,
@@ -63,9 +70,10 @@ export {
     type FrameTabGeometry,
     FRAME_TAB_TITLE_PX_PER_CHAR,
     FRAME_TAB_OWNER_PX_PER_CHAR,
-    FRAME_TAB_TITLE_MIN_WIDTH_PX,
-    FRAME_TAB_OWNER_MIN_WIDTH_PX,
-    FRAME_TAB_INTERNAL_PADDING_PX,
+    FRAME_TAB_INNER_GAP_PX,
+    FRAME_TAB_LEFT_INSET_PX,
+    FRAME_TAB_RIGHT_INSET_PX,
+    FRAME_TAB_MIN_WIDTH_PX,
     FRAME_TAB_OFFSET_FROM_BOX_PX,
 } from './frame-tab-geometry.js';
 export {

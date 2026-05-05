@@ -119,6 +119,63 @@ swimlane a "A"
     });
 });
 
+describe('renderSvg — lane capacity badge', () => {
+    it('paints a multiplier badge inside the frame tab', async () => {
+        const dsl = `nowline v1\n\nroadmap r1 "R" start:2026-01-05\n\nswimlane sprint "Sprint" capacity:5\n  item x "Build" duration:2w\n`;
+        const model = await parseToModel(dsl);
+        const svg = await renderSvg(model);
+        // Lane swimlane block should contain a 5× text node from the
+        // capacity badge. Identify the swimlane's <g> by data-id and
+        // confirm the badge appears inside it.
+        const laneFragment = svg.match(/<g data-id="sprint" data-layer="swimlane">[\s\S]*?<\/g>/);
+        expect(laneFragment).not.toBeNull();
+        expect(laneFragment![0]).toContain('>5\u00D7<');
+    });
+
+    it('paints a person SVG glyph inside the frame tab', async () => {
+        // `team` is a grammar keyword — pick a non-keyword lane id.
+        const dsl = `nowline v1\n\nconfig\nstyle counted\n  capacity-icon: person\n\nroadmap r1 "R" start:2026-01-05\n\nswimlane crew "Team" capacity:8 style:counted\n  item x "Build" duration:2w\n`;
+        const model = await parseToModel(dsl);
+        const svg = await renderSvg(model);
+        const laneFragment = svg.match(/<g data-id="crew" data-layer="swimlane">[\s\S]*?<\/g>/);
+        expect(laneFragment).not.toBeNull();
+        // Number text + curated person SVG icon in the chiclet.
+        expect(laneFragment![0]).toContain('>8<');
+        expect(laneFragment![0]).toMatch(/<svg [^>]*viewBox="0 0 24 24"[^>]*>.*<circle[^>]*currentColor/);
+    });
+
+    it('omits the badge when no capacity is declared', async () => {
+        const dsl = `nowline v1\n\nroadmap r1 "R" start:2026-01-05\n\nswimlane sprint "Sprint"\n  item x "Build" duration:2w\n`;
+        const model = await parseToModel(dsl);
+        const svg = await renderSvg(model);
+        const laneFragment = svg.match(/<g data-id="sprint" data-layer="swimlane">[\s\S]*?<\/g>/);
+        expect(laneFragment).not.toBeNull();
+        // No multiplication sign and no SVG icon inside the lane block.
+        expect(laneFragment![0]).not.toContain('\u00D7');
+        expect(laneFragment![0]).not.toMatch(/<svg [^>]*viewBox="0 0 24 24"/);
+    });
+
+    it('renders inline-literal capacity-icon in the badge via tspan', async () => {
+        const dsl = `nowline v1\n\nconfig\nstyle gear\n  capacity-icon: "⚙"\n\nroadmap r1 "R" start:2026-01-05\n\nswimlane ops "Ops" capacity:4 style:gear\n  item x "Build" duration:2w\n`;
+        const model = await parseToModel(dsl);
+        const svg = await renderSvg(model);
+        const laneFragment = svg.match(/<g data-id="ops" data-layer="swimlane">[\s\S]*?<\/g>/);
+        expect(laneFragment).not.toBeNull();
+        expect(laneFragment![0]).toMatch(/>4<tspan dx="[^"]+">⚙<\/tspan>/);
+    });
+
+    it('still emits the badge when the lane has both an owner and capacity', async () => {
+        const dsl = `nowline v1\n\nconfig\nteam plat "Platform"\n\nroadmap r1 "R" start:2026-01-05\n\nswimlane sprint "Sprint" owner:plat capacity:5\n  item x "Build" duration:2w\n`;
+        const model = await parseToModel(dsl);
+        const svg = await renderSvg(model);
+        const laneFragment = svg.match(/<g data-id="sprint" data-layer="swimlane">[\s\S]*?<\/g>/);
+        expect(laneFragment).not.toBeNull();
+        // Owner badge text + capacity badge both appear.
+        expect(laneFragment![0]).toContain('owner: Platform');
+        expect(laneFragment![0]).toContain('>5\u00D7<');
+    });
+});
+
 describe('renderSvg — item capacity suffix', () => {
     it('renders multiplier capacity as a single text node ending in U+00D7', async () => {
         const dsl = `nowline v1\n\nroadmap r1 "R" start:2026-01-05\n\nswimlane s "Sprint"\n  item x "Build" duration:2w capacity:5\n`;

@@ -1,0 +1,73 @@
+nowline v1
+
+// Fixture exercising lane-level `capacity:N` badges in the frame tab.
+// Each lane uses a different `capacity-icon:` so the renderer's full
+// suffix-rendering matrix (text, built-in SVG, inline literal, custom
+// glyph, none) is visible inside the chiclet alongside lanes that also
+// have items declaring item-level capacity.
+//
+// Style names avoid grammar keywords (`team`, `person`, `description`).
+// Lane ids likewise avoid `team`, etc. Comments use `//`.
+
+config
+
+glyph budget "Budget" unicode:"💰" ascii:"$"
+
+style fte
+  capacity-icon: person
+
+style scored
+  capacity-icon: points
+
+style hours
+  capacity-icon: time
+
+style funded
+  capacity-icon: budget
+
+style gear
+  capacity-icon: "⚙"
+
+style silent
+  capacity-icon: none
+
+roadmap r "Lane capacity badges" start:2026-01-05 length:6w
+
+team plat "Platform"
+team data "Data"
+
+// Default multiplier badge. No owner.
+swimlane mul-lane "Default mul" capacity:5
+  item m1 "Build" duration:4w capacity:2
+
+// Lane + owner + multiplier badge.
+swimlane owned "Sprint" owner:plat capacity:8
+  item w1 "Work" duration:4w capacity:3
+
+// Built-in SVG glyph (`person`) on the badge.
+swimlane fte-lane "Headcount" capacity:6 style:fte
+  item h1 "Hire" duration:4w capacity:2 style:fte
+
+// Built-in SVG glyph (`points`) for story-points capacity.
+swimlane points-lane "Sprint pts" capacity:42 style:scored
+  item s1 "Epic" duration:4w capacity:8 style:scored
+
+// Built-in SVG glyph (`time`) for hours-based capacity.
+swimlane hours-lane "Hours" owner:data capacity:160 style:hours
+  item h2 "Phase" duration:4w capacity:40 style:hours
+
+// Custom glyph (`budget`) dereferenced to its unicode payload.
+swimlane funded-lane "Funded" capacity:120000 style:funded
+  item c1 "Phase A" duration:4w capacity:30000 style:funded
+
+// Inline Unicode literal capacity-icon.
+swimlane gear-lane "Ops" capacity:3 style:gear
+  item o1 "Run" duration:4w capacity:1 style:gear
+
+// `capacity-icon:none` — bare number badge.
+swimlane silent-lane "Bare" capacity:7 style:silent
+  item n1 "Item" duration:4w capacity:2 style:silent
+
+// Decimal lane capacity.
+swimlane half "Half-time" capacity:0.5
+  item d1 "Item" duration:4w capacity:0.25

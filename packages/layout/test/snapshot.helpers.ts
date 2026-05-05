@@ -65,6 +65,9 @@ export const SAMPLES: SampleSpec[] = [
     // exercises default multiplier, built-in SVG icons, decimal/percent
     // values, inline Unicode literals, and declared custom glyphs.
     { name: 'capacity-items', sourceFile: 'capacity-items.nowline', theme: 'light' },
+    // m7: pins the rendering of lane-level `capacity:N` badges in the frame
+    // tab across the same icon matrix, plus owner-with-capacity stacking.
+    { name: 'capacity-lanes', sourceFile: 'capacity-lanes.nowline', theme: 'light' },
 ];
 
 export async function renderSampleSvg(spec: SampleSpec): Promise<string> {

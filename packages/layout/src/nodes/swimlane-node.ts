@@ -38,6 +38,49 @@ import { propValue } from '../dsl-utils.js';
 import { resolveDuration } from '../calendar.js';
 import { frameTabGeometry } from '../frame-tab-geometry.js';
 import { RowPacker } from '../row-packer.js';
+import {
+    parseCapacityValue,
+    formatCapacityNumber,
+    resolveCapacityIcon,
+    estimateCapacitySuffixWidth,
+} from '../capacity.js';
+import type { PositionedCapacity } from '../types.js';
+
+/**
+ * Font size (px) the renderer uses for the lane capacity badge. Mirrors
+ * the owner-badge font size in `renderSwimlane` so the two reads as a
+ * single info row inside the chiclet. Width estimates here must use the
+ * same value or the geometry-collision math diverges from the painted
+ * footprint.
+ */
+const LANE_CAPACITY_BADGE_FONT_SIZE_PX = 10;
+
+/**
+ * Compute the lane's PositionedCapacity (or null when no `capacity:` is
+ * declared / value is non-positive) plus the px width the badge will
+ * occupy inside the frame tab. The width includes the bare badge —
+ * leading-separator handling lives in `frameTabGeometry`.
+ */
+function resolveLaneCapacity(
+    lane: SwimlaneDeclaration,
+    style: { capacityIcon: string },
+    glyphs: LayoutContext['glyphs'],
+): { capacity: PositionedCapacity | null; badgeWidthPx: number } {
+    const raw = propValue(lane.properties, 'capacity');
+    const value = parseCapacityValue(raw);
+    if (value === null) return { capacity: null, badgeWidthPx: 0 };
+    const text = formatCapacityNumber(value);
+    const icon = resolveCapacityIcon(style.capacityIcon, glyphs);
+    const badgeWidthPx = estimateCapacitySuffixWidth(
+        text,
+        icon,
+        LANE_CAPACITY_BADGE_FONT_SIZE_PX,
+    );
+    return {
+        capacity: { value, text, icon },
+        badgeWidthPx,
+    };
+}
 
 /** Helpers that SwimlaneNode delegates to until the rest of m2.5c lands. */
 export interface SwimlaneNodeDeps {
@@ -92,15 +135,17 @@ const TAB_GUTTER_PX = 8;
  * Right edge (canvas px) of the lane title tab. Delegates to the
  * shared `frameTabGeometry` helper that the renderer also uses, so
  * the chiclet's collision footprint and its painted footprint stay
- * exactly in sync.
+ * exactly in sync. Capacity badge width is added when the lane
+ * declares `capacity:` so the first-item collision math reserves
+ * enough horizontal space for the (now-wider) chiclet.
  */
-function computeLaneTabRightX(lane: SwimlaneDeclaration): number {
+function computeLaneTabRightX(lane: SwimlaneDeclaration, capacityBadgeWidthPx: number): number {
     const title = lane.title ?? lane.name ?? '';
     if (!title) return 0;
     const ownerRaw = propValue(lane.properties, 'owner');
     // Box is laid out at `box.x = 0` for top-level lanes; the helper
     // adds the standard `FRAME_TAB_OFFSET_FROM_BOX_PX` itself.
-    return frameTabGeometry(0, title, ownerRaw ?? undefined).rightX;
+    return frameTabGeometry(0, title, ownerRaw ?? undefined, capacityBadgeWidthPx).rightX;
 }
 
 /**
@@ -142,8 +187,16 @@ export class SwimlaneNode {
         const laneLeftX = origin.x;
         const step = ctx.bandScale.step();
 
+        // Resolve lane capacity early — its width feeds into the
+        // chiclet's right-edge collision calculation, which determines
+        // whether the first row sits at TAB_TOP_Y or TAB_BOTTOM_Y.
+        const { capacity, badgeWidthPx } = resolveLaneCapacity(
+            lane,
+            style,
+            ctx.glyphs,
+        );
         // Title-tab geometry (mirrors the renderer; see renderSwimlane).
-        const tabRightX = computeLaneTabRightX(lane);
+        const tabRightX = computeLaneTabRightX(lane, badgeWidthPx);
         // First-row Y: when the first child's desired x is past the title
         // tab, top-align with the tab and reclaim ~28 px per lane.
         // Otherwise drop below the tab.
@@ -309,6 +362,7 @@ export class SwimlaneNode {
                 style,
                 owner: ownerDisplay,
                 footnoteIndicators,
+                capacity,
             },
             usedHeight: bandHeight,
             usedRightX,

@@ -76,6 +76,7 @@ import {
     FOOTNOTE_PANEL_PADDING_PX,
     FOOTNOTE_HEADER_BASELINE_OFFSET_PX,
     frameTabGeometry,
+    estimateCapacitySuffixWidth,
 } from '@nowline/layout';
 import { IdGenerator } from './ids.js';
 import { attrs, escAttr, escText, num, tag, textTag } from './xml.js';
@@ -1069,17 +1070,28 @@ function renderSwimlane(s: PositionedSwimlane, options: RenderOptions, idPrefix:
     // helper that the layout's row-packer also calls, so the chiclet's
     // visible footprint matches the collision box layout reserved for it.
     if (s.title) {
-        const tab = frameTabGeometry(s.box.x, s.title, s.owner);
-        const titleWidth = tab.titleWidth;
-        const tabW = tab.tabW;
+        // Lane capacity badge sits inside the frame tab after the owner
+        // (or after the title if no owner). Compute its width up-front so
+        // `frameTabGeometry` can size the chiclet to fit it, then read
+        // the placement positions back out — no second placement pass in
+        // the renderer.
+        const LANE_BADGE_FONT_SIZE_PX = 10;
+        const capacityBadgeBareWidthPx = s.capacity
+            ? estimateCapacitySuffixWidth(
+                  s.capacity.text,
+                  s.capacity.icon,
+                  LANE_BADGE_FONT_SIZE_PX,
+              )
+            : 0;
+        const tab = frameTabGeometry(s.box.x, s.title, s.owner, capacityBadgeBareWidthPx);
         const tabH = FRAME_TAB_HEIGHT_PX;
-        const tabX = tab.tabX;
         const tabY = s.box.y + 10;
+        const labelY = tabY + FRAME_TAB_LABEL_BASELINE_OFFSET_PX;
         parts.push(
             tag('rect', {
-                x: num(tabX),
+                x: num(tab.tabX),
                 y: num(tabY),
-                width: num(tabW),
+                width: num(tab.tabW),
                 height: num(tabH),
                 rx: 4,
                 ry: 4,
@@ -1091,8 +1103,8 @@ function renderSwimlane(s: PositionedSwimlane, options: RenderOptions, idPrefix:
         parts.push(
             textTag(
                 {
-                    x: num(tabX + 12),
-                    y: num(tabY + FRAME_TAB_LABEL_BASELINE_OFFSET_PX),
+                    x: num(tab.titleX),
+                    y: num(labelY),
                     'font-family': FONT_STACK[s.style.font],
                     'font-size': 12,
                     'font-weight': 600,
@@ -1105,8 +1117,8 @@ function renderSwimlane(s: PositionedSwimlane, options: RenderOptions, idPrefix:
             parts.push(
                 textTag(
                     {
-                        x: num(tabX + 12 + titleWidth),
-                        y: num(tabY + FRAME_TAB_LABEL_BASELINE_OFFSET_PX),
+                        x: num(tab.ownerX),
+                        y: num(labelY),
                         'font-family': FONT_STACK[s.style.font],
                         'font-size': 10,
                         fill: ownerText,
@@ -1115,11 +1127,28 @@ function renderSwimlane(s: PositionedSwimlane, options: RenderOptions, idPrefix:
                 ),
             );
         }
+        if (s.capacity) {
+            // Re-uses the same `renderCapacitySuffix` helper that paints
+            // item-level suffixes (m6) so multiplier / built-in SVG /
+            // inline literal / dereferenced-custom-glyph paths stay
+            // consistent across both contexts.
+            parts.push(
+                renderCapacitySuffix(
+                    s.capacity,
+                    undefined,
+                    tab.badgeX,
+                    labelY,
+                    LANE_BADGE_FONT_SIZE_PX,
+                    FONT_STACK[s.style.font],
+                    ownerText,
+                ),
+            );
+        }
         if (s.footnoteIndicators.length > 0) {
             parts.push(
                 textTag(
                     {
-                        x: num(tabX + tabW - 8),
+                        x: num(tab.rightX - 8),
                         y: num(tabY + 14),
                         'font-family': FONT_STACK.sans,
                         'font-size': 10,

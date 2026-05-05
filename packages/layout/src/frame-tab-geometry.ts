@@ -1,38 +1,83 @@
 // Frame-tab chiclet geometry — the rounded label tab that overhangs a
-// swimlane's frame. Layout pre-computes the chiclet's right edge so the
-// row-packer can decide whether the first item should sit at the
-// chiclet's TOP_Y (clear of the chiclet) or be pushed below it; the
-// renderer paints the chiclet using the SAME math.
+// swimlane's frame. Both the layout (collision math) and the renderer
+// (drawing) call `frameTabGeometry` so the chiclet's painted footprint
+// matches the bounding box layout reserves for it, and so the same
+// helper computes WHERE inside the chiclet each text element lands.
 //
-// The character-width factors are deliberately conservative — they
-// over-estimate so the chiclet never visually clips its label even
-// when the actual font metrics exceed our estimate.
+// Design note: this helper separates two concerns that used to be
+// conflated in a single set of "column widths":
+//
+//   * Text-end positions (`titleX`, `ownerX`, `badgeX`) are computed
+//     from estimated actual text widths plus a small explicit
+//     `FRAME_TAB_INNER_GAP_PX`. The renderer paints elements at these
+//     X coordinates directly — no second placement pass.
+//
+//   * Chiclet width (`tabW`) is computed from the right edge of the
+//     last painted element plus `FRAME_TAB_RIGHT_INSET_PX`, with a
+//     small minimum so a 2–3 char solo title still produces a usable
+//     chip. This means short labels naturally shrink-wrap their
+//     chiclet rather than reserving a wide whitespace column.
+//
+// The per-char width factors are calibrated to actual avg-char-width
+// of the system sans-serif stack at the relevant font sizes / weights.
+// They lean slightly conservative (~5 % over actual) so the chiclet
+// never visually clips its label even when the runtime font's metrics
+// exceed the calibration target.
 
-/** Conservative px-per-char for a 12 pt bold-ish title in `FONT_STACK.sans`. */
-export const FRAME_TAB_TITLE_PX_PER_CHAR = 7;
+/**
+ * Px-per-char for a 12 pt 600-weight title in `FONT_STACK.sans`.
+ * Calibrated against system-ui at 12 pt bold (~6.3 px/char actual);
+ * 6.5 leaves a small safety margin without producing a wide gap to
+ * the owner / badge that follows.
+ */
+export const FRAME_TAB_TITLE_PX_PER_CHAR = 6.5;
 
-/** Conservative px-per-char for a 10 pt regular owner suffix. */
-export const FRAME_TAB_OWNER_PX_PER_CHAR = 5.6;
+/**
+ * Px-per-char for a 10 pt regular owner suffix in `FONT_STACK.sans`.
+ * Calibrated against system-ui at 10 pt regular (~5 px/char actual).
+ */
+export const FRAME_TAB_OWNER_PX_PER_CHAR = 5;
 
-/** Minimum title-text column width inside the chiclet. */
-export const FRAME_TAB_TITLE_MIN_WIDTH_PX = 40;
+/**
+ * Visible gap (px) between adjacent text elements inside the chiclet:
+ * title→owner, owner→badge, and (no-owner) title→badge. Small enough
+ * to read as a single chip but big enough that the eye can still
+ * separate the tokens.
+ */
+export const FRAME_TAB_INNER_GAP_PX = 6;
 
-/** Minimum owner-suffix column width when an owner is present. */
-export const FRAME_TAB_OWNER_MIN_WIDTH_PX = 60;
+/** Horizontal inset (px) from the chiclet's left edge to the title text. */
+export const FRAME_TAB_LEFT_INSET_PX = 12;
 
-/** Horizontal internal padding (left + right combined) inside the chiclet. */
-export const FRAME_TAB_INTERNAL_PADDING_PX = 24;
+/** Horizontal inset (px) from the rightmost element's right edge to the chiclet's right edge. */
+export const FRAME_TAB_RIGHT_INSET_PX = 12;
+
+/**
+ * Minimum total chiclet width (px). Acts as a floor so very short
+ * solo titles ("Q1", "Mob") don't produce a tiny chip that's hard to
+ * notice. Owner / badge presence almost always pushes the chiclet
+ * past this floor on its own.
+ */
+export const FRAME_TAB_MIN_WIDTH_PX = 56;
 
 /** Horizontal offset (px) from the swimlane box's left edge to the tab's left edge. */
 export const FRAME_TAB_OFFSET_FROM_BOX_PX = 10;
 
 export interface FrameTabGeometry {
-    /** Width of the title text column (inside the chiclet). */
-    titleWidth: number;
-    /** Width of the owner suffix column (0 when no owner). */
-    ownerWidth: number;
-    /** Internal horizontal padding for the chiclet (left + right). */
-    padding: number;
+    /** Estimated rendered width (px) of the title text, no min-clamp. */
+    titleTextWidth: number;
+    /** Estimated rendered width (px) of the owner suffix; 0 when no owner. */
+    ownerTextWidth: number;
+    /** Width (px) of the capacity badge as supplied by the caller; 0 when none. */
+    capacityBadgeWidth: number;
+
+    /** Canvas X (px) where the title text is painted. */
+    titleX: number;
+    /** Canvas X (px) where the owner text is painted; 0 when no owner. */
+    ownerX: number;
+    /** Canvas X (px) where the capacity badge starts; 0 when no badge. */
+    badgeX: number;
+
     /** Left X (canvas px) of the chiclet rectangle. */
     tabX: number;
     /** Total chiclet width (px). */
@@ -42,21 +87,58 @@ export interface FrameTabGeometry {
 }
 
 /**
- * Single source of truth for the swimlane chiclet's geometry. Both the
- * layout (collision math) and the renderer (drawing) call this so the
- * chiclet never clips its label and never overlaps the first item.
+ * Single source of truth for the swimlane chiclet's geometry.
+ *
+ * `capacityBadgeWidth` is supplied by the caller (it depends on the
+ * resolved `capacity-icon` shape — text vs. SVG glyph — which neither
+ * the layout nor the renderer wants to duplicate). Pass 0 (or omit)
+ * when the lane has no capacity badge to render.
  */
 export function frameTabGeometry(
     boxX: number,
     title: string,
     owner: string | undefined,
+    capacityBadgeWidth: number = 0,
 ): FrameTabGeometry {
-    const titleWidth = Math.max(FRAME_TAB_TITLE_MIN_WIDTH_PX, title.length * FRAME_TAB_TITLE_PX_PER_CHAR);
-    const ownerWidth = owner
-        ? Math.max(FRAME_TAB_OWNER_MIN_WIDTH_PX, ('owner: ' + owner).length * FRAME_TAB_OWNER_PX_PER_CHAR)
-        : 0;
-    const padding = FRAME_TAB_INTERNAL_PADDING_PX;
     const tabX = boxX + FRAME_TAB_OFFSET_FROM_BOX_PX;
-    const tabW = titleWidth + ownerWidth + padding;
-    return { titleWidth, ownerWidth, padding, tabX, tabW, rightX: tabX + tabW };
+    const titleX = tabX + FRAME_TAB_LEFT_INSET_PX;
+
+    const titleTextWidth = title.length * FRAME_TAB_TITLE_PX_PER_CHAR;
+    let ownerTextWidth = 0;
+    let ownerX = 0;
+    if (owner) {
+        ownerTextWidth = ('owner: ' + owner).length * FRAME_TAB_OWNER_PX_PER_CHAR;
+        ownerX = titleX + titleTextWidth + FRAME_TAB_INNER_GAP_PX;
+    }
+
+    let badgeX = 0;
+    if (capacityBadgeWidth > 0) {
+        const lastTextEndX = owner
+            ? ownerX + ownerTextWidth
+            : titleX + titleTextWidth;
+        badgeX = lastTextEndX + FRAME_TAB_INNER_GAP_PX;
+    }
+
+    // Right edge of the rightmost painted element.
+    const contentRightX =
+        capacityBadgeWidth > 0
+            ? badgeX + capacityBadgeWidth
+            : owner
+              ? ownerX + ownerTextWidth
+              : titleX + titleTextWidth;
+
+    const contentW = contentRightX - tabX + FRAME_TAB_RIGHT_INSET_PX;
+    const tabW = Math.max(FRAME_TAB_MIN_WIDTH_PX, contentW);
+
+    return {
+        titleTextWidth,
+        ownerTextWidth,
+        capacityBadgeWidth,
+        titleX,
+        ownerX,
+        badgeX,
+        tabX,
+        tabW,
+        rightX: tabX + tabW,
+    };
 }

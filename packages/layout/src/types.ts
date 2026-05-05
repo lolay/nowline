@@ -326,6 +326,19 @@ export interface PositionedSwimlane {
     // Footnote indicator numbers attached to this swimlane (via `on:` in the
     // footnote declaration). Rendered in the upper-right of the frame tab.
     footnoteIndicators: number[];
+    /**
+     * Lane-level capacity badge data when the swimlane declares
+     * `capacity:N`. Null when no capacity is set or the value parses to
+     * zero. The renderer paints the badge inside the frame tab after the
+     * owner badge (or after the lane title when no owner is present),
+     * per specs/rendering.md § Lane capacity badge. m8 (overload sweep)
+     * also reads `value` to compute load against item capacities.
+     *
+     * `capacity-icon:none` resolves to `icon: null` here (just the bare
+     * number renders, no glyph) but the badge still appears. Authors who
+     * want the badge fully hidden simply omit `capacity:`.
+     */
+    capacity: PositionedCapacity | null;
 }
 
 export interface PositionedAnchor {

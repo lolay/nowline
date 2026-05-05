@@ -87,6 +87,59 @@ swimlane build "Build"
         expect(chip.style.bg.toLowerCase()).toBe('#e53935');
     });
 
+    describe('PositionedSwimlane.capacity emission', () => {
+        it('omits capacity when the lane declares none', async () => {
+            const src = `nowline v1\n\nroadmap r\n\nswimlane s "Lane"\n  item x duration:1w\n`;
+            const { file, resolved } = await parseAndResolve(src);
+            const model = layoutRoadmap(file, resolved, { theme: 'light' });
+            expect(model.swimlanes[0].capacity).toBeNull();
+        });
+
+        it('emits a multiplier badge by default for lanes with capacity', async () => {
+            const src = `nowline v1\n\nroadmap r\n\nswimlane s "Sprint" capacity:5\n  item x duration:1w\n`;
+            const { file, resolved } = await parseAndResolve(src);
+            const model = layoutRoadmap(file, resolved, { theme: 'light' });
+            expect(model.swimlanes[0].capacity).toEqual({
+                value: 5,
+                text: '5',
+                icon: { kind: 'builtin', name: 'multiplier' },
+            });
+        });
+
+        it('honors capacity-icon overrides on the lane via style chain', async () => {
+            const src = `nowline v1\n\nconfig\nstyle counted\n  capacity-icon: people\n\nroadmap r\n\nswimlane s "Team" capacity:3 style:counted\n  item x duration:1w\n`;
+            const { file, resolved } = await parseAndResolve(src);
+            const model = layoutRoadmap(file, resolved, { theme: 'light' });
+            expect(model.swimlanes[0].capacity?.icon).toEqual({
+                kind: 'builtin',
+                name: 'people',
+            });
+        });
+
+        it('grows the frame tab to fit the capacity badge', async () => {
+            const src = `nowline v1\n\nroadmap r\n\nswimlane s "Sprint"\n  item x duration:1w\n`;
+            const srcWithCap = `nowline v1\n\nroadmap r\n\nswimlane s "Sprint" capacity:12000\n  item x duration:1w\n`;
+            const { file: f1, resolved: r1 } = await parseAndResolve(src);
+            const { file: f2, resolved: r2 } = await parseAndResolve(srcWithCap);
+            const m1 = layoutRoadmap(f1, r1, { theme: 'light' });
+            const m2 = layoutRoadmap(f2, r2, { theme: 'light' });
+            // Frame tab itself isn't directly exposed, but it determines
+            // where the first item lands in x. With a capacity badge the
+            // chiclet is wider, so the first item gets pushed further
+            // right (or below the tab — same row-pack outcome). Verify
+            // the chart-level box width grows.
+            expect(m2.width).toBeGreaterThanOrEqual(m1.width);
+        });
+
+        it('decimal lane capacity formats per spec', async () => {
+            const src = `nowline v1\n\nroadmap r\n\nswimlane s "Half" capacity:0.5\n  item x duration:1w\n`;
+            const { file, resolved } = await parseAndResolve(src);
+            const model = layoutRoadmap(file, resolved, { theme: 'light' });
+            expect(model.swimlanes[0].capacity?.value).toBe(0.5);
+            expect(model.swimlanes[0].capacity?.text).toBe('0.5');
+        });
+    });
+
     describe('PositionedItem.capacity emission', () => {
         it('omits capacity when the item declares none', async () => {
             const src = `nowline v1\n\nroadmap r\n\nswimlane s\n  item x duration:1w\n`;
