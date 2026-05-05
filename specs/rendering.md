@@ -238,9 +238,9 @@ When an item has `before:anchor-id` and its duration would push past the anchor 
 
 #### Item size chip
 
-Items declaring `size:NAME` render the size **id** (uppercased) as a small chip at the leading edge of the meta line, before the duration: `M 2w` for `size:m`, `XS 0.5d` for `size:xs`. The size declaration's title — used in legends, tooltips, and elsewhere — is intentionally not used here so the chip stays compact in t-shirt-code form. The chip uses the item's resolved meta color and the meta line font size; no separate background fill (it reads as inline text, not a tinted pill).
+Items declaring `size:NAME` render an author-controlled size label as a small chip at the leading edge of the meta line, before the duration. The chip text is the size declaration's `title` when one was provided, falling back to the id verbatim (case as typed): `size m "M" effort:1w` paints `M 2w`, `size xs effort:0.5d` paints `xs 0.5d`, `size med effort:1w` paints `med 1w`. Authors who want the classic uppercased t-shirt look pin it via the title (`size m "M"`); the layout never folds case on its own. The chip uses the item's resolved meta color and the meta line font size; no separate background fill (it reads as inline text, not a tinted pill).
 
-When `size:` and `duration:` are both set, the explicit `duration:` literal wins for bar width and the size chip still renders as annotation: `L 2w` even when `duration:2w` overrode a `size:l` derivation. Items without `size:` render no chip.
+When `size:` and `duration:` are both set, the explicit `duration:` literal wins for bar width and the size chip still renders as annotation: `lg 2w` (or `L 2w` if the `lg` size declares `title:"L"`) even when `duration:2w` overrode a `size:lg` derivation. Items without `size:` render no chip.
 
 #### Item capacity suffix
 
@@ -248,7 +248,7 @@ Items with `capacity:N` render the value as a suffix on their duration label: `2
 
 The suffix uses the item's resolved text color and matches the duration label's font size and weight.
 
-When all three meta-line elements are present, the on-bar reading order is `[size chip] [duration] [capacity suffix]` — e.g. `M 2w 2×` for a `size:m capacity:2` item with the default `multiplier` glyph.
+When all three meta-line elements are present, the on-bar reading order is `[size chip] [duration] [capacity suffix]` — e.g. `m 2w 2×` for a `size:m capacity:2` item (or `M 2w 2×` if the size declares `title:"M"`).
 
 #### Lane capacity badge
 

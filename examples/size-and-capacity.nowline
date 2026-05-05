@@ -1,0 +1,83 @@
+nowline v1
+
+// Fixture exercising the size + capacity interaction on items. Each
+// lane shows a single combination so the chip / derived duration /
+// capacity suffix are easy to read on the rendered SVG. Pairs nicely
+// with examples/capacity-items.nowline (capacity glyph variants) and
+// examples/long.nowline (size catalog without capacity).
+//
+// Reading order on each item bar: `[size chip] [duration] [capacity suffix]`.
+// The chip text is the size's title when one was provided, otherwise the
+// id verbatim (case as typed) — see specs/rendering.md § Item size chip.
+
+config
+
+style fte
+  capacity-icon: person
+
+style pair
+  capacity-icon: people
+
+roadmap r "Size + capacity demo" start:2026-01-05 length:8w
+
+// Sizes with t-shirt opt-in titles. Authors who want lowercase ids on the
+// chip just leave the title off (`size sm effort:3d`); see the `verbose-`
+// lanes below for the alternative.
+size sm "S"  effort:3d
+size md "M"  effort:1w
+size lg "L"  effort:2w
+size xl "XL" effort:4w
+
+// Lane 1 — size only, default capacity (1). Bar width = effort.
+//   chip: "S"  duration: 3d
+swimlane size-only-s "size:sm (capacity defaults to 1)"
+  item s1 "Solo" size:sm
+
+//   chip: "L"  duration: 2w
+swimlane size-only-l "size:lg (capacity defaults to 1)"
+  item l1 "Solo large" size:lg
+
+// Lane 2 — size + capacity, multiplier glyph (default).
+//   chip: "L"  duration: 1w (effort 2w / capacity 2)  suffix: "2×"
+swimlane team-of-2 "size:lg capacity:2 (default × glyph)"
+  item t1 "Two-engineer large" size:lg capacity:2
+
+//   chip: "XL" duration: 1w (effort 4w / capacity 4)  suffix: "4×"
+swimlane team-of-4 "size:xl capacity:4 (default × glyph)"
+  item t2 "Four-engineer XL" size:xl capacity:4
+
+// Lane 3 — size + capacity with a custom glyph.
+//   chip: "M"  duration: 1d (effort 1w / capacity 5)  suffix: "5 [person]"
+swimlane fte-lane "size:md capacity:5 (person glyph)"
+  item f1 "Five FTEs on a medium" size:md capacity:5 style:fte
+
+//   chip: "L"  duration: 1w (effort 2w / capacity 2)  suffix: "2 [people]"
+swimlane pair-lane "size:lg capacity:2 (people glyph)"
+  item f2 "Pair on a large" size:lg capacity:2 style:pair
+
+// Lane 4 — explicit duration: literal wins; chip is annotation only.
+//   chip: "XL" duration: 1w (literal wins; effort would have been 4w)
+swimlane override "size:xl duration:1w (literal overrides effort)"
+  item o1 "XL annotation, week-long bar" size:xl duration:1w
+
+//   chip: "L"  duration: 3d (literal wins; chip + capacity coexist)  suffix: "3×"
+swimlane override-cap "size:lg duration:3d capacity:3 (literal + capacity)"
+  item o2 "Annotated short burst" size:lg duration:3d capacity:3
+
+// Lane 5 — sized item that's in-progress with a literal `remaining:`.
+//   chip: "L"  duration: 1w  meta: "L 1w — 50% remaining" (1w of 2w left)
+swimlane progress "size:lg capacity:2 status:in-progress remaining:1w"
+  item p1 "Halfway through" size:lg capacity:2 status:in-progress remaining:1w
+
+// Lane 6 — id-as-typed case preservation. No title, so the id appears
+// on the chip exactly how the author wrote it.
+size verbose "verbose" effort:1w
+size MED          effort:1w
+
+//   chip: "verbose" — title used (matches id text)
+swimlane id-verbose "size:verbose (lowercase title 'verbose')"
+  item v1 "Lowercase chip" size:verbose
+
+//   chip: "MED" — id verbatim (no title, no case folding)
+swimlane id-MED "size:MED (no title, id case preserved)"
+  item v2 "Author-uppercased id" size:MED

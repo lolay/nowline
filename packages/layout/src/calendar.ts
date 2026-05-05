@@ -164,6 +164,44 @@ export function deriveTotalEffortDays(
 }
 
 /**
+ * Format a calendar day count back into the largest unit literal that
+ * divides cleanly under the active calendar. Used by the meta line for
+ * sized items so the displayed duration reflects the *derived* calendar
+ * duration rather than the raw effort literal — `size:m capacity:5`
+ * with `effort:1w` paints a 1d bar and the meta should read `M 1d`,
+ * not `M 1w`.
+ *
+ *   - Whole-unit folds happen in descending order (`y` → `q` → `m` →
+ *     `w`); the first one that yields an integer wins so `5d` →
+ *     `"1w"` and `22d` (business calendar) → `"1m"`.
+ *   - Anything left over collapses to a `Nd` literal with up to two
+ *     decimal places, trailing zeros trimmed (`"3d"`, `"1.5d"`,
+ *     `"1.67d"`). Matches the `DURATION_LITERAL` shape the parser
+ *     accepts so round-tripping through the renderer reads naturally.
+ *   - `0` (or anything sub-1d) returns `"0d"` rather than an empty
+ *     string so callers always get a renderable token.
+ */
+export function formatDurationDays(days: number, cal: CalendarConfig): string {
+    const EPSILON = 1e-6;
+    const isWhole = (n: number) => n >= 1 && Math.abs(n - Math.round(n)) < EPSILON;
+    const folds: Array<[number, string]> = [
+        [cal.daysPerYear, 'y'],
+        [cal.daysPerQuarter, 'q'],
+        [cal.daysPerMonth, 'm'],
+        [cal.daysPerWeek, 'w'],
+    ];
+    for (const [unitDays, suffix] of folds) {
+        const n = days / unitDays;
+        if (isWhole(n)) return `${Math.round(n)}${suffix}`;
+    }
+    if (Math.abs(days - Math.round(days)) < EPSILON) {
+        return `${Math.round(days)}d`;
+    }
+    // parseFloat strips trailing zeros: `1.50` → `1.5`, `1.67` → `1.67`.
+    return `${parseFloat(days.toFixed(2))}d`;
+}
+
+/**
  * Build the layout's `Map<string, ResolvedSize>` once the calendar is
  * known. Skips sizes whose `effort:` literal is missing or unparseable —
  * the validator already errors on those, so layout silently drops them
@@ -180,7 +218,12 @@ export function resolveSizes(
         if (!effortLiteral) continue;
         const effortDays = literalToDays(effortLiteral, cal);
         if (effortDays <= 0) continue;
-        out.set(name, { name, effortDays, effortLiteral });
+        out.set(name, {
+            name,
+            title: decl.title || undefined,
+            effortDays,
+            effortLiteral,
+        });
     }
     return out;
 }

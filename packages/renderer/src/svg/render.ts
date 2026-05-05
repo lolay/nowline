@@ -294,6 +294,111 @@ function renderCapacitySuffix(
     );
 }
 
+/**
+ * Em-distance the renderer reserves between an item's metaText and its
+ * capacity suffix (or any inline trailing token). Half a space's worth
+ * — wide enough to read as a separator, narrow enough not to look like
+ * a stray gap. SVG `<tspan dx>` honors this exactly so we don't depend
+ * on per-character estimation for the gap itself.
+ */
+const META_SUFFIX_DX_EM = 0.6;
+
+/**
+ * Tighter em-per-char width estimate used inside `renderItemMetaLine`
+ * for positioning a built-in SVG icon after a metaText + number. Layout
+ * still uses 0.58 em/char to pessimistically reserve bar width for
+ * spill detection (so `metaText 5×` always fits its row); the renderer
+ * paints the icon at a tighter offset so there's no visible
+ * dead-space between the rendered number and its glyph. Lands inside
+ * the layout reservation either way (`0.5 < 0.58`).
+ */
+const META_ICON_EM_PER_CHAR = 0.5;
+
+/**
+ * Paint the item meta line (metaText plus optional capacity suffix) as
+ * a single SVG fragment. Call sites used to emit metaText and the
+ * suffix as two unrelated `<text>` nodes whose horizontal offsets came
+ * from `estimateCaptionWidthPx` — fine for short metas like `2w`, but
+ * the per-character estimate over-reserves for longer captions like
+ * `L 1w — 1w remaining`, leaving a visible gap before `2×`.
+ *
+ * The fix flows the suffix INSIDE the same `<text>` element via
+ * `<tspan dx>` whenever the suffix is pure inline text (multiplier,
+ * literal glyph, or no glyph). Browsers compute the dx anchor relative
+ * to the previously rendered glyph so the gap matches the spec
+ * regardless of how wide metaText actually rendered.
+ *
+ * Built-in SVG icons (person/people/points/time) still need an `<svg>`
+ * sibling outside `<text>`, so the icon's x is computed via the
+ * tighter `META_ICON_EM_PER_CHAR` constant — which still lands inside
+ * the layout's pessimistic spill reservation.
+ */
+function renderItemMetaLine(opts: {
+    metaText: string | undefined;
+    capacity: PositionedCapacity | null;
+    x: number;
+    baselineY: number;
+    fontSize: number;
+    fontFamily: string;
+    color: string;
+}): string {
+    const { metaText, capacity, x, baselineY, fontSize, fontFamily, color } = opts;
+    if (!metaText && !capacity) return '';
+    const baseAttrs = {
+        'font-family': fontFamily,
+        'font-size': fontSize,
+        fill: color,
+    } as const;
+    if (!capacity) {
+        return textTag({ x: num(x), y: num(baselineY), ...baseAttrs }, metaText!);
+    }
+    if (!metaText) {
+        return renderCapacitySuffix(capacity, undefined, x, baselineY, fontSize, fontFamily, color);
+    }
+    const sepDx = num(fontSize * META_SUFFIX_DX_EM);
+    const openText =
+        `<text x="${num(x)}" y="${num(baselineY)}" font-family="${escAttr(fontFamily)}"`
+        + ` font-size="${fontSize}" fill="${escAttr(color)}">`;
+    const { text: numberStr, icon } = capacity;
+    if (!icon) {
+        return openText
+            + escText(metaText)
+            + `<tspan dx="${sepDx}">${escText(numberStr)}</tspan>`
+            + '</text>';
+    }
+    if (icon.kind === 'builtin' && icon.name === 'multiplier') {
+        return openText
+            + escText(metaText)
+            + `<tspan dx="${sepDx}">${escText(numberStr)}\u00D7</tspan>`
+            + '</text>';
+    }
+    if (icon.kind === 'literal') {
+        const glyphDx = num(fontSize * 0.1);
+        return openText
+            + escText(metaText)
+            + `<tspan dx="${sepDx}">${escText(numberStr)}</tspan>`
+            + `<tspan dx="${glyphDx}">${escText(icon.text)}</tspan>`
+            + '</text>';
+    }
+    // Built-in SVG icon — text element holds metaText + tspan-separated
+    // number, then the icon SVG sits at an estimated position. Tighter
+    // per-character estimate than layout's spill detector so the icon
+    // visually hugs the number.
+    const def = CAPACITY_ICON_SVG[icon.name];
+    const tightWidth = (s: string) => s.length * fontSize * META_ICON_EM_PER_CHAR;
+    const numberStartX = x + tightWidth(metaText) + fontSize * META_SUFFIX_DX_EM;
+    const iconGapPx = fontSize * 0.1;
+    const iconSize = fontSize;
+    const iconX = numberStartX + tightWidth(numberStr) + iconGapPx;
+    const iconY = baselineY - fontSize * 0.85;
+    const textPart = openText
+        + escText(metaText)
+        + `<tspan dx="${sepDx}">${escText(numberStr)}</tspan>`
+        + '</text>';
+    const iconPart = `<svg x="${num(iconX)}" y="${num(iconY)}" width="${num(iconSize)}" height="${num(iconSize)}" viewBox="${def.viewBox}" style="color:${escAttr(color)}" aria-hidden="true">${def.body}</svg>`;
+    return textPart + iconPart;
+}
+
 function rectFrame(x: number, y: number, w: number, h: number, style: ResolvedStyle, extra: Record<string, string | number | undefined | null | boolean> = {}): string {
     const rx = Math.min(CORNER_RADIUS_PX[style.cornerRadius] ?? 4, h / 2);
     return tag('rect', {
@@ -793,36 +898,24 @@ function renderItem(i: PositionedItem, options: RenderOptions, idPrefix: string,
             ),
         );
     }
-    if (i.metaText) {
+    // Meta line and capacity suffix render as a unified SVG fragment.
+    // For pure-text suffixes (multiplier, literal glyph, no glyph) the
+    // unified path emits a single `<text>` element with `<tspan dx>`
+    // for the gap so the suffix hugs the metaText regardless of how
+    // wide it actually rendered. Built-in SVG icon glyphs still emit a
+    // sibling `<svg>` but at a tighter offset than the legacy two-text
+    // path. See `renderItemMetaLine` for the full case-by-case.
+    if (i.metaText || i.capacity) {
         parts.push(
-            textTag(
-                {
-                    x: num(captionX),
-                    y: num(i.box.y + ITEM_CAPTION_META_BASELINE_OFFSET_PX),
-                    'font-family': FONT_STACK[i.style.font],
-                    'font-size': ITEM_CAPTION_META_FONT_SIZE_PX,
-                    fill: metaColor,
-                },
-                i.metaText,
-            ),
-        );
-    }
-    // Capacity suffix — `2w 5×`, `2w 5 [person]`, `0.5 ★`, etc. Renders on
-    // the meta line, immediately after metaText (or at the line's left
-    // edge when there's no metaText). See specs/rendering.md § Item
-    // capacity suffix. Layout owns parsing/formatting/icon resolution; the
-    // renderer just paints the assembled `PositionedCapacity`.
-    if (i.capacity) {
-        parts.push(
-            renderCapacitySuffix(
-                i.capacity,
-                i.metaText,
-                captionX,
-                i.box.y + ITEM_CAPTION_META_BASELINE_OFFSET_PX,
-                ITEM_CAPTION_META_FONT_SIZE_PX,
-                FONT_STACK[i.style.font],
-                metaColor,
-            ),
+            renderItemMetaLine({
+                metaText: i.metaText,
+                capacity: i.capacity,
+                x: captionX,
+                baselineY: i.box.y + ITEM_CAPTION_META_BASELINE_OFFSET_PX,
+                fontSize: ITEM_CAPTION_META_FONT_SIZE_PX,
+                fontFamily: FONT_STACK[i.style.font],
+                color: metaColor,
+            }),
         );
     }
     // Footnote superscript indicators. Two render modes:

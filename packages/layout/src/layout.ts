@@ -51,6 +51,7 @@ import {
     resolveDuration,
     deriveItemDurationDays,
     deriveTotalEffortDays,
+    formatDurationDays,
     addDays,
     daysBetween,
 } from './calendar.js';
@@ -383,34 +384,67 @@ function sequenceItem(
         style.fg = STATUS_BORDER[status];
     }
 
-    // Pre-format the secondary line shown inside the item bar. `duration:` is
-    // a literal; `size:NAME` resolves to the declared size's `effort:` literal
-    // — both shown as the same string ("2w"), not the alias ("lg"). m5 will
-    // adjust this for sized items so the displayed duration reflects
-    // `effort ÷ capacity` instead of the raw effort literal.
-    const durationRaw = propValue(props, 'duration') ?? propValue(props, 'size');
-    const durationLiteral = resolveDurationLiteral(durationRaw, ctx);
+    // Pre-format the secondary line shown inside the item bar.
+    //
+    //   - explicit `duration:LITERAL` renders verbatim (the literal IS
+    //     the calendar duration the bar paints).
+    //   - sized items render the *derived* calendar duration, NOT the
+    //     raw effort literal. `size:m capacity:5` with `effort:1w`
+    //     paints a 1d bar and the meta line must read `M 1d`, not
+    //     `M 1w` (which would lie about the bar's width).
+    //
+    // `formatDurationDays` folds days back into the largest whole-unit
+    // literal under the current calendar so common cases (`5d` → `1w`,
+    // `22d` → `1m` on business cal) read naturally; awkward divisions
+    // collapse to a decimal day literal (`1.67d`).
+    const explicitDurationLiteral = propValue(props, 'duration');
+    let displayDuration: string | undefined;
+    if (explicitDurationLiteral && /^\d+(?:\.\d+)?[dwmqy]$/.test(explicitDurationLiteral)) {
+        displayDuration = explicitDurationLiteral;
+    } else if (sizeResolved && durationDays > 0) {
+        displayDuration = formatDurationDays(durationDays, ctx.cal);
+    }
     const remainingRaw = propValue(props, 'remaining');
     const remainingLiteral = resolveDurationLiteral(remainingRaw, ctx);
+    // Size chip — author-controlled label at the leading edge of the
+    // meta line per specs/rendering.md § Item size chip. Prefers the
+    // size's `title` when one was provided, otherwise the id verbatim
+    // (case as typed). Inline text in the same color/font as the rest
+    // of meta (no tinted pill); composed into `metaText` so the
+    // renderer keeps painting one `<text>` element and the
+    // capacity-suffix offset math (which measures `metaText` width)
+    // accounts for the chip automatically.
+    const sizeChipText = sizeResolved
+        ? (sizeResolved.title ?? sizeResolved.name)
+        : '';
+    const sizeChipPrefix = sizeChipText ? `${sizeChipText} ` : '';
     let metaText: string | undefined;
     const ownerDisplay = resolveActorDisplay(ownerOverride ?? propValue(props, 'owner'), ctx);
     if (status === 'in-progress' && remainingLiteral) {
         if (ownerDisplay) {
-            metaText = `${ownerDisplay} — ${remainingLiteral} remaining`;
-        } else if (durationLiteral) {
-            metaText = `${durationLiteral} — ${remainingLiteral} remaining`;
+            metaText = `${sizeChipPrefix}${ownerDisplay} — ${remainingLiteral} remaining`;
+        } else if (displayDuration) {
+            metaText = `${sizeChipPrefix}${displayDuration} — ${remainingLiteral} remaining`;
         } else {
-            metaText = `${remainingLiteral} remaining`;
+            metaText = `${sizeChipPrefix}${remainingLiteral} remaining`;
         }
     } else if (status === 'in-progress' && progress > 0 && progress < 1) {
         const pct = Math.round((1 - progress) * 100);
         metaText = ownerDisplay
-            ? `${ownerDisplay} — ${pct}% remaining`
-            : durationLiteral ? `${durationLiteral} — ${pct}% remaining` : `${pct}% remaining`;
+            ? `${sizeChipPrefix}${ownerDisplay} — ${pct}% remaining`
+            : displayDuration
+                ? `${sizeChipPrefix}${displayDuration} — ${pct}% remaining`
+                : `${sizeChipPrefix}${pct}% remaining`;
     } else if (ownerDisplay) {
-        metaText = ownerDisplay;
-    } else if (durationLiteral) {
-        metaText = durationLiteral;
+        metaText = `${sizeChipPrefix}${ownerDisplay}`;
+    } else if (displayDuration) {
+        metaText = `${sizeChipPrefix}${displayDuration}`;
+    } else if (sizeChipPrefix) {
+        // Sized item with no other meta to compose around — chip alone.
+        // Practically unreachable today (sized items always derive a
+        // duration), but a safety belt against silently dropping the
+        // chip if a future code path nulls out displayDuration.
+        metaText = sizeChipPrefix.trimEnd();
     }
 
     // Capacity suffix — appended after metaText at render time. Layout's

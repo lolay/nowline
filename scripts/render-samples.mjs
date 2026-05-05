@@ -41,6 +41,7 @@ const MANIFEST = [
     { slug: 'teams',               source: 'examples/teams.nowline',           theme: 'light', now: NOW },
     { slug: 'capacity-items',      source: 'examples/capacity-items.nowline',  theme: 'light', now: NOW },
     { slug: 'capacity-lanes',      source: 'examples/capacity-lanes.nowline',  theme: 'light', now: NOW },
+    { slug: 'size-and-capacity',   source: 'examples/size-and-capacity.nowline', theme: 'light', now: NOW },
 ];
 
 function run(cmd, args, opts = {}) {

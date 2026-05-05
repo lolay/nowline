@@ -255,11 +255,11 @@ Each diagnostic is rendered in a biome/oxc-style frame via `@babel/code-frame`:
 
 ```
 roadmap.nowline:7:34 error: Unknown reference 'auth-refactro' in after — did you mean 'auth-refactor'?
-  5 |   item auth-refactor "Auth refactor" duration:l
+  5 |   item auth-refactor "Auth refactor" size:l
   6 |   parallel after:auth-refactor
 > 7 |     group audit-track "Audit Track" labels:security
     |                                     ^^^^^^^^^^^^^^^
-  8 |       item audit-log "Audit log v2" duration:xl before:code-freeze
+  8 |       item audit-log "Audit log v2" size:xl before:code-freeze
 ```
 
 `--diagnostic-format json` emits the stable diagnostic schema:

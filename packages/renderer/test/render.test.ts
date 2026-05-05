@@ -211,8 +211,10 @@ describe('renderSvg — item capacity suffix', () => {
         const dsl = `nowline v1\n\nconfig\nstyle gear\n  capacity-icon: "⚙"\n\nroadmap r1 "R" start:2026-01-05\n\nswimlane s "Sprint"\n  item x "Build" duration:2w capacity:2 style:gear\n`;
         const model = await parseToModel(dsl);
         const svg = await renderSvg(model);
-        // Number + tspan-separated literal in a single <text> element.
-        expect(svg).toMatch(/>2<tspan dx="[^"]+">⚙<\/tspan>/);
+        // metaText + tspan-separated number + tspan-separated literal,
+        // all inside the same <text> element so the gap is browser-
+        // computed instead of estimated. Order: `2w<tspan>2</tspan><tspan>⚙</tspan>`.
+        expect(svg).toMatch(/>2w<tspan dx="[^"]+">2<\/tspan><tspan dx="[^"]+">⚙<\/tspan>/);
     });
 
     it('renders custom glyph capacity by dereferencing to its unicode payload', async () => {
@@ -221,19 +223,22 @@ describe('renderSvg — item capacity suffix', () => {
         const dsl = `nowline v1\n\nconfig\nglyph budget "Budget" unicode:"💰" ascii:"$"\nstyle finance\n  capacity-icon: budget\n\nroadmap r1 "R" start:2026-01-05\n\nswimlane s "Funded"\n  item x "Phase A" duration:2w capacity:12000 style:finance\n`;
         const model = await parseToModel(dsl);
         const svg = await renderSvg(model);
-        expect(svg).toMatch(/>12000<tspan dx="[^"]+">💰<\/tspan>/);
+        expect(svg).toMatch(/>2w<tspan dx="[^"]+">12000<\/tspan><tspan dx="[^"]+">💰<\/tspan>/);
     });
 
-    it('omits the suffix when capacity-icon is "none"', async () => {
+    it('omits the glyph when capacity-icon is "none" (number still renders inline)', async () => {
         const dsl = `nowline v1\n\nconfig\nstyle silent\n  capacity-icon: none\n\nroadmap r1 "R" start:2026-01-05\n\nswimlane s "Sprint"\n  item x "Build" duration:2w capacity:7 style:silent\n`;
         const model = await parseToModel(dsl);
         const svg = await renderSvg(model);
-        // Number renders, but no glyph follows.
-        expect(svg).toContain('>7<');
-        expect(svg).not.toContain('\u00D7');
-        expect(svg).not.toMatch(/<tspan/);
-        // No SVG icon either.
-        expect(svg).not.toMatch(/<svg [^>]*viewBox="0 0 24 24"/);
+        // The number sits in a tspan inside the meta <text> for inline
+        // flow, but no glyph follows. Confirm: number present, exactly
+        // one tspan inside the item group, no multiplier sign, no icon SVG.
+        const fragment = svg.match(/<g data-id="x" data-layer="item">[\s\S]*?<\/g>/)![0];
+        expect(fragment).toMatch(/>2w<tspan dx="[^"]+">7<\/tspan>/);
+        const tspanCount = (fragment.match(/<tspan/g) || []).length;
+        expect(tspanCount).toBe(1);
+        expect(fragment).not.toContain('\u00D7');
+        expect(fragment).not.toMatch(/<svg [^>]*viewBox="0 0 24 24"/);
     });
 
     it('omits the entire suffix when no capacity is declared', async () => {
@@ -243,5 +248,83 @@ describe('renderSvg — item capacity suffix', () => {
         // No multiplication sign, no curated SVG glyphs.
         expect(svg).not.toContain('\u00D7');
         expect(svg).not.toMatch(/viewBox="0 0 24 24"/);
+    });
+});
+
+describe('renderSvg — item size chip', () => {
+    // The size chip is composed into the item's metaText by the layout
+    // (see specs/rendering.md § Item size chip — "no separate background
+    // fill, it reads as inline text"). The renderer just paints metaText
+    // verbatim, so these tests confirm the assembled string ends up in
+    // the rendered <text> element on the meta line.
+
+    function itemMetaTextNode(svg: string, itemId: string): string | null {
+        const fragment = svg.match(
+            new RegExp(`<g data-id="${itemId}" data-layer="item">[\\s\\S]*?<\\/g>`),
+        );
+        if (!fragment) return null;
+        // The meta line is the <text> element with font-size="11" inside
+        // the item group (the title sits at font-size="13"). The element
+        // may carry trailing `<tspan>` children for the capacity suffix
+        // (multiplier or literal glyph) — strip them so the test asserts
+        // only the metaText portion.
+        const metaOpen = fragment[0].match(/<text [^>]*font-size="11"[^>]*>([\s\S]*?)<\/text>/);
+        if (!metaOpen) return null;
+        const inner = metaOpen[1].split('<tspan')[0];
+        return inner;
+    }
+
+    it('paints the size id verbatim (no case folding) when no title is set', async () => {
+        const dsl = `nowline v1\n\nconfig\nsize m effort:1w\n\nroadmap r1 "R" start:2026-01-05\n\nswimlane s "Sprint"\n  item build "Build" size:m\n`;
+        const model = await parseToModel(dsl);
+        const svg = await renderSvg(model);
+        expect(itemMetaTextNode(svg, 'build')).toBe('m 1w');
+    });
+
+    it('paints the size title when one is provided (author-controlled chip label)', async () => {
+        // Title takes precedence — `size m "M"` is the canonical
+        // t-shirt opt-in for an uppercase chip.
+        const dsl = `nowline v1\n\nconfig\nsize m "M" effort:1w\n\nroadmap r1 "R" start:2026-01-05\n\nswimlane s "Sprint"\n  item build "Build" size:m\n`;
+        const model = await parseToModel(dsl);
+        const svg = await renderSvg(model);
+        expect(itemMetaTextNode(svg, 'build')).toBe('M 1w');
+    });
+
+    it('shows the derived calendar duration next to the chip, not the raw effort literal', async () => {
+        // size:m effort:1w (5d) ÷ capacity:5 = 1d on the calendar.
+        // Meta line must read "m 1d" — printing "m 1w" here would
+        // mislead the reader about the bar's actual width.
+        const dsl = `nowline v1\n\nconfig\nsize m effort:1w\n\nroadmap r1 "R" start:2026-01-05\n\nswimlane s "Sprint"\n  item build "Build" size:m capacity:5\n`;
+        const model = await parseToModel(dsl);
+        const svg = await renderSvg(model);
+        expect(itemMetaTextNode(svg, 'build')).toBe('m 1d');
+    });
+
+    it('keeps the chip when duration: literal overrides size:', async () => {
+        // Per spec sizing precedence: explicit `duration:` literal wins
+        // for the bar width; the size chip still renders as annotation.
+        const dsl = `nowline v1\n\nconfig\nsize lg effort:2w\n\nroadmap r1 "R" start:2026-01-05\n\nswimlane s "Sprint"\n  item build "Build" size:lg duration:3d capacity:2\n`;
+        const model = await parseToModel(dsl);
+        const svg = await renderSvg(model);
+        expect(itemMetaTextNode(svg, 'build')).toBe('lg 3d');
+    });
+
+    it('renders the on-bar reading order as `[size chip] [duration] [capacity suffix]`', async () => {
+        // metaText carries "m 1w"; the capacity suffix paints "2×" in a
+        // separate <text> node positioned after metaText's measured
+        // width. We just need both to be present in the item group.
+        const dsl = `nowline v1\n\nconfig\nsize m effort:2w\n\nroadmap r1 "R" start:2026-01-05\n\nswimlane s "Sprint"\n  item build "Build" size:m capacity:2\n`;
+        const model = await parseToModel(dsl);
+        const svg = await renderSvg(model);
+        expect(itemMetaTextNode(svg, 'build')).toBe('m 1w');
+        const fragment = svg.match(/<g data-id="build" data-layer="item">[\s\S]*?<\/g>/)![0];
+        expect(fragment).toContain('>2\u00D7<');
+    });
+
+    it('omits the chip entirely for items without size:', async () => {
+        const dsl = `nowline v1\n\nroadmap r1 "R" start:2026-01-05\n\nswimlane s "Sprint"\n  item build "Build" duration:1w\n`;
+        const model = await parseToModel(dsl);
+        const svg = await renderSvg(model);
+        expect(itemMetaTextNode(svg, 'build')).toBe('1w');
     });
 });

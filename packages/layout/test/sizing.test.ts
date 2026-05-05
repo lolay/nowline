@@ -62,10 +62,11 @@ describe('m5 — size + capacity duration derivation', () => {
 
     it('exposes ResolvedSize on PositionedItem when sized; null otherwise', async () => {
         const sized = await firstItem(
-            `nowline v1\n\nconfig\nsize md effort:2w\n\nroadmap r start:2026-01-05\n\nswimlane s\n  item a size:md\n`,
+            `nowline v1\n\nconfig\nsize md "Medium" effort:2w\n\nroadmap r start:2026-01-05\n\nswimlane s\n  item a size:md\n`,
         );
         expect(sized.size).not.toBeNull();
         expect(sized.size?.name).toBe('md');
+        expect(sized.size?.title).toBe('Medium');
         expect(sized.size?.effortLiteral).toBe('2w');
         expect(sized.size?.effortDays).toBe(10);
 
@@ -114,3 +115,90 @@ describe('m5 — remaining: literal normalizes against single-engineer effort', 
         expect(item.progressFraction).toBeCloseTo(0.5, 5);
     });
 });
+
+describe('m6 — size chip on the meta line', () => {
+    it('prefixes metaText with the size id verbatim when no title is provided', async () => {
+        // size:m, no title → chip text is "m" (case as typed). The
+        // derived calendar duration of 1w shows beside it.
+        const item = await firstItem(
+            `nowline v1\n\nconfig\nsize m effort:1w\n\nroadmap r start:2026-01-05\n\nswimlane s\n  item a size:m\n`,
+        );
+        expect(item.metaText).toBe('m 1w');
+    });
+
+    it('uses the size title when provided (author opt-in for a custom chip label)', async () => {
+        // `size m "M"` is the canonical t-shirt opt-in: title takes
+        // precedence over the id so authors who want uppercase get
+        // it explicitly, without the layout folding case on its own.
+        const item = await firstItem(
+            `nowline v1\n\nconfig\nsize m "M" effort:1w\n\nroadmap r start:2026-01-05\n\nswimlane s\n  item a size:m\n`,
+        );
+        expect(item.metaText).toBe('M 1w');
+    });
+
+    it('preserves the id case as typed when no title is set', async () => {
+        // Non-t-shirt naming (`med`, `MED`, `Med`) round-trips into the
+        // chip with the author's casing intact. Authors who hate
+        // shouty MED can keep `size med`; authors who love it can
+        // declare `size MED` directly.
+        const lower = await firstItem(
+            `nowline v1\n\nconfig\nsize med effort:1w\n\nroadmap r start:2026-01-05\n\nswimlane s\n  item a size:med\n`,
+        );
+        expect(lower.metaText).toBe('med 1w');
+        const upper = await firstItem(
+            `nowline v1\n\nconfig\nsize MED effort:1w\n\nroadmap r start:2026-01-05\n\nswimlane s\n  item a size:MED\n`,
+        );
+        expect(upper.metaText).toBe('MED 1w');
+    });
+
+    it('reflects the derived calendar duration, not the raw effort literal', async () => {
+        // effort:1w (5d) ÷ capacity:5 = 1d on the calendar. Meta must
+        // read "m 1d" — showing the size's effort literal here would
+        // mislead readers about the bar's actual width.
+        const item = await firstItem(
+            `nowline v1\n\nconfig\nsize m effort:1w\n\nroadmap r start:2026-01-05\n\nswimlane s\n  item a size:m capacity:5\n`,
+        );
+        expect(item.metaText).toBe('m 1d');
+    });
+
+    it('keeps the explicit duration: literal verbatim and still shows the chip', async () => {
+        // duration: wins for the bar; the chip is annotation-only per
+        // specs/dsl.md "Sizing precedence" → "lg 2w" even when the
+        // size would otherwise have derived a different value.
+        const item = await firstItem(
+            `nowline v1\n\nconfig\nsize lg effort:2w\n\nroadmap r start:2026-01-05\n\nswimlane s\n  item a size:lg duration:2w capacity:2\n`,
+        );
+        expect(item.metaText).toBe('lg 2w');
+    });
+
+    it('renders the on-bar reading order as [size chip] [duration] [capacity suffix]', async () => {
+        // Capacity suffix paints separately AFTER metaText (renderer
+        // uses metaText width as its x offset); we just need to confirm
+        // metaText itself ends right where the suffix expects to begin.
+        const item = await firstItem(
+            `nowline v1\n\nconfig\nsize m effort:2w\n\nroadmap r start:2026-01-05\n\nswimlane s\n  item a size:m capacity:2\n`,
+        );
+        expect(item.metaText).toBe('m 1w');
+        expect(item.capacity?.text).toBe('2');
+        expect(item.capacity?.icon).toEqual({ kind: 'builtin', name: 'multiplier' });
+    });
+
+    it('omits the chip entirely for items without size:', async () => {
+        const item = await firstItem(
+            `nowline v1\n\nroadmap r start:2026-01-05\n\nswimlane s\n  item a duration:1w\n`,
+        );
+        expect(item.metaText).toBe('1w');
+    });
+
+    it('keeps the chip when meta is owner-led (done item with owner)', async () => {
+        // Done items drop the duration from meta — only the owner
+        // shows. The size chip still annotates the item's effort
+        // budget so a quick scan still tells you "this large piece is
+        // owned by Alice".
+        const item = await firstItem(
+            `nowline v1\n\nconfig\nsize lg effort:2w\nperson alice "Alice"\n\nroadmap r start:2026-01-05\n\nswimlane s\n  item a size:lg owner:alice status:done\n`,
+        );
+        expect(item.metaText).toBe('lg Alice');
+    });
+});
+
