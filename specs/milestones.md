@@ -25,6 +25,7 @@ Commercial milestones (hosted editor, free viewer, MCP, enterprise, FedRAMP) are
 | ~~m2.5c~~ | ~~Layout v2: Measure/Place Tree~~ | Apache 2.0 | `Renderable` nodes per entity (item/swimlane/group/parallel/anchor/milestone/footnote/include) replace the monolithic `layout.ts` |
 | ~~m2.5d~~ | ~~Layout v2: Theme in Model~~ | Apache 2.0 | Resolved palette carried in the positioned model; renderer drops `theme === 'dark'` branches |
 | ~~m2i~~ | ~~Sample fidelity polish~~ | Apache 2.0 | Post-Layout-v2 rendering refinements: row-packing for items/markers/groups, caption + chip spill, narrow-bar decoration spill, luminance-aware status dots, now-pill flag mode, canvas growth helpers, geometry-constant centralization |
+| m2j | Capacity & utilization | Apache 2.0 | `capacity:` on swimlanes and items, `capacity-icon:` glyph vocabulary, `size <id> effort:N` declarations with item-derived durations, `remaining:` literal form, tri-state lane utilization underline (`utilization-warn-at:N`, `utilization-over-at:N`) |
 | m3 | IDE | Apache 2.0 | LSP server, VS Code/Cursor extension with live preview |
 | m4 | Embed | Apache 2.0 | Browser embed script, GitHub Action |
 | m4.5 | IDE Expansion | Apache 2.0 | Obsidian, Neovim, JetBrains (timing TBD) |
@@ -246,6 +247,27 @@ Test harness:
 
 Spec: [`specs/rendering.md`](./rendering.md) (post-m2.5 sections covering item bars, narrow-bar spill, bracket-style groups, now-pill flag mode, row packing)
 
+### m2j — Capacity & utilization
+
+Adds a first-class capacity model so swimlanes and items can express throughput, with a tri-state visualization for lane utilization. Lands in two phases on `feat/capacity`.
+
+**Phase A — Effort-based sizing (m1–m8 of the in-flight branch):**
+
+- `capacity:N` on swimlanes (integer/decimal) and items (integer/decimal/percent).
+- `capacity-icon:` style vocabulary (`none`, `multiplier` (default), `person`, `people`, `points`, `time`) plus custom `glyph` declarations and inline Unicode literals.
+- `size <id> ["title"] effort:N` declarations replace the old `duration` entity. Items reference a size via `size:NAME` and derive their bar duration as `effort ÷ item_capacity`. Explicit `duration:` literal always wins.
+- `remaining:` accepts both percent (`30%`) and single-engineer effort literals (`0.5d`, `1w`); literal form normalizes to a percent of total effort with overflow clamped + soft warning.
+- Renderer paints an inline size chip on the meta line (chip text uses size's `title` when provided, falls back to id-as-typed) and a `N[glyph]` capacity suffix after the duration.
+
+**Phase B — Tri-state utilization indicator (m9–m14 of the in-flight branch):**
+
+- `utilization-warn-at:N` and `utilization-over-at:N` properties on `swimlane` (and `default swimlane`). Defaults: `warn-at:80%`, `over-at:100%`.
+- Layout sweeps the lane's per-timestep load function and classifies half-open segments as `green | yellow | red`.
+- Renderer paints a continuous health-bar underline along the bottom of each lane band that has `capacity:` declared.
+- `utilization-warn-at:none` / `utilization-over-at:none` opt out of individual color bands; setting both to `none` suppresses the underline outright. Replaces the old `overcapacity:show|hide` toggle.
+
+Spec: [`specs/dsl.md`](./dsl.md) § Capacity, [`specs/rendering.md`](./rendering.md) § Swimlane Capacity | Handoff: [`specs/handoffs/handoff-m9-utilization.md`](./handoffs/handoff-m9-utilization.md)
+
 ### m3 — IDE
 
 First-class editing experience in VS Code and Cursor. Pulled ahead of the embed (m4) so authors can write `.nowline` files in their primary editor with live preview before the public embed surface ships.
@@ -280,9 +302,9 @@ Spec: [`specs/ide.md`](./ide.md)
 ## Dependency Chain
 
 ```
-m1 → m2a → m2b → m2b.5 → m2c → m2d → m2e → m2f → m2g → m2h → m2.5a → m2.5b → m2.5c → m2.5d → m2i → m3 → m4
-                                                                                                          ↘
-                                                                                                           m4.5 (depends on m3 only; sequenced after m4)
+m1 → m2a → m2b → m2b.5 → m2c → m2d → m2e → m2f → m2g → m2h → m2.5a → m2.5b → m2.5c → m2.5d → m2i → m2j → m3 → m4
+                                                                                                                ↘
+                                                                                                                 m4.5 (depends on m3 only; sequenced after m4)
 ```
 
 m1 is the critical foundation — every subsequent milestone depends on the DSL, parser, and typed AST it produces.

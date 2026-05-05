@@ -196,7 +196,7 @@ Swimlanes render as sequential solid bands with alternating subtle background ti
 - Content flows **left-to-right** (sequential items along the timeline) and **top-to-bottom** when nesting or parallel flows require vertical stacking
 - **Frame label**: swimlane name renders in the top-left of the band, horizontally written, styled like a PlantUML frame tab but with a modern aesthetic — a small tab or badge that sits at the top-left edge of the band, not a full-width header
 - **Owner badge**: if the swimlane has `owner:`, the resolved owner title renders inline inside the frame tab, to the right of the swimlane name, in the tab's muted text color
-- **Capacity badge**: if the swimlane has `capacity:`, the value renders inline inside the frame tab, after the owner badge (or after the lane name if no owner), in the tab's muted text color. Format: `N[glyph]` where `N` is the capacity number (trailing zeros trimmed) and the glyph is determined by the resolved `capacity-icon` style property. Example with default `multiplier`: `Platform Team · Sam · 5×`. With `person`: `Platform Team · Sam · 5 [person]`. With `points`: `Platform Team · Sam · 5 ★`. See [Swimlane Capacity & Overload](#swimlane-capacity--overload) for the full contract.
+- **Capacity badge**: if the swimlane has `capacity:`, the value renders inline inside the frame tab, after the owner badge (or after the lane name if no owner), in the tab's muted text color. Format: `N[glyph]` where `N` is the capacity number (trailing zeros trimmed) and the glyph is determined by the resolved `capacity-icon` style property. Example with default `multiplier`: `Platform Team · Sam · 5×`. With `person`: `Platform Team · Sam · 5 [person]`. With `points`: `Platform Team · Sam · 5 ★`. See [Swimlane Capacity](#swimlane-capacity) for the full contract.
 - **Footnote superscript**: footnote indicators attached to a swimlane render inside the **upper-right corner of the frame tab** (right-aligned, inset from the tab's right edge), not at the upper-right of the full band. This keeps the indicator co-located with the swimlane's own label instead of floating next to unrelated item bars on the far right of the chart
 - **Nested swimlane indentation**: child swimlanes are inset by the parent swimlane's `padding`. No separate indent property — padding stacking naturally creates visual nesting hierarchy
 - The swimlane band spans the full timeline width (from first to last tick mark, plus padding)
@@ -232,9 +232,9 @@ All dependency arrows use orthogonal routing — horizontal and vertical segment
 
 When an item has `before:anchor-id` and its duration would push past the anchor date, the overflowing portion of the item bar renders in red.
 
-### Swimlane Capacity & Overload
+### Swimlane Capacity
 
-`capacity:` annotations on swimlanes and items render as visual badges and (when concurrent item capacity exceeds the lane's budget) as an overload underline. None of these affect parser diagnostics — overload is a pure rendering signal.
+`capacity:` annotations on swimlanes and items render as visual badges, and lanes with `capacity:` paint a tri-state utilization underline (green / yellow / red) per timestep based on concurrent item load. None of these affect parser diagnostics — the underline is a pure rendering signal.
 
 #### Item size chip
 
@@ -274,26 +274,47 @@ Swimlanes with `capacity:N` render the value as `N[glyph]` inside the frame tab,
 | `points`     | `★` curated SVG star path             | `*`            | For story-points-based capacity.                       |
 | `time`       | `⏱` curated SVG stopwatch path        | `t`            | For time/hours-based capacity.                         |
 
-#### Lane overload underline
+#### Lane utilization underline
 
-When the **sum of concurrent item capacities at any timestep** within a swimlane exceeds the lane's `capacity:`, the lane renders an **overload underline** along the bottom edge of the band:
+Swimlanes with `capacity:` paint a **tri-state utilization underline** (green / yellow / red) along the bottom edge of the band. The underline is the visual surface for the lane's per-timestep load against capacity; it reads as a continuous health bar for the lane's lifetime, with color tracking utilization.
 
-- Compute the load function `f(x) = Σ items[i].capacity for items active at x` per timestep, walking from the lane's start to the lane's end.
-- Identify contiguous x-ranges where `f(x) > lane.capacity`. The result is zero or more discontiguous intervals.
-- For each interval, emit a red rectangle along the bottom edge of the swimlane band.
-  - Color: red (matches the existing overrun visual language used by `before:` overflow and date-driven overrun milestone lines).
-  - Height: 2px. Same visual weight as the milestone-line stroke for consistency.
-  - Y-position: flush with the bottom edge of the lane band, inside the band (not below).
-  - X-positions: align to the timestep boundaries, not item-bar edges. The underline can span less than a full item bar (when a parallel block partially overlaps with another item).
-- The underline is purely visual — no parser warning, no CLI diagnostic, no log output.
+**Load function and segmentation:**
 
-The underline is suppressed (not rendered) when:
+- Compute `f(x) = Σ items[i].capacity for items active at x` per timestep, walking from the lane's first item start to the lane's last item end. Items contribute their `capacity:` value (default `1` for sized items, `0` for duration-literal items with no explicit capacity — see `dsl.md` § Capacity → Default capacity).
+- Slice `f(x)` into half-open intervals `[t, t+δ)` at every event boundary (item start, item end). Within each interval the load is constant.
+- For each interval, compute the utilization fraction `u = f(x) / capacity` and classify against the lane's resolved thresholds (default `warn-at:80%`, `over-at:100%`):
+  - `u < warn-at` → **green** segment (healthy; includes the `u = 0` "idle" case, so the underline is continuous).
+  - `warn-at ≤ u < over-at` → **yellow** segment (approaching saturation).
+  - `u ≥ over-at` → **red** segment (over capacity).
+- Adjacent same-color segments coalesce into a single rectangle for fewer SVG nodes.
 
-- The lane has no `capacity:` value.
-- The lane (or its applicable `default swimlane`) declares `overcapacity:hide`.
-- No timestep in the lane is over capacity.
+**Geometry:**
 
-`overcapacity:hide` only suppresses this underline; it does not affect the lane's capacity badge in the frame tab nor any item-level capacity suffixes.
+- Height: 2px, matching the milestone-line stroke weight.
+- Y-position: flush with the bottom edge of the lane band, inside the band (not below).
+- X-positions: align to the timestep event boundaries (item start/end), not arbitrary day grid lines. Use `pixelsPerDay` arithmetic from the time scale.
+- The underline spans the full lane lifetime — from the first item's left edge to the last item's right edge — so adjacent green segments make the lane read as a continuous bar.
+
+**Theme tokens:**
+
+| Token                                  | Light default | Dark default | Notes                                         |
+| -------------------------------------- | ------------- | ------------ | --------------------------------------------- |
+| `theme.swimlane.utilizationOk`         | `#10b981`     | `#34d399`    | Green; healthy (load below `warn-at`).        |
+| `theme.swimlane.utilizationWarn`       | `#f59e0b`     | `#fbbf24`    | Yellow; warn band (load in `[warn, over)`).   |
+| `theme.swimlane.utilizationOver`       | `#ef4444`     | `#f87171`    | Red; over capacity (load `≥ over-at`).        |
+
+Authors can override these via the standard theme mechanism (out of scope here — see `themes.md` when it lands).
+
+**Threshold resolution order:** lane explicit > applicable `default swimlane` > built-in default (`warn-at:80%`, `over-at:100%`). The resolved values are independent — a lane can pin `warn-at:none` to skip the yellow band while leaving `over-at` at its default.
+
+**`none` and suppression:**
+
+- `utilization-warn-at:none` removes the yellow band; segments at or above `warn-at`'s effective coverage paint green until they reach `over-at`.
+- `utilization-over-at:none` removes the red band; segments at or above `over-at`'s effective coverage paint yellow (or green if `warn-at` is also `none`).
+- Setting both to `none` suppresses the underline entirely. Equivalent to opting out of the visual.
+- A lane without `capacity:` paints no underline regardless of threshold values (no denominator → undefined utilization). No diagnostic.
+
+The underline never affects parser diagnostics — it is purely a rendering signal — and it does not affect the lane's capacity badge in the frame tab nor any item-level capacity suffixes.
 
 ### Styles
 
