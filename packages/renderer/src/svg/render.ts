@@ -527,6 +527,18 @@ function renderItem(i: PositionedItem, options: RenderOptions, idPrefix: string,
     const captionX = i.textSpills
         ? i.box.x + i.box.width + ITEM_CAPTION_SPILL_GAP_PX
         : i.box.x + ITEM_CAPTION_INSET_X_PX;
+    // When the caption spills outside the bar it renders on the
+    // chart / group bg instead of the bar fill — `i.style.text` is
+    // resolved against the bar (e.g. `enterprise-style` propagates
+    // `text:white` from a label and audit-log's title becomes
+    // white-on-blue inside, but white-on-peach when spilled onto
+    // the orange-tinted audit-track group). Use the theme's
+    // default item text color (always tuned for chart bg) when
+    // text spills, and the per-bar color when it stays inside.
+    const captionInsideTextColor = i.style.text;
+    const captionOutsideTextColor = palette.entities.item.text;
+    const titleColor = i.textSpills ? captionOutsideTextColor : captionInsideTextColor;
+    const metaColor = i.textSpills ? captionOutsideTextColor : i.style.fg;
     if (i.title) {
         parts.push(
             textTag(
@@ -536,7 +548,7 @@ function renderItem(i: PositionedItem, options: RenderOptions, idPrefix: string,
                     'font-family': FONT_STACK[i.style.font],
                     'font-size': ITEM_CAPTION_TITLE_FONT_SIZE_PX,
                     'font-weight': 600,
-                    fill: i.style.text,
+                    fill: titleColor,
                 },
                 i.title,
             ),
@@ -550,13 +562,20 @@ function renderItem(i: PositionedItem, options: RenderOptions, idPrefix: string,
                     y: num(i.box.y + ITEM_CAPTION_META_BASELINE_OFFSET_PX),
                     'font-family': FONT_STACK[i.style.font],
                     'font-size': ITEM_CAPTION_META_FONT_SIZE_PX,
-                    fill: i.style.fg,
+                    fill: metaColor,
                 },
                 i.metaText,
             ),
         );
     }
-    // Footnote superscript indicators (just LEFT of the upper-right status dot).
+    // Footnote superscript indicators (just LEFT of the upper-right
+    // status dot). Render in the bar's resolved text color so they
+    // stay readable on any bar fill — a hardcoded red was getting
+    // lost on saturated mid-tone bars (e.g. a `bg:blue` bar from a
+    // label-style ref). The "footnote = red" attention cue lives in
+    // the footnote PANEL's red number column at the bottom of the
+    // chart, which renders on the white panel bg where red reads
+    // cleanly.
     if (i.footnoteIndicators.length > 0) {
         let fx = i.box.x + i.box.width - ITEM_FOOTNOTE_INDICATOR_INSET_RIGHT_PX;
         for (let k = i.footnoteIndicators.length - 1; k >= 0; k--) {
@@ -569,7 +588,7 @@ function renderItem(i: PositionedItem, options: RenderOptions, idPrefix: string,
                         'font-family': FONT_STACK.sans,
                         'font-size': 10,
                         'font-weight': 700,
-                        fill: palette.item.overflowX,
+                        fill: i.style.text,
                         'text-anchor': 'end',
                     },
                     String(n2),
