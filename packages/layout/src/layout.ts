@@ -449,12 +449,16 @@ function sequenceItem(
     if (chipsOutside) {
         chipPack = packSpillChips(chipSamples, itemBox.width);
     }
-    const chipRowCount = chipPack ? chipPack.rows.length : 0;
+    const chipRowCount = chipPack
+        ? chipPack.rows.length
+        : (chipSamples.length > 0 ? 1 : 0);
+    const hasMeta = metaText !== undefined;
     const chipBarExtra = computeChipBarExtra(
         chipsOutside,
         textSpills,
         chipRowCount,
         bandwidth,
+        hasMeta,
     );
     if (chipBarExtra > 0) {
         itemBox.height = bandwidth + chipBarExtra;
@@ -468,8 +472,18 @@ function sequenceItem(
     const captionStackChipY =
         itemBox.y + ITEM_CAPTION_META_BASELINE_OFFSET_PX
         + LABEL_CHIP_GAP_ABOVE_PROGRESS_STRIP_PX;
-    const chipRow0Y = chipsOutside && textSpills
-        ? captionStackChipY
+    // Inside-bar chips with meta need to clear the meta baseline —
+    // the natural `baseChipY` (anchored to bar bottom) sits above
+    // the meta line at typical bandwidths, so the chip rect would
+    // overlap the meta text vertically. Use whichever Y is lower.
+    // Outside-bar chips already reuse `captionStackChipY` when the
+    // caption ALSO spills; with caption inside we don't need to
+    // shift them since they're horizontally separated from the meta.
+    const stackBelowMeta =
+        (chipsOutside && textSpills) ||
+        (!chipsOutside && hasMeta && chipSamples.length > 0);
+    const chipRow0Y = stackBelowMeta
+        ? Math.max(baseChipY, captionStackChipY)
         : baseChipY;
     const chipStartX = chipsOutside
         ? itemBox.x + itemBox.width + ITEM_CAPTION_SPILL_GAP_PX
@@ -727,19 +741,38 @@ function computeChipBarExtra(
     captionSpills: boolean,
     chipRowCount: number,
     bandwidth: number,
+    hasMeta: boolean,
 ): number {
-    if (!chipsOutside || chipRowCount === 0) return 0;
-    // Row 0 anchor relative to the bar's TOP. When the caption
-    // spills, row 0 sits below the meta baseline; otherwise it sits
-    // just above where the original (un-grown) progress strip would
-    // have been.
-    const chipRow0Top = captionSpills
-        ? ITEM_CAPTION_META_BASELINE_OFFSET_PX
-            + LABEL_CHIP_GAP_ABOVE_PROGRESS_STRIP_PX
-        : bandwidth
-            - PROGRESS_STRIP_HEIGHT_PX
-            - LABEL_CHIP_HEIGHT_PX
-            - LABEL_CHIP_GAP_ABOVE_PROGRESS_STRIP_PX;
+    if (chipRowCount === 0) return 0;
+    // Row 0 anchor relative to the bar's TOP — three regimes:
+    //
+    //   1. chipsOutside + captionSpills → chips stack below the
+    //      spilled meta line (`captionStackTop`).
+    //   2. chips INSIDE the bar AND meta is present → chip top must
+    //      clear the meta baseline; the natural `baseTop` sits
+    //      ABOVE the meta line at default bandwidth (=56), so we
+    //      take whichever is lower of base/captionStack.
+    //   3. otherwise (in-bar w/o meta, or chipsOutside w/o caption
+    //      spill) → row 0 hugs the bar bottom at `baseTop`.
+    //
+    // Cases (2) and (3-with-multi-row-spill) can both grow the bar;
+    // case (3-with-single-row-inside-no-meta) never grows.
+    const baseTop =
+        bandwidth
+        - PROGRESS_STRIP_HEIGHT_PX
+        - LABEL_CHIP_HEIGHT_PX
+        - LABEL_CHIP_GAP_ABOVE_PROGRESS_STRIP_PX;
+    const captionStackTop =
+        ITEM_CAPTION_META_BASELINE_OFFSET_PX
+        + LABEL_CHIP_GAP_ABOVE_PROGRESS_STRIP_PX;
+    let chipRow0Top: number;
+    if (chipsOutside && captionSpills) {
+        chipRow0Top = captionStackTop;
+    } else if (!chipsOutside && hasMeta) {
+        chipRow0Top = Math.max(baseTop, captionStackTop);
+    } else {
+        chipRow0Top = baseTop;
+    }
     const lastRowBottomTop =
         chipRow0Top
         + (chipRowCount - 1) * LABEL_CHIP_ROW_STEP_PX
@@ -791,17 +824,30 @@ function predictItemChipExtraHeight(
     }
     const insideAvail = Math.max(0, visualWidth - 2 * ITEM_CAPTION_INSET_X_PX);
     const chipsOutside = chipRowWidth > insideAvail;
-    if (!chipsOutside) return 0;
+
+    // `hasMeta` mirrors `metaText !== undefined` in `sequenceItem`:
+    // metaText is set whenever an item declares a duration, owner,
+    // or remaining — so we just check those three props. Status
+    // strings (in-progress) only matter when paired with one of
+    // these, so this is an upper bound (false-positives still grow
+    // the bar by exactly the same amount as the renderer would, so
+    // they stay byte-stable).
+    const hasMeta =
+        propValue(props, 'duration') !== undefined ||
+        propValue(props, 'owner') !== undefined ||
+        propValue(props, 'remaining') !== undefined;
 
     const titleStr = item.title ?? item.name ?? '';
     const titleW = titleStr ? estimateTextWidth(titleStr, ITEM_CAPTION_TITLE_FONT_SIZE_PX) : 0;
     const captionSpills = titleW > insideAvail;
-    const pack = packSpillChips(samples, visualWidth);
+    const pack = chipsOutside ? packSpillChips(samples, visualWidth) : null;
+    const chipRowCount = pack ? pack.rows.length : (samples.length > 0 ? 1 : 0);
     return computeChipBarExtra(
         chipsOutside,
         captionSpills,
-        pack.rows.length,
+        chipRowCount,
         ctx.bandScale.bandwidth(),
+        hasMeta,
     );
 }
 
