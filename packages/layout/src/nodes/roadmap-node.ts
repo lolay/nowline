@@ -61,7 +61,11 @@ import {
 import { propValue, propValues, parseDate } from '../dsl-utils.js';
 import { SwimlaneNode } from './swimlane-node.js';
 import { buildAnchors } from './anchor-node.js';
-import { buildMilestones } from './milestone-node.js';
+import {
+    buildMilestones,
+    collectMilestonePredecessors,
+    lastPredecessorPerFlow,
+} from './milestone-node.js';
 import { buildFootnotes } from './footnote-node.js';
 import { buildIncludeRegions } from './include-node.js';
 
@@ -115,6 +119,8 @@ export interface RoadmapNodeDeps extends LayoutHelpers {
     collectItems: (swimlanes: SwimlaneDeclaration[]) => Map<string, ItemDeclaration>;
     buildDependencies: (
         items: Map<string, ItemDeclaration>,
+        swimlanes: PositionedSwimlane[],
+        includes: PositionedIncludeRegion[],
         ctx: LayoutContext,
     ) => PositionedDependencyEdge[];
     buildNowline: (today: Date | undefined, ctx: LayoutContext) => PositionedNowline | null;
@@ -349,6 +355,11 @@ export class RoadmapNode {
             entityLeftEdges: new Map(),
             entityRightEdges: new Map(),
             entityMidpoints: new Map(),
+            entityVisualLeftX: new Map(),
+            entityVisualRightX: new Map(),
+            itemArrowSource: new Map(),
+            itemFlowKey: new Map(),
+            currentFlowKey: '',
             itemSlackAttachY: new Map(),
             slackCorridors: [],
             markerRowPlacements,
@@ -383,6 +394,9 @@ export class RoadmapNode {
         const baselineEntityLeft = new Map(ctx.entityLeftEdges);
         const baselineEntityRight = new Map(ctx.entityRightEdges);
         const baselineEntityMid = new Map(ctx.entityMidpoints);
+        // Item-only maps don't carry baseline entries (date-pinned
+        // markers don't populate visual edges or arrow sources), so
+        // pass-2 reruns reset them to fresh empties.
 
         // Build swimlanes (declared order). Inter-band gap comes from
         // the swimlane default style's `spacing` bucket. Default
@@ -431,8 +445,14 @@ export class RoadmapNode {
             ctx.entityMidpoints = new Map(baselineEntityMid);
             // itemSlackAttachY only ever holds item entries (markers
             // never write to it), so a fresh map is the right reset —
-            // pass 2's items will repopulate.
+            // pass 2's items will repopulate. Same applies to the
+            // visual-edge / arrow-source / flow-key maps below.
             ctx.itemSlackAttachY = new Map();
+            ctx.entityVisualLeftX = new Map();
+            ctx.entityVisualRightX = new Map();
+            ctx.itemArrowSource = new Map();
+            ctx.itemFlowKey = new Map();
+            ctx.currentFlowKey = '';
             ctx.slackCorridors = corridors;
             pass = runSwimlaneLoop();
             swimlanes = pass.swimlanes;
@@ -605,7 +625,7 @@ export class RoadmapNode {
         const milestoneXs = new Set<number>(milestones.map((m) => m.center.x));
         const anchors = buildAnchors(resolved.content.anchors, ctx, milestoneXs);
         const itemsMap = deps.collectItems(laneEntries);
-        const edges = deps.buildDependencies(itemsMap, ctx);
+        const edges = deps.buildDependencies(itemsMap, swimlanes, includes, ctx);
 
         // Now-line (if today is within the window). Stops at the bottom
         // timeline panel when present, otherwise at the last swimlane —
@@ -720,53 +740,37 @@ function collectSlackCorridors(
         const dateRaw = propValue(m.properties, 'date');
         const afterRaw = propValues(m.properties, 'after');
         const date = parseDate(dateRaw);
+        // Reuse MilestoneNode's helpers so the corridor set agrees
+        // exactly with the rendered slack-arrow set: same source x
+        // (visual edge for items / cut-line for markers), same
+        // attach y, and the same flow-dedupe rule that collapses
+        // chained predecessors to one arrow per flow.
+        const preds = collectMilestonePredecessors(afterRaw, ctx);
+        const dedupedPreds = lastPredecessorPerFlow(preds);
+
         if (date) {
             const milestoneX = ctx.scale.forwardWithinDomain(date);
             if (milestoneX === null) continue;
-            let maxEnd = 0;
-            let maxY = 0;
-            let maxRef = '';
-            for (const ref of afterRaw) {
-                const end = ctx.entityRightEdges.get(ref);
-                if (end === undefined) continue;
-                if (end > maxEnd) {
-                    maxEnd = end;
-                    // Mirror MilestoneNode's attach-Y choice so the
-                    // corridor sits on the same row band as the rendered
-                    // arrow.
-                    maxY = ctx.itemSlackAttachY.get(ref)
-                        ?? ctx.entityMidpoints.get(ref)?.y
-                        ?? 0;
-                    maxRef = ref;
-                }
+            let maxPred = null as ReturnType<typeof collectMilestonePredecessors>[number] | null;
+            for (const p of dedupedPreds) {
+                if (!maxPred || p.x > maxPred.x) maxPred = p;
             }
-            if (maxEnd > milestoneX && maxY > 0) {
+            if (maxPred && maxPred.x > milestoneX && maxPred.y > 0) {
                 out.push({
-                    xStart: Math.min(maxEnd, milestoneX),
-                    xEnd: Math.max(maxEnd, milestoneX),
-                    y: maxY,
-                    slackPredId: maxRef,
+                    xStart: Math.min(maxPred.x, milestoneX),
+                    xEnd: Math.max(maxPred.x, milestoneX),
+                    y: maxPred.y,
+                    slackPredId: maxPred.ref,
                     milestoneId: id,
                 });
             }
             continue;
         }
-        if (afterRaw.length === 0) continue;
-        type Pred = { ref: string; x: number; y: number };
-        const preds: Pred[] = [];
-        for (const ref of afterRaw) {
-            const end = ctx.entityRightEdges.get(ref);
-            if (end === undefined) continue;
-            const yAttach = ctx.itemSlackAttachY.get(ref)
-                ?? ctx.entityMidpoints.get(ref)?.y
-                ?? 0;
-            preds.push({ ref, x: end, y: yAttach });
-        }
-        preds.sort((a, b) => b.x - a.x);
-        const maxEnd = preds[0]?.x;
-        if (maxEnd === undefined) continue;
-        for (let i = 1; i < preds.length; i++) {
-            const p = preds[i];
+        if (dedupedPreds.length === 0) continue;
+        dedupedPreds.sort((a, b) => b.x - a.x);
+        const maxEnd = dedupedPreds[0].x;
+        for (let i = 1; i < dedupedPreds.length; i++) {
+            const p = dedupedPreds[i];
             if (p.x < maxEnd && p.y > 0) {
                 out.push({
                     xStart: p.x,

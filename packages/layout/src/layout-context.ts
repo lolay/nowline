@@ -63,6 +63,44 @@ export interface LayoutContext {
     entityRightEdges: Map<string, number>;
     entityMidpoints: Map<string, Point>;
     /**
+     * Visual edges for items (entries with a painted bar). Differs
+     * from `entityLeftEdges`/`entityRightEdges` (logical column
+     * boundaries) by `ITEM_INSET_PX` on each side so dependency
+     * arrows attach to the painted bar edge instead of landing in
+     * the inter-column gutter. Anchors and milestones are absent —
+     * their attach geometry uses `(center.x, target.row.midY)` on
+     * the cut line, computed inline by `buildDependencies`.
+     */
+    entityVisualLeftX: Map<string, number>;
+    entityVisualRightX: Map<string, number>;
+    /**
+     * Per-item exit point for `after:` dependency arrows leaving
+     * this entity. Default = `(visualRight, midY)`. When the
+     * caption spills past the bar's right edge (`textSpills`), the
+     * exit drops to `(box.x + box.width / 2, box.y + box.height)`
+     * — the bottom-middle of the progress strip — so the arrow
+     * doesn't visually pierce the spilled title/meta text to the
+     * right of the bar.
+     */
+    itemArrowSource: Map<string, Point>;
+    /**
+     * Flow key for each item, used to dedupe milestone slack arrows.
+     * A "flow" is the deepest enclosing single-track container —
+     * swimlane root, sequential group, or one parallel sub-track.
+     * Two items share a flowKey iff they share that container path
+     * (file order already encodes their ordering, so only the
+     * latest predecessor in each flow contributes a slack arrow).
+     */
+    itemFlowKey: Map<string, string>;
+    /**
+     * The flow key currently being built by the swimlane walk.
+     * Container nodes (`SwimlaneNode`, `GroupNode`, `ParallelNode`)
+     * push their own segment onto this string before recursing into
+     * children and restore it afterward. `sequenceItem` reads this
+     * value to populate `itemFlowKey`.
+     */
+    currentFlowKey: string;
+    /**
      * Y coordinate where milestone slack arrows attach for each item id.
      * Defaults to the item's row midpoint; when an item's caption spills
      * past the bar's right edge, drops to the progress-strip's vertical

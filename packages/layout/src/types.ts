@@ -381,7 +381,18 @@ export interface PositionedDependencyEdge {
     fromId: string;
     toId: string;
     waypoints: Point[];    // first = source port; last = target port
-    kind: 'normal' | 'overflow';
+    /**
+     * - `normal`   — orthogonal arrow drawn AFTER swimlane / item /
+     *   marker fills so it sits on top of lane bands.
+     * - `overflow` — currently unused at construction; reserved for the
+     *   red `before:` overrun annotation arrow.
+     * - `underBar` — channel router could not find a clear vertical
+     *   gutter between the source and target columns; the arrow's
+     *   vertical leg crosses one or more item bars. The renderer paints
+     *   these edges BEFORE bar fills with a thinner stroke so the bar
+     *   stays the visual foreground.
+     */
+    kind: 'normal' | 'overflow' | 'underBar';
     style: ResolvedStyle;
 }
 

@@ -142,6 +142,13 @@ export class SwimlaneNode {
         const laneLeftX = origin.x;
         const step = ctx.bandScale.step();
 
+        // Each swimlane root opens a fresh flow — its direct children
+        // chain in time, so a milestone's `after:` predecessors that
+        // share a swimlane collapse to the latest one in file order
+        // (file order encodes the dependency on its own).
+        const previousFlowKey = ctx.currentFlowKey;
+        ctx.currentFlowKey = `lane:${lane.name ?? bandIndex}`;
+
         // Title-tab geometry (mirrors the renderer; see renderSwimlane).
         const tabRightX = computeLaneTabRightX(lane);
         // First-row Y: when the first child's desired x is past the title
@@ -298,6 +305,7 @@ export class SwimlaneNode {
             footnoteIndicators.sort((a, b) => a - b);
         }
 
+        ctx.currentFlowKey = previousFlowKey;
         return {
             positioned: {
                 id: lane.name,

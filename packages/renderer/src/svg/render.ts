@@ -1272,11 +1272,16 @@ function renderEdge(e: PositionedDependencyEdge, palette: Theme): string {
         : palette.dependency.edgeStroke;
     const points = e.waypoints;
     if (points.length < 2) return '';
+    // Under-bar edges paint BEFORE item fills (see `renderRoadmap`)
+    // and use a thinner stroke so the bar stays foreground. Normal /
+    // overflow edges sit on top of items and use the standard 1.1 px
+    // stroke.
+    const strokeWidth = e.kind === 'underBar' ? 0.8 : 1.1;
     return tag('path', {
         d: roundedOrthogonalPath(points, EDGE_CORNER_RADIUS),
         fill: 'none',
         stroke: color,
-        'stroke-width': 1.1,
+        'stroke-width': strokeWidth,
         'stroke-dasharray': e.kind === 'overflow' ? '4 2' : null,
         'stroke-linejoin': 'round',
         'marker-end': 'url(#nl-arrow)',
@@ -1693,6 +1698,18 @@ export async function renderSvg(
     // before items and overlays so item bars sit cleanly on top.
     parts.push(renderGridLines(model.timeline, model.chartBox.y, palette));
 
+    // m2g+: under-bar dependency edges go BEFORE swimlane / item
+    // content. The channel router falls back to under-bar routing when
+    // it can't find a clear vertical gutter between source and target;
+    // these edges intentionally cross item bars and need the item fills
+    // painted ON TOP so the bars stay the visual foreground. Renderer
+    // applies a thinner stroke (see `renderEdge`) to further de-emphasise
+    // the arrow body — only the head and stub at the target end stay
+    // crisply visible.
+    for (const e of model.edges) {
+        if (e.kind === 'underBar') parts.push(renderEdge(e, palette));
+    }
+
     // Swimlane content (frame tabs + items) on top of the grid lines.
     for (const s of model.swimlanes) parts.push(renderSwimlane(s, options, idPrefix, palette));
 
@@ -1700,8 +1717,11 @@ export async function renderSvg(
     // overlay the chart, with their own nested swimlanes inside).
     for (const r of model.includes) parts.push(renderIncludeRegion(r, options, idPrefix, palette));
 
-    // Dependency edges on top of items but below cut-lines / nowline
-    for (const e of model.edges) parts.push(renderEdge(e, palette));
+    // Normal / overflow dependency edges on top of items but below
+    // cut-lines / nowline. Under-bar edges already painted above.
+    for (const e of model.edges) {
+        if (e.kind !== 'underBar') parts.push(renderEdge(e, palette));
+    }
 
     // Anchor + milestone cut lines drawn AFTER items so they overlay the
     // swimlane fills.
