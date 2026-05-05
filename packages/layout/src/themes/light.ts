@@ -121,8 +121,8 @@ export const lightTheme: Theme = {
         rowTintOdd: '#f8fafc',
     },
     timeline: {
-        gridLine: '#e2e8f0',
-        minorGridLine: '#eef2f7',
+        gridLine: '#cbd5e1',
+        minorGridLine: '#e2e8f0',
         tickMark: '#cbd5e1',
         labelText: '#64748b',
         panelFill: '#ffffff',

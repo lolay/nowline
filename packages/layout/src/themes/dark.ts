@@ -119,8 +119,8 @@ export const darkTheme: Theme = {
         rowTintOdd: '#1e293b',
     },
     timeline: {
-        gridLine: '#334155',
-        minorGridLine: '#1f2937',
+        gridLine: '#475569',
+        minorGridLine: '#334155',
         tickMark: '#334155',
         labelText: '#cbd5e1',
         panelFill: '#0f172a',

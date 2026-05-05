@@ -55,7 +55,7 @@ export class AnchorNode {
             style,
             predecessorPoints: [],
             cutTopY: ctx.chartTopY,
-            cutBottomY: ctx.chartBottomY,
+            cutBottomY: ctx.swimlaneBottomY,
             bumpedUp: (placement?.rowIndex ?? 0) > 0,
             labelBox,
             labelSide,
