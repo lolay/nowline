@@ -25,6 +25,7 @@ Commercial milestones (hosted editor, free viewer, MCP, enterprise, FedRAMP) are
 | ~~m2.5c~~ | ~~Layout v2: Measure/Place Tree~~ | Apache 2.0 | `Renderable` nodes per entity (item/swimlane/group/parallel/anchor/milestone/footnote/include) replace the monolithic `layout.ts` |
 | ~~m2.5d~~ | ~~Layout v2: Theme in Model~~ | Apache 2.0 | Resolved palette carried in the positioned model; renderer drops `theme === 'dark'` branches |
 | ~~m2i~~ | ~~Sample fidelity polish~~ | Apache 2.0 | Post-Layout-v2 rendering refinements: row-packing for items/markers/groups, caption + chip spill, narrow-bar decoration spill, luminance-aware status dots, now-pill flag mode, canvas growth helpers, geometry-constant centralization |
+| ~~m2j~~ | ~~Dependency arrow attach + routing~~ | Apache 2.0 | Visual-edge attach with flow dedupe; channel-based orthogonal router (item-bar obstacles, parallel/group bracket-clearance nudge, slot assignment, under-bar fallback); min-stub constraints + parallel bracket-foot clearance |
 | m3 | IDE | Apache 2.0 | LSP server, VS Code/Cursor extension with live preview |
 | m4 | Embed | Apache 2.0 | Browser embed script, GitHub Action |
 | m4.5 | IDE Expansion | Apache 2.0 | Obsidian, Neovim, JetBrains (timing TBD) |
@@ -246,6 +247,31 @@ Test harness:
 
 Spec: [`specs/rendering.md`](./rendering.md) (post-m2.5 sections covering item bars, narrow-bar spill, bracket-style groups, now-pill flag mode, row packing)
 
+### ~~m2j — Dependency arrow attach + routing~~
+
+Three-step refinement of the m2g edge routing once Layout v2 (m2.5a–m2.5d) and the m2i polish were in place. Sample reviews of [`examples/dependencies.svg`](../examples/dependencies.svg) exposed three escalating issues that the original Manhattan `routeEdge` couldn't address: arrows piercing entity centers, vertical legs crashing through item bars, and tight gutters with no visible target stub. m2j collects the fixes.
+
+Attach geometry:
+- Arrows terminate at the **left visual edge** of the dependent item (not the logical column center), so the arrowhead lands on the painted bar.
+- Source point exits the **right visual edge** at the row midline, dropping to the **vertical center of the bottom progress strip** when the caption spills past the bar (so the arrow runs underneath the spilled text rather than through it).
+- Anchor / milestone predecessors attach to the marker's **vertical cut line** at the *target* item's row mid-Y — the cut line is the visible stem; the arrow is the short horizontal stub from the line into the target's left edge.
+- Same-row immediate-successor chains in one swimlane skip drawing — the spatial flow already conveys ordering. Marker → item stubs always draw.
+
+Milestone slack arrows — flow dedupe:
+- Predecessors are grouped by their enclosing **flow** (deepest single-track container — swimlane root, sequential `group`, or one `parallel` sub-track). Within one flow, only the **latest** predecessor (rightmost x) draws a slack arrow; siblings to its left collapse silently because file order in a single-track container already encodes the chain. Across flows (e.g., two predecessors in different `parallel` sub-tracks), each flow's last entry contributes its own slack arrow.
+
+Channel-based orthogonal router:
+- Replaced the single-elbow Manhattan `routeEdge` with a router that drops the vertical leg in the cleanest **inter-column gutter** between source and target. Item bars are obstacles; containers (`group`, `parallel`) are NOT obstacles (looping arrows around container edges produced unsatisfying detours).
+- Visible parallel `[ ]` brackets and bracket-style groups get a **bracket-clearance nudge**: the elbow X is shifted at least `BRACKET_NUDGE_PX` (4 px) away from any bracket whose Y span overlaps the leg. Both the vertical bar AND the inward foot tips of `[ ]` brackets are modelled.
+- Edges sharing a channel get distinct **slot indices** assigned by greedy interval coloring on their Y spans (slots map to ±3, ±6 px offsets around the channel centerline), so parallel arrows fan out instead of stacking.
+- **Under-bar fallback**: when no clean channel fits, the edge is tagged `kind: 'underBar'` and the renderer paints it BEFORE swimlane / item fills with a thinner 0.8 px stroke so the bar stays the visual foreground (vs the standard 1.1 px for normal edges).
+
+Min-stub constraints:
+- Every left-to-right edge guarantees `MIN_SOURCE_STUB_PX` (6 px) of horizontal lead-out from the source AND `MIN_TARGET_STUB_PX` (6 px) of horizontal lead-in to the target's arrowhead. The router computes a **satisfiable range** `[from.x + MIN_SOURCE_STUB_PX, to.x - MIN_TARGET_STUB_PX]` and confines the elbow X to it. When the gutter is narrower than the combined stubs, the router pins the elbow at `to.x - MIN_TARGET_STUB_PX` and forces under-bar so the leg paints behind the bars while the visible arrowhead lead-in is preserved.
+- Bracket-clearance nudge candidates are constrained to the satisfiable range; when neither side fits inside the range, the router signals under-bar.
+
+Spec: [`specs/rendering.md`](./rendering.md) § Dependency Arrows (Attach geometry + Channel Routing) | Handoff: [`specs/handoffs/m2j.md`](./handoffs/m2j.md)
+
 ### m3 — IDE
 
 First-class editing experience in VS Code and Cursor. Pulled ahead of the embed (m4) so authors can write `.nowline` files in their primary editor with live preview before the public embed surface ships.
@@ -280,9 +306,9 @@ Spec: [`specs/ide.md`](./ide.md)
 ## Dependency Chain
 
 ```
-m1 → m2a → m2b → m2b.5 → m2c → m2d → m2e → m2f → m2g → m2h → m2.5a → m2.5b → m2.5c → m2.5d → m2i → m3 → m4
-                                                                                                          ↘
-                                                                                                           m4.5 (depends on m3 only; sequenced after m4)
+m1 → m2a → m2b → m2b.5 → m2c → m2d → m2e → m2f → m2g → m2h → m2.5a → m2.5b → m2.5c → m2.5d → m2i → m2j → m3 → m4
+                                                                                                                ↘
+                                                                                                                 m4.5 (depends on m3 only; sequenced after m4)
 ```
 
 m1 is the critical foundation — every subsequent milestone depends on the DSL, parser, and typed AST it produces.
