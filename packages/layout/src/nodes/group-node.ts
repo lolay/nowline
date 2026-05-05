@@ -233,7 +233,17 @@ export class GroupNode {
         };
         cursor.x = timeCursorX + TRACK_BLOCK_TAIL_GUTTER_PX;
         cursor.maxX = Math.max(cursor.maxX, cursor.x);
-        cursor.height = Math.max(cursor.height, box.height);
+        // The painted `box.height` is the group's tight visual
+        // footprint (chiclet + content + bottomPad). The cursor
+        // advance, however, must include one inter-row gap
+        // (`step - bandwidth`) so a sibling stacked below in a
+        // `parallel` (or any track-pack consumer) doesn't butt
+        // right up against the group's bottom edge. Items naturally
+        // include that gap because they report `cursor.height = step`
+        // (bandwidth + gap); groups need to add it explicitly since
+        // their painted height is gap-less.
+        const interRowGap = ctx.bandScale.step() - ctx.bandScale.bandwidth();
+        cursor.height = Math.max(cursor.height, box.height + interRowGap);
         const id = node.name;
         if (id) {
             ctx.entityLeftEdges.set(id, box.x);
