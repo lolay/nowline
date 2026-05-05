@@ -9,6 +9,7 @@ import type {
     GroupBlock,
     ParallelBlock,
     EntityProperty,
+    GlyphDeclaration,
 } from '@nowline/core';
 import type {
     PositionedTimelineScale,
@@ -52,6 +53,13 @@ export interface LayoutContext {
     labels: Map<string, LabelDeclaration>;
     teams: Map<string, import('@nowline/core').TeamDeclaration>;
     persons: Map<string, import('@nowline/core').PersonDeclaration>;
+    /**
+     * Custom `glyph` declarations from `ResolvedConfig.glyphs`. Used by
+     * `resolveCapacityIcon` (in `capacity.ts`) to dereference custom glyph
+     * ids like `capacity-icon:budget` to the glyph's `unicode:` payload.
+     * Empty when the file declares no glyphs.
+     */
+    glyphs: Map<string, GlyphDeclaration>;
     footnoteIndex: Map<string, number>;
     /** For each footnote id, the list of `on:` host ids it references. */
     footnoteHosts: Map<string, string[]>;

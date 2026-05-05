@@ -95,6 +95,13 @@ import {
     packSpillChips,
 } from './item-bar-geometry.js';
 import { ItemNode } from './nodes/item-node.js';
+import {
+    parseCapacityValue,
+    formatCapacityNumber,
+    resolveCapacityIcon,
+    estimateCapacitySuffixWidth,
+} from './capacity.js';
+import type { PositionedCapacity } from './types.js';
 import { SwimlaneNode } from './nodes/swimlane-node.js';
 import { ParallelNode } from './nodes/parallel-node.js';
 import { GroupNode } from './nodes/group-node.js';
@@ -380,6 +387,34 @@ function sequenceItem(
         metaText = durationLiteral;
     }
 
+    // Capacity suffix — appended after metaText at render time. Layout's
+    // job here is to (a) parse the value out of `capacity:`, (b) format
+    // the display number, (c) resolve `capacity-icon` to either a
+    // built-in name or a literal string the renderer can paint directly,
+    // and (d) feed the suffix's estimated width into ItemNode so spill
+    // detection accounts for `2w 5×` rather than just `2w`. The suffix
+    // disappears entirely when capacity is missing or non-positive.
+    const capacityRaw = propValue(props, 'capacity');
+    const capacityValue = parseCapacityValue(capacityRaw);
+    let capacity: PositionedCapacity | null = null;
+    let capacityTrailingWidth = 0;
+    if (capacityValue !== null) {
+        const capacityText = formatCapacityNumber(capacityValue);
+        const capacityIcon = resolveCapacityIcon(style.capacityIcon, ctx.glyphs);
+        capacity = { value: capacityValue, text: capacityText, icon: capacityIcon };
+        const META_FONT_SIZE_PX_LOCAL = 11;
+        // Add a small leading separator (a single space's worth) only when
+        // the suffix sits next to existing meta text, so `2w 5×` has air
+        // between the duration and the count. Standalone suffix needs no
+        // leading separator.
+        const separatorWidth = metaText
+            ? estimateTextWidth(' ', META_FONT_SIZE_PX_LOCAL)
+            : 0;
+        capacityTrailingWidth =
+            separatorWidth
+            + estimateCapacitySuffixWidth(capacityText, capacityIcon, META_FONT_SIZE_PX_LOCAL);
+    }
+
     // Visual bar + caption-spill decision delegated to ItemNode. Logical
     // extent (used by chaining and `after:` lookups) stays on
     // logicalLeft/logicalRight; ItemNode computes the inset visual box and
@@ -391,6 +426,7 @@ function sequenceItem(
         logicalLeftX: logicalLeft,
         logicalRightX: logicalRight,
         metaText,
+        metaTrailingWidth: capacityTrailingWidth,
         hasLinkIcon,
     }).place(
         { x: logicalLeft, y: cursor.y },
@@ -452,7 +488,10 @@ function sequenceItem(
     const chipRowCount = chipPack
         ? chipPack.rows.length
         : (chipSamples.length > 0 ? 1 : 0);
-    const hasMeta = metaText !== undefined;
+    // Capacity suffix renders on the same line as metaText. Treat the meta
+    // line as present whenever EITHER metaText OR a capacity suffix will
+    // paint, so chip-row pitch reserves the right amount of vertical space.
+    const hasMeta = metaText !== undefined || capacity !== null;
     const chipBarExtra = computeChipBarExtra(
         chipsOutside,
         textSpills,
@@ -586,7 +625,13 @@ function sequenceItem(
             titleStr,
             ITEM_CAPTION_TITLE_FONT_SIZE_PX,
         );
-        const metaW = metaText ? estimateTextWidth(metaText, 11) : 0;
+        // Spill column width is the wider of the title and the *full* meta
+        // line (text + capacity suffix). `capacityTrailingWidth` is 0 when
+        // no capacity suffix is rendered, so this stays a no-op for items
+        // without `capacity:`.
+        const metaW =
+            (metaText ? estimateTextWidth(metaText, 11) : 0)
+            + capacityTrailingWidth;
         captionSpillWidth = Math.max(titleW, metaW);
         spillCursor += captionSpillWidth;
         needGap = true;
@@ -673,6 +718,7 @@ function sequenceItem(
         iconSpillX,
         footnoteSpillStartX,
         decorationsRightX,
+        capacity,
         style,
     };
     return result;
@@ -825,9 +871,10 @@ function predictItemChipExtraHeight(
     const insideAvail = Math.max(0, visualWidth - 2 * ITEM_CAPTION_INSET_X_PX);
     const chipsOutside = chipRowWidth > insideAvail;
 
-    // `hasMeta` mirrors `metaText !== undefined` in `sequenceItem`:
+    // `hasMeta` mirrors `metaText !== undefined` in `sequenceItem`,
+    // plus the capacity suffix (which renders on the same meta line).
     // metaText is set whenever an item declares a duration, owner,
-    // or remaining — so we just check those three props. Status
+    // or remaining — so we just check those four props. Status
     // strings (in-progress) only matter when paired with one of
     // these, so this is an upper bound (false-positives still grow
     // the bar by exactly the same amount as the renderer would, so
@@ -835,7 +882,8 @@ function predictItemChipExtraHeight(
     const hasMeta =
         propValue(props, 'duration') !== undefined ||
         propValue(props, 'owner') !== undefined ||
-        propValue(props, 'remaining') !== undefined;
+        propValue(props, 'remaining') !== undefined ||
+        propValue(props, 'capacity') !== undefined;
 
     const titleStr = item.title ?? item.name ?? '';
     const titleW = titleStr ? estimateTextWidth(titleStr, ITEM_CAPTION_TITLE_FONT_SIZE_PX) : 0;

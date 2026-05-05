@@ -87,6 +87,89 @@ swimlane build "Build"
         expect(chip.style.bg.toLowerCase()).toBe('#e53935');
     });
 
+    describe('PositionedItem.capacity emission', () => {
+        it('omits capacity when the item declares none', async () => {
+            const src = `nowline v1\n\nroadmap r\n\nswimlane s\n  item x duration:1w\n`;
+            const { file, resolved } = await parseAndResolve(src);
+            const model = layoutRoadmap(file, resolved, { theme: 'light' });
+            const item = model.swimlanes[0].children[0] as { capacity: unknown };
+            expect(item.capacity).toBeNull();
+        });
+
+        it('emits a multiplier suffix by default for items with capacity', async () => {
+            const src = `nowline v1\n\nroadmap r\n\nswimlane s\n  item x duration:1w capacity:5\n`;
+            const { file, resolved } = await parseAndResolve(src);
+            const model = layoutRoadmap(file, resolved, { theme: 'light' });
+            const item = model.swimlanes[0].children[0] as {
+                capacity: { value: number; text: string; icon: { kind: string; name?: string } | null };
+            };
+            expect(item.capacity).toEqual({
+                value: 5,
+                text: '5',
+                icon: { kind: 'builtin', name: 'multiplier' },
+            });
+        });
+
+        it('formats decimal capacity per spec (trailing zeros trimmed)', async () => {
+            const src = `nowline v1\n\nroadmap r\n\nswimlane s\n  item x duration:1w capacity:1.25\n`;
+            const { file, resolved } = await parseAndResolve(src);
+            const model = layoutRoadmap(file, resolved, { theme: 'light' });
+            const item = model.swimlanes[0].children[0] as { capacity: { text: string; value: number } };
+            expect(item.capacity.text).toBe('1.25');
+            expect(item.capacity.value).toBe(1.25);
+        });
+
+        it('converts percent literals to decimal capacity (50% → 0.5)', async () => {
+            const src = `nowline v1\n\nroadmap r\n\nswimlane s\n  item x duration:1w capacity:50%\n`;
+            const { file, resolved } = await parseAndResolve(src);
+            const model = layoutRoadmap(file, resolved, { theme: 'light' });
+            const item = model.swimlanes[0].children[0] as { capacity: { text: string; value: number } };
+            expect(item.capacity.value).toBe(0.5);
+            expect(item.capacity.text).toBe('0.5');
+        });
+
+        it('honors capacity-icon override on the item', async () => {
+            const src = `nowline v1\n\nconfig\nstyle counted\n  capacity-icon: person\n\nroadmap r\n\nswimlane s\n  item x duration:1w capacity:3 style:counted\n`;
+            const { file, resolved } = await parseAndResolve(src);
+            const model = layoutRoadmap(file, resolved, { theme: 'light' });
+            const item = model.swimlanes[0].children[0] as {
+                capacity: { icon: { kind: string; name?: string } };
+            };
+            expect(item.capacity.icon).toEqual({ kind: 'builtin', name: 'person' });
+        });
+
+        it('dereferences custom glyph ids to literal Unicode payload', async () => {
+            // Style ref sits on the item itself so the icon applies to the
+            // item's resolved style (style chain is per-entity, not
+            // parent-cascading).
+            const src = `nowline v1\n\nconfig\nglyph budget "Budget" unicode:"💰" ascii:"$"\nstyle finance\n  capacity-icon: budget\n\nroadmap r\n\nswimlane s\n  item x duration:1w capacity:12000 style:finance\n`;
+            const { file, resolved } = await parseAndResolve(src);
+            const model = layoutRoadmap(file, resolved, { theme: 'light' });
+            const item = model.swimlanes[0].children[0] as {
+                capacity: { icon: { kind: string; text?: string } };
+            };
+            expect(item.capacity.icon).toEqual({ kind: 'literal', text: '💰' });
+        });
+
+        it('treats inline Unicode literal capacity-icon as a literal', async () => {
+            const src = `nowline v1\n\nconfig\nstyle gear\n  capacity-icon: "⚙"\n\nroadmap r\n\nswimlane s\n  item x duration:1w capacity:2 style:gear\n`;
+            const { file, resolved } = await parseAndResolve(src);
+            const model = layoutRoadmap(file, resolved, { theme: 'light' });
+            const item = model.swimlanes[0].children[0] as {
+                capacity: { icon: { kind: string; text?: string } };
+            };
+            expect(item.capacity.icon).toEqual({ kind: 'literal', text: '⚙' });
+        });
+
+        it('drops icon to null when capacity-icon is "none"', async () => {
+            const src = `nowline v1\n\nconfig\nstyle silent\n  capacity-icon: none\n\nroadmap r\n\nswimlane s\n  item x duration:1w capacity:3 style:silent\n`;
+            const { file, resolved } = await parseAndResolve(src);
+            const model = layoutRoadmap(file, resolved, { theme: 'light' });
+            const item = model.swimlanes[0].children[0] as { capacity: { icon: unknown } };
+            expect(item.capacity.icon).toBeNull();
+        });
+    });
+
     describe('capacity-icon precedence', () => {
         it('defaults to multiplier when nothing overrides', async () => {
             const src = `nowline v1\n\nroadmap r\n\nswimlane s\n  item x duration:1w\n`;

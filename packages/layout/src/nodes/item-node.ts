@@ -50,6 +50,18 @@ export interface ItemNodeInput {
     /** Caption text shown under the title (e.g. "1w - 50% remaining"). */
     metaText?: string;
     /**
+     * Extra horizontal width (px) appended to the meta line for spill
+     * detection — covers content the renderer paints after `metaText` but
+     * that the layout assembles as a structured trailing element rather
+     * than a string (currently: the capacity suffix). The layout adds this
+     * to the meta-line's measured width before deciding whether the
+     * caption block fits inside the bar.
+     *
+     * Defaults to 0. Title spill checks ignore this value (the suffix
+     * never renders on the title line).
+     */
+    metaTrailingWidth?: number;
+    /**
      * True when the bar shows a link icon in its upper-left corner.
      * Caption text indents past the icon column so the title doesn't
      * collide with the icon.
@@ -119,12 +131,20 @@ export class ItemNode implements Renderable<PlacedItemGeometry> {
         const innerWidth = Math.max(0, visualWidth - captionLeftInset - TEXT_INSET_PX);
         const titleStr = this.input.title;
         const titleWidth = titleStr ? estimateTextWidth(titleStr, TITLE_FONT_SIZE_PX) : 0;
-        const metaWidth = this.input.metaText
+        const metaTextWidth = this.input.metaText
             ? estimateTextWidth(this.input.metaText, META_FONT_SIZE_PX)
             : 0;
+        const trailingWidth = this.input.metaTrailingWidth ?? 0;
+        // Trailing decoration (capacity suffix) renders to the right of
+        // metaText. When metaText is empty the suffix sits at the
+        // caption's leading edge, so its width is the entire meta-line
+        // budget; when both exist the suffix needs a small separator gap
+        // (rendered via `<tspan dx>` later) included in trailingWidth.
+        const metaWidth = metaTextWidth + trailingWidth;
+        const hasMetaContent = this.input.metaText !== undefined || trailingWidth > 0;
         const textSpills =
             (titleStr.length > 0 && titleWidth > innerWidth) ||
-            (this.input.metaText !== undefined && metaWidth > innerWidth);
+            (hasMetaContent && metaWidth > innerWidth);
         const textX = textSpills
             ? boxX + visualWidth + TEXT_OUTSIDE_GAP_PX
             : boxX + captionLeftInset;

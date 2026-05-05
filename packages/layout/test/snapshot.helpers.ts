@@ -60,6 +60,11 @@ export const SAMPLES: SampleSpec[] = [
     { name: 'platform-2026-dark', sourceFile: 'platform-2026.nowline', theme: 'dark' },
     { name: 'dependencies', sourceFile: 'dependencies.nowline', theme: 'light' },
     { name: 'isolate-include', sourceFile: 'isolate-include.nowline', theme: 'light' },
+    // m6: pins the rendering of every shape of `capacity:` + `capacity-icon:`
+    // combination for items. The companion `capacity-items.nowline` example
+    // exercises default multiplier, built-in SVG icons, decimal/percent
+    // values, inline Unicode literals, and declared custom glyphs.
+    { name: 'capacity-items', sourceFile: 'capacity-items.nowline', theme: 'light' },
 ];
 
 export async function renderSampleSvg(spec: SampleSpec): Promise<string> {

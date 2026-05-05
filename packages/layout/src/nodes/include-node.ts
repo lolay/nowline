@@ -71,6 +71,7 @@ export function buildIncludeRegions(
             labels: region.content.labels,
             teams: region.content.teams,
             persons: region.content.persons,
+            glyphs: region.config.glyphs,
             footnoteIndex: new Map(),
             footnoteHosts: new Map(),
             timeline: ctx.timeline,

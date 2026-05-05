@@ -240,8 +240,47 @@ export interface PositionedItem {
      *  to size the row's spill reservation so the next chained item
      *  doesn't land underneath. */
     decorationsRightX: number;
+    /**
+     * Capacity suffix data when the item declares `capacity:N`. Null when
+     * the item has no capacity, the value is non-positive, or the resolved
+     * `capacity-icon` is `none` and no number should render either way.
+     *
+     * Renders alongside the item's `metaText` (or stand-alone when no meta
+     * is present) per specs/rendering.md § Item capacity suffix. The `text`
+     * is the formatted number (`'5'`, `'0.5'`, `'1.25'`); `icon` tells the
+     * renderer which glyph to draw and whether to use the SVG library, the
+     * `×` text node, or an inline literal.
+     */
+    capacity: PositionedCapacity | null;
     style: ResolvedStyle;
 }
+
+/**
+ * Positioned capacity suffix shared by `PositionedItem` and (in m7) the lane
+ * frame-tab badge. The shape stays small and serializable: a formatted number
+ * string plus a discriminated union for the glyph. The renderer paints both.
+ *
+ * `icon === null` means the resolved `capacity-icon` was `'none'` — render
+ * the bare number with no glyph or separator.
+ */
+export interface PositionedCapacity {
+    /** Numeric capacity, post-percent-sugar conversion (e.g. `50%` → 0.5). */
+    value: number;
+    /** Display string per spec number-formatting rules (`'5'`, `'0.5'`). */
+    text: string;
+    /** Resolved glyph instruction, or `null` when the icon is `'none'`. */
+    icon: ResolvedCapacityIconRef | null;
+}
+
+/**
+ * Renderer-facing capacity-icon reference. Mirrors the layout-internal
+ * `ResolvedCapacityIcon` from `capacity.ts` but lives in the shared
+ * positioned-model types so the renderer can read it without importing
+ * layout internals.
+ */
+export type ResolvedCapacityIconRef =
+    | { kind: 'builtin'; name: 'multiplier' | 'person' | 'people' | 'points' | 'time' }
+    | { kind: 'literal'; text: string };
 
 export type LinkIconKind = 'linear' | 'github' | 'jira' | 'generic' | 'none';
 

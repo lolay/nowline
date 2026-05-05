@@ -1,0 +1,70 @@
+nowline v1
+
+// Fixture exercising item-level `capacity:` suffixes for each shape of
+// `capacity-icon:` value: default multiplier, built-in SVG icons,
+// inline Unicode literal, and a declared custom glyph. Each scenario
+// lives in its own swimlane so items don't chain off-screen and the
+// rendered suffix is easy to compare visually. Lane-level capacity
+// (m7) and the overload underline (m8) come later.
+//
+// Style names avoid the grammar keywords `team`, `person`, and
+// `description` to prevent the lexer from picking them up as
+// declaration keywords (would parse as TeamDeclaration / PersonDecl
+// otherwise). Comments use `//` per the .langium hidden terminal.
+
+config
+
+glyph budget "Budget" unicode:"💰" ascii:"$"
+
+style fte
+  capacity-icon: person
+
+style pair
+  capacity-icon: people
+
+style scored
+  capacity-icon: points
+
+style hours
+  capacity-icon: time
+
+style funded
+  capacity-icon: budget
+
+style gear
+  capacity-icon: "⚙"
+
+style silent
+  capacity-icon: none
+
+roadmap r "Capacity item suffixes" start:2026-01-05 length:6w
+
+swimlane mul-lane "Default multiplier"
+  item m1 "Five" duration:4w capacity:5
+
+swimlane fte-lane "Person glyph"
+  item p1 "One FTE" duration:4w capacity:1 style:fte
+
+swimlane pair-lane "People glyph"
+  item p2 "Pair" duration:4w capacity:2 style:pair
+
+swimlane points-lane "Points glyph"
+  item s1 "Story" duration:4w capacity:8 style:scored
+
+swimlane hours-lane "Time glyph"
+  item h1 "Hours" duration:4w capacity:40 style:hours
+
+swimlane decimal-lane "Decimal capacity"
+  item d1 "Half" duration:4w capacity:0.5
+
+swimlane percent-lane "Percent (sugar)"
+  item p3 "Half" duration:4w capacity:50%
+
+swimlane literal-lane "Inline literal"
+  item l1 "Gear" duration:4w capacity:3 style:gear
+
+swimlane custom-lane "Custom glyph"
+  item c1 "Funded" duration:4w capacity:12000 style:funded
+
+swimlane none-lane "No glyph"
+  item n1 "Bare" duration:4w capacity:7 style:silent

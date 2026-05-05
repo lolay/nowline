@@ -13,6 +13,7 @@ import type {
     PositionedNowline,
     PositionedFootnoteArea,
     PositionedIncludeRegion,
+    PositionedCapacity,
     ResolvedStyle,
     Point,
     Theme,
@@ -80,7 +81,7 @@ import { IdGenerator } from './ids.js';
 import { attrs, escAttr, escText, num, tag, textTag } from './xml.js';
 import { allShadowDefs, shadowFilterUrl } from './shadow.js';
 import { sanitizeSvg } from './sanitize.js';
-import { LINK_ICON_PATHS } from './icons.js';
+import { LINK_ICON_PATHS, CAPACITY_ICON_SVG } from './icons.js';
 
 // Browser-safe types. The renderer never touches `fs`, `path`, or `Buffer`.
 // Callers inject an AssetResolver when they want logos embedded.
@@ -182,6 +183,112 @@ function pickStatusDotPalette(
     return relativeLuminance(bg) >= 0.24
         ? palette.statusDot.onLight
         : palette.statusDot.onDark;
+}
+
+/**
+ * Approx. rendered width (px) of `text` at `fontSizePx`. Mirrors the
+ * `0.58 em / char` heuristic the layout uses for spill detection so the
+ * renderer's positioning of the capacity suffix lines up with what the
+ * layout reserved.
+ */
+function estimateCaptionWidthPx(text: string, fontSizePx: number): number {
+    return text.length * fontSizePx * 0.58;
+}
+
+/**
+ * Paint an item / lane capacity suffix starting at `(x0, baselineY)`. The
+ * capacity model arrives pre-resolved from layout (`PositionedCapacity`):
+ * `text` is the formatted number, `icon` is either `null` (no glyph), a
+ * built-in name, or an inline literal string.
+ *
+ * Three rendering paths:
+ *
+ *   1. `icon === null` (the resolved `capacity-icon` was `'none'`): paint
+ *      the bare number as a single `<text>` node.
+ *   2. `icon.kind === 'builtin'` and `name === 'multiplier'`: paint
+ *      `5×` as a single `<text>` node — the multiplication sign is a
+ *      typographic operator with consistent rendering across system
+ *      fonts and built-in side bearing, so no `<tspan dx>` separator.
+ *   3. `icon.kind === 'builtin'` and `name` ∈ {person, people, points,
+ *      time}: paint the number as `<text>`, then drop the curated SVG
+ *      icon at the next column (`0.1em` gap, sized to one em). The
+ *      icon's `style="color:..."` propagates through the
+ *      `currentColor`-bound paths in the icon library.
+ *   4. `icon.kind === 'literal'` (inline Unicode literal or
+ *      dereferenced custom `glyph`): paint number + glyph in a single
+ *      `<text>`, with a `<tspan dx="0.1em">` separator before the
+ *      glyph payload.
+ *
+ * `precedingText` is the existing meta-line text (or `undefined` when the
+ * suffix is standalone). When present, the suffix's left edge starts one
+ * space's width past the meta text's estimated right edge so `2w  5×`
+ * reads as a single caption rather than running text together.
+ */
+function renderCapacitySuffix(
+    capacity: PositionedCapacity,
+    precedingText: string | undefined,
+    x0: number,
+    baselineY: number,
+    fontSize: number,
+    fontFamily: string,
+    color: string,
+): string {
+    const charWidthPx = fontSize * 0.58;
+    const precedingWidthPx = precedingText
+        ? estimateCaptionWidthPx(precedingText, fontSize)
+        : 0;
+    const separatorPx = precedingText ? charWidthPx : 0;
+    const numberX = x0 + precedingWidthPx + separatorPx;
+    const { text: numberStr, icon } = capacity;
+    const numberWidthPx = estimateCaptionWidthPx(numberStr, fontSize);
+    const baseAttrs = {
+        'font-family': fontFamily,
+        'font-size': fontSize,
+        fill: color,
+    } as const;
+
+    if (!icon) {
+        return textTag(
+            { x: num(numberX), y: num(baselineY), ...baseAttrs },
+            numberStr,
+        );
+    }
+
+    if (icon.kind === 'builtin' && icon.name === 'multiplier') {
+        return textTag(
+            { x: num(numberX), y: num(baselineY), ...baseAttrs },
+            `${numberStr}\u00D7`,
+        );
+    }
+
+    if (icon.kind === 'builtin') {
+        const def = CAPACITY_ICON_SVG[icon.name];
+        // Render `<text>5</text>` followed by the curated SVG icon. The
+        // icon sits at one font-em wide and tall, with a 0.1em separator
+        // gap. Vertical positioning lifts the icon so its visual center
+        // sits on the text x-height (`baselineY - fontSize * 0.85`); this
+        // matches how Lucide-style outline icons read in inline text.
+        const numberSvg = textTag(
+            { x: num(numberX), y: num(baselineY), ...baseAttrs },
+            numberStr,
+        );
+        const gapPx = fontSize * 0.1;
+        const iconSize = fontSize;
+        const iconX = numberX + numberWidthPx + gapPx;
+        const iconY = baselineY - fontSize * 0.85;
+        const iconSvg = `<svg x="${num(iconX)}" y="${num(iconY)}" width="${num(iconSize)}" height="${num(iconSize)}" viewBox="${def.viewBox}" style="color:${escAttr(color)}" aria-hidden="true">${def.body}</svg>`;
+        return numberSvg + iconSvg;
+    }
+
+    // Literal glyph (inline Unicode literal or dereferenced custom glyph).
+    // Single <text> node with the number + a tspan-separated glyph.
+    const dx = num(fontSize * 0.1);
+    return (
+        `<text x="${num(numberX)}" y="${num(baselineY)}" font-family="${escAttr(fontFamily)}"`
+        + ` font-size="${fontSize}" fill="${escAttr(color)}">`
+        + `${escText(numberStr)}<tspan dx="${dx}">${escText(icon.text)}</tspan>`
+        + '</text>'
+    );
 }
 
 function rectFrame(x: number, y: number, w: number, h: number, style: ResolvedStyle, extra: Record<string, string | number | undefined | null | boolean> = {}): string {
@@ -587,6 +694,24 @@ function renderItem(i: PositionedItem, options: RenderOptions, idPrefix: string,
                     fill: metaColor,
                 },
                 i.metaText,
+            ),
+        );
+    }
+    // Capacity suffix — `2w 5×`, `2w 5 [person]`, `0.5 ★`, etc. Renders on
+    // the meta line, immediately after metaText (or at the line's left
+    // edge when there's no metaText). See specs/rendering.md § Item
+    // capacity suffix. Layout owns parsing/formatting/icon resolution; the
+    // renderer just paints the assembled `PositionedCapacity`.
+    if (i.capacity) {
+        parts.push(
+            renderCapacitySuffix(
+                i.capacity,
+                i.metaText,
+                captionX,
+                i.box.y + ITEM_CAPTION_META_BASELINE_OFFSET_PX,
+                ITEM_CAPTION_META_FONT_SIZE_PX,
+                FONT_STACK[i.style.font],
+                metaColor,
             ),
         );
     }

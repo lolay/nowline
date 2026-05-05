@@ -118,3 +118,73 @@ swimlane a "A"
         expect(svg).toContain('https://nowline.io');
     });
 });
+
+describe('renderSvg — item capacity suffix', () => {
+    it('renders multiplier capacity as a single text node ending in U+00D7', async () => {
+        const dsl = `nowline v1\n\nroadmap r1 "R" start:2026-01-05\n\nswimlane s "Sprint"\n  item x "Build" duration:2w capacity:5\n`;
+        const model = await parseToModel(dsl);
+        const svg = await renderSvg(model);
+        // Default `multiplier` glyph: number+× concatenated with no
+        // separator. The exact text node may be split across multiple
+        // <text> elements (one for metaText, one for the suffix), so look
+        // for the suffix by its tail character.
+        expect(svg).toContain('>5\u00D7<');
+    });
+
+    it('renders person capacity as text + curated SVG icon', async () => {
+        const dsl = `nowline v1\n\nconfig\nstyle counted\n  capacity-icon: person\n\nroadmap r1 "R" start:2026-01-05\n\nswimlane s "Sprint"\n  item x "Build" duration:2w capacity:3 style:counted\n`;
+        const model = await parseToModel(dsl);
+        const svg = await renderSvg(model);
+        // Number renders as plain text, then an inline <svg> with a
+        // currentColor circle (head) — that's the Lucide `user` shape.
+        expect(svg).toContain('>3<');
+        expect(svg).toMatch(/<svg [^>]*viewBox="0 0 24 24"[^>]*>.*<circle[^>]*currentColor/);
+    });
+
+    it('renders points capacity as text + star SVG', async () => {
+        const dsl = `nowline v1\n\nconfig\nstyle scored\n  capacity-icon: points\n\nroadmap r1 "R" start:2026-01-05\n\nswimlane s "Sprint"\n  item x "Build" duration:2w capacity:8 style:scored\n`;
+        const model = await parseToModel(dsl);
+        const svg = await renderSvg(model);
+        expect(svg).toContain('>8<');
+        // Star is rendered as a <polygon> filled with currentColor.
+        expect(svg).toMatch(/<polygon[^>]*points="12 2 15\.09/);
+    });
+
+    it('renders inline Unicode literal capacity-icon as a <tspan>-separated glyph', async () => {
+        const dsl = `nowline v1\n\nconfig\nstyle gear\n  capacity-icon: "⚙"\n\nroadmap r1 "R" start:2026-01-05\n\nswimlane s "Sprint"\n  item x "Build" duration:2w capacity:2 style:gear\n`;
+        const model = await parseToModel(dsl);
+        const svg = await renderSvg(model);
+        // Number + tspan-separated literal in a single <text> element.
+        expect(svg).toMatch(/>2<tspan dx="[^"]+">⚙<\/tspan>/);
+    });
+
+    it('renders custom glyph capacity by dereferencing to its unicode payload', async () => {
+        // Style ref on the item itself — `capacity-icon` is an entity-level
+        // style and doesn't cascade from a parent swimlane to its children.
+        const dsl = `nowline v1\n\nconfig\nglyph budget "Budget" unicode:"💰" ascii:"$"\nstyle finance\n  capacity-icon: budget\n\nroadmap r1 "R" start:2026-01-05\n\nswimlane s "Funded"\n  item x "Phase A" duration:2w capacity:12000 style:finance\n`;
+        const model = await parseToModel(dsl);
+        const svg = await renderSvg(model);
+        expect(svg).toMatch(/>12000<tspan dx="[^"]+">💰<\/tspan>/);
+    });
+
+    it('omits the suffix when capacity-icon is "none"', async () => {
+        const dsl = `nowline v1\n\nconfig\nstyle silent\n  capacity-icon: none\n\nroadmap r1 "R" start:2026-01-05\n\nswimlane s "Sprint"\n  item x "Build" duration:2w capacity:7 style:silent\n`;
+        const model = await parseToModel(dsl);
+        const svg = await renderSvg(model);
+        // Number renders, but no glyph follows.
+        expect(svg).toContain('>7<');
+        expect(svg).not.toContain('\u00D7');
+        expect(svg).not.toMatch(/<tspan/);
+        // No SVG icon either.
+        expect(svg).not.toMatch(/<svg [^>]*viewBox="0 0 24 24"/);
+    });
+
+    it('omits the entire suffix when no capacity is declared', async () => {
+        const dsl = `nowline v1\n\nroadmap r1 "R" start:2026-01-05\n\nswimlane s "Sprint"\n  item x "Build" duration:2w\n`;
+        const model = await parseToModel(dsl);
+        const svg = await renderSvg(model);
+        // No multiplication sign, no curated SVG glyphs.
+        expect(svg).not.toContain('\u00D7');
+        expect(svg).not.toMatch(/viewBox="0 0 24 24"/);
+    });
+});
