@@ -349,6 +349,31 @@ importers:
         specifier: ^3.1.0
         version: 3.2.4(@types/node@22.19.17)
 
+  packages/lsp:
+    dependencies:
+      '@nowline/core':
+        specifier: workspace:*
+        version: link:../core
+      langium:
+        specifier: ~4.2.2
+        version: 4.2.2
+      vscode-languageserver:
+        specifier: ~9.0.1
+        version: 9.0.1
+      vscode-languageserver-textdocument:
+        specifier: ~1.0.12
+        version: 1.0.12
+    devDependencies:
+      '@types/node':
+        specifier: ^22.0.0
+        version: 22.19.17
+      typescript:
+        specifier: ~5.7.0
+        version: 5.7.3
+      vitest:
+        specifier: ^3.1.0
+        version: 3.2.4(@types/node@22.19.17)
+
   packages/renderer:
     dependencies:
       '@nowline/layout':

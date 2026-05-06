@@ -41,3 +41,4 @@ tests/**/*.pdf
 tests/**/*.html
 tests/**/*.xlsx
 .cursor/rules/personal-*.mdc
+.cursor/plans

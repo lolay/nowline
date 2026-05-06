@@ -1,8 +1,8 @@
 export * from './generated/ast.js';
 export * from './generated/module.js';
-export { createNowlineServices } from './language/nowline-module.js';
+export { createNowlineServices, NowlineModule } from './language/nowline-module.js';
 export type { NowlineServices, NowlineAddedServices } from './language/nowline-module.js';
-export { NowlineValidator } from './language/nowline-validator.js';
+export { NowlineValidator, registerValidationChecks } from './language/nowline-validator.js';
 export {
     resolveIncludes,
     type ResolveResult,
