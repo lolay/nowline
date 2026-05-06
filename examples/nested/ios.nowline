@@ -19,11 +19,11 @@ style near-term
 default item shadow:subtle
 default swimlane padding:sm spacing:none
 
-roadmap ios-nested "iOS (nested)" author:"iOS Team" start:2026-01-01
+roadmap ios-nested "iOS (nested)" author:"iOS Team" start:2026-01-05
 
-duration sm length:3d
-duration md length:1w
-duration lg length:2w
+size sm effort:3d
+size md effort:1w
+size lg effort:2w
 
 label tech-debt "Tech debt" style:tech-debt-style
 label agent "Agent" style:near-term
@@ -31,15 +31,15 @@ label agent "Agent" style:near-term
 anchor kickoff date:2026-01-06
 
 swimlane ios
-  item ios-offline "Offline mode" duration:lg after:kickoff status:at-risk remaining:60%
-  item ios-push "Push notifications" duration:md
-  item ios-widgets "Home-screen widgets" duration:md labels:tech-debt
-  item ios-agent-surface "Agent entry point" duration:md labels:agent
-  item ios-agent-voice "Agent voice mode" duration:md labels:agent
-  item ios-performance "Performance pass" duration:md
-  item ios-onboarding "Onboarding v2" duration:md
-  item ios-camera "Camera refactor" duration:md labels:tech-debt
-  item ios-crash "Crash hardening" duration:sm
-  item ios-agent-chat "Agent chat UI" duration:md labels:agent
+  item ios-offline "Offline mode" size:lg after:kickoff status:at-risk remaining:60%
+  item ios-push "Push notifications" size:md
+  item ios-widgets "Home-screen widgets" size:md labels:tech-debt
+  item ios-agent-surface "Agent entry point" size:md labels:agent
+  item ios-agent-voice "Agent voice mode" size:md labels:agent
+  item ios-performance "Performance pass" size:md
+  item ios-onboarding "Onboarding v2" size:md
+  item ios-camera "Camera refactor" size:md labels:tech-debt
+  item ios-crash "Crash hardening" size:sm
+  item ios-agent-chat "Agent chat UI" size:md labels:agent
 
 milestone ios-beta "iOS Beta" after:[ios-offline, ios-agent-chat]

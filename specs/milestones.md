@@ -2,7 +2,7 @@
 
 ## Overview
 
-The OSS tooling (`lolay/nowline` and its satellite repos) ships incrementally across milestones m1–m4b. Each milestone has a clear scope and set of Apache-2.0 deliverables. Later milestones depend on earlier ones.
+The OSS tooling (`lolay/nowline` and its satellite repos) ships incrementally across milestones m1–m4.5, with a four-phase layout-engine refactor (m2.5a–m2.5d) and a follow-on rendering-polish pass (m2i) sitting between the sample-fidelity work (m2h) and IDE support (m3). The IDE work ships before the public embed (m4) so authors can edit `.nowline` files in VS Code / Cursor with live preview before the embed surface goes wide. Each milestone has a clear scope and set of Apache-2.0 deliverables. Later milestones depend on earlier ones.
 
 Commercial milestones (hosted editor, free viewer, MCP, enterprise, FedRAMP) are tracked in a separate, private spec and are out of scope here.
 
@@ -10,18 +10,30 @@ Commercial milestones (hosted editor, free viewer, MCP, enterprise, FedRAMP) are
 
 | Milestone | Name | License | Deliverables |
 |-----------|------|---------|--------------|
-| m1 | DSL | Apache 2.0 | Grammar, parser, AST, validation, TextMate grammar |
-| m2a | CLI Core | Apache 2.0 | CLI scaffold, `validate`, `convert`, `init`, `version`, distribution pipeline |
-| m2b | Layout + SVG | Apache 2.0 | Layout engine, SVG renderer, `render` (SVG only), `serve` live-reload |
-| m2b.5 | CLI Redesign | Apache 2.0 | Verbless `nowline <input>` default; mode flags (`--serve`, `--init`, `--dry-run`); hard cut on old verbs |
-| m2c | Export Formats | Apache 2.0 | PNG, PDF, HTML, Markdown+Mermaid, XLSX, MS Project XML |
-| m3 | Embed | Apache 2.0 | Browser embed script, GitHub Action |
-| m4 | IDE | Apache 2.0 | LSP server, VS Code/Cursor extension with live preview |
-| m4b | IDE Expansion | Apache 2.0 | Obsidian, Neovim, JetBrains (timing TBD) |
+| ~~m1~~ | ~~DSL~~ | Apache 2.0 | Grammar, parser, AST, validation, TextMate grammar |
+| ~~m2a~~ | ~~CLI Core~~ | Apache 2.0 | CLI scaffold, `validate`, `convert`, `init`, `version`, distribution pipeline |
+| ~~m2b~~ | ~~Layout + SVG~~ | Apache 2.0 | Layout engine, SVG renderer, `render` (SVG only), `serve` live-reload |
+| ~~m2b.5~~ | ~~CLI Redesign~~ | Apache 2.0 | Verbless `nowline <input>` default; mode flags (`--serve`, `--init`, `--dry-run`); hard cut on old verbs |
+| ~~m2c~~ | ~~Export Formats~~ | Apache 2.0 | PNG, PDF, HTML, Markdown+Mermaid, XLSX, MS Project XML |
+| ~~m2d~~ | ~~Sample minimal alignment~~ | Apache 2.0 | Light-theme palette overhaul + minimal sample fidelity (header card, timeline panel, frame tab, status dot upper-right, bottom progress strip, solid now-line, attribution wordmark) |
+| ~~m2e~~ | ~~Sample platform-2026~~ | Apache 2.0 | Full-feature sample fidelity: unified anchor+milestone header row, anchor/milestone cut lines, owner/footnote-in-tab, inline label chiclets, link-icon tile, footnote panel, styled group chiclets, marker arrowheads |
+| ~~m2f~~ | ~~Sample platform-2026-dark~~ | Apache 2.0 | Dark-theme palette tightened to match the dark reference sample |
+| ~~m2g~~ | ~~Sample dependencies~~ | Apache 2.0 | Cross-swimlane orthogonal edge routing, parallel `[ ]` brackets, `before:` overflow refinement, floating milestone slack arrow |
+| ~~m2h~~ | ~~Sample isolate-include~~ | Apache 2.0 | Dashed-bordered isolate region with label tab + external-link badge, cross-region arrows |
+| ~~m2.5a~~ | ~~Layout v2: Time Axis~~ | Apache 2.0 | `TimeScale` + `ViewPreset` + `WorkingCalendar` replace `timeline.ts`; multi-row headers, `invert()`, `weekendsOff()` |
+| ~~m2.5b~~ | ~~Layout v2: Band Heights~~ | Apache 2.0 | `BandScale` drives swimlane heights; `defaults > spacing` and item `text-size` + `padding` actually consulted |
+| ~~m2.5c~~ | ~~Layout v2: Measure/Place Tree~~ | Apache 2.0 | `Renderable` nodes per entity (item/swimlane/group/parallel/anchor/milestone/footnote/include) replace the monolithic `layout.ts` |
+| ~~m2.5d~~ | ~~Layout v2: Theme in Model~~ | Apache 2.0 | Resolved palette carried in the positioned model; renderer drops `theme === 'dark'` branches |
+| ~~m2i~~ | ~~Sample fidelity polish~~ | Apache 2.0 | Post-Layout-v2 rendering refinements: row-packing for items/markers/groups, caption + chip spill, narrow-bar decoration spill, luminance-aware status dots, now-pill flag mode, canvas growth helpers, geometry-constant centralization |
+| m2j | Capacity & utilization | Apache 2.0 | `capacity:` on swimlanes and items, `capacity-icon:` glyph vocabulary, `size <id> effort:N` declarations with item-derived durations, `remaining:` literal form, tri-state lane utilization underline (`utilization-warn-at:N`, `utilization-over-at:N`) |
+| ~~m2k~~ | ~~Dependency arrow attach + routing~~ | Apache 2.0 | Visual-edge attach with flow dedupe; channel-based orthogonal router (item-bar obstacles, parallel/group bracket-clearance nudge, slot assignment, under-bar fallback); min-stub constraints + parallel bracket-foot clearance |
+| m3 | IDE | Apache 2.0 | LSP server, VS Code/Cursor extension with live preview |
+| m4 | Embed | Apache 2.0 | Browser embed script, GitHub Action |
+| m4.5 | IDE Expansion | Apache 2.0 | Obsidian, Neovim, JetBrains (timing TBD) |
 
 ## Milestone Details
 
-### m1 — DSL
+### ~~m1 — DSL~~
 
 Define and implement the `.nowline` language.
 
@@ -35,7 +47,7 @@ Define and implement the `.nowline` language.
 
 Repo: `lolay/nowline` | Handoff: [`specs/handoffs/m1.md`](./handoffs/m1.md)
 
-### m2a — CLI Core
+### ~~m2a — CLI Core~~
 
 CLI scaffold and the subset of commands that do not need a layout engine. Ships the distribution pipeline so every later milestone inherits it.
 
@@ -46,19 +58,19 @@ CLI scaffold and the subset of commands that do not need a layout engine. Ships 
 
 Spec: [`specs/cli.md`](./cli.md) | Handoff: [`specs/handoffs/m2a.md`](./handoffs/m2a.md)
 
-### m2b — Layout + SVG
+### ~~m2b — Layout + SVG~~
 
-The visual milestone: render a `.nowline` file to an SVG. This is what m3 (embed) and m4 (IDE live preview) both consume.
+The visual milestone: render a `.nowline` file to an SVG. This is what m3 (IDE live preview) and m4 (embed) both consume.
 
 - Layout engine (`@nowline/layout`) — AST → positioned model (pure, browser-safe)
 - SVG renderer (`@nowline/renderer`) — positioned model → SVG string
 - `nowline render` command with SVG output (all flags except format-specific ones)
-- `nowline serve` — local dev server that watches a file and live-reloads the SVG in the browser (originally slated for m4b; pulled forward because `serve` needs only SVG and unlocks preview for editors without a native panel)
+- `nowline serve` — local dev server that watches a file and live-reloads the SVG in the browser (originally slated for m4.5; pulled forward because `serve` needs only SVG and unlocks preview for editors without a native panel)
 - Light and dark themes
 
 Spec: [`specs/rendering.md`](./rendering.md), [`specs/cli.md`](./cli.md) | Handoff: [`specs/handoffs/m2b.md`](./handoffs/m2b.md)
 
-### m2b.5 — CLI Redesign
+### ~~m2b.5 — CLI Redesign~~
 
 Verbless, all-flags CLI. Lands before m2c so the six new export formats inherit the new shape from day one.
 
@@ -70,7 +82,7 @@ Verbless, all-flags CLI. Lands before m2c so the six new export formats inherit 
 
 Spec: [`specs/cli.md`](./cli.md) | Handoff: [`specs/handoffs/m2b.5.md`](./handoffs/m2b.5.md)
 
-### m2c — Export Formats
+### ~~m2c — Export Formats~~
 
 Every other format the verbless render mode can emit. Each format is an adapter on top of the SVG renderer or the positioned model.
 
@@ -83,7 +95,215 @@ Every other format the verbless render mode can emit. Each format is an adapter 
 
 Spec: [`specs/rendering.md`](./rendering.md) § Output Formats, [`specs/cli.md`](./cli.md) | Handoff: [`specs/handoffs/m2c.md`](./handoffs/m2c.md)
 
-### m3 — Embed
+### ~~m2d — Sample minimal alignment~~
+
+The first of five sample-fidelity milestones. Pairs [`examples/minimal.nowline`](../examples/minimal.nowline) with [`specs/samples/minimal.svg`](./samples/minimal.svg) and brings the renderer's light-theme output into the same visual family as the hand-built reference.
+
+- Light-theme palette overhaul in [`packages/layout/src/themes/light.ts`](../packages/layout/src/themes/light.ts) (slate page background, white panels, slate borders, slate text, sample status palette)
+- Header card — rounded white rect with subtle drop shadow, title + author on two lines
+- Timeline panel — rounded white rect behind tick labels; thin dotted vertical grid lines drop through the swimlanes
+- Swimlane frame tab — small rounded chiclet at the top-left of each band carrying the swimlane title
+- Item bar status indicator moved to the upper-right of the bar; title moves left
+- Bottom 4px progress strip in `style.fg` (replaces the full-height fill)
+- Solid red now-line at 2.25px stroke with a pill label
+- "now|ine" wordmark anchored bottom-right of the last swimlane (or footnote panel when present)
+
+Spec: [`specs/rendering.md`](./rendering.md) | Handoff: [`specs/handoffs/m2d.md`](./handoffs/m2d.md)
+
+### ~~m2e — Sample platform-2026~~
+
+Full-feature reference. Pairs [`examples/platform-2026.nowline`](../examples/platform-2026.nowline) with [`specs/samples/platform-2026.svg`](./samples/platform-2026.svg) and adds the chrome that covers anchors, milestones, owners, footnotes, labels, and styled groups.
+
+- Unified anchor + milestone header row (with collision stacking) layered above the tick-label row
+- Anchor cut lines (thin dashed) and milestone cut lines (prominent dashed indigo) drawn over swimlane fills
+- Frame tab carries owner badge and footnote superscript inline
+- Inline label chiclets sit inside the item bar above the progress strip
+- Link-icon tile (small colored square + arrow glyph) in the item bottom-right
+- Footnote panel — rounded white rect with shadow, red-numbered entries, attribution wordmark anchored to the panel
+- Styled group with a chiclet label tab overhanging the box top
+- Dependency arrow `<marker>` arrowheads attached to visual bar edges
+
+Spec: [`specs/rendering.md`](./rendering.md) | Handoff: [`specs/handoffs/m2e.md`](./handoffs/m2e.md)
+
+### ~~m2f — Sample platform-2026-dark~~
+
+Re-renders the m2e source with `--theme dark` to [`examples/platform-2026-dark.svg`](../examples/platform-2026-dark.svg) and tightens the dark-theme palette in [`packages/layout/src/themes/dark.ts`](../packages/layout/src/themes/dark.ts) to match [`specs/samples/platform-2026-dark.svg`](./samples/platform-2026-dark.svg). No new geometric features.
+
+Spec: [`specs/rendering.md`](./rendering.md) | Handoff: [`specs/handoffs/m2f.md`](./handoffs/m2f.md)
+
+### ~~m2g — Sample dependencies~~
+
+Cross-lane dependencies and parallel-block visuals. Pairs [`examples/dependencies.nowline`](../examples/dependencies.nowline) with [`specs/samples/dependencies.svg`](./samples/dependencies.svg).
+
+- Cross-swimlane dependency arrow routing with rounded corners and detour around parallel blocks
+- Parallel `[ ]` brackets (`bracket:solid` / `bracket:dashed`) framing nested tracks with group-style padding
+- `before:` overflow refinement — red tail on the offending portion of the item bar
+- Floating milestone slack arrow — dotted arrow from earlier predecessor's visual right to the milestone line
+
+Spec: [`specs/rendering.md`](./rendering.md) | Handoff: [`specs/handoffs/m2g.md`](./handoffs/m2g.md)
+
+### ~~m2h — Sample isolate-include~~
+
+The final sample-fidelity milestone. Pairs [`examples/isolate-include.nowline`](../examples/isolate-include.nowline) (+ `examples/partner.nowline` for the include target) with [`specs/samples/isolate-include.svg`](./samples/isolate-include.svg).
+
+- Dashed-bordered isolate region with rounded corners and a region label tab on the top edge
+- Small external-link badge to the right of the region label
+- Cross-region dependency arrows render on top of the region fill
+
+Spec: [`specs/rendering.md`](./rendering.md) | Handoff: [`specs/handoffs/m2h.md`](./handoffs/m2h.md)
+
+### ~~m2.5a — Layout v2: Time Axis~~
+
+First phase of the layout-engine v2 refactor. Replaces the imperative tick math in [`packages/layout/src/timeline.ts`](../packages/layout/src/timeline.ts) with a declarative pair of primitives validated end-to-end in a standalone prototype during planning (now retired; see commit `771127c`).
+
+- `TimeScale` (d3-scale wrapper) replaces `buildTimelineScale` + `pixelsPerDay` + `xForDate`. Adds `forward(date)` / `invert(x)` / `ticks()` so m3's editor gets click-to-date for free.
+- `ViewPreset` replaces the `LABEL_THINNING` table and per-unit format functions. Multi-row time headers (year over month over day) drop out for free.
+- `WorkingCalendar` lands alongside `CalendarConfig` in [`packages/layout/src/calendar.ts`](../packages/layout/src/calendar.ts) as a strategy: `continuousCalendar()` (default), `weekendsOff()`, `withHolidays(...)`. The DSL's `business` calendar mode becomes a factory call.
+- `PositionedTimelineScale` shape stays stable so the renderer needs no changes.
+
+Validation: existing CLI render tests stay byte-stable on continuous calendars; new tests assert `weekendsOff()` shrinks the chart's `pixelsPerDay` and that `invert(forward(d)) === d` on continuous mode.
+
+Spec: [`specs/rendering-v2.md`](./rendering-v2.md) § m2.5a
+
+### ~~m2.5b — Layout v2: Band Heights~~
+
+Wires `BandScale` (d3-scale-band wrapper) into the swimlane row sizing. Replaces the hardcoded `ITEM_ROW_HEIGHT` constant and the currently-ignored `defaults > spacing` parsing path in [`packages/layout/src/layout.ts`](../packages/layout/src/layout.ts).
+
+- `BandScale.bandwidth()` drives swimlane row height; `paddingInner` exposes `defaults > spacing` to the DSL author for the first time.
+- `ItemNode.measure()` returns `height = (text-size * 1.4) * lineCount + padding * 2` so the bar grows with `text-size` instead of clipping.
+
+Validation: bumping `defaults > spacing` from `none` to `md` widens the visible gap between bands; bumping `text-size` from `md` to `lg` grows item heights.
+
+Spec: [`specs/rendering-v2.md`](./rendering-v2.md) § m2.5b
+
+### ~~m2.5c — Layout v2: Measure/Place Tree~~
+
+The load-bearing rewrite. Replaces the monolithic [`layout.ts`](../packages/layout/src/layout.ts) (~1.6 KLOC) with a tree of `Renderable` nodes, one file per entity type:
+
+- `ItemNode`, `SwimlaneNode`, `GroupNode`, `ParallelNode`, `AnchorNode`, `MilestoneNode`, `FootnoteNode`, `IncludeNode`
+- Each node implements `measure(ctx)` (returns intrinsic size) and `place(origin, ctx)` (returns a `Positioned*` subtree).
+- A `RoadmapNode` composition root walks children top-to-bottom; X stays time-driven via `TimeScale`, Y becomes content-driven.
+- Style resolution stays in [`style-resolution.ts`](../packages/layout/src/style-resolution.ts); `measure()` calls take a resolved style as input.
+- Edge routing keeps its current orthogonal router as-is — `Renderable.place()` just provides clean endpoint geometry.
+
+Validation: every existing sample (`minimal`, `platform-2026`, `platform-2026-dark`, `dependencies`, `isolate-include`) re-renders byte-stable. Adding a new entity type means a new node file with no edits to existing nodes.
+
+Spec: [`specs/rendering-v2.md`](./rendering-v2.md) § m2.5c | Handoff: [`specs/handoffs/handoff-m2.5c-measure-place.md`](./handoffs/handoff-m2.5c-measure-place.md)
+
+### ~~m2.5d — Layout v2: Theme in Model~~
+
+Cosmetic but valuable for the embed bundle. Resolved palette tokens move into the positioned model so [`packages/renderer/src/svg/render.ts`](../packages/renderer/src/svg/render.ts) drops every `theme === 'dark' ? ...` branch.
+
+- `PositionedItem.fill`, `PositionedItem.stroke`, etc. carry resolved color strings instead of palette tokens.
+- The renderer becomes pure data → SVG with no theming logic.
+- Bundle savings on the embed script (m4's primary artifact).
+
+Validation: `--theme dark` still emits the expected palette; renderer file shrinks measurably; no theme branches remain in the renderer.
+
+Spec: [`specs/rendering-v2.md`](./rendering-v2.md) § m2.5d
+
+### ~~m2i — Sample fidelity polish~~
+
+Post-Layout-v2 rendering refinements that landed once the measure/place tree was in place. Not planned as a discrete milestone up front — surfaced from sample reviews of `examples/long.nowline`, `examples/nested.nowline`, and `examples/platform-2026.nowline` as the v2 nodes exposed seams that the monolithic `layout.ts` had hidden. Recorded here so the milestone chain reflects what shipped before m3 begins.
+
+Item-bar geometry:
+- Restructured item-bar layout (groups, label chiclets, link icons in upper-left, footnote indicator)
+- Stack spilled label chips and grow the bar vertically to enclose them
+- Stack in-bar chips below the meta baseline and grow the bar to fit
+- Spill the status dot, link icon, and footnote past narrow item bars (with `MIN_BAR_WIDTH_FOR_*` thresholds + a reading-order spill column)
+- Wrap bracket-style group titles inside the bracket glyph (`GROUP_BRACKET_LABEL_OVERHANG_PX`)
+
+Group / parallel layout:
+- Reserve inter-row gap below a styled group inside parallel layouts
+- Pack markers + chart rows so anchor / milestone / item collisions bump out of the way (with `topmost-fit` row packer)
+- Repack markers tick-first
+
+Color & contrast:
+- Pick status-dot tone per-bar from a luminance-aware dual palette (`onLight` / `onDark`)
+- Deepen the status-dot palette so dots read on label-tinted bars
+- Use chart-tuned color for spilled captions and bar text for footnote indicators
+- Theme dark header card
+
+Now-pill & canvas:
+- Reserve canvas room for the now-pill via a single growth helper
+- Flag-mode the now-pill at chart edges instead of growing the canvas; align the flag-mode pill edge with the now-line's outer stroke edge
+- Fit canvas and lanes to spilled captions
+- Centralize layout geometry constants and reposition slack arrows
+- Standardize roadmap dates and default missing `start:` to today
+- Halo include-region source-path text to clear the dashed border
+- Refine output: gutter token, tighter trailing tick, attribution mark
+- Resolve `after:<anchor>` and reverse-side footnotes on items
+
+Timeline visibility on tall canvases:
+- Add `timeline-position` style (`top` (default), `bottom`, `both`); `both` mirrors the date strip at the chart bottom so dates stay readable without scrolling back to the top. The mirrored strip shares fill, border, label color, and tick positions with the top strip; it has no now-pill and no marker row.
+- Add `minor-grid` style (boolean, opt-in) — draws faint solid grid lines at every tick boundary in addition to the major-tick lines.
+- Promote chart-body grid lines to a dedicated `grid` layer drawn after swimlane backgrounds so they actually appear in the chart body (previously occluded by the opaque swimlane fills, only visible inside the timeline header).
+- Tune palette so the major grid line is darker than the minor line, both solid — visual hierarchy by color rather than texture (`theme.timeline.gridLine` + `theme.timeline.minorGridLine`).
+- Major grid lines thread the entire timeline strip (top date panel through bottom date panel when one is mirrored); minor grid lines stay inside the chart body, starting at the topmost swimlane top edge and stopping above the bottom date panel so they don't streak through the marker row or compete with date labels.
+- Introduce `swimlaneBottomY` on the layout context, distinct from `chartBottomY`. Milestone and anchor cut-lines now stop at the last swimlane (no longer invading the bottom date strip when one is mirrored). The now-line stops at the bottom date panel when present, otherwise at the last swimlane; it no longer extends through the footnote area.
+
+Test harness:
+- Add `tests/` harness for renderer manual validation; add `item-bumps-up` and `isolate-include-multi` fixtures
+- Strip dead `layout-v2/` links from spec + code; remove the layout-v2 prototype
+
+Spec: [`specs/rendering.md`](./rendering.md) (post-m2.5 sections covering item bars, narrow-bar spill, bracket-style groups, now-pill flag mode, row packing)
+
+### m2j — Capacity & utilization
+
+Adds a first-class capacity model so swimlanes and items can express throughput, with a tri-state visualization for lane utilization. Lands in two phases on `feat/capacity`.
+
+**Phase A — Effort-based sizing (m1–m8 of the in-flight branch):**
+
+- `capacity:N` on swimlanes (integer/decimal) and items (integer/decimal/percent).
+- `capacity-icon:` style vocabulary (`none`, `multiplier` (default), `person`, `people`, `points`, `time`) plus custom `glyph` declarations and inline Unicode literals.
+- `size <id> ["title"] effort:N` declarations replace the old `duration` entity. Items reference a size via `size:NAME` and derive their bar duration as `effort ÷ item_capacity`. Explicit `duration:` literal always wins.
+- `remaining:` accepts both percent (`30%`) and single-engineer effort literals (`0.5d`, `1w`); literal form normalizes to a percent of total effort with overflow clamped + soft warning.
+- Renderer paints an inline size chip on the meta line (chip text uses size's `title` when provided, falls back to id-as-typed) and a `N[glyph]` capacity suffix after the duration.
+
+**Phase B — Tri-state utilization indicator (m9–m14 of the in-flight branch):**
+
+- `utilization-warn-at:N` and `utilization-over-at:N` properties on `swimlane` (and `default swimlane`). Defaults: `warn-at:80%`, `over-at:100%`.
+- Layout sweeps the lane's per-timestep load function and classifies half-open segments as `green | yellow | red`.
+- Renderer paints a continuous health-bar underline along the bottom of each lane band that has `capacity:` declared.
+- `utilization-warn-at:none` / `utilization-over-at:none` opt out of individual color bands; setting both to `none` suppresses the underline outright. Replaces the old `overcapacity:show|hide` toggle.
+
+Spec: [`specs/dsl.md`](./dsl.md) § Capacity, [`specs/rendering.md`](./rendering.md) § Swimlane Capacity | Handoff: [`specs/handoffs/handoff-m9-utilization.md`](./handoffs/handoff-m9-utilization.md)
+
+### ~~m2k — Dependency arrow attach + routing~~
+
+Three-step refinement of the m2g edge routing once Layout v2 (m2.5a–m2.5d) and the m2i polish were in place. Sample reviews of [`examples/dependencies.svg`](../examples/dependencies.svg) exposed three escalating issues that the original Manhattan `routeEdge` couldn't address: arrows piercing entity centers, vertical legs crashing through item bars, and tight gutters with no visible target stub. m2k collects the fixes.
+
+Attach geometry:
+- Arrows terminate at the **left visual edge** of the dependent item (not the logical column center), so the arrowhead lands on the painted bar.
+- Source point exits the **right visual edge** at the row midline, dropping to the **vertical center of the bottom progress strip** when the caption spills past the bar (so the arrow runs underneath the spilled text rather than through it).
+- Anchor / milestone predecessors attach to the marker's **vertical cut line** at the *target* item's row mid-Y — the cut line is the visible stem; the arrow is the short horizontal stub from the line into the target's left edge.
+- Same-row immediate-successor chains in one swimlane skip drawing — the spatial flow already conveys ordering. Marker → item stubs always draw.
+
+Milestone slack arrows — flow dedupe:
+- Predecessors are grouped by their enclosing **flow** (deepest single-track container — swimlane root, sequential `group`, or one `parallel` sub-track). Within one flow, only the **latest** predecessor (rightmost x) draws a slack arrow; siblings to its left collapse silently because file order in a single-track container already encodes the chain. Across flows (e.g., two predecessors in different `parallel` sub-tracks), each flow's last entry contributes its own slack arrow.
+
+Channel-based orthogonal router:
+- Replaced the single-elbow Manhattan `routeEdge` with a router that drops the vertical leg in the cleanest **inter-column gutter** between source and target. Item bars are obstacles; containers (`group`, `parallel`) are NOT obstacles (looping arrows around container edges produced unsatisfying detours).
+- Visible parallel `[ ]` brackets and bracket-style groups get a **bracket-clearance nudge**: the elbow X is shifted at least `BRACKET_NUDGE_PX` (4 px) away from any bracket whose Y span overlaps the leg. Both the vertical bar AND the inward foot tips of `[ ]` brackets are modelled.
+- Edges sharing a channel get distinct **slot indices** assigned by greedy interval coloring on their Y spans (slots map to ±3, ±6 px offsets around the channel centerline), so parallel arrows fan out instead of stacking.
+- **Under-bar fallback**: when no clean channel fits, the edge is tagged `kind: 'underBar'` and the renderer paints it BEFORE swimlane / item fills with a thinner 0.8 px stroke so the bar stays the visual foreground (vs the standard 1.1 px for normal edges).
+
+Min-stub constraints:
+- Every left-to-right edge guarantees `MIN_SOURCE_STUB_PX` (6 px) of horizontal lead-out from the source AND `MIN_TARGET_STUB_PX` (6 px) of horizontal lead-in to the target's arrowhead. The router computes a **satisfiable range** `[from.x + MIN_SOURCE_STUB_PX, to.x - MIN_TARGET_STUB_PX]` and confines the elbow X to it. When the gutter is narrower than the combined stubs, the router pins the elbow at `to.x - MIN_TARGET_STUB_PX` and forces under-bar so the leg paints behind the bars while the visible arrowhead lead-in is preserved.
+- Bracket-clearance nudge candidates are constrained to the satisfiable range; when neither side fits inside the range, the router signals under-bar.
+
+Spec: [`specs/rendering.md`](./rendering.md) § Dependency Arrows (Attach geometry + Channel Routing) | Handoff: [`specs/handoffs/m2k.md`](./handoffs/m2k.md)
+
+### m3 — IDE
+
+First-class editing experience in VS Code and Cursor. Pulled ahead of the embed (m4) so authors can write `.nowline` files in their primary editor with live preview before the public embed surface ships.
+
+- Langium LSP server (autocomplete, validation, go-to-definition)
+- VS Code / Cursor extension (LSP + side panel live preview that re-renders on save/keystroke)
+
+Spec: [`specs/ide.md`](./ide.md)
+
+### m4 — Embed
 
 Roadmaps render anywhere on the web and in CI.
 
@@ -95,18 +315,9 @@ Roadmaps render anywhere on the web and in CI.
 
 Spec: [`specs/embed.md`](./embed.md)
 
-### m4 — IDE
+### m4.5 — IDE Expansion (timing TBD)
 
-First-class editing experience in VS Code and Cursor.
-
-- Langium LSP server (autocomplete, validation, go-to-definition)
-- VS Code / Cursor extension (LSP + side panel live preview that re-renders on save/keystroke)
-
-Spec: [`specs/ide.md`](./ide.md)
-
-### m4b — IDE Expansion (timing TBD)
-
-Extend IDE support beyond VS Code/Cursor.
+Extend IDE support beyond VS Code/Cursor. Depends on m3 (LSP server) and is independent of m4 (Embed); slots after m4 in the chain so the public embed ships before plugin work begins.
 
 - Obsidian plugin (edit + inline preview)
 - Neovim LSP config
@@ -117,13 +328,13 @@ Spec: [`specs/ide.md`](./ide.md)
 ## Dependency Chain
 
 ```
-m1 → m2a → m2b → m2b.5 → m2c → m3 → m4
-                          ↘
-                           m4b (independent — depends only on m4)
+m1 → m2a → m2b → m2b.5 → m2c → m2d → m2e → m2f → m2g → m2h → m2.5a → m2.5b → m2.5c → m2.5d → m2i → m2j → m2k → m3 → m4
+                                                                                                                ↘
+                                                                                                                 m4.5 (depends on m3 only; sequenced after m4)
 ```
 
 m1 is the critical foundation — every subsequent milestone depends on the DSL, parser, and typed AST it produces.
 
-## Beyond m4b
+## Beyond m4.5
 
 Hosted products (pro editor, free viewer, MCP server, enterprise, FedRAMP) consume these OSS packages via npm but are built in separate, proprietary repos. See the commercial roadmap for that scope.

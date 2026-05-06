@@ -82,7 +82,7 @@ describeBuilt('verbless render (requires `pnpm build`)', () => {
         });
     });
 
-    it('--today places the now-line in the output', async () => {
+    it('--now places the now-line in the output', async () => {
         await withTempDir(async (dir) => {
             const source = path.join(dir, 'sample.nowline');
             await fs.writeFile(source, [
@@ -94,10 +94,49 @@ describeBuilt('verbless render (requires `pnpm build`)', () => {
                 '  item x duration:1w',
                 '',
             ].join('\n'));
-            const r = await runCliBuilt([source, '--today', '2026-02-01', '-o', '-'], { cwd: dir });
+            const r = await runCliBuilt([source, '--now', '2026-02-01', '-o', '-'], { cwd: dir });
             expect(r.exitCode).toBe(0);
             expect(r.stdout).toContain('data-layer="nowline"');
-            expect(r.stdout).toContain('Today');
+            // m2d: pill label reads the short-form "now" rather than "Today".
+            expect(r.stdout).toContain('>now<');
+        });
+    });
+
+    it('--now - suppresses the now-line even though today is in range', async () => {
+        await withTempDir(async (dir) => {
+            const source = path.join(dir, 'sample.nowline');
+            // Use a length that comfortably contains "today" so we know the
+            // suppression came from `--now -`, not a date-window cutoff.
+            await fs.writeFile(source, [
+                'nowline v1',
+                '',
+                'roadmap r1 "R" start:2020-01-01 length:520w',
+                '',
+                'swimlane a "A"',
+                '  item x duration:1w',
+                '',
+            ].join('\n'));
+            const r = await runCliBuilt([source, '--now', '-', '-o', '-'], { cwd: dir });
+            expect(r.exitCode).toBe(0);
+            expect(r.stdout).not.toContain('data-layer="nowline"');
+        });
+    });
+
+    it('default (no --now) draws the now-line at today when in range', async () => {
+        await withTempDir(async (dir) => {
+            const source = path.join(dir, 'sample.nowline');
+            await fs.writeFile(source, [
+                'nowline v1',
+                '',
+                'roadmap r1 "R" start:2020-01-01 length:520w',
+                '',
+                'swimlane a "A"',
+                '  item x duration:1w',
+                '',
+            ].join('\n'));
+            const r = await runCliBuilt([source, '-o', '-'], { cwd: dir });
+            expect(r.exitCode).toBe(0);
+            expect(r.stdout).toContain('data-layer="nowline"');
         });
     });
 

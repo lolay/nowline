@@ -24,11 +24,11 @@ style long-term
 default item shadow:subtle
 default swimlane padding:sm spacing:none
 
-roadmap platform-nested "Platform (nested)" author:"Platform Team" start:2026-01-01
+roadmap platform-nested "Platform (nested)" author:"Platform Team" start:2026-01-05
 
-duration md length:1w
-duration lg length:2w
-duration xl length:1m
+size md effort:1w
+size lg effort:2w
+size xl effort:1m
 
 label tech-debt "Tech debt" style:tech-debt-style
 label agent "Agent" style:near-term
@@ -37,15 +37,15 @@ label self-service "Self-service" style:long-term
 anchor kickoff date:2026-01-06
 
 swimlane platform
-  item pf-auth-refactor "Auth refactor" duration:lg after:kickoff status:done labels:tech-debt
-  item pf-service-mesh "Service mesh" duration:xl after:pf-auth-refactor status:in-progress remaining:40% labels:agent
-  item pf-api-gateway "API gateway" duration:lg after:pf-service-mesh labels:agent
-  item pf-events "Event bus" duration:md
-  item pf-telemetry "Telemetry pipe" duration:md labels:tech-debt
-  item pf-agent-runtime "Agent runtime" duration:md labels:agent
-  item pf-agent-sdk "Agent SDK" duration:md labels:agent
-  item pf-ss-catalog "Service catalog" duration:md labels:self-service
-  item pf-ss-onboarding "Self-service onboarding" duration:md labels:self-service
-  item pf-ss-billing "Self-service billing" duration:md labels:self-service
+  item pf-auth-refactor "Auth refactor" size:lg after:kickoff status:done labels:tech-debt
+  item pf-service-mesh "Service mesh" size:xl after:pf-auth-refactor status:in-progress remaining:40% labels:agent
+  item pf-api-gateway "API gateway" size:lg after:pf-service-mesh labels:agent
+  item pf-events "Event bus" size:md
+  item pf-telemetry "Telemetry pipe" size:md labels:tech-debt
+  item pf-agent-runtime "Agent runtime" size:md labels:agent
+  item pf-agent-sdk "Agent SDK" size:md labels:agent
+  item pf-ss-catalog "Service catalog" size:md labels:self-service
+  item pf-ss-onboarding "Self-service onboarding" size:md labels:self-service
+  item pf-ss-billing "Self-service billing" size:md labels:self-service
 
 milestone pf-beta "Platform Beta" after:[pf-service-mesh, pf-agent-runtime]

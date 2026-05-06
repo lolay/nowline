@@ -31,7 +31,7 @@ jobs:
         run: pnpm install --frozen-lockfile
 
       - name: Build all packages
-        run: pnpm -r build
+        run: pnpm build
 
       - name: Lint
         run: pnpm -r lint --if-present
@@ -77,7 +77,7 @@ jobs:
         run: pnpm install --frozen-lockfile
 
       - name: Build all packages
-        run: pnpm -r build
+        run: pnpm build
 
       - name: Compile single target (smoke)
         working-directory: packages/cli

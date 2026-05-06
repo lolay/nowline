@@ -7,7 +7,7 @@ import {
     isDefaultDeclaration,
     isLabelDeclaration,
     isStatusDeclaration,
-    isDurationDeclaration,
+    isSizeDeclaration,
 } from '../../src/generated/ast.js';
 
 describe('config section', () => {
@@ -127,22 +127,22 @@ swimlane s
         expect(statuses.map((s) => s.name)).toEqual(['awaiting-review', 'in-review']);
     });
 
-    it('parses duration declarations with length: in roadmap section', async () => {
+    it('parses size declarations with effort: in roadmap section', async () => {
         const r = await parse(
             `roadmap r
-duration xs length:1d
-duration sm length:3d
-duration md length:1w
+size xs effort:1d
+size sm effort:3d
+size md effort:1w
 swimlane s
-  item x duration:md
+  item x size:md
 `,
             { validate: false },
         );
         expect(r.parserErrors).toEqual([]);
-        const durations = r.ast.roadmapEntries.filter(isDurationDeclaration);
-        expect(durations.map((d) => d.name)).toEqual(['xs', 'sm', 'md']);
+        const sizes = r.ast.roadmapEntries.filter(isSizeDeclaration);
+        expect(sizes.map((s) => s.name)).toEqual(['xs', 'sm', 'md']);
         expect(
-            durations[0].properties.find((p) => p.key === 'length')?.value,
+            sizes[0].properties.find((p) => p.key === 'effort')?.value,
         ).toBe('1d');
     });
 

@@ -56,6 +56,11 @@ function entityStyleToResolved(e: EntityStyle, theme: Theme): ResolvedStyle {
         // default `beside` applies. Roadmap entity's resolve step lifts this
         // from the 5-level chain.
         headerPosition: 'beside',
+        capacityIcon: e.capacityIcon,
+        // Roadmap-only readability knobs. Defaults preserve the existing
+        // single-top-strip layout and keep the major-ticks-only grid.
+        timelinePosition: 'top',
+        minorGrid: false,
     };
 }
 
@@ -114,6 +119,21 @@ function applyProp(target: ResolvedStyle, key: string, value: string, theme: The
             break;
         case 'header-position':
             if (value === 'beside' || value === 'above') target.headerPosition = value;
+            break;
+        case 'capacity-icon':
+            // Validator (rule 17e + checkGlyphReferences) has already verified
+            // the value is a built-in name, a declared glyph id, or an inline
+            // Unicode literal. Pass it through verbatim — interpretation
+            // happens in the renderer where we have access to ResolvedConfig.glyphs.
+            target.capacityIcon = value;
+            break;
+        case 'timeline-position':
+            if (value === 'top' || value === 'bottom' || value === 'both') {
+                target.timelinePosition = value;
+            }
+            break;
+        case 'minor-grid':
+            target.minorGrid = value === 'true';
             break;
         default:
             break;

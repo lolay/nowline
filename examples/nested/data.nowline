@@ -24,12 +24,12 @@ style long-term
 default item shadow:subtle
 default swimlane padding:sm spacing:none
 
-roadmap data-nested "Data (nested)" author:"Data Team" start:2026-01-01
+roadmap data-nested "Data (nested)" author:"Data Team" start:2026-01-05
 
-duration sm length:3d
-duration md length:1w
-duration lg length:2w
-duration xl length:1m
+size sm effort:3d
+size md effort:1w
+size lg effort:2w
+size xl effort:1m
 
 label tech-debt "Tech debt" style:tech-debt-style
 label agent "Agent" style:near-term
@@ -38,15 +38,15 @@ label self-service "Self-service" style:long-term
 anchor kickoff date:2026-01-06
 
 swimlane data
-  item data-warehouse "Warehouse migration" duration:xl after:kickoff status:in-progress remaining:50% labels:tech-debt
-  item data-streaming "Streaming pipeline" duration:lg labels:agent
-  item data-agent-features "Agent feature store" duration:md labels:agent
-  item data-agent-eval "Agent eval dataset" duration:md labels:agent
-  item data-ss-exports "Self-service exports" duration:md labels:self-service
-  item data-ss-sql "Self-service SQL editor" duration:lg labels:self-service
-  item data-catalog "Data catalog" duration:md
-  item data-lineage "Data lineage" duration:md
-  item data-governance "Governance policies" duration:md
-  item data-pii-scan "PII scanner" duration:md
+  item data-warehouse "Warehouse migration" size:xl after:kickoff status:in-progress remaining:50% labels:tech-debt
+  item data-streaming "Streaming pipeline" size:lg labels:agent
+  item data-agent-features "Agent feature store" size:md labels:agent
+  item data-agent-eval "Agent eval dataset" size:md labels:agent
+  item data-ss-exports "Self-service exports" size:md labels:self-service
+  item data-ss-sql "Self-service SQL editor" size:lg labels:self-service
+  item data-catalog "Data catalog" size:md
+  item data-lineage "Data lineage" size:md
+  item data-governance "Governance policies" size:md
+  item data-pii-scan "PII scanner" size:md
 
 milestone data-beta "Data Beta" after:[data-warehouse, data-streaming]

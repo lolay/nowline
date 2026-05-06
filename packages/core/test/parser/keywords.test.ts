@@ -160,14 +160,85 @@ swimlane s
         expect(r.parserErrors).toEqual([]);
     });
 
-    it('parses roadmap-section duration/status/label declarations', async () => {
+    it('parses roadmap-section size/status/label declarations', async () => {
         const r = await parse(`roadmap r
-duration xs length:1d
+size xs effort:1d
 status awaiting-review
 label security "Security"
 swimlane s
-  item x duration:xs status:awaiting-review labels:security
+  item x size:xs status:awaiting-review labels:security
 `, { validate: false });
+        expect(r.parserErrors).toEqual([]);
+    });
+
+    it('parses capacity: integer/decimal/percent on items', async () => {
+        const r = await parse(`roadmap r
+swimlane s capacity:5
+  item a duration:1w capacity:2
+  item b duration:1w capacity:0.5
+  item c duration:1w capacity:50%
+  item d duration:1w capacity:12.5%
+`, { validate: false });
+        expect(r.lexerErrors).toEqual([]);
+        expect(r.parserErrors).toEqual([]);
+    });
+
+    it('parses overcapacity:show|hide on swimlane and default', async () => {
+        const r = await parse(`config
+default swimlane overcapacity:hide
+roadmap r
+swimlane platform capacity:5 overcapacity:show
+  item x duration:1w capacity:2
+swimlane mobile capacity:2 overcapacity:hide
+  item y duration:1w capacity:1
+`, { validate: false });
+        expect(r.lexerErrors).toEqual([]);
+        expect(r.parserErrors).toEqual([]);
+    });
+
+    it('parses utilization-warn-at: and utilization-over-at: in percent, decimal, integer, and `none` forms on swimlane and default swimlane', async () => {
+        const r = await parse(`config
+default swimlane utilization-warn-at:80% utilization-over-at:100%
+roadmap r
+swimlane percent capacity:5 utilization-warn-at:75% utilization-over-at:120%
+  item a duration:1w capacity:2
+swimlane decimal capacity:5 utilization-warn-at:0.5 utilization-over-at:1.25
+  item b duration:1w capacity:2
+swimlane integer capacity:5 utilization-warn-at:80 utilization-over-at:100
+  item c duration:1w capacity:2
+swimlane opt-out capacity:5 utilization-warn-at:none utilization-over-at:none
+  item d duration:1w capacity:2
+`, { validate: false });
+        expect(r.lexerErrors).toEqual([]);
+        expect(r.parserErrors).toEqual([]);
+    });
+
+    it('parses capacity-icon: identifier and string forms in style + default', async () => {
+        const r = await parse(`config
+style finance
+  capacity-icon: budget
+style adhoc
+  capacity-icon: "⚙"
+default swimlane capacity-icon:person
+roadmap r
+swimlane s capacity:3
+  item x duration:1w capacity:1
+`, { validate: false });
+        expect(r.lexerErrors).toEqual([]);
+        expect(r.parserErrors).toEqual([]);
+    });
+
+    it('parses glyph declarations in config (inline + with description)', async () => {
+        const r = await parse(`config
+glyph budget "Budget" unicode:"💰" ascii:"$"
+glyph fte unicode:"\\u{1F464}" ascii:"@"
+glyph star unicode:"⭐"
+  description "Custom star glyph"
+roadmap r
+swimlane s
+  item x duration:1w
+`, { validate: false });
+        expect(r.lexerErrors).toEqual([]);
         expect(r.parserErrors).toEqual([]);
     });
 });

@@ -10,7 +10,7 @@ import type {
     StyleDeclaration,
     LabelDeclaration,
     StatusDeclaration,
-    DurationDeclaration,
+    SizeDeclaration,
     ScaleBlock,
     CalendarBlock,
     DefaultDeclaration,
@@ -21,12 +21,13 @@ import type {
     MilestoneDeclaration,
     FootnoteDeclaration,
     RoadmapDeclaration,
+    GlyphDeclaration,
 } from '../generated/ast.js';
 import {
     isStyleDeclaration,
     isLabelDeclaration,
     isStatusDeclaration,
-    isDurationDeclaration,
+    isSizeDeclaration,
     isScaleBlock,
     isCalendarBlock,
     isDefaultDeclaration,
@@ -36,6 +37,7 @@ import {
     isAnchorDeclaration,
     isMilestoneDeclaration,
     isFootnoteDeclaration,
+    isGlyphDeclaration,
 } from '../generated/ast.js';
 
 export type IncludeMode = 'merge' | 'ignore' | 'isolate';
@@ -69,6 +71,11 @@ export interface ResolvedConfig {
     calendar?: CalendarBlock;
     styles: Map<string, StyleDeclaration>;
     defaults: Map<string, DefaultDeclaration>;
+    // Custom glyph declarations from the `glyph` config keyword. Renderer-side
+    // resolution of `icon:` / `capacity-icon:` looks here when the value isn't
+    // a built-in identifier or an inline Unicode literal. See specs/dsl.md §
+    // Glyph Declaration.
+    glyphs: Map<string, GlyphDeclaration>;
 }
 
 export interface ResolvedContent {
@@ -77,7 +84,7 @@ export interface ResolvedContent {
     teams: Map<string, TeamDeclaration>;
     anchors: Map<string, AnchorDeclaration>;
     labels: Map<string, LabelDeclaration>;
-    durations: Map<string, DurationDeclaration>;
+    sizes: Map<string, SizeDeclaration>;
     statuses: Map<string, StatusDeclaration>;
     swimlanes: Map<string, SwimlaneDeclaration>;
     milestones: Map<string, MilestoneDeclaration>;
@@ -86,6 +93,10 @@ export interface ResolvedContent {
 }
 
 export interface IsolatedRegion {
+    // The path string as written in the parent's `include "..."` directive
+    // (e.g. "./partner.nowline"). Used as the user-facing label/badge in the
+    // rendered region. The resolver's internal caching/dedup uses the
+    // resolved absolute path, but that's never exposed to layout/render.
     sourcePath: string;
     config: ResolvedConfig;
     content: ResolvedContent;
@@ -117,6 +128,7 @@ function emptyConfig(): ResolvedConfig {
     return {
         styles: new Map(),
         defaults: new Map(),
+        glyphs: new Map(),
     };
 }
 
@@ -126,7 +138,7 @@ function emptyContent(): ResolvedContent {
         teams: new Map(),
         anchors: new Map(),
         labels: new Map(),
-        durations: new Map(),
+        sizes: new Map(),
         statuses: new Map(),
         swimlanes: new Map(),
         milestones: new Map(),
@@ -238,6 +250,7 @@ async function resolveFile(
             childConfig,
             roadmapMode,
             childAbsPath,
+            childRelPath,
             ctx.diagnostics,
         );
 
@@ -312,6 +325,7 @@ function applyConfigMode(
 
     mergeMap(target.styles, child.styles, (name) => warn(name, 'Style'));
     mergeMap(target.defaults, child.defaults, (name) => warn(name, 'Default'));
+    mergeMap(target.glyphs, child.glyphs, (name) => warn(name, 'Glyph'));
     if (child.scale && !target.scale) {
         target.scale = child.scale;
     }
@@ -326,6 +340,7 @@ function applyRoadmapMode(
     childConfig: ResolvedConfig,
     mode: IncludeMode,
     childPath: string,
+    childRelPath: string,
     diagnostics: ResolveDiagnostic[],
 ): void {
     if (mode === 'ignore') return;
@@ -333,7 +348,7 @@ function applyRoadmapMode(
     if (mode === 'isolate') {
         if (child.roadmap) {
             target.isolatedRegions.push({
-                sourcePath: childPath,
+                sourcePath: childRelPath,
                 config: childConfig,
                 content: child,
             });
@@ -352,7 +367,7 @@ function applyRoadmapMode(
     mergeMap(target.teams, child.teams, (name) => warn(name, 'Team'));
     mergeMap(target.anchors, child.anchors, (name) => warn(name, 'Anchor'));
     mergeMap(target.labels, child.labels, (name) => warn(name, 'Label'));
-    mergeMap(target.durations, child.durations, (name) => warn(name, 'Duration'));
+    mergeMap(target.sizes, child.sizes, (name) => warn(name, 'Size'));
     mergeMap(target.statuses, child.statuses, (name) => warn(name, 'Status'));
     mergeMap(target.swimlanes, child.swimlanes, (name) => warn(name, 'Swimlane'));
     mergeMap(target.milestones, child.milestones, (name) => warn(name, 'Milestone'));
@@ -391,6 +406,10 @@ function addConfigEntry(config: ResolvedConfig, entry: ConfigEntry): void {
         if (entry.name && !config.styles.has(entry.name)) {
             config.styles.set(entry.name, entry);
         }
+    } else if (isGlyphDeclaration(entry)) {
+        if (entry.name && !config.glyphs.has(entry.name)) {
+            config.glyphs.set(entry.name, entry);
+        }
     } else if (isDefaultDeclaration(entry)) {
         if (!config.defaults.has(entry.entityType)) {
             config.defaults.set(entry.entityType, entry);
@@ -428,9 +447,9 @@ function addRoadmapEntry(content: ResolvedContent, entry: RoadmapEntry): void {
         if (entry.name && !content.labels.has(entry.name)) {
             content.labels.set(entry.name, entry);
         }
-    } else if (isDurationDeclaration(entry)) {
-        if (entry.name && !content.durations.has(entry.name)) {
-            content.durations.set(entry.name, entry);
+    } else if (isSizeDeclaration(entry)) {
+        if (entry.name && !content.sizes.has(entry.name)) {
+            content.sizes.set(entry.name, entry);
         }
     } else if (isStatusDeclaration(entry)) {
         if (entry.name && !content.statuses.has(entry.name)) {

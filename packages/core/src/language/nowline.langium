@@ -21,7 +21,7 @@ IncludeOption:
 // --- Config Entries ---
 
 ConfigEntry:
-    ScaleBlock | CalendarBlock | StyleDeclaration | DefaultDeclaration;
+    ScaleBlock | CalendarBlock | StyleDeclaration | GlyphDeclaration | DefaultDeclaration;
 
 ScaleBlock:
     'scale'
@@ -38,8 +38,19 @@ StyleDeclaration:
     'style' (name=ID)? (title=STRING)?
     (INDENT properties+=StyleProperty+ DEDENT)?;
 
+GlyphDeclaration:
+    'glyph' (name=ID)? (title=STRING)?
+    (properties+=EntityProperty)*
+    (INDENT description=DescriptionDirective DEDENT)?;
+
+// 'person' appears here as an explicit alternative because it is also a declaration
+// keyword (PersonDeclaration / PersonMemberRef), and Langium's lexer tokenizes it as
+// the keyword in preference to ID. Without the alternation, `capacity-icon:person`
+// (a built-in capacity-icon name) would fail to parse. Other built-in icon names
+// (`none`, `multiplier`, `people`, `points`, `time`, `shield`, `warning`, `lock`)
+// are not grammar keywords and therefore lex as ID without help.
 StylePropertyValue returns string:
-    ID | COLOR_HEX;
+    ID | COLOR_HEX | STRING | 'person';
 
 DefaultDeclaration:
     'default' entityType=DefaultEntityType
@@ -57,7 +68,7 @@ RoadmapDeclaration:
 
 RoadmapEntry:
     PersonDeclaration | TeamDeclaration | AnchorDeclaration |
-    LabelDeclaration | DurationDeclaration | StatusDeclaration |
+    LabelDeclaration | SizeDeclaration | StatusDeclaration |
     SwimlaneDeclaration | MilestoneDeclaration | FootnoteDeclaration;
 
 PersonDeclaration:
@@ -86,8 +97,8 @@ LabelDeclaration:
     (properties+=EntityProperty)*
     (INDENT description=DescriptionDirective DEDENT)?;
 
-DurationDeclaration:
-    'duration' (name=ID)? (title=STRING)?
+SizeDeclaration:
+    'size' (name=ID)? (title=STRING)?
     (properties+=EntityProperty)*
     (INDENT description=DescriptionDirective DEDENT)?;
 
@@ -140,7 +151,7 @@ DescriptionDirective:
 
 // --- Properties ---
 
-// EntityProperty uses a single "key:" token so that keywords like `status`, `duration`,
+// EntityProperty uses a single "key:" token so that keywords like `status`, `size`,
 // `label`, `style`, etc. still parse unambiguously as property keys when followed by `:`.
 // The validator strips the trailing `:` and validates the key text.
 EntityProperty:
@@ -155,8 +166,11 @@ BlockProperty:
 StyleProperty:
     key=PROPERTY_KEY_WITH_COLON value=StylePropertyValue;
 
+// 'person' appears here for the same reason as in StylePropertyValue — it is a
+// declaration keyword that the lexer prefers over ID, but it must also be accepted
+// as a property-atom value (e.g. `default swimlane capacity-icon:person`).
 PropertyAtom returns string:
-    ID | STRING | DURATION_LITERAL | PERCENTAGE | URL | DATE_LITERAL | COLOR_HEX | INTEGER;
+    ID | STRING | DURATION_LITERAL | PERCENTAGE | URL | DATE_LITERAL | COLOR_HEX | DECIMAL | INTEGER | 'person';
 
 // --- Terminals ---
 // INDENT/DEDENT must be declared before ID to avoid Chevrotain unreachable-token errors.
@@ -173,14 +187,19 @@ terminal INCLUDE_OPTION_KEY: /(config|roadmap):/;
 terminal URL: /https?:\/\/[^\s\[\],]+/;
 terminal STRING: /"([^"\\]|\\.)*"/;
 terminal DATE_LITERAL: /\d{4}-\d{2}-\d{2}/;
-terminal DURATION_LITERAL: /\d+[dwmqy]/;
-terminal PERCENTAGE: /\d+%/;
+terminal DURATION_LITERAL: /\d+(\.\d+)?[dwmqy]/;
+terminal PERCENTAGE: /\d+(\.\d+)?%/;
 terminal COLOR_HEX: /#[0-9a-fA-F]{3,8}/;
+// DECIMAL must precede INTEGER so that "0.5" lexes as one token (max-munch handles this,
+// but ordering keeps the grammar's intent obvious to readers). Requires both a leading and
+// trailing digit to avoid colliding with integer-then-property-value patterns.
+terminal DECIMAL: /\d+\.\d+/;
 terminal INTEGER: /\d+/;
 // PROPERTY_KEY_WITH_COLON matches `name:` as a single token. Because it is longer than any
 // bare keyword, the lexer prefers it over keywords when a colon immediately follows — letting
-// us use `duration:`, `status:`, `label:`, `style:` etc. as property keys without shadowing
-// those words as declaration keywords.
+// us use `size:`, `status:`, `label:`, `style:` etc. as property keys without shadowing
+// those words as declaration keywords. (`duration:` is also a property key — literal-only —
+// even though no `duration` declaration keyword exists.)
 terminal PROPERTY_KEY_WITH_COLON: /[a-zA-Z_][a-zA-Z0-9_-]*:/;
 terminal ID: /[a-zA-Z_][a-zA-Z0-9_-]*/;
 

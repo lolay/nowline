@@ -19,7 +19,7 @@ import type {
     StyleDeclaration,
     StyleProperty,
     LabelDeclaration,
-    DurationDeclaration,
+    SizeDeclaration,
     StatusDeclaration,
     DefaultDeclaration,
     CalendarBlock,
@@ -32,6 +32,7 @@ import type {
     ParallelContent,
     TeamContent,
     DefaultEntityType,
+    GlyphDeclaration,
 } from '../generated/ast.js';
 import {
     isItemDeclaration,
@@ -48,10 +49,11 @@ import {
     isStyleDeclaration,
     isStatusDeclaration,
     isLabelDeclaration,
-    isDurationDeclaration,
+    isSizeDeclaration,
     isScaleBlock,
     isCalendarBlock,
     isDefaultDeclaration,
+    isGlyphDeclaration,
 } from '../generated/ast.js';
 
 const SUPPORTED_VERSION = 'v1';
@@ -67,8 +69,28 @@ const BUILTIN_STATUSES = new Set([
 const STYLE_PROP_KEYS = new Set([
     'bg', 'fg', 'text', 'border', 'icon', 'shadow', 'font', 'weight',
     'italic', 'text-size', 'padding', 'spacing', 'header-height',
-    'corner-radius', 'bracket', 'header-position',
+    'corner-radius', 'bracket', 'header-position', 'capacity-icon',
+    'timeline-position', 'minor-grid',
 ]);
+
+// Built-in capacity-icon vocabulary. Renderer-curated SVG glyphs (plus 'multiplier'
+// which renders as the U+00D7 text character and 'none' which suppresses the glyph).
+const BUILTIN_CAPACITY_ICONS = new Set([
+    'none', 'multiplier', 'person', 'people', 'points', 'time',
+]);
+
+// Built-in icon: vocabulary. Superset of capacity-icon names plus the entity-decoration
+// icons currently shipped by the renderer.
+const BUILTIN_ICON_NAMES = new Set([
+    ...BUILTIN_CAPACITY_ICONS,
+    'shield', 'warning', 'lock',
+]);
+
+// `utilization-warn-at:` / `utilization-over-at:` accept the literal `none`
+// to opt out of that color band (per specs/dsl.md rule 17d). Numeric forms
+// (positive percent, decimal, integer) are validated separately via
+// POSITIVE_NUMBER_RE / POSITIVE_PERCENT_RE.
+const UTILIZATION_NONE = 'none';
 
 const STYLE_PROP_ENUMS: Record<string, Set<string>> = {
     border: new Set(['solid', 'dashed', 'dotted']),
@@ -83,6 +105,8 @@ const STYLE_PROP_ENUMS: Record<string, Set<string>> = {
     'corner-radius': new Set(['none', 'xs', 'sm', 'md', 'lg', 'xl', 'full']),
     bracket: new Set(['none', 'solid', 'dashed']),
     'header-position': new Set(['beside', 'above']),
+    'timeline-position': new Set(['top', 'bottom', 'both']),
+    'minor-grid': new Set(['true', 'false']),
 };
 
 const COLOR_NAMES = new Set([
@@ -107,13 +131,16 @@ const DEFAULT_ENTITY_TYPES = new Set([
 ]);
 
 // Banned properties per entity type on `default <entity>` lines.
+// `capacity` on `default swimlane` is banned because each lane's budget must be
+// explicit at its declaration site (per dsl.md). `capacity` on `default item` is
+// allowed (and a useful "every item consumes 1 unit by default" lever).
 const DEFAULT_BANNED: Record<DefaultEntityType, Set<string>> = {
-    item: new Set(['duration', 'after', 'before', 'remaining', 'link', 'description', 'owner']),
+    item: new Set(['size', 'duration', 'after', 'before', 'remaining', 'link', 'description', 'owner']),
     milestone: new Set(['date', 'after', 'link', 'description']),
     anchor: new Set(['date', 'link', 'description']),
     footnote: new Set(['on', 'link', 'description']),
     label: new Set(['link', 'description']),
-    swimlane: new Set(),
+    swimlane: new Set(['capacity']),
     roadmap: new Set(),
     parallel: new Set(),
     group: new Set(),
@@ -123,7 +150,8 @@ function propKey(prop: { key: string }): string {
     return prop.key.endsWith(':') ? prop.key.slice(0, -1) : prop.key;
 }
 
-const DURATION_RE = /^\d+[dwmqy]$/;
+// Matches duration literals including decimals, e.g. `2w`, `0.5d`, `1.5m`.
+const DURATION_RE = /^\d+(?:\.\d+)?[dwmqy]$/;
 const PERCENTAGE_RE = /^\d+%$/;
 const DATE_RE = /^\d{4}-\d{2}-\d{2}$/;
 const HEX_COLOR_RE = /^#[0-9a-fA-F]{3,8}$/;
@@ -131,6 +159,20 @@ const VERSION_RE = /^v\d+$/;
 const KEBAB_RE = /^[a-z][a-z0-9]*(-[a-z0-9]+)*$/;
 const INTEGER_RE = /^\d+$/;
 const BARE_DURATION_SUFFIX_RE = /^[dwmqy]$/;
+// Capacity numeric forms — the grammar already separates DECIMAL/INTEGER/PERCENTAGE
+// terminals, but the validator needs to enforce the spec's "positive number" rule
+// and to differentiate where percent is allowed (item) vs. banned (swimlane).
+const POSITIVE_NUMBER_RE = /^\d+(\.\d+)?$/;
+const POSITIVE_PERCENT_RE = /^\d+(\.\d+)?%$/;
+// Disambiguated forms used by `utilization-warn-at:` / `utilization-over-at:`.
+// A decimal-fraction MUST include the dot so its meaning is unambiguous; a
+// bare integer matches the integer regex and is rejected by the validator
+// with a hint to switch to either the percent or decimal-fraction form.
+const POSITIVE_DECIMAL_FRACTION_RE = /^\d+\.\d+$/;
+const POSITIVE_INTEGER_RE = /^\d+$/;
+// ASCII printable, length 1-3 — used by the glyph declaration validator for the
+// `ascii:"..."` fallback property after Langium has stripped the surrounding quotes.
+const ASCII_FALLBACK_RE = /^[\x20-\x7E]{1,3}$/;
 
 const INCLUDE_MODES = new Set(['merge', 'ignore', 'isolate']);
 
@@ -166,9 +208,11 @@ export function registerValidationChecks(services: NowlineServices): void {
             validator.checkForwardReferences,
             validator.checkReferenceResolution,
             validator.checkCircularDependencies,
-            validator.checkDuplicateDurationIds,
+            validator.checkDuplicateSizeIds,
             validator.checkCalendarBlockConsistency,
             validator.checkPersonDeclarations,
+            validator.checkDuplicateGlyphIds,
+            validator.checkGlyphReferences,
         ],
         NowlineDirective: [validator.checkDirectiveVersion],
         IncludeOption: [validator.checkIncludeMode],
@@ -188,6 +232,7 @@ export function registerValidationChecks(services: NowlineServices): void {
         SwimlaneDeclaration: [
             validator.checkEntityIdOrTitle,
             validator.checkNoRawStyleProperties,
+            validator.checkUtilizationOrdering,
         ],
         ItemDeclaration: [
             validator.checkEntityIdOrTitle,
@@ -225,13 +270,17 @@ export function registerValidationChecks(services: NowlineServices): void {
         ],
         StyleDeclaration: [validator.checkEntityIdOrTitle],
         StyleProperty: [validator.checkStylePropertyEnum],
+        GlyphDeclaration: [
+            validator.checkEntityIdOrTitle,
+            validator.checkGlyphDeclaration,
+        ],
         LabelDeclaration: [
             validator.checkEntityIdOrTitle,
             validator.checkNoRawStyleProperties,
         ],
-        DurationDeclaration: [
+        SizeDeclaration: [
             validator.checkEntityIdOrTitle,
-            validator.checkDurationDeclaration,
+            validator.checkSizeDeclaration,
             validator.checkNoRawStyleProperties,
         ],
         StatusDeclaration: [
@@ -239,7 +288,7 @@ export function registerValidationChecks(services: NowlineServices): void {
             validator.checkStatusDeclaration,
             validator.checkNoRawStyleProperties,
         ],
-        DefaultDeclaration: [validator.checkDefaultDeclaration],
+        DefaultDeclaration: [validator.checkDefaultDeclaration, validator.checkUtilizationOrdering],
         CalendarBlock: [validator.checkCalendarBlock],
         ScaleBlock: [validator.checkScaleBlock],
     };
@@ -411,17 +460,30 @@ export class NowlineValidator {
                 break;
 
             case 'duration':
-                if (val && !DURATION_RE.test(val) && !isIdentifier(val)) {
-                    accept('error', `Invalid duration "${val}". Use format like 2w, 3d, 1m, 2q or a declared duration name.`, {
+                // `duration:` is literal-only — no alias lookup. Authors who
+                // want a named alias use `size:NAME` instead, which resolves
+                // to the size's `effort:` (and divides by `capacity:` at
+                // layout time, m5).
+                if (val && !DURATION_RE.test(val)) {
+                    accept('error', `Invalid duration "${val}". Use a raw duration literal like 0.5d, 2w, 1m, 2q. Use "size:NAME" to reference a declared size.`, {
                         node: prop,
                         property: 'value',
                     });
                 }
                 break;
 
-            case 'length':
+            case 'size':
+                if (val && !isIdentifier(val)) {
+                    accept('error', `Invalid size "${val}". Use the id of a declared size (e.g. xs, m, lg).`, {
+                        node: prop,
+                        property: 'value',
+                    });
+                }
+                break;
+
+            case 'effort':
                 if (val && !DURATION_RE.test(val)) {
-                    accept('error', `Invalid length "${val}". Use a raw duration literal like 2w, 3d, 1m, 2q.`, {
+                    accept('error', `Invalid effort "${val}". Use a raw duration literal like 0.5d, 2w, 1m, 2q.`, {
                         node: prop,
                         property: 'value',
                     });
@@ -429,20 +491,25 @@ export class NowlineValidator {
                 break;
 
             case 'remaining': {
+                // Accepts either a percent (`30%`, validated 0-100) or a
+                // single-engineer effort literal (`1w`, `0.5d`). The literal
+                // form is normalized to a percent at layout time using the
+                // item's resolved total effort (m5); overflow there emits a
+                // soft warning and clamps the rendered bar to 100%.
                 if (val) {
-                    if (!PERCENTAGE_RE.test(val)) {
-                        accept('error', `Invalid remaining value "${val}". Use a percentage like 30%.`, {
-                            node: prop,
-                            property: 'value',
-                        });
-                    } else {
-                        const pct = parseInt(val, 10);
+                    if (PERCENTAGE_RE.test(val)) {
+                        const pct = parseFloat(val);
                         if (pct < 0 || pct > 100) {
                             accept('error', `Remaining must be between 0% and 100%, got ${val}.`, {
                                 node: prop,
                                 property: 'value',
                             });
                         }
+                    } else if (!DURATION_RE.test(val)) {
+                        accept('error', `Invalid remaining value "${val}". Use a percentage like 30% or a duration literal like 1w, 0.5d.`, {
+                            node: prop,
+                            property: 'value',
+                        });
                     }
                 }
                 break;
@@ -494,6 +561,103 @@ export class NowlineValidator {
                         node: prop,
                     });
                 }
+                break;
+
+            case 'capacity': {
+                if (!val) break;
+                const parent = prop.$container;
+                const parentKind = capacityParentKind(parent);
+                // Parallel/group ban is reported by checkNoComputedProperties; skip here.
+                if (parentKind === 'invalid') break;
+                if (parentKind === 'lane') {
+                    if (!POSITIVE_NUMBER_RE.test(val) || parseFloat(val) <= 0) {
+                        accept('error',
+                            `Invalid swimlane capacity "${val}". Use a positive integer (e.g. capacity:5) or decimal (e.g. capacity:1.5). Percent literals are not allowed on swimlanes.`,
+                            { node: prop, property: 'value' });
+                    }
+                } else {
+                    if (POSITIVE_PERCENT_RE.test(val)) {
+                        const pct = parseFloat(val);
+                        if (pct <= 0) {
+                            accept('error',
+                                `Item capacity "${val}" must be positive.`,
+                                { node: prop, property: 'value' });
+                        }
+                    } else if (POSITIVE_NUMBER_RE.test(val)) {
+                        if (parseFloat(val) <= 0) {
+                            accept('error',
+                                `Item capacity "${val}" must be positive.`,
+                                { node: prop, property: 'value' });
+                        }
+                    } else {
+                        accept('error',
+                            `Invalid item capacity "${val}". Use a positive integer (capacity:2), decimal (capacity:0.5), or percent literal (capacity:50%).`,
+                            { node: prop, property: 'value' });
+                    }
+                }
+                break;
+            }
+
+            case 'overcapacity': {
+                // Removed in m9. Suppression is now expressed via
+                // `utilization-warn-at:none` / `utilization-over-at:none`
+                // (see specs/dsl.md § Capacity → Utilization thresholds).
+                accept('error',
+                    `"overcapacity:" was removed. Use "utilization-over-at:none" (and/or "utilization-warn-at:none") to suppress the lane utilization underline.`,
+                    { node: prop });
+                break;
+            }
+
+            case 'utilization-warn-at':
+            case 'utilization-over-at': {
+                if (!val) break;
+                if (!isUtilizationAllowedHere(prop.$container)) {
+                    accept('error',
+                        `"${key}:" is only valid on "swimlane" or "default swimlane".`,
+                        { node: prop });
+                    break;
+                }
+                if (val === UTILIZATION_NONE) break;
+                if (POSITIVE_PERCENT_RE.test(val)) {
+                    if (parseFloat(val) <= 0) {
+                        accept('error',
+                            `${key} value "${val}" must be positive.`,
+                            { node: prop, property: 'value' });
+                    }
+                    break;
+                }
+                // Decimals must include the dot to read as fractions; bare
+                // integers are ambiguous (`80` could mean 80% or 8000% as a
+                // fraction) so we reject them with a hint to disambiguate.
+                if (POSITIVE_DECIMAL_FRACTION_RE.test(val)) {
+                    if (parseFloat(val) <= 0) {
+                        accept('error',
+                            `${key} value "${val}" must be positive.`,
+                            { node: prop, property: 'value' });
+                    }
+                    break;
+                }
+                if (POSITIVE_INTEGER_RE.test(val)) {
+                    accept('error',
+                        `Ambiguous ${key} value "${val}". Use the percent form ("${val}%") or the decimal-fraction form ("0.${val}") to make the intent explicit.`,
+                        { node: prop, property: 'value' });
+                    break;
+                }
+                accept('error',
+                    `Invalid ${key} value "${val}". Use a positive percent (e.g. 80%), a positive decimal fraction (e.g. 0.8), or "none" to opt out.`,
+                    { node: prop, property: 'value' });
+                break;
+            }
+
+            case 'capacity-icon':
+                // Value-form rule (built-in / glyph id / string literal) and
+                // forward-reference rule are enforced together by
+                // checkGlyphReferences at file scope so style blocks and
+                // default-declaration property positions share one code path.
+                break;
+
+            case 'icon':
+                // Same handling as capacity-icon.
                 break;
 
             default:
@@ -610,21 +774,22 @@ export class NowlineValidator {
         }
     }
 
-    // --- Rule 10: Item requires duration: ---
+    // --- Rule 10: Item requires either size: or duration: ---
     checkItemRequiredDuration(item: ItemDeclaration, accept: ValidationAcceptor): void {
         const hasDuration = item.properties.some((p) => propKey(p) === 'duration');
-        if (!hasDuration) {
-            accept('error', `Item "${displayName(item)}" requires a "duration:" property.`, {
+        const hasSize = item.properties.some((p) => propKey(p) === 'size');
+        if (!hasDuration && !hasSize) {
+            accept('error', `Item "${displayName(item)}" requires a "size:" or "duration:" property.`, {
                 node: item,
             });
         }
     }
 
-    // --- Parallel/group rule 3: duration/remaining not valid on parallel/group ---
+    // --- Parallel/group rule 3: size/duration/remaining/capacity not valid on parallel/group ---
     checkNoComputedProperties(node: ParallelBlock | GroupBlock, accept: ValidationAcceptor): void {
         for (const prop of node.properties) {
             const key = propKey(prop);
-            if (key === 'duration' || key === 'remaining') {
+            if (key === 'size' || key === 'duration' || key === 'remaining' || key === 'capacity') {
                 accept('error', `"${key}" is not valid on ${node.$type === 'ParallelBlock' ? 'parallel' : 'group'} (computed from children).`, {
                     node: prop,
                 });
@@ -680,6 +845,10 @@ export class NowlineValidator {
     }
 
     // --- Rule 18: Style property enum values ---
+    // Value forms accepted by `icon:` and `capacity-icon:` (built-in identifier,
+    // glyph name, or inline string literal) plus forward-reference resolution are
+    // enforced by checkGlyphReferences at file scope so style blocks and
+    // `default <entity>` lines share a single code path.
     checkStylePropertyEnum(prop: StyleProperty, accept: ValidationAcceptor): void {
         const key = propKey(prop);
         const val = prop.value;
@@ -699,7 +868,7 @@ export class NowlineValidator {
                     property: 'value',
                 });
             }
-        } else if (key !== 'icon' && !STYLE_PROP_KEYS.has(key)) {
+        } else if (!STYLE_PROP_KEYS.has(key)) {
             accept('error', `Unknown style property "${key}".`, {
                 node: prop,
                 property: 'key',
@@ -707,11 +876,11 @@ export class NowlineValidator {
         }
     }
 
-    // --- Duration declaration: rule 4 (length: required), rule 3 (id format) ---
-    checkDurationDeclaration(decl: DurationDeclaration, accept: ValidationAcceptor): void {
-        const lengthProp = decl.properties.find((p) => propKey(p) === 'length');
-        if (!lengthProp) {
-            accept('error', `Duration "${displayName(decl)}" requires a "length:" property.`, {
+    // --- Size declaration: rule 5 (effort: required), rule 4 (id format) ---
+    checkSizeDeclaration(decl: SizeDeclaration, accept: ValidationAcceptor): void {
+        const effortProp = decl.properties.find((p) => propKey(p) === 'effort');
+        if (!effortProp) {
+            accept('error', `Size "${displayName(decl)}" requires an "effort:" property.`, {
                 node: decl,
             });
         }
@@ -719,11 +888,11 @@ export class NowlineValidator {
         if (decl.name) {
             if (DURATION_RE.test(decl.name) || BARE_DURATION_SUFFIX_RE.test(decl.name)) {
                 accept('error',
-                    `Duration id "${decl.name}" collides with the raw duration pattern. Choose a different kebab-case name (e.g. "xs", "small", "quarter").`,
+                    `Size id "${decl.name}" collides with the raw duration pattern. Choose a different kebab-case name (e.g. "xs", "small", "quarter").`,
                     { node: decl, property: 'name' });
             }
             if (!KEBAB_RE.test(decl.name)) {
-                accept('warning', `Duration id "${decl.name}" is not kebab-case.`, {
+                accept('warning', `Size id "${decl.name}" is not kebab-case.`, {
                     node: decl,
                     property: 'name',
                 });
@@ -748,20 +917,42 @@ export class NowlineValidator {
         }
     }
 
-    // --- Rule 5: Duplicate duration ids ---
-    checkDuplicateDurationIds(file: NowlineFile, accept: ValidationAcceptor): void {
-        const seen = new Map<string, DurationDeclaration>();
+    // --- Rule 5: Duplicate size ids ---
+    checkDuplicateSizeIds(file: NowlineFile, accept: ValidationAcceptor): void {
+        const seen = new Map<string, SizeDeclaration>();
         for (const entry of file.roadmapEntries) {
-            if (isDurationDeclaration(entry) && entry.name) {
+            if (isSizeDeclaration(entry) && entry.name) {
                 const existing = seen.get(entry.name);
                 if (existing) {
                     accept('error',
-                        `Duplicate duration id "${entry.name}". First declared at ${locationOf(existing)}.`,
+                        `Duplicate size id "${entry.name}". First declared at ${locationOf(existing)}.`,
                         { node: entry, property: 'name' });
                 } else {
                     seen.set(entry.name, entry);
                 }
             }
+        }
+    }
+
+    // --- Rule 17d (ordering half): utilization-warn-at <= utilization-over-at ---
+    // Runs on both `SwimlaneDeclaration` and `DefaultDeclaration` (when its
+    // entityType is `swimlane`). The value-form check in checkPropertyValues
+    // has already run by the time this fires; this method only re-reads the
+    // values and compares fractions when both are numeric. `none` on either
+    // side opts that side out and skips the comparison (the spec treats the
+    // two thresholds as independent — see specs/dsl.md rule 17d).
+    checkUtilizationOrdering(decl: SwimlaneDeclaration | DefaultDeclaration, accept: ValidationAcceptor): void {
+        if (isDefaultDeclaration(decl) && decl.entityType !== 'swimlane') return;
+        const warnProp = decl.properties.find((p) => propKey(p) === 'utilization-warn-at');
+        const overProp = decl.properties.find((p) => propKey(p) === 'utilization-over-at');
+        if (!warnProp || !overProp) return;
+        const warn = parseUtilizationFraction(warnProp.value);
+        const over = parseUtilizationFraction(overProp.value);
+        if (warn === null || over === null) return;
+        if (warn > over) {
+            accept('error',
+                `utilization-warn-at (${warnProp.value}) must be ≤ utilization-over-at (${overProp.value}). Warn fires below over; if both fire at the same point, the warn band collapses to zero.`,
+                { node: warnProp, property: 'value' });
         }
     }
 
@@ -895,16 +1086,16 @@ export class NowlineValidator {
         }
     }
 
-    // --- Rule 15: duration:/status: references resolve to earlier declarations ---
+    // --- Rule 15: size:/status: references resolve to earlier declarations ---
     checkForwardReferences(file: NowlineFile, accept: ValidationAcceptor): void {
         // Declarations in source order across the file.
-        const durationOrder = new Map<string, number>();
+        const sizeOrder = new Map<string, number>();
         const statusOrder = new Map<string, number>();
 
         for (let i = 0; i < file.roadmapEntries.length; i++) {
             const entry = file.roadmapEntries[i];
-            if (isDurationDeclaration(entry) && entry.name) {
-                if (!durationOrder.has(entry.name)) durationOrder.set(entry.name, i);
+            if (isSizeDeclaration(entry) && entry.name) {
+                if (!sizeOrder.has(entry.name)) sizeOrder.set(entry.name, i);
             } else if (isStatusDeclaration(entry) && entry.name) {
                 if (!statusOrder.has(entry.name)) statusOrder.set(entry.name, i);
             }
@@ -914,17 +1105,16 @@ export class NowlineValidator {
             const entry = file.roadmapEntries[i];
             visitPropertiesDeep(entry, (prop) => {
                 const key = propKey(prop);
-                if (key === 'duration' && prop.value) {
+                if (key === 'size' && prop.value) {
                     const val = prop.value;
-                    if (DURATION_RE.test(val)) return;
-                    const declIdx = durationOrder.get(val);
+                    const declIdx = sizeOrder.get(val);
                     if (declIdx === undefined) {
                         accept('error',
-                            `Duration "${val}" is not declared. Add "duration ${val} length:<literal>" earlier in the roadmap section.`,
+                            `Size "${val}" is not declared. Add "size ${val} effort:<literal>" earlier in the roadmap section.`,
                             { node: prop, property: 'value' });
                     } else if (declIdx >= i) {
                         accept('error',
-                            `Duration "${val}" is referenced before its declaration. Move "duration ${val}" above this entity.`,
+                            `Size "${val}" is referenced before its declaration. Move "size ${val}" above this entity.`,
                             { node: prop, property: 'value' });
                     }
                 } else if (key === 'status' && prop.value) {
@@ -1088,6 +1278,134 @@ export class NowlineValidator {
             }
         }
     }
+
+    // --- Rules 17f / 17g / 17h / 17i: per-declaration glyph checks ---
+    // Note: Langium's default ValueConverter strips surrounding quotes from STRING
+    // tokens before they reach the AST, so unicode:"💰" arrives here as just "💰"
+    // — we validate the *content* (length / ASCII range) rather than presence of
+    // quotes. The grammar already restricts `unicode:` and `ascii:` to PropertyAtom,
+    // so the only quoteless form an author can pass is a bare identifier like
+    // `unicode:foo`, which we treat permissively (it's a single-grapheme literal).
+    checkGlyphDeclaration(decl: GlyphDeclaration, accept: ValidationAcceptor): void {
+        if (decl.name && BUILTIN_ICON_NAMES.has(decl.name)) {
+            accept('error',
+                `Glyph id "${decl.name}" collides with a built-in icon name. Reserved built-ins: ${[...BUILTIN_ICON_NAMES].sort().join(', ')}.`,
+                { node: decl, property: 'name' });
+        }
+        if (decl.name && !KEBAB_RE.test(decl.name)) {
+            accept('warning', `Glyph id "${decl.name}" is not kebab-case.`, {
+                node: decl,
+                property: 'name',
+            });
+        }
+
+        const unicodeProp = decl.properties.find((p) => propKey(p) === 'unicode');
+        if (!unicodeProp) {
+            accept('error',
+                `Glyph "${displayName(decl)}" requires a "unicode:" property (e.g. unicode:"💰" or unicode:"\\u{1F464}").`,
+                { node: decl });
+        } else if (!unicodeProp.value || unicodeProp.value.length === 0) {
+            accept('error',
+                `Glyph "${displayName(decl)}" unicode: must be a non-empty value.`,
+                { node: unicodeProp, property: 'value' });
+        }
+
+        const asciiProp = decl.properties.find((p) => propKey(p) === 'ascii');
+        if (asciiProp) {
+            const raw = asciiProp.value ?? '';
+            if (!ASCII_FALLBACK_RE.test(raw)) {
+                accept('error',
+                    `Glyph "${displayName(decl)}" ascii: must be 1-3 ASCII characters (got ${raw.length} character${raw.length === 1 ? '' : 's'}).`,
+                    { node: asciiProp, property: 'value' });
+            }
+        }
+
+        for (const prop of decl.properties) {
+            const key = propKey(prop);
+            if (key !== 'unicode' && key !== 'ascii' && key !== 'link' && key !== 'description') {
+                accept('error',
+                    `Unknown glyph property "${key}". Allowed: unicode, ascii, link, description.`,
+                    { node: prop, property: 'key' });
+            }
+        }
+    }
+
+    // --- Rule 17j: duplicate glyph ids in the same file ---
+    checkDuplicateGlyphIds(file: NowlineFile, accept: ValidationAcceptor): void {
+        const seen = new Map<string, GlyphDeclaration>();
+        for (const entry of file.configEntries) {
+            if (isGlyphDeclaration(entry) && entry.name) {
+                const existing = seen.get(entry.name);
+                if (existing) {
+                    accept('error',
+                        `Duplicate glyph id "${entry.name}". First declared at ${locationOf(existing)}.`,
+                        { node: entry, property: 'name' });
+                } else {
+                    seen.set(entry.name, entry);
+                }
+            }
+        }
+    }
+
+    // --- Rule 17k: icon: / capacity-icon: references resolve to a built-in,
+    // a quoted Unicode literal, or an earlier glyph declaration. Forward
+    // references are an error. Walks both StyleDeclaration.properties and
+    // DefaultDeclaration.properties so style blocks and default <entity>
+    // lines share one path.
+    checkGlyphReferences(file: NowlineFile, accept: ValidationAcceptor): void {
+        const glyphOrder = new Map<string, number>();
+        for (let i = 0; i < file.configEntries.length; i++) {
+            const entry = file.configEntries[i];
+            if (isGlyphDeclaration(entry) && entry.name) {
+                if (!glyphOrder.has(entry.name)) glyphOrder.set(entry.name, i);
+            }
+        }
+
+        const checkRef = (
+            entryIdx: number,
+            key: string,
+            val: string | undefined,
+            propNode: AstNode,
+        ) => {
+            if (key !== 'icon' && key !== 'capacity-icon') return;
+            if (!val) return;
+            // Inline Unicode literals (`capacity-icon:"💰"`) reach the AST as their
+            // unquoted content — the only way to tell them from an identifier
+            // reference is by checking the character set. Anything that doesn't
+            // look like a kebab-style identifier is treated as a literal and
+            // accepted as-is. Authors who genuinely want to write a literal that
+            // happens to spell a real identifier should declare a glyph instead.
+            if (!isIdentifier(val)) return;
+            if (key === 'capacity-icon' && BUILTIN_CAPACITY_ICONS.has(val)) return;
+            if (key === 'icon' && BUILTIN_ICON_NAMES.has(val)) return;
+            const declIdx = glyphOrder.get(val);
+            if (declIdx === undefined) {
+                const builtins = key === 'capacity-icon'
+                    ? [...BUILTIN_CAPACITY_ICONS].sort().join(', ')
+                    : [...BUILTIN_ICON_NAMES].sort().join(', ');
+                accept('error',
+                    `${key}: "${val}" is neither a built-in (${builtins}) nor a declared glyph. Add "glyph ${val} unicode:..." earlier in config or use a quoted Unicode literal.`,
+                    { node: propNode, property: 'value' });
+            } else if (declIdx >= entryIdx) {
+                accept('error',
+                    `${key}: glyph "${val}" is referenced before its declaration. Move "glyph ${val}" above this entry.`,
+                    { node: propNode, property: 'value' });
+            }
+        };
+
+        for (let i = 0; i < file.configEntries.length; i++) {
+            const entry = file.configEntries[i];
+            if (isStyleDeclaration(entry)) {
+                for (const sp of entry.properties) {
+                    checkRef(i, propKey(sp), sp.value, sp);
+                }
+            } else if (isDefaultDeclaration(entry)) {
+                for (const ep of entry.properties) {
+                    checkRef(i, propKey(ep), ep.value, ep);
+                }
+            }
+        }
+    }
 }
 
 // --- Helpers ---
@@ -1098,6 +1416,52 @@ function isColorValue(val: string): boolean {
 
 function isIdentifier(val: string): boolean {
     return /^[a-zA-Z_][a-zA-Z0-9_-]*$/.test(val);
+}
+
+type CapacityParentKind = 'lane' | 'item' | 'invalid';
+
+function capacityParentKind(parent: AstNode | undefined): CapacityParentKind {
+    if (!parent) return 'invalid';
+    if (isSwimlaneDeclaration(parent)) return 'lane';
+    if (isItemDeclaration(parent)) return 'item';
+    if (isDefaultDeclaration(parent)) {
+        return parent.entityType === 'swimlane' ? 'lane' : 'item';
+    }
+    return 'invalid';
+}
+
+function isUtilizationAllowedHere(parent: AstNode | undefined): boolean {
+    if (!parent) return false;
+    if (isSwimlaneDeclaration(parent)) return true;
+    if (isDefaultDeclaration(parent) && parent.entityType === 'swimlane') return true;
+    return false;
+}
+
+/**
+ * Parse a numeric utilization-threshold value into a fraction. Mirrors the
+ * accepted value forms in checkPropertyValues (case `utilization-warn-at` /
+ * `utilization-over-at`):
+ *
+ *   - `'none'` → null (opt-out; ordering check skips this side).
+ *   - positive percent (`80%`) → 0.8.
+ *   - positive decimal fraction (`0.8`) → 0.8 (or `1.25` → 1.25 for the
+ *     intentionally-stretched-over case `utilization-over-at:125%`).
+ *   - bare integer or anything else → null. Bare integers are rejected with
+ *     a disambiguation hint by the value-form check before this helper runs;
+ *     returning null here makes the ordering check skip that side instead of
+ *     double-reporting.
+ */
+function parseUtilizationFraction(val: string | undefined): number | null {
+    if (!val || val === UTILIZATION_NONE) return null;
+    if (POSITIVE_PERCENT_RE.test(val)) {
+        const n = parseFloat(val);
+        return Number.isFinite(n) && n > 0 ? n / 100 : null;
+    }
+    if (POSITIVE_DECIMAL_FRACTION_RE.test(val)) {
+        const n = parseFloat(val);
+        return Number.isFinite(n) && n > 0 ? n : null;
+    }
+    return null;
 }
 
 function locationOf(node: AstNode): string {
@@ -1142,7 +1506,7 @@ function registerEntity(
         register(entry.name, entry);
     } else if (isLabelDeclaration(entry)) {
         register(entry.name, entry);
-    } else if (isDurationDeclaration(entry)) {
+    } else if (isSizeDeclaration(entry)) {
         register(entry.name, entry);
     } else if (isStatusDeclaration(entry)) {
         register(entry.name, entry);

@@ -30,6 +30,11 @@ export interface EntityStyle {
     headerHeight: 'none' | 'xs' | 'sm' | 'md' | 'lg' | 'xl';
     cornerRadius: 'none' | 'xs' | 'sm' | 'md' | 'lg' | 'xl' | 'full';
     bracket: BracketKind;
+    // Glyph used as the suffix on capacity numbers (lane badge / item suffix).
+    // Holds whatever the author wrote (built-in name, custom glyph id, or an
+    // inline Unicode literal) — interpretation is the renderer's job. Default
+    // is `multiplier` so unannotated capacity values render as `5×`.
+    capacityIcon: string;
 }
 
 export interface Theme {
@@ -59,11 +64,74 @@ export interface Theme {
         separator: string;
         frameTabText: string;
         frameTabMuted: string;
+        // m2.5d: tokens lifted out of the renderer's inline `theme === 'dark'`
+        // branches in `renderSwimlane`.
+        border: string;
+        tabFill: string;
+        tabStroke: string;
+        tabText: string;
+        ownerText: string;
+        footnoteIndicator: string;
+        rowTintEven: string;  // alternating row tint (even rows)
+        rowTintOdd: string;   // alternating row tint (odd rows)
+        // m13: tri-state lane utilization underline. Each token paints one
+        // classification band along the bottom edge of the lane band when
+        // the lane has `capacity:` and at least one item contributing load.
+        // See specs/rendering.md § Lane utilization underline.
+        utilizationOk: string;     // green; load below `warn-at` (incl. zero)
+        utilizationWarn: string;   // yellow; load in `[warn-at, over-at)`
+        utilizationOver: string;   // red; load >= `over-at`
     };
     timeline: {
         gridLine: string;
+        // Faint dotted line drawn at every tick boundary (not just majors)
+        // when the roadmap's resolved `minor-grid` style is `true`. A step
+        // lighter than `gridLine` so the major lines still dominate.
+        minorGridLine: string;
         tickMark: string;
         labelText: string;
+        // m2.5d: lifted from renderTimeline.
+        panelFill: string;
+        border: string;
+    };
+    // m2.5d: all renderer-side palette tokens previously inlined as
+    // `theme === 'dark' ? darkColor : lightColor` ternaries. Each new
+    // token reads from one of the existing theme objects so the
+    // renderer becomes pure data → SVG.
+    header: {
+        cardBorder: string;
+        author: string;
+    };
+    item: {
+        overflowX: string;          // red X mark on overrun tail
+        linkIconFg: string;         // generic link icon color
+        overflowTailFill: string;
+        overflowTailStroke: string;
+        overflowCaption: string;    // "past <id>" caption color
+    };
+    parallel: {
+        bracketStroke: string;
+    };
+    anchorDiamond: {
+        fill: string;
+        stroke: string;
+        label: string;
+        cutLine: string;
+    };
+    milestoneDiamond: {
+        fill: string;
+        label: string;
+        cutLineNormal: string;
+        cutLineOverrun: string;
+        slack: string;
+    };
+    footnotePanel: {
+        fill: string;
+        border: string;
+        header: string;
+        title: string;
+        description: string;
+        number: string;
     };
     nowline: {
         stroke: string;
@@ -89,6 +157,20 @@ export interface Theme {
         border: string;
         label: string;
         badge: string;
+        // m2.5d: lifted from renderIncludeRegion.
+        fill: string;
+        tabFill: string;
+        tabStroke: string;
+        tabText: string;
+        badgeFill: string;
+        badgeStroke: string;
+        badgeText: string;
+    };
+    // m2.5d: lifted from renderEdge marker defs.
+    arrowhead: {
+        neutral: string;
+        light: string;
+        dark: string;
     };
     // Five built-in statuses plus neutral fallback for custom statuses.
     status: {
@@ -98,6 +180,36 @@ export interface Theme {
         blocked: string;
         planned: string;
         neutral: string;
+    };
+    /**
+     * Upper-right status-dot colors. Two palettes — the renderer
+     * picks `onLight` for bars whose effective bg is light/pale and
+     * `onDark` for bars whose bg is dark/saturated. This lets the
+     * dot stay recognizably status-hued on the pale status-tint
+     * bars used by default AND on the saturated mid-tone bars that
+     * a label's `style:` ref can paint (e.g. `bg:blue` →
+     * `#1e88e5` in light theme, `#60a5fa` in dark theme). Both
+     * palettes appear in both themes — bar luminance is independent
+     * of overall theme, since a label can tint a bar bright or dark
+     * regardless of whether the chart background is light or dark.
+     */
+    statusDot: {
+        onLight: {
+            done: string;
+            inProgress: string;
+            atRisk: string;
+            blocked: string;
+            planned: string;
+            neutral: string;
+        };
+        onDark: {
+            done: string;
+            inProgress: string;
+            atRisk: string;
+            blocked: string;
+            planned: string;
+            neutral: string;
+        };
     };
     attribution: {
         mark: string;

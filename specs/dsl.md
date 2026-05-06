@@ -12,7 +12,7 @@ Fenced code block: ````nowline`
 
 ## Design Rules
 
-1. **~20 keywords.** If the keyword count grows beyond ~20, the language is too complex.
+1. **~20 keywords (currently 21).** If the keyword count grows beyond ~20, the language is too complex. The `glyph` declaration was added to support custom-named glyphs for `icon:` and `capacity-icon:`; further additions should stay rare.
 2. **Indentation-significant.** Two-space or one-tab indent defines nesting. Spaces and tabs must not be mixed within a file — the parser rejects mixed indentation with a clear error identifying the first offending line. No braces, brackets, or explicit block delimiters.
 3. **Strings are double-quoted.** `"Auth refactor"`, not `Auth refactor` or `'Auth refactor'`.
 4. **Properties are key:value pairs** on the same line as the entity. All key-value pairs use `:` as the single separator — the DSL does not use `=`. Values containing spaces must be double-quoted.
@@ -38,14 +38,7 @@ nowline v1
 
 The version follows the project's simplified versioning scheme: `v1`, `v2`, `v3`, etc. When the parser encounters a version newer than it supports, it emits an error identifying the required version. When the directive is omitted, the parser assumes the latest version it supports.
 
-`config` and `roadmap` are section markers, not indent-containers. Config keywords (`scale`, `style`, `default`, `calendar`) appear at the top level after `config`. Roadmap keywords (`person`, `team`, `anchor`, `label`, `duration`, `status`, `swimlane`, `milestone`, `footnote`) appear at the top level after `roadmap`. Indentation is used where nesting is real: style properties under `style`, `scale` and `calendar` block properties under their keyword, team members under `team`, and swimlane contents under `swimlane`.
-
-> **Breaking change from pre-release syntax.** Earlier drafts placed `status` and `duration` under `config` using a positional form (`status NAME`, `duration NAME VALUE`). Both keywords are now roadmap entities using the Universal Declaration Pattern:
->
-> - `duration xs 1d` → `duration xs "Extra Small" length:1d` (title optional; `length:` required)
-> - `status waiting-review` → `status waiting-review "Awaiting Review"` (title optional)
->
-> Declarations must now appear under `roadmap`, not `config`.
+`config` and `roadmap` are section markers, not indent-containers. Config keywords (`scale`, `style`, `default`, `calendar`) appear at the top level after `config`. Roadmap keywords (`person`, `team`, `anchor`, `label`, `size`, `status`, `swimlane`, `milestone`, `footnote`) appear at the top level after `roadmap`. Indentation is used where nesting is real: style properties under `style`, `scale` and `calendar` block properties under their keyword, team members under `team`, and swimlane contents under `swimlane`.
 
 ## Full Example
 
@@ -94,11 +87,11 @@ anchor kickoff date:2026-01-06
 anchor code-freeze "Code Freeze" date:2026-05-01
 anchor ga-date "GA Date" date:2026-06-01
 
-duration xs "Extra Small" length:1d
-duration s "Small" length:3d
-duration m "Medium" length:1w
-duration l "Large" length:2w
-duration xl "Extra Large" length:1m
+size xs "Extra Small" effort:1d
+size s "Small" effort:3d
+size m "Medium" effort:1w
+size l "Large" effort:2w
+size xl "Extra Large" effort:1m
 
 status awaiting-review "Awaiting Review"
 status in-review "In Review"
@@ -107,23 +100,23 @@ label enterprise "Enterprise readiness" style:enterprise
 label security "Security hardening" style:enterprise
 label low-confidence style:risky
 
-swimlane platform owner:platform
-  item auth-refactor "Auth refactor" duration:l after:kickoff \
-    status:done owner:sam labels:enterprise \
+swimlane platform owner:platform capacity:5
+  item auth-refactor "Auth refactor" size:l after:kickoff \
+    status:done owner:sam labels:enterprise capacity:3 \
     link:https://linear.app/acme/issue/ENG-123
   parallel after:auth-refactor
     group audit-track "Audit Track" labels:security
-      item audit-log "Audit log v2" duration:xl before:code-freeze \
-        remaining:30% labels:[enterprise, security] \
+      item audit-log "Audit log v2" size:xl before:code-freeze \
+        remaining:30% labels:[enterprise, security] capacity:2 \
         link:https://notion.so/acme/audit-log-spec
         description "Comprehensive audit trail for all admin actions"
-      item audit-ui "Audit UI" duration:m
-    item sso "SSO plugins" duration:m labels:[enterprise, low-confidence]
-  item platform-qa "Platform QA" duration:s
+      item audit-ui "Audit UI" size:m capacity:1
+    item sso "SSO plugins" size:m labels:[enterprise, low-confidence] capacity:50%
+  item platform-qa "Platform QA" size:s capacity:2
 
-swimlane mobile owner:mobile
-  item offline "Offline mode" duration:l after:kickoff owner:jen status:at-risk remaining:60% link:https://github.com/acme/mobile/pull/87
-  item push-v2 "Push notifications v2" duration:m owner:mobile
+swimlane mobile owner:mobile capacity:2
+  item offline "Offline mode" size:l after:kickoff owner:jen status:at-risk remaining:60% capacity:3 link:https://github.com/acme/mobile/pull/87
+  item push-v2 "Push notifications v2" size:m owner:mobile capacity:1
 
 milestone beta "Beta" after:auth-refactor
 milestone v1-ga "v1 GA" after:[auth-refactor, audit-log]
@@ -161,6 +154,7 @@ footnote capacity-risk "Team capacity risk" on:[mobile, platform]
 | ----------- | ---------------------------------------------------------------------------------------------- |
 | `scale`     | Display settings for the timeline axis (properties indented beneath). Optional.                |
 | `style`     | Named visual definition (properties indented beneath).                                         |
+| `glyph`     | Named declaration of a custom glyph for use by `icon:` and `capacity-icon:` style properties. `[id] ["title"] unicode:"..."` (required) plus optional `ascii:"..."` fallback and universal properties. |
 | `default`   | Default property values for a given entity type. One `default <entity> <properties>` declaration per entity type. |
 | `calendar`  | Day-arithmetic overrides (properties indented beneath). Only valid when `roadmap` declares `calendar:custom`. |
 
@@ -170,12 +164,12 @@ footnote capacity-risk "Team capacity risk" on:[mobile, platform]
 
 | Keyword     | Purpose                            | Notes                                                                                    |
 | ----------- | ---------------------------------- | ---------------------------------------------------------------------------------------- |
-| `swimlane`  | Groups items by team/area/stream   | `[id] ["title"]`. Optional `owner:id`. Items indented beneath.                           |
+| `swimlane`  | Groups items by team/area/stream   | `[id] ["title"]`. Optional `owner:id`, `capacity:N`, `utilization-warn-at:N%`, `utilization-over-at:N%`. Items indented beneath. See "Capacity" below.                           |
 | `person`    | Individual contributor declaration | `[id] ["title"]`. May be declared at roadmap top level or nested inside a team. Bare `person <id>` inside a team is a membership reference. Declared at most once per merged scope. |
 | `team`      | Team/group declaration             | `[id] ["title"]`. Nested teams/persons indented beneath.                                 |
 | `anchor`    | Named date on the timeline         | `[id] ["title"] date:YYYY-MM-DD`. `date:` is required.                                    |
 | `label`     | Semantic tag / chip vocabulary     | `[id] ["title"]`. Optional `style:id` plus universal properties (`labels:`, `link:`, `description`). Raw style properties are not allowed — declare a `style` in config and reference it. |
-| `duration`  | Named alias for a duration length  | `[id] ["title"]`. Required `length:<duration literal>`. Universal properties (`description`, `link:`) also allowed. Must be declared before any entity referencing `duration:NAME`. |
+| `size`      | Named effort budget calibrated to single-engineer scale | `[id] ["title"]`. Required `effort:<duration literal>` (decimal-aware: `0.5d`, `2w`, `1m`). Universal properties (`description`, `link:`) also allowed. Must be declared before any entity referencing `size:NAME`. An item with `size:` derives its duration as `effort ÷ item_capacity` (item `capacity:` defaults to `1` when absent). |
 | `status`    | Custom status value                | `[id] ["title"]`. Extends the built-in set (`planned`, `in-progress`, `done`, `at-risk`, `blocked`). Universal properties (`description`, `link:`) also allowed. Must be declared before any entity referencing `status:NAME`. |
 | `milestone` | Achievement marker                 | `[id] ["title"]`. At least one of `date:` or `after:` is required. `after:` accepts a single id or a list of item/milestone/anchor ids. |
 | `item`      | Work item inside a swimlane        | `[id] ["title"]`. Indented under a swimlane.                                             |
@@ -198,9 +192,9 @@ Items are indented under a swimlane, prefixed with the `item` keyword. Each item
 
 ```nowline
 swimlane platform
-  item auth-refactor "Auth refactor" duration:l status:done
-  item "Quick cleanup" duration:s
-  item sso duration:m
+  item auth-refactor "Auth refactor" size:l status:done
+  item "Quick cleanup" size:s
+  item sso size:m
 ```
 
 ### Parallel and Group
@@ -211,11 +205,11 @@ swimlane platform
 
 ```nowline
 swimlane platform
-  item auth "Auth refactor" duration:l
+  item auth "Auth refactor" size:l
   parallel
-    item api-v2 "API v2" duration:m
-    item sdk-update "SDK update" duration:s
-  item integration "Integration" duration:s
+    item api-v2 "API v2" size:m
+    item sdk-update "SDK update" size:s
+  item integration "Integration" size:s
 ```
 
 - `api-v2` and `sdk-update` start at the same time (after `auth` finishes).
@@ -230,15 +224,15 @@ swimlane platform
 ```nowline
 swimlane platform
   group api-work "API Work" labels:enterprise
-    item api-v2 "API v2" duration:m
-    item api-docs "API docs" duration:s
-  item deploy "Deploy" duration:s
+    item api-v2 "API v2" size:m
+    item api-docs "API docs" size:s
+  item deploy "Deploy" size:s
 ```
 
-- Items inside a group execute sequentially (same as swimlane behavior).
+- Items inside a group execute sequentially (same as swimlane behavior). The renderer uses the same row-pack engine swimlanes use, so an item whose desired start collides with a sibling's logical right edge, an upstream caption's spill reservation, or a slack-arrow corridor bumps to a new inner row inside the group's content area. The group's bounding box grows vertically to encompass every populated row.
 - Inside a swimlane (outside a parallel block), the group is sequential with respect to its siblings — `deploy` starts after `api-docs` finishes.
-- **Styled group** — when a group has `style:`, `labels:`, or other visual properties, it renders with a visible bounding box. Useful for visually bundling related items.
-- **Unstyled group** — when a group has no style or labels, it is purely structural. No visible artifact in the rendered output; it only governs sequencing.
+- **Styled group** — when a group has `style:`, `labels:`, or other visual properties, it renders with a visible bounding box plus a small title chiclet anchored flush in the box's upper-left corner. The chiclet sits entirely inside the box (no overhang) and the box reserves vertical pad above the first inner row plus a symmetric pad below the last row. See `specs/rendering.md` "Group (styled)" for the full chiclet contract.
+- **Unstyled group** — when a group has no style or labels, it is purely structural. No visible artifact in the rendered output; it only governs sequencing and inner row growth.
 
 #### `parallel` with `group` — parallel sequential tracks
 
@@ -246,16 +240,16 @@ Combine parallel and group for parallel tracks where each track has its own sequ
 
 ```nowline
 swimlane platform
-  item kickoff-work "Kickoff" duration:s
+  item kickoff-work "Kickoff" size:s
   parallel streams "Parallel Streams"
     group api-track "API Track"
-      item api-v2 "API v2" duration:m
-      item api-docs "API docs" duration:s
+      item api-v2 "API v2" size:m
+      item api-docs "API docs" size:s
     group sdk-track "SDK Track"
-      item sdk-update "SDK update" duration:s
-      item sdk-tests "SDK tests" duration:m
-      item sdk-release "SDK release" duration:s
-  item integration "Integration testing" duration:s
+      item sdk-update "SDK update" size:s
+      item sdk-tests "SDK tests" size:m
+      item sdk-release "SDK release" size:s
+  item integration "Integration testing" size:s
 ```
 
 - `api-track` and `sdk-track` start in parallel after `kickoff-work`.
@@ -279,6 +273,7 @@ Both `parallel` and `group` support universal properties (`labels`, `style`, `li
 
 - `duration` — derived from children's durations (sum for group, max for parallel).
 - `remaining` — derived from children's progress.
+- `capacity` — derived from children (sum at each timestep across parallel; pass-through for group).
 
 #### Nesting Rules
 
@@ -293,7 +288,7 @@ Some entity types require specific keyed properties. Omitting a required propert
 
 | Entity      | Required property                            |
 | ----------- | -------------------------------------------- |
-| `item`      | `duration:`                                  |
+| `item`      | `size:` or `duration:` (at least one)        |
 | `milestone` | `date:` or `after:` (at least one)           |
 | `anchor`    | `date:`                                      |
 | `footnote`  | `on:`                                        |
@@ -307,12 +302,12 @@ These properties and directives are valid on every entity type: items, swimlanes
 
 | Property / Directive | Type          | Description                                                                                          |
 | -------------------- | ------------- | ---------------------------------------------------------------------------------------------------- |
-| `labels`             | list          | Tags for filtering and display. `labels:[enterprise, security]`.                                     |
+| `labels`             | list          | Tags for filtering and display. `labels:[enterprise, security]`. On an item, each label renders as an atomic chiclet inside the bar; chips that don't fit on a single row wrap to additional rows and the bar grows downward. See `specs/rendering.md` "Labels" for the wrapping contract. |
 | `link`               | URL           | Single URL to external content.                                                                      |
 | `style`              | identifier    | Single reference to a named style declared in config. `style:enterprise`. This is the only visual property allowed on an entity. |
 | `description`        | sub-directive | Indented under the entity. Longer explanatory text. `description "Details here"`                     |
 
-**Content vs. rendering separation.** Entities in the roadmap section carry only semantic information (identity, ownership, sequencing, sizing, state, categorisation) plus an optional single `style:id` reference. Raw style properties (`bg`, `fg`, `text`, `border`, `icon`, `shadow`, `font`, `weight`, `italic`, `text-size`, `padding`, `spacing`, `header-height`, `corner-radius`, `bracket`) may only appear in `style` blocks and `default <entity>` lines — both of which live in `config`. To flag an item in red, declare a named style in config (`style flagged` with `bg: red` properties indented beneath) and reference it (`item blocked-work style:flagged`).
+**Content vs. rendering separation.** Entities in the roadmap section carry only semantic information (identity, ownership, sequencing, sizing, state, categorisation) plus an optional single `style:id` reference. Raw style properties (`bg`, `fg`, `text`, `border`, `icon`, `shadow`, `font`, `weight`, `italic`, `text-size`, `padding`, `spacing`, `header-height`, `corner-radius`, `bracket`, `timeline-position`, `minor-grid`) may only appear in `style` blocks and `default <entity>` lines — both of which live in `config`. To flag an item in red, declare a named style in config (`style flagged` with `bg: red` properties indented beneath) and reference it (`item blocked-work style:flagged`).
 
 
 ### Item Properties
@@ -326,9 +321,149 @@ These properties are specific to items. `status`, `owner`, `after`, and `before`
 | `owner`     | person or team ref    | References a person or team. `owner:sam` or `owner:platform`. Singular — one accountable owner.                                         |
 | `after`     | identifier or list    | This item starts after the referenced entity finishes. Single: `after:auth-refactor`. List: `after:[auth-refactor, audit-log]` — starts after the latest finisher. Accepts item, milestone, anchor, parallel, or group ids. |
 | `before`    | identifier or list    | This item must finish before the referenced entity starts. List: `before:[code-freeze, ga-date]` — finishes before the earliest starter.                                                                                    |
-| `duration`  | duration or alias     | Raw duration literal (`duration:2w`, `duration:3m`) or a name declared by a `duration` roadmap declaration (`duration:l`). Items only — not valid on parallel or group.          |
-| `remaining` | percentage            | Work remaining. `remaining:30%`. `status:done` takes priority. Items only — not valid on parallel or group.                             |
+| `size`      | size alias            | References a `size` roadmap declaration (`size:l`). The item's duration is calculated as `effort ÷ item_capacity` (`capacity:` defaults to `1` when absent). Overridden by an explicit `duration:` literal — see "Sizing precedence" below. Items only — not valid on parallel or group. |
+| `duration`  | duration literal      | Raw duration literal only (`duration:2w`, `duration:3m`, `duration:0.5d`). No alias names; `size:` is the alias mechanism. When set alongside `size:`, this wins for bar width and meta-line driver (size chip omitted). Items only — not valid on parallel or group. |
+| `remaining` | percentage or literal | Work remaining. Two equivalent forms — author picks whichever reads naturally: percent (`remaining:30%`) or single-eng effort literal (`remaining:1w`, `remaining:0.5d`). When a literal is given, the system computes `remaining_literal ÷ total_effort` to derive the percent (capacity divides the literal: `total_effort = size.effort` for sized items, or `duration × item_capacity` for duration-literal'd items). Both forms render identically — a percent of the bar. `status:done` takes priority. Items only — not valid on parallel or group. |
+| `capacity`  | number                | Concurrent capacity consumed by this item while it runs. Positive integer (`capacity:2`), decimal (`capacity:0.5`), or percent literal (`capacity:50%`) which parses to a decimal. Items only — not valid on parallel or group. See "Capacity" below. |
 
+
+### Capacity
+
+`capacity:` is an optional annotation that models per-timestep throughput. Both swimlanes and items may declare it, and the two annotations are fully independent — neither requires the other.
+
+```nowline
+swimlane platform capacity:5
+  item auth size:l capacity:2
+  parallel
+    item api size:m capacity:2
+    item sdk size:m capacity:1
+  item qa size:s capacity:50%
+```
+
+The unit is opaque to the DSL — the same way `size:l` is opaque until a `size` declaration gives it meaning. Authors decide whether `5` means engineers, story points, FTE, hours, story budget, or any other measure.
+
+**Where it can appear:**
+
+- `swimlane` — integer or decimal only (no percent form). The lane's per-timestep budget.
+- `item` — integer, decimal, or percent literal. The item's concurrent consumption.
+- Not valid on `parallel` or `group` — derived from children (sum at each timestep across parallel; pass-through for group), same exclusion family as `size`, `duration`, and `remaining`.
+
+**Numeric formats:**
+
+- Integer (`\d+`): `capacity:2`, `capacity:5`
+- Decimal (`\d+\.\d+`, leading and trailing digit required): `capacity:0.5`, `capacity:1.5`
+- Percent literal (`\d+(\.\d+)?%`): `capacity:50%`, `capacity:12.5%`. **Authoring sugar only** — the parser converts `50%` to `0.5` at lex time, and the DSL stores a single decimal value with no record of which form the author wrote. There is no resolution step against the lane's capacity.
+
+All values must resolve to a positive number (`> 0`).
+
+**Independence:** an item may declare `capacity:` whether or not its swimlane does, and vice versa. There is no validation rule coupling them.
+
+**Default capacity:**
+
+- **Sized items** (`size:` declared, no explicit `capacity:`): capacity defaults to `1` in both duration derivation (`duration = effort ÷ 1 = effort`) and overload accounting (the item contributes `1` to the per-timestep load).
+- **Duration-literal items** (`duration:` declared, no `size:`, no explicit `capacity:`): capacity stays unset and the item contributes `0` to overload (uncounted). The literal duration is the bar width regardless.
+- **Explicit `capacity:N`** always wins for both purposes.
+
+**Lifetime:** capacity is constant for the item's full duration. No ramps in v1.
+
+**Utilization thresholds.** Swimlanes that declare `capacity:` paint a tri-state utilization underline (green / yellow / red) along the bottom of the band based on the per-timestep load function `f(x) = Σ items[i].capacity for items active at x`. Two thresholds gate the colors and accept either a percent literal or a decimal in the same value family as `capacity:`:
+
+- `utilization-warn-at:N%` (default `80%`) — at or above this fraction of `capacity:`, the segment paints **yellow**.
+- `utilization-over-at:N%` (default `100%`) — at or above this fraction of `capacity:`, the segment paints **red**.
+
+Below `warn-at` (including segments with zero load), segments paint **green** — the underline reads as a continuous health bar wherever the lane has `capacity:` declared. Both thresholds accept the literal value `none` to opt out of that color band: `utilization-warn-at:none` collapses to a binary green/red indicator; `utilization-over-at:none` removes red entirely; setting both to `none` suppresses the underline outright. Use `default swimlane utilization-over-at:none` to disable utilization indicators globally; individual lanes can re-enable by setting their own threshold.
+
+> Removed in this release: `overcapacity:show|hide`. Suppression is now expressed via `utilization-over-at:none` (and/or `utilization-warn-at:none`); the binary `show|hide` form is no longer accepted.
+
+**Cross-reference:** lane capacity renders inside the frame tab; item capacity renders as a `N[glyph]` suffix after the meta line's driver token (duration literal or size chip). When `size:` drives, the suffix follows the chip (`m 2×`, or `M 2×` when the size declares `title:"M"`); when `duration:` drives, it follows the literal (`2w 2×`). The glyph is controlled by the `capacity-icon:` style property (default: `multiplier`, rendering as `×`). The tri-state utilization underline is described in `rendering.md` § Lane utilization underline. See also `rendering.md` § Swimlane Capacity and § Item size chip.
+
+**Examples — switching the glyph:**
+
+```nowline
+// People-based capacity (uses default people-icon SVG from the renderer's library)
+default swimlane capacity-icon:person
+
+swimlane platform capacity:5
+  item auth size:l capacity:2    // renders as: l 2 [person] (effort 2w ÷ capacity 2 = 1w bar; meta driver is chip; suffix uses person glyph)
+```
+
+```nowline
+// Story-points-based capacity
+default swimlane capacity-icon:points
+
+swimlane backend capacity:13
+  item rewrite size:l capacity:8   // renders as: l 1.25d 8 ★ (effort 2w ÷ capacity 8 = 1.25d; folds to days when no whole-week match)
+```
+
+**Example — custom glyph and inline literal:**
+
+```nowline
+config
+
+glyph budget "Budget" unicode:"💰" ascii:"$"
+
+style finance capacity-icon:budget
+style adhoc capacity-icon:"⚙"
+
+default swimlane style:finance
+
+roadmap ops "Operations"
+
+swimlane payroll capacity:50000
+  item q1-payroll size:m capacity:12000
+swimlane tooling style:adhoc capacity:5
+  item ci-revamp size:l capacity:2
+```
+
+**Example — tri-state utilization underline:**
+
+```nowline
+roadmap r "Utilization demo" start:2026-01-05 length:6w
+
+size m effort:2w
+
+// Default thresholds (warn:80%, over:100%) — three lanes show the
+// three colors side by side at the same horizontal position.
+swimlane healthy capacity:5
+  item a size:m capacity:2     // load 2/5 = 40% → green underline
+swimlane stressed capacity:5
+  item b size:m capacity:4     // load 4/5 = 80% → yellow underline
+swimlane overloaded capacity:5
+  parallel
+    item c size:m capacity:4
+    item d size:m capacity:2   // load 6/5 = 120% → red underline
+```
+
+```nowline
+// Custom thresholds — tighter warn band, slack on over.
+default swimlane utilization-warn-at:60% utilization-over-at:120%
+
+swimlane backend capacity:8
+  item rebuild size:l capacity:5    // load 5/8 = 62.5% → yellow
+```
+
+```nowline
+// Opt out of the underline on a specific lane.
+swimlane research capacity:3 utilization-warn-at:none utilization-over-at:none
+  item explore size:m capacity:5    // no underline; capacity badge still shows "3×"
+
+// Opt out globally; re-enable per lane.
+default swimlane utilization-over-at:none
+swimlane critical capacity:5 utilization-over-at:100%
+  item ship size:l capacity:6       // global default suppresses; lane override re-enables → red
+```
+
+#### Sizing precedence
+
+When an item declares both `size:` and `duration:`, the explicit `duration:` literal wins for bar width **and** for the meta line: the size chip is not shown (only the literal appears as the driver token). When only `size:` is declared, the item's duration is calculated as `effort ÷ item_capacity` (item `capacity:` defaults to `1` when absent); the meta line shows the size chip only — calendar span reads from the bar width. When only `duration:` is declared, the bar width is the literal value with no derivation and the meta line shows that literal.
+
+| `size:` | `duration:` | `capacity:` | Resulting duration                                |
+| ------- | ----------- | ----------- | ------------------------------------------------- |
+| `l`     | —           | —           | `size.l.effort ÷ 1` (e.g. `2w`)                   |
+| `l`     | —           | `2`         | `size.l.effort ÷ 2` (e.g. `1w`)                   |
+| `l`     | `2w`        | `2`         | `2w` (literal wins; meta line shows `2w` only — no chip) |
+| —       | `2w`        | `2`         | `2w` (capacity does not divide a literal duration) |
+| —       | —           | —           | Validation error — item needs at least one of `size:`/`duration:` |
 
 ### Anchor Declaration
 
@@ -363,26 +498,28 @@ A label's style applies only to the label's own chip/badge as rendered on a host
 
 Labels used on items without a matching `label` declaration are valid (see Validation Rule 16). They render with chip defaults from `default label` (if declared in config) or system defaults otherwise.
 
-### Duration Declaration
+### Size Declaration
 
-A `duration` declaration maps a named alias to a raw duration length so items and other entities can reference the alias via `duration:NAME`. Durations are declared in the roadmap section so that content vocabulary lives together.
+A `size` declaration maps a named t-shirt size to a single-engineer **effort** budget. Items reference a size via `size:NAME`; the system divides the effort by the item's `capacity:` to derive the bar's calendar duration. Sizes live in the roadmap section so vocabulary co-locates with content.
 
 ```nowline
-duration xs "Extra Small" length:1d
-duration s "Small" length:3d
-duration m "Medium" length:1w
-duration l "Large" length:2w
-duration xl "Extra Large" length:1m
+size xs "Extra Small" effort:0.5d
+size s "Small" effort:3d
+size m "Medium" effort:1w
+size l "Large" effort:2w
+size xl "Extra Large" effort:1m
 ```
 
-A `duration` line follows the universal `[id] ["title"]` pattern and accepts:
+A `size` line follows the universal `[id] ["title"]` pattern and accepts:
 
-- `length:<duration literal>` — **required**. The raw duration value (`\d+[dwmqy]`) the name resolves to.
+- `effort:<duration literal>` — **required**. The single-eng effort budget. Decimal-aware (`0.5d`, `1.5w`); positive non-zero.
 - Universal properties — `description`, `link:`.
 
-The id is a kebab-case identifier used as the lookup key (`duration:xs`, `duration:l`). The optional title is for rendering in legends, tooltips, and chips; when absent, renderers fall back to the id. Changing a `duration` declaration's `length:` later rescales every entity that references the alias.
+The id is a kebab-case identifier used as the lookup key (`size:xs`, `size:l`). On items, the on-bar size chip renders the size's optional `title` when provided, falling back to the id verbatim (case as typed). Authors who want the classic uppercased t-shirt look pin it explicitly: `size m "M" effort:1w` renders `M`, `size m effort:1w` renders `m`, `size med effort:1w` renders `med`. The title also surfaces in legends, tooltips, and elsewhere — see `rendering.md` § Item size chip. Changing a `size` declaration's `effort:` later rescales every sized item that hasn't pinned an explicit `duration:` literal.
 
-`duration` declarations must appear in the roadmap section before any swimlane or item that references them.
+`size` declarations must appear in the roadmap section before any swimlane or item that references them.
+
+**Effort vs. duration.** A size carries effort calibrated to a single engineer; an item's calendar duration falls out of `effort ÷ capacity:`. An item that overrides with an explicit `duration:LITERAL` ignores the derivation entirely for both bar width and meta-line display (no size chip on the meta line). See "Sizing precedence" under Capacity for the full table.
 
 ### Status Declaration
 
@@ -480,7 +617,7 @@ Footnotes are numbered sequentially by document order. A superscript number appe
 | Category                             | What it contains                                                                                                     | Examples                                                       |
 | ------------------------------------ | -------------------------------------------------------------------------------------------------------------------- | -------------------------------------------------------------- |
 | **Config** (rendering configuration) | scale block, calendar block, styles, defaults                                                                                | Everything between `config` and `roadmap` in the included file |
-| **Roadmap** (content)                | `roadmap` declaration, persons, teams, anchors, labels, durations, statuses, swimlanes (+ contained items/parallel/groups), milestones, footnotes | Everything after `roadmap` in the included file                |
+| **Roadmap** (content)                | `roadmap` declaration, persons, teams, anchors, labels, sizes, statuses, swimlanes (+ contained items/parallel/groups), milestones, footnotes | Everything after `roadmap` in the included file                |
 
 
 #### `config:` mode
@@ -499,7 +636,7 @@ Footnotes are numbered sequentially by document order. A superscript number appe
 | Mode                      | Behavior                                                                                                                                                                                                                                                     |
 | ------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
 | `roadmap:merge` (default) | The child's content entities are merged into the parent. On name collision, the **parent wins** and the parser emits a **warning**. If a swimlane collides, its contained items are also dropped. Merged content resolves styles from the post-merge config. |
-| `roadmap:ignore`          | The child's content entities are dropped. Only the child's config is processed (subject to `config:` mode). Use for shared style libraries. Shared label, status, and duration vocabulary — since they are all roadmap content — uses `roadmap:merge` instead. |
+| `roadmap:ignore`          | The child's content entities are dropped. Only the child's config is processed (subject to `config:` mode). Use for shared style libraries. Shared label, status, and size vocabulary — since they are all roadmap content — uses `roadmap:merge` instead. |
 | `roadmap:isolate`         | The child's content stays scoped to the child file. The child uses only the child's config. The child must contain a `roadmap` declaration (needed for the region label). The isolated content renders as a visually distinct region — see `rendering.md`.   |
 
 
@@ -520,7 +657,7 @@ Includes are processed in **file order, depth-first**. When the processor encoun
 On `merge`, when the parent and child both declare an entity with the same identifier:
 
 - **Config items** (styles): parent wins, child's definition is dropped, warning emitted.
-- **Roadmap entities** (swimlanes, persons, teams, labels, durations, statuses, anchors, milestones, footnotes, etc.): parent wins, child's entity is dropped, warning emitted. If a swimlane collides, its contained items are also dropped.
+- **Roadmap entities** (swimlanes, persons, teams, labels, sizes, statuses, anchors, milestones, footnotes, etc.): parent wins, child's entity is dropped, warning emitted. If a swimlane collides, its contained items are also dropped.
 - **Defaults**: `default <entity>` lines can be declared in both parent and child. On collision of entity type, the parent's `default <entity>` wins and a warning is emitted.
 
 #### Diamond Includes (same file via multiple paths)
@@ -551,7 +688,7 @@ config
 roadmap platform-2026 "Platform 2026" scale:1w
 
 swimlane platform owner:platform
-  item auth-refactor "Auth refactor" duration:l after:kickoff
+  item auth-refactor "Auth refactor" size:l after:kickoff
 ```
 
 #### Common patterns
@@ -698,7 +835,7 @@ Style properties:
 | `fg`            | color or `none` | Border/outline color. Named, hex, or `none` (no border).                                                                                                |
 | `text`          | color or `none` | Text color. Named, hex, or `none` (hides text).                                                                                                         |
 | `border`        | enum            | Border/line style: `solid`, `dashed`, `dotted`.                                                                                                         |
-| `icon`          | identifier      | Named icon displayed on the entity (e.g., `shield`, `warning`, `lock`).                                                                                 |
+| `icon`          | identifier or string | Named icon displayed on the entity. Built-in identifiers (rendered from a curated SVG library, identical across platforms): `shield`, `warning`, `lock`, plus the capacity-icon vocabulary. Custom: any identifier declared by a `glyph` declaration in config. Inline: a double-quoted Unicode literal (`"💰"`, `"\u{1F464}"`) — font-dependent. |
 | `shadow`        | enum            | Drop shadow: `none` (default), `subtle`, `fuzzy`, `hard`.                                                                                               |
 | `font`          | enum            | Font family preset: `sans` (default), `serif`, `mono`.                                                                                                  |
 | `weight`        | enum            | Font weight: `thin`, `light`, `normal` (default), `bold`.                                                                                               |
@@ -709,9 +846,34 @@ Style properties:
 | `header-height` | enum            | Timeline header row height. Roadmap-only: `none`, `xs`, `sm`, `md` (default), `lg`, `xl`.                                                               |
 | `corner-radius` | enum            | Corner rounding: `none`, `xs`, `sm`, `md`, `lg`, `xl`, `full`.                                                                                          |
 | `bracket`       | enum            | Bracket/join line on parallel blocks: `none` (default), `solid`, `dashed`. Parallel-only.                                                               |
+| `capacity-icon` | identifier or string | Glyph used as the suffix to capacity numbers on lanes and items. Built-in identifiers (rendered from the same curated SVG library as `icon:`): `none`, `multiplier` (default — `×`), `person`, `people`, `points` (`★`), `time` (`⏱`). Custom: any identifier declared by a `glyph` declaration in config. Inline: a double-quoted Unicode literal — font-dependent. |
+| `timeline-position` | enum        | Where the timeline date strip is rendered. Roadmap-only: `top` (default), `bottom`, `both`. `both` mirrors the strip at the chart bottom so dates stay readable on tall canvases.   |
+| `minor-grid`    | boolean         | When `true`, draws faint dotted grid lines at every tick boundary in addition to the standard major-tick grid. Roadmap-only: `true` or `false` (default).                          |
 
 
 All style properties are optional. Unset properties inherit from the system defaults.
+
+`capacity-icon` follows the same value-form contract as `icon:` — a built-in identifier, a custom name from a `glyph` config declaration, or a double-quoted Unicode literal — but applies to the capacity number rendered on lanes and items, not as an entity-leading badge. Default is `multiplier` because it has the cleanest ASCII fallback (`5x`) and reads as a quantity in every context without presupposing a unit type. Roadmaps measuring capacity in people switch via `default swimlane capacity-icon:person`; story-points roadmaps use `capacity-icon:points`; etc. The `none` value renders just the bare number with no glyph.
+
+**Built-in icon names are rendered from a curated SVG library shipped with the renderer**, not from Unicode emoji codepoints. This guarantees consistent visual output across every platform (web, CLI, exports) — emoji rendering otherwise varies dramatically by OS and font (Apple, Google, Microsoft, Linux). Authors who want platform-default emoji rendering can use an inline literal (`capacity-icon:"👤"`) instead of the named `person` icon.
+
+**Glyphs** — declare custom named glyphs for use by `icon:` and `capacity-icon:`. Each `glyph` line follows the universal `[id] ["title"]` pattern.
+
+```nowline
+glyph budget "Budget" unicode:"💰" ascii:"$"
+glyph fte unicode:"\u{1F464}" ascii:"@"
+glyph star unicode:"⭐"
+```
+
+A `glyph` line accepts:
+
+- `unicode:"<string>"` — **required**. The Unicode character (literal or escape, e.g. `"\u{1F464}"`). May be a multi-codepoint grapheme cluster (flag emoji, ZWJ sequences, etc.).
+- `ascii:"<string>"` — optional. Short ASCII fallback for terminals/exports that lack the Unicode glyph. Length ≤ 3 ASCII characters. Defaults to `?` when omitted.
+- Universal properties — `description`, `link:`.
+
+The id is the lookup key used by `icon:my-glyph` and `capacity-icon:my-glyph`. Custom glyph ids cannot shadow built-in icon names (`none`, `multiplier`, `person`, `people`, `points`, `time`, `shield`, `warning`, `lock`) — the renderer's built-in vocabulary is reserved.
+
+`glyph` declarations must precede any reference. Authors use the inline Unicode-literal form (`capacity-icon:"💰"`) for one-off glyphs; `glyph` declarations are for reusable named ones.
 
 **Defaults** — set default property values for an entity type. Each line declares one default. Supported entity types: `item`, `label`, `swimlane`, `roadmap`, `parallel`, `group`, `milestone`, `footnote`, `anchor`.
 
@@ -733,12 +895,14 @@ default group padding:xs spacing:xs
 
 | Entity             | Cannot default                                                          | Rationale                                                                                                                                       |
 | ------------------ | ----------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------- |
-| `default item`     | `duration`, `after`, `before`, `remaining`, `link`, `description`, `owner` | `duration` is required per item. Sequencing creates invisible dependencies. `remaining` is transient progress. `link`/`description` are unique. |
+| `default item`     | `size`, `duration`, `after`, `before`, `remaining`, `link`, `description`, `owner` | `size`/`duration` are sizing properties — at least one is required per item, and they are intentionally explicit. Sequencing creates invisible dependencies. `remaining` is transient progress. `link`/`description` are unique. |
 | `default milestone`| `date`, `after`, `link`, `description`                                  | `date`/`after` are identity/sizing properties — at least one is required per milestone.                                                         |
 | `default anchor`   | `date`, `link`, `description`                                           | `date` is required and anchor-specific.                                                                                                         |
 | `default footnote` | `on`, `link`, `description`                                             | `on` is the attachment target — identity-defining.                                                                                              |
 
 Allowed on every `default <entity>`: presentation properties (`style:` and raw style properties — see next paragraph), bulk-state (`status:`, `labels:`), plus any non-banned entity-specific property.
+
+`capacity` is allowed on `default item` (e.g. `default item capacity:1`). It is **not** allowed on `default swimlane` because each lane's budget is intentionally explicit at its declaration site. `utilization-warn-at:`, `utilization-over-at:`, and `capacity-icon:` (the capacity-adjacent properties), in contrast, are allowed on `default swimlane` and `default item` per the usual presentation-property rule.
 
 **Raw style properties are allowed on `default`** as a catch-all escape hatch (e.g. `default item shadow:subtle padding:md`). `default` lives in config, which is the presentation section, so the ban on raw style properties applies to roadmap-section entities, not to `default` lines.
 
@@ -803,9 +967,9 @@ keyword [id] ["title"] [key:value ...]
 
 Examples:
 
-- `item auth-refactor "Auth refactor" duration:l` — both id and title
-- `item "Auth refactor" duration:l` — title only, auto-id: `auth-refactor`
-- `item auth-refactor duration:l` — id only, display name: `auth-refactor`
+- `item auth-refactor "Auth refactor" size:l` — both id and title
+- `item "Auth refactor" size:l` — title only, auto-id: `auth-refactor`
+- `item auth-refactor size:l` — id only, display name: `auth-refactor`
 
 The `nowline v1` version directive is the only positional (non-entity) construct in the language; every other declaration follows the Universal Declaration Pattern.
 
@@ -873,7 +1037,7 @@ The parser enforces these rules and produces clear error messages with file posi
 6. At least one swimlane is required in the merged result.
 7. Indentation must be consistent within a file — either spaces or tabs, not both. Mixed indentation is a parse error identifying the first offending line.
 8. `label` declarations must appear in the roadmap section, not under `config`. A `label` line placed before `roadmap` is an error. The error message should suggest moving the declaration under `roadmap`.
-9. `duration` declarations must appear in the roadmap section, not under `config`. A `duration` line placed before `roadmap` is an error. The error message should suggest moving the declaration under `roadmap`.
+9. `size` declarations must appear in the roadmap section, not under `config`. A `size` line placed before `roadmap` is an error. The error message should suggest moving the declaration under `roadmap`.
 10. `status` declarations must appear in the roadmap section, not under `config`. A `status` line placed before `roadmap` is an error. The error message should suggest moving the declaration under `roadmap`.
 
 ### Reference rules
@@ -883,13 +1047,13 @@ The parser enforces these rules and produces clear error messages with file posi
 
 ### Value rules
 
-**Dates, durations, scales**
+**Dates, durations, sizes, scales**
 
 1. `anchor` `date:` values and dated `milestone` `date:` values are valid ISO 8601 dates.
-2. `duration:` property values match a raw duration pattern (`\d+[dwmqy]`) or a name declared by a `duration` declaration in the roadmap section. `scale:` property values must match the raw duration pattern (no name lookup).
-3. A `duration` declaration's id is a kebab-case identifier. It must not match the raw duration pattern `\d+[dwmqy]` and must not be a bare `d`, `w`, `m`, `q`, or `y`. This avoids ambiguity when parsing `duration:` property values.
-4. Every `duration` declaration must specify a `length:` property, and its value must match the raw duration pattern `\d+[dwmqy]`. A `duration` declaration without `length:` is a validation error.
-5. Duplicate `duration` declaration ids within a single file are an error (same rule as duplicate `status` or `label` ids).
+2. `duration:` property values must match the raw duration pattern (`\d+(\.\d+)?[dwmqy]`) — literal only, no alias name lookup. `scale:` property values use the same raw duration pattern.
+3. `size:` property values must reference a `size` declaration in the roadmap section. Forward references are an error (rule 15 applies to `size:` the same way it applied to `duration:`).
+4. A `size` declaration's id is a kebab-case identifier. It must not match the raw duration pattern `\d+(\.\d+)?[dwmqy]` and must not be a bare `d`, `w`, `m`, `q`, or `y`. This avoids ambiguity at the call site.
+5. Every `size` declaration must specify an `effort:` property, and its value must match the raw duration pattern `\d+(\.\d+)?[dwmqy]` (positive, non-zero). A `size` declaration without `effort:` is a validation error. Duplicate `size` declaration ids within a single file are an error (same rule as duplicate `status` or `label` ids).
 
 **Calendar**
 
@@ -900,7 +1064,7 @@ The parser enforces these rules and produces clear error messages with file posi
 
 **Required properties per entity**
 
-10. `item` declarations must include a `duration:` property. Omitting it is an error that identifies the item by id/title and line number.
+10. `item` declarations must include at least one of `size:` or `duration:`. Omitting both is an error that identifies the item by id/title and line number. Declaring both is valid; the explicit `duration:` literal wins for bar width and meta-line display (size chip omitted; see Sizing Precedence in the Capacity section).
 11. `anchor` declarations must include a `date:` property.
 12. `milestone` declarations must include at least one of `date:` or `after:`.
 13. `footnote` declarations must include an `on:` property referencing one or more valid identifiers. Single: `on:id`. Multiple: `on:[id1, id2]`.
@@ -908,15 +1072,39 @@ The parser enforces these rules and produces clear error messages with file posi
 **Status, labels, remaining**
 
 14. `status` values are a built-in value (`planned`, `in-progress`, `done`, `at-risk`, `blocked`) or a value declared by a `status` declaration in the roadmap section.
-15. A `duration:` or `status:` property reference must resolve to a declaration that appears **earlier in the file** (or in an earlier include, per `config:`/`roadmap:` mode). Forward references are a validation error. The error message should point to both the reference site and suggest the declaration location.
+15. A `size:` or `status:` property reference must resolve to a declaration that appears **earlier in the file** (or in an earlier include, per `config:`/`roadmap:` mode). Forward references are a validation error. The error message should point to both the reference site and suggest the declaration location.
 16. `labels` values are kebab-case identifiers. Undeclared labels are valid (no config entry required).
-17. `remaining` values are a percentage (`0%`–`100%`).
+17. `remaining` values are either a percentage (`0%`–`100%`) or a single-eng effort literal (`\d+(\.\d+)?[dwmqy]`, e.g. `1w`, `0.5d`). Both forms normalize to a percent of the item's total effort during layout: `percent = remaining_literal ÷ total_effort`, where `total_effort = size.effort` for sized items, or `duration_literal × item_capacity` for duration-literal'd items (`item_capacity` defaults to `1`). When the literal exceeds total effort (computed percent `> 100%`), the layout step emits a soft warning and clamps the painted bar to 100% remaining; rendering is never blocked.
+
+**Capacity**
+
+17a. `capacity:` on a `swimlane` must match a positive number literal (integer `\d+` or decimal `\d+\.\d+`). Percent form is not allowed on swimlanes.
+17b. `capacity:` on an `item` must match a positive number literal or percent literal (`\d+(\.\d+)?%`). The percent literal is parsed to its decimal equivalent (`50%` → `0.5`).
+17c. `capacity:` is not valid on `parallel` or `group` (same exclusion as `size`, `duration`, and `remaining`).
+17d. `utilization-warn-at:` and `utilization-over-at:` on a `swimlane` (or `default swimlane`) must each match either a positive percent literal (`\d+(\.\d+)?%`), a positive decimal (`\d+(\.\d+)?`, interpreted as a fraction — `0.8` ≡ `80%`), or the bareword `none`. Defaults: `utilization-warn-at:80%`, `utilization-over-at:100%`. When both numeric thresholds are present on the same lane (or merged from a `default swimlane`), `utilization-warn-at` must be ≤ `utilization-over-at`; otherwise it is a validation error. Not valid on any other entity type.
+17e. `capacity-icon:` value must be a built-in identifier (`none`, `multiplier`, `person`, `people`, `points`, `time`), an identifier matching a `glyph` declaration in scope, or a double-quoted Unicode literal. Like all raw style properties, it is only valid inside `style` blocks and `default <entity>` lines — not inline on entities. Defaults to `multiplier` when omitted. The same value-form rule applies to `icon:`.
+
+Non-rules (intentionally not validated):
+
+- Item and swimlane capacity are independent. An item declaring `capacity:` without its swimlane declaring one is **valid** and produces no diagnostic.
+- A lane declaring `utilization-warn-at:` or `utilization-over-at:` without a `capacity:` value is **valid** but produces no underline (the load function has no denominator). Renderer treats it as a silent no-op; consider adding `capacity:` to make the threshold meaningful.
+- A lane being over capacity — concurrent item capacity exceeding swimlane capacity at any timestep — is **not** a validation error and produces no parser output. It is rendered visually per `rendering.md`.
+- `utilization-warn-at:none` and/or `utilization-over-at:none` on a swimlane that has no `capacity:` (or no items contributing load) is valid and a no-op — there is nothing to color.
+
+**Glyph declarations**
+
+17f. Every `glyph` declaration must specify a `unicode:"<string>"` property. Missing `unicode:` is a validation error.
+17g. `unicode:` value must be a non-empty quoted string. May contain Unicode escapes (`\u{...}`) or literal Unicode characters. May be a multi-codepoint grapheme cluster.
+17h. `ascii:` value, if present, must be a quoted string of length ≤ 3 ASCII characters.
+17i. A `glyph` id must not match any built-in icon name (`none`, `multiplier`, `person`, `people`, `points`, `time`, `shield`, `warning`, `lock`, plus any other built-ins the renderer reserves). Shadowing is an error.
+17j. Duplicate `glyph` declaration ids within a single file are an error (same rule as duplicate `status` or `label` ids).
+17k. A `glyph` reference (`icon:NAME` or `capacity-icon:NAME`) must resolve to either a built-in or an earlier `glyph` declaration. Forward references are an error.
 
 **Styles and content/rendering separation**
 
 18. `style:` references on entities and labels must resolve to a style declared in the applicable `config` scope.
-19. Style property values must be valid for their type: color properties (`bg`, `fg`, `text`) must be named colors, hex values, or `none`; `border` must be `solid`, `dashed`, or `dotted`; `shadow` must be `none`, `subtle`, `fuzzy`, or `hard`; `font` must be `sans`, `serif`, or `mono`; `weight` must be `thin`, `light`, `normal`, or `bold`; `italic` must be `true` or `false`; `text-size`, `padding`, `spacing`, `header-height` must be `none`, `xs`, `sm`, `md`, `lg`, or `xl`; `corner-radius` must be `none`, `xs`, `sm`, `md`, `lg`, `xl`, or `full`; `bracket` must be `none`, `solid`, or `dashed`.
-20. Raw style properties (`bg`, `fg`, `text`, `border`, `icon`, `shadow`, `font`, `weight`, `italic`, `text-size`, `padding`, `spacing`, `header-height`, `corner-radius`, `bracket`) may only appear in `style` blocks and `default <entity>` lines (both in config). Using them on any roadmap-section entity is an error.
+19. Style property values must be valid for their type: color properties (`bg`, `fg`, `text`) must be named colors, hex values, or `none`; `border` must be `solid`, `dashed`, or `dotted`; `shadow` must be `none`, `subtle`, `fuzzy`, or `hard`; `font` must be `sans`, `serif`, or `mono`; `weight` must be `thin`, `light`, `normal`, or `bold`; `italic` must be `true` or `false`; `text-size`, `padding`, `spacing`, `header-height` must be `none`, `xs`, `sm`, `md`, `lg`, or `xl`; `corner-radius` must be `none`, `xs`, `sm`, `md`, `lg`, `xl`, or `full`; `bracket` must be `none`, `solid`, or `dashed`; `capacity-icon` must be `none`, `multiplier`, `person`, `people`, `points`, `time`, a custom `glyph` id, or a double-quoted Unicode literal; `timeline-position` must be `top`, `bottom`, or `both`; `minor-grid` must be `true` or `false`.
+20. Raw style properties (`bg`, `fg`, `text`, `border`, `icon`, `shadow`, `font`, `weight`, `italic`, `text-size`, `padding`, `spacing`, `header-height`, `corner-radius`, `bracket`, `capacity-icon`, `timeline-position`, `minor-grid`) may only appear in `style` blocks and `default <entity>` lines (both in config). Using them on any roadmap-section entity is an error.
 
 **Defaults**
 
@@ -952,7 +1140,7 @@ The parser enforces these rules and produces clear error messages with file posi
 6. `roadmap:` on `include` must be `merge`, `ignore`, or `isolate`.
 7. On `config:merge`, if a child config entry collides with a parent entry, the parent wins and the parser emits a warning with the source file path and shadowed name.
 8. On `roadmap:merge`, if a child entity collides with a parent entity, the parent wins and the parser emits a warning. Swimlane collisions also drop contained items.
-9. On `config:isolate`, `style:` references within the isolated file must resolve within that file's own config. References to parent config are a validation error. Label, duration, and status references are governed by `roadmap:isolate`, not `config:isolate`, because labels, durations, and statuses are roadmap content.
+9. On `config:isolate`, `style:` references within the isolated file must resolve within that file's own config. References to parent config are a validation error. Label, size, and status references are governed by `roadmap:isolate`, not `config:isolate`, because labels, sizes, and statuses are roadmap content.
 10. On `roadmap:isolate`, the included file must contain a `roadmap` declaration (needed for the region label).
 11. For any `include` whose `roadmap:` mode is not `ignore` (i.e. `merge` or `isolate`), if the child file declares a `roadmap`, the parent and child must agree on `start:`: both absent, or both present with identical values. A mismatch is an error reported on the parent's `include` line. **This is an explicit exception to rule 8's "parent wins with warning" merge behaviour.** `start:` defines the shared timeline baseline, so silently shadowing a child's `start:` would cause rendered dates to drift from what the author wrote. `roadmap:ignore` is exempt because the child's roadmap content is dropped entirely.
 
@@ -960,6 +1148,6 @@ The parser enforces these rules and produces clear error messages with file posi
 
 1. `parallel` must contain at least 2 children (items or groups). A single-child parallel is a warning.
 2. `group` must contain at least 1 child (item, parallel, or nested group).
-3. `duration` and `remaining` are not valid on `parallel` or `group` (computed from children).
+3. `size`, `duration`, and `remaining` are not valid on `parallel` or `group` (computed from children).
 4. `parallel` is valid inside swimlane or group. `group` is valid inside swimlane, parallel, or group.
 

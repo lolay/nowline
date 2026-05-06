@@ -114,7 +114,7 @@ nowline roadmap.nowline --headless               # bundled DejaVu fonts (determi
 | Flag                  | Default      | Notes                                       |
 |-----------------------|--------------|---------------------------------------------|
 | `-t, --theme <name>`  | `light`      | `light` \| `dark`.                          |
-| `--today YYYY-MM-DD`  | system today | Override the now-line anchor.               |
+| `--now YYYY-MM-DD`    | today (UTC)  | Override the now-line anchor date. Use `--now -` to suppress it. |
 | `--no-links`          | (off)        | Omit link icons from items.                 |
 | `-s, --scale <n>`     | `1`          | Raster scale (PNG only).                    |
 | `--strict`            | (off)        | Promote asset / sanitizer warnings to errors. |
@@ -255,11 +255,11 @@ Each diagnostic is rendered in a biome/oxc-style frame via `@babel/code-frame`:
 
 ```
 roadmap.nowline:7:34 error: Unknown reference 'auth-refactro' in after — did you mean 'auth-refactor'?
-  5 |   item auth-refactor "Auth refactor" duration:l
+  5 |   item auth-refactor "Auth refactor" size:l
   6 |   parallel after:auth-refactor
 > 7 |     group audit-track "Audit Track" labels:security
     |                                     ^^^^^^^^^^^^^^^
-  8 |       item audit-log "Audit log v2" duration:xl before:code-freeze
+  8 |       item audit-log "Audit log v2" size:xl before:code-freeze
 ```
 
 `--diagnostic-format json` emits the stable diagnostic schema:

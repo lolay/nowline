@@ -1,0 +1,148 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 960 260" width="960" height="260" font-family="-apple-system, 'SF Pro Display', 'Segoe UI', Helvetica, Arial, sans-serif">
+  <!--
+    Sample - Minimal
+    DSL gist:
+      nowline v1
+      roadmap "Starter" start:2026-01-05 scale:1w
+      swimlane engineering "Engineering"
+        item research "Research"  duration:1w status:done
+        item design   "Design"    duration:2w status:in-progress remaining:50%
+        item build    "Build"     duration:3w status:planned
+    Demonstrates: header box, timeline scale header, now-line,
+                  status dots, progress fill, alternating swimlane tint (single lane = no alt).
+  -->
+
+  <!-- Palette (light theme) -->
+  <defs>
+    <filter id="nl-shadow-subtle" x="-10%" y="-10%" width="120%" height="140%">
+      <feDropShadow dx="0" dy="1" stdDeviation="1.5" flood-color="#0f172a" flood-opacity="0.12"/>
+    </filter>
+  </defs>
+
+  <!-- Canvas background -->
+  <rect width="960" height="260" fill="#f8fafc"/>
+
+  <!-- =========================
+       Roadmap header box (top-left)
+       ========================= -->
+  <g transform="translate(24,20)">
+    <rect width="220" height="58" rx="6" fill="#ffffff" stroke="#e2e8f0" stroke-width="1" filter="url(#nl-shadow-subtle)"/>
+    <text x="16" y="28" font-size="16" font-weight="600" fill="#0f172a">Starter</text>
+    <text x="16" y="46" font-size="11" fill="#64748b">Engineering roadmap</text>
+  </g>
+
+  <!-- =========================
+       Timeline scale (week columns)
+       Each week = 120px. Start x=264 (after header+gap), 6 weeks shown.
+       The timeline header is BOTTOM-ALIGNED with the title block:
+         - Title block: y=20..78 (58 tall)
+         - Timeline header: y=42..78 (36 tall, same bottom)
+       ========================= -->
+  <g transform="translate(264,42)">
+    <!-- Header band (bottom aligns with title block at y=78) -->
+    <rect width="672" height="36" fill="#ffffff" stroke="#e2e8f0" stroke-width="1" rx="4"/>
+    <!-- Week tick labels -->
+    <g font-size="11" fill="#64748b" text-anchor="middle">
+      <text x="60"  y="22">Jan 05</text>
+      <text x="180" y="22">Jan 12</text>
+      <text x="300" y="22">Jan 19</text>
+      <text x="420" y="22">Jan 26</text>
+      <text x="540" y="22">Feb 02</text>
+      <text x="660" y="22">Feb 09</text>
+    </g>
+    <!-- Vertical grid lines drop down through the lane (y local=36 => y abs=78,
+         matching the swimlane top edge at y=80) -->
+    <g stroke="#e2e8f0" stroke-width="1" stroke-dasharray="2 3">
+      <line x1="120" y1="36" x2="120" y2="178"/>
+      <line x1="240" y1="36" x2="240" y2="178"/>
+      <line x1="360" y1="36" x2="360" y2="178"/>
+      <line x1="480" y1="36" x2="480" y2="178"/>
+      <line x1="600" y1="36" x2="600" y2="178"/>
+    </g>
+  </g>
+
+  <!-- =========================
+       Swimlane band
+       ========================= -->
+  <g transform="translate(24,80)">
+    <!-- Band background - covers both the lane tab column and the timeline area -->
+    <rect x="0" y="0" width="912" height="140" fill="#ffffff" stroke="#e2e8f0"/>
+    <!-- Frame-tab badge (PlantUML-style tab at top-left of band) -->
+    <g>
+      <rect x="10" y="10" width="120" height="22" rx="4" fill="#f1f5f9" stroke="#cbd5e1"/>
+      <text x="20" y="25" font-size="12" font-weight="600" fill="#334155">Engineering</text>
+    </g>
+
+    <!-- Items live within the timeline column (logical origin x=240 relative
+         to this g, i.e. absolute x=264 matching the timeline header above).
+         Each item reserves its logical column width but visually renders
+         with 6px inset on each side, for a 12px visible gutter between
+         back-to-back items. Gutter width matches the item's own internal
+         left padding (12px title inset), so the chart feels evenly padded.
+         Internal text stays at x=12 (inset from the visible bar edge). -->
+    <g transform="translate(240,44)">
+      <!-- Research - done, logical 1w=120, visual 108 (6+108+6 = 120) -->
+      <g transform="translate(6,0)">
+        <rect x="0" y="0" width="108" height="56" rx="4"
+              fill="#ecfdf5" stroke="#10b981" stroke-width="1" filter="url(#nl-shadow-subtle)"/>
+        <text x="12" y="20" font-size="13" font-weight="600" fill="#064e3b">Research</text>
+        <text x="12" y="38" font-size="11" fill="#047857">1w</text>
+        <circle cx="96" cy="12" r="5" fill="#10b981"/>
+        <rect x="0" y="52" width="108" height="4" rx="0" fill="#10b981" opacity="0.5"/>
+      </g>
+
+      <!-- Design - in-progress, logical 2w=240 starting at logical x=120, visual 228 -->
+      <g transform="translate(126,0)">
+        <rect x="0" y="0" width="228" height="56" rx="4"
+              fill="#eff6ff" stroke="#3b82f6" stroke-width="1" filter="url(#nl-shadow-subtle)"/>
+        <text x="12" y="20" font-size="13" font-weight="600" fill="#1e3a8a">Design</text>
+        <text x="12" y="38" font-size="11" fill="#1d4ed8">2w - 50% remaining</text>
+        <circle cx="216" cy="12" r="5" fill="#3b82f6"/>
+        <!-- progress fill: 50% of 228 = 114 -->
+        <rect x="0" y="52" width="114" height="4" fill="#3b82f6" opacity="0.6"/>
+      </g>
+
+      <!-- Build - planned, logical 3w=360 starting at logical x=360, visual 300
+           (remainder clipped to stay inside timeline area). -->
+      <g transform="translate(366,0)">
+        <rect x="0" y="0" width="300" height="56" rx="4"
+              fill="#f8fafc" stroke="#94a3b8" stroke-width="1" filter="url(#nl-shadow-subtle)"/>
+        <text x="12" y="20" font-size="13" font-weight="600" fill="#1e293b">Build</text>
+        <text x="12" y="38" font-size="11" fill="#64748b">3w</text>
+        <circle cx="288" cy="12" r="5" fill="#94a3b8"/>
+      </g>
+    </g>
+  </g>
+
+  <!-- =========================
+       The now-line - hero visual
+       Placed at "Jan 22" which is halfway through the Design item.
+       Timeline starts x=264 (Jan 05). Jan 22 = 2.5w in => 264 + 2.5*120 = 564
+       Extends from the top of the (now bottom-aligned) timeline header
+       (y=42) down to the lane bottom (y=220).
+       ========================= -->
+  <g>
+    <line x1="564" y1="42" x2="564" y2="220" stroke="#e53e3e" stroke-width="2.25"/>
+    <!-- "now" label floats at top of the timeline header row -->
+    <g transform="translate(564,36)">
+      <rect x="-18" y="-12" width="36" height="16" rx="8" fill="#e53e3e"/>
+      <text x="0" y="0" font-size="10" font-weight="700" fill="#ffffff" text-anchor="middle">now</text>
+    </g>
+  </g>
+
+  <!-- Nowline attribution mark - bottom-right of the last swimlane (no
+       footnotes exist). Swimlane rect bounds: x=[24,936], y=[80,220].
+       Mark is anchored 12px in from the swimlane's bottom-right corner,
+       rendered on top of the swimlane so it stays visible and never
+       extends below the drawing. -->
+  <g transform="translate(891,199) scale(0.22)">
+    <text x="0" y="40" font-size="40" font-weight="700" fill="#94a3b8">now</text>
+    <rect x="92" y="12" width="5" height="40" fill="#e53e3e"/>
+    <text x="100" y="40" font-size="40" font-weight="400" fill="#94a3b8">ine</text>
+  </g>
+
+  <!-- Caption -->
+  <text x="24" y="248" font-size="11" fill="#64748b" font-style="italic">
+    Sample - Minimal - single swimlane, three sequential items, hero now-line.
+  </text>
+</svg>

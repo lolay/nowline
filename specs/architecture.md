@@ -80,7 +80,7 @@ To keep `@nowline/renderer` browser-safe (no `fs`, no `path`, no `process`), the
 | Environment | Resolver implementation |
 |-------------|-------------------------|
 | `@nowline/cli` | Node resolver rooted at the input file's directory. Rejects paths that escape the root (no `..` traversal beyond the project root), rejects absolute paths outside an explicit `--asset-root`, and returns `null` on missing files so the renderer can emit its warning. |
-| Browser embed (m3) | Resolver that looks up assets in an author-supplied map (inline `data:` URIs or pre-bundled bytes). No network fetches — the embed script never hits disk or remote servers for DSL-referenced assets. |
+| Browser embed (m4) | Resolver that looks up assets in an author-supplied map (inline `data:` URIs or pre-bundled bytes). No network fetches — the embed script never hits disk or remote servers for DSL-referenced assets. |
 
 Downstream consumers (e.g. a hosted editor or an MCP server) plug in their own resolvers against the same contract without adding new environment coupling to `@nowline/renderer`.
 

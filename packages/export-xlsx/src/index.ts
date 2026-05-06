@@ -265,7 +265,7 @@ function itemRow(
     group: string,
     parallel: string,
 ): ItemRow {
-    const durationLiteral = getProp(item, 'duration');
+    const durationLiteral = getProp(item, 'duration') ?? getProp(item, 'size');
     return {
         id: item.name ?? '',
         title: item.title ?? '',

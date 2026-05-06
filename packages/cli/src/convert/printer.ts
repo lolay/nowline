@@ -4,8 +4,9 @@ import { CliError, ExitCode } from '../io/exit-codes.js';
 // Keyed-property canonical order. Keys not in this list sort alphabetically after.
 const KEY_ORDER = [
     'date',
-    'length',
+    'effort',
     'on',
+    'size',
     'duration',
     'status',
     'owner',
@@ -20,6 +21,8 @@ const KEY_ORDER = [
     'scale',
     'calendar',
     'header-position',
+    'timeline-position',
+    'minor-grid',
 ];
 
 const INDENT = '  ';
@@ -137,8 +140,8 @@ class Printer {
                 return this.team(entry, depth);
             case 'AnchorDeclaration':
                 return this.simpleEntity('anchor', entry, depth);
-            case 'DurationDeclaration':
-                return this.simpleEntity('duration', entry, depth);
+            case 'SizeDeclaration':
+                return this.simpleEntity('size', entry, depth);
             case 'StatusDeclaration':
                 return this.simpleEntity('status', entry, depth);
             case 'LabelDeclaration':
@@ -325,7 +328,7 @@ function normalizeKey(key: string): string {
 
 const URL_RE = /^https?:\/\//;
 const DATE_RE = /^\d{4}-\d{2}-\d{2}$/;
-const DURATION_RE = /^\d+[dwmqy]$/;
+const DURATION_RE = /^\d+(?:\.\d+)?[dwmqy]$/;
 const PERCENTAGE_RE = /^\d+%$/;
 const HEX_COLOR_RE = /^#[0-9a-fA-F]{3,8}$/;
 const INTEGER_RE = /^\d+$/;

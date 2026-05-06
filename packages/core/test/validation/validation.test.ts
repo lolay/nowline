@@ -79,22 +79,22 @@ describe('validation rules', () => {
         expect(hasError(errorMessages(r.diagnostics), /remaining/i)).toBe(true);
     });
 
-    it('Rule 15: forward reference to a duration is an error', async () => {
+    it('Rule 15: forward reference to a size is an error', async () => {
         const r = await parse(
             `roadmap r
 swimlane s
-  item a duration:md
-duration md length:1w
+  item a size:md
+size md effort:1w
 `,
         );
-        expect(hasError(errorMessages(r.diagnostics), /referenced before its declaration|Duration "md"/i)).toBe(true);
+        expect(hasError(errorMessages(r.diagnostics), /referenced before its declaration|Size "md"/i)).toBe(true);
     });
 
-    it('Rule 15: undeclared duration name is an error', async () => {
+    it('Rule 15: undeclared size name is an error', async () => {
         const r = await parse(
             `roadmap r
 swimlane s
-  item a duration:mystery
+  item a size:mystery
 `,
         );
         expect(hasError(errorMessages(r.diagnostics), /not declared/i)).toBe(true);
@@ -171,6 +171,45 @@ swimlane s
             `roadmap r header-position:above\nswimlane s\n  item x duration:1w\n`,
         );
         expect(hasError(errorMessages(r.diagnostics), /Raw style property "header-position"/i)).toBe(true);
+    });
+
+    it('Rule 18: timeline-position top/bottom/both are accepted', async () => {
+        for (const value of ['top', 'bottom', 'both']) {
+            const r = await parse(
+                `config\ndefault roadmap timeline-position:${value}\nroadmap r\nswimlane s\n  item x duration:1w\n`,
+            );
+            expect(errorMessages(r.diagnostics)).toEqual([]);
+        }
+    });
+
+    it('Rule 18: timeline-position with invalid value is an error', async () => {
+        const r = await parse(
+            `config\ndefault roadmap timeline-position:sideways\nroadmap r\nswimlane s\n  item x duration:1w\n`,
+        );
+        expect(hasError(errorMessages(r.diagnostics), /timeline-position|sideways/i)).toBe(true);
+    });
+
+    it('Rule 18: minor-grid true/false are accepted', async () => {
+        for (const value of ['true', 'false']) {
+            const r = await parse(
+                `config\ndefault roadmap minor-grid:${value}\nroadmap r\nswimlane s\n  item x duration:1w\n`,
+            );
+            expect(errorMessages(r.diagnostics)).toEqual([]);
+        }
+    });
+
+    it('Rule 18: minor-grid with invalid value is an error', async () => {
+        const r = await parse(
+            `config\ndefault roadmap minor-grid:maybe\nroadmap r\nswimlane s\n  item x duration:1w\n`,
+        );
+        expect(hasError(errorMessages(r.diagnostics), /minor-grid|maybe/i)).toBe(true);
+    });
+
+    it('Rule 20: raw timeline-position on roadmap declaration is an error', async () => {
+        const r = await parse(
+            `roadmap r timeline-position:both\nswimlane s\n  item x duration:1w\n`,
+        );
+        expect(hasError(errorMessages(r.diagnostics), /Raw style property "timeline-position"/i)).toBe(true);
     });
 
     it('Rule 20: raw style property on item is an error', async () => {
@@ -409,25 +448,71 @@ swimlane s
         expect(warningMessages(r.diagnostics)).toEqual([]);
     });
 
-    // --- Duration declaration: length: is required ---
+    // --- Size declaration: effort: is required ---
 
-    it('Duration decl: missing length: is an error', async () => {
+    it('Size decl: missing effort: is an error', async () => {
         const r = await parse(
-            `roadmap r\nduration md\nswimlane s\n  item a duration:md\n`,
+            `roadmap r\nsize md\nswimlane s\n  item a size:md\n`,
         );
-        expect(hasError(errorMessages(r.diagnostics), /length/i)).toBe(true);
+        expect(hasError(errorMessages(r.diagnostics), /effort/i)).toBe(true);
     });
 
-    it('Duration decl: invalid length value is an error', async () => {
+    it('Size decl: invalid effort value is an error', async () => {
         const r = await parse(
-            `roadmap r\nduration md length:maybe\nswimlane s\n  item a duration:md\n`,
+            `roadmap r\nsize md effort:maybe\nswimlane s\n  item a size:md\n`,
         );
-        expect(hasError(errorMessages(r.diagnostics), /length/i)).toBe(true);
+        expect(hasError(errorMessages(r.diagnostics), /effort/i)).toBe(true);
     });
 
-    it('Duration decl: quarter suffix is accepted in length: and in item duration:', async () => {
+    it('Size decl: quarter suffix is accepted in effort: and in item duration:', async () => {
         const r = await parse(
-            `roadmap r\nduration big length:1q\nswimlane s\n  item a duration:big\n  item b duration:2q\n`,
+            `roadmap r\nsize big effort:1q\nswimlane s\n  item a size:big\n  item b duration:2q\n`,
+        );
+        expect(errorMessages(r.diagnostics)).toEqual([]);
+    });
+
+    it('Size decl: decimal effort is accepted (0.5d)', async () => {
+        const r = await parse(
+            `roadmap r\nsize tiny effort:0.5d\nswimlane s\n  item a size:tiny\n`,
+        );
+        expect(errorMessages(r.diagnostics)).toEqual([]);
+    });
+
+    // --- Item duration: literal-only ---
+
+    it('Item duration: identifier (alias-style) is an error — use size:NAME', async () => {
+        const r = await parse(
+            `roadmap r\nsize md effort:1w\nswimlane s\n  item a duration:md\n`,
+        );
+        expect(hasError(errorMessages(r.diagnostics), /Invalid duration "md".*size:NAME/i)).toBe(true);
+    });
+
+    it('Item duration: decimal literal is accepted (0.5d)', async () => {
+        const r = await parse(
+            `roadmap r\nswimlane s\n  item a duration:0.5d\n`,
+        );
+        expect(errorMessages(r.diagnostics)).toEqual([]);
+    });
+
+    // --- Item remaining: percent OR literal ---
+
+    it('Item remaining: duration literal is accepted (1w)', async () => {
+        const r = await parse(
+            `roadmap r\nswimlane s\n  item a duration:2w remaining:1w\n`,
+        );
+        expect(errorMessages(r.diagnostics)).toEqual([]);
+    });
+
+    it('Item remaining: decimal literal is accepted (0.5d)', async () => {
+        const r = await parse(
+            `roadmap r\nswimlane s\n  item a duration:1w remaining:0.5d\n`,
+        );
+        expect(errorMessages(r.diagnostics)).toEqual([]);
+    });
+
+    it('Item remaining: literal larger than duration is accepted at parse-time (overflow handled at layout)', async () => {
+        const r = await parse(
+            `roadmap r\nswimlane s\n  item a duration:1w remaining:4w\n`,
         );
         expect(errorMessages(r.diagnostics)).toEqual([]);
     });
@@ -527,6 +612,274 @@ swimlane s
     it('Person: declaring a person inside a team is accepted', async () => {
         const r = await parse(
             `roadmap r\nteam eng "Engineering"\n  person sam\nswimlane s\n  item x duration:1w\n`,
+        );
+        expect(errorMessages(r.diagnostics)).toEqual([]);
+    });
+
+    // --- Capacity (rules 17a–17e) ---
+
+    it('Rule 17a: positive integer/decimal capacity on swimlane is accepted', async () => {
+        const r = await parse(
+            `roadmap r\nswimlane s capacity:5\n  item x duration:1w\n`,
+        );
+        expect(errorMessages(r.diagnostics)).toEqual([]);
+        const r2 = await parse(
+            `roadmap r\nswimlane s capacity:1.5\n  item x duration:1w\n`,
+        );
+        expect(errorMessages(r2.diagnostics)).toEqual([]);
+    });
+
+    it('Rule 17a: percent literal on swimlane capacity is an error', async () => {
+        const r = await parse(
+            `roadmap r\nswimlane s capacity:50%\n  item x duration:1w\n`,
+        );
+        expect(hasError(errorMessages(r.diagnostics), /swimlane capacity.*Percent literals are not allowed/i)).toBe(true);
+    });
+
+    it('Rule 17a: zero swimlane capacity is an error', async () => {
+        const r = await parse(
+            `roadmap r\nswimlane s capacity:0\n  item x duration:1w\n`,
+        );
+        expect(hasError(errorMessages(r.diagnostics), /swimlane capacity/i)).toBe(true);
+    });
+
+    it('Rule 17b: integer/decimal/percent on item capacity is accepted', async () => {
+        const r = await parse(
+            `roadmap r\nswimlane s\n  item a duration:1w capacity:2\n  item b duration:1w capacity:0.5\n  item c duration:1w capacity:50%\n  item d duration:1w capacity:12.5%\n`,
+        );
+        expect(errorMessages(r.diagnostics)).toEqual([]);
+    });
+
+    it('Rule 17b: zero item capacity is an error', async () => {
+        const r = await parse(
+            `roadmap r\nswimlane s\n  item a duration:1w capacity:0\n`,
+        );
+        expect(hasError(errorMessages(r.diagnostics), /Item capacity.*positive/i)).toBe(true);
+    });
+
+    it('Rule 17c: capacity on parallel is an error', async () => {
+        const r = await parse(
+            `roadmap r\nswimlane s\n  parallel "P" capacity:3\n    item a duration:1w\n    item b duration:1w\n`,
+        );
+        expect(hasError(errorMessages(r.diagnostics), /capacity.*not valid on parallel/i)).toBe(true);
+    });
+
+    it('Rule 17c: capacity on group is an error', async () => {
+        const r = await parse(
+            `roadmap r\nswimlane s\n  group g "G" capacity:3\n    item a duration:1w\n    item b duration:1w\n`,
+        );
+        expect(hasError(errorMessages(r.diagnostics), /capacity.*not valid on group/i)).toBe(true);
+    });
+
+    it('Rule 17d (removal): overcapacity:show|hide is rejected with a migration hint', async () => {
+        const r = await parse(
+            `roadmap r\nswimlane s capacity:5 overcapacity:hide\n  item x duration:1w\n`,
+        );
+        expect(hasError(errorMessages(r.diagnostics), /overcapacity.*was removed.*utilization-over-at:none/i)).toBe(true);
+    });
+
+    it('Rule 17d (removal): overcapacity:show is also rejected (no value carve-out)', async () => {
+        const r = await parse(
+            `roadmap r\nswimlane s capacity:5 overcapacity:show\n  item x duration:1w\n`,
+        );
+        expect(hasError(errorMessages(r.diagnostics), /overcapacity.*was removed/i)).toBe(true);
+    });
+
+    it('Rule 17d: utilization-warn-at percent and decimal-fraction values are accepted on swimlane and default swimlane', async () => {
+        const r = await parse(
+            `config\ndefault swimlane utilization-warn-at:80% utilization-over-at:100%\nroadmap r\nswimlane s capacity:5 utilization-warn-at:75% utilization-over-at:120%\n  item x duration:1w\n`,
+        );
+        expect(errorMessages(r.diagnostics)).toEqual([]);
+        const r2 = await parse(
+            `roadmap r\nswimlane s capacity:5 utilization-warn-at:0.5 utilization-over-at:1.25\n  item x duration:1w\n`,
+        );
+        expect(errorMessages(r2.diagnostics)).toEqual([]);
+    });
+
+    it('Rule 17d: utilization-*-at:none opts out of that color band', async () => {
+        const r = await parse(
+            `roadmap r\nswimlane s capacity:5 utilization-warn-at:none utilization-over-at:none\n  item x duration:1w\n`,
+        );
+        expect(errorMessages(r.diagnostics)).toEqual([]);
+    });
+
+    it('Rule 17d: bare integers are rejected with a disambiguation hint', async () => {
+        const r = await parse(
+            `roadmap r\nswimlane s capacity:5 utilization-warn-at:80\n  item x duration:1w\n`,
+        );
+        expect(hasError(errorMessages(r.diagnostics), /utilization-warn-at.*"80".*Use the percent form.*"80%".*decimal-fraction.*"0\.80"/i)).toBe(true);
+    });
+
+    it('Rule 17d: malformed values are rejected', async () => {
+        const r = await parse(
+            `roadmap r\nswimlane s capacity:5 utilization-over-at:maybe\n  item x duration:1w\n`,
+        );
+        expect(hasError(errorMessages(r.diagnostics), /utilization-over-at.*positive percent.*decimal fraction.*none/i)).toBe(true);
+    });
+
+    it('Rule 17d: utilization-warn-at on an item is an error', async () => {
+        const r = await parse(
+            `roadmap r\nswimlane s\n  item x duration:1w utilization-warn-at:50%\n`,
+        );
+        expect(hasError(errorMessages(r.diagnostics), /utilization-warn-at.*only valid on.*swimlane/i)).toBe(true);
+    });
+
+    it('Rule 17d (ordering): warn > over is an error', async () => {
+        const r = await parse(
+            `roadmap r\nswimlane s capacity:5 utilization-warn-at:120% utilization-over-at:100%\n  item x duration:1w\n`,
+        );
+        expect(hasError(errorMessages(r.diagnostics), /utilization-warn-at.*120%.*must be ≤.*utilization-over-at.*100%/i)).toBe(true);
+    });
+
+    it('Rule 17d (ordering): warn == over is allowed (binary indicator)', async () => {
+        const r = await parse(
+            `roadmap r\nswimlane s capacity:5 utilization-warn-at:100% utilization-over-at:100%\n  item x duration:1w\n`,
+        );
+        expect(errorMessages(r.diagnostics)).toEqual([]);
+    });
+
+    it('Rule 17d (ordering): `none` on either side skips the comparison', async () => {
+        const r = await parse(
+            `roadmap r\nswimlane s capacity:5 utilization-warn-at:none utilization-over-at:50%\n  item x duration:1w\n`,
+        );
+        expect(errorMessages(r.diagnostics)).toEqual([]);
+        const r2 = await parse(
+            `roadmap r\nswimlane s capacity:5 utilization-warn-at:200% utilization-over-at:none\n  item x duration:1w\n`,
+        );
+        expect(errorMessages(r2.diagnostics)).toEqual([]);
+    });
+
+    it('Rule 17d (ordering): default swimlane is also checked', async () => {
+        const r = await parse(
+            `config\ndefault swimlane utilization-warn-at:120% utilization-over-at:100%\nroadmap r\nswimlane s capacity:5\n  item x duration:1w\n`,
+        );
+        expect(hasError(errorMessages(r.diagnostics), /utilization-warn-at.*must be ≤.*utilization-over-at/i)).toBe(true);
+    });
+
+    it('default swimlane capacity is banned (rule: lane budgets must be explicit)', async () => {
+        const r = await parse(
+            `config\ndefault swimlane capacity:5\nroadmap r\nswimlane s\n  item x duration:1w\n`,
+        );
+        expect(hasError(errorMessages(r.diagnostics), /capacity.*default swimlane/i)).toBe(true);
+    });
+
+    it('default item capacity is allowed', async () => {
+        const r = await parse(
+            `config\ndefault item capacity:1\nroadmap r\nswimlane s\n  item x duration:1w\n`,
+        );
+        expect(errorMessages(r.diagnostics)).toEqual([]);
+    });
+
+    it('Rule 17e: capacity-icon built-in identifier is accepted in style block', async () => {
+        const r = await parse(
+            `config\nstyle finance\n  capacity-icon: person\nroadmap r\nswimlane s\n  item x duration:1w\n`,
+        );
+        expect(errorMessages(r.diagnostics)).toEqual([]);
+    });
+
+    it('Rule 17e: capacity-icon string literal is accepted in default swimlane', async () => {
+        const r = await parse(
+            `config\ndefault swimlane capacity-icon:"⚙"\nroadmap r\nswimlane s\n  item x duration:1w\n`,
+        );
+        expect(errorMessages(r.diagnostics)).toEqual([]);
+    });
+
+    it('Rule 17e: capacity-icon glyph reference is accepted when declared earlier', async () => {
+        const r = await parse(
+            `config\nglyph budget unicode:"💰"\nstyle finance\n  capacity-icon: budget\nroadmap r\nswimlane s\n  item x duration:1w\n`,
+        );
+        expect(errorMessages(r.diagnostics)).toEqual([]);
+    });
+
+    it('Rule 17e: capacity-icon as inline property on roadmap entity is an error (rule 20)', async () => {
+        const r = await parse(
+            `roadmap r\nswimlane s capacity-icon:person\n  item x duration:1w\n`,
+        );
+        expect(hasError(errorMessages(r.diagnostics), /Raw style property "capacity-icon"/i)).toBe(true);
+    });
+
+    // --- Glyph declaration (rules 17f–17k) ---
+
+    it('Rule 17f: glyph without unicode: is an error', async () => {
+        const r = await parse(
+            `config\nglyph budget "Budget"\nroadmap r\nswimlane s\n  item x duration:1w\n`,
+        );
+        expect(hasError(errorMessages(r.diagnostics), /requires a "unicode/i)).toBe(true);
+    });
+
+    it('Rule 17g: glyph with empty unicode string is an error', async () => {
+        const r = await parse(
+            `config\nglyph budget unicode:""\nroadmap r\nswimlane s\n  item x duration:1w\n`,
+        );
+        expect(hasError(errorMessages(r.diagnostics), /unicode.*non-empty/i)).toBe(true);
+    });
+
+    it('Rule 17h: glyph ascii longer than 3 chars is an error', async () => {
+        const r = await parse(
+            `config\nglyph budget unicode:"💰" ascii:"BUDG"\nroadmap r\nswimlane s\n  item x duration:1w\n`,
+        );
+        expect(hasError(errorMessages(r.diagnostics), /ascii.*1-3 ASCII/i)).toBe(true);
+    });
+
+    it('Rule 17h: glyph ascii of 1-3 ASCII chars is accepted', async () => {
+        const r = await parse(
+            `config\nglyph budget unicode:"💰" ascii:"$"\nglyph star unicode:"⭐" ascii:"*"\nroadmap r\nswimlane s\n  item x duration:1w\n`,
+        );
+        expect(errorMessages(r.diagnostics)).toEqual([]);
+    });
+
+    it('Rule 17i: glyph id shadowing a built-in icon name is an error', async () => {
+        const r = await parse(
+            `config\nglyph points unicode:"💰"\nroadmap r\nswimlane s\n  item x duration:1w\n`,
+        );
+        expect(hasError(errorMessages(r.diagnostics), /collides with a built-in icon name/i)).toBe(true);
+    });
+
+    it('Rule 17j: duplicate glyph ids are an error', async () => {
+        const r = await parse(
+            `config\nglyph budget unicode:"💰"\nglyph budget unicode:"$"\nroadmap r\nswimlane s\n  item x duration:1w\n`,
+        );
+        expect(hasError(errorMessages(r.diagnostics), /Duplicate glyph id/i)).toBe(true);
+    });
+
+    it('Rule 17k: capacity-icon referencing an unknown glyph is an error', async () => {
+        const r = await parse(
+            `config\nstyle finance\n  capacity-icon: nonesuch\nroadmap r\nswimlane s\n  item x duration:1w\n`,
+        );
+        expect(hasError(errorMessages(r.diagnostics), /capacity-icon.*nonesuch.*neither a built-in/i)).toBe(true);
+    });
+
+    it('Rule 17k: capacity-icon referencing a glyph declared later is a forward-reference error', async () => {
+        const r = await parse(
+            `config\nstyle finance\n  capacity-icon: budget\nglyph budget unicode:"💰"\nroadmap r\nswimlane s\n  item x duration:1w\n`,
+        );
+        expect(hasError(errorMessages(r.diagnostics), /capacity-icon.*budget.*before its declaration/i)).toBe(true);
+    });
+
+    it('Rule 17k: icon: referencing an unknown glyph is an error', async () => {
+        const r = await parse(
+            `config\nstyle finance\n  icon: mystery\nroadmap r\nswimlane s\n  item x duration:1w\n`,
+        );
+        expect(hasError(errorMessages(r.diagnostics), /icon.*mystery.*neither a built-in/i)).toBe(true);
+    });
+
+    it('Rule 17k: built-in icon name (shield) is accepted', async () => {
+        const r = await parse(
+            `config\nstyle danger\n  icon: shield\nroadmap r\nswimlane s\n  item x duration:1w\n`,
+        );
+        expect(errorMessages(r.diagnostics)).toEqual([]);
+    });
+
+    it('lane and item capacity are independent — item capacity without lane capacity is OK', async () => {
+        const r = await parse(
+            `roadmap r\nswimlane s\n  item x duration:1w capacity:3\n`,
+        );
+        expect(errorMessages(r.diagnostics)).toEqual([]);
+    });
+
+    it('lane capacity without item capacity is OK', async () => {
+        const r = await parse(
+            `roadmap r\nswimlane s capacity:5\n  item x duration:1w\n`,
         );
         expect(errorMessages(r.diagnostics)).toEqual([]);
     });

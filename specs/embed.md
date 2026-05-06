@@ -6,7 +6,7 @@ The Nowline embed script is a browser JavaScript bundle that finds ` ```nowline 
 
 **Package:** `@nowline/embed` in `lolay/nowline` monorepo.
 **License:** Apache 2.0.
-**Milestone:** m3.
+**Milestone:** m4.
 
 ## How It Works
 
@@ -96,7 +96,7 @@ The embed script **does not work** in contexts where you cannot inject a `<scrip
 The GitHub Action is the solution for contexts where the embed script cannot run (GitHub READMEs, CI pipelines).
 
 **Repo:** `lolay/nowline-action` (OSS, Apache 2.0).
-**Milestone:** m3 (ships with the embed).
+**Milestone:** m4 (ships with the embed).
 
 ### Two Modes
 

@@ -231,7 +231,7 @@ function emitItem(item: ItemDeclaration, drops: DropCounts, out: string[]): void
     const id = item.name ?? slugify(displayLabel(item));
     const status = mapStatus(getProp(item, 'status'));
     const after = getProps(item, 'after');
-    const duration = durationToMermaid(getProp(item, 'duration')) ?? '1d';
+    const duration = durationToMermaid(getProp(item, 'duration') ?? getProp(item, 'size')) ?? '1d';
     const ref = after.length > 0
         ? `after ${after.join(' ')}`
         : 'after , 0d'.replace(', 0d', '');

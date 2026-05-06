@@ -62,7 +62,10 @@ Mode flags (mutually exclusive)
 
 Render options
   -t, --theme <name>     light | dark
-  --today <date>         "Today" anchor for now-line / date math (YYYY-MM-DD)
+  --now <date>           "Now" anchor for now-line / date math (YYYY-MM-DD).
+                         Default: today (the OS calendar date in UTC).
+                         Pass `--now -` to suppress the now-line entirely
+                         (Unix-`-` sentinel; same convention as `-o -`).
   --no-links             Omit link icons from output
   -s, --scale <n>        Raster scale factor (PNG only; default 1)
   --strict               Promote asset / sanitizer warnings to errors
@@ -87,7 +90,7 @@ Format-specific options
   --headless             Skip platform font probe; force bundled DejaVu pair.
                          Byte-stable across machines.
   --start <date>         MS Project: anchor date (YYYY-MM-DD) for relative
-                         roadmaps. Default: --today, then deterministic
+                         roadmaps. Default: --now, then deterministic
                          fallback.
 
 Logging (mutually exclusive)
@@ -256,11 +259,11 @@ Default text format renders biome / oxc-style frames via `@babel/code-frame`:
 
 ```
 roadmap.nowline:7:34 error: Unknown reference 'auth-refactro' in after — did you mean 'auth-refactor'?
-  5 |   item auth-refactor "Auth refactor" duration:l
+  5 |   item auth-refactor "Auth refactor" size:l
   6 |   parallel after:auth-refactor
 > 7 |     group audit-track "Audit Track" labels:security
     |                                     ^^^^^^^^^^^^^^^
-  8 |       item audit-log "Audit log v2" duration:xl before:code-freeze
+  8 |       item audit-log "Audit log v2" size:xl before:code-freeze
 ```
 
 JSON diagnostics (`--format=json` on `--dry-run`) emit `{ "$nowlineDiagnostics": "1", "diagnostics": Diagnostic[] }`. Diagnostic shape:

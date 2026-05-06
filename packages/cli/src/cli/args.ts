@@ -20,7 +20,12 @@ export interface ParsedArgs {
 
     // Render options
     theme?: string;
-    today?: string;
+    /** Now-line date string from `--now`. Undefined means "use the actual
+     *  current date" (the default). The literal value `"-"` means
+     *  "suppress the now-line entirely" (mirrors the Unix-`-` convention
+     *  used elsewhere in the CLI). Otherwise expected as YYYY-MM-DD;
+     *  parsed downstream by resolveNowArg. */
+    now?: string;
     noLinks: boolean;
     scale?: string;
     strict: boolean;
@@ -87,7 +92,11 @@ export function parseArgv(argv: readonly string[]): ParsedArgs {
             'dry-run': { type: 'boolean', short: 'n' },
 
             theme: { type: 'string', short: 't' },
-            today: { type: 'string' },
+            // `--now <date>` overrides the now-line position; without it, the
+            // CLI defaults to today's calendar date. Use `--now -` to
+            // suppress the now-line entirely (Unix-`-` sentinel; same idea
+            // as `-o -` for stdout).
+            now: { type: 'string' },
             'no-links': { type: 'boolean' },
             scale: { type: 'string', short: 's' },
             strict: { type: 'boolean' },
@@ -197,7 +206,7 @@ export function parseArgv(argv: readonly string[]): ParsedArgs {
         format: stringOrUndefined(values.format),
         inputFormat: stringOrUndefined(values['input-format']),
         theme: stringOrUndefined(values.theme),
-        today: stringOrUndefined(values.today),
+        now: stringOrUndefined(values.now),
         noLinks: values['no-links'] === true,
         scale: stringOrUndefined(values.scale),
         strict: values.strict === true,

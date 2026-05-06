@@ -1,0 +1,30 @@
+nowline v1
+
+config
+
+style concurrent
+  bracket: solid
+
+style risky
+  border: dashed
+  fg: orange
+
+default item shadow:subtle
+
+roadmap dependency-demo "Dependency Demo" author:"Platform engineering" start:2026-01-05 scale:1w
+
+anchor kickoff date:2026-01-05
+anchor code-freeze "code-freeze" date:2026-03-02
+
+swimlane backend "Backend"
+  item api "API v2" duration:2w after:kickoff
+  parallel concurrent-block style:concurrent
+    item search "Search service" duration:3w
+    item audit "Audit pipeline" duration:7w before:code-freeze
+  item deploy "Deploy" duration:1w
+
+swimlane frontend "Frontend"
+  item sdk "SDK update" duration:2w after:api
+  item ui "New console UI" duration:3w after:[sdk, search]
+
+milestone beta "Beta" after:[deploy, ui]

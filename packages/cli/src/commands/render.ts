@@ -80,7 +80,7 @@ export async function renderHandler(options: RenderHandlerOptions): Promise<void
         absInputPath: input.isStdin ? path.resolve(cwd, 'stdin.nowline') : input.path,
         isStdin: input.isStdin,
         theme: parseTheme(args.theme),
-        today: parseTodayArg(args.today),
+        today: resolveNowArg(args),
         width: parseWidthArg(args.width),
         noLinks: args.noLinks,
         strict: args.strict,
@@ -433,16 +433,31 @@ function parseTheme(raw: string | undefined): ThemeName {
     return lower;
 }
 
-function parseTodayArg(raw: string | undefined): Date | undefined {
-    if (!raw) return undefined;
-    const m = /^(\d{4})-(\d{2})-(\d{2})$/.exec(raw);
-    if (!m) {
-        throw new CliError(
-            ExitCode.InputError,
-            `nowline: invalid --today "${raw}". Expected YYYY-MM-DD.`,
-        );
+// Resolve the now-line date from the CLI flag.
+//
+// Precedence:
+//   1. `--now -`            → undefined  (suppresses the now-line)
+//   2. `--now <YYYY-MM-DD>` → that date
+//   3. flag omitted          → today (UTC calendar date)
+//
+// The "default to today" behavior matches what the tool's name promises —
+// you should see a "now" line by default. Use `--now -` to opt out (Unix
+// `-` sentinel, mirroring `-o -` for stdout), or `--now <date>` for
+// deterministic snapshots / planning a hypothetical date.
+function resolveNowArg(args: { now?: string }): Date | undefined {
+    if (args.now === '-') return undefined;
+    if (args.now) {
+        const m = /^(\d{4})-(\d{2})-(\d{2})$/.exec(args.now);
+        if (!m) {
+            throw new CliError(
+                ExitCode.InputError,
+                `nowline: invalid --now "${args.now}". Expected YYYY-MM-DD or "-".`,
+            );
+        }
+        return new Date(Date.UTC(parseInt(m[1], 10), parseInt(m[2], 10) - 1, parseInt(m[3], 10)));
     }
-    return new Date(Date.UTC(parseInt(m[1], 10), parseInt(m[2], 10) - 1, parseInt(m[3], 10)));
+    const today = new Date();
+    return new Date(Date.UTC(today.getUTCFullYear(), today.getUTCMonth(), today.getUTCDate()));
 }
 
 function parseScale(raw: string | undefined): number | undefined {

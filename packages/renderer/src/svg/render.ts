@@ -13,13 +13,78 @@ import type {
     PositionedNowline,
     PositionedFootnoteArea,
     PositionedIncludeRegion,
+    PositionedCapacity,
     ResolvedStyle,
+    Point,
+    Theme,
+} from '@nowline/layout';
+import {
+    ATTRIBUTION_TEXT,
+    ATTRIBUTION_LINK,
+    ATTRIBUTION_SCALE,
+    ATTRIBUTION_WORDMARK_FONT_SIZE,
+    ATTRIBUTION_PREFIX_FONT_SIZE,
+    ATTRIBUTION_NOW_LOGICAL_X,
+    ATTRIBUTION_BAR_LOGICAL_X,
+    ATTRIBUTION_BAR_LOGICAL_WIDTH,
+    ATTRIBUTION_INE_LOGICAL_X,
+    PROGRESS_STRIP_HEIGHT_PX,
+    EDGE_CORNER_RADIUS,
+    TEXT_SIZE_PX,
+    CORNER_RADIUS_PX,
+    FONT_STACK,
+    TIMELINE_TICK_LABEL_BASELINE_OFFSET_PX,
+    FRAME_TAB_HEIGHT_PX,
+    FRAME_TAB_LABEL_BASELINE_OFFSET_PX,
+    GROUP_TITLE_TAB_HEIGHT_PX,
+    GROUP_TITLE_TAB_PAD_X_PX,
+    GROUP_TITLE_TAB_LABEL_BASELINE_OFFSET_PX,
+    GROUP_TITLE_TAB_LABEL_FONT_SIZE_PX,
+    GROUP_TITLE_TAB_CHAR_WIDTH_PX,
+    GROUP_BRACKET_LABEL_OVERHANG_PX,
+    ACCENT_DASH_PATTERN,
+    HEADER_CARD_PADDING_X,
+    HEADER_CARD_PADDING_TOP,
+    HEADER_TITLE_LINE_HEIGHT_PX,
+    HEADER_AUTHOR_LINE_HEIGHT_PX,
+    HEADER_TITLE_TO_AUTHOR_GAP_PX,
+    HEADER_TITLE_FONT_SIZE_PX,
+    HEADER_AUTHOR_FONT_SIZE_PX,
+    ITEM_CAPTION_INSET_X_PX,
+    ITEM_CAPTION_SPILL_GAP_PX,
+    ITEM_CAPTION_TITLE_BASELINE_OFFSET_PX,
+    ITEM_CAPTION_META_BASELINE_OFFSET_PX,
+    ITEM_CAPTION_TITLE_FONT_SIZE_PX,
+    ITEM_CAPTION_META_FONT_SIZE_PX,
+    ITEM_STATUS_DOT_INSET_RIGHT_PX,
+    ITEM_STATUS_DOT_INSET_TOP_PX,
+    ITEM_STATUS_DOT_RADIUS_PX,
+    ITEM_FOOTNOTE_INDICATOR_INSET_RIGHT_PX,
+    ITEM_FOOTNOTE_INDICATOR_BASELINE_OFFSET_PX,
+    ITEM_FOOTNOTE_INDICATOR_STEP_PX,
+    ITEM_LINK_ICON_TILE_SIZE_PX,
+    ITEM_LINK_ICON_INSET_PX,
+    ITEM_DECORATION_SPILL_GAP_PX,
+    NOW_PILL_WIDTH_PX,
+    NOW_PILL_HEIGHT_PX,
+    NOW_PILL_CORNER_RADIUS_PX,
+    NOW_PILL_LABEL_FONT_SIZE_PX,
+    NOW_PILL_LABEL_BASELINE_OFFSET_PX,
+    NOW_PILL_LABEL_INSET_X_PX,
+    NOWLINE_STROKE_WIDTH_PX,
+    FOOTNOTE_ROW_HEIGHT,
+    FOOTNOTE_HEADER_HEIGHT_PX,
+    FOOTNOTE_PANEL_PADDING_PX,
+    FOOTNOTE_HEADER_BASELINE_OFFSET_PX,
+    frameTabGeometry,
+    estimateCapacitySuffixWidth,
+    includeChromeGeometry,
 } from '@nowline/layout';
 import { IdGenerator } from './ids.js';
 import { attrs, escAttr, escText, num, tag, textTag } from './xml.js';
 import { allShadowDefs, shadowFilterUrl } from './shadow.js';
 import { sanitizeSvg } from './sanitize.js';
-import { LINK_ICON_PATHS } from './icons.js';
+import { LINK_ICON_PATHS, CAPACITY_ICON_SVG } from './icons.js';
 
 // Browser-safe types. The renderer never touches `fs`, `path`, or `Buffer`.
 // Callers inject an AssetResolver when they want logos embedded.
@@ -39,25 +104,28 @@ export interface RenderOptions {
     idPrefix?: string;
 }
 
-const TEXT_SIZE_PX: Record<string, number> = {
-    none: 0, xs: 10, sm: 12, md: 14, lg: 18, xl: 24,
-};
-const CORNER_RADIUS_PX: Record<string, number> = {
-    none: 0, xs: 2, sm: 4, md: 8, lg: 12, xl: 20, full: 9999,
-};
-const FONT_STACK: Record<string, string> = {
-    sans: 'system-ui, -apple-system, "Segoe UI", Roboto, sans-serif',
-    serif: 'Georgia, "Times New Roman", serif',
-    mono: 'ui-monospace, SFMono-Regular, Menlo, Consolas, monospace',
-};
+// `TEXT_SIZE_PX`, `CORNER_RADIUS_PX`, `FONT_STACK` come from
+// `@nowline/layout` (themes/shared) so a typography or radius change
+// flows from one place to both layout and renderer.
+//
+// `WEIGHT_NUM` lives here only because no DSL `weight` table exists in
+// shared yet. If/when it does, hoist this alongside `FONT_STACK`.
 const WEIGHT_NUM: Record<string, number> = {
     thin: 100, light: 300, normal: 400, bold: 700,
 };
 
+// `style.textSize` is `SizeBucket` which includes `'full'`; the shared
+// `TEXT_SIZE_PX` table only carries the size buckets (no `'full'` —
+// that's a corner-radius-only value). Widen the lookup so a stray
+// `'full'` falls through to the `?? 14` fallback instead of compiling.
+function textSizePx(bucket: ResolvedStyle['textSize']): number {
+    return (TEXT_SIZE_PX as Record<string, number>)[bucket] ?? 14;
+}
+
 function fontAttrs(style: ResolvedStyle, overrideSize?: number): Record<string, string | number> {
     return {
         'font-family': FONT_STACK[style.font],
-        'font-size': overrideSize ?? TEXT_SIZE_PX[style.textSize] ?? 14,
+        'font-size': overrideSize ?? textSizePx(style.textSize),
         'font-weight': WEIGHT_NUM[style.weight] ?? 400,
         'font-style': style.italic ? 'italic' : 'normal',
         fill: style.text,
@@ -68,6 +136,267 @@ function strokeDash(style: ResolvedStyle): string | undefined {
     if (style.border === 'dashed') return '4 3';
     if (style.border === 'dotted') return '1 3';
     return undefined;
+}
+
+/**
+ * sRGB → relative luminance per WCAG 2.x. Input may be `#rrggbb`,
+ * `#rgb`, or a non-hex token like `none` / `transparent`. Non-hex
+ * inputs return 1 (treated as light) so a transparent bar reuses
+ * the chart's light bg. Mostly used to choose between two
+ * status-dot palettes (`onLight` vs `onDark`) so the dot reads on
+ * any bar fill — see `pickStatusDotPalette` and
+ * `specs/rendering.md`'s status-dot section.
+ */
+function relativeLuminance(hex: string): number {
+    if (!hex || hex === 'none' || hex === 'transparent') return 1;
+    let h = hex.startsWith('#') ? hex.slice(1) : hex;
+    if (h.length === 3) {
+        h = h
+            .split('')
+            .map((c) => c + c)
+            .join('');
+    }
+    if (h.length !== 6) return 1;
+    const r = parseInt(h.slice(0, 2), 16) / 255;
+    const g = parseInt(h.slice(2, 4), 16) / 255;
+    const b = parseInt(h.slice(4, 6), 16) / 255;
+    const lin = (c: number): number =>
+        c <= 0.03928 ? c / 12.92 : Math.pow((c + 0.055) / 1.055, 2.4);
+    return 0.2126 * lin(r) + 0.7152 * lin(g) + 0.0722 * lin(b);
+}
+
+/**
+ * Pick the status-dot palette whose tone contrasts best with the
+ * given bar bg.
+ *
+ * The crossover threshold is the bar luminance at which a deep dot
+ * (avg luminance ≈ 0.045 across `onLight` palette entries) and a
+ * pale dot (avg ≈ 0.85 across `onDark` entries) give equal WCAG
+ * contrast. Solving `(L_bar + 0.05)² ≈ 0.86 × 0.095` gives
+ * `L_bar ≈ 0.24`, so:
+ *   - bars with luminance ≥ 0.24 (most label-driven mid-tones AND
+ *     all pale status-tint bars) → `onLight` deep dot
+ *   - bars with luminance < 0.24 (dark status-tint bars in dark
+ *     theme, e.g. `#172554`) → `onDark` pale dot
+ */
+function pickStatusDotPalette(
+    bg: string,
+    palette: Theme,
+): Theme['statusDot']['onLight'] {
+    return relativeLuminance(bg) >= 0.24
+        ? palette.statusDot.onLight
+        : palette.statusDot.onDark;
+}
+
+/**
+ * Approx. rendered width (px) of `text` at `fontSizePx`. Mirrors the
+ * `0.58 em / char` heuristic the layout uses for spill detection so the
+ * renderer's positioning of the capacity suffix lines up with what the
+ * layout reserved.
+ */
+function estimateCaptionWidthPx(text: string, fontSizePx: number): number {
+    return text.length * fontSizePx * 0.58;
+}
+
+/**
+ * Paint an item / lane capacity suffix starting at `(x0, baselineY)`. The
+ * capacity model arrives pre-resolved from layout (`PositionedCapacity`):
+ * `text` is the formatted number, `icon` is either `null` (no glyph), a
+ * built-in name, or an inline literal string.
+ *
+ * Three rendering paths:
+ *
+ *   1. `icon === null` (the resolved `capacity-icon` was `'none'`): paint
+ *      the bare number as a single `<text>` node.
+ *   2. `icon.kind === 'builtin'` and `name === 'multiplier'`: paint
+ *      `5×` as a single `<text>` node — the multiplication sign is a
+ *      typographic operator with consistent rendering across system
+ *      fonts and built-in side bearing, so no `<tspan dx>` separator.
+ *   3. `icon.kind === 'builtin'` and `name` ∈ {person, people, points,
+ *      time}: paint the number as `<text>`, then drop the curated SVG
+ *      icon at the next column (`0.1em` gap, sized to one em). The
+ *      icon's `style="color:..."` propagates through the
+ *      `currentColor`-bound paths in the icon library.
+ *   4. `icon.kind === 'literal'` (inline Unicode literal or
+ *      dereferenced custom `glyph`): paint number + glyph in a single
+ *      `<text>`, with a `<tspan dx="0.1em">` separator before the
+ *      glyph payload.
+ *
+ * `precedingText` is the existing meta-line text (or `undefined` when the
+ * suffix is standalone). When present, the suffix's left edge starts one
+ * space's width past the meta text's estimated right edge so `2w  5×`
+ * reads as a single caption rather than running text together.
+ */
+function renderCapacitySuffix(
+    capacity: PositionedCapacity,
+    precedingText: string | undefined,
+    x0: number,
+    baselineY: number,
+    fontSize: number,
+    fontFamily: string,
+    color: string,
+): string {
+    const charWidthPx = fontSize * 0.58;
+    const precedingWidthPx = precedingText
+        ? estimateCaptionWidthPx(precedingText, fontSize)
+        : 0;
+    const separatorPx = precedingText ? charWidthPx : 0;
+    const numberX = x0 + precedingWidthPx + separatorPx;
+    const { text: numberStr, icon } = capacity;
+    const numberWidthPx = estimateCaptionWidthPx(numberStr, fontSize);
+    const baseAttrs = {
+        'font-family': fontFamily,
+        'font-size': fontSize,
+        fill: color,
+    } as const;
+
+    if (!icon) {
+        return textTag(
+            { x: num(numberX), y: num(baselineY), ...baseAttrs },
+            numberStr,
+        );
+    }
+
+    if (icon.kind === 'builtin' && icon.name === 'multiplier') {
+        return textTag(
+            { x: num(numberX), y: num(baselineY), ...baseAttrs },
+            `${numberStr}\u00D7`,
+        );
+    }
+
+    if (icon.kind === 'builtin') {
+        const def = CAPACITY_ICON_SVG[icon.name];
+        // Render `<text>5</text>` followed by the curated SVG icon. The
+        // icon sits at one font-em wide and tall, with a 0.1em separator
+        // gap. Vertical positioning lifts the icon so its visual center
+        // sits on the text x-height (`baselineY - fontSize * 0.85`); this
+        // matches how Lucide-style outline icons read in inline text.
+        const numberSvg = textTag(
+            { x: num(numberX), y: num(baselineY), ...baseAttrs },
+            numberStr,
+        );
+        const gapPx = fontSize * 0.1;
+        const iconSize = fontSize;
+        const iconX = numberX + numberWidthPx + gapPx;
+        const iconY = baselineY - fontSize * 0.85;
+        const iconSvg = `<svg x="${num(iconX)}" y="${num(iconY)}" width="${num(iconSize)}" height="${num(iconSize)}" viewBox="${def.viewBox}" style="color:${escAttr(color)}" aria-hidden="true">${def.body}</svg>`;
+        return numberSvg + iconSvg;
+    }
+
+    // Literal glyph (inline Unicode literal or dereferenced custom glyph).
+    // Single <text> node with the number + a tspan-separated glyph.
+    const dx = num(fontSize * 0.1);
+    return (
+        `<text x="${num(numberX)}" y="${num(baselineY)}" font-family="${escAttr(fontFamily)}"`
+        + ` font-size="${fontSize}" fill="${escAttr(color)}">`
+        + `${escText(numberStr)}<tspan dx="${dx}">${escText(icon.text)}</tspan>`
+        + '</text>'
+    );
+}
+
+/**
+ * Em-distance the renderer reserves between an item's metaText and its
+ * capacity suffix (or any inline trailing token). Half a space's worth
+ * — wide enough to read as a separator, narrow enough not to look like
+ * a stray gap. SVG `<tspan dx>` honors this exactly so we don't depend
+ * on per-character estimation for the gap itself.
+ */
+const META_SUFFIX_DX_EM = 0.6;
+
+/**
+ * Tighter em-per-char width estimate used inside `renderItemMetaLine`
+ * for positioning a built-in SVG icon after a metaText + number. Layout
+ * still uses 0.58 em/char to pessimistically reserve bar width for
+ * spill detection (so `metaText 5×` always fits its row); the renderer
+ * paints the icon at a tighter offset so there's no visible
+ * dead-space between the rendered number and its glyph. Lands inside
+ * the layout reservation either way (`0.5 < 0.58`).
+ */
+const META_ICON_EM_PER_CHAR = 0.5;
+
+/**
+ * Paint the item meta line (metaText plus optional capacity suffix) as
+ * a single SVG fragment. Call sites used to emit metaText and the
+ * suffix as two unrelated `<text>` nodes whose horizontal offsets came
+ * from `estimateCaptionWidthPx` — fine for short metas like `2w`, but
+ * the per-character estimate over-reserves for longer captions like
+ * `L 1w — 1w remaining`, leaving a visible gap before `2×`.
+ *
+ * The fix flows the suffix INSIDE the same `<text>` element via
+ * `<tspan dx>` whenever the suffix is pure inline text (multiplier,
+ * literal glyph, or no glyph). Browsers compute the dx anchor relative
+ * to the previously rendered glyph so the gap matches the spec
+ * regardless of how wide metaText actually rendered.
+ *
+ * Built-in SVG icons (person/people/points/time) still need an `<svg>`
+ * sibling outside `<text>`, so the icon's x is computed via the
+ * tighter `META_ICON_EM_PER_CHAR` constant — which still lands inside
+ * the layout's pessimistic spill reservation.
+ */
+function renderItemMetaLine(opts: {
+    metaText: string | undefined;
+    capacity: PositionedCapacity | null;
+    x: number;
+    baselineY: number;
+    fontSize: number;
+    fontFamily: string;
+    color: string;
+}): string {
+    const { metaText, capacity, x, baselineY, fontSize, fontFamily, color } = opts;
+    if (!metaText && !capacity) return '';
+    const baseAttrs = {
+        'font-family': fontFamily,
+        'font-size': fontSize,
+        fill: color,
+    } as const;
+    if (!capacity) {
+        return textTag({ x: num(x), y: num(baselineY), ...baseAttrs }, metaText!);
+    }
+    if (!metaText) {
+        return renderCapacitySuffix(capacity, undefined, x, baselineY, fontSize, fontFamily, color);
+    }
+    const sepDx = num(fontSize * META_SUFFIX_DX_EM);
+    const openText =
+        `<text x="${num(x)}" y="${num(baselineY)}" font-family="${escAttr(fontFamily)}"`
+        + ` font-size="${fontSize}" fill="${escAttr(color)}">`;
+    const { text: numberStr, icon } = capacity;
+    if (!icon) {
+        return openText
+            + escText(metaText)
+            + `<tspan dx="${sepDx}">${escText(numberStr)}</tspan>`
+            + '</text>';
+    }
+    if (icon.kind === 'builtin' && icon.name === 'multiplier') {
+        return openText
+            + escText(metaText)
+            + `<tspan dx="${sepDx}">${escText(numberStr)}\u00D7</tspan>`
+            + '</text>';
+    }
+    if (icon.kind === 'literal') {
+        const glyphDx = num(fontSize * 0.1);
+        return openText
+            + escText(metaText)
+            + `<tspan dx="${sepDx}">${escText(numberStr)}</tspan>`
+            + `<tspan dx="${glyphDx}">${escText(icon.text)}</tspan>`
+            + '</text>';
+    }
+    // Built-in SVG icon — text element holds metaText + tspan-separated
+    // number, then the icon SVG sits at an estimated position. Tighter
+    // per-character estimate than layout's spill detector so the icon
+    // visually hugs the number.
+    const def = CAPACITY_ICON_SVG[icon.name];
+    const tightWidth = (s: string) => s.length * fontSize * META_ICON_EM_PER_CHAR;
+    const numberStartX = x + tightWidth(metaText) + fontSize * META_SUFFIX_DX_EM;
+    const iconGapPx = fontSize * 0.1;
+    const iconSize = fontSize;
+    const iconX = numberStartX + tightWidth(numberStr) + iconGapPx;
+    const iconY = baselineY - fontSize * 0.85;
+    const textPart = openText
+        + escText(metaText)
+        + `<tspan dx="${sepDx}">${escText(numberStr)}</tspan>`
+        + '</text>';
+    const iconPart = `<svg x="${num(iconX)}" y="${num(iconY)}" width="${num(iconSize)}" height="${num(iconSize)}" viewBox="${def.viewBox}" style="color:${escAttr(color)}" aria-hidden="true">${def.body}</svg>`;
+    return textPart + iconPart;
 }
 
 function rectFrame(x: number, y: number, w: number, h: number, style: ResolvedStyle, extra: Record<string, string | number | undefined | null | boolean> = {}): string {
@@ -87,153 +416,382 @@ function rectFrame(x: number, y: number, w: number, h: number, style: ResolvedSt
     });
 }
 
-function renderHeader(h: PositionedHeader, idPrefix: string, attributionText: string): string {
-    const bg = h.style.bg === 'none' ? 'transparent' : h.style.bg;
-    const box = tag('rect', {
-        x: num(h.box.x),
-        y: num(h.box.y),
-        width: num(h.box.width),
-        height: num(h.box.height),
-        fill: bg,
-        stroke: h.style.fg,
-        'stroke-width': 0.5,
-        opacity: 0.6,
+function renderHeader(h: PositionedHeader, idPrefix: string, palette: Theme): string {
+    // The layout has already sized the card to its (wrapped) text content
+    // and stashed the bounds in `h.cardBox`, with `h.titleLines` /
+    // `h.authorLines` ready to render line-by-line. See sizeBesideHeader
+    // in @nowline/layout.
+    const cardX = h.box.x + h.cardBox.x;
+    const cardY = h.box.y + h.cardBox.y;
+    const cardWidth = h.cardBox.width;
+    const cardHeight = h.cardBox.height;
+    const cardFill = h.style.bg === 'none' ? palette.surface.headerBox : h.style.bg;
+    const borderColor = palette.header.cardBorder;
+    const card = tag('rect', {
+        x: num(cardX),
+        y: num(cardY),
+        width: num(cardWidth),
+        height: num(cardHeight),
+        rx: 6,
+        ry: 6,
+        fill: cardFill,
+        stroke: borderColor,
+        'stroke-width': 1,
+        filter: `url(#${idPrefix}-shadow-subtle)`,
     });
-    const titleY = h.box.y + (h.position === 'above' ? h.box.height / 2 + 6 : 24);
-    const titleText = h.title
-        ? textTag(
+    // Title and author baselines come from `@nowline/layout`'s
+    // `header-card-geometry` module so the renderer paints with the
+    // exact metrics `sizeBesideHeader` sized the card to.
+    const titleParts: string[] = [];
+    h.titleLines.forEach((line, i) => {
+        titleParts.push(textTag(
             {
-                x: num(h.box.x + 12),
-                y: num(titleY),
-                ...fontAttrs(h.style, TEXT_SIZE_PX.lg),
-            },
-            h.title,
-        )
-        : '';
-    const authorText = h.author
-        ? textTag(
-            {
-                x: num(h.box.x + 12),
-                y: num(titleY + 20),
-                ...fontAttrs(h.style, TEXT_SIZE_PX.sm),
-                'fill-opacity': 0.7,
-            },
-            h.author,
-        )
-        : '';
-    // Attribution mark — link-safe wordmark. Clicking "nowline.io" opens in a
-    // new tab via target=_blank attribute on <a>.
-    const att = tag(
-        'a',
-        { href: 'https://nowline.io', target: '_blank', rel: 'noopener' },
-        textTag(
-            {
-                x: num(h.attributionBox.x),
-                y: num(h.attributionBox.y + 12),
-                'font-family': FONT_STACK.sans,
-                'font-size': 10,
+                x: num(cardX + HEADER_CARD_PADDING_X),
+                y: num(cardY + HEADER_CARD_PADDING_TOP + i * HEADER_TITLE_LINE_HEIGHT_PX),
+                'font-family': FONT_STACK[h.style.font],
+                'font-size': HEADER_TITLE_FONT_SIZE_PX,
+                'font-weight': 600,
                 fill: h.style.text,
-                'text-anchor': 'start',
             },
-            attributionText,
-        ),
-    );
-    return tag('g', { 'data-layer': 'header', 'data-id': `${idPrefix}-header` }, box + titleText + authorText + att);
+            line,
+        ));
+    });
+    const titleText = titleParts.join('');
+    const lastTitleY = cardY + HEADER_CARD_PADDING_TOP
+        + Math.max(0, h.titleLines.length - 1) * HEADER_TITLE_LINE_HEIGHT_PX;
+    const authorColor = palette.header.author;
+    const authorParts: string[] = [];
+    h.authorLines.forEach((line, j) => {
+        authorParts.push(textTag(
+            {
+                x: num(cardX + HEADER_CARD_PADDING_X),
+                y: num(lastTitleY + HEADER_TITLE_TO_AUTHOR_GAP_PX + j * HEADER_AUTHOR_LINE_HEIGHT_PX),
+                'font-family': FONT_STACK[h.style.font],
+                'font-size': HEADER_AUTHOR_FONT_SIZE_PX,
+                fill: authorColor,
+            },
+            line,
+        ));
+    });
+    const authorText = authorParts.join('');
+    return tag('g', { 'data-layer': 'header', 'data-id': `${idPrefix}-header` }, card + titleText + authorText);
 }
 
-function renderTimeline(t: PositionedTimelineScale, theme: 'light' | 'dark'): string {
-    const gridColor = theme === 'dark' ? '#2a2a2a' : '#eeeeee';
-    const tickColor = theme === 'dark' ? '#616161' : '#bdbdbd';
-    const labelColor = theme === 'dark' ? '#9e9e9e' : '#616161';
+// Renders the chart-body vertical grid lines (major dotted at every
+// labeled tick, plus optional faint minor lines at every tick when
+// `minorGrid` is set). Emitted as its own layer drawn AFTER the
+// swimlane backgrounds so the lines actually span the chart body
+// instead of being occluded — without this layer the lines would only
+// be visible inside the timeline header strip. Grid lines stay BEHIND
+// items, edges, anchor/milestone cuts, and the now-line so item bars
+// sit cleanly on top of the ruled-paper backdrop.
+function renderGridLines(
+    t: PositionedTimelineScale,
+    swimlaneTopY: number,
+    palette: Theme,
+): string {
+    const gridColor = palette.timeline.gridLine;
+    const minorGridColor = palette.timeline.minorGridLine;
+    // Major lines thread through the FULL timeline strip — they start
+    // at the top of the top date-label panel (when present) and run
+    // all the way through the bottom date-label panel (when one is
+    // mirrored at the chart bottom via `timeline-position:both` or
+    // `timeline-position:bottom`). This ties date labels at both ends
+    // to their column boundaries.
+    //
+    // Minor lines stay quieter: they start at the TOP OF THE TOPMOST
+    // SWIMLANE (i.e. below the top date panel AND below the marker
+    // row, so they don't streak through anchor/milestone diamonds in
+    // the header) and stop ABOVE the bottom date panel.
+    //
+    // Anchor diamonds, milestone markers, and date label text are
+    // rendered later in the orchestrator so they sit on top of any
+    // crossing line.
+    const bottomTickPanelHeight = t.bottomTickPanelHeight ?? 0;
+    const hasBottomTickPanel =
+        t.bottomTickPanelY !== undefined && bottomTickPanelHeight > 0;
+    const majorTopY = t.tickPanelY;
+    const majorBottomY = hasBottomTickPanel
+        ? t.bottomTickPanelY! + bottomTickPanelHeight
+        : t.box.y + t.box.height;
+    // Use the topmost swimlane's top edge directly — `markerRow.height`
+    // alone misses the small gap (`timelineHeightBudget` slack) between
+    // the marker row and the swimlane area, which would leave the minor
+    // lines short and floating in dead space above the swimlane.
+    const minorTopY = swimlaneTopY;
+    const minorBottomY = t.box.y + t.box.height;
     const parts: string[] = [];
-    // Baseline
-    parts.push(
-        tag('line', {
-            x1: num(t.box.x),
-            y1: num(t.box.y + 24),
-            x2: num(t.box.x + t.box.width),
-            y2: num(t.box.y + 24),
-            stroke: tickColor,
-            'stroke-width': 0.5,
-        }),
-    );
     for (const tick of t.ticks) {
+        if (tick.major) {
+            // Solid major line at every labeled tick — the dominant
+            // column boundary, drawn in the stronger gridLine color.
+            parts.push(
+                tag('line', {
+                    x1: num(tick.x),
+                    y1: num(majorTopY),
+                    x2: num(tick.x),
+                    y2: num(majorBottomY),
+                    stroke: gridColor,
+                    'stroke-width': 1,
+                }),
+            );
+        } else if (t.minorGrid) {
+            // Solid faint minor line at every non-major tick boundary.
+            // Hierarchy is established by color (lighter than the major)
+            // rather than by texture. Skip the very last tick since it
+            // has no following column — a line at the chart's right edge
+            // just doubles up the chart border.
+            if (tick.labelX === undefined) continue;
+            parts.push(
+                tag('line', {
+                    x1: num(tick.x),
+                    y1: num(minorTopY),
+                    x2: num(tick.x),
+                    y2: num(minorBottomY),
+                    stroke: minorGridColor,
+                    'stroke-width': 1,
+                }),
+            );
+        }
+    }
+    return tag('g', { 'data-layer': 'grid' }, parts.join(''));
+}
+
+function renderTimeline(t: PositionedTimelineScale, palette: Theme): string {
+    const panelFill = palette.timeline.panelFill;
+    const borderColor = palette.timeline.border;
+    const labelColor = palette.timeline.labelText;
+    const parts: string[] = [];
+    // Header layout from top: now-pill row → tick-label panel → marker row.
+    // The pill row owns its space (no panel rect); the now-line crosses it
+    // visually. Marker row is omitted entirely when empty. The top tick
+    // panel is also omitted when the roadmap requested
+    // `timeline-position:bottom` (height 0). The optional bottom tick
+    // panel mirrors the top panel directly above the footnote area.
+    const tickPanelY = t.tickPanelY;
+    const tickPanelHeight = t.tickPanelHeight;
+    const hasTopTickPanel = tickPanelHeight > 0;
+    const hasMarkerRow = t.markerRow.height > 0;
+    const markerRowY = tickPanelY + tickPanelHeight;
+    const markerRowHeight = t.markerRow.height;
+    const bottomTickPanelY = t.bottomTickPanelY;
+    const bottomTickPanelHeight = t.bottomTickPanelHeight ?? 0;
+    const hasBottomTickPanel = bottomTickPanelY !== undefined && bottomTickPanelHeight > 0;
+
+    if (hasTopTickPanel) {
         parts.push(
-            tag('line', {
-                x1: num(tick.x),
-                y1: num(t.box.y + (tick.major ? 14 : 20)),
-                x2: num(tick.x),
-                y2: num(t.box.y + 28),
-                stroke: tickColor,
-                'stroke-width': tick.major ? 1 : 0.5,
+            tag('rect', {
+                x: num(t.box.x),
+                y: num(tickPanelY),
+                width: num(t.box.width),
+                height: num(tickPanelHeight),
+                rx: 4,
+                ry: 4,
+                fill: panelFill,
+                stroke: borderColor,
+                'stroke-width': 1,
             }),
         );
-        if (tick.major && tick.label) {
+    }
+    if (hasMarkerRow) {
+        parts.push(
+            tag('rect', {
+                x: num(t.box.x),
+                y: num(markerRowY),
+                width: num(t.box.width),
+                height: num(markerRowHeight),
+                rx: 4,
+                ry: 4,
+                fill: panelFill,
+                stroke: borderColor,
+                'stroke-width': 1,
+            }),
+        );
+    }
+    if (hasBottomTickPanel) {
+        parts.push(
+            tag('rect', {
+                x: num(t.box.x),
+                y: num(bottomTickPanelY!),
+                width: num(t.box.width),
+                height: num(bottomTickPanelHeight),
+                rx: 4,
+                ry: 4,
+                fill: panelFill,
+                stroke: borderColor,
+                'stroke-width': 1,
+            }),
+        );
+    }
+    // Header-only labels — the chart-body grid lines themselves are
+    // emitted by `renderGridLines` after the swimlane backgrounds so
+    // they actually span the chart body rather than being occluded.
+    for (const tick of t.ticks) {
+        if (!tick.major) continue;
+        if (!tick.label || tick.labelX === undefined) continue;
+        // Label sits at the COLUMN CENTER (tick.labelX), not at the
+        // tick boundary. The last tick has no following column → no
+        // label.
+        if (hasTopTickPanel) {
             parts.push(
                 textTag(
                     {
-                        x: num(tick.x + 2),
-                        y: num(t.box.y + 12),
+                        x: num(tick.labelX),
+                        y: num(tickPanelY + TIMELINE_TICK_LABEL_BASELINE_OFFSET_PX),
                         'font-family': FONT_STACK.sans,
                         'font-size': 10,
                         fill: labelColor,
+                        'text-anchor': 'middle',
                     },
                     tick.label,
                 ),
             );
+        }
+        if (hasBottomTickPanel) {
             parts.push(
-                tag('line', {
-                    x1: num(tick.x),
-                    y1: num(t.box.y + 28),
-                    x2: num(tick.x),
-                    y2: num(t.box.y + t.box.height),
-                    stroke: gridColor,
-                    'stroke-width': 0.5,
-                }),
+                textTag(
+                    {
+                        x: num(tick.labelX),
+                        y: num(bottomTickPanelY! + TIMELINE_TICK_LABEL_BASELINE_OFFSET_PX),
+                        'font-family': FONT_STACK.sans,
+                        'font-size': 10,
+                        fill: labelColor,
+                        'text-anchor': 'middle',
+                    },
+                    tick.label,
+                ),
             );
         }
     }
     return tag('g', { 'data-layer': 'timeline' }, parts.join(''));
 }
 
-function renderNowline(n: PositionedNowline | null, theme: 'light' | 'dark'): string {
+function renderNowline(n: PositionedNowline | null, palette: Theme): string {
     if (!n) return '';
-    const color = theme === 'dark' ? '#ef5350' : '#d32f2f';
+    const color = palette.nowline.stroke;
+    const labelTextColor = palette.nowline.labelText;
+    // Line drops from `topY` (just below the pill / top of date headers)
+    // through the headers into the chart, ending at `bottomY`.
     const line = tag('line', {
         x1: num(n.x),
         y1: num(n.topY),
         x2: num(n.x),
         y2: num(n.bottomY),
         stroke: color,
-        'stroke-width': 1.5,
-        'stroke-dasharray': '4 2',
+        'stroke-width': NOWLINE_STROKE_WIDTH_PX,
     });
-    const bgWidth = n.label.length * 6 + 10;
-    const labelBg = tag('rect', {
-        x: num(n.x - bgWidth / 2),
-        y: num(n.topY - 14),
-        width: num(bgWidth),
-        height: 14,
-        rx: 2,
-        ry: 2,
-        fill: color,
-    });
-    const label = textTag(
-        {
-            x: num(n.x),
-            y: num(n.topY - 4),
-            'font-family': FONT_STACK.sans,
-            'font-size': 10,
-            'font-weight': 600,
-            fill: '#ffffff',
-            'text-anchor': 'middle',
-        },
-        n.label,
-    );
-    return tag('g', { 'data-layer': 'nowline' }, line + labelBg + label);
+    // Pill — sits above the date headers at `pillTopY`. Three modes
+    // (decided by layout in `buildNowline`):
+    //   - center      → rounded rect centered on the line, label `middle`
+    //   - flag-right  → squared LEFT, rounded RIGHT, line at left edge,
+    //                   label `start` past the line
+    //   - flag-left   → rounded LEFT, squared RIGHT, line at right edge,
+    //                   label `end` before the line
+    // The squared edge IS the line; the rounded edge points into the
+    // chart, so the pill always hugs the line and never overflows.
+    const pillBg = renderNowPillBg(n, color);
+    const label = renderNowPillLabel(n, labelTextColor);
+    return tag('g', { 'data-layer': 'nowline' }, line + pillBg + label);
 }
 
-function renderItem(i: PositionedItem, options: RenderOptions, idPrefix: string, theme: 'light' | 'dark'): string {
+/**
+ * X coordinate of the pill's squared edge in flag modes. SVG strokes
+ * are centered on their geometry, so a 2.25 px line at `n.x` actually
+ * paints from `n.x - 1.125` to `n.x + 1.125`. To make the pill's
+ * squared edge line up with the OUTER edge of the line stroke (so
+ * the line and the pill share a single continuous edge instead of
+ * the line peeking past the pill by half-stroke), we offset by
+ * `NOWLINE_STROKE_WIDTH_PX / 2` on the side the line is on.
+ *
+ *   flag-right: line on the LEFT  → squared edge at n.x - half-stroke
+ *   flag-left:  line on the RIGHT → squared edge at n.x + half-stroke
+ *
+ * Center mode doesn't apply — the line passes through the pill's
+ * vertical center, so a half-stroke offset would make things worse.
+ */
+function squaredEdgeX(n: PositionedNowline): number {
+    const halfStroke = NOWLINE_STROKE_WIDTH_PX / 2;
+    if (n.pillMode === 'flag-right') return n.x - halfStroke;
+    if (n.pillMode === 'flag-left') return n.x + halfStroke;
+    return n.x;
+}
+
+function renderNowPillBg(n: PositionedNowline, color: string): string {
+    const top = n.pillTopY;
+    const bottom = n.pillTopY + NOW_PILL_HEIGHT_PX;
+    const r = NOW_PILL_CORNER_RADIUS_PX;
+    if (n.pillMode === 'center') {
+        return tag('rect', {
+            x: num(n.x - NOW_PILL_WIDTH_PX / 2),
+            y: num(top),
+            width: num(NOW_PILL_WIDTH_PX),
+            height: num(NOW_PILL_HEIGHT_PX),
+            rx: r,
+            ry: r,
+            fill: color,
+        });
+    }
+    const edgeX = squaredEdgeX(n);
+    if (n.pillMode === 'flag-right') {
+        // Squared LEFT edge aligns with line's left outer stroke edge,
+        // rounded corners on the RIGHT.
+        const right = edgeX + NOW_PILL_WIDTH_PX;
+        const d = [
+            `M ${num(edgeX)} ${num(top)}`,
+            `L ${num(right - r)} ${num(top)}`,
+            `A ${r} ${r} 0 0 1 ${num(right)} ${num(top + r)}`,
+            `L ${num(right)} ${num(bottom - r)}`,
+            `A ${r} ${r} 0 0 1 ${num(right - r)} ${num(bottom)}`,
+            `L ${num(edgeX)} ${num(bottom)}`,
+            'Z',
+        ].join(' ');
+        return tag('path', { d, fill: color });
+    }
+    // flag-left: squared RIGHT edge aligns with line's right outer
+    // stroke edge, rounded corners on the LEFT.
+    const left = edgeX - NOW_PILL_WIDTH_PX;
+    const d = [
+        `M ${num(edgeX)} ${num(top)}`,
+        `L ${num(left + r)} ${num(top)}`,
+        `A ${r} ${r} 0 0 0 ${num(left)} ${num(top + r)}`,
+        `L ${num(left)} ${num(bottom - r)}`,
+        `A ${r} ${r} 0 0 0 ${num(left + r)} ${num(bottom)}`,
+        `L ${num(edgeX)} ${num(bottom)}`,
+        'Z',
+    ].join(' ');
+    return tag('path', { d, fill: color });
+}
+
+function renderNowPillLabel(n: PositionedNowline, labelTextColor: string): string {
+    const baselineY = n.pillTopY + NOW_PILL_LABEL_BASELINE_OFFSET_PX;
+    const edgeX = squaredEdgeX(n);
+    let labelX: number;
+    let textAnchor: 'start' | 'middle' | 'end';
+    if (n.pillMode === 'center') {
+        labelX = n.x;
+        textAnchor = 'middle';
+    } else if (n.pillMode === 'flag-right') {
+        labelX = edgeX + NOW_PILL_LABEL_INSET_X_PX;
+        textAnchor = 'start';
+    } else {
+        labelX = edgeX - NOW_PILL_LABEL_INSET_X_PX;
+        textAnchor = 'end';
+    }
+    return textTag(
+        {
+            x: num(labelX),
+            y: num(baselineY),
+            'font-family': FONT_STACK.sans,
+            'font-size': NOW_PILL_LABEL_FONT_SIZE_PX,
+            'font-weight': 700,
+            fill: labelTextColor,
+            'text-anchor': textAnchor,
+        },
+        'now',
+    );
+}
+
+function renderItem(i: PositionedItem, options: RenderOptions, idPrefix: string, palette: Theme): string {
     const parts: string[] = [];
     const shadow = shadowFilterUrl(idPrefix, i.style.shadow);
     parts.push(
@@ -241,95 +799,264 @@ function renderItem(i: PositionedItem, options: RenderOptions, idPrefix: string,
             filter: shadow ?? null,
         }),
     );
+    // Status-dot color — the dot communicates status via hue, but
+    // the bar bg can range from pale status tints (`#eff6ff`) to
+    // saturated mid-tones (`#1e88e5` from `bg:blue` labels) to
+    // dark navies (`#172554` in dark theme), so a single palette
+    // can't keep contrast across all bars. Two palettes — `onLight`
+    // (deep tints, for pale bars) and `onDark` (pale tints, for
+    // saturated/dark bars) — are picked from based on the bar
+    // bg's relative luminance.
+    const dotPalette = pickStatusDotPalette(i.style.bg, palette);
+    const statusColors: Record<string, string> = {
+        done: dotPalette.done,
+        'in-progress': dotPalette.inProgress,
+        'at-risk': dotPalette.atRisk,
+        blocked: dotPalette.blocked,
+        planned: dotPalette.planned,
+        neutral: dotPalette.neutral,
+    };
+    const dotColor = statusColors[i.status] ?? statusColors.neutral;
+    // Bottom progress strip along the bottom edge. Height comes from
+    // `PROGRESS_STRIP_HEIGHT_PX` so layout's chip placement and the
+    // milestone slack-arrow attach Y stay in sync if it's ever bumped.
     if (i.progressFraction > 0) {
         const pw = Math.max(0, Math.min(i.box.width, i.box.width * i.progressFraction));
-        const rx = Math.min(CORNER_RADIUS_PX[i.style.cornerRadius] ?? 4, i.box.height / 2);
         parts.push(
             tag('rect', {
                 x: num(i.box.x),
-                y: num(i.box.y),
+                y: num(i.box.y + i.box.height - PROGRESS_STRIP_HEIGHT_PX),
                 width: num(pw),
-                height: num(i.box.height),
-                rx: num(rx),
-                ry: num(rx),
+                height: PROGRESS_STRIP_HEIGHT_PX,
                 fill: i.style.fg,
-                opacity: 0.25,
+                opacity: 0.55,
             }),
         );
     }
-    // Status dot at left edge
-    const statusColors: Record<string, string> = theme === 'dark'
-        ? { done: '#66bb6a', 'in-progress': '#42a5f5', 'at-risk': '#ffa726', blocked: '#ef5350', planned: '#9e9e9e', neutral: '#9e9e9e' }
-        : { done: '#43a047', 'in-progress': '#1e88e5', 'at-risk': '#fb8c00', blocked: '#e53935', planned: '#9e9e9e', neutral: '#9e9e9e' };
+    // Status dot — upper-right inset inside the bar, OR pushed into
+    // the spill column when the bar is too narrow to host the dot's
+    // full inset (`dotSpills`). Layout pre-computes `dotSpillCx` for
+    // the spilled case so the renderer stays geometry-dumb.
+    const dotCx = i.dotSpills && i.dotSpillCx !== null
+        ? i.dotSpillCx
+        : i.box.x + i.box.width - ITEM_STATUS_DOT_INSET_RIGHT_PX;
     parts.push(
         tag('circle', {
-            cx: num(i.box.x + 6),
-            cy: num(i.box.y + i.box.height / 2),
-            r: 3,
-            fill: statusColors[i.status] ?? statusColors.neutral,
+            cx: num(dotCx),
+            cy: num(i.box.y + ITEM_STATUS_DOT_INSET_TOP_PX),
+            r: ITEM_STATUS_DOT_RADIUS_PX,
+            fill: dotColor,
         }),
     );
+    // Title + meta are an atomic caption. When `textSpills` is set the
+    // layout has already bumped the next item to a fresh row, so we draw
+    // both lines BESIDE the bar (just past its right edge, stacked) at
+    // the same vertical positions they would occupy inside. When they
+    // fit, both go inside at the bar's left padding.
+    //
+    // The spilled-decoration cluster reads `[bar] [icon?] [title]
+    // [footnote?] [dot?]` — the only decoration to the LEFT of the
+    // title is the link icon (the icon→title affordance must stay
+    // adjacent). The dot trails the title to mirror its in-bar
+    // upper-right position; the footnote walks alongside the title
+    // (between title and dot) just like its in-bar `text-anchor: end`
+    // placement at the upper-right.
+    let captionX: number;
+    if (i.textSpills) {
+        captionX = i.box.x + i.box.width + ITEM_CAPTION_SPILL_GAP_PX;
+        if (i.iconSpills) {
+            captionX +=
+                ITEM_LINK_ICON_TILE_SIZE_PX + ITEM_DECORATION_SPILL_GAP_PX;
+        }
+    } else {
+        captionX = i.box.x + ITEM_CAPTION_INSET_X_PX;
+    }
+    // When the caption spills outside the bar it renders on the
+    // chart / group bg instead of the bar fill — `i.style.text` is
+    // resolved against the bar (e.g. `enterprise-style` propagates
+    // `text:white` from a label and audit-log's title becomes
+    // white-on-blue inside, but white-on-peach when spilled onto
+    // the orange-tinted audit-track group). Use the theme's
+    // default item text color (always tuned for chart bg) when
+    // text spills, and the per-bar color when it stays inside.
+    const captionInsideTextColor = i.style.text;
+    const captionOutsideTextColor = palette.entities.item.text;
+    const titleColor = i.textSpills ? captionOutsideTextColor : captionInsideTextColor;
+    const metaColor = i.textSpills ? captionOutsideTextColor : i.style.fg;
     if (i.title) {
         parts.push(
             textTag(
                 {
-                    x: num(i.box.x + 14),
-                    y: num(i.box.y + i.box.height / 2 + 4),
-                    ...fontAttrs(i.style, TEXT_SIZE_PX.sm),
+                    x: num(captionX),
+                    y: num(i.box.y + ITEM_CAPTION_TITLE_BASELINE_OFFSET_PX),
+                    'font-family': FONT_STACK[i.style.font],
+                    'font-size': ITEM_CAPTION_TITLE_FONT_SIZE_PX,
+                    'font-weight': 600,
+                    fill: titleColor,
                 },
                 i.title,
             ),
         );
     }
-    // Footnote superscript indicators
+    // Meta line and capacity suffix render as a unified SVG fragment.
+    // For pure-text suffixes (multiplier, literal glyph, no glyph) the
+    // unified path emits a single `<text>` element with `<tspan dx>`
+    // for the gap so the suffix hugs the metaText regardless of how
+    // wide it actually rendered. Built-in SVG icon glyphs still emit a
+    // sibling `<svg>` but at a tighter offset than the legacy two-text
+    // path. See `renderItemMetaLine` for the full case-by-case.
+    if (i.metaText || i.capacity) {
+        parts.push(
+            renderItemMetaLine({
+                metaText: i.metaText,
+                capacity: i.capacity,
+                x: captionX,
+                baselineY: i.box.y + ITEM_CAPTION_META_BASELINE_OFFSET_PX,
+                fontSize: ITEM_CAPTION_META_FONT_SIZE_PX,
+                fontFamily: FONT_STACK[i.style.font],
+                color: metaColor,
+            }),
+        );
+    }
+    // Footnote superscript indicators. Two render modes:
+    //   - In-bar (default): glyphs walk LEFT from
+    //     `bar.right - ITEM_FOOTNOTE_INDICATOR_INSET_RIGHT_PX`,
+    //     anchored end. They sit on the bar fill, so use the bar's
+    //     resolved text color for contrast (a hardcoded red was
+    //     getting lost on saturated mid-tone bars from `bg:blue`
+    //     labels). The "footnote = red" attention cue lives on the
+    //     footnote PANEL's red number column at the bottom of the
+    //     chart where red reads cleanly against white.
+    //   - Spilled (narrow bars): the glyphs render in the spill
+    //     column to the right of the bar, walking RIGHT from
+    //     `footnoteSpillStartX` so they read in the same numerical
+    //     order as the in-bar case. They sit on the chart bg, so
+    //     use the chart-tuned default text color (same as spilled
+    //     captions).
     if (i.footnoteIndicators.length > 0) {
-        let fx = i.box.x + i.box.width - 4;
-        for (let k = i.footnoteIndicators.length - 1; k >= 0; k--) {
-            const n2 = i.footnoteIndicators[k];
-            parts.push(
-                textTag(
-                    {
-                        x: num(fx),
-                        y: num(i.box.y - 2),
-                        'font-family': FONT_STACK.sans,
-                        'font-size': 9,
-                        fill: theme === 'dark' ? '#ef5350' : '#d32f2f',
-                        'text-anchor': 'end',
-                    },
-                    String(n2),
-                ),
-            );
-            fx -= 10;
+        const footnoteY = i.box.y + ITEM_FOOTNOTE_INDICATOR_BASELINE_OFFSET_PX;
+        if (i.footnoteSpills && i.footnoteSpillStartX !== null) {
+            let fx = i.footnoteSpillStartX;
+            for (let k = 0; k < i.footnoteIndicators.length; k++) {
+                const n2 = i.footnoteIndicators[k];
+                parts.push(
+                    textTag(
+                        {
+                            x: num(fx),
+                            y: num(footnoteY),
+                            'font-family': FONT_STACK.sans,
+                            'font-size': 10,
+                            'font-weight': 700,
+                            fill: captionOutsideTextColor,
+                        },
+                        String(n2),
+                    ),
+                );
+                fx += ITEM_FOOTNOTE_INDICATOR_STEP_PX;
+            }
+        } else {
+            let fx = i.box.x + i.box.width - ITEM_FOOTNOTE_INDICATOR_INSET_RIGHT_PX;
+            for (let k = i.footnoteIndicators.length - 1; k >= 0; k--) {
+                const n2 = i.footnoteIndicators[k];
+                parts.push(
+                    textTag(
+                        {
+                            x: num(fx),
+                            y: num(footnoteY),
+                            'font-family': FONT_STACK.sans,
+                            'font-size': 10,
+                            'font-weight': 700,
+                            fill: i.style.text,
+                            'text-anchor': 'end',
+                        },
+                        String(n2),
+                    ),
+                );
+                fx -= ITEM_FOOTNOTE_INDICATOR_STEP_PX;
+            }
         }
     }
-    // Link icon
+    // Link icon — colored tile + white external-link glyph. Default
+    // position is the bar's UPPER-LEFT corner; on a bar too narrow
+    // to host both the icon and the status-dot column with a gap
+    // between them, the icon spills out to the right of the bar
+    // (in front of the spilled title) so the icon→title affordance
+    // stays intact. The glyph is the same outbound-arrow ↗ for
+    // every link kind (linear / github / jira / generic) — they
+    // only differ in tile color. The include FILE-LEVEL region
+    // (`include "./other.nowline"`) uses a separate stacked-sheets
+    // glyph rendered by `renderIncludeRegion`, distinct from this
+    // item-level link icon.
     if (!options.noLinks && i.linkIcon && i.linkIcon !== 'none') {
-        const d = LINK_ICON_PATHS[i.linkIcon] ?? LINK_ICON_PATHS.generic;
-        const lx = i.box.x + i.box.width - 18;
-        const ly = i.box.y + (i.box.height - 14) / 2;
-        const path = tag('path', {
-            d,
-            fill: i.style.text,
-            transform: `translate(${num(lx)} ${num(ly)}) scale(0.85)`,
-            opacity: 0.7,
+        const tileColor: Record<string, string> = {
+            linear: '#5e6ad2',
+            github: '#0f172a',
+            jira: '#0052cc',
+            generic: palette.item.linkIconFg,
+        };
+        const tile = tileColor[i.linkIcon] ?? tileColor.generic;
+        const tileSize = ITEM_LINK_ICON_TILE_SIZE_PX;
+        const tileX = i.iconSpills && i.iconSpillX !== null
+            ? i.iconSpillX
+            : i.box.x + ITEM_LINK_ICON_INSET_PX;
+        const tileY = i.box.y + ITEM_LINK_ICON_INSET_PX;
+        const tileRect = tag('rect', {
+            x: num(tileX),
+            y: num(tileY),
+            width: tileSize,
+            height: tileSize,
+            rx: 2,
+            ry: 2,
+            fill: tile,
         });
+        const gx = tileX;
+        const gy = tileY;
+        const glyph = tag('path', {
+            d: `M${num(gx + 4)} ${num(gy + 10)} L${num(gx + 10)} ${num(gy + 4)} M${num(gx + 6)} ${num(gy + 4)} H${num(gx + 10)} V${num(gy + 8)}`,
+            stroke: '#ffffff',
+            fill: 'none',
+            'stroke-width': 1.1,
+            'stroke-linecap': 'round',
+            'stroke-linejoin': 'round',
+        });
+        const inner = tileRect + glyph;
         const link = i.linkHref
-            ? tag('a', { href: i.linkHref, target: '_blank', rel: 'noopener' }, path)
-            : path;
+            ? tag('a', { href: i.linkHref, target: '_blank', rel: 'noopener' }, inner)
+            : inner;
         parts.push(link);
     }
-    // Overflow tail
+    // Overflow tail — red fill + stroke + caption.
     if (i.hasOverflow && i.overflowBox) {
+        const tailFill = palette.item.overflowTailFill;
+        const tailStroke = palette.item.overflowTailStroke;
+        const captionColor = palette.item.overflowCaption;
         parts.push(
             tag('rect', {
                 x: num(i.overflowBox.x),
                 y: num(i.overflowBox.y),
                 width: num(i.overflowBox.width),
                 height: num(i.overflowBox.height),
-                fill: theme === 'dark' ? '#ef5350' : '#d32f2f',
-                opacity: 0.25,
+                fill: tailFill,
+                stroke: tailStroke,
+                'stroke-width': 1,
             }),
         );
+        if (i.overflowAnchorId && i.overflowBox.width > 60) {
+            parts.push(
+                textTag(
+                    {
+                        x: num(i.overflowBox.x + i.overflowBox.width / 2),
+                        y: num(i.overflowBox.y + i.overflowBox.height / 2 + 3),
+                        'font-family': FONT_STACK.sans,
+                        'font-size': 9,
+                        'font-weight': 700,
+                        fill: captionColor,
+                        'text-anchor': 'middle',
+                    },
+                    `past ${i.overflowAnchorId}`,
+                ),
+            );
+        }
     }
     // Label chips
     for (const chip of i.labelChips) {
@@ -362,41 +1089,159 @@ function renderItem(i: PositionedItem, options: RenderOptions, idPrefix: string,
     return tag('g', { 'data-layer': 'item', 'data-id': i.id ?? null }, parts.join(''));
 }
 
-function renderGroup(g: PositionedGroup, options: RenderOptions, idPrefix: string, theme: 'light' | 'dark'): string {
-    const bracketColor = g.style.fg;
+function renderGroup(g: PositionedGroup, options: RenderOptions, idPrefix: string, palette: Theme): string {
     const parts: string[] = [];
-    if (g.style.bracket !== 'none') {
+    const hasFill = g.style.bg !== 'none' && g.style.bg !== '#ffffff';
+    if (hasFill) {
+        // Filled-box style with a chiclet label flush in the upper-left
+        // corner. The painted box matches the layout-reported `box` 1:1
+        // (no overhang), so parents stack against the right rectangle.
         parts.push(
-            tag('path', {
-                d: `M${num(g.box.x)} ${num(g.box.y)} L${num(g.box.x)} ${num(g.box.y + g.box.height)} L${num(g.box.x + 4)} ${num(g.box.y + g.box.height)}`,
-                fill: 'none',
-                stroke: bracketColor,
+            tag('rect', {
+                x: num(g.box.x),
+                y: num(g.box.y),
+                width: num(g.box.width),
+                height: num(g.box.height),
+                rx: 6,
+                ry: 6,
+                fill: g.style.bg,
+                stroke: g.style.fg,
                 'stroke-width': 1,
-                'stroke-dasharray': g.style.bracket === 'dashed' ? '3 2' : null,
+                'fill-opacity': 0.18,
+                filter: `url(#${idPrefix}-shadow-subtle)`,
             }),
         );
-    }
-    if (g.title) {
-        parts.push(
-            textTag(
-                {
-                    x: num(g.box.x + 6),
-                    y: num(g.box.y - 2),
-                    ...fontAttrs(g.style, TEXT_SIZE_PX.xs),
-                    'fill-opacity': 0.7,
-                },
-                g.title,
-            ),
-        );
+        if (g.title) {
+            const tabW =
+                g.title.length * GROUP_TITLE_TAB_CHAR_WIDTH_PX +
+                2 * GROUP_TITLE_TAB_PAD_X_PX;
+            const tabX = g.box.x;
+            const tabY = g.box.y;
+            const tabH = GROUP_TITLE_TAB_HEIGHT_PX;
+            // Asymmetric corner shape: TOP-LEFT and BOTTOM-RIGHT are
+            // rounded (radius 6, matching the parent group box), while
+            // TOP-RIGHT and BOTTOM-LEFT are square. The TL roundness
+            // continues the group box's outer corner; the squared
+            // BL / TR sides "anchor" the tab into the box's left and
+            // top edges so it reads as a corner-mounted label rather
+            // than a floating pill.
+            const r = 6;
+            const tabPath =
+                `M${num(tabX + r)} ${num(tabY)}` +
+                `H${num(tabX + tabW)}` +
+                `V${num(tabY + tabH - r)}` +
+                `A${r} ${r} 0 0 1 ${num(tabX + tabW - r)} ${num(tabY + tabH)}` +
+                `H${num(tabX)}` +
+                `V${num(tabY + r)}` +
+                `A${r} ${r} 0 0 1 ${num(tabX + r)} ${num(tabY)}` +
+                `Z`;
+            parts.push(
+                tag('path', {
+                    d: tabPath,
+                    fill: g.style.fg,
+                }),
+            );
+            parts.push(
+                textTag(
+                    {
+                        x: num(tabX + GROUP_TITLE_TAB_PAD_X_PX),
+                        y: num(tabY + GROUP_TITLE_TAB_LABEL_BASELINE_OFFSET_PX),
+                        'font-family': FONT_STACK[g.style.font],
+                        'font-size': GROUP_TITLE_TAB_LABEL_FONT_SIZE_PX,
+                        'font-weight': 600,
+                        fill: '#ffffff',
+                    },
+                    g.title,
+                ),
+            );
+        }
+    } else {
+        const bracketColor = g.style.fg;
+        if (g.style.bracket !== 'none') {
+            // Bracket-style groups paint a left-side `[` glyph along
+            // `box.x`. When a title is present the layout has reserved
+            // `GROUP_BRACKET_LABEL_OVERHANG_PX` of vertical space ABOVE
+            // `box.y` (see GroupNode.place); the bracket extends up
+            // through that overhang and adds a top foot mirroring the
+            // bottom foot so the `[` visually wraps the title text that
+            // sits in the reserved region. Title-less bracket groups
+            // keep the historical asymmetric shape (vertical bar + a
+            // single bottom foot) since there's nothing above to wrap.
+            const stub = 4;
+            const bottom = g.box.y + g.box.height;
+            const dash = g.style.bracket === 'dashed' ? '3 2' : null;
+            const bracketPath = g.title
+                ? `M${num(g.box.x + stub)} ${num(g.box.y - GROUP_BRACKET_LABEL_OVERHANG_PX)}` +
+                  ` L${num(g.box.x)} ${num(g.box.y - GROUP_BRACKET_LABEL_OVERHANG_PX)}` +
+                  ` L${num(g.box.x)} ${num(bottom)}` +
+                  ` L${num(g.box.x + stub)} ${num(bottom)}`
+                : `M${num(g.box.x)} ${num(g.box.y)}` +
+                  ` L${num(g.box.x)} ${num(bottom)}` +
+                  ` L${num(g.box.x + stub)} ${num(bottom)}`;
+            parts.push(
+                tag('path', {
+                    d: bracketPath,
+                    fill: 'none',
+                    stroke: bracketColor,
+                    'stroke-width': 1,
+                    'stroke-dasharray': dash,
+                }),
+            );
+        }
+        if (g.title) {
+            parts.push(
+                textTag(
+                    {
+                        x: num(g.box.x + 6),
+                        y: num(g.box.y - 2),
+                        ...fontAttrs(g.style, TEXT_SIZE_PX.xs),
+                        'fill-opacity': 0.7,
+                    },
+                    g.title,
+                ),
+            );
+        }
     }
     for (const c of g.children) {
-        parts.push(renderTrackChild(c, options, idPrefix, theme));
+        parts.push(renderTrackChild(c, options, idPrefix, palette));
     }
+    void palette;
     return tag('g', { 'data-layer': 'group', 'data-id': g.id ?? null }, parts.join(''));
 }
 
-function renderParallel(p: PositionedParallel, options: RenderOptions, idPrefix: string, theme: 'light' | 'dark'): string {
+function renderParallel(p: PositionedParallel, options: RenderOptions, idPrefix: string, palette: Theme): string {
     const parts: string[] = [];
+    // `bracket: solid|dashed` parallels render explicit [ ] brackets framing
+    // the nested tracks with 12 px vertical padding above/below.
+    if (p.style.bracket === 'solid' || p.style.bracket === 'dashed') {
+        const padding = 12;
+        const stub = 4;
+        const top = p.box.y - padding;
+        const bottom = p.box.y + p.box.height + padding;
+        const lx = p.box.x;
+        const rx = p.box.x + p.box.width;
+        const stroke = palette.parallel.bracketStroke;
+        parts.push(
+            tag('path', {
+                d: `M${num(lx + stub)} ${num(top)} H${num(lx)} V${num(bottom)} H${num(lx + stub)}`,
+                fill: 'none',
+                stroke,
+                'stroke-width': 1.25,
+                'stroke-dasharray': p.style.bracket === 'dashed' ? '3 3' : null,
+                'stroke-linejoin': 'round',
+            }),
+        );
+        parts.push(
+            tag('path', {
+                d: `M${num(rx - stub)} ${num(top)} H${num(rx)} V${num(bottom)} H${num(rx - stub)}`,
+                fill: 'none',
+                stroke,
+                'stroke-width': 1.25,
+                'stroke-dasharray': p.style.bracket === 'dashed' ? '3 3' : null,
+                'stroke-linejoin': 'round',
+            }),
+        );
+    }
     if (p.title) {
         parts.push(
             textTag(
@@ -411,194 +1256,654 @@ function renderParallel(p: PositionedParallel, options: RenderOptions, idPrefix:
         );
     }
     for (const c of p.children) {
-        parts.push(renderTrackChild(c, options, idPrefix, theme));
+        parts.push(renderTrackChild(c, options, idPrefix, palette));
     }
     return tag('g', { 'data-layer': 'parallel', 'data-id': p.id ?? null }, parts.join(''));
 }
 
-function renderTrackChild(c: PositionedTrackChild, options: RenderOptions, idPrefix: string, theme: 'light' | 'dark'): string {
-    if (c.kind === 'item') return renderItem(c, options, idPrefix, theme);
-    if (c.kind === 'group') return renderGroup(c, options, idPrefix, theme);
-    return renderParallel(c, options, idPrefix, theme);
+function renderTrackChild(c: PositionedTrackChild, options: RenderOptions, idPrefix: string, palette: Theme): string {
+    if (c.kind === 'item') return renderItem(c, options, idPrefix, palette);
+    if (c.kind === 'group') return renderGroup(c, options, idPrefix, palette);
+    return renderParallel(c, options, idPrefix, palette);
 }
 
-function renderSwimlane(s: PositionedSwimlane, options: RenderOptions, idPrefix: string, theme: 'light' | 'dark'): string {
-    const tint = theme === 'dark'
-        ? (s.bandIndex % 2 === 0 ? '#1e1e1e' : '#242424')
-        : (s.bandIndex % 2 === 0 ? '#ffffff' : '#f5f5f5');
-    const parts: string[] = [];
-    parts.push(
+// Renders only the swimlane's background tint rect. Emitted before the
+// chart-body grid lines so those lines visibly span the full chart width.
+// The frame tab (chiclet at top-left) and item content are emitted later,
+// in renderSwimlaneContent, so they appear on top of the grid.
+// Tri-state lane utilization underline. Painted along the bottom edge of
+// the band when the lane has `capacity:` AND at least one item contributing
+// load AND has not opted out of every color band via `utilization-*-at:none`.
+// Geometry per specs/rendering.md § Lane utilization underline:
+//   - height: 2px (matches the milestone-line stroke weight)
+//   - y: flush with the bottom edge of the band, fully inside it
+//   - x: aligned to the segment boundaries the layout already pre-coalesced
+// One <rect> per coalesced segment; classification → palette token mapping
+// is the only renderer-side decision.
+const LANE_UTILIZATION_HEIGHT_PX = 2;
+
+function utilizationColor(
+    classification: 'green' | 'yellow' | 'red',
+    palette: Theme,
+): string {
+    switch (classification) {
+        case 'green':
+            return palette.swimlane.utilizationOk;
+        case 'yellow':
+            return palette.swimlane.utilizationWarn;
+        case 'red':
+            return palette.swimlane.utilizationOver;
+    }
+}
+
+function renderLaneUtilization(s: PositionedSwimlane, palette: Theme): string {
+    if (!s.utilization || s.utilization.segments.length === 0) return '';
+    const y = s.box.y + s.box.height - LANE_UTILIZATION_HEIGHT_PX;
+    const rects = s.utilization.segments.map((seg) => {
+        const width = seg.endX - seg.startX;
+        if (width <= 0) return '';
+        return tag('rect', {
+            x: num(seg.startX),
+            y: num(y),
+            width: num(width),
+            height: LANE_UTILIZATION_HEIGHT_PX,
+            fill: utilizationColor(seg.classification, palette),
+            'data-utilization': seg.classification,
+            'data-load': num(seg.load),
+        });
+    });
+    return tag(
+        'g',
+        {
+            'data-layer': 'lane-utilization',
+            'data-id': s.id ?? null,
+        },
+        rects.join(''),
+    );
+}
+
+function renderSwimlaneBg(s: PositionedSwimlane, palette: Theme): string {
+    const tint = s.bandIndex % 2 === 0 ? palette.swimlane.rowTintEven : palette.swimlane.rowTintOdd;
+    const borderColor = palette.swimlane.border;
+    return tag(
+        'g',
+        { 'data-layer': 'swimlane-bg', 'data-id': s.id ?? null },
         tag('rect', {
             x: num(s.box.x),
             y: num(s.box.y),
             width: num(s.box.width),
             height: num(s.box.height),
             fill: tint,
+            stroke: borderColor,
+            'stroke-width': 1,
         }),
     );
-    // Swimlane title
+}
+
+function renderSwimlane(s: PositionedSwimlane, options: RenderOptions, idPrefix: string, palette: Theme): string {
+    const tabFill = palette.swimlane.tabFill;
+    const tabStroke = palette.swimlane.tabStroke;
+    const tabText = palette.swimlane.tabText;
+    const ownerText = palette.swimlane.ownerText;
+    const footnoteColor = palette.swimlane.footnoteIndicator;
+    const parts: string[] = [];
+    // Frame-tab chiclet at the top-left of the band — auto-sized to fit
+    // title + owner. Geometry comes from the shared `frameTabGeometry`
+    // helper that the layout's row-packer also calls, so the chiclet's
+    // visible footprint matches the collision box layout reserved for it.
     if (s.title) {
+        // Lane capacity badge + footnote indicator sit inside the frame
+        // tab after the owner (or after the title if no owner). Compute
+        // both widths up-front so `frameTabGeometry` can size the chiclet
+        // to fit them, then read the placement positions back out — no
+        // second placement pass in the renderer.
+        const LANE_BADGE_FONT_SIZE_PX = 10;
+        const capacityBadgeBareWidthPx = s.capacity
+            ? estimateCapacitySuffixWidth(
+                  s.capacity.text,
+                  s.capacity.icon,
+                  LANE_BADGE_FONT_SIZE_PX,
+              )
+            : 0;
+        // Footnote indicator is a comma-joined number list painted at
+        // 10 pt 700-weight; estimate via the shared caption helper.
+        const footnoteIndicatorText =
+            s.footnoteIndicators.length > 0 ? s.footnoteIndicators.join(',') : '';
+        const footnoteIndicatorWidthPx = footnoteIndicatorText
+            ? estimateCaptionWidthPx(footnoteIndicatorText, LANE_BADGE_FONT_SIZE_PX)
+            : 0;
+        const tab = frameTabGeometry(
+            s.box.x,
+            s.title,
+            s.owner,
+            capacityBadgeBareWidthPx,
+            footnoteIndicatorWidthPx,
+        );
+        const tabH = FRAME_TAB_HEIGHT_PX;
+        const tabY = s.box.y + 10;
+        const labelY = tabY + FRAME_TAB_LABEL_BASELINE_OFFSET_PX;
+        parts.push(
+            tag('rect', {
+                x: num(tab.tabX),
+                y: num(tabY),
+                width: num(tab.tabW),
+                height: num(tabH),
+                rx: 4,
+                ry: 4,
+                fill: tabFill,
+                stroke: tabStroke,
+                'stroke-width': 1,
+            }),
+        );
         parts.push(
             textTag(
                 {
-                    x: num(s.box.x + 8),
-                    y: num(s.box.y + 16),
-                    ...fontAttrs(s.style, TEXT_SIZE_PX.sm),
+                    x: num(tab.titleX),
+                    y: num(labelY),
+                    'font-family': FONT_STACK[s.style.font],
+                    'font-size': 12,
                     'font-weight': 600,
+                    fill: tabText,
                 },
                 s.title,
             ),
         );
+        if (s.owner) {
+            parts.push(
+                textTag(
+                    {
+                        x: num(tab.ownerX),
+                        y: num(labelY),
+                        'font-family': FONT_STACK[s.style.font],
+                        'font-size': 10,
+                        fill: ownerText,
+                    },
+                    `owner: ${s.owner}`,
+                ),
+            );
+        }
+        if (s.capacity) {
+            // Re-uses the same `renderCapacitySuffix` helper that paints
+            // item-level suffixes (m6) so multiplier / built-in SVG /
+            // inline literal / dereferenced-custom-glyph paths stay
+            // consistent across both contexts.
+            parts.push(
+                renderCapacitySuffix(
+                    s.capacity,
+                    undefined,
+                    tab.badgeX,
+                    labelY,
+                    LANE_BADGE_FONT_SIZE_PX,
+                    FONT_STACK[s.style.font],
+                    ownerText,
+                ),
+            );
+        }
+        if (footnoteIndicatorText) {
+            parts.push(
+                textTag(
+                    {
+                        x: num(tab.footnoteRightX),
+                        y: num(tabY + 14),
+                        'font-family': FONT_STACK.sans,
+                        'font-size': LANE_BADGE_FONT_SIZE_PX,
+                        'font-weight': 700,
+                        fill: footnoteColor,
+                        'text-anchor': 'end',
+                    },
+                    footnoteIndicatorText,
+                ),
+            );
+        }
     }
     for (const c of s.children) {
-        parts.push(renderTrackChild(c, options, idPrefix, theme));
+        parts.push(renderTrackChild(c, options, idPrefix, palette));
     }
+    // m13: tri-state utilization underline along the band's bottom edge.
+    // Painted after items so it overlays any item that happens to extend
+    // to the band's bottom; under cut-lines / now-line which run as
+    // separate top-level passes.
+    parts.push(renderLaneUtilization(s, palette));
     return tag('g', { 'data-layer': 'swimlane', 'data-id': s.id ?? null }, parts.join(''));
 }
 
-function renderAnchor(a: PositionedAnchor, idPrefix: string): string {
+function renderAnchor(a: PositionedAnchor, palette: Theme): string {
     const size = a.radius;
     const cx = a.center.x;
     const cy = a.center.y;
+    const fill = palette.anchorDiamond.fill;
+    const stroke = palette.anchorDiamond.stroke;
     const diamond = tag('path', {
         d: `M${num(cx)} ${num(cy - size)} L${num(cx + size)} ${num(cy)} L${num(cx)} ${num(cy + size)} L${num(cx - size)} ${num(cy)} Z`,
-        fill: a.style.bg === 'none' ? a.style.fg : a.style.bg,
-        stroke: a.style.fg,
-        'stroke-width': 1,
+        fill,
+        stroke,
+        'stroke-width': 1.25,
     });
-    const label = a.title
-        ? textTag(
-            {
-                x: num(cx),
-                y: num(cy - size - 4),
-                ...fontAttrs(a.style, TEXT_SIZE_PX.xs),
-                'text-anchor': 'middle',
-            },
-            a.title,
-        )
-        : '';
+    const labelColor = palette.anchorDiamond.label;
+    // For left-flipped labels, anchor the text at its RIGHT edge using
+    // `text-anchor: end`. The layout's `labelBox.width` is intentionally
+    // pessimistic (0.58 em/char) so positioning by the box's left edge
+    // would leave a visible gap between the actual text right edge and
+    // the diamond. End-anchoring lets the browser size the glyph run
+    // exactly and put the rightmost glyph 6 px from the diamond — same
+    // rhythm the right-side labels already get from start-anchoring at
+    // `diamondRight + 6`.
+    const labelX = a.labelSide === 'left'
+        ? a.labelBox.x + a.labelBox.width
+        : a.labelBox.x;
+    const labelAttrs: Record<string, string | number | null | undefined> = {
+        x: num(labelX),
+        y: num(cy + 4),
+        'font-family': FONT_STACK.sans,
+        'font-size': 10,
+        fill: labelColor,
+    };
+    if (a.labelSide === 'left') labelAttrs['text-anchor'] = 'end';
+    const label = a.title ? textTag(labelAttrs, a.title) : '';
     return tag('g', { 'data-layer': 'anchor', 'data-id': a.id ?? null }, diamond + label);
 }
 
-function renderMilestone(m: PositionedMilestone, theme: 'light' | 'dark'): string {
+function renderAnchorCutLine(a: PositionedAnchor, palette: Theme): string {
+    const stroke = palette.anchorDiamond.cutLine;
+    return tag('line', {
+        x1: num(a.center.x),
+        y1: num(a.center.y + a.radius + 1),
+        x2: num(a.center.x),
+        y2: num(a.cutBottomY),
+        stroke,
+        'stroke-width': 1,
+        'stroke-dasharray': '1 3',
+    });
+}
+
+function renderMilestone(m: PositionedMilestone, palette: Theme): string {
     const cx = m.center.x;
     const cy = m.center.y;
     const r = m.radius;
+    const fill = palette.milestoneDiamond.fill;
     const flag = tag('path', {
         d: `M${num(cx)} ${num(cy - r)} L${num(cx + r)} ${num(cy)} L${num(cx)} ${num(cy + r)} L${num(cx - r)} ${num(cy)} Z`,
-        fill: m.style.bg === 'none' ? m.style.fg : m.style.bg,
-        stroke: m.style.fg,
+        fill,
+        stroke: fill,
         'stroke-width': 1,
-        'stroke-dasharray': m.fixed ? null : '3 2',
     });
-    const label = m.title
-        ? textTag(
-            {
-                x: num(cx),
-                y: num(cy - r - 4),
-                ...fontAttrs(m.style, TEXT_SIZE_PX.xs),
-                'font-weight': 600,
-                'text-anchor': 'middle',
-            },
-            m.title,
-        )
-        : '';
-    let slack = '';
-    if (m.slackX !== undefined) {
-        const color = m.isOverrun
-            ? (theme === 'dark' ? '#ef5350' : '#d32f2f')
-            : (theme === 'dark' ? '#9e9e9e' : '#9e9e9e');
-        slack = tag('line', {
-            x1: num(cx),
-            y1: num(cy),
-            x2: num(m.slackX),
-            y2: num(cy),
-            stroke: color,
-            'stroke-width': 1.2,
-            'stroke-dasharray': '3 2',
-        });
-    }
-    return tag('g', { 'data-layer': 'milestone', 'data-id': m.id ?? null }, slack + flag + label);
+    const labelColor = palette.milestoneDiamond.label;
+    // See renderAnchor — left-flipped labels use `text-anchor: end` so
+    // the visual right edge sits at `diamondLeft - 6`, matching the
+    // 6 px rhythm of right-side labels.
+    const labelX = m.labelSide === 'left'
+        ? m.labelBox.x + m.labelBox.width
+        : m.labelBox.x;
+    const labelAttrs: Record<string, string | number | null | undefined> = {
+        x: num(labelX),
+        y: num(cy + 4),
+        'font-family': FONT_STACK.sans,
+        'font-size': 10,
+        'font-weight': 600,
+        fill: labelColor,
+    };
+    if (m.labelSide === 'left') labelAttrs['text-anchor'] = 'end';
+    const label = m.title ? textTag(labelAttrs, m.title) : '';
+    return tag('g', { 'data-layer': 'milestone', 'data-id': m.id ?? null }, flag + label);
 }
 
-function renderEdge(e: PositionedDependencyEdge, theme: 'light' | 'dark'): string {
+function renderMilestoneCutLine(m: PositionedMilestone, palette: Theme): string {
+    const stroke = m.isOverrun
+        ? palette.milestoneDiamond.cutLineOverrun
+        : palette.milestoneDiamond.cutLineNormal;
+    const parts: string[] = [];
+    parts.push(
+        tag('line', {
+            x1: num(m.center.x),
+            y1: num(m.center.y + m.radius + 1),
+            x2: num(m.center.x),
+            y2: num(m.cutBottomY),
+            stroke,
+            'stroke-width': 2,
+            'stroke-dasharray': ACCENT_DASH_PATTERN,
+            'stroke-linecap': 'round',
+        }),
+    );
+    if (m.slackArrows && m.slackArrows.length > 0) {
+        const slackColor = palette.milestoneDiamond.slack;
+        for (const arrow of m.slackArrows) {
+            parts.push(
+                tag('path', {
+                    d: `M${num(arrow.x)} ${num(arrow.y)} H${num(m.center.x - 6)}`,
+                    fill: 'none',
+                    stroke: slackColor,
+                    'stroke-width': 1.1,
+                    'stroke-dasharray': '3 3',
+                    'stroke-linecap': 'round',
+                    'marker-end': 'url(#nl-arrow-dark)',
+                }),
+            );
+        }
+    }
+    return parts.join('');
+}
+
+function renderEdge(e: PositionedDependencyEdge, palette: Theme): string {
     const color = e.kind === 'overflow'
-        ? (theme === 'dark' ? '#ef5350' : '#d32f2f')
-        : (theme === 'dark' ? '#9e9e9e' : '#757575');
+        ? palette.dependency.overflowStroke
+        : palette.dependency.edgeStroke;
     const points = e.waypoints;
     if (points.length < 2) return '';
-    const d = points.map((p, i) => (i === 0 ? `M${num(p.x)} ${num(p.y)}` : `L${num(p.x)} ${num(p.y)}`)).join(' ');
+    // Under-bar edges paint BEFORE item fills (see `renderRoadmap`)
+    // and use a thinner stroke so the bar stays foreground. Normal /
+    // overflow edges sit on top of items and use the standard 1.1 px
+    // stroke.
+    const strokeWidth = e.kind === 'underBar' ? 0.8 : 1.1;
     return tag('path', {
-        d,
+        d: roundedOrthogonalPath(points, EDGE_CORNER_RADIUS),
         fill: 'none',
         stroke: color,
-        'stroke-width': 1,
+        'stroke-width': strokeWidth,
         'stroke-dasharray': e.kind === 'overflow' ? '4 2' : null,
+        'stroke-linejoin': 'round',
+        'marker-end': 'url(#nl-arrow)',
     });
 }
 
-function renderFootnotes(f: PositionedFootnoteArea, theme: 'light' | 'dark'): string {
+// Build an SVG path for a sequence of orthogonal waypoints, inserting a
+// quarter-arc at every interior bend. Falls back to straight segments when
+// adjacent points aren't axis-aligned (defensive — the layout always emits
+// orthogonal segments).
+function roundedOrthogonalPath(points: Point[], radius: number): string {
+    if (points.length < 2) return '';
+    const parts: string[] = [`M${num(points[0].x)} ${num(points[0].y)}`];
+    for (let i = 1; i < points.length; i++) {
+        const prev = points[i - 1];
+        const cur = points[i];
+        if (i === points.length - 1) {
+            parts.push(`L${num(cur.x)} ${num(cur.y)}`);
+            continue;
+        }
+        const next = points[i + 1];
+        const dxIn = Math.sign(cur.x - prev.x);
+        const dyIn = Math.sign(cur.y - prev.y);
+        const dxOut = Math.sign(next.x - cur.x);
+        const dyOut = Math.sign(next.y - cur.y);
+        const inLen = Math.hypot(cur.x - prev.x, cur.y - prev.y);
+        const outLen = Math.hypot(next.x - cur.x, next.y - cur.y);
+        const r = Math.min(radius, inLen / 2, outLen / 2);
+        if (r <= 0 || (dxIn !== 0 && dxOut !== 0) || (dyIn !== 0 && dyOut !== 0)) {
+            parts.push(`L${num(cur.x)} ${num(cur.y)}`);
+            continue;
+        }
+        const beforeBend = { x: cur.x - dxIn * r, y: cur.y - dyIn * r };
+        const afterBend = { x: cur.x + dxOut * r, y: cur.y + dyOut * r };
+        parts.push(`L${num(beforeBend.x)} ${num(beforeBend.y)}`);
+        parts.push(`Q${num(cur.x)} ${num(cur.y)} ${num(afterBend.x)} ${num(afterBend.y)}`);
+    }
+    return parts.join(' ');
+}
+
+function renderFootnotes(f: PositionedFootnoteArea, idPrefix: string, palette: Theme): string {
     if (f.entries.length === 0) return '';
-    const labelColor = theme === 'dark' ? '#bdbdbd' : '#424242';
-    const numberColor = theme === 'dark' ? '#ef5350' : '#d32f2f';
+    const panelFill = palette.footnotePanel.fill;
+    const borderColor = palette.footnotePanel.border;
+    const headerColor = palette.footnotePanel.header;
+    const titleColor = palette.footnotePanel.title;
+    const descColor = palette.footnotePanel.description;
+    const numberColor = palette.footnotePanel.number;
     const parts: string[] = [];
+    parts.push(
+        tag('rect', {
+            x: num(f.box.x),
+            y: num(f.box.y),
+            width: num(f.box.width),
+            height: num(f.box.height),
+            rx: 6,
+            ry: 6,
+            fill: panelFill,
+            stroke: borderColor,
+            'stroke-width': 1,
+            filter: `url(#${idPrefix}-shadow-subtle)`,
+        }),
+    );
+    parts.push(
+        textTag(
+            {
+                x: num(f.box.x + FOOTNOTE_PANEL_PADDING_PX),
+                y: num(f.box.y + FOOTNOTE_HEADER_BASELINE_OFFSET_PX),
+                'font-family': FONT_STACK.sans,
+                'font-size': 12,
+                'font-weight': 700,
+                fill: headerColor,
+            },
+            'Footnotes',
+        ),
+    );
+    // First entry baseline = panel-top + header band + one panel padding
+    // (the gap between the header band and the first row).
+    const firstEntryBaselineY = f.box.y + FOOTNOTE_HEADER_HEIGHT_PX + FOOTNOTE_PANEL_PADDING_PX;
+    const numberX = f.box.x + FOOTNOTE_PANEL_PADDING_PX;
+    const titleX = numberX + FOOTNOTE_PANEL_PADDING_PX;
     f.entries.forEach((e, i) => {
-        const y = f.box.y + 12 + i * 18;
+        const y = firstEntryBaselineY + i * FOOTNOTE_ROW_HEIGHT;
         parts.push(
             textTag(
-                { x: num(f.box.x + 8), y: num(y), 'font-family': FONT_STACK.sans, 'font-size': 10, 'font-weight': 600, fill: numberColor },
-                `${e.number}.`,
+                { x: num(numberX), y: num(y), 'font-family': FONT_STACK.sans, 'font-size': 10, 'font-weight': 700, fill: numberColor },
+                String(e.number),
             ),
         );
-        const text = e.description ? `${e.title} — ${e.description}` : e.title;
         parts.push(
             textTag(
-                { x: num(f.box.x + 28), y: num(y), 'font-family': FONT_STACK.sans, 'font-size': 10, fill: labelColor },
-                text,
+                { x: num(titleX), y: num(y), 'font-family': FONT_STACK.sans, 'font-size': 11, 'font-weight': 600, fill: titleColor },
+                e.title,
             ),
         );
+        if (e.description) {
+            parts.push(
+                textTag(
+                    { x: num(titleX + Math.max(120, e.title.length * 6)), y: num(y), 'font-family': FONT_STACK.sans, 'font-size': 11, fill: descColor },
+                    `— ${e.description}`,
+                ),
+            );
+        }
     });
     return tag('g', { 'data-layer': 'footnotes' }, parts.join(''));
 }
 
-function renderIncludeRegion(r: PositionedIncludeRegion, theme: 'light' | 'dark'): string {
-    const border = theme === 'dark' ? '#78909c' : '#90a4ae';
-    const label = theme === 'dark' ? '#cfd8dc' : '#37474f';
-    const rect = tag('rect', {
-        x: num(r.box.x + 8),
-        y: num(r.box.y),
-        width: num(r.box.width - 16),
-        height: num(r.box.height),
-        rx: 6,
-        ry: 6,
-        fill: 'transparent',
+function renderIncludeRegion(
+    r: PositionedIncludeRegion,
+    options: RenderOptions,
+    idPrefix: string,
+    palette: Theme,
+): string {
+    const border = palette.includeRegion.border;
+    const fill = palette.includeRegion.fill;
+    const tabFill = palette.includeRegion.tabFill;
+    const tabStroke = palette.includeRegion.tabStroke;
+    const tabText = palette.includeRegion.tabText;
+    const badgeFill = palette.includeRegion.badgeFill;
+    const badgeStroke = palette.includeRegion.badgeStroke;
+    const badgeText = palette.includeRegion.badgeText;
+
+    const rx = r.box.x + 8;
+    const ry = r.box.y;
+    const rw = r.box.width - 16;
+    const rh = r.box.height;
+
+    const region = tag('rect', {
+        x: num(rx),
+        y: num(ry),
+        width: num(rw),
+        height: num(rh),
+        rx: 8,
+        ry: 8,
+        fill,
         stroke: border,
         'stroke-width': 1,
-        'stroke-dasharray': '5 3',
+        'stroke-dasharray': ACCENT_DASH_PATTERN,
     });
-    const text = textTag(
+
+    // Chrome geometry — single source of truth shared with the layout
+    // (`buildIncludeRegions` calls the same helper to size the dashed
+    // bracket so the chrome always fits inside it). All placement Xs
+    // come from the helper directly so the renderer stays declarative.
+    const tabHeight = FRAME_TAB_HEIGHT_PX;
+    const chrome = includeChromeGeometry(r.box.x, r.label, r.sourcePath);
+    const tabY = ry - tabHeight / 2;
+    const tab = tag('rect', {
+        x: num(chrome.tabX),
+        y: num(tabY),
+        width: num(chrome.tabWidth),
+        height: tabHeight,
+        rx: 4,
+        ry: 4,
+        fill: tabFill,
+        stroke: tabStroke,
+        'stroke-width': 1,
+    });
+    const tabLabel = textTag(
         {
-            x: num(r.box.x + 20),
-            y: num(r.box.y + 20),
+            x: num(chrome.tabLabelX),
+            y: num(tabY + FRAME_TAB_LABEL_BASELINE_OFFSET_PX),
             'font-family': FONT_STACK.sans,
-            'font-size': 12,
+            'font-size': 11,
             'font-weight': 600,
-            fill: label,
+            fill: tabText,
         },
         r.label,
     );
-    const badge = textTag(
+
+    // Content badge to the right of the tab. The glyph here is the
+    // stacked-sheets icon, distinct from the item-level link-icon
+    // outbound-arrow: an `include` is a content pull (one document
+    // brings in another), conceptually different from a `link:` that
+    // navigates somewhere.
+    const badgeX = chrome.badgeX;
+    const badgeSize = chrome.badgeSize;
+    const badgeY = ry - badgeSize / 2;
+    const badge = tag('rect', {
+        x: num(badgeX),
+        y: num(badgeY),
+        width: badgeSize,
+        height: badgeSize,
+        rx: 4,
+        ry: 4,
+        fill: badgeFill,
+        stroke: badgeStroke,
+        'stroke-width': 1,
+    });
+    // Glyph: stacked sheets — back rectangle peeking behind front
+    // rectangle. Sized for the 18×18 badge tile.
+    const glyph = tag('path', {
+        d: `M${num(badgeX + 7)} ${num(badgeY + 4)} H${num(badgeX + 14)} V${num(badgeY + 11)}` +
+            ` M${num(badgeX + 4)} ${num(badgeY + 7)} H${num(badgeX + 11)} V${num(badgeY + 14)} H${num(badgeX + 4)} Z`,
+        stroke: badgeText,
+        'stroke-width': 1.4,
+        fill: 'none',
+        'stroke-linecap': 'round',
+        'stroke-linejoin': 'round',
+    });
+    // Halo behind the source-path text. The text's baseline at `ry + 4`
+    // straddles the dashed region border (drawn at y = ry); without a
+    // backing rect the dashed stroke cuts through the text body. Matches
+    // how the tab and badge already mask the border where they cross it.
+    // Fill is `includeRegion.fill` — same cream/tint as the region, near
+    // the canvas surface above, so the halo disappears into both.
+    const sourceFontSize = 9;
+    const sourceTextY = ry + 4;
+    const sourceHalo = tag('rect', {
+        x: num(chrome.sourceHaloX),
+        y: num(sourceTextY - sourceFontSize),
+        width: num(chrome.sourceHaloWidth),
+        height: sourceFontSize + 6,
+        fill,
+    });
+    const sourceText = textTag(
         {
-            x: num(r.box.x + 20),
-            y: num(r.box.y + 36),
+            x: num(chrome.sourceTextX),
+            y: num(sourceTextY),
             'font-family': FONT_STACK.mono,
-            'font-size': 10,
-            fill: label,
-            'fill-opacity': 0.7,
+            'font-size': sourceFontSize,
+            fill: badgeText,
         },
-        `include: ${r.sourcePath}`,
+        r.sourcePath,
     );
-    return tag('g', { 'data-layer': 'include' }, rect + text + badge);
+
+    // Nested swimlanes (laid out by buildIncludeRegions against the parent's timeline).
+    const nested = r.nestedSwimlanes
+        .map((s) => renderSwimlane(s, options, idPrefix, palette))
+        .join('');
+
+    return tag(
+        'g',
+        { 'data-layer': 'include' },
+        region + nested + tab + tabLabel + badge + glyph + sourceHalo + sourceText,
+    );
+}
+
+// Paint the "Powered by nowline" attribution mark inside the
+// layout-supplied `attributionBox`. The whole mark — prefix text,
+// "now", red "l" bar, and "ine" — sits inside one <a href> so the
+// entire string is clickable. Glyph anatomy (positions, widths, scale)
+// lives in `themes/shared.ts` (`ATTRIBUTION_*`); the layout reserves a
+// box of exactly that size at canvas-bottom-right.
+function renderAttributionMark(model: PositionedRoadmap): string {
+    const muted = model.palette.attribution.mark;
+    const accent = model.palette.attribution.link;
+    if (model.swimlanes.length === 0) return '';
+    const tx = model.header.attributionBox.x;
+    const ty = model.header.attributionBox.y;
+    // Both texts share the wordmark's baseline (y = wordmark font size)
+    // so the smaller "Powered by" sits visually above the wordmark's
+    // baseline without bumping the bar's bottom up.
+    const baselineY = ATTRIBUTION_WORDMARK_FONT_SIZE;
+    const inner =
+        textTag(
+            {
+                x: '0',
+                y: baselineY,
+                'font-family': FONT_STACK.sans,
+                'font-size': ATTRIBUTION_PREFIX_FONT_SIZE,
+                'font-weight': 400,
+                fill: muted,
+            },
+            ATTRIBUTION_TEXT,
+        ) +
+        textTag(
+            {
+                x: ATTRIBUTION_NOW_LOGICAL_X,
+                y: baselineY,
+                'font-family': FONT_STACK.sans,
+                'font-size': ATTRIBUTION_WORDMARK_FONT_SIZE,
+                'font-weight': 700,
+                fill: muted,
+            },
+            'now',
+        ) +
+        tag('rect', {
+            x: ATTRIBUTION_BAR_LOGICAL_X,
+            y: 12,
+            width: ATTRIBUTION_BAR_LOGICAL_WIDTH,
+            height: ATTRIBUTION_WORDMARK_FONT_SIZE,
+            fill: accent,
+        }) +
+        textTag(
+            {
+                x: ATTRIBUTION_INE_LOGICAL_X,
+                y: baselineY,
+                'font-family': FONT_STACK.sans,
+                'font-size': ATTRIBUTION_WORDMARK_FONT_SIZE,
+                'font-weight': 400,
+                fill: muted,
+            },
+            'ine',
+        );
+    const group = tag(
+        'g',
+        { transform: `translate(${num(tx)} ${num(ty)}) scale(${num(ATTRIBUTION_SCALE)})` },
+        inner,
+    );
+    return tag(
+        'a',
+        { href: ATTRIBUTION_LINK, target: '_blank', rel: 'noopener', 'aria-label': 'Powered by nowline' },
+        tag('g', { 'data-layer': 'attribution' }, group),
+    );
 }
 
 async function embedLogo(
@@ -663,11 +1968,21 @@ export async function renderSvg(
     const ids = new IdGenerator(options.idPrefix ?? 'nl');
     const idPrefix = ids.next('root');
 
-    const theme = model.theme;
+    const palette = model.palette;
     const parts: string[] = [];
 
-    // <defs>
-    const defs = `<defs>${allShadowDefs(idPrefix)}</defs>`;
+    // <defs> — shadows + arrowhead markers (palette-driven fills baked in).
+    const arrowFillNeutral = palette.arrowhead.neutral;
+    const arrowFillLight = palette.arrowhead.light;
+    const arrowFillDark = palette.arrowhead.dark;
+    const arrowDef = (id: string, fill: string): string =>
+        `<marker id="${id}" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto"><path d="M 0 0 L 10 5 L 0 10 z" fill="${fill}"/></marker>`;
+    const defs =
+        `<defs>${allShadowDefs(idPrefix)}` +
+        arrowDef('nl-arrow', arrowFillNeutral) +
+        arrowDef('nl-arrow-light', arrowFillLight) +
+        arrowDef('nl-arrow-dark', arrowFillDark) +
+        `</defs>`;
     parts.push(defs);
 
     // Background
@@ -681,29 +1996,65 @@ export async function renderSvg(
         }),
     );
 
-    // Timeline (behind everything else in the chart)
-    parts.push(renderTimeline(model.timeline, theme));
+    // Timeline header strip (panels + date labels). Chart-body grid
+    // lines used to live here too, but they were occluded by the
+    // swimlane background rects emitted later — so the major dotted
+    // and minor grid lines never actually rendered in the chart body.
+    // They now ship as their own layer below.
+    parts.push(renderTimeline(model.timeline, palette));
 
-    // Swimlanes
-    for (const s of model.swimlanes) parts.push(renderSwimlane(s, options, idPrefix, theme));
+    // Swimlane backgrounds — emitted as their own pass so the grid
+    // lines can be drawn on top of them, then the swimlane content
+    // (frame tab + items) sits on top of the grid.
+    for (const s of model.swimlanes) parts.push(renderSwimlaneBg(s, palette));
 
-    // Include regions
-    for (const r of model.includes) parts.push(renderIncludeRegion(r, theme));
+    // Chart-body grid lines (major dotted at every labeled tick, plus
+    // optional faint minor lines when minor-grid is set). Drawn after
+    // swimlane backgrounds so they actually span the chart body, but
+    // before items and overlays so item bars sit cleanly on top.
+    parts.push(renderGridLines(model.timeline, model.chartBox.y, palette));
 
-    // Anchors + milestones
-    for (const a of model.anchors) parts.push(renderAnchor(a, idPrefix));
-    for (const m of model.milestones) parts.push(renderMilestone(m, theme));
+    // m2g+: under-bar dependency edges go BEFORE swimlane / item
+    // content. The channel router falls back to under-bar routing when
+    // it can't find a clear vertical gutter between source and target;
+    // these edges intentionally cross item bars and need the item fills
+    // painted ON TOP so the bars stay the visual foreground. Renderer
+    // applies a thinner stroke (see `renderEdge`) to further de-emphasise
+    // the arrow body — only the head and stub at the target end stay
+    // crisply visible.
+    for (const e of model.edges) {
+        if (e.kind === 'underBar') parts.push(renderEdge(e, palette));
+    }
 
-    // Dependency edges on top of items but below nowline
-    for (const e of model.edges) parts.push(renderEdge(e, theme));
+    // Swimlane content (frame tabs + items) on top of the grid lines.
+    for (const s of model.swimlanes) parts.push(renderSwimlane(s, options, idPrefix, palette));
+
+    // Include regions (drawn after own swimlanes so the dashed border + tab
+    // overlay the chart, with their own nested swimlanes inside).
+    for (const r of model.includes) parts.push(renderIncludeRegion(r, options, idPrefix, palette));
+
+    // Normal / overflow dependency edges on top of items but below
+    // cut-lines / nowline. Under-bar edges already painted above.
+    for (const e of model.edges) {
+        if (e.kind !== 'underBar') parts.push(renderEdge(e, palette));
+    }
+
+    // Anchor + milestone cut lines drawn AFTER items so they overlay the
+    // swimlane fills.
+    for (const a of model.anchors) parts.push(renderAnchorCutLine(a, palette));
+    for (const m of model.milestones) parts.push(renderMilestoneCutLine(m, palette));
+
+    // Marker-row diamonds + labels.
+    for (const a of model.anchors) parts.push(renderAnchor(a, palette));
+    for (const m of model.milestones) parts.push(renderMilestone(m, palette));
 
     // Now-line
-    parts.push(renderNowline(model.nowline, theme));
+    parts.push(renderNowline(model.nowline, palette));
 
     // Footnotes + header last (always on top)
-    parts.push(renderFootnotes(model.footnotes, theme));
-    const attribution = 'Made with Nowline';
-    parts.push(renderHeader(model.header, idPrefix, attribution));
+    parts.push(renderFootnotes(model.footnotes, idPrefix, palette));
+    parts.push(renderHeader(model.header, idPrefix, palette));
+    parts.push(renderAttributionMark(model));
 
     // Logo (if header carries one)
     if (model.header.logo && options.assetResolver) {
@@ -724,7 +2075,7 @@ export async function renderSvg(
         viewBox: `0 0 ${num(model.width)} ${num(model.height)}`,
         width: num(model.width),
         height: num(model.height),
-        'data-theme': theme,
+        'data-theme': model.theme,
         'data-generator': 'nowline',
     });
     return `<svg${svgAttrs}>${parts.join('')}</svg>`;
