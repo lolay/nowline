@@ -1,11 +1,11 @@
-# m2j handoff — Dependency arrow attach + routing
+# m2k handoff — Dependency arrow attach + routing
 
 > **Status: completed across three commits — `525f2d6` (visual-edge attach),
 > `a4acd0b` (channel router), `1ce7075` (min stubs + bracket feet). Recorded
 > here as a retrospective so the milestone chain reflects what shipped
 > between m2i and m3.**
 >
-> Canonical entry: [`specs/milestones.md`](../milestones.md) § m2j.
+> Canonical entry: [`specs/milestones.md`](../milestones.md) § m2k.
 > Spec context: [`specs/rendering.md`](../rendering.md) § Dependency Arrows
 > (Attach geometry + Channel Routing).
 
@@ -27,12 +27,12 @@ escalating issues that the m2g routing couldn't address on its own:
    the arrowhead lead-in could collapse to 1–2 px and the leg could clip
    the foot of a parallel `[ ]` bracket.
 
-m2j collects the three fixes — attach, route, tighten — under one milestone
+m2k collects the three fixes — attach, route, tighten — under one milestone
 label so the m2g → … → m3 chain reflects what actually shipped.
 
 ## What landed
 
-Themes mirror [`specs/milestones.md`](../milestones.md) § m2j. Each
+Themes mirror [`specs/milestones.md`](../milestones.md) § m2k. Each
 sub-bullet is one of the three commits.
 
 ### 1. Visual-edge attach + flow dedupe (`525f2d6`)
@@ -140,7 +140,7 @@ Refinements:
   picks up the rare cases where this isn't visually clean.
 - **Under-bar over long detour.** Given the choice between a long,
   loop-around detour and a short orthogonal path that passes behind the
-  occluding bar, m2j picks the latter. The `kind: 'underBar'` z-order +
+  occluding bar, m2k picks the latter. The `kind: 'underBar'` z-order +
   thinner stroke makes the fact that the arrow is "behind" something read
   visually without breaking comprehension.
 - **Batch routing over per-edge.** All requests are collected before any
@@ -169,7 +169,7 @@ Refinements:
   `buildDependencies` (collect → route → emit) and `sequenceItem` (visual
   edge + arrow source maps).
 - Layout context: [`packages/layout/src/layout-context.ts`](../../packages/layout/src/layout-context.ts) —
-  m2j additions: `entityVisualLeftX`, `entityVisualRightX`,
+  m2k additions: `entityVisualLeftX`, `entityVisualRightX`,
   `itemArrowSource`, `itemFlowKey`, `currentFlowKey`.
 - Slack arrow flow dedupe: [`packages/layout/src/nodes/milestone-node.ts`](../../packages/layout/src/nodes/milestone-node.ts) —
   exported helpers `collectMilestonePredecessors` and
@@ -205,18 +205,18 @@ Refinements:
       both render with the under-bar style; other arrows clear their
       bracket nudges.
 - [x] All 365 package tests pass; no lint or type errors.
-- [x] m2j strikethrough applied in [`specs/milestones.md`](../milestones.md).
+- [x] m2k strikethrough applied in [`specs/milestones.md`](../milestones.md).
 - [x] Dependency chain in [`specs/milestones.md`](../milestones.md)
-      reflects `m2i → m2j → m3`.
+      reflects `m2i → m2j → m2k → m3`.
 
 ## Known follow-ups (not blocking m3)
 
 - `search → ui` and `sdk → ui` arrows do not visually merge into a single
   shared trunk; each draws its own elbow into `ui`'s left edge. The user
-  noted this as an aesthetic issue (issue #3 in the m2j review) but
+  noted this as an aesthetic issue (issue #3 in the m2k review) but
   prioritized the cramped-stub and bracket-collision fixes for this
   milestone. A future revisit could group same-target edges into a shared
   arrowhead lead-in.
 - Container-aware routing was explicitly considered and dropped during
-  m2j planning — long detours obscured the dependency. Revisit only if
+  m2k planning — long detours obscured the dependency. Revisit only if
   under-bar fallback becomes visually noisy in larger samples.
