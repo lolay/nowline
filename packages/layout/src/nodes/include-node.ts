@@ -93,6 +93,7 @@ export function buildIncludeRegions(
             markerRowPlacements: new Map(),
             chartTopY: innerStartY,
             chartBottomY: innerStartY,
+            swimlaneBottomY: innerStartY,
             chartRightX: ctx.chartRightX,
         };
         const nestedSwimlanes: PositionedSwimlane[] = [];

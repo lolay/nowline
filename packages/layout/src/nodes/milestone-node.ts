@@ -175,7 +175,7 @@ export class MilestoneNode {
             isOverrun,
             style,
             cutTopY: ctx.chartTopY,
-            cutBottomY: ctx.chartBottomY,
+            cutBottomY: ctx.swimlaneBottomY,
             labelBox,
             labelSide,
         };

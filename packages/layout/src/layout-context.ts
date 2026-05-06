@@ -96,6 +96,15 @@ export interface LayoutContext {
     markerRowPlacements: Map<string, MarkerRowPlacement>;
     chartTopY: number;
     chartBottomY: number;
+    /**
+     * Y coordinate at the bottom of the last swimlane / include region.
+     * Distinct from `chartBottomY`, which extends through any mirrored
+     * bottom timeline tick panel. Marker cut-lines (anchors, milestones)
+     * stop here so they never invade the bottom date strip; the now-line
+     * uses the wider `chartBottomY` (or the bottom panel's bottom edge)
+     * to thread the entire timeline strip.
+     */
+    swimlaneBottomY: number;
     chartRightX: number;
 }
 

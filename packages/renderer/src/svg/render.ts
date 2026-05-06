@@ -372,11 +372,89 @@ function renderHeader(h: PositionedHeader, idPrefix: string, palette: Theme): st
     return tag('g', { 'data-layer': 'header', 'data-id': `${idPrefix}-header` }, card + titleText + authorText);
 }
 
+// Renders the chart-body vertical grid lines (major dotted at every
+// labeled tick, plus optional faint minor lines at every tick when
+// `minorGrid` is set). Emitted as its own layer drawn AFTER the
+// swimlane backgrounds so the lines actually span the chart body
+// instead of being occluded — without this layer the lines would only
+// be visible inside the timeline header strip. Grid lines stay BEHIND
+// items, edges, anchor/milestone cuts, and the now-line so item bars
+// sit cleanly on top of the ruled-paper backdrop.
+function renderGridLines(
+    t: PositionedTimelineScale,
+    swimlaneTopY: number,
+    palette: Theme,
+): string {
+    const gridColor = palette.timeline.gridLine;
+    const minorGridColor = palette.timeline.minorGridLine;
+    // Major lines thread through the FULL timeline strip — they start
+    // at the top of the top date-label panel (when present) and run
+    // all the way through the bottom date-label panel (when one is
+    // mirrored at the chart bottom via `timeline-position:both` or
+    // `timeline-position:bottom`). This ties date labels at both ends
+    // to their column boundaries.
+    //
+    // Minor lines stay quieter: they start at the TOP OF THE TOPMOST
+    // SWIMLANE (i.e. below the top date panel AND below the marker
+    // row, so they don't streak through anchor/milestone diamonds in
+    // the header) and stop ABOVE the bottom date panel.
+    //
+    // Anchor diamonds, milestone markers, and date label text are
+    // rendered later in the orchestrator so they sit on top of any
+    // crossing line.
+    const bottomTickPanelHeight = t.bottomTickPanelHeight ?? 0;
+    const hasBottomTickPanel =
+        t.bottomTickPanelY !== undefined && bottomTickPanelHeight > 0;
+    const majorTopY = t.tickPanelY;
+    const majorBottomY = hasBottomTickPanel
+        ? t.bottomTickPanelY! + bottomTickPanelHeight
+        : t.box.y + t.box.height;
+    // Use the topmost swimlane's top edge directly — `markerRow.height`
+    // alone misses the small gap (`timelineHeightBudget` slack) between
+    // the marker row and the swimlane area, which would leave the minor
+    // lines short and floating in dead space above the swimlane.
+    const minorTopY = swimlaneTopY;
+    const minorBottomY = t.box.y + t.box.height;
+    const parts: string[] = [];
+    for (const tick of t.ticks) {
+        if (tick.major) {
+            // Solid major line at every labeled tick — the dominant
+            // column boundary, drawn in the stronger gridLine color.
+            parts.push(
+                tag('line', {
+                    x1: num(tick.x),
+                    y1: num(majorTopY),
+                    x2: num(tick.x),
+                    y2: num(majorBottomY),
+                    stroke: gridColor,
+                    'stroke-width': 1,
+                }),
+            );
+        } else if (t.minorGrid) {
+            // Solid faint minor line at every non-major tick boundary.
+            // Hierarchy is established by color (lighter than the major)
+            // rather than by texture. Skip the very last tick since it
+            // has no following column — a line at the chart's right edge
+            // just doubles up the chart border.
+            if (tick.labelX === undefined) continue;
+            parts.push(
+                tag('line', {
+                    x1: num(tick.x),
+                    y1: num(minorTopY),
+                    x2: num(tick.x),
+                    y2: num(minorBottomY),
+                    stroke: minorGridColor,
+                    'stroke-width': 1,
+                }),
+            );
+        }
+    }
+    return tag('g', { 'data-layer': 'grid' }, parts.join(''));
+}
+
 function renderTimeline(t: PositionedTimelineScale, palette: Theme): string {
     const panelFill = palette.timeline.panelFill;
     const borderColor = palette.timeline.border;
-    const gridColor = palette.timeline.gridLine;
-    const minorGridColor = palette.timeline.minorGridLine;
     const labelColor = palette.timeline.labelText;
     const parts: string[] = [];
     // Header layout from top: now-pill row → tick-label panel → marker row.
@@ -440,81 +518,43 @@ function renderTimeline(t: PositionedTimelineScale, palette: Theme): string {
             }),
         );
     }
-    // Where the dotted grid lines start (just below the lowest header
-    // panel — date row alone, or marker row when present).
-    const gridTopY = hasMarkerRow
-        ? markerRowY + markerRowHeight
-        : tickPanelY + tickPanelHeight;
-    // Grid lines stop at the chart's bottom edge — which is the TOP of
-    // the bottom tick panel when one is present (so the panel reads as
-    // a clean strip rather than a column-cut zone).
-    const gridBottomY = t.box.y + t.box.height;
+    // Header-only labels — the chart-body grid lines themselves are
+    // emitted by `renderGridLines` after the swimlane backgrounds so
+    // they actually span the chart body rather than being occluded.
     for (const tick of t.ticks) {
-        if (tick.major) {
-            // Label sits at the COLUMN CENTER (tick.labelX), not at the
-            // tick boundary. The last tick has no following column → no
-            // label.
-            if (tick.label && tick.labelX !== undefined) {
-                if (hasTopTickPanel) {
-                    parts.push(
-                        textTag(
-                            {
-                                x: num(tick.labelX),
-                                y: num(tickPanelY + TIMELINE_TICK_LABEL_BASELINE_OFFSET_PX),
-                                'font-family': FONT_STACK.sans,
-                                'font-size': 10,
-                                fill: labelColor,
-                                'text-anchor': 'middle',
-                            },
-                            tick.label,
-                        ),
-                    );
-                }
-                if (hasBottomTickPanel) {
-                    parts.push(
-                        textTag(
-                            {
-                                x: num(tick.labelX),
-                                y: num(bottomTickPanelY! + TIMELINE_TICK_LABEL_BASELINE_OFFSET_PX),
-                                'font-family': FONT_STACK.sans,
-                                'font-size': 10,
-                                fill: labelColor,
-                                'text-anchor': 'middle',
-                            },
-                            tick.label,
-                        ),
-                    );
-                }
-            }
-            // Dotted grid line drops from below the lowest header panel
-            // through the swimlane area, at the column BOUNDARY (tick.x).
+        if (!tick.major) continue;
+        if (!tick.label || tick.labelX === undefined) continue;
+        // Label sits at the COLUMN CENTER (tick.labelX), not at the
+        // tick boundary. The last tick has no following column → no
+        // label.
+        if (hasTopTickPanel) {
             parts.push(
-                tag('line', {
-                    x1: num(tick.x),
-                    y1: num(gridTopY),
-                    x2: num(tick.x),
-                    y2: num(gridBottomY),
-                    stroke: gridColor,
-                    'stroke-width': 1,
-                    'stroke-dasharray': '2 3',
-                }),
+                textTag(
+                    {
+                        x: num(tick.labelX),
+                        y: num(tickPanelY + TIMELINE_TICK_LABEL_BASELINE_OFFSET_PX),
+                        'font-family': FONT_STACK.sans,
+                        'font-size': 10,
+                        fill: labelColor,
+                        'text-anchor': 'middle',
+                    },
+                    tick.label,
+                ),
             );
-        } else if (t.minorGrid) {
-            // Faint minor-tick grid line at every non-major boundary.
-            // Skip the very last tick since it has no following column —
-            // a line at the chart's right edge just doubles up the
-            // chart border.
-            if (tick.labelX === undefined) continue;
+        }
+        if (hasBottomTickPanel) {
             parts.push(
-                tag('line', {
-                    x1: num(tick.x),
-                    y1: num(gridTopY),
-                    x2: num(tick.x),
-                    y2: num(gridBottomY),
-                    stroke: minorGridColor,
-                    'stroke-width': 1,
-                    'stroke-dasharray': '1 4',
-                }),
+                textTag(
+                    {
+                        x: num(tick.labelX),
+                        y: num(bottomTickPanelY! + TIMELINE_TICK_LABEL_BASELINE_OFFSET_PX),
+                        'font-family': FONT_STACK.sans,
+                        'font-size': 10,
+                        fill: labelColor,
+                        'text-anchor': 'middle',
+                    },
+                    tick.label,
+                ),
             );
         }
     }
@@ -1134,16 +1174,16 @@ function renderTrackChild(c: PositionedTrackChild, options: RenderOptions, idPre
     return renderParallel(c, options, idPrefix, palette);
 }
 
-function renderSwimlane(s: PositionedSwimlane, options: RenderOptions, idPrefix: string, palette: Theme): string {
+// Renders only the swimlane's background tint rect. Emitted before the
+// chart-body grid lines so those lines visibly span the full chart width.
+// The frame tab (chiclet at top-left) and item content are emitted later,
+// in renderSwimlaneContent, so they appear on top of the grid.
+function renderSwimlaneBg(s: PositionedSwimlane, palette: Theme): string {
     const tint = s.bandIndex % 2 === 0 ? palette.swimlane.rowTintEven : palette.swimlane.rowTintOdd;
     const borderColor = palette.swimlane.border;
-    const tabFill = palette.swimlane.tabFill;
-    const tabStroke = palette.swimlane.tabStroke;
-    const tabText = palette.swimlane.tabText;
-    const ownerText = palette.swimlane.ownerText;
-    const footnoteColor = palette.swimlane.footnoteIndicator;
-    const parts: string[] = [];
-    parts.push(
+    return tag(
+        'g',
+        { 'data-layer': 'swimlane-bg', 'data-id': s.id ?? null },
         tag('rect', {
             x: num(s.box.x),
             y: num(s.box.y),
@@ -1154,6 +1194,15 @@ function renderSwimlane(s: PositionedSwimlane, options: RenderOptions, idPrefix:
             'stroke-width': 1,
         }),
     );
+}
+
+function renderSwimlane(s: PositionedSwimlane, options: RenderOptions, idPrefix: string, palette: Theme): string {
+    const tabFill = palette.swimlane.tabFill;
+    const tabStroke = palette.swimlane.tabStroke;
+    const tabText = palette.swimlane.tabText;
+    const ownerText = palette.swimlane.ownerText;
+    const footnoteColor = palette.swimlane.footnoteIndicator;
+    const parts: string[] = [];
     // Frame-tab chiclet at the top-left of the band — auto-sized to fit
     // title + owner. Geometry comes from the shared `frameTabGeometry`
     // helper that the layout's row-packer also calls, so the chiclet's
@@ -1793,10 +1842,25 @@ export async function renderSvg(
         }),
     );
 
-    // Timeline (behind everything else in the chart)
+    // Timeline header strip (panels + date labels). Chart-body grid
+    // lines used to live here too, but they were occluded by the
+    // swimlane background rects emitted later — so the major dotted
+    // and minor grid lines never actually rendered in the chart body.
+    // They now ship as their own layer below.
     parts.push(renderTimeline(model.timeline, palette));
 
-    // Swimlanes
+    // Swimlane backgrounds — emitted as their own pass so the grid
+    // lines can be drawn on top of them, then the swimlane content
+    // (frame tab + items) sits on top of the grid.
+    for (const s of model.swimlanes) parts.push(renderSwimlaneBg(s, palette));
+
+    // Chart-body grid lines (major dotted at every labeled tick, plus
+    // optional faint minor lines when minor-grid is set). Drawn after
+    // swimlane backgrounds so they actually span the chart body, but
+    // before items and overlays so item bars sit cleanly on top.
+    parts.push(renderGridLines(model.timeline, model.chartBox.y, palette));
+
+    // Swimlane content (frame tabs + items) on top of the grid lines.
     for (const s of model.swimlanes) parts.push(renderSwimlane(s, options, idPrefix, palette));
 
     // Include regions (drawn after own swimlanes so the dashed border + tab

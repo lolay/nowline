@@ -1305,10 +1305,20 @@ function buildNowline(
     } else {
         pillMode = 'center';
     }
+    // Bottom-most Y the now-line should reach. When a mirrored bottom
+    // tick panel exists, thread the line through it (so the line ties
+    // the two date strips together visually). Otherwise stop at the
+    // last swimlane — never extend into the footnote area below.
+    const bottomTickPanelY = ctx.timeline.bottomTickPanelY;
+    const bottomTickPanelHeight = ctx.timeline.bottomTickPanelHeight ?? 0;
+    const lineBottomY =
+        bottomTickPanelY !== undefined && bottomTickPanelHeight > 0
+            ? bottomTickPanelY + bottomTickPanelHeight
+            : ctx.swimlaneBottomY;
     return {
         x,
         topY: lineTopY,
-        bottomY: ctx.chartBottomY,
+        bottomY: lineBottomY,
         pillTopY,
         pillMode,
         label: 'Today',

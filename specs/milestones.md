@@ -232,6 +232,14 @@ Now-pill & canvas:
 - Refine output: gutter token, tighter trailing tick, attribution mark
 - Resolve `after:<anchor>` and reverse-side footnotes on items
 
+Timeline visibility on tall canvases:
+- Add `timeline-position` style (`top` (default), `bottom`, `both`); `both` mirrors the date strip at the chart bottom so dates stay readable without scrolling back to the top. The mirrored strip shares fill, border, label color, and tick positions with the top strip; it has no now-pill and no marker row.
+- Add `minor-grid` style (boolean, opt-in) — draws faint solid grid lines at every tick boundary in addition to the major-tick lines.
+- Promote chart-body grid lines to a dedicated `grid` layer drawn after swimlane backgrounds so they actually appear in the chart body (previously occluded by the opaque swimlane fills, only visible inside the timeline header).
+- Tune palette so the major grid line is darker than the minor line, both solid — visual hierarchy by color rather than texture (`theme.timeline.gridLine` + `theme.timeline.minorGridLine`).
+- Major grid lines thread the entire timeline strip (top date panel through bottom date panel when one is mirrored); minor grid lines stay inside the chart body, starting at the topmost swimlane top edge and stopping above the bottom date panel so they don't streak through the marker row or compete with date labels.
+- Introduce `swimlaneBottomY` on the layout context, distinct from `chartBottomY`. Milestone and anchor cut-lines now stop at the last swimlane (no longer invading the bottom date strip when one is mirrored). The now-line stops at the bottom date panel when present, otherwise at the last swimlane; it no longer extends through the footnote area.
+
 Test harness:
 - Add `tests/` harness for renderer manual validation; add `item-bumps-up` and `isolate-include-multi` fixtures
 - Strip dead `layout-v2/` links from spec + code; remove the layout-v2 prototype

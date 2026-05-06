@@ -355,6 +355,7 @@ export class RoadmapNode {
             markerRowPlacements,
             chartTopY: timelineY + timelineHeightBudget,
             chartBottomY: 0,
+            swimlaneBottomY: 0,
             chartRightX: finalChartRightX,
         };
 
@@ -471,6 +472,7 @@ export class RoadmapNode {
         }
 
         ctx.chartBottomY = y;
+        ctx.swimlaneBottomY = y;
         timeline.box.height = ctx.chartBottomY - timeline.box.y;
 
         // Milestones first so anchors know which xs are occupied (for
@@ -556,6 +558,7 @@ export class RoadmapNode {
             ctx.timeline.box.height += deltaY;
             ctx.chartTopY += deltaY;
             ctx.chartBottomY += deltaY;
+            ctx.swimlaneBottomY += deltaY;
             for (const lane of swimlanes) shiftSwimlaneY(lane, deltaY);
             for (const inc of includes) shiftIncludeY(inc, deltaY);
             // Item entityMidpoints were captured during swimlane
@@ -572,7 +575,7 @@ export class RoadmapNode {
             }
             for (const m of milestones) {
                 m.cutTopY = ctx.chartTopY;
-                m.cutBottomY = ctx.chartBottomY;
+                m.cutBottomY = ctx.swimlaneBottomY;
                 // Slack arrows were baked with the pre-shift attach Y
                 // when buildMilestones ran above. Shift them now so
                 // they land on the same row band as the (now-shifted)
@@ -589,18 +592,15 @@ export class RoadmapNode {
         // y honors the final chartBottomY. `timeline.box.height` stays
         // anchored to the chart's bottom edge — grid lines therefore
         // stop at the panel's TOP, not at its bottom — while the panel
-        // gets its own fill / border / labels in the renderer. The
-        // already-built milestones extend their cut lines through the
-        // panel; anchors picked up below see the bumped chartBottomY
-        // automatically.
+        // gets its own fill / border / labels in the renderer. Milestone
+        // and anchor cut-lines stay anchored to `swimlaneBottomY` so
+        // they never invade the bottom date strip; only the now-line
+        // (and full-height major grid lines) thread through this panel.
         if (showBottomTickPanel) {
             const gapAbovePanel = 8;
             ctx.timeline.bottomTickPanelY = ctx.chartBottomY + gapAbovePanel;
             ctx.timeline.bottomTickPanelHeight = TIMELINE_TICK_PANEL_HEIGHT_PX;
             ctx.chartBottomY += gapAbovePanel + TIMELINE_TICK_PANEL_HEIGHT_PX;
-            for (const m of milestones) {
-                m.cutBottomY = ctx.chartBottomY;
-            }
         }
 
         const milestoneXs = new Set<number>(milestones.map((m) => m.center.x));
@@ -608,19 +608,15 @@ export class RoadmapNode {
         const itemsMap = deps.collectItems(laneEntries);
         const edges = deps.buildDependencies(itemsMap, ctx);
 
-        // Now-line (if today is within the window). Initially drops to
-        // the bottom of the chart area; if a footnote panel exists below
-        // we extend it through the panel so the line still reads as a
-        // single sweep.
+        // Now-line (if today is within the window). Stops at the bottom
+        // timeline panel when present, otherwise at the last swimlane —
+        // see `buildNowline`. Footnote panels below do not extend it.
         const nowline = deps.buildNowline(options.today, ctx);
 
         // Finalize footnotes at the bottom.
         const foot = buildFootnotes(resolved.content.footnotes, ctx, ctx.chartBottomY);
         ctx.footnoteIndex = foot.index;
         ctx.footnoteHosts = foot.hosts;
-        if (nowline && foot.area.box.height > 0) {
-            nowline.bottomY = foot.area.box.y + foot.area.box.height;
-        }
 
         // Header (depends on chart height in beside-mode and on the
         // final canvas width in above-mode).
