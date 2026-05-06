@@ -24,6 +24,68 @@ import {
     MARKER_DIAMOND_RADIUS_PX,
 } from './marker-geometry.js';
 
+/**
+ * One predecessor of a milestone with everything the slack-arrow
+ * pipeline needs: its source x (visual right edge for items, marker
+ * centerX for anchors / other milestones), its attach y (bar bottom
+ * strip when text spills, row mid otherwise), and its flow key (used
+ * to dedupe so a chained-flow's siblings collapse to the last entry).
+ */
+export interface MilestonePredecessor {
+    ref: string;
+    x: number;
+    y: number;
+    flowKey: string;
+}
+
+/**
+ * Resolve each `after:` reference into a `MilestonePredecessor`.
+ * Items use their VISUAL right edge as the slack source so the
+ * arrow leaves the painted bar instead of landing in the inter-
+ * column gutter; markers (anchors / other milestones) fall back
+ * to their cut-line centerX. Refs whose target is unknown drop
+ * silently — matches the legacy continue path.
+ */
+export function collectMilestonePredecessors(
+    refs: string[],
+    ctx: LayoutContext,
+): MilestonePredecessor[] {
+    const out: MilestonePredecessor[] = [];
+    for (const ref of refs) {
+        const visualRight = ctx.entityVisualRightX.get(ref);
+        const x = visualRight ?? ctx.entityRightEdges.get(ref);
+        if (x === undefined) continue;
+        const y = ctx.itemSlackAttachY.get(ref)
+            ?? ctx.entityMidpoints.get(ref)?.y
+            ?? 0;
+        // Markers don't share a flow with anything, so use their id
+        // as a unique flow key — every marker stands on its own.
+        const flowKey = ctx.itemFlowKey.get(ref) ?? `marker:${ref}`;
+        out.push({ ref, x, y, flowKey });
+    }
+    return out;
+}
+
+/**
+ * Keep only the rightmost predecessor per flow key. Two
+ * predecessors share a flow when they sit in the same deepest
+ * single-track container (swimlane root, sequential group, or one
+ * sub-track of a parallel) — file order already encodes their
+ * ordering, so only the latest entry contributes a slack arrow.
+ * Predecessors in different flows (e.g. two parallel sub-tracks)
+ * each survive as their flow's last entry.
+ */
+export function lastPredecessorPerFlow(
+    preds: MilestonePredecessor[],
+): MilestonePredecessor[] {
+    const m = new Map<string, MilestonePredecessor>();
+    for (const p of preds) {
+        const existing = m.get(p.flowKey);
+        if (!existing || p.x > existing.x) m.set(p.flowKey, p);
+    }
+    return Array.from(m.values());
+}
+
 function decideLabelBoxForCanvas(
     centerX: number,
     centerY: number,
@@ -87,43 +149,39 @@ export class MilestoneNode {
                 labelBox = placement.labelBox;
                 labelSide = placement.labelSide;
             }
-            // Date-pinned milestones with `after:` predecessors that
-            // would overrun the date show a single slack arrow from
-            // the latest predecessor's right edge.
-            let maxEnd = 0;
-            let maxY = 0;
-            for (const ref of afterRaw) {
-                const end = ctx.entityRightEdges.get(ref);
-                if (end === undefined) continue;
-                if (end > maxEnd) {
-                    maxEnd = end;
-                    // Items publish a slack-attach Y that drops to the bar's
-                    // bottom strip when the caption spills right; non-items
-                    // (anchors, other milestones) fall back to the row mid.
-                    maxY = ctx.itemSlackAttachY.get(ref)
-                        ?? ctx.entityMidpoints.get(ref)?.y
-                        ?? 0;
-                }
+            // Date-pinned milestones whose `after:` predecessors finish
+            // past the pinned date are flagged `isOverrun`; the latest
+            // last-of-flow predecessor draws a single overrun arrow
+            // pointing back from its visual right edge to the
+            // milestone's column. Flow-dedupe avoids stacking redundant
+            // arrows from sibling items in one chained flow.
+            const preds = collectMilestonePredecessors(afterRaw, ctx);
+            const dedupedPreds = lastPredecessorPerFlow(preds);
+            let maxPred: MilestonePredecessor | null = null;
+            for (const p of dedupedPreds) {
+                if (!maxPred || p.x > maxPred.x) maxPred = p;
             }
-            if (maxEnd > x) {
+            if (maxPred && maxPred.x > x) {
                 isOverrun = true;
-                slackArrows = [{ x: maxEnd, y: maxY > 0 ? maxY : centerY }];
+                slackArrows = [{
+                    x: maxPred.x,
+                    y: maxPred.y > 0 ? maxPred.y : centerY,
+                }];
             }
         } else if (afterRaw.length > 0) {
             // Float to the rightmost (binding) predecessor; every
-            // earlier-finishing predecessor produces its own slack arrow.
-            type Pred = { ref: string; x: number; y: number };
-            const preds: Pred[] = [];
-            for (const ref of afterRaw) {
-                const end = ctx.entityRightEdges.get(ref);
-                if (end === undefined) continue;
-                const yAttach = ctx.itemSlackAttachY.get(ref)
-                    ?? ctx.entityMidpoints.get(ref)?.y
-                    ?? 0;
-                preds.push({ ref, x: end, y: yAttach });
-            }
-            preds.sort((a, b) => b.x - a.x);
-            const maxEnd = preds[0]?.x ?? ctx.timeline.originX;
+            // last-of-flow predecessor that finishes EARLIER than the
+            // binding contributes one slack arrow. Predecessors in the
+            // same single-track flow (sequential group, swimlane root,
+            // one parallel sub-track) collapse to just their last
+            // entry — file order encodes the dependency chain, so only
+            // the rightmost matters. Predecessors in different flows
+            // (e.g. two parallel sub-tracks) each contribute their own
+            // last-of-flow arrow.
+            const preds = collectMilestonePredecessors(afterRaw, ctx);
+            const dedupedPreds = lastPredecessorPerFlow(preds);
+            dedupedPreds.sort((a, b) => b.x - a.x);
+            const maxEnd = dedupedPreds[0]?.x ?? ctx.timeline.originX;
             centerX = maxEnd;
             fixed = false;
             // Provisional placement — RoadmapNode runs a unified
@@ -145,8 +203,8 @@ export class MilestoneNode {
                 labelSide,
             });
             const arrows: Array<{ x: number; y: number }> = [];
-            for (let i = 1; i < preds.length; i++) {
-                const p = preds[i];
+            for (let i = 1; i < dedupedPreds.length; i++) {
+                const p = dedupedPreds[i];
                 if (p.x < maxEnd && p.y > 0) arrows.push({ x: p.x, y: p.y });
             }
             if (arrows.length > 0) slackArrows = arrows;

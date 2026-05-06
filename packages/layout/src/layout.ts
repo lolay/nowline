@@ -120,6 +120,12 @@ import { buildIncludeRegions } from './nodes/include-node.js';
 import { RoadmapNode } from './nodes/roadmap-node.js';
 import { type LayoutContext, type TrackCursor, type LayoutHelpers, newCursor } from './layout-context.js';
 import { propValue, propValues, parseDate } from './dsl-utils.js';
+import {
+    ChannelGrid,
+    collectRoutingObstacles,
+    routeChannelEdges,
+    type EdgeRouteRequest,
+} from './edge-routing.js';
 
 export interface LayoutOptions {
     theme?: ThemeName;
@@ -728,6 +734,32 @@ function sequenceItem(
             x: (logicalLeft + logicalRight) / 2,
             y: itemBox.y + itemBox.height / 2,
         });
+        // Visual edges — where dependency arrows actually attach. These
+        // sit ITEM_INSET_PX inside the column boundaries so the arrows
+        // emerge from the painted bar edge instead of the inter-column
+        // gutter. See LayoutContext.entityVisualLeftX/RightX.
+        ctx.entityVisualLeftX.set(id, itemBox.x);
+        ctx.entityVisualRightX.set(id, itemBox.x + itemBox.width);
+        // Dependency-arrow source point. Default = the bar's right
+        // edge at row midpoint. When the caption spills past the
+        // bar's right edge (`textSpills`), the spilled title /
+        // meta occupy the area immediately right of the bar at
+        // row midline. Keep X on the bar's right edge so the
+        // arrow visually leaves the bar's side, but drop Y to the
+        // vertical center of the bottom progress strip so the
+        // arrow runs UNDERNEATH the spilled text rather than
+        // through it. Mirrors the slack-arrow attach below.
+        const arrowSource: Point = textSpills
+            ? {
+                  x: itemBox.x + itemBox.width,
+                  y: itemBox.y + itemBox.height - PROGRESS_STRIP_HEIGHT_PX / 2,
+              }
+            : {
+                  x: itemBox.x + itemBox.width,
+                  y: itemBox.y + itemBox.height / 2,
+              };
+        ctx.itemArrowSource.set(id, arrowSource);
+        ctx.itemFlowKey.set(id, ctx.currentFlowKey);
         // Slack-arrow attach Y. Defaults to the bar's row midpoint; when
         // the caption spills past the bar's right edge, drop to the
         // progress-strip's vertical center so the arrow aligns with the
@@ -1287,46 +1319,92 @@ function computeContentEndDay(
     return maxDay;
 }
 
-// Orthogonal (Manhattan) dep-edge routing: source-right → vertical-elbow →
-// target-left, with a small horizontal stub before the elbow on each side
-// (10 px) so the renderer can draw rounded corners cleanly.
-function routeEdge(from: Point, to: Point): Point[] {
-    if (Math.abs(from.y - to.y) < 0.5) {
-        return [from, to];
-    }
-    const stubOut = 10;
-    const elbowX = Math.max(from.x + stubOut, to.x - stubOut);
-    return [
-        from,
-        { x: elbowX, y: from.y },
-        { x: elbowX, y: to.y },
-        to,
-    ];
-}
-
 function buildDependencies(
     items: Map<string, ItemDeclaration>,
+    swimlanes: PositionedSwimlane[],
+    includes: PositionedIncludeRegion[],
     ctx: LayoutContext,
 ): PositionedDependencyEdge[] {
-    const out: PositionedDependencyEdge[] = [];
+    // m2g+: collect every painted item bar + every visible parallel /
+    // group bracket once, hand to the channel router so it can drop
+    // vertical legs in clean inter-column gutters and nudge away from
+    // bracket strokes that would otherwise be hugged.
+    const grid = new ChannelGrid(collectRoutingObstacles(swimlanes, includes));
+
+    interface Pending {
+        fromId: string;
+        toId: string;
+    }
+    const requests: EdgeRouteRequest[] = [];
+    const pending: Pending[] = [];
+
     for (const [id, item] of items) {
         const afters = propValues(item.properties, 'after');
+        const targetMid = ctx.entityMidpoints.get(id);
+        const targetVisualLeftX = ctx.entityVisualLeftX.get(id);
+        if (!targetMid || targetVisualLeftX === undefined) continue;
+        // The arrow always TERMINATES at the target item's left
+        // visual edge, vertically centered on the bar.
+        const targetPoint: Point = { x: targetVisualLeftX, y: targetMid.y };
         for (const pred of afters) {
-            const from = ctx.entityMidpoints.get(pred);
-            const to = ctx.entityMidpoints.get(id);
-            if (!from || !to) continue;
-            // Skip self- or same-lane contiguous edges; we only draw
-            // cross-lane / non-adjacent hops to reduce visual noise.
-            if (Math.abs(from.y - to.y) < 0.5 && to.x - from.x < 20) continue;
-            const waypoints = routeEdge(from, to);
-            out.push({
+            // Source point depends on what kind of predecessor `pred`
+            // is. For ITEMS we use the per-item arrow source point
+            // — (visualRight, midY) by default, dropping to
+            // (visualRight, bar.bottom - PROGRESS_STRIP_HEIGHT/2) when
+            // the caption spilled past the right edge so the arrow
+            // exits below the spilled title / meta text. For ANCHORS
+            // / MILESTONES we attach to the marker's vertical CUT
+            // LINE at the TARGET item's row mid-Y — the dashed/solid
+            // cut line already drops through the chart and reads as
+            // the arrow's stem, so a short horizontal stub from the
+            // line into the bar's left edge is the cleanest
+            // connection.
+            const itemSource = ctx.itemArrowSource.get(pred);
+            let from: Point;
+            const isMarkerPred = itemSource === undefined;
+            if (itemSource) {
+                from = itemSource;
+            } else {
+                const markerMid = ctx.entityMidpoints.get(pred);
+                if (!markerMid) continue;
+                from = { x: markerMid.x, y: targetMid.y };
+            }
+            // Skip same-row contiguous chains for ITEM → ITEM only:
+            // when the target sits immediately to the right of the
+            // source on the same row, the spatial flow already
+            // conveys ordering and an arrow is redundant noise.
+            // MARKER → ITEM stubs always draw (the cut line is the
+            // stem; the short stub completes the visual connection
+            // even when the bar is right next to the cut line).
+            if (
+                !isMarkerPred &&
+                Math.abs(from.y - targetPoint.y) < 0.5 &&
+                targetPoint.x - from.x < 20
+            ) {
+                continue;
+            }
+            requests.push({
                 fromId: pred,
                 toId: id,
-                waypoints,
-                kind: 'normal',
-                style: resolveStyle('item', [], ctx.styleCtx),
+                from,
+                to: targetPoint,
+                isMarkerSource: isMarkerPred,
             });
+            pending.push({ fromId: pred, toId: id });
         }
+    }
+
+    const routed = routeChannelEdges(requests, grid);
+    const out: PositionedDependencyEdge[] = [];
+    for (let i = 0; i < routed.length; i++) {
+        const r = routed[i];
+        out.push({
+            fromId: pending[i].fromId,
+            toId: pending[i].toId,
+            waypoints: r.waypoints,
+            kind: r.underBar ? 'underBar' : 'normal',
+            style: resolveStyle('item', [], ctx.styleCtx),
+        });
     }
     return out;
 }

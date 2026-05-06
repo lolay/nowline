@@ -88,6 +88,12 @@ export class GroupNode {
         const style = resolveStyle('group', node.properties, ctx.styleCtx);
         const startX = cursor.x;
         const title = node.title ?? node.name;
+
+        // Group children chain in time inside the group, so they
+        // form one sub-flow under the parent's flow path. See
+        // `LayoutContext.currentFlowKey`.
+        const previousFlowKey = ctx.currentFlowKey;
+        ctx.currentFlowKey = `${previousFlowKey}/group:${node.name ?? 'g'}`;
         // Mirrors `renderGroup`'s `hasFill` decision so the painted box
         // and the layout's reservation agree on whether a chiclet exists.
         const hasChiclet =
@@ -255,6 +261,7 @@ export class GroupNode {
             ctx.entityLeftEdges.set(id, box.x);
             ctx.entityRightEdges.set(id, box.x + box.width);
         }
+        ctx.currentFlowKey = previousFlowKey;
         return {
             kind: 'group',
             id,

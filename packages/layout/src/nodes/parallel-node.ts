@@ -54,8 +54,18 @@ export class ParallelNode {
         let maxRight = startX;
         let accumulatedHeight = 0;
 
+        // Each child of a parallel block lives on its own sub-track,
+        // so each child starts a fresh flow segment under the parent's
+        // path. Two predecessors that sit on different parallel
+        // sub-tracks therefore stay in different flows for milestone
+        // slack-arrow dedupe.
+        const previousFlowKey = ctx.currentFlowKey;
+        const parId = node.name ?? 'p';
+
+        let childIndex = 0;
         for (const child of node.content) {
             if (child.$type === 'DescriptionDirective') continue;
+            ctx.currentFlowKey = `${previousFlowKey}/par:${parId}#${childIndex}`;
             const subCursor = deps.newCursor(startX, startY + accumulatedHeight);
             const positioned = deps.sequenceOne(
                 child as ItemDeclaration | GroupBlock,
@@ -65,7 +75,9 @@ export class ParallelNode {
             children.push(positioned);
             accumulatedHeight += Math.max(ctx.bandScale.step(), subCursor.height);
             maxRight = Math.max(maxRight, subCursor.maxX);
+            childIndex++;
         }
+        ctx.currentFlowKey = previousFlowKey;
 
         const box: BoundingBox = {
             x: startX,

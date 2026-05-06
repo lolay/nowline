@@ -223,6 +223,14 @@ export class SwimlaneNode {
         const laneLeftX = origin.x;
         const step = ctx.bandScale.step();
 
+        // Each swimlane root opens a fresh flow — its direct children
+        // chain in time, so a milestone's `after:` predecessors that
+        // share a swimlane collapse to the latest one in file order
+        // (file order encodes the dependency on its own). Restored at
+        // the bottom of `place()`.
+        const previousFlowKey = ctx.currentFlowKey;
+        ctx.currentFlowKey = `lane:${lane.name ?? bandIndex}`;
+
         // Resolve lane capacity early — its width feeds into the
         // chiclet's right-edge collision calculation, which determines
         // whether the first row sits at TAB_TOP_Y or TAB_BOTTOM_Y.
@@ -412,6 +420,7 @@ export class SwimlaneNode {
               })()
             : null;
 
+        ctx.currentFlowKey = previousFlowKey;
         return {
             positioned: {
                 id: lane.name,
