@@ -1,8 +1,11 @@
 // m5 — size + capacity duration derivation and remaining-literal
 // normalization. These tests pin the layout-level contract:
-//   1. `duration:LITERAL` is the calendar duration; `size:NAME` (if also
-//      present) is annotation only (the bar paints `duration`).
-//   2. `size:NAME` alone derives `effort_days / capacity` (default cap = 1).
+//   1. `duration:LITERAL` is the calendar duration when set; if `size:`
+//      is also present, it does not appear on the meta line (driver is
+//      the literal only).
+//   2. `size:NAME` alone derives `effort_days / capacity` (default cap = 1)
+//      and the meta line shows the size chip only (bar width carries
+//      calendar span).
 //   3. `remaining:LITERAL` is single-engineer days and normalizes to a
 //      0..1 progress fraction against the item's total single-engineer
 //      effort (`size.effortDays`, OR `duration_days × capacity`).
@@ -116,14 +119,14 @@ describe('m5 — remaining: literal normalizes against single-engineer effort', 
     });
 });
 
-describe('m6 — size chip on the meta line', () => {
-    it('prefixes metaText with the size id verbatim when no title is provided', async () => {
-        // size:m, no title → chip text is "m" (case as typed). The
-        // derived calendar duration of 1w shows beside it.
+describe('m6 — size chip on the meta line (driver-only)', () => {
+    it('shows the size chip alone as driver when size: drives (no duration:)', async () => {
+        // size:m, no title → chip text is "m" (case as typed). Derived
+        // calendar span is encoded in bar width only — not duplicated in meta.
         const item = await firstItem(
             `nowline v1\n\nconfig\nsize m effort:1w\n\nroadmap r start:2026-01-05\n\nswimlane s\n  item a size:m\n`,
         );
-        expect(item.metaText).toBe('m 1w');
+        expect(item.metaText).toBe('m');
     });
 
     it('uses the size title when provided (author opt-in for a custom chip label)', async () => {
@@ -133,7 +136,7 @@ describe('m6 — size chip on the meta line', () => {
         const item = await firstItem(
             `nowline v1\n\nconfig\nsize m "M" effort:1w\n\nroadmap r start:2026-01-05\n\nswimlane s\n  item a size:m\n`,
         );
-        expect(item.metaText).toBe('M 1w');
+        expect(item.metaText).toBe('M');
     });
 
     it('preserves the id case as typed when no title is set', async () => {
@@ -144,41 +147,35 @@ describe('m6 — size chip on the meta line', () => {
         const lower = await firstItem(
             `nowline v1\n\nconfig\nsize med effort:1w\n\nroadmap r start:2026-01-05\n\nswimlane s\n  item a size:med\n`,
         );
-        expect(lower.metaText).toBe('med 1w');
+        expect(lower.metaText).toBe('med');
         const upper = await firstItem(
             `nowline v1\n\nconfig\nsize MED effort:1w\n\nroadmap r start:2026-01-05\n\nswimlane s\n  item a size:MED\n`,
         );
-        expect(upper.metaText).toBe('MED 1w');
+        expect(upper.metaText).toBe('MED');
     });
 
-    it('reflects the derived calendar duration, not the raw effort literal', async () => {
-        // effort:1w (5d) ÷ capacity:5 = 1d on the calendar. Meta must
-        // read "m 1d" — showing the size's effort literal here would
-        // mislead readers about the bar's actual width.
+    it('shows chip only after dividing effort by capacity (derived span not in meta)', async () => {
+        // effort:1w (5d) ÷ capacity:5 = 1d on the calendar — bar encodes
+        // it; meta shows the driver chip only.
         const item = await firstItem(
             `nowline v1\n\nconfig\nsize m effort:1w\n\nroadmap r start:2026-01-05\n\nswimlane s\n  item a size:m capacity:5\n`,
         );
-        expect(item.metaText).toBe('m 1d');
+        expect(item.metaText).toBe('m');
     });
 
-    it('keeps the explicit duration: literal verbatim and still shows the chip', async () => {
-        // duration: wins for the bar; the chip is annotation-only per
-        // specs/dsl.md "Sizing precedence" → "lg 2w" even when the
-        // size would otherwise have derived a different value.
+    it('uses duration literal as sole meta driver when both size: and duration: are set', async () => {
+        // duration: wins for the bar AND meta — no chip on the line.
         const item = await firstItem(
             `nowline v1\n\nconfig\nsize lg effort:2w\n\nroadmap r start:2026-01-05\n\nswimlane s\n  item a size:lg duration:2w capacity:2\n`,
         );
-        expect(item.metaText).toBe('lg 2w');
+        expect(item.metaText).toBe('2w');
     });
 
-    it('renders the on-bar reading order as [size chip] [duration] [capacity suffix]', async () => {
-        // Capacity suffix paints separately AFTER metaText (renderer
-        // uses metaText width as its x offset); we just need to confirm
-        // metaText itself ends right where the suffix expects to begin.
+    it('puts [driver] before capacity suffix width accounting (metaText is chip only)', async () => {
         const item = await firstItem(
             `nowline v1\n\nconfig\nsize m effort:2w\n\nroadmap r start:2026-01-05\n\nswimlane s\n  item a size:m capacity:2\n`,
         );
-        expect(item.metaText).toBe('m 1w');
+        expect(item.metaText).toBe('m');
         expect(item.capacity?.text).toBe('2');
         expect(item.capacity?.icon).toEqual({ kind: 'builtin', name: 'multiplier' });
     });
@@ -190,15 +187,32 @@ describe('m6 — size chip on the meta line', () => {
         expect(item.metaText).toBe('1w');
     });
 
-    it('keeps the chip when meta is owner-led (done item with owner)', async () => {
-        // Done items drop the duration from meta — only the owner
-        // shows. The size chip still annotates the item's effort
-        // budget so a quick scan still tells you "this large piece is
-        // owned by Alice".
+    it('composes driver then owner on the meta line', async () => {
         const item = await firstItem(
             `nowline v1\n\nconfig\nsize lg effort:2w\nperson alice "Alice"\n\nroadmap r start:2026-01-05\n\nswimlane s\n  item a size:lg owner:alice status:done\n`,
         );
         expect(item.metaText).toBe('lg Alice');
+    });
+
+    it('shows duration driver before owner when duration: drives', async () => {
+        const item = await firstItem(
+            `nowline v1\n\nperson bob "Bob"\n\nroadmap r start:2026-01-05\n\nswimlane s\n  item a duration:1w owner:bob status:done\n`,
+        );
+        expect(item.metaText).toBe('1w Bob');
+    });
+
+    it('shows duration before owner when size: + duration: override (no chip)', async () => {
+        const item = await firstItem(
+            `nowline v1\n\nconfig\nsize xl effort:4w\nperson carl "Carl"\n\nroadmap r start:2026-01-05\n\nswimlane s\n  item a size:xl duration:1w owner:carl status:done\n`,
+        );
+        expect(item.metaText).toBe('1w Carl');
+    });
+
+    it('in-progress remaining literal follows chip-only driver when sized', async () => {
+        const item = await firstItem(
+            `nowline v1\n\nconfig\nsize lg "L" effort:2w\n\nroadmap r start:2026-01-05\n\nswimlane s\n  item a size:lg capacity:2 status:in-progress remaining:1w\n`,
+        );
+        expect(item.metaText).toBe('L — 1w remaining');
     });
 });
 

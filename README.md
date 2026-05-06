@@ -105,7 +105,7 @@ pnpm install
 pnpm build
 ```
 
-`pnpm build` walks every workspace package in dependency order and then renders every example under [`examples/`](./examples) and every renderer-validation fixture under [`tests/`](./tests) to a sibling `.svg` for inspection. Set `NOWLINE_SKIP_RENDER=1` to skip the render step.
+`pnpm build` walks every workspace package in dependency order and then renders the curated lists in [`scripts/render-samples.mjs`](./scripts/render-samples.mjs) (examples) and [`scripts/render-tests.mjs`](./scripts/render-tests.mjs) (fixtures) to sibling `.svg` files for inspection. Set `NOWLINE_SKIP_RENDER=1` to skip the render step.
 
 That produces `packages/cli/dist/index.js` with a `#!/usr/bin/env node` shebang. Invoke it directly:
 
@@ -324,6 +324,8 @@ A TextMate grammar is at [`grammars/nowline.tmLanguage.json`](./grammars/nowline
 Progressively-richer examples are included:
 
 - [`examples/minimal.nowline`](./examples/minimal.nowline) — smallest complete file.
+- [`examples/capacity.nowline`](./examples/capacity.nowline) — lane and item `capacity:` with on-call support taking a quarter of team bandwidth; lane utilization underline.
+- [`examples/sizing.nowline`](./examples/sizing.nowline) — T-shirt `size:` entries plus shortening calendar span with `capacity:` (parallel work).
 - [`examples/teams.nowline`](./examples/teams.nowline) — persons, teams, anchors, milestones, footnotes.
 - [`examples/product.nowline`](./examples/product.nowline) — full config, styles, labels, parallels, groups, descriptions.
 - [`examples/long.nowline`](./examples/long.nowline) — stress test: eight swimlanes, ~160 items, parallels, groups, anchors, milestones, footnotes, cross-cutting labels. Used for layout/render perf.

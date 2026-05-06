@@ -251,12 +251,11 @@ describe('renderSvg — item capacity suffix', () => {
     });
 });
 
-describe('renderSvg — item size chip', () => {
-    // The size chip is composed into the item's metaText by the layout
-    // (see specs/rendering.md § Item size chip — "no separate background
-    // fill, it reads as inline text"). The renderer just paints metaText
-    // verbatim, so these tests confirm the assembled string ends up in
-    // the rendered <text> element on the meta line.
+describe('renderSvg — item size chip (driver-only meta)', () => {
+    // The driver token (size chip or duration literal) is composed into
+    // metaText by the layout. The renderer paints metaText verbatim in
+    // one `<text>` element on the meta line (see specs/rendering.md §
+    // Item size chip).
 
     function itemMetaTextNode(svg: string, itemId: string): string | null {
         const fragment = svg.match(
@@ -278,7 +277,7 @@ describe('renderSvg — item size chip', () => {
         const dsl = `nowline v1\n\nconfig\nsize m effort:1w\n\nroadmap r1 "R" start:2026-01-05\n\nswimlane s "Sprint"\n  item build "Build" size:m\n`;
         const model = await parseToModel(dsl);
         const svg = await renderSvg(model);
-        expect(itemMetaTextNode(svg, 'build')).toBe('m 1w');
+        expect(itemMetaTextNode(svg, 'build')).toBe('m');
     });
 
     it('paints the size title when one is provided (author-controlled chip label)', async () => {
@@ -287,36 +286,28 @@ describe('renderSvg — item size chip', () => {
         const dsl = `nowline v1\n\nconfig\nsize m "M" effort:1w\n\nroadmap r1 "R" start:2026-01-05\n\nswimlane s "Sprint"\n  item build "Build" size:m\n`;
         const model = await parseToModel(dsl);
         const svg = await renderSvg(model);
-        expect(itemMetaTextNode(svg, 'build')).toBe('M 1w');
+        expect(itemMetaTextNode(svg, 'build')).toBe('M');
     });
 
-    it('shows the derived calendar duration next to the chip, not the raw effort literal', async () => {
-        // size:m effort:1w (5d) ÷ capacity:5 = 1d on the calendar.
-        // Meta line must read "m 1d" — printing "m 1w" here would
-        // mislead the reader about the bar's actual width.
+    it('shows chip only when size: drives (derived span is bar width only)', async () => {
         const dsl = `nowline v1\n\nconfig\nsize m effort:1w\n\nroadmap r1 "R" start:2026-01-05\n\nswimlane s "Sprint"\n  item build "Build" size:m capacity:5\n`;
         const model = await parseToModel(dsl);
         const svg = await renderSvg(model);
-        expect(itemMetaTextNode(svg, 'build')).toBe('m 1d');
+        expect(itemMetaTextNode(svg, 'build')).toBe('m');
     });
 
-    it('keeps the chip when duration: literal overrides size:', async () => {
-        // Per spec sizing precedence: explicit `duration:` literal wins
-        // for the bar width; the size chip still renders as annotation.
+    it('omits the chip when duration: literal overrides size: (driver is literal only)', async () => {
         const dsl = `nowline v1\n\nconfig\nsize lg effort:2w\n\nroadmap r1 "R" start:2026-01-05\n\nswimlane s "Sprint"\n  item build "Build" size:lg duration:3d capacity:2\n`;
         const model = await parseToModel(dsl);
         const svg = await renderSvg(model);
-        expect(itemMetaTextNode(svg, 'build')).toBe('lg 3d');
+        expect(itemMetaTextNode(svg, 'build')).toBe('3d');
     });
 
-    it('renders the on-bar reading order as `[size chip] [duration] [capacity suffix]`', async () => {
-        // metaText carries "m 1w"; the capacity suffix paints "2×" in a
-        // separate <text> node positioned after metaText's measured
-        // width. We just need both to be present in the item group.
+    it('renders `[driver][capacity suffix]` for sized items', async () => {
         const dsl = `nowline v1\n\nconfig\nsize m effort:2w\n\nroadmap r1 "R" start:2026-01-05\n\nswimlane s "Sprint"\n  item build "Build" size:m capacity:2\n`;
         const model = await parseToModel(dsl);
         const svg = await renderSvg(model);
-        expect(itemMetaTextNode(svg, 'build')).toBe('m 1w');
+        expect(itemMetaTextNode(svg, 'build')).toBe('m');
         const fragment = svg.match(/<g data-id="build" data-layer="item">[\s\S]*?<\/g>/)![0];
         expect(fragment).toContain('>2\u00D7<');
     });
@@ -326,6 +317,20 @@ describe('renderSvg — item size chip', () => {
         const model = await parseToModel(dsl);
         const svg = await renderSvg(model);
         expect(itemMetaTextNode(svg, 'build')).toBe('1w');
+    });
+
+    it('composes duration driver before owner on the meta line', async () => {
+        const dsl = `nowline v1\n\nperson dana "Dana"\n\nroadmap r1 "R" start:2026-01-05\n\nswimlane s "Sprint"\n  item build "Build" duration:1w owner:dana status:done\n`;
+        const model = await parseToModel(dsl);
+        const svg = await renderSvg(model);
+        expect(itemMetaTextNode(svg, 'build')).toBe('1w Dana');
+    });
+
+    it('composes chip before owner on the meta line when size: drives', async () => {
+        const dsl = `nowline v1\n\nconfig\nsize m effort:1w\n\nperson eve "Eve"\n\nroadmap r1 "R" start:2026-01-05\n\nswimlane s "Sprint"\n  item build "Build" size:m owner:eve status:done\n`;
+        const model = await parseToModel(dsl);
+        const svg = await renderSvg(model);
+        expect(itemMetaTextNode(svg, 'build')).toBe('m Eve');
     });
 });
 

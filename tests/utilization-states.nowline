@@ -11,8 +11,9 @@ nowline v1
 //
 // Items use `duration:` literals (not `size:`) so each bar — and
 // therefore each underline segment — is the full lane width and the
-// color band is easy to read at a glance. See specs/rendering.md
-// § Lane utilization underline for the full model.
+// color band is easy to read at a glance. For a small real-world story
+// (on-call support as a capacity sink) see examples/capacity.nowline.
+// See specs/rendering.md § Lane utilization underline for the full model.
 
 roadmap r "Lane utilization states" start:2026-01-05 length:8w
 

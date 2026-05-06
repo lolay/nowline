@@ -263,17 +263,19 @@ When an item has `before:anchor-id` and its duration would push past the anchor 
 
 #### Item size chip
 
-Items declaring `size:NAME` render an author-controlled size label as a small chip at the leading edge of the meta line, before the duration. The chip text is the size declaration's `title` when one was provided, falling back to the id verbatim (case as typed): `size m "M" effort:1w` paints `M 2w`, `size xs effort:0.5d` paints `xs 0.5d`, `size med effort:1w` paints `med 1w`. Authors who want the classic uppercased t-shirt look pin it via the title (`size m "M"`); the layout never folds case on its own. The chip uses the item's resolved meta color and the meta line font size; no separate background fill (it reads as inline text, not a tinted pill).
+The meta line shows a **single driver token** first: either the `duration:` literal (when present) or the size chip (when `size:` drives the bar). Both are never shown together — the bar's width already encodes calendar span for sized items.
 
-When `size:` and `duration:` are both set, the explicit `duration:` literal wins for bar width and the size chip still renders as annotation: `lg 2w` (or `L 2w` if the `lg` size declares `title:"L"`) even when `duration:2w` overrode a `size:lg` derivation. Items without `size:` render no chip.
+When `size:` drives, the chip text is the size declaration's `title` when one was provided, falling back to the id verbatim (case as typed): `size m "M" effort:1w` paints `M`, `size xs effort:0.5d` paints `xs`, `size med effort:1w` paints `med`. Authors who want the classic uppercased t-shirt look pin it via the title (`size m "M"`); the layout never folds case on its own. The chip uses the item's resolved meta color and the meta line font size; no separate background fill (it reads as inline text, not a tinted pill).
+
+When `size:` and `duration:` are both set, the explicit `duration:` literal wins for bar width **and** for the meta line: the chip is omitted — e.g. `2w` for an item with `size:lg duration:2w`. Items without `size:` render no chip (the driver is the duration literal only).
 
 #### Item capacity suffix
 
-Items with `capacity:N` render the value as a suffix on their duration label: `2w 2×` (default `multiplier` glyph), `2w 2 [person]` (with `capacity-icon:person`), `2w 2 ★` (with `capacity-icon:points`), `2w 2 ⏱` (with `capacity-icon:time`). The suffix appears only when the resolved capacity is `> 0`. Items without `capacity:` render no suffix.
+Items with `capacity:N` render the value as a suffix after the meta text: `m 2×` when `size:m capacity:2` drives (default `multiplier` glyph), `1w 2×` when `duration:1w capacity:2`, `m 2 [person]` (with `capacity-icon:person`), and similarly for `points` / `time`. The suffix appears only when the resolved capacity is `> 0`. Items without `capacity:` render no suffix.
 
-The suffix uses the item's resolved text color and matches the duration label's font size and weight.
+The suffix uses the item's resolved text color and matches the meta line's font size and weight.
 
-When all three meta-line elements are present, the on-bar reading order is `[size chip] [duration] [capacity suffix]` — e.g. `m 2w 2×` for a `size:m capacity:2` item (or `M 2w 2×` if the size declares `title:"M"`).
+When driver and suffix are both present, the on-bar reading order is `[driver token] [capacity suffix]` — e.g. `m 2×` for a `size:m capacity:2` item (or `M 2×` if the size declares `title:"M"`). Optional `owner:` and `remaining` text compose between the driver and the suffix, e.g. `m Sam — 50% remaining 2×`.
 
 #### Lane capacity badge
 

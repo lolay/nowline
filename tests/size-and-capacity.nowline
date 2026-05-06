@@ -1,14 +1,16 @@
 nowline v1
 
 // Fixture exercising the size + capacity interaction on items. Each
-// lane shows a single combination so the chip / derived duration /
-// capacity suffix are easy to read on the rendered SVG. Pairs nicely
-// with examples/capacity-items.nowline (capacity glyph variants) and
-// examples/long.nowline (size catalog without capacity).
+// lane shows a single combination so the driver token (size chip or
+// duration literal) and capacity suffix are easy to read on the rendered
+// SVG. Pairs nicely with tests/capacity-items.nowline (capacity glyph
+// variants) and examples/long.nowline (size catalog without capacity).
 //
-// Reading order on each item bar: `[size chip] [duration] [capacity suffix]`.
-// The chip text is the size's title when one was provided, otherwise the
-// id verbatim (case as typed) — see specs/rendering.md § Item size chip.
+// Meta line: one **driver** token only — the `duration:` literal when
+// present, else the size chip. Bar width encodes derived calendar span
+// for sized items without repeating it in text. Then optional owner /
+// remaining, then the capacity suffix — see specs/rendering.md § Item
+// size chip.
 
 config
 
@@ -29,43 +31,43 @@ size lg "L"  effort:2w
 size xl "XL" effort:4w
 
 // Lane 1 — size only, default capacity (1). Bar width = effort.
-//   chip: "S"  duration: 3d
+//   driver: "S" on meta (no duration text; bar is 3d wide)
 swimlane size-only-s "size:sm (capacity defaults to 1)"
   item s1 "Solo" size:sm
 
-//   chip: "L"  duration: 2w
+//   driver: "L" on meta (bar is 2w wide)
 swimlane size-only-l "size:lg (capacity defaults to 1)"
   item l1 "Solo large" size:lg
 
 // Lane 2 — size + capacity, multiplier glyph (default).
-//   chip: "L"  duration: 1w (effort 2w / capacity 2)  suffix: "2×"
+//   driver: "L" on meta; bar is 1w (effort 2w / capacity 2); suffix: "2×"
 swimlane team-of-2 "size:lg capacity:2 (default × glyph)"
   item t1 "Two-engineer large" size:lg capacity:2
 
-//   chip: "XL" duration: 1w (effort 4w / capacity 4)  suffix: "4×"
+//   driver: "XL" on meta; bar is 1w (effort 4w / capacity 4); suffix: "4×"
 swimlane team-of-4 "size:xl capacity:4 (default × glyph)"
   item t2 "Four-engineer XL" size:xl capacity:4
 
 // Lane 3 — size + capacity with a custom glyph.
-//   chip: "M"  duration: 1d (effort 1w / capacity 5)  suffix: "5 [person]"
+//   driver: "M" on meta; bar is 1d (effort 1w / capacity 5); suffix: "5 [person]"
 swimlane fte-lane "size:md capacity:5 (person glyph)"
   item f1 "Five FTEs on a medium" size:md capacity:5 style:fte
 
-//   chip: "L"  duration: 1w (effort 2w / capacity 2)  suffix: "2 [people]"
+//   driver: "L" on meta; bar is 1w (effort 2w / capacity 2); suffix: "2 [people]"
 swimlane pair-lane "size:lg capacity:2 (people glyph)"
   item f2 "Pair on a large" size:lg capacity:2 style:pair
 
-// Lane 4 — explicit duration: literal wins; chip is annotation only.
-//   chip: "XL" duration: 1w (literal wins; effort would have been 4w)
+// Lane 4 — explicit duration: literal wins; size chip omitted from meta.
+//   driver: "1w" only (effort would have been 4w for XL, but literal wins)
 swimlane override "size:xl duration:1w (literal overrides effort)"
   item o1 "XL annotation, week-long bar" size:xl duration:1w
 
-//   chip: "L"  duration: 3d (literal wins; chip + capacity coexist)  suffix: "3×"
+//   driver: "3d" + suffix: "3×"; size:lg still in DSL but not on meta line
 swimlane override-cap "size:lg duration:3d capacity:3 (literal + capacity)"
   item o2 "Annotated short burst" size:lg duration:3d capacity:3
 
-// Lane 5 — sized item that's in-progress with a literal `remaining:`.
-//   chip: "L"  duration: 1w  meta: "L 1w — 50% remaining" (1w of 2w left)
+// Lane 5 — sized item in-progress with literal `remaining:`.
+//   driver: "L" — meta: "L — 1w remaining" (1w of 2w single-eng effort left)
 swimlane progress "size:lg capacity:2 status:in-progress remaining:1w"
   item p1 "Halfway through" size:lg capacity:2 status:in-progress remaining:1w
 

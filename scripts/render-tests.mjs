@@ -39,6 +39,11 @@ const MANIFEST = [
     { slug: 'item-bumps-up',           theme: 'light', now: NOW },
     { slug: 'isolate-include-multi',   theme: 'light', now: NOW },
     { slug: 'defaults-no-start-no-now', theme: 'light' },
+    { slug: 'capacity-items',          theme: 'light', now: NOW },
+    { slug: 'capacity-lanes',          theme: 'light', now: NOW },
+    { slug: 'size-and-capacity',       theme: 'light', now: NOW },
+    { slug: 'utilization-states',      theme: 'light', now: NOW },
+    { slug: 'nested-both-headers',     theme: 'light', now: NOW },
 ];
 
 function run(cmd, args, opts = {}) {

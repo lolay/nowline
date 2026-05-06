@@ -51,7 +51,6 @@ import {
     resolveDuration,
     deriveItemDurationDays,
     deriveTotalEffortDays,
-    formatDurationDays,
     addDays,
     daysBetween,
 } from './calendar.js';
@@ -392,65 +391,39 @@ function sequenceItem(
 
     // Pre-format the secondary line shown inside the item bar.
     //
-    //   - explicit `duration:LITERAL` renders verbatim (the literal IS
-    //     the calendar duration the bar paints).
-    //   - sized items render the *derived* calendar duration, NOT the
-    //     raw effort literal. `size:m capacity:5` with `effort:1w`
-    //     paints a 1d bar and the meta line must read `M 1d`, not
-    //     `M 1w` (which would lie about the bar's width).
-    //
-    // `formatDurationDays` folds days back into the largest whole-unit
-    // literal under the current calendar so common cases (`5d` → `1w`,
-    // `22d` → `1m` on business cal) read naturally; awkward divisions
-    // collapse to a decimal day literal (`1.67d`).
+    // Driver-only meta line (`rendering.md` § Item size chip): exactly one
+    // leading token — the explicit non-empty `duration:LITERAL` when set,
+    // otherwise the size chip when `size:` drives. Never both; bar width
+    // already encodes derived calendar span for sized items.
     const explicitDurationLiteral = propValue(props, 'duration');
-    let displayDuration: string | undefined;
-    if (explicitDurationLiteral && /^\d+(?:\.\d+)?[dwmqy]$/.test(explicitDurationLiteral)) {
-        displayDuration = explicitDurationLiteral;
-    } else if (sizeResolved && durationDays > 0) {
-        displayDuration = formatDurationDays(durationDays, ctx.cal);
-    }
-    const remainingRaw = propValue(props, 'remaining');
-    const remainingLiteral = resolveDurationLiteral(remainingRaw, ctx);
-    // Size chip — author-controlled label at the leading edge of the
-    // meta line per specs/rendering.md § Item size chip. Prefers the
-    // size's `title` when one was provided, otherwise the id verbatim
-    // (case as typed). Inline text in the same color/font as the rest
-    // of meta (no tinted pill); composed into `metaText` so the
-    // renderer keeps painting one `<text>` element and the
-    // capacity-suffix offset math (which measures `metaText` width)
-    // accounts for the chip automatically.
+    const durationDrives =
+        !!explicitDurationLiteral &&
+        /^\d+(?:\.\d+)?[dwmqy]$/.test(explicitDurationLiteral);
     const sizeChipText = sizeResolved
         ? (sizeResolved.title ?? sizeResolved.name)
         : '';
-    const sizeChipPrefix = sizeChipText ? `${sizeChipText} ` : '';
-    let metaText: string | undefined;
+    const driverToken: string | undefined = durationDrives
+        ? explicitDurationLiteral
+        : sizeChipText || undefined;
+    const remainingRaw = propValue(props, 'remaining');
+    const remainingLiteral = resolveDurationLiteral(remainingRaw, ctx);
     const ownerDisplay = resolveActorDisplay(ownerOverride ?? propValue(props, 'owner'), ctx);
+    const metaHead = (): string =>
+        [driverToken, ownerDisplay].filter(Boolean).join(' ');
+    let metaText: string | undefined;
     if (status === 'in-progress' && remainingLiteral) {
-        if (ownerDisplay) {
-            metaText = `${sizeChipPrefix}${ownerDisplay} — ${remainingLiteral} remaining`;
-        } else if (displayDuration) {
-            metaText = `${sizeChipPrefix}${displayDuration} — ${remainingLiteral} remaining`;
-        } else {
-            metaText = `${sizeChipPrefix}${remainingLiteral} remaining`;
-        }
+        const head = metaHead();
+        metaText = head
+            ? `${head} — ${remainingLiteral} remaining`
+            : `${remainingLiteral} remaining`;
     } else if (status === 'in-progress' && progress > 0 && progress < 1) {
         const pct = Math.round((1 - progress) * 100);
-        metaText = ownerDisplay
-            ? `${sizeChipPrefix}${ownerDisplay} — ${pct}% remaining`
-            : displayDuration
-                ? `${sizeChipPrefix}${displayDuration} — ${pct}% remaining`
-                : `${sizeChipPrefix}${pct}% remaining`;
-    } else if (ownerDisplay) {
-        metaText = `${sizeChipPrefix}${ownerDisplay}`;
-    } else if (displayDuration) {
-        metaText = `${sizeChipPrefix}${displayDuration}`;
-    } else if (sizeChipPrefix) {
-        // Sized item with no other meta to compose around — chip alone.
-        // Practically unreachable today (sized items always derive a
-        // duration), but a safety belt against silently dropping the
-        // chip if a future code path nulls out displayDuration.
-        metaText = sizeChipPrefix.trimEnd();
+        const head = metaHead();
+        metaText = head
+            ? `${head} — ${pct}% remaining`
+            : `${pct}% remaining`;
+    } else if (ownerDisplay || driverToken) {
+        metaText = metaHead() || undefined;
     }
 
     // Capacity suffix — appended after metaText at render time. Layout's
@@ -470,8 +443,8 @@ function sequenceItem(
         capacity = { value: capacityValue, text: capacityText, icon: capacityIcon };
         const META_FONT_SIZE_PX_LOCAL = 11;
         // Add a small leading separator (a single space's worth) only when
-        // the suffix sits next to existing meta text, so `2w 5×` has air
-        // between the duration and the count. Standalone suffix needs no
+        // the suffix sits next to existing meta text, so `m 5×` has air
+        // between the driver token and the count. Standalone suffix needs no
         // leading separator.
         const separatorWidth = metaText
             ? estimateTextWidth(' ', META_FONT_SIZE_PX_LOCAL)

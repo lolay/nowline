@@ -5,18 +5,18 @@ Tiny `.nowline` files that stress one renderer behavior each. They are **not** r
 > **Rule of thumb — where does a new `.nowline` go?**
 >
 > - **`tests/`** (this folder) — you're creating a visual to *exercise a renderer behavior*: sized titles, text-fit vs spill, dependency arrows, isolate-include with multiple lanes, etc. The file exists so a human can eyeball "did this axis regress?". SVG output is gitignored.
-> - **[`examples/`](../examples)** — you're adding a *representative, user-facing* roadmap: a `nowline --init` template, a doc screenshot source, or a sample-fidelity reference that pairs with [`specs/samples/`](../specs/samples). Examples are tracked by the byte-stable snapshot suite in [`packages/layout/test/__snapshots__/`](../packages/layout/test/__snapshots__/), so every addition is an ongoing regression-gate commitment.
+> - **[`examples/`](../examples)** — you're adding a *representative, user-facing* roadmap: a `nowline --init` template, a doc screenshot source, or a sample-fidelity reference that pairs with [`specs/samples/`](../specs/samples).
 >
 > If the file's purpose is "see how the renderer handles X", it belongs here — not in `examples/`.
 
-Pair this with the byte-stable snapshot suite at [`packages/layout/test/__snapshots__/`](../packages/layout/test/__snapshots__/):
+Pair this with the byte-stable snapshot suite at [`packages/layout/test/__snapshots__/`](../packages/layout/test/__snapshots__/) (driven by [`packages/layout/test/snapshot.helpers.ts`](../packages/layout/test/snapshot.helpers.ts)):
 
-- The snapshot suite catches *any* drift on the curated examples (canonical regression gate).
-- The fixtures here are for *human eyeballing* of specific behaviors — nobody asserts byte-equality on them.
+- The snapshot suite catches drift on representative `examples/*.nowline` files and on selected renderer matrices that live under `tests/` (canonical regression gate). Listing a file in `SAMPLES` there is an ongoing commitment.
+- Many fixtures here are for *human eyeballing* only — they are not all snapshotted.
 
 ## How they're rendered
 
-`pnpm build` (or `pnpm render`) runs [`scripts/render-tests.mjs`](../scripts/render-tests.mjs) which writes a sibling `.svg` next to every `.nowline` in this folder. The SVGs are gitignored — they are CLI output, not source. To skip rendering during build (e.g. while iterating on a broken renderer) set `NOWLINE_SKIP_RENDER=1`.
+`pnpm build` (or `pnpm render`) runs [`scripts/render-tests.mjs`](../scripts/render-tests.mjs) which writes a sibling `.svg` next to every entry in that script's manifest (curated list of `tests/*.nowline` sources). The SVGs are gitignored — they are CLI output, not source. To skip rendering during build (e.g. while iterating on a broken renderer) set `NOWLINE_SKIP_RENDER=1`.
 
 ## Starter fixtures
 
@@ -30,6 +30,11 @@ Most files are near-clones of [`examples/minimal.nowline`](../examples/minimal.n
 | [`text-spills-right.nowline`](text-spills-right.nowline) | Right-spill branch: every item is too narrow for its title, so title + meta render to the right of the bar. |
 | [`item-bumps-up.nowline`](item-bumps-up.nowline) | Topmost-fit row packing: a long middle item pushes itself to row 2, but the trailing item bumps back up to row 1 alongside the first item instead of claiming a fresh row. |
 | [`isolate-include-multi.nowline`](isolate-include-multi.nowline) | `roadmap:isolate` include where the child has multiple swimlanes — how a multi-lane isolated region stacks against the parent's own lanes. Uses [`partner-multi.nowline`](partner-multi.nowline) as its included child. |
+| [`capacity-items.nowline`](capacity-items.nowline) | Every shape of item-level `capacity:` suffix / `capacity-icon:` (multiplier, built-in SVG icons, decimal, percent sugar, inline literal, custom glyph, none). |
+| [`capacity-lanes.nowline`](capacity-lanes.nowline) | Lane-level `capacity:N` chiclet variants across the same icon matrix plus owner stacking. |
+| [`size-and-capacity.nowline`](size-and-capacity.nowline) | Size + capacity interaction matrix (driver token, derived duration, capacity suffix, overrides). |
+| [`utilization-states.nowline`](utilization-states.nowline) | Lane utilization underline: healthy, warn threshold, over capacity, coalesced segments, custom thresholds, opt-out. |
+| [`nested-both-headers.nowline`](nested-both-headers.nowline) | Tall roadmap with `timeline-position:both` (mirrored date strip) and `minor-grid:true`. |
 
 ### Multi-file fixtures
 

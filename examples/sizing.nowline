@@ -1,0 +1,17 @@
+nowline v1
+
+// Lean example: T-shirt sizes plus one "crash a job" — an XL burns one
+// month of effort but lands as a 2w bar with capacity:2. Full matrix of
+// size + capacity combinations lives in tests/size-and-capacity.nowline.
+
+roadmap web-q1 "Web Platform Q1" start:2026-01-05 length:6w
+
+size md effort:1w
+size lg effort:2w
+size xl effort:1m
+
+swimlane web "Web platform"
+  item header-refresh "Header refresh" size:md
+  // XL effort (1m) divided by capacity 2 → 2w bar on the timeline.
+  item auth-refactor "Auth refactor" size:xl capacity:2
+  item search-v2 "Search v2" size:lg after:header-refresh

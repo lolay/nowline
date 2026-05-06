@@ -11,7 +11,7 @@ style risky
 
 default item shadow:subtle
 
-roadmap dependency-demo "Dependency Demo" author:"Cross-lane deps, parallel [ ] bracket, floating milestone + slack" start:2026-01-05 scale:1w
+roadmap dependency-demo "Dependency Demo" author:"Platform engineering" start:2026-01-05 scale:1w
 
 anchor kickoff date:2026-01-05
 anchor code-freeze "code-freeze" date:2026-03-02
