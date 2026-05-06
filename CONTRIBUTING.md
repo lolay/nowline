@@ -96,8 +96,9 @@ Run these from the repo root. Most are simple pnpm re-runs across the workspace.
 | Build everything (regenerates grammar + bundles templates + tsc + renders `examples/` and `tests/`) | `pnpm build` |
 | Build packages without rendering SVGs | `NOWLINE_SKIP_RENDER=1 pnpm build` (or `pnpm -r build`) |
 | Render `examples/` and `tests/` only (CLI must be built) | `pnpm render` |
-| Render `examples/` only (one or more slugs optional) | `pnpm samples [slug ...]` |
-| Render `tests/` fixtures only | `pnpm fixtures` |
+| Render `examples/` (rebuilds CLI first; one or more slugs optional) | `pnpm samples [slug ...]` |
+| Render `tests/` fixtures (rebuilds CLI first) | `pnpm fixtures` |
+| Render without rebuilding (faster; errors if dist is stale) | `node scripts/render-samples.mjs [slug ...]` / `node scripts/render-tests.mjs` |
 | Run all tests | `pnpm -r test` |
 | Run tests for one package | `pnpm --filter @nowline/core test` |
 | Watch tests for one package | `pnpm --filter @nowline/core test:watch` |

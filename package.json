@@ -5,8 +5,8 @@
   "scripts": {
     "build": "pnpm -r run build && node scripts/render.mjs",
     "render": "node scripts/render.mjs",
-    "samples": "node scripts/render-samples.mjs",
-    "fixtures": "node scripts/render-tests.mjs",
+    "samples": "pnpm -r run build && node scripts/render-samples.mjs",
+    "fixtures": "pnpm -r run build && node scripts/render-tests.mjs",
     "test": "pnpm -r run test",
     "lint": "pnpm -r run lint",
     "langium:generate": "pnpm --filter @nowline/core run langium:generate"

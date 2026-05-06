@@ -107,7 +107,7 @@ pnpm build
 
 `pnpm build` walks every workspace package in dependency order and then renders the curated lists in [`scripts/render-samples.mjs`](./scripts/render-samples.mjs) (examples) and [`scripts/render-tests.mjs`](./scripts/render-tests.mjs) (fixtures) to sibling `.svg` files for inspection. Set `NOWLINE_SKIP_RENDER=1` to skip the render step.
 
-To regenerate just the SVGs without rebuilding packages, run `pnpm samples` (writes `examples/*.svg`) or `pnpm fixtures` (writes `tests/*.svg`); both accept positional slugs (e.g. `pnpm samples minimal long`) for a single example. The SVGs are gitignored — they are CLI output, not source.
+To regenerate the SVGs run `pnpm samples` (writes `examples/*.svg`) or `pnpm fixtures` (writes `tests/*.svg`); both rebuild the workspace incrementally first so the output always reflects the current source, and both accept positional slugs (e.g. `pnpm samples minimal long`) for a single example. To skip the rebuild step, invoke the underlying scripts directly (`node scripts/render-samples.mjs [slug ...]`); they error out if the CLI bundle is older than its source. The SVGs themselves are gitignored — they are CLI output, not source.
 
 That produces `packages/cli/dist/index.js` with a `#!/usr/bin/env node` shebang. Invoke it directly:
 
