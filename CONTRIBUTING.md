@@ -99,6 +99,7 @@ Run these from the repo root. Most are simple pnpm re-runs across the workspace.
 | Render `examples/` (rebuilds CLI first; one or more slugs optional) | `pnpm samples [slug ...]` |
 | Render `tests/` fixtures (rebuilds CLI first) | `pnpm fixtures` |
 | Render without rebuilding (faster; errors if dist is stale) | `node scripts/render-samples.mjs [slug ...]` / `node scripts/render-tests.mjs` |
+| Regenerate the README screenshot | `node packages/cli/dist/index.js examples/minimal.nowline -f png -o docs/screenshots/minimal.png --now 2026-02-09 --theme light` |
 | Run all tests | `pnpm -r test` |
 | Run tests for one package | `pnpm --filter @nowline/core test` |
 | Watch tests for one package | `pnpm --filter @nowline/core test:watch` |

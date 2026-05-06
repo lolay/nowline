@@ -12,23 +12,24 @@
 
 Nowline is a text-first DSL for describing product and engineering roadmaps. You write plain `.nowline` files — indented, keyword-driven, diff-friendly — and tooling renders them as timelines, validates them, and composes them.
 
+[`examples/minimal.nowline`](./examples/minimal.nowline):
+
 ```nowline
 nowline v1
 
-roadmap platform-2026 "Platform 2026" start:2026-01-06
+roadmap minimal "Starter" start:2026-01-05 scale:1w author:"Engineering roadmap"
 
-anchor kickoff date:2026-01-06
-anchor ga      date:2026-06-01
-
-swimlane platform
-  item auth-refactor "Auth refactor" duration:1m after:kickoff status:done
-  parallel
-    item audit-log "Audit log v2"  duration:2w
-    item sso       "SSO plugins"   duration:1m
-  item platform-qa "Platform QA" duration:1w
-
-milestone beta "Beta" after:[auth-refactor, audit-log]
+swimlane engineering "Engineering"
+  item research "Research"  duration:3w status:done
+  item design   "Design"    duration:2w status:in-progress remaining:50%
+  item build    "Build"     duration:3w status:planned
 ```
+
+Renders to:
+
+<p align="center">
+  <img src="./docs/screenshots/minimal.png" alt="Minimal roadmap rendered with light theme and now-line on 2026-02-09" width="720" />
+</p>
 
 ## Why Nowline?
 
