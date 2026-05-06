@@ -15,6 +15,7 @@ import { spawn } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
 import { dirname, resolve, relative } from 'node:path';
 import { existsSync } from 'node:fs';
+import { assertDistFresh } from './lib/check-dist-fresh.mjs';
 
 const here = dirname(fileURLToPath(import.meta.url));
 const repoRoot = resolve(here, '..');
@@ -77,6 +78,7 @@ async function main() {
         console.error(`       expected ${relative(repoRoot, cliPath)}`);
         process.exit(2);
     }
+    assertDistFresh({ repoRoot, cliPath });
     const wanted = process.argv.slice(2);
     const entries = wanted.length === 0
         ? MANIFEST
