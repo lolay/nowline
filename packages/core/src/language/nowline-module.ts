@@ -41,6 +41,27 @@ class NowlinePropertyKeyValueConverter extends DefaultValueConverter {
     }
 }
 
+// Override `isStartOfLine` so that a position immediately following a
+// `\`-line-continuation (handled by the LINE_CONTINUATION hidden terminal) is
+// NOT treated as the start of a new logical line. Without this, a continuation
+// line with zero leading whitespace would trigger a spurious DEDENT because the
+// base implementation only inspects the single character at `text[offset - 1]`.
+class NowlineIndentationAwareTokenBuilder extends IndentationAwareTokenBuilder<
+    NowlineTerminalNames,
+    NowlineKeywordNames
+> {
+    protected override isStartOfLine(text: string, offset: number): boolean {
+        if (!super.isStartOfLine(text, offset)) {
+            return false;
+        }
+        let i = offset - 1;
+        while (i >= 0 && (text[i] === ' ' || text[i] === '\t')) i--;
+        while (i >= 0 && (text[i] === '\r' || text[i] === '\n')) i--;
+        while (i >= 0 && (text[i] === ' ' || text[i] === '\t')) i--;
+        return i < 0 || text[i] !== '\\';
+    }
+}
+
 export type NowlineAddedServices = {
     validation: {
         NowlineValidator: NowlineValidator;
@@ -54,7 +75,7 @@ export type { NowlineAstType };
 export const NowlineModule: Module<NowlineServices, PartialLangiumCoreServices & NowlineAddedServices> = {
     parser: {
         TokenBuilder: () =>
-            new IndentationAwareTokenBuilder<NowlineTerminalNames, NowlineKeywordNames>({
+            new NowlineIndentationAwareTokenBuilder({
                 indentTokenName: 'INDENT',
                 dedentTokenName: 'DEDENT',
                 whitespaceTokenName: 'WS',

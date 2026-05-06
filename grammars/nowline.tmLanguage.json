@@ -5,6 +5,7 @@
   "fileTypes": ["nowline"],
   "patterns": [
     { "include": "#comments" },
+    { "include": "#line-continuation" },
     { "include": "#directive" },
     { "include": "#keywords" },
     { "include": "#properties" },
@@ -28,6 +29,10 @@
           "end": "\\*/"
         }
       ]
+    },
+    "line-continuation": {
+      "name": "punctuation.separator.continuation.nowline",
+      "match": "\\\\[ \\t]*$"
     },
     "directive": {
       "patterns": [

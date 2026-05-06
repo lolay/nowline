@@ -207,3 +207,10 @@ hidden terminal WS: /[\t ]+/;
 hidden terminal NL: /[\r\n]+/;
 hidden terminal SL_COMMENT: /\/\/[^\r\n]*/;
 hidden terminal ML_COMMENT: /\/\*[\s\S]*?\*\//;
+// Joins a property line with the next physical line. The backslash, the newline,
+// and the next line's leading whitespace are all swallowed, so the continuation
+// line attaches to the previous logical token stream and IndentationAwareLexer
+// does not emit INDENT/DEDENT for it. See specs/dsl.md "Line Continuation".
+// Tolerates trailing whitespace between `\` and the newline so invisible spaces
+// don't silently break a continuation.
+hidden terminal LINE_CONTINUATION: /\\[ \t]*\r?\n[ \t]*/;
