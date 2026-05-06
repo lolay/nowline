@@ -1,4 +1,5 @@
 import type { AstNode, ValidationAcceptor, ValidationChecks } from 'langium';
+import { GrammarUtils } from 'langium';
 import type { NowlineAstType, NowlineServices } from './nowline-module.js';
 import type {
     NowlineFile,
@@ -299,35 +300,32 @@ export class NowlineValidator {
 
     // --- Structural Rule 4: Section order ---
     checkFileStructure(file: NowlineFile, accept: ValidationAcceptor): void {
-        if (file.roadmapDecl && file.hasConfig) {
-            const roadmapNode = file.roadmapDecl.$cstNode;
-            const configIdx = file.$cstNode?.text.indexOf('config') ?? -1;
-            const roadmapIdx = roadmapNode?.offset ?? Infinity;
-            if (configIdx >= 0 && configIdx > roadmapIdx) {
-                accept('error', 'Config section must appear before roadmap.', {
-                    node: file,
-                    property: 'hasConfig',
-                });
-            }
+        // Use CST-aware lookup so the `config:` / `roadmap:` substrings inside
+        // INCLUDE_OPTION_KEY tokens (e.g. `config:isolate`) aren't mistaken for
+        // the top-level `config` section marker. See issue #1.
+        const configOffset = file.hasConfig
+            ? GrammarUtils.findNodeForKeyword(file.$cstNode, 'config')?.offset
+            : undefined;
+        const roadmapOffset = file.roadmapDecl?.$cstNode?.offset;
+
+        if (configOffset !== undefined && roadmapOffset !== undefined && configOffset > roadmapOffset) {
+            accept('error', 'Config section must appear before roadmap.', {
+                node: file,
+                property: 'hasConfig',
+            });
         }
 
         for (const inc of file.includes) {
             const incOffset = inc.$cstNode?.offset ?? 0;
-            if (file.hasConfig) {
-                const configOffset = findKeywordOffset(file, 'config');
-                if (configOffset !== undefined && incOffset > configOffset) {
-                    accept('error', 'Include declarations must appear before the config section.', {
-                        node: inc,
-                    });
-                }
+            if (configOffset !== undefined && incOffset > configOffset) {
+                accept('error', 'Include declarations must appear before the config section.', {
+                    node: inc,
+                });
             }
-            if (file.roadmapDecl) {
-                const roadmapOffset = file.roadmapDecl.$cstNode?.offset ?? Infinity;
-                if (incOffset > roadmapOffset) {
-                    accept('error', 'Include declarations must appear before the roadmap section.', {
-                        node: inc,
-                    });
-                }
+            if (roadmapOffset !== undefined && incOffset > roadmapOffset) {
+                accept('error', 'Include declarations must appear before the roadmap section.', {
+                    node: inc,
+                });
             }
         }
     }
@@ -1470,13 +1468,6 @@ function locationOf(node: AstNode): string {
         return `line ${cst.range.start.line + 1}`;
     }
     return 'unknown location';
-}
-
-function findKeywordOffset(file: NowlineFile, keyword: string): number | undefined {
-    const cst = file.$cstNode;
-    if (!cst) return undefined;
-    const idx = cst.text.indexOf(keyword);
-    return idx >= 0 ? idx : undefined;
 }
 
 function describeNode(node: { $type: string; name?: string; title?: string }): string {

@@ -28,6 +28,33 @@ describe('validation rules', () => {
         expect(r.parserErrors.length + errorMessages(r.diagnostics).length).toBeGreaterThan(0);
     });
 
+    it('Rule 4 / Issue #1: 2+ includes with config:isolate and a config block validate cleanly', async () => {
+        const r = await parse(
+            `nowline v1\n` +
+            `include "./child-a.nowline" config:isolate roadmap:isolate\n` +
+            `include "./child-b.nowline" config:isolate roadmap:isolate\n` +
+            `config\n` +
+            `default item shadow:subtle\n` +
+            `roadmap parent "Parent" start:2026-01-05 scale:1w calendar:business\n` +
+            `swimlane parent-lane "Parent"\n` +
+            `  item parent-item "Parent item" duration:1w\n`,
+        );
+        expect(hasError(errorMessages(r.diagnostics), /Include declarations must appear before/i)).toBe(false);
+    });
+
+    it('Rule 4: config block placed after roadmap is rejected even when an include uses config:isolate', async () => {
+        const r = await parse(
+            `nowline v1\n` +
+            `include "./child-a.nowline" config:isolate roadmap:isolate\n` +
+            `roadmap parent "Parent" start:2026-01-05 scale:1w calendar:business\n` +
+            `swimlane parent-lane "Parent"\n` +
+            `  item parent-item "Parent item" duration:1w\n` +
+            `config\n` +
+            `default item shadow:subtle\n`,
+        );
+        expect(r.parserErrors.length + errorMessages(r.diagnostics).length).toBeGreaterThan(0);
+    });
+
     it('Rule 5: invalid version format is an error', async () => {
         const r = await parse(`nowline 1.0\nroadmap r\nswimlane s\n  item x duration:1w\n`);
         expect(r.parserErrors.length + errorMessages(r.diagnostics).length).toBeGreaterThan(0);
