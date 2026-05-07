@@ -69,6 +69,22 @@
                     "description": "Trace LSP communication between VS Code and the bundled Nowline language server."
                 }
             }
+        },
+        "commands": [
+            {
+                "command": "nowline.openLinkInSideBrowser",
+                "title": "Nowline: Open Link in Side Browser",
+                "category": "Nowline"
+            }
+        ],
+        "menus": {
+            "editor/context": [
+                {
+                    "when": "editorLangId == nowline",
+                    "command": "nowline.openLinkInSideBrowser",
+                    "group": "navigation@10"
+                }
+            ]
         }
     },
     "scripts": {

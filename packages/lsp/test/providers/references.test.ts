@@ -48,4 +48,30 @@ describe('NowlineReferencesProvider', () => {
         });
         expect(refs).toHaveLength(2);
     });
+
+    it('finds usages of a config-section style declaration', async () => {
+        const styleSample = `nowline v1
+
+config
+
+style flagged "Flagged"
+  bg: red
+
+roadmap demo "Demo" start:2026-01-05 scale:1w
+
+label danger "Danger" style:flagged
+
+swimlane backend "Backend"
+  item api "API" duration:2w style:flagged
+`;
+        const doc = await parseDocument(styleSample);
+        const provider = services().Nowline.lsp.ReferencesProvider!;
+        const refs = await provider.findReferences(doc, {
+            textDocument: { uri: doc.uri.toString() },
+            position: locate(styleSample, 'flagged', 0),
+            context: { includeDeclaration: true },
+        });
+        // Declaration + two `style:flagged` references.
+        expect(refs).toHaveLength(3);
+    });
 });

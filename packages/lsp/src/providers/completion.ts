@@ -10,6 +10,8 @@ import {
 } from 'vscode-languageserver';
 import type { MaybePromise } from 'langium';
 import {
+    BUILTIN_CAPACITY_ICONS,
+    BUILTIN_ICON_NAMES,
     BUILTIN_STATUSES,
     collectNamedEntities,
     fileFromDocument,
@@ -17,17 +19,42 @@ import {
     entityKind,
     type NamedEntity,
 } from '../references/ast-utils.js';
-import { isStatusDeclaration } from '@nowline/core';
 import type { NowlineLspServices } from '../nowline-lsp-module.js';
+
+/**
+ * Per-key allowlist of entity kinds that make sense as values. Keeps
+ * suggestions focused — typing `style:` only shows styles instead of every
+ * declared id in the file.
+ *
+ * The string values match the output of `entityKind()`
+ * (`StyleDeclaration` → `style`, `ItemDeclaration` → `item`, …).
+ */
+const REF_KEY_TO_KINDS: Record<string, ReadonlySet<string>> = {
+    after: new Set(['item', 'milestone', 'anchor', 'parallel', 'group']),
+    before: new Set(['item', 'milestone', 'anchor', 'parallel', 'group']),
+    depends: new Set(['item', 'milestone', 'anchor', 'parallel', 'group']),
+    on: new Set(['item', 'swimlane', 'parallel', 'group', 'milestone']),
+    owner: new Set(['person', 'team']),
+    team: new Set(['team']),
+    style: new Set(['style']),
+    size: new Set(['size']),
+    status: new Set(['status']),
+    labels: new Set(['label']),
+    icon: new Set(['glyph']),
+    'capacity-icon': new Set(['glyph']),
+};
 
 /**
  * Custom completion provider. Defers to Langium's keyword + property-key
  * completion (free from the grammar) and adds:
  *
  *  - Id-reference completion when the cursor sits in a reference property's
- *    value position (`after:`, `before:`, `owner:`, `on:`, `depends:[...]`).
- *  - Status-value completion when the cursor sits in `status:` — built-in
- *    values plus any custom `status` declarations in the file.
+ *    value position (`after:`, `before:`, `style:`, `size:`, `labels:[...]`,
+ *    etc.). Each key only suggests entities whose kind makes sense for it
+ *    (see `REF_KEY_TO_KINDS`).
+ *  - Status-value completion: built-in values plus custom `status`
+ *    declarations.
+ *  - Icon / capacity-icon built-in vocabulary plus user-declared glyphs.
  */
 export class NowlineCompletionProvider extends DefaultCompletionProvider {
     constructor(services: NowlineLspServices) {
@@ -57,13 +84,7 @@ export class NowlineCompletionProvider extends DefaultCompletionProvider {
     ): void {
         const file = fileFromDocument(context.document);
         if (!file) return;
-        if (REFERENCE_PROP_KEYS.has(hint.key)) {
-            for (const ent of collectNamedEntities(file)) {
-                if (!ent.name) continue;
-                acceptor(context, buildEntityItem(ent));
-            }
-            return;
-        }
+
         if (hint.key === 'status') {
             for (const status of BUILTIN_STATUSES) {
                 acceptor(context, {
@@ -73,15 +94,34 @@ export class NowlineCompletionProvider extends DefaultCompletionProvider {
                     insertText: status,
                 });
             }
-            for (const entry of file.roadmapEntries) {
-                if (isStatusDeclaration(entry) && entry.name) {
-                    acceptor(context, {
-                        label: entry.name,
-                        kind: CompletionItemKind.Enum,
-                        detail: entry.title ?? 'custom status',
-                        insertText: entry.name,
-                    });
-                }
+        }
+        if (hint.key === 'icon') {
+            for (const icon of BUILTIN_ICON_NAMES) {
+                acceptor(context, {
+                    label: icon,
+                    kind: CompletionItemKind.EnumMember,
+                    detail: 'built-in icon',
+                    insertText: icon,
+                });
+            }
+        }
+        if (hint.key === 'capacity-icon') {
+            for (const icon of BUILTIN_CAPACITY_ICONS) {
+                acceptor(context, {
+                    label: icon,
+                    kind: CompletionItemKind.EnumMember,
+                    detail: 'built-in capacity icon',
+                    insertText: icon,
+                });
+            }
+        }
+
+        if (REFERENCE_PROP_KEYS.has(hint.key)) {
+            const allowed = REF_KEY_TO_KINDS[hint.key];
+            for (const ent of collectNamedEntities(file)) {
+                if (!ent.name) continue;
+                if (allowed && !allowed.has(entityKind(ent))) continue;
+                acceptor(context, buildEntityItem(ent));
             }
         }
     }
@@ -144,6 +184,8 @@ function kindFor(kind: string): CompletionItemKind {
         case 'label': return CompletionItemKind.EnumMember;
         case 'size': return CompletionItemKind.Value;
         case 'status': return CompletionItemKind.Enum;
+        case 'style': return CompletionItemKind.Color;
+        case 'glyph': return CompletionItemKind.Snippet;
         case 'footnote': return CompletionItemKind.Text;
         default: return CompletionItemKind.Reference;
     }

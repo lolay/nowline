@@ -1,4 +1,4 @@
-import type { AstNode, CstNode, LangiumDocument, MaybePromise } from 'langium';
+import type { LangiumDocument, MaybePromise } from 'langium';
 import { CstUtils } from 'langium';
 import type {
     CancellationToken,
@@ -11,12 +11,11 @@ import type {
     WorkspaceEdit,
 } from 'vscode-languageserver';
 import type { RenameProvider } from 'langium/lsp';
-import type { NowlineFile } from '@nowline/core';
 import {
     declarationAt,
     fileFromDocument,
+    findDeclarationRange,
     leafAt,
-    nameRangeOf,
     propKey,
     propertyValueAt,
     REFERENCE_PROP_KEYS,
@@ -100,21 +99,6 @@ function renameRangeAt(document: LangiumDocument, position: Position): RenameTar
     const hit = propertyValueAt(leaf);
     if (hit && REFERENCE_PROP_KEYS.has(propKey(hit.prop))) {
         return { id: hit.value, range: hit.valueNode.range };
-    }
-    return undefined;
-}
-
-function findDeclarationRange(file: NowlineFile, targetId: string): Range | undefined {
-    const stack: AstNode[] = [...file.roadmapEntries];
-    while (stack.length) {
-        const node = stack.pop()!;
-        const named = node as AstNode & { name?: string };
-        if (named.name === targetId) {
-            const range = nameRangeOf(node);
-            if (range) return range;
-        }
-        const children = (node as unknown as Record<string, unknown>)['content'];
-        if (Array.isArray(children)) stack.push(...(children as AstNode[]));
     }
     return undefined;
 }

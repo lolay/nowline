@@ -19,10 +19,13 @@ import type {
     LabelDeclaration,
     SizeDeclaration,
     StatusDeclaration,
+    StyleDeclaration,
+    GlyphDeclaration,
 } from '@nowline/core';
 import {
     isAnchorDeclaration,
     isFootnoteDeclaration,
+    isGlyphDeclaration,
     isGroupBlock,
     isItemDeclaration,
     isLabelDeclaration,
@@ -33,6 +36,7 @@ import {
     isPersonMemberRef,
     isSizeDeclaration,
     isStatusDeclaration,
+    isStyleDeclaration,
     isSwimlaneDeclaration,
     isTeamDeclaration,
 } from '@nowline/core';
@@ -42,16 +46,31 @@ import {
  * definition / references / rename / completion to decide whether the cursor
  * sits on an id reference.
  *
- * Mirrors the validator's `checkReferenceResolution` (`after` / `before` /
- * `on` / `owner`) plus `depends:` (synonym used by some examples) so the LSP
- * stays forgiving even when the validator is strict.
+ * Wider than the validator's `checkReferenceResolution` (which is strict only
+ * for sequencing — `after` / `before` / `on`). Categorisation references
+ * (`size` / `status` / `style` / `labels`), decoration references
+ * (`icon` / `capacity-icon`), and ownership references (`owner` / `team`) are
+ * permissive in the validator (an undeclared id is not an error) but still
+ * navigable when a declaration exists.
+ *
+ * `footnote:` is intentionally absent — the legacy `item … footnote:foo`
+ * form is being removed in a separate breaking-change PR. Footnote
+ * association flows only from the footnote declaration's `on:` going
+ * forward.
  */
 export const REFERENCE_PROP_KEYS = new Set([
     'after',
     'before',
+    'depends',
     'on',
     'owner',
-    'depends',
+    'team',
+    'size',
+    'status',
+    'style',
+    'labels',
+    'icon',
+    'capacity-icon',
 ]);
 
 /** Status value-completion source: built-in statuses ship with the renderer. */
@@ -63,6 +82,31 @@ export const BUILTIN_STATUSES: readonly string[] = [
     'blocked',
 ];
 
+/**
+ * Built-in `capacity-icon:` vocabulary. Mirrors `BUILTIN_CAPACITY_ICONS` in
+ * the validator — kept as a literal here so the LSP doesn't have to import a
+ * non-public symbol from `@nowline/core`.
+ */
+export const BUILTIN_CAPACITY_ICONS: readonly string[] = [
+    'none',
+    'multiplier',
+    'person',
+    'people',
+    'points',
+    'time',
+];
+
+/**
+ * Built-in `icon:` vocabulary. Superset of `BUILTIN_CAPACITY_ICONS` plus the
+ * entity-decoration glyphs the renderer ships.
+ */
+export const BUILTIN_ICON_NAMES: readonly string[] = [
+    ...BUILTIN_CAPACITY_ICONS,
+    'shield',
+    'warning',
+    'lock',
+];
+
 /** Strip the trailing `:` an `EntityProperty.key` carries from the grammar. */
 export function propKey(prop: { key: string }): string {
     return prop.key.endsWith(':') ? prop.key.slice(0, -1) : prop.key;
@@ -71,12 +115,18 @@ export function propKey(prop: { key: string }): string {
 /**
  * Named declaration shapes we expose for navigation. All have `name?: string`,
  * `title?: string`, and `properties?: EntityProperty[]`.
+ *
+ * Includes both roadmap-section declarations (item, swimlane, person, …) and
+ * config-section declarations (`style`, `glyph`) so cmd+click on
+ * `style:enterprise-style` and `icon:my-glyph` resolves to the right place.
  */
 export type NamedEntity =
     | RoadmapEntryNamed
     | ItemDeclaration
     | ParallelBlock
-    | GroupBlock;
+    | GroupBlock
+    | StyleDeclaration
+    | GlyphDeclaration;
 
 type RoadmapEntryNamed =
     | SwimlaneDeclaration
@@ -90,12 +140,19 @@ type RoadmapEntryNamed =
     | StatusDeclaration;
 
 /**
- * Walk the `NowlineFile` and collect every entity that owns an `id`. The
- * traversal mirrors the validator's `collectReferenceableIds` so the LSP and
- * the validator agree on what's reachable.
+ * Walk the `NowlineFile` and collect every entity that owns an `id`. Covers
+ * roadmap-section entities (mirrors the validator's `collectReferenceableIds`)
+ * plus the named config-section declarations (`style`, `glyph`) so style and
+ * glyph references navigate correctly. Anonymous config blocks (`scale`,
+ * `calendar`, `default <entity>`) are skipped.
  */
 export function collectNamedEntities(file: NowlineFile): NamedEntity[] {
     const out: NamedEntity[] = [];
+
+    for (const entry of file.configEntries) {
+        if (isStyleDeclaration(entry) && entry.name) out.push(entry);
+        else if (isGlyphDeclaration(entry) && entry.name) out.push(entry);
+    }
 
     const visitTeam = (team: TeamDeclaration) => {
         if (team.name) out.push(team);
@@ -261,9 +318,30 @@ export function declarationAt(leaf: CstNode | undefined): NamedEntity | undefine
         isTeamDeclaration(owner) ||
         isLabelDeclaration(owner) ||
         isSizeDeclaration(owner) ||
-        isStatusDeclaration(owner)
+        isStatusDeclaration(owner) ||
+        isStyleDeclaration(owner) ||
+        isGlyphDeclaration(owner)
     ) {
         return owner as NamedEntity;
+    }
+    return undefined;
+}
+
+/**
+ * Look up the `name=ID` token range of the entity that declares `id`. Walks
+ * `collectNamedEntities` so config-section declarations (style / glyph)
+ * participate. Returns `undefined` when no declaration matches.
+ *
+ * Replaces the per-provider `findDeclarationRange` helpers in
+ * references.ts and rename.ts so all providers agree on what "declared"
+ * means.
+ */
+export function findDeclarationRange(file: NowlineFile, id: string): Range | undefined {
+    for (const ent of collectNamedEntities(file)) {
+        if (ent.name === id) {
+            const range = nameRangeOf(ent);
+            if (range) return range;
+        }
     }
     return undefined;
 }

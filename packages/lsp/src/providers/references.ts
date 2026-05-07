@@ -1,14 +1,13 @@
-import type { AstNode, CstNode, LangiumDocument, MaybePromise } from 'langium';
+import type { CstNode, LangiumDocument, MaybePromise } from 'langium';
 import { CstUtils } from 'langium';
 import type { CancellationToken, ReferenceParams } from 'vscode-languageserver';
 import { Location } from 'vscode-languageserver';
 import type { ReferencesProvider } from 'langium/lsp';
-import type { NowlineFile } from '@nowline/core';
 import {
     declarationAt,
     fileFromDocument,
+    findDeclarationRange,
     leafAt,
-    nameRangeOf,
     propKey,
     propertyValueAt,
     REFERENCE_PROP_KEYS,
@@ -71,21 +70,6 @@ function resolveTargetId(leaf: CstNode): string | undefined {
     const propHit = propertyValueAt(leaf);
     if (propHit && REFERENCE_PROP_KEYS.has(propKey(propHit.prop))) {
         return propHit.value;
-    }
-    return undefined;
-}
-
-function findDeclarationRange(file: NowlineFile, targetId: string): import('vscode-languageserver').Range | undefined {
-    const stack: AstNode[] = [...file.roadmapEntries];
-    while (stack.length) {
-        const node = stack.pop()!;
-        const named = node as AstNode & { name?: string };
-        if (named.name === targetId) {
-            const range = nameRangeOf(node);
-            if (range) return range;
-        }
-        const children = (node as unknown as Record<string, unknown>)['content'];
-        if (Array.isArray(children)) stack.push(...(children as AstNode[]));
     }
     return undefined;
 }
