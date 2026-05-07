@@ -106,6 +106,7 @@ html, body {
 .btn:hover { background: var(--vscode-toolbar-hoverBackground, rgba(255,255,255,0.08)); }
 .btn:active { background: var(--vscode-toolbar-activeBackground, rgba(255,255,255,0.12)); }
 .btn.zoom-label { min-width: 48px; font-variant-numeric: tabular-nums; }
+.btn.glyph { font-size: 16px; line-height: 1; padding: 4px 6px; }
 .dropdown { position: relative; }
 .menu {
     position: absolute; top: 100%; right: 0; margin-top: 4px;
@@ -266,8 +267,8 @@ const BODY = `
         <button class="btn zoom-label" id="zoom-reset" title="Reset to 100%">100%</button>
         <button class="btn" id="zoom-in" title="Zoom in">+</button>
         <span class="sep"></span>
-        <button class="btn" id="fit-width" title="Fit width (3)">Fit Width</button>
-        <button class="btn" id="fit-page" title="Fit page (1)">Fit Page</button>
+        <button class="btn glyph" id="fit-width" title="Fit width (3)" aria-label="Fit width">↔</button>
+        <button class="btn glyph" id="fit-page" title="Fit page (1)" aria-label="Fit page">▭</button>
         <span class="sep"></span>
         <div class="dropdown">
             <button class="btn" id="save-toggle" title="Save the rendered diagram">Save ▾</button>
@@ -284,7 +285,7 @@ const BODY = `
             </ul>
         </div>
         <span class="sep"></span>
-        <button class="btn" id="maximize" title="Maximize tab (Cmd+K Cmd+M). For distraction-free, use Zen Mode (Cmd+K Z).">⛶</button>
+        <button class="btn glyph" id="maximize" title="Maximize tab and fit page (Cmd+K Cmd+M). For distraction-free, use Zen Mode (Cmd+K Z).">⛶</button>
     </div>
 </div>
 <div id="minimap" class="hidden">
@@ -645,6 +646,11 @@ const SCRIPT = `
 
     els.viewport.addEventListener('scroll', updateMinimapRect);
     window.addEventListener('resize', function () {
+        if (pendingMaximizeFit) {
+            pendingMaximizeFit = false;
+            fitPage();
+            return;
+        }
         updateMinimapRect();
         updateMinimapVisibility();
     });
@@ -711,7 +717,12 @@ const SCRIPT = `
     document.getElementById('zoom-reset').addEventListener('click', actualSize);
     document.getElementById('fit-width').addEventListener('click', fitWidth);
     document.getElementById('fit-page').addEventListener('click', fitPage);
+    var pendingMaximizeFit = false;
     document.getElementById('maximize').addEventListener('click', function () {
+        // Fit-page once the workbench finishes the resize triggered by the
+        // maximize/restore toggle. The flag clears after the first resize so
+        // ordinary window resizes don't keep snapping back to fit.
+        pendingMaximizeFit = true;
         vscode.postMessage({ type: 'toggleMaximize' });
     });
 
