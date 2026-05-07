@@ -333,6 +333,11 @@ const SCRIPT = `
         naturalWidth: 0,
         naturalHeight: 0,
         defaultFit: 'fitPage',
+        // 'fitPage' | 'fitWidth' | 'manual' — what the user most recently
+        // asked for. Resize re-applies the last fit mode unless the user
+        // moved to manual via Cmd-wheel, +/- buttons, 100% reset, or
+        // keyboard preset 2.
+        activeFit: 'fitPage',
         showMinimap: true,
         minimapDismissedThisSession: false,
         firstRender: true,
@@ -349,10 +354,16 @@ const SCRIPT = `
     showToolbar();
 
     // ===== Transform =====
+    // Resize the canvas to the visually-scaled dimensions instead of relying
+    // on CSS transform. CSS transform doesn't change the layout box, so the
+    // viewport's overflow:auto would show scrollbars at scales <= 1 even when
+    // nothing is off-screen. The inner <svg> uses width/height = 100% of the
+    // canvas, so vector rendering scales for free.
     function applyTransform() {
-        els.canvas.style.transform = 'scale(' + state.scale + ')';
-        els.canvas.style.width = state.naturalWidth + 'px';
-        els.canvas.style.height = state.naturalHeight + 'px';
+        var w = Math.max(1, Math.round(state.naturalWidth * state.scale));
+        var h = Math.max(1, Math.round(state.naturalHeight * state.scale));
+        els.canvas.style.width = w + 'px';
+        els.canvas.style.height = h + 'px';
         els.zoomReset.textContent = Math.round(state.scale * 100) + '%';
         updateMinimapRect();
         updateMinimapVisibility();
@@ -382,6 +393,7 @@ const SCRIPT = `
 
     function fitPage() {
         if (!state.naturalWidth || !state.naturalHeight) return;
+        state.activeFit = 'fitPage';
         var sx = els.viewport.clientWidth / state.naturalWidth;
         var sy = els.viewport.clientHeight / state.naturalHeight;
         setScale(Math.min(sx, sy));
@@ -391,12 +403,14 @@ const SCRIPT = `
 
     function fitWidth() {
         if (!state.naturalWidth) return;
+        state.activeFit = 'fitWidth';
         setScale(els.viewport.clientWidth / state.naturalWidth);
         els.viewport.scrollLeft = 0;
         els.viewport.scrollTop = 0;
     }
 
     function actualSize() {
+        state.activeFit = 'manual';
         setScale(1);
     }
 
@@ -404,6 +418,11 @@ const SCRIPT = `
         if (state.defaultFit === 'fitWidth') fitWidth();
         else if (state.defaultFit === 'actual') actualSize();
         else fitPage();
+    }
+
+    function reapplyActiveFit() {
+        if (state.activeFit === 'fitPage') fitPage();
+        else if (state.activeFit === 'fitWidth') fitWidth();
     }
 
     // ===== Render handling =====
@@ -651,6 +670,10 @@ const SCRIPT = `
             fitPage();
             return;
         }
+        // Re-apply the user's last fit choice so the diagram tracks the new
+        // panel size. Manual zoom (Cmd-wheel, +/-, 100%) opts out so the
+        // user's chosen zoom isn't undone by a window resize.
+        reapplyActiveFit();
         updateMinimapRect();
         updateMinimapVisibility();
     });
@@ -659,6 +682,7 @@ const SCRIPT = `
     els.viewport.addEventListener('wheel', function (e) {
         if (!(e.ctrlKey || e.metaKey)) return;
         e.preventDefault();
+        state.activeFit = 'manual';
         var rect = els.viewport.getBoundingClientRect();
         var anchorX = e.clientX - rect.left;
         var anchorY = e.clientY - rect.top;
@@ -712,8 +736,14 @@ const SCRIPT = `
     });
 
     // ===== Toolbar buttons =====
-    document.getElementById('zoom-out').addEventListener('click', function () { setScale(state.scale / 1.1); });
-    document.getElementById('zoom-in').addEventListener('click', function () { setScale(state.scale * 1.1); });
+    document.getElementById('zoom-out').addEventListener('click', function () {
+        state.activeFit = 'manual';
+        setScale(state.scale / 1.1);
+    });
+    document.getElementById('zoom-in').addEventListener('click', function () {
+        state.activeFit = 'manual';
+        setScale(state.scale * 1.1);
+    });
     document.getElementById('zoom-reset').addEventListener('click', actualSize);
     document.getElementById('fit-width').addEventListener('click', fitWidth);
     document.getElementById('fit-page').addEventListener('click', fitPage);
