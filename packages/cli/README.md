@@ -32,6 +32,13 @@ npm install -g @nowline/cli
 # or one-shot: npx @nowline/cli roadmap.nowline -o -
 ```
 
+After any of the package-manager installs above, `man nowline` shows the
+manual. The Homebrew formula's `resource "manpage"`, the `.deb`'s
+`/usr/share/man/man1/nowline.1.gz`, and npm's `"man"` field all install
+the same hand-authored mdoc source from [`man/nowline.1`](./man/nowline.1).
+For direct binary downloads from GitHub Releases, the man page ships as
+a separate `nowline.1` asset alongside the platform binaries.
+
 ## Usage
 
 `nowline` is **verbless**: rendering is the default. Other modes are flags on the same command:

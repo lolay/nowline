@@ -225,6 +225,7 @@ jobs:
         run: |
           mkdir -p release-assets
           find artifacts -type f \( -name 'nowline-*' -o -name '*.deb' \) -exec cp {} release-assets/ \;
+          cp packages/cli/man/nowline.1 release-assets/
           ls -la release-assets
 
       - name: Publish GitHub Release
@@ -238,6 +239,11 @@ jobs:
     runs-on: ubuntu-latest
     needs: release
     steps:
+      - name: Checkout source
+        uses: actions/checkout@v4
+        with:
+          path: src
+
       - name: Checkout lolay/tap
         uses: actions/checkout@v4
         with:
@@ -254,6 +260,7 @@ jobs:
         run: |
           set -euo pipefail
           VERSION="${GITHUB_REF_NAME#v}"
+          SHA_MANPAGE=$(sha256sum src/packages/cli/man/nowline.1 | awk '{print $1}')
           cd artifacts
           SHA_DARWIN_ARM64=$(sha256sum nowline-macos-arm64/nowline-macos-arm64 | awk '{print $1}')
           SHA_DARWIN_X64=$(sha256sum nowline-macos-x64/nowline-macos-x64 | awk '{print $1}')
@@ -288,8 +295,14 @@ jobs:
               end
             end
 
+            resource "manpage" do
+              url "https://github.com/lolay/nowline/releases/download/v${VERSION}/nowline.1"
+              sha256 "${SHA_MANPAGE}"
+            end
+
             def install
               bin.install Dir["nowline-*"].first => "nowline"
+              resource("manpage").stage { man1.install "nowline.1" }
             end
 
             test do

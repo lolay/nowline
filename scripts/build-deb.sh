@@ -19,8 +19,16 @@ ARCH="$1"
 BIN_SRC="$2"
 VERSION="$3"
 
+REPO_ROOT="$(cd "$(dirname "$0")/.." && pwd)"
+MAN_SRC="$REPO_ROOT/packages/cli/man/nowline.1"
+
 if [[ ! -f "$BIN_SRC" ]]; then
     echo "error: binary not found at $BIN_SRC" >&2
+    exit 2
+fi
+
+if [[ ! -f "$MAN_SRC" ]]; then
+    echo "error: man page not found at $MAN_SRC" >&2
     exit 2
 fi
 
@@ -40,10 +48,16 @@ PKG_ROOT="$STAGE/${PKG_NAME}_${VERSION}_${ARCH}"
 mkdir -p "$PKG_ROOT/DEBIAN"
 mkdir -p "$PKG_ROOT/usr/bin"
 mkdir -p "$PKG_ROOT/usr/share/doc/${PKG_NAME}"
+mkdir -p "$PKG_ROOT/usr/share/man/man1"
 
 install -m 0755 "$BIN_SRC" "$PKG_ROOT/usr/bin/nowline"
 
-BIN_SIZE_KB=$(du -sk "$PKG_ROOT/usr/bin/nowline" | awk '{print $1}')
+# Debian policy 12.3: man pages are gzip-compressed at maximum level.
+# `gzip -n` strips filename + mtime from the gzip header for byte-stable output.
+gzip -n -9 -c "$MAN_SRC" > "$PKG_ROOT/usr/share/man/man1/nowline.1.gz"
+chmod 0644 "$PKG_ROOT/usr/share/man/man1/nowline.1.gz"
+
+INSTALLED_SIZE_KB=$(du -sk --exclude=DEBIAN "$PKG_ROOT" | awk '{print $1}')
 
 cat > "$PKG_ROOT/DEBIAN/control" <<EOF
 Package: ${PKG_NAME}
@@ -51,7 +65,7 @@ Version: ${VERSION}
 Section: utils
 Priority: optional
 Architecture: ${ARCH}
-Installed-Size: ${BIN_SIZE_KB}
+Installed-Size: ${INSTALLED_SIZE_KB}
 Maintainer: Lolay <packages@lolay.com>
 Homepage: https://github.com/lolay/nowline
 Description: ${PKG_DESC_SHORT}

@@ -27,6 +27,7 @@ Commercial milestones (hosted editor, free viewer, MCP, enterprise, FedRAMP) are
 | ~~m2i~~ | ~~Sample fidelity polish~~ | Apache 2.0 | Post-Layout-v2 rendering refinements: row-packing for items/markers/groups, caption + chip spill, narrow-bar decoration spill, luminance-aware status dots, now-pill flag mode, canvas growth helpers, geometry-constant centralization |
 | ~~m2j~~ | ~~Capacity & utilization~~ | Apache 2.0 | `capacity:` on swimlanes and items, `capacity-icon:` glyph vocabulary, `size <id> effort:N` declarations with item-derived durations, `remaining:` literal form, tri-state lane utilization underline (`utilization-warn-at:N`, `utilization-over-at:N`) |
 | ~~m2k~~ | ~~Dependency arrow attach + routing~~ | Apache 2.0 | Visual-edge attach with flow dedupe; channel-based orthogonal router (item-bar obstacles, parallel/group bracket-clearance nudge, slot assignment, under-bar fallback); min-stub constraints + parallel bracket-foot clearance |
+| m2l | Manual page | Apache 2.0 | Hand-authored mdoc `nowline.1` shipped through every install channel (Homebrew tap, `.deb`, npm `"man"`, GitHub Release asset) so `man nowline` works after any package-manager install |
 | ~~m3a~~ | ~~LSP server~~ | Apache 2.0 | Langium-based language server (`@nowline/lsp`): validation, definition, references, rename, hover, completion, document symbols, folding |
 | ~~m3b~~ | ~~VS Code/Cursor extension scaffold~~ | Apache 2.0 | Bundled `.vsix`: TextMate grammar, language config, snippets, file icon, LSP client, trace setting |
 | ~~m3c~~ | ~~Live preview~~ | Apache 2.0 | Side-or-behind preview panel; host-side render pipeline (parse + layout + renderSvg) posts SVG to a webview; clickable diagnostic table; toolbar zoom/pan/fit/save/copy; Cmd-wheel & pinch zoom; keyboard presets; minimap; five `nowline.preview.*` settings |
@@ -296,6 +297,18 @@ Min-stub constraints:
 
 Spec: [`specs/rendering.md`](./rendering.md) § Dependency Arrows (Attach geometry + Channel Routing) | Handoff: [`specs/handoffs/m2k.md`](./handoffs/m2k.md)
 
+### m2l — Manual page
+
+Distribution-polish milestone: a hand-authored `nowline.1` page so `man nowline` works after any normal package-manager install. The page mirrors the existing `--help` text and the [`specs/cli.md`](./cli.md) flag tables; it is not generated from either, deliberately, so that it can be edited as a man page first and a help text afterwards.
+
+- **Source:** [`packages/cli/man/nowline.1`](../packages/cli/man/nowline.1) — mdoc format (`.Dd`, `.Sh NAME`, `.Bl -tag`, etc.). Co-located with the CLI package so it travels with the npm publish.
+- **Homebrew tap:** the `Formula/nowline.rb` heredoc emitted by [`.github/workflows/release.yml`](../.github/workflows/release.yml) gains a `resource "manpage"` block plus `resource("manpage").stage { man1.install "nowline.1" }` in `def install`.
+- **Debian:** [`scripts/build-deb.sh`](../scripts/build-deb.sh) installs the page at `/usr/share/man/man1/nowline.1.gz` (`gzip -n -9` for byte-deterministic output, per Debian policy 12.3).
+- **npm:** [`packages/cli/package.json`](../packages/cli/package.json) declares `"man": "./man/nowline.1"` and includes `man/` in the `"files"` array; `npm install -g @nowline/cli` installs the page on Unix automatically.
+- **GitHub Release asset:** the `release` job stages `packages/cli/man/nowline.1` alongside the six platform binaries and two `.deb`s; advanced direct-download users can grab it from the same release page.
+
+The mdoc `.Dd $Mdocdate$` placeholder is substituted by groff at render time from the file's mtime, so the source bytes don't change between releases. Mirrors the d2 pattern; we evaluated `pandoc -t man`, `marked-man`, and `scdoc` and picked hand-authored mdoc for its zero build dependencies (see [`specs/cli-distribution.md`](./cli-distribution.md)).
+
 ### ~~m3a — LSP server~~
 
 Langium-based language server (`@nowline/lsp`) shipped as a standalone package. Provides validation, go-to-definition, find-references, rename, hover, completion (IDs and status values), document symbols, and folding for `.nowline` files.
@@ -346,10 +359,12 @@ Spec: [`specs/ide.md`](./ide.md)
 ## Dependency Chain
 
 ```
-m1 → m2a → m2b → m2b.5 → m2c → m2d → m2e → m2f → m2g → m2h → m2.5a → m2.5b → m2.5c → m2.5d → m2i → m2j → m2k → m3a → m3b → m3c → m4
-                                                                                                                              ↘
-                                                                                                                               m4.5 (depends on m3a only; sequenced after m4)
+m1 → m2a → m2b → m2b.5 → m2c → m2d → m2e → m2f → m2g → m2h → m2.5a → m2.5b → m2.5c → m2.5d → m2i → m2j → m2k → m2l → m3a → m3b → m3c → m4
+                                                                                                                                    ↘
+                                                                                                                                     m4.5 (depends on m3a only; sequenced after m4)
 ```
+
+m2l is positioned in the m2 series logically (CLI distribution polish) but landed after m3c chronologically; the chain reflects logical OSS sequence rather than strict shipping order, similar to m2i.
 
 m1 is the critical foundation — every subsequent milestone depends on the DSL, parser, and typed AST it produces.
 

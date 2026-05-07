@@ -21,6 +21,8 @@ The CLI is **verbless** by design: `nowline <input>` renders by default. Operati
 | Windows | Direct download from GitHub Releases (`.exe`) |
 | npm (any platform) | `npm install -g nowline` |
 
+Each of the Unix paths (Homebrew, `.deb`, npm) ships the [`packages/cli/man/nowline.1`](../packages/cli/man/nowline.1) man page, so `man nowline` works immediately after install. See [`specs/cli-distribution.md`](./cli-distribution.md) for the per-channel install layout.
+
 ### Standalone Binaries
 
 `bun compile` produces self-contained binaries (~55MB) with no runtime dependency. Published as GitHub Release assets for:

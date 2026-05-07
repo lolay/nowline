@@ -1,0 +1,330 @@
+.Dd $Mdocdate$
+.Dt NOWLINE 1
+.Os
+.Sh NAME
+.Nm nowline
+.Nd render, validate, and serve .nowline roadmap files
+.Sh SYNOPSIS
+.Nm
+.Op Fl f Ar format
+.Op Fl o Ar path
+.Op Fl t Ar theme
+.Op Fl -now Ar date
+.Op Ar options
+.Ar input
+.Nm
+.Fl -serve
+.Op Fl p Ar port
+.Op Ar options
+.Ar input
+.Nm
+.Fl -init
+.Op Ar name
+.Nm
+.Fl -dry-run
+.Op Ar options
+.Ar input
+.Nm
+.Op Fl V | Fl -version
+.Nm
+.Op Fl h | Fl -help
+.Sh DESCRIPTION
+.Nm
+parses a
+.Pa .nowline
+roadmap file (or its JSON AST form) and writes the rendered output to a
+file or to standard output.
+Rendering is the default; other modes are selected by mutually-exclusive
+mode flags rather than subcommands
+.Pq verbless, matching mmdc, dot, d2, prettier, and tsc .
+.Pp
+The render pipeline is
+.Sy parse
+\(->
+.Sy validate
+\(->
+.Sy layout
+\(->
+.Sy format-specific exporter .
+Output is byte-for-byte deterministic for a given input,
+.Fl -theme ,
+and
+.Fl -now .
+.Pp
+A single
+.Nm
+binary ships every export format: SVG, PNG, PDF, HTML,
+Markdown+Mermaid, XLSX, MS Project XML, plus AST round-trip
+.Pq json , nowline .
+.Pp
+.Ar input
+is required for the default render mode,
+.Fl -serve ,
+and
+.Fl -dry-run .
+Pass
+.Sq -
+to read from standard input.
+With zero arguments,
+.Nm
+prints help and exits 0.
+.Sh INPUT
+The input format is detected from the file extension:
+.Pa .nowline
+\(-> DSL,
+.Pa .json
+\(-> AST.
+Standard-input input defaults to
+.Pa .nowline .
+Use
+.Fl -input-format
+to override for unusual filenames.
+.Sh MODE FLAGS
+The mode flags below are mutually exclusive.
+.Bl -tag -width Fl
+.It Fl -serve
+Run a local live-reload preview server.
+Re-parses, re-validates, re-lays-out, and re-renders on every file
+change; connected browsers refresh via Server-Sent Events.
+Validation errors are shown as an overlay on top of the most recent
+successful render.
+Opt-in
+.Fl o Ar path
+also writes the rendered output to disk on each rebuild.
+.It Fl -init Op Ar name
+Scaffold a starter
+.Pa .nowline
+file in the current directory.
+The positional argument is the project
+.Em name ,
+not a file path;
+.Pa .nowline
+is auto-appended if missing.
+Default name is
+.Sy roadmap .
+Existing files are silently overwritten.
+.It Fl n , -dry-run
+Run the full pipeline (parse + validate + layout + format) but skip the
+write step.
+Replaces the deprecated
+.Sy validate
+verb.
+Exits 0 on success, 1 on validation error.
+Works with any output format \(em
+.Nm Ar roadmap.nowline Fl f Ar pdf Fl -dry-run
+exercises the entire PDF pipeline without producing a file.
+.El
+.Sh I/O OPTIONS
+.Bl -tag -width Fl
+.It Fl f , -format Ar fmt
+Output format:
+.Sy svg , png , pdf , html , mermaid , xlsx , msproj , json , nowline .
+Default: inferred from
+.Fl o
+extension, else
+.Pa .nowlinerc
+.Sy defaultFormat ,
+else
+.Sy svg .
+.It Fl o , -output Ar path
+Output file path.
+Use
+.Sq -
+for standard output (Unix dash convention).
+Default:
+.Pa <cwd>/<input-base>.<format> .
+Existing files are silently overwritten.
+.It Fl -input-format Ar fmt
+Force input format:
+.Sy nowline | json .
+Default: inferred from extension; standard input defaults to
+.Sy nowline .
+.El
+.Sh RENDER OPTIONS
+.Bl -tag -width Fl
+.It Fl t , -theme Ar name
+.Sy light | dark .
+.It Fl -now Ar date
+.Sq Now
+anchor for the now-line and date math, in
+.Pa YYYY-MM-DD
+form.
+Default: today (the OS calendar date in UTC).
+Pass
+.Fl -now Sq -
+to suppress the now-line entirely.
+.It Fl -no-links
+Omit link icons from rendered items.
+.It Fl s , -scale Ar n
+Raster scale factor (PNG only; default 1).
+.It Fl -strict
+Promote asset / sanitizer warnings to errors.
+.It Fl w , -width Ar px
+Canvas width in pixels (default 1280).
+.It Fl -asset-root Ar dir
+Directory from which logo / image assets may be loaded
+(default: input file's directory).
+.El
+.Sh FORMAT-SPECIFIC OPTIONS
+.Bl -tag -width Fl
+.It Fl -page-size Ar size
+PDF page size: preset
+.Pq Sy letter , legal , tabloid , ledger , a1 No \(en Sy a5 , b3 No \(en Sy b5 ,
+.Sy content
+for auto-fit, or
+.Sy WxH Ns Em unit
+for custom (e.g.
+.Sy 8.5x11in , 210x297mm ) .
+Default:
+.Sy letter .
+.It Fl -orientation Ar name
+PDF orientation:
+.Sy portrait | landscape | auto .
+Default:
+.Sy auto .
+.It Fl -margin Ar length
+PDF page margin.
+Bare numbers are points; length suffixes
+.Pq Sy in , mm , cm
+are accepted.
+Default:
+.Sy 36pt
+(1/2 inch).
+.It Fl -font-sans Ar ref
+Sans font for PNG/PDF: TTF/OTF path, or alias
+.Pq Sy sf , helvetica , dejavu , ... .
+Default: platform probe \(-> bundled DejaVu fallback.
+.It Fl -font-mono Ar ref
+Monospace font for PNG/PDF; same resolution chain as
+.Fl -font-sans .
+.It Fl -headless
+Skip the platform font probe and force the bundled DejaVu pair.
+Output is byte-stable across machines.
+.It Fl -start Ar date
+MS Project: anchor date
+.Pq Pa YYYY-MM-DD
+for relative-only roadmaps.
+Default:
+.Fl -now ,
+then deterministic fallback.
+.El
+.Sh SERVE OPTIONS
+.Bl -tag -width Fl
+.It Fl p , -port Ar n
+Port to bind (default 4318).
+.It Fl -host Ar host
+Bind address (default
+.Sy 127.0.0.1 ;
+use
+.Sy 0.0.0.0
+to expose on the LAN).
+.It Fl -open
+Open the browser on start.
+.El
+.Sh LOGGING OPTIONS
+The logging flags are mutually exclusive.
+.Bl -tag -width Fl
+.It Fl v , -verbose
+Print extra diagnostics to standard error (config path, pipeline
+timings, font resolution, fallback decisions).
+.It Fl q , -quiet
+Suppress non-error standard error.
+.El
+.Sh STANDARD OPTIONS
+.Bl -tag -width Fl
+.It Fl h , -help
+Print help to standard output and exit 0.
+.It Fl V , -version
+Print version to standard output and exit 0.
+.El
+.Pp
+.Fl V
+(uppercase) is
+.Fl -version ;
+lowercase
+.Fl v
+is
+.Fl -verbose ,
+matching
+.Xr curl 1
+and
+.Xr ssh 1 .
+.Sh FILES
+.Bl -tag -width Pa
+.It Pa .nowlinerc
+Optional JSON or YAML configuration file.
+Walked up from the input file's directory; nearest one wins.
+CLI flags override config values.
+Recognized keys:
+.Sy theme , defaultFormat , width , pdfPageSize , pdfOrientation ,
+.Sy pdfMargin , fontSans , fontMono , headlessFonts .
+Unknown keys are ignored.
+.El
+.Sh EXIT STATUS
+.Bl -tag -width Ds
+.It 0
+Success.
+.It 1
+Validation error (parse failure, invalid reference, etc.).
+.It 2
+Usage error (missing input, bad flags, mutually-exclusive flags,
+unsupported format, file not found, binary output to TTY, unreadable
+input).
+.It 3
+Output error (cannot write to destination, exporter pipeline failure).
+.El
+.Sh EXAMPLES
+Render the default SVG to the current directory:
+.Bd -literal -offset indent
+nowline roadmap.nowline
+.Ed
+.Pp
+Render to a different format; format inferred from
+.Fl o
+extension:
+.Bd -literal -offset indent
+nowline roadmap.nowline -f pdf
+nowline roadmap.nowline -o roadmap.pdf
+nowline roadmap.nowline -f png --scale 3
+.Ed
+.Pp
+Stream SVG to standard output, validate, and live-preview:
+.Bd -literal -offset indent
+nowline roadmap.nowline -o -
+nowline roadmap.nowline --dry-run
+nowline roadmap.nowline --serve -p 8080
+.Ed
+.Pp
+Read from standard input; convert text \(<-\(-> JSON AST:
+.Bd -literal -offset indent
+cat roadmap.nowline | nowline -
+nowline roadmap.nowline -f json -o roadmap.json
+nowline roadmap.json -f nowline -o roadmap.nowline
+.Ed
+.Pp
+Scaffold a new file:
+.Bd -literal -offset indent
+nowline --init
+nowline --init my-project
+.Ed
+.Pp
+PDF with explicit page geometry, byte-stable across machines:
+.Bd -literal -offset indent
+nowline roadmap.nowline -f pdf --page-size a4 \\
+    --orientation landscape --margin 0.5in --headless
+.Ed
+.Sh SEE ALSO
+.Lk https://github.com/lolay/nowline "Source code, issues, and full DSL reference"
+.Pp
+The
+.Sy specs/
+directory in the source repository documents the DSL grammar
+.Pq Pa specs/dsl.md ,
+the layout / rendering pipeline
+.Pq Pa specs/rendering.md ,
+the CLI surface
+.Pq Pa specs/cli.md ,
+and OSS milestones
+.Pq Pa specs/milestones.md .
+.Sh AUTHORS
+.An Lolay Aq Mt packages@lolay.com

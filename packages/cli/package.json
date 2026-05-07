@@ -7,19 +7,21 @@
   "bin": {
     "nowline": "./dist/index.js"
   },
-  "main": "./dist/index.js",
-  "types": "./dist/index.d.ts",
-  "exports": {
-    ".": {
-      "types": "./dist/index.d.ts",
-      "import": "./dist/index.js"
-    }
-  },
-  "files": [
-    "dist/",
-    "src/",
-    "scripts/"
-  ],
+    "main": "./dist/index.js",
+    "types": "./dist/index.d.ts",
+    "man": "./man/nowline.1",
+    "exports": {
+        ".": {
+            "types": "./dist/index.d.ts",
+            "import": "./dist/index.js"
+        }
+    },
+    "files": [
+        "dist/",
+        "man/",
+        "src/",
+        "scripts/"
+    ],
   "scripts": {
     "bundle-templates": "node scripts/bundle-templates.mjs",
     "prebuild": "node scripts/bundle-templates.mjs",

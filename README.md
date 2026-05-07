@@ -149,6 +149,10 @@ nowline --init my-project --template=teams  # use the teams template
 | 2 | Usage error (missing input, bad flags, unsupported format, file not found, binary→TTY refusal) |
 | 3 | Output error (cannot write to destination) |
 
+### Manual
+
+After any package-manager install (`brew install lolay/tap/nowline`, `apt install nowline`, `npm install -g @nowline/cli`), `man nowline` shows the manual. The man page source lives at [`packages/cli/man/nowline.1`](./packages/cli/man/nowline.1) and ships as a release asset on every GitHub Release.
+
 ## Language at a glance
 
 ### File structure
