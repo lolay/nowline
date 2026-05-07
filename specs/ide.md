@@ -86,26 +86,32 @@ Users install the extension from the marketplace and it works immediately.
 ```
 nowline-vscode/
   src/
-    extension.ts           # Activation, LSP client setup
-    preview.ts             # Webview panel for live preview
+    extension.ts                    # Activation, LSP client, command dispatch
+    server-launcher.ts              # Bundled LSP server boot
+    preview/
+      preview-manager.ts            # One-panel-per-source registry
+      preview-panel.ts              # Wraps vscode.WebviewPanel, debounced render
+      render-pipeline.ts            # parseSource + resolveIncludes + layout + renderSvg
+      shell-html.ts                 # Webview HTML/CSS/JS shell
+      diagnostic-row.ts             # Adapters for the host -> webview diagnostic protocol
   syntaxes/
-    nowline.tmLanguage.json  # Copied from monorepo grammars/
+    nowline.tmLanguage.json         # Synced from monorepo grammars/
   snippets/
     nowline.json
-  package.json             # Extension manifest
-  LICENSE                  # Apache 2.0
+  package.json                      # Extension manifest
+  LICENSE                           # Apache 2.0
 ```
 
 ### Live Preview
 
-The preview panel is a VS Code webview that:
+The preview panel is a VS Code webview that displays an SVG rendered by the **extension host**, not by the webview itself:
 
-1. Loads a bundled preview script (core + layout + renderer, similar to the embed script but optimized for the extension context).
-2. Receives the current document text from the extension host on each change.
-3. Parses, lays out, and renders the SVG client-side in the webview.
-4. Scrolls to keep the cursor's corresponding card visible.
+1. The extension host reuses the CLI's pipeline (`parseSource` → `resolveIncludes` → `layoutRoadmap` → `renderSvg`) inside `preview/render-pipeline.ts`. This keeps `include:` resolution, asset embedding, and theme handling identical to the CLI without bouncing `readFile` callbacks across the host/webview message boundary.
+2. The host posts `{ type: 'svg', body }` (success), `{ type: 'diagnostics', rows }` (parse / validate / include errors), or `{ type: 'fatal', message }` (unexpected throw) into a "dumb" webview that renders SVG, a clickable diagnostic table, and a viewport layer (toolbar, zoom, pan, minimap, save / copy).
+3. Updates fire on `onDidChangeTextDocument` (debounced; default 200 ms), `onDidSaveTextDocument` (immediate), `onDidChangeActiveColorTheme`, and any `nowline.preview.*` setting change.
+4. Two open commands match VS Code's markdown UX: `nowline.openPreview` (`Cmd+Shift+V`, same tab) and `nowline.openPreviewToSide` (`Cmd+K V`, beside).
 
-The preview updates on every keystroke (debounced ~200ms) or on save, configurable via settings.
+This deviates from earlier drafts of this spec that called for client-side parsing and rendering inside the webview. The host-render approach was chosen to avoid asset / include round-trips, ship one bundle instead of two, and reuse the exact CLI codepath. The future embed (m4) still owns the client-side bundle for browser environments without an extension host.
 
 ## Obsidian Plugin (m4.5)
 

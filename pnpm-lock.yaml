@@ -380,6 +380,9 @@ importers:
       '@nowline/renderer':
         specifier: workspace:*
         version: link:../renderer
+      langium:
+        specifier: ~4.2.2
+        version: 4.2.2
       vscode-languageclient:
         specifier: ^9.0.1
         version: 9.0.1

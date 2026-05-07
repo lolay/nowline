@@ -27,7 +27,9 @@ Commercial milestones (hosted editor, free viewer, MCP, enterprise, FedRAMP) are
 | ~~m2i~~ | ~~Sample fidelity polish~~ | Apache 2.0 | Post-Layout-v2 rendering refinements: row-packing for items/markers/groups, caption + chip spill, narrow-bar decoration spill, luminance-aware status dots, now-pill flag mode, canvas growth helpers, geometry-constant centralization |
 | ~~m2j~~ | ~~Capacity & utilization~~ | Apache 2.0 | `capacity:` on swimlanes and items, `capacity-icon:` glyph vocabulary, `size <id> effort:N` declarations with item-derived durations, `remaining:` literal form, tri-state lane utilization underline (`utilization-warn-at:N`, `utilization-over-at:N`) |
 | ~~m2k~~ | ~~Dependency arrow attach + routing~~ | Apache 2.0 | Visual-edge attach with flow dedupe; channel-based orthogonal router (item-bar obstacles, parallel/group bracket-clearance nudge, slot assignment, under-bar fallback); min-stub constraints + parallel bracket-foot clearance |
-| m3 | IDE | Apache 2.0 | LSP server, VS Code/Cursor extension with live preview |
+| ~~m3a~~ | ~~LSP server~~ | Apache 2.0 | Langium-based language server (`@nowline/lsp`): validation, definition, references, rename, hover, completion, document symbols, folding |
+| ~~m3b~~ | ~~VS Code/Cursor extension scaffold~~ | Apache 2.0 | Bundled `.vsix`: TextMate grammar, language config, snippets, file icon, LSP client, trace setting |
+| ~~m3c~~ | ~~Live preview~~ | Apache 2.0 | Side-or-behind preview panel; host-side render pipeline (parse + layout + renderSvg) posts SVG to a webview; clickable diagnostic table; toolbar zoom/pan/fit/save/copy/maximize; Cmd-wheel & pinch zoom; keyboard presets; minimap; five `nowline.preview.*` settings |
 | m4 | Embed | Apache 2.0 | Browser embed script, GitHub Action |
 | m4.5 | IDE Expansion | Apache 2.0 | Obsidian, Neovim, JetBrains (timing TBD) |
 
@@ -294,14 +296,30 @@ Min-stub constraints:
 
 Spec: [`specs/rendering.md`](./rendering.md) § Dependency Arrows (Attach geometry + Channel Routing) | Handoff: [`specs/handoffs/m2k.md`](./handoffs/m2k.md)
 
-### m3 — IDE
+### ~~m3a — LSP server~~
 
-First-class editing experience in VS Code and Cursor. Pulled ahead of the embed (m4) so authors can write `.nowline` files in their primary editor with live preview before the public embed surface ships.
+Langium-based language server (`@nowline/lsp`) shipped as a standalone package. Provides validation, go-to-definition, find-references, rename, hover, completion (IDs and status values), document symbols, and folding for `.nowline` files.
 
-- Langium LSP server (autocomplete, validation, go-to-definition)
-- VS Code / Cursor extension (LSP + side panel live preview that re-renders on save/keystroke)
+### ~~m3b — VS Code / Cursor extension scaffold~~
 
-Spec: [`specs/ide.md`](./ide.md)
+Bundled `.vsix` (`@nowline/vscode`) shipping the TextMate grammar, language configuration, snippets, file icon, LSP client, and `nowline.trace.server` setting. Live preview deferred to m3c.
+
+### ~~m3c — Live preview~~
+
+Live preview lands in the same extension as m3b. The extension host runs the CLI's pipeline (`parseSource` → `resolveIncludes` → `layoutRoadmap` → `renderSvg`) and posts the SVG into a webview that owns viewport + diagnostics chrome. Two open commands match VS Code's markdown UX (`Cmd+Shift+V` same tab, `Cmd+K V` beside) and the preview is also reachable from the editor title bar, editor right-click, tab right-click, and Explorer right-click.
+
+Webview shell ships:
+
+- Toolbar (zoom −/+, zoom %, Fit Width / Fit Page, Save ▾, Copy ▾, Maximize)
+- `Cmd/Ctrl + scroll-wheel` and trackpad pinch zoom (centered on cursor)
+- Spacebar-drag pan + Figma-style keyboard presets (`1`/`2`/`3`/`0`)
+- Minimap with viewport rect, click-to-recenter, drag-to-pan, auto-hide
+- Clickable diagnostic table (jump-to-line, link to Problems panel)
+- Save / Copy SVG (passthrough) and Save / Copy PNG (browser-canvas raster, with documented ~95% fidelity caveat vs. `nowline --format png`)
+
+Five new settings: `nowline.preview.refreshOn`, `debounceMs`, `theme`, `defaultFit`, `showMinimap`.
+
+Spec: [`specs/ide.md`](./ide.md) | Handoff: [`specs/handoffs/m3c.md`](./handoffs/m3c.md)
 
 ### m4 — Embed
 
@@ -328,9 +346,9 @@ Spec: [`specs/ide.md`](./ide.md)
 ## Dependency Chain
 
 ```
-m1 → m2a → m2b → m2b.5 → m2c → m2d → m2e → m2f → m2g → m2h → m2.5a → m2.5b → m2.5c → m2.5d → m2i → m2j → m2k → m3 → m4
-                                                                                                                ↘
-                                                                                                                 m4.5 (depends on m3 only; sequenced after m4)
+m1 → m2a → m2b → m2b.5 → m2c → m2d → m2e → m2f → m2g → m2h → m2.5a → m2.5b → m2.5c → m2.5d → m2i → m2j → m2k → m3a → m3b → m3c → m4
+                                                                                                                              ↘
+                                                                                                                               m4.5 (depends on m3a only; sequenced after m4)
 ```
 
 m1 is the critical foundation — every subsequent milestone depends on the DSL, parser, and typed AST it produces.

@@ -74,6 +74,46 @@
                     ],
                     "default": "off",
                     "description": "Trace LSP communication between VS Code and the bundled Nowline language server."
+                },
+                "nowline.preview.refreshOn": {
+                    "type": "string",
+                    "enum": [
+                        "keystroke",
+                        "save"
+                    ],
+                    "default": "keystroke",
+                    "description": "When to re-render the live preview. 'keystroke' renders on every change (debounced); 'save' only on Cmd/Ctrl+S."
+                },
+                "nowline.preview.debounceMs": {
+                    "type": "number",
+                    "default": 200,
+                    "minimum": 0,
+                    "description": "Debounce window for keystroke-triggered re-renders, in milliseconds."
+                },
+                "nowline.preview.theme": {
+                    "type": "string",
+                    "enum": [
+                        "auto",
+                        "light",
+                        "dark"
+                    ],
+                    "default": "auto",
+                    "description": "Theme used to render the preview. 'auto' follows the active VS Code color theme."
+                },
+                "nowline.preview.defaultFit": {
+                    "type": "string",
+                    "enum": [
+                        "fitPage",
+                        "fitWidth",
+                        "actual"
+                    ],
+                    "default": "fitPage",
+                    "description": "Initial fit when a preview opens. 'fitPage' shows the entire diagram; 'fitWidth' scales to the panel width; 'actual' uses 1:1 zoom."
+                },
+                "nowline.preview.showMinimap": {
+                    "type": "boolean",
+                    "default": true,
+                    "description": "Show a bottom-right minimap with a viewport indicator. The minimap auto-hides when the diagram fully fits inside the panel."
                 }
             }
         },
@@ -82,14 +122,81 @@
                 "command": "nowline.openLinkInSideBrowser",
                 "title": "Nowline: Open Link in Side Browser",
                 "category": "Nowline"
+            },
+            {
+                "command": "nowline.openPreview",
+                "title": "Open Preview",
+                "category": "Nowline",
+                "icon": "$(open-preview)"
+            },
+            {
+                "command": "nowline.openPreviewToSide",
+                "title": "Open Preview to the Side",
+                "category": "Nowline",
+                "icon": "$(open-preview)"
+            }
+        ],
+        "keybindings": [
+            {
+                "command": "nowline.openPreview",
+                "key": "ctrl+shift+v",
+                "mac": "cmd+shift+v",
+                "when": "editorLangId == nowline"
+            },
+            {
+                "command": "nowline.openPreviewToSide",
+                "key": "ctrl+k v",
+                "mac": "cmd+k v",
+                "when": "editorLangId == nowline"
             }
         ],
         "menus": {
+            "editor/title": [
+                {
+                    "command": "nowline.openPreviewToSide",
+                    "when": "editorLangId == nowline",
+                    "group": "navigation"
+                }
+            ],
+            "editor/title/context": [
+                {
+                    "command": "nowline.openPreview",
+                    "when": "resourceExtname == .nowline",
+                    "group": "1_open"
+                },
+                {
+                    "command": "nowline.openPreviewToSide",
+                    "when": "resourceExtname == .nowline",
+                    "group": "1_open"
+                }
+            ],
             "editor/context": [
+                {
+                    "when": "editorLangId == nowline",
+                    "command": "nowline.openPreview",
+                    "group": "navigation@1"
+                },
+                {
+                    "when": "editorLangId == nowline",
+                    "command": "nowline.openPreviewToSide",
+                    "group": "navigation@2"
+                },
                 {
                     "when": "editorLangId == nowline",
                     "command": "nowline.openLinkInSideBrowser",
                     "group": "navigation@10"
+                }
+            ],
+            "explorer/context": [
+                {
+                    "command": "nowline.openPreview",
+                    "when": "resourceExtname == .nowline",
+                    "group": "navigation"
+                },
+                {
+                    "command": "nowline.openPreviewToSide",
+                    "when": "resourceExtname == .nowline",
+                    "group": "navigation"
                 }
             ]
         }
@@ -110,6 +217,7 @@
         "@nowline/layout": "workspace:*",
         "@nowline/lsp": "workspace:*",
         "@nowline/renderer": "workspace:*",
+        "langium": "~4.2.2",
         "vscode-languageclient": "^9.0.1"
     },
     "devDependencies": {
