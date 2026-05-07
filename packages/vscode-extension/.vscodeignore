@@ -1,0 +1,13 @@
+.vscode/**
+.scratch/**
+.cursor/**
+.gitignore
+**/*.map
+**/*.ts
+!dist/**/*.cjs
+!dist/**/*.js
+node_modules/**
+src/**
+scripts/**
+tsconfig.json
+**/.DS_Store

@@ -1,0 +1,105 @@
+{
+    "Roadmap header": {
+        "prefix": "roadmap",
+        "body": [
+            "roadmap ${1:my-roadmap} \"${2:My Roadmap}\" start:${3:2026-01-05} scale:${4|1d,1w,1mo,1q|}"
+        ],
+        "description": "Top-level roadmap declaration"
+    },
+    "Swimlane": {
+        "prefix": "swimlane",
+        "body": [
+            "swimlane ${1:lane-id} \"${2:Lane Title}\" owner:${3:owner-id}",
+            "\t$0"
+        ],
+        "description": "New swimlane with an owner"
+    },
+    "Item": {
+        "prefix": "item",
+        "body": [
+            "item ${1:item-id} \"${2:Item title}\" size:${3|sm,md,lg,xl|} status:${4|backlog,planned,in-progress,blocked,done,at-risk|}$0"
+        ],
+        "description": "Roadmap item"
+    },
+    "Item with after / owner / labels": {
+        "prefix": "item-full",
+        "body": [
+            "item ${1:item-id} \"${2:Item title}\" size:${3|sm,md,lg,xl|} after:${4:dependency-id} owner:${5:owner-id} status:${6|backlog,planned,in-progress,blocked,done,at-risk|} labels:[${7:label-id}]$0"
+        ],
+        "description": "Roadmap item with common metadata"
+    },
+    "Parallel block": {
+        "prefix": "parallel",
+        "body": [
+            "parallel after:${1:dependency-id}",
+            "\t$0"
+        ],
+        "description": "Parallel group of items"
+    },
+    "Group block": {
+        "prefix": "group",
+        "body": [
+            "group ${1:group-id} \"${2:Group Title}\"",
+            "\t$0"
+        ],
+        "description": "Named group of items"
+    },
+    "Milestone": {
+        "prefix": "milestone",
+        "body": [
+            "milestone ${1:milestone-id} \"${2:Milestone Title}\" after:${3:dependency-id}$0"
+        ],
+        "description": "Milestone marker tied to a dependency"
+    },
+    "Milestone (date)": {
+        "prefix": "milestone-date",
+        "body": [
+            "milestone ${1:milestone-id} \"${2:Milestone Title}\" date:${3:2026-03-16}$0"
+        ],
+        "description": "Milestone marker on a fixed date"
+    },
+    "Anchor": {
+        "prefix": "anchor",
+        "body": [
+            "anchor ${1:anchor-id} \"${2:Anchor Title}\" date:${3:2026-01-05}$0"
+        ],
+        "description": "Calendar anchor on a fixed date"
+    },
+    "Footnote": {
+        "prefix": "footnote",
+        "body": [
+            "footnote ${1:note-id} \"${2:Note title}\" on:${3:target-id}",
+            "\tdescription \"${4:Why this matters.}\"$0"
+        ],
+        "description": "Footnote attached to one or more targets"
+    },
+    "Person": {
+        "prefix": "person",
+        "body": [
+            "person ${1:person-id} \"${2:Full Name}\"$0"
+        ],
+        "description": "Person declaration"
+    },
+    "Team": {
+        "prefix": "team",
+        "body": [
+            "team ${1:team-id} \"${2:Team Name}\"",
+            "\t$0"
+        ],
+        "description": "Team declaration"
+    },
+    "Custom status": {
+        "prefix": "status",
+        "body": [
+            "status ${1:status-id} \"${2:Status Label}\"$0"
+        ],
+        "description": "Custom status declaration"
+    },
+    "Label": {
+        "prefix": "label",
+        "body": [
+            "label ${1:label-id} \"${2:Label Title}\" style:${3:style-id}$0"
+        ],
+        "description": "Label declaration with style"
+    }
+}

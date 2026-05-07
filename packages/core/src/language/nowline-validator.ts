@@ -1134,13 +1134,18 @@ export class NowlineValidator {
     }
 
     // --- Rules 24/1 (reference): after/before/on must resolve to declared ids ---
+    // `owner:` is intentionally NOT checked here. Per specs/dsl.md ("Declarations
+    // are optional"), `owner:sam` is valid even if no `person sam` declaration
+    // exists — it renders as the bare id. Sequencing properties (`after`,
+    // `before`, `on`) stay strict because a phantom dependency silently breaks
+    // the timeline / footnote target.
     checkReferenceResolution(file: NowlineFile, accept: ValidationAcceptor): void {
         const declaredIds = collectReferenceableIds(file);
 
         const visit = (entry: RoadmapEntry) => {
             visitPropertiesDeep(entry, (prop) => {
                 const key = propKey(prop);
-                if (key !== 'after' && key !== 'before' && key !== 'on' && key !== 'owner') return;
+                if (key !== 'after' && key !== 'before' && key !== 'on') return;
                 const vals = prop.value ? [prop.value] : prop.values;
                 for (const v of vals) {
                     if (!v) continue;

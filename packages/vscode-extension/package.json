@@ -1,0 +1,98 @@
+{
+    "name": "nowline-vscode",
+    "displayName": "Nowline",
+    "description": "Author Nowline roadmaps in VS Code and Cursor — syntax highlighting, language server, and live preview (preview coming in m3c).",
+    "version": "0.1.0",
+    "private": true,
+    "license": "Apache-2.0",
+    "publisher": "lolay",
+    "repository": {
+        "type": "git",
+        "url": "https://github.com/lolay/nowline.git",
+        "directory": "packages/vscode-extension"
+    },
+    "homepage": "https://github.com/lolay/nowline",
+    "bugs": {
+        "url": "https://github.com/lolay/nowline/issues"
+    },
+    "categories": [
+        "Programming Languages",
+        "Snippets"
+    ],
+    "keywords": [
+        "nowline",
+        "roadmap",
+        "gantt",
+        "planning",
+        "dsl"
+    ],
+    "engines": {
+        "vscode": "^1.85.0"
+    },
+    "main": "./dist/extension.cjs",
+    "activationEvents": [
+        "onLanguage:nowline"
+    ],
+    "contributes": {
+        "languages": [
+            {
+                "id": "nowline",
+                "aliases": ["Nowline", "nowline"],
+                "extensions": [".nowline"],
+                "configuration": "./language-configuration.json",
+                "icon": {
+                    "light": "./icons/nowline-light.svg",
+                    "dark": "./icons/nowline-dark.svg"
+                }
+            }
+        ],
+        "grammars": [
+            {
+                "language": "nowline",
+                "scopeName": "source.nowline",
+                "path": "./syntaxes/nowline.tmLanguage.json"
+            }
+        ],
+        "snippets": [
+            {
+                "language": "nowline",
+                "path": "./snippets/nowline.json"
+            }
+        ],
+        "configuration": {
+            "title": "Nowline",
+            "properties": {
+                "nowline.trace.server": {
+                    "type": "string",
+                    "enum": ["off", "messages", "verbose"],
+                    "default": "off",
+                    "description": "Trace LSP communication between VS Code and the bundled Nowline language server."
+                }
+            }
+        }
+    },
+    "scripts": {
+        "sync-grammar": "node scripts/sync-grammar.mjs",
+        "presync-grammar": "echo 'syncing grammar from grammars/'",
+        "prebuild": "node scripts/sync-grammar.mjs",
+        "build": "node scripts/bundle.mjs",
+        "watch": "node scripts/bundle.mjs --watch",
+        "package": "node scripts/sync-grammar.mjs && NODE_ENV=production node scripts/bundle.mjs && vsce package --no-dependencies --out dist/nowline-vscode.vsix",
+        "test": "node scripts/smoke-server.mjs",
+        "lint": "tsc --noEmit -p tsconfig.json"
+    },
+    "dependencies": {
+        "@nowline/core": "workspace:*",
+        "@nowline/layout": "workspace:*",
+        "@nowline/lsp": "workspace:*",
+        "@nowline/renderer": "workspace:*",
+        "vscode-languageclient": "^9.0.1"
+    },
+    "devDependencies": {
+        "@types/node": "^22.0.0",
+        "@types/vscode": "^1.85.0",
+        "@vscode/vsce": "^3.2.0",
+        "esbuild": "^0.27.0",
+        "typescript": "~5.7.0"
+    }
+}

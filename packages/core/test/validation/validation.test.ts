@@ -295,6 +295,13 @@ swimlane s
         expect(hasError(errorMessages(r.diagnostics), /after: reference.*does not resolve/i)).toBe(true);
     });
 
+    it('Rule 24: owner: with no matching declaration is allowed (per dsl.md "declarations are optional")', async () => {
+        const r = await parse(
+            `roadmap r\nswimlane s\n  item a duration:1w owner:sam\n`,
+        );
+        expect(errorMessages(r.diagnostics).some((m) => /owner.*does not resolve/i.test(m))).toBe(false);
+    });
+
     it('Rule 25: circular dependency via after: is an error', async () => {
         const r = await parse(
             `roadmap r\nswimlane s\n  item a duration:1w after:b\n  item b duration:1w after:a\n`,
