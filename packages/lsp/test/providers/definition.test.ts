@@ -205,11 +205,14 @@ swimlane s
         expect(links).toBeUndefined();
     });
 
-    it('returns nothing for the legacy "footnote:" property key (deferred)', async () => {
-        // The `item ... footnote:foo` form is being removed in a separate
-        // breaking-change PR. Until then, the LSP must not advertise
-        // navigation for it (`footnote` is intentionally excluded from
-        // REFERENCE_PROP_KEYS).
+    it('does not advertise navigation for the removed "footnote:" property key', async () => {
+        // The `item ... footnote:foo` form was removed in favor of the
+        // spec-mandated reverse direction (`footnote ... on:<target>`).
+        // The validator now rejects `footnote:` on host entities, but the
+        // LSP must also stay silent on the cursor position so a stray
+        // legacy line doesn't surface phantom navigation. `footnote` is
+        // intentionally excluded from REFERENCE_PROP_KEYS — this test is
+        // a structural pin against accidental re-add.
         const legacy = `nowline v1
 
 roadmap r "R" start:2026-01-05 scale:1w

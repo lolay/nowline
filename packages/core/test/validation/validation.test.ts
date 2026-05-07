@@ -153,6 +153,27 @@ swimlane s
         expect(hasError(errorMessages(r.diagnostics), /Footnote.*on/i)).toBe(true);
     });
 
+    it('Rule 16a: footnote: as a property on an item is an error', async () => {
+        const r = await parse(
+            `roadmap r\nswimlane s\n  item x duration:1w footnote:vendor-dep\nfootnote vendor-dep "Vendor dep" on:x\n`,
+        );
+        expect(hasError(errorMessages(r.diagnostics), /"footnote:" is not valid/i)).toBe(true);
+    });
+
+    it('Rule 16a: footnote: as a property on a swimlane is an error', async () => {
+        const r = await parse(
+            `roadmap r\nswimlane s footnote:capacity-risk\n  item x duration:1w\nfootnote capacity-risk "Capacity risk" on:x\n`,
+        );
+        expect(hasError(errorMessages(r.diagnostics), /"footnote:" is not valid/i)).toBe(true);
+    });
+
+    it('Rule 16a: footnote ... on:item-id is accepted (spec-mandated direction)', async () => {
+        const r = await parse(
+            `roadmap r\nswimlane s\n  item x duration:1w\nfootnote vendor-dep "Vendor dep" on:x\n`,
+        );
+        expect(errorMessages(r.diagnostics)).toEqual([]);
+    });
+
     it('Rule 17: bg with bad color is an error', async () => {
         const r = await parse(`config\nstyle bad\n  bg: xyzzy\nroadmap r\nswimlane s\n  item x duration:1w\n`);
         expect(hasError(errorMessages(r.diagnostics), /color|bg/i)).toBe(true);

@@ -229,32 +229,38 @@ export function registerValidationChecks(services: NowlineServices): void {
             validator.checkAnchorRequiredDate,
             validator.checkAnchorAgainstStart,
             validator.checkNoRawStyleProperties,
+            validator.checkNoFootnoteProperty,
         ],
         SwimlaneDeclaration: [
             validator.checkEntityIdOrTitle,
             validator.checkNoRawStyleProperties,
             validator.checkUtilizationOrdering,
+            validator.checkNoFootnoteProperty,
         ],
         ItemDeclaration: [
             validator.checkEntityIdOrTitle,
             validator.checkItemRequiredDuration,
             validator.checkNoRawStyleProperties,
+            validator.checkNoFootnoteProperty,
         ],
         ParallelBlock: [
             validator.checkParallelMinChildren,
             validator.checkNoComputedProperties,
             validator.checkNoRawStyleProperties,
+            validator.checkNoFootnoteProperty,
         ],
         GroupBlock: [
             validator.checkGroupMinChildren,
             validator.checkNoComputedProperties,
             validator.checkNoRawStyleProperties,
+            validator.checkNoFootnoteProperty,
         ],
         MilestoneDeclaration: [
             validator.checkEntityIdOrTitle,
             validator.checkMilestoneRequirement,
             validator.checkMilestoneAgainstStart,
             validator.checkNoRawStyleProperties,
+            validator.checkNoFootnoteProperty,
         ],
         FootnoteDeclaration: [
             validator.checkEntityIdOrTitle,
@@ -264,10 +270,12 @@ export function registerValidationChecks(services: NowlineServices): void {
         PersonDeclaration: [
             validator.checkEntityIdOrTitle,
             validator.checkNoRawStyleProperties,
+            validator.checkNoFootnoteProperty,
         ],
         TeamDeclaration: [
             validator.checkEntityIdOrTitle,
             validator.checkNoRawStyleProperties,
+            validator.checkNoFootnoteProperty,
         ],
         StyleDeclaration: [validator.checkEntityIdOrTitle],
         StyleProperty: [validator.checkStylePropertyEnum],
@@ -769,6 +777,33 @@ export class NowlineValidator {
             accept('error', 'Footnote requires an "on:" property referencing one or more entities.', {
                 node: footnote,
             });
+        }
+    }
+
+    // --- Rule 13a: `footnote:` is not a valid property on host entities ---
+    // The spec attaches footnotes via the `on:` property on the footnote
+    // declaration only; there is no forward `footnote:` property on the
+    // referenced item / swimlane / etc. Surface a fix-it style error so
+    // authors who reach for the (legacy, undocumented) forward form get
+    // a clear nudge toward the spec-mandated direction.
+    checkNoFootnoteProperty(
+        node: {
+            $type: string;
+            properties: EntityProperty[];
+            name?: string;
+            title?: string;
+        },
+        accept: ValidationAcceptor,
+    ): void {
+        for (const prop of node.properties) {
+            if (propKey(prop) === 'footnote') {
+                accept('error',
+                    `Property "footnote:" is not valid on ${describeNode(node)}. ` +
+                    'Footnotes attach via "on:" on the footnote declaration — ' +
+                    'declare `footnote <id> on:<target-id>` instead.',
+                    { node: prop },
+                );
+            }
         }
     }
 

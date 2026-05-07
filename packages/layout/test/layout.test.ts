@@ -63,7 +63,7 @@ swimlane build "Build"
     });
 
     it('numbers footnotes in deterministic order', async () => {
-        const src = `nowline v1\n\nroadmap r1 "R"\n\nfootnote alpha "Alpha"\nfootnote beta "Beta"\n\nswimlane a "A"\n  item x duration:1w footnote:alpha\n`;
+        const src = `nowline v1\n\nroadmap r1 "R"\n\nfootnote alpha "Alpha" on:x\nfootnote beta "Beta" on:x\n\nswimlane a "A"\n  item x duration:1w\n`;
         const { file, resolved } = await parseAndResolve(src);
         const model = layoutRoadmap(file, resolved, { theme: 'light' });
         expect(model.footnotes.entries.map((e) => e.number)).toEqual([1, 2]);

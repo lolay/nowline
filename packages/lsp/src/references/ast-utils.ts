@@ -54,9 +54,9 @@ import {
  * navigable when a declaration exists.
  *
  * `footnote:` is intentionally absent — the legacy `item … footnote:foo`
- * form is being removed in a separate breaking-change PR. Footnote
- * association flows only from the footnote declaration's `on:` going
- * forward.
+ * form was removed in favor of the spec-mandated reverse direction.
+ * Footnote association flows only from the footnote declaration's `on:`,
+ * and the validator now rejects `footnote:` as a property on host entities.
  */
 export const REFERENCE_PROP_KEYS = new Set([
     'after',
