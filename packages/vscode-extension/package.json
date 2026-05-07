@@ -1,11 +1,11 @@
 {
-    "name": "nowline-vscode",
+    "name": "vscode",
     "displayName": "Nowline",
     "description": "Author Nowline roadmaps in VS Code and Cursor — syntax highlighting, language server, and live preview (preview coming in m3c).",
     "version": "0.1.0",
     "private": true,
     "license": "Apache-2.0",
-    "publisher": "lolay",
+    "publisher": "nowline",
     "repository": {
         "type": "git",
         "url": "https://github.com/lolay/nowline.git",
@@ -29,6 +29,7 @@
     "engines": {
         "vscode": "^1.85.0"
     },
+    "icon": "dist/icons/icon.png",
     "main": "./dist/extension.cjs",
     "activationEvents": [
         "onLanguage:nowline"
@@ -37,8 +38,13 @@
         "languages": [
             {
                 "id": "nowline",
-                "aliases": ["Nowline", "nowline"],
-                "extensions": [".nowline"],
+                "aliases": [
+                    "Nowline",
+                    "nowline"
+                ],
+                "extensions": [
+                    ".nowline"
+                ],
                 "configuration": "./language-configuration.json",
                 "icon": {
                     "light": "./icons/nowline-light.svg",
@@ -64,7 +70,11 @@
             "properties": {
                 "nowline.trace.server": {
                     "type": "string",
-                    "enum": ["off", "messages", "verbose"],
+                    "enum": [
+                        "off",
+                        "messages",
+                        "verbose"
+                    ],
                     "default": "off",
                     "description": "Trace LSP communication between VS Code and the bundled Nowline language server."
                 }
@@ -90,10 +100,11 @@
     "scripts": {
         "sync-grammar": "node scripts/sync-grammar.mjs",
         "presync-grammar": "echo 'syncing grammar from grammars/'",
-        "prebuild": "node scripts/sync-grammar.mjs",
+        "build-icon": "node scripts/build-icon.mjs",
+        "prebuild": "node scripts/sync-grammar.mjs && node scripts/build-icon.mjs",
         "build": "node scripts/bundle.mjs",
         "watch": "node scripts/bundle.mjs --watch",
-        "package": "node scripts/sync-grammar.mjs && NODE_ENV=production node scripts/bundle.mjs && vsce package --no-dependencies --out dist/nowline-vscode.vsix",
+        "package": "node scripts/sync-grammar.mjs && node scripts/build-icon.mjs && NODE_ENV=production node scripts/bundle.mjs && vsce package --no-dependencies --out dist/nowline-vscode.vsix",
         "test": "node scripts/smoke-server.mjs",
         "lint": "tsc --noEmit -p tsconfig.json"
     },
@@ -105,6 +116,7 @@
         "vscode-languageclient": "^9.0.1"
     },
     "devDependencies": {
+        "@resvg/resvg-js": "^2.6.2",
         "@types/node": "^22.0.0",
         "@types/vscode": "^1.85.0",
         "@vscode/vsce": "^3.2.0",

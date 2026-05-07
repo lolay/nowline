@@ -13,7 +13,7 @@ const serverPath = resolve(here, '..', 'dist', 'server.cjs');
 
 if (!existsSync(serverPath)) {
     console.error(`server bundle not found: ${serverPath}`);
-    console.error('run `pnpm --filter nowline-vscode build` first');
+    console.error('run `pnpm --filter ./packages/vscode-extension build` first');
     process.exit(1);
 }
 
