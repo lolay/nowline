@@ -30,8 +30,11 @@
     "assets/"
   ],
   "scripts": {
+    "bundle-fonts": "node scripts/bundle-fonts.mjs",
+    "prebuild": "node scripts/bundle-fonts.mjs",
     "build": "tsc -b tsconfig.json",
     "watch": "tsc -b tsconfig.json --watch",
+    "pretest": "node scripts/bundle-fonts.mjs",
     "test": "vitest run",
     "test:watch": "vitest",
     "lint": "eslint src/"
