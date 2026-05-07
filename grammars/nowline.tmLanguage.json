@@ -7,8 +7,8 @@
     { "include": "#comments" },
     { "include": "#line-continuation" },
     { "include": "#directive" },
-    { "include": "#keywords" },
     { "include": "#properties" },
+    { "include": "#keywords" },
     { "include": "#strings" },
     { "include": "#dates" },
     { "include": "#urls" },
@@ -49,7 +49,7 @@
       "patterns": [
         {
           "name": "keyword.control.nowline",
-          "match": "\\b(config|roadmap|include|person|team|anchor|swimlane|item|parallel|group|milestone|footnote|label|style|status|size|scale|calendar|default|description)\\b"
+          "match": "\\b(config|roadmap|include|person|team|anchor|swimlane|item|parallel|group|milestone|footnote|label|style|status|size|scale|calendar|default|description)\\b(?!\\s*:)"
         }
       ]
     },
