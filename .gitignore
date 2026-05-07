@@ -7,6 +7,9 @@ dist-deb/
 .scratch/
 .pnpm-store/
 
+# bun --compile intermediate cache (sometimes left in package roots)
+*.bun-build
+
 # Langium generated
 **/src/generated/
 
