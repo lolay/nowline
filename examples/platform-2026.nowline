@@ -40,7 +40,7 @@ label low-confidence "Low confidence" style:risky-style
 status handoff "Handoff"
 
 swimlane platform "Platform" owner:platform-team
-  item auth-refactor "Auth refactor" size:lg after:kickoff status:done owner:sam labels:enterprise link:https://linear.app/acme/issue/ENG-123
+  item auth-refactor "Auth refactor" size:lg after:kickoff status:done owner:sam labels:enterprise link:https://github.com/acme/auth/issues/123
   parallel after:auth-refactor
     group audit-track "Audit Track" style:audit-track-style labels:security
       item audit-log "Audit log v2" size:lg before:code-freeze status:in-progress remaining:30% labels:[enterprise, security] link:https://wiki.acme.com/audit

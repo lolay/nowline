@@ -12,7 +12,7 @@ Bring the renderer's light-theme output into visual parity with [`specs/samples/
 
 ### 1. Example DSL — `examples/platform-2026.nowline`
 
-New file mirroring the DSL gist embedded in [`specs/samples/platform-2026.svg`](../samples/platform-2026.svg). Includes anchors, milestones with `after:`, parallel + group, label chiclets, owners, footnotes, and a Linear-flavored `link:`. Render with `--now 2026-02-09 --theme light`.
+New file mirroring the DSL gist embedded in [`specs/samples/platform-2026.svg`](../samples/platform-2026.svg). Includes anchors, milestones with `after:`, parallel + group, label chiclets, owners, footnotes, and a GitHub-flavored `link:`. Render with `--now 2026-02-09 --theme light`.
 
 ### 2. Renderer changes in `packages/renderer/src/svg/render.ts`
 

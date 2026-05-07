@@ -28,7 +28,7 @@ Ships in the OSS monorepo at `grammars/nowline.tmLanguage.json`.
 | Property values | `constant.other.nowline` | `done`, `in-progress`, `at-risk`, `blocked`, `planned`, `merge`, `ignore`, `isolate` |
 | Identifiers | `variable.other.nowline` | `auth-refactor`, `audit-log` |
 | Identifiers (references) | `entity.name.tag.nowline` | `sam`, `jen`, `platform` (in `owner:`, `on:`, `depends:`, `after:`, `before:`) |
-| URLs | `markup.underline.link.nowline` | `https://linear.app/...` |
+| URLs | `markup.underline.link.nowline` | `https://github.com/acme/...` |
 | Comments | `comment.line.double-slash.nowline` | `// comment` |
 | Lists | `meta.structure.list.nowline` | `labels:[enterprise, security]`, `depends:[auth-refactor, audit-log]` |
 | Dates | `constant.numeric.date.nowline` | `2026-06-01` |

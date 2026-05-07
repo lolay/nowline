@@ -56,7 +56,7 @@ anchor kickoff date:2026-01-05
 swimlane platform "Platform"
   item auth "Auth refactor" duration:2w status:in-progress \\
     owner:sam labels:[security,enterprise] \\
-    link:https://linear.app/team/PRJ-123 \\
+    link:https://github.com/acme/auth/issues/123 \\
     style:flagged
 `,
             { validate: false },

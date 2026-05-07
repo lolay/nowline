@@ -103,7 +103,7 @@ label low-confidence style:risky
 swimlane platform owner:platform capacity:5
   item auth-refactor "Auth refactor" size:l after:kickoff \
     status:done owner:sam labels:enterprise capacity:3 \
-    link:https://linear.app/acme/issue/ENG-123
+    link:https://github.com/acme/auth/issues/123
   parallel after:auth-refactor
     group audit-track "Audit Track" labels:security
       item audit-log "Audit log v2" size:xl before:code-freeze \
@@ -1010,7 +1010,7 @@ A `\` at the end of a line means the next line continues the same declaration. I
 ```nowline
 item auth "Auth refactor" duration:2w status:in-progress \
   owner:sam labels:[security,enterprise] \
-  link:https://linear.app/team/PRJ-123 \
+  link:https://github.com/acme/auth/issues/123 \
   style:flagged
 ```
 

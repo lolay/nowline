@@ -46,13 +46,13 @@ describe('renderSvg', () => {
 roadmap r1 "R"
 
 swimlane a "A"
-  item x duration:1w link:https://linear.app/team/issue/X-1
+  item x duration:1w link:https://github.com/acme/team/issues/1
 `;
         const model = await parseToModel(dsl);
         const withLinks = await renderSvg(model);
         const noLinks = await renderSvg(model, { noLinks: true });
-        expect(withLinks).toContain('href="https://linear.app');
-        expect(noLinks).not.toContain('href="https://linear.app');
+        expect(withLinks).toContain('href="https://github.com');
+        expect(noLinks).not.toContain('href="https://github.com');
     });
 
     it('renders the now-line when today falls inside the range', async () => {
