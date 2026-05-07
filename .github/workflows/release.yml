@@ -4,13 +4,83 @@ on:
   push:
     tags:
       - 'v*'
+  workflow_dispatch:
+    inputs:
+      level:
+        description: 'SemVer bump level'
+        type: choice
+        required: true
+        default: 'patch'
+        options:
+          - patch
+          - minor
+          - major
 
 permissions:
   contents: write
 
 jobs:
+  cut-release:
+    name: Cut release (bump + tag)
+    if: ${{ github.event_name == 'workflow_dispatch' }}
+    runs-on: ubuntu-latest
+    steps:
+      # Use a PAT (RELEASE_TAG_PAT) instead of GITHUB_TOKEN so the tag
+      # push below actually triggers downstream jobs in this same
+      # workflow. GITHUB_TOKEN-pushed tags do not trigger workflow_run /
+      # push events to avoid recursion; a user-scoped PAT does.
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          token: ${{ secrets.RELEASE_TAG_PAT }}
+
+      - name: Install pnpm
+        uses: pnpm/action-setup@v4
+        with:
+          version: 9
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: pnpm
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Bump versions
+        id: bump
+        run: |
+          set -euo pipefail
+          NEW_VERSION=$(node scripts/bump-version.mjs "${{ inputs.level }}")
+          echo "version=${NEW_VERSION}" >> "$GITHUB_OUTPUT"
+          echo "Bumped to ${NEW_VERSION}"
+
+      - name: Commit, tag, and push
+        env:
+          NEW_VERSION: ${{ steps.bump.outputs.version }}
+        run: |
+          set -euo pipefail
+          # nowline.io is the project's canonical domain (matches the
+          # attribution mark renderer + ATTRIBUTION_LINK in
+          # packages/layout/src/themes/shared.ts). The address does not
+          # need to be deliverable — git only stores it as a string —
+          # but pointing at the project domain keeps the trail
+          # consistent.
+          git config user.name "nowline-release-bot"
+          git config user.email "release-bot@nowline.io"
+          git add packages/*/package.json
+          git commit -m "release v${NEW_VERSION}"
+          git tag "v${NEW_VERSION}"
+          git push origin HEAD
+          git push origin "v${NEW_VERSION}"
+
   build-binaries:
     name: Build ${{ matrix.target }}
+    # Skip on workflow_dispatch — cut-release runs alone, then the tag
+    # push it produces fires this whole workflow again under
+    # `event_name == 'push'`, which is when builds + publishes execute.
+    if: ${{ startsWith(github.ref, 'refs/tags/v') }}
     runs-on: ${{ matrix.runner }}
     strategy:
       fail-fast: false
@@ -209,6 +279,50 @@ jobs:
         env:
           NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
 
+  publish-vscode:
+    name: Publish VS Code extension
+    runs-on: ubuntu-latest
+    needs: publish-npm
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install pnpm
+        uses: pnpm/action-setup@v4
+        with:
+          version: 9
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: pnpm
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Build all packages
+        run: pnpm -r build
+
+      - name: Package .vsix
+        working-directory: packages/vscode-extension
+        run: pnpm package
+
+      - name: Publish to VS Code Marketplace
+        working-directory: packages/vscode-extension
+        # No `--pre-release`: per specs/releasing.md we ship every tag as
+        # a stable release. Marketplace doesn't accept SemVer pre-release
+        # suffixes (e.g. `0.1.0-rc.1`) so we don't try to model an RC
+        # channel. Revisit at 1.0.
+        run: npx --yes @vscode/vsce publish --packagePath dist/nowline-vscode.vsix
+        env:
+          VSCE_PAT: ${{ secrets.VSCE_PAT }}
+
+      - name: Publish to Open VSX
+        working-directory: packages/vscode-extension
+        run: npx --yes ovsx publish dist/nowline-vscode.vsix -p $OVSX_PAT
+        env:
+          OVSX_PAT: ${{ secrets.OVSX_PAT }}
+
   release:
     name: GitHub Release
     runs-on: ubuntu-latest
@@ -244,10 +358,15 @@ jobs:
         with:
           path: src
 
-      - name: Checkout lolay/tap
+      - name: Checkout lolay/homebrew-tap
         uses: actions/checkout@v4
         with:
-          repository: lolay/tap
+          # Brew tap shorthand `lolay/tap` (used in `brew install
+          # lolay/tap/nowline`) maps to the GitHub repo
+          # `lolay/homebrew-tap` — Homebrew strips the `homebrew-`
+          # prefix only inside its own tooling. actions/checkout needs
+          # the literal repo name.
+          repository: lolay/homebrew-tap
           token: ${{ secrets.HOMEBREW_TAP_TOKEN }}
           path: tap
 
@@ -260,6 +379,19 @@ jobs:
         run: |
           set -euo pipefail
           VERSION="${GITHUB_REF_NAME#v}"
+          # Fail loudly if any expected artifact is missing — without this
+          # guard, a missing download produces an all-zero SHA and a
+          # broken formula gets pushed to the tap.
+          required=(
+            "src/packages/cli/man/nowline.1"
+            "artifacts/nowline-macos-arm64/nowline-macos-arm64"
+            "artifacts/nowline-macos-x64/nowline-macos-x64"
+            "artifacts/nowline-linux-x64/nowline-linux-x64"
+            "artifacts/nowline-linux-arm64/nowline-linux-arm64"
+          )
+          for f in "${required[@]}"; do
+            test -s "$f" || { echo "missing or empty artifact: $f" >&2; exit 1; }
+          done
           SHA_MANPAGE=$(sha256sum src/packages/cli/man/nowline.1 | awk '{print $1}')
           cd artifacts
           SHA_DARWIN_ARM64=$(sha256sum nowline-macos-arm64/nowline-macos-arm64 | awk '{print $1}')
@@ -274,6 +406,11 @@ jobs:
             homepage "https://github.com/lolay/nowline"
             version "${VERSION}"
             license "Apache-2.0"
+
+            livecheck do
+              url :stable
+              strategy :github_latest
+            end
 
             on_macos do
               if Hardware::CPU.arm?
@@ -311,8 +448,8 @@ jobs:
           end
           EOF
 
-          git config user.name "lolay-release-bot"
-          git config user.email "bot@lolay.com"
+          git config user.name "nowline-release-bot"
+          git config user.email "release-bot@nowline.io"
           git add Formula/nowline.rb
           git commit -m "nowline ${VERSION}"
-          git push
+          git push origin HEAD

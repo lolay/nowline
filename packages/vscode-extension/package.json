@@ -1,9 +1,9 @@
 {
     "name": "vscode",
     "displayName": "Nowline",
-    "description": "Author Nowline roadmaps in VS Code and Cursor — syntax highlighting, language server, and live preview (preview coming in m3c).",
+    "description": "Author Nowline roadmaps in VS Code and Cursor — syntax highlighting, language server, and live preview.",
     "version": "0.1.0",
-    "private": true,
+    "private": false,
     "license": "Apache-2.0",
     "publisher": "nowline",
     "repository": {

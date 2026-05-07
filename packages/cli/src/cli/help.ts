@@ -1,6 +1,9 @@
-import { CLI_VERSION } from '../version.js';
+import { fullVersionString } from '../version.js';
 
-const HELP_TEXT = `nowline ${CLI_VERSION} — render, validate, and serve .nowline roadmaps.
+// Use the dev-aware string here too: a contributor running `pnpm dev`
+// against a feature branch should see e.g. `0.1.0+abc1234.dirty` in
+// `--help` so it's obvious which build they're looking at.
+const HELP_TEXT = `nowline ${fullVersionString()} — render, validate, and serve .nowline roadmaps.
 
 USAGE
   nowline <input> [options]
@@ -78,5 +81,5 @@ export function renderHelp(): string {
 }
 
 export function renderVersion(): string {
-    return `${CLI_VERSION}\n`;
+    return `${fullVersionString()}\n`;
 }

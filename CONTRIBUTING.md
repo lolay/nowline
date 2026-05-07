@@ -16,6 +16,7 @@ Nowline is early-stage: the parser, validator, and CLI are usable, but layout, r
 - [Code style](#code-style)
 - [Tests](#tests)
 - [Commits and pull requests](#commits-and-pull-requests)
+- [Versioning](#versioning)
 - [Reporting bugs](#reporting-bugs)
 - [Proposing features](#proposing-features)
 - [Licensing](#licensing)
@@ -210,6 +211,40 @@ WIP
 6. **Respond to review feedback** with follow-up commits; we squash-merge, so intermediate history doesn't need to be pristine.
 
 For changes touching the language or the published AST JSON schema, please open an issue first so we can discuss the shape before you invest implementation time — these are contracts we want to keep stable.
+
+> **Hotfix exception.** PRs that patch a *released* version target a `release/vX.Y` branch instead of `main`. Apply the **`backport main`** label so the merged hotfix is auto-cherry-picked back onto `main` (see [Versioning](#versioning) below).
+
+## Versioning
+
+All packages in this repo (the `@nowline/*` npm packages and the VS Code extension) ship under [Semantic Versioning](https://semver.org/) and are kept lock-step — every release tag bumps every package to the same `MAJOR.MINOR.PATCH`. The DSL itself uses an independent integer-only version (`nowline v1`) declared inside `.nowline` files; see [`specs/dsl.md`](./specs/dsl.md) for that contract.
+
+The maintainer-facing release process (cut a tag, what publishes where, how to rotate secrets) lives in [`specs/releasing.md`](./specs/releasing.md). Contributors only need to know the rules below.
+
+### Branching
+
+- **`main` is the only long-lived branch.** Feature work happens on short-lived `feat/*`, `fix/*`, or `docs/*` branches and lands via squash-merge.
+- **`release/vX.Y` branches exist only when a released line needs a hotfix** (e.g. `release/v0.1` to ship `0.1.1` after `0.2.0` is out). They are cut on demand from the relevant tag and deleted once the line is end-of-life.
+- We do **not** maintain a `develop` branch or a release-candidate channel before 1.0; every tag is a stable release.
+
+### Dev builds vs. releases
+
+`package.json#version` always reflects the *last released* version on `main`. To distinguish a dev build from the real thing, the CLI appends git build metadata to its `--version` output (per SemVer §10):
+
+| Build | `nowline --version` |
+|---|---|
+| Tagged release | `0.1.0` |
+| Dev build, clean tree | `0.1.0+abc1234` |
+| Dev build, uncommitted changes | `0.1.0+abc1234.dirty` |
+
+The `+...` suffix is informational metadata only; npm and the VS Code Marketplace strip it (and the `+` is invalid in their version fields), so it never reaches a published artifact. The metadata is captured at compile time by `packages/cli/scripts/bundle-templates.mjs`.
+
+### Hotfix flow
+
+1. Cut `release/vX.Y` from the tag you need to patch (`git switch -c release/v0.1 v0.1.0`) and push it.
+2. Open a PR against that branch with the fix.
+3. Apply the **`backport main`** label.
+4. After CI passes, merge. `.github/workflows/backport.yml` opens a follow-up PR cherry-picking the squash-commit onto `main` — review and merge it once green. Auto-merge is intentionally off because hotfixes can conflict with newer work on `main`.
+5. The maintainer cuts a new tag from `release/vX.Y` (`v0.1.1`) via the manual `Release` workflow dispatch (see `specs/releasing.md`).
 
 ## Reporting bugs
 

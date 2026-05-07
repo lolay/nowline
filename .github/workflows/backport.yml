@@ -1,0 +1,55 @@
+name: Backport
+
+# Auto-open a cherry-pick PR to `main` whenever a hotfix PR is merged
+# into a `release/v*` branch with the `backport main` label.
+#
+# Workflow:
+#   1. Cut a hotfix PR against `release/vX` (e.g. release/v0.1).
+#   2. Apply the `backport main` label.
+#   3. Merge the hotfix PR — this Action runs.
+#   4. korthout/backport-action cherry-picks the squash-commit and
+#      opens a follow-up PR to `main`.
+#   5. Reviewer validates CI on the backport PR and merges it.
+#
+# We deliberately do NOT auto-merge: hotfixes can conflict with `main`
+# and a human needs to look at the cherry-pick before it lands.
+
+on:
+  pull_request_target:
+    types: [closed]
+
+permissions:
+  contents: write
+  pull-requests: write
+
+jobs:
+  backport:
+    name: Backport hotfix to main
+    if: >-
+      github.event.pull_request.merged == true
+      && contains(github.event.pull_request.labels.*.name, 'backport main')
+      && startsWith(github.event.pull_request.base.ref, 'release/v')
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Open backport PR
+        uses: korthout/backport-action@v3
+        with:
+          # Without an explicit token the action falls back to
+          # GITHUB_TOKEN, which can open PRs but cannot trigger
+          # downstream workflows on them — that's fine here, since CI
+          # already runs on every PR via ci.yml's `pull_request`
+          # trigger.
+          github_token: ${{ secrets.GITHUB_TOKEN }}
+          # Use the standard "backport <branch>" label convention so
+          # the target branch is parsed from the label itself.
+          label_pattern: '^backport ([^ ]+)$'
+          pull_title: '[backport ${target_branch}] ${pull_title}'
+          pull_description: |-
+            Backport of #${pull_number} to `${target_branch}`.
+
+            Automated cherry-pick by korthout/backport-action. Please
+            verify CI passes and resolve any conflicts before merging.

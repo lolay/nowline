@@ -4,6 +4,11 @@ class Nowline < Formula
   version "0.0.0"
   license "Apache-2.0"
 
+  livecheck do
+    url :stable
+    strategy :github_latest
+  end
+
   on_macos do
     if Hardware::CPU.arm?
       url "https://github.com/lolay/nowline/releases/download/v0.0.0/nowline-macos-arm64"
@@ -29,6 +34,6 @@ class Nowline < Formula
   end
 
   test do
-    system "#{bin}/nowline", "version"
+    system "#{bin}/nowline", "--version"
   end
 end

@@ -36,7 +36,7 @@ The `nowline` directive declares which version of the DSL the file targets. It m
 nowline v1
 ```
 
-The version follows the project's simplified versioning scheme: `v1`, `v2`, `v3`, etc. When the parser encounters a version newer than it supports, it emits an error identifying the required version. When the directive is omitted, the parser assumes the latest version it supports.
+The DSL version is an integer-only major (`v1`, `v2`, `v3`, …) and is **independent of the package version**. The packages (`@nowline/cli`, the VS Code extension, etc.) ship under SemVer (`MAJOR.MINOR.PATCH`, see `specs/releasing.md`); the DSL major exists separately to express format-stability. Within a DSL major, the parser must accept every valid file written for that major: new syntax may be added between package minor/patch releases, but no breaking change to an existing valid `nowline v1` file ships without bumping the directive to `v2`. When the parser encounters a version newer than it supports, it emits an error identifying the required version. When the directive is omitted, the parser assumes the latest version it supports.
 
 `config` and `roadmap` are section markers, not indent-containers. Config keywords (`scale`, `style`, `default`, `calendar`) appear at the top level after `config`. Roadmap keywords (`person`, `team`, `anchor`, `label`, `size`, `status`, `swimlane`, `milestone`, `footnote`) appear at the top level after `roadmap`. Indentation is used where nesting is real: style properties under `style`, `scale` and `calendar` block properties under their keyword, team members under `team`, and swimlane contents under `swimlane`.
 
