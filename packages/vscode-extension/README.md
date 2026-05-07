@@ -37,7 +37,7 @@ Keybindings (mirroring VS Code's markdown preview):
 
 ### Zoom & pan
 
-- **Toolbar** (top-right of the preview) — zoom −/+, zoom %, *Fit Width*, *Fit Page*, *Save ▾*, *Copy ▾*, *Maximize*. Fades after 2 s of inactivity; reappears on mouse move.
+- **Toolbar** (top-right of the preview) — zoom −/+, zoom %, *Fit Width* (`↔`), *Fit Page* (`⛶`), *Save ▾*, *Copy ▾*. Fades after 2 s of inactivity; reappears on mouse move.
 - **`Cmd/Ctrl + scroll wheel`** zooms centered on the cursor. Trackpad pinch fires the same path on macOS.
 - **Spacebar + drag** pans (useful for trackpad-only setups).
 - **Keyboard presets** (when the preview has focus): `1` Fit Page, `2` 100%, `3` Fit Width, `0` Fit Page (alias). Matches Figma.
@@ -61,9 +61,11 @@ The minimap (bottom-right corner) clones the rendered SVG at small scale and tra
 
 ### Maximize / fullscreen
 
-- The toolbar's *Maximize* (`⛶`) button runs `workbench.action.maximizeEditorHideSidebar` (same as `Cmd+K Cmd+M`): hides the sidebar, collapses other editor groups, leaves the status bar.
-- For a more distraction-free view, use **Zen Mode** (`Cmd+K Z`).
-- For OS-level fullscreen, use `Ctrl+Cmd+F` (macOS) or `F11` (Windows / Linux).
+Use the built-in VS Code shortcuts when you want more space:
+
+- **Maximize the preview pane** — `Cmd+K Cmd+M` (`workbench.action.maximizeEditorHideSidebar`).
+- **Zen Mode** — `Cmd+K Z`.
+- **OS-level fullscreen** — `Ctrl+Cmd+F` (macOS) or `F11` (Windows / Linux).
 
 ## Settings
 

@@ -75,9 +75,10 @@ shape — the JSON-friendly diagnostic the webview consumes.
 [`shell-html.ts`](../../packages/vscode-extension/src/preview/shell-html.ts)
 returns a single HTML string with a per-call CSP nonce. Highlights:
 
-- **Toolbar**: `−` / zoom % / `+`, *Fit Width* / *Fit Page*, *Save ▾* /
-  *Copy ▾* dropdowns, *Maximize*. Fades after 2 s of inactivity, returns on
-  mouse move.
+- **Toolbar**: `−` / zoom % / `+`, *Fit Width* (`↔`) / *Fit Page* (`⛶`),
+  *Save ▾* / *Copy ▾* dropdowns. Fades after 2 s of inactivity, returns on
+  mouse move. Maximizing the panel is left to VS Code's built-in
+  `Cmd+K Cmd+M`.
 - **Zoom & pan**: `Cmd/Ctrl + scroll wheel` zoom centered on the cursor
   (trackpad pinch fires the same path on macOS via `ctrlKey: true`),
   spacebar-drag pan, Figma keyboard presets `1`/`2`/`3`/`0`. Default fit
@@ -93,10 +94,6 @@ returns a single HTML string with a per-call CSP nonce. Highlights:
   PNG rasterizes through a `<canvas>` at `devicePixelRatio` scale; if
   `ClipboardItem` rejects PNG, the host writes a temp file and surfaces a
   "Reveal in Finder" notification.
-- **Maximize**: posts `{type:'toggleMaximize'}`; the host runs
-  `workbench.action.maximizeEditorHideSidebar` (same toggle as
-  `Cmd+K Cmd+M`).
-
 ### Lifecycle wiring
 
 [`extension.ts`](../../packages/vscode-extension/src/extension.ts) subscribes
@@ -166,7 +163,7 @@ the import.
   `examples/minimal.nowline`; fire both preview commands and confirm
   same-tab vs side-by-side placement, live updates on keystroke + save,
   theme switch, error overlay on intentional syntax break, save / copy
-  SVG and PNG, minimap drag, maximize button.
+  SVG and PNG, minimap drag.
 
 ## Files
 

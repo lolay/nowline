@@ -24,7 +24,6 @@ export interface PreviewSettings {
 export type PreviewWebviewMessage =
     | { type: 'goto'; file: string; line: number; column: number }
     | { type: 'openProblems' }
-    | { type: 'toggleMaximize' }
     | { type: 'save'; format: 'svg' | 'png'; body: string | Uint8Array }
     | { type: 'copyPngFallback'; body: Uint8Array }
     | { type: 'fatal'; message: string };

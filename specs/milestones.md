@@ -29,7 +29,7 @@ Commercial milestones (hosted editor, free viewer, MCP, enterprise, FedRAMP) are
 | ~~m2k~~ | ~~Dependency arrow attach + routing~~ | Apache 2.0 | Visual-edge attach with flow dedupe; channel-based orthogonal router (item-bar obstacles, parallel/group bracket-clearance nudge, slot assignment, under-bar fallback); min-stub constraints + parallel bracket-foot clearance |
 | ~~m3a~~ | ~~LSP server~~ | Apache 2.0 | Langium-based language server (`@nowline/lsp`): validation, definition, references, rename, hover, completion, document symbols, folding |
 | ~~m3b~~ | ~~VS Code/Cursor extension scaffold~~ | Apache 2.0 | Bundled `.vsix`: TextMate grammar, language config, snippets, file icon, LSP client, trace setting |
-| ~~m3c~~ | ~~Live preview~~ | Apache 2.0 | Side-or-behind preview panel; host-side render pipeline (parse + layout + renderSvg) posts SVG to a webview; clickable diagnostic table; toolbar zoom/pan/fit/save/copy/maximize; Cmd-wheel & pinch zoom; keyboard presets; minimap; five `nowline.preview.*` settings |
+| ~~m3c~~ | ~~Live preview~~ | Apache 2.0 | Side-or-behind preview panel; host-side render pipeline (parse + layout + renderSvg) posts SVG to a webview; clickable diagnostic table; toolbar zoom/pan/fit/save/copy; Cmd-wheel & pinch zoom; keyboard presets; minimap; five `nowline.preview.*` settings |
 | m4 | Embed | Apache 2.0 | Browser embed script, GitHub Action |
 | m4.5 | IDE Expansion | Apache 2.0 | Obsidian, Neovim, JetBrains (timing TBD) |
 
@@ -310,7 +310,7 @@ Live preview lands in the same extension as m3b. The extension host runs the CLI
 
 Webview shell ships:
 
-- Toolbar (zoom −/+, zoom %, Fit Width / Fit Page, Save ▾, Copy ▾, Maximize)
+- Toolbar (zoom −/+, zoom %, Fit Width, Fit Page, Save ▾, Copy ▾)
 - `Cmd/Ctrl + scroll-wheel` and trackpad pinch zoom (centered on cursor)
 - Spacebar-drag pan + Figma-style keyboard presets (`1`/`2`/`3`/`0`)
 - Minimap with viewport rect, click-to-recenter, drag-to-pan, auto-hide

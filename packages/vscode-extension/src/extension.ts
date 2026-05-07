@@ -149,9 +149,6 @@ function handleWebviewMessage(msg: PreviewWebviewMessage, source: NowlinePreview
         case 'openProblems':
             void vscode.commands.executeCommand('workbench.actions.view.problems');
             return;
-        case 'toggleMaximize':
-            void vscode.commands.executeCommand('workbench.action.maximizeEditorHideSidebar');
-            return;
         case 'save':
             void handleSave(msg.format, msg.body, source);
             return;

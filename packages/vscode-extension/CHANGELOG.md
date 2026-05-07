@@ -23,8 +23,6 @@ Live preview (m3c):
 - Save and Copy dropdowns: SVG goes through the SVG already in the webview;
   PNG is rasterized via the webview's `<canvas>` (~95% fidelity to
   `nowline --format png` — see README for the strict-PNG workflow).
-- In-toolbar Maximize button (runs
-  `workbench.action.maximizeEditorHideSidebar`).
 - New settings: `nowline.preview.refreshOn`, `nowline.preview.debounceMs`,
   `nowline.preview.theme`, `nowline.preview.defaultFit`,
   `nowline.preview.showMinimap`.

@@ -268,7 +268,7 @@ const BODY = `
         <button class="btn" id="zoom-in" title="Zoom in">+</button>
         <span class="sep"></span>
         <button class="btn glyph" id="fit-width" title="Fit width (3)" aria-label="Fit width">↔</button>
-        <button class="btn glyph" id="fit-page" title="Fit page (1)" aria-label="Fit page">▭</button>
+        <button class="btn glyph" id="fit-page" title="Fit page (1)" aria-label="Fit page">⛶</button>
         <span class="sep"></span>
         <div class="dropdown">
             <button class="btn" id="save-toggle" title="Save the rendered diagram">Save ▾</button>
@@ -284,8 +284,6 @@ const BODY = `
                 <li><button class="btn" data-action="copy-png">Copy PNG</button></li>
             </ul>
         </div>
-        <span class="sep"></span>
-        <button class="btn glyph" id="maximize" title="Maximize tab and fit page (Cmd+K Cmd+M). For distraction-free, use Zen Mode (Cmd+K Z).">⛶</button>
     </div>
 </div>
 <div id="minimap" class="hidden">
@@ -665,11 +663,6 @@ const SCRIPT = `
 
     els.viewport.addEventListener('scroll', updateMinimapRect);
     window.addEventListener('resize', function () {
-        if (pendingMaximizeFit) {
-            pendingMaximizeFit = false;
-            fitPage();
-            return;
-        }
         // Re-apply the user's last fit choice so the diagram tracks the new
         // panel size. Manual zoom (Cmd-wheel, +/-, 100%) opts out so the
         // user's chosen zoom isn't undone by a window resize.
@@ -747,14 +740,6 @@ const SCRIPT = `
     document.getElementById('zoom-reset').addEventListener('click', actualSize);
     document.getElementById('fit-width').addEventListener('click', fitWidth);
     document.getElementById('fit-page').addEventListener('click', fitPage);
-    var pendingMaximizeFit = false;
-    document.getElementById('maximize').addEventListener('click', function () {
-        // Fit-page once the workbench finishes the resize triggered by the
-        // maximize/restore toggle. The flag clears after the first resize so
-        // ordinary window resizes don't keep snapping back to fit.
-        pendingMaximizeFit = true;
-        vscode.postMessage({ type: 'toggleMaximize' });
-    });
 
     // ===== Save / Copy dropdowns =====
     function setupDropdown(toggleId, menu) {
