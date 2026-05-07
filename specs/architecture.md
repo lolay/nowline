@@ -31,12 +31,21 @@ nowline/
     core/                        # @nowline/core — Langium grammar, parser, AST, validation
     layout/                      # @nowline/layout — Positioning engine (AST → positioned model)
     renderer/                    # @nowline/renderer — SVG renderer (positioned model → SVG)
-    cli/                         # @nowline/cli — CLI entry point, wraps core + layout + renderer
-    embed/                       # @nowline/embed — Browser embed script bundle
+    export-core/                 # @nowline/export-core — Shared types, unit converter, PDF page-size parser, font resolver
+    export-png/                  # @nowline/export-png — PNG via @resvg/resvg-js (WASM)
+    export-pdf/                  # @nowline/export-pdf — Vector PDF via PDFKit + svg-to-pdfkit
+    export-html/                 # @nowline/export-html — Self-contained HTML page with inline pan/zoom
+    export-mermaid/              # @nowline/export-mermaid — Markdown + Mermaid `gantt` block
+    export-xlsx/                 # @nowline/export-xlsx — Five-sheet workbook via ExcelJS
+    export-msproj/               # @nowline/export-msproj — MS Project import XML
+    cli/                         # @nowline/cli — `nowline` CLI, every export format, ~70 MB standalone binary
+    lsp/                         # @nowline/lsp — Language server (validation, completion, navigation)
+    vscode-extension/            # VS Code / Cursor extension wrapping @nowline/lsp
   grammars/
     nowline.tmLanguage.json      # TextMate grammar for syntax highlighting
-  examples/                      # Example .nowline files
-  docs/                          # GitHub Pages documentation site
+  examples/                      # Example .nowline files (also `nowline --init` templates)
+  tests/                         # Renderer manual-validation fixtures (one stressed axis per file)
+  scripts/                       # Repo-wide build / packaging scripts
   specs/                         # Design specs for the OSS tooling
   package.json                   # Workspace root
   LICENSE                        # Apache 2.0
@@ -45,15 +54,48 @@ nowline/
 ## Package Dependency Graph
 
 ```
-@nowline/cli ──→ @nowline/renderer ──→ @nowline/layout ──→ @nowline/core
-@nowline/embed ──→ @nowline/renderer ──→ @nowline/layout ──→ @nowline/core
+@nowline/core
+  ├── @nowline/layout
+  │     ├── @nowline/renderer
+  │     │     └── (used by @nowline/cli, @nowline/vscode-extension)
+  │     └── @nowline/export-core
+  │           ├── @nowline/export-html
+  │           ├── @nowline/export-pdf
+  │           ├── @nowline/export-png
+  │           ├── @nowline/export-mermaid
+  │           ├── @nowline/export-xlsx
+  │           └── @nowline/export-msproj
+  └── @nowline/lsp
+        └── @nowline/vscode-extension
+
+@nowline/cli depends on core, layout, renderer, export-core, and every @nowline/export-*.
 ```
 
-- **@nowline/core** — Zero dependencies beyond Langium. Parses `.nowline` text into a typed AST. Runs validation. Exports the AST for consumers.
-- **@nowline/layout** — Takes the AST and produces a positioned model (x/y coordinates, dimensions, connection points). Pure computation, no rendering.
-- **@nowline/renderer** — Takes the positioned model and produces SVG. Also handles PNG (via resvg-js) and PDF (via PDFKit) for the CLI. Reads local assets referenced from the roadmap (e.g. company logos) via an injectable asset resolver so the package stays browser-safe — see § Local Asset Resolution.
-- **@nowline/cli** — Command-line entry point. Wraps core + layout + renderer. Compiled to standalone binaries via `bun compile`.
-- **@nowline/embed** — Browser bundle. Finds ` ```nowline ` blocks in the DOM, parses, lays out, and renders inline. No server required.
+Dependencies flow downward only. No upward or sideways imports. The graph is enforced by package.json declarations, not just convention.
+
+### Core layers
+
+- **@nowline/core** — Langium grammar, parser, typed AST, and validator. Pure TypeScript; no DOM, no Node-specific APIs in the hot path. Zero internal deps.
+- **@nowline/layout** — Layout engine. Takes the AST and produces a positioned model (x/y coordinates, dimensions, connection points). Pure computation, no rendering.
+- **@nowline/renderer** — SVG renderer. Takes the positioned model and produces a deterministic SVG string. Reads local assets referenced from the roadmap (e.g. company logos) via an injectable asset resolver so the package stays browser-safe — see § Local Asset Resolution.
+
+### Export packages
+
+- **@nowline/export-core** — Shared types, unit converter, PDF page-size parser, 5-step font resolver, bundled DejaVu fonts. The other `export-*` packages depend on this for common plumbing.
+- **@nowline/export-png** — PNG via [`@resvg/resvg-js`](https://github.com/yisibl/resvg-js) (WASM).
+- **@nowline/export-pdf** — Vector PDF via [`pdfkit`](https://github.com/foliojs/pdfkit) + `svg-to-pdfkit`.
+- **@nowline/export-html** — Self-contained HTML page with inline pan/zoom JS.
+- **@nowline/export-mermaid** — Markdown file with a Mermaid `gantt` block, for embedding in READMEs and wikis that already render Mermaid.
+- **@nowline/export-xlsx** — Five-sheet workbook via [`exceljs`](https://github.com/exceljs/exceljs).
+- **@nowline/export-msproj** — MS Project import XML.
+
+### Surfaces
+
+- **@nowline/cli** — Command-line entry point. Wraps core + layout + renderer + every exporter. Compiled to standalone binaries via `bun compile`. See [`cli.md`](./cli.md) and [`cli-distribution.md`](./cli-distribution.md).
+- **@nowline/lsp** — Language server. Reuses core's parser/validator behind the LSP wire protocol so editors get the same diagnostics as the CLI. See [`ide.md`](./ide.md).
+- **vscode-extension** — VS Code / Cursor extension that boots `@nowline/lsp` and registers commands. Will eventually be published to the marketplace from a satellite repo (`lolay/nowline-vscode`); developed in-tree until it stabilises.
+
+A planned `@nowline/embed` (browser bundle) will sit beside `@nowline/renderer` in the same way — see [`embed.md`](./embed.md).
 
 ## Technology Choices
 

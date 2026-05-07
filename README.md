@@ -17,11 +17,11 @@ Nowline is a text-first DSL for describing product and engineering roadmaps. You
 ```nowline
 nowline v1
 
-roadmap minimal "Starter" start:2026-01-05 scale:1w author:"Engineering roadmap"
+roadmap minimal "Starter" start:2026-01-05 scale:2w author:"Jane Doe"
 
 swimlane engineering "Engineering"
   item research "Research"  duration:3w status:done
-  item design   "Design"    duration:2w status:in-progress remaining:50%
+  item design   "Design"    duration:2w status:in-progress remaining:5d
   item build    "Build"     duration:3w status:planned
 ```
 
@@ -38,59 +38,7 @@ Renders to:
 - **Strict enough to catch mistakes.** 30+ validation rules, clear error messages with line and column numbers.
 - **Composable.** `include` other files with explicit `merge` / `ignore` / `isolate` semantics.
 
-## Status
-
-Nowline is pre-release. Nothing is published to package registries, Homebrew, or GitHub Releases yet — the toolchain runs from source. Stable releases will land with the milestones tracked in [`specs/milestones.md`](./specs/milestones.md). The parser, validator, layout, renderer, every export format (SVG, PNG, PDF, HTML, Markdown+Mermaid, XLSX, MS Project XML), and CLI (verbless render, `--dry-run`, `--init`, `--serve`) are usable today.
-
-## Packages
-
-This repository is an OSS monorepo of the Nowline language tooling.
-
-### Core layers
-
-| Package | Purpose |
-|---|---|
-| [`@nowline/core`](./packages/core) | Parser, typed AST, and validator. Pure TypeScript; no DOM, no Node-specific APIs in the hot path. |
-| [`@nowline/layout`](./packages/layout) | Layout engine — AST → positioned model (themes, style resolution, calendar, timeline). |
-| [`@nowline/renderer`](./packages/renderer) | SVG renderer — positioned model → deterministic SVG string. |
-
-### Export packages
-
-| Package | Purpose |
-|---|---|
-| [`@nowline/export-core`](./packages/export-core) | Shared types, unit converter, PDF page-size parser, 5-step font resolver, bundled DejaVu fonts. |
-| [`@nowline/export-png`](./packages/export-png) | PNG via [`@resvg/resvg-js`](https://github.com/yisibl/resvg-js) WASM. |
-| [`@nowline/export-pdf`](./packages/export-pdf) | Vector PDF via [`pdfkit`](https://github.com/foliojs/pdfkit) + `svg-to-pdfkit`. |
-| [`@nowline/export-html`](./packages/export-html) | Self-contained HTML page with inline pan/zoom JS. |
-| [`@nowline/export-mermaid`](./packages/export-mermaid) | Markdown + Mermaid `gantt` block. |
-| [`@nowline/export-xlsx`](./packages/export-xlsx) | Five-sheet workbook via [`exceljs`](https://github.com/exceljs/exceljs). |
-| [`@nowline/export-msproj`](./packages/export-msproj) | MS Project import XML. |
-
-### CLI
-
-| Package | Purpose |
-|---|---|
-| [`@nowline/cli`](./packages/cli) | `nowline` — every export format (SVG, PNG, PDF, HTML, Markdown+Mermaid, XLSX, MS Project XML) plus AST round-trip. ~70 MB standalone binary. |
-
-Planned: a browser embed script and an LSP / VS Code extension.
-
-## Design
-
-Design specs for the DSL, renderer, CLI, IDE integrations, and OSS milestones live under [`specs/`](./specs). Start here if you want to understand how Nowline is shaped before touching code.
-
-| Spec | Scope |
-|------|-------|
-| [`specs/principles.md`](./specs/principles.md) | What Nowline is and isn't — scope, guiding principles, design constraints |
-| [`specs/architecture.md`](./specs/architecture.md) | Monorepo layout, package dependency graph, tech choices |
-| [`specs/dsl.md`](./specs/dsl.md) | The `.nowline` language — full grammar reference |
-| [`specs/cli.md`](./specs/cli.md) | CLI surface (verbless render; `--serve`, `--init`, `--dry-run` mode flags) |
-| [`specs/rendering.md`](./specs/rendering.md) | Positioned model and SVG renderer |
-| [`specs/ide.md`](./specs/ide.md) | LSP and editor integrations (VS Code, Obsidian, Neovim, JetBrains) |
-| [`specs/embed.md`](./specs/embed.md) | Browser embed script and GitHub Action |
-| [`specs/features.md`](./specs/features.md) | Scoring rubric + feature tables (m1–m4.5) |
-| [`specs/milestones.md`](./specs/milestones.md) | OSS roadmap (m1–m4.5) |
-
-## Try it from source
+## Quick start
 
 Until release artifacts ship, the fastest way to try `nowline` is to run it from a checkout:
 
@@ -99,29 +47,26 @@ git clone https://github.com/lolay/nowline.git
 cd nowline
 pnpm install
 pnpm build
+node packages/cli/dist/index.js examples/minimal.nowline   # writes ./minimal.svg
 ```
 
-`pnpm build` walks every workspace package in dependency order and then renders the curated lists in [`scripts/render-samples.mjs`](./scripts/render-samples.mjs) (examples) and [`scripts/render-tests.mjs`](./scripts/render-tests.mjs) (fixtures) to sibling `.svg` files for inspection. Set `NOWLINE_SKIP_RENDER=1` to skip the render step.
-
-To regenerate the SVGs run `pnpm samples` (writes `examples/*.svg`) or `pnpm fixtures` (writes `tests/*.svg`); both rebuild the workspace incrementally first so the output always reflects the current source, and both accept positional slugs (e.g. `pnpm samples minimal long`) for a single example. To skip the rebuild step, invoke the underlying scripts directly (`node scripts/render-samples.mjs [slug ...]`); they error out if the CLI bundle is older than its source. The SVGs themselves are gitignored — they are CLI output, not source.
-
-That produces `packages/cli/dist/index.js` with a `#!/usr/bin/env node` shebang. Invoke it directly:
-
-```bash
-node packages/cli/dist/index.js examples/minimal.nowline           # writes ./minimal.svg
-node packages/cli/dist/index.js examples/minimal.nowline --dry-run # validate only
-node packages/cli/dist/index.js examples/minimal.nowline --serve   # live preview
-node packages/cli/dist/index.js --init my-project                  # ./my-project.nowline
-```
-
-Or expose it on your `PATH` with a local `npm link`:
+Or expose `nowline` on your `PATH` with a local `npm link`:
 
 ```bash
 cd packages/cli
-npm link          # adds `nowline` to your PATH
+npm link
 nowline examples/minimal.nowline
 nowline --version
 ```
+
+You can also scaffold a brand-new file from a template:
+
+```bash
+nowline --init my-project              # ./my-project.nowline
+nowline --init my-project -t teams     # ./my-project.nowline (teams template)
+```
+
+`pnpm build` regenerates the SVGs for every example and renderer fixture into sibling files for inspection. See [`CONTRIBUTING.md`](./CONTRIBUTING.md) for the full developer setup, including how to skip the render step or rebuild a single sample.
 
 ## Use the CLI
 
@@ -145,13 +90,7 @@ nowline roadmap.nowline -f pdf --page-size a4 --orientation landscape --margin 0
 cat roadmap.nowline | nowline -                  # stdin → ./roadmap.svg
 ```
 
-The render pipeline is `@nowline/core` parse → `@nowline/layout` layout →
-`@nowline/renderer` SVG → format-specific exporter. Output is byte-for-byte
-deterministic for the same input, theme, and `--now`. A single `nowline`
-binary ships every format — see
-[`packages/cli/README.md`](./packages/cli/README.md#install) for install
-details and [`specs/cli-distribution.md`](./specs/cli-distribution.md) for
-why we ship one binary instead of a tiered split.
+The render pipeline is `@nowline/core` parse → `@nowline/layout` layout → `@nowline/renderer` SVG → format-specific exporter. Output is byte-for-byte deterministic for the same input, theme, and `--now`. A single `nowline` binary ships every format — see [`packages/cli/README.md`](./packages/cli/README.md#install) for install details.
 
 ### Validate (`--dry-run`)
 
@@ -209,33 +148,6 @@ nowline --init my-project --template=teams  # use the teams template
 | 1 | Validation error (parse failure, invalid reference) |
 | 2 | Usage error (missing input, bad flags, unsupported format, file not found, binary→TTY refusal) |
 | 3 | Output error (cannot write to destination) |
-
-## Use the library
-
-`@nowline/core` is a pure-TypeScript parser + typed AST + validator built on [Langium](https://langium.org/). Everything the CLI does on top of parsing is itself built against this library.
-
-```ts
-import { createNowlineServices, resolveIncludes } from '@nowline/core';
-import { URI } from 'langium';
-import { readFile } from 'node:fs/promises';
-
-const { shared, Nowline } = createNowlineServices();
-const text = await readFile('roadmap.nowline', 'utf-8');
-const doc = shared.workspace.LangiumDocumentFactory.fromString(
-  text,
-  URI.file('/absolute/path/to/roadmap.nowline'),
-);
-await shared.workspace.DocumentBuilder.build([doc], { validation: true });
-
-const ast = doc.parseResult.value;
-const diagnostics = doc.diagnostics ?? [];
-
-const resolved = await resolveIncludes(ast, '/absolute/path/to/roadmap.nowline', {
-  services: Nowline,
-});
-
-console.log(resolved.content);
-```
 
 ## Language at a glance
 
@@ -314,9 +226,7 @@ include "partner.nowline"  roadmap:isolate  // render child as a separate region
 - `ignore` — child content of that kind is discarded.
 - `isolate` — child roadmap is preserved as a self-contained region (requires a `roadmap` in the child).
 
-## Syntax highlighting
-
-A TextMate grammar is at [`grammars/nowline.tmLanguage.json`](./grammars/nowline.tmLanguage.json). Works in any editor that supports TextMate grammars (VS Code, Sublime Text, Zed, IntelliJ via third-party plugins, etc.). A first-class LSP and VS Code extension are planned.
+For the full grammar reference, see [`specs/dsl.md`](./specs/dsl.md).
 
 ## Examples
 
@@ -330,15 +240,23 @@ Progressively-richer examples are included:
 - [`examples/long.nowline`](./examples/long.nowline) — stress test: eight swimlanes, ~160 items, parallels, groups, anchors, milestones, footnotes, cross-cutting labels. Used for layout/render perf.
 - [`examples/nested.nowline`](./examples/nested.nowline) + [`examples/nested/`](./examples/nested) — parent Security swimlane plus five isolated per-team roadmap includes (iOS, Android, Web, Platform, Data). Demonstrates `roadmap:isolate`.
 
-## Visual reference
+## Editor support
 
-Reference renderings the renderer aims to match live in [`specs/samples/`](./specs/samples). Open [`specs/samples/index.html`](./specs/samples/index.html) for a side-by-side gallery of the SVG outputs alongside their DSL snippets.
+A TextMate grammar lives at [`grammars/nowline.tmLanguage.json`](./grammars/nowline.tmLanguage.json). It works in any editor that supports TextMate grammars (VS Code, Sublime Text, Zed, IntelliJ via third-party plugins, etc.). A first-class LSP server and VS Code extension are tracked in [`packages/lsp/`](./packages/lsp) and [`packages/vscode-extension/`](./packages/vscode-extension).
 
-For renderer manual validation, see [`tests/`](./tests) — tiny `.nowline` fixtures that each stress a single layout / rendering axis (sized titles, text-fit-vs-spill, etc.). Their SVG output is gitignored and regenerated by every `pnpm build`.
+## Use as a library
+
+`@nowline/core` is a pure-TypeScript parser, typed AST, and validator built on [Langium](https://langium.org/). Everything the CLI does on top of parsing is itself built against this library. See [`packages/core/README.md`](./packages/core/README.md) for the API and a usage example.
+
+## Status
+
+Nowline is pre-release. Nothing is published to package registries, Homebrew, or GitHub Releases yet — the toolchain runs from source. Stable releases will land with the milestones tracked in [`specs/milestones.md`](./specs/milestones.md). The parser, validator, layout, renderer, every export format (SVG, PNG, PDF, HTML, Markdown+Mermaid, XLSX, MS Project XML), and CLI (verbless render, `--dry-run`, `--init`, `--serve`) are usable today.
 
 ## Contributing
 
-Bug reports, feature requests, and pull requests are welcome. Start with [`CONTRIBUTING.md`](./CONTRIBUTING.md) for setup, build/test commands, and the expected workflow.
+Bug reports, feature requests, and pull requests are welcome. Start with [`CONTRIBUTING.md`](./CONTRIBUTING.md) for setup, build/test commands, and the expected workflow. Before opening an issue, please check the templates under [`.github/ISSUE_TEMPLATE/`](./.github/ISSUE_TEMPLATE). Security issues should follow [`SECURITY.md`](./SECURITY.md). All participation is governed by our [`CODE_OF_CONDUCT.md`](./CODE_OF_CONDUCT.md).
+
+Design specs for the DSL, renderer, CLI, IDE integrations, and OSS milestones live under [`specs/`](./specs) — start there to understand how Nowline is shaped before touching code.
 
 ## License
 

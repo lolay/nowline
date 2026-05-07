@@ -1,8 +1,8 @@
 nowline v1
 
-roadmap minimal "Starter" start:2026-01-05 scale:1w author:"Engineering roadmap"
+roadmap minimal "Starter" start:2026-01-05 scale:2w author:"Jane Doe"
 
 swimlane engineering "Engineering"
   item research "Research"  duration:3w status:done
-  item design   "Design"    duration:2w status:in-progress remaining:50%
+  item design   "Design"    duration:2w status:in-progress remaining:5d
   item build    "Build"     duration:3w status:planned

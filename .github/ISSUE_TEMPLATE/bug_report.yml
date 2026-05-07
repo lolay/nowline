@@ -1,0 +1,77 @@
+name: Bug report
+description: Report a problem with the Nowline parser, validator, layout, renderer, or CLI.
+title: "bug: <short summary>"
+labels: ["bug"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thanks for taking the time to file a bug report. Before opening, please check existing issues to see if your problem has already been reported.
+
+  - type: textarea
+    id: minimal-repro
+    attributes:
+      label: Minimal `.nowline` (or JSON) input that reproduces the problem
+      description: |
+        Paste it inline, do not link to a gist that may disappear. Strip your input down to the smallest example that still reproduces the issue.
+      render: nowline
+      placeholder: |
+        nowline v1
+
+        roadmap r "Repro" start:2026-01-05 scale:1w
+        swimlane s
+          item x "thing" duration:1w
+    validations:
+      required: true
+
+  - type: input
+    id: command
+    attributes:
+      label: Exact command you ran
+      placeholder: nowline broken.nowline -f pdf -o out.pdf
+    validations:
+      required: true
+
+  - type: textarea
+    id: output
+    attributes:
+      label: Full stdout / stderr output (including exit code)
+      description: Include the stack trace if the CLI crashed.
+      render: shell
+    validations:
+      required: true
+
+  - type: textarea
+    id: expected
+    attributes:
+      label: What did you expect to happen?
+      description: If this is a wrong diagnostic (false positive or false negative), cite the relevant rule from `specs/dsl.md` if you can.
+    validations:
+      required: true
+
+  - type: input
+    id: version
+    attributes:
+      label: Nowline version
+      description: Output of `nowline version`, or the commit SHA if you built from source.
+      placeholder: 0.0.0-dev (commit abc1234)
+    validations:
+      required: true
+
+  - type: input
+    id: environment
+    attributes:
+      label: Operating system + Node.js version
+      placeholder: macOS 14.5, Node 22.10.0
+    validations:
+      required: true
+
+  - type: checkboxes
+    id: confirmations
+    attributes:
+      label: Confirmations
+      options:
+        - label: I have searched existing issues for this problem.
+          required: true
+        - label: I have provided a minimal reproduction (not just a screenshot).
+          required: true

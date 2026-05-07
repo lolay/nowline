@@ -1,0 +1,54 @@
+name: Feature request
+description: Propose an addition or change to the Nowline DSL, CLI, renderer, or tooling.
+title: "feat: <short summary>"
+labels: ["enhancement"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Nowline has an opinionated scope. Please skim [`specs/principles.md`](https://github.com/lolay/nowline/blob/main/specs/principles.md) before opening — features that don't fit the core DSL/tooling remit may be better implemented as external consumers of `@nowline/core`.
+
+        For non-trivial proposals, a short design sketch (what changes, how the user sees it, what breaks) speeds up review significantly.
+
+  - type: textarea
+    id: problem
+    attributes:
+      label: What problem are you trying to solve?
+      description: Describe the use case, not the proposed implementation. What does the current behavior force you to do that you wish you didn't have to?
+    validations:
+      required: true
+
+  - type: textarea
+    id: proposal
+    attributes:
+      label: Proposed shape
+      description: |
+        A rough sketch is fine. If this is a DSL change, paste the syntax you're imagining. If this is a CLI change, paste the command you want to run.
+      render: nowline
+    validations:
+      required: true
+
+  - type: textarea
+    id: alternatives
+    attributes:
+      label: Alternatives you considered
+      description: Other approaches you thought about, or workarounds you've used in the meantime.
+
+  - type: textarea
+    id: scope-fit
+    attributes:
+      label: How does this fit Nowline's scope?
+      description: |
+        Briefly explain why this belongs in the core DSL/tooling rather than in a downstream consumer. Reference [`specs/principles.md`](https://github.com/lolay/nowline/blob/main/specs/principles.md) if relevant.
+    validations:
+      required: true
+
+  - type: checkboxes
+    id: confirmations
+    attributes:
+      label: Confirmations
+      options:
+        - label: I have read [`specs/principles.md`](https://github.com/lolay/nowline/blob/main/specs/principles.md) and believe this fits the project's scope.
+          required: true
+        - label: I have searched existing issues for similar proposals.
+          required: true

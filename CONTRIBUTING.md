@@ -22,7 +22,7 @@ Nowline is early-stage: the parser, validator, and CLI are usable, but layout, r
 
 ## Code of conduct
 
-Be respectful, assume good intent, and give concrete feedback. We'll add a formal Code of Conduct as the community grows; for now, the short version is: treat every contributor the way you'd want to be treated.
+This project follows the [Contributor Covenant 2.1](./CODE_OF_CONDUCT.md). Reports of unacceptable behavior may be sent to **gary@lolay.com**.
 
 ## Prerequisites
 
@@ -53,38 +53,31 @@ If you want to work offline or have a pre-populated pnpm store, check the `.pnpm
 
 ```
 nowline/
-├── packages/
-│   ├── core/          # @nowline/core — Langium grammar, parser, AST, validator
-│   └── cli/           # @nowline/cli  — `nowline` command-line tool
-├── examples/          # User-grounded .nowline files: tests, `nowline init` templates, sample-fidelity references
+├── packages/          # Workspace packages (@nowline/core, @nowline/cli, exporters, layout, renderer, lsp, vscode-extension)
+├── examples/          # User-grounded .nowline files: progressive samples, `nowline --init` templates, sample-fidelity references
 ├── tests/             # Renderer manual-validation fixtures: one stressed axis per file, gitignored SVG output
 ├── grammars/          # TextMate grammar for editor syntax highlighting
 ├── scripts/           # Repo-wide scripts: .deb build, Homebrew tap seed, render-samples, render-tests, render aggregator
 ├── specs/             # Design specs for the DSL, renderer, CLI, IDE integrations, and OSS milestones
-├── .github/workflows/ # CI and release pipelines
+├── .github/           # Issue and PR templates, CI and release pipelines
 ├── branding/          # Logos and marks
 └── pnpm-workspace.yaml
 ```
 
 The repo-level `tests/` folder (plural) holds renderer manual-validation fixtures and is distinct from each package's own `test/` folder (singular) which holds Vitest unit/integration tests.
 
-Packages have a shared version and are published together. The dependency graph is strictly:
-
-```
-@nowline/cli ──▶ @nowline/core
-```
-
-No upward or sideways imports. Future packages (`@nowline/layout`, `@nowline/renderer`, etc.) will extend this graph without breaking it.
+Packages have a shared version and are published together. The full dependency graph and tech choices live in [`specs/architecture.md`](./specs/architecture.md).
 
 ### Design docs
 
-Before making a non-trivial change, skim the specs under [`specs/`](./specs) — they describe the intended shape of the product and are the best reference for "why" questions:
+Before making a non-trivial change, skim the specs under [`specs/`](./specs) — they describe the intended shape of the product and are the best reference for "why" questions. The specs live in-repo so PRs can update them alongside code when behavior changes. Start with:
 
-- [`specs/principles.md`](./specs/principles.md) for what's in scope (and what's deliberately not).
-- [`specs/dsl.md`](./specs/dsl.md) for the canonical language design — if you're touching the grammar, parser, or validator, start here.
-- [`specs/architecture.md`](./specs/architecture.md) for the package graph, tech choices, and the `AssetResolver` contract.
-
-The specs live in-repo so PRs can update them alongside code when behavior changes.
+- [`specs/principles.md`](./specs/principles.md) — what's in scope and what's deliberately not.
+- [`specs/dsl.md`](./specs/dsl.md) — canonical language design. Required reading if you're touching the grammar, parser, or validator.
+- [`specs/architecture.md`](./specs/architecture.md) — package graph, tech choices, and the `AssetResolver` contract.
+- [`specs/cli.md`](./specs/cli.md), [`specs/rendering.md`](./specs/rendering.md), [`specs/ide.md`](./specs/ide.md), [`specs/embed.md`](./specs/embed.md) — surface-area specs for the rest of the toolchain.
+- [`specs/milestones.md`](./specs/milestones.md) — OSS roadmap (m1–m4.5).
+- [`specs/releasing.md`](./specs/releasing.md) — maintainer release process (tagging, npm publish order, Homebrew tap update).
 
 ## Common tasks
 
@@ -178,6 +171,7 @@ All tests use [Vitest](https://vitest.dev/).
 - **CLI integration tests** in `packages/cli/test/integration/` spawn the compiled `dist/index.js` and assert exit codes + stdout/stderr. These catch bundling bugs that unit tests miss (especially around `bun compile` and templated resources). They're skipped if `dist/index.js` is missing, so run `pnpm build` first.
 - **Round-trip tests** in `packages/cli/test/convert/roundtrip.test.ts` assert that every example file round-trips text → JSON → text and JSON → text → JSON without drift, modulo comment loss.
 - **Renderer manual-validation fixtures** under [`tests/`](./tests) are tiny `.nowline` files that each stress a single layout / rendering axis (sized titles, text-fit-vs-spill, etc.). They are *not* Vitest tests — `pnpm build` (or `pnpm render`) re-renders each fixture to a sibling `.svg` so you can eyeball the result. The byte-stable regression gate is the snapshot suite under `packages/layout/test/__snapshots__/`; the `tests/` fixtures complement it by making specific behaviors easy to spot when something drifts.
+- **Visual reference** for what the renderer aims to match lives in [`specs/samples/`](./specs/samples). Open [`specs/samples/index.html`](./specs/samples/index.html) for a side-by-side gallery of the SVG outputs alongside their DSL snippets.
 
 When you add a feature, add at least one test that would fail without your change. When you fix a bug, add a regression test that reproduces it.
 
@@ -219,18 +213,13 @@ For changes touching the language or the published AST JSON schema, please open 
 
 ## Reporting bugs
 
-Please include:
+Open a bug report using the [bug template](./.github/ISSUE_TEMPLATE/bug_report.yml) — it walks you through the minimum repro, command, output, and version information we need.
 
-- A minimal `.nowline` or JSON input that reproduces the problem (paste it inline; don't link to a gist that may disappear).
-- The exact command you ran.
-- The full stderr / stdout output, including the exit code.
-- The Nowline version (`nowline version`) and your OS + Node version.
-
-If the bug is a crash, attach the stack trace. If it's a wrong diagnostic (false positive or false negative), describe what you expected the behavior to be and cite the relevant rule from the DSL spec if you can.
+For security issues, follow [`SECURITY.md`](./SECURITY.md) and **do not** open a public issue.
 
 ## Proposing features
 
-Open an issue first. For anything non-trivial, a short design sketch — what changes, how the user sees it, what breaks — speeds up review significantly. The project has an opinionated scope (see `README.md` § Status and [`specs/principles.md`](./specs/principles.md)); features that don't fit the core DSL/tooling remit may be better implemented as external consumers of `@nowline/core`.
+Open an issue using the [feature template](./.github/ISSUE_TEMPLATE/feature_request.yml). Nowline has an opinionated scope (see [`specs/principles.md`](./specs/principles.md)); features that don't fit the core DSL/tooling remit may be better implemented as external consumers of `@nowline/core`.
 
 ## Licensing
 

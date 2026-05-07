@@ -1,6 +1,6 @@
 # @nowline/core
 
-Parser, typed AST, and validator for the [Nowline](../../) DSL.
+Parser, typed AST, and validator for the [Nowline](../../) DSL. Pure TypeScript, built on [Langium](https://langium.org/), no DOM or Node-specific APIs in the hot path. This package is the foundation everything else in the toolchain (`@nowline/layout`, `@nowline/renderer`, `@nowline/cli`, `@nowline/lsp`) is built against.
 
 ## Install
 
@@ -10,7 +10,38 @@ pnpm add @nowline/core
 
 ## Usage
 
-### Parse and validate
+### Parse and validate from a file
+
+```ts
+import { createNowlineServices, resolveIncludes } from '@nowline/core';
+import { URI } from 'langium';
+import { readFile } from 'node:fs/promises';
+
+const { shared, Nowline } = createNowlineServices();
+const text = await readFile('roadmap.nowline', 'utf-8');
+const doc = shared.workspace.LangiumDocumentFactory.fromString(
+  text,
+  URI.file('/absolute/path/to/roadmap.nowline'),
+);
+await shared.workspace.DocumentBuilder.build([doc], { validation: true });
+
+const ast = doc.parseResult.value;          // typed AST root: NowlineFile
+const parserErrors = doc.parseResult.parserErrors;
+const diagnostics = doc.diagnostics ?? [];  // validation errors/warnings
+
+const resolved = await resolveIncludes(ast, '/absolute/path/to/roadmap.nowline', {
+  services: Nowline,
+});
+
+resolved.config.styles;        // Map<string, StyleDeclaration>
+resolved.content.swimlanes;    // Map<string, SwimlaneDeclaration>
+resolved.content.isolatedRegions;
+resolved.diagnostics;          // Array<ResolveDiagnostic>
+```
+
+### Parse from in-memory text
+
+For embedding in editors or one-shot validation against a string:
 
 ```ts
 import { createNowlineServices } from '@nowline/core';
@@ -23,24 +54,7 @@ const doc = shared.workspace.LangiumDocumentFactory.fromString(
 );
 await shared.workspace.DocumentBuilder.build([doc], { validation: true });
 
-const ast = doc.parseResult.value;          // typed AST root: NowlineFile
-const parserErrors = doc.parseResult.parserErrors;
-const diagnostics = doc.diagnostics ?? []; // validation errors/warnings
-```
-
-### Resolve includes
-
-```ts
-import { resolveIncludes } from '@nowline/core';
-
-const resolved = await resolveIncludes(ast, '/abs/path/to/roadmap.nowline', {
-  services: Nowline,
-});
-
-resolved.config.styles;        // Map<string, StyleDeclaration>
-resolved.content.swimlanes;    // Map<string, SwimlaneDeclaration>
-resolved.content.isolatedRegions;
-resolved.diagnostics;          // Array<ResolveDiagnostic>
+const ast = doc.parseResult.value;
 ```
 
 ## What's included
