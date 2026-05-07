@@ -56,7 +56,7 @@
     "properties": {
       "patterns": [
         {
-          "match": "\\b(status|owner|after|before|size|duration|remaining|labels|link|style|date|on|start|scale|calendar|effort|name|label-every|days-per-week|days-per-month|days-per-quarter|days-per-year|author)\\s*(:)",
+          "match": "\\b(status|owner|after|before|size|duration|remaining|labels|link|style|date|on|start|scale|calendar|effort|name|label-every|days-per-week|days-per-month|days-per-quarter|days-per-year|author|capacity|length|utilization-warn-at|utilization-over-at|logo-size|logo|unicode|ascii)\\s*(:)",
           "captures": {
             "1": { "name": "entity.other.attribute-name.nowline" },
             "2": { "name": "punctuation.separator.key-value.nowline" }
@@ -71,7 +71,7 @@
           }
         },
         {
-          "match": "\\b(bg|fg|text|border|icon|shadow|font|weight|italic|text-size|padding|spacing|header-height|corner-radius|bracket)\\s*(:)",
+          "match": "\\b(bg|fg|text|border|icon|shadow|font|weight|italic|text-size|padding|spacing|header-height|corner-radius|bracket|capacity-icon|timeline-position|minor-grid)\\s*(:)",
           "captures": {
             "1": { "name": "entity.other.attribute-name.style.nowline" },
             "2": { "name": "punctuation.separator.key-value.nowline" }

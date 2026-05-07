@@ -1,0 +1,10 @@
+nowline v1
+
+// Stub partner for tests/grammar-properties.nowline's `include` line. Exists
+// only so the parent fixture parses without "missing roadmap" errors; the
+// grammar fixture's job is highlighting, not include semantics.
+
+roadmap stub "Grammar fixture include stub" start:2026-01-05 scale:1w
+
+swimlane stub-lane "Stub"
+  item stub-item "Stub item" duration:1w

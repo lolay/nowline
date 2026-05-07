@@ -1,0 +1,81 @@
+nowline v1
+
+// Grammar fixture: every property name in attribute form (`name:`) and
+// every dual-purpose word in statement-keyword form. Open this file in an
+// editor with the Nowline TextMate grammar loaded and confirm:
+//
+//   - Every `name:` below renders as `entity.other.attribute-name` (the
+//     attribute color), regardless of whether `name` also appears in the
+//     keywords list (`status`, `size`, `scale`, `calendar`, `style`, `label`).
+//   - Every bare statement keyword below renders as `keyword.control`
+//     (the keyword color).
+//
+// Not in `scripts/render-tests.mjs` MANIFEST — this file exists for
+// grammar eyeballing, not renderer validation.
+
+// `include` exercises the `config:` / `roadmap:` include-mode pattern in
+// the grammar (a separate match arm from regular property names). Stub
+// partner lives at `./grammar-properties-include.nowline` so the file
+// parses without "missing roadmap" errors.
+include "./grammar-properties-include.nowline" config:merge roadmap:isolate
+
+config
+
+calendar
+  days-per-week: 5
+  days-per-month: 22
+  days-per-quarter: 65
+  days-per-year: 260
+
+scale
+  name: sprints
+  label-every: 2
+  label: "Sprint {n}"
+
+glyph budget "Budget" unicode:"💰" ascii:"$"
+
+style sample
+  bg: blue
+  fg: navy
+  text: white
+  border: solid
+  icon: shield
+  shadow: subtle
+  font: sans
+  weight: bold
+  italic: false
+  text-size: lg
+  padding: md
+  spacing: sm
+  header-height: md
+  corner-radius: lg
+  bracket: none
+  capacity-icon: budget
+  timeline-position: top
+  minor-grid: true
+
+default item shadow:subtle
+
+roadmap r "Grammar fixture" author:"Eng" logo:"./logo.svg" logo-size:md \
+  start:2026-01-05 scale:1w calendar:custom length:8w
+
+status awaiting-review
+size medium "Medium" effort:1w
+label enterprise "Enterprise"
+
+person sam "Sam"
+team platform-team "Platform"
+  person sam
+
+anchor kickoff date:2026-01-05
+anchor code-freeze date:2026-05-01
+
+swimlane platform "Platform" owner:platform-team capacity:5 \
+    utilization-warn-at:80% utilization-over-at:100%
+  item one "Sample" size:medium duration:2w status:done owner:sam \
+      after:kickoff before:code-freeze remaining:50% labels:[enterprise] \
+      link:https://example.com style:sample capacity:2
+
+milestone ga "GA" date:2026-03-01 after:one
+
+footnote ref "Footnote" on:one
