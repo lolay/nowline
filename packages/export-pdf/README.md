@@ -8,9 +8,6 @@ to embed the renderer's SVG as a PDF page.
 **License:** Apache 2.0
 **Part of:** [`lolay/nowline`](../../) monorepo
 **Spec:** [`specs/handoffs/m2c.md`](../../specs/handoffs/m2c.md) § 4
-**Tiny / full:** *full only* — install [`@nowline/cli-full`](../cli-full)
-or download `nowline-full-<os>-<arch>` from
-[GitHub Releases](https://github.com/lolay/nowline/releases).
 
 ## Install
 
@@ -85,26 +82,6 @@ via `svg-to-pdfkit`. Trade-offs:
 
 The trade-off is documented in
 [`specs/handoffs/m2c.md`](../../specs/handoffs/m2c.md) § 4.
-
-## Tiny / full distribution
-
-This package is *not* in the tiny `nowline` binary. If you ran into a
-"the 'pdf' format is not available in this build" message, you have three
-options:
-
-```bash
-# 1. Install the full npm package
-npm install -g @nowline/cli-full
-nowline-full roadmap.nowline -f pdf -o roadmap.pdf
-
-# 2. Download the full binary from GitHub Releases
-curl -L -o nowline-full https://github.com/lolay/nowline/releases/latest/download/nowline-full-macos-arm64
-chmod +x nowline-full
-./nowline-full roadmap.nowline -f pdf -o roadmap.pdf
-
-# 3. Use Homebrew
-brew install lolay/tap/nowline-full
-```
 
 ## License
 

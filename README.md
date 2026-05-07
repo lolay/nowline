@@ -59,23 +59,18 @@ This repository is an OSS monorepo of the Nowline language tooling.
 | Package | Purpose |
 |---|---|
 | [`@nowline/export-core`](./packages/export-core) | Shared types, unit converter, PDF page-size parser, 5-step font resolver, bundled DejaVu fonts. |
-| [`@nowline/export-png`](./packages/export-png) | PNG via [`@resvg/resvg-js`](https://github.com/yisibl/resvg-js) WASM. *Tiny + Full*. |
-| [`@nowline/export-pdf`](./packages/export-pdf) | Vector PDF via [`pdfkit`](https://github.com/foliojs/pdfkit) + `svg-to-pdfkit`. *Full only*. |
-| [`@nowline/export-html`](./packages/export-html) | Self-contained HTML page with inline pan/zoom JS. *Full only*. |
-| [`@nowline/export-mermaid`](./packages/export-mermaid) | Markdown + Mermaid `gantt` block. *Full only*. |
-| [`@nowline/export-xlsx`](./packages/export-xlsx) | Five-sheet workbook via [`exceljs`](https://github.com/exceljs/exceljs). *Full only*. |
-| [`@nowline/export-msproj`](./packages/export-msproj) | MS Project import XML. *Full only*. |
+| [`@nowline/export-png`](./packages/export-png) | PNG via [`@resvg/resvg-js`](https://github.com/yisibl/resvg-js) WASM. |
+| [`@nowline/export-pdf`](./packages/export-pdf) | Vector PDF via [`pdfkit`](https://github.com/foliojs/pdfkit) + `svg-to-pdfkit`. |
+| [`@nowline/export-html`](./packages/export-html) | Self-contained HTML page with inline pan/zoom JS. |
+| [`@nowline/export-mermaid`](./packages/export-mermaid) | Markdown + Mermaid `gantt` block. |
+| [`@nowline/export-xlsx`](./packages/export-xlsx) | Five-sheet workbook via [`exceljs`](https://github.com/exceljs/exceljs). |
+| [`@nowline/export-msproj`](./packages/export-msproj) | MS Project import XML. |
 
 ### CLI
 
 | Package | Purpose |
 |---|---|
-| [`@nowline/cli`](./packages/cli) | `nowline` (tiny) — SVG + PNG + AST round-trip. ~50 MB binary. |
-| [`@nowline/cli-full`](./packages/cli-full) | `nowline-full` — every format. ~58–62 MB binary. |
-
-The tiny `nowline` build covers the common case (SVG + PNG sharing); the
-full `nowline-full` build adds PDF, HTML, Markdown+Mermaid, XLSX, and MS
-Project XML for users who need those workflow-specific formats.
+| [`@nowline/cli`](./packages/cli) | `nowline` — every export format (SVG, PNG, PDF, HTML, Markdown+Mermaid, XLSX, MS Project XML) plus AST round-trip. ~70 MB standalone binary. |
 
 Planned: a browser embed script and an LSP / VS Code extension.
 
@@ -136,12 +131,12 @@ nowline --version
 
 ```bash
 nowline roadmap.nowline                          # writes ./roadmap.svg
-nowline roadmap.nowline -f png                   # writes ./roadmap.png   (tiny + full)
-nowline roadmap.nowline -f pdf                   # writes ./roadmap.pdf   (full only)
-nowline roadmap.nowline -f html                  # writes ./roadmap.html  (full only)
-nowline roadmap.nowline -f mermaid               # writes ./roadmap.md    (full only)
-nowline roadmap.nowline -f xlsx                  # writes ./roadmap.xlsx  (full only)
-nowline roadmap.nowline -f msproj                # writes ./roadmap.xml   (full only)
+nowline roadmap.nowline -f png                   # writes ./roadmap.png
+nowline roadmap.nowline -f pdf                   # writes ./roadmap.pdf
+nowline roadmap.nowline -f html                  # writes ./roadmap.html
+nowline roadmap.nowline -f mermaid               # writes ./roadmap.md
+nowline roadmap.nowline -f xlsx                  # writes ./roadmap.xlsx
+nowline roadmap.nowline -f msproj                # writes ./roadmap.xml
 nowline roadmap.nowline -o roadmap.pdf           # format inferred from extension
 nowline roadmap.nowline -o -                     # SVG to stdout
 nowline roadmap.nowline --theme dark --now 2026-03-15
@@ -152,10 +147,11 @@ cat roadmap.nowline | nowline -                  # stdin → ./roadmap.svg
 
 The render pipeline is `@nowline/core` parse → `@nowline/layout` layout →
 `@nowline/renderer` SVG → format-specific exporter. Output is byte-for-byte
-deterministic for the same input, theme, and `--now`. The two binary
-distributions (tiny `nowline`, full `nowline-full`) cover the same source
-tree — see [`packages/cli/README.md`](./packages/cli/README.md#install)
-for the format / size split.
+deterministic for the same input, theme, and `--now`. A single `nowline`
+binary ships every format — see
+[`packages/cli/README.md`](./packages/cli/README.md#install) for install
+details and [`specs/cli-distribution.md`](./specs/cli-distribution.md) for
+why we ship one binary instead of a tiered split.
 
 ### Validate (`--dry-run`)
 

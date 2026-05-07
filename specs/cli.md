@@ -32,7 +32,7 @@ The CLI is **verbless** by design: `nowline <input>` renders by default. Operati
 - Windows x64
 - Windows arm64 (Parallels, Snapdragon laptops)
 
-m2c introduces a **tiny / full** split — see [`specs/handoffs/m2c.md`](./handoffs/m2c.md) § 11. Both binaries share the same flag surface.
+A single `nowline` binary ships per platform with every export format bundled — see [`specs/cli-distribution.md`](./cli-distribution.md). (The original m2c plan was a tiny/full split; that decision was reversed after measuring that the bun runtime dominates compiled-binary size.)
 
 ## CLI Surface
 
@@ -334,14 +334,8 @@ The `defaultFormat` key participates in the format-resolution chain (step 3): us
 3. **Homebrew:** Custom tap (`lolay/tap`) with a formula that downloads the macOS or Linux binary. Also works in WSL.
 4. **apt:** `.deb` packages published to a PPA or GitHub Releases.
 
-m2c introduces a tiny / full split (see [`specs/handoffs/m2c.md`](./handoffs/m2c.md) § 11). The flag surface is identical between the two; the tiny binary refuses formats it doesn't include with a "available in nowline-full" exit-2 message.
+A single `nowline` binary per platform bundles every export format — see [`specs/cli-distribution.md`](./cli-distribution.md) for the rationale (post-measurement reversal of the original m2c § 11 tiny/full split).
 
 ## Binary Size Budget
 
-Target: **<60MB** per platform binary via `bun compile`. This is comparable to:
-
-- Deno (~40MB)
-- Bun itself (~50MB)
-- D2 (~30MB, Go-based)
-
-Acceptable for a developer tool installed once. The npm package is much smaller since it requires a Node.js/Bun runtime.
+Ceiling: **≤ 75 MB** per platform binary via `bun compile`. Measured macOS-arm64 today is ~70 MB. The bun runtime accounts for ~60 MB of that — comparable to Deno (~40 MB) and Bun standalone (~50 MB), and acceptable for a developer tool installed once. See [`specs/cli-distribution.md`](./cli-distribution.md) for the measurement breakdown that ruled out a tiered split. The npm package is much smaller since it relies on the user's own Node.js / Bun runtime.

@@ -8,9 +8,6 @@ filter/sort-friendly column shapes.
 **Part of:** [`lolay/nowline`](../../) monorepo
 **Spec:** [`specs/handoffs/m2c.md`](../../specs/handoffs/m2c.md) § 7 +
 [`specs/rendering.md`](../../specs/rendering.md) § XLSX Export
-**Tiny / full:** *full only* — install
-[`@nowline/cli-full`](../cli-full) or download a `nowline-full-<os>-<arch>`
-binary from [GitHub Releases](https://github.com/lolay/nowline/releases).
 
 ## Install
 

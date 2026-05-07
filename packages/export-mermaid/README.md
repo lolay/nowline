@@ -7,9 +7,6 @@ mermaid.live, etc.). Pure strings — no Node-only dependencies.
 **License:** Apache 2.0
 **Part of:** [`lolay/nowline`](../../) monorepo
 **Spec:** [`specs/handoffs/m2c.md`](../../specs/handoffs/m2c.md) § 6
-**Tiny / full:** *full only* — install
-[`@nowline/cli-full`](../cli-full) or download `nowline-full-<os>-<arch>`
-from [GitHub Releases](https://github.com/lolay/nowline/releases).
 
 ## Install
 

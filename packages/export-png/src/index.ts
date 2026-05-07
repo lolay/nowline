@@ -9,9 +9,6 @@
 //   - Fonts come from the @nowline/export-core resolver; we pass them as
 //     `fontBuffers` (Uint8Array, supported since resvg-js 2.5.0).
 //   - The WASM module is loaded lazily on first call.
-//
-// The package owns the resvg-js dependency; that's why it's in the "full"
-// CLI build but not in the "tiny" build.
 
 import type { ResolvedFontPair, ExportInputs } from '@nowline/export-core';
 import { resolveFonts } from '@nowline/export-core';

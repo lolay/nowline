@@ -7,7 +7,7 @@
 - **Snippets** for common patterns (swimlane, item, parallel, group, milestone, anchor, footnote)
 - **File icon** for `.nowline` documents
 
-> Live preview (open a roadmap as SVG side-by-side) lands in the next release (`m3c`). PNG/PDF render commands are deferred to a follow-up — install [`@nowline/cli-full`](https://github.com/lolay/nowline) for raster export until then.
+> Live preview (open a roadmap as SVG side-by-side) lands in the next release (`m3c`). PNG/PDF render commands are deferred to a follow-up — install [`@nowline/cli`](https://github.com/lolay/nowline) for raster export until then.
 
 ## Quick start
 
@@ -32,7 +32,7 @@ The extension is fully self-contained. The `.vsix` ships:
 - `@nowline/layout` — layout engine (used by the upcoming preview)
 - `@nowline/renderer` — SVG renderer (used by the upcoming preview)
 
-No external Node runtime, native modules, or fonts are required. PDF and PNG rendering depend on native bindings and ship in [`@nowline/cli-full`](https://github.com/lolay/nowline) instead.
+No external Node runtime, native modules, or fonts are required. PDF and PNG rendering depend on native bindings and ship in [`@nowline/cli`](https://github.com/lolay/nowline) instead.
 
 ## Reporting issues
 

@@ -193,8 +193,9 @@ async function produce(args: ProduceArgs): Promise<ProduceResult> {
 
     // The remaining formats all start from a positioned model + (sometimes) an
     // SVG. Build them once and dispatch to the format-specific exporter via
-    // dynamic import so the tiny CLI build can `--external` the optional
-    // packages.
+    // dynamic import — keeps each exporter's heavy deps off cold paths and
+    // leaves room to re-extract a package later if a future build profile
+    // wants to slim down.
     const stage = await stageRoadmap(args);
 
     if (args.format === 'svg') {
@@ -247,12 +248,6 @@ async function produce(args: ProduceArgs): Promise<ProduceResult> {
         }
     } catch (err) {
         if (err instanceof CliError) throw err;
-        if (isMissingExporterError(err, args.format)) {
-            throw new CliError(
-                ExitCode.InputError,
-                buildMissingExporterMessage(args.format),
-            );
-        }
         const message = err instanceof Error ? err.message : String(err);
         throw new CliError(
             ExitCode.OutputError,
@@ -261,28 +256,6 @@ async function produce(args: ProduceArgs): Promise<ProduceResult> {
     }
 
     throw new CliError(ExitCode.InputError, `nowline: unsupported format "${args.format}".`);
-}
-
-/**
- * True when `err` looks like Node's "module not found" error and the missing
- * specifier is the `@nowline/export-*` package the CLI just tried to dynamic-
- * import. Used to detect tiny-build runs where the optional packages were
- * `--external`'d at compile time.
- */
-export function isMissingExporterError(err: unknown, format: OutputFormat): boolean {
-    if (!(err instanceof Error)) return false;
-    const code = (err as NodeJS.ErrnoException).code;
-    if (code !== 'ERR_MODULE_NOT_FOUND' && code !== 'MODULE_NOT_FOUND') return false;
-    const expected = `@nowline/export-${format}`;
-    return err.message.includes(expected);
-}
-
-export function buildMissingExporterMessage(format: OutputFormat): string {
-    return [
-        `nowline: the '${format}' format is not available in this build.`,
-        "Install 'nowline-full' from https://github.com/lolay/nowline/releases or:",
-        '  npm install -g @nowline/cli-full',
-    ].join('\n');
 }
 
 async function produceJson(args: ProduceArgs): Promise<string> {

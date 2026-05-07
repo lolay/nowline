@@ -10,24 +10,18 @@ permissions:
 
 jobs:
   build-binaries:
-    name: Build ${{ matrix.target }} (${{ matrix.variant }})
+    name: Build ${{ matrix.target }}
     runs-on: ${{ matrix.runner }}
     strategy:
       fail-fast: false
       matrix:
         include:
-          - { variant: tiny, runner: macos-latest, target: bun-darwin-arm64, suffix: macos-arm64 }
-          - { variant: tiny, runner: macos-latest, target: bun-darwin-x64, suffix: macos-x64 }
-          - { variant: tiny, runner: ubuntu-latest, target: bun-linux-x64, suffix: linux-x64 }
-          - { variant: tiny, runner: ubuntu-latest, target: bun-linux-arm64, suffix: linux-arm64 }
-          - { variant: tiny, runner: windows-latest, target: bun-windows-x64, suffix: windows-x64.exe }
-          - { variant: tiny, runner: windows-latest, target: bun-windows-arm64, suffix: windows-arm64.exe }
-          - { variant: full, runner: macos-latest, target: bun-darwin-arm64, suffix: macos-arm64 }
-          - { variant: full, runner: macos-latest, target: bun-darwin-x64, suffix: macos-x64 }
-          - { variant: full, runner: ubuntu-latest, target: bun-linux-x64, suffix: linux-x64 }
-          - { variant: full, runner: ubuntu-latest, target: bun-linux-arm64, suffix: linux-arm64 }
-          - { variant: full, runner: windows-latest, target: bun-windows-x64, suffix: windows-x64.exe }
-          - { variant: full, runner: windows-latest, target: bun-windows-arm64, suffix: windows-arm64.exe }
+          - { runner: macos-latest, target: bun-darwin-arm64, suffix: macos-arm64 }
+          - { runner: macos-latest, target: bun-darwin-x64, suffix: macos-x64 }
+          - { runner: ubuntu-latest, target: bun-linux-x64, suffix: linux-x64 }
+          - { runner: ubuntu-latest, target: bun-linux-arm64, suffix: linux-arm64 }
+          - { runner: windows-latest, target: bun-windows-x64, suffix: windows-x64.exe }
+          - { runner: windows-latest, target: bun-windows-arm64, suffix: windows-arm64.exe }
     steps:
       - uses: actions/checkout@v4
 
@@ -55,25 +49,14 @@ jobs:
 
       - name: Compile binary
         working-directory: packages/cli
-        run: node scripts/compile.mjs --target=${{ matrix.target }} --variant=${{ matrix.variant }}
+        run: node scripts/compile.mjs --target=${{ matrix.target }}
 
-      - name: Resolve binary name
-        id: bin
+      - name: Smoke test binary (render every format)
+        if: matrix.runner != 'windows-latest'
         shell: bash
         run: |
           set -euo pipefail
-          if [[ "${{ matrix.variant }}" == "full" ]]; then
-            echo "name=nowline-full-${{ matrix.suffix }}" >> "$GITHUB_OUTPUT"
-          else
-            echo "name=nowline-${{ matrix.suffix }}" >> "$GITHUB_OUTPUT"
-          fi
-
-      - name: Smoke test binary (tiny — render SVG/PNG, reject PDF)
-        if: matrix.variant == 'tiny' && matrix.runner != 'windows-latest'
-        shell: bash
-        run: |
-          set -euo pipefail
-          bin=packages/cli/dist-bin/${{ steps.bin.outputs.name }}
+          bin=packages/cli/dist-bin/nowline-${{ matrix.suffix }}
           if [[ "${{ matrix.runner }}" == "macos-latest" && "${{ matrix.target }}" != *"darwin"* ]]; then
             echo "cross-target binary; skipping execution smoke"
             exit 0
@@ -88,33 +71,6 @@ jobs:
           head -c 4 /tmp/minimal.svg | grep -q "<svg"
           "$bin" examples/minimal.nowline -f png --headless -o /tmp/minimal.png
           head -c 4 /tmp/minimal.png | od -An -c | grep -q 'P   N   G'
-          set +e
-          "$bin" examples/minimal.nowline -f pdf -o /tmp/minimal.pdf
-          rc=$?
-          set -e
-          if [[ $rc -ne 2 ]]; then
-            echo "expected exit 2 from tiny binary asked for PDF, got $rc" >&2
-            exit 1
-          fi
-
-      - name: Smoke test binary (full — render every format)
-        if: matrix.variant == 'full' && matrix.runner != 'windows-latest'
-        shell: bash
-        run: |
-          set -euo pipefail
-          bin=packages/cli/dist-bin/${{ steps.bin.outputs.name }}
-          if [[ "${{ matrix.runner }}" == "macos-latest" && "${{ matrix.target }}" != *"darwin"* ]]; then
-            echo "cross-target binary; skipping execution smoke"
-            exit 0
-          fi
-          if [[ "${{ matrix.runner }}" == "ubuntu-latest" && "${{ matrix.target }}" != *"linux-x64"* ]]; then
-            echo "cross-target binary; skipping execution smoke"
-            exit 0
-          fi
-          chmod +x "$bin"
-          "$bin" --version
-          "$bin" examples/minimal.nowline -o - > /tmp/minimal.svg
-          "$bin" examples/minimal.nowline -f png --headless -o /tmp/minimal.png
           "$bin" examples/minimal.nowline -f pdf --headless -o /tmp/minimal.pdf
           "$bin" examples/minimal.nowline -f html -o /tmp/minimal.html
           "$bin" examples/minimal.nowline -f mermaid -o /tmp/minimal.md
@@ -127,60 +83,36 @@ jobs:
       - name: Upload binary artifact
         uses: actions/upload-artifact@v4
         with:
-          name: ${{ steps.bin.outputs.name }}
-          path: packages/cli/dist-bin/${{ steps.bin.outputs.name }}
+          name: nowline-${{ matrix.suffix }}
+          path: packages/cli/dist-bin/nowline-${{ matrix.suffix }}
           if-no-files-found: error
 
   build-deb:
-    name: Build .deb (${{ matrix.variant }} ${{ matrix.arch }})
+    name: Build .deb (${{ matrix.arch }})
     runs-on: ubuntu-latest
     needs: build-binaries
     strategy:
       matrix:
         include:
-          - { variant: tiny, arch: amd64, suffix: linux-x64 }
-          - { variant: tiny, arch: arm64, suffix: linux-arm64 }
-          - { variant: full, arch: amd64, suffix: linux-x64 }
-          - { variant: full, arch: arm64, suffix: linux-arm64 }
+          - { arch: amd64, suffix: linux-x64 }
+          - { arch: arm64, suffix: linux-arm64 }
     steps:
       - uses: actions/checkout@v4
-
-      - name: Resolve artifact name
-        id: art
-        shell: bash
-        run: |
-          set -euo pipefail
-          if [[ "${{ matrix.variant }}" == "full" ]]; then
-            echo "name=nowline-full-${{ matrix.suffix }}" >> "$GITHUB_OUTPUT"
-          else
-            echo "name=nowline-${{ matrix.suffix }}" >> "$GITHUB_OUTPUT"
-          fi
 
       - name: Download binary
         uses: actions/download-artifact@v4
         with:
-          name: ${{ steps.art.outputs.name }}
+          name: nowline-${{ matrix.suffix }}
           path: dist-bin
 
       - name: Build .deb
-        run: bash scripts/build-deb.sh "${{ matrix.arch }}" "dist-bin/${{ steps.art.outputs.name }}" "${GITHUB_REF_NAME#v}" "${{ matrix.variant }}"
-
-      - name: Resolve deb name
-        id: deb
-        shell: bash
-        run: |
-          set -euo pipefail
-          if [[ "${{ matrix.variant }}" == "full" ]]; then
-            echo "pkg=nowline-full" >> "$GITHUB_OUTPUT"
-          else
-            echo "pkg=nowline" >> "$GITHUB_OUTPUT"
-          fi
+        run: bash scripts/build-deb.sh "${{ matrix.arch }}" "dist-bin/nowline-${{ matrix.suffix }}" "${GITHUB_REF_NAME#v}"
 
       - name: Upload .deb artifact
         uses: actions/upload-artifact@v4
         with:
-          name: ${{ steps.deb.outputs.pkg }}_${{ matrix.arch }}.deb
-          path: dist-deb/${{ steps.deb.outputs.pkg }}_*_${{ matrix.arch }}.deb
+          name: nowline_${{ matrix.arch }}.deb
+          path: dist-deb/nowline_*_${{ matrix.arch }}.deb
           if-no-files-found: error
 
   publish-npm:
@@ -209,7 +141,7 @@ jobs:
         run: pnpm -r build
 
       # Publish in dependency order: core layers first, then export-core,
-      # then per-format export packages, then the two CLI packages.
+      # then per-format export packages, then the CLI.
 
       - name: Publish @nowline/core
         working-directory: packages/core
@@ -277,12 +209,6 @@ jobs:
         env:
           NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
 
-      - name: Publish @nowline/cli-full
-        working-directory: packages/cli-full
-        run: pnpm publish --access public --no-git-checks
-        env:
-          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
-
   release:
     name: GitHub Release
     runs-on: ubuntu-latest
@@ -298,7 +224,7 @@ jobs:
       - name: Stage release assets
         run: |
           mkdir -p release-assets
-          find artifacts -type f \( -name 'nowline-*' -o -name 'nowline-full-*' -o -name '*.deb' \) -exec cp {} release-assets/ \;
+          find artifacts -type f \( -name 'nowline-*' -o -name '*.deb' \) -exec cp {} release-assets/ \;
           ls -la release-assets
 
       - name: Publish GitHub Release
@@ -324,30 +250,23 @@ jobs:
         with:
           path: artifacts
 
-      - name: Compute SHA256s and update formulas
+      - name: Compute SHA256s and update formula
         run: |
           set -euo pipefail
           VERSION="${GITHUB_REF_NAME#v}"
           cd artifacts
-          # Tiny
           SHA_DARWIN_ARM64=$(sha256sum nowline-macos-arm64/nowline-macos-arm64 | awk '{print $1}')
           SHA_DARWIN_X64=$(sha256sum nowline-macos-x64/nowline-macos-x64 | awk '{print $1}')
           SHA_LINUX_X64=$(sha256sum nowline-linux-x64/nowline-linux-x64 | awk '{print $1}')
           SHA_LINUX_ARM64=$(sha256sum nowline-linux-arm64/nowline-linux-arm64 | awk '{print $1}')
-          # Full
-          SHA_FULL_DARWIN_ARM64=$(sha256sum nowline-full-macos-arm64/nowline-full-macos-arm64 | awk '{print $1}')
-          SHA_FULL_DARWIN_X64=$(sha256sum nowline-full-macos-x64/nowline-full-macos-x64 | awk '{print $1}')
-          SHA_FULL_LINUX_X64=$(sha256sum nowline-full-linux-x64/nowline-full-linux-x64 | awk '{print $1}')
-          SHA_FULL_LINUX_ARM64=$(sha256sum nowline-full-linux-arm64/nowline-full-linux-arm64 | awk '{print $1}')
           cd ../tap
           mkdir -p Formula
           cat > Formula/nowline.rb <<EOF
           class Nowline < Formula
-            desc "Parse, validate, and convert .nowline roadmap files (tiny build: SVG + PNG)"
+            desc "Parse, validate, and convert .nowline roadmap files"
             homepage "https://github.com/lolay/nowline"
             version "${VERSION}"
             license "Apache-2.0"
-            conflicts_with "nowline-full", because: "both install nowline binary"
 
             on_macos do
               if Hardware::CPU.arm?
@@ -379,46 +298,8 @@ jobs:
           end
           EOF
 
-          cat > Formula/nowline-full.rb <<EOF
-          class NowlineFull < Formula
-            desc "Parse, validate, and convert .nowline roadmaps (full build: every format)"
-            homepage "https://github.com/lolay/nowline"
-            version "${VERSION}"
-            license "Apache-2.0"
-            conflicts_with "nowline", because: "both install nowline binary"
-
-            on_macos do
-              if Hardware::CPU.arm?
-                url "https://github.com/lolay/nowline/releases/download/v${VERSION}/nowline-full-macos-arm64"
-                sha256 "${SHA_FULL_DARWIN_ARM64}"
-              else
-                url "https://github.com/lolay/nowline/releases/download/v${VERSION}/nowline-full-macos-x64"
-                sha256 "${SHA_FULL_DARWIN_X64}"
-              end
-            end
-
-            on_linux do
-              if Hardware::CPU.arm?
-                url "https://github.com/lolay/nowline/releases/download/v${VERSION}/nowline-full-linux-arm64"
-                sha256 "${SHA_FULL_LINUX_ARM64}"
-              else
-                url "https://github.com/lolay/nowline/releases/download/v${VERSION}/nowline-full-linux-x64"
-                sha256 "${SHA_FULL_LINUX_X64}"
-              end
-            end
-
-            def install
-              bin.install Dir["nowline-full-*"].first => "nowline"
-            end
-
-            test do
-              system "#{bin}/nowline", "--version"
-            end
-          end
-          EOF
-
           git config user.name "lolay-release-bot"
           git config user.email "bot@lolay.com"
-          git add Formula/nowline.rb Formula/nowline-full.rb
+          git add Formula/nowline.rb
           git commit -m "nowline ${VERSION}"
           git push

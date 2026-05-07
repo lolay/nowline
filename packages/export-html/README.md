@@ -7,9 +7,6 @@ strings. No external assets, no third-party JavaScript.
 **License:** Apache 2.0
 **Part of:** [`lolay/nowline`](../../) monorepo
 **Spec:** [`specs/handoffs/m2c.md`](../../specs/handoffs/m2c.md) § 5
-**Tiny / full:** *full only* — install
-[`@nowline/cli-full`](../cli-full) or download a `nowline-full-<os>-<arch>`
-binary from [GitHub Releases](https://github.com/lolay/nowline/releases).
 
 ## Install
 
@@ -73,13 +70,6 @@ avoid pulling a third-party library. It supports:
 - The script bundle is a literal string constant in
   `src/pan-zoom-script.ts` — same bytes every export.
 - Output snapshots in `test/__snapshots__/` regenerate via `vitest -u`.
-
-## Tiny / full distribution
-
-Same story as the other "full only" exporters. The tiny `nowline` binary
-exits `2` with a "the 'html' format is not available in this build"
-message. Install [`@nowline/cli-full`](../cli-full) or download
-`nowline-full-<os>-<arch>` to enable HTML export.
 
 ## License
 

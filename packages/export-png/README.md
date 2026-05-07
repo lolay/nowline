@@ -2,12 +2,11 @@
 
 Rasterizes a Nowline-rendered SVG to PNG using
 [`@resvg/resvg-js`](https://github.com/yisibl/resvg-js) (a Rust→WASM SVG
-rasterizer). Ships in both the *tiny* and *full* CLI builds.
+rasterizer). Bundled into the `nowline` CLI.
 
 **License:** Apache 2.0
 **Part of:** [`lolay/nowline`](../../) monorepo
 **Spec:** [`specs/handoffs/m2c.md`](../../specs/handoffs/m2c.md) § 3
-**Tiny / full:** included in *both* (PNG is the common-case binary output)
 
 ## Install
 

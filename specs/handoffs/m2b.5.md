@@ -270,7 +270,7 @@ m2b.5 is **a CLI shape change**. Layout, renderer, parser, and core packages are
 | [specs/cli.md](../cli.md) | Old verb-based surface (about to be rewritten) |
 | [specs/handoffs/m2a.md](./m2a.md) § Resolutions | Citty + `.nowlinerc` arg-parser stack — kept; flag layout changes |
 | [specs/handoffs/m2b.md](./m2b.md) § 4–5 | Existing `render` and `serve` flag tables — most flags carry over verbatim |
-| [specs/handoffs/m2c.md](./m2c.md) § 9, § 11 | New format flags and tiny / full CLI distribution — must reach m2c on the verbless shape |
+| [specs/handoffs/m2c.md](./m2c.md) § 9, § 11 | New format flags and CLI distribution — must reach m2c on the verbless shape (m2c § 11 tiny/full split was later collapsed; see [specs/cli-distribution.md](../cli-distribution.md)) |
 | [specs/principles.md](../principles.md) | "Boring tooling" — favoring peer-consistent CLI shapes |
 
 ## Definition of Done

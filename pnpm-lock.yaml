@@ -26,9 +26,24 @@ importers:
       '@nowline/export-core':
         specifier: workspace:*
         version: link:../export-core
+      '@nowline/export-html':
+        specifier: workspace:*
+        version: link:../export-html
+      '@nowline/export-mermaid':
+        specifier: workspace:*
+        version: link:../export-mermaid
+      '@nowline/export-msproj':
+        specifier: workspace:*
+        version: link:../export-msproj
+      '@nowline/export-pdf':
+        specifier: workspace:*
+        version: link:../export-pdf
       '@nowline/export-png':
         specifier: workspace:*
         version: link:../export-png
+      '@nowline/export-xlsx':
+        specifier: workspace:*
+        version: link:../export-xlsx
       '@nowline/layout':
         specifier: workspace:*
         version: link:../layout
@@ -51,21 +66,6 @@ importers:
         specifier: ~4.2.2
         version: 4.2.2
     devDependencies:
-      '@nowline/export-html':
-        specifier: workspace:*
-        version: link:../export-html
-      '@nowline/export-mermaid':
-        specifier: workspace:*
-        version: link:../export-mermaid
-      '@nowline/export-msproj':
-        specifier: workspace:*
-        version: link:../export-msproj
-      '@nowline/export-pdf':
-        specifier: workspace:*
-        version: link:../export-pdf
-      '@nowline/export-xlsx':
-        specifier: workspace:*
-        version: link:../export-xlsx
       '@types/babel__code-frame':
         specifier: ^7.0.6
         version: 7.27.0
@@ -81,33 +81,6 @@ importers:
       vitest:
         specifier: ^3.1.0
         version: 3.2.4(@types/node@22.19.17)
-
-  packages/cli-full:
-    dependencies:
-      '@nowline/cli':
-        specifier: workspace:*
-        version: link:../cli
-      '@nowline/export-core':
-        specifier: workspace:*
-        version: link:../export-core
-      '@nowline/export-html':
-        specifier: workspace:*
-        version: link:../export-html
-      '@nowline/export-mermaid':
-        specifier: workspace:*
-        version: link:../export-mermaid
-      '@nowline/export-msproj':
-        specifier: workspace:*
-        version: link:../export-msproj
-      '@nowline/export-pdf':
-        specifier: workspace:*
-        version: link:../export-pdf
-      '@nowline/export-png':
-        specifier: workspace:*
-        version: link:../export-png
-      '@nowline/export-xlsx':
-        specifier: workspace:*
-        version: link:../export-xlsx
 
   packages/core:
     dependencies:

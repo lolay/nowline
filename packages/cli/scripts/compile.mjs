@@ -3,15 +3,10 @@
 // Uses `bun build --compile`. Requires bun to be installed; delegates errors
 // from bun rather than attempting a polyfill.
 //
-// Two variants are produced from the same source tree (m2c § 11):
-//   tiny  — bundles only @nowline/export-core + @nowline/export-png; the five
-//           optional export packages are passed via `--external` so dynamic
-//           imports of them fail at runtime with the "install nowline-full"
-//           message. Output: nowline-<suffix>.
-//   full  — bundles every @nowline/export-* package. Output:
-//           nowline-full-<suffix>.
-//
-// Defaults to --variant=tiny for backwards-compat with the m2a release flow.
+// One binary per platform: `nowline-<suffix>`. Bundles every `@nowline/export-*`
+// package — see `specs/cli-distribution.md` for the rationale (the bun runtime
+// dominates compiled binary size; a tiny/full split paid only ~5% size dividend
+// for the cost of doubled CI/release/distribution channels).
 
 import { spawnSync } from 'node:child_process';
 import { mkdirSync, rmSync, statSync, readdirSync } from 'node:fs';
@@ -30,26 +25,15 @@ const ALL_TARGETS = [
     { id: 'bun-windows-arm64', suffix: 'windows-arm64.exe' },
 ];
 
-// Tiny: 60 MB. Full: 65 MB. m2c § 11 + m2a unchanged ceiling.
-const TINY_MAX_BYTES = 60 * 1024 * 1024;
-const FULL_MAX_BYTES = 65 * 1024 * 1024;
-
-const TINY_EXTERNALS = [
-    '@nowline/export-pdf',
-    '@nowline/export-html',
-    '@nowline/export-mermaid',
-    '@nowline/export-xlsx',
-    '@nowline/export-msproj',
-];
+// Measured macOS-arm64 binary at the time of the m2c → single-binary collapse
+// was 69.6 MB (bun runtime ~60 MB + JS payload ~6 MB + resvg native ~3.5 MB).
+// 75 MB ceiling gives ~5 MB headroom for future bun-runtime growth.
+const MAX_BYTES = 75 * 1024 * 1024;
 
 function parseArgs(argv) {
-    const out = { target: 'all', variant: 'tiny' };
+    const out = { target: 'all' };
     for (const arg of argv.slice(2)) {
         if (arg.startsWith('--target=')) out.target = arg.slice('--target='.length);
-        else if (arg.startsWith('--variant=')) out.variant = arg.slice('--variant='.length);
-    }
-    if (out.variant !== 'tiny' && out.variant !== 'full') {
-        throw new Error(`--variant must be 'tiny' or 'full' (got '${out.variant}')`);
     }
     return out;
 }
@@ -75,35 +59,15 @@ function pickTargets(selector) {
     return match;
 }
 
-function binaryName(variant, suffix) {
-    return variant === 'full' ? `nowline-full-${suffix}` : `nowline-${suffix}`;
-}
-
-function externalsFor(variant) {
-    return variant === 'tiny' ? TINY_EXTERNALS : [];
-}
-
-function maxBytesFor(variant) {
-    return variant === 'tiny' ? TINY_MAX_BYTES : FULL_MAX_BYTES;
-}
-
 function main() {
-    const { target, variant } = parseArgs(process.argv);
+    const { target } = parseArgs(process.argv);
     const targets = pickTargets(target);
     const outDir = path.join(packageRoot, 'dist-bin');
-    // We *don't* clear dist-bin between variants — the release flow runs
-    // `--variant=tiny` and `--variant=full` back-to-back and expects both to
-    // coexist. Instead, only remove existing files matching the current
-    // variant's prefix so re-runs are idempotent.
     if (!safeStat(outDir)) {
         mkdirSync(outDir, { recursive: true });
     } else {
-        const prefix = variant === 'full' ? 'nowline-full-' : 'nowline-';
         for (const name of readdirSync(outDir)) {
-            // Don't accidentally delete `nowline-full-...` when prefix is
-            // `nowline-` — startsWith would falsely match.
-            if (variant === 'tiny' && name.startsWith('nowline-full-')) continue;
-            if (name.startsWith(prefix)) {
+            if (name.startsWith('nowline-')) {
                 rmSync(path.join(outDir, name), { force: true });
             }
         }
@@ -115,14 +79,11 @@ function main() {
         process.exit(1);
     }
 
-    const externals = externalsFor(variant);
-    const maxBytes = maxBytesFor(variant);
-
     let failed = 0;
     for (const tgt of targets) {
-        const outName = binaryName(variant, tgt.suffix);
+        const outName = `nowline-${tgt.suffix}`;
         const outPath = path.join(outDir, outName);
-        console.log(`compiling ${tgt.id} (${variant}) -> ${path.relative(packageRoot, outPath)}`);
+        console.log(`compiling ${tgt.id} -> ${path.relative(packageRoot, outPath)}`);
         const args = [
             'build',
             entry,
@@ -130,9 +91,6 @@ function main() {
             '--target', tgt.id,
             '--outfile', outPath,
         ];
-        for (const ext of externals) {
-            args.push('--external', ext);
-        }
         const result = spawnSync('bun', args, { stdio: 'inherit', cwd: packageRoot });
         if (result.status !== 0) {
             console.error(`  FAILED ${tgt.id}`);
@@ -141,17 +99,14 @@ function main() {
         }
     }
 
-    // Print sizes for *only this variant's* binaries; verify against ceiling.
-    const variantPrefix = variant === 'full' ? 'nowline-full-' : 'nowline-';
     for (const entryName of readdirSync(outDir)) {
-        if (variant === 'tiny' && entryName.startsWith('nowline-full-')) continue;
-        if (!entryName.startsWith(variantPrefix)) continue;
+        if (!entryName.startsWith('nowline-')) continue;
         const p = path.join(outDir, entryName);
         const size = statSync(p).size;
         const mb = (size / 1024 / 1024).toFixed(1);
         console.log(`  ${entryName}: ${mb} MB`);
-        if (size > maxBytes) {
-            const ceilingMb = (maxBytes / 1024 / 1024).toFixed(0);
+        if (size > MAX_BYTES) {
+            const ceilingMb = (MAX_BYTES / 1024 / 1024).toFixed(0);
             console.error(`    ERROR: ${entryName} is larger than ${ceilingMb} MB (${mb} MB).`);
             failed += 1;
         }

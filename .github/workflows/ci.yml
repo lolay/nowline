@@ -41,19 +41,16 @@ jobs:
         run: pnpm -r test
 
   compile-smoke:
-    name: Bun compile smoke (${{ matrix.os }} ${{ matrix.variant }})
+    name: Bun compile smoke (${{ matrix.os }})
     runs-on: ${{ matrix.os }}
     needs: build-test
     strategy:
       fail-fast: false
       matrix:
         include:
-          - { variant: tiny, os: ubuntu-latest, target: bun-linux-x64 }
-          - { variant: tiny, os: macos-latest, target: bun-darwin-arm64 }
-          - { variant: tiny, os: windows-latest, target: bun-windows-x64 }
-          - { variant: full, os: ubuntu-latest, target: bun-linux-x64 }
-          - { variant: full, os: macos-latest, target: bun-darwin-arm64 }
-          - { variant: full, os: windows-latest, target: bun-windows-x64 }
+          - { os: ubuntu-latest, target: bun-linux-x64 }
+          - { os: macos-latest, target: bun-darwin-arm64 }
+          - { os: windows-latest, target: bun-windows-x64 }
     steps:
       - uses: actions/checkout@v4
 
@@ -81,14 +78,14 @@ jobs:
 
       - name: Compile single target (smoke)
         working-directory: packages/cli
-        run: node scripts/compile.mjs --target=${{ matrix.target }} --variant=${{ matrix.variant }}
+        run: node scripts/compile.mjs --target=${{ matrix.target }}
 
-      - name: Smoke — tiny binary (Linux/macOS)
-        if: matrix.variant == 'tiny' && runner.os != 'Windows'
+      - name: Smoke — binary (Linux/macOS)
+        if: runner.os != 'Windows'
         working-directory: packages/cli
         run: |
           set -euo pipefail
-          BIN="$(ls dist-bin/nowline-* | grep -v 'nowline-full-' | head -n 1)"
+          BIN="$(ls dist-bin/nowline-* | head -n 1)"
           chmod +x "$BIN"
           "$BIN" --version
           "$BIN" ../../examples/minimal.nowline --dry-run
@@ -96,27 +93,6 @@ jobs:
           head -c 4 /tmp/minimal.svg | grep -q "<svg"
           "$BIN" ../../examples/minimal.nowline -f png --headless -o /tmp/minimal.png
           head -c 4 /tmp/minimal.png | od -An -c | grep -q 'P   N   G'
-          set +e
-          out=$("$BIN" ../../examples/minimal.nowline -f pdf -o /tmp/minimal.pdf 2>&1)
-          rc=$?
-          set -e
-          if [[ $rc -ne 2 ]]; then
-            echo "expected tiny binary to refuse PDF with exit 2, got $rc" >&2
-            echo "$out" >&2
-            exit 1
-          fi
-          echo "$out" | grep -q "nowline-full" || { echo "missing nowline-full hint" >&2; exit 1; }
-
-      - name: Smoke — full binary (Linux/macOS)
-        if: matrix.variant == 'full' && runner.os != 'Windows'
-        working-directory: packages/cli
-        run: |
-          set -euo pipefail
-          BIN="$(ls dist-bin/nowline-full-* | head -n 1)"
-          chmod +x "$BIN"
-          "$BIN" --version
-          "$BIN" ../../examples/minimal.nowline -o - > /tmp/minimal.svg
-          "$BIN" ../../examples/minimal.nowline -f png --headless -o /tmp/minimal.png
           "$BIN" ../../examples/minimal.nowline -f pdf --headless -o /tmp/minimal.pdf
           "$BIN" ../../examples/minimal.nowline -f html -o /tmp/minimal.html
           "$BIN" ../../examples/minimal.nowline -f mermaid -o /tmp/minimal.md
@@ -126,27 +102,16 @@ jobs:
             test -s "$f" || { echo "empty: $f" >&2; exit 1; }
           done
 
-      - name: Smoke — tiny binary (Windows)
-        if: matrix.variant == 'tiny' && runner.os == 'Windows'
+      - name: Smoke — binary (Windows)
+        if: runner.os == 'Windows'
         working-directory: packages/cli
         shell: pwsh
         run: |
-          $bin = (Get-ChildItem dist-bin/nowline-*.exe | Where-Object { $_.Name -notlike 'nowline-full-*' } | Select-Object -First 1).FullName
+          $bin = (Get-ChildItem dist-bin/nowline-*.exe | Select-Object -First 1).FullName
           & $bin --version
           & $bin ../../examples/minimal.nowline --dry-run
           $svg = & $bin ../../examples/minimal.nowline -o -
           if (-not $svg.StartsWith("<svg")) { throw "render did not emit SVG" }
-          & $bin ../../examples/minimal.nowline -f png --headless -o C:\Temp\minimal.png
-          & $bin ../../examples/minimal.nowline -f pdf -o C:\Temp\minimal.pdf 2>&1
-          if ($LASTEXITCODE -ne 2) { throw "expected tiny binary to refuse PDF with exit 2, got $LASTEXITCODE" }
-
-      - name: Smoke — full binary (Windows)
-        if: matrix.variant == 'full' && runner.os == 'Windows'
-        working-directory: packages/cli
-        shell: pwsh
-        run: |
-          $bin = (Get-ChildItem dist-bin/nowline-full-*.exe | Select-Object -First 1).FullName
-          & $bin --version
           & $bin ../../examples/minimal.nowline -f png --headless -o C:\Temp\minimal.png
           & $bin ../../examples/minimal.nowline -f pdf --headless -o C:\Temp\minimal.pdf
           & $bin ../../examples/minimal.nowline -f html -o C:\Temp\minimal.html
