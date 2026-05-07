@@ -31,9 +31,6 @@
     },
     "icon": "dist/icons/icon.png",
     "main": "./dist/extension.cjs",
-    "activationEvents": [
-        "onLanguage:nowline"
-    ],
     "contributes": {
         "languages": [
             {
