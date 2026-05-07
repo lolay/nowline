@@ -375,13 +375,6 @@ swimlane s
         expect(hasError(errorMessages(r.diagnostics), /remaining.*group|not valid on group/i)).toBe(true);
     });
 
-    it('Label rule: non-kebab label emits a warning', async () => {
-        const r = await parse(
-            `roadmap r\nswimlane s\n  item x duration:1w labels:BadLabel\n`,
-        );
-        expect(warningMessages(r.diagnostics).some((m) => /kebab/i.test(m))).toBe(true);
-    });
-
     // --- R1: roadmap start: format ---
 
     it('R1: roadmap start with invalid format is an error', async () => {

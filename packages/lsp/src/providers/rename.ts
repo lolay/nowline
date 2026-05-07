@@ -55,7 +55,7 @@ export class NowlineRenameProvider implements RenameProvider {
         const newName = params.newName;
         if (!isValidId(newName)) {
             throw new Error(
-                `"${newName}" is not a valid Nowline identifier. Use kebab-case letters, digits, and dashes (must start with a letter).`,
+                `"${newName}" is not a valid Nowline identifier. Use letters, digits, underscores, and dashes (must start with a letter or underscore).`,
             );
         }
 

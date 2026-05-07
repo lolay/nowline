@@ -16,7 +16,7 @@ Fenced code block: ````nowline`
 2. **Indentation-significant.** Two-space or one-tab indent defines nesting. Spaces and tabs must not be mixed within a file — the parser rejects mixed indentation with a clear error identifying the first offending line. No braces, brackets, or explicit block delimiters.
 3. **Strings are double-quoted.** `"Auth refactor"`, not `Auth refactor` or `'Auth refactor'`.
 4. **Properties are key:value pairs** on the same line as the entity. All key-value pairs use `:` as the single separator — the DSL does not use `=`. Values containing spaces must be double-quoted.
-5. **Identifiers are kebab-case.** `id:auth-refactor`, not `id:authRefactor`.
+5. **Built-in DSL names are kebab-case.** Property names (`capacity-icon`, `days-per-week`), section keywords, and built-in values (`in-progress`, `at-risk`) all use kebab-case. Author-chosen identifiers may use any combination of letters, digits, underscores, and dashes (must start with a letter or underscore) — `auth-refactor`, `authRefactor`, and `auth_refactor` are all valid.
 6. **Order matters.** Items render and execute sequentially in source order within a swimlane.
 7. **Comments** use `//` for single-line and `/* */` for multi-line.
 8. **Line continuation** uses `\` at the end of a line. The next line continues the same declaration. Indentation on the continuation line is cosmetic. Use `\\` for a literal backslash.
@@ -515,7 +515,7 @@ A `size` line follows the universal `[id] ["title"]` pattern and accepts:
 - `effort:<duration literal>` — **required**. The single-eng effort budget. Decimal-aware (`0.5d`, `1.5w`); positive non-zero.
 - Universal properties — `description`, `link:`.
 
-The id is a kebab-case identifier used as the lookup key (`size:xs`, `size:l`). On items, the on-bar size chip renders the size's optional `title` when provided, falling back to the id verbatim (case as typed). Authors who want the classic uppercased t-shirt look pin it explicitly: `size m "M" effort:1w` renders `M`, `size m effort:1w` renders `m`, `size med effort:1w` renders `med`. The title also surfaces in legends, tooltips, and elsewhere — see `rendering.md` § Item size chip. Changing a `size` declaration's `effort:` later rescales every sized item that hasn't pinned an explicit `duration:` literal.
+The id is the identifier used as the lookup key (`size:xs`, `size:l`). On items, the on-bar size chip renders the size's optional `title` when provided, falling back to the id verbatim (case as typed). Authors who want the classic uppercased t-shirt look pin it explicitly: `size m "M" effort:1w` renders `M`, `size m effort:1w` renders `m`, `size med effort:1w` renders `med`. The title also surfaces in legends, tooltips, and elsewhere — see `rendering.md` § Item size chip. Changing a `size` declaration's `effort:` later rescales every sized item that hasn't pinned an explicit `duration:` literal.
 
 `size` declarations must appear in the roadmap section before any swimlane or item that references them.
 
@@ -535,7 +535,7 @@ A `status` line follows the universal `[id] ["title"]` pattern and accepts:
 
 - Universal properties — `description`, `link:`.
 
-The id is a kebab-case identifier used as the lookup key on entities via `status:NAME`. The optional title is for rendering in legends, chips, and status displays; when absent, renderers fall back to the id.
+The id is the identifier used as the lookup key on entities via `status:NAME`. The optional title is for rendering in legends, chips, and status displays; when absent, renderers fall back to the id.
 
 `status` declarations must appear in the roadmap section before any entity that references them.
 
@@ -959,7 +959,7 @@ keyword [id] ["title"] [key:value ...]
 ```
 
 - **Positional slots are only `id` and `title`.** At least one of the two must be present.
-- **Identifier** — unquoted, kebab-case. Used for referencing. Optional — auto-generated from the title if omitted.
+- **Identifier** — unquoted, matches `[a-zA-Z_][a-zA-Z0-9_-]*`. Used for referencing. Optional — auto-generated from the title (kebab-cased) if omitted.
 - **Title** — a double-quoted string. Human-readable display name. Optional. **Titles are always double-quoted, even single-word titles** (the quote is how the parser distinguishes id from title).
 - The parser distinguishes them by format: unquoted = identifier, quoted = title.
 - Every other input (`date:`, `duration:`, `status:`, `after:`, `before:`, `on:`, `owner:`, `style:`, `labels:`, `link:`, etc.) is a keyed property using `key:value`.
@@ -975,9 +975,9 @@ The `nowline v1` version directive is the only positional (non-entity) construct
 
 ### Identifiers
 
-Identifiers are kebab-case strings: `auth-refactor`, `push-v2`, `ga-launch`. They must be unique across the merged result (the file and all its includes).
+Identifiers match `[a-zA-Z_][a-zA-Z0-9_-]*` — letters, digits, underscores, and dashes, starting with a letter or underscore. Idiomatic Nowline uses kebab-case (`auth-refactor`, `push-v2`, `ga-launch`), but `authRefactor`, `auth_refactor`, and `MED` are equally valid; pick what reads best for your team. They must be unique across the merged result (the file and all its includes).
 
-When omitted, the parser generates one by slugifying the title: `"Audit log v2"` becomes `audit-log-v2`.
+When omitted, the parser generates one by slugifying the title to kebab-case: `"Audit log v2"` becomes `audit-log-v2`. Auto-generated ids are always kebab-case for stability across reruns.
 
 ### Lists
 
@@ -1052,7 +1052,7 @@ The parser enforces these rules and produces clear error messages with file posi
 1. `anchor` `date:` values and dated `milestone` `date:` values are valid ISO 8601 dates.
 2. `duration:` property values must match the raw duration pattern (`\d+(\.\d+)?[dwmqy]`) — literal only, no alias name lookup. `scale:` property values use the same raw duration pattern.
 3. `size:` property values must reference a `size` declaration in the roadmap section. Forward references are an error (rule 15 applies to `size:` the same way it applied to `duration:`).
-4. A `size` declaration's id is a kebab-case identifier. It must not match the raw duration pattern `\d+(\.\d+)?[dwmqy]` and must not be a bare `d`, `w`, `m`, `q`, or `y`. This avoids ambiguity at the call site.
+4. A `size` declaration's id must not match the raw duration pattern `\d+(\.\d+)?[dwmqy]` and must not be a bare `d`, `w`, `m`, `q`, or `y`. This avoids ambiguity at the call site.
 5. Every `size` declaration must specify an `effort:` property, and its value must match the raw duration pattern `\d+(\.\d+)?[dwmqy]` (positive, non-zero). A `size` declaration without `effort:` is a validation error. Duplicate `size` declaration ids within a single file are an error (same rule as duplicate `status` or `label` ids).
 
 **Calendar**
@@ -1073,7 +1073,7 @@ The parser enforces these rules and produces clear error messages with file posi
 
 14. `status` values are a built-in value (`planned`, `in-progress`, `done`, `at-risk`, `blocked`) or a value declared by a `status` declaration in the roadmap section.
 15. A `size:` or `status:` property reference must resolve to a declaration that appears **earlier in the file** (or in an earlier include, per `config:`/`roadmap:` mode). Forward references are a validation error. The error message should point to both the reference site and suggest the declaration location.
-16. `labels` values are kebab-case identifiers. Undeclared labels are valid (no config entry required).
+16. `labels` values are identifiers (rule 5). Undeclared labels are valid (no config entry required).
 17. `remaining` values are either a percentage (`0%`–`100%`) or a single-eng effort literal (`\d+(\.\d+)?[dwmqy]`, e.g. `1w`, `0.5d`). Both forms normalize to a percent of the item's total effort during layout: `percent = remaining_literal ÷ total_effort`, where `total_effort = size.effort` for sized items, or `duration_literal × item_capacity` for duration-literal'd items (`item_capacity` defaults to `1`). When the literal exceeds total effort (computed percent `> 100%`), the layout step emits a soft warning and clamps the painted bar to 100% remaining; rendering is never blocked.
 
 **Capacity**

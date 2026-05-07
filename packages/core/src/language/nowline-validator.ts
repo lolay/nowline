@@ -157,7 +157,6 @@ const PERCENTAGE_RE = /^\d+%$/;
 const DATE_RE = /^\d{4}-\d{2}-\d{2}$/;
 const HEX_COLOR_RE = /^#[0-9a-fA-F]{3,8}$/;
 const VERSION_RE = /^v\d+$/;
-const KEBAB_RE = /^[a-z][a-z0-9]*(-[a-z0-9]+)*$/;
 const INTEGER_RE = /^\d+$/;
 const BARE_DURATION_SUFFIX_RE = /^[dwmqy]$/;
 // Capacity numeric forms — the grammar already separates DECIMAL/INTEGER/PERCENTAGE
@@ -549,16 +548,6 @@ export class NowlineValidator {
                 }
                 break;
 
-            case 'labels':
-                for (const v of allValues) {
-                    if (v && isIdentifier(v) && !KEBAB_RE.test(v)) {
-                        accept('warning', `Label "${v}" is not kebab-case.`, {
-                            node: prop,
-                        });
-                    }
-                }
-                break;
-
             case 'on':
             case 'after':
             case 'before':
@@ -921,31 +910,19 @@ export class NowlineValidator {
         if (decl.name) {
             if (DURATION_RE.test(decl.name) || BARE_DURATION_SUFFIX_RE.test(decl.name)) {
                 accept('error',
-                    `Size id "${decl.name}" collides with the raw duration pattern. Choose a different kebab-case name (e.g. "xs", "small", "quarter").`,
+                    `Size id "${decl.name}" collides with the raw duration pattern. Choose a different name (e.g. "xs", "small", "quarter").`,
                     { node: decl, property: 'name' });
-            }
-            if (!KEBAB_RE.test(decl.name)) {
-                accept('warning', `Size id "${decl.name}" is not kebab-case.`, {
-                    node: decl,
-                    property: 'name',
-                });
             }
         }
     }
 
-    // --- Status declaration: id format ---
+    // --- Status declaration: id collision with built-ins ---
     checkStatusDeclaration(decl: StatusDeclaration, accept: ValidationAcceptor): void {
         if (decl.name) {
             if (BUILTIN_STATUSES.has(decl.name)) {
                 accept('error',
                     `Status id "${decl.name}" collides with the built-in status value. Built-ins: ${[...BUILTIN_STATUSES].join(', ')}.`,
                     { node: decl, property: 'name' });
-            }
-            if (!KEBAB_RE.test(decl.name)) {
-                accept('warning', `Status id "${decl.name}" is not kebab-case.`, {
-                    node: decl,
-                    property: 'name',
-                });
             }
         }
     }
@@ -1330,12 +1307,6 @@ export class NowlineValidator {
                 `Glyph id "${decl.name}" collides with a built-in icon name. Reserved built-ins: ${[...BUILTIN_ICON_NAMES].sort().join(', ')}.`,
                 { node: decl, property: 'name' });
         }
-        if (decl.name && !KEBAB_RE.test(decl.name)) {
-            accept('warning', `Glyph id "${decl.name}" is not kebab-case.`, {
-                node: decl,
-                property: 'name',
-            });
-        }
 
         const unicodeProp = decl.properties.find((p) => propKey(p) === 'unicode');
         if (!unicodeProp) {
@@ -1410,7 +1381,7 @@ export class NowlineValidator {
             // Inline Unicode literals (`capacity-icon:"💰"`) reach the AST as their
             // unquoted content — the only way to tell them from an identifier
             // reference is by checking the character set. Anything that doesn't
-            // look like a kebab-style identifier is treated as a literal and
+            // look like an identifier is treated as a literal and
             // accepted as-is. Authors who genuinely want to write a literal that
             // happens to spell a real identifier should declare a glyph instead.
             if (!isIdentifier(val)) return;

@@ -131,7 +131,7 @@ function glyphUnicode(decl: GlyphDeclaration): string | undefined {
  *   1. `'none'` → `null` (renderer emits no glyph).
  *   2. Built-in name → `{ kind: 'builtin', name }`.
  *   3. Custom glyph id present in `glyphs` → `{ kind: 'literal', text:
- *      <unicode:> }`. The author wrote a kebab-case identifier; we hand the
+ *      <unicode:> }`. The author wrote an identifier; we hand the
  *      renderer the underlying Unicode payload.
  *   4. Anything else → `{ kind: 'literal', text: icon }`. This is the inline
  *      Unicode literal form (`capacity-icon:"💰"`) — Langium's
