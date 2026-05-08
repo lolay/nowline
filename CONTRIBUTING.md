@@ -12,6 +12,7 @@ Nowline is early-stage: the parser, validator, and CLI are usable, but layout, r
 - [Repository layout](#repository-layout)
 - [Common tasks](#common-tasks)
 - [Running the CLI from source](#running-the-cli-from-source)
+- [Working on the VS Code / Cursor extension](#working-on-the-vs-code--cursor-extension)
 - [Working on the grammar](#working-on-the-grammar)
 - [Code style](#code-style)
 - [Tests](#tests)
@@ -102,6 +103,7 @@ Run these from the repo root. Most are simple pnpm re-runs across the workspace.
 | Regenerate Langium AST only | `pnpm langium:generate` |
 | Compile standalone binaries | `pnpm --filter @nowline/cli compile` (requires Bun) |
 | Compile only the host platform's binary | `pnpm --filter @nowline/cli compile:local` |
+| Build the VS Code / Cursor extension `.vsix` | `pnpm -F vscode run package` |
 
 The pre-hooks (`prebuild`, `pretest`) handle code generation automatically — you generally don't need to run `langium:generate` or `bundle-templates` by hand.
 
@@ -134,6 +136,46 @@ During development you usually want to invoke the CLI against local changes with
     ```
 
 Because the CLI bundles example templates at build time, changes to files under `examples/` are picked up by `pnpm build` (the `prebuild` hook re-runs `bundle-templates.mjs`).
+
+## Working on the VS Code / Cursor extension
+
+The extension at `packages/vscode-extension/` bundles `@nowline/lsp`, `@nowline/core`, `@nowline/layout`, and `@nowline/renderer` into a single self-contained `.vsix`. Two iteration loops, depending on what you're touching:
+
+### Fast loop — Extension Development Host
+
+For day-to-day extension code, grammar, snippets, or preview changes, skip packaging entirely:
+
+1. Open `packages/vscode-extension/` as its own workspace in VS Code or Cursor.
+2. Press `F5`. A second editor window launches with your in-tree build attached.
+3. Edit, save, and reload the host window (`Cmd+R` / `Ctrl+R` inside the dev-host window) to pick up changes.
+
+This is much faster than rebuilding the `.vsix` and avoids the install-cache gotchas below.
+
+### Full loop — install the `.vsix` locally
+
+When you need to test the *packaged* extension exactly as users will receive it (signed bundle, sealed `dist/`, real `vsce` output), build and install it:
+
+```bash
+# from the repo root
+pnpm -F vscode run package
+# → packages/vscode-extension/dist/nowline-vscode.vsix
+
+# VS Code:
+code  --install-extension packages/vscode-extension/dist/nowline-vscode.vsix --force
+# Cursor:
+cursor --install-extension packages/vscode-extension/dist/nowline-vscode.vsix --force
+```
+
+`--force` reinstalls in place without an explicit uninstall. Then in the editor: `Cmd+Shift+P` → **Developer: Reload Window**.
+
+The `package` script chains `sync-grammar` (pulls `grammars/nowline.tmLanguage.json` into `packages/vscode-extension/syntaxes/`) → `build-icon` → production esbuild → `vsce package`, so a single command produces a fresh `.vsix` from current sources.
+
+### Gotchas
+
+- **Reload Window isn't always enough.** The extension host occasionally caches the old `.cjs` bundle. If your changes don't appear after reload, fully quit the editor (`Cmd+Q`) and reopen.
+- **Confirm the loaded build.** `Cmd+Shift+P` → **Developer: Show Running Extensions**, find Nowline, check the path next to it points at `~/.cursor/extensions/nowline.vscode-<version>/` (or `~/.vscode/extensions/...`).
+- **Stuck install.** If `--install-extension --force` reports success but the new bundle doesn't appear, remove the extension directory by hand — `ls ~/.cursor/extensions/ | grep -i nowline`, `rm -rf` the matching folder — then reinstall.
+- **`cursor` CLI missing.** Open Cursor and run **Shell Command: Install 'cursor' command** from the command palette to put it on `$PATH`.
 
 ## Working on the grammar
 
