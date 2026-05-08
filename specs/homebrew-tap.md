@@ -111,9 +111,9 @@ No PR opened against the tap. Auto-generated formulas in custom taps are routine
 
 ## Bootstrap (one-time, before first release)
 
-These steps are prerequisites for the first `v0.1.0` tag and **not** automated by `release.yml`. They are tracked in [the release-versioning-strategy plan](../../.cursor/plans/release-versioning-strategy_2503c118.plan.md), not duplicated here.
+These tap-specific prerequisites for the first `v0.1.0` tag are **not** automated by `release.yml`. The end-to-end maintainer checklist (tap + Marketplace + Open VSX + all five repo secrets) lives in [`specs/release-bootstrap.md`](./release-bootstrap.md); this section just calls out the constraints that are intrinsic to the tap design.
 
-1. **Tap repo seeded.** `lolay/homebrew-tap` exists but is empty. The `update-homebrew-tap` job calls `actions/checkout@v4` against the tap, and checkout fails on a repo with no `HEAD`. Pushing the seed (`Formula/nowline.rb` placeholder + a tap README) on a `main` branch creates the default branch and unblocks the workflow. Source: [`scripts/homebrew-tap/`](../scripts/homebrew-tap/).
+1. **Tap repo seeded.** `lolay/homebrew-tap` must exist with at least one commit on `main`. The `update-homebrew-tap` job calls `actions/checkout@v4` against the tap, and checkout fails on a repo with no `HEAD`. Pushing the seed (`Formula/nowline.rb` placeholder + a tap README) creates the default branch and unblocks the workflow. Source files: [`scripts/homebrew-tap/`](../scripts/homebrew-tap/).
 2. **`HOMEBREW_TAP_TOKEN` secret set.** Fine-grained PAT (or deploy key) with `contents: write` on `lolay/homebrew-tap`, stored in this repo's Actions secrets.
 3. **Seed Formula passes `brew test`.** The placeholder seed must be syntactically valid and its `test do` block must call a real CLI invocation, so any pre-release `brew test lolay/tap/nowline` doesn't fail on the placeholder. The release workflow overwrites the formula on every tag, so this only matters for the window between bootstrap and first tag.
 4. **`livecheck` block included from day one.** Adding it to both the seed and the workflow heredoc together avoids drift.
