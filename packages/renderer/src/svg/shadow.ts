@@ -6,7 +6,7 @@ interface Params { dx: number; dy: number; stdDeviation: number; opacity: number
 const PARAMS: Record<ShadowKind, Params> = {
     none: { dx: 0, dy: 0, stdDeviation: 0, opacity: 0 },
     subtle: { dx: 0, dy: 1, stdDeviation: 1.5, opacity: 0.2 },
-    fuzzy: { dx: 0, dy: 3, stdDeviation: 5, opacity: 0.3 },
+    soft: { dx: 0, dy: 3, stdDeviation: 5, opacity: 0.3 },
     hard: { dx: 2, dy: 2, stdDeviation: 0, opacity: 0.45 },
 };
 
@@ -27,7 +27,7 @@ export function shadowFilterUrl(idPrefix: string, kind: ShadowKind): string | nu
 }
 
 export function allShadowDefs(idPrefix: string): string {
-    return (['subtle', 'fuzzy', 'hard'] as const)
+    return (['subtle', 'soft', 'hard'] as const)
         .map((k) => shadowFilterDef(idPrefix, k))
         .join('');
 }

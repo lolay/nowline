@@ -147,7 +147,11 @@ export type LayoutResult = PositionedRoadmap;
 function statusFromProp(raw: string | undefined): StatusKind {
     switch (raw) {
         case 'done':
+        case 'completed':
+            return 'done';
         case 'in-progress':
+        case 'active':
+            return 'in-progress';
         case 'at-risk':
         case 'blocked':
         case 'planned':
@@ -449,7 +453,7 @@ function sequenceItem(
     let capacityTrailingWidth = 0;
     if (capacityValue !== null) {
         const capacityText = formatCapacityNumber(capacityValue);
-        const capacityIcon = resolveCapacityIcon(style.capacityIcon, ctx.glyphs);
+        const capacityIcon = resolveCapacityIcon(style.capacityIcon, ctx.symbols);
         capacity = { value: capacityValue, text: capacityText, icon: capacityIcon };
         const META_FONT_SIZE_PX_LOCAL = 11;
         // Add a small leading separator (a single space's worth) only when

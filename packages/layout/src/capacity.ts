@@ -9,17 +9,17 @@
 //     stay integers (`5`, not `5.0`); decimals trim trailing zeros (`0.5`,
 //     `1.25`).
 //   - `resolveCapacityIcon` collapses the three syntactic forms of the
-//     `capacity-icon:` style property (built-in name, custom `glyph` id,
+//     `capacity-icon:` style property (built-in name, custom `symbol` id,
 //     inline Unicode literal) into either a built-in name the renderer
 //     recognizes OR a literal string the renderer paints as text. Custom
-//     glyph ids are dereferenced via `ResolvedConfig.glyphs` here so the
+//     symbol ids are dereferenced via `ResolvedConfig.symbols` here so the
 //     renderer never has to walk the config map.
 //
 // All three helpers are pure — no AST, no theme, no side effects — so they
 // can be tested in isolation and reused by future capacity consumers (e.g.
 // the lane badge in m7 and the overload sweep in m8).
 
-import type { GlyphDeclaration } from '@nowline/core';
+import type { SymbolDeclaration } from '@nowline/core';
 import type { ResolvedCapacityIconRef } from './types.js';
 
 /**
@@ -100,7 +100,7 @@ export function formatCapacityNumber(value: number): string {
  *     `'none'` is collapsed to `null` upstream (no glyph rendered).
  *   - `kind: 'literal'` — the renderer paints `text` as a `<text>` node.
  *     Covers inline Unicode literals (`capacity-icon:"💰"`) and dereferenced
- *     custom `glyph` declarations.
+ *     custom `symbol` declarations.
  */
 export type ResolvedCapacityIcon = ResolvedCapacityIconRef;
 
@@ -114,7 +114,7 @@ function propKey(prop: { key: string }): string {
     return prop.key.endsWith(':') ? prop.key.slice(0, -1) : prop.key;
 }
 
-function glyphUnicode(decl: GlyphDeclaration): string | undefined {
+function symbolUnicode(decl: SymbolDeclaration): string | undefined {
     for (const p of decl.properties) {
         if (propKey(p) === 'unicode' && p.value) return p.value;
     }
@@ -130,7 +130,7 @@ function glyphUnicode(decl: GlyphDeclaration): string | undefined {
  *
  *   1. `'none'` → `null` (renderer emits no glyph).
  *   2. Built-in name → `{ kind: 'builtin', name }`.
- *   3. Custom glyph id present in `glyphs` → `{ kind: 'literal', text:
+ *   3. Custom symbol id present in `symbols` → `{ kind: 'literal', text:
  *      <unicode:> }`. The author wrote an identifier; we hand the
  *      renderer the underlying Unicode payload.
  *   4. Anything else → `{ kind: 'literal', text: icon }`. This is the inline
@@ -139,20 +139,20 @@ function glyphUnicode(decl: GlyphDeclaration): string | undefined {
  *      raw payload arrives here.
  *
  * Validator rule 17 already rejects malformed combinations (unknown built-in
- * with no matching glyph, glyph id collision with built-ins, etc.), so this
+ * with no matching symbol, symbol id collision with built-ins, etc.), so this
  * function trusts its input shape.
  */
 export function resolveCapacityIcon(
     icon: string,
-    glyphs: Map<string, GlyphDeclaration>,
+    symbols: Map<string, SymbolDeclaration>,
 ): ResolvedCapacityIcon | null {
     if (icon === 'none') return null;
     if (BUILTIN_CAPACITY_ICONS.has(icon)) {
         return { kind: 'builtin', name: icon as 'multiplier' | 'person' | 'people' | 'points' | 'time' };
     }
-    const custom = glyphs.get(icon);
+    const custom = symbols.get(icon);
     if (custom) {
-        const unicode = glyphUnicode(custom);
+        const unicode = symbolUnicode(custom);
         return { kind: 'literal', text: unicode ?? icon };
     }
     return { kind: 'literal', text: icon };

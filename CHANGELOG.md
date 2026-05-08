@@ -10,11 +10,13 @@ Until the first tagged release, all changes accumulate under **Unreleased**. Pac
 
 ### Added
 
-- _Nothing yet._
+- Status aliases for international audiences: `active` (= `in-progress`) and `completed` (= `done`). Both spellings are valid input; aliases canonicalize at the layout boundary so downstream consumers see one normalized form.
+- Color aliases for international audiences: `grey` (= `gray`) and `violet` (= `purple`). Both spellings are valid input; aliases canonicalize at the theme boundary so themes don't grow new fields.
 
 ### Changed
 
-- _Nothing yet._
+- **Pre-release rename:** `glyph` config keyword → `symbol`. The DSL is unreleased; no in-code alias is provided. Update any in-progress files that use `glyph budget unicode:"💰"` to `symbol budget unicode:"💰"`.
+- **Pre-release rename:** shadow value `fuzzy` → `soft`. Update any in-progress files that use `shadow:fuzzy` to `shadow:soft`. The `nl-*-root-shadow-fuzzy` SVG filter id becomes `nl-*-root-shadow-soft`.
 
 ### Fixed
 

@@ -34,7 +34,7 @@ import type {
     ParallelContent,
     TeamContent,
     DefaultEntityType,
-    GlyphDeclaration,
+    SymbolDeclaration,
 } from '../generated/ast.js';
 import {
     isItemDeclaration,
@@ -55,17 +55,24 @@ import {
     isScaleBlock,
     isCalendarBlock,
     isDefaultDeclaration,
-    isGlyphDeclaration,
+    isSymbolDeclaration,
 } from '../generated/ast.js';
 import { tr } from '../i18n/index.js';
 import type { MessageCode, MessageArgs } from '../i18n/index.js';
 
 const SUPPORTED_VERSION = 'v1';
 
+// Built-in status vocabulary. `active` and `completed` are international-
+// friendly aliases for `in-progress` and `done` respectively — they
+// canonicalize at the layout boundary (see statusFromProp in layout.ts) so
+// downstream consumers see a single normalized form. Both spellings remain
+// valid input.
 const BUILTIN_STATUSES = new Set([
     'planned',
     'in-progress',
+    'active',
     'done',
+    'completed',
     'at-risk',
     'blocked',
 ]);
@@ -98,7 +105,7 @@ const UTILIZATION_NONE = 'none';
 
 const STYLE_PROP_ENUMS: Record<string, Set<string>> = {
     border: new Set(['solid', 'dashed', 'dotted']),
-    shadow: new Set(['none', 'subtle', 'fuzzy', 'hard']),
+    shadow: new Set(['none', 'subtle', 'soft', 'hard']),
     font: new Set(['sans', 'serif', 'mono']),
     weight: new Set(['thin', 'light', 'normal', 'bold']),
     italic: new Set(['true', 'false']),
@@ -113,9 +120,15 @@ const STYLE_PROP_ENUMS: Record<string, Set<string>> = {
     'minor-grid': new Set(['true', 'false']),
 };
 
+// Built-in color vocabulary. `grey` and `violet` are international-friendly
+// aliases for `gray` and `purple` — they canonicalize at the theme
+// boundary (resolveColor in packages/layout/src/themes/index.ts) so themes
+// don't grow new fields. Both spellings remain valid input.
 const COLOR_NAMES = new Set([
-    'red', 'blue', 'yellow', 'green', 'orange', 'purple',
-    'gray', 'navy', 'white', 'none',
+    'red', 'blue', 'yellow', 'green', 'orange',
+    'purple', 'violet',
+    'gray', 'grey',
+    'navy', 'white', 'none',
 ]);
 
 const CALENDAR_MODES = new Set(['business', 'full', 'custom']);
@@ -255,8 +268,8 @@ export function registerValidationChecks(services: NowlineServices): void {
             validator.checkDuplicateSizeIds,
             validator.checkCalendarBlockConsistency,
             validator.checkPersonDeclarations,
-            validator.checkDuplicateGlyphIds,
-            validator.checkGlyphReferences,
+            validator.checkDuplicateSymbolIds,
+            validator.checkSymbolReferences,
         ],
         NowlineDirective: [validator.checkDirectiveVersion, validator.checkDirectiveProperties],
         IncludeOption: [validator.checkIncludeMode],
@@ -322,9 +335,9 @@ export function registerValidationChecks(services: NowlineServices): void {
         ],
         StyleDeclaration: [validator.checkEntityIdOrTitle],
         StyleProperty: [validator.checkStylePropertyEnum],
-        GlyphDeclaration: [
+        SymbolDeclaration: [
             validator.checkEntityIdOrTitle,
-            validator.checkGlyphDeclaration,
+            validator.checkSymbolDeclaration,
         ],
         LabelDeclaration: [
             validator.checkEntityIdOrTitle,
@@ -684,9 +697,9 @@ export class NowlineValidator {
             }
 
             case 'capacity-icon':
-                // Value-form rule (built-in / glyph id / string literal) and
+                // Value-form rule (built-in / symbol id / string literal) and
                 // forward-reference rule are enforced together by
-                // checkGlyphReferences at file scope so style blocks and
+                // checkSymbolReferences at file scope so style blocks and
                 // default-declaration property positions share one code path.
                 break;
 
@@ -896,8 +909,8 @@ export class NowlineValidator {
 
     // --- Rule 18: Style property enum values ---
     // Value forms accepted by `icon:` and `capacity-icon:` (built-in identifier,
-    // glyph name, or inline string literal) plus forward-reference resolution are
-    // enforced by checkGlyphReferences at file scope so style blocks and
+    // symbol name, or inline string literal) plus forward-reference resolution are
+    // enforced by checkSymbolReferences at file scope so style blocks and
     // `default <entity>` lines share a single code path.
     checkStylePropertyEnum(prop: StyleProperty, accept: ValidationAcceptor): void {
         const key = propKey(prop);
@@ -1322,28 +1335,28 @@ export class NowlineValidator {
         }
     }
 
-    // --- Rules 17f / 17g / 17h / 17i: per-declaration glyph checks ---
+    // --- Rules 17f / 17g / 17h / 17i: per-declaration symbol checks ---
     // Note: Langium's default ValueConverter strips surrounding quotes from STRING
     // tokens before they reach the AST, so unicode:"💰" arrives here as just "💰"
     // — we validate the *content* (length / ASCII range) rather than presence of
     // quotes. The grammar already restricts `unicode:` and `ascii:` to PropertyAtom,
     // so the only quoteless form an author can pass is a bare identifier like
     // `unicode:foo`, which we treat permissively (it's a single-grapheme literal).
-    checkGlyphDeclaration(decl: GlyphDeclaration, accept: ValidationAcceptor): void {
+    checkSymbolDeclaration(decl: SymbolDeclaration, accept: ValidationAcceptor): void {
         if (decl.name && BUILTIN_ICON_NAMES.has(decl.name)) {
             accept('error',
-                `Glyph id "${decl.name}" collides with a built-in icon name. Reserved built-ins: ${[...BUILTIN_ICON_NAMES].sort().join(', ')}.`,
+                `Symbol id "${decl.name}" collides with a built-in icon name. Reserved built-ins: ${[...BUILTIN_ICON_NAMES].sort().join(', ')}.`,
                 { node: decl, property: 'name' });
         }
 
         const unicodeProp = decl.properties.find((p) => propKey(p) === 'unicode');
         if (!unicodeProp) {
             accept('error',
-                `Glyph "${displayName(decl)}" requires a "unicode:" property (e.g. unicode:"💰" or unicode:"\\u{1F464}").`,
+                `Symbol "${displayName(decl)}" requires a "unicode:" property (e.g. unicode:"💰" or unicode:"\\u{1F464}").`,
                 { node: decl });
         } else if (!unicodeProp.value || unicodeProp.value.length === 0) {
             accept('error',
-                `Glyph "${displayName(decl)}" unicode: must be a non-empty value.`,
+                `Symbol "${displayName(decl)}" unicode: must be a non-empty value.`,
                 { node: unicodeProp, property: 'value' });
         }
 
@@ -1352,7 +1365,7 @@ export class NowlineValidator {
             const raw = asciiProp.value ?? '';
             if (!ASCII_FALLBACK_RE.test(raw)) {
                 accept('error',
-                    `Glyph "${displayName(decl)}" ascii: must be 1-3 ASCII characters (got ${raw.length} character${raw.length === 1 ? '' : 's'}).`,
+                    `Symbol "${displayName(decl)}" ascii: must be 1-3 ASCII characters (got ${raw.length} character${raw.length === 1 ? '' : 's'}).`,
                     { node: asciiProp, property: 'value' });
             }
         }
@@ -1361,21 +1374,21 @@ export class NowlineValidator {
             const key = propKey(prop);
             if (key !== 'unicode' && key !== 'ascii' && key !== 'link' && key !== 'description') {
                 accept('error',
-                    `Unknown glyph property "${key}". Allowed: unicode, ascii, link, description.`,
+                    `Unknown symbol property "${key}". Allowed: unicode, ascii, link, description.`,
                     { node: prop, property: 'key' });
             }
         }
     }
 
-    // --- Rule 17j: duplicate glyph ids in the same file ---
-    checkDuplicateGlyphIds(file: NowlineFile, accept: ValidationAcceptor): void {
-        const seen = new Map<string, GlyphDeclaration>();
+    // --- Rule 17j: duplicate symbol ids in the same file ---
+    checkDuplicateSymbolIds(file: NowlineFile, accept: ValidationAcceptor): void {
+        const seen = new Map<string, SymbolDeclaration>();
         for (const entry of file.configEntries) {
-            if (isGlyphDeclaration(entry) && entry.name) {
+            if (isSymbolDeclaration(entry) && entry.name) {
                 const existing = seen.get(entry.name);
                 if (existing) {
                     accept('error',
-                        `Duplicate glyph id "${entry.name}". First declared at ${locationOf(existing)}.`,
+                        `Duplicate symbol id "${entry.name}". First declared at ${locationOf(existing)}.`,
                         { node: entry, property: 'name' });
                 } else {
                     seen.set(entry.name, entry);
@@ -1385,16 +1398,16 @@ export class NowlineValidator {
     }
 
     // --- Rule 17k: icon: / capacity-icon: references resolve to a built-in,
-    // a quoted Unicode literal, or an earlier glyph declaration. Forward
+    // a quoted Unicode literal, or an earlier symbol declaration. Forward
     // references are an error. Walks both StyleDeclaration.properties and
     // DefaultDeclaration.properties so style blocks and default <entity>
     // lines share one path.
-    checkGlyphReferences(file: NowlineFile, accept: ValidationAcceptor): void {
-        const glyphOrder = new Map<string, number>();
+    checkSymbolReferences(file: NowlineFile, accept: ValidationAcceptor): void {
+        const symbolOrder = new Map<string, number>();
         for (let i = 0; i < file.configEntries.length; i++) {
             const entry = file.configEntries[i];
-            if (isGlyphDeclaration(entry) && entry.name) {
-                if (!glyphOrder.has(entry.name)) glyphOrder.set(entry.name, i);
+            if (isSymbolDeclaration(entry) && entry.name) {
+                if (!symbolOrder.has(entry.name)) symbolOrder.set(entry.name, i);
             }
         }
 
@@ -1411,21 +1424,21 @@ export class NowlineValidator {
             // reference is by checking the character set. Anything that doesn't
             // look like an identifier is treated as a literal and
             // accepted as-is. Authors who genuinely want to write a literal that
-            // happens to spell a real identifier should declare a glyph instead.
+            // happens to spell a real identifier should declare a symbol instead.
             if (!isIdentifier(val)) return;
             if (key === 'capacity-icon' && BUILTIN_CAPACITY_ICONS.has(val)) return;
             if (key === 'icon' && BUILTIN_ICON_NAMES.has(val)) return;
-            const declIdx = glyphOrder.get(val);
+            const declIdx = symbolOrder.get(val);
             if (declIdx === undefined) {
                 const builtins = key === 'capacity-icon'
                     ? [...BUILTIN_CAPACITY_ICONS].sort().join(', ')
                     : [...BUILTIN_ICON_NAMES].sort().join(', ');
                 accept('error',
-                    `${key}: "${val}" is neither a built-in (${builtins}) nor a declared glyph. Add "glyph ${val} unicode:..." earlier in config or use a quoted Unicode literal.`,
+                    `${key}: "${val}" is neither a built-in (${builtins}) nor a declared symbol. Add "symbol ${val} unicode:..." earlier in config or use a quoted Unicode literal.`,
                     { node: propNode, property: 'value' });
             } else if (declIdx >= entryIdx) {
                 accept('error',
-                    `${key}: glyph "${val}" is referenced before its declaration. Move "glyph ${val}" above this entry.`,
+                    `${key}: symbol "${val}" is referenced before its declaration. Move "symbol ${val}" above this entry.`,
                     { node: propNode, property: 'value' });
             }
         };

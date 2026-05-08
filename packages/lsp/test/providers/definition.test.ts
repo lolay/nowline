@@ -14,7 +14,7 @@ swimlane backend "Backend"
 
 // Richer fixture exercising the full reference-property surface so we can
 // verify cmd+click works for size, status, style, labels, owner/team, and
-// glyph references — not just sequencing keys.
+// symbol references — not just sequencing keys.
 const referenceSample = `nowline v1
 
 config
@@ -22,7 +22,7 @@ config
 style enterprise-style "Enterprise"
   bg: blue
 
-glyph money "Money"
+symbol money "Money"
   unicode: "$"
 
 default item shadow:subtle
@@ -230,12 +230,12 @@ footnote vendor-dep "Vendor dep" on:x
         expect(links).toBeUndefined();
     });
 
-    it('jumps from glyph reference "icon:money" inside a style block', async () => {
-        const glyphSample = `nowline v1
+    it('jumps from symbol reference "icon:money" inside a style block', async () => {
+        const symbolSample = `nowline v1
 
 config
 
-glyph money "Money"
+symbol money "Money"
   unicode: "$"
 
 style flagged "Flagged"
@@ -246,12 +246,12 @@ roadmap demo "Demo" start:2026-01-05 scale:1w
 swimlane s
   item a duration:1w style:flagged
 `;
-        const doc = await parseDocument(glyphSample);
+        const doc = await parseDocument(symbolSample);
         const provider = services().Nowline.lsp.DefinitionProvider!;
-        // First occurrence of "money" is the glyph declaration; second is the icon: ref.
+        // First occurrence of "money" is the symbol declaration; second is the icon: ref.
         const links = await provider.getDefinition(doc, {
             textDocument: { uri: doc.uri.toString() },
-            position: locate(glyphSample, 'money', 1),
+            position: locate(symbolSample, 'money', 1),
         });
         // Style blocks use StyleProperty (not EntityProperty), so propertyValueAt
         // currently won't match — this is documented behavior. If/when we widen

@@ -20,12 +20,12 @@ import type {
     SizeDeclaration,
     StatusDeclaration,
     StyleDeclaration,
-    GlyphDeclaration,
+    SymbolDeclaration,
 } from '@nowline/core';
 import {
     isAnchorDeclaration,
     isFootnoteDeclaration,
-    isGlyphDeclaration,
+    isSymbolDeclaration,
     isGroupBlock,
     isItemDeclaration,
     isLabelDeclaration,
@@ -117,8 +117,8 @@ export function propKey(prop: { key: string }): string {
  * `title?: string`, and `properties?: EntityProperty[]`.
  *
  * Includes both roadmap-section declarations (item, swimlane, person, …) and
- * config-section declarations (`style`, `glyph`) so cmd+click on
- * `style:enterprise-style` and `icon:my-glyph` resolves to the right place.
+ * config-section declarations (`style`, `symbol`) so cmd+click on
+ * `style:enterprise-style` and `icon:my-symbol` resolves to the right place.
  */
 export type NamedEntity =
     | RoadmapEntryNamed
@@ -126,7 +126,7 @@ export type NamedEntity =
     | ParallelBlock
     | GroupBlock
     | StyleDeclaration
-    | GlyphDeclaration;
+    | SymbolDeclaration;
 
 type RoadmapEntryNamed =
     | SwimlaneDeclaration
@@ -142,8 +142,8 @@ type RoadmapEntryNamed =
 /**
  * Walk the `NowlineFile` and collect every entity that owns an `id`. Covers
  * roadmap-section entities (mirrors the validator's `collectReferenceableIds`)
- * plus the named config-section declarations (`style`, `glyph`) so style and
- * glyph references navigate correctly. Anonymous config blocks (`scale`,
+ * plus the named config-section declarations (`style`, `symbol`) so style and
+ * symbol references navigate correctly. Anonymous config blocks (`scale`,
  * `calendar`, `default <entity>`) are skipped.
  */
 export function collectNamedEntities(file: NowlineFile): NamedEntity[] {
@@ -151,7 +151,7 @@ export function collectNamedEntities(file: NowlineFile): NamedEntity[] {
 
     for (const entry of file.configEntries) {
         if (isStyleDeclaration(entry) && entry.name) out.push(entry);
-        else if (isGlyphDeclaration(entry) && entry.name) out.push(entry);
+        else if (isSymbolDeclaration(entry) && entry.name) out.push(entry);
     }
 
     const visitTeam = (team: TeamDeclaration) => {
@@ -240,7 +240,7 @@ export function visitProperties(
 /**
  * Iterate every `EntityProperty` in the file, including those on the roadmap
  * declaration itself, plus the properties on top-level config entries (style /
- * default / glyph blocks). Useful for find-references and completion when the
+ * default / symbol blocks). Useful for find-references and completion when the
  * cursor isn't necessarily inside a roadmap entry.
  */
 export function visitAllProperties(
@@ -320,7 +320,7 @@ export function declarationAt(leaf: CstNode | undefined): NamedEntity | undefine
         isSizeDeclaration(owner) ||
         isStatusDeclaration(owner) ||
         isStyleDeclaration(owner) ||
-        isGlyphDeclaration(owner)
+        isSymbolDeclaration(owner)
     ) {
         return owner as NamedEntity;
     }
@@ -329,7 +329,7 @@ export function declarationAt(leaf: CstNode | undefined): NamedEntity | undefine
 
 /**
  * Look up the `name=ID` token range of the entity that declares `id`. Walks
- * `collectNamedEntities` so config-section declarations (style / glyph)
+ * `collectNamedEntities` so config-section declarations (style / symbol)
  * participate. Returns `undefined` when no declaration matches.
  *
  * Replaces the per-provider `findDeclarationRange` helpers in

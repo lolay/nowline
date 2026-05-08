@@ -339,7 +339,7 @@ export const ATTRIBUTION_GLYPH_HEIGHT =
 export const EDGE_CORNER_RADIUS = 4;
 
 // Shadow filter parameters per shadow kind.
-export const SHADOW_PARAMS: Record<'none' | 'subtle' | 'fuzzy' | 'hard', {
+export const SHADOW_PARAMS: Record<'none' | 'subtle' | 'soft' | 'hard', {
     dx: number;
     dy: number;
     stdDeviation: number;
@@ -347,7 +347,7 @@ export const SHADOW_PARAMS: Record<'none' | 'subtle' | 'fuzzy' | 'hard', {
 }> = {
     none: { dx: 0, dy: 0, stdDeviation: 0, opacity: 0 },
     subtle: { dx: 0, dy: 1, stdDeviation: 1.5, opacity: 0.2 },
-    fuzzy: { dx: 0, dy: 3, stdDeviation: 5, opacity: 0.3 },
+    soft: { dx: 0, dy: 3, stdDeviation: 5, opacity: 0.3 },
     hard: { dx: 2, dy: 2, stdDeviation: 0, opacity: 0.45 },
 };
 

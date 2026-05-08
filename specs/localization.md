@@ -8,7 +8,7 @@ Nowline localizes three surfaces:
 2. **Pipeline messages** — validator strings, CLI help, error codes, runtime warnings.
 3. **Man page** — the `nowline.1` mdoc shipped through every install channel that [`specs/cli-distribution.md`](./cli-distribution.md) wires up.
 
-DSL keywords (`roadmap`, `swimlane`, `item`, …), built-in vocabularies (`planned`, `in-progress`, `done`, `at-risk`, `blocked`; color names; calendar modes; icon names), and identifier characters (`[a-zA-Z_][a-zA-Z0-9_-]*`) all stay English/ASCII. This is a deliberate non-goal: every diagram-tool peer (Mermaid, D2, PlantUML's modern diagram families, Graphviz) keeps keywords English-only, and the ones that tried regional keywords (PlantUML's pre-2010 diagrams) regretted it. Author-supplied titles (`item research "Investigación"`) accept any UTF-8 and are how localized roadmap text reaches readers today.
+DSL keywords (`roadmap`, `swimlane`, `item`, …), built-in vocabularies (`planned`, `in-progress` (alias `active`), `done` (alias `completed`), `at-risk`, `blocked`; color names including `grey`/`gray` and `violet`/`purple` aliases; calendar modes; icon names), and identifier characters (`[a-zA-Z_][a-zA-Z0-9_-]*`) all stay English/ASCII. This is a deliberate non-goal: every diagram-tool peer (Mermaid, D2, PlantUML's modern diagram families, Graphviz) keeps keywords English-only, and the ones that tried regional keywords (PlantUML's pre-2010 diagrams) regretted it. Author-supplied titles (`item research "Investigación"`) accept any UTF-8 and are how localized roadmap text reaches readers today.
 
 ## Locale precedence
 

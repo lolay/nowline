@@ -84,7 +84,7 @@ function applyProp(target: ResolvedStyle, key: string, value: string, theme: The
             target.icon = value;
             break;
         case 'shadow':
-            if (value === 'none' || value === 'subtle' || value === 'fuzzy' || value === 'hard') {
+            if (value === 'none' || value === 'subtle' || value === 'soft' || value === 'hard') {
                 target.shadow = value;
             }
             break;
@@ -121,10 +121,10 @@ function applyProp(target: ResolvedStyle, key: string, value: string, theme: The
             if (value === 'beside' || value === 'above') target.headerPosition = value;
             break;
         case 'capacity-icon':
-            // Validator (rule 17e + checkGlyphReferences) has already verified
-            // the value is a built-in name, a declared glyph id, or an inline
+            // Validator (rule 17e + checkSymbolReferences) has already verified
+            // the value is a built-in name, a declared symbol id, or an inline
             // Unicode literal. Pass it through verbatim — interpretation
-            // happens in the renderer where we have access to ResolvedConfig.glyphs.
+            // happens in the renderer where we have access to ResolvedConfig.symbols.
             target.capacityIcon = value;
             break;
         case 'timeline-position':

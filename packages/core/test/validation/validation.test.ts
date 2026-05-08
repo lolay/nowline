@@ -865,9 +865,9 @@ swimlane s
         expect(errorMessages(r.diagnostics)).toEqual([]);
     });
 
-    it('Rule 17e: capacity-icon glyph reference is accepted when declared earlier', async () => {
+    it('Rule 17e: capacity-icon symbol reference is accepted when declared earlier', async () => {
         const r = await parse(
-            `config\nglyph budget unicode:"💰"\nstyle finance\n  capacity-icon: budget\nroadmap r\nswimlane s\n  item x duration:1w\n`,
+            `config\nsymbol budget unicode:"💰"\nstyle finance\n  capacity-icon: budget\nroadmap r\nswimlane s\n  item x duration:1w\n`,
         );
         expect(errorMessages(r.diagnostics)).toEqual([]);
     });
@@ -879,65 +879,65 @@ swimlane s
         expect(hasError(errorMessages(r.diagnostics), /Raw style property "capacity-icon"/i)).toBe(true);
     });
 
-    // --- Glyph declaration (rules 17f–17k) ---
+    // --- Symbol declaration (rules 17f–17k) ---
 
-    it('Rule 17f: glyph without unicode: is an error', async () => {
+    it('Rule 17f: symbol without unicode: is an error', async () => {
         const r = await parse(
-            `config\nglyph budget "Budget"\nroadmap r\nswimlane s\n  item x duration:1w\n`,
+            `config\nsymbol budget "Budget"\nroadmap r\nswimlane s\n  item x duration:1w\n`,
         );
         expect(hasError(errorMessages(r.diagnostics), /requires a "unicode/i)).toBe(true);
     });
 
-    it('Rule 17g: glyph with empty unicode string is an error', async () => {
+    it('Rule 17g: symbol with empty unicode string is an error', async () => {
         const r = await parse(
-            `config\nglyph budget unicode:""\nroadmap r\nswimlane s\n  item x duration:1w\n`,
+            `config\nsymbol budget unicode:""\nroadmap r\nswimlane s\n  item x duration:1w\n`,
         );
         expect(hasError(errorMessages(r.diagnostics), /unicode.*non-empty/i)).toBe(true);
     });
 
-    it('Rule 17h: glyph ascii longer than 3 chars is an error', async () => {
+    it('Rule 17h: symbol ascii longer than 3 chars is an error', async () => {
         const r = await parse(
-            `config\nglyph budget unicode:"💰" ascii:"BUDG"\nroadmap r\nswimlane s\n  item x duration:1w\n`,
+            `config\nsymbol budget unicode:"💰" ascii:"BUDG"\nroadmap r\nswimlane s\n  item x duration:1w\n`,
         );
         expect(hasError(errorMessages(r.diagnostics), /ascii.*1-3 ASCII/i)).toBe(true);
     });
 
-    it('Rule 17h: glyph ascii of 1-3 ASCII chars is accepted', async () => {
+    it('Rule 17h: symbol ascii of 1-3 ASCII chars is accepted', async () => {
         const r = await parse(
-            `config\nglyph budget unicode:"💰" ascii:"$"\nglyph star unicode:"⭐" ascii:"*"\nroadmap r\nswimlane s\n  item x duration:1w\n`,
+            `config\nsymbol budget unicode:"💰" ascii:"$"\nsymbol star unicode:"⭐" ascii:"*"\nroadmap r\nswimlane s\n  item x duration:1w\n`,
         );
         expect(errorMessages(r.diagnostics)).toEqual([]);
     });
 
-    it('Rule 17i: glyph id shadowing a built-in icon name is an error', async () => {
+    it('Rule 17i: symbol id shadowing a built-in icon name is an error', async () => {
         const r = await parse(
-            `config\nglyph points unicode:"💰"\nroadmap r\nswimlane s\n  item x duration:1w\n`,
+            `config\nsymbol points unicode:"💰"\nroadmap r\nswimlane s\n  item x duration:1w\n`,
         );
         expect(hasError(errorMessages(r.diagnostics), /collides with a built-in icon name/i)).toBe(true);
     });
 
-    it('Rule 17j: duplicate glyph ids are an error', async () => {
+    it('Rule 17j: duplicate symbol ids are an error', async () => {
         const r = await parse(
-            `config\nglyph budget unicode:"💰"\nglyph budget unicode:"$"\nroadmap r\nswimlane s\n  item x duration:1w\n`,
+            `config\nsymbol budget unicode:"💰"\nsymbol budget unicode:"$"\nroadmap r\nswimlane s\n  item x duration:1w\n`,
         );
-        expect(hasError(errorMessages(r.diagnostics), /Duplicate glyph id/i)).toBe(true);
+        expect(hasError(errorMessages(r.diagnostics), /Duplicate symbol id/i)).toBe(true);
     });
 
-    it('Rule 17k: capacity-icon referencing an unknown glyph is an error', async () => {
+    it('Rule 17k: capacity-icon referencing an unknown symbol is an error', async () => {
         const r = await parse(
             `config\nstyle finance\n  capacity-icon: nonesuch\nroadmap r\nswimlane s\n  item x duration:1w\n`,
         );
         expect(hasError(errorMessages(r.diagnostics), /capacity-icon.*nonesuch.*neither a built-in/i)).toBe(true);
     });
 
-    it('Rule 17k: capacity-icon referencing a glyph declared later is a forward-reference error', async () => {
+    it('Rule 17k: capacity-icon referencing a symbol declared later is a forward-reference error', async () => {
         const r = await parse(
-            `config\nstyle finance\n  capacity-icon: budget\nglyph budget unicode:"💰"\nroadmap r\nswimlane s\n  item x duration:1w\n`,
+            `config\nstyle finance\n  capacity-icon: budget\nsymbol budget unicode:"💰"\nroadmap r\nswimlane s\n  item x duration:1w\n`,
         );
         expect(hasError(errorMessages(r.diagnostics), /capacity-icon.*budget.*before its declaration/i)).toBe(true);
     });
 
-    it('Rule 17k: icon: referencing an unknown glyph is an error', async () => {
+    it('Rule 17k: icon: referencing an unknown symbol is an error', async () => {
         const r = await parse(
             `config\nstyle finance\n  icon: mystery\nroadmap r\nswimlane s\n  item x duration:1w\n`,
         );
@@ -963,5 +963,65 @@ swimlane s
             `roadmap r\nswimlane s capacity:5\n  item x duration:1w\n`,
         );
         expect(errorMessages(r.diagnostics)).toEqual([]);
+    });
+
+    // --- Vocabulary aliases (additive, behavior-equivalent) ---
+
+    it('accepts status alias "active" (= in-progress)', async () => {
+        const r = await parse(
+            `roadmap r\nswimlane s\n  item x duration:1w status:active\n`,
+        );
+        expect(errorMessages(r.diagnostics)).toEqual([]);
+    });
+
+    it('accepts status alias "completed" (= done)', async () => {
+        const r = await parse(
+            `roadmap r\nswimlane s\n  item x duration:1w status:completed\n`,
+        );
+        expect(errorMessages(r.diagnostics)).toEqual([]);
+    });
+
+    it('accepts color alias "grey" inside a style block (= gray)', async () => {
+        const r = await parse(
+            `config\nstyle muted\n  bg: grey\nroadmap r\nswimlane s\n  item x duration:1w style:muted\n`,
+        );
+        expect(errorMessages(r.diagnostics)).toEqual([]);
+    });
+
+    it('accepts color alias "violet" inside a style block (= purple)', async () => {
+        const r = await parse(
+            `config\nstyle accent\n  bg: violet\nroadmap r\nswimlane s\n  item x duration:1w style:accent\n`,
+        );
+        expect(errorMessages(r.diagnostics)).toEqual([]);
+    });
+
+    // --- Pre-release renames: old spellings must be rejected ---
+
+    it('rejects shadow:fuzzy (renamed to soft)', async () => {
+        const r = await parse(
+            `config\nstyle elevated\n  shadow: fuzzy\nroadmap r\nswimlane s\n  item x duration:1w style:elevated\n`,
+        );
+        expect(hasError(errorMessages(r.diagnostics), /shadow/i)).toBe(true);
+    });
+
+    it('accepts shadow:soft (canonical)', async () => {
+        const r = await parse(
+            `config\nstyle elevated\n  shadow: soft\nroadmap r\nswimlane s\n  item x duration:1w style:elevated\n`,
+        );
+        expect(errorMessages(r.diagnostics)).toEqual([]);
+    });
+
+    it('rejects the legacy "glyph" keyword (renamed to "symbol")', async () => {
+        // The keyword `glyph` is no longer a config-section keyword, so the
+        // parser refuses the line. Surface error on either parserErrors or
+        // validation diagnostics — the parser front-ends differ.
+        const r = await parse(
+            `config\nglyph budget unicode:"💰"\nroadmap r\nswimlane s\n  item x duration:1w\n`,
+        );
+        const hadProblem =
+            r.parserErrors.length > 0 ||
+            r.lexerErrors.length > 0 ||
+            r.diagnostics.some((d) => d.severity === 'error');
+        expect(hadProblem).toBe(true);
     });
 });

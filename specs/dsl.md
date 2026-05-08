@@ -12,7 +12,7 @@ Fenced code block: ````nowline`
 
 ## Design Rules
 
-1. **~20 keywords (currently 21).** If the keyword count grows beyond ~20, the language is too complex. The `glyph` declaration was added to support custom-named glyphs for `icon:` and `capacity-icon:`; further additions should stay rare.
+1. **~20 keywords (currently 21).** If the keyword count grows beyond ~20, the language is too complex. The `symbol` declaration was added to support custom-named symbols for `icon:` and `capacity-icon:`; further additions should stay rare.
 2. **Indentation-significant.** Two-space or one-tab indent defines nesting. Spaces and tabs must not be mixed within a file — the parser rejects mixed indentation with a clear error identifying the first offending line. No braces, brackets, or explicit block delimiters.
 3. **Strings are double-quoted.** `"Auth refactor"`, not `Auth refactor` or `'Auth refactor'`.
 4. **Properties are key:value pairs** on the same line as the entity. All key-value pairs use `:` as the single separator — the DSL does not use `=`. Values containing spaces must be double-quoted.
@@ -162,7 +162,7 @@ footnote capacity-risk "Team capacity risk" on:[mobile, platform]
 | ----------- | ---------------------------------------------------------------------------------------------- |
 | `scale`     | Display settings for the timeline axis (properties indented beneath). Optional.                |
 | `style`     | Named visual definition (properties indented beneath).                                         |
-| `glyph`     | Named declaration of a custom glyph for use by `icon:` and `capacity-icon:` style properties. `[id] ["title"] unicode:"..."` (required) plus optional `ascii:"..."` fallback and universal properties. |
+| `symbol`    | Named declaration of a custom symbol for use by `icon:` and `capacity-icon:` style properties. `[id] ["title"] unicode:"..."` (required) plus optional `ascii:"..."` fallback and universal properties. |
 | `default`   | Default property values for a given entity type. One `default <entity> <properties>` declaration per entity type. |
 | `calendar`  | Day-arithmetic overrides (properties indented beneath). Only valid when `roadmap` declares `calendar:custom`. |
 
@@ -178,7 +178,7 @@ footnote capacity-risk "Team capacity risk" on:[mobile, platform]
 | `anchor`    | Named date on the timeline         | `[id] ["title"] date:YYYY-MM-DD`. `date:` is required.                                    |
 | `label`     | Semantic tag / chip vocabulary     | `[id] ["title"]`. Optional `style:id` plus universal properties (`labels:`, `link:`, `description`). Raw style properties are not allowed — declare a `style` in config and reference it. |
 | `size`      | Named effort budget calibrated to single-engineer scale | `[id] ["title"]`. Required `effort:<duration literal>` (decimal-aware: `0.5d`, `2w`, `1m`). Universal properties (`description`, `link:`) also allowed. Must be declared before any entity referencing `size:NAME`. An item with `size:` derives its duration as `effort ÷ item_capacity` (item `capacity:` defaults to `1` when absent). |
-| `status`    | Custom status value                | `[id] ["title"]`. Extends the built-in set (`planned`, `in-progress`, `done`, `at-risk`, `blocked`). Universal properties (`description`, `link:`) also allowed. Must be declared before any entity referencing `status:NAME`. |
+| `status`    | Custom status value                | `[id] ["title"]`. Extends the built-in set (`planned`, `in-progress` (alias `active`), `done` (alias `completed`), `at-risk`, `blocked`). Universal properties (`description`, `link:`) also allowed. Must be declared before any entity referencing `status:NAME`. |
 | `milestone` | Achievement marker                 | `[id] ["title"]`. At least one of `date:` or `after:` is required. `after:` accepts a single id or a list of item/milestone/anchor ids. |
 | `item`      | Work item inside a swimlane        | `[id] ["title"]`. Indented under a swimlane.                                             |
 | `parallel`  | Parallel execution block           | `[id] ["title"]`. Children run in parallel. Implicit join on dedent.                     |
@@ -325,7 +325,7 @@ These properties are specific to items. `status`, `owner`, `after`, and `before`
 
 | Property    | Type                  | Description                                                                                                                             |
 | ----------- | --------------------- | --------------------------------------------------------------------------------------------------------------------------------------- |
-| `status`    | enum or string        | Built-in: `planned`, `in-progress`, `done`, `at-risk`, `blocked`. Custom values allowed: `status:awaiting-review`.                      |
+| `status`    | enum or string        | Built-in: `planned`, `in-progress` (alias `active`), `done` (alias `completed`), `at-risk`, `blocked`. Custom values allowed: `status:awaiting-review`.                      |
 | `owner`     | person or team ref    | References a person or team. `owner:sam` or `owner:platform`. Singular — one accountable owner.                                         |
 | `after`     | identifier or list    | This item starts after the referenced entity finishes. Single: `after:auth-refactor`. List: `after:[auth-refactor, audit-log]` — starts after the latest finisher. Accepts item, milestone, anchor, parallel, or group ids. |
 | `before`    | identifier or list    | This item must finish before the referenced entity starts. List: `before:[code-freeze, ga-date]` — finishes before the earliest starter.                                                                                    |
@@ -403,12 +403,12 @@ swimlane backend capacity:13
   item rewrite size:l capacity:8   // renders as: l 1.25d 8 ★ (effort 2w ÷ capacity 8 = 1.25d; folds to days when no whole-week match)
 ```
 
-**Example — custom glyph and inline literal:**
+**Example — custom symbol and inline literal:**
 
 ```nowline
 config
 
-glyph budget "Budget" unicode:"💰" ascii:"$"
+symbol budget "Budget" unicode:"💰" ascii:"$"
 
 style finance capacity-icon:budget
 style adhoc capacity-icon:"⚙"
@@ -531,7 +531,7 @@ The id is the identifier used as the lookup key (`size:xs`, `size:l`). On items,
 
 ### Status Declaration
 
-A `status` declaration extends the built-in set of item/swimlane/parallel/group status values (`planned`, `in-progress`, `done`, `at-risk`, `blocked`). Custom statuses are declared in the roadmap section so that vocabulary lives with the content that uses it.
+A `status` declaration extends the built-in set of item/swimlane/parallel/group status values (`planned`, `in-progress` / `active`, `done` / `completed`, `at-risk`, `blocked`). The aliases `active` (= `in-progress`) and `completed` (= `done`) canonicalize at the layout boundary — both spellings are valid input. Custom statuses are declared in the roadmap section so that vocabulary lives with the content that uses it.
 
 ```nowline
 status awaiting-review "Awaiting Review"
@@ -819,7 +819,7 @@ style subtle
   text: white
 
 style elevated
-  shadow: fuzzy
+  shadow: soft
   bg: white
 
 style code-task
@@ -839,12 +839,12 @@ Style properties:
 
 | Property        | Type            | Description                                                                                                                                             |
 | --------------- | --------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `bg`            | color or `none` | Background/fill color. Named (`red`, `blue`, `yellow`, `green`, `orange`, `purple`, `gray`, `navy`, `white`), hex (`#2563eb`), or `none` (transparent). |
+| `bg`            | color or `none` | Background/fill color. Named (`red`, `blue`, `yellow`, `green`, `orange`, `purple` (alias `violet`), `gray` (alias `grey`), `navy`, `white`), hex (`#2563eb`), or `none` (transparent). |
 | `fg`            | color or `none` | Border/outline color. Named, hex, or `none` (no border).                                                                                                |
 | `text`          | color or `none` | Text color. Named, hex, or `none` (hides text).                                                                                                         |
 | `border`        | enum            | Border/line style: `solid`, `dashed`, `dotted`.                                                                                                         |
-| `icon`          | identifier or string | Named icon displayed on the entity. Built-in identifiers (rendered from a curated SVG library, identical across platforms): `shield`, `warning`, `lock`, plus the capacity-icon vocabulary. Custom: any identifier declared by a `glyph` declaration in config. Inline: a double-quoted Unicode literal (`"💰"`, `"\u{1F464}"`) — font-dependent. |
-| `shadow`        | enum            | Drop shadow: `none` (default), `subtle`, `fuzzy`, `hard`.                                                                                               |
+| `icon`          | identifier or string | Named icon displayed on the entity. Built-in identifiers (rendered from a curated SVG library, identical across platforms): `shield`, `warning`, `lock`, plus the capacity-icon vocabulary. Custom: any identifier declared by a `symbol` declaration in config. Inline: a double-quoted Unicode literal (`"💰"`, `"\u{1F464}"`) — font-dependent. |
+| `shadow`        | enum            | Drop shadow: `none` (default), `subtle`, `soft`, `hard`.                                                                                                |
 | `font`          | enum            | Font family preset: `sans` (default), `serif`, `mono`.                                                                                                  |
 | `weight`        | enum            | Font weight: `thin`, `light`, `normal` (default), `bold`.                                                                                               |
 | `italic`        | boolean         | Italic text: `true` or `false` (default).                                                                                                               |
@@ -854,34 +854,34 @@ Style properties:
 | `header-height` | enum            | Timeline header row height. Roadmap-only: `none`, `xs`, `sm`, `md` (default), `lg`, `xl`.                                                               |
 | `corner-radius` | enum            | Corner rounding: `none`, `xs`, `sm`, `md`, `lg`, `xl`, `full`.                                                                                          |
 | `bracket`       | enum            | Bracket/join line on parallel blocks: `none` (default), `solid`, `dashed`. Parallel-only.                                                               |
-| `capacity-icon` | identifier or string | Glyph used as the suffix to capacity numbers on lanes and items. Built-in identifiers (rendered from the same curated SVG library as `icon:`): `none`, `multiplier` (default — `×`), `person`, `people`, `points` (`★`), `time` (`⏱`). Custom: any identifier declared by a `glyph` declaration in config. Inline: a double-quoted Unicode literal — font-dependent. |
+| `capacity-icon` | identifier or string | Glyph used as the suffix to capacity numbers on lanes and items. Built-in identifiers (rendered from the same curated SVG library as `icon:`): `none`, `multiplier` (default — `×`), `person`, `people`, `points` (`★`), `time` (`⏱`). Custom: any identifier declared by a `symbol` declaration in config. Inline: a double-quoted Unicode literal — font-dependent. |
 | `timeline-position` | enum        | Where the timeline date strip is rendered. Roadmap-only: `top` (default), `bottom`, `both`. `both` mirrors the strip at the chart bottom so dates stay readable on tall canvases.   |
 | `minor-grid`    | boolean         | When `true`, draws faint dotted grid lines at every tick boundary in addition to the standard major-tick grid. Roadmap-only: `true` or `false` (default).                          |
 
 
 All style properties are optional. Unset properties inherit from the system defaults.
 
-`capacity-icon` follows the same value-form contract as `icon:` — a built-in identifier, a custom name from a `glyph` config declaration, or a double-quoted Unicode literal — but applies to the capacity number rendered on lanes and items, not as an entity-leading badge. Default is `multiplier` because it has the cleanest ASCII fallback (`5x`) and reads as a quantity in every context without presupposing a unit type. Roadmaps measuring capacity in people switch via `default swimlane capacity-icon:person`; story-points roadmaps use `capacity-icon:points`; etc. The `none` value renders just the bare number with no glyph.
+`capacity-icon` follows the same value-form contract as `icon:` — a built-in identifier, a custom name from a `symbol` config declaration, or a double-quoted Unicode literal — but applies to the capacity number rendered on lanes and items, not as an entity-leading badge. Default is `multiplier` because it has the cleanest ASCII fallback (`5x`) and reads as a quantity in every context without presupposing a unit type. Roadmaps measuring capacity in people switch via `default swimlane capacity-icon:person`; story-points roadmaps use `capacity-icon:points`; etc. The `none` value renders just the bare number with no glyph.
 
 **Built-in icon names are rendered from a curated SVG library shipped with the renderer**, not from Unicode emoji codepoints. This guarantees consistent visual output across every platform (web, CLI, exports) — emoji rendering otherwise varies dramatically by OS and font (Apple, Google, Microsoft, Linux). Authors who want platform-default emoji rendering can use an inline literal (`capacity-icon:"👤"`) instead of the named `person` icon.
 
-**Glyphs** — declare custom named glyphs for use by `icon:` and `capacity-icon:`. Each `glyph` line follows the universal `[id] ["title"]` pattern.
+**Symbols** — declare custom named symbols for use by `icon:` and `capacity-icon:`. Each `symbol` line follows the universal `[id] ["title"]` pattern.
 
 ```nowline
-glyph budget "Budget" unicode:"💰" ascii:"$"
-glyph fte unicode:"\u{1F464}" ascii:"@"
-glyph star unicode:"⭐"
+symbol budget "Budget" unicode:"💰" ascii:"$"
+symbol fte unicode:"\u{1F464}" ascii:"@"
+symbol star unicode:"⭐"
 ```
 
-A `glyph` line accepts:
+A `symbol` line accepts:
 
 - `unicode:"<string>"` — **required**. The Unicode character (literal or escape, e.g. `"\u{1F464}"`). May be a multi-codepoint grapheme cluster (flag emoji, ZWJ sequences, etc.).
 - `ascii:"<string>"` — optional. Short ASCII fallback for terminals/exports that lack the Unicode glyph. Length ≤ 3 ASCII characters. Defaults to `?` when omitted.
 - Universal properties — `description`, `link:`.
 
-The id is the lookup key used by `icon:my-glyph` and `capacity-icon:my-glyph`. Custom glyph ids cannot shadow built-in icon names (`none`, `multiplier`, `person`, `people`, `points`, `time`, `shield`, `warning`, `lock`) — the renderer's built-in vocabulary is reserved.
+The id is the lookup key used by `icon:my-symbol` and `capacity-icon:my-symbol`. Custom symbol ids cannot shadow built-in icon names (`none`, `multiplier`, `person`, `people`, `points`, `time`, `shield`, `warning`, `lock`) — the renderer's built-in vocabulary is reserved.
 
-`glyph` declarations must precede any reference. Authors use the inline Unicode-literal form (`capacity-icon:"💰"`) for one-off glyphs; `glyph` declarations are for reusable named ones.
+`symbol` declarations must precede any reference. Authors use the inline Unicode-literal form (`capacity-icon:"💰"`) for one-off symbols; `symbol` declarations are for reusable named ones.
 
 **Defaults** — set default property values for an entity type. Each line declares one default. Supported entity types: `item`, `label`, `swimlane`, `roadmap`, `parallel`, `group`, `milestone`, `footnote`, `anchor`.
 
@@ -1079,7 +1079,7 @@ The parser enforces these rules and produces clear error messages with file posi
 
 **Status, labels, remaining**
 
-14. `status` values are a built-in value (`planned`, `in-progress`, `done`, `at-risk`, `blocked`) or a value declared by a `status` declaration in the roadmap section.
+14. `status` values are a built-in value (`planned`, `in-progress` (alias `active`), `done` (alias `completed`), `at-risk`, `blocked`) or a value declared by a `status` declaration in the roadmap section.
 15. A `size:` or `status:` property reference must resolve to a declaration that appears **earlier in the file** (or in an earlier include, per `config:`/`roadmap:` mode). Forward references are a validation error. The error message should point to both the reference site and suggest the declaration location.
 16. `labels` values are identifiers (rule 5). Undeclared labels are valid (no config entry required).
 17. `remaining` values are either a percentage (`0%`–`100%`) or a single-eng effort literal (`\d+(\.\d+)?[dwmqy]`, e.g. `1w`, `0.5d`). Both forms normalize to a percent of the item's total effort during layout: `percent = remaining_literal ÷ total_effort`, where `total_effort = size.effort` for sized items, or `duration_literal × item_capacity` for duration-literal'd items (`item_capacity` defaults to `1`). When the literal exceeds total effort (computed percent `> 100%`), the layout step emits a soft warning and clamps the painted bar to 100% remaining; rendering is never blocked.
@@ -1090,7 +1090,7 @@ The parser enforces these rules and produces clear error messages with file posi
 17b. `capacity:` on an `item` must match a positive number literal or percent literal (`\d+(\.\d+)?%`). The percent literal is parsed to its decimal equivalent (`50%` → `0.5`).
 17c. `capacity:` is not valid on `parallel` or `group` (same exclusion as `size`, `duration`, and `remaining`).
 17d. `utilization-warn-at:` and `utilization-over-at:` on a `swimlane` (or `default swimlane`) must each match either a positive percent literal (`\d+(\.\d+)?%`), a positive decimal (`\d+(\.\d+)?`, interpreted as a fraction — `0.8` ≡ `80%`), or the bareword `none`. Defaults: `utilization-warn-at:80%`, `utilization-over-at:100%`. When both numeric thresholds are present on the same lane (or merged from a `default swimlane`), `utilization-warn-at` must be ≤ `utilization-over-at`; otherwise it is a validation error. Not valid on any other entity type.
-17e. `capacity-icon:` value must be a built-in identifier (`none`, `multiplier`, `person`, `people`, `points`, `time`), an identifier matching a `glyph` declaration in scope, or a double-quoted Unicode literal. Like all raw style properties, it is only valid inside `style` blocks and `default <entity>` lines — not inline on entities. Defaults to `multiplier` when omitted. The same value-form rule applies to `icon:`.
+17e. `capacity-icon:` value must be a built-in identifier (`none`, `multiplier`, `person`, `people`, `points`, `time`), an identifier matching a `symbol` declaration in scope, or a double-quoted Unicode literal. Like all raw style properties, it is only valid inside `style` blocks and `default <entity>` lines — not inline on entities. Defaults to `multiplier` when omitted. The same value-form rule applies to `icon:`.
 
 Non-rules (intentionally not validated):
 
@@ -1099,19 +1099,19 @@ Non-rules (intentionally not validated):
 - A lane being over capacity — concurrent item capacity exceeding swimlane capacity at any timestep — is **not** a validation error and produces no parser output. It is rendered visually per `rendering.md`.
 - `utilization-warn-at:none` and/or `utilization-over-at:none` on a swimlane that has no `capacity:` (or no items contributing load) is valid and a no-op — there is nothing to color.
 
-**Glyph declarations**
+**Symbol declarations**
 
-17f. Every `glyph` declaration must specify a `unicode:"<string>"` property. Missing `unicode:` is a validation error.
+17f. Every `symbol` declaration must specify a `unicode:"<string>"` property. Missing `unicode:` is a validation error.
 17g. `unicode:` value must be a non-empty quoted string. May contain Unicode escapes (`\u{...}`) or literal Unicode characters. May be a multi-codepoint grapheme cluster.
 17h. `ascii:` value, if present, must be a quoted string of length ≤ 3 ASCII characters.
-17i. A `glyph` id must not match any built-in icon name (`none`, `multiplier`, `person`, `people`, `points`, `time`, `shield`, `warning`, `lock`, plus any other built-ins the renderer reserves). Shadowing is an error.
-17j. Duplicate `glyph` declaration ids within a single file are an error (same rule as duplicate `status` or `label` ids).
-17k. A `glyph` reference (`icon:NAME` or `capacity-icon:NAME`) must resolve to either a built-in or an earlier `glyph` declaration. Forward references are an error.
+17i. A `symbol` id must not match any built-in icon name (`none`, `multiplier`, `person`, `people`, `points`, `time`, `shield`, `warning`, `lock`, plus any other built-ins the renderer reserves). Shadowing is an error.
+17j. Duplicate `symbol` declaration ids within a single file are an error (same rule as duplicate `status` or `label` ids).
+17k. A `symbol` reference (`icon:NAME` or `capacity-icon:NAME`) must resolve to either a built-in or an earlier `symbol` declaration. Forward references are an error.
 
 **Styles and content/rendering separation**
 
 18. `style:` references on entities and labels must resolve to a style declared in the applicable `config` scope.
-19. Style property values must be valid for their type: color properties (`bg`, `fg`, `text`) must be named colors, hex values, or `none`; `border` must be `solid`, `dashed`, or `dotted`; `shadow` must be `none`, `subtle`, `fuzzy`, or `hard`; `font` must be `sans`, `serif`, or `mono`; `weight` must be `thin`, `light`, `normal`, or `bold`; `italic` must be `true` or `false`; `text-size`, `padding`, `spacing`, `header-height` must be `none`, `xs`, `sm`, `md`, `lg`, or `xl`; `corner-radius` must be `none`, `xs`, `sm`, `md`, `lg`, `xl`, or `full`; `bracket` must be `none`, `solid`, or `dashed`; `capacity-icon` must be `none`, `multiplier`, `person`, `people`, `points`, `time`, a custom `glyph` id, or a double-quoted Unicode literal; `timeline-position` must be `top`, `bottom`, or `both`; `minor-grid` must be `true` or `false`.
+19. Style property values must be valid for their type: color properties (`bg`, `fg`, `text`) must be named colors (including aliases `grey` for `gray` and `violet` for `purple`), hex values, or `none`; `border` must be `solid`, `dashed`, or `dotted`; `shadow` must be `none`, `subtle`, `soft`, or `hard`; `font` must be `sans`, `serif`, or `mono`; `weight` must be `thin`, `light`, `normal`, or `bold`; `italic` must be `true` or `false`; `text-size`, `padding`, `spacing`, `header-height` must be `none`, `xs`, `sm`, `md`, `lg`, or `xl`; `corner-radius` must be `none`, `xs`, `sm`, `md`, `lg`, `xl`, or `full`; `bracket` must be `none`, `solid`, or `dashed`; `capacity-icon` must be `none`, `multiplier`, `person`, `people`, `points`, `time`, a custom `symbol` id, or a double-quoted Unicode literal; `timeline-position` must be `top`, `bottom`, or `both`; `minor-grid` must be `true` or `false`.
 20. Raw style properties (`bg`, `fg`, `text`, `border`, `icon`, `shadow`, `font`, `weight`, `italic`, `text-size`, `padding`, `spacing`, `header-height`, `corner-radius`, `bracket`, `capacity-icon`, `timeline-position`, `minor-grid`) may only appear in `style` blocks and `default <entity>` lines (both in config). Using them on any roadmap-section entity is an error.
 
 **Defaults**

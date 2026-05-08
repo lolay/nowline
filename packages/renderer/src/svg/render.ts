@@ -217,7 +217,7 @@ function estimateCaptionWidthPx(text: string, fontSizePx: number): number {
  *      icon's `style="color:..."` propagates through the
  *      `currentColor`-bound paths in the icon library.
  *   4. `icon.kind === 'literal'` (inline Unicode literal or
- *      dereferenced custom `glyph`): paint number + glyph in a single
+ *      dereferenced custom `symbol`): paint number + glyph in a single
  *      `<text>`, with a `<tspan dx="0.1em">` separator before the
  *      glyph payload.
  *

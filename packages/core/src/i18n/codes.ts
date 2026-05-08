@@ -11,7 +11,7 @@
 //   NL.E0500–E0599  anchor / milestone / footnote
 //   NL.E0600–E0699  item / swimlane
 //   NL.E0700–E0799  capacity / utilization
-//   NL.E0800–E0899  style / color / glyph
+//   NL.E0800–E0899  style / color / symbol
 //   NL.E0900–E0999  config blocks (calendar, scale, default)
 //
 // The full list of allocated codes lives in `messages.en.ts` (one entry

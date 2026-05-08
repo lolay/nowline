@@ -63,12 +63,12 @@ swimlane backend "Backend"
         expect(labels).not.toContain('backend');
     });
 
-    it('proposes built-in icons plus user-declared glyphs inside `icon:`', async () => {
+    it('proposes built-in icons plus user-declared symbols inside `icon:`', async () => {
         const source = `nowline v1
 
 config
 
-glyph money "Money"
+symbol money "Money"
   unicode: "$"
 
 roadmap demo "Demo" start:2026-01-05 scale:1w
@@ -83,7 +83,7 @@ swimlane backend "Backend"
         });
         expect(list).toBeDefined();
         const labels = list!.items.map((i) => i.label);
-        // user-declared glyph
+        // user-declared symbol
         expect(labels).toContain('money');
         // built-ins
         expect(labels).toContain('shield');

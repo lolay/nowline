@@ -353,7 +353,7 @@ export class RoadmapNode {
             labels: resolved.content.labels,
             teams: resolved.content.teams,
             persons: resolved.content.persons,
-            glyphs: resolved.config.glyphs,
+            symbols: resolved.config.symbols,
             footnoteIndex: new Map(),
             footnoteHosts: new Map(),
             timeline,

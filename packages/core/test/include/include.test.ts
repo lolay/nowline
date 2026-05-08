@@ -272,10 +272,10 @@ describe('include resolver', () => {
         });
     });
 
-    describe('glyphs in resolved config', () => {
-        it('collects glyph declarations into ResolvedConfig.glyphs', async () => {
+    describe('symbols in resolved config', () => {
+        it('collects symbol declarations into ResolvedConfig.symbols', async () => {
             const files = {
-                'main.nowline': `config\nglyph budget "Budget" unicode:"💰" ascii:"$"\nglyph fte unicode:"\\u{1F464}"\nroadmap r\nswimlane s\n  item x duration:1w\n`,
+                'main.nowline': `config\nsymbol budget "Budget" unicode:"💰" ascii:"$"\nsymbol fte unicode:"\\u{1F464}"\nroadmap r\nswimlane s\n  item x duration:1w\n`,
             };
             const { Nowline } = getServices();
             const main = await parseAtPath(files['main.nowline'], '/root/main.nowline');
@@ -284,15 +284,15 @@ describe('include resolver', () => {
                 readFile: makeFs(files),
             });
             expect(result.diagnostics.filter((d) => d.severity === 'error')).toEqual([]);
-            expect(result.config.glyphs.size).toBe(2);
-            expect(result.config.glyphs.get('budget')?.title).toBe('Budget');
-            expect(result.config.glyphs.has('fte')).toBe(true);
+            expect(result.config.symbols.size).toBe(2);
+            expect(result.config.symbols.get('budget')?.title).toBe('Budget');
+            expect(result.config.symbols.has('fte')).toBe(true);
         });
 
-        it('merges child glyphs into the parent on config:merge (default)', async () => {
+        it('merges child symbols into the parent on config:merge (default)', async () => {
             const files = {
                 'main.nowline': `include "./a.nowline"\nroadmap r\nswimlane s\n  item x duration:1w\n`,
-                'a.nowline': `config\nglyph budget unicode:"💰"\nglyph star unicode:"⭐"\n`,
+                'a.nowline': `config\nsymbol budget unicode:"💰"\nsymbol star unicode:"⭐"\n`,
             };
             const { Nowline } = getServices();
             const main = await parseAtPath(files['main.nowline'], '/root/main.nowline');
@@ -300,15 +300,15 @@ describe('include resolver', () => {
                 services: Nowline,
                 readFile: makeFs(files),
             });
-            expect(result.config.glyphs.size).toBe(2);
-            expect(result.config.glyphs.has('budget')).toBe(true);
-            expect(result.config.glyphs.has('star')).toBe(true);
+            expect(result.config.symbols.size).toBe(2);
+            expect(result.config.symbols.has('budget')).toBe(true);
+            expect(result.config.symbols.has('star')).toBe(true);
         });
 
-        it('parent glyphs shadow same-named child glyphs with a warning', async () => {
+        it('parent symbols shadow same-named child symbols with a warning', async () => {
             const files = {
-                'main.nowline': `include "./a.nowline"\nconfig\nglyph budget unicode:"💵"\nroadmap r\nswimlane s\n  item x duration:1w\n`,
-                'a.nowline': `config\nglyph budget unicode:"💰"\n`,
+                'main.nowline': `include "./a.nowline"\nconfig\nsymbol budget unicode:"💵"\nroadmap r\nswimlane s\n  item x duration:1w\n`,
+                'a.nowline': `config\nsymbol budget unicode:"💰"\n`,
             };
             const { Nowline } = getServices();
             const main = await parseAtPath(files['main.nowline'], '/root/main.nowline');
@@ -316,18 +316,18 @@ describe('include resolver', () => {
                 services: Nowline,
                 readFile: makeFs(files),
             });
-            expect(result.config.glyphs.size).toBe(1);
+            expect(result.config.symbols.size).toBe(1);
             // Parent's declaration wins.
-            const budgetUnicode = result.config.glyphs.get('budget')?.properties.find((p) => p.key.replace(/:$/, '') === 'unicode')?.value;
+            const budgetUnicode = result.config.symbols.get('budget')?.properties.find((p) => p.key.replace(/:$/, '') === 'unicode')?.value;
             expect(budgetUnicode).toBe('💵');
-            const shadowWarn = result.diagnostics.filter((d) => d.severity === 'warning' && /Glyph "budget"/.test(d.message));
+            const shadowWarn = result.diagnostics.filter((d) => d.severity === 'warning' && /Symbol "budget"/.test(d.message));
             expect(shadowWarn).toHaveLength(1);
         });
 
-        it('config:ignore drops child glyphs', async () => {
+        it('config:ignore drops child symbols', async () => {
             const files = {
                 'main.nowline': `include "./a.nowline" config:ignore\nroadmap r\nswimlane s\n  item x duration:1w\n`,
-                'a.nowline': `config\nglyph budget unicode:"💰"\n`,
+                'a.nowline': `config\nsymbol budget unicode:"💰"\n`,
             };
             const { Nowline } = getServices();
             const main = await parseAtPath(files['main.nowline'], '/root/main.nowline');
@@ -335,7 +335,7 @@ describe('include resolver', () => {
                 services: Nowline,
                 readFile: makeFs(files),
             });
-            expect(result.config.glyphs.size).toBe(0);
+            expect(result.config.symbols.size).toBe(0);
         });
     });
 });

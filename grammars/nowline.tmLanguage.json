@@ -49,7 +49,7 @@
       "patterns": [
         {
           "name": "keyword.control.nowline",
-          "match": "\\b(config|roadmap|include|person|team|anchor|swimlane|item|parallel|group|milestone|footnote|label|style|status|size|scale|calendar|default|description)\\b(?!\\s*:)"
+          "match": "\\b(config|roadmap|include|person|team|anchor|swimlane|item|parallel|group|milestone|footnote|label|style|status|size|scale|calendar|default|description|symbol)\\b(?!\\s*:)"
         }
       ]
     },
@@ -83,7 +83,7 @@
         },
         {
           "name": "constant.language.enum.nowline",
-          "match": "\\b(solid|dashed|dotted|subtle|fuzzy|hard|sans|serif|mono|thin|light|normal|bold|true|false|none|xs|sm|md|lg|xl|full|business|full|custom|merge|ignore|isolate)\\b"
+          "match": "\\b(solid|dashed|dotted|subtle|soft|hard|sans|serif|mono|thin|light|normal|bold|true|false|none|xs|sm|md|lg|xl|full|business|full|custom|merge|ignore|isolate)\\b"
         }
       ]
     },

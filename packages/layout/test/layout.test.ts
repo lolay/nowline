@@ -269,11 +269,11 @@ swimlane build "Build"
             expect(item.capacity.icon).toEqual({ kind: 'builtin', name: 'person' });
         });
 
-        it('dereferences custom glyph ids to literal Unicode payload', async () => {
+        it('dereferences custom symbol ids to literal Unicode payload', async () => {
             // Style ref sits on the item itself so the icon applies to the
             // item's resolved style (style chain is per-entity, not
             // parent-cascading).
-            const src = `nowline v1\n\nconfig\nglyph budget "Budget" unicode:"💰" ascii:"$"\nstyle finance\n  capacity-icon: budget\n\nroadmap r\n\nswimlane s\n  item x duration:1w capacity:12000 style:finance\n`;
+            const src = `nowline v1\n\nconfig\nsymbol budget "Budget" unicode:"💰" ascii:"$"\nstyle finance\n  capacity-icon: budget\n\nroadmap r\n\nswimlane s\n  item x duration:1w capacity:12000 style:finance\n`;
             const { file, resolved } = await parseAndResolve(src);
             const model = layoutRoadmap(file, resolved, { theme: 'light' });
             const item = model.swimlanes[0].children[0] as {
@@ -333,13 +333,44 @@ swimlane build "Build"
             expect(model.swimlanes[0].style.capacityIcon).toBe('⚙');
         });
 
-        it('declared glyph id reaches ResolvedStyle and the glyph survives in ResolvedConfig', async () => {
-            const src = `nowline v1\n\nconfig\nglyph budget "Budget" unicode:"💰" ascii:"$"\nstyle finance\n  capacity-icon: budget\n\nroadmap r\n\nswimlane s style:finance\n  item x duration:1w\n`;
+        it('declared symbol id reaches ResolvedStyle and the symbol survives in ResolvedConfig', async () => {
+            const src = `nowline v1\n\nconfig\nsymbol budget "Budget" unicode:"💰" ascii:"$"\nstyle finance\n  capacity-icon: budget\n\nroadmap r\n\nswimlane s style:finance\n  item x duration:1w\n`;
             const { file, resolved } = await parseAndResolve(src);
             const model = layoutRoadmap(file, resolved, { theme: 'light' });
             expect(model.swimlanes[0].style.capacityIcon).toBe('budget');
-            expect(resolved.config.glyphs.has('budget')).toBe(true);
-            expect(resolved.config.glyphs.get('budget')?.title).toBe('Budget');
+            expect(resolved.config.symbols.has('budget')).toBe(true);
+            expect(resolved.config.symbols.get('budget')?.title).toBe('Budget');
+        });
+    });
+
+    describe('vocabulary aliases', () => {
+        it('canonicalizes status:active to in-progress at the layout boundary', async () => {
+            // Both spellings reach the same StatusKind so downstream consumers
+            // (renderer color/dot, exports) only see the canonical form.
+            const aliasSrc = `nowline v1\n\nroadmap r1\n\nswimlane s\n  item x duration:1w status:active\n`;
+            const canonicalSrc = `nowline v1\n\nroadmap r1\n\nswimlane s\n  item x duration:1w status:in-progress\n`;
+            const aliasOut = await parseAndResolve(aliasSrc);
+            const canonicalOut = await parseAndResolve(canonicalSrc);
+            const aliasModel = layoutRoadmap(aliasOut.file, aliasOut.resolved, { theme: 'light' });
+            const canonicalModel = layoutRoadmap(canonicalOut.file, canonicalOut.resolved, { theme: 'light' });
+            const aliasItem = aliasModel.swimlanes[0].children[0] as { status: string };
+            const canonicalItem = canonicalModel.swimlanes[0].children[0] as { status: string };
+            expect(aliasItem.status).toBe('in-progress');
+            expect(canonicalItem.status).toBe('in-progress');
+            expect(aliasItem.status).toBe(canonicalItem.status);
+        });
+
+        it('canonicalizes status:completed to done at the layout boundary', async () => {
+            const aliasSrc = `nowline v1\n\nroadmap r1\n\nswimlane s\n  item x duration:1w status:completed\n`;
+            const canonicalSrc = `nowline v1\n\nroadmap r1\n\nswimlane s\n  item x duration:1w status:done\n`;
+            const aliasOut = await parseAndResolve(aliasSrc);
+            const canonicalOut = await parseAndResolve(canonicalSrc);
+            const aliasModel = layoutRoadmap(aliasOut.file, aliasOut.resolved, { theme: 'light' });
+            const canonicalModel = layoutRoadmap(canonicalOut.file, canonicalOut.resolved, { theme: 'light' });
+            const aliasItem = aliasModel.swimlanes[0].children[0] as { status: string };
+            const canonicalItem = canonicalModel.swimlanes[0].children[0] as { status: string };
+            expect(aliasItem.status).toBe('done');
+            expect(canonicalItem.status).toBe('done');
         });
     });
 

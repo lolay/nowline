@@ -228,12 +228,12 @@ swimlane s capacity:3
         expect(r.parserErrors).toEqual([]);
     });
 
-    it('parses glyph declarations in config (inline + with description)', async () => {
+    it('parses symbol declarations in config (inline + with description)', async () => {
         const r = await parse(`config
-glyph budget "Budget" unicode:"💰" ascii:"$"
-glyph fte unicode:"\\u{1F464}" ascii:"@"
-glyph star unicode:"⭐"
-  description "Custom star glyph"
+symbol budget "Budget" unicode:"💰" ascii:"$"
+symbol fte unicode:"\\u{1F464}" ascii:"@"
+symbol star unicode:"⭐"
+  description "Custom star symbol"
 roadmap r
 swimlane s
   item x duration:1w

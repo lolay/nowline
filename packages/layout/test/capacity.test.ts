@@ -6,7 +6,7 @@ import {
     estimateCapacitySuffixWidth,
     type ResolvedCapacityIcon,
 } from '../src/capacity.js';
-import type { GlyphDeclaration } from '@nowline/core';
+import type { SymbolDeclaration } from '@nowline/core';
 
 // Tests pin the layout-side contract the renderer (m6/m7) and the
 // overload sweep (m8) read. Pure helpers, no AST, so each test is
@@ -63,22 +63,22 @@ describe('formatCapacityNumber', () => {
 });
 
 describe('resolveCapacityIcon', () => {
-    const noGlyphs = new Map<string, GlyphDeclaration>();
+    const noSymbols = new Map<string, SymbolDeclaration>();
 
     it('returns null for "none"', () => {
-        expect(resolveCapacityIcon('none', noGlyphs)).toBeNull();
+        expect(resolveCapacityIcon('none', noSymbols)).toBeNull();
     });
 
     it('returns built-in tag for known names', () => {
-        expect(resolveCapacityIcon('multiplier', noGlyphs)).toEqual({
+        expect(resolveCapacityIcon('multiplier', noSymbols)).toEqual({
             kind: 'builtin',
             name: 'multiplier',
         });
-        expect(resolveCapacityIcon('person', noGlyphs)).toEqual({
+        expect(resolveCapacityIcon('person', noSymbols)).toEqual({
             kind: 'builtin',
             name: 'person',
         });
-        expect(resolveCapacityIcon('points', noGlyphs)).toEqual({
+        expect(resolveCapacityIcon('points', noSymbols)).toEqual({
             kind: 'builtin',
             name: 'points',
         });
@@ -86,42 +86,42 @@ describe('resolveCapacityIcon', () => {
 
     it('treats unknown values as inline literals', () => {
         // Unicode literal — Langium ValueConverter strips quotes upstream.
-        expect(resolveCapacityIcon('💰', noGlyphs)).toEqual({
+        expect(resolveCapacityIcon('💰', noSymbols)).toEqual({
             kind: 'literal',
             text: '💰',
         });
-        expect(resolveCapacityIcon('★', noGlyphs)).toEqual({
+        expect(resolveCapacityIcon('★', noSymbols)).toEqual({
             kind: 'literal',
             text: '★',
         });
     });
 
-    it('dereferences custom glyph ids to their unicode payload', () => {
-        const glyph = {
-            $type: 'GlyphDeclaration',
+    it('dereferences custom symbol ids to their unicode payload', () => {
+        const symbol = {
+            $type: 'SymbolDeclaration',
             name: 'budget',
             properties: [
                 { key: 'unicode:', value: '💰' },
                 { key: 'ascii:', value: '$' },
             ],
-        } as unknown as GlyphDeclaration;
-        const glyphs = new Map<string, GlyphDeclaration>([['budget', glyph]]);
-        expect(resolveCapacityIcon('budget', glyphs)).toEqual({
+        } as unknown as SymbolDeclaration;
+        const symbols = new Map<string, SymbolDeclaration>([['budget', symbol]]);
+        expect(resolveCapacityIcon('budget', symbols)).toEqual({
             kind: 'literal',
             text: '💰',
         });
     });
 
-    it('falls back to the bare id when a custom glyph is missing unicode (defensive)', () => {
-        const glyph = {
-            $type: 'GlyphDeclaration',
+    it('falls back to the bare id when a custom symbol is missing unicode (defensive)', () => {
+        const symbol = {
+            $type: 'SymbolDeclaration',
             name: 'broken',
             properties: [],
-        } as unknown as GlyphDeclaration;
-        const glyphs = new Map<string, GlyphDeclaration>([['broken', glyph]]);
+        } as unknown as SymbolDeclaration;
+        const symbols = new Map<string, SymbolDeclaration>([['broken', symbol]]);
         // Should not crash; renderer paints the id as a literal so the bug
         // is visible rather than silent.
-        expect(resolveCapacityIcon('broken', glyphs)).toEqual({
+        expect(resolveCapacityIcon('broken', symbols)).toEqual({
             kind: 'literal',
             text: 'broken',
         });

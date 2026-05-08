@@ -4,7 +4,7 @@
 // in by style-resolution; the renderer is palette-dumb.
 
 export type SizeBucket = 'none' | 'xs' | 'sm' | 'md' | 'lg' | 'xl' | 'full';
-export type ShadowKind = 'none' | 'subtle' | 'fuzzy' | 'hard';
+export type ShadowKind = 'none' | 'subtle' | 'soft' | 'hard';
 export type BorderKind = 'solid' | 'dashed' | 'dotted';
 export type FontFamily = 'sans' | 'serif' | 'mono';
 export type FontWeight = 'thin' | 'light' | 'normal' | 'bold';
@@ -47,10 +47,10 @@ export interface ResolvedStyle {
     /**
      * Glyph used as the suffix on capacity numbers (`5×`, `5 [person]`, etc.).
      * Stores the raw value as the author wrote it: a built-in icon name
-     * (`'multiplier'`, `'person'`, ...), a custom glyph id declared via
-     * `glyph` in config, or an inline Unicode literal (`'💰'`). The renderer
+     * (`'multiplier'`, `'person'`, ...), a custom symbol id declared via
+     * `symbol` in config, or an inline Unicode literal (`'💰'`). The renderer
      * resolves built-in vs custom vs literal at paint time using
-     * `ResolvedConfig.glyphs` and the `BUILTIN_CAPACITY_ICONS` set.
+     * `ResolvedConfig.symbols` and the `BUILTIN_CAPACITY_ICONS` set.
      * Default `'multiplier'`.
      */
     capacityIcon: string;

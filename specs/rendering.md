@@ -279,7 +279,7 @@ When driver and suffix are both present, the on-bar reading order is `[driver to
 
 #### Lane capacity badge
 
-Swimlanes with `capacity:N` render the value as `N[glyph]` inside the frame tab, after the owner badge (or after the lane name if no owner is present). Same glyph rules and formatting as the item suffix. The capacity-icon vocabulary supports `none`, `multiplier` (default), `person`, `people`, `points`, `time`, custom `glyph` declarations, and inline Unicode literals.
+Swimlanes with `capacity:N` render the value as `N[glyph]` inside the frame tab, after the owner badge (or after the lane name if no owner is present). Same glyph rules and formatting as the item suffix. The capacity-icon vocabulary supports `none`, `multiplier` (default), `person`, `people`, `points`, `time`, custom `symbol` declarations, and inline Unicode literals.
 
 #### Glyph formatting
 
@@ -288,7 +288,7 @@ Swimlanes with `capacity:N` render the value as `N[glyph]` inside the frame tab,
   - `multiplier` glyph: no gap (`5×`) — multiplication sign is a typographic operator that already includes side-bearing.
   - All other built-in glyphs and custom/literal glyphs: `0.1em` gap (`5 [person]`, `8 ★`, `12000 $`) — small but visible separator.
 - **Number formatting:** integers render as integers (`5`, not `5.0`); decimals render with trailing zeros trimmed (`0.5`, `1.25`); percent literals already converted to decimals at parse time so they render in decimal form (`50%` author input → `0.5` rendered).
-- **ASCII fallback:** when SVG output is constrained to ASCII (e.g. CLI text mode export), substitute the glyph's `ascii:` value. Built-in glyph fallbacks: `multiplier` → `x`, `person` → `p`, `people` → `P`, `points` → `*`, `time` → `t`, `none` → `` (empty). Custom `glyph` declarations supply their own `ascii:` value (default `?` if absent).
+- **ASCII fallback:** when SVG output is constrained to ASCII (e.g. CLI text mode export), substitute the glyph's `ascii:` value. Built-in glyph fallbacks: `multiplier` → `x`, `person` → `p`, `people` → `P`, `points` → `*`, `time` → `t`, `none` → `` (empty). Custom `symbol` declarations supply their own `ascii:` value (default `?` if absent).
 
 #### Built-in glyph table
 
@@ -353,8 +353,8 @@ Styles defined in `config` control the visual appearance of entities. Style prop
 | `fg` | Border/outline color of the entity. `none` for no border. |
 | `text` | Color of text within the entity. `none` hides text. |
 | `border` | Border/connection line style: `solid` (default), `dashed`, `dotted` |
-| `icon` | Small icon rendered at the leading edge of the entity. Built-in identifiers (rendered from a curated SVG library, identical across platforms): `shield`, `warning`, `lock`, plus the capacity-icon vocabulary (`person`, `people`, `points`, `time`). Custom: any identifier declared by a `glyph` declaration in config. Inline: a double-quoted Unicode literal — font-dependent. |
-| `shadow` | Drop shadow beneath the entity: `none` (no shadow), `subtle` (tight, small offset), `fuzzy` (soft, larger offset), `hard` (solid, no blur, offset down-right). `subtle`/`fuzzy` rendered via SVG `<feDropShadow>`; `hard` rendered as a solid duplicate shape offset behind the entity. |
+| `icon` | Small icon rendered at the leading edge of the entity. Built-in identifiers (rendered from a curated SVG library, identical across platforms): `shield`, `warning`, `lock`, plus the capacity-icon vocabulary (`person`, `people`, `points`, `time`). Custom: any identifier declared by a `symbol` declaration in config. Inline: a double-quoted Unicode literal — font-dependent. |
+| `shadow` | Drop shadow beneath the entity: `none` (no shadow), `subtle` (tight, small offset), `soft` (larger offset, softer blur), `hard` (solid, no blur, offset down-right). `subtle`/`soft` rendered via SVG `<feDropShadow>`; `hard` rendered as a solid duplicate shape offset behind the entity. |
 | `font` | Font family for text within the entity. Named preset (`sans`, `serif`, `mono`) that maps to a cross-platform font stack. No font downloads required. |
 | `weight` | Font weight for the entity's primary text (title). Maps to SVG `font-weight`: `thin` (100), `light` (300), `normal` (400), `bold` (700). `thin` degrades gracefully if the font lacks that variant. |
 | `italic` | When `true`, renders the entity's primary text in italic. Maps to SVG `font-style: italic`. |
@@ -364,7 +364,7 @@ Styles defined in `config` control the visual appearance of entities. Style prop
 | `header-height` | Height of the timeline scale header row. Roadmap-only. Named preset (`none`, `xs`, `sm`, `md`, `lg`, `xl`). |
 | `corner-radius` | Corner rounding for the entity's bounding shape. Maps to SVG `rx`/`ry`. Values: `none`, `xs`, `sm`, `md`, `lg`, `xl`, `full`. `full` computes radius as half the rendered height. |
 | `bracket` | Bracket/join line on parallel blocks. `none` (default), `solid`, `dashed`. Parallel-only — ignored on other entities. |
-| `capacity-icon` | Glyph used as the suffix to capacity numbers on lanes and items. Built-in names (`none`, `multiplier` (default — `×`), `person`, `people`, `points` (`★`), `time` (`⏱`)) render from the renderer's curated SVG glyph library — consistent across all platforms. Custom names from `glyph` declarations and inline Unicode literals (`"💰"`) are font-dependent. ASCII fallback per the glyph definition. |
+| `capacity-icon` | Glyph used as the suffix to capacity numbers on lanes and items. Built-in names (`none`, `multiplier` (default — `×`), `person`, `people`, `points` (`★`), `time` (`⏱`)) render from the renderer's curated SVG glyph library — consistent across all platforms. Custom names from `symbol` declarations and inline Unicode literals (`"💰"`) are font-dependent. ASCII fallback per the glyph definition. |
 | `timeline-position` | Where the timeline date strip is rendered. `top` (default), `bottom`, `both`. Roadmap-only. `both` mirrors the strip at the chart's bottom so the dates remain readable on tall canvases without scrolling back to the top. The mirrored strip shares fill, border, label color, and tick positions with the top strip; it has no now-pill and no marker row. The now-line and major grid lines thread through the mirrored strip so the timeline reads as a single sweep; milestone and anchor cut lines stop at the bottom of the last swimlane to keep the date labels uncluttered. |
 | `minor-grid` | When `true`, draws a faint dotted grid line at every tick boundary in addition to the major-tick lines. Roadmap-only. Uses `theme.timeline.minorGridLine` (a step lighter than `gridLine`) so the major lines still dominate. |
 
@@ -376,7 +376,7 @@ The renderer ships a curated SVG icon library backing both `icon:` and `capacity
 
 The library includes the entity-decoration set used by `icon:` (`shield`, `warning`, `lock`, etc.) and the capacity-suffix set used by `capacity-icon:` (`person`, `people`, `points`, `time`). `multiplier` is rendered as a `<text>×</text>` element rather than an SVG path because U+00D7 MULTIPLICATION SIGN is a basic typographic operator with consistent rendering across all standard fonts.
 
-When an author needs a glyph not in the library, the `glyph` config declaration (with `unicode:`) or an inline Unicode literal provides escape hatches — both font-dependent.
+When an author needs a glyph not in the library, the `symbol` config declaration (with `unicode:`) or an inline Unicode literal provides escape hatches — both font-dependent.
 
 #### Font Presets
 

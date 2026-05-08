@@ -22,7 +22,7 @@ IncludeOption:
 // --- Config Entries ---
 
 ConfigEntry:
-    ScaleBlock | CalendarBlock | StyleDeclaration | GlyphDeclaration | DefaultDeclaration;
+    ScaleBlock | CalendarBlock | StyleDeclaration | SymbolDeclaration | DefaultDeclaration;
 
 ScaleBlock:
     'scale'
@@ -39,8 +39,8 @@ StyleDeclaration:
     'style' (name=ID)? (title=STRING)?
     (INDENT properties+=StyleProperty+ DEDENT)?;
 
-GlyphDeclaration:
-    'glyph' (name=ID)? (title=STRING)?
+SymbolDeclaration:
+    'symbol' (name=ID)? (title=STRING)?
     (properties+=EntityProperty)*
     (INDENT description=DescriptionDirective DEDENT)?;
 

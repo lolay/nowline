@@ -11,7 +11,7 @@ nowline v1
 
 config
 
-glyph budget "Budget" unicode:"💰" ascii:"$"
+symbol budget "Budget" unicode:"💰" ascii:"$"
 
 style fte
   capacity-icon: person

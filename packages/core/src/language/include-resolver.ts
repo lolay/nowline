@@ -21,7 +21,7 @@ import type {
     MilestoneDeclaration,
     FootnoteDeclaration,
     RoadmapDeclaration,
-    GlyphDeclaration,
+    SymbolDeclaration,
 } from '../generated/ast.js';
 import {
     isStyleDeclaration,
@@ -37,7 +37,7 @@ import {
     isAnchorDeclaration,
     isMilestoneDeclaration,
     isFootnoteDeclaration,
-    isGlyphDeclaration,
+    isSymbolDeclaration,
 } from '../generated/ast.js';
 
 export type IncludeMode = 'merge' | 'ignore' | 'isolate';
@@ -71,11 +71,11 @@ export interface ResolvedConfig {
     calendar?: CalendarBlock;
     styles: Map<string, StyleDeclaration>;
     defaults: Map<string, DefaultDeclaration>;
-    // Custom glyph declarations from the `glyph` config keyword. Renderer-side
+    // Custom symbol declarations from the `symbol` config keyword. Renderer-side
     // resolution of `icon:` / `capacity-icon:` looks here when the value isn't
     // a built-in identifier or an inline Unicode literal. See specs/dsl.md §
-    // Glyph Declaration.
-    glyphs: Map<string, GlyphDeclaration>;
+    // Symbol Declaration.
+    symbols: Map<string, SymbolDeclaration>;
 }
 
 export interface ResolvedContent {
@@ -128,7 +128,7 @@ function emptyConfig(): ResolvedConfig {
     return {
         styles: new Map(),
         defaults: new Map(),
-        glyphs: new Map(),
+        symbols: new Map(),
     };
 }
 
@@ -325,7 +325,7 @@ function applyConfigMode(
 
     mergeMap(target.styles, child.styles, (name) => warn(name, 'Style'));
     mergeMap(target.defaults, child.defaults, (name) => warn(name, 'Default'));
-    mergeMap(target.glyphs, child.glyphs, (name) => warn(name, 'Glyph'));
+    mergeMap(target.symbols, child.symbols, (name) => warn(name, 'Symbol'));
     if (child.scale && !target.scale) {
         target.scale = child.scale;
     }
@@ -406,9 +406,9 @@ function addConfigEntry(config: ResolvedConfig, entry: ConfigEntry): void {
         if (entry.name && !config.styles.has(entry.name)) {
             config.styles.set(entry.name, entry);
         }
-    } else if (isGlyphDeclaration(entry)) {
-        if (entry.name && !config.glyphs.has(entry.name)) {
-            config.glyphs.set(entry.name, entry);
+    } else if (isSymbolDeclaration(entry)) {
+        if (entry.name && !config.symbols.has(entry.name)) {
+            config.symbols.set(entry.name, entry);
         }
     } else if (isDefaultDeclaration(entry)) {
         if (!config.defaults.has(entry.entityType)) {

@@ -33,7 +33,7 @@ export const LINK_ICON_PATHS: Record<string, string> = {
 // platform-specific fonts (Apple, Google, Microsoft, Linux), so the same DSL
 // would produce visually inconsistent output. SVG paths are pixel-deterministic.
 // Authors who *want* the host-platform emoji can use an inline literal
-// (`capacity-icon:"👤"`) or declare a custom glyph via the `glyph` keyword.
+// (`capacity-icon:"👤"`) or declare a custom symbol via the `symbol` keyword.
 //
 // `multiplier` is intentionally absent from this map: U+00D7 MULTIPLICATION
 // SIGN is a stable typographic operator with consistent rendering across every

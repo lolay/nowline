@@ -68,13 +68,13 @@ const LANE_CAPACITY_BADGE_FONT_SIZE_PX = 10;
 function resolveLaneCapacity(
     lane: SwimlaneDeclaration,
     style: { capacityIcon: string },
-    glyphs: LayoutContext['glyphs'],
+    symbols: LayoutContext['symbols'],
 ): { capacity: PositionedCapacity | null; badgeWidthPx: number } {
     const raw = propValue(lane.properties, 'capacity');
     const value = parseCapacityValue(raw);
     if (value === null) return { capacity: null, badgeWidthPx: 0 };
     const text = formatCapacityNumber(value);
-    const icon = resolveCapacityIcon(style.capacityIcon, glyphs);
+    const icon = resolveCapacityIcon(style.capacityIcon, symbols);
     const badgeWidthPx = estimateCapacitySuffixWidth(
         text,
         icon,
@@ -237,7 +237,7 @@ export class SwimlaneNode {
         const { capacity, badgeWidthPx } = resolveLaneCapacity(
             lane,
             style,
-            ctx.glyphs,
+            ctx.symbols,
         );
         // Footnote indicators (the small "1, 2" red text in the upper
         // right of the chiclet) need to be reserved in the chiclet's

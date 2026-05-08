@@ -53,7 +53,7 @@ describe('NowlineRenameProvider', () => {
 
     it('renames a config-section style declaration and every reference', async () => {
         // Verifies that lifting findDeclarationRange into ast-utils picks up
-        // declarations that live in `configEntries` (style / glyph) rather
+        // declarations that live in `configEntries` (style / symbol) rather
         // than `roadmapEntries`.
         const styleSample = `nowline v1
 

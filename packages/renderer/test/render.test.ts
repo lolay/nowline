@@ -217,10 +217,10 @@ describe('renderSvg — item capacity suffix', () => {
         expect(svg).toMatch(/>2w<tspan dx="[^"]+">2<\/tspan><tspan dx="[^"]+">⚙<\/tspan>/);
     });
 
-    it('renders custom glyph capacity by dereferencing to its unicode payload', async () => {
+    it('renders custom symbol capacity by dereferencing to its unicode payload', async () => {
         // Style ref on the item itself — `capacity-icon` is an entity-level
         // style and doesn't cascade from a parent swimlane to its children.
-        const dsl = `nowline v1\n\nconfig\nglyph budget "Budget" unicode:"💰" ascii:"$"\nstyle finance\n  capacity-icon: budget\n\nroadmap r1 "R" start:2026-01-05\n\nswimlane s "Funded"\n  item x "Phase A" duration:2w capacity:12000 style:finance\n`;
+        const dsl = `nowline v1\n\nconfig\nsymbol budget "Budget" unicode:"💰" ascii:"$"\nstyle finance\n  capacity-icon: budget\n\nroadmap r1 "R" start:2026-01-05\n\nswimlane s "Funded"\n  item x "Phase A" duration:2w capacity:12000 style:finance\n`;
         const model = await parseToModel(dsl);
         const svg = await renderSvg(model);
         expect(svg).toMatch(/>2w<tspan dx="[^"]+">12000<\/tspan><tspan dx="[^"]+">💰<\/tspan>/);

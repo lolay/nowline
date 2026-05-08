@@ -259,7 +259,7 @@ Adds a first-class capacity model so swimlanes and items can express throughput,
 **Phase A — Effort-based sizing (m1–m8 of the in-flight branch):**
 
 - `capacity:N` on swimlanes (integer/decimal) and items (integer/decimal/percent).
-- `capacity-icon:` style vocabulary (`none`, `multiplier` (default), `person`, `people`, `points`, `time`) plus custom `glyph` declarations and inline Unicode literals.
+- `capacity-icon:` style vocabulary (`none`, `multiplier` (default), `person`, `people`, `points`, `time`) plus custom `symbol` declarations and inline Unicode literals.
 - `size <id> ["title"] effort:N` declarations replace the old `duration` entity. Items reference a size via `size:NAME` and derive their bar duration as `effort ÷ item_capacity`. Explicit `duration:` literal always wins.
 - `remaining:` accepts both percent (`30%`) and single-engineer effort literals (`0.5d`, `1w`); literal form normalizes to a percent of total effort with overflow clamped + soft warning.
 - Renderer paints an inline size chip on the meta line (chip text uses size's `title` when provided, falls back to id-as-typed) and a `N[glyph]` capacity suffix after the duration.

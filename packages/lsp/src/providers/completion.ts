@@ -40,8 +40,8 @@ const REF_KEY_TO_KINDS: Record<string, ReadonlySet<string>> = {
     size: new Set(['size']),
     status: new Set(['status']),
     labels: new Set(['label']),
-    icon: new Set(['glyph']),
-    'capacity-icon': new Set(['glyph']),
+    icon: new Set(['symbol']),
+    'capacity-icon': new Set(['symbol']),
 };
 
 /**
@@ -54,7 +54,7 @@ const REF_KEY_TO_KINDS: Record<string, ReadonlySet<string>> = {
  *    (see `REF_KEY_TO_KINDS`).
  *  - Status-value completion: built-in values plus custom `status`
  *    declarations.
- *  - Icon / capacity-icon built-in vocabulary plus user-declared glyphs.
+ *  - Icon / capacity-icon built-in vocabulary plus user-declared symbols.
  */
 export class NowlineCompletionProvider extends DefaultCompletionProvider {
     constructor(services: NowlineLspServices) {
@@ -185,7 +185,7 @@ function kindFor(kind: string): CompletionItemKind {
         case 'size': return CompletionItemKind.Value;
         case 'status': return CompletionItemKind.Enum;
         case 'style': return CompletionItemKind.Color;
-        case 'glyph': return CompletionItemKind.Snippet;
+        case 'symbol': return CompletionItemKind.Snippet;
         case 'footnote': return CompletionItemKind.Text;
         default: return CompletionItemKind.Reference;
     }

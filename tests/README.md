@@ -30,7 +30,7 @@ Most files are near-clones of [`examples/minimal.nowline`](../examples/minimal.n
 | [`text-spills-right.nowline`](text-spills-right.nowline) | Right-spill branch: every item is too narrow for its title, so title + meta render to the right of the bar. |
 | [`item-bumps-up.nowline`](item-bumps-up.nowline) | Topmost-fit row packing: a long middle item pushes itself to row 2, but the trailing item bumps back up to row 1 alongside the first item instead of claiming a fresh row. |
 | [`isolate-include-multi.nowline`](isolate-include-multi.nowline) | `roadmap:isolate` include where the child has multiple swimlanes — how a multi-lane isolated region stacks against the parent's own lanes. Uses [`partner-multi.nowline`](partner-multi.nowline) as its included child. |
-| [`capacity-items.nowline`](capacity-items.nowline) | Every shape of item-level `capacity:` suffix / `capacity-icon:` (multiplier, built-in SVG icons, decimal, percent sugar, inline literal, custom glyph, none). |
+| [`capacity-items.nowline`](capacity-items.nowline) | Every shape of item-level `capacity:` suffix / `capacity-icon:` (multiplier, built-in SVG icons, decimal, percent sugar, inline literal, custom symbol, none). |
 | [`capacity-lanes.nowline`](capacity-lanes.nowline) | Lane-level `capacity:N` chiclet variants across the same icon matrix plus owner stacking. |
 | [`size-and-capacity.nowline`](size-and-capacity.nowline) | Size + capacity interaction matrix (driver token, derived duration, capacity suffix, overrides). |
 | [`utilization-states.nowline`](utilization-states.nowline) | Lane utilization underline: healthy, warn threshold, over capacity, coalesced segments, custom thresholds, opt-out. |

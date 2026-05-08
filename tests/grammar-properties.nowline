@@ -32,7 +32,7 @@ scale
   label-every: 2
   label: "Sprint {n}"
 
-glyph budget "Budget" unicode:"💰" ascii:"$"
+symbol budget "Budget" unicode:"💰" ascii:"$"
 
 style sample
   bg: blue
