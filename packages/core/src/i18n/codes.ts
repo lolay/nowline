@@ -13,6 +13,7 @@
 //   NL.E0700–E0799  capacity / utilization
 //   NL.E0800–E0899  style / color / symbol
 //   NL.E0900–E0999  config blocks (calendar, scale, default)
+//   NL.W0700–W0799  warnings (silently-ignored input)
 //
 // The full list of allocated codes lives in `messages.en.ts` (one entry
 // per code). The runtime walks the locale fallback chain and falls
@@ -62,6 +63,9 @@ export type MessageCode =
 
     // Item (NL.E0600–E0699)
     | 'NL.E0600'  // item-requires-size-or-duration
+
+    // Warnings (NL.W0700–W0799)
+    | 'NL.W0700'  // unknown-entity-property
     ;
 
 export const ALL_CODES: ReadonlyArray<MessageCode> = [
@@ -73,4 +77,5 @@ export const ALL_CODES: ReadonlyArray<MessageCode> = [
     'NL.E0405', 'NL.E0406', 'NL.E0407', 'NL.E0408',
     'NL.E0500', 'NL.E0501', 'NL.E0502', 'NL.E0503', 'NL.E0504', 'NL.E0505',
     'NL.E0600',
+    'NL.W0700',
 ] as const;

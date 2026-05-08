@@ -1024,4 +1024,67 @@ swimlane s
             r.diagnostics.some((d) => d.severity === 'error');
         expect(hadProblem).toBe(true);
     });
+
+    // --- NL.W0700: unknown property on entity declaration ---
+
+    it('NL.W0700: unknown roadmap property emits a warning, not an error', async () => {
+        const r = await parse(
+            `roadmap r "R" start:2026-01-05 scale:1w now:2026-01-25\nswimlane s\n  item x duration:1w\n`,
+        );
+        const warnings = warningMessages(r.diagnostics);
+        expect(warnings.some((m) => /Unknown property "now" on/.test(m))).toBe(true);
+        expect(hasError(errorMessages(r.diagnostics), /Unknown property "now"/)).toBe(false);
+    });
+
+    it('NL.W0700: unknown item property emits exactly one warning', async () => {
+        const r = await parse(
+            `roadmap r\nswimlane s\n  item a duration:1w foo:bar\n`,
+        );
+        const warnings = warningMessages(r.diagnostics).filter((m) => /Unknown property "foo"/.test(m));
+        expect(warnings.length).toBe(1);
+        expect(errorMessages(r.diagnostics)).toEqual([]);
+    });
+
+    it('NL.W0700: typo close to a known key includes a "did you mean" suggestion', async () => {
+        const r = await parse(
+            `roadmap r\nswimlane s\n  item a duration:1w descripton:"x"\n`,
+        );
+        const warnings = warningMessages(r.diagnostics);
+        const hit = warnings.find((m) => /Unknown property "descripton"/.test(m));
+        expect(hit).toBeDefined();
+        expect(hit).toMatch(/Did you mean "description"\?/);
+    });
+
+    it('NL.W0700: documented per-entity properties produce no warnings', async () => {
+        const r = await parse(
+            [
+                `roadmap r "R" start:2026-01-05 length:6m scale:1w calendar:business author:"Jane"`,
+                `  description "A roadmap"`,
+                `swimlane s "S" owner:jane capacity:5 utilization-warn-at:80% utilization-over-at:100%`,
+                `  anchor kickoff date:2026-01-05`,
+                `  milestone launch date:2026-02-15`,
+                `  item x "X" duration:1w status:in-progress owner:jane after:kickoff remaining:50%`,
+                `  parallel`,
+                `    item p1 "P1" duration:1w owner:jane`,
+                `    item p2 "P2" duration:1w owner:jane`,
+                `  group g1`,
+                `    item g1a "G1A" duration:1w`,
+                `    item g1b "G1B" duration:1w`,
+                `  footnote fn1 "Note" on:x`,
+                `person jane "Jane Doe"`,
+                `team team-a "Team A"`,
+            ].join('\n') + '\n',
+        );
+        const warnings = warningMessages(r.diagnostics).filter((m) => /Unknown property/.test(m));
+        expect(warnings).toEqual([]);
+    });
+
+    it('NL.W0700: raw style key on an entity stays an error and does NOT emit a duplicate warning', async () => {
+        const r = await parse(
+            `roadmap r\nswimlane s\n  item a duration:1w bg:#ff0000\n`,
+        );
+        expect(hasError(errorMessages(r.diagnostics), /Raw style property "bg"/)).toBe(true);
+        const warnings = warningMessages(r.diagnostics).filter((m) => /Unknown property "bg"/.test(m));
+        expect(warnings).toEqual([]);
+    });
 });

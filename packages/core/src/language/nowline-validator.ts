@@ -163,6 +163,105 @@ const DEFAULT_BANNED: Record<DefaultEntityType, Set<string>> = {
     group: new Set(),
 };
 
+// Properties every entity declaration may carry (`specs/dsl.md` § Universal Properties).
+// `description` is technically a sub-directive (`description "text"` indented under the
+// entity), not an EntityProperty, but we accept it here too: authors who type
+// `description:"text"` as a property aren't doing anything meaningful, but the typo is
+// common enough that warning on it adds noise rather than signal — the value is at
+// least carried into the AST and could be surfaced later if we choose to.
+const UNIVERSAL_ENTITY_PROPS = new Set(['labels', 'link', 'style', 'description']);
+
+// Properties each entity declaration's `properties: EntityProperty[]` bag actually
+// consumes downstream. Sourced from (a) the property tables in `specs/dsl.md` and
+// (b) every `propValue(...)`/`propValues(...)` call site in `packages/layout/`. Keys
+// outside this set + `UNIVERSAL_ENTITY_PROPS` are silently dropped by the layout —
+// `checkUnknownEntityProperties` warns on them so authors notice typos like
+// `now:2026-01-25` on a `roadmap` line.
+//
+// Raw style props (`bg`, `fg`, ...) intentionally stay OUT of this map — they are
+// rejected as errors by `checkNoRawStyleProperties` and the unknown-property check
+// short-circuits on them so authors don't see a duplicate diagnostic.
+const ENTITY_KNOWN_PROPS: Record<string, Set<string>> = {
+    RoadmapDeclaration: new Set([
+        'author', 'start', 'length', 'scale', 'calendar', 'logo', 'logo-size',
+    ]),
+    AnchorDeclaration: new Set(['date']),
+    SwimlaneDeclaration: new Set([
+        'owner', 'capacity', 'utilization-warn-at', 'utilization-over-at',
+        'status', 'after', 'before',
+    ]),
+    // `date:` and `start:` on items are read by `packages/layout/src/layout.ts`
+    // (`resolveChildStart`, `walkNode`) to pin an item to a fixed start date. Not
+    // documented in `specs/dsl.md` yet — left allow-listed so authors don't see
+    // a spurious warning for a working code path. See plan's out-of-scope note.
+    ItemDeclaration: new Set([
+        'size', 'duration', 'status', 'owner', 'after', 'before',
+        'remaining', 'capacity', 'date', 'start',
+    ]),
+    // size/duration/remaining/capacity on parallel/group are already errors via
+    // `checkNoComputedProperties`, so we don't list them here.
+    ParallelBlock: new Set(['owner', 'after', 'before', 'status']),
+    GroupBlock: new Set(['owner', 'after', 'before', 'status']),
+    MilestoneDeclaration: new Set(['date', 'after']),
+    FootnoteDeclaration: new Set(['on']),
+    PersonDeclaration: new Set(),
+    TeamDeclaration: new Set(),
+    LabelDeclaration: new Set(),
+    SizeDeclaration: new Set(['effort']),
+    StatusDeclaration: new Set(),
+};
+
+// Levenshtein distance with an early-exit cap: returns `cap + 1` once the running
+// minimum exceeds the cap so we can short-circuit the matcher in the common case
+// where the typo is much further than 2 edits from any valid key. The helper is
+// only used by `checkUnknownEntityProperties` for the "did you mean?" suggestion.
+function levenshteinCapped(a: string, b: string, cap: number): number {
+    if (a === b) return 0;
+    const an = a.length;
+    const bn = b.length;
+    if (Math.abs(an - bn) > cap) return cap + 1;
+    if (an === 0) return bn;
+    if (bn === 0) return an;
+    let prev = new Array<number>(bn + 1);
+    let curr = new Array<number>(bn + 1);
+    for (let j = 0; j <= bn; j++) prev[j] = j;
+    for (let i = 1; i <= an; i++) {
+        curr[0] = i;
+        let rowMin = i;
+        for (let j = 1; j <= bn; j++) {
+            const cost = a.charCodeAt(i - 1) === b.charCodeAt(j - 1) ? 0 : 1;
+            curr[j] = Math.min(
+                prev[j] + 1,        // deletion
+                curr[j - 1] + 1,    // insertion
+                prev[j - 1] + cost, // substitution
+            );
+            if (curr[j] < rowMin) rowMin = curr[j];
+        }
+        if (rowMin > cap) return cap + 1;
+        const tmp = prev;
+        prev = curr;
+        curr = tmp;
+    }
+    return prev[bn];
+}
+
+// Pick the closest known key within `cap` edits of `key`, or undefined. Ties are
+// broken by the order of `candidates`, so callers should pass entity-specific keys
+// first when both lists are searched.
+function suggestKey(key: string, candidates: Iterable<string>, cap = 2): string | undefined {
+    let best: string | undefined;
+    let bestDist = cap + 1;
+    for (const c of candidates) {
+        const d = levenshteinCapped(key, c, cap);
+        if (d < bestDist) {
+            best = c;
+            bestDist = d;
+            if (d === 0) break;
+        }
+    }
+    return best;
+}
+
 function propKey(prop: { key: string }): string {
     return prop.key.endsWith(':') ? prop.key.slice(0, -1) : prop.key;
 }
@@ -279,6 +378,7 @@ export function registerValidationChecks(services: NowlineServices): void {
             validator.checkEntityIdOrTitle,
             validator.checkRoadmapProperties,
             validator.checkNoRawStyleProperties,
+            validator.checkUnknownEntityProperties,
         ],
         AnchorDeclaration: [
             validator.checkEntityIdOrTitle,
@@ -286,30 +386,35 @@ export function registerValidationChecks(services: NowlineServices): void {
             validator.checkAnchorAgainstStart,
             validator.checkNoRawStyleProperties,
             validator.checkNoFootnoteProperty,
+            validator.checkUnknownEntityProperties,
         ],
         SwimlaneDeclaration: [
             validator.checkEntityIdOrTitle,
             validator.checkNoRawStyleProperties,
             validator.checkUtilizationOrdering,
             validator.checkNoFootnoteProperty,
+            validator.checkUnknownEntityProperties,
         ],
         ItemDeclaration: [
             validator.checkEntityIdOrTitle,
             validator.checkItemRequiredDuration,
             validator.checkNoRawStyleProperties,
             validator.checkNoFootnoteProperty,
+            validator.checkUnknownEntityProperties,
         ],
         ParallelBlock: [
             validator.checkParallelMinChildren,
             validator.checkNoComputedProperties,
             validator.checkNoRawStyleProperties,
             validator.checkNoFootnoteProperty,
+            validator.checkUnknownEntityProperties,
         ],
         GroupBlock: [
             validator.checkGroupMinChildren,
             validator.checkNoComputedProperties,
             validator.checkNoRawStyleProperties,
             validator.checkNoFootnoteProperty,
+            validator.checkUnknownEntityProperties,
         ],
         MilestoneDeclaration: [
             validator.checkEntityIdOrTitle,
@@ -317,21 +422,25 @@ export function registerValidationChecks(services: NowlineServices): void {
             validator.checkMilestoneAgainstStart,
             validator.checkNoRawStyleProperties,
             validator.checkNoFootnoteProperty,
+            validator.checkUnknownEntityProperties,
         ],
         FootnoteDeclaration: [
             validator.checkEntityIdOrTitle,
             validator.checkFootnoteOn,
             validator.checkNoRawStyleProperties,
+            validator.checkUnknownEntityProperties,
         ],
         PersonDeclaration: [
             validator.checkEntityIdOrTitle,
             validator.checkNoRawStyleProperties,
             validator.checkNoFootnoteProperty,
+            validator.checkUnknownEntityProperties,
         ],
         TeamDeclaration: [
             validator.checkEntityIdOrTitle,
             validator.checkNoRawStyleProperties,
             validator.checkNoFootnoteProperty,
+            validator.checkUnknownEntityProperties,
         ],
         StyleDeclaration: [validator.checkEntityIdOrTitle],
         StyleProperty: [validator.checkStylePropertyEnum],
@@ -342,16 +451,19 @@ export function registerValidationChecks(services: NowlineServices): void {
         LabelDeclaration: [
             validator.checkEntityIdOrTitle,
             validator.checkNoRawStyleProperties,
+            validator.checkUnknownEntityProperties,
         ],
         SizeDeclaration: [
             validator.checkEntityIdOrTitle,
             validator.checkSizeDeclaration,
             validator.checkNoRawStyleProperties,
+            validator.checkUnknownEntityProperties,
         ],
         StatusDeclaration: [
             validator.checkEntityIdOrTitle,
             validator.checkStatusDeclaration,
             validator.checkNoRawStyleProperties,
+            validator.checkUnknownEntityProperties,
         ],
         DefaultDeclaration: [validator.checkDefaultDeclaration, validator.checkUtilizationOrdering],
         CalendarBlock: [validator.checkCalendarBlock],
@@ -897,6 +1009,50 @@ export class NowlineValidator {
                     { node: prop },
                 );
             }
+        }
+    }
+
+    // Warn on property keys the runtime never reads. Severity is `warning` so a
+    // file that happened to render with a bogus key (e.g. `roadmap r now:2026-01-25`)
+    // keeps parsing — promoting to error would break files that work today even
+    // though the bogus key was a no-op all along.
+    //
+    // Skips:
+    //   - raw style keys (already an error from `checkNoRawStyleProperties`)
+    //   - `footnote` (already an error from `checkNoFootnoteProperty`)
+    //   - sizing keys on parallel/group (already an error from `checkNoComputedProperties`)
+    //
+    // Suggests the closest known key within 2 edits when one exists, so the
+    // existing `DID_YOU_MEAN_RE` in `packages/cli/src/diagnostics/adapt.ts` picks
+    // it up as a structured suggestion alongside the rendered message.
+    checkUnknownEntityProperties(
+        node: {
+            $type: string;
+            properties: EntityProperty[];
+            name?: string;
+            title?: string;
+        },
+        accept: ValidationAcceptor,
+    ): void {
+        const known = ENTITY_KNOWN_PROPS[node.$type];
+        if (!known) return;
+        const computedBanned = node.$type === 'ParallelBlock' || node.$type === 'GroupBlock'
+            ? new Set(['size', 'duration', 'remaining', 'capacity'])
+            : null;
+        for (const prop of node.properties) {
+            const key = propKey(prop);
+            if (known.has(key)) continue;
+            if (UNIVERSAL_ENTITY_PROPS.has(key)) continue;
+            if (STYLE_PROP_KEYS.has(key)) continue;
+            if (key === 'footnote') continue;
+            if (computedBanned && computedBanned.has(key)) continue;
+            const candidates: string[] = [
+                ...known,
+                ...UNIVERSAL_ENTITY_PROPS,
+            ];
+            const suggested = suggestKey(key, candidates) ?? '';
+            acceptTr(accept, 'warning', { node: prop, property: 'key' },
+                'NL.W0700', { key, entity: describeNode(node), suggested });
         }
     }
 

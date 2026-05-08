@@ -88,4 +88,10 @@ export const messages: MessageBundle = {
     // Élément
     'NL.E0600': (a: { name: string }) =>
         `L'élément «\u00A0${a.name}\u00A0» exige une propriété «\u00A0size:\u00A0» ou «\u00A0duration:\u00A0».`,
+
+    // Avertissements
+    'NL.W0700': (a: { key: string; entity: string; suggested: string }) =>
+        `Propriété inconnue «\u00A0${a.key}\u00A0» sur ${a.entity}. Le moteur de rendu l'ignore.${
+            a.suggested ? ` Vouliez-vous dire «\u00A0${a.suggested}\u00A0»\u00A0?` : ''
+        }`,
 };
