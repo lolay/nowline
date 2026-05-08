@@ -38,6 +38,14 @@ nowline v1
 
 The DSL version is an integer-only major (`v1`, `v2`, `v3`, …) and is **independent of the package version**. The packages (`@nowline/cli`, the VS Code extension, etc.) ship under SemVer (`MAJOR.MINOR.PATCH`, see `specs/releasing.md`); the DSL major exists separately to express format-stability. Within a DSL major, the parser must accept every valid file written for that major: new syntax may be added between package minor/patch releases, but no breaking change to an existing valid `nowline v1` file ships without bumping the directive to `v2`. When the parser encounters a version newer than it supports, it emits an error identifying the required version. When the directive is omitted, the parser assumes the latest version it supports.
 
+The directive line accepts optional file-level properties after the version:
+
+```nowline
+nowline v1 locale:fr-CA
+```
+
+The only directive property today is `locale:`, a BCP-47 tag controlling localized rendering and validator messages. Unknown directive keys are an error so typos surface immediately. See [`specs/localization.md`](./localization.md) for the full locale model, precedence chain, and bundle structure.
+
 `config` and `roadmap` are section markers, not indent-containers. Config keywords (`scale`, `style`, `default`, `calendar`) appear at the top level after `config`. Roadmap keywords (`person`, `team`, `anchor`, `label`, `size`, `status`, `swimlane`, `milestone`, `footnote`) appear at the top level after `roadmap`. Indentation is used where nesting is real: style properties under `style`, `scale` and `calendar` block properties under their keyword, team members under `team`, and swimlane contents under `swimlane`.
 
 ## Full Example
@@ -133,9 +141,9 @@ footnote capacity-risk "Team capacity risk" on:[mobile, platform]
 ### Directives
 
 
-| Keyword   | Purpose                 | Notes                                                                                  |
-| --------- | ----------------------- | -------------------------------------------------------------------------------------- |
-| `nowline` | DSL version declaration | `nowline v1`. Optional but recommended. Must be the first non-comment, non-blank line. |
+| Keyword   | Purpose                 | Notes                                                                                                                                       |
+| --------- | ----------------------- | ------------------------------------------------------------------------------------------------------------------------------------------- |
+| `nowline` | DSL version declaration | `nowline v1`. Optional but recommended. Must be the first non-comment, non-blank line. Accepts optional `locale:<bcp47>` (see `localization.md`). |
 
 
 ### Section Markers
@@ -971,7 +979,7 @@ Examples:
 - `item "Auth refactor" size:l` — title only, auto-id: `auth-refactor`
 - `item auth-refactor size:l` — id only, display name: `auth-refactor`
 
-The `nowline v1` version directive is the only positional (non-entity) construct in the language; every other declaration follows the Universal Declaration Pattern.
+The `nowline` directive is the only construct without an id or title; every other declaration follows the Universal Declaration Pattern. The directive accepts optional `key:value` properties after the version (currently just `locale:`) using the same `BlockProperty` shape as the indented `scale` and `calendar` blocks.
 
 ### Identifiers
 

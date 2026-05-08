@@ -45,6 +45,21 @@ describe('canonical printer rules', () => {
         expect(out).toMatch(/\n    description "hello"/);
     });
 
+    it('preserves locale: on the directive line through a round-trip', async () => {
+        const out = await canonical(
+            `nowline v1 locale:fr-CA\nroadmap r "R"\nswimlane s "S"\n  item x "X" duration:1w\n`,
+        );
+        expect(out).toMatch(/^nowline v1 locale:fr-CA\n/);
+    });
+
+    it('directive without properties round-trips byte-stable', async () => {
+        const out = await canonical(
+            `nowline v1\nroadmap r "R"\nswimlane s "S"\n  item x "X" duration:1w\n`,
+        );
+        expect(out).toMatch(/^nowline v1\n/);
+        expect(out).not.toMatch(/locale:/);
+    });
+
     it('orders header-position after calendar on default roadmap', async () => {
         const out = await canonical(
             `config\ndefault roadmap header-position:above calendar:full\nroadmap r "R"\nswimlane s "S"\n  item x "X" duration:1w\n`,

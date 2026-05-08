@@ -153,6 +153,48 @@ Default: today (the OS calendar date in UTC).
 Pass
 .Fl -now Sq -
 to suppress the now-line entirely.
+.It Fl -locale Ar bcp47
+BCP-47 language tag for the operator's CLI message output (validator
+diagnostics on standard error,
+.Fl -help ,
+parse errors, verbose logs).
+Examples:
+.Sy en-US , fr , fr-CA , fr-FR .
+.Pp
+Nowline keeps two independent locale chains so a French operator
+can read errors in French while still rendering an English roadmap
+authored by an American teammate (and vice-versa):
+.Bl -tag -width Ds
+.It Em Content locale Pq baked into the rendered SVG / PDF / etc.
+File's
+.Sy nowline v1 locale:
+directive
+\(->
+.Fl -locale
+\(->
+.Ev LC_ALL Ns / Ns Ev LC_MESSAGES Ns / Ns Ev LANG
+\(->
+.Sy en-US .
+The file always wins; the operator's locale only acts as a fallback
+when the file declines to declare its own.
+.It Em Operator locale Pq stderr / stdout messages
+.Fl -locale
+\(->
+.Ev LC_ALL Ns / Ns Ev LC_MESSAGES Ns / Ns Ev LANG
+\(->
+.Sy en-US .
+Independent of the file directive: a French
+.Ev LANG
+keeps validator errors in French even when the file says
+.Sy locale:en-US .
+.El
+.Pp
+Bundles fall back along the BCP-47 chain
+.Pq Sy fr-CA No \(-> Sy fr No \(-> Sy en-US ,
+so missing entries are silently filled in.
+See
+.Pa specs/localization.md
+for the resolution matrix.
 .It Fl -no-links
 Omit link icons from rendered items.
 .It Fl s , -scale Ar n
@@ -249,6 +291,30 @@ matching
 .Xr curl 1
 and
 .Xr ssh 1 .
+.Sh ENVIRONMENT
+.Bl -tag -width Ev
+.It Ev LC_ALL , LC_MESSAGES , LANG
+Operator locale fallback when
+.Fl -locale
+is absent.
+First non-empty value wins, in the order listed.
+POSIX-style suffixes
+.Pq Sq .UTF-8 , Sq @euro
+are stripped and the result is normalized to BCP-47.
+.Pp
+Affects the operator chain
+.Pq stderr / stdout, validator diagnostics, --help, errors, verbose logs
+unconditionally.
+Affects the content chain
+.Pq rendered axis labels, now-pill, quarter prefix
+only when the file does not declare its own
+.Sy nowline v1 locale:
+directive — the file directive always wins for the rendered
+artifact.
+See
+.Pa specs/localization.md
+for the resolution matrix.
+.El
 .Sh FILES
 .Bl -tag -width Pa
 .It Pa .nowlinerc
@@ -257,7 +323,7 @@ Walked up from the input file's directory; nearest one wins.
 CLI flags override config values.
 Recognized keys:
 .Sy theme , defaultFormat , width , pdfPageSize , pdfOrientation ,
-.Sy pdfMargin , fontSans , fontMono , headlessFonts .
+.Sy pdfMargin , fontSans , fontMono , headlessFonts , locale .
 Unknown keys are ignored.
 .El
 .Sh EXIT STATUS
@@ -312,6 +378,19 @@ PDF with explicit page geometry, byte-stable across machines:
 .Bd -literal -offset indent
 nowline roadmap.nowline -f pdf --page-size a4 \\
     --orientation landscape --margin 0.5in --headless
+.Ed
+.Pp
+Read errors and diagnostics in French while rendering whatever
+locale the file declares:
+.Bd -literal -offset indent
+nowline roadmap.nowline --locale fr-CA
+.Ed
+.Pp
+Set the rendered artifact's locale at the file level so it stays
+French no matter who runs
+.Nm :
+.Bd -literal -offset indent
+nowline v1 locale:fr-CA
 .Ed
 .Sh SEE ALSO
 .Lk https://github.com/lolay/nowline "Source code, issues, and full DSL reference"

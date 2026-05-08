@@ -53,6 +53,84 @@ swimlane build "Build"
         expect(model.nowline!.x).toBeGreaterThan(model.timeline.originX);
     });
 
+    it('now-pill: en-US default produces 36px width with `now` label', async () => {
+        const src = `nowline v1\n\nroadmap r1 "R" start:2026-01-01 length:26w\n\nswimlane a "A"\n  item x duration:1w\n`;
+        const { file, resolved } = await parseAndResolve(src);
+        const model = layoutRoadmap(file, resolved, {
+            theme: 'light',
+            today: new Date(Date.UTC(2026, 2, 1)),
+        });
+        expect(model.nowline!.label).toBe('now');
+        expect(model.nowline!.pillWidth).toBe(36);
+    });
+
+    it('now-pill: fr locale grows the pill to fit `maint.`', async () => {
+        const src = `nowline v1\n\nroadmap r1 "R" start:2026-01-01 length:26w\n\nswimlane a "A"\n  item x duration:1w\n`;
+        const { file, resolved } = await parseAndResolve(src);
+        const model = layoutRoadmap(file, resolved, {
+            theme: 'light',
+            today: new Date(Date.UTC(2026, 2, 1)),
+            locale: 'fr',
+        });
+        expect(model.nowline!.label).toBe('maint.');
+        // Floored at 36 (default); fr label 'maint.' (6 chars × 10px × 0.58 + 12 inset
+        // ≈ 47px) clears the floor and grows the pill.
+        expect(model.nowline!.pillWidth).toBeGreaterThan(36);
+    });
+
+    it('now-pill: fr-CA falls through fr overlay and renders the same pill width as fr', async () => {
+        const src = `nowline v1\n\nroadmap r1 "R" start:2026-01-01 length:26w\n\nswimlane a "A"\n  item x duration:1w\n`;
+        const { file, resolved } = await parseAndResolve(src);
+        const fr = layoutRoadmap(file, resolved, {
+            theme: 'light',
+            today: new Date(Date.UTC(2026, 2, 1)),
+            locale: 'fr',
+        });
+        const frCA = layoutRoadmap(file, resolved, {
+            theme: 'light',
+            today: new Date(Date.UTC(2026, 2, 1)),
+            locale: 'fr-CA',
+        });
+        expect(frCA.nowline!.label).toBe(fr.nowline!.label);
+        expect(frCA.nowline!.pillWidth).toBe(fr.nowline!.pillWidth);
+    });
+
+    it('locale: directive locale honored when LayoutOptions.locale is undefined', async () => {
+        const src = `nowline v1 locale:fr\n\nroadmap r1 "R" start:2026-01-01 length:26w\n\nswimlane a "A"\n  item x duration:1w\n`;
+        const { file, resolved } = await parseAndResolve(src);
+        const model = layoutRoadmap(file, resolved, {
+            theme: 'light',
+            today: new Date(Date.UTC(2026, 2, 1)),
+        });
+        expect(model.nowline!.label).toBe('maint.');
+    });
+
+    it('locale: file directive wins over LayoutOptions.locale (content-chain precedence)', async () => {
+        // The file is the artifact: a French roadmap stays French even when
+        // an operator passes `--locale en-US`. The override only acts as a
+        // fallback when the file declines to declare its own locale. See
+        // specs/localization.md for the two-chain model.
+        const src = `nowline v1 locale:fr\n\nroadmap r1 "R" start:2026-01-01 length:26w\n\nswimlane a "A"\n  item x duration:1w\n`;
+        const { file, resolved } = await parseAndResolve(src);
+        const model = layoutRoadmap(file, resolved, {
+            theme: 'light',
+            today: new Date(Date.UTC(2026, 2, 1)),
+            locale: 'en-US',
+        });
+        expect(model.nowline!.label).toBe('maint.');
+    });
+
+    it('locale: LayoutOptions.locale used as fallback when the file omits the directive', async () => {
+        const src = `nowline v1\n\nroadmap r1 "R" start:2026-01-01 length:26w\n\nswimlane a "A"\n  item x duration:1w\n`;
+        const { file, resolved } = await parseAndResolve(src);
+        const model = layoutRoadmap(file, resolved, {
+            theme: 'light',
+            today: new Date(Date.UTC(2026, 2, 1)),
+            locale: 'fr',
+        });
+        expect(model.nowline!.label).toBe('maint.');
+    });
+
     it('resolves anchors to their date x-coordinate', async () => {
         const src = `nowline v1\n\nroadmap r1 "R" start:2026-01-01 length:26w\n\nanchor launch "Launch" date:2026-03-01\n\nswimlane a "A"\n  item x duration:1w\n`;
         const { file, resolved } = await parseAndResolve(src);

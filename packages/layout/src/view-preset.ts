@@ -11,6 +11,7 @@
 
 import type { NowlineFile, ScaleBlock } from '@nowline/core';
 import { addDays } from './calendar.js';
+import { DEFAULT_LOCALE, localeStrings } from './i18n.js';
 import { DEFAULT_PIXELS_PER_DAY, LABEL_THINNING } from './themes/shared.js';
 import type { PositionedTick } from './types.js';
 import type { TimeScale } from './time-scale.js';
@@ -122,6 +123,7 @@ export function buildHeaderTicks(
     scale: TimeScale,
     preset: ViewPreset,
     calendar: WorkingCalendar,
+    locale: string = DEFAULT_LOCALE,
 ): PositionedTick[] {
     const dayPerTick = calendar.daysPerUnit(preset.unit);
     const stridePx = dayPerTick * scale.pixelsPerDay;
@@ -138,27 +140,27 @@ export function buildHeaderTicks(
             labelX: isLast ? undefined : x + stridePx / 2,
             major: isMajor,
             label: isMajor && !isLast
-                ? formatTickLabel(preset.unit, addDays(scale.domain[0], days), i)
+                ? formatTickLabel(preset.unit, addDays(scale.domain[0], days), i, locale)
                 : undefined,
         });
     }
     return ticks;
 }
 
-function formatTickLabel(unit: ScaleUnit, date: Date, index: number): string {
+function formatTickLabel(unit: ScaleUnit, date: Date, _index: number, locale: string): string {
     switch (unit) {
         case 'days':
             return `${date.getUTCMonth() + 1}/${date.getUTCDate()}`;
         case 'weeks': {
-            const month = date.toLocaleString('en-US', { month: 'short', timeZone: 'UTC' });
+            const month = date.toLocaleString(locale, { month: 'short', timeZone: 'UTC' });
             const day = date.getUTCDate().toString().padStart(2, '0');
             return `${month} ${day}`;
         }
         case 'months':
-            return date.toLocaleString('en-US', { month: 'short', timeZone: 'UTC' });
+            return date.toLocaleString(locale, { month: 'short', timeZone: 'UTC' });
         case 'quarters': {
             const q = Math.floor(date.getUTCMonth() / 3) + 1;
-            return `Q${q} ${date.getUTCFullYear()}`;
+            return `${localeStrings(locale).quarterPrefix}${q} ${date.getUTCFullYear()}`;
         }
         case 'years':
             return `${date.getUTCFullYear()}`;

@@ -44,6 +44,13 @@ RENDER OPTIONS
       --strict            Promote asset / sanitizer warnings to errors.
   -w, --width <px>        Canvas width in pixels (default: 1280).
       --asset-root <dir>  Root for logo / image assets (default: input dir).
+      --locale <bcp47>    BCP-47 locale (e.g. fr, fr-CA) for CLI message
+                          output (validator diagnostics, --help, errors).
+                          Used as a fallback for the rendered drawing only
+                          when the file does not declare its own
+                          'nowline v1 locale:' directive — the file always
+                          wins for content. Falls back to LC_ALL /
+                          LC_MESSAGES / LANG, then en-US.
 
 SERVE OPTIONS
   -p, --port <n>          Port (default: 4318).

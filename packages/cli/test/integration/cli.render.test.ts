@@ -222,3 +222,187 @@ describeBuilt('verbless render (requires `pnpm build`)', () => {
         expect(r.stderr).toMatch(/msproj|xml/i);
     });
 });
+
+describeBuilt('verbless render — locale precedence (two-chain model)', () => {
+    // File declares `locale:fr-CA`. Operator passes `--locale en-US`. Per
+    // the two-chain model, the rendered SVG must remain in French (file
+    // wins for content) while operator-facing messages use en-US. Here we
+    // verify the artifact half of the rule end-to-end.
+    it('file `locale:fr-CA` wins over `--locale en-US` for rendered SVG', async () => {
+        await withTempDir(async (dir) => {
+            const source = path.join(dir, 'fr-sample.nowline');
+            await fs.writeFile(source, [
+                'nowline v1 locale:fr-CA',
+                '',
+                'roadmap r1 "R" start:2026-01-01 length:26w',
+                '',
+                'swimlane a "A"',
+                '  item x duration:1w',
+                '',
+            ].join('\n'));
+            const r = await runCliBuilt([
+                source,
+                '--locale', 'en-US',
+                '--now', '2026-02-01',
+                '-o', '-',
+            ], { cwd: dir });
+            expect(r.exitCode).toBe(0);
+            // The now-pill is the headline localized string. "maint." is
+            // French for "maintenant" (the short-form "now") and proves
+            // the file directive's `fr-CA` won over the operator's
+            // `--locale en-US`. (We don't assert absence of literal
+            // "now" because the "Powered by now|line" attribution
+            // contains a literal English "now" in every locale.)
+            expect(r.stdout).toContain('>maint.<');
+        });
+    });
+
+    // The operator chain still acts as a fallback when the file declines
+    // to set its own locale. Same `--locale en-US` here, but the file has
+    // no directive, so the rendered SVG is en-US.
+    it('--locale fr fallback applies when the file omits locale:', async () => {
+        await withTempDir(async (dir) => {
+            const source = path.join(dir, 'no-directive.nowline');
+            await fs.writeFile(source, [
+                'nowline v1',
+                '',
+                'roadmap r1 "R" start:2026-01-01 length:26w',
+                '',
+                'swimlane a "A"',
+                '  item x duration:1w',
+                '',
+            ].join('\n'));
+            const r = await runCliBuilt([
+                source,
+                '--locale', 'fr-CA',
+                '--now', '2026-02-01',
+                '-o', '-',
+            ], { cwd: dir });
+            expect(r.exitCode).toBe(0);
+            expect(r.stdout).toContain('>maint.<');
+        });
+    });
+
+    // Verbose mode prints exactly one `nowline: locale=...` line on
+    // stderr after parse, naming the source so an operator can see at a
+    // glance which chain won.
+    it('--verbose logs the content locale source on stderr (file directive)', async () => {
+        await withTempDir(async (dir) => {
+            const source = path.join(dir, 'fr-sample.nowline');
+            await fs.writeFile(source, [
+                'nowline v1 locale:fr-CA',
+                '',
+                'roadmap r1 "R" start:2026-01-01 length:26w',
+                '',
+                'swimlane a "A"',
+                '  item x duration:1w',
+                '',
+            ].join('\n'));
+            const r = await runCliBuilt([source, '--verbose', '-o', '-'], { cwd: dir });
+            expect(r.exitCode).toBe(0);
+            expect(r.stderr).toContain('nowline: locale=fr-CA (from file directive)');
+        });
+    });
+
+    it('--verbose logs the content locale source on stderr (--locale fallback)', async () => {
+        await withTempDir(async (dir) => {
+            const source = path.join(dir, 'no-directive.nowline');
+            await fs.writeFile(source, [
+                'nowline v1',
+                '',
+                'roadmap r1 "R" start:2026-01-01 length:26w',
+                '',
+                'swimlane a "A"',
+                '  item x duration:1w',
+                '',
+            ].join('\n'));
+            const r = await runCliBuilt([
+                source,
+                '--locale', 'fr-CA',
+                '--verbose',
+                '-o', '-',
+            ], { cwd: dir });
+            expect(r.exitCode).toBe(0);
+            expect(r.stderr).toContain('nowline: locale=fr-CA (from --locale)');
+        });
+    });
+
+    // The split-locale headline test: file declares `locale:fr-CA` and
+    // contains a validator error, but the operator is on en-US. The
+    // operator must see the diagnostic in English (operator chain wins
+    // for stderr) while the rendered artifact, had it been valid, would
+    // have been French. We run with a deliberately invalid roadmap to
+    // exercise the diagnostic path.
+    it('split-locale: operator sees en-US diagnostic even when file says fr-CA', async () => {
+        await withTempDir(async (dir) => {
+            const source = path.join(dir, 'bad-fr.nowline');
+            // Anchor without `date:` — fires NL.E0500.
+            await fs.writeFile(source, [
+                'nowline v1 locale:fr-CA',
+                '',
+                'roadmap r1 "R" start:2026-01-01 length:26w',
+                '',
+                'swimlane a "A"',
+                '  item x duration:1w',
+                '',
+                'anchor launch "Launch"',
+                '',
+            ].join('\n'));
+            const r = await runCliBuilt([source, '--locale', 'en-US', '-o', '-'], {
+                cwd: dir,
+                env: { LC_ALL: '', LC_MESSAGES: '', LANG: '' },
+            });
+            expect(r.exitCode).not.toBe(0);
+            expect(r.stderr).toMatch(/Anchor "launch" requires/);
+            expect(r.stderr).not.toMatch(/L'ancre/);
+        });
+    });
+
+    // Mirror of the above with the operator on fr — even when no file
+    // directive is present, the operator's locale governs diagnostics.
+    it('split-locale: operator sees fr diagnostic when --locale fr (no file directive)', async () => {
+        await withTempDir(async (dir) => {
+            const source = path.join(dir, 'bad-en.nowline');
+            await fs.writeFile(source, [
+                'nowline v1',
+                '',
+                'roadmap r1 "R" start:2026-01-01 length:26w',
+                '',
+                'swimlane a "A"',
+                '  item x duration:1w',
+                '',
+                'anchor launch "Launch"',
+                '',
+            ].join('\n'));
+            const r = await runCliBuilt([source, '--locale', 'fr', '-o', '-'], {
+                cwd: dir,
+                env: { LC_ALL: '', LC_MESSAGES: '', LANG: '' },
+            });
+            expect(r.exitCode).not.toBe(0);
+            expect(r.stderr).toMatch(/L'ancre/);
+        });
+    });
+
+    it('--verbose logs the content locale source on stderr (default en-US)', async () => {
+        await withTempDir(async (dir) => {
+            const source = path.join(dir, 'no-directive.nowline');
+            await fs.writeFile(source, [
+                'nowline v1',
+                '',
+                'roadmap r1 "R" start:2026-01-01 length:26w',
+                '',
+                'swimlane a "A"',
+                '  item x duration:1w',
+                '',
+            ].join('\n'));
+            // No --locale, no env override. The verbose line should
+            // report the `default` source, not pretend a flag was set.
+            const r = await runCliBuilt([source, '--verbose', '-o', '-'], {
+                cwd: dir,
+                env: { LC_ALL: '', LC_MESSAGES: '', LANG: '' },
+            });
+            expect(r.exitCode).toBe(0);
+            expect(r.stderr).toContain('nowline: locale=en-US (default)');
+        });
+    });
+});

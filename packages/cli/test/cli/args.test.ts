@@ -120,6 +120,16 @@ describe('parseArgv — mutual exclusivity', () => {
 
 });
 
+describe('parseArgv — locale', () => {
+    it('--locale populates `locale`', () => {
+        expect(parseArgv(['foo.nowline', '--locale', 'fr-CA']).locale).toBe('fr-CA');
+    });
+
+    it('omitting --locale leaves locale undefined (env-var fallback happens in render)', () => {
+        expect(parseArgv(['foo.nowline']).locale).toBeUndefined();
+    });
+});
+
 describe('parseArgv — now-line flag', () => {
     it('--now <date> populates `now`', () => {
         const r = parseArgv(['foo.nowline', '--now', '2026-04-29']);

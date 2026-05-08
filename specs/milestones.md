@@ -28,6 +28,7 @@ Commercial milestones (hosted editor, free viewer, MCP, enterprise, FedRAMP) are
 | ~~m2j~~ | ~~Capacity & utilization~~ | Apache 2.0 | `capacity:` on swimlanes and items, `capacity-icon:` glyph vocabulary, `size <id> effort:N` declarations with item-derived durations, `remaining:` literal form, tri-state lane utilization underline (`utilization-warn-at:N`, `utilization-over-at:N`) |
 | ~~m2k~~ | ~~Dependency arrow attach + routing~~ | Apache 2.0 | Visual-edge attach with flow dedupe; channel-based orthogonal router (item-bar obstacles, parallel/group bracket-clearance nudge, slot assignment, under-bar fallback); min-stub constraints + parallel bracket-foot clearance |
 | m2l | Manual page | Apache 2.0 | Hand-authored mdoc `nowline.1` shipped through every install channel (Homebrew tap, `.deb`, npm `"man"`, GitHub Release asset) so `man nowline` works after any package-manager install |
+| m2m | Localization (fr) | Apache 2.0 | `locale:` on the `nowline` directive; `--locale` flag and `LC_ALL`/`LC_MESSAGES`/`LANG` fallback; CLDR-style bundle tree (`fr` neutral base + empty `fr-CA` / `fr-FR` overlays); error-code-keyed validator messages; translated `man/fr/nowline.1`; per-channel install wiring for translated man pages |
 | ~~m3a~~ | ~~LSP server~~ | Apache 2.0 | Langium-based language server (`@nowline/lsp`): validation, definition, references, rename, hover, completion, document symbols, folding |
 | ~~m3b~~ | ~~VS Code/Cursor extension scaffold~~ | Apache 2.0 | Bundled `.vsix`: TextMate grammar, language config, snippets, file icon, LSP client, trace setting |
 | ~~m3c~~ | ~~Live preview~~ | Apache 2.0 | Side-or-behind preview panel; host-side render pipeline (parse + layout + renderSvg) posts SVG to a webview; clickable diagnostic table; toolbar zoom/pan/fit/save/copy; Cmd-wheel & pinch zoom; keyboard presets; minimap; five `nowline.preview.*` settings |
@@ -308,6 +309,22 @@ Distribution-polish milestone: a hand-authored `nowline.1` page so `man nowline`
 - **GitHub Release asset:** the `release` job stages `packages/cli/man/nowline.1` alongside the six platform binaries and two `.deb`s; advanced direct-download users can grab it from the same release page.
 
 The mdoc `.Dd $Mdocdate$` placeholder is substituted by groff at render time from the file's mtime, so the source bytes don't change between releases. Mirrors the d2 pattern; we evaluated `pandoc -t man`, `marked-man`, and `scdoc` and picked hand-authored mdoc for its zero build dependencies (see [`specs/cli-distribution.md`](./cli-distribution.md)).
+
+### m2m — Localization (fr)
+
+Localization milestone landing the architecture (file-level locale property, env-var-aware CLI flag, CLDR-style fallback resolver, error-code-keyed validator messages) plus the first non-English bundle. Quebec is the driver: `fr-CA` users get a translated man page and validator messages immediately; the architecture leaves room for future `es`, `de`, `ja`, RTL/CJK locales without rework.
+
+Three surfaces become locale-aware:
+
+- **Render** — axis tick labels (`Intl.DateTimeFormat` keyed on the resolved locale), now-pill text, quarter prefix (`Q`/`T`), footnote sort.
+- **Pipeline** — validator messages and CLI help, extracted into stable error-coded bundles (`NL.E####`); a CI check enforces every key in `messages.en.ts` exists in `messages.fr.ts`.
+- **Man page** — `packages/cli/man/fr/nowline.1` (full neutral-French translation) plus per-channel install wiring (Homebrew loop, `.deb` `/usr/share/man/<locale>/man1/`, npm `"man"` array, GitHub Release assets).
+
+Bundle layout mirrors the CLDR tree (`root → fr → {fr-CA, fr-FR}`); regional overlays start empty and exist only as a contract for future divergence. The loader strips trailing subtags and retries, so future `fr-BE` / `fr-CH` resolve through `fr` automatically.
+
+DSL non-goals: keywords and identifier characters stay English/ASCII (every diagram-tool peer that translated keywords regretted it). Author-facing localization runs through arbitrary-UTF-8 titles (`item research "Investigación"`).
+
+Spec: [`specs/localization.md`](./localization.md)
 
 ### ~~m3a — LSP server~~
 

@@ -65,6 +65,39 @@ describe('validation rules', () => {
         expect(hasError(errorMessages(r.diagnostics), /requires.*v99|only supports/i)).toBe(true);
     });
 
+    it('Directive locale: well-formed BCP-47 tag parses cleanly', async () => {
+        for (const tag of ['en-US', 'fr', 'fr-CA', 'fr-FR', 'zh-CN', 'es-419']) {
+            const r = await parse(`nowline v1 locale:${tag}\nroadmap r\nswimlane s\n  item x duration:1w\n`);
+            expect(errorMessages(r.diagnostics)).toEqual([]);
+            expect(r.ast.directive?.properties[0]?.value).toBe(tag);
+        }
+    });
+
+    it('Directive locale: malformed tag is an error', async () => {
+        const r = await parse(`nowline v1 locale:englishUS\nroadmap r\nswimlane s\n  item x duration:1w\n`);
+        expect(hasError(errorMessages(r.diagnostics), /Invalid locale.*BCP-47/i)).toBe(true);
+    });
+
+    it('Directive locale: unknown directive property is an error', async () => {
+        const r = await parse(`nowline v1 strict:true\nroadmap r\nswimlane s\n  item x duration:1w\n`);
+        expect(hasError(errorMessages(r.diagnostics), /Unknown directive property/i)).toBe(true);
+    });
+
+    it('Directive locale: duplicate keys are rejected', async () => {
+        // Both values are en-US so the duplicate-detection message itself is
+        // emitted in English (validation messages localize to the file's own
+        // declared locale; switching locale here would only test the French
+        // bundle, not the rule).
+        const r = await parse(`nowline v1 locale:en-US locale:en-US\nroadmap r\nswimlane s\n  item x duration:1w\n`);
+        expect(hasError(errorMessages(r.diagnostics), /Duplicate directive property/i)).toBe(true);
+    });
+
+    it('Directive: bare `nowline v1` without properties stays valid', async () => {
+        const r = await parse(`nowline v1\nroadmap r\nswimlane s\n  item x duration:1w\n`);
+        expect(errorMessages(r.diagnostics)).toEqual([]);
+        expect(r.ast.directive?.properties).toEqual([]);
+    });
+
     it('Rule 6: roadmap without swimlane is an error', async () => {
         const r = await parse(`roadmap r "R"\n`);
         expect(hasError(errorMessages(r.diagnostics), /swimlane/i)).toBe(true);

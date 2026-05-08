@@ -325,9 +325,20 @@ The CLI reads an optional `.nowlinerc` file (JSON or YAML) from the current dire
 }
 ```
 
-CLI flags override config file values. Environment variables are not supported in m2 — keep it simple.
+CLI flags override config file values. The narrow exception is locale (see below): Nowline honors `LC_ALL` / `LC_MESSAGES` / `LANG` because every Unix tool author's `man` page reader, terminal, and OS already does. Other environment variables are not supported in m2 — keep it simple.
 
 The `defaultFormat` key participates in the format-resolution chain (step 3): used when neither `-f` nor a recognized `-o` extension is present.
+
+## Localization
+
+Nowline localizes axis tick labels, the now-pill text, the quarter prefix, footnote sort, validator messages, and the man page. DSL keywords stay English/ASCII.
+
+Two independent locale chains, one per surface:
+
+- **Content chain** (the rendered SVG / PDF / etc.): file's `nowline v1 locale:` directive → `--locale` → `LC_ALL` / `LC_MESSAGES` / `LANG` → `.nowlinerc` `locale` → `en-US`. The file always wins for the artifact so a French roadmap stays French regardless of the operator's shell — same idea as HTML's `lang` and AsciiDoc's `:lang:`.
+- **Operator chain** (terminal output: validator diagnostics, `--help`, errors, verbose logs): `--locale` → `LC_ALL` / `LC_MESSAGES` / `LANG` → `.nowlinerc` `locale` → `en-US`. The file's directive never enters this chain — operator-facing text follows the operator's environment.
+
+Bundles follow the CLDR locale tree (`root → fr → {fr-CA, fr-FR}`); the loader strips trailing subtags and retries, so any future `fr-BE` resolves through `fr` for free. See [`specs/localization.md`](./localization.md) for the resolution matrix, bundle layout, fallback chain, error-code policy, and translation strategy.
 
 ## Distribution Pipeline
 

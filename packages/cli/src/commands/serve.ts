@@ -9,6 +9,12 @@ import { renderSvg } from '@nowline/renderer';
 import { createAssetResolver } from './render.js';
 import { formatDiagnostics, type DiagnosticSource } from '../diagnostics/index.js';
 import type { ParsedArgs } from '../cli/args.js';
+import {
+    describeContentLocaleSource,
+    operatorLocale,
+    readDirectiveLocale,
+    resolveLocaleOverride,
+} from '../i18n/locale.js';
 
 export interface ServeHandlerOptions {
     args: ParsedArgs;
@@ -51,6 +57,9 @@ export async function serveHandler(options: ServeHandlerOptions): Promise<void> 
     const host = args.host ?? '127.0.0.1';
     const theme = parseTheme(args.theme);
     const today = resolveNowArg(args);
+    const resolvedLocale = resolveLocaleOverride({ flag: args.locale, env: process.env });
+    const locale = resolvedLocale.tag;
+    const opLocale = operatorLocale(resolvedLocale);
 
     const inputPath = path.resolve(cwd, args.positional);
     try {
@@ -76,11 +85,19 @@ export async function serveHandler(options: ServeHandlerOptions): Promise<void> 
             const parse = await parseSource(text, inputPath, { validate: true });
             if (parse.hasErrors) {
                 const sources = new Map<string, DiagnosticSource>([[inputPath, parse.source]]);
-                const rendered = formatDiagnostics(parse.diagnostics, 'text', sources, { color: false });
+                const rendered = formatDiagnostics(parse.diagnostics, 'text', sources, {
+                    color: false,
+                    operatorLocale: opLocale,
+                });
                 lastPayload = { kind: 'error', body: rendered };
                 process.stderr.write(`${rendered}\n`);
                 broadcast(clients, 'error', rendered);
                 return;
+            }
+            if (args.logLevel === 'verbose') {
+                const directive = readDirectiveLocale(parse.ast);
+                const { tag, source } = describeContentLocaleSource(directive, resolvedLocale);
+                process.stderr.write(`nowline: locale=${tag} (${source})\n`);
             }
             const resolved = await resolveIncludes(parse.ast, inputPath, {
                 services: getServices().Nowline,
@@ -94,7 +111,7 @@ export async function serveHandler(options: ServeHandlerOptions): Promise<void> 
                 broadcast(clients, 'error', msg);
                 return;
             }
-            const model = layoutRoadmap(parse.ast, resolved, { theme, today });
+            const model = layoutRoadmap(parse.ast, resolved, { theme, today, locale });
             const svg = await renderSvg(model, {
                 assetResolver: createAssetResolver(assetRoot),
                 warn: (m) => process.stderr.write(`warning: ${m}\n`),

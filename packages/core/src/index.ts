@@ -13,3 +13,10 @@ export {
     type IncludeMode,
     type ResolveIncludesOptions,
 } from './language/include-resolver.js';
+export {
+    tr,
+    registerBundle,
+    type MessageBundle,
+    type MessageArgs,
+} from './i18n/index.js';
+export { type MessageCode, ALL_CODES } from './i18n/codes.js';

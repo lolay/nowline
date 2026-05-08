@@ -340,6 +340,17 @@ jobs:
           mkdir -p release-assets
           find artifacts -type f \( -name 'nowline-*' -o -name '*.deb' \) -exec cp {} release-assets/ \;
           cp packages/cli/man/nowline.1 release-assets/
+          # Translated man pages flatten to nowline.<locale>.1 in the release
+          # assets so the URLs stay predictable. Loop runs zero times when
+          # no overlay directories exist, so adding a new locale is a
+          # pure-data drop with no workflow change.
+          for d in packages/cli/man/*/; do
+            [ -d "$d" ] || continue
+            locale="$(basename "$d")"
+            src="${d}nowline.1"
+            [ -f "$src" ] || continue
+            cp "$src" "release-assets/nowline.${locale}.1"
+          done
           ls -la release-assets
 
       - name: Publish GitHub Release
@@ -398,7 +409,32 @@ jobs:
           SHA_DARWIN_X64=$(sha256sum nowline-macos-x64/nowline-macos-x64 | awk '{print $1}')
           SHA_LINUX_X64=$(sha256sum nowline-linux-x64/nowline-linux-x64 | awk '{print $1}')
           SHA_LINUX_ARM64=$(sha256sum nowline-linux-arm64/nowline-linux-arm64 | awk '{print $1}')
-          cd ../tap
+          cd ..
+
+          # Discover locale overlays and emit the matching `resource` /
+          # `man.install` lines. The empty overlay case (no files under
+          # packages/cli/man/<locale>/) skips both blocks cleanly.
+          MAN_RESOURCES=""
+          MAN_INSTALL=""
+          for d in src/packages/cli/man/*/; do
+            [ -d "$d" ] || continue
+            locale="$(basename "$d")"
+            srcfile="${d}nowline.1"
+            [ -f "$srcfile" ] || continue
+            sha=$(sha256sum "$srcfile" | awk '{print $1}')
+            res_name="manpage-${locale}"
+            asset="nowline.${locale}.1"
+            MAN_RESOURCES+="
+            resource \"${res_name}\" do
+              url \"https://github.com/lolay/nowline/releases/download/v${VERSION}/${asset}\"
+              sha256 \"${sha}\"
+            end
+"
+            MAN_INSTALL+="
+              resource(\"${res_name}\").stage { (share/\"man/${locale}/man1\").install \"${asset}\" => \"nowline.1\" }"
+          done
+
+          cd tap
           mkdir -p Formula
           cat > Formula/nowline.rb <<EOF
           class Nowline < Formula
@@ -436,10 +472,10 @@ jobs:
               url "https://github.com/lolay/nowline/releases/download/v${VERSION}/nowline.1"
               sha256 "${SHA_MANPAGE}"
             end
-
+${MAN_RESOURCES}
             def install
               bin.install Dir["nowline-*"].first => "nowline"
-              resource("manpage").stage { man1.install "nowline.1" }
+              resource("manpage").stage { man1.install "nowline.1" }${MAN_INSTALL}
             end
 
             test do

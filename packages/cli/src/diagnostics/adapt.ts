@@ -1,4 +1,4 @@
-import type { CliDiagnostic, DiagnosticSeverity } from './model.js';
+import type { CliDiagnostic, DiagnosticSeverity, LocalizedMessageData } from './model.js';
 
 // Minimal LSP-style diagnostic shape. Langium re-exports vscode-languageserver-types'
 // Diagnostic internally; we keep a narrow local type to avoid a direct coupling and
@@ -11,6 +11,13 @@ export interface LangiumLikeDiagnostic {
         start: { line: number; character: number };
         end: { line: number; character: number };
     };
+    /**
+     * Validator's stash for re-formattable messages. The shape is
+     * `{ code: MessageCode, args: MessageArgs<K> }`; we keep it
+     * `unknown` here to avoid coupling the CLI's diagnostic adapter
+     * to `@nowline/core`'s internal i18n types.
+     */
+    data?: unknown;
 }
 
 // Minimal shapes for chevrotain parser/lexer errors to avoid pulling chevrotain types.
@@ -38,12 +45,15 @@ export function adaptLangiumDiagnostic(diag: LangiumLikeDiagnostic, file: string
     const severity = mapSeverity(diag.severity);
     const line = (diag.range?.start.line ?? 0) + 1;
     const column = (diag.range?.start.character ?? 0) + 1;
+    const data = extractMessageData(diag.data);
     return {
         file,
         line,
         column,
         severity,
-        code: diagnosticCode(diag),
+        // Localized validator data carries the stable message code; prefer it
+        // over the heuristic message-substring inference below.
+        code: data?.code ?? diagnosticCode(diag),
         message: diag.message,
         span: diag.range
             ? {
@@ -55,7 +65,22 @@ export function adaptLangiumDiagnostic(diag: LangiumLikeDiagnostic, file: string
               }
             : undefined,
         suggestion: extractSuggestion(diag.message),
+        data,
     };
+}
+
+/**
+ * Validate the shape of `diag.data`. Validator-emitted diagnostics
+ * stash `{ code: MessageCode, args: MessageArgs<K> }` (where `args` is
+ * the spread tuple `[]` or `[{...}]`). Anything else (vscode code
+ * actions, third-party data, etc.) is ignored.
+ */
+function extractMessageData(data: unknown): LocalizedMessageData | undefined {
+    if (!data || typeof data !== 'object') return undefined;
+    const obj = data as { code?: unknown; args?: unknown };
+    if (typeof obj.code !== 'string') return undefined;
+    if (!Array.isArray(obj.args)) return undefined;
+    return { code: obj.code, args: obj.args };
 }
 
 export function adaptParserError(err: ChevrotainParserError, file: string): CliDiagnostic {

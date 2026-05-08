@@ -38,6 +38,7 @@ import { themes, type Theme, type ThemeName } from '../themes/index.js';
 import { resolveStyle, type StyleContext } from '../style-resolution.js';
 import { resolveCalendar, daysBetween, resolveSizes } from '../calendar.js';
 import { resolveScale, buildHeaderTicks } from '../view-preset.js';
+import { resolveLocale } from '../i18n.js';
 import { TimeScale } from '../time-scale.js';
 import { fromCalendarConfig } from '../working-calendar.js';
 import { defaultRowBand } from '../band-scale.js';
@@ -123,7 +124,7 @@ export interface RoadmapNodeDeps extends LayoutHelpers {
         includes: PositionedIncludeRegion[],
         ctx: LayoutContext,
     ) => PositionedDependencyEdge[];
-    buildNowline: (today: Date | undefined, ctx: LayoutContext) => PositionedNowline | null;
+    buildNowline: (today: Date | undefined, ctx: LayoutContext, locale: string) => PositionedNowline | null;
 }
 
 export class RoadmapNode {
@@ -136,6 +137,7 @@ export class RoadmapNode {
         const themeName: ThemeName = options.theme ?? 'light';
         const theme: Theme = themes[themeName];
         const width = options.width ?? 1280;
+        const locale = resolveLocale(options.locale, directiveLocale(file));
 
         const cal = resolveCalendar(file, resolved.config.calendar);
         const scale = resolveScale(file, resolved.config.scale);
@@ -304,7 +306,7 @@ export class RoadmapNode {
         const markerRowY = tickPanelY + tickPanelHeight;
         const headerRowsBottomY = markerRowY + markerRowHeight;
 
-        const ticks = buildHeaderTicks(timeScale, scale, calendar);
+        const ticks = buildHeaderTicks(timeScale, scale, calendar, locale);
         const timeline: PositionedTimelineScale = {
             box: { x: originX, y: timelineY, width: naturalWidth, height: 0 },
             ticks,
@@ -636,7 +638,7 @@ export class RoadmapNode {
         // Now-line (if today is within the window). Stops at the bottom
         // timeline panel when present, otherwise at the last swimlane —
         // see `buildNowline`. Footnote panels below do not extend it.
-        const nowline = deps.buildNowline(options.today, ctx);
+        const nowline = deps.buildNowline(options.today, ctx, locale);
 
         // Finalize footnotes at the bottom.
         const foot = buildFootnotes(resolved.content.footnotes, ctx, ctx.chartBottomY);
@@ -928,4 +930,16 @@ export function packMarkerRow(
     }
 
     return { placements, rowCount: rowSpans.length };
+}
+
+// Read the optional `locale:` property from the file's `nowline` directive.
+// Layout receives an already-parsed AST, so this is a cheap lookup with no
+// validation work — that's the validator's job in `@nowline/core`.
+function directiveLocale(file: NowlineFile): string | undefined {
+    const prop = file.directive?.properties.find((p) => stripColon(p.key) === 'locale');
+    return prop?.value;
+}
+
+function stripColon(key: string): string {
+    return key.endsWith(':') ? key.slice(0, -1) : key;
 }

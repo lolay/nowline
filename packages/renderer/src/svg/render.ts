@@ -65,7 +65,6 @@ import {
     ITEM_LINK_ICON_TILE_SIZE_PX,
     ITEM_LINK_ICON_INSET_PX,
     ITEM_DECORATION_SPILL_GAP_PX,
-    NOW_PILL_WIDTH_PX,
     NOW_PILL_HEIGHT_PX,
     NOW_PILL_CORNER_RADIUS_PX,
     NOW_PILL_LABEL_FONT_SIZE_PX,
@@ -720,11 +719,16 @@ function renderNowPillBg(n: PositionedNowline, color: string): string {
     const top = n.pillTopY;
     const bottom = n.pillTopY + NOW_PILL_HEIGHT_PX;
     const r = NOW_PILL_CORNER_RADIUS_PX;
+    // Pill width comes from the layout (`n.pillWidth`) — locale-aware,
+    // floored at `NOW_PILL_WIDTH_PX` so en-US output stays byte-stable
+    // and longer locale strings (e.g. fr `'maint.'`) grow the pill
+    // instead of clipping. See `buildNowline` in `@nowline/layout`.
+    const width = n.pillWidth;
     if (n.pillMode === 'center') {
         return tag('rect', {
-            x: num(n.x - NOW_PILL_WIDTH_PX / 2),
+            x: num(n.x - width / 2),
             y: num(top),
-            width: num(NOW_PILL_WIDTH_PX),
+            width: num(width),
             height: num(NOW_PILL_HEIGHT_PX),
             rx: r,
             ry: r,
@@ -735,7 +739,7 @@ function renderNowPillBg(n: PositionedNowline, color: string): string {
     if (n.pillMode === 'flag-right') {
         // Squared LEFT edge aligns with line's left outer stroke edge,
         // rounded corners on the RIGHT.
-        const right = edgeX + NOW_PILL_WIDTH_PX;
+        const right = edgeX + width;
         const d = [
             `M ${num(edgeX)} ${num(top)}`,
             `L ${num(right - r)} ${num(top)}`,
@@ -749,7 +753,7 @@ function renderNowPillBg(n: PositionedNowline, color: string): string {
     }
     // flag-left: squared RIGHT edge aligns with line's right outer
     // stroke edge, rounded corners on the LEFT.
-    const left = edgeX - NOW_PILL_WIDTH_PX;
+    const left = edgeX - width;
     const d = [
         `M ${num(edgeX)} ${num(top)}`,
         `L ${num(left + r)} ${num(top)}`,
@@ -787,7 +791,7 @@ function renderNowPillLabel(n: PositionedNowline, labelTextColor: string): strin
             fill: labelTextColor,
             'text-anchor': textAnchor,
         },
-        'now',
+        n.label,
     );
 }
 

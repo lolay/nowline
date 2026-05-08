@@ -9,7 +9,9 @@
   },
     "main": "./dist/index.js",
     "types": "./dist/index.d.ts",
-    "man": "./man/nowline.1",
+    "man": [
+        "./man/nowline.1"
+    ],
     "exports": {
         ".": {
             "types": "./dist/index.d.ts",

@@ -213,7 +213,19 @@ export interface PositionedNowline {
     pillTopY: number;
     /** How the pill aligns to the line (see `NowPillMode`). */
     pillMode: NowPillMode;
-    label: string;      // 'Today' by default
+    /**
+     * Locale-resolved string painted inside the pill (`'now'` for `en-US`,
+     * `'maint.'` for `fr`). Layout owns the locale lookup; the renderer
+     * just paints the string. See `packages/layout/src/i18n.ts`.
+     */
+    label: string;
+    /**
+     * Width (px) of the pill. Floored at `NOW_PILL_WIDTH_PX` so en-US
+     * (`'now'`) keeps its byte-stable 36 px footprint; longer locale
+     * strings (e.g. `'maint.'` for fr) grow the pill to fit instead of
+     * clipping. Computed in `buildNowline` from `estimateTextWidth(label)`.
+     */
+    pillWidth: number;
     style: ResolvedStyle;
 }
 

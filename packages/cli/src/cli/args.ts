@@ -41,6 +41,14 @@ export interface ParsedArgs {
     headless: boolean;
     start?: string;
 
+    /**
+     * BCP-47 locale override (`fr-CA`, `fr`, …). When omitted the CLI
+     * falls back to `LC_ALL` / `LC_MESSAGES` / `LANG`, then to the
+     * file's `nowline v1 locale:` directive, then to `en-US`. See
+     * `specs/localization.md`.
+     */
+    locale?: string;
+
     // Serve options
     port?: string;
     host?: string;
@@ -119,6 +127,9 @@ export function parseArgv(argv: readonly string[]): ParsedArgs {
             'font-mono': { type: 'string' },
             headless: { type: 'boolean' },
             start: { type: 'string' },
+
+            // Localization (m-loc-b)
+            locale: { type: 'string' },
         },
     };
 
@@ -224,6 +235,7 @@ export function parseArgv(argv: readonly string[]): ParsedArgs {
         fontMono: stringOrUndefined(values['font-mono']),
         headless: values.headless === true,
         start: stringOrUndefined(values.start),
+        locale: stringOrUndefined(values.locale),
     };
 }
 

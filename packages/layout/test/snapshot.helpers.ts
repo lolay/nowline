@@ -56,6 +56,12 @@ export interface SampleSpec {
     dir?: 'examples' | 'tests';
     /** Theme to render with. */
     theme: ThemeName;
+    /**
+     * Optional locale override. Mirrors the CLI `--locale` flag — slots in
+     * above the file's `nowline v1 locale:` directive. Omit to let the
+     * directive (or `en-US` default) win.
+     */
+    locale?: string;
 }
 
 function sourceRoot(spec: SampleSpec): string {
@@ -80,6 +86,10 @@ export const SAMPLES: SampleSpec[] = [
     { name: 'capacity-lanes', sourceFile: 'capacity-lanes.nowline', dir: 'tests', theme: 'light' },
     { name: 'capacity', sourceFile: 'capacity.nowline', theme: 'light' },
     { name: 'sizing', sourceFile: 'sizing.nowline', theme: 'light' },
+    // m2m localization: French sample exercises the now-pill, axis labels,
+    // and quarter prefix under a non-default locale. Source file already
+    // declares `locale:fr-CA` on the directive — no override needed.
+    { name: 'minimal-fr', sourceFile: 'minimal.fr.nowline', theme: 'light' },
 ];
 
 export async function renderSampleSvg(spec: SampleSpec): Promise<string> {
@@ -96,6 +106,7 @@ export async function renderSampleSvg(spec: SampleSpec): Promise<string> {
     const model = layoutRoadmap(file, resolved, {
         theme: spec.theme,
         today: FIXED_TODAY,
+        locale: spec.locale,
     });
     return renderSvg(model);
 }

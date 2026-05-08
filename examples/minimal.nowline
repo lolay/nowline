@@ -3,6 +3,11 @@ nowline v1
 roadmap minimal "Starter" start:2026-01-05 scale:2w author:"Jane Doe"
 
 swimlane engineering "Engineering"
-  item research "Research"  duration:3w status:done
-  item design   "Design"    duration:2w status:in-progress remaining:5d
-  item build    "Build"     duration:3w status:planned
+  parallel concurrent-block style:concurrent
+    group research-group "Research"
+      item research "Research"  duration:3w status:done
+      item design   "Design"    duration:2w status:in-progress remaining:5d
+      item build    "Build"     duration:3w status:planned
+    group release-group "Release"
+      item release  "Release"   duration:1w status:planned
+      item deploy   "Deploy"    duration:1w status:planned

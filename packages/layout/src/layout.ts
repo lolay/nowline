@@ -55,6 +55,7 @@ import {
     daysBetween,
 } from './calendar.js';
 import { resolveScale, buildHeaderTicks, type ViewPreset } from './view-preset.js';
+import { localeStrings } from './i18n.js';
 import { TimeScale } from './time-scale.js';
 import { fromCalendarConfig, daysPerUnit, type WorkingCalendar } from './working-calendar.js';
 import {
@@ -70,6 +71,8 @@ import {
     EDGE_CORNER_RADIUS,
     PROGRESS_STRIP_HEIGHT_PX,
     NOW_PILL_WIDTH_PX,
+    NOW_PILL_LABEL_FONT_SIZE_PX,
+    NOW_PILL_LABEL_INSET_X_PX,
 } from './themes/shared.js';
 import { BandScale, defaultRowBand } from './band-scale.js';
 import {
@@ -130,6 +133,13 @@ export interface LayoutOptions {
     theme?: ThemeName;
     today?: Date;
     width?: number;   // total SVG width in px; default 1280
+    /**
+     * BCP-47 tag controlling axis labels, the now-pill string, and the
+     * quarter prefix. Resolved by the caller (CLI flag → env vars). When
+     * undefined, layout falls back to the file's `nowline v1 locale:` and
+     * then to `en-US`. See `specs/localization.md`.
+     */
+    locale?: string;
 }
 
 export type LayoutResult = PositionedRoadmap;
@@ -1378,6 +1388,7 @@ function buildDependencies(
 function buildNowline(
     today: Date | undefined,
     ctx: LayoutContext,
+    locale: string,
 ): PositionedNowline | null {
     if (!today) return null;
     const x = ctx.scale.forwardWithinDomain(today);
@@ -1388,12 +1399,25 @@ function buildNowline(
     // visually connected.
     const pillTopY = ctx.timeline.box.y;
     const lineTopY = ctx.timeline.tickPanelY;
+    // Pill width is locale-aware: en-US's `'now'` (3 chars) fits the
+    // 36 px default trivially; longer strings like fr's `'maint.'`
+    // (6 chars) need a wider pill to avoid clipping. Floor at the
+    // default so en-US output stays byte-stable; grow when the
+    // measured label needs it. The 2× inset matches the renderer's
+    // flag-mode label inset (`NOW_PILL_LABEL_INSET_X_PX`) and gives
+    // the same visual padding to centered-mode strings.
+    const label = localeStrings(locale).nowLabel;
+    const labelTextWidth = estimateTextWidth(label, NOW_PILL_LABEL_FONT_SIZE_PX);
+    const pillWidth = Math.max(
+        NOW_PILL_WIDTH_PX,
+        Math.ceil(labelTextWidth + 2 * NOW_PILL_LABEL_INSET_X_PX),
+    );
     // The "chart's left edge" the pill must clear is `chartLeftX` (in
     // beside-mode, the right edge of the header card; in above-mode,
     // the canvas left edge at x=0). originX = chartLeftX + GUTTER_PX,
     // so we recover chartLeftX as `originX - GUTTER_PX`.
     const chartLeftX = ctx.timeline.originX - GUTTER_PX;
-    const halfPill = NOW_PILL_WIDTH_PX / 2;
+    const halfPill = pillWidth / 2;
     let pillMode: 'center' | 'flag-right' | 'flag-left';
     if (x - halfPill < chartLeftX) {
         // Centered pill would intrude into the header card / past the
@@ -1423,7 +1447,8 @@ function buildNowline(
         bottomY: lineBottomY,
         pillTopY,
         pillMode,
-        label: 'Today',
+        label,
+        pillWidth,
         style: resolveStyle('item', [], ctx.styleCtx),
     };
 }

@@ -9,7 +9,8 @@ entry NowlineFile:
     (roadmapEntries+=RoadmapEntry)*;
 
 NowlineDirective:
-    'nowline' version=ID;
+    'nowline' version=ID
+    (properties+=BlockProperty)*;
 
 IncludeDeclaration:
     'include' path=STRING

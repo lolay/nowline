@@ -22,6 +22,12 @@ import { serializeToJson } from '../convert/schema.js';
 import { printNowlineFile } from '../convert/printer.js';
 import { parseNowlineJson } from '../convert/parse-json.js';
 import type { ParsedArgs } from '../cli/args.js';
+import {
+    describeContentLocaleSource,
+    operatorLocale,
+    readDirectiveLocale,
+    resolveLocaleOverride,
+} from '../i18n/locale.js';
 
 export interface RenderHandlerOptions {
     args: ParsedArgs;
@@ -72,6 +78,14 @@ export async function renderHandler(options: RenderHandlerOptions): Promise<void
 
     const input = await readInput(args.positional, { cwd });
 
+    const resolved = resolveLocaleOverride({
+        flag: args.locale,
+        env: process.env,
+        rc: stringFromConfig(config, 'locale'),
+    });
+    const locale = resolved.tag;
+    const opLocale = operatorLocale(resolved);
+
     const { rendered, isBinary } = await produce({
         format,
         inputFormat,
@@ -95,6 +109,10 @@ export async function renderHandler(options: RenderHandlerOptions): Promise<void
         headless: args.headless || boolFromConfig(config, 'headlessFonts'),
         scale: args.scale,
         start: args.start,
+        locale,
+        operatorLocale: opLocale,
+        resolvedLocale: resolved,
+        verbose: args.logLevel === 'verbose',
     });
 
     if (args.dryRun) {
@@ -176,6 +194,14 @@ interface ProduceArgs {
     headless: boolean;
     scale?: string;
     start?: string;
+    /** Resolved locale override (CLI flag or env-var fallback); undefined falls through to the directive. */
+    locale?: string;
+    /** Operator locale used to format CLI message output (validator diagnostics on stderr). */
+    operatorLocale: string;
+    /** Resolved locale override metadata, used for the verbose-mode source line. */
+    resolvedLocale: import('../i18n/locale.js').ResolvedLocale;
+    /** True for `--verbose`. Gates the `nowline: locale=...` source-line emission. */
+    verbose: boolean;
 }
 
 interface ProduceResult {
@@ -263,10 +289,10 @@ async function produceJson(args: ProduceArgs): Promise<string> {
         // Re-parse JSON → DSL → JSON to canonicalize through @nowline/core.
         const { ast } = parseNowlineJson(args.contents, args.displayPath);
         const text = printNowlineFile(ast);
-        const parsed = await parseAndValidate(text, args.displayPath);
+        const parsed = await parseAndValidate(text, args);
         return JSON.stringify(serializeToJson(parsed.document, text), null, 2);
     }
-    const parsed = await parseAndValidate(args.contents, args.displayPath);
+    const parsed = await parseAndValidate(args.contents, args);
     return JSON.stringify(serializeToJson(parsed.document, args.contents), null, 2);
 }
 
@@ -275,7 +301,7 @@ async function produceCanonicalNowline(args: ProduceArgs): Promise<string> {
         const { ast } = parseNowlineJson(args.contents, args.displayPath);
         return printNowlineFile(ast);
     }
-    const parsed = await parseAndValidate(args.contents, args.displayPath);
+    const parsed = await parseAndValidate(args.contents, args);
     const doc = serializeToJson(parsed.document, args.contents);
     return printNowlineFile(doc.ast);
 }
@@ -290,7 +316,7 @@ interface StagedRoadmap {
 async function stageRoadmap(args: ProduceArgs): Promise<StagedRoadmap> {
     const parsed = await parseAndValidate(
         args.inputFormat === 'json' ? jsonToNowlineText(args.contents, args.displayPath) : args.contents,
-        args.displayPath,
+        args,
     );
     const resolved = await resolveIncludes(parsed.ast, args.absInputPath, {
         services: getServices().Nowline,
@@ -308,6 +334,7 @@ async function stageRoadmap(args: ProduceArgs): Promise<StagedRoadmap> {
         theme: args.theme,
         today: args.today,
         width: args.width,
+        locale: args.locale,
     });
 
     const assetRoot = args.assetRoot
@@ -370,11 +397,16 @@ function jsonToNowlineText(contents: string, displayPath: string): string {
     return printNowlineFile(ast);
 }
 
-async function parseAndValidate(contents: string, displayPath: string) {
-    const result = await parseSource(contents, displayPath, { validate: true });
+async function parseAndValidate(contents: string, args: ProduceArgs) {
+    const result = await parseSource(contents, args.displayPath, { validate: true });
     if (result.hasErrors) {
-        emitDiagnostics(result.diagnostics, result.source, displayPath);
+        emitDiagnostics(result.diagnostics, result.source, args.displayPath, args.operatorLocale);
         throw new CliError(ExitCode.ValidationError, '');
+    }
+    if (args.verbose) {
+        const directive = readDirectiveLocale(result.ast);
+        const { tag, source } = describeContentLocaleSource(directive, args.resolvedLocale);
+        process.stderr.write(`nowline: locale=${tag} (${source})\n`);
     }
     return result;
 }
@@ -503,10 +535,12 @@ function emitDiagnostics(
     diagnostics: Parameters<typeof formatDiagnostics>[0],
     source: DiagnosticSource,
     displayPath: string,
+    operatorLocale: string,
 ): void {
     const sources = new Map<string, DiagnosticSource>([[displayPath, source]]);
     const rendered = formatDiagnostics(diagnostics, 'text', sources, {
         color: process.stderr.isTTY === true,
+        operatorLocale,
     });
     if (rendered) process.stderr.write(`${rendered}\n`);
 }

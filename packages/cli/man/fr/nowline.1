@@ -1,0 +1,424 @@
+.\" Traduction française neutre. Les divergences régionales (fr-CA, fr-FR)
+.\" prennent la forme de surcouches dans packages/cli/man/<locale>/nowline.1
+.\" lorsqu'elles existent. Voir specs/localization.md.
+.Dd $Mdocdate$
+.Dt NOWLINE 1
+.Os
+.Sh NOM
+.Nm nowline
+.Nd produire, valider et servir des fichiers de feuille de route .nowline
+.Sh SYNOPSIS
+.Nm
+.Op Fl f Ar format
+.Op Fl o Ar chemin
+.Op Fl t Ar thème
+.Op Fl -now Ar date
+.Op Ar options
+.Ar entrée
+.Nm
+.Fl -serve
+.Op Fl p Ar port
+.Op Ar options
+.Ar entrée
+.Nm
+.Fl -init
+.Op Ar nom
+.Nm
+.Fl -dry-run
+.Op Ar options
+.Ar entrée
+.Nm
+.Op Fl V | Fl -version
+.Nm
+.Op Fl h | Fl -help
+.Sh DESCRIPTION
+.Nm
+analyse un fichier de feuille de route
+.Pa .nowline
+(ou sa forme JSON AST) et écrit le résultat produit dans un fichier ou
+sur la sortie standard.
+La production est le mode par défaut\ ; les autres modes sont
+sélectionnés par des indicateurs mutuellement exclusifs plutôt que par
+des sous-commandes
+.Pq sans verbe, comme mmdc, dot, d2, prettier et tsc .
+.Pp
+Le pipeline de production est
+.Sy analyse
+\(->
+.Sy validation
+\(->
+.Sy mise en page
+\(->
+.Sy exportateur spécifique au format .
+La sortie est déterministe octet pour octet pour une entrée,
+.Fl -theme
+et
+.Fl -now
+donnés.
+.Pp
+Un seul binaire
+.Nm
+fournit tous les formats d'export\ : SVG, PNG, PDF, HTML,
+Markdown+Mermaid, XLSX, MS Project XML, et l'aller-retour AST
+.Pq json , nowline .
+.Pp
+.Ar entrée
+est obligatoire pour le mode de production par défaut, pour
+.Fl -serve
+et pour
+.Fl -dry-run .
+Indiquez
+.Sq -
+pour lire l'entrée standard.
+Sans argument,
+.Nm
+affiche l'aide et termine avec le code 0.
+.Sh ENTRÉE
+Le format d'entrée est détecté à partir de l'extension du fichier\ :
+.Pa .nowline
+\(-> DSL,
+.Pa .json
+\(-> AST.
+L'entrée standard est traitée par défaut comme
+.Pa .nowline .
+Utilisez
+.Fl -input-format
+pour les noms de fichiers inhabituels.
+.Sh INDICATEURS DE MODE
+Les indicateurs de mode ci-dessous sont mutuellement exclusifs.
+.Bl -tag -width Fl
+.It Fl -serve
+Lance un serveur de prévisualisation locale avec rechargement
+automatique.
+Réanalyse, revalide, refait la mise en page et reproduit à chaque
+modification du fichier\ ; les navigateurs connectés rafraîchissent
+via Server-Sent Events.
+Les erreurs de validation s'affichent en surimpression sur le dernier
+rendu réussi.
+L'option
+.Fl o Ar chemin
+écrit également le résultat sur le disque à chaque reconstruction.
+.It Fl -init Op Ar nom
+Crée un fichier
+.Pa .nowline
+de démarrage dans le répertoire courant.
+L'argument positionnel est le
+.Em nom
+du projet, et non un chemin\ ;
+.Pa .nowline
+est ajouté automatiquement s'il manque.
+Le nom par défaut est
+.Sy roadmap .
+Les fichiers existants sont écrasés sans confirmation.
+.It Fl n , -dry-run
+Exécute la totalité du pipeline (analyse + validation + mise en page +
+format) sans écrire de fichier.
+Remplace l'ancien verbe
+.Sy validate .
+Termine avec 0 en cas de succès, 1 en cas d'erreur de validation.
+Compatible avec tous les formats de sortie\ —
+.Nm Ar feuille.nowline Fl f Ar pdf Fl -dry-run
+exerce tout le pipeline PDF sans produire de fichier.
+.El
+.Sh OPTIONS D'E/S
+.Bl -tag -width Fl
+.It Fl f , -format Ar fmt
+Format de sortie\ :
+.Sy svg , png , pdf , html , mermaid , xlsx , msproj , json , nowline .
+Par défaut\ : déduit de l'extension de
+.Fl o ,
+sinon
+.Pa .nowlinerc
+.Sy defaultFormat ,
+sinon
+.Sy svg .
+.It Fl o , -output Ar chemin
+Chemin du fichier de sortie.
+Utilisez
+.Sq -
+pour la sortie standard (convention Unix du tiret).
+Par défaut\ :
+.Pa <cwd>/<base-entrée>.<format> .
+Les fichiers existants sont écrasés sans confirmation.
+.It Fl -input-format Ar fmt
+Force le format d'entrée\ :
+.Sy nowline | json .
+Par défaut\ : déduit de l'extension\ ; l'entrée standard est traitée
+comme
+.Sy nowline .
+.El
+.Sh OPTIONS DE PRODUCTION
+.Bl -tag -width Fl
+.It Fl t , -theme Ar nom
+.Sy light | dark .
+.It Fl -now Ar date
+Ancrage
+.Sq Maintenant
+pour la ligne de temps présent et le calcul des dates, au format
+.Pa AAAA-MM-JJ .
+Par défaut\ : aujourd'hui (date civile UTC du système).
+Indiquez
+.Fl -now Sq -
+pour supprimer entièrement la ligne de temps présent.
+.It Fl -locale Ar bcp47
+Étiquette de langue BCP-47 pour les messages CLI de l'opérateur
+(diagnostics de validation sur la sortie d'erreur,
+.Fl -help ,
+erreurs d'analyse, journaux verbeux).
+Exemples\ :
+.Sy en-US , fr , fr-CA , fr-FR .
+.Pp
+Nowline maintient deux chaînes de locale indépendantes pour qu'un
+opérateur francophone puisse lire les erreurs en français tout en
+produisant une feuille de route anglaise rédigée par un collègue
+américain (et inversement)\ :
+.Bl -tag -width Ds
+.It Em Locale du contenu Pq inscrite dans le SVG / PDF / etc. produit
+Directive
+.Sy nowline v1 locale:
+du fichier
+\(->
+.Fl -locale
+\(->
+.Ev LC_ALL Ns / Ns Ev LC_MESSAGES Ns / Ns Ev LANG
+\(->
+.Sy en-US .
+Le fichier l'emporte toujours\ ; la locale de l'opérateur ne sert
+de repli que si le fichier ne déclare pas la sienne.
+.It Em Locale de l'opérateur Pq messages stderr / stdout
+.Fl -locale
+\(->
+.Ev LC_ALL Ns / Ns Ev LC_MESSAGES Ns / Ns Ev LANG
+\(->
+.Sy en-US .
+Indépendante de la directive du fichier\ : un
+.Ev LANG
+français maintient les erreurs de validation en français même si
+le fichier indique
+.Sy locale:en-US .
+.El
+.Pp
+Les bundles de traduction redescendent la chaîne BCP-47
+.Pq Sy fr-CA No \(-> Sy fr No \(-> Sy en-US ,
+de sorte que les entrées manquantes sont silencieusement complétées.
+Voir
+.Pa specs/localization.md
+pour la matrice de résolution.
+.It Fl -no-links
+Omet les icônes de lien dans les éléments produits.
+.It Fl s , -scale Ar n
+Facteur d'échelle pour le rendu raster (PNG uniquement\ ; 1 par défaut).
+.It Fl -strict
+Promeut les avertissements (assets, sanitiseur) en erreurs.
+.It Fl w , -width Ar px
+Largeur du canevas en pixels (1280 par défaut).
+.It Fl -asset-root Ar dossier
+Dossier à partir duquel les ressources logo / image peuvent être
+chargées (par défaut\ : dossier du fichier d'entrée).
+.El
+.Sh OPTIONS SPÉCIFIQUES AU FORMAT
+.Bl -tag -width Fl
+.It Fl -page-size Ar taille
+Taille de page PDF\ : préréglage
+.Pq Sy letter , legal , tabloid , ledger , a1 No \(en Sy a5 , b3 No \(en Sy b5 ,
+.Sy content
+pour ajustement automatique, ou
+.Sy LxH Ns Em unité
+pour une taille personnalisée (p.\ ex.
+.Sy 8.5x11in , 210x297mm ) .
+Par défaut\ :
+.Sy letter .
+.It Fl -orientation Ar nom
+Orientation PDF\ :
+.Sy portrait | landscape | auto .
+Par défaut\ :
+.Sy auto .
+.It Fl -margin Ar longueur
+Marge de page PDF.
+Les nombres seuls sont en points\ ; les suffixes
+.Pq Sy in , mm , cm
+sont acceptés.
+Par défaut\ :
+.Sy 36pt
+(1/2 pouce).
+.It Fl -font-sans Ar réf
+Police sans-serif pour PNG/PDF\ : chemin TTF/OTF, ou alias
+.Pq Sy sf , helvetica , dejavu , ... .
+Par défaut\ : sondage de la plateforme \(-> repli sur DejaVu intégré.
+.It Fl -font-mono Ar réf
+Police monospace pour PNG/PDF\ ; même chaîne de résolution que
+.Fl -font-sans .
+.It Fl -headless
+Saute le sondage de polices de la plateforme et force la paire DejaVu
+intégrée.
+La sortie est stable octet par octet entre machines.
+.It Fl -start Ar date
+MS Project\ : date d'ancrage
+.Pq Pa AAAA-MM-JJ
+pour les feuilles de route uniquement relatives.
+Par défaut\ :
+.Fl -now ,
+puis repli déterministe.
+.El
+.Sh OPTIONS DE SERVEUR
+.Bl -tag -width Fl
+.It Fl p , -port Ar n
+Port d'écoute (4318 par défaut).
+.It Fl -host Ar hôte
+Adresse de liaison (par défaut
+.Sy 127.0.0.1 ;
+utilisez
+.Sy 0.0.0.0
+pour exposer sur le réseau local).
+.It Fl -open
+Ouvre le navigateur au démarrage.
+.El
+.Sh OPTIONS DE JOURNALISATION
+Les indicateurs de journalisation sont mutuellement exclusifs.
+.Bl -tag -width Fl
+.It Fl v , -verbose
+Affiche des diagnostics supplémentaires sur la sortie d'erreur standard
+(chemin de configuration, durées du pipeline, résolution des polices,
+décisions de repli).
+.It Fl q , -quiet
+Supprime les messages non liés aux erreurs sur la sortie d'erreur
+standard.
+.El
+.Sh OPTIONS STANDARD
+.Bl -tag -width Fl
+.It Fl h , -help
+Affiche l'aide sur la sortie standard et termine avec 0.
+.It Fl V , -version
+Affiche la version sur la sortie standard et termine avec 0.
+.El
+.Pp
+.Fl V
+(majuscule) correspond à
+.Fl -version ,
+tandis que la minuscule
+.Fl v
+correspond à
+.Fl -verbose ,
+suivant
+.Xr curl 1
+et
+.Xr ssh 1 .
+.Sh ENVIRONNEMENT
+.Bl -tag -width Ev
+.It Ev LC_ALL , LC_MESSAGES , LANG
+Locale de repli pour l'opérateur lorsque
+.Fl -locale
+est absent.
+La première variable non vide l'emporte, dans l'ordre indiqué.
+Les suffixes POSIX
+.Pq Sq .UTF-8 , Sq @euro
+sont retirés et le résultat est normalisé en BCP-47.
+.Pp
+Affecte sans condition la chaîne opérateur
+.Pq stderr / stdout, diagnostics de validation, --help, erreurs, journaux verbeux .
+N'affecte la chaîne contenu
+.Pq libellés d'axe rendus, pastille « maintenant », préfixe trimestriel
+que si le fichier ne déclare pas sa propre directive
+.Sy nowline v1 locale: \(em
+le fichier l'emporte toujours pour l'artefact produit.
+Voir
+.Pa specs/localization.md
+pour la matrice de résolution.
+.El
+.Sh FICHIERS
+.Bl -tag -width Pa
+.It Pa .nowlinerc
+Fichier de configuration JSON ou YAML facultatif.
+Recherché en remontant depuis le dossier du fichier d'entrée\ ; le plus
+proche l'emporte.
+Les indicateurs CLI surclassent les valeurs de configuration.
+Clés reconnues\ :
+.Sy theme , defaultFormat , width , pdfPageSize , pdfOrientation ,
+.Sy pdfMargin , fontSans , fontMono , headlessFonts , locale .
+Les clés inconnues sont ignorées.
+.El
+.Sh CODES DE SORTIE
+.Bl -tag -width Ds
+.It 0
+Succès.
+.It 1
+Erreur de validation (analyse en échec, référence invalide, etc.).
+.It 2
+Erreur d'utilisation (entrée manquante, indicateurs incorrects ou
+mutuellement exclusifs, format non pris en charge, fichier introuvable,
+sortie binaire vers un terminal, entrée illisible).
+.It 3
+Erreur de sortie (impossible d'écrire à la destination, échec du
+pipeline d'export).
+.El
+.Sh EXEMPLES
+Produire le SVG par défaut dans le dossier courant\ :
+.Bd -literal -offset indent
+nowline feuille.nowline
+.Ed
+.Pp
+Produire dans un autre format\ ; le format est déduit de l'extension de
+.Fl o \ :
+.Bd -literal -offset indent
+nowline feuille.nowline -f pdf
+nowline feuille.nowline -o feuille.pdf
+nowline feuille.nowline -f png --scale 3
+.Ed
+.Pp
+Diffuser le SVG vers la sortie standard, valider et prévisualiser en
+direct\ :
+.Bd -literal -offset indent
+nowline feuille.nowline -o -
+nowline feuille.nowline --dry-run
+nowline feuille.nowline --serve -p 8080
+.Ed
+.Pp
+Lire l'entrée standard\ ; convertir entre texte et JSON AST\ :
+.Bd -literal -offset indent
+cat feuille.nowline | nowline -
+nowline feuille.nowline -f json -o feuille.json
+nowline feuille.json -f nowline -o feuille.nowline
+.Ed
+.Pp
+Créer un nouveau fichier\ :
+.Bd -literal -offset indent
+nowline --init
+nowline --init mon-projet
+.Ed
+.Pp
+PDF avec géométrie de page explicite, stable octet pour octet entre
+machines\ :
+.Bd -literal -offset indent
+nowline feuille.nowline -f pdf --page-size a4 \\
+    --orientation landscape --margin 0.5in --headless
+.Ed
+.Pp
+Lire les erreurs et diagnostics en français tout en produisant
+l'artefact dans la locale déclarée par le fichier\ :
+.Bd -literal -offset indent
+nowline feuille.nowline --locale fr-CA
+.Ed
+.Pp
+Fixer la locale de l'artefact produit au niveau du fichier pour
+qu'elle reste française quel que soit l'opérateur qui exécute
+.Nm \ :
+.Bd -literal -offset indent
+nowline v1 locale:fr-CA
+.Ed
+.Sh VOIR AUSSI
+.Lk https://github.com/lolay/nowline "Code source, suivi des incidents et référence DSL complète"
+.Pp
+Le dossier
+.Sy specs/
+du dépôt source documente la grammaire DSL
+.Pq Pa specs/dsl.md ,
+le pipeline de mise en page et de production
+.Pq Pa specs/rendering.md ,
+la surface CLI
+.Pq Pa specs/cli.md ,
+les jalons libres
+.Pq Pa specs/milestones.md
+et le modèle de localisation
+.Pq Pa specs/localization.md .
+.Sh AUTEURS
+.An Lolay Aq Mt packages@lolay.com

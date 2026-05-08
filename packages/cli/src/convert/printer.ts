@@ -51,7 +51,11 @@ class Printer {
         assertType(file, 'NowlineFile');
         const directive = file.directive as JsonAstNode | undefined;
         if (directive) {
-            this.line(0, `nowline ${getString(directive, 'version')}`);
+            const props = asArray(directive.properties);
+            const tail = props.length > 0
+                ? ` ${props.map(renderProperty).join(' ')}`
+                : '';
+            this.line(0, `nowline ${getString(directive, 'version')}${tail}`);
             this.blank();
         }
         for (const inc of asArray(file.includes)) {

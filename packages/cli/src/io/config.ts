@@ -16,6 +16,9 @@ export interface NowlineRc {
     fontSans?: string;
     fontMono?: string;
     headlessFonts?: boolean;
+    // BCP-47 locale (e.g. "fr", "fr-CA"). Overridden by --locale on the
+    // command line and by env vars (LC_ALL/LC_MESSAGES/LANG).
+    locale?: string;
     [key: string]: unknown;
 }
 

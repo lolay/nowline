@@ -1,0 +1,8 @@
+nowline v1 locale:fr-CA
+
+roadmap minimal "Démarrage" start:2026-01-05 scale:2w author:"Jane Doe"
+
+swimlane ingenierie "Ingénierie"
+  item recherche "Recherche"   duration:3w status:done
+  item conception "Conception" duration:2w status:in-progress remaining:5d
+  item realisation "Réalisation" duration:3w status:planned

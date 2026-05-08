@@ -1,4 +1,5 @@
-import type { AstNode, ValidationAcceptor, ValidationChecks } from 'langium';
+import type { AstNode, ValidationAcceptor, ValidationChecks, ValidationSeverity } from 'langium';
+import type { Properties } from 'langium';
 import { GrammarUtils } from 'langium';
 import type { NowlineAstType, NowlineServices } from './nowline-module.js';
 import type {
@@ -56,6 +57,8 @@ import {
     isDefaultDeclaration,
     isGlyphDeclaration,
 } from '../generated/ast.js';
+import { tr } from '../i18n/index.js';
+import type { MessageCode, MessageArgs } from '../i18n/index.js';
 
 const SUPPORTED_VERSION = 'v1';
 
@@ -174,7 +177,18 @@ const POSITIVE_INTEGER_RE = /^\d+$/;
 // `ascii:"..."` fallback property after Langium has stripped the surrounding quotes.
 const ASCII_FALLBACK_RE = /^[\x20-\x7E]{1,3}$/;
 
+// BCP-47 language tag, simplified to the subset Nowline cares about: a 2- or 3-letter
+// primary language subtag followed by an optional region subtag (2 letters or 3 digits).
+// Permissive enough for `fr`, `fr-CA`, `zh-CN`, `es-419` while rejecting obvious typos.
+// The runtime resolver does the actual fallback work; this regex just gates input shape.
+const BCP47_RE = /^[a-zA-Z]{2,3}(-[a-zA-Z]{2}|-\d{3})?$/;
+
 const INCLUDE_MODES = new Set(['merge', 'ignore', 'isolate']);
+
+// Allow-listed property keys on the `nowline` directive line. The directive existed
+// historically as `nowline v1` only; properties are a forward-extension point but stay
+// restrictive so authors get an early error instead of typos rendering silently.
+const DIRECTIVE_FIELDS = new Set(['locale']);
 
 type StartState =
     | { kind: 'valid'; iso: string; date: Date }
@@ -193,6 +207,36 @@ function resolveLocalStart(file: NowlineFile | undefined): StartState {
 
 function displayName(node: { name?: string; title?: string }): string {
     return node.name ?? node.title ?? '<unnamed>';
+}
+
+/**
+ * Emit a localized validator diagnostic.
+ *
+ * Validator runs at parse time when only the file's locale is in scope.
+ * The CLI re-formats with the operator's locale before printing —
+ * see `specs/localization.md` for the two-chain model. We always
+ * format the en-US text now so non-CLI consumers (LSP, tests) still
+ * see usable copy, and stash `{ code, args }` in `data` so the CLI
+ * can swap in the operator-locale text downstream.
+ */
+type DiagnosticInfo = {
+    node: AstNode;
+    property?: Properties<AstNode>;
+    keyword?: string;
+    index?: number;
+};
+
+function acceptTr<K extends MessageCode>(
+    accept: ValidationAcceptor,
+    severity: ValidationSeverity,
+    info: DiagnosticInfo,
+    code: K,
+    ...args: MessageArgs<K>
+): void {
+    accept(severity, tr('en-US', code, ...args), {
+        ...info,
+        data: { code, args },
+    });
 }
 
 export function registerValidationChecks(services: NowlineServices): void {
@@ -214,7 +258,7 @@ export function registerValidationChecks(services: NowlineServices): void {
             validator.checkDuplicateGlyphIds,
             validator.checkGlyphReferences,
         ],
-        NowlineDirective: [validator.checkDirectiveVersion],
+        NowlineDirective: [validator.checkDirectiveVersion, validator.checkDirectiveProperties],
         IncludeOption: [validator.checkIncludeMode],
         IncludeDeclaration: [validator.checkIncludeDuplicateOptions],
         EntityProperty: [validator.checkPropertyValues],
@@ -316,23 +360,16 @@ export class NowlineValidator {
         const roadmapOffset = file.roadmapDecl?.$cstNode?.offset;
 
         if (configOffset !== undefined && roadmapOffset !== undefined && configOffset > roadmapOffset) {
-            accept('error', 'Config section must appear before roadmap.', {
-                node: file,
-                property: 'hasConfig',
-            });
+            acceptTr(accept, 'error', { node: file, property: 'hasConfig' }, 'NL.E0001');
         }
 
         for (const inc of file.includes) {
             const incOffset = inc.$cstNode?.offset ?? 0;
             if (configOffset !== undefined && incOffset > configOffset) {
-                accept('error', 'Include declarations must appear before the config section.', {
-                    node: inc,
-                });
+                acceptTr(accept, 'error', { node: inc }, 'NL.E0002');
             }
             if (roadmapOffset !== undefined && incOffset > roadmapOffset) {
-                accept('error', 'Include declarations must appear before the roadmap section.', {
-                    node: inc,
-                });
+                acceptTr(accept, 'error', { node: inc }, 'NL.E0003');
             }
         }
     }
@@ -348,26 +385,51 @@ export class NowlineValidator {
     // --- Rule 5: Directive version ---
     checkDirectiveVersion(directive: NowlineDirective, accept: ValidationAcceptor): void {
         if (!VERSION_RE.test(directive.version)) {
-            accept('error', `Invalid version format "${directive.version}". Expected format: v1, v2, etc.`, {
-                node: directive,
-                property: 'version',
-            });
+            acceptTr(accept, 'error', { node: directive, property: 'version' },
+                'NL.E0100', { version: directive.version });
             return;
         }
         const num = parseInt(directive.version.slice(1), 10);
         const supportedNum = parseInt(SUPPORTED_VERSION.slice(1), 10);
         if (num > supportedNum) {
-            accept('error', `This file requires Nowline ${directive.version}, but the parser only supports up to ${SUPPORTED_VERSION}.`, {
-                node: directive,
-                property: 'version',
-            });
+            acceptTr(accept, 'error', { node: directive, property: 'version' },
+                'NL.E0101', { version: directive.version, supported: SUPPORTED_VERSION });
+        }
+    }
+
+    // --- Directive properties (locale) ---
+    // Validates the optional key:value pairs on the `nowline` directive line. Today the
+    // only allowed key is `locale:` (BCP-47 tag); unknown keys are rejected so typos
+    // surface immediately. Duplicate keys are also rejected.
+    checkDirectiveProperties(directive: NowlineDirective, accept: ValidationAcceptor): void {
+        const seen = new Set<string>();
+        for (const prop of directive.properties) {
+            const key = propKey(prop);
+            if (!DIRECTIVE_FIELDS.has(key)) {
+                acceptTr(accept, 'error', { node: prop, property: 'key' },
+                    'NL.E0102', { key, allowed: [...DIRECTIVE_FIELDS].join(', ') });
+                continue;
+            }
+            if (seen.has(key)) {
+                acceptTr(accept, 'error', { node: prop, property: 'key' },
+                    'NL.E0103', { key });
+            }
+            seen.add(key);
+
+            if (key === 'locale') {
+                const raw = prop.value;
+                if (!BCP47_RE.test(raw)) {
+                    acceptTr(accept, 'error', { node: prop, property: 'value' },
+                        'NL.E0104', { value: raw });
+                }
+            }
         }
     }
 
     // --- Rule 3: Id or title required ---
     checkEntityIdOrTitle(node: AstNode & { name?: string; title?: string }, accept: ValidationAcceptor): void {
         if (!node.name && !node.title) {
-            accept('error', `${node.$type} must have an identifier, a title, or both.`, { node });
+            acceptTr(accept, 'error', { node }, 'NL.E0301', { type: node.$type });
         }
     }
 
@@ -379,7 +441,8 @@ export class NowlineValidator {
             if (!name) return;
             const existing = seen.get(name);
             if (existing) {
-                accept('error', `Duplicate identifier "${name}". First declared at ${locationOf(existing)}.`, { node });
+                acceptTr(accept, 'error', { node },
+                    'NL.E0300', { name, location: locationOf(existing) });
             } else {
                 seen.set(name, node);
             }
@@ -412,9 +475,7 @@ export class NowlineValidator {
             if (!match) continue;
             const indent = match[1];
             if (indent.includes('\t') && indent.includes(' ')) {
-                accept('error', `Line ${i + 1}: mixed tabs and spaces in indentation. Use either tabs or spaces consistently.`, {
-                    node: file,
-                });
+                acceptTr(accept, 'error', { node: file }, 'NL.E0005', { line: i + 1 });
                 return;
             }
         }
@@ -424,19 +485,15 @@ export class NowlineValidator {
     checkSwimlaneRequired(file: NowlineFile, accept: ValidationAcceptor): void {
         const hasSwimlane = file.roadmapEntries.some(isSwimlaneDeclaration);
         if (file.roadmapDecl && !hasSwimlane) {
-            accept('error', 'At least one swimlane is required.', {
-                node: file.roadmapDecl,
-            });
+            acceptTr(accept, 'error', { node: file.roadmapDecl }, 'NL.E0004');
         }
     }
 
     // --- Include rules 5/6: mode values ---
     checkIncludeMode(option: IncludeOption, accept: ValidationAcceptor): void {
         if (!INCLUDE_MODES.has(option.value)) {
-            accept('error', `Invalid include mode "${option.value}". Must be merge, ignore, or isolate.`, {
-                node: option,
-                property: 'value',
-            });
+            acceptTr(accept, 'error', { node: option, property: 'value' },
+                'NL.E0200', { value: option.value });
         }
     }
 
@@ -446,7 +503,7 @@ export class NowlineValidator {
         for (const opt of inc.options) {
             const normalized = opt.key.replace(/:$/, '');
             if (keys.has(normalized)) {
-                accept('error', `Duplicate "${normalized}" option on include.`, { node: opt });
+                acceptTr(accept, 'error', { node: opt }, 'NL.E0201', { key: normalized });
             }
             keys.add(normalized);
         }
@@ -470,28 +527,22 @@ export class NowlineValidator {
                 // to the size's `effort:` (and divides by `capacity:` at
                 // layout time, m5).
                 if (val && !DURATION_RE.test(val)) {
-                    accept('error', `Invalid duration "${val}". Use a raw duration literal like 0.5d, 2w, 1m, 2q. Use "size:NAME" to reference a declared size.`, {
-                        node: prop,
-                        property: 'value',
-                    });
+                    acceptTr(accept, 'error', { node: prop, property: 'value' },
+                        'NL.E0400', { value: val });
                 }
                 break;
 
             case 'size':
                 if (val && !isIdentifier(val)) {
-                    accept('error', `Invalid size "${val}". Use the id of a declared size (e.g. xs, m, lg).`, {
-                        node: prop,
-                        property: 'value',
-                    });
+                    acceptTr(accept, 'error', { node: prop, property: 'value' },
+                        'NL.E0401', { value: val });
                 }
                 break;
 
             case 'effort':
                 if (val && !DURATION_RE.test(val)) {
-                    accept('error', `Invalid effort "${val}". Use a raw duration literal like 0.5d, 2w, 1m, 2q.`, {
-                        node: prop,
-                        property: 'value',
-                    });
+                    acceptTr(accept, 'error', { node: prop, property: 'value' },
+                        'NL.E0402', { value: val });
                 }
                 break;
 
@@ -505,16 +556,12 @@ export class NowlineValidator {
                     if (PERCENTAGE_RE.test(val)) {
                         const pct = parseFloat(val);
                         if (pct < 0 || pct > 100) {
-                            accept('error', `Remaining must be between 0% and 100%, got ${val}.`, {
-                                node: prop,
-                                property: 'value',
-                            });
+                            acceptTr(accept, 'error', { node: prop, property: 'value' },
+                                'NL.E0404', { value: val });
                         }
                     } else if (!DURATION_RE.test(val)) {
-                        accept('error', `Invalid remaining value "${val}". Use a percentage like 30% or a duration literal like 1w, 0.5d.`, {
-                            node: prop,
-                            property: 'value',
-                        });
+                        acceptTr(accept, 'error', { node: prop, property: 'value' },
+                            'NL.E0403', { value: val });
                     }
                 }
                 break;
@@ -523,28 +570,22 @@ export class NowlineValidator {
             case 'date':
             case 'start':
                 if (val && (!DATE_RE.test(val) || isNaN(new Date(val).getTime()))) {
-                    accept('error', `Invalid ${key} "${val}". Use ISO 8601 format: YYYY-MM-DD.`, {
-                        node: prop,
-                        property: 'value',
-                    });
+                    acceptTr(accept, 'error', { node: prop, property: 'value' },
+                        'NL.E0405', { key, value: val });
                 }
                 break;
 
             case 'scale':
                 if (val && !DURATION_RE.test(val)) {
-                    accept('error', `Invalid scale "${val}". Use a raw duration literal like 1w, 2w, 1q (no name lookup).`, {
-                        node: prop,
-                        property: 'value',
-                    });
+                    acceptTr(accept, 'error', { node: prop, property: 'value' },
+                        'NL.E0406', { value: val });
                 }
                 break;
 
             case 'calendar':
                 if (val && !CALENDAR_MODES.has(val)) {
-                    accept('error', `Invalid calendar "${val}". Must be business, full, or custom.`, {
-                        node: prop,
-                        property: 'value',
-                    });
+                    acceptTr(accept, 'error', { node: prop, property: 'value' },
+                        'NL.E0407', { value: val });
                 }
                 break;
 
@@ -552,9 +593,7 @@ export class NowlineValidator {
             case 'after':
             case 'before':
                 if (allValues.length === 0) {
-                    accept('error', `Property "${key}" requires at least one reference.`, {
-                        node: prop,
-                    });
+                    acceptTr(accept, 'error', { node: prop }, 'NL.E0408', { key });
                 }
                 break;
 
@@ -682,9 +721,8 @@ export class NowlineValidator {
     checkAnchorRequiredDate(anchor: AnchorDeclaration, accept: ValidationAcceptor): void {
         const dateProp = anchor.properties.find((p) => propKey(p) === 'date');
         if (!dateProp) {
-            accept('error', `Anchor "${displayName(anchor)}" requires a "date:" property.`, {
-                node: anchor,
-            });
+            acceptTr(accept, 'error', { node: anchor },
+                'NL.E0500', { name: displayName(anchor) });
         }
     }
 
@@ -702,17 +740,13 @@ export class NowlineValidator {
             case 'invalid':
                 return;
             case 'missing':
-                accept('error', `Anchor "${displayName(anchor)}" has a date but the roadmap is missing "start:". Add start:YYYY-MM-DD to the roadmap.`, {
-                    node: dateProp,
-                    property: 'value',
-                });
+                acceptTr(accept, 'error', { node: dateProp, property: 'value' },
+                    'NL.E0501', { name: displayName(anchor) });
                 return;
             case 'valid':
                 if (anchorDate < start.date) {
-                    accept('error', `Anchor "${displayName(anchor)}" date ${raw} is before roadmap start ${start.iso}.`, {
-                        node: dateProp,
-                        property: 'value',
-                    });
+                    acceptTr(accept, 'error', { node: dateProp, property: 'value' },
+                        'NL.E0502', { name: displayName(anchor), date: raw, start: start.iso });
                 }
                 return;
         }
@@ -723,9 +757,8 @@ export class NowlineValidator {
         const hasDate = milestone.properties.some((p) => propKey(p) === 'date');
         const hasAfter = milestone.properties.some((p) => propKey(p) === 'after');
         if (!hasDate && !hasAfter) {
-            accept('error', `Milestone "${displayName(milestone)}" requires at least one of "date:" or "after:".`, {
-                node: milestone,
-            });
+            acceptTr(accept, 'error', { node: milestone },
+                'NL.E0503', { name: displayName(milestone) });
         }
     }
 
@@ -750,10 +783,8 @@ export class NowlineValidator {
                 return;
             case 'valid':
                 if (milestoneDate < start.date) {
-                    accept('error', `Milestone "${displayName(milestone)}" date ${raw} is before roadmap start ${start.iso}.`, {
-                        node: dateProp,
-                        property: 'value',
-                    });
+                    acceptTr(accept, 'error', { node: dateProp, property: 'value' },
+                        'NL.E0504', { name: displayName(milestone), date: raw, start: start.iso });
                 }
                 return;
         }
@@ -763,9 +794,7 @@ export class NowlineValidator {
     checkFootnoteOn(footnote: FootnoteDeclaration, accept: ValidationAcceptor): void {
         const hasOn = footnote.properties.some((p) => propKey(p) === 'on');
         if (!hasOn) {
-            accept('error', 'Footnote requires an "on:" property referencing one or more entities.', {
-                node: footnote,
-            });
+            acceptTr(accept, 'error', { node: footnote }, 'NL.E0505');
         }
     }
 
@@ -801,9 +830,8 @@ export class NowlineValidator {
         const hasDuration = item.properties.some((p) => propKey(p) === 'duration');
         const hasSize = item.properties.some((p) => propKey(p) === 'size');
         if (!hasDuration && !hasSize) {
-            accept('error', `Item "${displayName(item)}" requires a "size:" or "duration:" property.`, {
-                node: item,
-            });
+            acceptTr(accept, 'error', { node: item },
+                'NL.E0600', { name: displayName(item) });
         }
     }
 
