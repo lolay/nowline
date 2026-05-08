@@ -28,9 +28,29 @@ export interface RenderInputs {
     /**
      * "Today" override. The CLI uses today by default; we mirror that for
      * the live preview so the now-line stays anchored without surprising
-     * the user with stale dates.
+     * the user with stale dates. Pass an explicit date for deterministic
+     * snapshots; pass `null` to suppress the now-line entirely (mirrors
+     * the CLI's `--now -`).
      */
-    today?: Date;
+    today?: Date | null;
+    /**
+     * BCP-47 tag for the operator chain (axis labels / now-pill / quarter
+     * prefix when there's no `nowline v1 locale:` directive). Caller is
+     * responsible for resolving setting → `.nowlinerc` → `vscode.env.language`
+     * before passing it in.
+     */
+    locale?: string;
+    /** Total canvas width in px. Layout's default is 1280. */
+    width?: number;
+    /** Inverse of the CLI's `--no-links`. When false, link icons are dropped. */
+    showLinks?: boolean;
+    /** Promote asset / sanitizer warnings to errors in the diagnostic table. */
+    strict?: boolean;
+    /**
+     * Override the asset-resolver root. When omitted, defaults to the
+     * directory containing the source file — matches the CLI's behavior.
+     */
+    assetRoot?: string;
 }
 
 export type RenderOutcome =
@@ -69,6 +89,8 @@ function freshUri(): URI {
  *    so unsaved edits are reflected.
  *  - Errors return as structured `DiagnosticRow[]` instead of pre-formatted
  *    text, so the webview can present them as a clickable table.
+ *  - Warnings emitted by the renderer go into the same table when `strict`
+ *    is on (matches the CLI's `--strict` flag).
  */
 export async function renderDocument(inputs: RenderInputs): Promise<RenderOutcome> {
     const { text, fsPath } = inputs;
@@ -104,11 +126,46 @@ export async function renderDocument(inputs: RenderInputs): Promise<RenderOutcom
         return { kind: 'diagnostics', rows };
     }
 
-    const model = layoutRoadmap(ast, resolved, { theme, today: inputs.today });
-    const assetRoot = path.dirname(fsPath);
+    const today = inputs.today === null ? undefined : inputs.today;
+    const model = layoutRoadmap(ast, resolved, {
+        theme,
+        today,
+        width: inputs.width,
+        locale: inputs.locale,
+    });
+
+    const assetRoot = inputs.assetRoot ?? path.dirname(fsPath);
+    const showLinks = inputs.showLinks !== false;
+    const strict = inputs.strict === true;
+    const warnings: string[] = [];
+
     const svg = await renderSvg(model, {
         assetResolver: createAssetResolver(assetRoot),
+        noLinks: !showLinks,
+        strict,
+        warn: (msg) => warnings.push(msg),
     });
+
+    if (warnings.length > 0) {
+        const severity: DiagnosticRow['severity'] = strict ? 'error' : 'warning';
+        for (const warning of warnings) {
+            rows.push({
+                file: fsPath,
+                line: 1,
+                column: 1,
+                severity,
+                code: 'render.warning',
+                message: warning,
+            });
+        }
+        if (strict) {
+            return { kind: 'diagnostics', rows };
+        }
+    }
+
+    if (rows.some((r) => r.severity === 'error')) {
+        return { kind: 'diagnostics', rows };
+    }
 
     return { kind: 'svg', svg };
 }

@@ -1,7 +1,8 @@
 import * as path from 'node:path';
 import * as vscode from 'vscode';
-import type { ThemeName } from '@nowline/layout';
 import { renderDocument, type RenderOutcome } from './render-pipeline.js';
+import { resolvePreviewOptions } from './option-resolver.js';
+import type { RcConfigCache } from '../io/rc-config.js';
 import { getShellHtml } from './shell-html.js';
 
 export type RefreshTrigger = 'keystroke' | 'save';
@@ -14,6 +15,28 @@ export interface PreviewSettings {
     theme: ThemeMode;
     defaultFit: DefaultFit;
     showMinimap: boolean;
+    /** BCP-47 locale override; empty falls through the chain. */
+    locale: string;
+    /** `'auto'` (today) | `'none'` (suppress) | `'YYYY-MM-DD'` (snapshot). */
+    now: string;
+    strict: boolean;
+    showLinks: boolean;
+    /** Canvas width in px; `0` leaves it unset. */
+    width: number;
+    /** Override asset-resolver root; empty uses source-file directory. */
+    assetRoot: string;
+}
+
+/**
+ * Per-panel ad-hoc overrides applied on top of `PreviewSettings`. Live in
+ * panel state only; never persisted back to settings or `.nowlinerc`. The
+ * webview owns the toolbar UI and posts these via `viewOptions` messages.
+ */
+export interface ToolbarOverrides {
+    theme?: ThemeMode;
+    /** `'today'` mirrors the default; `'hide'` mirrors `--now -`; `Date` pins. */
+    now?: 'today' | 'hide' | Date;
+    showLinks?: boolean;
 }
 
 /**
@@ -26,12 +49,31 @@ export type PreviewWebviewMessage =
     | { type: 'openProblems' }
     | { type: 'save'; format: 'svg' | 'png'; body: string | Uint8Array }
     | { type: 'copyPngFallback'; body: Uint8Array }
-    | { type: 'fatal'; message: string };
+    | { type: 'fatal'; message: string }
+    | { type: 'viewOptions'; overrides: ViewOptionsPayload };
+
+/**
+ * Wire-format for toolbar overrides. Dates serialize to ISO YYYY-MM-DD
+ * because `Date` instances don't survive `postMessage` round-trips
+ * cleanly across webview boundaries.
+ */
+export interface ViewOptionsPayload {
+    theme?: ThemeMode;
+    now?: 'today' | 'hide' | string;
+    showLinks?: boolean;
+}
 
 export interface NowlinePreviewOptions {
     panel: vscode.WebviewPanel;
     sourceUri: vscode.Uri;
     settings: PreviewSettings;
+    /**
+     * Cache for `.nowlinerc` discovery. The panel calls into it on every
+     * render; the cache itself owns the file watcher + invalidation.
+     */
+    rcCache: RcConfigCache;
+    /** `vscode.env.language` snapshot; rarely changes within a session. */
+    vscodeLanguage: string | undefined;
     onMessage: (msg: PreviewWebviewMessage, source: NowlinePreview) => void;
     onDispose: (source: NowlinePreview) => void;
 }
@@ -46,12 +88,17 @@ export interface NowlinePreviewOptions {
  *  - Forward webview messages to the supplied `onMessage` callback so the
  *    extension host owns command dispatch (showSaveDialog, executeCommand,
  *    etc.).
+ *  - Apply panel-local toolbar overrides on top of the resolved settings
+ *    chain when collapsing options before each render.
  *  - Clean up on close.
  */
 export class NowlinePreview {
     private readonly panel: vscode.WebviewPanel;
     readonly sourceUri: vscode.Uri;
     private settings: PreviewSettings;
+    private readonly rcCache: RcConfigCache;
+    private readonly vscodeLanguage: string | undefined;
+    private toolbarOverrides: ToolbarOverrides = {};
     private readonly disposables: vscode.Disposable[] = [];
     private debounceTimer: ReturnType<typeof setTimeout> | undefined;
     /** Monotonic counter so a slow render can't overwrite a newer one. */
@@ -62,14 +109,14 @@ export class NowlinePreview {
         this.panel = opts.panel;
         this.sourceUri = opts.sourceUri;
         this.settings = opts.settings;
+        this.rcCache = opts.rcCache;
+        this.vscodeLanguage = opts.vscodeLanguage;
 
         this.panel.webview.html = getShellHtml(this.panel.webview);
         this.postInit();
 
         this.disposables.push(
-            this.panel.webview.onDidReceiveMessage((msg) =>
-                opts.onMessage(msg as PreviewWebviewMessage, this),
-            ),
+            this.panel.webview.onDidReceiveMessage((msg) => this.handleWebviewMessage(msg, opts.onMessage)),
             this.panel.onDidDispose(() => {
                 this.disposed = true;
                 this.cancelDebounce();
@@ -88,13 +135,17 @@ export class NowlinePreview {
 
     /** Apply new settings; re-render if the theme effectively changed. */
     updateSettings(settings: PreviewSettings, themeChanged: boolean): void {
-        const oldTheme = this.resolveTheme(this.settings);
+        const oldResolvedTheme = this.resolveThemeQuick(this.settings);
         this.settings = settings;
-        const newTheme = this.resolveTheme(settings);
+        const newResolvedTheme = this.resolveThemeQuick(settings);
 
         this.postConfigChange();
 
-        if (themeChanged || oldTheme !== newTheme) {
+        if (themeChanged || oldResolvedTheme !== newResolvedTheme) {
+            void this.refreshNow();
+        } else {
+            // Re-render unconditionally for any other settings change so
+            // locale / now / strict / etc. propagate immediately.
             void this.refreshNow();
         }
     }
@@ -121,10 +172,25 @@ export class NowlinePreview {
         const seq = ++this.renderSeq;
         try {
             const text = await this.readSourceText();
+            const sourceDir = path.dirname(this.sourceUri.fsPath);
+            const rc = await this.rcCache.resolveFor(sourceDir);
+            const resolved = resolvePreviewOptions({
+                settings: this.settings,
+                rc: rc.config,
+                vscodeLanguage: this.vscodeLanguage,
+                isDarkTheme: isDarkColorTheme(),
+                toolbarOverrides: this.toolbarOverrides,
+            });
             const outcome = await renderDocument({
                 text,
                 fsPath: this.sourceUri.fsPath,
-                theme: this.resolveTheme(this.settings),
+                theme: resolved.theme,
+                today: resolved.today,
+                locale: resolved.locale,
+                width: resolved.width,
+                showLinks: resolved.showLinks,
+                strict: resolved.strict,
+                assetRoot: resolved.assetRoot,
             });
             if (this.disposed || seq !== this.renderSeq) return;
             this.postOutcome(outcome);
@@ -161,6 +227,33 @@ export class NowlinePreview {
         }
     }
 
+    private handleWebviewMessage(
+        msg: PreviewWebviewMessage,
+        external: (msg: PreviewWebviewMessage, source: NowlinePreview) => void,
+    ): void {
+        if (msg.type === 'viewOptions') {
+            this.applyToolbarOverrides(msg.overrides);
+            return;
+        }
+        external(msg, this);
+    }
+
+    private applyToolbarOverrides(payload: ViewOptionsPayload): void {
+        const next: ToolbarOverrides = {};
+        if (payload.theme) next.theme = payload.theme;
+        if (payload.now !== undefined) {
+            if (payload.now === 'today' || payload.now === 'hide') {
+                next.now = payload.now;
+            } else if (typeof payload.now === 'string') {
+                const parsed = parseIsoDate(payload.now);
+                if (parsed) next.now = parsed;
+            }
+        }
+        if (payload.showLinks !== undefined) next.showLinks = payload.showLinks;
+        this.toolbarOverrides = next;
+        void this.refreshNow();
+    }
+
     /**
      * Pull document text from VS Code's in-memory model when the source is
      * open (so unsaved edits show in the preview), falling back to the
@@ -188,6 +281,9 @@ export class NowlinePreview {
             type: 'init',
             defaultFit: this.settings.defaultFit,
             showMinimap: this.settings.showMinimap,
+            showLinks: this.settings.showLinks,
+            theme: this.settings.theme,
+            now: this.settings.now,
         });
     }
 
@@ -196,19 +292,34 @@ export class NowlinePreview {
             type: 'configChange',
             defaultFit: this.settings.defaultFit,
             showMinimap: this.settings.showMinimap,
+            showLinks: this.settings.showLinks,
+            theme: this.settings.theme,
+            now: this.settings.now,
         });
     }
 
-    private resolveTheme(settings: PreviewSettings): ThemeName {
+    /**
+     * Cheap theme resolution used to detect "did the resolved theme
+     * change" without touching the rc cache. The full chain runs inside
+     * `resolvePreviewOptions` for actual rendering.
+     */
+    private resolveThemeQuick(settings: PreviewSettings): 'light' | 'dark' {
         if (settings.theme === 'light') return 'light';
         if (settings.theme === 'dark') return 'dark';
-        const kind = vscode.window.activeColorTheme?.kind;
-        if (
-            kind === vscode.ColorThemeKind.Dark ||
-            kind === vscode.ColorThemeKind.HighContrast
-        ) {
-            return 'dark';
-        }
-        return 'light';
+        return isDarkColorTheme() ? 'dark' : 'light';
     }
+}
+
+function isDarkColorTheme(): boolean {
+    const kind = vscode.window.activeColorTheme?.kind;
+    return (
+        kind === vscode.ColorThemeKind.Dark ||
+        kind === vscode.ColorThemeKind.HighContrast
+    );
+}
+
+function parseIsoDate(value: string): Date | undefined {
+    const m = /^(\d{4})-(\d{2})-(\d{2})$/.exec(value);
+    if (!m) return undefined;
+    return new Date(Date.UTC(parseInt(m[1], 10), parseInt(m[2], 10) - 1, parseInt(m[3], 10)));
 }

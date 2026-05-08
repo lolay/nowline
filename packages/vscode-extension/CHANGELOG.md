@@ -1,5 +1,31 @@
 # Changelog
 
+## 0.3.0 — Unreleased
+
+Preview parity, export from VS Code, and authoring commands (m3d / m3e / m3f):
+
+- Preview now honors a project-local `.nowlinerc` (read via the new
+  `@nowline/config` package, watched via a workspace `FileSystemWatcher`).
+  Disable with `nowline.ignoreRcFile: true`.
+- Six new preview-affecting settings: `nowline.preview.locale`, `now`,
+  `strict`, `showLinks`, `width`, and `assetRoot`. Mirror their CLI
+  counterparts and resolve through a single chain
+  (toolbar → settings → `.nowlinerc` → DSL directive → defaults).
+- Locale auto-detects from `vscode.env.language` when
+  `nowline.preview.locale` is empty, so a French-installed Cursor renders
+  French previews and French diagnostics with no configuration.
+- Preview toolbar adds a *View ▾* dropdown with per-session overrides for
+  theme, now-line, and link visibility (not persisted to settings).
+- **Nowline: Export…** command (palette, editor title bar, editor /
+  tab / Explorer context menus) shells out to the `nowline` CLI to produce
+  PDF, pixel-strict PNG, SVG, HTML, Markdown+Mermaid, XLSX, or MS Project
+  XML. Configurable via `nowline.export.*` settings; CLI path defaults to
+  the bare `nowline` command on `PATH`.
+- **Nowline: New Roadmap…** scaffolds a `.nowline` file from the same
+  templates the CLI's `--init` writes (`minimal`, `teams`, `product`).
+- One-time info notification when a `.nowlinerc` value is shadowed by an
+  explicit VS Code setting (suppressed when `nowline.ignoreRcFile` is `true`).
+
 ## 0.2.0 — Unreleased
 
 Live preview (m3c):

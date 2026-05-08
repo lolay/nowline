@@ -32,6 +32,9 @@ Commercial milestones (hosted editor, free viewer, MCP, enterprise, FedRAMP) are
 | ~~m3a~~ | ~~LSP server~~ | Apache 2.0 | Langium-based language server (`@nowline/lsp`): validation, definition, references, rename, hover, completion, document symbols, folding |
 | ~~m3b~~ | ~~VS Code/Cursor extension scaffold~~ | Apache 2.0 | Bundled `.vsix`: TextMate grammar, language config, snippets, file icon, LSP client, trace setting |
 | ~~m3c~~ | ~~Live preview~~ | Apache 2.0 | Side-or-behind preview panel; host-side render pipeline (parse + layout + renderSvg) posts SVG to a webview; clickable diagnostic table; toolbar zoom/pan/fit/save/copy; Cmd-wheel & pinch zoom; keyboard presets; minimap; five `nowline.preview.*` settings |
+| m3d | Preview parity | Apache 2.0 | `.nowlinerc` reader + workspace watcher; new preview-affecting settings (`nowline.preview.{locale,now,strict,showLinks,width,assetRoot}` + `nowline.ignoreRcFile`); preview toolbar overrides (theme, now-line, show-links) |
+| m3e | Export from VS Code | Apache 2.0 | `Nowline: Export…` shell-out command for PDF / pixel-strict PNG / HTML / Markdown+Mermaid / XLSX / MS Project XML; `nowline.export.*` settings (cliPath, PDF page-size/orientation/margin, sans/mono fonts, headless, PNG scale, MS Project start); per-export Override… quickPick |
+| m3f | Authoring commands | Apache 2.0 | `Nowline: New Roadmap…` (`--init` parity); `.nowlinerc`-vs-settings disagreement diagnostic in the preview (suppressed when `nowline.ignoreRcFile` is `true`) |
 | m4 | Embed | Apache 2.0 | Browser embed script, GitHub Action |
 | m4.5 | IDE Expansion | Apache 2.0 | Obsidian, Neovim, JetBrains (timing TBD) |
 
@@ -351,6 +354,37 @@ Five new settings: `nowline.preview.refreshOn`, `debounceMs`, `theme`, `defaultF
 
 Spec: [`specs/ide.md`](./ide.md) | Handoff: [`specs/handoffs/m3c.md`](./handoffs/m3c.md)
 
+### m3d — Preview parity
+
+Brings the live preview into option-parity with `nowline render`. Today the preview pipeline only consumes `text + fsPath + theme + today`; CLI flags like `--locale`, `--width`, `--strict`, `--no-links`, `--asset-root`, and `--now` are silently the default. m3d widens the pipeline input and threads a single resolution chain through it (settings → `.nowlinerc` → DSL directive → defaults; toolbar overrides on top for the active panel).
+
+- `.nowlinerc` reader with workspace `FileSystemWatcher('**/.nowlinerc')`; cached per-directory; same `loadConfig` helper as `@nowline/cli` (extracted to the shared `@nowline/config` package so both consumers stay byte-identical).
+- New preview-affecting settings: `nowline.preview.locale`, `now`, `strict`, `showLinks`, `width`, `assetRoot`.
+- New global setting: `nowline.ignoreRcFile` (default `false`).
+- Preview toolbar overrides: theme (light/dark/auto), now-line (today/at-date/hide), show links — per-session, not persisted.
+
+Spec: [`specs/ide.md`](./ide.md) § Configuration
+
+### m3e — Export from VS Code
+
+Adds `Nowline: Export…` (palette + editor-title menu + tab right-click), which shells out to the bundled `nowline` CLI to produce PDF, pixel-strict PNG, HTML, Markdown+Mermaid, XLSX, or MS Project XML. Avoids bundling resvg / pdfkit / exceljs / etc. into the `.vsix`; mirrors the README's existing PNG-fidelity caveat ("for pixel-strict output run the CLI").
+
+- New `nowline.export.*` settings: `cliPath`, `pdf.pageSize`, `pdf.orientation`, `pdf.margin`, `fonts.sans`, `fonts.mono`, `fonts.headless`, `png.scale`, `msproj.start`.
+- Per-export **Override…** quickPick for format-specific flags (overrides not persisted).
+- Spawn streams stderr to the existing `Nowline Language Server` output channel; failures surface via `vscode.window.showErrorMessage`.
+- Missing CLI surfaces an "Install Nowline CLI…" notification and falls back to the existing in-webview SVG / browser-canvas-PNG buttons.
+
+Spec: [`specs/ide.md`](./ide.md) § Export to other formats
+
+### m3f — Authoring commands
+
+Closes the remaining gap with the verbless CLI by exposing the parts of `--init` that make sense from the editor.
+
+- `Nowline: New Roadmap…` writes a starter `.nowline` file from the same template the CLI's `--init` writes; prompts for a name and target folder.
+- `.nowlinerc`-vs-settings disagreement diagnostic in the preview, surfaced inline so authors notice when a workspace `.nowlinerc` is being shadowed by a personal VS Code setting (suppressed when `nowline.ignoreRcFile` is `true`).
+
+Spec: [`specs/ide.md`](./ide.md) § Authoring commands
+
 ### m4 — Embed
 
 Roadmaps render anywhere on the web and in CI.
@@ -376,9 +410,9 @@ Spec: [`specs/ide.md`](./ide.md)
 ## Dependency Chain
 
 ```
-m1 → m2a → m2b → m2b.5 → m2c → m2d → m2e → m2f → m2g → m2h → m2.5a → m2.5b → m2.5c → m2.5d → m2i → m2j → m2k → m2l → m3a → m3b → m3c → m4
-                                                                                                                                    ↘
-                                                                                                                                     m4.5 (depends on m3a only; sequenced after m4)
+m1 → m2a → m2b → m2b.5 → m2c → m2d → m2e → m2f → m2g → m2h → m2.5a → m2.5b → m2.5c → m2.5d → m2i → m2j → m2k → m2l → m3a → m3b → m3c → m3d → m3e → m3f → m4
+                                                                                                                                                        ↘
+                                                                                                                                                         m4.5 (depends on m3a only; sequenced after m4)
 ```
 
 m2l is positioned in the m2 series logically (CLI distribution polish) but landed after m3c chronologically; the chain reflects logical OSS sequence rather than strict shipping order, similar to m2i.

@@ -75,6 +75,11 @@
                     "default": "off",
                     "description": "Trace LSP communication between VS Code and the bundled Nowline language server."
                 },
+                "nowline.ignoreRcFile": {
+                    "type": "boolean",
+                    "default": false,
+                    "description": "When true, skip the .nowlinerc baseline lookup. The preview and Export… command then resolve options purely from VS Code settings + DSL directives + built-in defaults."
+                },
                 "nowline.preview.refreshOn": {
                     "type": "string",
                     "enum": [
@@ -114,6 +119,94 @@
                     "type": "boolean",
                     "default": true,
                     "description": "Show a bottom-right minimap with a viewport indicator. The minimap auto-hides when the diagram fully fits inside the panel."
+                },
+                "nowline.preview.locale": {
+                    "type": "string",
+                    "default": "",
+                    "pattern": "^$|^[A-Za-z]{2,3}(-[A-Za-z0-9]{2,8})*$",
+                    "patternErrorMessage": "Must be a BCP-47 language tag (e.g. 'fr', 'fr-CA') or empty.",
+                    "description": "BCP-47 locale used to render the preview and validator messages. Empty falls through to .nowlinerc → vscode.env.language → 'en-US'. The file's `nowline v1 locale:` directive overrides this for the rendered SVG."
+                },
+                "nowline.preview.now": {
+                    "type": "string",
+                    "default": "auto",
+                    "pattern": "^(auto|none|\\d{4}-\\d{2}-\\d{2})$",
+                    "patternErrorMessage": "Must be 'auto', 'none', or a YYYY-MM-DD date.",
+                    "description": "Anchor for the now-line. 'auto' uses today's date; 'none' suppresses the now-line entirely (mirrors `--now -`); 'YYYY-MM-DD' pins it to a specific date for snapshots."
+                },
+                "nowline.preview.strict": {
+                    "type": "boolean",
+                    "default": false,
+                    "description": "Promote asset / sanitizer warnings to errors in the preview's diagnostic table. Mirrors the CLI's --strict flag."
+                },
+                "nowline.preview.showLinks": {
+                    "type": "boolean",
+                    "default": true,
+                    "description": "Render link icons inside item bars. Inverse of the CLI's --no-links flag."
+                },
+                "nowline.preview.width": {
+                    "type": "number",
+                    "default": 0,
+                    "minimum": 0,
+                    "description": "Canvas width in pixels for the preview render. 0 leaves it unset (defaults to 1280); the preview's pan/zoom usually makes this irrelevant."
+                },
+                "nowline.preview.assetRoot": {
+                    "type": "string",
+                    "default": "",
+                    "description": "Directory from which logo / image assets may be loaded. Empty uses the source file's directory (the same default the CLI uses without --asset-root)."
+                },
+                "nowline.export.cliPath": {
+                    "type": "string",
+                    "default": "nowline",
+                    "description": "Path to the `nowline` binary used by the Export… command. Bare 'nowline' uses the PATH lookup; ${workspaceFolder} substitution is supported."
+                },
+                "nowline.export.pdf.pageSize": {
+                    "type": "string",
+                    "default": "letter",
+                    "description": "PDF page size: a preset (letter, legal, tabloid, ledger, a1..a5, b3..b5), 'content' for auto-fit, or WxHunit for custom (e.g. 8.5x11in)."
+                },
+                "nowline.export.pdf.orientation": {
+                    "type": "string",
+                    "enum": [
+                        "auto",
+                        "portrait",
+                        "landscape"
+                    ],
+                    "default": "auto",
+                    "description": "PDF page orientation."
+                },
+                "nowline.export.pdf.margin": {
+                    "type": "string",
+                    "default": "36pt",
+                    "description": "PDF page margin. Bare numbers are points; length suffixes (in, mm, cm) are accepted (e.g. 36pt, 0.5in, 12mm)."
+                },
+                "nowline.export.fonts.sans": {
+                    "type": "string",
+                    "default": "",
+                    "description": "Sans font for PNG/PDF export: a TTF/OTF path or alias (sf, helvetica, dejavu, …). Empty leaves font resolution to the CLI."
+                },
+                "nowline.export.fonts.mono": {
+                    "type": "string",
+                    "default": "",
+                    "description": "Mono font for PNG/PDF export. Empty falls back to the same resolution chain as the sans font."
+                },
+                "nowline.export.fonts.headless": {
+                    "type": "boolean",
+                    "default": false,
+                    "description": "Skip the platform font probe and force the bundled DejaVu pair. Yields byte-stable PNG/PDF output across machines."
+                },
+                "nowline.export.png.scale": {
+                    "type": "number",
+                    "default": 1,
+                    "minimum": 0.1,
+                    "description": "Raster scale factor for PNG export."
+                },
+                "nowline.export.msproj.start": {
+                    "type": "string",
+                    "default": "",
+                    "pattern": "^$|^\\d{4}-\\d{2}-\\d{2}$",
+                    "patternErrorMessage": "Must be empty or a YYYY-MM-DD date.",
+                    "description": "MS Project export anchor date for relative roadmaps. Empty uses the same fallback chain as the CLI (--now → deterministic fallback)."
                 }
             }
         },
@@ -134,6 +227,17 @@
                 "title": "Open Preview to the Side",
                 "category": "Nowline",
                 "icon": "$(open-preview)"
+            },
+            {
+                "command": "nowline.export",
+                "title": "Export…",
+                "category": "Nowline",
+                "icon": "$(export)"
+            },
+            {
+                "command": "nowline.newRoadmap",
+                "title": "New Roadmap…",
+                "category": "Nowline"
             }
         ],
         "keybindings": [
@@ -156,6 +260,11 @@
                     "command": "nowline.openPreviewToSide",
                     "when": "editorLangId == nowline",
                     "group": "navigation"
+                },
+                {
+                    "command": "nowline.export",
+                    "when": "editorLangId == nowline",
+                    "group": "navigation"
                 }
             ],
             "editor/title/context": [
@@ -168,6 +277,11 @@
                     "command": "nowline.openPreviewToSide",
                     "when": "resourceExtname == .nowline",
                     "group": "1_open"
+                },
+                {
+                    "command": "nowline.export",
+                    "when": "resourceExtname == .nowline",
+                    "group": "5_export"
                 }
             ],
             "editor/context": [
@@ -185,6 +299,11 @@
                     "when": "editorLangId == nowline",
                     "command": "nowline.openLinkInSideBrowser",
                     "group": "navigation@10"
+                },
+                {
+                    "when": "editorLangId == nowline",
+                    "command": "nowline.export",
+                    "group": "navigation@20"
                 }
             ],
             "explorer/context": [
@@ -197,6 +316,20 @@
                     "command": "nowline.openPreviewToSide",
                     "when": "resourceExtname == .nowline",
                     "group": "navigation"
+                },
+                {
+                    "command": "nowline.export",
+                    "when": "resourceExtname == .nowline",
+                    "group": "navigation"
+                }
+            ],
+            "commandPalette": [
+                {
+                    "command": "nowline.export",
+                    "when": "editorLangId == nowline || resourceExtname == .nowline"
+                },
+                {
+                    "command": "nowline.newRoadmap"
                 }
             ]
         }
@@ -213,6 +346,7 @@
         "lint": "tsc --noEmit -p tsconfig.json"
     },
     "dependencies": {
+        "@nowline/config": "workspace:*",
         "@nowline/core": "workspace:*",
         "@nowline/layout": "workspace:*",
         "@nowline/lsp": "workspace:*",

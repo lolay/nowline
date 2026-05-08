@@ -122,6 +122,27 @@ html, body {
     display: block; width: 100%; text-align: left;
     padding: 6px 10px;
 }
+.menu li.menu-section {
+    padding: 4px 10px 2px;
+    font-size: 0.85em;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+    color: var(--vscode-descriptionForeground, #999);
+}
+.menu li.menu-divider {
+    height: 1px;
+    margin: 4px 6px;
+    background: var(--vscode-editorWidget-border, rgba(255,255,255,0.1));
+}
+.menu .btn.view-opt {
+    padding-left: 22px;
+    position: relative;
+}
+.menu .btn.view-opt[data-active="true"]::before {
+    content: '\\2713';
+    position: absolute;
+    left: 8px;
+}
 
 /* === Minimap === */
 #minimap {
@@ -271,6 +292,22 @@ const BODY = `
         <button class="btn glyph" id="fit-page" title="Fit page (1)" aria-label="Fit page">⛶</button>
         <span class="sep"></span>
         <div class="dropdown">
+            <button class="btn" id="view-toggle" title="View options for this preview (theme, now-line, links)">View ▾</button>
+            <ul class="menu" id="view-menu" hidden>
+                <li class="menu-section">Theme</li>
+                <li><button class="btn view-opt" data-opt="theme" data-value="auto">Auto</button></li>
+                <li><button class="btn view-opt" data-opt="theme" data-value="light">Light</button></li>
+                <li><button class="btn view-opt" data-opt="theme" data-value="dark">Dark</button></li>
+                <li class="menu-divider"></li>
+                <li class="menu-section">Now-line</li>
+                <li><button class="btn view-opt" data-opt="now" data-value="today">Today</button></li>
+                <li><button class="btn view-opt" data-opt="now" data-value="hide">Hide</button></li>
+                <li class="menu-divider"></li>
+                <li><button class="btn view-opt" data-opt="showLinks" data-value="toggle">Show links</button></li>
+            </ul>
+        </div>
+        <span class="sep"></span>
+        <div class="dropdown">
             <button class="btn" id="save-toggle" title="Save the rendered diagram">Save ▾</button>
             <ul class="menu" id="save-menu" hidden>
                 <li><button class="btn" data-action="save-svg">Save SVG…</button></li>
@@ -323,6 +360,7 @@ const SCRIPT = `
         openProblems: document.getElementById('open-problems'),
         saveMenu: document.getElementById('save-menu'),
         copyMenu: document.getElementById('copy-menu'),
+        viewMenu: document.getElementById('view-menu'),
     };
 
     var state = {
@@ -339,6 +377,20 @@ const SCRIPT = `
         showMinimap: true,
         minimapDismissedThisSession: false,
         firstRender: true,
+        // === View toolbar overrides (per-panel; not persisted) ===
+        // theme: 'auto' | 'light' | 'dark' — UI representation; resolves
+        // against the workbench color theme when 'auto'.
+        // now: 'today' | 'hide' — mirrors --now and --now -.
+        // showLinks: boolean — inverse of --no-links.
+        // baseline* fields capture the host-side setting so the menu
+        // can show "the user hasn't overridden this yet" states.
+        view: {
+            theme: 'auto',
+            now: 'today',
+            showLinks: true,
+            // Track whether each option has been explicitly clicked.
+            overridden: { theme: false, now: false, showLinks: false },
+        },
     };
 
     // ===== Toolbar fade =====
@@ -741,25 +793,74 @@ const SCRIPT = `
     document.getElementById('fit-width').addEventListener('click', fitWidth);
     document.getElementById('fit-page').addEventListener('click', fitPage);
 
-    // ===== Save / Copy dropdowns =====
+    // ===== View / Save / Copy dropdowns =====
     function setupDropdown(toggleId, menu) {
         var toggle = document.getElementById(toggleId);
         toggle.addEventListener('click', function (e) {
             e.stopPropagation();
-            // Close the other menu first.
+            // Close the other menus first so only one is open at a time.
             els.saveMenu.hidden = true;
             els.copyMenu.hidden = true;
+            els.viewMenu.hidden = true;
             menu.hidden = !menu.hidden;
         });
     }
+    setupDropdown('view-toggle', els.viewMenu);
     setupDropdown('save-toggle', els.saveMenu);
     setupDropdown('copy-toggle', els.copyMenu);
     document.addEventListener('click', function () {
         els.saveMenu.hidden = true;
         els.copyMenu.hidden = true;
+        els.viewMenu.hidden = true;
     });
-    [els.saveMenu, els.copyMenu].forEach(function (m) {
+    [els.saveMenu, els.copyMenu, els.viewMenu].forEach(function (m) {
         m.addEventListener('click', function (e) { e.stopPropagation(); });
+    });
+
+    // ===== View options =====
+    function refreshViewMenu() {
+        var items = els.viewMenu.querySelectorAll('.view-opt');
+        for (var i = 0; i < items.length; i++) {
+            var item = items[i];
+            var opt = item.getAttribute('data-opt');
+            var value = item.getAttribute('data-value');
+            var active = false;
+            if (opt === 'theme') active = state.view.theme === value;
+            else if (opt === 'now') active = state.view.now === value;
+            else if (opt === 'showLinks') active = state.view.showLinks;
+            item.setAttribute('data-active', active ? 'true' : 'false');
+        }
+    }
+
+    function postViewOverrides() {
+        // Only send overridden fields. The host merges them on top of
+        // the resolution chain (settings → .nowlinerc → defaults), so
+        // omitted fields fall back to whatever the chain produced.
+        var overrides = {};
+        if (state.view.overridden.theme) overrides.theme = state.view.theme;
+        if (state.view.overridden.now) overrides.now = state.view.now;
+        if (state.view.overridden.showLinks) overrides.showLinks = state.view.showLinks;
+        vscode.postMessage({ type: 'viewOptions', overrides: overrides });
+    }
+
+    els.viewMenu.addEventListener('click', function (e) {
+        var btn = e.target.closest ? e.target.closest('.view-opt') : null;
+        if (!btn) return;
+        var opt = btn.getAttribute('data-opt');
+        var value = btn.getAttribute('data-value');
+        if (opt === 'theme') {
+            state.view.theme = value;
+            state.view.overridden.theme = true;
+        } else if (opt === 'now') {
+            state.view.now = value;
+            state.view.overridden.now = true;
+        } else if (opt === 'showLinks') {
+            state.view.showLinks = !state.view.showLinks;
+            state.view.overridden.showLinks = true;
+        }
+        refreshViewMenu();
+        els.viewMenu.hidden = true;
+        postViewOverrides();
     });
 
     document.querySelectorAll('[data-action]').forEach(function (btn) {
@@ -848,7 +949,9 @@ const SCRIPT = `
         if (msg.type === 'init') {
             if (msg.defaultFit) state.defaultFit = msg.defaultFit;
             if (msg.showMinimap !== undefined) state.showMinimap = !!msg.showMinimap;
+            applyHostViewState(msg, /*resetOverrides*/ true);
             updateMinimapVisibility();
+            refreshViewMenu();
         } else if (msg.type === 'svg') {
             setSvg(msg.body);
         } else if (msg.type === 'diagnostics') {
@@ -862,7 +965,32 @@ const SCRIPT = `
                 updateMinimapVisibility();
             }
             if (msg.defaultFit) state.defaultFit = msg.defaultFit;
+            // Settings changed in the workbench. Refresh non-overridden
+            // baselines so the menu's checkmarks reflect the new setting,
+            // but don't clobber explicit toolbar overrides.
+            applyHostViewState(msg, /*resetOverrides*/ false);
+            refreshViewMenu();
         }
     });
+
+    function applyHostViewState(msg, resetOverrides) {
+        if (msg.theme && !state.view.overridden.theme) {
+            state.view.theme = msg.theme;
+        }
+        if (msg.now !== undefined && !state.view.overridden.now) {
+            // Setting is 'auto'/'none'/YYYY-MM-DD; the toolbar only
+            // exposes today/hide, so collapse anything that isn't 'none'
+            // to 'today' for the displayed checkmark. Custom dates still
+            // render via the setting; the toolbar just doesn't claim
+            // ownership of them.
+            state.view.now = msg.now === 'none' ? 'hide' : 'today';
+        }
+        if (msg.showLinks !== undefined && !state.view.overridden.showLinks) {
+            state.view.showLinks = !!msg.showLinks;
+        }
+        if (resetOverrides) {
+            state.view.overridden = { theme: false, now: false, showLinks: false };
+        }
+    }
 })();
 `;

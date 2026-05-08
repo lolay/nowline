@@ -79,7 +79,7 @@ Users install the extension from the marketplace and it works immediately.
 3. **Live preview panel** — side panel that renders the `.nowline` file as SVG and re-renders on every keystroke or save. Uses `@nowline/renderer` running in a webview.
 4. **File icon** — custom icon for `.nowline` files in the explorer.
 5. **Snippets** — code snippets for common patterns (new swimlane, new item, new parallel/group).
-6. **Commands** — `Nowline: Render to SVG`, `Nowline: Render to PNG`, `Nowline: Open Preview`.
+6. **Commands** — `Nowline: Open Preview`, `Nowline: Open Preview to the Side`, `Nowline: Open Link in Side Browser`, `Nowline: Export…` (m3e), `Nowline: New Roadmap…` (m3f).
 
 ### Extension Structure
 
@@ -88,10 +88,17 @@ nowline-vscode/
   src/
     extension.ts                    # Activation, LSP client, command dispatch
     server-launcher.ts              # Bundled LSP server boot
+    io/
+      rc-config.ts                  # .nowlinerc reader + workspace watcher (m3d)
+      disagreement-check.ts         # Settings-vs-.nowlinerc shadow notifications (m3f)
+    export/
+      cli-runner.ts                 # `Nowline: Export…` shell-out (m3e)
+      new-roadmap.ts                # `Nowline: New Roadmap…` scaffolder (m3f)
     preview/
       preview-manager.ts            # One-panel-per-source registry
       preview-panel.ts              # Wraps vscode.WebviewPanel, debounced render
       render-pipeline.ts            # parseSource + resolveIncludes + layout + renderSvg
+      option-resolver.ts            # Collapses settings/.nowlinerc/env/defaults into render inputs (m3d)
       shell-html.ts                 # Webview HTML/CSS/JS shell
       diagnostic-row.ts             # Adapters for the host -> webview diagnostic protocol
   syntaxes/
@@ -108,10 +115,97 @@ The preview panel is a VS Code webview that displays an SVG rendered by the **ex
 
 1. The extension host reuses the CLI's pipeline (`parseSource` → `resolveIncludes` → `layoutRoadmap` → `renderSvg`) inside `preview/render-pipeline.ts`. This keeps `include:` resolution, asset embedding, and theme handling identical to the CLI without bouncing `readFile` callbacks across the host/webview message boundary.
 2. The host posts `{ type: 'svg', body }` (success), `{ type: 'diagnostics', rows }` (parse / validate / include errors), or `{ type: 'fatal', message }` (unexpected throw) into a "dumb" webview that renders SVG, a clickable diagnostic table, and a viewport layer (toolbar, zoom, pan, minimap, save / copy).
-3. Updates fire on `onDidChangeTextDocument` (debounced; default 200 ms), `onDidSaveTextDocument` (immediate), `onDidChangeActiveColorTheme`, and any `nowline.preview.*` setting change.
+3. Updates fire on `onDidChangeTextDocument` (debounced; default 200 ms), `onDidSaveTextDocument` (immediate), `onDidChangeActiveColorTheme`, any `nowline.preview.*` / `nowline.export.*` / `nowline.ignoreRcFile` setting change, and (m3d+) any change to a `.nowlinerc` reachable from the source file.
 4. Two open commands match VS Code's markdown UX: `nowline.openPreview` (`Cmd+Shift+V`, same tab) and `nowline.openPreviewToSide` (`Cmd+K V`, beside).
 
 This deviates from earlier drafts of this spec that called for client-side parsing and rendering inside the webview. The host-render approach was chosen to avoid asset / include round-trips, ship one bundle instead of two, and reuse the exact CLI codepath. The future embed (m4) still owns the client-side bundle for browser environments without an extension host.
+
+### Configuration
+
+The extension resolves render-affecting and export-affecting options through a single chain (highest wins):
+
+1. **Toolbar / session override** — applies only to the active preview panel; not persisted.
+2. **VS Code settings** — `nowline.preview.*`, `nowline.export.*`, `nowline.ignoreRcFile`, `nowline.trace.server`.
+3. **`.nowlinerc`** — discovered by walking up from the source file; honored by default. Skipped when `nowline.ignoreRcFile` is `true`.
+4. **DSL directive** — e.g. `nowline v1 locale:fr-CA` in the source file.
+5. **Built-in defaults** — match the CLI defaults from [`specs/cli.md`](./cli.md).
+
+This keeps the in-panel preview byte-stable with `nowline render` for the same source.
+
+#### Locale resolution (special case)
+
+Locale uses two chains, mirroring the CLI's [`packages/cli/src/i18n/locale.ts`](../packages/cli/src/i18n/locale.ts):
+
+- **Operator chain** (validator-table messages): `nowline.preview.locale` > `.nowlinerc` `locale` > `vscode.env.language` > `en-US`.
+- **Content chain** (rendered axis labels, now-pill, footnote sort): the file's `nowline v1 locale:` directive wins outright; the operator chain only takes over when no directive is present.
+
+`vscode.env.language` plays the role the CLI's `LC_ALL`/`LC_MESSAGES`/`LANG` env vars play — it reflects Cursor's display language (set via Cursor's "Configure Display Language" command; defaults to the OS locale on first install). A French-installed Cursor therefore renders a French preview and French diagnostics with `nowline.preview.locale` left at its empty default. A power user who wants English output despite a French Cursor sets `nowline.preview.locale` to `en-US`. Locale is deliberately not exposed as a toolbar override — Cursor-locale auto-detection plus directive precedence covers the cases a per-panel toggle would address.
+
+#### Settings
+
+| Setting | Default | CLI flag | Notes |
+| --- | --- | --- | --- |
+| `nowline.trace.server` | `off` | — | LSP trace level (`off` / `messages` / `verbose`). Ships in m3b. |
+| `nowline.ignoreRcFile` | `false` | — | Skip the `.nowlinerc` baseline lookup entirely. Ships in m3d. |
+| `nowline.preview.refreshOn` | `keystroke` | — | `keystroke` or `save`. Ships in m3c. |
+| `nowline.preview.debounceMs` | `200` | — | Keystroke debounce window. Ships in m3c. |
+| `nowline.preview.theme` | `auto` | `--theme` | `auto` follows the active VS Code color theme. Ships in m3c. |
+| `nowline.preview.defaultFit` | `fitPage` | — | Initial viewport fit. Ships in m3c. |
+| `nowline.preview.showMinimap` | `true` | — | Minimap default visibility. Ships in m3c. |
+| `nowline.preview.locale` | `""` | `--locale` | BCP-47; empty falls through to `.nowlinerc` → `vscode.env.language` → `en-US`. File directive overrides for content. Ships in m3d. |
+| `nowline.preview.now` | `auto` | `--now` | `auto` / `none` / `YYYY-MM-DD`. Ships in m3d. |
+| `nowline.preview.strict` | `false` | `--strict` | Promotes asset / sanitizer warnings to errors. Ships in m3d. |
+| `nowline.preview.showLinks` | `true` | inverse of `--no-links` | Toggle link icons in rendered items. Ships in m3d. |
+| `nowline.preview.width` | `0` | `--width` | `0` = unset; preview has zoom anyway. Ships in m3d. |
+| `nowline.preview.assetRoot` | `""` | `--asset-root` | Empty = source file's directory. Ships in m3d. |
+| `nowline.export.cliPath` | `nowline` | — | Path to the `nowline` binary; PATH lookup by default. `${workspaceFolder}` substitution supported. Ships in m3e. |
+| `nowline.export.pdf.pageSize` | `letter` | `--page-size` | Ships in m3e. |
+| `nowline.export.pdf.orientation` | `auto` | `--orientation` | Ships in m3e. |
+| `nowline.export.pdf.margin` | `36pt` | `--margin` | Ships in m3e. |
+| `nowline.export.fonts.sans` | `""` | `--font-sans` | Ships in m3e. |
+| `nowline.export.fonts.mono` | `""` | `--font-mono` | Ships in m3e. |
+| `nowline.export.fonts.headless` | `false` | `--headless` | Ships in m3e. |
+| `nowline.export.png.scale` | `1` | `--scale` | Ships in m3e. |
+| `nowline.export.msproj.start` | `""` | `--start` | Ships in m3e. |
+
+#### `.nowlinerc` handling
+
+The extension reads `.nowlinerc` via the same `loadConfig` helper used by `@nowline/cli` — extracted to the shared `@nowline/config` package so both consumers stay byte-identical. A workspace `FileSystemWatcher('**/.nowlinerc')` invalidates the per-directory cache and re-renders any open preview whose source file resolves through the changed config.
+
+Honored keys for the preview: `theme`, `width`, `locale`, `assetRoot`. The export-only keys (`pdfPageSize`, `pdfOrientation`, `pdfMargin`, `fontSans`, `fontMono`, `headlessFonts`) are read by the export command only. `defaultFormat` is consulted by the export command's format picker as the pre-selected default.
+
+#### Toolbar overrides
+
+The preview toolbar adds three per-session controls that don't write back to settings:
+
+- **Theme** — light / dark / auto (override the resolved theme for screenshots).
+- **Now-line** — show today / show as-of date / hide (`--now` parity).
+- **Show links** — toggle the link-icon tile (`--no-links` parity).
+
+Locale, strict, width, and asset-root stay settings-only — they aren't things you flip while skimming a roadmap.
+
+### Export to other formats
+
+`Nowline: Export…` (palette + editor-title menu + tab right-click; m3e) shells out to the bundled `nowline` CLI to produce PDF, pixel-strict PNG, HTML, Markdown+Mermaid, XLSX, or MS Project XML. The flow:
+
+1. Pick format → save dialog.
+2. Optional **Override…** quickPick for format-specific flags (page size, orientation, margin, fonts, scale, start date) — overrides aren't persisted.
+3. Spawn `nowline <source> -f <fmt> -o <path>` with options resolved through the chain in § Configuration.
+4. Stream stderr to the existing `Nowline Language Server` output channel; surface failures via `vscode.window.showErrorMessage`.
+
+If `nowline.export.cliPath` doesn't resolve (no CLI installed), the command surfaces a notification with an "Install Nowline CLI…" link to the docs. The existing in-webview SVG and browser-canvas-PNG buttons stay (no install required for the common case).
+
+This deliberately mirrors the README's PNG-fidelity caveat ("for pixel-strict output run the CLI") and avoids bundling resvg / pdfkit / exceljs / etc. into the `.vsix` (~30 MB savings) — keeping the marketplace footprint near today's ~2 MB.
+
+### Authoring commands
+
+| Command | Keybinding | Notes |
+| --- | --- | --- |
+| `Nowline: Open Preview` | `Cmd/Ctrl+Shift+V` | Same tab. Ships in m3c. |
+| `Nowline: Open Preview to the Side` | `Cmd/Ctrl+K V` | Beside. Ships in m3c. |
+| `Nowline: Open Link in Side Browser` | — | Opens the URL nearest the cursor in VS Code's Simple Browser. Ships in m3c. |
+| `Nowline: Export…` | — | See § Export to other formats. Ships in m3e. |
+| `Nowline: New Roadmap…` | — | Scaffolds a `.nowline` file from the same starter the CLI's `--init` writes; prompts for a name and target folder. Ships in m3f. |
 
 ## Obsidian Plugin (m4.5)
 

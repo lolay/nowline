@@ -5,12 +5,17 @@ import {
     type PreviewSettings,
     type PreviewWebviewMessage,
 } from './preview-panel.js';
+import type { RcConfigCache } from '../io/rc-config.js';
 
 const VIEW_TYPE = 'nowline.preview';
 
 export interface PreviewManagerDeps {
     /** Read the current `nowline.preview.*` settings as a snapshot. */
     readSettings(): PreviewSettings;
+    /** `.nowlinerc` cache shared across all panels. */
+    rcCache: RcConfigCache;
+    /** `vscode.env.language` snapshot — refreshed via `readSettings` callers if it ever changes. */
+    vscodeLanguage(): string | undefined;
     /** Webview message handler, owned by extension.ts. */
     onMessage(msg: PreviewWebviewMessage, source: NowlinePreview): void;
 }
@@ -69,6 +74,8 @@ export class PreviewManager {
             panel,
             sourceUri,
             settings: this.deps.readSettings(),
+            rcCache: this.deps.rcCache,
+            vscodeLanguage: this.deps.vscodeLanguage(),
             onMessage: (msg, source) => this.deps.onMessage(msg, source),
             onDispose: (source) => this.previews.delete(source.sourceUri.toString()),
         });
@@ -91,6 +98,13 @@ export class PreviewManager {
     propagateSettings(settings: PreviewSettings, themeChanged: boolean): void {
         for (const p of this.previews.values()) {
             p.updateSettings(settings, themeChanged);
+        }
+    }
+
+    /** Trigger an immediate refresh on every open panel (e.g. on rc-file change). */
+    refreshAll(): void {
+        for (const p of this.previews.values()) {
+            void p.refreshNow();
         }
     }
 

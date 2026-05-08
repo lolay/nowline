@@ -16,9 +16,16 @@ import {
     type RefreshTrigger,
     type ThemeMode,
 } from './preview/preview-panel.js';
+import { RcConfigCache } from './io/rc-config.js';
+import { DisagreementTracker } from './io/disagreement-check.js';
+import { runExportCommand, type ExportSettings } from './export/cli-runner.js';
+import { runNewRoadmapCommand } from './export/new-roadmap.js';
 
 let client: LanguageClient | undefined;
 let previewManager: PreviewManager | undefined;
+let rcCache: RcConfigCache | undefined;
+let disagreementTracker: DisagreementTracker | undefined;
+let exportOutputChannel: vscode.OutputChannel | undefined;
 
 // Mirrors the URL terminal in packages/core/src/language/nowline.langium —
 // `https?://` followed by any non-whitespace, non-list-punctuation chars.
@@ -26,14 +33,24 @@ const URL_RE = /https?:\/\/[^\s\[\],]+/g;
 
 export function activate(context: vscode.ExtensionContext): void {
     startLanguageClient(context);
+
+    rcCache = new RcConfigCache();
+    rcCache.setDisabled(readIgnoreRcFile());
+    disagreementTracker = new DisagreementTracker();
+    exportOutputChannel = vscode.window.createOutputChannel('Nowline Export');
+
     previewManager = new PreviewManager(context, {
         readSettings: readPreviewSettings,
+        rcCache,
+        vscodeLanguage: () => vscode.env.language,
         onMessage: handleWebviewMessage,
     });
 
     context.subscriptions.push(
         { dispose: () => { void client?.stop(); } },
         { dispose: () => previewManager?.dispose() },
+        { dispose: () => rcCache?.dispose() },
+        { dispose: () => exportOutputChannel?.dispose() },
         vscode.commands.registerCommand('nowline.openLinkInSideBrowser', openLinkInSideBrowser),
         vscode.commands.registerCommand('nowline.openPreview', (uri?: vscode.Uri) =>
             openPreview(uri, vscode.ViewColumn.Active),
@@ -41,6 +58,15 @@ export function activate(context: vscode.ExtensionContext): void {
         vscode.commands.registerCommand('nowline.openPreviewToSide', (uri?: vscode.Uri) =>
             openPreview(uri, vscode.ViewColumn.Beside),
         ),
+        vscode.commands.registerCommand('nowline.export', (uri?: vscode.Uri) =>
+            handleExport(uri),
+        ),
+        vscode.commands.registerCommand('nowline.newRoadmap', () =>
+            runNewRoadmapCommand(),
+        ),
+        rcCache.onDidChange(() => {
+            previewManager?.refreshAll();
+        }),
         vscode.workspace.onDidChangeTextDocument((e) => {
             if (e.document.languageId !== 'nowline') return;
             previewManager?.forEach((p) => {
@@ -65,15 +91,26 @@ export function activate(context: vscode.ExtensionContext): void {
             previewManager?.propagateSettings(settings, /*themeChanged*/ true);
         }),
         vscode.workspace.onDidChangeConfiguration((e) => {
-            if (!e.affectsConfiguration('nowline.preview')) return;
-            const settings = readPreviewSettings();
-            previewManager?.propagateSettings(settings, /*themeChanged*/ false);
+            if (e.affectsConfiguration('nowline.ignoreRcFile')) {
+                rcCache?.setDisabled(readIgnoreRcFile());
+                disagreementTracker?.reset();
+            }
+            if (
+                e.affectsConfiguration('nowline.preview') ||
+                e.affectsConfiguration('nowline.ignoreRcFile')
+            ) {
+                disagreementTracker?.reset();
+                const settings = readPreviewSettings();
+                previewManager?.propagateSettings(settings, /*themeChanged*/ false);
+            }
         }),
     );
 }
 
 export function deactivate(): Thenable<void> | undefined {
     previewManager?.dispose();
+    rcCache?.dispose();
+    exportOutputChannel?.dispose();
     if (!client) return undefined;
     return client.stop();
 }
@@ -122,6 +159,13 @@ async function openPreview(uri: vscode.Uri | undefined, viewColumn: vscode.ViewC
         return;
     }
     await previewManager.openOrReveal(target, viewColumn);
+    // Fire-and-forget shadow-warning check; rcCache hit is cached after the
+    // first preview render, so this is a cheap second lookup.
+    if (rcCache && disagreementTracker) {
+        const dir = path.dirname(target.fsPath);
+        const rc = await rcCache.resolveFor(dir);
+        disagreementTracker.check(rc.config, rc.rcPath, target);
+    }
 }
 
 function activeNowlineUri(): vscode.Uri | undefined {
@@ -131,6 +175,10 @@ function activeNowlineUri(): vscode.Uri | undefined {
     return open?.uri;
 }
 
+function readIgnoreRcFile(): boolean {
+    return vscode.workspace.getConfiguration('nowline').get<boolean>('ignoreRcFile') ?? false;
+}
+
 function readPreviewSettings(): PreviewSettings {
     const cfg = vscode.workspace.getConfiguration('nowline.preview');
     const refreshOn = (cfg.get<string>('refreshOn') ?? 'keystroke') as RefreshTrigger;
@@ -138,7 +186,40 @@ function readPreviewSettings(): PreviewSettings {
     const theme = (cfg.get<string>('theme') ?? 'auto') as ThemeMode;
     const defaultFit = (cfg.get<string>('defaultFit') ?? 'fitPage') as DefaultFit;
     const showMinimap = cfg.get<boolean>('showMinimap') ?? true;
-    return { refreshOn, debounceMs, theme, defaultFit, showMinimap };
+    const locale = cfg.get<string>('locale') ?? '';
+    const now = cfg.get<string>('now') ?? 'auto';
+    const strict = cfg.get<boolean>('strict') ?? false;
+    const showLinks = cfg.get<boolean>('showLinks') ?? true;
+    const width = cfg.get<number>('width') ?? 0;
+    const assetRoot = cfg.get<string>('assetRoot') ?? '';
+    return {
+        refreshOn,
+        debounceMs,
+        theme,
+        defaultFit,
+        showMinimap,
+        locale,
+        now,
+        strict,
+        showLinks,
+        width,
+        assetRoot,
+    };
+}
+
+function readExportSettings(): ExportSettings {
+    const cfg = vscode.workspace.getConfiguration('nowline.export');
+    return {
+        cliPath: cfg.get<string>('cliPath') ?? 'nowline',
+        pdfPageSize: cfg.get<string>('pdf.pageSize') ?? 'letter',
+        pdfOrientation: cfg.get<string>('pdf.orientation') ?? 'auto',
+        pdfMargin: cfg.get<string>('pdf.margin') ?? '36pt',
+        fontSans: cfg.get<string>('fonts.sans') ?? '',
+        fontMono: cfg.get<string>('fonts.mono') ?? '',
+        headlessFonts: cfg.get<boolean>('fonts.headless') ?? false,
+        pngScale: cfg.get<number>('png.scale') ?? 1,
+        msprojStart: cfg.get<string>('msproj.start') ?? '',
+    };
 }
 
 function handleWebviewMessage(msg: PreviewWebviewMessage, source: NowlinePreview): void {
@@ -159,6 +240,10 @@ function handleWebviewMessage(msg: PreviewWebviewMessage, source: NowlinePreview
             // Webview-side rasterize / clipboard failures surface here so
             // the user sees a notification instead of a silent dead button.
             vscode.window.showErrorMessage(`Nowline preview: ${msg.message}`);
+            return;
+        case 'viewOptions':
+            // Toolbar overrides are handled inside NowlinePreview; the
+            // external dispatcher should never see them.
             return;
     }
 }
@@ -222,6 +307,20 @@ async function handleCopyPngFallback(body: Uint8Array, source: NowlinePreview): 
     if (choice) {
         void vscode.commands.executeCommand('revealFileInOS', target);
     }
+}
+
+async function handleExport(uri: vscode.Uri | undefined): Promise<void> {
+    const target = uri ?? activeNowlineUri();
+    if (!target) {
+        vscode.window.showInformationMessage('Open a .nowline file to use Nowline export.');
+        return;
+    }
+    if (!exportOutputChannel) return;
+    await runExportCommand({
+        sourceUri: target,
+        settings: readExportSettings(),
+        outputChannel: exportOutputChannel,
+    });
 }
 
 /**
