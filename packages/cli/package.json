@@ -39,6 +39,7 @@
   "dependencies": {
     "@babel/code-frame": "^7.29.0",
     "@clack/prompts": "^0.11.0",
+    "@nowline/config": "workspace:*",
     "@nowline/core": "workspace:*",
     "@nowline/export-core": "workspace:*",
     "@nowline/export-html": "workspace:*",
