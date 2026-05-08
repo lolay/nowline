@@ -2,7 +2,7 @@
 
 ## Overview
 
-The OSS tooling (`lolay/nowline` and its satellite repos) ships incrementally across milestones m1–m4.5. A four-phase layout-engine refactor (m2.5a–m2.5d), a rendering-polish pass (m2i), capacity & utilization (m2j), and a dependency-arrow attach + routing pass (m2k) sit between the sample-fidelity work (m2h) and IDE support (m3). The IDE work ships before the public embed (m4) so authors can edit `.nowline` files in VS Code / Cursor with live preview before the embed surface goes wide. Each milestone has a clear scope and set of Apache-2.0 deliverables. Later milestones depend on earlier ones.
+The OSS tooling (`lolay/nowline` and its satellite repos) ships incrementally across milestones m1–m4.6. A four-phase layout-engine refactor (m2.5a–m2.5d), a rendering-polish pass (m2i), capacity & utilization (m2j), and a dependency-arrow attach + routing pass (m2k) sit between the sample-fidelity work (m2h) and IDE support (m3). The IDE work ships before the public embed (m4) so authors can edit `.nowline` files in VS Code / Cursor with live preview before the embed surface goes wide. Two independent post-m4 add-ons round out the OSS chain: m4.5 expands IDE coverage (Obsidian, Neovim, JetBrains), m4.6 expands Windows install coverage (Scoop, WinGet). Each milestone has a clear scope and set of Apache-2.0 deliverables. Later milestones depend on earlier ones.
 
 Commercial milestones (hosted editor, free viewer, MCP, enterprise, FedRAMP) are tracked in a separate, private spec and are out of scope here.
 
@@ -37,6 +37,7 @@ Commercial milestones (hosted editor, free viewer, MCP, enterprise, FedRAMP) are
 | m3f | Authoring commands | Apache 2.0 | `Nowline: New Roadmap…` (`--init` parity); `.nowlinerc`-vs-settings disagreement diagnostic in the preview (suppressed when `nowline.ignoreRcFile` is `true`) |
 | m4 | Embed | Apache 2.0 | Browser embed script, GitHub Action |
 | m4.5 | IDE Expansion | Apache 2.0 | Obsidian, Neovim, JetBrains (timing TBD) |
+| m4.6 | Windows distribution | Apache 2.0 | Scoop bucket (`lolay/scoop-bucket`) and WinGet central-registry submission via `wingetcreate`; new `update-scoop-bucket` + `submit-winget-pkg` jobs in `release.yml`; `SCOOP_BUCKET_TOKEN` + `WINGET_PR_PAT` secrets |
 
 ## Milestone Details
 
@@ -407,15 +408,39 @@ Extend IDE support beyond VS Code/Cursor. Depends on m3 (LSP server) and is inde
 
 Spec: [`specs/ide.md`](./ide.md)
 
+### m4.6 — Windows distribution (timing TBD)
+
+Brings Windows to parity with the Homebrew + apt + npm install paths shipped in m2a / m2l. Two complementary channels — neither requires a code-signing certificate, both reuse the existing release-job patterns:
+
+- **Scoop bucket** — `lolay/scoop-bucket`, parallel in shape to `lolay/homebrew-tap`. JSON manifests under `bucket/nowline.json`; users install with `scoop bucket add lolay https://github.com/lolay/scoop-bucket && scoop install nowline`. A new `update-scoop-bucket` job in [`.github/workflows/release.yml`](../.github/workflows/release.yml) mirrors `update-homebrew-tap`: download the two Windows binaries from the GitHub Release, compute SHA256s, rewrite the manifest from a heredoc, push to the bucket repo using a `SCOOP_BUCKET_TOKEN` PAT. `checkver` + `autoupdate` blocks in the manifest let `scoop update` self-pull future versions even when the workflow lags.
+- **WinGet central registry** — submit to `microsoft/winget-pkgs` per release via `wingetcreate update lolay.nowline -u <release-url> -v <version> --submit`. A new `submit-winget-pkg` job runs after the GitHub Release publishes. First submission goes through manual Microsoft moderation (hours to days); subsequent updates from the same `nowline-release-bot` identity get auto-approval once Microsoft's automation marks us trusted. PAT is `WINGET_PR_PAT`, fine-grained, scoped to fork-and-submit on a personal fork of `microsoft/winget-pkgs`.
+- **Both channels stay unsigned.** Mirrors the current Homebrew + apt + GitHub-Release posture; `scoop install` and `winget install` perform the trust transfer the same way `brew install` does. Code-signing the `.exe` itself (Authenticode or Azure Trusted Signing) would also benefit direct GitHub-Release downloads and head off Microsoft's tightening signing pressure on WinGet long-term — tracked separately, out of scope for m4.6.
+- **Skipped: Chocolatey, custom WinGet source.** Chocolatey overlaps with WinGet's audience without adding reach. A custom WinGet source would force every user through `winget source add` plus a third-party warning, and the index has to ship as a signed MSIX — much more infra than the central-registry PR flow buys you.
+
+Documentation:
+
+- New [`specs/scoop-bucket.md`](./scoop-bucket.md) — parallel to [`specs/homebrew-tap.md`](./homebrew-tap.md): naming convention, manifest structure, release pipeline integration, bootstrap, install path.
+- Update [`specs/cli-distribution.md`](./cli-distribution.md) Windows section: replace "download the `.exe` directly" guidance with `scoop install` and `winget install`.
+- Update [`specs/release-bootstrap.md`](./release-bootstrap.md) — add Scoop bucket repo (`lolay/scoop-bucket`) bootstrap row to step 2 and `SCOOP_BUCKET_TOKEN` + `WINGET_PR_PAT` rows to the secrets table in step 3; add Scoop + WinGet rows to the verification matrix.
+- Update [`specs/homebrew-tap.md`](./homebrew-tap.md) Windows-on-the-tap note: replace "the `.deb` (under WSL), or by downloading the `.exe` directly" with `scoop install lolay/nowline` / `winget install lolay.nowline`.
+
+Depends on: m2a (original distribution pipeline) and m2l (man-page-style multi-channel pattern); does not depend on m3 / m4 / m4.5. Sequenced after m4.5 by numbering only — m4.6 and m4.5 do not depend on each other and can ship in either order.
+
+Spec: [`specs/scoop-bucket.md`](./scoop-bucket.md), [`specs/cli-distribution.md`](./cli-distribution.md) Windows section.
+
 ## Dependency Chain
 
 ```
 m1 → m2a → m2b → m2b.5 → m2c → m2d → m2e → m2f → m2g → m2h → m2.5a → m2.5b → m2.5c → m2.5d → m2i → m2j → m2k → m2l → m3a → m3b → m3c → m3d → m3e → m3f → m4
                                                                                                                                                         ↘
                                                                                                                                                          m4.5 (depends on m3a only; sequenced after m4)
+                                                                                                                                                        ↘
+                                                                                                                                                         m4.6 (depends on m2a + m2l; sequenced after m4.5 by numbering only — independent of m4.5)
 ```
 
 m2l is positioned in the m2 series logically (CLI distribution polish) but landed after m3c chronologically; the chain reflects logical OSS sequence rather than strict shipping order, similar to m2i.
+
+m4.5 and m4.6 are independent post-m4 add-ons — m4.5 extends IDE coverage (Obsidian, Neovim, JetBrains) and only needs m3a; m4.6 extends Windows install coverage (Scoop, WinGet) and only needs m2a + m2l. Either can ship first; the `.5 / .6` numbering reflects ordering of the proposals, not a dependency.
 
 m1 is the critical foundation — every subsequent milestone depends on the DSL, parser, and typed AST it produces.
 
