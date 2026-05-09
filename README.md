@@ -1,5 +1,5 @@
 <p align="center">
-  <img src="./branding/logo.svg" alt="Nowline" width="360" />
+  <img src="./branding/logo.png" alt="Nowline" width="360" />
 </p>
 
 <p align="center">
