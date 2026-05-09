@@ -1,3 +1,4 @@
+import * as path from 'node:path';
 import { afterEach, describe, expect, it } from 'vitest';
 import {
     BUNDLED_MONO_PATH,
@@ -68,10 +69,15 @@ function mockFs(files: Record<string, Uint8Array>): MockFs {
 
 describe('resolveFonts — explicit flag', () => {
     it('takes a literal absolute path and reports source: flag', async () => {
-        const fs = mockFs({ '/abs/MyFont.ttf': NON_VF_TTF });
+        // resolveFonts runs flag/env paths through `path.resolve` to normalize,
+        // which on Windows turns `/abs/MyFont.ttf` into `D:\\abs\\MyFont.ttf`.
+        // Resolve once and key the stub on the same value so the lookup hits
+        // on every platform.
+        const myFontPath = path.resolve('/abs/MyFont.ttf');
+        const fs = mockFs({ [myFontPath]: NON_VF_TTF });
         const result = await resolveFonts({
-            fontSans: '/abs/MyFont.ttf',
-            fontMono: '/abs/MyFont.ttf',
+            fontSans: myFontPath,
+            fontMono: myFontPath,
             fileExists: fs.fileExists,
             readFileBytes: fs.readFileBytes,
             platform: 'linux',
@@ -79,7 +85,7 @@ describe('resolveFonts — explicit flag', () => {
             isStdoutTty: true,
         });
         expect(result.sans.source).toBe('flag');
-        expect(result.sans.path).toBe('/abs/MyFont.ttf');
+        expect(result.sans.path).toBe(myFontPath);
         expect(result.sans.bytes).toBe(NON_VF_TTF);
         expect(result.sans.isVariableFont).toBe(false);
     });
@@ -99,9 +105,10 @@ describe('resolveFonts — explicit flag', () => {
     });
 
     it('detects a variable font and surfaces isVariableFont=true', async () => {
-        const fs = mockFs({ '/abs/SF.ttf': VF_TTF });
+        const sfPath = path.resolve('/abs/SF.ttf');
+        const fs = mockFs({ [sfPath]: VF_TTF });
         const result = await resolveFonts({
-            fontSans: '/abs/SF.ttf',
+            fontSans: sfPath,
             fileExists: fs.fileExists,
             readFileBytes: fs.readFileBytes,
             platform: 'darwin',
@@ -114,19 +121,20 @@ describe('resolveFonts — explicit flag', () => {
 
 describe('resolveFonts — env', () => {
     it('NOWLINE_FONT_SANS wins over the probe list', async () => {
+        const envFontPath = path.resolve('/abs/EnvFont.ttf');
         const fs = mockFs({
-            '/abs/EnvFont.ttf': NON_VF_TTF,
+            [envFontPath]: NON_VF_TTF,
             '/System/Library/Fonts/SFNS.ttf': VF_TTF, // probe candidate
         });
         const result = await resolveFonts({
             fileExists: fs.fileExists,
             readFileBytes: fs.readFileBytes,
             platform: 'darwin',
-            env: { NOWLINE_FONT_SANS: '/abs/EnvFont.ttf' },
+            env: { NOWLINE_FONT_SANS: envFontPath },
             isStdoutTty: true,
         });
         expect(result.sans.source).toBe('env');
-        expect(result.sans.path).toBe('/abs/EnvFont.ttf');
+        expect(result.sans.path).toBe(envFontPath);
     });
 });
 
