@@ -111,6 +111,7 @@ A planned `@nowline/embed` (browser bundle) will sit beside `@nowline/renderer` 
 | XLSX generation | ExcelJS | Mature (13M weekly downloads), excellent data/formatting/auto-filter support. ~1 MB JS — negligible impact on the ~55 MB CLI binary. No chart support; stacked-bar Gantt sheet deferred. |
 | Embed bundling | esbuild | Fast, zero-config bundling of core + layout + renderer into a single IIFE browser script. No plugins needed for this use case. |
 | Testing | Vitest | Fast, TypeScript-native, compatible with the monorepo structure. |
+| Lint and format | Biome | Single Rust binary handling lint, format, and import organization. Type-aware rules in v2.4 cover the promise hygiene we want (`noFloatingPromises`, `noMisusedPromises`) without a typescript-eslint dependency. Replaces the aspirational ESLint+Prettier reference that was never wired up. |
 | CI | GitHub Actions | Standard for GitHub-hosted repos. |
 
 ## Local Asset Resolution
@@ -137,6 +138,6 @@ The resolver abstraction is reused for any future asset-bearing property (e.g. p
 
 - **Build:** TypeScript compilation. esbuild bundles the embed script into a single IIFE.
 - **Test:** Vitest across all packages.
-- **Lint:** ESLint + Prettier.
+- **Lint and format:** Biome (single tool, type-aware rules, single config). See `CONTRIBUTING.md` § "Linting and formatting" for the rule overrides we adopted and why.
 - **Release:** Single version across all packages. npm publish for library packages. GitHub Releases for CLI binaries.
 - **CLI distribution:** `bun compile` produces binaries for macOS (arm64, x64), Linux (x64, arm64), Windows (x64, arm64). Published to Homebrew (macOS, Linux, WSL), apt-get, GitHub Releases (Windows .exe direct download), and npm.

@@ -35,9 +35,11 @@ jobs:
       - name: Build all packages
         run: pnpm build
 
-      - name: Lint
-        run: pnpm -r lint --if-present
-        continue-on-error: false
+      - name: Lint and format check
+        run: pnpm check
+
+      - name: Typecheck
+        run: pnpm typecheck
 
       - name: Test
         run: pnpm -r test

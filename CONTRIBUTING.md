@@ -15,6 +15,7 @@ Nowline is early-stage: the parser, validator, and CLI are usable, but layout, r
 - [Working on the VS Code / Cursor extension](#working-on-the-vs-code--cursor-extension)
 - [Working on the grammar](#working-on-the-grammar)
 - [Code style](#code-style)
+- [Linting and formatting](#linting-and-formatting)
 - [Tests](#tests)
 - [Commits and pull requests](#commits-and-pull-requests)
 - [Versioning](#versioning)
@@ -98,9 +99,12 @@ Run these from the repo root. Most are simple pnpm re-runs across the workspace.
 | Run all tests | `pnpm -r test` |
 | Run tests for one package | `pnpm --filter @nowline/core test` |
 | Watch tests for one package | `pnpm --filter @nowline/core test:watch` |
-| Lint | `pnpm -r lint` |
+| Lint and format check | `pnpm check` (Biome — runs lint + format check + import organization in one pass) |
+| Auto-fix lint and format | `pnpm check:fix` |
+| Format only | `pnpm format` (writes) / `pnpm format:check` (read-only) |
+| Lint only | `pnpm lint` (read-only) / `pnpm lint:fix` (writes safe fixes) |
 | Lint GitHub Actions workflows | `pnpm lint:workflows` (requires `brew install actionlint`) |
-| Type-check without emit | `pnpm -r build` (incremental; tsc -b handles this; skips render) |
+| Type-check (vscode-extension; other packages type-check via `pnpm -r build`) | `pnpm typecheck` |
 | Regenerate Langium AST only | `pnpm langium:generate` |
 | Compile standalone binaries | `pnpm --filter @nowline/cli compile` (requires Bun) |
 | Compile only the host platform's binary | `pnpm --filter @nowline/cli compile:local` |
@@ -204,7 +208,61 @@ If you're changing the spec'd behavior of the language, also update the relevant
 - **Error handling.** The CLI uses a `CliError` + numeric `ExitCode` scheme (`packages/cli/src/io/exit-codes.ts`). New error paths should throw `CliError` with the appropriate code so `process.exit` gets the right value.
 - **No emojis in source, commit messages, or user-facing output unless explicitly requested.**
 
-Run `pnpm -r lint` before pushing.
+Formatting and lint enforcement are described in the next section.
+
+## Linting and formatting
+
+The repo uses [Biome](https://biomejs.dev) as a single tool for linting, formatting, and import organization. One Rust binary, one config file ([`biome.json`](./biome.json)), and one script entry point — `pnpm check` runs everything CI runs.
+
+### Day-to-day
+
+| Task | Command |
+|---|---|
+| Run the full check (what CI runs) | `pnpm check` |
+| Auto-fix everything safe | `pnpm check:fix` |
+| Format only | `pnpm format` (writes) / `pnpm format:check` (read-only) |
+| Lint only | `pnpm lint` / `pnpm lint:fix` |
+| Type-check the vscode-extension | `pnpm typecheck` |
+
+`pnpm check` is the gate: lint + format-drift + import organization, all in one Biome invocation. CI fails the PR if it isn't clean.
+
+`pnpm typecheck` is a separate step because most packages type-check as part of `pnpm -r build` (via `tsc -b`); the VS Code extension bundles via esbuild and skips that, so its `tsc --noEmit` runs under `typecheck` instead.
+
+### Style baseline
+
+Set in [`biome.json`](./biome.json) — change there if you have a strong reason to deviate:
+
+- 4-space indent, LF line endings, 100-column line width.
+- Single quotes, semicolons, trailing commas everywhere, parens around arrow params.
+- Imports auto-organized on `pnpm check:fix`.
+
+### Rule overrides (and why)
+
+These rules are explicitly disabled in `biome.json`. Each is a deliberate codebase decision; new code should follow the same pattern rather than re-enabling these:
+
+- `complexity/noUselessConstructor` — Langium service-injection providers (`packages/lsp/src/providers/*`) accept a `services` argument even when they currently store nothing, so the API contract is stable when collaborators are added later. Removing the constructor would break that contract.
+- `correctness/noVoidTypeReturn` — the canonical printer in `packages/cli/src/convert/printer.ts` uses `return this.someVoidMethod(...)` as an early-exit pattern inside long `switch` and `if-else` chains. The returned value is `void`; the `return` is for control flow only. Refactoring 16 sites to `{ this.fn(); return; }` adds noise without changing semantics.
+- `style/noNonNullAssertion` — `!` is widely used as a documented assertion idiom across the layout and renderer code where the surrounding logic guarantees non-null. We accept the trade-off in exchange for readable hot paths.
+
+When you legitimately need to suppress a rule for one specific call site, prefer an inline `// biome-ignore lint/<group>/<rule>: <reason>` comment over a config-level disable. Examples in the codebase:
+
+- `packages/layout/src/nodes/{group,parallel,swimlane}-node.ts` — `noUnusedPrivateClassMembers` (the analyzer doesn't see `const { deps } = this`).
+- `packages/cli/scripts/bundle-templates.mjs` — `noTemplateCurlyInString` (literal placeholder in a code generator).
+- `packages/layout/test/lane-utilization.test.ts` — `noExplicitAny` (test scaffolding).
+
+### IDE integration
+
+Install the [Biome VS Code extension](https://marketplace.visualstudio.com/items?itemName=biomejs.biome) (`biomejs.biome`) and Biome will format on save and surface lint diagnostics inline. Recommended VS Code settings:
+
+```json
+"editor.defaultFormatter": "biomejs.biome",
+"editor.formatOnSave": true,
+"editor.codeActionsOnSave": {
+    "source.organizeImports.biome": "explicit"
+}
+```
+
+The Biome extension reads [`biome.json`](./biome.json) automatically, so the IDE matches CI byte-for-byte.
 
 ## Editing GitHub Actions workflows
 
@@ -255,7 +313,7 @@ WIP
 
 1. **Fork** the repo (or branch, if you have write access) and create a feature branch: `git checkout -b feat/short-description`.
 2. Make your change. Keep the diff focused — one logical change per PR.
-3. **Run `pnpm build && pnpm -r lint && pnpm -r test` locally** before pushing. CI runs the same commands across Linux, macOS, and Windows.
+3. **Run `pnpm build && pnpm check && pnpm typecheck && pnpm -r test` locally** before pushing. CI runs the same commands across Linux, macOS, and Windows.
 4. **Update documentation** — package READMEs, the top-level `README.md`, inline comments — anywhere the change affects observable behavior.
 5. **Open a PR** against `main` with:
     - A clear summary of the change.
