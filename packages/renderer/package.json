@@ -28,6 +28,7 @@
   },
   "devDependencies": {
     "@nowline/core": "workspace:*",
+    "@types/node": "^22.0.0",
     "langium": "~4.2.2",
     "typescript": "~5.7.0",
     "vitest": "^3.1.0"
