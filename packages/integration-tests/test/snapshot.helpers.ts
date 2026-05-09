@@ -21,7 +21,7 @@ import {
     type NowlineFile,
     type NowlineServices,
 } from '@nowline/core';
-import { layoutRoadmap, type ThemeName } from '../src/index.js';
+import { layoutRoadmap, type ThemeName } from '@nowline/layout';
 import { renderSvg } from '@nowline/renderer';
 
 let cached: { shared: ReturnType<typeof createNowlineServices>['shared']; Nowline: NowlineServices } | undefined;

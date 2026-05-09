@@ -9,7 +9,7 @@ Tiny `.nowline` files that stress one renderer behavior each. They are **not** r
 >
 > If the file's purpose is "see how the renderer handles X", it belongs here — not in `examples/`.
 
-Pair this with the byte-stable snapshot suite at [`packages/layout/test/__snapshots__/`](../packages/layout/test/__snapshots__/) (driven by [`packages/layout/test/snapshot.helpers.ts`](../packages/layout/test/snapshot.helpers.ts)):
+Pair this with the byte-stable snapshot suite at [`packages/integration-tests/test/__snapshots__/`](../packages/integration-tests/test/__snapshots__/) (driven by [`packages/integration-tests/test/snapshot.helpers.ts`](../packages/integration-tests/test/snapshot.helpers.ts)):
 
 - The snapshot suite catches drift on representative `examples/*.nowline` files and on selected renderer matrices that live under `tests/` (canonical regression gate). Listing a file in `SAMPLES` there is an ongoing commitment.
 - Many fixtures here are for *human eyeballing* only — they are not all snapshotted.

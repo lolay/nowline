@@ -1,7 +1,7 @@
 import { describe, it, expect } from 'vitest';
 import { promises as fs } from 'node:fs';
 import * as path from 'node:path';
-import { layoutRoadmap } from '../src/index.js';
+import { layoutRoadmap } from '@nowline/layout';
 import { renderSvg } from '@nowline/renderer';
 import { URI } from 'langium';
 import {

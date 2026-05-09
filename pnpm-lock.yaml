@@ -316,6 +316,30 @@ importers:
         specifier: ^3.1.0
         version: 3.2.4(@types/node@22.19.17)
 
+  packages/integration-tests:
+    devDependencies:
+      '@nowline/core':
+        specifier: workspace:*
+        version: link:../core
+      '@nowline/layout':
+        specifier: workspace:*
+        version: link:../layout
+      '@nowline/renderer':
+        specifier: workspace:*
+        version: link:../renderer
+      '@types/node':
+        specifier: ^22.0.0
+        version: 22.19.17
+      langium:
+        specifier: ~4.2.2
+        version: 4.2.2
+      typescript:
+        specifier: ~5.7.0
+        version: 5.7.3
+      vitest:
+        specifier: ^3.1.0
+        version: 3.2.4(@types/node@22.19.17)
+
   packages/layout:
     dependencies:
       '@nowline/core':
@@ -328,9 +352,6 @@ importers:
         specifier: ^3.1.0
         version: 3.1.0
     devDependencies:
-      '@nowline/renderer':
-        specifier: workspace:*
-        version: link:../renderer
       '@types/d3-scale':
         specifier: ^4.0.8
         version: 4.0.9
