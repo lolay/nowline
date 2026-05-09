@@ -12,7 +12,7 @@ brew install lolay/tap/nowline
 
 The repo holds **one tap for all of `lolay`'s Homebrew-distributed CLIs**, not a per-product tap. A new `lolay/foo` CLI in the future would land as `Formula/foo.rb` in the same repo and ship via `brew install lolay/tap/foo`.
 
-The formula is **auto-rewritten on every `v*` tag** by the `update-homebrew-tap` job in [`.github/workflows/release.yml`](../.github/workflows/release.yml). Maintainers do not hand-edit `Formula/nowline.rb` between releases.
+The formula is **auto-rewritten on every `v*` tag** by the `github-release` cell of the `publish` matrix in [`.github/workflows/release.yml`](../.github/workflows/release.yml) — the tap commit runs as the last step of that cell, immediately after the GitHub Release is published. Maintainers do not hand-edit `Formula/nowline.rb` between releases.
 
 ## Naming convention
 
@@ -99,13 +99,15 @@ Windows binaries (`nowline-windows-x64.exe`, `nowline-windows-arm64.exe`) are pr
 
 ## Release pipeline integration
 
-The `update-homebrew-tap` job in [`.github/workflows/release.yml`](../.github/workflows/release.yml) runs after the GitHub Release is published. It:
+The tap commit lives at the tail of the `github-release` cell of the `publish` matrix in [`.github/workflows/release.yml`](../.github/workflows/release.yml), running on the same runner immediately after the GitHub Release is published. It:
 
 1. Checks out `lolay/homebrew-tap` using `HOMEBREW_TAP_TOKEN` (a fine-grained PAT with `contents: write` on the tap repo, stored as a repo secret in this repo).
-2. Downloads the four Homebrew-relevant binary artifacts from the same release: `nowline-macos-arm64`, `nowline-macos-x64`, `nowline-linux-x64`, `nowline-linux-arm64`.
+2. Reuses the four Homebrew-relevant binary artifacts that the same cell already downloaded for the GitHub Release upload: `nowline-macos-arm64`, `nowline-macos-x64`, `nowline-linux-x64`, `nowline-linux-arm64` — no second download.
 3. Computes a SHA256 for each.
 4. Rewrites `Formula/nowline.rb` from a heredoc with the new version + four SHAs.
 5. Commits as `nowline-release-bot <release-bot@nowline.io>` and `git push`es directly to `main` on the tap.
+
+Folding the tap commit into the same matrix cell (instead of running it as a separate job after `publish`) means it fires right after the GH release publish without waiting on the unrelated `npm` and `vscode` cells. Matrix cells can't depend on each other (no intra-matrix `needs:`), and the formula references release-asset URLs that have to resolve before they're committed, so chaining the tap inside the cell is the only way to keep this in the matrix.
 
 No PR opened against the tap. Auto-generated formulas in custom taps are routinely pushed direct; the GoReleaser default behaves the same way. Homebrew's official `homebrew-core` tap requires PRs, but third-party taps don't.
 
@@ -113,7 +115,7 @@ No PR opened against the tap. Auto-generated formulas in custom taps are routine
 
 These tap-specific prerequisites for the first `v0.1.0` tag are **not** automated by `release.yml`. The end-to-end maintainer checklist (tap + Marketplace + Open VSX + all five repo secrets) lives in [`specs/release-bootstrap.md`](./release-bootstrap.md); this section just calls out the constraints that are intrinsic to the tap design.
 
-1. **Tap repo seeded.** `lolay/homebrew-tap` must exist with at least one commit on `main`. The `update-homebrew-tap` job calls `actions/checkout@v4` against the tap, and checkout fails on a repo with no `HEAD`. Pushing the seed (`Formula/nowline.rb` placeholder + a tap README) creates the default branch and unblocks the workflow. Source files: [`scripts/homebrew-tap/`](../scripts/homebrew-tap/).
+1. **Tap repo seeded.** `lolay/homebrew-tap` must exist with at least one commit on `main`. The `github-release` cell calls `actions/checkout@v4` against the tap, and checkout fails on a repo with no `HEAD`. Pushing the seed (`Formula/nowline.rb` placeholder + a tap README) creates the default branch and unblocks the workflow. Source files: [`scripts/homebrew-tap/`](../scripts/homebrew-tap/).
 2. **`HOMEBREW_TAP_TOKEN` secret set.** Fine-grained PAT (or deploy key) with `contents: write` on `lolay/homebrew-tap`, stored in this repo's Actions secrets.
 3. **Seed Formula passes `brew test`.** The placeholder seed must be syntactically valid and its `test do` block must call a real CLI invocation, so any pre-release `brew test lolay/tap/nowline` doesn't fail on the placeholder. The release workflow overwrites the formula on every tag, so this only matters for the window between bootstrap and first tag.
 4. **`livecheck` block included from day one.** Adding it to both the seed and the workflow heredoc together avoids drift.
@@ -124,7 +126,7 @@ These tap-specific prerequisites for the first `v0.1.0` tag are **not** automate
 brew install lolay/tap/nowline
 ```
 
-No `brew tap lolay/tap` required as a separate step — specifying the full `tap/formula` spec auto-taps. Subsequent `brew upgrade nowline` keeps the formula in sync because `update-homebrew-tap` pushes a new version on every tag.
+No `brew tap lolay/tap` required as a separate step — specifying the full `tap/formula` spec auto-taps. Subsequent `brew upgrade nowline` keeps the formula in sync because the `github-release` cell pushes a new version on every tag.
 
 `brew install` strips the macOS quarantine xattr that GitHub Release downloads carry, so Gatekeeper does not prompt on first run. Users who download the binary **directly** from the GitHub Release page (bypassing Homebrew) will see Gatekeeper friction on macOS — already documented in [`packages/cli/README.md`](../packages/cli/README.md). The brew-installed binary is unsigned and unnotarized, but unaffected by Gatekeeper because Homebrew handles the trust transfer.
 

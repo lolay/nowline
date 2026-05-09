@@ -8,7 +8,7 @@ Work top-to-bottom: each section depends only on the ones above it.
 
 These are already shipped on `main` — no action needed, included so you know what to skip.
 
-- [x] `nowline-release-bot <release-bot@nowline.io>` git identity in both `cut-release` and `update-homebrew-tap` jobs of [`.github/workflows/release.yml`](../.github/workflows/release.yml).
+- [x] `nowline-release-bot <release-bot@nowline.io>` git identity in the `cut-release` job and the `github-release` cell of the `publish` matrix in [`.github/workflows/release.yml`](../.github/workflows/release.yml).
 - [x] `"private": false` on [`packages/vscode-extension/package.json`](../packages/vscode-extension/package.json) so `vsce package` will accept it.
 - [x] `"publisher": "nowline"` on the same file — this is the namespace you'll register on both Marketplaces in step 2.
 - [x] [`backport main`](https://github.com/lolay/nowline/labels) GitHub label.
@@ -22,7 +22,7 @@ Each registry needs a one-time account/namespace before you can scope a PAT to i
 
 ### 2a. Homebrew tap repo (`lolay/homebrew-tap`)
 
-`update-homebrew-tap` runs `actions/checkout` against the tap repo on every release. Checkout fails on a repo with no `HEAD`, so the tap needs an initial commit on `main` before the first release.
+The `github-release` cell of the `publish` matrix runs `actions/checkout` against the tap repo on every release. Checkout fails on a repo with no `HEAD`, so the tap needs an initial commit on `main` before the first release.
 
 ```bash
 gh repo create lolay/homebrew-tap --public \
@@ -98,7 +98,7 @@ git tag v0.1.0
 git push origin v0.1.0
 ```
 
-The tag push triggers `release.yml` under `event_name == 'push'`; everything from `build-binaries` through `update-homebrew-tap` runs without further input.
+The tag push triggers `release.yml` under `event_name == 'push'`; the `build` matrix runs to completion, then the `publish` matrix fans out (npm + vscode + github-release/tap) without further input.
 
 From `v0.1.1` onward, use the dispatch UI exclusively: **Actions → Release → Run workflow** with `level: patch | minor | major`.
 

@@ -76,69 +76,62 @@ flowchart LR
     dispatch[workflow_dispatch] --> cut[cut-release]
     cut --> tagpush[Push tag v*]
     direct[Manual tag push] --> tagpush
-    tagpush --> binaries[build-binaries]
-    binaries --> deb[build-deb]
-    binaries --> npm[publish-npm]
-    npm --> vscode[publish-vscode]
-    binaries --> release[GitHub Release]
-    deb --> release
-    release --> tap[update-homebrew-tap]
+    tagpush --> build["build matrix (6 binaries [linux cells also build deb] + pack-npm + pack-vsix)"]
+    build --> publish["publish matrix (npm + vscode + github-release [also commits homebrew tap])"]
 ```
+
+Two real jobs after `cut-release`: `build` and `publish`. `publish` does `needs: build`, so GitHub Actions waits for every cell of the build matrix to succeed before any cell of publish starts — that is the gate, no separate job required. Inside the `github-release` cell of `publish`, the homebrew tap commit runs as the last sequential step, so the tap fires right after the GH release publish without waiting on the npm or vscode cells.
 
 ### `cut-release`
 
 Dispatch-only. Bumps versions, commits, tags, and pushes. See [Cutting the release](#cutting-the-release).
 
-### `build-binaries`
+### `build`
 
-Builds standalone CLI binaries for six targets via `bun compile`:
+A single job with one matrix of eight cells. Heterogeneous on purpose so the publish phase can `needs: build` and inherit "wait for every cell" gating from GitHub Actions for free.
 
-- `bun-darwin-arm64`, `bun-darwin-x64`
-- `bun-linux-x64`, `bun-linux-arm64`
-- `bun-windows-x64`, `bun-windows-arm64`
+| Cell id | Runner | Produces |
+|---|---|---|
+| `bin-macos-arm64` | macos-latest | `nowline-macos-arm64` artifact |
+| `bin-macos-x64` | macos-latest | `nowline-macos-x64` artifact |
+| `bin-linux-x64` | ubuntu-latest | `nowline-linux-x64` + `nowline_amd64.deb` artifacts |
+| `bin-linux-arm64` | ubuntu-latest | `nowline-linux-arm64` + `nowline_arm64.deb` artifacts |
+| `bin-windows-x64` | windows-latest | `nowline-windows-x64.exe` artifact |
+| `bin-windows-arm64` | windows-latest | `nowline-windows-arm64.exe` artifact |
+| `pack-npm` | ubuntu-latest | `npm-tarballs` artifact (eleven `.tgz` files) |
+| `pack-vsix` | ubuntu-latest | `nowline-vscode.vsix` artifact |
 
-Each binary runs a smoke test against `examples/minimal.nowline` covering every export format (SVG, PNG, PDF, HTML, Mermaid, XLSX, MS Project XML), except cross-target combinations that cannot execute on the runner. Binaries upload as artifacts named `nowline-<suffix>`.
+Binary cells use `bun compile` and run the same per-format smoke test (SVG, PNG, PDF, HTML, Mermaid, XLSX, MS Project XML) against `examples/minimal.nowline`, except cross-target combinations that cannot execute on the runner. The two linux cells additionally invoke [`scripts/build-deb.sh`](../scripts/build-deb.sh) on the binary they just produced — keeping the binary→deb chain intra-cell skips an artifact upload/download round-trip.
 
-### `build-deb`
+`pack-npm` runs `pnpm pack` for the eleven publishable packages in dependency order (`@nowline/core`, `@nowline/layout`, `@nowline/renderer`, `@nowline/export-core`, the six per-format `@nowline/export-*` packages, `@nowline/cli`). pnpm 10 rewrites `workspace:*` to the resolved version inside each tarball, so the publish phase uses plain `npm publish <tarball>` with no workspace-protocol shenanigans. `@nowline/config` and `@nowline/lsp` are intentionally excluded — neither is published today.
 
-Packages the Linux x64 and arm64 binaries into `.deb` archives via `scripts/build-deb.sh`. Output uploads as `nowline_<arch>.deb` artifacts.
+`pack-vsix` runs `pnpm package` in [`packages/vscode-extension`](../packages/vscode-extension), which produces `dist/nowline-vscode.vsix` via esbuild + `vsce package --no-dependencies`. The `.vsix` bundles the workspace dependencies, so the vscode publish cell never needs to read from npm.
 
-### `publish-npm`
+### `publish`
 
-Publishes every workspace package to npm in dependency order:
+A single job with one matrix of three cells. `needs: build` means every cell of the build matrix must succeed before any cell here starts — built-in gating, no no-op job. Each cell downloads only the artifacts it needs, then pushes; there is no `pnpm install` or `pnpm -r build` happening alongside any external upload.
 
-1. `@nowline/core`
-2. `@nowline/layout`
-3. `@nowline/renderer`
-4. `@nowline/export-core`
-5. `@nowline/export-png`, `@nowline/export-pdf`, `@nowline/export-html`, `@nowline/export-mermaid`, `@nowline/export-xlsx`, `@nowline/export-msproj`
-6. `@nowline/lsp`
-7. `@nowline/cli`
+| Cell id | Action |
+|---|---|
+| `npm` | Downloads `npm-tarballs`, runs `npm publish <tarball> --access public` for each tarball in dependency order. Uses `NPM_TOKEN`. |
+| `vscode` | Downloads `nowline-vscode.vsix`, runs `vsce publish --packagePath …` then `ovsx publish …`. Uses `VSCE_PAT` and `OVSX_PAT`. |
+| `github-release` | Downloads binary + deb artifacts, stages them with the man page (`nowline.1`) and any `nowline.<locale>.1` overlays, publishes the GitHub Release via `softprops/action-gh-release@v2`, **then** commits a refreshed `Formula/nowline.rb` to [`lolay/homebrew-tap`](https://github.com/lolay/homebrew-tap) using `HOMEBREW_TAP_TOKEN`. The formula references the release-asset URLs that the same cell just published and embeds SHA256s computed on the fly. The cell fails loudly if any expected artifact is missing rather than emitting an all-zero SHA. See [`specs/homebrew-tap.md`](./homebrew-tap.md) for the formula structure and seed-repo bootstrap. |
 
-Requires the `NPM_TOKEN` repository secret.
-
-### `publish-vscode`
-
-Builds a `.vsix` from `packages/vscode-extension` (`pnpm package`, which sources the bundled LSP and renderer from the workspace), then publishes it to:
-
-- the **VS Code Marketplace** via `vsce publish` using `VSCE_PAT`, and
-- **Open VSX** via `ovsx publish` using `OVSX_PAT`.
+The matrix uses `fail-fast: false` so a flaky npm publish does not cancel an in-flight Marketplace publish or the github-release/tap cell.
 
 We deliberately ship every tag as a stable release — Marketplace pre-release channels require SemVer pre-release suffixes (e.g. `0.1.0-rc.1`) that we do not currently produce. Revisit at 1.0 if we want a "next" channel.
 
-### `release` (GitHub Release)
+#### Why the homebrew tap commit lives inside the github-release cell
 
-Collects all binary and `.deb` artifacts into a GitHub Release for the tag, with auto-generated release notes. Files attached:
+GitHub Actions matrix cells cannot depend on each other (no intra-matrix `needs:`). The tap commit must run after the GH release publish because the formula references `releases/download/v…/…` URLs that have to resolve. Folding the tap steps into the `github-release` cell as sequential steps on the same runner gives "tap fires right after release, doesn't wait for vscode or npm" with no extra job, no inter-job artifact re-download, and no separate gate. The trade is that re-running the cell after a tap-only failure also re-attempts the GH release publish; `softprops/action-gh-release@v2` is upsert-style on the same tag and overwrites asset uploads, so re-runs are safe.
+
+#### Files attached to the GitHub Release
 
 - `nowline-macos-arm64`, `nowline-macos-x64`
 - `nowline-linux-x64`, `nowline-linux-arm64`
 - `nowline-windows-x64.exe`, `nowline-windows-arm64.exe`
 - `nowline_amd64.deb`, `nowline_arm64.deb`
-- `nowline.1` (man page; referenced as a Homebrew resource).
-
-### `update-homebrew-tap`
-
-Pushes a refreshed `Formula/nowline.rb` to [`lolay/homebrew-tap`](https://github.com/lolay/homebrew-tap) (the brew tap shorthand `lolay/tap` resolves to that GitHub repo) using the `HOMEBREW_TAP_TOKEN` secret. The formula points at the just-published GitHub Release URLs and embeds SHA256s computed on the fly. The job fails loudly if any expected artifact is missing rather than emitting an all-zero SHA. See [`specs/homebrew-tap.md`](./homebrew-tap.md) for the formula structure and seed-repo bootstrap.
+- `nowline.1` (man page; referenced as a Homebrew resource), plus any `nowline.<locale>.1` overlays.
 
 ## Hotfix flow
 
@@ -157,10 +150,10 @@ All secrets live under **Settings → Secrets and variables → Actions** on `lo
 | Secret | Used by | Purpose |
 |---|---|---|
 | `RELEASE_TAG_PAT` | `cut-release` | User-scoped PAT (fine-grained, `contents: write` on `lolay/nowline`) used to push the release commit + tag. `GITHUB_TOKEN`-pushed tags do not trigger downstream workflow runs, which would prevent the build/publish jobs from firing. |
-| `NPM_TOKEN` | `publish-npm` | npm publish for `@nowline/*` packages. Use an automation token. |
-| `VSCE_PAT` | `publish-vscode` | Azure DevOps personal access token with **Marketplace → Manage** scope, scoped to the `nowline` publisher. |
-| `OVSX_PAT` | `publish-vscode` | Open VSX personal access token. |
-| `HOMEBREW_TAP_TOKEN` | `update-homebrew-tap` | Fine-grained PAT with `contents: write` on `lolay/homebrew-tap` for committing the refreshed formula. |
+| `NPM_TOKEN` | `publish` (npm cell) | npm publish for `@nowline/*` packages. Use an automation token. |
+| `VSCE_PAT` | `publish` (vscode cell) | Azure DevOps personal access token with **Marketplace → Manage** scope, scoped to the `nowline` publisher. |
+| `OVSX_PAT` | `publish` (vscode cell) | Open VSX personal access token. |
+| `HOMEBREW_TAP_TOKEN` | `publish` (github-release cell) | Fine-grained PAT with `contents: write` on `lolay/homebrew-tap` for committing the refreshed formula. |
 
 ## Changelog workflow
 

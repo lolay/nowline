@@ -19,6 +19,19 @@ on:
 permissions:
   contents: write
 
+# Workflow-level git identity for every `git commit` made by this
+# workflow (cut-release commits the version bump; the github-release
+# cell commits the Homebrew tap formula). git honours these env vars
+# without needing per-step `git config user.name/email`. nowline.io is
+# the project's canonical domain (matches the attribution mark in
+# packages/layout/src/themes/shared.ts); it doesn't need to be a
+# deliverable mailbox — git just stores it as a string.
+env:
+  GIT_AUTHOR_NAME: nowline-release-bot
+  GIT_AUTHOR_EMAIL: release-bot@nowline.io
+  GIT_COMMITTER_NAME: nowline-release-bot
+  GIT_COMMITTER_EMAIL: release-bot@nowline.io
+
 jobs:
   cut-release:
     name: Cut release (bump + tag)
@@ -34,17 +47,7 @@ jobs:
           fetch-depth: 0
           token: ${{ secrets.RELEASE_TAG_PAT }}
 
-      - name: Install pnpm
-        uses: pnpm/action-setup@v4
-
-      - name: Setup Node.js
-        uses: actions/setup-node@v4
-        with:
-          node-version: '22'
-          cache: pnpm
-
-      - name: Install dependencies
-        run: pnpm install --frozen-lockfile
+      - uses: ./.github/actions/setup-node-pnpm
 
       - name: Bump versions
         id: bump
@@ -59,22 +62,32 @@ jobs:
           NEW_VERSION: ${{ steps.bump.outputs.version }}
         run: |
           set -euo pipefail
-          # nowline.io is the project's canonical domain (matches the
-          # attribution mark renderer + ATTRIBUTION_LINK in
-          # packages/layout/src/themes/shared.ts). The address does not
-          # need to be deliverable — git only stores it as a string —
-          # but pointing at the project domain keeps the trail
-          # consistent.
-          git config user.name "nowline-release-bot"
-          git config user.email "release-bot@nowline.io"
           git add packages/*/package.json
           git commit -m "release v${NEW_VERSION}"
           git tag "v${NEW_VERSION}"
           git push origin HEAD
           git push origin "v${NEW_VERSION}"
 
-  build-binaries:
-    name: Build ${{ matrix.target }}
+  # Phase 1 — pack everything in parallel.
+  #
+  # One job, one matrix, eight cells. Heterogeneous on purpose so the
+  # publish phase can do `needs: build` and inherit "wait for every
+  # cell" gating from GitHub Actions for free — no separate gate job.
+  #
+  # Cell layout:
+  #   bin-* (×6)    Compile a `bun compile` binary for one os/arch. The
+  #                 two linux cells additionally build their .deb on the
+  #                 same runner (gated on `matrix.deb_arch`) so the
+  #                 binary -> deb chain stays intra-cell, with no
+  #                 artifact upload/download round-trip between jobs.
+  #   pack-npm      `pnpm pack` the eleven publishable packages in
+  #                 dependency order. pnpm 10 rewrites `workspace:*` to
+  #                 the resolved version inside the tarballs, so the
+  #                 publish phase can use plain `npm publish <tarball>`.
+  #   pack-vsix     `pnpm package` for the VS Code extension (esbuild
+  #                 bundle + `vsce package --no-dependencies`).
+  build:
+    name: Build ${{ matrix.id }}
     # Skip on workflow_dispatch — cut-release runs alone, then the tag
     # push it produces fires this whole workflow again under
     # `event_name == 'push'`, which is when builds + publishes execute.
@@ -84,41 +97,36 @@ jobs:
       fail-fast: false
       matrix:
         include:
-          - { runner: macos-latest, target: bun-darwin-arm64, suffix: macos-arm64 }
-          - { runner: macos-latest, target: bun-darwin-x64, suffix: macos-x64 }
-          - { runner: ubuntu-latest, target: bun-linux-x64, suffix: linux-x64 }
-          - { runner: ubuntu-latest, target: bun-linux-arm64, suffix: linux-arm64 }
-          - { runner: windows-latest, target: bun-windows-x64, suffix: windows-x64.exe }
-          - { runner: windows-latest, target: bun-windows-arm64, suffix: windows-arm64.exe }
+          - { id: bin-macos-arm64, kind: binary, runner: macos-latest, target: bun-darwin-arm64, suffix: macos-arm64 }
+          - { id: bin-macos-x64, kind: binary, runner: macos-latest, target: bun-darwin-x64, suffix: macos-x64 }
+          - { id: bin-linux-x64, kind: binary, runner: ubuntu-latest, target: bun-linux-x64, suffix: linux-x64, deb_arch: amd64 }
+          - { id: bin-linux-arm64, kind: binary, runner: ubuntu-latest, target: bun-linux-arm64, suffix: linux-arm64, deb_arch: arm64 }
+          - { id: bin-windows-x64, kind: binary, runner: windows-latest, target: bun-windows-x64, suffix: windows-x64.exe }
+          - { id: bin-windows-arm64, kind: binary, runner: windows-latest, target: bun-windows-arm64, suffix: windows-arm64.exe }
+          - { id: pack-npm, kind: npm-pack, runner: ubuntu-latest }
+          - { id: pack-vsix, kind: vsix-pack, runner: ubuntu-latest }
     steps:
       - uses: actions/checkout@v4
-
-      - name: Install pnpm
-        uses: pnpm/action-setup@v4
-
-      - name: Setup Node.js
-        uses: actions/setup-node@v4
-        with:
-          node-version: '22'
-          cache: pnpm
+      - uses: ./.github/actions/setup-node-pnpm
 
       - name: Install Bun
+        if: matrix.kind == 'binary'
         uses: oven-sh/setup-bun@v2
         with:
           bun-version: latest
 
-      - name: Install dependencies
-        run: pnpm install --frozen-lockfile
-
       - name: Build
         run: pnpm -r build
 
+      # ===== binary cells =====
+
       - name: Compile binary
+        if: matrix.kind == 'binary'
         working-directory: packages/cli
         run: node scripts/compile.mjs --target=${{ matrix.target }}
 
       - name: Smoke test binary (render every format)
-        if: matrix.runner != 'windows-latest'
+        if: matrix.kind == 'binary' && matrix.runner != 'windows-latest'
         shell: bash
         env:
           MATRIX_RUNNER: ${{ matrix.runner }}
@@ -153,221 +161,176 @@ jobs:
           done
 
       - name: Upload binary artifact
+        if: matrix.kind == 'binary'
         uses: actions/upload-artifact@v4
         with:
           name: nowline-${{ matrix.suffix }}
           path: packages/cli/dist-bin/nowline-${{ matrix.suffix }}
           if-no-files-found: error
 
-  build-deb:
-    name: Build .deb (${{ matrix.arch }})
-    runs-on: ubuntu-latest
-    needs: build-binaries
-    strategy:
-      matrix:
-        include:
-          - { arch: amd64, suffix: linux-x64 }
-          - { arch: arm64, suffix: linux-arm64 }
-    steps:
-      - uses: actions/checkout@v4
-
-      - name: Download binary
-        uses: actions/download-artifact@v4
-        with:
-          name: nowline-${{ matrix.suffix }}
-          path: dist-bin
-
       - name: Build .deb
-        run: bash scripts/build-deb.sh "${{ matrix.arch }}" "dist-bin/nowline-${{ matrix.suffix }}" "${GITHUB_REF_NAME#v}"
+        if: matrix.deb_arch
+        run: bash scripts/build-deb.sh "${{ matrix.deb_arch }}" "packages/cli/dist-bin/nowline-${{ matrix.suffix }}" "${GITHUB_REF_NAME#v}"
 
       - name: Upload .deb artifact
+        if: matrix.deb_arch
         uses: actions/upload-artifact@v4
         with:
-          name: nowline_${{ matrix.arch }}.deb
-          path: dist-deb/nowline_*_${{ matrix.arch }}.deb
+          name: nowline_${{ matrix.deb_arch }}.deb
+          path: dist-deb/nowline_*_${{ matrix.deb_arch }}.deb
           if-no-files-found: error
 
-  publish-npm:
-    name: Publish npm packages
+      # ===== pack-npm cell =====
+
+      - name: Pack npm tarballs
+        if: matrix.kind == 'npm-pack'
+        run: |
+          set -euo pipefail
+          mkdir -p dist-pack
+          # Dependency order: core layers first, then export-core,
+          # then per-format export packages, then the CLI. pnpm pack
+          # rewrites `workspace:*` to the actual version inside each
+          # produced .tgz, so the publish phase doesn't need pnpm.
+          for pkg in \
+              packages/core \
+              packages/layout \
+              packages/renderer \
+              packages/export-core \
+              packages/export-png \
+              packages/export-pdf \
+              packages/export-html \
+              packages/export-mermaid \
+              packages/export-xlsx \
+              packages/export-msproj \
+              packages/cli; do
+            (cd "$pkg" && pnpm pack --pack-destination "$GITHUB_WORKSPACE/dist-pack")
+          done
+          ls -la dist-pack
+
+      - name: Upload npm tarballs
+        if: matrix.kind == 'npm-pack'
+        uses: actions/upload-artifact@v4
+        with:
+          name: npm-tarballs
+          path: dist-pack/*.tgz
+          if-no-files-found: error
+
+      # ===== pack-vsix cell =====
+
+      - name: Package .vsix
+        if: matrix.kind == 'vsix-pack'
+        working-directory: packages/vscode-extension
+        run: pnpm package
+
+      - name: Upload .vsix
+        if: matrix.kind == 'vsix-pack'
+        uses: actions/upload-artifact@v4
+        with:
+          name: nowline-vscode.vsix
+          path: packages/vscode-extension/dist/nowline-vscode.vsix
+          if-no-files-found: error
+
+  # Phase 2 — publish to every external registry.
+  #
+  # `needs: build` means GitHub Actions waits for every cell of the
+  # build matrix to succeed before starting any cell here. That's the
+  # built-in gate — no no-op job required.
+  #
+  # Cells download only what they need, then push. No `pnpm install`,
+  # no `pnpm -r build`, no source checkout in the npm and vscode cells
+  # — those are pure download + push.
+  #
+  # The github-release cell also commits the Homebrew tap formula at
+  # the end of the same job, on the same runner, so the tap commit
+  # fires right after the GH release publish without waiting on the
+  # npm or vscode cells. Matrix cells can't depend on each other (no
+  # intra-matrix `needs:`), and the formula references release-asset
+  # URLs that have to resolve before they're committed, so chaining
+  # the tap inside the cell is the only way to keep this in the matrix.
+  publish:
+    name: Publish ${{ matrix.id }}
+    if: ${{ startsWith(github.ref, 'refs/tags/v') }}
+    needs: build
     runs-on: ubuntu-latest
-    needs: build-binaries
+    strategy:
+      # A flaky npm publish must not cancel an in-flight Marketplace
+      # publish or the github-release/tap cell. Partial failures still
+      # need to be inspected and re-run individually, but neither
+      # registry should hold the others hostage.
+      fail-fast: false
+      matrix:
+        include:
+          - { id: npm, kind: npm }
+          - { id: vscode, kind: vscode }
+          - { id: github-release, kind: github-release }
     steps:
-      - uses: actions/checkout@v4
-
-      - name: Install pnpm
-        uses: pnpm/action-setup@v4
-
       - name: Setup Node.js
+        if: matrix.kind == 'npm' || matrix.kind == 'vscode'
         uses: actions/setup-node@v4
         with:
           node-version: '22'
           registry-url: 'https://registry.npmjs.org'
-          cache: pnpm
 
-      - name: Install dependencies
-        run: pnpm install --frozen-lockfile
+      # ===== npm cell =====
 
-      - name: Build
-        run: pnpm -r build
-
-      # Publish in dependency order: core layers first, then export-core,
-      # then per-format export packages, then the CLI.
-
-      - name: Publish @nowline/core
-        working-directory: packages/core
-        run: pnpm publish --access public --no-git-checks
-        env:
-          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
-
-      - name: Publish @nowline/layout
-        working-directory: packages/layout
-        run: pnpm publish --access public --no-git-checks
-        env:
-          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
-
-      - name: Publish @nowline/renderer
-        working-directory: packages/renderer
-        run: pnpm publish --access public --no-git-checks
-        env:
-          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
-
-      - name: Publish @nowline/export-core
-        working-directory: packages/export-core
-        run: pnpm publish --access public --no-git-checks
-        env:
-          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
-
-      - name: Publish @nowline/export-png
-        working-directory: packages/export-png
-        run: pnpm publish --access public --no-git-checks
-        env:
-          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
-
-      - name: Publish @nowline/export-pdf
-        working-directory: packages/export-pdf
-        run: pnpm publish --access public --no-git-checks
-        env:
-          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
-
-      - name: Publish @nowline/export-html
-        working-directory: packages/export-html
-        run: pnpm publish --access public --no-git-checks
-        env:
-          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
-
-      - name: Publish @nowline/export-mermaid
-        working-directory: packages/export-mermaid
-        run: pnpm publish --access public --no-git-checks
-        env:
-          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
-
-      - name: Publish @nowline/export-xlsx
-        working-directory: packages/export-xlsx
-        run: pnpm publish --access public --no-git-checks
-        env:
-          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
-
-      - name: Publish @nowline/export-msproj
-        working-directory: packages/export-msproj
-        run: pnpm publish --access public --no-git-checks
-        env:
-          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
-
-      - name: Publish @nowline/cli
-        working-directory: packages/cli
-        run: pnpm publish --access public --no-git-checks
-        env:
-          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
-
-  publish-vscode:
-    name: Publish VS Code extension
-    runs-on: ubuntu-latest
-    needs: publish-npm
-    steps:
-      - uses: actions/checkout@v4
-
-      - name: Install pnpm
-        uses: pnpm/action-setup@v4
-
-      - name: Setup Node.js
-        uses: actions/setup-node@v4
-        with:
-          node-version: '22'
-          cache: pnpm
-
-      - name: Install dependencies
-        run: pnpm install --frozen-lockfile
-
-      - name: Build all packages
-        run: pnpm -r build
-
-      - name: Package .vsix
-        working-directory: packages/vscode-extension
-        run: pnpm package
-
-      - name: Publish to VS Code Marketplace
-        working-directory: packages/vscode-extension
-        # No `--pre-release`: per specs/releasing.md we ship every tag as
-        # a stable release. Marketplace doesn't accept SemVer pre-release
-        # suffixes (e.g. `0.1.0-rc.1`) so we don't try to model an RC
-        # channel. Revisit at 1.0.
-        run: npx --yes @vscode/vsce publish --packagePath dist/nowline-vscode.vsix
-        env:
-          VSCE_PAT: ${{ secrets.VSCE_PAT }}
-
-      - name: Publish to Open VSX
-        working-directory: packages/vscode-extension
-        run: npx --yes ovsx publish dist/nowline-vscode.vsix -p "$OVSX_PAT"
-        env:
-          OVSX_PAT: ${{ secrets.OVSX_PAT }}
-
-  release:
-    name: GitHub Release
-    runs-on: ubuntu-latest
-    needs: [build-binaries, build-deb]
-    steps:
-      - uses: actions/checkout@v4
-
-      - name: Download all artifacts
+      - name: Download npm tarballs
+        if: matrix.kind == 'npm'
         uses: actions/download-artifact@v4
         with:
-          path: artifacts
+          name: npm-tarballs
+          path: dist-pack
 
-      - name: Stage release assets
+      - name: Publish to npm (dependency order)
+        if: matrix.kind == 'npm'
+        env:
+          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
         run: |
-          mkdir -p release-assets
-          find artifacts -type f \( -name 'nowline-*' -o -name '*.deb' \) -exec cp {} release-assets/ \;
-          cp packages/cli/man/nowline.1 release-assets/
-          # Translated man pages flatten to nowline.<locale>.1 in the release
-          # assets so the URLs stay predictable. Loop runs zero times when
-          # no overlay directories exist, so adding a new locale is a
-          # pure-data drop with no workflow change.
-          for d in packages/cli/man/*/; do
-            [ -d "$d" ] || continue
-            locale="$(basename "$d")"
-            src="${d}nowline.1"
-            [ -f "$src" ] || continue
-            cp "$src" "release-assets/nowline.${locale}.1"
+          set -euo pipefail
+          # `pnpm pack` strips the `@` scope and joins with `-`, so
+          # `@nowline/core` → `nowline-core-<version>.tgz`. Same
+          # dependency order as the pack step.
+          for pkg in nowline-core nowline-layout nowline-renderer nowline-export-core nowline-export-png nowline-export-pdf nowline-export-html nowline-export-mermaid nowline-export-xlsx nowline-export-msproj nowline-cli; do
+            tarball=$(find dist-pack -maxdepth 1 -name "${pkg}-*.tgz" -print -quit)
+            test -n "$tarball" || { echo "missing tarball for ${pkg}" >&2; exit 1; }
+            echo "publishing ${tarball}"
+            npm publish "$tarball" --access public
           done
-          ls -la release-assets
 
-      - name: Publish GitHub Release
-        uses: softprops/action-gh-release@v2
+      # ===== vscode cell =====
+
+      - name: Download .vsix
+        if: matrix.kind == 'vscode'
+        uses: actions/download-artifact@v4
         with:
-          files: release-assets/*
-          generate_release_notes: true
+          name: nowline-vscode.vsix
+          path: dist-vsix
 
-  update-homebrew-tap:
-    name: Update Homebrew tap
-    runs-on: ubuntu-latest
-    needs: release
-    steps:
+      - name: Publish to VS Code Marketplace
+        if: matrix.kind == 'vscode'
+        # No `--pre-release`: per specs/releasing.md we ship every tag
+        # as a stable release. Marketplace doesn't accept SemVer
+        # pre-release suffixes (e.g. `0.1.0-rc.1`) so we don't try to
+        # model an RC channel. Revisit at 1.0.
+        env:
+          VSCE_PAT: ${{ secrets.VSCE_PAT }}
+        run: npx --yes @vscode/vsce publish --packagePath dist-vsix/nowline-vscode.vsix
+
+      - name: Publish to Open VSX
+        if: matrix.kind == 'vscode'
+        env:
+          OVSX_PAT: ${{ secrets.OVSX_PAT }}
+        run: npx --yes ovsx publish dist-vsix/nowline-vscode.vsix -p "$OVSX_PAT"
+
+      # ===== github-release cell (also commits the Homebrew tap) =====
+
       - name: Checkout source
+        if: matrix.kind == 'github-release'
         uses: actions/checkout@v4
         with:
           path: src
 
       - name: Checkout lolay/homebrew-tap
+        if: matrix.kind == 'github-release'
         uses: actions/checkout@v4
         with:
           # Brew tap shorthand `lolay/tap` (used in `brew install
@@ -379,12 +342,49 @@ jobs:
           token: ${{ secrets.HOMEBREW_TAP_TOKEN }}
           path: tap
 
-      - name: Download macOS/Linux binaries
+      - name: Download binary artifacts
+        if: matrix.kind == 'github-release'
         uses: actions/download-artifact@v4
         with:
           path: artifacts
+          pattern: 'nowline-{macos,linux,windows}-*'
 
-      - name: Compute SHA256s and update formula
+      - name: Download .deb artifacts
+        if: matrix.kind == 'github-release'
+        uses: actions/download-artifact@v4
+        with:
+          path: artifacts
+          pattern: 'nowline_*.deb'
+
+      - name: Stage release assets
+        if: matrix.kind == 'github-release'
+        run: |
+          set -euo pipefail
+          mkdir -p release-assets
+          find artifacts -type f \( -name 'nowline-*' -o -name '*.deb' \) -exec cp {} release-assets/ \;
+          cp src/packages/cli/man/nowline.1 release-assets/
+          # Translated man pages flatten to nowline.<locale>.1 in the release
+          # assets so the URLs stay predictable. Loop runs zero times when
+          # no overlay directories exist, so adding a new locale is a
+          # pure-data drop with no workflow change.
+          for d in src/packages/cli/man/*/; do
+            [ -d "$d" ] || continue
+            locale="$(basename "$d")"
+            srcfile="${d}nowline.1"
+            [ -f "$srcfile" ] || continue
+            cp "$srcfile" "release-assets/nowline.${locale}.1"
+          done
+          ls -la release-assets
+
+      - name: Publish GitHub Release
+        if: matrix.kind == 'github-release'
+        uses: softprops/action-gh-release@v2
+        with:
+          files: release-assets/*
+          generate_release_notes: true
+
+      - name: Compute SHA256s and update Homebrew formula
+        if: matrix.kind == 'github-release'
         run: |
           set -euo pipefail
           VERSION="${GITHUB_REF_NAME#v}"
@@ -482,8 +482,6 @@ jobs:
           end
           EOF
 
-          git config user.name "nowline-release-bot"
-          git config user.email "release-bot@nowline.io"
           git add Formula/nowline.rb
           git commit -m "nowline ${VERSION}"
           git push origin HEAD
