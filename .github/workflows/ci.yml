@@ -107,20 +107,22 @@ jobs:
           shopt -s nullglob
           bins=(dist-bin/nowline-*)
           BIN="${bins[0]}"
+          EXAMPLE=../../examples/minimal.nowline
+          OUT="${RUNNER_TEMP:-/tmp}/minimal"
           chmod +x "$BIN"
           "$BIN" --version
-          "$BIN" ../../examples/minimal.nowline --dry-run
-          "$BIN" ../../examples/minimal.nowline -o - > /tmp/minimal.svg
-          head -c 4 /tmp/minimal.svg | grep -q "<svg"
-          "$BIN" ../../examples/minimal.nowline -f png --headless -o /tmp/minimal.png
-          head -c 4 /tmp/minimal.png | od -An -c | grep -q 'P   N   G'
-          "$BIN" ../../examples/minimal.nowline -f pdf --headless -o /tmp/minimal.pdf
-          "$BIN" ../../examples/minimal.nowline -f html -o /tmp/minimal.html
-          "$BIN" ../../examples/minimal.nowline -f mermaid -o /tmp/minimal.md
-          "$BIN" ../../examples/minimal.nowline -f xlsx -o /tmp/minimal.xlsx
-          "$BIN" ../../examples/minimal.nowline -f msproj -o /tmp/minimal.xml
-          for f in /tmp/minimal.svg /tmp/minimal.png /tmp/minimal.pdf /tmp/minimal.html /tmp/minimal.md /tmp/minimal.xlsx /tmp/minimal.xml; do
-            test -s "$f" || { echo "empty: $f" >&2; exit 1; }
+          "$BIN" "$EXAMPLE" --dry-run
+          "$BIN" "$EXAMPLE" -o - > "$OUT.svg"
+          head -c 4 "$OUT.svg" | grep -q "<svg"
+          "$BIN" "$EXAMPLE" -f png --headless -o "$OUT.png"
+          head -c 4 "$OUT.png" | od -An -c | grep -q 'P   N   G'
+          "$BIN" "$EXAMPLE" -f pdf --headless -o "$OUT.pdf"
+          "$BIN" "$EXAMPLE" -f html -o "$OUT.html"
+          "$BIN" "$EXAMPLE" -f mermaid -o "$OUT.md"
+          "$BIN" "$EXAMPLE" -f xlsx -o "$OUT.xlsx"
+          "$BIN" "$EXAMPLE" -f msproj -o "$OUT.xml"
+          for ext in svg png pdf html md xlsx xml; do
+            test -s "$OUT.$ext" || { echo "empty: $OUT.$ext" >&2; exit 1; }
           done
 
       - name: Smoke — binary (Windows)
@@ -129,13 +131,16 @@ jobs:
         shell: pwsh
         run: |
           $bin = (Get-ChildItem dist-bin/nowline-*.exe | Select-Object -First 1).FullName
+          $example = '../../examples/minimal.nowline'
+          $outDir = if ($env:RUNNER_TEMP) { $env:RUNNER_TEMP } else { 'C:\Temp' }
+          $out = Join-Path $outDir 'minimal'
           & $bin --version
-          & $bin ../../examples/minimal.nowline --dry-run
-          $svg = & $bin ../../examples/minimal.nowline -o -
+          & $bin $example --dry-run
+          $svg = & $bin $example -o -
           if (-not $svg.StartsWith("<svg")) { throw "render did not emit SVG" }
-          & $bin ../../examples/minimal.nowline -f png --headless -o C:\Temp\minimal.png
-          & $bin ../../examples/minimal.nowline -f pdf --headless -o C:\Temp\minimal.pdf
-          & $bin ../../examples/minimal.nowline -f html -o C:\Temp\minimal.html
-          & $bin ../../examples/minimal.nowline -f mermaid -o C:\Temp\minimal.md
-          & $bin ../../examples/minimal.nowline -f xlsx -o C:\Temp\minimal.xlsx
-          & $bin ../../examples/minimal.nowline -f msproj -o C:\Temp\minimal.xml
+          & $bin $example -f png --headless -o "$out.png"
+          & $bin $example -f pdf --headless -o "$out.pdf"
+          & $bin $example -f html -o "$out.html"
+          & $bin $example -f mermaid -o "$out.md"
+          & $bin $example -f xlsx -o "$out.xlsx"
+          & $bin $example -f msproj -o "$out.xml"

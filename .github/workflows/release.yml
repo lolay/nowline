@@ -126,7 +126,9 @@ jobs:
           MATRIX_SUFFIX: ${{ matrix.suffix }}
         run: |
           set -euo pipefail
-          bin="packages/cli/dist-bin/nowline-${MATRIX_SUFFIX}"
+          BIN="packages/cli/dist-bin/nowline-${MATRIX_SUFFIX}"
+          EXAMPLE=examples/minimal.nowline
+          OUT="${RUNNER_TEMP:-/tmp}/minimal"
           if [[ "$MATRIX_RUNNER" == "macos-latest" && "$MATRIX_TARGET" != *darwin* ]]; then
             echo "cross-target binary; skipping execution smoke"
             exit 0
@@ -135,19 +137,19 @@ jobs:
             echo "cross-target binary; skipping execution smoke"
             exit 0
           fi
-          chmod +x "$bin"
-          "$bin" --version
-          "$bin" examples/minimal.nowline -o - > /tmp/minimal.svg
-          head -c 4 /tmp/minimal.svg | grep -q "<svg"
-          "$bin" examples/minimal.nowline -f png --headless -o /tmp/minimal.png
-          head -c 4 /tmp/minimal.png | od -An -c | grep -q 'P   N   G'
-          "$bin" examples/minimal.nowline -f pdf --headless -o /tmp/minimal.pdf
-          "$bin" examples/minimal.nowline -f html -o /tmp/minimal.html
-          "$bin" examples/minimal.nowline -f mermaid -o /tmp/minimal.md
-          "$bin" examples/minimal.nowline -f xlsx -o /tmp/minimal.xlsx
-          "$bin" examples/minimal.nowline -f msproj -o /tmp/minimal.xml
-          for f in /tmp/minimal.svg /tmp/minimal.png /tmp/minimal.pdf /tmp/minimal.html /tmp/minimal.md /tmp/minimal.xlsx /tmp/minimal.xml; do
-            test -s "$f" || { echo "empty: $f" >&2; exit 1; }
+          chmod +x "$BIN"
+          "$BIN" --version
+          "$BIN" "$EXAMPLE" -o - > "$OUT.svg"
+          head -c 4 "$OUT.svg" | grep -q "<svg"
+          "$BIN" "$EXAMPLE" -f png --headless -o "$OUT.png"
+          head -c 4 "$OUT.png" | od -An -c | grep -q 'P   N   G'
+          "$BIN" "$EXAMPLE" -f pdf --headless -o "$OUT.pdf"
+          "$BIN" "$EXAMPLE" -f html -o "$OUT.html"
+          "$BIN" "$EXAMPLE" -f mermaid -o "$OUT.md"
+          "$BIN" "$EXAMPLE" -f xlsx -o "$OUT.xlsx"
+          "$BIN" "$EXAMPLE" -f msproj -o "$OUT.xml"
+          for ext in svg png pdf html md xlsx xml; do
+            test -s "$OUT.$ext" || { echo "empty: $OUT.$ext" >&2; exit 1; }
           done
 
       - name: Upload binary artifact
