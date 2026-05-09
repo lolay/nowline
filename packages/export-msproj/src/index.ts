@@ -10,8 +10,6 @@
 // Determinism: no `new Date()`. Anchoring date comes from `options.startDate`
 // or `inputs.today`; calendar UIDs are fixed; Tasks numbered sequentially.
 
-import type { ExportInputs } from '@nowline/export-core';
-import { displayLabel, getProp, getProps, hasProp, roadmapTitle } from '@nowline/export-core';
 import type {
     AnchorDeclaration,
     GroupBlock,
@@ -25,10 +23,12 @@ import type {
     SwimlaneDeclaration,
     TeamDeclaration,
 } from '@nowline/core';
+import type { ExportInputs } from '@nowline/export-core';
+import { displayLabel, getProp, getProps, hasProp, roadmapTitle } from '@nowline/export-core';
 
 import { buildCalendarsBlock, STANDARD_RESOURCE_CALENDAR_UID } from './calendar.js';
 import { durationToMsProjMinutes, minutesToMsProjDuration } from './duration.js';
-import { tag, escapeXml } from './xml.js';
+import { escapeXml, tag } from './xml.js';
 
 export interface MsProjOptions {
     /** Project name attribute. Defaults to roadmap title. */
@@ -429,7 +429,7 @@ interface AssignmentRow {
 
 function collectAssignments(tasks: TaskRow[], idToUid: Map<string, number>): AssignmentRow[] {
     const out: AssignmentRow[] = [];
-    let assignmentUid = 1;
+    const assignmentUid = 1;
     void assignmentUid;
     for (const t of tasks) {
         for (const owner of t.ownerRefs) {

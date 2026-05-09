@@ -1,11 +1,11 @@
-import { URI } from 'langium';
 import {
     createNowlineServices,
-    resolveIncludes,
-    type NowlineServices,
     type NowlineFile,
+    type NowlineServices,
+    resolveIncludes,
 } from '@nowline/core';
-import { layoutRoadmap, type LayoutOptions, type PositionedRoadmap } from '@nowline/layout';
+import { type LayoutOptions, layoutRoadmap, type PositionedRoadmap } from '@nowline/layout';
+import { URI } from 'langium';
 
 let cached:
     | { shared: ReturnType<typeof createNowlineServices>['shared']; Nowline: NowlineServices }

@@ -13,16 +13,16 @@
 // and `textX`. The shape is byte-stable with the legacy sequenceItem
 // arithmetic when fed the same inputs.
 
-import type { BoundingBox } from '../types.js';
+import { ITEM_LINK_ICON_INSET_PX, ITEM_LINK_ICON_TILE_SIZE_PX } from '../item-bar-geometry.js';
 import type {
-    Renderable,
+    IntrinsicSize,
     MeasureContext,
     PlaceContext,
-    IntrinsicSize,
     Point,
+    Renderable,
 } from '../renderable.js';
 import { ITEM_INSET_PX, MIN_ITEM_WIDTH } from '../themes/shared.js';
-import { ITEM_LINK_ICON_INSET_PX, ITEM_LINK_ICON_TILE_SIZE_PX } from '../item-bar-geometry.js';
+import type { BoundingBox } from '../types.js';
 
 /**
  * Inner padding applied on each side of the title text — the bar's

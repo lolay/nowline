@@ -18,34 +18,34 @@
 //     preserved.
 
 import type {
-    SwimlaneDeclaration,
-    ItemDeclaration,
-    GroupBlock,
-    ParallelBlock,
     EntityProperty,
+    GroupBlock,
+    ItemDeclaration,
+    ParallelBlock,
+    SwimlaneDeclaration,
 } from '@nowline/core';
 import { isItemDeclaration } from '@nowline/core';
+import { deriveItemDurationDays } from '../calendar.js';
+import {
+    estimateCapacitySuffixWidth,
+    formatCapacityNumber,
+    parseCapacityValue,
+    resolveCapacityIcon,
+} from '../capacity.js';
+import { propValue } from '../dsl-utils.js';
+import { frameTabGeometry } from '../frame-tab-geometry.js';
+import { computeLaneUtilization, resolveLaneUtilizationThresholds } from '../lane-utilization.js';
+import type { LayoutContext, TrackCursor } from '../layout-context.js';
+import { RowPacker } from '../row-packer.js';
 import { resolveStyle } from '../style-resolution.js';
 import { ITEM_INSET_PX, MIN_ITEM_WIDTH } from '../themes/shared.js';
 import type {
+    BoundingBox,
+    PositionedCapacity,
+    PositionedItem,
     PositionedSwimlane,
     PositionedTrackChild,
-    PositionedItem,
-    BoundingBox,
 } from '../types.js';
-import type { LayoutContext, TrackCursor } from '../layout-context.js';
-import { propValue } from '../dsl-utils.js';
-import { deriveItemDurationDays } from '../calendar.js';
-import { frameTabGeometry } from '../frame-tab-geometry.js';
-import { RowPacker } from '../row-packer.js';
-import {
-    parseCapacityValue,
-    formatCapacityNumber,
-    resolveCapacityIcon,
-    estimateCapacitySuffixWidth,
-} from '../capacity.js';
-import { computeLaneUtilization, resolveLaneUtilizationThresholds } from '../lane-utilization.js';
-import type { PositionedCapacity } from '../types.js';
 
 /**
  * Font size (px) the renderer uses for the lane capacity badge. Mirrors
@@ -199,6 +199,7 @@ function firstChildStartX(
 export class SwimlaneNode {
     constructor(
         public readonly input: SwimlaneNodeInput,
+        // biome-ignore lint/correctness/noUnusedPrivateClassMembers: accessed via `const { deps } = this` destructuring inside methods, which the analyzer does not detect.
         private readonly deps: SwimlaneNodeDeps,
     ) {}
 

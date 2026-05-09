@@ -1,6 +1,6 @@
 import * as path from 'node:path';
-import * as vscode from 'vscode';
 import type { NowlineRc } from '@nowline/config';
+import * as vscode from 'vscode';
 
 /** Settings keys we cross-check against `.nowlinerc`. */
 const CHECKED_KEYS: ReadonlyArray<{ rcKey: string; settingPath: string; label: string }> = [

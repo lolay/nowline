@@ -1,8 +1,8 @@
 import * as path from 'node:path';
 import * as vscode from 'vscode';
-import { renderDocument, type RenderOutcome } from './render-pipeline.js';
-import { resolvePreviewOptions } from './option-resolver.js';
 import type { RcConfigCache } from '../io/rc-config.js';
+import { resolvePreviewOptions } from './option-resolver.js';
+import { type RenderOutcome, renderDocument } from './render-pipeline.js';
 import { getShellHtml } from './shell-html.js';
 
 export type RefreshTrigger = 'keystroke' | 'save';

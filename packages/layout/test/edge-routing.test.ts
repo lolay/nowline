@@ -3,14 +3,14 @@
 // behaviour (slot assignment, obstacle detection, bracket nudge,
 // under-bar fallback) without going through the layout engine.
 
-import { describe, it, expect } from 'vitest';
+import { describe, expect, it } from 'vitest';
 import {
     BRACKET_NUDGE_PX,
     ChannelGrid,
+    type EdgeRouteRequest,
     MIN_SOURCE_STUB_PX,
     MIN_TARGET_STUB_PX,
     routeChannelEdges,
-    type EdgeRouteRequest,
 } from '../src/edge-routing.js';
 import { layoutRoadmap } from '../src/index.js';
 import { parseAndResolve } from './helpers.js';

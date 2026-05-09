@@ -1,4 +1,4 @@
-import { describe, it, expect } from 'vitest';
+import { describe, expect, it } from 'vitest';
 import { parseSource } from '../../src/core/parse.js';
 import { formatDiagnostics } from '../../src/diagnostics/index.js';
 import type { DiagnosticSource } from '../../src/diagnostics/model.js';

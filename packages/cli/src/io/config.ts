@@ -2,10 +2,10 @@
 // lives in `@nowline/config` so the VS Code/Cursor extension can read the
 // same files without depending on the CLI's heavier export-format graph.
 export {
+    type LoadConfigOptions,
+    type LoadConfigResult,
     loadConfig,
-    parseConfig,
     mergeConfig,
     type NowlineRc,
-    type LoadConfigResult,
-    type LoadConfigOptions,
+    parseConfig,
 } from '@nowline/config';

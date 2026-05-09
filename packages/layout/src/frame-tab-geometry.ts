@@ -126,7 +126,7 @@ export function frameTabGeometry(
     let ownerTextWidth = 0;
     let ownerX = 0;
     if (owner) {
-        ownerTextWidth = ('owner: ' + owner).length * FRAME_TAB_OWNER_PX_PER_CHAR;
+        ownerTextWidth = `owner: ${owner}`.length * FRAME_TAB_OWNER_PX_PER_CHAR;
         ownerX = cursorX + FRAME_TAB_INNER_GAP_PX;
         cursorX = ownerX + ownerTextWidth;
     }

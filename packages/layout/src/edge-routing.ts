@@ -19,11 +19,11 @@
 // (see `specs/handoffs/handoff-channel-routing-design.md`).
 
 import type {
-    Point,
     BoundingBox,
+    Point,
+    PositionedIncludeRegion,
     PositionedSwimlane,
     PositionedTrackChild,
-    PositionedIncludeRegion,
 } from './types.js';
 
 /** A visible parallel or group bracket stroke. Used by the

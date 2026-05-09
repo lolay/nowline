@@ -1,13 +1,13 @@
 import type {
+    DefaultDeclaration,
     EntityProperty,
     LabelDeclaration,
     StyleDeclaration,
     StyleProperty,
-    DefaultDeclaration,
 } from '@nowline/core';
-import type { ResolvedStyle, SizeBucket } from './types.js';
-import type { Theme, EntityStyle } from './themes/shape.js';
 import { resolveColor } from './themes/index.js';
+import type { EntityStyle, Theme } from './themes/shape.js';
+import type { ResolvedStyle, SizeBucket } from './types.js';
 
 type EntityTypeKey =
     | 'roadmap'

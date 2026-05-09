@@ -25,9 +25,7 @@
 //     family?)` so glyph subsets are byte-identical across hosts.
 
 import { PassThrough } from 'node:stream';
-import PDFDocument from 'pdfkit';
 import SVGtoPDF from '@kittl/svg-to-pdfkit';
-
 import type {
     ExportInputs,
     PdfOrientation,
@@ -37,11 +35,12 @@ import type {
 import {
     fitContent,
     parsePageSize,
+    type ResolvedPage,
     resolveFonts,
     resolvePage,
     validateMargin,
-    type ResolvedPage,
 } from '@nowline/export-core';
+import PDFDocument from 'pdfkit';
 
 export interface PdfOptions {
     pageSize?: PdfPageSize | string;

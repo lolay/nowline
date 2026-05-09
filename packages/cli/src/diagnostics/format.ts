@@ -1,7 +1,7 @@
-import { tr, type MessageCode } from '@nowline/core';
-import { renderText } from './text.js';
+import { type MessageCode, tr } from '@nowline/core';
 import { renderJson } from './json.js';
 import type { CliDiagnostic, DiagnosticSource } from './model.js';
+import { renderText } from './text.js';
 
 export type DiagnosticFormat = 'text' | 'json';
 

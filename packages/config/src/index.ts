@@ -1,8 +1,8 @@
 export {
+    type LoadConfigOptions,
+    type LoadConfigResult,
     loadConfig,
-    parseConfig,
     mergeConfig,
     type NowlineRc,
-    type LoadConfigResult,
-    type LoadConfigOptions,
+    parseConfig,
 } from './load-config.js';

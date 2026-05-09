@@ -1,22 +1,22 @@
 export * from './generated/ast.js';
 export * from './generated/module.js';
-export { createNowlineServices, NowlineModule } from './language/nowline-module.js';
-export type { NowlineServices, NowlineAddedServices } from './language/nowline-module.js';
-export { NowlineValidator, registerValidationChecks } from './language/nowline-validator.js';
+export { ALL_CODES, type MessageCode } from './i18n/codes.js';
 export {
-    resolveIncludes,
-    type ResolveResult,
+    type MessageArgs,
+    type MessageBundle,
+    registerBundle,
+    tr,
+} from './i18n/index.js';
+export {
+    type IncludeMode,
+    type IsolatedRegion,
     type ResolveDiagnostic,
     type ResolvedConfig,
     type ResolvedContent,
-    type IsolatedRegion,
-    type IncludeMode,
     type ResolveIncludesOptions,
+    type ResolveResult,
+    resolveIncludes,
 } from './language/include-resolver.js';
-export {
-    tr,
-    registerBundle,
-    type MessageBundle,
-    type MessageArgs,
-} from './i18n/index.js';
-export { type MessageCode, ALL_CODES } from './i18n/codes.js';
+export type { NowlineAddedServices, NowlineServices } from './language/nowline-module.js';
+export { createNowlineServices, NowlineModule } from './language/nowline-module.js';
+export { NowlineValidator, registerValidationChecks } from './language/nowline-validator.js';

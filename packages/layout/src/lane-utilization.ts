@@ -16,8 +16,8 @@ import type { DefaultDeclaration, SwimlaneDeclaration } from '@nowline/core';
 import { propValue } from './dsl-utils.js';
 import type {
     PositionedItem,
-    PositionedTrackChild,
     PositionedLaneUtilization,
+    PositionedTrackChild,
     PositionedUtilizationSegment,
     UtilizationClassification,
 } from './types.js';

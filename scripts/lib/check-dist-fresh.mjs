@@ -16,7 +16,7 @@
 // SVGs — looks like a real renderer regression.
 
 import { existsSync, readdirSync, statSync } from 'node:fs';
-import { resolve, relative, join } from 'node:path';
+import { join, relative, resolve } from 'node:path';
 
 const SOURCE_EXTS = new Set(['.ts', '.tsx', '.mjs', '.js', '.json']);
 const SOURCE_SUBDIRS = ['src', 'scripts'];

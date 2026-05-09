@@ -1,5 +1,5 @@
-import type { AstNode, CstNode, LangiumDocument } from 'langium';
 import type { NowlineFile } from '@nowline/core';
+import type { AstNode, CstNode, LangiumDocument } from 'langium';
 
 export const NOWLINE_SCHEMA_VERSION = '1';
 

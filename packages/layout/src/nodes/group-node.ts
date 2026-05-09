@@ -11,28 +11,27 @@
 // to the chiclet height plus a small gutter before the first inner
 // row begins.
 
-import type { GroupBlock, ItemDeclaration, ParallelBlock, EntityProperty } from '@nowline/core';
+import type { EntityProperty, GroupBlock, ItemDeclaration, ParallelBlock } from '@nowline/core';
 import { isItemDeclaration } from '@nowline/core';
-import { resolveStyle } from '../style-resolution.js';
-import type {
-    PositionedGroup,
-    PositionedTrackChild,
-    PositionedItem,
-    BoundingBox,
-} from '../types.js';
+import { deriveItemDurationDays } from '../calendar.js';
 import type { LayoutContext, TrackCursor } from '../layout-context.js';
+import { RowPacker } from '../row-packer.js';
+import { resolveStyle } from '../style-resolution.js';
 import {
-    TRACK_BLOCK_TAIL_GUTTER_PX,
-    GROUP_TITLE_TAB_HEIGHT_PX,
-    GROUP_TITLE_TAB_GUTTER_PX,
     GROUP_BOTTOM_PAD_PX,
     GROUP_BRACKET_LABEL_OVERHANG_PX,
+    GROUP_TITLE_TAB_GUTTER_PX,
+    GROUP_TITLE_TAB_HEIGHT_PX,
     ITEM_INSET_PX,
     MIN_ITEM_WIDTH,
+    TRACK_BLOCK_TAIL_GUTTER_PX,
 } from '../themes/shared.js';
-import { propValue } from '../dsl-utils.js';
-import { deriveItemDurationDays } from '../calendar.js';
-import { RowPacker } from '../row-packer.js';
+import type {
+    BoundingBox,
+    PositionedGroup,
+    PositionedItem,
+    PositionedTrackChild,
+} from '../types.js';
 
 export interface GroupNodeDeps {
     sequenceItem: (
@@ -63,6 +62,7 @@ export interface GroupNodeDeps {
 export class GroupNode {
     constructor(
         public readonly node: GroupBlock,
+        // biome-ignore lint/correctness/noUnusedPrivateClassMembers: accessed via `const { deps } = this` destructuring inside methods, which the analyzer does not detect.
         private readonly deps: GroupNodeDeps,
     ) {}
 
@@ -101,8 +101,7 @@ export class GroupNode {
         // box.bottom, and the next sibling's label visual top sits just
         // above box.y — they touch in the gap. Shift `box.y` down by
         // the overhang amount so the glyph lands in space we own.
-        const bracketLabelOverhang =
-            !hasChiclet && Boolean(title) ? GROUP_BRACKET_LABEL_OVERHANG_PX : 0;
+        const bracketLabelOverhang = !hasChiclet && title ? GROUP_BRACKET_LABEL_OVERHANG_PX : 0;
         const startY = cursor.y + bracketLabelOverhang;
 
         const step = ctx.bandScale.step();

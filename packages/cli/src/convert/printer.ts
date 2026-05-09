@@ -1,5 +1,5 @@
-import type { JsonAstNode } from './schema.js';
 import { CliError, ExitCode } from '../io/exit-codes.js';
+import type { JsonAstNode } from './schema.js';
 
 // Keyed-property canonical order. Keys not in this list sort alphabetically after.
 const KEY_ORDER = [

@@ -91,7 +91,7 @@ export const CAPACITY_ICON_SVG: Record<string, CapacityIconSvg> = {
  * differentiating built-ins from custom glyph declarations and inline literals
  * in the upcoming layout/render passes (m6/m7). */
 export function hasCapacityIconSvg(name: string): boolean {
-    return Object.prototype.hasOwnProperty.call(CAPACITY_ICON_SVG, name);
+    return Object.hasOwn(CAPACITY_ICON_SVG, name);
 }
 
 /** ASCII fallbacks for every built-in capacity-icon name, including the ones

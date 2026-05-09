@@ -1,4 +1,4 @@
-import { parseArgs, type ParseArgsConfig } from 'node:util';
+import { type ParseArgsConfig, parseArgs } from 'node:util';
 import { CliError, ExitCode } from '../io/exit-codes.js';
 
 export type ModeKind = 'render' | 'serve' | 'init' | 'help' | 'version';

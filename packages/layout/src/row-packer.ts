@@ -19,7 +19,7 @@
 // row share that row's top y" intact while letting individual children
 // grow vertically (e.g. wrapped label-chiclet stacks in m3).
 
-import type { PositionedTrackChild, PositionedItem, SlackCorridor } from './types.js';
+import type { PositionedItem, PositionedTrackChild, SlackCorridor } from './types.js';
 
 export interface PackedRow {
     /** Top-y of the row in canvas px. */

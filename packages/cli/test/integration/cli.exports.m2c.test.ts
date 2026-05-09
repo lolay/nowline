@@ -3,9 +3,9 @@
 // resulting bytes carry the format's magic / shape, the file is written
 // where requested, and exit code is 0.
 
-import { describe, expect, it } from 'vitest';
 import { existsSync, promises as fs } from 'node:fs';
 import * as path from 'node:path';
+import { describe, expect, it } from 'vitest';
 import { examplesDir, packageRoot, runCliBuilt, withTempDir } from '../helpers.js';
 
 const distEntry = path.join(packageRoot, 'dist', 'index.js');

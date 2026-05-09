@@ -1,12 +1,12 @@
+import type { SymbolDeclaration } from '@nowline/core';
 import { describe, expect, it } from 'vitest';
 import {
-    parseCapacityValue,
-    formatCapacityNumber,
-    resolveCapacityIcon,
     estimateCapacitySuffixWidth,
+    formatCapacityNumber,
+    parseCapacityValue,
     type ResolvedCapacityIcon,
+    resolveCapacityIcon,
 } from '../src/capacity.js';
-import type { SymbolDeclaration } from '@nowline/core';
 
 // Tests pin the layout-side contract the renderer (m6/m7) and the
 // overload sweep (m8) read. Pure helpers, no AST, so each test is

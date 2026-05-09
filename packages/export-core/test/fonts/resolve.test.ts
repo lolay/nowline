@@ -1,7 +1,7 @@
 import { afterEach, describe, expect, it } from 'vitest';
 import {
-    BUNDLED_SANS_PATH,
     BUNDLED_MONO_PATH,
+    BUNDLED_SANS_PATH,
     clearBundledCache,
     FontResolveError,
     resolveFonts,

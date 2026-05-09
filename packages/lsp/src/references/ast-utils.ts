@@ -1,31 +1,27 @@
-import type { AstNode, CstNode, LangiumDocument } from 'langium';
-import { CstUtils } from 'langium';
-import type { Range } from 'vscode-languageserver';
 import type {
-    EntityProperty,
-    NowlineFile,
-    SwimlaneContent,
-    GroupContent,
-    ParallelContent,
-    SwimlaneDeclaration,
-    GroupBlock,
-    ParallelBlock,
-    ItemDeclaration,
     AnchorDeclaration,
-    MilestoneDeclaration,
+    EntityProperty,
     FootnoteDeclaration,
-    PersonDeclaration,
-    TeamDeclaration,
+    GroupBlock,
+    GroupContent,
+    ItemDeclaration,
     LabelDeclaration,
+    MilestoneDeclaration,
+    NowlineFile,
+    ParallelBlock,
+    ParallelContent,
+    PersonDeclaration,
     SizeDeclaration,
     StatusDeclaration,
     StyleDeclaration,
+    SwimlaneContent,
+    SwimlaneDeclaration,
     SymbolDeclaration,
+    TeamDeclaration,
 } from '@nowline/core';
 import {
     isAnchorDeclaration,
     isFootnoteDeclaration,
-    isSymbolDeclaration,
     isGroupBlock,
     isItemDeclaration,
     isLabelDeclaration,
@@ -38,8 +34,12 @@ import {
     isStatusDeclaration,
     isStyleDeclaration,
     isSwimlaneDeclaration,
+    isSymbolDeclaration,
     isTeamDeclaration,
 } from '@nowline/core';
+import type { AstNode, CstNode, LangiumDocument } from 'langium';
+import { CstUtils } from 'langium';
+import type { Range } from 'vscode-languageserver';
 
 /**
  * Property keys whose value(s) name another entity in the same file. Used by

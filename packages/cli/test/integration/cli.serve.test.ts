@@ -1,8 +1,8 @@
-import { describe, it, expect } from 'vitest';
+import { type ChildProcess, spawn } from 'node:child_process';
 import { existsSync, promises as fs } from 'node:fs';
 import * as http from 'node:http';
 import * as path from 'node:path';
-import { spawn, type ChildProcess } from 'node:child_process';
+import { describe, expect, it } from 'vitest';
 import { packageRoot, withTempDir } from '../helpers.js';
 
 const distEntry = path.join(packageRoot, 'dist', 'index.js');

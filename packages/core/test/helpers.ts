@@ -1,7 +1,7 @@
-import { URI } from 'langium';
-import { createNowlineServices, type NowlineServices } from '../src/language/nowline-module.js';
-import type { NowlineFile } from '../src/generated/ast.js';
 import type { Diagnostic } from 'langium';
+import { URI } from 'langium';
+import type { NowlineFile } from '../src/generated/ast.js';
+import { createNowlineServices, type NowlineServices } from '../src/language/nowline-module.js';
 
 let cached:
     | { shared: ReturnType<typeof createNowlineServices>['shared']; Nowline: NowlineServices }

@@ -1,9 +1,9 @@
-import { describe, it, expect } from 'vitest';
 import * as path from 'node:path';
 import { URI } from 'langium';
-import { parse, getServices } from '../helpers.js';
-import { resolveIncludes } from '../../src/language/include-resolver.js';
+import { describe, expect, it } from 'vitest';
 import type { NowlineFile } from '../../src/generated/ast.js';
+import { resolveIncludes } from '../../src/language/include-resolver.js';
+import { getServices, parse } from '../helpers.js';
 
 function makeFs(files: Record<string, string>): (p: string) => Promise<string> {
     return async (abs) => {

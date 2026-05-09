@@ -1,6 +1,6 @@
-import { describe, it, expect } from 'vitest';
-import { parse } from '../helpers.js';
+import { describe, expect, it } from 'vitest';
 import { isItemDeclaration, isSwimlaneDeclaration } from '../../src/generated/ast.js';
+import { parse } from '../helpers.js';
 
 describe('strings and identifiers', () => {
     it('accepts empty string title', async () => {

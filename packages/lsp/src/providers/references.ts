@@ -1,19 +1,19 @@
 import type { CstNode, LangiumDocument, MaybePromise } from 'langium';
 import { CstUtils } from 'langium';
+import type { ReferencesProvider } from 'langium/lsp';
 import type { CancellationToken, ReferenceParams } from 'vscode-languageserver';
 import { Location } from 'vscode-languageserver';
-import type { ReferencesProvider } from 'langium/lsp';
+import type { NowlineLspServices } from '../nowline-lsp-module.js';
 import {
     declarationAt,
     fileFromDocument,
     findDeclarationRange,
     leafAt,
-    propKey,
     propertyValueAt,
+    propKey,
     REFERENCE_PROP_KEYS,
     visitAllProperties,
 } from '../references/ast-utils.js';
-import type { NowlineLspServices } from '../nowline-lsp-module.js';
 
 /**
  * Custom find-references provider. Resolves the symbol the cursor is on to a

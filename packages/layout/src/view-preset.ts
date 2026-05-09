@@ -13,8 +13,8 @@ import type { NowlineFile, ScaleBlock } from '@nowline/core';
 import { addDays } from './calendar.js';
 import { DEFAULT_LOCALE, localeStrings } from './i18n.js';
 import { DEFAULT_PIXELS_PER_DAY, LABEL_THINNING } from './themes/shared.js';
-import type { PositionedTick } from './types.js';
 import type { TimeScale } from './time-scale.js';
+import type { PositionedTick } from './types.js';
 import type { WorkingCalendar } from './working-calendar.js';
 
 export type ScaleUnit = 'days' | 'weeks' | 'months' | 'quarters' | 'years';

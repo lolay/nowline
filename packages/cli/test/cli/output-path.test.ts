@@ -1,8 +1,8 @@
-import { describe, it, expect } from 'vitest';
 import * as path from 'node:path';
+import { describe, expect, it } from 'vitest';
 import {
-    defaultRenderOutputPath,
     defaultInitOutputPath,
+    defaultRenderOutputPath,
     initNameHasIncompatibleExtension,
     resolveRenderOutputPath,
 } from '../../src/cli/output-path.js';

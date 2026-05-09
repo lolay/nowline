@@ -3,9 +3,9 @@
 // arithmetic produces. m2.5c wires this into the production pipeline
 // in a follow-up; the tests serve as the byte-stable contract.
 
-import { describe, it, expect } from 'vitest';
-import { ItemNode } from '../src/nodes/item-node.js';
+import { describe, expect, it } from 'vitest';
 import { defaultRowBand } from '../src/band-scale.js';
+import { ItemNode } from '../src/nodes/item-node.js';
 import { TimeScale } from '../src/time-scale.js';
 import type { ResolvedStyle } from '../src/types.js';
 

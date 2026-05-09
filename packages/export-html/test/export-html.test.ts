@@ -1,5 +1,5 @@
-import { describe, expect, it } from 'vitest';
 import { renderSvg } from '@nowline/renderer';
+import { describe, expect, it } from 'vitest';
 import { exportHtml } from '../src/index.js';
 import { buildExportInputs, MINIMAL_FIXTURE } from './helpers.js';
 

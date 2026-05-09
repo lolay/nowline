@@ -1,11 +1,11 @@
 import * as path from 'node:path';
 import * as vscode from 'vscode';
+import type { RcConfigCache } from '../io/rc-config.js';
 import {
     NowlinePreview,
     type PreviewSettings,
     type PreviewWebviewMessage,
 } from './preview-panel.js';
-import type { RcConfigCache } from '../io/rc-config.js';
 
 const VIEW_TYPE = 'nowline.preview';
 

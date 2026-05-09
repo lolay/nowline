@@ -1,15 +1,15 @@
 #!/usr/bin/env node
 import { parseArgv } from './cli/args.js';
 import { renderHelp, renderVersion } from './cli/help.js';
+import { initHandler } from './commands/init.js';
 import { renderHandler } from './commands/render.js';
 import { serveHandler } from './commands/serve.js';
-import { initHandler } from './commands/init.js';
 import { CliError, ExitCode } from './io/exit-codes.js';
 
 async function run(): Promise<number> {
     const argv = process.argv.slice(2);
 
-    let parsed;
+    let parsed: ReturnType<typeof parseArgv>;
     try {
         parsed = parseArgv(argv);
     } catch (err) {

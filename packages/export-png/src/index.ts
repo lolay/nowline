@@ -10,7 +10,7 @@
 //     `fontBuffers` (Uint8Array, supported since resvg-js 2.5.0).
 //   - The WASM module is loaded lazily on first call.
 
-import type { ResolvedFontPair, ExportInputs } from '@nowline/export-core';
+import type { ExportInputs, ResolvedFontPair } from '@nowline/export-core';
 import { resolveFonts } from '@nowline/export-core';
 
 export interface PngOptions {

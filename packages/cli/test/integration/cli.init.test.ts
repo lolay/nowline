@@ -1,7 +1,7 @@
-import { describe, it, expect } from 'vitest';
 import { existsSync, promises as fs } from 'node:fs';
 import * as path from 'node:path';
-import { runCliBuilt, packageRoot, withTempDir } from '../helpers.js';
+import { describe, expect, it } from 'vitest';
+import { packageRoot, runCliBuilt, withTempDir } from '../helpers.js';
 
 const distEntry = path.join(packageRoot, 'dist', 'index.js');
 const hasBuild = existsSync(distEntry);

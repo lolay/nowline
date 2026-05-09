@@ -9,9 +9,9 @@
 // for the cost of doubled CI/release/distribution channels).
 
 import { spawnSync } from 'node:child_process';
-import { mkdirSync, rmSync, statSync, readdirSync } from 'node:fs';
-import { fileURLToPath } from 'node:url';
+import { mkdirSync, readdirSync, rmSync, statSync } from 'node:fs';
 import * as path from 'node:path';
+import { fileURLToPath } from 'node:url';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const packageRoot = path.resolve(__dirname, '..');
@@ -91,7 +91,6 @@ function main() {
         if (result.status !== 0) {
             console.error(`  FAILED ${tgt.id}`);
             failed += 1;
-            continue;
         }
     }
 

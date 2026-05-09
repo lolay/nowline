@@ -4,7 +4,7 @@
 // truth remain at the repo root: grammars/nowline.tmLanguage.json and
 // LICENSE.
 
-import { copyFileSync, mkdirSync, existsSync } from 'node:fs';
+import { copyFileSync, existsSync, mkdirSync } from 'node:fs';
 import { dirname, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 

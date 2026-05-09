@@ -1,13 +1,6 @@
-import type { AstNode, LangiumDocument, MaybePromise } from 'langium';
-import type {
-    CancellationToken,
-    DocumentSymbol,
-    DocumentSymbolParams,
-    Range,
-} from 'vscode-languageserver';
-import { SymbolKind } from 'vscode-languageserver';
-import type { DocumentSymbolProvider } from 'langium/lsp';
 import {
+    type GroupBlock,
+    type ItemDeclaration,
     isAnchorDeclaration,
     isFootnoteDeclaration,
     isGroupBlock,
@@ -20,15 +13,22 @@ import {
     isStatusDeclaration,
     isSwimlaneDeclaration,
     isTeamDeclaration,
-    type GroupBlock,
-    type ItemDeclaration,
     type ParallelBlock,
     type RoadmapDeclaration,
     type SwimlaneContent,
     type SwimlaneDeclaration,
 } from '@nowline/core';
-import { entityKind, fileFromDocument, nameRangeOf } from '../references/ast-utils.js';
+import type { AstNode, LangiumDocument, MaybePromise } from 'langium';
+import type { DocumentSymbolProvider } from 'langium/lsp';
+import type {
+    CancellationToken,
+    DocumentSymbol,
+    DocumentSymbolParams,
+    Range,
+} from 'vscode-languageserver';
+import { SymbolKind } from 'vscode-languageserver';
 import type { NowlineLspServices } from '../nowline-lsp-module.js';
+import { entityKind, fileFromDocument, nameRangeOf } from '../references/ast-utils.js';
 
 /**
  * Outline view: roadmap → swimlanes → items, with parallel/group nesting and

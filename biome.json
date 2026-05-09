@@ -12,13 +12,13 @@
             "**/*.js",
             "**/*.json",
             "**/*.md",
-            "!**/dist/**",
-            "!**/node_modules/**",
-            "!**/src/generated/**",
-            "!**/__snapshots__/**",
+            "!**/dist",
+            "!**/node_modules",
+            "!**/src/generated",
+            "!**/__snapshots__",
             "!**/*.tsbuildinfo",
             "!pnpm-lock.yaml",
-            "!specs/handoffs/**"
+            "!specs/handoffs"
         ]
     },
     "formatter": {
@@ -40,7 +40,21 @@
     "linter": {
         "enabled": true,
         "rules": {
-            "recommended": true
+            "recommended": true,
+            "complexity": {
+                "noUselessConstructor": "off"
+            },
+            "correctness": {
+                "noVoidTypeReturn": "off",
+                "noUnusedFunctionParameters": "warn"
+            },
+            "style": {
+                "noNonNullAssertion": "off"
+            },
+            "nursery": {
+                "noFloatingPromises": "error",
+                "noMisusedPromises": "warn"
+            }
         }
     },
     "assist": {

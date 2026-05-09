@@ -1,7 +1,7 @@
 import { promises as fs } from 'node:fs';
 import * as path from 'node:path';
-import { EmptyFileSystem, URI, type LangiumDocument } from 'langium';
 import type { NowlineFile } from '@nowline/core';
+import { EmptyFileSystem, type LangiumDocument, URI } from 'langium';
 import { createNowlineLspServices, type NowlineLspServices } from '../src/nowline-lsp-module.js';
 
 let cached:

@@ -1,33 +1,32 @@
-import * as path from 'node:path';
 import { promises as fs } from 'node:fs';
-import { readInput } from '../io/read.js';
-import { writeOutput } from '../io/write.js';
-import { CliError, ExitCode } from '../io/exit-codes.js';
-import { parseSource, getServices } from '../core/parse.js';
+import * as path from 'node:path';
 import { resolveIncludes } from '@nowline/core';
+import { lengthToPoints, parseLength } from '@nowline/export-core';
 import { layoutRoadmap, type ThemeName } from '@nowline/layout';
-import { renderSvg, type AssetResolver } from '@nowline/renderer';
-import { parseLength, lengthToPoints } from '@nowline/export-core';
-import { formatDiagnostics, type DiagnosticSource } from '../diagnostics/index.js';
+import { type AssetResolver, renderSvg } from '@nowline/renderer';
+import type { ParsedArgs } from '../cli/args.js';
 import {
-    isBinaryFormat,
-    isInputFormat,
-    resolveFormat,
     FormatResolutionError,
+    isInputFormat,
     type OutputFormat,
+    resolveFormat,
 } from '../cli/formats.js';
 import { resolveRenderOutputPath } from '../cli/output-path.js';
-import { loadConfig } from '../io/config.js';
-import { serializeToJson } from '../convert/schema.js';
-import { printNowlineFile } from '../convert/printer.js';
 import { parseNowlineJson } from '../convert/parse-json.js';
-import type { ParsedArgs } from '../cli/args.js';
+import { printNowlineFile } from '../convert/printer.js';
+import { serializeToJson } from '../convert/schema.js';
+import { getServices, parseSource } from '../core/parse.js';
+import { type DiagnosticSource, formatDiagnostics } from '../diagnostics/index.js';
 import {
     describeContentLocaleSource,
     operatorLocale,
     readDirectiveLocale,
     resolveLocaleOverride,
 } from '../i18n/locale.js';
+import { loadConfig } from '../io/config.js';
+import { CliError, ExitCode } from '../io/exit-codes.js';
+import { readInput } from '../io/read.js';
+import { writeOutput } from '../io/write.js';
 
 export interface RenderHandlerOptions {
     args: ParsedArgs;

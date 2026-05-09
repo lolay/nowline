@@ -1,7 +1,7 @@
-import { describe, it, expect } from 'vitest';
+import { describe, expect, it } from 'vitest';
 import { TimeScale } from '../src/time-scale.js';
+import { buildHeaderTicks, resolveScale } from '../src/view-preset.js';
 import { fromCalendarConfig } from '../src/working-calendar.js';
-import { resolveScale, buildHeaderTicks } from '../src/view-preset.js';
 
 const businessCal = {
     mode: 'business' as const,

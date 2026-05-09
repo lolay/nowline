@@ -1,5 +1,5 @@
-import { attrs, tag } from './xml.js';
 import type { ShadowKind } from '@nowline/layout';
+import { attrs, tag } from './xml.js';
 
 interface Params {
     dx: number;

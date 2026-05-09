@@ -1,7 +1,7 @@
 export {
+    type CreateNowlineLspServicesContext,
     createNowlineLspServices,
     type NowlineLspServices,
-    type CreateNowlineLspServicesContext,
 } from './nowline-lsp-module.js';
 export { NowlineCompletionProvider } from './providers/completion.js';
 export { NowlineDefinitionProvider } from './providers/definition.js';
@@ -11,16 +11,16 @@ export { NowlineReferencesProvider } from './providers/references.js';
 export { NowlineRenameProvider } from './providers/rename.js';
 export {
     BUILTIN_STATUSES,
-    REFERENCE_PROP_KEYS,
     buildEntityIndex,
     collectNamedEntities,
     declarationAt,
     entityKind,
     fileFromDocument,
     leafAt,
-    propKey,
+    type NamedEntity,
     propertyValueAt,
+    propKey,
+    REFERENCE_PROP_KEYS,
     visitAllProperties,
     visitProperties,
-    type NamedEntity,
 } from './references/ast-utils.js';

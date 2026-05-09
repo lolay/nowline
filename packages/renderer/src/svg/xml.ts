@@ -35,7 +35,7 @@ export function attrs(values: Record<string, AttrValue>): string {
             parts.push(`${key}="${escAttr(String(v))}"`);
         }
     }
-    return parts.length ? ' ' + parts.join(' ') : '';
+    return parts.length ? ` ${parts.join(' ')}` : '';
 }
 
 export function tag(name: string, attributes: Record<string, AttrValue>, inner?: string): string {

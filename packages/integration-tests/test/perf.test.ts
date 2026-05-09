@@ -1,10 +1,10 @@
-import { describe, it, expect } from 'vitest';
 import { promises as fs } from 'node:fs';
 import * as path from 'node:path';
+import { createNowlineServices, type NowlineFile, resolveIncludes } from '@nowline/core';
 import { layoutRoadmap } from '@nowline/layout';
 import { renderSvg } from '@nowline/renderer';
 import { URI } from 'langium';
-import { createNowlineServices, resolveIncludes, type NowlineFile } from '@nowline/core';
+import { describe, expect, it } from 'vitest';
 
 const repoRoot = path.resolve(process.cwd(), '..', '..');
 const longPath = path.join(repoRoot, 'examples', 'long.nowline');

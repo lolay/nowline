@@ -7,19 +7,19 @@ import {
     type ServerOptions,
     TransportKind,
 } from 'vscode-languageclient/node';
-import { PreviewManager } from './preview/preview-manager.js';
-import {
-    type NowlinePreview,
-    type PreviewSettings,
-    type PreviewWebviewMessage,
-    type DefaultFit,
-    type RefreshTrigger,
-    type ThemeMode,
-} from './preview/preview-panel.js';
-import { RcConfigCache } from './io/rc-config.js';
-import { DisagreementTracker } from './io/disagreement-check.js';
-import { runExportCommand, type ExportSettings } from './export/cli-runner.js';
+import { type ExportSettings, runExportCommand } from './export/cli-runner.js';
 import { runNewRoadmapCommand } from './export/new-roadmap.js';
+import { DisagreementTracker } from './io/disagreement-check.js';
+import { RcConfigCache } from './io/rc-config.js';
+import { PreviewManager } from './preview/preview-manager.js';
+import type {
+    DefaultFit,
+    NowlinePreview,
+    PreviewSettings,
+    PreviewWebviewMessage,
+    RefreshTrigger,
+    ThemeMode,
+} from './preview/preview-panel.js';
 
 let client: LanguageClient | undefined;
 let previewManager: PreviewManager | undefined;
@@ -29,7 +29,7 @@ let exportOutputChannel: vscode.OutputChannel | undefined;
 
 // Mirrors the URL terminal in packages/core/src/language/nowline.langium —
 // `https?://` followed by any non-whitespace, non-list-punctuation chars.
-const URL_RE = /https?:\/\/[^\s\[\],]+/g;
+const URL_RE = /https?:\/\/[^\s[\],]+/g;
 
 export function activate(context: vscode.ExtensionContext): void {
     startLanguageClient(context);

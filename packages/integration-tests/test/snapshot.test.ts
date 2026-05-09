@@ -3,12 +3,12 @@
 // pass without touching the snapshot files; if it introduces a
 // deliberate visual change re-run with `UPDATE_LAYOUT_SNAPSHOTS=1`.
 
-import { describe, it, expect } from 'vitest';
+import { describe, expect, it } from 'vitest';
 import {
-    SAMPLES,
     isUpdateMode,
     readSnapshot,
     renderSampleSvg,
+    SAMPLES,
     writeSnapshot,
 } from './snapshot.helpers.js';
 

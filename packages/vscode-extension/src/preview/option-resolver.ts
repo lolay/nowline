@@ -1,5 +1,5 @@
-import type { ThemeName } from '@nowline/layout';
 import type { NowlineRc } from '@nowline/config';
+import type { ThemeName } from '@nowline/layout';
 import type { PreviewSettings, ToolbarOverrides } from './preview-panel.js';
 
 /**

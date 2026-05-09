@@ -20,8 +20,7 @@
         "build": "tsc -b tsconfig.json",
         "watch": "tsc -b tsconfig.json --watch",
         "test": "vitest run",
-        "test:watch": "vitest",
-        "lint": "eslint src/"
+        "test:watch": "vitest"
     },
     "dependencies": {
         "@nowline/export-core": "workspace:*",

@@ -1,6 +1,6 @@
-import { describe, it, expect } from 'vitest';
-import { loadConfig, parseConfig, mergeConfig } from '../src/index.js';
 import * as path from 'node:path';
+import { describe, expect, it } from 'vitest';
+import { loadConfig, mergeConfig, parseConfig } from '../src/index.js';
 
 describe('.nowlinerc discovery', () => {
     it('walks up from the input directory until a .nowlinerc is found', async () => {

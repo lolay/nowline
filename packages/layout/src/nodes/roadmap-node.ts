@@ -10,65 +10,62 @@
 // runtime cycle while keeping the composition logic in a dedicated file.
 
 import type {
+    ItemDeclaration,
     NowlineFile,
     ResolveResult,
-    ItemDeclaration,
-    GroupBlock,
-    ParallelBlock,
     SwimlaneDeclaration,
-    EntityProperty,
 } from '@nowline/core';
-import type {
-    PositionedRoadmap,
-    PositionedHeader,
-    PositionedSwimlane,
-    PositionedIncludeRegion,
-    PositionedDependencyEdge,
-    PositionedNowline,
-    PositionedTimelineScale,
-    BoundingBox,
-    SlackCorridor,
-    MarkerRowPlacement,
-} from '../types.js';
-import type { LayoutContext, TrackCursor, LayoutHelpers } from '../layout-context.js';
-import type { LayoutOptions, LayoutResult } from '../layout.js';
-import type { ViewPreset } from '../view-preset.js';
-import type { CalendarConfig } from '../calendar.js';
-import { themes, type Theme, type ThemeName } from '../themes/index.js';
-import { resolveStyle, type StyleContext } from '../style-resolution.js';
-import { resolveCalendar, daysBetween, resolveSizes } from '../calendar.js';
-import { resolveScale, buildHeaderTicks } from '../view-preset.js';
-import { resolveLocale } from '../i18n.js';
-import { TimeScale } from '../time-scale.js';
-import { fromCalendarConfig } from '../working-calendar.js';
 import { defaultRowBand } from '../band-scale.js';
+import type { CalendarConfig } from '../calendar.js';
+import { daysBetween, resolveCalendar, resolveSizes } from '../calendar.js';
+import { parseDate, propValue, propValues } from '../dsl-utils.js';
+import { resolveLocale } from '../i18n.js';
+import type { LayoutOptions, LayoutResult } from '../layout.js';
+import type { LayoutContext, LayoutHelpers } from '../layout-context.js';
+import { resolveStyle, type StyleContext } from '../style-resolution.js';
+import { type Theme, type ThemeName, themes } from '../themes/index.js';
 import {
-    HEADER_ABOVE_HEIGHT_PX,
-    SPACING_PX,
-    GUTTER_PX,
-    ATTRIBUTION_GLYPH_WIDTH,
     ATTRIBUTION_GLYPH_HEIGHT,
-    TIMELINE_TICK_PANEL_HEIGHT_PX,
+    ATTRIBUTION_GLYPH_WIDTH,
+    GUTTER_PX,
+    HEADER_ABOVE_HEIGHT_PX,
     NOW_PILL_HEIGHT_PX,
+    SPACING_PX,
+    TIMELINE_TICK_PANEL_HEIGHT_PX,
 } from '../themes/shared.js';
+import { TimeScale } from '../time-scale.js';
+import type {
+    BoundingBox,
+    MarkerRowPlacement,
+    PositionedDependencyEdge,
+    PositionedHeader,
+    PositionedIncludeRegion,
+    PositionedNowline,
+    PositionedRoadmap,
+    PositionedSwimlane,
+    PositionedTimelineScale,
+    SlackCorridor,
+} from '../types.js';
+import type { ViewPreset } from '../view-preset.js';
+import { buildHeaderTicks, resolveScale } from '../view-preset.js';
+import { fromCalendarConfig } from '../working-calendar.js';
+import { buildAnchors } from './anchor-node.js';
+import { buildFootnotes } from './footnote-node.js';
+import { buildIncludeRegions } from './include-node.js';
 import {
-    MARKER_LABEL_GAP_PX,
-    MARKER_LABEL_HEIGHT_PX,
     MARKER_BOLD_WIDTH_FACTOR,
     MARKER_DIAMOND_RADIUS_PX,
-    MARKER_ROW_PITCH_PX,
+    MARKER_LABEL_GAP_PX,
+    MARKER_LABEL_HEIGHT_PX,
     MARKER_ROW_CENTER_OFFSET_PX,
+    MARKER_ROW_PITCH_PX,
 } from './marker-geometry.js';
-import { propValue, propValues, parseDate } from '../dsl-utils.js';
-import { SwimlaneNode } from './swimlane-node.js';
-import { buildAnchors } from './anchor-node.js';
 import {
     buildMilestones,
     collectMilestonePredecessors,
     lastPredecessorPerFlow,
 } from './milestone-node.js';
-import { buildFootnotes } from './footnote-node.js';
-import { buildIncludeRegions } from './include-node.js';
+import { SwimlaneNode } from './swimlane-node.js';
 
 const HEADER_CARD_TOP_INSET = 4;
 

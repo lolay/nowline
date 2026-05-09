@@ -389,7 +389,6 @@ export function sanitizeSvg(input: string, options: SanitizeOptions = {}): strin
         if (t.kind === 'close') {
             const kept = stack.pop();
             if (kept) output.push(`</${t.name}>`);
-            continue;
         }
     }
     return output.join('');

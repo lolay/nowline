@@ -5,15 +5,25 @@
 // reserved 18 px above the first region; subsequent regions are
 // separated by GAP_BETWEEN_REGIONS px.
 
-import type { IsolatedRegion } from '@nowline/core';
-import { resolveStyle } from '../style-resolution.js';
-import type { PositionedIncludeRegion, PositionedSwimlane, BoundingBox } from '../types.js';
-import type { LayoutContext, TrackCursor } from '../layout-context.js';
-import type { PositionedItem, PositionedTrackChild } from '../types.js';
-import type { ItemDeclaration, GroupBlock, ParallelBlock, EntityProperty } from '@nowline/core';
-import { SwimlaneNode } from './swimlane-node.js';
-import { includeChromeGeometry } from '../include-chrome-geometry.js';
+import type {
+    EntityProperty,
+    GroupBlock,
+    IsolatedRegion,
+    ItemDeclaration,
+    ParallelBlock,
+} from '@nowline/core';
 import { resolveSizes } from '../calendar.js';
+import { includeChromeGeometry } from '../include-chrome-geometry.js';
+import type { LayoutContext, TrackCursor } from '../layout-context.js';
+import { resolveStyle } from '../style-resolution.js';
+import type {
+    BoundingBox,
+    PositionedIncludeRegion,
+    PositionedItem,
+    PositionedSwimlane,
+    PositionedTrackChild,
+} from '../types.js';
+import { SwimlaneNode } from './swimlane-node.js';
 
 const TAB_RESERVE = 18;
 const REGION_INSET_TOP = 14;

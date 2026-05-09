@@ -1,15 +1,15 @@
-import { describe, it, expect } from 'vitest';
-import { parse } from '../helpers.js';
+import { describe, expect, it } from 'vitest';
 import {
-    isItemDeclaration,
-    isSwimlaneDeclaration,
-    isParallelBlock,
-    isGroupBlock,
     isAnchorDeclaration,
     isFootnoteDeclaration,
+    isGroupBlock,
+    isItemDeclaration,
     isMilestoneDeclaration,
+    isParallelBlock,
+    isSwimlaneDeclaration,
     isTeamDeclaration,
 } from '../../src/generated/ast.js';
+import { parse } from '../helpers.js';
 
 describe('parser basics', () => {
     it('parses the minimal valid file', async () => {

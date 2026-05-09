@@ -1,5 +1,5 @@
-import { describe, it, expect } from 'vitest';
-import { parse, errorMessages, warningMessages } from '../helpers.js';
+import { describe, expect, it } from 'vitest';
+import { errorMessages, parse, warningMessages } from '../helpers.js';
 
 function hasError(diags: ReturnType<typeof errorMessages>, pattern: RegExp): boolean {
     return diags.some((m) => pattern.test(m));
@@ -1099,7 +1099,7 @@ swimlane s
 
     it('NL.W0700: documented per-entity properties produce no warnings', async () => {
         const r = await parse(
-            [
+            `${[
                 `roadmap r "R" start:2026-01-05 length:6m scale:1w calendar:business author:"Jane"`,
                 `  description "A roadmap"`,
                 `swimlane s "S" owner:jane capacity:5 utilization-warn-at:80% utilization-over-at:100%`,
@@ -1115,7 +1115,7 @@ swimlane s
                 `  footnote fn1 "Note" on:x`,
                 `person jane "Jane Doe"`,
                 `team team-a "Team A"`,
-            ].join('\n') + '\n',
+            ].join('\n')}\n`,
         );
         const warnings = warningMessages(r.diagnostics).filter((m) => /Unknown property/.test(m));
         expect(warnings).toEqual([]);

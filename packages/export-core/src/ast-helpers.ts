@@ -35,8 +35,8 @@ export function hasProp(host: PropertyHost, key: string): boolean {
 
 /** Display label: title if present, otherwise name (id), otherwise '<unnamed>'. */
 export function displayLabel(host: PropertyHost): string {
-    if (host.title && host.title.trim()) return host.title;
-    if (host.name && host.name.trim()) return host.name;
+    if (host.title?.trim()) return host.title;
+    if (host.name?.trim()) return host.name;
     return '<unnamed>';
 }
 

@@ -1,8 +1,8 @@
-import { writeOutput } from '../io/write.js';
-import { CliError, ExitCode } from '../io/exit-codes.js';
-import { TEMPLATES, TEMPLATE_NAMES, type TemplateName } from '../generated/templates.js';
-import { defaultInitOutputPath, initNameHasIncompatibleExtension } from '../cli/output-path.js';
 import type { ParsedArgs } from '../cli/args.js';
+import { defaultInitOutputPath, initNameHasIncompatibleExtension } from '../cli/output-path.js';
+import { TEMPLATE_NAMES, TEMPLATES, type TemplateName } from '../generated/templates.js';
+import { CliError, ExitCode } from '../io/exit-codes.js';
+import { writeOutput } from '../io/write.js';
 
 export interface InitHandlerOptions {
     args: ParsedArgs;

@@ -4,9 +4,9 @@
 // failure so CI / pre-commit can catch a broken bundle.
 
 import { spawn } from 'node:child_process';
+import { existsSync } from 'node:fs';
 import { dirname, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { existsSync } from 'node:fs';
 
 const here = dirname(fileURLToPath(import.meta.url));
 const serverPath = resolve(here, '..', 'dist', 'server.cjs');

@@ -343,7 +343,7 @@
         "watch": "node scripts/bundle.mjs --watch",
         "package": "node scripts/sync-grammar.mjs && node scripts/build-icon.mjs && NODE_ENV=production node scripts/bundle.mjs && vsce package --no-dependencies --out dist/nowline-vscode.vsix",
         "test": "node scripts/smoke-server.mjs",
-        "lint": "tsc --noEmit -p tsconfig.json"
+        "typecheck": "tsc --noEmit -p tsconfig.json"
     },
     "dependencies": {
         "@nowline/config": "workspace:*",

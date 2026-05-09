@@ -1,20 +1,20 @@
 import { promises as fs } from 'node:fs';
 import * as path from 'node:path';
-import { URI } from 'langium';
 import {
     createNowlineServices,
-    resolveIncludes,
     type NowlineFile,
     type NowlineServices,
+    resolveIncludes,
 } from '@nowline/core';
 import { layoutRoadmap, type ThemeName } from '@nowline/layout';
-import { renderSvg, type AssetResolver } from '@nowline/renderer';
+import { type AssetResolver, renderSvg } from '@nowline/renderer';
+import { URI } from 'langium';
 import {
+    type DiagnosticRow,
     fromLangiumDiagnostic,
     fromLexerError,
     fromParserError,
     fromResolveDiagnostic,
-    type DiagnosticRow,
     type LangiumLikeDiagnostic,
 } from './diagnostic-row.js';
 

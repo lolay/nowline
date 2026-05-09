@@ -14,15 +14,15 @@
 
 import { promises as fs } from 'node:fs';
 import * as path from 'node:path';
-import { URI } from 'langium';
 import {
     createNowlineServices,
-    resolveIncludes,
     type NowlineFile,
     type NowlineServices,
+    resolveIncludes,
 } from '@nowline/core';
 import { layoutRoadmap, type ThemeName } from '@nowline/layout';
 import { renderSvg } from '@nowline/renderer';
+import { URI } from 'langium';
 
 let cached:
     | { shared: ReturnType<typeof createNowlineServices>['shared']; Nowline: NowlineServices }

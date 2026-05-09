@@ -19,8 +19,8 @@
 // at publish time, so we deliberately do NOT rewrite dependency
 // versions. Only the top-level `version` field is touched.
 
-import { readFileSync, writeFileSync, readdirSync, statSync } from 'node:fs';
-import { join, resolve, dirname } from 'node:path';
+import { readdirSync, readFileSync, statSync, writeFileSync } from 'node:fs';
+import { dirname, join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
 const here = dirname(fileURLToPath(import.meta.url));

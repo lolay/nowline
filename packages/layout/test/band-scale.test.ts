@@ -1,4 +1,4 @@
-import { describe, it, expect } from 'vitest';
+import { describe, expect, it } from 'vitest';
 import { BandScale, defaultRowBand } from '../src/band-scale.js';
 
 describe('BandScale', () => {

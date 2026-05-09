@@ -1,7 +1,14 @@
 import {
+    type NowlineAddedServices,
+    NowlineGeneratedModule,
+    NowlineGeneratedSharedModule,
+    NowlineModule,
+    registerValidationChecks,
+} from '@nowline/core';
+import {
+    type FileSystemProvider,
     inject,
     type LangiumSharedCoreServices,
-    type FileSystemProvider,
     type Module,
 } from 'langium';
 import {
@@ -12,13 +19,6 @@ import {
     type LangiumSharedServices,
     type PartialLangiumServices,
 } from 'langium/lsp';
-import {
-    NowlineGeneratedSharedModule,
-    NowlineGeneratedModule,
-    NowlineModule,
-    registerValidationChecks,
-    type NowlineAddedServices,
-} from '@nowline/core';
 import { NowlineCompletionProvider } from './providers/completion.js';
 import { NowlineDefinitionProvider } from './providers/definition.js';
 import { NowlineDocumentSymbolProvider } from './providers/document-symbols.js';

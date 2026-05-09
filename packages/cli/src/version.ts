@@ -1,5 +1,6 @@
-export { CLI_VERSION, CLI_BUILD, type CliBuild } from './generated/version.js';
-import { CLI_VERSION, CLI_BUILD } from './generated/version.js';
+export { CLI_BUILD, CLI_VERSION, type CliBuild } from './generated/version.js';
+
+import { CLI_BUILD, CLI_VERSION } from './generated/version.js';
 
 /**
  * Compose the user-visible version string per SemVer build-metadata

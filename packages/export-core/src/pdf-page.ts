@@ -6,8 +6,8 @@
 //   - Custom: WxHunit (mixed units rejected).
 //   - "content": page = content dimensions, no scaling, no upper bound.
 
-import type { PdfLength, PdfPageSize, PdfPresetName, PdfOrientation } from './types.js';
-import { lengthToPoints, parseLength, LengthParseError } from './units.js';
+import type { PdfLength, PdfOrientation, PdfPageSize, PdfPresetName } from './types.js';
+import { LengthParseError, lengthToPoints, parseLength } from './units.js';
 
 interface PresetDimensions {
     widthPt: number;

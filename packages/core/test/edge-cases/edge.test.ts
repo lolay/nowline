@@ -1,5 +1,5 @@
-import { describe, it, expect } from 'vitest';
-import { parse, errorMessages } from '../helpers.js';
+import { describe, expect, it } from 'vitest';
+import { errorMessages, parse } from '../helpers.js';
 
 describe('edge cases', () => {
     it('parses an empty file without crashing', async () => {

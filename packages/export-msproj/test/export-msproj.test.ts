@@ -1,7 +1,7 @@
 import { describe, expect, it, vi } from 'vitest';
+import { durationToMsProjMinutes, minutesToMsProjDuration } from '../src/duration.js';
 import { exportMsProjXml } from '../src/index.js';
 import { buildExportInputs, SIMPLE_FIXTURE } from './helpers.js';
-import { durationToMsProjMinutes, minutesToMsProjDuration } from '../src/duration.js';
 
 describe('exportMsProjXml — basic structure', () => {
     it('emits a well-formed XML prologue + Project root', async () => {

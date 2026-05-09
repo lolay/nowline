@@ -1,64 +1,63 @@
-import type { AstNode, ValidationAcceptor, ValidationChecks, ValidationSeverity } from 'langium';
-import type { Properties } from 'langium';
-import { GrammarUtils } from 'langium';
-import type { NowlineAstType, NowlineServices } from './nowline-module.js';
 import type {
-    NowlineFile,
-    NowlineDirective,
+    AstNode,
+    Properties,
+    ValidationAcceptor,
+    ValidationChecks,
+    ValidationSeverity,
+} from 'langium';
+import { GrammarUtils } from 'langium';
+import type {
+    AnchorDeclaration,
+    CalendarBlock,
+    DefaultDeclaration,
+    DefaultEntityType,
+    EntityProperty,
+    FootnoteDeclaration,
+    GroupBlock,
+    GroupContent,
     IncludeDeclaration,
     IncludeOption,
-    EntityProperty,
-    RoadmapDeclaration,
-    AnchorDeclaration,
-    SwimlaneDeclaration,
     ItemDeclaration,
-    ParallelBlock,
-    GroupBlock,
     MilestoneDeclaration,
-    FootnoteDeclaration,
+    NowlineDirective,
+    NowlineFile,
+    ParallelBlock,
+    ParallelContent,
     PersonDeclaration,
-    TeamDeclaration,
-    StyleDeclaration,
-    StyleProperty,
-    LabelDeclaration,
+    RoadmapDeclaration,
+    RoadmapEntry,
+    ScaleBlock,
     SizeDeclaration,
     StatusDeclaration,
-    DefaultDeclaration,
-    CalendarBlock,
-    ScaleBlock,
-    BlockProperty,
-    RoadmapEntry,
-    ConfigEntry,
+    StyleProperty,
     SwimlaneContent,
-    GroupContent,
-    ParallelContent,
-    TeamContent,
-    DefaultEntityType,
+    SwimlaneDeclaration,
     SymbolDeclaration,
+    TeamDeclaration,
 } from '../generated/ast.js';
 import {
-    isItemDeclaration,
-    isParallelBlock,
-    isGroupBlock,
-    isDescriptionDirective,
-    isPersonMemberRef,
-    isTeamDeclaration,
-    isSwimlaneDeclaration,
-    isFootnoteDeclaration,
-    isPersonDeclaration,
     isAnchorDeclaration,
-    isMilestoneDeclaration,
-    isStyleDeclaration,
-    isStatusDeclaration,
-    isLabelDeclaration,
-    isSizeDeclaration,
-    isScaleBlock,
     isCalendarBlock,
     isDefaultDeclaration,
+    isDescriptionDirective,
+    isFootnoteDeclaration,
+    isGroupBlock,
+    isItemDeclaration,
+    isLabelDeclaration,
+    isMilestoneDeclaration,
+    isParallelBlock,
+    isPersonDeclaration,
+    isPersonMemberRef,
+    isSizeDeclaration,
+    isStatusDeclaration,
+    isStyleDeclaration,
+    isSwimlaneDeclaration,
     isSymbolDeclaration,
+    isTeamDeclaration,
 } from '../generated/ast.js';
+import type { MessageArgs, MessageCode } from '../i18n/index.js';
 import { tr } from '../i18n/index.js';
-import type { MessageCode, MessageArgs } from '../i18n/index.js';
+import type { NowlineAstType, NowlineServices } from './nowline-module.js';
 
 const SUPPORTED_VERSION = 'v1';
 
@@ -373,7 +372,7 @@ function resolveLocalStart(file: NowlineFile | undefined): StartState {
     const raw = prop.value;
     if (!raw || !DATE_RE.test(raw)) return { kind: 'invalid' };
     const d = new Date(raw);
-    if (isNaN(d.getTime())) return { kind: 'invalid' };
+    if (Number.isNaN(d.getTime())) return { kind: 'invalid' };
     return { kind: 'valid', iso: raw, date: d };
 }
 
@@ -774,7 +773,7 @@ export class NowlineValidator {
 
             case 'date':
             case 'start':
-                if (val && (!DATE_RE.test(val) || isNaN(new Date(val).getTime()))) {
+                if (val && (!DATE_RE.test(val) || Number.isNaN(new Date(val).getTime()))) {
                     acceptTr(accept, 'error', { node: prop, property: 'value' }, 'NL.E0405', {
                         key,
                         value: val,
@@ -961,11 +960,11 @@ export class NowlineValidator {
     // --- R2 + R3: anchor must not precede roadmap start; dated roadmap requires start: ---
     checkAnchorAgainstStart(anchor: AnchorDeclaration, accept: ValidationAcceptor): void {
         const dateProp = anchor.properties.find((p) => propKey(p) === 'date');
-        if (!dateProp || !dateProp.value) return;
+        if (!dateProp?.value) return;
         const raw = dateProp.value;
         if (!DATE_RE.test(raw)) return;
         const anchorDate = new Date(raw);
-        if (isNaN(anchorDate.getTime())) return;
+        if (Number.isNaN(anchorDate.getTime())) return;
 
         const start = resolveLocalStart(anchor.$container);
         switch (start.kind) {
@@ -1002,11 +1001,11 @@ export class NowlineValidator {
     // --- R2 + R3: dated milestone must not precede roadmap start ---
     checkMilestoneAgainstStart(milestone: MilestoneDeclaration, accept: ValidationAcceptor): void {
         const dateProp = milestone.properties.find((p) => propKey(p) === 'date');
-        if (!dateProp || !dateProp.value) return;
+        if (!dateProp?.value) return;
         const raw = dateProp.value;
         if (!DATE_RE.test(raw)) return;
         const milestoneDate = new Date(raw);
-        if (isNaN(milestoneDate.getTime())) return;
+        if (Number.isNaN(milestoneDate.getTime())) return;
 
         const start = resolveLocalStart(milestone.$container);
         switch (start.kind) {
@@ -1174,7 +1173,7 @@ export class NowlineValidator {
             if (UNIVERSAL_ENTITY_PROPS.has(key)) continue;
             if (STYLE_PROP_KEYS.has(key)) continue;
             if (key === 'footnote') continue;
-            if (computedBanned && computedBanned.has(key)) continue;
+            if (computedBanned?.has(key)) continue;
             const candidates: string[] = [...known, ...UNIVERSAL_ENTITY_PROPS];
             const suggested = suggestKey(key, candidates) ?? '';
             acceptTr(accept, 'warning', { node: prop, property: 'key' }, 'NL.W0700', {

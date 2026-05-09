@@ -7,9 +7,9 @@
 // Embedding the bytes as string literals is the simplest cross-runtime fix
 // (works under both Node and bun-compiled). Mirrors the
 // packages/cli/scripts/bundle-templates.mjs pattern.
-import { readFileSync, writeFileSync, mkdirSync } from 'node:fs';
-import { fileURLToPath } from 'node:url';
+import { mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import * as path from 'node:path';
+import { fileURLToPath } from 'node:url';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const packageRoot = path.resolve(__dirname, '..');

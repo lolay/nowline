@@ -1,10 +1,10 @@
-import { describe, it, expect } from 'vitest';
-import { parse } from '../helpers.js';
+import { describe, expect, it } from 'vitest';
 import {
+    isDefaultDeclaration,
     isItemDeclaration,
     isSwimlaneDeclaration,
-    isDefaultDeclaration,
 } from '../../src/generated/ast.js';
+import { parse } from '../helpers.js';
 
 // Regression coverage for https://github.com/lolay/nowline/issues/2.
 // The trailing `\` line continuation is documented in specs/dsl.md

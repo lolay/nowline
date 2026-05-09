@@ -1,19 +1,19 @@
 import type { LangiumDocument, MaybePromise } from 'langium';
+import type { HoverProvider } from 'langium/lsp';
 import type { CancellationToken, Hover, HoverParams, Range } from 'vscode-languageserver';
 import { MarkupKind } from 'vscode-languageserver';
-import type { HoverProvider } from 'langium/lsp';
+import type { NowlineLspServices } from '../nowline-lsp-module.js';
 import {
     buildEntityIndex,
     declarationAt,
     entityKind,
     fileFromDocument,
     leafAt,
-    propKey,
-    propertyValueAt,
-    REFERENCE_PROP_KEYS,
     type NamedEntity,
+    propertyValueAt,
+    propKey,
+    REFERENCE_PROP_KEYS,
 } from '../references/ast-utils.js';
-import type { NowlineLspServices } from '../nowline-lsp-module.js';
 
 /**
  * Hover provider. Surfaces the resolved entity (kind + id + title), plus the

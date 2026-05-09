@@ -11,19 +11,12 @@
 //   4. Platform probe   — first existing entry from `probe-list.ts`
 //   5. Bundled fallback — DejaVuSans.ttf / DejaVuSansMono.ttf
 
-import { promises as fs } from 'node:fs';
-import { existsSync as defaultExistsSync } from 'node:fs';
+import { existsSync as defaultExistsSync, promises as fs } from 'node:fs';
 import * as path from 'node:path';
 
-import type { FontRole, FontSource, ResolvedFont, ResolvedFontPair } from '../types.js';
-import { loadBundledSans, loadBundledMono } from './bundled.js';
-import {
-    aliasCandidate,
-    isAlias,
-    probeListFor,
-    type FontCandidate,
-    type PlatformProbe,
-} from './probe-list.js';
+import type { FontRole, FontSource, ResolvedFont } from '../types.js';
+import { loadBundledMono, loadBundledSans } from './bundled.js';
+import { aliasCandidate, isAlias, type PlatformProbe, probeListFor } from './probe-list.js';
 import { isVariableFontBytes } from './sfns.js';
 
 export interface ResolveOptions {

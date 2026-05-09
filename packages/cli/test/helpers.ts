@@ -1,8 +1,8 @@
 import { spawn } from 'node:child_process';
 import { promises as fs } from 'node:fs';
-import { fileURLToPath } from 'node:url';
-import * as path from 'node:path';
 import * as os from 'node:os';
+import * as path from 'node:path';
+import { fileURLToPath } from 'node:url';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 

@@ -1,10 +1,10 @@
-import { describe, it, expect } from 'vitest';
 import { promises as fs } from 'node:fs';
 import * as path from 'node:path';
-import { parseSource } from '../../src/core/parse.js';
-import { serializeToJson } from '../../src/convert/schema.js';
+import { describe, expect, it } from 'vitest';
 import { parseNowlineJson } from '../../src/convert/parse-json.js';
 import { printNowlineFile } from '../../src/convert/printer.js';
+import { serializeToJson } from '../../src/convert/schema.js';
+import { parseSource } from '../../src/core/parse.js';
 import { examplesDir } from '../helpers.js';
 
 const EXAMPLES = ['minimal.nowline', 'teams.nowline', 'product.nowline'];

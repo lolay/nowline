@@ -1,82 +1,45 @@
 import type {
-    NowlineFile,
-    ItemDeclaration,
-    GroupBlock,
-    ParallelBlock,
-    SwimlaneDeclaration,
-    AnchorDeclaration,
-    MilestoneDeclaration,
-    FootnoteDeclaration,
     EntityProperty,
+    GroupBlock,
+    ItemDeclaration,
     LabelDeclaration,
-    IsolatedRegion,
+    NowlineFile,
+    ParallelBlock,
     ResolveResult,
+    SwimlaneDeclaration,
 } from '@nowline/core';
-import { isItemDeclaration, isGroupBlock, isParallelBlock } from '@nowline/core';
-import type {
-    PositionedRoadmap,
-    PositionedHeader,
-    PositionedSwimlane,
-    PositionedTrackChild,
-    PositionedItem,
-    PositionedGroup,
-    PositionedParallel,
-    PositionedAnchor,
-    PositionedMilestone,
-    PositionedDependencyEdge,
-    PositionedLabelChip,
-    PositionedFootnoteArea,
-    PositionedFootnoteEntry,
-    PositionedIncludeRegion,
-    PositionedNowline,
-    PositionedTimelineScale,
-    ResolvedStyle,
-    Point,
-    BoundingBox,
-    StatusKind,
-    LinkIconKind,
-} from './types.js';
-import { themes, type Theme, type ThemeName, resolveColor } from './themes/index.js';
-import { resolveStyle, resolveLabelChipStyle, type StyleContext } from './style-resolution.js';
+import { isGroupBlock, isItemDeclaration, isParallelBlock } from '@nowline/core';
 import {
-    resolveCalendar,
-    resolveDuration,
-    deriveItemDurationDays,
-    deriveTotalEffortDays,
     addDays,
     daysBetween,
+    deriveItemDurationDays,
+    deriveTotalEffortDays,
+    resolveDuration,
 } from './calendar.js';
-import { resolveScale, buildHeaderTicks, type ViewPreset } from './view-preset.js';
-import { localeStrings } from './i18n.js';
-import { TimeScale } from './time-scale.js';
-import { fromCalendarConfig, daysPerUnit, type WorkingCalendar } from './working-calendar.js';
 import {
-    HEADER_ABOVE_HEIGHT_PX,
-    HEADER_BESIDE_MIN_WIDTH_PX,
-    HEADER_BESIDE_MAX_WIDTH_PX,
-    MIN_ITEM_WIDTH,
-    ITEM_INSET_PX,
-    PADDING_PX,
-    SPACING_PX,
-    GUTTER_PX,
-    FOOTNOTE_ROW_HEIGHT,
-    EDGE_CORNER_RADIUS,
-    PROGRESS_STRIP_HEIGHT_PX,
-    NOW_PILL_WIDTH_PX,
-    NOW_PILL_LABEL_FONT_SIZE_PX,
-    NOW_PILL_LABEL_INSET_X_PX,
-} from './themes/shared.js';
-import { BandScale, defaultRowBand } from './band-scale.js';
+    estimateCapacitySuffixWidth,
+    formatCapacityNumber,
+    parseCapacityValue,
+    resolveCapacityIcon,
+} from './capacity.js';
+import { parseDate, propValue, propValues } from './dsl-utils.js';
 import {
-    HEADER_CARD_PADDING_X,
-    HEADER_CARD_PADDING_TOP,
-    HEADER_CARD_PADDING_BOTTOM,
-    HEADER_TITLE_LINE_HEIGHT_PX,
-    HEADER_AUTHOR_LINE_HEIGHT_PX,
-    HEADER_TITLE_TO_AUTHOR_GAP_PX,
-    HEADER_TITLE_FONT_SIZE_PX,
+    ChannelGrid,
+    collectRoutingObstacles,
+    type EdgeRouteRequest,
+    routeChannelEdges,
+} from './edge-routing.js';
+import {
     HEADER_AUTHOR_FONT_SIZE_PX,
+    HEADER_AUTHOR_LINE_HEIGHT_PX,
+    HEADER_CARD_PADDING_BOTTOM,
+    HEADER_CARD_PADDING_TOP,
+    HEADER_CARD_PADDING_X,
+    HEADER_TITLE_FONT_SIZE_PX,
+    HEADER_TITLE_LINE_HEIGHT_PX,
+    HEADER_TITLE_TO_AUTHOR_GAP_PX,
 } from './header-card-geometry.js';
+import { localeStrings } from './i18n.js';
 import {
     ITEM_CAPTION_INSET_X_PX,
     ITEM_CAPTION_META_BASELINE_OFFSET_PX,
@@ -84,47 +47,56 @@ import {
     ITEM_CAPTION_TITLE_FONT_SIZE_PX,
     ITEM_DECORATION_SPILL_GAP_PX,
     ITEM_FOOTNOTE_INDICATOR_STEP_PX,
-    ITEM_LINK_ICON_INSET_PX,
     ITEM_LINK_ICON_TILE_SIZE_PX,
     ITEM_STATUS_DOT_RADIUS_PX,
-    LABEL_CHIP_HEIGHT_PX,
     LABEL_CHIP_GAP_ABOVE_PROGRESS_STRIP_PX,
     LABEL_CHIP_GAP_BETWEEN_PX,
+    LABEL_CHIP_HEIGHT_PX,
     LABEL_CHIP_ROW_STEP_PX,
     MIN_BAR_WIDTH_FOR_DOT_PX,
     MIN_BAR_WIDTH_FOR_FOOTNOTE_PX,
     MIN_BAR_WIDTH_FOR_LINK_AND_DOT_PX,
     packSpillChips,
 } from './item-bar-geometry.js';
-import { ItemNode } from './nodes/item-node.js';
-import {
-    parseCapacityValue,
-    formatCapacityNumber,
-    resolveCapacityIcon,
-    estimateCapacitySuffixWidth,
-} from './capacity.js';
-import type { PositionedCapacity } from './types.js';
-import { SwimlaneNode } from './nodes/swimlane-node.js';
-import { ParallelNode } from './nodes/parallel-node.js';
+import { type LayoutContext, newCursor, type TrackCursor } from './layout-context.js';
 import { GroupNode } from './nodes/group-node.js';
-import { buildAnchors } from './nodes/anchor-node.js';
-import { buildMilestones } from './nodes/milestone-node.js';
-import { buildFootnotes } from './nodes/footnote-node.js';
-import { buildIncludeRegions } from './nodes/include-node.js';
+import { ItemNode } from './nodes/item-node.js';
+import { ParallelNode } from './nodes/parallel-node.js';
 import { RoadmapNode } from './nodes/roadmap-node.js';
+import { SwimlaneNode } from './nodes/swimlane-node.js';
+import { resolveLabelChipStyle, resolveStyle, type StyleContext } from './style-resolution.js';
+import type { ThemeName } from './themes/index.js';
 import {
-    type LayoutContext,
-    type TrackCursor,
-    type LayoutHelpers,
-    newCursor,
-} from './layout-context.js';
-import { propValue, propValues, parseDate } from './dsl-utils.js';
-import {
-    ChannelGrid,
-    collectRoutingObstacles,
-    routeChannelEdges,
-    type EdgeRouteRequest,
-} from './edge-routing.js';
+    GUTTER_PX,
+    HEADER_BESIDE_MAX_WIDTH_PX,
+    HEADER_BESIDE_MIN_WIDTH_PX,
+    ITEM_INSET_PX,
+    MIN_ITEM_WIDTH,
+    NOW_PILL_LABEL_FONT_SIZE_PX,
+    NOW_PILL_LABEL_INSET_X_PX,
+    NOW_PILL_WIDTH_PX,
+    PADDING_PX,
+    PROGRESS_STRIP_HEIGHT_PX,
+} from './themes/shared.js';
+import type {
+    BoundingBox,
+    LinkIconKind,
+    Point,
+    PositionedCapacity,
+    PositionedDependencyEdge,
+    PositionedGroup,
+    PositionedIncludeRegion,
+    PositionedItem,
+    PositionedLabelChip,
+    PositionedNowline,
+    PositionedParallel,
+    PositionedRoadmap,
+    PositionedSwimlane,
+    PositionedTrackChild,
+    StatusKind,
+} from './types.js';
+import type { ViewPreset } from './view-preset.js';
+import { daysPerUnit } from './working-calendar.js';
 
 export interface LayoutOptions {
     theme?: ThemeName;
@@ -947,7 +919,7 @@ function resolveChildStart(
     return seqDefault;
 }
 
-function buildSwimlane(
+function _buildSwimlane(
     lane: SwimlaneDeclaration,
     y: number,
     bandIndex: number,

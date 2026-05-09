@@ -15,7 +15,7 @@
 // finite domain — the swimlane row loop uses this to know
 // `bandwidth()` and `step()` without committing to a row count.
 
-import { scaleBand, type ScaleBand } from 'd3-scale';
+import { type ScaleBand, scaleBand } from 'd3-scale';
 
 export interface FixedRowOptions {
     /** Visible height of one row in pixels. */

@@ -3,8 +3,8 @@
 // Heavy deps (resvg, pdfkit, exceljs) live in the format packages, never
 // here — see specs/handoffs/m2c.md § 1.
 
-import type { PositionedRoadmap } from '@nowline/layout';
 import type { NowlineFile, ResolveResult } from '@nowline/core';
+import type { PositionedRoadmap } from '@nowline/layout';
 
 /** Bundle of inputs every export function consumes. */
 export interface ExportInputs {

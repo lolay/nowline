@@ -1,44 +1,44 @@
 import { promises as fs } from 'node:fs';
 import * as path from 'node:path';
 import { URI } from 'langium';
-import type { NowlineServices } from './nowline-module.js';
 import type {
-    NowlineFile,
-    IncludeDeclaration,
-    ConfigEntry,
-    RoadmapEntry,
-    StyleDeclaration,
-    LabelDeclaration,
-    StatusDeclaration,
-    SizeDeclaration,
-    ScaleBlock,
-    CalendarBlock,
-    DefaultDeclaration,
-    SwimlaneDeclaration,
-    PersonDeclaration,
-    TeamDeclaration,
     AnchorDeclaration,
-    MilestoneDeclaration,
+    CalendarBlock,
+    ConfigEntry,
+    DefaultDeclaration,
     FootnoteDeclaration,
+    IncludeDeclaration,
+    LabelDeclaration,
+    MilestoneDeclaration,
+    NowlineFile,
+    PersonDeclaration,
     RoadmapDeclaration,
+    RoadmapEntry,
+    ScaleBlock,
+    SizeDeclaration,
+    StatusDeclaration,
+    StyleDeclaration,
+    SwimlaneDeclaration,
     SymbolDeclaration,
+    TeamDeclaration,
 } from '../generated/ast.js';
 import {
-    isStyleDeclaration,
-    isLabelDeclaration,
-    isStatusDeclaration,
-    isSizeDeclaration,
-    isScaleBlock,
+    isAnchorDeclaration,
     isCalendarBlock,
     isDefaultDeclaration,
-    isSwimlaneDeclaration,
-    isPersonDeclaration,
-    isTeamDeclaration,
-    isAnchorDeclaration,
-    isMilestoneDeclaration,
     isFootnoteDeclaration,
+    isLabelDeclaration,
+    isMilestoneDeclaration,
+    isPersonDeclaration,
+    isScaleBlock,
+    isSizeDeclaration,
+    isStatusDeclaration,
+    isStyleDeclaration,
+    isSwimlaneDeclaration,
     isSymbolDeclaration,
+    isTeamDeclaration,
 } from '../generated/ast.js';
+import type { NowlineServices } from './nowline-module.js';
 
 export type IncludeMode = 'merge' | 'ignore' | 'isolate';
 
@@ -46,9 +46,9 @@ const DATE_RE = /^\d{4}-\d{2}-\d{2}$/;
 
 function readStartProp(decl: RoadmapDeclaration | undefined): string | undefined {
     const prop = decl?.properties.find((p) => p.key === 'start');
-    if (!prop || !prop.value) return undefined;
+    if (!prop?.value) return undefined;
     if (!DATE_RE.test(prop.value)) return undefined;
-    if (isNaN(new Date(prop.value).getTime())) return undefined;
+    if (Number.isNaN(new Date(prop.value).getTime())) return undefined;
     return prop.value;
 }
 

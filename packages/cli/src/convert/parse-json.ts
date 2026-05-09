@@ -1,5 +1,5 @@
-import { NOWLINE_SCHEMA_VERSION, type JsonAstNode, type NowlineDocument } from './schema.js';
 import { CliError, ExitCode } from '../io/exit-codes.js';
+import { type JsonAstNode, NOWLINE_SCHEMA_VERSION, type NowlineDocument } from './schema.js';
 
 export interface ParseJsonResult {
     document: NowlineDocument;

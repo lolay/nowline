@@ -1,20 +1,20 @@
+import { type FSWatcher, promises as fs, watch as fsWatch } from 'node:fs';
 import * as http from 'node:http';
 import * as path from 'node:path';
-import { promises as fs, type FSWatcher, watch as fsWatch } from 'node:fs';
-import { CliError, ExitCode } from '../io/exit-codes.js';
-import { parseSource, getServices } from '../core/parse.js';
 import { resolveIncludes } from '@nowline/core';
 import { layoutRoadmap, type ThemeName } from '@nowline/layout';
 import { renderSvg } from '@nowline/renderer';
-import { createAssetResolver } from './render.js';
-import { formatDiagnostics, type DiagnosticSource } from '../diagnostics/index.js';
 import type { ParsedArgs } from '../cli/args.js';
+import { getServices, parseSource } from '../core/parse.js';
+import { type DiagnosticSource, formatDiagnostics } from '../diagnostics/index.js';
 import {
     describeContentLocaleSource,
     operatorLocale,
     readDirectiveLocale,
     resolveLocaleOverride,
 } from '../i18n/locale.js';
+import { CliError, ExitCode } from '../io/exit-codes.js';
+import { createAssetResolver } from './render.js';
 
 export interface ServeHandlerOptions {
     args: ParsedArgs;

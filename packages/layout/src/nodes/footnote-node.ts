@@ -5,15 +5,15 @@
 // 28 px header + (entries × FOOTNOTE_ROW_HEIGHT) + 16 px padding.
 
 import type { FootnoteDeclaration } from '@nowline/core';
+import { propValues } from '../dsl-utils.js';
+import type { LayoutContext } from '../layout-context.js';
 import { resolveStyle } from '../style-resolution.js';
 import {
-    FOOTNOTE_ROW_HEIGHT,
     FOOTNOTE_HEADER_HEIGHT_PX,
     FOOTNOTE_PANEL_PADDING_PX,
+    FOOTNOTE_ROW_HEIGHT,
 } from '../themes/shared.js';
-import type { PositionedFootnoteArea, PositionedFootnoteEntry, BoundingBox } from '../types.js';
-import type { LayoutContext } from '../layout-context.js';
-import { propValues } from '../dsl-utils.js';
+import type { BoundingBox, PositionedFootnoteArea, PositionedFootnoteEntry } from '../types.js';
 
 export interface BuiltFootnotes {
     area: PositionedFootnoteArea;

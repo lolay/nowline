@@ -23,8 +23,7 @@
         "watch": "tsc -b tsconfig.json --watch",
         "pretest": "npm run langium:generate",
         "test": "vitest run",
-        "test:watch": "vitest",
-        "lint": "eslint src/"
+        "test:watch": "vitest"
     },
     "dependencies": {
         "langium": "~4.2.2"

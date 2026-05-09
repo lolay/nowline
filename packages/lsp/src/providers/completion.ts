@@ -1,22 +1,22 @@
+import type { MaybePromise } from 'langium';
 import {
-    DefaultCompletionProvider,
     type CompletionAcceptor,
     type CompletionContext,
+    DefaultCompletionProvider,
     type NextFeature,
 } from 'langium/lsp';
-import { CompletionItemKind, type CompletionItem } from 'vscode-languageserver';
-import type { MaybePromise } from 'langium';
+import { type CompletionItem, CompletionItemKind } from 'vscode-languageserver';
+import type { NowlineLspServices } from '../nowline-lsp-module.js';
 import {
     BUILTIN_CAPACITY_ICONS,
     BUILTIN_ICON_NAMES,
     BUILTIN_STATUSES,
     collectNamedEntities,
-    fileFromDocument,
-    REFERENCE_PROP_KEYS,
     entityKind,
+    fileFromDocument,
     type NamedEntity,
+    REFERENCE_PROP_KEYS,
 } from '../references/ast-utils.js';
-import type { NowlineLspServices } from '../nowline-lsp-module.js';
 
 /**
  * Per-key allowlist of entity kinds that make sense as values. Keeps

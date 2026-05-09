@@ -18,8 +18,8 @@
 // etc. under `nodes/`) follow this pattern: place re-measures, but
 // measure is O(content) without I/O.
 
-import type { TimeScale } from './time-scale.js';
 import type { BandScale } from './band-scale.js';
+import type { TimeScale } from './time-scale.js';
 import type { ResolvedStyle } from './types.js';
 
 export interface Point {

@@ -12,9 +12,9 @@
 // on a single milestone).
 
 import { spawn } from 'node:child_process';
-import { fileURLToPath } from 'node:url';
-import { dirname, resolve, relative } from 'node:path';
 import { existsSync } from 'node:fs';
+import { dirname, relative, resolve } from 'node:path';
+import { fileURLToPath } from 'node:url';
 import { assertDistFresh } from './lib/check-dist-fresh.mjs';
 
 const here = dirname(fileURLToPath(import.meta.url));

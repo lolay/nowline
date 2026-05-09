@@ -6,10 +6,10 @@
 // the same row stack — see `LayoutContext.markerRowPlacements`.
 
 import type { AnchorDeclaration } from '@nowline/core';
-import { resolveStyle } from '../style-resolution.js';
-import type { PositionedAnchor, Point } from '../types.js';
+import { parseDate, propValue } from '../dsl-utils.js';
 import type { LayoutContext } from '../layout-context.js';
-import { propValue, parseDate } from '../dsl-utils.js';
+import { resolveStyle } from '../style-resolution.js';
+import type { Point, PositionedAnchor } from '../types.js';
 import {
     MARKER_DIAMOND_RADIUS_PX,
     MARKER_LABEL_GAP_PX,

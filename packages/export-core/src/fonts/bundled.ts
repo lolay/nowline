@@ -17,7 +17,7 @@
 import * as path from 'node:path';
 import { fileURLToPath } from 'node:url';
 
-import { SANS_BASE64, MONO_BASE64 } from '../generated/bundled-fonts.js';
+import { MONO_BASE64, SANS_BASE64 } from '../generated/bundled-fonts.js';
 
 const HERE = path.dirname(fileURLToPath(import.meta.url));
 

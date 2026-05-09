@@ -1,8 +1,8 @@
 import { describe, expect, it } from 'vitest';
 import {
-    PageSizeParseError,
     fitContent,
     isPdfPresetName,
+    PageSizeParseError,
     parsePageSize,
     presetDimensions,
     presetNames,

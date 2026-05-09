@@ -1,11 +1,11 @@
-import { describe, it, expect } from 'vitest';
-import { parse } from '../helpers.js';
+import { describe, expect, it } from 'vitest';
 import {
-    isParallelBlock,
     isGroupBlock,
     isItemDeclaration,
+    isParallelBlock,
     isSwimlaneDeclaration,
 } from '../../src/generated/ast.js';
+import { parse } from '../helpers.js';
 
 describe('parallel and group', () => {
     it('parses groups inside parallel', async () => {

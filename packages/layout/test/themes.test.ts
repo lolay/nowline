@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { lightTheme, darkTheme, resolveColor } from '../src/themes/index.js';
+import { darkTheme, lightTheme, resolveColor } from '../src/themes/index.js';
 
 // Pin the alias canonicalization at the theme boundary. Authors who type
 // `bg:grey` should land on the same paint as `bg:gray`; same for

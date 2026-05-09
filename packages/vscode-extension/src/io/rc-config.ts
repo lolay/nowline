@@ -1,6 +1,6 @@
 import * as path from 'node:path';
-import * as vscode from 'vscode';
 import { loadConfig, type NowlineRc } from '@nowline/config';
+import * as vscode from 'vscode';
 
 /**
  * Per-directory cache around `@nowline/config`'s `loadConfig`. Each entry

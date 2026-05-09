@@ -1,17 +1,17 @@
 import type { LangiumDocument, MaybePromise } from 'langium';
+import type { DefinitionProvider } from 'langium/lsp';
 import type { CancellationToken, DefinitionParams } from 'vscode-languageserver';
 import { LocationLink } from 'vscode-languageserver';
-import type { DefinitionProvider } from 'langium/lsp';
+import type { NowlineLspServices } from '../nowline-lsp-module.js';
 import {
     buildEntityIndex,
     fileFromDocument,
     leafAt,
     nameRangeOf,
-    propKey,
     propertyValueAt,
+    propKey,
     REFERENCE_PROP_KEYS,
 } from '../references/ast-utils.js';
-import type { NowlineLspServices } from '../nowline-lsp-module.js';
 
 /**
  * Custom definition provider. The Nowline grammar uses `PropertyAtom` (plain

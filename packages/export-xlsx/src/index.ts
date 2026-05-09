@@ -17,7 +17,6 @@
 //   - Style ids and column orders are explicit so ExcelJS's id allocator
 //     emits the same numbers across runs.
 
-import ExcelJS from 'exceljs';
 import type {
     AnchorDeclaration,
     GroupBlock,
@@ -33,6 +32,7 @@ import type {
 } from '@nowline/core';
 import type { ExportInputs } from '@nowline/export-core';
 import { displayLabel, getProp, getProps, roadmapTitle } from '@nowline/export-core';
+import ExcelJS from 'exceljs';
 
 import { durationLiteralToText, durationToWorkingDays } from './duration.js';
 

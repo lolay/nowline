@@ -23,19 +23,18 @@
 //
 //   <%% lossy comment %%>
 
-import type { ExportInputs } from '@nowline/export-core';
-import { displayLabel, getProp, getProps, hasProp, roadmapTitle } from '@nowline/export-core';
 import type {
     AnchorDeclaration,
     GroupBlock,
     GroupContent,
     ItemDeclaration,
     MilestoneDeclaration,
-    NowlineFile,
     ParallelBlock,
     SwimlaneContent,
     SwimlaneDeclaration,
 } from '@nowline/core';
+import type { ExportInputs } from '@nowline/export-core';
+import { displayLabel, getProp, getProps, hasProp, roadmapTitle } from '@nowline/export-core';
 
 import { durationToMermaid } from './duration.js';
 
@@ -229,7 +228,7 @@ function emitItem(item: ItemDeclaration, drops: DropCounts, out: string[]): void
     const status = mapStatus(getProp(item, 'status'));
     const after = getProps(item, 'after');
     const duration = durationToMermaid(getProp(item, 'duration') ?? getProp(item, 'size')) ?? '1d';
-    const ref = after.length > 0 ? `after ${after.join(' ')}` : 'after , 0d'.replace(', 0d', '');
+    const _ref = after.length > 0 ? `after ${after.join(' ')}` : 'after , 0d'.replace(', 0d', '');
 
     const meta = [status, id, after.length > 0 ? `after ${after.join(' ')}` : '', duration]
         .filter((s) => s !== '')

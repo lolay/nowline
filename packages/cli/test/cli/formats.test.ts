@@ -1,13 +1,13 @@
-import { describe, it, expect } from 'vitest';
+import { describe, expect, it } from 'vitest';
 import {
-    resolveFormat,
     autoAddExtension,
     canonicalExtension,
-    formatFromExtension,
-    isOutputFormat,
-    isBinaryFormat,
-    isTextFormat,
     FormatResolutionError,
+    formatFromExtension,
+    isBinaryFormat,
+    isOutputFormat,
+    isTextFormat,
+    resolveFormat,
 } from '../../src/cli/formats.js';
 
 describe('format resolution precedence', () => {

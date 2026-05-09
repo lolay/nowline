@@ -1,5 +1,6 @@
 import type { LangiumDocument, MaybePromise } from 'langium';
 import { CstUtils } from 'langium';
+import type { RenameProvider } from 'langium/lsp';
 import type {
     CancellationToken,
     Position,
@@ -10,18 +11,17 @@ import type {
     TextEdit,
     WorkspaceEdit,
 } from 'vscode-languageserver';
-import type { RenameProvider } from 'langium/lsp';
+import type { NowlineLspServices } from '../nowline-lsp-module.js';
 import {
     declarationAt,
     fileFromDocument,
     findDeclarationRange,
     leafAt,
-    propKey,
     propertyValueAt,
+    propKey,
     REFERENCE_PROP_KEYS,
     visitAllProperties,
 } from '../references/ast-utils.js';
-import type { NowlineLspServices } from '../nowline-lsp-module.js';
 
 /**
  * Rename an entity id (item, swimlane, anchor, etc.) and propagate the change

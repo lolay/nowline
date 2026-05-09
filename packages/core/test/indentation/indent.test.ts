@@ -1,5 +1,5 @@
-import { describe, it, expect } from 'vitest';
-import { parse, errorMessages } from '../helpers.js';
+import { describe, expect, it } from 'vitest';
+import { errorMessages, parse } from '../helpers.js';
 
 describe('indentation', () => {
     it('rejects mixed tabs and spaces (spaces then tab on different lines)', async () => {

@@ -1,8 +1,8 @@
 #!/usr/bin/env node
-import { readFileSync, writeFileSync, mkdirSync } from 'node:fs';
-import { fileURLToPath } from 'node:url';
 import { execFileSync } from 'node:child_process';
+import { mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import * as path from 'node:path';
+import { fileURLToPath } from 'node:url';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const packageRoot = path.resolve(__dirname, '..');
@@ -91,6 +91,7 @@ writeFileSync(
         'export interface CliBuild {',
         '    /** Short git SHA at build time, or empty when not in a git checkout. */',
         '    readonly sha: string;',
+        // biome-ignore lint/suspicious/noTemplateCurlyInString: emits a TypeScript JSDoc comment that intentionally contains a template-literal placeholder string for readers, not for evaluation.
         '    /** True when HEAD is the tag matching `v${CLI_VERSION}`. */',
         '    readonly isRelease: boolean;',
         '    /** True when the working tree had uncommitted changes at build time. */',

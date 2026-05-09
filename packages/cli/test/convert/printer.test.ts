@@ -1,7 +1,7 @@
-import { describe, it, expect } from 'vitest';
-import { parseSource } from '../../src/core/parse.js';
-import { serializeToJson } from '../../src/convert/schema.js';
+import { describe, expect, it } from 'vitest';
 import { printNowlineFile } from '../../src/convert/printer.js';
+import { serializeToJson } from '../../src/convert/schema.js';
+import { parseSource } from '../../src/core/parse.js';
 
 async function canonical(source: string): Promise<string> {
     const r = await parseSource(source, 'test.nowline', { validate: true });
@@ -40,7 +40,7 @@ describe('canonical printer rules', () => {
         const out = await canonical(
             `roadmap r "R"\nswimlane s "S"\n  item x "X" duration:1w\n    description "hello"\n`,
         );
-        expect(out).toMatch(/\n    description "hello"/);
+        expect(out).toMatch(/\n {4}description "hello"/);
     });
 
     it('preserves locale: on the directive line through a round-trip', async () => {

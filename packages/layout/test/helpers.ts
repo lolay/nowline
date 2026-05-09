@@ -1,11 +1,11 @@
-import { URI } from 'langium';
 import {
     createNowlineServices,
-    resolveIncludes,
-    type NowlineServices,
     type NowlineFile,
+    type NowlineServices,
     type ResolveResult,
+    resolveIncludes,
 } from '@nowline/core';
+import { URI } from 'langium';
 
 let cached:
     | { shared: ReturnType<typeof createNowlineServices>['shared']; Nowline: NowlineServices }

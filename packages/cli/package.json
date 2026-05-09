@@ -32,7 +32,6 @@
         "pretest": "node scripts/bundle-templates.mjs",
         "test": "vitest run",
         "test:watch": "vitest",
-        "lint": "eslint src/",
         "compile": "node scripts/compile.mjs",
         "compile:local": "node scripts/compile.mjs --target=local"
     },

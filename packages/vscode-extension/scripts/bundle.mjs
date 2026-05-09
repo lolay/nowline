@@ -1,12 +1,13 @@
 #!/usr/bin/env node
+
 // Bundles the VS Code extension entry and the Nowline LSP server into
 // self-contained CommonJS files under dist/. The extension marks the
 // `vscode` API as external (provided by the host); the server bundles
 // every workspace package so the .vsix is fully self-contained.
 
-import { build, context } from 'esbuild';
 import { dirname, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { build, context } from 'esbuild';
 
 const here = dirname(fileURLToPath(import.meta.url));
 const root = resolve(here, '..');

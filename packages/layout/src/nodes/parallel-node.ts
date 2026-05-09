@@ -5,11 +5,11 @@
 // per-entity Renderable (or, transitionally, the legacy sequencer
 // helpers in `layout.ts`).
 
-import type { ParallelBlock, ItemDeclaration, GroupBlock } from '@nowline/core';
-import { resolveStyle } from '../style-resolution.js';
-import type { PositionedParallel, PositionedTrackChild, BoundingBox } from '../types.js';
+import type { GroupBlock, ItemDeclaration, ParallelBlock } from '@nowline/core';
 import type { LayoutContext, TrackCursor } from '../layout-context.js';
+import { resolveStyle } from '../style-resolution.js';
 import { TRACK_BLOCK_TAIL_GUTTER_PX } from '../themes/shared.js';
+import type { BoundingBox, PositionedParallel, PositionedTrackChild } from '../types.js';
 
 export interface ParallelNodeDeps {
     sequenceOne: (
@@ -23,6 +23,7 @@ export interface ParallelNodeDeps {
 export class ParallelNode {
     constructor(
         public readonly node: ParallelBlock,
+        // biome-ignore lint/correctness/noUnusedPrivateClassMembers: accessed via `const { deps } = this` destructuring inside methods, which the analyzer does not detect.
         private readonly deps: ParallelNodeDeps,
     ) {}
 

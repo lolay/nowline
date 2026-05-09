@@ -12,9 +12,9 @@
 // non-continuous calendars override `nextWorkingDay` and `addUnits`
 // without changing the consumer surface.
 
-import type { ScaleUnit } from './view-preset.js';
 import type { CalendarConfig } from './calendar.js';
 import { addDays as addCalendarDays } from './calendar.js';
+import type { ScaleUnit } from './view-preset.js';
 
 export interface WorkingCalendar {
     /** Days per `1<unit>` literal (e.g. `1w` → 5 for business). */

@@ -13,15 +13,15 @@
 // bottom-first slot once every centerX is known.
 
 import type { MilestoneDeclaration } from '@nowline/core';
-import { resolveStyle } from '../style-resolution.js';
-import type { PositionedMilestone, Point, BoundingBox } from '../types.js';
+import { parseDate, propValue, propValues } from '../dsl-utils.js';
 import type { LayoutContext } from '../layout-context.js';
-import { propValue, propValues, parseDate } from '../dsl-utils.js';
+import { resolveStyle } from '../style-resolution.js';
+import type { BoundingBox, Point, PositionedMilestone } from '../types.js';
 import {
-    MARKER_LABEL_GAP_PX,
-    MARKER_LABEL_HEIGHT_PX,
     MARKER_BOLD_WIDTH_FACTOR,
     MARKER_DIAMOND_RADIUS_PX,
+    MARKER_LABEL_GAP_PX,
+    MARKER_LABEL_HEIGHT_PX,
 } from './marker-geometry.js';
 
 /**

@@ -120,7 +120,7 @@ export const ALIASES: Readonly<Record<string, { sans?: string; mono?: string }>>
 };
 
 export function isAlias(value: string): boolean {
-    return Object.prototype.hasOwnProperty.call(ALIASES, value.toLowerCase());
+    return Object.hasOwn(ALIASES, value.toLowerCase());
 }
 
 /**

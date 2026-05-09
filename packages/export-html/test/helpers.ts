@@ -1,13 +1,13 @@
-import { URI } from 'langium';
 import {
     createNowlineServices,
-    resolveIncludes,
     type NowlineFile,
     type NowlineServices,
     type ResolveResult,
+    resolveIncludes,
 } from '@nowline/core';
-import { layoutRoadmap, type ThemeName } from '@nowline/layout';
 import type { ExportInputs } from '@nowline/export-core';
+import { layoutRoadmap, type ThemeName } from '@nowline/layout';
+import { URI } from 'langium';
 
 let services:
     | { shared: ReturnType<typeof createNowlineServices>['shared']; Nowline: NowlineServices }

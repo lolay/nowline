@@ -1,7 +1,7 @@
 import { createHash } from 'node:crypto';
-import { describe, expect, it } from 'vitest';
-import { renderSvg } from '@nowline/renderer';
 import { resolveFonts } from '@nowline/export-core';
+import { renderSvg } from '@nowline/renderer';
+import { describe, expect, it } from 'vitest';
 import { exportPng } from '../src/index.js';
 import { buildExportInputs, MINIMAL_FIXTURE } from './helpers.js';
 

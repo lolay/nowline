@@ -15,7 +15,7 @@
 // The width assertions go through ratios, not absolute pixel values, so
 // the tests survive timeline-scale tweaks and pixel-per-day rounding.
 
-import { describe, it, expect } from 'vitest';
+import { describe, expect, it } from 'vitest';
 import { layoutRoadmap } from '../src/index.js';
 import type { PositionedItem } from '../src/types.js';
 import { parseAndResolve } from './helpers.js';

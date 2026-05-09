@@ -1,10 +1,10 @@
 import type {
-    Module,
-    LangiumCoreServices,
-    LangiumSharedCoreServices,
-    PartialLangiumCoreServices,
     CstNode,
     GrammarAST,
+    LangiumCoreServices,
+    LangiumSharedCoreServices,
+    Module,
+    PartialLangiumCoreServices,
     ValueType,
 } from 'langium';
 import {
@@ -12,16 +12,16 @@ import {
     createDefaultSharedCoreModule,
     DefaultValueConverter,
     EmptyFileSystem,
-    inject,
-    IndentationAwareTokenBuilder,
     IndentationAwareLexer,
+    IndentationAwareTokenBuilder,
+    inject,
 } from 'langium';
-import { NowlineGeneratedSharedModule, NowlineGeneratedModule } from '../generated/module.js';
 import type {
-    NowlineTerminalNames,
-    NowlineKeywordNames,
     NowlineAstType,
+    NowlineKeywordNames,
+    NowlineTerminalNames,
 } from '../generated/ast.js';
+import { NowlineGeneratedModule, NowlineGeneratedSharedModule } from '../generated/module.js';
 import { NowlineValidator, registerValidationChecks } from './nowline-validator.js';
 
 // Strip trailing ':' from property key tokens so AST nodes carry clean keys

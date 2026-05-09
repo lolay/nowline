@@ -4,27 +4,27 @@
 // import on the production composition root in `layout.ts`.
 
 import type {
-    LabelDeclaration,
-    ItemDeclaration,
-    GroupBlock,
-    ParallelBlock,
     EntityProperty,
+    GroupBlock,
+    ItemDeclaration,
+    LabelDeclaration,
+    ParallelBlock,
     SymbolDeclaration,
 } from '@nowline/core';
-import type {
-    PositionedTimelineScale,
-    PositionedItem,
-    PositionedTrackChild,
-    Point,
-    SlackCorridor,
-    MarkerRowPlacement,
-    ResolvedSize,
-} from './types.js';
+import type { BandScale } from './band-scale.js';
 import type { resolveCalendar } from './calendar.js';
 import type { StyleContext } from './style-resolution.js';
 import type { TimeScale } from './time-scale.js';
+import type {
+    MarkerRowPlacement,
+    Point,
+    PositionedItem,
+    PositionedTimelineScale,
+    PositionedTrackChild,
+    ResolvedSize,
+    SlackCorridor,
+} from './types.js';
 import type { WorkingCalendar } from './working-calendar.js';
-import type { BandScale } from './band-scale.js';
 
 /** Slim accumulator used while sequencing items into a track. */
 export interface TrackCursor {

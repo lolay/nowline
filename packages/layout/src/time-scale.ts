@@ -9,7 +9,7 @@
 // `d3-scale.scaleTime` so callers get a precise Date back from a
 // pixel coordinate.
 
-import { scaleTime, type ScaleTime } from 'd3-scale';
+import { type ScaleTime, scaleTime } from 'd3-scale';
 import { daysBetween } from './calendar.js';
 import type { WorkingCalendar } from './working-calendar.js';
 

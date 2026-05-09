@@ -1,12 +1,12 @@
-import { URI, type LangiumDocument } from 'langium';
-import { createNowlineServices, type NowlineServices, type NowlineFile } from '@nowline/core';
-import type { CliDiagnostic, DiagnosticSource } from '../diagnostics/model.js';
+import { createNowlineServices, type NowlineFile, type NowlineServices } from '@nowline/core';
+import { type LangiumDocument, URI } from 'langium';
 import {
     adaptLangiumDiagnostic,
     adaptLexerError,
     adaptParserError,
     type LangiumLikeDiagnostic,
 } from '../diagnostics/adapt.js';
+import type { CliDiagnostic, DiagnosticSource } from '../diagnostics/model.js';
 
 export interface ParseOptions {
     validate?: boolean;

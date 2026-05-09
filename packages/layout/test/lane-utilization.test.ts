@@ -17,9 +17,8 @@
 //   - `none` thresholds (warn:none, over:none, both:none)
 //   - default-swimlane resolution
 
-import { describe, it, expect } from 'vitest';
+import { describe, expect, it } from 'vitest';
 import { layoutRoadmap } from '../src/index.js';
-import type { PositionedSwimlane, PositionedLaneUtilization } from '../src/types.js';
 import {
     classifyLoad,
     collectLoadContributors,
@@ -27,6 +26,7 @@ import {
     DEFAULT_UTILIZATION_OVER_FRACTION,
     DEFAULT_UTILIZATION_WARN_FRACTION,
 } from '../src/lane-utilization.js';
+import type { PositionedLaneUtilization, PositionedSwimlane } from '../src/types.js';
 import { parseAndResolve } from './helpers.js';
 
 async function firstLane(src: string): Promise<PositionedSwimlane> {
@@ -269,14 +269,14 @@ describe('m12 — pure helpers: collectLoadContributors recursion', () => {
             decorationsRightX: x + w,
             capacity: { value: load, text: String(load), icon: null },
             size: null,
-            // eslint-disable-next-line @typescript-eslint/no-explicit-any
+            // biome-ignore lint/suspicious/noExplicitAny: test scaffold; full PositionedItem.style is irrelevant to load aggregation.
             style: {} as any,
         });
         const parallel = {
             kind: 'parallel' as const,
             box: { x: 0, y: 0, width: 100, height: 50 },
             children: [item('a', 0, 50, 2), item('b', 0, 50, 3)],
-            // eslint-disable-next-line @typescript-eslint/no-explicit-any
+            // biome-ignore lint/suspicious/noExplicitAny: test scaffold; full ParallelGroup.style is irrelevant to load aggregation.
             style: {} as any,
         };
         const contributors = collectLoadContributors([parallel]);

@@ -1,10 +1,10 @@
-export type { Theme, EntityStyle, NamedColors } from './shape.js';
-export { lightTheme, lightNamed } from './light.js';
-export { darkTheme, darkNamed } from './dark.js';
+export { darkNamed, darkTheme } from './dark.js';
+export { lightNamed, lightTheme } from './light.js';
+export type { EntityStyle, NamedColors, Theme } from './shape.js';
 
-import type { Theme, NamedColors } from './shape.js';
-import { lightTheme, lightNamed } from './light.js';
-import { darkTheme, darkNamed } from './dark.js';
+import { darkNamed, darkTheme } from './dark.js';
+import { lightNamed, lightTheme } from './light.js';
+import type { NamedColors, Theme } from './shape.js';
 
 export type ThemeName = 'light' | 'dark';
 

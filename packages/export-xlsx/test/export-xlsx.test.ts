@@ -1,8 +1,8 @@
 import { createHash } from 'node:crypto';
-import { describe, expect, it } from 'vitest';
 import ExcelJS from 'exceljs';
-import { exportXlsx } from '../src/index.js';
+import { describe, expect, it } from 'vitest';
 import { durationToWorkingDays } from '../src/duration.js';
+import { exportXlsx } from '../src/index.js';
 import { buildExportInputs, FIXTURE, PINNED_DATE } from './helpers.js';
 
 const XLSX_MAGIC = Buffer.from([0x50, 0x4b, 0x03, 0x04]); // PK\x03\x04 (zip)
@@ -134,7 +134,7 @@ describe('exportXlsx — Items sheet', () => {
             if (cell.value === 'Title') titleCol = col;
             if (cell.value === 'Labels') labelsCol = col;
         });
-        let labelsValue: unknown = undefined;
+        let labelsValue: unknown;
         sheet.eachRow({ includeEmpty: false }, (row, rowNumber) => {
             if (rowNumber === 1) return;
             if (row.getCell(titleCol).value === 'Auth refactor') {
