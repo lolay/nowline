@@ -1,0 +1,26 @@
+# Force LF line endings on every checkout, regardless of platform.
+# Without this, Windows's default `core.autocrlf=true` rewrites text
+# files to CRLF on checkout, which Biome's `lineEnding: lf` formatter
+# (see biome.json) then flags as drift in CI.
+* text=auto eol=lf
+
+# Binary files: never touch line endings, never diff as text.
+*.png binary
+*.jpg binary
+*.jpeg binary
+*.gif binary
+*.webp binary
+*.ico binary
+*.pdf binary
+*.zip binary
+*.gz binary
+*.tar binary
+*.vsix binary
+*.ttf binary
+*.otf binary
+*.woff binary
+*.woff2 binary
+
+# Snapshots are byte-stable artifacts checked in for regression testing;
+# treat them as text but lock to LF so a Windows commit can't drift.
+*.svg text eol=lf
