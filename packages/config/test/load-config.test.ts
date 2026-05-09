@@ -4,31 +4,39 @@ import { loadConfig, mergeConfig, parseConfig } from '../src/index.js';
 
 describe('.nowlinerc discovery', () => {
     it('walks up from the input directory until a .nowlinerc is found', async () => {
+        // Build all paths through `path.resolve` / `path.join` so the stub
+        // filesystem keys match what `loadConfig` actually looks up. On
+        // Windows `path.resolve('/repo')` becomes `D:\\repo`; on posix it
+        // stays `/repo`.
+        const startDir = path.resolve('/repo/roadmaps/team-a');
+        const rcPath = path.join(path.resolve('/repo'), '.nowlinerc');
+        const root = path.parse(startDir).root;
         const files: Record<string, string> = {
-            '/repo/.nowlinerc': '{"theme": "dark"}',
+            [rcPath]: '{"theme": "dark"}',
         };
         const readFile = async (p: string) => {
             if (p in files) return files[p];
             throw Object.assign(new Error('ENOENT'), { code: 'ENOENT' });
         };
         const fileExists = async (p: string) => p in files;
-        const startDir = path.posix.resolve('/repo/roadmaps/team-a');
         const { config, path: foundAt } = await loadConfig(startDir, {
             readFile,
             fileExists,
-            root: '/',
+            root,
         });
         expect(config.theme).toBe('dark');
-        expect(foundAt).toBe('/repo/.nowlinerc');
+        expect(foundAt).toBe(rcPath);
     });
 
     it('returns an empty config when no file is found', async () => {
-        const { config, path: foundAt } = await loadConfig('/tmp/nonexistent-path-12345', {
+        const startDir = path.resolve('/tmp/nonexistent-path-12345');
+        const root = path.parse(startDir).root;
+        const { config, path: foundAt } = await loadConfig(startDir, {
             readFile: async () => {
                 throw new Error('nope');
             },
             fileExists: async () => false,
-            root: '/',
+            root,
         });
         expect(config).toEqual({});
         expect(foundAt).toBeUndefined();
