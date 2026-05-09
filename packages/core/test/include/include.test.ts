@@ -188,8 +188,14 @@ describe('include resolver', () => {
                 'a.nowline': `roadmap child "Child" start:2026-02-01\n`,
             };
             const { Nowline } = getServices();
-            const main = await parseAtPath(files['main.nowline'], '/root/main.nowline');
-            const result = await resolveIncludes(main, '/root/main.nowline', {
+            // Resolve the posix-shaped test path through `path.resolve` so it
+            // round-trips through `URI.file` the same way the implementation
+            // sees it: `/root/main.nowline` on posix, `D:\\root\\main.nowline`
+            // on Windows. The assertion below uses the same value so it stays
+            // platform-agnostic.
+            const mainPath = path.resolve('/root/main.nowline');
+            const main = await parseAtPath(files['main.nowline'], mainPath);
+            const result = await resolveIncludes(main, mainPath, {
                 services: Nowline,
                 readFile: makeFs(files),
             });
@@ -197,7 +203,7 @@ describe('include resolver', () => {
                 (d) => d.severity === 'error' && /start/i.test(d.message),
             );
             expect(mismatch).toHaveLength(1);
-            expect(mismatch[0].sourcePath).toBe('/root/main.nowline');
+            expect(mismatch[0].sourcePath).toBe(mainPath);
         });
 
         it('merge: parent has start but child does not is an error', async () => {
