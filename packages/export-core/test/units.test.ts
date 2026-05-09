@@ -1,10 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import {
-    LengthParseError,
-    lengthToPoints,
-    parseLength,
-    pointsToLength,
-} from '../src/units.js';
+import { LengthParseError, lengthToPoints, parseLength, pointsToLength } from '../src/units.js';
 
 describe('lengthToPoints', () => {
     it('treats pt as identity', () => {

@@ -10,11 +10,7 @@ declare module '@kittl/svg-to-pdfkit' {
         useCSS?: boolean;
         assumePt?: boolean;
         precision?: number;
-        fontCallback?: (
-            family: string,
-            isBold: boolean,
-            isItalic: boolean,
-        ) => string;
+        fontCallback?: (family: string, isBold: boolean, isItalic: boolean) => string;
         imageCallback?: (link: string) => string;
         documentCallback?: (doc: PDFKit.PDFDocument) => PDFKit.PDFDocument;
         warningCallback?: (message: string) => void;

@@ -166,9 +166,7 @@ export function collectNamedEntities(file: NowlineFile): NamedEntity[] {
         }
     };
 
-    const visitTrackChild = (
-        child: SwimlaneContent | GroupContent | ParallelContent,
-    ) => {
+    const visitTrackChild = (child: SwimlaneContent | GroupContent | ParallelContent) => {
         if (isItemDeclaration(child) && child.name) out.push(child);
         else if (isParallelBlock(child)) {
             if (child.name) out.push(child);

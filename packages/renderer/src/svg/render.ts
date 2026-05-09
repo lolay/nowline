@@ -110,7 +110,10 @@ export interface RenderOptions {
 // `WEIGHT_NUM` lives here only because no DSL `weight` table exists in
 // shared yet. If/when it does, hoist this alongside `FONT_STACK`.
 const WEIGHT_NUM: Record<string, number> = {
-    thin: 100, light: 300, normal: 400, bold: 700,
+    thin: 100,
+    light: 300,
+    normal: 400,
+    bold: 700,
 };
 
 // `style.textSize` is `SizeBucket` which includes `'full'`; the shared
@@ -178,13 +181,8 @@ function relativeLuminance(hex: string): number {
  *   - bars with luminance < 0.24 (dark status-tint bars in dark
  *     theme, e.g. `#172554`) → `onDark` pale dot
  */
-function pickStatusDotPalette(
-    bg: string,
-    palette: Theme,
-): Theme['statusDot']['onLight'] {
-    return relativeLuminance(bg) >= 0.24
-        ? palette.statusDot.onLight
-        : palette.statusDot.onDark;
+function pickStatusDotPalette(bg: string, palette: Theme): Theme['statusDot']['onLight'] {
+    return relativeLuminance(bg) >= 0.24 ? palette.statusDot.onLight : palette.statusDot.onDark;
 }
 
 /**
@@ -236,9 +234,7 @@ function renderCapacitySuffix(
     color: string,
 ): string {
     const charWidthPx = fontSize * 0.58;
-    const precedingWidthPx = precedingText
-        ? estimateCaptionWidthPx(precedingText, fontSize)
-        : 0;
+    const precedingWidthPx = precedingText ? estimateCaptionWidthPx(precedingText, fontSize) : 0;
     const separatorPx = precedingText ? charWidthPx : 0;
     const numberX = x0 + precedingWidthPx + separatorPx;
     const { text: numberStr, icon } = capacity;
@@ -250,17 +246,11 @@ function renderCapacitySuffix(
     } as const;
 
     if (!icon) {
-        return textTag(
-            { x: num(numberX), y: num(baselineY), ...baseAttrs },
-            numberStr,
-        );
+        return textTag({ x: num(numberX), y: num(baselineY), ...baseAttrs }, numberStr);
     }
 
     if (icon.kind === 'builtin' && icon.name === 'multiplier') {
-        return textTag(
-            { x: num(numberX), y: num(baselineY), ...baseAttrs },
-            `${numberStr}\u00D7`,
-        );
+        return textTag({ x: num(numberX), y: num(baselineY), ...baseAttrs }, `${numberStr}\u00D7`);
     }
 
     if (icon.kind === 'builtin') {
@@ -270,10 +260,7 @@ function renderCapacitySuffix(
         // gap. Vertical positioning lifts the icon so its visual center
         // sits on the text x-height (`baselineY - fontSize * 0.85`); this
         // matches how Lucide-style outline icons read in inline text.
-        const numberSvg = textTag(
-            { x: num(numberX), y: num(baselineY), ...baseAttrs },
-            numberStr,
-        );
+        const numberSvg = textTag({ x: num(numberX), y: num(baselineY), ...baseAttrs }, numberStr);
         const gapPx = fontSize * 0.1;
         const iconSize = fontSize;
         const iconX = numberX + numberWidthPx + gapPx;
@@ -286,10 +273,10 @@ function renderCapacitySuffix(
     // Single <text> node with the number + a tspan-separated glyph.
     const dx = num(fontSize * 0.1);
     return (
-        `<text x="${num(numberX)}" y="${num(baselineY)}" font-family="${escAttr(fontFamily)}"`
-        + ` font-size="${fontSize}" fill="${escAttr(color)}">`
-        + `${escText(numberStr)}<tspan dx="${dx}">${escText(icon.text)}</tspan>`
-        + '</text>'
+        `<text x="${num(numberX)}" y="${num(baselineY)}" font-family="${escAttr(fontFamily)}"` +
+        ` font-size="${fontSize}" fill="${escAttr(color)}">` +
+        `${escText(numberStr)}<tspan dx="${dx}">${escText(icon.text)}</tspan>` +
+        '</text>'
     );
 }
 
@@ -356,28 +343,34 @@ function renderItemMetaLine(opts: {
     }
     const sepDx = num(fontSize * META_SUFFIX_DX_EM);
     const openText =
-        `<text x="${num(x)}" y="${num(baselineY)}" font-family="${escAttr(fontFamily)}"`
-        + ` font-size="${fontSize}" fill="${escAttr(color)}">`;
+        `<text x="${num(x)}" y="${num(baselineY)}" font-family="${escAttr(fontFamily)}"` +
+        ` font-size="${fontSize}" fill="${escAttr(color)}">`;
     const { text: numberStr, icon } = capacity;
     if (!icon) {
-        return openText
-            + escText(metaText)
-            + `<tspan dx="${sepDx}">${escText(numberStr)}</tspan>`
-            + '</text>';
+        return (
+            openText +
+            escText(metaText) +
+            `<tspan dx="${sepDx}">${escText(numberStr)}</tspan>` +
+            '</text>'
+        );
     }
     if (icon.kind === 'builtin' && icon.name === 'multiplier') {
-        return openText
-            + escText(metaText)
-            + `<tspan dx="${sepDx}">${escText(numberStr)}\u00D7</tspan>`
-            + '</text>';
+        return (
+            openText +
+            escText(metaText) +
+            `<tspan dx="${sepDx}">${escText(numberStr)}\u00D7</tspan>` +
+            '</text>'
+        );
     }
     if (icon.kind === 'literal') {
         const glyphDx = num(fontSize * 0.1);
-        return openText
-            + escText(metaText)
-            + `<tspan dx="${sepDx}">${escText(numberStr)}</tspan>`
-            + `<tspan dx="${glyphDx}">${escText(icon.text)}</tspan>`
-            + '</text>';
+        return (
+            openText +
+            escText(metaText) +
+            `<tspan dx="${sepDx}">${escText(numberStr)}</tspan>` +
+            `<tspan dx="${glyphDx}">${escText(icon.text)}</tspan>` +
+            '</text>'
+        );
     }
     // Built-in SVG icon — text element holds metaText + tspan-separated
     // number, then the icon SVG sits at an estimated position. Tighter
@@ -390,15 +383,23 @@ function renderItemMetaLine(opts: {
     const iconSize = fontSize;
     const iconX = numberStartX + tightWidth(numberStr) + iconGapPx;
     const iconY = baselineY - fontSize * 0.85;
-    const textPart = openText
-        + escText(metaText)
-        + `<tspan dx="${sepDx}">${escText(numberStr)}</tspan>`
-        + '</text>';
+    const textPart =
+        openText +
+        escText(metaText) +
+        `<tspan dx="${sepDx}">${escText(numberStr)}</tspan>` +
+        '</text>';
     const iconPart = `<svg x="${num(iconX)}" y="${num(iconY)}" width="${num(iconSize)}" height="${num(iconSize)}" viewBox="${def.viewBox}" style="color:${escAttr(color)}" aria-hidden="true">${def.body}</svg>`;
     return textPart + iconPart;
 }
 
-function rectFrame(x: number, y: number, w: number, h: number, style: ResolvedStyle, extra: Record<string, string | number | undefined | null | boolean> = {}): string {
+function rectFrame(
+    x: number,
+    y: number,
+    w: number,
+    h: number,
+    style: ResolvedStyle,
+    extra: Record<string, string | number | undefined | null | boolean> = {},
+): string {
     const rx = Math.min(CORNER_RADIUS_PX[style.cornerRadius] ?? 4, h / 2);
     return tag('rect', {
         x: num(x),
@@ -443,37 +444,51 @@ function renderHeader(h: PositionedHeader, idPrefix: string, palette: Theme): st
     // exact metrics `sizeBesideHeader` sized the card to.
     const titleParts: string[] = [];
     h.titleLines.forEach((line, i) => {
-        titleParts.push(textTag(
-            {
-                x: num(cardX + HEADER_CARD_PADDING_X),
-                y: num(cardY + HEADER_CARD_PADDING_TOP + i * HEADER_TITLE_LINE_HEIGHT_PX),
-                'font-family': FONT_STACK[h.style.font],
-                'font-size': HEADER_TITLE_FONT_SIZE_PX,
-                'font-weight': 600,
-                fill: h.style.text,
-            },
-            line,
-        ));
+        titleParts.push(
+            textTag(
+                {
+                    x: num(cardX + HEADER_CARD_PADDING_X),
+                    y: num(cardY + HEADER_CARD_PADDING_TOP + i * HEADER_TITLE_LINE_HEIGHT_PX),
+                    'font-family': FONT_STACK[h.style.font],
+                    'font-size': HEADER_TITLE_FONT_SIZE_PX,
+                    'font-weight': 600,
+                    fill: h.style.text,
+                },
+                line,
+            ),
+        );
     });
     const titleText = titleParts.join('');
-    const lastTitleY = cardY + HEADER_CARD_PADDING_TOP
-        + Math.max(0, h.titleLines.length - 1) * HEADER_TITLE_LINE_HEIGHT_PX;
+    const lastTitleY =
+        cardY +
+        HEADER_CARD_PADDING_TOP +
+        Math.max(0, h.titleLines.length - 1) * HEADER_TITLE_LINE_HEIGHT_PX;
     const authorColor = palette.header.author;
     const authorParts: string[] = [];
     h.authorLines.forEach((line, j) => {
-        authorParts.push(textTag(
-            {
-                x: num(cardX + HEADER_CARD_PADDING_X),
-                y: num(lastTitleY + HEADER_TITLE_TO_AUTHOR_GAP_PX + j * HEADER_AUTHOR_LINE_HEIGHT_PX),
-                'font-family': FONT_STACK[h.style.font],
-                'font-size': HEADER_AUTHOR_FONT_SIZE_PX,
-                fill: authorColor,
-            },
-            line,
-        ));
+        authorParts.push(
+            textTag(
+                {
+                    x: num(cardX + HEADER_CARD_PADDING_X),
+                    y: num(
+                        lastTitleY +
+                            HEADER_TITLE_TO_AUTHOR_GAP_PX +
+                            j * HEADER_AUTHOR_LINE_HEIGHT_PX,
+                    ),
+                    'font-family': FONT_STACK[h.style.font],
+                    'font-size': HEADER_AUTHOR_FONT_SIZE_PX,
+                    fill: authorColor,
+                },
+                line,
+            ),
+        );
     });
     const authorText = authorParts.join('');
-    return tag('g', { 'data-layer': 'header', 'data-id': `${idPrefix}-header` }, card + titleText + authorText);
+    return tag(
+        'g',
+        { 'data-layer': 'header', 'data-id': `${idPrefix}-header` },
+        card + titleText + authorText,
+    );
 }
 
 // Renders the chart-body vertical grid lines (major dotted at every
@@ -484,11 +499,7 @@ function renderHeader(h: PositionedHeader, idPrefix: string, palette: Theme): st
 // be visible inside the timeline header strip. Grid lines stay BEHIND
 // items, edges, anchor/milestone cuts, and the now-line so item bars
 // sit cleanly on top of the ruled-paper backdrop.
-function renderGridLines(
-    t: PositionedTimelineScale,
-    swimlaneTopY: number,
-    palette: Theme,
-): string {
+function renderGridLines(t: PositionedTimelineScale, swimlaneTopY: number, palette: Theme): string {
     const gridColor = palette.timeline.gridLine;
     const minorGridColor = palette.timeline.minorGridLine;
     // Major lines thread through the FULL timeline strip — they start
@@ -507,8 +518,7 @@ function renderGridLines(
     // rendered later in the orchestrator so they sit on top of any
     // crossing line.
     const bottomTickPanelHeight = t.bottomTickPanelHeight ?? 0;
-    const hasBottomTickPanel =
-        t.bottomTickPanelY !== undefined && bottomTickPanelHeight > 0;
+    const hasBottomTickPanel = t.bottomTickPanelY !== undefined && bottomTickPanelHeight > 0;
     const majorTopY = t.tickPanelY;
     const majorBottomY = hasBottomTickPanel
         ? t.bottomTickPanelY! + bottomTickPanelHeight
@@ -795,7 +805,12 @@ function renderNowPillLabel(n: PositionedNowline, labelTextColor: string): strin
     );
 }
 
-function renderItem(i: PositionedItem, options: RenderOptions, idPrefix: string, palette: Theme): string {
+function renderItem(
+    i: PositionedItem,
+    options: RenderOptions,
+    idPrefix: string,
+    palette: Theme,
+): string {
     const parts: string[] = [];
     const shadow = shadowFilterUrl(idPrefix, i.style.shadow);
     parts.push(
@@ -841,9 +856,10 @@ function renderItem(i: PositionedItem, options: RenderOptions, idPrefix: string,
     // the spill column when the bar is too narrow to host the dot's
     // full inset (`dotSpills`). Layout pre-computes `dotSpillCx` for
     // the spilled case so the renderer stays geometry-dumb.
-    const dotCx = i.dotSpills && i.dotSpillCx !== null
-        ? i.dotSpillCx
-        : i.box.x + i.box.width - ITEM_STATUS_DOT_INSET_RIGHT_PX;
+    const dotCx =
+        i.dotSpills && i.dotSpillCx !== null
+            ? i.dotSpillCx
+            : i.box.x + i.box.width - ITEM_STATUS_DOT_INSET_RIGHT_PX;
     parts.push(
         tag('circle', {
             cx: num(dotCx),
@@ -869,8 +885,7 @@ function renderItem(i: PositionedItem, options: RenderOptions, idPrefix: string,
     if (i.textSpills) {
         captionX = i.box.x + i.box.width + ITEM_CAPTION_SPILL_GAP_PX;
         if (i.iconSpills) {
-            captionX +=
-                ITEM_LINK_ICON_TILE_SIZE_PX + ITEM_DECORATION_SPILL_GAP_PX;
+            captionX += ITEM_LINK_ICON_TILE_SIZE_PX + ITEM_DECORATION_SPILL_GAP_PX;
         }
     } else {
         captionX = i.box.x + ITEM_CAPTION_INSET_X_PX;
@@ -1000,9 +1015,10 @@ function renderItem(i: PositionedItem, options: RenderOptions, idPrefix: string,
         };
         const tile = tileColor[i.linkIcon] ?? tileColor.generic;
         const tileSize = ITEM_LINK_ICON_TILE_SIZE_PX;
-        const tileX = i.iconSpills && i.iconSpillX !== null
-            ? i.iconSpillX
-            : i.box.x + ITEM_LINK_ICON_INSET_PX;
+        const tileX =
+            i.iconSpills && i.iconSpillX !== null
+                ? i.iconSpillX
+                : i.box.x + ITEM_LINK_ICON_INSET_PX;
         const tileY = i.box.y + ITEM_LINK_ICON_INSET_PX;
         const tileRect = tag('rect', {
             x: num(tileX),
@@ -1093,7 +1109,12 @@ function renderItem(i: PositionedItem, options: RenderOptions, idPrefix: string,
     return tag('g', { 'data-layer': 'item', 'data-id': i.id ?? null }, parts.join(''));
 }
 
-function renderGroup(g: PositionedGroup, options: RenderOptions, idPrefix: string, palette: Theme): string {
+function renderGroup(
+    g: PositionedGroup,
+    options: RenderOptions,
+    idPrefix: string,
+    palette: Theme,
+): string {
     const parts: string[] = [];
     const hasFill = g.style.bg !== 'none' && g.style.bg !== '#ffffff';
     if (hasFill) {
@@ -1117,8 +1138,7 @@ function renderGroup(g: PositionedGroup, options: RenderOptions, idPrefix: strin
         );
         if (g.title) {
             const tabW =
-                g.title.length * GROUP_TITLE_TAB_CHAR_WIDTH_PX +
-                2 * GROUP_TITLE_TAB_PAD_X_PX;
+                g.title.length * GROUP_TITLE_TAB_CHAR_WIDTH_PX + 2 * GROUP_TITLE_TAB_PAD_X_PX;
             const tabX = g.box.x;
             const tabY = g.box.y;
             const tabH = GROUP_TITLE_TAB_HEIGHT_PX;
@@ -1213,7 +1233,12 @@ function renderGroup(g: PositionedGroup, options: RenderOptions, idPrefix: strin
     return tag('g', { 'data-layer': 'group', 'data-id': g.id ?? null }, parts.join(''));
 }
 
-function renderParallel(p: PositionedParallel, options: RenderOptions, idPrefix: string, palette: Theme): string {
+function renderParallel(
+    p: PositionedParallel,
+    options: RenderOptions,
+    idPrefix: string,
+    palette: Theme,
+): string {
     const parts: string[] = [];
     // `bracket: solid|dashed` parallels render explicit [ ] brackets framing
     // the nested tracks with 12 px vertical padding above/below.
@@ -1265,7 +1290,12 @@ function renderParallel(p: PositionedParallel, options: RenderOptions, idPrefix:
     return tag('g', { 'data-layer': 'parallel', 'data-id': p.id ?? null }, parts.join(''));
 }
 
-function renderTrackChild(c: PositionedTrackChild, options: RenderOptions, idPrefix: string, palette: Theme): string {
+function renderTrackChild(
+    c: PositionedTrackChild,
+    options: RenderOptions,
+    idPrefix: string,
+    palette: Theme,
+): string {
     if (c.kind === 'item') return renderItem(c, options, idPrefix, palette);
     if (c.kind === 'group') return renderGroup(c, options, idPrefix, palette);
     return renderParallel(c, options, idPrefix, palette);
@@ -1286,10 +1316,7 @@ function renderTrackChild(c: PositionedTrackChild, options: RenderOptions, idPre
 // is the only renderer-side decision.
 const LANE_UTILIZATION_HEIGHT_PX = 2;
 
-function utilizationColor(
-    classification: 'green' | 'yellow' | 'red',
-    palette: Theme,
-): string {
+function utilizationColor(classification: 'green' | 'yellow' | 'red', palette: Theme): string {
     switch (classification) {
         case 'green':
             return palette.swimlane.utilizationOk;
@@ -1344,7 +1371,12 @@ function renderSwimlaneBg(s: PositionedSwimlane, palette: Theme): string {
     );
 }
 
-function renderSwimlane(s: PositionedSwimlane, options: RenderOptions, idPrefix: string, palette: Theme): string {
+function renderSwimlane(
+    s: PositionedSwimlane,
+    options: RenderOptions,
+    idPrefix: string,
+    palette: Theme,
+): string {
     const tabFill = palette.swimlane.tabFill;
     const tabStroke = palette.swimlane.tabStroke;
     const tabText = palette.swimlane.tabText;
@@ -1363,11 +1395,7 @@ function renderSwimlane(s: PositionedSwimlane, options: RenderOptions, idPrefix:
         // second placement pass in the renderer.
         const LANE_BADGE_FONT_SIZE_PX = 10;
         const capacityBadgeBareWidthPx = s.capacity
-            ? estimateCapacitySuffixWidth(
-                  s.capacity.text,
-                  s.capacity.icon,
-                  LANE_BADGE_FONT_SIZE_PX,
-              )
+            ? estimateCapacitySuffixWidth(s.capacity.text, s.capacity.icon, LANE_BADGE_FONT_SIZE_PX)
             : 0;
         // Footnote indicator is a comma-joined number list painted at
         // 10 pt 700-weight; estimate via the shared caption helper.
@@ -1492,9 +1520,7 @@ function renderAnchor(a: PositionedAnchor, palette: Theme): string {
     // exactly and put the rightmost glyph 6 px from the diamond — same
     // rhythm the right-side labels already get from start-anchoring at
     // `diamondRight + 6`.
-    const labelX = a.labelSide === 'left'
-        ? a.labelBox.x + a.labelBox.width
-        : a.labelBox.x;
+    const labelX = a.labelSide === 'left' ? a.labelBox.x + a.labelBox.width : a.labelBox.x;
     const labelAttrs: Record<string, string | number | null | undefined> = {
         x: num(labelX),
         y: num(cy + 4),
@@ -1535,9 +1561,7 @@ function renderMilestone(m: PositionedMilestone, palette: Theme): string {
     // See renderAnchor — left-flipped labels use `text-anchor: end` so
     // the visual right edge sits at `diamondLeft - 6`, matching the
     // 6 px rhythm of right-side labels.
-    const labelX = m.labelSide === 'left'
-        ? m.labelBox.x + m.labelBox.width
-        : m.labelBox.x;
+    const labelX = m.labelSide === 'left' ? m.labelBox.x + m.labelBox.width : m.labelBox.x;
     const labelAttrs: Record<string, string | number | null | undefined> = {
         x: num(labelX),
         y: num(cy + 4),
@@ -1588,9 +1612,8 @@ function renderMilestoneCutLine(m: PositionedMilestone, palette: Theme): string 
 }
 
 function renderEdge(e: PositionedDependencyEdge, palette: Theme): string {
-    const color = e.kind === 'overflow'
-        ? palette.dependency.overflowStroke
-        : palette.dependency.edgeStroke;
+    const color =
+        e.kind === 'overflow' ? palette.dependency.overflowStroke : palette.dependency.edgeStroke;
     const points = e.waypoints;
     if (points.length < 2) return '';
     // Under-bar edges paint BEFORE item fills (see `renderRoadmap`)
@@ -1688,20 +1711,40 @@ function renderFootnotes(f: PositionedFootnoteArea, idPrefix: string, palette: T
         const y = firstEntryBaselineY + i * FOOTNOTE_ROW_HEIGHT;
         parts.push(
             textTag(
-                { x: num(numberX), y: num(y), 'font-family': FONT_STACK.sans, 'font-size': 10, 'font-weight': 700, fill: numberColor },
+                {
+                    x: num(numberX),
+                    y: num(y),
+                    'font-family': FONT_STACK.sans,
+                    'font-size': 10,
+                    'font-weight': 700,
+                    fill: numberColor,
+                },
                 String(e.number),
             ),
         );
         parts.push(
             textTag(
-                { x: num(titleX), y: num(y), 'font-family': FONT_STACK.sans, 'font-size': 11, 'font-weight': 600, fill: titleColor },
+                {
+                    x: num(titleX),
+                    y: num(y),
+                    'font-family': FONT_STACK.sans,
+                    'font-size': 11,
+                    'font-weight': 600,
+                    fill: titleColor,
+                },
                 e.title,
             ),
         );
         if (e.description) {
             parts.push(
                 textTag(
-                    { x: num(titleX + Math.max(120, e.title.length * 6)), y: num(y), 'font-family': FONT_STACK.sans, 'font-size': 11, fill: descColor },
+                    {
+                        x: num(titleX + Math.max(120, e.title.length * 6)),
+                        y: num(y),
+                        'font-family': FONT_STACK.sans,
+                        'font-size': 11,
+                        fill: descColor,
+                    },
                     `— ${e.description}`,
                 ),
             );
@@ -1795,7 +1838,8 @@ function renderIncludeRegion(
     // Glyph: stacked sheets — back rectangle peeking behind front
     // rectangle. Sized for the 18×18 badge tile.
     const glyph = tag('path', {
-        d: `M${num(badgeX + 7)} ${num(badgeY + 4)} H${num(badgeX + 14)} V${num(badgeY + 11)}` +
+        d:
+            `M${num(badgeX + 7)} ${num(badgeY + 4)} H${num(badgeX + 14)} V${num(badgeY + 11)}` +
             ` M${num(badgeX + 4)} ${num(badgeY + 7)} H${num(badgeX + 11)} V${num(badgeY + 14)} H${num(badgeX + 4)} Z`,
         stroke: badgeText,
         'stroke-width': 1.4,
@@ -1905,7 +1949,12 @@ function renderAttributionMark(model: PositionedRoadmap): string {
     );
     return tag(
         'a',
-        { href: ATTRIBUTION_LINK, target: '_blank', rel: 'noopener', 'aria-label': 'Powered by nowline' },
+        {
+            href: ATTRIBUTION_LINK,
+            target: '_blank',
+            rel: 'noopener',
+            'aria-label': 'Powered by nowline',
+        },
         tag('g', { 'data-layer': 'attribution' }, group),
     );
 }
@@ -1935,7 +1984,12 @@ async function embedLogo(
         const cleaned = sanitizeSvg(raw, { idPrefix: `${idPrefix}-logo`, onWarn: options.warn });
         return tag('g', { transform: `translate(${num(x)} ${num(y)})` }, cleaned);
     }
-    if (mime === 'image/png' || mime === 'image/jpeg' || mime === 'image/jpg' || mime === 'image/webp') {
+    if (
+        mime === 'image/png' ||
+        mime === 'image/jpeg' ||
+        mime === 'image/jpg' ||
+        mime === 'image/webp'
+    ) {
         const b64 = bytesToBase64(asset.bytes);
         return tag('image', {
             href: `data:${mime};base64,${b64}`,
@@ -1960,7 +2014,9 @@ function bytesToBase64(bytes: Uint8Array): string {
         return btoa(bin);
     }
     // Node fallback without importing Buffer directly; use lazy dynamic require.
-    const g = globalThis as { Buffer?: { from: (b: Uint8Array) => { toString: (enc: string) => string } } };
+    const g = globalThis as {
+        Buffer?: { from: (b: Uint8Array) => { toString: (enc: string) => string } };
+    };
     if (g.Buffer) return g.Buffer.from(bytes).toString('base64');
     throw new Error('renderer: no base64 encoder available');
 }

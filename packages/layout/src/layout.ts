@@ -12,11 +12,7 @@ import type {
     IsolatedRegion,
     ResolveResult,
 } from '@nowline/core';
-import {
-    isItemDeclaration,
-    isGroupBlock,
-    isParallelBlock,
-} from '@nowline/core';
+import { isItemDeclaration, isGroupBlock, isParallelBlock } from '@nowline/core';
 import type {
     PositionedRoadmap,
     PositionedHeader,
@@ -41,11 +37,7 @@ import type {
     LinkIconKind,
 } from './types.js';
 import { themes, type Theme, type ThemeName, resolveColor } from './themes/index.js';
-import {
-    resolveStyle,
-    resolveLabelChipStyle,
-    type StyleContext,
-} from './style-resolution.js';
+import { resolveStyle, resolveLabelChipStyle, type StyleContext } from './style-resolution.js';
 import {
     resolveCalendar,
     resolveDuration,
@@ -120,7 +112,12 @@ import { buildMilestones } from './nodes/milestone-node.js';
 import { buildFootnotes } from './nodes/footnote-node.js';
 import { buildIncludeRegions } from './nodes/include-node.js';
 import { RoadmapNode } from './nodes/roadmap-node.js';
-import { type LayoutContext, type TrackCursor, type LayoutHelpers, newCursor } from './layout-context.js';
+import {
+    type LayoutContext,
+    type TrackCursor,
+    type LayoutHelpers,
+    newCursor,
+} from './layout-context.js';
 import { propValue, propValues, parseDate } from './dsl-utils.js';
 import {
     ChannelGrid,
@@ -132,7 +129,7 @@ import {
 export interface LayoutOptions {
     theme?: ThemeName;
     today?: Date;
-    width?: number;   // total SVG width in px; default 1280
+    width?: number; // total SVG width in px; default 1280
     /**
      * BCP-47 tag controlling axis labels, the now-pill string, and the
      * quarter prefix. Resolved by the caller (CLI flag → env vars). When
@@ -249,7 +246,7 @@ function sequenceItem(
     //      capacity = 1).
     // The validator requires one of the two on every item.
     const sizeRef = propValue(props, 'size');
-    const sizeResolved = sizeRef ? ctx.sizes.get(sizeRef) ?? null : null;
+    const sizeResolved = sizeRef ? (ctx.sizes.get(sizeRef) ?? null) : null;
     const durationDays = deriveItemDurationDays(props, ctx.sizes, ctx.cal);
     // Total work in single-engineer days, used below to normalize a literal
     // `remaining:` value into a progress fraction. Stays per-engineer
@@ -259,11 +256,7 @@ function sequenceItem(
     const afterRaw = propValues(props, 'after');
     const beforeRaw = propValue(props, 'before');
     const dateRaw = propValue(props, 'date');
-    const remainingDays = resolveDuration(
-        propValue(props, 'remaining'),
-        ctx.sizes,
-        ctx.cal,
-    );
+    const remainingDays = resolveDuration(propValue(props, 'remaining'), ctx.sizes, ctx.cal);
 
     // Resolve start x: explicit date > after-chain > cursor position
     let startX = cursor.x;
@@ -318,12 +311,8 @@ function sequenceItem(
         if (i > 0) chipRowWidth += LABEL_CHIP_GAP_BETWEEN_PX;
         chipRowWidth += chipSamples[i].width;
     }
-    const chipInsideAvailWidth = Math.max(
-        0,
-        visualWidthPredict - 2 * ITEM_CAPTION_INSET_X_PX,
-    );
-    const chipsOutside =
-        chipSamples.length > 0 && chipRowWidth > chipInsideAvailWidth;
+    const chipInsideAvailWidth = Math.max(0, visualWidthPredict - 2 * ITEM_CAPTION_INSET_X_PX);
+    const chipsOutside = chipSamples.length > 0 && chipRowWidth > chipInsideAvailWidth;
 
     // Handle `before:` — item must end by the named anchor/milestone x.
     let hasOverflow = false;
@@ -411,19 +400,15 @@ function sequenceItem(
     // already encodes derived calendar span for sized items.
     const explicitDurationLiteral = propValue(props, 'duration');
     const durationDrives =
-        !!explicitDurationLiteral &&
-        /^\d+(?:\.\d+)?[dwmqy]$/.test(explicitDurationLiteral);
-    const sizeChipText = sizeResolved
-        ? (sizeResolved.title ?? sizeResolved.name)
-        : '';
+        !!explicitDurationLiteral && /^\d+(?:\.\d+)?[dwmqy]$/.test(explicitDurationLiteral);
+    const sizeChipText = sizeResolved ? (sizeResolved.title ?? sizeResolved.name) : '';
     const driverToken: string | undefined = durationDrives
         ? explicitDurationLiteral
         : sizeChipText || undefined;
     const remainingRaw = propValue(props, 'remaining');
     const remainingLiteral = resolveDurationLiteral(remainingRaw, ctx);
     const ownerDisplay = resolveActorDisplay(ownerOverride ?? propValue(props, 'owner'), ctx);
-    const metaHead = (): string =>
-        [driverToken, ownerDisplay].filter(Boolean).join(' ');
+    const metaHead = (): string => [driverToken, ownerDisplay].filter(Boolean).join(' ');
     let metaText: string | undefined;
     if (status === 'in-progress' && remainingLiteral) {
         const head = metaHead();
@@ -433,9 +418,7 @@ function sequenceItem(
     } else if (status === 'in-progress' && progress > 0 && progress < 1) {
         const pct = Math.round((1 - progress) * 100);
         const head = metaHead();
-        metaText = head
-            ? `${head} — ${pct}% remaining`
-            : `${pct}% remaining`;
+        metaText = head ? `${head} — ${pct}% remaining` : `${pct}% remaining`;
     } else if (ownerDisplay || driverToken) {
         metaText = metaHead() || undefined;
     }
@@ -460,12 +443,10 @@ function sequenceItem(
         // the suffix sits next to existing meta text, so `m 5×` has air
         // between the driver token and the count. Standalone suffix needs no
         // leading separator.
-        const separatorWidth = metaText
-            ? estimateTextWidth(' ', META_FONT_SIZE_PX_LOCAL)
-            : 0;
+        const separatorWidth = metaText ? estimateTextWidth(' ', META_FONT_SIZE_PX_LOCAL) : 0;
         capacityTrailingWidth =
-            separatorWidth
-            + estimateCapacitySuffixWidth(capacityText, capacityIcon, META_FONT_SIZE_PX_LOCAL);
+            separatorWidth +
+            estimateCapacitySuffixWidth(capacityText, capacityIcon, META_FONT_SIZE_PX_LOCAL);
     }
 
     // Visual bar + caption-spill decision delegated to ItemNode. Logical
@@ -481,10 +462,7 @@ function sequenceItem(
         metaText,
         metaTrailingWidth: capacityTrailingWidth,
         hasLinkIcon,
-    }).place(
-        { x: logicalLeft, y: cursor.y },
-        { time: ctx.scale, bands: ctx.bandScale, style },
-    );
+    }).place({ x: logicalLeft, y: cursor.y }, { time: ctx.scale, bands: ctx.bandScale, style });
     const itemBox = placed.box;
     const bandwidth = ctx.bandScale.bandwidth();
 
@@ -502,10 +480,8 @@ function sequenceItem(
     // float at `bar.right + 6` while the title stayed inside the
     // bar, breaking the icon→title affordance.
     const dotSpills = itemBox.width < MIN_BAR_WIDTH_FOR_DOT_PX;
-    const iconSpills =
-        hasLinkIcon && itemBox.width < MIN_BAR_WIDTH_FOR_LINK_AND_DOT_PX;
-    const footnoteSpillsForNarrow =
-        itemBox.width < MIN_BAR_WIDTH_FOR_FOOTNOTE_PX;
+    const iconSpills = hasLinkIcon && itemBox.width < MIN_BAR_WIDTH_FOR_LINK_AND_DOT_PX;
+    const footnoteSpillsForNarrow = itemBox.width < MIN_BAR_WIDTH_FOR_FOOTNOTE_PX;
     const textSpills = placed.textSpills || iconSpills;
 
     // Label chips lay out left → right at natural text width.
@@ -538,9 +514,7 @@ function sequenceItem(
     if (chipsOutside) {
         chipPack = packSpillChips(chipSamples, itemBox.width);
     }
-    const chipRowCount = chipPack
-        ? chipPack.rows.length
-        : (chipSamples.length > 0 ? 1 : 0);
+    const chipRowCount = chipPack ? chipPack.rows.length : chipSamples.length > 0 ? 1 : 0;
     // Capacity suffix renders on the same line as metaText. Treat the meta
     // line as present whenever EITHER metaText OR a capacity suffix will
     // paint, so chip-row pitch reserves the right amount of vertical space.
@@ -557,13 +531,14 @@ function sequenceItem(
     }
 
     const labelChips: PositionedLabelChip[] = [];
-    const baseChipY = itemBox.y + bandwidth
-        - PROGRESS_STRIP_HEIGHT_PX
-        - LABEL_CHIP_HEIGHT_PX
-        - LABEL_CHIP_GAP_ABOVE_PROGRESS_STRIP_PX;
+    const baseChipY =
+        itemBox.y +
+        bandwidth -
+        PROGRESS_STRIP_HEIGHT_PX -
+        LABEL_CHIP_HEIGHT_PX -
+        LABEL_CHIP_GAP_ABOVE_PROGRESS_STRIP_PX;
     const captionStackChipY =
-        itemBox.y + ITEM_CAPTION_META_BASELINE_OFFSET_PX
-        + LABEL_CHIP_GAP_ABOVE_PROGRESS_STRIP_PX;
+        itemBox.y + ITEM_CAPTION_META_BASELINE_OFFSET_PX + LABEL_CHIP_GAP_ABOVE_PROGRESS_STRIP_PX;
     // Inside-bar chips with meta need to clear the meta baseline —
     // the natural `baseChipY` (anchored to bar bottom) sits above
     // the meta line at typical bandwidths, so the chip rect would
@@ -572,11 +547,8 @@ function sequenceItem(
     // caption ALSO spills; with caption inside we don't need to
     // shift them since they're horizontally separated from the meta.
     const stackBelowMeta =
-        (chipsOutside && textSpills) ||
-        (!chipsOutside && hasMeta && chipSamples.length > 0);
-    const chipRow0Y = stackBelowMeta
-        ? Math.max(baseChipY, captionStackChipY)
-        : baseChipY;
+        (chipsOutside && textSpills) || (!chipsOutside && hasMeta && chipSamples.length > 0);
+    const chipRow0Y = stackBelowMeta ? Math.max(baseChipY, captionStackChipY) : baseChipY;
     const chipStartX = chipsOutside
         ? itemBox.x + itemBox.width + ITEM_CAPTION_SPILL_GAP_PX
         : itemBox.x + ITEM_CAPTION_INSET_X_PX;
@@ -601,9 +573,7 @@ function sequenceItem(
             labelChips.push(chip);
             rowCursorX += chip.box.width + LABEL_CHIP_GAP_BETWEEN_PX;
         }
-        chipsRightX = chipSamples.length > 0
-            ? rowCursorX - LABEL_CHIP_GAP_BETWEEN_PX
-            : chipStartX;
+        chipsRightX = chipSamples.length > 0 ? rowCursorX - LABEL_CHIP_GAP_BETWEEN_PX : chipStartX;
     }
 
     // Footnote superscript indicators. Per `specs/dsl.md`, footnotes
@@ -629,8 +599,7 @@ function sequenceItem(
     // indicator AND the bar is too narrow to host them at the inset-
     // right anchor. Compute the final boolean here once we know the
     // indicator count.
-    const footnoteSpills =
-        footnoteIndicators.length > 0 && footnoteSpillsForNarrow;
+    const footnoteSpills = footnoteIndicators.length > 0 && footnoteSpillsForNarrow;
 
     // Spill-column x positions for the decorations. The cluster
     // mirrors the in-bar reading order so users see the same visual
@@ -667,17 +636,12 @@ function sequenceItem(
     let captionSpillWidth = 0;
     if (textSpills) {
         if (needGap) spillCursor += ITEM_DECORATION_SPILL_GAP_PX;
-        const titleW = estimateTextWidth(
-            titleStr,
-            ITEM_CAPTION_TITLE_FONT_SIZE_PX,
-        );
+        const titleW = estimateTextWidth(titleStr, ITEM_CAPTION_TITLE_FONT_SIZE_PX);
         // Spill column width is the wider of the title and the *full* meta
         // line (text + capacity suffix). `capacityTrailingWidth` is 0 when
         // no capacity suffix is rendered, so this stays a no-op for items
         // without `capacity:`.
-        const metaW =
-            (metaText ? estimateTextWidth(metaText, 11) : 0)
-            + capacityTrailingWidth;
+        const metaW = (metaText ? estimateTextWidth(metaText, 11) : 0) + capacityTrailingWidth;
         captionSpillWidth = Math.max(titleW, metaW);
         spillCursor += captionSpillWidth;
         needGap = true;
@@ -686,8 +650,7 @@ function sequenceItem(
     if (footnoteSpills) {
         if (needGap) spillCursor += ITEM_DECORATION_SPILL_GAP_PX;
         footnoteSpillStartX = spillCursor;
-        spillCursor +=
-            footnoteIndicators.length * ITEM_FOOTNOTE_INDICATOR_STEP_PX;
+        spillCursor += footnoteIndicators.length * ITEM_FOOTNOTE_INDICATOR_STEP_PX;
         needGap = true;
     }
     let dotSpillCx: number | null = null;
@@ -697,10 +660,7 @@ function sequenceItem(
         spillCursor = dotSpillCx + ITEM_STATUS_DOT_RADIUS_PX;
         needGap = true;
     }
-    const decorationsRightX = Math.max(
-        itemBox.x + itemBox.width,
-        spillCursor,
-    );
+    const decorationsRightX = Math.max(itemBox.x + itemBox.width, spillCursor);
 
     const id = node.name;
     if (id) {
@@ -805,11 +765,7 @@ function sequenceParallel(
     return new ParallelNode(node, { sequenceOne, newCursor }).place(cursor, ctx);
 }
 
-function sequenceGroup(
-    node: GroupBlock,
-    cursor: TrackCursor,
-    ctx: LayoutContext,
-): PositionedGroup {
+function sequenceGroup(node: GroupBlock, cursor: TrackCursor, ctx: LayoutContext): PositionedGroup {
     return new GroupNode(node, {
         sequenceItem,
         sequenceOne,
@@ -828,7 +784,9 @@ function sequenceOne(
     if (isItemDeclaration(node)) return sequenceItem(node, cursor, ctx);
     if (isParallelBlock(node)) return sequenceParallel(node, cursor, ctx);
     if (isGroupBlock(node)) return sequenceGroup(node, cursor, ctx);
-    throw new Error(`Unknown swimlane child type: ${(node as { $type?: string }).$type ?? 'unknown'}`);
+    throw new Error(
+        `Unknown swimlane child type: ${(node as { $type?: string }).$type ?? 'unknown'}`,
+    );
 }
 
 // Rough px-width estimate for sans-serif text. Intentionally pessimistic
@@ -877,13 +835,12 @@ function computeChipBarExtra(
     // Cases (2) and (3-with-multi-row-spill) can both grow the bar;
     // case (3-with-single-row-inside-no-meta) never grows.
     const baseTop =
-        bandwidth
-        - PROGRESS_STRIP_HEIGHT_PX
-        - LABEL_CHIP_HEIGHT_PX
-        - LABEL_CHIP_GAP_ABOVE_PROGRESS_STRIP_PX;
+        bandwidth -
+        PROGRESS_STRIP_HEIGHT_PX -
+        LABEL_CHIP_HEIGHT_PX -
+        LABEL_CHIP_GAP_ABOVE_PROGRESS_STRIP_PX;
     const captionStackTop =
-        ITEM_CAPTION_META_BASELINE_OFFSET_PX
-        + LABEL_CHIP_GAP_ABOVE_PROGRESS_STRIP_PX;
+        ITEM_CAPTION_META_BASELINE_OFFSET_PX + LABEL_CHIP_GAP_ABOVE_PROGRESS_STRIP_PX;
     let chipRow0Top: number;
     if (chipsOutside && captionSpills) {
         chipRow0Top = captionStackTop;
@@ -893,15 +850,11 @@ function computeChipBarExtra(
         chipRow0Top = baseTop;
     }
     const lastRowBottomTop =
-        chipRow0Top
-        + (chipRowCount - 1) * LABEL_CHIP_ROW_STEP_PX
-        + LABEL_CHIP_HEIGHT_PX;
+        chipRow0Top + (chipRowCount - 1) * LABEL_CHIP_ROW_STEP_PX + LABEL_CHIP_HEIGHT_PX;
     // The bar must be tall enough to fit `lastRowBottomTop` plus a
     // GAP above the progress strip plus the progress strip itself.
     const requiredHeight =
-        lastRowBottomTop
-        + LABEL_CHIP_GAP_ABOVE_PROGRESS_STRIP_PX
-        + PROGRESS_STRIP_HEIGHT_PX;
+        lastRowBottomTop + LABEL_CHIP_GAP_ABOVE_PROGRESS_STRIP_PX + PROGRESS_STRIP_HEIGHT_PX;
     return Math.max(0, requiredHeight - bandwidth);
 }
 
@@ -914,10 +867,7 @@ function computeChipBarExtra(
  * Mirrors the chip-pack + caption-spill arithmetic in
  * `sequenceItem` so prediction and placement agree byte-for-byte.
  */
-function predictItemChipExtraHeight(
-    item: ItemDeclaration,
-    ctx: LayoutContext,
-): number {
+function predictItemChipExtraHeight(item: ItemDeclaration, ctx: LayoutContext): number {
     const props = item.properties;
     const labelIds = propValues(props, 'labels');
     if (labelIds.length === 0) return 0;
@@ -959,7 +909,7 @@ function predictItemChipExtraHeight(
     const titleW = titleStr ? estimateTextWidth(titleStr, ITEM_CAPTION_TITLE_FONT_SIZE_PX) : 0;
     const captionSpills = titleW > insideAvail;
     const pack = chipsOutside ? packSpillChips(samples, visualWidth) : null;
-    const chipRowCount = pack ? pack.rows.length : (samples.length > 0 ? 1 : 0);
+    const chipRowCount = pack ? pack.rows.length : samples.length > 0 ? 1 : 0;
     return computeChipBarExtra(
         chipsOutside,
         captionSpills,
@@ -979,7 +929,8 @@ function resolveChildStart(
     laneLeftX: number,
     ctx: LayoutContext,
 ): number {
-    const explicitDate = parseDate(propValue(props, 'date')) ?? parseDate(propValue(props, 'start'));
+    const explicitDate =
+        parseDate(propValue(props, 'date')) ?? parseDate(propValue(props, 'start'));
     if (explicitDate) {
         const xd = ctx.scale.forwardWithinDomain(explicitDate);
         if (xd !== null) return xd;
@@ -1065,8 +1016,10 @@ function sizeBesideHeader(title: string, author: string | undefined): SizedHeade
     const authorLines = wrapText(author ?? '', maxContentWidth, HEADER_AUTHOR_FONT_SIZE_PX);
 
     let widest = 0;
-    for (const line of titleLines) widest = Math.max(widest, estimateTextWidth(line, HEADER_TITLE_FONT_SIZE_PX));
-    for (const line of authorLines) widest = Math.max(widest, estimateTextWidth(line, HEADER_AUTHOR_FONT_SIZE_PX));
+    for (const line of titleLines)
+        widest = Math.max(widest, estimateTextWidth(line, HEADER_TITLE_FONT_SIZE_PX));
+    for (const line of authorLines)
+        widest = Math.max(widest, estimateTextWidth(line, HEADER_AUTHOR_FONT_SIZE_PX));
 
     const naturalCardWidth = widest + 2 * HEADER_CARD_PADDING_X;
     // `HEADER_BESIDE_{MIN,MAX}_WIDTH_PX` bound the **boxWidth** (= cardWidth
@@ -1077,13 +1030,15 @@ function sizeBesideHeader(title: string, author: string | undefined): SizedHeade
         Math.min(HEADER_BESIDE_MAX_WIDTH_PX - HEADER_CARD_OUTER_PAD, naturalCardWidth),
     );
 
-    const titleBlockHeight = titleLines.length > 0
-        ? (titleLines.length - 1) * HEADER_TITLE_LINE_HEIGHT_PX
-        : 0;
-    const authorBlockHeight = authorLines.length > 0
-        ? HEADER_TITLE_TO_AUTHOR_GAP_PX + (authorLines.length - 1) * HEADER_AUTHOR_LINE_HEIGHT_PX
-        : 0;
-    const cardHeight = HEADER_CARD_PADDING_TOP + titleBlockHeight + authorBlockHeight + HEADER_CARD_PADDING_BOTTOM;
+    const titleBlockHeight =
+        titleLines.length > 0 ? (titleLines.length - 1) * HEADER_TITLE_LINE_HEIGHT_PX : 0;
+    const authorBlockHeight =
+        authorLines.length > 0
+            ? HEADER_TITLE_TO_AUTHOR_GAP_PX +
+              (authorLines.length - 1) * HEADER_AUTHOR_LINE_HEIGHT_PX
+            : 0;
+    const cardHeight =
+        HEADER_CARD_PADDING_TOP + titleBlockHeight + authorBlockHeight + HEADER_CARD_PADDING_BOTTOM;
 
     // `boxWidth` only includes the LEFT outer pad — the right-side breathing
     // room between the card and the chart is owned by `GUTTER_PX` in
@@ -1140,9 +1095,8 @@ function computeDateWindow(
     // the latest content lands exactly on a tick boundary the chart ends
     // exactly there (no extra trailing tick); otherwise we extend to the
     // next tick so the right edge always sits on a labelled column.
-    const padded = contentDays > 0
-        ? Math.ceil(contentDays / tickDays) * tickDays
-        : 4 * ctx.cal.daysPerWeek;
+    const padded =
+        contentDays > 0 ? Math.ceil(contentDays / tickDays) * tickDays : 4 * ctx.cal.daysPerWeek;
     return { startDate, endDate: addDays(startDate, Math.max(1, padded)) };
 }
 
@@ -1163,12 +1117,18 @@ function literalDays(literal: string, cal: import('./calendar.js').CalendarConfi
     if (!m) return 0;
     const n = parseFloat(m[1]);
     switch (m[2]) {
-        case 'd': return n;
-        case 'w': return n * cal.daysPerWeek;
-        case 'm': return n * cal.daysPerMonth;
-        case 'q': return n * cal.daysPerQuarter;
-        case 'y': return n * cal.daysPerYear;
-        default: return 0;
+        case 'd':
+            return n;
+        case 'w':
+            return n * cal.daysPerWeek;
+        case 'm':
+            return n * cal.daysPerMonth;
+        case 'q':
+            return n * cal.daysPerQuarter;
+        case 'y':
+            return n * cal.daysPerYear;
+        default:
+            return 0;
     }
 }
 
@@ -1207,10 +1167,7 @@ function computeContentEndDay(
         }
     }
 
-    const walkLane = (
-        children: SwimlaneDeclaration['content'],
-        baselineEnd: number,
-    ): number => {
+    const walkLane = (children: SwimlaneDeclaration['content'], baselineEnd: number): number => {
         let prevEnd = baselineEnd;
         for (const child of children) {
             if (child.$type === 'DescriptionDirective') continue;
@@ -1283,7 +1240,12 @@ function computeContentEndDay(
     // shared timeline.
     for (const region of resolved.content.isolatedRegions) {
         const nestedMax = computeContentEndDay(
-            { config: region.config, content: region.content, diagnostics: [], processedFiles: new Set() },
+            {
+                config: region.config,
+                content: region.content,
+                diagnostics: [],
+                processedFiles: new Set(),
+            },
             ctx,
             startDate,
             undefined,
@@ -1460,9 +1422,7 @@ function buildNowline(
 // Mutable layout-time context shared across helpers.
 
 // Traverse the full content tree to build an `items` map keyed by id.
-function collectItems(
-    swimlanes: SwimlaneDeclaration[],
-): Map<string, ItemDeclaration> {
+function collectItems(swimlanes: SwimlaneDeclaration[]): Map<string, ItemDeclaration> {
     const out = new Map<string, ItemDeclaration>();
     const walk = (node: ItemDeclaration | GroupBlock | ParallelBlock): void => {
         if (isItemDeclaration(node)) {
@@ -1512,4 +1472,3 @@ export function layoutRoadmap(
         buildNowline,
     });
 }
-

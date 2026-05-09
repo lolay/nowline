@@ -10,5 +10,4 @@
 
 import type { MessageBundle } from './index.js';
 
-export const messages: MessageBundle = {
-};
+export const messages: MessageBundle = {};

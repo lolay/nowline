@@ -70,7 +70,10 @@ function guardBinaryStdout(format: OutputFormat, options: WriteOutputOptions): v
     }
 }
 
-function ensureTrailingNewline(data: string | Uint8Array, format: OutputFormat): string | Uint8Array {
+function ensureTrailingNewline(
+    data: string | Uint8Array,
+    format: OutputFormat,
+): string | Uint8Array {
     if (format !== 'text') return data;
     if (typeof data !== 'string') return data;
     return data.endsWith('\n') ? data : `${data}\n`;

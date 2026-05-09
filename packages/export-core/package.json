@@ -1,51 +1,51 @@
 {
-  "name": "@nowline/export-core",
-  "version": "0.1.0",
-  "description": "Nowline export-core — shared types, font resolver, unit converter, PDF page-size types",
-  "license": "Apache-2.0",
-  "type": "module",
-  "main": "./dist/index.js",
-  "types": "./dist/index.d.ts",
-  "exports": {
-    ".": {
-      "types": "./dist/index.d.ts",
-      "import": "./dist/index.js"
+    "name": "@nowline/export-core",
+    "version": "0.1.0",
+    "description": "Nowline export-core — shared types, font resolver, unit converter, PDF page-size types",
+    "license": "Apache-2.0",
+    "type": "module",
+    "main": "./dist/index.js",
+    "types": "./dist/index.d.ts",
+    "exports": {
+        ".": {
+            "types": "./dist/index.d.ts",
+            "import": "./dist/index.js"
+        },
+        "./fonts": {
+            "types": "./dist/fonts/index.d.ts",
+            "import": "./dist/fonts/index.js"
+        },
+        "./units": {
+            "types": "./dist/units.d.ts",
+            "import": "./dist/units.js"
+        },
+        "./pdf-page": {
+            "types": "./dist/pdf-page.d.ts",
+            "import": "./dist/pdf-page.js"
+        }
     },
-    "./fonts": {
-      "types": "./dist/fonts/index.d.ts",
-      "import": "./dist/fonts/index.js"
+    "files": [
+        "dist/",
+        "src/",
+        "assets/"
+    ],
+    "scripts": {
+        "bundle-fonts": "node scripts/bundle-fonts.mjs",
+        "prebuild": "node scripts/bundle-fonts.mjs",
+        "build": "tsc -b tsconfig.json",
+        "watch": "tsc -b tsconfig.json --watch",
+        "pretest": "node scripts/bundle-fonts.mjs",
+        "test": "vitest run",
+        "test:watch": "vitest",
+        "lint": "eslint src/"
     },
-    "./units": {
-      "types": "./dist/units.d.ts",
-      "import": "./dist/units.js"
+    "dependencies": {
+        "@nowline/core": "workspace:*",
+        "@nowline/layout": "workspace:*"
     },
-    "./pdf-page": {
-      "types": "./dist/pdf-page.d.ts",
-      "import": "./dist/pdf-page.js"
+    "devDependencies": {
+        "@types/node": "^22.0.0",
+        "typescript": "~5.7.0",
+        "vitest": "^3.1.0"
     }
-  },
-  "files": [
-    "dist/",
-    "src/",
-    "assets/"
-  ],
-  "scripts": {
-    "bundle-fonts": "node scripts/bundle-fonts.mjs",
-    "prebuild": "node scripts/bundle-fonts.mjs",
-    "build": "tsc -b tsconfig.json",
-    "watch": "tsc -b tsconfig.json --watch",
-    "pretest": "node scripts/bundle-fonts.mjs",
-    "test": "vitest run",
-    "test:watch": "vitest",
-    "lint": "eslint src/"
-  },
-  "dependencies": {
-    "@nowline/core": "workspace:*",
-    "@nowline/layout": "workspace:*"
-  },
-  "devDependencies": {
-    "@types/node": "^22.0.0",
-    "typescript": "~5.7.0",
-    "vitest": "^3.1.0"
-  }
 }

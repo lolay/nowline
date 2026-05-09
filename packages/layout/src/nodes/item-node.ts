@@ -14,12 +14,15 @@
 // arithmetic when fed the same inputs.
 
 import type { BoundingBox } from '../types.js';
-import type { Renderable, MeasureContext, PlaceContext, IntrinsicSize, Point } from '../renderable.js';
+import type {
+    Renderable,
+    MeasureContext,
+    PlaceContext,
+    IntrinsicSize,
+    Point,
+} from '../renderable.js';
 import { ITEM_INSET_PX, MIN_ITEM_WIDTH } from '../themes/shared.js';
-import {
-    ITEM_LINK_ICON_INSET_PX,
-    ITEM_LINK_ICON_TILE_SIZE_PX,
-} from '../item-bar-geometry.js';
+import { ITEM_LINK_ICON_INSET_PX, ITEM_LINK_ICON_TILE_SIZE_PX } from '../item-bar-geometry.js';
 
 /**
  * Inner padding applied on each side of the title text — the bar's
@@ -100,7 +103,10 @@ export class ItemNode implements Renderable<PlacedItemGeometry> {
     }
 
     measure(ctx: MeasureContext): IntrinsicSize {
-        const naturalWidth = Math.max(MIN_ITEM_WIDTH, this.input.logicalRightX - this.input.logicalLeftX);
+        const naturalWidth = Math.max(
+            MIN_ITEM_WIDTH,
+            this.input.logicalRightX - this.input.logicalLeftX,
+        );
         return {
             width: naturalWidth,
             height: ctx.bands.bandwidth(),

@@ -15,8 +15,7 @@ import {
 import { layoutRoadmap } from '../src/index.js';
 import { parseAndResolve } from './helpers.js';
 
-const emptyGrid = (): ChannelGrid =>
-    new ChannelGrid({ itemBars: [], brackets: [] });
+const emptyGrid = (): ChannelGrid => new ChannelGrid({ itemBars: [], brackets: [] });
 
 function req(
     fromId: string,
@@ -63,10 +62,7 @@ describe('routeChannelEdges', () => {
             itemBars: [{ x: 140, y: 0, width: 20, height: 200 }],
             brackets: [],
         });
-        const r = routeChannelEdges(
-            [req('a', 'b', { x: 100, y: 50 }, { x: 200, y: 150 })],
-            grid,
-        );
+        const r = routeChannelEdges([req('a', 'b', { x: 100, y: 50 }, { x: 200, y: 150 })], grid);
         expect(r[0].underBar).toBe(false);
         const elbow = r[0].waypoints[1].x;
         // Channel must clear the 140..160 bar.
@@ -81,10 +77,7 @@ describe('routeChannelEdges', () => {
             itemBars: [{ x: 95, y: 0, width: 110, height: 200 }],
             brackets: [],
         });
-        const r = routeChannelEdges(
-            [req('a', 'b', { x: 100, y: 50 }, { x: 200, y: 150 })],
-            grid,
-        );
+        const r = routeChannelEdges([req('a', 'b', { x: 100, y: 50 }, { x: 200, y: 150 })], grid);
         expect(r[0].underBar).toBe(true);
     });
 
@@ -95,10 +88,7 @@ describe('routeChannelEdges', () => {
             itemBars: [],
             brackets: [{ x: 151, yTop: 0, yBottom: 200 }],
         });
-        const r = routeChannelEdges(
-            [req('a', 'b', { x: 100, y: 50 }, { x: 200, y: 150 })],
-            grid,
-        );
+        const r = routeChannelEdges([req('a', 'b', { x: 100, y: 50 }, { x: 200, y: 150 })], grid);
         const elbow = r[0].waypoints[1].x;
         // Nudge moves AT LEAST BRACKET_NUDGE_PX from the bracket on
         // the side that keeps the elbow inside the gutter.
@@ -134,10 +124,7 @@ describe('routeChannelEdges', () => {
             itemBars: [{ x: 101, y: 0, width: 91, height: 200 }],
             brackets: [],
         });
-        const r = routeChannelEdges(
-            [req('a', 'b', { x: 100, y: 50 }, { x: 200, y: 150 })],
-            grid,
-        );
+        const r = routeChannelEdges([req('a', 'b', { x: 100, y: 50 }, { x: 200, y: 150 })], grid);
         const elbow = r[0].waypoints[1].x;
         expect(200 - elbow).toBeGreaterThanOrEqual(MIN_TARGET_STUB_PX);
         expect(elbow - 100).toBeGreaterThanOrEqual(MIN_SOURCE_STUB_PX);
@@ -155,10 +142,7 @@ describe('routeChannelEdges', () => {
             // Bracket at the satisfiable-range midpoint (gutter mid = 106).
             brackets: [{ x: 106, yTop: 0, yBottom: 200 }],
         });
-        const r = routeChannelEdges(
-            [req('a', 'b', { x: 100, y: 50 }, { x: 112, y: 150 })],
-            grid,
-        );
+        const r = routeChannelEdges([req('a', 'b', { x: 100, y: 50 }, { x: 112, y: 150 })], grid);
         expect(r[0].underBar).toBe(true);
         // Channel still pinned inside the stub-satisfying range.
         const elbow = r[0].waypoints[1].x;
@@ -174,19 +158,16 @@ describe('routeChannelEdges', () => {
         const grid = new ChannelGrid({
             itemBars: [],
             brackets: [
-                { x: 10, yTop: 0, yBottom: 200 },        // vertical bar
-                { x: 14, yTop: 0, yBottom: 2 },          // top foot tip
-                { x: 14, yTop: 198, yBottom: 200 },      // bottom foot tip
+                { x: 10, yTop: 0, yBottom: 200 }, // vertical bar
+                { x: 14, yTop: 0, yBottom: 2 }, // top foot tip
+                { x: 14, yTop: 198, yBottom: 200 }, // bottom foot tip
             ],
         });
         // Edge whose Y span crosses the top foot row: pick a wide
         // gutter so the satisfiable range is loose, then verify that
         // the chosen channel is at least BRACKET_NUDGE_PX from BOTH
         // x=10 and x=14.
-        const r = routeChannelEdges(
-            [req('a', 'b', { x: 0, y: 1 }, { x: 30, y: 100 })],
-            grid,
-        );
+        const r = routeChannelEdges([req('a', 'b', { x: 0, y: 1 }, { x: 30, y: 100 })], grid);
         const elbow = r[0].waypoints[1].x;
         // Recheck radius is BRACKET_NUDGE_PX − 0.01, so distance == 4
         // is acceptable; assert distance ≥ 4 from each foot/vertical.
@@ -250,9 +231,7 @@ swimlane frontend "Frontend"
 `;
         const { file, resolved } = await parseAndResolve(src);
         const model = layoutRoadmap(file, resolved, { theme: 'light' });
-        const edge = model.edges.find(
-            (e) => e.fromId === 'search' && e.toId === 'ui',
-        );
+        const edge = model.edges.find((e) => e.fromId === 'search' && e.toId === 'ui');
         expect(edge).toBeDefined();
         // The audit bar sits squarely in the gutter between search
         // and ui — no clean channel exists, so the router emits the
@@ -290,9 +269,7 @@ swimlane frontend "Frontend"
 `;
         const { file, resolved } = await parseAndResolve(src);
         const model = layoutRoadmap(file, resolved, { theme: 'light' });
-        const edge = model.edges.find(
-            (e) => e.fromId === 'api' && e.toId === 'sdk',
-        );
+        const edge = model.edges.find((e) => e.fromId === 'api' && e.toId === 'sdk');
         expect(edge).toBeDefined();
         expect(edge!.kind).toBe('underBar');
         // Channel sits at target.x − MIN_TARGET_STUB_PX so the

@@ -19,10 +19,7 @@
 
 import { describe, it, expect } from 'vitest';
 import { layoutRoadmap } from '../src/index.js';
-import type {
-    PositionedSwimlane,
-    PositionedLaneUtilization,
-} from '../src/types.js';
+import type { PositionedSwimlane, PositionedLaneUtilization } from '../src/types.js';
 import {
     classifyLoad,
     collectLoadContributors,
@@ -45,27 +42,27 @@ async function laneUtilization(src: string): Promise<PositionedLaneUtilization |
 describe('m12 — pure helpers: classifyLoad', () => {
     it('paints green when load is below warn-at (including zero)', () => {
         expect(classifyLoad(0, 5, 0.8, 1.0)).toBe('green');
-        expect(classifyLoad(2, 5, 0.8, 1.0)).toBe('green');  // 40%
+        expect(classifyLoad(2, 5, 0.8, 1.0)).toBe('green'); // 40%
     });
 
     it('paints yellow inside the warn band [warn, over)', () => {
-        expect(classifyLoad(4, 5, 0.8, 1.0)).toBe('yellow');  // 80% exactly = warn
-        expect(classifyLoad(4.5, 5, 0.8, 1.0)).toBe('yellow');  // 90%
+        expect(classifyLoad(4, 5, 0.8, 1.0)).toBe('yellow'); // 80% exactly = warn
+        expect(classifyLoad(4.5, 5, 0.8, 1.0)).toBe('yellow'); // 90%
     });
 
     it('paints red at and above over-at', () => {
-        expect(classifyLoad(5, 5, 0.8, 1.0)).toBe('red');  // 100% exactly = over
-        expect(classifyLoad(6, 5, 0.8, 1.0)).toBe('red');  // 120%
+        expect(classifyLoad(5, 5, 0.8, 1.0)).toBe('red'); // 100% exactly = over
+        expect(classifyLoad(6, 5, 0.8, 1.0)).toBe('red'); // 120%
     });
 
     it('skips the yellow band when warnFraction is null (binary green/red)', () => {
-        expect(classifyLoad(4.5, 5, null, 1.0)).toBe('green');  // 90%, no warn
-        expect(classifyLoad(5, 5, null, 1.0)).toBe('red');       // 100%
+        expect(classifyLoad(4.5, 5, null, 1.0)).toBe('green'); // 90%, no warn
+        expect(classifyLoad(5, 5, null, 1.0)).toBe('red'); // 100%
     });
 
     it('skips the red band when overFraction is null (binary green/yellow)', () => {
         expect(classifyLoad(4, 5, 0.8, null)).toBe('yellow');
-        expect(classifyLoad(10, 5, 0.8, null)).toBe('yellow');  // 200%, still warn (no red)
+        expect(classifyLoad(10, 5, 0.8, null)).toBe('yellow'); // 200%, still warn (no red)
     });
 
     it('exposes built-in defaults at the spec values', () => {
@@ -284,6 +281,6 @@ describe('m12 — pure helpers: collectLoadContributors recursion', () => {
         };
         const contributors = collectLoadContributors([parallel]);
         expect(contributors).toHaveLength(2);
-        expect(contributors.map(c => c.load)).toEqual([2, 3]);
+        expect(contributors.map((c) => c.load)).toEqual([2, 3]);
     });
 });

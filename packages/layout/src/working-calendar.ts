@@ -41,15 +41,30 @@ export function continuousCalendar(): WorkingCalendar {
     return {
         daysPerUnit: (unit) => {
             switch (unit) {
-                case 'days': return 1;
-                case 'weeks': return 7;
-                case 'months': return 30;
-                case 'quarters': return 91;
-                case 'years': return 365;
+                case 'days':
+                    return 1;
+                case 'weeks':
+                    return 7;
+                case 'months':
+                    return 30;
+                case 'quarters':
+                    return 91;
+                case 'years':
+                    return 365;
             }
         },
         addUnits: (date, count, unit) => {
-            const days = count * (unit === 'days' ? 1 : unit === 'weeks' ? 7 : unit === 'months' ? 30 : unit === 'quarters' ? 91 : 365);
+            const days =
+                count *
+                (unit === 'days'
+                    ? 1
+                    : unit === 'weeks'
+                      ? 7
+                      : unit === 'months'
+                        ? 30
+                        : unit === 'quarters'
+                          ? 91
+                          : 365);
             return addCalendarDays(date, days);
         },
         isWorkingDay: () => true,
@@ -62,10 +77,15 @@ export function daysPerUnit(unit: ScaleUnit, cal: CalendarConfig): number {
 
 function daysPerUnitForCalendar(unit: ScaleUnit, cal: CalendarConfig): number {
     switch (unit) {
-        case 'days': return 1;
-        case 'weeks': return cal.daysPerWeek;
-        case 'months': return cal.daysPerMonth;
-        case 'quarters': return cal.daysPerQuarter;
-        case 'years': return cal.daysPerYear;
+        case 'days':
+            return 1;
+        case 'weeks':
+            return cal.daysPerWeek;
+        case 'months':
+            return cal.daysPerMonth;
+        case 'quarters':
+            return cal.daysPerQuarter;
+        case 'years':
+            return cal.daysPerYear;
     }
 }

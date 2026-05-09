@@ -117,7 +117,6 @@ describe('parseArgv — mutual exclusivity', () => {
             expect(err).toBeInstanceOf(CliError);
         }
     });
-
 });
 
 describe('parseArgv — locale', () => {

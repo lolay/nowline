@@ -29,12 +29,20 @@ function compose(...parts: Uint8Array[]): Uint8Array {
 
 describe('isVariableFontBytes', () => {
     it('returns true when the SFNT table list contains an fvar record', () => {
-        const bytes = compose(buildSfntHeader(2), buildTableRecord('fvar'), buildTableRecord('glyf'));
+        const bytes = compose(
+            buildSfntHeader(2),
+            buildTableRecord('fvar'),
+            buildTableRecord('glyf'),
+        );
         expect(isVariableFontBytes(bytes)).toBe(true);
     });
 
     it('returns false on a regular TTF without fvar', () => {
-        const bytes = compose(buildSfntHeader(2), buildTableRecord('cmap'), buildTableRecord('glyf'));
+        const bytes = compose(
+            buildSfntHeader(2),
+            buildTableRecord('cmap'),
+            buildTableRecord('glyf'),
+        );
         expect(isVariableFontBytes(bytes)).toBe(false);
     });
 

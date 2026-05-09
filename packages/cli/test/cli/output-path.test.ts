@@ -41,18 +41,19 @@ describe('default render output path (always cwd)', () => {
 
 describe('default init output path', () => {
     it('appends .nowline when no extension', () => {
-        expect(defaultInitOutputPath({ name: 'my-project', cwd: '/work' }))
-            .toBe(path.join('/work', 'my-project.nowline'));
+        expect(defaultInitOutputPath({ name: 'my-project', cwd: '/work' })).toBe(
+            path.join('/work', 'my-project.nowline'),
+        );
     });
 
     it('preserves .nowline extension as-is', () => {
-        expect(defaultInitOutputPath({ name: 'my-project.nowline', cwd: '/work' }))
-            .toBe(path.join('/work', 'my-project.nowline'));
+        expect(defaultInitOutputPath({ name: 'my-project.nowline', cwd: '/work' })).toBe(
+            path.join('/work', 'my-project.nowline'),
+        );
     });
 
     it('defaults to roadmap.nowline when no name given', () => {
-        expect(defaultInitOutputPath({ cwd: '/work' }))
-            .toBe(path.join('/work', 'roadmap.nowline'));
+        expect(defaultInitOutputPath({ cwd: '/work' })).toBe(path.join('/work', 'roadmap.nowline'));
     });
 });
 

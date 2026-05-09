@@ -3,13 +3,7 @@
 // and declares `const <name>Theme: Theme = { ... }`. `tsc` refuses to compile
 // if any role is omitted — that's our primary drift-prevention mechanism.
 
-import type {
-    BorderKind,
-    BracketKind,
-    FontFamily,
-    FontWeight,
-    ShadowKind,
-} from '../types.js';
+import type { BorderKind, BracketKind, FontFamily, FontWeight, ShadowKind } from '../types.js';
 
 // Per-entity DSL-style defaults. Every property from specs/dsl.md §
 // Style Properties appears here so tsc enforces parity across themes.
@@ -41,9 +35,9 @@ export interface Theme {
     name: 'light' | 'dark' | string;
     // Surfaces — base colors drawn under every entity.
     surface: {
-        page: string;        // overall background
-        chart: string;       // content area background
-        headerBox: string;   // header/title block background
+        page: string; // overall background
+        chart: string; // content area background
+        headerBox: string; // header/title block background
     };
     // Per-entity DSL defaults. Mirrors the DSL's `default <entity>` level.
     entities: {
@@ -72,15 +66,15 @@ export interface Theme {
         tabText: string;
         ownerText: string;
         footnoteIndicator: string;
-        rowTintEven: string;  // alternating row tint (even rows)
-        rowTintOdd: string;   // alternating row tint (odd rows)
+        rowTintEven: string; // alternating row tint (even rows)
+        rowTintOdd: string; // alternating row tint (odd rows)
         // m13: tri-state lane utilization underline. Each token paints one
         // classification band along the bottom edge of the lane band when
         // the lane has `capacity:` and at least one item contributing load.
         // See specs/rendering.md § Lane utilization underline.
-        utilizationOk: string;     // green; load below `warn-at` (incl. zero)
-        utilizationWarn: string;   // yellow; load in `[warn-at, over-at)`
-        utilizationOver: string;   // red; load >= `over-at`
+        utilizationOk: string; // green; load below `warn-at` (incl. zero)
+        utilizationWarn: string; // yellow; load in `[warn-at, over-at)`
+        utilizationOver: string; // red; load >= `over-at`
     };
     timeline: {
         gridLine: string;
@@ -103,11 +97,11 @@ export interface Theme {
         author: string;
     };
     item: {
-        overflowX: string;          // red X mark on overrun tail
-        linkIconFg: string;         // generic link icon color
+        overflowX: string; // red X mark on overrun tail
+        linkIconFg: string; // generic link icon color
         overflowTailFill: string;
         overflowTailStroke: string;
-        overflowCaption: string;    // "past <id>" caption color
+        overflowCaption: string; // "past <id>" caption color
     };
     parallel: {
         bracketStroke: string;
@@ -139,11 +133,11 @@ export interface Theme {
         labelBg: string;
     };
     milestone: {
-        dashedInk: string;  // used on floating/overrun slack arrows
-        overrun: string;    // accent for overrun highlight
+        dashedInk: string; // used on floating/overrun slack arrows
+        overrun: string; // accent for overrun highlight
     };
     anchor: {
-        predecessorLine: string;   // non-binding slack arrow color
+        predecessorLine: string; // non-binding slack arrow color
     };
     dependency: {
         edgeStroke: string;

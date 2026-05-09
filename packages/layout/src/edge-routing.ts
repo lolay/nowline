@@ -18,7 +18,13 @@
 // to avoid a single intersecting bar produced unsatisfying detours
 // (see `specs/handoffs/handoff-channel-routing-design.md`).
 
-import type { Point, BoundingBox, PositionedSwimlane, PositionedTrackChild, PositionedIncludeRegion } from './types.js';
+import type {
+    Point,
+    BoundingBox,
+    PositionedSwimlane,
+    PositionedTrackChild,
+    PositionedIncludeRegion,
+} from './types.js';
 
 /** A visible parallel or group bracket stroke. Used by the
  *  bracket-clearance nudge: arrows whose chosen elbow X falls within
@@ -346,10 +352,7 @@ function nudgeAwayFromBrackets(
     // (now sitting at exactly the nudge distance) doesn't falsely
     // trip the rejection — and so a SECOND bracket exactly at the
     // nudge distance is also accepted as "just clear enough".
-    const candidates = [
-        closest.x + BRACKET_NUDGE_PX,
-        closest.x - BRACKET_NUDGE_PX,
-    ];
+    const candidates = [closest.x + BRACKET_NUDGE_PX, closest.x - BRACKET_NUDGE_PX];
     const recheckRadius = BRACKET_NUDGE_PX - 0.01;
     for (const candidate of candidates) {
         if (range && (candidate < range.minX || candidate > range.maxX)) continue;
@@ -370,9 +373,7 @@ function nudgeAwayFromBrackets(
     // No nudge fits. Keep the channel at its current X (clamped into
     // the range) and force under-bar so item bars + bracket strokes
     // mask the colliding portion of the leg.
-    const fallback = range
-        ? Math.min(Math.max(x, range.minX), range.maxX)
-        : x;
+    const fallback = range ? Math.min(Math.max(x, range.minX), range.maxX) : x;
     return { x: fallback, forceUnderBar: true };
 }
 
@@ -384,7 +385,12 @@ function nudgeAwayFromBrackets(
  * collapse back to the centerline (rare; visual stacking accepted).
  */
 function assignSlots(
-    edges: Array<{ req: EdgeRouteRequest; channelX: number; underBar: boolean; orderIndex: number }>,
+    edges: Array<{
+        req: EdgeRouteRequest;
+        channelX: number;
+        underBar: boolean;
+        orderIndex: number;
+    }>,
 ): Map<number, number> {
     // Group by channel X (sort first so close-X edges collapse).
     const byX = [...edges].sort((a, b) => {
@@ -462,9 +468,7 @@ function routeMarkerStub(req: EdgeRouteRequest): EdgeRouteResult {
     // hugs the anchor's date column), nudge the source 1 px back so
     // routeEdge produces a non-degenerate path with a visible
     // arrowhead.
-    const from = req.from.x >= req.to.x
-        ? { x: req.to.x - 1, y: req.from.y }
-        : req.from;
+    const from = req.from.x >= req.to.x ? { x: req.to.x - 1, y: req.from.y } : req.from;
     return {
         fromId: req.fromId,
         toId: req.toId,
@@ -542,10 +546,5 @@ function buildOrthogonalPath(from: Point, to: Point, slotX: number): Point[] {
     if (Math.abs(from.y - to.y) < 0.5) {
         return [from, to];
     }
-    return [
-        from,
-        { x: slotX, y: from.y },
-        { x: slotX, y: to.y },
-        to,
-    ];
+    return [from, { x: slotX, y: from.y }, { x: slotX, y: to.y }, to];
 }

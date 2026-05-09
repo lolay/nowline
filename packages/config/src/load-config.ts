@@ -75,7 +75,9 @@ export function parseConfig(contents: string, source: string): NowlineRc {
     if (trimmed === '') return {};
     const parsed = parseJsonOrYaml(trimmed, source);
     if (parsed === null || typeof parsed !== 'object' || Array.isArray(parsed)) {
-        throw new Error(`Invalid ${path.basename(source)}: top-level must be an object (${source})`);
+        throw new Error(
+            `Invalid ${path.basename(source)}: top-level must be an object (${source})`,
+        );
     }
     return parsed as NowlineRc;
 }

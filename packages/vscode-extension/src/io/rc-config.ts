@@ -98,6 +98,4 @@ export interface RcResolution {
 
 export type RcWatcherKind = 'created' | 'changed' | 'deleted';
 
-export type RcChangeEvent =
-    | { kind: 'settings-toggled' }
-    | { kind: RcWatcherKind; uri: vscode.Uri };
+export type RcChangeEvent = { kind: 'settings-toggled' } | { kind: RcWatcherKind; uri: vscode.Uri };

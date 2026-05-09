@@ -24,13 +24,7 @@
 //   <%% lossy comment %%>
 
 import type { ExportInputs } from '@nowline/export-core';
-import {
-    displayLabel,
-    getProp,
-    getProps,
-    hasProp,
-    roadmapTitle,
-} from '@nowline/export-core';
+import { displayLabel, getProp, getProps, hasProp, roadmapTitle } from '@nowline/export-core';
 import type {
     AnchorDeclaration,
     GroupBlock,
@@ -78,10 +72,7 @@ function emptyCounts(): DropCounts {
     };
 }
 
-export function exportMermaid(
-    inputs: ExportInputs,
-    options: MermaidOptions = {},
-): string {
+export function exportMermaid(inputs: ExportInputs, options: MermaidOptions = {}): string {
     const ast = inputs.ast;
     const title = roadmapTitle(ast.roadmapDecl ?? undefined);
     const drops = emptyCounts();
@@ -98,16 +89,22 @@ export function exportMermaid(
     drops.footnote += ast.roadmapEntries.filter((e) => e.$type === 'FootnoteDeclaration').length;
 
     // Anchors → milestone entries (Mermaid doesn't support standalone anchors).
-    const anchors = ast.roadmapEntries.filter((e): e is AnchorDeclaration => e.$type === 'AnchorDeclaration');
+    const anchors = ast.roadmapEntries.filter(
+        (e): e is AnchorDeclaration => e.$type === 'AnchorDeclaration',
+    );
     if (anchors.length > 0) {
         out.push('    section Anchors');
         for (const anchor of anchors) {
             const date = getProp(anchor, 'date');
             const id = anchor.name ?? slugify(displayLabel(anchor));
             if (date) {
-                out.push(`    ${escapeTaskName(displayLabel(anchor))} :milestone, ${id}, ${date}, 0d`);
+                out.push(
+                    `    ${escapeTaskName(displayLabel(anchor))} :milestone, ${id}, ${date}, 0d`,
+                );
             } else {
-                out.push(`    ${escapeTaskName(displayLabel(anchor))} :milestone, ${id}, after , 0d`);
+                out.push(
+                    `    ${escapeTaskName(displayLabel(anchor))} :milestone, ${id}, after , 0d`,
+                );
             }
         }
     }
@@ -232,9 +229,7 @@ function emitItem(item: ItemDeclaration, drops: DropCounts, out: string[]): void
     const status = mapStatus(getProp(item, 'status'));
     const after = getProps(item, 'after');
     const duration = durationToMermaid(getProp(item, 'duration') ?? getProp(item, 'size')) ?? '1d';
-    const ref = after.length > 0
-        ? `after ${after.join(' ')}`
-        : 'after , 0d'.replace(', 0d', '');
+    const ref = after.length > 0 ? `after ${after.join(' ')}` : 'after , 0d'.replace(', 0d', '');
 
     const meta = [status, id, after.length > 0 ? `after ${after.join(' ')}` : '', duration]
         .filter((s) => s !== '')
@@ -250,7 +245,9 @@ function emitMilestone(milestone: MilestoneDeclaration, drops: DropCounts, out: 
     } else {
         const after = getProps(milestone, 'depends');
         if (after.length > 0) {
-            out.push(`    ${escapeTaskName(displayLabel(milestone))} :milestone, ${id}, after ${after.join(' ')}, 0d`);
+            out.push(
+                `    ${escapeTaskName(displayLabel(milestone))} :milestone, ${id}, after ${after.join(' ')}, 0d`,
+            );
         } else {
             out.push(`    ${escapeTaskName(displayLabel(milestone))} :milestone, ${id}, 0d`);
         }
@@ -269,20 +266,25 @@ function countDrops(item: ItemDeclaration, drops: DropCounts): void {
 
 function mapStatus(status: string | undefined): string {
     switch (status) {
-        case 'done': return 'done';
-        case 'in-progress': return 'active';
+        case 'done':
+            return 'done';
+        case 'in-progress':
+            return 'active';
         case 'blocked':
-        case 'at-risk': return 'crit';
-        default: return '';
+        case 'at-risk':
+            return 'crit';
+        default:
+            return '';
     }
 }
 
 function slugify(s: string): string {
-    return s
-        .toLowerCase()
-        .replace(/[^a-z0-9]+/g, '-')
-        .replace(/^-+|-+$/g, '')
-        || 'item';
+    return (
+        s
+            .toLowerCase()
+            .replace(/[^a-z0-9]+/g, '-')
+            .replace(/^-+|-+$/g, '') || 'item'
+    );
 }
 
 function escapeMermaidText(s: string): string {

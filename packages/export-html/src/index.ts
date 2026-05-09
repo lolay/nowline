@@ -35,9 +35,7 @@ export async function exportHtml(
     svg: string,
     options: HtmlOptions = {},
 ): Promise<string> {
-    const title = escapeText(
-        options.title ?? roadmapTitle(inputs.ast.roadmapDecl ?? undefined),
-    );
+    const title = escapeText(options.title ?? roadmapTitle(inputs.ast.roadmapDecl ?? undefined));
     const generator = escapeAttr(options.generator ?? 'nowline (m2c)');
     const surfaceColor = inputs.model.backgroundColor;
 

@@ -39,15 +39,16 @@ export const TEXT_SIZE_PX: Record<'none' | 'xs' | 'sm' | 'md' | 'lg' | 'xl', num
     xl: 24,
 };
 
-export const CORNER_RADIUS_PX: Record<'none' | 'xs' | 'sm' | 'md' | 'lg' | 'xl' | 'full', number> = {
-    none: 0,
-    xs: 2,
-    sm: 4,
-    md: 8,
-    lg: 12,
-    xl: 20,
-    full: 9999,
-};
+export const CORNER_RADIUS_PX: Record<'none' | 'xs' | 'sm' | 'md' | 'lg' | 'xl' | 'full', number> =
+    {
+        none: 0,
+        xs: 2,
+        sm: 4,
+        md: 8,
+        lg: 12,
+        xl: 20,
+        full: 9999,
+    };
 
 export const LOGO_SIZE_PX: Record<'xs' | 'sm' | 'md' | 'lg' | 'xl', number> = {
     xs: 18,
@@ -321,30 +322,29 @@ export const ATTRIBUTION_PREFIX_LOGICAL_WIDTH =
 export const ATTRIBUTION_PREFIX_TO_WORDMARK_GAP = 10;
 export const ATTRIBUTION_NOW_LOGICAL_X =
     ATTRIBUTION_PREFIX_LOGICAL_WIDTH + ATTRIBUTION_PREFIX_TO_WORDMARK_GAP; // 195.6
-export const ATTRIBUTION_BAR_LOGICAL_X = ATTRIBUTION_NOW_LOGICAL_X + 74;    // 269.6
+export const ATTRIBUTION_BAR_LOGICAL_X = ATTRIBUTION_NOW_LOGICAL_X + 74; // 269.6
 export const ATTRIBUTION_BAR_LOGICAL_WIDTH = 5;
-export const ATTRIBUTION_INE_LOGICAL_X = ATTRIBUTION_NOW_LOGICAL_X + 81;    // 276.6
-export const ATTRIBUTION_INE_LOGICAL_WIDTH =
-    3 * ATTRIBUTION_WORDMARK_FONT_SIZE * ATTR_CHAR_FACTOR;                  // 69.6
+export const ATTRIBUTION_INE_LOGICAL_X = ATTRIBUTION_NOW_LOGICAL_X + 81; // 276.6
+export const ATTRIBUTION_INE_LOGICAL_WIDTH = 3 * ATTRIBUTION_WORDMARK_FONT_SIZE * ATTR_CHAR_FACTOR; // 69.6
 export const ATTRIBUTION_GLYPH_LOGICAL_WIDTH =
-    ATTRIBUTION_INE_LOGICAL_X + ATTRIBUTION_INE_LOGICAL_WIDTH;              // 346.2
-export const ATTRIBUTION_GLYPH_LOGICAL_HEIGHT =
-    12 + ATTRIBUTION_WORDMARK_FONT_SIZE;                                    // 52
-export const ATTRIBUTION_GLYPH_WIDTH =
-    ATTRIBUTION_GLYPH_LOGICAL_WIDTH * ATTRIBUTION_SCALE;
-export const ATTRIBUTION_GLYPH_HEIGHT =
-    ATTRIBUTION_GLYPH_LOGICAL_HEIGHT * ATTRIBUTION_SCALE;
+    ATTRIBUTION_INE_LOGICAL_X + ATTRIBUTION_INE_LOGICAL_WIDTH; // 346.2
+export const ATTRIBUTION_GLYPH_LOGICAL_HEIGHT = 12 + ATTRIBUTION_WORDMARK_FONT_SIZE; // 52
+export const ATTRIBUTION_GLYPH_WIDTH = ATTRIBUTION_GLYPH_LOGICAL_WIDTH * ATTRIBUTION_SCALE;
+export const ATTRIBUTION_GLYPH_HEIGHT = ATTRIBUTION_GLYPH_LOGICAL_HEIGHT * ATTRIBUTION_SCALE;
 
 // Dependency-edge rounded-corner radius (for Manhattan routing).
 export const EDGE_CORNER_RADIUS = 4;
 
 // Shadow filter parameters per shadow kind.
-export const SHADOW_PARAMS: Record<'none' | 'subtle' | 'soft' | 'hard', {
-    dx: number;
-    dy: number;
-    stdDeviation: number;
-    opacity: number;
-}> = {
+export const SHADOW_PARAMS: Record<
+    'none' | 'subtle' | 'soft' | 'hard',
+    {
+        dx: number;
+        dy: number;
+        stdDeviation: number;
+        opacity: number;
+    }
+> = {
     none: { dx: 0, dy: 0, stdDeviation: 0, opacity: 0 },
     subtle: { dx: 0, dy: 1, stdDeviation: 1.5, opacity: 0.2 },
     soft: { dx: 0, dy: 3, stdDeviation: 5, opacity: 0.3 },

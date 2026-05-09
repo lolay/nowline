@@ -70,7 +70,7 @@ export function tr<K extends MessageCode>(
 // Type helper: extract the named-argument object type for a given code.
 // `messages.en.ts` is the canonical signature source; other bundles
 // satisfy `MessageBundle`, which only constrains the return type.
-export type MessageArgs<K extends MessageCode> = Parameters<typeof enMessages[K]>;
+export type MessageArgs<K extends MessageCode> = Parameters<(typeof enMessages)[K]>;
 
 const DEFAULT_LOCALE = 'en-US';
 

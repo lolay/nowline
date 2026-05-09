@@ -80,9 +80,7 @@ function rewriteVersion(path, newVersion) {
 function main() {
     const level = process.argv[2];
     if (!VALID_LEVELS.has(level)) {
-        process.stderr.write(
-            `usage: bump-version.mjs <patch|minor|major>\n`,
-        );
+        process.stderr.write(`usage: bump-version.mjs <patch|minor|major>\n`);
         process.exit(2);
     }
 

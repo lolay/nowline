@@ -85,7 +85,9 @@ export class BandScale {
     /** Top-y for a band id (only available on `forRows` instances). */
     forward(id: string): number {
         if (!this.d3) {
-            throw new Error('BandScale.forward is only available on closed-domain bands (BandScale.forRows)');
+            throw new Error(
+                'BandScale.forward is only available on closed-domain bands (BandScale.forRows)',
+            );
         }
         const y = this.d3(id);
         if (y === undefined) {

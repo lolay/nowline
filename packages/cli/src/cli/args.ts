@@ -195,18 +195,15 @@ export function parseArgv(argv: readonly string[]): ParsedArgs {
     }
 
     if (positionals.length > 1) {
-        const extras = positionals.slice(1).map((p) => JSON.stringify(p)).join(' ');
-        throw new CliError(
-            ExitCode.InputError,
-            `nowline: unexpected extra arguments: ${extras}.`,
-        );
+        const extras = positionals
+            .slice(1)
+            .map((p) => JSON.stringify(p))
+            .join(' ');
+        throw new CliError(ExitCode.InputError, `nowline: unexpected extra arguments: ${extras}.`);
     }
 
-    const logLevel: ParsedArgs['logLevel'] = values.verbose === true
-        ? 'verbose'
-        : values.quiet === true
-            ? 'quiet'
-            : 'normal';
+    const logLevel: ParsedArgs['logLevel'] =
+        values.verbose === true ? 'verbose' : values.quiet === true ? 'quiet' : 'normal';
 
     return {
         mode,

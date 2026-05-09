@@ -91,8 +91,7 @@ export const ITEM_DECORATION_SPILL_GAP_PX = 4;
  * extend past the bar's left edge, so the dot spills into the
  * caption column to the right of the bar instead.
  */
-export const MIN_BAR_WIDTH_FOR_DOT_PX =
-    ITEM_STATUS_DOT_INSET_RIGHT_PX + ITEM_STATUS_DOT_RADIUS_PX;
+export const MIN_BAR_WIDTH_FOR_DOT_PX = ITEM_STATUS_DOT_INSET_RIGHT_PX + ITEM_STATUS_DOT_RADIUS_PX;
 
 /**
  * Minimum bar width (px) needed to host the link-icon tile AND the
@@ -115,8 +114,7 @@ export const MIN_BAR_WIDTH_FOR_LINK_AND_DOT_PX =
  * edge or colliding with a leading link icon. Approximate width
  * for one digit is 8px (font-size 10, bold).
  */
-export const MIN_BAR_WIDTH_FOR_FOOTNOTE_PX =
-    ITEM_FOOTNOTE_INDICATOR_INSET_RIGHT_PX + 1;
+export const MIN_BAR_WIDTH_FOR_FOOTNOTE_PX = ITEM_FOOTNOTE_INDICATOR_INSET_RIGHT_PX + 1;
 
 // ---- Label chips (along the bar's bottom) ------------------------
 
@@ -143,8 +141,7 @@ export const LABEL_CHIP_ROW_GAP_PX = 4;
  * Vertical row pitch (px) for a stacked chip column — chip height +
  * inter-row gap.
  */
-export const LABEL_CHIP_ROW_STEP_PX =
-    LABEL_CHIP_HEIGHT_PX + LABEL_CHIP_ROW_GAP_PX;
+export const LABEL_CHIP_ROW_STEP_PX = LABEL_CHIP_HEIGHT_PX + LABEL_CHIP_ROW_GAP_PX;
 
 /**
  * Slack budget (fraction) applied ONCE per item when chips spill

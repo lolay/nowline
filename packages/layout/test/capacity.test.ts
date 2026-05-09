@@ -135,32 +135,26 @@ describe('estimateCapacitySuffixWidth', () => {
     it('multiplier glyph contributes one char width and no separator', () => {
         const icon: ResolvedCapacityIcon = { kind: 'builtin', name: 'multiplier' };
         // "5×": 1 char number + 1 char glyph = 2 chars
-        expect(estimateCapacitySuffixWidth('5', icon, fontSize)).toBeCloseTo(
-            2 * charPx,
-        );
+        expect(estimateCapacitySuffixWidth('5', icon, fontSize)).toBeCloseTo(2 * charPx);
     });
 
     it('built-in SVG glyph adds 0.1em separator + 1em glyph', () => {
         const icon: ResolvedCapacityIcon = { kind: 'builtin', name: 'person' };
         // "5 [person]": 1 char number + 0.1em + 1em = 1*charPx + 1.1*fontSize
-        expect(
-            estimateCapacitySuffixWidth('5', icon, fontSize),
-        ).toBeCloseTo(charPx + 1.1 * fontSize);
+        expect(estimateCapacitySuffixWidth('5', icon, fontSize)).toBeCloseTo(
+            charPx + 1.1 * fontSize,
+        );
     });
 
     it('literal glyph adds 0.1em separator + 1em glyph', () => {
         const icon: ResolvedCapacityIcon = { kind: 'literal', text: '💰' };
-        expect(
-            estimateCapacitySuffixWidth('5', icon, fontSize),
-        ).toBeCloseTo(charPx + 1.1 * fontSize);
+        expect(estimateCapacitySuffixWidth('5', icon, fontSize)).toBeCloseTo(
+            charPx + 1.1 * fontSize,
+        );
     });
 
     it('null icon (no glyph) is just the number width', () => {
-        expect(estimateCapacitySuffixWidth('5', null, fontSize)).toBeCloseTo(
-            charPx,
-        );
-        expect(estimateCapacitySuffixWidth('100', null, fontSize)).toBeCloseTo(
-            3 * charPx,
-        );
+        expect(estimateCapacitySuffixWidth('5', null, fontSize)).toBeCloseTo(charPx);
+        expect(estimateCapacitySuffixWidth('100', null, fontSize)).toBeCloseTo(3 * charPx);
     });
 });

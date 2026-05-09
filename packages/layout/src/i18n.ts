@@ -30,7 +30,7 @@ const BUNDLES: Record<string, Partial<LocaleStrings>> = {
         nowLabel: 'now',
         quarterPrefix: 'Q',
     },
-    'fr': {
+    fr: {
         // Short form of "maintenant"; keeps the pill compact while staying
         // correct French. The full word is too wide for the ~3-6 char pill
         // budget without geometry work (tracked in m-loc-c).

@@ -38,21 +38,14 @@ export function attrs(values: Record<string, AttrValue>): string {
     return parts.length ? ' ' + parts.join(' ') : '';
 }
 
-export function tag(
-    name: string,
-    attributes: Record<string, AttrValue>,
-    inner?: string,
-): string {
+export function tag(name: string, attributes: Record<string, AttrValue>, inner?: string): string {
     if (inner === undefined || inner === '') {
         return `<${name}${attrs(attributes)}/>`;
     }
     return `<${name}${attrs(attributes)}>${inner}</${name}>`;
 }
 
-export function textTag(
-    attributes: Record<string, AttrValue>,
-    content: string,
-): string {
+export function textTag(attributes: Record<string, AttrValue>, content: string): string {
     return `<text${attrs(attributes)}>${escText(content)}</text>`;
 }
 

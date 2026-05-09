@@ -52,9 +52,7 @@ class Printer {
         const directive = file.directive as JsonAstNode | undefined;
         if (directive) {
             const props = asArray(directive.properties);
-            const tail = props.length > 0
-                ? ` ${props.map(renderProperty).join(' ')}`
-                : '';
+            const tail = props.length > 0 ? ` ${props.map(renderProperty).join(' ')}` : '';
             this.line(0, `nowline ${getString(directive, 'version')}${tail}`);
             this.blank();
         }
@@ -272,9 +270,7 @@ function declarationHeader(keyword: string, entry: JsonAstNode, properties: Json
 }
 
 function renderProperties(properties: JsonAstNode[]): string {
-    return orderProperties(properties)
-        .map(renderProperty)
-        .join(' ');
+    return orderProperties(properties).map(renderProperty).join(' ');
 }
 
 function orderProperties(properties: JsonAstNode[]): JsonAstNode[] {

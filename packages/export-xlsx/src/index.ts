@@ -32,12 +32,7 @@ import type {
     TeamDeclaration,
 } from '@nowline/core';
 import type { ExportInputs } from '@nowline/export-core';
-import {
-    displayLabel,
-    getProp,
-    getProps,
-    roadmapTitle,
-} from '@nowline/export-core';
+import { displayLabel, getProp, getProps, roadmapTitle } from '@nowline/export-core';
 
 import { durationLiteralToText, durationToWorkingDays } from './duration.js';
 
@@ -54,7 +49,9 @@ export async function exportXlsx(
 ): Promise<Uint8Array> {
     const wb = new ExcelJS.Workbook();
     const today = options.generated ?? inputs.today ?? new Date(Date.UTC(2026, 0, 5));
-    const generated = new Date(Date.UTC(today.getUTCFullYear(), today.getUTCMonth(), today.getUTCDate()));
+    const generated = new Date(
+        Date.UTC(today.getUTCFullYear(), today.getUTCMonth(), today.getUTCDate()),
+    );
     wb.creator = options.author ?? inferAuthor(inputs.ast) ?? 'nowline';
     wb.lastModifiedBy = wb.creator;
     wb.created = generated;
@@ -90,7 +87,7 @@ function buildRoadmapSheet(wb: ExcelJS.Workbook, inputs: ExportInputs, generated
 
     const rows: [string, string | number | Date | undefined][] = [
         ['Roadmap', roadmapTitle(decl ?? undefined)],
-        ['Author', inputs.ast.roadmapDecl ? getProp(inputs.ast.roadmapDecl, 'author') ?? '' : ''],
+        ['Author', inputs.ast.roadmapDecl ? (getProp(inputs.ast.roadmapDecl, 'author') ?? '') : ''],
         ['Scale', scale ?? ''],
         ['Start', start ?? ''],
         ['Generated', generated],

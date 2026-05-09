@@ -40,22 +40,32 @@ describe('resolveLocaleOverride', () => {
 
     it('strips POSIX `.encoding` and `@variant` suffixes', () => {
         expect(resolveLocaleOverride({ flag: undefined, env: { LANG: 'fr_FR.UTF-8' } })).toEqual({
-            tag: 'fr-FR', source: 'env', envVar: 'LANG',
+            tag: 'fr-FR',
+            source: 'env',
+            envVar: 'LANG',
         });
         expect(resolveLocaleOverride({ flag: undefined, env: { LANG: 'fr_CA@euro' } })).toEqual({
-            tag: 'fr-CA', source: 'env', envVar: 'LANG',
+            tag: 'fr-CA',
+            source: 'env',
+            envVar: 'LANG',
         });
-        expect(resolveLocaleOverride({ flag: undefined, env: { LANG: 'fr_FR.UTF-8@euro' } })).toEqual({
-            tag: 'fr-FR', source: 'env', envVar: 'LANG',
+        expect(
+            resolveLocaleOverride({ flag: undefined, env: { LANG: 'fr_FR.UTF-8@euro' } }),
+        ).toEqual({
+            tag: 'fr-FR',
+            source: 'env',
+            envVar: 'LANG',
         });
     });
 
     it('skips POSIX C / POSIX locales (treated as "no localization")', () => {
         expect(resolveLocaleOverride({ flag: undefined, env: { LANG: 'C' } })).toEqual({
-            tag: undefined, source: undefined,
+            tag: undefined,
+            source: undefined,
         });
         expect(resolveLocaleOverride({ flag: undefined, env: { LANG: 'POSIX' } })).toEqual({
-            tag: undefined, source: undefined,
+            tag: undefined,
+            source: undefined,
         });
         expect(
             resolveLocaleOverride({ flag: undefined, env: { LC_ALL: 'C', LANG: 'fr_FR' } }),
@@ -64,17 +74,23 @@ describe('resolveLocaleOverride', () => {
 
     it('returns undefined when nothing is set (operator falls back to en-US, content to directive)', () => {
         expect(resolveLocaleOverride({ flag: undefined, env: {} })).toEqual({
-            tag: undefined, source: undefined,
+            tag: undefined,
+            source: undefined,
         });
     });
 
     it('passes BCP-47-shaped values through unchanged', () => {
-        expect(resolveLocaleOverride({ flag: 'fr', env: {} })).toEqual({ tag: 'fr', source: 'flag' });
+        expect(resolveLocaleOverride({ flag: 'fr', env: {} })).toEqual({
+            tag: 'fr',
+            source: 'flag',
+        });
         expect(resolveLocaleOverride({ flag: 'fr-CA', env: {} })).toEqual({
-            tag: 'fr-CA', source: 'flag',
+            tag: 'fr-CA',
+            source: 'flag',
         });
         expect(resolveLocaleOverride({ flag: 'es-419', env: {} })).toEqual({
-            tag: 'es-419', source: 'flag',
+            tag: 'es-419',
+            source: 'flag',
         });
     });
 
@@ -107,7 +123,9 @@ describe('describeContentLocaleSource', () => {
 
     it('reports the env var by name when env produced the tag', () => {
         const result = describeContentLocaleSource(undefined, {
-            tag: 'fr-FR', source: 'env', envVar: 'LANG',
+            tag: 'fr-FR',
+            source: 'env',
+            envVar: 'LANG',
         });
         expect(result).toEqual({ tag: 'fr-FR', source: 'from LANG env var' });
     });
@@ -118,7 +136,10 @@ describe('describeContentLocaleSource', () => {
     });
 
     it('reports the en-US default when nothing is set', () => {
-        const result = describeContentLocaleSource(undefined, { tag: undefined, source: undefined });
+        const result = describeContentLocaleSource(undefined, {
+            tag: undefined,
+            source: undefined,
+        });
         expect(result).toEqual({ tag: 'en-US', source: 'default' });
     });
 });

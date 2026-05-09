@@ -1,36 +1,36 @@
 {
-  "name": "@nowline/renderer",
-  "version": "0.1.0",
-  "description": "Nowline SVG renderer — positioned model → SVG string",
-  "license": "Apache-2.0",
-  "type": "module",
-  "main": "./dist/index.js",
-  "types": "./dist/index.d.ts",
-  "exports": {
-    ".": {
-      "types": "./dist/index.d.ts",
-      "import": "./dist/index.js"
+    "name": "@nowline/renderer",
+    "version": "0.1.0",
+    "description": "Nowline SVG renderer — positioned model → SVG string",
+    "license": "Apache-2.0",
+    "type": "module",
+    "main": "./dist/index.js",
+    "types": "./dist/index.d.ts",
+    "exports": {
+        ".": {
+            "types": "./dist/index.d.ts",
+            "import": "./dist/index.js"
+        }
+    },
+    "files": [
+        "dist/",
+        "src/"
+    ],
+    "scripts": {
+        "build": "tsc -b tsconfig.json",
+        "watch": "tsc -b tsconfig.json --watch",
+        "test": "vitest run",
+        "test:watch": "vitest",
+        "lint": "eslint src/"
+    },
+    "dependencies": {
+        "@nowline/layout": "workspace:*"
+    },
+    "devDependencies": {
+        "@nowline/core": "workspace:*",
+        "@types/node": "^22.0.0",
+        "langium": "~4.2.2",
+        "typescript": "~5.7.0",
+        "vitest": "^3.1.0"
     }
-  },
-  "files": [
-    "dist/",
-    "src/"
-  ],
-  "scripts": {
-    "build": "tsc -b tsconfig.json",
-    "watch": "tsc -b tsconfig.json --watch",
-    "test": "vitest run",
-    "test:watch": "vitest",
-    "lint": "eslint src/"
-  },
-  "dependencies": {
-    "@nowline/layout": "workspace:*"
-  },
-  "devDependencies": {
-    "@nowline/core": "workspace:*",
-    "@types/node": "^22.0.0",
-    "langium": "~4.2.2",
-    "typescript": "~5.7.0",
-    "vitest": "^3.1.0"
-  }
 }

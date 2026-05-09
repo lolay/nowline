@@ -1,10 +1,7 @@
 import { writeOutput } from '../io/write.js';
 import { CliError, ExitCode } from '../io/exit-codes.js';
 import { TEMPLATES, TEMPLATE_NAMES, type TemplateName } from '../generated/templates.js';
-import {
-    defaultInitOutputPath,
-    initNameHasIncompatibleExtension,
-} from '../cli/output-path.js';
+import { defaultInitOutputPath, initNameHasIncompatibleExtension } from '../cli/output-path.js';
 import type { ParsedArgs } from '../cli/args.js';
 
 export interface InitHandlerOptions {
@@ -30,7 +27,11 @@ export async function initHandler(options: InitHandlerOptions): Promise<void> {
     const template = parseTemplateName(args.template);
     const positional = args.positional;
 
-    if (positional !== undefined && positional !== '' && initNameHasIncompatibleExtension(positional)) {
+    if (
+        positional !== undefined &&
+        positional !== '' &&
+        initNameHasIncompatibleExtension(positional)
+    ) {
         throw new CliError(
             ExitCode.InputError,
             `nowline: --init only scaffolds .nowline files; got "${positional}".`,
@@ -42,8 +43,7 @@ export async function initHandler(options: InitHandlerOptions): Promise<void> {
     const templateText = TEMPLATES[template];
     const rendered = applyName(templateText, titleName);
 
-    const outputPath = args.output
-        ?? defaultInitOutputPath({ name: projectName, cwd });
+    const outputPath = args.output ?? defaultInitOutputPath({ name: projectName, cwd });
 
     await writeOutput(outputPath, rendered, 'text', { cwd });
 
@@ -76,9 +76,7 @@ function projectNameFor(positional: string | undefined): string | undefined {
  */
 function titleFor(positional: string | undefined): string | undefined {
     if (!positional) return undefined;
-    return positional.endsWith('.nowline')
-        ? positional.slice(0, -'.nowline'.length)
-        : positional;
+    return positional.endsWith('.nowline') ? positional.slice(0, -'.nowline'.length) : positional;
 }
 
 export function applyName(template: string, name: string | undefined): string {

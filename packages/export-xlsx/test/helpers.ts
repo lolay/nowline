@@ -9,7 +9,9 @@ import {
 import { layoutRoadmap, type ThemeName } from '@nowline/layout';
 import type { ExportInputs } from '@nowline/export-core';
 
-let services: { shared: ReturnType<typeof createNowlineServices>['shared']; Nowline: NowlineServices } | undefined;
+let services:
+    | { shared: ReturnType<typeof createNowlineServices>['shared']; Nowline: NowlineServices }
+    | undefined;
 let counter = 0;
 
 function getServices() {
@@ -28,7 +30,10 @@ export async function buildExportInputs(
     const ast = doc.parseResult.value;
     const sourcePath = options.sourcePath ?? '/virtual/fixture.nowline';
     const resolved: ResolveResult = await resolveIncludes(ast, sourcePath, { services: Nowline });
-    const model = layoutRoadmap(ast, resolved, { theme: options.theme ?? 'light', today: options.today });
+    const model = layoutRoadmap(ast, resolved, {
+        theme: options.theme ?? 'light',
+        today: options.today,
+    });
     return { ast, resolved, model, sourcePath, today: options.today };
 }
 

@@ -10,10 +10,9 @@ const describeBuilt = hasBuild ? describe : describe.skip;
 describeBuilt('--dry-run integration (replaces validate verb)', () => {
     it('exits 0 on a valid file and writes nothing', async () => {
         await withTempDir(async (dir) => {
-            const r = await runCliBuilt([
-                '--dry-run',
-                path.join(examplesDir, 'minimal.nowline'),
-            ], { cwd: dir });
+            const r = await runCliBuilt(['--dry-run', path.join(examplesDir, 'minimal.nowline')], {
+                cwd: dir,
+            });
             expect(r.exitCode).toBe(0);
             expect(existsSync(path.join(dir, 'minimal.svg'))).toBe(false);
         });
@@ -21,10 +20,9 @@ describeBuilt('--dry-run integration (replaces validate verb)', () => {
 
     it('-n short alias works the same way', async () => {
         await withTempDir(async (dir) => {
-            const r = await runCliBuilt([
-                '-n',
-                path.join(examplesDir, 'minimal.nowline'),
-            ], { cwd: dir });
+            const r = await runCliBuilt(['-n', path.join(examplesDir, 'minimal.nowline')], {
+                cwd: dir,
+            });
             expect(r.exitCode).toBe(0);
             expect(existsSync(path.join(dir, 'minimal.svg'))).toBe(false);
         });
@@ -45,7 +43,8 @@ describeBuilt('--dry-run integration (replaces validate verb)', () => {
 
     it('--dry-run --serve is a usage error', async () => {
         const r = await runCliBuilt([
-            '--dry-run', '--serve',
+            '--dry-run',
+            '--serve',
             path.join(examplesDir, 'minimal.nowline'),
         ]);
         expect(r.exitCode).toBe(2);

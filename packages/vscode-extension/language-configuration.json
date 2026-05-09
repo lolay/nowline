@@ -3,17 +3,12 @@
         "lineComment": "//",
         "blockComment": ["/*", "*/"]
     },
-    "brackets": [
-        ["[", "]"]
-    ],
+    "brackets": [["[", "]"]],
     "autoClosingPairs": [
         { "open": "[", "close": "]" },
         { "open": "\"", "close": "\"", "notIn": ["string", "comment"] }
     ],
-    "surroundingPairs": [
-        ["[", "]"],
-        ["\"", "\""]
-    ],
+    "surroundingPairs": [["[", "]"], ["\"", "\""]],
     "wordPattern": "[A-Za-z_][A-Za-z0-9_-]*",
     "onEnterRules": [
         {

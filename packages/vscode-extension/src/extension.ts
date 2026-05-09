@@ -47,7 +47,11 @@ export function activate(context: vscode.ExtensionContext): void {
     });
 
     context.subscriptions.push(
-        { dispose: () => { void client?.stop(); } },
+        {
+            dispose: () => {
+                void client?.stop();
+            },
+        },
         { dispose: () => previewManager?.dispose() },
         { dispose: () => rcCache?.dispose() },
         { dispose: () => exportOutputChannel?.dispose() },
@@ -58,12 +62,8 @@ export function activate(context: vscode.ExtensionContext): void {
         vscode.commands.registerCommand('nowline.openPreviewToSide', (uri?: vscode.Uri) =>
             openPreview(uri, vscode.ViewColumn.Beside),
         ),
-        vscode.commands.registerCommand('nowline.export', (uri?: vscode.Uri) =>
-            handleExport(uri),
-        ),
-        vscode.commands.registerCommand('nowline.newRoadmap', () =>
-            runNewRoadmapCommand(),
-        ),
+        vscode.commands.registerCommand('nowline.export', (uri?: vscode.Uri) => handleExport(uri)),
+        vscode.commands.registerCommand('nowline.newRoadmap', () => runNewRoadmapCommand()),
         rcCache.onDidChange(() => {
             previewManager?.refreshAll();
         }),
@@ -135,12 +135,7 @@ function startLanguageClient(context: vscode.ExtensionContext): void {
         outputChannel: vscode.window.createOutputChannel('Nowline Language Server'),
     };
 
-    client = new LanguageClient(
-        'nowline',
-        'Nowline Language Server',
-        serverOptions,
-        clientOptions,
-    );
+    client = new LanguageClient('nowline', 'Nowline Language Server', serverOptions, clientOptions);
 
     client.start().catch((err) => {
         vscode.window.showErrorMessage(
@@ -149,13 +144,14 @@ function startLanguageClient(context: vscode.ExtensionContext): void {
     });
 }
 
-async function openPreview(uri: vscode.Uri | undefined, viewColumn: vscode.ViewColumn): Promise<void> {
+async function openPreview(
+    uri: vscode.Uri | undefined,
+    viewColumn: vscode.ViewColumn,
+): Promise<void> {
     if (!previewManager) return;
     const target = uri ?? activeNowlineUri();
     if (!target) {
-        vscode.window.showInformationMessage(
-            'Open a .nowline file to use Nowline preview.',
-        );
+        vscode.window.showInformationMessage('Open a .nowline file to use Nowline preview.');
         return;
     }
     await previewManager.openOrReveal(target, viewColumn);
@@ -276,9 +272,12 @@ async function handleSave(
         saveLabel: `Save ${ext.toUpperCase()}`,
     });
     if (!target) return;
-    const bytes = format === 'svg'
-        ? new TextEncoder().encode(typeof body === 'string' ? body : '')
-        : body instanceof Uint8Array ? body : new Uint8Array();
+    const bytes =
+        format === 'svg'
+            ? new TextEncoder().encode(typeof body === 'string' ? body : '')
+            : body instanceof Uint8Array
+              ? body
+              : new Uint8Array();
     try {
         await vscode.workspace.fs.writeFile(target, bytes);
         vscode.window.setStatusBarMessage(`Nowline: saved ${path.basename(target.fsPath)}`, 4000);
@@ -334,7 +333,8 @@ async function openLinkInSideBrowser(): Promise<void> {
         url = await vscode.window.showInputBox({
             prompt: 'URL to open in the side browser',
             placeHolder: 'https://example.com',
-            validateInput: (value) => /^https?:\/\//.test(value) ? null : 'Must start with http:// or https://',
+            validateInput: (value) =>
+                /^https?:\/\//.test(value) ? null : 'Must start with http:// or https://',
         });
     }
     if (!url) return;
@@ -351,8 +351,8 @@ function findUrlNearCursor(editor: vscode.TextEditor): string | undefined {
         const end = start + match[0].length;
         // Distance: 0 when cursor is inside the URL; otherwise distance to the
         // nearest edge.
-        const distance = cursorChar < start ? start - cursorChar
-            : cursorChar > end ? cursorChar - end : 0;
+        const distance =
+            cursorChar < start ? start - cursorChar : cursorChar > end ? cursorChar - end : 0;
         if (distance < bestDistance) {
             bestDistance = distance;
             bestUrl = match[0];

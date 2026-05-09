@@ -11,12 +11,7 @@
 // to the chiclet height plus a small gutter before the first inner
 // row begins.
 
-import type {
-    GroupBlock,
-    ItemDeclaration,
-    ParallelBlock,
-    EntityProperty,
-} from '@nowline/core';
+import type { GroupBlock, ItemDeclaration, ParallelBlock, EntityProperty } from '@nowline/core';
 import { isItemDeclaration } from '@nowline/core';
 import { resolveStyle } from '../style-resolution.js';
 import type {
@@ -96,13 +91,8 @@ export class GroupNode {
         ctx.currentFlowKey = `${previousFlowKey}/group:${node.name ?? 'g'}`;
         // Mirrors `renderGroup`'s `hasFill` decision so the painted box
         // and the layout's reservation agree on whether a chiclet exists.
-        const hasChiclet =
-            style.bg !== 'none' &&
-            style.bg !== '#ffffff' &&
-            Boolean(title);
-        const topPad = hasChiclet
-            ? GROUP_TITLE_TAB_HEIGHT_PX + GROUP_TITLE_TAB_GUTTER_PX
-            : 0;
+        const hasChiclet = style.bg !== 'none' && style.bg !== '#ffffff' && Boolean(title);
+        const topPad = hasChiclet ? GROUP_TITLE_TAB_HEIGHT_PX + GROUP_TITLE_TAB_GUTTER_PX : 0;
         const bottomPad = hasChiclet ? GROUP_BOTTOM_PAD_PX : 0;
         // Bracket-style groups paint their label at `box.y - 2`, so the
         // label glyph overhangs ABOVE box.y. Without an explicit
@@ -158,20 +148,12 @@ export class GroupNode {
             }
 
             const props = (child as ItemDeclaration).properties;
-            const desiredStart = deps.resolveChildStart(
-                props,
-                timeCursorX,
-                groupContentLeftX,
-                ctx,
-            );
+            const desiredStart = deps.resolveChildStart(props, timeCursorX, groupContentLeftX, ctx);
             // Predict logical extent so the row-packer can bump on
             // collision before we hand off to `sequenceItem`. Mirrors
             // SwimlaneNode's pre-flight width math.
             const durationDays = deriveItemDurationDays(props, ctx.sizes, ctx.cal);
-            const naturalWidth = Math.max(
-                MIN_ITEM_WIDTH,
-                durationDays * ctx.timeline.pixelsPerDay,
-            );
+            const naturalWidth = Math.max(MIN_ITEM_WIDTH, durationDays * ctx.timeline.pixelsPerDay);
             const desiredEnd = desiredStart + naturalWidth;
             const childId = (child as ItemDeclaration).name ?? '';
 
@@ -252,10 +234,7 @@ export class GroupNode {
         // (bandwidth + gap); groups need to add it explicitly since
         // their painted height is gap-less.
         const interRowGap = ctx.bandScale.step() - ctx.bandScale.bandwidth();
-        cursor.height = Math.max(
-            cursor.height,
-            bracketLabelOverhang + box.height + interRowGap,
-        );
+        cursor.height = Math.max(cursor.height, bracketLabelOverhang + box.height + interRowGap);
         const id = node.name;
         if (id) {
             ctx.entityLeftEdges.set(id, box.x);

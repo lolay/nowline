@@ -4,11 +4,7 @@ import * as path from 'node:path';
 import { layoutRoadmap } from '@nowline/layout';
 import { renderSvg } from '@nowline/renderer';
 import { URI } from 'langium';
-import {
-    createNowlineServices,
-    resolveIncludes,
-    type NowlineFile,
-} from '@nowline/core';
+import { createNowlineServices, resolveIncludes, type NowlineFile } from '@nowline/core';
 
 const repoRoot = path.resolve(process.cwd(), '..', '..');
 const longPath = path.join(repoRoot, 'examples', 'long.nowline');

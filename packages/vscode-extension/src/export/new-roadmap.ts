@@ -5,7 +5,11 @@ import * as vscode from 'vscode';
 const TEMPLATES: ReadonlyArray<{ id: string; label: string; detail: string }> = [
     { id: 'minimal', label: 'minimal', detail: 'Bare-bones starter (one swimlane, a few items)' },
     { id: 'teams', label: 'teams', detail: 'People + teams + anchors + footnotes' },
-    { id: 'product', label: 'product', detail: 'Full feature set: config, styles, sizes, labels, milestones' },
+    {
+        id: 'product',
+        label: 'product',
+        detail: 'Full feature set: config, styles, sizes, labels, milestones',
+    },
 ];
 
 const NAME_RE = /^[A-Za-z][A-Za-z0-9_-]*$/;
@@ -30,7 +34,8 @@ export async function runNewRoadmapCommand(): Promise<void> {
         validateInput: (raw) => {
             if (!raw) return 'Name is required.';
             if (raw.endsWith('.nowline')) raw = raw.slice(0, -'.nowline'.length);
-            return NAME_RE.test(raw) ? null
+            return NAME_RE.test(raw)
+                ? null
                 : 'Use a kebab/snake identifier (letters, digits, dashes, underscores).';
         },
     });
@@ -54,7 +59,8 @@ export async function runNewRoadmapCommand(): Promise<void> {
         if (overwrite !== 'Overwrite') return;
     }
 
-    const cliPath = vscode.workspace.getConfiguration('nowline.export').get<string>('cliPath') ?? 'nowline';
+    const cliPath =
+        vscode.workspace.getConfiguration('nowline.export').get<string>('cliPath') ?? 'nowline';
 
     try {
         await runCli(
@@ -98,7 +104,9 @@ function runCli(cliPath: string, args: string[], cwd: string): Promise<void> {
     return new Promise<void>((resolve, reject) => {
         const child = spawn(cliPath, args, { cwd });
         let stderr = '';
-        child.stderr.on('data', (chunk: Buffer) => { stderr += chunk.toString('utf8'); });
+        child.stderr.on('data', (chunk: Buffer) => {
+            stderr += chunk.toString('utf8');
+        });
         child.on('error', (err) => reject(err));
         child.on('close', (code) => {
             if (code === 0) resolve();

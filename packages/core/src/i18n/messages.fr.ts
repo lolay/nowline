@@ -16,14 +16,10 @@ import type { MessageBundle } from './index.js';
 
 export const messages: MessageBundle = {
     // Structurel
-    'NL.E0001': () =>
-        'La section config doit précéder la section roadmap.',
-    'NL.E0002': () =>
-        'Les déclarations include doivent précéder la section config.',
-    'NL.E0003': () =>
-        'Les déclarations include doivent précéder la section roadmap.',
-    'NL.E0004': () =>
-        'Au moins une swimlane est requise.',
+    'NL.E0001': () => 'La section config doit précéder la section roadmap.',
+    'NL.E0002': () => 'Les déclarations include doivent précéder la section config.',
+    'NL.E0003': () => 'Les déclarations include doivent précéder la section roadmap.',
+    'NL.E0004': () => 'Au moins une swimlane est requise.',
     'NL.E0005': (a: { line: number }) =>
         `Ligne ${a.line}\u00A0: tabulations et espaces mélangés dans l'indentation. Utilisez l'un ou l'autre, mais pas les deux.`,
 
@@ -34,16 +30,14 @@ export const messages: MessageBundle = {
         `Ce fichier requiert Nowline ${a.version}, mais l'analyseur ne prend en charge que jusqu'à ${a.supported}.`,
     'NL.E0102': (a: { key: string; allowed: string }) =>
         `Propriété de directive inconnue «\u00A0${a.key}\u00A0». Valeurs admises\u00A0: ${a.allowed}.`,
-    'NL.E0103': (a: { key: string }) =>
-        `Propriété de directive «\u00A0${a.key}\u00A0» en double.`,
+    'NL.E0103': (a: { key: string }) => `Propriété de directive «\u00A0${a.key}\u00A0» en double.`,
     'NL.E0104': (a: { value: string }) =>
         `Locale invalide «\u00A0${a.value}\u00A0». Utilisez une étiquette BCP-47 telle que «\u00A0en-US\u00A0», «\u00A0fr\u00A0» ou «\u00A0fr-CA\u00A0».`,
 
     // Include
     'NL.E0200': (a: { value: string }) =>
         `Mode d'include invalide «\u00A0${a.value}\u00A0». Doit être merge, ignore ou isolate.`,
-    'NL.E0201': (a: { key: string }) =>
-        `Option «\u00A0${a.key}\u00A0» en double sur include.`,
+    'NL.E0201': (a: { key: string }) => `Option «\u00A0${a.key}\u00A0» en double sur include.`,
 
     // Identifiant
     'NL.E0300': (a: { name: string; location: string }) =>

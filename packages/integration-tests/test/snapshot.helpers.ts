@@ -24,7 +24,9 @@ import {
 import { layoutRoadmap, type ThemeName } from '@nowline/layout';
 import { renderSvg } from '@nowline/renderer';
 
-let cached: { shared: ReturnType<typeof createNowlineServices>['shared']; Nowline: NowlineServices } | undefined;
+let cached:
+    | { shared: ReturnType<typeof createNowlineServices>['shared']; Nowline: NowlineServices }
+    | undefined;
 
 function getServices() {
     if (!cached) {

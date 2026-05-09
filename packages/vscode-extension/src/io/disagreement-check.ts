@@ -49,7 +49,10 @@ export class DisagreementTracker {
                 .showInformationMessage(message, 'Open Settings', `Edit ${path.basename(rcPath)}`)
                 .then((choice) => {
                     if (choice === 'Open Settings') {
-                        void vscode.commands.executeCommand('workbench.action.openSettings', entry.settingPath);
+                        void vscode.commands.executeCommand(
+                            'workbench.action.openSettings',
+                            entry.settingPath,
+                        );
                     } else if (choice && rcPath) {
                         void vscode.window.showTextDocument(vscode.Uri.file(rcPath));
                     }

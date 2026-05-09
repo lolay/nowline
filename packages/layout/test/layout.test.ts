@@ -160,7 +160,8 @@ swimlane build "Build"
         const src = `nowline v1\n\nconfig\n\nstyle critical\n  bg: red\n  fg: white\n\nroadmap r1 "R"\n\nlabel urgent "Urgent" style:critical\n\nswimlane a "A"\n  item one duration:1w labels:urgent\n`;
         const { file, resolved } = await parseAndResolve(src);
         const model = layoutRoadmap(file, resolved, { theme: 'light' });
-        const chip = (model.swimlanes[0].children[0] as { labelChips: { style: { bg: string } }[] }).labelChips[0];
+        const chip = (model.swimlanes[0].children[0] as { labelChips: { style: { bg: string } }[] })
+            .labelChips[0];
         expect(chip).toBeDefined();
         expect(chip.style.bg.toLowerCase()).toBe('#e53935');
     });
@@ -232,7 +233,11 @@ swimlane build "Build"
             const { file, resolved } = await parseAndResolve(src);
             const model = layoutRoadmap(file, resolved, { theme: 'light' });
             const item = model.swimlanes[0].children[0] as {
-                capacity: { value: number; text: string; icon: { kind: string; name?: string } | null };
+                capacity: {
+                    value: number;
+                    text: string;
+                    icon: { kind: string; name?: string } | null;
+                };
             };
             expect(item.capacity).toEqual({
                 value: 5,
@@ -245,7 +250,9 @@ swimlane build "Build"
             const src = `nowline v1\n\nroadmap r\n\nswimlane s\n  item x duration:1w capacity:1.25\n`;
             const { file, resolved } = await parseAndResolve(src);
             const model = layoutRoadmap(file, resolved, { theme: 'light' });
-            const item = model.swimlanes[0].children[0] as { capacity: { text: string; value: number } };
+            const item = model.swimlanes[0].children[0] as {
+                capacity: { text: string; value: number };
+            };
             expect(item.capacity.text).toBe('1.25');
             expect(item.capacity.value).toBe(1.25);
         });
@@ -254,7 +261,9 @@ swimlane build "Build"
             const src = `nowline v1\n\nroadmap r\n\nswimlane s\n  item x duration:1w capacity:50%\n`;
             const { file, resolved } = await parseAndResolve(src);
             const model = layoutRoadmap(file, resolved, { theme: 'light' });
-            const item = model.swimlanes[0].children[0] as { capacity: { text: string; value: number } };
+            const item = model.swimlanes[0].children[0] as {
+                capacity: { text: string; value: number };
+            };
             expect(item.capacity.value).toBe(0.5);
             expect(item.capacity.text).toBe('0.5');
         });
@@ -352,7 +361,9 @@ swimlane build "Build"
             const aliasOut = await parseAndResolve(aliasSrc);
             const canonicalOut = await parseAndResolve(canonicalSrc);
             const aliasModel = layoutRoadmap(aliasOut.file, aliasOut.resolved, { theme: 'light' });
-            const canonicalModel = layoutRoadmap(canonicalOut.file, canonicalOut.resolved, { theme: 'light' });
+            const canonicalModel = layoutRoadmap(canonicalOut.file, canonicalOut.resolved, {
+                theme: 'light',
+            });
             const aliasItem = aliasModel.swimlanes[0].children[0] as { status: string };
             const canonicalItem = canonicalModel.swimlanes[0].children[0] as { status: string };
             expect(aliasItem.status).toBe('in-progress');
@@ -366,7 +377,9 @@ swimlane build "Build"
             const aliasOut = await parseAndResolve(aliasSrc);
             const canonicalOut = await parseAndResolve(canonicalSrc);
             const aliasModel = layoutRoadmap(aliasOut.file, aliasOut.resolved, { theme: 'light' });
-            const canonicalModel = layoutRoadmap(canonicalOut.file, canonicalOut.resolved, { theme: 'light' });
+            const canonicalModel = layoutRoadmap(canonicalOut.file, canonicalOut.resolved, {
+                theme: 'light',
+            });
             const aliasItem = aliasModel.swimlanes[0].children[0] as { status: string };
             const canonicalItem = canonicalModel.swimlanes[0].children[0] as { status: string };
             expect(aliasItem.status).toBe('done');
@@ -392,10 +405,12 @@ swimlane b "B"
         const { file, resolved } = await parseAndResolve(src);
         const model = layoutRoadmap(file, resolved, { theme: 'light' });
         const upstream = model.swimlanes[0].children[0] as {
-            id: string; box: { x: number; y: number; width: number; height: number };
+            id: string;
+            box: { x: number; y: number; width: number; height: number };
         };
         const downstream = model.swimlanes[1].children[0] as {
-            id: string; box: { x: number; y: number; width: number; height: number };
+            id: string;
+            box: { x: number; y: number; width: number; height: number };
         };
         const edge = model.edges.find((e) => e.toId === 'downstream');
         expect(edge).toBeDefined();
@@ -427,15 +442,14 @@ swimlane a "A"
 `;
         const { file, resolved } = await parseAndResolve(src);
         const model = layoutRoadmap(file, resolved, { theme: 'light' });
-        const phase2 = model.swimlanes[0].children.find(
-            (c) => 'id' in c && c.id === 'phase2',
-        ) as { id: string; box: { x: number; y: number; width: number; height: number } };
+        const phase2 = model.swimlanes[0].children.find((c) => 'id' in c && c.id === 'phase2') as {
+            id: string;
+            box: { x: number; y: number; width: number; height: number };
+        };
         expect(phase2).toBeDefined();
         const anchor = model.anchors.find((a) => a.id === 'kickoff');
         expect(anchor).toBeDefined();
-        const edge = model.edges.find(
-            (e) => e.fromId === 'kickoff' && e.toId === 'phase2',
-        );
+        const edge = model.edges.find((e) => e.fromId === 'kickoff' && e.toId === 'phase2');
         expect(edge).toBeDefined();
         const wp = edge!.waypoints;
         expect(wp.length).toBeGreaterThanOrEqual(2);

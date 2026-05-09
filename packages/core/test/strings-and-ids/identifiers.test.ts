@@ -4,7 +4,9 @@ import { isItemDeclaration, isSwimlaneDeclaration } from '../../src/generated/as
 
 describe('strings and identifiers', () => {
     it('accepts empty string title', async () => {
-        const r = await parse(`roadmap r ""\nswimlane s\n  item a duration:1w\n`, { validate: false });
+        const r = await parse(`roadmap r ""\nswimlane s\n  item a duration:1w\n`, {
+            validate: false,
+        });
         expect(r.parserErrors).toEqual([]);
     });
 
@@ -17,18 +19,16 @@ describe('strings and identifiers', () => {
     });
 
     it('accepts unicode in titles', async () => {
-        const r = await parse(
-            `roadmap r "Plataforma 🚀"\nswimlane s\n  item a duration:1w\n`,
-            { validate: false },
-        );
+        const r = await parse(`roadmap r "Plataforma 🚀"\nswimlane s\n  item a duration:1w\n`, {
+            validate: false,
+        });
         expect(r.parserErrors).toEqual([]);
     });
 
     it('accepts identifier with consecutive hyphens', async () => {
-        const r = await parse(
-            `roadmap r\nswimlane s\n  item auth--refactor duration:1w\n`,
-            { validate: false },
-        );
+        const r = await parse(`roadmap r\nswimlane s\n  item auth--refactor duration:1w\n`, {
+            validate: false,
+        });
         expect(r.parserErrors).toEqual([]);
         const swimlane = r.ast.roadmapEntries[0];
         if (!isSwimlaneDeclaration(swimlane)) throw new Error('expected swimlane');
@@ -56,28 +56,25 @@ describe('strings and identifiers', () => {
     });
 
     it('accepts empty bracket list', async () => {
-        const r = await parse(
-            `roadmap r\nswimlane s\n  item a duration:1w labels:[]\n`,
-            { validate: false },
-        );
+        const r = await parse(`roadmap r\nswimlane s\n  item a duration:1w labels:[]\n`, {
+            validate: false,
+        });
         // Empty [] may be a parser error since the grammar requires at least one atom;
         // confirm parser either accepts it or fails cleanly.
         expect(typeof r.parserErrors.length).toBe('number');
     });
 
     it('accepts single-item bracket list', async () => {
-        const r = await parse(
-            `roadmap r\nswimlane s\n  item a duration:1w labels:[enterprise]\n`,
-            { validate: false },
-        );
+        const r = await parse(`roadmap r\nswimlane s\n  item a duration:1w labels:[enterprise]\n`, {
+            validate: false,
+        });
         expect(r.parserErrors).toEqual([]);
     });
 
     it('accepts densely-packed and spaced list variants', async () => {
-        const r1 = await parse(
-            `roadmap r\nswimlane s\n  item a duration:1w labels:[a,b,c]\n`,
-            { validate: false },
-        );
+        const r1 = await parse(`roadmap r\nswimlane s\n  item a duration:1w labels:[a,b,c]\n`, {
+            validate: false,
+        });
         const r2 = await parse(
             `roadmap r\nswimlane s\n  item a duration:1w labels:[ a , b , c ]\n`,
             { validate: false },

@@ -33,18 +33,18 @@ const cliPath = resolve(repoRoot, 'packages/cli/dist/index.js');
 // snapshot fixture.
 const NOW = '2026-02-09';
 const MANIFEST = [
-    { slug: 'large-roadmap-title',     theme: 'light', now: NOW },
-    { slug: 'large-swimlane-title',    theme: 'light', now: NOW },
-    { slug: 'text-fits-inside-bars',   theme: 'light', now: NOW },
-    { slug: 'text-spills-right',       theme: 'light', now: NOW },
-    { slug: 'item-bumps-up',           theme: 'light', now: NOW },
-    { slug: 'isolate-include-multi',   theme: 'light', now: NOW },
+    { slug: 'large-roadmap-title', theme: 'light', now: NOW },
+    { slug: 'large-swimlane-title', theme: 'light', now: NOW },
+    { slug: 'text-fits-inside-bars', theme: 'light', now: NOW },
+    { slug: 'text-spills-right', theme: 'light', now: NOW },
+    { slug: 'item-bumps-up', theme: 'light', now: NOW },
+    { slug: 'isolate-include-multi', theme: 'light', now: NOW },
     { slug: 'defaults-no-start-no-now', theme: 'light' },
-    { slug: 'capacity-items',          theme: 'light', now: NOW },
-    { slug: 'capacity-lanes',          theme: 'light', now: NOW },
-    { slug: 'size-and-capacity',       theme: 'light', now: NOW },
-    { slug: 'utilization-states',      theme: 'light', now: NOW },
-    { slug: 'nested-both-headers',     theme: 'light', now: NOW },
+    { slug: 'capacity-items', theme: 'light', now: NOW },
+    { slug: 'capacity-lanes', theme: 'light', now: NOW },
+    { slug: 'size-and-capacity', theme: 'light', now: NOW },
+    { slug: 'utilization-states', theme: 'light', now: NOW },
+    { slug: 'nested-both-headers', theme: 'light', now: NOW },
 ];
 
 function run(cmd, args, opts = {}) {
@@ -66,12 +66,7 @@ async function renderOne(entry) {
         return;
     }
     const outRel = `tests/${entry.slug}.svg`;
-    const args = [
-        cliPath,
-        sourceRel,
-        '-o', outRel,
-        '--theme', entry.theme,
-    ];
+    const args = [cliPath, sourceRel, '-o', outRel, '--theme', entry.theme];
     if (entry.now) args.push('--now', entry.now);
     console.log(`render ${entry.slug} (${entry.theme}) -> ${outRel}`);
     await run(process.execPath, args);
@@ -79,15 +74,16 @@ async function renderOne(entry) {
 
 async function main() {
     if (!existsSync(cliPath)) {
-        console.error(`error: CLI not built. Run \`pnpm -r --workspace-concurrency=1 run build\` first.`);
+        console.error(
+            `error: CLI not built. Run \`pnpm -r --workspace-concurrency=1 run build\` first.`,
+        );
         console.error(`       expected ${relative(repoRoot, cliPath)}`);
         process.exit(2);
     }
     assertDistFresh({ repoRoot, cliPath });
     const wanted = process.argv.slice(2);
-    const entries = wanted.length === 0
-        ? MANIFEST
-        : MANIFEST.filter((e) => wanted.includes(e.slug));
+    const entries =
+        wanted.length === 0 ? MANIFEST : MANIFEST.filter((e) => wanted.includes(e.slug));
     if (entries.length === 0) {
         console.error(`error: no matching entries for ${wanted.join(', ')}`);
         console.error(`       available slugs: ${MANIFEST.map((e) => e.slug).join(', ')}`);

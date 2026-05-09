@@ -26,7 +26,9 @@ describe('validate — happy path', () => {
         // NL.E0600 is the stable item-requires-duration code; the legacy
         // inferred 'duration' / 'validation' strings are still acceptable
         // for diagnostics that haven't been migrated to a stable code yet.
-        expect(codes.some((c) => c === 'NL.E0600' || c === 'duration' || c === 'validation')).toBe(true);
+        expect(codes.some((c) => c === 'NL.E0600' || c === 'duration' || c === 'validation')).toBe(
+            true,
+        );
     });
 
     it('attributes every diagnostic to the input file', async () => {
@@ -115,7 +117,7 @@ anchor launch "Launch"
             operatorLocale: 'en-US',
         });
         expect(text).toMatch(/Anchor "launch" requires/);
-        expect(text).not.toContain('L\'ancre');
+        expect(text).not.toContain("L'ancre");
     });
 
     it('JSON output also re-formats with operator locale', async () => {

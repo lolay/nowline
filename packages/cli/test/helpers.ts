@@ -37,8 +37,12 @@ export function runCliBuilt(args: string[], options: RunOptions = {}): Promise<R
         });
         let stdout = '';
         let stderr = '';
-        child.stdout.on('data', (d: Buffer) => { stdout += d.toString('utf-8'); });
-        child.stderr.on('data', (d: Buffer) => { stderr += d.toString('utf-8'); });
+        child.stdout.on('data', (d: Buffer) => {
+            stdout += d.toString('utf-8');
+        });
+        child.stderr.on('data', (d: Buffer) => {
+            stderr += d.toString('utf-8');
+        });
         child.on('error', reject);
         child.on('close', (code) => {
             resolve({ exitCode: code ?? 0, stdout, stderr });

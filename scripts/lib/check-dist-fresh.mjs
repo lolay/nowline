@@ -88,10 +88,10 @@ export function assertDistFresh({ repoRoot, cliPath }) {
         const srcRel = relative(repoRoot, newest.path);
         const fmt = (ms) => new Date(ms).toISOString();
         process.stderr.write(
-            `error: CLI dist is older than its source — rebuild before rendering.\n`
-            + `       ${distRel}  ${fmt(cliMtime)}\n`
-            + `       ${srcRel} (newest source)  ${fmt(newest.mtimeMs)}\n`
-            + `       Run \`pnpm build\` (or \`pnpm -r run build\`) first.\n`,
+            `error: CLI dist is older than its source — rebuild before rendering.\n` +
+                `       ${distRel}  ${fmt(cliMtime)}\n` +
+                `       ${srcRel} (newest source)  ${fmt(newest.mtimeMs)}\n` +
+                `       Run \`pnpm build\` (or \`pnpm -r run build\`) first.\n`,
         );
         process.exit(2);
     }

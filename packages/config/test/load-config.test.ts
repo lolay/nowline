@@ -24,7 +24,9 @@ describe('.nowlinerc discovery', () => {
 
     it('returns an empty config when no file is found', async () => {
         const { config, path: foundAt } = await loadConfig('/tmp/nonexistent-path-12345', {
-            readFile: async () => { throw new Error('nope'); },
+            readFile: async () => {
+                throw new Error('nope');
+            },
             fileExists: async () => false,
             root: '/',
         });

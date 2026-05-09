@@ -25,7 +25,15 @@ const TEXT_FORMATS: ReadonlySet<OutputFormat> = new Set([
 const BINARY_FORMATS: ReadonlySet<OutputFormat> = new Set(['png', 'pdf', 'xlsx']);
 
 export const ALL_OUTPUT_FORMATS: readonly OutputFormat[] = [
-    'svg', 'png', 'pdf', 'html', 'mermaid', 'xlsx', 'msproj', 'json', 'nowline',
+    'svg',
+    'png',
+    'pdf',
+    'html',
+    'mermaid',
+    'xlsx',
+    'msproj',
+    'json',
+    'nowline',
 ];
 
 export function isOutputFormat(value: string): value is OutputFormat {

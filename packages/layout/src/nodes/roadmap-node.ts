@@ -124,7 +124,11 @@ export interface RoadmapNodeDeps extends LayoutHelpers {
         includes: PositionedIncludeRegion[],
         ctx: LayoutContext,
     ) => PositionedDependencyEdge[];
-    buildNowline: (today: Date | undefined, ctx: LayoutContext, locale: string) => PositionedNowline | null;
+    buildNowline: (
+        today: Date | undefined,
+        ctx: LayoutContext,
+        locale: string,
+    ) => PositionedNowline | null;
 }
 
 export class RoadmapNode {
@@ -179,8 +183,7 @@ export class RoadmapNode {
         // and specs/rendering.md § Timeline Scale.
         const showTopTickPanel = headerStyle.timelinePosition !== 'bottom';
         const showBottomTickPanel =
-            headerStyle.timelinePosition === 'bottom'
-            || headerStyle.timelinePosition === 'both';
+            headerStyle.timelinePosition === 'bottom' || headerStyle.timelinePosition === 'both';
 
         // Pre-size the beside-mode header card. Width = max line width +
         // padding, clamped to MIN..MAX with word-wrap once the title
@@ -288,7 +291,12 @@ export class RoadmapNode {
         // entries claim row 0; later ones drop to row 1+ when their
         // bounding box (diamond + label) overlaps an already-placed
         // entry. The renderer reads `labelBox.x/y` directly.
-        const packed = packMarkerRow(datePinnedEntries, chartLeftX, finalChartRightX, deps.estimateTextWidth);
+        const packed = packMarkerRow(
+            datePinnedEntries,
+            chartLeftX,
+            finalChartRightX,
+            deps.estimateTextWidth,
+        );
         const markerRowsCount = hasMarkerEntities ? Math.max(1, packed.rowCount) : 0;
         const markerRowHeight = markerRowsCount * MARKER_ROW_PITCH_PX;
         const headerRowsHeight = pillRowHeight + tickPanelHeight + markerRowHeight;
@@ -337,7 +345,8 @@ export class RoadmapNode {
         // build time so they slot into the same rows where there's room.
         const markerRowPlacements = new Map<string, MarkerRowPlacement>();
         for (const [id, p] of packed.placements) {
-            const centerY = markerRowY + MARKER_ROW_CENTER_OFFSET_PX + p.rowIndex * MARKER_ROW_PITCH_PX;
+            const centerY =
+                markerRowY + MARKER_ROW_CENTER_OFFSET_PX + p.rowIndex * MARKER_ROW_PITCH_PX;
             markerRowPlacements.set(id, {
                 rowIndex: p.rowIndex,
                 centerY,
@@ -415,7 +424,11 @@ export class RoadmapNode {
         const interBandGapPx =
             SPACING_PX[swimlaneDefaultStyle.spacing as keyof typeof SPACING_PX] ?? 0;
 
-        const runSwimlaneLoop = (): { swimlanes: PositionedSwimlane[]; nextY: number; maxRightX: number } => {
+        const runSwimlaneLoop = (): {
+            swimlanes: PositionedSwimlane[];
+            nextY: number;
+            maxRightX: number;
+        } => {
             const out: PositionedSwimlane[] = [];
             let cursorY = ctx.chartTopY;
             let bIndex = 0;
@@ -544,7 +557,8 @@ export class RoadmapNode {
 
         ctx.markerRowPlacements.clear();
         for (const [id, p] of repacked.placements) {
-            const centerY = markerRowY + MARKER_ROW_CENTER_OFFSET_PX + p.rowIndex * MARKER_ROW_PITCH_PX;
+            const centerY =
+                markerRowY + MARKER_ROW_CENTER_OFFSET_PX + p.rowIndex * MARKER_ROW_PITCH_PX;
             ctx.markerRowPlacements.set(id, {
                 rowIndex: p.rowIndex,
                 centerY,
@@ -657,11 +671,11 @@ export class RoadmapNode {
         // HEADER_CARD_TOP_INSET clearance from the canvas top.
         const cardBox: BoundingBox = isBeside
             ? {
-                x: 6,
-                y: headerRowsBottomY - sizedHeader.cardHeight,
-                width: sizedHeader.cardWidth,
-                height: sizedHeader.cardHeight,
-            }
+                  x: 6,
+                  y: headerRowsBottomY - sizedHeader.cardHeight,
+                  width: sizedHeader.cardWidth,
+                  height: sizedHeader.cardHeight,
+              }
             : { x: 0, y: 0, width: ctx.chartRightX, height: HEADER_ABOVE_HEIGHT_PX };
 
         // Attribution wordmark placement. Canvas grows by GUTTER_PX +
@@ -678,9 +692,10 @@ export class RoadmapNode {
         // header gap and shouldn't push the attribution down. Use the
         // bare `chartBottomY` in that case so the bottom margin is
         // exactly `GUTTER_PX + glyphHeight + GUTTER_PX`.
-        const contentBottomY = foot.area.entries.length > 0
-            ? foot.area.box.y + foot.area.box.height
-            : ctx.chartBottomY;
+        const contentBottomY =
+            foot.area.entries.length > 0
+                ? foot.area.box.y + foot.area.box.height
+                : ctx.chartBottomY;
         const attributionBox: BoundingBox = {
             x: ctx.chartRightX - GUTTER_PX - ATTRIBUTION_GLYPH_WIDTH,
             y: contentBottomY + GUTTER_PX,

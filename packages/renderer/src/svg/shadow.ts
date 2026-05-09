@@ -1,7 +1,12 @@
 import { attrs, tag } from './xml.js';
 import type { ShadowKind } from '@nowline/layout';
 
-interface Params { dx: number; dy: number; stdDeviation: number; opacity: number }
+interface Params {
+    dx: number;
+    dy: number;
+    stdDeviation: number;
+    opacity: number;
+}
 
 const PARAMS: Record<ShadowKind, Params> = {
     none: { dx: 0, dy: 0, stdDeviation: 0, opacity: 0 },
@@ -27,9 +32,7 @@ export function shadowFilterUrl(idPrefix: string, kind: ShadowKind): string | nu
 }
 
 export function allShadowDefs(idPrefix: string): string {
-    return (['subtle', 'soft', 'hard'] as const)
-        .map((k) => shadowFilterDef(idPrefix, k))
-        .join('');
+    return (['subtle', 'soft', 'hard'] as const).map((k) => shadowFilterDef(idPrefix, k)).join('');
 }
 // keep attrs referenced so TS doesn't complain about unused
 void attrs;

@@ -148,7 +148,10 @@ export function resolveCapacityIcon(
 ): ResolvedCapacityIcon | null {
     if (icon === 'none') return null;
     if (BUILTIN_CAPACITY_ICONS.has(icon)) {
-        return { kind: 'builtin', name: icon as 'multiplier' | 'person' | 'people' | 'points' | 'time' };
+        return {
+            kind: 'builtin',
+            name: icon as 'multiplier' | 'person' | 'people' | 'points' | 'time',
+        };
     }
     const custom = symbols.get(icon);
     if (custom) {

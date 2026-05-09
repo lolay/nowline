@@ -37,13 +37,8 @@ function stripColon(key: string): string {
     return key.endsWith(':') ? key.slice(0, -1) : key;
 }
 
-export function resolveScale(
-    file: NowlineFile,
-    scaleBlock: ScaleBlock | undefined,
-): ViewPreset {
-    const scaleProp = file.roadmapDecl?.properties.find(
-        (p) => stripColon(p.key) === 'scale',
-    );
+export function resolveScale(file: NowlineFile, scaleBlock: ScaleBlock | undefined): ViewPreset {
+    const scaleProp = file.roadmapDecl?.properties.find((p) => stripColon(p.key) === 'scale');
     // `scale:` accepts a unit name (`days`/`weeks`/`months`/`quarters`/`years`)
     // OR a duration literal (`1w`, `2w`, `1m`, `1q`, `1y`). The literal form
     // is the documented default in the DSL spec; it picks the unit and uses
@@ -53,18 +48,34 @@ export function resolveScale(
     let pixelsPerUnitOverride: number | undefined;
     let labelEveryOverride: number | undefined;
     if (rawScale) {
-        if (rawScale === 'days' || rawScale === 'weeks' || rawScale === 'months' || rawScale === 'quarters' || rawScale === 'years') {
+        if (
+            rawScale === 'days' ||
+            rawScale === 'weeks' ||
+            rawScale === 'months' ||
+            rawScale === 'quarters' ||
+            rawScale === 'years'
+        ) {
             unit = rawScale;
         } else {
             const dur = /^(\d+)([dwmqy])$/.exec(rawScale);
             if (dur) {
                 const n = Math.max(1, parseInt(dur[1], 10));
                 switch (dur[2]) {
-                    case 'd': unit = 'days'; break;
-                    case 'w': unit = 'weeks'; break;
-                    case 'm': unit = 'months'; break;
-                    case 'q': unit = 'quarters'; break;
-                    case 'y': unit = 'years'; break;
+                    case 'd':
+                        unit = 'days';
+                        break;
+                    case 'w':
+                        unit = 'weeks';
+                        break;
+                    case 'm':
+                        unit = 'months';
+                        break;
+                    case 'q':
+                        unit = 'quarters';
+                        break;
+                    case 'y':
+                        unit = 'years';
+                        break;
                 }
                 pixelsPerUnitOverride = unitPx(unit) * n;
                 // A literal scale like `1w` says "I want exactly one label per
@@ -78,12 +89,8 @@ export function resolveScale(
     if (scaleBlock) {
         const unitProp = scaleBlock.properties.find((p) => stripColon(p.key) === 'unit');
         const resolvedUnit: ScaleUnit = (unitProp?.value as ScaleUnit) ?? unit;
-        const labelProp = scaleBlock.properties.find(
-            (p) => stripColon(p.key) === 'label-every',
-        );
-        const pxProp = scaleBlock.properties.find(
-            (p) => stripColon(p.key) === 'pixels-per-unit',
-        );
+        const labelProp = scaleBlock.properties.find((p) => stripColon(p.key) === 'label-every');
+        const pxProp = scaleBlock.properties.find((p) => stripColon(p.key) === 'pixels-per-unit');
         const labelEvery = labelProp
             ? Math.max(1, parseInt(labelProp.value, 10) || defaultLabelEvery)
             : defaultLabelEvery;
@@ -93,7 +100,11 @@ export function resolveScale(
         return { unit: resolvedUnit, labelEvery, pixelsPerUnit };
     }
 
-    return { unit, labelEvery: defaultLabelEvery, pixelsPerUnit: pixelsPerUnitOverride ?? unitPx(unit) };
+    return {
+        unit,
+        labelEvery: defaultLabelEvery,
+        pixelsPerUnit: pixelsPerUnitOverride ?? unitPx(unit),
+    };
 }
 
 function unitPx(unit: ScaleUnit): number {
@@ -139,9 +150,10 @@ export function buildHeaderTicks(
             x,
             labelX: isLast ? undefined : x + stridePx / 2,
             major: isMajor,
-            label: isMajor && !isLast
-                ? formatTickLabel(preset.unit, addDays(scale.domain[0], days), i, locale)
-                : undefined,
+            label:
+                isMajor && !isLast
+                    ? formatTickLabel(preset.unit, addDays(scale.domain[0], days), i, locale)
+                    : undefined,
         });
     }
     return ticks;

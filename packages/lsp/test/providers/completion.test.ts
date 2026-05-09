@@ -17,7 +17,10 @@ swimlane backend "Backend"
         const provider = services().Nowline.lsp.CompletionProvider!;
         const list = await provider.getCompletion(doc, {
             textDocument: { uri: doc.uri.toString() },
-            position: { line: source.split('\n').length - 1, character: source.split('\n').pop()!.length },
+            position: {
+                line: source.split('\n').length - 1,
+                character: source.split('\n').pop()!.length,
+            },
         });
         expect(list).toBeDefined();
         const labels = list!.items.map((i) => i.label);
@@ -51,7 +54,10 @@ swimlane backend "Backend"
         const provider = services().Nowline.lsp.CompletionProvider!;
         const list = await provider.getCompletion(doc, {
             textDocument: { uri: doc.uri.toString() },
-            position: { line: source.split('\n').length - 1, character: source.split('\n').pop()!.length },
+            position: {
+                line: source.split('\n').length - 1,
+                character: source.split('\n').pop()!.length,
+            },
         });
         expect(list).toBeDefined();
         const labels = list!.items.map((i) => i.label);
@@ -79,7 +85,10 @@ swimlane backend "Backend"
         const provider = services().Nowline.lsp.CompletionProvider!;
         const list = await provider.getCompletion(doc, {
             textDocument: { uri: doc.uri.toString() },
-            position: { line: source.split('\n').length - 1, character: source.split('\n').pop()!.length },
+            position: {
+                line: source.split('\n').length - 1,
+                character: source.split('\n').pop()!.length,
+            },
         });
         expect(list).toBeDefined();
         const labels = list!.items.map((i) => i.label);
@@ -101,11 +110,16 @@ swimlane backend "Backend"
         const provider = services().Nowline.lsp.CompletionProvider!;
         const list = await provider.getCompletion(doc, {
             textDocument: { uri: doc.uri.toString() },
-            position: { line: source.split('\n').length - 1, character: source.split('\n').pop()!.length },
+            position: {
+                line: source.split('\n').length - 1,
+                character: source.split('\n').pop()!.length,
+            },
         });
         expect(list).toBeDefined();
         const labels = list!.items.map((i) => i.label);
-        expect(labels).toEqual(expect.arrayContaining(['planned', 'in-progress', 'done', 'at-risk', 'blocked']));
+        expect(labels).toEqual(
+            expect.arrayContaining(['planned', 'in-progress', 'done', 'at-risk', 'blocked']),
+        );
     });
 
     it('proposes custom status declarations alongside the built-ins', async () => {
@@ -121,7 +135,10 @@ swimlane backend "Backend"
         const provider = services().Nowline.lsp.CompletionProvider!;
         const list = await provider.getCompletion(doc, {
             textDocument: { uri: doc.uri.toString() },
-            position: { line: source.split('\n').length - 1, character: source.split('\n').pop()!.length },
+            position: {
+                line: source.split('\n').length - 1,
+                character: source.split('\n').pop()!.length,
+            },
         });
         expect(list).toBeDefined();
         const labels = list!.items.map((i) => i.label);

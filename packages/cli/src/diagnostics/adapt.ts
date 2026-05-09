@@ -130,7 +130,8 @@ function diagnosticCode(diag: LangiumLikeDiagnostic): string {
 function inferCodeFromMessage(message: string): string {
     const lower = message.toLowerCase();
     if (lower.includes('duplicate identifier')) return 'duplicate-identifier';
-    if (lower.includes('unknown reference') || lower.includes('did you mean')) return 'unknown-reference';
+    if (lower.includes('unknown reference') || lower.includes('did you mean'))
+        return 'unknown-reference';
     if (lower.includes('circular')) return 'circular-dependency';
     if (lower.includes('requires') && lower.includes('date:')) return 'missing-date';
     if (lower.includes('duration')) return 'duration';

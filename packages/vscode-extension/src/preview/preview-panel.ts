@@ -116,13 +116,19 @@ export class NowlinePreview {
         this.postInit();
 
         this.disposables.push(
-            this.panel.webview.onDidReceiveMessage((msg) => this.handleWebviewMessage(msg, opts.onMessage)),
+            this.panel.webview.onDidReceiveMessage((msg) =>
+                this.handleWebviewMessage(msg, opts.onMessage),
+            ),
             this.panel.onDidDispose(() => {
                 this.disposed = true;
                 this.cancelDebounce();
                 opts.onDispose(this);
                 for (const d of this.disposables) {
-                    try { d.dispose(); } catch { /* swallow */ }
+                    try {
+                        d.dispose();
+                    } catch {
+                        /* swallow */
+                    }
                 }
             }),
         );
@@ -210,7 +216,11 @@ export class NowlinePreview {
     /** Public hook so the manager can dispose us programmatically (deactivate). */
     dispose(): void {
         if (this.disposed) return;
-        try { this.panel.dispose(); } catch { /* swallow */ }
+        try {
+            this.panel.dispose();
+        } catch {
+            /* swallow */
+        }
     }
 
     /** Default file basename for save dialogs (without extension). */
@@ -260,8 +270,8 @@ export class NowlinePreview {
      * filesystem when the document isn't currently in the editor.
      */
     private async readSourceText(): Promise<string> {
-        const open = vscode.workspace.textDocuments.find((d) =>
-            d.uri.toString() === this.sourceUri.toString(),
+        const open = vscode.workspace.textDocuments.find(
+            (d) => d.uri.toString() === this.sourceUri.toString(),
         );
         if (open) return open.getText();
         const bytes = await vscode.workspace.fs.readFile(this.sourceUri);
@@ -312,10 +322,7 @@ export class NowlinePreview {
 
 function isDarkColorTheme(): boolean {
     const kind = vscode.window.activeColorTheme?.kind;
-    return (
-        kind === vscode.ColorThemeKind.Dark ||
-        kind === vscode.ColorThemeKind.HighContrast
-    );
+    return kind === vscode.ColorThemeKind.Dark || kind === vscode.ColorThemeKind.HighContrast;
 }
 
 function parseIsoDate(value: string): Date | undefined {

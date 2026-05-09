@@ -7,11 +7,7 @@
 
 import type { IsolatedRegion } from '@nowline/core';
 import { resolveStyle } from '../style-resolution.js';
-import type {
-    PositionedIncludeRegion,
-    PositionedSwimlane,
-    BoundingBox,
-} from '../types.js';
+import type { PositionedIncludeRegion, PositionedSwimlane, BoundingBox } from '../types.js';
 import type { LayoutContext, TrackCursor } from '../layout-context.js';
 import type { PositionedItem, PositionedTrackChild } from '../types.js';
 import type { ItemDeclaration, GroupBlock, ParallelBlock, EntityProperty } from '@nowline/core';
@@ -134,7 +130,8 @@ export function buildIncludeRegions(
         // extends into the attribution / right-margin area.
         const boxX = 0;
         const { chromeRightX } = includeChromeGeometry(boxX, label, region.sourcePath);
-        const naturalRightX = Math.max(chromeRightX, nestedContentRightX) + INCLUDE_CONTENT_RIGHT_PAD_PX;
+        const naturalRightX =
+            Math.max(chromeRightX, nestedContentRightX) + INCLUDE_CONTENT_RIGHT_PAD_PX;
         const boxWidth = Math.min(ctx.chartRightX - boxX, naturalRightX - boxX);
         const box: BoundingBox = {
             x: boxX,

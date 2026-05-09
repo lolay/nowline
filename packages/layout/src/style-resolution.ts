@@ -78,7 +78,8 @@ function applyProp(target: ResolvedStyle, key: string, value: string, theme: The
             target.text = resolveColor(value, theme);
             break;
         case 'border':
-            if (value === 'solid' || value === 'dashed' || value === 'dotted') target.border = value;
+            if (value === 'solid' || value === 'dashed' || value === 'dotted')
+                target.border = value;
             break;
         case 'icon':
             target.icon = value;
@@ -149,7 +150,11 @@ function coerceSize(value: string, max: SizeBucket): SizeBucket {
     return order[idx];
 }
 
-function applyStyleDecl(target: ResolvedStyle, decl: StyleDeclaration | undefined, theme: Theme): void {
+function applyStyleDecl(
+    target: ResolvedStyle,
+    decl: StyleDeclaration | undefined,
+    theme: Theme,
+): void {
     if (!decl) return;
     for (const p of decl.properties as StyleProperty[]) {
         applyProp(target, propKey(p), p.value, theme);

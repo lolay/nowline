@@ -16,32 +16,26 @@ export type HeaderPosition = 'beside' | 'above';
 //   - `both` — strips at both ends; tall canvases stay readable from
 //     either edge of the viewport
 export type TimelinePosition = 'top' | 'bottom' | 'both';
-export type StatusKind =
-    | 'planned'
-    | 'in-progress'
-    | 'done'
-    | 'at-risk'
-    | 'blocked'
-    | 'neutral';
+export type StatusKind = 'planned' | 'in-progress' | 'done' | 'at-risk' | 'blocked' | 'neutral';
 
 // The 17 style properties from specs/dsl.md § Style Properties plus header-position
 // and the two roadmap-only readability knobs (`timeline-position`, `minor-grid`).
 // Every one has a concrete value after resolution (theme + defaults fill gaps).
 export interface ResolvedStyle {
-    bg: string;             // hex or 'none'
-    fg: string;             // hex
-    text: string;           // hex
+    bg: string; // hex or 'none'
+    fg: string; // hex
+    text: string; // hex
     border: BorderKind;
-    icon: string;           // identifier like 'linear' | 'github' | 'jira' | 'generic' | 'none'
+    icon: string; // identifier like 'linear' | 'github' | 'jira' | 'generic' | 'none'
     shadow: ShadowKind;
     font: FontFamily;
     weight: FontWeight;
     italic: boolean;
-    textSize: SizeBucket;       // 'none'..'xl'
-    padding: SizeBucket;        // 'none'..'xl'
-    spacing: SizeBucket;        // 'none'..'xl'
-    headerHeight: SizeBucket;   // 'none'..'xl'
-    cornerRadius: SizeBucket;   // 'none'..'xl'|'full'
+    textSize: SizeBucket; // 'none'..'xl'
+    padding: SizeBucket; // 'none'..'xl'
+    spacing: SizeBucket; // 'none'..'xl'
+    headerHeight: SizeBucket; // 'none'..'xl'
+    cornerRadius: SizeBucket; // 'none'..'xl'|'full'
     bracket: BracketKind;
     headerPosition: HeaderPosition;
     /**
@@ -97,13 +91,13 @@ export interface Point {
 // Header + attribution mark + optional logo.
 export interface PositionedLogo {
     box: BoundingBox;
-    assetRef?: string;  // path as declared in DSL; renderer resolves via AssetResolver
+    assetRef?: string; // path as declared in DSL; renderer resolves via AssetResolver
 }
 
 export interface PositionedHeader {
     box: BoundingBox;
-    position: HeaderPosition;   // 'beside' | 'above'
-    title: string;              // empty string if no title set
+    position: HeaderPosition; // 'beside' | 'above'
+    title: string; // empty string if no title set
     author?: string;
     // Word-wrapped title and author lines, sized to the resolved card
     // width (title text wraps when it exceeds HEADER_BESIDE_MAX_WIDTH_PX
@@ -132,8 +126,8 @@ export interface PositionedHeader {
 export interface PositionedTick {
     x: number;
     labelX?: number;
-    label?: string;     // undefined for thinned ticks
-    major: boolean;     // full-height major line vs short minor tick
+    label?: string; // undefined for thinned ticks
+    major: boolean; // full-height major line vs short minor tick
 }
 
 export interface PositionedTimelineScale {
@@ -160,8 +154,8 @@ export interface PositionedTimelineScale {
     // there are no markers to render — the renderer then omits the panel
     // entirely so we don't reserve dead space.
     markerRow: {
-        y: number;          // y of the in-row diamond center
-        height: number;     // total height of the marker row band (in-row + collision)
+        y: number; // y of the in-row diamond center
+        height: number; // total height of the marker row band (in-row + collision)
         collisionY: number; // y of the bumped-up diamond center
     };
     // Mirrored bottom tick-label panel. Populated when the roadmap's
@@ -235,8 +229,8 @@ export interface PositionedItem {
     title: string;
     box: BoundingBox;
     status: StatusKind;
-    progressFraction: number;   // 0..1; 1 == fully filled
-    footnoteIndicators: number[];  // 1-based superscript numbers, empty when no footnotes
+    progressFraction: number; // 0..1; 1 == fully filled
+    footnoteIndicators: number[]; // 1-based superscript numbers, empty when no footnotes
     labelChips: PositionedLabelChip[];
     /** True when the chip row's natural total width exceeded the bar's
      *  effective inner width and the whole row spilled past the bar's
@@ -252,12 +246,12 @@ export interface PositionedItem {
     chipsRightX: number;
     linkIcon?: LinkIconKind;
     linkHref?: string;
-    hasOverflow: boolean;       // true when before: forced the item past its natural end
-    overflowBox?: BoundingBox;  // the offending tail, flagged red
+    hasOverflow: boolean; // true when before: forced the item past its natural end
+    overflowBox?: BoundingBox; // the offending tail, flagged red
     // The id of the `before:` anchor/milestone the item overran. Used by the
     // renderer to caption the overflow tail ("past <id>").
     overflowAnchorId?: string;
-    owner?: string;             // owner id (person/team) for annotation
+    owner?: string; // owner id (person/team) for annotation
     description?: string;
     // Pre-formatted secondary line shown under the title inside the item bar
     // (e.g. "1w" or "2w — 50% remaining"). Layout assembles this so the
@@ -373,7 +367,7 @@ export interface PositionedParallel {
     id?: string;
     title?: string;
     box: BoundingBox;
-    children: PositionedTrackChild[];   // sub-tracks stacked vertically
+    children: PositionedTrackChild[]; // sub-tracks stacked vertically
     style: ResolvedStyle;
 }
 
@@ -381,11 +375,11 @@ export type PositionedTrackChild = PositionedItem | PositionedParallel | Positio
 
 export interface PositionedSwimlane {
     id?: string;
-    title: string;     // display name; falls back to id
+    title: string; // display name; falls back to id
     box: BoundingBox;
     bandIndex: number; // zero-based; even/odd drives tint
     children: PositionedTrackChild[];
-    nested: PositionedSwimlane[];   // recursive sub-swimlanes
+    nested: PositionedSwimlane[]; // recursive sub-swimlanes
     style: ResolvedStyle;
     // Owner display string ("Platform Team", "Sam Chen") rendered inside
     // the frame tab. Resolved from team/person id → title.
@@ -465,7 +459,7 @@ export interface PositionedLaneUtilization {
 export interface PositionedAnchor {
     id?: string;
     title: string;
-    center: Point;         // diamond center (post-collision-resolution)
+    center: Point; // diamond center (post-collision-resolution)
     radius: number;
     style: ResolvedStyle;
     // Non-binding predecessor edges: small arrows from prior items, drawn by renderer.
@@ -491,13 +485,13 @@ export interface PositionedMilestone {
     title: string;
     center: Point;
     radius: number;
-    fixed: boolean;            // true for date: style, false for after: style
+    fixed: boolean; // true for date: style, false for after: style
     // One slack arrow per non-binding predecessor. Each entry's (x, y) is
     // the predecessor's right-edge midpoint; the arrow runs horizontally
     // from there to (center.x - 6) at y. Empty / undefined when the
     // milestone has zero or one predecessor.
     slackArrows?: Array<{ x: number; y: number }>;
-    isOverrun: boolean;        // true when the aggregated predecessor end exceeds `date:`
+    isOverrun: boolean; // true when the aggregated predecessor end exceeds `date:`
     style: ResolvedStyle;
     // Vertical span of the milestone's cut line through the swimlane area.
     cutTopY: number;
@@ -529,17 +523,17 @@ export interface MarkerRowPlacement {
  * so the arrow has clear horizontal space to travel.
  */
 export interface SlackCorridor {
-    xStart: number;       // slack pred's right edge (logical chart x)
-    xEnd: number;         // binding pred's right edge / milestone center.x
-    y: number;            // slack pred's row midpoint
-    slackPredId: string;  // exempt from bumping (owns the arrow's origin)
+    xStart: number; // slack pred's right edge (logical chart x)
+    xEnd: number; // binding pred's right edge / milestone center.x
+    y: number; // slack pred's row midpoint
+    slackPredId: string; // exempt from bumping (owns the arrow's origin)
     milestoneId: string;
 }
 
 export interface PositionedDependencyEdge {
     fromId: string;
     toId: string;
-    waypoints: Point[];    // first = source port; last = target port
+    waypoints: Point[]; // first = source port; last = target port
     /**
      * - `normal`   — orthogonal arrow drawn AFTER swimlane / item /
      *   marker fills so it sits on top of lane bands.
@@ -576,8 +570,8 @@ export interface PositionedFootnoteEntry {
 }
 
 export interface PositionedIncludeRegion {
-    sourcePath: string;    // relative to the parent file
-    label: string;         // e.g. the child roadmap's title or basename
+    sourcePath: string; // relative to the parent file
+    label: string; // e.g. the child roadmap's title or basename
     box: BoundingBox;
     // Nested swimlanes laid out inside the region. They share the parent's
     // timeline (originX, pixelsPerDay) so cross-region dates align with the
@@ -598,7 +592,7 @@ export interface PositionedRoadmap {
      * `data-theme` SVG attribution; all color decisions read `palette`.
      */
     palette: import('./themes/index.js').Theme;
-    backgroundColor: string;    // resolved from theme.surface.page
+    backgroundColor: string; // resolved from theme.surface.page
     header: PositionedHeader;
     timeline: PositionedTimelineScale;
     nowline: PositionedNowline | null;

@@ -78,24 +78,41 @@ const BUILTIN_STATUSES = new Set([
 ]);
 
 const STYLE_PROP_KEYS = new Set([
-    'bg', 'fg', 'text', 'border', 'icon', 'shadow', 'font', 'weight',
-    'italic', 'text-size', 'padding', 'spacing', 'header-height',
-    'corner-radius', 'bracket', 'header-position', 'capacity-icon',
-    'timeline-position', 'minor-grid',
+    'bg',
+    'fg',
+    'text',
+    'border',
+    'icon',
+    'shadow',
+    'font',
+    'weight',
+    'italic',
+    'text-size',
+    'padding',
+    'spacing',
+    'header-height',
+    'corner-radius',
+    'bracket',
+    'header-position',
+    'capacity-icon',
+    'timeline-position',
+    'minor-grid',
 ]);
 
 // Built-in capacity-icon vocabulary. Renderer-curated SVG glyphs (plus 'multiplier'
 // which renders as the U+00D7 text character and 'none' which suppresses the glyph).
 const BUILTIN_CAPACITY_ICONS = new Set([
-    'none', 'multiplier', 'person', 'people', 'points', 'time',
+    'none',
+    'multiplier',
+    'person',
+    'people',
+    'points',
+    'time',
 ]);
 
 // Built-in icon: vocabulary. Superset of capacity-icon names plus the entity-decoration
 // icons currently shipped by the renderer.
-const BUILTIN_ICON_NAMES = new Set([
-    ...BUILTIN_CAPACITY_ICONS,
-    'shield', 'warning', 'lock',
-]);
+const BUILTIN_ICON_NAMES = new Set([...BUILTIN_CAPACITY_ICONS, 'shield', 'warning', 'lock']);
 
 // `utilization-warn-at:` / `utilization-over-at:` accept the literal `none`
 // to opt out of that color band (per specs/dsl.md rule 17d). Numeric forms
@@ -125,10 +142,18 @@ const STYLE_PROP_ENUMS: Record<string, Set<string>> = {
 // boundary (resolveColor in packages/layout/src/themes/index.ts) so themes
 // don't grow new fields. Both spellings remain valid input.
 const COLOR_NAMES = new Set([
-    'red', 'blue', 'yellow', 'green', 'orange',
-    'purple', 'violet',
-    'gray', 'grey',
-    'navy', 'white', 'none',
+    'red',
+    'blue',
+    'yellow',
+    'green',
+    'orange',
+    'purple',
+    'violet',
+    'gray',
+    'grey',
+    'navy',
+    'white',
+    'none',
 ]);
 
 const CALENDAR_MODES = new Set(['business', 'full', 'custom']);
@@ -143,8 +168,15 @@ const CALENDAR_FIELDS = new Set([
 const SCALE_FIELDS = new Set(['name', 'label-every', 'label']);
 
 const DEFAULT_ENTITY_TYPES = new Set([
-    'item', 'label', 'swimlane', 'roadmap', 'milestone',
-    'footnote', 'anchor', 'parallel', 'group',
+    'item',
+    'label',
+    'swimlane',
+    'roadmap',
+    'milestone',
+    'footnote',
+    'anchor',
+    'parallel',
+    'group',
 ]);
 
 // Banned properties per entity type on `default <entity>` lines.
@@ -152,7 +184,16 @@ const DEFAULT_ENTITY_TYPES = new Set([
 // explicit at its declaration site (per dsl.md). `capacity` on `default item` is
 // allowed (and a useful "every item consumes 1 unit by default" lever).
 const DEFAULT_BANNED: Record<DefaultEntityType, Set<string>> = {
-    item: new Set(['size', 'duration', 'after', 'before', 'remaining', 'link', 'description', 'owner']),
+    item: new Set([
+        'size',
+        'duration',
+        'after',
+        'before',
+        'remaining',
+        'link',
+        'description',
+        'owner',
+    ]),
     milestone: new Set(['date', 'after', 'link', 'description']),
     anchor: new Set(['date', 'link', 'description']),
     footnote: new Set(['on', 'link', 'description']),
@@ -183,20 +224,39 @@ const UNIVERSAL_ENTITY_PROPS = new Set(['labels', 'link', 'style', 'description'
 // short-circuits on them so authors don't see a duplicate diagnostic.
 const ENTITY_KNOWN_PROPS: Record<string, Set<string>> = {
     RoadmapDeclaration: new Set([
-        'author', 'start', 'length', 'scale', 'calendar', 'logo', 'logo-size',
+        'author',
+        'start',
+        'length',
+        'scale',
+        'calendar',
+        'logo',
+        'logo-size',
     ]),
     AnchorDeclaration: new Set(['date']),
     SwimlaneDeclaration: new Set([
-        'owner', 'capacity', 'utilization-warn-at', 'utilization-over-at',
-        'status', 'after', 'before',
+        'owner',
+        'capacity',
+        'utilization-warn-at',
+        'utilization-over-at',
+        'status',
+        'after',
+        'before',
     ]),
     // `date:` and `start:` on items are read by `packages/layout/src/layout.ts`
     // (`resolveChildStart`, `walkNode`) to pin an item to a fixed start date. Not
     // documented in `specs/dsl.md` yet — left allow-listed so authors don't see
     // a spurious warning for a working code path. See plan's out-of-scope note.
     ItemDeclaration: new Set([
-        'size', 'duration', 'status', 'owner', 'after', 'before',
-        'remaining', 'capacity', 'date', 'start',
+        'size',
+        'duration',
+        'status',
+        'owner',
+        'after',
+        'before',
+        'remaining',
+        'capacity',
+        'date',
+        'start',
     ]),
     // size/duration/remaining/capacity on parallel/group are already errors via
     // `checkNoComputedProperties`, so we don't list them here.
@@ -231,8 +291,8 @@ function levenshteinCapped(a: string, b: string, cap: number): number {
         for (let j = 1; j <= bn; j++) {
             const cost = a.charCodeAt(i - 1) === b.charCodeAt(j - 1) ? 0 : 1;
             curr[j] = Math.min(
-                prev[j] + 1,        // deletion
-                curr[j - 1] + 1,    // insertion
+                prev[j] + 1, // deletion
+                curr[j - 1] + 1, // insertion
                 prev[j - 1] + cost, // substitution
             );
             if (curr[j] < rowMin) rowMin = curr[j];
@@ -444,10 +504,7 @@ export function registerValidationChecks(services: NowlineServices): void {
         ],
         StyleDeclaration: [validator.checkEntityIdOrTitle],
         StyleProperty: [validator.checkStylePropertyEnum],
-        SymbolDeclaration: [
-            validator.checkEntityIdOrTitle,
-            validator.checkSymbolDeclaration,
-        ],
+        SymbolDeclaration: [validator.checkEntityIdOrTitle, validator.checkSymbolDeclaration],
         LabelDeclaration: [
             validator.checkEntityIdOrTitle,
             validator.checkNoRawStyleProperties,
@@ -473,7 +530,6 @@ export function registerValidationChecks(services: NowlineServices): void {
 }
 
 export class NowlineValidator {
-
     // --- Structural Rule 4: Section order ---
     checkFileStructure(file: NowlineFile, accept: ValidationAcceptor): void {
         // Use CST-aware lookup so the `config:` / `roadmap:` substrings inside
@@ -484,7 +540,11 @@ export class NowlineValidator {
             : undefined;
         const roadmapOffset = file.roadmapDecl?.$cstNode?.offset;
 
-        if (configOffset !== undefined && roadmapOffset !== undefined && configOffset > roadmapOffset) {
+        if (
+            configOffset !== undefined &&
+            roadmapOffset !== undefined &&
+            configOffset > roadmapOffset
+        ) {
             acceptTr(accept, 'error', { node: file, property: 'hasConfig' }, 'NL.E0001');
         }
 
@@ -510,15 +570,18 @@ export class NowlineValidator {
     // --- Rule 5: Directive version ---
     checkDirectiveVersion(directive: NowlineDirective, accept: ValidationAcceptor): void {
         if (!VERSION_RE.test(directive.version)) {
-            acceptTr(accept, 'error', { node: directive, property: 'version' },
-                'NL.E0100', { version: directive.version });
+            acceptTr(accept, 'error', { node: directive, property: 'version' }, 'NL.E0100', {
+                version: directive.version,
+            });
             return;
         }
         const num = parseInt(directive.version.slice(1), 10);
         const supportedNum = parseInt(SUPPORTED_VERSION.slice(1), 10);
         if (num > supportedNum) {
-            acceptTr(accept, 'error', { node: directive, property: 'version' },
-                'NL.E0101', { version: directive.version, supported: SUPPORTED_VERSION });
+            acceptTr(accept, 'error', { node: directive, property: 'version' }, 'NL.E0101', {
+                version: directive.version,
+                supported: SUPPORTED_VERSION,
+            });
         }
     }
 
@@ -531,28 +594,33 @@ export class NowlineValidator {
         for (const prop of directive.properties) {
             const key = propKey(prop);
             if (!DIRECTIVE_FIELDS.has(key)) {
-                acceptTr(accept, 'error', { node: prop, property: 'key' },
-                    'NL.E0102', { key, allowed: [...DIRECTIVE_FIELDS].join(', ') });
+                acceptTr(accept, 'error', { node: prop, property: 'key' }, 'NL.E0102', {
+                    key,
+                    allowed: [...DIRECTIVE_FIELDS].join(', '),
+                });
                 continue;
             }
             if (seen.has(key)) {
-                acceptTr(accept, 'error', { node: prop, property: 'key' },
-                    'NL.E0103', { key });
+                acceptTr(accept, 'error', { node: prop, property: 'key' }, 'NL.E0103', { key });
             }
             seen.add(key);
 
             if (key === 'locale') {
                 const raw = prop.value;
                 if (!BCP47_RE.test(raw)) {
-                    acceptTr(accept, 'error', { node: prop, property: 'value' },
-                        'NL.E0104', { value: raw });
+                    acceptTr(accept, 'error', { node: prop, property: 'value' }, 'NL.E0104', {
+                        value: raw,
+                    });
                 }
             }
         }
     }
 
     // --- Rule 3: Id or title required ---
-    checkEntityIdOrTitle(node: AstNode & { name?: string; title?: string }, accept: ValidationAcceptor): void {
+    checkEntityIdOrTitle(
+        node: AstNode & { name?: string; title?: string },
+        accept: ValidationAcceptor,
+    ): void {
         if (!node.name && !node.title) {
             acceptTr(accept, 'error', { node }, 'NL.E0301', { type: node.$type });
         }
@@ -566,8 +634,10 @@ export class NowlineValidator {
             if (!name) return;
             const existing = seen.get(name);
             if (existing) {
-                acceptTr(accept, 'error', { node },
-                    'NL.E0300', { name, location: locationOf(existing) });
+                acceptTr(accept, 'error', { node }, 'NL.E0300', {
+                    name,
+                    location: locationOf(existing),
+                });
             } else {
                 seen.set(name, node);
             }
@@ -617,8 +687,9 @@ export class NowlineValidator {
     // --- Include rules 5/6: mode values ---
     checkIncludeMode(option: IncludeOption, accept: ValidationAcceptor): void {
         if (!INCLUDE_MODES.has(option.value)) {
-            acceptTr(accept, 'error', { node: option, property: 'value' },
-                'NL.E0200', { value: option.value });
+            acceptTr(accept, 'error', { node: option, property: 'value' }, 'NL.E0200', {
+                value: option.value,
+            });
         }
     }
 
@@ -652,22 +723,25 @@ export class NowlineValidator {
                 // to the size's `effort:` (and divides by `capacity:` at
                 // layout time, m5).
                 if (val && !DURATION_RE.test(val)) {
-                    acceptTr(accept, 'error', { node: prop, property: 'value' },
-                        'NL.E0400', { value: val });
+                    acceptTr(accept, 'error', { node: prop, property: 'value' }, 'NL.E0400', {
+                        value: val,
+                    });
                 }
                 break;
 
             case 'size':
                 if (val && !isIdentifier(val)) {
-                    acceptTr(accept, 'error', { node: prop, property: 'value' },
-                        'NL.E0401', { value: val });
+                    acceptTr(accept, 'error', { node: prop, property: 'value' }, 'NL.E0401', {
+                        value: val,
+                    });
                 }
                 break;
 
             case 'effort':
                 if (val && !DURATION_RE.test(val)) {
-                    acceptTr(accept, 'error', { node: prop, property: 'value' },
-                        'NL.E0402', { value: val });
+                    acceptTr(accept, 'error', { node: prop, property: 'value' }, 'NL.E0402', {
+                        value: val,
+                    });
                 }
                 break;
 
@@ -681,12 +755,18 @@ export class NowlineValidator {
                     if (PERCENTAGE_RE.test(val)) {
                         const pct = parseFloat(val);
                         if (pct < 0 || pct > 100) {
-                            acceptTr(accept, 'error', { node: prop, property: 'value' },
-                                'NL.E0404', { value: val });
+                            acceptTr(
+                                accept,
+                                'error',
+                                { node: prop, property: 'value' },
+                                'NL.E0404',
+                                { value: val },
+                            );
                         }
                     } else if (!DURATION_RE.test(val)) {
-                        acceptTr(accept, 'error', { node: prop, property: 'value' },
-                            'NL.E0403', { value: val });
+                        acceptTr(accept, 'error', { node: prop, property: 'value' }, 'NL.E0403', {
+                            value: val,
+                        });
                     }
                 }
                 break;
@@ -695,22 +775,26 @@ export class NowlineValidator {
             case 'date':
             case 'start':
                 if (val && (!DATE_RE.test(val) || isNaN(new Date(val).getTime()))) {
-                    acceptTr(accept, 'error', { node: prop, property: 'value' },
-                        'NL.E0405', { key, value: val });
+                    acceptTr(accept, 'error', { node: prop, property: 'value' }, 'NL.E0405', {
+                        key,
+                        value: val,
+                    });
                 }
                 break;
 
             case 'scale':
                 if (val && !DURATION_RE.test(val)) {
-                    acceptTr(accept, 'error', { node: prop, property: 'value' },
-                        'NL.E0406', { value: val });
+                    acceptTr(accept, 'error', { node: prop, property: 'value' }, 'NL.E0406', {
+                        value: val,
+                    });
                 }
                 break;
 
             case 'calendar':
                 if (val && !CALENDAR_MODES.has(val)) {
-                    acceptTr(accept, 'error', { node: prop, property: 'value' },
-                        'NL.E0407', { value: val });
+                    acceptTr(accept, 'error', { node: prop, property: 'value' }, 'NL.E0407', {
+                        value: val,
+                    });
                 }
                 break;
 
@@ -730,28 +814,34 @@ export class NowlineValidator {
                 if (parentKind === 'invalid') break;
                 if (parentKind === 'lane') {
                     if (!POSITIVE_NUMBER_RE.test(val) || parseFloat(val) <= 0) {
-                        accept('error',
+                        accept(
+                            'error',
                             `Invalid swimlane capacity "${val}". Use a positive integer (e.g. capacity:5) or decimal (e.g. capacity:1.5). Percent literals are not allowed on swimlanes.`,
-                            { node: prop, property: 'value' });
+                            { node: prop, property: 'value' },
+                        );
                     }
                 } else {
                     if (POSITIVE_PERCENT_RE.test(val)) {
                         const pct = parseFloat(val);
                         if (pct <= 0) {
-                            accept('error',
-                                `Item capacity "${val}" must be positive.`,
-                                { node: prop, property: 'value' });
+                            accept('error', `Item capacity "${val}" must be positive.`, {
+                                node: prop,
+                                property: 'value',
+                            });
                         }
                     } else if (POSITIVE_NUMBER_RE.test(val)) {
                         if (parseFloat(val) <= 0) {
-                            accept('error',
-                                `Item capacity "${val}" must be positive.`,
-                                { node: prop, property: 'value' });
+                            accept('error', `Item capacity "${val}" must be positive.`, {
+                                node: prop,
+                                property: 'value',
+                            });
                         }
                     } else {
-                        accept('error',
+                        accept(
+                            'error',
                             `Invalid item capacity "${val}". Use a positive integer (capacity:2), decimal (capacity:0.5), or percent literal (capacity:50%).`,
-                            { node: prop, property: 'value' });
+                            { node: prop, property: 'value' },
+                        );
                     }
                 }
                 break;
@@ -761,9 +851,11 @@ export class NowlineValidator {
                 // Removed in m9. Suppression is now expressed via
                 // `utilization-warn-at:none` / `utilization-over-at:none`
                 // (see specs/dsl.md § Capacity → Utilization thresholds).
-                accept('error',
+                accept(
+                    'error',
                     `"overcapacity:" was removed. Use "utilization-over-at:none" (and/or "utilization-warn-at:none") to suppress the lane utilization underline.`,
-                    { node: prop });
+                    { node: prop },
+                );
                 break;
             }
 
@@ -771,17 +863,20 @@ export class NowlineValidator {
             case 'utilization-over-at': {
                 if (!val) break;
                 if (!isUtilizationAllowedHere(prop.$container)) {
-                    accept('error',
+                    accept(
+                        'error',
                         `"${key}:" is only valid on "swimlane" or "default swimlane".`,
-                        { node: prop });
+                        { node: prop },
+                    );
                     break;
                 }
                 if (val === UTILIZATION_NONE) break;
                 if (POSITIVE_PERCENT_RE.test(val)) {
                     if (parseFloat(val) <= 0) {
-                        accept('error',
-                            `${key} value "${val}" must be positive.`,
-                            { node: prop, property: 'value' });
+                        accept('error', `${key} value "${val}" must be positive.`, {
+                            node: prop,
+                            property: 'value',
+                        });
                     }
                     break;
                 }
@@ -790,21 +885,26 @@ export class NowlineValidator {
                 // fraction) so we reject them with a hint to disambiguate.
                 if (POSITIVE_DECIMAL_FRACTION_RE.test(val)) {
                     if (parseFloat(val) <= 0) {
-                        accept('error',
-                            `${key} value "${val}" must be positive.`,
-                            { node: prop, property: 'value' });
+                        accept('error', `${key} value "${val}" must be positive.`, {
+                            node: prop,
+                            property: 'value',
+                        });
                     }
                     break;
                 }
                 if (POSITIVE_INTEGER_RE.test(val)) {
-                    accept('error',
+                    accept(
+                        'error',
                         `Ambiguous ${key} value "${val}". Use the percent form ("${val}%") or the decimal-fraction form ("0.${val}") to make the intent explicit.`,
-                        { node: prop, property: 'value' });
+                        { node: prop, property: 'value' },
+                    );
                     break;
                 }
-                accept('error',
+                accept(
+                    'error',
                     `Invalid ${key} value "${val}". Use a positive percent (e.g. 80%), a positive decimal fraction (e.g. 0.8), or "none" to opt out.`,
-                    { node: prop, property: 'value' });
+                    { node: prop, property: 'value' },
+                );
                 break;
             }
 
@@ -823,18 +923,26 @@ export class NowlineValidator {
                 if (STYLE_PROP_KEYS.has(key)) {
                     if (key === 'bg' || key === 'fg' || key === 'text') {
                         if (val && !isColorValue(val)) {
-                            accept('error', `Invalid color "${val}" for "${key}". Use a named color, hex value, or "none".`, {
-                                node: prop,
-                                property: 'value',
-                            });
+                            accept(
+                                'error',
+                                `Invalid color "${val}" for "${key}". Use a named color, hex value, or "none".`,
+                                {
+                                    node: prop,
+                                    property: 'value',
+                                },
+                            );
                         }
                     } else if (key in STYLE_PROP_ENUMS) {
                         const allowed = STYLE_PROP_ENUMS[key];
                         if (val && !allowed.has(val) && !isColorValue(val)) {
-                            accept('error', `Invalid value "${val}" for "${key}". Allowed: ${[...allowed].join(', ')}.`, {
-                                node: prop,
-                                property: 'value',
-                            });
+                            accept(
+                                'error',
+                                `Invalid value "${val}" for "${key}". Allowed: ${[...allowed].join(', ')}.`,
+                                {
+                                    node: prop,
+                                    property: 'value',
+                                },
+                            );
                         }
                     }
                 }
@@ -846,8 +954,7 @@ export class NowlineValidator {
     checkAnchorRequiredDate(anchor: AnchorDeclaration, accept: ValidationAcceptor): void {
         const dateProp = anchor.properties.find((p) => propKey(p) === 'date');
         if (!dateProp) {
-            acceptTr(accept, 'error', { node: anchor },
-                'NL.E0500', { name: displayName(anchor) });
+            acceptTr(accept, 'error', { node: anchor }, 'NL.E0500', { name: displayName(anchor) });
         }
     }
 
@@ -865,13 +972,17 @@ export class NowlineValidator {
             case 'invalid':
                 return;
             case 'missing':
-                acceptTr(accept, 'error', { node: dateProp, property: 'value' },
-                    'NL.E0501', { name: displayName(anchor) });
+                acceptTr(accept, 'error', { node: dateProp, property: 'value' }, 'NL.E0501', {
+                    name: displayName(anchor),
+                });
                 return;
             case 'valid':
                 if (anchorDate < start.date) {
-                    acceptTr(accept, 'error', { node: dateProp, property: 'value' },
-                        'NL.E0502', { name: displayName(anchor), date: raw, start: start.iso });
+                    acceptTr(accept, 'error', { node: dateProp, property: 'value' }, 'NL.E0502', {
+                        name: displayName(anchor),
+                        date: raw,
+                        start: start.iso,
+                    });
                 }
                 return;
         }
@@ -882,8 +993,9 @@ export class NowlineValidator {
         const hasDate = milestone.properties.some((p) => propKey(p) === 'date');
         const hasAfter = milestone.properties.some((p) => propKey(p) === 'after');
         if (!hasDate && !hasAfter) {
-            acceptTr(accept, 'error', { node: milestone },
-                'NL.E0503', { name: displayName(milestone) });
+            acceptTr(accept, 'error', { node: milestone }, 'NL.E0503', {
+                name: displayName(milestone),
+            });
         }
     }
 
@@ -901,15 +1013,22 @@ export class NowlineValidator {
             case 'invalid':
                 return;
             case 'missing':
-                accept('error', `Milestone "${displayName(milestone)}" has a date but the roadmap is missing "start:". Add start:YYYY-MM-DD to the roadmap.`, {
-                    node: dateProp,
-                    property: 'value',
-                });
+                accept(
+                    'error',
+                    `Milestone "${displayName(milestone)}" has a date but the roadmap is missing "start:". Add start:YYYY-MM-DD to the roadmap.`,
+                    {
+                        node: dateProp,
+                        property: 'value',
+                    },
+                );
                 return;
             case 'valid':
                 if (milestoneDate < start.date) {
-                    acceptTr(accept, 'error', { node: dateProp, property: 'value' },
-                        'NL.E0504', { name: displayName(milestone), date: raw, start: start.iso });
+                    acceptTr(accept, 'error', { node: dateProp, property: 'value' }, 'NL.E0504', {
+                        name: displayName(milestone),
+                        date: raw,
+                        start: start.iso,
+                    });
                 }
                 return;
         }
@@ -940,10 +1059,11 @@ export class NowlineValidator {
     ): void {
         for (const prop of node.properties) {
             if (propKey(prop) === 'footnote') {
-                accept('error',
+                accept(
+                    'error',
                     `Property "footnote:" is not valid on ${describeNode(node)}. ` +
-                    'Footnotes attach via "on:" on the footnote declaration — ' +
-                    'declare `footnote <id> on:<target-id>` instead.',
+                        'Footnotes attach via "on:" on the footnote declaration — ' +
+                        'declare `footnote <id> on:<target-id>` instead.',
                     { node: prop },
                 );
             }
@@ -955,8 +1075,7 @@ export class NowlineValidator {
         const hasDuration = item.properties.some((p) => propKey(p) === 'duration');
         const hasSize = item.properties.some((p) => propKey(p) === 'size');
         if (!hasDuration && !hasSize) {
-            acceptTr(accept, 'error', { node: item },
-                'NL.E0600', { name: displayName(item) });
+            acceptTr(accept, 'error', { node: item }, 'NL.E0600', { name: displayName(item) });
         }
     }
 
@@ -965,9 +1084,13 @@ export class NowlineValidator {
         for (const prop of node.properties) {
             const key = propKey(prop);
             if (key === 'size' || key === 'duration' || key === 'remaining' || key === 'capacity') {
-                accept('error', `"${key}" is not valid on ${node.$type === 'ParallelBlock' ? 'parallel' : 'group'} (computed from children).`, {
-                    node: prop,
-                });
+                accept(
+                    'error',
+                    `"${key}" is not valid on ${node.$type === 'ParallelBlock' ? 'parallel' : 'group'} (computed from children).`,
+                    {
+                        node: prop,
+                    },
+                );
             }
         }
     }
@@ -978,7 +1101,11 @@ export class NowlineValidator {
         if (children.length === 0) {
             accept('error', 'Parallel block must contain at least 2 children.', { node });
         } else if (children.length === 1) {
-            accept('warning', 'Parallel block has only 1 child. Use at least 2 for parallel execution.', { node });
+            accept(
+                'warning',
+                'Parallel block has only 1 child. Use at least 2 for parallel execution.',
+                { node },
+            );
         }
     }
 
@@ -1003,9 +1130,10 @@ export class NowlineValidator {
         for (const prop of node.properties) {
             const key = propKey(prop);
             if (STYLE_PROP_KEYS.has(key)) {
-                accept('error',
+                accept(
+                    'error',
                     `Raw style property "${key}" is not allowed on ${describeNode(node)}. ` +
-                    `Declare a named style in config and reference it via "style:id".`,
+                        `Declare a named style in config and reference it via "style:id".`,
                     { node: prop },
                 );
             }
@@ -1036,9 +1164,10 @@ export class NowlineValidator {
     ): void {
         const known = ENTITY_KNOWN_PROPS[node.$type];
         if (!known) return;
-        const computedBanned = node.$type === 'ParallelBlock' || node.$type === 'GroupBlock'
-            ? new Set(['size', 'duration', 'remaining', 'capacity'])
-            : null;
+        const computedBanned =
+            node.$type === 'ParallelBlock' || node.$type === 'GroupBlock'
+                ? new Set(['size', 'duration', 'remaining', 'capacity'])
+                : null;
         for (const prop of node.properties) {
             const key = propKey(prop);
             if (known.has(key)) continue;
@@ -1046,13 +1175,13 @@ export class NowlineValidator {
             if (STYLE_PROP_KEYS.has(key)) continue;
             if (key === 'footnote') continue;
             if (computedBanned && computedBanned.has(key)) continue;
-            const candidates: string[] = [
-                ...known,
-                ...UNIVERSAL_ENTITY_PROPS,
-            ];
+            const candidates: string[] = [...known, ...UNIVERSAL_ENTITY_PROPS];
             const suggested = suggestKey(key, candidates) ?? '';
-            acceptTr(accept, 'warning', { node: prop, property: 'key' },
-                'NL.W0700', { key, entity: describeNode(node), suggested });
+            acceptTr(accept, 'warning', { node: prop, property: 'key' }, 'NL.W0700', {
+                key,
+                entity: describeNode(node),
+                suggested,
+            });
         }
     }
 
@@ -1074,18 +1203,26 @@ export class NowlineValidator {
 
         if (key === 'bg' || key === 'fg' || key === 'text') {
             if (!isColorValue(val)) {
-                accept('error', `Invalid color "${val}" for "${key}". Use a named color, hex value, or "none".`, {
-                    node: prop,
-                    property: 'value',
-                });
+                accept(
+                    'error',
+                    `Invalid color "${val}" for "${key}". Use a named color, hex value, or "none".`,
+                    {
+                        node: prop,
+                        property: 'value',
+                    },
+                );
             }
         } else if (key in STYLE_PROP_ENUMS) {
             const allowed = STYLE_PROP_ENUMS[key];
             if (!allowed.has(val)) {
-                accept('error', `Invalid value "${val}" for "${key}". Allowed: ${[...allowed].join(', ')}.`, {
-                    node: prop,
-                    property: 'value',
-                });
+                accept(
+                    'error',
+                    `Invalid value "${val}" for "${key}". Allowed: ${[...allowed].join(', ')}.`,
+                    {
+                        node: prop,
+                        property: 'value',
+                    },
+                );
             }
         } else if (!STYLE_PROP_KEYS.has(key)) {
             accept('error', `Unknown style property "${key}".`, {
@@ -1106,9 +1243,11 @@ export class NowlineValidator {
 
         if (decl.name) {
             if (DURATION_RE.test(decl.name) || BARE_DURATION_SUFFIX_RE.test(decl.name)) {
-                accept('error',
+                accept(
+                    'error',
                     `Size id "${decl.name}" collides with the raw duration pattern. Choose a different name (e.g. "xs", "small", "quarter").`,
-                    { node: decl, property: 'name' });
+                    { node: decl, property: 'name' },
+                );
             }
         }
     }
@@ -1117,9 +1256,11 @@ export class NowlineValidator {
     checkStatusDeclaration(decl: StatusDeclaration, accept: ValidationAcceptor): void {
         if (decl.name) {
             if (BUILTIN_STATUSES.has(decl.name)) {
-                accept('error',
+                accept(
+                    'error',
                     `Status id "${decl.name}" collides with the built-in status value. Built-ins: ${[...BUILTIN_STATUSES].join(', ')}.`,
-                    { node: decl, property: 'name' });
+                    { node: decl, property: 'name' },
+                );
             }
         }
     }
@@ -1131,9 +1272,11 @@ export class NowlineValidator {
             if (isSizeDeclaration(entry) && entry.name) {
                 const existing = seen.get(entry.name);
                 if (existing) {
-                    accept('error',
+                    accept(
+                        'error',
                         `Duplicate size id "${entry.name}". First declared at ${locationOf(existing)}.`,
-                        { node: entry, property: 'name' });
+                        { node: entry, property: 'name' },
+                    );
                 } else {
                     seen.set(entry.name, entry);
                 }
@@ -1148,7 +1291,10 @@ export class NowlineValidator {
     // values and compares fractions when both are numeric. `none` on either
     // side opts that side out and skips the comparison (the spec treats the
     // two thresholds as independent — see specs/dsl.md rule 17d).
-    checkUtilizationOrdering(decl: SwimlaneDeclaration | DefaultDeclaration, accept: ValidationAcceptor): void {
+    checkUtilizationOrdering(
+        decl: SwimlaneDeclaration | DefaultDeclaration,
+        accept: ValidationAcceptor,
+    ): void {
         if (isDefaultDeclaration(decl) && decl.entityType !== 'swimlane') return;
         const warnProp = decl.properties.find((p) => propKey(p) === 'utilization-warn-at');
         const overProp = decl.properties.find((p) => propKey(p) === 'utilization-over-at');
@@ -1157,18 +1303,22 @@ export class NowlineValidator {
         const over = parseUtilizationFraction(overProp.value);
         if (warn === null || over === null) return;
         if (warn > over) {
-            accept('error',
+            accept(
+                'error',
                 `utilization-warn-at (${warnProp.value}) must be ≤ utilization-over-at (${overProp.value}). Warn fires below over; if both fire at the same point, the warn band collapses to zero.`,
-                { node: warnProp, property: 'value' });
+                { node: warnProp, property: 'value' },
+            );
         }
     }
 
     // --- Defaults rules 21-23: entity-type whitelist, duplicate-per-entity, banned props ---
     checkDefaultDeclaration(decl: DefaultDeclaration, accept: ValidationAcceptor): void {
         if (!DEFAULT_ENTITY_TYPES.has(decl.entityType)) {
-            accept('error',
+            accept(
+                'error',
                 `"${decl.entityType}" is not a supported entity type for default. Allowed: ${[...DEFAULT_ENTITY_TYPES].join(', ')}.`,
-                { node: decl, property: 'entityType' });
+                { node: decl, property: 'entityType' },
+            );
             return;
         }
 
@@ -1181,9 +1331,11 @@ export class NowlineValidator {
                 if (firstIdx < 0) {
                     firstIdx = i;
                 } else if (other === decl) {
-                    accept('error',
+                    accept(
+                        'error',
                         `Duplicate "default ${decl.entityType}" declaration. Only one is allowed per entity type per file.`,
-                        { node: decl });
+                        { node: decl },
+                    );
                     break;
                 }
             }
@@ -1194,9 +1346,11 @@ export class NowlineValidator {
             for (const prop of decl.properties) {
                 const key = propKey(prop);
                 if (banned.has(key)) {
-                    accept('error',
+                    accept(
+                        'error',
                         `"${key}" cannot be set on "default ${decl.entityType}". Identity-defining, sizing, sequencing, reference, and prose properties must be explicit on each entity.`,
-                        { node: prop });
+                        { node: prop },
+                    );
                 }
             }
         }
@@ -1211,16 +1365,20 @@ export class NowlineValidator {
 
         if (calendarBlocks.length > 0 && calendarMode !== 'custom') {
             for (const block of calendarBlocks) {
-                accept('error',
+                accept(
+                    'error',
                     `A "calendar" config block is only valid when the roadmap declares calendar:custom.`,
-                    { node: block });
+                    { node: block },
+                );
             }
         }
 
         if (calendarMode === 'custom' && calendarBlocks.length === 0) {
-            accept('error',
+            accept(
+                'error',
                 `calendar:custom requires a "calendar" config block with days-per-week, days-per-month, days-per-quarter, and days-per-year.`,
-                { node: file.roadmapDecl!, property: 'properties' });
+                { node: file.roadmapDecl!, property: 'properties' },
+            );
         }
 
         if (calendarMode === 'custom' && calendarBlocks.length > 0) {
@@ -1228,9 +1386,11 @@ export class NowlineValidator {
                 const presentKeys = new Set(block.properties.map((p) => propKey(p)));
                 for (const field of CALENDAR_FIELDS) {
                     if (!presentKeys.has(field)) {
-                        accept('error',
+                        accept(
+                            'error',
                             `calendar:custom requires "${field}" in the calendar config block.`,
-                            { node: block });
+                            { node: block },
+                        );
                     }
                 }
             }
@@ -1243,9 +1403,11 @@ export class NowlineValidator {
         for (const prop of block.properties) {
             const key = propKey(prop);
             if (!CALENDAR_FIELDS.has(key)) {
-                accept('error',
+                accept(
+                    'error',
                     `Unknown calendar property "${key}". Allowed: ${[...CALENDAR_FIELDS].join(', ')}.`,
-                    { node: prop, property: 'key' });
+                    { node: prop, property: 'key' },
+                );
                 continue;
             }
             if (seen.has(key)) {
@@ -1257,9 +1419,10 @@ export class NowlineValidator {
             seen.add(key);
 
             if (!INTEGER_RE.test(prop.value) || parseInt(prop.value, 10) <= 0) {
-                accept('error',
-                    `"${key}" must be a positive integer, got "${prop.value}".`,
-                    { node: prop, property: 'value' });
+                accept('error', `"${key}" must be a positive integer, got "${prop.value}".`, {
+                    node: prop,
+                    property: 'value',
+                });
             }
         }
     }
@@ -1270,9 +1433,11 @@ export class NowlineValidator {
         for (const prop of block.properties) {
             const key = propKey(prop);
             if (!SCALE_FIELDS.has(key)) {
-                accept('error',
+                accept(
+                    'error',
                     `Unknown scale property "${key}". Allowed: ${[...SCALE_FIELDS].join(', ')}.`,
-                    { node: prop, property: 'key' });
+                    { node: prop, property: 'key' },
+                );
                 continue;
             }
             if (seen.has(key)) {
@@ -1285,9 +1450,11 @@ export class NowlineValidator {
 
             if (key === 'label-every') {
                 if (!INTEGER_RE.test(prop.value) || parseInt(prop.value, 10) <= 0) {
-                    accept('error',
+                    accept(
+                        'error',
                         `"label-every" must be a positive integer, got "${prop.value}".`,
-                        { node: prop, property: 'value' });
+                        { node: prop, property: 'value' },
+                    );
                 }
             }
         }
@@ -1316,26 +1483,34 @@ export class NowlineValidator {
                     const val = prop.value;
                     const declIdx = sizeOrder.get(val);
                     if (declIdx === undefined) {
-                        accept('error',
+                        accept(
+                            'error',
                             `Size "${val}" is not declared. Add "size ${val} effort:<literal>" earlier in the roadmap section.`,
-                            { node: prop, property: 'value' });
+                            { node: prop, property: 'value' },
+                        );
                     } else if (declIdx >= i) {
-                        accept('error',
+                        accept(
+                            'error',
                             `Size "${val}" is referenced before its declaration. Move "size ${val}" above this entity.`,
-                            { node: prop, property: 'value' });
+                            { node: prop, property: 'value' },
+                        );
                     }
                 } else if (key === 'status' && prop.value) {
                     const val = prop.value;
                     if (BUILTIN_STATUSES.has(val)) return;
                     const declIdx = statusOrder.get(val);
                     if (declIdx === undefined) {
-                        accept('error',
+                        accept(
+                            'error',
                             `Status "${val}" is not a built-in and has no declaration. Add "status ${val}" earlier in the roadmap section.`,
-                            { node: prop, property: 'value' });
+                            { node: prop, property: 'value' },
+                        );
                     } else if (declIdx >= i) {
-                        accept('error',
+                        accept(
+                            'error',
                             `Status "${val}" is referenced before its declaration. Move "status ${val}" above this entity.`,
-                            { node: prop, property: 'value' });
+                            { node: prop, property: 'value' },
+                        );
                     }
                 }
             });
@@ -1359,9 +1534,11 @@ export class NowlineValidator {
                 for (const v of vals) {
                     if (!v) continue;
                     if (!declaredIds.has(v)) {
-                        accept('error',
+                        accept(
+                            'error',
                             `${key}: reference "${v}" does not resolve to any declared entity in this file.`,
-                            { node: prop });
+                            { node: prop },
+                        );
                     }
                 }
             });
@@ -1383,7 +1560,11 @@ export class NowlineValidator {
             deps.get(node)!.add(dep);
         };
 
-        const indexDependents = (idName: string | undefined, props: EntityProperty[], file: NowlineFile) => {
+        const indexDependents = (
+            idName: string | undefined,
+            props: EntityProperty[],
+            file: NowlineFile,
+        ) => {
             if (!idName) return;
             for (const prop of props) {
                 const key = propKey(prop);
@@ -1413,7 +1594,9 @@ export class NowlineValidator {
         for (const entry of file.roadmapEntries) visitEntry(entry);
 
         // DFS for cycles.
-        const WHITE = 0, GRAY = 1, BLACK = 2;
+        const WHITE = 0,
+            GRAY = 1,
+            BLACK = 2;
         const color = new Map<string, number>();
         for (const id of deps.keys()) color.set(id, WHITE);
 
@@ -1429,9 +1612,9 @@ export class NowlineValidator {
                     const key = [...cycle].sort().join('→');
                     if (!reported.has(key)) {
                         reported.add(key);
-                        accept('error',
-                            `Circular dependency detected: ${cycle.join(' → ')}.`,
-                            { node: file.roadmapDecl ?? file });
+                        accept('error', `Circular dependency detected: ${cycle.join(' → ')}.`, {
+                            node: file.roadmapDecl ?? file,
+                        });
                     }
                 } else if (c === WHITE) {
                     dfs(dep, path);
@@ -1461,9 +1644,11 @@ export class NowlineValidator {
             if (!declarations.has(p.name)) declarations.set(p.name, []);
             declarations.get(p.name)!.push({ node: p, isDeclaration: isDecl });
             if (!isDecl && p.$container.$type === 'NowlineFile') {
-                accept('warning',
+                accept(
+                    'warning',
                     `Bare "person ${p.name}" at roadmap top level has no declaration. Either add properties (title, link, etc.) or remove the line.`,
-                    { node: p });
+                    { node: p },
+                );
             }
         };
 
@@ -1483,9 +1668,11 @@ export class NowlineValidator {
             const decls = sites.filter((s) => s.isDeclaration);
             if (decls.length > 1) {
                 for (let i = 1; i < decls.length; i++) {
-                    accept('error',
+                    accept(
+                        'error',
                         `Person "${name}" is declared more than once. First declaration at ${locationOf(decls[0].node)}.`,
-                        { node: decls[i].node });
+                        { node: decls[i].node },
+                    );
                 }
             }
         }
@@ -1500,38 +1687,47 @@ export class NowlineValidator {
     // `unicode:foo`, which we treat permissively (it's a single-grapheme literal).
     checkSymbolDeclaration(decl: SymbolDeclaration, accept: ValidationAcceptor): void {
         if (decl.name && BUILTIN_ICON_NAMES.has(decl.name)) {
-            accept('error',
+            accept(
+                'error',
                 `Symbol id "${decl.name}" collides with a built-in icon name. Reserved built-ins: ${[...BUILTIN_ICON_NAMES].sort().join(', ')}.`,
-                { node: decl, property: 'name' });
+                { node: decl, property: 'name' },
+            );
         }
 
         const unicodeProp = decl.properties.find((p) => propKey(p) === 'unicode');
         if (!unicodeProp) {
-            accept('error',
+            accept(
+                'error',
                 `Symbol "${displayName(decl)}" requires a "unicode:" property (e.g. unicode:"💰" or unicode:"\\u{1F464}").`,
-                { node: decl });
+                { node: decl },
+            );
         } else if (!unicodeProp.value || unicodeProp.value.length === 0) {
-            accept('error',
-                `Symbol "${displayName(decl)}" unicode: must be a non-empty value.`,
-                { node: unicodeProp, property: 'value' });
+            accept('error', `Symbol "${displayName(decl)}" unicode: must be a non-empty value.`, {
+                node: unicodeProp,
+                property: 'value',
+            });
         }
 
         const asciiProp = decl.properties.find((p) => propKey(p) === 'ascii');
         if (asciiProp) {
             const raw = asciiProp.value ?? '';
             if (!ASCII_FALLBACK_RE.test(raw)) {
-                accept('error',
+                accept(
+                    'error',
                     `Symbol "${displayName(decl)}" ascii: must be 1-3 ASCII characters (got ${raw.length} character${raw.length === 1 ? '' : 's'}).`,
-                    { node: asciiProp, property: 'value' });
+                    { node: asciiProp, property: 'value' },
+                );
             }
         }
 
         for (const prop of decl.properties) {
             const key = propKey(prop);
             if (key !== 'unicode' && key !== 'ascii' && key !== 'link' && key !== 'description') {
-                accept('error',
+                accept(
+                    'error',
                     `Unknown symbol property "${key}". Allowed: unicode, ascii, link, description.`,
-                    { node: prop, property: 'key' });
+                    { node: prop, property: 'key' },
+                );
             }
         }
     }
@@ -1543,9 +1739,11 @@ export class NowlineValidator {
             if (isSymbolDeclaration(entry) && entry.name) {
                 const existing = seen.get(entry.name);
                 if (existing) {
-                    accept('error',
+                    accept(
+                        'error',
                         `Duplicate symbol id "${entry.name}". First declared at ${locationOf(existing)}.`,
-                        { node: entry, property: 'name' });
+                        { node: entry, property: 'name' },
+                    );
                 } else {
                     seen.set(entry.name, entry);
                 }
@@ -1586,16 +1784,21 @@ export class NowlineValidator {
             if (key === 'icon' && BUILTIN_ICON_NAMES.has(val)) return;
             const declIdx = symbolOrder.get(val);
             if (declIdx === undefined) {
-                const builtins = key === 'capacity-icon'
-                    ? [...BUILTIN_CAPACITY_ICONS].sort().join(', ')
-                    : [...BUILTIN_ICON_NAMES].sort().join(', ');
-                accept('error',
+                const builtins =
+                    key === 'capacity-icon'
+                        ? [...BUILTIN_CAPACITY_ICONS].sort().join(', ')
+                        : [...BUILTIN_ICON_NAMES].sort().join(', ');
+                accept(
+                    'error',
                     `${key}: "${val}" is neither a built-in (${builtins}) nor a declared symbol. Add "symbol ${val} unicode:..." earlier in config or use a quoted Unicode literal.`,
-                    { node: propNode, property: 'value' });
+                    { node: propNode, property: 'value' },
+                );
             } else if (declIdx >= entryIdx) {
-                accept('error',
+                accept(
+                    'error',
                     `${key}: symbol "${val}" is referenced before its declaration. Move "symbol ${val}" above this entry.`,
-                    { node: propNode, property: 'value' });
+                    { node: propNode, property: 'value' },
+                );
             }
         };
 

@@ -8,10 +8,7 @@
     },
     "Swimlane": {
         "prefix": "swimlane",
-        "body": [
-            "swimlane ${1:lane-id} \"${2:Lane Title}\" owner:${3:owner-id}",
-            "\t$0"
-        ],
+        "body": ["swimlane ${1:lane-id} \"${2:Lane Title}\" owner:${3:owner-id}", "\t$0"],
         "description": "New swimlane with an owner"
     },
     "Item": {
@@ -30,39 +27,27 @@
     },
     "Parallel block": {
         "prefix": "parallel",
-        "body": [
-            "parallel after:${1:dependency-id}",
-            "\t$0"
-        ],
+        "body": ["parallel after:${1:dependency-id}", "\t$0"],
         "description": "Parallel group of items"
     },
     "Group block": {
         "prefix": "group",
-        "body": [
-            "group ${1:group-id} \"${2:Group Title}\"",
-            "\t$0"
-        ],
+        "body": ["group ${1:group-id} \"${2:Group Title}\"", "\t$0"],
         "description": "Named group of items"
     },
     "Milestone": {
         "prefix": "milestone",
-        "body": [
-            "milestone ${1:milestone-id} \"${2:Milestone Title}\" after:${3:dependency-id}$0"
-        ],
+        "body": ["milestone ${1:milestone-id} \"${2:Milestone Title}\" after:${3:dependency-id}$0"],
         "description": "Milestone marker tied to a dependency"
     },
     "Milestone (date)": {
         "prefix": "milestone-date",
-        "body": [
-            "milestone ${1:milestone-id} \"${2:Milestone Title}\" date:${3:2026-03-16}$0"
-        ],
+        "body": ["milestone ${1:milestone-id} \"${2:Milestone Title}\" date:${3:2026-03-16}$0"],
         "description": "Milestone marker on a fixed date"
     },
     "Anchor": {
         "prefix": "anchor",
-        "body": [
-            "anchor ${1:anchor-id} \"${2:Anchor Title}\" date:${3:2026-01-05}$0"
-        ],
+        "body": ["anchor ${1:anchor-id} \"${2:Anchor Title}\" date:${3:2026-01-05}$0"],
         "description": "Calendar anchor on a fixed date"
     },
     "Footnote": {
@@ -75,31 +60,22 @@
     },
     "Person": {
         "prefix": "person",
-        "body": [
-            "person ${1:person-id} \"${2:Full Name}\"$0"
-        ],
+        "body": ["person ${1:person-id} \"${2:Full Name}\"$0"],
         "description": "Person declaration"
     },
     "Team": {
         "prefix": "team",
-        "body": [
-            "team ${1:team-id} \"${2:Team Name}\"",
-            "\t$0"
-        ],
+        "body": ["team ${1:team-id} \"${2:Team Name}\"", "\t$0"],
         "description": "Team declaration"
     },
     "Custom status": {
         "prefix": "status",
-        "body": [
-            "status ${1:status-id} \"${2:Status Label}\"$0"
-        ],
+        "body": ["status ${1:status-id} \"${2:Status Label}\"$0"],
         "description": "Custom status declaration"
     },
     "Label": {
         "prefix": "label",
-        "body": [
-            "label ${1:label-id} \"${2:Label Title}\" style:${3:style-id}$0"
-        ],
+        "body": ["label ${1:label-id} \"${2:Label Title}\" style:${3:style-id}$0"],
         "description": "Label declaration with style"
     }
 }

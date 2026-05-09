@@ -85,7 +85,9 @@ describe('resolveScale', () => {
     });
 
     it('defaults to weeks with thinned labels when no scale is set', () => {
-        const file = { roadmapDecl: { properties: [] } } as unknown as Parameters<typeof resolveScale>[0];
+        const file = { roadmapDecl: { properties: [] } } as unknown as Parameters<
+            typeof resolveScale
+        >[0];
         const preset = resolveScale(file, undefined);
         expect(preset.unit).toBe('weeks');
         expect(preset.pixelsPerUnit).toBe(40);

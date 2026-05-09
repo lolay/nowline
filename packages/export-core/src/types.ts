@@ -31,14 +31,20 @@ export interface ExportInputs {
 
 export type PdfPresetName =
     // Imperial / ANSI
-    | 'letter'   //  8.5 x 11    in   (default)
-    | 'legal'    //  8.5 x 14    in
-    | 'tabloid'  // 11   x 17    in   (ANSI B portrait)
-    | 'ledger'   // 17   x 11    in   (ANSI B landscape)
+    | 'letter' //  8.5 x 11    in   (default)
+    | 'legal' //  8.5 x 14    in
+    | 'tabloid' // 11   x 17    in   (ANSI B portrait)
+    | 'ledger' // 17   x 11    in   (ANSI B landscape)
     // Metric / ISO 216 — A series
-    | 'a5' | 'a4' | 'a3' | 'a2' | 'a1'
+    | 'a5'
+    | 'a4'
+    | 'a3'
+    | 'a2'
+    | 'a1'
     // Metric / ISO 216 — B series
-    | 'b5' | 'b4' | 'b3';
+    | 'b5'
+    | 'b4'
+    | 'b3';
 
 export type PdfLengthUnit = 'pt' | 'in' | 'mm' | 'cm';
 

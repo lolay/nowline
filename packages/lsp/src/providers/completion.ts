@@ -4,10 +4,7 @@ import {
     type CompletionContext,
     type NextFeature,
 } from 'langium/lsp';
-import {
-    CompletionItemKind,
-    type CompletionItem,
-} from 'vscode-languageserver';
+import { CompletionItemKind, type CompletionItem } from 'vscode-languageserver';
 import type { MaybePromise } from 'langium';
 import {
     BUILTIN_CAPACITY_ICONS,
@@ -173,20 +170,33 @@ function buildEntityItem(entity: NamedEntity): CompletionItem {
 
 function kindFor(kind: string): CompletionItemKind {
     switch (kind) {
-        case 'item': return CompletionItemKind.Field;
-        case 'swimlane': return CompletionItemKind.Class;
+        case 'item':
+            return CompletionItemKind.Field;
+        case 'swimlane':
+            return CompletionItemKind.Class;
         case 'parallel':
-        case 'group': return CompletionItemKind.Module;
+        case 'group':
+            return CompletionItemKind.Module;
         case 'anchor':
-        case 'milestone': return CompletionItemKind.Event;
-        case 'person': return CompletionItemKind.Constant;
-        case 'team': return CompletionItemKind.Module;
-        case 'label': return CompletionItemKind.EnumMember;
-        case 'size': return CompletionItemKind.Value;
-        case 'status': return CompletionItemKind.Enum;
-        case 'style': return CompletionItemKind.Color;
-        case 'symbol': return CompletionItemKind.Snippet;
-        case 'footnote': return CompletionItemKind.Text;
-        default: return CompletionItemKind.Reference;
+        case 'milestone':
+            return CompletionItemKind.Event;
+        case 'person':
+            return CompletionItemKind.Constant;
+        case 'team':
+            return CompletionItemKind.Module;
+        case 'label':
+            return CompletionItemKind.EnumMember;
+        case 'size':
+            return CompletionItemKind.Value;
+        case 'status':
+            return CompletionItemKind.Enum;
+        case 'style':
+            return CompletionItemKind.Color;
+        case 'symbol':
+            return CompletionItemKind.Snippet;
+        case 'footnote':
+            return CompletionItemKind.Text;
+        default:
+            return CompletionItemKind.Reference;
     }
 }

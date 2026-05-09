@@ -1,38 +1,38 @@
 {
-  "name": "@nowline/core",
-  "version": "0.1.0",
-  "description": "Nowline DSL parser, AST, and validation",
-  "license": "Apache-2.0",
-  "type": "module",
-  "main": "./dist/index.js",
-  "types": "./dist/index.d.ts",
-  "exports": {
-    ".": {
-      "types": "./dist/index.d.ts",
-      "import": "./dist/index.js"
+    "name": "@nowline/core",
+    "version": "0.1.0",
+    "description": "Nowline DSL parser, AST, and validation",
+    "license": "Apache-2.0",
+    "type": "module",
+    "main": "./dist/index.js",
+    "types": "./dist/index.d.ts",
+    "exports": {
+        ".": {
+            "types": "./dist/index.d.ts",
+            "import": "./dist/index.js"
+        }
+    },
+    "files": [
+        "dist/",
+        "src/"
+    ],
+    "scripts": {
+        "langium:generate": "langium generate",
+        "prebuild": "npm run langium:generate",
+        "build": "tsc -b tsconfig.json",
+        "watch": "tsc -b tsconfig.json --watch",
+        "pretest": "npm run langium:generate",
+        "test": "vitest run",
+        "test:watch": "vitest",
+        "lint": "eslint src/"
+    },
+    "dependencies": {
+        "langium": "~4.2.2"
+    },
+    "devDependencies": {
+        "@types/node": "^22.0.0",
+        "langium-cli": "~4.2.0",
+        "typescript": "~5.7.0",
+        "vitest": "^3.1.0"
     }
-  },
-  "files": [
-    "dist/",
-    "src/"
-  ],
-  "scripts": {
-    "langium:generate": "langium generate",
-    "prebuild": "npm run langium:generate",
-    "build": "tsc -b tsconfig.json",
-    "watch": "tsc -b tsconfig.json --watch",
-    "pretest": "npm run langium:generate",
-    "test": "vitest run",
-    "test:watch": "vitest",
-    "lint": "eslint src/"
-  },
-  "dependencies": {
-    "langium": "~4.2.2"
-  },
-  "devDependencies": {
-    "@types/node": "^22.0.0",
-    "langium-cli": "~4.2.0",
-    "typescript": "~5.7.0",
-    "vitest": "^3.1.0"
-  }
 }

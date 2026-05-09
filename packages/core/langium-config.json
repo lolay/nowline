@@ -1,11 +1,11 @@
 {
-  "projectName": "Nowline",
-  "languages": [
-    {
-      "id": "nowline",
-      "grammar": "src/language/nowline.langium",
-      "fileExtensions": [".nowline"]
-    }
-  ],
-  "out": "src/generated"
+    "projectName": "Nowline",
+    "languages": [
+        {
+            "id": "nowline",
+            "grammar": "src/language/nowline.langium",
+            "fileExtensions": [".nowline"]
+        }
+    ],
+    "out": "src/generated"
 }

@@ -315,7 +315,9 @@ interface StagedRoadmap {
 
 async function stageRoadmap(args: ProduceArgs): Promise<StagedRoadmap> {
     const parsed = await parseAndValidate(
-        args.inputFormat === 'json' ? jsonToNowlineText(args.contents, args.displayPath) : args.contents,
+        args.inputFormat === 'json'
+            ? jsonToNowlineText(args.contents, args.displayPath)
+            : args.contents,
         args,
     );
     const resolved = await resolveIncludes(parsed.ast, args.absInputPath, {
@@ -411,7 +413,10 @@ async function parseAndValidate(contents: string, args: ProduceArgs) {
     return result;
 }
 
-async function loadConfigFor(inputArg: string, cwd: string): Promise<{ defaultFormat?: string } | null> {
+async function loadConfigFor(
+    inputArg: string,
+    cwd: string,
+): Promise<{ defaultFormat?: string } | null> {
     try {
         if (inputArg === '-') {
             const { config } = await loadConfig(cwd);
@@ -494,10 +499,7 @@ function parseMargin(raw: string | undefined): number | undefined {
         return lengthToPoints(parseLength(raw));
     } catch (err) {
         const message = err instanceof Error ? err.message : String(err);
-        throw new CliError(
-            ExitCode.InputError,
-            `nowline: invalid --margin "${raw}": ${message}`,
-        );
+        throw new CliError(ExitCode.InputError, `nowline: invalid --margin "${raw}": ${message}`);
     }
 }
 
@@ -510,10 +512,7 @@ function stringFromConfig(
     return typeof value === 'string' ? value : undefined;
 }
 
-function boolFromConfig(
-    config: { [key: string]: unknown } | null,
-    key: string,
-): boolean {
+function boolFromConfig(config: { [key: string]: unknown } | null, key: string): boolean {
     if (!config) return false;
     const value = config[key];
     return value === true;

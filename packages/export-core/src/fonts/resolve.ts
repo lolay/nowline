@@ -15,12 +15,7 @@ import { promises as fs } from 'node:fs';
 import { existsSync as defaultExistsSync } from 'node:fs';
 import * as path from 'node:path';
 
-import type {
-    FontRole,
-    FontSource,
-    ResolvedFont,
-    ResolvedFontPair,
-} from '../types.js';
+import type { FontRole, FontSource, ResolvedFont, ResolvedFontPair } from '../types.js';
 import { loadBundledSans, loadBundledMono } from './bundled.js';
 import {
     aliasCandidate,
@@ -151,12 +146,17 @@ async function loadFlag(
     source: 'flag' | 'env',
     args: RoleArgs,
 ): Promise<ResolvedFont> {
-    if (path.isAbsolute(raw) || raw.startsWith('.') || raw.includes(path.sep) || raw.endsWith('.ttf') || raw.endsWith('.otf') || raw.endsWith('.ttc')) {
+    if (
+        path.isAbsolute(raw) ||
+        raw.startsWith('.') ||
+        raw.includes(path.sep) ||
+        raw.endsWith('.ttf') ||
+        raw.endsWith('.otf') ||
+        raw.endsWith('.ttc')
+    ) {
         const abs = path.resolve(raw);
         if (!args.fileExists(abs)) {
-            throw new FontResolveError(
-                `font path does not exist: ${raw} (resolved to ${abs})`,
-            );
+            throw new FontResolveError(`font path does not exist: ${raw} (resolved to ${abs})`);
         }
         const bytes = await args.readFileBytes(abs);
         return decorate(bytes, {
@@ -169,9 +169,7 @@ async function loadFlag(
     if (isAlias(raw)) {
         const candidate = aliasCandidate(raw, role, args.probe);
         if (!candidate) {
-            throw new FontResolveError(
-                `alias "${raw}" has no ${role} mapping on this platform`,
-            );
+            throw new FontResolveError(`alias "${raw}" has no ${role} mapping on this platform`);
         }
         if (!args.fileExists(candidate.path)) {
             // Alias is known but the underlying file is missing — fall through
@@ -190,9 +188,7 @@ async function loadFlag(
         });
     }
 
-    throw new FontResolveError(
-        `font value "${raw}" is neither a path nor a known alias`,
-    );
+    throw new FontResolveError(`font value "${raw}" is neither a path nor a known alias`);
 }
 
 async function loadBundled(role: FontRole, source: FontSource): Promise<ResolvedFont> {

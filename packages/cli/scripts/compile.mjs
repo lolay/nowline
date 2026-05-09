@@ -75,7 +75,9 @@ function main() {
 
     const entry = path.join(packageRoot, 'dist', 'index.js');
     if (!safeStat(entry)) {
-        console.error(`error: expected ${path.relative(packageRoot, entry)} to exist; run \`pnpm build\` first.`);
+        console.error(
+            `error: expected ${path.relative(packageRoot, entry)} to exist; run \`pnpm build\` first.`,
+        );
         process.exit(1);
     }
 
@@ -84,13 +86,7 @@ function main() {
         const outName = `nowline-${tgt.suffix}`;
         const outPath = path.join(outDir, outName);
         console.log(`compiling ${tgt.id} -> ${path.relative(packageRoot, outPath)}`);
-        const args = [
-            'build',
-            entry,
-            '--compile',
-            '--target', tgt.id,
-            '--outfile', outPath,
-        ];
+        const args = ['build', entry, '--compile', '--target', tgt.id, '--outfile', outPath];
         const result = spawnSync('bun', args, { stdio: 'inherit', cwd: packageRoot });
         if (result.status !== 0) {
             console.error(`  FAILED ${tgt.id}`);

@@ -71,7 +71,12 @@ swimlane s
         );
         expect(r.parserErrors).toEqual([]);
         const defaults = r.ast.configEntries.filter(isDefaultDeclaration);
-        expect(defaults.map((d) => d.entityType)).toEqual(['item', 'swimlane', 'roadmap', 'parallel']);
+        expect(defaults.map((d) => d.entityType)).toEqual([
+            'item',
+            'swimlane',
+            'roadmap',
+            'parallel',
+        ]);
         expect(defaults[0].properties.map((p) => p.key)).toEqual(['shadow']);
     });
 
@@ -141,9 +146,7 @@ swimlane s
         expect(r.parserErrors).toEqual([]);
         const sizes = r.ast.roadmapEntries.filter(isSizeDeclaration);
         expect(sizes.map((s) => s.name)).toEqual(['xs', 'sm', 'md']);
-        expect(
-            sizes[0].properties.find((p) => p.key === 'effort')?.value,
-        ).toBe('1d');
+        expect(sizes[0].properties.find((p) => p.key === 'effort')?.value).toBe('1d');
     });
 
     it('allows config-only file (no roadmap)', async () => {

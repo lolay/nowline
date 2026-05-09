@@ -55,9 +55,7 @@ export function collectMilestonePredecessors(
         const visualRight = ctx.entityVisualRightX.get(ref);
         const x = visualRight ?? ctx.entityRightEdges.get(ref);
         if (x === undefined) continue;
-        const y = ctx.itemSlackAttachY.get(ref)
-            ?? ctx.entityMidpoints.get(ref)?.y
-            ?? 0;
+        const y = ctx.itemSlackAttachY.get(ref) ?? ctx.entityMidpoints.get(ref)?.y ?? 0;
         // Markers don't share a flow with anything, so use their id
         // as a unique flow key — every marker stands on its own.
         const flowKey = ctx.itemFlowKey.get(ref) ?? `marker:${ref}`;
@@ -75,9 +73,7 @@ export function collectMilestonePredecessors(
  * Predecessors in different flows (e.g. two parallel sub-tracks)
  * each survive as their flow's last entry.
  */
-export function lastPredecessorPerFlow(
-    preds: MilestonePredecessor[],
-): MilestonePredecessor[] {
+export function lastPredecessorPerFlow(preds: MilestonePredecessor[]): MilestonePredecessor[] {
     const m = new Map<string, MilestonePredecessor>();
     for (const p of preds) {
         const existing = m.get(p.flowKey);
@@ -101,7 +97,7 @@ function decideLabelBoxForCanvas(
     const naturalLeftX = centerX - radius - MARKER_LABEL_GAP_PX - labelWidth;
     const fitsRight = naturalRightX + labelWidth <= chartRightX;
     const fitsLeft = naturalLeftX >= chartLeftX;
-    const side: 'left' | 'right' = fitsRight ? 'right' : (fitsLeft ? 'left' : 'right');
+    const side: 'left' | 'right' = fitsRight ? 'right' : fitsLeft ? 'left' : 'right';
     const xLeft = side === 'right' ? naturalRightX : naturalLeftX;
     return {
         box: { x: xLeft, y: centerY - 4, width: labelWidth, height: MARKER_LABEL_HEIGHT_PX },
@@ -163,10 +159,12 @@ export class MilestoneNode {
             }
             if (maxPred && maxPred.x > x) {
                 isOverrun = true;
-                slackArrows = [{
-                    x: maxPred.x,
-                    y: maxPred.y > 0 ? maxPred.y : centerY,
-                }];
+                slackArrows = [
+                    {
+                        x: maxPred.x,
+                        y: maxPred.y > 0 ? maxPred.y : centerY,
+                    },
+                ];
             }
         } else if (afterRaw.length > 0) {
             // Float to the rightmost (binding) predecessor; every
@@ -190,8 +188,14 @@ export class MilestoneNode {
             // everyone's centerX is known. That pass overwrites the
             // rowIndex / centerY / labelBox / labelSide we set here.
             const provisional = decideLabelBoxForCanvas(
-                centerX, inRowY, radius, title, 10, true,
-                ctx.timeline.box.x, ctx.chartRightX,
+                centerX,
+                inRowY,
+                radius,
+                title,
+                10,
+                true,
+                ctx.timeline.box.x,
+                ctx.chartRightX,
             );
             centerY = inRowY;
             labelBox = provisional.box;
@@ -212,8 +216,14 @@ export class MilestoneNode {
         if (centerX === null) return null;
         if (!labelBox) {
             const fallback = decideLabelBoxForCanvas(
-                centerX, centerY, radius, title, 10, true,
-                ctx.timeline.box.x, ctx.chartRightX,
+                centerX,
+                centerY,
+                radius,
+                title,
+                10,
+                true,
+                ctx.timeline.box.x,
+                ctx.chartRightX,
             );
             labelBox = fallback.box;
             labelSide = fallback.side;

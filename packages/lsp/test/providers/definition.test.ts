@@ -150,7 +150,9 @@ describe('NowlineDefinitionProvider', () => {
         // `label enterprise "Enterprise"` line.
         const labelLine = locate(referenceSample, 'label enterprise ');
         expect(links![0].targetSelectionRange.start.line).toBe(labelLine.line);
-        expect(links![0].targetSelectionRange.start.character).toBe(labelLine.character + 'label '.length);
+        expect(links![0].targetSelectionRange.start.character).toBe(
+            labelLine.character + 'label '.length,
+        );
     });
 
     it('jumps from "owner:platform" to the team declaration', async () => {

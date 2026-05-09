@@ -1,12 +1,12 @@
 {
-  "name": "@nowline/cli",
-  "version": "0.1.0",
-  "description": "Nowline command-line interface — validate, convert, init",
-  "license": "Apache-2.0",
-  "type": "module",
-  "bin": {
-    "nowline": "./dist/index.js"
-  },
+    "name": "@nowline/cli",
+    "version": "0.1.0",
+    "description": "Nowline command-line interface — validate, convert, init",
+    "license": "Apache-2.0",
+    "type": "module",
+    "bin": {
+        "nowline": "./dist/index.js"
+    },
     "main": "./dist/index.js",
     "types": "./dist/index.d.ts",
     "man": [
@@ -24,43 +24,43 @@
         "src/",
         "scripts/"
     ],
-  "scripts": {
-    "bundle-templates": "node scripts/bundle-templates.mjs",
-    "prebuild": "node scripts/bundle-templates.mjs",
-    "build": "tsc -b tsconfig.json",
-    "watch": "tsc -b tsconfig.json --watch",
-    "pretest": "node scripts/bundle-templates.mjs",
-    "test": "vitest run",
-    "test:watch": "vitest",
-    "lint": "eslint src/",
-    "compile": "node scripts/compile.mjs",
-    "compile:local": "node scripts/compile.mjs --target=local"
-  },
-  "dependencies": {
-    "@babel/code-frame": "^7.29.0",
-    "@clack/prompts": "^0.11.0",
-    "@nowline/config": "workspace:*",
-    "@nowline/core": "workspace:*",
-    "@nowline/export-core": "workspace:*",
-    "@nowline/export-html": "workspace:*",
-    "@nowline/export-mermaid": "workspace:*",
-    "@nowline/export-msproj": "workspace:*",
-    "@nowline/export-pdf": "workspace:*",
-    "@nowline/export-png": "workspace:*",
-    "@nowline/export-xlsx": "workspace:*",
-    "@nowline/layout": "workspace:*",
-    "@nowline/renderer": "workspace:*",
-    "chalk": "^5.6.0",
-    "citty": "^0.2.2",
-    "consola": "^3.4.0",
-    "js-yaml": "^4.1.0",
-    "langium": "~4.2.2"
-  },
-  "devDependencies": {
-    "@types/babel__code-frame": "^7.0.6",
-    "@types/js-yaml": "^4.0.9",
-    "@types/node": "^22.0.0",
-    "typescript": "~5.7.0",
-    "vitest": "^3.1.0"
-  }
+    "scripts": {
+        "bundle-templates": "node scripts/bundle-templates.mjs",
+        "prebuild": "node scripts/bundle-templates.mjs",
+        "build": "tsc -b tsconfig.json",
+        "watch": "tsc -b tsconfig.json --watch",
+        "pretest": "node scripts/bundle-templates.mjs",
+        "test": "vitest run",
+        "test:watch": "vitest",
+        "lint": "eslint src/",
+        "compile": "node scripts/compile.mjs",
+        "compile:local": "node scripts/compile.mjs --target=local"
+    },
+    "dependencies": {
+        "@babel/code-frame": "^7.29.0",
+        "@clack/prompts": "^0.11.0",
+        "@nowline/config": "workspace:*",
+        "@nowline/core": "workspace:*",
+        "@nowline/export-core": "workspace:*",
+        "@nowline/export-html": "workspace:*",
+        "@nowline/export-mermaid": "workspace:*",
+        "@nowline/export-msproj": "workspace:*",
+        "@nowline/export-pdf": "workspace:*",
+        "@nowline/export-png": "workspace:*",
+        "@nowline/export-xlsx": "workspace:*",
+        "@nowline/layout": "workspace:*",
+        "@nowline/renderer": "workspace:*",
+        "chalk": "^5.6.0",
+        "citty": "^0.2.2",
+        "consola": "^3.4.0",
+        "js-yaml": "^4.1.0",
+        "langium": "~4.2.2"
+    },
+    "devDependencies": {
+        "@types/babel__code-frame": "^7.0.6",
+        "@types/js-yaml": "^4.0.9",
+        "@types/node": "^22.0.0",
+        "typescript": "~5.7.0",
+        "vitest": "^3.1.0"
+    }
 }

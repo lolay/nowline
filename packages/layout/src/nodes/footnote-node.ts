@@ -11,11 +11,7 @@ import {
     FOOTNOTE_HEADER_HEIGHT_PX,
     FOOTNOTE_PANEL_PADDING_PX,
 } from '../themes/shared.js';
-import type {
-    PositionedFootnoteArea,
-    PositionedFootnoteEntry,
-    BoundingBox,
-} from '../types.js';
+import type { PositionedFootnoteArea, PositionedFootnoteEntry, BoundingBox } from '../types.js';
 import type { LayoutContext } from '../layout-context.js';
 import { propValues } from '../dsl-utils.js';
 
@@ -49,11 +45,12 @@ export function buildFootnotes(
         x: FOOTNOTE_PANEL_PADDING_PX,
         y: chartBottomY + FOOTNOTE_PANEL_PADDING_PX,
         width: ctx.chartRightX - 2 * FOOTNOTE_PANEL_PADDING_PX,
-        height: entries.length === 0
-            ? 0
-            : FOOTNOTE_HEADER_HEIGHT_PX
-                + entries.length * FOOTNOTE_ROW_HEIGHT
-                + FOOTNOTE_PANEL_PADDING_PX,
+        height:
+            entries.length === 0
+                ? 0
+                : FOOTNOTE_HEADER_HEIGHT_PX +
+                  entries.length * FOOTNOTE_ROW_HEIGHT +
+                  FOOTNOTE_PANEL_PADDING_PX,
     };
     return {
         area: { box, entries },

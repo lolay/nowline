@@ -9,15 +9,7 @@
 // Calendar UIDs are fixed (1 / 2). No timestamps in the calendar block →
 // deterministic across runs.
 
-const DAY_NAMES = [
-    'Sunday',
-    'Monday',
-    'Tuesday',
-    'Wednesday',
-    'Thursday',
-    'Friday',
-    'Saturday',
-];
+const DAY_NAMES = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
 
 function dayBlock(dayIndex: number): string {
     const isWeekend = dayIndex === 0 || dayIndex === 6;

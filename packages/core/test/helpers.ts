@@ -3,7 +3,9 @@ import { createNowlineServices, type NowlineServices } from '../src/language/now
 import type { NowlineFile } from '../src/generated/ast.js';
 import type { Diagnostic } from 'langium';
 
-let cached: { shared: ReturnType<typeof createNowlineServices>['shared']; Nowline: NowlineServices } | undefined;
+let cached:
+    | { shared: ReturnType<typeof createNowlineServices>['shared']; Nowline: NowlineServices }
+    | undefined;
 
 export function getServices() {
     if (!cached) {
@@ -21,7 +23,10 @@ export interface ParseOutcome {
 
 let docCounter = 0;
 
-export async function parse(input: string, options: { validate?: boolean } = {}): Promise<ParseOutcome> {
+export async function parse(
+    input: string,
+    options: { validate?: boolean } = {},
+): Promise<ParseOutcome> {
     const { shared } = getServices();
     const uri = URI.parse(`memory:///test-${++docCounter}.nowline`);
     const docFactory = shared.workspace.LangiumDocumentFactory;

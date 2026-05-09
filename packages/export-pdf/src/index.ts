@@ -96,12 +96,9 @@ export async function exportPdf(
     });
 
     const today = inputs.today ?? new Date(Date.UTC(2026, 0, 5)); // deterministic Monday default
-    const creationDate = new Date(Date.UTC(
-        today.getUTCFullYear(),
-        today.getUTCMonth(),
-        today.getUTCDate(),
-        0, 0, 0, 0,
-    ));
+    const creationDate = new Date(
+        Date.UTC(today.getUTCFullYear(), today.getUTCMonth(), today.getUTCDate(), 0, 0, 0, 0),
+    );
 
     const doc = new PDFDocument({
         autoFirstPage: false,
@@ -167,7 +164,7 @@ async function resolveOptions(options: PdfOptions): Promise<ResolvedPdfOptions> 
     const pageSize: PdfPageSize =
         typeof options.pageSize === 'string'
             ? parsePageSize(options.pageSize)
-            : options.pageSize ?? { kind: 'preset', name: 'letter' };
+            : (options.pageSize ?? { kind: 'preset', name: 'letter' });
     const orientation = options.orientation ?? 'auto';
     const marginPt = options.marginPt ?? 36;
     const fonts = options.fonts ?? (await resolveFontsFor());

@@ -4,7 +4,9 @@ import { EmptyFileSystem, URI, type LangiumDocument } from 'langium';
 import type { NowlineFile } from '@nowline/core';
 import { createNowlineLspServices, type NowlineLspServices } from '../src/nowline-lsp-module.js';
 
-let cached: { shared: ReturnType<typeof createNowlineLspServices>['shared']; Nowline: NowlineLspServices } | undefined;
+let cached:
+    | { shared: ReturnType<typeof createNowlineLspServices>['shared']; Nowline: NowlineLspServices }
+    | undefined;
 let docCounter = 0;
 
 export function services() {
@@ -50,7 +52,11 @@ export function pos(line: number, character: number): { line: number; character:
  * Useful for tests that want to position the cursor on a specific token without
  * counting columns by hand.
  */
-export function locate(source: string, needle: string, occurrence = 0): { line: number; character: number } {
+export function locate(
+    source: string,
+    needle: string,
+    occurrence = 0,
+): { line: number; character: number } {
     let from = -1;
     for (let i = 0; i <= occurrence; i++) {
         from = source.indexOf(needle, from + 1);
@@ -66,7 +72,11 @@ export function locate(source: string, needle: string, occurrence = 0): { line: 
 }
 
 /** Cursor position one character past the last char of the first match of `needle`. */
-export function locateAfter(source: string, needle: string, occurrence = 0): { line: number; character: number } {
+export function locateAfter(
+    source: string,
+    needle: string,
+    occurrence = 0,
+): { line: number; character: number } {
     const start = locate(source, needle, occurrence);
     return { line: start.line, character: start.character + needle.length };
 }

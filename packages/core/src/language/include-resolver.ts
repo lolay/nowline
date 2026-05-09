@@ -286,7 +286,10 @@ async function resolveFile(
     return result;
 }
 
-function getIncludeMode(inc: IncludeDeclaration, key: 'config' | 'roadmap'): IncludeMode | undefined {
+function getIncludeMode(
+    inc: IncludeDeclaration,
+    key: 'config' | 'roadmap',
+): IncludeMode | undefined {
     const opt = inc.options.find((o) => o.key === key);
     if (!opt) return undefined;
     if (opt.value === 'merge' || opt.value === 'ignore' || opt.value === 'isolate') {

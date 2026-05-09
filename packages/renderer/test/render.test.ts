@@ -86,7 +86,9 @@ swimlane a "A"
         };
         const svg = await renderSvg(model, {
             assetResolver: async () => ({
-                bytes: new TextEncoder().encode('<svg><rect x="0" y="0" width="4" height="4"/></svg>'),
+                bytes: new TextEncoder().encode(
+                    '<svg><rect x="0" y="0" width="4" height="4"/></svg>',
+                ),
                 mime: 'image/svg+xml',
             }),
         });
@@ -141,7 +143,9 @@ describe('renderSvg — lane capacity badge', () => {
         expect(laneFragment).not.toBeNull();
         // Number text + curated person SVG icon in the chiclet.
         expect(laneFragment![0]).toContain('>8<');
-        expect(laneFragment![0]).toMatch(/<svg [^>]*viewBox="0 0 24 24"[^>]*>.*<circle[^>]*currentColor/);
+        expect(laneFragment![0]).toMatch(
+            /<svg [^>]*viewBox="0 0 24 24"[^>]*>.*<circle[^>]*currentColor/,
+        );
     });
 
     it('omits the badge when no capacity is declared', async () => {
@@ -345,9 +349,7 @@ describe('renderSvg — lane utilization underline', () => {
         // Attribute order: `attrs()` sorts keys alphabetically, so
         // `data-id` precedes `data-layer` in the emitted markup.
         const m = svg.match(
-            new RegExp(
-                `<g data-id="${laneId}" data-layer="lane-utilization">[\\s\\S]*?<\\/g>`,
-            ),
+            new RegExp(`<g data-id="${laneId}" data-layer="lane-utilization">[\\s\\S]*?<\\/g>`),
         );
         return m ? m[0] : null;
     }

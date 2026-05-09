@@ -20,10 +20,7 @@ describeBuilt('verbless render (requires `pnpm build`)', () => {
     });
 
     it('-o - writes SVG to stdout', async () => {
-        const r = await runCliBuilt([
-            path.join(examplesDir, 'minimal.nowline'),
-            '-o', '-',
-        ]);
+        const r = await runCliBuilt([path.join(examplesDir, 'minimal.nowline'), '-o', '-']);
         expect(r.exitCode).toBe(0);
         expect(r.stdout.startsWith('<svg')).toBe(true);
         expect(r.stdout).toContain('</svg>');
@@ -34,7 +31,8 @@ describeBuilt('verbless render (requires `pnpm build`)', () => {
             const output = path.join(dir, 'roadmap.svg');
             const first = await runCliBuilt([
                 path.join(examplesDir, 'minimal.nowline'),
-                '-o', output,
+                '-o',
+                output,
             ]);
             expect(first.exitCode).toBe(0);
             const firstContents = await fs.readFile(output, 'utf-8');
@@ -42,7 +40,8 @@ describeBuilt('verbless render (requires `pnpm build`)', () => {
 
             const second = await runCliBuilt([
                 path.join(examplesDir, 'minimal.nowline'),
-                '-o', output,
+                '-o',
+                output,
             ]);
             expect(second.exitCode).toBe(0);
             const secondContents = await fs.readFile(output, 'utf-8');
@@ -71,11 +70,10 @@ describeBuilt('verbless render (requires `pnpm build`)', () => {
 
     it('-f png renders a PNG file (m2c)', async () => {
         await withTempDir(async (dir) => {
-            const r = await runCliBuilt([
-                path.join(examplesDir, 'minimal.nowline'),
-                '-f', 'png',
-                '--headless',
-            ], { cwd: dir });
+            const r = await runCliBuilt(
+                [path.join(examplesDir, 'minimal.nowline'), '-f', 'png', '--headless'],
+                { cwd: dir },
+            );
             expect(r.exitCode).toBe(0);
             const out = path.join(dir, 'minimal.png');
             expect(existsSync(out)).toBe(true);
@@ -85,15 +83,18 @@ describeBuilt('verbless render (requires `pnpm build`)', () => {
     it('--now places the now-line in the output', async () => {
         await withTempDir(async (dir) => {
             const source = path.join(dir, 'sample.nowline');
-            await fs.writeFile(source, [
-                'nowline v1',
-                '',
-                'roadmap r1 "R" start:2026-01-01 length:26w',
-                '',
-                'swimlane a "A"',
-                '  item x duration:1w',
-                '',
-            ].join('\n'));
+            await fs.writeFile(
+                source,
+                [
+                    'nowline v1',
+                    '',
+                    'roadmap r1 "R" start:2026-01-01 length:26w',
+                    '',
+                    'swimlane a "A"',
+                    '  item x duration:1w',
+                    '',
+                ].join('\n'),
+            );
             const r = await runCliBuilt([source, '--now', '2026-02-01', '-o', '-'], { cwd: dir });
             expect(r.exitCode).toBe(0);
             expect(r.stdout).toContain('data-layer="nowline"');
@@ -107,15 +108,18 @@ describeBuilt('verbless render (requires `pnpm build`)', () => {
             const source = path.join(dir, 'sample.nowline');
             // Use a length that comfortably contains "today" so we know the
             // suppression came from `--now -`, not a date-window cutoff.
-            await fs.writeFile(source, [
-                'nowline v1',
-                '',
-                'roadmap r1 "R" start:2020-01-01 length:520w',
-                '',
-                'swimlane a "A"',
-                '  item x duration:1w',
-                '',
-            ].join('\n'));
+            await fs.writeFile(
+                source,
+                [
+                    'nowline v1',
+                    '',
+                    'roadmap r1 "R" start:2020-01-01 length:520w',
+                    '',
+                    'swimlane a "A"',
+                    '  item x duration:1w',
+                    '',
+                ].join('\n'),
+            );
             const r = await runCliBuilt([source, '--now', '-', '-o', '-'], { cwd: dir });
             expect(r.exitCode).toBe(0);
             expect(r.stdout).not.toContain('data-layer="nowline"');
@@ -125,15 +129,18 @@ describeBuilt('verbless render (requires `pnpm build`)', () => {
     it('default (no --now) draws the now-line at today when in range', async () => {
         await withTempDir(async (dir) => {
             const source = path.join(dir, 'sample.nowline');
-            await fs.writeFile(source, [
-                'nowline v1',
-                '',
-                'roadmap r1 "R" start:2020-01-01 length:520w',
-                '',
-                'swimlane a "A"',
-                '  item x duration:1w',
-                '',
-            ].join('\n'));
+            await fs.writeFile(
+                source,
+                [
+                    'nowline v1',
+                    '',
+                    'roadmap r1 "R" start:2020-01-01 length:520w',
+                    '',
+                    'swimlane a "A"',
+                    '  item x duration:1w',
+                    '',
+                ].join('\n'),
+            );
             const r = await runCliBuilt([source, '-o', '-'], { cwd: dir });
             expect(r.exitCode).toBe(0);
             expect(r.stdout).toContain('data-layer="nowline"');
@@ -150,13 +157,17 @@ describeBuilt('verbless render (requires `pnpm build`)', () => {
     it('--theme dark emits dark-theme marker', async () => {
         const light = await runCliBuilt([
             path.join(examplesDir, 'minimal.nowline'),
-            '--theme', 'light',
-            '-o', '-',
+            '--theme',
+            'light',
+            '-o',
+            '-',
         ]);
         const dark = await runCliBuilt([
             path.join(examplesDir, 'minimal.nowline'),
-            '--theme', 'dark',
-            '-o', '-',
+            '--theme',
+            'dark',
+            '-o',
+            '-',
         ]);
         expect(light.stdout).toContain('data-theme="light"');
         expect(dark.stdout).toContain('data-theme="dark"');
@@ -166,8 +177,10 @@ describeBuilt('verbless render (requires `pnpm build`)', () => {
     it('-f json emits the JSON AST (replaces the old `convert` verb)', async () => {
         const r = await runCliBuilt([
             path.join(examplesDir, 'minimal.nowline'),
-            '-f', 'json',
-            '-o', '-',
+            '-f',
+            'json',
+            '-o',
+            '-',
         ]);
         expect(r.exitCode).toBe(0);
         const parsed = JSON.parse(r.stdout);
@@ -176,12 +189,17 @@ describeBuilt('verbless render (requires `pnpm build`)', () => {
 
     it('-o report -f pdf auto-adds the .pdf extension', async () => {
         await withTempDir(async (dir) => {
-            const r = await runCliBuilt([
-                path.join(examplesDir, 'minimal.nowline'),
-                '-o', 'report',
-                '-f', 'pdf',
-                '--headless',
-            ], { cwd: dir });
+            const r = await runCliBuilt(
+                [
+                    path.join(examplesDir, 'minimal.nowline'),
+                    '-o',
+                    'report',
+                    '-f',
+                    'pdf',
+                    '--headless',
+                ],
+                { cwd: dir },
+            );
             expect(r.exitCode).toBe(0);
             const out = path.join(dir, 'report.pdf');
             expect(existsSync(out)).toBe(true);
@@ -190,10 +208,10 @@ describeBuilt('verbless render (requires `pnpm build`)', () => {
 
     it('-o report.svg writes SVG to that name', async () => {
         await withTempDir(async (dir) => {
-            const r = await runCliBuilt([
-                path.join(examplesDir, 'minimal.nowline'),
-                '-o', 'report.svg',
-            ], { cwd: dir });
+            const r = await runCliBuilt(
+                [path.join(examplesDir, 'minimal.nowline'), '-o', 'report.svg'],
+                { cwd: dir },
+            );
             expect(r.exitCode).toBe(0);
             const out = path.join(dir, 'report.svg');
             expect(existsSync(out)).toBe(true);
@@ -202,11 +220,10 @@ describeBuilt('verbless render (requires `pnpm build`)', () => {
 
     it('-f infers from .pdf extension and writes a PDF', async () => {
         await withTempDir(async (dir) => {
-            const r = await runCliBuilt([
-                path.join(examplesDir, 'minimal.nowline'),
-                '-o', 'foo.pdf',
-                '--headless',
-            ], { cwd: dir });
+            const r = await runCliBuilt(
+                [path.join(examplesDir, 'minimal.nowline'), '-o', 'foo.pdf', '--headless'],
+                { cwd: dir },
+            );
             expect(r.exitCode).toBe(0);
             const out = path.join(dir, 'foo.pdf');
             expect(existsSync(out)).toBe(true);
@@ -214,10 +231,7 @@ describeBuilt('verbless render (requires `pnpm build`)', () => {
     });
 
     it('-o foo.xml without -f msproj fails as ambiguous', async () => {
-        const r = await runCliBuilt([
-            path.join(examplesDir, 'minimal.nowline'),
-            '-o', 'foo.xml',
-        ]);
+        const r = await runCliBuilt([path.join(examplesDir, 'minimal.nowline'), '-o', 'foo.xml']);
         expect(r.exitCode).toBe(2);
         expect(r.stderr).toMatch(/msproj|xml/i);
     });
@@ -231,21 +245,22 @@ describeBuilt('verbless render — locale precedence (two-chain model)', () => {
     it('file `locale:fr-CA` wins over `--locale en-US` for rendered SVG', async () => {
         await withTempDir(async (dir) => {
             const source = path.join(dir, 'fr-sample.nowline');
-            await fs.writeFile(source, [
-                'nowline v1 locale:fr-CA',
-                '',
-                'roadmap r1 "R" start:2026-01-01 length:26w',
-                '',
-                'swimlane a "A"',
-                '  item x duration:1w',
-                '',
-            ].join('\n'));
-            const r = await runCliBuilt([
+            await fs.writeFile(
                 source,
-                '--locale', 'en-US',
-                '--now', '2026-02-01',
-                '-o', '-',
-            ], { cwd: dir });
+                [
+                    'nowline v1 locale:fr-CA',
+                    '',
+                    'roadmap r1 "R" start:2026-01-01 length:26w',
+                    '',
+                    'swimlane a "A"',
+                    '  item x duration:1w',
+                    '',
+                ].join('\n'),
+            );
+            const r = await runCliBuilt(
+                [source, '--locale', 'en-US', '--now', '2026-02-01', '-o', '-'],
+                { cwd: dir },
+            );
             expect(r.exitCode).toBe(0);
             // The now-pill is the headline localized string. "maint." is
             // French for "maintenant" (the short-form "now") and proves
@@ -263,21 +278,22 @@ describeBuilt('verbless render — locale precedence (two-chain model)', () => {
     it('--locale fr fallback applies when the file omits locale:', async () => {
         await withTempDir(async (dir) => {
             const source = path.join(dir, 'no-directive.nowline');
-            await fs.writeFile(source, [
-                'nowline v1',
-                '',
-                'roadmap r1 "R" start:2026-01-01 length:26w',
-                '',
-                'swimlane a "A"',
-                '  item x duration:1w',
-                '',
-            ].join('\n'));
-            const r = await runCliBuilt([
+            await fs.writeFile(
                 source,
-                '--locale', 'fr-CA',
-                '--now', '2026-02-01',
-                '-o', '-',
-            ], { cwd: dir });
+                [
+                    'nowline v1',
+                    '',
+                    'roadmap r1 "R" start:2026-01-01 length:26w',
+                    '',
+                    'swimlane a "A"',
+                    '  item x duration:1w',
+                    '',
+                ].join('\n'),
+            );
+            const r = await runCliBuilt(
+                [source, '--locale', 'fr-CA', '--now', '2026-02-01', '-o', '-'],
+                { cwd: dir },
+            );
             expect(r.exitCode).toBe(0);
             expect(r.stdout).toContain('>maint.<');
         });
@@ -289,15 +305,18 @@ describeBuilt('verbless render — locale precedence (two-chain model)', () => {
     it('--verbose logs the content locale source on stderr (file directive)', async () => {
         await withTempDir(async (dir) => {
             const source = path.join(dir, 'fr-sample.nowline');
-            await fs.writeFile(source, [
-                'nowline v1 locale:fr-CA',
-                '',
-                'roadmap r1 "R" start:2026-01-01 length:26w',
-                '',
-                'swimlane a "A"',
-                '  item x duration:1w',
-                '',
-            ].join('\n'));
+            await fs.writeFile(
+                source,
+                [
+                    'nowline v1 locale:fr-CA',
+                    '',
+                    'roadmap r1 "R" start:2026-01-01 length:26w',
+                    '',
+                    'swimlane a "A"',
+                    '  item x duration:1w',
+                    '',
+                ].join('\n'),
+            );
             const r = await runCliBuilt([source, '--verbose', '-o', '-'], { cwd: dir });
             expect(r.exitCode).toBe(0);
             expect(r.stderr).toContain('nowline: locale=fr-CA (from file directive)');
@@ -307,21 +326,21 @@ describeBuilt('verbless render — locale precedence (two-chain model)', () => {
     it('--verbose logs the content locale source on stderr (--locale fallback)', async () => {
         await withTempDir(async (dir) => {
             const source = path.join(dir, 'no-directive.nowline');
-            await fs.writeFile(source, [
-                'nowline v1',
-                '',
-                'roadmap r1 "R" start:2026-01-01 length:26w',
-                '',
-                'swimlane a "A"',
-                '  item x duration:1w',
-                '',
-            ].join('\n'));
-            const r = await runCliBuilt([
+            await fs.writeFile(
                 source,
-                '--locale', 'fr-CA',
-                '--verbose',
-                '-o', '-',
-            ], { cwd: dir });
+                [
+                    'nowline v1',
+                    '',
+                    'roadmap r1 "R" start:2026-01-01 length:26w',
+                    '',
+                    'swimlane a "A"',
+                    '  item x duration:1w',
+                    '',
+                ].join('\n'),
+            );
+            const r = await runCliBuilt([source, '--locale', 'fr-CA', '--verbose', '-o', '-'], {
+                cwd: dir,
+            });
             expect(r.exitCode).toBe(0);
             expect(r.stderr).toContain('nowline: locale=fr-CA (from --locale)');
         });
@@ -337,17 +356,20 @@ describeBuilt('verbless render — locale precedence (two-chain model)', () => {
         await withTempDir(async (dir) => {
             const source = path.join(dir, 'bad-fr.nowline');
             // Anchor without `date:` — fires NL.E0500.
-            await fs.writeFile(source, [
-                'nowline v1 locale:fr-CA',
-                '',
-                'roadmap r1 "R" start:2026-01-01 length:26w',
-                '',
-                'swimlane a "A"',
-                '  item x duration:1w',
-                '',
-                'anchor launch "Launch"',
-                '',
-            ].join('\n'));
+            await fs.writeFile(
+                source,
+                [
+                    'nowline v1 locale:fr-CA',
+                    '',
+                    'roadmap r1 "R" start:2026-01-01 length:26w',
+                    '',
+                    'swimlane a "A"',
+                    '  item x duration:1w',
+                    '',
+                    'anchor launch "Launch"',
+                    '',
+                ].join('\n'),
+            );
             const r = await runCliBuilt([source, '--locale', 'en-US', '-o', '-'], {
                 cwd: dir,
                 env: { LC_ALL: '', LC_MESSAGES: '', LANG: '' },
@@ -363,17 +385,20 @@ describeBuilt('verbless render — locale precedence (two-chain model)', () => {
     it('split-locale: operator sees fr diagnostic when --locale fr (no file directive)', async () => {
         await withTempDir(async (dir) => {
             const source = path.join(dir, 'bad-en.nowline');
-            await fs.writeFile(source, [
-                'nowline v1',
-                '',
-                'roadmap r1 "R" start:2026-01-01 length:26w',
-                '',
-                'swimlane a "A"',
-                '  item x duration:1w',
-                '',
-                'anchor launch "Launch"',
-                '',
-            ].join('\n'));
+            await fs.writeFile(
+                source,
+                [
+                    'nowline v1',
+                    '',
+                    'roadmap r1 "R" start:2026-01-01 length:26w',
+                    '',
+                    'swimlane a "A"',
+                    '  item x duration:1w',
+                    '',
+                    'anchor launch "Launch"',
+                    '',
+                ].join('\n'),
+            );
             const r = await runCliBuilt([source, '--locale', 'fr', '-o', '-'], {
                 cwd: dir,
                 env: { LC_ALL: '', LC_MESSAGES: '', LANG: '' },
@@ -386,15 +411,18 @@ describeBuilt('verbless render — locale precedence (two-chain model)', () => {
     it('--verbose logs the content locale source on stderr (default en-US)', async () => {
         await withTempDir(async (dir) => {
             const source = path.join(dir, 'no-directive.nowline');
-            await fs.writeFile(source, [
-                'nowline v1',
-                '',
-                'roadmap r1 "R" start:2026-01-01 length:26w',
-                '',
-                'swimlane a "A"',
-                '  item x duration:1w',
-                '',
-            ].join('\n'));
+            await fs.writeFile(
+                source,
+                [
+                    'nowline v1',
+                    '',
+                    'roadmap r1 "R" start:2026-01-01 length:26w',
+                    '',
+                    'swimlane a "A"',
+                    '  item x duration:1w',
+                    '',
+                ].join('\n'),
+            );
             // No --locale, no env override. The verbose line should
             // report the `default` source, not pretend a flag was set.
             const r = await runCliBuilt([source, '--verbose', '-o', '-'], {

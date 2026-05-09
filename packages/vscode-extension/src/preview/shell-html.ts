@@ -25,13 +25,23 @@ export function getShellHtml(webview: vscode.Webview): string {
         '<html lang="en">\n' +
         '<head>\n' +
         '<meta charset="utf-8" />\n' +
-        '<meta http-equiv="Content-Security-Policy" content="' + csp + '" />\n' +
+        '<meta http-equiv="Content-Security-Policy" content="' +
+        csp +
+        '" />\n' +
         '<title>Nowline preview</title>\n' +
-        '<style nonce="' + nonce + '">' + STYLES + '</style>\n' +
+        '<style nonce="' +
+        nonce +
+        '">' +
+        STYLES +
+        '</style>\n' +
         '</head>\n' +
         '<body>\n' +
         BODY +
-        '<script nonce="' + nonce + '">' + SCRIPT + '</script>\n' +
+        '<script nonce="' +
+        nonce +
+        '">' +
+        SCRIPT +
+        '</script>\n' +
         '</body>\n' +
         '</html>\n'
     );

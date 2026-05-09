@@ -44,10 +44,7 @@ import {
     resolveCapacityIcon,
     estimateCapacitySuffixWidth,
 } from '../capacity.js';
-import {
-    computeLaneUtilization,
-    resolveLaneUtilizationThresholds,
-} from '../lane-utilization.js';
+import { computeLaneUtilization, resolveLaneUtilizationThresholds } from '../lane-utilization.js';
 import type { PositionedCapacity } from '../types.js';
 
 /**
@@ -75,11 +72,7 @@ function resolveLaneCapacity(
     if (value === null) return { capacity: null, badgeWidthPx: 0 };
     const text = formatCapacityNumber(value);
     const icon = resolveCapacityIcon(style.capacityIcon, symbols);
-    const badgeWidthPx = estimateCapacitySuffixWidth(
-        text,
-        icon,
-        LANE_CAPACITY_BADGE_FONT_SIZE_PX,
-    );
+    const badgeWidthPx = estimateCapacitySuffixWidth(text, icon, LANE_CAPACITY_BADGE_FONT_SIZE_PX);
     return {
         capacity: { value, text, icon },
         badgeWidthPx,
@@ -131,8 +124,8 @@ export interface SwimlaneOrigin {
     y: number;
 }
 
-const TAB_TOP_Y = 10;     // matches renderer: tabY = box.y + 10
-const TAB_BOTTOM_Y = 38;  // tab (height 22) plus 6 px breathing room
+const TAB_TOP_Y = 10; // matches renderer: tabY = box.y + 10
+const TAB_BOTTOM_Y = 38; // tab (height 22) plus 6 px breathing room
 const TAB_GUTTER_PX = 8;
 
 /**
@@ -168,10 +161,7 @@ function computeLaneTabRightX(
  * footnote hosts. Computed up-front so the chiclet width reservation
  * and the painted footnote text use the same numbers.
  */
-function collectFootnoteIndicators(
-    lane: SwimlaneDeclaration,
-    ctx: LayoutContext,
-): number[] {
+function collectFootnoteIndicators(lane: SwimlaneDeclaration, ctx: LayoutContext): number[] {
     if (!lane.name) return [];
     const out: number[] = [];
     for (const [fid, host] of ctx.footnoteHosts.entries()) {
@@ -200,7 +190,7 @@ function firstChildStartX(
         if (child.$type === 'DescriptionDirective') continue;
         const props = isItemDeclaration(child)
             ? child.properties
-            : (child as ParallelBlock | GroupBlock).properties ?? [];
+            : ((child as ParallelBlock | GroupBlock).properties ?? []);
         return deps.resolveChildStart(props, laneLeftX, laneLeftX, ctx);
     }
     return undefined;
@@ -234,29 +224,22 @@ export class SwimlaneNode {
         // Resolve lane capacity early — its width feeds into the
         // chiclet's right-edge collision calculation, which determines
         // whether the first row sits at TAB_TOP_Y or TAB_BOTTOM_Y.
-        const { capacity, badgeWidthPx } = resolveLaneCapacity(
-            lane,
-            style,
-            ctx.symbols,
-        );
+        const { capacity, badgeWidthPx } = resolveLaneCapacity(lane, style, ctx.symbols);
         // Footnote indicators (the small "1, 2" red text in the upper
         // right of the chiclet) need to be reserved in the chiclet's
         // width too, otherwise they paint on top of the owner / badge
         // for shrink-wrapped chiclets. Computed up front from the
         // pre-resolved footnote index/host map.
         const footnoteIndicators = collectFootnoteIndicators(lane, ctx);
-        const footnoteIndicatorWidthPx = footnoteIndicators.length > 0
-            ? deps.estimateTextWidth(
-                  footnoteIndicators.join(','),
-                  LANE_CAPACITY_BADGE_FONT_SIZE_PX,
-              )
-            : 0;
+        const footnoteIndicatorWidthPx =
+            footnoteIndicators.length > 0
+                ? deps.estimateTextWidth(
+                      footnoteIndicators.join(','),
+                      LANE_CAPACITY_BADGE_FONT_SIZE_PX,
+                  )
+                : 0;
         // Title-tab geometry (mirrors the renderer; see renderSwimlane).
-        const tabRightX = computeLaneTabRightX(
-            lane,
-            badgeWidthPx,
-            footnoteIndicatorWidthPx,
-        );
+        const tabRightX = computeLaneTabRightX(lane, badgeWidthPx, footnoteIndicatorWidthPx);
         // First-row Y: when the first child's desired x is past the title
         // tab, top-align with the tab and reclaim ~28 px per lane.
         // Otherwise drop below the tab.
@@ -312,10 +295,7 @@ export class SwimlaneNode {
             // the duration → width math in `sequenceItem` (see
             // packages/layout/src/layout.ts).
             const durationDays = deriveItemDurationDays(props, ctx.sizes, ctx.cal);
-            const naturalWidth = Math.max(
-                MIN_ITEM_WIDTH,
-                durationDays * ctx.timeline.pixelsPerDay,
-            );
+            const naturalWidth = Math.max(MIN_ITEM_WIDTH, durationDays * ctx.timeline.pixelsPerDay);
             const desiredEnd = desiredStart + naturalWidth;
             const childId = (child as ItemDeclaration).name ?? '';
 

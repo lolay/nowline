@@ -29,18 +29,28 @@ const cliPath = resolve(repoRoot, 'packages/cli/dist/index.js');
 // `at-risk` items are visibly distinguishable.
 const NOW = '2026-02-09';
 const MANIFEST = [
-    { slug: 'minimal',             source: 'examples/minimal.nowline',         theme: 'light', now: NOW },
-    { slug: 'platform-2026',       source: 'examples/platform-2026.nowline',   theme: 'light', now: NOW },
-    { slug: 'platform-2026-dark',  source: 'examples/platform-2026.nowline',   theme: 'dark',  now: NOW },
-    { slug: 'dependencies',        source: 'examples/dependencies.nowline',    theme: 'light', now: NOW },
-    { slug: 'isolate-include',     source: 'examples/isolate-include.nowline', theme: 'light', now: NOW },
-    { slug: 'long',                source: 'examples/long.nowline',            theme: 'light', now: NOW },
-    { slug: 'nested',              source: 'examples/nested.nowline',          theme: 'light', now: NOW },
-    { slug: 'partner',             source: 'examples/partner.nowline',         theme: 'light', now: NOW },
-    { slug: 'product',             source: 'examples/product.nowline',         theme: 'light', now: NOW },
-    { slug: 'teams',               source: 'examples/teams.nowline',           theme: 'light', now: NOW },
-    { slug: 'capacity',            source: 'examples/capacity.nowline',        theme: 'light', now: NOW },
-    { slug: 'sizing',              source: 'examples/sizing.nowline',          theme: 'light', now: NOW },
+    { slug: 'minimal', source: 'examples/minimal.nowline', theme: 'light', now: NOW },
+    { slug: 'platform-2026', source: 'examples/platform-2026.nowline', theme: 'light', now: NOW },
+    {
+        slug: 'platform-2026-dark',
+        source: 'examples/platform-2026.nowline',
+        theme: 'dark',
+        now: NOW,
+    },
+    { slug: 'dependencies', source: 'examples/dependencies.nowline', theme: 'light', now: NOW },
+    {
+        slug: 'isolate-include',
+        source: 'examples/isolate-include.nowline',
+        theme: 'light',
+        now: NOW,
+    },
+    { slug: 'long', source: 'examples/long.nowline', theme: 'light', now: NOW },
+    { slug: 'nested', source: 'examples/nested.nowline', theme: 'light', now: NOW },
+    { slug: 'partner', source: 'examples/partner.nowline', theme: 'light', now: NOW },
+    { slug: 'product', source: 'examples/product.nowline', theme: 'light', now: NOW },
+    { slug: 'teams', source: 'examples/teams.nowline', theme: 'light', now: NOW },
+    { slug: 'capacity', source: 'examples/capacity.nowline', theme: 'light', now: NOW },
+    { slug: 'sizing', source: 'examples/sizing.nowline', theme: 'light', now: NOW },
 ];
 
 function run(cmd, args, opts = {}) {
@@ -61,12 +71,7 @@ async function renderOne(entry) {
         return;
     }
     const outRel = `examples/${entry.slug}.svg`;
-    const args = [
-        cliPath,
-        entry.source,
-        '-o', outRel,
-        '--theme', entry.theme,
-    ];
+    const args = [cliPath, entry.source, '-o', outRel, '--theme', entry.theme];
     if (entry.now) args.push('--now', entry.now);
     console.log(`render ${entry.slug} (${entry.theme}) -> ${outRel}`);
     await run(process.execPath, args);
@@ -74,15 +79,16 @@ async function renderOne(entry) {
 
 async function main() {
     if (!existsSync(cliPath)) {
-        console.error(`error: CLI not built. Run \`pnpm -r --workspace-concurrency=1 run build\` first.`);
+        console.error(
+            `error: CLI not built. Run \`pnpm -r --workspace-concurrency=1 run build\` first.`,
+        );
         console.error(`       expected ${relative(repoRoot, cliPath)}`);
         process.exit(2);
     }
     assertDistFresh({ repoRoot, cliPath });
     const wanted = process.argv.slice(2);
-    const entries = wanted.length === 0
-        ? MANIFEST
-        : MANIFEST.filter((e) => wanted.includes(e.slug));
+    const entries =
+        wanted.length === 0 ? MANIFEST : MANIFEST.filter((e) => wanted.includes(e.slug));
     if (entries.length === 0) {
         console.error(`error: no matching entries for ${wanted.join(', ')}`);
         console.error(`       available slugs: ${MANIFEST.map((e) => e.slug).join(', ')}`);

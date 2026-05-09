@@ -19,11 +19,7 @@
 // row share that row's top y" intact while letting individual children
 // grow vertically (e.g. wrapped label-chiclet stacks in m3).
 
-import type {
-    PositionedTrackChild,
-    PositionedItem,
-    SlackCorridor,
-} from './types.js';
+import type { PositionedTrackChild, PositionedItem, SlackCorridor } from './types.js';
 
 export interface PackedRow {
     /** Top-y of the row in canvas px. */
@@ -147,9 +143,7 @@ export class RowPacker {
             if (this.rowIntersectsCorridor(r, input)) continue;
             return { rowIndex: i, y: r.y };
         }
-        const fresh = this.appendRow(
-            Math.max(this.opts.minRowHeight, input.predictedHeight),
-        );
+        const fresh = this.appendRow(Math.max(this.opts.minRowHeight, input.predictedHeight));
         return { rowIndex: this.rows.length - 1, y: fresh.y };
     }
 

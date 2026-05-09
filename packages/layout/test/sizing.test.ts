@@ -215,4 +215,3 @@ describe('m6 — size chip on the meta line (driver-only)', () => {
         expect(item.metaText).toBe('L — 1w remaining');
     });
 });
-

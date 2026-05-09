@@ -62,8 +62,19 @@ export class NowlineHoverProvider implements HoverProvider {
         lines.push(header);
         if (title) lines.push(`_${title}_`);
 
-        const props = (entity as { properties?: { key: string; value?: string; values?: string[] }[] }).properties ?? [];
-        const surfaced = ['status', 'owner', 'link', 'date', 'duration', 'size', 'effort', 'capacity'];
+        const props =
+            (entity as { properties?: { key: string; value?: string; values?: string[] }[] })
+                .properties ?? [];
+        const surfaced = [
+            'status',
+            'owner',
+            'link',
+            'date',
+            'duration',
+            'size',
+            'effort',
+            'capacity',
+        ];
         const rendered: string[] = [];
         for (const key of surfaced) {
             const prop = props.find((p) => propKey(p as { key: string }) === key);

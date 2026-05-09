@@ -43,10 +43,7 @@ export type NowlineLspServices = LangiumServices & NowlineAddedServices;
  * Keeping the parser/validation slots on the core-side `NowlineModule` means
  * the LSP and the headless `@nowline/cli` parse path stay byte-identical.
  */
-const NowlineLspProviderModule: Module<
-    NowlineLspServices,
-    PartialLangiumServices
-> = {
+const NowlineLspProviderModule: Module<NowlineLspServices, PartialLangiumServices> = {
     lsp: {
         CompletionProvider: (services) => new NowlineCompletionProvider(services),
         DefinitionProvider: (services) => new NowlineDefinitionProvider(services),
@@ -71,9 +68,7 @@ export interface CreateNowlineLspServicesContext {
  * services. Returns the shared container (used to start the language server)
  * and the language-specific services (used by tests + provider call sites).
  */
-export function createNowlineLspServices(
-    context: CreateNowlineLspServicesContext,
-): {
+export function createNowlineLspServices(context: CreateNowlineLspServicesContext): {
     shared: LangiumSharedServices;
     Nowline: NowlineLspServices;
 } {
@@ -94,7 +89,10 @@ export function createNowlineLspServices(
         // through `unknown` because the LSP injector is strictly broader and
         // Langium's `inject()` accepts that at runtime. See
         // `packages/core/src/language/nowline-module.ts` for the source.
-        NowlineModule as unknown as Module<NowlineLspServices, PartialLangiumServices & NowlineAddedServices>,
+        NowlineModule as unknown as Module<
+            NowlineLspServices,
+            PartialLangiumServices & NowlineAddedServices
+        >,
         NowlineLspProviderModule,
     );
 

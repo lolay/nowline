@@ -78,7 +78,9 @@ describe('include resolver', () => {
             services: Nowline,
             readFile: makeFs(files),
         });
-        expect(result.diagnostics.some((d) => d.severity === 'error' && /no roadmap/i.test(d.message))).toBe(true);
+        expect(
+            result.diagnostics.some((d) => d.severity === 'error' && /no roadmap/i.test(d.message)),
+        ).toBe(true);
     });
 
     it('detects circular includes', async () => {
@@ -93,7 +95,11 @@ describe('include resolver', () => {
             services: Nowline,
             readFile: makeFs(files),
         });
-        expect(result.diagnostics.some((d) => d.severity === 'error' && /Circular include/i.test(d.message))).toBe(true);
+        expect(
+            result.diagnostics.some(
+                (d) => d.severity === 'error' && /Circular include/i.test(d.message),
+            ),
+        ).toBe(true);
     });
 
     it('detects duplicate includes in the same file', async () => {
@@ -107,7 +113,11 @@ describe('include resolver', () => {
             services: Nowline,
             readFile: makeFs(files),
         });
-        expect(result.diagnostics.some((d) => d.severity === 'error' && /Duplicate include/i.test(d.message))).toBe(true);
+        expect(
+            result.diagnostics.some(
+                (d) => d.severity === 'error' && /Duplicate include/i.test(d.message),
+            ),
+        ).toBe(true);
     });
 
     it('handles diamond includes without duplication error', async () => {
@@ -138,12 +148,17 @@ describe('include resolver', () => {
             services: Nowline,
             readFile: makeFs(files),
         });
-        expect(result.diagnostics.some((d) => d.severity === 'warning' && /shadowed/i.test(d.message))).toBe(true);
+        expect(
+            result.diagnostics.some((d) => d.severity === 'warning' && /shadowed/i.test(d.message)),
+        ).toBe(true);
         expect(result.content.persons.get('sam')?.title).toBe('Sam Parent');
     });
 
     it('resolveIncludes integrates with a parsed NowlineFile', async () => {
-        const r = await parse(`include "./a.nowline"\nroadmap r "R"\nswimlane s\n  item x duration:1w\n`, { validate: false });
+        const r = await parse(
+            `include "./a.nowline"\nroadmap r "R"\nswimlane s\n  item x duration:1w\n`,
+            { validate: false },
+        );
         expect(r.parserErrors).toEqual([]);
         expect(r.ast.includes).toHaveLength(1);
         expect(r.ast.includes[0].path).toBe('./a.nowline');
@@ -161,7 +176,9 @@ describe('include resolver', () => {
                 services: Nowline,
                 readFile: makeFs(files),
             });
-            const mismatch = result.diagnostics.filter((d) => d.severity === 'error' && /start:/i.test(d.message));
+            const mismatch = result.diagnostics.filter(
+                (d) => d.severity === 'error' && /start:/i.test(d.message),
+            );
             expect(mismatch).toEqual([]);
         });
 
@@ -176,7 +193,9 @@ describe('include resolver', () => {
                 services: Nowline,
                 readFile: makeFs(files),
             });
-            const mismatch = result.diagnostics.filter((d) => d.severity === 'error' && /start/i.test(d.message));
+            const mismatch = result.diagnostics.filter(
+                (d) => d.severity === 'error' && /start/i.test(d.message),
+            );
             expect(mismatch).toHaveLength(1);
             expect(mismatch[0].sourcePath).toBe('/root/main.nowline');
         });
@@ -192,7 +211,9 @@ describe('include resolver', () => {
                 services: Nowline,
                 readFile: makeFs(files),
             });
-            const mismatch = result.diagnostics.filter((d) => d.severity === 'error' && /start/i.test(d.message));
+            const mismatch = result.diagnostics.filter(
+                (d) => d.severity === 'error' && /start/i.test(d.message),
+            );
             expect(mismatch).toHaveLength(1);
         });
 
@@ -207,7 +228,9 @@ describe('include resolver', () => {
                 services: Nowline,
                 readFile: makeFs(files),
             });
-            const mismatch = result.diagnostics.filter((d) => d.severity === 'error' && /start/i.test(d.message));
+            const mismatch = result.diagnostics.filter(
+                (d) => d.severity === 'error' && /start/i.test(d.message),
+            );
             expect(mismatch).toHaveLength(1);
         });
 
@@ -222,7 +245,9 @@ describe('include resolver', () => {
                 services: Nowline,
                 readFile: makeFs(files),
             });
-            const mismatch = result.diagnostics.filter((d) => d.severity === 'error' && /start/i.test(d.message));
+            const mismatch = result.diagnostics.filter(
+                (d) => d.severity === 'error' && /start/i.test(d.message),
+            );
             expect(mismatch).toEqual([]);
         });
 
@@ -237,7 +262,9 @@ describe('include resolver', () => {
                 services: Nowline,
                 readFile: makeFs(files),
             });
-            const mismatch = result.diagnostics.filter((d) => d.severity === 'error' && /start/i.test(d.message));
+            const mismatch = result.diagnostics.filter(
+                (d) => d.severity === 'error' && /start/i.test(d.message),
+            );
             expect(mismatch).toHaveLength(1);
         });
 
@@ -252,7 +279,9 @@ describe('include resolver', () => {
                 services: Nowline,
                 readFile: makeFs(files),
             });
-            const mismatch = result.diagnostics.filter((d) => d.severity === 'error' && /start/i.test(d.message));
+            const mismatch = result.diagnostics.filter(
+                (d) => d.severity === 'error' && /start/i.test(d.message),
+            );
             expect(mismatch).toEqual([]);
         });
 
@@ -267,7 +296,9 @@ describe('include resolver', () => {
                 services: Nowline,
                 readFile: makeFs(files),
             });
-            const mismatch = result.diagnostics.filter((d) => d.severity === 'error' && /start/i.test(d.message));
+            const mismatch = result.diagnostics.filter(
+                (d) => d.severity === 'error' && /start/i.test(d.message),
+            );
             expect(mismatch).toEqual([]);
         });
     });
@@ -318,9 +349,13 @@ describe('include resolver', () => {
             });
             expect(result.config.symbols.size).toBe(1);
             // Parent's declaration wins.
-            const budgetUnicode = result.config.symbols.get('budget')?.properties.find((p) => p.key.replace(/:$/, '') === 'unicode')?.value;
+            const budgetUnicode = result.config.symbols
+                .get('budget')
+                ?.properties.find((p) => p.key.replace(/:$/, '') === 'unicode')?.value;
             expect(budgetUnicode).toBe('💵');
-            const shadowWarn = result.diagnostics.filter((d) => d.severity === 'warning' && /Symbol "budget"/.test(d.message));
+            const shadowWarn = result.diagnostics.filter(
+                (d) => d.severity === 'warning' && /Symbol "budget"/.test(d.message),
+            );
             expect(shadowWarn).toHaveLength(1);
         });
 

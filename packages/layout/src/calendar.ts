@@ -40,9 +40,7 @@ export function resolveCalendar(
     file: NowlineFile,
     customBlock: CalendarBlock | undefined,
 ): CalendarConfig {
-    const calProp = file.roadmapDecl?.properties.find(
-        (p) => stripColon(p.key) === 'calendar',
-    );
+    const calProp = file.roadmapDecl?.properties.find((p) => stripColon(p.key) === 'calendar');
     const mode: CalendarMode = (calProp?.value as CalendarMode) ?? 'business';
     if (mode === 'business') return { ...BUSINESS };
     if (mode === 'full') return { ...FULL };

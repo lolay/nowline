@@ -41,7 +41,10 @@ export class PreviewManager {
      * the source document text first guarantees the in-memory document is
      * available to readSourceText() inside the panel.
      */
-    async openOrReveal(sourceUri: vscode.Uri, viewColumn: vscode.ViewColumn): Promise<NowlinePreview> {
+    async openOrReveal(
+        sourceUri: vscode.Uri,
+        viewColumn: vscode.ViewColumn,
+    ): Promise<NowlinePreview> {
         const key = sourceUri.toString();
         const existing = this.previews.get(key);
         if (existing) {

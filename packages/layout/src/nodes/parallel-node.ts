@@ -5,17 +5,9 @@
 // per-entity Renderable (or, transitionally, the legacy sequencer
 // helpers in `layout.ts`).
 
-import type {
-    ParallelBlock,
-    ItemDeclaration,
-    GroupBlock,
-} from '@nowline/core';
+import type { ParallelBlock, ItemDeclaration, GroupBlock } from '@nowline/core';
 import { resolveStyle } from '../style-resolution.js';
-import type {
-    PositionedParallel,
-    PositionedTrackChild,
-    BoundingBox,
-} from '../types.js';
+import type { PositionedParallel, PositionedTrackChild, BoundingBox } from '../types.js';
 import type { LayoutContext, TrackCursor } from '../layout-context.js';
 import { TRACK_BLOCK_TAIL_GUTTER_PX } from '../themes/shared.js';
 

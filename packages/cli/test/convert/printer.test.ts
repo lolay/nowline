@@ -11,9 +11,7 @@ async function canonical(source: string): Promise<string> {
 
 describe('canonical printer rules', () => {
     it('uses two-space indentation', async () => {
-        const out = await canonical(
-            `roadmap r "R"\nswimlane s "S"\n  item x "X" duration:1w\n`,
-        );
+        const out = await canonical(`roadmap r "R"\nswimlane s "S"\n  item x "X" duration:1w\n`);
         expect(out).toContain('\n  item x');
     });
 

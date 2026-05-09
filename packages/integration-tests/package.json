@@ -1,22 +1,22 @@
 {
-  "name": "@nowline/integration-tests",
-  "version": "0.1.0",
-  "private": true,
-  "description": "End-to-end tests for the core → layout → renderer pipeline",
-  "license": "Apache-2.0",
-  "type": "module",
-  "scripts": {
-    "test": "vitest run",
-    "test:watch": "vitest",
-    "lint": "eslint test/"
-  },
-  "devDependencies": {
-    "@nowline/core": "workspace:*",
-    "@nowline/layout": "workspace:*",
-    "@nowline/renderer": "workspace:*",
-    "@types/node": "^22.0.0",
-    "langium": "~4.2.2",
-    "typescript": "~5.7.0",
-    "vitest": "^3.1.0"
-  }
+    "name": "@nowline/integration-tests",
+    "version": "0.1.0",
+    "private": true,
+    "description": "End-to-end tests for the core → layout → renderer pipeline",
+    "license": "Apache-2.0",
+    "type": "module",
+    "scripts": {
+        "test": "vitest run",
+        "test:watch": "vitest",
+        "lint": "eslint test/"
+    },
+    "devDependencies": {
+        "@nowline/core": "workspace:*",
+        "@nowline/layout": "workspace:*",
+        "@nowline/renderer": "workspace:*",
+        "@types/node": "^22.0.0",
+        "langium": "~4.2.2",
+        "typescript": "~5.7.0",
+        "vitest": "^3.1.0"
+    }
 }

@@ -12,10 +12,7 @@
 // next to `capacity.ts` (the other capacity-helper module) and is tested in
 // isolation.
 
-import type {
-    DefaultDeclaration,
-    SwimlaneDeclaration,
-} from '@nowline/core';
+import type { DefaultDeclaration, SwimlaneDeclaration } from '@nowline/core';
 import { propValue } from './dsl-utils.js';
 import type {
     PositionedItem,
@@ -29,8 +26,8 @@ import type {
  * Built-in defaults used when neither the lane nor its `default swimlane`
  * declares a threshold. Mirrors specs/dsl.md rule 17d.
  */
-export const DEFAULT_UTILIZATION_WARN_FRACTION = 0.8;  // 80%
-export const DEFAULT_UTILIZATION_OVER_FRACTION = 1.0;  // 100%
+export const DEFAULT_UTILIZATION_WARN_FRACTION = 0.8; // 80%
+export const DEFAULT_UTILIZATION_OVER_FRACTION = 1.0; // 100%
 
 /**
  * One contributor to a lane's load function: a single positioned item with
@@ -59,9 +56,7 @@ interface LoadContributor {
  *     but does not contribute load — this is the legacy "uncounted" item
  *     family from before the size system existed).
  */
-export function collectLoadContributors(
-    children: PositionedTrackChild[],
-): LoadContributor[] {
+export function collectLoadContributors(children: PositionedTrackChild[]): LoadContributor[] {
     const out: LoadContributor[] = [];
     walk(children, out);
     return out;
@@ -141,7 +136,12 @@ export function computeLaneUtilization(opts: {
             startX: a,
             endX: b,
             load,
-            classification: classifyLoad(load, opts.capacityValue, opts.warnFraction, opts.overFraction),
+            classification: classifyLoad(
+                load,
+                opts.capacityValue,
+                opts.warnFraction,
+                opts.overFraction,
+            ),
         });
     }
 
@@ -239,10 +239,7 @@ function resolveThreshold(
     return parsed.value;
 }
 
-type ParsedThreshold =
-    | { kind: 'unset' }
-    | { kind: 'none' }
-    | { kind: 'number'; value: number };
+type ParsedThreshold = { kind: 'unset' } | { kind: 'none' } | { kind: 'number'; value: number };
 
 const PERCENT_RE = /^\d+(?:\.\d+)?%$/;
 const DECIMAL_FRACTION_RE = /^\d+\.\d+$/;

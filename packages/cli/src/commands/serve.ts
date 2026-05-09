@@ -68,15 +68,14 @@ export async function serveHandler(options: ServeHandlerOptions): Promise<void> 
         throw new CliError(ExitCode.InputError, `nowline: file not found: ${args.positional}`);
     }
 
-    const assetRoot = args.assetRoot
-        ? path.resolve(cwd, args.assetRoot)
-        : path.dirname(inputPath);
+    const assetRoot = args.assetRoot ? path.resolve(cwd, args.assetRoot) : path.dirname(inputPath);
 
     const fileSink = args.output ? path.resolve(cwd, args.output) : undefined;
 
     const clients = new Set<http.ServerResponse>();
     let lastPayload: { kind: 'svg'; body: string } | { kind: 'error'; body: string } = {
-        kind: 'svg', body: '',
+        kind: 'svg',
+        body: '',
     };
 
     const rebuild = async (): Promise<void> => {
@@ -183,13 +182,21 @@ export async function serveHandler(options: ServeHandlerOptions): Promise<void> 
     const shutdown = async (): Promise<void> => {
         watcher.close();
         for (const c of clients) {
-            try { c.end(); } catch { /* ignore */ }
+            try {
+                c.end();
+            } catch {
+                /* ignore */
+            }
         }
         clients.clear();
         server.close();
     };
-    process.once('SIGINT', () => { void shutdown().then(() => process.exit(0)); });
-    process.once('SIGTERM', () => { void shutdown().then(() => process.exit(0)); });
+    process.once('SIGINT', () => {
+        void shutdown().then(() => process.exit(0));
+    });
+    process.once('SIGTERM', () => {
+        void shutdown().then(() => process.exit(0));
+    });
 
     // Keep the process alive until a signal.
     await new Promise<void>(() => {});
@@ -225,7 +232,10 @@ function resolveNowArg(args: { now?: string }): Date | undefined {
 }
 
 function sendEvent(res: http.ServerResponse, event: string, data: string): void {
-    const lines = data.split('\n').map((l) => `data: ${l}`).join('\n');
+    const lines = data
+        .split('\n')
+        .map((l) => `data: ${l}`)
+        .join('\n');
     res.write(`event: ${event}\n${lines}\n\n`);
 }
 
@@ -243,7 +253,9 @@ function watchFile(target: string, onChange: () => Promise<void>): FSWatcher {
     let timer: NodeJS.Timeout | undefined;
     const w = fsWatch(target, { persistent: true }, () => {
         if (timer) clearTimeout(timer);
-        timer = setTimeout(() => { void onChange(); }, 75);
+        timer = setTimeout(() => {
+            void onChange();
+        }, 75);
     });
     return w;
 }
@@ -251,9 +263,7 @@ function watchFile(target: string, onChange: () => Promise<void>): FSWatcher {
 async function openBrowser(url: string): Promise<void> {
     const { spawn } = await import('node:child_process');
     const platform = process.platform;
-    const command = platform === 'darwin' ? 'open'
-        : platform === 'win32' ? 'cmd'
-            : 'xdg-open';
+    const command = platform === 'darwin' ? 'open' : platform === 'win32' ? 'cmd' : 'xdg-open';
     const argList = platform === 'win32' ? ['/c', 'start', '', url] : [url];
     try {
         const child = spawn(command, argList, { stdio: 'ignore', detached: true });
@@ -263,7 +273,8 @@ async function openBrowser(url: string): Promise<void> {
     }
 }
 
-const emptySvg = '<svg xmlns="http://www.w3.org/2000/svg" width="400" height="60"><text x="10" y="30" font-family="system-ui" font-size="14" fill="#999">no output yet</text></svg>';
+const emptySvg =
+    '<svg xmlns="http://www.w3.org/2000/svg" width="400" height="60"><text x="10" y="30" font-family="system-ui" font-size="14" fill="#999">no output yet</text></svg>';
 
 function shellHtml(theme: ThemeName): string {
     const bg = theme === 'dark' ? '#121212' : '#ffffff';

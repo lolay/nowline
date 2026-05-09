@@ -12,10 +12,7 @@ import { dirname, resolve } from 'node:path';
 const here = dirname(fileURLToPath(import.meta.url));
 const repoRoot = resolve(here, '..');
 
-const STEPS = [
-    'scripts/render-samples.mjs',
-    'scripts/render-tests.mjs',
-];
+const STEPS = ['scripts/render-samples.mjs', 'scripts/render-tests.mjs'];
 
 function run(scriptRel) {
     return new Promise((resolveRun, rejectRun) => {

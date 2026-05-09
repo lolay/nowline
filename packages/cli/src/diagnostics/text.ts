@@ -27,9 +27,7 @@ function renderOne(
         source.contents,
         {
             start: { line: diag.line, column: diag.column },
-            end: diag.span
-                ? { line: diag.span.end.line, column: diag.span.end.column }
-                : undefined,
+            end: diag.span ? { line: diag.span.end.line, column: diag.span.end.column } : undefined,
         },
         {
             highlightCode: useColor,
@@ -49,9 +47,8 @@ function renderHeader(diag: CliDiagnostic, useColor: boolean): string {
         return `${loc} ${severityWord}: ${stripSuggestion(diag.message, diag.suggestion)}${suffix}`;
     }
     const coloredLoc = chalk.cyan(loc);
-    const coloredSeverity = diag.severity === 'error'
-        ? chalk.red.bold(severityWord)
-        : chalk.yellow.bold(severityWord);
+    const coloredSeverity =
+        diag.severity === 'error' ? chalk.red.bold(severityWord) : chalk.yellow.bold(severityWord);
     const message = stripSuggestion(diag.message, diag.suggestion);
     const suggestion = diag.suggestion
         ? ` ${chalk.dim('—')} did you mean ${chalk.green(`'${diag.suggestion}'`)}?`

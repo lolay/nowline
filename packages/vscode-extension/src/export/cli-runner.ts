@@ -35,14 +35,62 @@ type ExportTarget = {
 };
 
 const EXPORT_TARGETS: ExportTarget[] = [
-    { format: 'pdf', label: 'PDF', detail: 'Print-ready (page size, margins from settings)', extension: 'pdf', fileFilters: { PDF: ['pdf'] } },
-    { format: 'png', label: 'PNG', detail: 'Pixel-strict raster from the bundled CLI', extension: 'png', fileFilters: { PNG: ['png'] } },
-    { format: 'svg', label: 'SVG', detail: 'Pixel-identical CLI render (compare to preview Save SVG)', extension: 'svg', fileFilters: { SVG: ['svg'] } },
-    { format: 'html', label: 'HTML', detail: 'Standalone document', extension: 'html', fileFilters: { HTML: ['html'] } },
-    { format: 'mermaid', label: 'Mermaid (Markdown)', detail: 'Gantt diagram for docs', extension: 'md', fileFilters: { Markdown: ['md', 'markdown'] } },
-    { format: 'xlsx', label: 'Excel (XLSX)', detail: 'Tabular dump for analysis', extension: 'xlsx', fileFilters: { Excel: ['xlsx'] } },
-    { format: 'msproj', label: 'MS Project XML', detail: 'Microsoft Project import', extension: 'xml', fileFilters: { 'MS Project XML': ['xml'] } },
-    { format: 'json', label: 'JSON (canonical)', detail: 'Round-trippable AST', extension: 'json', fileFilters: { JSON: ['json'] } },
+    {
+        format: 'pdf',
+        label: 'PDF',
+        detail: 'Print-ready (page size, margins from settings)',
+        extension: 'pdf',
+        fileFilters: { PDF: ['pdf'] },
+    },
+    {
+        format: 'png',
+        label: 'PNG',
+        detail: 'Pixel-strict raster from the bundled CLI',
+        extension: 'png',
+        fileFilters: { PNG: ['png'] },
+    },
+    {
+        format: 'svg',
+        label: 'SVG',
+        detail: 'Pixel-identical CLI render (compare to preview Save SVG)',
+        extension: 'svg',
+        fileFilters: { SVG: ['svg'] },
+    },
+    {
+        format: 'html',
+        label: 'HTML',
+        detail: 'Standalone document',
+        extension: 'html',
+        fileFilters: { HTML: ['html'] },
+    },
+    {
+        format: 'mermaid',
+        label: 'Mermaid (Markdown)',
+        detail: 'Gantt diagram for docs',
+        extension: 'md',
+        fileFilters: { Markdown: ['md', 'markdown'] },
+    },
+    {
+        format: 'xlsx',
+        label: 'Excel (XLSX)',
+        detail: 'Tabular dump for analysis',
+        extension: 'xlsx',
+        fileFilters: { Excel: ['xlsx'] },
+    },
+    {
+        format: 'msproj',
+        label: 'MS Project XML',
+        detail: 'Microsoft Project import',
+        extension: 'xml',
+        fileFilters: { 'MS Project XML': ['xml'] },
+    },
+    {
+        format: 'json',
+        label: 'JSON (canonical)',
+        detail: 'Round-trippable AST',
+        extension: 'json',
+        fileFilters: { JSON: ['json'] },
+    },
 ];
 
 /**
@@ -144,11 +192,7 @@ function buildCliArgs(
     destPath: string,
     settings: ExportSettings,
 ): string[] {
-    const args: string[] = [
-        sourcePath,
-        '-f', target.format,
-        '-o', destPath,
-    ];
+    const args: string[] = [sourcePath, '-f', target.format, '-o', destPath];
 
     if (target.format === 'pdf') {
         args.push('--page-size', settings.pdfPageSize);

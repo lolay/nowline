@@ -7,39 +7,113 @@
 // <foreignObject>, no animation elements (they can leak time-based
 // variance into deterministic snapshots).
 const ALLOWED_ELEMENTS = new Set([
-    'svg', 'g', 'defs', 'symbol', 'use',
-    'path', 'rect', 'circle', 'ellipse', 'line', 'polyline', 'polygon',
-    'text', 'tspan', 'title', 'desc',
-    'linearGradient', 'radialGradient', 'stop',
-    'clipPath', 'mask', 'pattern',
-    'filter', 'feGaussianBlur', 'feColorMatrix', 'feOffset', 'feMerge',
-    'feMergeNode', 'feFlood', 'feComposite', 'feBlend', 'feDropShadow',
+    'svg',
+    'g',
+    'defs',
+    'symbol',
+    'use',
+    'path',
+    'rect',
+    'circle',
+    'ellipse',
+    'line',
+    'polyline',
+    'polygon',
+    'text',
+    'tspan',
+    'title',
+    'desc',
+    'linearGradient',
+    'radialGradient',
+    'stop',
+    'clipPath',
+    'mask',
+    'pattern',
+    'filter',
+    'feGaussianBlur',
+    'feColorMatrix',
+    'feOffset',
+    'feMerge',
+    'feMergeNode',
+    'feFlood',
+    'feComposite',
+    'feBlend',
+    'feDropShadow',
     'image',
 ]);
 
 // Allow-list of attributes, by-name. Event handlers (on*) are always dropped.
 const ALLOWED_ATTRIBUTES = new Set([
-    'd', 'x', 'y', 'x1', 'y1', 'x2', 'y2', 'cx', 'cy', 'r', 'rx', 'ry',
-    'width', 'height', 'viewBox', 'preserveAspectRatio',
-    'fill', 'fill-opacity', 'fill-rule',
-    'stroke', 'stroke-width', 'stroke-opacity', 'stroke-linecap',
-    'stroke-linejoin', 'stroke-miterlimit', 'stroke-dasharray',
-    'stroke-dashoffset', 'opacity', 'transform',
+    'd',
+    'x',
+    'y',
+    'x1',
+    'y1',
+    'x2',
+    'y2',
+    'cx',
+    'cy',
+    'r',
+    'rx',
+    'ry',
+    'width',
+    'height',
+    'viewBox',
+    'preserveAspectRatio',
+    'fill',
+    'fill-opacity',
+    'fill-rule',
+    'stroke',
+    'stroke-width',
+    'stroke-opacity',
+    'stroke-linecap',
+    'stroke-linejoin',
+    'stroke-miterlimit',
+    'stroke-dasharray',
+    'stroke-dashoffset',
+    'opacity',
+    'transform',
     'points',
-    'id', 'class',
-    'clip-path', 'mask', 'filter',
-    'font-family', 'font-size', 'font-weight', 'font-style', 'text-anchor',
-    'dx', 'dy', 'rotate', 'letter-spacing', 'word-spacing',
+    'id',
+    'class',
+    'clip-path',
+    'mask',
+    'filter',
+    'font-family',
+    'font-size',
+    'font-weight',
+    'font-style',
+    'text-anchor',
+    'dx',
+    'dy',
+    'rotate',
+    'letter-spacing',
+    'word-spacing',
     'style',
     'xmlns',
-    'href', 'xlink:href',
-    'offset', 'stop-color', 'stop-opacity',
-    'gradientUnits', 'gradientTransform', 'spreadMethod',
-    'maskUnits', 'maskContentUnits',
-    'stdDeviation', 'values', 'in', 'in2', 'mode', 'type', 'result',
-    'flood-color', 'flood-opacity',
-    'patternUnits', 'patternContentUnits',
-    'role', 'aria-label',
+    'href',
+    'xlink:href',
+    'offset',
+    'stop-color',
+    'stop-opacity',
+    'gradientUnits',
+    'gradientTransform',
+    'spreadMethod',
+    'maskUnits',
+    'maskContentUnits',
+    'stdDeviation',
+    'values',
+    'in',
+    'in2',
+    'mode',
+    'type',
+    'result',
+    'flood-color',
+    'flood-opacity',
+    'patternUnits',
+    'patternContentUnits',
+    'role',
+    'aria-label',
 ]);
 
 export interface SanitizeOptions {
@@ -131,12 +205,12 @@ function tokenize(src: string): Token[] {
 
 function findTagEnd(src: string, start: number): number {
     let i = start + 1;
-    let inQuote: '"' | '\'' | null = null;
+    let inQuote: '"' | "'" | null = null;
     while (i < src.length) {
         const ch = src[i];
         if (inQuote) {
             if (ch === inQuote) inQuote = null;
-        } else if (ch === '"' || ch === '\'') {
+        } else if (ch === '"' || ch === "'") {
             inQuote = ch;
         } else if (ch === '>') {
             return i;
@@ -166,7 +240,7 @@ function parseTagBody(body: string): { name: string; attrs: Record<string, strin
         i++; // skip '='
         if (i >= body.length) break;
         const quote = body[i];
-        if (quote !== '"' && quote !== '\'') {
+        if (quote !== '"' && quote !== "'") {
             const valStart = i;
             while (i < body.length && !/\s/.test(body[i])) i++;
             attrs[attrName] = body.slice(valStart, i);
@@ -222,7 +296,7 @@ export function sanitizeSvg(input: string, options: SanitizeOptions = {}): strin
 
     // Second pass: emit only allow-listed elements.
     const output: string[] = [];
-    const stack: boolean[] = [];  // parallel stack of "kept" flags
+    const stack: boolean[] = []; // parallel stack of "kept" flags
 
     for (const t of tokens) {
         if (t.kind === 'comment') continue;
@@ -233,15 +307,24 @@ export function sanitizeSvg(input: string, options: SanitizeOptions = {}): strin
         }
         if (t.kind === 'text') {
             if (stack.length === 0 || stack[stack.length - 1]) {
-                const text = (t.text ?? '').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+                const text = (t.text ?? '')
+                    .replace(/&/g, '&amp;')
+                    .replace(/</g, '&lt;')
+                    .replace(/>/g, '&gt;');
                 output.push(text);
             }
             continue;
         }
         if (t.kind === 'open' || t.kind === 'self') {
             const name = t.name ?? '';
-            if (name === 'script' || name === 'foreignObject' || name === 'animate'
-                || name === 'animateTransform' || name === 'animateMotion' || name === 'set') {
+            if (
+                name === 'script' ||
+                name === 'foreignObject' ||
+                name === 'animate' ||
+                name === 'animateTransform' ||
+                name === 'animateMotion' ||
+                name === 'set'
+            ) {
                 warn(`sanitizer: dropping <${name}>`);
                 if (t.kind === 'open') stack.push(false);
                 continue;

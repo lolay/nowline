@@ -7,7 +7,9 @@ describe('exportMsProjXml — basic structure', () => {
     it('emits a well-formed XML prologue + Project root', async () => {
         const inputs = await buildExportInputs(SIMPLE_FIXTURE);
         const xml = exportMsProjXml(inputs, { onLossy: () => {} });
-        expect(xml.startsWith('<?xml version="1.0" encoding="UTF-8" standalone="yes"?>')).toBe(true);
+        expect(xml.startsWith('<?xml version="1.0" encoding="UTF-8" standalone="yes"?>')).toBe(
+            true,
+        );
         expect(xml).toContain('<Project xmlns="http://schemas.microsoft.com/project">');
         expect(xml.endsWith('</Project>')).toBe(true);
     });
@@ -92,7 +94,9 @@ describe('exportMsProjXml — determinism', () => {
 
     it('rejects malformed startDate', async () => {
         const inputs = await buildExportInputs(SIMPLE_FIXTURE);
-        expect(() => exportMsProjXml(inputs, { startDate: 'not-a-date', onLossy: () => {} })).toThrow();
+        expect(() =>
+            exportMsProjXml(inputs, { startDate: 'not-a-date', onLossy: () => {} }),
+        ).toThrow();
     });
 });
 

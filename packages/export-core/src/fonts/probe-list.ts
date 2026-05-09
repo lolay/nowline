@@ -37,11 +37,7 @@ const MACOS: PlatformProbe = {
     ],
 };
 
-function windowsCandidate(
-    fontsDir: string,
-    file: string,
-    name: string,
-): FontCandidate {
+function windowsCandidate(fontsDir: string, file: string, name: string): FontCandidate {
     return { path: path.win32.join(fontsDir, file), name };
 }
 
@@ -66,7 +62,10 @@ const LINUX: PlatformProbe = {
         { path: '/usr/share/fonts/dejavu/DejaVuSans.ttf', name: 'DejaVu Sans' },
         { path: '/usr/share/fonts/TTF/DejaVuSans.ttf', name: 'DejaVu Sans' },
         { path: '/usr/share/fonts/liberation/LiberationSans-Regular.ttf', name: 'Liberation Sans' },
-        { path: '/usr/share/fonts/truetype/liberation/LiberationSans-Regular.ttf', name: 'Liberation Sans' },
+        {
+            path: '/usr/share/fonts/truetype/liberation/LiberationSans-Regular.ttf',
+            name: 'Liberation Sans',
+        },
         { path: '/usr/share/fonts/truetype/noto/NotoSans-Regular.ttf', name: 'Noto Sans' },
         { path: '/usr/share/fonts/ubuntu/Ubuntu-R.ttf', name: 'Ubuntu' },
         { path: '/usr/share/fonts/cantarell/Cantarell-Regular.otf', name: 'Cantarell' },
@@ -76,7 +75,10 @@ const LINUX: PlatformProbe = {
         { path: '/usr/share/fonts/dejavu/DejaVuSansMono.ttf', name: 'DejaVu Sans Mono' },
         { path: '/usr/share/fonts/TTF/DejaVuSansMono.ttf', name: 'DejaVu Sans Mono' },
         { path: '/usr/share/fonts/liberation/LiberationMono-Regular.ttf', name: 'Liberation Mono' },
-        { path: '/usr/share/fonts/truetype/liberation/LiberationMono-Regular.ttf', name: 'Liberation Mono' },
+        {
+            path: '/usr/share/fonts/truetype/liberation/LiberationMono-Regular.ttf',
+            name: 'Liberation Mono',
+        },
         { path: '/usr/share/fonts/ubuntu/UbuntuMono-R.ttf', name: 'Ubuntu Mono' },
         { path: '/usr/share/fonts/truetype/noto/NotoSansMono-Regular.ttf', name: 'Noto Sans Mono' },
     ],

@@ -25,7 +25,9 @@ async function fetchText(url: string): Promise<string> {
         http.get(url, (res) => {
             let data = '';
             res.setEncoding('utf-8');
-            res.on('data', (chunk: string) => { data += chunk; });
+            res.on('data', (chunk: string) => {
+                data += chunk;
+            });
             res.on('end', () => resolve(data));
             res.on('error', reject);
         }).on('error', reject);
@@ -49,15 +51,18 @@ describeBuilt('--serve integration (requires `pnpm build`)', () => {
     it('serves HTML shell and rebuilds on file changes', async () => {
         await withTempDir(async (dir) => {
             const source = path.join(dir, 'sample.nowline');
-            await fs.writeFile(source, [
-                'nowline v1',
-                '',
-                'roadmap r1 "One"',
-                '',
-                'swimlane a "A"',
-                '  item x duration:1w',
-                '',
-            ].join('\n'));
+            await fs.writeFile(
+                source,
+                [
+                    'nowline v1',
+                    '',
+                    'roadmap r1 "One"',
+                    '',
+                    'swimlane a "A"',
+                    '  item x duration:1w',
+                    '',
+                ].join('\n'),
+            );
 
             const port = await pickPort();
             const child: ChildProcess = spawn(
@@ -80,16 +85,19 @@ describeBuilt('--serve integration (requires `pnpm build`)', () => {
                 expect(svg).toContain('<svg');
                 expect(svg).toContain('data-layer="item"');
 
-                await fs.writeFile(source, [
-                    'nowline v1',
-                    '',
-                    'roadmap r1 "Two"',
-                    '',
-                    'swimlane a "A"',
-                    '  item x duration:1w',
-                    '  item y duration:1w',
-                    '',
-                ].join('\n'));
+                await fs.writeFile(
+                    source,
+                    [
+                        'nowline v1',
+                        '',
+                        'roadmap r1 "Two"',
+                        '',
+                        'swimlane a "A"',
+                        '  item x duration:1w',
+                        '  item y duration:1w',
+                        '',
+                    ].join('\n'),
+                );
 
                 let newSvg = svg;
                 const start = Date.now();

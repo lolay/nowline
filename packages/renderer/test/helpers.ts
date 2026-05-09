@@ -7,7 +7,9 @@ import {
 } from '@nowline/core';
 import { layoutRoadmap, type LayoutOptions, type PositionedRoadmap } from '@nowline/layout';
 
-let cached: { shared: ReturnType<typeof createNowlineServices>['shared']; Nowline: NowlineServices } | undefined;
+let cached:
+    | { shared: ReturnType<typeof createNowlineServices>['shared']; Nowline: NowlineServices }
+    | undefined;
 
 export function getServices() {
     if (!cached) cached = createNowlineServices();

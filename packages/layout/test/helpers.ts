@@ -7,7 +7,9 @@ import {
     type ResolveResult,
 } from '@nowline/core';
 
-let cached: { shared: ReturnType<typeof createNowlineServices>['shared']; Nowline: NowlineServices } | undefined;
+let cached:
+    | { shared: ReturnType<typeof createNowlineServices>['shared']; Nowline: NowlineServices }
+    | undefined;
 
 export function getServices() {
     if (!cached) {

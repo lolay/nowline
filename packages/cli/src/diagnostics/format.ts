@@ -56,7 +56,13 @@ function relocalizeDiagnostics(
         // reaches us through `unknown` it has lost that tagged shape; we cast
         // back here because the only producer is the validator and the
         // `code` half of the pair pins the expected arity.
-        const args = d.data.args as Parameters<typeof tr<MessageCode>> extends [string, MessageCode, ...infer R] ? R : never;
+        const args = d.data.args as Parameters<typeof tr<MessageCode>> extends [
+            string,
+            MessageCode,
+            ...infer R,
+        ]
+            ? R
+            : never;
         const message = tr(operatorLocale, d.data.code as MessageCode, ...args);
         if (message === d.message) return d;
         return { ...d, message };

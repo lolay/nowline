@@ -11,13 +11,7 @@
 // or `inputs.today`; calendar UIDs are fixed; Tasks numbered sequentially.
 
 import type { ExportInputs } from '@nowline/export-core';
-import {
-    displayLabel,
-    getProp,
-    getProps,
-    hasProp,
-    roadmapTitle,
-} from '@nowline/export-core';
+import { displayLabel, getProp, getProps, hasProp, roadmapTitle } from '@nowline/export-core';
 import type {
     AnchorDeclaration,
     GroupBlock,
@@ -85,10 +79,7 @@ interface ResourceRow {
 
 const PROJECT_XMLNS = 'http://schemas.microsoft.com/project';
 
-export function exportMsProjXml(
-    inputs: ExportInputs,
-    options: MsProjOptions = {},
-): string {
+export function exportMsProjXml(inputs: ExportInputs, options: MsProjOptions = {}): string {
     const ast = inputs.ast;
     const drops: DropCounts = {
         labels: 0,
@@ -172,11 +163,7 @@ export function exportMsProjXml(
 
 // ---------- Tasks ----------
 
-function collectTasks(
-    ast: NowlineFile,
-    drops: DropCounts,
-    startDate: string,
-): TaskRow[] {
+function collectTasks(ast: NowlineFile, drops: DropCounts, startDate: string): TaskRow[] {
     const tasks: TaskRow[] = [];
     const ctx = { uid: 1, id: 1 };
 
@@ -271,7 +258,14 @@ function walkSwimlaneChild(
             if (grandchild.$type === 'ItemDeclaration') {
                 emitTaskRow(grandchild, outline, ctx, drops, tasks);
             } else if (grandchild.$type === 'GroupBlock') {
-                walkSwimlaneChild(grandchild as unknown as SwimlaneContent, outline, ctx, drops, tasks, startDate);
+                walkSwimlaneChild(
+                    grandchild as unknown as SwimlaneContent,
+                    outline,
+                    ctx,
+                    drops,
+                    tasks,
+                    startDate,
+                );
             }
         }
     } else if (child.$type === 'DescriptionDirective') {
@@ -333,7 +327,9 @@ function emitTaskRow(
         outlineLevel: outline,
         isSummary: false,
         isMilestone: false,
-        durationMinutes: durationToMsProjMinutes(getProp(item, 'duration') ?? getProp(item, 'size')),
+        durationMinutes: durationToMsProjMinutes(
+            getProp(item, 'duration') ?? getProp(item, 'size'),
+        ),
         predecessors: getProps(item, 'after') as string[],
         nowlineId: item.name,
         ownerRefs: getProps(item, 'owner') as string[],
@@ -348,11 +344,7 @@ function countDrops(item: ItemDeclaration, drops: DropCounts): void {
     if (item.description) drops.description += 1;
 }
 
-function emitTask(
-    t: TaskRow,
-    idToUid: Map<string, number>,
-    lines: string[],
-): void {
+function emitTask(t: TaskRow, idToUid: Map<string, number>, lines: string[]): void {
     lines.push('    <Task>');
     lines.push(`      ${tag('UID', t.uid)}`);
     lines.push(`      ${tag('ID', t.id)}`);
@@ -435,10 +427,7 @@ interface AssignmentRow {
     resourceUid: number;
 }
 
-function collectAssignments(
-    tasks: TaskRow[],
-    idToUid: Map<string, number>,
-): AssignmentRow[] {
+function collectAssignments(tasks: TaskRow[], idToUid: Map<string, number>): AssignmentRow[] {
     const out: AssignmentRow[] = [];
     let assignmentUid = 1;
     void assignmentUid;
@@ -473,9 +462,7 @@ function formatDrops(drops: DropCounts): string | null {
         'before',
         'description',
     ];
-    const parts = order
-        .filter((k) => drops[k] > 0)
-        .map((k) => `${k} (${drops[k]})`);
+    const parts = order.filter((k) => drops[k] > 0).map((k) => `${k} (${drops[k]})`);
     if (parts.length === 0) return null;
     return `nowline: msproj export dropped ${parts.length} feature kinds: ${parts.join(', ')}`;
 }

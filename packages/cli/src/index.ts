@@ -49,10 +49,12 @@ function handleError(err: unknown): number {
     return ExitCode.ValidationError;
 }
 
-run().then((code) => {
-    process.exit(code);
-}).catch((err: unknown) => {
-    const message = err instanceof Error ? (err.stack ?? err.message) : String(err);
-    process.stderr.write(`${message}\n`);
-    process.exit(ExitCode.ValidationError);
-});
+run()
+    .then((code) => {
+        process.exit(code);
+    })
+    .catch((err: unknown) => {
+        const message = err instanceof Error ? (err.stack ?? err.message) : String(err);
+        process.stderr.write(`${message}\n`);
+        process.exit(ExitCode.ValidationError);
+    });

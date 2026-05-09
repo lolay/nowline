@@ -1,9 +1,5 @@
 import { URI, type LangiumDocument } from 'langium';
-import {
-    createNowlineServices,
-    type NowlineServices,
-    type NowlineFile,
-} from '@nowline/core';
+import { createNowlineServices, type NowlineServices, type NowlineFile } from '@nowline/core';
 import type { CliDiagnostic, DiagnosticSource } from '../diagnostics/model.js';
 import {
     adaptLangiumDiagnostic,
@@ -27,7 +23,10 @@ export interface ParseResult {
     source: DiagnosticSource;
 }
 
-type Services = { shared: ReturnType<typeof createNowlineServices>['shared']; Nowline: NowlineServices };
+type Services = {
+    shared: ReturnType<typeof createNowlineServices>['shared'];
+    Nowline: NowlineServices;
+};
 
 let cachedServices: Services | undefined;
 let docCounter = 0;

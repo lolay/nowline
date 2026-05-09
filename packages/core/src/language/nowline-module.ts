@@ -16,11 +16,12 @@ import {
     IndentationAwareTokenBuilder,
     IndentationAwareLexer,
 } from 'langium';
-import {
-    NowlineGeneratedSharedModule,
-    NowlineGeneratedModule,
-} from '../generated/module.js';
-import type { NowlineTerminalNames, NowlineKeywordNames, NowlineAstType } from '../generated/ast.js';
+import { NowlineGeneratedSharedModule, NowlineGeneratedModule } from '../generated/module.js';
+import type {
+    NowlineTerminalNames,
+    NowlineKeywordNames,
+    NowlineAstType,
+} from '../generated/ast.js';
 import { NowlineValidator, registerValidationChecks } from './nowline-validator.js';
 
 // Strip trailing ':' from property key tokens so AST nodes carry clean keys
@@ -72,7 +73,10 @@ export type NowlineServices = LangiumCoreServices & NowlineAddedServices;
 
 export type { NowlineAstType };
 
-export const NowlineModule: Module<NowlineServices, PartialLangiumCoreServices & NowlineAddedServices> = {
+export const NowlineModule: Module<
+    NowlineServices,
+    PartialLangiumCoreServices & NowlineAddedServices
+> = {
     parser: {
         TokenBuilder: () =>
             new NowlineIndentationAwareTokenBuilder({
@@ -92,9 +96,7 @@ export const NowlineModule: Module<NowlineServices, PartialLangiumCoreServices &
     },
 };
 
-export function createNowlineServices(context: {
-    shared?: LangiumSharedCoreServices;
-} = {}): {
+export function createNowlineServices(context: { shared?: LangiumSharedCoreServices } = {}): {
     shared: LangiumSharedCoreServices;
     Nowline: NowlineServices;
 } {
