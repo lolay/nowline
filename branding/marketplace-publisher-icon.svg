@@ -1,0 +1,14 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 128 128" width="128" height="128">
+  <!--
+    Nowline Visual Studio Marketplace publisher icon (128x128).
+    Standalone mark (now-line bar + diamond) on white, with ~12.5% padding.
+    Built from branding/favicon.svg, scaled 3x and centered in a 128 canvas.
+  -->
+  <rect width="128" height="128" fill="#ffffff"/>
+
+  <!-- Red now-line bar -->
+  <rect x="59.5" y="19" width="9" height="90" rx="4.5" fill="#e53e3e"/>
+
+  <!-- Red diamond at the bottom of the bar -->
+  <polygon points="64,37 91,64 64,91 37,64" fill="#e53e3e"/>
+</svg>
