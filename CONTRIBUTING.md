@@ -99,6 +99,7 @@ Run these from the repo root. Most are simple pnpm re-runs across the workspace.
 | Run tests for one package | `pnpm --filter @nowline/core test` |
 | Watch tests for one package | `pnpm --filter @nowline/core test:watch` |
 | Lint | `pnpm -r lint` |
+| Lint GitHub Actions workflows | `pnpm lint:workflows` (requires `brew install actionlint`) |
 | Type-check without emit | `pnpm -r build` (incremental; tsc -b handles this; skips render) |
 | Regenerate Langium AST only | `pnpm langium:generate` |
 | Compile standalone binaries | `pnpm --filter @nowline/cli compile` (requires Bun) |
@@ -204,6 +205,17 @@ If you're changing the spec'd behavior of the language, also update the relevant
 - **No emojis in source, commit messages, or user-facing output unless explicitly requested.**
 
 Run `pnpm -r lint` before pushing.
+
+## Editing GitHub Actions workflows
+
+Install [actionlint](https://github.com/rhysd/actionlint) and run it locally before pushing changes to `.github/workflows/`:
+
+```
+brew install actionlint
+pnpm lint:workflows
+```
+
+CI runs the same `pnpm lint:workflows` step on every PR — catches YAML errors, action-input mismatches, expression typos, and bash issues inside `run:` blocks (via shellcheck) before they break a workflow run.
 
 ## Tests
 

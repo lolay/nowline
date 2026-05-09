@@ -6,6 +6,29 @@ on:
   pull_request:
 
 jobs:
+  lint-workflows:
+    name: Lint workflows (actionlint)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install pnpm
+        uses: pnpm/action-setup@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: pnpm
+
+      - name: Install actionlint
+        run: |
+          bash <(curl -sSf https://raw.githubusercontent.com/rhysd/actionlint/main/scripts/download-actionlint.bash) 1.7.12
+          echo "$PWD" >> "$GITHUB_PATH"
+
+      - name: Lint workflows
+        run: pnpm lint:workflows
+
   build-test:
     name: Build & test (${{ matrix.os }})
     runs-on: ${{ matrix.os }}
@@ -81,7 +104,9 @@ jobs:
         working-directory: packages/cli
         run: |
           set -euo pipefail
-          BIN="$(ls dist-bin/nowline-* | head -n 1)"
+          shopt -s nullglob
+          bins=(dist-bin/nowline-*)
+          BIN="${bins[0]}"
           chmod +x "$BIN"
           "$BIN" --version
           "$BIN" ../../examples/minimal.nowline --dry-run

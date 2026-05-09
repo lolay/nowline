@@ -120,14 +120,18 @@ jobs:
       - name: Smoke test binary (render every format)
         if: matrix.runner != 'windows-latest'
         shell: bash
+        env:
+          MATRIX_RUNNER: ${{ matrix.runner }}
+          MATRIX_TARGET: ${{ matrix.target }}
+          MATRIX_SUFFIX: ${{ matrix.suffix }}
         run: |
           set -euo pipefail
-          bin=packages/cli/dist-bin/nowline-${{ matrix.suffix }}
-          if [[ "${{ matrix.runner }}" == "macos-latest" && "${{ matrix.target }}" != *"darwin"* ]]; then
+          bin="packages/cli/dist-bin/nowline-${MATRIX_SUFFIX}"
+          if [[ "$MATRIX_RUNNER" == "macos-latest" && "$MATRIX_TARGET" != *darwin* ]]; then
             echo "cross-target binary; skipping execution smoke"
             exit 0
           fi
-          if [[ "${{ matrix.runner }}" == "ubuntu-latest" && "${{ matrix.target }}" != *"linux-x64"* ]]; then
+          if [[ "$MATRIX_RUNNER" == "ubuntu-latest" && "$MATRIX_TARGET" != *linux-x64* ]]; then
             echo "cross-target binary; skipping execution smoke"
             exit 0
           fi
@@ -311,7 +315,7 @@ jobs:
 
       - name: Publish to Open VSX
         working-directory: packages/vscode-extension
-        run: npx --yes ovsx publish dist/nowline-vscode.vsix -p $OVSX_PAT
+        run: npx --yes ovsx publish dist/nowline-vscode.vsix -p "$OVSX_PAT"
         env:
           OVSX_PAT: ${{ secrets.OVSX_PAT }}
 
