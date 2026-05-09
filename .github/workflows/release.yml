@@ -429,7 +429,7 @@ jobs:
               url \"https://github.com/lolay/nowline/releases/download/v${VERSION}/${asset}\"
               sha256 \"${sha}\"
             end
-"
+          "
             MAN_INSTALL+="
               resource(\"${res_name}\").stage { (share/\"man/${locale}/man1\").install \"${asset}\" => \"nowline.1\" }"
           done
@@ -472,7 +472,7 @@ jobs:
               url "https://github.com/lolay/nowline/releases/download/v${VERSION}/nowline.1"
               sha256 "${SHA_MANPAGE}"
             end
-${MAN_RESOURCES}
+          ${MAN_RESOURCES}
             def install
               bin.install Dir["nowline-*"].first => "nowline"
               resource("manpage").stage { man1.install "nowline.1" }${MAN_INSTALL}
