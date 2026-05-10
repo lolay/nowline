@@ -27,14 +27,14 @@ Commercial milestones (hosted editor, free viewer, MCP, enterprise, FedRAMP) are
 | ~~m2i~~ | ~~Sample fidelity polish~~ | Apache 2.0 | Post-Layout-v2 rendering refinements: row-packing for items/markers/groups, caption + chip spill, narrow-bar decoration spill, luminance-aware status dots, now-pill flag mode, canvas growth helpers, geometry-constant centralization |
 | ~~m2j~~ | ~~Capacity & utilization~~ | Apache 2.0 | `capacity:` on swimlanes and items, `capacity-icon:` glyph vocabulary, `size <id> effort:N` declarations with item-derived durations, `remaining:` literal form, tri-state lane utilization underline (`utilization-warn-at:N`, `utilization-over-at:N`) |
 | ~~m2k~~ | ~~Dependency arrow attach + routing~~ | Apache 2.0 | Visual-edge attach with flow dedupe; channel-based orthogonal router (item-bar obstacles, parallel/group bracket-clearance nudge, slot assignment, under-bar fallback); min-stub constraints + parallel bracket-foot clearance |
-| m2l | Manual pages | Apache 2.0 | Hand-authored mdoc `nowline.1` (CLI flags + LANGUAGE cheatsheet) and `nowline.5` (full DSL reference) shipped through every install channel (Homebrew tap, `.deb`, npm `"man"`, GitHub Release asset) so `man nowline` and `man 5 nowline` both work after any package-manager install |
-| m2m | Localization (fr) | Apache 2.0 | `locale:` on the `nowline` directive; `--locale` flag and `LC_ALL`/`LC_MESSAGES`/`LANG` fallback; CLDR-style bundle tree (`fr` neutral base + empty `fr-CA` / `fr-FR` overlays); error-code-keyed validator messages; translated `man/fr/nowline.1` and `man/fr/nowline.5`; per-channel install wiring for translated man pages |
+| ~~m2l~~ | ~~Manual pages~~ | Apache 2.0 | Hand-authored mdoc `nowline.1` (CLI flags + LANGUAGE cheatsheet) and `nowline.5` (full DSL reference) shipped through every install channel (Homebrew tap, `.deb`, npm `"man"`, GitHub Release asset) so `man nowline` and `man 5 nowline` both work after any package-manager install |
+| ~~m2m~~ | ~~Localization (fr)~~ | Apache 2.0 | `locale:` on the `nowline` directive; `--locale` flag and `LC_ALL`/`LC_MESSAGES`/`LANG` fallback; CLDR-style bundle tree (`fr` neutral base + empty `fr-CA` / `fr-FR` overlays); error-code-keyed validator messages; translated `man/fr/nowline.1` and `man/fr/nowline.5`; per-channel install wiring for translated man pages |
 | ~~m3a~~ | ~~LSP server~~ | Apache 2.0 | Langium-based language server (`@nowline/lsp`): validation, definition, references, rename, hover, completion, document symbols, folding |
 | ~~m3b~~ | ~~VS Code/Cursor extension scaffold~~ | Apache 2.0 | Bundled `.vsix`: TextMate grammar, language config, snippets, file icon, LSP client, trace setting |
 | ~~m3c~~ | ~~Live preview~~ | Apache 2.0 | Side-or-behind preview panel; host-side render pipeline (parse + layout + renderSvg) posts SVG to a webview; clickable diagnostic table; toolbar zoom/pan/fit/save/copy; Cmd-wheel & pinch zoom; keyboard presets; minimap; five `nowline.preview.*` settings |
-| m3d | Preview parity | Apache 2.0 | `.nowlinerc` reader + workspace watcher; new preview-affecting settings (`nowline.preview.{locale,now,strict,showLinks,width,assetRoot}` + `nowline.ignoreRcFile`); preview toolbar overrides (theme, now-line, show-links) |
-| m3e | Export from VS Code | Apache 2.0 | `Nowline: Export…` shell-out command for PDF / pixel-strict PNG / HTML / Markdown+Mermaid / XLSX / MS Project XML; `nowline.export.*` settings (cliPath, PDF page-size/orientation/margin, sans/mono fonts, headless, PNG scale, MS Project start); per-export Override… quickPick |
-| m3f | Authoring commands | Apache 2.0 | `Nowline: New Roadmap…` (`--init` parity); `.nowlinerc`-vs-settings disagreement diagnostic in the preview (suppressed when `nowline.ignoreRcFile` is `true`) |
+| ~~m3d~~ | ~~Preview parity~~ | Apache 2.0 | `.nowlinerc` reader + workspace watcher; new preview-affecting settings (`nowline.preview.{locale,now,strict,showLinks,width,assetRoot}` + `nowline.ignoreRcFile`); preview toolbar overrides (theme, now-line, show-links) |
+| ~~m3e~~ | ~~Export from VS Code~~ | Apache 2.0 | `Nowline: Export…` shell-out command for PDF / pixel-strict PNG / HTML / Markdown+Mermaid / XLSX / MS Project XML; `nowline.export.*` settings (cliPath, PDF page-size/orientation/margin, sans/mono fonts, headless, PNG scale, MS Project start); per-export Override… quickPick |
+| ~~m3f~~ | ~~Authoring commands~~ | Apache 2.0 | `Nowline: New Roadmap…` (`--init` parity); `.nowlinerc`-vs-settings disagreement diagnostic in the preview (suppressed when `nowline.ignoreRcFile` is `true`) |
 | m4 | Embed | Apache 2.0 | Browser embed script, GitHub Action |
 | m4.5 | IDE Expansion | Apache 2.0 | Obsidian, Neovim, JetBrains (timing TBD) |
 | m4.6 | Windows distribution | Apache 2.0 | Scoop bucket (`lolay/scoop-bucket`) and WinGet central-registry submission via `wingetcreate`; new `update-scoop-bucket` + `submit-winget-pkg` jobs in `release.yml`; `SCOOP_BUCKET_TOKEN` + `WINGET_PR_PAT` secrets |
@@ -302,7 +302,7 @@ Min-stub constraints:
 
 Spec: [`specs/rendering.md`](./rendering.md) § Dependency Arrows (Attach geometry + Channel Routing) | Handoff: [`specs/handoffs/m2k.md`](./handoffs/m2k.md)
 
-### m2l — Manual pages
+### ~~m2l — Manual pages~~
 
 Distribution-polish milestone: hand-authored `nowline.1` (CLI flags + a `LANGUAGE` cheatsheet) and `nowline.5` (full DSL reference) so `man nowline` and `man 5 nowline` both work after any normal package-manager install. The CLI page mirrors the existing `--help` text and the [`specs/cli.md`](./cli.md) flag tables; the section-5 page mirrors [`specs/dsl.md`](./dsl.md). Neither is generated from either source, deliberately, so each can be edited as a man page first and a derived doc afterwards. The DSL is the product (per [`AGENTS.md`](../AGENTS.md)), so it gets its own section-5 page in the Unix file-format convention (`gitignore(5)`, `crontab(5)`, `ssh_config(5)`).
 
@@ -314,7 +314,7 @@ Distribution-polish milestone: hand-authored `nowline.1` (CLI flags + a `LANGUAG
 
 The mdoc `.Dd $Mdocdate$` placeholder is substituted by groff at render time from the file's mtime, so the source bytes don't change between releases. Mirrors the d2 pattern; we evaluated `pandoc -t man`, `marked-man`, and `scdoc` and picked hand-authored mdoc for its zero build dependencies (see [`specs/cli-distribution.md`](./cli-distribution.md)).
 
-### m2m — Localization (fr)
+### ~~m2m — Localization (fr)~~
 
 Localization milestone landing the architecture (file-level locale property, env-var-aware CLI flag, CLDR-style fallback resolver, error-code-keyed validator messages) plus the first non-English bundle. Quebec is the driver: `fr-CA` users get a translated man page and validator messages immediately; the architecture leaves room for future `es`, `de`, `ja`, RTL/CJK locales without rework.
 
@@ -355,7 +355,7 @@ Five new settings: `nowline.preview.refreshOn`, `debounceMs`, `theme`, `defaultF
 
 Spec: [`specs/ide.md`](./ide.md) | Handoff: [`specs/handoffs/m3c.md`](./handoffs/m3c.md)
 
-### m3d — Preview parity
+### ~~m3d — Preview parity~~
 
 Brings the live preview into option-parity with `nowline render`. Today the preview pipeline only consumes `text + fsPath + theme + today`; CLI flags like `--locale`, `--width`, `--strict`, `--no-links`, `--asset-root`, and `--now` are silently the default. m3d widens the pipeline input and threads a single resolution chain through it (settings → `.nowlinerc` → DSL directive → defaults; toolbar overrides on top for the active panel).
 
@@ -366,7 +366,7 @@ Brings the live preview into option-parity with `nowline render`. Today the prev
 
 Spec: [`specs/ide.md`](./ide.md) § Configuration
 
-### m3e — Export from VS Code
+### ~~m3e — Export from VS Code~~
 
 Adds `Nowline: Export…` (palette + editor-title menu + tab right-click), which shells out to the bundled `nowline` CLI to produce PDF, pixel-strict PNG, HTML, Markdown+Mermaid, XLSX, or MS Project XML. Avoids bundling resvg / pdfkit / exceljs / etc. into the `.vsix`; mirrors the README's existing PNG-fidelity caveat ("for pixel-strict output run the CLI").
 
@@ -377,7 +377,7 @@ Adds `Nowline: Export…` (palette + editor-title menu + tab right-click), which
 
 Spec: [`specs/ide.md`](./ide.md) § Export to other formats
 
-### m3f — Authoring commands
+### ~~m3f — Authoring commands~~
 
 Closes the remaining gap with the verbless CLI by exposing the parts of `--init` that make sense from the editor.
 
