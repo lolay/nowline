@@ -3,18 +3,23 @@ description: 'Install pnpm, set up Node.js 22 with the pnpm cache, then install 
 
 # Composite action so every workflow job that needs the standard
 # pnpm + Node toolchain can share one place to bump versions or change
-# install flags. Jobs still call `actions/checkout@v4` themselves
+# install flags. Jobs still call `actions/checkout@v6` themselves
 # because checkout parameters (token, fetch-depth, path) vary across
 # callers — keeping checkout in the workflow keeps this action
 # parameter-free.
+#
+# setup-node@v5+ enables automatic packageManager-aware caching when
+# `packageManager` is set in package.json. We pass `cache: pnpm`
+# explicitly anyway; the explicit value takes precedence and keeps
+# behaviour identical to the v4 era.
 runs:
   using: composite
   steps:
     - name: Install pnpm
-      uses: pnpm/action-setup@v4
+      uses: pnpm/action-setup@v5
 
     - name: Setup Node.js
-      uses: actions/setup-node@v4
+      uses: actions/setup-node@v6
       with:
         node-version: '22'
         cache: pnpm

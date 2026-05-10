@@ -42,7 +42,7 @@ jobs:
       # push below actually triggers downstream jobs in this same
       # workflow. GITHUB_TOKEN-pushed tags do not trigger workflow_run /
       # push events to avoid recursion; a user-scoped PAT does.
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v6
         with:
           fetch-depth: 0
           token: ${{ secrets.RELEASE_TAG_PAT }}
@@ -106,7 +106,7 @@ jobs:
           - { id: pack-npm, kind: npm-pack, runner: ubuntu-latest }
           - { id: pack-vsix, kind: vsix-pack, runner: ubuntu-latest }
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v6
       - uses: ./.github/actions/setup-node-pnpm
 
       - name: Install Bun
@@ -162,7 +162,7 @@ jobs:
 
       - name: Upload binary artifact
         if: matrix.kind == 'binary'
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: nowline-${{ matrix.suffix }}
           path: packages/cli/dist-bin/nowline-${{ matrix.suffix }}
@@ -174,7 +174,7 @@ jobs:
 
       - name: Upload .deb artifact
         if: matrix.deb_arch
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: nowline_${{ matrix.deb_arch }}.deb
           path: dist-deb/nowline_*_${{ matrix.deb_arch }}.deb
@@ -209,7 +209,7 @@ jobs:
 
       - name: Upload npm tarballs
         if: matrix.kind == 'npm-pack'
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: npm-tarballs
           path: dist-pack/*.tgz
@@ -224,7 +224,7 @@ jobs:
 
       - name: Upload .vsix
         if: matrix.kind == 'vsix-pack'
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: nowline-vscode.vsix
           path: packages/vscode-extension/dist/nowline-vscode.vsix
@@ -266,7 +266,7 @@ jobs:
     steps:
       - name: Setup Node.js
         if: matrix.kind == 'npm' || matrix.kind == 'vscode'
-        uses: actions/setup-node@v4
+        uses: actions/setup-node@v6
         with:
           node-version: '22'
           registry-url: 'https://registry.npmjs.org'
@@ -275,7 +275,7 @@ jobs:
 
       - name: Download npm tarballs
         if: matrix.kind == 'npm'
-        uses: actions/download-artifact@v4
+        uses: actions/download-artifact@v8
         with:
           name: npm-tarballs
           path: dist-pack
@@ -300,7 +300,7 @@ jobs:
 
       - name: Download .vsix
         if: matrix.kind == 'vscode'
-        uses: actions/download-artifact@v4
+        uses: actions/download-artifact@v8
         with:
           name: nowline-vscode.vsix
           path: dist-vsix
@@ -325,13 +325,13 @@ jobs:
 
       - name: Checkout source
         if: matrix.kind == 'github-release'
-        uses: actions/checkout@v4
+        uses: actions/checkout@v6
         with:
           path: src
 
       - name: Checkout lolay/homebrew-tap
         if: matrix.kind == 'github-release'
-        uses: actions/checkout@v4
+        uses: actions/checkout@v6
         with:
           # Brew tap shorthand `lolay/tap` (used in `brew install
           # lolay/tap/nowline`) maps to the GitHub repo
@@ -344,14 +344,14 @@ jobs:
 
       - name: Download binary artifacts
         if: matrix.kind == 'github-release'
-        uses: actions/download-artifact@v4
+        uses: actions/download-artifact@v8
         with:
           path: artifacts
           pattern: 'nowline-{macos,linux,windows}-*'
 
       - name: Download .deb artifacts
         if: matrix.kind == 'github-release'
-        uses: actions/download-artifact@v4
+        uses: actions/download-artifact@v8
         with:
           path: artifacts
           pattern: 'nowline_*.deb'
@@ -378,7 +378,7 @@ jobs:
 
       - name: Publish GitHub Release
         if: matrix.kind == 'github-release'
-        uses: softprops/action-gh-release@v2
+        uses: softprops/action-gh-release@v3
         with:
           files: release-assets/*
           generate_release_notes: true
