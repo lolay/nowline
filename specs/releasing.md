@@ -179,4 +179,4 @@ There's no automated rollback. If a release is broken:
 2. Cut a hotfix release with the next patch version (e.g. `v0.1.0 → v0.1.1`) via the [Hotfix flow](#hotfix-flow); do **not** delete or overwrite the broken tag.
 3. Mark the broken release as a pre-release on GitHub so package managers stop offering it.
 4. For npm-specific breakage, `npm deprecate '@nowline/<pkg>@<version>' "broken release; use vX.Y.Z+1"` rather than unpublishing — unpublish has a 72-hour window and breaks existing lockfiles.
-5. For Marketplace breakage, you can unpublish a version with `vsce unpublish nowline.vscode@X.Y.Z`. Open VSX has a similar `ovsx unpublish` command.
+5. For Marketplace breakage, you can unpublish a version with `vsce unpublish nowline.vscode-nowline@X.Y.Z`. Open VSX has a similar `ovsx unpublish` command.

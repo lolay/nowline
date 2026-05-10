@@ -1,5 +1,5 @@
 {
-    "name": "vscode",
+    "name": "vscode-nowline",
     "displayName": "Nowline",
     "description": "Author Nowline roadmaps in VS Code and Cursor — syntax highlighting, language server, and live preview.",
     "version": "0.2.0",

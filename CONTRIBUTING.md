@@ -178,7 +178,7 @@ The `package` script chains `sync-grammar` (pulls `grammars/nowline.tmLanguage.j
 ### Gotchas
 
 - **Reload Window isn't always enough.** The extension host occasionally caches the old `.cjs` bundle. If your changes don't appear after reload, fully quit the editor (`Cmd+Q`) and reopen.
-- **Confirm the loaded build.** `Cmd+Shift+P` → **Developer: Show Running Extensions**, find Nowline, check the path next to it points at `~/.cursor/extensions/nowline.vscode-<version>/` (or `~/.vscode/extensions/...`).
+- **Confirm the loaded build.** `Cmd+Shift+P` → **Developer: Show Running Extensions**, find Nowline, check the path next to it points at `~/.cursor/extensions/nowline.vscode-nowline-<version>/` (or `~/.vscode/extensions/...`).
 - **Stuck install.** If `--install-extension --force` reports success but the new bundle doesn't appear, remove the extension directory by hand — `ls ~/.cursor/extensions/ | grep -i nowline`, `rm -rf` the matching folder — then reinstall.
 - **`cursor` CLI missing.** Open Cursor and run **Shell Command: Install 'cursor' command** from the command palette to put it on `$PATH`.
 

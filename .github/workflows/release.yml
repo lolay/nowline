@@ -423,7 +423,11 @@ jobs:
             tarball=$(find dist-pack -maxdepth 1 -name "${pkg}-*.tgz" -print -quit)
             test -n "$tarball" || { echo "missing tarball for ${pkg}" >&2; exit 1; }
             echo "publishing ${tarball}"
-            npm publish "$tarball" --access public
+            # `./` prefix forces npm to treat the argument as a filesystem
+            # path. Without it, npm 11+ sees `dist-pack/<name>.tgz`, treats
+            # the slash as an `org/repo` GitHub spec, and tries to git-clone
+            # over SSH — which fails with "Permission denied (publickey)".
+            npm publish "./$tarball" --access public
           done
 
       # ===== vscode cell =====
