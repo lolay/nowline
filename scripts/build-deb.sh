@@ -104,7 +104,7 @@ Section: utils
 Priority: optional
 Architecture: ${ARCH}
 Installed-Size: ${INSTALLED_SIZE_KB}
-Maintainer: Lolay <packages@lolay.com>
+Maintainer: The Nowline Authors <maintainers@nowline.io>
 Homepage: https://github.com/lolay/nowline
 Description: ${PKG_DESC_SHORT}
 $(printf "%b" "${PKG_DESC_LONG}")
@@ -120,7 +120,7 @@ chmod 0755 "$PKG_ROOT/DEBIAN/postinst"
 cat > "$PKG_ROOT/usr/share/doc/${PKG_NAME}/copyright" <<'EOF'
 Format: https://www.debian.org/doc/packaging-manuals/copyright-format/1.0/
 Upstream-Name: nowline
-Upstream-Contact: Lolay <packages@lolay.com>
+Upstream-Contact: The Nowline Authors <maintainers@nowline.io>
 Source: https://github.com/lolay/nowline
 
 Files: *

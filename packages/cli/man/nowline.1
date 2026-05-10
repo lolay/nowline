@@ -3,7 +3,7 @@
 .Os
 .Sh NAME
 .Nm nowline
-.Nd render, validate, and serve .nowline roadmap files
+.Nd create roadmaps using a human readable text file .nowline
 .Sh SYNOPSIS
 .Nm
 .Op Fl f Ar format
@@ -30,44 +30,16 @@
 .Op Fl h | Fl -help
 .Sh DESCRIPTION
 .Nm
-parses a
+is a CLI that processes simple human readable
 .Pa .nowline
-roadmap file (or its JSON AST form) and writes the rendered output to a
-file or to standard output.
-Rendering is the default; other modes are selected by mutually-exclusive
-mode flags rather than subcommands
-.Pq verbless, matching mmdc, dot, d2, prettier, and tsc .
+files that define a roadmap, not a Gantt chart.
+The primary artifact is an SVG, but it also generates many other
+artifacts including PNG, PDF, HTML, Markdown+Mermaid, XLSX, MS Project
+XML.
 .Pp
-The render pipeline is
-.Sy parse
-\(->
-.Sy validate
-\(->
-.Sy layout
-\(->
-.Sy format-specific exporter .
-Output is byte-for-byte deterministic for a given input,
-.Fl -theme ,
-and
-.Fl -now .
-.Pp
-A single
-.Nm
-binary ships every export format: SVG, PNG, PDF, HTML,
-Markdown+Mermaid, XLSX, MS Project XML, plus AST round-trip
-.Pq json , nowline .
-.Pp
-.Ar input
-is required for the default render mode,
-.Fl -serve ,
-and
-.Fl -dry-run .
-Pass
-.Sq -
-to read from standard input.
-With zero arguments,
-.Nm
-prints help and exits 0.
+This page documents the CLI.
+For the file format, see
+.Xr nowline 5 .
 .Sh INPUT
 The input format is detected from the file extension:
 .Pa .nowline
@@ -93,61 +65,28 @@ Comments use
 or
 .Sq /* */ .
 .Pp
-File structure has up to four sections in strict order:
-.Bl -enum -offset indent -compact
-.It
-.Sy nowline v1
-directive (optional, must be the first non-comment line; accepts
-.Sy locale:<bcp47> ) .
-.It
-.Sy include
-declarations (optional).
-.It
-.Sy config
-section (optional): styles, defaults, scale, calendar, symbols.
-.It
-.Sy roadmap
-section (required): the content.
-.El
-.Pp
-Keyword summary:
-.Bl -tag -width "person/team" -compact
-.It Sy nowline
-DSL version directive (currently
-.Sy v1 ) .
-.It Sy include
-Pull in another
-.Pa .nowline
-file;
-.Sy config:
-and
-.Sy roadmap:
-modes
-.Pq Sy merge | ignore | isolate
-control merge behavior.
-.It Sy config , roadmap
-Section markers; one
-.Sy roadmap
-per file.
-.It Sy style , symbol , default , scale , calendar
-Config keywords (presentation, defaults, axis, day arithmetic).
+Core keywords:
+.Bl -tag -width "person, team" -compact
+.It Sy roadmap
+The top-level roadmap declaration; one per file.
+.It Sy swimlane
+A horizontal lane of work (team, area, stream).
+.It Sy item
+A unit of work, indented under a swimlane.
+.It Sy parallel
+A block whose children run concurrently.
+.It Sy group
+A logical bundle of items, rendered together.
+.It Sy anchor
+A named date on the timeline.
+.It Sy milestone
+A point-in-time marker that depends on work.
 .It Sy person , team
 Org vocabulary referenced by
 .Sy owner: .
-.It Sy anchor , milestone
-Named dates and achievement markers on the timeline.
-.It Sy label , size , status
-Reusable vocabulary referenced by
-.Sy labels: , size: , status: .
-.It Sy swimlane
-Groups items by team / area / stream.
-.It Sy item
-Work item, indented under a swimlane (or parallel / group).
-.It Sy parallel , group
-Parallel block and sequential bundle; nestable.
-.It Sy footnote
-Annotation attached to one or more entities via
-.Sy on: .
+.It Sy label
+Reusable tag referenced by
+.Sy labels: .
 .El
 .Pp
 Every entity follows a universal shape:
@@ -160,30 +99,22 @@ At least one of
 or
 .Qq Ar title
 is required \(em the parser distinguishes them by quoting.
-Lists use bracket notation
-.Pq Sy labels:[a, b] ;
-a trailing
-.Sq \e
-continues a line.
 .Pp
 Minimal example:
 .Bd -literal -offset indent
 nowline v1
-
 roadmap r "Demo" start:2026-01-06
-
-size m effort:1w
-
 swimlane platform
-  item auth "Auth refactor" size:m
+  item research "Research" duration:3w
+  item build "Build" duration:2w
 .Ed
 .Pp
 See
 .Xr nowline 5
 .Pq Sy man 5 nowline
-for the full grammar, every property, validation rules, and the
+for the full grammar, every property, validation rules, and
 .Sy include
-collision model.
+/ config / style declarations.
 .Sh MODE FLAGS
 The mode flags below are mutually exclusive.
 .Bl -tag -width Fl
@@ -514,4 +445,4 @@ the CLI surface
 and OSS milestones
 .Pq Pa specs/milestones.md .
 .Sh AUTHORS
-.An Lolay Aq Mt packages@lolay.com
+.An The Nowline Authors Aq Mt maintainers@nowline.io

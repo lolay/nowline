@@ -6,7 +6,7 @@
 .Os
 .Sh NOM
 .Nm nowline
-.Nd produire, valider et servir des fichiers de feuille de route .nowline
+.Nd créer des feuilles de route à partir d'un fichier texte lisible .nowline
 .Sh SYNOPSIS
 .Nm
 .Op Fl f Ar format
@@ -33,46 +33,17 @@
 .Op Fl h | Fl -help
 .Sh DESCRIPTION
 .Nm
-analyse un fichier de feuille de route
+est une CLI qui traite des fichiers
 .Pa .nowline
-(ou sa forme JSON AST) et écrit le résultat produit dans un fichier ou
-sur la sortie standard.
-La production est le mode par défaut\ ; les autres modes sont
-sélectionnés par des indicateurs mutuellement exclusifs plutôt que par
-des sous-commandes
-.Pq sans verbe, comme mmdc, dot, d2, prettier et tsc .
+simples et lisibles qui définissent une feuille de route, et non un
+diagramme de Gantt.
+L'artefact principal est un SVG, mais elle génère aussi de nombreux
+autres artefacts dont PNG, PDF, HTML, Markdown+Mermaid, XLSX,
+MS Project XML.
 .Pp
-Le pipeline de production est
-.Sy analyse
-\(->
-.Sy validation
-\(->
-.Sy mise en page
-\(->
-.Sy exportateur spécifique au format .
-La sortie est déterministe octet pour octet pour une entrée,
-.Fl -theme
-et
-.Fl -now
-donnés.
-.Pp
-Un seul binaire
-.Nm
-fournit tous les formats d'export\ : SVG, PNG, PDF, HTML,
-Markdown+Mermaid, XLSX, MS Project XML, et l'aller-retour AST
-.Pq json , nowline .
-.Pp
-.Ar entrée
-est obligatoire pour le mode de production par défaut, pour
-.Fl -serve
-et pour
-.Fl -dry-run .
-Indiquez
-.Sq -
-pour lire l'entrée standard.
-Sans argument,
-.Nm
-affiche l'aide et termine avec le code 0.
+Cette page documente la CLI.
+Pour le format de fichier, voir
+.Xr nowline 5 .
 .Sh ENTRÉE
 Le format d'entrée est détecté à partir de l'extension du fichier\ :
 .Pa .nowline
@@ -84,6 +55,74 @@ L'entrée standard est traitée par défaut comme
 Utilisez
 .Fl -input-format
 pour les noms de fichiers inhabituels.
+.Sh LANGAGE
+Un fichier
+.Pa .nowline
+est une esquisse à indentation significative.
+L'indentation canonique est de deux espaces\ ; les tabulations sont
+acceptées mais ne doivent pas être mélangées avec des espaces dans un
+même fichier.
+Les chaînes sont entre guillemets doubles\ ; les propriétés sont des
+paires
+.Sy key:value .
+Les commentaires utilisent
+.Sq //
+ou
+.Sq /* */ .
+.Pp
+Mots-clés principaux\ :
+.Bl -tag -width "person, team" -compact
+.It Sy roadmap
+La déclaration de feuille de route de plus haut niveau\ ; une seule
+par fichier.
+.It Sy swimlane
+Une voie horizontale de travail (équipe, domaine, flux).
+.It Sy item
+Une unité de travail, indentée sous un
+.Sy swimlane .
+.It Sy parallel
+Un bloc dont les enfants s'exécutent en simultané.
+.It Sy group
+Un regroupement logique d'éléments, rendus ensemble.
+.It Sy anchor
+Une date nommée sur la chronologie.
+.It Sy milestone
+Un repère ponctuel qui dépend d'un travail.
+.It Sy person , team
+Vocabulaire d'organisation référencé par
+.Sy owner: .
+.It Sy label
+Étiquette réutilisable référencée par
+.Sy labels: .
+.El
+.Pp
+Chaque entité suit une forme universelle\ :
+.Bd -literal -offset indent
+keyword [id] ["title"] [key:value ...]
+.Ed
+.Pp
+Au moins un identifiant
+.Ar id
+ou un titre
+.Qq Ar title
+est requis \(em l'analyseur les distingue par les guillemets.
+.Pp
+Exemple minimal\ :
+.Bd -literal -offset indent
+nowline v1
+roadmap r "Demo" start:2026-01-06
+swimlane platform
+  item research "Research" duration:3w
+  item build "Build" duration:2w
+.Ed
+.Pp
+Voir
+.Xr nowline 5
+.Pq Sy man 5 nowline
+pour la grammaire complète, toutes les propriétés, les règles de
+validation et les déclarations
+.Sy include
+/ config / style.
 .Sh INDICATEURS DE MODE
 Les indicateurs de mode ci-dessous sont mutuellement exclusifs.
 .Bl -tag -width Fl
@@ -421,4 +460,4 @@ les jalons libres
 et le modèle de localisation
 .Pq Pa specs/localization.md .
 .Sh AUTEURS
-.An Lolay Aq Mt packages@lolay.com
+.An Les Auteurs de Nowline Aq Mt maintainers@nowline.io
