@@ -351,4 +351,15 @@ A single `nowline` binary per platform bundles every export format — see [`spe
 
 ## Binary Size Budget
 
-Ceiling: **≤ 75 MB** per platform binary via `bun compile`. Measured macOS-arm64 today is ~70 MB. The bun runtime accounts for ~60 MB of that — comparable to Deno (~40 MB) and Bun standalone (~50 MB), and acceptable for a developer tool installed once. See [`specs/cli-distribution.md`](./cli-distribution.md) for the measurement breakdown that ruled out a tiered split. The npm package is much smaller since it relies on the user's own Node.js / Bun runtime.
+Ceilings are **per target**, asserted in CI by [`packages/cli/scripts/compile.mjs`](../packages/cli/scripts/compile.mjs). The bun standalone runtime varies by ~50 MB across platforms — darwin-arm64 ships ~60 MB, linux-x64 with glibc compat shims is ~95 MB, and windows-x64 is ~110 MB — so a single global ceiling would either let macOS regressions slide or fail every Linux/Windows build. Each target gets ~5–8 MB headroom over its current measurement.
+
+| Target          | Measured | Ceiling |
+| --------------- | -------- | ------- |
+| `darwin-arm64`  | ~70 MB   | 80 MB   |
+| `darwin-x64`    | ~75 MB   | 85 MB   |
+| `linux-x64`     | ~107 MB  | 115 MB  |
+| `linux-arm64`   | ~107 MB  | 115 MB  |
+| `windows-x64`   | ~122 MB  | 130 MB  |
+| `windows-arm64` | ~119 MB  | 125 MB  |
+
+Comparable runtimes: Deno (~40 MB), Bun standalone (~50 MB) — acceptable for a developer tool installed once. See [`specs/cli-distribution.md`](./cli-distribution.md) for the measurement breakdown that ruled out a tiered split. The npm package is much smaller since it relies on the user's own Node.js / Bun runtime.

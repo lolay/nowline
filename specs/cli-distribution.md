@@ -47,17 +47,27 @@ The win didn't justify the surface area. We collapsed.
 
 ## Size budget
 
-- Ceiling: **75 MB** per platform binary, asserted in CI by [`packages/cli/scripts/compile.mjs`](../packages/cli/scripts/compile.mjs).
-- Current measured macOS-arm64 binary: ~70 MB.
-- Headroom: ~5 MB for future bun-runtime growth or modest exporter additions.
-- If we breach 75 MB, the next conversation re-opens the tier question — but with measurements, not assumptions.
+Ceilings are **per target** rather than global, asserted in CI by [`packages/cli/scripts/compile.mjs`](../packages/cli/scripts/compile.mjs). Bun's standalone runtime varies by ~50 MB across platforms (darwin-arm64 is the smallest at ~60 MB; linux-x64 with glibc compat shims is ~95 MB; windows-x64 is ~110 MB), so a single global cap would either let darwin regressions slide or fail every Linux/Windows build.
+
+| Target          | Measured | Ceiling | Headroom |
+| --------------- | -------- | ------- | -------- |
+| `darwin-arm64`  | ~70 MB   | 80 MB   | ~10 MB   |
+| `darwin-x64`    | ~75 MB   | 85 MB   | ~10 MB   |
+| `linux-x64`     | ~107 MB  | 115 MB  | ~8 MB    |
+| `linux-arm64`   | ~107 MB  | 115 MB  | ~8 MB    |
+| `windows-x64`   | ~122 MB  | 130 MB  | ~8 MB    |
+| `windows-arm64` | ~119 MB  | 125 MB  | ~6 MB    |
+
+Headroom comfortably absorbs Bun patch versions and most minor bumps; a new exporter, native dependency, or Bun major bump should still trip the ceiling and force the explicit conversation called out below.
+
+If a build breaches its target's ceiling, the next conversation re-opens the tier question — but with measurements, not assumptions.
 
 ## When to revisit
 
 Re-read this doc and re-measure if any of the following becomes true:
 
 1. **Bun runtime drops materially** (e.g. `bun --compile --slim` lands a 20 MB runtime). Then the 5 MB exporter delta becomes a 25 MB delta and a tier potentially earns its keep.
-2. **A new exporter adds > 5 MB to the compiled binary.** The current "everything fits in 70 MB" math depends on each exporter being small once tree-shaken; a heavyweight format would re-open the question.
+2. **A new exporter adds > 5 MB to the compiled binary.** The current "darwin-arm64 fits in 70 MB / linux-x64 in 107 MB" math depends on each exporter being small once tree-shaken; a heavyweight format would re-open the question.
 3. **A new distribution channel emerges with hard size limits.** Today every channel (Homebrew, .deb, GitHub Release, npm) tolerates ~70 MB without complaint.
 4. **Profile data shows users actually want a smaller download.** No one has asked yet; the current premise is "if we measured wrong, fix it; don't speculate."
 

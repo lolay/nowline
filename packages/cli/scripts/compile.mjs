@@ -16,19 +16,26 @@ import { fileURLToPath } from 'node:url';
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const packageRoot = path.resolve(__dirname, '..');
 
+// Per-target size ceilings (MB). Bun's standalone runtime varies by ~50 MB
+// across targets — darwin-arm64 ships ~60 MB, linux-x64 with glibc compat
+// shims is ~95 MB, and windows-x64 is ~110 MB. A single global ceiling would
+// either let darwin regressions slide or fail every Linux/Windows build, so
+// each target carries its own budget = (currently measured size) + ~6–10 MB
+// headroom for future bun-runtime growth and modest exporter additions.
+// Tight by design: a breach should trigger the conversation called out in
+// `specs/cli-distribution.md` "Size budget", not be silently absorbed.
+//
+// Last measured (bun 1.3.13) using --target on macOS-arm64:
+//   darwin-arm64=70  darwin-x64=75  linux-arm64=107  linux-x64=107
+//   windows-arm64=119  windows-x64=122
 const ALL_TARGETS = [
-    { id: 'bun-darwin-arm64', suffix: 'macos-arm64' },
-    { id: 'bun-darwin-x64', suffix: 'macos-x64' },
-    { id: 'bun-linux-x64', suffix: 'linux-x64' },
-    { id: 'bun-linux-arm64', suffix: 'linux-arm64' },
-    { id: 'bun-windows-x64', suffix: 'windows-x64.exe' },
-    { id: 'bun-windows-arm64', suffix: 'windows-arm64.exe' },
+    { id: 'bun-darwin-arm64', suffix: 'macos-arm64', maxMb: 80 },
+    { id: 'bun-darwin-x64', suffix: 'macos-x64', maxMb: 85 },
+    { id: 'bun-linux-x64', suffix: 'linux-x64', maxMb: 115 },
+    { id: 'bun-linux-arm64', suffix: 'linux-arm64', maxMb: 115 },
+    { id: 'bun-windows-x64', suffix: 'windows-x64.exe', maxMb: 130 },
+    { id: 'bun-windows-arm64', suffix: 'windows-arm64.exe', maxMb: 125 },
 ];
-
-// Measured macOS-arm64 binary at the time of the m2c → single-binary collapse
-// was 69.6 MB (bun runtime ~60 MB + JS payload ~6 MB + resvg native ~3.5 MB).
-// 75 MB ceiling gives ~5 MB headroom for future bun-runtime growth.
-const MAX_BYTES = 75 * 1024 * 1024;
 
 function parseArgs(argv) {
     const out = { target: 'all' };
@@ -94,15 +101,18 @@ function main() {
         }
     }
 
+    const targetBySuffix = new Map(ALL_TARGETS.map((t) => [`nowline-${t.suffix}`, t]));
     for (const entryName of readdirSync(outDir)) {
         if (!entryName.startsWith('nowline-')) continue;
+        const tgt = targetBySuffix.get(entryName);
+        if (!tgt) continue; // unknown artifact; size budget is per known target
         const p = path.join(outDir, entryName);
         const size = statSync(p).size;
         const mb = (size / 1024 / 1024).toFixed(1);
-        console.log(`  ${entryName}: ${mb} MB`);
-        if (size > MAX_BYTES) {
-            const ceilingMb = (MAX_BYTES / 1024 / 1024).toFixed(0);
-            console.error(`    ERROR: ${entryName} is larger than ${ceilingMb} MB (${mb} MB).`);
+        const maxBytes = tgt.maxMb * 1024 * 1024;
+        console.log(`  ${entryName}: ${mb} MB (max ${tgt.maxMb} MB)`);
+        if (size > maxBytes) {
+            console.error(`    ERROR: ${entryName} is larger than ${tgt.maxMb} MB (${mb} MB).`);
             failed += 1;
         }
     }

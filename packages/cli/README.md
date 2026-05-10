@@ -350,8 +350,12 @@ re-introducing a tier (see
 
 Six platform binaries ship per release (macOS arm64/x64, Linux
 x64/arm64, Windows x64/arm64), attached to every GitHub Release. Size
-budget: **≤ 75 MB**; CI asserts on disk for every target. The current
-macOS-arm64 binary measures ~70 MB.
+budgets are per target (Bun's standalone runtime varies by ~50 MB across
+platforms): macOS-arm64 ~70 MB, macOS-x64 ~75 MB, Linux ~107 MB, Windows
+~119–122 MB. CI asserts on disk for every target via
+[`packages/cli/scripts/compile.mjs`](./scripts/compile.mjs). See
+[`specs/cli-distribution.md`](../../specs/cli-distribution.md#size-budget)
+for the full ceiling table.
 
 ### Windows SmartScreen walkthrough
 
