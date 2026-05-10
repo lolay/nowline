@@ -115,10 +115,90 @@ jobs:
         with:
           bun-version: latest
 
+      # `pnpm install` in setup-node-pnpm respects the host's os/cpu and
+      # only installs optionalDependencies matching the host (e.g. on a
+      # macOS-arm64 runner, only `@resvg/resvg-js-darwin-arm64` lands).
+      # When `bun build --compile --target=bun-darwin-x64` then bundles
+      # the binary, the `require('@resvg/resvg-js-darwin-x64')` line in
+      # resvg-js's runtime loader (js-binding.js) resolves to nothing,
+      # so the shipped binary crashes the first time a user runs
+      # `nowline -f png`. Re-install with --cpu/--os (pnpm 10.14+) to
+      # additionally pull the *target's* native binding alongside the
+      # host's. Bun then embeds only the target-arch .node into the
+      # compiled binary; the host arch's binding stays on disk so any
+      # workspace tooling that needs it (esbuild, biome, etc.) keeps
+      # working. Installing all 12 platform variants would balloon the
+      # binary by ~30 MB because bun cannot statically eliminate the
+      # unreachable switch branches once their require targets resolve.
+      - name: Install target-platform native deps for bun --compile
+        if: matrix.kind == 'binary'
+        shell: bash
+        run: |
+          set -euo pipefail
+          case "${{ matrix.target }}" in
+            bun-darwin-arm64)  TGT_OS=darwin;  TGT_CPU=arm64 ;;
+            bun-darwin-x64)    TGT_OS=darwin;  TGT_CPU=x64 ;;
+            bun-linux-x64)     TGT_OS=linux;   TGT_CPU=x64 ;;
+            bun-linux-arm64)   TGT_OS=linux;   TGT_CPU=arm64 ;;
+            bun-windows-x64)   TGT_OS=win32;   TGT_CPU=x64 ;;
+            bun-windows-arm64) TGT_OS=win32;   TGT_CPU=arm64 ;;
+            *) echo "unknown target: ${{ matrix.target }}" >&2; exit 1 ;;
+          esac
+          HOST_OS=$(node -e "console.log({darwin:'darwin',linux:'linux',win32:'win32'}[process.platform])")
+          HOST_CPU=$(node -e "console.log(process.arch)")
+          pnpm install --frozen-lockfile \
+            --cpu="$HOST_CPU" --cpu="$TGT_CPU" \
+            --os="$HOST_OS" --os="$TGT_OS"
+
       - name: Build
         run: pnpm -r build
 
       # ===== binary cells =====
+
+      # Belt-and-suspenders: assert the target's native resvg binding is
+      # resolvable from inside the resvg-js parent before `bun --compile`.
+      # `bin-linux-arm64` and `bin-windows-arm64` are never executed in
+      # CI (no qemu, no Windows-on-ARM runner), so without this gate a
+      # regression in the install step above would silently ship broken
+      # binaries that fail at the user's first `-f png`.
+      #
+      # We resolve from the resvg-js parent because pnpm only symlinks
+      # the host-arch optional dep into top-level node_modules; the
+      # cross-arch variants live under `node_modules/.pnpm/.../resvg-js/
+      # node_modules/@resvg/`, which is what bun's bundler walks.
+      - name: Verify target native deps present
+        if: matrix.kind == 'binary'
+        shell: bash
+        # Run from packages/export-png because that's the only workspace
+        # package that depends on `@resvg/resvg-js`; the dep isn't hoisted
+        # to the repo root, so `require.resolve('@resvg/resvg-js/...')`
+        # only succeeds from inside export-png's resolution scope.
+        working-directory: packages/export-png
+        run: |
+          set -euo pipefail
+          case "${{ matrix.target }}" in
+            bun-darwin-arm64)  REQUIRED="@resvg/resvg-js-darwin-arm64" ;;
+            bun-darwin-x64)    REQUIRED="@resvg/resvg-js-darwin-x64" ;;
+            bun-linux-x64)     REQUIRED="@resvg/resvg-js-linux-x64-gnu" ;;
+            bun-linux-arm64)   REQUIRED="@resvg/resvg-js-linux-arm64-gnu" ;;
+            bun-windows-x64)   REQUIRED="@resvg/resvg-js-win32-x64-msvc" ;;
+            bun-windows-arm64) REQUIRED="@resvg/resvg-js-win32-arm64-msvc" ;;
+            *) echo "unknown target: ${{ matrix.target }}" >&2; exit 1 ;;
+          esac
+          REQUIRED="$REQUIRED" node -e "
+            const Module = require('module');
+            const resvgPkg = require.resolve('@resvg/resvg-js/package.json');
+            const req = Module.createRequire(resvgPkg);
+            const required = process.env.REQUIRED;
+            try {
+              const r = req.resolve(required + '/package.json');
+              console.log('ok:', required, '->', r);
+            } catch (e) {
+              console.error('ERROR:', required, 'is not resolvable from', resvgPkg);
+              console.error('bun --compile --target=${{ matrix.target }} would ship a broken binary');
+              process.exit(1);
+            }
+          "
 
       - name: Compile binary
         if: matrix.kind == 'binary'
