@@ -21,7 +21,7 @@ The CLI is **verbless** by design: `nowline <input>` renders by default. Operati
 | Windows | Direct download from GitHub Releases (`.exe`) |
 | npm (any platform) | `npm install -g nowline` |
 
-Each of the Unix paths (Homebrew, `.deb`, npm) ships the [`packages/cli/man/nowline.1`](../packages/cli/man/nowline.1) man page, so `man nowline` works immediately after install. See [`specs/cli-distribution.md`](./cli-distribution.md) for the per-channel install layout.
+Each of the Unix paths (Homebrew, `.deb`, npm) ships the [`packages/cli/man/nowline.1`](../packages/cli/man/nowline.1) and [`packages/cli/man/nowline.5`](../packages/cli/man/nowline.5) man pages, so `man nowline` (CLI flags + LANGUAGE cheatsheet) and `man 5 nowline` (full DSL reference) both work immediately after install. See [`specs/cli-distribution.md`](./cli-distribution.md) for the per-channel install layout.
 
 ### Standalone Binaries
 

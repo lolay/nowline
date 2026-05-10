@@ -33,11 +33,15 @@ npm install -g @nowline/cli
 ```
 
 After any of the package-manager installs above, `man nowline` shows the
-manual. The Homebrew formula's `resource "manpage"`, the `.deb`'s
-`/usr/share/man/man1/nowline.1.gz`, and npm's `"man"` field all install
-the same hand-authored mdoc source from [`man/nowline.1`](./man/nowline.1).
-For direct binary downloads from GitHub Releases, the man page ships as
-a separate `nowline.1` asset alongside the platform binaries.
+CLI manual (flags + a `LANGUAGE` cheatsheet) and `man 5 nowline` shows
+the full `.nowline` DSL reference. The Homebrew formula's
+`resource "manpage"` / `resource "manpage5"`, the `.deb`'s
+`/usr/share/man/man1/nowline.1.gz` / `/usr/share/man/man5/nowline.5.gz`,
+and npm's `"man"` field (which lists both files) all install the same
+hand-authored mdoc sources from [`man/nowline.1`](./man/nowline.1) and
+[`man/nowline.5`](./man/nowline.5). For direct binary downloads from
+GitHub Releases, both man pages ship as separate `nowline.1` and
+`nowline.5` assets alongside the platform binaries.
 
 ## Usage
 

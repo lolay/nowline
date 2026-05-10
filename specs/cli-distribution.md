@@ -73,10 +73,10 @@ Re-read this doc and re-measure if any of the following becomes true:
 
 ## Distribution channels (current)
 
-- **GitHub Releases:** six binaries per release (`nowline-macos-arm64`, `nowline-macos-x64`, `nowline-linux-x64`, `nowline-linux-arm64`, `nowline-windows-x64.exe`, `nowline-windows-arm64.exe`), plus the `nowline.1` man page (mdoc, hand-authored — see m2l in [`specs/milestones.md`](./milestones.md)).
-- **Homebrew:** one `Formula/nowline.rb` in `lolay/tap`. Auto-updated by [`.github/workflows/release.yml`](../.github/workflows/release.yml). Installs the binary at `bin/nowline` and the man page at `share/man/man1/nowline.1` via a `resource "manpage"` block.
-- **Debian/Ubuntu:** one `nowline_<version>_<arch>.deb` per arch. Installs the binary at `/usr/bin/nowline` and the man page at `/usr/share/man/man1/nowline.1.gz` (`gzip -n -9` for byte-stable output, per Debian policy 12.3). No `Conflicts:` / `Replaces:` plumbing.
-- **npm:** `@nowline/cli` (a JS package that runs on user-installed Node 22+ or Bun). Much smaller than the standalone binary because the runtime is the user's. The `"man"` field in `package.json` makes `npm install -g` install the man page on Unix.
+- **GitHub Releases:** six binaries per release (`nowline-macos-arm64`, `nowline-macos-x64`, `nowline-linux-x64`, `nowline-linux-arm64`, `nowline-windows-x64.exe`, `nowline-windows-arm64.exe`), plus the `nowline.1` (CLI surface) and `nowline.5` (full DSL reference) man pages (mdoc, hand-authored — see m2l in [`specs/milestones.md`](./milestones.md)).
+- **Homebrew:** one `Formula/nowline.rb` in `lolay/tap`. Auto-updated by [`.github/workflows/release.yml`](../.github/workflows/release.yml). Installs the binary at `bin/nowline`, the section-1 man page at `share/man/man1/nowline.1` via a `resource "manpage"` block, and the section-5 man page at `share/man/man5/nowline.5` via a `resource "manpage5"` block.
+- **Debian/Ubuntu:** one `nowline_<version>_<arch>.deb` per arch. Installs the binary at `/usr/bin/nowline`, the section-1 man page at `/usr/share/man/man1/nowline.1.gz`, and the section-5 man page at `/usr/share/man/man5/nowline.5.gz` (`gzip -n -9` for byte-stable output, per Debian policy 12.3). No `Conflicts:` / `Replaces:` plumbing.
+- **npm:** `@nowline/cli` (a JS package that runs on user-installed Node 22+ or Bun). Much smaller than the standalone binary because the runtime is the user's. The `"man"` field in `package.json` lists both `nowline.1` and `nowline.5`, so `npm install -g` installs both pages on Unix.
 - **Library packages:** every `@nowline/core`, `@nowline/layout`, `@nowline/renderer`, `@nowline/export-core`, and `@nowline/export-*` continues to ship to npm independently.
 
 ## Related decisions retained from m2c

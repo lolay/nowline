@@ -108,7 +108,7 @@ Run after the workflow finishes. Each row is a single channel — if any one fai
 
 | Channel | Verification | Expected |
 |---|---|---|
-| GitHub Release | `gh release view v0.1.0 --json assets --jq '.assets[].name'` | 8 binaries (4 macOS/Linux + 2 Windows + 2 .deb) and the `nowline.1` man page (plus any `nowline.<locale>.1` translations). |
+| GitHub Release | `gh release view v0.1.0 --json assets --jq '.assets[].name'` | 8 binaries (4 macOS/Linux + 2 Windows + 2 .deb), the `nowline.1` (CLI) and `nowline.5` (DSL) man pages, plus any `nowline.<locale>.1` and `nowline.<locale>.5` translations. |
 | npm | `npm view @nowline/cli version` | `0.1.0` |
 | VS Code Marketplace | <https://marketplace.visualstudio.com/items?itemName=nowline.vscode> | Listing shows `0.1.0`. |
 | Open VSX (Cursor) | <https://open-vsx.org/extension/nowline/vscode> | Listing shows `0.1.0`. |

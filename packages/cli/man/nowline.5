@@ -1,0 +1,1784 @@
+.Dd $Mdocdate$
+.Dt NOWLINE 5
+.Os
+.Sh NAME
+.Nm nowline
+.Nd Nowline DSL roadmap file format
+.Sh DESCRIPTION
+A
+.Pa .nowline
+file is an indentation-significant outline that defines a roadmap.
+The file itself is the product; every other artefact (SVG, PNG, PDF,
+HTML, Markdown+Mermaid, XLSX, MS Project XML) is a view of it produced
+by
+.Xr nowline 1 .
+.Pp
+This page documents the file format.
+For the rendering pipeline and visual contracts, see
+.Pa specs/rendering.md
+in the source repository.
+For the CLI surface, see
+.Xr nowline 1 .
+.Pp
+The canonical, prose source for everything below is
+.Pa specs/dsl.md
+in the source repository; this page is a hand-authored reference
+distilled from it.
+.Sh FILE STRUCTURE
+A
+.Pa .nowline
+file has up to four sections in strict order:
+.Bl -enum -offset indent
+.It
+.Sy nowline
+directive (optional, recommended). Must be the first non-comment,
+non-blank line if present.
+.It
+.Sy include
+declarations (optional). Pull in other
+.Pa .nowline
+files.
+.It
+.Sy config
+section (optional). Rendering configuration: styles, defaults,
+scale, calendar, symbols.
+.It
+.Sy roadmap
+section (required). Content: persons, teams, anchors, labels, sizes,
+statuses, swimlanes, items, milestones, footnotes.
+.El
+.Pp
+.Sy config
+and
+.Sy roadmap
+are section markers, not indent-containers.
+Keywords inside each section appear at the top level (not indented
+under the marker).
+Indentation is used where nesting is real: style properties under a
+.Sy style
+block, items under a
+.Sy swimlane ,
+team members under a
+.Sy team .
+.Pp
+Indentation is significant.
+Two-space indent is canonical; one tab is also accepted.
+Spaces and tabs must not be mixed inside a single file \(em the
+parser rejects mixed indentation with an error identifying the first
+offending line.
+.Pp
+Strings are double-quoted
+.Pq Qq Auth refactor ,
+not bare or single-quoted.
+Properties are
+.Sy key:value
+pairs on the same line as the entity; values containing spaces must
+be double-quoted.
+Property keys never use
+.Sq = .
+.Pp
+Built-in keywords and property names are kebab-case
+.Pq Sy capacity-icon , Sy days-per-week , Sy in-progress .
+Author-chosen identifiers may use any combination of letters,
+digits, underscores, and dashes
+.Pq Sy auth-refactor , Sy authRefactor , Sy auth_refactor ;
+they must start with a letter or underscore.
+.Pp
+Comments use
+.Sq //
+for single-line and
+.Sq /* */
+for multi-line.
+A trailing
+.Sq \e
+continues a line; indentation on the continuation line is cosmetic.
+Use
+.Sq \e\e
+for a literal backslash.
+.Sh DIRECTIVE
+The
+.Sy nowline
+directive declares which DSL major version a file targets:
+.Bd -literal -offset indent
+nowline v1
+.Ed
+.Pp
+The version is integer-only
+.Pq Sy v1 , Sy v2 , Sy v3 , ...
+and is independent of the npm package version.
+Within a DSL major, the parser must accept every valid file written
+for that major; new syntax may be added between package minor/patch
+releases, but no breaking change to an existing valid
+.Sy nowline v1
+file ships without bumping the directive to
+.Sy v2 .
+When the parser encounters a version newer than it supports, it
+emits an error identifying the required version.
+When the directive is omitted, the parser assumes the latest
+version it supports.
+.Pp
+The directive line accepts optional file-level properties after the
+version.
+The only directive property today is
+.Sy locale: ,
+a BCP-47 tag controlling localized rendering and validator
+messages:
+.Bd -literal -offset indent
+nowline v1 locale:fr-CA
+.Ed
+.Pp
+Unknown directive keys are an error so typos surface immediately.
+See
+.Pa specs/localization.md
+for the locale model and precedence chain.
+.Pp
+The
+.Sy nowline
+directive is the only construct that does not follow the universal
+declaration pattern
+.Pq see Sx GRAMMAR :
+no identifier, no title, just the keyword and version.
+.Sh INCLUDES
+.Sy include
+pulls another
+.Pa .nowline
+file into the current file:
+.Bd -literal -offset indent
+include "shared/teams.nowline"
+include "brand-styles.nowline" roadmap:ignore
+include "partner.nowline" config:isolate roadmap:isolate
+.Ed
+.Pp
+Two optional properties \(em
+.Sy config:
+and
+.Sy roadmap:
+\(em control how the included file's content is handled.
+They operate on two independent categories:
+.Bl -tag -width "Roadmap (content)"
+.It Sy Config
+The included file's
+.Sy scale ,
+.Sy style ,
+.Sy symbol ,
+.Sy default ,
+and
+.Sy calendar
+declarations.
+.It Sy Roadmap
+The included file's
+.Sy roadmap
+declaration plus all its content (persons, teams, anchors, labels,
+sizes, statuses, swimlanes, items, milestones, footnotes).
+.El
+.Pp
+.Sy config:
+modes:
+.Bl -tag -width "isolate"
+.It Sy merge Pq default
+Child config items are merged into the parent.
+On collision, the
+.Em parent wins
+and the parser emits a warning identifying the shadowed definition
+and source file.
+.It Sy ignore
+Child config is dropped entirely.
+If child roadmap content is merged, it resolves styles from the
+parent's post-merge config.
+.It Sy isolate
+Child config is only available within the child file; parent config
+is only available in the parent.
+Neither side bleeds into the other.
+.El
+.Pp
+.Sy roadmap:
+modes:
+.Bl -tag -width "isolate"
+.It Sy merge Pq default
+Child content entities are merged into the parent.
+On collision,
+.Em parent wins
+and a warning is emitted.
+A swimlane collision drops the swimlane's contained items as well.
+Merged content resolves styles from the post-merge config.
+.It Sy ignore
+Child content is dropped.
+Use for shared style libraries
+.Pq Sy include "brand.nowline" roadmap:ignore .
+Shared label, status, and size vocabulary uses
+.Sy roadmap:merge ,
+not
+.Sy roadmap:ignore .
+.It Sy isolate
+Child content stays scoped to the child file and uses only the
+child's config.
+The child must contain a
+.Sy roadmap
+declaration (needed for the region label).
+The isolated content renders as a visually distinct region with its
+own border.
+.El
+.Pp
+Includes are processed depth-first, in file order.
+When the processor encounters an
+.Sy include ,
+it processes that child (and its includes recursively) before
+continuing with the next declaration.
+Config is merged before roadmap content at each level.
+.Pp
+Diamond includes (A includes B and C, both include D) are valid;
+D is processed once on first encounter.
+Duplicate includes of the same file in a single file are an error.
+Circular includes are an error.
+.Pp
+Includes are resolved relative to the including file's directory.
+Paths use forward slashes on all platforms.
+Includes must appear before
+.Sy config
+and
+.Sy roadmap
+\(em they are the first declarations in a file (after the optional
+.Sy nowline
+directive).
+.Pp
+For any include whose
+.Sy roadmap:
+mode is not
+.Sy ignore ,
+if the child file declares a
+.Sy roadmap ,
+the parent and child must agree on
+.Sy start: \(em
+both absent, or both present with identical values.
+A mismatch is an error reported on the parent's
+.Sy include
+line; this is an explicit exception to the
+.Qq parent wins
+merge behaviour because
+.Sy start:
+defines the shared timeline baseline.
+.Sh CONFIG SECTION
+The optional
+.Sy config
+section marker appears before
+.Sy roadmap .
+Config keywords sit at the top level (not indented under the
+marker) and define rendering vocabulary, defaults, axis settings,
+day arithmetic, and custom symbols.
+.Pp
+Five config keywords:
+.Sy scale ,
+.Sy style ,
+.Sy symbol ,
+.Sy default ,
+.Sy calendar .
+Every config entry is optional; if
+.Sy config
+is omitted, all built-in defaults apply.
+.Ss style \(em named visual definition
+A
+.Sy style
+declares a named visual treatment.
+Properties are indented beneath:
+.Bd -literal -offset indent
+style enterprise "Enterprise readiness"
+  bg: blue
+  fg: navy
+  text: white
+  border: solid
+  icon: shield
+
+style risky
+  border: dashed
+  fg: orange
+.Ed
+.Pp
+Styles follow the universal
+.Sy [id] ["title"]
+pattern.
+Properties are listed under
+.Sx STYLE PROPERTIES
+below.
+.Ss symbol \(em custom named symbol
+A
+.Sy symbol
+declares a custom symbol for use by
+.Sy icon:
+and
+.Sy capacity-icon:
+style properties.
+Authors use the inline Unicode-literal form
+.Pq Sy capacity-icon:"\(rs"
+for one-off symbols; named
+.Sy symbol
+declarations are for reusable ones.
+.Bd -literal -offset indent
+symbol budget "Budget" unicode:"\(em" ascii:"$"
+symbol fte unicode:"\eu{1F464}" ascii:"@"
+symbol star unicode:"\(em"
+.Ed
+.Pp
+Required:
+.Sy unicode:"<string>"
+\(em the Unicode character (literal or
+.Sy \eu{...}
+escape, may be a multi-codepoint grapheme cluster).
+.Pp
+Optional:
+.Sy ascii:"<string>"
+\(em short ASCII fallback for terminals lacking the glyph,
+\(<= 3 ASCII characters; defaults to
+.Sq \&?
+when omitted.
+.Pp
+A
+.Sy symbol
+id must not shadow a built-in icon name
+.Pq Sy none , Sy multiplier , Sy person , Sy people , Sy points , Sy time , Sy shield , Sy warning , Sy lock .
+.Ss default \(em default property values per entity type
+.Sy default <entity> <properties>
+sets default property values for a given entity type.
+One declaration per entity type per file:
+.Bd -literal -offset indent
+default item status:planned shadow:subtle
+default label style:subtle corner-radius:full
+default swimlane padding:sm spacing:none
+default roadmap padding:md header-height:md font:sans
+default milestone weight:bold
+default footnote style:subtle shadow:subtle
+default anchor style:subtle
+default parallel bracket:none
+default group padding:xs spacing:xs
+.Ed
+.Pp
+Supported entity types:
+.Sy item , label , swimlane , roadmap , parallel , group , milestone , footnote , anchor .
+When an entity omits a property, the matching default applies;
+explicit values on the entity always override defaults.
+.Pp
+Identity-defining, sizing, sequencing, reference, and prose
+properties cannot be defaulted because they must be explicit per
+entity.
+Banned, by entity type:
+.Bl -tag -width "default footnote"
+.It Sy default item
+.Sy size , duration , after , before , remaining , link , description , owner .
+.It Sy default milestone
+.Sy date , after , link , description .
+.It Sy default anchor
+.Sy date , link , description .
+.It Sy default footnote
+.Sy on , link , description .
+.El
+.Pp
+Raw style properties
+.Pq Sy bg , Sy fg , Sy text , Sy border , Sy shadow , ...
+are allowed on
+.Sy default
+because
+.Sy default
+lives in
+.Sy config ,
+the presentation section.
+The ban on raw style properties applies to roadmap-section
+entities, not to
+.Sy default
+lines.
+.Pp
+.Sy capacity
+is allowed on
+.Sy default item
+but
+.Em not
+on
+.Sy default swimlane
+\(em each lane's budget is intentionally explicit at its declaration
+site.
+.Sy utilization-warn-at: ,
+.Sy utilization-over-at: ,
+and
+.Sy capacity-icon:
+are allowed on both
+.Sy default swimlane
+and
+.Sy default item
+per the usual presentation-property rule.
+.Ss scale \(em axis display
+.Sy scale
+configures the timeline axis.
+Column width is set by
+.Sy scale:<duration>
+on the
+.Sy roadmap
+declaration; this block configures display:
+.Bd -literal -offset indent
+scale
+  name: sprints
+  label-every: 2
+  label: "Sprint {n}"
+.Ed
+.Bl -tag -width "label-every"
+.It Sy name
+Display label for the scale unit (e.g.
+.Qq sprint ) .
+Defaults to an auto-generated name based on the roadmap's
+.Sy scale:
+duration.
+.It Sy label-every
+Show an axis label every Nth column.
+Defaults to the renderer's choice.
+.It Sy label
+Axis label format.
+.Sq {n}
+is the column index.
+.El
+.Pp
+The
+.Sy scale
+config block is optional.
+A file can declare
+.Sy scale:2w
+on its
+.Sy roadmap
+with no
+.Sy scale
+block and the renderer picks all display defaults.
+.Ss calendar \(em day arithmetic
+The
+.Sy calendar:
+property on
+.Sy roadmap
+selects day-arithmetic mode:
+.Bl -tag -width "calendar:business"
+.It Sy calendar:business Pq default
+Engineering working-day arithmetic.
+.Sy days-per-week:5 ,
+.Sy days-per-month:22 ,
+.Sy days-per-quarter:65 ,
+.Sy days-per-year:260 .
+.It Sy calendar:full
+Calendar-day arithmetic with weekends.
+.Sy days-per-week:7 ,
+.Sy days-per-month:30 ,
+.Sy days-per-quarter:90 ,
+.Sy days-per-year:365 .
+.It Sy calendar:custom
+Author-supplied values via the
+.Sy calendar
+config block.
+.El
+.Pp
+A
+.Sy calendar
+config block is only meaningful when
+.Sy roadmap
+declares
+.Sy calendar:custom .
+When custom, all four
+.Sy days-per-*
+fields are required:
+.Bd -literal -offset indent
+config
+
+calendar
+  days-per-week: 6
+  days-per-month: 26
+  days-per-quarter: 78
+  days-per-year: 312
+
+roadmap rotating-shift "Rotating Shift" calendar:custom
+.Ed
+.Pp
+All four entries must be positive integers.
+There is no partial form.
+.Pp
+Each
+.Sy days-per-*
+field is independently defined: a duration like
+.Sy 1y
+resolves to
+.Sy days-per-year
+directly, not by multiplying through months or weeks.
+This is why business mode's
+.Sy 1y
+is
+.Sy 260d ,
+not
+.Sy 12 \(mu 22d = 264d .
+.Sh ROADMAP SECTION
+The
+.Sy roadmap
+section marker is required and appears exactly once per file.
+Roadmap keywords sit at the top level (not indented under the
+marker) and form the content of the file.
+.Pp
+The
+.Sy roadmap
+declaration line itself accepts:
+.Bd -literal -offset indent
+roadmap platform-2026 "Platform 2026" \e
+    author:"Acme" \e
+    start:2026-01-06 \e
+    scale:2w \e
+    calendar:business \e
+    logo:"./brand/acme.svg" \e
+    logo-size:md
+.Ed
+.Bl -tag -width "calendar:"
+.It Sy author:
+Free-form string.
+.It Sy start:
+ISO date
+.Pq Pa YYYY-MM-DD ,
+the timeline baseline.
+Required if any
+.Sy anchor
+or any dated
+.Sy milestone
+exists.
+Every anchor date and dated milestone date must be on or after
+.Sy start: .
+.It Sy scale:
+Raw duration literal for column width
+.Pq Sy 2w , Sy 1q ;
+defaults to
+.Sy 1w .
+.It Sy calendar:
+.Sy business | full | custom .
+Defaults to
+.Sy business .
+.It Sy logo:
+Path to a logo file
+.Pq Sy .svg , Sy .png , Sy .jpg / Sy .jpeg , Sy .webp ,
+resolved relative to the
+.Pa .nowline
+file's directory.
+Forward slashes on all platforms; only local paths are accepted.
+Asset resolution happens at render time, not parse time \(em a file
+referencing a missing logo is still a valid document.
+.It Sy logo-size:
+Size preset
+.Pq Sy xs | sm | md | lg | xl ,
+default
+.Sy md .
+.El
+.Pp
+Twelve roadmap-section keywords:
+.Sy swimlane , item , parallel , group ,
+.Sy person , team , anchor , label , size , status , milestone ,
+.Sy footnote .
+Each follows the universal
+.Sy [id] ["title"] [key:value...]
+pattern.
+.Ss swimlane \(em group items by team / area / stream
+.Bd -literal -offset indent
+swimlane platform owner:platform capacity:5
+  item auth-refactor "Auth refactor" size:l after:kickoff
+  item platform-qa "Platform QA" size:s capacity:2
+.Ed
+.Pp
+Items, parallels, and groups are indented beneath.
+Properties:
+.Bl -tag -width "utilization-over-at"
+.It Sy owner:
+Person or team id.
+.It Sy capacity:
+Per-timestep budget.
+Integer or decimal only; no percent form.
+.It Sy utilization-warn-at: , Sy utilization-over-at:
+Thresholds for the lane utilization underline.
+Each accepts a percent literal
+.Pq Sy 80% ,
+a positive decimal interpreted as a fraction
+.Pq Sy 0.8 ,
+or the bareword
+.Sy none
+to opt out of that color band.
+Defaults
+.Sy 80%
+and
+.Sy 100% .
+When both numeric thresholds are set,
+.Sy warn-at \(<= over-at .
+.El
+.Ss item \(em work item
+Items live inside swimlanes (or
+.Sy parallel /
+.Sy group
+blocks) and must declare at least one of
+.Sy size:
+or
+.Sy duration: .
+See
+.Sx ITEM PROPERTIES
+below.
+.Bd -literal -offset indent
+swimlane platform
+  item auth-refactor "Auth refactor" size:l status:done
+  item "Quick cleanup" size:s
+  item sso size:m
+.Ed
+.Ss parallel \(em parallel execution block
+.Sy parallel
+runs its children in parallel.
+Children can be bare items or groups.
+.Bd -literal -offset indent
+swimlane platform
+  item auth "Auth refactor" size:l
+  parallel
+    item api-v2 "API v2" size:m
+    item sdk-update "SDK update" size:s
+  item integration "Integration" size:s
+.Ed
+.Pp
+.Sy api-v2
+and
+.Sy sdk-update
+start at the same time (after
+.Sy auth
+finishes).
+When the
+.Sy parallel
+block ends, the next sibling
+.Pq Sy integration
+waits for all parallel children to complete (implicit join on
+dedent).
+A
+.Sy parallel
+block must contain at least 2 children; a single-child parallel
+emits a warning.
+.Ss group \(em sequential item bundle
+.Sy group
+bundles items into a named sequential track.
+Inside a swimlane (outside a parallel block), the group is
+sequential with respect to its siblings.
+.Bd -literal -offset indent
+swimlane platform
+  group api-work "API Work" labels:enterprise
+    item api-v2 "API v2" size:m
+    item api-docs "API docs" size:s
+  item deploy "Deploy" size:s
+.Ed
+.Pp
+A
+.Sy group
+with
+.Sy style: ,
+.Sy labels: ,
+or other visual properties renders with a visible bounding box
+plus a small title chiclet.
+A
+.Sy group
+with no styling is purely structural \(em it only governs
+sequencing and inner row growth, with no visible artefact.
+.Ss anchor \(em named date on the timeline
+.Bd -literal -offset indent
+anchor kickoff date:2026-01-06
+anchor code-freeze "Code Freeze" date:2026-05-01
+.Ed
+.Pp
+.Sy date:
+is required.
+Anchors are referenced by
+.Sy after:
+and
+.Sy before:
+on items, parallels, groups, and milestones to pin their position.
+.Ss label \(em semantic tag / chip vocabulary
+Labels live in the roadmap section so content and vocabulary live
+together; visual defaults live in
+.Sy config
+via
+.Sy default label
+and referenced
+.Sy style
+blocks.
+.Bd -literal -offset indent
+label enterprise "Enterprise readiness" style:enterprise
+label security "Security hardening" style:enterprise-red
+label low-confidence style:risky-dotted
+.Ed
+.Pp
+A
+.Sy label
+line accepts
+.Sy style:id
+plus universal properties
+.Pq Sy labels: , Sy link: , description .
+Raw style properties are
+.Em not
+allowed on a
+.Sy label
+line.
+Labels used on items without a matching
+.Sy label
+declaration are valid; they render with chip defaults from
+.Sy default label
+or system defaults.
+.Ss size \(em named effort budget
+A
+.Sy size
+maps a named t-shirt size to a single-engineer effort budget.
+.Bd -literal -offset indent
+size xs "Extra Small" effort:0.5d
+size s "Small" effort:3d
+size m "Medium" effort:1w
+size l "Large" effort:2w
+size xl "Extra Large" effort:1m
+.Ed
+.Pp
+.Sy effort:
+is required and must be a positive raw duration literal
+.Pq decimal-aware: Sy 0.5d , Sy 1.5w .
+The id must not match the raw duration pattern
+.Sy \&\ed+(\e.\ed+)?[dwmqy]
+or be a bare
+.Sy d , w , m , q , y
+\(em this avoids ambiguity at the call site.
+.Pp
+On items, the on-bar size chip renders the size's optional
+.Sy title
+when provided, falling back to the id verbatim.
+.Sy size m "M" effort:1w
+renders
+.Qq M ;
+.Sy size m effort:1w
+renders
+.Qq m .
+.Pp
+.Sy size
+declarations must precede any item that references them.
+.Ss status \(em custom status value
+.Bd -literal -offset indent
+status awaiting-review "Awaiting Review"
+status in-review "In Review"
+status deferred "Deferred"
+.Ed
+.Pp
+Extends the built-in set
+.Po
+.Sy planned ,
+.Sy in-progress
+.Pq alias Sy active ,
+.Sy done
+.Pq alias Sy completed ,
+.Sy at-risk ,
+.Sy blocked
+.Pc .
+The aliases canonicalize at the layout boundary; both spellings
+are valid input.
+.Pp
+Custom statuses have no inherent semantics beyond what renderers
+assign; the DSL only guarantees the value resolves and can carry
+a display title.
+Renderers may map custom statuses to visual treatments via
+.Sy default item style:...
+or entity-level
+.Sy style:
+overrides.
+.Pp
+.Sy status
+declarations must precede any entity that references them.
+.Ss milestone \(em achievement marker
+.Bd -literal -offset indent
+milestone v1-ga "v1 GA" date:2026-06-30
+milestone beta "Beta" after:auth-refactor
+milestone v1-ga "v1 GA" after:[core-api, audit-log]
+milestone v1-ga "v1 GA" date:2026-06-30 after:[core-api, audit-log]
+.Ed
+.Pp
+At least one of
+.Sy date:
+or
+.Sy after:
+is required.
+With both, the
+.Sy date:
+is an intended target, not a hard cap; slippage (dependencies not
+converging by the target date) is a rendering concern, not a
+validation error.
+.Ss footnote \(em attachable annotation
+.Bd -literal -offset indent
+footnote "Vendor dependency" on:audit-log
+  description "Blocked until vendor contract is signed."
+
+footnote capacity-risk "Team capacity risk" on:[mobile, platform]
+  description "Both teams are understaffed through Q2."
+.Ed
+.Pp
+.Sy on:
+is required and references one or more identifiers (item,
+swimlane, anchor, milestone, person, team).
+Use bracket notation for multiples:
+.Sy on:[id1, id2] .
+Footnotes are numbered sequentially by document order; a
+superscript number appears on every entity the footnote attaches
+to.
+.Ss person and team \(em organisational vocabulary
+.Bd -literal -offset indent
+person sam "Sam Chen" link:https://github.com/samchen
+person jen "Jennifer Wu"
+
+team engineering "Engineering"
+  team platform "Platform Team"
+    person sam
+    person jen
+  team mobile "Mobile Team"
+.Ed
+.Pp
+A
+.Sy person
+may be declared at the roadmap top level or nested inside a
+.Sy team .
+.Bl -tag -width "person <id>"
+.It Sy person <id>
+Bare reference.
+Inside a
+.Sy team
+it denotes membership.
+At the roadmap top level it is a no-op (parser may emit a
+warning).
+.It Sy person <id> ["title"] [properties]
+Declaration.
+Creates the person.
+If nested inside a
+.Sy team ,
+the declaration also establishes membership.
+.El
+.Pp
+Person identifiers are global within the merged file scope
+regardless of where they are declared.
+A person may be declared at most once in the merged scope;
+duplicate declarations are an error.
+.Pp
+.Sy team
+nesting inside another
+.Sy team
+is always a declaration.
+Teams cannot be referenced with a bare
+.Sy team <id>
+line.
+.Pp
+Both
+.Sy person
+and
+.Sy team
+support
+.Sy link:
+and the
+.Sy description
+sub-directive.
+.Sh UNIVERSAL PROPERTIES
+These properties are valid on every entity type: items, swimlanes,
+parallel blocks, groups, milestones, anchors, persons, teams,
+labels, sizes, statuses, footnotes.
+.Bl -tag -width "description"
+.It Sy labels:
+List.
+Tags for filtering and display.
+.Sy labels:enterprise
+or
+.Sy labels:[enterprise, security] .
+On an item, each label renders as an atomic chiclet inside the
+bar.
+.It Sy link:
+Bare URL (no quotes).
+One link per entity.
+.It Sy style:
+Identifier.
+Single reference to a named style declared in
+.Sy config .
+This is the only visual property allowed on a roadmap-section
+entity.
+.It Sy description
+Sub-directive.
+Indented under the entity.
+Longer explanatory text:
+.Sy description "Details here" .
+.El
+.Pp
+.Sy Content vs. rendering separation .
+Entities in the roadmap section carry only semantic information
+plus an optional single
+.Sy style:id
+reference.
+Raw style properties
+.Po
+.Sy bg , Sy fg , Sy text , Sy border , Sy icon , Sy shadow ,
+.Sy font , Sy weight , Sy italic , Sy text-size , Sy padding ,
+.Sy spacing , Sy header-height , Sy corner-radius , Sy bracket ,
+.Sy capacity-icon , Sy timeline-position , Sy minor-grid
+.Pc
+may only appear in
+.Sy style
+blocks and
+.Sy default <entity>
+lines \(em both of which live in
+.Sy config .
+.Sh ITEM PROPERTIES
+.Sy status , owner , after ,
+and
+.Sy before
+are also valid on swimlanes, parallel blocks, and groups.
+The rest are item-only.
+.Bl -tag -width "remaining"
+.It Sy status:
+Built-in:
+.Sy planned ,
+.Sy in-progress
+.Pq alias Sy active ,
+.Sy done
+.Pq alias Sy completed ,
+.Sy at-risk ,
+.Sy blocked .
+Custom:
+.Sy status:awaiting-review
+matching a
+.Sy status
+declaration.
+.It Sy owner:
+Person or team id.
+Singular \(em one accountable owner.
+.It Sy after:
+Identifier or bracketed list.
+The entity starts after the referenced entity finishes.
+.Sy after:[a, b]
+starts after the latest finisher.
+Accepts item, milestone, anchor, parallel, or group ids.
+.It Sy before:
+Identifier or bracketed list.
+The entity must finish before the referenced entity starts.
+.Sy before:[a, b]
+finishes before the earliest starter.
+.It Sy size:
+Size alias.
+.Sy size:l
+references a
+.Sy size
+declaration; the item's calendar duration is
+.Sy effort \(di item_capacity
+.Pq Sy capacity:
+defaults to
+.Sy 1
+when absent.
+Items only \(em not valid on
+.Sy parallel
+or
+.Sy group .
+.It Sy duration:
+Raw duration literal only
+.Pq Sy 2w , Sy 3m , Sy 0.5d ;
+no alias names.
+.Sy size:
+is the alias mechanism.
+When set alongside
+.Sy size: ,
+.Sy duration:
+wins for bar width and meta-line driver (size chip omitted).
+Items only.
+.It Sy remaining:
+Work remaining.
+Two equivalent forms: percent
+.Pq Sy remaining:30%
+or single-eng effort literal
+.Pq Sy remaining:1w , Sy remaining:0.5d .
+A literal is normalized to a percent during layout.
+Both forms render identically.
+.Sy status:done
+takes priority.
+Items only.
+.It Sy capacity:
+Concurrent capacity consumed by this item while it runs.
+Positive integer
+.Pq Sy capacity:2 ,
+decimal
+.Pq Sy capacity:0.5 ,
+or percent literal
+.Pq Sy capacity:50%
+which parses to a decimal.
+Items only.
+.El
+.Pp
+.Sy Required properties .
+.Sy item
+declarations must include at least one of
+.Sy size:
+or
+.Sy duration: .
+.Sy anchor
+declarations require
+.Sy date: .
+.Sy milestone
+declarations require at least one of
+.Sy date:
+or
+.Sy after: .
+.Sy footnote
+declarations require
+.Sy on: .
+Omitting a required property is a validation error that names the
+entity by id or title.
+.Sh CAPACITY
+.Sy capacity:
+is an optional annotation that models per-timestep throughput.
+Both swimlanes and items may declare it, and the two annotations
+are fully independent \(em neither requires the other.
+.Bd -literal -offset indent
+swimlane platform capacity:5
+  item auth size:l capacity:2
+  parallel
+    item api size:m capacity:2
+    item sdk size:m capacity:1
+  item qa size:s capacity:50%
+.Ed
+.Pp
+The unit is opaque to the DSL: authors decide whether
+.Sy 5
+means engineers, story points, FTE, hours, or any other measure
+.Pq same opacity contract as Sy size:l until a Sy size declaration gives it meaning .
+.Pp
+Where it can appear:
+.Bl -tag -width "swimlane"
+.It Sy swimlane
+Integer or decimal only (no percent form).
+The lane's per-timestep budget.
+.It Sy item
+Integer, decimal, or percent literal.
+The item's concurrent consumption.
+.It Sy parallel , Sy group
+Not valid \(em derived from children (sum at each timestep across
+parallel; pass-through for group).
+Same exclusion family as
+.Sy size , duration , remaining .
+.El
+.Pp
+Default capacity:
+.Bl -tag -width "Duration-literal items"
+.It Sy Sized items
+.Sy size:
+declared, no explicit
+.Sy capacity: \(em
+capacity defaults to
+.Sy 1
+in both duration derivation
+.Pq Sy duration = effort \(di 1 = effort
+and overload accounting.
+.It Sy Duration-literal items
+.Sy duration:
+declared, no
+.Sy size: ,
+no explicit
+.Sy capacity: \(em
+capacity stays unset and the item contributes
+.Sy 0
+to overload (uncounted).
+The literal duration is the bar width regardless.
+.It Sy Explicit Sy capacity:N
+Always wins for both purposes.
+.El
+.Pp
+Lifetime: capacity is constant for the item's full duration.
+No ramps in
+.Sy v1 .
+.Pp
+.Sy Utilization thresholds .
+Swimlanes that declare
+.Sy capacity:
+paint a tri-state utilization underline (green / yellow / red)
+along the bottom of the band based on the per-timestep load
+function
+.Sy f(x) = \(*S items[i].capacity for items active at x .
+.Bl -tag -width "utilization-over-at"
+.It Sy utilization-warn-at:N% Pq default Sy 80%
+At or above this fraction of
+.Sy capacity: ,
+the segment paints
+.Sy yellow .
+.It Sy utilization-over-at:N% Pq default Sy 100%
+At or above this fraction of
+.Sy capacity: ,
+the segment paints
+.Sy red .
+.El
+.Pp
+Below
+.Sy warn-at
+the segment paints
+.Sy green .
+Both thresholds accept the literal value
+.Sy none
+to opt out of that color band:
+.Sy utilization-warn-at:none
+collapses to a binary green/red indicator;
+.Sy utilization-over-at:none
+removes red entirely; setting both to
+.Sy none
+suppresses the underline outright.
+.Sh SIZING PRECEDENCE
+When an item declares both
+.Sy size:
+and
+.Sy duration: ,
+the explicit
+.Sy duration:
+literal wins for bar width and the meta line: the size chip is
+not shown (only the literal appears as the driver token).
+.Bl -column -offset indent "size:" "duration:" "capacity:" "Resulting duration"
+.It Sy size: Ta Sy duration: Ta Sy capacity: Ta Resulting duration
+.It l Ta \(em Ta \(em Ta size.l.effort \(di 1 (e.g. 2w)
+.It l Ta \(em Ta 2 Ta size.l.effort \(di 2 (e.g. 1w)
+.It l Ta 2w Ta 2 Ta 2w (literal wins; no chip)
+.It \(em Ta 2w Ta 2 Ta 2w (capacity does not divide a literal)
+.It \(em Ta \(em Ta \(em Ta validation error
+.El
+.Sh STYLE PROPERTIES
+Properties valid inside a
+.Sy style
+block (and on
+.Sy default <entity>
+lines):
+.Bl -tag -width "timeline-position"
+.It Sy bg
+Background/fill color or
+.Sy none .
+Named
+.Po
+.Sy red , blue , yellow , green , orange ,
+.Sy purple
+.Pq alias Sy violet ,
+.Sy gray
+.Pq alias Sy grey ,
+.Sy navy , white
+.Pc ,
+hex
+.Pq Sy #2563eb ,
+or
+.Sy none
+(transparent).
+.It Sy fg
+Border/outline color.
+Named, hex, or
+.Sy none
+(no border).
+.It Sy text
+Text color.
+Named, hex, or
+.Sy none
+(hides text).
+.It Sy border
+.Sy solid | dashed | dotted .
+.It Sy icon
+Identifier or string.
+Built-in identifiers
+.Po
+.Sy shield , warning , lock , plus the capacity-icon vocabulary
+.Pc ;
+custom: any identifier declared by a
+.Sy symbol
+declaration; inline: a double-quoted Unicode literal
+.Pq Sy "\(rs"
+\(em font-dependent.
+.It Sy shadow
+.Sy none Pq default | subtle | soft | hard .
+.It Sy font
+.Sy sans Pq default | serif | mono .
+.It Sy weight
+.Sy thin | light | normal Pq default | bold .
+.It Sy italic
+.Sy true | false Pq default .
+.It Sy text-size
+.Sy xs | sm | md Pq default | lg | xl .
+.It Sy padding
+.Sy none | xs | sm | md Pq default | lg | xl .
+.It Sy spacing
+.Sy none | xs | sm | md | lg | xl .
+Default varies by entity.
+.It Sy header-height
+.Sy none | xs | sm | md Pq default | lg | xl .
+Roadmap-only.
+.It Sy corner-radius
+.Sy none | xs | sm | md | lg | xl | full .
+.It Sy bracket
+.Sy none Pq default | solid | dashed .
+Parallel-only.
+.It Sy capacity-icon
+Glyph used as the suffix to capacity numbers.
+Built-in identifiers:
+.Sy none ,
+.Sy multiplier
+.Pq default \(em "\(mu" ,
+.Sy person ,
+.Sy people ,
+.Sy points
+.Pq "\(em" ,
+.Sy time
+.Pq "\(em" .
+Custom: any
+.Sy symbol
+id; inline: a double-quoted Unicode literal.
+.It Sy timeline-position
+.Sy top Pq default | bottom | both .
+Roadmap-only.
+.Sy both
+mirrors the date strip at the chart bottom.
+.It Sy minor-grid
+.Sy true | false Pq default .
+Roadmap-only.
+When
+.Sy true ,
+draws faint dotted grid lines at every tick boundary.
+.El
+.Pp
+Built-in icon names are rendered from a curated SVG library
+shipped with the renderer, not from Unicode emoji codepoints.
+This guarantees consistent visual output across every platform
+(web, CLI, exports).
+Authors who want platform-default emoji rendering use an inline
+Unicode literal instead of the named identifier.
+.Sh GRAMMAR
+.Ss Universal declaration pattern
+Every entity declaration follows the same shape:
+.Bd -literal -offset indent
+keyword [id] ["title"] [key:value ...]
+.Ed
+.Bl -tag -width "Identifier"
+.It Sy Identifier
+Unquoted, matches
+.Sy [a-zA-Z_][a-zA-Z0-9_-]* .
+Used for referencing.
+Optional \(em auto-generated from the title (kebab-cased) if
+omitted.
+.It Sy Title
+Double-quoted string.
+Human-readable display name.
+Optional.
+Always double-quoted, even single-word titles \(em the quote is
+how the parser distinguishes id from title.
+.El
+.Pp
+At least one of
+.Sy id
+or
+.Sy "title"
+must be present.
+Every other input is a keyed property using
+.Sy key:value .
+.Pp
+The
+.Sy nowline
+directive is the only construct without an id or title; every
+other declaration follows this pattern.
+.Ss Identifiers
+Identifiers match
+.Sy [a-zA-Z_][a-zA-Z0-9_-]* \(em
+letters, digits, underscores, and dashes, starting with a letter
+or underscore.
+They must be unique across the merged result (the file and all
+its includes); items, parallel blocks, groups, anchors, persons,
+teams, milestones, footnotes share one namespace.
+.Pp
+Idiomatic Nowline uses kebab-case but
+.Sy authRefactor ,
+.Sy auth_refactor ,
+and
+.Sy MED
+are equally valid.
+.Pp
+When omitted, the parser generates one by slugifying the title to
+kebab-case:
+.Qq Audit log v2
+becomes
+.Sy audit-log-v2 .
+.Ss Lists
+Any list-typed property accepts a single value without brackets or
+multiple values with bracket notation:
+.Bd -literal -offset indent
+labels:enterprise
+labels:[enterprise, security]
+.Ed
+.Pp
+No quotes around identifiers in lists.
+Comma-separated, optional spaces.
+.Ss Dependencies
+.Sy after:
+and
+.Sy before:
+each accept a single identifier or a bracketed list.
+References may target items, milestones, anchors, parallel
+blocks, or groups.
+.Bl -bullet -offset indent -compact
+.It
+.Sy after:id
+\(em this entity starts after the referenced entity finishes (or
+after the referenced anchor date).
+.It
+.Sy after:[id1, id2, ...]
+\(em starts after
+.Em all
+referenced entities finish (i.e. after the latest of them).
+.It
+.Sy before:id
+\(em this entity must finish before the referenced entity starts
+(or before the referenced anchor date).
+.It
+.Sy before:[id1, id2, ...]
+\(em finishes before the
+.Em earliest
+of the referenced entities starts.
+.El
+.Pp
+Circular dependencies across the full graph (including every
+element of list-form references) are a validation error.
+.Ss Line continuation
+A trailing
+.Sq \e
+means the next line continues the same declaration.
+Indentation on the continuation line is cosmetic.
+Only valid at the end of a property line \(em not inside strings
+or comments.
+Use
+.Sq \e\e
+for a literal backslash.
+.Bd -literal -offset indent
+item auth "Auth refactor" duration:2w status:in-progress \e
+  owner:sam labels:[security,enterprise] \e
+  link:https://github.com/acme/auth/issues/123 \e
+  style:flagged
+.Ed
+.Ss Comments
+.Bd -literal -offset indent
+// This is a single-line comment
+
+/* This is a
+   multi-line comment */
+.Ed
+.Sh VALIDATION
+The parser produces clear error messages with file position and
+suggestions (fuzzy-match
+.Qq did you mean X?
+hints).
+Rules group as follows; full prose lives in
+.Pa specs/dsl.md .
+.Ss Structural
+.Bl -bullet -offset indent -compact
+.It
+Exactly one
+.Sy roadmap
+declaration per file (subject to
+.Sy include
+.Sy roadmap:
+mode).
+.It
+All identifiers are unique across the merged result.
+Parent wins on collision, with a warning.
+.It
+Every entity must have at least an identifier or a title (or
+both).
+.It
+File structure must follow the section order:
+.Sy nowline
+directive (optional, first non-comment line),
+.Sy include ,
+.Sy config ,
+.Sy roadmap .
+.It
+The
+.Sy nowline
+directive version must match
+.Sy v\&\ed+ .
+A version newer than the parser supports is an error identifying
+the required version.
+.It
+At least one swimlane is required in the merged result.
+.It
+Indentation must be consistent within a file: spaces
+.Em or
+tabs, not both.
+Mixed indentation is a parse error identifying the first offending
+line.
+.It
+.Sy label ,
+.Sy size ,
+and
+.Sy status
+declarations must appear in the roadmap section.
+Placing them before
+.Sy roadmap
+is an error.
+.El
+.Ss References
+.Bl -bullet -offset indent -compact
+.It
+All elements of
+.Sy after: ,
+.Sy before: ,
+and
+.Sy on:
+must resolve to declared identifiers within the merged scope.
+.It
+A
+.Sy size:
+or
+.Sy status:
+reference must resolve to a declaration that appears
+.Em earlier in the file
+(or in an earlier include).
+Forward references are an error.
+.It
+No circular dependencies in
+.Sy after / before
+chains.
+.El
+.Ss Values
+.Bl -bullet -offset indent -compact
+.It
+.Sy anchor date:
+and dated
+.Sy milestone date:
+values are valid ISO 8601 dates
+.Pq Pa YYYY-MM-DD , calendar-valid .
+.It
+.Sy duration:
+and
+.Sy scale:
+values match the raw duration pattern
+.Sy \&\ed+(\e.\ed+)?[dwmqy] .
+.It
+A
+.Sy size
+declaration's id must not match the raw duration pattern and must
+not be a bare
+.Sy d , w , m , q , y .
+.It
+Every
+.Sy size
+declaration must specify
+.Sy effort: ;
+the value must be a positive raw duration literal.
+.It
+.Sy capacity:
+on a
+.Sy swimlane
+must be a positive integer or decimal (no percent form).
+.Sy capacity:
+on an
+.Sy item
+must be a positive integer, decimal, or percent literal.
+.Sy capacity:
+is not valid on
+.Sy parallel
+or
+.Sy group .
+.It
+.Sy utilization-warn-at:
+and
+.Sy utilization-over-at:
+must each be a positive percent literal, a positive decimal
+fraction, or
+.Sy none .
+When both numeric thresholds are set,
+.Sy warn-at \(<= over-at .
+.It
+.Sy capacity-icon:
+value must be a built-in identifier
+.Po
+.Sy none , Sy multiplier , Sy person , Sy people , Sy points , Sy time
+.Pc ,
+an identifier matching a
+.Sy symbol
+declaration in scope, or a double-quoted Unicode literal.
+Same contract for
+.Sy icon: .
+.It
+.Sy remaining:
+is either a percentage
+.Pq Sy 0% \(en Sy 100%
+or a single-eng effort literal.
+When the literal exceeds total effort (computed percent
+.Sy > 100% ) ,
+the layout step emits a soft warning and clamps the painted bar
+to 100% remaining; rendering is never blocked.
+.El
+.Ss Calendar
+.Bl -bullet -offset indent -compact
+.It
+.Sy calendar:
+on
+.Sy roadmap
+must be one of
+.Sy business , full , custom .
+.It
+A
+.Sy calendar
+config block is only valid when the roadmap declares
+.Sy calendar:custom .
+.It
+When
+.Sy calendar:custom ,
+all four
+.Sy days-per-*
+entries are required and must be positive integers.
+.El
+.Ss Roadmap start property
+.Bl -bullet -offset indent -compact
+.It
+.Sy roadmap start:
+must be a valid ISO 8601 date.
+.It
+If a file contains any
+.Sy anchor
+or any dated
+.Sy milestone ,
+.Sy start:
+is required.
+.It
+Every anchor date and every dated milestone date must be on or
+after
+.Sy start: .
+.El
+.Ss Persons and teams
+.Bl -bullet -offset indent -compact
+.It
+A
+.Sy person
+may be declared at most once in the merged file scope.
+A declaration is identified by the presence of a title or any
+keyed property on the line.
+.It
+A bare
+.Sy person <id>
+inside a
+.Sy team
+denotes membership and is valid with or without a separate
+declaration.
+.It
+A bare
+.Sy person <id>
+at roadmap top level with no matching declaration anywhere is a
+no-op (parser may emit a warning).
+.El
+.Ss Includes
+.Bl -bullet -offset indent -compact
+.It
+.Sy include
+paths must resolve to an existing
+.Pa .nowline
+file relative to the including file's directory.
+.It
+No circular includes.
+.It
+.Sy include
+declarations appear before
+.Sy config
+and
+.Sy roadmap
+(after the
+.Sy nowline
+directive if present).
+.It
+Duplicate
+.Sy include
+of the same file in a single file is an error.
+.It
+.Sy config:
+must be
+.Sy merge , ignore , or isolate .
+.Sy roadmap:
+must be
+.Sy merge , ignore , or isolate .
+.It
+On
+.Sy config:isolate ,
+.Sy style:
+references within the isolated file must resolve within that
+file's own config.
+.It
+On
+.Sy roadmap:isolate ,
+the included file must contain a
+.Sy roadmap
+declaration.
+.It
+For any
+.Sy include
+whose
+.Sy roadmap:
+mode is not
+.Sy ignore ,
+parent and child must agree on
+.Sy start: \(em
+both absent or both present with identical values.
+A mismatch is an error reported on the parent's
+.Sy include
+line.
+.El
+.Ss Parallel and group
+.Bl -bullet -offset indent -compact
+.It
+.Sy parallel
+must contain at least 2 children.
+A single-child parallel emits a warning.
+.It
+.Sy group
+must contain at least 1 child.
+.It
+.Sy size , duration , remaining , capacity
+are not valid on
+.Sy parallel
+or
+.Sy group
+(computed from children).
+.It
+.Sy parallel
+is valid inside swimlane or group.
+.Pp
+.Sy group
+is valid inside swimlane, parallel, or group.
+.El
+.Ss Defaults
+.Bl -bullet -offset indent -compact
+.It
+The first positional argument after
+.Sy default
+must be one of:
+.Sy item , label , swimlane , roadmap , parallel , group ,
+.Sy milestone , footnote , anchor .
+.It
+Duplicate
+.Sy default <entity>
+declarations for the same entity type within a single file are
+an error.
+.It
+A
+.Sy default <entity>
+that sets a banned property
+.Pq see Sx CONFIG SECTION
+is an error.
+.El
+.Ss Symbols
+.Bl -bullet -offset indent -compact
+.It
+Every
+.Sy symbol
+declaration must specify a non-empty
+.Sy unicode:"<string>" .
+.It
+.Sy ascii: ,
+if present, must be a quoted string of length \(<= 3 ASCII
+characters.
+.It
+A
+.Sy symbol
+id must not shadow a built-in icon name.
+.It
+A
+.Sy symbol
+reference
+.Pq Sy icon:NAME or Sy capacity-icon:NAME
+must resolve to a built-in or an earlier
+.Sy symbol
+declaration.
+Forward references are an error.
+.El
+.Sh EXAMPLES
+A complete
+.Pa .nowline
+file exercising the major language features:
+.Bd -literal -offset indent
+nowline v1
+
+include "shared/teams.nowline"
+
+config
+
+style enterprise "Enterprise readiness"
+  bg: blue
+  fg: navy
+  text: white
+  border: solid
+  icon: shield
+
+style risky
+  border: dashed
+  fg: orange
+
+default item status:planned shadow:subtle
+default label style:subtle corner-radius:full
+default swimlane padding:sm spacing:none
+
+roadmap platform-2026 "Platform 2026" \e
+    author:"Acme Engineering" \e
+    logo:"./brand/acme.svg" \e
+    start:2026-01-06 scale:2w calendar:business
+
+person sam "Sam Chen" link:https://github.com/samchen
+person jen "Jennifer Wu"
+
+team engineering "Engineering"
+  team platform "Platform Team"
+    person sam
+    person jen
+  team mobile "Mobile Team"
+
+anchor kickoff date:2026-01-06
+anchor code-freeze "Code Freeze" date:2026-05-01
+anchor ga-date "GA Date" date:2026-06-01
+
+size xs "Extra Small" effort:1d
+size s  "Small"       effort:3d
+size m  "Medium"      effort:1w
+size l  "Large"       effort:2w
+size xl "Extra Large" effort:1m
+
+status awaiting-review "Awaiting Review"
+
+label enterprise "Enterprise readiness" style:enterprise
+label security  "Security hardening"   style:enterprise
+label low-confidence                   style:risky
+
+swimlane platform owner:platform capacity:5
+  item auth-refactor "Auth refactor" size:l after:kickoff \e
+    status:done owner:sam labels:enterprise capacity:3 \e
+    link:https://github.com/acme/auth/issues/123
+  parallel after:auth-refactor
+    group audit-track "Audit Track" labels:security
+      item audit-log "Audit log v2" size:xl before:code-freeze \e
+        remaining:30% labels:[enterprise, security] capacity:2
+        description "Comprehensive audit trail for admin actions"
+      item audit-ui "Audit UI" size:m capacity:1
+    item sso "SSO plugins" size:m \e
+      labels:[enterprise, low-confidence] capacity:50%
+  item platform-qa "Platform QA" size:s capacity:2
+
+swimlane mobile owner:mobile capacity:2
+  item offline "Offline mode" size:l after:kickoff owner:jen \e
+    status:at-risk remaining:60% capacity:3
+  item push-v2 "Push notifications v2" size:m owner:mobile capacity:1
+
+milestone beta "Beta" after:auth-refactor
+milestone v1-ga "v1 GA" after:[auth-refactor, audit-log]
+milestone ga-launch "GA launch" date:2026-06-01 \e
+    after:[auth-refactor, audit-log]
+
+footnote "Vendor dependency" on:audit-log
+  description "Blocked until vendor contract is signed."
+footnote capacity-risk "Team capacity risk" on:[mobile, platform]
+  description "Mobile team is down to 2 engineers through Q2."
+.Ed
+.Sh SEE ALSO
+.Xr nowline 1
+.Pq Sy man 1 nowline
+.Pp
+The
+.Sy specs/
+directory in the source repository documents the DSL grammar in
+prose
+.Pq Pa specs/dsl.md ,
+the layout / rendering pipeline
+.Pq Pa specs/rendering.md ,
+the localization model
+.Pq Pa specs/localization.md ,
+and OSS milestones
+.Pq Pa specs/milestones.md .
+.Sh AUTHORS
+.An Lolay Aq Mt packages@lolay.com

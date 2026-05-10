@@ -363,16 +363,20 @@ jobs:
           mkdir -p release-assets
           find artifacts -type f \( -name 'nowline-*' -o -name '*.deb' \) -exec cp {} release-assets/ \;
           cp src/packages/cli/man/nowline.1 release-assets/
-          # Translated man pages flatten to nowline.<locale>.1 in the release
-          # assets so the URLs stay predictable. Loop runs zero times when
-          # no overlay directories exist, so adding a new locale is a
-          # pure-data drop with no workflow change.
+          cp src/packages/cli/man/nowline.5 release-assets/
+          # Translated man pages flatten to nowline.<locale>.<section> in the
+          # release assets so the URLs stay predictable. Each section is gated
+          # independently so a locale that translates only one section still
+          # ships cleanly. Loop runs zero times when no overlay directories
+          # exist, so adding a new locale is a pure-data drop with no
+          # workflow change.
           for d in src/packages/cli/man/*/; do
             [ -d "$d" ] || continue
             locale="$(basename "$d")"
-            srcfile="${d}nowline.1"
-            [ -f "$srcfile" ] || continue
-            cp "$srcfile" "release-assets/nowline.${locale}.1"
+            srcfile1="${d}nowline.1"
+            srcfile5="${d}nowline.5"
+            [ -f "$srcfile1" ] && cp "$srcfile1" "release-assets/nowline.${locale}.1"
+            [ -f "$srcfile5" ] && cp "$srcfile5" "release-assets/nowline.${locale}.5"
           done
           ls -la release-assets
 
@@ -393,6 +397,7 @@ jobs:
           # broken formula gets pushed to the tap.
           required=(
             "src/packages/cli/man/nowline.1"
+            "src/packages/cli/man/nowline.5"
             "artifacts/nowline-macos-arm64/nowline-macos-arm64"
             "artifacts/nowline-macos-x64/nowline-macos-x64"
             "artifacts/nowline-linux-x64/nowline-linux-x64"
@@ -402,6 +407,7 @@ jobs:
             test -s "$f" || { echo "missing or empty artifact: $f" >&2; exit 1; }
           done
           SHA_MANPAGE=$(sha256sum src/packages/cli/man/nowline.1 | awk '{print $1}')
+          SHA_MANPAGE5=$(sha256sum src/packages/cli/man/nowline.5 | awk '{print $1}')
           cd artifacts
           SHA_DARWIN_ARM64=$(sha256sum nowline-macos-arm64/nowline-macos-arm64 | awk '{print $1}')
           SHA_DARWIN_X64=$(sha256sum nowline-macos-x64/nowline-macos-x64 | awk '{print $1}')
@@ -410,26 +416,46 @@ jobs:
           cd ..
 
           # Discover locale overlays and emit the matching `resource` /
-          # `man.install` lines. The empty overlay case (no files under
-          # packages/cli/man/<locale>/) skips both blocks cleanly.
+          # `man.install` lines for each section that has a translation. The
+          # empty overlay case (no files under packages/cli/man/<locale>/)
+          # skips both blocks cleanly. Each section is gated independently
+          # so a locale that translates only one section still ships
+          # cleanly.
           MAN_RESOURCES=""
           MAN_INSTALL=""
           for d in src/packages/cli/man/*/; do
             [ -d "$d" ] || continue
             locale="$(basename "$d")"
-            srcfile="${d}nowline.1"
-            [ -f "$srcfile" ] || continue
-            sha=$(sha256sum "$srcfile" | awk '{print $1}')
-            res_name="manpage-${locale}"
-            asset="nowline.${locale}.1"
-            MAN_RESOURCES+="
+
+            srcfile1="${d}nowline.1"
+            if [ -f "$srcfile1" ]; then
+              sha=$(sha256sum "$srcfile1" | awk '{print $1}')
+              res_name="manpage-${locale}"
+              asset="nowline.${locale}.1"
+              MAN_RESOURCES+="
             resource \"${res_name}\" do
               url \"https://github.com/lolay/nowline/releases/download/v${VERSION}/${asset}\"
               sha256 \"${sha}\"
             end
           "
-            MAN_INSTALL+="
+              MAN_INSTALL+="
               resource(\"${res_name}\").stage { (share/\"man/${locale}/man1\").install \"${asset}\" => \"nowline.1\" }"
+            fi
+
+            srcfile5="${d}nowline.5"
+            if [ -f "$srcfile5" ]; then
+              sha=$(sha256sum "$srcfile5" | awk '{print $1}')
+              res_name="manpage-${locale}-5"
+              asset="nowline.${locale}.5"
+              MAN_RESOURCES+="
+            resource \"${res_name}\" do
+              url \"https://github.com/lolay/nowline/releases/download/v${VERSION}/${asset}\"
+              sha256 \"${sha}\"
+            end
+          "
+              MAN_INSTALL+="
+              resource(\"${res_name}\").stage { (share/\"man/${locale}/man5\").install \"${asset}\" => \"nowline.5\" }"
+            fi
           done
 
           cd tap
@@ -470,10 +496,16 @@ jobs:
               url "https://github.com/lolay/nowline/releases/download/v${VERSION}/nowline.1"
               sha256 "${SHA_MANPAGE}"
             end
+
+            resource "manpage5" do
+              url "https://github.com/lolay/nowline/releases/download/v${VERSION}/nowline.5"
+              sha256 "${SHA_MANPAGE5}"
+            end
           ${MAN_RESOURCES}
             def install
               bin.install Dir["nowline-*"].first => "nowline"
-              resource("manpage").stage { man1.install "nowline.1" }${MAN_INSTALL}
+              resource("manpage").stage { man1.install "nowline.1" }
+              resource("manpage5").stage { man5.install "nowline.5" }${MAN_INSTALL}
             end
 
             test do

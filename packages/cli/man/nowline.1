@@ -79,6 +79,111 @@ Standard-input input defaults to
 Use
 .Fl -input-format
 to override for unusual filenames.
+.Sh LANGUAGE
+A
+.Pa .nowline
+file is an indentation-significant outline.
+Two-space indent is canonical; tabs are accepted but must not be
+mixed with spaces in a single file.
+Strings are double-quoted; properties are
+.Sy key:value
+pairs.
+Comments use
+.Sq //
+or
+.Sq /* */ .
+.Pp
+File structure has up to four sections in strict order:
+.Bl -enum -offset indent -compact
+.It
+.Sy nowline v1
+directive (optional, must be the first non-comment line; accepts
+.Sy locale:<bcp47> ) .
+.It
+.Sy include
+declarations (optional).
+.It
+.Sy config
+section (optional): styles, defaults, scale, calendar, symbols.
+.It
+.Sy roadmap
+section (required): the content.
+.El
+.Pp
+Keyword summary:
+.Bl -tag -width "person/team" -compact
+.It Sy nowline
+DSL version directive (currently
+.Sy v1 ) .
+.It Sy include
+Pull in another
+.Pa .nowline
+file;
+.Sy config:
+and
+.Sy roadmap:
+modes
+.Pq Sy merge | ignore | isolate
+control merge behavior.
+.It Sy config , roadmap
+Section markers; one
+.Sy roadmap
+per file.
+.It Sy style , symbol , default , scale , calendar
+Config keywords (presentation, defaults, axis, day arithmetic).
+.It Sy person , team
+Org vocabulary referenced by
+.Sy owner: .
+.It Sy anchor , milestone
+Named dates and achievement markers on the timeline.
+.It Sy label , size , status
+Reusable vocabulary referenced by
+.Sy labels: , size: , status: .
+.It Sy swimlane
+Groups items by team / area / stream.
+.It Sy item
+Work item, indented under a swimlane (or parallel / group).
+.It Sy parallel , group
+Parallel block and sequential bundle; nestable.
+.It Sy footnote
+Annotation attached to one or more entities via
+.Sy on: .
+.El
+.Pp
+Every entity follows a universal shape:
+.Bd -literal -offset indent
+keyword [id] ["title"] [key:value ...]
+.Ed
+.Pp
+At least one of
+.Ar id
+or
+.Qq Ar title
+is required \(em the parser distinguishes them by quoting.
+Lists use bracket notation
+.Pq Sy labels:[a, b] ;
+a trailing
+.Sq \e
+continues a line.
+.Pp
+Minimal example:
+.Bd -literal -offset indent
+nowline v1
+
+roadmap r "Demo" start:2026-01-06
+
+size m effort:1w
+
+swimlane platform
+  item auth "Auth refactor" size:m
+.Ed
+.Pp
+See
+.Xr nowline 5
+.Pq Sy man 5 nowline
+for the full grammar, every property, validation rules, and the
+.Sy include
+collision model.
 .Sh MODE FLAGS
 The mode flags below are mutually exclusive.
 .Bl -tag -width Fl
@@ -393,6 +498,9 @@ French no matter who runs
 nowline v1 locale:fr-CA
 .Ed
 .Sh SEE ALSO
+.Xr nowline 5
+.Pq Sy man 5 nowline
+.Pp
 .Lk https://github.com/lolay/nowline "Source code, issues, and full DSL reference"
 .Pp
 The

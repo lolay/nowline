@@ -21,6 +21,7 @@ VERSION="$3"
 
 REPO_ROOT="$(cd "$(dirname "$0")/.." && pwd)"
 MAN_SRC="$REPO_ROOT/packages/cli/man/nowline.1"
+MAN5_SRC="$REPO_ROOT/packages/cli/man/nowline.5"
 MAN_DIR="$REPO_ROOT/packages/cli/man"
 
 if [[ ! -f "$BIN_SRC" ]]; then
@@ -30,6 +31,11 @@ fi
 
 if [[ ! -f "$MAN_SRC" ]]; then
     echo "error: man page not found at $MAN_SRC" >&2
+    exit 2
+fi
+
+if [[ ! -f "$MAN5_SRC" ]]; then
+    echo "error: section 5 man page not found at $MAN5_SRC" >&2
     exit 2
 fi
 
@@ -50,6 +56,7 @@ mkdir -p "$PKG_ROOT/DEBIAN"
 mkdir -p "$PKG_ROOT/usr/bin"
 mkdir -p "$PKG_ROOT/usr/share/doc/${PKG_NAME}"
 mkdir -p "$PKG_ROOT/usr/share/man/man1"
+mkdir -p "$PKG_ROOT/usr/share/man/man5"
 
 install -m 0755 "$BIN_SRC" "$PKG_ROOT/usr/bin/nowline"
 
@@ -58,20 +65,34 @@ install -m 0755 "$BIN_SRC" "$PKG_ROOT/usr/bin/nowline"
 gzip -n -9 -c "$MAN_SRC" > "$PKG_ROOT/usr/share/man/man1/nowline.1.gz"
 chmod 0644 "$PKG_ROOT/usr/share/man/man1/nowline.1.gz"
 
-# Translated man pages live under packages/cli/man/<locale>/nowline.1 and get
-# installed into /usr/share/man/<locale>/man1/. Debian policy 12.4 places
-# translated pages under /usr/share/man/<locale>/man<section>/. The `for` loop
-# stays empty if no overlay directories exist, so adding a new locale is a
-# pure-data drop with no script change.
+gzip -n -9 -c "$MAN5_SRC" > "$PKG_ROOT/usr/share/man/man5/nowline.5.gz"
+chmod 0644 "$PKG_ROOT/usr/share/man/man5/nowline.5.gz"
+
+# Translated man pages live under packages/cli/man/<locale>/nowline.<section>
+# and get installed into /usr/share/man/<locale>/man<section>/. Debian policy
+# 12.4 places translated pages under /usr/share/man/<locale>/man<section>/.
+# Each section is gated independently so a locale that translates only
+# nowline.1 (or only nowline.5) still installs cleanly. Adding a new locale
+# is a pure-data drop with no script change.
 for LOCALE_DIR in "$MAN_DIR"/*/; do
     [ -d "$LOCALE_DIR" ] || continue
     LOCALE_NAME="$(basename "$LOCALE_DIR")"
-    LOCALE_MAN="$LOCALE_DIR/nowline.1"
-    [ -f "$LOCALE_MAN" ] || continue
-    DEST_DIR="$PKG_ROOT/usr/share/man/${LOCALE_NAME}/man1"
-    mkdir -p "$DEST_DIR"
-    gzip -n -9 -c "$LOCALE_MAN" > "$DEST_DIR/nowline.1.gz"
-    chmod 0644 "$DEST_DIR/nowline.1.gz"
+
+    LOCALE_MAN1="$LOCALE_DIR/nowline.1"
+    if [ -f "$LOCALE_MAN1" ]; then
+        DEST_DIR_1="$PKG_ROOT/usr/share/man/${LOCALE_NAME}/man1"
+        mkdir -p "$DEST_DIR_1"
+        gzip -n -9 -c "$LOCALE_MAN1" > "$DEST_DIR_1/nowline.1.gz"
+        chmod 0644 "$DEST_DIR_1/nowline.1.gz"
+    fi
+
+    LOCALE_MAN5="$LOCALE_DIR/nowline.5"
+    if [ -f "$LOCALE_MAN5" ]; then
+        DEST_DIR_5="$PKG_ROOT/usr/share/man/${LOCALE_NAME}/man5"
+        mkdir -p "$DEST_DIR_5"
+        gzip -n -9 -c "$LOCALE_MAN5" > "$DEST_DIR_5/nowline.5.gz"
+        chmod 0644 "$DEST_DIR_5/nowline.5.gz"
+    fi
 done
 
 INSTALLED_SIZE_KB=$(du -sk --exclude=DEBIAN "$PKG_ROOT" | awk '{print $1}')
