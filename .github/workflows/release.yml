@@ -200,6 +200,56 @@ jobs:
             }
           "
 
+      # Pre-download the target's bun runtime tarball directly into bun's
+      # cache. Works around a known cross-drive bug in `bun --compile`: on
+      # GitHub Actions Windows runners the workspace lives on D:\ while
+      # bun's cache lives on C:\, so bun's "download to temp dir then
+      # rename into cache" path fails with EXDEV and surfaces as
+      #   Failed to extract executable for 'bun-windows-aarch64-vX.Y.Z'.
+      #   The download may be incomplete.
+      # See https://github.com/oven-sh/bun/issues/25346 and
+      # https://github.com/oven-sh/bun/issues/28327. Curl-into-cache
+      # sidesteps the buggy rename. Native cells (target == host) and
+      # repeat runs short-circuit on the cache-hit check, so this step
+      # is cheap when not strictly needed.
+      - name: Pre-cache bun cross-compile target
+        if: matrix.kind == 'binary'
+        shell: bash
+        run: |
+          set -euo pipefail
+          BUN_VERSION=$(bun --version)
+          case "${{ matrix.target }}" in
+            bun-darwin-arm64)  BUN_PLATFORM=darwin-aarch64;  BUN_BIN=bun ;;
+            bun-darwin-x64)    BUN_PLATFORM=darwin-x64;      BUN_BIN=bun ;;
+            bun-linux-arm64)   BUN_PLATFORM=linux-aarch64;   BUN_BIN=bun ;;
+            bun-linux-x64)     BUN_PLATFORM=linux-x64;       BUN_BIN=bun ;;
+            bun-windows-arm64) BUN_PLATFORM=windows-aarch64; BUN_BIN=bun.exe ;;
+            bun-windows-x64)   BUN_PLATFORM=windows-x64;     BUN_BIN=bun.exe ;;
+            *) echo "unknown target: ${{ matrix.target }}" >&2; exit 1 ;;
+          esac
+          CACHE_DIR=$(bun pm cache)
+          CACHE_DEST="${CACHE_DIR}/bun-${BUN_PLATFORM}-v${BUN_VERSION}"
+          if [[ -f "$CACHE_DEST" ]]; then
+            echo "ok: bun-${BUN_PLATFORM}-v${BUN_VERSION} already cached at ${CACHE_DEST}"
+            exit 0
+          fi
+          URL="https://registry.npmjs.org/@oven/bun-${BUN_PLATFORM}/-/bun-${BUN_PLATFORM}-${BUN_VERSION}.tgz"
+          echo "fetching ${URL}"
+          mkdir -p "$CACHE_DIR"
+          TMP=$(mktemp -d)
+          curl -fsSL --retry 5 --retry-delay 5 "$URL" | tar -xzf - -C "$TMP"
+          if [[ -f "${TMP}/package/bin/${BUN_BIN}" ]]; then
+            cp "${TMP}/package/bin/${BUN_BIN}" "$CACHE_DEST"
+          elif [[ -f "${TMP}/package/${BUN_BIN}" ]]; then
+            cp "${TMP}/package/${BUN_BIN}" "$CACHE_DEST"
+          else
+            echo "ERROR: ${BUN_BIN} not found in tarball; contents:" >&2
+            find "$TMP" -type f >&2
+            exit 1
+          fi
+          chmod +x "$CACHE_DEST" 2>/dev/null || true
+          ls -lh "$CACHE_DEST"
+
       - name: Compile binary
         if: matrix.kind == 'binary'
         working-directory: packages/cli
