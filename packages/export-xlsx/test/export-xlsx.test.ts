@@ -209,6 +209,17 @@ describe('exportXlsx — determinism', () => {
         const b = await exportXlsx(inputs);
         expect(sha256(a)).toBe(sha256(b));
     });
+
+    // Guards against per-entry ZIP timestamps leaking wall-clock drift into
+    // the output. Without normalization JSZip stamps every entry with
+    // `new Date()`, so two calls separated by >2s differ in dozens of bytes.
+    it('two calls separated by a wall-clock gap still produce identical bytes', async () => {
+        const inputs = await buildExportInputs(FIXTURE, { today: PINNED_DATE });
+        const a = await exportXlsx(inputs);
+        await new Promise((resolve) => setTimeout(resolve, 2100));
+        const b = await exportXlsx(inputs);
+        expect(sha256(a)).toBe(sha256(b));
+    }, 10000);
 });
 
 describe('durationToWorkingDays', () => {

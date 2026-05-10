@@ -16,6 +16,11 @@
 //   - Sheet 1 ("Roadmap") "Generated" cell takes the same `today`.
 //   - Style ids and column orders are explicit so ExcelJS's id allocator
 //     emits the same numbers across runs.
+//   - JSZip (used by ExcelJS to pack the .xlsx archive) stamps every entry
+//     with `new Date()` by default; we rewrite all per-entry `last mod
+//     time/date` fields to `generated` after `writeBuffer()` so two
+//     consecutive calls with identical inputs produce byte-identical
+//     output. See `zip-normalize.ts` for the patcher.
 
 import type {
     AnchorDeclaration,
@@ -35,6 +40,7 @@ import { displayLabel, getProp, getProps, roadmapTitle } from '@nowline/export-c
 import ExcelJS from 'exceljs';
 
 import { durationLiteralToText, durationToWorkingDays } from './duration.js';
+import { normalizeZipTimestamps } from './zip-normalize.js';
 
 export interface XlsxOptions {
     /** Override the workbook author / Roadmap-sheet "Author" cell. */
@@ -65,10 +71,10 @@ export async function exportXlsx(
     buildPeopleAndTeamsSheet(wb, inputs.ast);
 
     const buf = (await wb.xlsx.writeBuffer()) as ArrayBuffer | Buffer;
-    if (Buffer.isBuffer(buf)) {
-        return new Uint8Array(buf.buffer, buf.byteOffset, buf.byteLength);
-    }
-    return new Uint8Array(buf);
+    const bytes = Buffer.isBuffer(buf)
+        ? new Uint8Array(buf.buffer, buf.byteOffset, buf.byteLength)
+        : new Uint8Array(buf);
+    return normalizeZipTimestamps(bytes, generated);
 }
 
 function inferAuthor(ast: NowlineFile): string | undefined {
