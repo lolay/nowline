@@ -4,7 +4,7 @@
 
 The Nowline embed script is a browser JavaScript bundle that finds ` ```nowline ` fenced code blocks in a web page and replaces them with rendered SVG roadmaps. It works like Mermaid's embed script — add a `<script>` tag and roadmaps render client-side with no server.
 
-**Package:** `@nowline/embed` in `lolay/nowline` monorepo.
+**Package:** `@nowline/embed`, developed in the `lolay/nowline-embed` sibling repo (mirrors `lolay/nowline-action` posture — see [Architecture](./architecture.md#organization-and-repositories)).
 **License:** Apache 2.0.
 **Milestone:** m4.
 
@@ -20,7 +20,7 @@ The Nowline embed script is a browser JavaScript bundle that finds ` ```nowline 
 ### Basic
 
 ```html
-<script src="https://cdn.jsdelivr.net/npm/@nowline/embed@latest/dist/nowline.min.js"></script>
+<script src="https://embed.nowline.io/0.2.0/nowline.min.js"></script>
 ```
 
 That's it. Any ` ```nowline ` block in the page will render automatically on `DOMContentLoaded`.
@@ -28,7 +28,7 @@ That's it. Any ` ```nowline ` block in the page will render automatically on `DO
 ### With Configuration
 
 ```html
-<script src="https://cdn.jsdelivr.net/npm/@nowline/embed@latest/dist/nowline.min.js"></script>
+<script src="https://embed.nowline.io/0.2.0/nowline.min.js"></script>
 <script>
   nowline.initialize({
     theme: 'dark',
@@ -41,7 +41,7 @@ That's it. Any ` ```nowline ` block in the page will render automatically on `DO
 ### Manual Rendering
 
 ```html
-<script src="https://cdn.jsdelivr.net/npm/@nowline/embed@latest/dist/nowline.min.js"></script>
+<script src="https://embed.nowline.io/0.2.0/nowline.min.js"></script>
 <script>
   const svg = await nowline.render(`
     roadmap "My Roadmap"
@@ -55,14 +55,35 @@ That's it. Any ` ```nowline ` block in the page will render automatically on `DO
 
 ## Distribution
 
-Every `npm publish` of `@nowline/embed` is automatically available via the standard npm-backed CDNs:
+The embed bundle is served from two domains, both Firebase-Hosted under separate Firebase projects so dev traffic and abuse can never spill into prod:
 
-| CDN | URL Pattern |
-|-----|-------------|
-| jsDelivr | `https://cdn.jsdelivr.net/npm/@nowline/embed@{version}/dist/nowline.min.js` |
-| unpkg | `https://unpkg.com/@nowline/embed@{version}/dist/nowline.min.js` |
+| URL | Triggered by | Stability | `Cache-Control` | Audience |
+|-----|--------------|-----------|-----------------|----------|
+| `https://embed.nowline.io/{X.Y.Z}/nowline.min.js` | git tag push on `lolay/nowline-embed` | immutable per patch | `public, max-age=31536000, immutable` | embedders pinning to a known-good build |
+| `https://embed.nowline.io/{X.Y}/nowline.min.js` | git tag push (rewritten on each release in the minor) | mutable within minor | `public, max-age=300, s-maxage=600` | embedders who want patch fixes auto-rolled in |
+| `https://embed.nowline.io/latest/nowline.min.js` | git tag push (rewritten on each release) | mutable, latest stable | `public, max-age=300, s-maxage=600` | docs site, demos, prototypes |
+| `https://embed.nowline.dev/nowline.min.js` | every push to `main` on `lolay/nowline-embed` | mutable, no SLA, may break | `public, max-age=60, s-maxage=120, must-revalidate`, `X-Robots-Tag: noindex` | internal preview, early adopters opting into "next" |
+| `https://nowline-embed-dev--pr-{N}-{sha}.web.app/nowline.min.js` | PR open or sync against `lolay/nowline-embed` `main` | ephemeral, 7-day TTL | Firebase default | per-PR review, posted as a PR comment by the deploy action |
 
-Both support `@latest` and version-pinned URLs. No extra deploy step beyond `npm publish`.
+### Why minor-pinning, not major-pinning, on `embed.nowline.io`
+
+Per semver, the *minor* is the breaking-change boundary while the package is pre-1.0 (`0.2 → 0.3` is allowed to break; `0.2.0 → 0.2.1` must not). So the auto-upgrading "stable channel" for an embedder during 0.x is `/0.2/`, not `/0/` — bare `/0/` would also read as ambiguous, while `/0.2/` is unambiguously a version number.
+
+When the package reaches 1.0, a `https://embed.nowline.io/v{N}/nowline.min.js` major-pinned tier will be added (`v` prefix because bare `/1/` is ambiguous in the same way `/0/` was). Existing `0.2.0`, `0.2`, `latest`, `dev` URLs keep working unchanged.
+
+### Bundle provenance
+
+Every built bundle includes a banner injected at the top:
+
+```js
+/*! @nowline/embed 0.2.0 sha=<short-sha> built=<iso-utc> */
+```
+
+curl the URL or open it in DevTools to see exactly which build is being served. The `embed.nowline.dev` build additionally calls `console.warn("nowline embed @<sha> — unstable, do not pin")` once per page load.
+
+### Why a custom CDN instead of jsDelivr / unpkg
+
+The embed is shipped as `@nowline/embed` on npm, so the npm-backed CDNs (jsDelivr, unpkg) automatically serve it too — but they're an unsupported escape hatch, not a documented channel. The custom CDN exists for branded URLs in `view-source` (small but real marketing surface), per-version telemetry for sunset planning, custom cache and security headers, and the `embed.nowline.dev` + per-PR ephemeral preview tiers that npm-backed CDNs can't provide. We can revisit and document jsDelivr as a fallback if real-world feedback surfaces a need.
 
 ## Bundle Size Target
 
