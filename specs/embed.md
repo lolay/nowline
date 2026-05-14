@@ -4,9 +4,9 @@
 
 The Nowline embed script is a browser JavaScript bundle that finds ` ```nowline ` fenced code blocks in a web page and replaces them with rendered SVG roadmaps. It works like Mermaid's embed script — add a `<script>` tag and roadmaps render client-side with no server.
 
-**Package:** `@nowline/embed`, developed in the `lolay/nowline-embed` sibling repo (mirrors `lolay/nowline-action` posture — see [Architecture](./architecture.md#organization-and-repositories)).
+**Package:** `@nowline/embed`, in this monorepo at `packages/embed/`, published to npm in lock-step with the rest of the workspace.
 **License:** Apache 2.0.
-**Milestone:** m4.
+**Milestone:** m4. (The GitHub Action is its own milestone — m3.5 — built in this monorepo at `packages/nowline-action/` and mirrored to the `lolay/nowline-action` repo for GitHub Marketplace listing. See `specs/milestones.md` for the m3.5 / m4 split.)
 
 ## How It Works
 
@@ -31,7 +31,7 @@ That's it. Any ` ```nowline ` block in the page will render automatically on `DO
 <script src="https://embed.nowline.io/0.2.0/nowline.min.js"></script>
 <script>
   nowline.initialize({
-    theme: 'dark',
+    theme: 'dark',           // 'light' | 'dark' | 'auto' (reads prefers-color-scheme once)
     startOnLoad: true,
     selector: 'pre code.language-nowline'  // custom selector
   });
@@ -53,17 +53,26 @@ That's it. Any ` ```nowline ` block in the page will render automatically on `DO
 </script>
 ```
 
+### API Surface
+
+| Call                            | Returns                  | Use for |
+|---------------------------------|--------------------------|---------|
+| `nowline.initialize(options?)`  | `void`                   | Configure theme / selector / locale once on page load. |
+| `nowline.render(source, opts?)` | `Promise<string>` (SVG)  | Render a single source string to SVG (custom containers, dynamic loads). |
+| `nowline.parse(source)`         | `Promise<{ ast, errors }>` | Parse without layout / render — for editor experiences. |
+| `nowline.init()` / `.run()`     | `Promise<{ rendered, failed }>` | Manually re-scan after the page mutates. |
+
 ## Distribution
 
-The embed bundle is served from two domains, both Firebase-Hosted under separate Firebase projects so dev traffic and abuse can never spill into prod:
+The embed bundle is served from two domains, both Firebase-Hosted under separate Firebase projects so dev traffic and abuse can never spill into prod. The build artefact is produced inside this monorepo (`packages/embed/`) and the release pipeline is responsible for uploading it to Firebase — see [Bootstrap status](#bootstrap-status) for what's wired today.
 
 | URL | Triggered by | Stability | `Cache-Control` | Audience |
 |-----|--------------|-----------|-----------------|----------|
-| `https://embed.nowline.io/{X.Y.Z}/nowline.min.js` | git tag push on `lolay/nowline-embed` | immutable per patch | `public, max-age=31536000, immutable` | embedders pinning to a known-good build |
-| `https://embed.nowline.io/{X.Y}/nowline.min.js` | git tag push (rewritten on each release in the minor) | mutable within minor | `public, max-age=300, s-maxage=600` | embedders who want patch fixes auto-rolled in |
-| `https://embed.nowline.io/latest/nowline.min.js` | git tag push (rewritten on each release) | mutable, latest stable | `public, max-age=300, s-maxage=600` | docs site, demos, prototypes |
-| `https://embed.nowline.dev/nowline.min.js` | every push to `main` on `lolay/nowline-embed` | mutable, no SLA, may break | `public, max-age=60, s-maxage=120, must-revalidate`, `X-Robots-Tag: noindex` | internal preview, early adopters opting into "next" |
-| `https://nowline-embed-dev--pr-{N}-{sha}.web.app/nowline.min.js` | PR open or sync against `lolay/nowline-embed` `main` | ephemeral, 7-day TTL | Firebase default | per-PR review, posted as a PR comment by the deploy action |
+| `https://embed.nowline.io/{X.Y.Z}/nowline.min.js` | release tag | immutable per patch | `public, max-age=31536000, immutable` | embedders pinning to a known-good build |
+| `https://embed.nowline.io/{X.Y}/nowline.min.js` | release tag (rewritten on each release in the minor) | mutable within minor | `public, max-age=300, s-maxage=600` | embedders who want patch fixes auto-rolled in |
+| `https://embed.nowline.io/latest/nowline.min.js` | release tag (rewritten on each release) | mutable, latest stable | `public, max-age=300, s-maxage=600` | docs site, demos, prototypes |
+| `https://embed.nowline.dev/nowline.min.js` | every push to `main` | mutable, no SLA, may break | `public, max-age=60, s-maxage=120, must-revalidate`, `X-Robots-Tag: noindex` | internal preview, early adopters opting into "next" |
+| `https://nowline-embed-dev--pr-{N}-{sha}.web.app/nowline.min.js` | PR open or sync | ephemeral, 7-day TTL | Firebase default | per-PR review, posted as a PR comment by the deploy action |
 
 ### Why minor-pinning, not major-pinning, on `embed.nowline.io`
 
@@ -85,13 +94,26 @@ curl the URL or open it in DevTools to see exactly which build is being served. 
 
 The embed is shipped as `@nowline/embed` on npm, so the npm-backed CDNs (jsDelivr, unpkg) automatically serve it too — but they're an unsupported escape hatch, not a documented channel. The custom CDN exists for branded URLs in `view-source` (small but real marketing surface), per-version telemetry for sunset planning, custom cache and security headers, and the `embed.nowline.dev` + per-PR ephemeral preview tiers that npm-backed CDNs can't provide. We can revisit and document jsDelivr as a fallback if real-world feedback surfaces a need.
 
+### Bootstrap status
+
+The bundle ships in m4 as `@nowline/embed` on npm (already wired through `release.yml`). The Firebase Hosting projects, deploy job, and the `embed.nowline.{io,dev}` DNS records remain to be set up — see the m4 handoff under [Carried forward](./handoffs/handoff-m4-embed.md) and `specs/features.md` feature 32. Until that lands, embedders that need the bundle today can `npm i @nowline/embed` and serve it themselves; the URLs above are the shape the documented channel will take, not something live yet.
+
 ## Bundle Size Target
 
-**< 150KB gzipped.** This includes the parser (Langium runtime), layout engine, and SVG renderer. No external dependencies in the browser bundle.
+**≤ 175 KB gzipped.** First measurement landed at ~163 KB; the 175 KB ceiling buys ~12 KB headroom for incremental growth and still beats Mermaid by a comfortable margin. Crossing 200 KB triggers a serious review (pre-bundled grammars, hand-rolled parser, etc.) — the m4 plan documents the escalation. The `bundle-size` CI job (`packages/embed/scripts/check-size.mjs`) gates every PR.
 
 For comparison:
 - Mermaid embed: ~200KB gzipped
 - D2 WASM: ~2MB
+
+## Single-File Mode (`include` directive)
+
+The browser embed runs in single-file mode: it cannot fetch other `.nowline` files. When an `include "./other.nowline"` directive is encountered, the embed:
+
+1. Emits a one-shot `console.warn` describing the limitation.
+2. Skips the include and renders whatever survived without it.
+
+A future opt-in HTTP-fetch resolver could resolve relative includes via `fetch()`, but it is intentionally out of scope for m4 (CORS, relative-URL semantics, and waterfall performance each warrant their own decision). Use the CLI or the GitHub Action for multi-file rendering today.
 
 ## Platform Integration
 
@@ -112,12 +134,14 @@ The embed script **does not work** in contexts where you cannot inject a `<scrip
 - Slack, Discord, Teams messages
 - Email
 
-## GitHub Action (`lolay/nowline-action`)
+## GitHub Action (`packages/nowline-action/`)
 
 The GitHub Action is the solution for contexts where the embed script cannot run (GitHub READMEs, CI pipelines).
 
-**Repo:** `lolay/nowline-action` (OSS, Apache 2.0).
-**Milestone:** m4 (ships with the embed).
+**Source:** `packages/nowline-action/` in this monorepo.
+**Marketplace mirror:** `lolay/nowline-action` (write-only; populated by `release.yml` on each tag with the compiled `action.yml` + `dist/`. Exists because GitHub Marketplace requires `action.yml` at repo root).
+**License:** Apache 2.0.
+**Milestone:** m3.5 — sequenced before m4 so the GitHub-bound rendering path lands first. The action shells out to `@nowline/cli`. At dev time that's a workspace symlink so cross-cutting PRs stay atomic; at runtime the action `npm install -g`s the CLI version that matches its tag, so the published artifact consumes the CLI exactly the way an external user would.
 
 ### Two Modes
 

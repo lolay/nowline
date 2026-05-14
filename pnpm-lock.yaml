@@ -86,7 +86,7 @@ importers:
         version: 5.7.3
       vitest:
         specifier: ^3.1.0
-        version: 3.2.4(@types/node@22.19.17)
+        version: 3.2.4(@types/node@22.19.17)(happy-dom@15.11.7)
 
   packages/config:
     dependencies:
@@ -105,7 +105,7 @@ importers:
         version: 5.7.3
       vitest:
         specifier: ^3.1.0
-        version: 3.2.4(@types/node@22.19.17)
+        version: 3.2.4(@types/node@22.19.17)(happy-dom@15.11.7)
 
   packages/core:
     dependencies:
@@ -124,7 +124,38 @@ importers:
         version: 5.7.3
       vitest:
         specifier: ^3.1.0
-        version: 3.2.4(@types/node@22.19.17)
+        version: 3.2.4(@types/node@22.19.17)(happy-dom@15.11.7)
+
+  packages/embed:
+    dependencies:
+      '@nowline/core':
+        specifier: workspace:*
+        version: link:../core
+      '@nowline/layout':
+        specifier: workspace:*
+        version: link:../layout
+      '@nowline/renderer':
+        specifier: workspace:*
+        version: link:../renderer
+      langium:
+        specifier: ~4.2.2
+        version: 4.2.2
+    devDependencies:
+      '@types/node':
+        specifier: ^22.0.0
+        version: 22.19.17
+      esbuild:
+        specifier: ^0.27.0
+        version: 0.27.7
+      happy-dom:
+        specifier: ^15.11.0
+        version: 15.11.7
+      typescript:
+        specifier: ~5.7.0
+        version: 5.7.3
+      vitest:
+        specifier: ^3.1.0
+        version: 3.2.4(@types/node@22.19.17)(happy-dom@15.11.7)
 
   packages/export-core:
     dependencies:
@@ -143,7 +174,7 @@ importers:
         version: 5.7.3
       vitest:
         specifier: ^3.1.0
-        version: 3.2.4(@types/node@22.19.17)
+        version: 3.2.4(@types/node@22.19.17)(happy-dom@15.11.7)
 
   packages/export-html:
     dependencies:
@@ -171,7 +202,7 @@ importers:
         version: 5.7.3
       vitest:
         specifier: ^3.1.0
-        version: 3.2.4(@types/node@22.19.17)
+        version: 3.2.4(@types/node@22.19.17)(happy-dom@15.11.7)
 
   packages/export-mermaid:
     dependencies:
@@ -196,7 +227,7 @@ importers:
         version: 5.7.3
       vitest:
         specifier: ^3.1.0
-        version: 3.2.4(@types/node@22.19.17)
+        version: 3.2.4(@types/node@22.19.17)(happy-dom@15.11.7)
 
   packages/export-msproj:
     dependencies:
@@ -221,7 +252,7 @@ importers:
         version: 5.7.3
       vitest:
         specifier: ^3.1.0
-        version: 3.2.4(@types/node@22.19.17)
+        version: 3.2.4(@types/node@22.19.17)(happy-dom@15.11.7)
 
   packages/export-pdf:
     dependencies:
@@ -258,7 +289,7 @@ importers:
         version: 5.7.3
       vitest:
         specifier: ^3.1.0
-        version: 3.2.4(@types/node@22.19.17)
+        version: 3.2.4(@types/node@22.19.17)(happy-dom@15.11.7)
 
   packages/export-png:
     dependencies:
@@ -289,7 +320,7 @@ importers:
         version: 5.7.3
       vitest:
         specifier: ^3.1.0
-        version: 3.2.4(@types/node@22.19.17)
+        version: 3.2.4(@types/node@22.19.17)(happy-dom@15.11.7)
 
   packages/export-xlsx:
     dependencies:
@@ -317,7 +348,7 @@ importers:
         version: 5.7.3
       vitest:
         specifier: ^3.1.0
-        version: 3.2.4(@types/node@22.19.17)
+        version: 3.2.4(@types/node@22.19.17)(happy-dom@15.11.7)
 
   packages/integration-tests:
     devDependencies:
@@ -341,7 +372,7 @@ importers:
         version: 5.7.3
       vitest:
         specifier: ^3.1.0
-        version: 3.2.4(@types/node@22.19.17)
+        version: 3.2.4(@types/node@22.19.17)(happy-dom@15.11.7)
 
   packages/layout:
     dependencies:
@@ -369,7 +400,7 @@ importers:
         version: 5.7.3
       vitest:
         specifier: ^3.1.0
-        version: 3.2.4(@types/node@22.19.17)
+        version: 3.2.4(@types/node@22.19.17)(happy-dom@15.11.7)
 
   packages/lsp:
     dependencies:
@@ -394,7 +425,7 @@ importers:
         version: 5.7.3
       vitest:
         specifier: ^3.1.0
-        version: 3.2.4(@types/node@22.19.17)
+        version: 3.2.4(@types/node@22.19.17)(happy-dom@15.11.7)
 
   packages/renderer:
     dependencies:
@@ -416,7 +447,7 @@ importers:
         version: 5.7.3
       vitest:
         specifier: ^3.1.0
-        version: 3.2.4(@types/node@22.19.17)
+        version: 3.2.4(@types/node@22.19.17)(happy-dom@15.11.7)
 
   packages/vscode-extension:
     dependencies:
@@ -1743,6 +1774,10 @@ packages:
   graceful-fs@4.2.11:
     resolution: {integrity: sha512-RbJ5/jmFcNNCcDV5o9eTnBLJ/HszWV0P73bc+Ff4nS/rJj+YaS6IGyiOL0VoBYX+l1Wrl3k63h/KrH+nhJ0XvQ==}
 
+  happy-dom@15.11.7:
+    resolution: {integrity: sha512-KyrFvnl+J9US63TEzwoiJOQzZBJY7KgBushJA8X61DMbNsH+2ONkDuLDnCnwUiPTF42tLoEmrPyoqbenVA5zrg==}
+    engines: {node: '>=18.0.0'}
+
   has-bigints@1.1.0:
     resolution: {integrity: sha512-R3pbpkcIqv2Pm3dUwgjclDRVmWpTJW2DcMzcIhEXEx1oh/CEMObMm3KLmRJOdvhM7o4uQBnwr8pzRK2sJWIqfg==}
     engines: {node: '>= 0.4'}
@@ -2765,10 +2800,18 @@ packages:
   vscode-uri@3.1.0:
     resolution: {integrity: sha512-/BpdSx+yCQGnCvecbyXdxHDkuk55/G3xwnC0GqY4gmQ3j+A+g8kzzgB4Nk/SINjqn6+waqw3EgbVF2QKExkRxQ==}
 
+  webidl-conversions@7.0.0:
+    resolution: {integrity: sha512-VwddBukDzu71offAQR975unBIGqfKZpM+8ZX6ySk8nYhVoo5CYaZyzt3YBvYtRtO+aoGlqxPg/B87NGVZ/fu6g==}
+    engines: {node: '>=12'}
+
   whatwg-encoding@3.1.1:
     resolution: {integrity: sha512-6qN4hJdMwfYBtE3YBTTHhoeuUrDBPZmbQaxWAqSALV/MeEnR5z1xd8UKud2RAkFoPkmB+hli1TZSnyi84xz1vQ==}
     engines: {node: '>=18'}
     deprecated: Use @exodus/bytes instead for a more spec-conformant and faster implementation
+
+  whatwg-mimetype@3.0.0:
+    resolution: {integrity: sha512-nt+N2dzIutVRxARx1nghPKGv1xHikU7HKdfafKkLNLindmPU/ch3U31NOCGGA/dmPcmb1VlofO0vnKAcsm0o/Q==}
+    engines: {node: '>=12'}
 
   whatwg-mimetype@4.0.0:
     resolution: {integrity: sha512-QaKxh0eNIi2mE9p2vEdzfagOKHCcj1pJ56EEHGQOVxp8r9/iszLUUV7v89x9O1p/T+NlTM5W7jW6+cz4Fq1YVg==}
@@ -4155,6 +4198,12 @@ snapshots:
 
   graceful-fs@4.2.11: {}
 
+  happy-dom@15.11.7:
+    dependencies:
+      entities: 4.5.0
+      webidl-conversions: 7.0.0
+      whatwg-mimetype: 3.0.0
+
   has-bigints@1.1.0: {}
 
   has-flag@4.0.0: {}
@@ -5170,7 +5219,7 @@ snapshots:
       '@types/node': 22.19.17
       fsevents: 2.3.3
 
-  vitest@3.2.4(@types/node@22.19.17):
+  vitest@3.2.4(@types/node@22.19.17)(happy-dom@15.11.7):
     dependencies:
       '@types/chai': 5.2.3
       '@vitest/expect': 3.2.4
@@ -5197,6 +5246,7 @@ snapshots:
       why-is-node-running: 2.3.0
     optionalDependencies:
       '@types/node': 22.19.17
+      happy-dom: 15.11.7
     transitivePeerDependencies:
       - jiti
       - less
@@ -5234,9 +5284,13 @@ snapshots:
 
   vscode-uri@3.1.0: {}
 
+  webidl-conversions@7.0.0: {}
+
   whatwg-encoding@3.1.1:
     dependencies:
       iconv-lite: 0.6.3
+
+  whatwg-mimetype@3.0.0: {}
 
   whatwg-mimetype@4.0.0: {}
 

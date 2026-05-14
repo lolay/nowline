@@ -1,12 +1,23 @@
 # m4 handoff — Embed
 
-Forward-looking onboarding for the m4 milestone. Pairs the existing
-[`specs/embed.md`](../embed.md) (product surface, CDN, GitHub Action)
-with the engineering reality after the m3 series shipped (m3a LSP,
-m3b/c VS Code scaffold + live preview, m3d preview parity, m3e CLI
-shell-out exports, m3f authoring commands).
+m4 has shipped. **[What shipped](#what-shipped)** at the bottom is the
+canonical record of what landed and why. The sections above it preserve
+the pre-implementation handoff for context — they describe the
+*original* plan, including a sibling-repo posture for `@nowline/embed`
+and `lolay/nowline-action` that was revised during implementation. Read
+them as historical decision-making, not as instructions to follow.
 
-## Where we are
+> **Structural decisions revised during m4:** the embed moved from a
+> sibling repo (`lolay/nowline-embed`) into this monorepo at
+> `packages/embed/`; the m3.5 GitHub Action moved from a sibling repo
+> to monorepo-source + Marketplace mirror. Both follow Mermaid's split:
+> parser-coupled packages live with the parser; loose-coupling
+> consumers go sibling or get mirrored. See [Decisions that diverged](#what-shipped)
+> below and [`specs/architecture.md`](../architecture.md).
+
+---
+
+## Where we are *(state at the time the handoff was written)*
 
 **Building blocks already in place:**
 
@@ -22,19 +33,19 @@ shell-out exports, m3f authoring commands).
 
 **Not yet present:**
 
-- No `lolay/nowline-embed` repo. Per [`specs/embed.md`](../embed.md)
-  §Distribution and [`architecture.md`](../architecture.md#organization-and-repositories)
-  the embed is its own OSS repo (not `packages/embed/` in the engine
-  monorepo) so it consumes `@nowline/core` / `layout` / `renderer`
-  via npm exactly the way external embedders would. Same posture as
-  `lolay/nowline-action`. Bootstrapping it is the gating prerequisite
-  for everything else in this milestone.
-- No browser-bundle build pipeline. The new repo will introduce its
-  own `esbuild`/`rollup` setup that produces a single minified IIFE
-  for `<script>` tag loading; nothing in the engine monorepo
+- No `@nowline/embed` package. The original plan was a sibling
+  `lolay/nowline-embed` repo so the package would consume engine
+  packages from npm exactly the way external embedders would; that
+  call was revised during implementation to a monorepo subpath
+  (`packages/embed/`) — see "Decisions that diverged" below.
+- No browser-bundle build pipeline. Whichever repo lands the embed
+  needs an `esbuild`/`rollup` setup that produces a single minified
+  IIFE for `<script>` tag loading; nothing in the engine monorepo
   currently ships browser-targeted artifacts.
-- No `lolay/nowline-action` repo. Same pattern as nowline-embed —
-  separate OSS repo per [`specs/embed.md`](../embed.md) §GitHub Action.
+- No `packages/nowline-action/` source and no `lolay/nowline-action`
+  Marketplace mirror repo (m3.5, not m4). Posture chosen during this
+  milestone: monorepo-source + write-only mirror — see "Decisions
+  that diverged" below.
 - No Firebase projects. Two projects need creating before the embed
   CDN deploy workflows can run:
   - `nowline-embed` (Spark plan to start; upgrade to Blaze when the
@@ -44,16 +55,20 @@ shell-out exports, m3f authoring commands).
     `nowline-embed-dev.web.app`, custom domain `embed.nowline.dev`.
     `main`-push deploys + per-PR ephemeral preview channels (7-day
     TTL) via [`FirebaseExtended/action-hosting-deploy`](https://github.com/FirebaseExtended/action-hosting-deploy).
-  Each project needs a service-account JSON stored in the
-  `lolay/nowline-embed` repo as `FIREBASE_SERVICE_ACCOUNT_PROD` and
-  `FIREBASE_SERVICE_ACCOUNT_DEV` repo secrets.
+  Each project needs a service-account JSON stored in this monorepo
+  as `FIREBASE_SERVICE_ACCOUNT_PROD` and `FIREBASE_SERVICE_ACCOUNT_DEV`
+  repo secrets so `release.yml` can deploy the bundle (originally
+  scoped for the `lolay/nowline-embed` repo; revised during m4 to live
+  alongside the existing `release.yml`).
 
-## What this milestone needs to deliver
+## What this milestone needs to deliver *(original plan)*
 
-Per [`specs/embed.md`](../embed.md):
+Per [`specs/embed.md`](../embed.md). The plan as originally drafted
+assumed a `lolay/nowline-embed` sibling repo; the substance below
+still applies, but it lands in `packages/embed/` instead — see "What
+shipped" for the revised location.
 
-1. **`lolay/nowline-embed` sibling repo** (Apache 2.0) hosting
-   `@nowline/embed` with:
+1. **`@nowline/embed` package** (Apache 2.0) with:
    - `nowline.initialize({ theme, startOnLoad, selector })` and
      `nowline.render(source)` global API.
    - Auto-scan of `pre code.language-nowline` blocks on
@@ -62,34 +77,30 @@ Per [`specs/embed.md`](../embed.md):
      gzipped** (Mermaid is ~200 KB; we have headroom).
    - Bundle banner injected with `version`, `sha`, `built-at` so any
      curl/devtools reveal exactly which build is being served.
-   - Consumes `@nowline/core` / `layout` / `renderer` from npm at the
-     latest compatible engine version — no `workspace:*` symlinks.
-2. **CDN deploy infrastructure on `lolay/nowline-embed`:**
-   - `deploy-prod.yml` — on tag push, build and deploy to
-     `embed.nowline.io/{X.Y.Z}/`, rewrite `/{X.Y}/` and `/latest/`
-     aliases.
-   - `deploy-dev.yml` — on `main` push, build and deploy to
-     `embed.nowline.dev/`. Bundle additionally `console.warn`s an
-     unstable-build notice once per page load.
-   - `pr-preview.yml` — on PR open/sync, deploy to a Firebase
-     ephemeral channel via `FirebaseExtended/action-hosting-deploy`
-     and post the URL as a PR comment.
-3. **`lolay/nowline-action` sibling repo** (Apache 2.0) with two modes
-   (file, markdown), action inputs per the spec table, and a no-Docker
-   runner that installs `@nowline/cli` from npm.
-4. **Browser-safety patch for `@nowline/core`** — `include-resolver.ts`
+   - Builds against `@nowline/core` / `layout` / `renderer` at lock-step
+     workspace versions.
+2. **CDN deploy infrastructure** in `release.yml` (originally scoped
+   for the sibling repo's own workflows):
+   - On tag push, build and deploy to `embed.nowline.io/{X.Y.Z}/`,
+     rewrite `/{X.Y}/` and `/latest/` aliases.
+   - On `main` push, build and deploy to `embed.nowline.dev/`. Bundle
+     additionally `console.warn`s an unstable-build notice once per
+     page load.
+   - On PR open/sync, deploy to a Firebase ephemeral channel via
+     `FirebaseExtended/action-hosting-deploy` and post the URL as a
+     PR comment.
+3. **Browser-safety patch for `@nowline/core`** — `include-resolver.ts`
    imports `node:fs` and `node:path`, which break a browser bundle.
    Either skip include resolution in the embed (single-file mode) or
-   inject a no-op resolver via DI. This patch lands in **this**
-   monorepo because `@nowline/core` lives here; the embed repo
-   consumes the patched version from npm.
-5. **CI pipeline updates on `lolay/nowline-embed`** (not on this
-   monorepo):
+   inject a no-op resolver via DI.
+4. **CI pipeline updates** in this monorepo's `ci.yml`:
    - `bundle-size` step that fails if the gzipped bundle exceeds
      150 KB on every PR.
    - `compile-smoke` matrix that loads the bundled IIFE in headless
      Chromium / Firefox / WebKit (Playwright) and asserts
      `nowline.render('roadmap "x"…')` returns valid SVG.
+
+(The action moved to its own milestone — m3.5.)
 
 ## Key decisions to make early
 
@@ -122,63 +133,35 @@ rework cost compounds.
   contract to hold. Mirror Mermaid's surface where possible
   (`initialize`, `render`, `parse`, `init`) so users coming from
   Mermaid don't have to relearn.
-- **Sibling-repo bootstrap timing.** Both new repos
-  (`lolay/nowline-embed`, `lolay/nowline-action`) need the same
-  `release.yml`-style infra that took m2a and m4.6 to set up.
-  Bootstrap them first so they can publish from day one, rather than
-  retrofitting after the engine npm packages exist.
+- **Repo posture (resolved during m4).** The original plan assumed
+  sibling repos for both `@nowline/embed` and `lolay/nowline-action`
+  with their own `release.yml`-style infra. Implementation revised
+  this to monorepo-source for both, with a Marketplace mirror for the
+  action — see "Decisions that diverged" below for the rationale.
 
-## Suggested plan for the next session
+## Suggested plan *(historical sketch)*
 
-Sequenced so each step unblocks the next; cross-repo work is called
-out explicitly.
+The original plan staged work across this monorepo and a new sibling
+`lolay/nowline-embed` repo, sequenced so prerequisites (Firebase
+project bootstrap, DNS, sibling-repo skeleton) ran first. The revised
+plan kept the substance but collapsed the sibling-repo work into this
+monorepo:
 
-### Prerequisites (do once, in this order)
+1. **`@nowline/core` browser-safety refactor** — extract the `fs`/`path`
+   work behind a DI boundary so the embed bundle carries no `node:*`
+   literal.
+2. **Scaffold `@nowline/embed`** at `packages/embed/` with the
+   `initialize` / `render` / `parse` / `init` API and a no-op include
+   resolver.
+3. **Add the esbuild bundler + bundle-size CI gate** producing
+   `dist/nowline.min.js` (IIFE) and `dist/nowline.esm.js` (ESM).
+4. **Wire CDN deploy** to `embed.nowline.io` (prod, tag-driven) /
+   `embed.nowline.dev` (dev + per-PR ephemeral channels). Carried
+   forward — see "What shipped".
 
-0a. **Create the two Firebase projects** (`nowline-embed`,
-    `nowline-embed-dev`) on Spark plan; upgrade to Blaze when wiring
-    the custom domain. Create one service-account per project.
-0b. **DNS for `embed.nowline.io` and `embed.nowline.dev`** —
-    Firebase-issued TXT verification + A/AAAA records on the
-    `nowline.io` and `nowline.dev` zones.
-0c. **Bootstrap `lolay/nowline-embed`** — empty repo, Apache 2.0,
-    README, `.github/workflows/` skeleton. Mirrors
-    `lolay/homebrew-tap` / `lolay/scoop-bucket` bootstrap pattern
-    (see [`specs/release-bootstrap.md`](../release-bootstrap.md)).
-    Store both Firebase service-account JSONs as
-    `FIREBASE_SERVICE_ACCOUNT_PROD` and `FIREBASE_SERVICE_ACCOUNT_DEV`
-    repo secrets.
-
-### In `lolay/nowline` (this monorepo)
-
-1. **Patch include-resolver for browser** — extract the `fs`/`path`
-   work into an `IncludeResolver` interface, default to the existing
-   Node implementation, accept a DI override. Snapshots stay
-   byte-stable on CLI tests. Cut a `@nowline/core` patch release so
-   the embed repo can consume the patched version from npm.
-
-### In `lolay/nowline-embed` (new repo)
-
-2. **Scaffold `@nowline/embed`** — `package.json`, `tsconfig.json`,
-   `src/index.ts` skeleton with `initialize`/`render` signatures, no
-   bundler yet. Depends on `@nowline/core` / `@nowline/layout` /
-   `@nowline/renderer` from npm at the patched version from step 1.
-   Wires a no-op `IncludeResolver`.
-3. **Add esbuild (or rollup) bundler** — produce
-   `dist/nowline.min.js` IIFE with banner injection (`version`,
-   `sha`, `built-at`); add a CI size-check that fails on >150 KB
-   gzipped; add a Playwright smoke that loads the IIFE in headless
-   Chromium / Firefox / WebKit and renders a fixture.
-4. **Wire deploy workflows** — `deploy-prod.yml` (tag → `embed.nowline.io/{X.Y.Z}/`,
-   rewrites `/{X.Y}/` and `/latest/` aliases), `deploy-dev.yml`
-   (`main` → `embed.nowline.dev/`), `pr-preview.yml` (PR → ephemeral
-   channel).
-
-### In `lolay/nowline-action` (other new repo)
-
-5. **Bootstrap `lolay/nowline-action`** — separate repo work, but
-   tracked here. Same bootstrap pattern as `nowline-embed`. First
-   action release is its own milestone moment.
+The action work moved to m3.5 (its own milestone, source at
+`packages/nowline-action/` + Marketplace mirror at
+`lolay/nowline-action`).
 
 ## Gotchas
 
@@ -210,10 +193,12 @@ out explicitly.
   mutable. The deploy workflow must `firebase hosting:rewrite` the
   mutable aliases on each tag/main push (not just upload new
   immutable paths) for users to actually see updates.
-- **GitHub Action versioning.** `lolay/nowline-action@v1` is a moving
-  target; `@v1.2.3` is fixed. Tag both — `v1` as a moving major-tag
-  pointer (force-pushed on each release) per GitHub's standard
-  pattern, plus immutable point-version tags for users who pin.
+- **GitHub Action versioning (m3.5 follow-up).** The Marketplace
+  mirror repo (`lolay/nowline-action`) carries its own tags, populated
+  by `release.yml` on each engine release. Push both the immutable
+  point-version tag (`v1.2.3`, what production users pin) and a
+  moving major-tag pointer (`v1`, force-pushed on each release) per
+  GitHub's standard pattern. The monorepo's tag drives both pushes.
 
 ## Files to reference
 
@@ -225,14 +210,14 @@ out explicitly.
   same parse → layout → render pipeline". Patterns transfer directly.
 - [`packages/core/src/language/include-resolver.ts`](../../packages/core/src/language/include-resolver.ts) — the
   only browser-safety blocker; refactor target for step 1.
-- [`.github/workflows/release.yml`](../../.github/workflows/release.yml) — reference for how the
-  engine repo's tag-driven multi-target deploy is wired; the embed
-  repo's deploy workflows will share the SemVer / tag conventions but
-  swap `bun --compile` for `esbuild` and `bun publish` for
-  `firebase deploy`.
-- [`specs/release-bootstrap.md`](../release-bootstrap.md) — the
-  bootstrap recipe for the sibling embed and action repos, including
-  Firebase project + DNS prerequisites.
+- [`.github/workflows/release.yml`](../../.github/workflows/release.yml) — the
+  monorepo's tag-driven multi-target release pipeline. The pending
+  Firebase deploy work (see "What shipped" → "Carried forward")
+  attaches new cells here rather than living in a separate workflow.
+- [`specs/release-bootstrap.md`](../release-bootstrap.md) — bootstrap
+  recipe for one-time prerequisites (Homebrew tap, Marketplace IDs,
+  PATs). The Firebase project + DNS work that's still pending for the
+  branded CDN belongs alongside this checklist.
 
 ## Out of scope for m4
 
@@ -244,3 +229,135 @@ out explicitly.
   use case lands; resist API surface creep before v1.
 - WASM builds. The renderer is pure JS string construction; no WASM
   speed-up to chase.
+
+## What shipped
+
+m4 landed as a single in-monorepo package, not the originally-scoped
+sibling repo. The GitHub Action work was pulled out into its own
+pre-m4 milestone (m3.5) since it shells out to `@nowline/cli` and has
+no embed dependency — see [`specs/milestones.md`](../milestones.md).
+The m3.5 action also moved into the monorepo (at
+`packages/nowline-action/`, with a Marketplace mirror at
+`lolay/nowline-action`) for the same Mermaid-pattern reasons — see
+"Decisions that diverged" below.
+
+**Decisions that diverged from the original handoff:**
+
+- **In-monorepo, not sibling-repo.** `@nowline/embed` lives at
+  [`packages/embed/`](../../packages/embed) and rides the same publish
+  pipeline as the rest of the workspace. The plan's rationale for a
+  sibling repo (consume engine packages from npm exactly the way
+  external embedders would) was outweighed by the operational cost of
+  a second tag-driven release process and the lock-step versioning
+  benefit of staying in the workspace. This matches
+  [Mermaid](https://github.com/mermaid-js/mermaid)'s split: parser-coupled
+  packages (parser, layout, plugins, **embed**) live in the monorepo;
+  loose-coupling consumers (CLI, live editor, VS Code extension) sit
+  as siblings. The dogfooding signal a sibling repo would have bought
+  is recovered with a `pnpm pack`-based smoke test in CI — see
+  [`specs/architecture.md`](../architecture.md) §Build and Release.
+- **Action posture revised in lock-step.** While reconciling the
+  embed's monorepo move with the original spec, the m3.5 GitHub
+  Action's posture also flipped from "sibling repo" to "monorepo
+  source at `packages/nowline-action/` + `lolay/nowline-action`
+  Marketplace mirror." Same Mermaid-shaped logic: action couples to
+  the CLI it shells out to, so source ships with the CLI; the mirror
+  is a publish target like Homebrew tap or npm. m3.5 implementation
+  now follows that posture — see
+  [`specs/architecture.md`](../architecture.md) §Organization and
+  Repositories and [`specs/milestones.md`](../milestones.md) §m3.5.
+- **Branded CDN deploy carried forward; bundle ships through npm
+  first.** [`specs/embed.md`](../embed.md) and `specs/features.md`
+  feature 32 both call for the branded `embed.nowline.{io,dev}`
+  Firebase-Hosted CDN. The bundle landed in m4 and is published to
+  npm by `release.yml`, but the Firebase project bootstrap, the
+  release-time deploy job, and the DNS records have not been wired
+  yet. Until they are, embedders can `npm i @nowline/embed` and
+  self-host; npm-backed CDNs (jsDelivr, unpkg) serve the package as
+  the unsupported escape hatch the spec already calls out, not the
+  documented channel.
+- **Bundler: esbuild.** Matches Mermaid's production bundler since
+  [PR #4729](https://github.com/mermaid-js/mermaid/pull/4729) (2023,
+  when they replaced UMD with IIFE for the same reason we want one),
+  and matches `packages/vscode-extension/scripts/bundle.mjs` which
+  already runs esbuild. One toolchain across the monorepo.
+- **Include resolution: DI no-op (option 2).** A `readFile` callback
+  that always rejects with a stable sniff-able error tag; the pipeline
+  filters those into a single deduped `console.warn`. HTTP-fetch
+  remains a future opt-in.
+- **API surface: Mermaid-shaped.** `nowline.initialize(opts)`,
+  `nowline.render(source)`, `nowline.parse(source)`,
+  `nowline.init()` / `.run()`. Mermaid users transfer with no
+  relearning.
+- **Bundle size: 175 KB gzipped budget (was 150 KB).** First build
+  measured at ~163 KB gzipped, with the Langium ecosystem at ~100 KB
+  gzipped — well under the handoff's 120 KB escalation trigger. Per
+  the handoff's "next moves", the cheap fix was a higher budget; we
+  set 175 KB so we still beat Mermaid's 200 KB by a comfortable
+  margin while leaving ~12 KB headroom. The 200 KB ceiling is now the
+  documented review trigger for pre-bundled grammars / hand-rolled
+  parser.
+
+**Browser-safety changes to `@nowline/core`:**
+
+- [`packages/core/src/util/posix-path.ts`](../../packages/core/src/util/posix-path.ts)
+  — 30-LOC POSIX/Windows-compatible `dirname` / `basename` /
+  `resolve` helper replaces the `node:path` calls in the include
+  resolver. Audited inline; no third-party dependency.
+- [`packages/core/src/util/node-read-file.ts`](../../packages/core/src/util/node-read-file.ts)
+  — Node-only `readFile` fallback isolated behind a dynamic
+  `await import()` boundary. The embed bundle plugin in
+  [`packages/embed/scripts/bundle.mjs`](../../packages/embed/scripts/bundle.mjs)
+  stubs this module out so the IIFE carries no `node:fs` literal.
+- `"sideEffects": false` added to `@nowline/core`,
+  `@nowline/layout`, and `@nowline/renderer` so esbuild tree-shakes
+  unused exports out of the embed bundle.
+
+**Tests delivered:**
+
+- [`packages/embed/test/auto-scan.test.ts`](../../packages/embed/test/auto-scan.test.ts)
+  — happy-dom smoke for single-block replacement, multi-block style
+  isolation (per-render `idPrefix`), selector filtering, and
+  partial-failure resilience.
+- [`packages/embed/test/manual-render.test.ts`](../../packages/embed/test/manual-render.test.ts)
+  — `nowline.render` + `nowline.parse` deterministic output and
+  `theme` overrides.
+- [`packages/embed/test/include-warn.test.ts`](../../packages/embed/test/include-warn.test.ts)
+  — once-per-page-load warning latch on `include` directives, plus
+  the surviving SVG render.
+- [`packages/core/test/util/posix-path.test.ts`](../../packages/core/test/util/posix-path.test.ts)
+  — covers the POSIX/Windows path helper.
+
+**CI gates added:**
+
+- [`bundle-size`](../../.github/workflows/ci.yml) job — runs
+  `pnpm --filter @nowline/embed check-size --print-attribution` on
+  every PR. Fails if gzipped > 175 KB OR if any `node:*` literal
+  survives in the IIFE.
+- [`packages/embed/scripts/check-size.mjs`](../../packages/embed/scripts/check-size.mjs)
+  walks the esbuild metafile to print the top contributors so a
+  Langium runtime regression surfaces with a directional fix.
+
+**Publish wiring:** the `pack-npm` matrix cell in
+[`.github/workflows/release.yml`](../../.github/workflows/release.yml)
+packs `@nowline/embed` between `@nowline/renderer` and
+`@nowline/export-core`; the `npm` publish cell publishes the tarball
+in dependency order.
+
+**Carried forward — required to close m4:**
+
+- Branded `embed.nowline.{io,dev}` Firebase-Hosted CDN deploy. Two
+  Firebase projects (prod tag-driven, dev `main`-driven + per-PR
+  ephemeral channels), the deploy job in `release.yml` (or a new
+  workflow), DNS records on `nowline.io` / `nowline.dev`, and the
+  bundle-provenance banner described in [`specs/embed.md`](../embed.md)
+  → "Bundle provenance". Tracked as `specs/features.md` feature 32.
+
+**Carried forward — out of scope for m4:**
+
+- HTTP-fetch include resolver (opt-in flag).
+- Playwright cross-browser smoke (Chromium / Firefox / WebKit). The
+  happy-dom smoke covers the API contract; cross-browser parity is
+  worth a follow-up once we have a public URL to point Playwright at.
+- Plugin / transform hooks (`nowline.use(...)`). Resist surface creep
+  before v1.

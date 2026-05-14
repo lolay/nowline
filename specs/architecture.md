@@ -6,11 +6,12 @@ The core tooling lives under the **lolay** GitHub organization. Copyright **Lola
 
 | Repo | Type | License | Contents |
 |------|------|---------|----------|
-| `lolay/nowline` | OSS monorepo | Apache 2.0 | Engine packages (core, layout, renderer, exporters), CLI, LSP, in-tree VS Code extension, examples, docs |
-| `lolay/nowline-embed` | OSS | Apache 2.0 | `@nowline/embed` browser bundle, Firebase deploy workflows for `embed.nowline.{io,dev}`. Consumes engine packages from npm exactly the way external embedders would (no `workspace:*` symlinks). |
-| `lolay/nowline-action` | OSS | Apache 2.0 | GitHub Action — installs `@nowline/cli` from npm and renders `.nowline` files into committed SVG/PNG. |
+| `lolay/nowline` | OSS monorepo | Apache 2.0 | Engine packages (core, layout, renderer, exporters), CLI, LSP, in-tree VS Code extension, browser embed (`@nowline/embed`), GitHub Action source (`packages/nowline-action/`), examples, docs |
+| `lolay/nowline-action` | OSS Marketplace mirror | Apache 2.0 | Compiled GitHub Action — `action.yml` and minified `dist/` populated by `release.yml` on every tag. No source code; the source lives in this monorepo at `packages/nowline-action/`. The mirror exists so the Action is listable on GitHub Marketplace (which requires `action.yml` at repo root). |
 | `lolay/nowline-vscode` | OSS | Apache 2.0 | VS Code / Cursor extension (will graduate out of the engine monorepo once stable; tracked but not yet active). |
 | `lolay/nowline-obsidian` | OSS | Apache 2.0 | Obsidian plugin (planned, m4.5). |
+
+This shape mirrors [Mermaid's split](https://github.com/mermaid-js): parser-coupled packages (parser, layout, renderer, embed, plugins) live together in the monorepo because cross-package changes are common; downstream consumers that interact through stable interfaces (the GitHub Action via the CLI, future VS Code extension via the LSP) live as siblings or write-only mirrors.
 
 Proprietary web apps (free viewer, Pro editor, enterprise) are developed in private repositories owned by Lolay, Inc. They consume the OSS packages documented here via npm.
 
@@ -42,6 +43,8 @@ nowline/
     cli/                         # @nowline/cli — `nowline` CLI, every export format, ~70 MB standalone binary
     lsp/                         # @nowline/lsp — Language server (validation, completion, navigation)
     vscode-extension/            # VS Code / Cursor extension wrapping @nowline/lsp
+    embed/                       # @nowline/embed — esbuild IIFE that renders `nowline` blocks in the browser
+    nowline-action/              # GitHub Action source (mirrored to lolay/nowline-action on release)
   grammars/
     nowline.tmLanguage.json      # TextMate grammar for syntax highlighting
   examples/                      # Example .nowline files (also `nowline --init` templates)
@@ -95,8 +98,8 @@ Dependencies flow downward only. No upward or sideways imports. The graph is enf
 - **@nowline/cli** — Command-line entry point. Wraps core + layout + renderer + every exporter. Compiled to standalone binaries via `bun compile`. See [`cli.md`](./cli.md) and [`cli-distribution.md`](./cli-distribution.md).
 - **@nowline/lsp** — Language server. Reuses core's parser/validator behind the LSP wire protocol so editors get the same diagnostics as the CLI. See [`ide.md`](./ide.md).
 - **vscode-extension** — VS Code / Cursor extension that boots `@nowline/lsp` and registers commands. Published as `nowline.vscode-nowline` on both the [VS Code Marketplace](https://marketplace.visualstudio.com/items?itemName=nowline.vscode-nowline) and [Open VSX](https://open-vsx.org/extension/nowline/vscode-nowline) (the latter is what Cursor users install from). Developed in-tree for now; planned to graduate to the `lolay/nowline-vscode` satellite repo once the marketplace listing has accumulated some real-world install/feedback signal.
-
-A planned `@nowline/embed` (browser bundle) will sit beside `@nowline/renderer` in the same way, but lives in the **`lolay/nowline-embed` sibling repo** rather than this monorepo, so it consumes the engine packages from npm exactly the way external embedders do — see [`embed.md`](./embed.md).
+- **@nowline/embed** — Browser bundle (esbuild IIFE) that finds ` ```nowline ` fenced code blocks in a page and renders them client-side. Mirrors [Mermaid's](https://mermaid.js.org) embed surface (`initialize` / `render` / `parse` / `init`). Consumes core + layout + renderer as workspace deps. See [`embed.md`](./embed.md).
+- **GitHub Action** (`packages/nowline-action/`, mirrored to `lolay/nowline-action`) — Renders `.nowline` files in CI for hosts that strip `<script>` tags (GitHub READMEs, issue comments). Shells out to `@nowline/cli`, so it couples loosely to the engine through a stable command-line interface. Source ships in the monorepo for lock-step PRs with the CLI it drives; the mirror repo carries the compiled `action.yml` + `dist/` for Marketplace listing. See [`embed.md`](./embed.md) § GitHub Action.
 
 ## Technology Choices
 
@@ -110,7 +113,7 @@ A planned `@nowline/embed` (browser bundle) will sit beside `@nowline/renderer` 
 | PNG conversion | resvg-js (WASM) | SVG → PNG rasterization. Better SVG fidelity than librsvg, no native addons (WASM works everywhere), smaller footprint, clean `bun compile` story. |
 | PDF generation | PDFKit | Pure JS, no native deps (~2MB). Walks the positioned model to produce true vector PDFs. Bundles cleanly with `bun compile` — no Chromium dependency. |
 | XLSX generation | ExcelJS | Mature (13M weekly downloads), excellent data/formatting/auto-filter support. ~1 MB JS — negligible impact on the ~55 MB CLI binary. No chart support; stacked-bar Gantt sheet deferred. |
-| Embed bundling | esbuild (in `lolay/nowline-embed`) | Fast, zero-config bundling of core + layout + renderer into a single IIFE browser script. No plugins needed for this use case. |
+| Embed bundling | esbuild | Fast, zero-config bundling of core + layout + renderer into a single IIFE browser script. Same toolchain the VS Code extension already uses; one esbuild config covers both. |
 | Embed CDN | Firebase Hosting (two projects) | `embed.nowline.io` (prod, tag-driven, `Cache-Control: immutable` per-version) and `embed.nowline.dev` (latest `main` + per-PR ephemeral preview channels). Branded URLs, custom headers, per-version telemetry. See [`embed.md`](./embed.md) §Distribution. |
 | Testing | Vitest | Fast, TypeScript-native, compatible with the monorepo structure. |
 | Lint and format | Biome | Single Rust binary handling lint, format, and import organization. Type-aware rules in v2.4 cover the promise hygiene we want (`noFloatingPromises`, `noMisusedPromises`) without a typescript-eslint dependency. Replaces the aspirational ESLint+Prettier reference that was never wired up. |
@@ -138,9 +141,10 @@ The resolver abstraction is reused for any future asset-bearing property (e.g. p
 
 ## Build and Release
 
-- **Build:** TypeScript compilation. The embed script's esbuild bundle lives in the sibling `lolay/nowline-embed` repo.
-- **Test:** Vitest across all packages.
+- **Build:** TypeScript compilation, plus an esbuild step in `packages/embed/` and (m3.5) `packages/nowline-action/`. Both bundlers emit minified JS plus source maps.
+- **Test:** Vitest across all packages. A workspace-wide `pack-and-smoke` CI job runs `pnpm pack` on every publishable package, installs the resulting tarballs into a scratch project, and runs a smoke render against them. This catches `package.json` `exports` mistakes and missing `dist/` files that workspace symlinks would otherwise mask — the dogfooding signal that a sibling-repo split would buy, recovered without leaving the monorepo.
 - **Lint and format:** Biome (single tool, type-aware rules, single config). See `CONTRIBUTING.md` § "Linting and formatting" for the rule overrides we adopted and why.
 - **Release:** Single version across all packages in this repo. npm publish for library packages. GitHub Releases for CLI binaries.
 - **CLI distribution:** `bun compile` produces binaries for macOS (arm64, x64), Linux (x64, arm64), Windows (x64, arm64). Published to Homebrew (macOS, Linux, WSL), apt-get, GitHub Releases (Windows .exe direct download), and npm.
-- **Embed distribution:** `lolay/nowline-embed` deploys to `embed.nowline.io` (prod) and `embed.nowline.dev` (dev + ephemeral PR channels) via two Firebase projects on its own release cadence. See [`embed.md`](./embed.md) §Distribution.
+- **Embed distribution:** Built in `packages/embed/`, published as `@nowline/embed` on npm via `release.yml`. Firebase Hosting deploys serve `embed.nowline.io` (prod, tag-driven) and `embed.nowline.dev` (dev + ephemeral PR channels) — two Firebase projects, per-version `Cache-Control`, per-PR preview channels. See [`embed.md`](./embed.md) §Distribution.
+- **Action distribution:** Built in `packages/nowline-action/` (m3.5). On each release, `release.yml` pushes the compiled `action.yml` + `dist/` to the `lolay/nowline-action` mirror repo so the Action is listable on GitHub Marketplace. The mirror is a publish target; PRs land in this monorepo.

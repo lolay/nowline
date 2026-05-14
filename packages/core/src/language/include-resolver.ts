@@ -1,5 +1,3 @@
-import { promises as fs } from 'node:fs';
-import * as path from 'node:path';
 import { URI } from 'langium';
 import type {
     AnchorDeclaration,
@@ -38,6 +36,7 @@ import {
     isSymbolDeclaration,
     isTeamDeclaration,
 } from '../generated/ast.js';
+import { basename, dirname, resolve as resolvePath } from '../util/posix-path.js';
 import type { NowlineServices } from './nowline-module.js';
 
 export type IncludeMode = 'merge' | 'ignore' | 'isolate';
@@ -157,7 +156,15 @@ export async function resolveIncludes(
     filePath: string,
     options: ResolveIncludesOptions,
 ): Promise<ResolveResult> {
-    const readFile = options.readFile ?? ((p) => fs.readFile(p, 'utf-8'));
+    // Default `readFile` lives behind a dynamic import so a browser
+    // bundle that always injects its own callback never pulls `node:fs`
+    // into the static dependency graph.
+    const readFile =
+        options.readFile ??
+        (async (p: string) => {
+            const { nodeReadFile } = await import('../util/node-read-file.js');
+            return nodeReadFile(p);
+        });
     const ctx: ResolveContext = {
         services: options.services,
         diagnostics: [],
@@ -165,7 +172,7 @@ export async function resolveIncludes(
         processed: new Map(),
         readFile,
     };
-    const absPath = path.resolve(filePath);
+    const absPath = resolvePath('', filePath);
     const { config, content } = await resolveFile(file, absPath, ctx);
     return {
         config,
@@ -207,12 +214,12 @@ async function resolveFile(
     const seenIncludes = new Set<string>();
     for (const inc of file.includes) {
         const childRelPath = inc.path;
-        const childAbsPath = path.resolve(path.dirname(absPath), childRelPath);
+        const childAbsPath = resolvePath(dirname(absPath), childRelPath);
 
         if (seenIncludes.has(childAbsPath)) {
             ctx.diagnostics.push({
                 severity: 'error',
-                message: `Duplicate include "${childRelPath}" in ${path.basename(absPath)}.`,
+                message: `Duplicate include "${childRelPath}" in ${basename(absPath)}.`,
                 sourcePath: absPath,
                 line: inc.$cstNode?.range.start.line,
             });
@@ -322,7 +329,7 @@ function applyConfigMode(
     const warn = (name: string, category: string) =>
         diagnostics.push({
             severity: 'warning',
-            message: `${category} "${name}" from ${path.basename(childPath)} is shadowed by the parent's definition.`,
+            message: `${category} "${name}" from ${basename(childPath)} is shadowed by the parent's definition.`,
             sourcePath: childPath,
         });
 
@@ -362,7 +369,7 @@ function applyRoadmapMode(
     const warn = (name: string, category: string) =>
         diagnostics.push({
             severity: 'warning',
-            message: `${category} "${name}" from ${path.basename(childPath)} is shadowed by the parent's definition.`,
+            message: `${category} "${name}" from ${basename(childPath)} is shadowed by the parent's definition.`,
             sourcePath: childPath,
         });
 

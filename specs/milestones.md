@@ -2,7 +2,7 @@
 
 ## Overview
 
-The OSS tooling (`lolay/nowline` and its satellite repos) ships incrementally across milestones m1–m4.6. A four-phase layout-engine refactor (m2.5a–m2.5d), a rendering-polish pass (m2i), capacity & utilization (m2j), and a dependency-arrow attach + routing pass (m2k) sit between the sample-fidelity work (m2h) and IDE support (m3). The IDE work ships before the public embed (m4) so authors can edit `.nowline` files in VS Code / Cursor with live preview before the embed surface goes wide. Two independent post-m4 add-ons round out the OSS chain: m4.5 expands IDE coverage (Obsidian, Neovim, JetBrains), m4.6 expands Windows install coverage (Scoop, WinGet). Each milestone has a clear scope and set of Apache-2.0 deliverables. Later milestones depend on earlier ones.
+The OSS tooling (`lolay/nowline` and its satellite repos) ships incrementally across milestones m1–m4.6. A four-phase layout-engine refactor (m2.5a–m2.5d), a rendering-polish pass (m2i), capacity & utilization (m2j), and a dependency-arrow attach + routing pass (m2k) sit between the sample-fidelity work (m2h) and IDE support (m3). The IDE work ships before the GitHub-bound rendering paths (m3.5 GitHub Action, m4 browser embed) so authors can edit `.nowline` files in VS Code / Cursor with live preview before either surface goes wide. m3.5 (action) and m4 (embed) are independent of each other and could ship in either order; the chain numbers them m3.5 → m4. Two independent post-m4 add-ons round out the OSS chain: m4.5 expands IDE coverage (Obsidian, Neovim, JetBrains), m4.6 expands Windows install coverage (Scoop, WinGet). Each milestone has a clear scope and set of Apache-2.0 deliverables. Later milestones depend on earlier ones.
 
 Commercial milestones (hosted editor, free viewer, MCP, enterprise, FedRAMP) are tracked in a separate, private spec and are out of scope here.
 
@@ -35,7 +35,8 @@ Commercial milestones (hosted editor, free viewer, MCP, enterprise, FedRAMP) are
 | ~~m3d~~ | ~~Preview parity~~ | Apache 2.0 | `.nowlinerc` reader + workspace watcher; new preview-affecting settings (`nowline.preview.{locale,now,strict,showLinks,width,assetRoot}` + `nowline.ignoreRcFile`); preview toolbar overrides (theme, now-line, show-links) |
 | ~~m3e~~ | ~~Export from VS Code~~ | Apache 2.0 | `Nowline: Export…` shell-out command for PDF / pixel-strict PNG / HTML / Markdown+Mermaid / XLSX / MS Project XML; `nowline.export.*` settings (cliPath, PDF page-size/orientation/margin, sans/mono fonts, headless, PNG scale, MS Project start); per-export Override… quickPick |
 | ~~m3f~~ | ~~Authoring commands~~ | Apache 2.0 | `Nowline: New Roadmap…` (`--init` parity); `.nowlinerc`-vs-settings disagreement diagnostic in the preview (suppressed when `nowline.ignoreRcFile` is `true`) |
-| m4 | Embed | Apache 2.0 | Browser embed script, GitHub Action |
+| m3.5 | GitHub Action | Apache 2.0 | `packages/nowline-action/` (in this monorepo) + `lolay/nowline-action` Marketplace mirror: file mode + markdown mode, shells out to `@nowline/cli`. Sequenced before m4 because it has no dependency on the embed bundle. |
+| m4 | Embed | Apache 2.0 | Browser embed script (`@nowline/embed`) and the branded `embed.nowline.{io,dev}` Firebase-Hosted CDN deploy. Bundle landed; CDN deploy still pending — see [`specs/handoffs/handoff-m4-embed.md`](./handoffs/handoff-m4-embed.md) → "Carried forward". |
 | m4.5 | IDE Expansion | Apache 2.0 | Obsidian, Neovim, JetBrains (timing TBD) |
 | m4.6 | Windows distribution | Apache 2.0 | Scoop bucket (`lolay/scoop-bucket`) and WinGet central-registry submission via `wingetcreate`; new `update-scoop-bucket` + `submit-winget-pkg` jobs in `release.yml`; `SCOOP_BUCKET_TOKEN` + `WINGET_PR_PAT` secrets |
 
@@ -386,17 +387,34 @@ Closes the remaining gap with the verbless CLI by exposing the parts of `--init`
 
 Spec: [`specs/ide.md`](./ide.md) § Authoring commands
 
-### m4 — Embed
+### m3.5 — GitHub Action
 
-Roadmaps render anywhere on the web and in CI.
+Renders Nowline files in CI for hosts that strip `<script>` tags (GitHub READMEs, issue comments, etc.). Two modes:
 
-- Browser embed script (`<script>` tag, like mermaid.js)
-- CDN hosting via npm-backed CDNs (jsDelivr, unpkg)
-- GitHub Action with two modes:
-  - File mode: render `.nowline` files to SVG/PNG, commit output
-  - Markdown mode: scan markdown for ` ```nowline ` blocks, render and insert images
+- **File mode** — render `.nowline` files to SVG/PNG and commit the output.
+- **Markdown mode** — scan markdown for ` ```nowline ` blocks, render each one, and insert / refresh the generated image adjacent to the block.
 
-Spec: [`specs/embed.md`](./embed.md)
+**Repo posture (matches Mermaid's `mermaid-cli` shape):** the action source lives in this monorepo at `packages/nowline-action/` so cross-cutting PRs with the CLI stay atomic. On each release, `release.yml` mirrors the compiled `action.yml` + `dist/` to the `lolay/nowline-action` repo for GitHub Marketplace listing — the mirror is a publish target like Homebrew tap or npm, not a source-of-truth repo. See [`specs/architecture.md`](./architecture.md) § Organization and Repositories.
+
+The action shells out to `@nowline/cli` (from m2a) and has no dependency on the embed bundle, so it ships before m4 — depending on the embed package would force the action to wait for m4 without buying anything in return.
+
+Depends on: m2a (CLI distribution pipeline), m2c (export formats — PNG, in particular), m3e (CLI shell-out pattern reused for repeatability).
+
+Spec: [`specs/embed.md`](./embed.md) § GitHub Action
+
+### m4 — Embed (browser bundle)
+
+`@nowline/embed`: a single esbuild-built IIFE that finds ` ```nowline ` fenced code blocks in a page and renders them client-side. Mirrors Mermaid's surface (`initialize`, `render`, `parse`, `init`/`run`) so users coming from Mermaid don't have to relearn anything.
+
+- Browser-safety refactor of `@nowline/core` (`include-resolver` lazy-imports `node:fs`; `posix-path` helper replaces `node:path`; `sideEffects: false` on core / layout / renderer for tree-shaking).
+- New `packages/embed/` package, published to npm in lock-step with the rest of the workspace.
+- esbuild script emits `dist/nowline.min.js` (IIFE), `dist/nowline.esm.js` (ESM), and source maps; CI bundle-size gate at 175 KB gzipped (first measurement landed at ~163 KB; budget headroom buys ~12 KB for incremental growth and still beats Mermaid's 200 KB by a comfortable margin).
+- happy-dom smoke covers auto-scan replacement, multi-block style isolation, manual `nowline.render`, and the once-per-page `include`-warning behaviour.
+- Distribution: branded CDN at `embed.nowline.{io,dev}` (Firebase-Hosted, two projects, per-PR ephemeral channels). Bundle is published to npm today; the Firebase deploy job + DNS bootstrap is the remaining piece of m4 — tracked in [`specs/handoffs/handoff-m4-embed.md`](./handoffs/handoff-m4-embed.md) → "Carried forward" and aligned with `specs/features.md` feature 32.
+
+Single-file mode: the embed warns once and skips `include` directives. Multi-file rendering remains the CLI's / m3.5 action's job.
+
+Spec: [`specs/embed.md`](./embed.md) | Handoff: [`specs/handoffs/handoff-m4-embed.md`](./handoffs/handoff-m4-embed.md)
 
 ### m4.5 — IDE Expansion (timing TBD)
 
@@ -431,12 +449,14 @@ Spec: [`specs/scoop-bucket.md`](./scoop-bucket.md), [`specs/cli-distribution.md`
 ## Dependency Chain
 
 ```
-m1 → m2a → m2b → m2b.5 → m2c → m2d → m2e → m2f → m2g → m2h → m2.5a → m2.5b → m2.5c → m2.5d → m2i → m2j → m2k → m2l → m3a → m3b → m3c → m3d → m3e → m3f → m4
-                                                                                                                                                        ↘
-                                                                                                                                                         m4.5 (depends on m3a only; sequenced after m4)
-                                                                                                                                                        ↘
-                                                                                                                                                         m4.6 (depends on m2a + m2l; sequenced after m4.5 by numbering only — independent of m4.5)
+m1 → m2a → m2b → m2b.5 → m2c → m2d → m2e → m2f → m2g → m2h → m2.5a → m2.5b → m2.5c → m2.5d → m2i → m2j → m2k → m2l → m3a → m3b → m3c → m3d → m3e → m3f → m3.5 → m4
+                                                                                                                                                                ↘
+                                                                                                                                                                 m4.5 (depends on m3a only; sequenced after m4)
+                                                                                                                                                                ↘
+                                                                                                                                                                 m4.6 (depends on m2a + m2l; sequenced after m4.5 by numbering only — independent of m4.5)
 ```
+
+m3.5 (GitHub Action) and m4 (browser embed) are independent of each other — m3.5 shells out to `@nowline/cli`, m4 ships the browser bundle. The chain orders them m3.5 → m4 by numbering only; either could ship first.
 
 m2l is positioned in the m2 series logically (CLI distribution polish) but landed after m3c chronologically; the chain reflects logical OSS sequence rather than strict shipping order, similar to m2i.
 

@@ -325,6 +325,7 @@ jobs:
               packages/core \
               packages/layout \
               packages/renderer \
+              packages/embed \
               packages/export-core \
               packages/export-png \
               packages/export-pdf \
@@ -419,7 +420,7 @@ jobs:
           # `pnpm pack` strips the `@` scope and joins with `-`, so
           # `@nowline/core` → `nowline-core-<version>.tgz`. Same
           # dependency order as the pack step.
-          for pkg in nowline-core nowline-layout nowline-renderer nowline-export-core nowline-export-png nowline-export-pdf nowline-export-html nowline-export-mermaid nowline-export-xlsx nowline-export-msproj nowline-cli; do
+          for pkg in nowline-core nowline-layout nowline-renderer nowline-embed nowline-export-core nowline-export-png nowline-export-pdf nowline-export-html nowline-export-mermaid nowline-export-xlsx nowline-export-msproj nowline-cli; do
             tarball=$(find dist-pack -maxdepth 1 -name "${pkg}-*.tgz" -print -quit)
             test -n "$tarball" || { echo "missing tarball for ${pkg}" >&2; exit 1; }
             echo "publishing ${tarball}"

@@ -1,0 +1,59 @@
+{
+    "name": "@nowline/embed",
+    "version": "0.2.0",
+    "description": "Browser embed bundle for Nowline. Drop a <script> tag and ```nowline``` blocks render in place.",
+    "license": "Apache-2.0",
+    "type": "module",
+    "sideEffects": false,
+    "main": "./dist/index.js",
+    "types": "./dist/index.d.ts",
+    "exports": {
+        ".": {
+            "types": "./dist/index.d.ts",
+            "import": "./dist/index.js"
+        }
+    },
+    "files": [
+        "dist/",
+        "src/"
+    ],
+    "repository": {
+        "type": "git",
+        "url": "https://github.com/lolay/nowline.git",
+        "directory": "packages/embed"
+    },
+    "homepage": "https://github.com/lolay/nowline",
+    "bugs": {
+        "url": "https://github.com/lolay/nowline/issues"
+    },
+    "keywords": [
+        "nowline",
+        "roadmap",
+        "gantt",
+        "embed",
+        "browser",
+        "cdn"
+    ],
+    "scripts": {
+        "build": "tsc -b tsconfig.json && node scripts/bundle.mjs",
+        "watch": "tsc -b tsconfig.json --watch",
+        "typecheck": "tsc --noEmit -p tsconfig.json",
+        "bundle": "node scripts/bundle.mjs",
+        "check-size": "node scripts/check-size.mjs",
+        "test": "vitest run",
+        "test:watch": "vitest"
+    },
+    "dependencies": {
+        "@nowline/core": "workspace:*",
+        "@nowline/layout": "workspace:*",
+        "@nowline/renderer": "workspace:*",
+        "langium": "~4.2.2"
+    },
+    "devDependencies": {
+        "@types/node": "^22.0.0",
+        "esbuild": "^0.27.0",
+        "happy-dom": "^15.11.0",
+        "typescript": "~5.7.0",
+        "vitest": "^3.1.0"
+    }
+}

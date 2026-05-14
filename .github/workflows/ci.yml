@@ -44,6 +44,19 @@ jobs:
       - name: Test
         run: pnpm -r test
 
+  bundle-size:
+    name: Embed bundle size gate
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v6
+      - uses: ./.github/actions/setup-node-pnpm
+
+      - name: Build core / layout / renderer / embed
+        run: pnpm -r --filter @nowline/core --filter @nowline/layout --filter @nowline/renderer --filter @nowline/embed run build
+
+      - name: Check bundle size + node:* leak
+        run: pnpm --filter @nowline/embed check-size --print-attribution
+
   compile-smoke:
     name: Bun compile smoke (${{ matrix.os }})
     runs-on: ${{ matrix.os }}
