@@ -1,0 +1,58 @@
+name: 'Nowline Roadmap Renderer'
+description: 'Render Nowline roadmap diagrams in GitHub Actions — file mode renders one .nowline file; markdown mode scans markdown for nowline fenced blocks and inserts the rendered images.'
+author: 'Lolay, Inc.'
+
+branding:
+    icon: 'map'
+    color: 'blue'
+
+inputs:
+    mode:
+        description: 'file or markdown'
+        required: false
+        default: 'file'
+    input:
+        description: 'Path to the .nowline file (file mode)'
+        required: false
+    output:
+        description: 'Output path for the rendered diagram (file mode)'
+        required: false
+    files:
+        description: 'Glob pattern for markdown files to scan (markdown mode)'
+        required: false
+        default: '**/*.md'
+    output-dir:
+        description: 'Directory where markdown-mode rendered images are written, relative to the repo root'
+        required: false
+        default: '.nowline/'
+    format:
+        description: 'svg or png'
+        required: false
+        default: 'svg'
+    theme:
+        description: 'light or dark'
+        required: false
+        default: 'light'
+    cli-version:
+        description: 'Version of @nowline/cli to install on the runner. Defaults to the action version (lock-step).'
+        required: false
+    commit:
+        description: 'Auto-commit the rendered output. true or false.'
+        required: false
+        default: 'false'
+    commit-message:
+        description: 'Commit message used when commit is true.'
+        required: false
+        default: 'render nowline diagrams [skip ci]'
+
+outputs:
+    rendered:
+        description: 'Number of diagrams rendered'
+    failed:
+        description: 'Number of diagrams that failed to render'
+    changed-files:
+        description: 'Newline-separated list of files changed by the action'
+
+runs:
+    using: 'node24'
+    main: 'dist/index.js'

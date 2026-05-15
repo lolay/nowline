@@ -1,0 +1,56 @@
+{
+    "private": true,
+    "name": "@nowline/action",
+    "version": "0.2.0",
+    "description": "GitHub Action that renders Nowline roadmap diagrams in CI — file and markdown modes.",
+    "license": "Apache-2.0",
+    "type": "module",
+    "main": "./dist/index.js",
+    "files": [
+        "action.yml",
+        "dist/",
+        "README.md",
+        "LICENSE"
+    ],
+    "repository": {
+        "type": "git",
+        "url": "https://github.com/lolay/nowline.git",
+        "directory": "packages/nowline-action"
+    },
+    "homepage": "https://github.com/lolay/nowline-action",
+    "bugs": {
+        "url": "https://github.com/lolay/nowline/issues"
+    },
+    "keywords": [
+        "github-action",
+        "github-actions",
+        "nowline",
+        "roadmap",
+        "diagram-as-code",
+        "dsl"
+    ],
+    "scripts": {
+        "build": "tsc -b tsconfig.json && node scripts/bundle.mjs",
+        "typecheck": "tsc --noEmit -p tsconfig.json",
+        "bundle": "node scripts/bundle.mjs",
+        "test": "vitest run",
+        "test:watch": "vitest"
+    },
+    "dependencies": {
+        "@actions/core": "^1.11.1",
+        "@actions/exec": "^1.1.1",
+        "fast-glob": "^3.3.3",
+        "remark-parse": "^11.0.0",
+        "remark-stringify": "^11.0.0",
+        "unified": "^11.0.5",
+        "unist-util-visit": "^5.0.0"
+    },
+    "devDependencies": {
+        "@nowline/cli": "workspace:*",
+        "@types/mdast": "^4.0.4",
+        "@types/node": "^22.0.0",
+        "esbuild": "^0.27.0",
+        "typescript": "~5.7.0",
+        "vitest": "^3.1.0"
+    }
+}

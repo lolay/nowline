@@ -400,6 +400,8 @@ The action shells out to `@nowline/cli` (from m2a) and has no dependency on the 
 
 Depends on: m2a (CLI distribution pipeline), m2c (export formats — PNG, in particular), m3e (CLI shell-out pattern reused for repeatability).
 
+Status: **in progress.** `packages/nowline-action/` scaffolded — `package.json`, `tsconfig.json`, `action.yml`, input parsing, mode dispatch, README. File mode, markdown mode, esbuild bundle script, tests, and the `release.yml` Marketplace-mirror cell are still ahead. See [`specs/handoffs/handoff-m3.5-action.md`](./handoffs/handoff-m3.5-action.md) → "Where we are".
+
 Spec: [`specs/embed.md`](./embed.md) § GitHub Action
 
 ### m4 — Embed (browser bundle)

@@ -48,9 +48,10 @@ them as historical decision-making, not as instructions to follow.
   that diverged" below.
 - No Firebase projects. Two projects need creating before the embed
   CDN deploy workflows can run:
-  - `nowline-embed` (Spark plan to start; upgrade to Blaze when the
-    custom domain is wired). Default site name `nowline-embed.web.app`,
-    custom domain `embed.nowline.io`. Tag-triggered deploys only.
+  - `nowline-embed-prod` (Spark plan to start; upgrade to Blaze when
+    the custom domain is wired). Default site name
+    `nowline-embed-prod.web.app`, custom domain `embed.nowline.io`.
+    Tag-triggered deploys only.
   - `nowline-embed-dev`. Default site name
     `nowline-embed-dev.web.app`, custom domain `embed.nowline.dev`.
     `main`-push deploys + per-PR ephemeral preview channels (7-day

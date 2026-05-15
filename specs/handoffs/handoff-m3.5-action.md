@@ -29,7 +29,28 @@ m3.5 is sequenced before m4 (the browser embed) for two reasons:
 
 ## Where we are
 
-**Building blocks already in place:**
+**Shipped so far:**
+
+- `packages/nowline-action/` package scaffold landed:
+  - `package.json` (private; runtime deps `@actions/core`,
+    `@actions/exec`, `fast-glob`, `unified` + remark family;
+    workspace dev dep on `@nowline/cli`).
+  - `tsconfig.json` (extends root, server-side `lib: ["ES2022"]`).
+  - `action.yml` with the full input matrix from
+    [`specs/embed.md`](../embed.md) § GitHub Action plus `output-dir`
+    + `cli-version`, three outputs (`rendered`, `failed`,
+    `changed-files`), `using: node24`, `branding: { icon: map,
+    color: blue }`.
+  - `src/index.ts` entry point dispatching to `runFileMode` /
+    `runMarkdownMode`; `src/inputs.ts` typed input parsing; stub
+    `file-mode.ts` and `markdown-mode.ts` ready for T2/T3.
+  - `README.md` with quickstart, input/output tables, and a
+    "source lives in monorepo" callout explaining the Marketplace
+    mirror posture.
+- Workspace `pnpm install` resolves the new package; `pnpm --filter
+  @nowline/action run typecheck` passes.
+
+**Building blocks already in place (carried over from m4 / m2):**
 
 - [`@nowline/cli`](../../packages/cli) — verbless CLI (m2b.5) plus all
   export formats (m2c PNG, PDF, HTML, Markdown, XLSX, MS Project XML).
@@ -40,18 +61,20 @@ m3.5 is sequenced before m4 (the browser embed) for two reasons:
   — has a Homebrew tap mirror cell that pushes a generated formula
   into `lolay/homebrew-tap` on every tag. Same pattern the action's
   Marketplace mirror cell will use, just pointed at a different repo.
+- [`packages/embed/scripts/bundle.mjs`](../../packages/embed/scripts/bundle.mjs)
+  — esbuild reference the action's bundler will mirror.
 
 **Not yet present:**
 
-- No `packages/nowline-action/` source directory.
-- No `lolay/nowline-action` Marketplace mirror repo. Will be created
-  empty during bootstrap (Apache-2.0 license, README pointing at the
-  monorepo for source; everything else populated by `release.yml`).
-- No GitHub Action runtime entry. Most likely shape: a small TypeScript
-  / JavaScript wrapper that reads `core.getInput(...)` from
-  `@actions/core`, builds a CLI invocation, and shells out via
-  `@actions/exec`. Bundled into a single `dist/index.js` via
-  `@vercel/ncc` (the standard for distributable actions) or esbuild.
+- File mode and markdown mode are scaffolding stubs that throw
+  "not yet implemented" — T2 and T3 fill them in.
+- No esbuild bundle script under `packages/nowline-action/scripts/`.
+- No `packages/nowline-action/test/` directory.
+- No `lolay/nowline-action` Marketplace mirror repo on GitHub. Will
+  be created empty during bootstrap (Apache-2.0 license, README
+  pointing at the monorepo for source; everything else populated by
+  `release.yml`).
+- No `mirror-action` cell in `release.yml`.
 
 ## What this milestone needs to deliver
 
