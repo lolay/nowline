@@ -1,5 +1,5 @@
-name: 'Nowline Roadmap Renderer'
-description: 'Render Nowline roadmap diagrams in GitHub Actions — file mode renders one .nowline file; markdown mode scans markdown for nowline fenced blocks and inserts the rendered images.'
+name: 'Nowline Roadmap Builder'
+description: 'Build Nowline roadmap diagrams from .nowline files or markdown.'
 author: 'Lolay, Inc.'
 
 branding:
