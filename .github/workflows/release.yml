@@ -770,3 +770,34 @@ jobs:
           # losing — so plain --force is both safe and necessary.
           git tag --force "$MAJOR"
           git push --force origin "$MAJOR"
+
+      # The action is only listed on the GitHub Marketplace via Release
+      # objects (tags alone don't surface there). After the first
+      # human-drafted Marketplace release, subsequent releases auto-roll
+      # the listing forward iff a Release exists for each new tag — so
+      # we create one here. Body intentionally short: the monorepo's
+      # auto-generated release notes are the source of truth for change
+      # history (rich commit log, PR refs, comparison link), and
+      # duplicating them on the mirror would bit-rot. We point users at
+      # the monorepo release instead.
+      - name: Publish GitHub Release on mirror
+        if: matrix.kind == 'action-mirror'
+        env:
+          GH_TOKEN: ${{ secrets.MARKETPLACE_MIRROR_PAT }}
+        run: |
+          set -euo pipefail
+          VERSION="${GITHUB_REF_NAME#v}"
+          MAJOR="v${VERSION%%.*}"
+
+          BODY=$(cat <<EOF
+          This release builds \`@nowline/action\` from [\`lolay/nowline@v${VERSION}\`](https://github.com/lolay/nowline/releases/tag/v${VERSION}). Full release notes live there.
+
+          Pin \`uses: lolay/nowline-action@v${VERSION}\` for fully reproducible builds, or \`@${MAJOR}\` to track the latest ${MAJOR}.x patch automatically.
+          EOF
+          )
+
+          gh release create "v${VERSION}" \
+            --repo lolay/nowline-action \
+            --title "v${VERSION}" \
+            --notes "$BODY" \
+            --latest
