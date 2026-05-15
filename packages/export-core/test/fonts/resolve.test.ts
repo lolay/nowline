@@ -426,8 +426,13 @@ describe('resolveFonts — bundled fallback determinism', () => {
             env: {},
             isStdoutTty: true,
         });
-        expect(a.sans.bytes).toEqual(b.sans.bytes);
-        expect(a.mono.bytes).toEqual(b.mono.bytes);
+        // Buffer.compare is O(n) native memcmp; vitest's `toEqual` walks the
+        // typed array element-by-element, which on Windows CI workers can push
+        // ~740 KB + ~330 KB comparisons past the default 5 s test budget.
+        expect(a.sans.bytes.byteLength).toBe(b.sans.bytes.byteLength);
+        expect(a.mono.bytes.byteLength).toBe(b.mono.bytes.byteLength);
+        expect(Buffer.compare(a.sans.bytes, b.sans.bytes)).toBe(0);
+        expect(Buffer.compare(a.mono.bytes, b.mono.bytes)).toBe(0);
     });
 
     it('bundled DejaVu bytes are non-empty', async () => {
