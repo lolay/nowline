@@ -84,15 +84,37 @@ m3.5 is sequenced before m4 (the browser embed) for two reasons:
     checks out `lolay/nowline-action` with `MARKETPLACE_MIRROR_PAT`,
     replaces contents (preserving `.git/`), commits, pushes
     `v${VERSION}` (immutable, hard-fails on collision) and
-    `v${MAJOR}` (moving major-tag pointer, `--force-with-lease`,
-    matches the `actions/checkout@v4` convention).
+    `v${MAJOR}` (moving major-tag pointer, plain `git push --force` —
+    `--force-with-lease` was tried first but tags lack upstream-tracking
+    refs and every retag rejected with "stale info"; CI is the single
+    writer so plain `--force` is both safe and necessary), then calls
+    `gh release create` against the mirror so the Marketplace listing
+    auto-rolls forward to each new tag.
   - The bundle script's incidental `dist/meta.json` write was
     dropped so the staged mirror is verbatim `cp -R dist/`. Mirror
     ships six files: `action.yml`, `README.md`, `LICENSE`,
     `dist/index.cjs`, `dist/index.cjs.map`, `dist/index.cjs.LEGAL.txt`.
+- `MARKETPLACE_MIRROR_PAT` provisioned on `lolay/nowline` (fine-grained
+  PAT scoped to `lolay/nowline-action` with `contents: write`).
+- Five releases pushed end-to-end through the mirror cell: `v0.2.2`,
+  `v0.2.3`, `v0.2.4`, `v0.2.5`, with the moving `v0` tag tracking
+  the latest. Recovery loop on `v0.2.1` (stale `origin/main` snapshot)
+  resolved by rebasing the local feature commits onto `origin/main`
+  and re-bumping; root cause was a forgotten `git push` of the
+  T3-T6 work before kicking off the release workflow.
+- Marketplace listing **live** at
+  [`github.com/marketplace/actions/nowline-roadmap-builder`](https://github.com/marketplace/actions/nowline-roadmap-builder),
+  category **Continuous integration** (primary) + **Utilities**
+  (secondary), branded `map` / `blue`. First listing was the
+  human-drafted v0.2.5 release; subsequent releases will roll the
+  listing forward automatically via the `gh release create` step
+  added in the action-mirror publish cell.
 - Validations green: `pnpm --filter @nowline/action run typecheck`,
   `pnpm --filter @nowline/action run test` (29/29), `biome check`,
   and `pnpm --filter @nowline/action run build` (1.2 MB bundled CJS).
+  Cross-OS path normalization fix (`toPosixRelative`) landed during
+  the recovery loop after Windows CI surfaced backslash-separated
+  paths in `changed-files` output.
 
 **Building blocks already in place (carried over from m4 / m2):**
 
@@ -110,16 +132,12 @@ m3.5 is sequenced before m4 (the browser embed) for two reasons:
 
 **Not yet present:**
 
-- No `MARKETPLACE_MIRROR_PAT` repo secret on `lolay/nowline` yet —
-  the mirror cell will fail until this lands (fine-grained PAT
-  with `contents: write` on `lolay/nowline-action`).
-- No first release; the mirror repo still has only the bootstrap
-  `README.md` + `LICENSE` until the first tag fires the cell.
-- No bundled-action smoke test yet (deferred from T5 to land
-  against the published mirror artifact rather than a one-off
-  local bundle — see deliverable item 7 below).
-- No Marketplace listing — submit on the mirror repo's first
-  release page (T7).
+- No bundled-action smoke test (deferred from T5; the original goal
+  was running `node dist/index.cjs` with `INPUT_*` env vars against
+  a fixture, intended to land against the published mirror
+  artifact). Now that the mirror is live and stable across five
+  releases, this is a real gap rather than a deferral, but it's
+  small in scope — see deliverable item 7 below.
 
 ## What this milestone needs to deliver
 
@@ -157,11 +175,24 @@ Per [`specs/embed.md`](../embed.md) § GitHub Action:
    **Landed.** Implemented as a `pack-action` cell in the build
    matrix and an `action-mirror` cell in the publish matrix,
    patterned after the existing npm-pack/npm and vsix-pack/vscode
-   pairs. `--force-with-lease` on the moving major tag, hard-fail
-   on the immutable tag.
+   pairs. Plain `--force` on the moving major tag (initial
+   `--force-with-lease` attempt rejected on the second update with
+   "stale info" because tags have no upstream-tracking ref to compare
+   against), hard-fail on the immutable tag. After the tag push, a
+   final `gh release create` step publishes a Release object on the
+   mirror so the Marketplace listing auto-rolls forward to each new
+   tag — body intentionally short, links to the monorepo release for
+   full notes.
 6. **Marketplace listing** — the mirror repo's `action.yml` with a
    `branding:` block (icon + color) is what GitHub Marketplace
    surfaces. Submit for listing once the first release lands.
+
+   **Landed.** Listed at
+   [`github.com/marketplace/actions/nowline-roadmap-builder`](https://github.com/marketplace/actions/nowline-roadmap-builder)
+   from the v0.2.5 release page. Categories: Continuous integration
+   (primary) + Utilities (secondary). Subsequent releases roll the
+   listing forward automatically via the `gh release create` step
+   noted above.
 7. **Tests** in `packages/nowline-action/test/`:
    - Unit tests for the markdown scan/insert logic (parse, find blocks,
      compute insertion sites, idempotent refresh).
@@ -243,9 +274,9 @@ Sequenced so each step unblocks the next.
 0a. ~~**Create the `lolay/nowline-action` mirror repo** — empty, public,
     Apache-2.0 license. README points at the monorepo for source.~~
     *(Done — bootstrapped with placeholder README + LICENSE during T1.)*
-0b. **Add `MARKETPLACE_MIRROR_PAT` repo secret** on `lolay/nowline` —
-    fine-grained PAT with `contents: write` on `lolay/nowline-action`.
-    *(Still required — the mirror cell fails without it.)*
+0b. ~~**Add `MARKETPLACE_MIRROR_PAT` repo secret** on `lolay/nowline` —
+    fine-grained PAT with `contents: write` on `lolay/nowline-action`.~~
+    *(Done — provisioned mid-milestone; pushed five releases successfully.)*
 
 ### In this monorepo
 
@@ -273,12 +304,26 @@ Sequenced so each step unblocks the next.
 
 ### Marketplace submission
 
-6. **First release smoke** — cut a `v0.x.0` from this monorepo, watch
+6. ~~**First release smoke** — cut a `v0.x.0` from this monorepo, watch
    the mirror cell run, manually verify the mirror repo has the new
-   tag and the `dist/` looks right.
-7. **Submit Marketplace listing** — visit the mirror repo's release
+   tag and the `dist/` looks right.~~
+   *(Done — five releases through v0.2.5. Recovery loop on `v0.2.1`
+   covered in "Where we are" → "Five releases pushed end-to-end".)*
+7. ~~**Submit Marketplace listing** — visit the mirror repo's release
    page, check "Publish this release to the GitHub Marketplace",
-   pick the icon and color from `branding:`, fill the description.
+   pick the icon and color from `branding:`, fill the description.~~
+   *(Done — listed from v0.2.5 release page. Categories: Continuous
+   integration + Utilities.)*
+
+### Remaining work
+
+8. **Bundled-action smoke test** (deferred T5 leftover). Run
+   `node dist/index.cjs` with `INPUT_*` env vars against a fixture
+   from CI, asserting the action's wired inputs / outputs against
+   real bundled JS. Lower urgency now that five releases have shipped
+   without the smoke test catching anything in production, but still
+   a real gap — bundling regressions wouldn't surface until users hit
+   them.
 
 ## Gotchas
 
