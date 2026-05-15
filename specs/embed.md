@@ -96,7 +96,7 @@ The embed is shipped as `@nowline/embed` on npm, so the npm-backed CDNs (jsDeliv
 
 ### Bootstrap status
 
-The bundle ships in m4 as `@nowline/embed` on npm (already wired through `release.yml`). The Firebase Hosting projects, deploy job, and the `embed.nowline.{io,dev}` DNS records remain to be set up — see the m4 handoff under [Carried forward](./handoffs/handoff-m4-embed.md) and `specs/features.md` feature 32. Until that lands, embedders that need the bundle today can `npm i @nowline/embed` and serve it themselves; the URLs above are the shape the documented channel will take, not something live yet.
+The bundle ships in m4 as `@nowline/embed` on npm (already wired through `release.yml`). The Firebase Hosting projects, deploy job, and the `embed.nowline.{io,dev}` DNS records remain to be set up — see the m4 handoff under [Carried forward](./handoffs/handoff-m4-embed.md) and `specs/features.md` feature 32. The one-time provisioning runbook for the two Firebase projects, service accounts, GitHub secrets, DNS, and the dev auth gate decision is at [`../ops/embed-deploy.md`](../ops/embed-deploy.md). Until that lands, embedders that need the bundle today can `npm i @nowline/embed` and serve it themselves; the URLs above are the shape the documented channel will take, not something live yet.
 
 ## Bundle Size Target
 
