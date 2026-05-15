@@ -1,7 +1,7 @@
 {
     "private": true,
     "name": "@nowline/action",
-    "version": "0.2.2",
+    "version": "0.2.3",
     "description": "GitHub Action that renders Nowline roadmap diagrams in CI — file and markdown modes.",
     "license": "Apache-2.0",
     "type": "module",

@@ -1,6 +1,6 @@
 {
     "name": "@nowline/embed",
-    "version": "0.2.2",
+    "version": "0.2.3",
     "description": "Browser embed bundle for Nowline. Drop a <script> tag and ```nowline``` blocks render in place.",
     "license": "Apache-2.0",
     "type": "module",
