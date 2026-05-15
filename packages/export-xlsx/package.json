@@ -1,6 +1,6 @@
 {
     "name": "@nowline/export-xlsx",
-    "version": "0.2.4",
+    "version": "0.2.5",
     "description": "Nowline XLSX exporter — five-sheet workbook via ExcelJS",
     "license": "Apache-2.0",
     "type": "module",

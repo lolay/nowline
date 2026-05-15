@@ -1,6 +1,6 @@
 {
     "name": "@nowline/config",
-    "version": "0.2.4",
+    "version": "0.2.5",
     "description": "Shared .nowlinerc loader for the Nowline CLI and editors",
     "license": "Apache-2.0",
     "type": "module",
