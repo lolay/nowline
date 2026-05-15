@@ -2,7 +2,7 @@
     "name": "vscode-nowline",
     "displayName": "Nowline",
     "description": "Author Nowline roadmaps in VS Code and Cursor — syntax highlighting, language server, and live preview.",
-    "version": "0.2.1",
+    "version": "0.2.2",
     "private": false,
     "license": "Apache-2.0",
     "publisher": "nowline",

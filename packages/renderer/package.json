@@ -1,6 +1,6 @@
 {
     "name": "@nowline/renderer",
-    "version": "0.2.1",
+    "version": "0.2.2",
     "description": "Nowline SVG renderer — positioned model → SVG string",
     "license": "Apache-2.0",
     "type": "module",

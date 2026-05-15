@@ -1,6 +1,6 @@
 {
     "name": "@nowline/lsp",
-    "version": "0.2.1",
+    "version": "0.2.2",
     "description": "Nowline language-server — Langium-based LSP that powers VS Code, Cursor, and any other LSP-capable editor",
     "license": "Apache-2.0",
     "type": "module",
