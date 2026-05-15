@@ -1,6 +1,6 @@
 {
     "name": "@nowline/export-core",
-    "version": "0.2.3",
+    "version": "0.2.4",
     "description": "Nowline export-core — shared types, font resolver, unit converter, PDF page-size types",
     "license": "Apache-2.0",
     "type": "module",
