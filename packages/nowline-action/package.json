@@ -5,7 +5,7 @@
     "description": "GitHub Action that renders Nowline roadmap diagrams in CI — file and markdown modes.",
     "license": "Apache-2.0",
     "type": "module",
-    "main": "./dist/index.js",
+    "main": "./dist/index.cjs",
     "files": [
         "action.yml",
         "dist/",
@@ -30,7 +30,7 @@
         "dsl"
     ],
     "scripts": {
-        "build": "tsc -b tsconfig.json && node scripts/bundle.mjs",
+        "build": "node scripts/bundle.mjs",
         "typecheck": "tsc --noEmit -p tsconfig.json",
         "bundle": "node scripts/bundle.mjs",
         "test": "vitest run",
