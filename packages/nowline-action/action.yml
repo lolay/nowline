@@ -36,14 +36,6 @@ inputs:
     cli-version:
         description: 'Version of @nowline/cli to install on the runner. Defaults to the action version (lock-step).'
         required: false
-    commit:
-        description: 'Auto-commit the rendered output. true or false.'
-        required: false
-        default: 'false'
-    commit-message:
-        description: 'Commit message used when commit is true.'
-        required: false
-        default: 'render nowline diagrams [skip ci]'
 
 outputs:
     rendered:
@@ -51,7 +43,7 @@ outputs:
     failed:
         description: 'Number of diagrams that failed to render'
     changed-files:
-        description: 'Newline-separated list of files changed by the action'
+        description: 'Newline-separated list of files written or modified by the action. Pair with stefanzweifel/git-auto-commit-action or peter-evans/create-pull-request to commit the result.'
 
 runs:
     using: 'node24'

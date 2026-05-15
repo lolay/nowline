@@ -13,8 +13,6 @@ export interface ActionInputs {
     format: Format;
     theme: Theme;
     cliVersion?: string;
-    commit: boolean;
-    commitMessage: string;
 }
 
 export interface RunResult {
@@ -47,14 +45,6 @@ function readTheme(): Theme {
     return raw;
 }
 
-function readBoolean(name: string, fallback: boolean): boolean {
-    const raw = core.getInput(name);
-    if (raw === '') return fallback;
-    if (raw === 'true') return true;
-    if (raw === 'false') return false;
-    throw new Error(`${name} must be "true" or "false" (got "${raw}")`);
-}
-
 export function parseInputs(): ActionInputs {
     const mode = readMode();
     const input = core.getInput('input') || undefined;
@@ -77,7 +67,5 @@ export function parseInputs(): ActionInputs {
         format: readFormat(),
         theme: readTheme(),
         cliVersion,
-        commit: readBoolean('commit', false),
-        commitMessage: core.getInput('commit-message') || 'render nowline diagrams [skip ci]',
     };
 }

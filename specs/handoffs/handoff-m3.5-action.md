@@ -11,9 +11,11 @@ diverged" for the full rationale).
 The browser embed (m4) cannot run inside hosts that strip `<script>`
 tags — GitHub READMEs, GitHub issues, GitHub PRs, and most CI-rendered
 markdown surfaces. The GitHub Action is the answer for those: it
-shells out to `@nowline/cli` on a runner and commits the rendered
-SVG / PNG into the repo, so the markdown reference becomes a static
-image asset that any markdown surface renders verbatim.
+shells out to `@nowline/cli` on a runner and writes / refreshes the
+rendered SVG / PNG. Pairing it with a downstream commit action (see
+"Key decisions" → "Commit semantics") lands the result in the repo so
+the markdown reference becomes a static image asset that any markdown
+surface renders verbatim.
 
 m3.5 is sequenced before m4 (the browser embed) for two reasons:
 
@@ -31,24 +33,44 @@ m3.5 is sequenced before m4 (the browser embed) for two reasons:
 
 **Shipped so far:**
 
-- `packages/nowline-action/` package scaffold landed:
+- `packages/nowline-action/` package source complete except for tests:
   - `package.json` (private; runtime deps `@actions/core`,
     `@actions/exec`, `fast-glob`, `unified` + remark family;
     workspace dev dep on `@nowline/cli`).
   - `tsconfig.json` (extends root, server-side `lib: ["ES2022"]`).
-  - `action.yml` with the full input matrix from
-    [`specs/embed.md`](../embed.md) § GitHub Action plus `output-dir`
-    + `cli-version`, three outputs (`rendered`, `failed`,
-    `changed-files`), `using: node24`, `branding: { icon: map,
-    color: blue }`.
-  - `src/index.ts` entry point dispatching to `runFileMode` /
-    `runMarkdownMode`; `src/inputs.ts` typed input parsing; stub
-    `file-mode.ts` and `markdown-mode.ts` ready for T2/T3.
-  - `README.md` with quickstart, input/output tables, and a
-    "source lives in monorepo" callout explaining the Marketplace
-    mirror posture.
-- Workspace `pnpm install` resolves the new package; `pnpm --filter
-  @nowline/action run typecheck` passes.
+  - `action.yml` with the input matrix `mode`, `input`, `output`,
+    `files`, `output-dir`, `format`, `theme`, `cli-version`; three
+    outputs (`rendered`, `failed`, `changed-files`); `using: node24`;
+    `branding: { icon: map, color: blue }`. **No `commit` or
+    `commit-message`** — render-only contract, see "Key decisions"
+    below.
+  - `src/index.ts` mode-dispatch entry; `src/inputs.ts` typed input
+    parsing; `src/version.ts` reads action version from
+    `package.json` for lock-step CLI install.
+  - `src/cli.ts` — `ensureCli()` skips reinstall when the requested
+    CLI version is already on PATH; `renderOnce()` shells out via
+    `@actions/exec`.
+  - `src/file-mode.ts` — orchestrates a single render; emits the
+    output path via `changed-files`.
+  - `src/markdown-mode.ts` + pure helpers (`markdown-scan.ts`,
+    `markdown-edit.ts`) — fast-glob → remark-parse → SHA-256 slug →
+    CLI render → idempotent HTML-comment-fenced marker insert/refresh.
+    Scanner and editor are pure functions (no I/O), unit-testable
+    independently of `@actions/exec`.
+  - `scripts/bundle.mjs` — esbuild bundle to `dist/index.cjs`
+    (CJS, node24, sourcemap, legal comments). Builds the safety
+    check that no non-builtin imports escape into the bundle (would
+    throw `Cannot find module` on a runner with no `node_modules/`).
+  - `README.md` — quickstart, full input/output table, three
+    composition examples (auto-commit, PR mode, drift detection),
+    "source lives in monorepo" callout.
+- `lolay/nowline-action` mirror repo created and the local clone at
+  `../nowline-action/` populated with placeholder `README.md` +
+  Apache-2.0 `LICENSE`. The repo will be self-populating from the
+  `release.yml` mirror cell once it lands (T6).
+- Validations green: `pnpm --filter @nowline/action run typecheck`,
+  `biome check`, and `pnpm --filter @nowline/action run build`
+  (1.2 MB bundled CJS).
 
 **Building blocks already in place (carried over from m4 / m2):**
 
@@ -62,19 +84,21 @@ m3.5 is sequenced before m4 (the browser embed) for two reasons:
   into `lolay/homebrew-tap` on every tag. Same pattern the action's
   Marketplace mirror cell will use, just pointed at a different repo.
 - [`packages/embed/scripts/bundle.mjs`](../../packages/embed/scripts/bundle.mjs)
-  — esbuild reference the action's bundler will mirror.
+  — esbuild reference the action's bundler mirrored.
 
 **Not yet present:**
 
-- File mode and markdown mode are scaffolding stubs that throw
-  "not yet implemented" — T2 and T3 fill them in.
-- No esbuild bundle script under `packages/nowline-action/scripts/`.
-- No `packages/nowline-action/test/` directory.
-- No `lolay/nowline-action` Marketplace mirror repo on GitHub. Will
-  be created empty during bootstrap (Apache-2.0 license, README
-  pointing at the monorepo for source; everything else populated by
-  `release.yml`).
-- No `mirror-action` cell in `release.yml`.
+- No `packages/nowline-action/test/` directory; T5 covers vitest
+  unit tests for `markdown-scan.ts` / `markdown-edit.ts` plus an
+  integration test that boots the bundled action against a fixture
+  repo.
+- No `mirror-action` cell in `release.yml` (T6).
+- No `MARKETPLACE_MIRROR_PAT` repo secret on `lolay/nowline` yet —
+  needed before T6 can run successfully (fine-grained PAT with
+  `contents: write` on `lolay/nowline-action`).
+- No first release; the mirror clone in `../nowline-action/` will
+  remain empty (just placeholder README + LICENSE) until the first
+  tag fires the mirror cell.
 
 ## What this milestone needs to deliver
 
@@ -83,14 +107,17 @@ Per [`specs/embed.md`](../embed.md) § GitHub Action:
 1. **`packages/nowline-action/` source** — TypeScript entry that
    implements two modes:
    - **File mode** — read `input` and `output` action inputs, run
-     `nowline <input> -o <output> -f <format>`, optionally commit.
+     `nowline <input> -o <output> -f <format>`, emit the output
+     path on the `changed-files` output for downstream commit
+     actions.
    - **Markdown mode** — glob `files`, parse each markdown for
      ` ```nowline ` fenced blocks, render each block to a configurable
-     output directory, insert / refresh an `![Roadmap](path)` link
-     adjacent to the block, optionally commit.
+     output directory, insert / refresh an HTML-comment-fenced
+     image reference adjacent to the block, emit the list of
+     written paths on `changed-files`.
 2. **`action.yml`** at the package root, declaring the input matrix
-   from the spec table (`mode`, `input`, `output`, `files`, `format`,
-   `theme`, `commit`, `commit-message`).
+   from the spec table (`mode`, `input`, `output`, `files`,
+   `output-dir`, `format`, `theme`, `cli-version`).
 3. **Bundle step** that compiles `src/index.ts` into a single
    `dist/index.js` (no `node_modules` shipped to consumers — actions
    ship their `dist/` because runners don't `npm install`). `ncc` or
@@ -140,14 +167,19 @@ Per [`specs/embed.md`](../embed.md) § GitHub Action:
   Recommend option 1. Match-version means the action and CLI stay
   lock-step automatically. The 5–10s overhead is dwarfed by Action
   startup time anyway.
-- **Commit semantics.** Three pieces of behaviour to nail down:
-  - Should the action skip the commit step if the rendered output is
-    byte-identical to what's already committed? (Yes — avoid noise.)
-  - Should the action use `actions/checkout`'s default token, or a
-    PAT? (Default token is fine for same-repo commits; PAT only if
-    the user wants the commits to bypass branch protection.)
-  - Should the action force-push? (No — append a normal commit. Force-
-    push behaviour is a footgun.)
+- **Commit semantics — resolved: render-only.** The action does not
+  commit. It writes / refreshes output files and emits the list of
+  changed paths via the `changed-files` output. Persistence is
+  composed downstream by the user via
+  [`stefanzweifel/git-auto-commit-action`](https://github.com/stefanzweifel/git-auto-commit-action),
+  [`peter-evans/create-pull-request`](https://github.com/peter-evans/create-pull-request),
+  or a bare `git diff --exit-code` step for drift detection. This
+  shape was chosen deliberately during T4 — see
+  [`specs/embed.md`](../embed.md) § "Render-only contract" for the
+  rationale. It tightens the action's contract ("render Nowline
+  files, period") and lets every team compose the exact commit
+  semantics they want with the action they already trust, instead
+  of feature-matching against a thin slice of `git-auto-commit-action`.
 - **Markdown-mode insertion idempotency.** When the action runs twice,
   the second run shouldn't double-insert image refs. Use an HTML
   comment marker around the auto-inserted line, e.g.
@@ -178,12 +210,13 @@ Sequenced so each step unblocks the next.
    `action.yml`, `src/index.ts` skeleton with mode dispatch, no real
    logic yet. Workspace dep on `@nowline/cli` (so dev-loop tests run
    against monorepo CLI).
-2. **Implement file mode** — read inputs, exec the CLI, optionally
-   commit. Add unit tests for the input-parsing layer and integration
-   tests for end-to-end exec + commit.
+2. **Implement file mode** — read inputs, exec the CLI, emit
+   `changed-files`. Add unit tests for the input-parsing layer and
+   integration tests for end-to-end exec.
 3. **Implement markdown mode** — markdown scanner, fenced-block
    finder, insertion-site computer with idempotency markers, render
-   loop, commit. Heavier test coverage here because the markdown
+   loop. Emit `changed-files` covering written images + edited
+   markdown. Heavier test coverage here because the markdown
    surface is what most users will actually use.
 4. **Add the bundler step** — `scripts/bundle.mjs` (mirror the embed's
    pattern) producing `dist/index.js`. Fail the build if any
@@ -230,12 +263,13 @@ Sequenced so each step unblocks the next.
   proper markdown parser (`remark` / `markdown-it`) rather than a
   regex; multi-fence-level support has been a source of subtle bugs
   in similar actions.
-- **Same-repo commits trigger CI.** When the action commits the
-  rendered output, the resulting `push` event will trigger CI again.
-  Document that users should add `paths-ignore` to their other
-  workflows or use `[skip ci]` in the auto-commit message. Defaulting
-  the commit message to something like `render nowline diagrams [skip ci]`
-  is a reasonable default.
+- **Same-repo auto-commit loops are the user's problem now.** The
+  action no longer commits, so the classic "render-action commits,
+  push triggers CI, CI runs render-action again" loop can only happen
+  if the user's chained commit action does the loop. README points
+  users at `[skip ci]` in their commit-message input as the standard
+  defence; `stefanzweifel/git-auto-commit-action` already supports
+  this directly.
 - **`v0` major tag during 0.x.** During 0.x, the breaking-change
   boundary is the *minor* (semver pre-1.0). So the moving major-tag
   pointer for users on 0.x should be `v0`, but it's effectively
@@ -269,10 +303,16 @@ Sequenced so each step unblocks the next.
 
 - **PR comment integration** (e.g. preview-rendered roadmap as a PR
   comment). Possible follow-up but adds GitHub-API surface; defer.
-- **Drift detection** (fail CI if the committed image is out of date
-  vs. its source `.nowline`). A natural follow-up but separable from
-  the render-and-commit core.
+- **Auto-commit / push / PR creation.** Render-only contract;
+  composed downstream by the user. See "Key decisions" → "Commit
+  semantics".
 - **Multi-repo / cross-repo modes.** The action runs in one repo at
   a time. Cross-repo automation is the user's responsibility.
 - **Custom theme palettes beyond `light` / `dark`.** Whatever the CLI
   supports, the action exposes; nothing more.
+
+Drift detection ("fail CI when the committed image is out of date
+vs. its source `.nowline`") used to be listed here. It's now a
+documented usage pattern via `git diff --exit-code` after the action
+runs — no special action behaviour needed. See the README's
+"Drift detection" example.

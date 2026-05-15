@@ -6,7 +6,6 @@ import * as core from '@actions/core';
 import fastGlob from 'fast-glob';
 
 import { ensureCli, renderOnce } from './cli.js';
-import { commitChanges, configureGitIdentity } from './git.js';
 import type { ActionInputs, RunResult } from './inputs.js';
 import { applyEdits, type BlockEdit } from './markdown-edit.js';
 import { type ScannedBlock, scanMarkdown } from './markdown-scan.js';
@@ -34,7 +33,7 @@ export async function runMarkdownMode(inputs: ActionInputs): Promise<RunResult> 
 
     let rendered = 0;
     let failed = 0;
-    const touchedMarkdown: string[] = [];
+    const changedFiles: string[] = [];
 
     for (const mdPath of markdownFiles) {
         const fileResult = await processMarkdownFile({
@@ -45,17 +44,12 @@ export async function runMarkdownMode(inputs: ActionInputs): Promise<RunResult> 
         });
         rendered += fileResult.rendered;
         failed += fileResult.failed;
-        if (fileResult.markdownChanged) touchedMarkdown.push(mdPath);
-    }
-
-    let changedFiles: string[] = [];
-    if (inputs.commit && (touchedMarkdown.length > 0 || rendered > 0)) {
-        await configureGitIdentity();
-        const commitPaths = [
-            ...touchedMarkdown.map((p) => path.relative(repoRoot, p)),
-            path.relative(repoRoot, outputDir),
-        ];
-        changedFiles = await commitChanges(commitPaths, inputs.commitMessage);
+        for (const renderedPath of fileResult.renderedPaths) {
+            changedFiles.push(path.relative(repoRoot, renderedPath));
+        }
+        if (fileResult.markdownChanged) {
+            changedFiles.push(path.relative(repoRoot, mdPath));
+        }
     }
 
     return { rendered, failed, changedFiles };
@@ -65,6 +59,7 @@ interface FileResult {
     rendered: number;
     failed: number;
     markdownChanged: boolean;
+    renderedPaths: string[];
 }
 
 interface ProcessMarkdownFileArgs {
@@ -80,7 +75,7 @@ async function processMarkdownFile(args: ProcessMarkdownFileArgs): Promise<FileR
     const { blocks } = scanMarkdown(source);
 
     if (blocks.length === 0) {
-        return { rendered: 0, failed: 0, markdownChanged: false };
+        return { rendered: 0, failed: 0, markdownChanged: false, renderedPaths: [] };
     }
 
     core.info(
@@ -88,6 +83,7 @@ async function processMarkdownFile(args: ProcessMarkdownFileArgs): Promise<FileR
     );
 
     const successful: BlockEdit[] = [];
+    const renderedPaths: string[] = [];
     let rendered = 0;
     let failed = 0;
 
@@ -96,6 +92,7 @@ async function processMarkdownFile(args: ProcessMarkdownFileArgs): Promise<FileR
         const success = await renderBlock({ block, outPath, format, theme });
         if (success) {
             rendered += 1;
+            renderedPaths.push(outPath);
             successful.push({
                 block,
                 imagePath: relativeImagePath(mdPath, outPath),
@@ -106,16 +103,16 @@ async function processMarkdownFile(args: ProcessMarkdownFileArgs): Promise<FileR
     }
 
     if (successful.length === 0) {
-        return { rendered, failed, markdownChanged: false };
+        return { rendered, failed, markdownChanged: false, renderedPaths };
     }
 
     const updated = applyEdits(source, successful);
     if (updated === source) {
-        return { rendered, failed, markdownChanged: false };
+        return { rendered, failed, markdownChanged: false, renderedPaths };
     }
 
     await fs.writeFile(mdPath, updated, 'utf-8');
-    return { rendered, failed, markdownChanged: true };
+    return { rendered, failed, markdownChanged: true, renderedPaths };
 }
 
 interface RenderBlockArgs {

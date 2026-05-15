@@ -143,11 +143,21 @@ The GitHub Action is the solution for contexts where the embed script cannot run
 **License:** Apache 2.0.
 **Milestone:** m3.5 — sequenced before m4 so the GitHub-bound rendering path lands first. The action shells out to `@nowline/cli`. At dev time that's a workspace symlink so cross-cutting PRs stay atomic; at runtime the action `npm install -g`s the CLI version that matches its tag, so the published artifact consumes the CLI exactly the way an external user would.
 
+### Render-only contract
+
+The action **renders** Nowline files. It does not commit, push, or open pull requests. Persisting the rendered output is the user's job, composed downstream of the action via a purpose-built helper:
+
+- [`stefanzweifel/git-auto-commit-action`](https://github.com/stefanzweifel/git-auto-commit-action) — the canonical "stage, commit, push" composer (signed commits, branch protection, fork-PR detection all built-in).
+- [`peter-evans/create-pull-request`](https://github.com/peter-evans/create-pull-request) — when the rendered output should land via PR review rather than direct push.
+- A bare `git diff --exit-code` step — for "fail CI when committed renders drift from source" workflows where no commit ever happens.
+
+This shape was chosen deliberately. Rendering and persisting are independent concerns, and the persistence side has a deep, well-maintained ecosystem of specialized actions (signed commits, GPG signing, PR mode, fork detection, retry-on-conflict, `[skip ci]` semantics, etc.). Bundling commit logic into this action would duplicate a thin slice of that surface and force users to live with our defaults; chaining lets every team compose the exact commit semantics they want with the action they already trust.
+
 ### Two Modes
 
 #### File Mode
 
-Render `.nowline` files into SVG/PNG and commit the output.
+Render a single `.nowline` file to SVG/PNG. The chained commit action picks up the result.
 
 ```yaml
 - uses: lolay/nowline-action@v1
@@ -156,6 +166,11 @@ Render `.nowline` files into SVG/PNG and commit the output.
     input: docs/roadmap.nowline
     output: docs/roadmap.svg
     format: svg
+
+- uses: stefanzweifel/git-auto-commit-action@v5
+  with:
+    commit_message: 'render nowline diagrams [skip ci]'
+    file_pattern: 'docs/roadmap.svg'
 ```
 
 The README then references the generated image:
@@ -174,16 +189,18 @@ Scan markdown files for ` ```nowline ` fenced code blocks, render each one, and 
     mode: markdown
     files: '**/*.md'
     format: svg
-    commit: true
-    commit-message: 'render nowline diagrams'
+
+- uses: stefanzweifel/git-auto-commit-action@v5
+  with:
+    commit_message: 'render nowline diagrams [skip ci]'
+    file_pattern: '**/*.md .nowline/'
 ```
 
 The action:
 
 1. Finds all ` ```nowline ` blocks in the matched markdown files.
-2. Renders each block to an SVG/PNG file in a configurable output directory.
-3. Inserts an image reference below each block (or replaces a previously generated one).
-4. Optionally commits the changes.
+2. Renders each block to an SVG/PNG file in a configurable output directory using a content-derived 12-char SHA-256 slug (`<output-dir>/nowline-<slug>.<format>`); identical block content always produces the same filename.
+3. Inserts an HTML-comment-fenced image reference below each block, or refreshes an existing one in place. Idempotent across runs — same input means same output, no duplicated markdown.
 
 ### Action Inputs
 
@@ -193,11 +210,19 @@ The action:
 | `input` | Path to `.nowline` file (file mode) | required in file mode |
 | `output` | Output path (file mode) | required in file mode |
 | `files` | Glob pattern for markdown files (markdown mode) | `**/*.md` |
+| `output-dir` | Directory for markdown-mode rendered images, relative to repo root | `.nowline/` |
 | `format` | `svg` or `png` | `svg` |
 | `theme` | `light` or `dark` | `light` |
-| `commit` | Auto-commit rendered output | `false` |
-| `commit-message` | Commit message | `render nowline diagrams` |
+| `cli-version` | Version of `@nowline/cli` to install on the runner | (action version) |
+
+### Action Outputs
+
+| Output | Description |
+|--------|-------------|
+| `rendered` | Number of diagrams rendered |
+| `failed` | Number of diagrams that failed to render |
+| `changed-files` | Newline-separated list of files written or modified by the action. Pair with `git-auto-commit-action` or `create-pull-request` to commit them. |
 
 ### How It Works Under the Hood
 
-The action installs the `nowline` CLI (from npm), then runs `nowline <input>` (verbless) for each input. No Docker image required — it runs directly on the GitHub Actions runner.
+The action installs the `nowline` CLI (from npm) on the runner — skipped when the requested version is already on PATH — then runs `nowline <input> -o <output> -f <format> -t <theme>` for each render. No Docker image required; it runs directly on the GitHub Actions runner.

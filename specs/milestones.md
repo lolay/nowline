@@ -391,8 +391,10 @@ Spec: [`specs/ide.md`](./ide.md) § Authoring commands
 
 Renders Nowline files in CI for hosts that strip `<script>` tags (GitHub READMEs, issue comments, etc.). Two modes:
 
-- **File mode** — render `.nowline` files to SVG/PNG and commit the output.
+- **File mode** — render `.nowline` files to SVG/PNG.
 - **Markdown mode** — scan markdown for ` ```nowline ` blocks, render each one, and insert / refresh the generated image adjacent to the block.
+
+The action is render-only — it writes / refreshes output files and emits the list of changed paths. Persistence is composed downstream via [`stefanzweifel/git-auto-commit-action`](https://github.com/stefanzweifel/git-auto-commit-action), [`peter-evans/create-pull-request`](https://github.com/peter-evans/create-pull-request), or a bare `git diff --exit-code` step. See [`specs/embed.md`](./embed.md) § "Render-only contract" for the rationale.
 
 **Repo posture (matches Mermaid's `mermaid-cli` shape):** the action source lives in this monorepo at `packages/nowline-action/` so cross-cutting PRs with the CLI stay atomic. On each release, `release.yml` mirrors the compiled `action.yml` + `dist/` to the `lolay/nowline-action` repo for GitHub Marketplace listing — the mirror is a publish target like Homebrew tap or npm, not a source-of-truth repo. See [`specs/architecture.md`](./architecture.md) § Organization and Repositories.
 
@@ -400,7 +402,7 @@ The action shells out to `@nowline/cli` (from m2a) and has no dependency on the 
 
 Depends on: m2a (CLI distribution pipeline), m2c (export formats — PNG, in particular), m3e (CLI shell-out pattern reused for repeatability).
 
-Status: **in progress.** `packages/nowline-action/` scaffolded — `package.json`, `tsconfig.json`, `action.yml`, input parsing, mode dispatch, README. File mode, markdown mode, esbuild bundle script, tests, and the `release.yml` Marketplace-mirror cell are still ahead. See [`specs/handoffs/handoff-m3.5-action.md`](./handoffs/handoff-m3.5-action.md) → "Where we are".
+Status: **in progress.** `packages/nowline-action/` source complete: file mode, markdown mode (remark-based scanner with idempotent HTML-comment markers), esbuild bundle (`dist/index.cjs`, ~1.2 MB CJS), and bootstrap mirror clone in place. Tests and the `release.yml` Marketplace-mirror cell are still ahead. See [`specs/handoffs/handoff-m3.5-action.md`](./handoffs/handoff-m3.5-action.md) → "Where we are".
 
 Spec: [`specs/embed.md`](./embed.md) § GitHub Action
 

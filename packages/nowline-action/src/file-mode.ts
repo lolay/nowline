@@ -1,7 +1,6 @@
 import * as core from '@actions/core';
 
 import { ensureCli, renderOnce } from './cli.js';
-import { commitChanges, configureGitIdentity } from './git.js';
 import type { ActionInputs, RunResult } from './inputs.js';
 
 export async function runFileMode(inputs: ActionInputs): Promise<RunResult> {
@@ -13,6 +12,7 @@ export async function runFileMode(inputs: ActionInputs): Promise<RunResult> {
 
     let rendered = 0;
     let failed = 0;
+    const changedFiles: string[] = [];
 
     try {
         core.info(`rendering ${inputs.input} -> ${inputs.output}`);
@@ -23,16 +23,11 @@ export async function runFileMode(inputs: ActionInputs): Promise<RunResult> {
             theme: inputs.theme,
         });
         rendered = 1;
+        changedFiles.push(inputs.output);
     } catch (err) {
         const message = err instanceof Error ? err.message : String(err);
         core.error(`failed to render ${inputs.input}: ${message}`);
         failed = 1;
-    }
-
-    let changedFiles: string[] = [];
-    if (inputs.commit && rendered > 0) {
-        await configureGitIdentity();
-        changedFiles = await commitChanges([inputs.output], inputs.commitMessage);
     }
 
     return { rendered, failed, changedFiles };
