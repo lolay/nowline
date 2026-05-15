@@ -761,8 +761,12 @@ jobs:
           git tag "v${VERSION}"
           git push origin "v${VERSION}"
 
-          # Moving major-tag pointer. --force-with-lease guards against
-          # concurrent manual pushes; in the standard CI flow we just
-          # checked out the tip so the lease succeeds.
+          # Moving major-tag pointer. Plain --force, not --force-with-lease:
+          # tags have no upstream-tracking ref, so --force-with-lease can
+          # only succeed on first creation and then rejects every later
+          # update with "stale info" (no lease to compare against). This
+          # CI is the single writer, the checkout above is fresh, and any
+          # external manual push to the mirror is operator error worth
+          # losing — so plain --force is both safe and necessary.
           git tag --force "$MAJOR"
-          git push --force-with-lease origin "$MAJOR"
+          git push --force origin "$MAJOR"
