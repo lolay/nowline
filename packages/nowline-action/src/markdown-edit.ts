@@ -34,7 +34,7 @@ export function applyEdits(source: string, edits: readonly BlockEdit[]): string 
             result = result.slice(0, start) + block + result.slice(end);
         } else {
             const at = edit.block.insertOffset;
-            result = result.slice(0, at) + '\n\n' + block + result.slice(at);
+            result = `${result.slice(0, at)}\n\n${block}${result.slice(at)}`;
         }
     }
     return result;

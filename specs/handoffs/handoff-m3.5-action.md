@@ -33,7 +33,7 @@ m3.5 is sequenced before m4 (the browser embed) for two reasons:
 
 **Shipped so far:**
 
-- `packages/nowline-action/` package source complete except for tests:
+- `packages/nowline-action/` package source complete:
   - `package.json` (private; runtime deps `@actions/core`,
     `@actions/exec`, `fast-glob`, `unified` + remark family;
     workspace dev dep on `@nowline/cli`).
@@ -64,13 +64,21 @@ m3.5 is sequenced before m4 (the browser embed) for two reasons:
   - `README.md` — quickstart, full input/output table, three
     composition examples (auto-commit, PR mode, drift detection),
     "source lives in monorepo" callout.
+  - `test/` — 29-case vitest suite: pure scanner / editor unit tests
+    (`markdown-scan.test.ts`, `markdown-edit.test.ts`), input-parser
+    edge cases (`inputs.test.ts`), and a markdown-mode orchestration
+    test (`markdown-mode.test.ts`) that runs against a temp directory
+    with `./cli.js` mocked via `vi.mock`. Covers slug stability,
+    marker-pair detection, idempotent re-runs, multi-block ordering,
+    URL-escaping of image paths, and the empty-glob / no-blocks
+    branches.
 - `lolay/nowline-action` mirror repo created and the local clone at
   `../nowline-action/` populated with placeholder `README.md` +
   Apache-2.0 `LICENSE`. The repo will be self-populating from the
   `release.yml` mirror cell once it lands (T6).
 - Validations green: `pnpm --filter @nowline/action run typecheck`,
-  `biome check`, and `pnpm --filter @nowline/action run build`
-  (1.2 MB bundled CJS).
+  `pnpm --filter @nowline/action run test` (29/29), `biome check`,
+  and `pnpm --filter @nowline/action run build` (1.2 MB bundled CJS).
 
 **Building blocks already in place (carried over from m4 / m2):**
 
@@ -88,10 +96,6 @@ m3.5 is sequenced before m4 (the browser embed) for two reasons:
 
 **Not yet present:**
 
-- No `packages/nowline-action/test/` directory; T5 covers vitest
-  unit tests for `markdown-scan.ts` / `markdown-edit.ts` plus an
-  integration test that boots the bundled action against a fixture
-  repo.
 - No `mirror-action` cell in `release.yml` (T6).
 - No `MARKETPLACE_MIRROR_PAT` repo secret on `lolay/nowline` yet —
   needed before T6 can run successfully (fine-grained PAT with
@@ -141,6 +145,20 @@ Per [`specs/embed.md`](../embed.md) § GitHub Action:
    - Integration tests that boot the action's compiled entry against
      a fixture repo (file mode + markdown mode) and assert the
      emitted git diff matches a golden snapshot.
+
+   **Landed shape (deviation from above).** Pure-function unit tests
+   for `markdown-scan` and `markdown-edit` shipped as planned. Input
+   parsing got its own focused test file. The "boot the compiled
+   entry against a fixture repo" integration test was replaced with
+   an orchestration test that calls `runMarkdownMode` directly
+   against a temp directory with `./cli.js` stubbed via `vi.mock`,
+   which exercises the same wiring (glob → scan → render → edit →
+   write back → output `changed-files`) and is hermetic and fast
+   (~25ms total). The bundled-action smoke test — running
+   `node dist/index.cjs` with `INPUT_*` env vars on a fixture — is
+   the more honest version of the original goal and is deferred to
+   land *after* T6 so it can run against the published mirror
+   artifact rather than a one-off local bundle.
 
 ## Key decisions to make early
 

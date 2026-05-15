@@ -402,7 +402,7 @@ The action shells out to `@nowline/cli` (from m2a) and has no dependency on the 
 
 Depends on: m2a (CLI distribution pipeline), m2c (export formats — PNG, in particular), m3e (CLI shell-out pattern reused for repeatability).
 
-Status: **in progress.** `packages/nowline-action/` source complete: file mode, markdown mode (remark-based scanner with idempotent HTML-comment markers), esbuild bundle (`dist/index.cjs`, ~1.2 MB CJS), and bootstrap mirror clone in place. Tests and the `release.yml` Marketplace-mirror cell are still ahead. See [`specs/handoffs/handoff-m3.5-action.md`](./handoffs/handoff-m3.5-action.md) → "Where we are".
+Status: **in progress.** `packages/nowline-action/` source complete: file mode, markdown mode (remark-based scanner with idempotent HTML-comment markers), esbuild bundle (`dist/index.cjs`, ~1.2 MB CJS), 29-case vitest suite (pure scan/edit, input parsing, mocked-CLI orchestration), and bootstrap mirror clone in place. The `release.yml` Marketplace-mirror cell is still ahead. See [`specs/handoffs/handoff-m3.5-action.md`](./handoffs/handoff-m3.5-action.md) → "Where we are".
 
 Spec: [`specs/embed.md`](./embed.md) § GitHub Action
 
