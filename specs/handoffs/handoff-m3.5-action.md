@@ -72,10 +72,24 @@ m3.5 is sequenced before m4 (the browser embed) for two reasons:
     marker-pair detection, idempotent re-runs, multi-block ordering,
     URL-escaping of image paths, and the empty-glob / no-blocks
     branches.
-- `lolay/nowline-action` mirror repo created and the local clone at
-  `../nowline-action/` populated with placeholder `README.md` +
-  Apache-2.0 `LICENSE`. The repo will be self-populating from the
-  `release.yml` mirror cell once it lands (T6).
+- `lolay/nowline-action` mirror repo created with bootstrap
+  `README.md` + Apache-2.0 `LICENSE`. The repo will self-populate
+  from the `release.yml` mirror cell on the next release tag.
+- `release.yml` Marketplace-mirror cell landed (two new matrix cells
+  patterned after `pack-npm` / `npm` and `pack-vsix` / `vscode`):
+  - **`pack-action`** (build phase) verifies the bundle is non-empty,
+    stages `action.yml` + `README.md` + `LICENSE` + `dist/` into the
+    `action-mirror` artifact.
+  - **`action-mirror`** (publish phase) downloads the artifact,
+    checks out `lolay/nowline-action` with `MARKETPLACE_MIRROR_PAT`,
+    replaces contents (preserving `.git/`), commits, pushes
+    `v${VERSION}` (immutable, hard-fails on collision) and
+    `v${MAJOR}` (moving major-tag pointer, `--force-with-lease`,
+    matches the `actions/checkout@v4` convention).
+  - The bundle script's incidental `dist/meta.json` write was
+    dropped so the staged mirror is verbatim `cp -R dist/`. Mirror
+    ships six files: `action.yml`, `README.md`, `LICENSE`,
+    `dist/index.cjs`, `dist/index.cjs.map`, `dist/index.cjs.LEGAL.txt`.
 - Validations green: `pnpm --filter @nowline/action run typecheck`,
   `pnpm --filter @nowline/action run test` (29/29), `biome check`,
   and `pnpm --filter @nowline/action run build` (1.2 MB bundled CJS).
@@ -96,13 +110,16 @@ m3.5 is sequenced before m4 (the browser embed) for two reasons:
 
 **Not yet present:**
 
-- No `mirror-action` cell in `release.yml` (T6).
 - No `MARKETPLACE_MIRROR_PAT` repo secret on `lolay/nowline` yet —
-  needed before T6 can run successfully (fine-grained PAT with
-  `contents: write` on `lolay/nowline-action`).
-- No first release; the mirror clone in `../nowline-action/` will
-  remain empty (just placeholder README + LICENSE) until the first
-  tag fires the mirror cell.
+  the mirror cell will fail until this lands (fine-grained PAT
+  with `contents: write` on `lolay/nowline-action`).
+- No first release; the mirror repo still has only the bootstrap
+  `README.md` + `LICENSE` until the first tag fires the cell.
+- No bundled-action smoke test yet (deferred from T5 to land
+  against the published mirror artifact rather than a one-off
+  local bundle — see deliverable item 7 below).
+- No Marketplace listing — submit on the mirror repo's first
+  release page (T7).
 
 ## What this milestone needs to deliver
 
@@ -136,6 +153,12 @@ Per [`specs/embed.md`](../embed.md) § GitHub Action:
    the mirror repo. Tag the mirror with both the immutable point
    version (`v1.2.3`) and the moving major-tag pointer (`v1`,
    force-pushed) per [GitHub's standard pattern](https://docs.github.com/en/actions/sharing-automations/creating-actions/about-custom-actions#using-tags-for-release-management).
+
+   **Landed.** Implemented as a `pack-action` cell in the build
+   matrix and an `action-mirror` cell in the publish matrix,
+   patterned after the existing npm-pack/npm and vsix-pack/vscode
+   pairs. `--force-with-lease` on the moving major tag, hard-fail
+   on the immutable tag.
 6. **Marketplace listing** — the mirror repo's `action.yml` with a
    `branding:` block (icon + color) is what GitHub Marketplace
    surfaces. Submit for listing once the first release lands.
@@ -217,10 +240,12 @@ Sequenced so each step unblocks the next.
 
 ### Prerequisites (do once)
 
-0a. **Create the `lolay/nowline-action` mirror repo** — empty, public,
-    Apache-2.0 license. README points at the monorepo for source.
+0a. ~~**Create the `lolay/nowline-action` mirror repo** — empty, public,
+    Apache-2.0 license. README points at the monorepo for source.~~
+    *(Done — bootstrapped with placeholder README + LICENSE during T1.)*
 0b. **Add `MARKETPLACE_MIRROR_PAT` repo secret** on `lolay/nowline` —
     fine-grained PAT with `contents: write` on `lolay/nowline-action`.
+    *(Still required — the mirror cell fails without it.)*
 
 ### In this monorepo
 
