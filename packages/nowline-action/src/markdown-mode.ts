@@ -45,14 +45,28 @@ export async function runMarkdownMode(inputs: ActionInputs): Promise<RunResult> 
         rendered += fileResult.rendered;
         failed += fileResult.failed;
         for (const renderedPath of fileResult.renderedPaths) {
-            changedFiles.push(path.relative(repoRoot, renderedPath));
+            changedFiles.push(toPosixRelative(repoRoot, renderedPath));
         }
         if (fileResult.markdownChanged) {
-            changedFiles.push(path.relative(repoRoot, mdPath));
+            changedFiles.push(toPosixRelative(repoRoot, mdPath));
         }
     }
 
     return { rendered, failed, changedFiles };
+}
+
+/**
+ * Compute a repo-relative path with forward slashes regardless of host OS.
+ *
+ * The `changed-files` action output feeds downstream commit actions
+ * (`stefanzweifel/git-auto-commit-action`, `peter-evans/create-pull-request`)
+ * and `git diff --exit-code` checks. Git tracks paths with forward slashes
+ * everywhere, so emitting OS-native separators on Windows runners breaks
+ * the chain silently — the downstream action's glob match against
+ * `.nowline\foo.svg` won't see git's `.nowline/foo.svg` entry.
+ */
+function toPosixRelative(from: string, to: string): string {
+    return path.relative(from, to).split(path.sep).join('/');
 }
 
 interface FileResult {
@@ -147,11 +161,9 @@ async function renderBlock(args: RenderBlockArgs): Promise<boolean> {
 }
 
 /**
- * Compute the markdown-image-link-relative path from the .md file to the
- * rendered image. Image-link paths use forward slashes regardless of host
- * OS, so we normalise the result.
+ * Markdown-image-link-relative path from the .md file to the rendered
+ * image. Image-link paths use forward slashes regardless of host OS.
  */
 function relativeImagePath(mdPath: string, outPath: string): string {
-    const rel = path.relative(path.dirname(mdPath), outPath);
-    return rel.split(path.sep).join('/');
+    return toPosixRelative(path.dirname(mdPath), outPath);
 }
