@@ -9,7 +9,7 @@ Nowline is pre-release. There are no published packages or release artifacts yet
 Please **do not** open a public issue for security problems. Use one of the private channels below:
 
 1. **GitHub private vulnerability report (preferred).** Open a draft advisory at <https://github.com/lolay/nowline/security/advisories/new>. This keeps the report visible only to maintainers until a fix and disclosure plan are ready.
-2. **Email.** If you cannot use GitHub's private reporting, email **gary@lolay.com** with `[nowline security]` in the subject line.
+2. **Email.** If you cannot use GitHub's private reporting, email **security@nowline.io** with `[nowline security]` in the subject line.
 
 In your report, please include:
 

@@ -25,7 +25,7 @@ Nowline is early-stage: the parser, validator, and CLI are usable, but layout, r
 
 ## Code of conduct
 
-This project follows the [Contributor Covenant 2.1](./CODE_OF_CONDUCT.md). Reports of unacceptable behavior may be sent to **gary@lolay.com**.
+This project follows the [Contributor Covenant 2.1](./CODE_OF_CONDUCT.md). Reports of unacceptable behavior may be sent to **security@nowline.io**.
 
 ## Prerequisites
 
