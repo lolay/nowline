@@ -105,6 +105,7 @@ jobs:
           - { id: bin-windows-arm64, kind: binary, runner: windows-latest, target: bun-windows-arm64, suffix: windows-arm64.exe }
           - { id: pack-npm, kind: npm-pack, runner: ubuntu-latest }
           - { id: pack-vsix, kind: vsix-pack, runner: ubuntu-latest }
+          - { id: pack-action, kind: action-pack, runner: ubuntu-latest }
     steps:
       - uses: actions/checkout@v6
       - uses: ./.github/actions/setup-node-pnpm
@@ -361,6 +362,48 @@ jobs:
           path: packages/vscode-extension/dist/nowline-vscode.vsix
           if-no-files-found: error
 
+      # ===== pack-action cell =====
+      #
+      # The Marketplace action is mirrored to lolay/nowline-action — a
+      # write-only publish target like the Homebrew tap, not a source-of-
+      # truth repo. Source lives at packages/nowline-action/. The mirror
+      # ships exactly four files at its repo root: action.yml, dist/,
+      # README.md, LICENSE. action.yml MUST be at the mirror's repo root
+      # (nested paths don't satisfy GitHub Marketplace's listing
+      # requirements). esbuild produced dist/index.cjs in the earlier
+      # `pnpm -r build` step.
+
+      - name: Verify action bundle exists
+        if: matrix.kind == 'action-pack'
+        run: |
+          set -euo pipefail
+          test -s packages/nowline-action/dist/index.cjs || { echo "missing or empty packages/nowline-action/dist/index.cjs" >&2; exit 1; }
+          test -s packages/nowline-action/action.yml
+          test -s packages/nowline-action/README.md
+          test -s packages/nowline-action/LICENSE
+
+      - name: Stage action mirror bundle
+        if: matrix.kind == 'action-pack'
+        run: |
+          set -euo pipefail
+          mkdir -p dist-action
+          cp packages/nowline-action/action.yml dist-action/
+          cp packages/nowline-action/README.md dist-action/
+          cp packages/nowline-action/LICENSE dist-action/
+          cp -R packages/nowline-action/dist dist-action/
+          ls -laR dist-action
+
+      - name: Upload action mirror bundle
+        if: matrix.kind == 'action-pack'
+        uses: actions/upload-artifact@v7
+        with:
+          name: action-mirror
+          # Trailing slash → archive contents are at the artifact root
+          # (action.yml, README.md, LICENSE, dist/index.cjs). Matches
+          # the publish cell's `path: action-bundle` download contract.
+          path: dist-action/
+          if-no-files-found: error
+
   # Phase 2 — publish to every external registry.
   #
   # `needs: build` means GitHub Actions waits for every cell of the
@@ -394,6 +437,7 @@ jobs:
           - { id: npm, kind: npm }
           - { id: vscode, kind: vscode }
           - { id: github-release, kind: github-release }
+          - { id: action-mirror, kind: action-mirror }
     steps:
       - name: Setup Node.js
         if: matrix.kind == 'npm' || matrix.kind == 'vscode'
@@ -652,3 +696,73 @@ jobs:
           git add Formula/nowline.rb
           git commit -m "nowline ${VERSION}"
           git push origin HEAD
+
+      # ===== action-mirror cell =====
+      #
+      # Mirrors the Marketplace artifact built in pack-action to
+      # lolay/nowline-action. Two tags per release:
+      #
+      #   v${VERSION}   immutable point version (`lolay/nowline-action@v0.4.0`)
+      #   v${MAJOR}     moving major-tag pointer (`lolay/nowline-action@v0`)
+      #
+      # The README's quickstart examples reference `@v0`, matching the
+      # actions/checkout@v4 / actions/cache@v4 convention; the immutable
+      # tag exists for users who want to pin a specific release. During
+      # 0.x the moving major has the usual pre-1.0 caveat — minor bumps
+      # may include breaking changes — documented in the changelog.
+      # When 1.0 ships, `v1` becomes the canonical reference and the
+      # moving-tag semantics align with semver-stable convention.
+
+      - name: Download action mirror bundle
+        if: matrix.kind == 'action-mirror'
+        uses: actions/download-artifact@v8
+        with:
+          name: action-mirror
+          path: action-bundle
+
+      - name: Checkout lolay/nowline-action
+        if: matrix.kind == 'action-mirror'
+        uses: actions/checkout@v6
+        with:
+          repository: lolay/nowline-action
+          token: ${{ secrets.MARKETPLACE_MIRROR_PAT }}
+          path: mirror
+          # Need full history so subsequent moving-major tag retags
+          # against a known parent rather than a shallow tip.
+          fetch-depth: 0
+
+      - name: Sync mirror, commit, tag, push
+        if: matrix.kind == 'action-mirror'
+        run: |
+          set -euo pipefail
+          VERSION="${GITHUB_REF_NAME#v}"
+          MAJOR="v${VERSION%%.*}"
+
+          # Replace mirror contents with the freshly-built bundle.
+          # Preserve `.git/` so push history survives; everything else
+          # in the mirror is generated output and is safe to wipe.
+          # `find ... -mindepth 1 -maxdepth 1 ! -name .git -exec rm -rf`
+          # avoids the `rm -rf .git` foot-gun.
+          cd mirror
+          find . -mindepth 1 -maxdepth 1 ! -name '.git' -exec rm -rf {} +
+          cp -R ../action-bundle/. .
+
+          git add -A
+          if git diff --cached --quiet; then
+            echo "mirror bundle byte-identical to previous release; tagging current HEAD"
+          else
+            git commit -m "release v${VERSION}"
+            git push origin HEAD
+          fi
+
+          # Immutable point tag. Hard fail if it already exists — that
+          # indicates a re-pushed release with stale state, which the
+          # operator needs to investigate manually.
+          git tag "v${VERSION}"
+          git push origin "v${VERSION}"
+
+          # Moving major-tag pointer. --force-with-lease guards against
+          # concurrent manual pushes; in the standard CI flow we just
+          # checked out the tip so the lease succeeds.
+          git tag --force "$MAJOR"
+          git push --force-with-lease origin "$MAJOR"

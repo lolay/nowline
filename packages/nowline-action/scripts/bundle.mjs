@@ -2,9 +2,13 @@
 
 // Produces the GitHub Actions runtime bundle for `@nowline/action`:
 //
-//   dist/index.cjs       — single-file CJS action entry point
-//   dist/index.cjs.map   — source map (linked, served alongside)
-//   dist/meta.json       — esbuild metafile (used by the safety check below)
+//   dist/index.cjs           — single-file CJS action entry point
+//   dist/index.cjs.map       — source map (linked, served alongside)
+//   dist/index.cjs.LEGAL.txt — third-party license attributions
+//
+// The esbuild metafile is consulted in-memory by the safety check below
+// but deliberately NOT written to disk — `dist/` is the published mirror
+// surface and should contain only files the runner needs.
 //
 // Why CJS, not ESM? When GitHub Actions runs `uses: lolay/nowline-action@vX`,
 // it clones the mirror repo (which has no package.json) and spawns
@@ -25,7 +29,7 @@
 //    Caught by check 1 because workspace deps either get inlined or show
 //    up as imports.
 
-import { mkdir, readFile, writeFile } from 'node:fs/promises';
+import { mkdir, readFile } from 'node:fs/promises';
 import { builtinModules } from 'node:module';
 import { dirname, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -61,8 +65,6 @@ const result = await build({
         js: `// @nowline/action ${pkg.version} — bundled ${builtAt}`,
     },
 });
-
-await writeFile(resolve(outDir, 'meta.json'), JSON.stringify(result.metafile, null, 2));
 
 assertNoExternalImports(result.metafile);
 
