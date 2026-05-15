@@ -1,6 +1,6 @@
 {
     "name": "@nowline/export-html",
-    "version": "0.2.0",
+    "version": "0.2.1",
     "description": "Nowline HTML exporter — self-contained HTML page wrapping the SVG with pan/zoom",
     "license": "Apache-2.0",
     "type": "module",
