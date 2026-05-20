@@ -223,6 +223,30 @@ export interface PositionedNowline {
     style: ResolvedStyle;
 }
 
+/**
+ * One inline-date pin (`after:DATE` / `before:DATE`) attached to an entity.
+ * The renderer paints a small calendar glyph at `glyphTopLeft` with side
+ * length `glyphSize`, fills with the entity's resolved meta color, and emits
+ * a `<title>` child carrying `isoDate` for native browser tooltips. There is
+ * no inline date caption — see specs/rendering.md "Inline-date glyph".
+ *
+ * `side` decides which corner the glyph belongs in (top-LEFT for `after`,
+ * top-RIGHT for `before`). The validator enforces "at most one inline date
+ * per direction" so `inlineDatePins` carries 0..2 entries.
+ *
+ * `spilled === true` means the entity (item bar) was too narrow to host the
+ * glyph inside its decoration row, so `glyphTopLeft` points at the spill
+ * column outside the bar instead. Group and parallel containers never spill;
+ * they always have room for the glyph in their bounding box.
+ */
+export interface InlineDatePin {
+    side: 'after' | 'before';
+    isoDate: string;
+    glyphTopLeft: Point;
+    glyphSize: number;
+    spilled: boolean;
+}
+
 export interface PositionedItem {
     kind: 'item';
     id?: string;
@@ -232,6 +256,10 @@ export interface PositionedItem {
     progressFraction: number; // 0..1; 1 == fully filled
     footnoteIndicators: number[]; // 1-based superscript numbers, empty when no footnotes
     labelChips: PositionedLabelChip[];
+    /** Inline-date pins attached to this item (`after:DATE` / `before:DATE`).
+     *  Empty (or undefined) when the item has no inline-date pins. See
+     *  `InlineDatePin` and specs/rendering.md "Inline-date glyph". */
+    inlineDatePins?: InlineDatePin[];
     /** True when the chip row's natural total width exceeded the bar's
      *  effective inner width and the whole row spilled past the bar's
      *  right edge. The chips' `box.x` already reflects the spilled
@@ -359,6 +387,9 @@ export interface PositionedGroup {
     box: BoundingBox;
     // Bracket is drawn on the left edge when style.bracket != 'none'.
     children: PositionedTrackChild[];
+    /** Inline-date pins attached to this group (`after:DATE` / `before:DATE`).
+     *  See `InlineDatePin` and specs/rendering.md "Inline-date glyph". */
+    inlineDatePins?: InlineDatePin[];
     style: ResolvedStyle;
 }
 
@@ -368,6 +399,9 @@ export interface PositionedParallel {
     title?: string;
     box: BoundingBox;
     children: PositionedTrackChild[]; // sub-tracks stacked vertically
+    /** Inline-date pins attached to this parallel (`after:DATE` / `before:DATE`).
+     *  See `InlineDatePin` and specs/rendering.md "Inline-date glyph". */
+    inlineDatePins?: InlineDatePin[];
     style: ResolvedStyle;
 }
 

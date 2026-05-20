@@ -1,4 +1,5 @@
 import type {
+    InlineDatePin,
     Point,
     PositionedAnchor,
     PositionedCapacity,
@@ -79,7 +80,7 @@ import {
     TEXT_SIZE_PX,
     TIMELINE_TICK_LABEL_BASELINE_OFFSET_PX,
 } from '@nowline/layout';
-import { CAPACITY_ICON_SVG } from './icons.js';
+import { BUILTIN_ICON_SVG, CAPACITY_ICON_SVG } from './icons.js';
 import { IdGenerator } from './ids.js';
 import { sanitizeSvg } from './sanitize.js';
 import { allShadowDefs, shadowFilterUrl } from './shadow.js';
@@ -389,6 +390,45 @@ function renderItemMetaLine(opts: {
         '</text>';
     const iconPart = `<svg x="${num(iconX)}" y="${num(iconY)}" width="${num(iconSize)}" height="${num(iconSize)}" viewBox="${def.viewBox}" style="color:${escAttr(color)}" aria-hidden="true">${def.body}</svg>`;
     return textPart + iconPart;
+}
+
+/**
+ * Paint one inline-date pin (`after:DATE` / `before:DATE`) as a small
+ * `calendar` glyph from the curated icon library. Wrapped in a `<g>`
+ * carrying `<title>YYYY-MM-DD</title>` so browsers surface the date as
+ * a native hover tooltip; non-interactive exports (PDF / PNG) still
+ * carry the date in the title text. Z-order: above the bar fill,
+ * alongside status dot and footnote indicators, below dependency
+ * arrowheads.
+ *
+ * Shared by item, group, and parallel render paths so the visual is
+ * identical across every entity type.
+ */
+function renderInlineDatePin(pin: InlineDatePin, color: string): string {
+    const def = BUILTIN_ICON_SVG.calendar;
+    const inner =
+        `<svg x="${num(pin.glyphTopLeft.x)}" y="${num(pin.glyphTopLeft.y)}"` +
+        ` width="${num(pin.glyphSize)}" height="${num(pin.glyphSize)}"` +
+        ` viewBox="${def.viewBox}" style="color:${escAttr(color)}" aria-hidden="true">${def.body}</svg>`;
+    const titleEl = `<title>${escText(pin.isoDate)}</title>`;
+    return tag(
+        'g',
+        {
+            'data-layer': 'inline-date-pin',
+            'data-side': pin.side,
+            'data-date': pin.isoDate,
+            'data-spilled': pin.spilled ? 'true' : null,
+        },
+        titleEl + inner,
+    );
+}
+
+function renderInlineDatePins(
+    pins: InlineDatePin[] | undefined,
+    color: string,
+): string {
+    if (!pins || pins.length === 0) return '';
+    return pins.map((pin) => renderInlineDatePin(pin, color)).join('');
 }
 
 function rectFrame(
@@ -867,6 +907,11 @@ function renderItem(
             fill: dotColor,
         }),
     );
+    // Inline-date pins (after:DATE / before:DATE). Same z-order family as
+    // the status dot and footnote indicators — small badge in the top
+    // decoration row. Color matches the bar's resolved meta (`fg`) so the
+    // glyph reads against the bar fill the same way the meta text does.
+    parts.push(renderInlineDatePins(i.inlineDatePins, i.style.fg));
     // Title + meta are an atomic caption. When `textSpills` is set the
     // layout has already bumped the next item to a fresh row, so we draw
     // both lines BESIDE the bar (just past its right edge, stacked) at
@@ -1225,6 +1270,11 @@ function renderGroup(
             );
         }
     }
+    // Inline-date pins on the group itself (`group ... after:DATE` /
+    // `before:DATE`). Painted before the children so children's bars stay
+    // visually on top — the glyphs only sit in the empty corners of the
+    // bounding box.
+    parts.push(renderInlineDatePins(g.inlineDatePins, g.style.fg));
     for (const c of g.children) {
         parts.push(renderTrackChild(c, options, idPrefix, palette));
     }
@@ -1283,6 +1333,9 @@ function renderParallel(
             ),
         );
     }
+    // Inline-date pins on the parallel itself (`parallel ... after:DATE` /
+    // `before:DATE`). Painted before children so child bars sit on top.
+    parts.push(renderInlineDatePins(p.inlineDatePins, p.style.fg));
     for (const c of p.children) {
         parts.push(renderTrackChild(c, options, idPrefix, palette));
     }

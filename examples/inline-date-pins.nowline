@@ -1,0 +1,48 @@
+nowline v1
+
+// Inline date pins on `after:` / `before:` — pin an item, group, or
+// parallel to a specific calendar date without declaring a named
+// `anchor`. The renderer paints a small `calendar` glyph in the
+// entity's top-left (`after`) or top-right (`before`) corner. See
+// `specs/dsl.md` "Inline date pins" and `specs/rendering.md`
+// "Inline-date glyph".
+
+config
+
+style flagged
+  border: dashed
+  fg: orange
+
+roadmap inline-pins "Inline date pins" start:2026-01-05 scale:1w
+
+swimlane platform "Platform"
+
+  // Single inline date pin on `after:` — the item starts on
+  // 2026-02-09 even though the lane cursor would have placed it
+  // earlier.
+  item kickoff-prep "Kickoff prep" duration:1w
+  item launch "Launch readiness" duration:2w after:2026-02-09
+
+  // Single inline date pin on `before:` — the item must finish by
+  // 2026-04-13. Caps the natural end via the existing red-overflow
+  // rule when the item runs long.
+  item docs "Docs handoff" duration:2w before:2026-04-13
+
+  // Mixed list — one ISO date plus one entity id. Starts after the
+  // LATEST of the two: the launch item's end OR 2026-03-15
+  // (whichever is later).
+  item integration "Integration window" duration:2w after:[launch, 2026-03-15]
+
+swimlane releases "Releases"
+
+  // Group with an inline-date `after:` — the whole group starts
+  // on 2026-02-23. Glyph attaches to the group's bounding box.
+  group api-track "API track" style:flagged after:2026-02-23
+    item api-design "API design" duration:1w
+    item api-build "API build" duration:2w
+
+  // Parallel with an inline-date `before:` — the whole parallel
+  // must finish by 2026-05-25.
+  parallel rollouts "Region rollouts" before:2026-05-25
+    item us-rollout "US rollout" duration:2w
+    item eu-rollout "EU rollout" duration:2w

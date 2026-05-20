@@ -1,0 +1,86 @@
+nowline v1
+
+// Fixture exercising the inline-date pin glyph (`after:DATE` /
+// `before:DATE`) on every entity type that supports it: items in
+// every decoration-row state, styled groups (visible box), unstyled
+// groups (logical extent), bracketed parallels (bracket footprint),
+// and bare parallels (logical extent). Each scenario lives in its
+// own swimlane so the corner glyphs are easy to compare visually.
+//
+// See specs/dsl.md "Inline date pins" and specs/rendering.md
+// "Inline-date glyph" for the full contract.
+
+config
+
+style flagged
+  border: dashed
+  fg: orange
+
+style enterprise
+  bg: blue
+  text: white
+
+roadmap r "Inline-date pin corners" start:2026-01-05 length:14w
+
+swimlane plain-lane "Plain item — both corners"
+
+  // Bare item, no decorations: glyphs sit at the leftmost / rightmost
+  // top-decoration slots.
+  item plain-bar "Plain bar" duration:4w after:2026-01-26 before:2026-04-13
+
+swimlane with-link "Item — with link icon"
+
+  // Top-LEFT after-glyph walks RIGHT past the 14 px link icon column.
+  item linked "With link" duration:3w \
+    link:https://github.com/example/repo \
+    after:2026-02-02 before:2026-03-30
+
+swimlane with-decorations "Item — link + dot + footnotes"
+
+  // Both corners simultaneously occupied: link icon on the left
+  // pushes the after-glyph right; status dot + footnote indicators
+  // on the right pull the before-glyph left of the badge cluster.
+  item busy "Busy bar" duration:4w \
+    status:in-progress \
+    link:https://linear.app/x \
+    after:2026-02-09 before:2026-04-20
+
+footnote f1 "Footnote attached to busy" on:busy
+
+swimlane mixed-list "Item — mixed list"
+
+  // Mixed `after:` list (id + date). Resolves to the LATEST of the
+  // two; only one calendar glyph appears on the left.
+  item upstream "Upstream" duration:2w
+  item downstream "Downstream" duration:3w after:[upstream, 2026-03-09]
+
+swimlane styled-group "Styled group — visible box corners"
+
+  // Filled-style groups paint a chiclet in the upper-left; the
+  // after-glyph sits flush in the box's top-left corner alongside
+  // the chiclet (see specs/rendering.md). The before-glyph anchors
+  // flush right inside the visible box.
+  group sg "Styled group" style:enterprise after:2026-02-09 before:2026-04-20
+    item sg-a "Step A" duration:2w
+    item sg-b "Step B" duration:2w
+
+swimlane unstyled-group "Unstyled group — logical extent"
+
+  // Unstyled groups have no visible box. Glyphs attach to the
+  // logical bounding box (leftmost child's left edge, rightmost
+  // child's right edge, top of the highest child row).
+  group ug after:2026-02-23 before:2026-05-04
+    item ug-a "Free A" duration:2w
+    item ug-b "Free B" duration:2w
+
+swimlane bracketed-parallel "Bracketed parallel — bracket footprint"
+
+  parallel bp style:flagged after:2026-02-09 before:2026-05-11
+    item bp-a "Track 1" duration:3w
+    item bp-b "Track 2" duration:3w
+
+swimlane bare-parallel "Bare parallel — logical extent"
+
+  parallel barep after:2026-02-23 before:2026-05-25
+    item barep-a "Bare track 1" duration:2w
+    item barep-b "Bare track 2" duration:2w

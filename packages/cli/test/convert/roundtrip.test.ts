@@ -7,7 +7,12 @@ import { serializeToJson } from '../../src/convert/schema.js';
 import { parseSource } from '../../src/core/parse.js';
 import { examplesDir } from '../helpers.js';
 
-const EXAMPLES = ['minimal.nowline', 'teams.nowline', 'product.nowline'];
+const EXAMPLES = [
+    'minimal.nowline',
+    'teams.nowline',
+    'product.nowline',
+    'inline-date-pins.nowline',
+];
 
 async function textToJsonString(text: string, file: string): Promise<string> {
     // Round-trip only depends on parser output, not semantic validation, so we

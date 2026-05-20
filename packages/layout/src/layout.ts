@@ -40,6 +40,7 @@ import {
     HEADER_TITLE_TO_AUTHOR_GAP_PX,
 } from './header-card-geometry.js';
 import { localeStrings } from './i18n.js';
+import { computeItemInlineDatePins, pickInlineDate } from './inline-date-pin-geometry.js';
 import {
     ITEM_CAPTION_INSET_X_PX,
     ITEM_CAPTION_META_BASELINE_OFFSET_PX,
@@ -226,11 +227,15 @@ function sequenceItem(
     // "one engineer-week of work left".
     const totalEffortDays = deriveTotalEffortDays(props, ctx.sizes, ctx.cal);
     const afterRaw = propValues(props, 'after');
-    const beforeRaw = propValue(props, 'before');
+    const beforeRaw = propValues(props, 'before');
     const dateRaw = propValue(props, 'date');
     const remainingDays = resolveDuration(propValue(props, 'remaining'), ctx.sizes, ctx.cal);
 
-    // Resolve start x: explicit date > after-chain > cursor position
+    // Resolve start x: explicit date > after-chain > cursor position.
+    // `after:` accepts both entity ids (looked up in entityRightEdges) and
+    // inline ISO date literals (resolved through the time scale). The
+    // validator enforces "at most one inline date per direction" so at most
+    // one element will hit the date path per item.
     let startX = cursor.x;
     const explicitDate = parseDate(dateRaw);
     if (explicitDate) {
@@ -239,6 +244,12 @@ function sequenceItem(
     } else if (afterRaw.length > 0) {
         let maxEnd = cursor.x;
         for (const ref of afterRaw) {
+            const inlineDate = parseDate(ref);
+            if (inlineDate) {
+                const xd = ctx.scale.forwardWithinDomain(inlineDate);
+                if (xd !== null) maxEnd = Math.max(maxEnd, xd);
+                continue;
+            }
             const endX = ctx.entityRightEdges.get(ref);
             if (endX !== undefined) maxEnd = Math.max(maxEnd, endX);
         }
@@ -286,23 +297,37 @@ function sequenceItem(
     const chipInsideAvailWidth = Math.max(0, visualWidthPredict - 2 * ITEM_CAPTION_INSET_X_PX);
     const chipsOutside = chipSamples.length > 0 && chipRowWidth > chipInsideAvailWidth;
 
-    // Handle `before:` — item must end by the named anchor/milestone x.
+    // Handle `before:` — item must end by the earliest cap. Each cap is
+    // either an entity id (looked up in entityLeftEdges) or an inline ISO
+    // date literal (resolved through the time scale). The validator enforces
+    // "at most one inline date per direction" so at most one element per
+    // before-list will hit the date path.
     let hasOverflow = false;
     let overflowBox: BoundingBox | undefined;
     let overflowAnchorId: string | undefined;
-    if (beforeRaw) {
-        const beforeX = ctx.entityLeftEdges.get(beforeRaw);
-        if (beforeX !== undefined) {
-            if (logicalRight > beforeX) {
-                hasOverflow = true;
-                overflowBox = {
-                    x: beforeX,
-                    y: cursor.y,
-                    width: logicalRight - beforeX,
-                    height: ctx.bandScale.bandwidth(),
-                };
-                overflowAnchorId = beforeRaw;
+    if (beforeRaw.length > 0) {
+        let earliestCapX: number | undefined;
+        let earliestCapRef: string | undefined;
+        for (const ref of beforeRaw) {
+            const inlineDate = parseDate(ref);
+            const capX = inlineDate
+                ? (ctx.scale.forwardWithinDomain(inlineDate) ?? undefined)
+                : ctx.entityLeftEdges.get(ref);
+            if (capX === undefined) continue;
+            if (earliestCapX === undefined || capX < earliestCapX) {
+                earliestCapX = capX;
+                earliestCapRef = ref;
             }
+        }
+        if (earliestCapX !== undefined && logicalRight > earliestCapX) {
+            hasOverflow = true;
+            overflowBox = {
+                x: earliestCapX,
+                y: cursor.y,
+                width: logicalRight - earliestCapX,
+                height: ctx.bandScale.bandwidth(),
+            };
+            overflowAnchorId = earliestCapRef;
         }
     }
 
@@ -695,6 +720,14 @@ function sequenceItem(
     // `step − bandwidth` px below the (now-taller) bar bottom.
     cursor.height = Math.max(cursor.height, ctx.bandScale.step() + chipBarExtra);
 
+    const inlineDatePins = computeItemInlineDatePins({
+        box: itemBox,
+        afterDate: pickInlineDate(afterRaw),
+        beforeDate: pickInlineDate(beforeRaw),
+        hasLinkIcon,
+        footnoteCount: footnoteIndicators.length,
+    });
+
     const result: PositionedItem = {
         kind: 'item',
         id,
@@ -725,6 +758,7 @@ function sequenceItem(
         capacity,
         size: sizeResolved,
         style,
+        inlineDatePins: inlineDatePins.length > 0 ? inlineDatePins : undefined,
     };
     return result;
 }
@@ -895,6 +929,11 @@ function predictItemChipExtraHeight(item: ItemDeclaration, ctx: LayoutContext): 
 // pin) > `start:` (fixed pin) > `after:` (chain after refs) > sequential
 // default (continue from `seqDefault`, which is the lane's rightmost time
 // cursor across all rows).
+//
+// `after:` accepts both entity ids (looked up in `ctx.entityRightEdges`) and
+// inline ISO date literals (looked up via `ctx.scale.forwardWithinDomain`).
+// The validator already enforces "at most one inline date per direction" so
+// at most one element in the list will hit the date path.
 function resolveChildStart(
     props: EntityProperty[],
     seqDefault: number,
@@ -911,6 +950,12 @@ function resolveChildStart(
     if (afterRefs.length > 0) {
         let maxEnd = laneLeftX;
         for (const ref of afterRefs) {
+            const inlineDate = parseDate(ref);
+            if (inlineDate) {
+                const xd = ctx.scale.forwardWithinDomain(inlineDate);
+                if (xd !== null) maxEnd = Math.max(maxEnd, xd);
+                continue;
+            }
             const endX = ctx.entityRightEdges.get(ref);
             if (endX !== undefined) maxEnd = Math.max(maxEnd, endX);
         }
@@ -1121,7 +1166,14 @@ function computeContentEndDay(
     const milestoneEnd = new Map<string, number>();
     let maxDay = 0;
 
-    const refEndDay = (ref: string): number => {
+    // Resolve a single `after:` element to a day-offset from `startDate`.
+    // The element is either an entity id (looked up in itemEnd / anchorEnd /
+    // milestoneEnd) or an inline ISO date literal (converted directly via
+    // `daysBetween`). The validator already enforces "at most one inline date
+    // per direction", so at most one element per list will hit the date path.
+    const resolveAfterDay = (ref: string): number => {
+        const inlineDate = parseDate(ref);
+        if (inlineDate) return daysBetween(startDate, inlineDate);
         if (itemEnd.has(ref)) return itemEnd.get(ref)!;
         if (anchorEnd.has(ref)) return anchorEnd.get(ref)!;
         if (milestoneEnd.has(ref)) return milestoneEnd.get(ref)!;
@@ -1164,7 +1216,7 @@ function computeContentEndDay(
             } else if (startProp) {
                 start = daysBetween(startDate, startProp);
             } else if (afterRefs.length > 0) {
-                start = Math.max(prevEnd, ...afterRefs.map(refEndDay));
+                start = Math.max(prevEnd, ...afterRefs.map(resolveAfterDay));
             }
             const end = start + dur;
             if (node.name) itemEnd.set(node.name, end);
@@ -1172,17 +1224,33 @@ function computeContentEndDay(
         }
         if (isParallelBlock(node)) {
             // All children share the parallel's start; the block's effective
-            // end is the maximum child end.
-            let parallelEnd = prevEnd;
+            // end is the maximum child end. The parallel's own `after:`
+            // (including inline-date pins) widens that shared start.
+            const afterRefs = propValues(node.properties, 'after');
+            const containerStart =
+                afterRefs.length > 0
+                    ? Math.max(prevEnd, ...afterRefs.map(resolveAfterDay))
+                    : prevEnd;
+            let parallelEnd = containerStart;
             for (const child of node.content) {
                 if (child.$type === 'DescriptionDirective') continue;
-                const childEnd = walkNode(child as ItemDeclaration | GroupBlock, prevEnd);
+                const childEnd = walkNode(
+                    child as ItemDeclaration | GroupBlock,
+                    containerStart,
+                );
                 parallelEnd = Math.max(parallelEnd, childEnd);
             }
             return parallelEnd;
         }
         if (isGroupBlock(node)) {
-            return walkLane(node.content as SwimlaneDeclaration['content'], prevEnd);
+            // The group's own `after:` (including inline-date pins) widens
+            // the baseline before walking the inner sequential lane.
+            const afterRefs = propValues(node.properties, 'after');
+            const containerStart =
+                afterRefs.length > 0
+                    ? Math.max(prevEnd, ...afterRefs.map(resolveAfterDay))
+                    : prevEnd;
+            return walkLane(node.content as SwimlaneDeclaration['content'], containerStart);
         }
         return prevEnd;
     };
@@ -1202,7 +1270,12 @@ function computeContentEndDay(
         }
         const after = propValues(ms.properties, 'after');
         if (after.length > 0) {
-            const day = Math.max(0, ...after.map(refEndDay));
+            // Milestones disallow inline date literals at the validator
+            // level (rule 24a — milestones already have `date:`). The
+            // shared `resolveAfterDay` helper still handles such input
+            // gracefully if it slips past, treating the date as the
+            // milestone's effective day.
+            const day = Math.max(0, ...after.map(resolveAfterDay));
             if (ms.name) milestoneEnd.set(ms.name, day);
             maxDay = Math.max(maxDay, day);
         }

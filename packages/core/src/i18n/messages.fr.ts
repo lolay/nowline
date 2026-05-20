@@ -64,6 +64,14 @@ export const messages: MessageBundle = {
         `Calendrier invalide «\u00A0${a.value}\u00A0». Doit être business, full ou custom.`,
     'NL.E0408': (a: { key: string }) =>
         `La propriété «\u00A0${a.key}\u00A0» exige au moins une référence.`,
+    'NL.E0410': (a: { key: string }) =>
+        `«\u00A0${a.key}:\u00A0» n'accepte qu'une seule date inline par direction\u00A0; regroupez les dates en une seule date contraignante ou utilisez une ancre déclarée.`,
+    'NL.E0411': (a: { key: string; type: string }) =>
+        `Une date inline dans «\u00A0${a.key}:\u00A0» n'est pas autorisée sur ${a.type}. Autorisée seulement sur item, parallel et group\u00A0; pour un milestone utilisez «\u00A0date:\u00A0» à la place.`,
+    'NL.E0412': (a: { key: string; date: string }) =>
+        `La date inline «\u00A0${a.date}\u00A0» dans «\u00A0${a.key}:\u00A0» exige que la roadmap déclare «\u00A0start:\u00A0». Ajoutez start:AAAA-MM-JJ à la roadmap.`,
+    'NL.E0413': (a: { key: string; date: string; start: string }) =>
+        `La date inline «\u00A0${a.date}\u00A0» dans «\u00A0${a.key}:\u00A0» précède le début de la roadmap (${a.start}).`,
 
     // Ancre / jalon / note de bas de page
     'NL.E0500': (a: { name: string }) =>

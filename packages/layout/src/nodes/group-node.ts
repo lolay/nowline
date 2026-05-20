@@ -14,6 +14,11 @@
 import type { EntityProperty, GroupBlock, ItemDeclaration, ParallelBlock } from '@nowline/core';
 import { isItemDeclaration } from '@nowline/core';
 import { deriveItemDurationDays } from '../calendar.js';
+import { propValues } from '../dsl-utils.js';
+import {
+    computeContainerInlineDatePins,
+    pickInlineDate,
+} from '../inline-date-pin-geometry.js';
 import type { LayoutContext, TrackCursor } from '../layout-context.js';
 import { RowPacker } from '../row-packer.js';
 import { resolveStyle } from '../style-resolution.js';
@@ -240,6 +245,11 @@ export class GroupNode {
             ctx.entityRightEdges.set(id, box.x + box.width);
         }
         ctx.currentFlowKey = previousFlowKey;
+        const inlineDatePins = computeContainerInlineDatePins({
+            box,
+            afterDate: pickInlineDate(propValues(node.properties, 'after')),
+            beforeDate: pickInlineDate(propValues(node.properties, 'before')),
+        });
         return {
             kind: 'group',
             id,
@@ -247,6 +257,7 @@ export class GroupNode {
             box,
             children,
             style,
+            inlineDatePins: inlineDatePins.length > 0 ? inlineDatePins : undefined,
         };
     }
 }

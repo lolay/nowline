@@ -61,6 +61,14 @@ export const messages = {
     'NL.E0407': (a: { value: string }) =>
         `Invalid calendar "${a.value}". Must be business, full, or custom.`,
     'NL.E0408': (a: { key: string }) => `Property "${a.key}" requires at least one reference.`,
+    'NL.E0410': (a: { key: string }) =>
+        `"${a.key}:" accepts at most one inline date per direction; collapse the multiple dates to a single binding date or use a declared anchor.`,
+    'NL.E0411': (a: { key: string; type: string }) =>
+        `Inline date in "${a.key}:" is not allowed on ${a.type}. Allowed only on item, parallel, and group; for a milestone use "date:" instead.`,
+    'NL.E0412': (a: { key: string; date: string }) =>
+        `Inline date "${a.date}" in "${a.key}:" requires the roadmap to declare "start:". Add start:YYYY-MM-DD to the roadmap.`,
+    'NL.E0413': (a: { key: string; date: string; start: string }) =>
+        `Inline date "${a.date}" in "${a.key}:" is before roadmap start ${a.start}.`,
 
     // Anchor / milestone / footnote
     'NL.E0500': (a: { name: string }) => `Anchor "${a.name}" requires a "date:" property.`,

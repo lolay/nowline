@@ -30,7 +30,7 @@ This document describes the public **output contract**. The internal layout-engi
 `@nowline/layout` produces a data structure describing every visual element with absolute coordinates. This is the contract between layout and rendering:
 
 - **Roadmap header** — title, author (optional), company logo (optional), Nowline attribution mark, positioned above and to the left of the timeline
-- **Item bars** — x, y, width (from `duration`), height (auto-computed from `text-size` + `padding` + content), title, metadata (status, owner, remaining), link, label chiclets, footnote indicators
+- **Item bars** — x, y, width (from `duration`), height (auto-computed from `text-size` + `padding` + content), title, metadata (status, owner, remaining), link, label chiclets, footnote indicators, inline-date glyphs (`after:DATE` / `before:DATE`)
 - **Swimlane bands** — x, y, width, height, frame label, separator lines, nested swimlane children
 - **Timeline scale** — header row with scale units (days/weeks/months/etc.), tick marks, grid lines, derived from `config`
 - **Now-line** — x position (today's date), label ("now"), full-height red vertical line
@@ -153,9 +153,9 @@ The now-line is the hero visual element — the vertical line marking today on t
 
 ### Item Bars
 
-Each roadmap item renders as a horizontal bar. Width is determined by `duration`. Height equals the band's `bandwidth()` — bars are uniform-height within a row regardless of label count. Bar contents include title, status indicator, owner, label chiclets, and footnote indicators.
+Each roadmap item renders as a horizontal bar. Width is determined by `duration`. Height equals the band's `bandwidth()` — bars are uniform-height within a row regardless of label count. Bar contents include title, status indicator, owner, label chiclets, footnote indicators, and inline-date glyphs (when `after:DATE` / `before:DATE` are present).
 
-- **Status indicator:** Hue-tinted dot in the bar's upper-right — green (done), blue (in-progress), amber (at-risk), red (blocked), slate (planned). Custom statuses use a neutral slate indicator. The exact tone is picked PER-BAR based on the bar bg's relative luminance: pale or saturated mid-tone bars (label-driven `bg:blue` etc.) get the deep `onLight` palette (≈ 800-900-level), and dark bars (default dark-theme status tints like `#172554`) get the pale `onDark` palette (≈ 100-level). The two palettes cross over at `L_bar ≈ 0.24` so the dot never fades into the bar even when a label propagates a same-hue saturated bg.
+- **Status indicator:** Hue-tinted dot in the bar's upper-right — green (done), blue (in-progress), amber (at-risk), red (blocked), slate (planned). Custom statuses use a neutral slate indicator. The exact tone is picked PER-BAR based on the bar bg's relative luminance: pale or saturated mid-tone bars (label-driven `bg:blue` etc.) get the deep `onLight` palette (≈ 800-900-level), and dark bars (default dark-theme status tints like `#172554`) get the pale `onDark` palette (≈ 100-level). The two palettes cross over at `L_bar ≈ 0.24` so the dot never fades into the bar even when a label propagates a same-hue saturated bg. The inline-date `before:` glyph (when present) sits to the LEFT of the status dot and footnote indicators, sharing the same upper-right decoration row — see [Inline-date glyph](#inline-date-glyph).
 - **Progress bar:** When `remaining` is set, the bar fills proportionally (e.g., `remaining:30%` → 70% filled). `remaining:` accepts both percent and single-eng effort literal forms (`remaining:30%` and `remaining:0.6w` are equivalent on a `size:m` item with no capacity); both normalize to the same painted percent during layout. `status:done` fills the bar completely regardless of `remaining`. When the literal exceeds total effort, the painted bar clamps at 100% remaining and a soft warning is emitted (see `specs/dsl.md` rule 17). The strip sits at the bar's bottom.
 - **Link icon:** A 14×14 colored tile in the bar's UPPER-LEFT corner with a white outbound-arrow ↗ glyph. The glyph is the SAME for every link target — only the tile color changes by service:
     - `linear.app` → **Linear** (purple tile)
@@ -166,7 +166,7 @@ Each roadmap item renders as a horizontal bar. Width is determined by `duration`
   Item-level `link:` always means "navigates to this URL", regardless of whether the target is `.nowline` or anything else. When a link icon is rendered, the caption text indents past the icon column so the title and icon never overlap inside the bar. The visually-distinct stacked-sheets glyph is reserved for the file-level `include` region badge — see [Include Region](#include-region).
 - **Caption (title + meta) — no wrap, horizontal spill**: when the title or meta line is wider than the bar's inner area, the caption renders OUTSIDE the bar to the right (`textSpills=true`). Caption text never wraps to a second line. Caption spill reserves an x-extent on the row so the next chained item bumps to a fresh row instead of overlapping the spilled text.
 - **Caption color (in-bar vs. spilled)**: when the caption stays inside the bar, the title uses the bar's resolved text color (`i.style.text`) and the meta uses `i.style.fg` so they read against the bar fill — including label-propagated overrides (e.g. `enterprise-style` setting `text:white` on a saturated bg). When the caption spills onto the chart / group bg instead, those bar-tuned colors no longer apply (white-on-peach is unreadable when an audit-track group's orange tint shows through behind the spilled title). The spilled title and meta both fall back to the theme's default item text color (`palette.entities.item.text` — `#0f172a` light / `#e2e8f0` dark) which is tuned for chart/group surfaces.
-- **Footnote indicator color**: the small `1` `2` … superscripts in the bar's upper-right render in the bar's own resolved text color (`i.style.text`), so they read with the same contrast as the title regardless of the bar fill. The "footnote = red" attention cue lives in the footnote PANEL's red number column at the bottom of the chart, where red contrasts cleanly against the panel's white surface; on saturated mid-tone bars (e.g. a `bg:blue` from a label-style ref) the same red would lose contrast against the bar.
+- **Footnote indicator color**: the small `1` `2` … superscripts in the bar's upper-right render in the bar's own resolved text color (`i.style.text`), so they read with the same contrast as the title regardless of the bar fill. The "footnote = red" attention cue lives in the footnote PANEL's red number column at the bottom of the chart, where red contrasts cleanly against the panel's white surface; on saturated mid-tone bars (e.g. a `bg:blue` from a label-style ref) the same red would lose contrast against the bar. The inline-date `before:` glyph (when present) walks LEFT from the leftmost footnote indicator using the same step pitch — see [Inline-date glyph](#inline-date-glyph).
 - **Label chips — natural width, horizontal-then-vertical spill, bar grows**: chips render at natural text width on a single row inside the bar when the full row fits. When the row's total width exceeds the bar's effective inner width, the chips spill past the bar's right edge and pack into one or more rows whose width is capped at the bar's visual width (multiple chips per spill row, additional rows stack DOWNWARD by `LABEL_CHIP_HEIGHT_PX + LABEL_CHIP_ROW_GAP_PX`). When the spilled column would extend past the bar's natural bottom, the BAR GROWS DOWNWARD by exactly the overflow so the chip column reads as enclosed by the bar — the bottom progress strip rides the new bottom and the row's pitch grows by the same amount so neighbors below clear cleanly. See [Labels](#labels) for the slack rule and bar-grow behavior.
 - **Narrow-bar decoration spill**: very short bars (e.g. a 3-day item rendered at 12 px wide) can't host the dot, link icon, and footnote at their full insets — the dot would overshoot the bar's left edge, the link icon would visually collide with the dot, and the footnote would land behind both. Each decoration has its own width threshold; when the bar falls below it, the decoration moves into the spill column to the right of the bar. Reading order mirrors the in-bar layout (`[icon] [title] [¹²] [dot]` from left to right):
 
@@ -180,6 +180,7 @@ Each roadmap item renders as a horizontal bar. Width is determined by `duration`
     - Dot spills when `bar.width < ITEM_STATUS_DOT_INSET_RIGHT_PX + ITEM_STATUS_DOT_RADIUS_PX` (≈ 17).
     - Link icon spills when `bar.width < ITEM_LINK_ICON_INSET_PX + ITEM_LINK_ICON_TILE_SIZE_PX + ITEM_DECORATION_SPILL_GAP_PX + ITEM_STATUS_DOT_INSET_RIGHT_PX + ITEM_STATUS_DOT_RADIUS_PX` (≈ 41) so the icon clears the dot's column with breathing room.
     - Footnote spills when `bar.width < ITEM_FOOTNOTE_INDICATOR_INSET_RIGHT_PX + 1` (≈ 23).
+    - Inline-date glyph spills when `bar.width < MIN_BAR_WIDTH_FOR_INLINE_DATE_PX` (≈ 30 — covers the glyph tile plus its inset and a clearance gap from the link icon / status-dot column). The `before:` glyph spills to the right of the bar in the same column the status dot uses; the `after:` glyph spills to the LEFT of the bar's leading edge so the side semantics stay readable.
 
   When the link icon spills, the title is forced to spill alongside it so the icon→title click affordance stays intact (icon and title would otherwise sit on opposite sides of the bar). The row-packer factors the rightmost spilled glyph (`decorationsRightX`) into its spill reservation so the next chained item bumps to a fresh row instead of landing under the spilled cluster. Spilled footnotes use the chart-tuned text color (same as spilled captions) since they no longer sit on the bar fill.
 
@@ -204,6 +205,35 @@ Swimlanes render as sequential solid bands with alternating subtle background ti
 ### Anchors
 
 Anchors render as **diamonds** (Gantt milestone style). An anchor appears at its date position on the timeline, vertically aligned with the topmost item that references it. Items linked to an anchor via `after` or `before` show a Gantt-style predecessor arrow connecting the item bar to the anchor. The anchor's vertical cut line is the visible "stem" of the arrow: each `after:anchor` dependency draws a short horizontal stub from the cut line at the dependent item's row mid-Y to the item's left visual edge, and lands the arrowhead on that left edge. Multiple items referencing the same anchor each draw their own stub — the cut line itself does the through-chart work, no per-arrow vertical leg is needed. The cut line stops at the bottom of the last swimlane and does not invade the mirrored bottom tick panel when one is present — only the now-line and the major grid lines thread through that panel.
+
+### Inline-date glyph
+
+When an `item`, `parallel`, or `group` declares an inline date literal in `after:` or `before:` (e.g. `after:2026-03-15` — see [`specs/dsl.md`](./dsl.md) "Inline date pins"), the renderer paints a small **calendar glyph** in the entity's top-decoration row. This is the lightweight counterpart to a declared `anchor` — it pins the entity to a specific date without claiming chart-spanning visual real estate.
+
+- **Glyph:** the renderer's built-in `calendar` icon, rendered from the same curated SVG library as `shield`, `warning`, `lock`, etc. Same sizing and color rules as the other built-in icons; identical across web, CLI, and exports.
+- **Tile size:** 12 × 12 px (`INLINE_DATE_GLYPH_TILE_SIZE_PX`). Slightly smaller than the 14 × 14 link icon — the date glyph reads as a sibling of the status dot and footnote indicators, not a peer of the link tile.
+- **Side:** top-LEFT corner for `after:DATE`, top-RIGHT corner for `before:DATE`. At most one glyph per side per entity (validation rule 24b enforces this structurally).
+- **Color:** entity's resolved meta color (the same family as the status dot tint) so the glyph reads against any bar fill or container surface.
+- **No caption.** The ISO date is not painted next to the glyph. The renderer wraps the glyph `<g>` in `<title>YYYY-MM-DD</title>` so a hover tooltip surfaces it on web targets; non-interactive exports (PDF, PNG) encode the date in alt text only. Authors who want a visible on-canvas date label declare a real `anchor` instead.
+- **No vertical cut line.** Inline-date pins never extend a line through the chart — that visual is reserved for declared `anchor` and `milestone` entities.
+
+#### Per-entity attach point
+
+- **Item** — top-LEFT of the painted bar for `after`, top-RIGHT for `before`. Inset insets defined in [`packages/layout/src/item-bar-geometry.ts`](../packages/layout/src/item-bar-geometry.ts).
+- **Styled group** — top-LEFT and top-RIGHT of the visible bounding box. The `after`-side glyph sits immediately right of the title chiclet's right edge so the chiclet stays anchored flush in the corner; the `before`-side glyph sits flush right inside the box.
+- **Bracketed parallel** — top-LEFT and top-RIGHT of the bracket footprint.
+- **Unstyled group / bare parallel** — top-LEFT / top-RIGHT of the entity's **logical** bounding box (leftmost child's left visual edge for `after`, rightmost child's right visual edge for `before`; vertical y is the top of the highest child row). The glyph floats in otherwise-blank space, but its position is unambiguous and the tooltip explains its presence. Authors who want a louder visual can add `style:` to the group or `bracket:` to the parallel.
+
+#### Decoration-row interleaving (item)
+
+The inline-date glyph joins the existing top-decoration family (link icon top-LEFT, status dot + footnote indicators top-RIGHT) without reordering anything else.
+
+- **Top-LEFT (`after:DATE`)**: glyph sits one decoration step right of the link icon's right edge when a link icon is present, otherwise at the bar's leftmost decoration slot. Caption indent reservation grows by one column so the title text doesn't run under the glyph.
+- **Top-RIGHT (`before:DATE`)**: glyph sits one decoration step LEFT of the leftmost footnote indicator (or one step left of the status dot when no footnotes are present). The status dot stays anchored at the rightmost slot; the inline-date glyph inserts at the LEFT end of the cluster so the existing badge sequence keeps its order.
+
+#### Narrow-bar spill
+
+When the bar is too narrow to host the full decoration row inside, the inline-date glyph spills into the same column the existing status dot and footnote indicators spill into — same step constants, same family. The threshold is `MIN_BAR_WIDTH_FOR_INLINE_DATE_PX`. Spilled inline-date glyphs use the chart-tuned text color (same as spilled captions) since they no longer sit on the bar fill.
 
 ### Milestones
 
@@ -353,7 +383,7 @@ Styles defined in `config` control the visual appearance of entities. Style prop
 | `fg` | Border/outline color of the entity. `none` for no border. |
 | `text` | Color of text within the entity. `none` hides text. |
 | `border` | Border/connection line style: `solid` (default), `dashed`, `dotted` |
-| `icon` | Small icon rendered at the leading edge of the entity. Built-in identifiers (rendered from a curated SVG library, identical across platforms): `shield`, `warning`, `lock`, plus the capacity-icon vocabulary (`person`, `people`, `points`, `time`). Custom: any identifier declared by a `symbol` declaration in config. Inline: a double-quoted Unicode literal — font-dependent. |
+| `icon` | Small icon rendered at the leading edge of the entity. Built-in identifiers (rendered from a curated SVG library, identical across platforms): `shield`, `warning`, `lock`, `calendar`, plus the capacity-icon vocabulary (`person`, `people`, `points`, `time`). Custom: any identifier declared by a `symbol` declaration in config. Inline: a double-quoted Unicode literal — font-dependent. |
 | `shadow` | Drop shadow beneath the entity: `none` (no shadow), `subtle` (tight, small offset), `soft` (larger offset, softer blur), `hard` (solid, no blur, offset down-right). `subtle`/`soft` rendered via SVG `<feDropShadow>`; `hard` rendered as a solid duplicate shape offset behind the entity. |
 | `font` | Font family for text within the entity. Named preset (`sans`, `serif`, `mono`) that maps to a cross-platform font stack. No font downloads required. |
 | `weight` | Font weight for the entity's primary text (title). Maps to SVG `font-weight`: `thin` (100), `light` (300), `normal` (400), `bold` (700). `thin` degrades gracefully if the font lacks that variant. |
@@ -374,7 +404,7 @@ Text style properties (`font`, `weight`, `italic`, `text-size`) apply to the ent
 
 The renderer ships a curated SVG icon library backing both `icon:` and `capacity-icon:` built-in names. Each named icon is an inline SVG path emitted directly into the output — not a Unicode codepoint, not a font reference, not an external asset. This guarantees identical rendering across web (browser SVG), CLI (terminal-rendered SVG / image), and downstream exports.
 
-The library includes the entity-decoration set used by `icon:` (`shield`, `warning`, `lock`, etc.) and the capacity-suffix set used by `capacity-icon:` (`person`, `people`, `points`, `time`). `multiplier` is rendered as a `<text>×</text>` element rather than an SVG path because U+00D7 MULTIPLICATION SIGN is a basic typographic operator with consistent rendering across all standard fonts.
+The library includes the entity-decoration set used by `icon:` (`shield`, `warning`, `lock`, `calendar`, etc.) and the capacity-suffix set used by `capacity-icon:` (`person`, `people`, `points`, `time`). `multiplier` is rendered as a `<text>×</text>` element rather than an SVG path because U+00D7 MULTIPLICATION SIGN is a basic typographic operator with consistent rendering across all standard fonts. The `calendar` icon is also reserved as the renderer-side glyph for inline-date pins (`after:DATE` / `before:DATE` on `item`, `parallel`, `group`) — see [Inline-date glyph](#inline-date-glyph).
 
 When an author needs a glyph not in the library, the `symbol` config declaration (with `unicode:`) or an inline Unicode literal provides escape hatches — both font-dependent.
 

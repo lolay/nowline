@@ -6,6 +6,11 @@
 // helpers in `layout.ts`).
 
 import type { GroupBlock, ItemDeclaration, ParallelBlock } from '@nowline/core';
+import { propValues } from '../dsl-utils.js';
+import {
+    computeContainerInlineDatePins,
+    pickInlineDate,
+} from '../inline-date-pin-geometry.js';
 import type { LayoutContext, TrackCursor } from '../layout-context.js';
 import { resolveStyle } from '../style-resolution.js';
 import { TRACK_BLOCK_TAIL_GUTTER_PX } from '../themes/shared.js';
@@ -89,6 +94,12 @@ export class ParallelNode {
             ctx.entityRightEdges.set(id, box.x + box.width);
         }
 
+        const inlineDatePins = computeContainerInlineDatePins({
+            box,
+            afterDate: pickInlineDate(propValues(node.properties, 'after')),
+            beforeDate: pickInlineDate(propValues(node.properties, 'before')),
+        });
+
         return {
             kind: 'parallel',
             id,
@@ -96,6 +107,7 @@ export class ParallelNode {
             box,
             children,
             style,
+            inlineDatePins: inlineDatePins.length > 0 ? inlineDatePins : undefined,
         };
     }
 }

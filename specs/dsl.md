@@ -273,8 +273,8 @@ Both `parallel` and `group` support universal properties (`labels`, `style`, `li
 | -------- | ------------------ | ------------------------------------------------------------------ |
 | `status` | enum or string     | Aggregate/override status for the block as a whole.                |
 | `owner`  | person or team ref | Accountable owner for the block.                                   |
-| `after`  | identifier or list | The entire block starts after the referenced entity finishes. List form (`after:[a,b]`) starts after the latest of them. Accepts item, milestone, anchor, parallel, or group ids. |
-| `before` | identifier or list | The entire block must finish before the referenced entity starts. List form (`before:[a,b]`) finishes before the earliest of them.                                                |
+| `after`  | identifier, ISO date, or list | The entire block starts after the referenced entity finishes (or after the inline ISO date). Single id: `after:kickoff`. Single date: `after:2026-03-15`. List: `after:[a, b, 2026-03-15]` — starts after the latest of all elements. Accepts item, milestone, anchor, parallel, or group ids. **At most one inline date per direction**; multiple dates are a validation error. See "Inline date pins" below. |
+| `before` | identifier, ISO date, or list | The entire block must finish before the referenced entity starts (or before the inline ISO date). List form finishes before the earliest of all elements. **At most one inline date per direction.** See "Inline date pins" below. |
 
 
 **Not supported** on parallel/group (computed from children):
@@ -327,8 +327,8 @@ These properties are specific to items. `status`, `owner`, `after`, and `before`
 | ----------- | --------------------- | --------------------------------------------------------------------------------------------------------------------------------------- |
 | `status`    | enum or string        | Built-in: `planned`, `in-progress` (alias `active`), `done` (alias `completed`), `at-risk`, `blocked`. Custom values allowed: `status:awaiting-review`.                      |
 | `owner`     | person or team ref    | References a person or team. `owner:sam` or `owner:platform`. Singular — one accountable owner.                                         |
-| `after`     | identifier or list    | This item starts after the referenced entity finishes. Single: `after:auth-refactor`. List: `after:[auth-refactor, audit-log]` — starts after the latest finisher. Accepts item, milestone, anchor, parallel, or group ids. |
-| `before`    | identifier or list    | This item must finish before the referenced entity starts. List: `before:[code-freeze, ga-date]` — finishes before the earliest starter.                                                                                    |
+| `after`     | identifier, ISO date, or list | This item starts after the referenced entity finishes (or after the inline ISO date). Single id: `after:auth-refactor`. Single date: `after:2026-03-15`. List: `after:[auth-refactor, audit-log, 2026-03-15]` — starts after the latest of all elements. Accepts item, milestone, anchor, parallel, or group ids. **At most one inline date per direction**; multiple dates are a validation error. See "Inline date pins" below. |
+| `before`    | identifier, ISO date, or list | This item must finish before the referenced entity starts (or before the inline ISO date). List form (`before:[code-freeze, 2026-05-01]`) finishes before the earliest of all elements. **At most one inline date per direction.** See "Inline date pins" below. |
 | `size`      | size alias            | References a `size` roadmap declaration (`size:l`). The item's duration is calculated as `effort ÷ item_capacity` (`capacity:` defaults to `1` when absent). Overridden by an explicit `duration:` literal — see "Sizing precedence" below. Items only — not valid on parallel or group. |
 | `duration`  | duration literal      | Raw duration literal only (`duration:2w`, `duration:3m`, `duration:0.5d`). No alias names; `size:` is the alias mechanism. When set alongside `size:`, this wins for bar width and meta-line driver (size chip omitted). Items only — not valid on parallel or group. |
 | `remaining` | percentage or literal | Work remaining. Two equivalent forms — author picks whichever reads naturally: percent (`remaining:30%`) or single-eng effort literal (`remaining:1w`, `remaining:0.5d`). When a literal is given, the system computes `remaining_literal ÷ total_effort` to derive the percent (capacity divides the literal: `total_effort = size.effort` for sized items, or `duration × item_capacity` for duration-literal'd items). Both forms render identically — a percent of the bar. `status:done` takes priority. Items only — not valid on parallel or group. |
@@ -1002,14 +1002,38 @@ The `link` property takes a bare URL (no quotes). One link per entity.
 
 ### Dependencies and Anchoring
 
-Both `after:` and `before:` accept a single identifier or a bracketed list of identifiers. References may target items, milestones, anchors, parallel blocks, or groups.
+Both `after:` and `before:` accept a single identifier, a single ISO date literal, or a bracketed list mixing both. References may target items, milestones, anchors, parallel blocks, or groups.
 
 - `after:id` — this entity starts after the referenced entity finishes (or after the referenced anchor date).
-- `after:[id1, id2, ...]` — this entity starts after **all** referenced entities finish (i.e. after the latest of them).
+- `after:2026-03-15` — **inline date pin.** This entity starts on the given date with no `anchor` declaration required. See "Inline date pins" below.
+- `after:[id1, id2, ...]` — this entity starts after **all** referenced entities finish (i.e. after the latest of them). List elements may be ids, an ISO date literal, or a mix.
 - `before:id` — this entity must finish before the referenced entity starts (or before the referenced anchor date).
-- `before:[id1, id2, ...]` — this entity must finish before the **earliest** of the referenced entities starts.
+- `before:2026-05-01` — **inline date pin.** This entity must finish on or before the given date. See "Inline date pins" below.
+- `before:[id1, id2, ...]` — this entity must finish before the **earliest** of the referenced entities starts. List elements may be ids, an ISO date literal, or a mix.
 
-Circular dependencies across the full graph (including every element of list-form references) are a validation error.
+Circular dependencies across the full graph (including every element of list-form references) are a validation error. Inline date literals are not graph nodes and do not participate in cycle detection.
+
+#### Inline date pins
+
+An inline date literal pins the entity directly without a named `anchor` declaration. The form is intentionally lightweight — useful for one-off date constraints that don't deserve a named, chart-spanning anchor.
+
+```nowline
+item ship "Ship release" size:m after:2026-03-15
+item code-review size:s before:2026-05-01
+item integration size:l after:[auth-refactor, 2026-04-01]
+group api-track after:2026-02-01
+parallel rollouts before:2026-06-30
+```
+
+**Rules:**
+
+- Inline dates are valid on `item`, `parallel`, and `group`. They are **not** valid on `milestone` (which already has its own `date:`), `swimlane`, `anchor`, `footnote`, `person`, or `team`. Using an inline date on those entity types is a validation error.
+- **At most one inline date per direction.** `after:[2026-03-15, 2026-04-01]` is a validation error — collapse to a single binding date instead. Mixing one date with any number of id references in the same list (`after:[kickoff, 2026-03-15]`) is allowed.
+- The roadmap must declare `start:` whenever the file contains any inline date (same rule as for `anchor` declarations and dated `milestone`s — see Validation Rule 27).
+- Every inline date must be on or after the roadmap's `start:` (Validation Rule 28).
+- ISO 8601 format only (`YYYY-MM-DD`); the date literal terminal already enforces this.
+
+**Visual treatment.** Each inline-date pin renders as a small `calendar` glyph in the entity's top-left corner (`after`) or top-right corner (`before`) decoration row, joining the existing status-dot / footnote-indicator family. There is no inline date caption next to the glyph and no chart-spanning vertical cut line — the lightweight form deliberately stays quiet. The ISO date is available as a tooltip and lives in the source. Authors who want a louder, chart-spanning visual should declare a real `anchor`. See [`specs/rendering.md`](./rendering.md) "Inline-date glyph" for full geometry.
 
 ### Line Continuation
 
@@ -1104,7 +1128,7 @@ Non-rules (intentionally not validated):
 17f. Every `symbol` declaration must specify a `unicode:"<string>"` property. Missing `unicode:` is a validation error.
 17g. `unicode:` value must be a non-empty quoted string. May contain Unicode escapes (`\u{...}`) or literal Unicode characters. May be a multi-codepoint grapheme cluster.
 17h. `ascii:` value, if present, must be a quoted string of length ≤ 3 ASCII characters.
-17i. A `symbol` id must not match any built-in icon name (`none`, `multiplier`, `person`, `people`, `points`, `time`, `shield`, `warning`, `lock`, plus any other built-ins the renderer reserves). Shadowing is an error.
+17i. A `symbol` id must not match any built-in icon name (`none`, `multiplier`, `person`, `people`, `points`, `time`, `shield`, `warning`, `lock`, `calendar`, plus any other built-ins the renderer reserves). Shadowing is an error.
 17j. Duplicate `symbol` declaration ids within a single file are an error (same rule as duplicate `status` or `label` ids).
 17k. A `symbol` reference (`icon:NAME` or `capacity-icon:NAME`) must resolve to either a built-in or an earlier `symbol` declaration. Forward references are an error.
 
@@ -1122,14 +1146,16 @@ Non-rules (intentionally not validated):
 
 **Dependencies**
 
-24. `after:` and `before:` on any entity accept a single identifier or a bracketed list of identifiers. Each element must resolve to a declared item, milestone, anchor, parallel, or group identifier.
-25. Circular dependency detection operates on the full graph across all `after:`/`before:` references (including every element of list-form references).
+24. `after:` and `before:` on any entity accept a single identifier, a single ISO date literal, or a bracketed list mixing both. Each non-date element must resolve to a declared item, milestone, anchor, parallel, or group identifier.
+24a. **Inline date pins are valid only on `item`, `parallel`, and `group`.** An ISO date literal in `after:` or `before:` on `milestone`, `swimlane`, `anchor`, `footnote`, `person`, or `team` is a validation error (`NL.E0411`).
+24b. **At most one inline date per direction.** A list with two or more ISO date literals in the same `after:` or the same `before:` property is a validation error (`NL.E0410`). Mixing one date with any number of id references in the same list is allowed.
+25. Circular dependency detection operates on the full graph across all `after:`/`before:` references (including every element of list-form references). **Inline date literals are not graph nodes** and do not participate in cycle detection.
 
 **Roadmap `start:`**
 
 26. `roadmap` `start:` values are valid ISO 8601 dates (format `YYYY-MM-DD`, calendar-valid).
-27. If a file contains any `anchor` declaration or any `milestone` with a `date:` property, the `roadmap` declaration must also declare `start:`. One error is emitted per offending dated entity.
-28. Every `anchor` date and every dated `milestone`'s `date:` must be on or after the roadmap's `start:`. One error is emitted per offender.
+27. If a file contains any `anchor` declaration, any `milestone` with a `date:` property, or any `item`/`parallel`/`group` with an inline date literal in `after:` or `before:`, the `roadmap` declaration must also declare `start:`. One error is emitted per offending dated entity (`NL.E0412` for inline-date offenders).
+28. Every `anchor` date, every dated `milestone`'s `date:`, and every inline date literal in `after:`/`before:` must be on or after the roadmap's `start:`. One error is emitted per offender.
 29. If `start:` is present but fails the date-format rule, the two rules above are suppressed for that file — the user sees only the format error until they fix it.
 
 **Persons and teams**

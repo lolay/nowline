@@ -51,6 +51,12 @@ const MANIFEST = [
     { slug: 'teams', source: 'examples/teams.nowline', theme: 'light', now: NOW },
     { slug: 'capacity', source: 'examples/capacity.nowline', theme: 'light', now: NOW },
     { slug: 'sizing', source: 'examples/sizing.nowline', theme: 'light', now: NOW },
+    {
+        slug: 'inline-date-pins',
+        source: 'examples/inline-date-pins.nowline',
+        theme: 'light',
+        now: NOW,
+    },
 ];
 
 function run(cmd, args, opts = {}) {

@@ -116,6 +116,55 @@ export const MIN_BAR_WIDTH_FOR_LINK_AND_DOT_PX =
  */
 export const MIN_BAR_WIDTH_FOR_FOOTNOTE_PX = ITEM_FOOTNOTE_INDICATOR_INSET_RIGHT_PX + 1;
 
+// ---- Inline-date glyph (after:DATE / before:DATE corner badge) ---
+//
+// Renders the renderer's built-in `calendar` SVG at top-LEFT (`after`)
+// or top-RIGHT (`before`) of the entity bar. Sized as a sibling of
+// the status dot and footnote indicators (smaller than the link tile)
+// so the top-decoration row stays visually unified. See
+// specs/rendering.md "Inline-date glyph".
+
+/** Side length (px) of the inline-date calendar glyph tile. */
+export const INLINE_DATE_GLYPH_TILE_SIZE_PX = 12;
+
+/** Distance (px) from the bar's left edge to the glyph's left edge
+ *  when the glyph sits at the leftmost top-decoration slot (no link
+ *  icon present). */
+export const INLINE_DATE_GLYPH_INSET_LEFT_PX = 6;
+
+/** Distance (px) from the bar's right edge to the glyph's right edge
+ *  when the glyph sits at the rightmost top-decoration slot (no
+ *  status dot or footnote present). */
+export const INLINE_DATE_GLYPH_INSET_RIGHT_PX = 6;
+
+/** Distance (px) from the bar's top edge to the glyph's top edge. */
+export const INLINE_DATE_GLYPH_INSET_TOP_PX = 5;
+
+/** Horizontal gap (px) between the inline-date glyph and an adjacent
+ *  decoration (link icon on the left, status dot / footnote indicator
+ *  on the right). Matches the existing decoration spill gap so the
+ *  top-decoration row reads as one rhythm. */
+export const INLINE_DATE_GLYPH_GAP_PX = ITEM_DECORATION_SPILL_GAP_PX;
+
+/**
+ * Minimum bar width (px) needed to host the inline-date glyph inside
+ * the bar. Below this, the glyph spills:
+ *   - `before:` glyph spills RIGHT into the column the status dot
+ *     uses (same family of decorations, same step pitch).
+ *   - `after:` glyph spills LEFT of the bar's leading edge so the
+ *     side semantics (after vs before) stay readable in the spill.
+ *
+ * The threshold reserves room for the glyph itself plus a small
+ * clearance from the link-icon column (when present) so the two
+ * glyphs don't overlap inside narrow bars.
+ */
+export const MIN_BAR_WIDTH_FOR_INLINE_DATE_PX =
+    INLINE_DATE_GLYPH_INSET_LEFT_PX +
+    INLINE_DATE_GLYPH_TILE_SIZE_PX +
+    INLINE_DATE_GLYPH_GAP_PX +
+    INLINE_DATE_GLYPH_TILE_SIZE_PX +
+    INLINE_DATE_GLYPH_INSET_RIGHT_PX;
+
 // ---- Label chips (along the bar's bottom) ------------------------
 
 /** Height (px) of a label chip rectangle. */

@@ -52,6 +52,10 @@ export type MessageCode =
     | 'NL.E0406' // invalid-scale
     | 'NL.E0407' // invalid-calendar
     | 'NL.E0408' // empty-property-list
+    | 'NL.E0410' // inline-date-multi-per-direction
+    | 'NL.E0411' // inline-date-disallowed-entity
+    | 'NL.E0412' // inline-date-needs-roadmap-start
+    | 'NL.E0413' // inline-date-before-roadmap-start
 
     // Anchor / milestone / footnote (NL.E0500–E0599)
     | 'NL.E0500' // anchor-requires-date
@@ -91,6 +95,10 @@ export const ALL_CODES: ReadonlyArray<MessageCode> = [
     'NL.E0406',
     'NL.E0407',
     'NL.E0408',
+    'NL.E0410',
+    'NL.E0411',
+    'NL.E0412',
+    'NL.E0413',
     'NL.E0500',
     'NL.E0501',
     'NL.E0502',

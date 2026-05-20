@@ -2,7 +2,7 @@
 
 ## Overview
 
-The OSS tooling (`lolay/nowline` and its satellite repos) ships incrementally across milestones m1–m4.6. A four-phase layout-engine refactor (m2.5a–m2.5d), a rendering-polish pass (m2i), capacity & utilization (m2j), and a dependency-arrow attach + routing pass (m2k) sit between the sample-fidelity work (m2h) and IDE support (m3). The IDE work ships before the GitHub-bound rendering paths (m3.5 GitHub Action, m4 browser embed) so authors can edit `.nowline` files in VS Code / Cursor with live preview before either surface goes wide. m3.5 (action) and m4 (embed) are independent of each other and could ship in either order; the chain numbers them m3.5 → m4. Two independent post-m4 add-ons round out the OSS chain: m4.5 expands IDE coverage (Obsidian, Neovim, JetBrains), m4.6 expands Windows install coverage (Scoop, WinGet). Each milestone has a clear scope and set of Apache-2.0 deliverables. Later milestones depend on earlier ones.
+The OSS tooling (`lolay/nowline` and its satellite repos) ships incrementally across milestones m1–m4.6. A four-phase layout-engine refactor (m2.5a–m2.5d), a rendering-polish pass (m2i), capacity & utilization (m2j), and a dependency-arrow attach + routing pass (m2k) sit between the sample-fidelity work (m2h) and IDE support (m3). Manual pages (m2l), French localization (m2m), and inline date pins (m2n) close out the m2 series with distribution polish and DSL refinements. The IDE work ships before the GitHub-bound rendering paths (m3.5 GitHub Action, m4 browser embed) so authors can edit `.nowline` files in VS Code / Cursor with live preview before either surface goes wide. m3.5 (action) and m4 (embed) are independent of each other and could ship in either order; the chain numbers them m3.5 → m4. Two independent post-m4 add-ons round out the OSS chain: m4.5 expands IDE coverage (Obsidian, Neovim, JetBrains), m4.6 expands Windows install coverage (Scoop, WinGet). Each milestone has a clear scope and set of Apache-2.0 deliverables. Later milestones depend on earlier ones.
 
 Commercial milestones (hosted editor, free viewer, MCP, enterprise, FedRAMP) are tracked in a separate, private spec and are out of scope here.
 
@@ -29,13 +29,14 @@ Commercial milestones (hosted editor, free viewer, MCP, enterprise, FedRAMP) are
 | ~~m2k~~ | ~~Dependency arrow attach + routing~~ | Apache 2.0 | Visual-edge attach with flow dedupe; channel-based orthogonal router (item-bar obstacles, parallel/group bracket-clearance nudge, slot assignment, under-bar fallback); min-stub constraints + parallel bracket-foot clearance |
 | ~~m2l~~ | ~~Manual pages~~ | Apache 2.0 | Hand-authored mdoc `nowline.1` (CLI flags + LANGUAGE cheatsheet) and `nowline.5` (full DSL reference) shipped through every install channel (Homebrew tap, `.deb`, npm `"man"`, GitHub Release asset) so `man nowline` and `man 5 nowline` both work after any package-manager install |
 | ~~m2m~~ | ~~Localization (fr)~~ | Apache 2.0 | `locale:` on the `nowline` directive; `--locale` flag and `LC_ALL`/`LC_MESSAGES`/`LANG` fallback; CLDR-style bundle tree (`fr` neutral base + empty `fr-CA` / `fr-FR` overlays); error-code-keyed validator messages; translated `man/fr/nowline.1` and `man/fr/nowline.5`; per-channel install wiring for translated man pages |
+| ~~m2n~~ | ~~Inline date pins~~ | Apache 2.0 | `after:DATE` / `before:DATE` ISO literals on `item` / `parallel` / `group` pin an entity to a calendar position without a named `anchor`; mixed lists (`after:[upstream, 2026-03-09]`) supported; renderer paints a `calendar` glyph (built-in icon) in the entity's top-LEFT (`after`) / top-RIGHT (`before`) corner with narrow-bar spill matching the status-dot family; four new validator codes (`NL.E0410`–`NL.E0413`) shipped with EN + FR bundles; new validation rules 24a/24b plus extended rules 27/28 |
 | ~~m3a~~ | ~~LSP server~~ | Apache 2.0 | Langium-based language server (`@nowline/lsp`): validation, definition, references, rename, hover, completion, document symbols, folding |
 | ~~m3b~~ | ~~VS Code/Cursor extension scaffold~~ | Apache 2.0 | Bundled `.vsix`: TextMate grammar, language config, snippets, file icon, LSP client, trace setting |
 | ~~m3c~~ | ~~Live preview~~ | Apache 2.0 | Side-or-behind preview panel; host-side render pipeline (parse + layout + renderSvg) posts SVG to a webview; clickable diagnostic table; toolbar zoom/pan/fit/save/copy; Cmd-wheel & pinch zoom; keyboard presets; minimap; five `nowline.preview.*` settings |
 | ~~m3d~~ | ~~Preview parity~~ | Apache 2.0 | `.nowlinerc` reader + workspace watcher; new preview-affecting settings (`nowline.preview.{locale,now,strict,showLinks,width,assetRoot}` + `nowline.ignoreRcFile`); preview toolbar overrides (theme, now-line, show-links) |
 | ~~m3e~~ | ~~Export from VS Code~~ | Apache 2.0 | `Nowline: Export…` shell-out command for PDF / pixel-strict PNG / HTML / Markdown+Mermaid / XLSX / MS Project XML; `nowline.export.*` settings (cliPath, PDF page-size/orientation/margin, sans/mono fonts, headless, PNG scale, MS Project start); per-export Override… quickPick |
 | ~~m3f~~ | ~~Authoring commands~~ | Apache 2.0 | `Nowline: New Roadmap…` (`--init` parity); `.nowlinerc`-vs-settings disagreement diagnostic in the preview (suppressed when `nowline.ignoreRcFile` is `true`) |
-| m3.5 | GitHub Action | Apache 2.0 | `packages/nowline-action/` (in this monorepo) + `lolay/nowline-action` Marketplace mirror: file mode + markdown mode, shells out to `@nowline/cli`. Sequenced before m4 because it has no dependency on the embed bundle. |
+| ~~m3.5~~ | ~~GitHub Action~~ | Apache 2.0 | `packages/nowline-action/` (in this monorepo) + `lolay/nowline-action` Marketplace mirror: file mode + markdown mode, shells out to `@nowline/cli`. Five releases (`v0.2.2`–`v0.2.5`) shipped; Marketplace listing live. One small carry-forward: bundled-action smoke test — see [`specs/handoffs/handoff-m3.5-action.md`](./handoffs/handoff-m3.5-action.md) → "Remaining work". |
 | m4 | Embed | Apache 2.0 | Browser embed script (`@nowline/embed`) and the branded `embed.nowline.{io,dev}` Firebase-Hosted CDN deploy. Bundle landed; CDN deploy still pending — see [`specs/handoffs/handoff-m4-embed.md`](./handoffs/handoff-m4-embed.md) → "Carried forward". |
 | m4.5 | IDE Expansion | Apache 2.0 | Obsidian, Neovim, JetBrains (timing TBD) |
 | m4.6 | Windows distribution | Apache 2.0 | Scoop bucket (`lolay/scoop-bucket`) and WinGet central-registry submission via `wingetcreate`; new `update-scoop-bucket` + `submit-winget-pkg` jobs in `release.yml`; `SCOOP_BUCKET_TOKEN` + `WINGET_PR_PAT` secrets |
@@ -331,6 +332,48 @@ DSL non-goals: keywords and identifier characters stay English/ASCII (every diag
 
 Spec: [`specs/localization.md`](./localization.md)
 
+### ~~m2n — Inline date pins~~
+
+Lightweight, calendar-bound counterpart to a declared `anchor`. Lets an author pin a single `item`, `parallel`, or `group` to a specific date by typing the date directly into `after:` / `before:` instead of declaring a named `anchor` and referring to it.
+
+```nowline
+item ship "Ship release" size:m after:2026-03-15
+item code-review size:s before:2026-05-01
+item integration size:l after:[auth-refactor, 2026-04-01]
+group api-track after:2026-02-01
+parallel rollouts before:2026-06-30
+```
+
+DSL surface:
+
+- `after:DATE` / `before:DATE` accept a single ISO date literal (`YYYY-MM-DD`) — already a terminal in the grammar so no parser changes were needed.
+- Mixed lists are allowed (`after:[kickoff, 2026-03-15]`) and resolve to the latest (`after`) / earliest (`before`) of all elements; ids and dates can intermix freely.
+- Allowed only on `item`, `parallel`, `group` — *not* `milestone` (which already has `date:`), `swimlane`, `anchor`, `footnote`, `person`, or `team`.
+- At most one inline date per direction — multiple dates in the same `after:` (or same `before:`) collapse to one binding date.
+- File-level rules unchanged: any file with an inline date requires `roadmap … start:YYYY-MM-DD`, and every inline date must be ≥ that start.
+
+Validator:
+
+- Four new error codes — `NL.E0410` (multiple dates per direction), `NL.E0411` (date on a disallowed entity), `NL.E0412` (missing roadmap `start:`), `NL.E0413` (date before roadmap `start:`). EN + FR bundles both ship.
+- New validation rules `24a` / `24b` plus extended `27` / `28` in [`specs/dsl.md`](./dsl.md) § Validation Rules.
+- Inline date literals are *not* graph nodes — cycle detection (rule 25) and reference resolution both skip them so a self-`after:DATE` neither becomes a phantom node nor a cycle.
+
+Layout / renderer:
+
+- New `inline-date-pin-geometry.ts` module — pure placement helpers for items (with narrow-bar spill + decoration-row interleaving) and containers (group / parallel — always flush in the bounding-box corner, never spill).
+- `PositionedItem` / `PositionedGroup` / `PositionedParallel` carry an optional `inlineDatePins?: InlineDatePin[]` payload (0–2 entries per entity, one per direction).
+- Renderer paints a 12×12 px `calendar` glyph from the curated icon library at top-LEFT (`after`) / top-RIGHT (`before`); coloured with the entity's resolved meta colour; wrapped in `<g><title>YYYY-MM-DD</title></g>` so browsers surface a hover tooltip. **No caption, no chart-spanning cut line** — those visuals remain reserved for declared `anchor` / `milestone`.
+- `calendar` is reserved as a built-in icon name (rule `17i`) so a `symbol calendar` declaration can't shadow the inline-date glyph.
+
+Fixtures / tests:
+
+- New example `examples/inline-date-pins.nowline` covering single-direction pins, mixed lists, group, and parallel; rendered by `pnpm build`.
+- New renderer fixture `tests/inline-date-corners.nowline` exercising the corner-glyph placement matrix (bare item, link icon only, link + dot + footnotes, mixed list, styled group, unstyled group, bracketed parallel, bare parallel).
+- New vitest suites: `packages/core/test/validation/inline-date-pins.test.ts` (6 happy paths + 6 error paths + 2 negative checks for cycle / reference resolution) and `packages/layout/test/inline-date-pins.test.ts` (snapshot guard on the geometry numbers for item / group / parallel).
+- `inline-date-pins.nowline` joined the roundtrip allow-list in `packages/cli/test/convert/roundtrip.test.ts` so the printer keeps the new syntax stable.
+
+Spec: [`specs/dsl.md`](./dsl.md) § "Inline date pins" + rules `24a`, `24b`, `27`, `28`; [`specs/rendering.md`](./rendering.md) § "Inline-date glyph" | Handoff: [`specs/handoffs/handoff-m2n-inline-date-pins.md`](./handoffs/handoff-m2n-inline-date-pins.md)
+
 ### ~~m3a — LSP server~~
 
 Langium-based language server (`@nowline/lsp`) shipped as a standalone package. Provides validation, go-to-definition, find-references, rename, hover, completion (IDs and status values), document symbols, and folding for `.nowline` files.
@@ -453,16 +496,16 @@ Spec: [`specs/scoop-bucket.md`](./scoop-bucket.md), [`specs/cli-distribution.md`
 ## Dependency Chain
 
 ```
-m1 → m2a → m2b → m2b.5 → m2c → m2d → m2e → m2f → m2g → m2h → m2.5a → m2.5b → m2.5c → m2.5d → m2i → m2j → m2k → m2l → m3a → m3b → m3c → m3d → m3e → m3f → m3.5 → m4
-                                                                                                                                                                ↘
-                                                                                                                                                                 m4.5 (depends on m3a only; sequenced after m4)
-                                                                                                                                                                ↘
-                                                                                                                                                                 m4.6 (depends on m2a + m2l; sequenced after m4.5 by numbering only — independent of m4.5)
+m1 → m2a → m2b → m2b.5 → m2c → m2d → m2e → m2f → m2g → m2h → m2.5a → m2.5b → m2.5c → m2.5d → m2i → m2j → m2k → m2l → m2m → m2n → m3a → m3b → m3c → m3d → m3e → m3f → m3.5 → m4
+                                                                                                                                                                              ↘
+                                                                                                                                                                               m4.5 (depends on m3a only; sequenced after m4)
+                                                                                                                                                                              ↘
+                                                                                                                                                                               m4.6 (depends on m2a + m2l; sequenced after m4.5 by numbering only — independent of m4.5)
 ```
 
 m3.5 (GitHub Action) and m4 (browser embed) are independent of each other — m3.5 shells out to `@nowline/cli`, m4 ships the browser bundle. The chain orders them m3.5 → m4 by numbering only; either could ship first.
 
-m2l is positioned in the m2 series logically (CLI distribution polish) but landed after m3c chronologically; the chain reflects logical OSS sequence rather than strict shipping order, similar to m2i.
+m2l, m2m, and m2n are positioned in the m2 series logically (CLI distribution polish; localization; DSL enhancement) but landed after m3c chronologically; the chain reflects logical OSS sequence rather than strict shipping order, similar to m2i.
 
 m4.5 and m4.6 are independent post-m4 add-ons — m4.5 extends IDE coverage (Obsidian, Neovim, JetBrains) and only needs m3a; m4.6 extends Windows install coverage (Scoop, WinGet) and only needs m2a + m2l. Either can ship first; the `.5 / .6` numbering reflects ordering of the proposals, not a dependency.
 

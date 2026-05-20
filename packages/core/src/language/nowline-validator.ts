@@ -110,8 +110,16 @@ const BUILTIN_CAPACITY_ICONS = new Set([
 ]);
 
 // Built-in icon: vocabulary. Superset of capacity-icon names plus the entity-decoration
-// icons currently shipped by the renderer.
-const BUILTIN_ICON_NAMES = new Set([...BUILTIN_CAPACITY_ICONS, 'shield', 'warning', 'lock']);
+// icons currently shipped by the renderer. `calendar` is the renderer-side glyph the
+// inline-date pin path (`after:DATE` / `before:DATE`) draws onto items, parallels, and
+// groups; reserving it here prevents a `symbol calendar` declaration from shadowing it.
+const BUILTIN_ICON_NAMES = new Set([
+    ...BUILTIN_CAPACITY_ICONS,
+    'shield',
+    'warning',
+    'lock',
+    'calendar',
+]);
 
 // `utilization-warn-at:` / `utilization-over-at:` accept the literal `none`
 // to opt out of that color band (per specs/dsl.md rule 17d). Numeric forms
@@ -381,6 +389,17 @@ function displayName(node: { name?: string; title?: string }): string {
 }
 
 /**
+ * Returns the lowercase entity-type label for an AST node, suitable for
+ * embedding inside a validator message (e.g. `"item"`, `"milestone"`,
+ * `"swimlane"`). Mirrors `describeNode`'s normalization (strip
+ * `Declaration` / `Block` suffix, lowercase) but returns just the type so
+ * callers can compose their own message.
+ */
+function entityTypeLabel(node: AstNode): string {
+    return node.$type.replace(/Declaration$|Block$/, '').toLowerCase();
+}
+
+/**
  * Emit a localized validator diagnostic.
  *
  * Validator runs at parse time when only the file's locale is in scope.
@@ -422,6 +441,7 @@ export function registerValidationChecks(services: NowlineServices): void {
             validator.checkRoadmapOnlyKeywordsPosition,
             validator.checkForwardReferences,
             validator.checkReferenceResolution,
+            validator.checkInlineDatePins,
             validator.checkCircularDependencies,
             validator.checkDuplicateSizeIds,
             validator.checkCalendarBlockConsistency,
@@ -1522,6 +1542,12 @@ export class NowlineValidator {
     // exists — it renders as the bare id. Sequencing properties (`after`,
     // `before`, `on`) stay strict because a phantom dependency silently breaks
     // the timeline / footnote target.
+    //
+    // Inline date literals in `after:` / `before:` (e.g. `after:2026-03-15`)
+    // are intentionally NOT id references — they pin the entity directly to a
+    // calendar date without a named anchor. The DATE_RE check below skips them
+    // here; their own validation (entity-type allowlist, multi-date-per-direction,
+    // roadmap-start: requirements) lives in `checkInlineDatePins` below.
     checkReferenceResolution(file: NowlineFile, accept: ValidationAcceptor): void {
         const declaredIds = collectReferenceableIds(file);
 
@@ -1532,6 +1558,7 @@ export class NowlineValidator {
                 const vals = prop.value ? [prop.value] : prop.values;
                 for (const v of vals) {
                     if (!v) continue;
+                    if ((key === 'after' || key === 'before') && DATE_RE.test(v)) continue;
                     if (!declaredIds.has(v)) {
                         accept(
                             'error',
@@ -1546,6 +1573,85 @@ export class NowlineValidator {
         for (const entry of file.roadmapEntries) {
             visit(entry);
         }
+    }
+
+    // --- Rules 24a/24b/27/28 (inline-date pins on after:/before:) ---
+    // An inline ISO date literal in `after:` or `before:` pins the entity
+    // directly to a calendar position without a named `anchor` declaration
+    // (see specs/dsl.md "Inline date pins"). This check enforces:
+    //   - 24a: inline date allowed only on item / parallel / group
+    //   - 24b: at most one inline date per direction (per `after:` / `before:`)
+    //   -  27: file with any inline date requires roadmap `start:`
+    //   -  28: every inline date must be on or after roadmap `start:`
+    //
+    // Cycle detection (`checkCircularDependencies`) skips dates entirely —
+    // they are not graph nodes — so this is the only validator that touches
+    // their date semantics. The grammar's DATE_LITERAL terminal already
+    // enforces the YYYY-MM-DD shape; we only need to verify calendar validity
+    // for the start: comparison.
+    checkInlineDatePins(file: NowlineFile, accept: ValidationAcceptor): void {
+        const start = resolveLocalStart(file);
+
+        const visit = (entry: AstNode): void => {
+            const props = (entry as { properties?: EntityProperty[] }).properties ?? [];
+            const allowed =
+                isItemDeclaration(entry) || isParallelBlock(entry) || isGroupBlock(entry);
+
+            for (const prop of props) {
+                const key = propKey(prop);
+                if (key !== 'after' && key !== 'before') continue;
+                const vals = prop.value ? [prop.value] : prop.values;
+                const dateVals = vals.filter((v): v is string => !!v && DATE_RE.test(v));
+                if (dateVals.length === 0) continue;
+
+                if (!allowed) {
+                    acceptTr(accept, 'error', { node: prop }, 'NL.E0411', {
+                        key,
+                        type: entityTypeLabel(entry),
+                    });
+                    continue;
+                }
+
+                if (dateVals.length > 1) {
+                    acceptTr(accept, 'error', { node: prop }, 'NL.E0410', { key });
+                }
+
+                for (const dateVal of dateVals) {
+                    switch (start.kind) {
+                        case 'invalid':
+                            // Roadmap start: itself is malformed; the user
+                            // already sees that error. Suppress this one to
+                            // avoid noise (mirrors anchor / milestone behavior).
+                            continue;
+                        case 'missing':
+                            acceptTr(accept, 'error', { node: prop }, 'NL.E0412', {
+                                key,
+                                date: dateVal,
+                            });
+                            continue;
+                        case 'valid': {
+                            const d = new Date(dateVal);
+                            if (Number.isNaN(d.getTime())) continue;
+                            if (d < start.date) {
+                                acceptTr(accept, 'error', { node: prop }, 'NL.E0413', {
+                                    key,
+                                    date: dateVal,
+                                    start: start.iso,
+                                });
+                            }
+                        }
+                    }
+                }
+            }
+
+            if (isSwimlaneDeclaration(entry)) {
+                for (const c of entry.content) visit(c);
+            } else if (isParallelBlock(entry) || isGroupBlock(entry)) {
+                for (const c of entry.content) visit(c);
+            }
+        };
+
+        for (const entry of file.roadmapEntries) visit(entry);
     }
 
     // --- Rule 25: circular dependencies in after/before graph ---
@@ -1569,10 +1675,22 @@ export class NowlineValidator {
                 const key = propKey(prop);
                 if (key === 'after') {
                     const refs = prop.value ? [prop.value] : prop.values;
-                    for (const r of refs) if (r) addDep(idName, r);
+                    for (const r of refs) {
+                        if (!r) continue;
+                        // Inline date literals are not graph nodes — they pin
+                        // to a calendar position, not to another entity. Skip
+                        // them so they never participate in a cycle (per
+                        // specs/dsl.md rule 25).
+                        if (DATE_RE.test(r)) continue;
+                        addDep(idName, r);
+                    }
                 } else if (key === 'before') {
                     const refs = prop.value ? [prop.value] : prop.values;
-                    for (const r of refs) if (r) addDep(r, idName);
+                    for (const r of refs) {
+                        if (!r) continue;
+                        if (DATE_RE.test(r)) continue;
+                        addDep(r, idName);
+                    }
                 }
             }
             void file;

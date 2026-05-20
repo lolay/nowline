@@ -12,13 +12,14 @@ export const LINK_ICON_PATHS: Record<string, string> = {
     jira: 'M8 1 1 8l7 7 7-7Zm0 3.5L11.5 8 8 11.5 4.5 8Z',
 };
 
-// --- Capacity-icon library ---
+// --- Curated built-in icon library ---
 //
-// Built-in named glyphs for the `capacity-icon:` style property and (where
-// reused) the `icon:` style property. Each glyph is a small inline SVG fragment
-// drawn on a 24x24 viewBox using `currentColor` so the renderer can paint it in
-// the resolved entity text color and at any pixel size by setting the wrapping
-// `<svg>` element's `width` / `height`.
+// Named glyphs for the `capacity-icon:` style property, the `icon:` style
+// property, and renderer-internal vocabulary like the inline-date pin glyph
+// (`calendar`). Each glyph is a small inline SVG fragment drawn on a 24x24
+// viewBox using `currentColor` so the renderer can paint it in the resolved
+// entity text color and at any pixel size by setting the wrapping `<svg>`
+// element's `width` / `height`.
 //
 // Adapted from Lucide (https://lucide.dev) under the ISC License — paths are
 // transcribed verbatim; only the wrapping `<svg>` element differs (we set
@@ -87,6 +88,46 @@ export const CAPACITY_ICON_SVG: Record<string, CapacityIconSvg> = {
     },
 };
 
+// --- Renderer-internal built-in icons ---
+//
+// Glyphs from the curated library that the renderer reaches for outside the
+// `capacity-icon:` path. Currently just `calendar`, used by the inline-date
+// pin painter (`after:DATE` / `before:DATE` on items, parallels, and groups
+// — see specs/rendering.md "Inline-date glyph"). The validator reserves
+// `calendar` as a built-in name so authors can't shadow it via a `symbol`
+// declaration (rule 17i).
+//
+// `BUILTIN_ICON_SVG` re-exports the capacity-icon entries plus these renderer-
+// internal glyphs so callers walking the curated library by name don't have to
+// know which path each glyph belongs to. The capacity-icon contract
+// (`CAPACITY_ICON_SVG` exposes exactly the four `capacity-icon:` glyphs) stays
+// intact for the m6/m7 sites that depend on it.
+
+const RENDERER_BUILTIN_ICON_SVG: Record<string, CapacityIconSvg> = {
+    // Lucide `calendar` — month grid (rounded rectangle body, two top tabs
+    // for hanger pegs, a horizontal divider for the day-row separator).
+    calendar: {
+        viewBox: '0 0 24 24',
+        body:
+            '<rect x="3" y="4" width="18" height="18" rx="2" ry="2" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>' +
+            '<line x1="16" x2="16" y1="2" y2="6" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>' +
+            '<line x1="8" x2="8" y1="2" y2="6" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>' +
+            '<line x1="3" x2="21" y1="10" y2="10" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>',
+        ascii: 'd',
+    },
+};
+
+/**
+ * Union of every built-in glyph the renderer can paint by name: the
+ * `capacity-icon:` set plus renderer-internal glyphs (currently `calendar`).
+ * Use this when you need any built-in by name; use `CAPACITY_ICON_SVG` when
+ * you specifically want the `capacity-icon:` subset.
+ */
+export const BUILTIN_ICON_SVG: Record<string, CapacityIconSvg> = {
+    ...CAPACITY_ICON_SVG,
+    ...RENDERER_BUILTIN_ICON_SVG,
+};
+
 /** Returns true when `name` is a renderer-curated capacity glyph. Useful for
  * differentiating built-ins from custom glyph declarations and inline literals
  * in the upcoming layout/render passes (m6/m7). */
@@ -96,7 +137,12 @@ export function hasCapacityIconSvg(name: string): boolean {
 
 /** ASCII fallbacks for every built-in capacity-icon name, including the ones
  * that render as text (`multiplier`) or render nothing (`none`). The spec's
- * `Built-in glyph table` is the source of truth — keep these in sync. */
+ * `Built-in glyph table` is the source of truth — keep these in sync.
+ *
+ * `calendar` is intentionally absent: it is a renderer-internal glyph for
+ * inline-date pins (not a `capacity-icon:` value), so it has no role in
+ * capacity-suffix ASCII fallback.
+ */
 export const CAPACITY_ICON_ASCII: Record<string, string> = {
     none: '',
     multiplier: 'x',
