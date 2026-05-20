@@ -6,6 +6,7 @@ dist-deb/
 *.tsbuildinfo
 .scratch/
 .pnpm-store/
+.pnpm-bin/
 
 # bun --compile intermediate cache (sometimes left in package roots)
 *.bun-build
