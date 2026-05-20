@@ -10,6 +10,7 @@ The core tooling lives under the **lolay** GitHub organization. Copyright **Lola
 | `lolay/nowline-action` | OSS Marketplace mirror | Apache 2.0 | Compiled GitHub Action — `action.yml` and minified `dist/` populated by `release.yml` on every tag. No source code; the source lives in this monorepo at `packages/nowline-action/`. The mirror exists so the Action is listable on GitHub Marketplace (which requires `action.yml` at repo root). |
 | `lolay/nowline-vscode` | OSS | Apache 2.0 | VS Code / Cursor extension (will graduate out of the engine monorepo once stable; tracked but not yet active). |
 | `lolay/nowline-obsidian` | OSS | Apache 2.0 | Obsidian plugin (planned, m4.5). |
+| `lolay/nowline-infra` | Cloud control plane | Apache 2.0 (private during bootstrap) | Terraform for every GCP project, billing link, IAM grant, Workload Identity Federation pool, org policy, and Firebase Hosting resource Lolay operates for Nowline — including the two `nowline-embed-{prod,dev}` projects that back the embed CDN. **No application code, no cloud resources outside of TF.** This monorepo's `release.yml` deploys consume the infra's WIF outputs (via GitHub environment-scoped variables) but never the other way around. See [`embed.md`](./embed.md) § Distribution for the responsibility split; see `lolay/nowline-infra/specs/architecture.md` for the tier model. |
 
 This shape mirrors [Mermaid's split](https://github.com/mermaid-js): parser-coupled packages (parser, layout, renderer, embed, plugins) live together in the monorepo because cross-package changes are common; downstream consumers that interact through stable interfaces (the GitHub Action via the CLI, future VS Code extension via the LSP) live as siblings or write-only mirrors.
 
@@ -18,6 +19,8 @@ Proprietary web apps (free viewer, Pro editor, enterprise) are developed in priv
 ### Dependency Rule
 
 Dependencies flow one direction: downstream consumers depend on OSS, never the reverse. All paid apps consume OSS packages via npm. No OSS package may import from a proprietary repo.
+
+Infrastructure dependencies flow the same way: `lolay/nowline-infra` provisions the cloud projects every other repo's deploy pipeline targets. This repo's `release.yml` *consumes* the infra repo's `terraform output` values (wired into GitHub environment-scoped variables per the infra repo's `ops/runbook.md`); it never reaches back to mutate cloud state directly. The only documented exception is Squarespace DNS — no Terraform provider exists, so DNS edits are manual against the infra repo's `ops/dns.md` inventory.
 
 ### Discoverability
 
@@ -114,7 +117,7 @@ Dependencies flow downward only. No upward or sideways imports. The graph is enf
 | PDF generation | PDFKit | Pure JS, no native deps (~2MB). Walks the positioned model to produce true vector PDFs. Bundles cleanly with `bun compile` — no Chromium dependency. |
 | XLSX generation | ExcelJS | Mature (13M weekly downloads), excellent data/formatting/auto-filter support. ~1 MB JS — negligible impact on the ~55 MB CLI binary. No chart support; stacked-bar Gantt sheet deferred. |
 | Embed bundling | esbuild | Fast, zero-config bundling of core + layout + renderer into a single IIFE browser script. Same toolchain the VS Code extension already uses; one esbuild config covers both. |
-| Embed CDN | Firebase Hosting (two projects) | `embed.nowline.io` (prod, tag-driven, `Cache-Control: immutable` per-version) and `embed.nowline.dev` (latest `main` + per-PR ephemeral preview channels). Branded URLs, custom headers, per-version telemetry. See [`embed.md`](./embed.md) §Distribution. |
+| Embed CDN | Firebase Hosting (two projects) | `embed.nowline.io` (prod, tag-driven, `Cache-Control: immutable` per-version) and `embed.nowline.dev` (latest `main` + per-PR ephemeral preview channels). Branded URLs, custom headers, per-version telemetry. **Provisioned by Terraform in [`lolay/nowline-infra`](https://github.com/lolay/nowline-infra)** (stack: `stacks/embed/`, milestone m7) — this monorepo's release pipeline deploys the built bundle to projects the infra repo owns, via WIF. See [`embed.md`](./embed.md) § Distribution and [`../ops/embed-deploy.md`](../ops/embed-deploy.md) for the deploy-side checklist. |
 | Testing | Vitest | Fast, TypeScript-native, compatible with the monorepo structure. |
 | Lint and format | Biome | Single Rust binary handling lint, format, and import organization. Type-aware rules in v2.4 cover the promise hygiene we want (`noFloatingPromises`, `noMisusedPromises`) without a typescript-eslint dependency. Replaces the aspirational ESLint+Prettier reference that was never wired up. |
 | CI | GitHub Actions | Standard for GitHub-hosted repos. |

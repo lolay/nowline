@@ -64,7 +64,12 @@ That's it. Any ` ```nowline ` block in the page will render automatically on `DO
 
 ## Distribution
 
-The embed bundle is served from two domains, both Firebase-Hosted under separate Firebase projects so dev traffic and abuse can never spill into prod. The build artefact is produced inside this monorepo (`packages/embed/`) and the release pipeline is responsible for uploading it to Firebase — see [Bootstrap status](#bootstrap-status) for what's wired today.
+The embed bundle is served from two domains, both Firebase-Hosted under separate Firebase projects so dev traffic and abuse can never spill into prod. **Responsibility split across two repos:**
+
+- **Infrastructure** — the two `nowline-embed-{prod,dev}` GCP projects, billing links, Firebase Hosting custom-domain bindings for `embed.nowline.{io,dev}`, deploy service accounts, Workload Identity Federation pools, and project-level IAM are all Terraform-managed in [`lolay/nowline-infra`](https://github.com/lolay/nowline-infra) (stack: `stacks/embed/`, milestone m7). Squarespace DNS records for the two `embed.*` subdomains are documented in that repo's `ops/dns.md` (no TF provider).
+- **Application** — the bundle build (`packages/embed/`), the per-project `firebase.json` cache-header config, and the `release.yml` deploy cells that consume the infra repo's WIF outputs all live in this monorepo. The deploy job authenticates via WIF (no static service-account JSON keys; the infra's org policy `iam.disableServiceAccountKeyCreation` is enforced at the org level).
+
+See [Bootstrap status](#bootstrap-status) for what's wired today and the [`../ops/embed-deploy.md`](../ops/embed-deploy.md) runbook for the OSS-repo-side checklist that wires this repo's deploy workflow against the infra outputs.
 
 | URL | Triggered by | Stability | `Cache-Control` | Audience |
 |-----|--------------|-----------|-----------------|----------|
@@ -96,7 +101,12 @@ The embed is shipped as `@nowline/embed` on npm, so the npm-backed CDNs (jsDeliv
 
 ### Bootstrap status
 
-The bundle ships in m4 as `@nowline/embed` on npm (already wired through `release.yml`). The Firebase Hosting projects, deploy job, and the `embed.nowline.{io,dev}` DNS records remain to be set up — see the m4 handoff under [Carried forward](./handoffs/handoff-m4-embed.md) and `specs/features.md` feature 32. The one-time provisioning runbook for the two Firebase projects, service accounts, GitHub secrets, DNS, and the dev auth gate decision is at [`../ops/embed-deploy.md`](../ops/embed-deploy.md). Until that lands, embedders that need the bundle today can `npm i @nowline/embed` and serve it themselves; the URLs above are the shape the documented channel will take, not something live yet.
+The bundle ships in m4 as `@nowline/embed` on npm (already wired through `release.yml`). Two pieces remain to bring the branded CDN online:
+
+1. **`lolay/nowline-infra` m7 — Embed tier.** Provisions `nowline-embed-{prod,dev}`, custom domains on `embed.nowline.{io,dev}`, deploy SAs, WIF pools, and IAM via Terraform (`stacks/embed/` instantiates `modules/tier-pair/` for `github_repo = "lolay/nowline"`). Squarespace DNS records on the two `embed.*` subdomains are applied by hand per `lolay/nowline-infra/ops/dns.md`. See `lolay/nowline-infra/specs/milestones.md` § m7 for the full deliverables and acceptance criteria.
+2. **OSS-repo deploy wiring.** Once m7 is applied, this repo wires `release.yml`'s `embed-prod` / `embed-dev` cells against the infra's WIF outputs (no static keys, no `FIREBASE_SERVICE_ACCOUNT_*` GitHub secrets), ships a `firebase.json` per project encoding the cache-header contract from the [Distribution table](#distribution) above, and resolves the [dev auth gate](#bootstrap-status) decision before exposing `embed.nowline.dev`. The end-to-end checklist is [`../ops/embed-deploy.md`](../ops/embed-deploy.md).
+
+Until both pieces land, embedders that need the bundle today can `npm i @nowline/embed` and serve it themselves; the URLs above are the shape the documented channel will take, not something live yet. The m4 handoff under [Carried forward](./handoffs/handoff-m4-embed.md) and `specs/features.md` feature 32 are the cross-references.
 
 ## Bundle Size Target
 
