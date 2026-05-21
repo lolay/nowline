@@ -30,6 +30,13 @@ export interface PreviewManagerDeps {
  */
 export class PreviewManager {
     private readonly previews = new Map<string, NowlinePreview>();
+    /**
+     * Tracks the most-recently-active preview panel. Updated by the
+     * onDidChangeViewState listener attached in openOrReveal so the
+     * `nowline.showSource` command can route back to the right source
+     * when the preview's title-bar button is clicked.
+     */
+    private activePreview: NowlinePreview | undefined;
 
     constructor(
         private readonly context: vscode.ExtensionContext,
@@ -80,8 +87,25 @@ export class PreviewManager {
             rcCache: this.deps.rcCache,
             vscodeLanguage: this.deps.vscodeLanguage(),
             onMessage: (msg, source) => this.deps.onMessage(msg, source),
-            onDispose: (source) => this.previews.delete(source.sourceUri.toString()),
+            onDispose: (source) => {
+                this.previews.delete(source.sourceUri.toString());
+                if (this.activePreview === source) this.activePreview = undefined;
+            },
         });
+        // Track the active preview so nowline.showSource can route back to
+        // the right source. The listener is auto-cleaned by VS Code when the
+        // panel disposes; pushing it into context.subscriptions also keeps
+        // it alive for the extension lifetime in case the panel is reused.
+        this.context.subscriptions.push(
+            panel.onDidChangeViewState((e) => {
+                if (e.webviewPanel.active) {
+                    this.activePreview = preview;
+                } else if (this.activePreview === preview) {
+                    this.activePreview = undefined;
+                }
+            }),
+        );
+        if (panel.active) this.activePreview = preview;
         this.previews.set(key, preview);
         void preview.refreshNow();
         return preview;
@@ -90,6 +114,15 @@ export class PreviewManager {
     /** Lookup an open preview by source URI. */
     getForSource(sourceUri: vscode.Uri): NowlinePreview | undefined {
         return this.previews.get(sourceUri.toString());
+    }
+
+    /**
+     * The currently active preview panel, if any. Used by the
+     * `nowline.showSource` title-bar button to find the source URI to
+     * navigate back to.
+     */
+    getActive(): NowlinePreview | undefined {
+        return this.activePreview;
     }
 
     /** Iterate every open preview. Used by document-change forwarding. */

@@ -229,6 +229,12 @@
                 "icon": "$(open-preview)"
             },
             {
+                "command": "nowline.showSource",
+                "title": "Show Source",
+                "category": "Nowline",
+                "icon": "$(go-to-file)"
+            },
+            {
                 "command": "nowline.export",
                 "title": "Export…",
                 "category": "Nowline",
@@ -262,17 +268,17 @@
                     "group": "navigation"
                 },
                 {
+                    "command": "nowline.showSource",
+                    "when": "activeWebviewPanelId == 'nowline.preview'",
+                    "group": "navigation"
+                },
+                {
                     "command": "nowline.export",
                     "when": "editorLangId == nowline",
                     "group": "navigation"
                 }
             ],
             "editor/title/context": [
-                {
-                    "command": "nowline.openPreview",
-                    "when": "resourceExtname == .nowline",
-                    "group": "1_open"
-                },
                 {
                     "command": "nowline.openPreviewToSide",
                     "when": "resourceExtname == .nowline",
@@ -287,13 +293,8 @@
             "editor/context": [
                 {
                     "when": "editorLangId == nowline",
-                    "command": "nowline.openPreview",
-                    "group": "navigation@1"
-                },
-                {
-                    "when": "editorLangId == nowline",
                     "command": "nowline.openPreviewToSide",
-                    "group": "navigation@2"
+                    "group": "navigation@1"
                 },
                 {
                     "when": "editorLangId == nowline",
@@ -307,11 +308,6 @@
                 }
             ],
             "explorer/context": [
-                {
-                    "command": "nowline.openPreview",
-                    "when": "resourceExtname == .nowline",
-                    "group": "navigation"
-                },
                 {
                     "command": "nowline.openPreviewToSide",
                     "when": "resourceExtname == .nowline",
@@ -327,6 +323,10 @@
                 {
                     "command": "nowline.export",
                     "when": "editorLangId == nowline || resourceExtname == .nowline"
+                },
+                {
+                    "command": "nowline.showSource",
+                    "when": "activeWebviewPanelId == 'nowline.preview'"
                 },
                 {
                     "command": "nowline.newRoadmap"

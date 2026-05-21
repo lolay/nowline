@@ -62,6 +62,7 @@ export function activate(context: vscode.ExtensionContext): void {
         vscode.commands.registerCommand('nowline.openPreviewToSide', (uri?: vscode.Uri) =>
             openPreview(uri, vscode.ViewColumn.Beside),
         ),
+        vscode.commands.registerCommand('nowline.showSource', () => showSource()),
         vscode.commands.registerCommand('nowline.export', (uri?: vscode.Uri) => handleExport(uri)),
         vscode.commands.registerCommand('nowline.newRoadmap', () => runNewRoadmapCommand()),
         rcCache.onDidChange(() => {
@@ -162,6 +163,35 @@ async function openPreview(
         const rc = await rcCache.resolveFor(dir);
         disagreementTracker.check(rc.config, rc.rcPath, target);
     }
+}
+
+/**
+ * Reverse of `openPreviewToSide`: from the preview's title-bar button, jump
+ * back to the source. If a visible editor already shows the source, reveal
+ * that editor in place; otherwise open it beside the active preview so we
+ * don't blow the preview away.
+ */
+async function showSource(): Promise<void> {
+    const active = previewManager?.getActive();
+    if (!active) {
+        vscode.window.showInformationMessage('No active Nowline preview.');
+        return;
+    }
+    const uri = active.sourceUri;
+    const existing = vscode.window.visibleTextEditors.find(
+        (e) => e.document.uri.toString() === uri.toString(),
+    );
+    if (existing) {
+        await vscode.window.showTextDocument(existing.document, {
+            viewColumn: existing.viewColumn,
+            preserveFocus: false,
+        });
+        return;
+    }
+    await vscode.window.showTextDocument(uri, {
+        viewColumn: vscode.ViewColumn.Beside,
+        preserveFocus: false,
+    });
 }
 
 function activeNowlineUri(): vscode.Uri | undefined {
