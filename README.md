@@ -40,33 +40,34 @@ Renders to:
 
 ## Quick start
 
-Until release artifacts ship, the fastest way to try `nowline` is to run it from a checkout:
+Install the CLI from your package manager:
 
 ```bash
-git clone https://github.com/lolay/nowline.git
-cd nowline
-pnpm install
-pnpm build
-node packages/cli/dist/index.js examples/minimal.nowline   # writes ./minimal.svg
+brew install lolay/tap/nowline                       # macOS / Linux / WSL
+npm install -g @nowline/cli                          # any platform with Node 22+
 ```
 
-Or expose `nowline` on your `PATH` with a local `npm link`:
+Debian/Ubuntu and Windows users can grab the latest `.deb` or `.exe` from [GitHub Releases](https://github.com/lolay/nowline/releases/latest). See [`packages/cli/README.md`](./packages/cli/README.md#install) for the full install matrix (including `man nowline` setup).
+
+Render your first roadmap:
 
 ```bash
-cd packages/cli
-npm link
-nowline examples/minimal.nowline
+nowline examples/minimal.nowline                     # writes ./minimal.svg
 nowline --version
 ```
 
-You can also scaffold a brand-new file from a template:
+Or scaffold a brand-new file from a template:
 
 ```bash
-nowline --init my-project              # ./my-project.nowline
-nowline --init my-project -t teams     # ./my-project.nowline (teams template)
+nowline --init my-project                            # ./my-project.nowline
+nowline --init my-project -t teams                   # ./my-project.nowline (teams template)
 ```
 
-`pnpm build` regenerates the SVGs for every example and renderer fixture into sibling files for inspection. See [`CONTRIBUTING.md`](./CONTRIBUTING.md) for the full developer setup, including how to skip the render step or rebuild a single sample.
+For the VS Code / Cursor / VSCodium extension, search **Nowline** on the [VS Code Marketplace](https://marketplace.visualstudio.com/items?itemName=nowline.vscode-nowline) or [Open VSX](https://open-vsx.org/extension/nowline/vscode-nowline).
+
+> **`0.x` versioning.** `nowline` is on `0.x.y` while we settle the embed surface and IDE expansion. Public APIs may change between minor versions; full SemVer guarantees apply once we ship `1.0`. See [`specs/releasing.md`](./specs/releasing.md) for the version contract.
+
+To run from a checkout for local development (`pnpm install && pnpm build`), see [`CONTRIBUTING.md`](./CONTRIBUTING.md).
 
 ## Use the CLI
 
@@ -151,7 +152,7 @@ nowline --init my-project --template=teams  # use the teams template
 
 ### Manual
 
-After any package-manager install (`brew install lolay/tap/nowline`, `apt install nowline`, `npm install -g @nowline/cli`), `man nowline` shows the manual. The man page source lives at [`packages/cli/man/nowline.1`](./packages/cli/man/nowline.1) and ships as a release asset on every GitHub Release.
+After any package-manager install (`brew install lolay/tap/nowline`, `npm install -g @nowline/cli`, or the `.deb` from GitHub Releases), `man nowline` shows the CLI manual and `man 5 nowline` shows the full DSL reference. Both man pages also ship as standalone assets on every [GitHub Release](https://github.com/lolay/nowline/releases) — see [`packages/cli/man/`](./packages/cli/man/) for the mdoc sources.
 
 ## Language at a glance
 
@@ -254,7 +255,7 @@ A TextMate grammar lives at [`grammars/nowline.tmLanguage.json`](./grammars/nowl
 
 ## Status
 
-Nowline is pre-release. Nothing is published to package registries, Homebrew, or GitHub Releases yet — the toolchain runs from source. Stable releases will land with the milestones tracked in [`specs/milestones.md`](./specs/milestones.md). The parser, validator, layout, renderer, every export format (SVG, PNG, PDF, HTML, Markdown+Mermaid, XLSX, MS Project XML), and CLI (verbless render, `--dry-run`, `--init`, `--serve`) are usable today.
+Nowline is on `v0.x` — published to Homebrew, npm, the VS Code Marketplace, Open VSX, and GitHub Releases. The parser, validator, layout, renderer, every export format (SVG, PNG, PDF, HTML, Markdown+Mermaid, XLSX, MS Project XML), and the verbless CLI (`--dry-run`, `--init`, `--serve`) are usable today. Breaking changes may land between `0.x` minor versions while the embed surface and IDE expansion settle; full SemVer guarantees kick in at `1.0`. The release-by-release roadmap lives in [`specs/milestones.md`](./specs/milestones.md).
 
 ## Contributing
 

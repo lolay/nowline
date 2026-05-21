@@ -119,7 +119,7 @@ Run after the workflow finishes. Each row is a single channel — if any one fai
 
 These are intentionally deferred until a release exists, because they reference live install commands and supported version lines:
 
-- [ ] Update [`README.md`](../README.md) "Quick Start" to drop "Until release artifacts ship…" and add `brew install lolay/tap/nowline`, `npm i -g @nowline/cli`, and the Marketplace install link. Add a one-line `0.x = API may change between minors` note.
-- [ ] Update [`SECURITY.md`](../SECURITY.md) "Supported versions" — replace "pre-release; only `main` is supported" with "the latest `0.x.y` line is supported; older `0.x` lines are not".
+- [x] Update [`README.md`](../README.md) "Quick Start" to drop "Until release artifacts ship…" and add `brew install lolay/tap/nowline`, `npm i -g @nowline/cli`, and the Marketplace install link. Add a one-line `0.x = API may change between minors` note.
+- [x] Update [`SECURITY.md`](../SECURITY.md) "Supported versions" — replace "pre-release; only `main` is supported" with "the latest `0.x.y` line is supported; older `0.x` lines are not".
 
 These are also tracked as the `docs-readme-status` and `docs-security-supported` todos from the original release-versioning-strategy plan.

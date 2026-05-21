@@ -2,7 +2,7 @@
 
 ## Supported versions
 
-Nowline is pre-release. There are no published packages or release artifacts yet, so the only version that receives fixes is the current `main` branch. Once the project ships its first tagged release, this policy will be updated to list supported versions explicitly.
+Nowline is on `0.x`. The latest `0.x.y` line receives security fixes; older `0.x` lines do not. Once `1.0` ships, the policy will be revised to support the latest stable major and one previous major in line with SemVer expectations.
 
 ## Reporting a vulnerability
 
