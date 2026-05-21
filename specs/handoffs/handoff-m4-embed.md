@@ -215,10 +215,10 @@ The action work moved to m3.5 (its own milestone, source at
   monorepo's tag-driven multi-target release pipeline. The pending
   Firebase deploy work (see "What shipped" → "Carried forward")
   attaches new cells here rather than living in a separate workflow.
-- [`specs/release-bootstrap.md`](../release-bootstrap.md) — bootstrap
-  recipe for one-time prerequisites (Homebrew tap, Marketplace IDs,
-  PATs). The Firebase project + DNS work that's still pending for the
-  branded CDN belongs alongside this checklist.
+- [`specs/releasing.md`](../releasing.md) — maintainer release flow
+  and required-secrets table; the Firebase project + DNS work that's
+  still pending for the branded CDN belongs alongside this checklist.
+  (Originally pointed at `specs/release-bootstrap.md`, retired post-v0.1.0.)
 
 ## Out of scope for m4
 

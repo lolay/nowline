@@ -33,7 +33,7 @@ Before cutting a release, on `main`:
 2. **`CHANGELOG.md` is up to date.** See [Changelog workflow](#changelog-workflow) below — contributors should already have appended entries to `## [Unreleased]` as part of their PRs; the maintainer moves them to a new `## [vX.Y.Z] - YYYY-MM-DD` section as part of the release-cut commit.
 3. **Examples render cleanly.** `pnpm build` (which runs `pnpm samples` and `pnpm fixtures`) should produce the expected SVGs without warnings.
 4. **Smoke-test the standalone binary locally** with `pnpm --filter @nowline/cli compile:local` and run `examples/minimal.nowline` through every export format. This catches `bun compile` regressions that the CI smoke test cannot reach for cross-platform binaries.
-5. **First-time setup is complete.** The first-ever release additionally requires the `lolay/homebrew-tap` repo, Marketplace / Open VSX namespaces, and all five repo secrets to be in place. Walk through [`specs/release-bootstrap.md`](./release-bootstrap.md) once before tagging `v0.1.0`; subsequent releases can skip it.
+5. **Required secrets are in place.** All five secrets in the [Required secrets](#required-secrets) table below must exist on `lolay/nowline`. The first-ever release also needed the `lolay/homebrew-tap` repo seeded and the Marketplace / Open VSX namespaces created — that one-time setup is now done; subsequent releases skip it. (Forking maintainers can recreate the namespaces from each registry's "create publisher" flow; the formula seed lives at [`scripts/homebrew-tap/`](../scripts/homebrew-tap/).)
 
 ## Cutting the release
 

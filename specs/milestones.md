@@ -486,7 +486,7 @@ Documentation:
 
 - New [`specs/scoop-bucket.md`](./scoop-bucket.md) — parallel to [`specs/homebrew-tap.md`](./homebrew-tap.md): naming convention, manifest structure, release pipeline integration, bootstrap, install path.
 - Update [`specs/cli-distribution.md`](./cli-distribution.md) Windows section: replace "download the `.exe` directly" guidance with `scoop install` and `winget install`.
-- Update [`specs/release-bootstrap.md`](./release-bootstrap.md) — add Scoop bucket repo (`lolay/scoop-bucket`) bootstrap row to step 2 and `SCOOP_BUCKET_TOKEN` + `WINGET_PR_PAT` rows to the secrets table in step 3; add Scoop + WinGet rows to the verification matrix.
+- Update [`specs/releasing.md`](./releasing.md) — add `SCOOP_BUCKET_TOKEN` + `WINGET_PR_PAT` rows to the required-secrets table; add Scoop + WinGet rows to the "After release" verification reminders. (Bootstrap of the `lolay/scoop-bucket` repo itself is a one-shot manual step, parallel to the original Homebrew tap seed.)
 - Update [`specs/homebrew-tap.md`](./homebrew-tap.md) Windows-on-the-tap note: replace "the `.deb` (under WSL), or by downloading the `.exe` directly" with `scoop install lolay/nowline` / `winget install lolay.nowline`.
 
 Depends on: m2a (original distribution pipeline) and m2l (man-page-style multi-channel pattern); does not depend on m3 / m4 / m4.5. Sequenced after m4.5 by numbering only — m4.6 and m4.5 do not depend on each other and can ship in either order.

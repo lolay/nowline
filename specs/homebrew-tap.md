@@ -113,7 +113,7 @@ No PR opened against the tap. Auto-generated formulas in custom taps are routine
 
 ## Bootstrap (one-time, before first release)
 
-These tap-specific prerequisites for the first `v0.1.0` tag are **not** automated by `release.yml`. The end-to-end maintainer checklist (tap + Marketplace + Open VSX + all five repo secrets) lives in [`specs/release-bootstrap.md`](./release-bootstrap.md); this section just calls out the constraints that are intrinsic to the tap design.
+These tap-specific prerequisites for the first `v0.1.0` tag are **not** automated by `release.yml`. The end-to-end maintainer release flow (including the secrets table) lives in [`specs/releasing.md`](./releasing.md); this section just calls out the constraints that are intrinsic to the tap design.
 
 1. **Tap repo seeded.** `lolay/homebrew-tap` must exist with at least one commit on `main`. The `github-release` cell calls `actions/checkout@v4` against the tap, and checkout fails on a repo with no `HEAD`. Pushing the seed (`Formula/nowline.rb` placeholder + a tap README) creates the default branch and unblocks the workflow. Source files: [`scripts/homebrew-tap/`](../scripts/homebrew-tap/).
 2. **`HOMEBREW_TAP_TOKEN` secret set.** Fine-grained PAT (or deploy key) with `contents: write` on `lolay/homebrew-tap`, stored in this repo's Actions secrets.
