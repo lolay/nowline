@@ -12,7 +12,7 @@
  * `allowlist` collection.
  *
  * See specs/embed.md § Bootstrap status (dev auth gate) and
- * ops/embed-deploy.md § 4 for the deploy-side wiring.
+ * lolay/nowline-infra:ops/embed-deploy.md § 4 for the deploy-side wiring.
  */
 
 export const ALLOWED_DOMAINS: readonly string[] = ['nowline.io'];

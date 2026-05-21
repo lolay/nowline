@@ -15,7 +15,7 @@
  * client-side, opaque to the embedder.
  *
  * See specs/embed.md § Bootstrap status (dev auth gate) and
- * ops/embed-deploy.md § 4 for the deploy-side wiring.
+ * lolay/nowline-infra:ops/embed-deploy.md § 4 for the deploy-side wiring.
  */
 
 import { type FirebaseApp, initializeApp } from 'firebase/app';
@@ -32,7 +32,8 @@ import { isAllowlisted } from './allowlist.js';
 
 // esbuild-substituted at build time from PUBLIC_FIREBASE_* env vars in
 // .github/workflows/embed-cdn.yml (sourced from the `embed-dev` GitHub
-// environment-scoped variables — see ops/embed-deploy.md § 2.5).
+// environment-scoped variables — see
+// lolay/nowline-infra:ops/embed-deploy.md § 2.5).
 declare const __NOWLINE_FIREBASE_API_KEY__: string;
 declare const __NOWLINE_FIREBASE_AUTH_DOMAIN__: string;
 declare const __NOWLINE_FIREBASE_PROJECT_ID__: string;

@@ -301,8 +301,8 @@ The m3.5 action also moved into the monorepo (at
     Actions"), ships a `firebase.json` per project encoding the
     cache-header contract from [`specs/embed.md`](../embed.md)
     § Distribution, and resolves the dev auth gate decision. The
-    end-to-end consuming-repo checklist is
-    [`ops/embed-deploy.md`](../../ops/embed-deploy.md).
+    end-to-end deploy checklist lives in the infra repo at
+    [`lolay/nowline-infra:ops/embed-deploy.md`](https://github.com/lolay/nowline-infra/blob/main/ops/embed-deploy.md).
 - **Bundler: esbuild.** Matches Mermaid's production bundler since
   [PR #4729](https://github.com/mermaid-js/mermaid/pull/4729) (2023,
   when they replaced UMD with IIFE for the same reason we want one),
@@ -386,7 +386,8 @@ in dependency order.
     per-project `firebase.json` carrying the cache-header contract
     from [`specs/embed.md`](../embed.md) § Distribution, the dev
     auth gate decision, and the bundle-provenance banner. End-to-end
-    checklist at [`ops/embed-deploy.md`](../../ops/embed-deploy.md).
+    checklist lives in the infra repo at
+    [`lolay/nowline-infra:ops/embed-deploy.md`](https://github.com/lolay/nowline-infra/blob/main/ops/embed-deploy.md).
 
   Tracked as `specs/features.md` feature 32.
 

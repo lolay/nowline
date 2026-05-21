@@ -15,8 +15,8 @@ name: Embed CDN
 #
 # Both jobs authenticate via the `embed-dev` environment's Workload
 # Identity Federation outputs from `lolay/nowline-infra` m7 — see
-# ops/embed-deploy.md §§ 1–2 for the operator-side env setup and
-# §§ 5–6 for the workflow shape and verification steps.
+# lolay/nowline-infra:ops/embed-deploy.md §§ 1–2 for the operator-side
+# env setup and §§ 5–6 for the workflow shape and verification steps.
 
 on:
   push:

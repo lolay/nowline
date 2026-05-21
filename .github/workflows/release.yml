@@ -866,10 +866,11 @@ jobs:
   # Authenticates to GCP via WIF — see lolay/nowline-infra m7 for the
   # provider/SA wiring. The GitHub environment-scoped variables
   # (WIF_PROVIDER, DEPLOY_SA_EMAIL, FIREBASE_PROJECT_ID) are set by the
-  # operator from `terraform output` of `lolay/nowline-infra/stacks/embed`
-  # per ops/embed-deploy.md § 2. No static service-account JSON keys —
-  # the org policy `iam.disableServiceAccountKeyCreation` would block
-  # them anyway.
+  # operator from `terraform output` of
+  # `lolay/nowline-infra/stacks/embed/<env>` per
+  # lolay/nowline-infra:ops/embed-deploy.md § 2. No static service-account
+  # JSON keys — the org policy `iam.disableServiceAccountKeyCreation`
+  # would block them anyway.
   embed-prod:
     name: Deploy embed.nowline.io (prod CDN)
     if: ${{ startsWith(github.ref, 'refs/tags/v') }}
