@@ -8,7 +8,7 @@ Work top-to-bottom: each section depends only on the ones above it.
 
 These are already shipped on `main` — no action needed, included so you know what to skip.
 
-- [x] `nowline-release-bot <release-bot@nowline.io>` git identity in the `cut-release` job and the `github-release` cell of the `publish` matrix in [`.github/workflows/release.yml`](../.github/workflows/release.yml).
+- [x] `nowline-release-bot <nowline-release-bot@lolay.com>` git identity in the `cut-release` job and the `github-release` cell of the `publish` matrix in [`.github/workflows/release.yml`](../.github/workflows/release.yml).
 - [x] `"private": false` on [`packages/vscode-extension/package.json`](../packages/vscode-extension/package.json) so `vsce package` will accept it.
 - [x] `"publisher": "nowline"` on the same file — this is the namespace you'll register on both Marketplaces in step 2.
 - [x] [`backport main`](https://github.com/lolay/nowline/labels) GitHub label.

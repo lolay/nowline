@@ -22,15 +22,18 @@ permissions:
 # Workflow-level git identity for every `git commit` made by this
 # workflow (cut-release commits the version bump; the github-release
 # cell commits the Homebrew tap formula). git honours these env vars
-# without needing per-step `git config user.name/email`. nowline.io is
-# the project's canonical domain (matches the attribution mark in
-# packages/layout/src/themes/shared.ts); it doesn't need to be a
-# deliverable mailbox — git just stores it as a string.
+# without needing per-step `git config user.name/email`. The bot
+# identity lives on the maintainer company's domain (Lolay); nowline.io
+# remains the project's web / docs / attribution site (see the
+# attribution mark in packages/layout/src/themes/shared.ts). The
+# address doesn't need to be deliverable — git just stores it as a
+# string — but lolay.com keeps it close to a maintainer mailbox if a
+# downstream tool ever does try to deliver to it.
 env:
   GIT_AUTHOR_NAME: nowline-release-bot
-  GIT_AUTHOR_EMAIL: release-bot@nowline.io
+  GIT_AUTHOR_EMAIL: nowline-release-bot@lolay.com
   GIT_COMMITTER_NAME: nowline-release-bot
-  GIT_COMMITTER_EMAIL: release-bot@nowline.io
+  GIT_COMMITTER_EMAIL: nowline-release-bot@lolay.com
 
 jobs:
   cut-release:

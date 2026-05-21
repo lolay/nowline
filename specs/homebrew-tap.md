@@ -105,7 +105,7 @@ The tap commit lives at the tail of the `github-release` cell of the `publish` m
 2. Reuses the four Homebrew-relevant binary artifacts that the same cell already downloaded for the GitHub Release upload: `nowline-macos-arm64`, `nowline-macos-x64`, `nowline-linux-x64`, `nowline-linux-arm64` — no second download.
 3. Computes a SHA256 for each.
 4. Rewrites `Formula/nowline.rb` from a heredoc with the new version + four SHAs.
-5. Commits as `nowline-release-bot <release-bot@nowline.io>` and `git push`es directly to `main` on the tap.
+5. Commits as `nowline-release-bot <nowline-release-bot@lolay.com>` and `git push`es directly to `main` on the tap.
 
 Folding the tap commit into the same matrix cell (instead of running it as a separate job after `publish`) means it fires right after the GH release publish without waiting on the unrelated `npm` and `vscode` cells. Matrix cells can't depend on each other (no intra-matrix `needs:`), and the formula references release-asset URLs that have to resolve before they're committed, so chaining the tap inside the cell is the only way to keep this in the matrix.
 
