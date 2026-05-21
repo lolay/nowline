@@ -881,21 +881,16 @@ jobs:
       contents: read
       id-token: write
     steps:
-      - name: Checkout source (for firebase.json)
-        uses: actions/checkout@v6
+      - name: Prepare Firebase deploy
+        uses: ./.github/actions/prepare-firebase-deploy
         with:
-          # Sparse-checkout would shave a few seconds, but we also need
-          # package.json for the version banner verification below and
-          # a few path roots are easier to maintain as a full checkout.
-          sparse-checkout: |
-            packages/embed/firebase/prod
-            packages/embed/package.json
-
-      - name: Download embed CDN artifact
-        uses: actions/download-artifact@v8
-        with:
-          name: embed-cdn-prod
-          path: packages/embed/dist-cdn-prod
+          firebase-config-path: packages/embed/firebase/prod
+          artifact-name: embed-cdn-prod
+          artifact-path: packages/embed/dist-cdn-prod
+          wif-provider: ${{ vars.WIF_PROVIDER }}
+          service-account: ${{ vars.DEPLOY_SA_EMAIL }}
+          # Need package.json for the banner-version assertion below.
+          extra-checkout-paths: packages/embed/package.json
 
       - name: Verify artifact banner matches release tag
         run: |
@@ -907,12 +902,6 @@ jobs:
             || { echo "ERROR: banner version doesn't match tag ${VERSION}" >&2; exit 1; }
           echo "$BANNER" | grep -q "env=prod" \
             || { echo "ERROR: banner env is not prod" >&2; exit 1; }
-
-      - name: Authenticate to GCP via Workload Identity Federation
-        uses: google-github-actions/auth@v3
-        with:
-          workload_identity_provider: ${{ vars.WIF_PROVIDER }}
-          service_account: ${{ vars.DEPLOY_SA_EMAIL }}
 
       - name: Deploy to Firebase Hosting (embed-prod)
         uses: w9jds/firebase-action@v15

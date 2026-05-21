@@ -93,22 +93,14 @@ jobs:
       contents: read
       id-token: write
     steps:
-      - name: Checkout source (for firebase.json)
-        uses: actions/checkout@v6
+      - name: Prepare Firebase deploy
+        uses: ./.github/actions/prepare-firebase-deploy
         with:
-          sparse-checkout: packages/embed/firebase/dev
-
-      - name: Download dev CDN artifact
-        uses: actions/download-artifact@v8
-        with:
-          name: embed-cdn-dev
-          path: packages/embed/dist-cdn-dev
-
-      - name: Authenticate to GCP via Workload Identity Federation
-        uses: google-github-actions/auth@v3
-        with:
-          workload_identity_provider: ${{ vars.WIF_PROVIDER }}
-          service_account: ${{ vars.DEPLOY_SA_EMAIL }}
+          firebase-config-path: packages/embed/firebase/dev
+          artifact-name: embed-cdn-dev
+          artifact-path: packages/embed/dist-cdn-dev
+          wif-provider: ${{ vars.WIF_PROVIDER }}
+          service-account: ${{ vars.DEPLOY_SA_EMAIL }}
 
       - name: Deploy to Firebase Hosting (embed-dev)
         uses: w9jds/firebase-action@v15
@@ -138,22 +130,14 @@ jobs:
       id-token: write
       pull-requests: write
     steps:
-      - name: Checkout source (for firebase.json)
-        uses: actions/checkout@v6
+      - name: Prepare Firebase deploy
+        uses: ./.github/actions/prepare-firebase-deploy
         with:
-          sparse-checkout: packages/embed/firebase/dev
-
-      - name: Download dev CDN artifact
-        uses: actions/download-artifact@v8
-        with:
-          name: embed-cdn-dev
-          path: packages/embed/dist-cdn-dev
-
-      - name: Authenticate to GCP via Workload Identity Federation
-        uses: google-github-actions/auth@v3
-        with:
-          workload_identity_provider: ${{ vars.WIF_PROVIDER }}
-          service_account: ${{ vars.DEPLOY_SA_EMAIL }}
+          firebase-config-path: packages/embed/firebase/dev
+          artifact-name: embed-cdn-dev
+          artifact-path: packages/embed/dist-cdn-dev
+          wif-provider: ${{ vars.WIF_PROVIDER }}
+          service-account: ${{ vars.DEPLOY_SA_EMAIL }}
 
       - name: Deploy preview channel
         uses: FirebaseExtended/action-hosting-deploy@v0
