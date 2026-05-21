@@ -23,18 +23,18 @@
         "test:watch": "vitest"
     },
     "dependencies": {
-        "@nowline/export-core": "workspace:*",
         "@kittl/svg-to-pdfkit": "^0.1.12",
-        "pdfkit": "^0.15.0"
+        "@nowline/export-core": "workspace:*",
+        "pdfkit": "^0.18.0"
     },
     "devDependencies": {
         "@nowline/core": "workspace:*",
         "@nowline/layout": "workspace:*",
         "@nowline/renderer": "workspace:*",
-        "@types/node": "^22.0.0",
-        "@types/pdfkit": "^0.13.4",
-        "langium": "~4.2.2",
-        "typescript": "~5.7.0",
-        "vitest": "^3.1.0"
+        "@types/node": "^25.9.1",
+        "@types/pdfkit": "^0.17.6",
+        "langium": "~4.2.4",
+        "typescript": "~6.0.3",
+        "vitest": "^4.1.7"
     }
 }

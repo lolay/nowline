@@ -1,2 +1,9 @@
 packages:
   - "packages/*"
+
+allowBuilds:
+  "@firebase/util": false
+  "@vscode/vsce-sign": true
+  esbuild: true
+  keytar: true
+  protobufjs: false
