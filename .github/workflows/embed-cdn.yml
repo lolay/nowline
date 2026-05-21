@@ -1,0 +1,165 @@
+name: Embed CDN
+
+# Continuous-deploy pipeline for the dev tier of `@nowline/embed`:
+#
+#   push: main       → builds dev IIFE, deploys to embed.nowline.dev.
+#   pull_request     → builds dev IIFE, deploys to a Firebase channel
+#                      with a 7-day TTL; URL is commented on the PR.
+#
+# Production CDN deploys (embed.nowline.io) live in
+# `.github/workflows/release.yml`'s `embed-prod` job — those fire on
+# `v*` tag pushes alongside `npm publish`, so a release ships the npm
+# tarball and the CDN bundle as one atomic operation. This workflow
+# deliberately does NOT carry the prod tier so a flaky main-push
+# deploy can never accidentally rewrite `embed.nowline.io/latest/`.
+#
+# Both jobs authenticate via the `embed-dev` environment's Workload
+# Identity Federation outputs from `lolay/nowline-infra` m7 — see
+# ops/embed-deploy.md §§ 1–2 for the operator-side env setup and
+# §§ 5–6 for the workflow shape and verification steps.
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'packages/embed/**'
+      - 'packages/core/**'
+      - 'packages/layout/**'
+      - 'packages/renderer/**'
+      - '.github/workflows/embed-cdn.yml'
+  pull_request:
+    paths:
+      - 'packages/embed/**'
+      - 'packages/core/**'
+      - 'packages/layout/**'
+      - 'packages/renderer/**'
+      - '.github/workflows/embed-cdn.yml'
+  workflow_dispatch:
+
+# One in-flight deploy per ref. PRs cancel earlier-in-flight runs (last
+# push wins for the preview channel); main-push deploys queue so we
+# never half-deploy a partially-updated bundle.
+concurrency:
+  group: embed-cdn-${{ github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
+permissions:
+  contents: read
+
+jobs:
+  # Build the dev IIFE once and hand it to the deploy jobs as an
+  # artifact. We do NOT reuse `release.yml`'s prod build artifact —
+  # that one is built without `PUBLIC_FIREBASE_*` defines (release.yml
+  # is environment-less by design) and so wouldn't have a working dev
+  # auth gate.
+  build:
+    name: Build dev IIFE
+    runs-on: ubuntu-latest
+    environment: embed-dev
+    env:
+      NOWLINE_EMBED_SHA: ${{ github.sha }}
+      PUBLIC_FIREBASE_API_KEY: ${{ vars.PUBLIC_FIREBASE_API_KEY }}
+      PUBLIC_FIREBASE_AUTH_DOMAIN: ${{ vars.PUBLIC_FIREBASE_AUTH_DOMAIN }}
+      PUBLIC_FIREBASE_PROJECT_ID: ${{ vars.PUBLIC_FIREBASE_PROJECT_ID }}
+      PUBLIC_FIREBASE_APP_ID: ${{ vars.PUBLIC_FIREBASE_APP_ID }}
+    steps:
+      - uses: actions/checkout@v6
+      - uses: ./.github/actions/setup-node-pnpm
+
+      - name: Build engine packages (deps of embed)
+        run: pnpm -r build
+
+      - name: Build embed dev bundle
+        run: pnpm --filter @nowline/embed bundle:dev
+
+      - name: Bundle-size gate
+        run: pnpm --filter @nowline/embed check-size
+
+      - name: Upload dev CDN artifact
+        uses: actions/upload-artifact@v7
+        with:
+          name: embed-cdn-dev
+          path: packages/embed/dist-cdn-dev/
+          if-no-files-found: error
+
+  # Continuous-deploy of `main` to embed.nowline.dev.
+  embed-dev:
+    name: Deploy embed.nowline.dev
+    needs: build
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+    environment: embed-dev
+    permissions:
+      contents: read
+      id-token: write
+    steps:
+      - name: Checkout source (for firebase.json)
+        uses: actions/checkout@v6
+        with:
+          sparse-checkout: packages/embed/firebase/dev
+
+      - name: Download dev CDN artifact
+        uses: actions/download-artifact@v8
+        with:
+          name: embed-cdn-dev
+          path: packages/embed/dist-cdn-dev
+
+      - name: Authenticate to GCP via Workload Identity Federation
+        uses: google-github-actions/auth@v2
+        with:
+          workload_identity_provider: ${{ vars.WIF_PROVIDER }}
+          service_account: ${{ vars.DEPLOY_SA_EMAIL }}
+
+      - name: Deploy to Firebase Hosting (embed-dev)
+        uses: w9jds/firebase-action@v14
+        with:
+          args: deploy --only hosting --project ${{ vars.FIREBASE_PROJECT_ID }} --non-interactive
+        env:
+          PROJECT_PATH: packages/embed/firebase/dev
+
+  # Per-PR ephemeral preview channel. 7-day TTL. URL is posted as a PR
+  # comment by FirebaseExtended/action-hosting-deploy.
+  #
+  # Skipped on fork PRs because the WIF chain requires a token whose
+  # `repository` claim is `lolay/nowline`; a fork's run would fail at
+  # the auth step rather than silently no-op, and that confuses
+  # external contributors. Re-runs from the PR's "Approve and run"
+  # button (org-internal contributors) still work.
+  embed-preview:
+    name: Deploy PR preview channel
+    needs: build
+    if: |
+      github.event_name == 'pull_request' &&
+      github.event.pull_request.head.repo.full_name == github.repository
+    runs-on: ubuntu-latest
+    environment: embed-dev
+    permissions:
+      contents: read
+      id-token: write
+      pull-requests: write
+    steps:
+      - name: Checkout source (for firebase.json)
+        uses: actions/checkout@v6
+        with:
+          sparse-checkout: packages/embed/firebase/dev
+
+      - name: Download dev CDN artifact
+        uses: actions/download-artifact@v8
+        with:
+          name: embed-cdn-dev
+          path: packages/embed/dist-cdn-dev
+
+      - name: Authenticate to GCP via Workload Identity Federation
+        uses: google-github-actions/auth@v2
+        with:
+          workload_identity_provider: ${{ vars.WIF_PROVIDER }}
+          service_account: ${{ vars.DEPLOY_SA_EMAIL }}
+
+      - name: Deploy preview channel
+        uses: FirebaseExtended/action-hosting-deploy@v0
+        with:
+          repoToken: ${{ secrets.GITHUB_TOKEN }}
+          projectId: ${{ vars.FIREBASE_PROJECT_ID }}
+          channelId: pr-${{ github.event.pull_request.number }}
+          entryPoint: packages/embed/firebase/dev
+          expires: 7d

@@ -35,10 +35,11 @@
         "cdn"
     ],
     "scripts": {
-        "build": "tsc -b tsconfig.json && node scripts/bundle.mjs",
+        "build": "tsc -b tsconfig.json && node scripts/bundle.mjs && node scripts/bundle.mjs --dev",
         "watch": "tsc -b tsconfig.json --watch",
         "typecheck": "tsc --noEmit -p tsconfig.json",
         "bundle": "node scripts/bundle.mjs",
+        "bundle:dev": "node scripts/bundle.mjs --dev",
         "check-size": "node scripts/check-size.mjs",
         "test": "vitest run",
         "test:watch": "vitest"
@@ -52,6 +53,7 @@
     "devDependencies": {
         "@types/node": "^22.0.0",
         "esbuild": "^0.27.0",
+        "firebase": "^11.0.0",
         "happy-dom": "^15.11.0",
         "typescript": "~5.7.0",
         "vitest": "^3.1.0"

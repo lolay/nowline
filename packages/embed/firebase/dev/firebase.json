@@ -1,0 +1,19 @@
+{
+    "hosting": {
+        "site": "nowline-embed-dev",
+        "public": "../../dist-cdn-dev",
+        "ignore": ["firebase.json", "**/.*", "**/node_modules/**"],
+        "headers": [
+            {
+                "source": "/nowline.min.@(js|js.map)",
+                "headers": [
+                    {
+                        "key": "Cache-Control",
+                        "value": "public, max-age=60, s-maxage=120, must-revalidate"
+                    },
+                    { "key": "X-Robots-Tag", "value": "noindex" }
+                ]
+            }
+        ]
+    }
+}

@@ -106,6 +106,7 @@ jobs:
           - { id: pack-npm, kind: npm-pack, runner: ubuntu-latest }
           - { id: pack-vsix, kind: vsix-pack, runner: ubuntu-latest }
           - { id: pack-action, kind: action-pack, runner: ubuntu-latest }
+          - { id: pack-embed, kind: embed-pack, runner: ubuntu-latest }
     steps:
       - uses: actions/checkout@v6
       - uses: ./.github/actions/setup-node-pnpm
@@ -402,6 +403,59 @@ jobs:
           # (action.yml, README.md, LICENSE, dist/index.cjs). Matches
           # the publish cell's `path: action-bundle` download contract.
           path: dist-action/
+          if-no-files-found: error
+
+      # ===== pack-embed cell =====
+      #
+      # Produces the CDN-shaped prod artifact for `embed.nowline.io`. The
+      # earlier `pnpm -r build` already ran `pnpm --filter @nowline/embed
+      # build`, which produces *both* the prod and dev IIFEs in their
+      # respective dist trees. We only upload the prod tree here — the
+      # dev tree is rebuilt by `.github/workflows/embed-cdn.yml` against
+      # the `embed-dev` environment's `PUBLIC_FIREBASE_*` vars, which
+      # `release.yml` deliberately doesn't have access to.
+      #
+      # NOWLINE_EMBED_SHA pins the bundle banner's `sha=` field to this
+      # workflow's commit so a curl against `embed.nowline.io/X.Y.Z/`
+      # after deploy matches the GitHub release.
+
+      - name: Verify embed CDN artifacts exist
+        if: matrix.kind == 'embed-pack'
+        env:
+          NOWLINE_EMBED_SHA: ${{ github.sha }}
+        run: |
+          set -euo pipefail
+          VERSION=$(node -p "require('./packages/embed/package.json').version")
+          MAJOR_MINOR="$(echo "$VERSION" | awk -F. '{print $1"."$2}')"
+          for alias in "$VERSION" "$MAJOR_MINOR" latest; do
+            test -s "packages/embed/dist-cdn-prod/$alias/nowline.min.js" \
+              || { echo "missing packages/embed/dist-cdn-prod/$alias/nowline.min.js" >&2; exit 1; }
+            test -s "packages/embed/dist-cdn-prod/$alias/nowline.min.js.map" \
+              || { echo "missing packages/embed/dist-cdn-prod/$alias/nowline.min.js.map" >&2; exit 1; }
+          done
+          # Belt-and-suspenders: the prod IIFE must not have shipped any
+          # firebase-auth payload. Same assertion check-size.mjs runs on
+          # every PR; re-run here so a tagged release fails loudly if
+          # the dev gate's DCE ever regresses.
+          if grep -q firebase packages/embed/dist-cdn-prod/latest/nowline.min.js; then
+            echo "ERROR: prod IIFE contains 'firebase' — dev auth gate dead-code elimination regressed." >&2
+            exit 1
+          fi
+          ls -la packages/embed/dist-cdn-prod/
+
+      - name: Upload embed CDN bundle
+        if: matrix.kind == 'embed-pack'
+        uses: actions/upload-artifact@v7
+        with:
+          name: embed-cdn-prod
+          # Trailing slash → archive contents are at the artifact root
+          # (version-aliased subdirs `0.2.5/`, `0.2/`, `latest/`, each
+          # holding `nowline.min.js` + `.map`). The deploy cell
+          # downloads this into `packages/embed/dist-cdn-prod/`, which
+          # is the path `packages/embed/firebase/prod/firebase.json`'s
+          # `"public": "../../dist-cdn-prod"` resolves to.
+          # firebase.json itself ships in git, not in the artifact.
+          path: packages/embed/dist-cdn-prod/
           if-no-files-found: error
 
   # Phase 2 — publish to every external registry.
@@ -801,3 +855,67 @@ jobs:
             --title "v${VERSION}" \
             --notes "$BODY" \
             --latest
+
+  # Phase 2 — deploy the embed bundle to the production CDN.
+  #
+  # Standalone job (not a publish-matrix cell) so it can carry its own
+  # `permissions: id-token: write` for Workload Identity Federation and
+  # `environment: embed-prod` for the manual-approval gate, both of
+  # which are job-level scopes that can't vary across matrix cells.
+  #
+  # Authenticates to GCP via WIF — see lolay/nowline-infra m7 for the
+  # provider/SA wiring. The GitHub environment-scoped variables
+  # (WIF_PROVIDER, DEPLOY_SA_EMAIL, FIREBASE_PROJECT_ID) are set by the
+  # operator from `terraform output` of `lolay/nowline-infra/stacks/embed`
+  # per ops/embed-deploy.md § 2. No static service-account JSON keys —
+  # the org policy `iam.disableServiceAccountKeyCreation` would block
+  # them anyway.
+  embed-prod:
+    name: Deploy embed.nowline.io (prod CDN)
+    if: ${{ startsWith(github.ref, 'refs/tags/v') }}
+    needs: build
+    runs-on: ubuntu-latest
+    environment: embed-prod
+    permissions:
+      contents: read
+      id-token: write
+    steps:
+      - name: Checkout source (for firebase.json)
+        uses: actions/checkout@v6
+        with:
+          # Sparse-checkout would shave a few seconds, but we also need
+          # package.json for the version banner verification below and
+          # a few path roots are easier to maintain as a full checkout.
+          sparse-checkout: |
+            packages/embed/firebase/prod
+            packages/embed/package.json
+
+      - name: Download embed CDN artifact
+        uses: actions/download-artifact@v8
+        with:
+          name: embed-cdn-prod
+          path: packages/embed/dist-cdn-prod
+
+      - name: Verify artifact banner matches release tag
+        run: |
+          set -euo pipefail
+          VERSION="${GITHUB_REF_NAME#v}"
+          BANNER=$(head -c 200 "packages/embed/dist-cdn-prod/${VERSION}/nowline.min.js")
+          echo "Banner: ${BANNER}"
+          echo "$BANNER" | grep -q "@nowline/embed ${VERSION}" \
+            || { echo "ERROR: banner version doesn't match tag ${VERSION}" >&2; exit 1; }
+          echo "$BANNER" | grep -q "env=prod" \
+            || { echo "ERROR: banner env is not prod" >&2; exit 1; }
+
+      - name: Authenticate to GCP via Workload Identity Federation
+        uses: google-github-actions/auth@v2
+        with:
+          workload_identity_provider: ${{ vars.WIF_PROVIDER }}
+          service_account: ${{ vars.DEPLOY_SA_EMAIL }}
+
+      - name: Deploy to Firebase Hosting (embed-prod)
+        uses: w9jds/firebase-action@v14
+        with:
+          args: deploy --only hosting --project ${{ vars.FIREBASE_PROJECT_ID }} --non-interactive
+        env:
+          PROJECT_PATH: packages/embed/firebase/prod

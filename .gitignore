@@ -3,6 +3,8 @@ dist/
 out/
 dist-bin/
 dist-deb/
+packages/embed/dist-cdn-prod/
+packages/embed/dist-cdn-dev/
 *.tsbuildinfo
 .scratch/
 .pnpm-store/
@@ -31,17 +33,19 @@ coverage/
 # Logs
 *.log
 
-# Rendered example outputs (CLI artifacts, not source)
-examples/**/*.svg
-examples/**/*.png
-examples/**/*.pdf
-examples/**/*.html
-examples/**/*.xlsx
+# Rendered example outputs (CLI artifacts, not source) — anchored to
+# the root-level `examples/` folder so package-scoped example dirs
+# (e.g. `packages/embed/examples/`) are not swept up.
+/examples/**/*.svg
+/examples/**/*.png
+/examples/**/*.pdf
+/examples/**/*.html
+/examples/**/*.xlsx
 
 # Rendered tests/ harness outputs (CLI artifacts, not source)
-tests/**/*.svg
-tests/**/*.png
-tests/**/*.pdf
-tests/**/*.html
-tests/**/*.xlsx
+/tests/**/*.svg
+/tests/**/*.png
+/tests/**/*.pdf
+/tests/**/*.html
+/tests/**/*.xlsx
 .cursor/plans

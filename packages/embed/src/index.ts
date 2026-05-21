@@ -5,6 +5,18 @@
 // The IIFE bundle exposes everything below as `window.nowline.*`. ESM
 // consumers import named exports from the package root.
 
+import { EMBED_SHA, EMBED_VERSION } from './auth/env.js';
+
+// Build-time constant substituted by esbuild's `define` (see
+// `scripts/bundle.mjs`). Reading it directly at the call site (rather
+// than via an `IS_DEV` re-export from env.ts) means esbuild can fold
+// the `if` below to a literal `true`/`false` at minify time and
+// dead-code-eliminate the dynamic-import branch in the prod bundle,
+// stripping `firebase/app` + `firebase/auth` from `dist/nowline.min.js`.
+// The `typeof` guard keeps the file safe to import under vitest, where
+// esbuild's define never runs and the identifier is undeclared.
+declare const __NOWLINE_EMBED_ENV__: string;
+
 import {
     __resetAutoScanForTests,
     type AutoScanInputs,
@@ -22,6 +34,18 @@ import {
 import { type EmbedTheme, effectiveTheme, resolveSystemTheme } from './theme.js';
 
 export { type AutoScanResult, type EmbedParseResult, EmbedRenderError, type EmbedTheme };
+
+/**
+ * Bundle provenance, mirroring the legal-comment banner that
+ * `scripts/bundle.mjs` injects at the top of every artifact:
+ * `@nowline/embed <version> sha=<short-sha> built=<iso-utc>`.
+ *
+ * Exposed on the IIFE global as `nowline.version` / `nowline.sha` so
+ * pages and bug reports can identify the exact build without scraping
+ * the comment banner.
+ */
+export const version: string = EMBED_VERSION;
+export const sha: string = EMBED_SHA;
 
 const DEFAULT_SELECTOR = 'pre code.language-nowline, code.language-nowline';
 
@@ -149,6 +173,24 @@ export const run = init;
 // the auto-scan branch.
 if (typeof document !== 'undefined' && !autoStartScheduled) {
     autoStartScheduled = true;
+
+    // Dev-only Firebase Auth gate (embed.nowline.dev). The condition
+    // reads `__NOWLINE_EMBED_ENV__` directly so esbuild's `define`
+    // substitutes a literal string at minify time — the prod bundle
+    // sees `if ("prod" === "dev")` → `if (false)` and DCEs the dynamic
+    // import that pulls in `firebase/app` + `firebase/auth`.
+    // `check-size.mjs` asserts no `firebase` literal survives in the
+    // prod IIFE as a belt-and-suspenders check.
+    if (typeof __NOWLINE_EMBED_ENV__ !== 'undefined' && __NOWLINE_EMBED_ENV__ === 'dev') {
+        void import('./auth/firebase-auth.client.js')
+            .then(({ startDevAuthGate }) => {
+                startDevAuthGate();
+            })
+            .catch((err) => {
+                console.error('[nowline] dev auth gate failed to load:', err);
+            });
+    }
+
     const start = (): void => {
         if (!config.startOnLoad) return;
         // Fire-and-forget; render errors are surfaced via `console.error`
