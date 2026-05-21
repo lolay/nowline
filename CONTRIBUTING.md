@@ -2,7 +2,9 @@
 
 Thanks for your interest in Nowline. This guide covers how to set up a development environment, where the code lives, what the expected workflow looks like, and how to get a pull request merged.
 
-Nowline is early-stage: the parser, validator, and CLI are usable, but layout, rendering, IDE integration, and the distribution pipeline are still in flight. Small, focused PRs are much easier to review than large refactors. If you're planning something substantial, please open an issue first.
+Nowline is early-stage: the parser, validator, and CLI are usable, but layout, rendering, IDE integration, and the distribution pipeline are still in flight. Small, focused PRs are much easier to review than large refactors.
+
+Non-trivial changes — grammar, AST shape, layout or renderer behavior, new packages, anything outside [`specs/principles.md`](./specs/principles.md) — should start with a GitHub issue so we can agree on the shape before code gets written. PRs that skip that step may be closed without review. AI-assisted contributions are welcome on the same terms; see [`AI_POLICY.md`](./AI_POLICY.md).
 
 ## Table of contents
 
@@ -207,6 +209,7 @@ If you're changing the spec'd behavior of the language, also update the relevant
 - **Comments.** Only write them when the code itself can't communicate the intent. No `// Increment the counter`-style narration. Explain *why*, not *what*.
 - **Error handling.** The CLI uses a `CliError` + numeric `ExitCode` scheme (`packages/cli/src/io/exit-codes.ts`). New error paths should throw `CliError` with the appropriate code so `process.exit` gets the right value.
 - **No emojis in source, commit messages, or user-facing output unless explicitly requested.**
+- **AI-assisted commits.** Every commit that materially relied on AI assistance must carry an `Assisted-By:` trailer naming the specific agent and version — e.g. `Assisted-By: Claude Opus 4.7`. The trailer is a standard Git footer (same shape as `Co-Authored-By:` / `Signed-off-by:`), so it survives squash-merge and stays grep-able in `git log`. Multiple trailers are fine if you used more than one agent. See [`AI_POLICY.md`](./AI_POLICY.md) for the rationale.
 
 Formatting and lint enforcement are described in the next section.
 
@@ -308,6 +311,14 @@ fix bug
 update files
 WIP
 ```
+
+### AI-assisted contributions
+
+Nowline ships [`AGENTS.md`](./AGENTS.md) and welcomes AI-assisted PRs. Read [`AI_POLICY.md`](./AI_POLICY.md) before opening one — the short version:
+
+- Disclose the specific agent (name + version) with an `Assisted-By:` trailer on each AI-assisted commit *and* under the **AI assistance** section of the PR description. Write `Assisted-By: None` if the PR is entirely hand-written.
+- Own every line you submit. You should be able to explain the change in your own words without re-prompting the AI.
+- PRs opened by autonomous agents (no human in the seat at submission time) should include a single `🤖` in the title so we can triage them quickly.
 
 ### Pull requests
 

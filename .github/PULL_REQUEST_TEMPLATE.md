@@ -32,9 +32,21 @@ Describe what you ran and what you saw. For example:
 
 <!-- If the change is user-visible (renderer, CLI output, error messages), include before/after. Delete this section if not applicable. -->
 
+## AI assistance
+
+<!--
+Required. Name the specific agent + version, one per line. Write "None" if the PR is entirely hand-written.
+Each AI-assisted commit also needs an Assisted-By: trailer. See AI_POLICY.md.
+-->
+
+Assisted-By: <e.g. Claude Opus 4.7, GPT-5.5, Cursor Composer 2.5, or "None">
+
+<!-- If the PR was opened by an autonomous agent (no human in the seat at submission time), put a single 🤖 in the PR title. -->
+
 ## Checklist
 
 - [ ] I ran `pnpm build && pnpm -r lint && pnpm -r test` locally.
 - [ ] I added or updated tests where the change affects observable behavior.
 - [ ] I updated documentation (READMEs, `specs/`, inline comments) where the change affects observable behavior.
+- [ ] I have disclosed any AI assistance above with an `Assisted-By:` line (see [AI_POLICY.md](../AI_POLICY.md)).
 - [ ] I have read [CONTRIBUTING.md](../CONTRIBUTING.md) and agree to license my contribution under Apache 2.0.
