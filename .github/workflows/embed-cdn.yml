@@ -105,13 +105,13 @@ jobs:
           path: packages/embed/dist-cdn-dev
 
       - name: Authenticate to GCP via Workload Identity Federation
-        uses: google-github-actions/auth@v2
+        uses: google-github-actions/auth@v3
         with:
           workload_identity_provider: ${{ vars.WIF_PROVIDER }}
           service_account: ${{ vars.DEPLOY_SA_EMAIL }}
 
       - name: Deploy to Firebase Hosting (embed-dev)
-        uses: w9jds/firebase-action@v14
+        uses: w9jds/firebase-action@v15
         with:
           args: deploy --only hosting --project ${{ vars.FIREBASE_PROJECT_ID }} --non-interactive
         env:
@@ -150,7 +150,7 @@ jobs:
           path: packages/embed/dist-cdn-dev
 
       - name: Authenticate to GCP via Workload Identity Federation
-        uses: google-github-actions/auth@v2
+        uses: google-github-actions/auth@v3
         with:
           workload_identity_provider: ${{ vars.WIF_PROVIDER }}
           service_account: ${{ vars.DEPLOY_SA_EMAIL }}
