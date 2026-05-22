@@ -868,7 +868,7 @@ jobs:
   #
   # Authenticates to GCP via WIF — see lolay/nowline-infra m7 for the
   # provider/SA wiring. The GitHub environment-scoped variables
-  # (WIF_PROVIDER, DEPLOY_SA_EMAIL, FIREBASE_PROJECT_ID) are set by the
+  # (WIF_PROVIDER, DEPLOY_SA_EMAIL, PROJECT_ID) are set by the
   # operator from `terraform output` of
   # `lolay/nowline-infra/stacks/embed/<env>` per
   # lolay/nowline-infra:ops/embed-deploy.md § 2. No static service-account
@@ -918,6 +918,6 @@ jobs:
       - name: Deploy to Firebase Hosting (embed-prod)
         uses: w9jds/firebase-action@v15.18.0
         with:
-          args: deploy --only hosting --project ${{ vars.FIREBASE_PROJECT_ID }} --non-interactive
+          args: deploy --only hosting --project ${{ vars.PROJECT_ID }} --non-interactive
         env:
           PROJECT_PATH: packages/embed/firebase/prod

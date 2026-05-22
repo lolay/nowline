@@ -296,7 +296,7 @@ The m3.5 action also moved into the monorepo (at
   - **This repo:** wires `release.yml`'s `embed-prod` / `embed-dev`
     cells against the infra's WIF outputs (consumed as GitHub
     environment-scoped variables `WIF_PROVIDER`,
-    `DEPLOY_SA_EMAIL`, `FIREBASE_PROJECT_ID` per the pattern in
+    `DEPLOY_SA_EMAIL`, `PROJECT_ID` per the pattern in
     `lolay/nowline-infra/ops/runbook.md` § "Wire a tier into GitHub
     Actions"), ships a `firebase.json` per project encoding the
     cache-header contract from [`specs/embed.md`](../embed.md)

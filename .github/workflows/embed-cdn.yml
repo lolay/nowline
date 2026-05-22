@@ -123,7 +123,7 @@ jobs:
       - name: Deploy to Firebase Hosting (embed-dev)
         uses: w9jds/firebase-action@v15.18.0
         with:
-          args: deploy --only hosting --project ${{ vars.FIREBASE_PROJECT_ID }} --non-interactive
+          args: deploy --only hosting --project ${{ vars.PROJECT_ID }} --non-interactive
         env:
           PROJECT_PATH: packages/embed/firebase/dev
 
@@ -167,7 +167,7 @@ jobs:
         uses: FirebaseExtended/action-hosting-deploy@v0
         with:
           repoToken: ${{ secrets.GITHUB_TOKEN }}
-          projectId: ${{ vars.FIREBASE_PROJECT_ID }}
+          projectId: ${{ vars.PROJECT_ID }}
           channelId: pr-${{ github.event.pull_request.number }}
           entryPoint: packages/embed/firebase/dev
           expires: 7d
