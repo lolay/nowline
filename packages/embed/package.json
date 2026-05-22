@@ -39,7 +39,7 @@
         "cdn"
     ],
     "scripts": {
-        "build": "tsc -b tsconfig.json && node scripts/bundle.mjs && node scripts/bundle.mjs --dev",
+        "build": "tsc -b tsconfig.json && node scripts/bundle.mjs",
         "watch": "tsc -b tsconfig.json --watch",
         "typecheck": "tsc --noEmit -p tsconfig.json",
         "bundle": "node scripts/bundle.mjs",
