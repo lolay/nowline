@@ -42,7 +42,13 @@ runs:
     - name: Checkout firebase config
       uses: actions/checkout@v6
       with:
+        # Include this composite's own directory so the runner can still
+        # find action.yml during the post-phase cleanup. Without it the
+        # sparse checkout wipes the manifest the runner loaded us from
+        # and the job fails after the deploy step with "Can't find
+        # action.yml ... Did you forget to run actions/checkout?".
         sparse-checkout: |
+          .github/actions/prepare-firebase-deploy
           ${{ inputs.firebase-config-path }}
           ${{ inputs.extra-checkout-paths }}
 
