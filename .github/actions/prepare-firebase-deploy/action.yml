@@ -26,10 +26,10 @@ inputs:
     description: 'Where the downloaded artifact tree should land. Must match the `"public"` path inside firebase.json once resolved relative to it.'
     required: true
   wif-provider:
-    description: 'Workload Identity Federation provider, typically `${{ vars.WIF_PROVIDER }}`.'
+    description: 'Workload Identity Federation provider. The caller typically passes vars.WIF_PROVIDER from a workflow-scoped vars context (composite actions cannot read vars directly, hence the explicit input).'
     required: true
   service-account:
-    description: 'Deploy service-account email, typically `${{ vars.DEPLOY_SA_EMAIL }}`.'
+    description: 'Deploy service-account email. The caller typically passes vars.DEPLOY_SA_EMAIL from a workflow-scoped vars context.'
     required: true
   extra-checkout-paths:
     description: 'Additional sparse-checkout paths to fetch alongside firebase-config-path. One path per line. Useful when the deploy needs sibling files (e.g. package.json for a banner-version assertion).'
