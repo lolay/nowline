@@ -7,10 +7,7 @@
 
 import type { GroupBlock, ItemDeclaration, ParallelBlock } from '@nowline/core';
 import { propValues } from '../dsl-utils.js';
-import {
-    computeContainerInlineDatePins,
-    pickInlineDate,
-} from '../inline-date-pin-geometry.js';
+import { computeContainerInlineDatePins, pickInlineDate } from '../inline-date-pin-geometry.js';
 import type { LayoutContext, TrackCursor } from '../layout-context.js';
 import { resolveStyle } from '../style-resolution.js';
 import { TRACK_BLOCK_TAIL_GUTTER_PX } from '../themes/shared.js';

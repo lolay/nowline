@@ -423,10 +423,7 @@ function renderInlineDatePin(pin: InlineDatePin, color: string): string {
     );
 }
 
-function renderInlineDatePins(
-    pins: InlineDatePin[] | undefined,
-    color: string,
-): string {
+function renderInlineDatePins(pins: InlineDatePin[] | undefined, color: string): string {
     if (!pins || pins.length === 0) return '';
     return pins.map((pin) => renderInlineDatePin(pin, color)).join('');
 }

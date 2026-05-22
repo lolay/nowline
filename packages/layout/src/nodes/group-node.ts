@@ -15,10 +15,7 @@ import type { EntityProperty, GroupBlock, ItemDeclaration, ParallelBlock } from 
 import { isItemDeclaration } from '@nowline/core';
 import { deriveItemDurationDays } from '../calendar.js';
 import { propValues } from '../dsl-utils.js';
-import {
-    computeContainerInlineDatePins,
-    pickInlineDate,
-} from '../inline-date-pin-geometry.js';
+import { computeContainerInlineDatePins, pickInlineDate } from '../inline-date-pin-geometry.js';
 import type { LayoutContext, TrackCursor } from '../layout-context.js';
 import { RowPacker } from '../row-packer.js';
 import { resolveStyle } from '../style-resolution.js';

@@ -90,9 +90,7 @@ describe('inline-date pins (after:DATE / before:DATE)', () => {
                     `  milestone m after:2026-02-09\n` +
                     `  item x duration:1w\n`,
             );
-            expect(
-                hasError(errorMessages(r.diagnostics), /not allowed on milestone/i),
-            ).toBe(true);
+            expect(hasError(errorMessages(r.diagnostics), /not allowed on milestone/i)).toBe(true);
         });
 
         it('NL.E0411: inline date on a swimlane is an error', async () => {
@@ -101,15 +99,11 @@ describe('inline-date pins (after:DATE / before:DATE)', () => {
                     `swimlane s after:2026-02-09\n` +
                     `  item x duration:1w\n`,
             );
-            expect(
-                hasError(errorMessages(r.diagnostics), /not allowed on swimlane/i),
-            ).toBe(true);
+            expect(hasError(errorMessages(r.diagnostics), /not allowed on swimlane/i)).toBe(true);
         });
 
         it('NL.E0412: inline date with no roadmap start: is an error', async () => {
-            const r = await parse(
-                `roadmap r\nswimlane s\n  item x duration:1w after:2026-02-09\n`,
-            );
+            const r = await parse(`roadmap r\nswimlane s\n  item x duration:1w after:2026-02-09\n`);
             expect(
                 hasError(errorMessages(r.diagnostics), /requires the roadmap to declare "start:"/i),
             ).toBe(true);
@@ -121,9 +115,7 @@ describe('inline-date pins (after:DATE / before:DATE)', () => {
                     `swimlane s\n` +
                     `  item x duration:1w after:2026-01-15\n`,
             );
-            expect(
-                hasError(errorMessages(r.diagnostics), /is before roadmap start/i),
-            ).toBe(true);
+            expect(hasError(errorMessages(r.diagnostics), /is before roadmap start/i)).toBe(true);
         });
     });
 
@@ -136,9 +128,7 @@ describe('inline-date pins (after:DATE / before:DATE)', () => {
                     `swimlane s\n` +
                     `  item x duration:1w after:2026-02-09\n`,
             );
-            expect(
-                hasError(errorMessages(r.diagnostics), /Circular dependency/i),
-            ).toBe(false);
+            expect(hasError(errorMessages(r.diagnostics), /Circular dependency/i)).toBe(false);
         });
     });
 

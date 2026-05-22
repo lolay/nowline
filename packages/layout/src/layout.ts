@@ -1234,10 +1234,7 @@ function computeContentEndDay(
             let parallelEnd = containerStart;
             for (const child of node.content) {
                 if (child.$type === 'DescriptionDirective') continue;
-                const childEnd = walkNode(
-                    child as ItemDeclaration | GroupBlock,
-                    containerStart,
-                );
+                const childEnd = walkNode(child as ItemDeclaration | GroupBlock, containerStart);
                 parallelEnd = Math.max(parallelEnd, childEnd);
             }
             return parallelEnd;
