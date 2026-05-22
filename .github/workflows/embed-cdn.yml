@@ -116,7 +116,12 @@ jobs:
         with:
           firebase-config-path: packages/embed/firebase/dev
           artifact-name: embed-cdn-dev
-          artifact-path: packages/embed/dist-cdn-dev
+          # Land the artifact INSIDE the firebase project directory so
+          # firebase.json's `"public": "public"` resolves cleanly. Firebase
+          # tools refuse a `public` path that escapes the directory holding
+          # firebase.json, which is why we don't reuse `packages/embed/
+          # dist-cdn-dev` here (that's the bundler's local output path).
+          artifact-path: packages/embed/firebase/dev/public
           wif-provider: ${{ vars.WIF_PROVIDER }}
           service-account: ${{ vars.DEPLOY_SA_EMAIL }}
 
@@ -159,7 +164,9 @@ jobs:
         with:
           firebase-config-path: packages/embed/firebase/dev
           artifact-name: embed-cdn-dev
-          artifact-path: packages/embed/dist-cdn-dev
+          # See embed-dev job comment for why this lands inside the
+          # firebase project directory rather than packages/embed/dist-cdn-dev.
+          artifact-path: packages/embed/firebase/dev/public
           wif-provider: ${{ vars.WIF_PROVIDER }}
           service-account: ${{ vars.DEPLOY_SA_EMAIL }}
 

@@ -898,7 +898,12 @@ jobs:
         with:
           firebase-config-path: packages/embed/firebase/prod
           artifact-name: embed-cdn-prod
-          artifact-path: packages/embed/dist-cdn-prod
+          # Land the artifact INSIDE the firebase project directory so
+          # firebase.json's `"public": "public"` resolves cleanly. Firebase
+          # tools refuse a `public` path that escapes the directory holding
+          # firebase.json, which is why we don't reuse `packages/embed/
+          # dist-cdn-prod` here (that's the bundler's local output path).
+          artifact-path: packages/embed/firebase/prod/public
           wif-provider: ${{ vars.WIF_PROVIDER }}
           service-account: ${{ vars.DEPLOY_SA_EMAIL }}
           # Need package.json for the banner-version assertion below.
@@ -908,7 +913,7 @@ jobs:
         run: |
           set -euo pipefail
           VERSION="${GITHUB_REF_NAME#v}"
-          BANNER=$(head -c 200 "packages/embed/dist-cdn-prod/${VERSION}/nowline.min.js")
+          BANNER=$(head -c 200 "packages/embed/firebase/prod/public/${VERSION}/nowline.min.js")
           echo "Banner: ${BANNER}"
           echo "$BANNER" | grep -q "@nowline/embed ${VERSION}" \
             || { echo "ERROR: banner version doesn't match tag ${VERSION}" >&2; exit 1; }

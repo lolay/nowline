@@ -1,7 +1,7 @@
 {
     "hosting": {
         "site": "nowline-embed-dev",
-        "public": "../../dist-cdn-dev",
+        "public": "public",
         "ignore": ["firebase.json", "**/.*", "**/node_modules/**"],
         "headers": [
             {

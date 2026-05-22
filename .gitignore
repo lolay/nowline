@@ -5,6 +5,12 @@ dist-bin/
 dist-deb/
 packages/embed/dist-cdn-prod/
 packages/embed/dist-cdn-dev/
+# CI deploy lands the downloaded CDN artifact under the firebase project
+# directory (so firebase.json's `"public": "public"` resolves without
+# escaping the project dir). Local `firebase emulators:start` would write
+# here too — keep it untracked.
+packages/embed/firebase/prod/public/
+packages/embed/firebase/dev/public/
 *.tsbuildinfo
 .scratch/
 .pnpm-store/
