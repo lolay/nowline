@@ -27,6 +27,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 ### Fixed
 
 - Embed CDN deploy: pin `w9jds/firebase-action` to `v15.18.0` instead of `v15`. The action publishes specific patch tags only (`v15.X.Y`); there is no moving major-only `v15` ref, so the previous pin failed to resolve (`Unable to resolve action w9jds/firebase-action@v15`) and broke the `embed.nowline.dev` deploy step on every push to `main`. Reproduced in [run 26263517719](https://github.com/lolay/nowline/actions/runs/26263517719/job/77301975164).
+- Embed CDN deploy: bootstrap the local `prepare-firebase-deploy` composite action with a minimal pre-checkout step in each caller (`embed-dev`, `embed-preview`, `embed-prod`). The composite was extracted from inline steps in commit `ae8702d`, but local composite actions can't be loaded until their `action.yml` is on disk — and the composite's own (broader) sparse-checkout fires too late. The error surfaced once the `v15` pin above was fixed. Reproduced in [run 26264969442](https://github.com/lolay/nowline/actions/runs/26264969442).
 
 ### Removed
 

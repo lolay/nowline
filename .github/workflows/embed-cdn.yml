@@ -93,6 +93,15 @@ jobs:
       contents: read
       id-token: write
     steps:
+      # Local composite actions can't be loaded until their `action.yml`
+      # is on disk; the runner has nothing checked out yet at this point.
+      # The composite itself does a (broader) sparse-checkout for the
+      # firebase config; this one just bootstraps the action source.
+      - name: Checkout composite action
+        uses: actions/checkout@v6
+        with:
+          sparse-checkout: .github/actions/prepare-firebase-deploy
+
       - name: Prepare Firebase deploy
         uses: ./.github/actions/prepare-firebase-deploy
         with:
@@ -130,6 +139,12 @@ jobs:
       id-token: write
       pull-requests: write
     steps:
+      # Bootstrap the local composite action (see embed-dev above).
+      - name: Checkout composite action
+        uses: actions/checkout@v6
+        with:
+          sparse-checkout: .github/actions/prepare-firebase-deploy
+
       - name: Prepare Firebase deploy
         uses: ./.github/actions/prepare-firebase-deploy
         with:
