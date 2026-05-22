@@ -351,12 +351,18 @@ Nowline ships [`AGENTS.md`](./AGENTS.md) and welcomes AI-assisted PRs. Read [`AI
 - Own every line you submit. You should be able to explain the change in your own words without re-prompting the AI.
 - PRs opened by autonomous agents (no human in the seat at submission time) should include a single `🤖` in the title so we can triage them quickly.
 
+### Changelog entries
+
+User-observable changes — DSL syntax, CLI flags, AST JSON shape, exporter output, extension UX, the `embed.nowline.io` surface — should land with an entry appended to `## [Unreleased]` in [`CHANGELOG.md`](./CHANGELOG.md). Use the right [Keep-a-Changelog](https://keepachangelog.com) heading (`Added` / `Changed` / `Deprecated` / `Removed` / `Fixed` / `Security`) and link to the PR or issue where it helps. Internal-only changes (build scripts, CI, dependency bumps with no behavior change) don't need an entry.
+
+The maintainer moves your entry into a new `## [vX.Y.Z] - YYYY-MM-DD` section as part of the release-cut commit — see [Changelog workflow](./specs/releasing.md#changelog-workflow) in `specs/releasing.md` for the full contract.
+
 ### Pull requests
 
 1. **Fork** the repo (or branch, if you have write access) and create a feature branch: `git checkout -b feat/short-description`.
 2. Make your change. Keep the diff focused — one logical change per PR.
 3. **Run `pnpm build && pnpm check && pnpm typecheck && pnpm -r test` locally** before pushing. CI runs the same commands across Linux, macOS, and Windows.
-4. **Update documentation** — package READMEs, the top-level `README.md`, inline comments — anywhere the change affects observable behavior.
+4. **Update documentation** — package READMEs, the top-level `README.md`, inline comments, plus a `## [Unreleased]` entry in [`CHANGELOG.md`](./CHANGELOG.md) for any user-observable change (see [Changelog entries](#changelog-entries) above).
 5. **Open a PR** against `main` with:
     - A clear summary of the change.
     - The motivation (linked issue, bug repro, or design doc).
