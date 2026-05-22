@@ -1,6 +1,6 @@
 # AGENTS.md
 
-Orientation for AI coding agents (Cursor, Claude Code, OpenAI Codex CLI, Aider) working in this repo. Human contributors should start with [`README.md`](./README.md) and [`CONTRIBUTING.md`](./CONTRIBUTING.md) instead — this file deliberately does not duplicate them.
+Orientation for AI coding agents (Cursor, Claude Code, OpenAI Codex CLI, Aider) working in this repo. Human contributors should start with [`README.md`](./README.md) and [`CONTRIBUTING.md`](./CONTRIBUTING.md) — this file deliberately does not duplicate them.
 
 ## What this repo is
 

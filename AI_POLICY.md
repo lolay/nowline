@@ -8,7 +8,7 @@ This document covers what we expect when you (a human) open a PR that AI helped 
 
 Disclose AI involvement at two levels.
 
-**On each AI-assisted commit**, add an `Assisted-By:` trailer naming the specific agent and version. The trailer is a standard Git footer (same shape as `Co-Authored-By:` / `Signed-off-by:`) so it survives squash-merge and stays grep-able in `git log`.
+**On each AI-assisted commit**, add an `Assisted-by:` trailer naming the specific agent and version. The trailer is a standard Git footer (same shape as `Co-Authored-By:` / `Signed-off-by:`) so it survives squash-merge and stays grep-able in `git log`.
 
 ```
 fix round-trip printer quoting for template strings
@@ -17,16 +17,20 @@ The printer was emitting bare double quotes inside ${...} interpolations,
 which broke the JSON -> text -> JSON round-trip on examples/templated.nowline.
 Quote the inner expression with the surrounding string's delimiter instead.
 
-Assisted-By: Claude Opus 4.7
+Assisted-by: Claude Opus 4.7
 ```
 
 Use the agent's own product name and version: `Claude Opus 4.7`, `Claude Sonnet 4.6`, `GPT-5.5`, `Cursor Composer 2.5`, `Codex CLI`, `Aider`, etc. Multiple trailers are fine if more than one agent contributed.
 
-**In the PR description**, repeat the same `Assisted-By:` line(s) under the `## AI assistance` section of the [PR template](./.github/PULL_REQUEST_TEMPLATE.md) so reviewers see the disclosure without clicking through commits. If the PR is entirely hand-written, write `Assisted-By: None`.
-
-**For PRs opened by autonomous agents** (no human in the seat at submission time), put a single `🤖` in the PR title so we can triage it quickly. Autonomous-agent PRs are not penalized for the marker — it just routes review attention.
+**In the PR description**, repeat the same `Assisted-by:` line(s) under the `## AI assistance` section of the [PR template](./.github/PULL_REQUEST_TEMPLATE.md) so reviewers see the disclosure without clicking through commits. If the PR is entirely hand-written, write `Assisted-by: None`.
 
 Optional but useful: a short note on *what* the AI did (e.g. "drafted the regex and the tests; I refactored the public API and rewrote the error messages"). This helps reviewers calibrate what to scrutinize.
+
+This `Assisted-by:` trailer convention follows the [Linux Kernel](https://docs.kernel.org/process/coding-assistants.html), [LLVM](https://github.com/llvm/llvm-project/blob/main/llvm/docs/AIToolPolicy.md), Fedora, and OpenTelemetry — they all converge on the same Git footer.
+
+### Effective date
+
+This policy applies to commits and PRs landed after the merge of the introducing PR (the one that adds this file). Pre-existing history is exempt — we will not rewrite past commits to add trailers, and `git log` searches for assistance disclosure will only be reliable going forward.
 
 ## Accountability
 
@@ -53,7 +57,7 @@ To keep review capacity for legitimate work, we will close — without extensive
 - Refactor grammar, printer, layout, or renderer code without a prior issue discussion.
 - Expand the product scope past [`specs/principles.md`](./specs/principles.md) (issue tracking, resource leveling, whiteboard features, etc.).
 - Update snapshots casually, with no explanation of the intentional visual or structural change.
-- Come from bot accounts, or omit the required `Assisted-By:` disclosure when AI was clearly involved.
+- Come from bot accounts, or omit the required `Assisted-by:` disclosure when AI was clearly involved.
 - Ask the reviewer to do the contributor's work (e.g. "can you tell me why this test fails?" with no investigation attached).
 
 None of these are AI-specific failure modes — they're the same patterns that already burn human review time. We're listing them here because AI tooling makes it easier to produce them at volume.
