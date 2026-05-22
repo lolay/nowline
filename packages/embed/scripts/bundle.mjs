@@ -89,10 +89,38 @@ const bannerJs = `${bannerHeader}${devWarn}`;
 // Firebase web-app config for the dev auth gate. Read at build time from
 // env vars (set by `.github/workflows/embed-cdn.yml` from the `embed-dev`
 // environment-scoped variables — see
-// lolay/nowline-infra:ops/embed-deploy.md § 2). Substituted into the bundle
+// lolay/nowline-infra:ops/embed-deploy.md § 2.5). Substituted into the bundle
 // via esbuild defines; the prod build never reaches the
 // firebase-auth.client module (dead-code-eliminated when
 // __NOWLINE_EMBED_ENV__ === 'prod'), so empty values are fine there.
+//
+// In CI we additionally fail the dev build outright when any of the four
+// vars are missing — otherwise the gate silently no-ops at runtime
+// (`startDevAuthGate()` console.warns and exits) and a non-functional
+// gate ships to embed.nowline.dev. Local `pnpm bundle:dev` keeps the
+// graceful-degradation path so laptop work isn't blocked.
+const REQUIRED_FIREBASE_VARS = [
+    'PUBLIC_FIREBASE_API_KEY',
+    'PUBLIC_FIREBASE_AUTH_DOMAIN',
+    'PUBLIC_FIREBASE_PROJECT_ID',
+    'PUBLIC_FIREBASE_APP_ID',
+];
+const isCI = process.env.CI === 'true' || process.env.GITHUB_ACTIONS === 'true';
+if (isDev && isCI) {
+    const missing = REQUIRED_FIREBASE_VARS.filter(
+        (v) => !process.env[v] || process.env[v].length === 0,
+    );
+    if (missing.length > 0) {
+        console.error(
+            `bundle.mjs: dev build in CI is missing required env vars: ${missing.join(', ')}.\n` +
+                'Without these the dev auth gate ships disabled (silent runtime no-op),\n' +
+                'leaving embed.nowline.dev publicly reachable.\n' +
+                'Configure them on the embed-dev GitHub environment per\n' +
+                'lolay/nowline-infra:ops/embed-deploy.md § 2.5.',
+        );
+        process.exit(1);
+    }
+}
 const firebaseDefines = {
     __NOWLINE_FIREBASE_API_KEY__: JSON.stringify(process.env.PUBLIC_FIREBASE_API_KEY ?? ''),
     __NOWLINE_FIREBASE_AUTH_DOMAIN__: JSON.stringify(process.env.PUBLIC_FIREBASE_AUTH_DOMAIN ?? ''),
