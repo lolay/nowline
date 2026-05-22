@@ -3,6 +3,10 @@
     "version": "0.2.5",
     "description": "Nowline command-line interface — validate, convert, init",
     "license": "Apache-2.0",
+    "engines": {
+        "node": ">=22",
+        "pnpm": ">=11"
+    },
     "type": "module",
     "bin": {
         "nowline": "./dist/index.js"
@@ -60,7 +64,7 @@
         "@types/babel__code-frame": "^7.27.0",
         "@types/js-yaml": "^4.0.9",
         "@types/node": "^25.9.1",
-        "typescript": "~6.0.3",
+        "typescript": "^6.0.3",
         "vitest": "^4.1.7"
     }
 }

@@ -49,6 +49,10 @@ npm install -g @nowline/cli                          # any platform with Node 22
 
 Debian/Ubuntu and Windows users can grab the latest `.deb` or `.exe` from [GitHub Releases](https://github.com/lolay/nowline/releases/latest). See [`packages/cli/README.md`](./packages/cli/README.md#install) for the full install matrix (including `man nowline` setup).
 
+## Toolchain
+
+Two-tier Node policy: **Node ≥ 22** to **consume** `@nowline/*` packages (`engines.node` on every published package), **Node 26** (`.nvmrc`) to **develop**. CI tests both versions on every PR. See [Toolchain & Supported Versions](./CONTRIBUTING.md#toolchain--supported-versions) for the full policy and bump procedure.
+
 Render your first roadmap:
 
 ```bash

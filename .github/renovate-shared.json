@@ -1,0 +1,66 @@
+{
+    "$schema": "https://docs.renovatebot.com/renovate-schema.json",
+    "extends": [
+        "config:recommended",
+        "group:monorepos",
+        "group:recommended",
+        ":semanticCommits",
+        ":dependencyDashboard"
+    ],
+    "timezone": "UTC",
+    "schedule": ["before 09:00 on Friday"],
+    "labels": ["dependencies", "automated"],
+    "assignees": ["copilot-swe-agent[bot]"],
+    "reviewersFromCodeOwners": true,
+    "prConcurrentLimit": 10,
+    "prHourlyLimit": 0,
+    "rebaseWhen": "behind-base-branch",
+    "rangeStrategy": "bump",
+    "minimumReleaseAge": "14 days",
+    "packageRules": [
+        {
+            "matchUpdateTypes": ["minor", "patch"],
+            "groupName": "all minor and patch updates",
+            "groupSlug": "minor-patch",
+            "commitMessagePrefix": "chore(deps):"
+        },
+        {
+            "matchUpdateTypes": ["major"],
+            "addLabels": ["major"],
+            "commitMessagePrefix": "feat(deps)!:",
+            "minimumReleaseAge": "30 days"
+        },
+        {
+            "matchPackageNames": ["node"],
+            "enabled": false,
+            "description": "Node version is governed by .nvmrc + engines policy (see nowline/CONTRIBUTING.md § Toolchain & Supported Versions), not Renovate"
+        }
+    ],
+    "customManagers": [
+        {
+            "customType": "regex",
+            "description": "Track Bun version pinned in workflow inputs (oven-sh/setup-bun)",
+            "fileMatch": ["^\\.github/workflows/.+\\.ya?ml$"],
+            "matchStrings": ["bun-version:\\s*['\"]?(?<currentValue>\\d+\\.\\d+\\.\\d+)['\"]?"],
+            "datasourceTemplate": "github-releases",
+            "depNameTemplate": "oven-sh/bun",
+            "extractVersionTemplate": "^bun-v(?<version>.+)$"
+        },
+        {
+            "customType": "regex",
+            "description": "Track actionlint version pinned in CI install script",
+            "fileMatch": ["^\\.github/workflows/.+\\.ya?ml$"],
+            "matchStrings": ["actionlint[/-](?<currentValue>\\d+\\.\\d+\\.\\d+)"],
+            "datasourceTemplate": "github-releases",
+            "depNameTemplate": "rhysd/actionlint"
+        },
+        {
+            "customType": "regex",
+            "description": "Track firebase-tools version pinned via `npm install -g firebase-tools@<ver>` in workflow shell steps",
+            "fileMatch": ["^\\.github/workflows/.+\\.ya?ml$"],
+            "matchStrings": ["firebase-tools@(?<currentValue>\\d+\\.\\d+\\.\\d+)"],
+            "datasourceTemplate": "npm",
+            "depNameTemplate": "firebase-tools"
+        }
+    ]
+}

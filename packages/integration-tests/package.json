@@ -4,6 +4,10 @@
     "private": true,
     "description": "End-to-end tests for the core → layout → renderer pipeline",
     "license": "Apache-2.0",
+    "engines": {
+        "node": ">=22",
+        "pnpm": ">=11"
+    },
     "type": "module",
     "scripts": {
         "test": "vitest run",
@@ -15,7 +19,7 @@
         "@nowline/renderer": "workspace:*",
         "@types/node": "^25.9.1",
         "langium": "~4.2.4",
-        "typescript": "~6.0.3",
+        "typescript": "^6.0.3",
         "vitest": "^4.1.7"
     }
 }

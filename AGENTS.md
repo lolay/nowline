@@ -16,6 +16,8 @@ pnpm -r test
 
 `pnpm build` regenerates the Langium parser, bundles CLI templates, type-checks every package, and re-renders every file under `examples/` and `tests/`. The `NOWLINE_SKIP_RENDER=1` flag is the right default for an inner dev loop. CLI integration tests spawn `packages/cli/dist/index.js` and silently skip when it's missing — always build before running them.
 
+**Toolchain pins:** Node from [`.nvmrc`](./.nvmrc) (currently `26.2.0`); pnpm from `packageManager` in [`package.json`](./package.json). Full policy: [`CONTRIBUTING.md` § Toolchain & Supported Versions](./CONTRIBUTING.md#toolchain--supported-versions).
+
 ## Repo map
 
 ```

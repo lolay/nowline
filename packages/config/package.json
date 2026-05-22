@@ -3,6 +3,10 @@
     "version": "0.2.5",
     "description": "Shared .nowlinerc loader for the Nowline CLI and editors",
     "license": "Apache-2.0",
+    "engines": {
+        "node": ">=22",
+        "pnpm": ">=11"
+    },
     "type": "module",
     "main": "./dist/index.js",
     "types": "./dist/index.d.ts",
@@ -28,7 +32,7 @@
     "devDependencies": {
         "@types/js-yaml": "^4.0.9",
         "@types/node": "^25.9.1",
-        "typescript": "~6.0.3",
+        "typescript": "^6.0.3",
         "vitest": "^4.1.7"
     }
 }

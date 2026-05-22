@@ -1,5 +1,5 @@
 name: 'Setup Node.js + pnpm + install dependencies'
-description: 'Install pnpm, set up Node.js 22 with the pnpm cache, then install workspace dependencies with --frozen-lockfile.'
+description: 'Install pnpm, set up Node.js with the pnpm cache, then install workspace dependencies with --frozen-lockfile.'
 
 # Composite action so every workflow job that needs the standard
 # pnpm + Node toolchain can share one place to bump versions or change
@@ -12,6 +12,17 @@ description: 'Install pnpm, set up Node.js 22 with the pnpm cache, then install 
 # `packageManager` is set in package.json. We pass `cache: pnpm`
 # explicitly anyway; the explicit value takes precedence and keeps
 # behaviour identical to the v4 era.
+#
+# The Node version is governed by the two-tier policy documented in
+# `CONTRIBUTING.md` § "Toolchain & Supported Versions": the default
+# `26` is the dev/CI version, matching `.nvmrc`. Callers can override
+# via the `node-version` input (the unit-test matrix in `ci.yml` does
+# this to also test against the published consumer floor of Node 22).
+inputs:
+  node-version:
+    description: 'Node.js major or full version to install (matches .nvmrc by default).'
+    required: false
+    default: '26'
 runs:
   using: composite
   steps:
@@ -21,7 +32,7 @@ runs:
     - name: Setup Node.js
       uses: actions/setup-node@v6
       with:
-        node-version: '22'
+        node-version: ${{ inputs.node-version }}
         cache: pnpm
 
     - name: Install dependencies

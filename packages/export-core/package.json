@@ -3,6 +3,10 @@
     "version": "0.2.5",
     "description": "Nowline export-core — shared types, font resolver, unit converter, PDF page-size types",
     "license": "Apache-2.0",
+    "engines": {
+        "node": ">=22",
+        "pnpm": ">=11"
+    },
     "type": "module",
     "main": "./dist/index.js",
     "types": "./dist/index.d.ts",
@@ -44,7 +48,7 @@
     },
     "devDependencies": {
         "@types/node": "^25.9.1",
-        "typescript": "~6.0.3",
+        "typescript": "^6.0.3",
         "vitest": "^4.1.7"
     }
 }

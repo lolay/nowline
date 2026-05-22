@@ -3,6 +3,10 @@
     "version": "0.2.5",
     "description": "Nowline MS Project XML exporter — lossy export for PM tool import",
     "license": "Apache-2.0",
+    "engines": {
+        "node": ">=22",
+        "pnpm": ">=11"
+    },
     "type": "module",
     "main": "./dist/index.js",
     "types": "./dist/index.d.ts",
@@ -30,7 +34,7 @@
     "devDependencies": {
         "@types/node": "^25.9.1",
         "langium": "~4.2.4",
-        "typescript": "~6.0.3",
+        "typescript": "^6.0.3",
         "vitest": "^4.1.7"
     }
 }

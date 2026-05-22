@@ -115,10 +115,14 @@ jobs:
       - uses: ./.github/actions/setup-node-pnpm
 
       - name: Install Bun
+        # Pinned to a specific version so the Bun runtime baked into
+        # shipped `bun compile` binaries (Homebrew, apt, GitHub Releases)
+        # is reproducible. Tracked by Renovate's custom manager — see
+        # `.github/renovate-shared.json`.
         if: matrix.kind == 'binary'
         uses: oven-sh/setup-bun@v2
         with:
-          bun-version: latest
+          bun-version: '1.3.14'
 
       # `pnpm install` in setup-node-pnpm respects the host's os/cpu and
       # only installs optionalDependencies matching the host (e.g. on a
@@ -500,7 +504,7 @@ jobs:
         if: matrix.kind == 'npm' || matrix.kind == 'vscode'
         uses: actions/setup-node@v6
         with:
-          node-version: '22'
+          node-version: '26'
           registry-url: 'https://registry.npmjs.org'
 
       # ===== npm cell =====

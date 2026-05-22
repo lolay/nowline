@@ -10,6 +10,7 @@ Non-trivial changes — grammar, AST shape, layout or renderer behavior, new pac
 
 - [Code of conduct](#code-of-conduct)
 - [Prerequisites](#prerequisites)
+- [Toolchain & Supported Versions](#toolchain--supported-versions)
 - [Getting the code](#getting-the-code)
 - [Repository layout](#repository-layout)
 - [Common tasks](#common-tasks)
@@ -33,12 +34,47 @@ This project follows the [Contributor Covenant 2.1](./CODE_OF_CONDUCT.md). Repor
 
 You'll need:
 
-- **Node.js** ≥ 22 (the CLI targets modern Node; older versions will fail TypeScript type-checks).
-- **pnpm** ≥ 9 (the repo is a pnpm workspace and pins the package manager via `packageManager` in the root `package.json`). Install with `corepack enable && corepack prepare pnpm@latest --activate`.
+- **Node.js** ≥ 22 to **consume** `@nowline/*` packages (matches `engines.node` in every published `package.json`). To **develop** in this repo, install **Node 26** — `.nvmrc` pins `26.2.0` and CI runs on it. See [Toolchain & Supported Versions](#toolchain--supported-versions) for the full policy.
+- **pnpm** ≥ 11 (the repo is a pnpm workspace and pins the package manager via `packageManager: pnpm@11.2.2` in the root `package.json`). Install with `corepack enable && corepack prepare pnpm@latest --activate`.
 - **Git**.
 - **Bun** (optional) — only required if you want to produce standalone binaries locally with `pnpm --filter @nowline/cli compile`. Skip it otherwise; nothing in the default dev loop uses Bun.
 
 No other global tooling is required.
+
+## Toolchain & Supported Versions
+
+This repo runs a **two-tier Node policy**: a low floor for what we ship to consumers, a high ceiling for what we build and test on. Both numbers live in the repo (`engines.node` in every `package.json`; `.nvmrc`); this section documents *why* and *how to change them*.
+
+### Tier 1 — Consumer floor (what published packages support)
+
+| Pin | Where | Value | Why |
+| --- | --- | --- | --- |
+| `engines.node` | every `@nowline/*` `package.json` | **`>=22`** | Node 22 is the oldest non-EOL LTS; supported through April 2027. Choosing the oldest non-EOL LTS as the floor doesn't lock out users on Node 22 LTS while still giving us modern language features. Matches the effective floor of comparable libraries (e.g. Mermaid). |
+| `engines.pnpm` | every `@nowline/*` `package.json` | **`>=11`** | Soft floor matching the `packageManager` pin below. |
+| `runs.using` | `packages/nowline-action/action.yml` | **`node24`** | GitHub controls the GitHub Action runtime ladder separately. `node26` is not yet available; revisit when GitHub adds it. |
+| `engines.vscode` | `packages/vscode-extension/package.json` | **`^1.85.0`** | VS Code bundles its own Node ABI. Independent of the policy above. |
+
+Tightening any of these — e.g. moving the consumer floor from `>=22` to `>=24` — is a **breaking change** for users still on the dropped version. Bump it alongside the EOL date of the floor LTS, and bundle it into a minor or major version bump of every `@nowline/*` package in the same release.
+
+### Tier 2 — Developer / CI version (what we build with)
+
+| Pin | Where | Value | Why |
+| --- | --- | --- | --- |
+| Node | `.nvmrc` (root) | **`26.2.0`** | Latest current; gives us early signal on Node 26 features before it becomes LTS in October 2026. Single source of truth — `nvm use` / `fnm use` picks it up automatically. |
+| Node | `actions/setup-node` calls in `.github/workflows/**` + the composite at `.github/actions/setup-node-pnpm/action.yml` | **`26`** (with a `22` cell in the `ci.yml` unit-test matrix) | Default uses 26 to match `.nvmrc`. The 22-cell exists to exercise the consumer floor on every PR, so we catch any accidental dependence on Node 26-only APIs leaking into published code. |
+| pnpm | root `package.json` `packageManager` field | **`pnpm@11.2.2`** | Pinned to a specific version so every dev gets the same `pnpm install` resolution. Setup actions read this via `pnpm/action-setup@v6` (no explicit `version:` input). |
+| Bun | `bun-version:` in `ci.yml` and `release.yml` | **`1.3.14`** | The Bun runtime is baked into shipped `bun compile` binaries (Homebrew, apt, GitHub Releases). Pinning makes those binaries reproducible. Tracked by a Renovate custom manager. |
+
+### How to bump
+
+- **Bump the dev/CI Node version (Tier 2):** edit `.nvmrc`, then every `node-version:` in `.github/workflows/**` and `.github/actions/setup-node-pnpm/action.yml`. Run `pnpm install`, `pnpm -r build`, `pnpm -r test` locally on both the new version *and* the consumer floor (currently Node 22). The matrix in `ci.yml` will continue to test both versions on every PR; verify both cells pass before merging.
+- **Bump the consumer floor (Tier 1):** this is a **breaking change** for `@nowline/*` consumers — tighten `engines.node` on the root and all 17 `packages/*/package.json` files in one PR. Bundle into a minor (pre-1.0) or major (post-1.0) version bump of every package; update the changelog accordingly. Don't do this casually — schedule it alongside the EOL date of the floor LTS, not as a side-effect of another change.
+
+### Adjacent automation
+
+- **Renovate** ([shared preset](./.github/renovate-shared.json)) opens a single grouped PR per week for minor/patch updates across npm, GitHub Actions, Terraform, Bun, and actionlint. Major updates open individually with a 30-day cooldown. See the per-repo `renovate.json` files for repo-specific overrides. The Dependency Dashboard issue in each repo is the single triage entry point.
+- **Node version is explicitly disabled in Renovate's `packageRules`** — version bumps are governed manually by this section, not by Renovate, because changing the consumer floor is policy work, not a routine dependency bump.
+- **Cross-references:** [Node release schedule](https://nodejs.org/en/about/previous-releases) · [`.nvmrc`](./.nvmrc) · [`.github/renovate-shared.json`](./.github/renovate-shared.json).
 
 ## Getting the code
 

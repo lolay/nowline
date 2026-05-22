@@ -27,6 +27,8 @@
         "dsl"
     ],
     "engines": {
+        "node": ">=22",
+        "pnpm": ">=11",
         "vscode": "^1.85.0"
     },
     "icon": "dist/icons/icon.png",
@@ -360,6 +362,6 @@
         "@types/vscode": "^1.120.0",
         "@vscode/vsce": "^3.9.1",
         "esbuild": "^0.28.0",
-        "typescript": "~6.0.3"
+        "typescript": "^6.0.3"
     }
 }

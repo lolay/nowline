@@ -4,6 +4,10 @@
     "version": "0.2.5",
     "description": "GitHub Action that renders Nowline roadmap diagrams in CI — file and markdown modes.",
     "license": "Apache-2.0",
+    "engines": {
+        "node": ">=22",
+        "pnpm": ">=11"
+    },
     "type": "module",
     "main": "./dist/index.cjs",
     "files": [
@@ -50,7 +54,7 @@
         "@types/mdast": "^4.0.4",
         "@types/node": "^25.9.1",
         "esbuild": "^0.28.0",
-        "typescript": "~6.0.3",
+        "typescript": "^6.0.3",
         "vitest": "^4.1.7"
     }
 }

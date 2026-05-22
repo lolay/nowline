@@ -3,6 +3,10 @@
     "version": "0.2.5",
     "description": "Nowline layout engine — AST → positioned model for rendering",
     "license": "Apache-2.0",
+    "engines": {
+        "node": ">=22",
+        "pnpm": ">=11"
+    },
     "type": "module",
     "sideEffects": false,
     "main": "./dist/index.js",
@@ -31,8 +35,9 @@
     "devDependencies": {
         "@types/d3-scale": "^4.0.9",
         "@types/d3-time": "^3.0.4",
+        "@types/node": "^25.9.1",
         "langium": "~4.2.4",
-        "typescript": "~6.0.3",
+        "typescript": "^6.0.3",
         "vitest": "^4.1.7"
     }
 }
