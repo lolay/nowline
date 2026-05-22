@@ -907,7 +907,7 @@ jobs:
             || { echo "ERROR: banner env is not prod" >&2; exit 1; }
 
       - name: Deploy to Firebase Hosting (embed-prod)
-        uses: w9jds/firebase-action@v15
+        uses: w9jds/firebase-action@v15.18.0
         with:
           args: deploy --only hosting --project ${{ vars.FIREBASE_PROJECT_ID }} --non-interactive
         env:

@@ -26,7 +26,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ### Fixed
 
-- _Nothing yet._
+- Embed CDN deploy: pin `w9jds/firebase-action` to `v15.18.0` instead of `v15`. The action publishes specific patch tags only (`v15.X.Y`); there is no moving major-only `v15` ref, so the previous pin failed to resolve (`Unable to resolve action w9jds/firebase-action@v15`) and broke the `embed.nowline.dev` deploy step on every push to `main`. Reproduced in [run 26263517719](https://github.com/lolay/nowline/actions/runs/26263517719/job/77301975164).
 
 ### Removed
 

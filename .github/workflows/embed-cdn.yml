@@ -103,7 +103,7 @@ jobs:
           service-account: ${{ vars.DEPLOY_SA_EMAIL }}
 
       - name: Deploy to Firebase Hosting (embed-dev)
-        uses: w9jds/firebase-action@v15
+        uses: w9jds/firebase-action@v15.18.0
         with:
           args: deploy --only hosting --project ${{ vars.FIREBASE_PROJECT_ID }} --non-interactive
         env:
