@@ -54,7 +54,7 @@ Specs ship in-repo so PRs update them alongside code. Skim the relevant spec bef
 ## Workflow expectations
 
 - **Commits**: imperative subject, no trailing period, ≤72 chars. Match `git log --oneline` for tone. Optional body explains *why*. No emojis.
-- **PRs**: one logical change each, squash-merged. Run `pnpm build && pnpm -r lint && pnpm -r test` locally before pushing — CI runs the same triple on Linux, macOS, and Windows.
+- **PRs**: one logical change each, squash-merged. Run `pnpm build && pnpm check && pnpm typecheck && pnpm -r test` locally before pushing — same quartet CI runs on Linux, macOS, and Windows. `pnpm check` is biome (lint + format); skipping it is the failure mode that lets formatting regressions slip into a `bd59e70`-style dep bump.
 - **Tests**: when you add a feature, add a test that would fail without your change. When you fix a bug, add a regression test that reproduces it.
 - **Docs**: if observable behavior changes, update the relevant spec under [`specs/`](./specs/) and any affected `README.md` in the same PR.
 - **Changelog**: user-observable changes (DSL syntax, CLI flag, AST JSON shape, exporter output, extension UX, embed/CDN surface) get an entry under `## [Unreleased]` in [`CHANGELOG.md`](./CHANGELOG.md) using the right [Keep-a-Changelog](https://keepachangelog.com) heading (`Added` / `Changed` / `Deprecated` / `Removed` / `Fixed` / `Security`). Internal-only changes (build scripts, CI, dep bumps with no behavior change) don't need an entry. Maintainers move your entry into a new `## [vX.Y.Z]` section as part of the release-cut commit; full contract in [`specs/releasing.md`](./specs/releasing.md#changelog-workflow).
