@@ -18,6 +18,11 @@ packages/embed/dist-cdn-dev/
 
 # IDE
 .vscode/
+# Exception: the vscode-extension package ships a committed launch.json so
+# F5 from inside that workspace launches the Extension Development Host with
+# zero manual setup. See CONTRIBUTING.md "Working on the VS Code / Cursor
+# extension" for the three iteration loops.
+!/packages/vscode-extension/.vscode/
 .idea/
 *.swp
 *.swo

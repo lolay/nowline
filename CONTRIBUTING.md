@@ -146,26 +146,54 @@ Because the CLI bundles example templates at build time, changes to files under 
 
 ## Working on the VS Code / Cursor extension
 
-The extension at `packages/vscode-extension/` bundles `@nowline/lsp`, `@nowline/core`, `@nowline/layout`, and `@nowline/renderer` into a single self-contained `.vsix`. Two iteration loops, depending on what you're touching:
+The extension at `packages/vscode-extension/` bundles `@nowline/lsp`, `@nowline/core`, `@nowline/layout`, and `@nowline/renderer` into a single self-contained `.vsix`. Three iteration loops, in order of preference:
 
-### Fast loop — Extension Development Host
+### 1. Fast loop — Extension Development Host (F5)
 
 For day-to-day extension code, grammar, snippets, or preview changes, skip packaging entirely:
 
 1. Open `packages/vscode-extension/` as its own workspace in VS Code or Cursor.
-2. Press `F5`. A second editor window launches with your in-tree build attached.
+2. Press `F5`. The committed [`.vscode/launch.json`](packages/vscode-extension/.vscode/launch.json) runs `pnpm build` and launches a second editor window with your in-tree build attached. Pick **Run Extension (no other extensions)** from the launch dropdown when you want a clean-room repro that disables every other installed extension.
 3. Edit, save, and reload the host window (`Cmd+R` / `Ctrl+R` inside the dev-host window) to pick up changes.
+
+The Extension Development Host swaps the dev build in for the marketplace `nowline.vscode-nowline` automatically — they share the same `publisher.name`, so VS Code suppresses the installed copy while the dev path is mounted. There's no collision and no need to uninstall first.
 
 This is much faster than rebuilding the `.vsix` and avoids the install-cache gotchas below.
 
-### Full loop — install the `.vsix` locally
+### 2. Sandboxed-profile loop — install the `.vsix` into a throwaway profile
 
-When you need to test the *packaged* extension exactly as users will receive it (signed bundle, sealed `dist/`, real `vsce` output), build and install it:
+When you need to test the *packaged* extension exactly as users will receive it (signed bundle, sealed `dist/`, real `vsce` output) but **don't** want to clobber the marketplace build that powers your main editor, install into a sandboxed profile via `--user-data-dir` / `--extensions-dir`:
 
 ```bash
 # from the repo root
 pnpm -F vscode run package
 # → packages/vscode-extension/dist/nowline-vscode.vsix
+
+# Cursor:
+cursor \
+  --user-data-dir /tmp/cursor-nowline-dev \
+  --extensions-dir /tmp/cursor-nowline-dev-ext \
+  --install-extension packages/vscode-extension/dist/nowline-vscode.vsix
+cursor --user-data-dir /tmp/cursor-nowline-dev --extensions-dir /tmp/cursor-nowline-dev-ext
+
+# VS Code:
+code \
+  --user-data-dir /tmp/vscode-nowline-dev \
+  --extensions-dir /tmp/vscode-nowline-dev-ext \
+  --install-extension packages/vscode-extension/dist/nowline-vscode.vsix
+code --user-data-dir /tmp/vscode-nowline-dev --extensions-dir /tmp/vscode-nowline-dev-ext
+```
+
+The first invocation installs the dev `.vsix` into the sandbox; the second opens an editor window pointed at it. The sandboxed dirs hold the dev extension and its settings; the main profile (and the marketplace install in it) are untouched. `rm -rf /tmp/cursor-nowline-dev*` to throw the sandbox away.
+
+Both editors also expose this as a built-in **Profiles** feature in the GUI (`Cmd+Shift+P` → **Profiles: Create Profile…**) — same isolation, no CLI flags. Use whichever feels natural.
+
+### 3. Full loop — install the `.vsix` in place (overwrites the marketplace build)
+
+If you specifically want the dev build to *be* your daily driver (e.g. you're debugging something that only reproduces with your full extension set enabled), install in place:
+
+```bash
+pnpm -F vscode run package
 
 # VS Code:
 code  --install-extension packages/vscode-extension/dist/nowline-vscode.vsix --force
@@ -175,6 +203,8 @@ cursor --install-extension packages/vscode-extension/dist/nowline-vscode.vsix --
 
 `--force` reinstalls in place without an explicit uninstall. Then in the editor: `Cmd+Shift+P` → **Developer: Reload Window**.
 
+**Heads up:** because the dev `.vsix` shares `publisher.name = nowline.vscode-nowline` with the marketplace build, this overwrites the marketplace bundle on disk. Reverting requires either an `Uninstall` from the marketplace UI followed by a reinstall, or deleting the `~/.cursor/extensions/nowline.vscode-nowline-*` directory and reinstalling from the marketplace. Prefer the sandboxed-profile loop above unless you have a specific reason to need this one.
+
 The `package` script chains `sync-grammar` (pulls `grammars/nowline.tmLanguage.json` into `packages/vscode-extension/syntaxes/`) → `build-icon` → production esbuild → `vsce package`, so a single command produces a fresh `.vsix` from current sources.
 
 ### Gotchas
@@ -183,6 +213,7 @@ The `package` script chains `sync-grammar` (pulls `grammars/nowline.tmLanguage.j
 - **Confirm the loaded build.** `Cmd+Shift+P` → **Developer: Show Running Extensions**, find Nowline, check the path next to it points at `~/.cursor/extensions/nowline.vscode-nowline-<version>/` (or `~/.vscode/extensions/...`).
 - **Stuck install.** If `--install-extension --force` reports success but the new bundle doesn't appear, remove the extension directory by hand — `ls ~/.cursor/extensions/ | grep -i nowline`, `rm -rf` the matching folder — then reinstall.
 - **`cursor` CLI missing.** Open Cursor and run **Shell Command: Install 'cursor' command** from the command palette to put it on `$PATH`.
+- **Don't rename `publisher`/`name` to install side-by-side.** It's tempting to fork `packages/vscode-extension/package.json` to a unique id (e.g. `nowline-dev.vscode-nowline-dev`) so the dev build can run in the same window as the marketplace build. Don't — duplicate command IDs (`nowline.openPreview`, `nowline.openPreviewToSide`, etc.), duplicate language registration for `.nowline`, and duplicate keybindings collide silently and produce confusing repros that don't match what users see. The sandboxed-profile loop above gives you the same A/B-in-isolation outcome without the bookkeeping.
 
 ## Working on the grammar
 

@@ -1,0 +1,34 @@
+{
+    // F5 launches the Extension Development Host with the in-tree
+    // build attached. The committed launch.json + tasks.json pair lets
+    // contributors press F5 with zero setup; see CONTRIBUTING.md
+    // "Working on the VS Code / Cursor extension" for the loop variants.
+    "version": "0.2.0",
+    "configurations": [
+        {
+            "name": "Run Extension",
+            "type": "extensionHost",
+            "request": "launch",
+            "args": [
+                "--extensionDevelopmentPath=${workspaceFolder}"
+            ],
+            "outFiles": [
+                "${workspaceFolder}/dist/**/*.cjs"
+            ],
+            "preLaunchTask": "build"
+        },
+        {
+            "name": "Run Extension (no other extensions)",
+            "type": "extensionHost",
+            "request": "launch",
+            "args": [
+                "--extensionDevelopmentPath=${workspaceFolder}",
+                "--disable-extensions"
+            ],
+            "outFiles": [
+                "${workspaceFolder}/dist/**/*.cjs"
+            ],
+            "preLaunchTask": "build"
+        }
+    ]
+}
