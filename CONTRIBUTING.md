@@ -22,6 +22,7 @@ Non-trivial changes — grammar, AST shape, layout or renderer behavior, new pac
 - [Linting and formatting](#linting-and-formatting)
 - [Tests](#tests)
 - [Commits and pull requests](#commits-and-pull-requests)
+  - [Auto-merge policy](#auto-merge-policy)
 - [Versioning](#versioning)
 - [Reporting bugs](#reporting-bugs)
 - [Proposing features](#proposing-features)
@@ -433,6 +434,21 @@ The maintainer moves your entry into a new `## [vX.Y.Z] - YYYY-MM-DD` section as
 For changes touching the language or the published AST JSON schema, please open an issue first so we can discuss the shape before you invest implementation time — these are contracts we want to keep stable.
 
 > **Hotfix exception.** PRs that patch a *released* version target a `release/vX.Y` branch instead of `main`. Apply the **`backport main`** label so the merged hotfix is auto-cherry-picked back onto `main` (see [Versioning](#versioning) below).
+
+### Auto-merge policy
+
+`main` is protected by a [branch ruleset](https://github.com/lolay/nowline/settings/rules) that requires every job in [`ci.yml`](./.github/workflows/ci.yml) to pass before any PR can merge — auto or manual. The ruleset is intentionally CI-gated only; no required reviewers, because GitHub's auto-merge cannot fire on a PR whose ruleset demands an approving review.
+
+| PR source | Auto-merge? | Why |
+| --- | --- | --- |
+| Renovate **minor/patch** | yes | Bounded blast radius; CI is the gate. Configured by `automerge: true` + the top-level `platformAutomerge: true` in [`.github/renovate-shared.json`](./.github/renovate-shared.json). |
+| Renovate **major** | no | Major bumps hide breaking changes; humans review before merging. |
+| `cursor-engine-sync` agent | yes | Same shape as Renovate minor/patch: the agent enables auto-merge with `gh pr merge --auto --squash` immediately after opening its PR. |
+| Hand-authored PRs | no | Default behavior — open, review, click merge. The same ruleset still requires CI to be green. |
+
+**Bypassing auto-merge on an automated PR.** If you need to hold an auto-merge-enabled PR (e.g. to push a follow-up commit before it lands), either convert it to a draft, or disable auto-merge explicitly: `gh pr merge <PR> --disable-auto`. Re-enabling later is `gh pr merge <PR> --auto --squash`.
+
+**Hotfix exception.** Hotfix PRs against `release/vX.Y` branches do **not** auto-merge. The `backport main` workflow opens a follow-up PR onto `main` which also does not auto-merge — hotfixes can conflict with newer work, so they always get a human click.
 
 ## Versioning
 
