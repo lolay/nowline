@@ -57,6 +57,7 @@ const MANIFEST = [
         theme: 'light',
         now: NOW,
     },
+    { slug: 'showcase', source: 'examples/showcase.nowline', theme: 'light', now: NOW },
 ];
 
 function run(cmd, args, opts = {}) {

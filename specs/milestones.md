@@ -40,7 +40,7 @@ Commercial milestones (hosted editor, free viewer, MCP, enterprise, FedRAMP) are
 | m4 | Embed | Apache 2.0 | Browser embed script (`@nowline/embed`) and the branded `embed.nowline.{io,dev}` Firebase-Hosted CDN deploy. Bundle landed; CDN deploy still pending — see [`specs/handoffs/handoff-m4-embed.md`](./handoffs/handoff-m4-embed.md) → "Carried forward". |
 | m4.5 | IDE Expansion | Apache 2.0 | Obsidian, Neovim, JetBrains (timing TBD) |
 | m4.6 | Windows distribution | Apache 2.0 | Scoop bucket (`lolay/scoop-bucket`) and WinGet central-registry submission via `wingetcreate`; new `update-scoop-bucket` + `submit-winget-pkg` jobs in `release.yml`; `SCOOP_BUCKET_TOKEN` + `WINGET_PR_PAT` secrets |
-| m4.7 | Browser pipeline + preview shell + LSP worker + showcase | Apache 2.0 | `@nowline/browser` (single-call browser pipeline; consolidates today's embed + VS Code render-pipeline glue), `@nowline/preview-shell` (framework-agnostic viewport chrome — zoom/pan/fit/minimap/diagnostic table), `@nowline/lsp-worker` (browser-side packaging of `@nowline/lsp` as a Web Worker + CodeMirror client adapter), `examples/showcase.nowline` (canonical sample roadmap re-exported as a string asset). Doc-only PR for this milestone; implementation lands in a follow-up. |
+| ~~m4.7~~ | ~~Browser pipeline + preview shell + LSP worker + showcase~~ | Apache 2.0 | `@nowline/browser` (single-call browser pipeline; consolidates today's embed + VS Code render-pipeline glue), `@nowline/preview-shell` (framework-agnostic viewport chrome — zoom/pan/fit/minimap/diagnostic table), `@nowline/lsp-worker` (browser-side packaging of `@nowline/lsp` as a Web Worker + CodeMirror client adapter), `examples/showcase.nowline` (canonical sample roadmap re-exported as a string asset). See [`specs/handoffs/handoff-m4.7-browser-pipeline.md`](./handoffs/handoff-m4.7-browser-pipeline.md). |
 
 ## Milestone Details
 
@@ -464,7 +464,7 @@ Single-file mode: the embed warns once and skips `include` directives. Multi-fil
 
 Spec: [`specs/embed.md`](./embed.md) | Handoff: [`specs/handoffs/handoff-m4-embed.md`](./handoffs/handoff-m4-embed.md)
 
-### m4.7 — Browser pipeline + preview shell + LSP worker + showcase
+### ~~m4.7 — Browser pipeline + preview shell + LSP worker + showcase~~
 
 Browser-tooling extraction milestone. Lifts three pieces of duplicated browser glue out of the embed bundle and the VS Code extension into reusable packages, plus a canonical sample example. Lands as a doc-only PR in this slot; the four code packages ship in a follow-up implementation PR. Apache-2.0 across the board.
 
@@ -502,7 +502,7 @@ Why no collab schema in OSS: [`lolay/nowline-app/specs/principles.md`](https://g
 
 Depends on: m1 (DSL + parser), m2b (layout + renderer), m3a (LSP server). Independent of m4 (`@nowline/browser` and `@nowline/preview-shell` consolidate code that today lives in m4 and m3c respectively, but neither requires the m4 CDN deploy to ship).
 
-Spec: [`specs/architecture.md`](./architecture.md) (workspace map updates), [`specs/lsp.md`](./lsp.md) (range-delta requirement), [`specs/embed.md`](./embed.md) (cross-references for `@nowline/browser` consolidation).
+Spec: [`specs/architecture.md`](./architecture.md) (workspace map updates), [`specs/lsp.md`](./lsp.md) (range-delta requirement + browser worker packaging), [`specs/embed.md`](./embed.md) (cross-references for `@nowline/browser` consolidation) | Handoff: [`specs/handoffs/handoff-m4.7-browser-pipeline.md`](./handoffs/handoff-m4.7-browser-pipeline.md)
 
 ### m4.5 — IDE Expansion (timing TBD)
 

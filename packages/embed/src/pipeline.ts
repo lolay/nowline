@@ -1,20 +1,28 @@
-// Render pipeline shared by `nowline.render(source)` and the auto-scan
-// path. Mirrors the shape of `packages/vscode-extension/src/preview/
-// render-pipeline.ts` but stripped of every Node-only dependency: no
-// `fs`, no `path`, no asset resolver. Includes are resolved against a
-// no-op `readFile` so a file containing `include "./other.nowline"`
-// renders the parts that survive without a network fetch.
+// Thin shim around `@nowline/browser`'s pipeline. The browser package
+// owns parse / resolveIncludes / layout / render; the embed layers two
+// embed-specific behaviours on top:
+//
+//  - Throws `EmbedRenderError` on failure instead of returning a
+//    discriminated union. The Mermaid-compatible `nowline.render(source)`
+//    surface promises a string; throwing matches the documented v1
+//    contract and keeps the auto-scan path's per-block error handling
+//    simple.
+//  - Latches a once-per-page-load `console.warn` the first time an
+//    `include` directive is encountered. The browser pipeline emits a
+//    structured callback for each skip; the embed converts that into a
+//    single, deduped user-visible message.
 
 import {
-    createNowlineServices,
-    type NowlineFile,
-    type NowlineServices,
-    resolveIncludes,
-} from '@nowline/core';
-import { layoutRoadmap, type ThemeName } from '@nowline/layout';
-import { renderSvg } from '@nowline/renderer';
-import { URI } from 'langium';
-import { isNoOpIncludeDiagnosticMessage, noOpIncludeReadFile } from './no-op-include-resolver.js';
+    __resetBrowserPipelineForTests,
+    type RenderOptions as BrowserRenderOptions,
+    parseSource as browserParseSource,
+    renderSource as browserRenderSource,
+    type DiagnosticRow,
+    type ParseResult,
+} from '@nowline/browser';
+import type { ThemeName } from '@nowline/layout';
+
+const EMBED_SOURCE_PATH = '/embed.nowline';
 
 export interface EmbedRenderOptions {
     theme?: ThemeName;
@@ -31,96 +39,52 @@ export interface EmbedRenderOptions {
 }
 
 export interface EmbedParseResult {
-    ast: NowlineFile;
+    ast: ParseResult['ast'];
     /** Lexer + parser + Langium validation diagnostics, normalized to strings. */
     errors: string[];
 }
 
-interface CachedServices {
-    shared: ReturnType<typeof createNowlineServices>['shared'];
-    Nowline: NowlineServices;
-}
-
-let cachedServices: CachedServices | undefined;
-let docCounter = 0;
 let includeWarningEmitted = false;
 
-function getServices(): CachedServices {
-    if (!cachedServices) cachedServices = createNowlineServices();
-    return cachedServices;
-}
-
-function freshUri(): URI {
-    return URI.parse(`memory:///nowline-embed-${++docCounter}.nowline`);
-}
-
 export async function parseSource(source: string): Promise<EmbedParseResult> {
-    const services = getServices();
-    const docFactory = services.shared.workspace.LangiumDocumentFactory;
-    const doc = docFactory.fromString<NowlineFile>(source, freshUri());
-    await services.shared.workspace.DocumentBuilder.build([doc], { validation: true });
-
-    const errors: string[] = [];
-    for (const e of doc.parseResult.lexerErrors) errors.push(e.message);
-    for (const e of doc.parseResult.parserErrors) errors.push(e.message);
-    for (const d of doc.diagnostics ?? []) {
-        if (d.severity === 1) errors.push(d.message);
-    }
-    return { ast: doc.parseResult.value, errors };
+    const { ast, diagnostics } = await browserParseSource(source, {
+        filePath: EMBED_SOURCE_PATH,
+    });
+    return {
+        ast,
+        errors: diagnostics
+            .filter((d: DiagnosticRow) => d.severity === 'error')
+            .map((d) => d.message),
+    };
 }
 
 export async function renderSource(
     source: string,
     options: EmbedRenderOptions = {},
 ): Promise<string> {
-    const parsed = await parseSource(source);
-    if (parsed.errors.length > 0) {
-        throw new EmbedRenderError(
-            `Failed to parse Nowline source: ${parsed.errors.join('; ')}`,
-            parsed.errors,
-        );
-    }
-
-    const services = getServices();
-    const resolved = await resolveIncludes(parsed.ast, '/embed.nowline', {
-        services: services.Nowline,
-        readFile: noOpIncludeReadFile,
-    });
-
-    let sawIncludeWarning = false;
-    const blockingErrors: string[] = [];
-    for (const diag of resolved.diagnostics) {
-        if (diag.severity !== 'error') continue;
-        if (isNoOpIncludeDiagnosticMessage(diag.message)) {
-            sawIncludeWarning = true;
-            continue;
-        }
-        blockingErrors.push(diag.message);
-    }
-    if (blockingErrors.length > 0) {
-        throw new EmbedRenderError(
-            `Failed to resolve Nowline source: ${blockingErrors.join('; ')}`,
-            blockingErrors,
-        );
-    }
-    if (sawIncludeWarning && !includeWarningEmitted) {
-        includeWarningEmitted = true;
-        console.warn(
-            'nowline: `include` directives are skipped in the browser embed (single-file mode). ' +
-                'Render multi-file roadmaps with the CLI or the GitHub Action.',
-        );
-    }
-
-    const model = layoutRoadmap(parsed.ast, resolved, {
+    const browserOptions: BrowserRenderOptions = {
+        filePath: EMBED_SOURCE_PATH,
         theme: options.theme,
         today: options.today,
         locale: options.locale,
         width: options.width,
-    });
-
-    return renderSvg(model, {
         idPrefix: options.idPrefix,
-    });
+        onSkippedInclude: () => {
+            if (!includeWarningEmitted) {
+                includeWarningEmitted = true;
+                console.warn(
+                    'nowline: `include` directives are skipped in the browser embed (single-file mode). ' +
+                        'Render multi-file roadmaps with the CLI or the GitHub Action.',
+                );
+            }
+        },
+    };
+
+    const result = await browserRenderSource(source, browserOptions);
+    if (result.kind === 'svg') return result.svg;
+
+    const messages = result.diagnostics.filter((d) => d.severity === 'error').map((d) => d.message);
+    throw new EmbedRenderError(`Failed to render Nowline source: ${messages.join('; ')}`, messages);
 }
 
 export class EmbedRenderError extends Error {
@@ -138,6 +102,5 @@ export class EmbedRenderError extends Error {
 // reset the latch between cases.
 export function __resetEmbedPipelineForTests(): void {
     includeWarningEmitted = false;
-    cachedServices = undefined;
-    docCounter = 0;
+    __resetBrowserPipelineForTests();
 }

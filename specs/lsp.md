@@ -75,6 +75,54 @@ Both servers accept `file://` URIs (Node) and arbitrary opaque scheme URIs (brow
 
 The Node server's include resolver (used by `@nowline/core`'s `resolveIncludes()`) only activates when the host URI is `file://`. Browser clients warn-once and skip `include` directives, matching the embed bundle's m4 single-file mode.
 
+## Browser worker packaging
+
+`@nowline/lsp-worker` packages the same Langium services as
+`@nowline/lsp`, but for a Web Worker host. Concrete shape:
+
+- **Worker entry — `@nowline/lsp-worker/worker`.** Calls
+  `createNowlineServices({ ...EmptyFileSystem, connection })` (the
+  `EmptyFileSystem` from `langium`, **not** `langium/node` — pulling
+  the Node filesystem into a worker bundle breaks the bundler and is
+  meaningless in a browser anyway). Connection is built with
+  `createConnection` plus `BrowserMessageReader` /
+  `BrowserMessageWriter` from `vscode-jsonrpc/browser`. The worker
+  calls `startLanguageServer(services)` then `connection.listen()`;
+  Langium's standard handler set publishes diagnostics, completion,
+  hover, definition, and references over the wire automatically. No
+  Nowline-specific notification handlers are registered.
+- **Client adapter — `@nowline/lsp-worker/client`.** Exposes
+  `createNowlineLanguageClient({ worker })` returning a thin object
+  with `didOpen` / `didChange` / `didClose` / `onDiagnostics` /
+  `completion` / `hover` / `definition` / `references` / `dispose`.
+  The client autonegotiates the LSP `initialize` handshake on
+  construction and **rejects** if the server advertises
+  `textDocumentSync.change ≠ TextDocumentSyncKind.Incremental` —
+  guarding the range-delta requirement above against future drift.
+  `didChange` also runtime-rejects whole-document changes (callers
+  must pass `range + text` deltas).
+- **Transport.** The reader/writer are wired against a single
+  `Worker` (or `MessagePort` for tests / `SharedWorker` consumers)
+  on both directions; the worker side uses
+  `BrowserMessageReader(self)` and `BrowserMessageWriter(self)`. No
+  custom envelope, no batching, no buffering — straight LSP
+  JSON-RPC over `postMessage`. Reading and writing through the same
+  port matches the standard dedicated-worker / message-channel
+  pattern.
+- **VS Code extension is unaffected.** The Node-side `@nowline/lsp`
+  keeps powering the in-tree extension via `vscode-languageclient`.
+  `@nowline/lsp-worker` exists purely so browser-hosted editors
+  (CodeMirror, Monaco, raw textareas) can consume the same Langium
+  services without spinning up a Node child process.
+
+The complete worker / client surface (including types and the
+runtime guards above) is in
+[`packages/lsp-worker/src/`](../packages/lsp-worker/src/);
+[`packages/lsp-worker/test/worker-roundtrip.test.ts`](../packages/lsp-worker/test/worker-roundtrip.test.ts)
+is the contract test (round-trips `initialize`, `publishDiagnostics`
+on `didOpen`, and the whole-document `didChange` rejection in-process
+using a hand-rolled `MessagePort` shim).
+
 ## Versioning
 
 The wire protocol is the LSP 3.17 standard. Nowline does not extend it with custom messages today; if we ever add `nowline/*` extension messages, those will be additive and feature-flagged via `initializeParams.initializationOptions`.

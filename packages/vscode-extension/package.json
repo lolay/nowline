@@ -348,10 +348,12 @@
         "typecheck": "tsc --noEmit -p tsconfig.json"
     },
     "dependencies": {
+        "@nowline/browser": "workspace:*",
         "@nowline/config": "workspace:*",
         "@nowline/core": "workspace:*",
         "@nowline/layout": "workspace:*",
         "@nowline/lsp": "workspace:*",
+        "@nowline/preview-shell": "workspace:*",
         "@nowline/renderer": "workspace:*",
         "langium": "~4.2.4",
         "vscode-languageclient": "^9.0.1"

@@ -83,6 +83,7 @@ export class PreviewManager {
         const preview = new NowlinePreview({
             panel,
             sourceUri,
+            extensionUri: this.context.extensionUri,
             settings: this.deps.readSettings(),
             rcCache: this.deps.rcCache,
             vscodeLanguage: this.deps.vscodeLanguage(),

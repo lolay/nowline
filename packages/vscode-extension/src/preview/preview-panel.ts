@@ -66,6 +66,8 @@ export interface ViewOptionsPayload {
 export interface NowlinePreviewOptions {
     panel: vscode.WebviewPanel;
     sourceUri: vscode.Uri;
+    /** Extension install root; shell-html resolves `dist/preview-webview.js` against it. */
+    extensionUri: vscode.Uri;
     settings: PreviewSettings;
     /**
      * Cache for `.nowlinerc` discovery. The panel calls into it on every
@@ -112,7 +114,7 @@ export class NowlinePreview {
         this.rcCache = opts.rcCache;
         this.vscodeLanguage = opts.vscodeLanguage;
 
-        this.panel.webview.html = getShellHtml(this.panel.webview);
+        this.panel.webview.html = getShellHtml(this.panel.webview, opts.extensionUri);
         this.postInit();
 
         this.disposables.push(

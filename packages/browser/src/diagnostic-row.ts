@@ -1,14 +1,14 @@
 import type { ResolveDiagnostic } from '@nowline/core';
 
 /**
- * JSON-friendly diagnostic shape posted across the host -> webview boundary.
+ * JSON-friendly diagnostic shape consumed by browser preview surfaces.
  *
- * Single source of truth for the protocol so the table renderer in
- * shell-html.ts and the host-side adapters in render-pipeline.ts can't drift.
- *
- * Field semantics mirror VS Code's Problems panel: `line` and `column` are
- * 1-based (the editor displays "Ln 12, Col 5"); `file` is an absolute fs path
- * so the `goto` handler can construct a `vscode.Uri` directly.
+ * Single source of truth shared by the VS Code preview's webview table,
+ * the embed's error path, and any other browser tool that wants
+ * structured Nowline diagnostics. Field semantics mirror VS Code's
+ * Problems panel: `line` and `column` are 1-based (the editor displays
+ * "Ln 12, Col 5"); `file` is an absolute fs path (or a synthetic
+ * embed-side path) so callers can map back to a source location.
  */
 export interface DiagnosticRow {
     severity: 'error' | 'warning';
@@ -82,10 +82,11 @@ export function fromLexerError(err: ChevrotainLexerError, file: string): Diagnos
 }
 
 /**
- * Adapt a `ResolveDiagnostic` (cross-file include resolution). The line is
- * 0-based in the resolver (it comes from a CST range) and may be undefined
- * for whole-file diagnostics like circular include — fall back to line 1 so
- * the click-to-jump still puts the cursor near the top of the offending file.
+ * Adapt a `ResolveDiagnostic` (cross-file include resolution). The line
+ * is 0-based in the resolver (it comes from a CST range) and may be
+ * undefined for whole-file diagnostics like circular include — fall
+ * back to line 1 so a click-to-jump still puts the cursor near the top
+ * of the offending file.
  */
 export function fromResolveDiagnostic(diag: ResolveDiagnostic): DiagnosticRow {
     return {
@@ -94,6 +95,27 @@ export function fromResolveDiagnostic(diag: ResolveDiagnostic): DiagnosticRow {
         message: diag.message,
         file: diag.sourcePath,
         line: diag.line !== undefined ? diag.line + 1 : 1,
+        column: 1,
+    };
+}
+
+/**
+ * Adapt a render-time warning message into a diagnostic row. Renderer
+ * warnings are bare strings without a source location, so callers
+ * supply the source `file`; in `strict` mode the caller upgrades
+ * severity to `error` before passing the result on.
+ */
+export function fromRenderWarning(
+    message: string,
+    file: string,
+    severity: DiagnosticRow['severity'] = 'warning',
+): DiagnosticRow {
+    return {
+        severity,
+        code: 'render.warning',
+        message,
+        file,
+        line: 1,
         column: 1,
     };
 }

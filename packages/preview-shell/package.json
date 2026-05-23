@@ -1,7 +1,7 @@
 {
-    "name": "@nowline/embed",
+    "name": "@nowline/preview-shell",
     "version": "0.2.5",
-    "description": "Browser embed bundle for Nowline. Drop a <script> tag and ```nowline``` blocks render in place.",
+    "description": "Framework-agnostic preview viewport for Nowline SVGs: zoom, pan, fit, minimap, diagnostic table. Consumed by the VS Code extension's webview and any browser-side Nowline preview surface.",
     "license": "Apache-2.0",
     "engines": {
         "node": ">=22",
@@ -24,7 +24,7 @@
     "repository": {
         "type": "git",
         "url": "https://github.com/lolay/nowline.git",
-        "directory": "packages/embed"
+        "directory": "packages/preview-shell"
     },
     "homepage": "https://github.com/lolay/nowline",
     "bugs": {
@@ -32,33 +32,25 @@
     },
     "keywords": [
         "nowline",
-        "roadmap",
-        "gantt",
-        "embed",
-        "browser",
-        "cdn"
+        "preview",
+        "viewport",
+        "svg",
+        "zoom",
+        "pan",
+        "minimap"
     ],
     "scripts": {
-        "build": "tsc -b tsconfig.json && node scripts/bundle.mjs",
+        "build": "tsc -b tsconfig.json",
         "watch": "tsc -b tsconfig.json --watch",
         "typecheck": "tsc --noEmit -p tsconfig.json",
-        "bundle": "node scripts/bundle.mjs",
-        "bundle:dev": "node scripts/bundle.mjs --dev",
-        "check-size": "node scripts/check-size.mjs",
         "test": "vitest run",
         "test:watch": "vitest"
     },
     "dependencies": {
-        "@nowline/browser": "workspace:*",
-        "@nowline/core": "workspace:*",
-        "@nowline/layout": "workspace:*",
-        "@nowline/renderer": "workspace:*",
-        "langium": "~4.2.4"
+        "@nowline/browser": "workspace:*"
     },
     "devDependencies": {
         "@types/node": "^25.9.1",
-        "esbuild": "^0.28.0",
-        "firebase": "^12.13.0",
         "happy-dom": "^20.9.0",
         "typescript": "^6.0.3",
         "vitest": "^4.1.7"

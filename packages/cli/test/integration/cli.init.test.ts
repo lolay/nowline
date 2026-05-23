@@ -55,4 +55,24 @@ describeBuilt('--init integration', () => {
             expect(second.exitCode).toBe(0);
         });
     });
+
+    it('--init --template showcase scaffolds the m4.7 showcase example', async () => {
+        await withTempDir(async (dir) => {
+            const r = await runCliBuilt(['--init', '--template', 'showcase'], { cwd: dir });
+            expect(r.exitCode).toBe(0);
+            const target = path.join(dir, 'roadmap.nowline');
+            const contents = await fs.readFile(target, 'utf-8');
+            // The showcase template has two swimlanes, a parallel+group,
+            // an anchor, and a milestone — guard the headline shape so a
+            // future template edit can't silently swap it for something
+            // smaller.
+            expect(contents).toMatch(/^nowline v1$/m);
+            expect(contents).toMatch(/swimlane engineering/);
+            expect(contents).toMatch(/swimlane marketing/);
+            expect(contents).toMatch(/^\s*parallel /m);
+            expect(contents).toMatch(/^\s*group /m);
+            expect(contents).toMatch(/^anchor kickoff/m);
+            expect(contents).toMatch(/^milestone launch/m);
+        });
+    });
 });

@@ -12,8 +12,18 @@ The Nowline embed script is a browser JavaScript bundle that finds ` ```nowline 
 
 1. Page loads the embed script via `<script>` tag.
 2. Script scans the DOM for `<pre><code class="language-nowline">` blocks (the standard HTML output of ` ```nowline ` in markdown renderers).
-3. For each block, it extracts the text content, parses it with `@nowline/core`, lays it out with `@nowline/layout`, and renders it with `@nowline/renderer`.
+3. For each block, it extracts the text content and runs it through `parseSource` / `renderSource` from [`@nowline/browser`](./architecture.md#surfaces) (the shared parse → resolveIncludes → layout → render → diagnostics pipeline introduced in m4.7); the embed passes the no-op include reader so `include` directives degrade to a single deduped `console.warn` per page load.
 4. The original `<pre>` block is replaced with the rendered SVG.
+
+`nowline.render(source)` and `nowline.parse(source)` are thin
+Mermaid-shaped wrappers around the same `@nowline/browser` calls —
+the embed package owns the auto-scan loop, the Mermaid surface, the
+warn-once latch, and the esbuild bundle, but the actual transform
+lives in `@nowline/browser` so VS Code (via a `node:fs`-backed
+`readFile` shim) and downstream browser surfaces (Free SPA) get the
+same behaviour without re-implementing the pipeline. See
+[`specs/handoffs/handoff-m4.7-browser-pipeline.md`](./handoffs/handoff-m4.7-browser-pipeline.md)
+for the consolidation details.
 
 ## Usage
 

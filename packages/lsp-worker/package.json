@@ -1,7 +1,7 @@
 {
-    "name": "@nowline/embed",
+    "name": "@nowline/lsp-worker",
     "version": "0.2.5",
-    "description": "Browser embed bundle for Nowline. Drop a <script> tag and ```nowline``` blocks render in place.",
+    "description": "Web Worker packaging of the Nowline LSP. Ships a worker entry that wires @nowline/lsp over postMessage, plus a CodeMirror-friendly client adapter for browser IDEs.",
     "license": "Apache-2.0",
     "engines": {
         "node": ">=22",
@@ -15,6 +15,18 @@
         ".": {
             "types": "./dist/index.d.ts",
             "import": "./dist/index.js"
+        },
+        "./worker": {
+            "types": "./dist/worker.d.ts",
+            "import": "./dist/worker.js"
+        },
+        "./client": {
+            "types": "./dist/client.d.ts",
+            "import": "./dist/client.js"
+        },
+        "./message-bridge": {
+            "types": "./dist/message-bridge.d.ts",
+            "import": "./dist/message-bridge.js"
         }
     },
     "files": [
@@ -24,7 +36,7 @@
     "repository": {
         "type": "git",
         "url": "https://github.com/lolay/nowline.git",
-        "directory": "packages/embed"
+        "directory": "packages/lsp-worker"
     },
     "homepage": "https://github.com/lolay/nowline",
     "bugs": {
@@ -32,33 +44,28 @@
     },
     "keywords": [
         "nowline",
-        "roadmap",
-        "gantt",
-        "embed",
-        "browser",
-        "cdn"
+        "lsp",
+        "language-server",
+        "web-worker",
+        "browser"
     ],
     "scripts": {
-        "build": "tsc -b tsconfig.json && node scripts/bundle.mjs",
+        "build": "tsc -b tsconfig.json",
         "watch": "tsc -b tsconfig.json --watch",
         "typecheck": "tsc --noEmit -p tsconfig.json",
-        "bundle": "node scripts/bundle.mjs",
-        "bundle:dev": "node scripts/bundle.mjs --dev",
-        "check-size": "node scripts/check-size.mjs",
         "test": "vitest run",
         "test:watch": "vitest"
     },
     "dependencies": {
-        "@nowline/browser": "workspace:*",
         "@nowline/core": "workspace:*",
-        "@nowline/layout": "workspace:*",
-        "@nowline/renderer": "workspace:*",
-        "langium": "~4.2.4"
+        "@nowline/lsp": "workspace:*",
+        "langium": "~4.2.4",
+        "vscode-jsonrpc": "8.2.0",
+        "vscode-languageserver": "~9.0.1",
+        "vscode-languageserver-protocol": "~3.17.5"
     },
     "devDependencies": {
         "@types/node": "^25.9.1",
-        "esbuild": "^0.28.0",
-        "firebase": "^12.13.0",
         "happy-dom": "^20.9.0",
         "typescript": "^6.0.3",
         "vitest": "^4.1.7"

@@ -1,7 +1,7 @@
 {
-    "name": "@nowline/embed",
+    "name": "@nowline/browser",
     "version": "0.2.5",
-    "description": "Browser embed bundle for Nowline. Drop a <script> tag and ```nowline``` blocks render in place.",
+    "description": "Browser-safe Nowline pipeline: parse + validate + resolve includes + layout + render with pluggable I/O hooks. Consumed by @nowline/embed, the VS Code preview, and any third-party browser tool.",
     "license": "Apache-2.0",
     "engines": {
         "node": ">=22",
@@ -24,7 +24,7 @@
     "repository": {
         "type": "git",
         "url": "https://github.com/lolay/nowline.git",
-        "directory": "packages/embed"
+        "directory": "packages/browser"
     },
     "homepage": "https://github.com/lolay/nowline",
     "bugs": {
@@ -34,22 +34,20 @@
         "nowline",
         "roadmap",
         "gantt",
-        "embed",
         "browser",
-        "cdn"
+        "pipeline"
     ],
     "scripts": {
-        "build": "tsc -b tsconfig.json && node scripts/bundle.mjs",
+        "prebuild": "node scripts/bundle-showcase.mjs",
+        "build": "tsc -b tsconfig.json",
         "watch": "tsc -b tsconfig.json --watch",
         "typecheck": "tsc --noEmit -p tsconfig.json",
-        "bundle": "node scripts/bundle.mjs",
-        "bundle:dev": "node scripts/bundle.mjs --dev",
-        "check-size": "node scripts/check-size.mjs",
+        "pretest": "node scripts/bundle-showcase.mjs",
         "test": "vitest run",
-        "test:watch": "vitest"
+        "test:watch": "vitest",
+        "bundle-showcase": "node scripts/bundle-showcase.mjs"
     },
     "dependencies": {
-        "@nowline/browser": "workspace:*",
         "@nowline/core": "workspace:*",
         "@nowline/layout": "workspace:*",
         "@nowline/renderer": "workspace:*",
@@ -57,8 +55,6 @@
     },
     "devDependencies": {
         "@types/node": "^25.9.1",
-        "esbuild": "^0.28.0",
-        "firebase": "^12.13.0",
         "happy-dom": "^20.9.0",
         "typescript": "^6.0.3",
         "vitest": "^4.1.7"
