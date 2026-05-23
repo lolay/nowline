@@ -29,7 +29,7 @@
     "engines": {
         "node": ">=22",
         "pnpm": ">=11",
-        "vscode": "^1.85.0"
+        "vscode": "^1.105.0"
     },
     "icon": "dist/icons/icon.png",
     "main": "./dist/extension.cjs",
@@ -361,7 +361,7 @@
     "devDependencies": {
         "@resvg/resvg-js": "^2.6.2",
         "@types/node": "^25.9.1",
-        "@types/vscode": "^1.120.0",
+        "@types/vscode": "^1.105.0",
         "@vscode/vsce": "^3.9.1",
         "esbuild": "^0.28.0",
         "typescript": "^6.0.3"

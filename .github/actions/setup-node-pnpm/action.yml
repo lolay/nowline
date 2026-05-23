@@ -23,6 +23,10 @@ inputs:
     description: 'Node.js major or full version to install (matches .nvmrc by default).'
     required: false
     default: '26'
+  skip-install:
+    description: 'Skip the workspace `pnpm install`. The caller must run install itself (e.g. with --cpu/--os flags to pull in cross-target optional native deps).'
+    required: false
+    default: 'false'
 runs:
   using: composite
   steps:
@@ -36,5 +40,6 @@ runs:
         cache: pnpm
 
     - name: Install dependencies
+      if: inputs.skip-install != 'true'
       shell: bash
       run: pnpm install --frozen-lockfile
