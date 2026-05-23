@@ -48,9 +48,12 @@ nowline/
     vscode-extension/            # VS Code / Cursor extension wrapping @nowline/lsp
     embed/                       # @nowline/embed — esbuild IIFE that renders `nowline` blocks in the browser
     nowline-action/              # GitHub Action source (mirrored to lolay/nowline-action on release)
+    browser/                     # @nowline/browser (m4.7) — single-call browser pipeline (renderSource / parseSource); consolidates embed + VS Code render-pipeline glue
+    preview-shell/               # @nowline/preview-shell (m4.7) — framework-agnostic viewport chrome (zoom/pan/fit/minimap/diagnostic table); consumed by VS Code webview and downstream browser apps
+    lsp-worker/                  # @nowline/lsp-worker (m4.7) — Web Worker packaging of @nowline/lsp + CodeMirror client adapter
   grammars/
     nowline.tmLanguage.json      # TextMate grammar for syntax highlighting
-  examples/                      # Example .nowline files (also `nowline --init` templates)
+  examples/                      # Example .nowline files (also `nowline --init` templates) — m4.7 adds showcase.nowline as the canonical "couple of swimlanes + linear flow + one parallel block + anchor + milestone" sample
   tests/                         # Renderer manual-validation fixtures (one stressed axis per file)
   scripts/                       # Repo-wide build / packaging scripts
   specs/                         # Design specs for the OSS tooling
@@ -64,7 +67,10 @@ nowline/
 @nowline/core
   ├── @nowline/layout
   │     ├── @nowline/renderer
-  │     │     └── (used by @nowline/cli, @nowline/vscode-extension)
+  │     │     ├── (used by @nowline/cli, @nowline/vscode-extension)
+  │     │     └── @nowline/browser (m4.7)
+  │     │           ├── @nowline/embed (m4 — re-exports render/parse from @nowline/browser after m4.7)
+  │     │           └── (used by @nowline/vscode-extension via a thin shim after m4.7; used directly by downstream browser apps)
   │     └── @nowline/export-core
   │           ├── @nowline/export-html
   │           ├── @nowline/export-pdf
@@ -73,7 +79,10 @@ nowline/
   │           ├── @nowline/export-xlsx
   │           └── @nowline/export-msproj
   └── @nowline/lsp
-        └── @nowline/vscode-extension
+        ├── @nowline/vscode-extension (Node-side LSP client)
+        └── @nowline/lsp-worker (m4.7 — browser-side Web Worker packaging)
+
+@nowline/preview-shell (m4.7) — standalone, no engine deps; consumed by @nowline/vscode-extension's webview and downstream browser apps.
 
 @nowline/cli depends on core, layout, renderer, export-core, and every @nowline/export-*.
 ```
@@ -99,10 +108,13 @@ Dependencies flow downward only. No upward or sideways imports. The graph is enf
 ### Surfaces
 
 - **@nowline/cli** — Command-line entry point. Wraps core + layout + renderer + every exporter. Compiled to standalone binaries via `bun compile`. See [`cli.md`](./cli.md) and [`cli-distribution.md`](./cli-distribution.md).
-- **@nowline/lsp** — Language server. Reuses core's parser/validator behind the LSP wire protocol so editors get the same diagnostics as the CLI. See [`ide.md`](./ide.md).
-- **vscode-extension** — VS Code / Cursor extension that boots `@nowline/lsp` and registers commands. Published as `nowline.vscode-nowline` on both the [VS Code Marketplace](https://marketplace.visualstudio.com/items?itemName=nowline.vscode-nowline) and [Open VSX](https://open-vsx.org/extension/nowline/vscode-nowline) (the latter is what Cursor users install from). Developed in-tree for now; planned to graduate to the `lolay/nowline-vscode` satellite repo once the marketplace listing has accumulated some real-world install/feedback signal.
-- **@nowline/embed** — Browser bundle (esbuild IIFE) that finds ` ```nowline ` fenced code blocks in a page and renders them client-side. Mirrors [Mermaid's](https://mermaid.js.org) embed surface (`initialize` / `render` / `parse` / `init`). Consumes core + layout + renderer as workspace deps. See [`embed.md`](./embed.md).
+- **@nowline/lsp** — Language server. Reuses core's parser/validator behind the LSP wire protocol so editors get the same diagnostics as the CLI. See [`ide.md`](./ide.md) and [`lsp.md`](./lsp.md).
+- **vscode-extension** — VS Code / Cursor extension that boots `@nowline/lsp` and registers commands. Published as `nowline.vscode-nowline` on both the [VS Code Marketplace](https://marketplace.visualstudio.com/items?itemName=nowline.vscode-nowline) and [Open VSX](https://open-vsx.org/extension/nowline/vscode-nowline) (the latter is what Cursor users install from). Developed in-tree for now; planned to graduate to the `lolay/nowline-vscode` satellite repo once the marketplace listing has accumulated some real-world install/feedback signal. After m4.7, the webview's render pipeline is a thin shim over `@nowline/browser` and the inline shell template is replaced by `@nowline/preview-shell`.
+- **@nowline/embed** — Browser bundle (esbuild IIFE) that finds ` ```nowline ` fenced code blocks in a page and renders them client-side. Mirrors [Mermaid's](https://mermaid.js.org) embed surface (`initialize` / `render` / `parse` / `init`). Consumes core + layout + renderer as workspace deps. After m4.7, `@nowline/embed` re-exports `render` / `parse` from `@nowline/browser`. See [`embed.md`](./embed.md).
 - **GitHub Action** (`packages/nowline-action/`, mirrored to `lolay/nowline-action`) — Renders `.nowline` files in CI for hosts that strip `<script>` tags (GitHub READMEs, issue comments). Shells out to `@nowline/cli`, so it couples loosely to the engine through a stable command-line interface. Source ships in the monorepo for lock-step PRs with the CLI it drives; the mirror repo carries the compiled `action.yml` + `dist/` for Marketplace listing. See [`embed.md`](./embed.md) § GitHub Action.
+- **@nowline/browser** (m4.7) — Single-call browser pipeline. Public API: `renderSource(source, options)` and `parseSource(source, options)`. Consolidates today's `packages/embed/src/pipeline.ts` and `packages/vscode-extension/src/preview/render-pipeline.ts`; keeps the VS Code branch's Node `fs`-backed include resolver as a pluggable hook. Re-exports the canonical showcase example (see `examples/showcase.nowline`) as a string so downstream apps don't copy-paste it.
+- **@nowline/preview-shell** (m4.7) — Framework-agnostic viewport chrome. Public API: `mountPreview(rootEl, options) → { setSvg, setDiagnostics, dispose, fitPage, fitWidth, ... }`. Hoists ~1000 LOC of zoom/pan/fit/minimap/diagnostic-table logic out of the VS Code webview's inline template into a reusable ES module. No opinion on text editor or message bus.
+- **@nowline/lsp-worker** (m4.7) — Browser-side packaging of `@nowline/lsp`. Ships a Web Worker entry (`@nowline/lsp-worker/worker`) and a thin client adapter (`@nowline/lsp-worker/client`) that CodeMirror's `@codemirror/lint` / `@codemirror/autocomplete` / hover extensions can consume via standard LSP-over-`postMessage`. The Node-side `@nowline/lsp` continues to power the VS Code extension; the worker package only adds a browser packaging without changing what the language server does. See [`lsp.md`](./lsp.md) for the wire-protocol contract (range deltas on `textDocument/didChange`).
 
 ## Technology Choices
 

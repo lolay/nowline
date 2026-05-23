@@ -12,7 +12,7 @@ Each feature is scored on three dimensions using a **1-3-9 scale** (logarithmic,
 
 **Score = Identity x Demand x Effort.** Higher is better (high identity, high demand, low effort).
 
-Features are assigned to milestones: m1–m4.5 (OSS tooling tracked here) or m4.5-deferred. Later commercial milestones are scoped in a separate roadmap and are out of scope for this file.
+Features are assigned to milestones: m1–m4.7 (OSS tooling tracked here) or m4.5-deferred. Later commercial milestones are scoped in a separate roadmap and are out of scope for this file. Feature numbers 44–69 are reserved for commercial-only features in the proprietary `nowline-app` and `nowline-api` repos so that adding new OSS features here does not collide with the existing commercial scoring matrices; m4.7 OSS features pick up at 70 to keep that gap intact.
 
 ## Feature Matrix
 
@@ -93,3 +93,14 @@ Features are assigned to milestones: m1–m4.5 (OSS tooling tracked here) or m4.
 | 41 | Obsidian plugin | 3 | 3 | 3 | 27 | Text-first audience overlap |
 | 42 | Neovim LSP config | 1 | 1 | 9 | 9 | Docs only, near-zero effort |
 | 43 | JetBrains plugin | 1 | 3 | 3 | 9 | Smaller audience for DSLs |
+
+### m4.7 — Browser pipeline + preview shell + LSP worker + showcase
+
+Feature numbers start at 70 to skip the 44–69 commercial-only block reserved for `nowline-app` and `nowline-api`. See § Scoring Rubric.
+
+| # | Feature | Identity | Demand | Effort | Score | Notes |
+|---|---------|----------|--------|--------|-------|-------|
+| 70 | `@nowline/browser` (single-call browser pipeline) | 9 | 3 | 3 | 81 | Consolidates today's `packages/embed/src/pipeline.ts` and `packages/vscode-extension/src/preview/render-pipeline.ts`; one ESM `renderSource()` + `parseSource()`. |
+| 71 | `@nowline/preview-shell` (framework-agnostic viewport chrome) | 3 | 3 | 3 | 27 | Hoists the ~1000-LOC inline preview shell out of the VS Code webview into a reusable ES module with `mountPreview()` API; consumed by VS Code webview and downstream browser apps. |
+| 72 | `@nowline/lsp-worker` (Langium LSP in a Web Worker) | 3 | 3 | 1 | 9 | Browser-side packaging of `@nowline/lsp` (m3a). Worker entry + CodeMirror client adapter; pinned to LSP-spec range deltas as standard discipline. |
+| 73 | `examples/showcase.nowline` (canonical sample) | 1 | 9 | 9 | 81 | Roadmap with swimlanes, linear flow, parallel block with groups, anchor, milestone. Wired into `--init showcase` and re-exported as a string from `@nowline/browser`. |

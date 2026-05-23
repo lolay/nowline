@@ -2,7 +2,7 @@
 
 ## Overview
 
-The OSS tooling (`lolay/nowline` and its satellite repos) ships incrementally across milestones m1–m4.6. A four-phase layout-engine refactor (m2.5a–m2.5d), a rendering-polish pass (m2i), capacity & utilization (m2j), and a dependency-arrow attach + routing pass (m2k) sit between the sample-fidelity work (m2h) and IDE support (m3). Manual pages (m2l), French localization (m2m), and inline date pins (m2n) close out the m2 series with distribution polish and DSL refinements. The IDE work ships before the GitHub-bound rendering paths (m3.5 GitHub Action, m4 browser embed) so authors can edit `.nowline` files in VS Code / Cursor with live preview before either surface goes wide. m3.5 (action) and m4 (embed) are independent of each other and could ship in either order; the chain numbers them m3.5 → m4. Two independent post-m4 add-ons round out the OSS chain: m4.5 expands IDE coverage (Obsidian, Neovim, JetBrains), m4.6 expands Windows install coverage (Scoop, WinGet). Each milestone has a clear scope and set of Apache-2.0 deliverables. Later milestones depend on earlier ones.
+The OSS tooling (`lolay/nowline` and its satellite repos) ships incrementally across milestones m1–m4.7. A four-phase layout-engine refactor (m2.5a–m2.5d), a rendering-polish pass (m2i), capacity & utilization (m2j), and a dependency-arrow attach + routing pass (m2k) sit between the sample-fidelity work (m2h) and IDE support (m3). Manual pages (m2l), French localization (m2m), and inline date pins (m2n) close out the m2 series with distribution polish and DSL refinements. The IDE work ships before the GitHub-bound rendering paths (m3.5 GitHub Action, m4 browser embed) so authors can edit `.nowline` files in VS Code / Cursor with live preview before either surface goes wide. m3.5 (action) and m4 (embed) are independent of each other and could ship in either order; the chain numbers them m3.5 → m4. m4.7 follows m4 with a browser-tooling extraction (browser pipeline, preview shell, LSP worker, showcase example) so commercial browser surfaces can stand on a shared OSS base instead of duplicating glue. Two independent post-m4 add-ons round out the OSS chain: m4.5 expands IDE coverage (Obsidian, Neovim, JetBrains), m4.6 expands Windows install coverage (Scoop, WinGet). Each milestone has a clear scope and set of Apache-2.0 deliverables. Later milestones depend on earlier ones.
 
 Commercial milestones (hosted editor, free viewer, MCP, enterprise, FedRAMP) are tracked in a separate, private spec and are out of scope here.
 
@@ -40,6 +40,7 @@ Commercial milestones (hosted editor, free viewer, MCP, enterprise, FedRAMP) are
 | m4 | Embed | Apache 2.0 | Browser embed script (`@nowline/embed`) and the branded `embed.nowline.{io,dev}` Firebase-Hosted CDN deploy. Bundle landed; CDN deploy still pending — see [`specs/handoffs/handoff-m4-embed.md`](./handoffs/handoff-m4-embed.md) → "Carried forward". |
 | m4.5 | IDE Expansion | Apache 2.0 | Obsidian, Neovim, JetBrains (timing TBD) |
 | m4.6 | Windows distribution | Apache 2.0 | Scoop bucket (`lolay/scoop-bucket`) and WinGet central-registry submission via `wingetcreate`; new `update-scoop-bucket` + `submit-winget-pkg` jobs in `release.yml`; `SCOOP_BUCKET_TOKEN` + `WINGET_PR_PAT` secrets |
+| m4.7 | Browser pipeline + preview shell + LSP worker + showcase | Apache 2.0 | `@nowline/browser` (single-call browser pipeline; consolidates today's embed + VS Code render-pipeline glue), `@nowline/preview-shell` (framework-agnostic viewport chrome — zoom/pan/fit/minimap/diagnostic table), `@nowline/lsp-worker` (browser-side packaging of `@nowline/lsp` as a Web Worker + CodeMirror client adapter), `examples/showcase.nowline` (canonical sample roadmap re-exported as a string asset). Doc-only PR for this milestone; implementation lands in a follow-up. |
 
 ## Milestone Details
 
@@ -463,6 +464,46 @@ Single-file mode: the embed warns once and skips `include` directives. Multi-fil
 
 Spec: [`specs/embed.md`](./embed.md) | Handoff: [`specs/handoffs/handoff-m4-embed.md`](./handoffs/handoff-m4-embed.md)
 
+### m4.7 — Browser pipeline + preview shell + LSP worker + showcase
+
+Browser-tooling extraction milestone. Lifts three pieces of duplicated browser glue out of the embed bundle and the VS Code extension into reusable packages, plus a canonical sample example. Lands as a doc-only PR in this slot; the four code packages ship in a follow-up implementation PR. Apache-2.0 across the board.
+
+Why this exists: today the embed bundle (`packages/embed/src/pipeline.ts`) and the VS Code extension (`packages/vscode-extension/src/preview/render-pipeline.ts`) carry near-duplicate "parse → resolve includes → layout → render → diagnostics" glue, and the VS Code webview's viewport chrome (`packages/vscode-extension/src/preview/shell-html.ts`, ~1000 LOC) lives in an inline string template that no other surface can reuse. The Langium LSP from m3a is Node-only and can't run in a browser without a packaging layer. Extracting these makes commercial browser surfaces (Free SPA at `free.nowline.io`, future browser-hosted IDE wrappers) consume the same battle-tested OSS code instead of forking, and gives any third-party building a Nowline-aware web tool a clean dependency target. Nothing about this milestone widens the OSS scope past today's tools — it's a refactor that reshapes existing code into smaller, more reusable units.
+
+Four code deliverables (plus this doc-only PR):
+
+1. **`packages/browser/` (`@nowline/browser`)**
+   - One ESM `renderSource(source, options) → { svg } | { diagnostics }` and a matching `parseSource(source, options) → { ast, diagnostics }`.
+   - Consolidates [`packages/embed/src/pipeline.ts`](../packages/embed/src/pipeline.ts) and [`packages/vscode-extension/src/preview/render-pipeline.ts`](../packages/vscode-extension/src/preview/render-pipeline.ts). Keeps the VS Code branch's Node `fs`-backed include resolver as a pluggable hook so VS Code can keep file-system include resolution while the embed and Free SPA stick with the single-file warning behavior.
+   - `@nowline/embed` re-exports `render` / `parse` from this package. VS Code extension's render pipeline becomes a thin shim. Free SPA imports it directly.
+   - Bundle-size invariant: the embed's gzipped size after the migration is bounded by the existing m4 budget (175 KB CI gate); aim for net-zero or smaller.
+
+2. **`packages/preview-shell/` (`@nowline/preview-shell`)**
+   - Framework-agnostic ES module hoisted from [`packages/vscode-extension/src/preview/shell-html.ts`](../packages/vscode-extension/src/preview/shell-html.ts).
+   - Public API: `mountPreview(rootEl, options) → { setSvg, setDiagnostics, dispose, fitPage, fitWidth, getZoom, setZoom, ... }`.
+   - Handles zoom (`Cmd/Ctrl + scroll-wheel`, trackpad pinch, toolbar +/−), pan (spacebar-drag, drag), Figma-style keyboard presets (`1`/`2`/`3`/`0`), Fit Page / Fit Width, minimap with viewport rect + click-to-recenter + drag-to-pan + auto-hide, and a clickable diagnostic table.
+   - No opinion on text editor or message bus. Consumers feed in SVG and diagnostics; consumers handle save/copy/jump-to-line in their own way.
+   - VS Code webview imports it (replacing today's inline string template); Free SPA wraps it in React via `useEffect` + ref.
+   - Pro does **not** consume this package. Pro's hybrid HTML+SVG canvas (drag-and-drop, inline card edit) has its own stage-transform interaction model — see `lolay/nowline-app/specs/rendering.md`.
+
+3. **`packages/lsp-worker/` (`@nowline/lsp-worker`)**
+   - Browser-side packaging of [`packages/lsp`](../packages/lsp). Today `@nowline/lsp` runs as a Node language server; this package wraps the same Langium services (`createNowlineServices()` from `@nowline/core`) in a Web Worker entry plus a `MessageReader` / `MessageWriter` over `postMessage`.
+   - Ships a Worker entry (`@nowline/lsp-worker/worker`) and a thin client adapter (`@nowline/lsp-worker/client`) that CodeMirror's `@codemirror/lint`, `@codemirror/autocomplete`, `@codemirror/view` (hover tooltip) extensions can consume via standard LSP-over-`postMessage`.
+   - **Wire-protocol requirement (standard LSP discipline, not collab-specific):** the `textDocument/didChange` notification accepts LSP-spec range deltas (`range` + `text`), not whole-document replacement. This matches what VS Code's language client already emits today, makes incremental analysis cheap on large documents, and is the protocol shape every conforming LSP implementation already speaks. We pin it explicitly so future contributors don't regress to whole-document sends and silently quadruple parse cost on every keystroke.
+   - Surface: `textDocument/publishDiagnostics`, `textDocument/completion`, `textDocument/hover`, `textDocument/definition`, `textDocument/references` — same set the VS Code extension exercises against the Node LSP today.
+   - VS Code extension keeps using the Node-side `@nowline/lsp` (no behaviour change for the extension). Only browser surfaces (Free SPA, future browser-hosted IDE wrappers) consume the worker package.
+
+4. **`examples/showcase.nowline`**
+   - Canonical sample roadmap: a couple of swimlanes, a simple linear flow, one parallel block with groups, one anchor, one milestone. Renders well at typical browser viewport sizes.
+   - Wired into [`packages/cli/scripts/bundle-templates.mjs`](../packages/cli/scripts/bundle-templates.mjs) as a `nowline --init showcase` template alongside the existing minimal/teams/product templates.
+   - Re-exported as a string from `@nowline/browser` (or a tiny `@nowline/showcase` sibling) so commercial Free SPAs can ship it as empty-state content without copy-paste drift from the canonical source.
+
+Why no collab schema in OSS: [`lolay/nowline-app/specs/principles.md`](https://github.com/lolay/nowline-app/blob/main/specs/principles.md) and [`lolay/nowline-app/AGENTS.md`](https://github.com/lolay/nowline-app/blob/main/AGENTS.md) carve collaboration out as the value Pro and Enterprise charge for. Even a doc-only Yjs schema would tip Lolay's hand on the moat. The schema doc lives in [`lolay/nowline-app/specs/collab.md`](https://github.com/lolay/nowline-app/blob/main/specs/collab.md) (proprietary). The LSP `didChange` range-delta requirement above is **standard LSP discipline**, not a collab-prep concession — VS Code's existing language client already emits range deltas, and the requirement is what makes incremental analysis on large documents tractable. Any side benefit to a future CRDT layer is incidental.
+
+Depends on: m1 (DSL + parser), m2b (layout + renderer), m3a (LSP server). Independent of m4 (`@nowline/browser` and `@nowline/preview-shell` consolidate code that today lives in m4 and m3c respectively, but neither requires the m4 CDN deploy to ship).
+
+Spec: [`specs/architecture.md`](./architecture.md) (workspace map updates), [`specs/lsp.md`](./lsp.md) (range-delta requirement), [`specs/embed.md`](./embed.md) (cross-references for `@nowline/browser` consolidation).
+
 ### m4.5 — IDE Expansion (timing TBD)
 
 Extend IDE support beyond VS Code/Cursor. Depends on m3 (LSP server) and is independent of m4 (Embed); slots after m4 in the chain so the public embed ships before plugin work begins.
@@ -496,18 +537,20 @@ Spec: [`specs/scoop-bucket.md`](./scoop-bucket.md), [`specs/cli-distribution.md`
 ## Dependency Chain
 
 ```
-m1 → m2a → m2b → m2b.5 → m2c → m2d → m2e → m2f → m2g → m2h → m2.5a → m2.5b → m2.5c → m2.5d → m2i → m2j → m2k → m2l → m2m → m2n → m3a → m3b → m3c → m3d → m3e → m3f → m3.5 → m4
-                                                                                                                                                                              ↘
-                                                                                                                                                                               m4.5 (depends on m3a only; sequenced after m4)
-                                                                                                                                                                              ↘
-                                                                                                                                                                               m4.6 (depends on m2a + m2l; sequenced after m4.5 by numbering only — independent of m4.5)
+m1 → m2a → m2b → m2b.5 → m2c → m2d → m2e → m2f → m2g → m2h → m2.5a → m2.5b → m2.5c → m2.5d → m2i → m2j → m2k → m2l → m2m → m2n → m3a → m3b → m3c → m3d → m3e → m3f → m3.5 → m4 → m4.7
+                                                                                                                                                                                    ↘
+                                                                                                                                                                                     m4.5 (depends on m3a only; sequenced after m4.7)
+                                                                                                                                                                                    ↘
+                                                                                                                                                                                     m4.6 (depends on m2a + m2l; sequenced after m4.5 by numbering only — independent of m4.5 and m4.7)
 ```
 
 m3.5 (GitHub Action) and m4 (browser embed) are independent of each other — m3.5 shells out to `@nowline/cli`, m4 ships the browser bundle. The chain orders them m3.5 → m4 by numbering only; either could ship first.
 
+m4.7 (browser pipeline + preview shell + LSP worker + showcase) consolidates code that today lives in m3c (the inline preview-shell template) and m4 (the embed pipeline) plus the m3a Langium services, repackaged for browser consumption. It depends on those three foundations; it does not depend on m4's CDN deploy actually shipping.
+
 m2l, m2m, and m2n are positioned in the m2 series logically (CLI distribution polish; localization; DSL enhancement) but landed after m3c chronologically; the chain reflects logical OSS sequence rather than strict shipping order, similar to m2i.
 
-m4.5 and m4.6 are independent post-m4 add-ons — m4.5 extends IDE coverage (Obsidian, Neovim, JetBrains) and only needs m3a; m4.6 extends Windows install coverage (Scoop, WinGet) and only needs m2a + m2l. Either can ship first; the `.5 / .6` numbering reflects ordering of the proposals, not a dependency.
+m4.5 and m4.6 are independent post-m4.7 add-ons — m4.5 extends IDE coverage (Obsidian, Neovim, JetBrains) and only needs m3a; m4.6 extends Windows install coverage (Scoop, WinGet) and only needs m2a + m2l. Either can ship first; the `.5 / .6` numbering reflects ordering of the proposals, not a dependency. Neither depends on m4.7.
 
 m1 is the critical foundation — every subsequent milestone depends on the DSL, parser, and typed AST it produces.
 
