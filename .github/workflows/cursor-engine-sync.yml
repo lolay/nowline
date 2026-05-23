@@ -1,0 +1,87 @@
+name: Cursor engine sync
+
+# Opens a monthly tracking issue assigned to copilot-swe-agent[bot], which
+# decides whether to bump engines.vscode and @types/vscode in
+# packages/vscode-extension/package.json per the Cursor-tracking policy in
+# CONTRIBUTING.md § VS Code extension engine floor policy.
+#
+# The job is idempotent: if an open issue labelled cursor-engine-sync already
+# exists (e.g. the agent's PR is still in review), no second issue is opened.
+#
+# COPILOT_ASSIGN_TOKEN — required secret
+# ----------------------------------------
+# The "Create issue + assign to Copilot" step needs a user-scoped token.
+# GitHub's billing model requires the token to be associated with a real user
+# account (not a GitHub App installation token or the default GITHUB_TOKEN).
+# The idempotent check step uses GITHUB_TOKEN and always works; only the
+# assignment step needs the special token.
+#
+# Acceptable token sources (store as repo or org secret COPILOT_ASSIGN_TOKEN):
+#   1. Fine-grained PAT with Issues: Read and write on lolay/nowline (simplest)
+#   2. GitHub App user-to-server token (requires a one-time OAuth authorization
+#      by a user with a Copilot seat; the refresh token is then stored as the
+#      secret)
+#   3. Fine-grained PAT under a dedicated bot account that has a Copilot seat
+#
+# If the secret is missing the "Create issue" step fails loudly — the check
+# step before it will have passed cleanly, so the workflow shows a clear
+# per-step failure rather than a cryptic auth error.
+
+on:
+    schedule:
+        - cron: "0 12 1 * *"  # 12:00 UTC on the 1st of each month
+    workflow_dispatch:
+
+permissions:
+    contents: read
+    issues: write
+
+jobs:
+    open-tracking-issue:
+        name: Open Cursor engine tracking issue
+        runs-on: ubuntu-latest
+        steps:
+            - name: Checkout (for agent prompt)
+              uses: actions/checkout@v6
+
+            - name: Check for existing open issue
+              id: existing
+              env:
+                  GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+              run: |
+                  set -euo pipefail
+                  count=$(gh issue list \
+                      --repo "$GITHUB_REPOSITORY" \
+                      --label "cursor-engine-sync" \
+                      --state open \
+                      --json number \
+                      --jq 'length')
+                  echo "count=$count" >> "$GITHUB_OUTPUT"
+                  echo "Open cursor-engine-sync issues: $count"
+
+            - name: Create issue + assign to Copilot
+              if: steps.existing.outputs.count == '0'
+              env:
+                  GH_TOKEN: ${{ secrets.COPILOT_ASSIGN_TOKEN }}
+              run: |
+                  set -euo pipefail
+                  BODY=$(cat .github/copilot-prompts/cursor-engine-sync.md)
+                  PAYLOAD=$(jq -n \
+                      --arg title "Sync engines.vscode / @types/vscode to Cursor's VS Code engine" \
+                      --arg body "$BODY" \
+                      '{
+                          title: $title,
+                          body: $body,
+                          labels: ["cursor-engine-sync", "maintenance"],
+                          assignees: ["copilot-swe-agent[bot]"],
+                          agent_assignment: {
+                              target_repo: env.GITHUB_REPOSITORY,
+                              base_branch: "main"
+                          }
+                      }')
+                  gh api \
+                      --method POST \
+                      -H "Accept: application/vnd.github+json" \
+                      -H "X-GitHub-Api-Version: 2022-11-28" \
+                      "/repos/$GITHUB_REPOSITORY/issues" \
+                      --input - <<< "$PAYLOAD"

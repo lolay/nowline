@@ -1,0 +1,37 @@
+{
+    "$schema": "http://json-schema.org/draft-07/schema#",
+    "$id": "https://github.com/lolay/nowline/blob/main/.github/cursor-engine.schema.json",
+    "title": "Cursor engine state",
+    "description": "Tracks the VS Code engine version embedded in the latest stable Cursor release. Read and written by cursor-engine-sync.yml via copilot-swe-agent.",
+    "type": "object",
+    "required": ["vscode_version", "first_observed_at", "cursor_app_version", "source", "notes"],
+    "additionalProperties": false,
+    "properties": {
+        "$schema": {
+            "type": "string"
+        },
+        "vscode_version": {
+            "type": "string",
+            "description": "The vscodeVersion value from Cursor's product.json, e.g. '1.105.1'. Reset to the newly-detected value whenever Cursor ships a new engine.",
+            "pattern": "^\\d+\\.\\d+\\.\\d+$"
+        },
+        "first_observed_at": {
+            "type": "string",
+            "description": "The date (YYYY-MM-DD, UTC) when this vscode_version was first seen in a stable Cursor release. engines.vscode and @types/vscode in packages/vscode-extension/package.json bump 30 days after this date.",
+            "pattern": "^\\d{4}-\\d{2}-\\d{2}$"
+        },
+        "cursor_app_version": {
+            "type": "string",
+            "description": "The Cursor app version string at the time vscode_version was observed, e.g. '3.5.33'.",
+            "pattern": "^\\d+\\.\\d+\\.\\d+$"
+        },
+        "source": {
+            "type": "string",
+            "description": "How vscode_version was determined — e.g. 'Cursor.app/Contents/Resources/app/product.json (local inspection)' or 'cursor.com/changelog (entry for 3.5.33)'."
+        },
+        "notes": {
+            "type": "string",
+            "description": "Free-form notes for this entry. Cite your evidence and any deviation from the standard detection procedure."
+        }
+    }
+}

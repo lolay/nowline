@@ -34,6 +34,11 @@
             "matchPackageNames": ["node"],
             "enabled": false,
             "description": "Node version is governed by .nvmrc + engines policy (see nowline/CONTRIBUTING.md § Toolchain & Supported Versions), not Renovate"
+        },
+        {
+            "matchPackageNames": ["@types/vscode"],
+            "enabled": false,
+            "description": "Floor tracks Cursor's embedded VS Code engine + 30-day grace; driven by .github/workflows/cursor-engine-sync.yml, not Renovate. Renovate would otherwise bump @types/vscode past engines.vscode and break vsce package (see v0.3.0 release-run #26337633859)."
         }
     ],
     "customManagers": [

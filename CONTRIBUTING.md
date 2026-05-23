@@ -11,6 +11,7 @@ Non-trivial changes — grammar, AST shape, layout or renderer behavior, new pac
 - [Code of conduct](#code-of-conduct)
 - [Prerequisites](#prerequisites)
 - [Toolchain & Supported Versions](#toolchain--supported-versions)
+  - [VS Code extension engine floor policy](#vs-code-extension-engine-floor-policy)
 - [Getting the code](#getting-the-code)
 - [Repository layout](#repository-layout)
 - [Common tasks](#common-tasks)
@@ -52,7 +53,7 @@ This repo runs a **two-tier Node policy**: a low floor for what we ship to consu
 | `engines.node` | every `@nowline/*` `package.json` | **`>=22`** | Node 22 is the oldest non-EOL LTS; supported through April 2027. Choosing the oldest non-EOL LTS as the floor doesn't lock out users on Node 22 LTS while still giving us modern language features. Matches the effective floor of comparable libraries (e.g. Mermaid). |
 | `engines.pnpm` | every `@nowline/*` `package.json` | **`>=11`** | Soft floor matching the `packageManager` pin below. |
 | `runs.using` | `packages/nowline-action/action.yml` | **`node24`** | GitHub controls the GitHub Action runtime ladder separately. `node26` is not yet available; revisit when GitHub adds it. |
-| `engines.vscode` | `packages/vscode-extension/package.json` | **`^1.85.0`** | VS Code bundles its own Node ABI. Independent of the policy above. |
+| `engines.vscode` | `packages/vscode-extension/package.json` | **`^1.105.0`** | VS Code bundles its own Node ABI. Independent of the policy above. Tracks Cursor's embedded VS Code engine + 30-day grace; see [VS Code extension engine floor policy](#vs-code-extension-engine-floor-policy). |
 
 Tightening any of these — e.g. moving the consumer floor from `>=22` to `>=24` — is a **breaking change** for users still on the dropped version. Bump it alongside the EOL date of the floor LTS, and bundle it into a minor or major version bump of every `@nowline/*` package in the same release.
 
@@ -74,7 +75,31 @@ Tightening any of these — e.g. moving the consumer floor from `>=22` to `>=24`
 
 - **Renovate** ([shared preset](./.github/renovate-shared.json)) opens a single grouped PR per week for minor/patch updates across npm, GitHub Actions, Terraform, Bun, and actionlint. Major updates open individually with a 30-day cooldown. See the per-repo `renovate.json` files for repo-specific overrides. The Dependency Dashboard issue in each repo is the single triage entry point.
 - **Node version is explicitly disabled in Renovate's `packageRules`** — version bumps are governed manually by this section, not by Renovate, because changing the consumer floor is policy work, not a routine dependency bump.
+- **`@types/vscode` is explicitly disabled in Renovate's `packageRules`** — the floor is governed by the Cursor-tracking policy below, not Renovate. Renovate would otherwise bump `@types/vscode` past `engines.vscode` and break `vsce package` (as seen in the v0.3.0 release-run failure).
 - **Cross-references:** [Node release schedule](https://nodejs.org/en/about/previous-releases) · [`.nvmrc`](./.nvmrc) · [`.github/renovate-shared.json`](./.github/renovate-shared.json).
+
+### VS Code extension engine floor policy
+
+The `engines.vscode` field in `packages/vscode-extension/package.json` and the `@types/vscode` devDependency **always equal each other** and **track the VS Code engine embedded in the latest stable Cursor release**, with a 30-day grace period so users have time to update their editor before the extension requires the newer engine.
+
+**What drives changes:**
+
+- [`.github/workflows/cursor-engine-sync.yml`](./.github/workflows/cursor-engine-sync.yml) runs on the 1st of each month. It opens a GitHub issue assigned to `copilot-swe-agent[bot]`, which:
+  1. Detects the `vscodeVersion` in Cursor's latest stable `product.json`.
+  2. If the version changed, opens a PR to update [`.github/cursor-engine.json`](./.github/cursor-engine.json) (the state file that records when each engine version was first observed).
+  3. If the version is unchanged and 30 days have elapsed since first observation, opens a PR to bump both `engines.vscode` and `@types/vscode` to `^MAJOR.MINOR.0`, refreshing `pnpm-lock.yaml` as well.
+  4. Enables auto-merge on the PR so it lands automatically once CI is green.
+- A human can also bump the floors manually at any time — edit both fields in `packages/vscode-extension/package.json`, update `.github/cursor-engine.json` to reflect the new observation, run `pnpm install --no-frozen-lockfile`, and open a PR.
+
+**Why not let Renovate handle it:** `@types/vscode` bumps must stay in lock-step with `engines.vscode`. Renovate updates devDependencies independently of `engines.*`, so an unconstrained `@types/vscode` bump breaks `vsce package` (error: "types floor exceeds engines floor"). Disabling Renovate for `@types/vscode` and delegating to a purpose-built workflow is the only way to keep the two in sync automatically.
+
+**COPILOT_ASSIGN_TOKEN:** The sync workflow assigns the tracking issue to `copilot-swe-agent[bot]`, which requires a user-scoped token (GitHub's billing model for Copilot requires user context — the default `GITHUB_TOKEN` is not sufficient). Store one of the following as a repo or org secret named `COPILOT_ASSIGN_TOKEN`:
+
+1. Fine-grained PAT with **Issues: Read and write** on `lolay/nowline` (simplest).
+2. GitHub App user-to-server token — requires a one-time OAuth authorization by a user with a Copilot seat; the refresh token is then stored as the secret.
+3. Fine-grained PAT under a dedicated bot account that has a Copilot seat.
+
+The workflow fails loudly on the assignment step if the secret is missing or lacks user context. The idempotent issue-check step before it uses `GITHUB_TOKEN` and always succeeds, so the per-step failure is visible in the workflow run.
 
 ## Getting the code
 
