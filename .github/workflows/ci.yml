@@ -71,8 +71,8 @@ jobs:
       - uses: actions/checkout@v6
       - uses: ./.github/actions/setup-node-pnpm
 
-      - name: Build core / layout / renderer / embed
-        run: pnpm -r --filter @nowline/core --filter @nowline/layout --filter @nowline/renderer --filter @nowline/embed run build
+      - name: Build core / layout / renderer / browser / embed
+        run: pnpm -r --filter @nowline/core --filter @nowline/layout --filter @nowline/renderer --filter @nowline/browser --filter @nowline/embed run build
 
       - name: Check bundle size + node:* leak
         run: pnpm --filter @nowline/embed check-size --print-attribution
