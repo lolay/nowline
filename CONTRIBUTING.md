@@ -94,32 +94,28 @@ The `engines.vscode` field in `packages/vscode-extension/package.json` and the `
 
 **Why not let Renovate handle it:** `@types/vscode` bumps must stay in lock-step with `engines.vscode`. Renovate updates devDependencies independently of `engines.*`, so an unconstrained `@types/vscode` bump breaks `vsce package` (error: "types floor exceeds engines floor"). Disabling Renovate for `@types/vscode` and delegating to a purpose-built workflow is the only way to keep the two in sync automatically.
 
-**Authentication — GitHub App with user-to-server token.** The sync workflow assigns the tracking issue to `copilot-swe-agent[bot]`. Two GitHub-side constraints shape the token choice:
+**Authentication — fine-grained PAT.** The sync workflow assigns the tracking issue to `copilot-swe-agent[bot]`. Two GitHub-side constraints shape the token choice:
 
 1. **The Copilot assignment API rejects GitHub App installation tokens** regardless of permissions. Copilot billing requires a user-associated token (see [github/gh-aw#19765](https://github.com/github/gh-aw/issues/19765)). The default `GITHUB_TOKEN` is therefore not sufficient.
 2. **The token must be associated with a user who holds a Copilot Business/Enterprise seat** (the billable identity).
 
-This repo uses a dedicated GitHub App (`lolay-nowline-copilot-assign`, App ID `3829843`) with **"User-to-server token expiration"** enabled, driven by a refresh token that rotates on every run. The App is intentionally separate from `lolay-nowline-release` so a leaked release secret can't impersonate the engine-sync identity (and vice versa). The workflow exchanges the stored refresh token for a fresh 8-hour user access token, persists the new refresh token back to the secret *before* using the access token (so a mid-run failure can't burn the refresh chain), and then assigns the issue.
-
-Required permissions on the App itself (App settings → Permissions): `Issues: Read and write`, `Contents: Read-only`, `Metadata: Read-only`, **`Secrets: Read and write`** (used by the workflow to rotate the refresh token). Add `Secrets` *after* installing the App and the install will surface a "review the new permissions" prompt that has to be accepted — the workflow 403s on `actions/secrets/public-key` until then.
+A fine-grained PAT issued by a seated user satisfies both. Fine-grained PATs are always user-issued — the "Resource owner: lolay" selector on the creation form scopes which repos the PAT can reach, but doesn't change the identity. Since the issuing user holds the Copilot seat, billing-attribution works.
 
 Required configuration in the repo:
 
 | Kind | Name | Source |
 | --- | --- | --- |
-| variable | `COPILOT_APP_ID` | App settings page — numeric App ID (currently `3829843` for `lolay-nowline-copilot-assign`). Must match the App that issued the private key, or GitHub rejects the signed JWT with a generic `JSON web token could not be decoded` 401. |
-| secret | `COPILOT_APP_CLIENT_ID` | App settings page — OAuth Client ID (the `Iv23…` string). Used by the refresh-token exchange. |
-| secret | `COPILOT_APP_CLIENT_SECRET` | App settings page — *Client secrets* → *Generate a new client secret* |
-| secret | `COPILOT_APP_PRIVATE_KEY` | App settings page — *Private keys* → *Generate a private key* (verbatim `.pem` contents — pipe via stdin redirect, never `--body`, to preserve newlines) |
-| secret | `COPILOT_APP_REFRESH_TOKEN` | One-time OAuth authorize-and-exchange by a user with a Copilot seat (see below). Auto-rotated by the workflow on every run. |
+| secret | `CURSOR_ENGINE_SYNC_PAT` | Fine-grained PAT issued by a user with a Copilot seat, scoped to `lolay/nowline` with `Issues: Read and write` (plus the auto-required `Metadata: Read-only`). Generate at <https://github.com/settings/personal-access-tokens/new>; 1-year max expiration. |
 
-**One-time provisioning (and recovery).** Run [`scripts/refresh-copilot-app-token.sh`](scripts/refresh-copilot-app-token.sh) — an interactive helper that walks through the OAuth authorize flow, exchanges the code for a token pair, and pipes the new refresh token straight into `gh secret set` without it ever touching stdout or shell history. Be logged in to `github.com` as a user holding a Copilot Business/Enterprise seat *before* clicking Authorize — that user becomes the billable identity. Refresh tokens have a 6-month TTL; running the workflow monthly keeps them fresh indefinitely. If the workflow is paused for more than 6 months *or* fails with `bad_refresh_token`, re-run the same script to reissue.
+**Provisioning (and renewal).** Generate the PAT at <https://github.com/settings/personal-access-tokens/new> — Resource owner `lolay`, Repository access *only select repositories → `lolay/nowline`*, Repository permissions *Issues: Read and write*, Expiration 1 year. Be logged in as the user holding the Copilot seat. Then `gh secret set CURSOR_ENGINE_SYNC_PAT -R lolay/nowline` and paste the token at the prompt. Set a calendar reminder ~11 months out for renewal — the workflow will fail with `Bad credentials` once the PAT expires. (Org policy gotcha: if lolay has fine-grained PATs disabled or approval-gated, you'll see the prompt at <https://github.com/organizations/lolay/settings/personal-access-tokens>.)
+
+**Lineage.** The workflow previously used a dedicated GitHub App (`lolay-nowline-copilot-assign`, App ID `3829843`) with user-to-server tokens + refresh-chain rotation. The non-atomic gap between OAuth refresh-token consumption and secret-store persistence was fragile — see commit `08c4533` for the last working version of that pattern.
 
 **Failure modes you'll actually see:**
 
-- Stored refresh token revoked or expired → curl step prints `::error::refresh exchange failed: bad_credentials` and the run fails. Recovery: re-do OAuth authorize-and-exchange.
-- Authorizing user loses their Copilot seat → assignment step fails with `'copilot-swe-agent' not found`. Recovery: reassign a seat or have a different seated user re-authorize.
-- The idempotency check step always uses `GITHUB_TOKEN` so it succeeds even if every secret is unset — the failure is visible per-step in the run log, not as a cryptic top-level auth error.
+- PAT expired or revoked → create-issue step fails with `Bad credentials` (HTTP 401). Recovery: regenerate the PAT and `gh secret set CURSOR_ENGINE_SYNC_PAT`.
+- Issuing user loses their Copilot seat → assignment step fails with `'copilot-swe-agent' not found`. Recovery: reassign a seat or have a different seated user issue the PAT.
+- The idempotency check step always uses `GITHUB_TOKEN` so it succeeds even if `CURSOR_ENGINE_SYNC_PAT` is unset — the failure is visible per-step in the run log, not as a cryptic top-level auth error.
 
 ## Getting the code
 
