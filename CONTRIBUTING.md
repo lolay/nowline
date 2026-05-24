@@ -99,16 +99,16 @@ The `engines.vscode` field in `packages/vscode-extension/package.json` and the `
 1. **The Copilot assignment API rejects GitHub App installation tokens** regardless of permissions. Copilot billing requires a user-associated token (see [github/gh-aw#19765](https://github.com/github/gh-aw/issues/19765)). The default `GITHUB_TOKEN` is therefore not sufficient.
 2. **The token must be associated with a user who holds a Copilot Business/Enterprise seat** (the billable identity).
 
-This repo uses a dedicated GitHub App (`nowline-copilot-assign`) with **"User-to-server token expiration"** enabled, driven by a refresh token that rotates on every run. The workflow exchanges the stored refresh token for a fresh 8-hour user access token, persists the new refresh token back to the secret *before* using the access token (so a mid-run failure can't burn the refresh chain), and then assigns the issue.
+This repo uses a dedicated GitHub App (`lolay-nowline-copilot-assign`, App ID `3829843`) with **"User-to-server token expiration"** enabled, driven by a refresh token that rotates on every run. The App is intentionally separate from `lolay-nowline-release` so a leaked release secret can't impersonate the engine-sync identity (and vice versa). The workflow exchanges the stored refresh token for a fresh 8-hour user access token, persists the new refresh token back to the secret *before* using the access token (so a mid-run failure can't burn the refresh chain), and then assigns the issue.
 
 Required configuration in the repo:
 
 | Kind | Name | Source |
 | --- | --- | --- |
-| variable | `COPILOT_APP_ID` | App settings page — numeric App ID |
-| secret | `COPILOT_APP_CLIENT_ID` | App settings page — OAuth Client ID |
+| variable | `COPILOT_APP_ID` | App settings page — numeric App ID (currently `3829843` for `lolay-nowline-copilot-assign`). Must match the App that issued the private key, or GitHub rejects the signed JWT with a generic `JSON web token could not be decoded` 401. |
+| secret | `COPILOT_APP_CLIENT_ID` | App settings page — OAuth Client ID (the `Iv23…` string). Used by the refresh-token exchange. |
 | secret | `COPILOT_APP_CLIENT_SECRET` | App settings page — *Client secrets* → *Generate a new client secret* |
-| secret | `COPILOT_APP_PRIVATE_KEY` | App settings page — *Private keys* → *Generate a private key* (`.pem` contents) |
+| secret | `COPILOT_APP_PRIVATE_KEY` | App settings page — *Private keys* → *Generate a private key* (verbatim `.pem` contents — pipe via stdin redirect, never `--body`, to preserve newlines) |
 | secret | `COPILOT_APP_REFRESH_TOKEN` | One-time OAuth authorize-and-exchange by a user with a Copilot seat (see below). Auto-rotated by the workflow on every run. |
 
 **One-time provisioning.** Pick a user with a Copilot seat (a dedicated bot account is the cleanest, but any seated user works), have them visit `https://github.com/login/oauth/authorize?client_id=<CLIENT_ID>` to authorize the App, extract the `code` from the redirect URL, then exchange it for the initial token pair:

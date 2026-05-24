@@ -15,14 +15,24 @@ name: Cursor engine sync
 # installation tokens for the Copilot assignment API; the default
 # GITHUB_TOKEN also lacks the necessary user context). This workflow uses a
 # GitHub App configured with "User-to-server token expiration", driven by a
-# refresh token that rotates on every run:
+# refresh token that rotates on every run. The App is `lolay-nowline-copilot-assign`
+# (App ID 3829843); it's distinct from `lolay-nowline-release` so a leaked
+# release-side secret can't impersonate the engine-sync identity (and vice
+# versa).
 #
-#   secrets.COPILOT_APP_CLIENT_ID      — App's OAuth Client ID
+#   secrets.COPILOT_APP_CLIENT_ID      — App's OAuth Client ID (used by the
+#                                        refresh-token exchange below)
 #   secrets.COPILOT_APP_CLIENT_SECRET  — App's OAuth Client Secret
 #   secrets.COPILOT_APP_PRIVATE_KEY    — App's private key (.pem)
 #   secrets.COPILOT_APP_REFRESH_TOKEN  — current refresh token (rotated on
 #                                        each successful run)
-#   vars.COPILOT_APP_ID                — App's numeric ID
+#   vars.COPILOT_APP_ID                — App's numeric ID. Consumed by
+#                                        actions/create-github-app-token via
+#                                        `app-id:`. Must match the App that
+#                                        the private key was issued for, or
+#                                        GitHub rejects the signed JWT with
+#                                        a generic 401 `JSON web token could
+#                                        not be decoded` error.
 #
 # Flow per run:
 #   1. Mint an installation access token (via the App's private key) with
@@ -81,6 +91,17 @@ jobs:
               if: steps.existing.outputs.count == '0'
               uses: actions/create-github-app-token@v3
               with:
+                  # The action's runtime warns to prefer client-id over
+                  # app-id, but its action.yml manifest doesn't (yet)
+                  # declare client-id as an input — using it makes
+                  # actionlint fail the Lint workflows CI check. Stick
+                  # with the (deprecated-but-functional) app-id input
+                  # until the manifest catches up. vars.COPILOT_APP_ID
+                  # must point at the lolay-nowline-copilot-assign App,
+                  # not the release App (a previous mis-set caused
+                  # `JSON web token could not be decoded` 401s because
+                  # the JWT's iss claim and the signing key were from
+                  # different Apps).
                   app-id: ${{ vars.COPILOT_APP_ID }}
                   private-key: ${{ secrets.COPILOT_APP_PRIVATE_KEY }}
                   # Need actions:write to call `gh secret set` for the
