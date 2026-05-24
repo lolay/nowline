@@ -1,0 +1,19 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1024 1024" width="1024" height="1024">
+  <!--
+    Nowline GitHub App icon, dark variant (1024x1024).
+    Standalone mark on charcoal so the icon pops on both light and dark
+    GitHub UI surfaces. Red stays #e53e3e per the brand spec; timeline
+    uses the dark-theme gray (#4a4a5a) from nowline-app/branding/README.md.
+  -->
+  <rect width="1024" height="1024" fill="#1a1a2e"/>
+
+  <!-- Horizontal timeline, split by the diamond -->
+  <line x1="120" y1="512" x2="296" y2="512" stroke="#4a4a5a" stroke-width="20" stroke-linecap="round"/>
+  <line x1="728" y1="512" x2="904" y2="512" stroke="#4a4a5a" stroke-width="20" stroke-linecap="round"/>
+
+  <!-- Red now-line bar -->
+  <rect x="476" y="152" width="72" height="720" rx="36" fill="#e53e3e"/>
+
+  <!-- Red diamond at the timeline level -->
+  <polygon points="512,296 728,512 512,728 296,512" fill="#e53e3e"/>
+</svg>
