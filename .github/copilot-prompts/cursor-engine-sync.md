@@ -39,6 +39,8 @@ Read `packages/vscode-extension/package.json`. Note:
 
 ## Step 3 — Apply the decision rules
 
+**Exactly one** of Rule 1, Rule 2, or Rule 3 applies on any given run. Determine which one matches the inputs, then take that path — and only that path.
+
 **Rule 1 — New engine version detected:**
 
 If the detected `vscode_version` differs from the state file's `vscode_version`, open **PR A**:
@@ -69,18 +71,32 @@ If all of the following are true:
 - PR title: `chore(vscode-extension): bump engines.vscode floor to ^X.Y.0`
 - After opening the PR, enable auto-merge: `gh pr merge <PR_NUMBER> --auto --squash`
 
-**Rule 3 — Nothing to do:**
+**Rule 3 — Nothing to do (close-only, no PR):**
 
-If the detected version matches the state, and either the 30-day window hasn't elapsed or the floor already matches the state's version, there is nothing to do.
+If the detected version matches the state, AND either the 30-day window hasn't elapsed OR the floor already matches the state's version, there is nothing to commit. In this case:
 
-## Step 4 — Close this issue
+- **Do not open a pull request.** No file changes are needed; an empty PR is forbidden (see Constraints).
+- Skip directly to Step 4b below.
 
-- If you opened a PR: post a comment on this issue linking the PR, then close the issue.
-- If nothing was needed (Rule 3): close the issue with the comment "No action needed — Cursor's VS Code engine version is unchanged and within the 30-day observation window (or the floor is already current)."
+## Step 4 — Final action
+
+This step has exactly two branches. Take the one that matches what you did in Step 3.
+
+**Step 4a — You opened a PR (Rule 1 or Rule 2 fired):**
+
+1. Post a single comment on this issue with the PR link, e.g. `Opened #<PR_NUMBER> per Rule <1|2>.`
+2. Close this issue.
+
+**Step 4b — You did not open a PR (Rule 3 fired):**
+
+1. Post a single comment on this issue: `No action needed — Cursor's VS Code engine version is unchanged and within the 30-day observation window (or the floor is already current).`
+2. Close this issue.
+3. Do not open any PR. The only artifact of a Rule 3 run is this closing comment.
 
 ## Constraints
 
-- Open **at most one PR** per run (Rule 1 and Rule 2 are mutually exclusive — Rule 1 fires when there is a new version, Rule 2 fires when the version is stable and aged).
+- Open **at most one PR** per run (Rule 1 and Rule 2 are mutually exclusive — Rule 1 fires when there is a new version, Rule 2 fires when the version is stable and aged). When Rule 3 fires, open **zero** PRs.
+- **Never open an empty PR.** If you have no file changes to commit, the correct action is to close the issue per Step 4b — not to open a no-op PR documenting that you decided not to act. The act of closing the issue is the audit trail.
 - Do **not** touch any other package or any field other than `engines.vscode`, `@types/vscode`, and `pnpm-lock.yaml` (in PR B), or the four fields of `.github/cursor-engine.json` (in PR A).
 - Do **not** bump `engines.node`, `engines.pnpm`, or any other engines field.
 - Do **not** bump past the detected version (no speculative bumps).
