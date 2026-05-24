@@ -94,13 +94,40 @@ The `engines.vscode` field in `packages/vscode-extension/package.json` and the `
 
 **Why not let Renovate handle it:** `@types/vscode` bumps must stay in lock-step with `engines.vscode`. Renovate updates devDependencies independently of `engines.*`, so an unconstrained `@types/vscode` bump breaks `vsce package` (error: "types floor exceeds engines floor"). Disabling Renovate for `@types/vscode` and delegating to a purpose-built workflow is the only way to keep the two in sync automatically.
 
-**COPILOT_ASSIGN_TOKEN:** The sync workflow assigns the tracking issue to `copilot-swe-agent[bot]`, which requires a user-scoped token (GitHub's billing model for Copilot requires user context — the default `GITHUB_TOKEN` is not sufficient). Store one of the following as a repo or org secret named `COPILOT_ASSIGN_TOKEN`:
+**Authentication — GitHub App with user-to-server token.** The sync workflow assigns the tracking issue to `copilot-swe-agent[bot]`. Two GitHub-side constraints shape the token choice:
 
-1. Fine-grained PAT with **Issues: Read and write** on `lolay/nowline` (simplest).
-2. GitHub App user-to-server token — requires a one-time OAuth authorization by a user with a Copilot seat; the refresh token is then stored as the secret.
-3. Fine-grained PAT under a dedicated bot account that has a Copilot seat.
+1. **The Copilot assignment API rejects GitHub App installation tokens** regardless of permissions. Copilot billing requires a user-associated token (see [github/gh-aw#19765](https://github.com/github/gh-aw/issues/19765)). The default `GITHUB_TOKEN` is therefore not sufficient.
+2. **The token must be associated with a user who holds a Copilot Business/Enterprise seat** (the billable identity).
 
-The workflow fails loudly on the assignment step if the secret is missing or lacks user context. The idempotent issue-check step before it uses `GITHUB_TOKEN` and always succeeds, so the per-step failure is visible in the workflow run.
+This repo uses a dedicated GitHub App (`nowline-copilot-assign`) with **"User-to-server token expiration"** enabled, driven by a refresh token that rotates on every run. The workflow exchanges the stored refresh token for a fresh 8-hour user access token, persists the new refresh token back to the secret *before* using the access token (so a mid-run failure can't burn the refresh chain), and then assigns the issue.
+
+Required configuration in the repo:
+
+| Kind | Name | Source |
+| --- | --- | --- |
+| variable | `COPILOT_APP_ID` | App settings page — numeric App ID |
+| secret | `COPILOT_APP_CLIENT_ID` | App settings page — OAuth Client ID |
+| secret | `COPILOT_APP_CLIENT_SECRET` | App settings page — *Client secrets* → *Generate a new client secret* |
+| secret | `COPILOT_APP_PRIVATE_KEY` | App settings page — *Private keys* → *Generate a private key* (`.pem` contents) |
+| secret | `COPILOT_APP_REFRESH_TOKEN` | One-time OAuth authorize-and-exchange by a user with a Copilot seat (see below). Auto-rotated by the workflow on every run. |
+
+**One-time provisioning.** Pick a user with a Copilot seat (a dedicated bot account is the cleanest, but any seated user works), have them visit `https://github.com/login/oauth/authorize?client_id=<CLIENT_ID>` to authorize the App, extract the `code` from the redirect URL, then exchange it for the initial token pair:
+
+```bash
+curl -sS -X POST https://github.com/login/oauth/access_token \
+    -H "Accept: application/json" \
+    -d "client_id=<CLIENT_ID>" \
+    -d "client_secret=<CLIENT_SECRET>" \
+    -d "code=<CODE>" | pbcopy   # macOS; never let this hit a terminal scrollback
+```
+
+Then from the clipboard, pipe `.refresh_token` straight into `gh secret set COPILOT_APP_REFRESH_TOKEN -R lolay/nowline`. Throw the `access_token` away — the workflow refreshes on every run anyway. Refresh tokens have a 6-month TTL; running the workflow monthly keeps them fresh indefinitely. If the workflow is paused for more than 6 months, the refresh token expires and this one-time provisioning step has to be repeated.
+
+**Failure modes you'll actually see:**
+
+- Stored refresh token revoked or expired → curl step prints `::error::refresh exchange failed: bad_credentials` and the run fails. Recovery: re-do OAuth authorize-and-exchange.
+- Authorizing user loses their Copilot seat → assignment step fails with `'copilot-swe-agent' not found`. Recovery: reassign a seat or have a different seated user re-authorize.
+- The idempotency check step always uses `GITHUB_TOKEN` so it succeeds even if every secret is unset — the failure is visible per-step in the run log, not as a cryptic top-level auth error.
 
 ## Getting the code
 

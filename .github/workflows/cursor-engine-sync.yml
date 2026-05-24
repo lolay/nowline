@@ -8,24 +8,40 @@ name: Cursor engine sync
 # The job is idempotent: if an open issue labelled cursor-engine-sync already
 # exists (e.g. the agent's PR is still in review), no second issue is opened.
 #
-# COPILOT_ASSIGN_TOKEN — required secret
+# Authentication — GitHub App with user-to-server token
 # ----------------------------------------
-# The "Create issue + assign to Copilot" step needs a user-scoped token.
-# GitHub's billing model requires the token to be associated with a real user
-# account (not a GitHub App installation token or the default GITHUB_TOKEN).
-# The idempotent check step uses GITHUB_TOKEN and always works; only the
-# assignment step needs the special token.
+# Assigning copilot-swe-agent[bot] requires a token associated with a user
+# account that has a Copilot seat (GitHub's billing model rejects GitHub App
+# installation tokens for the Copilot assignment API; the default
+# GITHUB_TOKEN also lacks the necessary user context). This workflow uses a
+# GitHub App configured with "User-to-server token expiration", driven by a
+# refresh token that rotates on every run:
 #
-# Acceptable token sources (store as repo or org secret COPILOT_ASSIGN_TOKEN):
-#   1. Fine-grained PAT with Issues: Read and write on lolay/nowline (simplest)
-#   2. GitHub App user-to-server token (requires a one-time OAuth authorization
-#      by a user with a Copilot seat; the refresh token is then stored as the
-#      secret)
-#   3. Fine-grained PAT under a dedicated bot account that has a Copilot seat
+#   secrets.COPILOT_APP_CLIENT_ID      — App's OAuth Client ID
+#   secrets.COPILOT_APP_CLIENT_SECRET  — App's OAuth Client Secret
+#   secrets.COPILOT_APP_PRIVATE_KEY    — App's private key (.pem)
+#   secrets.COPILOT_APP_REFRESH_TOKEN  — current refresh token (rotated on
+#                                        each successful run)
+#   vars.COPILOT_APP_ID                — App's numeric ID
 #
-# If the secret is missing the "Create issue" step fails loudly — the check
-# step before it will have passed cleanly, so the workflow shows a clear
-# per-step failure rather than a cryptic auth error.
+# Flow per run:
+#   1. Mint an installation access token (via the App's private key) with
+#      `actions: write` so we can rotate the refresh-token secret.
+#   2. Exchange the stored refresh token for a fresh
+#      (access_token, refresh_token) pair via POST /login/oauth/access_token.
+#   3. Write the NEW refresh token to the secret BEFORE doing anything with
+#      the new access token — if we use the access token first and any
+#      downstream step fails, the consumed refresh token never gets stored
+#      and the next run's authentication breaks. Rotating first means a
+#      mid-run failure costs us a single skipped issue, not the refresh
+#      chain.
+#   4. Use the fresh access token (TTL 8h) to create the tracking issue and
+#      assign copilot-swe-agent[bot].
+#
+# If `secrets.COPILOT_APP_REFRESH_TOKEN` is unset or stale (e.g. workflow
+# paused > 6 months and the refresh token expired), the curl step fails
+# loudly. Recovery: re-do OAuth authorize-and-exchange as documented in
+# CONTRIBUTING.md and re-set the secret.
 
 on:
     schedule:
@@ -35,6 +51,7 @@ on:
 permissions:
     contents: read
     issues: write
+    actions: write  # required to rotate COPILOT_APP_REFRESH_TOKEN via gh secret set
 
 jobs:
     open-tracking-issue:
@@ -59,10 +76,68 @@ jobs:
                   echo "count=$count" >> "$GITHUB_OUTPUT"
                   echo "Open cursor-engine-sync issues: $count"
 
+            - name: Mint App installation token (for secret rotation)
+              id: app-installation
+              if: steps.existing.outputs.count == '0'
+              uses: actions/create-github-app-token@v3
+              with:
+                  app-id: ${{ vars.COPILOT_APP_ID }}
+                  private-key: ${{ secrets.COPILOT_APP_PRIVATE_KEY }}
+                  # Need actions:write to call `gh secret set` for the
+                  # refresh-token rotation below.
+                  permission-actions: write
+
+            - name: Refresh user-to-server token + rotate secret
+              id: refresh
+              if: steps.existing.outputs.count == '0'
+              env:
+                  CLIENT_ID: ${{ secrets.COPILOT_APP_CLIENT_ID }}
+                  CLIENT_SECRET: ${{ secrets.COPILOT_APP_CLIENT_SECRET }}
+                  REFRESH_TOKEN: ${{ secrets.COPILOT_APP_REFRESH_TOKEN }}
+                  GH_TOKEN: ${{ steps.app-installation.outputs.token }}
+              run: |
+                  set -euo pipefail
+
+                  # Exchange the stored refresh token for a fresh pair.
+                  # POST body kept in $RESPONSE (memory only); never echoed.
+                  RESPONSE=$(curl -sS -X POST https://github.com/login/oauth/access_token \
+                      -H "Accept: application/json" \
+                      -d "client_id=$CLIENT_ID" \
+                      -d "client_secret=$CLIENT_SECRET" \
+                      -d "grant_type=refresh_token" \
+                      -d "refresh_token=$REFRESH_TOKEN")
+
+                  if ! jq -e 'has("access_token") and has("refresh_token")' <<<"$RESPONSE" >/dev/null; then
+                      ERR_CODE=$(jq -r '.error // "unknown"' <<<"$RESPONSE")
+                      ERR_DESC=$(jq -r '.error_description // "no description"' <<<"$RESPONSE")
+                      echo "::error::refresh exchange failed: $ERR_CODE — $ERR_DESC" >&2
+                      echo "::error::stored refresh token may have expired (6mo TTL) or been revoked. Re-do OAuth authorize per CONTRIBUTING.md." >&2
+                      exit 1
+                  fi
+
+                  NEW_ACCESS=$(jq -r .access_token <<<"$RESPONSE")
+                  NEW_REFRESH=$(jq -r .refresh_token <<<"$RESPONSE")
+
+                  # Mask both values in any subsequent logs.
+                  echo "::add-mask::$NEW_ACCESS"
+                  echo "::add-mask::$NEW_REFRESH"
+
+                  # Rotate the secret BEFORE using the access token. If the
+                  # later create-issue step fails we don't want a
+                  # one-time-use refresh token consumed by GitHub but never
+                  # persisted to our secret store.
+                  printf '%s' "$NEW_REFRESH" \
+                      | gh secret set COPILOT_APP_REFRESH_TOKEN -R "$GITHUB_REPOSITORY"
+
+                  echo "access_token=$NEW_ACCESS" >> "$GITHUB_OUTPUT"
+
+                  # Drop secrets from this shell before exit.
+                  unset RESPONSE NEW_ACCESS NEW_REFRESH
+
             - name: Create issue + assign to Copilot
               if: steps.existing.outputs.count == '0'
               env:
-                  GH_TOKEN: ${{ secrets.COPILOT_ASSIGN_TOKEN }}
+                  GH_TOKEN: ${{ steps.refresh.outputs.access_token }}
               run: |
                   set -euo pipefail
                   BODY=$(cat .github/copilot-prompts/cursor-engine-sync.md)
@@ -73,11 +148,7 @@ jobs:
                           title: $title,
                           body: $body,
                           labels: ["cursor-engine-sync", "maintenance"],
-                          assignees: ["copilot-swe-agent[bot]"],
-                          agent_assignment: {
-                              target_repo: env.GITHUB_REPOSITORY,
-                              base_branch: "main"
-                          }
+                          assignees: ["copilot-swe-agent[bot]"]
                       }')
                   gh api \
                       --method POST \
