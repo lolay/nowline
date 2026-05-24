@@ -63,6 +63,27 @@ on:
         - cron: "0 12 1 * *"  # 12:00 UTC on the 1st of each month
     workflow_dispatch:
 
+# Serialize runs so a manual dispatch can't race the monthly cron (or
+# another manual dispatch) on the COPILOT_APP_REFRESH_TOKEN rotation.
+#
+# Parallel runs are already accidentally safe — GitHub's OAuth refresh
+# tokens are strictly single-use, so only the run whose POST to
+# /login/oauth/access_token arrives first wins; the rest fail at the
+# refresh step with `bad_refresh_token` before they can touch the
+# secret or create a duplicate tracking issue. But "accidentally safe"
+# is implicit and could regress silently if the workflow ever grows a
+# secret write that isn't OAuth-mediated, so we make the safety
+# property explicit at the scheduler level.
+#
+# cancel-in-progress: false because the first run is already past the
+# point of doing useful work (creating the tracking issue) — cancelling
+# it would leave us with no issue this cycle. Queue the second run
+# instead; it'll detect the now-existing issue at the idempotency
+# check step and short-circuit.
+concurrency:
+    group: cursor-engine-sync
+    cancel-in-progress: false
+
 permissions:
     contents: read
     issues: read  # default GITHUB_TOKEN is only used by `gh issue list`; issue create uses the user-to-server token from the refresh step
