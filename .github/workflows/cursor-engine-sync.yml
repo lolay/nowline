@@ -36,7 +36,12 @@ name: Cursor engine sync
 #
 # Flow per run:
 #   1. Mint an installation access token (via the App's private key) with
-#      `actions: write` so we can rotate the refresh-token secret.
+#      `secrets: write` so we can rotate the refresh-token secret. The App
+#      itself must have "Secrets: Read and write" granted in its repo
+#      permissions for the installation; "Actions" is a separate permission
+#      and does not cover the /actions/secrets endpoints (an earlier version
+#      of this workflow requested `actions:write` and 403'd on the public-key
+#      fetch — keep `secrets:write` here).
 #   2. Exchange the stored refresh token for a fresh
 #      (access_token, refresh_token) pair via POST /login/oauth/access_token.
 #   3. Write the NEW refresh token to the secret BEFORE doing anything with
@@ -60,8 +65,7 @@ on:
 
 permissions:
     contents: read
-    issues: write
-    actions: write  # required to rotate COPILOT_APP_REFRESH_TOKEN via gh secret set
+    issues: read  # default GITHUB_TOKEN is only used by `gh issue list`; issue create uses the user-to-server token from the refresh step
 
 jobs:
     open-tracking-issue:
@@ -104,9 +108,11 @@ jobs:
                   # different Apps).
                   app-id: ${{ vars.COPILOT_APP_ID }}
                   private-key: ${{ secrets.COPILOT_APP_PRIVATE_KEY }}
-                  # Need actions:write to call `gh secret set` for the
-                  # refresh-token rotation below.
-                  permission-actions: write
+                  # Need secrets:write to call `gh secret set` for the
+                  # refresh-token rotation below. NOT actions:write — those
+                  # are different repo permissions and the /actions/secrets
+                  # endpoints check for "Secrets", not "Actions".
+                  permission-secrets: write
 
             - name: Refresh user-to-server token + rotate secret
               id: refresh

@@ -101,6 +101,8 @@ The `engines.vscode` field in `packages/vscode-extension/package.json` and the `
 
 This repo uses a dedicated GitHub App (`lolay-nowline-copilot-assign`, App ID `3829843`) with **"User-to-server token expiration"** enabled, driven by a refresh token that rotates on every run. The App is intentionally separate from `lolay-nowline-release` so a leaked release secret can't impersonate the engine-sync identity (and vice versa). The workflow exchanges the stored refresh token for a fresh 8-hour user access token, persists the new refresh token back to the secret *before* using the access token (so a mid-run failure can't burn the refresh chain), and then assigns the issue.
 
+Required permissions on the App itself (App settings → Permissions): `Issues: Read and write`, `Contents: Read-only`, `Metadata: Read-only`, **`Secrets: Read and write`** (used by the workflow to rotate the refresh token). Add `Secrets` *after* installing the App and the install will surface a "review the new permissions" prompt that has to be accepted — the workflow 403s on `actions/secrets/public-key` until then.
+
 Required configuration in the repo:
 
 | Kind | Name | Source |
@@ -111,17 +113,7 @@ Required configuration in the repo:
 | secret | `COPILOT_APP_PRIVATE_KEY` | App settings page — *Private keys* → *Generate a private key* (verbatim `.pem` contents — pipe via stdin redirect, never `--body`, to preserve newlines) |
 | secret | `COPILOT_APP_REFRESH_TOKEN` | One-time OAuth authorize-and-exchange by a user with a Copilot seat (see below). Auto-rotated by the workflow on every run. |
 
-**One-time provisioning.** Pick a user with a Copilot seat (a dedicated bot account is the cleanest, but any seated user works), have them visit `https://github.com/login/oauth/authorize?client_id=<CLIENT_ID>` to authorize the App, extract the `code` from the redirect URL, then exchange it for the initial token pair:
-
-```bash
-curl -sS -X POST https://github.com/login/oauth/access_token \
-    -H "Accept: application/json" \
-    -d "client_id=<CLIENT_ID>" \
-    -d "client_secret=<CLIENT_SECRET>" \
-    -d "code=<CODE>" | pbcopy   # macOS; never let this hit a terminal scrollback
-```
-
-Then from the clipboard, pipe `.refresh_token` straight into `gh secret set COPILOT_APP_REFRESH_TOKEN -R lolay/nowline`. Throw the `access_token` away — the workflow refreshes on every run anyway. Refresh tokens have a 6-month TTL; running the workflow monthly keeps them fresh indefinitely. If the workflow is paused for more than 6 months, the refresh token expires and this one-time provisioning step has to be repeated.
+**One-time provisioning (and recovery).** Run [`scripts/refresh-copilot-app-token.sh`](scripts/refresh-copilot-app-token.sh) — an interactive helper that walks through the OAuth authorize flow, exchanges the code for a token pair, and pipes the new refresh token straight into `gh secret set` without it ever touching stdout or shell history. Be logged in to `github.com` as a user holding a Copilot Business/Enterprise seat *before* clicking Authorize — that user becomes the billable identity. Refresh tokens have a 6-month TTL; running the workflow monthly keeps them fresh indefinitely. If the workflow is paused for more than 6 months *or* fails with `bad_refresh_token`, re-run the same script to reissue.
 
 **Failure modes you'll actually see:**
 
