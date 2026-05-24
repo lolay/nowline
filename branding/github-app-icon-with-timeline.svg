@@ -1,0 +1,18 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1024 1024" width="1024" height="1024">
+  <!--
+    Nowline GitHub App icon, timeline variant (1024x1024).
+    Adds the gray horizontal timeline (split into two segments by the diamond)
+    so the now-cuts-through-time metaphor is visible at app-icon size.
+  -->
+  <rect width="1024" height="1024" fill="#ffffff"/>
+
+  <!-- Horizontal timeline, split by the diamond -->
+  <line x1="120" y1="512" x2="296" y2="512" stroke="#c0c0c0" stroke-width="20" stroke-linecap="round"/>
+  <line x1="728" y1="512" x2="904" y2="512" stroke="#c0c0c0" stroke-width="20" stroke-linecap="round"/>
+
+  <!-- Red now-line bar -->
+  <rect x="476" y="152" width="72" height="720" rx="36" fill="#e53e3e"/>
+
+  <!-- Red diamond at the timeline level -->
+  <polygon points="512,296 728,512 512,728 296,512" fill="#e53e3e"/>
+</svg>
