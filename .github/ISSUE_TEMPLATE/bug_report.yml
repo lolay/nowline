@@ -67,6 +67,14 @@ body:
       required: true
 
   - type: checkboxes
+    id: agent-first-pass
+    attributes:
+      label: Agent first pass
+      description: |
+        Checking this box adds the `agent-triage` label, which enters this issue into the four-phase agent-triage state machine. The agent will triage, plan, and (if appropriate) fix the issue automatically. See [`.github/AGENT_TRIAGE.md`](https://github.com/lolay/nowline/blob/main/.github/AGENT_TRIAGE.md) for how the flow works and how to override it.
+      options:
+        - label: Let an AI agent take a first pass at this issue.
+  - type: checkboxes
     id: confirmations
     attributes:
       label: Confirmations

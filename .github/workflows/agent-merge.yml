@@ -1,0 +1,63 @@
+name: Agent merge
+
+# Triggered when agent-review adds the agent-merge label to a PR.
+# Defensive guard: checks that the repo's main branch ruleset has at least one
+# required_status_checks context before calling --auto. Without required CI,
+# auto-merge would land the PR ungated the moment this workflow fires.
+# If no required checks are configured, falls back to human-pr with a comment.
+#
+# Note: github-actions[bot] is NOT a bypass actor on any ruleset in this estate
+# by design (see nowline/ops/branch-policies.md). The bot satisfies the
+# pull_request rule via CI green + zero required approvals — no bypass needed.
+
+on:
+  pull_request:
+    types: [labeled]
+
+concurrency:
+  group: agent-merge-${{ github.event.pull_request.number }}
+  cancel-in-progress: false
+
+permissions:
+  pull-requests: write
+  issues: write
+  contents: read
+
+jobs:
+  merge:
+    name: Auto-merge or escalate
+    runs-on: ubuntu-latest
+    if: github.event.label.name == 'agent-merge'
+    env:
+      GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      PR_NUMBER: ${{ github.event.pull_request.number }}
+      REPO: ${{ github.repository }}
+    steps:
+      - name: Check for required status checks on main
+        id: ci-gate
+        run: |
+          required_count=$(
+            gh api "repos/$REPO/rulesets" \
+              --jq '[.[] |
+                select(.enforcement == "active") |
+                select(.conditions.ref_name.include[] | contains("~DEFAULT_BRANCH") or . == "refs/heads/main") |
+                .rules[] |
+                select(.type == "required_status_checks") |
+                .parameters.required_status_checks |
+                length
+              ] | add // 0'
+          )
+          echo "required_count=$required_count" >> "$GITHUB_OUTPUT"
+
+      - name: Auto-merge (CI gate present)
+        if: steps.ci-gate.outputs.required_count != '0'
+        run: gh pr merge "$PR_NUMBER" --repo "$REPO" --auto --squash
+
+      - name: Fall back to human-pr (no CI gate configured)
+        if: steps.ci-gate.outputs.required_count == '0'
+        run: |
+          gh pr edit "$PR_NUMBER" --repo "$REPO" \
+            --remove-label "agent-merge" \
+            --add-label "human-pr"
+          gh pr comment "$PR_NUMBER" --repo "$REPO" --body \
+            "Auto-merge requires at least one required status check on this repo's default branch ruleset. None are configured yet — falling back to human review. See \`.github/AGENT_TRIAGE.md\` § *PR has \`agent-merge\` but isn't auto-merging* for context. Once required CI is wired into the ruleset, future runs will auto-merge cleanly."

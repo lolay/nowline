@@ -490,6 +490,17 @@ The `+...` suffix is informational metadata only; npm and the VS Code Marketplac
 4. After CI passes, merge. `.github/workflows/backport.yml` opens a follow-up PR cherry-picking the squash-commit onto `main` — review and merge it once green. Auto-merge is intentionally off because hotfixes can conflict with newer work on `main`.
 5. The maintainer cuts a new tag from `release/vX.Y` (`v0.1.1`) via the manual `Release` workflow dispatch (see `specs/releasing.md`).
 
+## Agent triage
+
+Issues in this repo can be routed through a four-phase AI agent flow. The flow is opt-in during rollout: check the "Let an AI agent take a first pass" box when filing an issue, or add `agent-triage` manually to an existing issue.
+
+- **`agent-*` labels** — the agent owns the next move.
+- **`human-*` labels** — you own the next move. The flow is paused.
+- **Override** any state by adding the new target state label (the cleanup workflow removes the old one automatically).
+- **Stop the flow** at any time: add `human-only`. To resume, add `agent-triage`.
+
+Full reference: [`.github/AGENT_TRIAGE.md`](./.github/AGENT_TRIAGE.md).
+
 ## Reporting bugs
 
 Open a bug report using the [bug template](./.github/ISSUE_TEMPLATE/bug_report.yml) — it walks you through the minimum repro, command, output, and version information we need.

@@ -19,9 +19,11 @@
 #      with the exact title; if one exists, exits 0 without creating a
 #      duplicate. The target floor uniquely determines the title, so reruns
 #      stay quiet until the floor advances again.
-#   4. `gh issue create` with title + body. No labels, no assignees — the
-#      downstream issue-to-PR worker decides whether the work is
-#      agent-eligible or human-only and adds its own routing metadata.
+#   4. `gh issue create` with title + body + labels `agent-triage` +
+#      `vscode-engine-bump`. The `agent-triage` label enters the issue into
+#      the four-phase agent-triage state machine (see .github/AGENT_TRIAGE.md).
+#      `vscode-engine-bump` is the origin/metadata label so issues from this
+#      detector are queryable as `is:closed label:vscode-engine-bump label:agent-done`.
 #
 # The body describes *what* needs to change, not *how* (no merge strategy,
 # no CI gating instructions, no auto-merge hint). The issue worker's prompt
@@ -219,4 +221,7 @@ if [[ "$existing_count" != "0" ]]; then
 fi
 
 log "creating issue: $title"
-gh issue create --title "$title" --body "$body"
+gh issue create \
+    --title "$title" \
+    --body "$body" \
+    --label "agent-triage,vscode-engine-bump"

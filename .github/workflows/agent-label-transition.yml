@@ -1,0 +1,82 @@
+name: Agent label transition
+
+# Triggered when any agent-* or human-* label is added to an issue or PR.
+# Removes all OTHER state labels from the same target, keeping the state-label
+# set a singleton. Phase workflows just emit the new label via safe-outputs;
+# this cleanup workflow ensures only one state label is present at any time.
+#
+# State labels managed: agent-triage, agent-plan, agent-deep, agent-exec,
+# agent-merge, agent-done, human-only, human-author, human-decide, human-pr.
+# Origin/metadata labels (cursor-engine-sync, dependencies, bug, etc.) are
+# NOT state labels and are never touched by this workflow.
+#
+# Runs in parallel with the phase workflow triggered by the same label-add
+# event. No race condition because cleanup never removes the just-added label.
+
+on:
+  issues:
+    types: [labeled]
+  pull_request:
+    types: [labeled]
+
+permissions:
+  issues: write
+  pull-requests: write
+
+jobs:
+  transition:
+    name: Enforce single state label
+    runs-on: ubuntu-latest
+    if: >
+      startsWith(github.event.label.name, 'agent-') ||
+      startsWith(github.event.label.name, 'human-')
+    env:
+      GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      REPO: ${{ github.repository }}
+      ADDED_LABEL: ${{ github.event.label.name }}
+    steps:
+      - name: Remove stale state labels
+        run: |
+          STATE_LABELS=(
+            agent-triage
+            agent-plan
+            agent-deep
+            agent-exec
+            agent-merge
+            agent-done
+            human-only
+            human-author
+            human-decide
+            human-pr
+          )
+
+          if [[ "${{ github.event_name }}" == "issues" ]]; then
+            target_type="issue"
+            target_number="${{ github.event.issue.number }}"
+            current_labels=$(
+              gh issue view "$target_number" --repo "$REPO" --json labels \
+                --jq '[.labels[].name]'
+            )
+          else
+            target_type="pr"
+            target_number="${{ github.event.pull_request.number }}"
+            current_labels=$(
+              gh pr view "$target_number" --repo "$REPO" --json labels \
+                --jq '[.labels[].name]'
+            )
+          fi
+
+          for label in "${STATE_LABELS[@]}"; do
+            if [[ "$label" == "$ADDED_LABEL" ]]; then
+              continue
+            fi
+            if printf '%s' "$current_labels" | grep -q "\"$label\""; then
+              if [[ "$target_type" == "issue" ]]; then
+                gh issue edit "$target_number" --repo "$REPO" \
+                  --remove-label "$label" 2>/dev/null || true
+              else
+                gh pr edit "$target_number" --repo "$REPO" \
+                  --remove-label "$label" 2>/dev/null || true
+              fi
+            fi
+          done
