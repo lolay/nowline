@@ -18,7 +18,8 @@
             "!**/__snapshots__",
             "!**/*.tsbuildinfo",
             "!pnpm-lock.yaml",
-            "!specs/handoffs"
+            "!specs/handoffs",
+            "!.github/aw"
         ]
     },
     "formatter": {
