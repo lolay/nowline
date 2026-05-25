@@ -1,0 +1,51 @@
+{
+    "$schema": "http://json-schema.org/draft-07/schema#",
+    "$id": "https://github.com/lolay/nowline/blob/main/.github/cursor-release-history.schema.json",
+    "title": "Editor release history",
+    "description": "Per-fork history of observed editor releases and their embedded VS Code engine versions. The daily editor-release-monitor workflow maintains one of these per tracked fork (e.g. cursor-release-history.json, vscodium-release-history.json). The weekly vscode-extension-engine-bump analyzer reads every *-release-history.json under .github/, filters each by released_at, takes the min vscode_version across forks, and opens a bump issue when that min exceeds the current engines.vscode floor.",
+    "type": "object",
+    "additionalProperties": false,
+    "required": ["fork_name", "releases"],
+    "properties": {
+        "$schema": {
+            "type": "string",
+            "description": "Optional JSON Schema reference."
+        },
+        "fork_name": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Display name of the fork used verbatim in issue bodies. Examples: 'Cursor', 'VSCodium', 'Windsurf'."
+        },
+        "releases": {
+            "type": "array",
+            "description": "Append-only log of observed releases. Order is not enforced but entries are typically appended chronologically. Entries older than 2 years are pruned by the monitor on each run.",
+            "items": {
+                "type": "object",
+                "additionalProperties": false,
+                "required": ["version", "released_at", "vscode_version"],
+                "properties": {
+                    "version": {
+                        "type": "string",
+                        "minLength": 1,
+                        "description": "Fork-native release version string (e.g. '0.45.14' for Cursor, '1.105.0' for VSCodium). Identity for deduping; opaque to the analyzer."
+                    },
+                    "released_at": {
+                        "type": "string",
+                        "format": "date-time",
+                        "description": "ISO 8601 timestamp marking when the fork shipped this release. Used by the analyzer for the 30-day grace check."
+                    },
+                    "vscode_version": {
+                        "type": "string",
+                        "pattern": "^[0-9]+\\.[0-9]+\\.[0-9]+(-[0-9A-Za-z.-]+)?$",
+                        "description": "VS Code engine version embedded in this release, extracted from the fork's product.json or equivalent. Authoritative for the analyzer's floor computation."
+                    },
+                    "source_url": {
+                        "type": "string",
+                        "format": "uri",
+                        "description": "Optional audit-only URL the monitor used to obtain this release's data (e.g. an AppImage path, a raw GitHub URL). Not consumed by the analyzer."
+                    }
+                }
+            }
+        }
+    }
+}

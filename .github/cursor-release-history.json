@@ -1,0 +1,12 @@
+{
+    "$schema": "./cursor-release-history.schema.json",
+    "fork_name": "Cursor",
+    "releases": [
+        {
+            "version": "3.5.33",
+            "released_at": "2026-05-22T06:47:48.039Z",
+            "vscode_version": "1.105.1",
+            "source_url": "https://downloads.cursor.com/production/aac81804b986d739acab348ed96b8bea6e83cc57/linux/x64/Cursor-3.5.33-x86_64.AppImage"
+        }
+    ]
+}
