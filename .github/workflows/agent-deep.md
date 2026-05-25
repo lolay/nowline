@@ -12,7 +12,6 @@ imports:
 safe-outputs:
   assign-to-agent:
     model: claude-opus-4.7
-    github-token: ${{ secrets.COPILOT_ASSIGN_PAT }}
   add-labels:
     allowed: [agent-done, human-author, human-decide]
     max: 1

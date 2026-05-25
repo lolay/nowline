@@ -172,7 +172,7 @@ The settings below were applied to all six repos on 2026-05-24; this list is for
 
 - **Branch ruleset on `main`** with `required_approving_review_count: 0`, `bypass_mode: always` for OrgAdmin + the release App, `required_status_checks` populated with the repo's CI contexts. Spec: [`ops/branch-policies.md`](../ops/branch-policies.md). The auto-merge flow demands zero required reviewers and CI as the only gate.
 - **Repo settings**: `allow_auto_merge: true`, `allow_squash_merge: true`, `delete_branch_on_merge: true`. Without these, `gh pr merge --auto` errors.
-- **Secrets**: `COPILOT_ASSIGN_PAT` (fine-grained PAT for `safe-outputs: assign-to-agent`); `COPILOT_GITHUB_TOKEN` (gh-aw's Copilot engine auth — may be the same value as `COPILOT_ASSIGN_PAT`, depending on gh-aw's setup-wizard guidance).
+- **Secrets**: `GH_AW_AGENT_TOKEN` (gh-aw's magic-name fine-grained PAT for `safe-outputs: assign-to-agent`; needs Repo permissions actions/contents/issues/pull-requests Write); `COPILOT_GITHUB_TOKEN` (gh-aw's Copilot CLI engine auth — must be a user-account-owned PAT with Account permission Copilot Requests: Read; this is structurally a different token from `GH_AW_AGENT_TOKEN`).
 - **Org-level Copilot**: cloud agent enabled, Anthropic Claude partner agent on, repository access set to All repositories at the `lolay` org level. New repos in the org inherit access automatically; gating is enforced by which repos have agent workflows installed (and by `nowline-action`'s redirect `AGENTS.md` for the publish-only repo).
 - **Issue templates**: `bug_report.yml` and `feature_request.yml` include a "Let an AI agent take a first pass" checkbox that auto-applies `agent-triage`.
 

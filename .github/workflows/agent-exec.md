@@ -12,7 +12,6 @@ imports:
 safe-outputs:
   assign-to-agent:
     model: claude-sonnet-4.5
-    github-token: ${{ secrets.COPILOT_ASSIGN_PAT }}
   add-labels:
     allowed: [agent-done, human-author, human-decide]
     max: 1

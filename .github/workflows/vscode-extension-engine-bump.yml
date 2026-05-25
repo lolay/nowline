@@ -13,9 +13,10 @@ name: VS Code extension engine bump
 #       enters the issue into the four-phase agent-triage state machine
 #       (see .github/AGENT_TRIAGE.md). Assignment to Copilot happens
 #       downstream in agent-deep.md / agent-exec.md via safe-outputs:
-#       assign-to-agent, which uses COPILOT_ASSIGN_PAT. This decouples
-#       detection from execution and enables the plan phase to route the
-#       issue to the right model and complexity tier.
+#       assign-to-agent, which auto-discovers GH_AW_AGENT_TOKEN (gh-aw's
+#       magic-name PAT). This decouples detection from execution and
+#       enables the plan phase to route the issue to the right model
+#       and complexity tier.
 #
 # Decision logic:
 #   1. For each .github/*-release-history.json, find the most recent release
