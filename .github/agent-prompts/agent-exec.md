@@ -68,8 +68,16 @@ If Steps 1–2 pass, issue the safe-output `assign-to-agent`. The Copilot sessio
 
 - Read this issue, the plan comment, and the repo's `AGENTS.md` / `CONTRIBUTING.md` / `AI_POLICY.md`.
 - Implement the plan exactly as written. **Do not re-plan.**
-- Open one PR targeting the default branch with the same disclosures as `agent-deep` (plan reproduced verbatim, `Closes #N`, full PR template fill-in, `## AI assistance` section). The only difference:
-  - `Assisted-by: Claude Sonnet 4.5` under `## AI assistance` and on every commit trailer. (This phase is the fast model; the model contract is fixed in this workflow's frontmatter.)
+- Open one PR targeting the default branch.
+
+**The PR body MUST include all four of the following — these are mandatory per the prelude § 4 (smoke test C 2026-05-25 surfaced PRs missing them):**
+
+1. `Closes #<this-issue-number>` on its own line, exactly as written. This is the only thing that makes GitHub auto-close the issue on merge.
+2. `## AI assistance` heading with `Assisted-by: Claude Sonnet 4.5` underneath. (This phase is the fast model; the model contract is fixed in this workflow's frontmatter.)
+3. `Assisted-by: Claude Sonnet 4.5` as a trailer on **every commit** on the branch (standard Git footer, last line of the commit body).
+4. The full plan from the `## Plan` issue comment, reproduced verbatim under a `## Plan from issue` heading in the PR body.
+
+Plus the standard PR template `## Summary`, `## Motivation`, and `## How I tested this` sections, filled in.
 
 The Copilot session is structurally separate from this workflow. Your only job here is to verify, sanity-check, and delegate.
 

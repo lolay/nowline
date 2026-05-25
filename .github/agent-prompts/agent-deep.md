@@ -56,13 +56,16 @@ If Steps 1–2 pass, issue the safe-output `assign-to-agent`. The Copilot sessio
 
 - Read this issue, the plan comment, and the repo's `AGENTS.md` / `CONTRIBUTING.md` / `AI_POLICY.md`.
 - Implement the plan exactly as written. **Do not re-plan.** If the plan turns out to be wrong, the Copilot session falls back per Step 4.
-- Open one PR targeting the default branch. PR body must include:
-  - The plan reproduced verbatim under a heading `## Plan from issue`.
-  - `Closes #<this-issue>` so GitHub auto-closes on merge and `agent-pr-merged.yml` can link them.
-  - The PR template's `## Summary`, `## Motivation`, `## How I tested this`, and `## AI assistance` sections, filled in.
-  - `Assisted-by: Claude Opus 4.6` under `## AI assistance`. (This phase is the deep model; the model contract is fixed in this workflow's frontmatter.)
-- Each commit on the branch carries an `Assisted-by: Claude Opus 4.6` trailer (standard Git footer).
-- Each commit subject: imperative, ≤72 chars, no trailing period, no emojis. Match `git log --oneline` for tone.
+- Open one PR targeting the default branch.
+
+**The PR body MUST include all four of the following — these are mandatory per the prelude § 4 (smoke test C 2026-05-25 surfaced PRs missing them):**
+
+1. `Closes #<this-issue-number>` on its own line, exactly as written. This is the only thing that makes GitHub auto-close the issue on merge.
+2. `## AI assistance` heading with `Assisted-by: Claude Opus 4.7` underneath. (This phase is the deep model; the model contract is fixed in this workflow's frontmatter.)
+3. `Assisted-by: Claude Opus 4.7` as a trailer on **every commit** on the branch (standard Git footer, last line of the commit body).
+4. The full plan from the `## Plan` issue comment, reproduced verbatim under a `## Plan from issue` heading in the PR body.
+
+Plus the standard PR template `## Summary`, `## Motivation`, and `## How I tested this` sections, filled in. Each commit subject: imperative, ≤72 chars, no trailing period, no emojis. Match `git log --oneline` for tone.
 
 The Copilot session is structurally separate from this workflow. Its prompt is set by the `assign-to-agent` machinery, not by this body. Your only job here is to verify, sanity-check, and delegate.
 

@@ -35,13 +35,17 @@ jobs:
     steps:
       - name: Check for required status checks on main
         id: ci-gate
+        # Use repos/{repo}/rules/branches/main — returns the flattened set of
+        # rules effective on `main` after evaluating all rulesets. The
+        # repos/{repo}/rulesets LIST endpoint does NOT include .conditions or
+        # .rules (those only appear on per-ID detail responses), so iterating
+        # them errors with "cannot iterate over: null". This endpoint is
+        # purpose-built for "what rules apply to this branch?" and reads as
+        # the more correct intent here.
         run: |
           required_count=$(
-            gh api "repos/$REPO/rulesets" \
+            gh api "repos/$REPO/rules/branches/main" \
               --jq '[.[] |
-                select(.enforcement == "active") |
-                select(.conditions.ref_name.include[] | contains("~DEFAULT_BRANCH") or . == "refs/heads/main") |
-                .rules[] |
                 select(.type == "required_status_checks") |
                 .parameters.required_status_checks |
                 length
