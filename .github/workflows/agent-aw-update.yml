@@ -1,0 +1,79 @@
+name: Agent agentic-workflow update
+
+# Weekly cron: runs gh aw update --all to pull upstream changes from each
+# workflow's source: pin, then opens a PR if there is a non-empty diff.
+# Three-way merge from gh aw update preserves local customizations.
+#
+# For lolay/nowline this repo self-consumes its own canonical workflows, so
+# gh aw update will typically report nothing to update (source is local).
+# The workflow is useful on consuming commercial repos that pin to
+# lolay/nowline-infra at a ref.
+
+on:
+  schedule:
+    - cron: "0 10 * * 1"    # 10:00 UTC every Monday
+  workflow_dispatch:
+
+concurrency:
+  group: agent-aw-update
+  cancel-in-progress: false
+
+permissions:
+  contents: write
+  pull-requests: write
+
+jobs:
+  update:
+    name: Sync agentic workflows from upstream
+    runs-on: ubuntu-latest
+    env:
+      GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Install gh-aw CLI
+        run: |
+          gh extension install github/gh-aw 2>/dev/null || \
+          gh extension upgrade gh-aw 2>/dev/null || true
+
+      - name: Run gh aw update
+        id: update
+        run: |
+          gh aw update --all --repo . 2>&1 | tee /tmp/aw-update.log || true
+          if git diff --quiet; then
+            echo "changed=false" >> "$GITHUB_OUTPUT"
+          else
+            echo "changed=true" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Open PR if workflows changed
+        if: steps.update.outputs.changed == 'true'
+        run: |
+          branch="chore/aw-sync-$(date +%Y%m%d-%H%M%S)"
+          git config user.name  "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git checkout -b "$branch"
+          git add .github/workflows/
+          git commit -m "chore(aw): sync agentic workflows from upstream"
+          git push origin "$branch"
+
+          # Build the PR body in a tmpfile so the gh aw update log is included
+          # verbatim without shell-quoting hazards.
+          {
+            printf '%s\n\n' "Automated sync from \`gh aw update --all\`. Three-way merge preserves local customizations; review the diff before merging to confirm upstream changes are acceptable."
+            printf '%s\n\n' "<details><summary>gh aw update log</summary>"
+            printf '```\n'
+            cat /tmp/aw-update.log
+            printf '```\n\n'
+            printf '%s\n\n' "</details>"
+            printf '%s\n' "Assisted-by: None"
+          } > /tmp/aw-pr-body.md
+
+          gh pr create \
+            --title "chore(aw): sync agentic workflows from upstream" \
+            --body-file /tmp/aw-pr-body.md \
+            --head "$branch" \
+            --base main

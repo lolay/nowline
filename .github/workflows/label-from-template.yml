@@ -1,0 +1,36 @@
+name: Label from issue template
+
+# Applies agent-triage when a newly-opened issue has the "Let an AI agent take
+# a first pass" checkbox checked. GitHub issue forms don't natively turn
+# checkbox state into labels, so this workflow does the mapping.
+#
+# The checkbox text must match the label text in bug_report.yml and
+# feature_request.yml exactly (minus the leading "[ ] " / "[x] " marker).
+
+on:
+  issues:
+    types: [opened]
+
+permissions:
+  issues: write
+
+jobs:
+  apply-agent-label:
+    name: Apply agent-triage from checkbox
+    runs-on: ubuntu-latest
+    env:
+      GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+    steps:
+      - name: Check for agent-first-pass box and label
+        run: |
+          body=$(cat <<'BODY'
+          ${{ github.event.issue.body }}
+          BODY
+          )
+          # Match a checked checkbox (- [x] or - [X]) whose text starts with
+          # "Let an AI agent take a first pass"
+          if printf '%s' "$body" | grep -qiE '^\s*-\s*\[x\]\s*Let an AI agent take a first pass'; then
+            gh issue edit "${{ github.event.issue.number }}" \
+              --repo "${{ github.repository }}" \
+              --add-label "agent-triage"
+          fi

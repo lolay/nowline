@@ -4,6 +4,19 @@ name: VS Code extension engine bump
 # tracked VS Code fork's release history and opens a GitHub Issue when the
 # floor should advance.
 #
+# Issue lifecycle lineage:
+#   v1 (original): opened issue + directly assigned copilot-swe-agent[bot].
+#   v2 (CURSOR_ENGINE_SYNC_PAT era): opened issue + assigned via PAT; PAT was
+#       fragile because GitHub App tokens rotated unexpectedly.
+#   v3 (current / gh-aw era): opens issue with labels agent-triage +
+#       vscode-engine-bump and NO direct assignee. The agent-triage label
+#       enters the issue into the four-phase agent-triage state machine
+#       (see .github/AGENT_TRIAGE.md). Assignment to Copilot happens
+#       downstream in agent-deep.md / agent-exec.md via safe-outputs:
+#       assign-to-agent, which uses COPILOT_ASSIGN_PAT. This decouples
+#       detection from execution and enables the plan phase to route the
+#       issue to the right model and complexity tier.
+#
 # Decision logic:
 #   1. For each .github/*-release-history.json, find the most recent release
 #      with released_at <= today - 30 days (the grace window).
@@ -34,7 +47,7 @@ concurrency:
 
 permissions:
     contents: read
-    issues: write
+    issues: write      # needed for gh issue create in open-engine-bump-issue.sh
 
 jobs:
     maybe-open-bump-issue:
