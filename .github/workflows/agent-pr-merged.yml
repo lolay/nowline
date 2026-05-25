@@ -20,8 +20,7 @@ jobs:
     runs-on: ubuntu-latest
     if: >
       github.event.pull_request.merged == true &&
-      (github.event.pull_request.user.login == 'copilot-swe-agent[bot]' ||
-       github.event.pull_request.user.login == 'Copilot')
+      contains(github.event.pull_request.labels.*.name, 'copilot-pr')
     env:
       GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
       PR_BODY: ${{ github.event.pull_request.body }}
