@@ -22,15 +22,18 @@ jobs:
       GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
     steps:
       - name: Check for agent-first-pass box and label
+        env:
+          # Pass untrusted issue body through env, never inline-interpolate into
+          # the shell script. See actionlint expression-untrusted check and
+          # GitHub's secure-use guidance for script-injection mitigation.
+          ISSUE_BODY: ${{ github.event.issue.body }}
+          ISSUE_NUMBER: ${{ github.event.issue.number }}
+          REPO: ${{ github.repository }}
         run: |
-          body=$(cat <<'BODY'
-          ${{ github.event.issue.body }}
-          BODY
-          )
           # Match a checked checkbox (- [x] or - [X]) whose text starts with
           # "Let an AI agent take a first pass"
-          if printf '%s' "$body" | grep -qiE '^\s*-\s*\[x\]\s*Let an AI agent take a first pass'; then
-            gh issue edit "${{ github.event.issue.number }}" \
-              --repo "${{ github.repository }}" \
+          if printf '%s' "$ISSUE_BODY" | grep -qiE '^\s*-\s*\[x\]\s*Let an AI agent take a first pass'; then
+            gh issue edit "$ISSUE_NUMBER" \
+              --repo "$REPO" \
               --add-label "agent-triage"
           fi

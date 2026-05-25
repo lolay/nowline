@@ -37,7 +37,7 @@ jobs:
         id: ci-gate
         run: |
           required_count=$(
-            gh api repos/$REPO/rulesets \
+            gh api "repos/$REPO/rulesets" \
               --jq '[.[] |
                 select(.enforcement == "active") |
                 select(.conditions.ref_name.include[] | contains("~DEFAULT_BRANCH") or . == "refs/heads/main") |
