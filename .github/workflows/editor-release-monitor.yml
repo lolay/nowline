@@ -71,10 +71,12 @@ jobs:
                   git config user.email "github-actions[bot]@users.noreply.github.com"
 
                   # Stage every *-release-history.json file under .github/.
-                  # Use xargs -r (skip if find emits nothing) so the step
-                  # stays clean when no history files exist yet.
+                  # `find -exec … +` bundles all matches into a single
+                  # git-add call and sidesteps the find/xargs whitespace
+                  # pitfall. If no files match, -exec is not invoked, so
+                  # git add is not run with empty args.
                   find .github -maxdepth 1 -name '*-release-history.json' \
-                      | xargs -r git add --
+                      -exec git add -- {} +
 
                   if git diff --cached --quiet; then
                       echo "No release-history changes to commit."
