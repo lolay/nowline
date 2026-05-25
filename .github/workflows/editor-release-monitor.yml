@@ -1,0 +1,85 @@
+name: Editor release monitor
+
+# Keeps .github/*-release-history.json files up to date by polling each
+# tracked VS Code fork's stable release channel once a day.
+#
+# One step per fork makes individual fork failures visible in the job summary
+# (continue-on-error: true) without aborting the others. A commit step at the
+# end batches all history updates into a single "[skip ci]" commit so the
+# change history stays readable.
+#
+# Branch-protection note: this workflow pushes directly to main. Add
+# "github-actions[bot]" to the main branch ruleset's bypass list in
+# Settings → Rules → main so the push is not blocked by the CI-gate ruleset.
+# Without the bypass, the commit step fails with "refusing to allow a GitHub
+# App to create or update workflow refs" or similar.
+#
+# No custom secrets required. The default GITHUB_TOKEN with contents: write is
+# sufficient for git push.
+
+on:
+    schedule:
+        - cron: "0 6 * * *"   # 06:00 UTC daily
+    workflow_dispatch:
+
+concurrency:
+    group: editor-release-monitor
+    cancel-in-progress: false
+
+permissions:
+    contents: write   # git commit + push history files
+
+jobs:
+    update-release-history:
+        name: Update editor release history
+        runs-on: ubuntu-latest
+        steps:
+            - name: Checkout
+              uses: actions/checkout@v6
+
+            # ----------------------------------------------------------------
+            # One step per fork.  Add a new step for each additional VS Code
+            # fork you want to track.  The step should run the fork's monitor
+            # script; scripts live under scripts/ and follow the naming
+            # convention monitor-<fork-slug>-releases.sh.  Keep
+            # continue-on-error: true so a single fork's network hiccup or
+            # changed download URL doesn't abort the rest.
+            # ----------------------------------------------------------------
+
+            - name: Monitor Cursor releases
+              id: cursor
+              continue-on-error: true
+              run: bash scripts/monitor-cursor-releases.sh
+
+            # Example for a future fork:
+            # - name: Monitor VSCodium releases
+            #   id: vscodium
+            #   continue-on-error: true
+            #   run: bash scripts/monitor-vscodium-releases.sh
+
+            # ----------------------------------------------------------------
+            # Commit any history-file changes that the per-fork steps wrote.
+            # If nothing changed (no new releases today), git diff --cached is
+            # empty and we exit without a commit.  The [skip ci] trailer
+            # prevents a recursive CI trigger on the history update.
+            # ----------------------------------------------------------------
+
+            - name: Commit history updates
+              run: |
+                  set -euo pipefail
+                  git config user.name "github-actions[bot]"
+                  git config user.email "github-actions[bot]@users.noreply.github.com"
+
+                  # Stage every *-release-history.json file under .github/.
+                  # Use xargs -r (skip if find emits nothing) so the step
+                  # stays clean when no history files exist yet.
+                  find .github -maxdepth 1 -name '*-release-history.json' \
+                      | xargs -r git add --
+
+                  if git diff --cached --quiet; then
+                      echo "No release-history changes to commit."
+                      exit 0
+                  fi
+
+                  git commit -m "chore(ci): update editor release history [skip ci]"
+                  git push

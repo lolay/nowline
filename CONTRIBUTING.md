@@ -76,46 +76,39 @@ Tightening any of these — e.g. moving the consumer floor from `>=22` to `>=24`
 
 - **Renovate** ([shared preset](./.github/renovate-shared.json)) opens a single grouped PR per week for minor/patch updates across npm, GitHub Actions, Terraform, Bun, and actionlint. Major updates open individually with a 30-day cooldown. See the per-repo `renovate.json` files for repo-specific overrides. The Dependency Dashboard issue in each repo is the single triage entry point.
 - **Node version is explicitly disabled in Renovate's `packageRules`** — version bumps are governed manually by this section, not by Renovate, because changing the consumer floor is policy work, not a routine dependency bump.
-- **`@types/vscode` is explicitly disabled in Renovate's `packageRules`** — the floor is governed by the Cursor-tracking policy below, not Renovate. Renovate would otherwise bump `@types/vscode` past `engines.vscode` and break `vsce package` (as seen in the v0.3.0 release-run failure).
+- **`@types/vscode` is explicitly disabled in Renovate's `packageRules`** — the floor is governed by the Cursor-tracking policy below, not Renovate. Renovate would otherwise bump `@types/vscode` past `engines.vscode` and break `vsce package` (as seen in the v0.3.0 release-run failure). `editor-release-monitor.yml` + `vscode-extension-engine-bump.yml` are the source of truth for when and how this field changes.
 - **Cross-references:** [Node release schedule](https://nodejs.org/en/about/previous-releases) · [`.nvmrc`](./.nvmrc) · [`.github/renovate-shared.json`](./.github/renovate-shared.json).
 
 ### VS Code extension engine floor policy
 
-The `engines.vscode` field in `packages/vscode-extension/package.json` and the `@types/vscode` devDependency **always equal each other** and **track the VS Code engine embedded in the latest stable Cursor release**, with a 30-day grace period so users have time to update their editor before the extension requires the newer engine.
+The `engines.vscode` field in `packages/vscode-extension/package.json` and the `@types/vscode` devDependency **always equal each other** and **track the VS Code engine embedded in the latest stable Cursor release**, with a 30-day grace period so users have time to update before the extension requires the newer engine. The floor is expressed as `^MAJOR.MINOR.0` — patch is never floor-specific.
 
 **What drives changes:**
 
-- [`.github/workflows/cursor-engine-sync.yml`](./.github/workflows/cursor-engine-sync.yml) runs on the 1st of each month. It opens a GitHub issue assigned to `copilot-swe-agent[bot]`, which:
-  1. Detects the `vscodeVersion` in Cursor's latest stable `product.json`.
-  2. If the version changed, opens a PR to update [`.github/cursor-engine.json`](./.github/cursor-engine.json) (the state file that records when each engine version was first observed).
-  3. If the version is unchanged and 30 days have elapsed since first observation, opens a PR to bump both `engines.vscode` and `@types/vscode` to `^MAJOR.MINOR.0`, refreshing `pnpm-lock.yaml` as well.
-  4. Enables auto-merge on the PR so it lands automatically once CI is green.
-- A human can also bump the floors manually at any time — edit both fields in `packages/vscode-extension/package.json`, update `.github/cursor-engine.json` to reflect the new observation, run `pnpm install --no-frozen-lockfile`, and open a PR.
+Two workflows operate in tandem. No custom secrets or PATs are required; both run on the default `GITHUB_TOKEN`.
 
-**Why not let Renovate handle it:** `@types/vscode` bumps must stay in lock-step with `engines.vscode`. Renovate updates devDependencies independently of `engines.*`, so an unconstrained `@types/vscode` bump breaks `vsce package` (error: "types floor exceeds engines floor"). Disabling Renovate for `@types/vscode` and delegating to a purpose-built workflow is the only way to keep the two in sync automatically.
+1. **Daily monitor** ([`editor-release-monitor.yml`](./.github/workflows/editor-release-monitor.yml)) polls each tracked fork's stable channel and appends new releases to that fork's `.github/*-release-history.json`. Releases land via a single `[skip ci]` commit to `main`. One job step per fork runs with `continue-on-error: true` so a network hiccup for one fork doesn't abort the others.
 
-**Authentication — fine-grained PAT.** The sync workflow assigns the tracking issue to `copilot-swe-agent[bot]`. Two GitHub-side constraints shape the token choice:
+2. **Weekly analyzer** ([`vscode-extension-engine-bump.yml`](./.github/workflows/vscode-extension-engine-bump.yml)) runs every Friday at 09:00 UTC. It reads all `*-release-history.json` files, filters each to releases that are at least 30 days old, takes the min `vscode_version` across forks, and opens a GitHub Issue when that min is at a higher `MAJOR.MINOR` than the current floor. The issue is idempotent — a second run with the same target floor finds the open issue and exits without creating a duplicate.
 
-1. **The Copilot assignment API rejects GitHub App installation tokens** regardless of permissions. Copilot billing requires a user-associated token (see [github/gh-aw#19765](https://github.com/github/gh-aw/issues/19765)). The default `GITHUB_TOKEN` is therefore not sufficient.
-2. **The token must be associated with a user who holds a Copilot Business/Enterprise seat** (the billable identity).
+**The issue as deliverable.** The analyzer opens a plain GitHub Issue describing what needs to change (which fields, target value, reasoning). A separate generic issue-to-PR worker picks it up and does the mechanical edits. The issue does not prescribe *how* the work is done; that's the worker's domain.
 
-A fine-grained PAT issued by a seated user satisfies both. Fine-grained PATs are always user-issued — the "Resource owner: lolay" selector on the creation form scopes which repos the PAT can reach, but doesn't change the identity. Since the issuing user holds the Copilot seat, billing-attribution works.
+**Issue contract.** The title is always `chore(vscode-extension): bump engines.vscode floor to ^X.Y.0`. The body has four sections: `## Why` (derivation narrative), `## Required changes` (exact field edits), `## Source data` (per-fork evidence table), and `## Audit` (link to workflow run, history file pointers). A machine-readable HTML comment `<!-- engine-floor-bump:target=^X.Y.0;current=^A.B.0 -->` is appended for workers that want to parse it without scraping the body.
 
-Required configuration in the repo:
+**Adding a new fork.** Fork detection is deliberately extensible:
 
-| Kind | Name | Source |
-| --- | --- | --- |
-| secret | `CURSOR_ENGINE_SYNC_PAT` | Fine-grained PAT issued by a user with a Copilot seat, scoped to `lolay/nowline` with `Issues: Read and write` (plus the auto-required `Metadata: Read-only`). Generate at <https://github.com/settings/personal-access-tokens/new>; 1-year max expiration. |
+1. Write `scripts/monitor-<slug>-releases.sh` following the same contract as `scripts/monitor-cursor-releases.sh`: hits the fork's stable channel, downloads a package if needed, extracts `vscode_version` from `product.json` or equivalent, appends `{version, released_at, vscode_version, source_url}` to `.github/<slug>-release-history.json`, applies 2-year roll-off.
+2. Seed `.github/<slug>-release-history.json` with a `fork_name` matching the display name you want in issue bodies.
+3. Add one step to the `update-release-history` job in `editor-release-monitor.yml` (with `continue-on-error: true`).
+4. The analyzer picks up the new file automatically — no changes to `compute-engine-floor.sh` or `open-engine-bump-issue.sh` are needed.
 
-**Provisioning (and renewal).** Generate the PAT at <https://github.com/settings/personal-access-tokens/new> — Resource owner `lolay`, Repository access *only select repositories → `lolay/nowline`*, Repository permissions *Issues: Read and write*, Expiration 1 year. Be logged in as the user holding the Copilot seat. Then `gh secret set CURSOR_ENGINE_SYNC_PAT -R lolay/nowline` and paste the token at the prompt. Set a calendar reminder ~11 months out for renewal — the workflow will fail with `Bad credentials` once the PAT expires. (Org policy gotcha: if lolay has fine-grained PATs disabled or approval-gated, you'll see the prompt at <https://github.com/organizations/lolay/settings/personal-access-tokens>.)
+**Branch-protection requirement.** The daily monitor pushes a direct commit to `main`. Add `github-actions[bot]` to `main`'s branch ruleset bypass list (Settings → Rules → main → Bypass list) so the push is not blocked by the CI-gate ruleset. The bump analyzer only creates issues and does not push, so it is not affected.
 
-**Lineage.** The workflow previously used a dedicated GitHub App (`lolay-nowline-copilot-assign`, App ID `3829843`) with user-to-server tokens + refresh-chain rotation. The non-atomic gap between OAuth refresh-token consumption and secret-store persistence was fragile — see commit `08c4533` for the last working version of that pattern.
+**First-30-days caveat.** A freshly seeded history file whose only entry was observed within the last 30 days produces `floor=` (empty) on the first analyzer run — no issue is opened. The system becomes self-correcting once the seed entry ages past the grace window.
 
-**Failure modes you'll actually see:**
+**Manual bump.** Edit `engines.vscode` and `devDependencies["@types/vscode"]` in `packages/vscode-extension/package.json` to the same `^MAJOR.MINOR.0` specifier, run `pnpm install --no-frozen-lockfile` to refresh `pnpm-lock.yaml`, and open a PR.
 
-- PAT expired or revoked → create-issue step fails with `Bad credentials` (HTTP 401). Recovery: regenerate the PAT and `gh secret set CURSOR_ENGINE_SYNC_PAT`.
-- Issuing user loses their Copilot seat → assignment step fails with `'copilot-swe-agent' not found`. Recovery: reassign a seat or have a different seated user issue the PAT.
-- The idempotency check step always uses `GITHUB_TOKEN` so it succeeds even if `CURSOR_ENGINE_SYNC_PAT` is unset — the failure is visible per-step in the run log, not as a cryptic top-level auth error.
+**Why not let Renovate handle it:** `@types/vscode` bumps must stay in lock-step with `engines.vscode`. Renovate updates devDependencies independently of `engines.*`, so an unconstrained `@types/vscode` bump breaks `vsce package` (error: "types floor exceeds engines floor"). Pinning `@types/vscode` in Renovate and delegating to the purpose-built workflows is the only way to keep the two in sync automatically.
 
 ## Getting the code
 
@@ -458,7 +451,7 @@ For changes touching the language or the published AST JSON schema, please open 
 | --- | --- | --- |
 | Renovate **minor/patch** | yes | Bounded blast radius; CI is the gate. Configured by `automerge: true` + the top-level `platformAutomerge: true` in [`.github/renovate-shared.json`](./.github/renovate-shared.json). |
 | Renovate **major** | no | Major bumps hide breaking changes; humans review before merging. |
-| `cursor-engine-sync` agent | yes | Same shape as Renovate minor/patch: the agent enables auto-merge with `gh pr merge --auto --squash` immediately after opening its PR. |
+| Engine-floor bump PRs | depends on the issue worker | `vscode-extension-engine-bump.yml` opens a GitHub Issue, not a PR. The generic issue-to-PR worker that executes the work decides whether to enable auto-merge on the resulting PR. |
 | Hand-authored PRs | no | Default behavior — open, review, click merge. The same ruleset still requires CI to be green. |
 
 **Bypassing auto-merge on an automated PR.** If you need to hold an auto-merge-enabled PR (e.g. to push a follow-up commit before it lands), either convert it to a draft, or disable auto-merge explicitly: `gh pr merge <PR> --disable-auto`. Re-enabling later is `gh pr merge <PR> --auto --squash`.

@@ -1,0 +1,58 @@
+name: VS Code extension engine bump
+
+# Weekly analyzer that computes the safe engines.vscode floor across every
+# tracked VS Code fork's release history and opens a GitHub Issue when the
+# floor should advance.
+#
+# Decision logic:
+#   1. For each .github/*-release-history.json, find the most recent release
+#      with released_at <= today - 30 days (the grace window).
+#   2. Take the semver-min vscode_version across all eligible forks.
+#   3. Floor rounds to ^MAJOR.MINOR.0 (patch is never floor-specific).
+#   4. If that floor > the current engines.vscode in
+#      packages/vscode-extension/package.json (MAJOR.MINOR comparison),
+#      open an issue describing the required bump.
+#
+# The issue is the deliverable; a separate generic issue-to-PR worker picks
+# it up and does the mechanical file edits. This workflow has no opinion on
+# how the work is executed (squash vs. merge, CI gates, etc.).
+#
+# Idempotency: if an open issue with the same title already exists (same
+# target floor), the script exits 0 without creating a duplicate.
+#
+# No custom secrets required. The default GITHUB_TOKEN with issues: write is
+# sufficient for gh issue create.
+
+on:
+    schedule:
+        - cron: "0 9 * * 5"   # 09:00 UTC every Friday
+    workflow_dispatch:
+
+concurrency:
+    group: vscode-engine-bump
+    cancel-in-progress: false
+
+permissions:
+    contents: read
+    issues: write
+
+jobs:
+    maybe-open-bump-issue:
+        name: Maybe open engine floor bump issue
+        runs-on: ubuntu-latest
+        steps:
+            - name: Checkout
+              uses: actions/checkout@v6
+
+            - name: Compute engine floor
+              id: floor
+              run: bash scripts/compute-engine-floor.sh
+
+            - name: Open bump issue
+              if: steps.floor.outputs.bump_needed == 'true'
+              env:
+                  GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+              run: |
+                  bash scripts/open-engine-bump-issue.sh \
+                      "${{ steps.floor.outputs.floor }}" \
+                      "${{ steps.floor.outputs.current }}"
