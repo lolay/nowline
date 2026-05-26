@@ -4,7 +4,7 @@ This runbook describes how `main` branch protection is configured on the two OSS
 
 The policy is implemented as code in [`../scripts/apply-branch-policies.sh`](../scripts/apply-branch-policies.sh) — re-runnable, idempotent, and the source of truth for what's actually deployed. The script is the spec; this runbook is the *why* and the operator-facing wrapper around it.
 
-The four commercial repos (`lolay/nowline-{api,app,infra,site}`) are managed by a sibling script + runbook at `lolay/nowline-infra:scripts/apply-branch-policies.sh` + `lolay/nowline-infra:ops/branch-policies.md`. The two halves intentionally live in their respective source-of-truth repos so the OSS/Commercial firewall stays clean — no commercial repo names appear in this script, and no OSS repo names appear in the commercial script.
+The four commercial repos are managed by a sibling script + runbook that live in their respective source-of-truth repos so the OSS/Commercial firewall stays clean — no commercial repo names appear in this script, and no OSS repo names appear in the commercial script.
 
 > Conventions: shell snippets are zsh / bash compatible. Wherever a step touches GitHub state, you need `gh` authenticated as an org admin on `lolay`.
 
@@ -152,7 +152,7 @@ The bump commit / cron commit lands on `main`, downstream workflows fire (for th
 
 Edit `bypass_actors_json()` in [`../scripts/apply-branch-policies.sh`](../scripts/apply-branch-policies.sh). Both bodies call it. Re-run.
 
-If the bypass list should also change on the commercial side, edit the sibling helper at `lolay/nowline-infra:scripts/apply-branch-policies.sh` to match. The two scripts intentionally duplicate the helper to preserve the OSS/Commercial firewall — keep both copies in lockstep when the bypass shape changes.
+If the bypass list should also change on the commercial side, edit the sibling helper in the commercial repo's `scripts/apply-branch-policies.sh` to match. The two scripts intentionally duplicate the helper to preserve the OSS/Commercial firewall — keep both copies in lockstep when the bypass shape changes.
 
 ## Appendix — App-vs-PAT decision framework
 
@@ -192,5 +192,5 @@ This is the durable decision rule that drove tonight's work and the queued PAT�
 - [`../scripts/apply-branch-policies.sh`](../scripts/apply-branch-policies.sh) — the script this runbook drives.
 - App settings: <https://github.com/settings/apps/lolay-nowline-release> (App ID `3789687`).
 - App installation management: <https://github.com/settings/apps/lolay-nowline-release/installations>.
-- Sibling commercial runbook: `lolay/nowline-infra:ops/branch-policies.md` (covers `nowline-{api,app,infra,site}`).
-- The `release-bot@nowline.io` git author identity used by `release.yml` is documented in `lolay/nowline-infra:ops/email-setup.md`.
+- Sibling commercial runbook: lives in the commercial infrastructure repository (covers the commercial repos).
+- The `release-bot@nowline.io` git author identity used by `release.yml` is documented in the commercial infrastructure repository's `ops/email-setup.md`.

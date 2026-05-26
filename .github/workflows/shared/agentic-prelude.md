@@ -13,7 +13,7 @@ Before deciding anything in the phase that imports this prelude, read these file
 1. `AGENTS.md` — repo-wide orientation for AI agents. Treat any **Hard rules**, **What NOT to do**, **Don't do this**, or equivalent section as authoritative.
 2. `AI_POLICY.md` — repo-wide AI assistance policy (transparency, accountability, quality bars).
 3. `CONTRIBUTING.md` — human contributor workflow. The auto-merge policy and PR conventions there apply to you.
-4. `.github/AGENT_TRIAGE.md` — canonical reference for this state machine (label glossary, override paths, rollout phase). The OSS source-of-truth lives at `lolay/nowline/.github/AGENT_TRIAGE.md`; the commercial source lives at `lolay/nowline-infra/.github/AGENT_TRIAGE.md`; consuming repos may carry a stub linking back.
+4. `.github/AGENT_TRIAGE.md` — canonical reference for this state machine (label glossary, override paths, rollout phase). This repo's copy is the canonical reference; consuming repos may carry a stub linking back.
 
 If any rule in those files contradicts something below, the repo's rule wins. Stop and emit `human-decide` if you cannot reconcile them.
 
@@ -64,8 +64,7 @@ When a phase opens a PR (`agent-deep` and `agent-exec` only, via `safe-outputs: 
 Each repo's `AGENTS.md` lists Hard rules / Don't-do-this items that are stricter than anything here. Examples:
 
 - `lolay/nowline` — round-trip and snapshot tests are sacred regression gates; generated code under `packages/core/src/generated/` is gitignored and overwritten by the build.
-- `lolay/nowline-infra` — `terraform apply` always requires a prior `terraform plan`; `stacks/org/`, `stacks/site/`, and `bootstrap/` are protected by `prevent_destroy`; only WIF, no static service-account keys.
-- `lolay/nowline-app`, `lolay/nowline-api`, `lolay/nowline-site` — see each repo's `AGENTS.md`.
+- Other repos in this estate — see each repo's `AGENTS.md`.
 
 If your action would violate a Hard rule, stop and emit `human-decide` with a comment explaining which rule blocks the action and what would unblock it.
 

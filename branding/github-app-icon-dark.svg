@@ -3,7 +3,7 @@
     Nowline GitHub App icon, dark variant (1024x1024).
     Standalone mark on charcoal so the icon pops on both light and dark
     GitHub UI surfaces. Red stays #e53e3e per the brand spec; timeline
-    uses the dark-theme gray (#4a4a5a) from nowline-app/branding/README.md.
+    uses the dark-theme gray (#4a4a5a) from the commercial branding spec.
   -->
   <rect width="1024" height="1024" fill="#1a1a2e"/>
 

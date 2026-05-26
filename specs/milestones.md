@@ -484,7 +484,7 @@ Four code deliverables (plus this doc-only PR):
    - Handles zoom (`Cmd/Ctrl + scroll-wheel`, trackpad pinch, toolbar +/−), pan (spacebar-drag, drag), Figma-style keyboard presets (`1`/`2`/`3`/`0`), Fit Page / Fit Width, minimap with viewport rect + click-to-recenter + drag-to-pan + auto-hide, and a clickable diagnostic table.
    - No opinion on text editor or message bus. Consumers feed in SVG and diagnostics; consumers handle save/copy/jump-to-line in their own way.
    - VS Code webview imports it (replacing today's inline string template); Free SPA wraps it in React via `useEffect` + ref.
-   - Pro does **not** consume this package. Pro's hybrid HTML+SVG canvas (drag-and-drop, inline card edit) has its own stage-transform interaction model — see `lolay/nowline-app/specs/rendering.md`.
+   - Pro does **not** consume this package. Pro's hybrid HTML+SVG canvas (drag-and-drop, inline card edit) has its own stage-transform interaction model — see the commercial application's rendering spec.
 
 3. **`packages/lsp-worker/` (`@nowline/lsp-worker`)**
    - Browser-side packaging of [`packages/lsp`](../packages/lsp). Today `@nowline/lsp` runs as a Node language server; this package wraps the same Langium services (`createNowlineServices()` from `@nowline/core`) in a Web Worker entry plus a `MessageReader` / `MessageWriter` over `postMessage`.
@@ -498,7 +498,7 @@ Four code deliverables (plus this doc-only PR):
    - Wired into [`packages/cli/scripts/bundle-templates.mjs`](../packages/cli/scripts/bundle-templates.mjs) as a `nowline --init showcase` template alongside the existing minimal/teams/product templates.
    - Re-exported as a string from `@nowline/browser` (or a tiny `@nowline/showcase` sibling) so commercial Free SPAs can ship it as empty-state content without copy-paste drift from the canonical source.
 
-Why no collab schema in OSS: [`lolay/nowline-app/specs/principles.md`](https://github.com/lolay/nowline-app/blob/main/specs/principles.md) and [`lolay/nowline-app/AGENTS.md`](https://github.com/lolay/nowline-app/blob/main/AGENTS.md) carve collaboration out as the value Pro and Enterprise charge for. Even a doc-only Yjs schema would tip Lolay's hand on the moat. The schema doc lives in [`lolay/nowline-app/specs/collab.md`](https://github.com/lolay/nowline-app/blob/main/specs/collab.md) (proprietary). The LSP `didChange` range-delta requirement above is **standard LSP discipline**, not a collab-prep concession — VS Code's existing language client already emits range deltas, and the requirement is what makes incremental analysis on large documents tractable. Any side benefit to a future CRDT layer is incidental.
+Why no collab schema in OSS: the commercial application's principles and AGENTS docs carve collaboration out as the value Pro and Enterprise charge for. Even a doc-only Yjs schema would tip Lolay's hand on the moat. The schema doc lives in the commercial application's specs (proprietary). The LSP `didChange` range-delta requirement above is **standard LSP discipline**, not a collab-prep concession — VS Code's existing language client already emits range deltas, and the requirement is what makes incremental analysis on large documents tractable. Any side benefit to a future CRDT layer is incidental.
 
 Depends on: m1 (DSL + parser), m2b (layout + renderer), m3a (LSP server). Independent of m4 (`@nowline/browser` and `@nowline/preview-shell` consolidate code that today lives in m4 and m3c respectively, but neither requires the m4 CDN deploy to ship).
 

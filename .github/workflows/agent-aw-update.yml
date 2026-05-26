@@ -6,8 +6,7 @@ name: Agent agentic-workflow update
 #
 # For lolay/nowline this repo self-consumes its own canonical workflows, so
 # gh aw update will typically report nothing to update (source is local).
-# The workflow is useful on consuming commercial repos that pin to
-# lolay/nowline-infra at a ref.
+# The workflow is useful on consuming repos that pin to this repo at a ref.
 
 on:
   schedule:

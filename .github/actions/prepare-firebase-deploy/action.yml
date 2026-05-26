@@ -9,8 +9,8 @@ description: 'Sparse-checkout the firebase.json directory, download the named CD
 # effect and a different input shape.
 #
 # All three callers feed the same three GitHub environment-scoped vars
-# from `lolay/nowline-infra`'s WIF outputs (WIF_PROVIDER, DEPLOY_SA_EMAIL,
-# PROJECT_ID — see lolay/nowline-infra:ops/embed-deploy.md § 2).
+# from the infrastructure repository's WIF outputs (WIF_PROVIDER, DEPLOY_SA_EMAIL,
+# PROJECT_ID — see the infrastructure deploy runbook § 2).
 # The action takes those as explicit inputs rather than reading
 # `${{ vars.X }}` directly because composite actions have no access to
 # workflow-level `vars` context; the caller substitutes them.

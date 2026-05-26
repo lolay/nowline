@@ -50,7 +50,7 @@ Pick exactly one of two outcomes.
 The PR meets all of these:
 
 - **Diff matches the plan.** No surprise files, no unrelated drive-by changes, no scope expansion. If the plan said "edit `path/to/foo.ts` and add a test," the PR edits exactly those two files.
-- **Hard rules respected.** The diff doesn't edit generated code, doesn't touch protected snapshot files casually, doesn't drop `prevent_destroy` blocks, doesn't widen scope past `specs/principles.md` (or the analogous boundary doc). Anything in `lolay/nowline-infra/stacks/org/` is automatically `human-pr`.
+- **Hard rules respected.** The diff doesn't edit generated code, doesn't touch protected snapshot files casually, doesn't drop `prevent_destroy` blocks, doesn't widen scope past `specs/principles.md` (or the analogous boundary doc).
 - **Tests present per `CONTRIBUTING.md`.** A regression test for a bug fix; coverage for a new feature. For `lolay/nowline`: round-trip tests still pass and any snapshot bumps have a justification in the PR body.
 - **AI disclosure complete.** Commits carry `Assisted-by: <model>` trailers. PR body has `## AI assistance` section filled in with the matching `Assisted-by:` line. PR body has `Closes #<issue>` on its own line.
 - **CI is green or pending.** All required checks have run and are passing, or are still in progress (the auto-merge glue workflow waits on pending checks). If any required check is failing, this is `human-pr`.
@@ -63,7 +63,7 @@ Post a comment whose **first non-blank line** is `agent-verdict: agent-merge` (p
 Any of these triggers `human-pr`. List them all in the comment, not just one.
 
 - **Scope drift.** The diff exceeds the plan in surface area or intent — adds files the plan didn't list, refactors adjacent code, changes public API beyond what was specified.
-- **Hard-rule sensitivity.** The diff modifies a protected area in a way that warrants human eyes: snapshot updates without justification in the PR body, generated code edits, `prevent_destroy` removal, anything in `stacks/org/` for `lolay/nowline-infra`, anything that would change `specs/` substantively.
+- **Hard-rule sensitivity.** The diff modifies a protected area in a way that warrants human eyes: snapshot updates without justification in the PR body, generated code edits, `prevent_destroy` removal, anything that would change `specs/` substantively.
 - **Test gap.** Bug fix without regression test; new feature without coverage; round-trip / snapshot impact not addressed for `lolay/nowline`.
 - **Disclosure issue.** `Assisted-by:` absent or names the wrong agent; `## AI assistance` section missing or empty; `Closes #N` missing or wrong issue number.
 - **CI red.** Required check failing in a way that suggests the diff itself is broken (not a flake — for flakes, leave a comment naming the flake and let CI re-run). If the failure is genuine, `human-pr`.

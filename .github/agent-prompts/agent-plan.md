@@ -124,7 +124,7 @@ One sentence: what behavior changes after this PR lands.
 
 ### Testing
 
-Name the existing test you'll extend, or describe the new test. For `lolay/nowline`: include round-trip and snapshot impact. For `lolay/nowline-infra`: describe the `terraform plan` diff you expect.
+Name the existing test you'll extend, or describe the new test. For `lolay/nowline`: include round-trip and snapshot impact.
 
 ### Out of scope
 

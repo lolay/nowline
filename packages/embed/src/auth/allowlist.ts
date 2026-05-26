@@ -5,14 +5,14 @@
  *   1. Its domain is in ALLOWED_DOMAINS (e.g. anything @nowline.io), OR
  *   2. The exact lowercase email is in ALLOWED_EMAILS.
  *
- * Mirrors `lolay/nowline-site/src/lib/auth-allowlist.ts` so both Lolay
+ * Mirrors the commercial site's `auth-allowlist.ts` so both Lolay
  * dev surfaces (the marketing site and the embed CDN dev tier) share
  * one allowlist policy. Keep this short; when it grows past ~5 entries,
  * migrate to Firebase custom claims (Admin SDK) or a Firestore
  * `allowlist` collection.
  *
  * See specs/embed.md § Bootstrap status (dev auth gate) and
- * lolay/nowline-infra:ops/embed-deploy.md § 4 for the deploy-side wiring.
+ * the infrastructure deploy runbook § 4 for the deploy-side wiring.
  */
 
 export const ALLOWED_DOMAINS: readonly string[] = ['nowline.io'];
