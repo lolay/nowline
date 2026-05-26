@@ -1,0 +1,29 @@
+# EditorConfig helps maintain consistent coding styles across editors and IDEs
+# See https://editorconfig.org for details
+
+root = true
+
+# Default settings for all files
+[*]
+charset = utf-8
+end_of_line = lf
+indent_style = space
+insert_final_newline = true
+trim_trailing_whitespace = true
+
+# TypeScript, JavaScript, JSON files (4 spaces to match biome.json)
+[*.{ts,mts,cts,tsx,js,mjs,cjs,jsx,json,jsonc}]
+indent_size = 4
+
+# Nowline DSL files (2 spaces per canonical printer)
+[*.nowline]
+indent_size = 2
+
+# Markdown files (4 spaces to match biome formatting, preserve trailing spaces for line breaks)
+[*.md]
+indent_size = 4
+trim_trailing_whitespace = false
+
+# YAML files (2 spaces per GitHub Actions convention)
+[*.{yml,yaml}]
+indent_size = 2
