@@ -33,7 +33,13 @@ The issue meets all of these:
 - Doesn't touch a Hard rule that would categorically block agent action. Examples: editing generated code in `lolay/nowline`'s `packages/core/src/generated/`; `terraform destroy` against `stacks/org/` in `lolay/nowline-infra`; bypassing the WIF-only / no-static-keys policy.
 - Doesn't explicitly request human-only attention (e.g. "don't auto-fix this" in the issue body).
 
-Emit: `add-labels: ["agent-plan"]`. No comment is required on the happy path.
+Post a comment whose **first non-blank line** is the verdict marker:
+
+```
+<!-- agent-verdict: agent-plan -->
+```
+
+No further comment content is required on the happy path. The marker is parsed by `agent-verdict-apply.yml`, which applies the label after confirming no `human-*` override is present.
 
 ### Stop → emit `human-only`
 
@@ -46,19 +52,26 @@ The issue meets any of these:
 - **Conversational.** A question, a discussion-starter, "is this a bug?" with no actionable request. Discussions belong on the issue threads but not in the agent flow.
 - **Comes from a bot account other than this estate's known detectors.** Detectors we trust: `cursor-engine-sync`, `editor-release-monitor`/`vscode-extension-engine-bump` (when they file issues), and any future detector that's been deliberately added.
 
-Emit: `add-labels: ["human-only"]` plus a one-line comment naming which criterion applies. Examples:
+Post a comment whose **first non-blank line** is the verdict marker, followed by a blank line and a one-line reason naming which criterion applies:
 
-- "human-only: out of scope per `specs/principles.md` § non-goals (Nowline doesn't ship issue tracking)."
+```
+<!-- agent-verdict: human-only -->
+
+human-only: out of scope per `specs/principles.md` § non-goals (Nowline doesn't ship issue tracking).
+```
+
+Other examples of the one-line reason:
+
 - "human-only: looks security-sensitive — please follow `SECURITY.md` for private disclosure."
 - "human-only: hotfix on a `release/v*.*` branch — auto-merge is intentionally off for this path."
 
-Keep the comment short — one sentence, with the rule reference. The human reading it should immediately know why.
+Keep the reason short — one sentence, with the rule reference. The human reading it should immediately know why. `agent-verdict-apply.yml` applies the label after parsing the marker.
 
 ## Don't
 
 - Don't investigate the codebase. That's the plan phase's job. You only read the issue + the four house-rule files + the existing labels.
 - Don't post a long comment. One sentence on `human-only`, nothing on `agent-plan`.
-- Don't add any label other than the two listed above. `safe-outputs:` only allows `agent-plan`, `human-only`, and `post-comment`; everything else is rejected at compile time.
+- Don't emit a verdict marker outside the two listed above (`agent-plan`, `human-only`). `agent-verdict-apply.yml` encodes the state machine and will reject any other verdict from triage's current-state position. Your phase frontmatter no longer carries `safe-outputs.add-labels` — the verdict-marker channel is the only sanctioned write path.
 - Don't try to open a PR. You structurally can't, but also: don't try.
 - Don't re-trigger yourself. If the issue already has a state label other than `agent-triage` (because you ran a moment ago, or a human swapped labels), the workflow's `if:` gate skips you — but as a defensive belt-and-suspenders, also skip if you see one of `agent-plan`, `agent-deep`, `agent-exec`, `agent-merge`, `agent-done`, `human-only`, `human-author`, `human-decide`, `human-pr` already present.
 

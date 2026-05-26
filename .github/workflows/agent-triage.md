@@ -13,9 +13,6 @@ engine:
 imports:
   - shared/agentic-prelude.md
 safe-outputs:
-  add-labels:
-    allowed: [agent-plan, human-only]
-    max: 1
   add-comment:
     max: 1
 permissions:

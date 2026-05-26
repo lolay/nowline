@@ -12,9 +12,6 @@ imports:
 safe-outputs:
   assign-to-agent:
     model: claude-opus-4.7
-  add-labels:
-    allowed: [agent-done, human-author, human-decide]
-    max: 1
   add-comment:
     max: 1
 permissions:

@@ -71,7 +71,10 @@ Origin/metadata labels (`cursor-engine-sync`, `dependencies`, `bug`, `automated`
 
 State labels are mutually exclusive. At any moment an issue carries exactly one state label (or zero, before triage); a PR carries exactly one (`agent-merge` or `human-pr`) or zero pre-review.
 
-A glue workflow [`.github/workflows/agent-label-transition.yml`](./workflows/agent-label-transition.yml) enforces this: whenever any `agent-…` or `human-…` label is added, it removes every other state label from the same target. Phase workflows just emit the new label; the cleanup workflow keeps the state-label set a singleton.
+Two glue workflows enforce the lifecycle together:
+
+- [`.github/workflows/agent-verdict-apply.yml`](./workflows/agent-verdict-apply.yml) — the only sanctioned path for an agent (gh-aw phase orchestrator or Copilot session) to add a state label. It reads a verdict marker from a comment, validates the proposed transition against the state machine, and refuses to apply an `agent-*` verdict when any `human-*` label is present. Phase workflow frontmatter has no `safe-outputs.add-labels` capability.
+- [`.github/workflows/agent-label-transition.yml`](./workflows/agent-label-transition.yml) — refined cleanup. When a `human-*` label is added (by a human or by verdict-apply), strips all other state labels (humans win unconditionally). When an `agent-*` label is added (by verdict-apply after its override check passed), strips prior `agent-*` labels only and leaves `human-*` labels intact as defence-in-depth.
 
 Why this design:
 
@@ -111,15 +114,17 @@ The `agent-pr-merged.yml` and `agent-issue-close.yml` glue workflows are the onl
 
 ## Empty-PR ban with three-way resolution
 
-The state machine forbids PRs with zero diff. (See commit `8463631` for the failure mode this design replaces.) When a phase determines no work is needed, it picks a terminal:
+The state machine forbids PRs with zero diff. (See commit `8463631` for the failure mode this design replaces.) When a phase determines no work is needed, it posts a verdict comment:
 
-| Why no PR | Label | Effect | Comment expectation |
-| --- | --- | --- | --- |
-| **Resolved without action** — already implemented, duplicate, wrong repo, detector-says-no-action | `agent-done` | `agent-issue-close.yml` closes the issue | one-line reason + link to existing implementation / duplicate |
-| **Cannot reproduce / ambiguous** | `human-author` | issue stays open, awaits filer | `## What I tried` + `## What I need from you` |
-| **Multi-option / hard-rule blocks action** | `human-decide` | issue stays open, awaits human pick | numbered options with trade-offs and a recommendation |
+| Why no PR | Verdict marker | Resulting label | Effect | Comment expectation |
+| --- | --- | --- | --- | --- |
+| **Resolved without action** — already implemented, duplicate, wrong repo, detector-says-no-action | `<!-- agent-verdict: agent-done -->` | `agent-done` | `agent-issue-close.yml` closes the issue | one-line reason + link to existing implementation / duplicate |
+| **Cannot reproduce / ambiguous** | `<!-- agent-verdict: human-author -->` | `human-author` | issue stays open, awaits filer | `## What I tried` + `## What I need from you` |
+| **Multi-option / hard-rule blocks action** | `<!-- agent-verdict: human-decide -->` | `human-decide` | issue stays open, awaits human pick | numbered options with trade-offs and a recommendation |
 
-Both `agent-plan.md` and the implement workflows (`agent-deep.md`, `agent-exec.md`) can emit any of these terminals; plan is expected to catch most cases, and the implement-phase fallback is the last-line defense if Copilot finds zero diff at the end.
+The verdict marker must be the **first non-blank line** of the comment body; `agent-verdict-apply.yml` reads it, validates the transition against the state machine, and applies the label.
+
+Both `agent-plan.md` and the implement workflows (`agent-deep.md`, `agent-exec.md`) can emit any of these terminals; plan is expected to catch most cases, and the implement-phase fallback is the last-line defence if Copilot finds zero diff at the end. **For Copilot coding-agent sessions**: when the diff is empty after attempting the plan, post a comment with the appropriate verdict marker instead of opening a zero-diff PR or calling `gh issue edit --add-label` directly. `agent-verdict-apply.yml` is author-agnostic — Copilot's comment flows through the same mechanism as gh-aw orchestrator verdicts.
 
 `agent-review.md` has its own defensive empty-PR check: if a PR somehow lands with an empty diff, it emits `human-pr` with a comment recommending the PR be closed.
 
@@ -134,6 +139,7 @@ Both `agent-plan.md` and the implement workflows (`agent-deep.md`, `agent-exec.m
 | [`.github/workflows/agent-review.md`](./workflows/agent-review.md) | gh-aw | `pull_request.opened`/`synchronize` for `copilot-pr`-labeled PRs | add label `agent-merge` or `human-pr` + comment |
 | [`.github/workflows/agent-merge.yml`](./workflows/agent-merge.yml) | plain | `pull_request.labeled` for `agent-merge` | defensive ruleset check, then `gh pr merge --auto --squash`; if no required CI is configured on `main`, falls back to `human-pr` with an explanatory comment |
 | [`.github/workflows/agent-pr-merged.yml`](./workflows/agent-pr-merged.yml) | plain | `pull_request.closed && merged` for `copilot-pr`-labeled PRs | parse `Closes #N`, add `agent-done` to issue |
+| [`.github/workflows/agent-verdict-apply.yml`](./workflows/agent-verdict-apply.yml) | plain | `issue_comment.created` on issues + PRs | parse verdict marker from comment; check state-machine allowed-list + `human-*` override; apply proposed state label via `GH_AW_AGENT_TOKEN` so downstream phase fires |
 | [`.github/workflows/copilot-pr-stamp.yml`](./workflows/copilot-pr-stamp.yml) | plain | `pull_request.opened` by Copilot identity | add `copilot-pr` metadata label; the only place in the estate that checks bot identity |
 | [`.github/workflows/copilot-pr-validate.yml`](./workflows/copilot-pr-validate.yml) | plain | `pull_request.labeled` for `copilot-pr` + `synchronize`/`ready_for_review` | close PR + relabel linked issue to `human-author` if any of the 3 contract checks fail (non-empty diff, `Closes #N`, `Assisted-by:` in body) |
 | [`.github/workflows/agent-issue-close.yml`](./workflows/agent-issue-close.yml) | plain | `issues.labeled` for `agent-done`, gated by `state == 'open'` | `gh issue close $ISSUE` |
@@ -163,7 +169,7 @@ After ~10 issues have run cleanly through all four phases, the allowlist conditi
 The empty-PR ban is enforced at three layers:
 
 1. **Prompt discipline.** `agent-plan.md`'s decision tree forces the planner to pick a terminal before routing to implement. Cases (a)/(b)/(c) cover the no-work-needed scenarios explicitly.
-2. **Implement-phase fallback.** `agent-deep.md` and `agent-exec.md` instruct the delegated Copilot session to emit `agent-done` or `human-author` instead of opening a zero-diff PR.
+2. **Implement-phase fallback.** `agent-deep.md` and `agent-exec.md` instruct the delegated Copilot session to post a verdict-marker comment (`<!-- agent-verdict: agent-done -->` or `<!-- agent-verdict: human-author -->`) instead of opening a zero-diff PR. `agent-verdict-apply.yml` picks up the verdict and applies the label.
 3. **Review-phase defensive check.** `agent-review.md` flags any zero-diff PR that somehow slipped through and routes it to `human-pr` with a recommendation to close.
 
 Together these prevent the failure mode where a detector files an issue, the agent opens a PR with no actual diff, and CI auto-merges nothing into main.
@@ -201,6 +207,8 @@ Every label add and remove event is durable in the timeline. Every comment that 
 - **Two phase workflows ran on the same issue back-to-back.** Expected if a human added two labels in quick succession or if a workflow re-fired. The cleanup workflow ensures the state label set ends as a singleton; intermediate phases that ran before the wrong label was removed are harmless (they're judgment-only — no PR was opened from them).
 - **Copilot session opened a PR but `agent-review.md` didn't fire.** First check whether `copilot-pr-stamp.yml` ran: `gh run list --workflow=copilot-pr-stamp.yml --limit 5`. If stamp didn't run, the PR author wasn't a recognised Copilot identity — update the `if:` in `.github/workflows/copilot-pr-stamp.yml` to include the new identity literal (the only place the check lives). If stamp ran and the `copilot-pr` label is present on the PR, check `gh run list --workflow=agent-review.md --limit 5` — the review workflow's `if:` is `contains(labels, 'copilot-pr')`, so the label being present should be sufficient. Also check the `bots:` list in `agent-review.md` — it's retained as defense-in-depth; if gh-aw's pre-activation gate rejects the PR, add the new bot identity there too.
 - **PR was auto-closed by `copilot-pr-validate.yml`.** The validate workflow enforces three checks on every `copilot-pr`-labeled PR: (1) non-empty diff — if Copilot opened a zero-diff PR, the implementation phase should have emitted `agent-done` or `human-author` instead; re-add the correct label to the issue and close the PR manually if needed; (2) `Closes #N` in the PR body — add the missing reference and `gh pr reopen <PR>` to re-trigger validation; (3) `Assisted-by: <model>` in the PR body's `## AI assistance` section — add the missing line and reopen. After fixing the PR body, push a new commit or reopen the PR to trigger the `synchronize`/`ready_for_review` re-validation run.
+- **Verdict suppressed by human override.** A `<!-- agent-verdict: agent-* -->` comment was posted but the issue (or PR) already carries a `human-*` label applied by a human moderator to take the work offline. `agent-verdict-apply.yml` detects the override and posts a follow-up comment naming the offending label. To resume the agent flow, a human removes the `human-*` label and adds the desired `agent-*` label (or re-adds `agent-triage` to restart from Phase 1). The cleanup workflow's refined behaviour (don't strip `human-*` when adding `agent-*`) is the belt-and-suspenders here.
+- **Verdict rejected: not allowed from current state.** The proposed verdict isn't in the allowed-list for the issue/PR's current state. Examples: `<!-- agent-verdict: agent-merge -->` posted on an issue (PR-only verdict), or `<!-- agent-verdict: agent-plan -->` posted on an issue already labeled `agent-deep`. The state-machine case statement in `agent-verdict-apply.yml` is the canonical encoding; check it against the state diagram above. To recover, post a new comment with a valid verdict for the current state, or transition manually via label-swap.
 
 ## FAQ
 

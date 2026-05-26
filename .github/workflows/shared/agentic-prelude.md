@@ -26,21 +26,25 @@ Every label this state machine uses starts with one of two prefixes:
 
 State labels are mutually exclusive: the cleanup glue workflow (`agent-label-transition.yml`) keeps exactly one state label on an issue or PR at a time. Origin/metadata labels (`cursor-engine-sync`, `dependencies`, `bug`, etc.) are not state labels and are preserved across transitions.
 
-You add labels by emitting them through `safe-outputs: add-labels`. Never call `gh issue edit --add-label` directly from a phase prompt; the safe-outputs sandbox is the only sanctioned write path.
+You don't add labels directly. You emit a **verdict** — a comment whose first non-blank line is `<!-- agent-verdict: <label> -->`. The [`agent-verdict-apply.yml`](./agent-verdict-apply.yml) glue workflow reads the marker, validates it against the state machine (which transitions are reachable from the current state label), checks for any `human-*` override label, and applies the proposed label only when both checks pass.
+
+This means a human swapping in `human-only` (or any `human-*` label) mid-flight is structurally final: the apply workflow respects it and your verdict is suppressed with a follow-up comment naming the override. Your phase frontmatter no longer has `safe-outputs.add-labels` — emitting a verdict via `add-comment` is the only sanctioned write path. Never call `gh issue edit --add-label` directly from a phase prompt.
+
+The same mechanism serves Copilot coding-agent sessions (their empty-diff fallback path inside `agent-deep` / `agent-exec`) and human moderators using the same marker syntax — `agent-verdict-apply.yml` is author-agnostic.
 
 ## 3. Empty-PR ban — three-way resolution
 
 **Never open a PR with zero diff.** Empty PRs were the failure mode that prompted this state machine (see commit `8463631`); the v2 design forbids them structurally and behaviorally.
 
-If after investigation you find no work is needed, classify the reason and emit one terminal label:
+If after investigation you find no work is needed, classify the reason and post a verdict comment:
 
-| Why no PR | Label to emit | Effect |
-| --- | --- | --- |
-| **Resolved without action** — already implemented, duplicate, wrong repo, detector says no action needed | `agent-done` | `agent-issue-close.yml` closes the issue. |
-| **Cannot reproduce / ambiguous** — request unclear, need filer input | `human-author` | Issue stays open. Filer responds and removes the label, which re-fires the plan phase. |
-| **Multi-option / hard-rule blocks action** — would require a design choice, or violates an AGENTS.md hard rule | `human-decide` | Issue stays open. Human picks an option (or `human-only`). |
+| Why no PR | Verdict marker | Resulting label | Effect |
+| --- | --- | --- | --- |
+| **Resolved without action** — already implemented, duplicate, wrong repo, detector says no action needed | `<!-- agent-verdict: agent-done -->` | `agent-done` | `agent-issue-close.yml` closes the issue. |
+| **Cannot reproduce / ambiguous** — request unclear, need filer input | `<!-- agent-verdict: human-author -->` | `human-author` | Issue stays open. Filer responds and removes the label, which re-fires the plan phase. |
+| **Multi-option / hard-rule blocks action** — would require a design choice, or violates an AGENTS.md hard rule | `<!-- agent-verdict: human-decide -->` | `human-decide` | Issue stays open. Human picks an option (or `human-only`). |
 
-In every case, post a comment alongside the label that explains the reasoning. The comment is the auditable artifact; the label is the routing hint.
+Post the verdict marker as the **first non-blank line** of your comment, then a blank line, then the reasoning. The comment body is the auditable artifact; the marker drives `agent-verdict-apply.yml` to apply the label. Both gh-aw phase orchestrators and Copilot coding-agent sessions emit verdicts this way.
 
 ## 4. AI assistance disclosure on PRs — MANDATORY
 
@@ -73,6 +77,8 @@ The phase workflow's `safe-outputs:` frontmatter limits you to a specific set of
 - Implementation phases (deep, exec) can additionally **assign to a Copilot agent** (which then opens a PR in a separate session). The phase's own job still cannot modify code.
 
 If a phase prompt seems to ask for something outside the listed `safe-outputs` capabilities, that's either a mistake in the prompt or you misread it — re-read and pick the in-scope action.
+
+Beyond the safe-outputs sandbox, the verdict mechanism adds a second structural guarantee: agents cannot apply state labels directly. The only path is to emit a verdict marker inside a comment; `agent-verdict-apply.yml` is the only workflow with `issues: write` / `pull-requests: write` for state-label transitions, and it refuses any `agent-*` verdict when a `human-*` label is present. A human swapping `human-only` in mid-flight is structurally final.
 
 ## 7. House style — match the repo
 
