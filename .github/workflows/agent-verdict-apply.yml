@@ -7,7 +7,11 @@ name: Agent verdict apply
 #   (b) the proposed verdict must be in the per-state allowed-verdicts list
 #       (the state machine encoded in this workflow),
 #   (c) the comment must be a real verdict comment — first non-blank line
-#       matches the marker format: <!-- agent-verdict: <label> -->
+#       matches the marker format: agent-verdict: <label>
+#       (plain text, no HTML/XML, no code fence — chosen so gh-aw's safe-outputs
+#       content sanitizer leaves the marker untouched. The earlier
+#       `<!-- agent-verdict: <label> -->` form was mangled by gh-aw's T6
+#       Markdown Safety transformations and silently dropped by the parser.)
 #
 # Triggered by issue_comment.created on both issues and PRs. Author-agnostic
 # by design: verdicts emitted by gh-aw phase orchestrators (via the
@@ -64,7 +68,7 @@ jobs:
               stripped="${line//[[:space:]]/}"
               [[ -z "$stripped" ]] && continue
               search_started=1
-              if [[ "$line" =~ ^[[:space:]]*'<!--'[[:space:]]*agent-verdict:[[:space:]]*([a-z][a-z0-9-]+)[[:space:]]*'-->'[[:space:]]*$ ]]; then
+              if [[ "$line" =~ ^[[:space:]]*agent-verdict:[[:space:]]*([a-z][a-z0-9-]+)[[:space:]]*$ ]]; then
                 verdict="${BASH_REMATCH[1]}"
               fi
               break

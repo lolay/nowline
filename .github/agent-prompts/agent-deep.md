@@ -24,10 +24,10 @@ This phase does not investigate or re-plan. The plan comment from `agent-plan.md
 Search the issue's comments for one whose body starts with `## Plan` and contains the sections defined in `agent-plan.md`'s plan-comment template (Goal, Approach, Files, Testing, Out of scope, Risk).
 
 - **Plan found and complete** → proceed to Step 2.
-- **Plan missing or incomplete** → stop. Post a comment whose first non-blank line is `<!-- agent-verdict: human-decide -->`, followed by:
+- **Plan missing or incomplete** → stop. Post a comment whose first non-blank line is `agent-verdict: human-decide`, followed by:
 
 ```
-<!-- agent-verdict: human-decide -->
+agent-verdict: human-decide
 
 No plan found.
 
@@ -50,7 +50,7 @@ Read the plan's `### Files` list. For each file:
   - `lolay/nowline-infra` — `stacks/org/` requires extra care; `bootstrap/` is one-shot; `prevent_destroy` blocks should not be removed.
 - Confirm the plan's `### Testing` section names a concrete test (existing or new). "Run the test suite" is not a test; "extend `packages/cli/test/convert/roundtrip.test.ts` with a fixture for X" is.
 
-If anything looks wrong, stop. Post a comment whose first non-blank line is `<!-- agent-verdict: human-decide -->`, followed by a blank line and a description of the specific concern: which file is in a protected area, or which test isn't concrete enough, plus a one-line ask for the human to refine the plan. `agent-verdict-apply.yml` applies the label.
+If anything looks wrong, stop. Post a comment whose first non-blank line is `agent-verdict: human-decide`, followed by a blank line and a description of the specific concern: which file is in a protected area, or which test isn't concrete enough, plus a one-line ask for the human to refine the plan. `agent-verdict-apply.yml` applies the label.
 
 ## Step 3 — Hand off to Copilot
 
@@ -73,10 +73,10 @@ The Copilot session is structurally separate from this workflow. Its prompt is s
 
 ## Step 4 — Empty-diff fallback (Copilot's responsibility)
 
-If the Copilot session, after attempting the plan, finds the diff is empty, it must not open a PR. Instead, it must post a comment on the issue whose **first non-blank line** is one of the two verdict markers below, followed by a blank line and the reasoning:
+If the Copilot session, after attempting the plan, finds the diff is empty, it must not open a PR. Instead, it must post a comment on the issue whose **first non-blank line** is one of the two verdict markers below (plain text, no backticks, no HTML comment, no code fence), followed by a blank line and the reasoning:
 
-- `<!-- agent-verdict: agent-done -->` — the work was already there and the plan missed it. (Mirrors plan's case (a). `agent-verdict-apply.yml` applies the label; `agent-issue-close.yml` then closes the issue.)
-- `<!-- agent-verdict: human-author -->` — the issue under-specified what's needed and the plan was a reasonable guess that didn't pan out. (Mirrors plan's case (b). Issue stays open after the label is applied.)
+- `agent-verdict: agent-done` — the work was already there and the plan missed it. (Mirrors plan's case (a). `agent-verdict-apply.yml` applies the label; `agent-issue-close.yml` then closes the issue.)
+- `agent-verdict: human-author` — the issue under-specified what's needed and the plan was a reasonable guess that didn't pan out. (Mirrors plan's case (b). Issue stays open after the label is applied.)
 
 `agent-verdict-apply.yml` is author-agnostic — Copilot's comment emission flows through the same mechanism as gh-aw orchestrator verdicts. If a human applied `human-only` mid-Copilot-session, the apply workflow suppresses the verdict and the human override stays.
 
