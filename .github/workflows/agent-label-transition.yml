@@ -1,17 +1,27 @@
 name: Agent label transition
 
 # Triggered when any agent-* or human-* label is added to an issue or PR.
-# Removes all OTHER state labels from the same target, keeping the state-label
-# set a singleton. Phase workflows just emit the new label via safe-outputs;
-# this cleanup workflow ensures only one state label is present at any time.
+# Enforces the state-label-as-singleton invariant with refined semantics
+# (PR pair 2 / agent-verdict-glue):
+#
+#  - When human-* is added (by a human moderator or by agent-verdict-apply.yml),
+#    strips every other agent-* and human-* state label from the target.
+#    Humans win unconditionally; a human-* label always displaces anything else.
+#
+#  - When agent-* is added (by agent-verdict-apply.yml after the apply
+#    workflow's own override check passed), strips prior agent-* state labels
+#    only. Human-* labels are LEFT IN PLACE as defence-in-depth: if the apply
+#    workflow somehow missed the human-override check, the new agent label
+#    simply coexists with the human label and the human still owns the issue.
 #
 # State labels managed: agent-triage, agent-plan, agent-deep, agent-exec,
 # agent-merge, agent-done, human-only, human-author, human-decide, human-pr.
-# Origin/metadata labels (cursor-engine-sync, dependencies, bug, etc.) are
-# NOT state labels and are never touched by this workflow.
+# Origin/metadata labels (cursor-engine-sync, dependencies, bug, copilot-pr,
+# etc.) are not state labels and are never touched by this workflow.
 #
-# Runs in parallel with the phase workflow triggered by the same label-add
-# event. No race condition because cleanup never removes the just-added label.
+# Runs in parallel with agent-verdict-apply.yml and any phase workflow
+# triggered by the same labeled event. No race condition because cleanup
+# never removes the just-added label.
 
 on:
   issues:
@@ -37,18 +47,34 @@ jobs:
     steps:
       - name: Remove stale state labels
         run: |
-          STATE_LABELS=(
+          set -euo pipefail
+
+          AGENT_LABELS=(
             agent-triage
             agent-plan
             agent-deep
             agent-exec
             agent-merge
             agent-done
+          )
+          HUMAN_LABELS=(
             human-only
             human-author
             human-decide
             human-pr
           )
+
+          # Refined behaviour (PR pair 2 / agent-verdict-glue):
+          #  - human-* added -> strip ALL other state labels (humans win unconditionally)
+          #  - agent-* added -> strip prior agent-* state labels ONLY; leave human-*
+          #    intact as defence-in-depth (if agent-verdict-apply.yml somehow missed
+          #    the override check, the new agent label coexists rather than displacing
+          #    the human-* label)
+          if [[ "$ADDED_LABEL" == human-* ]]; then
+            STRIPPABLE=("${AGENT_LABELS[@]}" "${HUMAN_LABELS[@]}")
+          else
+            STRIPPABLE=("${AGENT_LABELS[@]}")
+          fi
 
           if [[ "${{ github.event_name }}" == "issues" ]]; then
             target_type="issue"
@@ -66,7 +92,7 @@ jobs:
             )
           fi
 
-          for label in "${STATE_LABELS[@]}"; do
+          for label in "${STRIPPABLE[@]}"; do
             if [[ "$label" == "$ADDED_LABEL" ]]; then
               continue
             fi

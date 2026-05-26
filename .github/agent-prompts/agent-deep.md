@@ -24,9 +24,11 @@ This phase does not investigate or re-plan. The plan comment from `agent-plan.md
 Search the issue's comments for one whose body starts with `## Plan` and contains the sections defined in `agent-plan.md`'s plan-comment template (Goal, Approach, Files, Testing, Out of scope, Risk).
 
 - **Plan found and complete** → proceed to Step 2.
-- **Plan missing or incomplete** → stop. Emit `add-labels: ["human-decide"]` and post a comment:
+- **Plan missing or incomplete** → stop. Post a comment whose first non-blank line is `<!-- agent-verdict: human-decide -->`, followed by:
 
 ```
+<!-- agent-verdict: human-decide -->
+
 No plan found.
 
 This phase requires a `## Plan` comment from `agent-plan.md` (or a human writing one
@@ -37,7 +39,7 @@ in the same shape). To resume:
 - Take this offline with `human-only`.
 ```
 
-Issue stays open. This guard exists for the rare case of a human manually adding `agent-deep` without invoking the plan phase. Plan should always be present in normal flow.
+`agent-verdict-apply.yml` applies the label. Issue stays open. This guard exists for the rare case of a human manually adding `agent-deep` without invoking the plan phase. Plan should always be present in normal flow.
 
 ## Step 2 — Sanity-check the plan against Hard rules
 
@@ -48,7 +50,7 @@ Read the plan's `### Files` list. For each file:
   - `lolay/nowline-infra` — `stacks/org/` requires extra care; `bootstrap/` is one-shot; `prevent_destroy` blocks should not be removed.
 - Confirm the plan's `### Testing` section names a concrete test (existing or new). "Run the test suite" is not a test; "extend `packages/cli/test/convert/roundtrip.test.ts` with a fixture for X" is.
 
-If anything looks wrong, stop. Emit `add-labels: ["human-decide"]` and post a comment naming the specific concern: which file is in a protected area, or which test isn't concrete enough, plus a one-line ask for the human to refine the plan.
+If anything looks wrong, stop. Post a comment whose first non-blank line is `<!-- agent-verdict: human-decide -->`, followed by a blank line and a description of the specific concern: which file is in a protected area, or which test isn't concrete enough, plus a one-line ask for the human to refine the plan. `agent-verdict-apply.yml` applies the label.
 
 ## Step 3 — Hand off to Copilot
 
@@ -69,14 +71,16 @@ Plus the standard PR template `## Summary`, `## Motivation`, and `## How I teste
 
 The Copilot session is structurally separate from this workflow. Its prompt is set by the `assign-to-agent` machinery, not by this body. Your only job here is to verify, sanity-check, and delegate.
 
-## Step 4 — Empty-diff fallback (Copilot's responsibility, documented here for completeness)
+## Step 4 — Empty-diff fallback (Copilot's responsibility)
 
-If the Copilot session, after attempting the plan, finds the diff is empty, it must not open a PR. Instead, it must comment on the issue and emit one of:
+If the Copilot session, after attempting the plan, finds the diff is empty, it must not open a PR. Instead, it must post a comment on the issue whose **first non-blank line** is one of the two verdict markers below, followed by a blank line and the reasoning:
 
-- `agent-done` — the work was already there and the plan missed it. (Mirrors plan's case (a). `agent-issue-close.yml` will close the issue.)
-- `human-author` — the issue under-specified what's needed and the plan was a reasonable guess that didn't pan out. (Mirrors plan's case (b). Issue stays open.)
+- `<!-- agent-verdict: agent-done -->` — the work was already there and the plan missed it. (Mirrors plan's case (a). `agent-verdict-apply.yml` applies the label; `agent-issue-close.yml` then closes the issue.)
+- `<!-- agent-verdict: human-author -->` — the issue under-specified what's needed and the plan was a reasonable guess that didn't pan out. (Mirrors plan's case (b). Issue stays open after the label is applied.)
 
-`safe-outputs:` lists these two labels alongside `human-decide` so the fallback path is reachable. The plan phase should catch most empty-diff scenarios; this is the last-line defense.
+`agent-verdict-apply.yml` is author-agnostic — Copilot's comment emission flows through the same mechanism as gh-aw orchestrator verdicts. If a human applied `human-only` mid-Copilot-session, the apply workflow suppresses the verdict and the human override stays.
+
+The plan phase should catch most empty-diff scenarios; this is the last-line defence. Copilot must NOT call `gh issue edit --add-label` directly — the verdict-marker comment is the only sanctioned label-write path.
 
 ## Don't
 
@@ -85,3 +89,4 @@ If the Copilot session, after attempting the plan, finds the diff is empty, it m
 - Don't open a PR from this phase's main job — `safe-outputs:` doesn't allow it. The PR comes from the Copilot session.
 - Don't strip or rewrite the `## Plan` comment. It's the contract between plan and implementation; downstream review reads it.
 - Don't delegate without a plan, even if the issue body looks self-explanatory. The plan-presence check is non-negotiable.
+- Don't emit a verdict marker outside the three listed above (`human-decide`, `agent-done`, `human-author`). Your phase frontmatter no longer carries `safe-outputs.add-labels` — the verdict-marker channel is the only sanctioned label-write path for this orchestrator phase.

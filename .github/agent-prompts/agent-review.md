@@ -26,7 +26,7 @@ This phase is judgment-only. You do not modify the PR diff, do not approve via r
 
 ## Defensive: empty-PR check
 
-If the PR's diff is empty (no files changed, or only whitespace / line-ending changes), this is a slipped-past-implement empty PR. Emit `add-labels: ["human-pr"]` and post:
+If the PR's diff is empty (no files changed, or only whitespace / line-ending changes), this is a slipped-past-implement empty PR. Post a comment whose first non-blank line is `<!-- agent-verdict: human-pr -->`, followed by:
 
 ```
 PR diff is empty.
@@ -54,7 +54,7 @@ The PR meets all of these:
 - **CI is green or pending.** All required checks have run and are passing, or are still in progress (the auto-merge glue workflow waits on pending checks). If any required check is failing, this is `human-pr`.
 - **Target branch is the default branch.** `release/v*.*` and similar hotfix branches are always `human-pr`.
 
-Action: `add-labels: ["agent-merge"]`. No comment is required on the happy path. The `agent-merge.yml` glue workflow then runs `gh pr merge --auto --squash` (after a defensive check that required CI is configured on the repo's main branch ruleset).
+Post a comment whose **first non-blank line** is `<!-- agent-verdict: agent-merge -->`. No further comment content is required on the happy path. `agent-verdict-apply.yml` applies the label; `agent-merge.yml` then runs `gh pr merge --auto --squash` (after a defensive check that required CI is configured on the repo's main branch ruleset).
 
 ### Human review → emit `human-pr`
 
@@ -69,7 +69,7 @@ Any of these triggers `human-pr`. List them all in the comment, not just one.
 - **Style mismatch.** Indentation, quote style, import grouping, or naming that diverges from the surrounding file. Auto-merge with a style miss erodes the bar.
 - **Uncertainty.** You're not sure about something material. Default to `human-pr` and name what you'd want a human to verify.
 
-Action: `add-labels: ["human-pr"]` and post a comment listing the specific concerns, one per bullet. Be concrete:
+Post a comment whose first non-blank line is `<!-- agent-verdict: human-pr -->`, followed by a blank line and a list of the specific concerns, one per bullet. Be concrete:
 
 ```
 Recommending human review for the following:
@@ -83,7 +83,7 @@ The PR sits awaiting a human; whoever picks it up uses your comment as the start
 
 ## Don't
 
-- Don't add labels other than `agent-merge` or `human-pr`. `safe-outputs:` doesn't permit anything else.
+- Don't emit a verdict marker outside the two listed above (`agent-merge`, `human-pr`). `agent-verdict-apply.yml` encodes the state machine and will reject any other verdict from a PR's current-state position. Your phase frontmatter no longer carries `safe-outputs.add-labels` — the verdict-marker channel is the only sanctioned write path.
 - Don't try to fix the PR. You can't (no `contents: write`); you also shouldn't (the implementation phase owns that).
 - Don't approve via `pull-request-review`. The auto-merge gate is the ruleset's CI requirement, not human approval — submitting a review wouldn't unblock anything and would be confusing audit-wise.
 - Don't escalate every PR to `human-pr` reflexively. The flow only earns its keep when most well-formed PRs land cleanly. False `human-pr` is cheap (one human glance), but persistent over-escalation defeats the purpose. Have the courage to emit `agent-merge` when the PR is clean.

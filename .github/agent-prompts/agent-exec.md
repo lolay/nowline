@@ -24,9 +24,11 @@ This phase does not investigate or re-plan. The plan comment from `agent-plan.md
 Search the issue's comments for one whose body starts with `## Plan` and contains the sections defined in `agent-plan.md`'s plan-comment template (Goal, Approach, Files, Testing, Out of scope, Risk).
 
 - **Plan found and complete** → proceed to Step 2.
-- **Plan missing or incomplete** → stop. Emit `add-labels: ["human-decide"]` and post a comment:
+- **Plan missing or incomplete** → stop. Post a comment whose first non-blank line is `<!-- agent-verdict: human-decide -->`, followed by:
 
 ```
+<!-- agent-verdict: human-decide -->
+
 No plan found.
 
 This phase requires a `## Plan` comment from `agent-plan.md` (or a human writing one
@@ -37,7 +39,7 @@ in the same shape). To resume:
 - Take this offline with `human-only`.
 ```
 
-Issue stays open.
+`agent-verdict-apply.yml` applies the label. Issue stays open.
 
 ## Step 2 — Sanity-check that this is actually exec-grade work
 
@@ -48,9 +50,11 @@ Issue stays open.
 - The `### Testing` section names a concrete test, not "we'll add coverage later."
 - No file in `### Files` is in a Hard-rule-protected area. (For `lolay/nowline`: nothing under `packages/core/src/generated/`, no casual snapshot updates, no grammar/AST/layout/renderer changes. For `lolay/nowline-infra`: nothing in `stacks/org/`, `bootstrap/`, no `prevent_destroy` removals. For others: per the repo's `AGENTS.md`.) Hard-rule-protected areas effectively always need `agent-deep`.
 
-If the plan looks deeper than `agent-exec` warrants, stop. Emit `add-labels: ["human-decide"]` and post a comment:
+If the plan looks deeper than `agent-exec` warrants, stop. Post a comment whose first non-blank line is `<!-- agent-verdict: human-decide -->`, followed by:
 
 ```
+<!-- agent-verdict: human-decide -->
+
 This plan looks deeper than `agent-exec` warrants. Consider routing to `agent-deep`
 instead — replace `agent-exec` with `agent-deep` and the deep workflow will pick up
 the same plan.
@@ -60,7 +64,7 @@ Concerns:
 - (one bullet per: too many files, vague approach, protected file, etc.)
 ```
 
-Don't try to do deep reasoning on a fast model. The Sonnet contract is for changes a human reviewer can validate in under a minute.
+`agent-verdict-apply.yml` applies the label. Don't try to do deep reasoning on a fast model. The Sonnet contract is for changes a human reviewer can validate in under a minute.
 
 ## Step 3 — Hand off to Copilot
 
@@ -81,14 +85,14 @@ Plus the standard PR template `## Summary`, `## Motivation`, and `## How I teste
 
 The Copilot session is structurally separate from this workflow. Your only job here is to verify, sanity-check, and delegate.
 
-## Step 4 — Empty-diff fallback
+## Step 4 — Empty-diff fallback (Copilot's responsibility)
 
-Same as `agent-deep`'s Step 4. If the Copilot session, after attempting the plan, finds the diff is empty, it must not open a PR. Instead, comment on the issue and emit one of:
+Same shape as `agent-deep`'s Step 4. If the Copilot session, after attempting the plan, finds the diff is empty, it must not open a PR. Instead, it must post a comment on the issue whose **first non-blank line** is one of the two verdict markers below, followed by a blank line and the reasoning:
 
-- `agent-done` — the work was already there. `agent-issue-close.yml` closes the issue.
-- `human-author` — the issue under-specified what's needed. Issue stays open awaiting filer input.
+- `<!-- agent-verdict: agent-done -->` — the work was already there. `agent-verdict-apply.yml` applies the label; `agent-issue-close.yml` closes the issue.
+- `<!-- agent-verdict: human-author -->` — the issue under-specified what's needed. Issue stays open awaiting filer input.
 
-`safe-outputs:` lists these two alongside `human-decide` (Step 1's escape hatch) so the fallback path is reachable.
+`agent-verdict-apply.yml` is author-agnostic — the Copilot session's comment flows through the same mechanism as gh-aw orchestrator verdicts. Copilot must NOT call `gh issue edit --add-label` directly — the verdict-marker comment is the only sanctioned label-write path.
 
 ## Don't
 
@@ -97,3 +101,4 @@ Same as `agent-deep`'s Step 4. If the Copilot session, after attempting the plan
 - Don't try to do deep reasoning on this fast model. If the plan needs it, escape to `human-decide`.
 - Don't open a PR from this phase's main job — `safe-outputs:` doesn't allow it. The PR comes from the Copilot session.
 - Don't strip or rewrite the `## Plan` comment. It's the contract between plan and implementation.
+- Don't emit a verdict marker outside the three listed above (`human-decide`, `agent-done`, `human-author`). Your phase frontmatter no longer carries `safe-outputs.add-labels` — the verdict-marker channel is the only sanctioned label-write path for this orchestrator phase.
