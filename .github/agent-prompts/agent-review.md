@@ -26,9 +26,11 @@ This phase is judgment-only. You do not modify the PR diff, do not approve via r
 
 ## Defensive: empty-PR check
 
-If the PR's diff is empty (no files changed, or only whitespace / line-ending changes), this is a slipped-past-implement empty PR. Post a comment whose first non-blank line is `<!-- agent-verdict: human-pr -->`, followed by:
+If the PR's diff is empty (no files changed, or only whitespace / line-ending changes), this is a slipped-past-implement empty PR. Post a comment whose first non-blank line is `agent-verdict: human-pr`, followed by:
 
 ```
+agent-verdict: human-pr
+
 PR diff is empty.
 
 The implementation phase should have caught this and emitted `agent-done` (resolved)
@@ -54,7 +56,7 @@ The PR meets all of these:
 - **CI is green or pending.** All required checks have run and are passing, or are still in progress (the auto-merge glue workflow waits on pending checks). If any required check is failing, this is `human-pr`.
 - **Target branch is the default branch.** `release/v*.*` and similar hotfix branches are always `human-pr`.
 
-Post a comment whose **first non-blank line** is `<!-- agent-verdict: agent-merge -->`. No further comment content is required on the happy path. `agent-verdict-apply.yml` applies the label; `agent-merge.yml` then runs `gh pr merge --auto --squash` (after a defensive check that required CI is configured on the repo's main branch ruleset).
+Post a comment whose **first non-blank line** is `agent-verdict: agent-merge` (plain text — no backticks, no HTML comment, no code fence in the comment body). No further comment content is required on the happy path. `agent-verdict-apply.yml` applies the label; `agent-merge.yml` then runs `gh pr merge --auto --squash` (after a defensive check that required CI is configured on the repo's main branch ruleset).
 
 ### Human review → emit `human-pr`
 
@@ -69,9 +71,11 @@ Any of these triggers `human-pr`. List them all in the comment, not just one.
 - **Style mismatch.** Indentation, quote style, import grouping, or naming that diverges from the surrounding file. Auto-merge with a style miss erodes the bar.
 - **Uncertainty.** You're not sure about something material. Default to `human-pr` and name what you'd want a human to verify.
 
-Post a comment whose first non-blank line is `<!-- agent-verdict: human-pr -->`, followed by a blank line and a list of the specific concerns, one per bullet. Be concrete:
+Post a comment whose first non-blank line is `agent-verdict: human-pr`, followed by a blank line and a list of the specific concerns, one per bullet. Be concrete:
 
 ```
+agent-verdict: human-pr
+
 Recommending human review for the following:
 
 - (file/line) `path/to/foo.ts:42` — adds an export not mentioned in the plan; please confirm this is intentional.

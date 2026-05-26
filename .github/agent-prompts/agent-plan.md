@@ -34,7 +34,7 @@ True if any of:
 - The detector that filed the issue is wrong about the underlying state. Example: `cursor-engine-sync` filed a bump issue but the floor is already current per the latest `editor-release-monitor` data.
 - The issue belongs in a different repo and the filer should re-file there.
 
-Post a comment whose **first non-blank line** is `<!-- agent-verdict: agent-done -->`, followed by a blank line and an explanation of which case applies and where the existing implementation / duplicate / correct repo is. `agent-verdict-apply.yml` applies the label; `agent-issue-close.yml` then closes the issue.
+Post a comment whose **first non-blank line** is `agent-verdict: agent-done` (plain text — no backticks, no HTML comment, no code fence in the comment body itself), followed by a blank line and an explanation of which case applies and where the existing implementation / duplicate / correct repo is. `agent-verdict-apply.yml` applies the label; `agent-issue-close.yml` then closes the issue.
 
 ### (b) Cannot reproduce or ambiguous → emit `human-author`
 
@@ -44,10 +44,10 @@ True if:
 - The issue's request is so vague that any plan you write would be a guess. List the questions you need answered.
 - The issue references a state of the world (a screenshot, a log line, a third-party service, a private artifact) you cannot inspect. Name what you'd need.
 
-Post a comment whose first non-blank line is `<!-- agent-verdict: human-author -->`, followed by two sections:
+Post a comment whose first non-blank line is `agent-verdict: human-author`, followed by two sections:
 
 ```
-<!-- agent-verdict: human-author -->
+agent-verdict: human-author
 
 ## What I tried
 
@@ -68,7 +68,7 @@ True if:
 - A repo Hard rule blocks the obvious approach and the alternative requires a deliberate policy call. Example: `lolay/nowline`'s "discuss before drafting non-trivial changes" applies to grammar/AST/layout/renderer changes — if the issue would touch one, this case applies even if you have a clean implementation in mind.
 - The change touches `specs/` content that needs human sign-off before code lands.
 
-Post a comment whose first non-blank line is `<!-- agent-verdict: human-decide -->`, followed by a blank line and a numbered list of options. Each option has:
+Post a comment whose first non-blank line is `agent-verdict: human-decide`, followed by a blank line and a numbered list of options. Each option has:
 
 ```
 ### Option N: <one-line title>
@@ -80,7 +80,7 @@ Post a comment whose first non-blank line is `<!-- agent-verdict: human-decide -
 **Recommendation.** Yours, with one-line reasoning. Or "no preference" if both are reasonable.
 ```
 
-Start the comment body with `<!-- agent-verdict: human-decide -->` as the first non-blank line. End the comment with: "Pick an option by replacing this label with `agent-deep` or `agent-exec`, or take it offline with `human-only`."
+Start the comment body with `agent-verdict: human-decide` as the first non-blank line (plain text — no backticks, no HTML comment, no code fence). End the comment with: "Pick an option by replacing this label with `agent-deep` or `agent-exec`, or take it offline with `human-only`."
 
 ### (d) Route to deep implementation → emit `agent-deep`
 
@@ -90,7 +90,7 @@ True if (a/b/c don't apply, and):
 - The change touches a Hard-rule-protected area but in a way the rule allows. Example: bumping `engines.vscode` per the documented Cursor-tracking policy in `lolay/nowline`'s `CONTRIBUTING.md` — the policy's existence makes the change pre-approved.
 - The change is small in line count but high in reasoning load (a one-line fix to a layout edge case where you need to understand the full layout invariants first).
 
-Post a comment whose first non-blank line is `<!-- agent-verdict: agent-deep -->`, followed by a blank line and a `## Plan` comment with the structure below. `agent-verdict-apply.yml` applies the label.
+Post a comment whose first non-blank line is `agent-verdict: agent-deep`, followed by a blank line and a `## Plan` comment with the structure below. `agent-verdict-apply.yml` applies the label.
 
 ### (e) Route to fast implementation → emit `agent-exec`
 
@@ -100,7 +100,7 @@ True if (a/b/c/d don't apply, and):
 - The diff is bounded to one or two files and the testing strategy is obvious.
 - A reviewer can validate the change in under a minute.
 
-Post a comment whose first non-blank line is `<!-- agent-verdict: agent-exec -->`, followed by a blank line and a `## Plan` comment with the structure below. `agent-verdict-apply.yml` applies the label.
+Post a comment whose first non-blank line is `agent-verdict: agent-exec`, followed by a blank line and a `## Plan` comment with the structure below. `agent-verdict-apply.yml` applies the label.
 
 ## Plan comment structure (cases d and e)
 

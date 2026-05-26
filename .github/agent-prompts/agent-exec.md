@@ -24,10 +24,10 @@ This phase does not investigate or re-plan. The plan comment from `agent-plan.md
 Search the issue's comments for one whose body starts with `## Plan` and contains the sections defined in `agent-plan.md`'s plan-comment template (Goal, Approach, Files, Testing, Out of scope, Risk).
 
 - **Plan found and complete** → proceed to Step 2.
-- **Plan missing or incomplete** → stop. Post a comment whose first non-blank line is `<!-- agent-verdict: human-decide -->`, followed by:
+- **Plan missing or incomplete** → stop. Post a comment whose first non-blank line is `agent-verdict: human-decide`, followed by:
 
 ```
-<!-- agent-verdict: human-decide -->
+agent-verdict: human-decide
 
 No plan found.
 
@@ -50,10 +50,10 @@ in the same shape). To resume:
 - The `### Testing` section names a concrete test, not "we'll add coverage later."
 - No file in `### Files` is in a Hard-rule-protected area. (For `lolay/nowline`: nothing under `packages/core/src/generated/`, no casual snapshot updates, no grammar/AST/layout/renderer changes. For `lolay/nowline-infra`: nothing in `stacks/org/`, `bootstrap/`, no `prevent_destroy` removals. For others: per the repo's `AGENTS.md`.) Hard-rule-protected areas effectively always need `agent-deep`.
 
-If the plan looks deeper than `agent-exec` warrants, stop. Post a comment whose first non-blank line is `<!-- agent-verdict: human-decide -->`, followed by:
+If the plan looks deeper than `agent-exec` warrants, stop. Post a comment whose first non-blank line is `agent-verdict: human-decide`, followed by:
 
 ```
-<!-- agent-verdict: human-decide -->
+agent-verdict: human-decide
 
 This plan looks deeper than `agent-exec` warrants. Consider routing to `agent-deep`
 instead — replace `agent-exec` with `agent-deep` and the deep workflow will pick up
@@ -87,10 +87,10 @@ The Copilot session is structurally separate from this workflow. Your only job h
 
 ## Step 4 — Empty-diff fallback (Copilot's responsibility)
 
-Same shape as `agent-deep`'s Step 4. If the Copilot session, after attempting the plan, finds the diff is empty, it must not open a PR. Instead, it must post a comment on the issue whose **first non-blank line** is one of the two verdict markers below, followed by a blank line and the reasoning:
+Same shape as `agent-deep`'s Step 4. If the Copilot session, after attempting the plan, finds the diff is empty, it must not open a PR. Instead, it must post a comment on the issue whose **first non-blank line** is one of the two verdict markers below (plain text, no backticks, no HTML comment, no code fence), followed by a blank line and the reasoning:
 
-- `<!-- agent-verdict: agent-done -->` — the work was already there. `agent-verdict-apply.yml` applies the label; `agent-issue-close.yml` closes the issue.
-- `<!-- agent-verdict: human-author -->` — the issue under-specified what's needed. Issue stays open awaiting filer input.
+- `agent-verdict: agent-done` — the work was already there. `agent-verdict-apply.yml` applies the label; `agent-issue-close.yml` closes the issue.
+- `agent-verdict: human-author` — the issue under-specified what's needed. Issue stays open awaiting filer input.
 
 `agent-verdict-apply.yml` is author-agnostic — the Copilot session's comment flows through the same mechanism as gh-aw orchestrator verdicts. Copilot must NOT call `gh issue edit --add-label` directly — the verdict-marker comment is the only sanctioned label-write path.
 

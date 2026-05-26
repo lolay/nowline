@@ -36,10 +36,12 @@ The issue meets all of these:
 Post a comment whose **first non-blank line** is the verdict marker:
 
 ```
-<!-- agent-verdict: agent-plan -->
+agent-verdict: agent-plan
 ```
 
 No further comment content is required on the happy path. The marker is parsed by `agent-verdict-apply.yml`, which applies the label after confirming no `human-*` override is present.
+
+The marker is plain text — no backticks, no HTML comment, no code fence in your actual comment body. Just the literal line `agent-verdict: agent-plan` as the first non-blank line. (The earlier `<!-- agent-verdict: ... -->` form was mangled by gh-aw's content sanitizer.)
 
 ### Stop → emit `human-only`
 
@@ -55,7 +57,7 @@ The issue meets any of these:
 Post a comment whose **first non-blank line** is the verdict marker, followed by a blank line and a one-line reason naming which criterion applies:
 
 ```
-<!-- agent-verdict: human-only -->
+agent-verdict: human-only
 
 human-only: out of scope per `specs/principles.md` § non-goals (Nowline doesn't ship issue tracking).
 ```

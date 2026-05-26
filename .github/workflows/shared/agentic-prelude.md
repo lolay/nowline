@@ -26,7 +26,7 @@ Every label this state machine uses starts with one of two prefixes:
 
 State labels are mutually exclusive: the cleanup glue workflow (`agent-label-transition.yml`) keeps exactly one state label on an issue or PR at a time. Origin/metadata labels (`cursor-engine-sync`, `dependencies`, `bug`, etc.) are not state labels and are preserved across transitions.
 
-You don't add labels directly. You emit a **verdict** — a comment whose first non-blank line is `<!-- agent-verdict: <label> -->`. The [`agent-verdict-apply.yml`](./agent-verdict-apply.yml) glue workflow reads the marker, validates it against the state machine (which transitions are reachable from the current state label), checks for any `human-*` override label, and applies the proposed label only when both checks pass.
+You don't add labels directly. You emit a **verdict** — a comment whose first non-blank line is the literal plain text `agent-verdict: <label>` (no backticks, no HTML comment, no code fence). The [`agent-verdict-apply.yml`](./agent-verdict-apply.yml) glue workflow reads the marker, validates it against the state machine (which transitions are reachable from the current state label), checks for any `human-*` override label, and applies the proposed label only when both checks pass. (The marker is plain text rather than an HTML comment because gh-aw's safe-outputs content sanitizer mangles XML-comment syntax — see [Safe Outputs Specification § Markdown Safety](https://github.github.com/gh-aw/reference/safe-outputs-specification/).)
 
 This means a human swapping in `human-only` (or any `human-*` label) mid-flight is structurally final: the apply workflow respects it and your verdict is suppressed with a follow-up comment naming the override. Your phase frontmatter no longer has `safe-outputs.add-labels` — emitting a verdict via `add-comment` is the only sanctioned write path. Never call `gh issue edit --add-label` directly from a phase prompt.
 
@@ -40,9 +40,9 @@ If after investigation you find no work is needed, classify the reason and post 
 
 | Why no PR | Verdict marker | Resulting label | Effect |
 | --- | --- | --- | --- |
-| **Resolved without action** — already implemented, duplicate, wrong repo, detector says no action needed | `<!-- agent-verdict: agent-done -->` | `agent-done` | `agent-issue-close.yml` closes the issue. |
-| **Cannot reproduce / ambiguous** — request unclear, need filer input | `<!-- agent-verdict: human-author -->` | `human-author` | Issue stays open. Filer responds and removes the label, which re-fires the plan phase. |
-| **Multi-option / hard-rule blocks action** — would require a design choice, or violates an AGENTS.md hard rule | `<!-- agent-verdict: human-decide -->` | `human-decide` | Issue stays open. Human picks an option (or `human-only`). |
+| **Resolved without action** — already implemented, duplicate, wrong repo, detector says no action needed | `agent-verdict: agent-done` | `agent-done` | `agent-issue-close.yml` closes the issue. |
+| **Cannot reproduce / ambiguous** — request unclear, need filer input | `agent-verdict: human-author` | `human-author` | Issue stays open. Filer responds and removes the label, which re-fires the plan phase. |
+| **Multi-option / hard-rule blocks action** — would require a design choice, or violates an AGENTS.md hard rule | `agent-verdict: human-decide` | `human-decide` | Issue stays open. Human picks an option (or `human-only`). |
 
 Post the verdict marker as the **first non-blank line** of your comment, then a blank line, then the reasoning. The comment body is the auditable artifact; the marker drives `agent-verdict-apply.yml` to apply the label. Both gh-aw phase orchestrators and Copilot coding-agent sessions emit verdicts this way.
 
