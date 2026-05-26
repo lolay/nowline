@@ -8,10 +8,13 @@ name: Copilot PR validate
 # On any failure: closes the PR with a consolidated comment + relabels the
 # linked issue to human-author with an explanation comment.
 #
-# Triggers via the labeled event when copilot-pr-stamp.yml adds the
-# copilot-pr label (no race — stamp only fires on pull_request.opened;
-# validate fires on pull_request.labeled). Also re-validates on subsequent
-# synchronize/ready_for_review events while the label is still present.
+# Trigger ordering:
+#   labeled (non-draft only): fires after copilot-pr-stamp.yml adds the label
+#     on an already-ready PR. Draft PRs are skipped here — Copilot opens a
+#     placeholder draft and fills in the body later.
+#   synchronize (non-draft only): re-validates on commit push for ready PRs.
+#   ready_for_review: the primary validation gate for Copilot draft PRs;
+#     fires when Copilot converts the draft to ready after completing the work.
 
 on:
   pull_request:
@@ -27,8 +30,11 @@ jobs:
     name: Validate Copilot PR contract
     runs-on: ubuntu-latest
     if: >
-      (github.event.action == 'labeled' && github.event.label.name == 'copilot-pr') ||
-      ((github.event.action == 'synchronize' || github.event.action == 'ready_for_review') &&
+      (github.event.action == 'labeled' && github.event.label.name == 'copilot-pr' &&
+       github.event.pull_request.draft == false) ||
+      (github.event.action == 'synchronize' && github.event.pull_request.draft == false &&
+       contains(github.event.pull_request.labels.*.name, 'copilot-pr')) ||
+      (github.event.action == 'ready_for_review' &&
        contains(github.event.pull_request.labels.*.name, 'copilot-pr'))
     env:
       # GH_AW_AGENT_TOKEN so label-add events fire downstream workflows.
