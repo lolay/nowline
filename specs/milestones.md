@@ -37,7 +37,7 @@ Commercial milestones (hosted editor, free viewer, MCP, enterprise, FedRAMP) are
 | ~~m3e~~ | ~~Export from VS Code~~ | Apache 2.0 | `Nowline: Export…` shell-out command for PDF / pixel-strict PNG / HTML / Markdown+Mermaid / XLSX / MS Project XML; `nowline.export.*` settings (cliPath, PDF page-size/orientation/margin, sans/mono fonts, headless, PNG scale, MS Project start); per-export Override… quickPick |
 | ~~m3f~~ | ~~Authoring commands~~ | Apache 2.0 | `Nowline: New Roadmap…` (`--init` parity); `.nowlinerc`-vs-settings disagreement diagnostic in the preview (suppressed when `nowline.ignoreRcFile` is `true`) |
 | ~~m3.5~~ | ~~GitHub Action~~ | Apache 2.0 | `packages/nowline-action/` (in this monorepo) + `lolay/nowline-action` Marketplace mirror: file mode + markdown mode, shells out to `@nowline/cli`. Five releases (`v0.2.2`–`v0.2.5`) shipped; Marketplace listing live. One small carry-forward: bundled-action smoke test — see [`specs/handoffs/handoff-m3.5-action.md`](./handoffs/handoff-m3.5-action.md) → "Remaining work". |
-| m4 | Embed | Apache 2.0 | Browser embed script (`@nowline/embed`) and the branded `embed.nowline.{io,dev}` Firebase-Hosted CDN deploy. Bundle landed; CDN deploy still pending — see [`specs/handoffs/handoff-m4-embed.md`](./handoffs/handoff-m4-embed.md) → "Carried forward". |
+| ~~m4~~ | ~~Embed~~ | Apache 2.0 | Browser embed script (`@nowline/embed`) and the branded `embed.nowline.{io,dev}` Firebase-Hosted CDN deploy. Bundle + CDN shipped — `embed.nowline.dev/nowline.min.js` live 2026-05-26. |
 | m4.5 | IDE Expansion | Apache 2.0 | Obsidian, Neovim, JetBrains (timing TBD) |
 | m4.6 | Windows distribution | Apache 2.0 | Scoop bucket (`lolay/scoop-bucket`) and WinGet central-registry submission via `wingetcreate`; new `update-scoop-bucket` + `submit-winget-pkg` jobs in `release.yml`; `SCOOP_BUCKET_TOKEN` + `WINGET_PR_PAT` secrets |
 | ~~m4.7~~ | ~~Browser pipeline + preview shell + LSP worker + showcase~~ | Apache 2.0 | `@nowline/browser` (single-call browser pipeline; consolidates today's embed + VS Code render-pipeline glue), `@nowline/preview-shell` (framework-agnostic viewport chrome — zoom/pan/fit/minimap/diagnostic table), `@nowline/lsp-worker` (browser-side packaging of `@nowline/lsp` as a Web Worker + CodeMirror client adapter), `examples/showcase.nowline` (canonical sample roadmap re-exported as a string asset). See [`specs/handoffs/handoff-m4.7-browser-pipeline.md`](./handoffs/handoff-m4.7-browser-pipeline.md). |
@@ -431,7 +431,7 @@ Closes the remaining gap with the verbless CLI by exposing the parts of `--init`
 
 Spec: [`specs/ide.md`](./ide.md) § Authoring commands
 
-### m3.5 — GitHub Action
+### ~~m3.5~~ — GitHub Action
 
 Renders Nowline files in CI for hosts that strip `<script>` tags (GitHub READMEs, issue comments, etc.). Two modes:
 
@@ -450,7 +450,7 @@ Status: **shipped.** `packages/nowline-action/` source, esbuild bundle (`dist/in
 
 Spec: [`specs/embed.md`](./embed.md) § GitHub Action
 
-### m4 — Embed (browser bundle)
+### ~~m4~~ — Embed (browser bundle)
 
 `@nowline/embed`: a single esbuild-built IIFE that finds ` ```nowline ` fenced code blocks in a page and renders them client-side. Mirrors Mermaid's surface (`initialize`, `render`, `parse`, `init`/`run`) so users coming from Mermaid don't have to relearn anything.
 
@@ -458,7 +458,7 @@ Spec: [`specs/embed.md`](./embed.md) § GitHub Action
 - New `packages/embed/` package, published to npm in lock-step with the rest of the workspace.
 - esbuild script emits `dist/nowline.min.js` (IIFE), `dist/nowline.esm.js` (ESM), and source maps; CI bundle-size gate at 175 KB gzipped (first measurement landed at ~163 KB; budget headroom buys ~12 KB for incremental growth and still beats Mermaid's 200 KB by a comfortable margin).
 - happy-dom smoke covers auto-scan replacement, multi-block style isolation, manual `nowline.render`, and the once-per-page `include`-warning behaviour.
-- Distribution: branded CDN at `embed.nowline.{io,dev}` (Firebase-Hosted, two projects, per-PR ephemeral channels). Bundle is published to npm today; the Firebase deploy job + DNS bootstrap is the remaining piece of m4 — tracked in [`specs/handoffs/handoff-m4-embed.md`](./handoffs/handoff-m4-embed.md) → "Carried forward" and aligned with `specs/features.md` feature 32.
+- Distribution: branded CDN at `embed.nowline.{io,dev}` (Firebase-Hosted, two projects, per-PR ephemeral channels). `embed.nowline.dev/nowline.min.js` live 2026-05-26 via `embed-cdn.yml` (WIF-authenticated, main-push dev deploy + tag-driven prod deploy). See [`specs/handoffs/handoff-m4-embed.md`](./handoffs/handoff-m4-embed.md) § "What shipped".
 
 Single-file mode: the embed warns once and skips `include` directives. Multi-file rendering remains the CLI's / m3.5 action's job.
 
