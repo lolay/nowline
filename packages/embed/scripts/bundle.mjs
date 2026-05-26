@@ -72,7 +72,7 @@ function resolveSha() {
     } catch {
         // git not available (e.g. shallow clone without history). Fall back
         // to a stable sentinel so the banner stays well-formed and the
-        // verification curl in lolay/nowline-infra:ops/embed-deploy.md still
+        // verification curl in the infrastructure deploy runbook still
         // parses.
         return 'unknown';
     }
@@ -88,9 +88,8 @@ const bannerJs = `${bannerHeader}${devWarn}`;
 
 // Firebase web-app config for the dev auth gate. Read at build time from
 // env vars (set by `.github/workflows/embed-cdn.yml` from the `embed-dev`
-// environment-scoped variables — see
-// lolay/nowline-infra:ops/embed-deploy.md § 2.5). Substituted into the bundle
-// via esbuild defines; the prod build never reaches the
+// environment-scoped variables — see the infrastructure deploy runbook § 2.5).
+// Substituted into the bundle via esbuild defines; the prod build never reaches the
 // firebase-auth.client module (dead-code-eliminated when
 // __NOWLINE_EMBED_ENV__ === 'prod'), so empty values are fine there.
 //
@@ -116,7 +115,7 @@ if (isDev && isCI) {
                 'Without these the dev auth gate ships disabled (silent runtime no-op),\n' +
                 'leaving embed.nowline.dev publicly reachable.\n' +
                 'Configure them on the embed-dev GitHub environment per\n' +
-                'lolay/nowline-infra:ops/embed-deploy.md § 2.5.',
+                'the infrastructure deploy runbook § 2.5.',
         );
         process.exit(1);
     }

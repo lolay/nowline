@@ -277,12 +277,12 @@ The m3.5 action also moved into the monorepo (at
   self-host; npm-backed CDNs (jsDelivr, unpkg) serve the package as
   the unsupported escape hatch the spec already calls out, not the
   documented channel.
-- **Infra moved to `lolay/nowline-infra` (not in this repo).** The
+- **Infra moved to the infrastructure repository (not in this repo).** The
   pre-implementation handoff above described creating the two
   Firebase projects manually, minting static service-account JSON
   keys, and uploading them as `FIREBASE_SERVICE_ACCOUNT_*` GitHub
   secrets. That posture is **superseded**. All cloud infrastructure
-  for Nowline now lives in [`lolay/nowline-infra`](https://github.com/lolay/nowline-infra)
+  for Nowline now lives in the infrastructure repository
   — a Terraform-managed control plane with WIF-only authentication
   (org policy `iam.disableServiceAccountKeyCreation` enforced, no
   static keys allowed). The embed bootstrap split is:
@@ -292,17 +292,16 @@ The m3.5 action also moved into the monorepo (at
     WIF pools, and the custom-domain bindings for
     `embed.nowline.{io,dev}`. Squarespace DNS records on the two
     `embed.*` subdomains are applied by hand per the infra repo's
-    `ops/dns.md`. See `lolay/nowline-infra/specs/milestones.md` § m7.
+    `ops/dns.md`. See the infrastructure repository's `specs/milestones.md` § m7.
   - **This repo:** wires `release.yml`'s `embed-prod` / `embed-dev`
     cells against the infra's WIF outputs (consumed as GitHub
     environment-scoped variables `WIF_PROVIDER`,
-    `DEPLOY_SA_EMAIL`, `PROJECT_ID` per the pattern in
-    `lolay/nowline-infra/ops/runbook.md` § "Wire a tier into GitHub
+    `DEPLOY_SA_EMAIL`, `PROJECT_ID` per the pattern in the
+    infrastructure repository's `ops/runbook.md` § "Wire a tier into GitHub
     Actions"), ships a `firebase.json` per project encoding the
     cache-header contract from [`specs/embed.md`](../embed.md)
     § Distribution, and resolves the dev auth gate decision. The
-    end-to-end deploy checklist lives in the infra repo at
-    [`lolay/nowline-infra:ops/embed-deploy.md`](https://github.com/lolay/nowline-infra/blob/main/ops/embed-deploy.md).
+    end-to-end deploy checklist lives in the infrastructure repository's deploy runbook.
 - **Bundler: esbuild.** Matches Mermaid's production bundler since
   [PR #4729](https://github.com/mermaid-js/mermaid/pull/4729) (2023,
   when they replaced UMD with IIFE for the same reason we want one),
@@ -375,7 +374,7 @@ in dependency order.
 
 - Branded `embed.nowline.{io,dev}` Firebase-Hosted CDN deploy. Now
   split across two repos:
-  - **`lolay/nowline-infra` m7** owns the two Firebase projects
+  - **Infrastructure repository m7** owns the two Firebase projects
     (`nowline-embed-{prod,dev}`), billing, deploy SAs, WIF pools,
     custom domain bindings, and the manual Squarespace DNS records.
     Cross-reference: that repo's `specs/milestones.md` § m7 and
@@ -386,8 +385,7 @@ in dependency order.
     per-project `firebase.json` carrying the cache-header contract
     from [`specs/embed.md`](../embed.md) § Distribution, the dev
     auth gate decision, and the bundle-provenance banner. End-to-end
-    checklist lives in the infra repo at
-    [`lolay/nowline-infra:ops/embed-deploy.md`](https://github.com/lolay/nowline-infra/blob/main/ops/embed-deploy.md).
+    checklist lives in the infrastructure repository's deploy runbook.
 
   Tracked as `specs/features.md` feature 32.
 

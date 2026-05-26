@@ -1,6 +1,6 @@
 # Agent triage — state machine
 
-Canonical reference for the issue → agent → PR state machine that runs across the Nowline OSS repos (`lolay/nowline`, `lolay/nowline-action`). This file is the OSS source-of-truth; the commercial mirror lives at `lolay/nowline-infra/.github/AGENT_TRIAGE.md`. The two docs are allowed to diverge over time; commercial may add repo-specific labels later.
+Canonical reference for the issue → agent → PR state machine that runs across the Nowline OSS repos (`lolay/nowline`, `lolay/nowline-action`). This file is the canonical reference for this repo.
 
 The flow turns any GitHub issue with the right starting label into a series of small AI-driven phases: **triage** decides whether the agent should proceed; **plan** decides what to do; **implement** (deep or fast) writes the code; **review** decides whether the PR is safe to auto-merge. Empty PRs are forbidden by design. Humans can override or stop the flow at any step by swapping a label.
 
@@ -153,7 +153,7 @@ Both `agent-plan.md` and the implement workflows (`agent-deep.md`, `agent-exec.m
 
 `agent-aw-update.yml` runs weekly. It executes `gh aw update --all`, which checks each installed workflow's `source:` pin against upstream and produces a three-way merge if upstream changed. If the merge produces a non-empty diff, the workflow opens a PR titled `chore(aw): sync agentic workflows from upstream`. The PR's diff is reviewable like any other.
 
-This repo self-consumes its own workflows — no `gh aw add` is needed because the source-of-truth IS the working repo. The same is true for `lolay/nowline-infra` on the commercial side.
+This repo self-consumes its own workflows — no `gh aw add` is needed because the source-of-truth IS the working repo.
 
 ## Rollout phase (allowlist mode)
 
@@ -202,7 +202,7 @@ Every label add and remove event is durable in the timeline. Every comment that 
 
 - **Issue stuck on `agent-plan` for >30 minutes.** The plan phase uses Opus and can take a few minutes, but >30m suggests the workflow failed to start. Check `gh run list --workflow=agent-plan.md --limit 5` for the run. If it's missing, the trigger condition probably didn't match — verify the issue carries `agent-plan` and no skip-gate label.
 - **Plan re-fires repeatedly.** Plan re-fires whenever its trigger label is re-added. If a human keeps swapping `human-author` → `agent-plan` without responding to the questions in the comment, the plan will keep producing the same `human-author` output. The right move: respond to the questions in a comment, *then* swap the label.
-- **PR has `agent-merge` but isn't auto-merging.** Either (a) `agent-merge.yml`'s defensive guard found no required CI on the ruleset and fell back to `human-pr` (look for a comment from the bot explaining), or (b) one or more required checks is failing. Check the PR's Checks tab. The defensive guard exists because three commercial repos currently lack required CI contexts; the OSS repo (`lolay/nowline`) has nine and passes through cleanly.
+- **PR has `agent-merge` but isn't auto-merging.** Either (a) `agent-merge.yml`'s defensive guard found no required CI on the ruleset and fell back to `human-pr` (look for a comment from the bot explaining), or (b) one or more required checks is failing. Check the PR's Checks tab.
 - **Issue closed but `agent-done` not present.** GitHub's `Closes #N` auto-close fires before `agent-pr-merged.yml` can add the label, depending on race ordering. In that case `agent-pr-merged.yml` adds `agent-done` post-close; the `agent-issue-close.yml` workflow is a no-op when the issue is already closed. Both terminals are reachable; search by `is:closed label:agent-done` for the canonical query.
 - **Two phase workflows ran on the same issue back-to-back.** Expected if a human added two labels in quick succession or if a workflow re-fired. The cleanup workflow ensures the state label set ends as a singleton; intermediate phases that ran before the wrong label was removed are harmless (they're judgment-only — no PR was opened from them).
 - **Copilot session opened a PR but `agent-review.md` didn't fire.** First check whether `copilot-pr-stamp.yml` ran: `gh run list --workflow=copilot-pr-stamp.yml --limit 5`. If stamp didn't run, the PR author wasn't a recognised Copilot identity — update the `if:` in `.github/workflows/copilot-pr-stamp.yml` to include the new identity literal (the only place the check lives). If stamp ran and the `copilot-pr` label is present on the PR, check `gh run list --workflow=agent-review.md --limit 5` — the review workflow's `if:` is `contains(labels, 'copilot-pr')`, so the label being present should be sufficient. Also check the `bots:` list in `agent-review.md` — it's retained as defense-in-depth; if gh-aw's pre-activation gate rejects the PR, add the new bot identity there too.
@@ -217,6 +217,6 @@ Every label add and remove event is durable in the timeline. Every comment that 
 
 **Why is judgment ≠ implementation?** The structural guarantee from `safe-outputs:` is the design's foundation: judgment phases physically cannot open PRs or modify code. Even if a prompt confuses the model into "wanting" to write code, the workflow's permissions don't allow it. Same is true for the review phase — it can label and comment, period.
 
-**Why does `agent-merge.yml` have a defensive guard?** Because not every repo in this estate has required CI contexts wired into its ruleset yet. Without the guard, `gh pr merge --auto` would land an ungated PR on those repos. The guard checks for at least one `required_status_checks` context before calling auto-merge; if none, it relabels to `human-pr` with an explanatory comment. See `commercial-three-pr-ci-gates` in the rollout plan and [nowline-infra/ops/branch-policies.md](../../nowline-infra/ops/branch-policies.md) §6 for the gap.
+**Why does `agent-merge.yml` have a defensive guard?** Because not every repo in this estate has required CI contexts wired into its ruleset yet. Without the guard, `gh pr merge --auto` would land an ungated PR on those repos. The guard checks for at least one `required_status_checks` context before calling auto-merge; if none, it relabels to `human-pr` with an explanatory comment.
 
 **Why preserve origin labels (`cursor-engine-sync`, `dependencies`, etc.)?** They're metadata about *where the issue came from*, not state. The cleanup workflow only touches `agent-…` and `human-…` labels. This means `is:closed label:cursor-engine-sync label:agent-done` shows every issue the engine-sync detector filed that resolved through the agent flow — useful for tracking detector signal-to-noise.

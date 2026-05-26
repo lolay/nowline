@@ -48,7 +48,7 @@ in the same shape). To resume:
 - The `### Files` list is one or two files. (Three is a stretch; four is a sign this should be `agent-deep`.)
 - The `### Approach` section is short — 2–4 sentences max. If it's longer than that, the change probably needs deeper reasoning.
 - The `### Testing` section names a concrete test, not "we'll add coverage later."
-- No file in `### Files` is in a Hard-rule-protected area. (For `lolay/nowline`: nothing under `packages/core/src/generated/`, no casual snapshot updates, no grammar/AST/layout/renderer changes. For `lolay/nowline-infra`: nothing in `stacks/org/`, `bootstrap/`, no `prevent_destroy` removals. For others: per the repo's `AGENTS.md`.) Hard-rule-protected areas effectively always need `agent-deep`.
+- No file in `### Files` is in a Hard-rule-protected area. (For `lolay/nowline`: nothing under `packages/core/src/generated/`, no casual snapshot updates, no grammar/AST/layout/renderer changes. For others: per the repo's `AGENTS.md`.) Hard-rule-protected areas effectively always need `agent-deep`.
 
 If the plan looks deeper than `agent-exec` warrants, stop. Post a comment whose first non-blank line is `agent-verdict: human-decide`, followed by:
 

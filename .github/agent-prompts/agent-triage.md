@@ -28,9 +28,9 @@ Pick exactly one of two outcomes.
 
 The issue meets all of these:
 
-- Falls within the repo's scope. For `lolay/nowline`, that's `specs/principles.md` (and its non-goals list); for `lolay/nowline-infra`, that's `specs/architecture.md`; equivalent boundary docs in the other repos.
+- Falls within the repo's scope. For `lolay/nowline`, that's `specs/principles.md` (and its non-goals list); equivalent boundary docs in other repos.
 - Has enough detail for a planning agent to read the codebase and pick an approach. You don't need to plan it yourself — you're just deciding it's plannable.
-- Doesn't touch a Hard rule that would categorically block agent action. Examples: editing generated code in `lolay/nowline`'s `packages/core/src/generated/`; `terraform destroy` against `stacks/org/` in `lolay/nowline-infra`; bypassing the WIF-only / no-static-keys policy.
+- Doesn't touch a Hard rule that would categorically block agent action. Examples: editing generated code in `lolay/nowline`'s `packages/core/src/generated/`; bypassing the WIF-only / no-static-keys policy.
 - Doesn't explicitly request human-only attention (e.g. "don't auto-fix this" in the issue body).
 
 Post a comment whose **first non-blank line** is the verdict marker:

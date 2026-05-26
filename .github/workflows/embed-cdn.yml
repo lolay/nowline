@@ -14,8 +14,8 @@ name: Embed CDN
 # deploy can never accidentally rewrite `embed.nowline.io/latest/`.
 #
 # Both jobs authenticate via the `embed-dev` environment's Workload
-# Identity Federation outputs from `lolay/nowline-infra` m7 — see
-# lolay/nowline-infra:ops/embed-deploy.md §§ 1–2 for the operator-side
+# Identity Federation outputs from the infrastructure repository m7 — see
+# the infrastructure deploy runbook §§ 1–2 for the operator-side
 # env setup and §§ 5–6 for the workflow shape and verification steps.
 
 on:

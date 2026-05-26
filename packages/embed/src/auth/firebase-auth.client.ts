@@ -1,7 +1,7 @@
 /**
  * Client-side Firebase Auth gate for the dev embed bundle.
  *
- * Mirrors `lolay/nowline-site/src/lib/firebase-auth.client.ts` so the
+ * Mirrors the commercial site's `firebase-auth.client.ts` so the
  * two Lolay dev surfaces share one allowlist UX. Loaded only on the
  * dev build (when `__NOWLINE_EMBED_ENV__ === 'dev'`); the prod build
  * tree-shakes the dynamic import in `src/index.ts` and never pulls
@@ -15,7 +15,7 @@
  * client-side, opaque to the embedder.
  *
  * See specs/embed.md § Bootstrap status (dev auth gate) and
- * lolay/nowline-infra:ops/embed-deploy.md § 4 for the deploy-side wiring.
+ * the infrastructure deploy runbook § 4 for the deploy-side wiring.
  */
 
 import { type FirebaseApp, initializeApp } from 'firebase/app';
@@ -32,8 +32,7 @@ import { isAllowlisted } from './allowlist.js';
 
 // esbuild-substituted at build time from PUBLIC_FIREBASE_* env vars in
 // .github/workflows/embed-cdn.yml (sourced from the `embed-dev` GitHub
-// environment-scoped variables — see
-// lolay/nowline-infra:ops/embed-deploy.md § 2.5).
+// environment-scoped variables — see the infrastructure deploy runbook § 2.5).
 declare const __NOWLINE_FIREBASE_API_KEY__: string;
 declare const __NOWLINE_FIREBASE_AUTH_DOMAIN__: string;
 declare const __NOWLINE_FIREBASE_PROJECT_ID__: string;

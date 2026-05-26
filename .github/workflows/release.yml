@@ -888,12 +888,11 @@ jobs:
   # `environment: embed-prod` for the manual-approval gate, both of
   # which are job-level scopes that can't vary across matrix cells.
   #
-  # Authenticates to GCP via WIF — see lolay/nowline-infra m7 for the
-  # provider/SA wiring. The GitHub environment-scoped variables
+  # Authenticates to GCP via WIF — see the infrastructure repository's
+  # m7 for the provider/SA wiring. The GitHub environment-scoped variables
   # (WIF_PROVIDER, DEPLOY_SA_EMAIL, PROJECT_ID) are set by the
-  # operator from `terraform output` of
-  # `lolay/nowline-infra/stacks/embed/<env>` per
-  # lolay/nowline-infra:ops/embed-deploy.md § 2. No static service-account
+  # operator from `terraform output` of the infrastructure repository's
+  # `stacks/embed/<env>` per the infrastructure deploy runbook § 2. No static service-account
   # JSON keys — the org policy `iam.disableServiceAccountKeyCreation`
   # would block them anyway.
   embed-prod:

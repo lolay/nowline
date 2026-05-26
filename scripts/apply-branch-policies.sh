@@ -6,11 +6,10 @@
 # from any machine that has `gh` authenticated with admin scope on the
 # lolay org.
 #
-# The commercial repos (`lolay/nowline-{api,app,infra,site}`) are managed
-# by a sibling script at `lolay/nowline-infra/scripts/apply-branch-policies.sh`.
-# Both scripts share the same helper shape but each owns only its own
-# tier — OSS source-of-truth lives in this repo, commercial source-of-
-# truth lives in nowline-infra.
+# The commercial repos are managed by a sibling script in the commercial
+# infrastructure repository. Both scripts share the same helper shape but
+# each owns only its own tier — OSS source-of-truth lives in this repo,
+# commercial source-of-truth lives in the infrastructure repository.
 #
 # Operator-facing runbook: ops/branch-policies.md (why the policy is
 # shaped this way, when to re-run, how to extend, known gaps).  This
