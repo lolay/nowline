@@ -116,16 +116,18 @@ Defined in [`build.yml`](./.github/workflows/build.yml). One job, one matrix, te
 | `bin-linux-arm64` | ubuntu-latest | `nowline-linux-arm64` + `nowline_arm64.deb` artifacts |
 | `bin-windows-x64` | windows-latest | `nowline-windows-x64.exe` artifact |
 | `bin-windows-arm64` | windows-latest | `nowline-windows-arm64.exe` artifact |
-| `pack-npm` | ubuntu-latest | `npm-tarballs` artifact (sixteen `.tgz` files) |
+| `pack-npm` | ubuntu-latest | `npm-tarballs` artifact (seventeen `.tgz` files) |
 | `pack-vsix` | ubuntu-latest | `nowline-vscode.vsix` artifact |
 | `pack-action` | ubuntu-latest | `action-mirror` bundle artifact |
 | `pack-embed` | ubuntu-latest | embed CDN prod tree integrity check |
 
 Binary cells use `bun compile` and run the same per-format smoke test (SVG, PNG, PDF, HTML, Mermaid, XLSX, MS Project XML) against `examples/minimal.nowline`, except cross-target combinations that cannot execute on the runner. The two linux cells additionally invoke [`scripts/build-deb.sh`](../scripts/build-deb.sh) on the binary they just produced — keeping the binary→deb chain intra-cell skips an artifact upload/download round-trip.
 
-`pack-npm` runs `pnpm pack` for the sixteen publishable packages in dependency order (`@nowline/core`, `@nowline/layout`, `@nowline/renderer`, `@nowline/browser`, `@nowline/embed`, `@nowline/preview-shell`, `@nowline/lsp`, `@nowline/lsp-worker`, `@nowline/export-core`, the six per-format `@nowline/export-*` packages, `@nowline/cli`). pnpm 10 rewrites `workspace:*` to the resolved version inside each tarball, so the publish phase uses plain `npm publish <tarball>` with no workspace-protocol shenanigans. `@nowline/config` is intentionally excluded — it is consumed only by `@nowline/cli`, which is shipped via the `bun compile` binaries (.deb, Homebrew, GH Releases) where the dep is bundled at compile time.
+`pack-npm` runs `pnpm pack` for the seventeen publishable packages in dependency order (`@nowline/core`, `@nowline/layout`, `@nowline/renderer`, `@nowline/browser`, `@nowline/embed`, `@nowline/preview-shell`, `@nowline/lsp`, `@nowline/lsp-worker`, `@nowline/export-core`, the six per-format `@nowline/export-*` packages, `@nowline/config`, `@nowline/cli`). pnpm 10 rewrites `workspace:*` to the resolved version inside each tarball, so the publish phase uses plain `npm publish <tarball>` with no workspace-protocol shenanigans.
 
 > **Note on `@nowline/lsp`.** As of v0.4.0, `@nowline/lsp` is published to npm. `@nowline/lsp-worker` declares `"@nowline/lsp": "workspace:*"` in its runtime `dependencies`; pnpm rewrites that to the resolved version inside the published tarball, so `npm install @nowline/lsp-worker` needs `@nowline/lsp` resolvable on the registry. Publishing `@nowline/lsp` also fulfills the contract documented in its own README (`npx nowline-lsp` for Neovim/JetBrains/Helix/Emacs). The alternative — bundling `@nowline/lsp` into `@nowline/lsp-worker` via esbuild — was evaluated and deferred: `lsp-worker` has no bundler config today (`tsc -b` only), and introducing one would require designing externals for all four entry points plus `langium`/`vscode-languageserver`; that's a separate project, not a pre-release patch.
+
+> **Note on `@nowline/config`.** As of v0.4.0, `@nowline/config` is also published to npm. `@nowline/cli` declares `"@nowline/config": "workspace:*"` in its runtime `dependencies`; pnpm rewrites that to the resolved version inside the published tarball, so `npm install -g @nowline/cli` needs `@nowline/config` resolvable on the registry. The primary distribution channels (Homebrew, `.deb`, GitHub Releases, VS Code Marketplace) are unaffected — they use `bun compile` binaries where `@nowline/config` is bundled at compile time.
 
 `pack-vsix` runs `pnpm package` in [`packages/vscode-extension`](../packages/vscode-extension), which produces `dist/nowline-vscode.vsix` via esbuild + `vsce package --no-dependencies`. The `.vsix` bundles the workspace dependencies, so the vscode publish cell never needs to read from npm.
 
@@ -143,7 +145,7 @@ A single job with one matrix of three cells. `needs: build` means every cell of 
 |---|---|
 | `npm` | Downloads `npm-tarballs`, runs `npm publish <tarball> --access public` for each tarball in dependency order. Uses `NPM_TOKEN`. |
 | `vscode` | Downloads `nowline-vscode.vsix`, runs `vsce publish --packagePath …` then `ovsx publish …`. Uses `VSCE_PAT` and `OVSX_PAT`. |
-| `github-release` | Downloads binary + deb artifacts, stages them with the man page (`nowline.1`) and any `nowline.<locale>.1` overlays, publishes the GitHub Release via `softprops/action-gh-release@v2`, **then** commits a refreshed `Formula/nowline.rb` to [`lolay/homebrew-tap`](https://github.com/lolay/homebrew-tap) using `HOMEBREW_TAP_TOKEN`. The formula references the release-asset URLs that the same cell just published and embeds SHA256s computed on the fly. The cell fails loudly if any expected artifact is missing rather than emitting an all-zero SHA. See [`specs/homebrew-tap.md`](./homebrew-tap.md) for the formula structure and seed-repo bootstrap. |
+| `github-release` | Downloads binary + deb artifacts, stages them with the man page (`nowline.1`) and any `nowline.<locale>.1` overlays, publishes the GitHub Release via `softprops/action-gh-release@v3`, **then** commits a refreshed `Formula/nowline.rb` to [`lolay/homebrew-tap`](https://github.com/lolay/homebrew-tap) using `HOMEBREW_TAP_TOKEN`. The formula references the release-asset URLs that the same cell just published and embeds SHA256s computed on the fly. The cell fails loudly if any expected artifact is missing rather than emitting an all-zero SHA. See [`specs/homebrew-tap.md`](./homebrew-tap.md) for the formula structure and seed-repo bootstrap. |
 
 The matrix uses `fail-fast: false` so a flaky npm publish does not cancel an in-flight Marketplace publish or the github-release/tap cell.
 
@@ -151,7 +153,7 @@ We deliberately ship every tag as a stable release — Marketplace pre-release c
 
 #### Why the homebrew tap commit lives inside the github-release cell
 
-GitHub Actions matrix cells cannot depend on each other (no intra-matrix `needs:`). The tap commit must run after the GH release publish because the formula references `releases/download/v…/…` URLs that have to resolve. Folding the tap steps into the `github-release` cell as sequential steps on the same runner gives "tap fires right after release, doesn't wait for vscode or npm" with no extra job, no inter-job artifact re-download, and no separate gate. The trade is that re-running the cell after a tap-only failure also re-attempts the GH release publish; `softprops/action-gh-release@v2` is upsert-style on the same tag and overwrites asset uploads, so re-runs are safe.
+GitHub Actions matrix cells cannot depend on each other (no intra-matrix `needs:`). The tap commit must run after the GH release publish because the formula references `releases/download/v…/…` URLs that have to resolve. Folding the tap steps into the `github-release` cell as sequential steps on the same runner gives "tap fires right after release, doesn't wait for vscode or npm" with no extra job, no inter-job artifact re-download, and no separate gate. The trade is that re-running the cell after a tap-only failure also re-attempts the GH release publish; `softprops/action-gh-release@v3` is upsert-style on the same tag and overwrites asset uploads, so re-runs are safe.
 
 #### Files attached to the GitHub Release
 
@@ -195,7 +197,24 @@ All secrets live under **Settings → Secrets and variables → Actions** on `lo
 ## After release
 
 - Verify the GitHub Release page lists all eight binaries / debs.
-- Verify each `@nowline/*` package shows the new version on npm (`npm view @nowline/cli version`).
+- Verify each `@nowline/*` package shows the new version on npm (all 17 should return `X.Y.Z`):
+  - `npm view @nowline/core version`
+  - `npm view @nowline/layout version`
+  - `npm view @nowline/renderer version`
+  - `npm view @nowline/browser version`
+  - `npm view @nowline/embed version`
+  - `npm view @nowline/preview-shell version`
+  - `npm view @nowline/lsp version`
+  - `npm view @nowline/lsp-worker version`
+  - `npm view @nowline/export-core version`
+  - `npm view @nowline/export-png version`
+  - `npm view @nowline/export-pdf version`
+  - `npm view @nowline/export-html version`
+  - `npm view @nowline/export-mermaid version`
+  - `npm view @nowline/export-xlsx version`
+  - `npm view @nowline/export-msproj version`
+  - `npm view @nowline/config version`
+  - `npm view @nowline/cli version`
 - Verify Homebrew works: `brew update && brew install lolay/tap/nowline && nowline --version` — should print `X.Y.Z` (no `+sha` suffix on a release build).
 - Verify the VS Code extension shows the new version on the Marketplace and Open VSX.
 
