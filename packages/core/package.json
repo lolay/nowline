@@ -1,6 +1,6 @@
 {
     "name": "@nowline/core",
-    "version": "0.4.0",
+    "version": "0.4.1",
     "description": "Nowline DSL parser, AST, and validation",
     "license": "Apache-2.0",
     "engines": {

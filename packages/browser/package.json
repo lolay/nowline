@@ -1,6 +1,6 @@
 {
     "name": "@nowline/browser",
-    "version": "0.4.0",
+    "version": "0.4.1",
     "description": "Browser-safe Nowline pipeline: parse + validate + resolve includes + layout + render with pluggable I/O hooks. Consumed by @nowline/embed, the VS Code preview, and any third-party browser tool.",
     "license": "Apache-2.0",
     "engines": {
