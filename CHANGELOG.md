@@ -38,9 +38,12 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 - `CONTRIBUTING.md` "Working on the VS Code / Cursor extension" restructured from two iteration loops (Fast / Full) into three (F5 / sandboxed profile via `--user-data-dir` + `--extensions-dir` / in-place `--force`). The sandboxed-profile loop preserves the marketplace install instead of clobbering it; new Gotchas note explains why renaming `publisher`/`name` for side-by-side install is not the right answer.
 - README `## Quick start` and `## Status` rewritten for post-v0.1.0 reality: `brew install lolay/tap/nowline`, `npm install -g @nowline/cli`, plus links to the .deb / .exe / Marketplace artifacts. `SECURITY.md` "Supported versions" updated to the `0.x` policy (latest `0.x.y` supported; older `0.x` lines are not). Stale `apt install` reference dropped (we ship `.deb` assets, not an apt repo).
 - Embed CDN deploy runbook moved to the infrastructure repository (`ops/embed-deploy.md`) so the env-per-stack `terraform output` invocations stay accurate alongside the stacks they describe.
+- `specs/releasing.md` "After release" verification list now enumerates all 17 published `@nowline/*` packages explicitly (was a single `npm view @nowline/cli version` placeholder). Includes the four packages first published in v0.4.0 (`@nowline/browser`, `@nowline/preview-shell`, `@nowline/lsp`, `@nowline/lsp-worker`) and `@nowline/config` (new this release).
 
 ### Fixed
 
+- `@nowline/config` is now published to npm, fixing `npm install -g @nowline/cli`'s workspace-dep resolution failure (`ERESOLVE` on `@nowline/config@0.x.y`). `@nowline/cli`'s tarball lists `@nowline/config` as a runtime dep; with the package absent from the registry, npm-installed CLI was broken. The primary distribution channels (Homebrew, `.deb`, GitHub Releases, VS Code Marketplace) are unaffected — they use `bun compile` binaries where `@nowline/config` is bundled at compile time. Resolves the v0.4.0 `[Unreleased]` Known Issue.
+- `specs/releasing.md` publish matrix table corrected to reference `softprops/action-gh-release@v3` (was `@v2`). Doc-only — the workflow has run on `@v3` since before v0.4.0.
 - Embed CDN deploy: pin `w9jds/firebase-action` to `v15.18.0` instead of `v15`. The action publishes specific patch tags only (`v15.X.Y`); there is no moving major-only `v15` ref, so the previous pin failed to resolve (`Unable to resolve action w9jds/firebase-action@v15`) and broke the `embed.nowline.dev` deploy step on every push to `main`. Reproduced in [run 26263517719](https://github.com/lolay/nowline/actions/runs/26263517719/job/77301975164).
 - Embed CDN deploy: bootstrap the local `prepare-firebase-deploy` composite action with a minimal pre-checkout step in each caller (`embed-dev`, `embed-preview`, `embed-prod`). The composite was extracted from inline steps in commit `ae8702d`, but local composite actions can't be loaded until their `action.yml` is on disk — and the composite's own (broader) sparse-checkout fires too late. The error surfaced once the `v15` pin above was fixed. Reproduced in [run 26264969442](https://github.com/lolay/nowline/actions/runs/26264969442).
 - Embed CDN deploy: rephrased two `${{ vars.X }}` references in the `prepare-firebase-deploy` composite action's input descriptions. GitHub Actions evaluates `${{ … }}` expressions in `description` text, and the `vars` context is not available inside composite actions — so manifest validation rejected the file with `Unrecognized named-value: 'vars'`. Surfaced once the bootstrap fix above let the manifest load. Reproduced in [run 26265376977](https://github.com/lolay/nowline/actions/runs/26265376977).
@@ -51,10 +54,6 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 ### Removed
 
 - `.github/workflows/cursor-engine-sync.yml`, `.github/cursor-engine.json`, `.github/cursor-engine.schema.json`, and `.github/copilot-prompts/cursor-engine-sync.md` — superseded by the deterministic monitor + analyzer pair described above. Release history is now tracked in `.github/cursor-release-history.json` (and a per-fork schema at `.github/cursor-release-history.schema.json`); the old point-in-time state file is no longer needed.
-
-### Known Issues
-
-- `npm install @nowline/cli` currently fails to resolve `@nowline/config` (workspace dep pattern, pre-existing). The CLI npm package lists `@nowline/config` as a runtime dep, but `@nowline/config` is not published to the registry. The primary distribution channels (Homebrew, `.deb`, GitHub Releases, VS Code Marketplace) are unaffected — they use `bun compile` binaries where the dep is bundled at compile time. Tracked for v0.4.x patch.
 
 ## [0.2.0]
 

@@ -347,6 +347,7 @@ jobs:
               packages/export-mermaid \
               packages/export-xlsx \
               packages/export-msproj \
+              packages/config \
               packages/cli; do
             (cd "$pkg" && pnpm pack --pack-destination "$GITHUB_WORKSPACE/dist-pack")
           done
