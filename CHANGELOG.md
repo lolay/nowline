@@ -8,6 +8,32 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ### Added
 
+- _Nothing yet._
+
+### Changed
+
+- _Nothing yet._
+
+### Deprecated
+
+- _Nothing yet._
+
+### Removed
+
+- _Nothing yet._
+
+### Fixed
+
+- _Nothing yet._
+
+### Security
+
+- _Nothing yet._
+
+## [0.4.0] - 2026-05-27
+
+### Added
+
 - **build.yml reusable matrix (shift-left release validation).** Extracted the 10-cell build matrix from `release.yml` into a new reusable workflow `build.yml`. `ci.yml` now calls it with `upload: false` on every PR commit and every squash-merge to `main` (via the `release-build-smoke` job), so PRs exercise the exact surface a tag push would — including cross-platform `bun compile` binaries, `.deb` packaging, `.vsix` build, action-mirror staging, and embed CDN integrity. `release.yml` calls the same workflow with `upload: true`, gated on tag push. Root cause of the v0.3.0 failed release run ([#26337633859](https://github.com/lolay/nowline/actions/runs/26337633859)) — CI did not cover cross-target binary and `vsce package` paths — is now structurally closed.
 - `@nowline/lsp` is now published to npm — third-party editors (Neovim, JetBrains, Helix, Emacs, …) can install and run the language server via `npx nowline-lsp` or pin the package directly. Previously this package was workspace-only; the README always documented the `npx nowline-lsp` path but it wasn't deliverable until this release.
 - **m4.7 — browser tooling extraction.** Four new packages plus a canonical sample roadmap, all Apache-2.0 and shipped through the existing `release.yml` pipeline. See [`specs/handoffs/handoff-m4.7-browser-pipeline.md`](./specs/handoffs/handoff-m4.7-browser-pipeline.md) for the full rundown.
@@ -54,6 +80,10 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 ### Removed
 
 - `.github/workflows/cursor-engine-sync.yml`, `.github/cursor-engine.json`, `.github/cursor-engine.schema.json`, and `.github/copilot-prompts/cursor-engine-sync.md` — superseded by the deterministic monitor + analyzer pair described above. Release history is now tracked in `.github/cursor-release-history.json` (and a per-fork schema at `.github/cursor-release-history.schema.json`); the old point-in-time state file is no longer needed.
+
+## [0.3.0]
+
+Tagged on 2026-05-23 but not released — the release pipeline failed in the `build` phase (see [run #26337633859](https://github.com/lolay/nowline/actions/runs/26337633859)). No artifacts published. All content originally targeted for `v0.3.0` shipped under [`v0.4.0`](#040---2026-05-27).
 
 ## [0.2.0]
 
