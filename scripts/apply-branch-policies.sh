@@ -153,6 +153,11 @@ echo ""
 echo "=== Tier 1: OSS — ${ORG}/nowline ==="
 
 OSS_BYPASS_JSON=$(bypass_actors_json "${ORG}/nowline")
+# NOTE: The release-build-smoke check names below are best-guess based on the
+# GitHub Actions convention `<caller-job-name> / <called-job-name>` with
+# matrix-cell expansion via `Build ${{ matrix.id }}` (the job name in build.yml).
+# Verify actual names via step 1.10 throwaway PR observation after the prep PR
+# merges; adjust and re-run this script if the names differ.
 cat > "$TMP/nowline.json" <<JSON
 {
   "name": "main: CI must pass",
@@ -190,9 +195,16 @@ cat > "$TMP/nowline.json" <<JSON
           { "context": "Build & test (macos-latest, node 26)" },
           { "context": "Build & test (windows-latest, node 26)" },
           { "context": "Embed bundle size gate" },
-          { "context": "Bun compile smoke (ubuntu-latest)" },
-          { "context": "Bun compile smoke (macos-latest)" },
-          { "context": "Bun compile smoke (windows-latest)" }
+          { "context": "release-build-smoke / Build bin-macos-arm64" },
+          { "context": "release-build-smoke / Build bin-macos-x64" },
+          { "context": "release-build-smoke / Build bin-linux-x64" },
+          { "context": "release-build-smoke / Build bin-linux-arm64" },
+          { "context": "release-build-smoke / Build bin-windows-x64" },
+          { "context": "release-build-smoke / Build bin-windows-arm64" },
+          { "context": "release-build-smoke / Build pack-npm" },
+          { "context": "release-build-smoke / Build pack-vsix" },
+          { "context": "release-build-smoke / Build pack-action" },
+          { "context": "release-build-smoke / Build pack-embed" }
         ]
       }
     }

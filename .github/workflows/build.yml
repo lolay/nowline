@@ -1,0 +1,471 @@
+name: Build
+
+# Reusable workflow that defines the 10-cell build matrix shared by
+# `ci.yml` (upload: false — shift-left smoke on every PR / main push)
+# and `release.yml` (upload: true — gated on tag push). One matrix,
+# two events.
+#
+# `upload` gates only the `actions/upload-artifact@v7` steps. Every
+# build / package / verify step always runs so PRs exercise the exact
+# surface a tag push would, including the .deb build, the .vsix
+# package, the action-mirror staging, and the embed CDN bundle
+# integrity check. Upload skipping just avoids paying storage cost
+# and avoids confusing artifact promotion semantics on non-release
+# runs.
+on:
+  workflow_call:
+    inputs:
+      upload:
+        description: 'Upload built artifacts (release mode). When false, runs as a build-only smoke.'
+        type: boolean
+        default: false
+
+# Defense-in-depth concurrency. `ci.yml` has its own workflow-level
+# concurrency block (added in step 1.2 of the v0.4.0 plan); when CI
+# is canceled, the in-flight reusable call is canceled automatically.
+# Repeating the same shape here means any future direct caller (or
+# `release.yml`) inherits cancel-on-new-push for PR events while main
+# and tag pushes always complete. The expression
+# `github.event_name == 'pull_request'` resolves to `false` for non-PR
+# events, so sequential main commits and tag pushes never cancel each
+# other.
+concurrency:
+  group: build-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
+# Least-privilege. Build cells only need to read the repo, install
+# deps, and upload artifacts. Artifact upload uses the runner's
+# default token scope; no explicit permission required. `release.yml`
+# carries `contents: write` at the workflow level because its
+# `publish` and `embed-prod` jobs need it — build itself never needed
+# write, so the reusable shape tightens that.
+permissions:
+  contents: read
+
+jobs:
+  # One job, one matrix, ten cells. Heterogeneous on purpose so the
+  # caller (publish in release.yml) can `needs: build` and inherit
+  # "wait for every cell" gating from GitHub Actions for free — no
+  # separate gate job.
+  #
+  # Cell layout:
+  #   bin-* (×6)    Compile a `bun compile` binary for one os/arch. The
+  #                 two linux cells additionally build their .deb on the
+  #                 same runner (gated on `matrix.deb_arch`) so the
+  #                 binary -> deb chain stays intra-cell, with no
+  #                 artifact upload/download round-trip between jobs.
+  #   pack-npm      `pnpm pack` the publishable packages in
+  #                 dependency order. pnpm 10 rewrites `workspace:*` to
+  #                 the resolved version inside the tarballs, so the
+  #                 publish phase can use plain `npm publish <tarball>`.
+  #   pack-vsix     `pnpm package` for the VS Code extension (esbuild
+  #                 bundle + `vsce package --no-dependencies`).
+  #   pack-action   Stage the Marketplace action mirror bundle.
+  #   pack-embed    Verify the embed CDN prod tree built by `pnpm -r build`.
+  build:
+    name: Build ${{ matrix.id }}
+    runs-on: ${{ matrix.runner }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - { id: bin-macos-arm64, kind: binary, runner: macos-latest, target: bun-darwin-arm64, suffix: macos-arm64 }
+          - { id: bin-macos-x64, kind: binary, runner: macos-latest, target: bun-darwin-x64, suffix: macos-x64 }
+          - { id: bin-linux-x64, kind: binary, runner: ubuntu-latest, target: bun-linux-x64, suffix: linux-x64, deb_arch: amd64 }
+          - { id: bin-linux-arm64, kind: binary, runner: ubuntu-latest, target: bun-linux-arm64, suffix: linux-arm64, deb_arch: arm64 }
+          - { id: bin-windows-x64, kind: binary, runner: windows-latest, target: bun-windows-x64, suffix: windows-x64.exe }
+          - { id: bin-windows-arm64, kind: binary, runner: windows-latest, target: bun-windows-arm64, suffix: windows-arm64.exe }
+          - { id: pack-npm, kind: npm-pack, runner: ubuntu-latest }
+          - { id: pack-vsix, kind: vsix-pack, runner: ubuntu-latest }
+          - { id: pack-action, kind: action-pack, runner: ubuntu-latest }
+          - { id: pack-embed, kind: embed-pack, runner: ubuntu-latest }
+    steps:
+      - uses: actions/checkout@v6
+      - uses: ./.github/actions/setup-node-pnpm
+        with:
+          # Binary cells run their own install below with --cpu/--os flags
+          # set so the target-platform native bindings land alongside the
+          # host's. Skipping the composite's install avoids a stale-state
+          # short-circuit in pnpm 11: once `node_modules` matches the
+          # lockfile, a second `pnpm install --frozen-lockfile` with
+          # broader `--cpu`/`--os` filters does NOT re-materialize the
+          # extra optional deps, so the cross-arch resvg binding never
+          # lands. Doing a single install with the right filters from a
+          # clean state sidesteps that.
+          skip-install: ${{ matrix.kind == 'binary' && 'true' || 'false' }}
+
+      - name: Install Bun
+        # Pinned to a specific version so the Bun runtime baked into
+        # shipped `bun compile` binaries (Homebrew, apt, GitHub Releases)
+        # is reproducible. Tracked by Renovate's custom manager — see
+        # `.github/renovate-shared.json`.
+        if: matrix.kind == 'binary'
+        uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: '1.3.14'
+
+      # A plain `pnpm install --frozen-lockfile` respects the host's
+      # os/cpu and only installs optionalDependencies matching the host
+      # (e.g. on a macOS-arm64 runner, only `@resvg/resvg-js-darwin-arm64`
+      # lands). When `bun build --compile --target=bun-darwin-x64` then
+      # bundles the binary, the `require('@resvg/resvg-js-darwin-x64')`
+      # line in resvg-js's runtime loader (js-binding.js) resolves to
+      # nothing, so the shipped binary crashes the first time a user
+      # runs `nowline -f png`. Install with --cpu/--os (pnpm 10.14+) to
+      # additionally pull the *target's* native binding alongside the
+      # host's. Bun then embeds only the target-arch .node into the
+      # compiled binary; the host arch's binding stays on disk so any
+      # workspace tooling that needs it (esbuild, biome, etc.) keeps
+      # working. Installing all 12 platform variants would balloon the
+      # binary by ~30 MB because bun cannot statically eliminate the
+      # unreachable switch branches once their require targets resolve.
+      #
+      # Run this as the cell's first (and only) install — the composite
+      # action above is told `skip-install: true` for binary cells
+      # specifically so this install is the one that materializes
+      # node_modules. pnpm 11 short-circuits a second install once the
+      # store/lockfile already match disk; doing the architecture-aware
+      # install from a clean state avoids that no-op trap.
+      - name: Install workspace with target-platform native deps for bun --compile
+        if: matrix.kind == 'binary'
+        shell: bash
+        run: |
+          set -euo pipefail
+          case "${{ matrix.target }}" in
+            bun-darwin-arm64)  TGT_OS=darwin;  TGT_CPU=arm64 ;;
+            bun-darwin-x64)    TGT_OS=darwin;  TGT_CPU=x64 ;;
+            bun-linux-x64)     TGT_OS=linux;   TGT_CPU=x64 ;;
+            bun-linux-arm64)   TGT_OS=linux;   TGT_CPU=arm64 ;;
+            bun-windows-x64)   TGT_OS=win32;   TGT_CPU=x64 ;;
+            bun-windows-arm64) TGT_OS=win32;   TGT_CPU=arm64 ;;
+            *) echo "unknown target: ${{ matrix.target }}" >&2; exit 1 ;;
+          esac
+          HOST_OS=$(node -e "console.log({darwin:'darwin',linux:'linux',win32:'win32'}[process.platform])")
+          HOST_CPU=$(node -e "console.log(process.arch)")
+          pnpm install --frozen-lockfile \
+            --cpu="$HOST_CPU" --cpu="$TGT_CPU" \
+            --os="$HOST_OS" --os="$TGT_OS"
+
+      - name: Build
+        run: pnpm -r build
+
+      # ===== binary cells =====
+
+      # Belt-and-suspenders: assert the target's native resvg binding is
+      # resolvable from inside the resvg-js parent before `bun --compile`.
+      # `bin-linux-arm64` and `bin-windows-arm64` are never executed in
+      # CI (no qemu, no Windows-on-ARM runner), so without this gate a
+      # regression in the install step above would silently ship broken
+      # binaries that fail at the user's first `-f png`.
+      #
+      # We resolve from the resvg-js parent because pnpm only symlinks
+      # the host-arch optional dep into top-level node_modules; the
+      # cross-arch variants live under `node_modules/.pnpm/.../resvg-js/
+      # node_modules/@resvg/`, which is what bun's bundler walks.
+      - name: Verify target native deps present
+        if: matrix.kind == 'binary'
+        shell: bash
+        # Run from packages/export-png because that's the only workspace
+        # package that depends on `@resvg/resvg-js`; the dep isn't hoisted
+        # to the repo root, so `require.resolve('@resvg/resvg-js/...')`
+        # only succeeds from inside export-png's resolution scope.
+        working-directory: packages/export-png
+        run: |
+          set -euo pipefail
+          case "${{ matrix.target }}" in
+            bun-darwin-arm64)  REQUIRED="@resvg/resvg-js-darwin-arm64" ;;
+            bun-darwin-x64)    REQUIRED="@resvg/resvg-js-darwin-x64" ;;
+            bun-linux-x64)     REQUIRED="@resvg/resvg-js-linux-x64-gnu" ;;
+            bun-linux-arm64)   REQUIRED="@resvg/resvg-js-linux-arm64-gnu" ;;
+            bun-windows-x64)   REQUIRED="@resvg/resvg-js-win32-x64-msvc" ;;
+            bun-windows-arm64) REQUIRED="@resvg/resvg-js-win32-arm64-msvc" ;;
+            *) echo "unknown target: ${{ matrix.target }}" >&2; exit 1 ;;
+          esac
+          REQUIRED="$REQUIRED" node -e "
+            const Module = require('module');
+            const resvgPkg = require.resolve('@resvg/resvg-js/package.json');
+            const req = Module.createRequire(resvgPkg);
+            const required = process.env.REQUIRED;
+            try {
+              const r = req.resolve(required + '/package.json');
+              console.log('ok:', required, '->', r);
+            } catch (e) {
+              console.error('ERROR:', required, 'is not resolvable from', resvgPkg);
+              console.error('bun --compile --target=${{ matrix.target }} would ship a broken binary');
+              process.exit(1);
+            }
+          "
+
+      # Pre-download the target's bun runtime tarball directly into bun's
+      # cache. Works around a known cross-drive bug in `bun --compile`: on
+      # GitHub Actions Windows runners the workspace lives on D:\ while
+      # bun's cache lives on C:\, so bun's "download to temp dir then
+      # rename into cache" path fails with EXDEV and surfaces as
+      #   Failed to extract executable for 'bun-windows-aarch64-vX.Y.Z'.
+      #   The download may be incomplete.
+      # See https://github.com/oven-sh/bun/issues/25346 and
+      # https://github.com/oven-sh/bun/issues/28327. Curl-into-cache
+      # sidesteps the buggy rename. Native cells (target == host) and
+      # repeat runs short-circuit on the cache-hit check, so this step
+      # is cheap when not strictly needed.
+      - name: Pre-cache bun cross-compile target
+        if: matrix.kind == 'binary'
+        shell: bash
+        run: |
+          set -euo pipefail
+          BUN_VERSION=$(bun --version)
+          case "${{ matrix.target }}" in
+            bun-darwin-arm64)  BUN_PLATFORM=darwin-aarch64;  BUN_BIN=bun ;;
+            bun-darwin-x64)    BUN_PLATFORM=darwin-x64;      BUN_BIN=bun ;;
+            bun-linux-arm64)   BUN_PLATFORM=linux-aarch64;   BUN_BIN=bun ;;
+            bun-linux-x64)     BUN_PLATFORM=linux-x64;       BUN_BIN=bun ;;
+            bun-windows-arm64) BUN_PLATFORM=windows-aarch64; BUN_BIN=bun.exe ;;
+            bun-windows-x64)   BUN_PLATFORM=windows-x64;     BUN_BIN=bun.exe ;;
+            *) echo "unknown target: ${{ matrix.target }}" >&2; exit 1 ;;
+          esac
+          CACHE_DIR=$(bun pm cache)
+          CACHE_DEST="${CACHE_DIR}/bun-${BUN_PLATFORM}-v${BUN_VERSION}"
+          if [[ -f "$CACHE_DEST" ]]; then
+            echo "ok: bun-${BUN_PLATFORM}-v${BUN_VERSION} already cached at ${CACHE_DEST}"
+            exit 0
+          fi
+          URL="https://registry.npmjs.org/@oven/bun-${BUN_PLATFORM}/-/bun-${BUN_PLATFORM}-${BUN_VERSION}.tgz"
+          echo "fetching ${URL}"
+          mkdir -p "$CACHE_DIR"
+          TMP=$(mktemp -d)
+          curl -fsSL --retry 5 --retry-delay 5 "$URL" | tar -xzf - -C "$TMP"
+          if [[ -f "${TMP}/package/bin/${BUN_BIN}" ]]; then
+            cp "${TMP}/package/bin/${BUN_BIN}" "$CACHE_DEST"
+          elif [[ -f "${TMP}/package/${BUN_BIN}" ]]; then
+            cp "${TMP}/package/${BUN_BIN}" "$CACHE_DEST"
+          else
+            echo "ERROR: ${BUN_BIN} not found in tarball; contents:" >&2
+            find "$TMP" -type f >&2
+            exit 1
+          fi
+          chmod +x "$CACHE_DEST" 2>/dev/null || true
+          ls -lh "$CACHE_DEST"
+
+      - name: Compile binary
+        if: matrix.kind == 'binary'
+        working-directory: packages/cli
+        run: node scripts/compile.mjs --target=${{ matrix.target }}
+
+      - name: Smoke test binary (render every format)
+        if: matrix.kind == 'binary' && matrix.runner != 'windows-latest'
+        shell: bash
+        env:
+          MATRIX_RUNNER: ${{ matrix.runner }}
+          MATRIX_TARGET: ${{ matrix.target }}
+          MATRIX_SUFFIX: ${{ matrix.suffix }}
+        run: |
+          set -euo pipefail
+          BIN="packages/cli/dist-bin/nowline-${MATRIX_SUFFIX}"
+          EXAMPLE=examples/minimal.nowline
+          OUT="${RUNNER_TEMP:-/tmp}/minimal"
+          if [[ "$MATRIX_RUNNER" == "macos-latest" && "$MATRIX_TARGET" != *darwin* ]]; then
+            echo "cross-target binary; skipping execution smoke"
+            exit 0
+          fi
+          if [[ "$MATRIX_RUNNER" == "ubuntu-latest" && "$MATRIX_TARGET" != *linux-x64* ]]; then
+            echo "cross-target binary; skipping execution smoke"
+            exit 0
+          fi
+          chmod +x "$BIN"
+          "$BIN" --version
+          "$BIN" "$EXAMPLE" -o - > "$OUT.svg"
+          head -c 4 "$OUT.svg" | grep -q "<svg"
+          "$BIN" "$EXAMPLE" -f png --headless -o "$OUT.png"
+          head -c 4 "$OUT.png" | od -An -c | grep -q 'P   N   G'
+          "$BIN" "$EXAMPLE" -f pdf --headless -o "$OUT.pdf"
+          "$BIN" "$EXAMPLE" -f html -o "$OUT.html"
+          "$BIN" "$EXAMPLE" -f mermaid -o "$OUT.md"
+          "$BIN" "$EXAMPLE" -f xlsx -o "$OUT.xlsx"
+          "$BIN" "$EXAMPLE" -f msproj -o "$OUT.xml"
+          for ext in svg png pdf html md xlsx xml; do
+            test -s "$OUT.$ext" || { echo "empty: $OUT.$ext" >&2; exit 1; }
+          done
+
+      - name: Upload binary artifact
+        if: matrix.kind == 'binary' && inputs.upload
+        uses: actions/upload-artifact@v7
+        with:
+          name: nowline-${{ matrix.suffix }}
+          path: packages/cli/dist-bin/nowline-${{ matrix.suffix }}
+          if-no-files-found: error
+
+      # Version comes from `packages/cli/package.json` rather than
+      # `${GITHUB_REF_NAME#v}` so this step works on PR runs too
+      # (where GITHUB_REF_NAME would be the branch/PR ref, not a
+      # `vX.Y.Z` tag). The package.json version is also what
+      # `cut-release` bumps and what the binary's `--version` reports,
+      # so the .deb's stamp stays in sync with the binary it wraps on
+      # both PR smoke runs and tag releases.
+      - name: Build .deb
+        if: matrix.deb_arch
+        run: |
+          set -euo pipefail
+          VERSION=$(node -p "require('./packages/cli/package.json').version")
+          bash scripts/build-deb.sh "${{ matrix.deb_arch }}" "packages/cli/dist-bin/nowline-${{ matrix.suffix }}" "$VERSION"
+
+      - name: Upload .deb artifact
+        if: matrix.deb_arch && inputs.upload
+        uses: actions/upload-artifact@v7
+        with:
+          name: nowline_${{ matrix.deb_arch }}.deb
+          path: dist-deb/nowline_*_${{ matrix.deb_arch }}.deb
+          if-no-files-found: error
+
+      # ===== pack-npm cell =====
+
+      - name: Pack npm tarballs
+        if: matrix.kind == 'npm-pack'
+        run: |
+          set -euo pipefail
+          mkdir -p dist-pack
+          # Dependency order: core layers first, then the browser
+          # pipeline + embed + preview-shell, then the LSP pair, then
+          # export-core, then per-format export packages, then the CLI.
+          # pnpm pack rewrites `workspace:*` to the actual version
+          # inside each produced .tgz, so the publish phase doesn't
+          # need pnpm. Order matters so downstream consumers running
+          # `npm install` after a partial publish never see a tarball
+          # whose workspace deps haven't landed yet.
+          for pkg in \
+              packages/core \
+              packages/layout \
+              packages/renderer \
+              packages/browser \
+              packages/embed \
+              packages/preview-shell \
+              packages/lsp \
+              packages/lsp-worker \
+              packages/export-core \
+              packages/export-png \
+              packages/export-pdf \
+              packages/export-html \
+              packages/export-mermaid \
+              packages/export-xlsx \
+              packages/export-msproj \
+              packages/cli; do
+            (cd "$pkg" && pnpm pack --pack-destination "$GITHUB_WORKSPACE/dist-pack")
+          done
+          ls -la dist-pack
+
+      - name: Upload npm tarballs
+        if: matrix.kind == 'npm-pack' && inputs.upload
+        uses: actions/upload-artifact@v7
+        with:
+          name: npm-tarballs
+          path: dist-pack/*.tgz
+          if-no-files-found: error
+
+      # ===== pack-vsix cell =====
+
+      - name: Package .vsix
+        if: matrix.kind == 'vsix-pack'
+        working-directory: packages/vscode-extension
+        run: pnpm package
+
+      - name: Upload .vsix
+        if: matrix.kind == 'vsix-pack' && inputs.upload
+        uses: actions/upload-artifact@v7
+        with:
+          name: nowline-vscode.vsix
+          path: packages/vscode-extension/dist/nowline-vscode.vsix
+          if-no-files-found: error
+
+      # ===== pack-action cell =====
+      #
+      # The Marketplace action is mirrored to lolay/nowline-action — a
+      # write-only publish target like the Homebrew tap, not a source-of-
+      # truth repo. Source lives at packages/nowline-action/. The mirror
+      # ships exactly four files at its repo root: action.yml, dist/,
+      # README.md, LICENSE. action.yml MUST be at the mirror's repo root
+      # (nested paths don't satisfy GitHub Marketplace's listing
+      # requirements). esbuild produced dist/index.cjs in the earlier
+      # `pnpm -r build` step.
+
+      - name: Verify action bundle exists
+        if: matrix.kind == 'action-pack'
+        run: |
+          set -euo pipefail
+          test -s packages/nowline-action/dist/index.cjs || { echo "missing or empty packages/nowline-action/dist/index.cjs" >&2; exit 1; }
+          test -s packages/nowline-action/action.yml
+          test -s packages/nowline-action/README.md
+          test -s packages/nowline-action/LICENSE
+
+      - name: Stage action mirror bundle
+        if: matrix.kind == 'action-pack'
+        run: |
+          set -euo pipefail
+          mkdir -p dist-action
+          cp packages/nowline-action/action.yml dist-action/
+          cp packages/nowline-action/README.md dist-action/
+          cp packages/nowline-action/LICENSE dist-action/
+          cp -R packages/nowline-action/dist dist-action/
+          ls -laR dist-action
+
+      - name: Upload action mirror bundle
+        if: matrix.kind == 'action-pack' && inputs.upload
+        uses: actions/upload-artifact@v7
+        with:
+          name: action-mirror
+          # Trailing slash → archive contents are at the artifact root
+          # (action.yml, README.md, LICENSE, dist/index.cjs). Matches
+          # the publish cell's `path: action-bundle` download contract.
+          path: dist-action/
+          if-no-files-found: error
+
+      # ===== pack-embed cell =====
+      #
+      # Produces the CDN-shaped prod artifact for `embed.nowline.io`. The
+      # earlier `pnpm -r build` already ran `pnpm --filter @nowline/embed
+      # build`, which produces *both* the prod and dev IIFEs in their
+      # respective dist trees. We only upload the prod tree here — the
+      # dev tree is rebuilt by `.github/workflows/embed-cdn.yml` against
+      # the `embed-dev` environment's `PUBLIC_FIREBASE_*` vars, which
+      # `release.yml` deliberately doesn't have access to.
+      #
+      # NOWLINE_EMBED_SHA pins the bundle banner's `sha=` field to this
+      # workflow's commit so a curl against `embed.nowline.io/X.Y.Z/`
+      # after deploy matches the GitHub release.
+
+      - name: Verify embed CDN artifacts exist
+        if: matrix.kind == 'embed-pack'
+        env:
+          NOWLINE_EMBED_SHA: ${{ github.sha }}
+        run: |
+          set -euo pipefail
+          VERSION=$(node -p "require('./packages/embed/package.json').version")
+          MAJOR_MINOR="$(echo "$VERSION" | awk -F. '{print $1"."$2}')"
+          for alias in "$VERSION" "$MAJOR_MINOR" latest; do
+            test -s "packages/embed/dist-cdn-prod/$alias/nowline.min.js" \
+              || { echo "missing packages/embed/dist-cdn-prod/$alias/nowline.min.js" >&2; exit 1; }
+            test -s "packages/embed/dist-cdn-prod/$alias/nowline.min.js.map" \
+              || { echo "missing packages/embed/dist-cdn-prod/$alias/nowline.min.js.map" >&2; exit 1; }
+          done
+          # Belt-and-suspenders: the prod IIFE must not have shipped any
+          # firebase-auth payload. Same assertion check-size.mjs runs on
+          # every PR; re-run here so a tagged release fails loudly if
+          # the dev gate's DCE ever regresses.
+          if grep -q firebase packages/embed/dist-cdn-prod/latest/nowline.min.js; then
+            echo "ERROR: prod IIFE contains 'firebase' — dev auth gate dead-code elimination regressed." >&2
+            exit 1
+          fi
+          ls -la packages/embed/dist-cdn-prod/
+
+      - name: Upload embed CDN bundle
+        if: matrix.kind == 'embed-pack' && inputs.upload
+        uses: actions/upload-artifact@v7
+        with:
+          name: embed-cdn-prod
+          # Trailing slash → archive contents are at the artifact root
+          # (version-aliased subdirs `0.2.5/`, `0.2/`, `latest/`, each
+          # holding `nowline.min.js` + `.map`). The deploy cell
+          # downloads this into `packages/embed/dist-cdn-prod/`, which
+          # is the path `packages/embed/firebase/prod/firebase.json`'s
+          # `"public": "../../dist-cdn-prod"` resolves to.
+          # firebase.json itself ships in git, not in the artifact.
+          path: packages/embed/dist-cdn-prod/
+          if-no-files-found: error

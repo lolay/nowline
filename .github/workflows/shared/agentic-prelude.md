@@ -24,7 +24,7 @@ Every label this state machine uses starts with one of two prefixes:
 - `agent-…` — you (the agent) own the next move. The label name matches the workflow file that fires on it (e.g. `agent-plan` triggers `agent-plan.md`). One-to-one mapping.
 - `human-…` — the next move belongs to a human. Stop and wait.
 
-State labels are mutually exclusive: the cleanup glue workflow (`agent-label-transition.yml`) keeps exactly one state label on an issue or PR at a time. Origin/metadata labels (`cursor-engine-sync`, `dependencies`, `bug`, etc.) are not state labels and are preserved across transitions.
+State labels are mutually exclusive: the cleanup glue workflow (`agent-label-transition.yml`) keeps exactly one state label on an issue or PR at a time. Origin/metadata labels (`vscode-engine-bump`, `dependencies`, `bug`, etc.) are not state labels and are preserved across transitions.
 
 You don't add labels directly. You emit a **verdict** — a comment whose first non-blank line is the literal plain text `agent-verdict: <label>` (no backticks, no HTML comment, no code fence). The [`agent-verdict-apply.yml`](./agent-verdict-apply.yml) glue workflow reads the marker, validates it against the state machine (which transitions are reachable from the current state label), checks for any `human-*` override label, and applies the proposed label only when both checks pass. (The marker is plain text rather than an HTML comment because gh-aw's safe-outputs content sanitizer mangles XML-comment syntax — see [Safe Outputs Specification § Markdown Safety](https://github.github.com/gh-aw/reference/safe-outputs-specification/).)
 

@@ -65,7 +65,7 @@ Two prefixes, both kebab-case, no colons:
 - **`agent-…`** — the agent owns the next move. The label name matches the workflow file that fires on it (e.g. `agent-plan` triggers [`.github/workflows/agent-plan.md`](./workflows/agent-plan.md)). One-to-one mapping.
 - **`human-…`** — a human owns the next move. The flow is paused.
 
-Origin/metadata labels (`cursor-engine-sync`, `dependencies`, `bug`, `automated`, `copilot-pr`) are not state labels; they're preserved through every transition. Renovate's `dependencies` label is one of these. `copilot-pr` is stamped on every PR authored by Copilot's coding-agent identity and persists for the life of the PR.
+Origin/metadata labels (`vscode-engine-bump`, `dependencies`, `bug`, `automated`, `copilot-pr`) are not state labels; they're preserved through every transition. Renovate's `dependencies` label is one of these. `copilot-pr` is stamped on every PR authored by Copilot's coding-agent identity and persists for the life of the PR.
 
 ## Label lifecycle — replace, don't accumulate
 
@@ -159,7 +159,7 @@ This repo self-consumes its own workflows — no `gh aw add` is needed because t
 
 For the first ~2 weeks after deployment:
 
-- The `agent-triage.md` workflow's `if:` condition skips unless the label was added by a known detector (e.g. `cursor-engine-sync.yml`) or by the issue template's "Let an AI agent take a first pass" checkbox.
+- The `agent-triage.md` workflow's `if:` condition skips unless the label was added by a known detector (`vscode-extension-engine-bump.yml` opens an issue with `agent-triage` + `vscode-engine-bump` labels; `editor-release-monitor.yml` writes history files but does not directly open issues) or by the issue template's "Let an AI agent take a first pass" checkbox.
 - Manually-filed issues without the checkbox don't enter the flow even if a label exists.
 
 After ~10 issues have run cleanly through all four phases, the allowlist condition is removed and the flow becomes the default for any issue with `agent-triage`. `human-only` remains as the opt-out.
@@ -219,4 +219,4 @@ Every label add and remove event is durable in the timeline. Every comment that 
 
 **Why does `agent-merge.yml` have a defensive guard?** Because not every repo in this estate has required CI contexts wired into its ruleset yet. Without the guard, `gh pr merge --auto` would land an ungated PR on those repos. The guard checks for at least one `required_status_checks` context before calling auto-merge; if none, it relabels to `human-pr` with an explanatory comment.
 
-**Why preserve origin labels (`cursor-engine-sync`, `dependencies`, etc.)?** They're metadata about *where the issue came from*, not state. The cleanup workflow only touches `agent-…` and `human-…` labels. This means `is:closed label:cursor-engine-sync label:agent-done` shows every issue the engine-sync detector filed that resolved through the agent flow — useful for tracking detector signal-to-noise.
+**Why preserve origin labels (`vscode-engine-bump`, `dependencies`, etc.)?** They're metadata about *where the issue came from*, not state. The cleanup workflow only touches `agent-…` and `human-…` labels. This means `is:closed label:vscode-engine-bump label:agent-done` shows every issue the engine-bump detector filed that resolved through the agent flow — useful for tracking detector signal-to-noise.
