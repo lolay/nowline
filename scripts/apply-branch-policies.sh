@@ -153,11 +153,12 @@ echo ""
 echo "=== Tier 1: OSS — ${ORG}/nowline ==="
 
 OSS_BYPASS_JSON=$(bypass_actors_json "${ORG}/nowline")
-# NOTE: The release-build-smoke check names below are best-guess based on the
-# GitHub Actions convention `<caller-job-name> / <called-job-name>` with
-# matrix-cell expansion via `Build ${{ matrix.id }}` (the job name in build.yml).
-# Verify actual names via step 1.10 throwaway PR observation after the prep PR
-# merges; adjust and re-run this script if the names differ.
+# NOTE: Reusable-workflow check names below use the caller job's `name:`
+# field (NOT its job ID) — `Release build smoke (no upload)` not
+# `release-build-smoke`. Confirmed by observation on PR #42 (Phase 1
+# prep), pre-merge. If `ci.yml`'s `release-build-smoke` job ever
+# changes its `name:` value, these contexts must be updated in lockstep
+# or PRs will block on stale check names.
 cat > "$TMP/nowline.json" <<JSON
 {
   "name": "main: CI must pass",
@@ -195,16 +196,16 @@ cat > "$TMP/nowline.json" <<JSON
           { "context": "Build & test (macos-latest, node 26)" },
           { "context": "Build & test (windows-latest, node 26)" },
           { "context": "Embed bundle size gate" },
-          { "context": "release-build-smoke / Build bin-macos-arm64" },
-          { "context": "release-build-smoke / Build bin-macos-x64" },
-          { "context": "release-build-smoke / Build bin-linux-x64" },
-          { "context": "release-build-smoke / Build bin-linux-arm64" },
-          { "context": "release-build-smoke / Build bin-windows-x64" },
-          { "context": "release-build-smoke / Build bin-windows-arm64" },
-          { "context": "release-build-smoke / Build pack-npm" },
-          { "context": "release-build-smoke / Build pack-vsix" },
-          { "context": "release-build-smoke / Build pack-action" },
-          { "context": "release-build-smoke / Build pack-embed" }
+          { "context": "Release build smoke (no upload) / Build bin-macos-arm64" },
+          { "context": "Release build smoke (no upload) / Build bin-macos-x64" },
+          { "context": "Release build smoke (no upload) / Build bin-linux-x64" },
+          { "context": "Release build smoke (no upload) / Build bin-linux-arm64" },
+          { "context": "Release build smoke (no upload) / Build bin-windows-x64" },
+          { "context": "Release build smoke (no upload) / Build bin-windows-arm64" },
+          { "context": "Release build smoke (no upload) / Build pack-npm" },
+          { "context": "Release build smoke (no upload) / Build pack-vsix" },
+          { "context": "Release build smoke (no upload) / Build pack-action" },
+          { "context": "Release build smoke (no upload) / Build pack-embed" }
         ]
       }
     }
