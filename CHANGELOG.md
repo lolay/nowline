@@ -30,6 +30,15 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 - _Nothing yet._
 
+## [0.4.1] - 2026-05-28
+
+Hotfix for two bugs in the v0.4.0 release pipeline. v0.4.0 itself shipped the GitHub Release binaries, the `lolay/nowline-action` mirror, and the VS Code Marketplace + Open VSX publishes; it did **not** complete the npm publish loop (7 of 17 packages reached 0.4.0; the loop halted on a glob ambiguity) and did **not** deploy `embed.nowline.io/0.4.0/` (the deploy job failed at sparse-checkout). v0.4.1 ships a corrected pipeline that publishes all 17 packages and the embed CDN cleanly. All v0.4.0 content is present in v0.4.1 modulo the two fixes below — see [`[0.4.0]`](#040---2026-05-27) for the full feature changelog.
+
+### Fixed
+
+- **`release.yml` npm publish loop: tighten tarball glob.** The `for pkg in …; do find dist-pack -name "${pkg}-*.tgz"; done` loop used an unanchored glob; for `pkg=nowline-lsp` the pattern matched both `nowline-lsp-0.4.0.tgz` and `nowline-lsp-worker-0.4.0.tgz`, and `find … -print -quit` returned whichever appeared first in the directory walk. In v0.4.0, the `nowline-lsp` iteration accidentally published `lsp-worker`; the next iteration (`nowline-lsp-worker`) then hit `403 already published` on its second attempt and halted the loop, leaving `@nowline/lsp`, `@nowline/config`, `@nowline/cli`, and all seven `@nowline/export-*` packages at their previous versions on the registry. The fix anchors the glob to `${pkg}-[0-9]*.tgz` so semver-prefixed tarballs match only their owning package.
+- **`prepare-firebase-deploy` composite action: disable sparse-checkout cone-mode.** The composite's `actions/checkout@v6` step used the default cone-mode sparse-checkout, which rejects file-path arguments (`packages/embed/package.json`, passed by `release.yml`'s `embed-prod` caller for the deploy step's banner-version assertion). v0.4.0's deploy job failed at sparse-checkout with `fatal: 'packages/embed/package.json' is not a directory`. Setting `sparse-checkout-cone-mode: false` switches to gitignore-style patterns that accept individual files. The fixed-path entries (`.github/actions/prepare-firebase-deploy`, `${{ inputs.firebase-config-path }}`) are single-segment so cone-vs-no-cone matching behavior is identical for them; only the variable `extra-checkout-paths` input benefits.
+
 ## [0.4.0] - 2026-05-27
 
 ### Added
