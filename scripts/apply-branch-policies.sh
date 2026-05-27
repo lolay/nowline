@@ -153,6 +153,12 @@ echo ""
 echo "=== Tier 1: OSS — ${ORG}/nowline ==="
 
 OSS_BYPASS_JSON=$(bypass_actors_json "${ORG}/nowline")
+# NOTE: Reusable-workflow check names below use the caller job's `name:`
+# field (NOT its job ID) — `Release build smoke (no upload)` not
+# `release-build-smoke`. Confirmed by observation on PR #42 (Phase 1
+# prep), pre-merge. If `ci.yml`'s `release-build-smoke` job ever
+# changes its `name:` value, these contexts must be updated in lockstep
+# or PRs will block on stale check names.
 cat > "$TMP/nowline.json" <<JSON
 {
   "name": "main: CI must pass",
@@ -190,9 +196,16 @@ cat > "$TMP/nowline.json" <<JSON
           { "context": "Build & test (macos-latest, node 26)" },
           { "context": "Build & test (windows-latest, node 26)" },
           { "context": "Embed bundle size gate" },
-          { "context": "Bun compile smoke (ubuntu-latest)" },
-          { "context": "Bun compile smoke (macos-latest)" },
-          { "context": "Bun compile smoke (windows-latest)" }
+          { "context": "Release build smoke (no upload) / Build bin-macos-arm64" },
+          { "context": "Release build smoke (no upload) / Build bin-macos-x64" },
+          { "context": "Release build smoke (no upload) / Build bin-linux-x64" },
+          { "context": "Release build smoke (no upload) / Build bin-linux-arm64" },
+          { "context": "Release build smoke (no upload) / Build bin-windows-x64" },
+          { "context": "Release build smoke (no upload) / Build bin-windows-arm64" },
+          { "context": "Release build smoke (no upload) / Build pack-npm" },
+          { "context": "Release build smoke (no upload) / Build pack-vsix" },
+          { "context": "Release build smoke (no upload) / Build pack-action" },
+          { "context": "Release build smoke (no upload) / Build pack-embed" }
         ]
       }
     }

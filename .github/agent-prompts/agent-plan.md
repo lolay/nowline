@@ -31,7 +31,7 @@ True if any of:
 
 - The issue requests a feature that already exists. Find and link the implementation.
 - The issue is a duplicate of an open or closed issue. Find and link it.
-- The detector that filed the issue is wrong about the underlying state. Example: `cursor-engine-sync` filed a bump issue but the floor is already current per the latest `editor-release-monitor` data.
+- The detector that filed the issue is wrong about the underlying state. Example: `vscode-extension-engine-bump` opened a bump issue but the floor is already current per the latest `editor-release-monitor` data.
 - The issue belongs in a different repo and the filer should re-file there.
 
 Post a comment whose **first non-blank line** is `agent-verdict: agent-done` (plain text — no backticks, no HTML comment, no code fence in the comment body itself), followed by a blank line and an explanation of which case applies and where the existing implementation / duplicate / correct repo is. `agent-verdict-apply.yml` applies the label; `agent-issue-close.yml` then closes the issue.

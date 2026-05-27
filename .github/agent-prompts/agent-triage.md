@@ -52,7 +52,7 @@ The issue meets any of these:
 - **Release-related.** Release-cut, hotfix on a `release/v*.*` branch, anything that touches `specs/releasing.md`'s manual gate. Releases are human-only across this estate.
 - **Touches a discuss-first area without prior discussion.** `lolay/nowline`'s `AI_POLICY.md` says grammar, AST shape, layout, renderer, and `specs/` changes need an issue-first agreement on shape. If the issue is itself the discussion (no agreement yet), it's `human-only`.
 - **Conversational.** A question, a discussion-starter, "is this a bug?" with no actionable request. Discussions belong on the issue threads but not in the agent flow.
-- **Comes from a bot account other than this estate's known detectors.** Detectors we trust: `cursor-engine-sync`, `editor-release-monitor`/`vscode-extension-engine-bump` (when they file issues), and any future detector that's been deliberately added.
+- **Comes from a bot account other than this estate's known detectors.** Detectors we trust: `editor-release-monitor`/`vscode-extension-engine-bump` (daily monitor writes `cursor-release-history.json`; weekly bump opens an issue when the engine floor should advance), and any future detector that's been deliberately added.
 
 Post a comment whose **first non-blank line** is the verdict marker, followed by a blank line and a one-line reason naming which criterion applies:
 

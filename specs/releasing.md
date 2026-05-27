@@ -71,16 +71,34 @@ The tag push triggers the same downstream jobs.
 
 ## Pipeline
 
+> **Motivating incident.** The [v0.3.0 release run (#26337633859)](https://github.com/lolay/nowline/actions/runs/26337633859) failed because CI did not exercise the same build surface as the release. The root-cause fix is the dual-event design below: every PR now runs the same 10-cell matrix the release does.
+
 ```mermaid
 flowchart LR
-    dispatch[workflow_dispatch] --> cut[cut-release]
-    cut --> tagpush[Push tag v*]
-    direct[Manual tag push] --> tagpush
-    tagpush --> build["build matrix (6 binaries [linux cells also build deb] + pack-npm + pack-vsix)"]
-    build --> publish["publish matrix (npm + vscode + github-release [also commits homebrew tap])"]
+    prOpen["Open PR / push to PR head"] --> ci["ci.yml \n lint-workflows + build-test + bundle-size \n + release-build-smoke -> build.yml (upload: false) \n PR pushes cancel prior in-flight runs"]
+    mergePush["Squash-merge to main"] --> ci
+    bumppush["cut-release bump commit on main \n (author = nowline-release-bot)"] --> ciLight["ci.yml \n lint-workflows + build-test + bundle-size \n (release-build-smoke skipped by author filter) \n main pushes never cancel"]
+    tagpush["Tag v* push"] --> reuse2["release.yml -> build.yml (upload: true)"] --> publish["publish matrix"]
+    dispatch["workflow_dispatch"] --> cut[cut-release] --> bumppush
+    cut --> tagpush
+    branchPush["Push to branch \n (no PR)"] -.->|no trigger| void["(nothing runs)"]
 ```
 
-Two real jobs after `cut-release`: `build` and `publish`. `publish` does `needs: build`, so GitHub Actions waits for every cell of the build matrix to succeed before any cell of publish starts — that is the gate, no separate job required. Inside the `github-release` cell of `publish`, the homebrew tap commit runs as the last sequential step, so the tap fires right after the GH release publish without waiting on the npm or vscode cells.
+`build.yml` is the **single source of truth** for the 10-cell build matrix. `ci.yml` calls it with `upload: false` on every PR commit and every squash-merge to main; `release.yml`'s `build` job calls it with `upload: true`, gated on tag push. The `upload` flag gates only the `actions/upload-artifact` steps — every build, pack, and verify step always runs, so PRs exercise the exact surface a tag push would.
+
+`publish` does `needs: build`, so GitHub Actions waits for every cell of the build matrix to succeed before any cell of publish starts — that is the gate, no separate job required. Inside the `github-release` cell of `publish`, the homebrew tap commit runs as the last sequential step, so the tap fires right after the GH release publish without waiting on the npm or vscode cells.
+
+### Bump-commit skip filter
+
+`ci.yml`'s `release-build-smoke` job carries this `if:` condition:
+
+```yaml
+if: ${{ github.event_name != 'push' || github.event.head_commit.author.email != 'nowline-release-bot@lolay.com' }}
+```
+
+This skips the heavy 10-cell matrix on the version-bump commit that `cut-release` produces, because `release.yml` is already about to run the same matrix via `build.yml` with `upload: true`. Running both in parallel would waste compute without adding any safety signal — both are reading the same SHA.
+
+The filter uses `head_commit.author.email` rather than commit-message matching because a human PR could coincidentally start with "release v…". The email `nowline-release-bot@lolay.com` is set via the `GIT_AUTHOR_EMAIL` env variable at the top of `release.yml`. **Cross-reference contract**: if that email ever changes, the `if:` condition in `ci.yml`'s `release-build-smoke` job must be updated to match — otherwise bump commits either silently re-run the full matrix in parallel (wasted compute) or the filter stops working (infinite-loop risk during release).
 
 ### `cut-release`
 
@@ -88,7 +106,7 @@ Dispatch-only. Bumps versions, commits, tags, and pushes. See [Cutting the relea
 
 ### `build`
 
-A single job with one matrix of eight cells. Heterogeneous on purpose so the publish phase can `needs: build` and inherit "wait for every cell" gating from GitHub Actions for free.
+Defined in [`build.yml`](./.github/workflows/build.yml). One job, one matrix, ten cells. Heterogeneous on purpose so the publish phase can `needs: build` and inherit "wait for every cell" gating from GitHub Actions for free.
 
 | Cell id | Runner | Produces |
 |---|---|---|
@@ -98,14 +116,24 @@ A single job with one matrix of eight cells. Heterogeneous on purpose so the pub
 | `bin-linux-arm64` | ubuntu-latest | `nowline-linux-arm64` + `nowline_arm64.deb` artifacts |
 | `bin-windows-x64` | windows-latest | `nowline-windows-x64.exe` artifact |
 | `bin-windows-arm64` | windows-latest | `nowline-windows-arm64.exe` artifact |
-| `pack-npm` | ubuntu-latest | `npm-tarballs` artifact (eleven `.tgz` files) |
+| `pack-npm` | ubuntu-latest | `npm-tarballs` artifact (sixteen `.tgz` files) |
 | `pack-vsix` | ubuntu-latest | `nowline-vscode.vsix` artifact |
+| `pack-action` | ubuntu-latest | `action-mirror` bundle artifact |
+| `pack-embed` | ubuntu-latest | embed CDN prod tree integrity check |
 
 Binary cells use `bun compile` and run the same per-format smoke test (SVG, PNG, PDF, HTML, Mermaid, XLSX, MS Project XML) against `examples/minimal.nowline`, except cross-target combinations that cannot execute on the runner. The two linux cells additionally invoke [`scripts/build-deb.sh`](../scripts/build-deb.sh) on the binary they just produced — keeping the binary→deb chain intra-cell skips an artifact upload/download round-trip.
 
-`pack-npm` runs `pnpm pack` for the eleven publishable packages in dependency order (`@nowline/core`, `@nowline/layout`, `@nowline/renderer`, `@nowline/export-core`, the six per-format `@nowline/export-*` packages, `@nowline/cli`). pnpm 10 rewrites `workspace:*` to the resolved version inside each tarball, so the publish phase uses plain `npm publish <tarball>` with no workspace-protocol shenanigans. `@nowline/config` and `@nowline/lsp` are intentionally excluded — neither is published today.
+`pack-npm` runs `pnpm pack` for the sixteen publishable packages in dependency order (`@nowline/core`, `@nowline/layout`, `@nowline/renderer`, `@nowline/browser`, `@nowline/embed`, `@nowline/preview-shell`, `@nowline/lsp`, `@nowline/lsp-worker`, `@nowline/export-core`, the six per-format `@nowline/export-*` packages, `@nowline/cli`). pnpm 10 rewrites `workspace:*` to the resolved version inside each tarball, so the publish phase uses plain `npm publish <tarball>` with no workspace-protocol shenanigans. `@nowline/config` is intentionally excluded — it is consumed only by `@nowline/cli`, which is shipped via the `bun compile` binaries (.deb, Homebrew, GH Releases) where the dep is bundled at compile time.
+
+> **Note on `@nowline/lsp`.** As of v0.4.0, `@nowline/lsp` is published to npm. `@nowline/lsp-worker` declares `"@nowline/lsp": "workspace:*"` in its runtime `dependencies`; pnpm rewrites that to the resolved version inside the published tarball, so `npm install @nowline/lsp-worker` needs `@nowline/lsp` resolvable on the registry. Publishing `@nowline/lsp` also fulfills the contract documented in its own README (`npx nowline-lsp` for Neovim/JetBrains/Helix/Emacs). The alternative — bundling `@nowline/lsp` into `@nowline/lsp-worker` via esbuild — was evaluated and deferred: `lsp-worker` has no bundler config today (`tsc -b` only), and introducing one would require designing externals for all four entry points plus `langium`/`vscode-languageserver`; that's a separate project, not a pre-release patch.
 
 `pack-vsix` runs `pnpm package` in [`packages/vscode-extension`](../packages/vscode-extension), which produces `dist/nowline-vscode.vsix` via esbuild + `vsce package --no-dependencies`. The `.vsix` bundles the workspace dependencies, so the vscode publish cell never needs to read from npm.
+
+`pack-action` stages the Marketplace action mirror bundle for `lolay/nowline-action`.
+
+`pack-embed` verifies the embed CDN prod tree produced by `pnpm -r build` (integrity check only on PR/main runs; the upload is gated on `inputs.upload`).
+
+> **Option B — version-from-tag (future direction).** Today the `cut-release` commit bumps `packages/*/package.json#version`, which is what stamps the binary's `--version`, the embed banner, the .deb control file, the .vsix manifest, and each `pnpm pack` tarball. A future refactor could keep `package.json` at `0.0.0-development` permanently and inject version from the tag at build time, enabling true cache-by-SHA across CI and release — PRs would build the exact same artifacts as the release without any version-bump commit in the way. Out of scope for v0.4.0; revisit after estate cleanups.
 
 ### `publish`
 
