@@ -51,6 +51,15 @@ runs:
           .github/actions/prepare-firebase-deploy
           ${{ inputs.firebase-config-path }}
           ${{ inputs.extra-checkout-paths }}
+        # Disable cone-mode so `extra-checkout-paths` can name individual
+        # files (e.g. `packages/embed/package.json`). Cone-mode requires
+        # directory paths and fails fatal on file paths, which broke the
+        # v0.4.0 embed-prod deploy (caller passed package.json for the
+        # banner-version assertion in the deploy step). The fixed-path
+        # entries above are still single-segment so cone-vs-no-cone
+        # matching behavior is identical for them; only the variable
+        # `extra-checkout-paths` benefits.
+        sparse-checkout-cone-mode: false
 
     - name: Download CDN artifact
       uses: actions/download-artifact@v8

@@ -152,7 +152,14 @@ jobs:
           # `@nowline/core` → `nowline-core-<version>.tgz`. Same
           # dependency order as the pack step.
           for pkg in nowline-core nowline-layout nowline-renderer nowline-browser nowline-embed nowline-preview-shell nowline-lsp nowline-lsp-worker nowline-export-core nowline-export-png nowline-export-pdf nowline-export-html nowline-export-mermaid nowline-export-xlsx nowline-export-msproj nowline-config nowline-cli; do
-            tarball=$(find dist-pack -maxdepth 1 -name "${pkg}-*.tgz" -print -quit)
+            # Anchor the glob to a digit (semver version always starts with
+            # a number) so `nowline-lsp-*.tgz` only matches
+            # `nowline-lsp-0.4.1.tgz` and not `nowline-lsp-worker-0.4.1.tgz`.
+            # The unanchored `${pkg}-*.tgz` pattern broke the v0.4.0 publish
+            # loop: the `nowline-lsp` iteration globbed to the lsp-worker
+            # tarball, and the subsequent `nowline-lsp-worker` iteration
+            # then hit 403 "already published" on its second attempt.
+            tarball=$(find dist-pack -maxdepth 1 -name "${pkg}-[0-9]*.tgz" -print -quit)
             test -n "$tarball" || { echo "missing tarball for ${pkg}" >&2; exit 1; }
             echo "publishing ${tarball}"
             # `./` prefix forces npm to treat the argument as a filesystem
