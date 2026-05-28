@@ -20,7 +20,7 @@
 # ubuntu-latest GitHub runners and macOS for local verification.
 #
 # Usage:
-#   scripts/monitor-cursor-releases.sh
+#   .github/scripts/monitor-cursor-releases.sh
 #
 # Exit codes:
 #   0  success (history updated, or no new release)
@@ -28,7 +28,7 @@
 
 set -euo pipefail
 
-REPO_ROOT="$(cd "$(dirname "$0")/.." && pwd)"
+REPO_ROOT="$(cd "$(dirname "$0")/../.." && pwd)"
 HISTORY_FILE="$REPO_ROOT/.github/cursor-release-history.json"
 API_URL="https://cursor.com/api/download?platform=linux-x64&releaseTrack=stable"
 ROLLOFF_DAYS=730

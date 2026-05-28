@@ -25,7 +25,7 @@
 # checkout. No network access required.
 #
 # Usage:
-#   scripts/compute-engine-floor.sh
+#   .github/scripts/compute-engine-floor.sh
 #
 # Exit codes:
 #   0  success
@@ -33,7 +33,7 @@
 
 set -euo pipefail
 
-REPO_ROOT="$(cd "$(dirname "$0")/.." && pwd)"
+REPO_ROOT="$(cd "$(dirname "$0")/../.." && pwd)"
 PKG_JSON="$REPO_ROOT/packages/vscode-extension/package.json"
 GRACE_DAYS=30
 

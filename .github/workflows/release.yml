@@ -63,7 +63,7 @@ jobs:
         id: bump
         run: |
           set -euo pipefail
-          NEW_VERSION=$(node scripts/bump-version.mjs "${{ inputs.level }}")
+          NEW_VERSION=$(node .github/scripts/bump-version.mjs "${{ inputs.level }}")
           echo "version=${NEW_VERSION}" >> "$GITHUB_OUTPUT"
           echo "Bumped to ${NEW_VERSION}"
 
