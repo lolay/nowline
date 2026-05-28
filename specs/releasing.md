@@ -48,7 +48,7 @@ There are two ways to trigger a release; the dispatch UI is the default.
 This kicks off the `cut-release` job, which:
 
 1. Checks out `main` using `RELEASE_TAG_PAT` (a user-scoped PAT — `GITHUB_TOKEN`-pushed tags do not trigger downstream workflows, which would defeat the whole point).
-2. Runs `node scripts/bump-version.mjs <level>` to rewrite every `packages/*/package.json` to the next SemVer.
+2. Runs `node .github/scripts/bump-version.mjs <level>` to rewrite every `packages/*/package.json` to the next SemVer.
 3. Commits the bump as `release vX.Y.Z`.
 4. Tags `vX.Y.Z`.
 5. Pushes both the commit and the tag to `main`.
@@ -60,7 +60,7 @@ The tag push then re-triggers `release.yml` under `event_name == 'push'`, which 
 If the dispatch flow is unusable (e.g. PAT expired), you can do the same thing locally:
 
 ```bash
-node scripts/bump-version.mjs patch     # or minor / major; prints new version
+node .github/scripts/bump-version.mjs patch     # or minor / major; prints new version
 git commit -am "release vX.Y.Z"
 git tag vX.Y.Z
 git push origin main

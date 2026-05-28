@@ -12,7 +12,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ### Changed
 
-- _Nothing yet._
+- Moved CI-only helper scripts from `scripts/` to `.github/scripts/` (`bump-version.mjs`, `compute-engine-floor.sh`, `open-engine-bump-issue.sh`, `monitor-cursor-releases.sh`).
 
 ### Deprecated
 

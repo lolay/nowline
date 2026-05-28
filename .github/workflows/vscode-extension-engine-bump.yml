@@ -60,13 +60,13 @@ jobs:
 
             - name: Compute engine floor
               id: floor
-              run: bash scripts/compute-engine-floor.sh
+              run: bash .github/scripts/compute-engine-floor.sh
 
             - name: Open bump issue
               if: steps.floor.outputs.bump_needed == 'true'
               env:
                   GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
               run: |
-                  bash scripts/open-engine-bump-issue.sh \
+                  bash .github/scripts/open-engine-bump-issue.sh \
                       "${{ steps.floor.outputs.floor }}" \
                       "${{ steps.floor.outputs.current }}"

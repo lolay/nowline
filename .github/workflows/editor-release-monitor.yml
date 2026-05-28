@@ -49,7 +49,7 @@ jobs:
             - name: Monitor Cursor releases
               id: cursor
               continue-on-error: true
-              run: bash scripts/monitor-cursor-releases.sh
+              run: bash .github/scripts/monitor-cursor-releases.sh
 
             # Example for a future fork:
             # - name: Monitor VSCodium releases

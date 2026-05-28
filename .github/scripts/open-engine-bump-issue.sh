@@ -43,7 +43,7 @@
 
 set -euo pipefail
 
-REPO_ROOT="$(cd "$(dirname "$0")/.." && pwd)"
+REPO_ROOT="$(cd "$(dirname "$0")/../.." && pwd)"
 PKG_JSON="$REPO_ROOT/packages/vscode-extension/package.json"
 GRACE_DAYS=30
 
@@ -198,7 +198,7 @@ Only forks with at least one release older than the 30-day grace window are list
 ## Audit
 
 - Source data lives in [`.github/*-release-history.json`](.github/) and is updated daily by `.github/workflows/editor-release-monitor.yml`.
-- The analyzer (this issue's author) is `.github/workflows/vscode-extension-engine-bump.yml` and reuses `scripts/compute-engine-floor.sh` for the floor math.{audit_footer}
+- The analyzer (this issue's author) is `.github/workflows/vscode-extension-engine-bump.yml` and reuses `.github/scripts/compute-engine-floor.sh` for the floor math.{audit_footer}
 
 <!-- engine-floor-bump:target={target_spec};current={current_spec} -->
 """

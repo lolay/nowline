@@ -97,10 +97,10 @@ Two workflows operate in tandem. No custom secrets or PATs are required; both ru
 
 **Adding a new fork.** Fork detection is deliberately extensible:
 
-1. Write `scripts/monitor-<slug>-releases.sh` following the same contract as `scripts/monitor-cursor-releases.sh`: hits the fork's stable channel, downloads a package if needed, extracts `vscode_version` from `product.json` or equivalent, appends `{version, released_at, vscode_version, source_url}` to `.github/<slug>-release-history.json`, applies 2-year roll-off.
+1. Write `.github/scripts/monitor-<slug>-releases.sh` following the same contract as `.github/scripts/monitor-cursor-releases.sh`: hits the fork's stable channel, downloads a package if needed, extracts `vscode_version` from `product.json` or equivalent, appends `{version, released_at, vscode_version, source_url}` to `.github/<slug>-release-history.json`, applies 2-year roll-off.
 2. Seed `.github/<slug>-release-history.json` with a `fork_name` matching the display name you want in issue bodies.
 3. Add one step to the `update-release-history` job in `editor-release-monitor.yml` (with `continue-on-error: true`).
-4. The analyzer picks up the new file automatically — no changes to `compute-engine-floor.sh` or `open-engine-bump-issue.sh` are needed.
+4. The analyzer picks up the new file automatically — no changes to `.github/scripts/compute-engine-floor.sh` or `.github/scripts/open-engine-bump-issue.sh` are needed.
 
 **Branch-protection requirement.** The daily monitor pushes a direct commit to `main`. Add `github-actions[bot]` to `main`'s branch ruleset bypass list (Settings → Rules → main → Bypass list) so the push is not blocked by the CI-gate ruleset. The bump analyzer only creates issues and does not push, so it is not affected.
 

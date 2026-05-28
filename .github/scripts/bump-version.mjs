@@ -4,7 +4,7 @@
 // `cut-release` job in .github/workflows/release.yml.
 //
 // Usage:
-//   node scripts/bump-version.mjs <patch|minor|major>
+//   node .github/scripts/bump-version.mjs <patch|minor|major>
 //
 // Behaviour:
 //   - Reads the current version from packages/cli/package.json (the
@@ -24,7 +24,7 @@ import { dirname, join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
 const here = dirname(fileURLToPath(import.meta.url));
-const repoRoot = resolve(here, '..');
+const repoRoot = resolve(here, '../..');
 const packagesDir = join(repoRoot, 'packages');
 
 const VALID_LEVELS = new Set(['patch', 'minor', 'major']);
