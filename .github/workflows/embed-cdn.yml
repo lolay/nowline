@@ -19,23 +19,39 @@ name: Embed CDN
 # env setup and §§ 5–6 for the workflow shape and verification steps.
 
 on:
+  # Filter inverted from allowlist (`paths:`) to blocklist (`paths-ignore:`).
+  # Allowlist is fail-open: a new top-level path added later silently
+  # bypasses the deploy until someone updates the list. Blocklist is
+  # fail-closed: any new path defaults to running the deploy, and only
+  # the explicit list of trivially-irrelevant paths short-circuits.
+  # Not a required check, so the "skipped workflow doesn't appear in
+  # rollup" semantic is fine — we just don't fire a preview deploy on
+  # docs-only PRs to save CI minutes and a Firebase preview channel.
   push:
     branches: [main]
-    paths:
-      - 'packages/embed/**'
-      - 'packages/core/**'
-      - 'packages/layout/**'
-      - 'packages/renderer/**'
-      - '.github/workflows/embed-cdn.yml'
-      - '.github/actions/prepare-firebase-deploy/**'
+    paths-ignore:
+      - '**.md'
+      - 'docs/**'
+      - 'specs/**'
+      - '.cursor/**'
+      - '.scratch/**'
+      - '.github/AGENTS.md'
+      - '.github/CODEOWNERS'
+      - '.github/agent-prompts/**'
+      - '.github/ISSUE_TEMPLATE/**'
+      - '.github/PULL_REQUEST_TEMPLATE.md'
   pull_request:
-    paths:
-      - 'packages/embed/**'
-      - 'packages/core/**'
-      - 'packages/layout/**'
-      - 'packages/renderer/**'
-      - '.github/workflows/embed-cdn.yml'
-      - '.github/actions/prepare-firebase-deploy/**'
+    paths-ignore:
+      - '**.md'
+      - 'docs/**'
+      - 'specs/**'
+      - '.cursor/**'
+      - '.scratch/**'
+      - '.github/AGENTS.md'
+      - '.github/CODEOWNERS'
+      - '.github/agent-prompts/**'
+      - '.github/ISSUE_TEMPLATE/**'
+      - '.github/PULL_REQUEST_TEMPLATE.md'
   workflow_dispatch:
 
 # One in-flight deploy per ref. PRs cancel earlier-in-flight runs (last
