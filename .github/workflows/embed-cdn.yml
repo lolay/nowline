@@ -148,8 +148,19 @@ jobs:
         env:
           PROJECT_PATH: packages/embed/firebase/dev
 
-  # Per-PR ephemeral preview channel. 7-day TTL. URL is posted as a PR
-  # comment by FirebaseExtended/action-hosting-deploy.
+  # Per-PR ephemeral preview channel. 7-day TTL. URL is parsed from
+  # the firebase CLI's --json output and posted/updated as a sticky
+  # PR comment by a follow-up github-script step.
+  #
+  # We deploy via the firebase CLI directly (matching the shape used
+  # by `nowline-app/.github/workflows/deploy.yml`) rather than via
+  # `FirebaseExtended/action-hosting-deploy@v0`. The latter only
+  # consumes inline service-account JSON for auth, which our
+  # org-policy-`disableServiceAccountKeyCreation` setup cannot
+  # provide; WIF (already minted by `prepare-firebase-deploy`) is the
+  # idiomatic auth path for this repo and matches how the embed-dev
+  # and embed-prod jobs above + release.yml's embed-prod cell already
+  # talk to Firebase.
   #
   # Skipped on fork PRs because the WIF chain requires a token whose
   # `repository` claim is `lolay/nowline`; a fork's run would fail at
@@ -186,11 +197,82 @@ jobs:
           wif-provider: ${{ vars.WIF_PROVIDER }}
           service-account: ${{ vars.DEPLOY_SA_EMAIL }}
 
+      - name: Install Firebase CLI
+        # Pinned to the same version w9jds/firebase-action@v15.18.0
+        # bundles for the embed-dev / embed-prod jobs so all three
+        # tiers run an identical CLI. Tracked by Renovate's
+        # `firebase-tools` custom manager (.github/renovate-shared.json)
+        # — the same regex picks up bare `firebase-tools@<ver>` strings.
+        run: npm install --global firebase-tools@15.18.0
+
       - name: Deploy preview channel
-        uses: FirebaseExtended/action-hosting-deploy@v0
+        id: deploy
+        env:
+          PROJECT_ID: ${{ vars.PROJECT_ID }}
+          CHANNEL_ID: pr-${{ github.event.pull_request.number }}
+        # cd into the firebase config directory so the CLI picks up
+        # `firebase.json` automatically (matches PROJECT_PATH used by
+        # w9jds/firebase-action in the embed-dev / embed-prod jobs).
+        # `--json` parsing pattern proven in
+        # nowline-app/.github/workflows/deploy.yml's deploy-free job.
+        working-directory: packages/embed/firebase/dev
+        run: |
+          set -euo pipefail
+          OUTPUT=$(firebase hosting:channel:deploy "${CHANNEL_ID}" \
+            --expires 7d \
+            --project "${PROJECT_ID}" \
+            --json \
+            --non-interactive)
+          echo "$OUTPUT"
+          URL=$(echo "$OUTPUT" | jq -r '.result | to_entries[0].value.url // empty')
+          if [ -z "$URL" ]; then
+            echo "::warning::Could not parse preview URL from firebase output; falling back to channel URL convention"
+            URL="https://${PROJECT_ID}--${CHANNEL_ID}.web.app"
+          fi
+          echo "url=${URL}" >> "$GITHUB_OUTPUT"
+          echo "Deployed preview channel: ${URL}"
+
+      - name: Comment preview URL on PR
+        # Sticky comment: locate any prior preview comment by its HTML
+        # marker and update it in-place; otherwise create a fresh one.
+        # Mirrors the "one comment, kept current" UX that
+        # FirebaseExtended/action-hosting-deploy used to provide.
+        uses: actions/github-script@v8
+        env:
+          PREVIEW_URL: ${{ steps.deploy.outputs.url }}
+          CHANNEL_ID: pr-${{ github.event.pull_request.number }}
         with:
-          repoToken: ${{ secrets.GITHUB_TOKEN }}
-          projectId: ${{ vars.PROJECT_ID }}
-          channelId: pr-${{ github.event.pull_request.number }}
-          entryPoint: packages/embed/firebase/dev
-          expires: 7d
+          script: |
+            const marker = '<!-- nowline-embed-preview-comment -->';
+            const url = process.env.PREVIEW_URL;
+            const channelId = process.env.CHANNEL_ID;
+            const body = [
+              marker,
+              '## Embed CDN preview',
+              '',
+              `Preview channel deployed: <${url}>`,
+              '',
+              `Channel id: \`${channelId}\` (expires in 7 days; redeployed on every push to this PR).`,
+            ].join('\n');
+            const { data: comments } = await github.rest.issues.listComments({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              issue_number: context.issue.number,
+              per_page: 100,
+            });
+            const existing = comments.find((c) => c.body && c.body.includes(marker));
+            if (existing) {
+              await github.rest.issues.updateComment({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                comment_id: existing.id,
+                body,
+              });
+            } else {
+              await github.rest.issues.createComment({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                issue_number: context.issue.number,
+                body,
+              });
+            }
