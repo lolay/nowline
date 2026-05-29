@@ -144,20 +144,24 @@ export function startDevAuthGate(): void {
 
     const provider = new GoogleAuthProvider();
 
-    const handleSignIn = async (): Promise<void> => {
-        try {
-            await signInWithPopup(auth as Auth, provider);
-        } catch (err) {
-            console.error('[nowline-embed-dev-auth-gate] Sign-in failed:', err);
-        }
+    const handleSignIn = (): void => {
+        void (async () => {
+            try {
+                await signInWithPopup(auth as Auth, provider);
+            } catch (err) {
+                console.error('[nowline-embed-dev-auth-gate] Sign-in failed:', err);
+            }
+        })();
     };
 
-    const handleSignOut = async (): Promise<void> => {
-        try {
-            await signOut(auth as Auth);
-        } catch (err) {
-            console.error('[nowline-embed-dev-auth-gate] Sign-out failed:', err);
-        }
+    const handleSignOut = (): void => {
+        void (async () => {
+            try {
+                await signOut(auth as Auth);
+            } catch (err) {
+                console.error('[nowline-embed-dev-auth-gate] Sign-out failed:', err);
+            }
+        })();
     };
 
     onAuthStateChanged(auth as Auth, (user: User | null) => {
