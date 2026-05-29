@@ -12,7 +12,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ### Changed
 
-- Moved CI-only helper scripts from `scripts/` to `.github/scripts/` (`bump-version.mjs`, `compute-engine-floor.sh`, `open-engine-bump-issue.sh`, `monitor-cursor-releases.sh`).
+- _Nothing yet._
 
 ### Deprecated
 
@@ -29,6 +29,16 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 ### Security
 
 - _Nothing yet._
+
+## [0.4.2] - 2026-05-28
+
+### Added
+
+- **`@nowline/embed`**: "Share on Nowline" link generation — `share` and `sourceUrl` `initialize()` options append a share link beneath each rendered diagram, encoding the source via the OSS share-link grammar (`#text=`/`#url=`). See `specs/embed.md`.
+
+### Changed
+
+- Moved CI-only helper scripts from `scripts/` to `.github/scripts/` (`bump-version.mjs`, `compute-engine-floor.sh`, `open-engine-bump-issue.sh`, `monitor-cursor-releases.sh`).
 
 ## [0.4.1] - 2026-05-28
 
