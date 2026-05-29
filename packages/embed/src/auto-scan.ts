@@ -5,6 +5,7 @@
 
 import type { ThemeName } from '@nowline/layout';
 import { type EmbedRenderOptions, renderSource } from './pipeline.js';
+import { buildShareLink, type ShareOption } from './share.js';
 
 export interface AutoScanInputs {
     selector: string;
@@ -12,6 +13,16 @@ export interface AutoScanInputs {
     locale?: string;
     width?: number;
     today?: Date;
+    /**
+     * Controls the "Share on Nowline" anchor appended after each rendered
+     * SVG. Defaults to `true` when omitted (mirrors the config default).
+     */
+    share?: ShareOption;
+    /**
+     * Global source URL for all blocks. Per-block `data-nowline-source-url`
+     * overrides this for individual blocks.
+     */
+    sourceUrl?: string;
     /**
      * Document to scan. Defaults to `globalThis.document`. Tests inject
      * a happy-dom document; the IIFE running on a real page picks up
@@ -40,6 +51,9 @@ export async function runAutoScan(inputs: AutoScanInputs): Promise<AutoScanResul
     let failed = 0;
     const baseRunId = ++runCounter;
 
+    // share defaults to true when omitted (mirrors config.share default)
+    const share: ShareOption = inputs.share ?? true;
+
     const tasks: Array<Promise<void>> = [];
     let blockIndex = 0;
     for (const code of Array.from(blocks)) {
@@ -56,11 +70,35 @@ export async function runAutoScan(inputs: AutoScanInputs): Promise<AutoScanResul
             today: inputs.today,
             idPrefix,
         };
+
+        // Capture DOM position before the async render. outerHTML replacement
+        // detaches `target` from the tree, so parent and nextSibling must be
+        // read now. The share anchor is inserted at the saved nextSibling
+        // position, which lands it as the immediate next sibling of the SVG.
+        const parent = target.parentElement;
+        const nextSibling = target.nextSibling;
+
+        // Per-block resolution order: data-nowline-source-url → global sourceUrl
+        const perBlockUrl = code.getAttribute('data-nowline-source-url') ?? undefined;
+        const resolvedSourceUrl = perBlockUrl ?? inputs.sourceUrl;
+
         tasks.push(
             renderSource(source, opts).then(
                 (svg) => {
                     replaceWithSvg(target, svg);
                     rendered++;
+                    if (parent !== null) {
+                        const href = buildShareLink({ source, sourceUrl: resolvedSourceUrl, share });
+                        if (href !== null) {
+                            const a = doc.createElement('a');
+                            a.className = 'nowline-share';
+                            a.href = href;
+                            a.target = '_blank';
+                            a.rel = 'noopener noreferrer';
+                            a.textContent = 'Share on Nowline';
+                            parent.insertBefore(a, nextSibling);
+                        }
+                    }
                 },
                 (err: unknown) => {
                     failed++;

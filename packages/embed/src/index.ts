@@ -31,9 +31,10 @@ import {
     parseSource,
     renderSource,
 } from './pipeline.js';
+import type { ShareOption } from './share.js';
 import { type EmbedTheme, effectiveTheme, resolveSystemTheme } from './theme.js';
 
-export { type AutoScanResult, type EmbedParseResult, EmbedRenderError, type EmbedTheme };
+export { type AutoScanResult, type EmbedParseResult, EmbedRenderError, type EmbedTheme, type ShareOption };
 
 /**
  * Bundle provenance, mirroring the legal-comment banner that
@@ -71,6 +72,21 @@ export interface InitializeOptions {
     width?: number;
     /** Pin a `today` for deterministic snapshots; defaults to live `new Date()` per render. */
     today?: Date;
+    /**
+     * Controls the "Share on Nowline" anchor appended after each rendered SVG.
+     * - `true` (default) — link to `https://free.nowline.io/open#text=…`.
+     * - string — a custom base URL (may include a path); the fragment is appended.
+     * - `false` / `'none'` — no anchor rendered.
+     * - `{ textUrl, remoteUrl }` — template with `{text}` / `{url}` substitution.
+     */
+    share?: ShareOption;
+    /**
+     * Global source URL for all blocks on the page. When set, share links
+     * use `#url=<sourceUrl>` instead of `#text=` (inline encoding).
+     * Per-block `data-nowline-source-url` overrides this for individual blocks.
+     * Only `https:` URLs are emitted as `#url=`.
+     */
+    sourceUrl?: string;
 }
 
 interface ResolvedConfig {
@@ -82,6 +98,10 @@ interface ResolvedConfig {
     today?: Date;
     /** System theme captured at init; not reactive to OS theme flips mid-session. */
     systemTheme: 'light' | 'dark';
+    /** Controls the "Share on Nowline" anchor. Defaults to `true`. */
+    share: ShareOption;
+    /** Global canonical source URL; per-block `data-nowline-source-url` takes priority. */
+    sourceUrl?: string;
 }
 
 const initialConfig: ResolvedConfig = {
@@ -89,6 +109,7 @@ const initialConfig: ResolvedConfig = {
     startOnLoad: true,
     selector: DEFAULT_SELECTOR,
     systemTheme: resolveSystemTheme(),
+    share: true,
 };
 
 let config: ResolvedConfig = { ...initialConfig };
@@ -102,6 +123,8 @@ export function initialize(options: InitializeOptions = {}): void {
         locale: options.locale ?? config.locale,
         width: options.width ?? config.width,
         today: options.today ?? config.today,
+        share: options.share ?? config.share,
+        sourceUrl: options.sourceUrl ?? config.sourceUrl,
         // Re-read `prefers-color-scheme` on every initialize() so callers
         // who explicitly want the latest system theme can ask for it by
         // calling initialize() again. Auto-scan paths still use the value
@@ -154,6 +177,8 @@ export async function init(overrides?: Partial<AutoScanInputs>): Promise<AutoSca
         locale: overrides?.locale ?? config.locale,
         width: overrides?.width ?? config.width,
         today: overrides?.today ?? config.today,
+        share: overrides?.share ?? config.share,
+        sourceUrl: overrides?.sourceUrl ?? config.sourceUrl,
         document: overrides?.document,
     };
     return runAutoScan(inputs);
