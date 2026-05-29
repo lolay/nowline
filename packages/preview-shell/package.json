@@ -1,6 +1,6 @@
 {
     "name": "@nowline/preview-shell",
-    "version": "0.4.1",
+    "version": "0.4.2",
     "description": "Framework-agnostic preview viewport for Nowline SVGs: zoom, pan, fit, minimap, diagnostic table. Consumed by the VS Code extension's webview and any browser-side Nowline preview surface.",
     "license": "Apache-2.0",
     "engines": {
