@@ -21,6 +21,25 @@
                 "headers": [
                     { "key": "Cache-Control", "value": "public, max-age=300, s-maxage=600" }
                 ]
+            },
+            {
+                "source": "/index.html",
+                "headers": [
+                    { "key": "Cache-Control", "value": "public, max-age=300, s-maxage=600" }
+                ]
+            },
+            {
+                "source": "/versions.json",
+                "headers": [
+                    { "key": "Cache-Control", "value": "public, max-age=300, s-maxage=600" }
+                ]
+            },
+            {
+                "source": "/@(+([0-9]).+([0-9]).+([0-9])|+([0-9]).+([0-9])|latest)/index.html",
+                "headers": [
+                    { "key": "Cache-Control", "value": "public, max-age=300, s-maxage=600" },
+                    { "key": "X-Robots-Tag", "value": "noindex" }
+                ]
             }
         ]
     }

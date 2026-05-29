@@ -8,11 +8,13 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ### Added
 
-- _Nothing yet._
+- Every released `@nowline/embed` version is now durably hosted on `embed.nowline.io`: the current version's bytes come from the published npm tarball (the exact artifact uploaded to the registry), and prior versions are fetched from the npm registry on each deploy — so the full history stays available and byte-identical to npm.
+- Root version-index page (`https://embed.nowline.io/`) and per-version "Nowline Embed Demo" pages (`https://embed.nowline.io/{X.Y.Z}/`) on both `embed.nowline.io` and `embed.nowline.dev`, serving as live smoke tests and a browsable version catalogue after each deploy.
 
 ### Changed
 
-- _Nothing yet._
+- Dev CDN bundle now serves at `https://embed.nowline.dev/latest/nowline.min.js` (was the flat path `https://embed.nowline.dev/nowline.min.js`), aligning the dev domain's path layout with the prod `/latest/` alias.
+- Embed bundle banner `built=` timestamp is now the git commit date rather than the wall-clock build time, making builds of the same tag byte-identical across the npm tarball and the branded CDN. Downstream integrity checks (`sha256sum`, Content-Length assertions) are stable across re-deploys.
 
 ### Deprecated
 

@@ -15,9 +15,10 @@
 //   dist-cdn-prod/X.Y/nowline.min.js     — rewritten each release
 //                                          within the minor.
 //   dist-cdn-prod/latest/nowline.min.js  — rewritten on every release.
-//   dist-cdn-dev/nowline.min.js          — main-push dev tier; carries
-//                                          the same banner plus a
-//                                          `console.warn` once per page.
+//   dist-cdn-dev/latest/nowline.min.js   — main-push dev tier; mirrors
+//                                          the prod `latest/` layout.
+//                                          Carries the same banner plus
+//                                          a `console.warn` once per page.
 //
 // They live outside `dist/` so they don't bloat the npm tarball
 // (`"files": ["dist/", "src/"]` in package.json), and so a downstream
@@ -46,6 +47,7 @@ import { readFileSync } from 'node:fs';
 import { dirname, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { build } from 'esbuild';
+import { renderDemo, renderRootIndex } from './lib/templates.mjs';
 
 const here = dirname(fileURLToPath(import.meta.url));
 const root = resolve(here, '..');
@@ -79,7 +81,30 @@ function resolveSha() {
 }
 
 const sha = resolveSha();
-const builtAt = new Date().toISOString();
+
+// builtAt must be deterministic so two builds from the same commit (e.g.
+// the `pack-npm` and `pack-embed` CI matrix cells) produce byte-identical
+// bundles. Resolution order:
+//   1. NOWLINE_EMBED_BUILT_AT env var — explicit override (CI pin or testing).
+//   2. Commit date from `git show -s --format=%cI HEAD` — same across all
+//      cells that check out the same tag.
+//   3. new Date() — local dev fallback; non-deterministic but harmless.
+function resolveBuiltAt() {
+    const fromEnv = process.env.NOWLINE_EMBED_BUILT_AT;
+    if (fromEnv) return fromEnv;
+    try {
+        return execSync('git show -s --format=%cI HEAD', {
+            cwd: root,
+            stdio: ['ignore', 'pipe', 'ignore'],
+        })
+            .toString()
+            .trim();
+    } catch {
+        return new Date().toISOString();
+    }
+}
+
+const builtAt = resolveBuiltAt();
 const bannerHeader = `/*! @nowline/embed ${version} sha=${sha} built=${builtAt} env=${embedEnv} */`;
 const devWarn = isDev
     ? `;(typeof console!=="undefined"&&console.warn&&console.warn("nowline embed @${sha} \\u2014 unstable, do not pin"));`
@@ -172,13 +197,13 @@ const shared = {
 
 // Prod IIFE writes to `dist/nowline.min.js` so the npm tarball (which
 // ships the contents of `dist/`) carries the publicly-documented bundle.
-// Dev IIFE writes directly into `dist-cdn-dev/` and does NOT touch
-// `dist/` — otherwise the dev artifact (with the auth gate + firebase
-// payload) would overwrite the prod one whenever both builds run in the
-// same `pnpm build` invocation, and a subsequent `npm publish` would
-// upload the wrong bytes.
+// Dev IIFE writes into `dist-cdn-dev/latest/` so it mirrors the prod
+// `latest/` layout and does NOT touch `dist/` — otherwise the dev
+// artifact (with the auth gate + firebase payload) would overwrite the
+// prod one whenever both builds run in the same `pnpm build` invocation,
+// and a subsequent `npm publish` would upload the wrong bytes.
 const iifePrimaryOutfile = isDev
-    ? resolve(cdnDir, 'nowline.min.js')
+    ? resolve(cdnDir, 'latest', 'nowline.min.js')
     : resolve(outDir, 'nowline.min.js');
 
 const iifeConfig = {
@@ -211,9 +236,25 @@ const fs = await import('node:fs/promises');
 
 async function layOutCdnArtifacts() {
     if (isDev) {
-        // Dev IIFE landed directly under `dist-cdn-dev/` — nothing more
-        // to do; firebase deploy points at that directory verbatim.
-        return [iifePrimaryOutfile];
+        // Dev IIFE landed in `dist-cdn-dev/latest/` (from the iifePrimaryOutfile
+        // above). Generate the two HTML pages so `firebase deploy` serves a
+        // complete site: a root index listing the single version and a per-version
+        // demo page that loads its sibling bundle.
+        const latestDir = resolve(cdnDir, 'latest');
+        const demoHtml = renderDemo({ version: 'latest', builtAt });
+        const rootHtml = renderRootIndex({
+            versions: ['latest'],
+            builtAt,
+            sha,
+            baseUrl: 'https://embed.nowline.dev',
+        });
+        await fs.writeFile(resolve(latestDir, 'index.html'), demoHtml, 'utf-8');
+        await fs.writeFile(resolve(cdnDir, 'index.html'), rootHtml, 'utf-8');
+        return [
+            iifePrimaryOutfile,
+            resolve(latestDir, 'index.html'),
+            resolve(cdnDir, 'index.html'),
+        ];
     }
 
     // Prod IIFE landed under `dist/` (npm tarball source). Mirror it
@@ -244,6 +285,11 @@ async function layOutCdnArtifacts() {
 
 async function run() {
     await fs.mkdir(outDir, { recursive: true });
+    if (isDev) {
+        // esbuild writes the IIFE directly to `dist-cdn-dev/latest/` — create
+        // the directory before the build so esbuild has a valid output path.
+        await fs.mkdir(resolve(cdnDir, 'latest'), { recursive: true });
+    }
     // ESM only on the prod build — see esmConfig comment for the rationale.
     const builds = isDev ? [build(iifeConfig)] : [build(iifeConfig), build(esmConfig)];
     const [iifeResult] = await Promise.all(builds);

@@ -190,17 +190,19 @@ See [Bootstrap status](#bootstrap-status) for what's wired today. The end-to-end
 
 | URL | Triggered by | Stability | `Cache-Control` | Audience |
 |-----|--------------|-----------|-----------------|----------|
-| `https://embed.nowline.io/{X.Y.Z}/nowline.min.js` | release tag | immutable per patch | `public, max-age=31536000, immutable` | embedders pinning to a known-good build |
+| `https://embed.nowline.io/{X.Y.Z}/nowline.min.js` | release tag | immutable; all released `X.Y.Z` reconstructed from npm each deploy | `public, max-age=31536000, immutable` | embedders pinning to a known-good build |
 | `https://embed.nowline.io/{X.Y}/nowline.min.js` | release tag (rewritten on each release in the minor) | mutable within minor | `public, max-age=300, s-maxage=600` | embedders who want patch fixes auto-rolled in |
 | `https://embed.nowline.io/latest/nowline.min.js` | release tag (rewritten on each release) | mutable, latest stable | `public, max-age=300, s-maxage=600` | docs site, demos, prototypes |
-| `https://embed.nowline.dev/nowline.min.js` | every push to `main` | mutable, no SLA, may break | `public, max-age=60, s-maxage=120, must-revalidate`, `X-Robots-Tag: noindex` | internal preview, early adopters opting into "next" |
-| `https://nowline-embed-dev--pr-{N}-{sha}.web.app/nowline.min.js` | PR open or sync | ephemeral, 7-day TTL | Firebase default | per-PR review, posted as a PR comment by the deploy action |
+| `https://embed.nowline.dev/latest/nowline.min.js` | every push to `main` | mutable, no SLA, may break | `public, max-age=60, s-maxage=120, must-revalidate`, `X-Robots-Tag: noindex` | internal preview, early adopters opting into "next" |
+| `https://nowline-embed-dev--pr-{N}-{sha}.web.app/latest/nowline.min.js` | PR open or sync | ephemeral, 7-day TTL | Firebase default | per-PR review, posted as a PR comment by the deploy action |
+| `https://embed.nowline.io/` | release deploy | version index, regenerated each deploy | `public, max-age=300, s-maxage=600` | browsable version catalogue; discovery surface for the CDN |
+| `https://embed.nowline.io/{X.Y.Z}/` | release deploy | demo page, regenerated each deploy | `public, max-age=300, s-maxage=600`, `X-Robots-Tag: noindex` | live smoke test for each released version; not indexed |
 
 ### Why minor-pinning, not major-pinning, on `embed.nowline.io`
 
 Per semver, the *minor* is the breaking-change boundary while the package is pre-1.0 (`0.2 → 0.3` is allowed to break; `0.2.0 → 0.2.1` must not). So the auto-upgrading "stable channel" for an embedder during 0.x is `/0.2/`, not `/0/` — bare `/0/` would also read as ambiguous, while `/0.2/` is unambiguously a version number.
 
-When the package reaches 1.0, a `https://embed.nowline.io/v{N}/nowline.min.js` major-pinned tier will be added (`v` prefix because bare `/1/` is ambiguous in the same way `/0/` was). Existing `0.2.0`, `0.2`, `latest`, `dev` URLs keep working unchanged.
+When the package reaches 1.0, a `https://embed.nowline.io/v{N}/nowline.min.js` major-pinned tier will be added (`v` prefix because bare `/1/` is ambiguous in the same way `/0/` was). All released `X.Y.Z` paths stay available indefinitely — they are reconstructed from the published npm tarball on each deploy, so the CDN bytes are byte-identical to what `npm pack @nowline/embed@X.Y.Z` produces.
 
 ### Bundle provenance
 
@@ -214,7 +216,7 @@ curl the URL or open it in DevTools to see exactly which build is being served. 
 
 ### Why a custom CDN instead of jsDelivr / unpkg
 
-The embed is shipped as `@nowline/embed` on npm, so the npm-backed CDNs (jsDelivr, unpkg) automatically serve it too — but they're an unsupported escape hatch, not a documented channel. The custom CDN exists for branded URLs in `view-source` (small but real marketing surface), per-version telemetry for sunset planning, custom cache and security headers, and the `embed.nowline.dev` + per-PR ephemeral preview tiers that npm-backed CDNs can't provide. We can revisit and document jsDelivr as a fallback if real-world feedback surfaces a need.
+The embed is shipped as `@nowline/embed` on npm, so the npm-backed CDNs (jsDelivr, unpkg) automatically serve it too. Direct embedding via `https://cdn.jsdelivr.net/npm/@nowline/embed@{version}/dist/nowline.min.js` (or the equivalent unpkg URL) works and is byte-identical to the branded CDN — the branded CDN's reconstruction logic mirrors exactly what the npm registry serves. However, jsDelivr and unpkg remain an unsupported escape hatch, not a documented channel. The custom CDN exists for branded URLs in `view-source` (small but real marketing surface), per-version telemetry for sunset planning, custom cache and security headers, and the `embed.nowline.dev` + per-PR ephemeral preview tiers that npm-backed CDNs can't provide. We can revisit and document jsDelivr as a fallback if real-world feedback surfaces a need.
 
 ### Bootstrap status
 

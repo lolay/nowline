@@ -5,8 +5,8 @@
 //
 // Two budgets, one per environment:
 //
-//   prod IIFE (dist/nowline.min.js)            ≤ 175 KB gzipped
-//   dev IIFE  (dist-cdn-dev/nowline.min.js)    ≤ 220 KB gzipped
+//   prod IIFE (dist/nowline.min.js)                   ≤ 175 KB gzipped
+//   dev IIFE  (dist-cdn-dev/latest/nowline.min.js)    ≤ 220 KB gzipped
 //
 // The dev bundle additionally carries `firebase/app` + `firebase/auth`
 // (tree-shaken to the popup sign-in path) so the allowlist gate can
@@ -51,7 +51,7 @@ const DEV_BUDGET = 220 * 1024;
 const DEV_ALERT = 240 * 1024;
 
 const PROD_BUNDLE = resolve(root, 'dist/nowline.min.js');
-const DEV_BUNDLE = resolve(root, 'dist-cdn-dev/nowline.min.js');
+const DEV_BUNDLE = resolve(root, 'dist-cdn-dev/latest/nowline.min.js');
 const META_PATH = resolve(root, 'dist/meta.json');
 
 function fmtKB(bytes) {
@@ -205,7 +205,7 @@ const devBundle = await loadIfPresent(DEV_BUNDLE);
 let devResult = { ok: true, gz: 0, budget: DEV_BUDGET };
 if (devBundle) {
     devResult = await checkBundle({
-        name: 'dev (dist-cdn-dev/nowline.min.js)',
+        name: 'dev (dist-cdn-dev/latest/nowline.min.js)',
         bundle: devBundle,
         budget: DEV_BUDGET,
         alert: DEV_ALERT,
@@ -213,7 +213,7 @@ if (devBundle) {
     });
 } else {
     console.log(
-        '\n[dev] dist-cdn-dev/nowline.min.js not present; skipping (run `pnpm bundle:dev` to build).',
+        '\n[dev] dist-cdn-dev/latest/nowline.min.js not present; skipping (run `pnpm bundle:dev` to build).',
     );
 }
 
