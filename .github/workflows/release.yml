@@ -534,18 +534,74 @@ jobs:
         with:
           firebase-config-path: packages/embed/firebase/prod
           artifact-name: embed-cdn-prod
-          # Land the artifact INSIDE the firebase project directory so
-          # firebase.json's `"public": "public"` resolves cleanly. Firebase
-          # tools refuse a `public` path that escapes the directory holding
-          # firebase.json, which is why we don't reuse `packages/embed/
-          # dist-cdn-prod` here (that's the bundler's local output path).
-          artifact-path: packages/embed/firebase/prod/public
+          # The embed-cdn-prod artifact is now only the byte-identity guard
+          # input for build-cdn-history.mjs below — NOT the deploy payload.
+          # The full public/ tree (every version + alias + index/demo page)
+          # is regenerated from npm into packages/embed/firebase/prod/public
+          # by the steps below, so land this download in a staging dir
+          # OUTSIDE public/ to keep that generated tree clean.
+          artifact-path: embed-cdn-prod-artifact
           wif-provider: ${{ vars.WIF_PROVIDER }}
           service-account: ${{ vars.DEPLOY_SA_EMAIL }}
-          # Need package.json for the banner-version assertion below.
-          extra-checkout-paths: packages/embed/package.json
+          # Check out the embed CDN scripts (build-cdn-history.mjs,
+          # gen-index.mjs, lib/templates.mjs) so the steps below can rebuild
+          # the full version history and render the index + demo pages.
+          extra-checkout-paths: packages/embed/scripts
 
-      - name: Verify artifact banner matches release tag
+      - name: Setup Node.js
+        uses: actions/setup-node@v6
+        with:
+          node-version: '26'
+
+      # Both the npm-tarballs and embed-cdn-prod artifacts come from the
+      # `build` job (this job stays `needs: build`), so the current-release
+      # bytes are the pre-publish tarball — no dependency on npm propagation
+      # of the just-tagged version.
+      - name: Download npm tarballs
+        uses: actions/download-artifact@v8
+        with:
+          name: npm-tarballs
+          path: dist-pack
+
+      # Rebuild the ENTIRE hosted version history into public/ from npm.
+      # Firebase Hosting deploys are atomic full-site replacements, so each
+      # deploy must lay down all versions, not just the new one: current-
+      # release bytes come from the npm tarball (the exact bytes npm serves),
+      # prior versions are fetched from the registry, and X.Y/latest aliases
+      # are byte copies. The script's byte-identity guard fails the deploy
+      # loudly if the tarball bytes and the embed-cdn-prod artifact disagree
+      # (a build-determinism regression). --version comes from the git tag,
+      # not the manifest: npm can already carry a version the local
+      # package.json lags.
+      - name: Reconstruct CDN version history (npm bytes + byte-identity guard)
+        run: |
+          set -euo pipefail
+          VERSION="${GITHUB_REF_NAME#v}"
+          node packages/embed/scripts/build-cdn-history.mjs \
+            --public packages/embed/firebase/prod/public \
+            --version "$VERSION" \
+            --npm-tarballs dist-pack \
+            --embed-cdn-prod embed-cdn-prod-artifact
+
+      # Generate the root index, versions.json, and per-dir demo pages over
+      # the tree just written. --built-at mirrors bundle.mjs's resolveBuiltAt
+      # (committer date of the tagged commit, %cI) so a deploy-time demo page
+      # is byte-identical to a dev build of the same commit; --sha stamps the
+      # release commit into the index footer and versions.json.
+      - name: Generate CDN index and demo pages
+        run: |
+          set -euo pipefail
+          BUILT_AT=$(git show -s --format=%cI HEAD)
+          node packages/embed/scripts/gen-index.mjs \
+            --public packages/embed/firebase/prod/public \
+            --sha "${GITHUB_SHA}" \
+            --built-at "$BUILT_AT"
+
+      # public/${VERSION}/nowline.min.js was written from the npm tarball
+      # above (and already byte-checked against embed-cdn-prod). Re-assert its
+      # banner so a wrong-tag → wrong-bytes mismatch fails the deploy before
+      # it ships.
+      - name: Verify current-version banner matches release tag
         run: |
           set -euo pipefail
           VERSION="${GITHUB_REF_NAME#v}"
@@ -555,6 +611,18 @@ jobs:
             || { echo "ERROR: banner version doesn't match tag ${VERSION}" >&2; exit 1; }
           echo "$BANNER" | grep -q "env=prod" \
             || { echo "ERROR: banner env is not prod" >&2; exit 1; }
+
+      # Sanity-check the generated root index actually lists this release, so
+      # a gen-index regression (empty or stale tree) can't ship a CDN landing
+      # page that omits the version we just published.
+      - name: Verify generated index lists the release version
+        run: |
+          set -euo pipefail
+          VERSION="${GITHUB_REF_NAME#v}"
+          INDEX="packages/embed/firebase/prod/public/index.html"
+          test -s "$INDEX" || { echo "ERROR: ${INDEX} missing or empty" >&2; exit 1; }
+          grep -qF -- "$VERSION" "$INDEX" \
+            || { echo "ERROR: generated index.html does not list ${VERSION}" >&2; exit 1; }
 
       - name: Deploy to Firebase Hosting (embed-prod)
         uses: w9jds/firebase-action@v15.18.0
