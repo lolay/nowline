@@ -34,7 +34,13 @@ import {
 import type { ShareOption } from './share.js';
 import { type EmbedTheme, effectiveTheme, resolveSystemTheme } from './theme.js';
 
-export { type AutoScanResult, type EmbedParseResult, EmbedRenderError, type EmbedTheme, type ShareOption };
+export {
+    type AutoScanResult,
+    type EmbedParseResult,
+    EmbedRenderError,
+    type EmbedTheme,
+    type ShareOption,
+};
 
 /**
  * Bundle provenance, mirroring the legal-comment banner that

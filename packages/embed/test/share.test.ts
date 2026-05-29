@@ -1,5 +1,5 @@
-import { describe, expect, it } from 'vitest';
 import { unzlibSync } from 'fflate';
+import { describe, expect, it } from 'vitest';
 import { buildShareLink, DEFAULT_SHARE_BASE, encodeText } from '../src/share.js';
 
 // ---------------------------------------------------------------------------
@@ -41,11 +41,7 @@ describe('encodeText', () => {
 
     it('uses base64url encoding (no +, /, or = characters)', () => {
         // Try several inputs to hit the character replacements
-        const sources = [
-            'short',
-            'a'.repeat(1000),
-            'roadmap r "R" start:2026-01-05 scale:2w\n',
-        ];
+        const sources = ['short', 'a'.repeat(1000), 'roadmap r "R" start:2026-01-05 scale:2w\n'];
         for (const s of sources) {
             const payload = encodeText(s).slice('#text='.length);
             expect(payload).not.toMatch(/[+/=]/);
@@ -105,7 +101,11 @@ describe('buildShareLink — share: string (custom base URL)', () => {
 
     it('falls back to #text= when sourceUrl is not https', () => {
         const base = 'https://editor.example.com';
-        const url = buildShareLink({ source: 'hi', share: base, sourceUrl: 'http://insecure.com/r.nowline' });
+        const url = buildShareLink({
+            source: 'hi',
+            share: base,
+            sourceUrl: 'http://insecure.com/r.nowline',
+        });
         expect(url!).toContain('#text=');
         expect(url!).not.toContain('#url=');
     });

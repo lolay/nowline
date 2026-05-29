@@ -27,11 +27,7 @@ export const DEFAULT_SHARE_BASE = 'https://free.nowline.io/open';
  *   `{text}` substituted with the base64url payload, `{url}` with the
  *   percent-encoded source URL.
  */
-export type ShareOption =
-    | boolean
-    | 'none'
-    | string
-    | { textUrl: string; remoteUrl: string };
+export type ShareOption = boolean | 'none' | string | { textUrl: string; remoteUrl: string };
 
 /**
  * Encode source text → `#text=<base64url(zlib(utf8(source)))>`.

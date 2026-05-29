@@ -88,7 +88,11 @@ export async function runAutoScan(inputs: AutoScanInputs): Promise<AutoScanResul
                     replaceWithSvg(target, svg);
                     rendered++;
                     if (parent !== null) {
-                        const href = buildShareLink({ source, sourceUrl: resolvedSourceUrl, share });
+                        const href = buildShareLink({
+                            source,
+                            sourceUrl: resolvedSourceUrl,
+                            share,
+                        });
                         if (href !== null) {
                             const a = doc.createElement('a');
                             a.className = 'nowline-share';
