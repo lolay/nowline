@@ -6,7 +6,7 @@ name: Copilot PR validate
 #   (3) Assisted-by: line in PR body (## AI assistance section)
 #
 # On any failure: closes the PR with a consolidated comment + relabels the
-# linked issue to human-author with an explanation comment.
+# linked issue to originator-input with an explanation comment.
 #
 # Trigger ordering:
 #   labeled (non-draft only): fires after copilot-pr-stamp.yml adds the label
@@ -52,7 +52,7 @@ jobs:
           # Check 1: non-empty diff
           diff_lines=$(gh pr diff "$PR_NUMBER" --repo "$REPO" | wc -l)
           if [[ "$diff_lines" -eq 0 ]]; then
-            failures+=("- **Empty diff.** This PR contains no file changes. Per the empty-PR ban in \`.github/AGENT_TRIAGE.md\`, the implementation phase should have emitted \`agent-done\` (resolved-without-action) or \`human-author\` (cannot-reproduce) instead of opening this PR.")
+            failures+=("- **Empty diff.** This PR contains no file changes. Per the empty-PR ban in \`.github/AGENT_TRIAGE.md\`, the implementation phase should have emitted \`agent-done\` (resolved-without-action) or \`originator-input\` (cannot-reproduce) instead of opening this PR.")
           fi
 
           # Check 2: Closes #N in body
@@ -81,7 +81,7 @@ jobs:
             echo ""
             cat /tmp/failures.md
             echo ""
-            echo "Closing this PR automatically. The originating issue (if linked via \`Closes #N\` or branch name) has been relabeled to \`human-author\` so the filer can decide next steps."
+            echo "Closing this PR automatically. The originating issue (if linked via \`Closes #N\` or branch name) has been relabeled to \`originator-input\` so the filer can decide next steps."
             echo ""
             echo "See \`.github/AGENT_TRIAGE.md\` for the contract details and fix guidance."
           } > /tmp/validate-comment.md
@@ -90,7 +90,7 @@ jobs:
             --comment "$(cat /tmp/validate-comment.md)" \
             --delete-branch=false
 
-      - name: Relabel linked issue to human-author
+      - name: Relabel linked issue to originator-input
         if: steps.checks.outputs.all_pass == 'false'
         run: |
           # Prefer the GitHub closing-issues API (works even with minor Closes syntax variations)
@@ -108,6 +108,6 @@ jobs:
             exit 0
           fi
           gh issue edit "$issue_number" --repo "$REPO" \
-            --add-label human-author 2>/dev/null || true
+            --add-label originator-input 2>/dev/null || true
           gh issue comment "$issue_number" --repo "$REPO" \
-            --body "Copilot opened PR #$PR_NUMBER but it failed the agent-flow PR contract (see PR for details). The PR has been auto-closed. Please respond with what is needed to proceed, then remove the \`human-author\` label to re-fire the plan phase."
+            --body "Copilot opened PR #$PR_NUMBER but it failed the agent-flow PR contract (see PR for details). The PR has been auto-closed. Please respond with what is needed to proceed, then remove the \`originator-input\` label to re-fire the plan phase."

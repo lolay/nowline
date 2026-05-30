@@ -1,21 +1,24 @@
 name: Agent label transition
 
-# Triggered when any agent-* or human-* label is added to an issue or PR.
-# Enforces the state-label-as-singleton invariant with refined semantics
-# (PR pair 2 / agent-verdict-glue):
+# Triggered when any agent-*, originator-*, or maintainer-* label is added to
+# an issue or PR (plus legacy labels during the migration window — see the
+# trigger gate below). Enforces the state-label-as-singleton invariant with
+# refined semantics (PR pair 2 / agent-verdict-glue):
 #
-#  - When human-* is added (by a human moderator or by agent-verdict-apply.yml),
-#    strips every other agent-* and human-* state label from the target.
-#    Humans win unconditionally; a human-* label always displaces anything else.
+#  - When originator-*/maintainer-* is added (by a maintainer or by
+#    agent-verdict-apply.yml), strips every other agent-*, originator-*, and
+#    maintainer-* state label from the target. Humans win unconditionally; an
+#    originator-*/maintainer-* label always displaces anything else.
 #
 #  - When agent-* is added (by agent-verdict-apply.yml after the apply
 #    workflow's own override check passed), strips prior agent-* state labels
-#    only. Human-* labels are LEFT IN PLACE as defence-in-depth: if the apply
-#    workflow somehow missed the human-override check, the new agent label
-#    simply coexists with the human label and the human still owns the issue.
+#    only. originator-*/maintainer-* labels are LEFT IN PLACE as defence-in-depth:
+#    if the apply workflow somehow missed the override check, the new agent label
+#    simply coexists with the owner label and the human still owns the issue.
 #
 # State labels managed: agent-triage, agent-plan, agent-deep, agent-exec,
-# agent-merge, agent-done, human-only, human-author, human-decide, human-pr.
+# agent-done, maintainer-only, originator-input, maintainer-decide,
+# maintainer-pr-safe, maintainer-pr-review.
 # Origin/metadata labels (cursor-engine-sync, dependencies, bug, copilot-pr,
 # etc.) are not state labels and are never touched by this workflow.
 #
@@ -37,8 +40,14 @@ jobs:
   transition:
     name: Enforce single state label
     runs-on: ubuntu-latest
+    # Trigger gate: agent-* / originator-* / maintainer-* are the live state
+    # namespaces. The legacy human-* prefix is retained ONLY for the migration
+    # window so already-labeled issues/PRs still get cleaned up; remove it once
+    # all open items are re-prefixed.
     if: >
       startsWith(github.event.label.name, 'agent-') ||
+      startsWith(github.event.label.name, 'originator-') ||
+      startsWith(github.event.label.name, 'maintainer-') ||
       startsWith(github.event.label.name, 'human-')
     env:
       GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
@@ -54,24 +63,27 @@ jobs:
             agent-plan
             agent-deep
             agent-exec
-            agent-merge
             agent-done
           )
-          HUMAN_LABELS=(
-            human-only
-            human-author
-            human-decide
-            human-pr
+          ORIGINATOR_LABELS=(
+            originator-input
+          )
+          MAINTAINER_LABELS=(
+            maintainer-only
+            maintainer-decide
+            maintainer-pr-safe
+            maintainer-pr-review
           )
 
           # Refined behaviour (PR pair 2 / agent-verdict-glue):
-          #  - human-* added -> strip ALL other state labels (humans win unconditionally)
-          #  - agent-* added -> strip prior agent-* state labels ONLY; leave human-*
-          #    intact as defence-in-depth (if agent-verdict-apply.yml somehow missed
-          #    the override check, the new agent label coexists rather than displacing
-          #    the human-* label)
-          if [[ "$ADDED_LABEL" == human-* ]]; then
-            STRIPPABLE=("${AGENT_LABELS[@]}" "${HUMAN_LABELS[@]}")
+          #  - originator-*/maintainer-* added -> strip ALL other state labels
+          #    (humans win unconditionally)
+          #  - agent-* added -> strip prior agent-* state labels ONLY; leave
+          #    originator-*/maintainer-* intact as defence-in-depth (if
+          #    agent-verdict-apply.yml somehow missed the override check, the new
+          #    agent label coexists rather than displacing the owner label)
+          if [[ "$ADDED_LABEL" == originator-* || "$ADDED_LABEL" == maintainer-* ]]; then
+            STRIPPABLE=("${AGENT_LABELS[@]}" "${ORIGINATOR_LABELS[@]}" "${MAINTAINER_LABELS[@]}")
           else
             STRIPPABLE=("${AGENT_LABELS[@]}")
           fi

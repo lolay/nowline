@@ -2,8 +2,8 @@ name: Agent verdict apply
 
 # Reads a verdict marker from a newly-posted issue or PR comment and applies
 # the proposed state label, gated by:
-#   (a) any `human-*` label currently present blocks any `agent-*` verdict
-#       (the override check — humans win unconditionally),
+#   (a) any `originator-*` or `maintainer-*` label currently present blocks
+#       any `agent-*` verdict (the override check — humans win unconditionally),
 #   (b) the proposed verdict must be in the per-state allowed-verdicts list
 #       (the state machine encoded in this workflow),
 #   (c) the comment must be a real verdict comment — first non-blank line
@@ -101,11 +101,13 @@ jobs:
           fi
 
           current_state=""
-          human_override=""
+          nonagent_override=""
           while IFS= read -r label; do
             [[ -z "$label" ]] && continue
-            if [[ "$label" == human-* ]]; then
-              [[ -z "$human_override" ]] && human_override="$label"
+            # The "non-agent owns it" set: originator-*/maintainer-* labels are
+            # owned by the filer or a maintainer, not the automation.
+            if [[ "$label" == originator-* || "$label" == maintainer-* ]]; then
+              [[ -z "$nonagent_override" ]] && nonagent_override="$label"
               continue
             fi
             # copilot-pr is metadata, not state — skip it
@@ -114,14 +116,15 @@ jobs:
             fi
           done <<< "$current_labels"
 
-          echo "target_type=$target_type current_state='$current_state' human_override='$human_override' verdict='$VERDICT'"
+          echo "target_type=$target_type current_state='$current_state' nonagent_override='$nonagent_override' verdict='$VERDICT'"
 
-          # (a) Override check: any human-* label blocks any agent-* verdict.
-          # Human verdicts (human-* -> human-*) are rejected at the allowed-list
-          # check below — humans use the label UI directly for state moves.
-          if [[ "$VERDICT" == agent-* && -n "$human_override" ]]; then
-            echo "Verdict '$VERDICT' suppressed by human override '$human_override'."
-            comment_body="Verdict \`$VERDICT\` suppressed: human override label \`$human_override\` is present. The state machine respects the human override and will not apply the proposed agent state label. To resume the agent flow, remove \`$human_override\` and add the desired \`agent-*\` label (or re-add \`agent-triage\` to restart from Phase 1)."
+          # (a) Override check: any originator-*/maintainer-* label blocks any
+          # agent-* verdict. Originator/maintainer verdicts (-> originator-*/
+          # maintainer-*) are rejected at the allowed-list check below — humans
+          # use the label UI directly for state moves.
+          if [[ "$VERDICT" == agent-* && -n "$nonagent_override" ]]; then
+            echo "Verdict '$VERDICT' suppressed by override '$nonagent_override'."
+            comment_body="Verdict \`$VERDICT\` suppressed: override label \`$nonagent_override\` is present. The state machine respects the override and will not apply the proposed agent state label. To resume the agent flow, remove the \`originator-\`/\`maintainer-\` label \`$nonagent_override\` and add the desired \`agent-*\` label (or re-add \`agent-triage\` to restart from Phase 1)."
             if [[ "$target_type" == "pr" ]]; then
               gh pr comment "$ISSUE_NUMBER" --repo "$REPO" --body "$comment_body"
             else
@@ -135,14 +138,14 @@ jobs:
           # anyone reading it can trace exactly which transitions are legal.
           if [[ "$target_type" == "pr" ]]; then
             case "$current_state" in
-              "")  allowed="agent-merge human-pr" ;;
+              "")  allowed="maintainer-pr-safe maintainer-pr-review" ;;
               *)   allowed="" ;;
             esac
           else
             case "$current_state" in
-              ""|"agent-triage")          allowed="agent-plan human-only" ;;
-              "agent-plan")               allowed="agent-deep agent-exec agent-done human-author human-decide" ;;
-              "agent-deep"|"agent-exec")  allowed="agent-done human-author human-decide" ;;
+              ""|"agent-triage")          allowed="agent-plan maintainer-only" ;;
+              "agent-plan")               allowed="agent-deep agent-exec agent-done originator-input maintainer-decide" ;;
+              "agent-deep"|"agent-exec")  allowed="agent-done originator-input maintainer-decide" ;;
               *)                          allowed="" ;;
             esac
           fi
