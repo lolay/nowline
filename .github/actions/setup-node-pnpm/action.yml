@@ -1,5 +1,5 @@
 name: 'Setup Node.js + pnpm + install dependencies'
-description: 'Install pnpm, set up Node.js with the pnpm cache, then install workspace dependencies with --frozen-lockfile.'
+description: 'Provision pnpm via corepack, set up Node.js with the pnpm cache, then install workspace dependencies with --frozen-lockfile.'
 
 # Composite action so every workflow job that needs the standard
 # pnpm + Node toolchain can share one place to bump versions or change
@@ -8,10 +8,16 @@ description: 'Install pnpm, set up Node.js with the pnpm cache, then install wor
 # callers — keeping checkout in the workflow keeps this action
 # parameter-free.
 #
-# setup-node@v5+ enables automatic packageManager-aware caching when
-# `packageManager` is set in package.json. We pass `cache: pnpm`
-# explicitly anyway; the explicit value takes precedence and keeps
-# behaviour identical to the v4 era.
+# pnpm is provisioned via `corepack enable`, which reads the
+# `packageManager: pnpm@<version>` pin from the root package.json.
+# This replaces pnpm/action-setup, which ran a `pnpm self-update` step
+# on Windows that intermittently crashed with STATUS_STACK_BUFFER_OVERRUN
+# (exit 3221226505) — an open upstream bug in pnpm/action-setup#260.
+# Corepack is built into every Node shipped on GitHub-hosted runners and
+# sidesteps the self-installer entirely.
+#
+# corepack enable must run before setup-node so pnpm is on PATH when
+# setup-node probes the store path for cache: pnpm.
 #
 # The Node version is governed by the two-tier policy documented in
 # `CONTRIBUTING.md` § "Toolchain & Supported Versions": the default
@@ -30,8 +36,9 @@ inputs:
 runs:
   using: composite
   steps:
-    - name: Install pnpm
-      uses: pnpm/action-setup@v6
+    - name: Enable corepack
+      shell: bash
+      run: corepack enable
 
     - name: Setup Node.js
       uses: actions/setup-node@v6
