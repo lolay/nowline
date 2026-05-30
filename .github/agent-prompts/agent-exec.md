@@ -24,10 +24,10 @@ This phase does not investigate or re-plan. The plan comment from `agent-plan.md
 Search the issue's comments for one whose body starts with `## Plan` and contains the sections defined in `agent-plan.md`'s plan-comment template (Goal, Approach, Files, Testing, Out of scope, Risk).
 
 - **Plan found and complete** → proceed to Step 2.
-- **Plan missing or incomplete** → stop. Post a comment whose first non-blank line is `agent-verdict: human-decide`, followed by:
+- **Plan missing or incomplete** → stop. Post a comment whose first non-blank line is `agent-verdict: maintainer-decide`, followed by:
 
 ```
-agent-verdict: human-decide
+agent-verdict: maintainer-decide
 
 No plan found.
 
@@ -36,7 +36,7 @@ in the same shape). To resume:
 
 - Add `agent-triage` to restart the flow from Phase 1, or
 - Add a `## Plan` comment manually and re-add `agent-exec`, or
-- Take this offline with `human-only`.
+- Take this offline with `maintainer-only`.
 ```
 
 `agent-verdict-apply.yml` applies the label. Issue stays open.
@@ -50,10 +50,10 @@ in the same shape). To resume:
 - The `### Testing` section names a concrete test, not "we'll add coverage later."
 - No file in `### Files` is in a Hard-rule-protected area. (For `lolay/nowline`: nothing under `packages/core/src/generated/`, no casual snapshot updates, no grammar/AST/layout/renderer changes. For others: per the repo's `AGENTS.md`.) Hard-rule-protected areas effectively always need `agent-deep`.
 
-If the plan looks deeper than `agent-exec` warrants, stop. Post a comment whose first non-blank line is `agent-verdict: human-decide`, followed by:
+If the plan looks deeper than `agent-exec` warrants, stop. Post a comment whose first non-blank line is `agent-verdict: maintainer-decide`, followed by:
 
 ```
-agent-verdict: human-decide
+agent-verdict: maintainer-decide
 
 This plan looks deeper than `agent-exec` warrants. Consider routing to `agent-deep`
 instead — replace `agent-exec` with `agent-deep` and the deep workflow will pick up
@@ -72,7 +72,7 @@ If Steps 1–2 pass, issue the safe-output `assign-to-agent`. The Copilot sessio
 
 - Read this issue, the plan comment, and the repo's `AGENTS.md` / `CONTRIBUTING.md` / `AI_POLICY.md`.
 - Implement the plan exactly as written. **Do not re-plan.**
-- Run `make ci` (the full pre-push gate: lint + typecheck + build + test) and confirm it passes before opening the PR. Fix any failures introduced by the implementation. If `make ci` cannot pass without changes that fall outside the plan's scope, post `agent-verdict: human-decide` instead of opening a PR.
+- Run `make ci` (the full pre-push gate: lint + typecheck + build + test) and confirm it passes before opening the PR. Fix any failures introduced by the implementation. If `make ci` cannot pass without changes that fall outside the plan's scope, post `agent-verdict: maintainer-decide` instead of opening a PR.
 - Open one PR targeting the default branch.
 
 **The PR body MUST include all four of the following — these are mandatory per the prelude § 4 (smoke test C 2026-05-25 surfaced PRs missing them):**
@@ -91,7 +91,7 @@ The Copilot session is structurally separate from this workflow. Your only job h
 Same shape as `agent-deep`'s Step 4. If the Copilot session, after attempting the plan, finds the diff is empty, it must not open a PR. Instead, it must post a comment on the issue whose **first non-blank line** is one of the two verdict markers below (plain text, no backticks, no HTML comment, no code fence), followed by a blank line and the reasoning:
 
 - `agent-verdict: agent-done` — the work was already there. `agent-verdict-apply.yml` applies the label; `agent-issue-close.yml` closes the issue.
-- `agent-verdict: human-author` — the issue under-specified what's needed. Issue stays open awaiting filer input.
+- `agent-verdict: originator-input` — the issue under-specified what's needed. Issue stays open awaiting filer input.
 
 `agent-verdict-apply.yml` is author-agnostic — the Copilot session's comment flows through the same mechanism as gh-aw orchestrator verdicts. Copilot must NOT call `gh issue edit --add-label` directly — the verdict-marker comment is the only sanctioned label-write path.
 
@@ -99,7 +99,7 @@ Same shape as `agent-deep`'s Step 4. If the Copilot session, after attempting th
 
 - Don't investigate the codebase yourself. The plan already did. The Copilot session does the implementation.
 - Don't re-plan. If the plan looks wrong, fall through to Step 2's escape hatch.
-- Don't try to do deep reasoning on this fast model. If the plan needs it, escape to `human-decide`.
+- Don't try to do deep reasoning on this fast model. If the plan needs it, escape to `maintainer-decide`.
 - Don't open a PR from this phase's main job — `safe-outputs:` doesn't allow it. The PR comes from the Copilot session.
 - Don't strip or rewrite the `## Plan` comment. It's the contract between plan and implementation.
-- Don't emit a verdict marker outside the three listed above (`human-decide`, `agent-done`, `human-author`). Your phase frontmatter no longer carries `safe-outputs.add-labels` — the verdict-marker channel is the only sanctioned label-write path for this orchestrator phase.
+- Don't emit a verdict marker outside the three listed above (`maintainer-decide`, `agent-done`, `originator-input`). Your phase frontmatter no longer carries `safe-outputs.add-labels` — the verdict-marker channel is the only sanctioned label-write path for this orchestrator phase.

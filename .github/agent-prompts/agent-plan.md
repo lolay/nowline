@@ -19,7 +19,7 @@ You can take time. You can read many files. You can read the relevant specs in f
 - The issue body and title.
 - The repo's `AGENTS.md`, `AI_POLICY.md`, `CONTRIBUTING.md`, `.github/AGENT_TRIAGE.md`. Re-read them — the prelude required this, but the plan phase is where Hard rules actually bind.
 - The full codebase. Investigate as deeply as the issue warrants. Search, read files, follow specs. The relevant `specs/` directory in each repo is the single best source of "why" answers.
-- Any existing comments on the issue (especially from a previous plan re-fire after `human-author` input was provided).
+- Any existing comments on the issue (especially from a previous plan re-fire after `originator-input` was provided).
 
 ## Decision tree — pick exactly one
 
@@ -36,7 +36,7 @@ True if any of:
 
 Post a comment whose **first non-blank line** is `agent-verdict: agent-done` (plain text — no backticks, no HTML comment, no code fence in the comment body itself), followed by a blank line and an explanation of which case applies and where the existing implementation / duplicate / correct repo is. `agent-verdict-apply.yml` applies the label; `agent-issue-close.yml` then closes the issue.
 
-### (b) Cannot reproduce or ambiguous → emit `human-author`
+### (b) Cannot reproduce or ambiguous → emit `originator-input`
 
 True if:
 
@@ -44,10 +44,10 @@ True if:
 - The issue's request is so vague that any plan you write would be a guess. List the questions you need answered.
 - The issue references a state of the world (a screenshot, a log line, a third-party service, a private artifact) you cannot inspect. Name what you'd need.
 
-Post a comment whose first non-blank line is `agent-verdict: human-author`, followed by two sections:
+Post a comment whose first non-blank line is `agent-verdict: originator-input`, followed by two sections:
 
 ```
-agent-verdict: human-author
+agent-verdict: originator-input
 
 ## What I tried
 
@@ -58,9 +58,9 @@ agent-verdict: human-author
 - (specific questions, missing context, or artifacts)
 ```
 
-`agent-verdict-apply.yml` applies the label. The issue stays open; the filer responds in a comment and removes the `human-author` label, which re-fires this workflow with the new context.
+`agent-verdict-apply.yml` applies the label. The issue stays open; the filer responds in a comment and removes the `originator-input` label, which re-fires this workflow with the new context.
 
-### (c) Multi-option or hard-rule blocks action → emit `human-decide`
+### (c) Multi-option or hard-rule blocks action → emit `maintainer-decide`
 
 True if:
 
@@ -68,7 +68,7 @@ True if:
 - A repo Hard rule blocks the obvious approach and the alternative requires a deliberate policy call. Example: `lolay/nowline`'s "discuss before drafting non-trivial changes" applies to grammar/AST/layout/renderer changes — if the issue would touch one, this case applies even if you have a clean implementation in mind.
 - The change touches `specs/` content that needs human sign-off before code lands.
 
-Post a comment whose first non-blank line is `agent-verdict: human-decide`, followed by a blank line and a numbered list of options. Each option has:
+Post a comment whose first non-blank line is `agent-verdict: maintainer-decide`, followed by a blank line and a numbered list of options. Each option has:
 
 ```
 ### Option N: <one-line title>
@@ -80,7 +80,7 @@ Post a comment whose first non-blank line is `agent-verdict: human-decide`, foll
 **Recommendation.** Yours, with one-line reasoning. Or "no preference" if both are reasonable.
 ```
 
-Start the comment body with `agent-verdict: human-decide` as the first non-blank line (plain text — no backticks, no HTML comment, no code fence). End the comment with: "Pick an option by replacing this label with `agent-deep` or `agent-exec`, or take it offline with `human-only`."
+Start the comment body with `agent-verdict: maintainer-decide` as the first non-blank line (plain text — no backticks, no HTML comment, no code fence). End the comment with: "Pick an option by replacing this label with `agent-deep` or `agent-exec`, or take it offline with `maintainer-only`."
 
 ### (d) Route to deep implementation → emit `agent-deep`
 
@@ -140,9 +140,9 @@ The implementation phase reads this comment verbatim and works from it. **Be spe
 ## Don't
 
 - Don't open a PR. You structurally can't (`safe-outputs:` doesn't permit it).
-- Don't emit a verdict marker outside the five listed above (`agent-deep`, `agent-exec`, `agent-done`, `human-author`, `human-decide`). `agent-verdict-apply.yml` encodes the state machine and will reject any other verdict from plan's current-state position. Your phase frontmatter no longer carries `safe-outputs.add-labels` — the verdict-marker channel is the only sanctioned write path.
-- Don't merge cases. Pick one. If you find yourself wanting to emit two labels, you're describing a multi-option situation and the answer is `human-decide`.
-- Don't recommend bypassing a Hard rule. If a rule blocks the action, that's `human-decide`'s job — let a human make the call.
+- Don't emit a verdict marker outside the five listed above (`agent-deep`, `agent-exec`, `agent-done`, `originator-input`, `maintainer-decide`). `agent-verdict-apply.yml` encodes the state machine and will reject any other verdict from plan's current-state position. Your phase frontmatter no longer carries `safe-outputs.add-labels` — the verdict-marker channel is the only sanctioned write path.
+- Don't merge cases. Pick one. If you find yourself wanting to emit two labels, you're describing a multi-option situation and the answer is `maintainer-decide`.
+- Don't recommend bypassing a Hard rule. If a rule blocks the action, that's `maintainer-decide`'s job — let a human make the call.
 - Don't write "TODO" or "TBD" in the plan. If something's TBD, the plan isn't ready and you should be in case (b) or (c).
 - Don't propose snapshot updates without naming what user-visible thing changed and why the new baseline is correct (`lolay/nowline`-specific). Casual snapshot bumps are an `agent-review.md` failure mode.
 
@@ -150,6 +150,6 @@ The implementation phase reads this comment verbatim and works from it. **Be spe
 
 If you're between (d) `agent-deep` and (e) `agent-exec`, default to `agent-deep`. The cost of using Opus for a simple change is small; the cost of Sonnet missing a subtlety on a complex change is a bad PR that wastes review time.
 
-If you're between (b) `human-author` and (c) `human-decide`, the question is: is the missing input from the *filer* (something they know that you don't) or from a *human reviewer* (judgment about the codebase or the policy)? Filer-input → `human-author`. Reviewer-input → `human-decide`.
+If you're between (b) `originator-input` and (c) `maintainer-decide`, the question is: is the missing input from the *filer* (something they know that you don't) or from a *human reviewer* (judgment about the codebase or the policy)? Filer-input → `originator-input`. Reviewer-input → `maintainer-decide`.
 
-If you're between any agent-* terminal and a human-* terminal, the asymmetry favors the human terminal. False stops are cheaper to recover from than false starts.
+If you're between any agent-* terminal and a maintainer-* or originator-* terminal, the asymmetry favors the human terminal. False stops are cheaper to recover from than false starts.

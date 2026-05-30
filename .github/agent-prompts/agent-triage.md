@@ -39,44 +39,44 @@ Post a comment whose **first non-blank line** is the verdict marker:
 agent-verdict: agent-plan
 ```
 
-No further comment content is required on the happy path. The marker is parsed by `agent-verdict-apply.yml`, which applies the label after confirming no `human-*` override is present.
+No further comment content is required on the happy path. The marker is parsed by `agent-verdict-apply.yml`, which applies the label after confirming no `maintainer-*` or `originator-*` override is present.
 
 The marker is plain text — no backticks, no HTML comment, no code fence in your actual comment body. Just the literal line `agent-verdict: agent-plan` as the first non-blank line. (The earlier `<!-- agent-verdict: ... -->` form was mangled by gh-aw's content sanitizer.)
 
-### Stop → emit `human-only`
+### Stop → emit `maintainer-only`
 
 The issue meets any of these:
 
 - **Out of scope.** Requests a feature `specs/principles.md` lists as a non-goal (issue tracking, resource leveling, whiteboard features, etc., for `lolay/nowline`), or analogous boundary violations in other repos.
 - **Security-sensitive.** Vulnerability reports, secrets in tracebacks, anything `SECURITY.md` would route to a private channel. When in doubt, stop.
-- **Release-related.** Release-cut, hotfix on a `release/v*.*` branch, anything that touches `specs/releasing.md`'s manual gate. Releases are human-only across this estate.
-- **Touches a discuss-first area without prior discussion.** `lolay/nowline`'s `AI_POLICY.md` says grammar, AST shape, layout, renderer, and `specs/` changes need an issue-first agreement on shape. If the issue is itself the discussion (no agreement yet), it's `human-only`.
+- **Release-related.** Release-cut, hotfix on a `release/v*.*` branch, anything that touches `specs/releasing.md`'s manual gate. Releases are `maintainer-only` across this estate.
+- **Touches a discuss-first area without prior discussion.** `lolay/nowline`'s `AI_POLICY.md` says grammar, AST shape, layout, renderer, and `specs/` changes need an issue-first agreement on shape. If the issue is itself the discussion (no agreement yet), it's `maintainer-only`.
 - **Conversational.** A question, a discussion-starter, "is this a bug?" with no actionable request. Discussions belong on the issue threads but not in the agent flow.
 - **Comes from a bot account other than this estate's known detectors.** Detectors we trust: `editor-release-monitor`/`vscode-extension-engine-bump` (daily monitor writes `cursor-release-history.json`; weekly bump opens an issue when the engine floor should advance), and any future detector that's been deliberately added.
 
 Post a comment whose **first non-blank line** is the verdict marker, followed by a blank line and a one-line reason naming which criterion applies:
 
 ```
-agent-verdict: human-only
+agent-verdict: maintainer-only
 
-human-only: out of scope per `specs/principles.md` § non-goals (Nowline doesn't ship issue tracking).
+maintainer-only: out of scope per `specs/principles.md` § non-goals (Nowline doesn't ship issue tracking).
 ```
 
 Other examples of the one-line reason:
 
-- "human-only: looks security-sensitive — please follow `SECURITY.md` for private disclosure."
-- "human-only: hotfix on a `release/v*.*` branch — auto-merge is intentionally off for this path."
+- "maintainer-only: looks security-sensitive — please follow `SECURITY.md` for private disclosure."
+- "maintainer-only: hotfix on a `release/v*.*` branch — auto-merge is intentionally off for this path."
 
 Keep the reason short — one sentence, with the rule reference. The human reading it should immediately know why. `agent-verdict-apply.yml` applies the label after parsing the marker.
 
 ## Don't
 
 - Don't investigate the codebase. That's the plan phase's job. You only read the issue + the four house-rule files + the existing labels.
-- Don't post a long comment. One sentence on `human-only`, nothing on `agent-plan`.
-- Don't emit a verdict marker outside the two listed above (`agent-plan`, `human-only`). `agent-verdict-apply.yml` encodes the state machine and will reject any other verdict from triage's current-state position. Your phase frontmatter no longer carries `safe-outputs.add-labels` — the verdict-marker channel is the only sanctioned write path.
+- Don't post a long comment. One sentence on `maintainer-only`, nothing on `agent-plan`.
+- Don't emit a verdict marker outside the two listed above (`agent-plan`, `maintainer-only`). `agent-verdict-apply.yml` encodes the state machine and will reject any other verdict from triage's current-state position. Your phase frontmatter no longer carries `safe-outputs.add-labels` — the verdict-marker channel is the only sanctioned write path.
 - Don't try to open a PR. You structurally can't, but also: don't try.
-- Don't re-trigger yourself. If the issue already has a state label other than `agent-triage` (because you ran a moment ago, or a human swapped labels), the workflow's `if:` gate skips you — but as a defensive belt-and-suspenders, also skip if you see one of `agent-plan`, `agent-deep`, `agent-exec`, `agent-merge`, `agent-done`, `human-only`, `human-author`, `human-decide`, `human-pr` already present.
+- Don't re-trigger yourself. If the issue already has a state label other than `agent-triage` (because you ran a moment ago, or a human swapped labels), the workflow's `if:` gate skips you — but as a defensive belt-and-suspenders, also skip if you see one of `agent-plan`, `agent-deep`, `agent-exec`, `agent-done`, `maintainer-only`, `originator-input`, `maintainer-decide`, `maintainer-pr-safe`, `maintainer-pr-review` already present.
 
 ## When uncertain
 
-Default to `human-only` with a one-line reason. The cost of a false `agent-plan` is a wasted Opus run; the cost of a false `human-only` is one extra label-swap by a human. The asymmetry favors stopping.
+Default to `maintainer-only` with a one-line reason. The cost of a false `agent-plan` is a wasted Opus run; the cost of a false `maintainer-only` is one extra label-swap by a human. The asymmetry favors stopping.

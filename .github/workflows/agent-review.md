@@ -1,5 +1,5 @@
 ---
-description: "Phase 4 of the Nowline agent-triage state machine. Triggered when a PR carrying the copilot-pr metadata label is opened or updated. The copilot-pr label is stamped by copilot-pr-stamp.yml (the single chokepoint that checks bot identity). bots: is retained as defense-in-depth for gh-aw's pre-activation gate. Reads the diff, plan comment, CI status, and repo house rules, then emits exactly one PR label: agent-merge (auto-merge approved) or human-pr (needs human review). Judgment-only — cannot modify the PR diff."
+description: "Phase 4 of the Nowline agent-triage state machine. Triggered when a PR carrying the copilot-pr metadata label is opened or updated. The copilot-pr label is stamped by copilot-pr-stamp.yml (the single chokepoint that checks bot identity). bots: is retained as defense-in-depth for gh-aw's pre-activation gate. Reads the diff, plan comment, CI status, and repo house rules, then emits exactly one PR label: maintainer-pr-safe (confident — a maintainer merges) or maintainer-pr-review (needs human review). Judgment-only — cannot modify the PR diff."
 on:
   pull_request:
     types: [opened, synchronize, ready_for_review]

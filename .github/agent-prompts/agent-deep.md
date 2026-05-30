@@ -24,10 +24,10 @@ This phase does not investigate or re-plan. The plan comment from `agent-plan.md
 Search the issue's comments for one whose body starts with `## Plan` and contains the sections defined in `agent-plan.md`'s plan-comment template (Goal, Approach, Files, Testing, Out of scope, Risk).
 
 - **Plan found and complete** → proceed to Step 2.
-- **Plan missing or incomplete** → stop. Post a comment whose first non-blank line is `agent-verdict: human-decide`, followed by:
+- **Plan missing or incomplete** → stop. Post a comment whose first non-blank line is `agent-verdict: maintainer-decide`, followed by:
 
 ```
-agent-verdict: human-decide
+agent-verdict: maintainer-decide
 
 No plan found.
 
@@ -36,7 +36,7 @@ in the same shape). To resume:
 
 - Add `agent-triage` to restart the flow from Phase 1, or
 - Add a `## Plan` comment manually and re-add `agent-deep`, or
-- Take this offline with `human-only`.
+- Take this offline with `maintainer-only`.
 ```
 
 `agent-verdict-apply.yml` applies the label. Issue stays open. This guard exists for the rare case of a human manually adding `agent-deep` without invoking the plan phase. Plan should always be present in normal flow.
@@ -49,7 +49,7 @@ Read the plan's `### Files` list. For each file:
   - `lolay/nowline` — `packages/core/src/generated/` is gitignored output; `packages/layout/test/__snapshots__/` is a deliberate baseline.
 - Confirm the plan's `### Testing` section names a concrete test (existing or new). "Run the test suite" is not a test; "extend `packages/cli/test/convert/roundtrip.test.ts` with a fixture for X" is.
 
-If anything looks wrong, stop. Post a comment whose first non-blank line is `agent-verdict: human-decide`, followed by a blank line and a description of the specific concern: which file is in a protected area, or which test isn't concrete enough, plus a one-line ask for the human to refine the plan. `agent-verdict-apply.yml` applies the label.
+If anything looks wrong, stop. Post a comment whose first non-blank line is `agent-verdict: maintainer-decide`, followed by a blank line and a description of the specific concern: which file is in a protected area, or which test isn't concrete enough, plus a one-line ask for the human to refine the plan. `agent-verdict-apply.yml` applies the label.
 
 ## Step 3 — Hand off to Copilot
 
@@ -57,7 +57,7 @@ If Steps 1–2 pass, issue the safe-output `assign-to-agent`. The Copilot sessio
 
 - Read this issue, the plan comment, and the repo's `AGENTS.md` / `CONTRIBUTING.md` / `AI_POLICY.md`.
 - Implement the plan exactly as written. **Do not re-plan.** If the plan turns out to be wrong, the Copilot session falls back per Step 4.
-- Run `make ci` (the full pre-push gate: lint + typecheck + build + test) and confirm it passes before opening the PR. Fix any failures introduced by the implementation. If `make ci` cannot pass without changes that fall outside the plan's scope, post `agent-verdict: human-decide` instead of opening a PR.
+- Run `make ci` (the full pre-push gate: lint + typecheck + build + test) and confirm it passes before opening the PR. Fix any failures introduced by the implementation. If `make ci` cannot pass without changes that fall outside the plan's scope, post `agent-verdict: maintainer-decide` instead of opening a PR.
 - Open one PR targeting the default branch.
 
 **The PR body MUST include all four of the following — these are mandatory per the prelude § 4 (smoke test C 2026-05-25 surfaced PRs missing them):**
@@ -76,9 +76,9 @@ The Copilot session is structurally separate from this workflow. Its prompt is s
 If the Copilot session, after attempting the plan, finds the diff is empty, it must not open a PR. Instead, it must post a comment on the issue whose **first non-blank line** is one of the two verdict markers below (plain text, no backticks, no HTML comment, no code fence), followed by a blank line and the reasoning:
 
 - `agent-verdict: agent-done` — the work was already there and the plan missed it. (Mirrors plan's case (a). `agent-verdict-apply.yml` applies the label; `agent-issue-close.yml` then closes the issue.)
-- `agent-verdict: human-author` — the issue under-specified what's needed and the plan was a reasonable guess that didn't pan out. (Mirrors plan's case (b). Issue stays open after the label is applied.)
+- `agent-verdict: originator-input` — the issue under-specified what's needed and the plan was a reasonable guess that didn't pan out. (Mirrors plan's case (b). Issue stays open after the label is applied.)
 
-`agent-verdict-apply.yml` is author-agnostic — Copilot's comment emission flows through the same mechanism as gh-aw orchestrator verdicts. If a human applied `human-only` mid-Copilot-session, the apply workflow suppresses the verdict and the human override stays.
+`agent-verdict-apply.yml` is author-agnostic — Copilot's comment emission flows through the same mechanism as gh-aw orchestrator verdicts. If a human applied `maintainer-only` mid-Copilot-session, the apply workflow suppresses the verdict and the human override stays.
 
 The plan phase should catch most empty-diff scenarios; this is the last-line defence. Copilot must NOT call `gh issue edit --add-label` directly — the verdict-marker comment is the only sanctioned label-write path.
 
@@ -89,4 +89,4 @@ The plan phase should catch most empty-diff scenarios; this is the last-line def
 - Don't open a PR from this phase's main job — `safe-outputs:` doesn't allow it. The PR comes from the Copilot session.
 - Don't strip or rewrite the `## Plan` comment. It's the contract between plan and implementation; downstream review reads it.
 - Don't delegate without a plan, even if the issue body looks self-explanatory. The plan-presence check is non-negotiable.
-- Don't emit a verdict marker outside the three listed above (`human-decide`, `agent-done`, `human-author`). Your phase frontmatter no longer carries `safe-outputs.add-labels` — the verdict-marker channel is the only sanctioned label-write path for this orchestrator phase.
+- Don't emit a verdict marker outside the three listed above (`maintainer-decide`, `agent-done`, `originator-input`). Your phase frontmatter no longer carries `safe-outputs.add-labels` — the verdict-marker channel is the only sanctioned label-write path for this orchestrator phase.

@@ -1,5 +1,5 @@
 ---
-description: "Phase 2 of the Nowline agent-triage state machine. Investigates the codebase for an issue labeled agent-plan and picks exactly one of five terminals: agent-deep, agent-exec, agent-done (resolved without action), human-author (cannot reproduce), or human-decide (multi-option / hard-rule blocks). Posts a ## Plan comment on the route-to-implement paths. Cannot open PRs."
+description: "Phase 2 of the Nowline agent-triage state machine. Investigates the codebase for an issue labeled agent-plan and picks exactly one of five terminals: agent-deep, agent-exec, agent-done (resolved without action), originator-input (cannot reproduce), or maintainer-decide (multi-option / hard-rule blocks). Posts a ## Plan comment on the route-to-implement paths. Cannot open PRs."
 on:
   issues:
     types: [labeled]

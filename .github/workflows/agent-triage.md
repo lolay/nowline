@@ -1,5 +1,5 @@
 ---
-description: "Phase 1 of the Nowline agent-triage state machine. Reads an issue labeled agent-triage and emits exactly one label: agent-plan (proceed to planning) or human-only (stop). Judgment-only — cannot open PRs or modify code."
+description: "Phase 1 of the Nowline agent-triage state machine. Reads an issue labeled agent-triage and emits exactly one label: agent-plan (proceed to planning) or maintainer-only (stop). Judgment-only — cannot open PRs or modify code."
 on:
   issues:
     types: [labeled]
