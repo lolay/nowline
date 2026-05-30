@@ -84,3 +84,55 @@ Re-read this doc and re-measure if any of the following becomes true:
 - **Per-format package boundary** (m2c Resolution § 1): unchanged. Seven packages plus `@nowline/export-core` is still the right shape because it serves **library** consumers (browsers, LSPs, embed scripts) that want format granularity. The CLI happens to bundle all of them; that's a CLI choice, not a packaging change.
 - **Dynamic `import()` for format dispatch** (m2c § 3 "CLI import strategy"): unchanged. Still useful for cold-path avoidance and future flexibility.
 - **Font resolver, asset pipeline, determinism contracts** (m2c § 10, etc.): unchanged. The collapse is only about which export packages bundle into the CLI binary; nothing about how those packages work.
+
+## MCP server distribution (`@nowline/mcp`)
+
+m4.8 adds `@nowline/mcp` — a separate npm package (`packages/mcp/`) that ships as an MCP server. Its distribution is distinct from and independent of the CLI binary distribution described above. `@nowline/mcp` installs via npm (not `bun compile`), so it is not a standalone binary and has no size budget analogous to the CLI's.
+
+### Two install forms, one codebase
+
+- **MCP CLI** — harnesses reference `npx @nowline/mcp` in their MCP config (Cursor `mcp.json`, VS Code settings, Claude Code). The harness spawns the server as a child process and communicates over stdin/stdout.
+- **MCP Desktop** — the same `@nowline/mcp` package bundled as a `.mcpb` file, which Claude Desktop installs one-click from its Extensions directory and runs locally.
+
+Neither form requires a separate binary download. The `nowline` CLI binary's `--mcp` flag is the power-user path for users who already have the CLI installed; `npx @nowline/mcp` is the canonical path for harness configs.
+
+### Distribution channels (marketplace-first)
+
+Where a harness has an official marketplace, publish there and **only** there. Skip community directories (cursor.directory) and self-hosted deep-link buttons ("Add to Cursor", `vscode:mcp/install`). Manual config is a fallback only where no marketplace exists.
+
+| Channel | Form | How |
+|---------|------|-----|
+| npm | npm package | Published in the `pack-npm` cell via `npm publish`; feeds all other channels |
+| Claude Desktop Extensions directory | `.mcpb` | Manual submission; `pack-mcp-mcpb` build cell produces `nowline.mcpb` |
+| Public MCP registry (`io.nowline/nowline`) | Registry entry | Manual update; feeds VS Code MCP gallery + Cursor Marketplace |
+| Official Cursor Marketplace | Registry-sourced | Reads the public MCP registry; no separate submission once registry entry is live |
+| Official VS Code MCP gallery | Registry-sourced | Reads the public MCP registry; no separate submission once registry entry is live |
+| Gemini CLI Extension channel | Extension bundle + `GEMINI.md` | Submitted per the Gemini CLI extension publishing process |
+| Claude Code | MCP CLI (manual) | `claude mcp add npx @nowline/mcp` or `.mcp.json`; no marketplace |
+| Codex CLI | MCP CLI (manual) | `~/.codex/config.toml` entry; no marketplace |
+
+Note: Cursor Marketplace and VS Code MCP gallery are both fed by the public MCP registry. Updating the registry entry is the single action that surfaces the MCP server in both IDEs.
+
+### Naming and publishing-id convention (going-forward)
+
+This section is the authoritative record for artifact ids. Already-published VS Code/Cursor `.vsix` artifacts keep their existing ids and are **not** renamed to apply this convention.
+
+| Channel | OSS id | Cloud id |
+|---------|--------|----------|
+| npm | `@nowline/mcp` | n/a (cloud is a Go remote server, not an npm package) |
+| Public MCP registry | `io.nowline/nowline` | `io.nowline/nowline-cloud` (suffixed only here, where both tiers share a namespace) |
+| Claude Desktop Extensions | `name: nowline` in `.mcpb` manifest | n/a (cloud lives in the Connectors directory, a separate store) |
+| Claude Connectors Directory | n/a | `nowline` (Connectors directory is a separate store from Extensions; no collision) |
+| Cursor Marketplace | `nowline` (local/stdio entry) | `nowline-cloud` (remote/OAuth entry) |
+| VS Code MCP gallery | `nowline` (local/stdio entry) | `nowline-cloud` (remote/OAuth entry) |
+| Gemini CLI extension | `name: nowline` | remote http entry (same channel) |
+| VS Code / Cursor `.vsix` | `nowline.vscode-nowline` (unchanged) | n/a |
+
+**Display name:** "Nowline" today (OSS only, no differentiation needed). When Nowline Cloud launches, the OSS display name becomes "Nowline OSS" and the cloud "Nowline Cloud". "Pro"/"Enterprise" are account tiers, never connector names.
+
+**Hard rules:**
+- The OSS id is never suffixed `-oss`. The cloud id is suffixed `-cloud` only where both tiers share the same namespace (the MCP registry).
+- Tool names stay identical across OSS and Cloud (`validate`, `render`, `read`, `create`, `update`, `delete`, `list`, `export`); cloud adds `search` + push/pull.
+- Cloud artifacts ship only from the proprietary side (`lolay/nowline-api`), never from `lolay/nowline`.
+
+See [`specs/releasing.md`](./releasing.md) § MCP publishing artifacts for the release pipeline integration and [`specs/mcp.md`](./mcp.md) for the full harness coverage matrix.
