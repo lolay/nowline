@@ -496,6 +496,18 @@ export function mountPreview(
         updateMinimapVisibility();
     });
 
+    // ResizeObserver picks up pane-level resizes (splitter drag, tab reveal)
+    // that window 'resize' misses. Guarded for happy-dom / test environments.
+    if (typeof ResizeObserver !== 'undefined') {
+        const ro = new ResizeObserver(() => {
+            reapplyActiveFit();
+            updateMinimapRect();
+            updateMinimapVisibility();
+        });
+        ro.observe(els.viewport);
+        cleanups.push(() => ro.disconnect());
+    }
+
     // ===== Wheel zoom =====
     on(
         els.viewport,

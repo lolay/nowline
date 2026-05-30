@@ -74,8 +74,13 @@ export const PREVIEW_SHELL_CSS = `
 .nl-preview-root .viewport {
     position: absolute; inset: 0;
     overflow: auto;
+    display: flex;
 }
 .nl-preview-root .canvas {
+    /* flex-shrink:0 + margin:auto: centers the diagram when it fits,
+       allows overflow scroll when it's larger than the viewport */
+    flex-shrink: 0;
+    margin: auto;
     transform-origin: 0 0;
     will-change: transform;
 }
