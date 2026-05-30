@@ -140,13 +140,28 @@ jobs:
           artifact-path: packages/embed/firebase/dev/public
           wif-provider: ${{ vars.WIF_PROVIDER }}
           service-account: ${{ vars.DEPLOY_SA_EMAIL }}
+          # Also sparse-checkout the Makefile so the deploy command comes from
+          # the single source of truth (`make publish-cdn`). The composite uses
+          # cone-mode-off sparse-checkout, which accepts individual file paths.
+          extra-checkout-paths: Makefile
 
+      # firebase-tools was bundled by the w9jds action this step replaces; with
+      # `make publish-cdn` running the raw CLI we install it ourselves, pinned
+      # to the same version the embed-preview job (and the former w9jds action)
+      # use so every tier runs an identical CLI.
+      - name: Install Firebase CLI
+        run: npm install --global firebase-tools@15.18.0
+
+      # `make publish-cdn` wraps `firebase deploy --only hosting`. CONFIRM_DEPLOY=1
+      # satisfies the friction guard that refuses an accidental manual deploy.
+      # WIF auth is already exported by the prepare-firebase-deploy composite
+      # (GOOGLE_APPLICATION_CREDENTIALS), which the firebase CLI reads.
       - name: Deploy to Firebase Hosting (embed-dev)
-        uses: w9jds/firebase-action@v15.18.0
-        with:
-          args: deploy --only hosting --project ${{ vars.PROJECT_ID }} --non-interactive
+        shell: bash
         env:
-          PROJECT_PATH: packages/embed/firebase/dev
+          PROJECT_ID: ${{ vars.PROJECT_ID }}
+          FIREBASE_PROJECT_PATH: packages/embed/firebase/dev
+        run: CONFIRM_DEPLOY=1 make publish-cdn
 
   # Per-PR ephemeral preview channel. 7-day TTL. URL is parsed from
   # the firebase CLI's --json output and posted/updated as a sticky

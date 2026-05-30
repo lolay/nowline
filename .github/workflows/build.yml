@@ -248,9 +248,15 @@ jobs:
 
       - name: Compile binary
         if: matrix.kind == 'binary'
-        working-directory: packages/cli
-        run: node scripts/compile.mjs --target=${{ matrix.target }}
+        # `make compile` runs from the repo root and cd's into packages/cli.
+        # bash so the windows-latest binary cells use Git Bash (ships make).
+        shell: bash
+        run: make compile TARGET=${{ matrix.target }}
 
+      # Renders examples/minimal.nowline to every output format and asserts
+      # each artifact is non-empty. The command lives in scripts/smoke-binary.sh
+      # (wrapped by `make smoke`) so a local run and CI exercise it identically;
+      # the MATRIX_* env below is what that script reads.
       - name: Smoke test binary (render every format)
         if: matrix.kind == 'binary' && matrix.runner != 'windows-latest'
         shell: bash
@@ -258,33 +264,7 @@ jobs:
           MATRIX_RUNNER: ${{ matrix.runner }}
           MATRIX_TARGET: ${{ matrix.target }}
           MATRIX_SUFFIX: ${{ matrix.suffix }}
-        run: |
-          set -euo pipefail
-          BIN="packages/cli/dist-bin/nowline-${MATRIX_SUFFIX}"
-          EXAMPLE=examples/minimal.nowline
-          OUT="${RUNNER_TEMP:-/tmp}/minimal"
-          if [[ "$MATRIX_RUNNER" == "macos-latest" && "$MATRIX_TARGET" != *darwin* ]]; then
-            echo "cross-target binary; skipping execution smoke"
-            exit 0
-          fi
-          if [[ "$MATRIX_RUNNER" == "ubuntu-latest" && "$MATRIX_TARGET" != *linux-x64* ]]; then
-            echo "cross-target binary; skipping execution smoke"
-            exit 0
-          fi
-          chmod +x "$BIN"
-          "$BIN" --version
-          "$BIN" "$EXAMPLE" -o - > "$OUT.svg"
-          head -c 4 "$OUT.svg" | grep -q "<svg"
-          "$BIN" "$EXAMPLE" -f png --headless -o "$OUT.png"
-          head -c 4 "$OUT.png" | od -An -c | grep -q 'P   N   G'
-          "$BIN" "$EXAMPLE" -f pdf --headless -o "$OUT.pdf"
-          "$BIN" "$EXAMPLE" -f html -o "$OUT.html"
-          "$BIN" "$EXAMPLE" -f mermaid -o "$OUT.md"
-          "$BIN" "$EXAMPLE" -f xlsx -o "$OUT.xlsx"
-          "$BIN" "$EXAMPLE" -f msproj -o "$OUT.xml"
-          for ext in svg png pdf html md xlsx xml; do
-            test -s "$OUT.$ext" || { echo "empty: $OUT.$ext" >&2; exit 1; }
-          done
+        run: make smoke
 
       - name: Upload binary artifact
         if: matrix.kind == 'binary' && inputs.upload
@@ -301,12 +281,13 @@ jobs:
       # `cut-release` bumps and what the binary's `--version` reports,
       # so the .deb's stamp stays in sync with the binary it wraps on
       # both PR smoke runs and tag releases.
+      # `make deb` derives the binary suffix and the version (from
+      # packages/cli/package.json — works on PR runs too, where GITHUB_REF_NAME
+      # isn't a vX.Y.Z tag) internally, so the deb's stamp stays in sync with
+      # the binary it wraps on both PR smoke runs and tag releases.
       - name: Build .deb
         if: matrix.deb_arch
-        run: |
-          set -euo pipefail
-          VERSION=$(node -p "require('./packages/cli/package.json').version")
-          bash scripts/build-deb.sh "${{ matrix.deb_arch }}" "packages/cli/dist-bin/nowline-${{ matrix.suffix }}" "$VERSION"
+        run: make deb ARCH=${{ matrix.deb_arch }}
 
       - name: Upload .deb artifact
         if: matrix.deb_arch && inputs.upload
@@ -318,40 +299,14 @@ jobs:
 
       # ===== pack-npm cell =====
 
+      # `make pack` packs the publishable packages into dist-pack/ in
+      # dependency order (core layers, then the browser pipeline + embed +
+      # preview-shell, then the LSP pair, export-core, the per-format export
+      # packages, and finally the CLI). pnpm pack rewrites `workspace:*` to the
+      # resolved version inside each .tgz, so the publish phase needs only npm.
       - name: Pack npm tarballs
         if: matrix.kind == 'npm-pack'
-        run: |
-          set -euo pipefail
-          mkdir -p dist-pack
-          # Dependency order: core layers first, then the browser
-          # pipeline + embed + preview-shell, then the LSP pair, then
-          # export-core, then per-format export packages, then the CLI.
-          # pnpm pack rewrites `workspace:*` to the actual version
-          # inside each produced .tgz, so the publish phase doesn't
-          # need pnpm. Order matters so downstream consumers running
-          # `npm install` after a partial publish never see a tarball
-          # whose workspace deps haven't landed yet.
-          for pkg in \
-              packages/core \
-              packages/layout \
-              packages/renderer \
-              packages/browser \
-              packages/embed \
-              packages/preview-shell \
-              packages/lsp \
-              packages/lsp-worker \
-              packages/export-core \
-              packages/export-png \
-              packages/export-pdf \
-              packages/export-html \
-              packages/export-mermaid \
-              packages/export-xlsx \
-              packages/export-msproj \
-              packages/config \
-              packages/cli; do
-            (cd "$pkg" && pnpm pack --pack-destination "$GITHUB_WORKSPACE/dist-pack")
-          done
-          ls -la dist-pack
+        run: make pack
 
       - name: Upload npm tarballs
         if: matrix.kind == 'npm-pack' && inputs.upload
@@ -365,8 +320,7 @@ jobs:
 
       - name: Package .vsix
         if: matrix.kind == 'vsix-pack'
-        working-directory: packages/vscode-extension
-        run: pnpm package
+        run: make vsix
 
       - name: Upload .vsix
         if: matrix.kind == 'vsix-pack' && inputs.upload

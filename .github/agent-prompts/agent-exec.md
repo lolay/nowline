@@ -72,6 +72,7 @@ If Steps 1–2 pass, issue the safe-output `assign-to-agent`. The Copilot sessio
 
 - Read this issue, the plan comment, and the repo's `AGENTS.md` / `CONTRIBUTING.md` / `AI_POLICY.md`.
 - Implement the plan exactly as written. **Do not re-plan.**
+- Run `make ci` (the full pre-push gate: lint + typecheck + build + test) and confirm it passes before opening the PR. Fix any failures introduced by the implementation. If `make ci` cannot pass without changes that fall outside the plan's scope, post `agent-verdict: human-decide` instead of opening a PR.
 - Open one PR targeting the default branch.
 
 **The PR body MUST include all four of the following — these are mandatory per the prelude § 4 (smoke test C 2026-05-25 surfaced PRs missing them):**

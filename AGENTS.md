@@ -9,12 +9,14 @@ Nowline is a text-first DSL for product/engineering roadmaps, plus the toolchain
 ## First boot
 
 ```bash
-pnpm install
-NOWLINE_SKIP_RENDER=1 pnpm build   # skip rendering ~30 example/fixture SVGs
-pnpm -r test
+make init        # install dependencies from the frozen lockfile
+make build-fast  # build every package, skipping the ~30-SVG render
+make test        # run the Vitest suites (builds first)
 ```
 
-`pnpm build` regenerates the Langium parser, bundles CLI templates, type-checks every package, and re-renders every file under `examples/` and `tests/`. The `NOWLINE_SKIP_RENDER=1` flag is the right default for an inner dev loop. CLI integration tests spawn `packages/cli/dist/index.js` and silently skip when it's missing — always build before running them.
+Everything goes through the [`Makefile`](./Makefile) — it is the single source of truth for build / test / lint / package / publish commands, and CI calls the same targets, so a green `make ci` locally is the gate CI runs. Run `make help` for the grouped target list; [`Makefile.md`](./Makefile.md) is the narrative reference.
+
+`make build` regenerates the Langium parser, bundles CLI templates, type-checks every package, and re-renders every file under `examples/` and `tests/`; `make build-fast` skips that render for an inner dev loop. CLI integration tests spawn `packages/cli/dist/index.js` and silently skip when it's missing — `make test` builds first (`test: build`) so they always run.
 
 **Toolchain pins:** Node from [`.nvmrc`](./.nvmrc) (currently `26.2.0`); pnpm from `packageManager` in [`package.json`](./package.json). Full policy: [`CONTRIBUTING.md` § Toolchain & Supported Versions](./CONTRIBUTING.md#toolchain--supported-versions).
 
@@ -55,8 +57,9 @@ Specs ship in-repo so PRs update them alongside code. Skim the relevant spec bef
 
 ## Workflow expectations
 
+- **Tooling**: always use the Makefile — never call `pnpm` / `npm` / `vsce` / `ovsx` / `firebase` / `gcloud` directly for build, test, lint, or deploy. The Makefile is the single source of truth for those command strings (change a command there, not in the workflow), and the guarded `publish-*` targets are what keep an accidental publish/deploy behind a `CONFIRM_*` variable — reaching for the raw tool bypasses that guard. `make help` lists every target; [`Makefile.md`](./Makefile.md) is the reference.
 - **Commits**: imperative subject, no trailing period, ≤72 chars. Match `git log --oneline` for tone. Optional body explains *why*. No emojis.
-- **PRs**: one logical change each, squash-merged. Run `pnpm build && pnpm check && pnpm typecheck && pnpm -r test` locally before pushing — same quartet CI runs on Linux, macOS, and Windows. `pnpm check` is biome (lint + format); skipping it is the failure mode that lets formatting regressions slip into a `bd59e70`-style dep bump.
+- **PRs**: one logical change each, squash-merged. Run `make ci` locally before pushing — it chains lint + typecheck + build + test, the same gate CI runs on Linux, macOS, and Windows. (`make lint` is biome lint + format-drift + import order; skipping it is the failure mode that lets formatting regressions slip into a `bd59e70`-style dep bump.)
 - **Tests**: when you add a feature, add a test that would fail without your change. When you fix a bug, add a regression test that reproduces it.
 - **Docs**: if observable behavior changes, update the relevant spec under [`specs/`](./specs/) and any affected `README.md` in the same PR.
 - **Changelog**: user-observable changes (DSL syntax, CLI flag, AST JSON shape, exporter output, extension UX, embed/CDN surface) get an entry under `## [Unreleased]` in [`CHANGELOG.md`](./CHANGELOG.md) using the right [Keep-a-Changelog](https://keepachangelog.com) heading (`Added` / `Changed` / `Deprecated` / `Removed` / `Fixed` / `Security`). Internal-only changes (build scripts, CI, dep bumps with no behavior change) don't need an entry. Maintainers move your entry into a new `## [vX.Y.Z]` section as part of the release-cut commit; full contract in [`specs/releasing.md`](./specs/releasing.md#changelog-workflow).

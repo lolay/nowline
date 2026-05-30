@@ -156,6 +156,8 @@ Before making a non-trivial change, skim the specs under [`specs/`](./specs) —
 
 ## Common tasks
 
+> **Use the Makefile.** Every build / test / lint / package / publish command is wrapped by a `make` target — run `make help` for the grouped list or see [`Makefile.md`](./Makefile.md). Always use the Makefile rather than calling `pnpm` / `npm` / `vsce` / `ovsx` / `firebase` / `gcloud` directly for build, test, lint, or deploy: the Makefile is the single source of truth (CI calls the same targets), and the guarded `publish-*` targets keep an accidental publish/deploy behind a `CONFIRM_*` variable. `make ci` is the one command to run before pushing. The raw `pnpm` invocations below remain valid for ad-hoc use and document what each target wraps.
+
 Run these from the repo root. Most are simple pnpm re-runs across the workspace.
 
 | Task | Command |
@@ -430,7 +432,7 @@ The maintainer moves your entry into a new `## [vX.Y.Z] - YYYY-MM-DD` section as
 
 1. **Fork** the repo (or branch, if you have write access) and create a feature branch: `git checkout -b feat/short-description`.
 2. Make your change. Keep the diff focused — one logical change per PR.
-3. **Run `pnpm build && pnpm check && pnpm typecheck && pnpm -r test` locally** before pushing. CI runs the same commands across Linux, macOS, and Windows.
+3. **Run `make ci` locally** before pushing — it chains lint + typecheck + build + test, the same gate CI runs across Linux, macOS, and Windows.
 4. **Update documentation** — package READMEs, the top-level `README.md`, inline comments, plus a `## [Unreleased]` entry in [`CHANGELOG.md`](./CHANGELOG.md) for any user-observable change (see [Changelog entries](#changelog-entries) above).
 5. **Open a PR** against `main` with:
     - A clear summary of the change.

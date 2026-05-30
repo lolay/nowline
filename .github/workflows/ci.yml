@@ -34,7 +34,7 @@ jobs:
           echo "$PWD" >> "$GITHUB_PATH"
 
       - name: Lint workflows
-        run: pnpm lint:workflows
+        run: make lint-workflows
 
   build-test:
     # Matrix layout: every supported OS runs on the dev/CI Node version
@@ -47,6 +47,12 @@ jobs:
     # OS-specific issues, not Node-version regressions.
     name: Build & test (${{ matrix.os }}, node ${{ matrix.node-version }})
     runs-on: ${{ matrix.os }}
+    # Run every step under bash on all three OSes so the `make` gate steps
+    # below work on the windows-latest cell too (Git Bash ships make + bash).
+    # Linux/macOS already default to bash, so this only changes the Windows cell.
+    defaults:
+      run:
+        shell: bash
     strategy:
       fail-fast: false
       matrix:
@@ -62,16 +68,16 @@ jobs:
           node-version: ${{ matrix.node-version }}
 
       - name: Build all packages
-        run: pnpm build
+        run: make build
 
       - name: Lint and format check
-        run: pnpm check
+        run: make lint
 
       - name: Typecheck
-        run: pnpm typecheck
+        run: make typecheck
 
       - name: Test
-        run: pnpm -r test
+        run: make test
 
   bundle-size:
     name: Embed bundle size gate
@@ -80,11 +86,8 @@ jobs:
       - uses: actions/checkout@v6
       - uses: ./.github/actions/setup-node-pnpm
 
-      - name: Build core / layout / renderer / browser / embed
-        run: pnpm -r --filter @nowline/core --filter @nowline/layout --filter @nowline/renderer --filter @nowline/browser --filter @nowline/embed run build
-
       - name: Check bundle size + node:* leak
-        run: pnpm --filter @nowline/embed check-size --print-attribution
+        run: make bundle-size
 
   release-build-smoke:
     name: Release build smoke (no upload)

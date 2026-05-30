@@ -61,9 +61,12 @@ jobs:
 
       - name: Bump versions
         id: bump
+        # `make bump` wraps .github/scripts/bump-version.mjs, which prints the
+        # new version (without the `v` prefix) to stdout and everything else to
+        # stderr, so the command substitution below captures just the version.
         run: |
           set -euo pipefail
-          NEW_VERSION=$(node .github/scripts/bump-version.mjs "${{ inputs.level }}")
+          NEW_VERSION=$(make bump LEVEL=${{ inputs.level }})
           echo "version=${NEW_VERSION}" >> "$GITHUB_OUTPUT"
           echo "Bumped to ${NEW_VERSION}"
 
@@ -126,6 +129,16 @@ jobs:
           - { id: github-release, kind: github-release }
           - { id: action-mirror, kind: action-mirror }
     steps:
+      # Check out the source so the publish command comes from the single
+      # source of truth (`make publish-npm` / `make publish-vscode`). These
+      # cells are otherwise pure download + push (no build), so a shallow
+      # default checkout is enough — it just lands the Makefile on disk. It
+      # runs first because actions/checkout cleans the workspace; the
+      # artifact downloads below then land inside the checked-out tree.
+      - name: Checkout source
+        if: matrix.kind == 'npm' || matrix.kind == 'vscode'
+        uses: actions/checkout@v6
+
       - name: Setup Node.js
         if: matrix.kind == 'npm' || matrix.kind == 'vscode'
         uses: actions/setup-node@v6
@@ -142,32 +155,16 @@ jobs:
           name: npm-tarballs
           path: dist-pack
 
+      # `make publish-npm` publishes the downloaded dist-pack/ tarballs in
+      # dependency order (the digit-anchored glob + `./` path prefix logic
+      # lives in the Makefile). CONFIRM_PUBLISH=1 satisfies the friction guard
+      # that refuses an accidental manual run. Auth stays here via the registry
+      # token; only the command is sourced from the Makefile.
       - name: Publish to npm (dependency order)
         if: matrix.kind == 'npm'
         env:
           NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
-        run: |
-          set -euo pipefail
-          # `pnpm pack` strips the `@` scope and joins with `-`, so
-          # `@nowline/core` → `nowline-core-<version>.tgz`. Same
-          # dependency order as the pack step.
-          for pkg in nowline-core nowline-layout nowline-renderer nowline-browser nowline-embed nowline-preview-shell nowline-lsp nowline-lsp-worker nowline-export-core nowline-export-png nowline-export-pdf nowline-export-html nowline-export-mermaid nowline-export-xlsx nowline-export-msproj nowline-config nowline-cli; do
-            # Anchor the glob to a digit (semver version always starts with
-            # a number) so `nowline-lsp-*.tgz` only matches
-            # `nowline-lsp-0.4.1.tgz` and not `nowline-lsp-worker-0.4.1.tgz`.
-            # The unanchored `${pkg}-*.tgz` pattern broke the v0.4.0 publish
-            # loop: the `nowline-lsp` iteration globbed to the lsp-worker
-            # tarball, and the subsequent `nowline-lsp-worker` iteration
-            # then hit 403 "already published" on its second attempt.
-            tarball=$(find dist-pack -maxdepth 1 -name "${pkg}-[0-9]*.tgz" -print -quit)
-            test -n "$tarball" || { echo "missing tarball for ${pkg}" >&2; exit 1; }
-            echo "publishing ${tarball}"
-            # `./` prefix forces npm to treat the argument as a filesystem
-            # path. Without it, npm 11+ sees `dist-pack/<name>.tgz`, treats
-            # the slash as an `org/repo` GitHub spec, and tries to git-clone
-            # over SSH — which fails with "Permission denied (publickey)".
-            npm publish "./$tarball" --access public
-          done
+        run: CONFIRM_PUBLISH=1 make publish-npm
 
       # ===== vscode cell =====
 
@@ -178,21 +175,19 @@ jobs:
           name: nowline-vscode.vsix
           path: dist-vsix
 
-      - name: Publish to VS Code Marketplace
+      # `make publish-vscode` publishes the downloaded .vsix to both the VS Code
+      # Marketplace (vsce) and Open VSX (ovsx). CONFIRM_PUBLISH=1 satisfies the
+      # friction guard. No `--pre-release`: per specs/releasing.md we ship every
+      # tag as a stable release. Marketplace doesn't accept SemVer pre-release
+      # suffixes (e.g. `0.1.0-rc.1`) so we don't model an RC channel; revisit at
+      # 1.0. Both registry tokens stay here in env; only the command is sourced
+      # from the Makefile.
+      - name: Publish to VS Code Marketplace + Open VSX
         if: matrix.kind == 'vscode'
-        # No `--pre-release`: per specs/releasing.md we ship every tag
-        # as a stable release. Marketplace doesn't accept SemVer
-        # pre-release suffixes (e.g. `0.1.0-rc.1`) so we don't try to
-        # model an RC channel. Revisit at 1.0.
         env:
           VSCE_PAT: ${{ secrets.VSCE_PAT }}
-        run: npx --yes @vscode/vsce publish --packagePath dist-vsix/nowline-vscode.vsix
-
-      - name: Publish to Open VSX
-        if: matrix.kind == 'vscode'
-        env:
           OVSX_PAT: ${{ secrets.OVSX_PAT }}
-        run: npx --yes ovsx publish dist-vsix/nowline-vscode.vsix -p "$OVSX_PAT"
+        run: CONFIRM_PUBLISH=1 make publish-vscode VSIX=dist-vsix/nowline-vscode.vsix
 
       # ===== github-release cell (also commits the Homebrew tap) =====
 
