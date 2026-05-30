@@ -78,7 +78,7 @@ Specs ship in-repo so PRs update them alongside code. Skim the relevant spec bef
 
 ## Agent triage flow
 
-Issues in this repo may enter a four-phase AI agent flow driven by labels. Every label the flow uses starts with `agent-` (agent owns the next move) or `human-` (human owns the next move). The canonical reference is [`.github/AGENT_TRIAGE.md`](./.github/AGENT_TRIAGE.md).
+Issues in this repo may enter a four-phase AI agent flow driven by labels. Labels use three prefixes: `agent-` (agent owns the next move), `originator-` (issue filer owns the next move), `maintainer-` (repo maintainer owns the next move). The canonical reference is [`.github/AGENT_TRIAGE.md`](./.github/AGENT_TRIAGE.md).
 
 **Labels you must respect if they appear on an issue or PR you are working on:**
 
@@ -87,17 +87,17 @@ Issues in this repo may enter a four-phase AI agent flow driven by labels. Every
 | `agent-triage` | triage phase queued | do not add other state labels; wait for triage to fire |
 | `agent-plan` | plan phase queued | do not implement yet; planning is in progress |
 | `agent-deep` / `agent-exec` | implement phase queued | proceed with implementation per the `## Plan` comment on the issue |
-| `agent-merge` | auto-merge approved | do not manually merge; let `agent-merge.yml` call `--auto` |
 | `agent-done` | terminal — resolved | do not reopen unless you have new information |
-| `human-only` | agent excluded | do not act on this issue; it is human-only |
-| `human-author` | waiting on issue filer | do not implement; agent is waiting for clarification |
-| `human-decide` | waiting on human design pick | do not implement; agent is waiting for a human to pick an option |
-| `human-pr` | PR needs human review | do not auto-merge; a human must review |
+| `originator-input` | waiting on issue filer | do not implement; agent is waiting for clarification from the filer |
+| `maintainer-only` | agent excluded / parked | do not act on this issue; it is outside the agent flow |
+| `maintainer-decide` | waiting on maintainer design pick | do not implement; a maintainer must pick a routing option |
+| `maintainer-pr-safe` | PR ready for maintainer merge (low-risk) | do not merge yourself; a maintainer reviews and clicks Approve + Merge |
+| `maintainer-pr-review` | PR needs careful maintainer review | do not merge; a maintainer reviews the flagged concerns and decides |
 
 **Labels you may emit** (as safe-outputs from a phase workflow, never directly):
-`agent-plan`, `human-only` (triage phase); `agent-deep`, `agent-exec`, `agent-done`, `human-author`, `human-decide` (plan phase); `agent-done`, `human-author`, `human-decide` (implement fallback); `agent-merge`, `human-pr` (review phase).
+`agent-plan`, `maintainer-only` (triage phase); `agent-deep`, `agent-exec`, `agent-done`, `originator-input`, `maintainer-decide` (plan phase); `agent-done`, `originator-input`, `maintainer-decide` (implement fallback); `maintainer-pr-safe`, `maintainer-pr-review` (review phase).
 
-Never emit a label outside the safe-outputs list for your phase. Never directly call `gh pr merge` — the `agent-merge.yml` glue workflow owns that.
+Never emit a label outside the safe-outputs list for your phase. A maintainer performs every merge — never call `gh pr merge` directly.
 
 ## For more detail
 

@@ -454,6 +454,7 @@ For changes touching the language or the published AST JSON schema, please open 
 | Renovate **minor/patch** | yes | Bounded blast radius; CI is the gate. Configured by `automerge: true` + the top-level `platformAutomerge: true` in [`.github/renovate-shared.json`](./.github/renovate-shared.json). |
 | Renovate **major** | no | Major bumps hide breaking changes; humans review before merging. |
 | Engine-floor bump PRs | depends on the issue worker | `vscode-extension-engine-bump.yml` opens a GitHub Issue, not a PR. The generic issue-to-PR worker that executes the work decides whether to enable auto-merge on the resulting PR. |
+| Copilot agent PRs (from the nowline triage flow) | no | Agent review labels the PR `maintainer-pr-safe` (low-risk) or `maintainer-pr-review` (needs attention). A maintainer reviews and clicks **Approve + Merge** in the UI. Nothing auto-merges. |
 | Hand-authored PRs | no | Default behavior — open, review, click merge. The same ruleset still requires CI to be green. |
 
 **Bypassing auto-merge on an automated PR.** If you need to hold an auto-merge-enabled PR (e.g. to push a follow-up commit before it lands), either convert it to a draft, or disable auto-merge explicitly: `gh pr merge <PR> --disable-auto`. Re-enabling later is `gh pr merge <PR> --auto --squash`.
@@ -497,9 +498,10 @@ The `+...` suffix is informational metadata only; npm and the VS Code Marketplac
 Issues in this repo can be routed through a four-phase AI agent flow. The flow is opt-in during rollout: check the "Let an AI agent take a first pass" box when filing an issue, or add `agent-triage` manually to an existing issue.
 
 - **`agent-*` labels** — the agent owns the next move.
-- **`human-*` labels** — you own the next move. The flow is paused.
+- **`originator-*` labels** — the issue filer owns the next move. The flow is paused waiting on the person who filed the issue.
+- **`maintainer-*` labels** — a repo maintainer owns the next move. Either a judgment call is needed, or a PR is ready to merge.
 - **Override** any state by adding the new target state label (the cleanup workflow removes the old one automatically).
-- **Stop the flow** at any time: add `human-only`. To resume, add `agent-triage`.
+- **Stop the flow** at any time: add `maintainer-only`. To resume, add `agent-triage`.
 
 Full reference: [`.github/AGENT_TRIAGE.md`](./.github/AGENT_TRIAGE.md).
 
