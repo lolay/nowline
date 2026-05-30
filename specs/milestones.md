@@ -2,9 +2,9 @@
 
 ## Overview
 
-The OSS tooling (`lolay/nowline` and its satellite repos) ships incrementally across milestones m1–m4.7. A four-phase layout-engine refactor (m2.5a–m2.5d), a rendering-polish pass (m2i), capacity & utilization (m2j), and a dependency-arrow attach + routing pass (m2k) sit between the sample-fidelity work (m2h) and IDE support (m3). Manual pages (m2l), French localization (m2m), and inline date pins (m2n) close out the m2 series with distribution polish and DSL refinements. The IDE work ships before the GitHub-bound rendering paths (m3.5 GitHub Action, m4 browser embed) so authors can edit `.nowline` files in VS Code / Cursor with live preview before either surface goes wide. m3.5 (action) and m4 (embed) are independent of each other and could ship in either order; the chain numbers them m3.5 → m4. m4.7 follows m4 with a browser-tooling extraction (browser pipeline, preview shell, LSP worker, showcase example) so commercial browser surfaces can stand on a shared OSS base instead of duplicating glue. Two independent post-m4 add-ons round out the OSS chain: m4.5 expands IDE coverage (Obsidian, Neovim, JetBrains), m4.6 expands Windows install coverage (Scoop, WinGet). Each milestone has a clear scope and set of Apache-2.0 deliverables. Later milestones depend on earlier ones.
+The OSS tooling (`lolay/nowline` and its satellite repos) ships incrementally across milestones m1–m4.8. A four-phase layout-engine refactor (m2.5a–m2.5d), a rendering-polish pass (m2i), capacity & utilization (m2j), and a dependency-arrow attach + routing pass (m2k) sit between the sample-fidelity work (m2h) and IDE support (m3). Manual pages (m2l), French localization (m2m), and inline date pins (m2n) close out the m2 series with distribution polish and DSL refinements. The IDE work ships before the GitHub-bound rendering paths (m3.5 GitHub Action, m4 browser embed) so authors can edit `.nowline` files in VS Code / Cursor with live preview before either surface goes wide. m3.5 (action) and m4 (embed) are independent of each other and could ship in either order; the chain numbers them m3.5 → m4. m4.7 follows m4 with a browser-tooling extraction (browser pipeline, preview shell, LSP worker, showcase example) so commercial browser surfaces can stand on a shared OSS base instead of duplicating glue. m4.8 follows m4.7 with the OSS MCP server (`@nowline/mcp`), which exposes the CLI's capabilities as a typed MCP tool surface so agent harnesses get discoverability, structured I/O, and an optional in-chat live preview. Two independent post-m4 add-ons round out the chain: m4.5 expands IDE coverage (Obsidian, Neovim, JetBrains), m4.6 expands Windows install coverage (Scoop, WinGet). Each milestone has a clear scope and set of Apache-2.0 deliverables. Later milestones depend on earlier ones.
 
-Commercial milestones (hosted editor, free viewer, MCP, enterprise, FedRAMP) are tracked in a separate, private spec and are out of scope here.
+Commercial milestones (hosted editor, free viewer, cloud MCP server, enterprise, FedRAMP) are tracked in a separate, private spec and are out of scope here.
 
 ## Milestone Summary
 
@@ -505,6 +505,55 @@ Depends on: m1 (DSL + parser), m2b (layout + renderer), m3a (LSP server). Indepe
 
 Spec: [`specs/architecture.md`](./architecture.md) (workspace map updates), [`specs/lsp.md`](./lsp.md) (range-delta requirement + browser worker packaging), [`specs/embed.md`](./embed.md) (cross-references for `@nowline/browser` consolidation) | Handoff: [`specs/handoffs/handoff-m4.7-browser-pipeline.md`](./handoffs/handoff-m4.7-browser-pipeline.md)
 
+### m4.8 — MCP server (`@nowline/mcp`)
+
+MCP server milestone. Ships one TypeScript package (`@nowline/mcp`, `packages/mcp/`) in two install forms — **MCP CLI** (stdio, added to a harness's MCP config as `npx @nowline/mcp`) and **MCP Desktop** (a `.mcpb` bundle for Claude Desktop's one-click Extensions directory). The same binary powers both; only the install wrapper differs.
+
+Why this exists: today an agent calling the CLI passes untyped arguments and parses unstructured text output. `@nowline/mcp` exposes a typed, discoverable tool surface so harnesses get IDE-quality type hints on inputs, machine-readable structured output, and an optional in-chat rendered preview instead of raw SVG text. The two resources — `nowline://reference` (DSL grammar / man page) and `nowline://examples` (canonical example roadmaps) — prime models to emit valid `.nowline` unprompted so the DSL stays discoverable without out-of-band documentation.
+
+**Tool surface** (tool names are shared with the Nowline Cloud MCP contract — identical names across local and cloud so agents graduate with zero relearning; cloud adds `search` + push/pull):
+
+| Tool | Input | Output |
+|------|-------|--------|
+| `validate` | source text or local path | structured diagnostics |
+| `render` | source / path + render options | SVG image resource + file path |
+| `read` | local path | source text |
+| `create` | local path + source | created path |
+| `update` | local path + source | updated path |
+| `delete` | local path | confirmation |
+| `list` | directory | `.nowline` file list |
+| `export` | source / path + format + options | image/document resource + file path |
+
+**Resources:**
+
+- `nowline://reference` — DSL grammar / man page (section-5 content from `nowline.5`). Gives models the full syntax vocabulary so they emit valid `.nowline` without out-of-band documentation.
+- `nowline://examples` — Canonical example roadmaps from `examples/` (including `examples/showcase.nowline` from m4.7). Concrete syntax patterns the model can sample from.
+
+**Optional MCP Apps UI variant:** when the harness supports the MCP Apps interactive-UI protocol, `@nowline/mcp` can return an HTML resource that mounts `@nowline/browser` (`renderSource`) + `@nowline/preview-shell` to render the roadmap live in-chat (the Mermaid Chart precedent). This variant exists because m4.7 extracted both packages as reusable; `@nowline/mcp` is the first consumer of both outside the VS Code extension. Basic stdio operation does not require this path.
+
+**Transport:** stdio primary — harnesses spawn `npx @nowline/mcp` and talk over stdin/stdout. Optional local HTTP via a `--port` flag for harnesses that prefer HTTP; not the default. No network, no auth, no proprietary deps. Runs as the user, with the user's file permissions, on local `.nowline` files only.
+
+**CLI integration (`--mcp` mode flag):** the `nowline` binary adds `--mcp` as a mode flag alongside `--serve` and `--init` to start the MCP server in stdio mode. `npx @nowline/mcp` is the canonical harness-install path; `nowline --mcp` is the power-user equivalent that reuses the installed binary without a separate package.
+
+**Open-core boundary:** `@nowline/mcp` is purely local — no network, no auth, no cloud endpoints. At most a docs-only "upgrade to Nowline Cloud" text pointer. Cloud `search` + push/pull and OAuth-gated access to cloud-stored roadmaps live in the proprietary Nowline Cloud MCP server (`nowline-api/services/mcp`, Go, OAuth).
+
+**Distribution (marketplace-first, from `lolay/nowline` via `release.yml`, independent of the `.vsix`):**
+
+- npm `@nowline/mcp` — the package all harness configs reference
+- `.mcpb` — submitted to Claude's Desktop Extensions directory (one-click install; MCP Desktop form)
+- Public MCP registry — `io.nowline/nowline` entry (feeds the VS Code MCP gallery + Cursor Marketplace)
+- Official Cursor Marketplace (in-app Settings → Tools & MCP)
+- Official VS Code MCP gallery (one-click; reads the public MCP registry)
+- Gemini CLI Extension (stdio + `GEMINI.md`)
+
+Harnesses with no marketplace (Claude Code, Codex CLI) use the MCP CLI form via `claude mcp add` / `~/.codex/config.toml`. See [`specs/mcp.md`](./mcp.md) and [`specs/cli-distribution.md`](./cli-distribution.md) § MCP distribution.
+
+**Branding:** display name "Nowline" (local OSS, no account); publishing id `nowline` (bare, no `-oss` suffix); registry id `io.nowline/nowline`; `.mcpb` manifest `name: nowline`. Relabeled "Nowline OSS" when Nowline Cloud launches. "Pro"/"Enterprise" are account tiers that gate Nowline Cloud, never MCP connector names. See [`specs/mcp.md`](./mcp.md) and [`specs/releasing.md`](./releasing.md) for the full naming/publishing-id convention.
+
+Depends on: m1 (DSL + parser + validator), m2a (CLI binary for `--mcp` flag), m2b (layout + renderer — `render` + `export` tools), m3a (LSP — optional, enables richer navigation tools via LSP-backed results), m4.7 (`@nowline/browser` + `@nowline/preview-shell` — required only for the optional MCP Apps UI variant; basic stdio operation is independent of m4.7).
+
+Spec: [`specs/mcp.md`](./mcp.md)
+
 ### m4.5 — IDE Expansion (timing TBD)
 
 Extend IDE support beyond VS Code/Cursor. Depends on m3 (LSP server) and is independent of m4 (Embed); slots after m4 in the chain so the public embed ships before plugin work begins.
@@ -538,7 +587,7 @@ Spec: [`specs/scoop-bucket.md`](./scoop-bucket.md), [`specs/cli-distribution.md`
 ## Dependency Chain
 
 ```
-m1 → m2a → m2b → m2b.5 → m2c → m2d → m2e → m2f → m2g → m2h → m2.5a → m2.5b → m2.5c → m2.5d → m2i → m2j → m2k → m2l → m2m → m2n → m3a → m3b → m3c → m3d → m3e → m3f → m3.5 → m4 → m4.7
+m1 → m2a → m2b → m2b.5 → m2c → m2d → m2e → m2f → m2g → m2h → m2.5a → m2.5b → m2.5c → m2.5d → m2i → m2j → m2k → m2l → m2m → m2n → m3a → m3b → m3c → m3d → m3e → m3f → m3.5 → m4 → m4.7 → m4.8
                                                                                                                                                                                     ↘
                                                                                                                                                                                      m4.5 (depends on m3a only; sequenced after m4.7)
                                                                                                                                                                                     ↘
@@ -551,10 +600,12 @@ m4.7 (browser pipeline + preview shell + LSP worker + showcase) consolidates cod
 
 m2l, m2m, and m2n are positioned in the m2 series logically (CLI distribution polish; localization; DSL enhancement) but landed after m3c chronologically; the chain reflects logical OSS sequence rather than strict shipping order, similar to m2i.
 
-m4.5 and m4.6 are independent post-m4.7 add-ons — m4.5 extends IDE coverage (Obsidian, Neovim, JetBrains) and only needs m3a; m4.6 extends Windows install coverage (Scoop, WinGet) and only needs m2a + m2l. Either can ship first; the `.5 / .6` numbering reflects ordering of the proposals, not a dependency. Neither depends on m4.7.
+m4.5 and m4.6 are independent post-m4.7 add-ons — m4.5 extends IDE coverage (Obsidian, Neovim, JetBrains) and only needs m3a; m4.6 extends Windows install coverage (Scoop, WinGet) and only needs m2a + m2l. Either can ship first; the `.5 / .6` numbering reflects ordering of the proposals, not a dependency. Neither depends on m4.7 or m4.8.
+
+m4.8 (MCP server, `@nowline/mcp`) needs m1 (DSL + parser + validator) and m2b (layout + renderer, for `render` and `export` tools) as its core dependencies. m3a (LSP) is optional — richer navigation tools can use LSP-backed results. The chain places m4.8 after m4.7 because the optional MCP Apps UI variant requires `@nowline/browser` + `@nowline/preview-shell`; basic stdio operation is independent of m4.7 and could ship earlier. m4.5 and m4.6 are independent of m4.8.
 
 m1 is the critical foundation — every subsequent milestone depends on the DSL, parser, and typed AST it produces.
 
-## Beyond m4.5
+## Beyond m4.8
 
-Hosted products (pro editor, free viewer, MCP server, enterprise, FedRAMP) consume these OSS packages via npm but are built in separate, proprietary repos. See the commercial roadmap for that scope.
+Hosted products (pro editor, free viewer, cloud MCP server, enterprise, FedRAMP) consume these OSS packages via npm but are built in separate, proprietary repos. See the commercial roadmap for that scope.

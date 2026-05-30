@@ -8,7 +8,7 @@ The CLI is **verbless** by design: `nowline <input>` renders by default. Operati
 
 **Package:** `@nowline/cli` in `lolay/nowline` monorepo.
 **License:** Apache 2.0.
-**Milestones:** the CLI ships in three parts: m2a (scaffold + `validate` / `convert` / `init` / `version` verbs + distribution pipeline), m2b (`render` + `serve` verbs, SVG output), m2b.5 (verbless redesign — current shape), m2c (every other output format on the same verbless invocation). Each depends on m1 DSL.
+**Milestones:** the CLI ships in three parts: m2a (scaffold + `validate` / `convert` / `init` / `version` verbs + distribution pipeline), m2b (`render` + `serve` verbs, SVG output), m2b.5 (verbless redesign — current shape), m2c (every other output format on the same verbless invocation). m4.8 adds `--mcp` (MCP server mode; see below). Each depends on m1 DSL.
 
 ## Installation
 
@@ -61,6 +61,11 @@ Mode flags (mutually exclusive)
   --dry-run, -n          Run full pipeline (parse + validate + layout + format)
                          but skip the write step. Subsumes the old `validate` verb.
                          Exit 0 on success, 1 on validation error.
+  --mcp [--port <n>]     Start an MCP server in stdio mode (default) or local HTTP
+                         (`--port`). Exposes the CLI's capabilities as a typed MCP
+                         tool surface. `npx @nowline/mcp` is the canonical
+                         harness-install path; `nowline --mcp` is the power-user
+                         equivalent. See [`specs/mcp.md`](./mcp.md).
 
 Render options
   -t, --theme <name>     light | dark
@@ -188,6 +193,23 @@ nowline roadmap.nowline --dry-run --format=json       # JSON diagnostics on stde
 ```
 
 Exit 0 on success, 1 on validation error.
+
+### `--mcp [--port <n>]` (m4.8)
+
+Start a local MCP server that exposes the CLI's capabilities as a typed MCP tool surface.
+
+```bash
+nowline --mcp                         # stdio server (default; harness spawns and talks stdin/stdout)
+nowline --mcp --port 6789             # local HTTP server (for harnesses that prefer HTTP transport)
+```
+
+Default transport is **stdio** — the harness spawns `nowline --mcp` (or `npx @nowline/mcp`) and communicates over stdin/stdout. This is the MCP CLI form. The `--port` flag switches to local HTTP, for harnesses that prefer an HTTP transport instead of stdio.
+
+The server exposes eight tools (`validate`, `render`, `read`, `create`, `update`, `delete`, `list`, `export`) and two resources (`nowline://reference`, `nowline://examples`). Tool names are intentionally identical to the Nowline Cloud MCP server contract, so agents graduate from local to cloud with zero relearning.
+
+**CLI-design note for review:** `--mcp` is a mode flag on `nowline` (like `--serve` and `--init`) rather than a verb on the separate `@nowline/mcp` package. The separate package (`npx @nowline/mcp`) is the canonical install path for harness configs because it decouples the MCP server's install lifecycle from the CLI binary — a harness using `npx @nowline/mcp` always gets the published npm version, whereas `nowline --mcp` uses whatever binary the user has installed. Either form is valid; `npx @nowline/mcp` is preferred in MCP config examples. See [`specs/mcp.md`](./mcp.md).
+
+`--mcp` rejects `--serve`, `--init`, and `--dry-run`.
 
 ### `--version` / `-V` and `--help` / `-h`
 

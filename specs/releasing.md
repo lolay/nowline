@@ -116,14 +116,15 @@ Defined in [`build.yml`](./.github/workflows/build.yml). One job, one matrix, te
 | `bin-linux-arm64` | ubuntu-latest | `nowline-linux-arm64` + `nowline_arm64.deb` artifacts |
 | `bin-windows-x64` | windows-latest | `nowline-windows-x64.exe` artifact |
 | `bin-windows-arm64` | windows-latest | `nowline-windows-arm64.exe` artifact |
-| `pack-npm` | ubuntu-latest | `npm-tarballs` artifact (seventeen `.tgz` files) |
+| `pack-npm` | ubuntu-latest | `npm-tarballs` artifact (eighteen `.tgz` files) |
 | `pack-vsix` | ubuntu-latest | `nowline-vscode.vsix` artifact |
 | `pack-action` | ubuntu-latest | `action-mirror` bundle artifact |
 | `pack-embed` | ubuntu-latest | embed CDN prod tree integrity check |
+| `pack-mcp-mcpb` | ubuntu-latest | `nowline.mcpb` artifact (Claude Desktop Extensions bundle built from `packages/mcp/`) |
 
 Binary cells use `bun compile` and run the same per-format smoke test (SVG, PNG, PDF, HTML, Mermaid, XLSX, MS Project XML) against `examples/minimal.nowline`, except cross-target combinations that cannot execute on the runner. The two linux cells additionally invoke [`scripts/build-deb.sh`](../scripts/build-deb.sh) on the binary they just produced — keeping the binary→deb chain intra-cell skips an artifact upload/download round-trip.
 
-`pack-npm` runs `pnpm pack` for the seventeen publishable packages in dependency order (`@nowline/core`, `@nowline/layout`, `@nowline/renderer`, `@nowline/browser`, `@nowline/embed`, `@nowline/preview-shell`, `@nowline/lsp`, `@nowline/lsp-worker`, `@nowline/export-core`, the six per-format `@nowline/export-*` packages, `@nowline/config`, `@nowline/cli`). pnpm 10 rewrites `workspace:*` to the resolved version inside each tarball, so the publish phase uses plain `npm publish <tarball>` with no workspace-protocol shenanigans.
+`pack-npm` runs `pnpm pack` for the eighteen publishable packages in dependency order (`@nowline/core`, `@nowline/layout`, `@nowline/renderer`, `@nowline/browser`, `@nowline/embed`, `@nowline/preview-shell`, `@nowline/lsp`, `@nowline/lsp-worker`, `@nowline/export-core`, the six per-format `@nowline/export-*` packages, `@nowline/config`, `@nowline/cli`, `@nowline/mcp`). pnpm 10 rewrites `workspace:*` to the resolved version inside each tarball, so the publish phase uses plain `npm publish <tarball>` with no workspace-protocol shenanigans.
 
 > **Note on `@nowline/lsp`.** As of v0.4.0, `@nowline/lsp` is published to npm. `@nowline/lsp-worker` declares `"@nowline/lsp": "workspace:*"` in its runtime `dependencies`; pnpm rewrites that to the resolved version inside the published tarball, so `npm install @nowline/lsp-worker` needs `@nowline/lsp` resolvable on the registry. Publishing `@nowline/lsp` also fulfills the contract documented in its own README (`npx nowline-lsp` for Neovim/JetBrains/Helix/Emacs). The alternative — bundling `@nowline/lsp` into `@nowline/lsp-worker` via esbuild — was evaluated and deferred: `lsp-worker` has no bundler config today (`tsc -b` only), and introducing one would require designing externals for all four entry points plus `langium`/`vscode-languageserver`; that's a separate project, not a pre-release patch.
 
@@ -134,6 +135,8 @@ Binary cells use `bun compile` and run the same per-format smoke test (SVG, PNG,
 `pack-action` stages the Marketplace action mirror bundle for `lolay/nowline-action`.
 
 `pack-embed` verifies the embed CDN prod tree produced by `pnpm -r build` (integrity check only on PR/main runs; the upload is gated on `inputs.upload`).
+
+`pack-mcp-mcpb` builds and bundles the `packages/mcp/` source into a `nowline.mcpb` Claude Desktop Extensions bundle using the `.mcpb` build toolchain. The artifact is submitted to Claude's Extensions directory as part of the release (analogous to the VS Code `.vsix` submission). Curated marketplace submissions (public MCP registry, Cursor Marketplace, VS Code MCP gallery, Gemini CLI extension channel) may require a separate manual submission/review step with lead time; see [§ MCP publishing artifacts](#mcp-publishing-artifacts) below.
 
 > **Option B — version-from-tag (future direction).** Today the `cut-release` commit bumps `packages/*/package.json#version`, which is what stamps the binary's `--version`, the embed banner, the .deb control file, the .vsix manifest, and each `pnpm pack` tarball. A future refactor could keep `package.json` at `0.0.0-development` permanently and inject version from the tag at build time, enabling true cache-by-SHA across CI and release — PRs would build the exact same artifacts as the release without any version-bump commit in the way. Out of scope for v0.4.0; revisit after estate cleanups.
 
@@ -185,6 +188,58 @@ All secrets live under **Settings → Secrets and variables → Actions** on `lo
 | `OVSX_PAT` | `publish` (vscode cell) | Open VSX personal access token. |
 | `HOMEBREW_TAP_TOKEN` | `publish` (github-release cell) | Fine-grained PAT with `contents: write` on `lolay/homebrew-tap` for committing the refreshed formula. |
 
+## MCP publishing artifacts
+
+`@nowline/mcp` ships to more channels than any other Nowline artifact because each agent harness has its own discovery mechanism. All OSS distribution builds and releases from `lolay/nowline` via `release.yml`, independently of the `.vsix`.
+
+### Per-channel actions at release time
+
+| Channel | Artifact | Action at release |
+|---------|----------|-------------------|
+| npm | `@nowline/mcp` tarball | Published automatically by the `npm` publish cell (same as all other `@nowline/*` packages). |
+| Claude Desktop Extensions directory | `nowline.mcpb` | Manual submission for first publish; subsequent updates may auto-approve. The `pack-mcp-mcpb` cell produces the artifact; a maintainer submits it to the directory. |
+| Public MCP registry (`io.nowline/nowline`) | Registry entry (JSON metadata + reference to npm package) | Manual update of the registry entry on each release. Feeds the VS Code MCP gallery. |
+| Cursor Marketplace | Registry-sourced listing | No separate action — Cursor Marketplace reads the public MCP registry; registry update covers this. |
+| VS Code MCP gallery | Registry-sourced listing | No separate action — VS Code MCP gallery reads the public MCP registry; registry update covers this. |
+| Gemini CLI Extension channel | Extension bundle + `GEMINI.md` | Submitted per the Gemini CLI extension publishing process; may require manual review. |
+
+Curated marketplace submissions (Claude Desktop Extensions, public MCP registry, Gemini CLI extension channel) may require a review period of hours to days for initial acceptance. Subsequent updates to the same publisher id generally receive faster approval. **Lead time:** plan for at least one sprint of buffer between tagging a release and these marketplace listings going live.
+
+Manual config harnesses (Claude Code's `claude mcp add`, Codex CLI's `~/.codex/config.toml`) do not require a submission step — users reference `npx @nowline/mcp` directly, which resolves from npm.
+
+### Naming and publishing-id convention
+
+This section is the canonical record for how Nowline MCP artifacts are named and identified across channels. It is a **going-forward** convention: already-published VS Code and Cursor `.vsix` artifacts keep their existing ids (`nowline.vscode-nowline`) and are **not** re-published or renamed to apply this convention.
+
+**Two independent levers:**
+
+- **Publishing id (stable, default `nowline`):** every OSS MCP artifact uses the bare `nowline` id. The `-cloud` suffix is added only where the cloud artifact would collide with the OSS one in the same namespace or store (currently only the public MCP registry). The OSS id is never suffixed (no `-oss`).
+- **Display name (phased):** "Nowline" today (OSS only); when Nowline Cloud launches, OSS becomes "Nowline OSS" and the cloud "Nowline Cloud". "Pro"/"Enterprise" are account tiers that gate Nowline Cloud, never connector or display names.
+
+**Concrete ids per channel:**
+
+| Channel | OSS id | Cloud id | Notes |
+|---------|--------|----------|-------|
+| npm | `@nowline/mcp` | n/a (Go server) | OSS package; cloud is remote-only |
+| Public MCP registry | `io.nowline/nowline` | `io.nowline/nowline-cloud` | Only channel where both tiers share a namespace, so cloud is suffixed |
+| Claude Desktop Extensions | `name: nowline` (`.mcpb` manifest) | n/a (Connectors directory, separate store) | Connectors directory = separate store; no collision |
+| Claude Connectors Directory | n/a (Extensions directory, separate store) | `nowline` | Each store holds only one tier |
+| Cursor Marketplace | `nowline` (local) | `nowline-cloud` (remote OAuth) | One store, two listings |
+| VS Code MCP gallery | `nowline` (local) | `nowline-cloud` (remote OAuth) | Sourced from public MCP registry |
+| Gemini CLI extension | `name: nowline` | remote http entry (same channel) | |
+
+**Hard rules:**
+- OSS stays `@nowline/mcp` (Apache-2.0) on npm + public MCP registry (`io.nowline/nowline`) + `.mcpb` (`name: nowline`).
+- The cloud artifact and any bundle that wires it are proprietary "Nowline Cloud" artifacts shipped only from the proprietary side — never from `lolay/nowline`.
+- Tool names stay identical across OSS and Cloud (`validate`, `render`, `read`, etc.); only the server display name + id differ.
+- Do NOT re-publish or rename the already-published `.vsix` (`nowline.vscode-nowline`) or Cursor extension to apply this convention. It is a going-forward-only change.
+
+**Operand-first descriptions on every listing (regardless of phase):**
+- OSS: "Edits your local `.nowline` files. Open source, no account."
+- Cloud: "Reads/writes your Nowline roadmaps in the cloud. Requires a Nowline account; cloud features depend on your plan (Pro/Enterprise)."
+
+See [`specs/mcp.md`](./mcp.md) and [`specs/cli-distribution.md`](./cli-distribution.md) § MCP distribution for the full harness coverage matrix.
+
 ## Changelog workflow
 
 `CHANGELOG.md` follows [Keep a Changelog](https://keepachangelog.com). Two roles, one file:
@@ -215,6 +270,7 @@ All secrets live under **Settings → Secrets and variables → Actions** on `lo
   - `npm view @nowline/export-msproj version`
   - `npm view @nowline/config version`
   - `npm view @nowline/cli version`
+  - `npm view @nowline/mcp version`
 - Verify Homebrew works: `brew update && brew install lolay/tap/nowline && nowline --version` — should print `X.Y.Z` (no `+sha` suffix on a release build).
 - Verify the VS Code extension shows the new version on the Marketplace and Open VSX.
 

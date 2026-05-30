@@ -51,6 +51,7 @@ nowline/
     browser/                     # @nowline/browser (m4.7) — single-call browser pipeline (renderSource / parseSource); consolidates embed + VS Code render-pipeline glue
     preview-shell/               # @nowline/preview-shell (m4.7) — framework-agnostic viewport chrome (zoom/pan/fit/minimap/diagnostic table); consumed by VS Code webview and downstream browser apps
     lsp-worker/                  # @nowline/lsp-worker (m4.7) — Web Worker packaging of @nowline/lsp + CodeMirror client adapter
+    mcp/                         # @nowline/mcp (m4.8) — MCP server: typed tool surface over the CLI's capabilities (validate/render/read/create/update/delete/list/export); nowline://reference + nowline://examples resources; stdio + .mcpb; local only, no auth
   grammars/
     nowline.tmLanguage.json      # TextMate grammar for syntax highlighting
   examples/                      # Example .nowline files (also `nowline --init` templates) — m4.7 adds showcase.nowline as the canonical "couple of swimlanes + linear flow + one parallel block + anchor + milestone" sample
@@ -84,6 +85,8 @@ nowline/
 
 @nowline/preview-shell (m4.7) — standalone, no engine deps; consumed by @nowline/vscode-extension's webview and downstream browser apps.
 
+@nowline/mcp (m4.8) depends on @nowline/core (validate, read, create, update, delete, list) and shells out to the `nowline` CLI binary for render/export (same pattern as the GitHub Action). Optionally depends on @nowline/browser + @nowline/preview-shell for the MCP Apps UI variant. No cloud deps; local only.
+
 @nowline/cli depends on core, layout, renderer, export-core, and every @nowline/export-*.
 ```
 
@@ -115,6 +118,7 @@ Dependencies flow downward only. No upward or sideways imports. The graph is enf
 - **@nowline/browser** (m4.7) — Single-call browser pipeline. Public API: `renderSource(source, options)` and `parseSource(source, options)`. Consolidates today's `packages/embed/src/pipeline.ts` and `packages/vscode-extension/src/preview/render-pipeline.ts`; keeps the VS Code branch's Node `fs`-backed include resolver as a pluggable hook. Re-exports the canonical showcase example (see `examples/showcase.nowline`) as a string so downstream apps don't copy-paste it.
 - **@nowline/preview-shell** (m4.7) — Framework-agnostic viewport chrome. Public API: `mountPreview(rootEl, options) → { setSvg, setDiagnostics, dispose, fitPage, fitWidth, ... }`. Hoists ~1000 LOC of zoom/pan/fit/minimap/diagnostic-table logic out of the VS Code webview's inline template into a reusable ES module. No opinion on text editor or message bus.
 - **@nowline/lsp-worker** (m4.7) — Browser-side packaging of `@nowline/lsp`. Ships a Web Worker entry (`@nowline/lsp-worker/worker`) and a thin client adapter (`@nowline/lsp-worker/client`) that CodeMirror's `@codemirror/lint` / `@codemirror/autocomplete` / hover extensions can consume via standard LSP-over-`postMessage`. The Node-side `@nowline/lsp` continues to power the VS Code extension; the worker package only adds a browser packaging without changing what the language server does. See [`lsp.md`](./lsp.md) for the wire-protocol contract (range deltas on `textDocument/didChange`).
+- **@nowline/mcp** (m4.8) — MCP server. Entry point: `npx @nowline/mcp` (MCP CLI, stdio) or the `.mcpb` bundle (MCP Desktop, Claude Desktop one-click). Tools: `validate`, `render`, `read`, `create`, `update`, `delete`, `list`, `export`. Resources: `nowline://reference` (DSL grammar / man page from `nowline.5`) and `nowline://examples` (canonical roadmap examples from `examples/`). Optional MCP Apps UI variant returns an HTML resource mounting `@nowline/browser` + `@nowline/preview-shell` for live in-chat preview. Local only: no network, no auth, no cloud endpoints; open-core boundary enforced. The `nowline` binary's `--mcp` flag starts the same server in stdio mode (power-user path). See [`mcp.md`](./mcp.md) and [`cli-distribution.md`](./cli-distribution.md) § MCP distribution.
 
 ## Technology Choices
 
