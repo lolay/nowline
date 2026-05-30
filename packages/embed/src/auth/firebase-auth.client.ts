@@ -91,7 +91,7 @@ function renderSignIn(overlay: HTMLDivElement, onClick: () => void): void {
         <div style="max-width: 28rem; text-align: center;">
             <div style="font-size: 0.75rem; letter-spacing: 0.08em; text-transform: uppercase; color: #5a5a6a; margin-bottom: 0.75rem;">embed.nowline.dev &mdash; internal preview</div>
             <h1 style="font-size: 1.875rem; font-weight: 700; margin: 0 0 0.75rem;">Sign in to continue</h1>
-            <p style="margin: 0 0 1.5rem; color: #5a5a6a;">Access is limited to allowlisted Lolay accounts. Production embed is at <a href="https://embed.nowline.io" style="color: #1a4ed8;">embed.nowline.io</a>.</p>
+            <p style="margin: 0 0 1.5rem; color: #5a5a6a;">Access is limited to @nowline.io Google accounts. Production embed is at <a href="https://embed.nowline.io" style="color: #1a4ed8;">embed.nowline.io</a>.</p>
             <button type="button" id="nowline-embed-dev-signin-btn" style="display: inline-block; padding: 0.75rem 1.5rem; border-radius: 8px; background-color: #e53e3e; color: #ffffff; font-weight: 700; border: 1px solid transparent; cursor: pointer; font-size: 1rem;">Sign in with Google</button>
         </div>
     `;
