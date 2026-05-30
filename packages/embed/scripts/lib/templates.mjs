@@ -8,7 +8,7 @@
 // Exports:
 //   escapeHtml(s)                                      → HTML-escaped string
 //   renderRootIndex({ versions, builtAt, sha, baseUrl,
-//                     aliases? })                      → HTML string
+//                     aliases?, showChannels? })      → HTML string
 //   renderDemo({ version, builtAt })                   → HTML string
 //
 // Dev caller (bundle.mjs):   versions=['latest'], no aliases
@@ -101,9 +101,11 @@ function makeVersionRow(version, baseUrl, annotation, isIndented) {
  *   (e.g. `new Map([['latest','0.4.2'],['0.4','0.4.2']])`). When present,
  *   renders grouped display (alias entries annotated, patches indented under
  *   their minor group). When absent, renders flat list (dev default).
+ * @param {boolean}             [opts.showChannels=true] When false, omits the
+ *   Channels explainer card (used on embed.nowline.dev where only `latest` exists).
  * @returns {string} Full HTML document
  */
-export function renderRootIndex({ versions, builtAt, sha, baseUrl, aliases }) {
+export function renderRootIndex({ versions, builtAt, sha, baseUrl, aliases, showChannels = true }) {
     let versionRows;
     if (aliases) {
         // Grouped prod display: latest → minor groups → indented patches.
@@ -157,6 +159,19 @@ export function renderRootIndex({ versions, builtAt, sha, baseUrl, aliases }) {
         )
         .join('\n');
 
+    const channelsCard = showChannels
+        ? `
+    <div class="card">
+      <h2>Channels</h2>
+      <table>
+        <thead><tr><th>Channel</th><th>Description</th></tr></thead>
+        <tbody>
+${channelRows}
+        </tbody>
+      </table>
+    </div>`
+        : '';
+
     return `<!doctype html>
 <html lang="en">
   <head>
@@ -184,19 +199,7 @@ ${BASE_STYLES}
   </head>
   <body>
     <h1>Nowline Embed CDN</h1>
-    <p class="subtitle">
-      Drop a <code>&lt;script&gt;</code> tag; <code>\`\`\`nowline</code> blocks render in place.
-    </p>
-
-    <div class="card">
-      <h2>Channels</h2>
-      <table>
-        <thead><tr><th>Channel</th><th>Description</th></tr></thead>
-        <tbody>
-${channelRows}
-        </tbody>
-      </table>
-    </div>
+${channelsCard}
 
     <div class="card">
       <h2>Available versions</h2>
@@ -265,10 +268,6 @@ ${BASE_STYLES}
   </head>
   <body>
     <h1>Nowline Embed Demo</h1>
-    <p class="subtitle">
-      Channel: <code>${escapedVersion}</code> &mdash;
-      drop a <code>&lt;script&gt;</code> tag; <code>\`\`\`nowline</code> blocks render in place.
-    </p>
 
     <div class="card">
       <h2>Snippet</h2>

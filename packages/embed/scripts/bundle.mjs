@@ -247,6 +247,7 @@ async function layOutCdnArtifacts() {
             builtAt,
             sha,
             baseUrl: 'https://embed.nowline.dev',
+            showChannels: false,
         });
         await fs.writeFile(resolve(latestDir, 'index.html'), demoHtml, 'utf-8');
         await fs.writeFile(resolve(cdnDir, 'index.html'), rootHtml, 'utf-8');
