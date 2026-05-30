@@ -355,3 +355,32 @@ The action:
 ### How It Works Under the Hood
 
 The action installs the `nowline` CLI (from npm) on the runner — skipped when the requested version is already on PATH — then runs `nowline <input> -o <output> -f <format> -t <theme>` for each render. No Docker image required; it runs directly on the GitHub Actions runner.
+
+## Host-Side Add-In Integrations
+
+`@nowline/embed` is the foundation for a planned set of **host-side add-ins**: native integrations that embed a rendered Nowline diagram inside a third-party host tool — in a Jira issue panel, a Confluence page, a Notion block, a Google Docs document, a Word document, a PowerPoint slide, or a Linear issue.
+
+**Direction note:** this is the reverse of the Pro OAuth link-enrichment feature in `nowline-app`, which fetches metadata *from* those tools to render links *inside* a Nowline diagram. Host-side add-ins go the other direction — they put a Nowline diagram *into* the host. Do not conflate the two; they involve different APIs, different OAuth scopes, and live in different parts of the product.
+
+### Planned hosts
+
+| Host | Add-in surface |
+|------|---------------|
+| Jira | Issue panel or project page macro (Atlassian Forge or Connect framework) |
+| Confluence | Page macro — a first-class Forge macro, superseding the current HTML-macro workaround listed under [§ Platform Integration](#platform-integration) |
+| Notion | Block integration (Notion integration platform) |
+| Google Docs | Workspace Add-on (Apps Script or add-on API) |
+| Microsoft Word | Office Add-in (task pane or content add-in) |
+| Microsoft PowerPoint | Office Add-in — embeds a diagram as a slide element; this is not `.pptx` export, which is a separate CLI exporter feature |
+| Linear | Issue attachment or document embed |
+
+GitHub is already covered by the [GitHub Action](#github-action-packagesnowline-action) (available now, m3.5). No additional host-side add-in is planned for GitHub.
+
+### How they extend `@nowline/embed`
+
+Each add-in consumes `@nowline/embed` (or `@nowline/browser`, the shared parse → layout → render pipeline) for client-side rendering. The add-in layer is responsible only for:
+
+1. The host's native embedding API — inserting the rendered SVG into the document, issue, or slide.
+2. A source-editing surface appropriate to the host — inline code block, file reference, or editor field.
+
+Packaging and marketplace distribution (Atlassian Marketplace, Google Workspace Marketplace, Microsoft AppSource, and equivalents) are commercial concerns and are not in scope for this OSS spec. All seven integrations listed above are planned; none have been built or submitted to a marketplace.

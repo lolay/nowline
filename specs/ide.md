@@ -10,7 +10,7 @@ Nowline provides first-class IDE support through a Language Server Protocol (LSP
 |-----------|-------|
 | m1 | TextMate grammar (syntax highlighting only, ships with the DSL) |
 | m3 | LSP server + VS Code/Cursor extension with live preview |
-| m4.5 | Obsidian plugin, Neovim LSP config, JetBrains plugin (timing TBD) |
+| m4.5 | Obsidian plugin, Neovim LSP config, JetBrains plugin; Zed extension (priority); VS Code-fork editors via Open VSX: Windsurf, Antigravity, Trae, Kiro, VSCodium, PearAI, Void (timing TBD) |
 
 ## TextMate Grammar (m1)
 
@@ -60,7 +60,7 @@ The LSP server is available in two forms:
 
 ## VS Code / Cursor Extension (m3)
 
-**Repo:** `lolay/nowline-vscode` (OSS, Apache 2.0).
+**Source:** `packages/vscode-extension/` in this monorepo (OSS, Apache 2.0). Published to the VS Code Marketplace and Open VSX from monorepo CI (`.github/workflows/release.yml`) via `vsce publish` and `ovsx publish`. No standalone `lolay/nowline-vscode` repository is needed: both marketplaces publish from a built package directory, not a repo root.
 **Marketplace:** Visual Studio Marketplace + Open VSX (for Cursor, VSCodium).
 
 ### Self-Contained
@@ -209,7 +209,8 @@ This deliberately mirrors the README's PNG-fidelity caveat ("for pixel-strict ou
 
 ## Obsidian Plugin (m4.5)
 
-**Repo:** `lolay/nowline-obsidian` (OSS, Apache 2.0).
+**Source:** `packages/obsidian-plugin/` (planned, m4.5) in this monorepo (OSS, Apache 2.0).
+**Marketplace mirror:** `lolay/nowline-obsidian` (write-only; populated by `release.yml` on each tag. Exists because Obsidian's community directory requires `manifest.json`, `README.md`, and `LICENSE` at the repository root plus release assets attached there — the same root-repo constraint that requires the `lolay/nowline-action` mirror described in `specs/embed.md`).
 **Marketplace:** Obsidian Community Plugins.
 
 ### Features
@@ -247,6 +248,8 @@ A documentation page and a sample config — not a maintained plugin. The LSP se
 
 ## JetBrains (m4.5)
 
+**Source:** `packages/jetbrains-plugin/` (planned) in this monorepo. Uploaded to JetBrains Marketplace from CI. No standalone repository is needed.
+
 JetBrains IDEs (IntelliJ, WebStorm, etc.) support LSP via the built-in LSP client (2023.2+).
 
 ### Setup
@@ -260,6 +263,47 @@ A lightweight plugin that:
 ### Deliverable
 
 A JetBrains Marketplace plugin. Minimal custom code — mostly configuration wrapping the LSP server.
+
+## Zed (m4.5)
+
+**Package:** `packages/zed-extension/` in this monorepo (planned, OSS, Apache 2.0).
+**Registry:** Zed Extension Registry.
+
+Zed is the priority m4.5 editor target beyond the initial Obsidian / Neovim / JetBrains set. It has a native extension API (Rust WASM host, tree-sitter grammars, built-in LSP client) and an open extension registry.
+
+### Setup
+
+A Zed extension that:
+
+1. Registers a tree-sitter grammar for `.nowline` files (syntax highlighting, structural selection).
+2. Points Zed's built-in LSP client at `nowline lsp` — the same subcommand used by Neovim and JetBrains.
+
+### Distribution
+
+The extension lives in this monorepo at `packages/zed-extension/`, alongside `packages/vscode-extension/` and `packages/nowline-action/`. No standalone `lolay/nowline-zed` repository is needed: Zed's registry has no repo-root constraint (unlike the GitHub Action, whose `lolay/nowline-action` mirror exists only because GitHub Marketplace forces `action.yml` to the repo root).
+
+Publishing is a PR to [`zed-industries/extensions`](https://github.com/zed-industries/extensions) that:
+
+1. Adds this monorepo as a git submodule.
+2. Adds an `extensions.toml` entry whose `path` field points at the submodule's `packages/zed-extension/` subdirectory — the same monorepo pattern the live registry already uses (`path = "packages/zed"`, `path = "editors/zed"`, etc.).
+
+**License caveat:** the Apache-2.0 `LICENSE` must reside at the package `path`; a root `LICENSE` alone does not satisfy the registry. Symlink the monorepo license into `packages/zed-extension/` so the package directory carries it directly.
+
+### Deliverable
+
+The `packages/zed-extension/` package, published to the Zed extension registry via the submodule + `path` PR above. Minimal Rust code wrapping the grammar and LSP configuration.
+
+## VS Code-Fork Editors via Open VSX (m4.5)
+
+VS Code-compatible editors that source extensions from Open VSX — **VSCodium**, **PearAI**, **Void**, **Windsurf**, **Antigravity**, **Trae**, and **Kiro** — are served by the `nowline.vscode-nowline` Open VSX listing published in m3. No separate per-fork packaging is planned.
+
+### Setup
+
+Users install `nowline.vscode-nowline` from the editor's built-in extension browser or directly from open-vsx.org. No separate per-fork build or submission is required — the same artifact serves all seven editors.
+
+### Deliverable
+
+Per-fork installation and compatibility verification, planned for m4.5. These editors are not yet confirmed-working. The VS Code extension API is expected to carry over given the shared extension model; webview and preview-panel behavior in any given fork may require adjustments once testing begins.
 
 ## LSP Subcommand
 
