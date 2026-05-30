@@ -8,14 +8,12 @@ name: Editor release monitor
 # end batches all history updates into a single "[skip ci]" commit so the
 # change history stays readable.
 #
-# Branch-protection note: this workflow pushes directly to main. Add
-# "github-actions[bot]" to the main branch ruleset's bypass list in
-# Settings → Rules → main so the push is not blocked by the CI-gate ruleset.
-# Without the bypass, the commit step fails with "refusing to allow a GitHub
-# App to create or update workflow refs" or similar.
+# Branch-protection note: this workflow pushes directly to main as the
+# lolay-nowline-release App (see ops/branch-policies.md §6). The App is a
+# bypass actor on the main ruleset; GITHUB_TOKEN / github-actions[bot] is not.
 #
-# No custom secrets required. The default GITHUB_TOKEN with contents: write is
-# sufficient for git push.
+# Requires repo variable RELEASE_APP_ID and secret RELEASE_APP_PRIVATE_KEY.
+# See ops/branch-policies.md §6 for setup.
 
 on:
     schedule:
@@ -34,8 +32,17 @@ jobs:
         name: Update editor release history
         runs-on: ubuntu-latest
         steps:
+            - name: Mint release-bot installation token
+              id: app-token
+              uses: actions/create-github-app-token@v3
+              with:
+                  app-id: ${{ vars.RELEASE_APP_ID }}
+                  private-key: ${{ secrets.RELEASE_APP_PRIVATE_KEY }}
+
             - name: Checkout
               uses: actions/checkout@v6
+              with:
+                  token: ${{ steps.app-token.outputs.token }}
 
             # ----------------------------------------------------------------
             # One step per fork.  Add a new step for each additional VS Code
@@ -67,8 +74,8 @@ jobs:
             - name: Commit history updates
               run: |
                   set -euo pipefail
-                  git config user.name "github-actions[bot]"
-                  git config user.email "github-actions[bot]@users.noreply.github.com"
+                  git config user.name "lolay-nowline-release[bot]"
+                  git config user.email "lolay-nowline-release[bot]@users.noreply.github.com"
 
                   # Stage every *-release-history.json file under .github/.
                   # `find -exec … +` bundles all matches into a single
