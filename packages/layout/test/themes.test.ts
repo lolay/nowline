@@ -6,7 +6,6 @@ import {
     lightTheme,
     resolveColor,
 } from '../src/themes/index.js';
-import type { NamedColors, Theme } from '../src/themes/index.js';
 
 // Pin the alias canonicalization at the theme boundary. Authors who type
 // `bg:grey` should land on the same paint as `bg:gray`; same for
@@ -52,11 +51,7 @@ describe('resolveColor aliases', () => {
 // Helper: parse a hex string to [r, g, b] components.
 function hexToRgb(hex: string): [number, number, number] {
     const h = hex.replace('#', '');
-    return [
-        parseInt(h.slice(0, 2), 16),
-        parseInt(h.slice(2, 4), 16),
-        parseInt(h.slice(4, 6), 16),
-    ];
+    return [parseInt(h.slice(0, 2), 16), parseInt(h.slice(2, 4), 16), parseInt(h.slice(4, 6), 16)];
 }
 
 function isAchromatic(hex: string): boolean {

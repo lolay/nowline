@@ -16,7 +16,7 @@ import type { ThemeName } from '@nowline/layout';
 
 export type EmbedTheme = ThemeName | 'auto';
 
-export function resolveSystemTheme(): ThemeName {
+export function resolveSystemTheme(): 'light' | 'dark' {
     if (typeof globalThis === 'undefined') return 'light';
     const win = (globalThis as { matchMedia?: (q: string) => { matches: boolean } }).matchMedia;
     if (typeof win !== 'function') return 'light';

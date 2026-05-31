@@ -220,9 +220,7 @@ export function mountPreview(
         minimapDismissedThisSession: false,
         firstRender: true,
         mode: 'dark',
-        locale:
-            options.locale ??
-            (typeof navigator !== 'undefined' ? navigator.language : 'en'),
+        locale: options.locale ?? (typeof navigator !== 'undefined' ? navigator.language : 'en'),
         export: { format: 'svg' },
         view: {
             theme: 'auto',
@@ -341,7 +339,7 @@ export function mountPreview(
 
     function getGutter(): number {
         const val = getComputedStyle(rootEl).getPropertyValue('--nl-preview-gutter').trim();
-        return parseInt(val) || 8;
+        return parseInt(val, 10) || 8;
     }
 
     function clampChromeIntoView(): void {
@@ -1228,7 +1226,9 @@ export function mountPreview(
         )) {
             btn.setAttribute(
                 'data-active',
-                (btn.getAttribute('data-value') === (state.view.showLinks ? 'true' : 'false')).toString(),
+                (
+                    btn.getAttribute('data-value') === (state.view.showLinks ? 'true' : 'false')
+                ).toString(),
             );
         }
     }
@@ -1326,10 +1326,7 @@ function applyBaseline(
     if (baseline.now !== undefined && !state.view.overridden.now) {
         if (baseline.now === 'none' || baseline.now === 'hide') {
             state.view.now = 'hide';
-        } else if (
-            typeof baseline.now === 'string' &&
-            /^\d{4}-\d{2}-\d{2}$/.test(baseline.now)
-        ) {
+        } else if (typeof baseline.now === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(baseline.now)) {
             state.view.now = baseline.now;
         } else {
             state.view.now = 'today';
