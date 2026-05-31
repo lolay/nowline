@@ -53,9 +53,7 @@ jobs:
           esac
 
           RUNBOOK_URL="${SERVER_URL}/${REPO}/blob/main/.github/agent-actions/${ADDED_LABEL}.md"
-          BODY="${NEXT_ACTION}
-
-Runbook: ${RUNBOOK_URL}"
+          BODY="$(printf '%s\n\nRunbook: %s\n' "$NEXT_ACTION" "$RUNBOOK_URL")"
 
           if [[ "${{ github.event_name }}" == "issues" ]]; then
             gh issue comment "${{ github.event.issue.number }}" \
