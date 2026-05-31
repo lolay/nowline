@@ -102,10 +102,17 @@
                     "enum": [
                         "auto",
                         "light",
-                        "dark"
+                        "dark",
+                        "grayscale"
+                    ],
+                    "enumDescriptions": [
+                        "Follow the active VS Code color theme (light/dark).",
+                        "Force the light palette.",
+                        "Force the dark palette.",
+                        "Force the grayscale palette (achromatic; good for print)."
                     ],
                     "default": "auto",
-                    "description": "Theme used to render the preview. 'auto' follows the active VS Code color theme."
+                    "description": "Palette used to render the preview diagram. 'auto' follows the active VS Code color theme; 'light', 'dark', or 'grayscale' force a palette."
                 },
                 "nowline.preview.defaultFit": {
                     "type": "string",

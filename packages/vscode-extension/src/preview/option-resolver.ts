@@ -1,5 +1,5 @@
 import type { NowlineRc } from '@nowline/config';
-import type { ThemeName } from '@nowline/layout';
+import { normalizeThemeName, type ThemeName } from '@nowline/layout';
 import type { PreviewSettings, ToolbarOverrides } from './preview-panel.js';
 
 /**
@@ -48,10 +48,12 @@ export function resolvePreviewOptions(ctx: ResolveContext): ResolvedRenderOption
 function resolveTheme(ctx: ResolveContext): ThemeName {
     const override = ctx.toolbarOverrides?.theme;
     const setting = override ?? ctx.settings.theme;
-    if (setting === 'light') return 'light';
-    if (setting === 'dark') return 'dark';
-    if (setting === 'auto' && rcThemeOverride(ctx.rc) === undefined) {
-        return ctx.isDarkTheme ? 'dark' : 'light';
+    // An explicit Theme token (light / dark / grayscale; `greyscale` accepted
+    // as an alias) wins outright. `auto` and any unrecognized token fall
+    // through to the rc override, then the active VS Code Mode (chrome).
+    if (setting && setting !== 'auto') {
+        const explicit = normalizeThemeName(setting);
+        if (explicit) return explicit;
     }
     const rc = rcThemeOverride(ctx.rc);
     if (rc) return rc;
@@ -59,8 +61,7 @@ function resolveTheme(ctx: ResolveContext): ThemeName {
 }
 
 function rcThemeOverride(rc: NowlineRc): ThemeName | undefined {
-    if (rc.theme === 'light' || rc.theme === 'dark') return rc.theme;
-    return undefined;
+    return typeof rc.theme === 'string' ? normalizeThemeName(rc.theme) : undefined;
 }
 
 /**

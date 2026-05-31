@@ -6,7 +6,10 @@ import { type RenderOutcome, renderDocument } from './render-pipeline.js';
 import { getShellHtml } from './shell-html.js';
 
 export type RefreshTrigger = 'keystroke' | 'save';
-export type ThemeMode = 'auto' | 'light' | 'dark';
+// Theme axis (the diagram render palette), distinct from the chrome Mode
+// (light/dark workbench). `'grayscale'` is a full palette; `'auto'` follows
+// the active VS Code color theme.
+export type ThemeMode = 'auto' | 'light' | 'dark' | 'grayscale';
 export type DefaultFit = 'fitPage' | 'fitWidth' | 'actual';
 
 export interface PreviewSettings {
@@ -317,9 +320,10 @@ export class NowlinePreview {
      * change" without touching the rc cache. The full chain runs inside
      * `resolvePreviewOptions` for actual rendering.
      */
-    private resolveThemeQuick(settings: PreviewSettings): 'light' | 'dark' {
+    private resolveThemeQuick(settings: PreviewSettings): 'light' | 'dark' | 'grayscale' {
         if (settings.theme === 'light') return 'light';
         if (settings.theme === 'dark') return 'dark';
+        if (settings.theme === 'grayscale') return 'grayscale';
         return isDarkColorTheme() ? 'dark' : 'light';
     }
 }

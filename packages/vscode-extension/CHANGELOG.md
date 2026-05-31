@@ -16,6 +16,11 @@ Preview parity, export from VS Code, and authoring commands (m3d / m3e / m3f):
   French previews and French diagnostics with no configuration.
 - Preview toolbar adds a *View ▾* dropdown with per-session overrides for
   theme, now-line, and link visibility (not persisted to settings).
+- `nowline.preview.theme` now offers `grayscale` alongside `auto` / `light` /
+  `dark`, and the toolbar *Theme ▾* `Grayscale` selection now actually renders
+  the grayscale palette (previously it silently fell back to light/dark). The
+  UK spelling `greyscale` is accepted as an alias. The chrome/workbench Mode is
+  unaffected — it stays light/dark.
 - **Nowline: Export…** command (palette, editor title bar, editor /
   tab / Explorer context menus) shells out to the `nowline` CLI to produce
   PDF, pixel-strict PNG, SVG, HTML, Markdown+Mermaid, XLSX, or MS Project

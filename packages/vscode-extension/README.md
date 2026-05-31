@@ -74,7 +74,7 @@ Use the built-in VS Code shortcuts when you want more space:
 
 The preview's *View ▾* dropdown adds three per-session toggles that override the resolved settings without writing them back:
 
-- **Theme** — `Auto` / `Light` / `Dark` (overrides `nowline.preview.theme` for screenshots).
+- **Theme** — `Auto` / `Light` / `Dark` / `Grayscale` (overrides `nowline.preview.theme` for screenshots).
 - **Now-line** — `Today` / `Hide` (mirrors `--now` / `--now -`).
 - **Show links** — toggles the link icon tile (mirrors `--no-links`).
 
@@ -125,7 +125,7 @@ Locale uses two chains, mirroring the CLI:
 | `nowline.ignoreRcFile` | `false` | — | Skip the `.nowlinerc` baseline lookup entirely. |
 | `nowline.preview.refreshOn` | `keystroke` | — | When to re-render. `keystroke` = render on every change (debounced); `save` = render only on `Cmd/Ctrl+S`. |
 | `nowline.preview.debounceMs` | `200` | — | Debounce window for keystroke renders, in milliseconds. |
-| `nowline.preview.theme` | `auto` | `--theme` | Render theme: `auto` follows the active VS Code color theme; force `light` or `dark` to override. |
+| `nowline.preview.theme` | `auto` | `--theme` | Render palette: `auto` follows the active VS Code color theme; force `light`, `dark`, or `grayscale` to override. |
 | `nowline.preview.defaultFit` | `fitPage` | — | Initial fit mode: `fitPage`, `fitWidth`, or `actual` (1:1). |
 | `nowline.preview.showMinimap` | `true` | — | Show the bottom-right minimap with a viewport indicator. |
 | `nowline.preview.locale` | `""` | `--locale` | BCP-47 locale; empty falls through to `.nowlinerc` → `vscode.env.language` → `en-US`. |
