@@ -8,10 +8,10 @@
 // Exports:
 //   escapeHtml(s)                                      → HTML-escaped string
 //   renderRootIndex({ versions, builtAt, sha, baseUrl,
-//                     aliases? })                      → HTML string
+//                     aliases?, showChannels? })      → HTML string
 //   renderDemo({ version, builtAt })                   → HTML string
 //
-// Dev caller (bundle.mjs):   versions=['latest'], no aliases
+// Dev caller (bundle.mjs):   versions=['latest'], no aliases, showChannels=false
 //                             baseUrl='https://embed.nowline.dev'
 // Prod caller (gen-index.mjs): versions=[X.Y.Z, ...] (patches, desc),
 //                              aliases=Map<alias,target> (latest + X.Y keys)
@@ -47,22 +47,121 @@ export function escapeHtml(s) {
         .replace(/'/g, '&#39;');
 }
 
+// Pre-paint theme init — mirrors nowline-site BaseLayout.astro and the Free
+// app's theme/index.ts. Shares the `starlight-theme` localStorage key so the
+// contract matches across Nowline surfaces (even though embed.* is a separate
+// origin and does not literally share storage with nowline.io).
+const THEME_INIT_SCRIPT = `\
+    (function () {
+      try {
+        var stored = localStorage.getItem('starlight-theme');
+        var theme =
+          stored === 'light' || stored === 'dark'
+            ? stored
+            : window.matchMedia('(prefers-color-scheme: light)').matches
+              ? 'light'
+              : 'dark';
+        document.documentElement.dataset.theme = theme;
+      } catch (e) {
+        document.documentElement.dataset.theme = 'light';
+      }
+    })();`;
+
+// Theme picker + system-preference listener — runs after DOM is ready.
+const THEME_SELECT_SCRIPT = `\
+    (function () {
+      var STORAGE_KEY = 'starlight-theme';
+      var select = document.querySelector('[data-theme-select]');
+      if (!select) return;
+
+      function parseTheme(value) {
+        return value === 'auto' || value === 'dark' || value === 'light' ? value : 'auto';
+      }
+
+      function loadTheme() {
+        try {
+          var stored = localStorage.getItem(STORAGE_KEY);
+          return stored === 'light' || stored === 'dark' ? stored : 'auto';
+        } catch (e) {
+          return 'auto';
+        }
+      }
+
+      function getSystemTheme() {
+        return window.matchMedia('(prefers-color-scheme: light)').matches ? 'light' : 'dark';
+      }
+
+      function applyTheme(theme) {
+        try {
+          localStorage.setItem(STORAGE_KEY, theme === 'light' || theme === 'dark' ? theme : '');
+        } catch (e) {}
+        document.documentElement.dataset.theme = theme === 'auto' ? getSystemTheme() : theme;
+      }
+
+      select.value = loadTheme();
+      select.addEventListener('change', function () {
+        applyTheme(parseTheme(select.value));
+      });
+
+      window.matchMedia('(prefers-color-scheme: light)').addEventListener('change', function () {
+        if (loadTheme() === 'auto') applyTheme('auto');
+      });
+    })();`;
+
+const THEME_SELECT_HTML = `\
+    <label class="theme-select" aria-label="Theme">
+      <span class="visually-hidden">Theme</span>
+      <select data-theme-select>
+        <option value="auto">System</option>
+        <option value="light">Light</option>
+        <option value="dark">Dark</option>
+      </select>
+    </label>`;
+
 // Shared CSS used by both the root index and per-version demo pages.
-// System font stack, light neutral palette, no external requests.
+// CSS custom properties + data-theme for light/dark; no external requests.
 const BASE_STYLES = `\
+    :root {
+      --color-bg: #fafafa;
+      --color-text: #1d1d1f;
+      --color-muted: #6e6e73;
+      --color-card: #fff;
+      --color-border: #d2d2d7;
+      --color-divider: #e0e0e5;
+      --color-link: #0066cc;
+      --color-pre-bg: #f5f5f7;
+      --color-result-bg: #fff;
+    }
+    :root[data-theme="dark"] {
+      --color-bg: #1d1d1f;
+      --color-text: #f5f5f7;
+      --color-muted: #98989d;
+      --color-card: #2c2c2e;
+      --color-border: #48484a;
+      --color-divider: #48484a;
+      --color-link: #64b5ff;
+      --color-pre-bg: #1c1c1e;
+      --color-result-bg: #2c2c2e;
+    }
     *, *::before, *::after { box-sizing: border-box; }
     html, body {
       margin: 0; padding: 0;
-      background: #fafafa; color: #1d1d1f;
+      background: var(--color-bg); color: var(--color-text);
       font: 15px/1.6 -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
     }
     body { max-width: 760px; margin: 0 auto; padding: 48px 24px 80px; }
-    h1 { margin: 0 0 4px; font-size: 22px; font-weight: 600; }
+    .page-header {
+      display: flex;
+      align-items: flex-start;
+      justify-content: space-between;
+      gap: 16px;
+      margin-bottom: 40px;
+    }
+    .page-header h1 { margin: 0; font-size: 22px; font-weight: 600; }
     h2 { margin: 0 0 12px; font-size: 15px; font-weight: 600; }
-    .subtitle { color: #6e6e73; font-size: 13px; margin: 0 0 40px; }
     .card {
-      background: #fff;
-      border: 1px solid #d2d2d7;
+      background: var(--color-card);
+      border: 1px solid var(--color-border);
       border-radius: 10px;
       padding: 24px;
       margin-bottom: 24px;
@@ -71,8 +170,49 @@ const BASE_STYLES = `\
       font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
       font-size: 0.9em;
     }
-    footer { margin-top: 48px; font-size: 12px; color: #6e6e73; }
-    footer a { color: #0066cc; }`;
+    footer { margin-top: 48px; font-size: 12px; color: var(--color-muted); }
+    footer a { color: var(--color-link); }
+    .theme-select {
+      display: inline-flex;
+      align-items: center;
+      border: 1px solid var(--color-border);
+      border-radius: 6px;
+      padding: 2px 8px;
+      color: var(--color-muted);
+      font-size: 12px;
+      flex-shrink: 0;
+    }
+    .theme-select:hover,
+    .theme-select:focus-within {
+      color: var(--color-text);
+      background: var(--color-pre-bg);
+    }
+    .theme-select select {
+      appearance: none;
+      background: transparent;
+      border: 0;
+      color: inherit;
+      font: inherit;
+      padding: 0;
+      cursor: pointer;
+      outline: none;
+    }
+    .theme-select select:focus-visible {
+      outline: 2px solid var(--color-link);
+      outline-offset: 2px;
+      border-radius: 4px;
+    }
+    .visually-hidden {
+      position: absolute;
+      width: 1px;
+      height: 1px;
+      padding: 0;
+      margin: -1px;
+      overflow: hidden;
+      clip: rect(0, 0, 0, 0);
+      white-space: nowrap;
+      border: 0;
+    }`;
 
 // Renders a single version-list item. Used by both flat and grouped modes.
 // `annotation` is an already-escaped string like " → 0.4.2", or empty.
@@ -101,9 +241,11 @@ function makeVersionRow(version, baseUrl, annotation, isIndented) {
  *   (e.g. `new Map([['latest','0.4.2'],['0.4','0.4.2']])`). When present,
  *   renders grouped display (alias entries annotated, patches indented under
  *   their minor group). When absent, renders flat list (dev default).
+ * @param {boolean}             [opts.showChannels=true] When false, omits the
+ *   Channels explainer card (used on embed.nowline.dev where only `latest` exists).
  * @returns {string} Full HTML document
  */
-export function renderRootIndex({ versions, builtAt, sha, baseUrl, aliases }) {
+export function renderRootIndex({ versions, builtAt, sha, baseUrl, aliases, showChannels = true }) {
     let versionRows;
     if (aliases) {
         // Grouped prod display: latest → minor groups → indented patches.
@@ -157,37 +299,8 @@ export function renderRootIndex({ versions, builtAt, sha, baseUrl, aliases }) {
         )
         .join('\n');
 
-    return `<!doctype html>
-<html lang="en">
-  <head>
-    <meta charset="utf-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1" />
-    <meta name="robots" content="noindex" />
-    <title>Nowline Embed CDN</title>
-    <style>
-${BASE_STYLES}
-      table { width: 100%; border-collapse: collapse; font-size: 14px; }
-      th, td { text-align: left; padding: 8px 12px; border-bottom: 1px solid #e0e0e5; }
-      th { font-weight: 600; font-size: 13px; color: #6e6e73; }
-      tr:last-child td { border-bottom: none; }
-      ul.version-list { margin: 0; padding: 0; list-style: none; }
-      li.version-item { padding: 10px 0; border-bottom: 1px solid #e0e0e5; }
-      li.version-item:last-child { border-bottom: none; }
-      li.version-item a { font-weight: 600; text-decoration: none; color: #0066cc; }
-      li.version-item a:hover { text-decoration: underline; }
-      li.version-patch { padding-left: 24px; }
-      li.version-patch a { font-weight: 400; }
-      .alias-target { font-size: 13px; color: #6e6e73; margin-left: 6px; }
-      .hint { display: block; font-size: 12px; color: #6e6e73; margin-top: 2px; }
-      footer code { font-family: ui-monospace, SFMono-Regular, Menlo, monospace; }
-    </style>
-  </head>
-  <body>
-    <h1>Nowline Embed CDN</h1>
-    <p class="subtitle">
-      Drop a <code>&lt;script&gt;</code> tag; <code>\`\`\`nowline</code> blocks render in place.
-    </p>
-
+    const channelsCard = showChannels
+        ? `
     <div class="card">
       <h2>Channels</h2>
       <table>
@@ -196,7 +309,41 @@ ${BASE_STYLES}
 ${channelRows}
         </tbody>
       </table>
+    </div>`
+        : '';
+
+    return `<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <meta name="robots" content="noindex" />
+    <title>Nowline Embed CDN</title>
+    <script>${THEME_INIT_SCRIPT}</script>
+    <style>
+${BASE_STYLES}
+      table { width: 100%; border-collapse: collapse; font-size: 14px; }
+      th, td { text-align: left; padding: 8px 12px; border-bottom: 1px solid var(--color-divider); }
+      th { font-weight: 600; font-size: 13px; color: var(--color-muted); }
+      tr:last-child td { border-bottom: none; }
+      ul.version-list { margin: 0; padding: 0; list-style: none; }
+      li.version-item { padding: 10px 0; border-bottom: 1px solid var(--color-divider); }
+      li.version-item:last-child { border-bottom: none; }
+      li.version-item a { font-weight: 600; text-decoration: none; color: var(--color-link); }
+      li.version-item a:hover { text-decoration: underline; }
+      li.version-patch { padding-left: 24px; }
+      li.version-patch a { font-weight: 400; }
+      .alias-target { font-size: 13px; color: var(--color-muted); margin-left: 6px; }
+      .hint { display: block; font-size: 12px; color: var(--color-muted); margin-top: 2px; }
+      footer code { font-family: ui-monospace, SFMono-Regular, Menlo, monospace; }
+    </style>
+  </head>
+  <body>
+    <div class="page-header">
+      <h1>Nowline Embed CDN</h1>
+${THEME_SELECT_HTML}
     </div>
+${channelsCard}
 
     <div class="card">
       <h2>Available versions</h2>
@@ -206,6 +353,7 @@ ${versionRows}
     </div>
 
     <footer>sha: ${escapeHtml(sha ?? 'unknown')} &middot; built: ${escapeHtml(builtAt)}</footer>
+    <script>${THEME_SELECT_SCRIPT}</script>
   </body>
 </html>`;
 }
@@ -234,12 +382,13 @@ export function renderDemo({ version, builtAt }) {
     <meta name="viewport" content="width=device-width, initial-scale=1" />
     <meta name="robots" content="noindex" />
     <title>Nowline Embed Demo \u2014 ${escapedVersion}</title>
+    <script>${THEME_INIT_SCRIPT}</script>
     <style>
 ${BASE_STYLES}
       pre {
         margin: 0;
         padding: 14px 16px;
-        background: #f5f5f7;
+        background: var(--color-pre-bg);
         border-radius: 7px;
         font: 13px/1.5 ui-monospace, SFMono-Regular, Menlo, monospace;
         white-space: pre;
@@ -247,8 +396,8 @@ ${BASE_STYLES}
       }
       .result-area {
         padding: 16px;
-        background: #fff;
-        border: 1px dashed #d2d2d7;
+        background: var(--color-result-bg);
+        border: 1px dashed var(--color-border);
         border-radius: 7px;
         overflow: auto;
       }
@@ -256,7 +405,7 @@ ${BASE_STYLES}
       .caption {
         margin: 12px 0 0;
         font-size: 12px;
-        color: #6e6e73;
+        color: var(--color-muted);
         font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
       }
     </style>
@@ -264,11 +413,10 @@ ${BASE_STYLES}
     <script>nowline.initialize({ startOnLoad: true });</script>
   </head>
   <body>
-    <h1>Nowline Embed Demo</h1>
-    <p class="subtitle">
-      Channel: <code>${escapedVersion}</code> &mdash;
-      drop a <code>&lt;script&gt;</code> tag; <code>\`\`\`nowline</code> blocks render in place.
-    </p>
+    <div class="page-header">
+      <h1>Nowline Embed Demo</h1>
+${THEME_SELECT_HTML}
+    </div>
 
     <div class="card">
       <h2>Snippet</h2>
@@ -307,6 +455,7 @@ ${escapedSample}
           'version: ' + v + ' \u00b7 sha: ' + s + ' \u00b7 built: ${escapedBuiltAt}';
       });
     </script>
+    <script>${THEME_SELECT_SCRIPT}</script>
   </body>
 </html>`;
 }

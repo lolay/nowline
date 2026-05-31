@@ -35,3 +35,7 @@ export const EMBED_SHA: string =
 
 export const PROD_ORIGIN = 'https://embed.nowline.io';
 export const DEV_ORIGIN = 'https://embed.nowline.dev';
+
+export const PROD_SHARE_BASE = 'https://free.nowline.io/open';
+export const DEV_SHARE_BASE = 'https://free.nowline.dev/open';
+export const DEFAULT_SHARE_BASE = IS_DEV ? DEV_SHARE_BASE : PROD_SHARE_BASE;

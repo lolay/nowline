@@ -80,7 +80,8 @@ export interface InitializeOptions {
     today?: Date;
     /**
      * Controls the "Share on Nowline" anchor appended after each rendered SVG.
-     * - `true` (default) — link to `https://free.nowline.io/open#text=…`.
+     * - `true` (default) — link to the env-specific Free app open route
+     *   (`https://free.nowline.io/open` prod, `https://free.nowline.dev/open` dev).
      * - string — a custom base URL (may include a path); the fragment is appended.
      * - `false` / `'none'` — no anchor rendered.
      * - `{ textUrl, remoteUrl }` — template with `{text}` / `{url}` substitution.

@@ -131,7 +131,7 @@ function decodeText(fragmentValue) {
 
 | `share` value | Rendered link | Notes |
 |---------------|---------------|-------|
-| `true` *(default)* | `DEFAULT_SHARE_BASE` + fragment | `DEFAULT_SHARE_BASE = "https://free.nowline.io/open"`. |
+| `true` *(default)* | `DEFAULT_SHARE_BASE` + fragment | Prod bundle: `"https://free.nowline.io/open"`. Dev bundle (`embed.nowline.dev`): `"https://free.nowline.dev/open"`. Selected at build time via `__NOWLINE_EMBED_ENV__`. |
 | `"https://editor.foo.com"` / `"https://foo.com/open"` *(string)* | base + fragment | A **base URL that may include a path** (a "root URI"). The link is built with the `URL` API and the `#text=`/`#url=` fragment is set on it, so `https://foo.com/open` → `https://foo.com/open#text=…`. Lets a self-hoster whose editor lives under a subpath receive shares. |
 | `false` / `"none"` | *(none)* | No "Share on Nowline" link is rendered. |
 | `{ textUrl, remoteUrl }` *(template)* | substituted template | Escape hatch for hosts needing a non-hash URL shape. `{text}` is substituted with the base64url payload; `{url}` with the percent-encoded source URL. e.g. `{ textUrl: 'https://x.com/o?d={text}', remoteUrl: 'https://x.com/o?u={url}' }`. |
