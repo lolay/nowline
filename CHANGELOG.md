@@ -11,6 +11,8 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 - VS Code: `nowline.preview.theme` now offers `grayscale` (the Theme/diagram-palette axis) in addition to `auto` / `light` / `dark`, and the preview toolbar's `Grayscale` selection now renders the grayscale palette instead of silently falling back to light/dark. The chrome/workbench Mode axis is unchanged (stays light/dark).
 - Every released `@nowline/embed` version is now durably hosted on `embed.nowline.io`: the current version's bytes come from the published npm tarball (the exact artifact uploaded to the registry), and prior versions are fetched from the npm registry on each deploy — so the full history stays available and byte-identical to npm.
 - Root version-index page (`https://embed.nowline.io/`) and per-version "Nowline Embed Demo" pages (`https://embed.nowline.io/{X.Y.Z}/`) on both `embed.nowline.io` and `embed.nowline.dev`, serving as live smoke tests and a browsable version catalogue after each deploy.
+- `@nowline/preview-shell`: Redesigned toolbar — single-row chrome with mode-aware palette (`data-nl-mode`), consolidated more-menu (Format, Copy, Export, Theme, Now, Show Links dropdowns), hand-rolled calendar picker for the Now control, minimap auto-hide, and `clampChromeIntoView` on drag/resize. VS Code extension wires `locale` and `themeControl:'show'`.
+- `@nowline/preview-shell`: Toolbar drag grip — reposition anywhere in the preview root with pointer capture and bounds clamping; position persists within the JS session. Collapse toggle (`«`/`»`) shrinks to a minimal puck. After a manual zoom/pan the viewport centre point is preserved across resize events (`isDirty` state).
 
 ### Changed
 
@@ -28,7 +30,8 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ### Fixed
 
-- _Nothing yet._
+- `@nowline/preview-shell`: Canvas is now flex-centered; a `ResizeObserver` re-applies fit presets when the pane is resized without a window resize event.
+- `@nowline/embed`: CDN demo pages (`embed.nowline.io` / `embed.nowline.dev`) now support System / Light / Dark theme switching with a pre-paint init script; `embed.nowline.dev` hides the version Channels table; share links now route to the correct environment (`free.nowline.dev` on dev, `free.nowline.io` on prod).
 
 ### Security
 
