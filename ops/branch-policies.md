@@ -20,28 +20,30 @@ Three independent forces shape the rules:
 
 1. **Solo-maintainer friction.** Gary needs to push directly to `main` on every repo without forcing a PR through himself. This is the OrgAdmin bypass with `bypass_mode: always`.
 2. **Automated release flows.** `lolay/nowline:.github/workflows/release.yml` does `git push origin HEAD` to commit a version bump back to `main` before tagging, and `editor-release-monitor.yml` pushes a daily `[skip ci]` history-update commit. Both run as bots; without an App bypass they'd fail the protection rules. (Today `release.yml` uses a personal PAT and `editor-release-monitor.yml` uses `github-actions[bot]` — both queued for migration to the App; see § 6.)
-3. **Copilot agent-merge flow.** A separate Copilot workflow (`agent-merge.yml`, queued — see the issue-triage agent plan) auto-merges Copilot PRs once required CI passes. That workflow demands `required_approving_review_count: 0` and CI as the only gate. Concretely, this means: no human review is required to merge; bypass actors must use `bypass_mode: always` (which still respects `required_status_checks`), never `bypass_mode: pull_request` (which would short-circuit the CI gate and let auto-merge land an ungated PR); and `github-actions[bot]` is intentionally **not** a bypass actor on any ruleset, because `gh pr merge --auto --squash` doesn't need a bypass when the ruleset has zero required approvals. Together these rules let Copilot's PRs auto-merge the moment CI turns green, with CI as the sole correctness check.
+3. **Defence-in-depth approval.** `required_approving_review_count: 1` ensures no token can merge a PR without a human approval — CI passes *and* a human clicks Approve. The Copilot agent-merge workflow (`agent-merge.yml`) is **retired**; there is no `gh pr merge --auto` in any automation. The Copilot agent flow now emits `maintainer-pr-safe` / `maintainer-pr-review` confidence labels; a maintainer reviews and clicks Approve + Merge in the UI (the maintainer can approve because Copilot, not the maintainer, authored the PR). The OrgAdmin `always` bypass lets the solo maintainer still push directly to `main` and merge their own PRs unblocked. Bypass actors must use `bypass_mode: always` (which still respects `required_status_checks`), never `bypass_mode: pull_request` (which would short-circuit the CI gate); `github-actions[bot]` remains intentionally **not** a bypass actor on any ruleset.
 
-The result is a uniform "0 approvals, CI is the gate, two trusted bypass actors" model across both OSS repos. Tier-1 OSS gets the full required-CI-context list; Tier-3 Follower has no PR CI to gate on (out-of-scope per the agent-merge brief).
+The result is a "1 approval + CI are the gates, two trusted bypass actors" model for the Tier-1 OSS repo. Tier-3 Follower is publish-only with no PR CI; its approval count is kept at 0 pending confirmation (see § 2 note and § 5).
 
 ## 2. The policy
 
 | Tier | Repo | Ruleset name | Required approvals | Required CI contexts | Bypass actors |
 |---|---|---|---|---|---|
-| OSS | `lolay/nowline` | `main: CI must pass` | 0 | 9 contexts (lint + matrix build/test + bundle size + bun smoke), `strict: true` | OrgAdmin (Gary) `always` + `lolay-nowline-release` App `always` |
-| Follower | `lolay/nowline-action` | `main: protected (follower)` | 0 | none (publish-only, agent-merge out-of-scope) | OrgAdmin (Gary) `always` + `lolay-nowline-release` App `always` |
+| OSS | `lolay/nowline` | `main: CI must pass` | 1 | 9 contexts (lint + matrix build/test + bundle size + bun smoke), `strict: true` | OrgAdmin (Gary) `always` + `lolay-nowline-release` App `always` |
+| Follower | `lolay/nowline-action` | `main: protected (follower)` | 0 *(flag: see note below)* | none (publish-only) | OrgAdmin (Gary) `always` + `lolay-nowline-release` App `always` |
 
 Every ruleset additionally enforces:
 
 - `deletion` blocked
 - `non_fast_forward` blocked
-- `pull_request` rule with `required_approving_review_count: 0`, `allowed_merge_methods: [squash, merge, rebase]`
+- `pull_request` rule with `required_approving_review_count: 1` (Tier-1 OSS) or `0` (Tier-3 Follower — see note below), `allowed_merge_methods: [squash, merge, rebase]`
 
 Every repo additionally has these settings (also patched by the script):
 
 - `allow_auto_merge: true`
 - `allow_squash_merge: true`
 - `delete_branch_on_merge: true`
+
+> **Follower approval-count flag (for parent review).** `lolay/nowline-action` is publish-only with no PR CI.  Bumping it to `required_approving_review_count: 1` adds defence-in-depth but could impede a future automated publish flow.  The script currently leaves it at `0`.  A maintainer should confirm: raise to `1` (consistent posture), or keep at `0` (friction-free publish path) and explicitly accept the risk.  Edit the follower body in `scripts/apply-branch-policies.sh` and re-run once decided.
 
 ## 3. Run it
 
@@ -97,7 +99,7 @@ That is the OrgAdmin bypass working as designed; the push still succeeds. If the
 - **App install changes.** Anyone toggles the `lolay-nowline-release` App's installation on `lolay/nowline` or `lolay/nowline-action` (install or uninstall via <https://github.com/settings/apps/lolay-nowline-release/installations>). Re-run to add or drop the App from that repo's bypass list.
 - **A required status-check name changes.** The OSS ruleset hardcodes 9 context names from `lolay/nowline:.github/workflows/ci.yml`. If a job is renamed, update the script and re-run before the next PR — required-but-missing checks block merges indefinitely.
 - **`lolay/nowline:ci.yml` adds or removes a required job.** Add or remove the corresponding `{ "context": "..." }` entry in the script's OSS body and re-run.
-- **The agent-merge brief changes.** If the Copilot agent flow ever needs `required_approving_review_count: 1` or a different bypass shape, this runbook + script are the single change point for the OSS half.
+- **The approval or bypass policy changes.** If the required-approvals count changes (e.g. raising the Follower to `1`), or if the bypass-actor list needs updating, this runbook + script are the single change point for the OSS half.
 
 ## 6. Known gaps — `lolay/nowline` PAT→App migration (queued)
 
@@ -119,7 +121,7 @@ Two workflows on `lolay/nowline` still push to `main` using identities other tha
 
   ...followed by replacing `token: ${{ secrets.RELEASE_TAG_PAT }}` on every `actions/checkout` step and `git push` step with `token: ${{ steps.app-token.outputs.token }}` (or `GH_TOKEN: ${{ steps.app-token.outputs.token }}` for `gh`-using steps). Keep `RELEASE_TAG_PAT` available as a fallback for one full release cycle; delete it from secrets after one verified release.
 
-- **`editor-release-monitor.yml`** runs daily at 06:00 UTC and pushes a `[skip ci]` commit to `main` as `github-actions[bot]`. `github-actions[bot]` was a bypass actor on the old `nowline` ruleset and was removed when the agent-merge brief landed (see § 1). Migration plan: same pattern — mint a `lolay-nowline-release` App installation token and push as the App. Same one-step change, same fallback discipline (this workflow doesn't have a fallback secret today; can simply re-add `github-actions[bot]` as a bypass-actor temporarily by editing the script + re-running if the App route fails on first cron).
+- **`editor-release-monitor.yml`** runs daily at 06:00 UTC and pushes a `[skip ci]` commit to `main` as `github-actions[bot]`. `github-actions[bot]` was a bypass actor on the original `nowline` ruleset; it was removed in an earlier policy tightening to keep the bypass list minimal (see § 1 historical background). Migration plan: same pattern — mint a `lolay-nowline-release` App installation token and push as the App. Same one-step change, same fallback discipline (this workflow doesn't have a fallback secret today; can simply re-add `github-actions[bot]` as a bypass-actor temporarily by editing the script + re-running if the App route fails on first cron).
 
 ### Required pre-work before either migration
 

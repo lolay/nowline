@@ -146,8 +146,8 @@ trap 'rm -rf "$TMP"' EXIT
 # Names must match exactly; a renamed job needs the script updated and
 # re-run before the next PR or merges block on a missing-but-required
 # check.  strict_required_status_checks_policy: true requires the PR
-# branch be up-to-date with main before merging — matches the brief
-# from the agent-merge flow (see ops/branch-policies.md § 1).
+# branch be up-to-date with main before merging.  Defence-in-depth:
+# required_approving_review_count: 1 (see ops/branch-policies.md § 1).
 # ──────────────────────────────────────────────────────────────────────────────
 echo ""
 echo "=== Tier 1: OSS — ${ORG}/nowline ==="
@@ -176,7 +176,7 @@ cat > "$TMP/nowline.json" <<JSON
     {
       "type": "pull_request",
       "parameters": {
-        "required_approving_review_count": 0,
+        "required_approving_review_count": 1,
         "dismiss_stale_reviews_on_push": false,
         "require_code_owner_review": false,
         "require_last_push_approval": false,
@@ -221,10 +221,12 @@ patch_repo_settings "${ORG}/nowline"
 # Tier 3 — Follower: lolay/nowline-action
 #
 # Publish-only repo (Marketplace mirror of `@nowline/action`).  No PR CI
-# exists today and no agent-merge flow runs here — agent-triage marks
-# this tier permanently out-of-scope.  Bypass list mirrors the OSS body
-# via bypass_actors_json so the App can later push to main if a future
-# release flow ever needs to (today nothing does).
+# exists today; no automated merge flow runs here.  required_approving_
+# review_count is kept at 0 (flagged — see ops/branch-policies.md § 2)
+# pending confirmation that requiring 1 approval would not impede the
+# publish flow.  Bypass list mirrors the OSS body via bypass_actors_json
+# so the App can later push to main if a future release flow ever needs
+# to (today nothing does).
 # ──────────────────────────────────────────────────────────────────────────────
 echo ""
 echo "=== Tier 3: Follower — ${ORG}/nowline-action ==="
