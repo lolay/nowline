@@ -174,6 +174,30 @@ describeBuilt('verbless render (requires `pnpm build`)', () => {
         expect(light.stdout).not.toBe(dark.stdout);
     });
 
+    it('--theme greyscale is accepted and emits greyscale marker', async () => {
+        const r = await runCliBuilt([
+            path.join(examplesDir, 'minimal.nowline'),
+            '--theme',
+            'greyscale',
+            '-o',
+            '-',
+        ]);
+        expect(r.exitCode).toBe(0);
+        expect(r.stdout).toContain('data-theme="greyscale"');
+    });
+
+    it('--theme auto is rejected with an error', async () => {
+        const r = await runCliBuilt([
+            path.join(examplesDir, 'minimal.nowline'),
+            '--theme',
+            'auto',
+            '-o',
+            '-',
+        ]);
+        expect(r.exitCode).not.toBe(0);
+        expect(r.stderr).toContain('Expected light, dark, or greyscale');
+    });
+
     it('-f json emits the JSON AST (replaces the old `convert` verb)', async () => {
         const r = await runCliBuilt([
             path.join(examplesDir, 'minimal.nowline'),

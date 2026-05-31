@@ -28,6 +28,6 @@ export function resolveSystemTheme(): ThemeName {
 }
 
 export function effectiveTheme(theme: EmbedTheme | undefined, systemTheme: ThemeName): ThemeName {
-    if (theme === 'light' || theme === 'dark') return theme;
+    if (theme && theme !== 'auto') return theme;
     return systemTheme;
 }

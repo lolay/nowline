@@ -92,6 +92,7 @@ export const SAMPLES: SampleSpec[] = [
     // and quarter prefix under a non-default locale. Source file already
     // declares `locale:fr-CA` on the directive — no override needed.
     { name: 'minimal-fr', sourceFile: 'minimal.fr.nowline', theme: 'light' },
+    { name: 'platform-2026-greyscale', sourceFile: 'platform-2026.nowline', theme: 'greyscale' },
 ];
 
 export async function renderSampleSvg(spec: SampleSpec): Promise<string> {

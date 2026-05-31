@@ -618,7 +618,7 @@ export interface PositionedIncludeRegion {
 export interface PositionedRoadmap {
     width: number;
     height: number;
-    theme: 'light' | 'dark';
+    theme: import('./themes/index.js').ThemeName;
     /**
      * Resolved palette — every color the renderer reads. m2.5d moved
      * theme resolution into the layout side, so the renderer no longer

@@ -433,13 +433,13 @@ async function loadConfigFor(
 function parseTheme(raw: string | undefined): ThemeName {
     if (!raw) return 'light';
     const lower = raw.toLowerCase();
-    if (lower !== 'light' && lower !== 'dark') {
+    if (lower !== 'light' && lower !== 'dark' && lower !== 'greyscale') {
         throw new CliError(
             ExitCode.InputError,
-            `nowline: invalid --theme "${raw}". Expected light or dark.`,
+            `nowline: invalid --theme "${raw}". Expected light, dark, or greyscale.`,
         );
     }
-    return lower;
+    return lower as ThemeName;
 }
 
 // Resolve the now-line date from the CLI flag.

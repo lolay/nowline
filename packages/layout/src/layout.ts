@@ -371,6 +371,14 @@ function sequenceItem(
         planned: '#1e293b',
         neutral: '#1e293b',
     };
+    const STATUS_TINT_GREY: Record<StatusKind, string> = {
+        done: '#ebebeb',
+        'in-progress': '#e4e4e4',
+        'at-risk': '#eeeeee',
+        blocked: '#dcdcdc',
+        planned: '#f5f5f5',
+        neutral: '#f5f5f5',
+    };
     const STATUS_BORDER: Record<StatusKind, string> = {
         done: ctx.styleCtx.theme.status.done,
         'in-progress': ctx.styleCtx.theme.status.inProgress,
@@ -379,11 +387,17 @@ function sequenceItem(
         planned: ctx.styleCtx.theme.status.planned,
         neutral: ctx.styleCtx.theme.status.neutral,
     };
-    const isLight = ctx.styleCtx.theme.name === 'light';
-    const themeDefaultBg = isLight ? '#ffffff' : '#0f172a';
-    const themeDefaultFg = '#94a3b8';
+    const themeName = ctx.styleCtx.theme.name;
+    const isDark = themeName === 'dark';
+    const themeDefaultBg = isDark ? '#0f172a' : '#ffffff';
+    const themeDefaultFg = themeName === 'greyscale' ? '#9e9e9e' : '#94a3b8';
     if (style.bg === themeDefaultBg) {
-        style.bg = isLight ? STATUS_TINT_LIGHT[status] : STATUS_TINT_DARK[status];
+        style.bg =
+            themeName === 'greyscale'
+                ? STATUS_TINT_GREY[status]
+                : isDark
+                  ? STATUS_TINT_DARK[status]
+                  : STATUS_TINT_LIGHT[status];
     }
     if (style.fg === themeDefaultFg) {
         style.fg = STATUS_BORDER[status];

@@ -37,6 +37,12 @@ const MANIFEST = [
         theme: 'dark',
         now: NOW,
     },
+    {
+        slug: 'platform-2026-greyscale',
+        source: 'examples/platform-2026.nowline',
+        theme: 'greyscale',
+        now: NOW,
+    },
     { slug: 'dependencies', source: 'examples/dependencies.nowline', theme: 'light', now: NOW },
     {
         slug: 'isolate-include',
