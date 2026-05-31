@@ -447,15 +447,17 @@ For changes touching the language or the published AST JSON schema, please open 
 
 ### Auto-merge policy
 
-`main` is protected by a [branch ruleset](https://github.com/lolay/nowline/settings/rules) that requires every job in [`ci.yml`](./.github/workflows/ci.yml) to pass before any PR can merge — auto or manual. The ruleset is intentionally CI-gated only; no required reviewers, because GitHub's auto-merge cannot fire on a PR whose ruleset demands an approving review.
+`main` is protected by a [branch ruleset](https://github.com/lolay/nowline/settings/rules) that requires **every job in [`ci.yml`](./.github/workflows/ci.yml) to pass *and* one approving review** before any PR can merge — auto or manual. A human clicks **Approve** on every PR; nothing lands on green CI alone. The Copilot `agent-merge.yml` auto-merge workflow is **retired** (see [`ops/branch-policies.md`](./ops/branch-policies.md)).
 
-| PR source | Auto-merge? | Why |
+GitHub's native auto-merge is still available as a convenience: enable it and the PR squash-merges automatically once CI is green **and** the required approval is in place. It no longer lands a PR hands-off, because the approval is always required. (The solo maintainer can't self-approve, but the OrgAdmin ruleset bypass lets them merge their own work directly — see `ops/branch-policies.md`.)
+
+| PR source | Auto-merge after approval? | Why |
 | --- | --- | --- |
-| Renovate **minor/patch** | yes | Bounded blast radius; CI is the gate. Configured by `automerge: true` + the top-level `platformAutomerge: true` in [`.github/renovate-shared.json`](./.github/renovate-shared.json). |
-| Renovate **major** | no | Major bumps hide breaking changes; humans review before merging. |
-| Engine-floor bump PRs | depends on the issue worker | `vscode-extension-engine-bump.yml` opens a GitHub Issue, not a PR. The generic issue-to-PR worker that executes the work decides whether to enable auto-merge on the resulting PR. |
-| Copilot agent PRs (from the nowline triage flow) | no | Agent review labels the PR `maintainer-pr-safe` (low-risk) or `maintainer-pr-review` (needs attention). A maintainer reviews and clicks **Approve + Merge** in the UI. Nothing auto-merges. |
-| Hand-authored PRs | no | Default behavior — open, review, click merge. The same ruleset still requires CI to be green. |
+| Renovate **minor/patch** | yes — still needs a maintainer **Approve** | Bounded blast radius. `automerge: true` + the top-level `platformAutomerge: true` in [`.github/renovate-shared.json`](./.github/renovate-shared.json) enable auto-merge; the required approval means a maintainer still clicks **Approve** before it squash-merges. |
+| Renovate **major** | no | Major bumps hide breaking changes; review and merge by hand. |
+| Engine-floor bump PRs | depends on the issue worker | `vscode-extension-engine-bump.yml` opens a GitHub Issue, not a PR. The generic issue-to-PR worker that executes the work decides whether to enable auto-merge on the resulting PR (which still gates on the approval). |
+| Copilot agent PRs (from the nowline triage flow) | no | Agent review labels the PR `maintainer-pr-safe` (low-risk) or `maintainer-pr-review` (needs attention). A maintainer reviews and clicks **Approve + Merge** in the UI. |
+| Hand-authored PRs | no | Default behavior — open, review, **Approve + Merge**. |
 
 **Bypassing auto-merge on an automated PR.** If you need to hold an auto-merge-enabled PR (e.g. to push a follow-up commit before it lands), either convert it to a draft, or disable auto-merge explicitly: `gh pr merge <PR> --disable-auto`. Re-enabling later is `gh pr merge <PR> --auto --squash`.
 
