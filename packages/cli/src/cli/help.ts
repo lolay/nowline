@@ -36,7 +36,7 @@ MODE FLAGS (mutually exclusive)
                           'validate' verb. Exit 0 on success, 1 on errors.
 
 RENDER OPTIONS
-  -t, --theme <name>      light | dark | greyscale
+  -t, --theme <name>      light | dark | grayscale (greyscale alias)
       --now <YYYY-MM-DD>  Date for the now-line. Default: today.
                           Use --now - to suppress the now-line.
       --no-links          Omit link icons from rendered items.

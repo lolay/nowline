@@ -15,9 +15,10 @@ import { PREVIEW_SHELL_CSS } from './styles.js';
 
 /**
  * Diagram render theme. `'auto'` resolves to the current Mode's
- * light/dark. `'greyscale'` is a fully available theme.
+ * light/dark. `'grayscale'` is a fully available theme (`'greyscale'`
+ * is accepted as an alias).
  */
-export type ThemeOverride = 'auto' | 'light' | 'dark' | 'greyscale';
+export type ThemeOverride = 'auto' | 'light' | 'dark' | 'grayscale' | 'greyscale';
 
 /**
  * Now-line override. `'today'` and `'hide'` are the named sentinels;
@@ -92,7 +93,7 @@ export interface MountPreviewOptions {
     themeControl?: 'show' | 'hide';
     /**
      * Diagram themes available in the Theme dropdown. **Auto** is
-     * always prepended. Defaults to `['light', 'dark', 'greyscale']`.
+     * always prepended. Defaults to `['light', 'dark', 'grayscale']`.
      */
     availableThemes?: string[];
     /**
@@ -1256,7 +1257,7 @@ export function mountPreview(
     }
 
     // ===== Apply initial theme menu + baselines =====
-    buildThemeMenu(options.availableThemes ?? ['light', 'dark', 'greyscale']);
+    buildThemeMenu(options.availableThemes ?? ['light', 'dark', 'grayscale']);
 
     if (options.viewBaseline) {
         applyBaseline(state, options.viewBaseline, true);

@@ -178,11 +178,11 @@ Honored keys for the preview: `theme`, `width`, `locale`, `assetRoot`. The expor
 
 The preview toolbar adds three per-session controls that don't write back to settings:
 
-- **Theme** — **Auto** / `light` / `dark` / `greyscale` (overrides the resolved diagram theme for screenshots). **Auto** is a client-side meta-option — Title-case in the UI, not a CLI token — meaning "follow the active Mode." The real theme tokens (`light`, `dark`, `greyscale`) are lowercase and code-styled throughout, matching `nowline.preview.theme` and `--theme`.
+- **Theme** — **Auto** / `light` / `dark` / `grayscale` (overrides the resolved diagram theme for screenshots). **Auto** is a client-side meta-option — Title-case in the UI, not a CLI token — meaning "follow the active Mode." The real theme tokens (`light`, `dark`, `grayscale`) are lowercase and code-styled throughout, matching `nowline.preview.theme` and `--theme`. The UK spelling `greyscale` is accepted as an alias and canonicalizes to `grayscale`.
 - **Now-line** — show today / show as-of date / hide (`--now` parity).
 - **Show links** — Yes / No dropdown in the toolbar more-menu; the initial state reflects the `nowline.preview.showLinks` setting (which still applies).
 
-**Theme vs Mode.** *Theme* (`nowline.preview.theme`) is the diagram render palette — `auto`, `light`, `dark`, or `greyscale`. *Mode* is the color scheme of the tooling chrome (toolbar, VS Code workbench), driven by VS Code's `onDidChangeActiveColorTheme`. `auto` on the Theme axis means "follow the active Mode"; `system` is the Mode-axis equivalent where chrome is present (e.g. the Free SPA). The embed has no Mode axis — it samples `prefers-color-scheme` once on init.
+**Theme vs Mode.** *Theme* (`nowline.preview.theme`) is the diagram render palette — `auto`, `light`, `dark`, or `grayscale` (`greyscale` accepted as alias). *Mode* is the color scheme of the tooling chrome (toolbar, VS Code workbench), driven by VS Code's `onDidChangeActiveColorTheme`. `auto` on the Theme axis means "follow the active Mode"; `system` is the Mode-axis equivalent where chrome is present (e.g. the Free SPA). The embed has no Mode axis — it samples `prefers-color-scheme` once on init.
 
 Locale, strict, width, and asset-root stay settings-only — they aren't things you flip while skimming a roadmap.
 

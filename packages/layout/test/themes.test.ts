@@ -1,9 +1,10 @@
 import { describe, expect, it } from 'vitest';
 import {
     darkTheme,
-    greyscaleNamed,
-    greyscaleTheme,
+    grayscaleNamed,
+    grayscaleTheme,
     lightTheme,
+    normalizeThemeName,
     resolveColor,
 } from '../src/themes/index.js';
 
@@ -36,15 +37,40 @@ describe('resolveColor aliases', () => {
         expect(resolveColor('none', lightTheme)).toBe('none');
     });
 
-    it('grey resolves to the same value as gray (greyscale theme)', () => {
-        expect(resolveColor('grey', greyscaleTheme)).toBe(resolveColor('gray', greyscaleTheme));
+    it('grey resolves to the same value as gray (grayscale theme)', () => {
+        expect(resolveColor('grey', grayscaleTheme)).toBe(resolveColor('gray', grayscaleTheme));
     });
 
-    it('blue resolves to the greyscale palette value, not the light palette blue', () => {
-        const greyscaleBlue = resolveColor('blue', greyscaleTheme);
+    it('blue resolves to the grayscale palette value, not the light palette blue', () => {
+        const grayscaleBlue = resolveColor('blue', grayscaleTheme);
         const lightBlue = resolveColor('blue', lightTheme);
-        expect(greyscaleBlue).not.toBe(lightBlue);
-        expect(greyscaleBlue).toBe(greyscaleNamed.blue);
+        expect(grayscaleBlue).not.toBe(lightBlue);
+        expect(grayscaleBlue).toBe(grayscaleNamed.blue);
+    });
+});
+
+// `grayscale` (US) is canonical, matching the `gray` color token; `greyscale`
+// (UK) is accepted as input and canonicalizes here so every theme-name surface
+// (CLI `--theme`, embed config) stays single-canonical.
+describe('normalizeThemeName', () => {
+    it('passes the canonical themes through unchanged', () => {
+        expect(normalizeThemeName('light')).toBe('light');
+        expect(normalizeThemeName('dark')).toBe('dark');
+        expect(normalizeThemeName('grayscale')).toBe('grayscale');
+    });
+
+    it('canonicalizes the UK spelling greyscale to grayscale', () => {
+        expect(normalizeThemeName('greyscale')).toBe('grayscale');
+    });
+
+    it('is case-insensitive for both spellings', () => {
+        expect(normalizeThemeName('GREYSCALE')).toBe('grayscale');
+        expect(normalizeThemeName('Grayscale')).toBe('grayscale');
+    });
+
+    it('returns undefined for unknown tokens', () => {
+        expect(normalizeThemeName('auto')).toBeUndefined();
+        expect(normalizeThemeName('sepia')).toBeUndefined();
     });
 });
 
@@ -70,15 +96,15 @@ function collectHexValues(obj: unknown): string[] {
     return [];
 }
 
-describe('greyscale theme achromatic invariant', () => {
-    it('every hex color in greyscaleTheme has R === G === B', () => {
-        const hexValues = collectHexValues(greyscaleTheme as unknown as Record<string, unknown>);
+describe('grayscale theme achromatic invariant', () => {
+    it('every hex color in grayscaleTheme has R === G === B', () => {
+        const hexValues = collectHexValues(grayscaleTheme as unknown as Record<string, unknown>);
         const chromatic = hexValues.filter((h) => !isAchromatic(h));
         expect(chromatic).toEqual([]);
     });
 
-    it('every hex color in greyscaleNamed has R === G === B', () => {
-        const hexValues = collectHexValues(greyscaleNamed as unknown as Record<string, unknown>);
+    it('every hex color in grayscaleNamed has R === G === B', () => {
+        const hexValues = collectHexValues(grayscaleNamed as unknown as Record<string, unknown>);
         const chromatic = hexValues.filter((h) => !isAchromatic(h));
         expect(chromatic).toEqual([]);
     });

@@ -41,7 +41,7 @@ That's it. Any ` ```nowline ` block in the page will render automatically on `DO
 <script src="https://embed.nowline.io/0.2.0/nowline.min.js"></script>
 <script>
   nowline.initialize({
-    theme: 'dark',           // 'light' | 'dark' | 'greyscale' | 'auto' (reads prefers-color-scheme once)
+    theme: 'dark',           // 'light' | 'dark' | 'grayscale' | 'auto' (reads prefers-color-scheme once); 'greyscale' accepted as alias
     startOnLoad: true,
     selector: 'pre code.language-nowline'  // custom selector
   });

@@ -67,8 +67,9 @@ export type { LayoutOptions, LayoutResult } from './layout.js';
 export { layoutRoadmap } from './layout.js';
 export {
     darkTheme,
-    greyscaleTheme,
+    grayscaleTheme,
     lightTheme,
+    normalizeThemeName,
     type Theme,
     type ThemeName,
     themes,

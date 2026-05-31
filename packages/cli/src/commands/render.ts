@@ -2,7 +2,7 @@ import { promises as fs } from 'node:fs';
 import * as path from 'node:path';
 import { resolveIncludes } from '@nowline/core';
 import { lengthToPoints, parseLength } from '@nowline/export-core';
-import { layoutRoadmap, type ThemeName } from '@nowline/layout';
+import { layoutRoadmap, normalizeThemeName, type ThemeName } from '@nowline/layout';
 import { type AssetResolver, renderSvg } from '@nowline/renderer';
 import type { ParsedArgs } from '../cli/args.js';
 import {
@@ -432,14 +432,15 @@ async function loadConfigFor(
 
 function parseTheme(raw: string | undefined): ThemeName {
     if (!raw) return 'light';
-    const lower = raw.toLowerCase();
-    if (lower !== 'light' && lower !== 'dark' && lower !== 'greyscale') {
+    // `greyscale` (UK) is accepted and canonicalized to `grayscale` (US).
+    const theme = normalizeThemeName(raw);
+    if (!theme) {
         throw new CliError(
             ExitCode.InputError,
-            `nowline: invalid --theme "${raw}". Expected light, dark, or greyscale.`,
+            `nowline: invalid --theme "${raw}". Expected light, dark, or grayscale.`,
         );
     }
-    return lower as ThemeName;
+    return theme;
 }
 
 // Resolve the now-line date from the CLI flag.

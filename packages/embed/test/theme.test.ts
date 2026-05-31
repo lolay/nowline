@@ -2,9 +2,14 @@ import { describe, expect, it } from 'vitest';
 import { effectiveTheme } from '../src/theme.js';
 
 describe('effectiveTheme', () => {
-    it('explicit greyscale is honored, not overridden by systemTheme', () => {
-        expect(effectiveTheme('greyscale', 'light')).toBe('greyscale');
-        expect(effectiveTheme('greyscale', 'dark')).toBe('greyscale');
+    it('explicit grayscale is honored, not overridden by systemTheme', () => {
+        expect(effectiveTheme('grayscale', 'light')).toBe('grayscale');
+        expect(effectiveTheme('grayscale', 'dark')).toBe('grayscale');
+    });
+
+    it('canonicalizes the UK alias greyscale to grayscale', () => {
+        expect(effectiveTheme('greyscale', 'light')).toBe('grayscale');
+        expect(effectiveTheme('greyscale', 'dark')).toBe('grayscale');
     });
 
     it('explicit light/dark are honored', () => {

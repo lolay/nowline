@@ -174,7 +174,19 @@ describeBuilt('verbless render (requires `pnpm build`)', () => {
         expect(light.stdout).not.toBe(dark.stdout);
     });
 
-    it('--theme greyscale is accepted and emits greyscale marker', async () => {
+    it('--theme grayscale is accepted and emits grayscale marker', async () => {
+        const r = await runCliBuilt([
+            path.join(examplesDir, 'minimal.nowline'),
+            '--theme',
+            'grayscale',
+            '-o',
+            '-',
+        ]);
+        expect(r.exitCode).toBe(0);
+        expect(r.stdout).toContain('data-theme="grayscale"');
+    });
+
+    it('--theme greyscale (UK alias) canonicalizes to the grayscale marker', async () => {
         const r = await runCliBuilt([
             path.join(examplesDir, 'minimal.nowline'),
             '--theme',
@@ -183,7 +195,7 @@ describeBuilt('verbless render (requires `pnpm build`)', () => {
             '-',
         ]);
         expect(r.exitCode).toBe(0);
-        expect(r.stdout).toContain('data-theme="greyscale"');
+        expect(r.stdout).toContain('data-theme="grayscale"');
     });
 
     it('--theme auto is rejected with an error', async () => {
@@ -195,7 +207,7 @@ describeBuilt('verbless render (requires `pnpm build`)', () => {
             '-',
         ]);
         expect(r.exitCode).not.toBe(0);
-        expect(r.stderr).toContain('Expected light, dark, or greyscale');
+        expect(r.stderr).toContain('Expected light, dark, or grayscale');
     });
 
     it('-f json emits the JSON AST (replaces the old `convert` verb)', async () => {

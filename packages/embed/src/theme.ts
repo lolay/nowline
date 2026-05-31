@@ -1,7 +1,8 @@
 // Theme resolution for the embed.
 //
 // Precedence (highest to lowest):
-//   1. `initialize({ theme })` flag (light / dark / auto).
+//   1. `initialize({ theme })` flag (light / dark / grayscale / auto;
+//      `greyscale` is accepted and canonicalized to `grayscale`).
 //   2. The file's own `nowline v1 theme:` directive — handled inside
 //      layout, so we just don't override it when the embed config says
 //      `'auto'` and we have no system preference reading.
@@ -12,9 +13,10 @@
 // roadmap on the page to repaint. This matches Mermaid's posture and
 // keeps the embed deterministic for screenshot tools.
 
-import type { ThemeName } from '@nowline/layout';
+import { normalizeThemeName, type ThemeName } from '@nowline/layout';
 
-export type EmbedTheme = ThemeName | 'auto';
+// `'greyscale'` (UK) is an accepted alias for the canonical `'grayscale'`.
+export type EmbedTheme = ThemeName | 'greyscale' | 'auto';
 
 export function resolveSystemTheme(): 'light' | 'dark' {
     if (typeof globalThis === 'undefined') return 'light';
@@ -28,6 +30,6 @@ export function resolveSystemTheme(): 'light' | 'dark' {
 }
 
 export function effectiveTheme(theme: EmbedTheme | undefined, systemTheme: ThemeName): ThemeName {
-    if (theme && theme !== 'auto') return theme;
+    if (theme && theme !== 'auto') return normalizeThemeName(theme) ?? systemTheme;
     return systemTheme;
 }

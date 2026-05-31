@@ -1,9 +1,9 @@
 import type { EntityStyle, NamedColors, Theme } from './shape.js';
 
-// Named-color mapping for greyscale theme. Each named color maps to a
+// Named-color mapping for grayscale theme. Each named color maps to a
 // distinct grey by lightness so `bg:blue` etc. remain differentiable
 // in black-and-white print without relying on automatic colour conversion.
-export const greyscaleNamed: NamedColors = {
+export const grayscaleNamed: NamedColors = {
     red: '#4a4a4a',
     blue: '#6b6b6b',
     green: '#8a8a8a',
@@ -34,8 +34,8 @@ const baseEntity: EntityStyle = {
     capacityIcon: 'multiplier',
 };
 
-export const greyscaleTheme: Theme = {
-    name: 'greyscale',
+export const grayscaleTheme: Theme = {
+    name: 'grayscale',
     surface: {
         page: '#f5f5f5',
         chart: '#ffffff',

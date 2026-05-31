@@ -68,7 +68,7 @@ Mode flags (mutually exclusive)
                          equivalent. See [`specs/mcp.md`](./mcp.md).
 
 Render options
-  -t, --theme <name>     light | dark
+  -t, --theme <name>     light | dark | grayscale (greyscale alias)
   --now <date>           "Now" anchor for now-line / date math (YYYY-MM-DD).
                          Default: today (the OS calendar date in UTC).
                          Pass `--now -` to suppress the now-line entirely

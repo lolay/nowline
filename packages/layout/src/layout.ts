@@ -390,10 +390,10 @@ function sequenceItem(
     const themeName = ctx.styleCtx.theme.name;
     const isDark = themeName === 'dark';
     const themeDefaultBg = isDark ? '#0f172a' : '#ffffff';
-    const themeDefaultFg = themeName === 'greyscale' ? '#9e9e9e' : '#94a3b8';
+    const themeDefaultFg = themeName === 'grayscale' ? '#9e9e9e' : '#94a3b8';
     if (style.bg === themeDefaultBg) {
         style.bg =
-            themeName === 'greyscale'
+            themeName === 'grayscale'
                 ? STATUS_TINT_GREY[status]
                 : isDark
                   ? STATUS_TINT_DARK[status]
