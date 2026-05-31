@@ -41,12 +41,14 @@ That's it. Any ` ```nowline ` block in the page will render automatically on `DO
 <script src="https://embed.nowline.io/0.2.0/nowline.min.js"></script>
 <script>
   nowline.initialize({
-    theme: 'dark',           // 'light' | 'dark' | 'auto' (reads prefers-color-scheme once)
+    theme: 'dark',           // 'light' | 'dark' | 'greyscale' | 'auto' (reads prefers-color-scheme once)
     startOnLoad: true,
     selector: 'pre code.language-nowline'  // custom selector
   });
 </script>
 ```
+
+**Theme vocabulary.** `'auto'` (shown as **Auto** in UIs) is the follow-ambient value on the Theme axis everywhere — no per-surface rename. `system` is the Mode-axis counterpart, used only where tooling chrome exists (e.g. the interactive preview-shell or Free SPA); the embed has no Mode axis. The vocabulary is identical across surfaces; only sampling cadence differs: the embed samples `prefers-color-scheme` **once on init** (deterministic, screenshot-stable), the interactive preview-shell (IDE/Free SPA) samples **live**, and CLI / GitHub Action offer `light` / `dark` only (no `auto`). See `editor-ux.md` in `nowline-app` for the full Mode/Theme axis definitions.
 
 ### Manual Rendering
 

@@ -48,6 +48,7 @@ describe('mountPreview', () => {
     afterEach(() => {
         document.body.innerHTML = '';
         vi.restoreAllMocks();
+        vi.useRealTimers();
     });
 
     it('mounts the preview shell stylesheet exactly once across multiple mounts', () => {
@@ -159,12 +160,13 @@ describe('mountPreview', () => {
         expect(root.innerHTML).toBe('');
     });
 
-    it('Save SVG action fires onSave with the current SVG body', () => {
+    it('Export SVG action fires onSave with the current SVG body', () => {
         const root = mountRoot();
         const onSave = vi.fn();
         const handle = mountPreview(root, { onSave });
         handle.setSvg(SAMPLE_SVG);
-        const btn = root.querySelector<HTMLButtonElement>('[data-action="save-svg"]');
+        // Default format is svg; clicking export-action fires save-svg
+        const btn = root.querySelector<HTMLButtonElement>('.export-action');
         btn?.click();
         expect(onSave).toHaveBeenCalledTimes(1);
         const call = onSave.mock.calls[0][0];
@@ -177,12 +179,12 @@ describe('mountPreview', () => {
         const onViewOptions = vi.fn();
         const handle = mountPreview(root, { onViewOptions });
         handle.setSvg(SAMPLE_SVG);
-        // Open the view menu, click Light theme.
-        const toggle = root.querySelector<HTMLButtonElement>('.view-toggle');
-        toggle?.click();
-        const lightBtn = root.querySelector<HTMLButtonElement>(
-            '.view-opt[data-opt="theme"][data-value="light"]',
-        );
+        // Open the more-menu, open the theme sub-menu, click light.
+        const moreToggle = root.querySelector<HTMLButtonElement>('.more-toggle');
+        moreToggle?.click();
+        const themeToggle = root.querySelector<HTMLButtonElement>('.theme-toggle');
+        themeToggle?.click();
+        const lightBtn = root.querySelector<HTMLButtonElement>('.theme-opt[data-value="light"]');
         lightBtn?.click();
         expect(onViewOptions).toHaveBeenCalledTimes(1);
         expect(onViewOptions.mock.calls[0][0]).toEqual({ theme: 'light' });
@@ -226,11 +228,129 @@ describe('mountPreview', () => {
         const onViewOptions = vi.fn();
         const handle = mountPreview(root, { onViewOptions });
         handle.setViewBaseline({ theme: 'dark' });
-        const activeTheme = root.querySelector('.view-opt[data-opt="theme"][data-active="true"]');
+        const activeTheme = root.querySelector('.theme-opt[data-active="true"]');
         expect(activeTheme?.getAttribute('data-value')).toBe('dark');
         // Baseline propagation must NOT fire the override callback —
         // that would create a feedback loop with the consumer's option
         // resolver.
         expect(onViewOptions).not.toHaveBeenCalled();
+    });
+
+    // ===== Conditional open-problems visibility =====
+
+    it('open-problems link is hidden when setDiagnostics receives zero rows', () => {
+        const root = mountRoot();
+        const handle = mountPreview(root);
+        handle.setDiagnostics([]);
+        const openProblems = root.querySelector<HTMLAnchorElement>('.open-problems')!;
+        expect(openProblems.hidden).toBe(true);
+        handle.dispose();
+    });
+
+    it('open-problems link is visible when diagnostics contain at least one error', () => {
+        const root = mountRoot();
+        const handle = mountPreview(root);
+        handle.setDiagnostics([SAMPLE_DIAGNOSTIC]);
+        const openProblems = root.querySelector<HTMLAnchorElement>('.open-problems')!;
+        expect(openProblems.hidden).toBe(false);
+        handle.dispose();
+    });
+
+    it('open-problems link is visible when diagnostics contain only warnings', () => {
+        const root = mountRoot();
+        const handle = mountPreview(root);
+        const warnRow: DiagnosticRow = { ...SAMPLE_DIAGNOSTIC, severity: 'warning' };
+        handle.setDiagnostics([warnRow]);
+        const openProblems = root.querySelector<HTMLAnchorElement>('.open-problems')!;
+        expect(openProblems.hidden).toBe(false);
+        handle.dispose();
+    });
+
+    // ===== Now-override date passthrough =====
+
+    function openNowPicker(root: HTMLElement): void {
+        root.querySelector<HTMLButtonElement>('.more-toggle')?.click();
+        root.querySelector<HTMLButtonElement>('.now-toggle')?.click();
+    }
+
+    it('calendar Today button fires onViewOptions with now: "today"', () => {
+        const root = mountRoot();
+        const onViewOptions = vi.fn();
+        const handle = mountPreview(root, { onViewOptions });
+        openNowPicker(root);
+        const todayBtn = Array.from(
+            root.querySelectorAll<HTMLButtonElement>('.cal-footer-btn'),
+        ).find((b) => b.textContent === 'Today');
+        expect(todayBtn).not.toBeNull();
+        todayBtn?.click();
+        expect(onViewOptions).toHaveBeenCalledTimes(1);
+        expect(onViewOptions.mock.calls[0][0]).toEqual({ now: 'today' });
+        handle.dispose();
+    });
+
+    it('calendar None button fires onViewOptions with now: "hide"', () => {
+        const root = mountRoot();
+        const onViewOptions = vi.fn();
+        const handle = mountPreview(root, { onViewOptions });
+        openNowPicker(root);
+        const noneBtn = Array.from(
+            root.querySelectorAll<HTMLButtonElement>('.cal-footer-btn'),
+        ).find((b) => b.textContent === 'None');
+        expect(noneBtn).not.toBeNull();
+        noneBtn?.click();
+        expect(onViewOptions).toHaveBeenCalledTimes(1);
+        expect(onViewOptions.mock.calls[0][0]).toEqual({ now: 'hide' });
+        handle.dispose();
+    });
+
+    it('calendar day click fires onViewOptions with a YYYY-MM-DD date string', () => {
+        const root = mountRoot();
+        const onViewOptions = vi.fn();
+        const handle = mountPreview(root, { onViewOptions });
+        openNowPicker(root);
+        const dayBtn = root.querySelector<HTMLButtonElement>('.cal-day');
+        expect(dayBtn).not.toBeNull();
+        dayBtn?.click();
+        expect(onViewOptions).toHaveBeenCalledTimes(1);
+        const { now } = onViewOptions.mock.calls[0][0] as { now: string };
+        expect(now).toMatch(/^\d{4}-\d{2}-\d{2}$/);
+        handle.dispose();
+    });
+
+    // ===== Clamp-on-resize math =====
+
+    it('clampChromeIntoView keeps chrome within [gutter, width - chromeWidth - gutter] after resize', () => {
+        vi.useFakeTimers();
+        const root = mountRoot();
+        const handle = mountPreview(root);
+
+        const chrome = root.querySelector<HTMLElement>('.chrome')!;
+
+        // Stub layout dimensions that happy-dom cannot compute
+        Object.defineProperty(root, 'clientWidth', { configurable: true, value: 400 });
+        Object.defineProperty(root, 'clientHeight', { configurable: true, value: 300 });
+        Object.defineProperty(chrome, 'offsetWidth', { configurable: true, value: 80 });
+        Object.defineProperty(chrome, 'offsetHeight', { configurable: true, value: 40 });
+
+        // Position chrome far outside the container
+        chrome.style.left = '9999px';
+        chrome.style.top = '9999px';
+
+        // handleResize is debounced at 50 ms; advance past it
+        window.dispatchEvent(new Event('resize'));
+        vi.advanceTimersByTime(100);
+
+        const gutter = 8; // parseInt('') || 8 when CSS var is unset
+        const left = parseInt(chrome.style.left, 10);
+        const top = parseInt(chrome.style.top, 10);
+        const maxLeft = 400 - 80 - gutter; // 312
+        const maxTop = 300 - 40 - gutter; // 252
+
+        expect(left).toBeGreaterThanOrEqual(gutter);
+        expect(left).toBeLessThanOrEqual(maxLeft);
+        expect(top).toBeGreaterThanOrEqual(gutter);
+        expect(top).toBeLessThanOrEqual(maxTop);
+
+        handle.dispose();
     });
 });

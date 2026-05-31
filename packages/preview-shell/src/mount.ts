@@ -13,8 +13,18 @@ import type { DiagnosticRow } from '@nowline/browser';
 import { buildViewport } from './markup.js';
 import { PREVIEW_SHELL_CSS } from './styles.js';
 
-export type ThemeOverride = 'auto' | 'light' | 'dark';
-export type NowOverride = 'today' | 'hide';
+/**
+ * Diagram render theme. `'auto'` resolves to the current Mode's
+ * light/dark. `'greyscale'` is a fully available theme.
+ */
+export type ThemeOverride = 'auto' | 'light' | 'dark' | 'greyscale';
+
+/**
+ * Now-line override. `'today'` and `'hide'` are the named sentinels;
+ * any `'YYYY-MM-DD'` date string is also valid.
+ */
+export type NowOverride = 'today' | 'hide' | (string & {});
+
 export type InitialFit = 'fitPage' | 'fitWidth' | 'actual';
 
 /**
@@ -38,9 +48,9 @@ export interface ExportRequest {
 }
 
 /**
- * View-options overrides emitted when the user clicks the View ▾ menu.
- * Only fields the user explicitly chose are present; consumers merge
- * with their own option-resolution chain (settings, .nowlinerc, etc.).
+ * View-options overrides emitted when the user changes Theme, Now, or
+ * Show-links in the more-menu. Only explicitly chosen fields are
+ * present; consumers merge with their option-resolution chain.
  */
 export interface ViewOptionsOverrides {
     theme?: ThemeOverride;
@@ -50,12 +60,12 @@ export interface ViewOptionsOverrides {
 
 /**
  * Baseline view state pushed by the consumer (e.g. when settings
- * change). The shell uses these to pre-fill the View menu's
- * checkmarks without claiming the option as user-overridden.
+ * change). The shell uses these to pre-fill menu checkmarks without
+ * claiming the option as user-overridden.
  */
 export interface ViewBaseline {
     theme?: ThemeOverride;
-    /** Maps to one of `today` | `hide` for the checkmark — host values like 'auto' / 'YYYY-MM-DD' collapse to 'today'. */
+    /** `'today'` | `'hide'` | `'YYYY-MM-DD'` | legacy `'auto'` / `'none'` values are accepted. */
     now?: NowOverride | 'auto' | 'none' | string;
     showLinks?: boolean;
 }
@@ -68,15 +78,36 @@ export interface MountPreviewOptions {
      * with `handle.setViewBaseline(...)`.
      */
     viewBaseline?: ViewBaseline;
+    /**
+     * Color scheme for the chrome (toolbar, menus, minimap).
+     * `'system'` (default) auto-detects: VS Code webview via `<body>`
+     * class; browser via `prefers-color-scheme`. Never affects the
+     * diagram theme.
+     */
+    mode?: 'light' | 'dark' | 'system';
+    /**
+     * Whether to show the Theme row in the more-menu.
+     * Defaults to `'show'`.
+     */
+    themeControl?: 'show' | 'hide';
+    /**
+     * Diagram themes available in the Theme dropdown. **Auto** is
+     * always prepended. Defaults to `['light', 'dark', 'greyscale']`.
+     */
+    availableThemes?: string[];
+    /**
+     * Locale used for date formatting in the Now picker.
+     * Defaults to `navigator.language`.
+     */
+    locale?: string;
     onGoto?: (loc: DiagnosticGoto) => void;
     onOpenProblems?: () => void;
     onSave?: (req: ExportRequest) => void;
     onCopy?: (req: ExportRequest) => void;
     /**
-     * Fired when the user toggles save-png / copy-png and the browser's
-     * `navigator.clipboard.write` is unavailable. Consumers usually
-     * pass the bytes off to a host-side fallback (write to a temp file
-     * + notify) and pop a message describing what happened.
+     * Fired when the browser's `navigator.clipboard.write` is
+     * unavailable during a copy-PNG action. Consumers pass the bytes
+     * to a host-side fallback.
      */
     onCopyPngFallback?: (body: Uint8Array) => void;
     onViewOptions?: (overrides: ViewOptionsOverrides) => void;
@@ -90,12 +121,26 @@ export interface PreviewHandle {
     setDiagnostics(rows: DiagnosticRow[]): void;
     /** Show a one-row diagnostics overlay with the supplied message. */
     setFatal(message: string): void;
-    /** Re-skin the view-menu baselines without claiming user overrides. */
+    /** Re-skin view-menu baselines without claiming user overrides. */
     setViewBaseline(baseline: ViewBaseline, resetOverrides?: boolean): void;
-    /** Update the "default fit" used by the next first-render. */
+    /** Update the default fit used by the next first-render. */
     setDefaultFit(fit: InitialFit): void;
-    /** Toggle the minimap behaviour from the host. */
+    /** Toggle minimap behaviour from the host. */
     setShowMinimap(show: boolean): void;
+    /**
+     * Switch the chrome color scheme. `'system'` re-detects from the
+     * host environment; `'light'`/`'dark'` pin explicitly.
+     */
+    setMode(mode: 'light' | 'dark' | 'system'): void;
+    /**
+     * Replace the list of selectable diagram themes. **Auto** is
+     * always prepended. Rebuilds the Theme dropdown immediately.
+     */
+    setAvailableThemes(themes: string[]): void;
+    /**
+     * Update the locale used for date formatting in the Now picker.
+     */
+    setLocale(locale: string): void;
     fitPage(): void;
     fitWidth(): void;
     actualSize(): void;
@@ -113,19 +158,19 @@ interface InternalState {
     defaultFit: InitialFit;
     activeFit: 'fitPage' | 'fitWidth' | 'manual';
     /**
-     * True once the user has manually zoomed, panned, or used zoom buttons —
-     * i.e. the view is no longer governed by a fit preset. Drives the resize
-     * focal-point strategy: when dirty the pre-resize viewport-centre content
-     * point is preserved instead of refitting.
+     * True once the user has manually zoomed, panned, or used zoom buttons.
+     * Drives the resize focal-point strategy.
      */
     isDirty: boolean;
-    /** Viewport dimensions as of the last handled resize, used for focal-point math. */
     lastViewportWidth: number;
     lastViewportHeight: number;
     showMinimap: boolean;
     minimapDismissedThisSession: boolean;
     firstRender: boolean;
-    toolbarCollapsed: boolean;
+    /** Resolved chrome color scheme — set by mode resolution, never by diagram theme. */
+    mode: 'light' | 'dark';
+    locale: string;
+    export: { format: 'svg' | 'png' };
     view: {
         theme: ThemeOverride;
         now: NowOverride;
@@ -137,18 +182,11 @@ interface InternalState {
 let stylesheetMounted = false;
 
 /**
- * Last chrome position saved after a drag, shared across all shells in this
- * JS session. Persists for the lifetime of the page (no localStorage so it
- * doesn't leak across tabs or reloads).
+ * Last chrome position saved after a drag, shared across all shells in
+ * this JS session. Persists for the lifetime of the page.
  */
 let savedChromePosition: { left: number; top: number } | null = null;
 
-/**
- * Ensure the shared `<style>` block is in the document `<head>`. Safe
- * to call repeatedly — only the first call writes. The stylesheet
- * scopes every selector under `.nl-preview-root` so multiple shells
- * can coexist with workbench / app styles.
- */
 function ensureStylesheet(doc: Document): void {
     if (stylesheetMounted) return;
     const style = doc.createElement('style');
@@ -181,7 +219,11 @@ export function mountPreview(
         showMinimap: options.showMinimap !== false,
         minimapDismissedThisSession: false,
         firstRender: true,
-        toolbarCollapsed: false,
+        mode: 'dark',
+        locale:
+            options.locale ??
+            (typeof navigator !== 'undefined' ? navigator.language : 'en'),
+        export: { format: 'svg' },
         view: {
             theme: 'auto',
             now: 'today',
@@ -201,41 +243,120 @@ export function mountPreview(
         cleanups.push(() => target.removeEventListener(type, handler as EventListener, opts));
     }
 
-    // ===== Toolbar fade =====
+    // ===== Mode resolution =====
+    function resolveSystemMode(): 'light' | 'dark' {
+        const body = doc.body;
+        if (body) {
+            if (
+                body.classList.contains('vscode-dark') ||
+                body.classList.contains('vscode-high-contrast-dark')
+            )
+                return 'dark';
+            if (
+                body.classList.contains('vscode-light') ||
+                body.classList.contains('vscode-high-contrast-light') ||
+                body.classList.contains('vscode-high-contrast')
+            )
+                return 'light';
+        }
+        if (typeof win.matchMedia === 'function') {
+            return win.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light';
+        }
+        return 'dark';
+    }
+
+    function applyMode(resolved: 'light' | 'dark'): void {
+        state.mode = resolved;
+        rootEl.setAttribute('data-nl-mode', resolved);
+    }
+
+    const rawMode = options.mode ?? 'system';
+    applyMode(rawMode === 'system' ? resolveSystemMode() : rawMode);
+
+    if (rawMode === 'system') {
+        if (typeof MutationObserver !== 'undefined' && doc.body) {
+            const bodyObs = new MutationObserver(() => applyMode(resolveSystemMode()));
+            bodyObs.observe(doc.body, { attributes: true, attributeFilter: ['class'] });
+            cleanups.push(() => bodyObs.disconnect());
+        }
+        const mq =
+            typeof win.matchMedia === 'function'
+                ? win.matchMedia('(prefers-color-scheme: dark)')
+                : null;
+        if (mq) {
+            const onMqChange = (): void => {
+                const body = doc.body;
+                const hasVsCode =
+                    body &&
+                    (body.classList.contains('vscode-dark') ||
+                        body.classList.contains('vscode-light') ||
+                        body.classList.contains('vscode-high-contrast') ||
+                        body.classList.contains('vscode-high-contrast-dark') ||
+                        body.classList.contains('vscode-high-contrast-light'));
+                if (!hasVsCode) applyMode(mq.matches ? 'dark' : 'light');
+            };
+            mq.addEventListener('change', onMqChange);
+            cleanups.push(() => mq.removeEventListener('change', onMqChange));
+        }
+    }
+
+    // ===== Floating UI fade =====
     let fadeTimer: ReturnType<typeof setTimeout> | null = null;
-    function showToolbar(): void {
+
+    function showFloatingUI(): void {
         els.chrome.classList.remove('faded');
+        els.minimap.classList.remove('faded');
         if (fadeTimer) clearTimeout(fadeTimer);
-        fadeTimer = setTimeout(() => els.chrome.classList.add('faded'), 2000);
+        fadeTimer = setTimeout(() => {
+            els.chrome.classList.add('faded');
+            els.minimap.classList.add('faded');
+        }, 2000);
     }
-    on(doc, 'mousemove', showToolbar);
-    showToolbar();
 
-    // ===== Toolbar collapse =====
-    function applyToolbarCollapsed(collapsed: boolean): void {
-        state.toolbarCollapsed = collapsed;
-        els.toolbarBody.classList.toggle('collapsed', collapsed);
-        els.toolbarCollapse.textContent = collapsed ? '»' : '«';
-        els.toolbarCollapse.title = collapsed ? 'Expand toolbar' : 'Collapse toolbar';
-        els.toolbarCollapse.setAttribute('aria-expanded', String(!collapsed));
-    }
-    on(els.toolbarCollapse, 'click', () => applyToolbarCollapsed(!state.toolbarCollapsed));
+    on(doc, 'mousemove', showFloatingUI);
+    showFloatingUI();
 
-    // ===== Toolbar drag (repositions chrome, clamped to root bounds) =====
-    // Restore last drag position from session if available.
+    // × hide button arms a 2-second fade from now
+    on(els.hideBtn, 'click', () => {
+        if (fadeTimer) clearTimeout(fadeTimer);
+        fadeTimer = setTimeout(() => {
+            els.chrome.classList.add('faded');
+            els.minimap.classList.add('faded');
+        }, 2000);
+    });
+
+    // ===== Toolbar drag (repositions chrome, clamped to root bounds + gutter) =====
     if (savedChromePosition) {
         els.chrome.style.right = 'auto';
         els.chrome.style.left = `${savedChromePosition.left}px`;
         els.chrome.style.top = `${savedChromePosition.top}px`;
     }
 
-    let chromeDragStart: { pointerX: number; pointerY: number; chromeLeft: number; chromeTop: number } | null = null;
+    let chromeDragStart: {
+        pointerX: number;
+        pointerY: number;
+        chromeLeft: number;
+        chromeTop: number;
+    } | null = null;
+
+    function getGutter(): number {
+        const val = getComputedStyle(rootEl).getPropertyValue('--nl-preview-gutter').trim();
+        return parseInt(val) || 8;
+    }
+
+    function clampChromeIntoView(): void {
+        if (els.chrome.style.left === '') return;
+        const g = getGutter();
+        const rawLeft = parseInt(els.chrome.style.left, 10) || 0;
+        const rawTop = parseInt(els.chrome.style.top, 10) || 0;
+        const maxLeft = Math.max(g, rootEl.clientWidth - els.chrome.offsetWidth - g);
+        const maxTop = Math.max(g, rootEl.clientHeight - els.chrome.offsetHeight - g);
+        els.chrome.style.left = `${Math.max(g, Math.min(rawLeft, maxLeft))}px`;
+        els.chrome.style.top = `${Math.max(g, Math.min(rawTop, maxTop))}px`;
+    }
 
     function ensureChromeLeftTopAnchoring(): void {
         if (els.chrome.style.left !== '') return;
-        // Switch from CSS right/top to explicit left/top so we can do pointer math.
-        // offsetLeft/Top give the position relative to the offset parent
-        // (nl-preview-root, which is position:relative).
         els.chrome.style.right = 'auto';
         els.chrome.style.left = `${els.chrome.offsetLeft}px`;
         els.chrome.style.top = `${els.chrome.offsetTop}px`;
@@ -260,10 +381,11 @@ export function mountPreview(
         const dy = e.clientY - chromeDragStart.pointerY;
         const rawLeft = chromeDragStart.chromeLeft + dx;
         const rawTop = chromeDragStart.chromeTop + dy;
-        const maxLeft = Math.max(0, rootEl.clientWidth - els.chrome.offsetWidth);
-        const maxTop = Math.max(0, rootEl.clientHeight - els.chrome.offsetHeight);
-        els.chrome.style.left = `${Math.max(0, Math.min(rawLeft, maxLeft))}px`;
-        els.chrome.style.top = `${Math.max(0, Math.min(rawTop, maxTop))}px`;
+        const g = getGutter();
+        const maxLeft = Math.max(g, rootEl.clientWidth - els.chrome.offsetWidth - g);
+        const maxTop = Math.max(g, rootEl.clientHeight - els.chrome.offsetHeight - g);
+        els.chrome.style.left = `${Math.max(g, Math.min(rawLeft, maxLeft))}px`;
+        els.chrome.style.top = `${Math.max(g, Math.min(rawTop, maxTop))}px`;
     });
 
     function endChromeDrag(): void {
@@ -352,8 +474,6 @@ export function mountPreview(
         const newH = els.viewport.clientHeight;
 
         if (state.isDirty) {
-            // Preserve the content point that was at the centre of the viewport
-            // before the resize instead of snapping scroll to origin.
             const oldW = state.lastViewportWidth || newW;
             const oldH = state.lastViewportHeight || newH;
             if (state.scale > 0 && (oldW !== newW || oldH !== newH)) {
@@ -458,6 +578,9 @@ export function mountPreview(
         if (!errors && warnings) els.diagSummary.classList.add('warn-only');
         if (!errors && !warnings) els.diagSummary.classList.add('clean');
 
+        // Hide Open Problems link when there are no issues
+        els.openProblems.hidden = errors + warnings === 0;
+
         const tbody = els.diagTbody;
         while (tbody.firstChild) tbody.removeChild(tbody.firstChild);
 
@@ -528,8 +651,8 @@ export function mountPreview(
             }
             svgEl.setAttribute('preserveAspectRatio', 'xMidYMid meet');
         }
-        const maxW = 160;
-        const maxH = 120;
+        const maxW = 120;
+        const maxH = 90;
         if (state.naturalWidth && state.naturalHeight) {
             const ratio = state.naturalWidth / state.naturalHeight;
             let w = maxW;
@@ -607,9 +730,6 @@ export function mountPreview(
 
     on(els.viewport, 'scroll', updateMinimapRect);
 
-    // Debounced resize handler — batches rapid resize events (e.g. splitter
-    // drag) so reapplyActiveFit / minimap update only runs once the viewport
-    // has settled, preventing thrash and unnecessary focal-point jumps.
     let resizeTimer: ReturnType<typeof setTimeout> | null = null;
     function handleResize(): void {
         if (resizeTimer) clearTimeout(resizeTimer);
@@ -618,13 +738,12 @@ export function mountPreview(
             reapplyActiveFit();
             updateMinimapRect();
             updateMinimapVisibility();
+            clampChromeIntoView();
         }, 50);
     }
 
     on(win, 'resize', handleResize);
 
-    // ResizeObserver picks up pane-level resizes (splitter drag, tab reveal)
-    // that window 'resize' misses. Guarded for happy-dom / test environments.
     if (typeof ResizeObserver !== 'undefined') {
         const ro = new ResizeObserver(handleResize);
         ro.observe(els.viewport);
@@ -717,84 +836,73 @@ export function mountPreview(
         setScale(state.scale * 1.1);
     });
     on(els.zoomReset, 'click', actualSize);
-    on(els.fitWidth, 'click', fitWidth);
     on(els.fitPage, 'click', fitPage);
 
-    // ===== Dropdowns =====
-    function setupDropdown(toggle: HTMLButtonElement, menu: HTMLUListElement): void {
-        on(toggle, 'click', (e: MouseEvent) => {
-            e.stopPropagation();
-            els.saveMenu.hidden = true;
-            els.copyMenu.hidden = true;
-            els.viewMenu.hidden = true;
-            menu.hidden = !menu.hidden;
-        });
+    // ===== Menu state helpers =====
+    function closeSubMenus(): void {
+        els.formatMenu.hidden = true;
+        els.themeMenu.hidden = true;
+        els.nowPicker.hidden = true;
+        els.linksMenu.hidden = true;
     }
-    setupDropdown(els.viewToggle, els.viewMenu);
-    setupDropdown(els.saveToggle, els.saveMenu);
-    setupDropdown(els.copyToggle, els.copyMenu);
-    on(doc, 'click', () => {
-        els.saveMenu.hidden = true;
-        els.copyMenu.hidden = true;
-        els.viewMenu.hidden = true;
+
+    function closeAllMenus(): void {
+        els.moreMenu.hidden = true;
+        closeSubMenus();
+    }
+
+    on(doc, 'click', closeAllMenus);
+    on(els.moreMenu, 'click', (e: Event) => e.stopPropagation());
+
+    // ===== More-menu toggle =====
+    on(els.moreToggle, 'click', (e: MouseEvent) => {
+        e.stopPropagation();
+        const opening = els.moreMenu.hidden;
+        closeAllMenus();
+        if (opening) els.moreMenu.hidden = false;
     });
-    for (const m of [els.saveMenu, els.copyMenu, els.viewMenu]) {
-        on(m, 'click', (e: Event) => e.stopPropagation());
-    }
 
-    // ===== View options =====
-    function refreshViewMenu(): void {
-        const items = els.viewMenu.querySelectorAll<HTMLButtonElement>('.view-opt');
-        for (const item of Array.from(items)) {
-            const opt = item.getAttribute('data-opt');
-            const value = item.getAttribute('data-value');
-            let active = false;
-            if (opt === 'theme') active = state.view.theme === value;
-            else if (opt === 'now') active = state.view.now === value;
-            else if (opt === 'showLinks') active = state.view.showLinks;
-            item.setAttribute('data-active', active ? 'true' : 'false');
-        }
-    }
+    // ===== Format dropdown =====
+    on(els.formatToggle, 'click', (e: MouseEvent) => {
+        e.stopPropagation();
+        const opening = els.formatMenu.hidden;
+        closeSubMenus();
+        if (opening) els.formatMenu.hidden = false;
+    });
 
-    function postViewOverrides(): void {
-        const overrides: ViewOptionsOverrides = {};
-        if (state.view.overridden.theme) overrides.theme = state.view.theme;
-        if (state.view.overridden.now) overrides.now = state.view.now;
-        if (state.view.overridden.showLinks) overrides.showLinks = state.view.showLinks;
-        options.onViewOptions?.(overrides);
-    }
-
-    on(els.viewMenu, 'click', (e: Event) => {
-        const target = e.target as HTMLElement | null;
-        const btn = target?.closest('.view-opt') as HTMLButtonElement | null;
+    on(els.formatMenu, 'click', (e: Event) => {
+        e.stopPropagation();
+        const btn = (e.target as HTMLElement).closest<HTMLButtonElement>('.format-opt');
         if (!btn) return;
-        const opt = btn.getAttribute('data-opt');
-        const value = btn.getAttribute('data-value');
-        if (opt === 'theme') {
-            state.view.theme = value as ThemeOverride;
-            state.view.overridden.theme = true;
-        } else if (opt === 'now') {
-            state.view.now = value as NowOverride;
-            state.view.overridden.now = true;
-        } else if (opt === 'showLinks') {
-            state.view.showLinks = !state.view.showLinks;
-            state.view.overridden.showLinks = true;
-        }
-        refreshViewMenu();
-        els.viewMenu.hidden = true;
-        postViewOverrides();
+        const value = btn.getAttribute('data-value') as 'svg' | 'png' | null;
+        if (!value) return;
+        state.export.format = value;
+        refreshFormatToggle();
+        els.formatMenu.hidden = true;
     });
 
-    // ===== Save / copy actions =====
-    const actionButtons = els.root.querySelectorAll<HTMLButtonElement>('[data-action]');
-    for (const btn of Array.from(actionButtons)) {
-        on(btn, 'click', () => {
-            const action = btn.getAttribute('data-action');
-            els.saveMenu.hidden = true;
-            els.copyMenu.hidden = true;
-            if (action) void handleExportAction(action);
-        });
+    function refreshFormatToggle(): void {
+        els.formatToggle.textContent = `${state.export.format.toUpperCase()} \u25be`;
+        for (const btn of Array.from(
+            els.formatMenu.querySelectorAll<HTMLButtonElement>('.format-opt'),
+        )) {
+            btn.setAttribute(
+                'data-active',
+                (btn.getAttribute('data-value') === state.export.format).toString(),
+            );
+        }
     }
+
+    // ===== Copy / export actions =====
+    on(els.copyAction, 'click', () => {
+        closeAllMenus();
+        void handleExportAction(`copy-${state.export.format}`);
+    });
+
+    on(els.exportAction, 'click', () => {
+        closeAllMenus();
+        void handleExportAction(`save-${state.export.format}`);
+    });
 
     async function handleExportAction(action: string): Promise<void> {
         if (!state.svgString) return;
@@ -874,13 +982,286 @@ export function mountPreview(
         });
     }
 
-    // ===== Apply initial baselines =====
+    // ===== Theme dropdown =====
+    function buildThemeMenu(themes: string[]): void {
+        els.themeMenu.innerHTML = '';
+
+        const autoLi = doc.createElement('li');
+        const autoBtn = doc.createElement('button');
+        autoBtn.className = 'btn theme-opt';
+        autoBtn.setAttribute('data-value', 'auto');
+        autoBtn.textContent = 'Auto';
+        autoLi.appendChild(autoBtn);
+        els.themeMenu.appendChild(autoLi);
+
+        for (const theme of themes) {
+            const li = doc.createElement('li');
+            const btn = doc.createElement('button');
+            btn.className = 'btn theme-opt';
+            btn.setAttribute('data-value', theme);
+            const chip = doc.createElement('code');
+            chip.className = 'code-chip';
+            chip.textContent = theme;
+            btn.appendChild(chip);
+            li.appendChild(btn);
+            els.themeMenu.appendChild(li);
+        }
+
+        refreshThemeToggle();
+    }
+
+    on(els.themeToggle, 'click', (e: MouseEvent) => {
+        e.stopPropagation();
+        const opening = els.themeMenu.hidden;
+        closeSubMenus();
+        if (opening) els.themeMenu.hidden = false;
+    });
+
+    on(els.themeMenu, 'click', (e: Event) => {
+        e.stopPropagation();
+        const btn = (e.target as HTMLElement).closest<HTMLButtonElement>('.theme-opt');
+        if (!btn) return;
+        const value = btn.getAttribute('data-value');
+        if (!value) return;
+        state.view.theme = value as ThemeOverride;
+        state.view.overridden.theme = true;
+        refreshThemeToggle();
+        els.themeMenu.hidden = true;
+        postViewOverrides();
+    });
+
+    function refreshThemeToggle(): void {
+        if (state.view.theme === 'auto') {
+            els.themeToggle.textContent = `Auto \u25be`;
+        } else {
+            els.themeToggle.innerHTML = '';
+            const chip = doc.createElement('code');
+            chip.className = 'code-chip';
+            chip.textContent = state.view.theme;
+            els.themeToggle.appendChild(chip);
+            els.themeToggle.appendChild(doc.createTextNode(` \u25be`));
+        }
+        for (const btn of Array.from(
+            els.themeMenu.querySelectorAll<HTMLButtonElement>('.theme-opt'),
+        )) {
+            btn.setAttribute(
+                'data-active',
+                (btn.getAttribute('data-value') === state.view.theme).toString(),
+            );
+        }
+    }
+
+    // ===== Now picker (calendar) =====
+    let calendarYear = new Date().getFullYear();
+    let calendarMonth = new Date().getMonth();
+
+    function buildCalendar(): void {
+        const picker = els.nowPicker;
+        picker.innerHTML = '';
+        const year = calendarYear;
+        const month = calendarMonth;
+
+        const nav = doc.createElement('div');
+        nav.className = 'cal-nav';
+
+        const prevBtn = doc.createElement('button');
+        prevBtn.className = 'btn cal-nav-btn';
+        prevBtn.textContent = '\u2039';
+        prevBtn.addEventListener('click', (e) => {
+            e.stopPropagation();
+            calendarMonth--;
+            if (calendarMonth < 0) {
+                calendarMonth = 11;
+                calendarYear--;
+            }
+            buildCalendar();
+        });
+
+        const heading = doc.createElement('span');
+        heading.className = 'cal-heading';
+        heading.textContent = new Intl.DateTimeFormat(state.locale, {
+            month: 'long',
+            year: 'numeric',
+        }).format(new Date(year, month, 1));
+
+        const nextBtn = doc.createElement('button');
+        nextBtn.className = 'btn cal-nav-btn';
+        nextBtn.textContent = '\u203a';
+        nextBtn.addEventListener('click', (e) => {
+            e.stopPropagation();
+            calendarMonth++;
+            if (calendarMonth > 11) {
+                calendarMonth = 0;
+                calendarYear++;
+            }
+            buildCalendar();
+        });
+
+        nav.appendChild(prevBtn);
+        nav.appendChild(heading);
+        nav.appendChild(nextBtn);
+        picker.appendChild(nav);
+
+        const grid = doc.createElement('div');
+        grid.className = 'cal-grid';
+
+        for (const d of ['Su', 'Mo', 'Tu', 'We', 'Th', 'Fr', 'Sa']) {
+            const cell = doc.createElement('span');
+            cell.className = 'cal-dow';
+            cell.textContent = d;
+            grid.appendChild(cell);
+        }
+
+        const firstDow = new Date(year, month, 1).getDay();
+        const daysInMonth = new Date(year, month + 1, 0).getDate();
+
+        for (let i = 0; i < firstDow; i++) {
+            const empty = doc.createElement('span');
+            empty.className = 'cal-empty';
+            grid.appendChild(empty);
+        }
+
+        const now = new Date();
+        const todayStr = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}`;
+
+        for (let d = 1; d <= daysInMonth; d++) {
+            const dateStr = `${year}-${String(month + 1).padStart(2, '0')}-${String(d).padStart(2, '0')}`;
+            const btn = doc.createElement('button');
+            btn.className = 'btn cal-day';
+            btn.textContent = String(d);
+            if (dateStr === todayStr) btn.classList.add('is-today');
+            if (state.view.now === dateStr) btn.classList.add('is-selected');
+            btn.addEventListener('click', (e) => {
+                e.stopPropagation();
+                applyNow(dateStr);
+            });
+            grid.appendChild(btn);
+        }
+
+        picker.appendChild(grid);
+
+        const footer = doc.createElement('div');
+        footer.className = 'cal-footer';
+
+        const todayBtnEl = doc.createElement('button');
+        todayBtnEl.className = 'btn cal-footer-btn';
+        todayBtnEl.textContent = 'Today';
+        todayBtnEl.addEventListener('click', (e) => {
+            e.stopPropagation();
+            applyNow('today');
+        });
+
+        const noneBtnEl = doc.createElement('button');
+        noneBtnEl.className = 'btn cal-footer-btn';
+        noneBtnEl.textContent = 'None';
+        noneBtnEl.addEventListener('click', (e) => {
+            e.stopPropagation();
+            applyNow('hide');
+        });
+
+        footer.appendChild(todayBtnEl);
+        footer.appendChild(noneBtnEl);
+        picker.appendChild(footer);
+    }
+
+    function applyNow(value: NowOverride): void {
+        state.view.now = value;
+        state.view.overridden.now = true;
+        refreshNowToggle();
+        els.nowPicker.hidden = true;
+        postViewOverrides();
+    }
+
+    on(els.nowToggle, 'click', (e: MouseEvent) => {
+        e.stopPropagation();
+        const opening = els.nowPicker.hidden;
+        closeSubMenus();
+        if (opening) {
+            buildCalendar();
+            els.nowPicker.hidden = false;
+        }
+    });
+
+    function refreshNowToggle(): void {
+        let label: string;
+        if (state.view.now === 'today') {
+            label = 'Today';
+        } else if (state.view.now === 'hide') {
+            label = 'None';
+        } else {
+            try {
+                label = new Intl.DateTimeFormat(state.locale, { dateStyle: 'medium' }).format(
+                    new Date(`${state.view.now}T00:00:00`),
+                );
+            } catch {
+                label = state.view.now;
+            }
+        }
+        els.nowLabel.textContent = label;
+    }
+
+    // ===== Show-links dropdown =====
+    on(els.linksToggle, 'click', (e: MouseEvent) => {
+        e.stopPropagation();
+        const opening = els.linksMenu.hidden;
+        closeSubMenus();
+        if (opening) els.linksMenu.hidden = false;
+    });
+
+    on(els.linksMenu, 'click', (e: Event) => {
+        e.stopPropagation();
+        const btn = (e.target as HTMLElement).closest<HTMLButtonElement>('.links-opt');
+        if (!btn) return;
+        const value = btn.getAttribute('data-value');
+        if (value === null) return;
+        state.view.showLinks = value === 'true';
+        state.view.overridden.showLinks = true;
+        refreshLinksToggle();
+        els.linksMenu.hidden = true;
+        postViewOverrides();
+    });
+
+    function refreshLinksToggle(): void {
+        els.linksToggle.textContent = `${state.view.showLinks ? 'Yes' : 'No'} \u25be`;
+        for (const btn of Array.from(
+            els.linksMenu.querySelectorAll<HTMLButtonElement>('.links-opt'),
+        )) {
+            btn.setAttribute(
+                'data-active',
+                (btn.getAttribute('data-value') === (state.view.showLinks ? 'true' : 'false')).toString(),
+            );
+        }
+    }
+
+    // ===== View-options helpers =====
+    function postViewOverrides(): void {
+        const overrides: ViewOptionsOverrides = {};
+        if (state.view.overridden.theme) overrides.theme = state.view.theme;
+        if (state.view.overridden.now) overrides.now = state.view.now;
+        if (state.view.overridden.showLinks) overrides.showLinks = state.view.showLinks;
+        options.onViewOptions?.(overrides);
+    }
+
+    function refreshAll(): void {
+        refreshThemeToggle();
+        refreshNowToggle();
+        refreshLinksToggle();
+        refreshFormatToggle();
+    }
+
+    // ===== Theme control visibility =====
+    if (options.themeControl === 'hide') {
+        const themeRow = els.themeMenu.closest<HTMLElement>('.theme-control-row');
+        if (themeRow) themeRow.style.display = 'none';
+    }
+
+    // ===== Apply initial theme menu + baselines =====
+    buildThemeMenu(options.availableThemes ?? ['light', 'dark', 'greyscale']);
+
     if (options.viewBaseline) {
         applyBaseline(state, options.viewBaseline, true);
-        refreshViewMenu();
-    } else {
-        refreshViewMenu();
     }
+    refreshAll();
     updateMinimapVisibility();
 
     // ===== Imperative API =====
@@ -890,7 +1271,7 @@ export function mountPreview(
         setFatal: showFatal,
         setViewBaseline(baseline, resetOverrides = false) {
             applyBaseline(state, baseline, resetOverrides);
-            refreshViewMenu();
+            refreshAll();
         },
         setDefaultFit(fit) {
             state.defaultFit = fit;
@@ -899,6 +1280,17 @@ export function mountPreview(
             state.showMinimap = show;
             state.minimapDismissedThisSession = false;
             updateMinimapVisibility();
+        },
+        setMode(mode) {
+            const resolved = mode === 'system' ? resolveSystemMode() : mode;
+            applyMode(resolved);
+        },
+        setAvailableThemes(themes) {
+            buildThemeMenu(themes);
+        },
+        setLocale(locale) {
+            state.locale = locale;
+            refreshNowToggle();
         },
         fitPage,
         fitWidth,
@@ -917,6 +1309,7 @@ export function mountPreview(
             for (const c of cleanups) c();
             cleanups.length = 0;
             rootEl.classList.remove('nl-preview-root');
+            rootEl.removeAttribute('data-nl-mode');
             rootEl.innerHTML = '';
         },
     };
@@ -931,10 +1324,16 @@ function applyBaseline(
         state.view.theme = baseline.theme;
     }
     if (baseline.now !== undefined && !state.view.overridden.now) {
-        // Setting is 'auto'/'none'/YYYY-MM-DD; the toolbar only exposes
-        // today/hide, so collapse anything that isn't 'none' to 'today'
-        // for the displayed checkmark.
-        state.view.now = baseline.now === 'none' ? 'hide' : 'today';
+        if (baseline.now === 'none' || baseline.now === 'hide') {
+            state.view.now = 'hide';
+        } else if (
+            typeof baseline.now === 'string' &&
+            /^\d{4}-\d{2}-\d{2}$/.test(baseline.now)
+        ) {
+            state.view.now = baseline.now;
+        } else {
+            state.view.now = 'today';
+        }
     }
     if (baseline.showLinks !== undefined && !state.view.overridden.showLinks) {
         state.view.showLinks = baseline.showLinks !== false;

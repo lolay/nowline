@@ -3,15 +3,21 @@
 // without forking the package. Sensible defaults baked in so the
 // viewport works out of the box on a blank page.
 //
-// VS Code consumers paste `VSCODE_THEME_BRIDGE_CSS` (below) into their
-// webview to map `--nl-preview-*` to the matching `--vscode-*` tokens
-// — that keeps the viewport in lock-step with the user's workbench
-// theme without having to keep two sets of variables in sync.
+// Chrome (toolbar, menus, minimap) uses `--nl-chrome-*` tokens driven
+// exclusively by the `data-nl-mode="light|dark"` attribute on the root
+// element — these intentionally do NOT inherit VS Code workbench colors
+// so the toolbar stays readable regardless of the active editor theme.
+//
+// VS Code consumers paste `VSCODE_THEME_BRIDGE_CSS` into their webview
+// to map viewport/canvas `--nl-preview-*` tokens to `--vscode-*`
+// variables. This bridge no longer touches chrome tokens.
 
 /**
- * Bridge CSS for VS Code webview consumers. Maps every `--nl-preview-*`
- * token to the matching `--vscode-*` variable so the viewport renders
- * in the active workbench colour theme automatically.
+ * Bridge CSS for VS Code webview consumers. Maps viewport and
+ * diagnostic `--nl-preview-*` tokens to `--vscode-*` variables.
+ * Does NOT map chrome (toolbar/menu) tokens — those are driven by
+ * `data-nl-mode` so the toolbar palette is independent of the
+ * workbench color theme.
  *
  * Inject as a `<style>` block after the preview-shell stylesheet.
  */
@@ -23,9 +29,6 @@ export const VSCODE_THEME_BRIDGE_CSS = `
     --nl-preview-font-size: var(--vscode-font-size, 13px);
     --nl-preview-widget-bg: var(--vscode-editorWidget-background, rgba(40,40,40,0.9));
     --nl-preview-widget-border: var(--vscode-editorWidget-border, rgba(255,255,255,0.1));
-    --nl-preview-toolbar-hover: var(--vscode-toolbar-hoverBackground, rgba(255,255,255,0.08));
-    --nl-preview-toolbar-active: var(--vscode-toolbar-activeBackground, rgba(255,255,255,0.12));
-    --nl-preview-list-hover: var(--vscode-list-hoverBackground, rgba(255,255,255,0.04));
     --nl-preview-description: var(--vscode-descriptionForeground, #999);
     --nl-preview-error: var(--vscode-editorError-foreground, #f48771);
     --nl-preview-warning: var(--vscode-editorWarning-foreground, #cca700);
@@ -38,9 +41,8 @@ export const VSCODE_THEME_BRIDGE_CSS = `
 
 /**
  * Default stylesheet for the viewport. Provides reasonable defaults
- * for every `--nl-preview-*` token so the viewport works on a blank
- * page; consumers override by re-declaring the variables on a
- * higher-specificity selector.
+ * for every `--nl-preview-*` token and both dark/light `--nl-chrome-*`
+ * palettes so the viewport works on a blank page without any bridge CSS.
  */
 export const PREVIEW_SHELL_CSS = `
 :root {
@@ -51,9 +53,6 @@ export const PREVIEW_SHELL_CSS = `
     --nl-preview-font-size: 13px;
     --nl-preview-widget-bg: rgba(40,40,40,0.9);
     --nl-preview-widget-border: rgba(255,255,255,0.1);
-    --nl-preview-toolbar-hover: rgba(255,255,255,0.08);
-    --nl-preview-toolbar-active: rgba(255,255,255,0.12);
-    --nl-preview-list-hover: rgba(255,255,255,0.04);
     --nl-preview-description: #999;
     --nl-preview-error: #f48771;
     --nl-preview-warning: #cca700;
@@ -70,6 +69,28 @@ export const PREVIEW_SHELL_CSS = `
     font-family: var(--nl-preview-font-family);
     font-size: var(--nl-preview-font-size);
     overflow: hidden;
+    /* Shared positioning gutter for all floating elements */
+    --nl-preview-gutter: 8px;
+    /* Chrome palette — dark default */
+    --nl-chrome-bg: rgba(30, 30, 30, 0.93);
+    --nl-chrome-border: rgba(255, 255, 255, 0.11);
+    --nl-chrome-fg: #d4d4d4;
+    --nl-chrome-hover: rgba(255, 255, 255, 0.08);
+    --nl-chrome-active: rgba(255, 255, 255, 0.13);
+    --nl-chrome-muted: #888;
+    --nl-chrome-chip-bg: rgba(255, 255, 255, 0.07);
+    --nl-chrome-shadow: rgba(0, 0, 0, 0.32);
+}
+/* Chrome palette — light mode override (driven by data-nl-mode, never by workbench) */
+.nl-preview-root[data-nl-mode="light"] {
+    --nl-chrome-bg: rgba(248, 248, 248, 0.96);
+    --nl-chrome-border: rgba(0, 0, 0, 0.13);
+    --nl-chrome-fg: #3c3c3c;
+    --nl-chrome-hover: rgba(0, 0, 0, 0.06);
+    --nl-chrome-active: rgba(0, 0, 0, 0.10);
+    --nl-chrome-muted: #717171;
+    --nl-chrome-chip-bg: rgba(0, 0, 0, 0.06);
+    --nl-chrome-shadow: rgba(0, 0, 0, 0.14);
 }
 .nl-preview-root .viewport {
     position: absolute; inset: 0;
@@ -87,82 +108,153 @@ export const PREVIEW_SHELL_CSS = `
 .nl-preview-root .canvas svg { display: block; max-width: none; height: auto; }
 .nl-preview-root .canvas.dimmed { opacity: 0.25; pointer-events: none; }
 
-/* === Toolbar (top-right, repositionable) === */
+/* === Toolbar (floating, repositionable) === */
 .nl-preview-root .chrome {
-    position: absolute; top: 8px; right: 8px;
+    position: absolute;
+    top: var(--nl-preview-gutter);
+    right: var(--nl-preview-gutter);
     display: flex; gap: 4px;
     transition: opacity 200ms ease;
     z-index: 10;
-    /* pointer-events on the chrome itself; individual children control cursor */
 }
-.nl-preview-root .chrome.faded { opacity: 0.25; }
-.nl-preview-root .chrome:hover { opacity: 1; }
+.nl-preview-root .chrome.faded { opacity: 0.2; pointer-events: none; }
+.nl-preview-root .chrome:hover { opacity: 1; pointer-events: auto; }
 .nl-preview-root .toolbar {
     display: flex; align-items: center; gap: 2px;
+    flex-wrap: nowrap;
     padding: 2px;
-    background: var(--nl-preview-widget-bg);
-    border: 1px solid var(--nl-preview-widget-border);
+    background: var(--nl-chrome-bg);
+    border: 1px solid var(--nl-chrome-border);
     border-radius: 6px;
-    box-shadow: 0 2px 8px rgba(0,0,0,0.2);
+    box-shadow: 0 2px 8px var(--nl-chrome-shadow);
+    color: var(--nl-chrome-fg);
     user-select: none;
 }
 .nl-preview-root .toolbar .sep {
-    width: 1px; height: 20px;
-    background: var(--nl-preview-widget-border);
-    margin: 0 4px;
+    width: 1px; height: 18px;
+    background: var(--nl-chrome-border);
+    margin: 0 3px;
+    flex-shrink: 0;
 }
-/* Drag grip at the leading edge of the toolbar */
 .nl-preview-root .toolbar-handle {
     display: flex; align-items: center; justify-content: center;
     padding: 4px 5px;
     cursor: grab;
-    color: var(--nl-preview-description);
+    color: var(--nl-chrome-muted);
     font-size: 13px;
     line-height: 1;
-    opacity: 0.6;
+    opacity: 0.7;
     flex-shrink: 0;
     touch-action: none;
 }
 .nl-preview-root .toolbar-handle:hover { opacity: 1; }
-/* Grabbing cursor while a drag is active */
 .nl-preview-root .chrome.dragging .toolbar-handle { cursor: grabbing; }
-/* Collapse/expand toggle button — stays visible when collapsed */
-.nl-preview-root .toolbar-collapse {
-    min-width: 20px;
-    padding: 4px 5px;
-    flex-shrink: 0;
-    font-size: 11px;
-}
-/* Collapsible portion of the toolbar — display:contents so children are
-   direct flex participants; .collapsed hides them all at once */
-.nl-preview-root .toolbar-body { display: contents; }
-.nl-preview-root .toolbar-body.collapsed { display: none; }
 .nl-preview-root .btn {
     appearance: none;
     background: transparent;
     color: inherit;
     border: 0;
-    padding: 4px 8px;
+    padding: 3px 7px;
     border-radius: 4px;
     font-family: inherit;
     font-size: inherit;
     cursor: pointer;
     line-height: 1;
-    min-width: 28px;
+    min-width: 20px;
+    flex-shrink: 0;
 }
-.nl-preview-root .btn:hover { background: var(--nl-preview-toolbar-hover); }
-.nl-preview-root .btn:active { background: var(--nl-preview-toolbar-active); }
-.nl-preview-root .btn.zoom-label { min-width: 48px; font-variant-numeric: tabular-nums; }
-.nl-preview-root .btn.glyph { font-size: 16px; line-height: 1; padding: 4px 6px; }
+.nl-preview-root .btn:hover { background: var(--nl-chrome-hover); }
+.nl-preview-root .btn:active { background: var(--nl-chrome-active); }
+.nl-preview-root .btn.zoom-label {
+    min-width: 44px;
+    font-variant-numeric: tabular-nums;
+}
+.nl-preview-root .btn.glyph { font-size: 15px; line-height: 1; padding: 3px 5px; }
 .nl-preview-root .dropdown { position: relative; }
+
+/* === More-menu panel === */
+.nl-preview-root .more-menu {
+    position: absolute; top: calc(100% + 4px); right: 0;
+    padding: 5px;
+    min-width: 210px;
+    background: var(--nl-chrome-bg);
+    border: 1px solid var(--nl-chrome-border);
+    border-radius: 6px;
+    box-shadow: 0 4px 14px var(--nl-chrome-shadow);
+    z-index: 20;
+    color: var(--nl-chrome-fg);
+}
+.nl-preview-root .more-row {
+    display: flex; align-items: center; justify-content: space-between;
+    padding: 2px 4px;
+    gap: 8px;
+}
+.nl-preview-root .more-row.action-row {
+    gap: 4px;
+    justify-content: flex-start;
+    padding-top: 4px;
+    padding-bottom: 2px;
+}
+.nl-preview-root .more-label {
+    font-size: 0.88em;
+    color: var(--nl-chrome-muted);
+    white-space: nowrap;
+    flex-shrink: 0;
+}
+.nl-preview-root .more-divider {
+    height: 1px;
+    margin: 4px 0;
+    background: var(--nl-chrome-border);
+}
+
+/* === Sub-menus inside more-menu === */
+.nl-preview-root .more-sub-toggle {
+    font-size: 0.88em;
+    padding: 3px 6px;
+}
+.nl-preview-root .more-sub-menu {
+    position: absolute; top: calc(100% + 2px); left: 0;
+    list-style: none; padding: 4px; min-width: 120px;
+    background: var(--nl-chrome-bg);
+    border: 1px solid var(--nl-chrome-border);
+    border-radius: 6px;
+    box-shadow: 0 4px 12px var(--nl-chrome-shadow);
+    z-index: 25;
+    color: var(--nl-chrome-fg);
+}
+.nl-preview-root .more-sub-menu li { padding: 0; }
+.nl-preview-root .more-sub-menu .btn {
+    display: block; width: 100%; text-align: left;
+    padding: 5px 8px 5px 22px;
+    position: relative;
+    font-size: 0.88em;
+}
+.nl-preview-root .more-sub-menu .btn[data-active="true"]::before {
+    content: '\\2713';
+    position: absolute;
+    left: 7px;
+}
+
+/* === Code-style chip for real theme/format tokens === */
+.nl-preview-root .code-chip {
+    font-family: var(--nl-preview-mono);
+    font-size: 0.9em;
+    background: var(--nl-chrome-chip-bg);
+    border-radius: 3px;
+    padding: 1px 4px;
+    font-style: normal;
+}
+
+/* === Diagnostic overlay menu (for old .menu usage in diagnostics) === */
 .nl-preview-root .menu {
     position: absolute; top: 100%; right: 0; margin-top: 4px;
     list-style: none; padding: 4px; min-width: 140px;
-    background: var(--nl-preview-widget-bg);
-    border: 1px solid var(--nl-preview-widget-border);
+    background: var(--nl-chrome-bg);
+    border: 1px solid var(--nl-chrome-border);
     border-radius: 6px;
-    box-shadow: 0 4px 12px rgba(0,0,0,0.3);
+    box-shadow: 0 4px 12px var(--nl-chrome-shadow);
     z-index: 20;
+    color: var(--nl-chrome-fg);
 }
 .nl-preview-root .menu li { padding: 0; }
 .nl-preview-root .menu .btn {
@@ -174,35 +266,30 @@ export const PREVIEW_SHELL_CSS = `
     font-size: 0.85em;
     text-transform: uppercase;
     letter-spacing: 0.05em;
-    color: var(--nl-preview-description);
+    color: var(--nl-chrome-muted);
 }
 .nl-preview-root .menu li.menu-divider {
     height: 1px;
     margin: 4px 6px;
-    background: var(--nl-preview-widget-border);
-}
-.nl-preview-root .menu .btn.view-opt {
-    padding-left: 22px;
-    position: relative;
-}
-.nl-preview-root .menu .btn.view-opt[data-active="true"]::before {
-    content: '\\2713';
-    position: absolute;
-    left: 8px;
+    background: var(--nl-chrome-border);
 }
 
-/* === Minimap === */
+/* === Minimap (subordinate floating widget) === */
 .nl-preview-root .minimap {
-    position: absolute; bottom: 12px; right: 12px;
-    width: 160px; max-height: 120px;
-    background: var(--nl-preview-widget-bg);
-    border: 1px solid var(--nl-preview-widget-border);
-    border-radius: 4px;
+    position: absolute;
+    bottom: var(--nl-preview-gutter);
+    right: var(--nl-preview-gutter);
+    width: 120px; max-height: 90px;
+    background: var(--nl-chrome-bg);
+    border: 1px solid var(--nl-chrome-border);
+    border-radius: 5px;
     overflow: hidden;
-    box-shadow: 0 2px 8px rgba(0,0,0,0.2);
+    box-shadow: 0 2px 6px var(--nl-chrome-shadow);
     z-index: 8;
+    transition: opacity 200ms ease;
 }
 .nl-preview-root .minimap.hidden { display: none; }
+.nl-preview-root .minimap.faded { opacity: 0.2; pointer-events: none; }
 .nl-preview-root .minimap-canvas {
     display: block;
     cursor: pointer;
@@ -223,11 +310,76 @@ export const PREVIEW_SHELL_CSS = `
 }
 .nl-preview-root .minimap-close {
     position: absolute; top: 2px; right: 2px;
-    width: 18px; height: 18px; padding: 0;
-    border-radius: 4px;
+    width: 16px; height: 16px; padding: 0;
+    border-radius: 3px;
     line-height: 1;
-    font-size: 12px;
+    font-size: 11px;
     z-index: 1;
+}
+
+/* === Calendar picker === */
+.nl-preview-root .now-picker {
+    position: absolute; top: calc(100% + 2px); left: 0;
+    padding: 8px;
+    min-width: 200px;
+    background: var(--nl-chrome-bg);
+    border: 1px solid var(--nl-chrome-border);
+    border-radius: 6px;
+    box-shadow: 0 4px 14px var(--nl-chrome-shadow);
+    z-index: 26;
+    color: var(--nl-chrome-fg);
+}
+.nl-preview-root .cal-nav {
+    display: flex; align-items: center; justify-content: space-between;
+    margin-bottom: 6px;
+}
+.nl-preview-root .cal-heading {
+    font-size: 0.85em;
+    font-weight: 600;
+}
+.nl-preview-root .cal-nav-btn {
+    padding: 2px 6px;
+    min-width: unset;
+    font-size: 14px;
+}
+.nl-preview-root .cal-grid {
+    display: grid; grid-template-columns: repeat(7, 1fr);
+    gap: 1px;
+    margin-bottom: 6px;
+}
+.nl-preview-root .cal-dow {
+    text-align: center;
+    font-size: 0.75em;
+    color: var(--nl-chrome-muted);
+    padding: 2px 0;
+}
+.nl-preview-root .cal-empty {
+    /* placeholder for days before the 1st of the month */
+}
+.nl-preview-root .cal-day {
+    padding: 3px 2px;
+    min-width: unset;
+    font-size: 0.8em;
+    text-align: center;
+    border-radius: 3px;
+}
+.nl-preview-root .cal-day.is-today { font-weight: 700; }
+.nl-preview-root .cal-day.is-selected {
+    background: var(--nl-chrome-hover);
+    outline: 1px solid var(--nl-chrome-border);
+}
+.nl-preview-root .cal-footer {
+    display: flex; gap: 4px;
+    border-top: 1px solid var(--nl-chrome-border);
+    padding-top: 6px;
+    margin-top: 2px;
+}
+.nl-preview-root .cal-footer-btn {
+    flex: 1;
+    text-align: center;
+    font-size: 0.82em;
+    padding: 4px 6px;
+    min-width: unset;
 }
 
 /* === Diagnostics overlay === */
@@ -276,7 +428,7 @@ export const PREVIEW_SHELL_CSS = `
     border-bottom: 1px solid var(--nl-preview-widget-border);
 }
 .nl-preview-root .diag-table tr:hover {
-    background: var(--nl-preview-list-hover);
+    background: rgba(255,255,255,0.04);
 }
 .nl-preview-root .diag-table td {
     padding: 6px 8px;

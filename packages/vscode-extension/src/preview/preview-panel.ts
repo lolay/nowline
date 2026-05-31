@@ -296,6 +296,7 @@ export class NowlinePreview {
             showLinks: this.settings.showLinks,
             theme: this.settings.theme,
             now: this.settings.now,
+            locale: this.vscodeLanguage,
         });
     }
 
@@ -307,6 +308,7 @@ export class NowlinePreview {
             showLinks: this.settings.showLinks,
             theme: this.settings.theme,
             now: this.settings.now,
+            locale: this.vscodeLanguage,
         });
     }
 

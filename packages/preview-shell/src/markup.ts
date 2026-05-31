@@ -11,21 +11,39 @@ export interface ViewportElements {
     chrome: HTMLElement;
     /** Drag grip at the leading edge of the toolbar — initiates chrome repositioning. */
     toolbarHandle: HTMLElement;
-    /** Collapse/expand toggle; collapses the toolbar body into a minimal puck. */
-    toolbarCollapse: HTMLButtonElement;
-    /** Wrapper for the collapsible portion of the toolbar (zoom, fit, menus). */
-    toolbarBody: HTMLElement;
     zoomReset: HTMLButtonElement;
     zoomIn: HTMLButtonElement;
     zoomOut: HTMLButtonElement;
-    fitWidth: HTMLButtonElement;
+    /** Single fit button (⤢) — triggers fitPage. */
     fitPage: HTMLButtonElement;
-    viewToggle: HTMLButtonElement;
-    viewMenu: HTMLUListElement;
-    saveToggle: HTMLButtonElement;
-    saveMenu: HTMLUListElement;
-    copyToggle: HTMLButtonElement;
-    copyMenu: HTMLUListElement;
+    /** ▾ more toggle — opens the more-menu panel. */
+    moreToggle: HTMLButtonElement;
+    /** More-menu panel containing format, copy, export, theme, now, links rows. */
+    moreMenu: HTMLElement;
+    /** Format sub-dropdown toggle (SVG ▾ / PNG ▾). */
+    formatToggle: HTMLButtonElement;
+    /** Format sub-dropdown list. */
+    formatMenu: HTMLUListElement;
+    /** Copy action button — uses the selected format. */
+    copyAction: HTMLButtonElement;
+    /** Export / download action button — uses the selected format. */
+    exportAction: HTMLButtonElement;
+    /** Theme sub-dropdown toggle. */
+    themeToggle: HTMLButtonElement;
+    /** Theme sub-dropdown list; items built programmatically from availableThemes. */
+    themeMenu: HTMLUListElement;
+    /** Now sub-dropdown toggle. */
+    nowToggle: HTMLButtonElement;
+    /** Label span inside nowToggle — shows Today / formatted date / None. */
+    nowLabel: HTMLElement;
+    /** Calendar picker panel — populated by mount.ts on open. */
+    nowPicker: HTMLElement;
+    /** Show-links sub-dropdown toggle. */
+    linksToggle: HTMLButtonElement;
+    /** Show-links sub-dropdown list. */
+    linksMenu: HTMLUListElement;
+    /** × hide button — arms 2-second auto-fade. */
+    hideBtn: HTMLButtonElement;
     minimap: HTMLElement;
     minimapCanvas: HTMLElement;
     minimapRect: HTMLElement;
@@ -38,54 +56,65 @@ export interface ViewportElements {
 
 const TEMPLATE = `
 <div class="viewport"><div class="canvas"></div></div>
-<div class="empty">Rendering preview…</div>
+<div class="empty">Rendering preview\u2026</div>
 <div class="chrome">
-    <div class="toolbar zoom-toolbar">
-        <span class="toolbar-handle" aria-hidden="true" title="Drag to reposition toolbar">⠿</span>
-        <button class="btn toolbar-collapse" title="Collapse toolbar" aria-label="Collapse toolbar" aria-expanded="true">«</button>
-        <div class="toolbar-body">
-            <button class="btn zoom-out" title="Zoom out">−</button>
-            <button class="btn zoom-label zoom-reset" title="Reset to 100%">100%</button>
-            <button class="btn zoom-in" title="Zoom in">+</button>
-            <span class="sep"></span>
-            <button class="btn glyph fit-width" title="Fit width (3)" aria-label="Fit width">↔</button>
-            <button class="btn glyph fit-page" title="Fit page (1)" aria-label="Fit page">⛶</button>
-            <span class="sep"></span>
-            <div class="dropdown">
-                <button class="btn view-toggle" title="View options for this preview (theme, now-line, links)">View ▾</button>
-                <ul class="menu view-menu" hidden>
-                    <li class="menu-section">Theme</li>
-                    <li><button class="btn view-opt" data-opt="theme" data-value="auto">Auto</button></li>
-                    <li><button class="btn view-opt" data-opt="theme" data-value="light">Light</button></li>
-                    <li><button class="btn view-opt" data-opt="theme" data-value="dark">Dark</button></li>
-                    <li class="menu-divider"></li>
-                    <li class="menu-section">Now-line</li>
-                    <li><button class="btn view-opt" data-opt="now" data-value="today">Today</button></li>
-                    <li><button class="btn view-opt" data-opt="now" data-value="hide">Hide</button></li>
-                    <li class="menu-divider"></li>
-                    <li><button class="btn view-opt" data-opt="showLinks" data-value="toggle">Show links</button></li>
-                </ul>
-            </div>
-            <span class="sep"></span>
-            <div class="dropdown">
-                <button class="btn save-toggle" title="Save the rendered diagram">Save ▾</button>
-                <ul class="menu save-menu" hidden>
-                    <li><button class="btn" data-action="save-svg">Save SVG…</button></li>
-                    <li><button class="btn" data-action="save-png">Save PNG…</button></li>
-                </ul>
-            </div>
-            <div class="dropdown">
-                <button class="btn copy-toggle" title="Copy the rendered diagram to the clipboard">Copy ▾</button>
-                <ul class="menu copy-menu" hidden>
-                    <li><button class="btn" data-action="copy-svg">Copy SVG</button></li>
-                    <li><button class="btn" data-action="copy-png">Copy PNG</button></li>
-                </ul>
+    <div class="toolbar">
+        <span class="toolbar-handle" aria-hidden="true" title="Drag to reposition toolbar">\u2838</span>
+        <button class="btn zoom-out" title="Zoom out" aria-label="Zoom out">\u2212</button>
+        <button class="btn zoom-label zoom-reset" title="Reset to 100%">100%</button>
+        <button class="btn zoom-in" title="Zoom in" aria-label="Zoom in">+</button>
+        <span class="sep"></span>
+        <button class="btn glyph fit-page" title="Fit page (1)" aria-label="Fit page">\u2922</button>
+        <span class="sep"></span>
+        <div class="dropdown">
+            <button class="btn more-toggle" title="More options">\u25be more</button>
+            <div class="more-menu" hidden>
+                <div class="more-row">
+                    <span class="more-label">Format:</span>
+                    <div class="dropdown">
+                        <button class="btn more-sub-toggle format-toggle">SVG \u25be</button>
+                        <ul class="menu more-sub-menu format-menu" hidden>
+                            <li><button class="btn format-opt" data-value="svg"><code class="code-chip">svg</code></button></li>
+                            <li><button class="btn format-opt" data-value="png"><code class="code-chip">png</code></button></li>
+                        </ul>
+                    </div>
+                </div>
+                <div class="more-row action-row">
+                    <button class="btn copy-action" title="Copy to clipboard">Copy <span aria-hidden="true">\u29c9</span></button>
+                    <button class="btn export-action" title="Export file">Export <span aria-hidden="true">\u2b73</span></button>
+                </div>
+                <div class="more-divider"></div>
+                <div class="more-row theme-control-row">
+                    <span class="more-label">Theme:</span>
+                    <div class="dropdown">
+                        <button class="btn more-sub-toggle theme-toggle">Auto \u25be</button>
+                        <ul class="menu more-sub-menu theme-menu" hidden></ul>
+                    </div>
+                </div>
+                <div class="more-row">
+                    <span class="more-label">Now:</span>
+                    <div class="dropdown">
+                        <button class="btn more-sub-toggle now-toggle"><span class="now-label">Today</span> \u25be</button>
+                        <div class="now-picker" hidden></div>
+                    </div>
+                </div>
+                <div class="more-row">
+                    <span class="more-label">Show links:</span>
+                    <div class="dropdown">
+                        <button class="btn more-sub-toggle links-toggle">Yes \u25be</button>
+                        <ul class="menu more-sub-menu links-menu" hidden>
+                            <li><button class="btn links-opt" data-value="true">Yes</button></li>
+                            <li><button class="btn links-opt" data-value="false">No</button></li>
+                        </ul>
+                    </div>
+                </div>
             </div>
         </div>
+        <button class="btn hide-btn" title="Hide toolbar" aria-label="Hide toolbar">\u00d7</button>
     </div>
 </div>
 <div class="minimap hidden">
-    <button class="btn minimap-close" title="Hide minimap">×</button>
+    <button class="btn minimap-close" title="Hide minimap">\u00d7</button>
     <div class="minimap-canvas"></div>
     <div class="minimap-rect"></div>
 </div>
@@ -117,19 +146,24 @@ export function buildViewport(rootEl: HTMLElement): ViewportElements {
         empty: q<HTMLElement>(rootEl, '.empty'),
         chrome: q<HTMLElement>(rootEl, '.chrome'),
         toolbarHandle: q<HTMLElement>(rootEl, '.toolbar-handle'),
-        toolbarCollapse: q<HTMLButtonElement>(rootEl, '.toolbar-collapse'),
-        toolbarBody: q<HTMLElement>(rootEl, '.toolbar-body'),
         zoomReset: q<HTMLButtonElement>(rootEl, '.zoom-reset'),
         zoomIn: q<HTMLButtonElement>(rootEl, '.zoom-in'),
         zoomOut: q<HTMLButtonElement>(rootEl, '.zoom-out'),
-        fitWidth: q<HTMLButtonElement>(rootEl, '.fit-width'),
         fitPage: q<HTMLButtonElement>(rootEl, '.fit-page'),
-        viewToggle: q<HTMLButtonElement>(rootEl, '.view-toggle'),
-        viewMenu: q<HTMLUListElement>(rootEl, '.view-menu'),
-        saveToggle: q<HTMLButtonElement>(rootEl, '.save-toggle'),
-        saveMenu: q<HTMLUListElement>(rootEl, '.save-menu'),
-        copyToggle: q<HTMLButtonElement>(rootEl, '.copy-toggle'),
-        copyMenu: q<HTMLUListElement>(rootEl, '.copy-menu'),
+        moreToggle: q<HTMLButtonElement>(rootEl, '.more-toggle'),
+        moreMenu: q<HTMLElement>(rootEl, '.more-menu'),
+        formatToggle: q<HTMLButtonElement>(rootEl, '.format-toggle'),
+        formatMenu: q<HTMLUListElement>(rootEl, '.format-menu'),
+        copyAction: q<HTMLButtonElement>(rootEl, '.copy-action'),
+        exportAction: q<HTMLButtonElement>(rootEl, '.export-action'),
+        themeToggle: q<HTMLButtonElement>(rootEl, '.theme-toggle'),
+        themeMenu: q<HTMLUListElement>(rootEl, '.theme-menu'),
+        nowToggle: q<HTMLButtonElement>(rootEl, '.now-toggle'),
+        nowLabel: q<HTMLElement>(rootEl, '.now-label'),
+        nowPicker: q<HTMLElement>(rootEl, '.now-picker'),
+        linksToggle: q<HTMLButtonElement>(rootEl, '.links-toggle'),
+        linksMenu: q<HTMLUListElement>(rootEl, '.links-menu'),
+        hideBtn: q<HTMLButtonElement>(rootEl, '.hide-btn'),
         minimap: q<HTMLElement>(rootEl, '.minimap'),
         minimapCanvas: q<HTMLElement>(rootEl, '.minimap-canvas'),
         minimapRect: q<HTMLElement>(rootEl, '.minimap-rect'),

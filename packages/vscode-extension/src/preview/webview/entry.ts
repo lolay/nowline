@@ -30,6 +30,7 @@ interface InitMessage {
     theme?: ThemeOverride;
     now?: string;
     showLinks?: boolean;
+    locale?: string;
 }
 
 interface ConfigChangeMessage {
@@ -39,6 +40,7 @@ interface ConfigChangeMessage {
     theme?: ThemeOverride;
     now?: string;
     showLinks?: boolean;
+    locale?: string;
 }
 
 interface SvgMessage {
@@ -71,45 +73,51 @@ function bootstrap(): void {
         return;
     }
 
-    const handle: PreviewHandle = mountPreview(root, {
-        onGoto: (loc) => {
-            vscode.postMessage({
-                type: 'goto',
-                file: loc.file,
-                line: loc.line,
-                column: loc.column,
-            });
-        },
-        onOpenProblems: () => {
-            vscode.postMessage({ type: 'openProblems' });
-        },
-        onSave: (req) => {
-            vscode.postMessage({ type: 'save', format: req.format, body: req.body });
-        },
-        onCopy: (req) => {
-            // `copy-svg` is handled in-shell via navigator.clipboard; PNG
-            // copies that need a host fallback flow through
-            // `onCopyPngFallback`. This callback isn't expected to fire
-            // in the current shell, but is wired for completeness in
-            // case future actions want host-side copy support.
-            vscode.postMessage({ type: 'save', format: req.format, body: req.body });
-        },
-        onCopyPngFallback: (body) => {
-            vscode.postMessage({ type: 'copyPngFallback', body });
-        },
-        onViewOptions: (overrides) => {
-            vscode.postMessage({ type: 'viewOptions', overrides });
-        },
-        onFatal: (message) => {
-            vscode.postMessage({ type: 'fatal', message });
-        },
-    });
+    // Deferred until the `init` message so `locale` can be passed at
+    // construction time. In practice `init` always arrives before any
+    // `svg` / `diagnostics` messages; optional chaining guards the rest.
+    let handle: PreviewHandle | undefined;
 
     window.addEventListener('message', (e: MessageEvent) => {
         const msg = e.data as IncomingMessage | undefined;
         if (!msg || typeof msg !== 'object') return;
         switch (msg.type) {
             case 'init': {
+                handle = mountPreview(root, {
+                    themeControl: 'show',
+                    locale: msg.locale,
+                    onGoto: (loc) => {
+                        vscode.postMessage({
+                            type: 'goto',
+                            file: loc.file,
+                            line: loc.line,
+                            column: loc.column,
+                        });
+                    },
+                    onOpenProblems: () => {
+                        vscode.postMessage({ type: 'openProblems' });
+                    },
+                    onSave: (req) => {
+                        vscode.postMessage({ type: 'save', format: req.format, body: req.body });
+                    },
+                    onCopy: (req) => {
+                        // `copy-svg` is handled in-shell via navigator.clipboard; PNG
+                        // copies that need a host fallback flow through
+                        // `onCopyPngFallback`. This callback isn't expected to fire
+                        // in the current shell, but is wired for completeness in
+                        // case future actions want host-side copy support.
+                        vscode.postMessage({ type: 'save', format: req.format, body: req.body });
+                    },
+                    onCopyPngFallback: (body) => {
+                        vscode.postMessage({ type: 'copyPngFallback', body });
+                    },
+                    onViewOptions: (overrides) => {
+                        vscode.postMessage({ type: 'viewOptions', overrides });
+                    },
+                    onFatal: (message) => {
+                        vscode.postMessage({ type: 'fatal', message });
+                    },
+                });
                 if (msg.defaultFit) handle.setDefaultFit(msg.defaultFit);
                 if (msg.showMinimap !== undefined) handle.setShowMinimap(!!msg.showMinimap);
                 handle.setViewBaseline(
@@ -119,8 +127,10 @@ function bootstrap(): void {
                 break;
             }
             case 'configChange': {
+                if (!handle) return;
                 if (msg.defaultFit) handle.setDefaultFit(msg.defaultFit);
                 if (msg.showMinimap !== undefined) handle.setShowMinimap(!!msg.showMinimap);
+                if (msg.locale) handle.setLocale(msg.locale);
                 handle.setViewBaseline(
                     { theme: msg.theme, now: msg.now, showLinks: msg.showLinks },
                     /* resetOverrides */ false,
@@ -128,13 +138,13 @@ function bootstrap(): void {
                 break;
             }
             case 'svg':
-                handle.setSvg(msg.body);
+                handle?.setSvg(msg.body);
                 break;
             case 'diagnostics':
-                handle.setDiagnostics(msg.rows ?? []);
+                handle?.setDiagnostics(msg.rows ?? []);
                 break;
             case 'fatal':
-                handle.setFatal(msg.message ?? 'Unknown error.');
+                handle?.setFatal(msg.message ?? 'Unknown error.');
                 break;
         }
     });
