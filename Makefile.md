@@ -63,6 +63,7 @@ pipeline that artifact is built in a separate CI job and handed over — see
 | `typecheck` | Type-check the packages that opt in (`pnpm typecheck`) |
 | `test` | Run every package's Vitest suite (`pnpm -r test`); depends on `build` |
 | `ci` | The full pre-push gate: `lint` + `typecheck` + `build` + `test` |
+| `pre-commit` | Local alias of `ci` — run before committing or pushing |
 | `clean` | Remove build / binary / package artifacts (keeps `node_modules`) |
 | `lint-workflows` | actionlint the GitHub Actions workflows (`pnpm lint:workflows`) |
 | `bundle-size` | Build the embed dependency graph and run the CDN bundle-size + `node:*` leak gate |

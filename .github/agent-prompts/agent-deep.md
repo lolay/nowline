@@ -57,7 +57,7 @@ If Steps 1–2 pass, issue the safe-output `assign-to-agent`. The Copilot sessio
 
 - Read this issue, the plan comment, and the repo's `AGENTS.md` / `CONTRIBUTING.md` / `AI_POLICY.md`.
 - Implement the plan exactly as written. **Do not re-plan.** If the plan turns out to be wrong, the Copilot session falls back per Step 4.
-- Run `make ci` (the full pre-push gate: lint + typecheck + build + test) and confirm it passes before opening the PR. Fix any failures introduced by the implementation. If `make ci` cannot pass without changes that fall outside the plan's scope, post `agent-verdict: maintainer-decide` instead of opening a PR.
+- Run `make pre-commit` (the full local gate, alias of `make ci`: lint + typecheck + build + test) and confirm it passes before opening the PR. Fix any failures introduced by the implementation. If `make pre-commit` cannot pass without changes that fall outside the plan's scope, post `agent-verdict: maintainer-decide` instead of opening a PR. When fixing a bug that escaped CI or a workflow, ask why `make pre-commit` didn't catch it; if a check could reasonably have caught the class of bug, add or tighten that check in the same PR.
 - Open one PR targeting the default branch.
 
 **The PR body MUST include all four of the following — these are mandatory per the prelude § 4 (smoke test C 2026-05-25 surfaced PRs missing them):**

@@ -2,7 +2,7 @@
 Thanks for opening a PR. A few quick reminders:
 
 - Keep diffs focused: one logical change per PR.
-- Run `pnpm build && pnpm -r lint && pnpm -r test` locally before pushing.
+- Run `make pre-commit` locally before committing or pushing.
 - For changes that touch the language or the published AST JSON schema, please open an issue first to discuss the shape.
 
 See CONTRIBUTING.md for the full workflow.
@@ -43,7 +43,7 @@ Assisted-by: <e.g. Claude Opus 4.7, GPT-5.5, Cursor Composer 2.5, or "None">
 
 ## Checklist
 
-- [ ] I ran `pnpm build && pnpm -r lint && pnpm -r test` locally.
+- [ ] I ran `make pre-commit` locally.
 - [ ] I added or updated tests where the change affects observable behavior.
 - [ ] I updated documentation (READMEs, `specs/`, inline comments) where the change affects observable behavior.
 - [ ] I have disclosed any AI assistance above with an `Assisted-by:` line (see [AI_POLICY.md](../AI_POLICY.md)).
