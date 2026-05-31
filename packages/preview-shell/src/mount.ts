@@ -112,9 +112,20 @@ interface InternalState {
     naturalHeight: number;
     defaultFit: InitialFit;
     activeFit: 'fitPage' | 'fitWidth' | 'manual';
+    /**
+     * True once the user has manually zoomed, panned, or used zoom buttons —
+     * i.e. the view is no longer governed by a fit preset. Drives the resize
+     * focal-point strategy: when dirty the pre-resize viewport-centre content
+     * point is preserved instead of refitting.
+     */
+    isDirty: boolean;
+    /** Viewport dimensions as of the last handled resize, used for focal-point math. */
+    lastViewportWidth: number;
+    lastViewportHeight: number;
     showMinimap: boolean;
     minimapDismissedThisSession: boolean;
     firstRender: boolean;
+    toolbarCollapsed: boolean;
     view: {
         theme: ThemeOverride;
         now: NowOverride;
@@ -124,6 +135,13 @@ interface InternalState {
 }
 
 let stylesheetMounted = false;
+
+/**
+ * Last chrome position saved after a drag, shared across all shells in this
+ * JS session. Persists for the lifetime of the page (no localStorage so it
+ * doesn't leak across tabs or reloads).
+ */
+let savedChromePosition: { left: number; top: number } | null = null;
 
 /**
  * Ensure the shared `<style>` block is in the document `<head>`. Safe
@@ -157,9 +175,13 @@ export function mountPreview(
         naturalHeight: 0,
         defaultFit: options.initialFit ?? 'fitPage',
         activeFit: options.initialFit === 'fitWidth' ? 'fitWidth' : 'fitPage',
+        isDirty: false,
+        lastViewportWidth: 0,
+        lastViewportHeight: 0,
         showMinimap: options.showMinimap !== false,
         minimapDismissedThisSession: false,
         firstRender: true,
+        toolbarCollapsed: false,
         view: {
             theme: 'auto',
             now: 'today',
@@ -188,6 +210,77 @@ export function mountPreview(
     }
     on(doc, 'mousemove', showToolbar);
     showToolbar();
+
+    // ===== Toolbar collapse =====
+    function applyToolbarCollapsed(collapsed: boolean): void {
+        state.toolbarCollapsed = collapsed;
+        els.toolbarBody.classList.toggle('collapsed', collapsed);
+        els.toolbarCollapse.textContent = collapsed ? '»' : '«';
+        els.toolbarCollapse.title = collapsed ? 'Expand toolbar' : 'Collapse toolbar';
+        els.toolbarCollapse.setAttribute('aria-expanded', String(!collapsed));
+    }
+    on(els.toolbarCollapse, 'click', () => applyToolbarCollapsed(!state.toolbarCollapsed));
+
+    // ===== Toolbar drag (repositions chrome, clamped to root bounds) =====
+    // Restore last drag position from session if available.
+    if (savedChromePosition) {
+        els.chrome.style.right = 'auto';
+        els.chrome.style.left = `${savedChromePosition.left}px`;
+        els.chrome.style.top = `${savedChromePosition.top}px`;
+    }
+
+    let chromeDragStart: { pointerX: number; pointerY: number; chromeLeft: number; chromeTop: number } | null = null;
+
+    function ensureChromeLeftTopAnchoring(): void {
+        if (els.chrome.style.left !== '') return;
+        // Switch from CSS right/top to explicit left/top so we can do pointer math.
+        // offsetLeft/Top give the position relative to the offset parent
+        // (nl-preview-root, which is position:relative).
+        els.chrome.style.right = 'auto';
+        els.chrome.style.left = `${els.chrome.offsetLeft}px`;
+        els.chrome.style.top = `${els.chrome.offsetTop}px`;
+    }
+
+    on<PointerEvent>(els.toolbarHandle, 'pointerdown', (e) => {
+        e.preventDefault();
+        ensureChromeLeftTopAnchoring();
+        chromeDragStart = {
+            pointerX: e.clientX,
+            pointerY: e.clientY,
+            chromeLeft: parseInt(els.chrome.style.left, 10) || 0,
+            chromeTop: parseInt(els.chrome.style.top, 10) || 0,
+        };
+        els.chrome.classList.add('dragging');
+        els.toolbarHandle.setPointerCapture(e.pointerId);
+    });
+
+    on<PointerEvent>(els.toolbarHandle, 'pointermove', (e) => {
+        if (!chromeDragStart) return;
+        const dx = e.clientX - chromeDragStart.pointerX;
+        const dy = e.clientY - chromeDragStart.pointerY;
+        const rawLeft = chromeDragStart.chromeLeft + dx;
+        const rawTop = chromeDragStart.chromeTop + dy;
+        const maxLeft = Math.max(0, rootEl.clientWidth - els.chrome.offsetWidth);
+        const maxTop = Math.max(0, rootEl.clientHeight - els.chrome.offsetHeight);
+        els.chrome.style.left = `${Math.max(0, Math.min(rawLeft, maxLeft))}px`;
+        els.chrome.style.top = `${Math.max(0, Math.min(rawTop, maxTop))}px`;
+    });
+
+    function endChromeDrag(): void {
+        if (!chromeDragStart) return;
+        chromeDragStart = null;
+        els.chrome.classList.remove('dragging');
+        savedChromePosition = {
+            left: parseInt(els.chrome.style.left, 10) || 0,
+            top: parseInt(els.chrome.style.top, 10) || 0,
+        };
+    }
+
+    on<PointerEvent>(els.toolbarHandle, 'pointerup', endChromeDrag);
+    on<PointerEvent>(els.toolbarHandle, 'pointercancel', () => {
+        chromeDragStart = null;
+        els.chrome.classList.remove('dragging');
+    });
 
     // ===== Transform =====
     function applyTransform(): void {
@@ -225,6 +318,7 @@ export function mountPreview(
     function fitPage(): void {
         if (!state.naturalWidth || !state.naturalHeight) return;
         state.activeFit = 'fitPage';
+        state.isDirty = false;
         const sx = els.viewport.clientWidth / state.naturalWidth;
         const sy = els.viewport.clientHeight / state.naturalHeight;
         setScale(Math.min(sx, sy));
@@ -235,6 +329,7 @@ export function mountPreview(
     function fitWidth(): void {
         if (!state.naturalWidth) return;
         state.activeFit = 'fitWidth';
+        state.isDirty = false;
         setScale(els.viewport.clientWidth / state.naturalWidth);
         els.viewport.scrollLeft = 0;
         els.viewport.scrollTop = 0;
@@ -242,6 +337,7 @@ export function mountPreview(
 
     function actualSize(): void {
         state.activeFit = 'manual';
+        state.isDirty = true;
         setScale(1);
     }
 
@@ -252,8 +348,28 @@ export function mountPreview(
     }
 
     function reapplyActiveFit(): void {
-        if (state.activeFit === 'fitPage') fitPage();
-        else if (state.activeFit === 'fitWidth') fitWidth();
+        const newW = els.viewport.clientWidth;
+        const newH = els.viewport.clientHeight;
+
+        if (state.isDirty) {
+            // Preserve the content point that was at the centre of the viewport
+            // before the resize instead of snapping scroll to origin.
+            const oldW = state.lastViewportWidth || newW;
+            const oldH = state.lastViewportHeight || newH;
+            if (state.scale > 0 && (oldW !== newW || oldH !== newH)) {
+                const cx = (els.viewport.scrollLeft + oldW / 2) / state.scale;
+                const cy = (els.viewport.scrollTop + oldH / 2) / state.scale;
+                els.viewport.scrollLeft = Math.max(0, cx * state.scale - newW / 2);
+                els.viewport.scrollTop = Math.max(0, cy * state.scale - newH / 2);
+            }
+        } else if (state.activeFit === 'fitPage') {
+            fitPage();
+        } else if (state.activeFit === 'fitWidth') {
+            fitWidth();
+        }
+
+        state.lastViewportWidth = newW;
+        state.lastViewportHeight = newH;
     }
 
     // ===== Render handling =====
@@ -490,20 +606,27 @@ export function mountPreview(
     });
 
     on(els.viewport, 'scroll', updateMinimapRect);
-    on(win, 'resize', () => {
-        reapplyActiveFit();
-        updateMinimapRect();
-        updateMinimapVisibility();
-    });
+
+    // Debounced resize handler — batches rapid resize events (e.g. splitter
+    // drag) so reapplyActiveFit / minimap update only runs once the viewport
+    // has settled, preventing thrash and unnecessary focal-point jumps.
+    let resizeTimer: ReturnType<typeof setTimeout> | null = null;
+    function handleResize(): void {
+        if (resizeTimer) clearTimeout(resizeTimer);
+        resizeTimer = setTimeout(() => {
+            resizeTimer = null;
+            reapplyActiveFit();
+            updateMinimapRect();
+            updateMinimapVisibility();
+        }, 50);
+    }
+
+    on(win, 'resize', handleResize);
 
     // ResizeObserver picks up pane-level resizes (splitter drag, tab reveal)
     // that window 'resize' misses. Guarded for happy-dom / test environments.
     if (typeof ResizeObserver !== 'undefined') {
-        const ro = new ResizeObserver(() => {
-            reapplyActiveFit();
-            updateMinimapRect();
-            updateMinimapVisibility();
-        });
+        const ro = new ResizeObserver(handleResize);
         ro.observe(els.viewport);
         cleanups.push(() => ro.disconnect());
     }
@@ -516,6 +639,7 @@ export function mountPreview(
             if (!(e.ctrlKey || e.metaKey)) return;
             e.preventDefault();
             state.activeFit = 'manual';
+            state.isDirty = true;
             const rect = els.viewport.getBoundingClientRect();
             const anchorX = e.clientX - rect.left;
             const anchorY = e.clientY - rect.top;
@@ -559,6 +683,7 @@ export function mountPreview(
     });
     on(els.viewport, 'mousedown', (e: MouseEvent) => {
         if (!spaceDown) return;
+        state.isDirty = true;
         dragOrigin = {
             x: e.clientX,
             y: e.clientY,
@@ -583,10 +708,12 @@ export function mountPreview(
     // ===== Toolbar buttons =====
     on(els.zoomOut, 'click', () => {
         state.activeFit = 'manual';
+        state.isDirty = true;
         setScale(state.scale / 1.1);
     });
     on(els.zoomIn, 'click', () => {
         state.activeFit = 'manual';
+        state.isDirty = true;
         setScale(state.scale * 1.1);
     });
     on(els.zoomReset, 'click', actualSize);
@@ -781,10 +908,12 @@ export function mountPreview(
         },
         setZoom(scale) {
             state.activeFit = 'manual';
+            state.isDirty = true;
             setScale(scale);
         },
         dispose() {
             if (fadeTimer) clearTimeout(fadeTimer);
+            if (resizeTimer) clearTimeout(resizeTimer);
             for (const c of cleanups) c();
             cleanups.length = 0;
             rootEl.classList.remove('nl-preview-root');

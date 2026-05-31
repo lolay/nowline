@@ -87,12 +87,13 @@ export const PREVIEW_SHELL_CSS = `
 .nl-preview-root .canvas svg { display: block; max-width: none; height: auto; }
 .nl-preview-root .canvas.dimmed { opacity: 0.25; pointer-events: none; }
 
-/* === Toolbar (top-right) === */
+/* === Toolbar (top-right, repositionable) === */
 .nl-preview-root .chrome {
     position: absolute; top: 8px; right: 8px;
     display: flex; gap: 4px;
     transition: opacity 200ms ease;
     z-index: 10;
+    /* pointer-events on the chrome itself; individual children control cursor */
 }
 .nl-preview-root .chrome.faded { opacity: 0.25; }
 .nl-preview-root .chrome:hover { opacity: 1; }
@@ -103,12 +104,39 @@ export const PREVIEW_SHELL_CSS = `
     border: 1px solid var(--nl-preview-widget-border);
     border-radius: 6px;
     box-shadow: 0 2px 8px rgba(0,0,0,0.2);
+    user-select: none;
 }
 .nl-preview-root .toolbar .sep {
     width: 1px; height: 20px;
     background: var(--nl-preview-widget-border);
     margin: 0 4px;
 }
+/* Drag grip at the leading edge of the toolbar */
+.nl-preview-root .toolbar-handle {
+    display: flex; align-items: center; justify-content: center;
+    padding: 4px 5px;
+    cursor: grab;
+    color: var(--nl-preview-description);
+    font-size: 13px;
+    line-height: 1;
+    opacity: 0.6;
+    flex-shrink: 0;
+    touch-action: none;
+}
+.nl-preview-root .toolbar-handle:hover { opacity: 1; }
+/* Grabbing cursor while a drag is active */
+.nl-preview-root .chrome.dragging .toolbar-handle { cursor: grabbing; }
+/* Collapse/expand toggle button — stays visible when collapsed */
+.nl-preview-root .toolbar-collapse {
+    min-width: 20px;
+    padding: 4px 5px;
+    flex-shrink: 0;
+    font-size: 11px;
+}
+/* Collapsible portion of the toolbar — display:contents so children are
+   direct flex participants; .collapsed hides them all at once */
+.nl-preview-root .toolbar-body { display: contents; }
+.nl-preview-root .toolbar-body.collapsed { display: none; }
 .nl-preview-root .btn {
     appearance: none;
     background: transparent;
