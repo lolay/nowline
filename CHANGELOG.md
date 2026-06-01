@@ -12,7 +12,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ### Changed
 
-- `@nowline/preview-shell`: the preview minimap can no longer be manually dismissed (the `×` close button is removed). It still auto-hides when the whole diagram fits in the viewport and still respects `nowline.preview.showMinimap`.
+- _Nothing yet._
 
 ### Deprecated
 
@@ -29,6 +29,12 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 ### Security
 
 - _Nothing yet._
+
+## [0.5.1] - 2026-06-01
+
+### Changed
+
+- `@nowline/preview-shell`: the preview minimap can no longer be manually dismissed (the `×` close button is removed). It still auto-hides when the whole diagram fits in the viewport and still respects `nowline.preview.showMinimap`.
 
 ## [0.5.0] - 2026-06-01
 
