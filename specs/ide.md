@@ -120,6 +120,17 @@ The preview panel is a VS Code webview that displays an SVG rendered by the **ex
 
 This deviates from earlier drafts of this spec that called for client-side parsing and rendering inside the webview. The host-render approach was chosen to avoid asset / include round-trips, ship one bundle instead of two, and reuse the exact CLI codepath. The future embed (m4) still owns the client-side bundle for browser environments without an extension host.
 
+#### Preview toolbar chrome
+
+The viewport chrome is provided by `@nowline/preview-shell`'s `mountPreview()` (see [`specs/architecture.md`](./architecture.md) § surfaces). UX rules the toolbar must hold to:
+
+- **Default placement & resize.** The toolbar floats in the upper-right corner by default and tracks that corner on resize. It keeps its natural width: when the panel narrows it shifts left as a whole rather than squishing or wrapping its controls. A drag grip repositions it anywhere in the viewport (clamped to the gutter); the dragged position persists for the JS session.
+- **Collapse / restore.** A `«` control collapses the toolbar to a translucent puck (just the drag grip and a `»` restore arrow); `»` expands it again. (Replaces the earlier `×` hide-and-auto-fade affordance.)
+- **Tab-frame expand / collapse.** A `$(screen-full)` button in the preview panel's VS Code title bar (next to **Show Source**) maximizes the editor group so the preview fills the entire editor area — exactly the "fill the window" button on the free web app. Clicking it again (now a `$(screen-normal)` icon) restores the previous layout. Implemented via VS Code's built-in `workbench.action.toggleMaximizeEditorGroup`; the icon swap is driven by the `nowline.previewMaximized` context key. Closing a maximized preview clears the context so the icon never strands in the "restore" state.
+- **Fit controls.** Separate **Fit width** (`↔`) and **Fit page** (`⤢`) buttons, mirroring the `3` / `1` keyboard presets.
+- **More-menu.** Format, Copy, Export, Theme, Now (calendar), and Show-links live in a `▾ more` menu. The Export action uses a download glyph; Copy / Export each take half the action row and are centred. Sub-menus size to their content (no dead whitespace).
+- **Stay in view.** The more-menu, its sub-dropdowns, and the Now calendar flip and clamp so they always render inside the preview root and respect the gutter — they never run off-screen, regardless of where the toolbar sits.
+
 ### Configuration
 
 The extension resolves render-affecting and export-affecting options through a single chain (highest wins):

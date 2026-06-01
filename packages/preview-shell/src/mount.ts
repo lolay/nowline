@@ -190,6 +190,16 @@ let savedChromePosition: { left: number; top: number } | null = null;
 
 function ensureStylesheet(doc: Document): void {
     if (stylesheetMounted) return;
+    // A CSP-restricted consumer (e.g. the VS Code webview, whose
+    // `style-src` is nonce-only with no `'unsafe-inline'`) pre-injects
+    // this stylesheet into the host HTML with a nonce, marked by the
+    // `data-nl-preview-shell` attribute. A second `<style>` created here
+    // would carry no nonce and be refused by the CSP, leaving the
+    // toolbar unstyled — so defer to the host-provided copy when present.
+    if (doc.querySelector('style[data-nl-preview-shell]')) {
+        stylesheetMounted = true;
+        return;
+    }
     const style = doc.createElement('style');
     style.setAttribute('data-nl-preview-shell', '');
     style.textContent = PREVIEW_SHELL_CSS;
@@ -315,21 +325,28 @@ export function mountPreview(
     on(doc, 'mousemove', showFloatingUI);
     showFloatingUI();
 
-    // × hide button arms a 2-second fade from now
-    on(els.hideBtn, 'click', () => {
-        if (fadeTimer) clearTimeout(fadeTimer);
-        fadeTimer = setTimeout(() => {
-            els.chrome.classList.add('faded');
-            els.minimap.classList.add('faded');
-        }, 2000);
+    // ===== Collapse / restore =====
+    // « collapses the toolbar to a translucent puck (just the drag grip
+    // + a » restore arrow); » expands it back to the full toolbar.
+    on(els.collapseBtn, 'click', (e: MouseEvent) => {
+        e.stopPropagation();
+        closeAllMenus();
+        els.chrome.classList.add('collapsed');
+        repositionChrome();
+    });
+    on(els.restoreBtn, 'click', (e: MouseEvent) => {
+        e.stopPropagation();
+        els.chrome.classList.remove('collapsed');
+        repositionChrome();
     });
 
-    // ===== Toolbar drag (repositions chrome, clamped to root bounds + gutter) =====
-    if (savedChromePosition) {
-        els.chrome.style.right = 'auto';
-        els.chrome.style.left = `${savedChromePosition.left}px`;
-        els.chrome.style.top = `${savedChromePosition.top}px`;
-    }
+    // ===== Toolbar positioning + drag =====
+    // The chrome defaults to the upper-right corner and tracks it on
+    // resize (`chromePinnedRight`). Once dragged it becomes free-floating
+    // and is merely clamped back into view. Either way the position is
+    // always expressed as explicit `left`/`top` so a narrowing viewport
+    // shifts the toolbar left instead of squishing the row.
+    let chromePinnedRight = savedChromePosition === null;
 
     let chromeDragStart: {
         pointerX: number;
@@ -343,15 +360,26 @@ export function mountPreview(
         return parseInt(val, 10) || 8;
     }
 
-    function clampChromeIntoView(): void {
-        if (els.chrome.style.left === '') return;
+    function repositionChrome(): void {
         const g = getGutter();
-        const rawLeft = parseInt(els.chrome.style.left, 10) || 0;
-        const rawTop = parseInt(els.chrome.style.top, 10) || 0;
-        const maxLeft = Math.max(g, rootEl.clientWidth - els.chrome.offsetWidth - g);
-        const maxTop = Math.max(g, rootEl.clientHeight - els.chrome.offsetHeight - g);
-        els.chrome.style.left = `${Math.max(g, Math.min(rawLeft, maxLeft))}px`;
-        els.chrome.style.top = `${Math.max(g, Math.min(rawTop, maxTop))}px`;
+        const cw = els.chrome.offsetWidth;
+        const ch = els.chrome.offsetHeight;
+        const maxLeft = Math.max(g, rootEl.clientWidth - cw - g);
+        const maxTop = Math.max(g, rootEl.clientHeight - ch - g);
+        let left: number;
+        let top: number;
+        if (chromePinnedRight) {
+            left = rootEl.clientWidth - cw - g;
+            top = g;
+        } else {
+            left = parseInt(els.chrome.style.left, 10);
+            top = parseInt(els.chrome.style.top, 10);
+            if (Number.isNaN(left)) left = savedChromePosition?.left ?? g;
+            if (Number.isNaN(top)) top = savedChromePosition?.top ?? g;
+        }
+        els.chrome.style.right = 'auto';
+        els.chrome.style.left = `${Math.max(g, Math.min(left, maxLeft))}px`;
+        els.chrome.style.top = `${Math.max(g, Math.min(top, maxTop))}px`;
     }
 
     function ensureChromeLeftTopAnchoring(): void {
@@ -363,6 +391,7 @@ export function mountPreview(
 
     on<PointerEvent>(els.toolbarHandle, 'pointerdown', (e) => {
         e.preventDefault();
+        chromePinnedRight = false;
         ensureChromeLeftTopAnchoring();
         chromeDragStart = {
             pointerX: e.clientX,
@@ -737,7 +766,7 @@ export function mountPreview(
             reapplyActiveFit();
             updateMinimapRect();
             updateMinimapVisibility();
-            clampChromeIntoView();
+            repositionChrome();
         }, 50);
     }
 
@@ -835,6 +864,7 @@ export function mountPreview(
         setScale(state.scale * 1.1);
     });
     on(els.zoomReset, 'click', actualSize);
+    on(els.fitWidth, 'click', fitWidth);
     on(els.fitPage, 'click', fitPage);
 
     // ===== Menu state helpers =====
@@ -850,6 +880,56 @@ export function mountPreview(
         closeSubMenus();
     }
 
+    /**
+     * Keep a just-opened flyout (more-menu, a sub-dropdown, or the
+     * calendar) inside the preview root + gutters. `defaultSide` is the
+     * edge the panel is anchored to in CSS; if opening that way would
+     * spill past the opposite gutter the panel is flipped, then any
+     * residual horizontal overflow is nudged back with a transform and
+     * excess height is capped with an internal scroll.
+     *
+     * `clampVertical` is off for the more-menu so capping its height
+     * never clips the calendar that pops out of it.
+     */
+    function placeFlyout(
+        panel: HTMLElement,
+        defaultSide: 'left' | 'right',
+        clampVertical = true,
+    ): void {
+        panel.classList.remove('flip');
+        panel.style.maxHeight = '';
+        panel.style.overflowY = '';
+        panel.style.transform = '';
+
+        const root = rootEl.getBoundingClientRect();
+        // Skip when the host hasn't laid out yet (e.g. happy-dom tests).
+        if (root.width === 0 && root.height === 0) return;
+        const g = getGutter();
+
+        let box = panel.getBoundingClientRect();
+        const fitsWidth = box.width <= root.width - 2 * g;
+        if (fitsWidth && defaultSide === 'left' && box.right > root.right - g) {
+            panel.classList.add('flip');
+        } else if (fitsWidth && defaultSide === 'right' && box.left < root.left + g) {
+            panel.classList.add('flip');
+        }
+
+        box = panel.getBoundingClientRect();
+        let dx = 0;
+        if (box.right > root.right - g) dx = root.right - g - box.right;
+        if (box.left + dx < root.left + g) dx = root.left + g - box.left;
+        if (dx !== 0) panel.style.transform = `translateX(${Math.round(dx)}px)`;
+
+        if (clampVertical) {
+            box = panel.getBoundingClientRect();
+            const avail = root.bottom - g - box.top;
+            if (box.height > avail && avail > 80) {
+                panel.style.maxHeight = `${Math.round(avail)}px`;
+                panel.style.overflowY = 'auto';
+            }
+        }
+    }
+
     on(doc, 'click', closeAllMenus);
     on(els.moreMenu, 'click', (e: Event) => e.stopPropagation());
 
@@ -858,7 +938,10 @@ export function mountPreview(
         e.stopPropagation();
         const opening = els.moreMenu.hidden;
         closeAllMenus();
-        if (opening) els.moreMenu.hidden = false;
+        if (opening) {
+            els.moreMenu.hidden = false;
+            placeFlyout(els.moreMenu, 'right', /* clampVertical */ false);
+        }
     });
 
     // ===== Format dropdown =====
@@ -866,7 +949,10 @@ export function mountPreview(
         e.stopPropagation();
         const opening = els.formatMenu.hidden;
         closeSubMenus();
-        if (opening) els.formatMenu.hidden = false;
+        if (opening) {
+            els.formatMenu.hidden = false;
+            placeFlyout(els.formatMenu, 'left');
+        }
     });
 
     on(els.formatMenu, 'click', (e: Event) => {
@@ -1013,7 +1099,10 @@ export function mountPreview(
         e.stopPropagation();
         const opening = els.themeMenu.hidden;
         closeSubMenus();
-        if (opening) els.themeMenu.hidden = false;
+        if (opening) {
+            els.themeMenu.hidden = false;
+            placeFlyout(els.themeMenu, 'left');
+        }
     });
 
     on(els.themeMenu, 'click', (e: Event) => {
@@ -1178,6 +1267,7 @@ export function mountPreview(
         if (opening) {
             buildCalendar();
             els.nowPicker.hidden = false;
+            placeFlyout(els.nowPicker, 'left');
         }
     });
 
@@ -1204,7 +1294,10 @@ export function mountPreview(
         e.stopPropagation();
         const opening = els.linksMenu.hidden;
         closeSubMenus();
-        if (opening) els.linksMenu.hidden = false;
+        if (opening) {
+            els.linksMenu.hidden = false;
+            placeFlyout(els.linksMenu, 'left');
+        }
     });
 
     on(els.linksMenu, 'click', (e: Event) => {
@@ -1264,6 +1357,9 @@ export function mountPreview(
     }
     refreshAll();
     updateMinimapVisibility();
+    // Anchor the toolbar explicitly (default: upper-right) so resize
+    // shifts it left rather than the CSS `right` anchor squishing it.
+    repositionChrome();
 
     // ===== Imperative API =====
     return {

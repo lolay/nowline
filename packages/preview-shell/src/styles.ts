@@ -114,6 +114,9 @@ export const PREVIEW_SHELL_CSS = `
     top: var(--nl-preview-gutter);
     right: var(--nl-preview-gutter);
     display: flex; gap: 4px;
+    /* Keep the toolbar at its natural width so a narrowing viewport
+       shifts it left (handled in JS) instead of squishing the row. */
+    width: max-content;
     transition: opacity 200ms ease;
     z-index: 10;
 }
@@ -122,6 +125,7 @@ export const PREVIEW_SHELL_CSS = `
 .nl-preview-root .toolbar {
     display: flex; align-items: center; gap: 2px;
     flex-wrap: nowrap;
+    white-space: nowrap;
     padding: 2px;
     background: var(--nl-chrome-bg);
     border: 1px solid var(--nl-chrome-border);
@@ -130,6 +134,16 @@ export const PREVIEW_SHELL_CSS = `
     color: var(--nl-chrome-fg);
     user-select: none;
 }
+
+/* Collapsed puck: hide everything but the drag grip + restore arrow,
+   and dim it so it stays out of the way until hovered. */
+.nl-preview-root .restore-btn { display: none; }
+.nl-preview-root .chrome.collapsed .toolbar > :not(.toolbar-handle):not(.restore-btn) {
+    display: none;
+}
+.nl-preview-root .chrome.collapsed .restore-btn { display: inline-flex; }
+.nl-preview-root .chrome.collapsed .toolbar { opacity: 0.55; }
+.nl-preview-root .chrome.collapsed:hover .toolbar { opacity: 1; }
 .nl-preview-root .toolbar .sep {
     width: 1px; height: 18px;
     background: var(--nl-chrome-border);
@@ -162,9 +176,16 @@ export const PREVIEW_SHELL_CSS = `
     line-height: 1;
     min-width: 20px;
     flex-shrink: 0;
+    /* Suppress the sticky focus ring left behind after a mouse click;
+       keyboard focus is restored via :focus-visible below. */
+    outline: none;
 }
 .nl-preview-root .btn:hover { background: var(--nl-chrome-hover); }
 .nl-preview-root .btn:active { background: var(--nl-chrome-active); }
+.nl-preview-root .btn:focus-visible {
+    outline: 1px solid var(--nl-preview-focus);
+    outline-offset: -1px;
+}
 .nl-preview-root .btn.zoom-label {
     min-width: 44px;
     font-variant-numeric: tabular-nums;
@@ -184,17 +205,30 @@ export const PREVIEW_SHELL_CSS = `
     z-index: 20;
     color: var(--nl-chrome-fg);
 }
+/* Opens right-aligned by default; flipped to left-aligned in JS when the
+   toolbar sits near the left edge and the menu would clip the gutter. */
+.nl-preview-root .more-menu.flip { right: auto; left: 0; }
 .nl-preview-root .more-row {
     display: flex; align-items: center; justify-content: space-between;
     padding: 2px 4px;
     gap: 8px;
 }
 .nl-preview-root .more-row.action-row {
-    gap: 4px;
-    justify-content: flex-start;
-    padding-top: 4px;
+    gap: 6px;
+    justify-content: stretch;
+    padding-top: 6px;
     padding-bottom: 2px;
 }
+/* Copy / Export each take half the row and center their label+icon. */
+.nl-preview-root .action-row .btn {
+    flex: 1 1 0;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 5px;
+}
+.nl-preview-root .action-ico { display: inline-flex; line-height: 0; }
+.nl-preview-root .action-ico svg { display: block; }
 .nl-preview-root .more-label {
     font-size: 0.88em;
     color: var(--nl-chrome-muted);
@@ -214,7 +248,10 @@ export const PREVIEW_SHELL_CSS = `
 }
 .nl-preview-root .more-sub-menu {
     position: absolute; top: calc(100% + 2px); left: 0;
-    list-style: none; padding: 4px; min-width: 120px;
+    list-style: none; padding: 4px;
+    /* Size to the widest option (plus the checkmark gutter) rather than
+       a fixed min-width, so there's no dead whitespace to the right. */
+    width: max-content; min-width: 0; max-width: 280px;
     background: var(--nl-chrome-bg);
     border: 1px solid var(--nl-chrome-border);
     border-radius: 6px;
@@ -222,17 +259,21 @@ export const PREVIEW_SHELL_CSS = `
     z-index: 25;
     color: var(--nl-chrome-fg);
 }
+/* Flyout flipped to open toward the left (set in JS when the default
+   right-ward opening would overflow the viewport gutter). */
+.nl-preview-root .more-sub-menu.flip { left: auto; right: 0; }
 .nl-preview-root .more-sub-menu li { padding: 0; }
 .nl-preview-root .more-sub-menu .btn {
     display: block; width: 100%; text-align: left;
-    padding: 5px 8px 5px 22px;
+    /* Generous left gutter keeps the checkmark off the label text. */
+    padding: 5px 12px 5px 26px;
     position: relative;
     font-size: 0.88em;
 }
 .nl-preview-root .more-sub-menu .btn[data-active="true"]::before {
     content: '\\2713';
     position: absolute;
-    left: 7px;
+    left: 9px;
 }
 
 /* === Code-style chip for real theme/format tokens === */
@@ -329,6 +370,9 @@ export const PREVIEW_SHELL_CSS = `
     z-index: 26;
     color: var(--nl-chrome-fg);
 }
+/* Calendar flips to open toward the left when opening rightward would
+   push it past the viewport's right gutter (see placeFlyout). */
+.nl-preview-root .now-picker.flip { left: auto; right: 0; }
 .nl-preview-root .cal-nav {
     display: flex; align-items: center; justify-content: space-between;
     margin-bottom: 6px;

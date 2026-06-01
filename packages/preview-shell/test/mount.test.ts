@@ -60,6 +60,24 @@ describe('mountPreview', () => {
         expect(styles.length).toBe(1);
     });
 
+    it('defers to a host-injected stylesheet instead of adding a second (CSP-safe path)', () => {
+        // A CSP-restricted consumer (the VS Code webview, whose
+        // `style-src` is nonce-only) serves the shell CSS from its host
+        // HTML with a nonce under the `data-nl-preview-shell` marker.
+        // mountPreview must not append its own non-nonced copy, which
+        // the CSP would refuse — leaving the toolbar unstyled.
+        const hostStyle = document.createElement('style');
+        hostStyle.setAttribute('data-nl-preview-shell', '');
+        hostStyle.setAttribute('nonce', 'host-nonce');
+        document.head.appendChild(hostStyle);
+
+        mountPreview(mountRoot());
+
+        const styles = document.head.querySelectorAll('style[data-nl-preview-shell]');
+        expect(styles.length).toBe(1);
+        expect(styles[0]).toBe(hostStyle);
+    });
+
     it('renders the viewport scaffolding (toolbar, viewport, diagnostics) into the root', () => {
         const root = mountRoot();
         mountPreview(root);
@@ -319,7 +337,7 @@ describe('mountPreview', () => {
 
     // ===== Clamp-on-resize math =====
 
-    it('clampChromeIntoView keeps chrome within [gutter, width - chromeWidth - gutter] after resize', () => {
+    it('repositionChrome keeps the toolbar within the gutter-inset bounds after resize', () => {
         vi.useFakeTimers();
         const root = mountRoot();
         const handle = mountPreview(root);
@@ -350,6 +368,67 @@ describe('mountPreview', () => {
         expect(left).toBeLessThanOrEqual(maxLeft);
         expect(top).toBeGreaterThanOrEqual(gutter);
         expect(top).toBeLessThanOrEqual(maxTop);
+
+        handle.dispose();
+    });
+
+    it('shifts the right-pinned toolbar left as the viewport narrows (no squish)', () => {
+        vi.useFakeTimers();
+        const root = mountRoot();
+        const handle = mountPreview(root);
+        const chrome = root.querySelector<HTMLElement>('.chrome')!;
+
+        Object.defineProperty(chrome, 'offsetWidth', { configurable: true, value: 200 });
+        Object.defineProperty(chrome, 'offsetHeight', { configurable: true, value: 40 });
+
+        Object.defineProperty(root, 'clientWidth', { configurable: true, value: 1000 });
+        Object.defineProperty(root, 'clientHeight', { configurable: true, value: 600 });
+        window.dispatchEvent(new Event('resize'));
+        vi.advanceTimersByTime(100);
+        const wideLeft = parseInt(chrome.style.left, 10);
+
+        // Narrow the viewport: the toolbar must move left, not shrink.
+        Object.defineProperty(root, 'clientWidth', { configurable: true, value: 500 });
+        window.dispatchEvent(new Event('resize'));
+        vi.advanceTimersByTime(100);
+        const narrowLeft = parseInt(chrome.style.left, 10);
+
+        expect(narrowLeft).toBeLessThan(wideLeft);
+        expect(narrowLeft).toBeGreaterThanOrEqual(8);
+
+        handle.dispose();
+    });
+
+    // ===== Fit-width button =====
+
+    it('clicking the fit-width button widens an under-fit diagram (distinct from fit-page)', () => {
+        const root = mountRoot();
+        const handle = mountPreview(root);
+        handle.setSvg(SAMPLE_SVG);
+        stubViewportDims(root, 600, 400);
+
+        root.querySelector<HTMLButtonElement>('.fit-page')?.click();
+        const pageZoom = handle.getZoom();
+        root.querySelector<HTMLButtonElement>('.fit-width')?.click();
+        const widthZoom = handle.getZoom();
+
+        // 800x600 into 600x400: fitWidth (0.75) > fitPage (0.667).
+        expect(widthZoom).toBeGreaterThan(pageZoom);
+        handle.dispose();
+    });
+
+    // ===== Collapse / restore =====
+
+    it('collapse button adds the collapsed class; restore removes it', () => {
+        const root = mountRoot();
+        const handle = mountPreview(root);
+        const chrome = root.querySelector<HTMLElement>('.chrome')!;
+
+        expect(chrome.classList.contains('collapsed')).toBe(false);
+        root.querySelector<HTMLButtonElement>('.collapse-btn')?.click();
+        expect(chrome.classList.contains('collapsed')).toBe(true);
+        root.querySelector<HTMLButtonElement>('.restore-btn')?.click();
+        expect(chrome.classList.contains('collapsed')).toBe(false);
 
         handle.dispose();
     });
