@@ -1,4 +1,11 @@
-import type { ResolveDiagnostic } from '@nowline/core';
+import {
+    extractSuggestion,
+    inferCodeFromMessage,
+    type LangiumLikeDiagnostic,
+    type LexerErrorLike,
+    type ParserErrorLike,
+    type ResolveDiagnostic,
+} from '@nowline/core';
 
 /**
  * JSON-friendly diagnostic shape consumed by browser preview surfaces.
@@ -20,41 +27,6 @@ export interface DiagnosticRow {
     column: number;
 }
 
-/** Minimal LSP-style diagnostic shape. Mirrors `LangiumLikeDiagnostic` in the CLI. */
-export interface LangiumLikeDiagnostic {
-    message: string;
-    severity?: number;
-    code?: string | number;
-    /**
-     * Langium stamps a machine-readable category here (e.g.
-     * `DocumentValidator.LexingError` = `'lexing-error'`). Used to skip the
-     * lexer/parser errors Langium re-folds into `doc.diagnostics`, since the
-     * browser pipeline already surfaces those from `parseResult` with
-     * friendlier codes.
-     */
-    data?: { code?: string | number };
-    range?: {
-        start: { line: number; character: number };
-        end: { line: number; character: number };
-    };
-}
-
-interface ChevrotainParserError {
-    message: string;
-    token?: {
-        startLine?: number;
-        startColumn?: number;
-    };
-}
-
-interface ChevrotainLexerError {
-    message: string;
-    line?: number;
-    column?: number;
-}
-
-const DID_YOU_MEAN_RE = /did you mean ['"]?([^'"?]+)['"]?\??/i;
-
 export function fromLangiumDiagnostic(diag: LangiumLikeDiagnostic, file: string): DiagnosticRow {
     return {
         severity: diag.severity === 2 ? 'warning' : 'error',
@@ -67,7 +39,7 @@ export function fromLangiumDiagnostic(diag: LangiumLikeDiagnostic, file: string)
     };
 }
 
-export function fromParserError(err: ChevrotainParserError, file: string): DiagnosticRow {
+export function fromParserError(err: ParserErrorLike, file: string): DiagnosticRow {
     return {
         severity: 'error',
         code: 'parse-error',
@@ -78,7 +50,7 @@ export function fromParserError(err: ChevrotainParserError, file: string): Diagn
     };
 }
 
-export function fromLexerError(err: ChevrotainLexerError, file: string): DiagnosticRow {
+export function fromLexerError(err: LexerErrorLike, file: string): DiagnosticRow {
     return {
         severity: 'error',
         code: 'lex-error',
@@ -132,22 +104,4 @@ function diagnosticCode(diag: LangiumLikeDiagnostic): string {
     if (typeof diag.code === 'string' && diag.code !== '') return diag.code;
     if (typeof diag.code === 'number') return String(diag.code);
     return inferCodeFromMessage(diag.message);
-}
-
-function inferCodeFromMessage(message: string): string {
-    const lower = message.toLowerCase();
-    if (lower.includes('duplicate identifier')) return 'duplicate-identifier';
-    if (lower.includes('unknown reference') || lower.includes('did you mean'))
-        return 'unknown-reference';
-    if (lower.includes('circular')) return 'circular-dependency';
-    if (lower.includes('requires') && lower.includes('date:')) return 'missing-date';
-    if (lower.includes('duration')) return 'duration';
-    if (lower.includes('include')) return 'include';
-    if (lower.includes('indent')) return 'indentation';
-    return 'validation';
-}
-
-function extractSuggestion(message: string): string | undefined {
-    const match = message.match(DID_YOU_MEAN_RE);
-    return match ? match[1].trim() : undefined;
 }

@@ -1,3 +1,18 @@
+export {
+    collectDocumentDiagnostics,
+    extractSuggestion,
+    inferCodeFromMessage,
+    isBuiltinParseDiagnostic,
+    LANGIUM_LEXING_ERROR,
+    LANGIUM_PARSING_ERROR,
+    type LangiumLikeDiagnostic,
+    type LexerErrorLike,
+    type ParserErrorLike,
+    type RawDiagnostic,
+    type RawDiagnosticOrigin,
+    resolveDiagnosticCode,
+    stableValidatorCode,
+} from './diagnostics/index.js';
 export * from './generated/ast.js';
 export * from './generated/module.js';
 export { ALL_CODES, type MessageCode } from './i18n/codes.js';

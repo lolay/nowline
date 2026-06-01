@@ -1,12 +1,11 @@
-import { createNowlineServices, type NowlineFile, type NowlineServices } from '@nowline/core';
-import { type LangiumDocument, URI } from 'langium';
 import {
-    adaptLangiumDiagnostic,
-    adaptLexerError,
-    adaptParserError,
-    isBuiltinParseDiagnostic,
-    type LangiumLikeDiagnostic,
-} from '../diagnostics/adapt.js';
+    collectDocumentDiagnostics,
+    createNowlineServices,
+    type NowlineFile,
+    type NowlineServices,
+} from '@nowline/core';
+import { type LangiumDocument, URI } from 'langium';
+import { adaptLangiumDiagnostic, adaptLexerError, adaptParserError } from '../diagnostics/adapt.js';
 import type { CliDiagnostic, DiagnosticSource } from '../diagnostics/model.js';
 
 export interface ParseOptions {
@@ -54,26 +53,22 @@ export async function parseSource(
     const diagnostics: CliDiagnostic[] = [];
     const parseDiagnostics: CliDiagnostic[] = [];
 
-    for (const err of doc.parseResult.lexerErrors) {
-        const adapted = adaptLexerError(err, filePath);
-        parseDiagnostics.push(adapted);
-        diagnostics.push(adapted);
-    }
-    for (const err of doc.parseResult.parserErrors) {
-        const adapted = adaptParserError(err, filePath);
-        parseDiagnostics.push(adapted);
-        diagnostics.push(adapted);
-    }
-    for (const diag of doc.diagnostics ?? []) {
-        const row = diag as LangiumLikeDiagnostic;
-        // Langium's validateDocument() folds the lexer + parser errors into
-        // doc.diagnostics before running the validation checks. We already
-        // emitted those above from parseResult (with dedicated lex-error /
-        // parse-error codes and proper spans), so skip the re-folded copies —
-        // otherwise every syntax error is counted twice in `nowline render` /
-        // `validate` output.
-        if (isBuiltinParseDiagnostic(row.data)) continue;
-        diagnostics.push(adaptLangiumDiagnostic(row, filePath));
+    // collectDocumentDiagnostics owns the de-dup: Langium re-folds lexer +
+    // parser errors into doc.diagnostics, so the shared collector skips those
+    // copies. Lexer/parser rows also feed `parseDiagnostics` (drives the
+    // hasParseErrors gate that suppresses downstream layout/render).
+    for (const raw of collectDocumentDiagnostics(doc)) {
+        if (raw.origin === 'lexer') {
+            const adapted = adaptLexerError(raw.error, filePath);
+            parseDiagnostics.push(adapted);
+            diagnostics.push(adapted);
+        } else if (raw.origin === 'parser') {
+            const adapted = adaptParserError(raw.error, filePath);
+            parseDiagnostics.push(adapted);
+            diagnostics.push(adapted);
+        } else {
+            diagnostics.push(adaptLangiumDiagnostic(raw.diagnostic, filePath));
+        }
     }
 
     const hasErrors = diagnostics.some((d) => d.severity === 'error');

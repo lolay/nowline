@@ -7,6 +7,10 @@
 // auto-scan, postMessage transport, save/copy commands) belong in the
 // consumer; this package stays a pure data transform.
 
+// LangiumLikeDiagnostic now lives in @nowline/core (shared with the CLI);
+// re-exported here so existing @nowline/browser consumers keep importing it
+// from the same place.
+export type { LangiumLikeDiagnostic } from '@nowline/core';
 export {
     type DiagnosticRow,
     fromLangiumDiagnostic,
@@ -14,7 +18,6 @@ export {
     fromParserError,
     fromRenderWarning,
     fromResolveDiagnostic,
-    type LangiumLikeDiagnostic,
 } from './diagnostic-row.js';
 // Showcase source string is generated from `examples/showcase.nowline`
 // by `scripts/bundle-showcase.mjs` (m4.7 slice F) and re-exported here

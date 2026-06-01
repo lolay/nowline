@@ -18,6 +18,7 @@
 // bundle stays free of any Node literal even before tree-shaking.
 
 import {
+    collectDocumentDiagnostics,
     createNowlineServices,
     type NowlineFile,
     type NowlineServices,
@@ -33,7 +34,6 @@ import {
     fromParserError,
     fromRenderWarning,
     fromResolveDiagnostic,
-    type LangiumLikeDiagnostic,
 } from './diagnostic-row.js';
 import {
     isNoOpIncludeDiagnosticMessage,
@@ -146,27 +146,18 @@ export async function parseSource(
     const doc = docFactory.fromString<NowlineFile>(source, freshUri());
     await services.shared.workspace.DocumentBuilder.build([doc], { validation: true });
 
+    // collectDocumentDiagnostics owns the de-dup: Langium re-folds lexer +
+    // parser errors into doc.diagnostics, so the shared collector skips those
+    // copies and we map each origin to a row here.
     const diagnostics: DiagnosticRow[] = [];
-    for (const err of doc.parseResult.lexerErrors) {
-        diagnostics.push(fromLexerError(err, filePath));
-    }
-    for (const err of doc.parseResult.parserErrors) {
-        diagnostics.push(fromParserError(err, filePath));
-    }
-    for (const diag of doc.diagnostics ?? []) {
-        const row = diag as LangiumLikeDiagnostic;
-        // Langium's validateDocument() folds the lexer + parser errors into
-        // doc.diagnostics (tagged with these `data.code` values) before
-        // running the validation checks. We already emitted those above from
-        // parseResult with dedicated `lex-error` / `parse-error` codes, so
-        // skip the re-folded copies here — otherwise every syntax error shows
-        // up twice in the preview table (the LSP Problems panel, which reads
-        // only doc.diagnostics, lists each once).
-        const builtinCode = row.data?.code;
-        if (builtinCode === 'lexing-error' || builtinCode === 'parsing-error') {
-            continue;
+    for (const raw of collectDocumentDiagnostics(doc)) {
+        if (raw.origin === 'lexer') {
+            diagnostics.push(fromLexerError(raw.error, filePath));
+        } else if (raw.origin === 'parser') {
+            diagnostics.push(fromParserError(raw.error, filePath));
+        } else {
+            diagnostics.push(fromLangiumDiagnostic(raw.diagnostic, filePath));
         }
-        diagnostics.push(fromLangiumDiagnostic(row, filePath));
     }
     return { ast: doc.parseResult.value, diagnostics };
 }

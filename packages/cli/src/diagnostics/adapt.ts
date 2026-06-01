@@ -1,59 +1,24 @@
+import {
+    extractSuggestion,
+    type LangiumLikeDiagnostic,
+    type LexerErrorLike,
+    type ParserErrorLike,
+    resolveDiagnosticCode,
+} from '@nowline/core';
 import type { CliDiagnostic, DiagnosticSeverity, LocalizedMessageData } from './model.js';
-
-// Minimal LSP-style diagnostic shape. Langium re-exports vscode-languageserver-types'
-// Diagnostic internally; we keep a narrow local type to avoid a direct coupling and
-// to survive cross-version type relocations.
-export interface LangiumLikeDiagnostic {
-    message: string;
-    severity?: number;
-    code?: string | number;
-    range?: {
-        start: { line: number; character: number };
-        end: { line: number; character: number };
-    };
-    /**
-     * Validator's stash for re-formattable messages. The shape is
-     * `{ code: MessageCode, args: MessageArgs<K> }`; we keep it
-     * `unknown` here to avoid coupling the CLI's diagnostic adapter
-     * to `@nowline/core`'s internal i18n types.
-     */
-    data?: unknown;
-}
-
-// Minimal shapes for chevrotain parser/lexer errors to avoid pulling chevrotain types.
-interface ChevrotainParserError {
-    message: string;
-    token?: {
-        startLine?: number;
-        startColumn?: number;
-        startOffset?: number;
-        endLine?: number;
-        endColumn?: number;
-        endOffset?: number;
-    };
-}
-
-interface ChevrotainLexerError {
-    message: string;
-    line?: number;
-    column?: number;
-    offset?: number;
-    length?: number;
-}
 
 export function adaptLangiumDiagnostic(diag: LangiumLikeDiagnostic, file: string): CliDiagnostic {
     const severity = mapSeverity(diag.severity);
     const line = (diag.range?.start.line ?? 0) + 1;
     const column = (diag.range?.start.character ?? 0) + 1;
-    const data = extractMessageData(diag.data);
     return {
         file,
         line,
         column,
         severity,
-        // Localized validator data carries the stable message code; prefer it
-        // over the heuristic message-substring inference below.
-        code: data?.code ?? diagnosticCode(diag),
+        // resolveDiagnosticCode prefers the stable validator code carried in
+        // `data`, then Langium's `code`, then a message heuristic.
+        code: resolveDiagnosticCode(diag),
         message: diag.message,
         span: diag.range
             ? {
@@ -65,22 +30,10 @@ export function adaptLangiumDiagnostic(diag: LangiumLikeDiagnostic, file: string
               }
             : undefined,
         suggestion: extractSuggestion(diag.message),
-        data,
+        // The CLI keeps the full { code, args } so formatDiagnostics can
+        // re-render the message in the operator's locale at print time.
+        data: extractMessageData(diag.data),
     };
-}
-
-/**
- * True for the lexer/parser errors Langium re-folds into `doc.diagnostics`
- * inside `validateDocument()`. They carry a bare `data.code` of
- * `'lexing-error'` / `'parsing-error'` (Langium's `DocumentValidator`
- * constants). Callers that already surface those errors directly from
- * `parseResult.lexerErrors` / `parserErrors` skip these copies so each syntax
- * error is reported once.
- */
-export function isBuiltinParseDiagnostic(data: unknown): boolean {
-    if (!data || typeof data !== 'object') return false;
-    const code = (data as { code?: unknown }).code;
-    return code === 'lexing-error' || code === 'parsing-error';
 }
 
 /**
@@ -97,7 +50,7 @@ function extractMessageData(data: unknown): LocalizedMessageData | undefined {
     return { code: obj.code, args: obj.args };
 }
 
-export function adaptParserError(err: ChevrotainParserError, file: string): CliDiagnostic {
+export function adaptParserError(err: ParserErrorLike, file: string): CliDiagnostic {
     const line = err.token?.startLine ?? 1;
     const column = err.token?.startColumn ?? 1;
     const endLine = err.token?.endLine ?? line;
@@ -113,7 +66,7 @@ export function adaptParserError(err: ChevrotainParserError, file: string): CliD
     };
 }
 
-export function adaptLexerError(err: ChevrotainLexerError, file: string): CliDiagnostic {
+export function adaptLexerError(err: LexerErrorLike, file: string): CliDiagnostic {
     const line = err.line ?? 1;
     const column = err.column ?? 1;
     const length = err.length ?? 1;
@@ -133,30 +86,4 @@ export function adaptLexerError(err: ChevrotainLexerError, file: string): CliDia
 
 function mapSeverity(severity: number | undefined): DiagnosticSeverity {
     return severity === 2 ? 'warning' : 'error';
-}
-
-function diagnosticCode(diag: LangiumLikeDiagnostic): string {
-    if (typeof diag.code === 'string' && diag.code !== '') return diag.code;
-    if (typeof diag.code === 'number') return String(diag.code);
-    return inferCodeFromMessage(diag.message);
-}
-
-function inferCodeFromMessage(message: string): string {
-    const lower = message.toLowerCase();
-    if (lower.includes('duplicate identifier')) return 'duplicate-identifier';
-    if (lower.includes('unknown reference') || lower.includes('did you mean'))
-        return 'unknown-reference';
-    if (lower.includes('circular')) return 'circular-dependency';
-    if (lower.includes('requires') && lower.includes('date:')) return 'missing-date';
-    if (lower.includes('duration')) return 'duration';
-    if (lower.includes('include')) return 'include';
-    if (lower.includes('indent')) return 'indentation';
-    return 'validation';
-}
-
-const DID_YOU_MEAN_RE = /did you mean ['"]?([^'"?]+)['"]?\??/i;
-
-function extractSuggestion(message: string): string | undefined {
-    const match = message.match(DID_YOU_MEAN_RE);
-    return match ? match[1].trim() : undefined;
 }
