@@ -25,6 +25,14 @@ export interface LangiumLikeDiagnostic {
     message: string;
     severity?: number;
     code?: string | number;
+    /**
+     * Langium stamps a machine-readable category here (e.g.
+     * `DocumentValidator.LexingError` = `'lexing-error'`). Used to skip the
+     * lexer/parser errors Langium re-folds into `doc.diagnostics`, since the
+     * browser pipeline already surfaces those from `parseResult` with
+     * friendlier codes.
+     */
+    data?: { code?: string | number };
     range?: {
         start: { line: number; character: number };
         end: { line: number; character: number };

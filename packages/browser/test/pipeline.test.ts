@@ -8,6 +8,7 @@ import {
 import {
     ROADMAP_ALPHA,
     ROADMAP_BETA,
+    ROADMAP_LEXER_ERROR,
     ROADMAP_PARSE_ERROR,
     ROADMAP_WITH_INCLUDE,
 } from './fixtures.js';
@@ -35,6 +36,26 @@ describe('parseSource', () => {
             filePath: '/custom/path.nowline',
         });
         expect(result.diagnostics[0].file).toBe('/custom/path.nowline');
+    });
+
+    it('does not double-count lexer/parser errors that Langium also folds into doc.diagnostics', async () => {
+        // Regression: Langium's validateDocument() re-emits lexer + parser
+        // errors inside doc.diagnostics, so collecting parseResult.lexerErrors
+        // / parserErrors AND doc.diagnostics duplicated every syntax error in
+        // the preview table while the LSP Problems panel showed each once.
+        const result = await parseSource(ROADMAP_LEXER_ERROR);
+
+        const seen = new Map<string, number>();
+        for (const d of result.diagnostics) {
+            const key = `${d.line}:${d.column}:${d.message}`;
+            seen.set(key, (seen.get(key) ?? 0) + 1);
+        }
+        const duplicated = [...seen.entries()].filter(([, n]) => n > 1).map(([k]) => k);
+        expect(duplicated).toEqual([]);
+
+        // The lexer error keeps its dedicated `lex-error` code (rather than
+        // collapsing to the generic `validation` fallback).
+        expect(result.diagnostics.some((d) => d.code === 'lex-error')).toBe(true);
     });
 });
 

@@ -154,7 +154,19 @@ export async function parseSource(
         diagnostics.push(fromParserError(err, filePath));
     }
     for (const diag of doc.diagnostics ?? []) {
-        diagnostics.push(fromLangiumDiagnostic(diag as LangiumLikeDiagnostic, filePath));
+        const row = diag as LangiumLikeDiagnostic;
+        // Langium's validateDocument() folds the lexer + parser errors into
+        // doc.diagnostics (tagged with these `data.code` values) before
+        // running the validation checks. We already emitted those above from
+        // parseResult with dedicated `lex-error` / `parse-error` codes, so
+        // skip the re-folded copies here — otherwise every syntax error shows
+        // up twice in the preview table (the LSP Problems panel, which reads
+        // only doc.diagnostics, lists each once).
+        const builtinCode = row.data?.code;
+        if (builtinCode === 'lexing-error' || builtinCode === 'parsing-error') {
+            continue;
+        }
+        diagnostics.push(fromLangiumDiagnostic(row, filePath));
     }
     return { ast: doc.parseResult.value, diagnostics };
 }

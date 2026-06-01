@@ -28,3 +28,17 @@ swimlane eng "Engineering"
 export const ROADMAP_PARSE_ERROR = `nowline v1
 this is not a valid roadmap line
 `;
+
+// `duration:3-w` trips three diagnostics on one line: an invalid-duration
+// validation, a lexer "unexpected character" on the stray `-`, and a parser
+// DEDENT error on the trailing `w`. Langium folds the lexer + parser errors
+// into doc.diagnostics, so a naive collector double-counts them. Mirrors the
+// real-world report that surfaced this bug.
+export const ROADMAP_LEXER_ERROR = `nowline v1
+
+roadmap eng-q1 "Engineering Q1" start:2026-01-05 length:8w
+swimlane engineering "Engineering" capacity:4
+  item support "On-call support" duration:8w capacity:1
+  item auth-refactor "Auth refactor" duration:3-w capacity:2
+  item search-v2 "Search v2" duration:2w capacity:2
+`;
