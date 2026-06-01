@@ -463,4 +463,55 @@ swimlane a "A"
         expect(wp[wp.length - 1].x).toBeCloseTo(phaseLeft, 1);
         expect(wp[wp.length - 1].y).toBeCloseTo(phaseMidY, 1);
     });
+
+    it('places title-only swimlanes from resolved content', async () => {
+        const src = `nowline v1
+
+roadmap "Generative AI" start:2026-04-06 scale:2w calendar:business
+
+swimlane "Platform"
+  item "Technology Selection" duration:2w
+
+swimlane "Web"
+  item "Web Prototype" duration:4w
+
+swimlane "Mobile"
+  parallel
+    group "iOS"
+      item "iOS Prototype" duration:4w
+`;
+        const { file, resolved } = await parseAndResolve(src);
+        expect(resolved.content.swimlanes.size).toBe(3);
+        const model = layoutRoadmap(file, resolved, { theme: 'light' });
+        expect(model.swimlanes).toHaveLength(3);
+        expect(model.swimlanes.map((lane) => lane.title)).toEqual(['Platform', 'Web', 'Mobile']);
+    });
+
+    it('assigns distinct flow keys to sibling id-less parallel blocks', async () => {
+        // `a` (1w) and `b` (3w) sit in two separate id-less parallel blocks.
+        // Distinct flow keys keep both as the last entry of their own flow, so
+        // the after-only `ship` milestone draws one slack arrow back from the
+        // non-binding `a`. A shared fallback key would collapse them into one
+        // flow, dedupe `a` away, and leave zero slack arrows — so the count
+        // assertion fails without the per-block flow key.
+        const src = `nowline v1
+
+roadmap r "R" start:2026-01-05
+
+swimlane lane "Lane"
+  parallel
+    item a "First" duration:1w
+  parallel
+    item b "Second" duration:3w
+  milestone ship "Ship" after:[a, b]
+`;
+        const { file, resolved } = await parseAndResolve(src);
+        const model = layoutRoadmap(file, resolved, { theme: 'light' });
+        const lane = model.swimlanes[0];
+        const parallels = lane.children.filter((c) => c.kind === 'parallel');
+        expect(parallels).toHaveLength(2);
+        const ship = model.milestones.find((m) => m.title === 'Ship');
+        expect(ship).toBeDefined();
+        expect(ship?.slackArrows?.length ?? 0).toBe(1);
+    });
 });

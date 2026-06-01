@@ -381,6 +381,8 @@ export class RoadmapNode {
             chartBottomY: 0,
             swimlaneBottomY: 0,
             chartRightX: finalChartRightX,
+            nextParallelId: 0,
+            nextGroupId: 0,
         };
 
         // Seed the entity-edge maps from the date-pinned pack so item
@@ -426,6 +428,8 @@ export class RoadmapNode {
             nextY: number;
             maxRightX: number;
         } => {
+            ctx.nextParallelId = 0;
+            ctx.nextGroupId = 0;
             const out: PositionedSwimlane[] = [];
             let cursorY = ctx.chartTopY;
             let bIndex = 0;

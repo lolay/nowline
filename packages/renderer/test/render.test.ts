@@ -470,4 +470,56 @@ describe('renderSvg — lane utilization underline', () => {
         // 2px tall, flush with band bottom.
         expect(utilY + 2).toBeCloseTo(bgY + bgH, 5);
     });
+
+    it('renders title-only swimlanes and id-less parallel/group blocks', async () => {
+        const dsl = `nowline v1
+
+roadmap "Generative AI" start:2026-04-06 scale:2w calendar:business
+
+anchor "Kickoff" date:2026-04-06
+milestone "Beta" date:2026-06-15
+
+swimlane "Platform"
+  item "Technology Selection" duration:2w status:done
+  item api "API" duration:2w status:done
+
+swimlane "Web"
+  item "Web Prototype" duration:4w status:done
+
+swimlane "Mobile"
+  parallel
+    group "iOS"
+      item "iOS Prototype" duration:4w status:done
+    group "Android"
+      item "Android Prototype" duration:4w status:done
+`;
+        const model = await parseToModel(dsl, {
+            theme: 'light',
+            today: new Date(Date.UTC(2026, 5, 1)),
+        });
+        expect(model.swimlanes).toHaveLength(3);
+        expect(model.swimlanes.map((lane) => lane.title)).toEqual(['Platform', 'Web', 'Mobile']);
+
+        const mobile = model.swimlanes[2];
+        const parallelChild = mobile.children.find((c) => c.kind === 'parallel');
+        expect(parallelChild).toBeDefined();
+        if (parallelChild?.kind !== 'parallel') throw new Error('expected parallel');
+        expect(parallelChild.children.filter((c) => c.kind === 'group')).toHaveLength(2);
+
+        const svg = await renderSvg(model);
+        for (const label of [
+            'Platform',
+            'Web',
+            'Mobile',
+            'Technology Selection',
+            'iOS Prototype',
+            'Android Prototype',
+            'Kickoff',
+            'Beta',
+        ]) {
+            expect(svg).toContain(label);
+        }
+        expect(svg).toContain('data-layer="swimlane"');
+        expect(svg).toContain('data-layer="item"');
+    });
 });

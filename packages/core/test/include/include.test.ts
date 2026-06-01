@@ -379,4 +379,138 @@ describe('include resolver', () => {
             expect(result.config.symbols.size).toBe(0);
         });
     });
+
+    describe('title-only declarations', () => {
+        it('registers title-only roadmap entities under slug keys', async () => {
+            const text = `nowline v1
+
+roadmap "Generative AI" start:2026-04-06
+
+anchor "Kickoff" date:2026-04-06
+milestone "Beta" date:2026-06-15
+person "Sam"
+footnote "Note" on:host
+
+swimlane host "Host"
+  item x duration:1w
+
+swimlane "Platform"
+  item "Technology Selection" duration:2w
+
+swimlane "Web"
+  item "Web Prototype" duration:4w
+
+swimlane "Mobile"
+  item "Mobile Prototype" duration:4w
+`;
+            const { Nowline } = getServices();
+            const file = await parseAtPath(text, '/root/gen.nowline');
+            const result = await resolveIncludes(file, '/root/gen.nowline', {
+                services: Nowline,
+                readFile: async () => {
+                    throw new Error('unexpected read');
+                },
+            });
+            expect(result.diagnostics.filter((d) => d.severity === 'error')).toEqual([]);
+            expect([...result.content.swimlanes.keys()]).toEqual([
+                'host',
+                'platform',
+                'web',
+                'mobile',
+            ]);
+            expect(result.content.anchors.has('kickoff')).toBe(true);
+            expect(result.content.milestones.has('beta')).toBe(true);
+            expect(result.content.persons.has('sam')).toBe(true);
+            expect(result.content.footnotes.has('note')).toBe(true);
+        });
+
+        it('de-dupes title-only entities with the same slug', async () => {
+            const text = `nowline v1
+
+roadmap r "R"
+
+swimlane "Platform"
+  item x duration:1w
+
+swimlane "Platform"
+  item y duration:1w
+`;
+            const { Nowline } = getServices();
+            const file = await parseAtPath(text, '/root/dedup.nowline');
+            const result = await resolveIncludes(file, '/root/dedup.nowline', {
+                services: Nowline,
+                readFile: async () => {
+                    throw new Error('unexpected read');
+                },
+            });
+            expect([...result.content.swimlanes.keys()]).toEqual(['platform', 'platform-2']);
+        });
+
+        it('keeps parent-wins behavior for explicit id collisions on merge', async () => {
+            const files = {
+                'main.nowline': `include "./child.nowline"\nroadmap r "R"\nswimlane parent "Parent"\n  item x duration:1w\n`,
+                'child.nowline': `swimlane parent "Child lane"\n  item y duration:1w\n`,
+            };
+            const { Nowline } = getServices();
+            const main = await parseAtPath(files['main.nowline'], '/root/main.nowline');
+            const result = await resolveIncludes(main, '/root/main.nowline', {
+                services: Nowline,
+                readFile: makeFs(files),
+            });
+            expect(result.content.swimlanes.size).toBe(1);
+            expect(result.content.swimlanes.get('parent')?.title).toBe('Parent');
+            expect(
+                result.diagnostics.some(
+                    (d) => d.severity === 'warning' && d.message.includes('Swimlane "parent"'),
+                ),
+            ).toBe(true);
+        });
+
+        it('never lets a title-only slug displace an explicit id (any order)', async () => {
+            const text = `nowline v1
+
+roadmap r "R"
+
+swimlane "Platform"
+  item x duration:1w
+
+swimlane platform "Backlog"
+  item y duration:1w
+`;
+            const { Nowline } = getServices();
+            const file = await parseAtPath(text, '/root/order.nowline');
+            const result = await resolveIncludes(file, '/root/order.nowline', {
+                services: Nowline,
+                readFile: async () => {
+                    throw new Error('unexpected read');
+                },
+            });
+            expect(result.diagnostics.filter((d) => d.severity === 'error')).toEqual([]);
+            // The explicit id keeps `platform`; the earlier title-only lane
+            // yields to `platform-2`. Source order (title-only first) is kept.
+            expect(result.content.swimlanes.get('platform')?.title).toBe('Backlog');
+            expect(result.content.swimlanes.get('platform-2')?.title).toBe('Platform');
+            expect([...result.content.swimlanes.keys()]).toEqual(['platform-2', 'platform']);
+        });
+
+        it('de-dupes title-only entities across an include with no warning', async () => {
+            const files = {
+                'main.nowline': `include "./child.nowline"\nroadmap r "R"\nswimlane "Platform"\n  item x duration:1w\n`,
+                'child.nowline': `swimlane "Platform"\n  item y duration:1w\n`,
+            };
+            const { Nowline } = getServices();
+            const main = await parseAtPath(files['main.nowline'], '/root/main.nowline');
+            const result = await resolveIncludes(main, '/root/main.nowline', {
+                services: Nowline,
+                readFile: makeFs(files),
+            });
+            expect(result.diagnostics.filter((d) => d.severity === 'error')).toEqual([]);
+            expect([...result.content.swimlanes.keys()]).toEqual(['platform', 'platform-2']);
+            expect(
+                result.diagnostics.some(
+                    (d) => d.severity === 'warning' && d.message.includes('Swimlane'),
+                ),
+            ).toBe(false);
+        });
+    });
 });

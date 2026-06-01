@@ -373,15 +373,15 @@ function applyRoadmapMode(
             sourcePath: childPath,
         });
 
-    mergeMap(target.persons, child.persons, (name) => warn(name, 'Person'));
-    mergeMap(target.teams, child.teams, (name) => warn(name, 'Team'));
-    mergeMap(target.anchors, child.anchors, (name) => warn(name, 'Anchor'));
-    mergeMap(target.labels, child.labels, (name) => warn(name, 'Label'));
-    mergeMap(target.sizes, child.sizes, (name) => warn(name, 'Size'));
-    mergeMap(target.statuses, child.statuses, (name) => warn(name, 'Status'));
-    mergeMap(target.swimlanes, child.swimlanes, (name) => warn(name, 'Swimlane'));
-    mergeMap(target.milestones, child.milestones, (name) => warn(name, 'Milestone'));
-    mergeMap(target.footnotes, child.footnotes, (name) => warn(name, 'Footnote'));
+    mergeContentMap(target.persons, child.persons, (name) => warn(name, 'Person'));
+    mergeContentMap(target.teams, child.teams, (name) => warn(name, 'Team'));
+    mergeContentMap(target.anchors, child.anchors, (name) => warn(name, 'Anchor'));
+    mergeContentMap(target.labels, child.labels, (name) => warn(name, 'Label'));
+    mergeContentMap(target.sizes, child.sizes, (name) => warn(name, 'Size'));
+    mergeContentMap(target.statuses, child.statuses, (name) => warn(name, 'Status'));
+    mergeContentMap(target.swimlanes, child.swimlanes, (name) => warn(name, 'Swimlane'));
+    mergeContentMap(target.milestones, child.milestones, (name) => warn(name, 'Milestone'));
+    mergeContentMap(target.footnotes, child.footnotes, (name) => warn(name, 'Footnote'));
     if (child.roadmap && !target.roadmap) {
         target.roadmap = child.roadmap;
     }
@@ -393,6 +393,30 @@ function mergeMap<V>(
     onConflict: (name: string) => void,
 ): void {
     for (const [name, value] of source) {
+        if (target.has(name)) {
+            onConflict(name);
+            continue;
+        }
+        target.set(name, value);
+    }
+}
+
+/**
+ * Merge a child content map into the parent. Explicit-id entries keep the
+ * parent-wins-on-collision behavior (and warn). Title-only (auto-slugged)
+ * entries are internal and non-referenceable, so they never shadow and never
+ * warn — each is re-keyed around the parent's entries and kept.
+ */
+function mergeContentMap<V extends { name?: string; title?: string }>(
+    target: Map<string, V>,
+    source: Map<string, V>,
+    onConflict: (name: string) => void,
+): void {
+    for (const [name, value] of source) {
+        if (!value.name && value.title) {
+            target.set(uniqueMapKey(target as Map<string, unknown>, slugifyTitle(value.title)), value);
+            continue;
+        }
         if (target.has(name)) {
             onConflict(name);
             continue;
@@ -427,51 +451,120 @@ function addConfigEntry(config: ResolvedConfig, entry: ConfigEntry): void {
     }
 }
 
+/** Explicit ids declared in a file, grouped by the content map they target. */
+interface ReservedRoadmapIds {
+    swimlanes: Set<string>;
+    persons: Set<string>;
+    teams: Set<string>;
+    anchors: Set<string>;
+    labels: Set<string>;
+    sizes: Set<string>;
+    statuses: Set<string>;
+    milestones: Set<string>;
+    footnotes: Set<string>;
+}
+
+function collectExplicitRoadmapIds(entries: RoadmapEntry[]): ReservedRoadmapIds {
+    const reserved: ReservedRoadmapIds = {
+        swimlanes: new Set(),
+        persons: new Set(),
+        teams: new Set(),
+        anchors: new Set(),
+        labels: new Set(),
+        sizes: new Set(),
+        statuses: new Set(),
+        milestones: new Set(),
+        footnotes: new Set(),
+    };
+    for (const entry of entries) {
+        const name = (entry as { name?: string }).name;
+        if (!name) continue;
+        if (isSwimlaneDeclaration(entry)) reserved.swimlanes.add(name);
+        else if (isPersonDeclaration(entry)) reserved.persons.add(name);
+        else if (isTeamDeclaration(entry)) reserved.teams.add(name);
+        else if (isAnchorDeclaration(entry)) reserved.anchors.add(name);
+        else if (isLabelDeclaration(entry)) reserved.labels.add(name);
+        else if (isSizeDeclaration(entry)) reserved.sizes.add(name);
+        else if (isStatusDeclaration(entry)) reserved.statuses.add(name);
+        else if (isMilestoneDeclaration(entry)) reserved.milestones.add(name);
+        else if (isFootnoteDeclaration(entry)) reserved.footnotes.add(name);
+    }
+    return reserved;
+}
+
 function mergeLocalContent(content: ResolvedContent, file: NowlineFile): void {
     if (file.roadmapDecl && !content.roadmap) {
         content.roadmap = file.roadmapDecl;
     }
+    // Pre-scan explicit ids so a title-only slug can never displace one an
+    // author spelled out, even when the title-only entry comes first in source.
+    const reserved = collectExplicitRoadmapIds(file.roadmapEntries);
     for (const entry of file.roadmapEntries) {
-        addRoadmapEntry(content, entry);
+        addRoadmapEntry(content, entry, reserved);
     }
 }
 
-function addRoadmapEntry(content: ResolvedContent, entry: RoadmapEntry): void {
+/** Kebab-case slug for title-only entities (specs/dsl.md § Identifiers). */
+function slugifyTitle(title: string): string {
+    return title.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-+|-+$/g, '') || 'entity';
+}
+
+/**
+ * Pick a map key that does not collide with an existing entry, nor with any
+ * key in `reserved` (explicit ids that will be inserted later in the same
+ * pass). Reserving keeps a title-only slug from claiming a key an author
+ * spelled out explicitly, regardless of source order.
+ */
+function uniqueMapKey(map: Map<string, unknown>, base: string, reserved?: Set<string>): string {
+    const taken = (key: string): boolean => map.has(key) || (reserved?.has(key) ?? false);
+    if (!taken(base)) return base;
+    let n = 2;
+    while (taken(`${base}-${n}`)) n++;
+    return `${base}-${n}`;
+}
+
+/**
+ * Insert a roadmap entity into a resolved-content map. Explicit ids always
+ * win their key (and keep today's parent-wins-on-collision behavior); title-only
+ * entries land under a slug derived from the title (internal key — not written
+ * to AST) that avoids both occupied and `reserved` explicit-id keys.
+ */
+function addByKey<V extends { name?: string; title?: string }>(
+    map: Map<string, V>,
+    entry: V,
+    reserved?: Set<string>,
+): void {
+    if (entry.name) {
+        if (!map.has(entry.name)) {
+            map.set(entry.name, entry);
+        }
+    } else if (entry.title) {
+        map.set(uniqueMapKey(map as Map<string, unknown>, slugifyTitle(entry.title), reserved), entry);
+    }
+}
+
+function addRoadmapEntry(
+    content: ResolvedContent,
+    entry: RoadmapEntry,
+    reserved: ReservedRoadmapIds,
+): void {
     if (isSwimlaneDeclaration(entry)) {
-        if (entry.name && !content.swimlanes.has(entry.name)) {
-            content.swimlanes.set(entry.name, entry);
-        }
+        addByKey(content.swimlanes, entry, reserved.swimlanes);
     } else if (isPersonDeclaration(entry)) {
-        if (entry.name && !content.persons.has(entry.name)) {
-            content.persons.set(entry.name, entry);
-        }
+        addByKey(content.persons, entry, reserved.persons);
     } else if (isTeamDeclaration(entry)) {
-        if (entry.name && !content.teams.has(entry.name)) {
-            content.teams.set(entry.name, entry);
-        }
+        addByKey(content.teams, entry, reserved.teams);
     } else if (isAnchorDeclaration(entry)) {
-        if (entry.name && !content.anchors.has(entry.name)) {
-            content.anchors.set(entry.name, entry);
-        }
+        addByKey(content.anchors, entry, reserved.anchors);
     } else if (isLabelDeclaration(entry)) {
-        if (entry.name && !content.labels.has(entry.name)) {
-            content.labels.set(entry.name, entry);
-        }
+        addByKey(content.labels, entry, reserved.labels);
     } else if (isSizeDeclaration(entry)) {
-        if (entry.name && !content.sizes.has(entry.name)) {
-            content.sizes.set(entry.name, entry);
-        }
+        addByKey(content.sizes, entry, reserved.sizes);
     } else if (isStatusDeclaration(entry)) {
-        if (entry.name && !content.statuses.has(entry.name)) {
-            content.statuses.set(entry.name, entry);
-        }
+        addByKey(content.statuses, entry, reserved.statuses);
     } else if (isMilestoneDeclaration(entry)) {
-        if (entry.name && !content.milestones.has(entry.name)) {
-            content.milestones.set(entry.name, entry);
-        }
+        addByKey(content.milestones, entry, reserved.milestones);
     } else if (isFootnoteDeclaration(entry)) {
-        if (entry.name && !content.footnotes.has(entry.name)) {
-            content.footnotes.set(entry.name, entry);
-        }
+        addByKey(content.footnotes, entry, reserved.footnotes);
     }
 }

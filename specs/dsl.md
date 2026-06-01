@@ -985,7 +985,7 @@ The `nowline` directive is the only construct without an id or title; every othe
 
 Identifiers match `[a-zA-Z_][a-zA-Z0-9_-]*` — letters, digits, underscores, and dashes, starting with a letter or underscore. Idiomatic Nowline uses kebab-case (`auth-refactor`, `push-v2`, `ga-launch`), but `authRefactor`, `auth_refactor`, and `MED` are equally valid; pick what reads best for your team. They must be unique across the merged result (the file and all its includes).
 
-When omitted, the parser generates one by slugifying the title to kebab-case: `"Audit log v2"` becomes `audit-log-v2`. Auto-generated ids are always kebab-case for stability across reruns.
+When omitted, the parser generates one by slugifying the title to kebab-case: `"Audit log v2"` becomes `audit-log-v2`. Auto-generated ids are always kebab-case for stability across reruns. These internal keys make title-only declarations render and participate in include merge maps, but they are **not referenceable** — declare an explicit id on an entity before using it in `after:`, `before:`, or `on:`. An explicit id always claims its key ahead of any auto-derived slug (regardless of source order), and two title-only entities whose titles slugify to the same key de-dupe silently (`platform`, `platform-2`, …) without a shadowing warning. Id-less `parallel` and title-less `group` blocks receive internal positional handles (`parallel-1`, `group-1`, …) for layout flow segmentation only; likewise not referenceable.
 
 ### Lists
 

@@ -24,7 +24,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ### Fixed
 
-- _Nothing yet._
+- Title-only roadmap declarations (swimlanes, anchors, milestones, and other entities with a quoted title but no explicit id) now render instead of being silently dropped during include resolution. Auto-derived map keys and id-less `parallel`/`group` flow handles are internal only — declare an explicit id to reference an entity from `after:`, `before:`, or `on:`. An explicit id always wins its key over an auto-derived slug regardless of source order, and auto-slug collisions de-dupe silently (no spurious "shadowed" warning).
 
 ### Security
 

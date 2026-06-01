@@ -145,6 +145,14 @@ export interface LayoutContext {
      */
     swimlaneBottomY: number;
     chartRightX: number;
+    /**
+     * Monotonic counters for id-less `parallel` / `group` blocks. Each
+     * swimlane-loop pass resets both to zero; blocks without an explicit
+     * `name` receive internal flow-key handles (`parallel-1`, `group-1`, …).
+     * These handles are not referenceable from `after:` / `before:` / `on:`.
+     */
+    nextParallelId: number;
+    nextGroupId: number;
 }
 
 /**

@@ -90,7 +90,8 @@ export class GroupNode {
         // form one sub-flow under the parent's flow path. See
         // `LayoutContext.currentFlowKey`.
         const previousFlowKey = ctx.currentFlowKey;
-        ctx.currentFlowKey = `${previousFlowKey}/group:${node.name ?? 'g'}`;
+        ctx.nextGroupId += 1;
+        ctx.currentFlowKey = `${previousFlowKey}/group:${node.name ?? `group-${ctx.nextGroupId}`}`;
         // Mirrors `renderGroup`'s `hasFill` decision so the painted box
         // and the layout's reservation agree on whether a chiclet exists.
         const hasChiclet = style.bg !== 'none' && style.bg !== '#ffffff' && Boolean(title);

@@ -55,7 +55,8 @@ export class ParallelNode {
         // sub-tracks therefore stay in different flows for milestone
         // slack-arrow dedupe.
         const previousFlowKey = ctx.currentFlowKey;
-        const parId = node.name ?? 'p';
+        ctx.nextParallelId += 1;
+        const parId = node.name ?? `parallel-${ctx.nextParallelId}`;
 
         let childIndex = 0;
         for (const child of node.content) {

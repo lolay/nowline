@@ -110,12 +110,16 @@ export function buildIncludeRegions(
             chartBottomY: innerStartY,
             swimlaneBottomY: innerStartY,
             chartRightX: ctx.chartRightX,
+            nextParallelId: 0,
+            nextGroupId: 0,
         };
         const nestedSwimlanes: PositionedSwimlane[] = [];
         let cursorY = innerStartY;
         let bandIndex = 0;
         let nestedContentRightX = childCtx.timeline.originX;
         for (const lane of region.content.swimlanes.values()) {
+            childCtx.nextParallelId = 0;
+            childCtx.nextGroupId = 0;
             const { positioned, usedHeight, usedRightX } = new SwimlaneNode(
                 { lane, bandIndex },
                 deps,
