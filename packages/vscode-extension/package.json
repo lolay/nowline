@@ -244,6 +244,18 @@
                 "icon": "$(go-to-file)"
             },
             {
+                "command": "nowline.preview.expand",
+                "title": "Expand Preview (Full Screen)",
+                "category": "Nowline",
+                "icon": "$(screen-full)"
+            },
+            {
+                "command": "nowline.preview.collapse",
+                "title": "Restore Preview Size",
+                "category": "Nowline",
+                "icon": "$(screen-normal)"
+            },
+            {
                 "command": "nowline.export",
                 "title": "Export…",
                 "category": "Nowline",
@@ -277,9 +289,19 @@
                     "group": "navigation"
                 },
                 {
+                    "command": "nowline.preview.expand",
+                    "when": "activeWebviewPanelId == 'nowline.preview' && !nowline.previewMaximized",
+                    "group": "navigation@0"
+                },
+                {
+                    "command": "nowline.preview.collapse",
+                    "when": "activeWebviewPanelId == 'nowline.preview' && nowline.previewMaximized",
+                    "group": "navigation@0"
+                },
+                {
                     "command": "nowline.showSource",
                     "when": "activeWebviewPanelId == 'nowline.preview'",
-                    "group": "navigation"
+                    "group": "navigation@1"
                 },
                 {
                     "command": "nowline.export",
@@ -336,6 +358,14 @@
                 {
                     "command": "nowline.showSource",
                     "when": "activeWebviewPanelId == 'nowline.preview'"
+                },
+                {
+                    "command": "nowline.preview.expand",
+                    "when": "activeWebviewPanelId == 'nowline.preview' && !nowline.previewMaximized"
+                },
+                {
+                    "command": "nowline.preview.collapse",
+                    "when": "activeWebviewPanelId == 'nowline.preview' && nowline.previewMaximized"
                 },
                 {
                     "command": "nowline.newRoadmap"

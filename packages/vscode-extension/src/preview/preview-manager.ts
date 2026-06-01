@@ -18,6 +18,12 @@ export interface PreviewManagerDeps {
     vscodeLanguage(): string | undefined;
     /** Webview message handler, owned by extension.ts. */
     onMessage(msg: PreviewWebviewMessage, source: NowlinePreview): void;
+    /**
+     * Notified when a preview panel is disposed. Used by extension.ts to
+     * clear the `nowline.previewMaximized` context so the title-bar toggle
+     * doesn't strand its "restore" icon after a maximized preview closes.
+     */
+    onDispose?(preview: NowlinePreview): void;
 }
 
 /**
@@ -91,6 +97,7 @@ export class PreviewManager {
             onDispose: (source) => {
                 this.previews.delete(source.sourceUri.toString());
                 if (this.activePreview === source) this.activePreview = undefined;
+                this.deps.onDispose?.(source);
             },
         });
         // Track the active preview so nowline.showSource can route back to

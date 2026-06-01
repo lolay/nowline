@@ -26,6 +26,9 @@ let previewManager: PreviewManager | undefined;
 let rcCache: RcConfigCache | undefined;
 let disagreementTracker: DisagreementTracker | undefined;
 let exportOutputChannel: vscode.OutputChannel | undefined;
+// Drives the `nowline.previewMaximized` when-context that swaps the preview
+// tab's expand/collapse title-bar icon. See togglePreviewFullscreen.
+let previewMaximized = false;
 
 // Mirrors the URL terminal in packages/core/src/language/nowline.langium —
 // `https?://` followed by any non-whitespace, non-list-punctuation chars.
@@ -39,11 +42,19 @@ export function activate(context: vscode.ExtensionContext): void {
     disagreementTracker = new DisagreementTracker();
     exportOutputChannel = vscode.window.createOutputChannel('Nowline Export');
 
+    // Seed the title-bar toggle to its "expand" state. A fresh window is
+    // never maximized, and a window reload also resets the editor layout, so
+    // false is always correct at activation.
+    setPreviewMaximized(false);
+
     previewManager = new PreviewManager(context, {
         readSettings: readPreviewSettings,
         rcCache,
         vscodeLanguage: () => vscode.env.language,
         onMessage: handleWebviewMessage,
+        // Clearing on dispose keeps the expand/collapse icon honest when a
+        // maximized preview is closed (VS Code restores the layout for us).
+        onDispose: () => setPreviewMaximized(false),
     });
 
     context.subscriptions.push(
@@ -63,6 +74,10 @@ export function activate(context: vscode.ExtensionContext): void {
             openPreview(uri, vscode.ViewColumn.Beside),
         ),
         vscode.commands.registerCommand('nowline.showSource', () => showSource()),
+        vscode.commands.registerCommand('nowline.preview.expand', () => togglePreviewFullscreen()),
+        vscode.commands.registerCommand('nowline.preview.collapse', () =>
+            togglePreviewFullscreen(),
+        ),
         vscode.commands.registerCommand('nowline.export', (uri?: vscode.Uri) => handleExport(uri)),
         vscode.commands.registerCommand('nowline.newRoadmap', () => runNewRoadmapCommand()),
         rcCache.onDidChange(() => {
@@ -192,6 +207,28 @@ async function showSource(): Promise<void> {
         viewColumn: vscode.ViewColumn.Beside,
         preserveFocus: false,
     });
+}
+
+/**
+ * Title-bar toggle that mirrors the free app's fullscreen button: expand the
+ * preview to fill VS Code's editor area, then restore it. We piggy-back on the
+ * built-in "Toggle Maximize Editor Group" so the action stays a clean,
+ * reversible primitive — no fragile sidebar/panel state to remember. The
+ * expand (`$(screen-full)`) ↔ restore (`$(screen-normal)`) icon swap is driven
+ * by the `nowline.previewMaximized` context key we maintain here.
+ *
+ * VS Code doesn't surface editor-group maximize state to extensions, so if the
+ * user un-maximizes another way (double-clicking the tab, the command palette)
+ * the icon can briefly disagree; one more click re-syncs it.
+ */
+async function togglePreviewFullscreen(): Promise<void> {
+    await vscode.commands.executeCommand('workbench.action.toggleMaximizeEditorGroup');
+    setPreviewMaximized(!previewMaximized);
+}
+
+function setPreviewMaximized(value: boolean): void {
+    previewMaximized = value;
+    void vscode.commands.executeCommand('setContext', 'nowline.previewMaximized', value);
 }
 
 function activeNowlineUri(): vscode.Uri | undefined {

@@ -16,6 +16,17 @@ Preview parity, export from VS Code, and authoring commands (m3d / m3e / m3f):
   French previews and French diagnostics with no configuration.
 - Preview toolbar adds a *View ▾* dropdown with per-session overrides for
   theme, now-line, and link visibility (not persisted to settings).
+- Preview toolbar polish: separate **Fit width** (`↔`) and **Fit page**
+  (`⤢`) buttons; a **collapse** control (`«`) that shrinks the toolbar to
+  a translucent puck with a `»` restore; the toolbar defaults to the
+  upper-right and shifts left (rather than squishing) when the panel
+  narrows; the Now calendar and all dropdowns stay within the panel
+  gutters instead of running off-screen; an Export download glyph; and a
+  centred Copy / Export action row.
+- **Expand / collapse preview** button in the tab title bar: `⛶` fills
+  the editor area with the preview (maximizes the editor group); `⊡`
+  restores the previous layout. Mirrors the fullscreen toggle on the free
+  web app. Commands: `nowline.preview.expand` / `nowline.preview.collapse`.
 - `nowline.preview.theme` now offers `grayscale` alongside `auto` / `light` /
   `dark`, and the toolbar *Theme ▾* `Grayscale` selection now actually renders
   the grayscale palette (previously it silently fell back to light/dark). The
