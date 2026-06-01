@@ -8,9 +8,8 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ### Added
 
+- **Canary channel**: every push to `main` publishes a `0.0.0-dev.<UTC>.<sha>` pre-release to npm under the `next` dist-tag via `.github/workflows/canary.yml`. The version sorts strictly below every real release so it can never satisfy a `^X.Y` range off `latest` — no prod leakage. After publish, the jsDelivr `@next` cache for `@nowline/embed` is purged. Install with `@nowline/embed@next` or reference `https://cdn.jsdelivr.net/npm/@nowline/embed@next/dist/nowline.min.js`.
 - VS Code: `nowline.preview.theme` now offers `grayscale` (the Theme/diagram-palette axis) in addition to `auto` / `light` / `dark`, and the preview toolbar's `Grayscale` selection now renders the grayscale palette instead of silently falling back to light/dark. The chrome/workbench Mode axis is unchanged (stays light/dark).
-- Every released `@nowline/embed` version is now durably hosted on `embed.nowline.io`: the current version's bytes come from the published npm tarball (the exact artifact uploaded to the registry), and prior versions are fetched from the npm registry on each deploy — so the full history stays available and byte-identical to npm.
-- Root version-index page (`https://embed.nowline.io/`) and per-version "Nowline Embed Demo" pages (`https://embed.nowline.io/{X.Y.Z}/`) on both `embed.nowline.io` and `embed.nowline.dev`, serving as live smoke tests and a browsable version catalogue after each deploy.
 - `@nowline/preview-shell`: Redesigned toolbar — single-row chrome with mode-aware palette (`data-nl-mode`), separate **Fit width** (`↔`) and **Fit page** (`⤢`) buttons, consolidated more-menu (Format, Copy, Export, Theme, Now, Show Links dropdowns), hand-rolled calendar picker for the Now control, and minimap auto-hide. The Export action uses a download glyph, and Copy / Export each take half the action row and are centred. VS Code extension wires `locale` and `themeControl:'show'`.
 - `@nowline/preview-shell`: Toolbar drag grip — reposition anywhere in the preview root with pointer capture and bounds clamping; position persists within the JS session. The toolbar defaults to the upper-right corner and tracks it on resize; a narrowing viewport shifts the whole toolbar left (it keeps its natural width) instead of squishing the row. Collapse toggle (`«`) shrinks the toolbar to a translucent puck (drag grip + `»` restore); `»` expands it again. After a manual zoom/pan the viewport centre point is preserved across resize events (`isDirty` state).
 - VS Code extension: **Expand / collapse preview** button in the tab title bar (`$(screen-full)` / `$(screen-normal)`) maximizes the editor group so the preview fills VS Code's editor area, then restores it. Mirrors the free web app's fullscreen toggle. Commands: `nowline.preview.expand` / `nowline.preview.collapse`, driven by the `nowline.previewMaximized` context key.
@@ -18,7 +17,6 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 ### Changed
 
 - The grayscale render theme's canonical token is now `grayscale` (US spelling), matching the canonical `gray` color token; the UK spelling `greyscale` is accepted as an alias everywhere a theme is named (`--theme`, embed `theme`, preview toolbar). The rendered `data-theme` attribute and the `theme:`-keyed sample outputs now emit `grayscale` — update any CSS or tooling that keys off `data-theme="greyscale"`.
-- Dev CDN bundle now serves at `https://embed.nowline.dev/latest/nowline.min.js` (was the flat path `https://embed.nowline.dev/nowline.min.js`), aligning the dev domain's path layout with the prod `/latest/` alias.
 - Embed bundle banner `built=` timestamp is now the git commit date rather than the wall-clock build time, making builds of the same tag byte-identical across the npm tarball and the branded CDN. Downstream integrity checks (`sha256sum`, Content-Length assertions) are stable across re-deploys.
 
 ### Deprecated
@@ -27,7 +25,8 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ### Removed
 
-- _Nothing yet._
+- **`@nowline/embed`**: Branded Firebase Hosting CDN (`embed.nowline.{io,dev}`) retired. jsDelivr (`cdn.jsdelivr.net/npm/@nowline/embed@…/dist/nowline.min.js`) is now the documented CDN channel — byte-identical to the npm tarball. The `embed-cdn.yml` workflow, `embed-prod` release job, `prepare-firebase-deploy` composite action, `packages/embed/firebase/`, dev/prod CDN layout scripts (`build-cdn-history.mjs`, `gen-index.mjs`, `lib/templates.mjs`), and the Firebase dev auth gate (`src/auth/`) are all removed. The sole trade-off is branding (`embed.nowline.io` custom domain goes away). The canary workflow (see Added below) replaces `embed.nowline.dev` as the HEAD-tracking channel.
+- **`@nowline/embed`**: `bundle:dev` script and `firebase` devDependency removed from `packages/embed/package.json`.
 
 ### Fixed
 
@@ -38,7 +37,6 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 - `@nowline/cli`: `nowline render` / `validate` diagnostics had the same double-counting bug as the browser pipeline (lexer/parser errors emitted from `parseResult` *and* again from `doc.diagnostics`). The CLI's `parseSource()` now skips the re-folded `lexing-error` / `parsing-error` copies, so each syntax error is reported once.
 - VS Code: the live preview's toolbar, menus, and minimap are styled again. After the m4.7 `@nowline/preview-shell` extraction the webview's nonce-only CSP (`style-src` with no `'unsafe-inline'`) refused the non-nonced `<style>` that `mountPreview()` injected at runtime, so the shell rendered unstyled (stacked controls, "Rendering preview…" stuck on screen). The webview HTML now serves `PREVIEW_SHELL_CSS` from its existing nonced `<style>` block, and `mountPreview()` skips its own injection when a `data-nl-preview-shell` stylesheet is already present.
 - `@nowline/preview-shell`: Canvas is now flex-centered; a `ResizeObserver` re-applies fit presets when the pane is resized without a window resize event.
-- `@nowline/embed`: CDN demo pages (`embed.nowline.io` / `embed.nowline.dev`) now support System / Light / Dark theme switching with a pre-paint init script; `embed.nowline.dev` hides the version Channels table; share links now route to the correct environment (`free.nowline.dev` on dev, `free.nowline.io` on prod).
 
 ### Security
 

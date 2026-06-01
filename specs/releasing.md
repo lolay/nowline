@@ -119,7 +119,6 @@ Defined in [`build.yml`](./.github/workflows/build.yml). One job, one matrix, te
 | `pack-npm` | ubuntu-latest | `npm-tarballs` artifact (eighteen `.tgz` files) |
 | `pack-vsix` | ubuntu-latest | `nowline-vscode.vsix` artifact |
 | `pack-action` | ubuntu-latest | `action-mirror` bundle artifact |
-| `pack-embed` | ubuntu-latest | embed CDN prod tree integrity check |
 | `pack-mcp-mcpb` | ubuntu-latest | `nowline.mcpb` artifact (Claude Desktop Extensions bundle built from `packages/mcp/`) |
 
 Binary cells use `bun compile` and run the same per-format smoke test (SVG, PNG, PDF, HTML, Mermaid, XLSX, MS Project XML) against `examples/minimal.nowline`, except cross-target combinations that cannot execute on the runner. The two linux cells additionally invoke [`scripts/build-deb.sh`](../scripts/build-deb.sh) on the binary they just produced — keeping the binary→deb chain intra-cell skips an artifact upload/download round-trip.
@@ -133,8 +132,6 @@ Binary cells use `bun compile` and run the same per-format smoke test (SVG, PNG,
 `pack-vsix` runs `pnpm package` in [`packages/vscode-extension`](../packages/vscode-extension), which produces `dist/nowline-vscode.vsix` via esbuild + `vsce package --no-dependencies`. The `.vsix` bundles the workspace dependencies, so the vscode publish cell never needs to read from npm.
 
 `pack-action` stages the Marketplace action mirror bundle for `lolay/nowline-action`.
-
-`pack-embed` verifies the embed CDN prod tree produced by `pnpm -r build` (integrity check only on PR/main runs; the upload is gated on `inputs.upload`).
 
 `pack-mcp-mcpb` builds and bundles the `packages/mcp/` source into a `nowline.mcpb` Claude Desktop Extensions bundle using the `.mcpb` build toolchain. The artifact is submitted to Claude's Extensions directory as part of the release (analogous to the VS Code `.vsix` submission). Curated marketplace submissions (public MCP registry, Cursor Marketplace, VS Code MCP gallery, Gemini CLI extension channel) may require a separate manual submission/review step with lead time; see [§ MCP publishing artifacts](#mcp-publishing-artifacts) below.
 

@@ -12,9 +12,8 @@
 // Sync, works on every browser, no feature-detect.
 
 import { zlibSync } from 'fflate';
-import { DEFAULT_SHARE_BASE } from './auth/env.js';
 
-export { DEFAULT_SHARE_BASE };
+export const DEFAULT_SHARE_BASE = 'https://free.nowline.io/open';
 
 /**
  * The `share` initialize option selects where share links point.

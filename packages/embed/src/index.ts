@@ -5,17 +5,12 @@
 // The IIFE bundle exposes everything below as `window.nowline.*`. ESM
 // consumers import named exports from the package root.
 
-import { EMBED_SHA, EMBED_VERSION } from './auth/env.js';
-
-// Build-time constant substituted by esbuild's `define` (see
-// `scripts/bundle.mjs`). Reading it directly at the call site (rather
-// than via an `IS_DEV` re-export from env.ts) means esbuild can fold
-// the `if` below to a literal `true`/`false` at minify time and
-// dead-code-eliminate the dynamic-import branch in the prod bundle,
-// stripping `firebase/app` + `firebase/auth` from `dist/nowline.min.js`.
-// The `typeof` guard keeps the file safe to import under vitest, where
-// esbuild's define never runs and the identifier is undeclared.
-declare const __NOWLINE_EMBED_ENV__: string;
+// Build-time constants substituted by esbuild's `define` (see
+// `scripts/bundle.mjs`). The `typeof` guards keep this file safe to
+// import under vitest, where esbuild's define never runs and the
+// identifiers are undeclared.
+declare const __NOWLINE_EMBED_VERSION__: string;
+declare const __NOWLINE_EMBED_SHA__: string;
 
 import {
     __resetAutoScanForTests,
@@ -51,8 +46,10 @@ export {
  * pages and bug reports can identify the exact build without scraping
  * the comment banner.
  */
-export const version: string = EMBED_VERSION;
-export const sha: string = EMBED_SHA;
+export const version: string =
+    typeof __NOWLINE_EMBED_VERSION__ !== 'undefined' ? __NOWLINE_EMBED_VERSION__ : '0.0.0';
+export const sha: string =
+    typeof __NOWLINE_EMBED_SHA__ !== 'undefined' ? __NOWLINE_EMBED_SHA__ : 'unknown';
 
 const DEFAULT_SELECTOR = 'pre code.language-nowline, code.language-nowline';
 
@@ -80,8 +77,8 @@ export interface InitializeOptions {
     today?: Date;
     /**
      * Controls the "Share on Nowline" anchor appended after each rendered SVG.
-     * - `true` (default) — link to the env-specific Free app open route
-     *   (`https://free.nowline.io/open` prod, `https://free.nowline.dev/open` dev).
+     * - `true` (default) — link to the Free app open route
+     *   (`https://free.nowline.io/open`).
      * - string — a custom base URL (may include a path); the fragment is appended.
      * - `false` / `'none'` — no anchor rendered.
      * - `{ textUrl, remoteUrl }` — template with `{text}` / `{url}` substitution.
@@ -205,23 +202,6 @@ export const run = init;
 // the auto-scan branch.
 if (typeof document !== 'undefined' && !autoStartScheduled) {
     autoStartScheduled = true;
-
-    // Dev-only Firebase Auth gate (embed.nowline.dev). The condition
-    // reads `__NOWLINE_EMBED_ENV__` directly so esbuild's `define`
-    // substitutes a literal string at minify time — the prod bundle
-    // sees `if ("prod" === "dev")` → `if (false)` and DCEs the dynamic
-    // import that pulls in `firebase/app` + `firebase/auth`.
-    // `check-size.mjs` asserts no `firebase` literal survives in the
-    // prod IIFE as a belt-and-suspenders check.
-    if (typeof __NOWLINE_EMBED_ENV__ !== 'undefined' && __NOWLINE_EMBED_ENV__ === 'dev') {
-        void import('./auth/firebase-auth.client.js')
-            .then(({ startDevAuthGate }) => {
-                startDevAuthGate();
-            })
-            .catch((err) => {
-                console.error('[nowline] dev auth gate failed to load:', err);
-            });
-    }
 
     const start = (): void => {
         if (!config.startOnLoad) return;

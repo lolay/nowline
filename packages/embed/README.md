@@ -8,25 +8,17 @@ tag and Nowline blocks light up.
 ## Quick start
 
 ```html
-<!-- pin a version in production; @latest is convenient for prototypes -->
-<script src="https://embed.nowline.io/0.2.0/nowline.min.js"></script>
+<!-- pin an exact version in production -->
+<script src="https://cdn.jsdelivr.net/npm/@nowline/embed@0.4.2/dist/nowline.min.js"></script>
 ```
 
 That's it. Every `<pre><code class="language-nowline">…</code></pre>`
 block on the page renders on `DOMContentLoaded`.
 
-> **Status note (m4 in progress):** the bundle is published to npm
-> today, but the branded `embed.nowline.io` CDN deploy is still
-> pending — see [`specs/handoffs/handoff-m4-embed.md`](../../specs/handoffs/handoff-m4-embed.md)
-> "Carried forward". Until that lands, install via npm and serve the
-> bundle yourself (see [ESM consumers](#esm-consumers) below) or
-> drop in `import { initialize } from '@nowline/embed'` from your
-> app bundle.
-
 ## Configuration
 
 ```html
-<script src="https://embed.nowline.io/0.2.0/nowline.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/@nowline/embed@0.4.2/dist/nowline.min.js"></script>
 <script>
   nowline.initialize({
     theme: 'dark',         // 'light' | 'dark' | 'auto' (reads prefers-color-scheme once)
@@ -49,7 +41,7 @@ Theme precedence (highest to lowest):
 For dynamically loaded blocks or custom containers:
 
 ```html
-<script src="https://embed.nowline.io/0.2.0/nowline.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/@nowline/embed@0.4.2/dist/nowline.min.js"></script>
 <script>
   const svg = await nowline.render(`
     roadmap "My Roadmap"
@@ -68,25 +60,21 @@ mutates.
 
 ## CDN URLs
 
-The documented channel is the branded `embed.nowline.io` / `embed.nowline.dev`
-CDN, served from a Firebase Hosting deploy that runs on each release.
-See [`specs/embed.md`](../../specs/embed.md) "Distribution" for the
-full URL matrix (immutable patch, mutable minor, `latest`, dev
-channel, per-PR ephemeral previews) and cache-control posture.
+jsDelivr is the documented CDN channel. The bytes are served directly
+from the npm tarball — byte-identical to `npm pack @nowline/embed@X.Y.Z`.
 
 | URL pattern | Stability | Audience |
 |-------------|-----------|----------|
-| `https://embed.nowline.io/{X.Y.Z}/nowline.min.js` | immutable per patch | production embedders pinning a known-good build |
-| `https://embed.nowline.io/{X.Y}/nowline.min.js`   | mutable within minor | embedders who want patch fixes auto-rolled in |
-| `https://embed.nowline.io/latest/nowline.min.js`  | mutable, latest stable | docs, demos, prototypes |
-| `https://embed.nowline.dev/nowline.min.js`        | mutable, no SLA      | "next" preview, opt-in only |
+| `https://cdn.jsdelivr.net/npm/@nowline/embed@X.Y.Z/dist/nowline.min.js` | immutable per patch | production embedders pinning a known-good build |
+| `https://cdn.jsdelivr.net/npm/@nowline/embed@X.Y/dist/nowline.min.js`   | mutable within minor | embedders who want patch fixes auto-rolled in (pre-1.0 the minor is the breaking-change boundary) |
+| `https://cdn.jsdelivr.net/npm/@nowline/embed/dist/nowline.min.js`       | mutable, latest stable | docs, demos, prototypes |
+| `https://cdn.jsdelivr.net/npm/@nowline/embed@next/dist/nowline.min.js`  | HEAD-tracking canary (`0.0.0-dev.*`) | "next" preview, opt-in only |
+
+unpkg also works (`https://unpkg.com/@nowline/embed@X.Y.Z/dist/nowline.min.js`).
 
 Pin the version in production so a release does not silently re-render
-your roadmap.
-
-> **Bootstrap pending:** `embed.nowline.{io,dev}` is not live yet —
-> see [`specs/handoffs/handoff-m4-embed.md`](../../specs/handoffs/handoff-m4-embed.md)
-> "Carried forward". For now, consume the package over npm.
+your roadmap. See [`specs/embed.md`](../../specs/embed.md) for the
+full distribution spec.
 
 ## Limitations
 

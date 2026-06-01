@@ -1,0 +1,88 @@
+name: Canary
+
+# Publishes a `0.0.0-dev.*` pre-release to npm under the `next` dist-tag
+# on every push to main (excluding release-bot commits and doc-only
+# changes). Provides a HEAD-tracking channel consumers can opt into:
+#
+#   npm install @nowline/embed@next
+#   <script src="https://cdn.jsdelivr.net/npm/@nowline/embed@next/dist/nowline.min.js">
+#
+# The `0.0.0-dev.*` version sorts strictly below every real release and
+# can never satisfy a `^X.Y` range from `latest` — no prod leakage.
+#
+# After each publish, the jsDelivr `@next` cache for `@nowline/embed` is
+# purged so the CDN serves the fresh bundle within seconds. Only
+# `@nowline/embed` is consumed via jsDelivr at runtime; the other
+# `@next` packages reach consumers through `npm install`, so no purge is
+# needed for them.
+
+on:
+  push:
+    branches: [main]
+    paths-ignore:
+      - '**/*.md'
+      - 'specs/**'
+      - '.scratch/**'
+  workflow_dispatch:
+
+# One canary publish at a time; cancel any in-flight run for the same
+# branch so a burst of pushes doesn't queue up stale publishes.
+concurrency:
+  group: canary-publish
+  cancel-in-progress: true
+
+jobs:
+  canary:
+    name: Publish canary (@next)
+    # Skip the release-bot's version-bump commits that land right before a
+    # tag — those go out on `latest` via release.yml, not here.
+    if: github.event.head_commit.author.email != 'nowline-release-bot@lolay.com'
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+
+    steps:
+      - name: Checkout main
+        uses: actions/checkout@v6
+
+      - name: Setup Node + pnpm
+        uses: ./.github/actions/setup-node-pnpm
+
+      # actions/setup-node with registry-url writes the .npmrc that wires
+      # NODE_AUTH_TOKEN into `npm publish`. Must run after setup-node-pnpm
+      # so the cache key is already set.
+      - name: Configure npm registry auth
+        uses: actions/setup-node@v6
+        with:
+          registry-url: 'https://registry.npmjs.org'
+
+      - name: Compute snapshot version
+        id: snap
+        run: |
+          VERSION=$(make snapshot-version)
+          echo "version=$VERSION" >> "$GITHUB_OUTPUT"
+          echo "Snapshot version: $VERSION"
+
+      - name: Build (fast)
+        run: make build-fast
+
+      - name: Pack tarballs
+        run: make pack
+
+      - name: Publish to npm (@next)
+        env:
+          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
+        run: CONFIRM_PUBLISH=1 NPM_DIST_TAG=next make publish-npm
+
+      # Purge jsDelivr's `@next` cache for @nowline/embed so the CDN
+      # serves the fresh bundle. Only the three files that consumers
+      # reference at runtime need purging; the source map and ESM bundle
+      # are included so DevTools and bundler consumers stay in sync.
+      - name: Purge jsDelivr cache (@nowline/embed@next)
+        run: |
+          set -euo pipefail
+          BASE="https://purge.jsdelivr.net/npm/@nowline/embed@next/dist"
+          for file in nowline.min.js nowline.min.js.map nowline.esm.js; do
+            echo "Purging $BASE/$file"
+            curl --silent --show-error --fail "$BASE/$file" || true
+          done

@@ -30,7 +30,8 @@ for the consolidation details.
 ### Basic
 
 ```html
-<script src="https://embed.nowline.io/0.2.0/nowline.min.js"></script>
+<!-- pin an exact version for production stability -->
+<script src="https://cdn.jsdelivr.net/npm/@nowline/embed@0.4.2/dist/nowline.min.js"></script>
 ```
 
 That's it. Any ` ```nowline ` block in the page will render automatically on `DOMContentLoaded`.
@@ -38,7 +39,7 @@ That's it. Any ` ```nowline ` block in the page will render automatically on `DO
 ### With Configuration
 
 ```html
-<script src="https://embed.nowline.io/0.2.0/nowline.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/@nowline/embed@0.4.2/dist/nowline.min.js"></script>
 <script>
   nowline.initialize({
     theme: 'dark',           // 'light' | 'dark' | 'grayscale' | 'auto' (reads prefers-color-scheme once); 'greyscale' accepted as alias
@@ -53,7 +54,7 @@ That's it. Any ` ```nowline ` block in the page will render automatically on `DO
 ### Manual Rendering
 
 ```html
-<script src="https://embed.nowline.io/0.2.0/nowline.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/@nowline/embed@0.4.2/dist/nowline.min.js"></script>
 <script>
   const svg = await nowline.render(`
     roadmap "My Roadmap"
@@ -84,7 +85,7 @@ The feature has two independent halves:
 2. **A destination** — configurable through the `share` option, defaulting to Nowline's own Free app.
 
 ```html
-<script src="https://embed.nowline.io/0.4/nowline.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/@nowline/embed@0.4/dist/nowline.min.js"></script>
 <script>
   nowline.initialize({
     share: true,                  // default; see the share matrix below
@@ -133,7 +134,7 @@ function decodeText(fragmentValue) {
 
 | `share` value | Rendered link | Notes |
 |---------------|---------------|-------|
-| `true` *(default)* | `DEFAULT_SHARE_BASE` + fragment | Prod bundle: `"https://free.nowline.io/open"`. Dev bundle (`embed.nowline.dev`): `"https://free.nowline.dev/open"`. Selected at build time via `__NOWLINE_EMBED_ENV__`. |
+| `true` *(default)* | `DEFAULT_SHARE_BASE` + fragment | `"https://free.nowline.io/open"`. |
 | `"https://editor.foo.com"` / `"https://foo.com/open"` *(string)* | base + fragment | A **base URL that may include a path** (a "root URI"). The link is built with the `URL` API and the `#text=`/`#url=` fragment is set on it, so `https://foo.com/open` → `https://foo.com/open#text=…`. Lets a self-hoster whose editor lives under a subpath receive shares. |
 | `false` / `"none"` | *(none)* | No "Share on Nowline" link is rendered. |
 | `{ textUrl, remoteUrl }` *(template)* | substituted template | Escape hatch for hosts needing a non-hash URL shape. `{text}` is substituted with the base64url payload; `{url}` with the percent-encoded source URL. e.g. `{ textUrl: 'https://x.com/o?d={text}', remoteUrl: 'https://x.com/o?u={url}' }`. |
@@ -183,51 +184,30 @@ Because both sides use the same library and the same zlib (RFC 1950) framing, en
 
 ## Distribution
 
-The embed bundle is served from two domains, both Firebase-Hosted under separate Firebase projects so dev traffic and abuse can never spill into prod. **Responsibility split across two repos:**
+`@nowline/embed` is published to npm on every release. **jsDelivr** is the documented CDN channel — the bytes are byte-identical to the npm registry because jsDelivr serves directly from the npm tarball.
 
-- **Infrastructure** — the two `nowline-embed-{prod,dev}` GCP projects, billing links, Firebase Hosting custom-domain bindings for `embed.nowline.{io,dev}`, deploy service accounts, Workload Identity Federation pools, and project-level IAM are all Terraform-managed in the infrastructure repository (stack: `stacks/embed/`, milestone m7). Squarespace DNS records for the two `embed.*` subdomains are documented in that repo's `ops/dns.md` (no TF provider).
-- **Application** — the bundle build (`packages/embed/`), the per-project `firebase.json` cache-header config, and the `release.yml` deploy cells that consume the infra repo's WIF outputs all live in this monorepo. The deploy job authenticates via WIF (no static service-account JSON keys; the infra's org policy `iam.disableServiceAccountKeyCreation` is enforced at the org level).
+> **Decision record (wave-1).** The earlier plan specified a branded `embed.nowline.{io,dev}` Firebase Hosting CDN (infrastructure repository m7). That approach was reversed: the sole material loss is branding (`embed.nowline.io` goes away in favour of `cdn.jsdelivr.net/npm/@nowline/embed@…`), but it severs the only `nowline → nowline-infra` deploy dependency and eliminates the Firebase Hosting stack, the WIF wiring, the CDN history-reconstruction scripts, and the dev auth gate entirely. The `canary.yml` workflow publishes `0.0.0-dev.*` canaries to the `@next` dist-tag on every push to `main`, providing a live HEAD-tracking channel in place of `embed.nowline.dev`.
 
-See [Bootstrap status](#bootstrap-status) for what's wired today. The end-to-end deploy runbook lives in the infrastructure repository — it covers the GitHub environment + variable wiring, the `firebase.json` cache-header contract, the dev auth gate, and the verification curls.
+### URL patterns
 
-| URL | Triggered by | Stability | `Cache-Control` | Audience |
-|-----|--------------|-----------|-----------------|----------|
-| `https://embed.nowline.io/{X.Y.Z}/nowline.min.js` | release tag | immutable; all released `X.Y.Z` reconstructed from npm each deploy | `public, max-age=31536000, immutable` | embedders pinning to a known-good build |
-| `https://embed.nowline.io/{X.Y}/nowline.min.js` | release tag (rewritten on each release in the minor) | mutable within minor | `public, max-age=300, s-maxage=600` | embedders who want patch fixes auto-rolled in |
-| `https://embed.nowline.io/latest/nowline.min.js` | release tag (rewritten on each release) | mutable, latest stable | `public, max-age=300, s-maxage=600` | docs site, demos, prototypes |
-| `https://embed.nowline.dev/latest/nowline.min.js` | every push to `main` | mutable, no SLA, may break | `public, max-age=60, s-maxage=120, must-revalidate`, `X-Robots-Tag: noindex` | internal preview, early adopters opting into "next" |
-| `https://nowline-embed-dev--pr-{N}-{sha}.web.app/latest/nowline.min.js` | PR open or sync | ephemeral, 7-day TTL | Firebase default | per-PR review, posted as a PR comment by the deploy action |
-| `https://embed.nowline.io/` | release deploy | version index, regenerated each deploy | `public, max-age=300, s-maxage=600` | browsable version catalogue; discovery surface for the CDN |
-| `https://embed.nowline.io/{X.Y.Z}/` | release deploy | demo page, regenerated each deploy | `public, max-age=300, s-maxage=600`, `X-Robots-Tag: noindex` | live smoke test for each released version; not indexed |
+| URL | Stability | Audience |
+|-----|-----------|----------|
+| `https://cdn.jsdelivr.net/npm/@nowline/embed@X.Y.Z/dist/nowline.min.js` | immutable per patch | production embedders pinning a known-good build |
+| `https://cdn.jsdelivr.net/npm/@nowline/embed@X.Y/dist/nowline.min.js` | mutable within minor (jsDelivr tag alias) | embedders who want patch fixes auto-rolled in (pre-1.0 the minor is the breaking-change boundary) |
+| `https://cdn.jsdelivr.net/npm/@nowline/embed/dist/nowline.min.js` | mutable, latest stable | docs site, demos, prototypes |
+| `https://cdn.jsdelivr.net/npm/@nowline/embed@next/dist/nowline.min.js` | HEAD-tracking canary (`0.0.0-dev.*`), published on every push to `main` | internal preview, early adopters opting into HEAD |
 
-### Why minor-pinning, not major-pinning, on `embed.nowline.io`
-
-Per semver, the *minor* is the breaking-change boundary while the package is pre-1.0 (`0.2 → 0.3` is allowed to break; `0.2.0 → 0.2.1` must not). So the auto-upgrading "stable channel" for an embedder during 0.x is `/0.2/`, not `/0/` — bare `/0/` would also read as ambiguous, while `/0.2/` is unambiguously a version number.
-
-When the package reaches 1.0, a `https://embed.nowline.io/v{N}/nowline.min.js` major-pinned tier will be added (`v` prefix because bare `/1/` is ambiguous in the same way `/0/` was). All released `X.Y.Z` paths stay available indefinitely — they are reconstructed from the published npm tarball on each deploy, so the CDN bytes are byte-identical to what `npm pack @nowline/embed@X.Y.Z` produces.
+> **unpkg** also works (`https://unpkg.com/@nowline/embed@X.Y.Z/dist/nowline.min.js`) and serves the same bytes.
 
 ### Bundle provenance
 
 Every built bundle includes a banner injected at the top:
 
 ```js
-/*! @nowline/embed 0.2.0 sha=<short-sha> built=<iso-utc> */
+/*! @nowline/embed 0.4.2 sha=<short-sha> built=<iso-utc> */
 ```
 
-curl the URL or open it in DevTools to see exactly which build is being served. The `embed.nowline.dev` build additionally calls `console.warn("nowline embed @<sha> — unstable, do not pin")` once per page load.
-
-### Why a custom CDN instead of jsDelivr / unpkg
-
-The embed is shipped as `@nowline/embed` on npm, so the npm-backed CDNs (jsDelivr, unpkg) automatically serve it too. Direct embedding via `https://cdn.jsdelivr.net/npm/@nowline/embed@{version}/dist/nowline.min.js` (or the equivalent unpkg URL) works and is byte-identical to the branded CDN — the branded CDN's reconstruction logic mirrors exactly what the npm registry serves. However, jsDelivr and unpkg remain an unsupported escape hatch, not a documented channel. The custom CDN exists for branded URLs in `view-source` (small but real marketing surface), per-version telemetry for sunset planning, custom cache and security headers, and the `embed.nowline.dev` + per-PR ephemeral preview tiers that npm-backed CDNs can't provide. We can revisit and document jsDelivr as a fallback if real-world feedback surfaces a need.
-
-### Bootstrap status
-
-The bundle ships in m4 as `@nowline/embed` on npm (already wired through `release.yml`). Two pieces remain to bring the branded CDN online:
-
-1. **Infrastructure repository m7 — Embed tier.** Provisions `nowline-embed-{prod,dev}`, custom domains on `embed.nowline.{io,dev}`, deploy SAs, WIF pools, and IAM via Terraform (`stacks/embed/` instantiates `modules/tier-pair/` for `github_repo = "lolay/nowline"`). Squarespace DNS records on the two `embed.*` subdomains are applied by hand per the infrastructure repository's `ops/dns.md`. See the infrastructure repository's `specs/milestones.md` § m7 for the full deliverables and acceptance criteria.
-2. **OSS-repo deploy wiring.** Once m7 is applied, this repo wires `release.yml`'s `embed-prod` / `embed-dev` cells against the infra's WIF outputs (no static keys, no `FIREBASE_SERVICE_ACCOUNT_*` GitHub secrets), ships a `firebase.json` per project encoding the cache-header contract from the [Distribution table](#distribution) above, and resolves the [dev auth gate](#bootstrap-status) decision before exposing `embed.nowline.dev`. The end-to-end checklist lives in the infrastructure repository's deploy runbook.
-
-Until both pieces land, embedders that need the bundle today can `npm i @nowline/embed` and serve it themselves; the URLs above are the shape the documented channel will take, not something live yet. The m4 handoff under [Carried forward](./handoffs/handoff-m4-embed.md) and `specs/features.md` feature 32 are the cross-references.
+Open the URL in DevTools or `curl` it to confirm exactly which build is running.
 
 ## Bundle Size Target
 

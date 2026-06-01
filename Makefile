@@ -26,7 +26,7 @@ SHELL := bash
 .DEFAULT_GOAL := help
 
 .PHONY: help init build build-fast test lint format typecheck ci pre-commit clean \
-        lint-workflows bundle-size compile smoke deb pack vsix bump \
+        lint-workflows bundle-size compile smoke deb pack vsix bump snapshot-version \
         publish-npm publish-vscode publish-cdn
 
 # Overridable inputs for the package / guarded targets. The release and
@@ -36,6 +36,7 @@ SHELL := bash
 #   PROJECT_ID            the Firebase project id (CI passes vars.PROJECT_ID)
 VSIX ?= packages/vscode-extension/dist/nowline-vscode.vsix
 FIREBASE_PROJECT_PATH ?= packages/embed/firebase/dev
+NPM_DIST_TAG ?= latest
 
 # $(call confirm,VAR,what-this-touches)
 #
@@ -127,6 +128,9 @@ vsix: ## [pkg] Package the VS Code / Cursor extension into a .vsix
 bump: ## [pkg] Bump every package version (LEVEL=patch|minor|major); prints the new version
 	@node .github/scripts/bump-version.mjs $(LEVEL)
 
+snapshot-version: ## [pkg] Compute and write 0.0.0-dev.<ts>.g<sha> to every package.json; prints the version
+	@node .github/scripts/snapshot-version.mjs
+
 ##@ Danger
 
 publish-npm: ## [danger] Publish the @nowline/* tarballs in dist-pack/ to npmjs.com
@@ -136,7 +140,7 @@ publish-npm: ## [danger] Publish the @nowline/* tarballs in dist-pack/ to npmjs.
 	  tarball=$$(find dist-pack -maxdepth 1 -name "$${pkg}-[0-9]*.tgz" -print -quit); \
 	  test -n "$$tarball" || { echo "missing tarball for $${pkg}" >&2; exit 1; }; \
 	  echo "publishing $$tarball"; \
-	  npm publish "./$$tarball" --access public; \
+	  npm publish "./$$tarball" --access public --tag $(NPM_DIST_TAG); \
 	done
 
 publish-vscode: ## [danger] Publish the VS Code extension to the VS Code Marketplace + Open VSX
