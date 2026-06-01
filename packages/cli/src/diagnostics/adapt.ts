@@ -70,6 +70,20 @@ export function adaptLangiumDiagnostic(diag: LangiumLikeDiagnostic, file: string
 }
 
 /**
+ * True for the lexer/parser errors Langium re-folds into `doc.diagnostics`
+ * inside `validateDocument()`. They carry a bare `data.code` of
+ * `'lexing-error'` / `'parsing-error'` (Langium's `DocumentValidator`
+ * constants). Callers that already surface those errors directly from
+ * `parseResult.lexerErrors` / `parserErrors` skip these copies so each syntax
+ * error is reported once.
+ */
+export function isBuiltinParseDiagnostic(data: unknown): boolean {
+    if (!data || typeof data !== 'object') return false;
+    const code = (data as { code?: unknown }).code;
+    return code === 'lexing-error' || code === 'parsing-error';
+}
+
+/**
  * Validate the shape of `diag.data`. Validator-emitted diagnostics
  * stash `{ code: MessageCode, args: MessageArgs<K> }` (where `args` is
  * the spread tuple `[]` or `[{...}]`). Anything else (vscode code

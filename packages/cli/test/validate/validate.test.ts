@@ -40,6 +40,31 @@ describe('validate — happy path', () => {
             expect(d.column).toBeGreaterThanOrEqual(1);
         }
     });
+
+    it('does not double-count lexer/parser errors that Langium folds into doc.diagnostics', async () => {
+        // Regression: Langium's validateDocument() re-emits lexer + parser
+        // errors inside doc.diagnostics, so collecting parseResult.lexerErrors
+        // / parserErrors AND doc.diagnostics duplicated every syntax error.
+        // `duration:3-w` trips an invalid-duration validation, a lexer error
+        // on the stray `-`, and a parser DEDENT error on the trailing `w`.
+        const source = `nowline v1
+
+roadmap r "R" start:2026-01-05 length:8w
+swimlane s "S" capacity:4
+  item a "A" duration:3-w capacity:2
+`;
+        const result = await parseSource(source, 'dup.nowline', { validate: true });
+
+        const seen = new Map<string, number>();
+        for (const d of result.diagnostics) {
+            const key = `${d.line}:${d.column}:${d.message}`;
+            seen.set(key, (seen.get(key) ?? 0) + 1);
+        }
+        const duplicated = [...seen.entries()].filter(([, n]) => n > 1).map(([k]) => k);
+        expect(duplicated).toEqual([]);
+        // The lexer error keeps its dedicated `lex-error` code.
+        expect(result.diagnostics.some((d) => d.code === 'lex-error')).toBe(true);
+    });
 });
 
 describe('validate — formatting', () => {

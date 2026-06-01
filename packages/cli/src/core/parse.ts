@@ -4,6 +4,7 @@ import {
     adaptLangiumDiagnostic,
     adaptLexerError,
     adaptParserError,
+    isBuiltinParseDiagnostic,
     type LangiumLikeDiagnostic,
 } from '../diagnostics/adapt.js';
 import type { CliDiagnostic, DiagnosticSource } from '../diagnostics/model.js';
@@ -64,7 +65,15 @@ export async function parseSource(
         diagnostics.push(adapted);
     }
     for (const diag of doc.diagnostics ?? []) {
-        diagnostics.push(adaptLangiumDiagnostic(diag as LangiumLikeDiagnostic, filePath));
+        const row = diag as LangiumLikeDiagnostic;
+        // Langium's validateDocument() folds the lexer + parser errors into
+        // doc.diagnostics before running the validation checks. We already
+        // emitted those above from parseResult (with dedicated lex-error /
+        // parse-error codes and proper spans), so skip the re-folded copies —
+        // otherwise every syntax error is counted twice in `nowline render` /
+        // `validate` output.
+        if (isBuiltinParseDiagnostic(row.data)) continue;
+        diagnostics.push(adaptLangiumDiagnostic(row, filePath));
     }
 
     const hasErrors = diagnostics.some((d) => d.severity === 'error');
