@@ -1,6 +1,6 @@
 name: Build
 
-# Reusable workflow that defines the 10-cell build matrix shared by
+# Reusable workflow that defines the 9-cell build matrix shared by
 # `ci.yml` (upload: false — shift-left smoke on every PR / main push)
 # and `release.yml` (upload: true — gated on tag push). One matrix,
 # two events.
@@ -8,10 +8,9 @@ name: Build
 # `upload` gates only the `actions/upload-artifact@v7` steps. Every
 # build / package / verify step always runs so PRs exercise the exact
 # surface a tag push would, including the .deb build, the .vsix
-# package, the action-mirror staging, and the embed CDN bundle
-# integrity check. Upload skipping just avoids paying storage cost
-# and avoids confusing artifact promotion semantics on non-release
-# runs.
+# package, and the action-mirror staging. Upload skipping just avoids
+# paying storage cost and avoids confusing artifact promotion
+# semantics on non-release runs.
 on:
   workflow_call:
     inputs:
@@ -37,13 +36,13 @@ concurrency:
 # deps, and upload artifacts. Artifact upload uses the runner's
 # default token scope; no explicit permission required. `release.yml`
 # carries `contents: write` at the workflow level because its
-# `publish` and `embed-prod` jobs need it — build itself never needed
-# write, so the reusable shape tightens that.
+# `publish` job needs it — build itself never needed write, so the
+# reusable shape tightens that.
 permissions:
   contents: read
 
 jobs:
-  # One job, one matrix, ten cells. Heterogeneous on purpose so the
+  # One job, one matrix, nine cells. Heterogeneous on purpose so the
   # caller (publish in release.yml) can `needs: build` and inherit
   # "wait for every cell" gating from GitHub Actions for free — no
   # separate gate job.
@@ -61,7 +60,6 @@ jobs:
   #   pack-vsix     `pnpm package` for the VS Code extension (esbuild
   #                 bundle + `vsce package --no-dependencies`).
   #   pack-action   Stage the Marketplace action mirror bundle.
-  #   pack-embed    Verify the embed CDN prod tree built by `pnpm -r build`.
   build:
     name: Build ${{ matrix.id }}
     runs-on: ${{ matrix.runner }}
