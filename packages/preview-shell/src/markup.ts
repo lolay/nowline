@@ -51,7 +51,6 @@ export interface ViewportElements {
     minimap: HTMLElement;
     minimapCanvas: HTMLElement;
     minimapRect: HTMLElement;
-    minimapClose: HTMLButtonElement;
     diagnostics: HTMLElement;
     diagSummary: HTMLElement;
     diagTbody: HTMLElement;
@@ -128,7 +127,6 @@ const TEMPLATE = `
     </div>
 </div>
 <div class="minimap hidden">
-    <button class="btn minimap-close" title="Hide minimap">\u00d7</button>
     <div class="minimap-canvas"></div>
     <div class="minimap-rect"></div>
 </div>
@@ -183,7 +181,6 @@ export function buildViewport(rootEl: HTMLElement): ViewportElements {
         minimap: q<HTMLElement>(rootEl, '.minimap'),
         minimapCanvas: q<HTMLElement>(rootEl, '.minimap-canvas'),
         minimapRect: q<HTMLElement>(rootEl, '.minimap-rect'),
-        minimapClose: q<HTMLButtonElement>(rootEl, '.minimap-close'),
         diagnostics: q<HTMLElement>(rootEl, '.diagnostics'),
         diagSummary: q<HTMLElement>(rootEl, '.diag-summary'),
         diagTbody: q<HTMLElement>(rootEl, '.diag-table tbody'),

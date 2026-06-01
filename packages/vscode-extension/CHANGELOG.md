@@ -23,6 +23,9 @@ Preview parity, export from VS Code, and authoring commands (m3d / m3e / m3f):
   narrows; the Now calendar and all dropdowns stay within the panel
   gutters instead of running off-screen; an Export download glyph; and a
   centred Copy / Export action row.
+- Preview minimap: the `×` session-dismiss control is removed; the minimap
+  still auto-hides when the diagram fits and still follows
+  `nowline.preview.showMinimap`.
 - **Expand / collapse preview** button in the tab title bar: `⛶` fills
   the editor area with the preview (maximizes the editor group); `⊡`
   restores the previous layout. Mirrors the fullscreen toggle on the free

@@ -349,14 +349,6 @@ export const PREVIEW_SHELL_CSS = `
     pointer-events: none;
     box-sizing: border-box;
 }
-.nl-preview-root .minimap-close {
-    position: absolute; top: 2px; right: 2px;
-    width: 16px; height: 16px; padding: 0;
-    border-radius: 3px;
-    line-height: 1;
-    font-size: 11px;
-    z-index: 1;
-}
 
 /* === Calendar picker === */
 .nl-preview-root .now-picker {

@@ -17,6 +17,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ### Changed
 
+- `@nowline/preview-shell`: the preview minimap can no longer be manually dismissed (the `×` close button is removed). It still auto-hides when the whole diagram fits in the viewport and still respects `nowline.preview.showMinimap`.
 - The grayscale render theme's canonical token is now `grayscale` (US spelling), matching the canonical `gray` color token; the UK spelling `greyscale` is accepted as an alias everywhere a theme is named (`--theme`, embed `theme`, preview toolbar). The rendered `data-theme` attribute and the `theme:`-keyed sample outputs now emit `grayscale` — update any CSS or tooling that keys off `data-theme="greyscale"`.
 - Embed bundle banner `built=` timestamp is now the git commit date rather than the wall-clock build time, making builds of the same tag byte-identical across the npm tarball and the branded CDN. Downstream integrity checks (`sha256sum`, Content-Length assertions) are stable across re-deploys.
 

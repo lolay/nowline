@@ -60,7 +60,7 @@ Keybindings (mirroring VS Code's markdown preview):
 
 ### Minimap
 
-The minimap (bottom-right corner) clones the rendered SVG at small scale and tracks the main viewport with a draggable rectangle. Click anywhere in the minimap to recenter the main view, or drag the viewport rect to pan continuously. The minimap **auto-hides** when the entire diagram fits inside the panel — there's no signal value when nothing is off-screen — and the `×` corner button dismisses it for the rest of the session. The default visibility comes from `nowline.preview.showMinimap`.
+The minimap (bottom-right corner) clones the rendered SVG at small scale and tracks the main viewport with a draggable rectangle. Click anywhere in the minimap to recenter the main view, or drag the viewport rect to pan continuously. The minimap **auto-hides** when the entire diagram fits inside the panel — there's no signal value when nothing is off-screen. The default visibility comes from `nowline.preview.showMinimap`.
 
 ### Maximize / fullscreen
 

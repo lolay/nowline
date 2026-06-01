@@ -166,7 +166,6 @@ interface InternalState {
     lastViewportWidth: number;
     lastViewportHeight: number;
     showMinimap: boolean;
-    minimapDismissedThisSession: boolean;
     firstRender: boolean;
     /** Resolved chrome color scheme — set by mode resolution, never by diagram theme. */
     mode: 'light' | 'dark';
@@ -228,7 +227,6 @@ export function mountPreview(
         lastViewportWidth: 0,
         lastViewportHeight: 0,
         showMinimap: options.showMinimap !== false,
-        minimapDismissedThisSession: false,
         firstRender: true,
         mode: 'dark',
         locale: options.locale ?? (typeof navigator !== 'undefined' ? navigator.language : 'en'),
@@ -712,7 +710,7 @@ export function mountPreview(
     }
 
     function updateMinimapVisibility(): void {
-        if (!state.showMinimap || state.minimapDismissedThisSession) {
+        if (!state.showMinimap) {
             els.minimap.classList.add('hidden');
             return;
         }
@@ -726,12 +724,6 @@ export function mountPreview(
             els.minimap.classList.remove('hidden');
         }
     }
-
-    on(els.minimapClose, 'click', (e: Event) => {
-        e.stopPropagation();
-        state.minimapDismissedThisSession = true;
-        els.minimap.classList.add('hidden');
-    });
 
     function panToMinimapPoint(clientX: number, clientY: number): void {
         const rect = els.minimapCanvas.getBoundingClientRect();
@@ -1375,7 +1367,6 @@ export function mountPreview(
         },
         setShowMinimap(show) {
             state.showMinimap = show;
-            state.minimapDismissedThisSession = false;
             updateMinimapVisibility();
         },
         setMode(mode) {

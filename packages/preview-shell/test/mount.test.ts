@@ -89,6 +89,13 @@ describe('mountPreview', () => {
         expect(root.querySelector('.minimap')).not.toBeNull();
     });
 
+    it('minimap has no manual dismiss control', () => {
+        const root = mountRoot();
+        mountPreview(root);
+        expect(root.querySelector('.minimap')).not.toBeNull();
+        expect(root.querySelector('.minimap-close')).toBeNull();
+    });
+
     it('setSvg injects markup into the canvas and switches to svg mode', () => {
         const root = mountRoot();
         const handle = mountPreview(root);
