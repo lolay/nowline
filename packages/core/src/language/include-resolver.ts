@@ -414,7 +414,10 @@ function mergeContentMap<V extends { name?: string; title?: string }>(
 ): void {
     for (const [name, value] of source) {
         if (!value.name && value.title) {
-            target.set(uniqueMapKey(target as Map<string, unknown>, slugifyTitle(value.title)), value);
+            target.set(
+                uniqueMapKey(target as Map<string, unknown>, slugifyTitle(value.title)),
+                value,
+            );
             continue;
         }
         if (target.has(name)) {
@@ -506,7 +509,12 @@ function mergeLocalContent(content: ResolvedContent, file: NowlineFile): void {
 
 /** Kebab-case slug for title-only entities (specs/dsl.md § Identifiers). */
 function slugifyTitle(title: string): string {
-    return title.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-+|-+$/g, '') || 'entity';
+    return (
+        title
+            .toLowerCase()
+            .replace(/[^a-z0-9]+/g, '-')
+            .replace(/^-+|-+$/g, '') || 'entity'
+    );
 }
 
 /**
@@ -539,7 +547,10 @@ function addByKey<V extends { name?: string; title?: string }>(
             map.set(entry.name, entry);
         }
     } else if (entry.title) {
-        map.set(uniqueMapKey(map as Map<string, unknown>, slugifyTitle(entry.title), reserved), entry);
+        map.set(
+            uniqueMapKey(map as Map<string, unknown>, slugifyTitle(entry.title), reserved),
+            entry,
+        );
     }
 }
 

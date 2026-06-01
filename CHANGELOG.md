@@ -25,6 +25,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 ### Fixed
 
 - Title-only roadmap declarations (swimlanes, anchors, milestones, and other entities with a quoted title but no explicit id) now render instead of being silently dropped during include resolution. Auto-derived map keys and id-less `parallel`/`group` flow handles are internal only — declare an explicit id to reference an entity from `after:`, `before:`, or `on:`. An explicit id always wins its key over an auto-derived slug regardless of source order, and auto-slug collisions de-dupe silently (no spurious "shadowed" warning).
+- Title-only items that declare `after:` or `before:` now draw their dependency arrow. Previously the arrow only appeared if the item also carried an (otherwise unused) explicit id, because the target item registered its attach geometry only when it had a `name`. Id-less items now get an internal, non-referenceable layout handle so they participate as dependency-edge targets; references still require an explicit id.
 
 ### Security
 

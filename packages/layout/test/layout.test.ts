@@ -514,4 +514,26 @@ swimlane lane "Lane"
         expect(ship).toBeDefined();
         expect(ship?.slackArrows?.length ?? 0).toBe(1);
     });
+
+    it('draws a dependency arrow into a title-only item carrying after:', async () => {
+        // The `after:` source `api` is explicit; the item that carries the
+        // `after:` is title-only. The arrow must still draw — an id-less item
+        // gets an internal handle so it registers as a dependency-edge target.
+        // Before the fix the title-only target never entered the items map,
+        // so no edge was built unless it also had an (otherwise unused) id.
+        const src = `nowline v1
+
+roadmap r "R" start:2026-01-05
+
+swimlane plat "Platform"
+  item api "API" duration:2w
+
+swimlane web "Web"
+  item "Web SDK" duration:2w after:api
+`;
+        const { file, resolved } = await parseAndResolve(src);
+        const model = layoutRoadmap(file, resolved, { theme: 'light' });
+        expect(model.edges).toHaveLength(1);
+        expect(model.edges[0].fromId).toBe('api');
+    });
 });

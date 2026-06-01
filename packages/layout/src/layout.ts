@@ -674,55 +674,60 @@ function sequenceItem(
     const decorationsRightX = Math.max(itemBox.x + itemBox.width, spillCursor);
 
     const id = node.name;
+    // Reference-target edges resolve `after:` / `before:` lookups, so only
+    // EXPLICIT ids register here — an id-less item never becomes a
+    // referenceable target. Entity edges live in LOGICAL space so chained
+    // items / `after:` references sit on the column boundary, not on the
+    // visually inset bar edge. The visible 12 px gutter between bars then
+    // becomes a clean attach corridor.
     if (id) {
-        // Entity edges live in LOGICAL space so chained items / `after:`
-        // references / dependency-arrow attach points sit on the column
-        // boundary, not on the visually inset bar edge. The visible 12 px
-        // gutter between bars then becomes a clean attach corridor.
         ctx.entityLeftEdges.set(id, logicalLeft);
         ctx.entityRightEdges.set(id, logicalRight);
-        ctx.entityMidpoints.set(id, {
-            x: (logicalLeft + logicalRight) / 2,
-            y: itemBox.y + itemBox.height / 2,
-        });
-        // Visual edges — where dependency arrows actually attach. These
-        // sit ITEM_INSET_PX inside the column boundaries so the arrows
-        // emerge from the painted bar edge instead of the inter-column
-        // gutter. See LayoutContext.entityVisualLeftX/RightX.
-        ctx.entityVisualLeftX.set(id, itemBox.x);
-        ctx.entityVisualRightX.set(id, itemBox.x + itemBox.width);
-        // Dependency-arrow source point. Default = the bar's right
-        // edge at row midpoint. When the caption spills past the
-        // bar's right edge (`textSpills`), the spilled title /
-        // meta occupy the area immediately right of the bar at
-        // row midline. Keep X on the bar's right edge so the
-        // arrow visually leaves the bar's side, but drop Y to the
-        // vertical center of the bottom progress strip so the
-        // arrow runs UNDERNEATH the spilled text rather than
-        // through it. Mirrors the slack-arrow attach below.
-        const arrowSource: Point = textSpills
-            ? {
-                  x: itemBox.x + itemBox.width,
-                  y: itemBox.y + itemBox.height - PROGRESS_STRIP_HEIGHT_PX / 2,
-              }
-            : {
-                  x: itemBox.x + itemBox.width,
-                  y: itemBox.y + itemBox.height / 2,
-              };
-        ctx.itemArrowSource.set(id, arrowSource);
-        ctx.itemFlowKey.set(id, ctx.currentFlowKey);
-        // Slack-arrow attach Y. Defaults to the bar's row midpoint; when
-        // the caption spills past the bar's right edge, drop to the
-        // progress-strip's vertical center so the arrow aligns with the
-        // bottom-edge progress bar instead of running through the
-        // adjacent title/meta text. The `/ 2` keeps the attach point on
-        // the strip's vertical center if `PROGRESS_STRIP_HEIGHT_PX` is
-        // ever bumped.
-        const slackAttachY = textSpills
-            ? itemBox.y + itemBox.height - PROGRESS_STRIP_HEIGHT_PX / 2
-            : itemBox.y + itemBox.height / 2;
-        ctx.itemSlackAttachY.set(id, slackAttachY);
     }
+    // Drawing / flow maps key on a registration handle EVERY item has: the
+    // explicit id when present, else a synthetic, non-referenceable handle
+    // (see `syntheticItemKey`). This lets a title-only item register its own
+    // dependency-arrow target geometry and join flow-key dedup without
+    // entering the human-referenceable namespace above.
+    const drawKey = id ?? syntheticItemKey(node);
+    ctx.entityMidpoints.set(drawKey, {
+        x: (logicalLeft + logicalRight) / 2,
+        y: itemBox.y + itemBox.height / 2,
+    });
+    // Visual edges — where dependency arrows actually attach. These sit
+    // ITEM_INSET_PX inside the column boundaries so the arrows emerge from
+    // the painted bar edge instead of the inter-column gutter. See
+    // LayoutContext.entityVisualLeftX/RightX.
+    ctx.entityVisualLeftX.set(drawKey, itemBox.x);
+    ctx.entityVisualRightX.set(drawKey, itemBox.x + itemBox.width);
+    // Dependency-arrow source point. Default = the bar's right edge at row
+    // midpoint. When the caption spills past the bar's right edge
+    // (`textSpills`), the spilled title / meta occupy the area immediately
+    // right of the bar at row midline. Keep X on the bar's right edge so the
+    // arrow visually leaves the bar's side, but drop Y to the vertical center
+    // of the bottom progress strip so the arrow runs UNDERNEATH the spilled
+    // text rather than through it. Mirrors the slack-arrow attach below.
+    const arrowSource: Point = textSpills
+        ? {
+              x: itemBox.x + itemBox.width,
+              y: itemBox.y + itemBox.height - PROGRESS_STRIP_HEIGHT_PX / 2,
+          }
+        : {
+              x: itemBox.x + itemBox.width,
+              y: itemBox.y + itemBox.height / 2,
+          };
+    ctx.itemArrowSource.set(drawKey, arrowSource);
+    ctx.itemFlowKey.set(drawKey, ctx.currentFlowKey);
+    // Slack-arrow attach Y. Defaults to the bar's row midpoint; when the
+    // caption spills past the bar's right edge, drop to the progress-strip's
+    // vertical center so the arrow aligns with the bottom-edge progress bar
+    // instead of running through the adjacent title/meta text. The `/ 2`
+    // keeps the attach point on the strip's vertical center if
+    // `PROGRESS_STRIP_HEIGHT_PX` is ever bumped.
+    const slackAttachY = textSpills
+        ? itemBox.y + itemBox.height - PROGRESS_STRIP_HEIGHT_PX / 2
+        : itemBox.y + itemBox.height / 2;
+    ctx.itemSlackAttachY.set(drawKey, slackAttachY);
 
     cursor.x = logicalRight;
     cursor.maxX = Math.max(cursor.maxX, cursor.x);
@@ -814,6 +819,22 @@ function sequenceOne(
 // row bump rather than draw an item with a clipped title.
 function estimateTextWidth(text: string, fontSize: number): number {
     return text.length * fontSize * 0.58;
+}
+
+/**
+ * Internal drawing handle for an id-less item. Title-only items have no
+ * `node.name`, yet they still need a stable key to register their own
+ * dependency-arrow target geometry and join flow-key dedup. The handle is
+ * derived from the item's source position so it is deterministic and
+ * byte-stable, and the `#item@line:col` form cannot be produced by the
+ * grammar's id rule — so `after:` / `before:` / `on:` can never resolve to it
+ * (an id-less item stays non-referenceable; declare an explicit id to
+ * reference it). Distinct items always start at distinct positions, so the
+ * handle is unique within a file.
+ */
+function syntheticItemKey(node: ItemDeclaration): string {
+    const start = node.$cstNode?.range.start;
+    return `#item@${start ? start.line + 1 : 0}:${start ? start.character + 1 : 0}`;
 }
 
 /**
@@ -1482,7 +1503,9 @@ function collectItems(swimlanes: SwimlaneDeclaration[]): Map<string, ItemDeclara
     const out = new Map<string, ItemDeclaration>();
     const walk = (node: ItemDeclaration | GroupBlock | ParallelBlock): void => {
         if (isItemDeclaration(node)) {
-            if (node.name) out.set(node.name, node);
+            // Title-only items register under a synthetic, non-referenceable
+            // handle so they still appear as dependency-edge targets.
+            out.set(node.name ?? syntheticItemKey(node), node);
             return;
         }
         if (isParallelBlock(node)) {
