@@ -8,6 +8,32 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ### Added
 
+- _Nothing yet._
+
+### Changed
+
+- `@nowline/preview-shell`: the preview minimap can no longer be manually dismissed (the `×` close button is removed). It still auto-hides when the whole diagram fits in the viewport and still respects `nowline.preview.showMinimap`.
+
+### Deprecated
+
+- _Nothing yet._
+
+### Removed
+
+- _Nothing yet._
+
+### Fixed
+
+- _Nothing yet._
+
+### Security
+
+- _Nothing yet._
+
+## [0.5.0] - 2026-06-01
+
+### Added
+
 - **Canary channel**: every push to `main` publishes a `0.0.0-dev.<UTC>.<sha>` pre-release to npm under the `next` dist-tag via `.github/workflows/canary.yml`. The version sorts strictly below every real release so it can never satisfy a `^X.Y` range off `latest` — no prod leakage. After publish, the jsDelivr `@next` cache for `@nowline/embed` is purged. Install with `@nowline/embed@next` or reference `https://cdn.jsdelivr.net/npm/@nowline/embed@next/dist/nowline.min.js`.
 - VS Code: `nowline.preview.theme` now offers `grayscale` (the Theme/diagram-palette axis) in addition to `auto` / `light` / `dark`, and the preview toolbar's `Grayscale` selection now renders the grayscale palette instead of silently falling back to light/dark. The chrome/workbench Mode axis is unchanged (stays light/dark).
 - `@nowline/preview-shell`: Redesigned toolbar — single-row chrome with mode-aware palette (`data-nl-mode`), separate **Fit width** (`↔`) and **Fit page** (`⤢`) buttons, consolidated more-menu (Format, Copy, Export, Theme, Now, Show Links dropdowns), hand-rolled calendar picker for the Now control, and minimap auto-hide. The Export action uses a download glyph, and Copy / Export each take half the action row and are centred. VS Code extension wires `locale` and `themeControl:'show'`.
@@ -17,7 +43,6 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ### Changed
 
-- `@nowline/preview-shell`: the preview minimap can no longer be manually dismissed (the `×` close button is removed). It still auto-hides when the whole diagram fits in the viewport and still respects `nowline.preview.showMinimap`.
 - The grayscale render theme's canonical token is now `grayscale` (US spelling), matching the canonical `gray` color token; the UK spelling `greyscale` is accepted as an alias everywhere a theme is named (`--theme`, embed `theme`, preview toolbar). The rendered `data-theme` attribute and the `theme:`-keyed sample outputs now emit `grayscale` — update any CSS or tooling that keys off `data-theme="greyscale"`.
 - Embed bundle banner `built=` timestamp is now the git commit date rather than the wall-clock build time, making builds of the same tag byte-identical across the npm tarball and the branded CDN. Downstream integrity checks (`sha256sum`, Content-Length assertions) are stable across re-deploys.
 
