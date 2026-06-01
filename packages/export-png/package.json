@@ -1,6 +1,6 @@
 {
     "name": "@nowline/export-png",
-    "version": "0.4.2",
+    "version": "0.5.0",
     "description": "Nowline PNG exporter — rasterizes the renderer SVG via resvg-js (WASM)",
     "license": "Apache-2.0",
     "engines": {

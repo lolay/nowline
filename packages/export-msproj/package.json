@@ -1,6 +1,6 @@
 {
     "name": "@nowline/export-msproj",
-    "version": "0.4.2",
+    "version": "0.5.0",
     "description": "Nowline MS Project XML exporter — lossy export for PM tool import",
     "license": "Apache-2.0",
     "engines": {
