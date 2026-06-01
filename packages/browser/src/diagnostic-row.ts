@@ -1,10 +1,10 @@
 import {
     extractSuggestion,
-    inferCodeFromMessage,
     type LangiumLikeDiagnostic,
     type LexerErrorLike,
     type ParserErrorLike,
     type ResolveDiagnostic,
+    resolveDiagnosticCode,
 } from '@nowline/core';
 
 /**
@@ -30,7 +30,10 @@ export interface DiagnosticRow {
 export function fromLangiumDiagnostic(diag: LangiumLikeDiagnostic, file: string): DiagnosticRow {
     return {
         severity: diag.severity === 2 ? 'warning' : 'error',
-        code: diagnosticCode(diag),
+        // resolveDiagnosticCode prefers the stable validator code (NL.Exxxx)
+        // carried in `data` so the preview table matches the CLI / Problems
+        // panel, then falls back to Langium's `code`, then a message heuristic.
+        code: resolveDiagnosticCode(diag),
         message: diag.message,
         suggestion: extractSuggestion(diag.message),
         file,
@@ -98,10 +101,4 @@ export function fromRenderWarning(
         line: 1,
         column: 1,
     };
-}
-
-function diagnosticCode(diag: LangiumLikeDiagnostic): string {
-    if (typeof diag.code === 'string' && diag.code !== '') return diag.code;
-    if (typeof diag.code === 'number') return String(diag.code);
-    return inferCodeFromMessage(diag.message);
 }

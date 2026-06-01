@@ -57,6 +57,24 @@ describe('parseSource', () => {
         // collapsing to the generic `validation` fallback).
         expect(result.diagnostics.some((d) => d.code === 'lex-error')).toBe(true);
     });
+
+    it('surfaces the stable validator code (NL.Exxxx) for migrated diagnostics, matching the CLI', async () => {
+        // Before the shared resolveDiagnosticCode() rewire, the preview ignored
+        // the validator's stable `data.code` and only inferred a code from the
+        // message (here: `missing-date`), diverging from the CLI / Problems
+        // panel which both showed `NL.E0500`.
+        const source = `nowline v1
+
+roadmap r1 "R"
+
+swimlane s1 "S"
+  item x duration:1w
+
+anchor launch "Launch"
+`;
+        const result = await parseSource(source);
+        expect(result.diagnostics.map((d) => d.code)).toContain('NL.E0500');
+    });
 });
 
 describe('renderSource — happy path', () => {
