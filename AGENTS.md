@@ -6,6 +6,34 @@ Orientation for AI coding agents (Cursor, Claude Code, OpenAI Codex CLI, Aider) 
 
 Nowline is a text-first DSL for product/engineering roadmaps, plus the toolchain that parses, validates, lays out, and renders it. The `.nowline` file is the product; everything else is a view of that file. Read [`specs/principles.md`](./specs/principles.md) for what's in scope (and what's deliberately not), and [`specs/dsl.md`](./specs/dsl.md) for the canonical language reference before touching grammar, parser, validator, or printer.
 
+## OSS boundary invariant
+
+**`nowline` is a standalone OSS repo. It never pushes to or triggers the
+proprietary services.**
+
+Permitted outbound writes from `nowline`:
+- `npm publish` -> `@nowline/*` packages on the npm registry
+- VS Code Marketplace + Open VSX extension publish
+- Homebrew tap formula update
+- Write to `lolay/nowline-action` (follow-only mirror, release pipeline only)
+
+Prohibited (hard rule -- do not add exceptions without estate-level sign-off):
+- `repository_dispatch` into `nowline-api`, `nowline-app`, `nowline-site`, or
+  `nowline-infra`
+- `gh workflow run -R` targeting those repos
+- Any write token held by a `nowline` workflow scoped to those repos
+
+**Consumers pull; `nowline` does not push:**
+- `nowline-app` installs `@nowline/*` from npm; Renovate handles updates.
+- `nowline-site` pulls docs via the `external/nowline` git submodule
+  (`branch = main`) + `sync-docs`; Renovate handles updates.
+- A consumer-owned schedule or consumer/human-initiated `repository_dispatch`
+  may trigger a deploy -- but the initiator must never be `nowline`.
+
+After the embed CDN retirement, **`nowline` has no remaining tie to
+`nowline-infra`**. See `docs/architecture.md` -> "Dependency direction" in the
+workspace for the full estate-level mapping.
+
 ## First boot
 
 ```bash
