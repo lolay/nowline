@@ -1,0 +1,8 @@
+{
+    // F5 launches the extension via the explicit "build" shell task in
+    // packages/vscode-extension/.vscode/tasks.json, so the built-in npm
+    // script auto-detector adds nothing here. Turning it off stops it from
+    // scanning every package.json in the monorepo and emitting a spurious
+    // "Npm task detection: failed to parse the file ..." task error.
+    "npm.autoDetect": "off"
+}

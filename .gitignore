@@ -29,6 +29,13 @@ packages/embed/firebase/dev/public/
 # zero manual setup. See CONTRIBUTING.md "Working on the VS Code / Cursor
 # extension" for the three iteration loops.
 !/packages/vscode-extension/.vscode/
+# Exception: repo-root .vscode/settings.json only (npm.autoDetect override
+# that silences a spurious "Npm task detection: failed to parse" task error
+# when contributors press F5 to launch the extension). Shared contributor
+# ergonomics, not personal; every other root .vscode/ file stays ignored.
+!/.vscode/
+/.vscode/*
+!/.vscode/settings.json
 .idea/
 *.swp
 *.swo
