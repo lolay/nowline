@@ -8,7 +8,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ### Added
 
-- _Nothing yet._
+- VS Code: the right-click commands now live under a single **Nowline** submenu on every surface (editor tab, editor body, and Explorer), instead of being scattered inline. The submenu collapses **Open Preview** (same tab), **Open Preview to the Side**, **Open Link in Side Browser** (editor only), and **Export…** into one consistent group. This restores the same-tab **Open Preview** entry, which was previously only reachable via `Cmd/Ctrl+Shift+V` and the Command Palette.
 
 ### Changed
 

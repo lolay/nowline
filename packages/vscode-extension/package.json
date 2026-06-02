@@ -222,7 +222,7 @@
         "commands": [
             {
                 "command": "nowline.openLinkInSideBrowser",
-                "title": "Nowline: Open Link in Side Browser",
+                "title": "Open Link in Side Browser",
                 "category": "Nowline"
             },
             {
@@ -281,6 +281,13 @@
                 "when": "editorLangId == nowline"
             }
         ],
+        "submenus": [
+            {
+                "id": "nowline.context",
+                "label": "Nowline",
+                "icon": "$(open-preview)"
+            }
+        ],
         "menus": {
             "editor/title": [
                 {
@@ -311,43 +318,42 @@
             ],
             "editor/title/context": [
                 {
-                    "command": "nowline.openPreviewToSide",
+                    "submenu": "nowline.context",
                     "when": "resourceExtname == .nowline",
                     "group": "1_open"
-                },
-                {
-                    "command": "nowline.export",
-                    "when": "resourceExtname == .nowline",
-                    "group": "5_export"
                 }
             ],
             "editor/context": [
                 {
+                    "submenu": "nowline.context",
                     "when": "editorLangId == nowline",
-                    "command": "nowline.openPreviewToSide",
-                    "group": "navigation@1"
-                },
-                {
-                    "when": "editorLangId == nowline",
-                    "command": "nowline.openLinkInSideBrowser",
-                    "group": "navigation@10"
-                },
-                {
-                    "when": "editorLangId == nowline",
-                    "command": "nowline.export",
-                    "group": "navigation@20"
+                    "group": "navigation"
                 }
             ],
             "explorer/context": [
                 {
-                    "command": "nowline.openPreviewToSide",
+                    "submenu": "nowline.context",
                     "when": "resourceExtname == .nowline",
                     "group": "navigation"
+                }
+            ],
+            "nowline.context": [
+                {
+                    "command": "nowline.openPreview",
+                    "group": "1_open@1"
+                },
+                {
+                    "command": "nowline.openPreviewToSide",
+                    "group": "1_open@2"
+                },
+                {
+                    "command": "nowline.openLinkInSideBrowser",
+                    "when": "editorLangId == nowline",
+                    "group": "1_open@3"
                 },
                 {
                     "command": "nowline.export",
-                    "when": "resourceExtname == .nowline",
-                    "group": "navigation"
+                    "group": "5_export@1"
                 }
             ],
             "commandPalette": [
