@@ -1,0 +1,42 @@
+{
+    "name": "@nowline/export",
+    "version": "0.5.1",
+    "description": "Nowline export kernel — the single parse→resolve→layout→renderSvg→format code path shared by every surface for byte-identical export output",
+    "license": "Apache-2.0",
+    "engines": {
+        "node": ">=22",
+        "pnpm": ">=11"
+    },
+    "type": "module",
+    "main": "./dist/index.js",
+    "types": "./dist/index.d.ts",
+    "exports": {
+        ".": {
+            "types": "./dist/index.d.ts",
+            "import": "./dist/index.js"
+        }
+    },
+    "files": [
+        "dist/",
+        "src/"
+    ],
+    "scripts": {
+        "build": "tsc -b tsconfig.json",
+        "watch": "tsc -b tsconfig.json --watch"
+    },
+    "dependencies": {
+        "@nowline/core": "workspace:*",
+        "@nowline/export-core": "workspace:*",
+        "@nowline/export-html": "workspace:*",
+        "@nowline/export-mermaid": "workspace:*",
+        "@nowline/export-msproj": "workspace:*",
+        "@nowline/export-pdf": "workspace:*",
+        "@nowline/export-png": "workspace:*",
+        "@nowline/export-xlsx": "workspace:*",
+        "@nowline/layout": "workspace:*",
+        "@nowline/renderer": "workspace:*"
+    },
+    "devDependencies": {
+        "typescript": "^6.0.3"
+    }
+}
