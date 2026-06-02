@@ -1,5 +1,19 @@
 # Changelog
 
+## [Unreleased]
+
+### Changed
+
+- `Nowline: Export…` now runs entirely in-process — no `nowline` CLI install
+  required for any format (PDF, PNG, SVG, HTML, Mermaid, XLSX, MS Project XML,
+  JSON). PNG is rasterized via `@resvg/resvg-wasm` (WASM build of resvg;
+  visually identical to the CLI, sub-pixel anti-aliasing can differ ≤ 2%).
+- `nowline.export.cliPath` is now an optional override: when set to a
+  non-default value the command shells out to that binary; the default
+  `'nowline'` sentinel triggers the new in-process path.
+- `.vsix` size is approximately 2.5 MB compressed (up from ~0.4 MB; the
+  increase comes from bundled exporter packages and the resvg WASM binary).
+
 ## 0.3.0 — Unreleased
 
 Preview parity, export from VS Code, and authoring commands (m3d / m3e / m3f):

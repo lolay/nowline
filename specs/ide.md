@@ -199,16 +199,18 @@ Locale, strict, width, and asset-root stay settings-only — they aren't things 
 
 ### Export to other formats
 
-`Nowline: Export…` (palette + editor-title menu + tab right-click; m3e) shells out to the bundled `nowline` CLI to produce PDF, pixel-strict PNG, HTML, Markdown+Mermaid, XLSX, or MS Project XML. The flow:
+`Nowline: Export…` (palette + editor-title menu + tab right-click; m3e) produces PDF, PNG, SVG, HTML, Markdown+Mermaid, XLSX, MS Project XML, or canonical JSON **in-process** — no `nowline` CLI install required. The flow:
 
 1. Pick format → save dialog.
-2. Optional **Override…** quickPick for format-specific flags (page size, orientation, margin, fonts, scale, start date) — overrides aren't persisted.
-3. Spawn `nowline <source> -f <fmt> -o <path>` with options resolved through the chain in § Configuration.
-4. Stream stderr to the existing `Nowline Language Server` output channel; surface failures via `vscode.window.showErrorMessage`.
+2. Run the full parse → layout → render → export pipeline in the extension host.
+3. Write the result bytes to the chosen path.
+4. Surface failures via `vscode.window.showErrorMessage` + the `Nowline Export` output channel.
 
-If `nowline.export.cliPath` doesn't resolve (no CLI installed), the command surfaces a notification with an "Install Nowline CLI…" link to the docs. The existing in-webview SVG and browser-canvas-PNG buttons stay (no install required for the common case).
+**PNG rasterization** uses `@resvg/resvg-wasm` (pure WASM build of the same resvg engine), bundled into the `.vsix` as `dist/resvg.wasm` (~2.4 MB). Output is visually identical to the CLI's native-resvg PNG; sub-pixel text anti-aliasing can differ by ≤ 2% of pixels (acceptable). **All other formats** are pure-JS and produce byte-identical output to `nowline -f <fmt>`.
 
-This deliberately mirrors the README's PNG-fidelity caveat ("for pixel-strict output run the CLI") and avoids bundling resvg / pdfkit / exceljs / etc. into the `.vsix` (~30 MB savings) — keeping the marketplace footprint near today's ~2 MB.
+**CLI override escape hatch.** If `nowline.export.cliPath` is set to an explicit path (anything other than the default `'nowline'`), the command shells out to that binary instead — preserving exact CLI-identical output for environments where that matters. The existing in-webview SVG and browser-canvas-PNG toolbar buttons are unaffected.
+
+**.vsix footprint.** The compressed marketplace bundle is approximately 2.5 MB (extension.cjs ~4 MB minified + resvg.wasm ~2.4 MB + server.cjs ~0.6 MB). This is larger than the pre-m3e footprint (~2 MB) but well within the VS Code Marketplace recommended limit.
 
 ### Authoring commands
 

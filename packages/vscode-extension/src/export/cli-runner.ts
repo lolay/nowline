@@ -1,6 +1,8 @@
 import { spawn } from 'node:child_process';
+import { promises as fs } from 'node:fs';
 import * as path from 'node:path';
 import * as vscode from 'vscode';
+import { type ExportFormat, exportInProcess } from './in-process.js';
 
 /** Snapshot of `nowline.export.*` settings; resolved by extension.ts. */
 export interface ExportSettings {
@@ -45,14 +47,14 @@ const EXPORT_TARGETS: ExportTarget[] = [
     {
         format: 'png',
         label: 'PNG',
-        detail: 'Pixel-strict raster from the bundled CLI',
+        detail: 'High-quality raster (in-process via resvg WASM)',
         extension: 'png',
         fileFilters: { PNG: ['png'] },
     },
     {
         format: 'svg',
         label: 'SVG',
-        detail: 'Pixel-identical CLI render (compare to preview Save SVG)',
+        detail: 'Scalable vector (in-process render)',
         extension: 'svg',
         fileFilters: { SVG: ['svg'] },
     },
@@ -97,14 +99,13 @@ const EXPORT_TARGETS: ExportTarget[] = [
  * Drives the Export… command end to end:
  *  1. Prompt for format via QuickPick.
  *  2. Prompt for destination path via showSaveDialog.
- *  3. Build the CLI argv from `ExportSettings` + chosen target.
- *  4. Spawn the CLI with the source as a positional, streaming stderr to
- *     the Nowline Export output channel; on success show a status bar
- *     toast with a "Reveal in Finder" action.
+ *  3. If `nowline.export.cliPath` is set to an explicit non-default value,
+ *     spawn that CLI binary (CLI override escape hatch).
+ *  4. Otherwise, run the export in-process (no CLI install required) using
+ *     the bundled exporters and @resvg/resvg-wasm for PNG.
+ *  5. On success show a status bar toast with "Reveal in Finder" / "Open".
  *
- * The extension never re-implements export-format logic — it shells out
- * to the CLI so PNG/PDF/XLSX stay byte-identical to `nowline -f …` runs
- * outside the editor. See `specs/ide.md` § Export to other formats.
+ * See `specs/ide.md` § Export to other formats.
  */
 export async function runExportCommand(args: RunExportArgs): Promise<void> {
     const { sourceUri, settings, outputChannel } = args;
@@ -123,23 +124,50 @@ export async function runExportCommand(args: RunExportArgs): Promise<void> {
     });
     if (!dest) return;
 
-    const cliPath = resolveCliPath(settings.cliPath, sourceUri);
-    const cliArgs = buildCliArgs(target, sourceUri.fsPath, dest.fsPath, settings);
-
     outputChannel.show(/*preserveFocus*/ true);
-    outputChannel.appendLine(`$ ${quote(cliPath)} ${cliArgs.map(quote).join(' ')}`);
 
-    try {
-        await runCli(cliPath, cliArgs, sourceDir, outputChannel);
-    } catch (err) {
-        const message = err instanceof Error ? err.message : String(err);
-        outputChannel.appendLine(`Export failed: ${message}`);
-        const choice = await vscode.window.showErrorMessage(
-            `Nowline export failed: ${message}`,
-            'Show Output',
-        );
-        if (choice) outputChannel.show();
-        return;
+    const useCliOverride = isExplicitCliPath(settings.cliPath);
+
+    if (useCliOverride) {
+        // Explicit cliPath: delegate to the external CLI binary unchanged.
+        const cliPath = resolveCliPath(settings.cliPath, sourceUri);
+        const cliArgs = buildCliArgs(target, sourceUri.fsPath, dest.fsPath, settings);
+        outputChannel.appendLine(`$ ${quote(cliPath)} ${cliArgs.map(quote).join(' ')}`);
+        try {
+            await runCli(cliPath, cliArgs, sourceDir, outputChannel);
+        } catch (err) {
+            const message = err instanceof Error ? err.message : String(err);
+            outputChannel.appendLine(`Export failed: ${message}`);
+            const choice = await vscode.window.showErrorMessage(
+                `Nowline export failed: ${message}`,
+                'Show Output',
+            );
+            if (choice) outputChannel.show();
+            return;
+        }
+    } else {
+        // Default path: in-process export — no CLI install required.
+        outputChannel.appendLine(`Nowline: exporting ${target.format} (in-process)…`);
+        try {
+            const result = await exportInProcess(
+                sourceUri.fsPath,
+                target.format as ExportFormat,
+                settings,
+            );
+            const bytes = result.isBinary
+                ? (result.rendered as Uint8Array)
+                : new TextEncoder().encode(result.rendered as string);
+            await fs.writeFile(dest.fsPath, bytes);
+        } catch (err) {
+            const message = err instanceof Error ? err.message : String(err);
+            outputChannel.appendLine(`Export failed: ${message}`);
+            const choice = await vscode.window.showErrorMessage(
+                `Nowline export failed: ${message}`,
+                'Show Output',
+            );
+            if (choice) outputChannel.show();
+            return;
+        }
     }
 
     outputChannel.appendLine(`Wrote ${dest.fsPath}`);
@@ -168,6 +196,16 @@ async function pickExportTarget(): Promise<ExportTarget | undefined> {
         matchOnDetail: true,
     });
     return pick?.target;
+}
+
+/**
+ * Returns true when the user has explicitly configured a CLI path other than
+ * the default 'nowline' sentinel. Only in that case do we shell out; otherwise
+ * we use the in-process exporter.
+ */
+function isExplicitCliPath(raw: string): boolean {
+    const trimmed = raw.trim();
+    return trimmed !== '' && trimmed !== 'nowline';
 }
 
 /**

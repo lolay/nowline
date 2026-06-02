@@ -8,6 +8,7 @@ import {
     TransportKind,
 } from 'vscode-languageclient/node';
 import { type ExportSettings, runExportCommand } from './export/cli-runner.js';
+import { initExportRuntime } from './export/in-process.js';
 import { runNewRoadmapCommand } from './export/new-roadmap.js';
 import { DisagreementTracker } from './io/disagreement-check.js';
 import { RcConfigCache } from './io/rc-config.js';
@@ -41,6 +42,9 @@ export function activate(context: vscode.ExtensionContext): void {
     rcCache.setDisabled(readIgnoreRcFile());
     disagreementTracker = new DisagreementTracker();
     exportOutputChannel = vscode.window.createOutputChannel('Nowline Export');
+
+    // Register the dist/ path so in-process PNG export can load resvg.wasm.
+    initExportRuntime(path.join(context.extensionPath, 'dist'));
 
     // Seed the title-bar toggle to its "expand" state. A fresh window is
     // never maximized, and a window reload also resets the editor layout, so

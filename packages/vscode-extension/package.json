@@ -167,7 +167,7 @@
                 "nowline.export.cliPath": {
                     "type": "string",
                     "default": "nowline",
-                    "description": "Path to the `nowline` binary used by the Export… command. Bare 'nowline' uses the PATH lookup; ${workspaceFolder} substitution is supported."
+                    "description": "Optional override: path to an external `nowline` CLI binary. When set to anything other than the default 'nowline', the Export… command shells out to that binary instead of using the bundled in-process exporter. Supports ${workspaceFolder} substitution."
                 },
                 "nowline.export.pdf.pageSize": {
                     "type": "string",
@@ -192,7 +192,7 @@
                 "nowline.export.fonts.sans": {
                     "type": "string",
                     "default": "",
-                    "description": "Sans font for PNG/PDF export: a TTF/OTF path or alias (sf, helvetica, dejavu, …). Empty leaves font resolution to the CLI."
+                    "description": "Sans font for PNG/PDF export: a TTF/OTF path or alias (sf, helvetica, dejavu, …). Empty uses the platform font probe then the bundled DejaVu pair."
                 },
                 "nowline.export.fonts.mono": {
                     "type": "string",
@@ -394,10 +394,17 @@
         "@nowline/browser": "workspace:*",
         "@nowline/config": "workspace:*",
         "@nowline/core": "workspace:*",
+        "@nowline/export-core": "workspace:*",
+        "@nowline/export-html": "workspace:*",
+        "@nowline/export-mermaid": "workspace:*",
+        "@nowline/export-msproj": "workspace:*",
+        "@nowline/export-pdf": "workspace:*",
+        "@nowline/export-xlsx": "workspace:*",
         "@nowline/layout": "workspace:*",
         "@nowline/lsp": "workspace:*",
         "@nowline/preview-shell": "workspace:*",
         "@nowline/renderer": "workspace:*",
+        "@resvg/resvg-wasm": "^2.6.2",
         "langium": "~4.2.4",
         "vscode-languageclient": "^9.0.1"
     },
