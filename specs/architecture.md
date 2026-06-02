@@ -36,7 +36,8 @@ nowline/
     layout/                      # @nowline/layout — Positioning engine (AST → positioned model)
     renderer/                    # @nowline/renderer — SVG renderer (positioned model → SVG)
     export-core/                 # @nowline/export-core — Shared types, unit converter, PDF page-size parser, font resolver
-    export-png/                  # @nowline/export-png — PNG via @resvg/resvg-js (WASM)
+    export-png/                  # @nowline/export-png — PNG via @resvg/resvg-wasm (pure WASM, byte-reproducible across hosts)
+    export/                      # @nowline/export — shared export kernel: parse→resolve→layout→renderSvg→format adapter; one code path for every surface (see export-determinism.md)
     export-pdf/                  # @nowline/export-pdf — Vector PDF via PDFKit + svg-to-pdfkit
     export-html/                 # @nowline/export-html — Self-contained HTML page with inline pan/zoom
     export-mermaid/              # @nowline/export-mermaid — Markdown + Mermaid `gantt` block
@@ -84,9 +85,11 @@ nowline/
 
 @nowline/preview-shell (m4.7) — standalone, no engine deps; consumed by @nowline/vscode-extension's webview and downstream browser apps.
 
-@nowline/mcp (m4.8) depends on @nowline/core (validate, read, create, update, delete, list) and shells out to the `nowline` CLI binary for render/export (same pattern as the GitHub Action). Optionally depends on @nowline/browser + @nowline/preview-shell for the MCP Apps UI variant. No cloud deps; local only.
+@nowline/mcp (m4.8) depends on @nowline/core (validate, read, create, update, delete, list) and on the shared @nowline/export kernel for render/export, which it runs in-process — no `nowline` CLI shell-out on the canonical `npx @nowline/mcp` path. This keeps it byte-identical to the CLI and the extension per export-determinism.md. Optionally depends on @nowline/browser + @nowline/preview-shell for the MCP Apps UI variant. No cloud deps; local only.
 
-@nowline/cli depends on core, layout, renderer, export-core, and every @nowline/export-*.
+@nowline/export (the shared kernel) depends on core, layout, renderer, export-core, and every @nowline/export-*. It is the single export code path; @nowline/cli, @nowline/mcp, vscode-extension, and the downstream web apps all consume it (rather than each re-implementing parse→layout→render→format). See export-determinism.md.
+
+@nowline/cli depends on @nowline/export (and transitively the above).
 ```
 
 Dependencies flow downward only. No upward or sideways imports. The graph is enforced by package.json declarations, not just convention.
@@ -100,7 +103,8 @@ Dependencies flow downward only. No upward or sideways imports. The graph is enf
 ### Export packages
 
 - **@nowline/export-core** — Shared types, unit converter, PDF page-size parser, 5-step font resolver, bundled DejaVu fonts. The other `export-*` packages depend on this for common plumbing.
-- **@nowline/export-png** — PNG via [`@resvg/resvg-js`](https://github.com/yisibl/resvg-js) (WASM).
+- **@nowline/export-png** — PNG via [`@resvg/resvg-wasm`](https://github.com/yisibl/resvg-js) (pure WebAssembly; byte-reproducible across hosts and bundlable into a single universal artifact, unlike the native `@resvg/resvg-js` `.node` addon). See [`export-determinism.md`](./export-determinism.md) § PNG rasterizer correction.
+- **@nowline/export** — Shared export kernel. The single code path from `.nowline` source to any of the eight artifacts (parse → resolve includes → layout → `renderSvg` → format adapter), parameterized by a runtime-agnostic `HostEnv`. Every surface (CLI, MCP, extension, web apps) calls this rather than re-implementing the pipeline; this is what enforces [`export-determinism.md`](./export-determinism.md).
 - **@nowline/export-pdf** — Vector PDF via [`pdfkit`](https://github.com/foliojs/pdfkit) + `svg-to-pdfkit`.
 - **@nowline/export-html** — Self-contained HTML page with inline pan/zoom JS.
 - **@nowline/export-mermaid** — Markdown file with a Mermaid `gantt` block, for embedding in READMEs and wikis that already render Mermaid.
@@ -117,7 +121,7 @@ Dependencies flow downward only. No upward or sideways imports. The graph is enf
 - **@nowline/browser** (m4.7) — Single-call browser pipeline. Public API: `renderSource(source, options)` and `parseSource(source, options)`. Consolidates today's `packages/embed/src/pipeline.ts` and `packages/vscode-extension/src/preview/render-pipeline.ts`; keeps the VS Code branch's Node `fs`-backed include resolver as a pluggable hook. Re-exports the canonical showcase example (see `examples/showcase.nowline`) as a string so downstream apps don't copy-paste it.
 - **@nowline/preview-shell** (m4.7) — Framework-agnostic viewport chrome. Public API: `mountPreview(rootEl, options) → { setSvg, setDiagnostics, dispose, fitPage, fitWidth, ... }`. Hoists ~1000 LOC of zoom/pan/fit/minimap/diagnostic-table logic out of the VS Code webview's inline template into a reusable ES module. No opinion on text editor or message bus.
 - **@nowline/lsp-worker** (m4.7) — Browser-side packaging of `@nowline/lsp`. Ships a Web Worker entry (`@nowline/lsp-worker/worker`) and a thin client adapter (`@nowline/lsp-worker/client`) that CodeMirror's `@codemirror/lint` / `@codemirror/autocomplete` / hover extensions can consume via standard LSP-over-`postMessage`. The Node-side `@nowline/lsp` continues to power the VS Code extension; the worker package only adds a browser packaging without changing what the language server does. See [`lsp.md`](./lsp.md) for the wire-protocol contract (range deltas on `textDocument/didChange`).
-- **@nowline/mcp** (m4.8) — MCP server. Entry point: `npx @nowline/mcp` (MCP CLI, stdio) or the `.mcpb` bundle (MCP Desktop, Claude Desktop one-click). Tools: `validate`, `render`, `read`, `create`, `update`, `delete`, `list`, `export`. Resources: `nowline://reference` (DSL grammar / man page from `nowline.5`) and `nowline://examples` (canonical roadmap examples from `examples/`). Optional MCP Apps UI variant returns an HTML resource mounting `@nowline/browser` + `@nowline/preview-shell` for live in-chat preview. Local only: no network, no auth, no cloud endpoints; open-core boundary enforced. The `nowline` binary's `--mcp` flag starts the same server in stdio mode (power-user path). See [`mcp.md`](./mcp.md) and [`cli-distribution.md`](./cli-distribution.md) § MCP distribution.
+- **@nowline/mcp** (m4.8) — MCP server. Entry point: `npx @nowline/mcp` (MCP CLI, stdio) or the `.mcpb` bundle (MCP Desktop, Claude Desktop one-click). Tools: `validate`, `render`, `read`, `create`, `update`, `delete`, `list`, `export`. `render`/`export` run **in-process** via the shared `@nowline/export` kernel — no `nowline` binary dependency on the canonical path — so output is byte-identical to the CLI per [`export-determinism.md`](./export-determinism.md). Resources: `nowline://reference` (DSL grammar / man page from `nowline.5`) and `nowline://examples` (canonical roadmap examples from `examples/`). Optional MCP Apps UI variant returns an HTML resource mounting `@nowline/browser` + `@nowline/preview-shell` for live in-chat preview. Local only: no network, no auth, no cloud endpoints; open-core boundary enforced. The `nowline` binary's `--mcp` flag starts the same server code hosted by the CLI (power-user path). See [`mcp.md`](./mcp.md) and [`cli-distribution.md`](./cli-distribution.md) § MCP distribution.
 
 ## Technology Choices
 
@@ -128,7 +132,7 @@ Dependencies flow downward only. No upward or sideways imports. The graph is enf
 | Package manager | pnpm | Strict dependency resolution prevents phantom imports. Fast installs, content-addressable store, superior workspace filtering. Pin via `"packageManager": "pnpm@9"` in root `package.json`. |
 | CLI binary | `bun compile` | Produces standalone binaries (~55MB) from TypeScript. No Node.js install required for end users. |
 | SVG rendering | Custom (TypeScript) | SVG is a text format — template-based generation is simpler than a rendering library dependency. |
-| PNG conversion | resvg-js (WASM) | SVG → PNG rasterization. Better SVG fidelity than librsvg, no native addons (WASM works everywhere), smaller footprint, clean `bun compile` story. |
+| PNG conversion | resvg-wasm | SVG → PNG rasterization via [`@resvg/resvg-wasm`](https://github.com/yisibl/resvg-js). Pure WebAssembly: one binary works in Node, Bun, and the browser, bundles into a single universal artifact, and rasterizes bit-reproducibly across hosts (native `@resvg/resvg-js` is faster but is a platform-specific `.node` addon and can vary by CPU/SIMD). Chosen so every surface shares one rasterizer per [`export-determinism.md`](./export-determinism.md). |
 | PDF generation | PDFKit | Pure JS, no native deps (~2MB). Walks the positioned model to produce true vector PDFs. Bundles cleanly with `bun compile` — no Chromium dependency. |
 | XLSX generation | ExcelJS | Mature (13M weekly downloads), excellent data/formatting/auto-filter support. ~1 MB JS — negligible impact on the ~55 MB CLI binary. No chart support; stacked-bar Gantt sheet deferred. |
 | Embed bundling | esbuild | Fast, zero-config bundling of core + layout + renderer into a single IIFE browser script. Same toolchain the VS Code extension already uses; one esbuild config covers both. |

@@ -18,7 +18,9 @@ Shelling out to `nowline` works, but agent harnesses lose:
 - **Structured I/O** — diagnostics, render output, and file paths come back as unstructured text the model re-parses.
 - **Resources** — no way to prime the model with the DSL grammar or canonical examples before it writes `.nowline`.
 
-`@nowline/mcp` wraps `@nowline/core` and the same CLI capabilities the human-facing `nowline` binary exposes, behind eight stable tool names shared with the Nowline Cloud MCP contract (see [Shared tool contract](#shared-tool-contract)). Cloud adds `search` and push/pull over remote storage; the OSS server stays purely local per [Open core](#open-core-boundary).
+`@nowline/mcp` wraps `@nowline/core` and the same export capabilities the human-facing `nowline` binary exposes, behind eight stable tool names shared with the Nowline Cloud MCP contract (see [Shared tool contract](#shared-tool-contract)). Cloud adds `search` and push/pull over remote storage; the OSS server stays purely local per [Open core](#open-core-boundary).
+
+**In-process, not a CLI shell-out.** `@nowline/mcp` runs as a Node process (`npx @nowline/mcp`), the same runtime as the CLI and the VS Code extension host, so it imports the shared `@nowline/export` kernel and `@nowline/core` directly and produces every artifact in-process — there is no `nowline` binary dependency on the canonical path. This is what lets `render`/`export` honor the byte-for-byte [export-determinism](./export-determinism.md) precedent: the MCP server, the CLI, and the extension all run the *same* kernel, so identical source + inputs yield identical bytes. The `nowline --mcp` power-user path is the one exception — it *is* the CLI hosting the same server code (see [MCP CLI vs MCP Desktop](#mcp-cli-vs-mcp-desktop)).
 
 ## MCP CLI vs MCP Desktop
 
@@ -40,13 +42,13 @@ Tool names are **identical** to the Nowline Cloud MCP server so agents and users
 | Tool | Args (OSS) | Returns | Notes |
 |------|------------|---------|-------|
 | `validate` | `{ source?: string, path?: string }` | `{ ok: boolean, diagnostics: Diagnostic[] }` | Parse + validate via `@nowline/core`. At least one of `source` or `path` required. Same `Diagnostic` shape as the CLI — see [`specs/cli.md`](./cli.md) § Diagnostics. |
-| `render` | `{ source?: string, path?: string, format?: 'svg' \| 'png' = svg, theme?, now?, width?, ... }` | image resource + `{ path?: string }` metadata | Renders via the CLI pipeline (`nowline` shell-out or in-process equivalent). Returns an MCP image resource (SVG/PNG) plus the output path when written to disk. |
+| `render` | `{ source?: string, path?: string, format?: 'svg' \| 'png' = svg, theme?, now?, width?, ... }` | image resource + `{ path?: string }` metadata | Renders in-process via the shared `@nowline/export` kernel (no `nowline` shell-out). Returns an MCP image resource (SVG/PNG) plus the output path when written to disk. PNG rasterizes via `@resvg/resvg-wasm` per [export-determinism](./export-determinism.md). |
 | `read` | `{ path: string }` | `{ path, source }` | Reads a local `.nowline` file. Rejects paths outside allowed roots (project directory + `--asset-root` semantics aligned with the CLI). |
 | `create` | `{ path: string, source: string }` | `{ path }` | Writes a new `.nowline` file after validation. Overwrites if the path already exists (same silent-overwrite posture as the CLI). |
 | `update` | `{ path: string, source: string }` | `{ path }` | Replaces an existing file after validation. |
 | `delete` | `{ path: string }` | `{ path }` | Deletes a local `.nowline` file. |
 | `list` | `{ directory?: string, recursive?: boolean = false }` | `{ paths: string[] }` | Lists `.nowline` files under `directory` (default: cwd). |
-| `export` | `{ source?: string, path?: string, format: 'pdf' \| 'html' \| 'mermaid' \| 'xlsx' \| 'msproj' \| 'png', ... }` | file resource + metadata | Same format adapters as `nowline <input> -f <format>`. Returns an MCP resource for the rendered artifact. |
+| `export` | `{ source?: string, path?: string, format: 'pdf' \| 'html' \| 'mermaid' \| 'xlsx' \| 'msproj' \| 'png', ... }` | file resource + metadata | Same `@nowline/export` kernel and format adapters as `nowline <input> -f <format>`, run in-process. Byte-identical to the CLI for the same source + inputs ([export-determinism](./export-determinism.md)). Returns an MCP resource for the rendered artifact. |
 
 Cloud-only additions (`search`, cloud `read`/`create`/`update`/`delete` by `id`) live in [`lolay/nowline-api/specs/mcp.md`](https://github.com/lolay/nowline-api/blob/main/specs/mcp.md). This doc covers the OSS local surface only.
 
