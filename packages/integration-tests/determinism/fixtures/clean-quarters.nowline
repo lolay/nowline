@@ -1,0 +1,9 @@
+nowline v1
+
+roadmap clean-quarters "Clean Quarters" start:2026-01-05 scale:1q
+
+swimlane platform "Platform"
+  item foundations "Foundations" duration:13w status:done
+  item buildout "Build-out" duration:13w status:in-progress remaining:50%
+  item hardening "Hardening" duration:13w status:planned
+  item launch "Launch" duration:13w status:planned

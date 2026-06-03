@@ -14,10 +14,11 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 - CLI: `nowline --mcp [--root <dir>]` starts the same MCP server in-process, sharing the `@nowline/mcp` server factory. The `--root` flag sets the allowed root for file tools (defaults to cwd).
 - PNG rasterizer replaced: `@nowline/export-png` now uses `@resvg/resvg-wasm` everywhere (CLI, extension, MCP). The native `@resvg/resvg-js` addon is removed. All Node-surface PNG exports are byte-identical.
 - VS Code: **Save PNG** and the **Copy PNG** temp-file fallback both re-rasterize through the kernel (WASM) so saved PNG files are byte-identical to `nowline -f png`. The in-clipboard PNG (when the webview clipboard write is available) remains a documented non-canonical exception (VS Code's `env.clipboard` is text-only).
+- Cross-surface export-determinism gate: a dedicated CI job (`make determinism` + `make determinism-browser`) hashes every fixture × format through the compiled CLI binary, the kernel in Node, and the kernel in a headless browser (Playwright/Chromium), asserting byte-identity across all three. Goldens are checked in at `packages/integration-tests/determinism/hashes.json` and regenerated deliberately with `make determinism-update`. Under the current toolchain the browser reproduces the Node bytes for the entire fixture set; the only recorded Node-surface divergence is each `pdf`'s `bun compile`-vs-Node zlib difference. See [`specs/export-determinism.md`](./specs/export-determinism.md) § Enforcement.
 
 ### Changed
 
-- _Nothing yet._
+- `@nowline/export-png` no longer imports the font resolver (and its `node:fs` dependency) at module top — the resolver is loaded lazily and only when a caller omits `fonts`. Canonical callers (the kernel, the CLI) always pass `fonts`, so behavior is unchanged, but the package now bundles cleanly for the browser (the determinism gate's headless leg and the Free/Pro web apps).
 
 ### Deprecated
 

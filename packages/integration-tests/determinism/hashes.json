@@ -1,0 +1,340 @@
+{
+    "about": "Cross-surface export-determinism goldens. `node` is the canonical SHA-256 every Node surface (compiled CLI binary, kernel-in-Node, MCP) must reproduce. `cli` is a recorded compiled-binary override for the few cells where the bun-compiled runtime diverges from Node (today: every pdf, via zlib). `browser` is a recorded headless-browser override for cells whose bytes diverge from Node in a browser (the deferred ICU date-label leak). The volatile source *directory* is stripped from every artifact before hashing (JSON file.uri / PDF Subject keep only the basename) so goldens are portable across checkouts and CI. Regenerate deliberately with UPDATE_DETERMINISM_GOLDENS=1 on a toolchain-version bump.",
+    "tracking": "Deferred: replace Intl-based axis-label formatting in @nowline/layout with a self-contained formatter (or pin ICU data) so the browser leg reaches full byte-identity. See specs/export-determinism.md § The ICU caveat.",
+    "cliTracking": "Deferred: PDFKit FlateDecode goes through the host runtime zlib, so the bun-compiled CLI binary and Node emit different (both valid) PDF bytes. Make the kernel PDF deflate runtime-independent for full binary↔Node identity. See specs/export-determinism.md § The PDF compression caveat.",
+    "today": "2026-02-09",
+    "locale": "en-US",
+    "pngScale": 2,
+    "cells": {
+        "capacity:html": {
+            "node": "b6ed9d20aec22837ca18077202c3c17895328e83027493199c606dbae101d0a0",
+            "icu": true
+        },
+        "capacity:json": {
+            "node": "3356161b7c50fbd6a6295c39e7943ce2f65c54fb6fa040f5c24f5ce81b4e0b6c",
+            "icu": false
+        },
+        "capacity:mermaid": {
+            "node": "3f980c26b1627b4421359733f147444d3af6221786b407f8b9378acd8ec70a5a",
+            "icu": false
+        },
+        "capacity:msproj": {
+            "node": "a5d514dd8b7e39a2c34d733e6f27ccd9e5a0cffae0f93891781c7e218e6e35a0",
+            "icu": false
+        },
+        "capacity:pdf": {
+            "node": "eb060d058301a6dbad6deb06956aa3a0ac428069a14fe00f7cb607f55af4adbd",
+            "icu": true,
+            "cli": "2081580cb55f1d2477a5150b521ba45404b4730ed1cfbff70bd4c130804ad3bd"
+        },
+        "capacity:png": {
+            "node": "ec0388d3f2626d837475d8fc6948ae549907307ecfc8f3af5a2fb998b5f952f2",
+            "icu": true
+        },
+        "capacity:svg": {
+            "node": "a7a54aad8f41ed83c38395d89ff8ff6416854ba66bc1d38025f9ce8559104a2b",
+            "icu": true
+        },
+        "capacity:xlsx": {
+            "node": "7195d00efc7647dc0610dca85f0d03a7bb1cafe2fbe66f23c7dbf1c3657b284e",
+            "icu": false
+        },
+        "clean-quarters:html": {
+            "node": "360c1bd55235f1040c7171fc38ddca450b70909e8d5ec4cd843083ce016c6252",
+            "icu": false
+        },
+        "clean-quarters:json": {
+            "node": "4251dddca3b2a6c9ab1b272925f0a13901efb2c02378451c574a32a9ea049e41",
+            "icu": false
+        },
+        "clean-quarters:mermaid": {
+            "node": "65c4490a9808b7b3cf72570c5908d504e7a303de147a35bf76228f6dd02dd4a7",
+            "icu": false
+        },
+        "clean-quarters:msproj": {
+            "node": "2bae36b99ce203b80e56b5174edcecf37208bb3b1181792299ee8fc9bc8d59ef",
+            "icu": false
+        },
+        "clean-quarters:pdf": {
+            "node": "5b8ca2fa7bbc252f01200a8cbb55fba16706b2fdd18a3cf179e4f3618589b36c",
+            "icu": false,
+            "cli": "be3e16b0b083f2690e6489ccc90bf6f9af5f5e0e1ec5f8e5e851a7e481e55b56"
+        },
+        "clean-quarters:png": {
+            "node": "a2a6518eacd2786ebe1d271e911025f9bb30c6caf810e5b89c7ef306da443d20",
+            "icu": false
+        },
+        "clean-quarters:svg": {
+            "node": "22d3b2f72bf222af3e132a2f60dab784d4665fffdaa1b225ede75627ac2ef80e",
+            "icu": false
+        },
+        "clean-quarters:xlsx": {
+            "node": "c9165a14497eeddaae3d2d51f5d7d988acf49cfbf062244d292e2b099c051d31",
+            "icu": false
+        },
+        "dependencies:html": {
+            "node": "590f8a2ca4dd9aad9ae9f7a31414d70adb680e77e50c8878329afdabfafd2231",
+            "icu": true
+        },
+        "dependencies:json": {
+            "node": "bdd378334fb2ded280d6266a4f34a6a33a2fb24af1d74b7b2d40b7c93eef868d",
+            "icu": false
+        },
+        "dependencies:mermaid": {
+            "node": "ae3bbdb21874ef1abf91d9ce8542d3657285a51f9a92224a586fe80ec451832e",
+            "icu": false
+        },
+        "dependencies:msproj": {
+            "node": "34ff1e3c97267006a4817400f5cf5e6a8b04fd6ad0f04753434393b986a8d758",
+            "icu": false
+        },
+        "dependencies:pdf": {
+            "node": "7fb3e5c311b998726818617a37252a70b212b0696f8cdeebf0977dc0f8372da0",
+            "icu": true,
+            "cli": "ec9075124da2311344746177d84391a37282412c1ec3a182aec7cefbc94fe75e"
+        },
+        "dependencies:png": {
+            "node": "711bf8250fbf4811756a3df121aec8851e172e3ea3c4b3018d251c50b9bfbff0",
+            "icu": true
+        },
+        "dependencies:svg": {
+            "node": "1ac2aa4fa5d09a02eaa7a6b7039a969ab0ef090fda35b1f7a6c7dfe7851f0e44",
+            "icu": true
+        },
+        "dependencies:xlsx": {
+            "node": "9ed7092493fdead3c5dc5a909161ef63bbea9448d06d3c73fec777304471513c",
+            "icu": false
+        },
+        "isolate-include:html": {
+            "node": "811a6a127438a562c9895fb253933789b9162cae98640055945df2d343f31632",
+            "icu": true
+        },
+        "isolate-include:json": {
+            "node": "244c5a50e1db3905443700b3fe2018bb1a350cfd5d967a1207429c6c3d24a3a4",
+            "icu": false
+        },
+        "isolate-include:mermaid": {
+            "node": "8db97a54c61b988df8512929ba49d66319cd4d95430efc89e740647912a4b752",
+            "icu": false
+        },
+        "isolate-include:msproj": {
+            "node": "c25996a20ea07ce640bd7b6b3bc589e523b0598bf635800d92ef2f4314d2bc0a",
+            "icu": false
+        },
+        "isolate-include:pdf": {
+            "node": "9a5cc34cf44e1b99cb331548f6a6d9157a97b25b695597d5a2f73f5d72763af8",
+            "icu": true,
+            "cli": "9c3c1c2e6cef5df424b861c45d10586fe7aa9751d65d1d0ed9e94c62be1e76bd"
+        },
+        "isolate-include:png": {
+            "node": "009d006789804b9355a3310ffa190d0893bea4f2c1bd87b5e44dde70357f7e46",
+            "icu": true
+        },
+        "isolate-include:svg": {
+            "node": "2194e2fa1780d65309f0830990aa91b47686c3eb54088bc0c98f7a0b38bec52d",
+            "icu": true
+        },
+        "isolate-include:xlsx": {
+            "node": "64f669cff9d6dd734560d8bb867273d7a28957c5f30c90ab800fa52d2b40c939",
+            "icu": false
+        },
+        "minimal-fr:html": {
+            "node": "eec33c8621be5768a837515df96d7e971b4b3aff2567923adf367386909af19d",
+            "icu": true
+        },
+        "minimal-fr:json": {
+            "node": "52732eb4b424adc7813ac50843eafb21aaf0f1b2c41c0386c9b5a92210b048ec",
+            "icu": false
+        },
+        "minimal-fr:mermaid": {
+            "node": "ae8e6d13a2dbbe7fd3911f459d6990b607d539803f9a789ca45814f80c1de0bd",
+            "icu": false
+        },
+        "minimal-fr:msproj": {
+            "node": "fee2595893252ece1ab98d48c46d6565c6d0a0651874c3382a95e500030b5224",
+            "icu": false
+        },
+        "minimal-fr:pdf": {
+            "node": "4f279f8f336fd3273359af62e3450911897420e05af60833db64f34005de4925",
+            "icu": true,
+            "cli": "5c35f4293060d6727c4fa02545a80b5474671db362da2701f6e33480087eac86"
+        },
+        "minimal-fr:png": {
+            "node": "68060b002da7d02c6c0c004e2df7719d55f9025cc4c508185599ed16969e0b7c",
+            "icu": true
+        },
+        "minimal-fr:svg": {
+            "node": "25f529b6eb8a8755d0bf7e9510550084cb67caa0eb350a0449fa83c92f44b60e",
+            "icu": true
+        },
+        "minimal-fr:xlsx": {
+            "node": "d6363ed3a8bc8a97ee956aa23fa2cba4b817560ec876ce3f794fa49a4270ee90",
+            "icu": false
+        },
+        "minimal:html": {
+            "node": "be3ee2823d9eef2e59ecf8f4783900a258c22f7c816739e10bfaef6718d3d2f6",
+            "icu": true
+        },
+        "minimal:json": {
+            "node": "4e722fb86361847cc932a9227bc39520755f464b17aebae993c4bbd917c9ba35",
+            "icu": false
+        },
+        "minimal:mermaid": {
+            "node": "802d5e58c14adad49371bc01c2a347c740984c4bac95109d6eaf6bd57ab15d21",
+            "icu": false
+        },
+        "minimal:msproj": {
+            "node": "c23cb8355971415508519cefad3e1b4224f8338221c9429e898c1774fdcaffdd",
+            "icu": false
+        },
+        "minimal:pdf": {
+            "node": "12341e2b1e2aa69f51960b87cd33dd87d79b35b40d6acfca4b140a7eacc869a1",
+            "icu": true,
+            "cli": "e9a01100f08a57eb23b228b13e92380eb861f2e689b5f78983406634dcde6aa6"
+        },
+        "minimal:png": {
+            "node": "16c3456cb9eb027d3b995966cb8a0cc9e4227e7f5651c41e81f98f80b956f2dc",
+            "icu": true
+        },
+        "minimal:svg": {
+            "node": "38c32ce0c7d067ccc8da20d2e84e218d1165826928e1e149bba70d9def8cde4e",
+            "icu": true
+        },
+        "minimal:xlsx": {
+            "node": "1d21ac80f19c62d744bb4a90a2936df826f1b6de2eeff3721d610b50a075319e",
+            "icu": false
+        },
+        "nested-both-headers:html": {
+            "node": "3b87fd59fa08f0533e8c3f8efb69b1745dc08bfb74b69cdd9d6efcf5a6da8f13",
+            "icu": true
+        },
+        "nested-both-headers:json": {
+            "node": "baa23183fd526c8efebb71b6ba0da10fa0bdd339433b37de83f9882fad36c872",
+            "icu": false
+        },
+        "nested-both-headers:mermaid": {
+            "node": "cd1fedc8e0be3b5b0325a3504459c644a1042a57df44cdfaa7a1f0d3726b92ab",
+            "icu": false
+        },
+        "nested-both-headers:msproj": {
+            "node": "ea0284c2516a1dc2d9b68690713ea0bec16480dfa2d1615f1d3d4a21ac722d2c",
+            "icu": false
+        },
+        "nested-both-headers:pdf": {
+            "node": "e8c3486d5bcb6200b41861ce20e0d9fa5936e3424a95c4724e169f25c849eb74",
+            "icu": true,
+            "cli": "def8c6fe8c5c2d3093662d2e3e177e7e29e5a936d9bbdd407fff3be707498ddb"
+        },
+        "nested-both-headers:png": {
+            "node": "b0b5bfaaad9027c8f944c03e7adddca1decec6cfad4ac583b153b3f9dc64449f",
+            "icu": true
+        },
+        "nested-both-headers:svg": {
+            "node": "eee79889dfedfbb78d06ea2019edcce65be80db2e70a325b0f27424e16cf9684",
+            "icu": true
+        },
+        "nested-both-headers:xlsx": {
+            "node": "302019c615e287ca67cb9036c39871ab933cb63217629d9ce9047b8f3cb28117",
+            "icu": false
+        },
+        "platform-2026-dark:html": {
+            "node": "1306e8c3335c1d986ea1ac91917df5d7907aeadae950c251376881de566c03cf",
+            "icu": true
+        },
+        "platform-2026-dark:json": {
+            "node": "476d22d28310bb3fe5ae2d239a6a425cbdb81e1610c24358add89dade07a9418",
+            "icu": false
+        },
+        "platform-2026-dark:mermaid": {
+            "node": "a405f52006ba58303040a480ec1302c62c2d16336691f338b42a9eb7a5c8687a",
+            "icu": false
+        },
+        "platform-2026-dark:msproj": {
+            "node": "d1c72dc3058f749945fb242d870eba1779b57027e3f40f8a2ba97973fdefbdf6",
+            "icu": false
+        },
+        "platform-2026-dark:pdf": {
+            "node": "ddb6ef24c48124ecf37ff507de0c6fe39e1d71099ce99e74dda22ff6db10ab03",
+            "icu": true,
+            "cli": "851a9baafdb4f3c85e86710737b73a6e5b26b6ed7a94e20b99404abd18dfea11"
+        },
+        "platform-2026-dark:png": {
+            "node": "e3af80c77b7f6ba0e3c7e1cc2b06e181da99b6ba171fd19d658170cbae9199b6",
+            "icu": true
+        },
+        "platform-2026-dark:svg": {
+            "node": "f1d9623f19f79e138fcf61b705a6148cd01b84f69c1308e3632f1def13673e08",
+            "icu": true
+        },
+        "platform-2026-dark:xlsx": {
+            "node": "246bc3113f2ea8fe148dbf2999fd194f34594d750246bb3a8cfa9c87e2921e0c",
+            "icu": false
+        },
+        "platform-2026:html": {
+            "node": "79d3c0143c5441a4e15557d0cc3ad5014f546a8ff8a5f7a4284609750a7cbe08",
+            "icu": true
+        },
+        "platform-2026:json": {
+            "node": "476d22d28310bb3fe5ae2d239a6a425cbdb81e1610c24358add89dade07a9418",
+            "icu": false
+        },
+        "platform-2026:mermaid": {
+            "node": "a405f52006ba58303040a480ec1302c62c2d16336691f338b42a9eb7a5c8687a",
+            "icu": false
+        },
+        "platform-2026:msproj": {
+            "node": "d1c72dc3058f749945fb242d870eba1779b57027e3f40f8a2ba97973fdefbdf6",
+            "icu": false
+        },
+        "platform-2026:pdf": {
+            "node": "37d75c7463b7f5372bffb792a1e27703f3b5ca239009498d96ec14f8ea9d752d",
+            "icu": true,
+            "cli": "45a8f21ee9d4b51ad4511c00c5524579d4a6b1e99dde2eee9159f185ed106a1a"
+        },
+        "platform-2026:png": {
+            "node": "3803205212b510ef52edc8c8c8a42dcb3a758da0081e696dac1224016f68d3b4",
+            "icu": true
+        },
+        "platform-2026:svg": {
+            "node": "31a13b31007523c1bdc0deba0de99f31c6b3860ba75a58396957b84f7bb2c43d",
+            "icu": true
+        },
+        "platform-2026:xlsx": {
+            "node": "246bc3113f2ea8fe148dbf2999fd194f34594d750246bb3a8cfa9c87e2921e0c",
+            "icu": false
+        },
+        "sizing:html": {
+            "node": "b27aaf833aaf997a763477bc02cc6f22ac50d1bc0c0a7cb3b7c83a85d3f3e2c9",
+            "icu": true
+        },
+        "sizing:json": {
+            "node": "46ec3d7d36d7e2669ea8d5e3377c56b2763306caecd11d55d30336860c919e4d",
+            "icu": false
+        },
+        "sizing:mermaid": {
+            "node": "410c9a80d0bf022fae8797bf47f065d7af233c6e7aba25615d75eeac31bd571c",
+            "icu": false
+        },
+        "sizing:msproj": {
+            "node": "a7502b279c79bd15c6d37d82e30e461b16bd006425d3a4ac96ad63e9547cf5e8",
+            "icu": false
+        },
+        "sizing:pdf": {
+            "node": "49439f5e386e104e18a7c7f818eeb0da9faa99aabf7987d450479cc4117f4946",
+            "icu": true,
+            "cli": "4a96be8786708a48f936959f42261c207f57cc70bdf9054874b18f2bf0e38aff"
+        },
+        "sizing:png": {
+            "node": "8c134b79def8d8b069e9ae64933acbd6b7e6b2bfd4af5feb29155a6243e2845d",
+            "icu": true
+        },
+        "sizing:svg": {
+            "node": "29652d48ad02e19bb3e215baae763034dbef5ead36290998ceeec576239dc7be",
+            "icu": true
+        },
+        "sizing:xlsx": {
+            "node": "63c28552ba0e38a1116573c0dc4d5e843feb72deff11bd69e44fecb2c47b868d",
+            "icu": false
+        }
+    }
+}

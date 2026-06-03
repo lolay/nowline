@@ -26,7 +26,8 @@ SHELL := bash
 .DEFAULT_GOAL := help
 
 .PHONY: help init build build-fast test lint format typecheck ci pre-commit clean \
-        lint-workflows bundle-size compile smoke deb pack vsix bump snapshot-version \
+        lint-workflows bundle-size determinism determinism-browser determinism-update \
+        compile smoke deb pack vsix bump snapshot-version \
         publish-npm publish-vscode publish-cdn
 
 # Overridable inputs for the package / guarded targets. The release and
@@ -88,6 +89,26 @@ lint-workflows: ## actionlint the GitHub Actions workflows (needs actionlint on 
 bundle-size: ## Build the embed graph and run the CDN bundle-size + node:* leak gate
 	pnpm -r --filter @nowline/core --filter @nowline/layout --filter @nowline/renderer --filter @nowline/browser --filter @nowline/embed run build
 	pnpm --filter @nowline/embed check-size --print-attribution
+
+##@ Determinism
+
+# Cross-surface export-determinism gate (specs/export-determinism.md § Enforcement).
+# Asserts byte-identity across the compiled CLI binary, the kernel in Node, and
+# the kernel in a headless browser. Run by the dedicated `determinism` CI job,
+# NOT by `make ci` — it needs a compiled binary (Bun) and a browser (Playwright),
+# which the multi-OS unit-test matrix deliberately does not provision.
+
+determinism: ## Determinism gate: compiled-CLI + kernel-in-Node legs (needs `make compile TARGET=local`)
+	pnpm --filter @nowline/integration-tests exec vitest run --config vitest.determinism.config.ts
+
+determinism-browser: ## Determinism gate: kernel-in-headless-browser leg (needs `playwright install chromium`)
+	pnpm --filter @nowline/integration-tests exec playwright install chromium
+	pnpm --filter @nowline/integration-tests exec vitest run --config vitest.browser.config.ts
+
+determinism-update: ## [danger] Regenerate determinism goldens (Node then browser) — deliberate, on a toolchain bump
+	UPDATE_DETERMINISM_GOLDENS=1 pnpm --filter @nowline/integration-tests exec vitest run --config vitest.determinism.config.ts
+	pnpm --filter @nowline/integration-tests exec playwright install chromium
+	UPDATE_DETERMINISM_GOLDENS=1 pnpm --filter @nowline/integration-tests exec vitest run --config vitest.browser.config.ts
 
 ##@ Release
 

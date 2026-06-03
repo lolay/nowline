@@ -15,7 +15,6 @@
 // Spec: specs/export-determinism.md — full replace (plan s4).
 
 import type { ExportInputs, ResolvedFontPair } from '@nowline/export-core';
-import { resolveFonts } from '@nowline/export-core';
 
 export interface PngOptions {
     /** Pixel-density multiplier. 1 (native), 1.5, 2, or 3 typical. Default 2. */
@@ -154,6 +153,13 @@ export async function exportPng(
 }
 
 async function resolveFontsFor(_inputs: ExportInputs): Promise<ResolvedFontPair> {
+    // Imported lazily (not at module top) so the static module graph of
+    // @nowline/export-png stays free of `node:fs` — the font resolver pulls it
+    // in. Canonical callers (the kernel, the CLI) always pass `options.fonts`,
+    // so this fallback never runs there; keeping the import dynamic lets the
+    // package bundle for the browser (the determinism gate's headless leg and
+    // the Free/Pro web apps) without a Node-builtin polyfill.
+    const { resolveFonts } = await import('@nowline/export-core');
     const result = await resolveFonts();
     return { sans: result.sans, mono: result.mono };
 }

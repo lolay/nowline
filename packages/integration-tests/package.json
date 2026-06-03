@@ -11,14 +11,21 @@
     "type": "module",
     "scripts": {
         "test": "vitest run",
-        "test:watch": "vitest"
+        "test:watch": "vitest",
+        "test:browser": "vitest run --config vitest.browser.config.ts"
     },
     "devDependencies": {
         "@nowline/core": "workspace:*",
+        "@nowline/export": "workspace:*",
+        "@nowline/export-core": "workspace:*",
         "@nowline/layout": "workspace:*",
         "@nowline/renderer": "workspace:*",
+        "@resvg/resvg-wasm": "^2.6.2",
         "@types/node": "^25.9.1",
+        "@vitest/browser": "4.1.7",
+        "@vitest/browser-playwright": "4.1.7",
         "langium": "~4.2.4",
+        "playwright": "^1.60.0",
         "typescript": "^6.0.3",
         "vitest": "^4.1.7"
     }

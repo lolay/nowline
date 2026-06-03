@@ -144,20 +144,70 @@ layout with a small self-contained formatter (or pinning ICU data). This is
 the only place where the engine, not the code, leaks into the bytes; the
 implementation plan treats it as a prerequisite, not an afterthought.
 
+The gate (below) measures this empirically: it classifies each cell as
+ICU-dependent or not by re-exporting with `toLocaleString` stubbed, and only
+records a `browser` override where the browser's bytes *actually* diverge from
+Node's. Under the current pinned toolchain (Node 26 + Chromium) **no cell
+diverges** — the bundled CLDR data agrees — so the gate asserts full
+cross-engine byte-identity for the whole fixture set today. The caveat stands
+as a latent risk: the day an engine ships different CLDR data, the gate turns
+red and the divergence is recorded as a pinned `browser` override rather than
+silently absorbed.
+
+## The PDF compression caveat
+
+PDFKit compresses each content stream with `FlateDecode`, which runs through
+the **host runtime's zlib**. Bun's zlib and Node's zlib emit different — both
+valid — compressed bytes for identical input, so the `bun compile` CLI binary's
+PDF is not byte-identical to the kernel-in-Node PDF. This is the one
+binary↔Node divergence on the Node surfaces; every other format is identical
+across the compiled binary and the kernel. The gate records it as a pinned
+`cli` override per `pdf` cell rather than hiding it, and asserts the override
+still differs from the Node bytes — so if a future change makes the kernel's
+PDF deflate runtime-independent (a fixed `zlib` build, or `compress:false`),
+the now-stale override turns the gate red and is dropped in the re-baseline.
+
 ## Enforcement
 
-A cross-surface golden-file gate, not a hope. CI runs the same fixture set
-through:
+A cross-surface golden-file gate, not a hope. The fixture set
+(`packages/integration-tests/determinism/`) is run through three surfaces:
 
-- the compiled CLI binary,
-- the kernel in Node,
-- the kernel in a headless browser,
+- **(a)** the compiled `bun compile` CLI binary — what users actually run;
+- **(b)** the kernel in Node — the canonical bytes;
+- **(c)** the kernel in a headless browser (Vitest browser mode +
+  Playwright/Chromium) — the same `@resvg/resvg-wasm` raster path behind both
+  "Export… → PNG" and "Copy as PNG", so one browser PNG hash covers both.
 
-and asserts `sha256` equality across all three for every format. Any surface
-that drifts turns the gate red. This is the mechanism that converts "we intend
-byte-identity" into "byte-identity is structurally guaranteed". The fixtures
-live alongside the existing renderer fixtures; the hashes are checked in and
-bumped only as a deliberate, reviewed act on a toolchain-version change.
+For every fixture × format the gate computes a SHA-256 and asserts:
+
+1. the kernel-in-Node bytes (b) match the checked-in `node` golden — the
+   toolchain-version regression detector;
+2. the compiled binary (a) equals the Node bytes — except the recorded `cli`
+   overrides (every `pdf`; see § The PDF compression caveat), which stay pinned
+   and must still diverge;
+3. the live ICU-dependence classification matches the stored `icu` flag, so a
+   cell can never silently change category;
+4. the browser bytes (c) equal the Node bytes for every clean cell, and equal a
+   recorded `browser` override where the deferred Intl leak makes them diverge
+   (none today; see § The ICU caveat).
+
+The goldens live in
+`packages/integration-tests/determinism/hashes.json`, checked in and bumped
+only as a deliberate, reviewed act on a toolchain-version change
+(`make determinism-update`). The gate runs as a **dedicated CI job**
+(`make determinism` + `make determinism-browser`), kept out of the multi-OS
+unit-test matrix on purpose: it needs a compiled binary (Bun) and a browser
+(Playwright), and the binary-format goldens (pdf/png) are pinned per toolchain
+version in one canonical environment rather than per OS.
+
+**Source-path normalization.** Two exporters echo the source path into their
+bytes — the JSON serializer (`file.uri`) and the PDF `Subject`. That path is an
+*input*, not engine output, and is machine-specific (`/Users/you/…` vs
+`/home/runner/…`), so the gate strips the volatile directory (keeping the
+stable basename) from every artifact before hashing, uniformly on all surfaces.
+Every other byte is compared verbatim. This keeps the checked-in goldens
+portable across checkouts and CI without weakening the cross-surface
+comparison.
 
 ## Non-goals and explicit opt-outs
 

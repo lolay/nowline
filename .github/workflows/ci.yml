@@ -89,6 +89,44 @@ jobs:
       - name: Check bundle size + node:* leak
         run: make bundle-size
 
+  determinism:
+    # Cross-surface export-determinism gate (specs/export-determinism.md §
+    # Enforcement). Deliberately a single dedicated job, NOT part of the
+    # multi-OS build-test matrix: it needs a compiled `bun compile` binary and
+    # a headless browser, which the matrix does not provision. One canonical
+    # environment (ubuntu, Node from .nvmrc) keeps the binary-format goldens
+    # (pdf/png) stable — they are pinned per toolchain version, not per OS.
+    name: Export determinism gate
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v6
+      - uses: ./.github/actions/setup-node-pnpm
+
+      # Pinned to match the runtime baked into shipped binaries (build.yml).
+      - name: Install Bun
+        uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: '1.3.14'
+
+      - name: Build all packages
+        run: make build-fast
+
+      # Surface (a): the standalone binary users actually run (here: linux-x64).
+      - name: Compile local CLI binary
+        run: make compile TARGET=local
+
+      # Surfaces (a) + (b): compiled CLI binary vs kernel-in-Node.
+      - name: Node + compiled-CLI determinism legs
+        run: make determinism
+
+      # Surface (c): kernel in a headless browser. install-deps pulls the
+      # system libraries chromium-headless-shell needs on a clean runner;
+      # `make determinism-browser` then installs the browser and runs the leg.
+      - name: Headless-browser determinism leg
+        run: |
+          pnpm --filter @nowline/integration-tests exec playwright install-deps chromium
+          make determinism-browser
+
   release-build-smoke:
     name: Release build smoke (no upload)
     needs: build-test
