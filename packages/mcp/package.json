@@ -1,7 +1,7 @@
 {
-    "name": "@nowline/export-png",
+    "name": "@nowline/mcp",
     "version": "0.5.1",
-    "description": "Nowline PNG exporter — rasterizes the renderer SVG via @resvg/resvg-wasm",
+    "description": "Nowline MCP server — stdio tool surface for validate/render/read/create/update/delete/list/export over local .nowline files",
     "license": "Apache-2.0",
     "engines": {
         "node": ">=22",
@@ -10,10 +10,17 @@
     "type": "module",
     "main": "./dist/index.js",
     "types": "./dist/index.d.ts",
+    "bin": {
+        "nowline-mcp": "./dist/index.js"
+    },
     "exports": {
         ".": {
             "types": "./dist/index.d.ts",
             "import": "./dist/index.js"
+        },
+        "./server": {
+            "types": "./dist/server.d.ts",
+            "import": "./dist/server.js"
         }
     },
     "files": [
@@ -21,22 +28,22 @@
         "src/"
     ],
     "scripts": {
+        "prebuild": "node scripts/bundle-resources.mjs",
         "build": "tsc -b tsconfig.json",
         "watch": "tsc -b tsconfig.json --watch",
-        "test": "vitest run",
-        "test:watch": "vitest"
+        "typecheck": "tsc --noEmit",
+        "test": "vitest run"
     },
     "dependencies": {
+        "@modelcontextprotocol/sdk": "^1.29.0",
+        "@nowline/core": "workspace:*",
+        "@nowline/export": "workspace:*",
         "@nowline/export-core": "workspace:*",
-        "@resvg/resvg-wasm": "^2.6.2"
+        "langium": "~4.2.4",
+        "zod": "^4.4.3"
     },
     "devDependencies": {
-        "@nowline/core": "workspace:*",
-        "@nowline/layout": "workspace:*",
-        "@nowline/renderer": "workspace:*",
         "@types/node": "^25.9.1",
-        "langium": "~4.2.4",
-        "typescript": "^6.0.3",
         "vitest": "^4.1.7"
     }
 }

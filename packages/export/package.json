@@ -36,7 +36,12 @@
         "@nowline/layout": "workspace:*",
         "@nowline/renderer": "workspace:*"
     },
+    "peerDependencies": {
+        "langium": "~4.2.4"
+    },
     "devDependencies": {
+        "@types/node": "^25.9.1",
+        "langium": "~4.2.4",
         "typescript": "^6.0.3"
     }
 }

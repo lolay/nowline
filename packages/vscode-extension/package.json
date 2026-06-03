@@ -394,6 +394,7 @@
         "@nowline/browser": "workspace:*",
         "@nowline/config": "workspace:*",
         "@nowline/core": "workspace:*",
+        "@nowline/export": "workspace:*",
         "@nowline/export-core": "workspace:*",
         "@nowline/export-html": "workspace:*",
         "@nowline/export-mermaid": "workspace:*",

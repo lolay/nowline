@@ -1,7 +1,7 @@
 import { type ParseArgsConfig, parseArgs } from 'node:util';
 import { CliError, ExitCode } from '../io/exit-codes.js';
 
-export type ModeKind = 'render' | 'serve' | 'init' | 'help' | 'version';
+export type ModeKind = 'render' | 'serve' | 'init' | 'mcp' | 'help' | 'version';
 
 export interface ParsedArgs {
     /** Resolved mode after dispatch (mutual-exclusivity already checked). */
@@ -59,6 +59,9 @@ export interface ParsedArgs {
 
     // Init
     template?: string;
+
+    // MCP
+    root?: string;
 }
 
 /**
@@ -97,6 +100,7 @@ export function parseArgv(argv: readonly string[]): ParsedArgs {
 
             serve: { type: 'boolean' },
             init: { type: 'boolean' },
+            mcp: { type: 'boolean' },
             'dry-run': { type: 'boolean', short: 'n' },
 
             theme: { type: 'string', short: 't' },
@@ -118,6 +122,9 @@ export function parseArgv(argv: readonly string[]): ParsedArgs {
             'diagnostic-format': { type: 'string' },
 
             template: { type: 'string' },
+
+            // MCP
+            root: { type: 'string' },
 
             // Format-specific (m2c)
             'page-size': { type: 'string' },
@@ -177,6 +184,7 @@ export function parseArgv(argv: readonly string[]): ParsedArgs {
     const modes: ModeKind[] = [];
     if (values.serve === true) modes.push('serve');
     if (values.init === true) modes.push('init');
+    if (values.mcp === true) modes.push('mcp');
     if (modes.length > 1) {
         throw new CliError(
             ExitCode.InputError,
@@ -187,7 +195,7 @@ export function parseArgv(argv: readonly string[]): ParsedArgs {
     const dryRun = values['dry-run'] === true;
     const mode: ModeKind = modes[0] ?? 'render';
 
-    if (dryRun && (mode === 'serve' || mode === 'init')) {
+    if (dryRun && (mode === 'serve' || mode === 'init' || mode === 'mcp')) {
         throw new CliError(
             ExitCode.InputError,
             `nowline: --dry-run cannot be combined with --${mode}.`,
@@ -233,6 +241,7 @@ export function parseArgv(argv: readonly string[]): ParsedArgs {
         headless: values.headless === true,
         start: stringOrUndefined(values.start),
         locale: stringOrUndefined(values.locale),
+        root: stringOrUndefined(values.root),
     };
 }
 

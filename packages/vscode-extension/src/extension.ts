@@ -8,7 +8,7 @@ import {
     TransportKind,
 } from 'vscode-languageclient/node';
 import { type ExportSettings, runExportCommand } from './export/cli-runner.js';
-import { initExportRuntime } from './export/in-process.js';
+import { exportInProcess, initExportRuntime } from './export/in-process.js';
 import { runNewRoadmapCommand } from './export/new-roadmap.js';
 import { DisagreementTracker } from './io/disagreement-check.js';
 import { RcConfigCache } from './io/rc-config.js';
@@ -343,12 +343,28 @@ async function handleSave(
         saveLabel: `Save ${ext.toUpperCase()}`,
     });
     if (!target) return;
-    const bytes =
-        format === 'svg'
-            ? new TextEncoder().encode(typeof body === 'string' ? body : '')
-            : body instanceof Uint8Array
-              ? body
-              : new Uint8Array();
+
+    let bytes: Uint8Array;
+    if (format === 'png') {
+        // Re-rasterize via the kernel (WASM) so the saved file matches
+        // "Nowline: Export... → PNG" byte-for-byte (plan s7).
+        try {
+            const result = await exportInProcess(
+                source.sourceUri.fsPath,
+                'png',
+                readExportSettings(),
+            );
+            bytes = result.rendered as Uint8Array;
+        } catch (err) {
+            vscode.window.showErrorMessage(
+                `Nowline: PNG rasterization failed: ${err instanceof Error ? err.message : String(err)}`,
+            );
+            return;
+        }
+    } else {
+        bytes = new TextEncoder().encode(typeof body === 'string' ? body : '');
+    }
+
     try {
         await vscode.workspace.fs.writeFile(target, bytes);
         vscode.window.setStatusBarMessage(`Nowline: saved ${path.basename(target.fsPath)}`, 4000);
@@ -359,11 +375,24 @@ async function handleSave(
     }
 }
 
-async function handleCopyPngFallback(body: Uint8Array, source: NowlinePreview): Promise<void> {
+async function handleCopyPngFallback(_body: Uint8Array, source: NowlinePreview): Promise<void> {
+    // Re-rasterize via the kernel (WASM) so the temp file is canonical —
+    // matches "Nowline: Export... → PNG" byte-for-byte (plan s7).
+    let pngBytes: Uint8Array;
+    try {
+        const result = await exportInProcess(source.sourceUri.fsPath, 'png', readExportSettings());
+        pngBytes = result.rendered as Uint8Array;
+    } catch (err) {
+        vscode.window.showErrorMessage(
+            `Nowline: failed to write PNG fallback: ${err instanceof Error ? err.message : String(err)}`,
+        );
+        return;
+    }
+
     const tmpFile = path.join(os.tmpdir(), `nowline-${source.sourceBasename()}-${Date.now()}.png`);
     const target = vscode.Uri.file(tmpFile);
     try {
-        await vscode.workspace.fs.writeFile(target, body);
+        await vscode.workspace.fs.writeFile(target, pngBytes);
     } catch (err) {
         vscode.window.showErrorMessage(
             `Nowline: failed to write PNG fallback: ${err instanceof Error ? err.message : String(err)}`,

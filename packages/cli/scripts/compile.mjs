@@ -25,9 +25,9 @@ const packageRoot = path.resolve(__dirname, '..');
 // Tight by design: a breach should trigger the conversation called out in
 // `specs/cli-distribution.md` "Size budget", not be silently absorbed.
 //
-// Last measured (bun 1.3.13) using --target on macOS-arm64:
-//   darwin-arm64=70  darwin-x64=75  linux-arm64=107  linux-x64=107
-//   windows-arm64=119  windows-x64=122
+// Last measured (bun 1.3.14, @resvg/resvg-wasm, no native .node) on macOS-arm64:
+//   darwin-arm64=67  darwin-x64=~72  linux-arm64=~104  linux-x64=~104
+//   windows-arm64=~116  windows-x64=~119
 const ALL_TARGETS = [
     { id: 'bun-darwin-arm64', suffix: 'macos-arm64', maxMb: 80 },
     { id: 'bun-darwin-x64', suffix: 'macos-x64', maxMb: 85 },
@@ -80,10 +80,15 @@ function main() {
         }
     }
 
-    const entry = path.join(packageRoot, 'dist', 'index.js');
-    if (!safeStat(entry)) {
+    // Use the bun-entry shim as the compile entry point so Bun's static
+    // analyzer sees the `import ... with { type: 'file' }` declaration that
+    // embeds resvg.wasm in the binary.  The shim sets __RESVG_WASM_PATH__
+    // and then delegates to dist/index.js.
+    const entry = path.join(packageRoot, 'scripts', 'bun-entry.mjs');
+    const distEntry = path.join(packageRoot, 'dist', 'index.js');
+    if (!safeStat(distEntry)) {
         console.error(
-            `error: expected ${path.relative(packageRoot, entry)} to exist; run \`pnpm build\` first.`,
+            `error: expected ${path.relative(packageRoot, distEntry)} to exist; run \`pnpm build\` first.`,
         );
         process.exit(1);
     }

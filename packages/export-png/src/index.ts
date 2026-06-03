@@ -1,14 +1,18 @@
-// PNG exporter — rasterizes the renderer SVG via resvg-js (WASM).
+// PNG exporter — rasterizes the renderer SVG via @resvg/resvg-wasm.
 //
-// Spec: specs/handoffs/m2c.md § 3 "PNG — rasterized SVG via resvg-js (WASM)".
+// Full replace of the old native @resvg/resvg-js dependency. The WASM build
+// is browser-capable, loads system fonts optionally (we always use
+// custom fontBuffers for determinism), and avoids native .node addons.
 //
 // Determinism contract:
-//   - `loadSystemFonts: false` — only the resolved fonts the caller hands in
-//     are visible to resvg, so identical input → identical bytes regardless
-//     of host machine.
-//   - Fonts come from the @nowline/export-core resolver; we pass them as
-//     `fontBuffers` (Uint8Array, supported since resvg-js 2.5.0).
-//   - The WASM module is loaded lazily on first call.
+//   - fontBuffers: only the resolved fonts the caller hands in are visible to
+//     resvg, so identical inputs → identical bytes regardless of host machine.
+//   - Fonts come from the @nowline/export-core resolver; passed as Uint8Array[].
+//   - WASM module is initialized lazily on first call; initPngWasm() lets the
+//     caller supply the bytes (HostEnv.loadWasm() path); auto-init falls back
+//     to loading index_bg.wasm from the package's node_modules (Node only).
+//
+// Spec: specs/export-determinism.md — full replace (plan s4).
 
 import type { ExportInputs, ResolvedFontPair } from '@nowline/export-core';
 import { resolveFonts } from '@nowline/export-core';
@@ -23,63 +27,68 @@ export interface PngOptions {
     background?: string;
     /** Pre-resolved font pair. If absent, the exporter calls `resolveFonts()`. */
     fonts?: ResolvedFontPair;
-    /** Resvg-js options bag for advanced overrides. Use sparingly. */
-    resvgOptions?: Record<string, unknown>;
 }
 
-let resvgModule: typeof import('@resvg/resvg-js') | undefined;
+// ---- WASM initialization ----------------------------------------------------
 
-async function getResvgModule(): Promise<typeof import('@resvg/resvg-js')> {
-    if (!resvgModule) {
-        resvgModule = await import('@resvg/resvg-js');
+let wasmReady = false;
+let wasmInitializing: Promise<void> | undefined;
+
+/**
+ * Initialize the resvg WASM module with the provided bytes. The kernel calls
+ * this with `await host.loadWasm()` before the first PNG export. Idempotent:
+ * subsequent calls with the same wasm bytes are no-ops.
+ */
+export async function initPngWasm(wasm: ArrayBuffer | Uint8Array): Promise<void> {
+    if (wasmReady) return;
+    const bytes = wasm instanceof Uint8Array ? wasm.buffer : wasm;
+    if (!wasmInitializing) {
+        wasmInitializing = (async () => {
+            const { initWasm } = await import('@resvg/resvg-wasm');
+            await initWasm(bytes as ArrayBuffer);
+            wasmReady = true;
+        })();
     }
-    return resvgModule;
+    await wasmInitializing;
 }
 
-/** Test seam: drop the cached WASM module so isolated tests start fresh. */
-export function _resetResvgModule(): void {
-    resvgModule = undefined;
-}
-
-export async function exportPng(
-    inputs: ExportInputs,
-    svg: string,
-    options: PngOptions = {},
-): Promise<Uint8Array> {
-    const scale = options.scale ?? 2;
-    if (!Number.isFinite(scale) || scale <= 0) {
-        throw new Error(`exportPng: invalid scale ${scale}; expected a positive number`);
+/**
+ * Ensure the WASM module is initialized. If initPngWasm() was not called
+ * explicitly, auto-loads index_bg.wasm from @resvg/resvg-wasm's Node package
+ * (Node.js / non-compiled use — tests and development). Under bun compile the
+ * kernel always calls initPngWasm() via HostEnv.loadWasm() so this path is not
+ * reached in production binaries.
+ */
+async function ensureWasmInitialized(): Promise<void> {
+    if (wasmReady) return;
+    if (!wasmInitializing) {
+        wasmInitializing = (async () => {
+            const { createRequire } = await import('node:module');
+            const { readFile } = await import('node:fs/promises');
+            const { dirname } = await import('node:path');
+            const req = createRequire(import.meta.url);
+            const entry = req.resolve('@resvg/resvg-wasm');
+            const wasmPath = `${dirname(entry)}/index_bg.wasm`;
+            const wasmBytes = await readFile(wasmPath);
+            const { initWasm } = await import('@resvg/resvg-wasm');
+            await initWasm(wasmBytes.buffer as ArrayBuffer);
+            wasmReady = true;
+        })();
     }
-    const background = options.background ?? inputs.model.backgroundColor;
-
-    const fontPair = options.fonts ?? (await resolveFontsFor(inputs));
-    const fontBuffers = [bufferOf(fontPair.sans.bytes), bufferOf(fontPair.mono.bytes)];
-
-    // Workaround: in resvg-js 2.6.2, supplying `font.fontBuffers` silently
-    // disables `fitTo` (zoom / width / height / dpi). To honour `--scale` we
-    // multiply the root <svg width=…> / <svg height=…> attributes ourselves
-    // before handing the SVG to resvg. The internal viewBox stays the same,
-    // so vector geometry is preserved — only the rasterized pixel grid grows.
-    const scaledSvg = scale === 1 ? svg : scaleRootSvgDimensions(svg, scale);
-
-    const resvgOpts = {
-        background,
-        font: {
-            loadSystemFonts: false,
-            fontBuffers,
-            defaultFontFamily: fontPair.sans.name,
-            sansSerifFamily: fontPair.sans.name,
-            monospaceFamily: fontPair.mono.name,
-        },
-        ...(options.resvgOptions ?? {}),
-    };
-
-    const { Resvg } = await getResvgModule();
-    const resvg = new Resvg(scaledSvg, resvgOpts);
-    const png = resvg.render();
-    const bytes = png.asPng();
-    return new Uint8Array(bytes.buffer, bytes.byteOffset, bytes.byteLength);
+    await wasmInitializing;
 }
+
+/** Test seam: reset WASM initialization state between isolated tests. */
+export function _resetPngWasm(): void {
+    wasmReady = false;
+    wasmInitializing = undefined;
+}
+
+// ---- Scale workaround -------------------------------------------------------
+//
+// @resvg/resvg-wasm (like resvg-js ≤ 2.6.x) silently disables fitTo when
+// fontBuffers are supplied. Pre-multiply root <svg width/height> by scale so
+// the rasterized grid grows while preserving vector geometry.
 
 const ROOT_SVG_RE = /<svg\b([^>]*)>/i;
 const WIDTH_RE = /\bwidth="([\d.]+)(px)?"/i;
@@ -99,11 +108,52 @@ function scaleRootSvgDimensions(svg: string, scale: number): string {
     return svg.replace(ROOT_SVG_RE, `<svg${nextAttrs}>`);
 }
 
+// ---- Public API -------------------------------------------------------------
+
+export async function exportPng(
+    inputs: ExportInputs,
+    svg: string,
+    options: PngOptions = {},
+): Promise<Uint8Array> {
+    const scale = options.scale ?? 2;
+    if (!Number.isFinite(scale) || scale <= 0) {
+        throw new Error(`exportPng: invalid scale ${scale}; expected a positive number`);
+    }
+
+    await ensureWasmInitialized();
+
+    const background = options.background ?? inputs.model.backgroundColor;
+    const fontPair = options.fonts ?? (await resolveFontsFor(inputs));
+
+    const sansBytes = new Uint8Array(
+        fontPair.sans.bytes.buffer,
+        fontPair.sans.bytes.byteOffset,
+        fontPair.sans.bytes.byteLength,
+    );
+    const monoBytes = new Uint8Array(
+        fontPair.mono.bytes.buffer,
+        fontPair.mono.bytes.byteOffset,
+        fontPair.mono.bytes.byteLength,
+    );
+
+    const scaledSvg = scale === 1 ? svg : scaleRootSvgDimensions(svg, scale);
+
+    const { Resvg } = await import('@resvg/resvg-wasm');
+    const resvg = new Resvg(scaledSvg, {
+        background,
+        font: {
+            fontBuffers: [sansBytes, monoBytes],
+            defaultFontFamily: fontPair.sans.name,
+            sansSerifFamily: fontPair.sans.name,
+            monospaceFamily: fontPair.mono.name,
+        },
+    });
+    const rendered = resvg.render();
+    const bytes = rendered.asPng();
+    return new Uint8Array(bytes.buffer, bytes.byteOffset, bytes.byteLength);
+}
+
 async function resolveFontsFor(_inputs: ExportInputs): Promise<ResolvedFontPair> {
     const result = await resolveFonts();
     return { sans: result.sans, mono: result.mono };
-}
-
-function bufferOf(bytes: Uint8Array): Buffer {
-    return Buffer.from(bytes.buffer, bytes.byteOffset, bytes.byteLength);
 }

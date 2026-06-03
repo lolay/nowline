@@ -174,6 +174,23 @@ bumped only as a deliberate, reviewed act on a toolchain-version change.
   toolchain version. A different `@nowline/*` release may legitimately change
   bytes; that is what the checked-in golden hashes record.
 
+## Copy semantics
+
+The distinction between canonical and non-canonical is most visible in the
+VS Code extension's copy actions.
+
+| Action | Output | Canonical? | Mechanism |
+|--------|--------|-----------|-----------|
+| **Copy SVG** (toolbar) | Engine SVG string | Yes | Webview posts engine-rendered SVG to extension; extension writes it via `env.clipboard`. The SVG equals `nowline -f svg`. |
+| **Copy PNG** (toolbar, happy path) | Canvas rasterization | **No** | Webview rasterizes via `<canvas>` and calls `navigator.clipboard.write()` directly (no extension host round-trip). VS Code's `env.clipboard` is text-only, so the host cannot write image bytes. This is the documented non-canonical exception. |
+| **Copy PNG fallback** (temp file written when clipboard unavailable) | Kernel PNG | Yes | Extension calls `exportInProcess(..., 'png', ...)`, which uses the kernel + `@resvg/resvg-wasm`. Matches `Nowline: Export… → PNG` byte-for-byte. |
+| **Save PNG** (toolbar "Save" button) | Kernel PNG | Yes | Same `exportInProcess` path; canvas bytes from the webview are discarded. |
+| **Export… → PNG** (command palette) | Kernel PNG | Yes | `exportInProcess` pipeline. |
+
+The in-clipboard PNG on the happy path is the **only** non-canonical output in
+the entire VS Code surface. It is non-canonical by necessity (not by design),
+and it is clearly labelled as such in [`specs/ide.md`](./ide.md).
+
 ## Cross-references
 
 - Kernel placement + dependency graph: [`architecture.md`](./architecture.md)

@@ -1,9 +1,14 @@
 import { promises as fs } from 'node:fs';
 import * as path from 'node:path';
-import { resolveIncludes } from '@nowline/core';
+import {
+    type ExportFormat,
+    exportDocument,
+    type HostEnv,
+    type RenderInputs,
+} from '@nowline/export';
 import { lengthToPoints, parseLength } from '@nowline/export-core';
-import { layoutRoadmap, normalizeThemeName, type ThemeName } from '@nowline/layout';
-import { type AssetResolver, renderSvg } from '@nowline/renderer';
+import { normalizeThemeName, type ThemeName } from '@nowline/layout';
+import type { AssetResolver } from '@nowline/renderer';
 import type { ParsedArgs } from '../cli/args.js';
 import {
     FormatResolutionError,
@@ -15,7 +20,7 @@ import { resolveRenderOutputPath } from '../cli/output-path.js';
 import { parseNowlineJson } from '../convert/parse-json.js';
 import { printNowlineFile } from '../convert/printer.js';
 import { serializeToJson } from '../convert/schema.js';
-import { getServices, parseSource } from '../core/parse.js';
+import { parseSource } from '../core/parse.js';
 import { type DiagnosticSource, formatDiagnostics } from '../diagnostics/index.js';
 import {
     describeContentLocaleSource,
@@ -208,69 +213,67 @@ interface ProduceResult {
     isBinary: boolean;
 }
 
+const BINARY_FORMATS = new Set<OutputFormat>(['png', 'pdf', 'xlsx']);
+const FONT_FORMATS = new Set<OutputFormat>(['png', 'pdf']);
+
 async function produce(args: ProduceArgs): Promise<ProduceResult> {
-    if (args.format === 'json') {
-        return { rendered: await produceJson(args), isBinary: false };
-    }
+    // `nowline` canonical-text format is not part of ExportFormat; handle here.
     if (args.format === 'nowline') {
         return { rendered: await produceCanonicalNowline(args), isBinary: false };
     }
 
-    // The remaining formats all start from a positioned model + (sometimes) an
-    // SVG. Build them once and dispatch to the format-specific exporter via
-    // dynamic import — keeps each exporter's heavy deps off cold paths and
-    // leaves room to re-extract a package later if a future build profile
-    // wants to slim down.
-    const stage = await stageRoadmap(args);
+    // Convert JSON-AST input to DSL text before handing to the kernel.
+    const sourceText =
+        args.inputFormat === 'json'
+            ? jsonToNowlineText(args.contents, args.displayPath)
+            : args.contents;
 
-    if (args.format === 'svg') {
-        return { rendered: stage.svg, isBinary: false };
+    // Pre-validate with locale-aware diagnostic formatting so validation
+    // errors reach the operator in their locale. The kernel will re-parse
+    // the same source below — double work accepted in exchange for faithful
+    // stderr output.
+    await parseAndValidate(sourceText, args);
+
+    const assetRoot = args.assetRoot
+        ? path.resolve(args.assetRoot)
+        : path.dirname(args.absInputPath);
+
+    const host = createNodeHostEnv(assetRoot);
+
+    // Resolve fonts lazily — only for formats that rasterize or embed them.
+    let fonts: RenderInputs['fonts'];
+    if (FONT_FORMATS.has(args.format)) {
+        fonts = await resolveNodeFonts(args);
     }
+
+    const kernelInputs: RenderInputs = {
+        sourcePath: args.absInputPath,
+        today: args.today,
+        locale: args.locale ?? 'und',
+        theme: args.theme,
+        fonts,
+        width: args.width,
+        noLinks: args.noLinks,
+        strict: args.strict,
+        pageSize: args.pageSize,
+        orientation: parseOrientation(args.orientation),
+        marginPt: parseMargin(args.margin),
+        pngScale: parseScale(args.scale),
+        msprojStart: args.start,
+    };
+
     try {
-        if (args.format === 'html') {
-            const mod = await import('@nowline/export-html');
-            const html = await mod.exportHtml(stage.exportInputs, stage.svg);
-            return { rendered: html, isBinary: false };
-        }
-        if (args.format === 'mermaid') {
-            const mod = await import('@nowline/export-mermaid');
-            const md = mod.exportMermaid(stage.exportInputs);
-            return { rendered: md, isBinary: false };
-        }
-        if (args.format === 'msproj') {
-            const mod = await import('@nowline/export-msproj');
-            const xml = mod.exportMsProjXml(stage.exportInputs, {
-                startDate: args.start,
-            });
-            return { rendered: xml, isBinary: false };
-        }
-        if (args.format === 'png') {
-            const fonts = await stage.fontPair();
-            const mod = await import('@nowline/export-png');
-            const png = await mod.exportPng(stage.exportInputs, stage.svg, {
-                scale: parseScale(args.scale),
-                fonts,
-            });
-            return { rendered: png, isBinary: true };
-        }
-        if (args.format === 'pdf') {
-            const fonts = await stage.fontPair();
-            const mod = await import('@nowline/export-pdf');
-            const pdf = await mod.exportPdf(stage.exportInputs, stage.svg, {
-                pageSize: args.pageSize,
-                orientation: parseOrientation(args.orientation),
-                marginPt: parseMargin(args.margin),
-                fonts,
-            });
-            return { rendered: pdf, isBinary: true };
-        }
-        if (args.format === 'xlsx') {
-            const mod = await import('@nowline/export-xlsx');
-            const xlsx = await mod.exportXlsx(stage.exportInputs, {
-                generated: args.today,
-            });
-            return { rendered: xlsx, isBinary: true };
-        }
+        const bytes = await exportDocument(
+            sourceText,
+            args.format as ExportFormat,
+            kernelInputs,
+            host,
+        );
+        const isBinary = BINARY_FORMATS.has(args.format);
+        const rendered: string | Uint8Array = isBinary
+            ? bytes
+            : new TextDecoder('utf-8').decode(bytes);
+        return { rendered, isBinary };
     } catch (err) {
         if (err instanceof CliError) throw err;
         const message = err instanceof Error ? err.message : String(err);
@@ -279,21 +282,77 @@ async function produce(args: ProduceArgs): Promise<ProduceResult> {
             `nowline: ${args.format} export failed: ${message}`,
         );
     }
-
-    throw new CliError(ExitCode.InputError, `nowline: unsupported format "${args.format}".`);
 }
 
-async function produceJson(args: ProduceArgs): Promise<string> {
-    if (args.inputFormat === 'json') {
-        // Re-parse JSON → DSL → JSON to canonicalize through @nowline/core.
-        const { ast } = parseNowlineJson(args.contents, args.displayPath);
-        const text = printNowlineFile(ast);
-        const parsed = await parseAndValidate(text, args);
-        return JSON.stringify(serializeToJson(parsed.document, text), null, 2);
+// ---- Node HostEnv -----------------------------------------------------------
+
+function createNodeHostEnv(assetRoot: string): HostEnv {
+    const root = path.resolve(assetRoot);
+    return {
+        readSource: async (absPath: string): Promise<string> => {
+            return await fs.readFile(absPath, 'utf-8');
+        },
+        readAsset: async (ref: string): Promise<Uint8Array> => {
+            const absPath = path.resolve(root, ref);
+            if (!absPath.startsWith(root + path.sep) && absPath !== root) {
+                throw new Error(`Asset ${ref} escapes asset-root ${assetRoot}`);
+            }
+            const bytes = await fs.readFile(absPath);
+            return new Uint8Array(bytes.buffer, bytes.byteOffset, bytes.byteLength);
+        },
+        loadWasm: async (): Promise<ArrayBuffer> => {
+            // Two code paths:
+            //
+            // 1. Bun compiled binary: scripts/bun-entry.mjs imports
+            //    dist/resvg.wasm via `with { type: 'file' }` (the only Bun
+            //    pattern the bundler embeds) and stashes the VFS path in
+            //    globalThis.__RESVG_WASM_PATH__. Read it with Bun.file().
+            //
+            // 2. Plain Node.js (dev, tests, uncompiled dist/index.js run):
+            //    dist/resvg.wasm is copied by scripts/copy-wasm.mjs (postbuild).
+            //    Use fs.readFile via a new URL relative to this module.
+            // eslint-disable-next-line @typescript-eslint/no-explicit-any
+            const bunWasmPath = (globalThis as any).__RESVG_WASM_PATH__ as string | undefined;
+            if (bunWasmPath) {
+                // eslint-disable-next-line @typescript-eslint/no-explicit-any
+                return (globalThis as any).Bun.file(
+                    bunWasmPath,
+                ).arrayBuffer() as Promise<ArrayBuffer>;
+            }
+            const wasmUrl = new URL('../resvg.wasm', import.meta.url);
+            const bytes = await fs.readFile(wasmUrl);
+            return bytes.buffer as ArrayBuffer;
+        },
+    };
+}
+
+// ---- Font resolution --------------------------------------------------------
+
+async function resolveNodeFonts(
+    args: ProduceArgs,
+): Promise<import('@nowline/export-core').ResolvedFontPair> {
+    const { resolveFonts } = await import('@nowline/export-core');
+    const result = await resolveFonts({
+        fontSans: args.fontSans,
+        fontMono: args.fontMono,
+        headless: args.headless,
+    });
+    if (args.strict) {
+        if (result.sansFellBackToBundled) {
+            process.stderr.write(
+                'warning: sans font fell back to bundled DejaVu (no platform font found)\n',
+            );
+        }
+        if (result.monoFellBackToBundled) {
+            process.stderr.write(
+                'warning: mono font fell back to bundled DejaVu (no platform font found)\n',
+            );
+        }
     }
-    const parsed = await parseAndValidate(args.contents, args);
-    return JSON.stringify(serializeToJson(parsed.document, args.contents), null, 2);
+    return { sans: result.sans, mono: result.mono };
 }
+
+// ---- nowline canonical-text format (not part of ExportFormat) ---------------
 
 async function produceCanonicalNowline(args: ProduceArgs): Promise<string> {
     if (args.inputFormat === 'json') {
@@ -305,93 +364,7 @@ async function produceCanonicalNowline(args: ProduceArgs): Promise<string> {
     return printNowlineFile(doc.ast);
 }
 
-interface StagedRoadmap {
-    svg: string;
-    exportInputs: import('@nowline/export-core').ExportInputs;
-    /** Lazy: only loads the resolved font pair when a format actually needs it. */
-    fontPair: () => Promise<import('@nowline/export-core').ResolvedFontPair>;
-}
-
-async function stageRoadmap(args: ProduceArgs): Promise<StagedRoadmap> {
-    const parsed = await parseAndValidate(
-        args.inputFormat === 'json'
-            ? jsonToNowlineText(args.contents, args.displayPath)
-            : args.contents,
-        args,
-    );
-    const resolved = await resolveIncludes(parsed.ast, args.absInputPath, {
-        services: getServices().Nowline,
-    });
-    for (const diag of resolved.diagnostics) {
-        if (diag.severity === 'error') {
-            process.stderr.write(`${diag.sourcePath}: ${diag.message}\n`);
-        }
-    }
-    if (resolved.diagnostics.some((d) => d.severity === 'error')) {
-        throw new CliError(ExitCode.ValidationError, '');
-    }
-
-    const model = layoutRoadmap(parsed.ast, resolved, {
-        theme: args.theme,
-        today: args.today,
-        width: args.width,
-        locale: args.locale,
-    });
-
-    const assetRoot = args.assetRoot
-        ? path.resolve(args.assetRoot)
-        : path.dirname(args.absInputPath);
-    const resolver: AssetResolver = createAssetResolver(assetRoot);
-
-    const warnings: string[] = [];
-    const svg = await renderSvg(model, {
-        assetResolver: resolver,
-        noLinks: args.noLinks,
-        strict: args.strict,
-        warn: (msg) => warnings.push(msg),
-    });
-
-    for (const w of warnings) {
-        process.stderr.write(`warning: ${w}\n`);
-    }
-
-    let cachedFonts: import('@nowline/export-core').ResolvedFontPair | undefined;
-    const fontPair = async () => {
-        if (cachedFonts) return cachedFonts;
-        const mod = await import('@nowline/export-core');
-        const result = await mod.resolveFonts({
-            fontSans: args.fontSans,
-            fontMono: args.fontMono,
-            headless: args.headless,
-        });
-        if (args.strict) {
-            if (result.sansFellBackToBundled) {
-                process.stderr.write(
-                    'warning: sans font fell back to bundled DejaVu (no platform font found)\n',
-                );
-            }
-            if (result.monoFellBackToBundled) {
-                process.stderr.write(
-                    'warning: mono font fell back to bundled DejaVu (no platform font found)\n',
-                );
-            }
-        }
-        cachedFonts = { sans: result.sans, mono: result.mono };
-        return cachedFonts;
-    };
-
-    return {
-        svg,
-        exportInputs: {
-            ast: parsed.ast,
-            resolved,
-            model,
-            sourcePath: args.displayPath,
-            today: args.today,
-        },
-        fontPair,
-    };
-}
+// ---- Shared helpers ---------------------------------------------------------
 
 function jsonToNowlineText(contents: string, displayPath: string): string {
     const { ast } = parseNowlineJson(contents, displayPath);
@@ -543,6 +516,8 @@ function emitDiagnostics(
     });
     if (rendered) process.stderr.write(`${rendered}\n`);
 }
+
+// ---- Asset resolver (still used by serve.ts) --------------------------------
 
 export function createAssetResolver(assetRoot: string): AssetResolver {
     const root = path.resolve(assetRoot);

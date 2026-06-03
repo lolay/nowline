@@ -31,6 +31,10 @@ MODE FLAGS (mutually exclusive)
                           rendered output to disk on each rebuild.
       --init [<name>]     Scaffold a starter .nowline file in cwd. Positional
                           becomes project name; .nowline appended if missing.
+      --mcp               Start a Model Context Protocol (MCP) stdio server
+                          exposing validate, render, export, and file tools.
+                          Shares the same @nowline/mcp server code as
+                          \`npx @nowline/mcp\`.
   -n, --dry-run           Run the full pipeline (parse + validate + layout +
                           format) but skip the write step. Subsumes the old
                           'validate' verb. Exit 0 on success, 1 on errors.
@@ -57,6 +61,10 @@ SERVE OPTIONS
       --host <host>       Bind address (default: 127.0.0.1).
       --open              Open the browser on start.
 
+MCP OPTIONS
+      --root <dir>        Allowed-root directory for file tools (default: cwd).
+                          File paths are resolved and restricted to this root.
+
 LOGGING (mutually exclusive)
   -v, --verbose           Print extra diagnostics to stderr.
   -q, --quiet             Suppress non-error stderr.
@@ -75,6 +83,8 @@ EXAMPLES
   nowline roadmap.nowline --dry-run         # validate-only
   nowline roadmap.nowline --serve -p 8080   # live preview
   nowline --init my-project                 # scaffold ./my-project.nowline
+  nowline --mcp                             # start MCP stdio server in cwd
+  nowline --mcp --root ./roadmaps           # MCP server with custom root
 
 EXIT CODES
   0  Success

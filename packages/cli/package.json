@@ -33,6 +33,7 @@
         "bundle-templates": "node scripts/bundle-templates.mjs",
         "prebuild": "node scripts/bundle-templates.mjs",
         "build": "tsc -b tsconfig.json",
+        "postbuild": "node scripts/copy-wasm.mjs",
         "watch": "tsc -b tsconfig.json --watch",
         "pretest": "node scripts/bundle-templates.mjs",
         "test": "vitest run",
@@ -43,8 +44,11 @@
     "dependencies": {
         "@babel/code-frame": "^7.29.0",
         "@clack/prompts": "^1.4.0",
+        "@modelcontextprotocol/sdk": "^1.29.0",
         "@nowline/config": "workspace:*",
         "@nowline/core": "workspace:*",
+        "@nowline/export": "workspace:*",
+        "@nowline/mcp": "workspace:*",
         "@nowline/export-core": "workspace:*",
         "@nowline/export-html": "workspace:*",
         "@nowline/export-mermaid": "workspace:*",
@@ -61,6 +65,7 @@
         "langium": "~4.2.4"
     },
     "devDependencies": {
+        "@resvg/resvg-wasm": "^2.6.2",
         "@types/babel__code-frame": "^7.27.0",
         "@types/js-yaml": "^4.0.9",
         "@types/node": "^25.9.1",

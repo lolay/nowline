@@ -9,6 +9,11 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 ### Added
 
 - VS Code: the right-click commands now live under a single **Nowline** submenu on every surface (editor tab, editor body, and Explorer), instead of being scattered inline. The submenu collapses **Open Preview** (same tab), **Open Preview to the Side**, **Open Link in Side Browser** (editor only), and **Export…** into one consistent group. This restores the same-tab **Open Preview** entry, which was previously only reachable via `Cmd/Ctrl+Shift+V` and the Command Palette.
+- New `@nowline/export` kernel package: `exportDocument(source, format, inputs, host)` is the single shared entry point for every export format (svg, png, pdf, html, mermaid, xlsx, msproj, json, nowline). CLI, VS Code extension, and MCP server all call this kernel; the `HostEnv` interface adapts environment I/O (file reads, asset reads, WASM loading) to the host.
+- New `@nowline/mcp` package: an MCP stdio server (`npx @nowline/mcp`) with eight tools (`validate`, `read`, `create`, `update`, `delete`, `list`, `render`, `export`) and two resources (`nowline://reference`, `nowline://examples`). The `render` and `export` tools produce byte-identical output to `nowline -f <format>` for the same inputs.
+- CLI: `nowline --mcp [--root <dir>]` starts the same MCP server in-process, sharing the `@nowline/mcp` server factory. The `--root` flag sets the allowed root for file tools (defaults to cwd).
+- PNG rasterizer replaced: `@nowline/export-png` now uses `@resvg/resvg-wasm` everywhere (CLI, extension, MCP). The native `@resvg/resvg-js` addon is removed. All Node-surface PNG exports are byte-identical.
+- VS Code: **Save PNG** and the **Copy PNG** temp-file fallback both re-rasterize through the kernel (WASM) so saved PNG files are byte-identical to `nowline -f png`. The in-clipboard PNG (when the webview clipboard write is available) remains a documented non-canonical exception (VS Code's `env.clipboard` is text-only).
 
 ### Changed
 

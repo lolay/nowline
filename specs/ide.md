@@ -206,7 +206,13 @@ Locale, strict, width, and asset-root stay settings-only — they aren't things 
 3. Write the result bytes to the chosen path.
 4. Surface failures via `vscode.window.showErrorMessage` + the `Nowline Export` output channel.
 
-**PNG rasterization** uses `@resvg/resvg-wasm` (pure WASM build of the same resvg engine), bundled into the `.vsix` as `dist/resvg.wasm` (~2.4 MB). Output is visually identical to the CLI's native-resvg PNG; sub-pixel text anti-aliasing can differ by ≤ 2% of pixels (acceptable). **All other formats** are pure-JS and produce byte-identical output to `nowline -f <fmt>`.
+**PNG rasterization** uses `@resvg/resvg-wasm` (pure WASM build of the same resvg engine), bundled into the `.vsix` as `dist/resvg.wasm` (~2.4 MB). All formats — including PNG — produce byte-for-byte identical output to `nowline -f <fmt>` for the same source and render inputs (see [`specs/export-determinism.md`](./export-determinism.md)).
+
+**Copy semantics** — the preview toolbar has two copy actions:
+- **Copy SVG**: posts the engine-rendered SVG string to the clipboard. This is canonical output; the string equals what `nowline -f svg` writes.
+- **Copy PNG**: the happy path calls `navigator.clipboard.write()` from inside the preview webview. Because VS Code's `env.clipboard` is text-only, the extension host cannot write image bytes; instead, the webview uses its own `<canvas>` rasterization — a documented *non-canonical* exception. This path is intentionally non-canonical because VS Code's clipboard API makes canonical (WASM) rasterization inside a user gesture impractical. If the webview clipboard write is unavailable, the fallback path saves a temp file — the fallback temp-file bytes ARE kernel-canonical (written via `exportInProcess`).
+
+**Save PNG** (the preview toolbar "Save" button) and the **copy-PNG fallback temp file** both use the kernel (`@nowline/export` via `exportInProcess`) and are byte-for-byte identical to `Nowline: Export… → PNG`. The in-clipboard PNG is the only exception.
 
 **CLI override escape hatch.** If `nowline.export.cliPath` is set to an explicit path (anything other than the default `'nowline'`), the command shells out to that binary instead — preserving exact CLI-identical output for environments where that matters. The existing in-webview SVG and browser-canvas-PNG toolbar buttons are unaffected.
 
