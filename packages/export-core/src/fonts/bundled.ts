@@ -19,11 +19,26 @@ import { fileURLToPath } from 'node:url';
 
 import { MONO_BASE64, SANS_BASE64 } from '../generated/bundled-fonts.js';
 
-const HERE = path.dirname(fileURLToPath(import.meta.url));
+// Resolve the on-disk assets/fonts directory from this module's location.
+// `import.meta.url` is rewritten to `undefined` when this module is bundled
+// into a CommonJS context — esbuild collapses `import.meta` to `{}` for the VS
+// Code extension's `dist/extension.cjs`. The two exported paths below are
+// informational only (the runtime decodes the embedded base64 above, never
+// reads these files), so degrade to a bare relative directory instead of
+// throwing `ERR_INVALID_ARG_TYPE` at module load — which would crash the
+// extension before it can activate. See packages/vscode-extension.
+function bundledFontsDir(): string {
+    try {
+        // dist/fonts/bundled.js → ../../assets/fonts/
+        //   src/fonts/bundled.ts → ../../assets/fonts/
+        const here = path.dirname(fileURLToPath(import.meta.url));
+        return path.resolve(here, '..', '..', 'assets', 'fonts');
+    } catch {
+        return path.join('assets', 'fonts');
+    }
+}
 
-// dist/fonts/bundled.js → ../../assets/fonts/
-//   src/fonts/bundled.ts → ../../assets/fonts/
-const ASSETS_DIR = path.resolve(HERE, '..', '..', 'assets', 'fonts');
+const ASSETS_DIR = bundledFontsDir();
 
 // Informational: where the source-of-truth TTFs live on disk for users
 // running under Node. Not the runtime load source — `loadBundledSans` and
