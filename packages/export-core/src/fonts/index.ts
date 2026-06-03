@@ -1,3 +1,4 @@
+export { _clearBrowserFontsCache, loadBundledFontsForBrowser } from './browser.js';
 export {
     BUNDLED_MONO_PATH,
     BUNDLED_SANS_PATH,

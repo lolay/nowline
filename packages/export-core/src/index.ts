@@ -6,6 +6,7 @@ export {
     type PropertyHost,
     roadmapTitle,
 } from './ast-helpers.js';
+export { _clearBrowserFontsCache, loadBundledFontsForBrowser } from './fonts/browser.js';
 export {
     BUNDLED_MONO_PATH,
     BUNDLED_SANS_PATH,

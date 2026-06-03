@@ -106,6 +106,14 @@ export interface MountPreviewOptions {
     onSave?: (req: ExportRequest) => void;
     onCopy?: (req: ExportRequest) => void;
     /**
+     * Called when the user invokes "Copy as PNG" and `ClipboardItem` is
+     * available. The shell passes the returned `Promise<Blob>` directly to
+     * `ClipboardItem` so async kernel rasterization (WASM) runs inside the
+     * user gesture — no separate clipboard-permission window needed. When
+     * absent, the shell rasterizes via `<canvas>` (non-canonical quick-grab).
+     */
+    onCopyPng?: () => Promise<Blob>;
+    /**
      * Fired when the browser's `navigator.clipboard.write` is
      * unavailable during a copy-PNG action. Consumers pass the bytes
      * to a host-side fallback.
@@ -997,20 +1005,26 @@ export function mountPreview(
                 const buf = await blob.arrayBuffer();
                 options.onSave?.({ format: 'png', body: new Uint8Array(buf) });
             } else if (action === 'copy-png') {
-                const blob = await rasterizePng();
                 const ClipboardItemCtor = (win as typeof window).ClipboardItem as
                     | typeof ClipboardItem
                     | undefined;
                 if (typeof ClipboardItemCtor === 'undefined' || !win.navigator.clipboard?.write) {
+                    // ClipboardItem not supported: canvas rasterize + host fallback.
+                    const blob = await rasterizePng();
                     const buf = await blob.arrayBuffer();
                     options.onCopyPngFallback?.(new Uint8Array(buf));
                     return;
                 }
+                // ClipboardItem supported: prefer canonical kernel blob (Promise form
+                // keeps the user gesture alive across async WASM rasterization); fall
+                // back to canvas quick-grab when no canonical provider is supplied.
+                const pngPromise = options.onCopyPng ? options.onCopyPng() : rasterizePng();
                 try {
                     await win.navigator.clipboard.write([
-                        new ClipboardItemCtor({ 'image/png': blob }),
+                        new ClipboardItemCtor({ 'image/png': pngPromise }),
                     ]);
                 } catch {
+                    const blob = await pngPromise;
                     const buf = await blob.arrayBuffer();
                     options.onCopyPngFallback?.(new Uint8Array(buf));
                 }
