@@ -410,13 +410,13 @@ When an author needs a glyph not in the library, the `symbol` config declaration
 
 #### Font Presets
 
-| Preset | macOS | Windows | Linux |
-|--------|-------|---------|-------|
-| `sans` | SF Pro, Helvetica Neue | Segoe UI | Liberation Sans, DejaVu Sans |
-| `serif` | Georgia, New York | Georgia, Times New Roman | Liberation Serif, DejaVu Serif |
-| `mono` | SF Mono, Menlo | Cascadia Code, Consolas | Liberation Mono, DejaVu Sans Mono |
+| Preset | SVG / HTML export | PNG / PDF raster export | VS Code preview |
+|--------|------------------|------------------------|-----------------|
+| `sans` | `system-ui, -apple-system, "Segoe UI", Roboto, sans-serif` (generic stack) | DejaVu Sans (bundled, static) | DejaVu Sans (via `@font-face`) |
+| `serif` | falls back to `sans` for raster; generic serif stack for SVG | DejaVu Sans (sans substitution) | DejaVu Sans |
+| `mono` | `ui-monospace, SFMono-Regular, "SF Mono", Menlo, monospace` (generic stack) | DejaVu Sans Mono (bundled, static) | DejaVu Sans Mono (via `@font-face`) |
 
-Each preset maps to a font stack (ordered fallback list). The renderer emits the full stack in the SVG `font-family` attribute so it renders correctly on any platform with no font downloads.
+**Default is bundled DejaVu everywhere for raster and preview.** The generic `FONT_STACK` is retained for `.svg` and `.html` exports so saved files render with the viewer's system fonts. System fonts for raster and preview can be enabled via `--use-system-fonts`; see `specs/handoffs/m2c.md § 10` for the full resolution order and VF guard.
 
 #### Shadow Defaults by Entity Type
 

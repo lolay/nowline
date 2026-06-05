@@ -56,6 +56,21 @@ RENDER OPTIONS
                           wins for content. Falls back to LC_ALL /
                           LC_MESSAGES / LANG, then en-US.
 
+FONT OPTIONS (png, pdf)
+                          Raster/PDF export is bundled-first: by default it
+                          renders with the bundled DejaVu pair on every OS, so
+                          output is identical cross-platform and matches the
+                          live preview.
+      --font-sans <ref>   Override the sans font: a .ttf/.otf/.ttc path or a
+                          known alias. A variable font is not rasterizable and
+                          is replaced by bundled DejaVu (error under --strict).
+      --font-mono <ref>   Override the mono font (path or alias; same rules).
+      --use-system-fonts  Opt in to the platform font probe; the first static
+                          installed font wins (variable fonts skipped), bundled
+                          if none. Output then varies by machine.
+      --headless          Force the bundled DejaVu pair, ignoring system fonts
+                          and --use-system-fonts. Implied in CI without a TTY.
+
 SERVE OPTIONS
   -p, --port <n>          Port (default: 4318).
       --host <host>       Bind address (default: 127.0.0.1).

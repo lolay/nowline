@@ -30,6 +30,23 @@ const require = createRequire(import.meta.url);
 const resvgWasmEntry = require.resolve('@resvg/resvg-wasm');
 const resvgWasmSrc = resolve(dirname(resvgWasmEntry), 'index_bg.wasm');
 
+// Bundled DejaVu TTFs (the same files the export resolver embeds) so the
+// live preview webview can `@font-face` them via `asWebviewUri` and render
+// with the identical face the PNG/PDF raster export uses — WYSIWYG.
+// @nowline/export-core is ESM-only (no CJS `main`), so resolve its workspace
+// source directory directly rather than going through require.resolve.
+const bundledFontsSrc = resolve(
+    here,
+    '..',
+    '..',
+    '..',
+    'packages',
+    'export-core',
+    'assets',
+    'fonts',
+);
+const BUNDLED_FONT_FILES = ['DejaVuSans.ttf', 'DejaVuSansMono.ttf'];
+
 const sharedOptions = {
     bundle: true,
     platform: 'node',
@@ -79,6 +96,15 @@ async function copyWasm() {
     console.log('copied resvg.wasm to dist/');
 }
 
+async function copyFonts() {
+    const fontsDist = resolve(dist, 'fonts');
+    await mkdir(fontsDist, { recursive: true });
+    for (const file of BUNDLED_FONT_FILES) {
+        await copyFile(resolve(bundledFontsSrc, file), resolve(fontsDist, file));
+    }
+    console.log('copied bundled DejaVu fonts to dist/fonts/');
+}
+
 async function run() {
     if (watch) {
         const ctxA = await context(extensionConfig);
@@ -86,6 +112,7 @@ async function run() {
         const ctxC = await context(webviewConfig);
         await Promise.all([ctxA.watch(), ctxB.watch(), ctxC.watch()]);
         await copyWasm();
+        await copyFonts();
         console.log('watching extension + server + preview-webview bundles…');
     } else {
         await Promise.all([
@@ -93,6 +120,7 @@ async function run() {
             build(serverConfig),
             build(webviewConfig),
             copyWasm(),
+            copyFonts(),
         ]);
         console.log('built extension + server + preview-webview bundles');
     }

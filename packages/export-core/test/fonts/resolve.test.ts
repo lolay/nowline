@@ -104,7 +104,7 @@ describe('resolveFonts — explicit flag', () => {
         ).rejects.toBeInstanceOf(FontResolveError);
     });
 
-    it('detects a variable font and surfaces isVariableFont=true', async () => {
+    it('guards an explicit variable font: substitutes bundled and sets variableSubstituted', async () => {
         const sfPath = path.resolve('/abs/SF.ttf');
         const fs = mockFs({ [sfPath]: VF_TTF });
         const result = await resolveFonts({
@@ -115,7 +115,11 @@ describe('resolveFonts — explicit flag', () => {
             env: {},
             isStdoutTty: true,
         });
-        expect(result.sans.isVariableFont).toBe(true);
+        // VF guard fires: the bundled static DejaVu is substituted.
+        expect(result.sansVariableFontSubstituted).toBe(true);
+        expect(result.sans.isVariableFont).toBe(false);
+        expect(result.sans.source).toBe('bundled');
+        expect(result.sans.name).toBe('DejaVu Sans');
     });
 });
 
@@ -181,12 +185,13 @@ describe('resolveFonts — headless', () => {
         expect(result.sans.source).toBe('headless');
     });
 
-    it('CI=true with TTY does NOT auto-headless', async () => {
+    it('CI=true with TTY does NOT auto-headless (useSystemFonts reaches probe)', async () => {
         const fs = mockFs({
             '/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf': NON_VF_TTF,
             '/usr/share/fonts/truetype/dejavu/DejaVuSansMono.ttf': NON_VF_TTF,
         });
         const result = await resolveFonts({
+            useSystemFonts: true,
             fileExists: fs.fileExists,
             readFileBytes: fs.readFileBytes,
             platform: 'linux',
@@ -203,6 +208,7 @@ describe('resolveFonts — headless', () => {
         });
         const result = await resolveFonts({
             disableAutoHeadless: true,
+            useSystemFonts: true,
             fileExists: fs.fileExists,
             readFileBytes: fs.readFileBytes,
             platform: 'linux',
@@ -213,22 +219,26 @@ describe('resolveFonts — headless', () => {
     });
 });
 
-describe('resolveFonts — macOS probe list', () => {
-    it('SFNS.ttf present → first hit, source=probe, name=SF Pro', async () => {
+describe('resolveFonts — macOS probe list (useSystemFonts opt-in)', () => {
+    it('SFNS.ttf (variable) is skipped by the VF guard; Helvetica (static) wins', async () => {
         const fs = mockFs({
             '/System/Library/Fonts/SFNS.ttf': VF_TTF,
             '/System/Library/Fonts/SFNSMono.ttf': NON_VF_TTF,
+            '/System/Library/Fonts/Helvetica.ttc': NON_VF_TTF,
         });
         const result = await resolveFonts({
+            useSystemFonts: true,
             fileExists: fs.fileExists,
             readFileBytes: fs.readFileBytes,
             platform: 'darwin',
             env: {},
             isStdoutTty: true,
         });
+        // SFNS.ttf is a VF — probe skips it and falls to the next static candidate.
         expect(result.sans.source).toBe('probe');
-        expect(result.sans.name).toBe('SF Pro');
-        expect(result.sans.path).toBe('/System/Library/Fonts/SFNS.ttf');
+        expect(result.sans.name).toBe('Helvetica');
+        // SFNSMono.ttf is static — probe accepts it.
+        expect(result.mono.source).toBe('probe');
         expect(result.mono.name).toBe('SF Mono');
     });
 
@@ -237,6 +247,7 @@ describe('resolveFonts — macOS probe list', () => {
             '/System/Library/Fonts/Helvetica.ttc': NON_VF_TTF,
         });
         const result = await resolveFonts({
+            useSystemFonts: true,
             fileExists: fs.fileExists,
             readFileBytes: fs.readFileBytes,
             platform: 'darwin',
@@ -251,6 +262,7 @@ describe('resolveFonts — macOS probe list', () => {
     it('all macOS candidates absent → bundled fallback marked as fell-back', async () => {
         const fs = mockFs({});
         const result = await resolveFonts({
+            useSystemFonts: true,
             fileExists: fs.fileExists,
             readFileBytes: fs.readFileBytes,
             platform: 'darwin',
@@ -264,13 +276,14 @@ describe('resolveFonts — macOS probe list', () => {
     });
 });
 
-describe('resolveFonts — Windows probe list', () => {
+describe('resolveFonts — Windows probe list (useSystemFonts opt-in)', () => {
     it('Segoe UI present in WINDIR\\Fonts → hits first', async () => {
         const fs = mockFs({
             'C:\\WINDOWS\\Fonts\\segoeui.ttf': NON_VF_TTF,
             'C:\\WINDOWS\\Fonts\\consola.ttf': NON_VF_TTF,
         });
         const result = await resolveFonts({
+            useSystemFonts: true,
             fileExists: fs.fileExists,
             readFileBytes: fs.readFileBytes,
             platform: 'win32',
@@ -287,6 +300,7 @@ describe('resolveFonts — Windows probe list', () => {
             'C:\\WINDOWS\\Fonts\\arial.ttf': NON_VF_TTF,
         });
         const result = await resolveFonts({
+            useSystemFonts: true,
             fileExists: fs.fileExists,
             readFileBytes: fs.readFileBytes,
             platform: 'win32',
@@ -297,13 +311,14 @@ describe('resolveFonts — Windows probe list', () => {
     });
 });
 
-describe('resolveFonts — Linux probe list (per-distro paths)', () => {
+describe('resolveFonts — Linux probe list (useSystemFonts opt-in, per-distro paths)', () => {
     it('Debian path resolves DejaVu', async () => {
         const fs = mockFs({
             '/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf': NON_VF_TTF,
             '/usr/share/fonts/truetype/dejavu/DejaVuSansMono.ttf': NON_VF_TTF,
         });
         const result = await resolveFonts({
+            useSystemFonts: true,
             fileExists: fs.fileExists,
             readFileBytes: fs.readFileBytes,
             platform: 'linux',
@@ -320,6 +335,7 @@ describe('resolveFonts — Linux probe list (per-distro paths)', () => {
             '/usr/share/fonts/dejavu/DejaVuSansMono.ttf': NON_VF_TTF,
         });
         const result = await resolveFonts({
+            useSystemFonts: true,
             fileExists: fs.fileExists,
             readFileBytes: fs.readFileBytes,
             platform: 'linux',
@@ -335,6 +351,7 @@ describe('resolveFonts — Linux probe list (per-distro paths)', () => {
             '/usr/share/fonts/TTF/DejaVuSansMono.ttf': NON_VF_TTF,
         });
         const result = await resolveFonts({
+            useSystemFonts: true,
             fileExists: fs.fileExists,
             readFileBytes: fs.readFileBytes,
             platform: 'linux',
@@ -344,9 +361,10 @@ describe('resolveFonts — Linux probe list (per-distro paths)', () => {
         expect(result.sans.path).toBe('/usr/share/fonts/TTF/DejaVuSans.ttf');
     });
 
-    it('nothing present → bundled fallback', async () => {
+    it('nothing present with useSystemFonts → fell-back to bundled', async () => {
         const fs = mockFs({});
         const result = await resolveFonts({
+            useSystemFonts: true,
             fileExists: fs.fileExists,
             readFileBytes: fs.readFileBytes,
             platform: 'linux',
@@ -354,11 +372,12 @@ describe('resolveFonts — Linux probe list (per-distro paths)', () => {
             isStdoutTty: true,
         });
         expect(result.sans.source).toBe('bundled');
+        expect(result.sansFellBackToBundled).toBe(true);
     });
 });
 
 describe('resolveFonts — alias resolution', () => {
-    it('--font-sans sf on macOS resolves to SFNS.ttf', async () => {
+    it('--font-sans sf on macOS resolves SFNS.ttf but VF guard substitutes bundled', async () => {
         const fs = mockFs({
             '/System/Library/Fonts/SFNS.ttf': VF_TTF,
         });
@@ -370,9 +389,10 @@ describe('resolveFonts — alias resolution', () => {
             env: {},
             isStdoutTty: true,
         });
-        expect(result.sans.source).toBe('flag');
-        expect(result.sans.name).toBe('SF Pro');
-        expect(result.sans.path).toBe('/System/Library/Fonts/SFNS.ttf');
+        // SFNS.ttf is a VF — guardExplicit fires and substitutes bundled DejaVu.
+        expect(result.sansVariableFontSubstituted).toBe(true);
+        expect(result.sans.source).toBe('bundled');
+        expect(result.sans.name).toBe('DejaVu Sans');
     });
 
     it('--font-sans dejavu always points at the bundled probe entry on Linux', async () => {
@@ -460,8 +480,22 @@ describe('resolveFonts — fellBackToBundled flag', () => {
         expect(result.sansFellBackToBundled).toBe(false);
     });
 
-    it('non-headless run that lands on bundled marks fellBack', async () => {
+    it('bundled-first default (no useSystemFonts) does NOT mark fellBack', async () => {
+        // Bundled is the intended default, not a fallback — fellBack stays false.
         const result = await resolveFonts({
+            platform: 'linux',
+            env: {},
+            isStdoutTty: true,
+            fileExists: () => false,
+            readFileBytes: async () => new Uint8Array(),
+        });
+        expect(result.sansFellBackToBundled).toBe(false);
+        expect(result.monoFellBackToBundled).toBe(false);
+    });
+
+    it('useSystemFonts opt-in with no system fonts present marks fellBack', async () => {
+        const result = await resolveFonts({
+            useSystemFonts: true,
             platform: 'linux',
             env: {},
             isStdoutTty: true,
@@ -470,5 +504,47 @@ describe('resolveFonts — fellBackToBundled flag', () => {
         });
         expect(result.sansFellBackToBundled).toBe(true);
         expect(result.monoFellBackToBundled).toBe(true);
+    });
+});
+
+describe('resolveFonts — bundled-first default', () => {
+    it('no options → bundled DejaVu on macOS (no probe needed)', async () => {
+        const result = await resolveFonts({
+            fileExists: () => false, // system fonts absent — irrelevant; no probe runs
+            readFileBytes: async () => new Uint8Array(),
+            platform: 'darwin',
+            env: {},
+            isStdoutTty: true,
+        });
+        expect(result.sans.source).toBe('bundled');
+        expect(result.sans.name).toBe('DejaVu Sans');
+        expect(result.mono.source).toBe('bundled');
+        expect(result.mono.name).toBe('DejaVu Sans Mono');
+        expect(result.sansFellBackToBundled).toBe(false);
+        expect(result.sansVariableFontSubstituted).toBe(false);
+    });
+
+    it('no options → bundled DejaVu on Windows (no probe needed)', async () => {
+        const result = await resolveFonts({
+            fileExists: () => false,
+            readFileBytes: async () => new Uint8Array(),
+            platform: 'win32',
+            env: { WINDIR: 'C:\\WINDOWS' },
+            isStdoutTty: true,
+        });
+        expect(result.sans.source).toBe('bundled');
+        expect(result.sans.name).toBe('DejaVu Sans');
+    });
+
+    it('no options → bundled DejaVu on Linux (no probe needed)', async () => {
+        const result = await resolveFonts({
+            fileExists: () => false,
+            readFileBytes: async () => new Uint8Array(),
+            platform: 'linux',
+            env: {},
+            isStdoutTty: true,
+        });
+        expect(result.sans.source).toBe('bundled');
+        expect(result.sans.name).toBe('DejaVu Sans');
     });
 });

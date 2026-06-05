@@ -1,6 +1,7 @@
 export type {
     AssetBytes,
     AssetResolver,
+    FontFamilies,
     RenderOptions,
 } from './svg/render.js';
 export { renderSvg } from './svg/render.js';

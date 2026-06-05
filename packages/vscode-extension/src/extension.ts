@@ -8,7 +8,7 @@ import {
     TransportKind,
 } from 'vscode-languageclient/node';
 import { type ExportSettings, runExportCommand } from './export/cli-runner.js';
-import { exportInProcess, initExportRuntime } from './export/in-process.js';
+import { exportInProcess, initExportRuntime, todayUtc } from './export/in-process.js';
 import { runNewRoadmapCommand } from './export/new-roadmap.js';
 import { DisagreementTracker } from './io/disagreement-check.js';
 import { RcConfigCache } from './io/rc-config.js';
@@ -274,6 +274,90 @@ function readPreviewSettings(): PreviewSettings {
     };
 }
 
+/**
+ * Resolve the theme to use for an export of `sourceUri`.
+ *
+ * Priority chain:
+ *  1. An open preview for this file: its current resolved theme wins, including
+ *     any toolbar overrides (e.g. the user switched to greyscale in the panel).
+ *  2. No preview open: apply the same `auto` logic the preview would use —
+ *     read `nowline.preview.theme` and resolve `auto` against the active VS
+ *     Code color theme.
+ *
+ * This ensures every export surface (toolbar save, Export… command, file
+ * context menu) produces an artifact that matches the preview.
+ */
+function resolveThemeForExport(sourceUri: vscode.Uri): 'light' | 'dark' | 'grayscale' {
+    const preview = previewManager?.getForSource(sourceUri);
+    if (preview) return preview.resolvedTheme();
+    // No preview open — fall back to the preview setting + VS Code color theme.
+    const setting = readPreviewSettings().theme;
+    if (setting === 'light') return 'light';
+    if (setting === 'dark') return 'dark';
+    if (setting === 'grayscale') return 'grayscale';
+    // 'auto': match the active VS Code color theme.
+    const kind = vscode.window.activeColorTheme?.kind;
+    const isDark =
+        kind === vscode.ColorThemeKind.Dark || kind === vscode.ColorThemeKind.HighContrast;
+    return isDark ? 'dark' : 'light';
+}
+
+/**
+ * Resolve the now-line anchor to use for an export of `sourceUri`.
+ *
+ * Precedence (same as the preview's own resolution):
+ *  1. `NowlinePreview.resolvedToday()` when a preview is open — respects
+ *     toolbar overrides (pinned date, "Today", "Hide").
+ *  2. `nowline.preview.now` setting, resolved to an explicit UTC-midnight
+ *     `Date` (for 'auto') or `null` (for 'none').
+ */
+function resolveNowForExport(sourceUri: vscode.Uri): Date | null {
+    const preview = previewManager?.getForSource(sourceUri);
+    if (preview) return preview.resolvedToday();
+    // No preview open — fall back to the preview setting.
+    const raw = readPreviewSettings().now;
+    if (raw === 'none') return null;
+    if (raw && raw !== 'auto') {
+        const m = /^(\d{4})-(\d{2})-(\d{2})$/.exec(raw);
+        if (m)
+            return new Date(
+                Date.UTC(parseInt(m[1], 10), parseInt(m[2], 10) - 1, parseInt(m[3], 10)),
+            );
+    }
+    return todayUtc();
+}
+
+/**
+ * Resolve the operator-chain locale to use for an export of `sourceUri`.
+ *
+ *  1. `NowlinePreview.resolvedLocale()` when a preview is open.
+ *  2. `nowline.preview.locale` setting → `vscode.env.language`.
+ *
+ * `undefined` lets the export default to `en-US`. (The file's own
+ * `nowline v1 locale:` directive still wins inside the layout regardless.)
+ */
+function resolveLocaleForExport(sourceUri: vscode.Uri): string | undefined {
+    const preview = previewManager?.getForSource(sourceUri);
+    if (preview) return preview.resolvedLocale();
+    const fromSettings = readPreviewSettings().locale;
+    if (fromSettings.length > 0) return fromSettings;
+    const lang = vscode.env.language;
+    return typeof lang === 'string' && lang.length > 0 ? lang : undefined;
+}
+
+/**
+ * Resolve link-icon visibility to use for an export of `sourceUri`.
+ *
+ *  1. `NowlinePreview.resolvedShowLinks()` when a preview is open (respects
+ *     the toolbar toggle).
+ *  2. `nowline.preview.showLinks` setting (default true).
+ */
+function resolveShowLinksForExport(sourceUri: vscode.Uri): boolean {
+    const preview = previewManager?.getForSource(sourceUri);
+    if (preview) return preview.resolvedShowLinks();
+    return readPreviewSettings().showLinks;
+}
+
 function readExportSettings(): ExportSettings {
     const cfg = vscode.workspace.getConfiguration('nowline.export');
     return {
@@ -286,6 +370,7 @@ function readExportSettings(): ExportSettings {
         headlessFonts: cfg.get<boolean>('fonts.headless') ?? false,
         pngScale: cfg.get<number>('png.scale') ?? 1,
         msprojStart: cfg.get<string>('msproj.start') ?? '',
+        width: cfg.get<number>('width') ?? 0,
     };
 }
 
@@ -345,6 +430,16 @@ async function handleSave(
     if (!target) return;
 
     let bytes: Uint8Array;
+    // Use the same render options the preview is currently showing so the
+    // saved file matches what the user sees — theme, now-line, locale, and
+    // link visibility all respect toolbar overrides.
+    const overrides = {
+        theme: source.resolvedTheme(),
+        today: source.resolvedToday(),
+        locale: source.resolvedLocale(),
+        noLinks: !source.resolvedShowLinks(),
+    };
+
     if (format === 'png') {
         // Re-rasterize via the kernel (WASM) so the saved file matches
         // "Nowline: Export... → PNG" byte-for-byte (plan s7).
@@ -353,6 +448,7 @@ async function handleSave(
                 source.sourceUri.fsPath,
                 'png',
                 readExportSettings(),
+                overrides,
             );
             bytes = result.rendered as Uint8Array;
         } catch (err) {
@@ -362,7 +458,26 @@ async function handleSave(
             return;
         }
     } else {
-        bytes = new TextEncoder().encode(typeof body === 'string' ? body : '');
+        // Re-render via the kernel rather than persisting the webview's SVG:
+        // the preview SVG pins the bundled family (paired with an injected
+        // @font-face), which a standalone .svg file cannot resolve. The kernel
+        // emits the portable FONT_STACK so the saved file renders anywhere and
+        // matches "Nowline: Export... → SVG" byte-for-byte. `body` is ignored.
+        void body;
+        try {
+            const result = await exportInProcess(
+                source.sourceUri.fsPath,
+                'svg',
+                readExportSettings(),
+                overrides,
+            );
+            bytes = new TextEncoder().encode(result.rendered as string);
+        } catch (err) {
+            vscode.window.showErrorMessage(
+                `Nowline: SVG export failed: ${err instanceof Error ? err.message : String(err)}`,
+            );
+            return;
+        }
     }
 
     try {
@@ -380,7 +495,12 @@ async function handleCopyPngFallback(_body: Uint8Array, source: NowlinePreview):
     // matches "Nowline: Export... → PNG" byte-for-byte (plan s7).
     let pngBytes: Uint8Array;
     try {
-        const result = await exportInProcess(source.sourceUri.fsPath, 'png', readExportSettings());
+        const result = await exportInProcess(source.sourceUri.fsPath, 'png', readExportSettings(), {
+            today: source.resolvedToday(),
+            theme: source.resolvedTheme(),
+            locale: source.resolvedLocale(),
+            noLinks: !source.resolvedShowLinks(),
+        });
         pngBytes = result.rendered as Uint8Array;
     } catch (err) {
         vscode.window.showErrorMessage(
@@ -419,6 +539,10 @@ async function handleExport(uri: vscode.Uri | undefined): Promise<void> {
         sourceUri: target,
         settings: readExportSettings(),
         outputChannel: exportOutputChannel,
+        theme: resolveThemeForExport(target),
+        today: resolveNowForExport(target),
+        locale: resolveLocaleForExport(target),
+        showLinks: resolveShowLinksForExport(target),
     });
 }
 

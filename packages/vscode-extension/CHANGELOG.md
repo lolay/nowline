@@ -2,8 +2,31 @@
 
 ## [Unreleased]
 
+### Added
+
+- `nowline.export.width` setting: an optional canvas-width cap (px) for exports.
+  Defaults to `0` (the layout's 1280 default, matching the `nowline` CLI). This
+  is deliberately independent of `nowline.preview.width` — preview width is an
+  ergonomic, pan/zoom-softened choice, whereas export width is a fidelity knob.
+  For PNG resolution/DPI use `nowline.export.png.scale` instead.
+
 ### Changed
 
+- All VS Code exports (toolbar save, file menu, code-editor command) now match
+  what the preview is showing for theme, now-line, locale, and link visibility.
+  Toolbar overrides (theme, pinned/hidden now-line, link toggle) and the
+  `nowline.preview.*` settings flow into every export surface; when no preview
+  is open the settings are resolved directly so exports stay consistent.
+  Previously the now-line defaulted to today, the locale to `en-US`, and links
+  were always shown regardless of the preview.
+- Preview now renders with the same bundled DejaVu fonts as PNG/PDF export.
+  `@font-face` rules are injected into the webview (fonts served from
+  `dist/fonts/` via `asWebviewUri`) and the SVG is rendered with the pinned
+  DejaVu family names — preview and raster export are now WYSIWYG.
+- "Save SVG" from the preview re-exports through the kernel so the saved SVG
+  uses the portable `system-ui` font stack, not the webview's pinned families.
+- `.vsix` size increases by ~1.1 MB (two bundled TTFs: DejaVu Sans +
+  DejaVu Sans Mono) to support font-injected preview.
 - `Nowline: Export…` now runs entirely in-process — no `nowline` CLI install
   required for any format (PDF, PNG, SVG, HTML, Mermaid, XLSX, MS Project XML,
   JSON). PNG is rasterized via `@resvg/resvg-wasm` (WASM build of resvg;
@@ -13,6 +36,18 @@
   `'nowline'` sentinel triggers the new in-process path.
 - `.vsix` size is approximately 2.5 MB compressed (up from ~0.4 MB; the
   increase comes from bundled exporter packages and the resvg WASM binary).
+
+### Fixed
+
+- Preview showed no now-line by default. The default (`now: 'auto'`) resolved
+  to `undefined`, which the browser pipeline treats as "no anchor" so the
+  layout omitted the now-line — even though the rasterized export drew it. The
+  now-line anchor is now resolved once (shared by the live render and export)
+  and the default is today's UTC date, so the preview shows the now-line out of
+  the box and matches the export. The toolbar "Today" toggle now works too.
+- Preview text was rendered with `system-ui` (the browser/webview default)
+  while PNG/PDF export used the bundled DejaVu pair. The preview now uses
+  DejaVu, matching what the exported image looks like.
 
 ## 0.3.0 — Unreleased
 

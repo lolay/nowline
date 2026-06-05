@@ -15,12 +15,40 @@ export interface ExportSettings {
     headlessFonts: boolean;
     pngScale: number;
     msprojStart: string;
+    /** Canvas-width cap in px. `0` leaves it at the layout default (1280). */
+    width: number;
 }
 
 export interface RunExportArgs {
     sourceUri: vscode.Uri;
     settings: ExportSettings;
     outputChannel: vscode.OutputChannel;
+    /**
+     * Resolved theme to use for the export. When a preview panel is open for
+     * the source file its current theme (including toolbar overrides) wins;
+     * otherwise the caller should resolve `nowline.preview.theme` against the
+     * active VS Code color theme. Defaults to `'light'` when omitted.
+     */
+    theme?: 'light' | 'dark' | 'grayscale';
+    /**
+     * Resolved now-line anchor. Pass a `Date` (UTC midnight) to pin the
+     * now-line; pass `null` to suppress it (mirrors `--now -`); leave
+     * `undefined` to default to today. When a preview panel is open, pass
+     * `NowlinePreview.resolvedToday()` so the export matches the preview.
+     */
+    today?: Date | null;
+    /**
+     * Resolved operator-chain locale. When a preview panel is open, pass
+     * `NowlinePreview.resolvedLocale()` so axis labels / now-pill text match
+     * the preview. `undefined` defaults to `en-US`.
+     */
+    locale?: string;
+    /**
+     * Whether link icons are shown. When a preview panel is open, pass
+     * `NowlinePreview.resolvedShowLinks()` so link visibility matches the
+     * preview. `undefined` defaults to links shown.
+     */
+    showLinks?: boolean;
 }
 
 /**
@@ -108,7 +136,8 @@ const EXPORT_TARGETS: ExportTarget[] = [
  * See `specs/ide.md` § Export to other formats.
  */
 export async function runExportCommand(args: RunExportArgs): Promise<void> {
-    const { sourceUri, settings, outputChannel } = args;
+    const { sourceUri, settings, outputChannel, theme, today, locale, showLinks } = args;
+    const noLinks = showLinks === undefined ? undefined : !showLinks;
 
     const target = await pickExportTarget();
     if (!target) return;
@@ -131,7 +160,12 @@ export async function runExportCommand(args: RunExportArgs): Promise<void> {
     if (useCliOverride) {
         // Explicit cliPath: delegate to the external CLI binary unchanged.
         const cliPath = resolveCliPath(settings.cliPath, sourceUri);
-        const cliArgs = buildCliArgs(target, sourceUri.fsPath, dest.fsPath, settings);
+        const cliArgs = buildCliArgs(target, sourceUri.fsPath, dest.fsPath, settings, {
+            theme,
+            today,
+            locale,
+            noLinks,
+        });
         outputChannel.appendLine(`$ ${quote(cliPath)} ${cliArgs.map(quote).join(' ')}`);
         try {
             await runCli(cliPath, cliArgs, sourceDir, outputChannel);
@@ -153,6 +187,12 @@ export async function runExportCommand(args: RunExportArgs): Promise<void> {
                 sourceUri.fsPath,
                 target.format as ExportFormat,
                 settings,
+                {
+                    today,
+                    theme,
+                    locale,
+                    noLinks,
+                },
             );
             const bytes = result.isBinary
                 ? (result.rendered as Uint8Array)
@@ -229,8 +269,32 @@ function buildCliArgs(
     sourcePath: string,
     destPath: string,
     settings: ExportSettings,
+    overrides: {
+        theme?: 'light' | 'dark' | 'grayscale';
+        today?: Date | null;
+        locale?: string;
+        noLinks?: boolean;
+    } = {},
 ): string[] {
+    const { theme, today, locale, noLinks } = overrides;
     const args: string[] = [sourcePath, '-f', target.format, '-o', destPath];
+    if (theme) args.push('--theme', theme);
+    // `null`  → suppress the now-line (CLI: `--now -`)
+    // `Date`  → pin to that date (CLI: `--now YYYY-MM-DD`)
+    // missing → let the CLI default to today (no flag)
+    if (today === null) {
+        args.push('--now', '-');
+    } else if (today instanceof Date) {
+        const y = today.getUTCFullYear();
+        const m = String(today.getUTCMonth() + 1).padStart(2, '0');
+        const d = String(today.getUTCDate()).padStart(2, '0');
+        args.push('--now', `${y}-${m}-${d}`);
+    }
+    if (locale) args.push('--locale', locale);
+    if (noLinks) args.push('--no-links');
+    // Width cap (deliberate export setting; not preview-coupled). `0`/unset
+    // omits the flag so the CLI keeps its 1280 default.
+    if (settings.width > 0) args.push('--width', String(settings.width));
 
     if (target.format === 'pdf') {
         args.push('--page-size', settings.pdfPageSize);

@@ -19,6 +19,8 @@ export interface NowlineRc {
     fontSans?: string;
     fontMono?: string;
     headlessFonts?: boolean;
+    /** Opt in to system-font probing for raster/PDF export (bundled-first by default). */
+    useSystemFonts?: boolean;
     locale?: string;
     [key: string]: unknown;
 }

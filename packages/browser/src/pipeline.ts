@@ -25,7 +25,7 @@ import {
     resolveIncludes,
 } from '@nowline/core';
 import { layoutRoadmap, type ThemeName } from '@nowline/layout';
-import { type AssetResolver, renderSvg } from '@nowline/renderer';
+import { type AssetResolver, type FontFamilies, renderSvg } from '@nowline/renderer';
 import { URI } from 'langium';
 import {
     type DiagnosticRow,
@@ -105,6 +105,12 @@ export interface RenderOptions extends ParseOptions {
      * silently dropped — match the embed's "no filesystem" posture.
      */
     assetResolver?: AssetResolver;
+    /**
+     * Override per-role `font-family` strings. Defaults to the portable
+     * `FONT_STACK`. The VS Code preview passes a pinned bundled family
+     * (paired with an injected `@font-face`) so preview == raster export.
+     */
+    fontFamilies?: FontFamilies;
 }
 
 export type RenderResult =
@@ -218,6 +224,7 @@ export async function renderSource(
         noLinks: !showLinks,
         strict,
         warn: (msg) => warnMessages.push(msg),
+        fontFamilies: options.fontFamilies,
     });
 
     const warnings = warnMessages.map((m) =>

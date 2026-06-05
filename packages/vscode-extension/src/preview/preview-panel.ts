@@ -1,7 +1,7 @@
 import * as path from 'node:path';
 import * as vscode from 'vscode';
 import type { RcConfigCache } from '../io/rc-config.js';
-import { resolvePreviewOptions } from './option-resolver.js';
+import { resolvePreviewOptions, resolveTodayAnchor } from './option-resolver.js';
 import { type RenderOutcome, renderDocument } from './render-pipeline.js';
 import { getShellHtml } from './shell-html.js';
 
@@ -233,6 +233,62 @@ export class NowlinePreview {
         const base = path.basename(this.sourceUri.fsPath);
         const dot = base.lastIndexOf('.');
         return dot > 0 ? base.slice(0, dot) : base;
+    }
+
+    /**
+     * The theme currently shown in this preview panel — toolbar overrides win
+     * over settings, and `'auto'` is resolved to `'light'`/`'dark'` using the
+     * active VS Code color theme. Use this when re-exporting the document so
+     * the saved file matches what the preview displayed (including greyscale
+     * toolbar overrides).
+     */
+    resolvedTheme(): 'light' | 'dark' | 'grayscale' {
+        // Toolbar override takes precedence over the persistent setting,
+        // matching the chain in resolvePreviewOptions / resolveTheme.
+        const effective = this.toolbarOverrides.theme ?? this.settings.theme;
+        if (effective === 'light') return 'light';
+        if (effective === 'dark') return 'dark';
+        if (effective === 'grayscale') return 'grayscale';
+        // 'auto' (or unrecognised): follow the active VS Code color theme.
+        return isDarkColorTheme() ? 'dark' : 'light';
+    }
+
+    /**
+     * The now-line anchor currently shown in this preview panel — toolbar
+     * overrides win over settings. Returns an explicit UTC-midnight `Date`
+     * so the export kernel always has an unambiguous anchor, or `null` to
+     * suppress the now-line entirely (mirrors `--now -`). Shares
+     * {@link resolveTodayAnchor} with the live render so export == preview.
+     */
+    resolvedToday(): Date | null {
+        return resolveTodayAnchor(this.toolbarOverrides.now, this.settings.now);
+    }
+
+    /**
+     * The operator-chain locale currently shown in this preview panel:
+     * `nowline.preview.locale` setting → `vscode.env.language`. Returns
+     * `undefined` to let the export default to `en-US`. (The file's own
+     * `nowline v1 locale:` directive still wins inside the layout for both
+     * preview and export, so it isn't reflected here.) Mirrors the sync
+     * `resolvedTheme()` / `resolvedToday()` pattern: the `.nowlinerc` layer
+     * is resolved asynchronously during render and not consulted here.
+     */
+    resolvedLocale(): string | undefined {
+        const fromSettings = this.settings.locale;
+        if (typeof fromSettings === 'string' && fromSettings.length > 0) return fromSettings;
+        if (typeof this.vscodeLanguage === 'string' && this.vscodeLanguage.length > 0) {
+            return this.vscodeLanguage;
+        }
+        return undefined;
+    }
+
+    /**
+     * Whether link icons are currently shown in this preview panel — toolbar
+     * override wins over the persistent setting. Use this when re-exporting so
+     * the saved file's link visibility matches what the preview displayed.
+     */
+    resolvedShowLinks(): boolean {
+        return this.toolbarOverrides.showLinks ?? this.settings.showLinks;
     }
 
     private cancelDebounce(): void {

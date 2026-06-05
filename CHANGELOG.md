@@ -6,6 +6,15 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ## [Unreleased]
 
+### Changed
+
+- `@nowline/export-core`: font resolution is now **bundled-first** by default. The bundled DejaVu Sans / DejaVu Sans Mono pair is used for PNG and PDF raster export on every OS without any configuration. System fonts are available via the new `--use-system-fonts` CLI flag (`useSystemFonts` in `.nowlinerc` / config). This makes Mac/Windows/Linux render identically by default and fixes the text-loss bug that occurred when macOS SF Pro (a variable font) was handed to `@resvg/resvg-wasm`. Variable fonts supplied via `--font-sans` / `--font-mono` are detected and replaced by the bundled pair, with a warning (`--strict` makes it an error).
+- VS Code extension: the live preview now renders with the same bundled DejaVu fonts as PNG/PDF raster export, via injected `@font-face` rules (served from `dist/fonts/` via `asWebviewUri`). Preview and export are now WYSIWYG. Saving SVG from the preview re-exports through the kernel so the saved file retains the portable `system-ui` font stack.
+
+### Fixed
+
+- PNG / PDF: text rendered as blank boxes on macOS when the system font probe resolved to SF Pro (`SFNS.ttf`), which is a variable font that `@resvg/resvg-wasm` cannot rasterize. The bundled-first default eliminates this entirely.
+
 ### Added
 
 - VS Code: the right-click commands now live under a single **Nowline** submenu on every surface (editor tab, editor body, and Explorer), instead of being scattered inline. The submenu collapses **Open Preview** (same tab), **Open Preview to the Side**, **Open Link in Side Browser** (editor only), and **Export…** into one consistent group. This restores the same-tab **Open Preview** entry, which was previously only reachable via `Cmd/Ctrl+Shift+V` and the Command Palette.

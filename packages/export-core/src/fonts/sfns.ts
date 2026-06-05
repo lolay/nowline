@@ -1,11 +1,13 @@
-// SF Pro variable-font handling.
+// Variable-font detection.
 //
-// Spec: specs/handoffs/m2c.md § 10 "Variable-font handling (SFNS.ttf)".
+// Spec: specs/handoffs/m2c.md § 10 "Font strategy — bundled first, system
+// fonts opt-in".
 //
-// Detection only — actual VF instancing for PDF embedding lives in
-// @nowline/export-pdf, which depends on fontkit directly. The resolver
-// surfaces `isVariableFont: true` so consumers know they may need to
-// pre-instance.
+// Detection only — the resolver uses this to guard explicit VF requests
+// (substituting the bundled DejaVu and setting `variableSubstituted`) and to
+// skip VF candidates on the opt-in system-font probe. There is no runtime
+// instancer; any VF that reaches export would rasterize as blank in
+// `@resvg/resvg-wasm`.
 
 const FVAR_TAG = 0x66766172; // 'fvar'
 

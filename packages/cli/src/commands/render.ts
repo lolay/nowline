@@ -111,6 +111,7 @@ export async function renderHandler(options: RenderHandlerOptions): Promise<void
         fontSans: args.fontSans ?? stringFromConfig(config, 'fontSans'),
         fontMono: args.fontMono ?? stringFromConfig(config, 'fontMono'),
         headless: args.headless || boolFromConfig(config, 'headlessFonts'),
+        useSystemFonts: args.useSystemFonts || boolFromConfig(config, 'useSystemFonts'),
         scale: args.scale,
         start: args.start,
         locale,
@@ -196,6 +197,8 @@ interface ProduceArgs {
     fontSans?: string;
     fontMono?: string;
     headless: boolean;
+    /** Opt in to system-font probing for raster/PDF export (bundled-first by default). */
+    useSystemFonts: boolean;
     scale?: string;
     start?: string;
     /** Resolved locale override (CLI flag or env-var fallback); undefined falls through to the directive. */
@@ -336,7 +339,29 @@ async function resolveNodeFonts(
         fontSans: args.fontSans,
         fontMono: args.fontMono,
         headless: args.headless,
+        useSystemFonts: args.useSystemFonts,
     });
+
+    // A variable font was explicitly requested but cannot be rasterized; we
+    // substituted bundled DejaVu. Always warn — and fail under --strict, since
+    // the requested font silently did not apply.
+    const vfSubstituted = result.sansVariableFontSubstituted || result.monoVariableFontSubstituted;
+    if (vfSubstituted) {
+        const roles = [
+            result.sansVariableFontSubstituted ? 'sans' : null,
+            result.monoVariableFontSubstituted ? 'mono' : null,
+        ].filter(Boolean) as string[];
+        const message = `requested variable font(s) for ${roles.join(
+            ', ',
+        )} cannot be rasterized; substituted bundled DejaVu`;
+        if (args.strict) {
+            throw new CliError(ExitCode.InputError, `nowline: ${message}`);
+        }
+        process.stderr.write(`warning: ${message}\n`);
+    }
+
+    // Bundled fallback after an opted-in probe found no usable system font.
+    // Only meaningful when --use-system-fonts is set; warn under --strict.
     if (args.strict) {
         if (result.sansFellBackToBundled) {
             process.stderr.write(

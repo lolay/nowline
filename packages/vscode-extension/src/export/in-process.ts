@@ -80,6 +80,26 @@ export interface InProcessExportResult {
     isBinary: boolean;
 }
 
+/**
+ * Preview-derived render overrides so the export matches what the preview is
+ * showing (WYSIWYG). When a preview panel is open, the caller passes the
+ * panel's resolved values; otherwise it resolves them from settings. Every
+ * field is optional and falls back to the kernel/CLI default when omitted.
+ */
+export interface ExportOverrides {
+    /**
+     * Now-line anchor. `Date` pins it (UTC midnight); `null` suppresses it
+     * (mirrors `--now -`); `undefined` defaults to today (UTC midnight).
+     */
+    today?: Date | null;
+    /** Theme. Defaults to `'light'` when omitted. */
+    theme?: 'light' | 'dark' | 'grayscale';
+    /** BCP-47 operator-chain locale. Defaults to `'en-US'` when omitted. */
+    locale?: string;
+    /** Drop `<a>` link icons from the render. Defaults to `false` (links shown). */
+    noLinks?: boolean;
+}
+
 const BINARY_FORMATS = new Set<KernelFormat>(['png', 'pdf', 'xlsx']);
 const TEXT_DECODER = new TextDecoder('utf-8');
 
@@ -90,21 +110,33 @@ const TEXT_DECODER = new TextDecoder('utf-8');
  * @param sourcePath  Absolute filesystem path to the .nowline source file.
  * @param format      Target export format.
  * @param settings    Resolved nowline.export.* VS Code settings.
- * @param today       Optional date override for the now-line (defaults to UTC today).
+ * @param overrides   Preview-derived render overrides (now-line, theme, locale,
+ *                    link visibility) so the export matches the preview. Pass
+ *                    the open panel's `resolved*()` values when saving from a
+ *                    preview; resolve from settings otherwise.
  */
 export async function exportInProcess(
     sourcePath: string,
     format: KernelFormat,
     settings: ExportSettings,
-    today?: Date,
+    overrides: ExportOverrides = {},
 ): Promise<InProcessExportResult> {
     const source = await fs.readFile(sourcePath, 'utf-8');
 
+    const { today, theme, locale, noLinks } = overrides;
+    // `null`  → suppress the now-line (RenderInputs.today = undefined)
+    // `Date`  → pin to that UTC midnight
+    // missing → default to today (UTC midnight)
     const inputs: RenderInputs = {
         sourcePath,
-        today: today ?? todayUtc(),
-        locale: 'en-US',
-        theme: 'light',
+        today: today === null ? undefined : (today ?? todayUtc()),
+        locale: locale ?? 'en-US',
+        theme: theme ?? 'light',
+        noLinks: noLinks ?? false,
+        // Canvas width is a deliberate export setting (not preview-coupled):
+        // a *maximum* cap, no floor. `0`/unset leaves it at the layout default
+        // (1280), keeping byte-for-byte parity with the `nowline` CLI default.
+        width: settings.width > 0 ? settings.width : undefined,
         // Font-requiring formats resolve lazily below.
         pngScale: settings.pngScale > 0 ? settings.pngScale : undefined,
         pageSize: settings.pdfPageSize || undefined,
@@ -135,7 +167,7 @@ export async function exportInProcess(
 
 // ---- Helpers ----------------------------------------------------------------
 
-function todayUtc(): Date {
+export function todayUtc(): Date {
     const now = new Date();
     return new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate()));
 }

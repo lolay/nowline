@@ -39,6 +39,12 @@ export interface ParsedArgs {
     fontSans?: string;
     fontMono?: string;
     headless: boolean;
+    /**
+     * Opt in to the platform font probe for raster/PDF export. Off by default
+     * (bundled-first): exports use the bundled DejaVu pair on every OS so the
+     * output is identical cross-platform and matches the live preview.
+     */
+    useSystemFonts: boolean;
     start?: string;
 
     /**
@@ -81,6 +87,7 @@ export function parseArgv(argv: readonly string[]): ParsedArgs {
             strict: false,
             open: false,
             headless: false,
+            useSystemFonts: false,
         };
     }
 
@@ -133,6 +140,7 @@ export function parseArgv(argv: readonly string[]): ParsedArgs {
             'font-sans': { type: 'string' },
             'font-mono': { type: 'string' },
             headless: { type: 'boolean' },
+            'use-system-fonts': { type: 'boolean' },
             start: { type: 'string' },
 
             // Localization (m-loc-b)
@@ -160,6 +168,7 @@ export function parseArgv(argv: readonly string[]): ParsedArgs {
             strict: false,
             open: false,
             headless: false,
+            useSystemFonts: false,
         };
     }
     if (values.version === true) {
@@ -171,6 +180,7 @@ export function parseArgv(argv: readonly string[]): ParsedArgs {
             strict: false,
             open: false,
             headless: false,
+            useSystemFonts: false,
         };
     }
 
@@ -239,6 +249,7 @@ export function parseArgv(argv: readonly string[]): ParsedArgs {
         fontSans: stringOrUndefined(values['font-sans']),
         fontMono: stringOrUndefined(values['font-mono']),
         headless: values.headless === true,
+        useSystemFonts: values['use-system-fonts'] === true,
         start: stringOrUndefined(values.start),
         locale: stringOrUndefined(values.locale),
         root: stringOrUndefined(values.root),

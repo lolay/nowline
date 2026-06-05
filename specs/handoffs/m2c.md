@@ -284,42 +284,54 @@ Contract (applies to every export-* package):
 
 **Logos.** Continue to use m2b's `AssetResolver` unchanged. PNG re-uses the sanitized inline copy for SVG logos and streams raster logos through as base64 data URIs exactly like the SVG renderer does — resvg loads inline data URIs without a network fetch.
 
-#### Font strategy — system first, one bundled fallback
+#### Font strategy — bundled first, system fonts opt-in
 
-The design is **system fonts where present, one bundled headless fallback when not**. On a dev machine the PDF/PNG looks native (SF Pro on macOS, Segoe UI on Windows, distro default on Linux); in CI, Docker, and any compiled binary shipped somewhere font-bare the resolver drops straight through to the single bundled DejaVu pair. One code path, no platform-conditional test matrices.
+> **Updated 2026-06-03.** The original design was system-first. It was
+> inverted to bundled-first after Phase 0 of the WYSIWYG-fonts work confirmed
+> that `@resvg/resvg-wasm` cannot rasterize variable fonts supplied via
+> `fontBuffers`, and macOS's primary sans font (SF Pro / SFNS.ttf) is a VF.
+> System fonts are now an explicit opt-in; the new default ensures preview ==
+> export and Mac/Windows/Linux look identical by default. See
+> `specs/handoffs/wysiwyg_fonts_a76d50d2.plan.md` for the full decision record.
+
+The design is **bundled DejaVu everywhere by default; system fonts on explicit opt-in**. This makes the live preview and every raster export (PNG/PDF) look identical to each other and identically across OSes without any per-platform configuration. System fonts are available via `--use-system-fonts` / `useSystemFonts: true` for authors who need native-looking output.
 
 **Resolution order** (`packages/export-core/src/fonts/resolve.ts`). Each role (`sans`, `mono`) runs the five-step resolver independently and stops at the first step that succeeds:
 
 1. **Explicit flag** — `--font-sans <path|alias>` / `--font-mono <path|alias>`.
 2. **Environment** — `NOWLINE_FONT_SANS` / `NOWLINE_FONT_MONO`.
-3. **Headless override** — `--headless` or `NOWLINE_HEADLESS=1`. Skips the probe list and goes straight to step 5. The resolver also auto-selects this path when it detects `CI=true` with no TTY unless the user has opted out via `.nowlinerc`.
-4. **Platform probe list** — walk the table below, `fs.existsSync` on each entry, first hit wins. Cached per process (`serve` resolves once on startup; CLI invocations resolve fresh so tests stay isolated).
-5. **Bundled fallback** — `packages/export-core/assets/fonts/DejaVuSans.ttf` and `DejaVuSansMono.ttf`. These are the only two TTFs we ship, and they live in `@nowline/export-core` so every format that consumes fonts picks up the same bytes.
+3. **Headless / bundled-first default** — `--headless`, `NOWLINE_HEADLESS=1`, auto in CI without a TTY, *or the plain default* (no `--use-system-fonts`). Resolves to the bundled DejaVu pair; no probe runs. `headless` and default both land here; `source` is `'headless'` for explicit headless, `'bundled'` for the default.
+4. **Platform probe** *(opt-in only, via `--use-system-fonts`)* — walk the table below; first existing **static** entry wins. Variable-font candidates are skipped (resvg cannot rasterize a VF; there is no runtime instancer).
+5. **Bundled fallback** *(only reachable via the opt-in probe path)* — `DejaVuSans.ttf` / `DejaVuSansMono.ttf`. Signals `fellBackToBundled: true` so the CLI can warn under `--strict`.
 
-**Platform probe list.** The resolver carries `{ path, face? }` tuples — collections (`.ttc`) need the face selected explicitly.
+**Variable-font guard.** Variable fonts cannot be rasterized by `@resvg/resvg-wasm` and there is no runtime instancer. The guard fires in two places:
+
+- *Probe path (opt-in)*: `isVariableFontBytes()` is called on each probe candidate; VF entries are skipped and the next static candidate is tried. On macOS, `SFNS.ttf` (SF Pro) is a VF and is therefore skipped; Helvetica and later entries are static and accepted.
+- *Explicit flag/env/alias*: if a requested font resolves to a VF, `guardExplicit()` substitutes the bundled DejaVu and sets `sansVariableFontSubstituted` / `monoVariableFontSubstituted`. The CLI warns; `--strict` turns this into an error.
+
+**Platform probe list** (used only when `--use-system-fonts` is set). The resolver carries `{ path, name, face? }` tuples — collections (`.ttc`) need the face selected explicitly.
 
 *macOS:*
 
 | Role | Path | Notes |
 |---|---|---|
-| sans | `/System/Library/Fonts/SFNS.ttf` | Variable font; pre-instance via fontkit at `wght: 400` and `wght: 700` before handing bytes to PDFKit / resvg. |
-| sans (fallback) | `/System/Library/Fonts/Helvetica.ttc` | Faces `Helvetica`, `Helvetica-Bold`. |
-| sans (fallback) | `/System/Library/Fonts/Supplemental/Arial.ttf` | |
+| sans | `/System/Library/Fonts/SFNS.ttf` | VF — **skipped** by the guard; Helvetica takes over. |
+| sans | `/System/Library/Fonts/Helvetica.ttc` | Static. Faces `Helvetica`, `Helvetica-Bold`. |
+| sans | `/System/Library/Fonts/Supplemental/Arial.ttf` | Static. |
 | mono | `/System/Library/Fonts/SFNSMono.ttf` | Static, multi-weight. |
-| mono (fallback) | `/System/Library/Fonts/Menlo.ttc` | Faces `Menlo-Regular`, `Menlo-Bold`. |
-| mono (fallback) | `/System/Library/Fonts/Monaco.ttf` | |
+| mono | `/System/Library/Fonts/Menlo.ttc` | Faces `Menlo-Regular`, `Menlo-Bold`. |
+| mono | `/System/Library/Fonts/Monaco.ttf` | |
 
 *Windows* (use `process.env.WINDIR ?? 'C:\\Windows'` and `path.join`; never hardcode backslashes):
 
 | Role | Path |
 |---|---|
-| sans | `%WINDIR%\Fonts\segoeui.ttf` (+ `segoeuib.ttf` bold, `segoeuii.ttf` italic) |
-| sans (fallback) | `%WINDIR%\Fonts\arial.ttf` (+ `arialbd.ttf`, `ariali.ttf`) |
-| sans (fallback) | `%WINDIR%\Fonts\tahoma.ttf` / `verdana.ttf` |
-| mono | `%WINDIR%\Fonts\consola.ttf` (+ `consolab.ttf`) |
-| mono (fallback) | `%WINDIR%\Fonts\cour.ttf` (Courier New) |
+| sans | `%WINDIR%\Fonts\segoeui.ttf` |
+| sans | `%WINDIR%\Fonts\arial.ttf` |
+| mono | `%WINDIR%\Fonts\consola.ttf` |
+| mono | `%WINDIR%\Fonts\cour.ttf` (Courier New) |
 
-*Linux* (spans Debian/Ubuntu, Fedora, Arch, and user trees — nothing is guaranteed, which is precisely why the bundled fallback exists):
+*Linux* (spans Debian/Ubuntu, Fedora, Arch, and user trees):
 
 | Role | Path |
 |---|---|
@@ -331,56 +343,53 @@ The design is **system fonts where present, one bundled headless fallback when n
 | sans | `/usr/share/fonts/truetype/noto/NotoSans-Regular.ttf` |
 | sans | `/usr/share/fonts/ubuntu/Ubuntu-R.ttf` |
 | sans | `/usr/share/fonts/cantarell/Cantarell-Regular.otf` |
-| sans (user) | `$XDG_DATA_HOME/fonts/**` (default `~/.local/share/fonts`) |
-| sans (user) | `~/.fonts/**` (legacy) |
 | mono | `…/DejaVuSansMono.ttf` → `LiberationMono-Regular.ttf` → `UbuntuMono-R.ttf` → `NotoSansMono-Regular.ttf` |
 
-User-local trees (`$XDG_DATA_HOME/fonts`, `~/.fonts`) are probed by filename rather than walked — we only look for the specific filenames above, not arbitrary fonts the user may have installed. Keeps the resolver fast and predictable.
+**Bundled fonts.** `packages/export-core/assets/fonts/`: `DejaVuSans.ttf` (~740 KB) and `DejaVuSansMono.ttf` (~330 KB). Total ~1.1 MB, carried by `@nowline/export-core` so every format picks up the same bytes. Bold / italic are synthesized by PDFKit's faux-bold + skew when the real face isn't present.
 
-**Variable-font handling (SFNS.ttf).** SF Pro ships as a continuous-axis VF on macOS 10.15+. PDFKit wants a fixed instance. The resolver pre-instances through fontkit:
-
-```ts
-import fontkit from '@foliojs-fork/fontkit';
-const font = fontkit.openSync('/System/Library/Fonts/SFNS.ttf');
-const regular = font.getVariation({ wght: 400 }); // bytes for registerFont
-const bold    = font.getVariation({ wght: 700 });
-```
-
-Instancing happens once per resolver call and produces stable byte output across macOS point releases where Apple may shift the VF's default axis location. SF Pro has no italic axis on the bundled file; PDFKit falls back to a skew transform for italics, which reads correctly in a roadmap. Older macOS (10.14 and below) shipped `SFNSText.ttf` + `SFNSDisplay.ttf` — out of support, not probed; the resolver falls through to Helvetica.
-
-**Bundled fallback.** Ship exactly two files under `packages/export-core/assets/fonts/`: `DejaVuSans.ttf` (~740 KB) and `DejaVuSansMono.ttf` (~330 KB). Total ~1.1 MB, carried by `@nowline/export-core` so every format picks up the same bytes. Bold / italic are synthesized by PDFKit's faux-bold + skew when the real face isn't present; acceptable for a roadmap tool. Bold / oblique real faces can be added later if users complain, behind a one-line config change.
+**WYSIWYG contract.** The VS Code preview injects `@font-face` rules for the same DejaVu TTFs served from the extension's `dist/fonts/` via `asWebviewUri` and renders the preview SVG with the pinned family names. The portable `.svg` file export keeps the generic `FONT_STACK` (`system-ui, -apple-system, …`) so saved SVGs render with the reader's system fonts.
 
 **Licensing.**
 
 - **DejaVu** — ship `packages/export-core/assets/fonts/LICENSE-DejaVu.txt` next to the TTFs and reference it in `packages/export-core/README.md`. The DejaVu license (Bitstream Vera + public-domain additions) is MIT-compatible; redistribution is allowed with notice.
-- **SF Pro / SF Mono** — embedded only when rendering **on macOS**. PDFKit embeds a subset (only the glyphs actually used, with a randomized subset tag), the same mechanism Apple's own Pages, Keynote, and Numbers use when exporting to PDF. Apple's EULA restricts redistribution of the font files themselves, not artifacts rendered from them — the PDF case is materially the same as rendering to a PNG, which nobody questions. If Apple ever objects, the one-line fix is to drop `SFNS.ttf` / `SFNSMono.ttf` out of the probe list; Helvetica / Menlo are already next in line and the rest of the pipeline doesn't change. Document this explicitly in `packages/export-core/README.md` under "Fonts — licensing notes".
-- **Segoe UI / Consolas** — same argument applies on Windows (EULA covers the file, not rendered artifacts; Arial / Courier New are the drop-in fallbacks).
-- **Linux system fonts** (DejaVu, Liberation, Noto, Ubuntu, Cantarell) — all ship under SIL OFL or similarly liberal licenses; nothing additional to include.
+- **System fonts** (Helvetica, Segoe UI, etc.) — accessed only when the user explicitly opts in via `--use-system-fonts`. EULAs govern the font *files*, not rendered artifacts; the same mechanism Apple's Pages and Microsoft Word use when exporting PDFs. If a vendor ever objects, dropping the entry from the probe list is a one-line fix.
+- **Linux system fonts** (DejaVu, Liberation, Noto, Ubuntu, Cantarell) — all ship under SIL OFL or similarly liberal licenses.
 
 **Resolver API.**
 
 ```ts
 export interface ResolvedFont {
-    name: string;                                  // 'DejaVu Sans', 'SF Pro', etc.
-    bytes: Uint8Array;                             // full TTF, ready for PDFKit / resvg
+    name: string;          // 'DejaVu Sans', 'Helvetica', etc.
+    bytes: Uint8Array;     // full static TTF, ready for PDFKit / resvg
     source: 'flag' | 'env' | 'headless' | 'probe' | 'bundled';
-    path?: string;                                 // undefined for bundled / in-memory VF slices
-    face?: string;                                 // for .ttc collections
+    path?: string;         // undefined for bundled
+    face?: string;         // for .ttc collections
+    isVariableFont: boolean;
+}
+export interface ResolveResult {
+    sans: ResolvedFont;
+    mono: ResolvedFont;
+    sansFellBackToBundled: boolean;    // true only when useSystemFonts+probe found nothing
+    monoFellBackToBundled: boolean;
+    sansVariableFontSubstituted: boolean;  // true when an explicit VF was replaced
+    monoVariableFontSubstituted: boolean;
 }
 export function resolveFonts(options: {
     fontSans?: string;
     fontMono?: string;
+    useSystemFonts?: boolean;   // opt in to the platform probe
     headless?: boolean;
-}): Promise<{ sans: ResolvedFont; mono: ResolvedFont }>;
+    disableAutoHeadless?: boolean;
+}): Promise<ResolveResult>;
 ```
 
-Both exporters call `resolveFonts()` from `@nowline/export-core` so PDF and PNG stay in lockstep on the resolved stack. `--strict` turns a bundled-fallback path (i.e. the resolver landed at step 5 while not explicitly headless) into a warning — the export still succeeds, so CI without system fonts isn't forced into `--headless` — but the stderr line makes it obvious the render was unstyled.
+Both exporters call `resolveFonts()` from `@nowline/export-core` so PDF and PNG stay in lockstep. `--strict` warns when `sansVariableFontSubstituted` is true (a VF explicit request was silently replaced) or when `sansFellBackToBundled` is true (an opted-in probe found no usable system font).
 
 **Why this design and not the alternatives.**
 
-- Bundling every variant costs ~3–4 MB per platform and gives the same pixels no matter what the author's roadmap actually needs. Most authors want SF Pro / Segoe UI when they run locally.
-- System-only fails on Alpine, slim Docker images, trimmed server installs, and most CI runners — exactly the environments where determinism matters most.
-- The hybrid costs 1.1 MB, renders natively on dev machines, and stays deterministic everywhere else with one flag (`--headless`) or one env var.
+- *System-first (original design)*: fails on macOS because SF Pro is a variable font that `@resvg/resvg-wasm` cannot rasterize. There is no runtime instancer (fontkit's subset is `cmap`-less and throws on the variation path). Ruled out 2026-06-03.
+- *Bundling every system-font variant*: costs ~3–4 MB per platform for pixels most authors never need; still doesn't solve VF instancing.
+- *Bundled-first (current)*: costs 1.1 MB, renders identically across all OSes and between preview and export by default, and sidesteps VF instancing entirely.
 
 ### 11. Tiny and Full CLI Distribution
 

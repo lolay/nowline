@@ -47,6 +47,15 @@ const ASSETS_DIR = bundledFontsDir();
 export const BUNDLED_SANS_PATH = path.join(ASSETS_DIR, 'DejaVuSans.ttf');
 export const BUNDLED_MONO_PATH = path.join(ASSETS_DIR, 'DejaVuSansMono.ttf');
 
+/**
+ * Family names stamped on the bundled DejaVu faces. The resolver's
+ * `ResolvedFont.name`, the renderer's pinned `font-family`, the resvg family
+ * hints, and the live-preview `@font-face` must all use these exact strings
+ * so preview and raster export name the same face (the WYSIWYG contract).
+ */
+export const BUNDLED_SANS_FAMILY = 'DejaVu Sans';
+export const BUNDLED_MONO_FAMILY = 'DejaVu Sans Mono';
+
 let cachedSans: Uint8Array | undefined;
 let cachedMono: Uint8Array | undefined;
 

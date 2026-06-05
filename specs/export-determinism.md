@@ -97,7 +97,7 @@ Deviating on any row forfeits the byte-identity guarantee for that export.
 | Axis | Rule |
 |------|------|
 | **Rasterizer** | `@resvg/resvg-wasm` on every surface — including the CLI and the browser apps. WASM execution is bit-reproducible across hosts; native `@resvg/resvg-js` is not (CPU/SIMD variance) and cannot run in a browser. Browser `<canvas>` rasterization is **banned** for canonical export — it uses the host browser's SVG renderer and system fonts. |
-| **Fonts** | Canonical export embeds the **bundled** font bytes (DejaVu sans/mono from `@nowline/export-core`), identical SHA on every surface. System-font probing is an explicit opt-out that forfeits the guarantee (see Non-goals). |
+| **Fonts** | Canonical export embeds the **bundled** font bytes (DejaVu sans/mono from `@nowline/export-core`), identical SHA on every surface. Bundled DejaVu is the default; system-font probing requires an explicit `--use-system-fonts` opt-in and forfeits the guarantee (see Non-goals). |
 | **`today` / now-line** | Always an explicit `Date` argument (UTC midnight). No surface calls `new Date()` / `Date.now()` in the export path. |
 | **Locale** | Explicit string; defaults to a fixed canonical locale, never the host's. |
 | **Toolchain version** | All surfaces pin the **same** `@nowline/*`, `@resvg/resvg-wasm`, `pdfkit`, and `exceljs` versions. Byte-identity is scoped *per release*; the version is part of the contract, not incidental. |
@@ -211,11 +211,11 @@ comparison.
 
 ## Non-goals and explicit opt-outs
 
-- **System fonts.** A user may pass `--font-sans` / `--font-mono` (CLI) or the
-  equivalent setting to render with installed system fonts. This is a
-  deliberate opt-out: it forfeits the byte-identity guarantee, because system
-  font files differ across machines. The default — bundled DejaVu — is the
-  canonical, reproducible path.
+- **System fonts.** A user may pass `--use-system-fonts` (or `--font-sans` /
+  `--font-mono`) to render with installed system fonts. This is an explicit
+  opt-in that forfeits the byte-identity guarantee, because system font files
+  differ across machines. The default — bundled DejaVu — is the canonical,
+  reproducible path. System fonts are never probed unless the user opts in.
 - **Browser `<canvas>` quick-grab.** The Free/Pro preview toolbar's "Save PNG"
   may continue to offer a fast `<canvas>` rasterization as a *non-canonical*
   convenience, clearly distinct from canonical export. It is never the

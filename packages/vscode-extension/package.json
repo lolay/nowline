@@ -208,7 +208,13 @@
                     "type": "number",
                     "default": 1,
                     "minimum": 0.1,
-                    "description": "Raster scale factor for PNG export."
+                    "description": "Raster scale factor for PNG export. This is the right knob for PNG resolution/DPI — it scales pixels without changing layout."
+                },
+                "nowline.export.width": {
+                    "type": "number",
+                    "default": 0,
+                    "minimum": 0,
+                    "description": "Canvas-width cap in px for exports (a maximum, not a target — the chart sizes to its natural content width and is clipped only if it exceeds this). 0 leaves it at the layout default (1280), matching the `nowline` CLI. Deliberately independent of the preview width (the preview's pan/zoom makes its width an ergonomic, not fidelity, choice). For PNG resolution use png.scale instead."
                 },
                 "nowline.export.msproj.start": {
                     "type": "string",

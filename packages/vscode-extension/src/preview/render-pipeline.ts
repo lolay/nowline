@@ -19,8 +19,9 @@ import {
     type DiagnosticRow,
     type RenderResult,
 } from '@nowline/browser';
+import { BUNDLED_MONO_FAMILY, BUNDLED_SANS_FAMILY } from '@nowline/export-core';
 import type { ThemeName } from '@nowline/layout';
-import type { AssetResolver } from '@nowline/renderer';
+import type { AssetResolver, FontFamilies } from '@nowline/renderer';
 
 export type { DiagnosticRow };
 
@@ -64,6 +65,18 @@ export type RenderOutcome =
     | { kind: 'diagnostics'; rows: DiagnosticRow[] };
 
 /**
+ * Pinned bundled families for the live preview. `serif` maps to the sans
+ * family (no serif role; raster already falls back serif->sans). Matches the
+ * `@font-face` injected by `shell-html.ts` and the raster export pin in
+ * `@nowline/export`.
+ */
+const PREVIEW_FONT_FAMILIES: FontFamilies = {
+    sans: BUNDLED_SANS_FAMILY,
+    serif: BUNDLED_SANS_FAMILY,
+    mono: BUNDLED_MONO_FAMILY,
+};
+
+/**
  * Run the full pipeline on the document's current text and return
  * either the SVG string or a list of diagnostics for the webview to
  * render as a table.
@@ -97,6 +110,10 @@ export async function renderDocument(inputs: RenderInputs): Promise<RenderOutcom
             return new TextDecoder('utf-8').decode(bytes);
         },
         assetResolver: createAssetResolver(assetRoot),
+        // Pin to the bundled DejaVu families so the preview names the same
+        // face the default raster export embeds; shell-html injects the
+        // matching `@font-face`. Keeps preview == export (WYSIWYG).
+        fontFamilies: PREVIEW_FONT_FAMILIES,
     });
 
     if (result.kind === 'svg') {

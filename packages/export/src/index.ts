@@ -22,7 +22,7 @@ import {
 } from '@nowline/core';
 import type { ExportInputs, ResolvedFontPair } from '@nowline/export-core';
 import { layoutRoadmap, type ThemeName } from '@nowline/layout';
-import { type AssetResolver, renderSvg } from '@nowline/renderer';
+import { type AssetResolver, type FontFamilies, renderSvg } from '@nowline/renderer';
 import type { AstNode, LangiumDocument } from 'langium';
 import { URI } from 'langium';
 
@@ -205,10 +205,29 @@ function guessMime(ref: string): string {
 // ---- Staged pipeline ---------------------------------------------------------
 
 interface StageResult {
+    /** SVG rendered with the portable FONT_STACK (for `svg` / `html` exports). */
     svg: string;
+    /**
+     * Re-render the already-laid-out model with a pinned `font-family` map.
+     * Used by the raster paths (png/pdf) so the exported pixels name exactly
+     * the bundled font and match the live preview (WYSIWYG). Reuses the same
+     * asset resolver and strict/warn handling as the portable render.
+     */
+    renderWith: (fontFamilies: FontFamilies) => Promise<string>;
     exportInputs: ExportInputs;
     document: LangiumDocument<NowlineFile>;
     source: string;
+}
+
+/**
+ * Pin the renderer's per-role families to the resolved fonts' real family
+ * names so raster/preview SVG names exactly the bundled face. `serif` maps to
+ * the sans family: the resolver has no serif role and raster already falls
+ * back serif->sans (resvg has no serif face loaded), so this is behavior-
+ * preserving while making the SVG explicit.
+ */
+function pinnedFamilies(fonts: ResolvedFontPair): FontFamilies {
+    return { sans: fonts.sans.name, serif: fonts.sans.name, mono: fonts.mono.name };
 }
 
 async function stageDocument(
@@ -267,20 +286,27 @@ async function stageDocument(
         return { bytes, mime: guessMime(ref) };
     };
 
-    const warnings: string[] = [];
-    const svg = await renderSvg(model, {
-        assetResolver,
-        noLinks: inputs.noLinks ?? false,
-        strict: inputs.strict ?? false,
-        warn: (msg) => warnings.push(msg),
-    });
+    const renderWith = async (fontFamilies?: FontFamilies): Promise<string> => {
+        const warnings: string[] = [];
+        const svg = await renderSvg(model, {
+            assetResolver,
+            noLinks: inputs.noLinks ?? false,
+            strict: inputs.strict ?? false,
+            warn: (msg) => warnings.push(msg),
+            fontFamilies,
+        });
+        if (inputs.strict && warnings.length > 0) {
+            throw new Error(`@nowline/export: render warnings (--strict): ${warnings.join('; ')}`);
+        }
+        return svg;
+    };
 
-    if (inputs.strict && warnings.length > 0) {
-        throw new Error(`@nowline/export: render warnings (--strict): ${warnings.join('; ')}`);
-    }
+    // Portable render (FONT_STACK) for the svg/html file exports.
+    const svg = await renderWith();
 
     return {
         svg,
+        renderWith: (fontFamilies: FontFamilies) => renderWith(fontFamilies),
         exportInputs: {
             model,
             ast,
@@ -384,7 +410,10 @@ export async function exportDocument(
         const wasmBytes = await host.loadWasm();
         const pngMod = await import('@nowline/export-png');
         await pngMod.initPngWasm(wasmBytes);
-        const bytes = await pngMod.exportPng(stage.exportInputs, stage.svg, {
+        // Raster with the pinned bundled family so the SVG resvg rasterizes
+        // names exactly the embedded font (matches the live preview).
+        const rasterSvg = await stage.renderWith(pinnedFamilies(inputs.fonts));
+        const bytes = await pngMod.exportPng(stage.exportInputs, rasterSvg, {
             scale: inputs.pngScale ?? 2,
             fonts: inputs.fonts,
         });
@@ -396,7 +425,10 @@ export async function exportDocument(
             throw new TypeError('@nowline/export: inputs.fonts is required for pdf format.');
         }
         const mod = await import('@nowline/export-pdf');
-        const bytes = await mod.exportPdf(stage.exportInputs, stage.svg, {
+        // Same pinned-family raster SVG as PNG so PDF text names the embedded
+        // font explicitly and stays consistent with preview + PNG.
+        const rasterSvg = await stage.renderWith(pinnedFamilies(inputs.fonts));
+        const bytes = await mod.exportPdf(stage.exportInputs, rasterSvg, {
             pageSize: inputs.pageSize,
             orientation: inputs.orientation,
             marginPt: inputs.marginPt,

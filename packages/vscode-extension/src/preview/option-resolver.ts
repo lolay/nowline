@@ -9,7 +9,13 @@ import type { PreviewSettings, ToolbarOverrides } from './preview-panel.js';
  */
 export interface ResolvedRenderOptions {
     theme: ThemeName;
-    today: Date | null | undefined;
+    /**
+     * Resolved now-line anchor: an explicit UTC-midnight `Date` to draw the
+     * now-line, or `null` to suppress it. Never `undefined` — the default
+     * (`'auto'`) resolves to today's date so the preview shows a now-line out
+     * of the box, matching the CLI and the rasterized export.
+     */
+    today: Date | null;
     locale: string | undefined;
     width: number | undefined;
     showLinks: boolean;
@@ -65,26 +71,49 @@ function rcThemeOverride(rc: NowlineRc): ThemeName | undefined {
 }
 
 /**
- * Resolve the now-line anchor:
- *  - toolbar override wins (`'today'` / `'hide'` / Date)
- *  - then setting (`'auto'` / `'none'` / YYYY-MM-DD)
- *  - default = today (matches CLI)
- *
- * Returning `null` suppresses the now-line (mirrors `--now -`); returning
- * `undefined` means "default to today" inside the render pipeline.
+ * Resolve the now-line anchor for a preview render. Thin wrapper over the
+ * shared {@link resolveTodayAnchor} so the live render and the export
+ * (`NowlinePreview.resolvedToday()`) can never drift.
  */
-function resolveToday(ctx: ResolveContext): Date | null | undefined {
-    const override = ctx.toolbarOverrides?.now;
-    if (override !== undefined) {
-        if (override === 'today') return undefined;
-        if (override === 'hide') return null;
-        return override;
+function resolveToday(ctx: ResolveContext): Date | null {
+    return resolveTodayAnchor(ctx.toolbarOverrides?.now, ctx.settings.now);
+}
+
+/**
+ * Resolve the now-line anchor from the toolbar override + persistent setting.
+ *
+ * Precedence:
+ *  - toolbar override wins (`'today'` / `'hide'` / pinned Date)
+ *  - then setting (`'auto'` / `'none'` / YYYY-MM-DD)
+ *  - default (`'auto'` / empty / unparseable) = today's UTC-midnight date
+ *
+ * Returns an explicit `Date` to draw the now-line, or `null` to suppress it
+ * (mirrors the CLI's `--now -`). Never returns `undefined`: the browser
+ * pipeline treats `undefined` as "no anchor" and the layout then omits the
+ * now-line, so the default must be a concrete date for the line to appear —
+ * matching the CLI default and the rasterized export.
+ *
+ * Shared by both the live preview render ({@link resolveToday}) and the
+ * export path (`NowlinePreview.resolvedToday()`).
+ */
+export function resolveTodayAnchor(
+    nowOverride: ToolbarOverrides['now'],
+    settingNow: string,
+): Date | null {
+    if (nowOverride !== undefined) {
+        if (nowOverride === 'today') return todayUtc();
+        if (nowOverride === 'hide') return null;
+        return nowOverride; // pinned Date
     }
-    const raw = ctx.settings.now;
-    if (raw === 'auto' || raw === '') return undefined;
-    if (raw === 'none') return null;
-    const parsed = parseIsoDate(raw);
-    return parsed ?? undefined;
+    if (settingNow === 'auto' || settingNow === '') return todayUtc();
+    if (settingNow === 'none') return null;
+    return parseIsoDate(settingNow) ?? todayUtc();
+}
+
+/** Today at UTC midnight — matches the CLI's `resolveNowArg` default. */
+function todayUtc(): Date {
+    const t = new Date();
+    return new Date(Date.UTC(t.getUTCFullYear(), t.getUTCMonth(), t.getUTCDate()));
 }
 
 function parseIsoDate(value: string): Date | undefined {

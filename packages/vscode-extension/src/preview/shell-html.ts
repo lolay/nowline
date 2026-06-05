@@ -12,6 +12,7 @@
 // untouched.
 
 import * as path from 'node:path';
+import { BUNDLED_MONO_FAMILY, BUNDLED_SANS_FAMILY } from '@nowline/export-core';
 import { PREVIEW_SHELL_CSS, VSCODE_THEME_BRIDGE_CSS } from '@nowline/preview-shell';
 import * as vscode from 'vscode';
 
@@ -34,6 +35,26 @@ export function getShellHtml(webview: vscode.Webview, extensionUri: vscode.Uri):
     const webviewScriptUri = webview.asWebviewUri(
         vscode.Uri.file(path.join(extensionUri.fsPath, 'dist', 'preview-webview.js')),
     );
+
+    // Bundled DejaVu faces, served from dist/fonts/ (copied by bundle.mjs,
+    // under `localResourceRoots` via `extensionUri`). The preview renders the
+    // SVG with these pinned families (see render-pipeline.ts), so `@font-face`
+    // makes the webview use the *same* face the PNG/PDF raster export embeds —
+    // the WYSIWYG contract. Only a Regular face ships; the browser synthesizes
+    // bold/italic, matching resvg/PDFKit faux styling.
+    const sansFontUri = webview.asWebviewUri(
+        vscode.Uri.file(path.join(extensionUri.fsPath, 'dist', 'fonts', 'DejaVuSans.ttf')),
+    );
+    const monoFontUri = webview.asWebviewUri(
+        vscode.Uri.file(path.join(extensionUri.fsPath, 'dist', 'fonts', 'DejaVuSansMono.ttf')),
+    );
+    const fontFaceCss =
+        `@font-face{font-family:'${BUNDLED_SANS_FAMILY}';` +
+        `src:url('${sansFontUri.toString()}') format('truetype');` +
+        `font-weight:normal;font-style:normal;font-display:block;}` +
+        `@font-face{font-family:'${BUNDLED_MONO_FAMILY}';` +
+        `src:url('${monoFontUri.toString()}') format('truetype');` +
+        `font-weight:normal;font-style:normal;font-display:block;}`;
 
     // `'unsafe-inline'` style intentionally omitted; the only inline
     // styles are the nonce'd shell-stylesheet + theme-bridge block
@@ -61,7 +82,10 @@ export function getShellHtml(webview: vscode.Webview, extensionUri: vscode.Uri):
         '<style nonce="' +
         nonce +
         '" data-nl-preview-shell>' +
-        // Full shell stylesheet first; the `data-nl-preview-shell`
+        // Bundled-font @font-face first so the pinned families the SVG names
+        // resolve to the embedded DejaVu faces (WYSIWYG with raster export).
+        fontFaceCss +
+        // Full shell stylesheet next; the `data-nl-preview-shell`
         // marker lets `mountPreview()` detect this host-provided copy
         // and skip its own (non-nonced) runtime injection.
         PREVIEW_SHELL_CSS +

@@ -95,6 +95,16 @@ export interface AssetBytes {
 
 export type AssetResolver = (ref: string) => Promise<AssetBytes>;
 
+/**
+ * Per-role `font-family` strings the renderer stamps onto `<text>` elements.
+ * Defaults to the shared, portable `FONT_STACK` (generic CSS stacks). Raster
+ * and preview callers override this with a *pinned* family (e.g. the bundled
+ * `DejaVu Sans` / `DejaVu Sans Mono`) so the rendered SVG names exactly the
+ * font that resvg / the webview `@font-face` actually provide — the WYSIWYG
+ * contract. The `.svg` file export keeps the default portable stack.
+ */
+export type FontFamilies = Record<'sans' | 'serif' | 'mono', string>;
+
 export interface RenderOptions {
     assetResolver?: AssetResolver;
     noLinks?: boolean;
@@ -102,6 +112,11 @@ export interface RenderOptions {
     warn?: (message: string) => void;
     // Override the deterministic id prefix (defaults to 'nl').
     idPrefix?: string;
+    /**
+     * Override per-role `font-family` strings. Defaults to the portable
+     * `FONT_STACK`. Set to a pinned family for raster/preview WYSIWYG.
+     */
+    fontFamilies?: FontFamilies;
 }
 
 // `TEXT_SIZE_PX`, `CORNER_RADIUS_PX`, `FONT_STACK` come from
@@ -125,9 +140,13 @@ function textSizePx(bucket: ResolvedStyle['textSize']): number {
     return (TEXT_SIZE_PX as Record<string, number>)[bucket] ?? 14;
 }
 
-function fontAttrs(style: ResolvedStyle, overrideSize?: number): Record<string, string | number> {
+function fontAttrs(
+    style: ResolvedStyle,
+    fonts: FontFamilies,
+    overrideSize?: number,
+): Record<string, string | number> {
     return {
-        'font-family': FONT_STACK[style.font],
+        'font-family': fonts[style.font],
         'font-size': overrideSize ?? textSizePx(style.textSize),
         'font-weight': WEIGHT_NUM[style.weight] ?? 400,
         'font-style': style.italic ? 'italic' : 'normal',
@@ -452,7 +471,12 @@ function rectFrame(
     });
 }
 
-function renderHeader(h: PositionedHeader, idPrefix: string, palette: Theme): string {
+function renderHeader(
+    h: PositionedHeader,
+    idPrefix: string,
+    palette: Theme,
+    fonts: FontFamilies,
+): string {
     // The layout has already sized the card to its (wrapped) text content
     // and stashed the bounds in `h.cardBox`, with `h.titleLines` /
     // `h.authorLines` ready to render line-by-line. See sizeBesideHeader
@@ -485,7 +509,7 @@ function renderHeader(h: PositionedHeader, idPrefix: string, palette: Theme): st
                 {
                     x: num(cardX + HEADER_CARD_PADDING_X),
                     y: num(cardY + HEADER_CARD_PADDING_TOP + i * HEADER_TITLE_LINE_HEIGHT_PX),
-                    'font-family': FONT_STACK[h.style.font],
+                    'font-family': fonts[h.style.font],
                     'font-size': HEADER_TITLE_FONT_SIZE_PX,
                     'font-weight': 600,
                     fill: h.style.text,
@@ -511,7 +535,7 @@ function renderHeader(h: PositionedHeader, idPrefix: string, palette: Theme): st
                             HEADER_TITLE_TO_AUTHOR_GAP_PX +
                             j * HEADER_AUTHOR_LINE_HEIGHT_PX,
                     ),
-                    'font-family': FONT_STACK[h.style.font],
+                    'font-family': fonts[h.style.font],
                     'font-size': HEADER_AUTHOR_FONT_SIZE_PX,
                     fill: authorColor,
                 },
@@ -602,7 +626,7 @@ function renderGridLines(t: PositionedTimelineScale, swimlaneTopY: number, palet
     return tag('g', { 'data-layer': 'grid' }, parts.join(''));
 }
 
-function renderTimeline(t: PositionedTimelineScale, palette: Theme): string {
+function renderTimeline(t: PositionedTimelineScale, palette: Theme, fonts: FontFamilies): string {
     const panelFill = palette.timeline.panelFill;
     const borderColor = palette.timeline.border;
     const labelColor = palette.timeline.labelText;
@@ -683,7 +707,7 @@ function renderTimeline(t: PositionedTimelineScale, palette: Theme): string {
                     {
                         x: num(tick.labelX),
                         y: num(tickPanelY + TIMELINE_TICK_LABEL_BASELINE_OFFSET_PX),
-                        'font-family': FONT_STACK.sans,
+                        'font-family': fonts.sans,
                         'font-size': 10,
                         fill: labelColor,
                         'text-anchor': 'middle',
@@ -698,7 +722,7 @@ function renderTimeline(t: PositionedTimelineScale, palette: Theme): string {
                     {
                         x: num(tick.labelX),
                         y: num(bottomTickPanelY! + TIMELINE_TICK_LABEL_BASELINE_OFFSET_PX),
-                        'font-family': FONT_STACK.sans,
+                        'font-family': fonts.sans,
                         'font-size': 10,
                         fill: labelColor,
                         'text-anchor': 'middle',
@@ -711,7 +735,7 @@ function renderTimeline(t: PositionedTimelineScale, palette: Theme): string {
     return tag('g', { 'data-layer': 'timeline' }, parts.join(''));
 }
 
-function renderNowline(n: PositionedNowline | null, palette: Theme): string {
+function renderNowline(n: PositionedNowline | null, palette: Theme, fonts: FontFamilies): string {
     if (!n) return '';
     const color = palette.nowline.stroke;
     const labelTextColor = palette.nowline.labelText;
@@ -735,7 +759,7 @@ function renderNowline(n: PositionedNowline | null, palette: Theme): string {
     // The squared edge IS the line; the rounded edge points into the
     // chart, so the pill always hugs the line and never overflows.
     const pillBg = renderNowPillBg(n, color);
-    const label = renderNowPillLabel(n, labelTextColor);
+    const label = renderNowPillLabel(n, labelTextColor, fonts);
     return tag('g', { 'data-layer': 'nowline' }, line + pillBg + label);
 }
 
@@ -812,7 +836,11 @@ function renderNowPillBg(n: PositionedNowline, color: string): string {
     return tag('path', { d, fill: color });
 }
 
-function renderNowPillLabel(n: PositionedNowline, labelTextColor: string): string {
+function renderNowPillLabel(
+    n: PositionedNowline,
+    labelTextColor: string,
+    fonts: FontFamilies,
+): string {
     const baselineY = n.pillTopY + NOW_PILL_LABEL_BASELINE_OFFSET_PX;
     const edgeX = squaredEdgeX(n);
     let labelX: number;
@@ -831,7 +859,7 @@ function renderNowPillLabel(n: PositionedNowline, labelTextColor: string): strin
         {
             x: num(labelX),
             y: num(baselineY),
-            'font-family': FONT_STACK.sans,
+            'font-family': fonts.sans,
             'font-size': NOW_PILL_LABEL_FONT_SIZE_PX,
             'font-weight': 700,
             fill: labelTextColor,
@@ -846,6 +874,7 @@ function renderItem(
     options: RenderOptions,
     idPrefix: string,
     palette: Theme,
+    fonts: FontFamilies,
 ): string {
     const parts: string[] = [];
     const shadow = shadowFilterUrl(idPrefix, i.style.shadow);
@@ -949,7 +978,7 @@ function renderItem(
                 {
                     x: num(captionX),
                     y: num(i.box.y + ITEM_CAPTION_TITLE_BASELINE_OFFSET_PX),
-                    'font-family': FONT_STACK[i.style.font],
+                    'font-family': fonts[i.style.font],
                     'font-size': ITEM_CAPTION_TITLE_FONT_SIZE_PX,
                     'font-weight': 600,
                     fill: titleColor,
@@ -973,7 +1002,7 @@ function renderItem(
                 x: captionX,
                 baselineY: i.box.y + ITEM_CAPTION_META_BASELINE_OFFSET_PX,
                 fontSize: ITEM_CAPTION_META_FONT_SIZE_PX,
-                fontFamily: FONT_STACK[i.style.font],
+                fontFamily: fonts[i.style.font],
                 color: metaColor,
             }),
         );
@@ -1004,7 +1033,7 @@ function renderItem(
                         {
                             x: num(fx),
                             y: num(footnoteY),
-                            'font-family': FONT_STACK.sans,
+                            'font-family': fonts.sans,
                             'font-size': 10,
                             'font-weight': 700,
                             fill: captionOutsideTextColor,
@@ -1023,7 +1052,7 @@ function renderItem(
                         {
                             x: num(fx),
                             y: num(footnoteY),
-                            'font-family': FONT_STACK.sans,
+                            'font-family': fonts.sans,
                             'font-size': 10,
                             'font-weight': 700,
                             fill: i.style.text,
@@ -1108,7 +1137,7 @@ function renderItem(
                     {
                         x: num(i.overflowBox.x + i.overflowBox.width / 2),
                         y: num(i.overflowBox.y + i.overflowBox.height / 2 + 3),
-                        'font-family': FONT_STACK.sans,
+                        'font-family': fonts.sans,
                         'font-size': 9,
                         'font-weight': 700,
                         fill: captionColor,
@@ -1140,7 +1169,7 @@ function renderItem(
                 {
                     x: num(chip.box.x + chip.box.width / 2),
                     y: num(chip.box.y + chip.box.height / 2 + 3),
-                    ...fontAttrs(chip.style, TEXT_SIZE_PX.xs),
+                    ...fontAttrs(chip.style, fonts, TEXT_SIZE_PX.xs),
                     'text-anchor': 'middle',
                 },
                 chip.text,
@@ -1155,6 +1184,7 @@ function renderGroup(
     options: RenderOptions,
     idPrefix: string,
     palette: Theme,
+    fonts: FontFamilies,
 ): string {
     const parts: string[] = [];
     const hasFill = g.style.bg !== 'none' && g.style.bg !== '#ffffff';
@@ -1211,7 +1241,7 @@ function renderGroup(
                     {
                         x: num(tabX + GROUP_TITLE_TAB_PAD_X_PX),
                         y: num(tabY + GROUP_TITLE_TAB_LABEL_BASELINE_OFFSET_PX),
-                        'font-family': FONT_STACK[g.style.font],
+                        'font-family': fonts[g.style.font],
                         'font-size': GROUP_TITLE_TAB_LABEL_FONT_SIZE_PX,
                         'font-weight': 600,
                         fill: '#ffffff',
@@ -1259,7 +1289,7 @@ function renderGroup(
                     {
                         x: num(g.box.x + 6),
                         y: num(g.box.y - 2),
-                        ...fontAttrs(g.style, TEXT_SIZE_PX.xs),
+                        ...fontAttrs(g.style, fonts, TEXT_SIZE_PX.xs),
                         'fill-opacity': 0.7,
                     },
                     g.title,
@@ -1273,7 +1303,7 @@ function renderGroup(
     // bounding box.
     parts.push(renderInlineDatePins(g.inlineDatePins, g.style.fg));
     for (const c of g.children) {
-        parts.push(renderTrackChild(c, options, idPrefix, palette));
+        parts.push(renderTrackChild(c, options, idPrefix, palette, fonts));
     }
     void palette;
     return tag('g', { 'data-layer': 'group', 'data-id': g.id ?? null }, parts.join(''));
@@ -1284,6 +1314,7 @@ function renderParallel(
     options: RenderOptions,
     idPrefix: string,
     palette: Theme,
+    fonts: FontFamilies,
 ): string {
     const parts: string[] = [];
     // `bracket: solid|dashed` parallels render explicit [ ] brackets framing
@@ -1323,7 +1354,7 @@ function renderParallel(
                 {
                     x: num(p.box.x + 4),
                     y: num(p.box.y - 2),
-                    ...fontAttrs(p.style, TEXT_SIZE_PX.xs),
+                    ...fontAttrs(p.style, fonts, TEXT_SIZE_PX.xs),
                     'fill-opacity': 0.7,
                 },
                 p.title,
@@ -1334,7 +1365,7 @@ function renderParallel(
     // `before:DATE`). Painted before children so child bars sit on top.
     parts.push(renderInlineDatePins(p.inlineDatePins, p.style.fg));
     for (const c of p.children) {
-        parts.push(renderTrackChild(c, options, idPrefix, palette));
+        parts.push(renderTrackChild(c, options, idPrefix, palette, fonts));
     }
     return tag('g', { 'data-layer': 'parallel', 'data-id': p.id ?? null }, parts.join(''));
 }
@@ -1344,10 +1375,11 @@ function renderTrackChild(
     options: RenderOptions,
     idPrefix: string,
     palette: Theme,
+    fonts: FontFamilies,
 ): string {
-    if (c.kind === 'item') return renderItem(c, options, idPrefix, palette);
-    if (c.kind === 'group') return renderGroup(c, options, idPrefix, palette);
-    return renderParallel(c, options, idPrefix, palette);
+    if (c.kind === 'item') return renderItem(c, options, idPrefix, palette, fonts);
+    if (c.kind === 'group') return renderGroup(c, options, idPrefix, palette, fonts);
+    return renderParallel(c, options, idPrefix, palette, fonts);
 }
 
 // Renders only the swimlane's background tint rect. Emitted before the
@@ -1425,6 +1457,7 @@ function renderSwimlane(
     options: RenderOptions,
     idPrefix: string,
     palette: Theme,
+    fonts: FontFamilies,
 ): string {
     const tabFill = palette.swimlane.tabFill;
     const tabStroke = palette.swimlane.tabStroke;
@@ -1481,7 +1514,7 @@ function renderSwimlane(
                 {
                     x: num(tab.titleX),
                     y: num(labelY),
-                    'font-family': FONT_STACK[s.style.font],
+                    'font-family': fonts[s.style.font],
                     'font-size': 12,
                     'font-weight': 600,
                     fill: tabText,
@@ -1495,7 +1528,7 @@ function renderSwimlane(
                     {
                         x: num(tab.ownerX),
                         y: num(labelY),
-                        'font-family': FONT_STACK[s.style.font],
+                        'font-family': fonts[s.style.font],
                         'font-size': 10,
                         fill: ownerText,
                     },
@@ -1515,7 +1548,7 @@ function renderSwimlane(
                     tab.badgeX,
                     labelY,
                     LANE_BADGE_FONT_SIZE_PX,
-                    FONT_STACK[s.style.font],
+                    fonts[s.style.font],
                     ownerText,
                 ),
             );
@@ -1526,7 +1559,7 @@ function renderSwimlane(
                     {
                         x: num(tab.footnoteRightX),
                         y: num(tabY + 14),
-                        'font-family': FONT_STACK.sans,
+                        'font-family': fonts.sans,
                         'font-size': LANE_BADGE_FONT_SIZE_PX,
                         'font-weight': 700,
                         fill: footnoteColor,
@@ -1538,7 +1571,7 @@ function renderSwimlane(
         }
     }
     for (const c of s.children) {
-        parts.push(renderTrackChild(c, options, idPrefix, palette));
+        parts.push(renderTrackChild(c, options, idPrefix, palette, fonts));
     }
     // m13: tri-state utilization underline along the band's bottom edge.
     // Painted after items so it overlays any item that happens to extend
@@ -1548,7 +1581,7 @@ function renderSwimlane(
     return tag('g', { 'data-layer': 'swimlane', 'data-id': s.id ?? null }, parts.join(''));
 }
 
-function renderAnchor(a: PositionedAnchor, palette: Theme): string {
+function renderAnchor(a: PositionedAnchor, palette: Theme, fonts: FontFamilies): string {
     const size = a.radius;
     const cx = a.center.x;
     const cy = a.center.y;
@@ -1573,7 +1606,7 @@ function renderAnchor(a: PositionedAnchor, palette: Theme): string {
     const labelAttrs: Record<string, string | number | null | undefined> = {
         x: num(labelX),
         y: num(cy + 4),
-        'font-family': FONT_STACK.sans,
+        'font-family': fonts.sans,
         'font-size': 10,
         fill: labelColor,
     };
@@ -1595,7 +1628,7 @@ function renderAnchorCutLine(a: PositionedAnchor, palette: Theme): string {
     });
 }
 
-function renderMilestone(m: PositionedMilestone, palette: Theme): string {
+function renderMilestone(m: PositionedMilestone, palette: Theme, fonts: FontFamilies): string {
     const cx = m.center.x;
     const cy = m.center.y;
     const r = m.radius;
@@ -1614,7 +1647,7 @@ function renderMilestone(m: PositionedMilestone, palette: Theme): string {
     const labelAttrs: Record<string, string | number | null | undefined> = {
         x: num(labelX),
         y: num(cy + 4),
-        'font-family': FONT_STACK.sans,
+        'font-family': fonts.sans,
         'font-size': 10,
         'font-weight': 600,
         fill: labelColor,
@@ -1715,7 +1748,12 @@ function roundedOrthogonalPath(points: Point[], radius: number): string {
     return parts.join(' ');
 }
 
-function renderFootnotes(f: PositionedFootnoteArea, idPrefix: string, palette: Theme): string {
+function renderFootnotes(
+    f: PositionedFootnoteArea,
+    idPrefix: string,
+    palette: Theme,
+    fonts: FontFamilies,
+): string {
     if (f.entries.length === 0) return '';
     const panelFill = palette.footnotePanel.fill;
     const borderColor = palette.footnotePanel.border;
@@ -1743,7 +1781,7 @@ function renderFootnotes(f: PositionedFootnoteArea, idPrefix: string, palette: T
             {
                 x: num(f.box.x + FOOTNOTE_PANEL_PADDING_PX),
                 y: num(f.box.y + FOOTNOTE_HEADER_BASELINE_OFFSET_PX),
-                'font-family': FONT_STACK.sans,
+                'font-family': fonts.sans,
                 'font-size': 12,
                 'font-weight': 700,
                 fill: headerColor,
@@ -1763,7 +1801,7 @@ function renderFootnotes(f: PositionedFootnoteArea, idPrefix: string, palette: T
                 {
                     x: num(numberX),
                     y: num(y),
-                    'font-family': FONT_STACK.sans,
+                    'font-family': fonts.sans,
                     'font-size': 10,
                     'font-weight': 700,
                     fill: numberColor,
@@ -1776,7 +1814,7 @@ function renderFootnotes(f: PositionedFootnoteArea, idPrefix: string, palette: T
                 {
                     x: num(titleX),
                     y: num(y),
-                    'font-family': FONT_STACK.sans,
+                    'font-family': fonts.sans,
                     'font-size': 11,
                     'font-weight': 600,
                     fill: titleColor,
@@ -1790,7 +1828,7 @@ function renderFootnotes(f: PositionedFootnoteArea, idPrefix: string, palette: T
                     {
                         x: num(titleX + Math.max(120, e.title.length * 6)),
                         y: num(y),
-                        'font-family': FONT_STACK.sans,
+                        'font-family': fonts.sans,
                         'font-size': 11,
                         fill: descColor,
                     },
@@ -1807,6 +1845,7 @@ function renderIncludeRegion(
     options: RenderOptions,
     idPrefix: string,
     palette: Theme,
+    fonts: FontFamilies,
 ): string {
     const border = palette.includeRegion.border;
     const fill = palette.includeRegion.fill;
@@ -1857,7 +1896,7 @@ function renderIncludeRegion(
         {
             x: num(chrome.tabLabelX),
             y: num(tabY + FRAME_TAB_LABEL_BASELINE_OFFSET_PX),
-            'font-family': FONT_STACK.sans,
+            'font-family': fonts.sans,
             'font-size': 11,
             'font-weight': 600,
             fill: tabText,
@@ -1915,7 +1954,7 @@ function renderIncludeRegion(
         {
             x: num(chrome.sourceTextX),
             y: num(sourceTextY),
-            'font-family': FONT_STACK.mono,
+            'font-family': fonts.mono,
             'font-size': sourceFontSize,
             fill: badgeText,
         },
@@ -1924,7 +1963,7 @@ function renderIncludeRegion(
 
     // Nested swimlanes (laid out by buildIncludeRegions against the parent's timeline).
     const nested = r.nestedSwimlanes
-        .map((s) => renderSwimlane(s, options, idPrefix, palette))
+        .map((s) => renderSwimlane(s, options, idPrefix, palette, fonts))
         .join('');
 
     return tag(
@@ -1940,7 +1979,7 @@ function renderIncludeRegion(
 // entire string is clickable. Glyph anatomy (positions, widths, scale)
 // lives in `themes/shared.ts` (`ATTRIBUTION_*`); the layout reserves a
 // box of exactly that size at canvas-bottom-right.
-function renderAttributionMark(model: PositionedRoadmap): string {
+function renderAttributionMark(model: PositionedRoadmap, fonts: FontFamilies): string {
     const muted = model.palette.attribution.mark;
     const accent = model.palette.attribution.link;
     if (model.swimlanes.length === 0) return '';
@@ -1955,7 +1994,7 @@ function renderAttributionMark(model: PositionedRoadmap): string {
             {
                 x: '0',
                 y: baselineY,
-                'font-family': FONT_STACK.sans,
+                'font-family': fonts.sans,
                 'font-size': ATTRIBUTION_PREFIX_FONT_SIZE,
                 'font-weight': 400,
                 fill: muted,
@@ -1966,7 +2005,7 @@ function renderAttributionMark(model: PositionedRoadmap): string {
             {
                 x: ATTRIBUTION_NOW_LOGICAL_X,
                 y: baselineY,
-                'font-family': FONT_STACK.sans,
+                'font-family': fonts.sans,
                 'font-size': ATTRIBUTION_WORDMARK_FONT_SIZE,
                 'font-weight': 700,
                 fill: muted,
@@ -1984,7 +2023,7 @@ function renderAttributionMark(model: PositionedRoadmap): string {
             {
                 x: ATTRIBUTION_INE_LOGICAL_X,
                 y: baselineY,
-                'font-family': FONT_STACK.sans,
+                'font-family': fonts.sans,
                 'font-size': ATTRIBUTION_WORDMARK_FONT_SIZE,
                 'font-weight': 400,
                 fill: muted,
@@ -2078,6 +2117,10 @@ export async function renderSvg(
     const idPrefix = ids.next('root');
 
     const palette = model.palette;
+    // Per-role family strings stamped onto every <text>. Defaults to the
+    // portable FONT_STACK; raster/preview callers pass a pinned bundled
+    // family so the SVG names exactly the font the consumer provides.
+    const fonts: FontFamilies = options.fontFamilies ?? FONT_STACK;
     const parts: string[] = [];
 
     // <defs> — shadows + arrowhead markers (palette-driven fills baked in).
@@ -2110,7 +2153,7 @@ export async function renderSvg(
     // swimlane background rects emitted later — so the major dotted
     // and minor grid lines never actually rendered in the chart body.
     // They now ship as their own layer below.
-    parts.push(renderTimeline(model.timeline, palette));
+    parts.push(renderTimeline(model.timeline, palette, fonts));
 
     // Swimlane backgrounds — emitted as their own pass so the grid
     // lines can be drawn on top of them, then the swimlane content
@@ -2136,11 +2179,13 @@ export async function renderSvg(
     }
 
     // Swimlane content (frame tabs + items) on top of the grid lines.
-    for (const s of model.swimlanes) parts.push(renderSwimlane(s, options, idPrefix, palette));
+    for (const s of model.swimlanes)
+        parts.push(renderSwimlane(s, options, idPrefix, palette, fonts));
 
     // Include regions (drawn after own swimlanes so the dashed border + tab
     // overlay the chart, with their own nested swimlanes inside).
-    for (const r of model.includes) parts.push(renderIncludeRegion(r, options, idPrefix, palette));
+    for (const r of model.includes)
+        parts.push(renderIncludeRegion(r, options, idPrefix, palette, fonts));
 
     // Normal / overflow dependency edges on top of items but below
     // cut-lines / nowline. Under-bar edges already painted above.
@@ -2154,16 +2199,16 @@ export async function renderSvg(
     for (const m of model.milestones) parts.push(renderMilestoneCutLine(m, palette));
 
     // Marker-row diamonds + labels.
-    for (const a of model.anchors) parts.push(renderAnchor(a, palette));
-    for (const m of model.milestones) parts.push(renderMilestone(m, palette));
+    for (const a of model.anchors) parts.push(renderAnchor(a, palette, fonts));
+    for (const m of model.milestones) parts.push(renderMilestone(m, palette, fonts));
 
     // Now-line
-    parts.push(renderNowline(model.nowline, palette));
+    parts.push(renderNowline(model.nowline, palette, fonts));
 
     // Footnotes + header last (always on top)
-    parts.push(renderFootnotes(model.footnotes, idPrefix, palette));
-    parts.push(renderHeader(model.header, idPrefix, palette));
-    parts.push(renderAttributionMark(model));
+    parts.push(renderFootnotes(model.footnotes, idPrefix, palette, fonts));
+    parts.push(renderHeader(model.header, idPrefix, palette, fonts));
+    parts.push(renderAttributionMark(model, fonts));
 
     // Logo (if header carries one)
     if (model.header.logo && options.assetResolver) {
