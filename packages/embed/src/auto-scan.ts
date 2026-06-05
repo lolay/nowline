@@ -12,7 +12,10 @@ export interface AutoScanInputs {
     theme?: ThemeName;
     locale?: string;
     width?: number;
-    today?: Date;
+    /** See {@link EmbedRenderOptions.today} — accepts Date, string, null, or undefined. */
+    today?: Date | string | null;
+    /** See {@link EmbedRenderOptions.timezone}. */
+    timezone?: string;
     /**
      * Controls the "Share on Nowline" anchor appended after each rendered
      * SVG. Defaults to `true` when omitted (mirrors the config default).
@@ -68,6 +71,7 @@ export async function runAutoScan(inputs: AutoScanInputs): Promise<AutoScanResul
             locale: inputs.locale,
             width: inputs.width,
             today: inputs.today,
+            timezone: inputs.timezone,
             idPrefix,
         };
 

@@ -139,9 +139,12 @@
                 "nowline.preview.now": {
                     "type": "string",
                     "default": "auto",
-                    "pattern": "^(auto|none|\\d{4}-\\d{2}-\\d{2})$",
-                    "patternErrorMessage": "Must be 'auto', 'none', or a YYYY-MM-DD date.",
-                    "description": "Anchor for the now-line. 'auto' uses today's date; 'none' suppresses the now-line entirely (mirrors `--now -`); 'YYYY-MM-DD' pins it to a specific date for snapshots."
+                    "description": "Anchor for the now-line. 'auto' uses today's local civil date; 'none' suppresses the now-line entirely (mirrors `--now -`); 'YYYY-MM-DD' pins it to a specific date; a full ISO 8601 instant (e.g. '2026-06-05T06:00:00+07:00') sets an exact moment."
+                },
+                "nowline.preview.timezone": {
+                    "type": "string",
+                    "default": "",
+                    "description": "Timezone for the clock-based 'today' default. Empty or 'local' uses the host zone (default). Accepts 'UTC', ISO 8601 offsets ('+05:30', 'Z'), or IANA names ('America/Los_Angeles'). Only consulted when nowline.preview.now is 'auto'."
                 },
                 "nowline.preview.strict": {
                     "type": "boolean",

@@ -7,7 +7,14 @@ import {
     type RenderInputs,
 } from '@nowline/export';
 import { lengthToPoints, parseLength } from '@nowline/export-core';
-import { normalizeThemeName, type ThemeName } from '@nowline/layout';
+import {
+    type NormalizedZone,
+    normalizeThemeName,
+    normalizeZone,
+    resolveToday,
+    type ThemeName,
+    TimezoneError,
+} from '@nowline/layout';
 import type { AssetResolver } from '@nowline/renderer';
 import type { ParsedArgs } from '../cli/args.js';
 import {
@@ -98,7 +105,7 @@ export async function renderHandler(options: RenderHandlerOptions): Promise<void
         absInputPath: input.isStdin ? path.resolve(cwd, 'stdin.nowline') : input.path,
         isStdin: input.isStdin,
         theme: parseTheme(args.theme),
-        today: resolveNowArg(args),
+        today: resolveNowCli(args),
         width: parseWidthArg(args.width),
         noLinks: args.noLinks,
         strict: args.strict,
@@ -314,10 +321,10 @@ function createNodeHostEnv(assetRoot: string): HostEnv {
             // 2. Plain Node.js (dev, tests, uncompiled dist/index.js run):
             //    dist/resvg.wasm is copied by scripts/copy-wasm.mjs (postbuild).
             //    Use fs.readFile via a new URL relative to this module.
-            // eslint-disable-next-line @typescript-eslint/no-explicit-any
+            // biome-ignore lint/suspicious/noExplicitAny: Bun-specific global not in TS types
             const bunWasmPath = (globalThis as any).__RESVG_WASM_PATH__ as string | undefined;
             if (bunWasmPath) {
-                // eslint-disable-next-line @typescript-eslint/no-explicit-any
+                // biome-ignore lint/suspicious/noExplicitAny: Bun-specific global not in TS types
                 return (globalThis as any).Bun.file(
                     bunWasmPath,
                 ).arrayBuffer() as Promise<ArrayBuffer>;
@@ -441,31 +448,41 @@ function parseTheme(raw: string | undefined): ThemeName {
     return theme;
 }
 
-// Resolve the now-line date from the CLI flag.
+// Resolve the now-line date from the CLI flags.
 //
 // Precedence:
-//   1. `--now -`            → undefined  (suppresses the now-line)
-//   2. `--now <YYYY-MM-DD>` → that date
-//   3. flag omitted          → today (UTC calendar date)
+//   1. `--now -`                           → undefined (suppress now-line)
+//   2. `--now YYYY-MM-DD`                  → floating date; zone ignored
+//   3. `--now YYYY-MM-DDTHH:MM:SS[±HH:MM]` → civil date at embedded offset; --timezone ignored
+//   4. `--now YYYY-MM-DDTHH:MM:SSZ`        → civil date in UTC; --timezone ignored
+//   5. `--now YYYY-MM-DDTHH:MM:SS`         → floating; written date part; zone ignored
+//   6. flag omitted                        → civil date of today in --timezone (default: local)
 //
-// The "default to today" behavior matches what the tool's name promises —
-// you should see a "now" line by default. Use `--now -` to opt out (Unix
-// `-` sentinel, mirroring `-o -` for stdout), or `--now <date>` for
-// deterministic snapshots / planning a hypothetical date.
-function resolveNowArg(args: { now?: string }): Date | undefined {
-    if (args.now === '-') return undefined;
-    if (args.now) {
-        const m = /^(\d{4})-(\d{2})-(\d{2})$/.exec(args.now);
-        if (!m) {
-            throw new CliError(
-                ExitCode.InputError,
-                `nowline: invalid --now "${args.now}". Expected YYYY-MM-DD or "-".`,
-            );
+// `--timezone` is only consulted for case 6. Authored dates in the roadmap
+// (bars, milestones, axis) are floating and are never affected.
+function resolveNowCli(args: { now?: string; timezone?: string }): Date | undefined {
+    let zone: NormalizedZone | undefined;
+    if (args.timezone) {
+        try {
+            zone = normalizeZone(args.timezone);
+        } catch (err) {
+            if (err instanceof TimezoneError) {
+                throw new CliError(ExitCode.InputError, err.message);
+            }
+            throw err;
         }
-        return new Date(Date.UTC(parseInt(m[1], 10), parseInt(m[2], 10) - 1, parseInt(m[3], 10)));
     }
-    const today = new Date();
-    return new Date(Date.UTC(today.getUTCFullYear(), today.getUTCMonth(), today.getUTCDate()));
+    const result = resolveToday({ now: args.now, zone });
+    // resolveToday returns undefined for unrecognised strings; surface that as
+    // an input error so the user gets a clear message instead of a silent no-line.
+    if (result === undefined && args.now !== undefined && args.now !== '-') {
+        throw new CliError(
+            ExitCode.InputError,
+            `nowline: invalid --now "${args.now}". ` +
+                `Expected YYYY-MM-DD, YYYY-MM-DDTHH:MM:SS[Z|±HH:MM], or "-".`,
+        );
+    }
+    return result;
 }
 
 function parseScale(raw: string | undefined): number | undefined {

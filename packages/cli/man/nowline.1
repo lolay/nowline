@@ -10,6 +10,7 @@
 .Op Fl o Ar path
 .Op Fl t Ar theme
 .Op Fl -now Ar date
+.Op Fl -timezone Ar zone
 .Op Ar options
 .Ar input
 .Nm
@@ -182,13 +183,50 @@ Default: inferred from extension; standard input defaults to
 .Sy light | dark .
 .It Fl -now Ar date
 .Sq Now
-anchor for the now-line and date math, in
+anchor for the now-line and date math.
+Accepts a bare
 .Pa YYYY-MM-DD
-form.
-Default: today (the OS calendar date in UTC).
+(floating; zone-independent) or a full ISO\~8601 instant such as
+.Pa 2026-06-04T23:00:00Z
+or
+.Pa 2026-06-05T06:00:00+07:00
+(an embedded Z or \(pmHH:MM offset overrides
+.Fl -timezone ) .
+A bare date or an instant without an offset is floating: the written date
+part is used and
+.Fl -timezone
+is ignored.
+Default: today's civil date in the host zone (or
+.Fl -timezone
+if given).
 Pass
 .Fl -now Sq -
 to suppress the now-line entirely.
+.It Fl -timezone Ar zone
+Timezone used for the clock-based
+.Dq today
+default; only consulted when
+.Fl -now
+is omitted.
+Accepted forms:
+.Bl -tag -width "America/Los_Angeles" -compact
+.It Sy local
+Host/viewer zone (default when the flag is absent).
+.It Sy UTC
+UTC.
+.It Sy Z , +00:00
+Zero-offset shorthand (equivalent to
+.Sy UTC ) .
+.It Sy \(pmHH , \(pmHH:MM , \(pmHHMM
+Fixed offset (DST-naive; documented caveat).
+.It Sy America/Los_Angeles
+Any valid IANA timezone name.
+.El
+Ambiguous abbreviations such as
+.Sy PST
+and
+.Sy IST
+are rejected with a clear error.
 .It Fl -locale Ar bcp47
 BCP-47 language tag for the operator's CLI message output (validator
 diagnostics on standard error,

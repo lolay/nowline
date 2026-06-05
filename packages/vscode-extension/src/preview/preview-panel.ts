@@ -22,6 +22,12 @@ export interface PreviewSettings {
     locale: string;
     /** `'auto'` (today) | `'none'` (suppress) | `'YYYY-MM-DD'` (snapshot). */
     now: string;
+    /**
+     * Timezone for the clock-based "today" default.
+     * `'local'` (default) | `'UTC'` | ISO 8601 offset | IANA name.
+     * Empty string means use the host local zone.
+     */
+    timezone: string;
     strict: boolean;
     showLinks: boolean;
     /** Canvas width in px; `0` leaves it unset. */

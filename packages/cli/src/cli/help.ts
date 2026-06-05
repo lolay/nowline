@@ -41,8 +41,23 @@ MODE FLAGS (mutually exclusive)
 
 RENDER OPTIONS
   -t, --theme <name>      light | dark | grayscale (greyscale alias)
-      --now <YYYY-MM-DD>  Date for the now-line. Default: today.
-                          Use --now - to suppress the now-line.
+      --now <date>        Date for the now-line. Default: today (local civil date).
+                          Accepts YYYY-MM-DD (floating date, zone-independent) or a
+                          full ISO 8601 instant: YYYY-MM-DDTHH:MM:SSZ or with a
+                          ±HH:MM offset. A bare date or ISO date without an offset is
+                          treated as floating (written date part used, --timezone
+                          ignored). An embedded Z or ±offset overrides --timezone.
+                          Use --now - to suppress the now-line entirely.
+      --timezone <zone>   Timezone for the clock-based "today" default.
+                          Only consulted when --now is omitted; ignored when --now
+                          carries an explicit date or embedded ISO offset.
+                          Accepted forms:
+                            local          — host/viewer zone (default)
+                            UTC            — UTC
+                            Z, +00:00      — zero-offset shorthand (= UTC)
+                            ±HH, ±HH:MM, ±HHMM  — fixed offset (DST-naive)
+                            America/Los_Angeles   — IANA timezone name
+                          Ambiguous abbreviations (PST, IST, CET) are rejected.
       --no-links          Omit link icons from rendered items.
   -s, --scale <n>         Raster scale factor (PNG only; default 1).
       --strict            Promote asset / sanitizer warnings to errors.

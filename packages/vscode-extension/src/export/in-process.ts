@@ -21,6 +21,7 @@ import {
     type HostEnv,
     type ExportFormat as KernelFormat,
     type RenderInputs,
+    resolveToday,
 } from '@nowline/export';
 import { lengthToPoints, parseLength, resolveFonts } from '@nowline/export-core';
 import type { ExportSettings } from './cli-runner.js';
@@ -126,10 +127,10 @@ export async function exportInProcess(
     const { today, theme, locale, noLinks } = overrides;
     // `null`  → suppress the now-line (RenderInputs.today = undefined)
     // `Date`  → pin to that UTC midnight
-    // missing → default to today (UTC midnight)
+    // missing → default to today (local civil date via resolveToday)
     const inputs: RenderInputs = {
         sourcePath,
-        today: today === null ? undefined : (today ?? todayUtc()),
+        today: today === null ? undefined : (today ?? resolveToday()),
         locale: locale ?? 'en-US',
         theme: theme ?? 'light',
         noLinks: noLinks ?? false,
@@ -166,11 +167,6 @@ export async function exportInProcess(
 }
 
 // ---- Helpers ----------------------------------------------------------------
-
-export function todayUtc(): Date {
-    const now = new Date();
-    return new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate()));
-}
 
 function parsePdfOrientation(raw: string): 'portrait' | 'landscape' | 'auto' | undefined {
     const lower = raw.toLowerCase();

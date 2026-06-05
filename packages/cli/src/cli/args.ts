@@ -23,9 +23,16 @@ export interface ParsedArgs {
     /** Now-line date string from `--now`. Undefined means "use the actual
      *  current date" (the default). The literal value `"-"` means
      *  "suppress the now-line entirely" (mirrors the Unix-`-` convention
-     *  used elsewhere in the CLI). Otherwise expected as YYYY-MM-DD;
-     *  parsed downstream by resolveNowArg. */
+     *  used elsewhere in the CLI). Accepts YYYY-MM-DD (floating) or a
+     *  full ISO 8601 instant with Z/offset; parsed downstream by resolveToday. */
     now?: string;
+    /**
+     * IANA timezone name, ISO 8601 offset, `"UTC"`, `"Z"`, or `"local"`.
+     * Governs which civil date is "today" when `--now` is omitted.
+     * Defaults to the host's local zone when absent.
+     * Ignored when `--now` carries an explicit date or embedded offset.
+     */
+    timezone?: string;
     noLinks: boolean;
     scale?: string;
     strict: boolean;
@@ -116,6 +123,9 @@ export function parseArgv(argv: readonly string[]): ParsedArgs {
             // suppress the now-line entirely (Unix-`-` sentinel; same idea
             // as `-o -` for stdout).
             now: { type: 'string' },
+            // `--timezone` controls which civil date is "today" when --now is
+            // omitted. Accepts IANA names, ISO offsets, "UTC", "Z", or "local".
+            timezone: { type: 'string' },
             'no-links': { type: 'boolean' },
             scale: { type: 'string', short: 's' },
             strict: { type: 'boolean' },
@@ -233,6 +243,7 @@ export function parseArgv(argv: readonly string[]): ParsedArgs {
         inputFormat: stringOrUndefined(values['input-format']),
         theme: stringOrUndefined(values.theme),
         now: stringOrUndefined(values.now),
+        timezone: stringOrUndefined(values.timezone),
         noLinks: values['no-links'] === true,
         scale: stringOrUndefined(values.scale),
         strict: values.strict === true,

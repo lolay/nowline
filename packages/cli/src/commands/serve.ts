@@ -2,7 +2,14 @@ import { type FSWatcher, promises as fs, watch as fsWatch } from 'node:fs';
 import * as http from 'node:http';
 import * as path from 'node:path';
 import { resolveIncludes } from '@nowline/core';
-import { layoutRoadmap, type ThemeName } from '@nowline/layout';
+import {
+    layoutRoadmap,
+    type NormalizedZone,
+    normalizeZone,
+    resolveToday,
+    type ThemeName,
+    TimezoneError,
+} from '@nowline/layout';
 import { renderSvg } from '@nowline/renderer';
 import type { ParsedArgs } from '../cli/args.js';
 import { getServices, parseSource } from '../core/parse.js';
@@ -218,17 +225,29 @@ function parseTheme(raw: string | undefined): ThemeName {
     return lower;
 }
 
-// Mirrors render.ts: `--now -` disables the line, `--now <date>` overrides
-// it, and the default is today's UTC calendar date.
-function resolveNowArg(args: { now?: string }): Date | undefined {
-    if (args.now === '-') return undefined;
-    if (args.now) {
-        const m = /^(\d{4})-(\d{2})-(\d{2})$/.exec(args.now);
-        if (!m) throw new CliError(ExitCode.InputError, `nowline: invalid --now "${args.now}".`);
-        return new Date(Date.UTC(parseInt(m[1], 10), parseInt(m[2], 10) - 1, parseInt(m[3], 10)));
+// Resolve the now-line date from the CLI flags. Mirrors render.ts.
+// Delegates to the shared resolveToday; see render.ts for the full precedence table.
+function resolveNowArg(args: { now?: string; timezone?: string }): Date | undefined {
+    let zone: NormalizedZone | undefined;
+    if (args.timezone) {
+        try {
+            zone = normalizeZone(args.timezone);
+        } catch (err) {
+            if (err instanceof TimezoneError) {
+                throw new CliError(ExitCode.InputError, err.message);
+            }
+            throw err;
+        }
     }
-    const t = new Date();
-    return new Date(Date.UTC(t.getUTCFullYear(), t.getUTCMonth(), t.getUTCDate()));
+    const result = resolveToday({ now: args.now, zone });
+    if (result === undefined && args.now !== undefined && args.now !== '-') {
+        throw new CliError(
+            ExitCode.InputError,
+            `nowline: invalid --now "${args.now}". ` +
+                `Expected YYYY-MM-DD, YYYY-MM-DDTHH:MM:SS[Z|±HH:MM], or "-".`,
+        );
+    }
+    return result;
 }
 
 function sendEvent(res: http.ServerResponse, event: string, data: string): void {

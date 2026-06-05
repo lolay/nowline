@@ -66,6 +66,14 @@ export {
 export type { LayoutOptions, LayoutResult } from './layout.js';
 export { layoutRoadmap } from './layout.js';
 export {
+    civilDateInZone,
+    type NormalizedZone,
+    normalizeZone,
+    type ResolveTodayOptions,
+    resolveToday,
+    TimezoneError,
+} from './resolve-today.js';
+export {
     darkTheme,
     grayscaleTheme,
     lightTheme,

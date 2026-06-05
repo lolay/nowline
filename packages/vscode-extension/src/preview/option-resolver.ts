@@ -1,5 +1,11 @@
 import type { NowlineRc } from '@nowline/config';
-import { normalizeThemeName, type ThemeName } from '@nowline/layout';
+import {
+    type NormalizedZone,
+    normalizeThemeName,
+    normalizeZone,
+    resolveToday,
+    type ThemeName,
+} from '@nowline/layout';
 import type { PreviewSettings, ToolbarOverrides } from './preview-panel.js';
 
 /**
@@ -42,7 +48,7 @@ export interface ResolveContext {
 export function resolvePreviewOptions(ctx: ResolveContext): ResolvedRenderOptions {
     return {
         theme: resolveTheme(ctx),
-        today: resolveToday(ctx),
+        today: resolveTodayForPreview(ctx),
         locale: resolveLocale(ctx),
         width: resolveWidth(ctx),
         showLinks: resolveShowLinks(ctx),
@@ -75,8 +81,8 @@ function rcThemeOverride(rc: NowlineRc): ThemeName | undefined {
  * shared {@link resolveTodayAnchor} so the live render and the export
  * (`NowlinePreview.resolvedToday()`) can never drift.
  */
-function resolveToday(ctx: ResolveContext): Date | null {
-    return resolveTodayAnchor(ctx.toolbarOverrides?.now, ctx.settings.now);
+function resolveTodayForPreview(ctx: ResolveContext): Date | null {
+    return resolveTodayAnchor(ctx.toolbarOverrides?.now, ctx.settings.now, ctx.settings.timezone);
 }
 
 /**
@@ -84,8 +90,9 @@ function resolveToday(ctx: ResolveContext): Date | null {
  *
  * Precedence:
  *  - toolbar override wins (`'today'` / `'hide'` / pinned Date)
- *  - then setting (`'auto'` / `'none'` / YYYY-MM-DD)
- *  - default (`'auto'` / empty / unparseable) = today's UTC-midnight date
+ *  - then setting (`'auto'` / `'none'` / YYYY-MM-DD or ISO 8601)
+ *  - default (`'auto'` / empty / unparseable) = today's local civil date
+ *    (or the zone from `settingTimezone` if set)
  *
  * Returns an explicit `Date` to draw the now-line, or `null` to suppress it
  * (mirrors the CLI's `--now -`). Never returns `undefined`: the browser
@@ -93,33 +100,52 @@ function resolveToday(ctx: ResolveContext): Date | null {
  * now-line, so the default must be a concrete date for the line to appear —
  * matching the CLI default and the rasterized export.
  *
- * Shared by both the live preview render ({@link resolveToday}) and the
- * export path (`NowlinePreview.resolvedToday()`).
+ * Shared by both the live preview render ({@link resolveTodayForPreview}) and
+ * the export path (`NowlinePreview.resolvedToday()`).
  */
 export function resolveTodayAnchor(
     nowOverride: ToolbarOverrides['now'],
     settingNow: string,
+    settingTimezone?: string,
 ): Date | null {
     if (nowOverride !== undefined) {
-        if (nowOverride === 'today') return todayUtc();
+        if (nowOverride === 'today') {
+            // 'today' toolbar override: use local civil date (or setting zone).
+            return resolveTodayWithZone(undefined, settingTimezone) ?? null;
+        }
         if (nowOverride === 'hide') return null;
         return nowOverride; // pinned Date
     }
-    if (settingNow === 'auto' || settingNow === '') return todayUtc();
+    if (settingNow === 'auto' || settingNow === '') {
+        return resolveTodayWithZone(undefined, settingTimezone) ?? null;
+    }
     if (settingNow === 'none') return null;
-    return parseIsoDate(settingNow) ?? todayUtc();
+    // Pinned date string (YYYY-MM-DD or ISO 8601): pass to resolveToday.
+    return (
+        resolveTodayWithZone(settingNow, settingTimezone) ??
+        resolveTodayWithZone(undefined, settingTimezone) ??
+        null
+    );
 }
 
-/** Today at UTC midnight — matches the CLI's `resolveNowArg` default. */
-function todayUtc(): Date {
-    const t = new Date();
-    return new Date(Date.UTC(t.getUTCFullYear(), t.getUTCMonth(), t.getUTCDate()));
-}
-
-function parseIsoDate(value: string): Date | undefined {
-    const m = /^(\d{4})-(\d{2})-(\d{2})$/.exec(value);
-    if (!m) return undefined;
-    return new Date(Date.UTC(parseInt(m[1], 10), parseInt(m[2], 10) - 1, parseInt(m[3], 10)));
+/**
+ * Resolve the now-line date using the shared helper.
+ * Returns `null` on suppress, or today as fallback when parsing fails.
+ */
+function resolveTodayWithZone(
+    nowStr: string | undefined,
+    timezoneStr: string | undefined,
+): Date | null | undefined {
+    let zone: NormalizedZone | undefined;
+    if (timezoneStr) {
+        try {
+            zone = normalizeZone(timezoneStr);
+        } catch {
+            // Silently fall back to local if the zone setting is invalid.
+            zone = undefined;
+        }
+    }
+    return resolveToday({ now: nowStr, zone }) ?? null;
 }
 
 /**

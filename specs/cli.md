@@ -69,10 +69,25 @@ Mode flags (mutually exclusive)
 
 Render options
   -t, --theme <name>     light | dark | grayscale (greyscale alias)
-  --now <date>           "Now" anchor for now-line / date math (YYYY-MM-DD).
-                         Default: today (the OS calendar date in UTC).
+  --now <date>           "Now" anchor for the now-line. Accepted forms:
+                           YYYY-MM-DD                   — floating date (zone-independent)
+                           YYYY-MM-DDTHH:MM:SSZ         — UTC instant; embedded Z wins
+                           YYYY-MM-DDTHH:MM:SS±HH:MM    — fixed-offset instant; offset wins
+                           YYYY-MM-DDTHH:MM:SS          — floating datetime; date part used
+                         Default: today's local civil date (or --timezone if set).
                          Pass `--now -` to suppress the now-line entirely
                          (Unix-`-` sentinel; same convention as `-o -`).
+  --timezone <zone>      Timezone for the clock-based "today" default. Only
+                         consulted when --now is omitted; ignored when --now
+                         carries an explicit date or embedded ISO offset.
+                         Accepted forms:
+                           local                        — host zone (default)
+                           UTC                          — UTC
+                           Z, +00:00                    — zero-offset (= UTC)
+                           ±HH, ±HH:MM, ±HHMM          — fixed offset (DST-naive)
+                           America/Los_Angeles          — IANA timezone name
+                         Ambiguous abbreviations (PST, IST, …) are rejected on
+                         most platforms; use IANA names for portable scripts.
   --no-links             Omit link icons from output
   -s, --scale <n>        Raster scale factor (PNG only; default 1)
   --strict               Promote asset / sanitizer warnings to errors

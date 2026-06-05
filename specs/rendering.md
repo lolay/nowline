@@ -144,6 +144,15 @@ A single-row header displays the scale units (days, weeks, months, quarters, yea
 
 The now-line is the hero visual element — the vertical line marking today on the timeline.
 
+**Timezone semantics.** The now-line date is resolved by the calling surface (CLI, VS Code extension, embed, web app) using the shared `resolveToday()` helper in `@nowline/layout`. The layout engine itself receives a concrete `today?: Date` (UTC midnight of the desired civil date) and is timezone-unaware. Key rules:
+
+- Default ("today" with no override): the viewer's **local civil date** (host/viewer zone). This matches iCalendar floating-date semantics and avoids the off-by-one when it is late evening on the west side of UTC midnight.
+- `--timezone <zone>` (CLI) / `timezone` option (embed, VS Code): override the zone for the clock-based default. Accepts `local` (default), `UTC`, ISO 8601 fixed offsets (`Z`, `+05:30`), or IANA names. Only consulted when `--now` is omitted.
+- `--now YYYY-MM-DD`: floating date — zone-independent. The axis labels are also floating (UTC midnight), so they align exactly.
+- `--now YYYY-MM-DDTHH:MM:SSZ` or with `±HH:MM` offset: the embedded offset determines the civil date. `--timezone` is ignored.
+- `--now -`: suppress the now-line.
+- Authored dates (item bars, milestones, anchors, axis ticks) are always floating and are never affected by `--timezone`.
+
 - A **red vertical line** at the x-position corresponding to today's date
 - Extends from the top of the timeline header through all swimlanes to the bottom of the chart
 - Rendered **above** grid lines and milestone lines (highest z-order among vertical lines)

@@ -6,6 +6,19 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ## [Unreleased]
 
+### Added
+
+- **`--timezone` CLI flag** (`nowline render`, `nowline --serve`): override the timezone used for the clock-based "today" default. Accepts `local` (default), `UTC`, ISO 8601 fixed offsets (`Z`, `+05:30`, `-07:00`), or IANA names (`America/Los_Angeles`). Only consulted when `--now` is omitted; ignored when `--now` carries an explicit date or embedded offset.
+- **ISO 8601 `--now`**: `--now` now accepts bare `YYYY-MM-DD` (unchanged) plus full ISO 8601 instants (`YYYY-MM-DDTHH:MM:SSZ`, `YYYY-MM-DDTHH:MM:SS±HH:MM`, `YYYY-MM-DDTHH:MM:SS`). An embedded Z or offset overrides `--timezone`.
+- **`resolveToday()` + `normalizeZone()`** in `@nowline/layout` (re-exported from `@nowline/browser` and `@nowline/export`): shared helpers for timezone-aware civil-date resolution used by all rendering surfaces.
+- **`timezone` option** in `@nowline/browser` `RenderOptions` and `@nowline/embed` `EmbedRenderOptions`/`InitializeOptions`: lets embed and browser surfaces specify the zone for the clock-based now-line default.
+- **`nowline.preview.timezone` VS Code setting**: override the zone for the now-line's clock-based default in the preview panel and export.
+
+### Changed
+
+- **Default now-line date is local** (all surfaces): the clock-based "today" default now uses the **viewer's local civil date** instead of UTC. Fixes the off-by-one visible when it is late evening on the west side of UTC midnight (e.g., `2026-06-04T23:00 PDT` = `2026-06-05T06:00Z` — the old UTC default showed June 5). Use `--timezone UTC` to restore the previous behaviour.
+- **Embed now draws a now-line by default**: when `today` is not supplied, the embed (and browser pipeline) defaults to the local civil today instead of omitting the now-line. Pass `today: null` to suppress.
+
 ### Changed
 
 - `@nowline/export-core`: font resolution is now **bundled-first** by default. The bundled DejaVu Sans / DejaVu Sans Mono pair is used for PNG and PDF raster export on every OS without any configuration. System fonts are available via the new `--use-system-fonts` CLI flag (`useSystemFonts` in `.nowlinerc` / config). This makes Mac/Windows/Linux render identically by default and fixes the text-loss bug that occurred when macOS SF Pro (a variable font) was handed to `@resvg/resvg-wasm`. Variable fonts supplied via `--font-sans` / `--font-mono` are detected and replaced by the bundled pair, with a warning (`--strict` makes it an error).

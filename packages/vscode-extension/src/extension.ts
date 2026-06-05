@@ -8,10 +8,11 @@ import {
     TransportKind,
 } from 'vscode-languageclient/node';
 import { type ExportSettings, runExportCommand } from './export/cli-runner.js';
-import { exportInProcess, initExportRuntime, todayUtc } from './export/in-process.js';
+import { exportInProcess, initExportRuntime } from './export/in-process.js';
 import { runNewRoadmapCommand } from './export/new-roadmap.js';
 import { DisagreementTracker } from './io/disagreement-check.js';
 import { RcConfigCache } from './io/rc-config.js';
+import { resolveTodayAnchor } from './preview/option-resolver.js';
 import { PreviewManager } from './preview/preview-manager.js';
 import type {
     DefaultFit,
@@ -255,6 +256,7 @@ function readPreviewSettings(): PreviewSettings {
     const showMinimap = cfg.get<boolean>('showMinimap') ?? true;
     const locale = cfg.get<string>('locale') ?? '';
     const now = cfg.get<string>('now') ?? 'auto';
+    const timezone = cfg.get<string>('timezone') ?? '';
     const strict = cfg.get<boolean>('strict') ?? false;
     const showLinks = cfg.get<boolean>('showLinks') ?? true;
     const width = cfg.get<number>('width') ?? 0;
@@ -267,6 +269,7 @@ function readPreviewSettings(): PreviewSettings {
         showMinimap,
         locale,
         now,
+        timezone,
         strict,
         showLinks,
         width,
@@ -308,23 +311,15 @@ function resolveThemeForExport(sourceUri: vscode.Uri): 'light' | 'dark' | 'grays
  * Precedence (same as the preview's own resolution):
  *  1. `NowlinePreview.resolvedToday()` when a preview is open — respects
  *     toolbar overrides (pinned date, "Today", "Hide").
- *  2. `nowline.preview.now` setting, resolved to an explicit UTC-midnight
- *     `Date` (for 'auto') or `null` (for 'none').
+ *  2. `nowline.preview.now` + `nowline.preview.timezone` settings, resolved
+ *     via `resolveTodayAnchor` (defaults to local civil date).
  */
 function resolveNowForExport(sourceUri: vscode.Uri): Date | null {
     const preview = previewManager?.getForSource(sourceUri);
     if (preview) return preview.resolvedToday();
     // No preview open — fall back to the preview setting.
-    const raw = readPreviewSettings().now;
-    if (raw === 'none') return null;
-    if (raw && raw !== 'auto') {
-        const m = /^(\d{4})-(\d{2})-(\d{2})$/.exec(raw);
-        if (m)
-            return new Date(
-                Date.UTC(parseInt(m[1], 10), parseInt(m[2], 10) - 1, parseInt(m[3], 10)),
-            );
-    }
-    return todayUtc();
+    const settings = readPreviewSettings();
+    return resolveTodayAnchor(undefined, settings.now, settings.timezone);
 }
 
 /**

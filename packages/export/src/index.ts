@@ -28,6 +28,14 @@ import { URI } from 'langium';
 
 export type { PdfOrientation, ResolvedFontPair } from '@nowline/export-core';
 export type { ThemeName } from '@nowline/layout';
+export {
+    civilDateInZone,
+    type NormalizedZone,
+    normalizeZone,
+    type ResolveTodayOptions,
+    resolveToday,
+    TimezoneError,
+} from '@nowline/layout';
 
 /** The eight canonical export formats. Every surface produces exactly these. */
 export type ExportFormat = 'svg' | 'png' | 'pdf' | 'html' | 'mermaid' | 'xlsx' | 'msproj' | 'json';

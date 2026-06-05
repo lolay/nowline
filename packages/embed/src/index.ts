@@ -73,8 +73,18 @@ export interface InitializeOptions {
     locale?: string;
     /** Layout canvas width in pixels. Layout's default is 1280. */
     width?: number;
-    /** Pin a `today` for deterministic snapshots; defaults to live `new Date()` per render. */
-    today?: Date;
+    /**
+     * "Today" override for the now-line. Accepts a `Date`, a YYYY-MM-DD string,
+     * a full ISO 8601 instant (with Z or ±offset), or `null` to suppress the
+     * now-line. Defaults to the local civil date when omitted.
+     */
+    today?: Date | string | null;
+    /**
+     * Timezone for the clock-based "today" default. Only consulted when `today`
+     * is omitted. Accepts `"local"` (default), `"UTC"`, ISO 8601 offsets, or
+     * IANA timezone names (e.g. `"America/Los_Angeles"`).
+     */
+    timezone?: string;
     /**
      * Controls the "Share on Nowline" anchor appended after each rendered SVG.
      * - `true` (default) — link to the Free app open route
@@ -99,7 +109,8 @@ interface ResolvedConfig {
     selector: string;
     locale?: string;
     width?: number;
-    today?: Date;
+    today?: Date | string | null;
+    timezone?: string;
     /** System theme captured at init; not reactive to OS theme flips mid-session. */
     systemTheme: 'light' | 'dark';
     /** Controls the "Share on Nowline" anchor. Defaults to `true`. */
@@ -126,7 +137,8 @@ export function initialize(options: InitializeOptions = {}): void {
         selector: options.selector ?? config.selector,
         locale: options.locale ?? config.locale,
         width: options.width ?? config.width,
-        today: options.today ?? config.today,
+        today: options.today !== undefined ? options.today : config.today,
+        timezone: options.timezone ?? config.timezone,
         share: options.share ?? config.share,
         sourceUrl: options.sourceUrl ?? config.sourceUrl,
         // Re-read `prefers-color-scheme` on every initialize() so callers
@@ -144,6 +156,7 @@ function renderOptionsFromConfig(): EmbedRenderOptions {
         locale: config.locale,
         width: config.width,
         today: config.today,
+        timezone: config.timezone,
     };
 }
 
@@ -180,7 +193,8 @@ export async function init(overrides?: Partial<AutoScanInputs>): Promise<AutoSca
         theme: overrides?.theme ?? renderOptionsFromConfig().theme,
         locale: overrides?.locale ?? config.locale,
         width: overrides?.width ?? config.width,
-        today: overrides?.today ?? config.today,
+        today: overrides?.today !== undefined ? overrides.today : config.today,
+        timezone: overrides?.timezone ?? config.timezone,
         share: overrides?.share ?? config.share,
         sourceUrl: overrides?.sourceUrl ?? config.sourceUrl,
         document: overrides?.document,

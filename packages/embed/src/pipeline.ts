@@ -26,7 +26,24 @@ const EMBED_SOURCE_PATH = '/embed.nowline';
 
 export interface EmbedRenderOptions {
     theme?: ThemeName;
-    today?: Date;
+    /**
+     * "Today" override for the now-line.
+     *
+     * - `Date`   — explicit UTC-midnight date; drawn as-is.
+     * - `string` — raw date string (YYYY-MM-DD or ISO 8601 instant with Z/offset).
+     * - `null`   — suppress the now-line (mirrors `--now -`).
+     * - `undefined` — default to local today (or `timezone` if set).
+     *
+     * Previously accepted only `Date`; strings and null are new as of the
+     * timezone-aware now-line release.
+     */
+    today?: Date | string | null;
+    /**
+     * Timezone for the clock-based "today" default. Only consulted when
+     * `today` is `undefined`. Accepts `"local"` (default), `"UTC"`, ISO 8601
+     * offsets (`"Z"`, `"+05:30"`), or IANA names (`"America/Los_Angeles"`).
+     */
+    timezone?: string;
     locale?: string;
     width?: number;
     /**
@@ -66,6 +83,7 @@ export async function renderSource(
         filePath: EMBED_SOURCE_PATH,
         theme: options.theme,
         today: options.today,
+        timezone: options.timezone,
         locale: options.locale,
         width: options.width,
         idPrefix: options.idPrefix,

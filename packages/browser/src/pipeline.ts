@@ -24,7 +24,14 @@ import {
     type NowlineServices,
     resolveIncludes,
 } from '@nowline/core';
-import { layoutRoadmap, type ThemeName } from '@nowline/layout';
+import {
+    layoutRoadmap,
+    type NormalizedZone,
+    normalizeZone,
+    resolveToday,
+    type ThemeName,
+    TimezoneError,
+} from '@nowline/layout';
 import { type AssetResolver, type FontFamilies, renderSvg } from '@nowline/renderer';
 import { URI } from 'langium';
 import {
@@ -79,12 +86,24 @@ export interface ParseResult {
 export interface RenderOptions extends ParseOptions {
     theme?: ThemeName;
     /**
-     * "Today" override threaded into the layout engine. Pass an
-     * explicit `Date` for deterministic snapshots; pass `null` to
-     * suppress the now-line entirely (mirrors the CLI's `--now -`);
-     * leave undefined to use `new Date()` per render.
+     * "Today" override threaded into the layout engine.
+     *
+     * - `Date`   — explicit UTC-midnight date; drawn as-is.
+     * - `string` — raw `--now` string (YYYY-MM-DD or ISO 8601 instant);
+     *              resolved via `resolveToday`. An embedded Z or ±offset wins
+     *              over `timezone`.
+     * - `null`   — suppress the now-line entirely (mirrors `--now -`).
+     * - `undefined` — default to the local civil date (or `timezone` if set).
      */
-    today?: Date | null;
+    today?: Date | string | null;
+    /**
+     * Timezone for the clock-based "today" default. Only consulted when
+     * `today` is `undefined`. Accepts `"local"` (default), `"UTC"`, ISO 8601
+     * offsets (`"Z"`, `"+05:30"`), or IANA names (`"America/Los_Angeles"`).
+     * Ignored when `today` carries an explicit date or embedded ISO offset.
+     * Throws `TimezoneError` for unrecognised values.
+     */
+    timezone?: string;
     /** BCP-47 locale forwarded to the layout engine for axis labels. */
     locale?: string;
     /** Total canvas width in px. Layout's default is 1280. */
@@ -206,7 +225,34 @@ export async function renderSource(
         return { kind: 'diagnostics', diagnostics: rows };
     }
 
-    const today = options.today === null ? undefined : options.today;
+    let zone: NormalizedZone | undefined;
+    if (options.timezone) {
+        try {
+            zone = normalizeZone(options.timezone);
+        } catch (err) {
+            if (err instanceof TimezoneError) {
+                // Surface timezone errors as a diagnostic row rather than throwing
+                // so the caller gets a structured result instead of an uncaught error.
+                return {
+                    kind: 'diagnostics',
+                    diagnostics: [
+                        {
+                            severity: 'error' as const,
+                            code: 'invalid-timezone',
+                            message: err.message,
+                            file: filePath,
+                            line: 1,
+                            column: 1,
+                        },
+                    ],
+                };
+            }
+            throw err;
+        }
+    }
+    // Pass today as-is: null suppresses the now-line, undefined defaults to
+    // local today (or zone), a string is parsed, a Date is used directly.
+    const today = resolveToday({ now: options.today, zone });
     const model = layoutRoadmap(parsed.ast, resolved, {
         theme: options.theme,
         today,
