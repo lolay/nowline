@@ -14,6 +14,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 ### Fixed
 
 - PNG / PDF: text rendered as blank boxes on macOS when the system font probe resolved to SF Pro (`SFNS.ttf`), which is a variable font that `@resvg/resvg-wasm` cannot rasterize. The bundled-first default eliminates this entirely.
+- Markdown+Mermaid export: the generated `gantt` block failed to render (`Mermaid Syntax Error` / `Invalid date: <id>`) for any roadmap whose items lacked an explicit `after:` dependency. Mermaid strips a leading status keyword and then reads `id, duration` as `start, duration`, mis-reading the task id as a start date. Every task now carries an explicit start token: declared `after:` deps, otherwise `after <previous lane item>`, otherwise the roadmap start date (lane / parallel-track leaders). Parallel tracks now correctly anchor at the block's entry point instead of serializing. Top-level milestones now read their predecessors from `after:` (they were incorrectly reading a non-existent `depends:` and emitting an unrenderable bare milestone).
 
 ### Added
 

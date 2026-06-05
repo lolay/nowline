@@ -640,8 +640,9 @@ The Mermaid output is a best-effort translation. The Nowline DSL is richer than 
 - Maps swimlanes to Mermaid `section` blocks.
 - Maps items to Mermaid tasks with duration.
 - Maps `after` dependencies to Mermaid `after` syntax.
+- Anchors every task with an explicit start token so Mermaid never mis-reads a task id as a start date: declared `after:` deps win, otherwise the task chains `after` the previous item in its lane, otherwise (a lane or parallel-track leader) it anchors at the roadmap's `start:` date (falling back to the layout-computed timeline start when `start:` is omitted). This mirrors Nowline's default "each item starts after the preceding item in its lane" layout.
 - Maps anchors to Mermaid milestones.
-- Drops properties that Mermaid cannot express (labels, footnotes, owners, remaining).
+- Drops properties that Mermaid cannot express (labels, footnotes, owners, remaining). Parallel/group structure is flattened (tracks anchor at the block's entry point; the lane then continues after the last track — Mermaid cannot express "after the latest of N tracks").
 - Includes a comment noting the lossy conversion.
 
 This output works as a Trojan horse — users can share roadmaps in Mermaid-compatible contexts (GitHub READMEs, Notion, Confluence) and link back to the full Nowline version.

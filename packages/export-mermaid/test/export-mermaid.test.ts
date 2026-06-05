@@ -78,6 +78,84 @@ describe('exportMermaid — lossy comment', () => {
     });
 });
 
+describe('exportMermaid — task start anchoring (regression)', () => {
+    // Mermaid strips a leading status keyword then reads the remaining comma
+    // fields positionally. A task that emits `status, id, duration` (no start)
+    // collapses to two fields, so Mermaid mis-reads the id as a start date and
+    // throws `Invalid date: <id>` at render time. Every task that names an id
+    // MUST therefore carry an explicit start token (a date or `after ...`).
+    const STATUS_KEYWORDS = new Set(['done', 'active', 'crit', 'milestone']);
+    const DATE_RE = /^\d{4}-\d{2}-\d{2}$/;
+
+    function taskLines(md: string): string[] {
+        return md
+            .split('\n')
+            .map((l) => l.trim())
+            .filter((l) => l.includes(' :') && !l.startsWith('section') && !l.startsWith('title'));
+    }
+
+    function startField(line: string): string {
+        const meta = line.slice(line.indexOf(':') + 1);
+        const fields = meta.split(',').map((f) => f.trim());
+        if (fields.length > 0 && STATUS_KEYWORDS.has(fields[0])) fields.shift();
+        // Remaining is [id, start, duration] for our id-bearing tasks.
+        return fields.length >= 3 ? fields[1] : (fields[1] ?? fields[0] ?? '');
+    }
+
+    const FIXTURE = `nowline v1
+
+roadmap r "Anchoring" start:2026-04-06
+
+swimlane platform "Platform"
+  item "Technology Selection" duration:2w status:done
+  item api "API" duration:3w status:done
+  item "Agent Instructions" duration:3w status:in-progress
+
+milestone "Release" after:[technology-selection, api]
+`;
+
+    it('anchors the lane leader at the roadmap start date', async () => {
+        const md = exportMermaid(await buildExportInputs(FIXTURE));
+        expect(md).toContain(':done, technology-selection, 2026-04-06, 2w');
+    });
+
+    it('chains followers without after: onto the previous lane item', async () => {
+        const md = exportMermaid(await buildExportInputs(FIXTURE));
+        expect(md).toContain(':done, api, after technology-selection, 3w');
+        expect(md).toContain(':active, agent-instructions, after api, 3w');
+    });
+
+    it('emits milestone predecessors from after: (not depends:)', async () => {
+        const md = exportMermaid(await buildExportInputs(FIXTURE));
+        expect(md).toContain(':milestone, release, after technology-selection api, 0d');
+    });
+
+    it('never emits a task whose start field is mis-read as a date', async () => {
+        const md = exportMermaid(await buildExportInputs(FIXTURE));
+        for (const line of taskLines(md)) {
+            const start = startField(line);
+            const ok = start.startsWith('after ') || DATE_RE.test(start);
+            expect(ok, `start token "${start}" in line: ${line}`).toBe(true);
+        }
+    });
+
+    it('anchors lane leaders even when the roadmap omits start:', async () => {
+        const noStart = `nowline v1
+
+roadmap r "No Start"
+
+swimlane build "Build"
+  item alpha "Alpha" duration:1w status:done
+  item beta "Beta" duration:1w status:done
+`;
+        const md = exportMermaid(await buildExportInputs(noStart));
+        const alpha = md.split('\n').find((l) => l.includes('Alpha'))!;
+        // Leader falls back to the layout-computed timeline start (a real date).
+        expect(alpha).toMatch(/:done, alpha, \d{4}-\d{2}-\d{2}, 1w/);
+        expect(md).toContain(':done, beta, after alpha, 1w');
+    });
+});
+
 describe('exportMermaid — escaping', () => {
     it('strips colons / commas from task names', async () => {
         const fixture = `nowline v1
