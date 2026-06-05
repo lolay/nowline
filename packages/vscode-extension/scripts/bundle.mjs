@@ -11,7 +11,7 @@
 // so the in-process PNG exporter can load it at runtime without bundling the
 // binary inline.
 
-import { copyFile, mkdir } from 'node:fs/promises';
+import { copyFile, mkdir, readdir } from 'node:fs/promises';
 import { createRequire } from 'node:module';
 import { dirname, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -46,6 +46,18 @@ const bundledFontsSrc = resolve(
     'fonts',
 );
 const BUNDLED_FONT_FILES = ['DejaVuSans.ttf', 'DejaVuSansMono.ttf'];
+
+// PDFKit reads its standard-14 Adobe Font Metrics (`data/*.afm`) and the sRGB
+// ICC profile from `__dirname/data/` via real `fs.readFileSync`. esbuild
+// rewrites that `__dirname` to the bundle dir (`dist/`), so the files must be
+// copied to `dist/data/` or PDF export throws `ENOENT … dist/data/Helvetica.afm`
+// (PDFKit's constructor initialises a default Helvetica font before our
+// Sans/Mono faces are registered). pdfkit is a transitive dep via
+// @nowline/export-pdf, so resolve it from that package's node_modules.
+const pdfkitEntry = require.resolve('pdfkit', {
+    paths: [resolve(here, '..', '..', 'export-pdf')],
+});
+const pdfkitDataSrc = resolve(dirname(pdfkitEntry), 'data');
 
 const sharedOptions = {
     bundle: true,
@@ -105,6 +117,16 @@ async function copyFonts() {
     console.log('copied bundled DejaVu fonts to dist/fonts/');
 }
 
+async function copyPdfkitData() {
+    const dataDist = resolve(dist, 'data');
+    await mkdir(dataDist, { recursive: true });
+    const files = await readdir(pdfkitDataSrc);
+    await Promise.all(
+        files.map((file) => copyFile(resolve(pdfkitDataSrc, file), resolve(dataDist, file))),
+    );
+    console.log(`copied ${files.length} pdfkit data files to dist/data/`);
+}
+
 async function run() {
     if (watch) {
         const ctxA = await context(extensionConfig);
@@ -113,6 +135,7 @@ async function run() {
         await Promise.all([ctxA.watch(), ctxB.watch(), ctxC.watch()]);
         await copyWasm();
         await copyFonts();
+        await copyPdfkitData();
         console.log('watching extension + server + preview-webview bundles…');
     } else {
         await Promise.all([
@@ -121,6 +144,7 @@ async function run() {
             build(webviewConfig),
             copyWasm(),
             copyFonts(),
+            copyPdfkitData(),
         ]);
         console.log('built extension + server + preview-webview bundles');
     }

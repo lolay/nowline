@@ -39,6 +39,11 @@
 
 ### Fixed
 
+- PDF export crashed with `ENOENT … dist/data/Helvetica.afm`. PDFKit reads its
+  standard-14 Adobe Font Metrics and sRGB ICC profile from `__dirname/data/`
+  via `fs.readFileSync`; esbuild rewrites that path to the bundle dir, so the
+  files must ship in `dist/data/`. The bundle step now copies pdfkit's `data/`
+  alongside the resvg WASM and DejaVu fonts.
 - Preview showed no now-line by default. The default (`now: 'auto'`) resolved
   to `undefined`, which the browser pipeline treats as "no anchor" so the
   layout omitted the now-line — even though the rasterized export drew it. The
