@@ -65,5 +65,5 @@ swimlane platform owner:platform
     item alpha "Alpha" duration:1w
     item beta "Beta" duration:1w
 
-milestone done "Done" date:2026-12-15 depends:[auth, api-v2]
+milestone done "Done" date:2026-12-15 after:[auth, api-v2]
 `;

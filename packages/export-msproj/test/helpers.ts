@@ -48,7 +48,7 @@ swimlane build "Build"
   item implement "Implement" duration:2w status:in-progress after:design
   item ship "Ship" duration:3d after:implement labels:[release]
 
-milestone done "Done" date:2026-03-15 depends:[ship]
+milestone done "Done" date:2026-03-15 after:[ship]
 
 anchor kickoff date:2026-01-06
 `;

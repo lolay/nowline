@@ -73,6 +73,8 @@ export {
     resolveToday,
     TimezoneError,
 } from './resolve-today.js';
+export type { RoadmapSchedule, ScheduledItem, ScheduleOptions } from './schedule.js';
+export { scheduleRoadmap } from './schedule.js';
 export {
     darkTheme,
     grayscaleTheme,

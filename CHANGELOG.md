@@ -8,6 +8,10 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ### Added
 
+- **XLSX Items `Start`/`End` columns**: the Items sheet now includes two date columns (`Start`, `End`) populated from the chart's computed schedule (same sequencing rules as the rendered chart — `date:` wins, then `start:`, then `after:`, then sequential). Named items get a real date cell; anonymous items are blank.
+- **XLSX Milestones computed `Date`**: the Milestones sheet `Date` cell is a real Excel date. When the milestone has `date:` it uses that value; otherwise the cell is filled from the schedule-computed date (via `after:` predecessors).
+- **`scheduleRoadmap` + `RoadmapSchedule`** in `@nowline/layout`: new public API that walks the resolved content tree and returns a map of per-id start/end dates for items, milestones, and anchors. Reuses the layout's calendar and sequencing primitives; does not run the full SVG layout.
+
 - **`--timezone` CLI flag** (`nowline render`, `nowline --serve`): override the timezone used for the clock-based "today" default. Accepts `local` (default), `UTC`, ISO 8601 fixed offsets (`Z`, `+05:30`, `-07:00`), or IANA names (`America/Los_Angeles`). Only consulted when `--now` is omitted; ignored when `--now` carries an explicit date or embedded offset.
 - **ISO 8601 `--now`**: `--now` now accepts bare `YYYY-MM-DD` (unchanged) plus full ISO 8601 instants (`YYYY-MM-DDTHH:MM:SSZ`, `YYYY-MM-DDTHH:MM:SS±HH:MM`, `YYYY-MM-DDTHH:MM:SS`). An embedded Z or offset overrides `--timezone`.
 - **`resolveToday()` + `normalizeZone()`** in `@nowline/layout` (re-exported from `@nowline/browser` and `@nowline/export`): shared helpers for timezone-aware civil-date resolution used by all rendering surfaces.
@@ -15,6 +19,11 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 - **`nowline.preview.timezone` VS Code setting**: override the zone for the now-line's clock-based default in the preview panel and export.
 
 ### Changed
+
+- **XLSX Milestones `Depends` → `After`**: the Milestones sheet column was renamed from `Depends` to `After` and now reads the `after:` property (the canonical milestone predecessor DSL key). The former `depends:` property is not a valid milestone property in the grammar. Both XLSX and MS Project exporters now read `after:` for milestone predecessors.
+- **XLSX swimlane column falls back to title**: the Items sheet `Swimlane` cell uses the swimlane's DSL id if present, otherwise the swimlane title. Previously the cell was blank for title-only swimlanes.
+- **XLSX empty sheets omitted**: the Milestones, Anchors, and People and Teams sheets are omitted when the roadmap contains no entities of that type. The Roadmap and Items sheets are always present.
+- **XLSX Anchors `Date` is a real date cell**: the Anchors sheet `Date` column is now an Excel date cell formatted `yyyy-mm-dd` (was a plain string).
 
 - **Default now-line date is local** (all surfaces): the clock-based "today" default now uses the **viewer's local civil date** instead of UTC. Fixes the off-by-one visible when it is late evening on the west side of UTC midnight (e.g., `2026-06-04T23:00 PDT` = `2026-06-05T06:00Z` — the old UTC default showed June 5). Use `--timezone UTC` to restore the previous behaviour.
 - **Embed now draws a now-line by default**: when `today` is not supplied, the embed (and browser pipeline) defaults to the local civil today instead of omitting the now-line. Pass `today: null` to suppress.

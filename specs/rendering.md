@@ -35,7 +35,7 @@ This document describes the public **output contract**. The internal layout-engi
 - **Timeline scale** — header row with scale units (days/weeks/months/etc.), tick marks, grid lines, derived from `config`
 - **Now-line** — x position (today's date), label ("now"), full-height red vertical line
 - **Anchors** — x, y, date, label, diamond marker, predecessor edges to referencing items
-- **Milestones** — x position (from `date` or computed from `depends`), label, diamond marker in header, solid vertical cut line
+- **Milestones** — x position (from `date` or computed from `after`), label, diamond marker in header, solid vertical cut line
 - **Dependency edges** — source point, target point, orthogonal segments with rounded corners (`after`/`before` relationships)
 - **Footnote indicators** — superscript numbers in upper-right of referenced entities
 - **Footnote area** — ordered list of footnote text, positioned below the roadmap boundary
@@ -555,7 +555,7 @@ When a file is included with `roadmap:isolate`, all of its content renders insid
 
 ### XLSX Export
 
-Generated via ExcelJS. The workbook contains five sheets modeled on MS Project's Excel export conventions, adapted to the Nowline data model.
+Generated via ExcelJS. The workbook contains up to five sheets modeled on MS Project's Excel export conventions, adapted to the Nowline data model. The Milestones, Anchors, and People and Teams sheets are omitted when the roadmap contains no entities of that type; the Roadmap and Items sheets are always present.
 
 #### Sheet 1: "Roadmap" (metadata)
 
@@ -576,16 +576,19 @@ One row per item. This is the primary sheet.
 |--------|--------|-------|
 | ID | item identifier | e.g., `auth-refactor` |
 | Title | item title | e.g., "Auth refactor" |
-| Swimlane | parent swimlane id | Dotted path for nested swimlanes (e.g., `engineering.platform`) |
-| Duration | `duration:` value | Raw DSL value (e.g., `2w`, `l`) |
+| Swimlane | parent swimlane id, falling back to title | Dotted path for nested swimlanes (e.g., `engineering.platform`) |
+| Group | parent group id | If inside a `group` block; blank otherwise |
+| Parallel | parent parallel id | If inside a `parallel` block; blank otherwise |
+| Duration | `duration:` working days | Numeric working days (e.g., `10` for `2w`) |
+| Duration (text) | `duration:` literal | Original DSL literal (e.g., `2w`) |
+| Start | computed from schedule | Floating calendar start date (UTC midnight); blank for anonymous items |
+| End | computed from schedule | Floating calendar end date (UTC midnight); blank for anonymous items |
 | Status | `status:` value | e.g., `done`, `at-risk`, `planned` |
 | Remaining | `remaining:` value | e.g., `30%` |
 | Owner | `owner:` value | Person or team identifier |
 | After | `after:` value(s) | Semicolon-delimited predecessors |
 | Before | `before:` value(s) | Semicolon-delimited constraints |
 | Labels | `labels:` value(s) | Semicolon-delimited |
-| Group | parent group id | If inside a `group` block; blank otherwise |
-| Parallel | parent parallel id | If inside a `parallel` block; blank otherwise |
 | Link | `link:` URL | External reference |
 | Description | `description` text | Full description text if present |
 
@@ -602,8 +605,8 @@ Formatting:
 |--------|--------|-------|
 | ID | milestone identifier | |
 | Title | milestone title | |
-| Date | `date:` value | Fixed date if specified |
-| Depends | `depends:` value(s) | Semicolon-delimited item IDs |
+| Date | `date:` or computed from `after:` | Real date cell; falls back to the schedule-computed date when no `date:` is set |
+| After | `after:` value(s) | Semicolon-delimited predecessor IDs |
 
 #### Sheet 4: "Anchors"
 
@@ -640,7 +643,7 @@ The column design mirrors MS Project's Excel export where concepts align:
 | Parallel | Shared predecessors (Finish-to-Start) |
 | Milestones (separate sheet) | Milestone flag on tasks |
 
-Key differences: no computed Start/Finish dates (Nowline uses relative positioning, not absolute scheduling), no WBS numbering, milestones are separate entities, and `before:` constraints have no MS Project equivalent.
+Key differences: Start/Finish dates are computed by `scheduleRoadmap` from the chart's sequencing rules (not MS Project's CPM engine), no WBS numbering, milestones are separate entities, and `before:` constraints have no MS Project equivalent.
 
 ### Markdown+Mermaid Bridge
 

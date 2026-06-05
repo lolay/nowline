@@ -199,7 +199,7 @@ function collectTasks(ast: NowlineFile, drops: DropCounts, startDate: string): T
                 isSummary: false,
                 isMilestone: true,
                 durationMinutes: 0,
-                predecessors: getProps(m, 'depends') as string[],
+                predecessors: getProps(m, 'after') as string[],
                 nowlineId: m.name,
                 ownerRefs: [],
                 startsAt: getProp(m, 'date'),

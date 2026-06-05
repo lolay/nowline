@@ -37,6 +37,7 @@ import type {
 } from '@nowline/core';
 import type { ExportInputs } from '@nowline/export-core';
 import { displayLabel, getProp, getProps, roadmapTitle } from '@nowline/export-core';
+import { type RoadmapSchedule, scheduleRoadmap } from '@nowline/layout';
 import ExcelJS from 'exceljs';
 
 import { durationLiteralToText, durationToWorkingDays } from './duration.js';
@@ -64,11 +65,27 @@ export async function exportXlsx(
     wb.modified = generated;
     wb.title = roadmapTitle(inputs.ast.roadmapDecl ?? undefined);
 
+    const schedule = scheduleRoadmap(inputs.ast, inputs.resolved, { today: inputs.today });
+
     buildRoadmapSheet(wb, inputs, generated);
-    buildItemsSheet(wb, inputs.ast);
-    buildMilestonesSheet(wb, inputs.ast);
-    buildAnchorsSheet(wb, inputs.ast);
-    buildPeopleAndTeamsSheet(wb, inputs.ast);
+    buildItemsSheet(wb, inputs.ast, schedule);
+
+    const hasMilestones = inputs.ast.roadmapEntries.some((e) => e.$type === 'MilestoneDeclaration');
+    if (hasMilestones) {
+        buildMilestonesSheet(wb, inputs.ast, schedule);
+    }
+
+    const hasAnchors = inputs.ast.roadmapEntries.some((e) => e.$type === 'AnchorDeclaration');
+    if (hasAnchors) {
+        buildAnchorsSheet(wb, inputs.ast, schedule);
+    }
+
+    const hasPeopleOrTeams = inputs.ast.roadmapEntries.some(
+        (e) => e.$type === 'PersonDeclaration' || e.$type === 'TeamDeclaration',
+    );
+    if (hasPeopleOrTeams) {
+        buildPeopleAndTeamsSheet(wb, inputs.ast);
+    }
 
     const buf = (await wb.xlsx.writeBuffer()) as ArrayBuffer | Buffer;
     const bytes = Buffer.isBuffer(buf)
@@ -119,6 +136,8 @@ const ITEM_HEADERS: ReadonlyArray<{ header: string; key: string; width: number }
     { header: 'Parallel', key: 'parallel', width: 18 },
     { header: 'Duration', key: 'duration', width: 12 },
     { header: 'Duration (text)', key: 'durationText', width: 16 },
+    { header: 'Start', key: 'start', width: 14 },
+    { header: 'End', key: 'end', width: 14 },
     { header: 'Status', key: 'status', width: 14 },
     { header: 'Remaining', key: 'remaining', width: 12 },
     { header: 'Owner', key: 'owner', width: 14 },
@@ -145,6 +164,8 @@ interface ItemRow {
     parallel: string;
     duration: number;
     durationText: string;
+    start: Date | undefined;
+    end: Date | undefined;
     status: string;
     remaining: string;
     owner: string;
@@ -155,16 +176,29 @@ interface ItemRow {
     description: string;
 }
 
-function buildItemsSheet(wb: ExcelJS.Workbook, ast: NowlineFile): void {
+function buildItemsSheet(wb: ExcelJS.Workbook, ast: NowlineFile, schedule: RoadmapSchedule): void {
     const sheet = wb.addWorksheet('Items', {
         views: [{ state: 'frozen', xSplit: 0, ySplit: 1 }],
     });
     sheet.columns = [...ITEM_HEADERS];
 
+    // Format the Start/End date columns as ISO dates.
+    const startCol = sheet.getColumn('start');
+    const endCol = sheet.getColumn('end');
+    startCol.numFmt = 'yyyy-mm-dd';
+    endCol.numFmt = 'yyyy-mm-dd';
+
     const rows: ItemRow[] = [];
     for (const entry of ast.roadmapEntries) {
         if (entry.$type === 'SwimlaneDeclaration') {
-            collectFromSwimlane(entry as SwimlaneDeclaration, [entry.name ?? ''], rows, '', '');
+            collectFromSwimlane(
+                entry as SwimlaneDeclaration,
+                [swimlaneLabel(entry as SwimlaneDeclaration)],
+                rows,
+                '',
+                '',
+                schedule,
+            );
         }
     }
     for (const r of rows) sheet.addRow(r);
@@ -191,16 +225,26 @@ function buildItemsSheet(wb: ExcelJS.Workbook, ast: NowlineFile): void {
     };
 }
 
+/**
+ * Resolve the swimlane's display label for the Swimlane column.
+ * Prefers the DSL id (name) for stable cross-sheet joins; falls back to
+ * the title when the lane has no id.
+ */
+function swimlaneLabel(lane: SwimlaneDeclaration): string {
+    return lane.name ?? lane.title ?? '';
+}
+
 function collectFromSwimlane(
     lane: SwimlaneDeclaration,
     breadcrumb: readonly string[],
     rows: ItemRow[],
     group: string,
     parallel: string,
+    schedule: RoadmapSchedule,
 ): void {
     const breadcrumbStr = breadcrumb.filter((s) => s.length > 0).join('.');
     for (const child of lane.content) {
-        addSwimlaneChild(child, breadcrumbStr, group, parallel, rows);
+        addSwimlaneChild(child, breadcrumbStr, group, parallel, rows, schedule);
     }
 }
 
@@ -210,15 +254,16 @@ function addSwimlaneChild(
     group: string,
     parallel: string,
     rows: ItemRow[],
+    schedule: RoadmapSchedule,
 ): void {
     if (child.$type === 'ItemDeclaration') {
-        rows.push(itemRow(child, swimlane, group, parallel));
+        rows.push(itemRow(child, swimlane, group, parallel, schedule));
         return;
     }
     if (child.$type === 'GroupBlock') {
         const g = child.name ?? displayLabel(child);
         for (const grandchild of (child as GroupBlock).content as GroupContent[]) {
-            addGroupChild(grandchild, swimlane, g, parallel, rows);
+            addGroupChild(grandchild, swimlane, g, parallel, rows, schedule);
         }
         return;
     }
@@ -226,11 +271,11 @@ function addSwimlaneChild(
         const p = child.name ?? displayLabel(child);
         for (const grandchild of (child as ParallelBlock).content) {
             if (grandchild.$type === 'ItemDeclaration') {
-                rows.push(itemRow(grandchild, swimlane, group, p));
+                rows.push(itemRow(grandchild, swimlane, group, p, schedule));
             } else if (grandchild.$type === 'GroupBlock') {
                 const g = grandchild.name ?? displayLabel(grandchild);
                 for (const inner of (grandchild as GroupBlock).content as GroupContent[]) {
-                    addGroupChild(inner, swimlane, g, p, rows);
+                    addGroupChild(inner, swimlane, g, p, rows, schedule);
                 }
             }
         }
@@ -243,20 +288,21 @@ function addGroupChild(
     group: string,
     parallel: string,
     rows: ItemRow[],
+    schedule: RoadmapSchedule,
 ): void {
     if (child.$type === 'ItemDeclaration') {
-        rows.push(itemRow(child, swimlane, group, parallel));
+        rows.push(itemRow(child, swimlane, group, parallel, schedule));
     } else if (child.$type === 'GroupBlock') {
         const sub = child.name ?? displayLabel(child);
         const nested = group ? `${group}.${sub}` : sub;
         for (const grandchild of (child as GroupBlock).content as GroupContent[]) {
-            addGroupChild(grandchild, swimlane, nested, parallel, rows);
+            addGroupChild(grandchild, swimlane, nested, parallel, rows, schedule);
         }
     } else if (child.$type === 'ParallelBlock') {
         const p = child.name ?? displayLabel(child);
         for (const grandchild of (child as ParallelBlock).content) {
             if (grandchild.$type === 'ItemDeclaration') {
-                rows.push(itemRow(grandchild, swimlane, group, p));
+                rows.push(itemRow(grandchild, swimlane, group, p, schedule));
             }
         }
     }
@@ -267,8 +313,13 @@ function itemRow(
     swimlane: string,
     group: string,
     parallel: string,
+    schedule: RoadmapSchedule,
 ): ItemRow {
     const durationLiteral = getProp(item, 'duration') ?? getProp(item, 'size');
+    // byNode covers anonymous items; fall back to the id map (same object, just
+    // belt-and-suspenders) for named items in case the node reference differs.
+    const scheduled =
+        schedule.byNode.get(item) ?? (item.name ? schedule.items.get(item.name) : undefined);
     return {
         id: item.name ?? '',
         title: item.title ?? '',
@@ -277,6 +328,8 @@ function itemRow(
         parallel,
         duration: durationToWorkingDays(durationLiteral),
         durationText: durationLiteralToText(durationLiteral),
+        start: scheduled?.start,
+        end: scheduled?.end,
         status: getProp(item, 'status') ?? '',
         remaining: getProp(item, 'remaining') ?? '',
         owner: getProp(item, 'owner') ?? '',
@@ -290,7 +343,11 @@ function itemRow(
 
 // ---------- Sheet 3: Milestones ----------
 
-function buildMilestonesSheet(wb: ExcelJS.Workbook, ast: NowlineFile): void {
+function buildMilestonesSheet(
+    wb: ExcelJS.Workbook,
+    ast: NowlineFile,
+    schedule: RoadmapSchedule,
+): void {
     const sheet = wb.addWorksheet('Milestones', {
         views: [{ state: 'frozen', xSplit: 0, ySplit: 1 }],
     });
@@ -298,16 +355,24 @@ function buildMilestonesSheet(wb: ExcelJS.Workbook, ast: NowlineFile): void {
         { header: 'ID', key: 'id', width: 18 },
         { header: 'Title', key: 'title', width: 28 },
         { header: 'Date', key: 'date', width: 14 },
-        { header: 'Depends', key: 'depends', width: 28 },
+        { header: 'After', key: 'after', width: 28 },
     ];
+    sheet.getColumn('date').numFmt = 'yyyy-mm-dd';
+
     for (const entry of ast.roadmapEntries) {
         if (entry.$type === 'MilestoneDeclaration') {
             const m = entry as MilestoneDeclaration;
+            // Prefer the explicit date:; fall back to the schedule-computed date.
+            // milestoneByNode covers anonymous milestones; milestones map covers named ones.
+            const explicitDate = getProp(m, 'date');
+            const computedDate =
+                schedule.milestoneByNode.get(m) ??
+                (m.name ? schedule.milestones.get(m.name) : undefined);
             sheet.addRow({
                 id: m.name ?? '',
                 title: m.title ?? '',
-                date: getProp(m, 'date') ?? '',
-                depends: getProps(m, 'depends').join('; '),
+                date: explicitDate ? new Date(explicitDate) : (computedDate ?? ''),
+                after: getProps(m, 'after').join('; '),
             });
         }
     }
@@ -316,7 +381,11 @@ function buildMilestonesSheet(wb: ExcelJS.Workbook, ast: NowlineFile): void {
 
 // ---------- Sheet 4: Anchors ----------
 
-function buildAnchorsSheet(wb: ExcelJS.Workbook, ast: NowlineFile): void {
+function buildAnchorsSheet(
+    wb: ExcelJS.Workbook,
+    ast: NowlineFile,
+    schedule: RoadmapSchedule,
+): void {
     const sheet = wb.addWorksheet('Anchors', {
         views: [{ state: 'frozen', xSplit: 0, ySplit: 1 }],
     });
@@ -325,13 +394,17 @@ function buildAnchorsSheet(wb: ExcelJS.Workbook, ast: NowlineFile): void {
         { header: 'Title', key: 'title', width: 28 },
         { header: 'Date', key: 'date', width: 14 },
     ];
+    sheet.getColumn('date').numFmt = 'yyyy-mm-dd';
+
     for (const entry of ast.roadmapEntries) {
         if (entry.$type === 'AnchorDeclaration') {
             const a = entry as AnchorDeclaration;
+            const explicitDate = getProp(a, 'date');
+            const computedDate = a.name ? schedule.anchors.get(a.name) : undefined;
             sheet.addRow({
                 id: a.name ?? '',
                 title: a.title ?? '',
-                date: getProp(a, 'date') ?? '',
+                date: explicitDate ? new Date(explicitDate) : (computedDate ?? ''),
             });
         }
     }

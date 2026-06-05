@@ -69,6 +69,18 @@ describe('exportMsProjXml — basic structure', () => {
         expect(xml).toContain('<Type>1</Type>');
     });
 
+    it('milestone predecessors come from after: not depends:', async () => {
+        // The "Done" milestone has after:[ship]; its PredecessorLink must
+        // resolve to the UID for the "Ship" task, not be empty.
+        const inputs = await buildExportInputs(SIMPLE_FIXTURE);
+        const xml = exportMsProjXml(inputs, { onLossy: () => {} });
+        const tasks = xml.match(/<Task>[\s\S]*?<\/Task>/g) ?? [];
+        const doneTask = tasks.find((t) => t.includes('<Name>Done</Name>'));
+        expect(doneTask).toBeDefined();
+        // "Done" milestone must carry a PredecessorLink (from after:[ship]).
+        expect(doneTask!).toContain('<PredecessorLink>');
+    });
+
     it('owners become Resources + Assignments', async () => {
         const inputs = await buildExportInputs(SIMPLE_FIXTURE);
         const xml = exportMsProjXml(inputs, { onLossy: () => {} });
