@@ -25,7 +25,7 @@ SHELL := bash
 
 .DEFAULT_GOAL := help
 
-.PHONY: help init build build-fast test lint format typecheck ci pre-commit clean \
+.PHONY: help init build build-fast test lint format typecheck ci pre-commit doctor clean \
         lint-workflows bundle-size determinism determinism-browser determinism-update \
         compile smoke deb pack vsix bump snapshot-version \
         publish-npm publish-vscode publish-cdn
@@ -49,6 +49,9 @@ confirm = @if [ -z "$($(1))" ]; then \
   printf 'Refusing to run "make %s": %s\nThis pushes to a remote. Re-run with %s=1 (CI sets this in the release/deploy workflow).\n' "$@" "$(2)" "$(1)"; \
   exit 1; \
 fi
+
+# MODE selects scripts/doctor.<mode>.conf (default | release).
+MODE ?= default
 
 ##@ Develop
 
@@ -79,6 +82,9 @@ test: build ## Run every package's Vitest suite (build first: CLI integration te
 ci: lint typecheck build test ## Run the full pre-push gate (what CI runs)
 
 pre-commit: ci ## Run the local gate before committing or pushing (alias of ci)
+
+doctor: ## Check required tools for this repo (read-only; non-zero on any problem). MODE=default|release
+	@DOCTOR_MODE='$(MODE)' bash scripts/doctor.sh
 
 clean: ## Remove build, binary, and package artifacts (keeps node_modules)
 	rm -rf dist-bin dist-deb dist-pack dist-action packages/*/dist packages/*/dist-*

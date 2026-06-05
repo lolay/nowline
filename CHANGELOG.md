@@ -8,6 +8,8 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ### Added
 
+- **`make doctor` target**: config-driven environment health check (`scripts/doctor.sh` + `scripts/doctor.default.conf` / `scripts/doctor.release.conf`). Checks git, gh, node (pinned to `.nvmrc`), and pnpm; `MODE=release` additionally checks bun. Read-only; exits non-zero on any missing or under-minimum tool. Two-state contract: exit 0 healthy, exit 1 on any problem (Make surfaces as exit 2).
+
 - **XLSX Items `Start`/`End` columns**: the Items sheet now includes two date columns (`Start`, `End`) populated from the chart's computed schedule (same sequencing rules as the rendered chart — `date:` wins, then `start:`, then `after:`, then sequential). Named items get a real date cell; anonymous items are blank.
 - **XLSX Milestones computed `Date`**: the Milestones sheet `Date` cell is a real Excel date. When the milestone has `date:` it uses that value; otherwise the cell is filled from the schedule-computed date (via `after:` predecessors).
 - **`scheduleRoadmap` + `RoadmapSchedule`** in `@nowline/layout`: new public API that walks the resolved content tree and returns a map of per-id start/end dates for items, milestones, and anchors. Reuses the layout's calendar and sequencing primitives; does not run the full SVG layout.
