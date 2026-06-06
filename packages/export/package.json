@@ -1,6 +1,6 @@
 {
     "name": "@nowline/export",
-    "version": "0.5.1",
+    "version": "0.6.0",
     "description": "Nowline export kernel — the single parse→resolve→layout→renderSvg→format code path shared by every surface for byte-identical export output",
     "license": "Apache-2.0",
     "engines": {

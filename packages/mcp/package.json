@@ -1,6 +1,6 @@
 {
     "name": "@nowline/mcp",
-    "version": "0.5.1",
+    "version": "0.6.0",
     "description": "Nowline MCP server — stdio tool surface for validate/render/read/create/update/delete/list/export over local .nowline files",
     "license": "Apache-2.0",
     "engines": {
