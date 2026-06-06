@@ -14,11 +14,12 @@ The Nowline MCP server exposes the CLI's capabilities to AI agent harnesses thro
 
 Shelling out to `nowline` works, but agent harnesses lose:
 
-- **Discoverability** — no typed tool list; the model must already know every flag.
+- **Discoverability** — no typed tool list; the model must already know every flag, and no way to enumerate valid themes, icons, locales, or formats.
 - **Structured I/O** — diagnostics, render output, and file paths come back as unstructured text the model re-parses.
-- **Resources** — no way to prime the model with the DSL grammar or canonical examples before it writes `.nowline`.
+- **Resources** — no way to prime the model with the DSL grammar, canonical examples, or conversion guidance before it writes `.nowline`.
+- **Prompts** — no reusable, server-authored workflow templates (create-a-roadmap, fix-these-diagnostics, convert-this-Gantt) the harness can surface as slash-commands.
 
-`@nowline/mcp` wraps `@nowline/core` and the same export capabilities the human-facing `nowline` binary exposes, behind eight stable tool names shared with the Nowline Cloud MCP contract (see [Shared tool contract](#shared-tool-contract)). Cloud adds `search` and push/pull over remote storage; the OSS server stays purely local per [Open core](#open-core-boundary).
+`@nowline/mcp` wraps `@nowline/core` and the same export capabilities the human-facing `nowline` binary exposes, behind the stable tool names shared with the Nowline Cloud MCP contract (see [Shared tool contract](#shared-tool-contract)), with [tool annotations](#tool-annotations) and [structured outputs](#structured-output) so harnesses can reason about each tool's risk and parse results without guessing. It also ships MCP [resources](#resources) (to prime the model) and [prompts](#prompts) (to script the common create / fix / convert workflows). Cloud adds `search` and push/pull over remote storage; the OSS server stays purely local per [Open core](#open-core-boundary).
 
 **In-process, not a CLI shell-out.** `@nowline/mcp` runs as a Node process (`npx @nowline/mcp`), the same runtime as the CLI and the VS Code extension host, so it imports the shared `@nowline/export` kernel and `@nowline/core` directly and produces every artifact in-process — there is no `nowline` binary dependency on the canonical path. This is what lets `render`/`export` honor the byte-for-byte [export-determinism](./export-determinism.md) precedent: the MCP server, the CLI, and the extension all run the *same* kernel, so identical source + inputs yield identical bytes. The `nowline --mcp` power-user path is the one exception — it *is* the CLI hosting the same server code (see [MCP CLI vs MCP Desktop](#mcp-cli-vs-mcp-desktop)).
 
@@ -52,21 +53,78 @@ Tool names are **identical** to the Nowline Cloud MCP server so agents and users
 
 Cloud-only additions (`search`, cloud `read`/`create`/`update`/`delete` by `id`) live in [`lolay/nowline-api/specs/mcp.md`](https://github.com/lolay/nowline-api/blob/main/specs/mcp.md). This doc covers the OSS local surface only.
 
+### Additional OSS tools
+
+Tools beyond the shared contract. They lean on capabilities the CLI already has (`convert` is m2a; the option vocabularies are the same enums the renderer and exporters consume), so none widens OSS scope. The Cloud server may mirror them, but they are not part of the shared-name guarantee.
+
+| Tool | Args | Returns | Notes |
+|------|------|---------|-------|
+| `convert` | `{ source?: string, path?: string, to: 'json' \| 'nowline' }` | `{ result: string }` (+ structured AST when `to: 'json'`) | Bidirectional text ↔ JSON AST, the same round-trip-stable `convert` the CLI exposes (`nowline … -f json` / JSON → text). Lets an agent fetch the typed AST, manipulate structure programmatically, and re-emit canonical `.nowline`. |
+| `capabilities` | `{}` | `{ themes, icons, locales, formats, templates }` | The whole option vocabulary in one call — the cheap way to prime a model before it writes `.nowline`: theme names (`light`, `dark`), the `capacity-icon` vocabulary + reserved built-in icon names, available locales (`en`, `fr`), export formats, and `--init` template names (`minimal`, `teams`, `product`, `showcase`). |
+| `list-themes` / `list-icons` / `list-locales` / `list-formats` / `list-templates` | `{}` | the matching slice of the `capabilities` payload | Granular discovery tools — thin projections of `capabilities`, one vocabulary each. For harnesses that surface options individually (a `list-themes` slash-command) or agents that want just one slice without the full payload. Mirrors Mermaid's `listSupportedTypes` and D2's `list_themes` / `list_icons` shape. Same underlying data as `capabilities`; pick whichever fits the call. |
+
+**Why both forms.** `capabilities` is one round-trip for the full picture (ideal for priming and for token-frugal agents); the `list-*` family is granular for harnesses that expose each vocabulary as its own affordance and for agents that need a single slice. They never disagree — the `list-*` tools are projections of the same source enums `capabilities` returns.
+
+### Tool annotations
+
+Every tool declares the standard MCP behavior hints ([spec](https://modelcontextprotocol.io/specification/2025-11-25/server/tools) § annotations) so harnesses can reason about risk and idempotency. These are advisory hints, never a security boundary — the path-root sandbox in [Open core](#open-core-boundary) is the real guard.
+
+| Tool | `readOnlyHint` | `idempotentHint` | `destructiveHint` | `openWorldHint` |
+|------|:--:|:--:|:--:|:--:|
+| `validate`, `read`, `list`, `render`, `export`, `convert`, `capabilities`, `list-*` | ✓ | ✓ | — | — |
+| `create` | — | ✓ | ✓¹ | — |
+| `update` | — | ✓ | — | — |
+| `delete` | — | ✓ | ✓ | — |
+
+¹ `create` is marked `destructiveHint` because it silently overwrites an existing file at the same path (same posture as the CLI). Whole-document writes are idempotent (same args → same end state), so `idempotentHint` is also true. No tool sets `openWorldHint` — the OSS server is local and self-contained.
+
+### Structured output
+
+Every tool declares an `outputSchema` and returns [structured content](https://modelcontextprotocol.io/specification/2025-11-25/server/tools) (the typed object in the table above) alongside a human-readable text block. This is the point of the server: harnesses get a machine-checkable shape (e.g. `validate` → `{ ok, diagnostics }` with the same `Diagnostic` schema the CLI emits) instead of re-parsing prose. `render`/`export` additionally return the image/document as an MCP resource (and, optionally, a [share link](#share-links)).
+
+### Share links
+
+`render` and `export` accept an optional `share?: boolean` arg. When set, the result includes a `shareUrl` built from the OSS share-link grammar (`#text=` / `#url=`, see [`specs/embed.md`](./embed.md) § Share on Nowline) pointing at the public `embed.nowline.io` viewer. This is the Mermaid-Chart playground-link UX done with infrastructure Nowline already ships from m4 — the agent can hand the user a viewable URL, not just bytes on disk. Purely a convenience: the link is a client-side-decoded fragment, so generating it makes no network call and stays inside the [Open core](#open-core-boundary) (the viewer is OSS; no account or cloud storage is involved).
+
 ## Resources
 
-Two MCP resources prime models to emit valid `.nowline` without out-of-band documentation — the DSL is the product.
+Three MCP resources prime models to emit valid `.nowline` without out-of-band documentation — the DSL is the product.
 
 | URI | Content | Source |
 |-----|---------|--------|
 | `nowline://reference` | Full DSL reference (section-5 man page) | [`packages/cli/man/nowline.5`](../packages/cli/man/nowline.5) |
 | `nowline://examples` | Canonical example roadmaps | [`examples/`](../examples/) — including `showcase.nowline` from m4.7 |
+| `nowline://conversions` | Mapping guide from common Gantt / timeline formats into `.nowline` | hand-authored, co-located with the spec (see [Conversion guidance](#conversion-guidance)) |
 
-Harnesses that support MCP resources should expose both by default. The reference resource is the grammar/man-page vocabulary; the examples resource is concrete syntax patterns to sample from.
+Harnesses that support MCP resources should expose all three by default. The reference resource is the grammar/man-page vocabulary; the examples resource is concrete syntax patterns to sample from; the conversions resource is the source-format → DSL mapping that powers the [`convert-to-nowline`](#prompts) prompt.
+
+### Conversion guidance
+
+Nowline already exports *to* Mermaid, XLSX, and MS Project XML; the inverse — importing *from* those and other planning tools — is deliberately **not** a set of native parsers (see [Non-goals](#non-goals)). Instead, `nowline://conversions` is a documented mapping cheatsheet that, paired with `nowline://reference`, gives an LLM everything it needs to do the conversion itself and then validate the result. The guide covers:
+
+- **Mermaid `gantt`** — `section` → swimlane; task lines → `item` (`:id, after dep, 5d` → `after:dep` + derived duration); `done` / `active` / `crit` → status; the date axis → `roadmap start:`.
+- **MS Project** (XML export, or a tasks CSV) — tasks → items; summary tasks → groups / swimlanes; finish-to-start predecessor links → `after:`; assigned resources → `person` / `team` + owner; zero-duration tasks → `milestone`.
+- **Excel / XLSX Gantt tables** — column mapping (`Task`, `Start`, `End` or `Duration`, `Dependencies`, `Owner`, `% Complete`) → item fields; a grouping column → swimlane / group; `% Complete` → progress / status.
+- **Google Sheets timeline view** — the Timeline view's Card title / Start / Duration / Dependencies / Resource columns map directly to the same item fields as the Excel path.
+- **Generic CSV exports** (Asana, Jira, Smartsheet, Monday timelines) — the same task-table mapping, with a documented fallback for unknown columns.
+- **General rules** — always emit `roadmap start:`; prefer `size` + `effort` when durations are derived rather than explicit; preserve dependency ids verbatim; map assignees to `person` / `team`; and surface anything ambiguous as a `#` comment in the output rather than guessing silently.
+
+## Prompts
+
+MCP prompts are reusable, server-authored workflow templates a harness can surface as slash-commands (the PlantUML and UML-MCP precedent). All three compose the [resources](#resources) and [tools](#shared-tool-contract) above; none require the network.
+
+| Prompt | Args | What it does |
+|--------|------|--------------|
+| `create-roadmap` | `{ description: string }` | Turns a natural-language description into a valid `.nowline` file. Primes the model with `nowline://reference` + `nowline://examples`, then expects a `validate` call to confirm before writing. |
+| `fix-diagnostics` | `{ source: string, diagnostics?: Diagnostic[] }` | The validate → fix → re-validate loop. Feeds the model the source plus the `NL.E####`-coded diagnostics (and their suggestions) and asks for a corrected document. Mirrors PlantUML's `plantuml_error_handling` auto-fix prompt. |
+| `convert-to-nowline` | `{ source: string, from?: 'mermaid-gantt' \| 'ms-project' \| 'xlsx' \| 'gsheets-timeline' \| 'csv' \| 'auto' = auto }` | Converts another Gantt / timeline format into `.nowline`. Primes the model with `nowline://conversions` (the mapping for the given `from`) + `nowline://reference`, emits the `.nowline`, then expects a `validate` pass. `auto` lets the model detect the source shape. This is the LLM-mediated importer — no native parser ships. |
+
+The point of `convert-to-nowline` is leverage: rather than maintaining brittle importers for every planning tool's export format, the server hands the model a precise mapping and a validator, and the model does the transcription. New source formats are added by extending `nowline://conversions`, not by writing code.
 
 ## Transport
 
 - **stdio (primary)** — the harness spawns `npx @nowline/mcp` (or `nowline --mcp`) and communicates over stdin/stdout. This is the default for every MCP CLI harness.
-- **local HTTP (optional)** — `nowline --mcp --port <n>` or `@nowline/mcp --port <n>` binds a local HTTP listener for harnesses that prefer HTTP over stdio. Not the default; no TLS; localhost only.
+- **Streamable HTTP (optional, local)** — `nowline --mcp --port <n>` or `@nowline/mcp --port <n>` binds a localhost listener speaking the current MCP **Streamable HTTP** transport for harnesses that prefer HTTP over stdio. Not the default; no TLS; localhost only. The deprecated standalone SSE transport is **not** offered — Streamable HTTP supersedes it.
 
 No remote transport, no OAuth, no network calls to Lolay infrastructure. The server runs as the user with the user's file permissions.
 
@@ -99,6 +157,15 @@ Distribution detail (release pipeline, naming ids, `.mcpb` build): [`specs/cli-d
 
 The `.vsix` (`nowline.vscode-nowline`) is a **separate product** for human authoring (grammar, LSP, live preview, export commands). It is not an MCP server and does not write `mcp.json`. Users who want both install both via their native channels.
 
+## Non-goals
+
+Capabilities other diagram MCP servers ship that Nowline's OSS server deliberately omits, recorded so they read as decisions rather than oversights:
+
+- **Native format importers.** No built-in parser for Mermaid `gantt`, MS Project XML, XLSX, Google Sheets, or CSV. Import is **LLM-mediated** through the [`convert-to-nowline`](#prompts) prompt + [`nowline://conversions`](#conversion-guidance) resource. Maintaining a mapping cheatsheet scales to new source formats far better than maintaining brittle parsers, and it keeps the OSS surface small.
+- **Stateful incremental editing.** No equivalent of D2's Oracle API (`create` / `set` / `move` / `rename` shape-level mutations on a live in-memory diagram). The `.nowline` file is the unit of state; agents read the whole document, edit text (or the AST via [`convert`](#additional-oss-tools)), and write it back. This matches the repo's file-is-the-product principle.
+- **Batch render.** One source per `render` / `export` call (no `generate_batch`). An agent loops; the determinism guarantee makes the loop predictable.
+- **Title / summary helper tools.** No `get_diagram_title` / `get_diagram_summary` (Mermaid Chart ships these). The host model already does this well from the source; a dedicated tool adds surface without adding capability.
+
 ## Open-core boundary
 
 Per [`specs/principles.md`](./principles.md) § Open core:
@@ -121,7 +188,7 @@ npx @nowline/mcp
 # Power-user path (requires @nowline/cli on PATH)
 nowline --mcp
 
-# Optional local HTTP
+# Optional local Streamable HTTP
 nowline --mcp --port 6789
 ```
 

@@ -61,7 +61,7 @@ Mode flags (mutually exclusive)
   --dry-run, -n          Run full pipeline (parse + validate + layout + format)
                          but skip the write step. Subsumes the old `validate` verb.
                          Exit 0 on success, 1 on validation error.
-  --mcp [--port <n>]     Start an MCP server in stdio mode (default) or local HTTP
+  --mcp [--port <n>]     Start an MCP server in stdio mode (default) or local Streamable HTTP
                          (`--port`). Exposes the CLI's capabilities as a typed MCP
                          tool surface. `npx @nowline/mcp` is the canonical
                          harness-install path; `nowline --mcp` is the power-user
@@ -215,12 +215,12 @@ Start a local MCP server that exposes the CLI's capabilities as a typed MCP tool
 
 ```bash
 nowline --mcp                         # stdio server (default; harness spawns and talks stdin/stdout)
-nowline --mcp --port 6789             # local HTTP server (for harnesses that prefer HTTP transport)
+nowline --mcp --port 6789             # local Streamable HTTP server (for harnesses that prefer HTTP transport)
 ```
 
-Default transport is **stdio** — the harness spawns `nowline --mcp` (or `npx @nowline/mcp`) and communicates over stdin/stdout. This is the MCP CLI form. The `--port` flag switches to local HTTP, for harnesses that prefer an HTTP transport instead of stdio.
+Default transport is **stdio** — the harness spawns `nowline --mcp` (or `npx @nowline/mcp`) and communicates over stdin/stdout. This is the MCP CLI form. The `--port` flag switches to local Streamable HTTP (the deprecated standalone SSE transport is not offered), for harnesses that prefer an HTTP transport instead of stdio.
 
-The server exposes eight tools (`validate`, `render`, `read`, `create`, `update`, `delete`, `list`, `export`) and two resources (`nowline://reference`, `nowline://examples`). Tool names are intentionally identical to the Nowline Cloud MCP server contract, so agents graduate from local to cloud with zero relearning.
+The server exposes the eight shared-contract tools (`validate`, `render`, `read`, `create`, `update`, `delete`, `list`, `export`) — names intentionally identical to the Nowline Cloud MCP server contract, so agents graduate from local to cloud with zero relearning — plus OSS conveniences (`convert`, `capabilities`, and the granular `list-themes` / `list-icons` / `list-locales` / `list-formats` / `list-templates` discovery family), three resources (`nowline://reference`, `nowline://examples`, `nowline://conversions`), and three prompts (`create-roadmap`, `fix-diagnostics`, `convert-to-nowline`). Full surface: [`specs/mcp.md`](./mcp.md).
 
 **CLI-design note for review:** `--mcp` is a mode flag on `nowline` (like `--serve` and `--init`) rather than a verb on the separate `@nowline/mcp` package. The separate package (`npx @nowline/mcp`) is the canonical install path for harness configs because it decouples the MCP server's install lifecycle from the CLI binary — a harness using `npx @nowline/mcp` always gets the published npm version, whereas `nowline --mcp` uses whatever binary the user has installed. Either form is valid; `npx @nowline/mcp` is preferred in MCP config examples. See [`specs/mcp.md`](./mcp.md).
 

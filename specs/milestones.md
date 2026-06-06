@@ -509,9 +509,9 @@ Spec: [`specs/architecture.md`](./architecture.md) (workspace map updates), [`sp
 
 MCP server milestone. Ships one TypeScript package (`@nowline/mcp`, `packages/mcp/`) in two install forms — **MCP CLI** (stdio, added to a harness's MCP config as `npx @nowline/mcp`) and **MCP Desktop** (a `.mcpb` bundle for Claude Desktop's one-click Extensions directory). The same binary powers both; only the install wrapper differs.
 
-Why this exists: today an agent calling the CLI passes untyped arguments and parses unstructured text output. `@nowline/mcp` exposes a typed, discoverable tool surface so harnesses get IDE-quality type hints on inputs, machine-readable structured output, and an optional in-chat rendered preview instead of raw SVG text. The two resources — `nowline://reference` (DSL grammar / man page) and `nowline://examples` (canonical example roadmaps) — prime models to emit valid `.nowline` unprompted so the DSL stays discoverable without out-of-band documentation.
+Why this exists: today an agent calling the CLI passes untyped arguments and parses unstructured text output. `@nowline/mcp` exposes a typed, discoverable tool surface so harnesses get IDE-quality type hints on inputs, machine-readable structured output (every tool declares an `outputSchema`), behavior hints via standard tool annotations (`readOnlyHint` / `idempotentHint` / `destructiveHint`), and an optional in-chat rendered preview instead of raw SVG text. Three resources prime models to emit valid `.nowline` unprompted, and three prompts script the common create / fix / convert workflows.
 
-**Tool surface** (tool names are shared with the Nowline Cloud MCP contract — identical names across local and cloud so agents graduate with zero relearning; cloud adds `search` + push/pull):
+**Tool surface** (the eight shared tools share names with the Nowline Cloud MCP contract — identical across local and cloud so agents graduate with zero relearning; cloud adds `search` + push/pull. `convert`, `capabilities`, and the `list-*` discovery family are OSS conveniences the cloud may mirror):
 
 | Tool | Input | Output |
 |------|-------|--------|
@@ -523,15 +523,23 @@ Why this exists: today an agent calling the CLI passes untyped arguments and par
 | `delete` | local path | confirmation |
 | `list` | directory | `.nowline` file list |
 | `export` | source / path + format + options | image/document resource + file path |
+| `convert` | source / path + `to: json\|nowline` | converted text (+ structured AST) |
+| `capabilities` | — | all option vocabularies in one call (themes / icons / locales / formats / templates) |
+| `list-themes` / `list-icons` / `list-locales` / `list-formats` / `list-templates` | — | one vocabulary slice each (granular projections of `capabilities`) |
 
 **Resources:**
 
 - `nowline://reference` — DSL grammar / man page (section-5 content from `nowline.5`). Gives models the full syntax vocabulary so they emit valid `.nowline` without out-of-band documentation.
 - `nowline://examples` — Canonical example roadmaps from `examples/` (including `examples/showcase.nowline` from m4.7). Concrete syntax patterns the model can sample from.
+- `nowline://conversions` — Mapping guide from common Gantt / timeline formats (Mermaid `gantt`, MS Project, Excel/XLSX, Google Sheets timeline view, generic CSV) into `.nowline`. Powers the `convert-to-nowline` prompt.
+
+**Prompts:** `create-roadmap` (NL description → `.nowline`), `fix-diagnostics` (validate → fix → re-validate loop, keyed on `NL.E####` codes), and `convert-to-nowline` (LLM-mediated import from another Gantt/timeline format, primed by `nowline://conversions` + `nowline://reference`). Import is intentionally LLM-mediated — **no native parsers ship**; new source formats are added by extending the conversions resource, not by writing code.
+
+**Non-goals:** native format importers (LLM-mediated via the conversions resource instead), stateful incremental editing (D2 Oracle-style shape mutation — the file is the unit of state), batch render, and title/summary helper tools. See [`specs/mcp.md`](./mcp.md) § Non-goals.
 
 **Optional MCP Apps UI variant:** when the harness supports the MCP Apps interactive-UI protocol, `@nowline/mcp` can return an HTML resource that mounts `@nowline/browser` (`renderSource`) + `@nowline/preview-shell` to render the roadmap live in-chat (the Mermaid Chart precedent). This variant exists because m4.7 extracted both packages as reusable; `@nowline/mcp` is the first consumer of both outside the VS Code extension. Basic stdio operation does not require this path.
 
-**Transport:** stdio primary — harnesses spawn `npx @nowline/mcp` and talk over stdin/stdout. Optional local HTTP via a `--port` flag for harnesses that prefer HTTP; not the default. No network, no auth, no proprietary deps. Runs as the user, with the user's file permissions, on local `.nowline` files only.
+**Transport:** stdio primary — harnesses spawn `npx @nowline/mcp` and talk over stdin/stdout. Optional local Streamable HTTP via a `--port` flag for harnesses that prefer HTTP (the deprecated standalone SSE transport is not offered); not the default. No network, no auth, no proprietary deps. Runs as the user, with the user's file permissions, on local `.nowline` files only.
 
 **CLI integration (`--mcp` mode flag):** the `nowline` binary adds `--mcp` as a mode flag alongside `--serve` and `--init` to start the MCP server in stdio mode. `npx @nowline/mcp` is the canonical harness-install path; `nowline --mcp` is the power-user equivalent that reuses the installed binary without a separate package.
 
