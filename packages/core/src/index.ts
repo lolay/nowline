@@ -1,3 +1,13 @@
+export { type ParseJsonResult, parseNowlineJson } from './convert/parse-json.js';
+export { type PrintOptions, printNowlineFile } from './convert/printer.js';
+export {
+    type JsonAstNode,
+    NOWLINE_SCHEMA_VERSION,
+    type NowlineDocument,
+    type Position,
+    type SerializeOptions,
+    serializeToJson,
+} from './convert/schema.js';
 export {
     collectDocumentDiagnostics,
     extractSuggestion,
@@ -35,3 +45,4 @@ export {
 export type { NowlineAddedServices, NowlineServices } from './language/nowline-module.js';
 export { createNowlineServices, NowlineModule } from './language/nowline-module.js';
 export { NowlineValidator, registerValidationChecks } from './language/nowline-validator.js';
+export { TEMPLATE_NAMES, type TemplateName } from './templates.js';
