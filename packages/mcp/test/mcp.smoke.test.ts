@@ -1,73 +1,559 @@
-// Integration tests for @nowline/mcp server tools.
+// In-process MCP server tests for @nowline/mcp.
 //
-// Tests run in-process against the server module's shared helpers without
-// spawning a subprocess, so they are fast and don't require a built binary.
+// Tests use an InMemoryTransport pair so every tool, resource, and prompt
+// is exercised via the real JSON-RPC protocol without spawning a subprocess.
+// A separate suite uses direct @nowline/export calls to assert byte-identity
+// (the export-determinism spec: same source + inputs → same bytes from the
+// MCP render tool and the kernel).
 
 import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs';
 import * as os from 'node:os';
 import * as path from 'node:path';
+import { Client } from '@modelcontextprotocol/sdk/client/index.js';
+import { InMemoryTransport } from '@modelcontextprotocol/sdk/inMemory.js';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import { createMcpServer } from '../src/server.js';
 
+// ---- Fixtures ---------------------------------------------------------------
+
+// Minimal valid .nowline source (matches DSL grammar from examples/minimal.nowline).
 const MINIMAL = [
     'nowline v1',
-    'title Smoke Test',
     '',
-    'roadmap',
-    '  lane Test',
-    '    item foo "Foo item" size:m',
+    'roadmap smoke-test "Smoke Test" start:2025-01-06 scale:1w',
+    '',
+    'swimlane test-lane "Test Lane"',
+    '  item foo "Foo Item" duration:1w',
 ].join('\n');
 
-const _INVALID_SOURCE = 'nowline v1\nbad syntax @@@@';
+// Source with invalid tokens — guaranteed to produce lexer errors.
+const INVALID_SOURCE = 'nowline v1\n\n@@@@';
+
+// ---- Shared client/server setup ---------------------------------------------
+
+let tmpDir: string;
+let client: Client;
+let serverTransport: InMemoryTransport;
+let clientTransport: InMemoryTransport;
+
+beforeAll(async () => {
+    tmpDir = mkdtempSync(path.join(os.tmpdir(), 'nowline-mcp-test-'));
+    writeFileSync(path.join(tmpDir, 'smoke.nowline'), MINIMAL, 'utf-8');
+    mkdirSync(path.join(tmpDir, 'sub'), { recursive: true });
+    writeFileSync(path.join(tmpDir, 'sub', 'nested.nowline'), MINIMAL, 'utf-8');
+
+    const server = createMcpServer({ allowedRoot: tmpDir });
+    [clientTransport, serverTransport] = InMemoryTransport.createLinkedPair();
+    await server.connect(serverTransport);
+    client = new Client({ name: 'test-client', version: '1.0.0' });
+    await client.connect(clientTransport);
+});
+
+afterAll(async () => {
+    try {
+        await clientTransport.close();
+    } catch {
+        /* best-effort */
+    }
+    try {
+        await serverTransport.close();
+    } catch {
+        /* best-effort */
+    }
+    try {
+        rmSync(tmpDir, { recursive: true, force: true });
+    } catch {
+        /* best-effort */
+    }
+});
+
+// ---- Tool list + annotations ------------------------------------------------
+
+describe('@nowline/mcp — tool list and annotations', () => {
+    it('lists the expected set of tools', async () => {
+        const { tools } = await client.listTools();
+        const names = tools.map((t) => t.name).sort();
+        expect(names).toEqual(
+            [
+                'capabilities',
+                'convert',
+                'create',
+                'delete',
+                'export',
+                'list',
+                'list-formats',
+                'list-icons',
+                'list-locales',
+                'list-templates',
+                'list-themes',
+                'read',
+                'render',
+                'update',
+                'validate',
+            ].sort(),
+        );
+    });
+
+    it('read-only tools carry readOnlyHint + idempotentHint', async () => {
+        const { tools } = await client.listTools();
+        const readOnly = [
+            'validate',
+            'read',
+            'list',
+            'render',
+            'export',
+            'convert',
+            'capabilities',
+        ];
+        for (const name of readOnly) {
+            const tool = tools.find((t) => t.name === name);
+            expect(tool, `tool ${name} missing`).toBeDefined();
+            expect(tool!.annotations?.readOnlyHint, `${name} readOnlyHint`).toBe(true);
+            expect(tool!.annotations?.idempotentHint, `${name} idempotentHint`).toBe(true);
+        }
+    });
+
+    it('list-* tools carry readOnlyHint + idempotentHint', async () => {
+        const { tools } = await client.listTools();
+        const listTools = [
+            'list-themes',
+            'list-icons',
+            'list-locales',
+            'list-formats',
+            'list-templates',
+        ];
+        for (const name of listTools) {
+            const tool = tools.find((t) => t.name === name);
+            expect(tool, `tool ${name} missing`).toBeDefined();
+            expect(tool!.annotations?.readOnlyHint, `${name} readOnlyHint`).toBe(true);
+            expect(tool!.annotations?.idempotentHint, `${name} idempotentHint`).toBe(true);
+        }
+    });
+
+    it('create carries destructiveHint + idempotentHint', async () => {
+        const { tools } = await client.listTools();
+        const create = tools.find((t) => t.name === 'create');
+        expect(create).toBeDefined();
+        expect(create!.annotations?.destructiveHint).toBe(true);
+        expect(create!.annotations?.idempotentHint).toBe(true);
+    });
+
+    it('delete carries destructiveHint', async () => {
+        const { tools } = await client.listTools();
+        const del = tools.find((t) => t.name === 'delete');
+        expect(del).toBeDefined();
+        expect(del!.annotations?.destructiveHint).toBe(true);
+    });
+
+    it('update carries idempotentHint', async () => {
+        const { tools } = await client.listTools();
+        const update = tools.find((t) => t.name === 'update');
+        expect(update).toBeDefined();
+        expect(update!.annotations?.idempotentHint).toBe(true);
+    });
+
+    it('tools declare an outputSchema', async () => {
+        const { tools } = await client.listTools();
+        for (const tool of tools) {
+            expect(tool.outputSchema, `${tool.name} missing outputSchema`).toBeDefined();
+        }
+    });
+});
+
+// ---- validate ---------------------------------------------------------------
+
+describe('@nowline/mcp — validate', () => {
+    it('returns ok=true + empty diagnostics for valid source', async () => {
+        const result = await client.callTool({ name: 'validate', arguments: { source: MINIMAL } });
+        expect(result.isError).toBeFalsy();
+        const structured = result.structuredContent as { ok: boolean; diagnostics: unknown[] };
+        expect(structured.ok).toBe(true);
+        expect(structured.diagnostics).toEqual([]);
+    });
+
+    it('returns ok=false + diagnostics for invalid source', async () => {
+        const result = await client.callTool({
+            name: 'validate',
+            arguments: { source: INVALID_SOURCE },
+        });
+        const structured = result.structuredContent as { ok: boolean; diagnostics: unknown[] };
+        expect(structured.ok).toBe(false);
+        expect(structured.diagnostics.length).toBeGreaterThan(0);
+    });
+
+    it('structuredContent matches text content', async () => {
+        const result = await client.callTool({ name: 'validate', arguments: { source: MINIMAL } });
+        const textBlock = result.content.find((c) => c.type === 'text') as
+            | { type: 'text'; text: string }
+            | undefined;
+        expect(textBlock).toBeDefined();
+        const fromText = JSON.parse(textBlock!.text) as { ok: boolean; diagnostics: unknown[] };
+        const structured = result.structuredContent as typeof fromText;
+        expect(structured.ok).toBe(fromText.ok);
+        expect(structured.diagnostics).toEqual(fromText.diagnostics);
+    });
+});
+
+// ---- create / update validation gating -------------------------------------
+
+describe('@nowline/mcp — create/update validation gating', () => {
+    it('create rejects invalid source with isError=true', async () => {
+        const result = await client.callTool({
+            name: 'create',
+            arguments: { path: 'bad.nowline', source: INVALID_SOURCE },
+        });
+        expect(result.isError).toBe(true);
+    });
+
+    it('create writes a valid file', async () => {
+        const result = await client.callTool({
+            name: 'create',
+            arguments: { path: 'created.nowline', source: MINIMAL },
+        });
+        expect(result.isError).toBeFalsy();
+        const structured = result.structuredContent as { ok: boolean; path: string };
+        expect(structured.ok).toBe(true);
+        expect(structured.path).toContain('created.nowline');
+    });
+
+    it('update rejects invalid source with isError=true', async () => {
+        const result = await client.callTool({
+            name: 'update',
+            arguments: { path: 'smoke.nowline', source: INVALID_SOURCE },
+        });
+        expect(result.isError).toBe(true);
+    });
+
+    it('update accepts valid source', async () => {
+        const result = await client.callTool({
+            name: 'update',
+            arguments: { path: 'smoke.nowline', source: MINIMAL },
+        });
+        expect(result.isError).toBeFalsy();
+        const structured = result.structuredContent as { ok: boolean; path: string };
+        expect(structured.ok).toBe(true);
+    });
+});
+
+// ---- convert round-trip -----------------------------------------------------
+
+describe('@nowline/mcp — convert round-trip', () => {
+    it('convert to:json returns a JSON string with AST structure', async () => {
+        const result = await client.callTool({
+            name: 'convert',
+            arguments: { source: MINIMAL, to: 'json' },
+        });
+        expect(result.isError).toBeFalsy();
+        const structured = result.structuredContent as { to: string; result: string };
+        expect(structured.to).toBe('json');
+        const parsed = JSON.parse(structured.result) as Record<string, unknown>;
+        expect(typeof parsed).toBe('object');
+    });
+
+    it('convert to:json then to:nowline round-trips without error', async () => {
+        const toJson = await client.callTool({
+            name: 'convert',
+            arguments: { source: MINIMAL, to: 'json' },
+        });
+        const jsonResult = (toJson.structuredContent as { to: string; result: string }).result;
+
+        const toNowline = await client.callTool({
+            name: 'convert',
+            arguments: { source: jsonResult, to: 'nowline' },
+        });
+        expect(toNowline.isError).toBeFalsy();
+        const structured = toNowline.structuredContent as { to: string; result: string };
+        expect(structured.to).toBe('nowline');
+        expect(structured.result).toContain('nowline v1');
+        expect(structured.result).toContain('roadmap');
+    });
+});
+
+// ---- capabilities + list-* --------------------------------------------------
+
+describe('@nowline/mcp — capabilities', () => {
+    it('returns all five capability slices', async () => {
+        const result = await client.callTool({ name: 'capabilities', arguments: {} });
+        expect(result.isError).toBeFalsy();
+        const structured = result.structuredContent as {
+            themes: string[];
+            icons: string[];
+            locales: string[];
+            formats: string[];
+            templates: string[];
+        };
+        expect(Array.isArray(structured.themes)).toBe(true);
+        expect(Array.isArray(structured.icons)).toBe(true);
+        expect(Array.isArray(structured.locales)).toBe(true);
+        expect(Array.isArray(structured.formats)).toBe(true);
+        expect(Array.isArray(structured.templates)).toBe(true);
+    });
+
+    it('themes includes light, dark, grayscale', async () => {
+        const result = await client.callTool({ name: 'capabilities', arguments: {} });
+        const structured = result.structuredContent as { themes: string[] };
+        expect(structured.themes).toContain('light');
+        expect(structured.themes).toContain('dark');
+        expect(structured.themes).toContain('grayscale');
+    });
+
+    it('formats includes all eight export formats', async () => {
+        const result = await client.callTool({ name: 'capabilities', arguments: {} });
+        const structured = result.structuredContent as { formats: string[] };
+        for (const fmt of ['svg', 'png', 'pdf', 'html', 'mermaid', 'xlsx', 'msproj', 'json']) {
+            expect(structured.formats, `format ${fmt}`).toContain(fmt);
+        }
+    });
+
+    it('list-themes matches capabilities.themes', async () => {
+        const [capResult, listResult] = await Promise.all([
+            client.callTool({ name: 'capabilities', arguments: {} }),
+            client.callTool({ name: 'list-themes', arguments: {} }),
+        ]);
+        const caps = capResult.structuredContent as { themes: string[] };
+        const list = listResult.structuredContent as { items: string[] };
+        expect(list.items).toEqual(caps.themes);
+    });
+
+    it('list-icons matches capabilities.icons', async () => {
+        const [capResult, listResult] = await Promise.all([
+            client.callTool({ name: 'capabilities', arguments: {} }),
+            client.callTool({ name: 'list-icons', arguments: {} }),
+        ]);
+        const caps = capResult.structuredContent as { icons: string[] };
+        const list = listResult.structuredContent as { items: string[] };
+        expect(list.items).toEqual(caps.icons);
+    });
+
+    it('list-locales matches capabilities.locales', async () => {
+        const [capResult, listResult] = await Promise.all([
+            client.callTool({ name: 'capabilities', arguments: {} }),
+            client.callTool({ name: 'list-locales', arguments: {} }),
+        ]);
+        const caps = capResult.structuredContent as { locales: string[] };
+        const list = listResult.structuredContent as { items: string[] };
+        expect(list.items).toEqual(caps.locales);
+    });
+
+    it('list-formats matches capabilities.formats', async () => {
+        const [capResult, listResult] = await Promise.all([
+            client.callTool({ name: 'capabilities', arguments: {} }),
+            client.callTool({ name: 'list-formats', arguments: {} }),
+        ]);
+        const caps = capResult.structuredContent as { formats: string[] };
+        const list = listResult.structuredContent as { items: string[] };
+        expect(list.items).toEqual(caps.formats);
+    });
+
+    it('list-templates matches capabilities.templates', async () => {
+        const [capResult, listResult] = await Promise.all([
+            client.callTool({ name: 'capabilities', arguments: {} }),
+            client.callTool({ name: 'list-templates', arguments: {} }),
+        ]);
+        const caps = capResult.structuredContent as { templates: string[] };
+        const list = listResult.structuredContent as { items: string[] };
+        expect(list.items).toEqual(caps.templates);
+    });
+});
+
+// ---- prompts list/get -------------------------------------------------------
+
+describe('@nowline/mcp — prompts', () => {
+    it('lists three prompts', async () => {
+        const { prompts } = await client.listPrompts();
+        const names = prompts.map((p) => p.name).sort();
+        expect(names).toEqual(['convert-to-nowline', 'create-roadmap', 'fix-diagnostics']);
+    });
+
+    it('create-roadmap prompt returns messages with resource + text', async () => {
+        const result = await client.getPrompt({
+            name: 'create-roadmap',
+            arguments: { description: 'Q3 platform migration roadmap' },
+        });
+        expect(result.messages.length).toBeGreaterThanOrEqual(2);
+        const resourceMsg = result.messages.find((m) => m.content.type === 'resource');
+        expect(resourceMsg).toBeDefined();
+    });
+
+    it('fix-diagnostics prompt includes source in user message text', async () => {
+        const result = await client.getPrompt({
+            name: 'fix-diagnostics',
+            arguments: { source: MINIMAL },
+        });
+        const textMsgs = result.messages.filter((m) => m.content.type === 'text');
+        const combined = textMsgs
+            .map((m) => (m.content as { type: 'text'; text: string }).text)
+            .join('');
+        expect(combined).toContain(MINIMAL);
+    });
+
+    it('convert-to-nowline prompt with from arg includes format hint', async () => {
+        const result = await client.getPrompt({
+            name: 'convert-to-nowline',
+            arguments: {
+                source: 'gantt\nsection A\n  Task1: 2024-01-01, 7d',
+                from: 'mermaid-gantt',
+            },
+        });
+        const textMsgs = result.messages.filter((m) => m.content.type === 'text');
+        const combined = textMsgs
+            .map((m) => (m.content as { type: 'text'; text: string }).text)
+            .join('');
+        expect(combined).toContain('mermaid-gantt');
+    });
+});
+
+// ---- resources --------------------------------------------------------------
+
+describe('@nowline/mcp — resources', () => {
+    it('lists reference, examples, and conversions resources', async () => {
+        const { resources } = await client.listResources();
+        const uris = resources.map((r) => r.uri);
+        expect(uris).toContain('nowline://reference');
+        expect(uris).toContain('nowline://examples');
+        expect(uris).toContain('nowline://conversions');
+    });
+
+    it('nowline://reference returns non-empty text content', async () => {
+        const result = await client.readResource({ uri: 'nowline://reference' });
+        expect(result.contents.length).toBeGreaterThan(0);
+        const text = result.contents.find((c) => 'text' in c);
+        expect(text).toBeDefined();
+        expect((text as { text: string }).text.length).toBeGreaterThan(100);
+    });
+
+    it('nowline://conversions returns non-empty text content', async () => {
+        const result = await client.readResource({ uri: 'nowline://conversions' });
+        expect(result.contents.length).toBeGreaterThan(0);
+        const text = result.contents.find((c) => 'text' in c);
+        expect(text).toBeDefined();
+        expect((text as { text: string }).text.length).toBeGreaterThan(50);
+    });
+
+    it('nowline://examples returns at least one entry', async () => {
+        const result = await client.readResource({ uri: 'nowline://examples' });
+        expect(result.contents.length).toBeGreaterThan(0);
+    });
+});
+
+// ---- structuredContent shapes -----------------------------------------------
+
+describe('@nowline/mcp — structuredContent shapes', () => {
+    it('validate structuredContent has ok (boolean) + diagnostics (array)', async () => {
+        const result = await client.callTool({ name: 'validate', arguments: { source: MINIMAL } });
+        const sc = result.structuredContent as Record<string, unknown>;
+        expect(typeof sc.ok).toBe('boolean');
+        expect(Array.isArray(sc.diagnostics)).toBe(true);
+    });
+
+    it('read structuredContent has path (string) + source (string)', async () => {
+        const result = await client.callTool({
+            name: 'read',
+            arguments: { path: 'smoke.nowline' },
+        });
+        const sc = result.structuredContent as Record<string, unknown>;
+        expect(typeof sc.path).toBe('string');
+        expect(typeof sc.source).toBe('string');
+    });
+
+    it('list structuredContent has paths (array)', async () => {
+        const result = await client.callTool({ name: 'list', arguments: {} });
+        const sc = result.structuredContent as Record<string, unknown>;
+        expect(Array.isArray(sc.paths)).toBe(true);
+    });
+
+    it('render (svg) structuredContent has format field', async () => {
+        const result = await client.callTool({
+            name: 'render',
+            arguments: { source: MINIMAL, format: 'svg', now: '2025-01-15' },
+        });
+        expect(result.isError).toBeFalsy();
+        const sc = result.structuredContent as Record<string, unknown>;
+        expect(sc.format).toBe('svg');
+    });
+
+    it('render with share=true includes shareUrl pointing to free.nowline.io/open', async () => {
+        const result = await client.callTool({
+            name: 'render',
+            arguments: { source: MINIMAL, format: 'svg', now: '2025-01-15', share: true },
+        });
+        const sc = result.structuredContent as { format: string; shareUrl?: string };
+        expect(typeof sc.shareUrl).toBe('string');
+        expect(sc.shareUrl).toContain('free.nowline.io/open');
+    });
+
+    it('capabilities structuredContent has 5 array fields', async () => {
+        const result = await client.callTool({ name: 'capabilities', arguments: {} });
+        const sc = result.structuredContent as Record<string, unknown>;
+        for (const field of ['themes', 'icons', 'locales', 'formats', 'templates']) {
+            expect(Array.isArray(sc[field]), `${field} should be array`).toBe(true);
+        }
+    });
+});
+
+// ---- Determinism parity (export-determinism spec) ---------------------------
+
+describe('@nowline/mcp — determinism parity', () => {
+    it('render SVG via MCP equals exportDocument directly for the same inputs', async () => {
+        const { exportDocument } = await import('@nowline/export');
+        const fixedDate = '2025-01-15';
+        const today = new Date(`${fixedDate}T00:00:00Z`);
+        const dummyPath = path.join(tmpDir, 'unnamed.nowline');
+
+        // Direct kernel call
+        const host = {
+            async readSource(p: string): Promise<string> {
+                const { readFile } = await import('node:fs/promises');
+                return readFile(p, 'utf-8');
+            },
+            async readAsset(ref: string): Promise<Uint8Array> {
+                const { readFile } = await import('node:fs/promises');
+                const bytes = await readFile(path.resolve(path.dirname(dummyPath), ref));
+                return new Uint8Array(bytes.buffer, bytes.byteOffset, bytes.byteLength);
+            },
+            async loadWasm(): Promise<ArrayBuffer> {
+                throw new Error('loadWasm not needed for SVG');
+            },
+        };
+
+        const directBytes = await exportDocument(
+            MINIMAL,
+            'svg',
+            {
+                sourcePath: dummyPath,
+                today,
+                locale: 'en-US',
+                theme: 'light',
+            },
+            host,
+        );
+        const directSvg = new TextDecoder('utf-8').decode(directBytes);
+
+        // MCP tool call
+        const mcpResult = await client.callTool({
+            name: 'render',
+            arguments: { source: MINIMAL, format: 'svg', now: fixedDate },
+        });
+        expect(mcpResult.isError).toBeFalsy();
+        const svgBlock = mcpResult.content.find((c) => c.type === 'text') as
+            | { type: 'text'; text: string }
+            | undefined;
+        expect(svgBlock).toBeDefined();
+        expect(svgBlock!.text).toBe(directSvg);
+    });
+});
+
+// ---- Legacy smoke tests (kept for regression coverage) ----------------------
 
 describe('@nowline/mcp — server creation', () => {
     it('createMcpServer() returns an McpServer instance', () => {
         const server = createMcpServer({ allowedRoot: process.cwd() });
         expect(server).toBeDefined();
-        // McpServer has a .server property (the underlying Server)
         expect(typeof server.connect).toBe('function');
     });
 });
 
-describe('@nowline/mcp — file tools', () => {
-    let tmpDir: string;
-
-    beforeAll(() => {
-        tmpDir = mkdtempSync(path.join(os.tmpdir(), 'nowline-mcp-test-'));
-        writeFileSync(path.join(tmpDir, 'smoke.nowline'), MINIMAL, 'utf-8');
-        mkdirSync(path.join(tmpDir, 'sub'), { recursive: true });
-        writeFileSync(path.join(tmpDir, 'sub', 'nested.nowline'), MINIMAL, 'utf-8');
-    });
-
-    afterAll(() => {
-        try {
-            rmSync(tmpDir, { recursive: true, force: true });
-        } catch {
-            /* best-effort */
-        }
-    });
-
-    it('list finds .nowline files non-recursively', async () => {
-        // Access list logic via an in-process helper instead of the MCP transport.
-        // We re-implement the directory scan to test it independently.
-        const { promises: fs } = await import('node:fs');
-        const files: string[] = [];
-        for (const entry of await fs.readdir(tmpDir, { withFileTypes: true })) {
-            if (entry.isFile() && entry.name.endsWith('.nowline')) {
-                files.push(path.join(tmpDir, entry.name));
-            }
-        }
-        expect(files.some((f) => f.endsWith('smoke.nowline'))).toBe(true);
-    });
-
-    it('the server module builds without error', async () => {
-        // Importing the module exercises all static imports.
-        const mod = await import('../src/server.js');
-        expect(typeof mod.createMcpServer).toBe('function');
-    });
-});
-
-describe('@nowline/mcp — resource content', () => {
+describe('@nowline/mcp — resource content (generated)', () => {
     it('REFERENCE_MAN_PAGE is non-empty text', async () => {
         const { REFERENCE_MAN_PAGE } = await import('../src/generated/resources.js');
         expect(typeof REFERENCE_MAN_PAGE).toBe('string');
@@ -80,5 +566,11 @@ describe('@nowline/mcp — resource content', () => {
         expect(EXAMPLES.length).toBeGreaterThan(0);
         expect(typeof EXAMPLES[0].name).toBe('string');
         expect(typeof EXAMPLES[0].content).toBe('string');
+    });
+
+    it('CONVERSIONS_GUIDE is non-empty text', async () => {
+        const { CONVERSIONS_GUIDE } = await import('../src/generated/resources.js');
+        expect(typeof CONVERSIONS_GUIDE).toBe('string');
+        expect(CONVERSIONS_GUIDE.length).toBeGreaterThan(50);
     });
 });

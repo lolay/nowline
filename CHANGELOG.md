@@ -8,15 +8,20 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ### Added
 
-- _Nothing yet._
+- **`@nowline/mcp` — `convert` tool**: converts a `.nowline` source to its JSON AST (`to:json`) or pretty-prints a JSON AST back to canonical `.nowline` text (`to:nowline`). Bidirectional, round-trip-stable, reuses the same `exportDocument` kernel the CLI uses.
+- **`@nowline/mcp` — `capabilities` tool**: returns all supported themes, icons, locales, export formats, and template names in one call — lets an agent prime itself before writing `.nowline` without multiple discovery round trips.
+- **`@nowline/mcp` — `list-themes`, `list-icons`, `list-locales`, `list-formats`, `list-templates` tools**: granular projections of the `capabilities` payload, one vocabulary slice each. Mirrors Mermaid Chart's `listSupportedTypes` / D2's `list_themes` shape.
+- **`@nowline/mcp` — `nowline://conversions` resource**: hand-authored LLM-mediated conversion guide covering Mermaid `gantt`, MS Project XML/CSV, Excel/XLSX, Google Sheets timeline view, and generic CSV into Nowline DSL.
+- **`@nowline/mcp` — MCP prompts**: three server-authored prompts (`create-roadmap`, `fix-diagnostics`, `convert-to-nowline`) that compose the `nowline://reference`, `nowline://examples`, and `nowline://conversions` resources into slash-command-ready workflow templates.
+- **`@nowline/mcp` — Streamable HTTP transport (`--port`)**: `nowline --mcp --port <n>` (and `@nowline/mcp --port <n>`) binds a localhost Streamable HTTP listener. stdio remains the default; no SSE.
+- **`@nowline/mcp` — share links**: `render` and `export` accept `share?: boolean`; when set, the result includes a `shareUrl` built from the `free.nowline.io/open` fragment grammar. No network call — purely client-side encoded.
+- **`@nowline/mcp` — MCP Apps in-chat preview**: `render` returns an embedded `text/html` resource (self-contained IIFE bundle of `@nowline/browser` + `@nowline/preview-shell`) when the client advertises the MCP Apps UI capability or `preview: true` is passed. Plain stdio operation is unchanged.
+- **`@nowline/mcp` — tool annotations**: every tool declares `readOnlyHint`, `idempotentHint`, and/or `destructiveHint` per the MCP spec § annotations.
+- **`@nowline/mcp` — structured output**: every tool declares an `outputSchema` (Zod) and returns `structuredContent` alongside the human-readable text block. Shared schemas live in `src/schemas.ts`.
 
 ### Changed
 
-- _Nothing yet._
-
-### Fixed
-
-- _Nothing yet._
+- **`printNowlineFile` + `parseNowlineJson` + `TEMPLATE_NAMES`** relocated from `@nowline/cli` into `@nowline/core` so `@nowline/mcp` can import them without creating a circular dependency. Both CLI and MCP now import from `@nowline/core`.
 
 ## [0.6.0] - 2026-06-06
 

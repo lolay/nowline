@@ -180,9 +180,9 @@ importers:
       '@nowline/renderer':
         specifier: workspace:*
         version: link:../renderer
-      fflate:
-        specifier: ^0.8.3
-        version: 0.8.3
+      '@nowline/share-link':
+        specifier: workspace:*
+        version: link:../share-link
       langium:
         specifier: ~4.2.4
         version: 4.2.4
@@ -576,6 +576,9 @@ importers:
       '@modelcontextprotocol/sdk':
         specifier: ^1.29.0
         version: 1.29.0(zod@4.4.3)
+      '@nowline/browser':
+        specifier: workspace:*
+        version: link:../browser
       '@nowline/core':
         specifier: workspace:*
         version: link:../core
@@ -585,6 +588,12 @@ importers:
       '@nowline/export-core':
         specifier: workspace:*
         version: link:../export-core
+      '@nowline/preview-shell':
+        specifier: workspace:*
+        version: link:../preview-shell
+      '@nowline/share-link':
+        specifier: workspace:*
+        version: link:../share-link
       langium:
         specifier: ~4.2.4
         version: 4.2.4
@@ -595,6 +604,9 @@ importers:
       '@types/node':
         specifier: ^25.9.1
         version: 25.9.1
+      esbuild:
+        specifier: ^0.28.0
+        version: 0.28.0
       vitest:
         specifier: ^4.1.7
         version: 4.1.7(@types/node@25.9.1)(@vitest/browser-playwright@4.1.7)(happy-dom@20.9.0)(vite@7.3.2(@types/node@25.9.1))
@@ -676,6 +688,22 @@ importers:
       langium:
         specifier: ~4.2.4
         version: 4.2.4
+      typescript:
+        specifier: ^6.0.3
+        version: 6.0.3
+      vitest:
+        specifier: ^4.1.7
+        version: 4.1.7(@types/node@25.9.1)(@vitest/browser-playwright@4.1.7)(happy-dom@20.9.0)(vite@7.3.2(@types/node@25.9.1))
+
+  packages/share-link:
+    dependencies:
+      fflate:
+        specifier: ^0.8.3
+        version: 0.8.3
+    devDependencies:
+      '@types/node':
+        specifier: ^25.9.1
+        version: 25.9.1
       typescript:
         specifier: ^6.0.3
         version: 6.0.3
