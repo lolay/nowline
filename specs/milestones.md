@@ -41,6 +41,7 @@ Commercial milestones (hosted editor, free viewer, cloud MCP server, enterprise,
 | m4.5 | IDE Expansion | Apache 2.0 | Obsidian, Neovim, JetBrains (timing TBD) |
 | m4.6 | Windows distribution | Apache 2.0 | Scoop bucket (`lolay/scoop-bucket`) and WinGet central-registry submission via `wingetcreate`; new `update-scoop-bucket` + `submit-winget-pkg` jobs in `release.yml`; `SCOOP_BUCKET_TOKEN` + `WINGET_PR_PAT` secrets |
 | ~~m4.7~~ | ~~Browser pipeline + preview shell + LSP worker + showcase~~ | Apache 2.0 | `@nowline/browser` (single-call browser pipeline; consolidates today's embed + VS Code render-pipeline glue), `@nowline/preview-shell` (framework-agnostic viewport chrome — zoom/pan/fit/minimap/diagnostic table), `@nowline/lsp-worker` (browser-side packaging of `@nowline/lsp` as a Web Worker + CodeMirror client adapter), `examples/showcase.nowline` (canonical sample roadmap re-exported as a string asset). See [`specs/handoffs/handoff-m4.7-browser-pipeline.md`](./handoffs/handoff-m4.7-browser-pipeline.md). |
+| ~~m4.8~~ | ~~MCP server~~ | Apache 2.0 | `@nowline/mcp` — 13 tools (validate/read/create/update/delete/list/render/export/convert/capabilities/list-themes/list-icons/list-locales/list-formats/list-templates), 3 resources (`nowline://reference`, `nowline://examples`, `nowline://conversions`), 3 prompts, tool annotations + structured output, Streamable HTTP `--port`, share links on render/export, MCP Apps in-chat live preview. `@nowline/share-link` extracted as a new leaf package (canonical `fflate`-based share-link encoder; consumed by `@nowline/embed` and `@nowline/mcp`). `printNowlineFile` + `parseNowlineJson` + `TEMPLATE_NAMES` relocated from `@nowline/cli` into `@nowline/core`. See [`specs/handoffs/handoff-m4.8-mcp.md`](./handoffs/handoff-m4.8-mcp.md). |
 
 ## Milestone Details
 
@@ -505,7 +506,7 @@ Depends on: m1 (DSL + parser), m2b (layout + renderer), m3a (LSP server). Indepe
 
 Spec: [`specs/architecture.md`](./architecture.md) (workspace map updates), [`specs/lsp.md`](./lsp.md) (range-delta requirement + browser worker packaging), [`specs/embed.md`](./embed.md) (cross-references for `@nowline/browser` consolidation) | Handoff: [`specs/handoffs/handoff-m4.7-browser-pipeline.md`](./handoffs/handoff-m4.7-browser-pipeline.md)
 
-### m4.8 — MCP server (`@nowline/mcp`)
+### ~~m4.8 — MCP server (`@nowline/mcp`)~~
 
 MCP server milestone. Ships one TypeScript package (`@nowline/mcp`, `packages/mcp/`) in two install forms — **MCP CLI** (stdio, added to a harness's MCP config as `npx @nowline/mcp`) and **MCP Desktop** (a `.mcpb` bundle for Claude Desktop's one-click Extensions directory). The same binary powers both; only the install wrapper differs.
 
@@ -547,6 +548,7 @@ Why this exists: today an agent calling the CLI passes untyped arguments and par
 
 **Distribution (marketplace-first, from `lolay/nowline` via `release.yml`, independent of the `.vsix`):**
 
+- npm `@nowline/share-link` — new leaf package; canonical `fflate`-based share-link encoder used by both `@nowline/embed` and `@nowline/mcp` (extracted from `@nowline/embed` to avoid pulling embed's DOM-coupled module graph into the MCP server)
 - npm `@nowline/mcp` — the package all harness configs reference
 - `.mcpb` — submitted to Claude's Desktop Extensions directory (one-click install; MCP Desktop form)
 - Public MCP registry — `io.nowline/nowline` entry (feeds the VS Code MCP gallery + Cursor Marketplace)
