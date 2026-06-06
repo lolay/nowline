@@ -8,6 +8,20 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ### Added
 
+- _Nothing yet._
+
+### Changed
+
+- _Nothing yet._
+
+### Fixed
+
+- _Nothing yet._
+
+## [0.6.0] - 2026-06-06
+
+### Added
+
 - **`make doctor` target**: config-driven environment health check (`scripts/doctor.sh` + `scripts/doctor.default.conf` / `scripts/doctor.release.conf`). Checks git, gh, node (pinned to `.nvmrc`), and pnpm; `MODE=release` additionally checks bun. Read-only; exits non-zero on any missing or under-minimum tool. Two-state contract: exit 0 healthy, exit 1 on any problem (Make surfaces as exit 2).
 
 - **XLSX Items `Start`/`End` columns**: the Items sheet now includes two date columns (`Start`, `End`) populated from the chart's computed schedule (same sequencing rules as the rendered chart — `date:` wins, then `start:`, then `after:`, then sequential). Named items get a real date cell; anonymous items are blank.
@@ -56,22 +70,12 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 - `@nowline/export-png` no longer imports the font resolver (and its `node:fs` dependency) at module top — the resolver is loaded lazily and only when a caller omits `fonts`. Canonical callers (the kernel, the CLI) always pass `fonts`, so behavior is unchanged, but the package now bundles cleanly for the browser (the determinism gate's headless leg and the Free/Pro web apps).
 
-### Deprecated
-
-- _Nothing yet._
-
-### Removed
-
-- _Nothing yet._
-
 ### Fixed
 
 - Title-only roadmap declarations (swimlanes, anchors, milestones, and other entities with a quoted title but no explicit id) now render instead of being silently dropped during include resolution. Auto-derived map keys and id-less `parallel`/`group` flow handles are internal only — declare an explicit id to reference an entity from `after:`, `before:`, or `on:`. An explicit id always wins its key over an auto-derived slug regardless of source order, and auto-slug collisions de-dupe silently (no spurious "shadowed" warning).
 - Title-only items that declare `after:` or `before:` now draw their dependency arrow. Previously the arrow only appeared if the item also carried an (otherwise unused) explicit id, because the target item registered its attach geometry only when it had a `name`. Id-less items now get an internal, non-referenceable layout handle so they participate as dependency-edge targets; references still require an explicit id.
-
-### Security
-
-- _Nothing yet._
+- PDF export (`nowline -f pdf`) no longer fails with `ENOENT` on the pdfkit data files (`data/` and `js/` directories) when the CLI binary runs from a path that doesn't contain a `node_modules` layout. The pdfkit data-file resolver now uses the bundled path correctly in all deployment contexts.
+- VS Code extension no longer crashes on activation with an `import.meta.url` reference error. The activation entry point was compiled as CJS for the VS Code host, and a top-level `import.meta.url` call in an ESM submodule leaked through the bundle. The submodule is now wrapped to guard the reference.
 
 ## [0.5.1] - 2026-06-01
 
