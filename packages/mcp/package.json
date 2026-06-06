@@ -28,7 +28,7 @@
         "src/"
     ],
     "scripts": {
-        "prebuild": "node scripts/bundle-resources.mjs",
+        "prebuild": "node scripts/bundle-resources.mjs && node scripts/bundle-ui.mjs",
         "build": "tsc -b tsconfig.json",
         "watch": "tsc -b tsconfig.json --watch",
         "typecheck": "tsc --noEmit",
@@ -36,14 +36,18 @@
     },
     "dependencies": {
         "@modelcontextprotocol/sdk": "^1.29.0",
+        "@nowline/browser": "workspace:*",
         "@nowline/core": "workspace:*",
         "@nowline/export": "workspace:*",
         "@nowline/export-core": "workspace:*",
+        "@nowline/preview-shell": "workspace:*",
+        "@nowline/share-link": "workspace:*",
         "langium": "~4.2.4",
         "zod": "^4.4.3"
     },
     "devDependencies": {
         "@types/node": "^25.9.1",
+        "esbuild": "^0.28.0",
         "vitest": "^4.1.7"
     }
 }

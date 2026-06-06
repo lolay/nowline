@@ -1,16 +1,21 @@
 // @nowline/mcp server factory.
 //
-// Creates and configures an McpServer instance with all eight tools and two
-// resources (nowline://reference + nowline://examples).  The factory is shared
-// by the entry-point bin (npx @nowline/mcp) and the CLI's --mcp flag so both
-// paths expose an identical surface.
+// Creates and configures an McpServer instance with all tools, resources, and
+// prompts.  The factory is shared by the entry-point bin (npx @nowline/mcp)
+// and the CLI's --mcp flag so both paths expose an identical surface.
 //
-// Spec: specs/mcp.md.  Plan: export_determinism s8 + s9.
+// Spec: specs/mcp.md.
 
 import { promises as fs } from 'node:fs';
 import * as path from 'node:path';
 import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
-import { collectDocumentDiagnostics, createNowlineServices, type NowlineFile } from '@nowline/core';
+import {
+    collectDocumentDiagnostics,
+    createNowlineServices,
+    type NowlineFile,
+    parseNowlineJson,
+    printNowlineFile,
+} from '@nowline/core';
 import {
     type ExportFormat,
     exportDocument,
@@ -18,9 +23,101 @@ import {
     type RenderInputs,
 } from '@nowline/export';
 import { resolveFonts } from '@nowline/export-core';
+import { buildShareLink } from '@nowline/share-link';
 import { URI } from 'langium';
 import { z } from 'zod';
-import { EXAMPLES, REFERENCE_MAN_PAGE } from './generated/resources.js';
+import { CAPABILITIES } from './capabilities.js';
+import { CONVERSIONS_GUIDE, EXAMPLES, REFERENCE_MAN_PAGE } from './generated/resources.js';
+import { UI_BUNDLE } from './generated/ui-bundle.js';
+import { registerPrompts } from './prompts.js';
+import {
+    CapabilitiesOutputSchema,
+    ConvertOutputSchema,
+    CreateOutputSchema,
+    DeleteOutputSchema,
+    ExportOutputSchema,
+    ListItemsOutputSchema,
+    ListOutputSchema,
+    ReadOutputSchema,
+    RenderOutputSchema,
+    UpdateOutputSchema,
+    ValidateOutputSchema,
+} from './schemas.js';
+
+// ---- MCP Apps UI (in-chat live preview) -------------------------------------
+//
+// The MCP Apps extension (SEP-1865) lets a tool return an interactive HTML
+// resource the host renders in a sandboxed iframe. We use the embedded-resource
+// form: `render` returns a self-contained text/html resource that inlines the
+// browser preview bundle (UI_BUNDLE, the @nowline/browser + @nowline/preview-
+// shell pipeline) plus the injected source. It is emitted only when the client
+// advertises the UI extension capability or the caller passes `preview: true`,
+// so plain stdio operation is unchanged and non-UI hosts still receive the
+// SVG/PNG content block alongside it (graceful degradation).
+
+/** SEP-1865 UI extension capability id; also probed under common short keys. */
+const MCP_APPS_UI_CAPABILITY = 'io.modelcontextprotocol/ui';
+const PREVIEW_UI_URI = 'ui://nowline/preview';
+/** SEP-1865 mandates the text/html;profile=mcp-app media type for UI resources. */
+const PREVIEW_UI_MIME = 'text/html;profile=mcp-app';
+
+function clientSupportsAppsUi(server: McpServer): boolean {
+    // Extension capabilities are negotiated under `experimental` in SDK 1.29
+    // (it does not yet model SEP-1724 extensions as a first-class field), so
+    // probe the canonical id plus the short `ui` / `apps` aliases some hosts use.
+    const experimental = server.server.getClientCapabilities()?.experimental as
+        | Record<string, unknown>
+        | undefined;
+    if (!experimental) return false;
+    return Boolean(experimental[MCP_APPS_UI_CAPABILITY] || experimental.ui || experimental.apps);
+}
+
+interface PreviewPayload {
+    source: string;
+    theme?: string;
+    now?: string;
+    width?: number;
+    locale?: string;
+    showLinks?: boolean;
+}
+
+function buildPreviewHtml(payload: PreviewPayload): string {
+    // The payload (including the .nowline source) is injected as a JSON
+    // <script> block rather than interpolated into executable JS, so source
+    // text with quotes/backticks can't break out. Escaping `<` as \u003c keeps
+    // any embedded "</script>" from closing the block early; JSON.parse in the
+    // bundle decodes it back. The bundle injects its own stylesheet at runtime,
+    // so only the root-element sizing CSS is inlined here.
+    const data = JSON.stringify(payload).replace(/</g, '\\u003c');
+    return [
+        '<!doctype html>',
+        '<html lang="en">',
+        '<head>',
+        '<meta charset="utf-8" />',
+        '<meta name="viewport" content="width=device-width, initial-scale=1" />',
+        '<title>Nowline preview</title>',
+        '<style>html,body,#nl-preview-root{margin:0;padding:0;height:100%;width:100%;overflow:hidden;}</style>',
+        '</head>',
+        '<body>',
+        '<div id="nl-preview-root"></div>',
+        `<script id="nl-preview-data" type="application/json">${data}</script>`,
+        `<script>${UI_BUNDLE}</script>`,
+        '</body>',
+        '</html>',
+        '',
+    ].join('\n');
+}
+
+function previewResourceBlock(payload: PreviewPayload) {
+    return {
+        type: 'resource' as const,
+        resource: {
+            uri: PREVIEW_UI_URI,
+            mimeType: PREVIEW_UI_MIME,
+            text: buildPreviewHtml(payload),
+        },
+    };
+}
 
 // ---- Diagnostic helpers -----------------------------------------------------
 
@@ -114,7 +211,6 @@ function createNodeHostEnv(sourcePath: string): HostEnv {
             return new Uint8Array(bytes.buffer, bytes.byteOffset, bytes.byteLength);
         },
         async loadWasm(): Promise<ArrayBuffer> {
-            // Resolve resvg.wasm relative to @nowline/export-png/dist/ at runtime.
             const { createRequire } = await import('node:module');
             const req = createRequire(import.meta.url);
             const entry = req.resolve('@resvg/resvg-wasm');
@@ -163,7 +259,7 @@ export function createMcpServer(opts: McpServerOptions = {}): McpServer {
     const allowedRoot = opts.allowedRoot ?? process.cwd();
     const server = new McpServer({
         name: opts.name ?? 'nowline',
-        version: opts.version ?? '0.5.1',
+        version: opts.version ?? '0.6.0',
     });
 
     // ---- Resources ----------------------------------------------------------
@@ -199,6 +295,29 @@ export function createMcpServer(opts: McpServerOptions = {}): McpServer {
         }),
     );
 
+    server.registerResource(
+        'nowline-conversions',
+        'nowline://conversions',
+        {
+            description:
+                'LLM-mediated conversion guide: how to translate Mermaid gantt, MS Project, Excel, Google Sheets timeline, and generic CSV into Nowline DSL.',
+            mimeType: 'text/plain',
+        },
+        async () => ({
+            contents: [
+                {
+                    uri: 'nowline://conversions',
+                    text: CONVERSIONS_GUIDE,
+                    mimeType: 'text/plain',
+                },
+            ],
+        }),
+    );
+
+    // ---- Prompts ------------------------------------------------------------
+
+    registerPrompts(server);
+
     // ---- validate -----------------------------------------------------------
 
     server.registerTool(
@@ -213,14 +332,18 @@ export function createMcpServer(opts: McpServerOptions = {}): McpServer {
                     .optional()
                     .describe('Absolute or relative path to a .nowline file to validate.'),
             }),
+            outputSchema: ValidateOutputSchema,
+            annotations: { readOnlyHint: true, idempotentHint: true },
         },
         async (args) => {
             const { source, filePath } = await sourceAndPath(args, allowedRoot);
             const doc = await buildDocument(source);
             const diagnostics = collectMcpDiagnostics(doc, filePath);
             const ok = diagnostics.every((d) => d.severity !== 'error');
+            const structured = { ok, diagnostics };
             return {
-                content: [{ type: 'text', text: JSON.stringify({ ok, diagnostics }, null, 2) }],
+                content: [{ type: 'text', text: JSON.stringify(structured, null, 2) }],
+                structuredContent: structured,
             };
         },
     );
@@ -236,17 +359,16 @@ export function createMcpServer(opts: McpServerOptions = {}): McpServer {
                     .string()
                     .describe('Absolute or relative path to the .nowline file to read.'),
             }),
+            outputSchema: ReadOutputSchema,
+            annotations: { readOnlyHint: true, idempotentHint: true },
         },
         async (args) => {
             const abs = resolveAndGuard(args.path, allowedRoot);
             const source = await fs.readFile(abs, 'utf-8');
+            const structured = { path: abs, source };
             return {
-                content: [
-                    {
-                        type: 'text',
-                        text: JSON.stringify({ path: abs, source }, null, 2),
-                    },
-                ],
+                content: [{ type: 'text', text: JSON.stringify(structured, null, 2) }],
+                structuredContent: structured,
             };
         },
     );
@@ -262,6 +384,9 @@ export function createMcpServer(opts: McpServerOptions = {}): McpServer {
                 path: z.string().describe('Absolute or relative path to write the .nowline file.'),
                 source: z.string().describe('The .nowline source text to write.'),
             }),
+            outputSchema: CreateOutputSchema,
+            // Overwrites silently → destructive; same source always produces same file → idempotent.
+            annotations: { destructiveHint: true, idempotentHint: true },
         },
         async (args) => {
             const abs = resolveAndGuard(args.path, allowedRoot);
@@ -281,8 +406,10 @@ export function createMcpServer(opts: McpServerOptions = {}): McpServer {
             }
             await fs.mkdir(path.dirname(abs), { recursive: true });
             await fs.writeFile(abs, args.source, 'utf-8');
+            const structured = { ok: true, path: abs };
             return {
-                content: [{ type: 'text', text: JSON.stringify({ ok: true, path: abs }, null, 2) }],
+                content: [{ type: 'text', text: JSON.stringify(structured, null, 2) }],
+                structuredContent: structured,
             };
         },
     );
@@ -299,6 +426,8 @@ export function createMcpServer(opts: McpServerOptions = {}): McpServer {
                     .describe('Absolute or relative path of the .nowline file to update.'),
                 source: z.string().describe('The new .nowline source text.'),
             }),
+            outputSchema: UpdateOutputSchema,
+            annotations: { idempotentHint: true },
         },
         async (args) => {
             const abs = resolveAndGuard(args.path, allowedRoot);
@@ -317,8 +446,10 @@ export function createMcpServer(opts: McpServerOptions = {}): McpServer {
                 };
             }
             await fs.writeFile(abs, args.source, 'utf-8');
+            const structured = { ok: true, path: abs };
             return {
-                content: [{ type: 'text', text: JSON.stringify({ ok: true, path: abs }, null, 2) }],
+                content: [{ type: 'text', text: JSON.stringify(structured, null, 2) }],
+                structuredContent: structured,
             };
         },
     );
@@ -334,12 +465,16 @@ export function createMcpServer(opts: McpServerOptions = {}): McpServer {
                     .string()
                     .describe('Absolute or relative path of the .nowline file to delete.'),
             }),
+            outputSchema: DeleteOutputSchema,
+            annotations: { destructiveHint: true },
         },
         async (args) => {
             const abs = resolveAndGuard(args.path, allowedRoot);
             await fs.unlink(abs);
+            const structured = { path: abs };
             return {
-                content: [{ type: 'text', text: JSON.stringify({ path: abs }, null, 2) }],
+                content: [{ type: 'text', text: JSON.stringify(structured, null, 2) }],
+                structuredContent: structured,
             };
         },
     );
@@ -362,13 +497,17 @@ export function createMcpServer(opts: McpServerOptions = {}): McpServer {
                     .optional()
                     .describe('Whether to scan subdirectories. Defaults to false.'),
             }),
+            outputSchema: ListOutputSchema,
+            annotations: { readOnlyHint: true, idempotentHint: true },
         },
         async (args) => {
             const dir = args.directory ? resolveAndGuard(args.directory, allowedRoot) : allowedRoot;
             const recursive = args.recursive ?? false;
             const paths = await listNowlineFiles(dir, recursive);
+            const structured = { paths };
             return {
-                content: [{ type: 'text', text: JSON.stringify({ paths }, null, 2) }],
+                content: [{ type: 'text', text: JSON.stringify(structured, null, 2) }],
+                structuredContent: structured,
             };
         },
     );
@@ -404,7 +543,21 @@ export function createMcpServer(opts: McpServerOptions = {}): McpServer {
                     .string()
                     .optional()
                     .describe('Write output to this path instead of returning inline.'),
+                share: z
+                    .boolean()
+                    .optional()
+                    .describe(
+                        'When true, include a shareUrl pointing to https://free.nowline.io/open.',
+                    ),
+                preview: z
+                    .boolean()
+                    .optional()
+                    .describe(
+                        'When true, also return an interactive in-chat HTML preview (MCP Apps UI). Auto-enabled when the client advertises MCP Apps UI support.',
+                    ),
             }),
+            outputSchema: RenderOutputSchema,
+            annotations: { readOnlyHint: true, idempotentHint: true },
         },
         async (args) => {
             const { source, filePath } = await sourceAndPath(args, allowedRoot);
@@ -424,22 +577,42 @@ export function createMcpServer(opts: McpServerOptions = {}): McpServer {
             }
             const host = createNodeHostEnv(filePath);
             const bytes = await exportDocument(source, format, inputs, host);
+            const shareUrl = args.share
+                ? (buildShareLink({ source, share: true }) ?? undefined)
+                : undefined;
+
+            // Optional MCP Apps in-chat preview. Emitted alongside the normal
+            // content so non-UI hosts still get the SVG/PNG; the bundle renders
+            // the live SVG itself, so the preview is format-agnostic.
+            const wantPreview = args.preview === true || clientSupportsAppsUi(server);
+            const previewBlocks = wantPreview
+                ? [
+                      previewResourceBlock({
+                          source,
+                          theme: args.theme,
+                          now: args.now,
+                          width: args.width,
+                          locale: 'en-US',
+                      }),
+                  ]
+                : [];
 
             if (args.output) {
                 const outAbs = resolveAndGuard(args.output, allowedRoot);
                 await fs.mkdir(path.dirname(outAbs), { recursive: true });
                 await fs.writeFile(outAbs, bytes);
+                const structured = { format, path: outAbs, bytes: bytes.byteLength, shareUrl };
                 return {
                     content: [
-                        {
-                            type: 'text',
-                            text: JSON.stringify({ path: outAbs, bytes: bytes.byteLength }),
-                        },
+                        { type: 'text', text: JSON.stringify(structured, null, 2) },
+                        ...previewBlocks,
                     ],
+                    structuredContent: structured,
                 };
             }
 
             if (format === 'png') {
+                const structured = { format, bytes: bytes.byteLength, shareUrl };
                 return {
                     content: [
                         {
@@ -447,17 +620,19 @@ export function createMcpServer(opts: McpServerOptions = {}): McpServer {
                             data: Buffer.from(bytes).toString('base64'),
                             mimeType: 'image/png',
                         },
+                        ...previewBlocks,
                     ],
+                    structuredContent: structured,
                 };
             }
+            const svgText = new TextDecoder('utf-8').decode(bytes);
+            const structured = { format, shareUrl };
             return {
                 content: [
-                    {
-                        type: 'text',
-                        text: new TextDecoder('utf-8').decode(bytes),
-                        mimeType: 'image/svg+xml',
-                    },
+                    { type: 'text', text: svgText, mimeType: 'image/svg+xml' },
+                    ...previewBlocks,
                 ],
+                structuredContent: structured,
             };
         },
     );
@@ -495,7 +670,15 @@ export function createMcpServer(opts: McpServerOptions = {}): McpServer {
                     .string()
                     .optional()
                     .describe('MS Project start date override (YYYY-MM-DD).'),
+                share: z
+                    .boolean()
+                    .optional()
+                    .describe(
+                        'When true, include a shareUrl pointing to https://free.nowline.io/open.',
+                    ),
             }),
+            outputSchema: ExportOutputSchema,
+            annotations: { readOnlyHint: true, idempotentHint: true },
         },
         async (args) => {
             const { source, filePath } = await sourceAndPath(args, allowedRoot);
@@ -518,6 +701,9 @@ export function createMcpServer(opts: McpServerOptions = {}): McpServer {
             }
             const host = createNodeHostEnv(filePath);
             const bytes = await exportDocument(source, format, inputs, host);
+            const shareUrl = args.share
+                ? (buildShareLink({ source, share: true }) ?? undefined)
+                : undefined;
 
             const BINARY_FORMATS = new Set<ExportFormat>(['png', 'pdf', 'xlsx']);
             const isBinary = BINARY_FORMATS.has(format);
@@ -526,13 +712,10 @@ export function createMcpServer(opts: McpServerOptions = {}): McpServer {
                 const outAbs = resolveAndGuard(args.output, allowedRoot);
                 await fs.mkdir(path.dirname(outAbs), { recursive: true });
                 await fs.writeFile(outAbs, bytes);
+                const structured = { format, path: outAbs, bytes: bytes.byteLength, shareUrl };
                 return {
-                    content: [
-                        {
-                            type: 'text',
-                            text: JSON.stringify({ path: outAbs, bytes: bytes.byteLength }),
-                        },
-                    ],
+                    content: [{ type: 'text', text: JSON.stringify(structured, null, 2) }],
+                    structuredContent: structured,
                 };
             }
 
@@ -542,6 +725,7 @@ export function createMcpServer(opts: McpServerOptions = {}): McpServer {
                     pdf: 'application/pdf',
                     xlsx: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
                 };
+                const structured = { format, bytes: bytes.byteLength, shareUrl };
                 return {
                     content: [
                         {
@@ -550,15 +734,198 @@ export function createMcpServer(opts: McpServerOptions = {}): McpServer {
                             mimeType: mimeMap[format] ?? 'application/octet-stream',
                         },
                     ],
+                    structuredContent: structured,
                 };
             }
+            const text = new TextDecoder('utf-8').decode(bytes);
+            const structured = { format, shareUrl };
             return {
-                content: [
+                content: [{ type: 'text', text }],
+                structuredContent: structured,
+            };
+        },
+    );
+
+    // ---- convert ------------------------------------------------------------
+
+    server.registerTool(
+        'convert',
+        {
+            description:
+                'Convert between .nowline source text and its JSON AST representation. `to:json` serializes a .nowline file to the JSON AST; `to:nowline` pretty-prints a JSON AST back to canonical .nowline source.',
+            inputSchema: z.object({
+                source: z.string().optional().describe('Inline source text to convert.'),
+                path: z.string().optional().describe('Path to the source file.'),
+                to: z
+                    .enum(['json', 'nowline'])
+                    .describe(
+                        '"json" — serialize .nowline text to JSON AST. "nowline" — pretty-print a JSON AST back to .nowline source.',
+                    ),
+            }),
+            outputSchema: ConvertOutputSchema,
+            annotations: { readOnlyHint: true, idempotentHint: true },
+        },
+        async (args) => {
+            if (args.to === 'json') {
+                const { source, filePath } = await sourceAndPath(args, allowedRoot);
+                const host = createNodeHostEnv(filePath);
+                const jsonBytes = await exportDocument(
+                    source,
+                    'json',
                     {
-                        type: 'text',
-                        text: new TextDecoder('utf-8').decode(bytes),
+                        sourcePath: filePath,
+                        today: todayUtc(),
+                        locale: 'en-US',
+                        theme: 'light',
                     },
-                ],
+                    host,
+                );
+                const result = new TextDecoder('utf-8').decode(jsonBytes);
+                const structured = { to: 'json' as const, result };
+                return {
+                    content: [{ type: 'text', text: result }],
+                    structuredContent: structured,
+                };
+            }
+
+            // to: 'nowline' — input is a JSON AST string
+            const jsonSource =
+                args.source ??
+                (args.path
+                    ? await fs.readFile(resolveAndGuard(args.path, allowedRoot), 'utf-8')
+                    : null);
+            if (!jsonSource) {
+                throw new Error('At least one of `source` or `path` is required.');
+            }
+            const { ast } = parseNowlineJson(jsonSource, args.path ?? 'input.json');
+            const result = printNowlineFile(ast);
+            const structured = { to: 'nowline' as const, result };
+            return {
+                content: [{ type: 'text', text: result }],
+                structuredContent: structured,
+            };
+        },
+    );
+
+    // ---- capabilities -------------------------------------------------------
+
+    server.registerTool(
+        'capabilities',
+        {
+            description:
+                'Return all supported themes, icons, locales, export formats, and template names in a single response.',
+            inputSchema: z.object({}),
+            outputSchema: CapabilitiesOutputSchema,
+            annotations: { readOnlyHint: true, idempotentHint: true },
+        },
+        async () => {
+            const structured = {
+                themes: [...CAPABILITIES.themes],
+                icons: [...CAPABILITIES.icons],
+                locales: [...CAPABILITIES.locales],
+                formats: [...CAPABILITIES.formats],
+                templates: [...CAPABILITIES.templates],
+            };
+            return {
+                content: [{ type: 'text', text: JSON.stringify(structured, null, 2) }],
+                structuredContent: structured,
+            };
+        },
+    );
+
+    // ---- list-themes --------------------------------------------------------
+
+    server.registerTool(
+        'list-themes',
+        {
+            description: 'List supported color themes: light, dark, grayscale.',
+            inputSchema: z.object({}),
+            outputSchema: ListItemsOutputSchema,
+            annotations: { readOnlyHint: true, idempotentHint: true },
+        },
+        async () => {
+            const structured = { items: [...CAPABILITIES.themes] };
+            return {
+                content: [{ type: 'text', text: JSON.stringify(structured, null, 2) }],
+                structuredContent: structured,
+            };
+        },
+    );
+
+    // ---- list-icons ---------------------------------------------------------
+
+    server.registerTool(
+        'list-icons',
+        {
+            description:
+                'List built-in capacity-icon names usable in the `capacity-icon:` style property.',
+            inputSchema: z.object({}),
+            outputSchema: ListItemsOutputSchema,
+            annotations: { readOnlyHint: true, idempotentHint: true },
+        },
+        async () => {
+            const structured = { items: [...CAPABILITIES.icons] };
+            return {
+                content: [{ type: 'text', text: JSON.stringify(structured, null, 2) }],
+                structuredContent: structured,
+            };
+        },
+    );
+
+    // ---- list-locales -------------------------------------------------------
+
+    server.registerTool(
+        'list-locales',
+        {
+            description: 'List supported BCP-47 locale tags.',
+            inputSchema: z.object({}),
+            outputSchema: ListItemsOutputSchema,
+            annotations: { readOnlyHint: true, idempotentHint: true },
+        },
+        async () => {
+            const structured = { items: [...CAPABILITIES.locales] };
+            return {
+                content: [{ type: 'text', text: JSON.stringify(structured, null, 2) }],
+                structuredContent: structured,
+            };
+        },
+    );
+
+    // ---- list-formats -------------------------------------------------------
+
+    server.registerTool(
+        'list-formats',
+        {
+            description:
+                'List all supported export formats (svg, png, pdf, html, mermaid, xlsx, msproj, json).',
+            inputSchema: z.object({}),
+            outputSchema: ListItemsOutputSchema,
+            annotations: { readOnlyHint: true, idempotentHint: true },
+        },
+        async () => {
+            const structured = { items: [...CAPABILITIES.formats] };
+            return {
+                content: [{ type: 'text', text: JSON.stringify(structured, null, 2) }],
+                structuredContent: structured,
+            };
+        },
+    );
+
+    // ---- list-templates -----------------------------------------------------
+
+    server.registerTool(
+        'list-templates',
+        {
+            description: 'List built-in template names usable with `nowline --init --template`.',
+            inputSchema: z.object({}),
+            outputSchema: ListItemsOutputSchema,
+            annotations: { readOnlyHint: true, idempotentHint: true },
+        },
+        async () => {
+            const structured = { items: [...CAPABILITIES.templates] };
+            return {
+                content: [{ type: 'text', text: JSON.stringify(structured, null, 2) }],
+                structuredContent: structured,
             };
         },
     );

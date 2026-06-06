@@ -31,12 +31,22 @@ const examples = exampleFiles.map((f) => ({
     content: readFileSync(path.join(examplesDir, f), 'utf-8'),
 }));
 
+// ---- nowline://conversions — LLM-mediated conversion guide ----------------
+
+const conversionsGuide = readFileSync(
+    path.join(packageRoot, 'resources', 'conversions.md'),
+    'utf-8',
+);
+
 // ---- Emit ------------------------------------------------------------------
 
 const lines = [
     '// GENERATED — do not edit. Re-run `pnpm --filter @nowline/mcp build` to regenerate.',
     '//',
-    '// Source: packages/cli/man/nowline.5 (reference) + examples/*.nowline (examples).',
+    '// Sources:',
+    '//   packages/cli/man/nowline.5          → REFERENCE_MAN_PAGE',
+    '//   examples/*.nowline                  → EXAMPLES',
+    '//   packages/mcp/resources/conversions.md → CONVERSIONS_GUIDE',
     '',
     '/** Full text of the nowline.5 DSL man page. Serves as the `nowline://reference` resource. */',
     `export const REFERENCE_MAN_PAGE: string = ${JSON.stringify(manPage)};`,
@@ -48,8 +58,13 @@ const lines = [
     '',
     '/** Canonical example .nowline files bundled as the `nowline://examples` resource. */',
     `export const EXAMPLES: ExampleFile[] = ${JSON.stringify(examples, null, 4)};`,
+    '',
+    '/** LLM-mediated conversion guide. Serves as the `nowline://conversions` resource. */',
+    `export const CONVERSIONS_GUIDE: string = ${JSON.stringify(conversionsGuide)};`,
 ];
 
 const outPath = path.join(outDir, 'resources.ts');
 writeFileSync(outPath, `${lines.join('\n')}\n`);
-console.log(`bundled ${examples.length} examples + man page → src/generated/resources.ts`);
+console.log(
+    `bundled ${examples.length} examples + man page + conversions guide → src/generated/resources.ts`,
+);
