@@ -1,6 +1,6 @@
 import { unzlibSync } from 'fflate';
 import { describe, expect, it } from 'vitest';
-import { buildShareLink, DEFAULT_SHARE_BASE, encodeText } from '../src/share.js';
+import { buildShareLink, DEFAULT_SHARE_BASE, encodeText } from '../src/index.js';
 
 // ---------------------------------------------------------------------------
 // encodeText — round-trip + wire-format assertions

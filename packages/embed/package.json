@@ -52,7 +52,7 @@
         "@nowline/core": "workspace:*",
         "@nowline/layout": "workspace:*",
         "@nowline/renderer": "workspace:*",
-        "fflate": "^0.8.3",
+        "@nowline/share-link": "workspace:*",
         "langium": "~4.2.4"
     },
     "devDependencies": {

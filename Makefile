@@ -140,7 +140,7 @@ pack: ## [pkg] Pack the publishable @nowline/* npm tarballs into dist-pack/ (dep
 	mkdir -p dist-pack; \
 	dest="$(CURDIR)/dist-pack"; \
 	for pkg in \
-	    packages/core packages/layout packages/renderer packages/browser \
+	    packages/core packages/share-link packages/layout packages/renderer packages/browser \
 	    packages/embed packages/preview-shell packages/lsp packages/lsp-worker \
 	    packages/export-core packages/export-png packages/export-pdf \
 	    packages/export-html packages/export-mermaid packages/export-xlsx \
@@ -163,7 +163,7 @@ snapshot-version: ## [pkg] Compute and write 0.0.0-dev.<ts>.g<sha> to every pack
 publish-npm: ## [danger] Publish the @nowline/* tarballs in dist-pack/ to npmjs.com
 	$(call confirm,CONFIRM_PUBLISH,Publishes @nowline/* to npmjs.com)
 	@set -euo pipefail; \
-	for pkg in nowline-core nowline-layout nowline-renderer nowline-browser nowline-embed nowline-preview-shell nowline-lsp nowline-lsp-worker nowline-export-core nowline-export-png nowline-export-pdf nowline-export-html nowline-export-mermaid nowline-export-xlsx nowline-export-msproj nowline-export nowline-mcp nowline-config nowline-cli; do \
+	for pkg in nowline-core nowline-share-link nowline-layout nowline-renderer nowline-browser nowline-embed nowline-preview-shell nowline-lsp nowline-lsp-worker nowline-export-core nowline-export-png nowline-export-pdf nowline-export-html nowline-export-mermaid nowline-export-xlsx nowline-export-msproj nowline-export nowline-mcp nowline-config nowline-cli; do \
 	  tarball=$$(find dist-pack -maxdepth 1 -name "$${pkg}-[0-9]*.tgz" -print -quit); \
 	  test -n "$$tarball" || { echo "missing tarball for $${pkg}" >&2; exit 1; }; \
 	  echo "publishing $$tarball"; \
