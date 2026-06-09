@@ -26,7 +26,7 @@ SHELL := bash
 .DEFAULT_GOAL := help
 
 .PHONY: help init build build-fast test lint format typecheck ci pre-commit doctor clean \
-        lint-workflows bundle-size gh-runs-list gh-runs-watch \
+        lint-workflows bundle-size gh-runs-list gh-runs-watch gh-runs-status \
         determinism determinism-browser determinism-update \
         compile smoke deb pack vsix pack-mcpb bump snapshot-version \
         publish-npm publish-vscode publish-cdn publish-mcp-registry
@@ -54,7 +54,7 @@ fi
 # MODE selects triage.yaml profile (default | release).
 MODE ?= default
 
-# Maximum recent runs to fetch for gh-runs-list / gh-runs-watch.
+# Maximum recent runs to fetch for gh-runs-list / gh-runs-watch / gh-runs-status.
 GH_LIMIT ?= 50
 
 ##@ Develop
@@ -117,6 +117,20 @@ gh-runs-watch: ## Watch this repo's in-flight Actions runs until each completes
 	if [ -z "$$ids" ]; then printf '  \033[2mno active runs\033[0m\n'; exit 0; fi; \
 	for id in $$ids; do \
 	  gh run watch "$$id" --compact || printf '  \033[33m⚠\033[0m watch failed for run %s\n' "$$id"; \
+	done
+
+gh-runs-status: ## Show pass/fail of the last completed run per workflow
+	@out=$$(gh run list --limit $(GH_LIMIT) \
+	  --json conclusion,workflowName,headBranch,url,status,updatedAt \
+	  --jq '[.[] | select(.status == "completed")] | group_by(.workflowName) | .[] | (sort_by(.updatedAt) | last) | "\(.conclusion)\t\(.workflowName)\t\(.headBranch)\t\(.url)"' \
+	  2>&1) \
+	  || { printf '  \033[33m⚠\033[0m gh run list failed (auth? run `gh auth login`)\n'; exit 0; }; \
+	if [ -z "$$out" ]; then printf '  \033[2mno completed runs\033[0m\n'; exit 0; fi; \
+	printf '%s\n' "$$out" | while IFS=$$'\t' read -r conclusion name branch url; do \
+	  if [ "$$conclusion" = "success" ]; then icon="\033[32m✓\033[0m"; \
+	  elif [ "$$conclusion" = "skipped" ]; then icon="\033[2m-\033[0m"; \
+	  else icon="\033[31m✗\033[0m"; fi; \
+	  printf "  $$icon  %-24s  %-14s  %s\n" "$$name" "$$branch" "$$url"; \
 	done
 
 ##@ Determinism
