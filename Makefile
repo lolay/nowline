@@ -126,16 +126,21 @@ gh-runs-status: ## Show pass/fail of the last completed run per workflow
 	  2>&1) \
 	  || { printf '  \033[33m⚠\033[0m gh run list failed (auth? run `gh auth login`)\n'; exit 0; }; \
 	if [ -z "$$out" ]; then printf '  \033[2mno completed runs\033[0m\n'; exit 0; fi; \
+	esc=$$(printf '\033'); \
 	printf '%s\n' "$$out" | while IFS=$$'\t' read -r conclusion name branch url age_secs; do \
-	  if [ "$$conclusion" = "success" ]; then icon="\033[32m✓\033[0m"; \
-	  elif [ "$$conclusion" = "skipped" ]; then icon="\033[2m-\033[0m"; \
-	  else icon="\033[31m✗\033[0m"; fi; \
+	  if [ "$$conclusion" = "success" ]; then mark="ok"; \
+	  elif [ "$$conclusion" = "skipped" ]; then mark="skip"; \
+	  else mark="fail"; fi; \
 	  if [ "$$age_secs" -lt 60 ]; then age="$${age_secs}s"; \
 	  elif [ "$$age_secs" -lt 3600 ]; then age="$$((age_secs / 60))m"; \
 	  elif [ "$$age_secs" -lt 86400 ]; then age="$$((age_secs / 3600))h"; \
 	  else age="$$((age_secs / 86400))d"; fi; \
-	  printf "  $$icon  %-24s  %-14s  %4s  %s\n" "$$name" "$$branch" "$$age" "$$url"; \
-	done
+	  printf '%s\t%s\t%s\t%s\t%s\n' "$$mark" "$$name" "$$branch" "$$age" "$$url"; \
+	done | column -t -s "$$(printf '\t')" \
+	| sed -e "s/^ok  /$${esc}[32m✓$${esc}[0m   /" \
+	      -e "s/^skip/$${esc}[2m-$${esc}[0m   /" \
+	      -e "s/^fail/$${esc}[31m✗$${esc}[0m   /" \
+	      -e 's/^/  /'
 
 ##@ Determinism
 
