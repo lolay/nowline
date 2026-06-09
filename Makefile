@@ -27,8 +27,8 @@ SHELL := bash
 
 .PHONY: help init build build-fast test lint format typecheck ci pre-commit doctor clean \
         lint-workflows bundle-size determinism determinism-browser determinism-update \
-        compile smoke deb pack vsix bump snapshot-version \
-        publish-npm publish-vscode publish-cdn
+        compile smoke deb pack vsix pack-mcpb bump snapshot-version \
+        publish-npm publish-vscode publish-cdn publish-mcp-registry
 
 # Overridable inputs for the package / guarded targets. The release and
 # deploy workflows pass these in; the defaults serve a manual local run:
@@ -87,7 +87,7 @@ doctor: ## Check required tools for this repo (read-only; non-zero on any proble
 	@DOCTOR_MODE='$(MODE)' bash scripts/doctor.sh
 
 clean: ## Remove build, binary, and package artifacts (keeps node_modules)
-	rm -rf dist-bin dist-deb dist-pack dist-action packages/*/dist packages/*/dist-*
+	rm -rf dist-bin dist-deb dist-pack dist-action dist-mcpb packages/*/dist packages/*/dist-*
 
 lint-workflows: ## actionlint the GitHub Actions workflows (needs actionlint on PATH)
 	pnpm lint:workflows
@@ -152,6 +152,18 @@ pack: ## [pkg] Pack the publishable @nowline/* npm tarballs into dist-pack/ (dep
 vsix: ## [pkg] Package the VS Code / Cursor extension into a .vsix
 	cd packages/vscode-extension && pnpm package
 
+pack-mcpb: ## [pkg] Pack the @nowline/mcp Claude Desktop bundle into dist-mcpb/nowline.mcpb
+	@set -euo pipefail; \
+	node scripts/sync-mcp-metadata.mjs >/dev/null; \
+	rm -rf dist-mcpb/staging dist-mcpb/nowline.mcpb; \
+	mkdir -p dist-mcpb/staging; \
+	pnpm --filter @nowline/mcp deploy --prod --legacy dist-mcpb/staging; \
+	rm -rf dist-mcpb/staging/src dist-mcpb/staging/scripts dist-mcpb/staging/test; \
+	cp packages/mcp/manifest.json packages/mcp/.mcpbignore dist-mcpb/staging/; \
+	cd dist-mcpb/staging && npx --yes @anthropic-ai/mcpb@latest pack . ../nowline.mcpb; \
+	test -s "$(CURDIR)/dist-mcpb/nowline.mcpb"; \
+	ls -la "$(CURDIR)/dist-mcpb/nowline.mcpb"
+
 bump: ## [pkg] Bump every package version (LEVEL=patch|minor|major); prints the new version
 	@node .github/scripts/bump-version.mjs $(LEVEL)
 
@@ -178,3 +190,10 @@ publish-vscode: ## [danger] Publish the VS Code extension to the VS Code Marketp
 publish-cdn: ## [danger] Deploy the @nowline/embed bundle to the Firebase Hosting CDN
 	$(call confirm,CONFIRM_DEPLOY,Deploys the embed bundle to the Firebase Hosting CDN)
 	cd $(FIREBASE_PROJECT_PATH) && firebase deploy --only hosting --project $(PROJECT_ID) --non-interactive
+
+publish-mcp-registry: ## [danger] Publish io.nowline/nowline to the public MCP registry (needs MCP_PRIVATE_KEY)
+	$(call confirm,CONFIRM_PUBLISH,Publishes io.nowline/nowline to the MCP registry)
+	@set -euo pipefail; \
+	test -n "$${MCP_PRIVATE_KEY:-}" || { echo "MCP_PRIVATE_KEY is required" >&2; exit 1; }; \
+	node scripts/sync-mcp-metadata.mjs >/dev/null; \
+	cd packages/mcp && mcp-publisher login dns --domain nowline.io --private-key "$$MCP_PRIVATE_KEY" && mcp-publisher publish

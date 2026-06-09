@@ -1,0 +1,138 @@
+name: Publish MCP
+
+# Reusable MCP marketplace publish workflow. Called by release.yml after the
+# main publish matrix is green (Option B) and by publish-mcp-standalone.yml for
+# maintainer re-runs (Option C). Ordering is intentional:
+#   1. verify npm @nowline/mcp@version is live (registry checks npm ownership)
+#   2. attach nowline.mcpb to the GitHub Release
+#   3. MCP registry publish (remote pointer — last)
+#   4. open a maintainer-only tracking issue for manual Claude Desktop + Gemini steps
+on:
+  workflow_call:
+    inputs:
+      version:
+        description: 'SemVer version without the v prefix (e.g. 0.6.0)'
+        type: string
+        required: true
+    secrets:
+      MCP_PRIVATE_KEY:
+        required: true
+
+permissions:
+  contents: write
+  issues: write
+
+jobs:
+  publish-mcp:
+    name: Publish MCP marketplace
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v6
+
+      - id: meta
+        run: |
+          set -euo pipefail
+          version="${{ inputs.version }}"
+          version="${version#v}"
+          test -n "$version"
+          echo "version=${version}" >> "$GITHUB_OUTPUT"
+
+      - name: Verify npm @nowline/mcp@version is live
+        env:
+          VERSION: ${{ steps.meta.outputs.version }}
+        run: |
+          set -euo pipefail
+          for attempt in $(seq 1 30); do
+            if npm view "@nowline/mcp@${VERSION}" version 2>/dev/null | grep -qx "${VERSION}"; then
+              echo "npm @nowline/mcp@${VERSION} is live"
+              exit 0
+            fi
+            echo "waiting for npm propagation (${attempt}/30)..."
+            sleep 10
+          done
+          echo "npm view @nowline/mcp@${VERSION} did not resolve after 5 minutes" >&2
+          exit 1
+
+      - name: Download nowline.mcpb artifact
+        id: mcpb-artifact
+        continue-on-error: true
+        uses: actions/download-artifact@v8
+        with:
+          name: nowline.mcpb
+          path: dist-mcpb
+
+      - name: Obtain nowline.mcpb
+        env:
+          VERSION: ${{ steps.meta.outputs.version }}
+        run: |
+          set -euo pipefail
+          mkdir -p dist-mcpb
+          if test -s dist-mcpb/nowline.mcpb; then
+            echo "using nowline.mcpb from build artifact"
+            exit 0
+          fi
+          tag="v${VERSION}"
+          url="https://github.com/${GITHUB_REPOSITORY}/releases/download/${tag}/nowline.mcpb"
+          if curl -fsSL -o dist-mcpb/nowline.mcpb "$url"; then
+            echo "downloaded nowline.mcpb from ${url}"
+            exit 0
+          fi
+          echo "artifact missing and release asset unavailable; building nowline.mcpb"
+          make pack-mcpb
+
+      - name: Attach nowline.mcpb to GitHub Release
+        env:
+          GH_TOKEN: ${{ github.token }}
+          VERSION: ${{ steps.meta.outputs.version }}
+        run: |
+          set -euo pipefail
+          test -s dist-mcpb/nowline.mcpb
+          gh release upload "v${VERSION}" dist-mcpb/nowline.mcpb --clobber
+
+      - uses: ./.github/actions/setup-node-pnpm
+
+      - name: Install mcp-publisher
+        run: |
+          set -euo pipefail
+          if command -v mcp-publisher >/dev/null 2>&1; then
+            mcp-publisher --help >/dev/null
+            exit 0
+          fi
+          brew install mcp-publisher
+
+      - name: Publish to MCP registry
+        env:
+          MCP_PRIVATE_KEY: ${{ secrets.MCP_PRIVATE_KEY }}
+        run: CONFIRM_PUBLISH=1 make publish-mcp-registry
+
+      - name: Create manual-submission tracking issue
+        env:
+          GH_TOKEN: ${{ github.token }}
+          VERSION: ${{ steps.meta.outputs.version }}
+        run: |
+          set -euo pipefail
+          tag="v${VERSION}"
+          repo="${GITHUB_REPOSITORY}"
+          body=$(cat <<EOF
+          ## MCP marketplace manual submissions — v${VERSION}
+
+          Automated steps completed in CI:
+          - npm \`@nowline/mcp@${VERSION}\` publish (release.yml \`publish\` job)
+          - \`nowline.mcpb\` attached to [${tag}](https://github.com/${repo}/releases/tag/${tag})
+          - MCP registry \`io.nowline/nowline\` updated via \`mcp-publisher\`
+
+          Cursor Marketplace and VS Code MCP gallery auto-surface from the registry entry — no action needed.
+
+          Manual channels (no public API):
+          - [ ] **Claude Desktop Extensions directory** — download \`nowline.mcpb\` from the [${tag} release](https://github.com/${repo}/releases/tag/${tag}) and submit to the Extensions directory
+          - [ ] **Gemini CLI extension channel** — submit the extension bundle per the runbook
+
+          Runbook: [ops/mcp-marketplace.md](https://github.com/${repo}/blob/main/ops/mcp-marketplace.md)
+          EOF
+          )
+          gh issue create \
+            --repo "${repo}" \
+            --title "MCP marketplace manual submissions — v${VERSION}" \
+            --body "$body" \
+            --label maintainer-only \
+            --label release-ops

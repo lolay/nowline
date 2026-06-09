@@ -2,7 +2,7 @@
 
 ## Overview
 
-The OSS tooling (`lolay/nowline` and its satellite repos) ships incrementally across milestones m1–m4.8. A four-phase layout-engine refactor (m2.5a–m2.5d), a rendering-polish pass (m2i), capacity & utilization (m2j), and a dependency-arrow attach + routing pass (m2k) sit between the sample-fidelity work (m2h) and IDE support (m3). Manual pages (m2l), French localization (m2m), and inline date pins (m2n) close out the m2 series with distribution polish and DSL refinements. The IDE work ships before the GitHub-bound rendering paths (m3.5 GitHub Action, m4 browser embed) so authors can edit `.nowline` files in VS Code / Cursor with live preview before either surface goes wide. m3.5 (action) and m4 (embed) are independent of each other and could ship in either order; the chain numbers them m3.5 → m4. m4.7 follows m4 with a browser-tooling extraction (browser pipeline, preview shell, LSP worker, showcase example) so commercial browser surfaces can stand on a shared OSS base instead of duplicating glue. m4.8 follows m4.7 with the OSS MCP server (`@nowline/mcp`), which exposes the CLI's capabilities as a typed MCP tool surface so agent harnesses get discoverability, structured I/O, and an optional in-chat live preview. Two independent post-m4 add-ons round out the chain: m4.5 expands IDE coverage (Obsidian, Neovim, JetBrains), m4.6 expands Windows install coverage (Scoop, WinGet). Each milestone has a clear scope and set of Apache-2.0 deliverables. Later milestones depend on earlier ones.
+The OSS tooling (`lolay/nowline` and its satellite repos) ships incrementally across milestones m1–m4.10. A four-phase layout-engine refactor (m2.5a–m2.5d), a rendering-polish pass (m2i), capacity & utilization (m2j), and a dependency-arrow attach + routing pass (m2k) sit between the sample-fidelity work (m2h) and IDE support (m3). Manual pages (m2l), French localization (m2m), and inline date pins (m2n) close out the m2 series with distribution polish and DSL refinements. The IDE work ships before the GitHub-bound rendering paths (m3.5 GitHub Action, m4 browser embed) so authors can edit `.nowline` files in VS Code / Cursor with live preview before either surface goes wide. m3.5 (action) and m4 (embed) are independent of each other and could ship in either order; the chain numbers them m3.5 → m4. m4.7 follows m4 with a browser-tooling extraction (browser pipeline, preview shell, LSP worker, showcase example) so commercial browser surfaces can stand on a shared OSS base instead of duplicating glue. m4.8 follows m4.7 with the OSS MCP server (`@nowline/mcp`), which exposes the CLI's capabilities as a typed MCP tool surface so agent harnesses get discoverability, structured I/O, and an optional in-chat live preview. Three independent post-m4 add-ons round out the chain: m4.5 expands IDE coverage (Obsidian, Neovim, JetBrains), m4.6 expands Windows install coverage (Scoop for developers, WinGet for mainstream reach) and Authenticode-signs the Windows binary so the mainstream path clears SmartScreen, and m4.10 code-signs + notarizes the macOS binaries so direct GitHub-Release downloads clear Gatekeeper. Each milestone has a clear scope and set of Apache-2.0 deliverables. Later milestones depend on earlier ones.
 
 Commercial milestones (hosted editor, free viewer, cloud MCP server, enterprise, FedRAMP) are tracked in a separate, private spec and are out of scope here.
 
@@ -39,9 +39,11 @@ Commercial milestones (hosted editor, free viewer, cloud MCP server, enterprise,
 | ~~m3.5~~ | ~~GitHub Action~~ | Apache 2.0 | `packages/nowline-action/` (in this monorepo) + `lolay/nowline-action` Marketplace mirror: file mode + markdown mode, shells out to `@nowline/cli`. Five releases (`v0.2.2`–`v0.2.5`) shipped; Marketplace listing live. One small carry-forward: bundled-action smoke test — see [`specs/handoffs/handoff-m3.5-action.md`](./handoffs/handoff-m3.5-action.md) → "Remaining work". |
 | ~~m4~~ | ~~Embed~~ | Apache 2.0 | Browser embed script (`@nowline/embed`), branded `embed.nowline.{io,dev}` Firebase-Hosted CDN (both tiers live 2026-05-28), and share-link generator (`share`/`sourceUrl`, OSS grammar in `specs/embed.md`) shipped in v0.4.2. |
 | m4.5 | IDE Expansion | Apache 2.0 | Obsidian, Neovim, JetBrains (timing TBD) |
-| m4.6 | Windows distribution | Apache 2.0 | Scoop bucket (`lolay/scoop-bucket`) and WinGet central-registry submission via `wingetcreate`; new `update-scoop-bucket` + `submit-winget-pkg` jobs in `release.yml`; `SCOOP_BUCKET_TOKEN` + `WINGET_PR_PAT` secrets |
+| m4.6 | Windows distribution | Apache 2.0 | Scoop bucket (`lolay/scoop-bucket`, dev-friendly) and WinGet central-registry submission via `wingetcreate` (mainstream reach); Authenticode-sign the Windows `.exe` via Azure Trusted Signing so the mainstream path clears SmartScreen; new `update-scoop-bucket` + `submit-winget-pkg` + `sign-windows` steps in `release.yml`; `SCOOP_BUCKET_TOKEN` + `WINGET_PR_PAT` + Azure Trusted Signing secrets |
 | ~~m4.7~~ | ~~Browser pipeline + preview shell + LSP worker + showcase~~ | Apache 2.0 | `@nowline/browser` (single-call browser pipeline; consolidates today's embed + VS Code render-pipeline glue), `@nowline/preview-shell` (framework-agnostic viewport chrome — zoom/pan/fit/minimap/diagnostic table), `@nowline/lsp-worker` (browser-side packaging of `@nowline/lsp` as a Web Worker + CodeMirror client adapter), `examples/showcase.nowline` (canonical sample roadmap re-exported as a string asset). See [`specs/handoffs/handoff-m4.7-browser-pipeline.md`](./handoffs/handoff-m4.7-browser-pipeline.md). |
 | ~~m4.8~~ | ~~MCP server~~ | Apache 2.0 | `@nowline/mcp` — 13 tools (validate/read/create/update/delete/list/render/export/convert/capabilities/list-themes/list-icons/list-locales/list-formats/list-templates), 3 resources (`nowline://reference`, `nowline://examples`, `nowline://conversions`), 3 prompts, tool annotations + structured output, Streamable HTTP `--port`, share links on render/export, MCP Apps in-chat live preview. `@nowline/share-link` extracted as a new leaf package (canonical `fflate`-based share-link encoder; consumed by `@nowline/embed` and `@nowline/mcp`). `printNowlineFile` + `parseNowlineJson` + `TEMPLATE_NAMES` relocated from `@nowline/cli` into `@nowline/core`. See [`specs/handoffs/handoff-m4.8-mcp.md`](./handoffs/handoff-m4.8-mcp.md). |
+| m4.9 | OSS MCP marketplace distribution | Apache 2.0 | `pack-mcp-mcpb` build cell + `nowline.mcpb`; automated MCP registry publish (`io.nowline/nowline` via DNS domain auth); `publish-mcp.yml` reusable workflow + standalone re-run caller; Claude Desktop + Gemini manual submission runbook + auto-tracked maintainer issues. Depends on m4.8. See [`specs/handoffs/handoff-m4.9-mcp-marketplace.md`](./handoffs/handoff-m4.9-mcp-marketplace.md). |
+| m4.10 | macOS notarization | Apache 2.0 | Code-sign (Developer ID Application, Hardened Runtime) + notarize (`notarytool`) + staple the macOS `bun compile` binaries in `release.yml`, clearing Gatekeeper for direct GitHub-Release / non-Homebrew downloads. Apple Developer account already held; deferred on priority, not cost. Pairs with the "tarball each binary" item in [`specs/homebrew-tap.md`](./homebrew-tap.md). |
 
 ## Milestone Details
 
@@ -564,6 +566,38 @@ Depends on: m1 (DSL + parser + validator), m2a (CLI binary for `--mcp` flag), m2
 
 Spec: [`specs/mcp.md`](./mcp.md)
 
+### m4.9 — OSS MCP marketplace distribution
+
+Ship the marketplace distribution deferred from m4.8: build the Claude Desktop `.mcpb` bundle, automate the public MCP registry entry, and document the manual submission channels that have no API.
+
+**Automated (CI):**
+
+- `pack-mcp-mcpb` cell in [`build.yml`](../.github/workflows/build.yml) — `make pack-mcpb` produces `nowline.mcpb`
+- [`publish-mcp.yml`](../.github/workflows/publish-mcp.yml) reusable workflow (Option B), invoked from `release.yml` with `needs: [build, publish]`:
+  1. Verify `npm view @nowline/mcp@$VERSION` is live
+  2. Attach `nowline.mcpb` to the GitHub Release
+  3. MCP registry publish via `mcp-publisher login dns` + `mcp-publisher publish` (last — registry verifies npm ownership)
+  4. Open a `maintainer-only` + `release-ops` tracking issue for manual Claude Desktop + Gemini steps
+- [`publish-mcp-standalone.yml`](../.github/workflows/publish-mcp-standalone.yml) thin caller (Option C) for maintainer re-runs via `workflow_dispatch` or `release: published`
+
+**Package metadata:**
+
+- `packages/mcp/server.json` — registry entry (`io.nowline/nowline`)
+- `packages/mcp/manifest.json` — `.mcpb` manifest (`name: nowline`)
+- `packages/mcp/package.json` — `mcpName: io.nowline/nowline` (npm ownership verification)
+
+**Makefile targets:** `pack-mcpb`, `publish-mcp-registry` (guarded by `CONFIRM_PUBLISH`)
+
+**One-time manual (not provisioned by code):** Ed25519 keypair, DNS TXT record on `nowline.io`, `MCP_PRIVATE_KEY` Actions secret. Full steps: [`ops/mcp-marketplace.md`](../ops/mcp-marketplace.md).
+
+**Manual per release (auto-tracked):** Claude Desktop Extensions directory submission; Gemini CLI extension channel submission.
+
+**Registry-sourced (no action):** Cursor Marketplace, VS Code MCP gallery — both read the public MCP registry.
+
+Depends on: m4.8 (`@nowline/mcp` on npm). Spec updates: [`specs/releasing.md`](./releasing.md) § MCP publishing artifacts, [`specs/cli-distribution.md`](./cli-distribution.md) § MCP server distribution.
+
+Handoff: [`specs/handoffs/handoff-m4.9-mcp-marketplace.md`](./handoffs/handoff-m4.9-mcp-marketplace.md)
+
 ### m4.5 — IDE Expansion (timing TBD)
 
 Extend IDE support beyond VS Code/Cursor. Depends on m3 (LSP server) and is independent of m4 (Embed); slots after m4 in the chain so the public embed ships before plugin work begins.
@@ -576,32 +610,54 @@ Spec: [`specs/ide.md`](./ide.md)
 
 ### m4.6 — Windows distribution (timing TBD)
 
-Brings Windows to parity with the Homebrew + apt + npm install paths shipped in m2a / m2l. Two complementary channels — neither requires a code-signing certificate, both reuse the existing release-job patterns:
+Brings Windows to parity with the Homebrew + apt + npm install paths shipped in m2a / m2l. The Windows audience splits in two, and the channels follow that split: **Scoop is the dev-friendly path; WinGet is the mainstream-reach path.** Because the mainstream path is precisely the one that an unsigned binary's SmartScreen wall scares off, m4.6 also Authenticode-signs the Windows `.exe` — the two channels plus signing reuse the existing release-job patterns:
 
-- **Scoop bucket** — `lolay/scoop-bucket`, parallel in shape to `lolay/homebrew-tap`. JSON manifests under `bucket/nowline.json`; users install with `scoop bucket add lolay https://github.com/lolay/scoop-bucket && scoop install nowline`. The bucket update follows the same pattern as the Homebrew tap commit in [`.github/workflows/release.yml`](../.github/workflows/release.yml): inside the `github-release` cell of the `publish` matrix, after the GH release publishes, append a step that downloads the two Windows binaries, computes SHA256s, rewrites the manifest from a heredoc, and pushes to the bucket repo using a `SCOOP_BUCKET_TOKEN` PAT. Keeping it intra-cell — same as the tap — avoids racing the formula/manifest commit ahead of the release URLs becoming valid. `checkver` + `autoupdate` blocks in the manifest let `scoop update` self-pull future versions even when the workflow lags.
-- **WinGet central registry** — submit to `microsoft/winget-pkgs` per release via `wingetcreate update lolay.nowline -u <release-url> -v <version> --submit`. A new `submit-winget-pkg` job runs after the GitHub Release publishes. First submission goes through manual Microsoft moderation (hours to days); subsequent updates from the same `nowline-release-bot` identity get auto-approval once Microsoft's automation marks us trusted. PAT is `WINGET_PR_PAT`, fine-grained, scoped to fork-and-submit on a personal fork of `microsoft/winget-pkgs`.
-- **Both channels stay unsigned.** Mirrors the current Homebrew + apt + GitHub-Release posture; `scoop install` and `winget install` perform the trust transfer the same way `brew install` does. Code-signing the `.exe` itself (Authenticode or Azure Trusted Signing) would also benefit direct GitHub-Release downloads and head off Microsoft's tightening signing pressure on WinGet long-term — tracked separately, out of scope for m4.6.
+- **Scoop bucket — the dev-friendly channel.** Developers want a CLI-first install and don't blink at unsigned binaries, because `scoop install` performs the trust transfer the same way `brew install` does. `lolay/scoop-bucket`, parallel in shape to `lolay/homebrew-tap`. JSON manifests under `bucket/nowline.json`; users install with `scoop bucket add lolay https://github.com/lolay/scoop-bucket && scoop install nowline`. The bucket update follows the same pattern as the Homebrew tap commit in [`.github/workflows/release.yml`](../.github/workflows/release.yml): inside the `github-release` cell of the `publish` matrix, after the GH release publishes, append a step that downloads the two Windows binaries, computes SHA256s, rewrites the manifest from a heredoc, and pushes to the bucket repo using a `SCOOP_BUCKET_TOKEN` PAT. Keeping it intra-cell — same as the tap — avoids racing the formula/manifest commit ahead of the release URLs becoming valid. `checkver` + `autoupdate` blocks in the manifest let `scoop update` self-pull future versions even when the workflow lags.
+- **WinGet central registry — the mainstream channel.** WinGet ships in-box with Windows 11, so it's the path non-developers actually reach for — and it's where an unsigned binary's SmartScreen warning does the most damage, which is why this milestone signs the `.exe` (next bullet). Submit to `microsoft/winget-pkgs` per release via `wingetcreate update lolay.nowline -u <release-url> -v <version> --submit`. A new `submit-winget-pkg` job runs after the GitHub Release publishes. First submission goes through manual Microsoft moderation (hours to days); subsequent updates from the same `nowline-release-bot` identity get auto-approval once Microsoft's automation marks us trusted. PAT is `WINGET_PR_PAT`, fine-grained, scoped to fork-and-submit on a personal fork of `microsoft/winget-pkgs`.
+- **Code-sign the Windows `.exe` (Authenticode).** Sign both `nowline-windows-x64.exe` and `nowline-windows-arm64.exe` in the release pipeline — on the Windows build runner, after `bun compile` and before upload — so the mainstream WinGet path (and direct GitHub-Release downloads) clear SmartScreen instead of hitting "Windows protected your PC". Use **Azure Trusted Signing** rather than a traditional certificate: it is CI-native (sign via the Trusted Signing GitHub Action / `signtool` with an Azure service principal or OIDC — no hardware token), inexpensive (~$10/mo), and carries Microsoft-backed SmartScreen reputation from the first signed build. A traditional EV cert would also clear SmartScreen immediately but requires an HSM/hardware token that doesn't fit headless CI; a plain OV cert is CI-friendly but earns SmartScreen reputation only slowly, which undercuts the mainstream goal. New secrets on `lolay/nowline`: the Azure Trusted Signing credentials (tenant / client / subscription identity + the signing-account and certificate-profile names). One-time onboarding (create the Trusted Signing account + certificate profile in Azure, complete identity validation) is a manual bootstrap step, parallel to the Homebrew tap seed. This is the Windows counterpart to the macOS code-signing + notarization tracked as m4.10; the two are independent and can ship in either order.
 - **Skipped: Chocolatey, custom WinGet source.** Chocolatey overlaps with WinGet's audience without adding reach. A custom WinGet source would force every user through `winget source add` plus a third-party warning, and the index has to ship as a signed MSIX — much more infra than the central-registry PR flow buys you.
 
 Documentation:
 
 - New [`specs/scoop-bucket.md`](./scoop-bucket.md) — parallel to [`specs/homebrew-tap.md`](./homebrew-tap.md): naming convention, manifest structure, release pipeline integration, bootstrap, install path.
-- Update [`specs/cli-distribution.md`](./cli-distribution.md) Windows section: replace "download the `.exe` directly" guidance with `scoop install` and `winget install`.
-- Update [`specs/releasing.md`](./releasing.md) — add `SCOOP_BUCKET_TOKEN` + `WINGET_PR_PAT` rows to the required-secrets table; add Scoop + WinGet rows to the "After release" verification reminders. (Bootstrap of the `lolay/scoop-bucket` repo itself is a one-shot manual step, parallel to the original Homebrew tap seed.)
+- Update [`specs/cli-distribution.md`](./cli-distribution.md) Windows section: replace "download the `.exe` directly" guidance with `scoop install` and `winget install`, and note that the Windows binaries are now Authenticode-signed.
+- Update [`specs/releasing.md`](./releasing.md) — add `SCOOP_BUCKET_TOKEN`, `WINGET_PR_PAT`, and the Azure Trusted Signing credential rows to the required-secrets table; add Scoop + WinGet install checks and a "verify the `.exe` signature" (`signtool verify /pa` / right-click → Digital Signatures) reminder to the "After release" section. (Bootstrap of the `lolay/scoop-bucket` repo and the Azure Trusted Signing account/profile are one-shot manual steps, parallel to the original Homebrew tap seed.)
 - Update [`specs/homebrew-tap.md`](./homebrew-tap.md) Windows-on-the-tap note: replace "the `.deb` (under WSL), or by downloading the `.exe` directly" with `scoop install lolay/nowline` / `winget install lolay.nowline`.
+- Update [`packages/cli/README.md`](../packages/cli/README.md) — add `scoop install lolay/nowline` and `winget install lolay.nowline` to the Install block, and retire (or soften to a fallback caveat) the "Windows SmartScreen walkthrough", since the signed `.exe` no longer trips the unsigned-binary warning.
 
 Depends on: m2a (original distribution pipeline) and m2l (man-page-style multi-channel pattern); does not depend on m3 / m4 / m4.5. Sequenced after m4.5 by numbering only — m4.6 and m4.5 do not depend on each other and can ship in either order.
 
 Spec: [`specs/scoop-bucket.md`](./scoop-bucket.md), [`specs/cli-distribution.md`](./cli-distribution.md) Windows section.
 
+### m4.10 — macOS notarization (timing TBD)
+
+Code-sign and notarize the macOS `bun compile` binaries so direct GitHub-Release downloads stop tripping Gatekeeper. This is the macOS parallel to the Windows `.exe` Authenticode signing folded into m4.6. Homebrew installs already work unsigned because `brew install` strips the `com.apple.quarantine` xattr and handles the trust transfer (see [`specs/homebrew-tap.md`](./homebrew-tap.md)); this milestone closes the gap for users who download the raw binary off the Releases page instead.
+
+- **Sign with Developer ID Application.** `codesign --options runtime --timestamp` the `nowline-macos-arm64` and `nowline-macos-x64` binaries on a macOS runner using a Developer ID Application certificate. Hardened Runtime (`--options runtime`) is a notarization prerequisite.
+- **Notarize + staple.** Submit the signed artifacts to Apple's notary service with `xcrun notarytool submit --wait`, then `xcrun stapler staple` so the ticket travels with the artifact offline. A bare binary (not a `.app`/`.pkg`/archive) can't be stapled directly, so this likely lands together with the "tarball each binary" future-work item in [`specs/homebrew-tap.md`](./homebrew-tap.md) — notarize the `.tar.gz` (or a `.pkg`/`.dmg`) and staple that.
+- **Credentials already in hand.** Lolay holds an Apple Developer account, so the $99/year Developer ID requirement is satisfied — this is deferred on priority, not cost. New secrets on `lolay/nowline` when the work lands: the Developer ID Application cert + private key (base64 `.p12` + import password) and an App Store Connect API key (issuer id + key id + `.p8`) for `notarytool`.
+- **Homebrew + apt unaffected.** Those channels keep installing the same binary; notarization is purely additive for the direct-download path. Linux binaries are untouched, and Windows `.exe` signing is handled in m4.6 (not here).
+
+Documentation when it ships:
+
+- Update [`specs/homebrew-tap.md`](./homebrew-tap.md) — move the "Code-sign + notarize macOS binaries" Future-work bullet into shipped behavior and drop the direct-download Gatekeeper caveat from "Install path for users".
+- Update [`specs/cli-distribution.md`](./cli-distribution.md) and [`packages/cli/README.md`](../packages/cli/README.md) — remove the macOS direct-download Gatekeeper warning.
+- Update [`specs/releasing.md`](./releasing.md) — add the signing/notarization secrets to the required-secrets table and a post-release "verify notarization" (`spctl -a -vv` / `xcrun stapler validate`) reminder.
+
+Depends on: m2a (the release pipeline that builds and uploads the macOS binaries). Independent of m4.5 / m4.6 / m4.7 / m4.8 / m4.9; sequenced after m4.9 by numbering only. Pairs naturally with the "tarball each binary" future-work item in [`specs/homebrew-tap.md`](./homebrew-tap.md).
+
+Spec: [`specs/homebrew-tap.md`](./homebrew-tap.md), [`specs/cli-distribution.md`](./cli-distribution.md).
+
 ## Dependency Chain
 
 ```
-m1 → m2a → m2b → m2b.5 → m2c → m2d → m2e → m2f → m2g → m2h → m2.5a → m2.5b → m2.5c → m2.5d → m2i → m2j → m2k → m2l → m2m → m2n → m3a → m3b → m3c → m3d → m3e → m3f → m3.5 → m4 → m4.7 → m4.8
+m1 → m2a → m2b → m2b.5 → m2c → m2d → m2e → m2f → m2g → m2h → m2.5a → m2.5b → m2.5c → m2.5d → m2i → m2j → m2k → m2l → m2m → m2n → m3a → m3b → m3c → m3d → m3e → m3f → m3.5 → m4 → m4.7 → m4.8 → m4.9
                                                                                                                                                                                     ↘
                                                                                                                                                                                      m4.5 (depends on m3a only; sequenced after m4.7)
                                                                                                                                                                                     ↘
                                                                                                                                                                                      m4.6 (depends on m2a + m2l; sequenced after m4.5 by numbering only — independent of m4.5 and m4.7)
+                                                                                                                                                                                    ↘
+                                                                                                                                                                                     m4.10 (depends on m2a; sequenced after m4.9 by numbering only — independent of m4.5 / m4.6 / m4.7)
 ```
 
 m3.5 (GitHub Action) and m4 (browser embed) are independent of each other — m3.5 shells out to `@nowline/cli`, m4 ships the browser bundle. The chain orders them m3.5 → m4 by numbering only; either could ship first.
@@ -614,8 +670,12 @@ m4.5 and m4.6 are independent post-m4.7 add-ons — m4.5 extends IDE coverage (O
 
 m4.8 (MCP server, `@nowline/mcp`) needs m1 (DSL + parser + validator) and m2b (layout + renderer, for `render` and `export` tools) as its core dependencies. m3a (LSP) is optional — richer navigation tools can use LSP-backed results. The chain places m4.8 after m4.7 because the optional MCP Apps UI variant requires `@nowline/browser` + `@nowline/preview-shell`; basic stdio operation is independent of m4.7 and could ship earlier. m4.5 and m4.6 are independent of m4.8.
 
+m4.9 (OSS MCP marketplace distribution) depends on m4.8 — it automates registry publish + `.mcpb` build/attach and documents/tracks the manual Claude Desktop + Gemini channels deferred from m4.8. m4.5 and m4.6 are independent of m4.9.
+
+m4.10 (macOS notarization) only needs m2a (the release pipeline that builds and uploads the macOS binaries). It is the macOS counterpart to the Windows `.exe` Authenticode signing folded into m4.6, independent of m4.5 / m4.6 / m4.7 / m4.8 / m4.9, and sequenced after m4.9 by numbering only. It pairs naturally with the "tarball each binary" future-work item in [`specs/homebrew-tap.md`](./homebrew-tap.md), since a bare binary can't be stapled.
+
 m1 is the critical foundation — every subsequent milestone depends on the DSL, parser, and typed AST it produces.
 
-## Beyond m4.8
+## Beyond m4.10
 
 Hosted products (pro editor, free viewer, cloud MCP server, enterprise, FedRAMP) consume these OSS packages via npm but are built in separate, proprietary repos. See the commercial roadmap for that scope.

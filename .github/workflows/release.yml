@@ -491,3 +491,17 @@ jobs:
             --notes "$BODY" \
             --latest
 
+  # Phase 3 — MCP marketplace (registry + .mcpb attach + manual-submission issue).
+  #
+  # Runs only after the whole publish matrix is green so the registry never
+  # advertises a version npm lacks. Registry publish is last inside
+  # publish-mcp.yml because mcp-publisher verifies npm package ownership.
+  publish-mcp:
+    name: Publish MCP marketplace
+    if: ${{ startsWith(github.ref, 'refs/tags/v') }}
+    needs: [build, publish]
+    uses: ./.github/workflows/publish-mcp.yml
+    with:
+      version: ${{ github.ref_name }}
+    secrets: inherit
+

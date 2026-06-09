@@ -18,6 +18,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 - **`@nowline/mcp` — MCP Apps in-chat preview**: `render` returns an embedded `text/html` resource (self-contained IIFE bundle of `@nowline/browser` + `@nowline/preview-shell`) when the client advertises the MCP Apps UI capability or `preview: true` is passed. Plain stdio operation is unchanged.
 - **`@nowline/mcp` — tool annotations**: every tool declares `readOnlyHint`, `idempotentHint`, and/or `destructiveHint` per the MCP spec § annotations.
 - **`@nowline/mcp` — structured output**: every tool declares an `outputSchema` (Zod) and returns `structuredContent` alongside the human-readable text block. Shared schemas live in `src/schemas.ts`.
+- **MCP marketplace distribution (m4.9)**: `@nowline/mcp` is listed on the public MCP registry as `io.nowline/nowline` (automated on each release). Claude Desktop users can install via the `nowline.mcpb` bundle attached to GitHub Releases. Cursor Marketplace and VS Code MCP gallery surface the server from the registry entry.
 
 ### Changed
 

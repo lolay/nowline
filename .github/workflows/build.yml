@@ -1,6 +1,6 @@
 name: Build
 
-# Reusable workflow that defines the 9-cell build matrix shared by
+# Reusable workflow that defines the 10-cell build matrix shared by
 # `ci.yml` (upload: false — shift-left smoke on every PR / main push)
 # and `release.yml` (upload: true — gated on tag push). One matrix,
 # two events.
@@ -42,7 +42,7 @@ permissions:
   contents: read
 
 jobs:
-  # One job, one matrix, nine cells. Heterogeneous on purpose so the
+  # One job, one matrix, ten cells. Heterogeneous on purpose so the
   # caller (publish in release.yml) can `needs: build` and inherit
   # "wait for every cell" gating from GitHub Actions for free — no
   # separate gate job.
@@ -60,6 +60,7 @@ jobs:
   #   pack-vsix     `pnpm package` for the VS Code extension (esbuild
   #                 bundle + `vsce package --no-dependencies`).
   #   pack-action   Stage the Marketplace action mirror bundle.
+  #   pack-mcp-mcpb `make pack-mcpb` for the Claude Desktop .mcpb bundle.
   build:
     name: Build ${{ matrix.id }}
     runs-on: ${{ matrix.runner }}
@@ -76,6 +77,7 @@ jobs:
           - { id: pack-npm, kind: npm-pack, runner: ubuntu-latest }
           - { id: pack-vsix, kind: vsix-pack, runner: ubuntu-latest }
           - { id: pack-action, kind: action-pack, runner: ubuntu-latest }
+          - { id: pack-mcp-mcpb, kind: mcpb-pack, runner: ubuntu-latest }
     steps:
       - uses: actions/checkout@v6
       - uses: ./.github/actions/setup-node-pnpm
@@ -269,5 +271,19 @@ jobs:
           # (action.yml, README.md, LICENSE, dist/index.cjs). Matches
           # the publish cell's `path: action-bundle` download contract.
           path: dist-action/
+          if-no-files-found: error
+
+      # ===== pack-mcp-mcpb cell =====
+
+      - name: Pack nowline.mcpb
+        if: matrix.kind == 'mcpb-pack'
+        run: make pack-mcpb
+
+      - name: Upload nowline.mcpb
+        if: matrix.kind == 'mcpb-pack' && inputs.upload
+        uses: actions/upload-artifact@v7
+        with:
+          name: nowline.mcpb
+          path: dist-mcpb/nowline.mcpb
           if-no-files-found: error
 

@@ -1,7 +1,8 @@
 {
     "name": "@nowline/mcp",
+    "mcpName": "io.nowline/nowline",
     "version": "0.6.0",
-    "description": "Nowline MCP server — stdio tool surface for validate/render/read/create/update/delete/list/export over local .nowline files",
+    "description": "Nowline MCP server — lets AI agents create, edit, and render your roadmaps.",
     "license": "Apache-2.0",
     "engines": {
         "node": ">=22",

@@ -133,13 +133,13 @@ Binary cells use `bun compile` and run the same per-format smoke test (SVG, PNG,
 
 `pack-action` stages the Marketplace action mirror bundle for `lolay/nowline-action`.
 
-`pack-mcp-mcpb` builds and bundles the `packages/mcp/` source into a `nowline.mcpb` Claude Desktop Extensions bundle using the `.mcpb` build toolchain. The artifact is submitted to Claude's Extensions directory as part of the release (analogous to the VS Code `.vsix` submission). Curated marketplace submissions (public MCP registry, Cursor Marketplace, VS Code MCP gallery, Gemini CLI extension channel) may require a separate manual submission/review step with lead time; see [§ MCP publishing artifacts](#mcp-publishing-artifacts) below.
+`pack-mcp-mcpb` runs `make pack-mcpb`, producing `dist-mcpb/nowline.mcpb` for Claude Desktop Extensions. Marketplace distribution (registry publish, `.mcpb` attach, manual submission tracking) is handled by the separate `publish-mcp` job — see [§ MCP publishing artifacts](#mcp-publishing-artifacts) and [`ops/mcp-marketplace.md`](../ops/mcp-marketplace.md).
 
 > **Option B — version-from-tag (future direction).** Today the `cut-release` commit bumps `packages/*/package.json#version`, which is what stamps the binary's `--version`, the embed banner, the .deb control file, the .vsix manifest, and each `pnpm pack` tarball. A future refactor could keep `package.json` at `0.0.0-development` permanently and inject version from the tag at build time, enabling true cache-by-SHA across CI and release — PRs would build the exact same artifacts as the release without any version-bump commit in the way. Out of scope for v0.4.0; revisit after estate cleanups.
 
 ### `publish`
 
-A single job with one matrix of three cells. `needs: build` means every cell of the build matrix must succeed before any cell here starts — built-in gating, no no-op job. Each cell downloads only the artifacts it needs, then pushes; there is no `pnpm install` or `pnpm -r build` happening alongside any external upload.
+A single job with one matrix of four cells. `needs: build` means every cell of the build matrix must succeed before any cell here starts — built-in gating, no no-op job. Each cell downloads only the artifacts it needs, then pushes; there is no `pnpm install` or `pnpm -r build` happening alongside any external upload.
 
 | Cell id | Action |
 |---|---|
@@ -147,7 +147,22 @@ A single job with one matrix of three cells. `needs: build` means every cell of 
 | `vscode` | Downloads `nowline-vscode.vsix`, runs `vsce publish --packagePath …` then `ovsx publish …`. Uses `VSCE_PAT` and `OVSX_PAT`. |
 | `github-release` | Downloads binary + deb artifacts, stages them with the man page (`nowline.1`) and any `nowline.<locale>.1` overlays, publishes the GitHub Release via `softprops/action-gh-release@v3`, **then** commits a refreshed `Formula/nowline.rb` to [`lolay/homebrew-tap`](https://github.com/lolay/homebrew-tap) using `HOMEBREW_TAP_TOKEN`. The formula references the release-asset URLs that the same cell just published and embeds SHA256s computed on the fly. The cell fails loudly if any expected artifact is missing rather than emitting an all-zero SHA. See [`specs/homebrew-tap.md`](./homebrew-tap.md) for the formula structure and seed-repo bootstrap. |
 
+| `action-mirror` | Downloads `action-mirror` bundle, syncs to `lolay/nowline-action`, tags, and publishes a GitHub Release on the mirror. Uses `MARKETPLACE_MIRROR_PAT`. |
+
 The matrix uses `fail-fast: false` so a flaky npm publish does not cancel an in-flight Marketplace publish or the github-release/tap cell.
+
+### `publish-mcp`
+
+Defined in [`publish-mcp.yml`](./.github/workflows/publish-mcp.yml). Reusable workflow invoked from `release.yml` with `needs: [build, publish]` so the MCP registry pointer is never pushed for a half-failed release or before npm is live. A thin standalone caller ([`publish-mcp-standalone.yml`](./.github/workflows/publish-mcp-standalone.yml)) reuses the same implementation for maintainer re-runs.
+
+Ordered steps inside `publish-mcp.yml`:
+
+1. Verify `npm view @nowline/mcp@$VERSION` resolves (waits out npm propagation lag).
+2. Attach `nowline.mcpb` to the GitHub Release (`gh release upload --clobber`).
+3. `make publish-mcp-registry` — DNS domain auth + `mcp-publisher publish` (**last** automated step).
+4. Open a `maintainer-only` + `release-ops` GitHub issue with the Claude Desktop + Gemini manual submission checklist.
+
+Uses `MCP_PRIVATE_KEY`. Operator runbook: [`ops/mcp-marketplace.md`](../ops/mcp-marketplace.md).
 
 We deliberately ship every tag as a stable release — Marketplace pre-release channels require SemVer pre-release suffixes (e.g. `0.1.0-rc.1`) that we do not currently produce. Revisit at 1.0 if we want a "next" channel.
 
@@ -162,6 +177,7 @@ GitHub Actions matrix cells cannot depend on each other (no intra-matrix `needs:
 - `nowline-windows-x64.exe`, `nowline-windows-arm64.exe`
 - `nowline_amd64.deb`, `nowline_arm64.deb`
 - `nowline.1` (man page; referenced as a Homebrew resource), plus any `nowline.<locale>.1` overlays.
+- `nowline.mcpb` (Claude Desktop Extensions bundle; attached by `publish-mcp.yml` after the main publish matrix is green).
 
 ## Hotfix flow
 
@@ -184,6 +200,8 @@ All secrets live under **Settings → Secrets and variables → Actions** on `lo
 | `VSCE_PAT` | `publish` (vscode cell) | Azure DevOps personal access token with **Marketplace → Manage** scope, scoped to the `nowline` publisher. |
 | `OVSX_PAT` | `publish` (vscode cell) | Open VSX personal access token. |
 | `HOMEBREW_TAP_TOKEN` | `publish` (github-release cell) | Fine-grained PAT with `contents: write` on `lolay/homebrew-tap` for committing the refreshed formula. |
+| `MCP_PRIVATE_KEY` | `publish-mcp` | Ed25519 private key (64-character hex) for DNS domain auth on `nowline.io`. Grants `io.nowline/*` namespace for automated MCP registry publish. One-time DNS TXT record setup — see [`ops/mcp-marketplace.md`](../ops/mcp-marketplace.md). |
+| `MARKETPLACE_MIRROR_PAT` | `publish` (action-mirror cell) | Fine-grained PAT with `contents: write` on `lolay/nowline-action` for mirroring the Marketplace action bundle. |
 
 ## MCP publishing artifacts
 
@@ -194,11 +212,12 @@ All secrets live under **Settings → Secrets and variables → Actions** on `lo
 | Channel | Artifact | Action at release |
 |---------|----------|-------------------|
 | npm | `@nowline/mcp` tarball | Published automatically by the `npm` publish cell (same as all other `@nowline/*` packages). |
-| Claude Desktop Extensions directory | `nowline.mcpb` | Manual submission for first publish; subsequent updates may auto-approve. The `pack-mcp-mcpb` cell produces the artifact; a maintainer submits it to the directory. |
-| Public MCP registry (`io.nowline/nowline`) | Registry entry (JSON metadata + reference to npm package) | Manual update of the registry entry on each release. Feeds the VS Code MCP gallery. |
-| Cursor Marketplace | Registry-sourced listing | No separate action — Cursor Marketplace reads the public MCP registry; registry update covers this. |
-| VS Code MCP gallery | Registry-sourced listing | No separate action — VS Code MCP gallery reads the public MCP registry; registry update covers this. |
-| Gemini CLI Extension channel | Extension bundle + `GEMINI.md` | Submitted per the Gemini CLI extension publishing process; may require manual review. |
+| Public MCP registry (`io.nowline/nowline`) | Registry entry (JSON metadata + npm package ref) | **Automated** by `publish-mcp.yml` via `mcp-publisher login dns` + `mcp-publisher publish` (runs after npm is live; registry publish is the last automated step). Feeds the VS Code MCP gallery and Cursor Marketplace. |
+| Cursor Marketplace | Registry-sourced listing | No separate action — reads the public MCP registry. |
+| VS Code MCP gallery | Registry-sourced listing | No separate action — reads the public MCP registry. |
+| GitHub Release | `nowline.mcpb` | **Automated** — `publish-mcp.yml` attaches the artifact built by `pack-mcp-mcpb`. |
+| Claude Desktop Extensions directory | `nowline.mcpb` | **Manual** submission (no public API). CI opens a `maintainer-only` tracking issue with checklist + link to [`ops/mcp-marketplace.md`](../ops/mcp-marketplace.md). |
+| Gemini CLI Extension channel | Extension bundle + `GEMINI.md` | **Manual** submission per the Gemini CLI extension publishing process; tracked on the same release issue. |
 
 Curated marketplace submissions (Claude Desktop Extensions, public MCP registry, Gemini CLI extension channel) may require a review period of hours to days for initial acceptance. Subsequent updates to the same publisher id generally receive faster approval. **Lead time:** plan for at least one sprint of buffer between tagging a release and these marketplace listings going live.
 
@@ -232,7 +251,7 @@ This section is the canonical record for how Nowline MCP artifacts are named and
 - Do NOT re-publish or rename the already-published `.vsix` (`nowline.vscode-nowline`) or Cursor extension to apply this convention. It is a going-forward-only change.
 
 **Operand-first descriptions on every listing (regardless of phase):**
-- OSS: "Edits your local `.nowline` files. Open source, no account."
+- OSS: "Create and edit your roadmaps in a plain-text format."
 - Cloud: "Reads/writes your Nowline roadmaps in the cloud. Requires a Nowline account; cloud features depend on your plan (Pro/Enterprise)."
 
 See [`specs/mcp.md`](./mcp.md) and [`specs/cli-distribution.md`](./cli-distribution.md) § MCP distribution for the full harness coverage matrix.

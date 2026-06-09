@@ -1,0 +1,46 @@
+name: Publish MCP (standalone)
+
+# Thin caller for publish-mcp.yml (Option C). Lets a maintainer re-fire the MCP
+# registry push and .mcpb attach without re-cutting a release — useful when a
+# flaky non-MCP publish cell blocked the registry step, or when re-running after
+# one-time credential setup.
+on:
+  workflow_dispatch:
+    inputs:
+      version:
+        description: 'SemVer version without the v prefix (e.g. 0.6.0)'
+        type: string
+        required: true
+  release:
+    types: [published]
+
+permissions:
+  contents: write
+  issues: write
+
+jobs:
+  resolve-version:
+    name: Resolve version
+    runs-on: ubuntu-latest
+    outputs:
+      version: ${{ steps.v.outputs.version }}
+    steps:
+      - id: v
+        run: |
+          set -euo pipefail
+          if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
+            version="${{ inputs.version }}"
+          else
+            version="${{ github.event.release.tag_name }}"
+            version="${version#v}"
+          fi
+          test -n "$version"
+          echo "version=${version}" >> "$GITHUB_OUTPUT"
+
+  publish-mcp:
+    name: Publish MCP marketplace
+    needs: resolve-version
+    uses: ./.github/workflows/publish-mcp.yml
+    with:
+      version: ${{ needs.resolve-version.outputs.version }}
+    secrets: inherit

@@ -1,0 +1,34 @@
+{
+    "manifest_version": "0.3",
+    "name": "nowline",
+    "display_name": "Nowline",
+    "version": "0.6.0",
+    "description": "Create and edit your roadmaps in a plain-text format.",
+    "long_description": "Nowline lets you create, edit, render, and export roadmaps written as plain text — no diagramming UI required. Agents get typed tools, structured diagnostics, and an optional in-chat preview.",
+    "author": {
+        "name": "Lolay",
+        "url": "https://nowline.io"
+    },
+    "repository": {
+        "type": "git",
+        "url": "https://github.com/lolay/nowline.git"
+    },
+    "homepage": "https://nowline.io",
+    "documentation": "https://github.com/lolay/nowline/blob/main/specs/mcp.md",
+    "support": "https://github.com/lolay/nowline/issues",
+    "license": "Apache-2.0",
+    "server": {
+        "type": "node",
+        "entry_point": "dist/index.js",
+        "mcp_config": {
+            "command": "node",
+            "args": ["${__dirname}/dist/index.js"]
+        }
+    },
+    "compatibility": {
+        "platforms": ["darwin", "win32", "linux"],
+        "runtimes": {
+            "node": ">=22.0.0"
+        }
+    }
+}

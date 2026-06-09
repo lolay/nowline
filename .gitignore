@@ -3,6 +3,9 @@ dist/
 out/
 dist-bin/
 dist-deb/
+dist-pack/
+dist-action/
+dist-mcpb/
 packages/embed/dist-cdn-prod/
 packages/embed/dist-cdn-dev/
 # CI deploy lands the downloaded CDN artifact under the firebase project

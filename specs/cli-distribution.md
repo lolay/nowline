@@ -100,16 +100,17 @@ Neither form requires a separate binary download. The `nowline` CLI binary's `--
 
 Where a harness has an official marketplace, publish there and **only** there. Skip community directories (cursor.directory) and self-hosted deep-link buttons ("Add to Cursor", `vscode:mcp/install`). Manual config is a fallback only where no marketplace exists.
 
-| Channel | Form | How |
-|---------|------|-----|
-| npm | npm package | Published in the `pack-npm` cell via `npm publish`; feeds all other channels |
-| Claude Desktop Extensions directory | `.mcpb` | Manual submission; `pack-mcp-mcpb` build cell produces `nowline.mcpb` |
-| Public MCP registry (`io.nowline/nowline`) | Registry entry | Manual update; feeds VS Code MCP gallery + Cursor Marketplace |
-| Official Cursor Marketplace | Registry-sourced | Reads the public MCP registry; no separate submission once registry entry is live |
-| Official VS Code MCP gallery | Registry-sourced | Reads the public MCP registry; no separate submission once registry entry is live |
-| Gemini CLI Extension channel | Extension bundle + `GEMINI.md` | Submitted per the Gemini CLI extension publishing process |
-| Claude Code | MCP CLI (manual) | `claude mcp add npx @nowline/mcp` or `.mcp.json`; no marketplace |
-| Codex CLI | MCP CLI (manual) | `~/.codex/config.toml` entry; no marketplace |
+| Channel | Form | How | CI |
+|---------|------|-----|-----|
+| npm | npm package | Published in the `pack-npm` / `publish` (npm) cells | Automated |
+| Public MCP registry (`io.nowline/nowline`) | Registry entry | `publish-mcp.yml` via DNS domain auth + `mcp-publisher publish` | Automated |
+| Official Cursor Marketplace | Registry-sourced | Reads the public MCP registry | Automated (registry-sourced) |
+| Official VS Code MCP gallery | Registry-sourced | Reads the public MCP registry | Automated (registry-sourced) |
+| GitHub Release | `nowline.mcpb` | Built in `pack-mcp-mcpb`; attached by `publish-mcp.yml` | Automated |
+| Claude Desktop Extensions directory | `.mcpb` | Manual submission; artifact from release | Manual (tracked issue) |
+| Gemini CLI Extension channel | Extension bundle + `GEMINI.md` | Manual submission per Gemini CLI process | Manual (tracked issue) |
+| Claude Code | MCP CLI (manual) | `claude mcp add npx @nowline/mcp` or `.mcp.json`; no marketplace | n/a (user config) |
+| Codex CLI | MCP CLI (manual) | `~/.codex/config.toml` entry; no marketplace | n/a (user config) |
 
 Note: Cursor Marketplace and VS Code MCP gallery are both fed by the public MCP registry. Updating the registry entry is the single action that surfaces the MCP server in both IDEs.
 

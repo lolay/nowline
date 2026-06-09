@@ -141,15 +141,17 @@ When the harness supports the MCP Apps interactive-UI protocol, `render` (and op
 
 The OSS local server ships wherever a harness can run a **local** stdio server with filesystem access. Web-only harnesses (ChatGPT web, Gemini app/Spark, MS Copilot) have no local runtime and are out of scope here — they use Nowline Cloud instead.
 
-| Harness | OSS install form | Config / marketplace |
-|---------|------------------|----------------------|
-| Cursor | MCP CLI (stdio) | Cursor Marketplace → `io.nowline/nowline` (registry-sourced) or manual `mcp.json` |
-| VS Code | MCP CLI (stdio) | VS Code MCP gallery → `io.nowline/nowline` (registry-sourced) or manual MCP config |
-| Claude Code | MCP CLI (stdio) | `claude mcp add` / `.mcp.json` — no marketplace |
-| Claude Desktop | MCP Desktop (`.mcpb`) | Claude Desktop Extensions directory (one-click) |
-| Gemini CLI | MCP CLI (stdio) + extension bundle | Gemini CLI extension channel (`name: nowline`) |
-| Codex CLI | MCP CLI (manual) | `~/.codex/config.toml` entry |
-| ChatGPT / Gemini app / MS Copilot | — | not supported (no local stdio) |
+| Harness | OSS install form | Config / marketplace | CI (m4.9) |
+|---------|------------------|----------------------|-----------|
+| Cursor | MCP CLI (stdio) | Cursor Marketplace → `io.nowline/nowline` (registry-sourced) or manual `mcp.json` | Registry automated |
+| VS Code | MCP CLI (stdio) | VS Code MCP gallery → `io.nowline/nowline` (registry-sourced) or manual MCP config | Registry automated |
+| Claude Code | MCP CLI (stdio) | `claude mcp add` / `.mcp.json` — no marketplace | npm only |
+| Claude Desktop | MCP Desktop (`.mcpb`) | Claude Desktop Extensions directory (one-click) | `.mcpb` built in CI; directory submission manual |
+| Gemini CLI | MCP CLI (stdio) + extension bundle | Gemini CLI extension channel (`name: nowline`) | Manual submission |
+| Codex CLI | MCP CLI (manual) | `~/.codex/config.toml` entry | npm only |
+| ChatGPT / Gemini app / MS Copilot | — | not supported (no local stdio) | — |
+
+Marketplace distribution status and the release pipeline: [`specs/milestones.md`](./milestones.md) § m4.9, [`specs/releasing.md`](./releasing.md) § MCP publishing artifacts, [`ops/mcp-marketplace.md`](../ops/mcp-marketplace.md).
 
 Marketplace-first: where a harness has an official marketplace, publish there and **only** there — no community directories (`cursor.directory`) or self-hosted deep-link buttons (`Add to Cursor`, `vscode:mcp/install`). Manual config is the fallback where no marketplace exists.
 
