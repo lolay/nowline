@@ -8,6 +8,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ### Added
 
+- **`make gh-runs-list` / `make gh-runs-watch`**: list and watch this repo's in-flight GitHub Actions runs (`status != completed`). Tunable via `GH_LIMIT` (default 50).
 - **`@nowline/mcp` — `convert` tool**: converts a `.nowline` source to its JSON AST (`to:json`) or pretty-prints a JSON AST back to canonical `.nowline` text (`to:nowline`). Bidirectional, round-trip-stable, reuses the same `exportDocument` kernel the CLI uses.
 - **`@nowline/mcp` — `capabilities` tool**: returns all supported themes, icons, locales, export formats, and template names in one call — lets an agent prime itself before writing `.nowline` without multiple discovery round trips.
 - **`@nowline/mcp` — `list-themes`, `list-icons`, `list-locales`, `list-formats`, `list-templates` tools**: granular projections of the `capabilities` payload, one vocabulary slice each. Mirrors Mermaid Chart's `listSupportedTypes` / D2's `list_themes` shape.

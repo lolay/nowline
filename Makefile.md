@@ -38,6 +38,8 @@ graph LR
     lint_workflows["lint-workflows"]
     bundle_size["bundle-size"]
     bump
+    gh_runs_list["gh-runs-list"]
+    gh_runs_watch["gh-runs-watch"]
 ```
 
 Solid arrows are hard prerequisites — running a target automatically runs
@@ -67,6 +69,16 @@ pipeline that artifact is built in a separate CI job and handed over — see
 | `clean` | Remove build / binary / package artifacts (keeps `node_modules`) |
 | `lint-workflows` | actionlint the GitHub Actions workflows (`pnpm lint:workflows`) |
 | `bundle-size` | Build the embed dependency graph and run the CDN bundle-size + `node:*` leak gate |
+
+### GitHub
+
+Local-only dev tools for monitoring this repo's GitHub Actions runs. Not invoked
+by any CI workflow. Requires `gh` on PATH and authentication (`gh auth login`).
+
+| Target | Description |
+|--------|-------------|
+| `gh-runs-list` | List in-flight Actions runs in this repo (`status != completed`: queued, in_progress, waiting, requested, pending). Columns: status, workflow, branch, event, URL. Tunable via `GH_LIMIT` (default 50). |
+| `gh-runs-watch` | Watch each in-flight run until it completes (`gh run watch --compact`). Prints `no active runs` when idle. |
 
 ### Release
 

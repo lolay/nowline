@@ -26,7 +26,8 @@ SHELL := bash
 .DEFAULT_GOAL := help
 
 .PHONY: help init build build-fast test lint format typecheck ci pre-commit doctor clean \
-        lint-workflows bundle-size determinism determinism-browser determinism-update \
+        lint-workflows bundle-size gh-runs-list gh-runs-watch \
+        determinism determinism-browser determinism-update \
         compile smoke deb pack vsix pack-mcpb bump snapshot-version \
         publish-npm publish-vscode publish-cdn publish-mcp-registry
 
@@ -52,6 +53,9 @@ fi
 
 # MODE selects scripts/doctor.<mode>.conf (default | release).
 MODE ?= default
+
+# Maximum recent runs to fetch for gh-runs-list / gh-runs-watch.
+GH_LIMIT ?= 50
 
 ##@ Develop
 
@@ -95,6 +99,24 @@ lint-workflows: ## actionlint the GitHub Actions workflows (needs actionlint on 
 bundle-size: ## Build the embed graph and run the CDN bundle-size + node:* leak gate
 	pnpm -r --filter @nowline/core --filter @nowline/share-link --filter @nowline/layout --filter @nowline/renderer --filter @nowline/browser --filter @nowline/embed run build
 	pnpm --filter @nowline/embed check-size --print-attribution
+
+##@ GitHub
+
+gh-runs-list: ## List this repo's in-flight Actions runs (status != completed)
+	@out=$$(gh run list --limit $(GH_LIMIT) \
+	  --json status,workflowName,headBranch,event,url \
+	  --jq '.[] | select(.status != "completed") | "  \(.status)\t\(.workflowName)\t\(.headBranch)\t\(.event)\t\(.url)"' 2>&1) \
+	  || { printf '  \033[33m⚠\033[0m gh run list failed (auth? run `gh auth login`)\n'; exit 0; }; \
+	if [ -z "$$out" ]; then printf '  \033[2mno active runs\033[0m\n'; \
+	else printf '%s\n' "$$out" | column -t -s "$$(printf '\t')"; fi
+
+gh-runs-watch: ## Watch this repo's in-flight Actions runs until each completes
+	@ids=$$(gh run list --limit $(GH_LIMIT) --json status,databaseId \
+	  --jq '.[] | select(.status != "completed") | .databaseId' 2>/dev/null); \
+	if [ -z "$$ids" ]; then printf '  \033[2mno active runs\033[0m\n'; exit 0; fi; \
+	for id in $$ids; do \
+	  gh run watch "$$id" --compact || printf '  \033[33m⚠\033[0m watch failed for run %s\n' "$$id"; \
+	done
 
 ##@ Determinism
 
