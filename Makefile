@@ -93,7 +93,7 @@ lint-workflows: ## actionlint the GitHub Actions workflows (needs actionlint on 
 	pnpm lint:workflows
 
 bundle-size: ## Build the embed graph and run the CDN bundle-size + node:* leak gate
-	pnpm -r --filter @nowline/core --filter @nowline/layout --filter @nowline/renderer --filter @nowline/browser --filter @nowline/embed run build
+	pnpm -r --filter @nowline/core --filter @nowline/share-link --filter @nowline/layout --filter @nowline/renderer --filter @nowline/browser --filter @nowline/embed run build
 	pnpm --filter @nowline/embed check-size --print-attribution
 
 ##@ Determinism
