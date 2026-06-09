@@ -36,6 +36,17 @@ jobs:
       - name: Lint workflows
         run: make lint-workflows
 
+  triage:
+    name: triage (env doctor)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v6
+      - uses: ./.github/actions/setup-node-pnpm
+
+      - uses: lolay/triage-action@v0.3
+        with:
+          profile: ci
+
   build-test:
     # Matrix layout: every supported OS runs on the dev/CI Node version
     # (26, matching .nvmrc), plus an extra Linux-only cell on Node 22 to

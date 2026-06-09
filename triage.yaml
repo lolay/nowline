@@ -1,0 +1,19 @@
+default:
+  - tool: git
+    hint: https://git-scm.com
+  - tool: gh
+    hint: https://cli.github.com
+  - tool: node
+    version_from: .nvmrc
+    hint: https://nodejs.org
+  - tool: pnpm
+    hint: corepack enable && corepack prepare pnpm@latest --activate
+
+release:
+  extends: [default]
+  add:
+    - tool: bun
+      hint: https://bun.sh
+
+ci:
+  extends: [default]

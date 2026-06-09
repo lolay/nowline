@@ -8,6 +8,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ### Added
 
+- **`triage.yaml` + `make doctor` via triage**: declarative environment health check (`triage --profile default|release|ci`) replaces vendored `scripts/doctor.sh` + `doctor.*.conf`. Checks git, gh, node (`version_from: .nvmrc`), and pnpm; `release` adds bun. CI runs `lolay/triage-action@v0.3` with `profile: ci`.
 - **`make gh-runs-list` / `make gh-runs-watch`**: list and watch this repo's in-flight GitHub Actions runs (`status != completed`). Tunable via `GH_LIMIT` (default 50).
 - **`@nowline/mcp` — `convert` tool**: converts a `.nowline` source to its JSON AST (`to:json`) or pretty-prints a JSON AST back to canonical `.nowline` text (`to:nowline`). Bidirectional, round-trip-stable, reuses the same `exportDocument` kernel the CLI uses.
 - **`@nowline/mcp` — `capabilities` tool**: returns all supported themes, icons, locales, export formats, and template names in one call — lets an agent prime itself before writing `.nowline` without multiple discovery round trips.

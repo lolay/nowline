@@ -51,7 +51,7 @@ confirm = @if [ -z "$($(1))" ]; then \
   exit 1; \
 fi
 
-# MODE selects scripts/doctor.<mode>.conf (default | release).
+# MODE selects triage.yaml profile (default | release).
 MODE ?= default
 
 # Maximum recent runs to fetch for gh-runs-list / gh-runs-watch.
@@ -87,8 +87,9 @@ ci: lint typecheck build test ## Run the full pre-push gate (what CI runs)
 
 pre-commit: ci ## Run the local gate before committing or pushing (alias of ci)
 
-doctor: ## Check required tools for this repo (read-only; non-zero on any problem). MODE=default|release
-	@DOCTOR_MODE='$(MODE)' bash scripts/doctor.sh
+doctor: ## Check required tools for this repo (read-only). MODE=default|release
+	@command -v triage >/dev/null 2>&1 || { printf 'triage not found - install: brew install lolay/tap/triage\n' >&2; exit 1; }
+	@triage --profile $(MODE)
 
 clean: ## Remove build, binary, and package artifacts (keeps node_modules)
 	rm -rf dist-bin dist-deb dist-pack dist-action dist-mcpb packages/*/dist packages/*/dist-*
