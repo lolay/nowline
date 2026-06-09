@@ -1,7 +1,7 @@
 {
     "name": "@nowline/export-png",
     "version": "0.6.0",
-    "description": "Nowline PNG exporter — rasterizes the renderer SVG via @resvg/resvg-wasm",
+    "description": "Exports a Nowline roadmap as a PNG image.",
     "license": "Apache-2.0",
     "engines": {
         "node": ">=22",

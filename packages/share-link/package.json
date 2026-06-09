@@ -1,7 +1,7 @@
 {
     "name": "@nowline/share-link",
     "version": "0.6.0",
-    "description": "Share-link encoder for Nowline roadmaps (zlib + base64url URL fragments)",
+    "description": "Packs a Nowline roadmap into a shareable link — no server needed, the whole roadmap rides in the URL.",
     "license": "Apache-2.0",
     "engines": {
         "node": ">=22",

@@ -1,7 +1,7 @@
 {
     "name": "@nowline/lsp-worker",
     "version": "0.6.0",
-    "description": "Web Worker packaging of the Nowline LSP. Ships a worker entry that wires @nowline/lsp over postMessage, plus a CodeMirror-friendly client adapter for browser IDEs.",
+    "description": "Runs the Nowline language server in a Web Worker, with a CodeMirror-friendly adapter for browser-based editors.",
     "license": "Apache-2.0",
     "engines": {
         "node": ">=22",

@@ -1,7 +1,7 @@
 {
     "name": "@nowline/export-pdf",
     "version": "0.6.0",
-    "description": "Nowline PDF exporter — vector PDF via PDFKit + svg-to-pdfkit",
+    "description": "Exports a Nowline roadmap as a crisp, vector PDF.",
     "license": "Apache-2.0",
     "engines": {
         "node": ">=22",

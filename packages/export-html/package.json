@@ -1,7 +1,7 @@
 {
     "name": "@nowline/export-html",
     "version": "0.6.0",
-    "description": "Nowline HTML exporter — self-contained HTML page wrapping the SVG with pan/zoom",
+    "description": "Exports a Nowline roadmap as a standalone HTML page you can pan and zoom.",
     "license": "Apache-2.0",
     "engines": {
         "node": ">=22",

@@ -1,7 +1,7 @@
 {
     "name": "@nowline/config",
     "version": "0.6.0",
-    "description": "Shared .nowlinerc loader for the Nowline CLI and editors",
+    "description": "Loads Nowline project settings (the .nowlinerc file) for the CLI and editor integrations.",
     "license": "Apache-2.0",
     "engines": {
         "node": ">=22",

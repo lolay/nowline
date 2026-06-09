@@ -1,7 +1,7 @@
 {
     "name": "@nowline/lsp",
     "version": "0.6.0",
-    "description": "Nowline language-server — Langium-based LSP that powers VS Code, Cursor, and any other LSP-capable editor",
+    "description": "Nowline language server — powers editor features like error checking, autocomplete, and hovers in VS Code, Cursor, and other editors.",
     "license": "Apache-2.0",
     "engines": {
         "node": ">=22",

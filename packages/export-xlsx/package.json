@@ -1,7 +1,7 @@
 {
     "name": "@nowline/export-xlsx",
     "version": "0.6.0",
-    "description": "Nowline XLSX exporter — five-sheet workbook via ExcelJS",
+    "description": "Exports a Nowline roadmap as an Excel workbook.",
     "license": "Apache-2.0",
     "engines": {
         "node": ">=22",

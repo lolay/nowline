@@ -1,7 +1,7 @@
 {
     "name": "@nowline/export",
     "version": "0.6.0",
-    "description": "Nowline export kernel — the single parse→resolve→layout→renderSvg→format code path shared by every surface for byte-identical export output",
+    "description": "Nowline export engine — the single code path every tool shares, so a roadmap exports identically everywhere.",
     "license": "Apache-2.0",
     "engines": {
         "node": ">=22",

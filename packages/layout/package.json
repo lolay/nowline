@@ -1,7 +1,7 @@
 {
     "name": "@nowline/layout",
     "version": "0.6.0",
-    "description": "Nowline layout engine — AST → positioned model for rendering",
+    "description": "Nowline layout engine — works out where everything goes on the page before it's drawn.",
     "license": "Apache-2.0",
     "engines": {
         "node": ">=22",

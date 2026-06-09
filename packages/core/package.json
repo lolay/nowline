@@ -1,7 +1,7 @@
 {
     "name": "@nowline/core",
     "version": "0.6.0",
-    "description": "Nowline DSL parser, AST, and validation",
+    "description": "Reads and checks the Nowline roadmap language — the parser and validator every Nowline tool builds on.",
     "license": "Apache-2.0",
     "engines": {
         "node": ">=22",
