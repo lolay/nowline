@@ -1,6 +1,6 @@
 {
     "name": "@nowline/lsp-worker",
-    "version": "0.6.0",
+    "version": "0.7.0",
     "description": "Runs the Nowline language server in a Web Worker, with a CodeMirror-friendly adapter for browser-based editors.",
     "license": "Apache-2.0",
     "engines": {

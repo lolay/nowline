@@ -6,6 +6,8 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ## [Unreleased]
 
+## [0.7.0] - 2026-06-09
+
 ### Added
 
 - **`triage.yaml` + `make doctor` via triage**: declarative environment health check (`triage --profile default|release|ci`) replaces vendored `scripts/doctor.sh` + `doctor.*.conf`. Checks git, gh, node (`version_from: .nvmrc`), and pnpm; `release` adds bun. CI runs `lolay/triage-action@v0.3` with `profile: ci`.
