@@ -28,6 +28,11 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 - **`printNowlineFile` + `parseNowlineJson` + `TEMPLATE_NAMES`** relocated from `@nowline/cli` into `@nowline/core` so `@nowline/mcp` can import them without creating a circular dependency. Both CLI and MCP now import from `@nowline/core`.
 
+### Fixed
+
+- **`make gh-runs-status`**: `neutral` run conclusions now display as `-` (skipped) instead of `✗` (failure).
+- **`make help`**: target-name pattern widened (`[a-zA-Z0-9_.-]+`) so targets containing digits or dots render in the help list.
+
 ## [0.6.0] - 2026-06-06
 
 ### Added

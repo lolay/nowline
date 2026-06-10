@@ -60,7 +60,7 @@ GH_LIMIT ?= 50
 ##@ Develop
 
 help: ## Show this help
-	@awk 'BEGIN {FS = ":.*##"} /^[a-zA-Z_-]+:.*?##/ {printf "  \033[36m%-14s\033[0m %s\n", $$1, $$2} /^##@/ {printf "\n\033[1m%s\033[0m\n", substr($$0,5)}' $(MAKEFILE_LIST)
+	@awk 'BEGIN {FS = ":.*##"} /^[a-zA-Z0-9_.-]+:.*?##/ {printf "  \033[36m%-14s\033[0m %s\n", $$1, $$2} /^##@/ {printf "\n\033[1m%s\033[0m\n", substr($$0,5)}' $(MAKEFILE_LIST)
 
 init: ## Install workspace dependencies from the frozen lockfile
 	pnpm install --frozen-lockfile
@@ -101,6 +101,26 @@ bundle-size: ## Build the embed graph and run the CDN bundle-size + node:* leak 
 	pnpm -r --filter @nowline/core --filter @nowline/share-link --filter @nowline/layout --filter @nowline/renderer --filter @nowline/browser --filter @nowline/embed run build
 	pnpm --filter @nowline/embed check-size --print-attribution
 
+##@ Determinism
+
+# Cross-surface export-determinism gate (specs/export-determinism.md § Enforcement).
+# Asserts byte-identity across the compiled CLI binary, the kernel in Node, and
+# the kernel in a headless browser. Run by the dedicated `determinism` CI job,
+# NOT by `make ci` — it needs a compiled binary (Bun) and a browser (Playwright),
+# which the multi-OS unit-test matrix deliberately does not provision.
+
+determinism: ## Determinism gate: compiled-CLI + kernel-in-Node legs (needs `make compile TARGET=local`)
+	pnpm --filter @nowline/integration-tests exec vitest run --config vitest.determinism.config.ts
+
+determinism-browser: ## Determinism gate: kernel-in-headless-browser leg (needs `playwright install chromium`)
+	pnpm --filter @nowline/integration-tests exec playwright install chromium
+	pnpm --filter @nowline/integration-tests exec vitest run --config vitest.browser.config.ts
+
+determinism-update: ## [danger] Regenerate determinism goldens (Node then browser) — deliberate, on a toolchain bump
+	UPDATE_DETERMINISM_GOLDENS=1 pnpm --filter @nowline/integration-tests exec vitest run --config vitest.determinism.config.ts
+	pnpm --filter @nowline/integration-tests exec playwright install chromium
+	UPDATE_DETERMINISM_GOLDENS=1 pnpm --filter @nowline/integration-tests exec vitest run --config vitest.browser.config.ts
+
 ##@ GitHub
 
 gh-runs-list: ## List this repo's in-flight Actions runs (status != completed)
@@ -129,7 +149,7 @@ gh-runs-status: ## Show pass/fail of the last completed run per workflow
 	esc=$$(printf '\033'); \
 	printf '%s\n' "$$out" | while IFS=$$'\t' read -r conclusion name branch url age_secs; do \
 	  if [ "$$conclusion" = "success" ]; then mark="ok"; \
-	  elif [ "$$conclusion" = "skipped" ]; then mark="skip"; \
+	  elif [ "$$conclusion" = "skipped" ] || [ "$$conclusion" = "neutral" ]; then mark="skip"; \
 	  else mark="fail"; fi; \
 	  if [ "$$age_secs" -lt 60 ]; then age="$${age_secs}s"; \
 	  elif [ "$$age_secs" -lt 3600 ]; then age="$$((age_secs / 60))m"; \
@@ -141,26 +161,6 @@ gh-runs-status: ## Show pass/fail of the last completed run per workflow
 	      -e "s/^skip/$${esc}[2m-$${esc}[0m   /" \
 	      -e "s/^fail/$${esc}[31m✗$${esc}[0m   /" \
 	      -e 's/^/  /'
-
-##@ Determinism
-
-# Cross-surface export-determinism gate (specs/export-determinism.md § Enforcement).
-# Asserts byte-identity across the compiled CLI binary, the kernel in Node, and
-# the kernel in a headless browser. Run by the dedicated `determinism` CI job,
-# NOT by `make ci` — it needs a compiled binary (Bun) and a browser (Playwright),
-# which the multi-OS unit-test matrix deliberately does not provision.
-
-determinism: ## Determinism gate: compiled-CLI + kernel-in-Node legs (needs `make compile TARGET=local`)
-	pnpm --filter @nowline/integration-tests exec vitest run --config vitest.determinism.config.ts
-
-determinism-browser: ## Determinism gate: kernel-in-headless-browser leg (needs `playwright install chromium`)
-	pnpm --filter @nowline/integration-tests exec playwright install chromium
-	pnpm --filter @nowline/integration-tests exec vitest run --config vitest.browser.config.ts
-
-determinism-update: ## [danger] Regenerate determinism goldens (Node then browser) — deliberate, on a toolchain bump
-	UPDATE_DETERMINISM_GOLDENS=1 pnpm --filter @nowline/integration-tests exec vitest run --config vitest.determinism.config.ts
-	pnpm --filter @nowline/integration-tests exec playwright install chromium
-	UPDATE_DETERMINISM_GOLDENS=1 pnpm --filter @nowline/integration-tests exec vitest run --config vitest.browser.config.ts
 
 ##@ Release
 
