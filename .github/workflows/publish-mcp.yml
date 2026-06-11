@@ -98,6 +98,13 @@ jobs:
             mcp-publisher --help >/dev/null
             exit 0
           fi
+          # On Linux runners Homebrew is installed at /home/linuxbrew but is
+          # not on PATH by default. Initialize it and persist to GITHUB_PATH
+          # so subsequent steps (publish-mcp-registry) can find the binary.
+          if [ -x /home/linuxbrew/.linuxbrew/bin/brew ]; then
+            eval "$(/home/linuxbrew/.linuxbrew/bin/brew shellenv)"
+            echo /home/linuxbrew/.linuxbrew/bin >> "$GITHUB_PATH"
+          fi
           brew install mcp-publisher
 
       - name: Publish to MCP registry
