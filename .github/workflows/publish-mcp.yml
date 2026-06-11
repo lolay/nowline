@@ -30,12 +30,23 @@ jobs:
       - uses: actions/checkout@v6
 
       - id: meta
+        env:
+          GH_TOKEN: ${{ github.token }}
         run: |
           set -euo pipefail
           version="${{ inputs.version }}"
           version="${version#v}"
           test -n "$version"
           echo "version=${version}" >> "$GITHUB_OUTPUT"
+          # Resolve the run that built this tag's artifacts. When called from
+          # release.yml the artifact lives in the current run; when called
+          # from publish-mcp-standalone.yml it lives in the tag's completed
+          # Release run, which download-artifact can only reach with an
+          # explicit run-id. Tag-push runs report the tag as their branch.
+          run_id="$(gh run list --workflow release.yml --event push \
+            --branch "v${version}" --json databaseId,status \
+            --jq '[.[] | select(.status=="completed")][0].databaseId // empty')"
+          echo "artifact_run_id=${run_id:-${GITHUB_RUN_ID}}" >> "$GITHUB_OUTPUT"
 
       - name: Verify npm @nowline/mcp@version is live
         env:
@@ -60,7 +71,14 @@ jobs:
         with:
           name: nowline.mcpb
           path: dist-mcpb
+          github-token: ${{ github.token }}
+          run-id: ${{ steps.meta.outputs.artifact_run_id }}
 
+      # No `make pack-mcpb` fallback here on purpose: it needs a full
+      # workspace install plus built packages/mcp/dist/, neither of which
+      # this job has. The two real sources are the build artifact (above)
+      # and the release asset; if both are missing, re-run release.yml's
+      # pack-mcp-mcpb cell rather than rebuilding in this job.
       - name: Obtain nowline.mcpb
         env:
           GH_TOKEN: ${{ github.token }}
@@ -78,7 +96,7 @@ jobs:
             echo "downloaded nowline.mcpb from ${tag} release"
             exit 0
           fi
-          echo "gh release download failed; aborting (no build environment for pack-mcpb fallback)" >&2
+          echo "nowline.mcpb not found in the build artifact or the ${tag} release assets" >&2
           exit 1
 
       - name: Attach nowline.mcpb to GitHub Release
