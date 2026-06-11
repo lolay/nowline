@@ -63,6 +63,7 @@ jobs:
 
       - name: Obtain nowline.mcpb
         env:
+          GH_TOKEN: ${{ github.token }}
           VERSION: ${{ steps.meta.outputs.version }}
         run: |
           set -euo pipefail
@@ -72,9 +73,9 @@ jobs:
             exit 0
           fi
           tag="v${VERSION}"
-          url="https://github.com/${GITHUB_REPOSITORY}/releases/download/${tag}/nowline.mcpb"
-          if curl -fsSL -o dist-mcpb/nowline.mcpb "$url"; then
-            echo "downloaded nowline.mcpb from ${url}"
+          if gh release download "${tag}" --repo "${GITHUB_REPOSITORY}" \
+               --pattern "nowline.mcpb" --dir dist-mcpb --clobber 2>/dev/null; then
+            echo "downloaded nowline.mcpb from ${tag} release"
             exit 0
           fi
           echo "artifact missing and release asset unavailable; building nowline.mcpb"
