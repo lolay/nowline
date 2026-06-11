@@ -73,13 +73,13 @@ jobs:
             exit 0
           fi
           tag="v${VERSION}"
-          if gh release download "${tag}" --repo "${GITHUB_REPOSITORY}" \
-               --pattern "nowline.mcpb" --dir dist-mcpb --clobber 2>/dev/null; then
+          if gh release download "${tag}" \
+               --pattern "nowline.mcpb" --dir dist-mcpb --clobber; then
             echo "downloaded nowline.mcpb from ${tag} release"
             exit 0
           fi
-          echo "artifact missing and release asset unavailable; building nowline.mcpb"
-          make pack-mcpb
+          echo "gh release download failed; aborting (no build environment for pack-mcpb fallback)" >&2
+          exit 1
 
       - name: Attach nowline.mcpb to GitHub Release
         env:
