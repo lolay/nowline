@@ -43,8 +43,8 @@ Renders to:
 Install the CLI from your package manager:
 
 ```bash
-brew install lolay/tap/nowline                       # macOS / Linux / WSL
-npm install -g @nowline/cli                          # any platform with Node 22+
+brew trust lolay/tap                                 # macOS / Linux / WSL (one-time)
+brew install lolay/tap/nowline
 ```
 
 Debian/Ubuntu and Windows users can grab the latest `.deb` or `.exe` from [GitHub Releases](https://github.com/lolay/nowline/releases/latest). See [`packages/cli/README.md`](./packages/cli/README.md#install) for the full install matrix (including `man nowline` setup).

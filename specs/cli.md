@@ -16,8 +16,8 @@ The CLI is **verbless** by design: `nowline <input>` renders by default. Operati
 
 | Platform | Command |
 |----------|---------|
-| macOS | `brew install lolay/tap/nowline` |
-| Linux / WSL | `brew install lolay/tap/nowline` or `sudo apt-get install nowline` (via PPA or .deb) |
+| macOS | `brew trust lolay/tap && brew install lolay/tap/nowline` |
+| Linux / WSL | `brew trust lolay/tap && brew install lolay/tap/nowline` or download `.deb` from [GitHub Releases](https://github.com/lolay/nowline/releases/latest) |
 | Windows | Direct download from GitHub Releases (`.exe`) |
 | npm (any platform) | `npm install -g nowline` |
 
