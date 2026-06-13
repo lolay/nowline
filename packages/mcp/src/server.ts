@@ -260,6 +260,16 @@ export function createMcpServer(opts: McpServerOptions = {}): McpServer {
     const server = new McpServer({
         name: opts.name ?? 'nowline',
         version: opts.version ?? '0.6.0',
+        instructions:
+            'Nowline manages roadmaps written in the .nowline plain-text DSL — ' +
+            'NOT JSON or any other structured format. All `source` parameters expect ' +
+            '.nowline DSL text (a UTF-8 text file that starts with `nowline v1`). ' +
+            'Use the `create-roadmap` prompt when generating a new roadmap from scratch; ' +
+            'it injects the full DSL reference and canonical examples before asking you ' +
+            'to write. Read the `nowline://reference` resource to learn the syntax. ' +
+            'The `json` value in the `formats` capability and the `convert` tool are ' +
+            'for converting an existing .nowline roadmap to/from its JSON AST; ' +
+            'JSON is not an authoring format.',
     });
 
     // ---- Resources ----------------------------------------------------------

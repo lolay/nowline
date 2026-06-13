@@ -6,6 +6,13 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ## [Unreleased]
 
+### Fixed
+
+- **`@nowline/mcp` — server instructions**: added `instructions` to the MCP server
+  initialization so agent harnesses receive guidance that `.nowline` DSL text is the
+  authoring format, not JSON. Previously the absence of server-level instructions caused
+  agents to infer from the JSON-shaped tool responses that JSON was also the input format.
+
 ## [0.7.0] - 2026-06-09
 
 ### Added
