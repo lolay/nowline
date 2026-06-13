@@ -82,6 +82,17 @@ describe('mountLivePreview', () => {
         expect(diagnostics?.classList.contains('show')).toBe(false);
     });
 
+    it('applies a diagnostics result via the default apply path', async () => {
+        const render = vi.fn().mockResolvedValue(ERROR_RESULT);
+        const root = mountRoot();
+        mountLivePreview(root, { source: 'roadmap v1 ...', render });
+        await vi.waitUntil(() => render.mock.calls.length > 0);
+        await new Promise((r) => setTimeout(r, 10));
+        // A diagnostics-kind result routes through setDiagnostics, not setSvg
+        const diagnostics = root.querySelector('.diagnostics');
+        expect(diagnostics?.classList.contains('show')).toBe(true);
+    });
+
     // ===== Injected render fn =====
 
     it('uses the injected render fn instead of the default', async () => {
@@ -224,11 +235,11 @@ describe('mountLivePreview', () => {
         mountLivePreview(root, { source: 'roadmap v1 ...', render });
         await vi.waitUntil(() => render.mock.calls.length > 0);
         await new Promise((r) => setTimeout(r, 10));
-        // The fatal error message should appear in the DOM
-        const fatalEl = root.querySelector('.fatal') ?? root.querySelector('[data-fatal]');
-        // We verify via the empty state toggle (fatal hides empty, shows error)
+        // setFatal surfaces the error as a diagnostics row, hiding the empty state
         const empty = root.querySelector('.empty');
         expect(empty?.classList.contains('hidden')).toBe(true);
+        const diagnostics = root.querySelector('.diagnostics');
+        expect(diagnostics?.classList.contains('show')).toBe(true);
     });
 
     // ===== Escape-hatch guard: mountPreview usable standalone =====
