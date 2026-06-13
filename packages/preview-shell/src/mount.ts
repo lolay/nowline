@@ -575,11 +575,17 @@ export function mountPreview(
 
     function showDiagnosticsMode(rows: DiagnosticRow[]): void {
         els.empty.classList.add('hidden');
-        if (state.svgString) {
-            els.canvas.classList.add('dimmed');
-        }
         populateDiagnostics(rows);
-        els.diagnostics.classList.add('show');
+        // Dim the (now stale) diagram only when an error blocked a fresh
+        // render. Warnings accompany a valid diagram — setDiagnostics([])
+        // or an all-warning list should never veil the canvas.
+        const hasError = rows.some((r) => r.severity === 'error');
+        if (state.svgString && hasError) {
+            els.canvas.classList.add('dimmed');
+        } else {
+            els.canvas.classList.remove('dimmed');
+        }
+        els.diagnostics.classList.toggle('show', rows.length > 0);
     }
 
     function showFatal(message: string): void {

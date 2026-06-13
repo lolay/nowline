@@ -424,6 +424,54 @@ describe('mountPreview', () => {
         handle.dispose();
     });
 
+    // ===== Dim / overlay regression (shell-fix) =====
+
+    it('setDiagnostics([]) does not dim the canvas and hides the overlay', () => {
+        const root = mountRoot();
+        const handle = mountPreview(root);
+        handle.setSvg(SAMPLE_SVG);
+        handle.setDiagnostics([]);
+        const canvas = root.querySelector<HTMLElement>('.canvas')!;
+        const diagnostics = root.querySelector<HTMLElement>('.diagnostics')!;
+        expect(canvas.classList.contains('dimmed')).toBe(false);
+        expect(diagnostics.classList.contains('show')).toBe(false);
+        handle.dispose();
+    });
+
+    it('setDiagnostics with only warnings does not dim the canvas', () => {
+        const root = mountRoot();
+        const handle = mountPreview(root);
+        handle.setSvg(SAMPLE_SVG);
+        const warnRow: DiagnosticRow = { ...SAMPLE_DIAGNOSTIC, severity: 'warning' };
+        handle.setDiagnostics([warnRow]);
+        const canvas = root.querySelector<HTMLElement>('.canvas')!;
+        const diagnostics = root.querySelector<HTMLElement>('.diagnostics')!;
+        expect(canvas.classList.contains('dimmed')).toBe(false);
+        expect(diagnostics.classList.contains('show')).toBe(true);
+        handle.dispose();
+    });
+
+    it('setDiagnostics with an error after setSvg dims the canvas', () => {
+        const root = mountRoot();
+        const handle = mountPreview(root);
+        handle.setSvg(SAMPLE_SVG);
+        handle.setDiagnostics([SAMPLE_DIAGNOSTIC]);
+        const canvas = root.querySelector<HTMLElement>('.canvas')!;
+        const diagnostics = root.querySelector<HTMLElement>('.diagnostics')!;
+        expect(canvas.classList.contains('dimmed')).toBe(true);
+        expect(diagnostics.classList.contains('show')).toBe(true);
+        handle.dispose();
+    });
+
+    it('setDiagnostics([error]) without a prior setSvg does not dim the canvas', () => {
+        const root = mountRoot();
+        const handle = mountPreview(root);
+        handle.setDiagnostics([SAMPLE_DIAGNOSTIC]);
+        const canvas = root.querySelector<HTMLElement>('.canvas')!;
+        expect(canvas.classList.contains('dimmed')).toBe(false);
+        handle.dispose();
+    });
+
     // ===== Collapse / restore =====
 
     it('collapse button adds the collapsed class; restore removes it', () => {

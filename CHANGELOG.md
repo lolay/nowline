@@ -6,6 +6,45 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ## [Unreleased]
 
+### Added
+
+- **`@nowline/preview`** — new package. `mountLivePreview(rootEl, opts)` is a Layer 2
+  live-preview controller that wraps `mountPreview` (Layer 0) and owns the
+  `renderSource → applyRenderResult` loop. Every entry point is injectable: `render?`
+  (default `renderSource`), `apply?` (default `applyRenderResult`), `beforeRender?` (pre-render
+  gate, e.g. LSP errors). Returns the raw `PreviewHandle` for direct imperative control.
+  Lives in a separate package so importing `mountPreview` alone never pulls in the render engine.
+- **`@nowline/preview-shell` — convention helpers**: `applyRenderResult(handle, result)`,
+  `classifyRenderResult(result)`, `themeOverrideToDiagramTheme(theme)`, and
+  `nowOverrideToToday(now)` are now exported from `@nowline/preview-shell`. These encode the
+  canonical "svg-vs-diagnostics" convention (a successful render shows the diagram; warnings
+  do not veil) in one place. All have a **type-only** `@nowline/browser` dependency so
+  shell-only bundles stay render-engine-free.
+
+### Changed
+
+- **`@nowline/mcp` — MCP Apps in-chat preview**: migrated from a hand-rolled
+  `mountPreview` + `renderSource` + coercion loop to `mountLivePreview`, which uses the shared
+  `applyRenderResult` convention by construction.
+- **`vscode-extension` — render-pipeline**: `renderDocument` now uses `classifyRenderResult`
+  from `@nowline/preview-shell` for the svg-vs-diagnostics decision instead of an inline copy,
+  so all surfaces share one definition.
+- **`@nowline/preview-shell` — viewport background in light mode**: `--nl-preview-bg` and
+  `--nl-preview-fg` now follow `data-nl-mode="light"` (white canvas, dark text), matching the
+  embed's default appearance.
+
+### Fixed
+
+- **`@nowline/mcp` — in-chat preview dimming**: the preview panel no longer shows a dark
+  50 % opacity overlay and "No problems" diagnostic bar on a clean roadmap in Claude Desktop
+  (and any other MCP Apps host). Root cause: `entry.ts` was calling
+  `handle.setDiagnostics(result.warnings)` after every successful render; even an empty
+  `warnings: []` triggered `showDiagnosticsMode` which unconditionally dimmed the canvas.
+  Fixed at two levels: (1) `mountLivePreview` uses `applyRenderResult` which never calls
+  `setDiagnostics` on a successful render; (2) `showDiagnosticsMode` in `@nowline/preview-shell`
+  now dims only when `rows` contains at least one `'error'`-severity entry, so even a raw
+  `setDiagnostics([])` call cannot produce the veil.
+
 ### Fixed
 
 - **`@nowline/mcp` — server instructions**: added `instructions` to the MCP server

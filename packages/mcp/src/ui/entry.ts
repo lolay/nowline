@@ -3,28 +3,22 @@
 // Unlike the VS Code webview entry — which receives pre-rendered SVG from
 // the extension host over postMessage — this entry runs standalone inside
 // the MCP host's sandboxed iframe. It reads the .nowline source the server
-// injected as a JSON <script> (#nl-preview-data), renders it to SVG in the
-// browser via `renderSource` (@nowline/browser, the same parse → layout →
-// render pipeline the embed CDN ships), and mounts the shared preview
-// viewport via `mountPreview` (@nowline/preview-shell). No host transport
-// is assumed, so the preview works in any MCP Apps host that renders the
-// embedded text/html resource.
+// injected as a JSON <script> (#nl-preview-data), then delegates the
+// entire render → apply loop to `mountLivePreview` (@nowline/preview),
+// which wires renderSource (@nowline/browser) to the shared preview
+// viewport (@nowline/preview-shell) via the canonical applyRenderResult
+// convention. No host transport is assumed.
 //
 // Mirrors packages/vscode-extension/src/preview/webview/entry.ts; the seam
 // is that this entry owns the render (no host editor feeding it SVG), so
-// theme / now / show-links changes re-render in-place via renderSource.
+// theme / now / show-links changes re-render in-place.
 
 // Runs in a browser-like iframe, not Node. Pull in the DOM lib only here
 // (the rest of @nowline/mcp is Node) — mirrors the VS Code webview entry.
 /// <reference lib="dom" />
 
-import { renderSource } from '@nowline/browser';
-import {
-    mountPreview,
-    type NowOverride,
-    type PreviewHandle,
-    type ThemeOverride,
-} from '@nowline/preview-shell';
+import { mountLivePreview } from '@nowline/preview';
+import type { NowOverride, ThemeOverride } from '@nowline/preview-shell';
 
 /** Server-injected render inputs (see buildPreviewHtml in server.ts). */
 interface PreviewPayload {
@@ -38,8 +32,6 @@ interface PreviewPayload {
     initialFit?: 'fitPage' | 'fitWidth' | 'actual';
 }
 
-type DiagramTheme = 'light' | 'dark' | 'grayscale';
-
 function readPayload(): PreviewPayload | undefined {
     const el = document.getElementById('nl-preview-data');
     if (!el?.textContent) return undefined;
@@ -50,7 +42,7 @@ function readPayload(): PreviewPayload | undefined {
     }
 }
 
-/** Coerce a raw theme token to the shell's ThemeOverride (defaults to Auto). */
+/** Coerce a raw theme token from the payload to the shell's ThemeOverride. */
 function toThemeOverride(theme: string | undefined): ThemeOverride {
     switch (theme) {
         case 'light':
@@ -64,28 +56,6 @@ function toThemeOverride(theme: string | undefined): ThemeOverride {
     }
 }
 
-/** Map a shell ThemeOverride to a renderer ThemeName (Auto → renderer default). */
-function toDiagramTheme(theme: ThemeOverride): DiagramTheme | undefined {
-    switch (theme) {
-        case 'light':
-            return 'light';
-        case 'dark':
-            return 'dark';
-        case 'grayscale':
-        case 'greyscale':
-            return 'grayscale';
-        default:
-            return undefined;
-    }
-}
-
-/** Map a shell NowOverride to the renderSource `today` input. */
-function toToday(now: NowOverride): Date | string | null | undefined {
-    if (now === 'today') return undefined;
-    if (now === 'hide' || now === 'none') return null;
-    return now;
-}
-
 function bootstrap(): void {
     const root = document.getElementById('nl-preview-root');
     if (!root) {
@@ -96,55 +66,22 @@ function bootstrap(): void {
     if (!payload || typeof payload.source !== 'string') {
         return;
     }
-    const { source, width, locale } = payload;
 
-    // Live view state — seeded from the server payload, mutated by the
-    // shell's view-options menu, and read on every re-render.
-    const current = {
-        theme: toThemeOverride(payload.theme),
-        now: (payload.now ?? 'today') as NowOverride,
-        showLinks: payload.showLinks !== false,
-    };
-
-    let handle: PreviewHandle | undefined;
-
-    async function render(): Promise<void> {
-        if (!handle) return;
-        try {
-            const result = await renderSource(source, {
-                theme: toDiagramTheme(current.theme),
-                today: toToday(current.now),
-                width,
-                locale,
-                showLinks: current.showLinks,
-            });
-            if (result.kind === 'svg') {
-                handle.setSvg(result.svg);
-                handle.setDiagnostics(result.warnings);
-            } else {
-                handle.setDiagnostics(result.diagnostics);
-            }
-        } catch (err) {
-            handle.setFatal(err instanceof Error ? err.message : String(err));
-        }
-    }
-
-    handle = mountPreview(root, {
+    mountLivePreview(root as HTMLElement, {
+        source: payload.source,
+        initialView: {
+            theme: toThemeOverride(payload.theme),
+            now: (payload.now ?? 'today') as NowOverride,
+            showLinks: payload.showLinks !== false,
+        },
+        renderOptions: {
+            width: payload.width,
+            locale: payload.locale,
+        },
         themeControl: 'show',
-        locale,
+        locale: payload.locale,
         initialFit: payload.initialFit,
         showMinimap: payload.showMinimap,
-        viewBaseline: {
-            theme: current.theme,
-            now: current.now,
-            showLinks: current.showLinks,
-        },
-        onViewOptions: (overrides) => {
-            if (overrides.theme !== undefined) current.theme = overrides.theme;
-            if (overrides.now !== undefined) current.now = overrides.now;
-            if (overrides.showLinks !== undefined) current.showLinks = overrides.showLinks;
-            void render();
-        },
         onSave: (req) => {
             // Best-effort in-iframe download; the host's iframe sandbox may
             // block it, in which case the copy actions remain available.
@@ -162,8 +99,6 @@ function bootstrap(): void {
             }
         },
     });
-
-    void render();
 }
 
 bootstrap();

@@ -8,6 +8,12 @@
 
 export type { DiagnosticRow } from '@nowline/browser';
 export {
+    applyRenderResult,
+    classifyRenderResult,
+    nowOverrideToToday,
+    themeOverrideToDiagramTheme,
+} from './apply-result.js';
+export {
     __resetPreviewShellStylesheetForTests,
     type DiagnosticGoto,
     type ExportRequest,

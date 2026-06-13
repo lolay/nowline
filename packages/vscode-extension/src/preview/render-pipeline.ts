@@ -20,6 +20,7 @@ import {
     type RenderResult,
 } from '@nowline/browser';
 import { BUNDLED_MONO_FAMILY, BUNDLED_SANS_FAMILY } from '@nowline/export-core';
+import { classifyRenderResult } from '@nowline/preview-shell';
 import type { ThemeName } from '@nowline/layout';
 import type { AssetResolver, FontFamilies } from '@nowline/renderer';
 
@@ -116,16 +117,10 @@ export async function renderDocument(inputs: RenderInputs): Promise<RenderOutcom
         fontFamilies: PREVIEW_FONT_FAMILIES,
     });
 
-    if (result.kind === 'svg') {
-        // Non-strict renderer warnings are silently dropped here to
-        // preserve the m3c preview UX: a successful render shows the
-        // diagram, not a diagnostics overlay. Strict mode flips the
-        // browser pipeline into the `diagnostics` branch upstream so
-        // this `kind: 'svg'` path is only reached when there is nothing
-        // for the diagnostics table to report.
-        return { kind: 'svg', svg: result.svg };
-    }
-    return { kind: 'diagnostics', rows: result.diagnostics };
+    // Non-strict renderer warnings are silently dropped here —
+    // classifyRenderResult encodes the shared convention: a successful
+    // render shows the diagram, not a diagnostics overlay.
+    return classifyRenderResult(result);
 }
 
 /**

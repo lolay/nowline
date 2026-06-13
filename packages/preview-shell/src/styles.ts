@@ -81,8 +81,11 @@ export const PREVIEW_SHELL_CSS = `
     --nl-chrome-chip-bg: rgba(255, 255, 255, 0.07);
     --nl-chrome-shadow: rgba(0, 0, 0, 0.32);
 }
-/* Chrome palette — light mode override (driven by data-nl-mode, never by workbench) */
+/* Chrome + viewport palette — light mode override (driven by data-nl-mode, never by workbench) */
 .nl-preview-root[data-nl-mode="light"] {
+    /* Viewport background: white matches the embed's default canvas. */
+    --nl-preview-bg: #ffffff;
+    --nl-preview-fg: #1e1e1e;
     --nl-chrome-bg: rgba(248, 248, 248, 0.96);
     --nl-chrome-border: rgba(0, 0, 0, 0.13);
     --nl-chrome-fg: #3c3c3c;

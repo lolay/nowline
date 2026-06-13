@@ -6,7 +6,7 @@ The Nowline MCP server exposes the CLI's capabilities to AI agent harnesses thro
 
 **Package:** `@nowline/mcp`, in this monorepo at `packages/mcp/`.
 **License:** Apache 2.0.
-**Milestone:** m4.8. Depends on m1 (core), m2a/m2b (CLI/layout/renderer), m3a (LSP — optional for richer navigation tools), m4.7 (`@nowline/browser` + `@nowline/preview-shell` — required only for the optional MCP Apps UI variant). See [`specs/milestones.md`](./milestones.md) § m4.8.
+**Milestone:** m4.8. Depends on m1 (core), m2a/m2b (CLI/layout/renderer), m3a (LSP — optional for richer navigation tools), m4.7 (`@nowline/browser` + `@nowline/preview-shell` + `@nowline/preview` — required only for the optional MCP Apps UI variant). See [`specs/milestones.md`](./milestones.md) § m4.8.
 
 > **Naming.** Display name **Nowline** today (local OSS, no account). Relabels to **Nowline OSS** once the hosted **Nowline Cloud** MCP ships. Publishing id `nowline` (bare — never `-oss`); registry id `io.nowline/nowline`; `.mcpb` manifest `name: nowline`. **Pro** and **Enterprise** are account tiers that gate Nowline Cloud — never connector names. Full convention: [`specs/releasing.md`](./releasing.md) § MCP publishing artifacts and [`specs/cli-distribution.md`](./cli-distribution.md) § MCP server distribution.
 
@@ -132,10 +132,12 @@ No remote transport, no OAuth, no network calls to Lolay infrastructure. The ser
 
 When the harness supports the MCP Apps interactive-UI protocol, `render` (and optionally `validate` preview) may return an **HTML resource** that mounts:
 
-- [`@nowline/browser`](./architecture.md#surfaces) — `renderSource(source, options)`
-- [`@nowline/preview-shell`](./architecture.md#surfaces) — `mountPreview(rootEl, options)` viewport chrome
+- [`@nowline/preview`](./architecture.md#surfaces) — `mountLivePreview(rootEl, opts)` Layer 2 controller (owns the `renderSource → applyRenderResult` loop)
+  - Which in turn uses [`@nowline/browser`](./architecture.md#surfaces) — `renderSource(source, options)` and [`@nowline/preview-shell`](./architecture.md#surfaces) — `mountPreview(rootEl, options)` viewport chrome
 
-…to show the roadmap live in-chat (the Mermaid Chart precedent). This path requires m4.7 packages and is **optional** — basic stdio operation does not depend on `@nowline/browser` or `@nowline/preview-shell`.
+…to show the roadmap live in-chat (the Mermaid Chart precedent). This path requires these packages and is **optional** — basic stdio operation does not depend on `@nowline/browser`, `@nowline/preview-shell`, or `@nowline/preview`.
+
+The convention used by the in-chat preview is encoded in `@nowline/preview-shell`'s `applyRenderResult` helper: **a successful render shows the diagram; warnings do not trigger the diagnostics overlay; only errors dim the canvas**. This is intrinsic to `mountLivePreview`'s default apply policy and is also hardened in `mountPreview`'s `setDiagnostics` implementation, so the veil cannot reappear from stale hand-rolled call sequences.
 
 ## Harness coverage (OSS tier only)
 
