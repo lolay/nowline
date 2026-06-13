@@ -588,6 +588,9 @@ importers:
       '@nowline/export-core':
         specifier: workspace:*
         version: link:../export-core
+      '@nowline/layout':
+        specifier: workspace:*
+        version: link:../layout
       '@nowline/preview':
         specifier: workspace:*
         version: link:../preview

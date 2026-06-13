@@ -22,6 +22,7 @@ export {
 export {
     type DiagnosticRow,
     fromLangiumDiagnostic,
+    fromLayoutInsight,
     fromLexerError,
     fromParserError,
     fromRenderWarning,
@@ -40,10 +41,12 @@ export {
 export {
     __resetBrowserPipelineForTests,
     DEFAULT_SYNTHETIC_PATH,
+    type DiagnosticLevel,
     type ParseOptions,
     type ParseResult,
     parseSource,
     type RenderOptions,
     type RenderResult,
     renderSource,
+    severityMeetsDiagnosticLevel,
 } from './pipeline.js';

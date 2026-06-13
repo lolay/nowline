@@ -29,6 +29,17 @@ const MINIMAL = [
 // Source with invalid tokens — guaranteed to produce lexer errors.
 const INVALID_SOURCE = 'nowline v1\n\n@@@@';
 
+const NO_SWIMLANE = ['nowline v1', '', 'roadmap r "Title" start:2026-01-05'].join('\n');
+
+const ITEM_NO_DURATION = [
+    'nowline v1',
+    '',
+    'roadmap r "Title" start:2026-01-05',
+    '',
+    'swimlane eng "Engineering"',
+    '  item build "Build"',
+].join('\n');
+
 // ---- Shared client/server setup ---------------------------------------------
 
 let tmpDir: string;
@@ -79,6 +90,7 @@ describe('@nowline/mcp — tool list and annotations', () => {
                 'convert',
                 'create',
                 'delete',
+                'examples',
                 'export',
                 'list',
                 'list-formats',
@@ -87,7 +99,9 @@ describe('@nowline/mcp — tool list and annotations', () => {
                 'list-templates',
                 'list-themes',
                 'read',
+                'reference',
                 'render',
+                'schema',
                 'update',
                 'validate',
             ].sort(),
@@ -181,6 +195,29 @@ describe('@nowline/mcp — validate', () => {
         expect(structured.diagnostics.length).toBeGreaterThan(0);
     });
 
+    it('returns NL.E0004 for swimlane-less source', async () => {
+        const result = await client.callTool({
+            name: 'validate',
+            arguments: { source: NO_SWIMLANE },
+        });
+        const structured = result.structuredContent as {
+            ok: boolean;
+            diagnostics: Array<{ code: string }>;
+        };
+        expect(structured.diagnostics.some((d) => d.code === 'NL.E0004')).toBe(true);
+    });
+
+    it('returns NL.E0600 for item without duration or size', async () => {
+        const result = await client.callTool({
+            name: 'validate',
+            arguments: { source: ITEM_NO_DURATION },
+        });
+        const structured = result.structuredContent as {
+            diagnostics: Array<{ code: string }>;
+        };
+        expect(structured.diagnostics.some((d) => d.code === 'NL.E0600')).toBe(true);
+    });
+
     it('structuredContent matches text content', async () => {
         const result = await client.callTool({ name: 'validate', arguments: { source: MINIMAL } });
         const textBlock = result.content.find((c) => c.type === 'text') as
@@ -191,6 +228,133 @@ describe('@nowline/mcp — validate', () => {
         const structured = result.structuredContent as typeof fromText;
         expect(structured.ok).toBe(fromText.ok);
         expect(structured.diagnostics).toEqual(fromText.diagnostics);
+    });
+});
+
+// ---- render/export validation errors ----------------------------------------
+
+describe('@nowline/mcp — render/export structured errors', () => {
+    it('render returns isError with structured diagnostics on invalid source', async () => {
+        const result = await client.callTool({
+            name: 'render',
+            arguments: { source: INVALID_SOURCE, format: 'svg', now: '2025-01-15' },
+        });
+        expect(result.isError).toBe(true);
+        const textBlock = result.content.find((c) => c.type === 'text') as
+            | { type: 'text'; text: string }
+            | undefined;
+        expect(textBlock).toBeDefined();
+        const parsed = JSON.parse(textBlock!.text) as {
+            ok: boolean;
+            diagnostics: Array<{ code: string }>;
+        };
+        expect(parsed.ok).toBe(false);
+        expect(parsed.diagnostics.length).toBeGreaterThan(0);
+        expect(parsed.diagnostics[0].code).not.toBe('unknown');
+    });
+
+    it('export returns isError with structured diagnostics on invalid source', async () => {
+        const result = await client.callTool({
+            name: 'export',
+            arguments: { source: INVALID_SOURCE, format: 'html' },
+        });
+        expect(result.isError).toBe(true);
+        const textBlock = result.content.find((c) => c.type === 'text') as
+            | { type: 'text'; text: string }
+            | undefined;
+        expect(textBlock).toBeDefined();
+        const parsed = JSON.parse(textBlock!.text) as { ok: boolean; diagnostics: unknown[] };
+        expect(parsed.ok).toBe(false);
+        expect(parsed.diagnostics.length).toBeGreaterThan(0);
+    });
+});
+
+// ---- discovery tools --------------------------------------------------------
+
+describe('@nowline/mcp — discovery tools', () => {
+    it('reference returns non-empty text for condensed and full', async () => {
+        for (const format of ['condensed', 'full'] as const) {
+            const result = await client.callTool({
+                name: 'reference',
+                arguments: { format },
+            });
+            expect(result.isError).toBeFalsy();
+            const structured = result.structuredContent as { format: string; text: string };
+            expect(structured.format).toBe(format);
+            expect(structured.text.length).toBeGreaterThan(50);
+        }
+    });
+
+    it('examples returns catalog without name and specific source by name', async () => {
+        const catalog = await client.callTool({ name: 'examples', arguments: {} });
+        expect(catalog.isError).toBeFalsy();
+        const cat = catalog.structuredContent as { names: string[]; source: string };
+        expect(cat.names.length).toBeGreaterThan(0);
+        expect(cat.source).toContain('nowline v1');
+
+        const named = await client.callTool({
+            name: 'examples',
+            arguments: { name: 'minimal' },
+        });
+        expect(named.isError).toBeFalsy();
+        const one = named.structuredContent as { name: string; source: string };
+        expect(one.name).toBe('minimal');
+        expect(one.source).toContain('nowline v1');
+    });
+
+    it('schema returns expected key slices', async () => {
+        const result = await client.callTool({ name: 'schema', arguments: {} });
+        expect(result.isError).toBeFalsy();
+        const structured = result.structuredContent as {
+            directiveKeys: string[];
+            entityTypes: string[];
+            itemPropertyKeys: string[];
+        };
+        expect(structured.directiveKeys).toContain('start');
+        expect(structured.entityTypes).toContain('swimlane');
+        expect(structured.itemPropertyKeys).toContain('duration');
+    });
+});
+
+// ---- render review + insights -----------------------------------------------
+
+describe('@nowline/mcp — render review and insights', () => {
+    it('render with review:true adds a review nudge on valid source', async () => {
+        const result = await client.callTool({
+            name: 'render',
+            arguments: { source: MINIMAL, format: 'svg', now: '2025-01-15', review: true },
+        });
+        expect(result.isError).toBeFalsy();
+        const textBlock = result.content.find(
+            (c) => c.type === 'text' && 'text' in c && c.text.includes('Review this raster'),
+        );
+        expect(textBlock).toBeDefined();
+    });
+
+    it('validate on valid source can return insights and hint for spill-prone source', async () => {
+        const longTitle = [
+            'nowline v1',
+            '',
+            'roadmap r "R" start:2026-01-05 scale:1w',
+            '',
+            'swimlane eng "Engineering"',
+            '  item x "This title is far too long to fit inside a one-week bar" duration:1w',
+        ].join('\n');
+        const result = await client.callTool({
+            name: 'validate',
+            arguments: { source: longTitle },
+        });
+        expect(result.isError).toBeFalsy();
+        const structured = result.structuredContent as {
+            ok: boolean;
+            insights?: Array<{ code: string }>;
+        };
+        expect(structured.ok).toBe(true);
+        expect(structured.insights?.some((i) => i.code === 'NL.I1000')).toBe(true);
+        const hintBlock = result.content.find(
+            (c) => c.type === 'text' && 'text' in c && c.text.includes('review:true'),
+        );
+        expect(hintBlock).toBeDefined();
     });
 });
 

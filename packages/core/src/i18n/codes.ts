@@ -14,6 +14,8 @@
 //   NL.E0800–E0899  style / color / symbol
 //   NL.E0900–E0999  config blocks (calendar, scale, default)
 //   NL.W0700–W0799  warnings (silently-ignored input)
+//   NL.W1000–W1099  layout warnings (author intent lost)
+//   NL.I1000–I1099  layout insights (informational reflow consequences)
 //
 // The full list of allocated codes lives in `messages.en.ts` (one entry
 // per code). The runtime walks the locale fallback chain and falls
@@ -69,7 +71,18 @@ export type MessageCode =
     | 'NL.E0600' // item-requires-size-or-duration
 
     // Warnings (NL.W0700–W0799)
-    | 'NL.W0700'; // unknown-entity-property
+    | 'NL.W0700' // unknown-entity-property
+
+    // Layout warnings (NL.W1000–W1099)
+    | 'NL.W1000' // now-line-outside-window
+
+    // Layout insights (NL.I1000–I1099)
+    | 'NL.I1000' // caption-spilled-right
+    | 'NL.I1001' // label-chips-outside
+    | 'NL.I1002' // bar-too-narrow
+    | 'NL.I1003' // before-overflow
+    | 'NL.I1004' // lane-multi-row
+    | 'NL.I1005'; // lane-over-capacity
 
 export const ALL_CODES: ReadonlyArray<MessageCode> = [
     'NL.E0001',
@@ -107,4 +120,11 @@ export const ALL_CODES: ReadonlyArray<MessageCode> = [
     'NL.E0505',
     'NL.E0600',
     'NL.W0700',
+    'NL.W1000',
+    'NL.I1000',
+    'NL.I1001',
+    'NL.I1002',
+    'NL.I1003',
+    'NL.I1004',
+    'NL.I1005',
 ] as const;

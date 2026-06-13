@@ -41,6 +41,7 @@
         "@nowline/core": "workspace:*",
         "@nowline/export": "workspace:*",
         "@nowline/export-core": "workspace:*",
+        "@nowline/layout": "workspace:*",
         "@nowline/preview": "workspace:*",
         "@nowline/preview-shell": "workspace:*",
         "@nowline/share-link": "workspace:*",

@@ -66,6 +66,12 @@ export {
 export type { LayoutOptions, LayoutResult } from './layout.js';
 export { layoutRoadmap } from './layout.js';
 export {
+    collectLayoutInsights,
+    type LayoutInsight,
+    type LayoutInsightContext,
+    type LayoutInsightSeverity,
+} from './layout-insights.js';
+export {
     civilDateInZone,
     type NormalizedZone,
     normalizeZone,

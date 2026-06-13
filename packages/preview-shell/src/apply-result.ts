@@ -35,8 +35,8 @@ export function classifyRenderResult(
 
 /**
  * Apply a `RenderResult` to a `PreviewHandle` using the shared convention:
- * svg shows the diagram; error diagnostics trigger the overlay; warnings
- * on a successful render are discarded.
+ * svg shows the diagram; error diagnostics trigger the overlay; non-error
+ * warnings/insights on a successful render show the non-dimming table.
  *
  * Call this (or override it in `mountLivePreview`) instead of calling
  * `setSvg` / `setDiagnostics` by hand in every surface.
@@ -44,6 +44,9 @@ export function classifyRenderResult(
 export function applyRenderResult(handle: PreviewHandle, result: RenderResult): void {
     if (result.kind === 'svg') {
         handle.setSvg(result.svg);
+        if (result.warnings.length > 0) {
+            handle.setDiagnostics(result.warnings);
+        }
     } else {
         handle.setDiagnostics(result.diagnostics);
     }

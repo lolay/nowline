@@ -25,6 +25,7 @@ import {
     resolveIncludes,
 } from '@nowline/core';
 import {
+    collectLayoutInsights,
     layoutRoadmap,
     type NormalizedZone,
     normalizeZone,
@@ -37,6 +38,7 @@ import { URI } from 'langium';
 import {
     type DiagnosticRow,
     fromLangiumDiagnostic,
+    fromLayoutInsight,
     fromLexerError,
     fromParserError,
     fromRenderWarning,
@@ -54,6 +56,27 @@ import {
  * a more user-meaningful label by setting `filePath`.
  */
 export const DEFAULT_SYNTHETIC_PATH = '/browser-source.nowline';
+
+export type DiagnosticLevel = 'error' | 'warning' | 'info';
+
+const SEVERITY_RANK: Record<DiagnosticRow['severity'], number> = {
+    error: 3,
+    warning: 2,
+    info: 1,
+};
+
+const LEVEL_RANK: Record<DiagnosticLevel, number> = {
+    error: 3,
+    warning: 2,
+    info: 1,
+};
+
+export function severityMeetsDiagnosticLevel(
+    severity: DiagnosticRow['severity'],
+    level: DiagnosticLevel,
+): boolean {
+    return SEVERITY_RANK[severity] >= LEVEL_RANK[level];
+}
 
 export interface ParseOptions {
     /**
@@ -76,6 +99,11 @@ export interface ParseOptions {
      * the pipeline to `console.warn`.
      */
     onSkippedInclude?: (info: SkippedInclude) => void;
+    /**
+     * Minimum diagnostic severity to surface from layout insights on a
+     * successful render. Defaults to `error` (layout insights hidden).
+     */
+    diagnosticLevel?: DiagnosticLevel;
 }
 
 export interface ParseResult {
@@ -260,6 +288,13 @@ export async function renderSource(
         width: options.width,
     });
 
+    const diagnosticLevel = options.diagnosticLevel ?? 'error';
+    // Filtered once below as part of the combined `warnings` array.
+    const layoutInsightRows = collectLayoutInsights(model, {
+        today: today ?? undefined,
+        locale: options.locale ?? 'en-US',
+    }).map((insight) => fromLayoutInsight(insight, filePath));
+
     const showLinks = options.showLinks !== false;
     const strict = options.strict === true;
     const warnMessages: string[] = [];
@@ -273,9 +308,10 @@ export async function renderSource(
         fontFamilies: options.fontFamilies,
     });
 
-    const warnings = warnMessages.map((m) =>
-        fromRenderWarning(m, filePath, strict ? 'error' : 'warning'),
-    );
+    const warnings = [
+        ...layoutInsightRows,
+        ...warnMessages.map((m) => fromRenderWarning(m, filePath, strict ? 'error' : 'warning')),
+    ].filter((row) => severityMeetsDiagnosticLevel(row.severity, diagnosticLevel));
     if (strict && warnings.length > 0) {
         return { kind: 'diagnostics', diagnostics: [...rows, ...warnings] };
     }

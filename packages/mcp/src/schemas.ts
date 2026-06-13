@@ -9,9 +9,17 @@ export const DiagnosticSchema = z.object({
     file: z.string(),
     line: z.number(),
     column: z.number(),
-    severity: z.enum(['error', 'warning']),
+    severity: z.enum(['error', 'warning', 'info']),
     code: z.string(),
     message: z.string(),
+    suggestion: z.string().optional(),
+});
+
+export const InsightSchema = z.object({
+    severity: z.enum(['info', 'warning']),
+    code: z.string(),
+    message: z.string(),
+    entityId: z.string().optional(),
 });
 
 // ---- Tool output schemas ---------------------------------------------------
@@ -19,6 +27,7 @@ export const DiagnosticSchema = z.object({
 export const ValidateOutputSchema = z.object({
     ok: z.boolean(),
     diagnostics: z.array(DiagnosticSchema),
+    insights: z.array(InsightSchema).optional(),
 });
 
 export const ReadOutputSchema = z.object({
@@ -52,6 +61,7 @@ export const RenderOutputSchema = z.object({
     path: z.string().optional(),
     bytes: z.number().optional(),
     shareUrl: z.string().optional(),
+    insights: z.array(InsightSchema).optional(),
 });
 
 export const ExportOutputSchema = z.object({
@@ -76,4 +86,21 @@ export const CapabilitiesOutputSchema = z.object({
 
 export const ListItemsOutputSchema = z.object({
     items: z.array(z.string()),
+});
+
+export const ReferenceOutputSchema = z.object({
+    format: z.enum(['condensed', 'full']),
+    text: z.string(),
+});
+
+export const ExamplesOutputSchema = z.object({
+    names: z.array(z.string()).optional(),
+    name: z.string().optional(),
+    source: z.string().optional(),
+});
+
+export const SchemaOutputSchema = z.object({
+    directiveKeys: z.array(z.string()),
+    entityTypes: z.array(z.string()),
+    itemPropertyKeys: z.array(z.string()),
 });

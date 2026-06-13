@@ -213,4 +213,32 @@ describe('renderSource — strict + warnings', () => {
         if (result.kind !== 'svg') throw new Error('expected svg');
         expect(result.svg).toContain('id="inject-');
     });
+
+    it('drops layout insights by default (diagnosticLevel error)', async () => {
+        const longTitle = `nowline v1
+
+roadmap r "R" start:2026-01-05 scale:1w
+
+swimlane eng "Engineering"
+  item x "This title is far too long to fit inside a one-week bar" duration:1w
+`;
+        const result = await renderSource(longTitle);
+        expect(result.kind).toBe('svg');
+        if (result.kind !== 'svg') return;
+        expect(result.warnings).toEqual([]);
+    });
+
+    it('includes layout insights when diagnosticLevel is info', async () => {
+        const longTitle = `nowline v1
+
+roadmap r "R" start:2026-01-05 scale:1w
+
+swimlane eng "Engineering"
+  item x "This title is far too long to fit inside a one-week bar" duration:1w
+`;
+        const result = await renderSource(longTitle, { diagnosticLevel: 'info' });
+        expect(result.kind).toBe('svg');
+        if (result.kind !== 'svg') return;
+        expect(result.warnings.some((w) => w.code === 'NL.I1000')).toBe(true);
+    });
 });

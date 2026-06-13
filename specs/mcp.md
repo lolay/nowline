@@ -42,8 +42,8 @@ Tool names are **identical** to the Nowline Cloud MCP server so agents and users
 
 | Tool | Args (OSS) | Returns | Notes |
 |------|------------|---------|-------|
-| `validate` | `{ source?: string, path?: string }` | `{ ok: boolean, diagnostics: Diagnostic[] }` | Parse + validate via `@nowline/core`. At least one of `source` or `path` required. Same `Diagnostic` shape as the CLI — see [`specs/cli.md`](./cli.md) § Diagnostics. |
-| `render` | `{ source?: string, path?: string, format?: 'svg' \| 'png' = svg, theme?, now?, width?, ... }` | image resource + `{ path?: string }` metadata | Renders in-process via the shared `@nowline/export` kernel (no `nowline` shell-out). Returns an MCP image resource (SVG/PNG) plus the output path when written to disk. PNG rasterizes via `@resvg/resvg-wasm` per [export-determinism](./export-determinism.md). |
+| `validate` | `{ source?: string, path?: string }` | `{ ok: boolean, diagnostics: Diagnostic[], insights?: Insight[] }` | Parse + validate via `@nowline/core`. On success, returns layout `insights` (informational reflow consequences) by default. At least one of `source` or `path` required. Diagnostics carry stable `NL.E####` codes and optional `suggestion`. |
+| `render` | `{ source?: string, path?: string, format?: 'svg' \| 'png' = svg, theme?, now?, width?, review?, ... }` | image resource + `{ path?: string, insights?: Insight[] }` metadata | Validates first; on error returns `{ ok: false, diagnostics }` (same shape as `validate`). On success renders in-process via `@nowline/export` and returns layout `insights`. Optional `review: true` attaches a downscaled inspection PNG for multimodal self-review. |
 | `read` | `{ path: string }` | `{ path, source }` | Reads a local `.nowline` file. Rejects paths outside allowed roots (project directory + `--asset-root` semantics aligned with the CLI). |
 | `create` | `{ path: string, source: string }` | `{ path }` | Writes a new `.nowline` file after validation. Overwrites if the path already exists (same silent-overwrite posture as the CLI). |
 | `update` | `{ path: string, source: string }` | `{ path }` | Replaces an existing file after validation. |
@@ -62,6 +62,9 @@ Tools beyond the shared contract. They lean on capabilities the CLI already has 
 | `convert` | `{ source?: string, path?: string, to: 'json' \| 'nowline' }` | `{ result: string }` (+ structured AST when `to: 'json'`) | Bidirectional text ↔ JSON AST, the same round-trip-stable `convert` the CLI exposes (`nowline … -f json` / JSON → text). Lets an agent fetch the typed AST, manipulate structure programmatically, and re-emit canonical `.nowline`. |
 | `capabilities` | `{}` | `{ themes, icons, locales, formats, templates }` | The whole option vocabulary in one call — the cheap way to prime a model before it writes `.nowline`: theme names (`light`, `dark`, `grayscale`), the `capacity-icon` vocabulary + reserved built-in icon names, available locales (`en`, `fr`), export formats, and `--init` template names (`minimal`, `teams`, `product`, `showcase`). |
 | `list-themes` / `list-icons` / `list-locales` / `list-formats` / `list-templates` | `{}` | the matching slice of the `capabilities` payload | Granular discovery tools — thin projections of `capabilities`, one vocabulary each. For harnesses that surface options individually (a `list-themes` slash-command) or agents that want just one slice without the full payload. Mirrors Mermaid's `listSupportedTypes` and D2's `list_themes` / `list_icons` shape. Same underlying data as `capabilities`; pick whichever fits the call. |
+| `reference` | `{ format?: 'condensed' \| 'full' = condensed }` | `{ format, text }` | Callable DSL reference (condensed cheatsheet or full man page). Mirrors Mermaid's `getMermaidSyntaxGuide`. **Tools mirror** the `nowline://reference` resource because agents call tools but often skip resources. |
+| `examples` | `{ name?: string }` | `{ names?, name?, source? }` | Example catalog (no `name`) or one example's source by name. Mirrors Mermaid's `get_examples`. Mirrors `nowline://examples`. |
+| `schema` | `{}` | `{ directiveKeys, entityTypes, itemPropertyKeys }` | Structured key vocabulary for the DSL. Mirrors Mermaid's frontmatter-schema discovery pattern. |
 
 **Why both forms.** `capabilities` is one round-trip for the full picture (ideal for priming and for token-frugal agents); the `list-*` family is granular for harnesses that expose each vocabulary as its own affordance and for agents that need a single slice. They never disagree — the `list-*` tools are projections of the same source enums `capabilities` returns.
 
@@ -71,7 +74,7 @@ Every tool declares the standard MCP behavior hints ([spec](https://modelcontext
 
 | Tool | `readOnlyHint` | `idempotentHint` | `destructiveHint` | `openWorldHint` |
 |------|:--:|:--:|:--:|:--:|
-| `validate`, `read`, `list`, `render`, `export`, `convert`, `capabilities`, `list-*` | ✓ | ✓ | — | — |
+| `validate`, `read`, `list`, `render`, `export`, `convert`, `capabilities`, `list-*`, `reference`, `examples`, `schema` | ✓ | ✓ | — | — |
 | `create` | — | ✓ | ✓¹ | — |
 | `update` | — | ✓ | — | — |
 | `delete` | — | ✓ | ✓ | — |
@@ -80,7 +83,7 @@ Every tool declares the standard MCP behavior hints ([spec](https://modelcontext
 
 ### Structured output
 
-Every tool declares an `outputSchema` and returns [structured content](https://modelcontextprotocol.io/specification/2025-11-25/server/tools) (the typed object in the table above) alongside a human-readable text block. This is the point of the server: harnesses get a machine-checkable shape (e.g. `validate` → `{ ok, diagnostics }` with the same `Diagnostic` schema the CLI emits) instead of re-parsing prose. `render`/`export` additionally return the image/document as an MCP resource (and, optionally, a [share link](#share-links)).
+Every tool declares an `outputSchema` and returns [structured content](https://modelcontextprotocol.io/specification/2025-11-25/server/tools) (the typed object in the table above) alongside a human-readable text block. This is the point of the server: harnesses get a machine-checkable shape (e.g. `validate` → `{ ok, diagnostics }` with stable `NL.E####` codes, optional `suggestion`, and optional layout `insights`) instead of re-parsing prose. `render`/`export` validate first and return the same `{ ok: false, diagnostics }` shape on error-severity input (never a raw kernel error string). On success, `render`/`validate` also return layout `insights` (informational reflow consequences, not errors). `render`/`export` additionally return the image/document as an MCP resource (and, optionally, a [share link](#share-links)).
 
 ### Share links
 

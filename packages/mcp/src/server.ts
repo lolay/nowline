@@ -9,13 +9,7 @@
 import { promises as fs } from 'node:fs';
 import * as path from 'node:path';
 import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
-import {
-    collectDocumentDiagnostics,
-    createNowlineServices,
-    type NowlineFile,
-    parseNowlineJson,
-    printNowlineFile,
-} from '@nowline/core';
+import { parseNowlineJson, printNowlineFile } from '@nowline/core';
 import {
     type ExportFormat,
     exportDocument,
@@ -24,22 +18,41 @@ import {
 } from '@nowline/export';
 import { resolveFonts } from '@nowline/export-core';
 import { buildShareLink } from '@nowline/share-link';
-import { URI } from 'langium';
 import { z } from 'zod';
 import { CAPABILITIES } from './capabilities.js';
-import { CONVERSIONS_GUIDE, EXAMPLES, REFERENCE_MAN_PAGE } from './generated/resources.js';
+import {
+    buildDocument,
+    collectMcpDiagnostics,
+    collectMcpLayoutInsights,
+    DEFAULT_RENDER_WIDTH,
+    diagnosticsErrorBlock,
+    LAYOUT_INSIGHT_HINT,
+    REVIEW_MAX_WIDTH,
+    toolDescriptionWithSyntax,
+} from './diagnostics.js';
+import {
+    CONVERSIONS_GUIDE,
+    EXAMPLES,
+    type ExampleFile,
+    REFERENCE_MAN_PAGE,
+} from './generated/resources.js';
 import { UI_BUNDLE } from './generated/ui-bundle.js';
 import { registerPrompts } from './prompts.js';
+import { REFERENCE_CHEATSHEET } from './reference-cheatsheet.js';
+import { SCHEMA_VOCABULARY } from './schema-vocab.js';
 import {
     CapabilitiesOutputSchema,
     ConvertOutputSchema,
     CreateOutputSchema,
     DeleteOutputSchema,
+    ExamplesOutputSchema,
     ExportOutputSchema,
     ListItemsOutputSchema,
     ListOutputSchema,
     ReadOutputSchema,
+    ReferenceOutputSchema,
     RenderOutputSchema,
+    SchemaOutputSchema,
     UpdateOutputSchema,
     ValidateOutputSchema,
 } from './schemas.js';
@@ -119,71 +132,7 @@ function previewResourceBlock(payload: PreviewPayload) {
     };
 }
 
-// ---- Diagnostic helpers -----------------------------------------------------
-
-interface McpDiagnostic {
-    file: string;
-    line: number;
-    column: number;
-    severity: 'error' | 'warning';
-    code: string;
-    message: string;
-}
-
-function collectMcpDiagnostics(
-    doc: Awaited<ReturnType<typeof buildDocument>>,
-    filePath: string,
-): McpDiagnostic[] {
-    const raw = collectDocumentDiagnostics(doc);
-    const out: McpDiagnostic[] = [];
-    for (const d of raw) {
-        if (d.origin === 'lexer' || d.origin === 'parser') {
-            out.push({
-                file: filePath,
-                line: 1,
-                column: 1,
-                severity: 'error',
-                code: d.origin === 'lexer' ? 'lexing-error' : 'parsing-error',
-                message: d.error.message,
-            });
-        } else {
-            const diag = d.diagnostic;
-            const range = diag.range;
-            out.push({
-                file: filePath,
-                line: (range?.start.line ?? 0) + 1,
-                column: (range?.start.character ?? 0) + 1,
-                severity: diag.severity === 1 ? 'error' : 'warning',
-                code: String(diag.code ?? 'unknown'),
-                message: diag.message,
-            });
-        }
-    }
-    return out;
-}
-
-// ---- Langium services -------------------------------------------------------
-
-let cachedServices: ReturnType<typeof createNowlineServices> | undefined;
-let docCounter = 0;
-
-function getServices() {
-    if (!cachedServices) cachedServices = createNowlineServices();
-    return cachedServices;
-}
-
-async function buildDocument(source: string) {
-    const services = getServices();
-    const uri = URI.parse(`memory:///mcp-${++docCounter}.nowline`);
-    const doc = services.shared.workspace.LangiumDocumentFactory.fromString<NowlineFile>(
-        source,
-        uri,
-    );
-    await services.shared.workspace.DocumentBuilder.build([doc], { validation: true });
-    return doc;
-}
-
-// ---- Allowed-root enforcement -----------------------------------------------
+// ---- Server factory ---------------------------------------------------------
 
 function resolveAndGuard(filePath: string, allowedRoot: string): string {
     const abs = path.resolve(allowedRoot, filePath);
@@ -229,6 +178,15 @@ function todayUtc(): Date {
     return new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate()));
 }
 
+function exampleShortName(fullName: string): string {
+    return fullName.endsWith('.nowline') ? fullName.slice(0, -'.nowline'.length) : fullName;
+}
+
+function findExample(name: string): ExampleFile | undefined {
+    const withExt = name.endsWith('.nowline') ? name : `${name}.nowline`;
+    return EXAMPLES.find((e) => e.name === withExt || e.name === name);
+}
+
 async function sourceAndPath(
     args: { source?: string; path?: string },
     allowedRoot: string,
@@ -264,15 +222,12 @@ export function createMcpServer(opts: McpServerOptions = {}): McpServer {
         },
         {
             instructions:
-                'Nowline manages roadmaps written in the .nowline plain-text DSL — ' +
-                'NOT JSON or any other structured format. All `source` parameters expect ' +
-                '.nowline DSL text (a UTF-8 text file that starts with `nowline v1`). ' +
-                'Use the `create-roadmap` prompt when generating a new roadmap from scratch; ' +
-                'it injects the full DSL reference and canonical examples before asking you ' +
-                'to write. Read the `nowline://reference` resource to learn the syntax. ' +
-                'The `json` value in the `formats` capability and the `convert` tool are ' +
-                'for converting an existing .nowline roadmap to/from its JSON AST; ' +
-                'JSON is not an authoring format.',
+                'Nowline manages roadmaps written in the .nowline plain-text DSL — NOT JSON or any other ' +
+                'structured format. All `source` parameters expect `.nowline` DSL text (starts with `nowline v1`). ' +
+                'Workflow: 1. call `reference` or `examples` to learn syntax → 2. write `.nowline` → ' +
+                '3. call `render` (validates + renders; or `validate` alone) → 4. fix errors keyed on `NL.E####` ' +
+                'and re-render → 5. review returned layout `insights` (what reflowed) → 6. when uncertain, ' +
+                'call `render` with `review:true` for a final visual check. JSON in `convert` is AST conversion only.',
         },
     );
 
@@ -337,8 +292,9 @@ export function createMcpServer(opts: McpServerOptions = {}): McpServer {
     server.registerTool(
         'validate',
         {
-            description:
-                'Parse and validate a .nowline roadmap. Returns ok=true and an empty diagnostics array if valid, or ok=false with structured diagnostics.',
+            description: toolDescriptionWithSyntax(
+                'Parse and validate a .nowline roadmap. Returns ok=true with optional layout insights when valid, or ok=false with structured diagnostics.',
+            ),
             inputSchema: z.object({
                 source: z.string().optional().describe('Inline .nowline source text to validate.'),
                 path: z
@@ -354,9 +310,24 @@ export function createMcpServer(opts: McpServerOptions = {}): McpServer {
             const doc = await buildDocument(source);
             const diagnostics = collectMcpDiagnostics(doc, filePath);
             const ok = diagnostics.every((d) => d.severity !== 'error');
-            const structured = { ok, diagnostics };
+            const insights = ok
+                ? await collectMcpLayoutInsights({
+                      source,
+                      filePath,
+                      today: todayUtc(),
+                      locale: 'en-US',
+                      readFile: createNodeHostEnv(filePath).readSource,
+                      doc,
+                  })
+                : [];
+            const structured = { ok, diagnostics, ...(insights.length > 0 ? { insights } : {}) };
             return {
-                content: [{ type: 'text', text: JSON.stringify(structured, null, 2) }],
+                content: [
+                    { type: 'text', text: JSON.stringify(structured, null, 2) },
+                    ...(insights.length > 0
+                        ? [{ type: 'text' as const, text: LAYOUT_INSIGHT_HINT }]
+                        : []),
+                ],
                 structuredContent: structured,
             };
         },
@@ -392,8 +363,9 @@ export function createMcpServer(opts: McpServerOptions = {}): McpServer {
     server.registerTool(
         'create',
         {
-            description:
+            description: toolDescriptionWithSyntax(
                 'Write a new .nowline file after validation. Overwrites if the path already exists.',
+            ),
             inputSchema: z.object({
                 path: z.string().describe('Absolute or relative path to write the .nowline file.'),
                 source: z.string().describe('The .nowline source text to write.'),
@@ -404,20 +376,8 @@ export function createMcpServer(opts: McpServerOptions = {}): McpServer {
         },
         async (args) => {
             const abs = resolveAndGuard(args.path, allowedRoot);
-            const doc = await buildDocument(args.source);
-            const diagnostics = collectMcpDiagnostics(doc, abs);
-            const errors = diagnostics.filter((d) => d.severity === 'error');
-            if (errors.length > 0) {
-                return {
-                    content: [
-                        {
-                            type: 'text',
-                            text: JSON.stringify({ ok: false, path: abs, diagnostics }, null, 2),
-                        },
-                    ],
-                    isError: true,
-                };
-            }
+            const blocked = await diagnosticsErrorBlock(args.source, abs);
+            if (!blocked.ok) return blocked.response;
             await fs.mkdir(path.dirname(abs), { recursive: true });
             await fs.writeFile(abs, args.source, 'utf-8');
             const structured = { ok: true, path: abs };
@@ -433,7 +393,9 @@ export function createMcpServer(opts: McpServerOptions = {}): McpServer {
     server.registerTool(
         'update',
         {
-            description: 'Replace an existing .nowline file after validation.',
+            description: toolDescriptionWithSyntax(
+                'Replace an existing .nowline file after validation.',
+            ),
             inputSchema: z.object({
                 path: z
                     .string()
@@ -445,20 +407,8 @@ export function createMcpServer(opts: McpServerOptions = {}): McpServer {
         },
         async (args) => {
             const abs = resolveAndGuard(args.path, allowedRoot);
-            const doc = await buildDocument(args.source);
-            const diagnostics = collectMcpDiagnostics(doc, abs);
-            const errors = diagnostics.filter((d) => d.severity === 'error');
-            if (errors.length > 0) {
-                return {
-                    content: [
-                        {
-                            type: 'text',
-                            text: JSON.stringify({ ok: false, path: abs, diagnostics }, null, 2),
-                        },
-                    ],
-                    isError: true,
-                };
-            }
+            const blocked = await diagnosticsErrorBlock(args.source, abs);
+            if (!blocked.ok) return blocked.response;
             await fs.writeFile(abs, args.source, 'utf-8');
             const structured = { ok: true, path: abs };
             return {
@@ -531,8 +481,10 @@ export function createMcpServer(opts: McpServerOptions = {}): McpServer {
     server.registerTool(
         'render',
         {
-            description:
-                'Render a .nowline roadmap to SVG or PNG using the shared export kernel. Byte-identical to `nowline -f svg/png` for the same source and inputs.',
+            description: toolDescriptionWithSyntax(
+                'Validate then render a .nowline roadmap to SVG or PNG (combined validate+render+share). ' +
+                    'Returns structured diagnostics on error-severity input instead of a raw kernel error.',
+            ),
             inputSchema: z.object({
                 source: z.string().optional().describe('Inline .nowline source text.'),
                 path: z.string().optional().describe('Path to the .nowline file.'),
@@ -563,6 +515,12 @@ export function createMcpServer(opts: McpServerOptions = {}): McpServer {
                     .describe(
                         'When true, include a shareUrl pointing to https://free.nowline.io/open.',
                     ),
+                review: z
+                    .boolean()
+                    .optional()
+                    .describe(
+                        'When true, also attach a downscaled PNG so a multimodal model can visually check layout (label overflow, lane crowding, off-range now-line). Off by default.',
+                    ),
                 preview: z
                     .boolean()
                     .optional()
@@ -575,6 +533,9 @@ export function createMcpServer(opts: McpServerOptions = {}): McpServer {
         },
         async (args) => {
             const { source, filePath } = await sourceAndPath(args, allowedRoot);
+            const blocked = await diagnosticsErrorBlock(source, filePath);
+            if (!blocked.ok) return blocked.response;
+
             const format: ExportFormat = args.format ?? 'svg';
             const today = args.now ? new Date(`${args.now}T00:00:00Z`) : todayUtc();
             const inputs: RenderInputs = {
@@ -585,21 +546,27 @@ export function createMcpServer(opts: McpServerOptions = {}): McpServer {
                 width: args.width,
                 pngScale: args.scale,
             };
-            if (format === 'png') {
+            const host = createNodeHostEnv(filePath);
+            if (format === 'png' || args.review === true) {
                 const result = await resolveFonts({ headless: true });
                 inputs.fonts = { sans: result.sans, mono: result.mono };
             }
-            const host = createNodeHostEnv(filePath);
             const bytes = await exportDocument(source, format, inputs, host);
             const shareUrl = args.share
                 ? (buildShareLink({ source, share: true }) ?? undefined)
                 : undefined;
 
-            // Optional MCP Apps in-chat preview. Emitted alongside the normal
-            // content so non-UI hosts still get the SVG/PNG; the bundle renders
-            // the live SVG itself, so the preview is format-agnostic. Toolbar
-            // export/copy is hidden (exportControls: hide) — artifacts come
-            // from the render/export tools, not the iframe sandbox.
+            const insights = await collectMcpLayoutInsights({
+                source,
+                filePath,
+                today,
+                theme: args.theme ?? 'light',
+                width: args.width,
+                locale: 'en-US',
+                readFile: host.readSource,
+                doc: blocked.doc,
+            });
+
             const wantPreview = args.preview === true || clientSupportsAppsUi(server);
             const previewBlocks = wantPreview
                 ? [
@@ -613,14 +580,31 @@ export function createMcpServer(opts: McpServerOptions = {}): McpServer {
                   ]
                 : [];
 
+            const reviewBlocks =
+                args.review === true
+                    ? await buildReviewContentBlocks(source, format, bytes, inputs, host)
+                    : [];
+
+            const insightHintBlocks =
+                insights.length > 0 ? [{ type: 'text' as const, text: LAYOUT_INSIGHT_HINT }] : [];
+            const insightsField = insights.length > 0 ? { insights } : {};
+
             if (args.output) {
                 const outAbs = resolveAndGuard(args.output, allowedRoot);
                 await fs.mkdir(path.dirname(outAbs), { recursive: true });
                 await fs.writeFile(outAbs, bytes);
-                const structured = { format, path: outAbs, bytes: bytes.byteLength, shareUrl };
+                const structured = {
+                    format,
+                    path: outAbs,
+                    bytes: bytes.byteLength,
+                    shareUrl,
+                    ...insightsField,
+                };
                 return {
                     content: [
                         { type: 'text', text: JSON.stringify(structured, null, 2) },
+                        ...insightHintBlocks,
+                        ...reviewBlocks,
                         ...previewBlocks,
                     ],
                     structuredContent: structured,
@@ -628,7 +612,7 @@ export function createMcpServer(opts: McpServerOptions = {}): McpServer {
             }
 
             if (format === 'png') {
-                const structured = { format, bytes: bytes.byteLength, shareUrl };
+                const structured = { format, bytes: bytes.byteLength, shareUrl, ...insightsField };
                 return {
                     content: [
                         {
@@ -636,16 +620,20 @@ export function createMcpServer(opts: McpServerOptions = {}): McpServer {
                             data: Buffer.from(bytes).toString('base64'),
                             mimeType: 'image/png',
                         },
+                        ...insightHintBlocks,
+                        ...reviewBlocks,
                         ...previewBlocks,
                     ],
                     structuredContent: structured,
                 };
             }
             const svgText = new TextDecoder('utf-8').decode(bytes);
-            const structured = { format, shareUrl };
+            const structured = { format, shareUrl, ...insightsField };
             return {
                 content: [
                     { type: 'text', text: svgText, mimeType: 'image/svg+xml' },
+                    ...insightHintBlocks,
+                    ...reviewBlocks,
                     ...previewBlocks,
                 ],
                 structuredContent: structured,
@@ -698,6 +686,9 @@ export function createMcpServer(opts: McpServerOptions = {}): McpServer {
         },
         async (args) => {
             const { source, filePath } = await sourceAndPath(args, allowedRoot);
+            const blocked = await diagnosticsErrorBlock(source, filePath);
+            if (!blocked.ok) return blocked.response;
+
             const format: ExportFormat = args.format as NonRenderFormat;
             const today = args.now ? new Date(`${args.now}T00:00:00Z`) : todayUtc();
             const inputs: RenderInputs = {
@@ -946,10 +937,164 @@ export function createMcpServer(opts: McpServerOptions = {}): McpServer {
         },
     );
 
+    // ---- reference / examples / schema (discovery tools) --------------------
+
+    server.registerTool(
+        'reference',
+        {
+            description:
+                'Return the Nowline DSL reference (condensed cheatsheet or full man page). Callable alternative to the nowline://reference resource.',
+            inputSchema: z.object({
+                format: z
+                    .enum(['condensed', 'full'])
+                    .optional()
+                    .describe('Reference format. Defaults to condensed.'),
+            }),
+            outputSchema: ReferenceOutputSchema,
+            annotations: { readOnlyHint: true, idempotentHint: true },
+        },
+        async (args) => {
+            const format = args.format ?? 'condensed';
+            const text = format === 'full' ? REFERENCE_MAN_PAGE : REFERENCE_CHEATSHEET;
+            const structured = { format, text };
+            return {
+                content: [{ type: 'text', text }],
+                structuredContent: structured,
+            };
+        },
+    );
+
+    server.registerTool(
+        'examples',
+        {
+            description:
+                'Return canonical .nowline example sources. Callable alternative to the nowline://examples resource.',
+            inputSchema: z.object({
+                name: z
+                    .string()
+                    .optional()
+                    .describe('Example name. Omit for the catalog plus minimal inline.'),
+            }),
+            outputSchema: ExamplesOutputSchema,
+            annotations: { readOnlyHint: true, idempotentHint: true },
+        },
+        async (args) => {
+            const exampleNames = EXAMPLES.map((e) => exampleShortName(e.name));
+            if (args.name) {
+                const ex = findExample(args.name);
+                if (!ex) {
+                    return {
+                        content: [
+                            {
+                                type: 'text',
+                                text: JSON.stringify({
+                                    error: `Unknown example "${args.name}".`,
+                                    names: exampleNames,
+                                }),
+                            },
+                        ],
+                        isError: true,
+                    };
+                }
+                const structured = { name: exampleShortName(ex.name), source: ex.content };
+                return {
+                    content: [{ type: 'text', text: ex.content }],
+                    structuredContent: structured,
+                };
+            }
+            const minimal = findExample('minimal') ?? EXAMPLES[0];
+            const structured = {
+                names: exampleNames,
+                name: exampleShortName(minimal.name),
+                source: minimal.content,
+            };
+            return {
+                content: [
+                    {
+                        type: 'text',
+                        text: `# Examples\n\n${exampleNames.map((n) => `- ${n}`).join('\n')}\n\n## ${structured.name}\n\n${minimal.content}`,
+                    },
+                ],
+                structuredContent: structured,
+            };
+        },
+    );
+
+    server.registerTool(
+        'schema',
+        {
+            description:
+                'Return the structured Nowline DSL key vocabulary (directive keys, entity types, item properties).',
+            inputSchema: z.object({}),
+            outputSchema: SchemaOutputSchema,
+            annotations: { readOnlyHint: true, idempotentHint: true },
+        },
+        async () => {
+            const structured = {
+                directiveKeys: [...SCHEMA_VOCABULARY.directiveKeys],
+                entityTypes: [...SCHEMA_VOCABULARY.entityTypes],
+                itemPropertyKeys: [...SCHEMA_VOCABULARY.itemPropertyKeys],
+            };
+            return {
+                content: [{ type: 'text', text: JSON.stringify(structured, null, 2) }],
+                structuredContent: structured,
+            };
+        },
+    );
+
     return server;
 }
 
 // ---- Helpers ----------------------------------------------------------------
+
+type ContentBlock =
+    | { type: 'text'; text: string; mimeType?: string }
+    | { type: 'image'; data: string; mimeType: string };
+
+async function buildReviewContentBlocks(
+    source: string,
+    format: ExportFormat,
+    artifactBytes: Uint8Array,
+    inputs: RenderInputs,
+    host: HostEnv,
+): Promise<ContentBlock[]> {
+    const blocks: ContentBlock[] = [
+        {
+            type: 'text',
+            text:
+                'Review this raster for layout issues (truncated labels, crowded lanes, ' +
+                'now-line position) before finalizing.',
+        },
+    ];
+
+    const artifactWidth = inputs.width ?? DEFAULT_RENDER_WIDTH;
+    let inspectionBytes: Uint8Array;
+
+    if (format === 'png' && artifactWidth <= REVIEW_MAX_WIDTH) {
+        inspectionBytes = artifactBytes;
+    } else {
+        const reviewInputs: RenderInputs = {
+            ...inputs,
+            width: Math.min(artifactWidth, REVIEW_MAX_WIDTH),
+            pngScale: 1,
+        };
+        if (!reviewInputs.fonts) {
+            const fonts = await resolveFonts({ headless: true });
+            reviewInputs.fonts = { sans: fonts.sans, mono: fonts.mono };
+        }
+        inspectionBytes = await exportDocument(source, 'png', reviewInputs, host);
+    }
+
+    if (format !== 'png' || inspectionBytes.byteLength !== artifactBytes.byteLength) {
+        blocks.push({
+            type: 'image',
+            data: Buffer.from(inspectionBytes).toString('base64'),
+            mimeType: 'image/png',
+        });
+    }
+
+    return blocks;
+}
 
 async function listNowlineFiles(dir: string, recursive: boolean): Promise<string[]> {
     const results: string[] = [];

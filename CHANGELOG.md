@@ -8,6 +8,14 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ### Added
 
+- **`@nowline/mcp` — discovery tools `reference`, `examples`, `schema`**: callable alternatives to the `nowline://*` resources so agents can learn DSL syntax without `resources/read`. `examples` resolves names with or without the `.nowline` extension. `schema` returns the structured DSL key vocabulary (directive keys, entity types, item properties) — all keys are real DSL tokens; render/CLI options are excluded.
+- **`@nowline/mcp` — `render` `review` flag**: opt-in downscaled inspection PNG for multimodal layout self-review. Insight hint is now included on inline `svg`/`png` branches (not just write-to-disk), matching `validate`.
+- **`@nowline/mcp` — structured diagnostics**: every authoring tool (`validate`, `render`, `export`, `create`, `update`) returns `{ ok: false, diagnostics }` with stable `NL.E####` codes and optional `suggestion` on error-severity input; `validate` and `render` return `insights` on success. Server instructions rewritten as a numbered tool-keyed workflow.
+- **`@nowline/layout` — `collectLayoutInsights`**: layout-time informational insights (`NL.I####`) and layout warnings (`NL.W1000`) from positioned-model geometry. `NL.I1002` (narrow bar) triggers only when decorations actually spilled, not on bars that merely fall below a theoretical threshold.
+- **`@nowline/browser` — `diagnosticLevel` on `renderSource`**: opt-in surfacing of layout insights in preview warnings (default `error` preserves today's behavior). Layout insights are filtered once in the combined `warnings` array rather than twice.
+- **`@nowline/browser` — `fromLayoutInsight`**: adapts a `LayoutInsight` to the shared `DiagnosticRow` shape; exported from the package.
+- **`@nowline/core` — `NL.W1000`, `NL.I1000`–`NL.I1005` codes**: new layout-warning and layout-insight message codes with `info` severity; registered in `codes.ts`, `messages.en.ts`, and `ALL_CODES`.
+- **`@nowline/preview-shell` — `applyRenderResult`**: shows non-error warnings/insights in the non-dimming diagnostics table on successful renders when present.
 - **`@nowline/preview-shell` — `exportControls` option**: `mountPreview(rootEl, { exportControls: 'show' | 'hide' })`
   gates the Format / Copy / Export rows in the toolbar more-menu (default `'show'`). Hide in
   sandboxed hosts where clipboard/download are unreliable and export is tool-owned.
@@ -26,6 +34,8 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ### Changed
 
+- **`@nowline/mcp` — `render`/`export` validate first**: invalid input returns structured `{ ok: false, diagnostics }` instead of a raw `@nowline/export` kernel error string.
+- **`@nowline/mcp` — tool descriptions and server instructions**: per-tool `.nowline` syntax anchors, numbered tool-keyed workflow, and `render` positioned as combined validate+render.
 - **`@nowline/mcp` — MCP Apps in-chat preview**: toolbar export/copy controls are hidden
   (`exportControls: 'hide'`); artifacts come from the `render`/`export` tools, not the iframe
   sandbox.
@@ -41,6 +51,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ### Fixed
 
+- **`@nowline/mcp` — validator diagnostic codes**: MCP tools now emit stable `NL.E####` codes (via `resolveDiagnosticCode`) instead of `unknown`, with optional `suggestion` on validation diagnostics.
 - **`@nowline/mcp` — in-chat preview dimming**: the preview panel no longer shows a dark
   50 % opacity overlay and "No problems" diagnostic bar on a clean roadmap in Claude Desktop
   (and any other MCP Apps host). Root cause: `entry.ts` was calling

@@ -92,11 +92,13 @@ describe('applyRenderResult', () => {
         expect(setSvg).not.toHaveBeenCalled();
     });
 
-    it('does NOT call setDiagnostics with warnings on a successful render', () => {
-        const { handle, setDiagnostics } = makeHandle();
+    it('calls setDiagnostics with non-error warnings on a successful render', () => {
+        const { handle, setSvg, setDiagnostics } = makeHandle();
         const result: RenderResult = { kind: 'svg', svg: '<svg/>', warnings: [WARNING_ROW] };
         applyRenderResult(handle, result);
-        expect(setDiagnostics).not.toHaveBeenCalled();
+        expect(setSvg).toHaveBeenCalledOnce();
+        expect(setDiagnostics).toHaveBeenCalledOnce();
+        expect(setDiagnostics).toHaveBeenCalledWith([WARNING_ROW]);
     });
 });
 

@@ -91,4 +91,24 @@ export const messages = {
         `Unknown property "${a.key}" on ${a.entity}. The renderer ignores it.${
             a.suggested ? ` Did you mean "${a.suggested}"?` : ''
         }`,
+
+    // Layout warnings
+    'NL.W1000': (a: { date: string; start: string; end: string }) =>
+        `Now-line date ${a.date} is outside the roadmap window (${a.start} – ${a.end}); it will not be drawn.`,
+
+    // Layout insights (informational)
+    'NL.I1000': (a: { name: string }) =>
+        `Title on item "${a.name}" is wider than its bar at this scale; it rendered to the right of the bar.`,
+    'NL.I1001': (a: { name: string }) =>
+        `Label chips on item "${a.name}" did not fit inside the bar; they rendered in a spill column to the right.`,
+    'NL.I1002': (a: { name: string }) =>
+        `Item "${a.name}" is too narrow to show its marker at this scale; decorations spilled beside the bar.`,
+    'NL.I1003': (a: { name: string; anchor?: string }) =>
+        a.anchor
+            ? `Item "${a.name}" extends past its "before:" anchor "${a.anchor}".`
+            : `Item "${a.name}" extends past its "before:" anchor.`,
+    'NL.I1004': (a: { lane: string; rows: number }) =>
+        `Swimlane "${a.lane}" packed into ${a.rows} rows to avoid overlap.`,
+    'NL.I1005': (a: { lane: string }) =>
+        `Swimlane "${a.lane}" is over capacity in one or more periods (red utilization band).`,
 };

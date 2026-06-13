@@ -6,6 +6,7 @@ import {
     type ResolveDiagnostic,
     resolveDiagnosticCode,
 } from '@nowline/core';
+import type { LayoutInsight } from '@nowline/layout';
 
 /**
  * JSON-friendly diagnostic shape consumed by browser preview surfaces.
@@ -18,7 +19,7 @@ import {
  * embed-side path) so callers can map back to a source location.
  */
 export interface DiagnosticRow {
-    severity: 'error' | 'warning';
+    severity: 'error' | 'warning' | 'info';
     code: string;
     message: string;
     suggestion?: string;
@@ -27,9 +28,15 @@ export interface DiagnosticRow {
     column: number;
 }
 
+function mapLangiumSeverity(severity: number | undefined): DiagnosticRow['severity'] {
+    if (severity === 2) return 'warning';
+    if (severity === 3) return 'info';
+    return 'error';
+}
+
 export function fromLangiumDiagnostic(diag: LangiumLikeDiagnostic, file: string): DiagnosticRow {
     return {
-        severity: diag.severity === 2 ? 'warning' : 'error',
+        severity: mapLangiumSeverity(diag.severity),
         // resolveDiagnosticCode prefers the stable validator code (NL.Exxxx)
         // carried in `data` so the preview table matches the CLI / Problems
         // panel, then falls back to Langium's `code`, then a message heuristic.
@@ -97,6 +104,18 @@ export function fromRenderWarning(
         severity,
         code: 'render.warning',
         message,
+        file,
+        line: 1,
+        column: 1,
+    };
+}
+
+/** Adapt a layout insight from `@nowline/layout` into a preview diagnostic row. */
+export function fromLayoutInsight(insight: LayoutInsight, file: string): DiagnosticRow {
+    return {
+        severity: insight.severity,
+        code: insight.code,
+        message: insight.message,
         file,
         line: 1,
         column: 1,
