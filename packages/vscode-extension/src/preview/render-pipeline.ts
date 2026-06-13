@@ -20,8 +20,8 @@ import {
     type RenderResult,
 } from '@nowline/browser';
 import { BUNDLED_MONO_FAMILY, BUNDLED_SANS_FAMILY } from '@nowline/export-core';
-import { classifyRenderResult } from '@nowline/preview-shell';
 import type { ThemeName } from '@nowline/layout';
+import { classifyRenderResult } from '@nowline/preview-shell';
 import type { AssetResolver, FontFamilies } from '@nowline/renderer';
 
 export type { DiagnosticRow };

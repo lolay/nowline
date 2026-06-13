@@ -1,5 +1,5 @@
-import { describe, expect, it, vi } from 'vitest';
 import type { DiagnosticRow, RenderResult } from '@nowline/browser';
+import { describe, expect, it, vi } from 'vitest';
 import type { PreviewHandle } from '../src/index.js';
 import {
     applyRenderResult,
@@ -25,7 +25,11 @@ const ERROR_ROW: DiagnosticRow = {
     column: 1,
 };
 
-function makeHandle(): { handle: PreviewHandle; setSvg: ReturnType<typeof vi.fn>; setDiagnostics: ReturnType<typeof vi.fn> } {
+function makeHandle(): {
+    handle: PreviewHandle;
+    setSvg: ReturnType<typeof vi.fn>;
+    setDiagnostics: ReturnType<typeof vi.fn>;
+} {
     const setSvg = vi.fn();
     const setDiagnostics = vi.fn();
     return {
@@ -123,7 +127,7 @@ describe('nowOverrideToToday', () => {
         expect(nowOverrideToToday('today')).toBeUndefined();
     });
 
-    it("undefined → undefined", () => {
+    it('undefined → undefined', () => {
         expect(nowOverrideToToday(undefined)).toBeUndefined();
     });
 

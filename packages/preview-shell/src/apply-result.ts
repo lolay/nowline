@@ -25,9 +25,9 @@ import type { NowOverride, PreviewHandle, ThemeOverride } from './mount.js';
  * split the "decide" step from the "apply to shell" step (e.g. VS Code,
  * where the extension host decides and the webview applies separately).
  */
-export function classifyRenderResult(result: RenderResult):
-    | { kind: 'svg'; svg: string }
-    | { kind: 'diagnostics'; rows: DiagnosticRow[] } {
+export function classifyRenderResult(
+    result: RenderResult,
+): { kind: 'svg'; svg: string } | { kind: 'diagnostics'; rows: DiagnosticRow[] } {
     return result.kind === 'svg'
         ? { kind: 'svg', svg: result.svg }
         : { kind: 'diagnostics', rows: result.diagnostics };
@@ -79,9 +79,7 @@ export function themeOverrideToDiagramTheme(
  * - `'hide'`                → `null` (suppresses the now-line).
  * - `'YYYY-MM-DD'`          → passes through so the pipeline parses it.
  */
-export function nowOverrideToToday(
-    now: NowOverride | undefined,
-): Date | string | null | undefined {
+export function nowOverrideToToday(now: NowOverride | undefined): Date | string | null | undefined {
     if (now === undefined || now === 'today') return undefined;
     if (now === 'hide') return null;
     return now;
