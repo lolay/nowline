@@ -79,25 +79,10 @@ function bootstrap(): void {
             locale: payload.locale,
         },
         themeControl: 'show',
+        exportControls: 'hide',
         locale: payload.locale,
         initialFit: payload.initialFit,
         showMinimap: payload.showMinimap,
-        onSave: (req) => {
-            // Best-effort in-iframe download; the host's iframe sandbox may
-            // block it, in which case the copy actions remain available.
-            try {
-                const type = req.format === 'png' ? 'image/png' : 'image/svg+xml';
-                const blob = new Blob([req.body as BlobPart], { type });
-                const url = URL.createObjectURL(blob);
-                const a = document.createElement('a');
-                a.href = url;
-                a.download = `roadmap.${req.format}`;
-                a.click();
-                setTimeout(() => URL.revokeObjectURL(url), 1000);
-            } catch {
-                // Download blocked by the sandbox — nothing to do.
-            }
-        },
     });
 }
 

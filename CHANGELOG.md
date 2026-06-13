@@ -8,6 +8,9 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ### Added
 
+- **`@nowline/preview-shell` — `exportControls` option**: `mountPreview(rootEl, { exportControls: 'show' | 'hide' })`
+  gates the Format / Copy / Export rows in the toolbar more-menu (default `'show'`). Hide in
+  sandboxed hosts where clipboard/download are unreliable and export is tool-owned.
 - **`@nowline/preview`** — new package. `mountLivePreview(rootEl, opts)` is a Layer 2
   live-preview controller that wraps `mountPreview` (Layer 0) and owns the
   `renderSource → applyRenderResult` loop. Every entry point is injectable: `render?`
@@ -23,6 +26,9 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ### Changed
 
+- **`@nowline/mcp` — MCP Apps in-chat preview**: toolbar export/copy controls are hidden
+  (`exportControls: 'hide'`); artifacts come from the `render`/`export` tools, not the iframe
+  sandbox.
 - **`@nowline/mcp` — MCP Apps in-chat preview**: migrated from a hand-rolled
   `mountPreview` + `renderSource` + coercion loop to `mountLivePreview`, which uses the shared
   `applyRenderResult` convention by construction.

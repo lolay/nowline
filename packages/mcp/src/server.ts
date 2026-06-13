@@ -257,20 +257,24 @@ export interface McpServerOptions {
 
 export function createMcpServer(opts: McpServerOptions = {}): McpServer {
     const allowedRoot = opts.allowedRoot ?? process.cwd();
-    const server = new McpServer({
-        name: opts.name ?? 'nowline',
-        version: opts.version ?? '0.6.0',
-        instructions:
-            'Nowline manages roadmaps written in the .nowline plain-text DSL — ' +
-            'NOT JSON or any other structured format. All `source` parameters expect ' +
-            '.nowline DSL text (a UTF-8 text file that starts with `nowline v1`). ' +
-            'Use the `create-roadmap` prompt when generating a new roadmap from scratch; ' +
-            'it injects the full DSL reference and canonical examples before asking you ' +
-            'to write. Read the `nowline://reference` resource to learn the syntax. ' +
-            'The `json` value in the `formats` capability and the `convert` tool are ' +
-            'for converting an existing .nowline roadmap to/from its JSON AST; ' +
-            'JSON is not an authoring format.',
-    });
+    const server = new McpServer(
+        {
+            name: opts.name ?? 'nowline',
+            version: opts.version ?? '0.6.0',
+        },
+        {
+            instructions:
+                'Nowline manages roadmaps written in the .nowline plain-text DSL — ' +
+                'NOT JSON or any other structured format. All `source` parameters expect ' +
+                '.nowline DSL text (a UTF-8 text file that starts with `nowline v1`). ' +
+                'Use the `create-roadmap` prompt when generating a new roadmap from scratch; ' +
+                'it injects the full DSL reference and canonical examples before asking you ' +
+                'to write. Read the `nowline://reference` resource to learn the syntax. ' +
+                'The `json` value in the `formats` capability and the `convert` tool are ' +
+                'for converting an existing .nowline roadmap to/from its JSON AST; ' +
+                'JSON is not an authoring format.',
+        },
+    );
 
     // ---- Resources ----------------------------------------------------------
 
@@ -563,7 +567,7 @@ export function createMcpServer(opts: McpServerOptions = {}): McpServer {
                     .boolean()
                     .optional()
                     .describe(
-                        'When true, also return an interactive in-chat HTML preview (MCP Apps UI). Auto-enabled when the client advertises MCP Apps UI support.',
+                        'When true, also return an interactive in-chat HTML preview (MCP Apps UI). Auto-enabled when the client advertises MCP Apps UI support. The preview is view-only (zoom, theme, now-line); export via the export/render tools.',
                     ),
             }),
             outputSchema: RenderOutputSchema,
@@ -593,7 +597,9 @@ export function createMcpServer(opts: McpServerOptions = {}): McpServer {
 
             // Optional MCP Apps in-chat preview. Emitted alongside the normal
             // content so non-UI hosts still get the SVG/PNG; the bundle renders
-            // the live SVG itself, so the preview is format-agnostic.
+            // the live SVG itself, so the preview is format-agnostic. Toolbar
+            // export/copy is hidden (exportControls: hide) — artifacts come
+            // from the render/export tools, not the iframe sandbox.
             const wantPreview = args.preview === true || clientSupportsAppsUi(server);
             const previewBlocks = wantPreview
                 ? [

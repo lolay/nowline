@@ -139,6 +139,8 @@ When the harness supports the MCP Apps interactive-UI protocol, `render` (and op
 
 The convention used by the in-chat preview is encoded in `@nowline/preview-shell`'s `applyRenderResult` helper: **a successful render shows the diagram; warnings do not trigger the diagnostics overlay; only errors dim the canvas**. This is intrinsic to `mountLivePreview`'s default apply policy and is also hardened in `mountPreview`'s `setDiagnostics` implementation, so the veil cannot reappear from stale hand-rolled call sequences.
 
+The in-chat preview mounts with `exportControls: 'hide'` — the toolbar is view-only (zoom, pan, fit, theme, now-line, show-links). Clipboard and in-iframe download are unreliable in the MCP Apps sandbox; artifacts come from the `render` and `export` tools instead.
+
 ## Harness coverage (OSS tier only)
 
 The OSS local server ships wherever a harness can run a **local** stdio server with filesystem access. Web-only harnesses (ChatGPT web, Gemini app/Spark, MS Copilot) have no local runtime and are out of scope here — they use Nowline Cloud instead.

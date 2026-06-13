@@ -487,4 +487,36 @@ describe('mountPreview', () => {
 
         handle.dispose();
     });
+
+    // ===== Export control visibility =====
+
+    it('shows Format and Copy/Export rows in the more-menu by default', () => {
+        const root = mountRoot();
+        const handle = mountPreview(root);
+        const formatRow = root.querySelector<HTMLElement>('.format-control-row');
+        const actionRow = root.querySelector<HTMLElement>('.action-row');
+        const exportDivider = root.querySelector<HTMLElement>('.export-divider');
+        expect(formatRow?.style.display).not.toBe('none');
+        expect(actionRow?.style.display).not.toBe('none');
+        expect(exportDivider?.style.display).not.toBe('none');
+        handle.dispose();
+    });
+
+    it('exportControls hide removes Format, Copy/Export, and the export divider', () => {
+        const root = mountRoot();
+        const handle = mountPreview(root, { exportControls: 'hide' });
+        const formatRow = root.querySelector<HTMLElement>('.format-control-row');
+        const actionRow = root.querySelector<HTMLElement>('.action-row');
+        const exportDivider = root.querySelector<HTMLElement>('.export-divider');
+        expect(formatRow?.style.display).toBe('none');
+        expect(actionRow?.style.display).toBe('none');
+        expect(exportDivider?.style.display).toBe('none');
+        // View-option rows remain visible.
+        expect(root.querySelector<HTMLElement>('.theme-control-row')?.style.display).not.toBe(
+            'none',
+        );
+        expect(root.querySelector<HTMLElement>('.now-toggle')).not.toBeNull();
+        expect(root.querySelector<HTMLElement>('.links-toggle')).not.toBeNull();
+        handle.dispose();
+    });
 });

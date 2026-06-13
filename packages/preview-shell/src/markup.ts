@@ -82,7 +82,7 @@ const TEMPLATE = `
         <div class="dropdown">
             <button class="btn more-toggle" title="More options">\u25be more</button>
             <div class="more-menu" hidden>
-                <div class="more-row">
+                <div class="more-row format-control-row">
                     <span class="more-label">Format:</span>
                     <div class="dropdown">
                         <button class="btn more-sub-toggle format-toggle">SVG \u25be</button>
@@ -96,7 +96,7 @@ const TEMPLATE = `
                     <button class="btn copy-action" title="Copy to clipboard"><span>Copy</span><span class="action-ico" aria-hidden="true">${COPY_ICON}</span></button>
                     <button class="btn export-action" title="Export file"><span>Export</span><span class="action-ico" aria-hidden="true">${DOWNLOAD_ICON}</span></button>
                 </div>
-                <div class="more-divider"></div>
+                <div class="more-divider export-divider"></div>
                 <div class="more-row theme-control-row">
                     <span class="more-label">Theme:</span>
                     <div class="dropdown">

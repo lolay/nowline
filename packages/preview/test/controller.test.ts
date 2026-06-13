@@ -1,7 +1,7 @@
-import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import type { RenderResult } from '@nowline/browser';
-import type { DiagnosticRow, PreviewHandle } from '@nowline/preview-shell';
+import type { DiagnosticRow } from '@nowline/preview-shell';
 import { __resetPreviewShellStylesheetForTests, mountPreview } from '@nowline/preview-shell';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { type LiveRenderOptions, mountLivePreview } from '../src/index.js';
 
 const SAMPLE_SVG =
@@ -232,6 +232,19 @@ describe('mountLivePreview', () => {
     });
 
     // ===== Escape-hatch guard: mountPreview usable standalone =====
+
+    it('forwards exportControls to mountPreview', () => {
+        const root = mountRoot();
+        mountLivePreview(root, {
+            source: 'roadmap v1 ...',
+            render: vi.fn().mockResolvedValue(SVG_RESULT),
+            exportControls: 'hide',
+        });
+        const formatRow = root.querySelector<HTMLElement>('.format-control-row');
+        const actionRow = root.querySelector<HTMLElement>('.action-row');
+        expect(formatRow?.style.display).toBe('none');
+        expect(actionRow?.style.display).toBe('none');
+    });
 
     it('mountPreview primitive works without mountLivePreview or renderSource', () => {
         const root = mountRoot();

@@ -92,6 +92,12 @@ export interface MountPreviewOptions {
      */
     themeControl?: 'show' | 'hide';
     /**
+     * Whether to show Format / Copy / Export in the more-menu.
+     * Defaults to `'show'`. Hide in sandboxed hosts (e.g. MCP Apps)
+     * where clipboard/download are unreliable and export is tool-owned.
+     */
+    exportControls?: 'show' | 'hide';
+    /**
      * Diagram themes available in the Theme dropdown. **Auto** is
      * always prepended. Defaults to `['light', 'dark', 'grayscale']`.
      */
@@ -1359,6 +1365,16 @@ export function mountPreview(
     if (options.themeControl === 'hide') {
         const themeRow = els.themeMenu.closest<HTMLElement>('.theme-control-row');
         if (themeRow) themeRow.style.display = 'none';
+    }
+
+    // ===== Export control visibility =====
+    if (options.exportControls === 'hide') {
+        const formatRow = els.formatMenu.closest<HTMLElement>('.format-control-row');
+        if (formatRow) formatRow.style.display = 'none';
+        const actionRow = els.copyAction.closest<HTMLElement>('.action-row');
+        if (actionRow) actionRow.style.display = 'none';
+        const exportDivider = els.moreMenu.querySelector<HTMLElement>('.export-divider');
+        if (exportDivider) exportDivider.style.display = 'none';
     }
 
     // ===== Apply initial theme menu + baselines =====
