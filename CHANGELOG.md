@@ -51,6 +51,14 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ### Fixed
 
+- **`@nowline/mcp` — PNG render / `review` flag**: added `@resvg/resvg-wasm` as a direct
+  dependency so `render --format png` and `render --review` resolve the rasterizer. Previously
+  `loadWasm` failed with `Cannot find module '@resvg/resvg-wasm'` under strict (non-hoisted)
+  `node_modules`, forcing hosts to fall back to SVG and rasterize it themselves.
+- **`@nowline/mcp` — in-chat preview auto-detect**: `clientSupportsAppsUi` now probes
+  `capabilities.extensions` (where Claude Desktop advertises `io.modelcontextprotocol/ui`) in
+  addition to `capabilities.experimental`, so the interactive preview auto-enables without the
+  caller having to pass `preview: true`.
 - **`@nowline/mcp` — validator diagnostic codes**: MCP tools now emit stable `NL.E####` codes (via `resolveDiagnosticCode`) instead of `unknown`, with optional `suggestion` on validation diagnostics.
 - **`@nowline/mcp` — in-chat preview dimming**: the preview panel no longer shows a dark
   50 % opacity overlay and "No problems" diagnostic bar on a clean roadmap in Claude Desktop

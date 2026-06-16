@@ -75,14 +75,23 @@ const PREVIEW_UI_URI = 'ui://nowline/preview';
 const PREVIEW_UI_MIME = 'text/html;profile=mcp-app';
 
 function clientSupportsAppsUi(server: McpServer): boolean {
-    // Extension capabilities are negotiated under `experimental` in SDK 1.29
-    // (it does not yet model SEP-1724 extensions as a first-class field), so
-    // probe the canonical id plus the short `ui` / `apps` aliases some hosts use.
-    const experimental = server.server.getClientCapabilities()?.experimental as
-        | Record<string, unknown>
+    // Hosts advertise the UI extension in different buckets: Claude Desktop
+    // sends it under `capabilities.extensions` (SEP-1724/1865), while SDK 1.29
+    // historically modeled extension capabilities under `experimental`. Probe
+    // both buckets for the canonical id plus the short `ui` / `apps` aliases.
+    const caps = server.server.getClientCapabilities() as
+        | {
+              experimental?: Record<string, unknown>;
+              extensions?: Record<string, unknown>;
+          }
         | undefined;
-    if (!experimental) return false;
-    return Boolean(experimental[MCP_APPS_UI_CAPABILITY] || experimental.ui || experimental.apps);
+    if (!caps) return false;
+    const buckets = [caps.extensions, caps.experimental].filter(
+        (bucket): bucket is Record<string, unknown> => Boolean(bucket),
+    );
+    return buckets.some((bucket) =>
+        Boolean(bucket[MCP_APPS_UI_CAPABILITY] || bucket.ui || bucket.apps),
+    );
 }
 
 interface PreviewPayload {
