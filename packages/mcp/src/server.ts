@@ -496,7 +496,14 @@ export function createMcpServer(opts: McpServerOptions = {}): McpServer {
             ),
             inputSchema: z.object({
                 source: z.string().optional().describe('Inline .nowline source text.'),
-                path: z.string().optional().describe('Path to the .nowline file.'),
+                path: z
+                    .string()
+                    .optional()
+                    .describe(
+                        'Real local filesystem path to the .nowline file (e.g. /Users/name/Desktop/foo.nowline). ' +
+                            'Never pass a virtual or sandbox path such as /mnt/user-data/… — ' +
+                            'those do not exist on the host filesystem. Pass `source` instead.',
+                    ),
                 format: z
                     .enum(['svg', 'png'])
                     .optional()
@@ -517,7 +524,11 @@ export function createMcpServer(opts: McpServerOptions = {}): McpServer {
                 output: z
                     .string()
                     .optional()
-                    .describe('Write output to this path instead of returning inline.'),
+                    .describe(
+                        'Real local filesystem path to write the output file (e.g. /Users/name/Desktop/roadmap.svg). ' +
+                            'Never pass a virtual or sandbox path such as /mnt/user-data/… — ' +
+                            'omit this parameter to receive output inline instead.',
+                    ),
                 share: z
                     .boolean()
                     .optional()
@@ -662,14 +673,26 @@ export function createMcpServer(opts: McpServerOptions = {}): McpServer {
                 'Export a .nowline roadmap to any of the eight canonical formats. Byte-identical to `nowline -f <format>` for the same source and inputs.',
             inputSchema: z.object({
                 source: z.string().optional().describe('Inline .nowline source text.'),
-                path: z.string().optional().describe('Path to the .nowline file.'),
+                path: z
+                    .string()
+                    .optional()
+                    .describe(
+                        'Real local filesystem path to the .nowline file (e.g. /Users/name/Desktop/foo.nowline). ' +
+                            'Never pass a virtual or sandbox path such as /mnt/user-data/… — ' +
+                            'those do not exist on the host filesystem. Pass `source` instead.',
+                    ),
                 format: z
                     .enum(EXPORT_FORMATS)
                     .describe('Export format: pdf, html, mermaid, xlsx, msproj, or png.'),
                 output: z
                     .string()
                     .optional()
-                    .describe('Path to write the output file. Required for binary formats.'),
+                    .describe(
+                        'Real local filesystem path to write the output (e.g. /Users/name/Desktop/roadmap.pdf). ' +
+                            'Required for binary formats (pdf, xlsx, msproj, png). ' +
+                            'Never pass a virtual or sandbox path such as /mnt/user-data/… — ' +
+                            'those do not exist on the host filesystem.',
+                    ),
                 now: z.string().optional().describe('Now-line date as YYYY-MM-DD (UTC).'),
                 theme: z.enum(['light', 'dark', 'grayscale']).optional(),
                 scale: z.number().optional().describe('PNG scale factor.'),
@@ -771,7 +794,14 @@ export function createMcpServer(opts: McpServerOptions = {}): McpServer {
                 'Convert between .nowline source text and its JSON AST representation. `to:json` serializes a .nowline file to the JSON AST; `to:nowline` pretty-prints a JSON AST back to canonical .nowline source.',
             inputSchema: z.object({
                 source: z.string().optional().describe('Inline source text to convert.'),
-                path: z.string().optional().describe('Path to the source file.'),
+                path: z
+                    .string()
+                    .optional()
+                    .describe(
+                        'Real local filesystem path to the source file. ' +
+                            'Never pass a virtual or sandbox path such as /mnt/user-data/… — ' +
+                            'pass `source` instead.',
+                    ),
                 to: z
                     .enum(['json', 'nowline'])
                     .describe(
