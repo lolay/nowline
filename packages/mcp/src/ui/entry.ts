@@ -1,27 +1,26 @@
 // Browser entry bundled into the MCP Apps in-chat live preview.
 //
-// Unlike the VS Code webview entry — which receives pre-rendered SVG from
-// the extension host over postMessage — this entry runs standalone inside
-// the MCP host's sandboxed iframe. It reads the .nowline source the server
-// injected as a JSON <script> (#nl-preview-data), then delegates the
-// entire render → apply loop to `mountLivePreview` (@nowline/preview),
-// which wires renderSource (@nowline/browser) to the shared preview
-// viewport (@nowline/preview-shell) via the canonical applyRenderResult
-// convention. No host transport is assumed.
+// The MCP host loads a pre-declared ui:// HTML resource and hydrates it via the
+// ext-apps ontoolresult handshake. Per-call render inputs ({ kind: 'nowline.preview',
+// source, theme, … }) arrive in the tool result; the widget renders the roadmap
+// in-browser via mountLivePreview. A #nl-preview-data JSON <script> fallback
+// remains for the /widget-preview dev shim and non-handshake degradation.
 //
-// Mirrors packages/vscode-extension/src/preview/webview/entry.ts; the seam
-// is that this entry owns the render (no host editor feeding it SVG), so
-// theme / now / show-links changes re-render in-place.
+// Mirrors packages/vscode-extension/src/preview/webview/entry.ts; this entry
+// owns the render (no host editor feeding it SVG), so theme / now / show-links
+// changes re-render in-place.
 
 // Runs in a browser-like iframe, not Node. Pull in the DOM lib only here
 // (the rest of @nowline/mcp is Node) — mirrors the VS Code webview entry.
 /// <reference lib="dom" />
 
+import { App } from '@modelcontextprotocol/ext-apps';
 import { mountLivePreview } from '@nowline/preview';
 import type { NowOverride, ThemeOverride } from '@nowline/preview-shell';
 
-/** Server-injected render inputs (see buildPreviewHtml in server.ts). */
+/** Server-injected or ontoolresult render inputs. */
 interface PreviewPayload {
+    kind?: string;
     source: string;
     theme?: string;
     now?: string;
@@ -42,6 +41,24 @@ function readPayload(): PreviewPayload | undefined {
     }
 }
 
+function parsePreviewFromContent(
+    content: Array<{ type: string; text?: string }> | undefined,
+): PreviewPayload | undefined {
+    if (!content) return undefined;
+    for (const block of content) {
+        if (block.type !== 'text' || !block.text) continue;
+        try {
+            const parsed = JSON.parse(block.text) as PreviewPayload;
+            if (parsed.kind === 'nowline.preview' && typeof parsed.source === 'string') {
+                return parsed;
+            }
+        } catch {
+            /* not JSON — skip */
+        }
+    }
+    return undefined;
+}
+
 /** Coerce a raw theme token from the payload to the shell's ThemeOverride. */
 function toThemeOverride(theme: string | undefined): ThemeOverride {
     switch (theme) {
@@ -56,14 +73,11 @@ function toThemeOverride(theme: string | undefined): ThemeOverride {
     }
 }
 
-function bootstrap(): void {
+let mounted = false;
+
+function mountFromPayload(payload: PreviewPayload): void {
     const root = document.getElementById('nl-preview-root');
-    if (!root) {
-        console.error('nowline mcp preview: #nl-preview-root missing');
-        return;
-    }
-    const payload = readPayload();
-    if (!payload || typeof payload.source !== 'string') {
+    if (!root || typeof payload.source !== 'string') {
         return;
     }
 
@@ -84,6 +98,24 @@ function bootstrap(): void {
         initialFit: payload.initialFit,
         showMinimap: payload.showMinimap,
     });
+    mounted = true;
 }
 
-bootstrap();
+async function bootstrap(): Promise<void> {
+    const app = new App({ name: 'NowlinePreview', version: '0.7.0' }, {});
+
+    app.ontoolresult = ({ content, isError }) => {
+        if (isError) return;
+        const payload = parsePreviewFromContent(content);
+        if (payload) mountFromPayload(payload);
+    };
+
+    await app.connect();
+
+    if (!mounted) {
+        const fallback = readPayload();
+        if (fallback) mountFromPayload(fallback);
+    }
+}
+
+void bootstrap();

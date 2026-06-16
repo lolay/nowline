@@ -61,17 +61,38 @@ const result = await build({
 
 const bundle = result.outputFiles[0].text;
 
+// Static HTML served as the pre-declared ui:// resource (no per-call data).
+// Per-call render inputs arrive via the ext-apps ontoolresult handshake.
+const previewHtml = [
+    '<!doctype html>',
+    '<html lang="en">',
+    '<head>',
+    '<meta charset="utf-8" />',
+    '<meta name="viewport" content="width=device-width, initial-scale=1" />',
+    '<title>Nowline preview</title>',
+    '<style>html,body,#nl-preview-root{margin:0;padding:0;height:100%;width:100%;overflow:hidden;}</style>',
+    '</head>',
+    '<body>',
+    '<div id="nl-preview-root"></div>',
+    `<script>${bundle}</script>`,
+    '</body>',
+    '</html>',
+    '',
+].join('\n');
+
 const lines = [
     '// GENERATED — do not edit. Re-run `pnpm --filter @nowline/mcp build` to regenerate.',
     '//',
     '// Source: packages/mcp/src/ui/entry.ts, bundled as a browser IIFE by',
     '//         packages/mcp/scripts/bundle-ui.mjs.',
     '//',
-    '// Inlined into the text/html resource that `render` returns under the',
-    '// MCP Apps UI capability (specs/mcp.md § Optional MCP Apps UI variant).',
+    '// Served as the pre-declared ui:// resource; per-call data flows via ontoolresult.',
     '',
     '/** Self-contained browser IIFE for the MCP Apps in-chat live preview. */',
     `export const UI_BUNDLE: string = ${JSON.stringify(bundle)};`,
+    '',
+    '/** Static text/html;profile=mcp-app document for the ui:// preview resource. */',
+    `export const PREVIEW_HTML: string = ${JSON.stringify(previewHtml)};`,
 ];
 
 writeFileSync(path.join(outDir, 'ui-bundle.ts'), `${lines.join('\n')}\n`);

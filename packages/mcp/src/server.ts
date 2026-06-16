@@ -8,6 +8,12 @@
 
 import { promises as fs } from 'node:fs';
 import * as path from 'node:path';
+import {
+    getUiCapability,
+    RESOURCE_MIME_TYPE,
+    registerAppResource,
+    registerAppTool,
+} from '@modelcontextprotocol/ext-apps/server';
 import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import { parseNowlineJson, printNowlineFile } from '@nowline/core';
 import {
@@ -36,7 +42,7 @@ import {
     type ExampleFile,
     REFERENCE_MAN_PAGE,
 } from './generated/resources.js';
-import { UI_BUNDLE } from './generated/ui-bundle.js';
+import { PREVIEW_HTML } from './generated/ui-bundle.js';
 import { registerPrompts } from './prompts.js';
 import { REFERENCE_CHEATSHEET } from './reference-cheatsheet.js';
 import { SCHEMA_VOCABULARY } from './schema-vocab.js';
@@ -59,26 +65,20 @@ import {
 
 // ---- MCP Apps UI (in-chat live preview) -------------------------------------
 //
-// The MCP Apps extension (SEP-1865) lets a tool return an interactive HTML
-// resource the host renders in a sandboxed iframe. We use the embedded-resource
-// form: `render` returns a self-contained text/html resource that inlines the
-// browser preview bundle (UI_BUNDLE, the @nowline/browser + @nowline/preview-
-// shell pipeline) plus the injected source. It is emitted only when the client
-// advertises the UI extension capability or the caller passes `preview: true`,
-// so plain stdio operation is unchanged and non-UI hosts still receive the
-// SVG/PNG content block alongside it (graceful degradation).
+// Official MCP Apps model (SEP-1865): a pre-declared ui:// resource serves
+// static HTML; the render tool declares _meta.ui.resourceUri; per-call data
+// flows through the ontoolresult handshake. When an MCP Apps host is active,
+// render returns a lean nowline.preview JSON payload (no inline SVG/PNG) so
+// results stay under the host's ~150K inline cap. Non-apps hosts still get
+// the full SVG/PNG inline (graceful degradation).
 
 /** SEP-1865 UI extension capability id; also probed under common short keys. */
 const MCP_APPS_UI_CAPABILITY = 'io.modelcontextprotocol/ui';
-const PREVIEW_UI_URI = 'ui://nowline/preview';
-/** SEP-1865 mandates the text/html;profile=mcp-app media type for UI resources. */
-const PREVIEW_UI_MIME = 'text/html;profile=mcp-app';
+/** Versioned URI doubles as a cache key — bump suffix on bundle changes. */
+export const PREVIEW_UI_URI = 'ui://nowline/preview-v1';
 
 function clientSupportsAppsUi(server: McpServer): boolean {
-    // Hosts advertise the UI extension in different buckets: Claude Desktop
-    // sends it under `capabilities.extensions` (SEP-1724/1865), while SDK 1.29
-    // historically modeled extension capabilities under `experimental`. Probe
-    // both buckets for the canonical id plus the short `ui` / `apps` aliases.
+    // SEP-1724 negotiated extensions: canonical id under `extensions`.
     const caps = server.server.getClientCapabilities() as
         | {
               experimental?: Record<string, unknown>;
@@ -86,6 +86,9 @@ function clientSupportsAppsUi(server: McpServer): boolean {
           }
         | undefined;
     if (!caps) return false;
+    if (getUiCapability(caps as Parameters<typeof getUiCapability>[0])) return true;
+
+    // Hosts also advertise under `experimental` or short `ui` / `apps` aliases.
     const buckets = [caps.extensions, caps.experimental].filter(
         (bucket): bucket is Record<string, unknown> => Boolean(bucket),
     );
@@ -100,44 +103,19 @@ interface PreviewPayload {
     now?: string;
     width?: number;
     locale?: string;
-    showLinks?: boolean;
 }
 
-function buildPreviewHtml(payload: PreviewPayload): string {
-    // The payload (including the .nowline source) is injected as a JSON
-    // <script> block rather than interpolated into executable JS, so source
-    // text with quotes/backticks can't break out. Escaping `<` as \u003c keeps
-    // any embedded "</script>" from closing the block early; JSON.parse in the
-    // bundle decodes it back. The bundle injects its own stylesheet at runtime,
-    // so only the root-element sizing CSS is inlined here.
-    const data = JSON.stringify(payload).replace(/</g, '\\u003c');
-    return [
-        '<!doctype html>',
-        '<html lang="en">',
-        '<head>',
-        '<meta charset="utf-8" />',
-        '<meta name="viewport" content="width=device-width, initial-scale=1" />',
-        '<title>Nowline preview</title>',
-        '<style>html,body,#nl-preview-root{margin:0;padding:0;height:100%;width:100%;overflow:hidden;}</style>',
-        '</head>',
-        '<body>',
-        '<div id="nl-preview-root"></div>',
-        `<script id="nl-preview-data" type="application/json">${data}</script>`,
-        `<script>${UI_BUNDLE}</script>`,
-        '</body>',
-        '</html>',
-        '',
-    ].join('\n');
-}
-
-function previewResourceBlock(payload: PreviewPayload) {
+function leanPreviewBlock(payload: PreviewPayload) {
     return {
-        type: 'resource' as const,
-        resource: {
-            uri: PREVIEW_UI_URI,
-            mimeType: PREVIEW_UI_MIME,
-            text: buildPreviewHtml(payload),
-        },
+        type: 'text' as const,
+        text: JSON.stringify({
+            kind: 'nowline.preview',
+            source: payload.source,
+            theme: payload.theme,
+            now: payload.now,
+            width: payload.width,
+            locale: payload.locale,
+        }),
     };
 }
 
@@ -287,6 +265,25 @@ export function createMcpServer(opts: McpServerOptions = {}): McpServer {
                     uri: 'nowline://conversions',
                     text: CONVERSIONS_GUIDE,
                     mimeType: 'text/plain',
+                },
+            ],
+        }),
+    );
+
+    registerAppResource(
+        server,
+        'nowline-preview',
+        PREVIEW_UI_URI,
+        {
+            description:
+                'Interactive in-chat roadmap preview (MCP Apps). Hydrates via ontoolresult.',
+        },
+        async () => ({
+            contents: [
+                {
+                    uri: PREVIEW_UI_URI,
+                    mimeType: RESOURCE_MIME_TYPE,
+                    text: PREVIEW_HTML,
                 },
             ],
         }),
@@ -487,7 +484,8 @@ export function createMcpServer(opts: McpServerOptions = {}): McpServer {
 
     // ---- render -------------------------------------------------------------
 
-    server.registerTool(
+    registerAppTool(
+        server,
         'render',
         {
             description: toolDescriptionWithSyntax(
@@ -545,11 +543,15 @@ export function createMcpServer(opts: McpServerOptions = {}): McpServer {
                     .boolean()
                     .optional()
                     .describe(
-                        'When true, also return an interactive in-chat HTML preview (MCP Apps UI). Auto-enabled when the client advertises MCP Apps UI support. The preview is view-only (zoom, theme, now-line); export via the export/render tools.',
+                        'When true, force the in-chat MCP Apps preview. On MCP Apps hosts the preview auto-renders via _meta.ui without this flag.',
                     ),
             }),
             outputSchema: RenderOutputSchema,
             annotations: { readOnlyHint: true, idempotentHint: true },
+            _meta: {
+                ui: { resourceUri: PREVIEW_UI_URI },
+                'openai/outputTemplate': PREVIEW_UI_URI,
+            },
         },
         async (args) => {
             const { source, filePath } = await sourceAndPath(args, allowedRoot);
@@ -587,18 +589,14 @@ export function createMcpServer(opts: McpServerOptions = {}): McpServer {
                 doc: blocked.doc,
             });
 
-            const wantPreview = args.preview === true || clientSupportsAppsUi(server);
-            const previewBlocks = wantPreview
-                ? [
-                      previewResourceBlock({
-                          source,
-                          theme: args.theme,
-                          now: args.now,
-                          width: args.width,
-                          locale: 'en-US',
-                      }),
-                  ]
-                : [];
+            const appActive = args.preview === true || clientSupportsAppsUi(server);
+            const previewPayload: PreviewPayload = {
+                source,
+                theme: args.theme,
+                now: args.now,
+                width: args.width,
+                locale: 'en-US',
+            };
 
             const reviewBlocks =
                 args.review === true
@@ -622,10 +620,33 @@ export function createMcpServer(opts: McpServerOptions = {}): McpServer {
                 };
                 return {
                     content: [
-                        { type: 'text', text: JSON.stringify(structured, null, 2) },
+                        ...(appActive
+                            ? [leanPreviewBlock(previewPayload)]
+                            : [
+                                  {
+                                      type: 'text' as const,
+                                      text: JSON.stringify(structured, null, 2),
+                                  },
+                              ]),
                         ...insightHintBlocks,
                         ...reviewBlocks,
-                        ...previewBlocks,
+                    ],
+                    structuredContent: structured,
+                };
+            }
+
+            if (appActive) {
+                const structured = {
+                    format,
+                    ...(format === 'png' ? { bytes: bytes.byteLength } : {}),
+                    shareUrl,
+                    ...insightsField,
+                };
+                return {
+                    content: [
+                        leanPreviewBlock(previewPayload),
+                        ...insightHintBlocks,
+                        ...reviewBlocks,
                     ],
                     structuredContent: structured,
                 };
@@ -642,7 +663,6 @@ export function createMcpServer(opts: McpServerOptions = {}): McpServer {
                         },
                         ...insightHintBlocks,
                         ...reviewBlocks,
-                        ...previewBlocks,
                     ],
                     structuredContent: structured,
                 };
@@ -654,7 +674,6 @@ export function createMcpServer(opts: McpServerOptions = {}): McpServer {
                     { type: 'text', text: svgText, mimeType: 'image/svg+xml' },
                     ...insightHintBlocks,
                     ...reviewBlocks,
-                    ...previewBlocks,
                 ],
                 structuredContent: structured,
             };

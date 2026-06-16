@@ -34,6 +34,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ### Changed
 
+- **`@nowline/mcp` — MCP Apps preview re-architecture**: migrated from per-call embedded HTML resources to the official MCP Apps model — pre-declared `ui://nowline/preview-v1` resource, `_meta.ui.resourceUri` on `render`, `ontoolresult` hydration via `@modelcontextprotocol/ext-apps`, and lean `nowline.preview` JSON results on UI-capable hosts (full SVG/PNG inline on non-apps hosts).
 - **`@nowline/mcp` — `render`/`export` validate first**: invalid input returns structured `{ ok: false, diagnostics }` instead of a raw `@nowline/export` kernel error string.
 - **`@nowline/mcp` — tool descriptions and server instructions**: per-tool `.nowline` syntax anchors, numbered tool-keyed workflow, and `render` positioned as combined validate+render.
 - **`@nowline/mcp` — `path`/`output` parameter descriptions**: `render`, `export`, and `convert` now state these must be real local filesystem paths and must never be virtual/sandbox paths (e.g. `/mnt/user-data/…`), so sandboxed hosts pass `source` inline instead of an unreadable artifact path that the `--root` guard rejects.
@@ -54,6 +55,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ### Fixed
 
+- **`@nowline/mcp` — MCP Apps preview payload cap**: lean tool results on apps hosts avoid the ~150K inline offload that prevented widget hydration when full SVG + bundle exceeded host limits.
 - **`@nowline/mcp` — PNG render / `review` flag**: added `@resvg/resvg-wasm` as a direct
   dependency so `render --format png` and `render --review` resolve the rasterizer. Previously
   `loadWasm` failed with `Cannot find module '@resvg/resvg-wasm'` under strict (non-hoisted)

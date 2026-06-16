@@ -12,7 +12,7 @@ import * as path from 'node:path';
 import { Client } from '@modelcontextprotocol/sdk/client/index.js';
 import { InMemoryTransport } from '@modelcontextprotocol/sdk/inMemory.js';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
-import { createMcpServer } from '../src/server.js';
+import { createMcpServer, PREVIEW_UI_URI } from '../src/server.js';
 
 // ---- Fixtures ---------------------------------------------------------------
 
@@ -171,6 +171,16 @@ describe('@nowline/mcp — tool list and annotations', () => {
         for (const tool of tools) {
             expect(tool.outputSchema, `${tool.name} missing outputSchema`).toBeDefined();
         }
+    });
+
+    it('render declares MCP Apps _meta.ui.resourceUri and openai/outputTemplate alias', async () => {
+        const { tools } = await client.listTools();
+        const render = tools.find((t) => t.name === 'render');
+        expect(render).toBeDefined();
+        const meta = render!._meta as Record<string, unknown>;
+        const ui = meta.ui as { resourceUri?: string } | undefined;
+        expect(ui?.resourceUri).toBe(PREVIEW_UI_URI);
+        expect(meta['openai/outputTemplate']).toBe(PREVIEW_UI_URI);
     });
 });
 
@@ -570,12 +580,15 @@ describe('@nowline/mcp — prompts', () => {
 // ---- resources --------------------------------------------------------------
 
 describe('@nowline/mcp — resources', () => {
-    it('lists reference, examples, and conversions resources', async () => {
+    it('lists reference, examples, conversions, and preview UI resources', async () => {
         const { resources } = await client.listResources();
         const uris = resources.map((r) => r.uri);
         expect(uris).toContain('nowline://reference');
         expect(uris).toContain('nowline://examples');
         expect(uris).toContain('nowline://conversions');
+        expect(uris).toContain(PREVIEW_UI_URI);
+        const preview = resources.find((r) => r.uri === PREVIEW_UI_URI);
+        expect(preview?.mimeType).toBe('text/html;profile=mcp-app');
     });
 
     it('nowline://reference returns non-empty text content', async () => {
@@ -597,6 +610,15 @@ describe('@nowline/mcp — resources', () => {
     it('nowline://examples returns at least one entry', async () => {
         const result = await client.readResource({ uri: 'nowline://examples' });
         expect(result.contents.length).toBeGreaterThan(0);
+    });
+
+    it('preview UI resource returns static HTML with the bundled script', async () => {
+        const result = await client.readResource({ uri: PREVIEW_UI_URI });
+        expect(result.contents.length).toBeGreaterThan(0);
+        const html = result.contents.find((c) => 'text' in c) as { text: string } | undefined;
+        expect(html?.text).toContain('<!doctype html>');
+        expect(html?.text).toContain('id="nl-preview-root"');
+        expect(html?.text).toContain('<script>');
     });
 });
 
@@ -704,6 +726,122 @@ describe('@nowline/mcp — determinism parity', () => {
             | undefined;
         expect(svgBlock).toBeDefined();
         expect(svgBlock!.text).toBe(directSvg);
+    });
+});
+
+// ---- MCP Apps preview (lean vs full result) ---------------------------------
+
+const MCP_UI_EXTENSION = 'io.modelcontextprotocol/ui';
+
+async function connectUiClient(
+    uiCaps: Record<string, unknown>,
+): Promise<{ client: Client; cleanup: () => Promise<void> }> {
+    const server = createMcpServer({ allowedRoot: tmpDir });
+    const [clientTransport, serverTransport] = InMemoryTransport.createLinkedPair();
+    await server.connect(serverTransport);
+    const uiClient = new Client({ name: 'ui-test-client', version: '1.0.0' });
+    uiClient.registerCapabilities({ extensions: uiCaps });
+    await uiClient.connect(clientTransport);
+    return {
+        client: uiClient,
+        cleanup: async () => {
+            try {
+                await clientTransport.close();
+            } catch {
+                /* best-effort */
+            }
+            try {
+                await serverTransport.close();
+            } catch {
+                /* best-effort */
+            }
+        },
+    };
+}
+
+describe('@nowline/mcp — MCP Apps preview', () => {
+    it('default client (no UI capability) returns full SVG inline', async () => {
+        const result = await client.callTool({
+            name: 'render',
+            arguments: { source: MINIMAL, format: 'svg', now: '2025-01-15' },
+        });
+        expect(result.isError).toBeFalsy();
+        const svgBlock = result.content.find(
+            (c) => c.type === 'text' && 'text' in c && c.text.trimStart().startsWith('<svg'),
+        );
+        expect(svgBlock).toBeDefined();
+        const previewBlock = result.content.find(
+            (c) => c.type === 'text' && 'text' in c && c.text.includes('"kind":"nowline.preview"'),
+        );
+        expect(previewBlock).toBeUndefined();
+    });
+
+    it('client with extensions[io.modelcontextprotocol/ui] returns lean nowline.preview JSON', async () => {
+        const { client: uiClient, cleanup } = await connectUiClient({
+            [MCP_UI_EXTENSION]: { mimeTypes: ['text/html;profile=mcp-app'] },
+        });
+        try {
+            const result = await uiClient.callTool({
+                name: 'render',
+                arguments: { source: MINIMAL, format: 'svg', now: '2025-01-15' },
+            });
+            expect(result.isError).toBeFalsy();
+            const previewBlock = result.content.find(
+                (c) =>
+                    c.type === 'text' && 'text' in c && c.text.includes('"kind":"nowline.preview"'),
+            ) as { type: 'text'; text: string } | undefined;
+            expect(previewBlock).toBeDefined();
+            const parsed = JSON.parse(previewBlock!.text) as {
+                kind: string;
+                source: string;
+            };
+            expect(parsed.kind).toBe('nowline.preview');
+            expect(parsed.source).toBe(MINIMAL);
+            const svgBlock = result.content.find(
+                (c) => c.type === 'text' && 'text' in c && c.text.trimStart().startsWith('<svg'),
+            );
+            expect(svgBlock).toBeUndefined();
+        } finally {
+            await cleanup();
+        }
+    });
+
+    it('client with experimental extension entry returns lean nowline.preview JSON', async () => {
+        const server = createMcpServer({ allowedRoot: tmpDir });
+        const [clientTransport, serverTransport] = InMemoryTransport.createLinkedPair();
+        await server.connect(serverTransport);
+        const uiClient = new Client({ name: 'ui-test-client', version: '1.0.0' });
+        uiClient.registerCapabilities({
+            experimental: { [MCP_UI_EXTENSION]: { mimeTypes: ['text/html;profile=mcp-app'] } },
+        });
+        await uiClient.connect(clientTransport);
+        try {
+            const result = await uiClient.callTool({
+                name: 'render',
+                arguments: { source: MINIMAL, format: 'svg', now: '2025-01-15' },
+            });
+            expect(result.isError).toBeFalsy();
+            const previewBlock = result.content.find(
+                (c) =>
+                    c.type === 'text' && 'text' in c && c.text.includes('"kind":"nowline.preview"'),
+            );
+            expect(previewBlock).toBeDefined();
+            const svgBlock = result.content.find(
+                (c) => c.type === 'text' && 'text' in c && c.text.trimStart().startsWith('<svg'),
+            );
+            expect(svgBlock).toBeUndefined();
+        } finally {
+            try {
+                await clientTransport.close();
+            } catch {
+                /* best-effort */
+            }
+            try {
+                await serverTransport.close();
+            } catch {
+                /* best-effort */
+            }
+        }
     });
 });
 

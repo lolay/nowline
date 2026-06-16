@@ -133,12 +133,19 @@ No remote transport, no OAuth, no network calls to Lolay infrastructure. The ser
 
 ## Optional MCP Apps UI variant
 
-When the harness supports the MCP Apps interactive-UI protocol, `render` (and optionally `validate` preview) may return an **HTML resource** that mounts:
+When the harness supports the MCP Apps interactive-UI protocol (SEP-1865), `render` auto-renders an in-chat preview on hosts that advertise the `io.modelcontextprotocol/ui` extension. The wiring follows the official four-piece model:
+
+1. **`_meta.ui.resourceUri`** on the `render` tool (plus the legacy `openai/outputTemplate` alias for older ChatGPT surfaces) points at a pre-declared UI resource.
+2. **`ui://nowline/preview-v1`** — a versioned `ui://` resource registered at server startup, served with MIME type `text/html;profile=mcp-app`. The HTML is static (bundle only); bump the URI suffix when the bundle changes so hosts invalidate their aggressive UI-resource cache.
+3. **`ontoolresult` handshake** — per-call data (`source`, `theme`, `now`, `width`, `locale`) arrives as a lean `{ kind: 'nowline.preview', … }` JSON block in the tool result. The widget (`@modelcontextprotocol/ext-apps` `App.ontoolresult`) hydrates `mountLivePreview` from that payload.
+4. **Lean result on apps hosts** — when a UI-capable client is detected, `render` omits the inline SVG/PNG artifact from the result content (keeping results under the host's ~150K inline cap). Non-apps hosts still receive the full SVG/PNG inline; degradation is automatic.
+
+The widget stack:
 
 - [`@nowline/preview`](./architecture.md#surfaces) — `mountLivePreview(rootEl, opts)` Layer 2 controller (owns the `renderSource → applyRenderResult` loop)
   - Which in turn uses [`@nowline/browser`](./architecture.md#surfaces) — `renderSource(source, options)` and [`@nowline/preview-shell`](./architecture.md#surfaces) — `mountPreview(rootEl, options)` viewport chrome
 
-…to show the roadmap live in-chat (the Mermaid Chart precedent). This path requires these packages and is **optional** — basic stdio operation does not depend on `@nowline/browser`, `@nowline/preview-shell`, or `@nowline/preview`.
+This path requires these packages and is **optional** — basic stdio operation does not depend on `@nowline/browser`, `@nowline/preview-shell`, or `@nowline/preview`.
 
 The convention used by the in-chat preview is encoded in `@nowline/preview-shell`'s `applyRenderResult` helper: **a successful render shows the diagram; warnings do not trigger the diagnostics overlay; only errors dim the canvas**. This is intrinsic to `mountLivePreview`'s default apply policy and is also hardened in `mountPreview`'s `setDiagnostics` implementation, so the veil cannot reappear from stale hand-rolled call sequences.
 
