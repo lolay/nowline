@@ -36,6 +36,9 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 - **`@nowline/mcp` — `render`/`export` validate first**: invalid input returns structured `{ ok: false, diagnostics }` instead of a raw `@nowline/export` kernel error string.
 - **`@nowline/mcp` — tool descriptions and server instructions**: per-tool `.nowline` syntax anchors, numbered tool-keyed workflow, and `render` positioned as combined validate+render.
+- **`@nowline/mcp` — `path`/`output` parameter descriptions**: `render`, `export`, and `convert` now state these must be real local filesystem paths and must never be virtual/sandbox paths (e.g. `/mnt/user-data/…`), so sandboxed hosts pass `source` inline instead of an unreadable artifact path that the `--root` guard rejects.
+- **`@nowline/mcp` — condensed `reference` (progress & status)**: the cheatsheet now documents the real item-property set (drops the non-existent `effort:`/`color:` item keys), adds a "Progress & status" section listing the `status:` values, and explains that completion is expressed with `status:` + `remaining:` (work *left*) — there is no `progress:` key. Prevents agents from emitting `progress:60` (silently ignored via `NL.W0700`) or `status:active` without a percentage.
+- **`@nowline/core` — `NL.W0700` concept-aware suggestions**: the unknown-property warning now maps common conceptual mistakes to the canonical DSL instead of staying silent when Levenshtein finds no near-typo. `progress:`/`percent:`/`pct:`/`complete:`/`completion:` on an entity that supports `remaining:` (e.g. an `item`) now suggests `status: + remaining:`, surfaced both in the message and the structured `suggestion` field. Gated on the target key, so it never fires where `remaining:` is unsupported (e.g. a `roadmap` line).
 - **`@nowline/mcp` — MCP Apps in-chat preview**: toolbar export/copy controls are hidden
   (`exportControls: 'hide'`); artifacts come from the `render`/`export` tools, not the iframe
   sandbox.

@@ -25,7 +25,19 @@ Items need \`duration:\` or \`size:\`. Use 2-space indentation under parents.
 
 ## Item properties
 
-\`duration:\`, \`size:\`, \`effort:\`, \`remaining:\`, \`status:\`, \`color:\`, \`after:\`, \`before:\`.
+\`duration:\` (or \`size:\`), \`status:\`, \`remaining:\`, \`owner:\`, \`after:\`, \`before:\`, \`labels:\`, \`link:\`, \`style:\`.
+
+There is NO \`progress:\` or \`color:\` key. Show completion with \`status:\` + \`remaining:\`; set visuals with a \`style:\` reference (see full reference).
+
+## Progress & status
+
+\`\`\`
+item api "API redesign" duration:4w status:in-progress remaining:40%
+\`\`\`
+
+\`status:\` values: \`planned\`, \`in-progress\` (alias \`active\`), \`done\` (alias \`completed\`), \`at-risk\`, \`blocked\`, or a custom \`status\` you declare earlier.
+
+\`remaining:\` is the work *left*, written as a percent (\`40%\`) or an effort literal (\`1w\`). So an item that is 60% complete is \`remaining:40%\`. Omit \`remaining:\` for a fully open or fully done bar.
 
 ## Config / includes (before roadmap)
 

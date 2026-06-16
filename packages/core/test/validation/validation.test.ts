@@ -1097,6 +1097,25 @@ swimlane s
         expect(hit).toMatch(/Did you mean "description"\?/);
     });
 
+    it('NL.W0700: "progress" on an item suggests status: + remaining:', async () => {
+        const r = await parse(`roadmap r\nswimlane s\n  item a duration:1w progress:60\n`);
+        const warnings = warningMessages(r.diagnostics);
+        const hit = warnings.find((m) => /Unknown property "progress"/.test(m));
+        expect(hit).toBeDefined();
+        expect(hit).toMatch(/Did you mean "status: \+ remaining:"\?/);
+        expect(errorMessages(r.diagnostics)).toEqual([]);
+    });
+
+    it('NL.W0700: "progress" on a roadmap line has no remaining-based suggestion', async () => {
+        // The roadmap declaration has no `remaining:` support, so the concept
+        // alias is gated off — the message must not point at status/remaining.
+        const r = await parse(`roadmap r "R" start:2026-01-05 scale:1w progress:60\n`);
+        const warnings = warningMessages(r.diagnostics);
+        const hit = warnings.find((m) => /Unknown property "progress"/.test(m));
+        expect(hit).toBeDefined();
+        expect(hit).not.toMatch(/remaining:/);
+    });
+
     it('NL.W0700: documented per-entity properties produce no warnings', async () => {
         const r = await parse(
             `${[

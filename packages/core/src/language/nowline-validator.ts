@@ -329,6 +329,35 @@ function suggestKey(key: string, candidates: Iterable<string>, cap = 2): string 
     return best;
 }
 
+// Conceptual mistakes that aren't typos of a real key — e.g. `progress:60` is a
+// reasonable guess for "60% done", but Nowline models completion as
+// `status:` + `remaining:` (work *left*). Levenshtein can't bridge that gap, so
+// we map the concept directly. `requires` names a key the entity must support,
+// so the hint only fires where it's actionable (e.g. on an `item`, which has
+// `remaining`, not on a `roadmap` line).
+const CONCEPT_ALIASES: ReadonlyArray<{
+    keys: ReadonlySet<string>;
+    requires: string;
+    suggest: string;
+}> = [
+    {
+        keys: new Set(['progress', 'percent', 'percentage', 'pct', 'complete', 'completion']),
+        requires: 'remaining',
+        suggest: 'status: + remaining:',
+    },
+];
+
+// Suggest the canonical property (or combination) for a known conceptual
+// mistake, gated to entities that actually support the target key. Returns
+// undefined when no concept matches so callers fall back to `suggestKey`.
+function suggestConcept(key: string, known: ReadonlySet<string>): string | undefined {
+    const lower = key.toLowerCase();
+    for (const alias of CONCEPT_ALIASES) {
+        if (alias.keys.has(lower) && known.has(alias.requires)) return alias.suggest;
+    }
+    return undefined;
+}
+
 function propKey(prop: { key: string }): string {
     return prop.key.endsWith(':') ? prop.key.slice(0, -1) : prop.key;
 }
@@ -1195,7 +1224,7 @@ export class NowlineValidator {
             if (key === 'footnote') continue;
             if (computedBanned?.has(key)) continue;
             const candidates: string[] = [...known, ...UNIVERSAL_ENTITY_PROPS];
-            const suggested = suggestKey(key, candidates) ?? '';
+            const suggested = suggestConcept(key, known) ?? suggestKey(key, candidates) ?? '';
             acceptTr(accept, 'warning', { node: prop, property: 'key' }, 'NL.W0700', {
                 key,
                 entity: describeNode(node),
