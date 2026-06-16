@@ -12,6 +12,7 @@ import * as path from 'node:path';
 import { Client } from '@modelcontextprotocol/sdk/client/index.js';
 import { InMemoryTransport } from '@modelcontextprotocol/sdk/inMemory.js';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
+import { NOWLINE_MCP_ICONS } from '../src/branding.js';
 import { createMcpServer, PREVIEW_UI_URI } from '../src/server.js';
 import { parsePreviewFromArguments, parsePreviewFromContent } from '../src/ui/payload.js';
 
@@ -80,6 +81,18 @@ afterAll(async () => {
 });
 
 // ---- Tool list + annotations ------------------------------------------------
+
+describe('@nowline/mcp — server branding', () => {
+    it('initialize response includes serverInfo.icons', async () => {
+        const serverInfo = client.getServerVersion();
+        expect(serverInfo?.icons).toBeDefined();
+        expect(serverInfo!.icons!.length).toBeGreaterThanOrEqual(1);
+        const png = serverInfo!.icons!.find((i) => i.mimeType === 'image/png');
+        expect(png?.src).toMatch(/^data:image\/png;base64,/);
+        expect(png?.sizes).toContain('128x128');
+        expect(NOWLINE_MCP_ICONS[0].src).toBe(png?.src);
+    });
+});
 
 describe('@nowline/mcp — tool list and annotations', () => {
     it('lists the expected set of tools', async () => {

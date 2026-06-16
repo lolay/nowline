@@ -17,16 +17,23 @@
     "documentation": "https://github.com/lolay/nowline/blob/main/specs/mcp.md",
     "support": "https://github.com/lolay/nowline/issues",
     "license": "Apache-2.0",
+    "icon": "icon.png",
     "server": {
         "type": "node",
         "entry_point": "dist/index.js",
         "mcp_config": {
             "command": "node",
-            "args": ["${__dirname}/dist/index.js"]
+            "args": [
+                "${__dirname}/dist/index.js"
+            ]
         }
     },
     "compatibility": {
-        "platforms": ["darwin", "win32", "linux"],
+        "platforms": [
+            "darwin",
+            "win32",
+            "linux"
+        ],
         "runtimes": {
             "node": ">=22.0.0"
         }

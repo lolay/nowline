@@ -25,6 +25,7 @@ import {
 import { resolveFonts } from '@nowline/export-core';
 import { buildShareLink } from '@nowline/share-link';
 import { z } from 'zod';
+import { NOWLINE_MCP_ICONS } from './branding.js';
 import { CAPABILITIES } from './capabilities.js';
 import {
     buildDocument,
@@ -206,6 +207,7 @@ export function createMcpServer(opts: McpServerOptions = {}): McpServer {
         {
             name: opts.name ?? 'nowline',
             version: opts.version ?? '0.6.0',
+            icons: [...NOWLINE_MCP_ICONS],
         },
         {
             instructions:

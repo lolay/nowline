@@ -36,6 +36,20 @@ Which form a harness uses depends on whether it is a terminal/IDE harness (MCP C
 
 **Power-user path:** `nowline --mcp` starts the same server in stdio mode using an already-installed CLI binary. `npx @nowline/mcp` is the canonical path in harness configs because it decouples the MCP server's install lifecycle from the CLI binary. See [`specs/cli.md`](./cli.md) § `--mcp`.
 
+## Branding and icons
+
+The Nowline mark appears on every MCP surface that supports icons (MCP spec `2025-11-25`, SEP-973):
+
+| Surface | Where | Format | Notes |
+|---------|-------|--------|-------|
+| **Runtime server** | `serverInfo.icons` in the `initialize` response | Inline `data:` URIs (128×128 PNG + SVG) | No network dependency for stdio/local clients. Source: `packages/mcp/src/branding.ts`, generated from `branding/marketplace-publisher-icon.png` and `branding/favicon.svg`. |
+| **Claude Desktop `.mcpb`** | `manifest.json` `"icon": "icon.png"` | Local PNG in the bundle (`packages/mcp/icon.png`) | Rendered by Claude Desktop today. Copied into the bundle by `make pack-mcpb`. |
+| **MCP registry** | `packages/mcp/server.json` `icons` | HTTPS `https://nowline.io/branding/icon-128.png` | Registry schema requires HTTPS URLs (no data URIs). Hosted by [`lolay/nowline-site`](https://github.com/lolay/nowline-site). |
+| **Claude.ai web custom connector** | Connector URL registrable domain | Root favicon at `https://nowline.io/favicon.ico` | Claude.ai currently ignores `serverInfo.icons` for custom connectors and derives the icon from the root-domain favicon. |
+| **Connectors Directory / ChatGPT App** | Submission metadata | Uploaded PNG at publish time | Same brand asset; not wired through the protocol. |
+
+**Per-tool / per-prompt icons** are deferred: `@modelcontextprotocol/sdk@1.29.0` `registerTool` / `registerPrompt` config types do not yet expose an `icons` field (TypeScript build error if added). When the SDK adds support, add `icons: [...NOWLINE_MCP_ICONS]` to each tool/prompt descriptor in `packages/mcp/src/server.ts` and `prompts.ts`.
+
 ## Shared tool contract
 
 Tool names are **identical** to the Nowline Cloud MCP server so agents and users graduate from local files to cloud storage with zero relearning. The OSS server addresses **local file paths**; cloud addresses **diagram ids** and adds `search`.

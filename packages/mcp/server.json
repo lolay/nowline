@@ -8,6 +8,15 @@
         "directory": "packages/mcp"
     },
     "version": "0.7.0",
+    "icons": [
+        {
+            "src": "https://nowline.io/branding/icon-128.png",
+            "mimeType": "image/png",
+            "sizes": [
+                "128x128"
+            ]
+        }
+    ],
     "packages": [
         {
             "registryType": "npm",

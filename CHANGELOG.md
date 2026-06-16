@@ -8,6 +8,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ### Added
 
+- **`@nowline/mcp` — Nowline icon on MCP surfaces**: `serverInfo.icons` in the `initialize` response (inline data URIs, no network dependency); `.mcpb` bundle `icon.png` for Claude Desktop; `icons` in `server.json` for the MCP registry (`https://nowline.io/branding/icon-128.png`). Per-tool/per-prompt icons deferred until `@modelcontextprotocol/sdk` exposes `icons` on `registerTool` / `registerPrompt` config.
 - **`@nowline/mcp` — discovery tools `reference`, `examples`, `schema`**: callable alternatives to the `nowline://*` resources so agents can learn DSL syntax without `resources/read`. `examples` resolves names with or without the `.nowline` extension. `schema` returns the structured DSL key vocabulary (directive keys, entity types, item properties) — all keys are real DSL tokens; render/CLI options are excluded.
 - **`@nowline/mcp` — `render` `review` flag**: opt-in downscaled inspection PNG for multimodal layout self-review. Insight hint is now included on inline `svg`/`png` branches (not just write-to-disk), matching `validate`.
 - **`@nowline/mcp` — structured diagnostics**: every authoring tool (`validate`, `render`, `export`, `create`, `update`) returns `{ ok: false, diagnostics }` with stable `NL.E####` codes and optional `suggestion` on error-severity input; `validate` and `render` return `insights` on success. Server instructions rewritten as a numbered tool-keyed workflow.
