@@ -11,13 +11,14 @@
 // in the full parse/layout/render stack — the same browser-safe stack the
 // embed CDN bundle ships. Runs as part of prebuild, after bundle-resources.
 
-import { mkdirSync, writeFileSync } from 'node:fs';
+import { mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import * as path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { build } from 'esbuild';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const packageRoot = path.resolve(__dirname, '..');
+const pkg = JSON.parse(readFileSync(path.join(packageRoot, 'package.json'), 'utf-8'));
 const entry = path.join(packageRoot, 'src', 'ui', 'entry.ts');
 const outDir = path.join(packageRoot, 'src', 'generated');
 
@@ -57,6 +58,7 @@ const result = await build({
     write: false,
     logLevel: 'silent',
     plugins: [stubNodeReadFile],
+    define: { __MCP_VERSION__: JSON.stringify(pkg.version) },
 });
 
 const bundle = result.outputFiles[0].text;

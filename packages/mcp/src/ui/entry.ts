@@ -14,6 +14,9 @@
 // (the rest of @nowline/mcp is Node) — mirrors the VS Code webview entry.
 /// <reference lib="dom" />
 
+// Injected by bundle-ui.mjs at build time from package.json; not a runtime import.
+declare const __MCP_VERSION__: string;
+
 import { App } from '@modelcontextprotocol/ext-apps';
 import { mountLivePreview } from '@nowline/preview';
 import type { NowOverride, ThemeOverride } from '@nowline/preview-shell';
@@ -102,7 +105,7 @@ function mountFromPayload(payload: PreviewPayload): void {
 }
 
 async function bootstrap(): Promise<void> {
-    const app = new App({ name: 'NowlinePreview', version: '0.7.0' }, {});
+    const app = new App({ name: 'NowlinePreview', version: __MCP_VERSION__ }, {});
 
     app.ontoolresult = ({ content, isError }) => {
         if (isError) return;

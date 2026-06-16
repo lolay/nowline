@@ -569,11 +569,17 @@ export function createMcpServer(opts: McpServerOptions = {}): McpServer {
                 pngScale: args.scale,
             };
             const host = createNodeHostEnv(filePath);
-            if (format === 'png' || args.review === true) {
+            const appActive = args.preview === true || clientSupportsAppsUi(server);
+            // Skip the full render when the bytes won't be used: apps host with
+            // no write-to-disk path and no review attachment requested.
+            const needsRender = !appActive || !!args.output || args.review === true;
+            if (needsRender && (format === 'png' || args.review === true)) {
                 const result = await resolveFonts({ headless: true });
                 inputs.fonts = { sans: result.sans, mono: result.mono };
             }
-            const bytes = await exportDocument(source, format, inputs, host);
+            const bytes = needsRender
+                ? await exportDocument(source, format, inputs, host)
+                : new Uint8Array(0);
             const shareUrl = args.share
                 ? (buildShareLink({ source, share: true }) ?? undefined)
                 : undefined;
@@ -589,7 +595,6 @@ export function createMcpServer(opts: McpServerOptions = {}): McpServer {
                 doc: blocked.doc,
             });
 
-            const appActive = args.preview === true || clientSupportsAppsUi(server);
             const previewPayload: PreviewPayload = {
                 source,
                 theme: args.theme,
@@ -620,14 +625,8 @@ export function createMcpServer(opts: McpServerOptions = {}): McpServer {
                 };
                 return {
                     content: [
-                        ...(appActive
-                            ? [leanPreviewBlock(previewPayload)]
-                            : [
-                                  {
-                                      type: 'text' as const,
-                                      text: JSON.stringify(structured, null, 2),
-                                  },
-                              ]),
+                        ...(appActive ? [leanPreviewBlock(previewPayload)] : []),
+                        { type: 'text' as const, text: JSON.stringify(structured, null, 2) },
                         ...insightHintBlocks,
                         ...reviewBlocks,
                     ],
@@ -638,7 +637,6 @@ export function createMcpServer(opts: McpServerOptions = {}): McpServer {
             if (appActive) {
                 const structured = {
                     format,
-                    ...(format === 'png' ? { bytes: bytes.byteLength } : {}),
                     shareUrl,
                     ...insightsField,
                 };
