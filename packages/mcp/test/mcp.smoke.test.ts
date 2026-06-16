@@ -13,6 +13,7 @@ import { Client } from '@modelcontextprotocol/sdk/client/index.js';
 import { InMemoryTransport } from '@modelcontextprotocol/sdk/inMemory.js';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import { createMcpServer, PREVIEW_UI_URI } from '../src/server.js';
+import { parsePreviewFromArguments, parsePreviewFromContent } from '../src/ui/payload.js';
 
 // ---- Fixtures ---------------------------------------------------------------
 
@@ -842,6 +843,81 @@ describe('@nowline/mcp — MCP Apps preview', () => {
                 /* best-effort */
             }
         }
+    });
+});
+
+// ---- preview widget payload extraction (ontoolinput + ontoolresult) ---------
+
+// The in-chat widget paints from two ext-apps signals: the LLM's tool arguments
+// (ontoolinput, the fast primary path mirroring the official examples) and the
+// server's tool result (ontoolresult, authoritative). These pure helpers back
+// both paths; the bug was the widget listening to ontoolresult only.
+describe('@nowline/mcp — preview payload extraction', () => {
+    it('parsePreviewFromArguments maps inline source + view options', () => {
+        const payload = parsePreviewFromArguments({
+            source: MINIMAL,
+            theme: 'dark',
+            now: '2025-01-15',
+            width: 1200,
+            // extra render-only args the widget ignores
+            format: 'svg',
+            review: true,
+        });
+        expect(payload).toEqual({
+            source: MINIMAL,
+            theme: 'dark',
+            now: '2025-01-15',
+            width: 1200,
+            locale: 'en-US',
+        });
+    });
+
+    it('parsePreviewFromArguments returns undefined for a path-only call', () => {
+        // No inline `source` — the file can't be read in the iframe, so the
+        // widget must wait for ontoolresult instead of rendering from input.
+        expect(
+            parsePreviewFromArguments({ path: 'smoke.nowline', theme: 'light' }),
+        ).toBeUndefined();
+        expect(parsePreviewFromArguments(undefined)).toBeUndefined();
+    });
+
+    it('parsePreviewFromArguments drops mistyped optional fields', () => {
+        const payload = parsePreviewFromArguments({
+            source: MINIMAL,
+            theme: 42,
+            width: '1200',
+        });
+        expect(payload).toEqual({
+            source: MINIMAL,
+            theme: undefined,
+            now: undefined,
+            width: undefined,
+            locale: 'en-US',
+        });
+    });
+
+    it('parsePreviewFromContent finds the lean nowline.preview block', () => {
+        const lean = JSON.stringify({
+            kind: 'nowline.preview',
+            source: MINIMAL,
+            theme: 'light',
+        });
+        const payload = parsePreviewFromContent([
+            { type: 'text', text: 'These are layout consequences, not errors.' },
+            { type: 'text', text: lean },
+        ]);
+        expect(payload?.kind).toBe('nowline.preview');
+        expect(payload?.source).toBe(MINIMAL);
+    });
+
+    it('parsePreviewFromContent ignores non-preview and non-JSON blocks', () => {
+        expect(parsePreviewFromContent(undefined)).toBeUndefined();
+        expect(
+            parsePreviewFromContent([
+                { type: 'text', text: 'not json' },
+                { type: 'text', text: JSON.stringify({ kind: 'something-else', source: 'x' }) },
+            ]),
+        ).toBeUndefined();
     });
 });
 

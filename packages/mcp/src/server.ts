@@ -75,7 +75,7 @@ import {
 /** SEP-1865 UI extension capability id; also probed under common short keys. */
 const MCP_APPS_UI_CAPABILITY = 'io.modelcontextprotocol/ui';
 /** Versioned URI doubles as a cache key — bump suffix on bundle changes. */
-export const PREVIEW_UI_URI = 'ui://nowline/preview-v1';
+export const PREVIEW_UI_URI = 'ui://nowline/preview-v3';
 
 function clientSupportsAppsUi(server: McpServer): boolean {
     // SEP-1724 negotiated extensions: canonical id under `extensions`.

@@ -31,6 +31,13 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
   canonical "svg-vs-diagnostics" convention (a successful render shows the diagram; warnings
   do not veil) in one place. All have a **type-only** `@nowline/browser` dependency so
   shell-only bundles stay render-engine-free.
+- **`@nowline/integration-tests` — MCP Apps preview e2e leg + `make mcp-app-e2e`**: a
+  headless-Chromium Playwright regression (`test/mcp-app-preview.e2e.test.ts`) that reproduces
+  the Claude-like opaque-origin `sandbox="allow-scripts"` iframe under a strict CSP, plays the
+  full AppBridge handshake (`ui/initialize → initialized → tool-input → tool-result`), sizes the
+  iframe from `size-changed` like a real web host, and asserts the widget reports a non-zero
+  height and paints. Kept out of `make ci` (needs a browser); see [`specs/mcp.md`](./specs/mcp.md)
+  § Debugging the in-chat preview (Claude Desktop).
 
 ### Changed
 
@@ -55,6 +62,8 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ### Fixed
 
+- **`@nowline/mcp` — in-chat preview blank on Claude Desktop (iframe collapsed to height 0)**: the live preview is a fill-the-container layout (`html`/`body`/`#nl-preview-root` are `height:100%`), so the `@modelcontextprotocol/ext-apps` SDK's default `autoResize` — which measures `documentElement` at `max-content` — reported `ui/notifications/size-changed` height **0**, and size-to-content web hosts (Claude Desktop) shrank the iframe to nothing: blank, with **no** console error in any log. `entry.ts` now constructs `App` with `autoResize: false` and drives the iframe height from `hostContext.containerDimensions` (with a clamped fixed fallback), re-applying on `host-context-changed`. VS Code and embed own their panel height and are unaffected. The widget further sizes to the diagram's **fit-width height** (clamped to the host's available height) rather than filling the container, so a short roadmap stays compact instead of being pushed below the fold; user zoom no longer resizes the iframe. The `ui://` resource URI is bumped (`preview-v1` → `preview-v3`) so hosts invalidate their cached widget and pick up the new bundle. See [`specs/mcp.md`](./specs/mcp.md) § Sizing in size-to-content hosts.
+- **`@nowline/mcp` — in-chat preview now paints from tool input**: the widget previously hydrated from `ontoolresult` only, so on hosts that deliver the tool result late (or not at all) to a freshly mounted iframe the preview stayed blank. It now mounts from `ontoolinput` (the LLM's `render` arguments, available before the server returns) as the primary path — mirroring the official `ext-apps` examples — and keeps `ontoolresult` as the authoritative reconciliation (it carries the server-resolved `source` when the caller passed `path:`). Mounting is idempotent across the two signals.
 - **`@nowline/mcp` — MCP Apps preview payload cap**: lean tool results on apps hosts avoid the ~150K inline offload that prevented widget hydration when full SVG + bundle exceeded host limits.
 - **`@nowline/mcp` — PNG render / `review` flag**: added `@resvg/resvg-wasm` as a direct
   dependency so `render --format png` and `render --review` resolve the rasterizer. Previously

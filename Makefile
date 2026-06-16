@@ -121,6 +121,11 @@ determinism-update: ## [danger] Regenerate determinism goldens (Node then browse
 	pnpm --filter @nowline/integration-tests exec playwright install chromium
 	UPDATE_DETERMINISM_GOLDENS=1 pnpm --filter @nowline/integration-tests exec vitest run --config vitest.browser.config.ts
 
+mcp-app-e2e: ## MCP Apps preview leg: render the widget in a Claude-like sandboxed iframe (needs a browser; not in `make ci`)
+	pnpm --filter @nowline/mcp build
+	pnpm --filter @nowline/integration-tests exec playwright install chromium
+	pnpm --filter @nowline/integration-tests exec vitest run --config vitest.mcp-app.config.ts
+
 ##@ GitHub
 
 gh-runs-list: ## List this repo's in-flight Actions runs (status != completed)

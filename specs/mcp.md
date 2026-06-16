@@ -137,7 +137,7 @@ When the harness supports the MCP Apps interactive-UI protocol (SEP-1865), `rend
 
 1. **`_meta.ui.resourceUri`** on the `render` tool (plus the legacy `openai/outputTemplate` alias for older ChatGPT surfaces) points at a pre-declared UI resource.
 2. **`ui://nowline/preview-v1`** — a versioned `ui://` resource registered at server startup, served with MIME type `text/html;profile=mcp-app`. The HTML is static (bundle only); bump the URI suffix when the bundle changes so hosts invalidate their aggressive UI-resource cache.
-3. **`ontoolresult` handshake** — per-call data (`source`, `theme`, `now`, `width`, `locale`) arrives as a lean `{ kind: 'nowline.preview', … }` JSON block in the tool result. The widget (`@modelcontextprotocol/ext-apps` `App.ontoolresult`) hydrates `mountLivePreview` from that payload.
+3. **`ontoolinput` + `ontoolresult` handshake** — per-call data (`source`, `theme`, `now`, `width`, `locale`) reaches the widget two ways. `App.ontoolinput` paints immediately from the LLM's `render` arguments (fast path, before the server finishes rendering); `App.ontoolresult` reconciles from the authoritative lean `{ kind: 'nowline.preview', … }` JSON block in the tool result (also covers `path:`-only calls and hosts that never deliver tool-input). Both feed one idempotent `mountLivePreview` mount.
 4. **Lean result on apps hosts** — when a UI-capable client is detected, `render` omits the inline SVG/PNG artifact from the result content (keeping results under the host's ~150K inline cap). Non-apps hosts still receive the full SVG/PNG inline; degradation is automatic.
 
 The widget stack:
@@ -150,6 +150,21 @@ This path requires these packages and is **optional** — basic stdio operation 
 The convention used by the in-chat preview is encoded in `@nowline/preview-shell`'s `applyRenderResult` helper: **a successful render shows the diagram; warnings do not trigger the diagnostics overlay; only errors dim the canvas**. This is intrinsic to `mountLivePreview`'s default apply policy and is also hardened in `mountPreview`'s `setDiagnostics` implementation, so the veil cannot reappear from stale hand-rolled call sequences.
 
 The in-chat preview mounts with `exportControls: 'hide'` — the toolbar is view-only (zoom, pan, fit, theme, now-line, show-links). Clipboard and in-iframe download are unreliable in the MCP Apps sandbox; artifacts come from the `render` and `export` tools instead.
+
+### Sizing in size-to-content hosts
+
+Web hosts (Claude Desktop) load the widget into an **opaque-origin** `sandbox="allow-scripts"` iframe and size that iframe from the widget's `ui/notifications/size-changed` notification. The shell is a fill-the-container layout (`html` / `body` / `#nl-preview-root` are all `height:100%`), so it has **no intrinsic content height**. The `@modelcontextprotocol/ext-apps` SDK's **default `autoResize` measures `documentElement` at `max-content`**, where that `height:100%` chain collapses to **0** — the host then shrinks the iframe to nothing: a **blank preview with no console error**.
+
+The MCP App entry (`packages/mcp/src/ui/entry.ts`) therefore constructs `App` with **`autoResize: false`** and reports the **diagram's** height instead. It mounts at `fitWidth` and measures the rendered SVG's `viewBox`, so the reported height is `naturalHeight × (width / naturalWidth)` — the diagram shown at full width — clamped to the host's available height (`containerDimensions.maxHeight`, default 640px, min 160px). A `ResizeObserver` + `MutationObserver` re-report on width changes and re-renders; because the measurement is `viewBox`-based (not the live zoom scale), **user zoom never resizes the iframe**. This keeps a short roadmap compact (no empty band that pushes the diagram below the fold) and caps a tall one, which then scrolls internally. VS Code and embed are unaffected: they own the panel height and never mount this entry.
+
+### Debugging the in-chat preview (Claude Desktop)
+
+Claude Desktop's logs do **not** capture anything inside the widget iframe — iframe `console.*`, uncaught errors, and CSP violations are invisible there. The server log (`~/Library/Logs/Claude/mcp-server-nowline.log`) confirms the tool call and the lean result; the renderer log (`~/Library/Logs/Claude/claude.ai-web.log`) shows host-side approval/CSP noise but **not** the iframe's own errors. A blank widget is therefore almost always a **silent** sandbox failure — sizing (above), CSP, or an opaque-origin API throw — not something you can grep a log for.
+
+Two ways to get ground truth without Claude:
+
+- **MCP Inspector** — `npx @modelcontextprotocol/inspector npx @nowline/mcp`. Its **Apps** tab loads `ui://nowline/preview-v1` in a sandboxed iframe and exposes that iframe's console + CSP violations directly. Use it to eyeball rendering and read the real error behind a blank widget.
+- **`make mcp-app-e2e`** — the automated equivalent. A headless-Chromium Playwright leg (`packages/integration-tests/test/mcp-app-preview.e2e.test.ts`) reproduces the opaque-origin `sandbox="allow-scripts"` iframe **under a strict CSP** and plays the AppBridge handshake (`ui/initialize → initialized → tool-input → tool-result`) with a mock host that sizes the iframe from `size-changed` exactly like Claude. It asserts the widget reports a **non-zero** height and actually paints. This leg caught the `autoResize` height-0 collapse and guards against its return; it is **not** in `make ci` (needs a browser), so run it on any change to the widget entry, the UI bundle, or the sizing model.
 
 ## Harness coverage (OSS tier only)
 
