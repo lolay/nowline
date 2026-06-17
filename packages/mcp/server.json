@@ -12,9 +12,7 @@
         {
             "src": "https://nowline.io/branding/icon-128.png",
             "mimeType": "image/png",
-            "sizes": [
-                "128x128"
-            ]
+            "sizes": ["128x128"]
         }
     ],
     "packages": [
