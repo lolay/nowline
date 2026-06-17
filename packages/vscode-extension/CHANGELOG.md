@@ -2,6 +2,8 @@
 
 ## [Unreleased]
 
+## [0.8.0] - 2026-06-17
+
 ### Added
 
 - `nowline.export.width` setting: an optional canvas-width cap (px) for exports.

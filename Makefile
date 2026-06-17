@@ -28,7 +28,7 @@ SHELL := bash
 .PHONY: help init build build-fast test lint format typecheck ci pre-commit doctor clean \
         lint-workflows bundle-size gh-runs-list gh-runs-watch gh-runs-status \
         determinism determinism-browser determinism-update \
-        compile smoke deb pack vsix pack-mcpb bump snapshot-version \
+        compile smoke deb pack vsix pack-mcpb bump snapshot-version release-changelog \
         publish-npm publish-vscode publish-cdn publish-mcp-registry
 
 # Overridable inputs for the package / guarded targets. The release and
@@ -221,6 +221,9 @@ bump: ## [pkg] Bump every package version (LEVEL=patch|minor|major); prints the 
 
 snapshot-version: ## [pkg] Compute and write 0.0.0-dev.<ts>.g<sha> to every package.json; prints the version
 	@node .github/scripts/snapshot-version.mjs
+
+release-changelog: ## [pkg] Promote [Unreleased] into a dated [X.Y.Z] section in both CHANGELOGs (VERSION=X.Y.Z)
+	@node .github/scripts/release-changelog.mjs $(VERSION)
 
 ##@ Danger
 

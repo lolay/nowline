@@ -6,6 +6,8 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ## [Unreleased]
 
+## [0.8.0] - 2026-06-17
+
 ### Added
 
 - **`@nowline/mcp` — Nowline icon on MCP surfaces**: `serverInfo.icons` in the `initialize` response (inline data URIs, no network dependency); `.mcpb` bundle `icon.png` for Claude Desktop; `icons` in `server.json` for the MCP registry (`https://nowline.io/branding/icon-128.png`). Per-tool/per-prompt icons deferred until `@modelcontextprotocol/sdk` exposes `icons` on `registerTool` / `registerPrompt` config.

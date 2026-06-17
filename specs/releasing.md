@@ -30,7 +30,7 @@ The `+...` suffix is informational metadata only; npm and the VS Code Marketplac
 Before cutting a release, on `main`:
 
 1. **CI is green** on the latest `main` commit (Linux, macOS, Windows).
-2. **`CHANGELOG.md` is up to date.** See [Changelog workflow](#changelog-workflow) below — contributors should already have appended entries to `## [Unreleased]` as part of their PRs; the maintainer moves them to a new `## [vX.Y.Z] - YYYY-MM-DD` section as part of the release-cut commit.
+2. **`CHANGELOG.md` is up to date.** See [Changelog workflow](#changelog-workflow) below — contributors should already have appended entries to `## [Unreleased]` as part of their PRs; the `cut-release` job automatically moves them into a new `## [vX.Y.Z] - YYYY-MM-DD` section. No manual edit is required before triggering the dispatch.
 3. **Examples render cleanly.** `pnpm build` (which runs `pnpm samples` and `pnpm fixtures`) should produce the expected SVGs without warnings.
 4. **Smoke-test the standalone binary locally** with `pnpm --filter @nowline/cli compile:local`, then run `examples/minimal.nowline` through every export format using the platform-suffixed binary the script produces — `./packages/cli/dist-bin/nowline-<platform>-<arch>` (e.g. `nowline-macos-arm64` on Apple Silicon, `nowline-linux-x64` on Linux/amd64). This catches `bun compile` regressions that the CI smoke test cannot reach for cross-platform binaries.
 5. **Required secrets are in place.** All five secrets in the [Required secrets](#required-secrets) table below must exist on `lolay/nowline`. The first-ever release also needed the `lolay/homebrew-tap` repo seeded and the Marketplace / Open VSX namespaces created — that one-time setup is now done; subsequent releases skip it. (Forking maintainers can recreate the namespaces from each registry's "create publisher" flow; the formula seed lives at [`scripts/homebrew-tap/`](../scripts/homebrew-tap/).)
@@ -49,9 +49,10 @@ This kicks off the `cut-release` job, which:
 
 1. Checks out `main` using `RELEASE_TAG_PAT` (a user-scoped PAT — `GITHUB_TOKEN`-pushed tags do not trigger downstream workflows, which would defeat the whole point).
 2. Runs `node .github/scripts/bump-version.mjs <level>` to rewrite every `packages/*/package.json` to the next SemVer.
-3. Commits the bump as `release vX.Y.Z`.
-4. Tags `vX.Y.Z`.
-5. Pushes both the commit and the tag to `main`.
+3. Runs `node .github/scripts/release-changelog.mjs <version>` to promote every entry under `## [Unreleased]` in `CHANGELOG.md` and `packages/vscode-extension/CHANGELOG.md` into a new `## [X.Y.Z] - YYYY-MM-DD` section, leaving an empty `## [Unreleased]` skeleton in place.
+4. Commits the bump and changelog promotion as `release vX.Y.Z`.
+5. Tags `vX.Y.Z`.
+6. Pushes both the commit and the tag to `main`.
 
 The tag push then re-triggers `release.yml` under `event_name == 'push'`, which runs the actual build/publish jobs (the `cut-release` job is gated to dispatch-only; the build/publish jobs are gated to tag-pushes-only).
 
@@ -61,6 +62,7 @@ If the dispatch flow is unusable (e.g. PAT expired), you can do the same thing l
 
 ```bash
 node .github/scripts/bump-version.mjs patch     # or minor / major; prints new version
+node .github/scripts/release-changelog.mjs X.Y.Z  # or: make release-changelog VERSION=X.Y.Z
 git commit -am "release vX.Y.Z"
 git tag vX.Y.Z
 git push origin main
@@ -261,9 +263,11 @@ See [`specs/mcp.md`](./mcp.md) and [`specs/cli-distribution.md`](./cli-distribut
 `CHANGELOG.md` follows [Keep a Changelog](https://keepachangelog.com). Two roles, one file:
 
 - **Contributors** append an entry to the `## [Unreleased]` section as part of their PR. Use the existing subsections (`Added`, `Changed`, `Deprecated`, `Removed`, `Fixed`, `Security`) and link to the PR number where useful.
-- **Maintainers**, as the first step of cutting a release, move every entry under `## [Unreleased]` into a new `## [vX.Y.Z] - YYYY-MM-DD` section directly above it, leaving an empty `## [Unreleased]` skeleton for the next cycle. This becomes part of the `release vX.Y.Z` commit produced by the `cut-release` job — for now this is a manual edit before triggering the dispatch.
+- **`cut-release`** automatically moves every entry under `## [Unreleased]` into a new `## [X.Y.Z] - YYYY-MM-DD` section directly above the previous release, leaving an empty `## [Unreleased]` skeleton for the next cycle. This is handled by `.github/scripts/release-changelog.mjs` (the `release-changelog` Make target) and runs as part of the `cut-release` job — no manual edit is required.
 
-> **Future enhancement.** A pre-flight check could fail the dispatch if `## [Unreleased]` is empty (or if its body has not been moved into a `vX.Y.Z` section in the working tree). Useful guard once we ship more frequently; not yet implemented.
+Both `CHANGELOG.md` (root) and `packages/vscode-extension/CHANGELOG.md` are promoted in the same commit.
+
+> **Empty `[Unreleased]` section.** If `## [Unreleased]` has no entries when a release is cut, the script still succeeds and emits an empty `## [X.Y.Z] - YYYY-MM-DD` section. A fail-on-empty pre-flight guard remains a possible future enhancement.
 
 ## After release
 
