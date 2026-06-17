@@ -1,39 +1,44 @@
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 560 180" width="560" height="180">
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 395 180" width="395" height="180" role="img" aria-label="Nowline">
   <!--
     Nowline Primary Logo
     The "l" is a red vertical line (the now-line) with a diamond at the bottom
-    where it meets the gray timeline.
+    where it meets the gray timeline. textLength/lengthAdjust pins glyph widths
+    to be renderer-independent. Geometry is shared with nowline-site/src/assets/.
   -->
 
   <!-- "now" — bold weight -->
   <text
-    x="48" y="118"
+    x="44" y="118"
     font-family="Inter, 'SF Pro Display', -apple-system, 'Segoe UI', Helvetica, Arial, sans-serif"
     font-size="92"
     font-weight="700"
     fill="#1a1a2e"
     letter-spacing="-1.5"
+    textLength="180"
+    lengthAdjust="spacingAndGlyphs"
   >now</text>
 
   <!-- Red "l" — the now-line, extends from ascender down past baseline -->
-  <rect x="274" y="34" width="9" height="118" rx="1.5" fill="#e53e3e"/>
+  <rect x="232" y="34" width="9" height="118" rx="1.5" fill="#e53e3e"/>
 
   <!-- "ine" — regular weight -->
   <text
-    x="290" y="118"
+    x="250" y="118"
     font-family="Inter, 'SF Pro Display', -apple-system, 'Segoe UI', Helvetica, Arial, sans-serif"
     font-size="92"
     font-weight="400"
     fill="#1a1a2e"
     letter-spacing="-1.5"
+    textLength="130"
+    lengthAdjust="spacingAndGlyphs"
   >ine</text>
 
   <!-- Left timeline segment -->
-  <line x1="44" y1="152" x2="266" y2="152" stroke="#c0c0c0" stroke-width="3.5" stroke-linecap="round"/>
+  <line x1="40" y1="152" x2="223" y2="152" stroke="#c0c0c0" stroke-width="3.5" stroke-linecap="round"/>
 
   <!-- Right timeline segment -->
-  <line x1="292" y1="152" x2="516" y2="152" stroke="#c0c0c0" stroke-width="3.5" stroke-linecap="round"/>
+  <line x1="250" y1="152" x2="386" y2="152" stroke="#c0c0c0" stroke-width="3.5" stroke-linecap="round"/>
 
   <!-- Red diamond at the bottom of the now-line, on the timeline -->
-  <polygon points="278.5,138 292,152 278.5,166 265,152" fill="#e53e3e"/>
+  <polygon points="236.5,138 250,152 236.5,166 223,152" fill="#e53e3e"/>
 </svg>

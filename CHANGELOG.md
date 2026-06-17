@@ -6,6 +6,10 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ## [Unreleased]
 
+### Fixed
+
+- **Branding: logo alignment corrected**: `branding/logo.svg` and `branding/logo-dark.svg` now use `textLength`/`lengthAdjust` to pin glyph widths, eliminating the gap between "now" and the red now-line and the right timeline overhang. Geometry is now identical to `nowline-site/src/assets/`. `README.md` updated to reference SVGs directly instead of PNGs.
+
 ### Added
 
 - **`@nowline/mcp` — human-readable titles on tools, resources, and prompts**: every tool declares `annotations.title` (Title Case, base-verb labels per Anthropic Software Directory Policy § 5.E); resources and prompts declare a top-level `title`; registry `server.json` adds `"title": "Nowline"`.

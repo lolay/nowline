@@ -1,7 +1,7 @@
 <p align="center">
   <picture>
-    <source media="(prefers-color-scheme: dark)" srcset="./branding/logo-dark.png" />
-    <img src="./branding/logo.png" alt="Nowline" width="360" />
+    <source media="(prefers-color-scheme: dark)" srcset="./branding/logo-dark.svg" />
+    <img src="./branding/logo.svg" alt="Nowline" width="360" />
   </picture>
 </p>
 

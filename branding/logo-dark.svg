@@ -1,41 +1,45 @@
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 560 180" width="560" height="180">
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 395 180" width="395" height="180" role="img" aria-label="Nowline">
   <!--
     Nowline Primary Logo - dark theme variant.
     Same geometry as logo.svg; text lightened to #f0f0f5 and the timeline
     darkened to #4a4a5a for legibility on dark backgrounds. The red now-line
-    and diamond (#e53e3e) are unchanged. See nowline-site/branding/README.md
-    "Dark Theme Variant" for the canonical palette.
+    and diamond (#e53e3e) are unchanged. Geometry shared with
+    nowline-site/src/assets/logo-dark.svg.
   -->
 
   <!-- "now" - bold weight -->
   <text
-    x="48" y="118"
+    x="44" y="118"
     font-family="Inter, 'SF Pro Display', -apple-system, 'Segoe UI', Helvetica, Arial, sans-serif"
     font-size="92"
     font-weight="700"
     fill="#f0f0f5"
     letter-spacing="-1.5"
+    textLength="180"
+    lengthAdjust="spacingAndGlyphs"
   >now</text>
 
   <!-- Red "l" - the now-line, extends from ascender down past baseline -->
-  <rect x="274" y="34" width="9" height="118" rx="1.5" fill="#e53e3e"/>
+  <rect x="232" y="34" width="9" height="118" rx="1.5" fill="#e53e3e"/>
 
   <!-- "ine" - regular weight -->
   <text
-    x="290" y="118"
+    x="250" y="118"
     font-family="Inter, 'SF Pro Display', -apple-system, 'Segoe UI', Helvetica, Arial, sans-serif"
     font-size="92"
     font-weight="400"
     fill="#f0f0f5"
     letter-spacing="-1.5"
+    textLength="130"
+    lengthAdjust="spacingAndGlyphs"
   >ine</text>
 
   <!-- Left timeline segment -->
-  <line x1="44" y1="152" x2="266" y2="152" stroke="#4a4a5a" stroke-width="3.5" stroke-linecap="round"/>
+  <line x1="40" y1="152" x2="223" y2="152" stroke="#4a4a5a" stroke-width="3.5" stroke-linecap="round"/>
 
   <!-- Right timeline segment -->
-  <line x1="292" y1="152" x2="516" y2="152" stroke="#4a4a5a" stroke-width="3.5" stroke-linecap="round"/>
+  <line x1="250" y1="152" x2="386" y2="152" stroke="#4a4a5a" stroke-width="3.5" stroke-linecap="round"/>
 
   <!-- Red diamond at the bottom of the now-line, on the timeline -->
-  <polygon points="278.5,138 292,152 278.5,166 265,152" fill="#e53e3e"/>
+  <polygon points="236.5,138 250,152 236.5,166 223,152" fill="#e53e3e"/>
 </svg>
