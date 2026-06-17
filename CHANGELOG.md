@@ -18,6 +18,8 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ### Changed
 
+- **`@nowline/mcp` — slim Claude Desktop `.mcpb` bundle**: `make pack-mcpb` now esbuild-bundles the server into a single `dist/index.js` (~6 MiB) and ships only `@resvg/resvg-wasm`, `pdfkit`, and `langium` (with its vscode-jsonrpc/chevrotain transitives) in `node_modules`. The first two are kept for on-disk WASM/AFM asset I/O; langium is kept because its Node entry uses dynamic `require()` incompatible with esbuild ESM output. Replaces `pnpm deploy --prod --legacy`, which produced ~608 MiB / 55k files via nested workspace `node_modules` duplication. Bundle size guard: 30 MiB max.
+
 - **`@nowline/mcp` — complete tool annotations for directory policy**: every tool declares `openWorldHint: false` (closed local world); `update` marks `destructiveHint` explicitly; `read`/`delete`/`list` and path/IO failures return structured `{ ok: false, error: { code, message } }` with stable `NL.MCP.*` codes instead of raw JSON-RPC errors (Anthropic Software Directory Policy § 5.A/§ 5.E).
 
 ## [0.8.0] - 2026-06-17

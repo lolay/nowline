@@ -207,13 +207,14 @@ pack-mcpb: ## [pkg] Pack the @nowline/mcp Claude Desktop bundle into dist-mcpb/n
 	@set -euo pipefail; \
 	node scripts/sync-mcp-metadata.mjs >/dev/null; \
 	rm -rf dist-mcpb/staging dist-mcpb/nowline.mcpb; \
-	mkdir -p dist-mcpb/staging; \
-	pnpm --filter @nowline/mcp deploy --prod --legacy dist-mcpb/staging; \
-	rm -rf dist-mcpb/staging/src dist-mcpb/staging/scripts dist-mcpb/staging/test; \
-	cp packages/mcp/manifest.json packages/mcp/.mcpbignore packages/mcp/icon.png dist-mcpb/staging/; \
-	cd dist-mcpb/staging && npx --yes @anthropic-ai/mcpb@latest pack . ../nowline.mcpb; \
-	rm -rf "$(CURDIR)/dist-mcpb/staging"; \
+	pnpm --filter "@nowline/mcp..." build; \
+	node packages/mcp/scripts/bundle-server.mjs; \
+	node packages/mcp/scripts/verify-mcpb-staging.mjs; \
+	cd "$(CURDIR)/dist-mcpb/staging" && node dist/index.js --version >/dev/null && \
+	npx --yes @anthropic-ai/mcpb@latest pack . ../nowline.mcpb; \
 	test -s "$(CURDIR)/dist-mcpb/nowline.mcpb"; \
+	test "$$(stat -f%z "$(CURDIR)/dist-mcpb/nowline.mcpb" 2>/dev/null || stat -c%s "$(CURDIR)/dist-mcpb/nowline.mcpb")" -le 31457280; \
+	rm -rf "$(CURDIR)/dist-mcpb/staging"; \
 	ls -la "$(CURDIR)/dist-mcpb/nowline.mcpb"
 
 bump: ## [pkg] Bump every package version (LEVEL=patch|minor|major); prints the new version

@@ -204,6 +204,24 @@ Marketplace-first: where a harness has an official marketplace, publish there an
 
 Distribution detail (release pipeline, naming ids, `.mcpb` build): [`specs/cli-distribution.md`](./cli-distribution.md) § MCP server distribution and [`specs/releasing.md`](./releasing.md) § MCP publishing artifacts.
 
+### `.mcpb` bundle packaging
+
+Claude Desktop installs the OSS server as a one-click `.mcpb` bundle (`make pack-mcpb` → `dist-mcpb/nowline.mcpb`). The bundle is **not** a deployed pnpm workspace tree — that approach (`pnpm deploy --prod --legacy`) produced ~608 MiB / 55k files because every `@nowline/*` package nested its own full `node_modules`, including devDependencies such as `typescript` duplicated dozens of times.
+
+**Decision: hybrid esbuild bundle.** `packages/mcp/scripts/bundle-server.mjs` bundles the compiled server into a single `dist/index.js` (~7 MiB) via esbuild (`platform: node`, `format: esm`). Everything reachable from the server entry is inlined and tree-shaken: all `@nowline/*` workspace code, Langium, ExcelJS, the MCP SDK, Zod, and the in-chat preview UI bundle. This matches how the rest of the estate ships runtime code (embed → single esbuild bundle; CLI → `bun compile` binary; npm → `dist/` only, no `node_modules`).
+
+**External allowlist** — the only packages kept in `staging/node_modules` (installed via a minimal `package.json` + `npm install --omit=dev`):
+
+| Package | Why external |
+|---------|--------------|
+| `@resvg/resvg-wasm` | Ships `index_bg.wasm` on disk; loaded via `createRequire(import.meta.url).resolve(...)` in `packages/export-png` and `packages/mcp/src/server.ts`. |
+| `pdfkit` | Reads AFM font-metric files from `js/data/` at runtime; bundling breaks path resolution. |
+| `langium` (+ vscode-jsonrpc / chevrotain transitives) | Langium's Node entry uses dynamic `require()` that esbuild cannot fold into an ESM bundle; kept external so the bundled server still starts. `@nowline/core` remains inlined — only the langium runtime is external. |
+
+**Not external:** DejaVu fallback fonts — embedded as base64 in `@nowline/export-core/generated/bundled-fonts.js` at build time; no on-disk TTF read at runtime.
+
+**Size guard:** `make pack-mcpb` fails if `nowline.mcpb` exceeds 30 MiB (regression guard against the deploy-based layout returning). Staging is smoke-verified by `packages/mcp/scripts/verify-mcpb-staging.mjs` (PNG via resvg WASM, PDF via pdfkit AFM, bundled DejaVu fonts) before packing.
+
 The `.vsix` (`nowline.vscode-nowline`) is a **separate product** for human authoring (grammar, LSP, live preview, export commands). It is not an MCP server and does not write `mcp.json`. Users who want both install both via their native channels.
 
 ## Non-goals
