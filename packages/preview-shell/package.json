@@ -1,6 +1,6 @@
 {
     "name": "@nowline/preview-shell",
-    "version": "0.7.0",
+    "version": "0.8.0",
     "description": "A framework-agnostic preview pane for Nowline diagrams — zoom, pan, fit, minimap, and a table of issues. Used by the VS Code preview and browser surfaces.",
     "license": "Apache-2.0",
     "engines": {

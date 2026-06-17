@@ -1,6 +1,6 @@
 {
     "name": "@nowline/preview",
-    "version": "0.7.0",
+    "version": "0.8.0",
     "description": "Live-preview controller for Nowline diagrams — mounts the preview-shell viewport and owns the renderSource → applyRenderResult loop. Every entry point is injectable.",
     "license": "Apache-2.0",
     "engines": {
