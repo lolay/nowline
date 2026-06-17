@@ -212,6 +212,7 @@ pack-mcpb: ## [pkg] Pack the @nowline/mcp Claude Desktop bundle into dist-mcpb/n
 	rm -rf dist-mcpb/staging/src dist-mcpb/staging/scripts dist-mcpb/staging/test; \
 	cp packages/mcp/manifest.json packages/mcp/.mcpbignore packages/mcp/icon.png dist-mcpb/staging/; \
 	cd dist-mcpb/staging && npx --yes @anthropic-ai/mcpb@latest pack . ../nowline.mcpb; \
+	rm -rf "$(CURDIR)/dist-mcpb/staging"; \
 	test -s "$(CURDIR)/dist-mcpb/nowline.mcpb"; \
 	ls -la "$(CURDIR)/dist-mcpb/nowline.mcpb"
 
