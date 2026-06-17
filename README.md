@@ -6,14 +6,16 @@
 </p>
 
 <p align="center">
-  <strong>A human-readable domain-specific language for roadmaps.</strong>
+  Roadmaps as code. For everyone.<br />
+  <strong>Human readable roadmaps, built for AI.</strong><br />
+  Plain <code>.nowline</code> text files. Version-controlled. Render to SVG, PNG, PDF, HTML, Mermaid, XLSX, and MS Project XML.
 </p>
 
 ---
 
 ## What is Nowline?
 
-Nowline is a text-first DSL for describing product and engineering roadmaps. You write plain `.nowline` files — indented, keyword-driven, diff-friendly — and tooling renders them as timelines, validates them, and composes them.
+Nowline is a text-first DSL for describing product and engineering roadmaps — human readable and machine readable. You write plain `.nowline` text files — indented, keyword-driven, diff-friendly — and tooling renders them as timelines, validates them, and composes them.
 
 [`examples/minimal.nowline`](./examples/minimal.nowline):
 
