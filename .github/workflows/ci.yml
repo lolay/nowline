@@ -138,6 +138,28 @@ jobs:
           pnpm --filter @nowline/integration-tests exec playwright install-deps chromium
           make determinism-browser
 
+  mcp-harness:
+    # MCP integration harness (specs/mcp.md § Testing the MCP server). Single
+    # ubuntu job — needs a headless browser for the AppBridge UI leg and runs
+    # the Inspector CLI smoke against the built stdio server. Not part of the
+    # multi-OS matrix for the same reasons as determinism above.
+    name: MCP harness gate
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v6
+      - uses: ./.github/actions/setup-node-pnpm
+
+      - name: Build all packages
+        run: make build
+
+      - name: MCP Inspector CLI smoke
+        run: make mcp-inspector-smoke
+
+      - name: MCP Apps AppBridge e2e
+        run: |
+          pnpm --filter @nowline/integration-tests exec playwright install-deps chromium
+          make mcp-app-e2e
+
   release-build-smoke:
     name: Release build smoke (no upload)
     needs: build-test

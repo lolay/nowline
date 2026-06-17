@@ -51,6 +51,7 @@
         "zod": "^4.4.3"
     },
     "devDependencies": {
+        "@modelcontextprotocol/inspector": "0.22.0",
         "@types/node": "^25.9.1",
         "esbuild": "^0.28.0",
         "vitest": "^4.1.7"

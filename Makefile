@@ -27,7 +27,7 @@ SHELL := bash
 
 .PHONY: help init build build-fast test lint format typecheck ci pre-commit doctor clean \
         lint-workflows bundle-size gh-runs-list gh-runs-watch gh-runs-status \
-        determinism determinism-browser determinism-update \
+        determinism determinism-browser determinism-update mcp-app-e2e mcp-inspector-smoke mcp-claude-e2e \
         compile smoke deb pack vsix pack-mcpb bump snapshot-version release-changelog \
         publish-npm publish-vscode publish-cdn publish-mcp-registry
 
@@ -125,6 +125,14 @@ mcp-app-e2e: ## MCP Apps preview leg: render the widget in a Claude-like sandbox
 	pnpm --filter @nowline/mcp build
 	pnpm --filter @nowline/integration-tests exec playwright install chromium
 	pnpm --filter @nowline/integration-tests exec vitest run --config vitest.mcp-app.config.ts
+
+mcp-inspector-smoke: ## MCP Inspector CLI smoke: cross-process stdio tools/list + validate + render (not in `make ci`)
+	pnpm --filter @nowline/mcp build
+	node packages/mcp/scripts/inspector-smoke.mjs
+
+mcp-claude-e2e: ## Gated real-Claude headless leg (needs ANTHROPIC_API_KEY + `claude` on PATH; skips when unset)
+	pnpm --filter @nowline/mcp build
+	node packages/mcp/scripts/mcp-claude-e2e.mjs
 
 ##@ GitHub
 

@@ -2,11 +2,9 @@
 //
 // Reproduces the exact environment a web MCP host (Claude Desktop) loads the
 // nowline live preview into — an opaque-origin `sandbox="allow-scripts"`
-// iframe under a strict CSP — and drives the real ext-apps handshake
-// (ui/initialize → initialized → tool-input → tool-result). A mock host plays
-// AppBridge: it answers initialize, then feeds the lean `nowline.preview`
-// payload, and (critically) sizes the iframe from the widget's
-// `ui/notifications/size-changed` exactly like Claude does.
+// iframe under a strict CSP — and drives the real ext-apps handshake through
+// the official AppBridge + PostMessageTransport (ui/initialize → initialized
+// → tool-input → tool-result → size-changed).
 //
 // The guarded regression: the widget used to be `height:100%` everywhere with
 // the SDK's default autoResize, which measures documentElement at `max-content`
@@ -21,12 +19,18 @@
 
 /// <reference lib="dom" />
 
+import * as path from 'node:path';
+import { fileURLToPath } from 'node:url';
+import * as esbuild from 'esbuild';
 import { type Browser, chromium } from 'playwright';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
+
+const __dirname = path.dirname(fileURLToPath(import.meta.url));
 
 // Loaded at runtime (dynamic import) from @nowline/mcp's built artifact so tsc
 // never resolves a sibling package's dist across the project graph.
 let PREVIEW_HTML: string;
+let bridgeBundle: string;
 
 // Mirror the sizing constants in packages/mcp/src/ui/entry.ts.
 const MIN_HEIGHT_PX = 160;
@@ -77,38 +81,9 @@ function widgetHtml(csp: string | null): string {
     return html;
 }
 
-function hostHtml(containerDimensions: { maxHeight: number; maxWidth: number } | null): string {
-    const cd = containerDimensions
-        ? `, containerDimensions:${JSON.stringify(containerDimensions)}`
-        : '';
-    return `<!doctype html><html><head><meta charset="utf-8"></head><body>
+const HOST_SHELL = `<!doctype html><html><head><meta charset="utf-8"></head><body>
 <iframe id="f" sandbox="allow-scripts" style="width:900px;height:0px;border:0;display:block"></iframe>
-<script>
-  const iframe = document.getElementById('f');
-  let view = null;
-  window.__sizes = [];
-  function send(msg){ view && view.postMessage(msg, '*'); }
-  window.addEventListener('message', (ev) => {
-    const m = ev.data; if (!m || m.jsonrpc !== '2.0') return;
-    if (m.method === 'ui/initialize') {
-      view = ev.source;
-      send({ jsonrpc:'2.0', id:m.id, result:{
-        protocolVersion: (m.params && m.params.protocolVersion) || '2026-01-26',
-        hostInfo:{ name:'repro-host', version:'0.0.0' }, hostCapabilities:{},
-        hostContext:{ theme:'light', displayMode:'inline'${cd} } }});
-    } else if (m.method === 'ui/notifications/initialized') {
-      send({ jsonrpc:'2.0', method:'ui/notifications/tool-input', params:{ arguments: ${JSON.stringify(ARGS)} }});
-      send({ jsonrpc:'2.0', method:'ui/notifications/tool-result', params:{ content:[{ type:'text', text: ${JSON.stringify(LEAN)} }] }});
-    } else if (m.method === 'ui/notifications/size-changed') {
-      window.__sizes.push(m.params);
-      if (m.params && m.params.height != null) iframe.style.height = m.params.height + 'px';
-    } else if (m.id && m.method) {
-      send({ jsonrpc:'2.0', id:m.id, result:{} });
-    }
-  });
-</script>
 </body></html>`;
-}
 
 interface WidgetResult {
     docHeight: number;
@@ -132,6 +107,22 @@ let browser: Browser;
 beforeAll(async () => {
     const bundleUrl = new URL('../../mcp/dist/generated/ui-bundle.js', import.meta.url);
     ({ PREVIEW_HTML } = (await import(bundleUrl.href)) as { PREVIEW_HTML: string });
+
+    const bridgeEntry = path.join(__dirname, 'support/mcp-app-host-bridge.ts');
+    const result = await esbuild.build({
+        entryPoints: [bridgeEntry],
+        bundle: true,
+        format: 'iife',
+        platform: 'browser',
+        target: 'es2022',
+        write: false,
+        logLevel: 'silent',
+    });
+    bridgeBundle = result.outputFiles[0]?.text ?? '';
+    if (!bridgeBundle) {
+        throw new Error(`failed to bundle AppBridge host harness from ${bridgeEntry}`);
+    }
+
     browser = await chromium.launch({ headless: true });
 }, 120_000);
 
@@ -153,10 +144,27 @@ async function renderWidget(
     });
     page.on('pageerror', (err) => errors.push(`pageerror: ${err.message}`));
 
-    await page.setContent(hostHtml(containerDimensions), { waitUntil: 'load' });
-    await page.evaluate((html) => {
-        (document.getElementById('f') as HTMLIFrameElement).srcdoc = html;
-    }, widgetHtml(csp));
+    await page.setContent(HOST_SHELL, { waitUntil: 'load' });
+    await page.addScriptTag({ content: bridgeBundle });
+
+    await page.evaluate(
+        async ({ html, args, leanPayload, dims }) => {
+            const iframe = document.getElementById('f') as HTMLIFrameElement;
+            await window.__startNowlineBridge(iframe, {
+                args,
+                leanPayload,
+                containerDimensions: dims,
+            });
+            iframe.srcdoc = html;
+            await window.__awaitNowlineBridge();
+        },
+        {
+            html: widgetHtml(csp),
+            args: ARGS,
+            leanPayload: LEAN,
+            dims: containerDimensions,
+        },
+    );
     await page.waitForTimeout(3000);
 
     const frame = page.frames().find((fr) => fr !== page.mainFrame());

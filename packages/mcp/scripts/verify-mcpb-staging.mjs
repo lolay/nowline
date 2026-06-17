@@ -1,8 +1,8 @@
 #!/usr/bin/env node
 // Smoke-verify the packed .mcpb staging tree END-TO-END through the bundled
 // server. Spawns staging/dist/index.js as a real stdio MCP server and calls
-// its `export` tool for PNG and PDF, so the externalized packages are exercised
-// exactly as Claude Desktop will run them:
+// its `export` tool for PNG and PDF via MCP Inspector CLI, so the externalized
+// packages are exercised exactly as Claude Desktop will run them:
 //
 //   - module graph loads (langium + vscode-jsonrpc resolve from staging/node_modules)
 //   - PNG export -> @resvg/resvg-wasm index_bg.wasm read from staging/node_modules
@@ -16,8 +16,7 @@ import { createRequire } from 'node:module';
 import { tmpdir } from 'node:os';
 import * as path from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { Client } from '@modelcontextprotocol/sdk/client/index.js';
-import { StdioClientTransport } from '@modelcontextprotocol/sdk/client/stdio.js';
+import { decodeImageFromToolResult, runInspectorCli, toolCallContent } from './inspector-cli.mjs';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const repoRoot = path.resolve(__dirname, '../../..');
@@ -51,20 +50,6 @@ function assertExternalAssets() {
     }
 }
 
-/** Decode the inline base64 image block returned by the `export` tool. */
-function decodeImage(result) {
-    if (result.isError) {
-        throw new Error(`export tool returned isError: ${JSON.stringify(result.content)}`);
-    }
-    const block = result.content.find((c) => c.type === 'image');
-    if (!block || typeof block.data !== 'string') {
-        throw new Error(
-            `export result missing inline image block: ${JSON.stringify(result.content)}`,
-        );
-    }
-    return Buffer.from(block.data, 'base64');
-}
-
 async function main() {
     if (!existsSync(bundlePath)) {
         throw new Error(`bundled entry missing: ${bundlePath}`);
@@ -73,21 +58,20 @@ async function main() {
     assertExternalAssets();
 
     const tmpDir = mkdtempSync(path.join(tmpdir(), 'nowline-mcpb-verify-'));
-    const transport = new StdioClientTransport({
-        command: 'node',
-        args: [bundlePath, '--root', tmpDir],
-        cwd: tmpDir,
-    });
-    const client = new Client({ name: 'mcpb-verify', version: '1.0.0' });
 
     try {
-        await client.connect(transport);
-
-        const pngResult = await client.callTool({
-            name: 'export',
-            arguments: { source: MINIMAL, format: 'png', now: '2025-01-15' },
+        const pngOut = runInspectorCli({
+            serverEntry: bundlePath,
+            cwd: tmpDir,
+            method: 'tools/call',
+            toolName: 'export',
+            toolArgs: {
+                source: MINIMAL,
+                format: 'png',
+                now: '2025-01-15',
+            },
         });
-        const png = decodeImage(pngResult);
+        const png = decodeImageFromToolResult(toolCallContent(pngOut));
         if (png.byteLength < 100) {
             throw new Error(`PNG export too small (${png.byteLength} bytes)`);
         }
@@ -95,11 +79,18 @@ async function main() {
             throw new Error('PNG export missing magic header');
         }
 
-        const pdfResult = await client.callTool({
-            name: 'export',
-            arguments: { source: MINIMAL, format: 'pdf', now: '2025-01-15' },
+        const pdfOut = runInspectorCli({
+            serverEntry: bundlePath,
+            cwd: tmpDir,
+            method: 'tools/call',
+            toolName: 'export',
+            toolArgs: {
+                source: MINIMAL,
+                format: 'pdf',
+                now: '2025-01-15',
+            },
         });
-        const pdf = decodeImage(pdfResult);
+        const pdf = decodeImageFromToolResult(toolCallContent(pdfOut));
         if (pdf.byteLength < 100) {
             throw new Error(`PDF export too small (${pdf.byteLength} bytes)`);
         }
@@ -111,7 +102,6 @@ async function main() {
             `mcpb staging verify ok — bundled server exported png ${png.byteLength} B, pdf ${pdf.byteLength} B`,
         );
     } finally {
-        await client.close().catch(() => {});
         rmSync(tmpDir, { recursive: true, force: true });
     }
 }

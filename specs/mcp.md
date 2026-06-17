@@ -182,7 +182,25 @@ Claude Desktop's logs do **not** capture anything inside the widget iframe — i
 Two ways to get ground truth without Claude:
 
 - **MCP Inspector** — `npx @modelcontextprotocol/inspector npx @nowline/mcp`. Its **Apps** tab loads `ui://nowline/preview-v1` in a sandboxed iframe and exposes that iframe's console + CSP violations directly. Use it to eyeball rendering and read the real error behind a blank widget.
-- **`make mcp-app-e2e`** — the automated equivalent. A headless-Chromium Playwright leg (`packages/integration-tests/test/mcp-app-preview.e2e.test.ts`) reproduces the opaque-origin `sandbox="allow-scripts"` iframe **under a strict CSP** and plays the AppBridge handshake (`ui/initialize → initialized → tool-input → tool-result`) with a mock host that sizes the iframe from `size-changed` exactly like Claude. It asserts the widget reports a **non-zero** height and actually paints. This leg caught the `autoResize` height-0 collapse and guards against its return; it is **not** in `make ci` (needs a browser), so run it on any change to the widget entry, the UI bundle, or the sizing model.
+- **`make mcp-app-e2e`** — the automated equivalent. A headless-Chromium Playwright leg (`packages/integration-tests/test/mcp-app-preview.e2e.test.ts`) reproduces the opaque-origin `sandbox="allow-scripts"` iframe **under a strict CSP** and drives the official `AppBridge` + `PostMessageTransport` handshake (`ui/initialize → initialized → tool-input → tool-result → size-changed`). It asserts the widget reports a **non-zero** height and actually paints. This leg caught the `autoResize` height-0 collapse and guards against its return. It runs in the dedicated **`mcp-harness` CI job** (not `make ci` / the multi-OS matrix) because it needs a browser.
+
+### Testing the MCP server
+
+Three harness legs exercise the OSS MCP server beyond the in-process Vitest suite (`packages/mcp/test/mcp.smoke.test.ts`). None are part of `make ci` / `make test` locally; the deterministic legs run in CI's **`mcp-harness`** job (ubuntu, headless Chromium for the UI leg).
+
+| Leg | Make target | What it proves | CI |
+|-----|-------------|----------------|-----|
+| **AppBridge UI e2e** | `make mcp-app-e2e` | Preview widget paints and sizes under strict CSP via official `AppBridge` (not hand-rolled JSON-RPC) | `mcp-harness` job |
+| **Inspector CLI smoke** | `make mcp-inspector-smoke` | Cross-process stdio: `tools/list`, `validate`, `render(svg)` via `@modelcontextprotocol/inspector --cli` | `mcp-harness` job |
+| **Real-Claude headless** | `make mcp-claude-e2e` | `claude -p --bare --strict-mcp-config` invokes at least one `mcp__nowline__*` tool | Gated workflow only (see below) |
+
+**Shared cross-process client:** `packages/mcp/scripts/inspector-cli.mjs` wraps MCP Inspector CLI. It backs `make mcp-inspector-smoke` and the PNG/PDF export checks in `packages/mcp/scripts/verify-mcpb-staging.mjs` (run during `make pack-mcpb`). The AppBridge leg uses a stub MCP client (required for `AppBridge.connect()` to attach the transport) and passes `hostContext` via constructor options before the widget loads.
+
+**Real-Claude leg gating:** `make mcp-claude-e2e` no-ops with exit 0 when `ANTHROPIC_API_KEY` is unset. In GitHub Actions, run [`.github/workflows/mcp-claude.yml`](../.github/workflows/mcp-claude.yml) via `workflow_dispatch`; it reads `ANTHROPIC_API_KEY` from the `claude-mcp` environment (or repo secret). Set locally or in CI:
+
+```bash
+gh secret set ANTHROPIC_API_KEY --repo lolay/nowline --env claude-mcp
+```
 
 ## Harness coverage (OSS tier only)
 
@@ -220,7 +238,7 @@ Claude Desktop installs the OSS server as a one-click `.mcpb` bundle (`make pack
 
 **Not external:** DejaVu fallback fonts — embedded as base64 in `@nowline/export-core/generated/bundled-fonts.js` at build time; no on-disk TTF read at runtime.
 
-**Size guard:** `make pack-mcpb` fails if `nowline.mcpb` exceeds 30 MiB (regression guard against the deploy-based layout returning). Staging is smoke-verified by `packages/mcp/scripts/verify-mcpb-staging.mjs` (PNG via resvg WASM, PDF via pdfkit AFM, bundled DejaVu fonts) before packing.
+**Size guard:** `make pack-mcpb` fails if `nowline.mcpb` exceeds 30 MiB (regression guard against the deploy-based layout returning). Staging is smoke-verified by `packages/mcp/scripts/verify-mcpb-staging.mjs` (PNG via resvg WASM, PDF via pdfkit AFM, bundled DejaVu fonts) via MCP Inspector CLI before packing.
 
 The `.vsix` (`nowline.vscode-nowline`) is a **separate product** for human authoring (grammar, LSP, live preview, export commands). It is not an MCP server and does not write `mcp.json`. Users who want both install both via their native channels.
 
