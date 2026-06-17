@@ -1,6 +1,6 @@
 {
     "name": "@nowline/export-core",
-    "version": "0.8.0",
+    "version": "0.8.1",
     "description": "Shared building blocks for Nowline's exporters — fonts, units, page sizes, and common types.",
     "license": "Apache-2.0",
     "engines": {

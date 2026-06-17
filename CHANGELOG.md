@@ -6,6 +6,8 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ## [Unreleased]
 
+## [0.8.1] - 2026-06-17
+
 ### Fixed
 
 - **Branding: logo alignment corrected**: `branding/logo.svg` and `branding/logo-dark.svg` now use `textLength`/`lengthAdjust` to pin glyph widths, eliminating the gap between "now" and the red now-line and the right timeline overhang. Geometry is now identical to `nowline-site/src/assets/`. `README.md` updated to reference SVGs directly instead of PNGs.
