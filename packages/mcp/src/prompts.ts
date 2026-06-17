@@ -10,6 +10,7 @@ export function registerPrompts(server: McpServer): void {
     server.registerPrompt(
         'create-roadmap',
         {
+            title: 'Create Roadmap from Description',
             description:
                 'Generate a new .nowline roadmap from a plain-English description. Composes the DSL reference and example files so the LLM has full context.',
             argsSchema: {
@@ -60,6 +61,7 @@ export function registerPrompts(server: McpServer): void {
     server.registerPrompt(
         'fix-diagnostics',
         {
+            title: 'Fix Roadmap Diagnostics',
             description:
                 'Fix validation errors in a .nowline file. Describe the validate→fix→re-validate loop keyed on NL.E#### diagnostic codes.',
             argsSchema: {
@@ -108,6 +110,7 @@ export function registerPrompts(server: McpServer): void {
     server.registerPrompt(
         'convert-to-nowline',
         {
+            title: 'Convert to Nowline',
             description:
                 'Convert a gantt/timeline from another format (Mermaid gantt, MS Project, Excel, Google Sheets, CSV) into Nowline DSL. Uses the conversion guide resource for format-specific rules.',
             argsSchema: {

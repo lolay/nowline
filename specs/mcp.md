@@ -86,18 +86,22 @@ Tools beyond the shared contract. They lean on capabilities the CLI already has 
 
 Every tool declares the standard MCP behavior hints ([spec](https://modelcontextprotocol.io/specification/2025-11-25/server/tools) § annotations) so harnesses can reason about risk and idempotency. These are advisory hints, never a security boundary — the path-root sandbox in [Open core](#open-core-boundary) is the real guard.
 
-| Tool | `readOnlyHint` | `idempotentHint` | `destructiveHint` | `openWorldHint` |
-|------|:--:|:--:|:--:|:--:|
-| `validate`, `read`, `list`, `render`, `export`, `convert`, `capabilities`, `list-*`, `reference`, `examples`, `schema` | ✓ | ✓ | — | — |
-| `create` | — | ✓ | ✓¹ | — |
-| `update` | — | ✓ | — | — |
-| `delete` | — | ✓ | ✓ | — |
+Every tool also sets a human-readable `annotations.title` (Title Case, base-verb label — e.g. "Validate Roadmap", "View Roadmap Reference") and `openWorldHint: false` (the OSS server is a closed local world). See [Anthropic Software Directory Policy](https://support.claude.com/en/articles/13145358-anthropic-software-directory-policy) § 5.E.
 
-¹ `create` is marked `destructiveHint` because it silently overwrites an existing file at the same path (same posture as the CLI). Whole-document writes are idempotent (same args → same end state), so `idempotentHint` is also true. No tool sets `openWorldHint` — the OSS server is local and self-contained.
+| Tool | `title` | `readOnlyHint` | `idempotentHint` | `destructiveHint` | `openWorldHint` |
+|------|---------|:--:|:--:|:--:|:--:|
+| `validate`, `read`, `list`, `render`, `export`, `convert`, `capabilities`, `list-*`, `reference`, `examples`, `schema` | ✓ | ✓ | ✓ | — | ✗ |
+| `create` | ✓ | — | ✓ | ✓¹ | ✗ |
+| `update` | ✓ | — | ✓ | ✓ | ✗ |
+| `delete` | ✓ | — | — | ✓ | ✗ |
+
+¹ `create` is marked `destructiveHint` because it silently overwrites an existing file at the same path (same posture as the CLI). Whole-document writes are idempotent (same args → same end state), so `idempotentHint` is also true.
 
 ### Structured output
 
 Every tool declares an `outputSchema` and returns [structured content](https://modelcontextprotocol.io/specification/2025-11-25/server/tools) (the typed object in the table above) alongside a human-readable text block. This is the point of the server: harnesses get a machine-checkable shape (e.g. `validate` → `{ ok, diagnostics }` with stable `NL.E####` codes, optional `suggestion`, and optional layout `insights`) instead of re-parsing prose. `render`/`export` validate first and return the same `{ ok: false, diagnostics }` shape on error-severity input (never a raw kernel error string). On success, `render`/`validate` also return layout `insights` (informational reflow consequences, not errors). `render`/`export` additionally return the image/document as an MCP resource (and, optionally, a [share link](#share-links)).
+
+`read`, `delete`, `list`, and path/IO guard failures return `{ ok: false, error: { code, message } }` with `isError: true` and stable `NL.MCP.*` codes (e.g. `NL.MCP.NOT_FOUND`, `NL.MCP.OUT_OF_ROOT`, `NL.MCP.INPUT`) rather than raw JSON-RPC error strings — per [Anthropic Software Directory Policy](https://support.claude.com/en/articles/13145358-anthropic-software-directory-policy) § 5.A.
 
 ### Share links
 

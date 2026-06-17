@@ -33,7 +33,10 @@ import {
     collectMcpLayoutInsights,
     DEFAULT_RENDER_WIDTH,
     diagnosticsErrorBlock,
+    handleToolError,
+    InputRequiredError,
     LAYOUT_INSIGHT_HINT,
+    PathOutsideRootError,
     REVIEW_MAX_WIDTH,
     toolDescriptionWithSyntax,
 } from './diagnostics.js';
@@ -120,13 +123,33 @@ function leanPreviewBlock(payload: PreviewPayload) {
     };
 }
 
+// ---- Tool annotation presets (Anthropic Software Directory Policy § 5.E) ---
+
+function readOnlyTool(title: string) {
+    return {
+        title,
+        readOnlyHint: true as const,
+        idempotentHint: true as const,
+        openWorldHint: false as const,
+    };
+}
+
+function mutatingTool(title: string, opts: { destructiveHint: boolean; idempotentHint?: boolean }) {
+    return {
+        title,
+        destructiveHint: opts.destructiveHint,
+        ...(opts.idempotentHint ? { idempotentHint: true as const } : {}),
+        openWorldHint: false as const,
+    };
+}
+
 // ---- Server factory ---------------------------------------------------------
 
 function resolveAndGuard(filePath: string, allowedRoot: string): string {
     const abs = path.resolve(allowedRoot, filePath);
     const guard = path.resolve(allowedRoot);
     if (!abs.startsWith(guard + path.sep) && abs !== guard) {
-        throw new Error(`Path ${filePath} is outside the allowed root ${allowedRoot}`);
+        throw new PathOutsideRootError(filePath, allowedRoot);
     }
     return abs;
 }
@@ -187,7 +210,7 @@ async function sourceAndPath(
         const source = args.source ?? (await fs.readFile(abs, 'utf-8'));
         return { source, filePath: abs };
     }
-    throw new Error('At least one of `source` or `path` is required.');
+    throw new InputRequiredError('At least one of `source` or `path` is required.');
 }
 
 // ---- Server factory ---------------------------------------------------------
@@ -226,6 +249,7 @@ export function createMcpServer(opts: McpServerOptions = {}): McpServer {
         'nowline-reference',
         'nowline://reference',
         {
+            title: 'Roadmap Reference',
             description:
                 'Full DSL reference (nowline.5 man page): syntax, directives, and examples.',
             mimeType: 'text/plain',
@@ -241,6 +265,7 @@ export function createMcpServer(opts: McpServerOptions = {}): McpServer {
         'nowline-examples',
         'nowline://examples',
         {
+            title: 'Roadmap Examples',
             description: 'Canonical example .nowline files from the official examples/ directory.',
             mimeType: 'text/plain',
         },
@@ -257,6 +282,7 @@ export function createMcpServer(opts: McpServerOptions = {}): McpServer {
         'nowline-conversions',
         'nowline://conversions',
         {
+            title: 'Conversion Guide',
             description:
                 'LLM-mediated conversion guide: how to translate Mermaid gantt, MS Project, Excel, Google Sheets timeline, and generic CSV into Nowline DSL.',
             mimeType: 'text/plain',
@@ -277,6 +303,7 @@ export function createMcpServer(opts: McpServerOptions = {}): McpServer {
         'nowline-preview',
         PREVIEW_UI_URI,
         {
+            title: 'Roadmap Preview',
             description:
                 'Interactive in-chat roadmap preview (MCP Apps). Hydrates via ontoolresult.',
         },
@@ -311,33 +338,41 @@ export function createMcpServer(opts: McpServerOptions = {}): McpServer {
                     .describe('Absolute or relative path to a .nowline file to validate.'),
             }),
             outputSchema: ValidateOutputSchema,
-            annotations: { readOnlyHint: true, idempotentHint: true },
+            annotations: readOnlyTool('Validate Roadmap'),
         },
         async (args) => {
-            const { source, filePath } = await sourceAndPath(args, allowedRoot);
-            const doc = await buildDocument(source);
-            const diagnostics = collectMcpDiagnostics(doc, filePath);
-            const ok = diagnostics.every((d) => d.severity !== 'error');
-            const insights = ok
-                ? await collectMcpLayoutInsights({
-                      source,
-                      filePath,
-                      today: todayUtc(),
-                      locale: 'en-US',
-                      readFile: createNodeHostEnv(filePath).readSource,
-                      doc,
-                  })
-                : [];
-            const structured = { ok, diagnostics, ...(insights.length > 0 ? { insights } : {}) };
-            return {
-                content: [
-                    { type: 'text', text: JSON.stringify(structured, null, 2) },
-                    ...(insights.length > 0
-                        ? [{ type: 'text' as const, text: LAYOUT_INSIGHT_HINT }]
-                        : []),
-                ],
-                structuredContent: structured,
-            };
+            try {
+                const { source, filePath } = await sourceAndPath(args, allowedRoot);
+                const doc = await buildDocument(source);
+                const diagnostics = collectMcpDiagnostics(doc, filePath);
+                const ok = diagnostics.every((d) => d.severity !== 'error');
+                const insights = ok
+                    ? await collectMcpLayoutInsights({
+                          source,
+                          filePath,
+                          today: todayUtc(),
+                          locale: 'en-US',
+                          readFile: createNodeHostEnv(filePath).readSource,
+                          doc,
+                      })
+                    : [];
+                const structured = {
+                    ok,
+                    diagnostics,
+                    ...(insights.length > 0 ? { insights } : {}),
+                };
+                return {
+                    content: [
+                        { type: 'text', text: JSON.stringify(structured, null, 2) },
+                        ...(insights.length > 0
+                            ? [{ type: 'text' as const, text: LAYOUT_INSIGHT_HINT }]
+                            : []),
+                    ],
+                    structuredContent: structured,
+                };
+            } catch (err) {
+                return handleToolError(err, args.path);
+            }
         },
     );
 
@@ -353,16 +388,20 @@ export function createMcpServer(opts: McpServerOptions = {}): McpServer {
                     .describe('Absolute or relative path to the .nowline file to read.'),
             }),
             outputSchema: ReadOutputSchema,
-            annotations: { readOnlyHint: true, idempotentHint: true },
+            annotations: readOnlyTool('Read Roadmap'),
         },
         async (args) => {
-            const abs = resolveAndGuard(args.path, allowedRoot);
-            const source = await fs.readFile(abs, 'utf-8');
-            const structured = { path: abs, source };
-            return {
-                content: [{ type: 'text', text: JSON.stringify(structured, null, 2) }],
-                structuredContent: structured,
-            };
+            try {
+                const abs = resolveAndGuard(args.path, allowedRoot);
+                const source = await fs.readFile(abs, 'utf-8');
+                const structured = { path: abs, source };
+                return {
+                    content: [{ type: 'text', text: JSON.stringify(structured, null, 2) }],
+                    structuredContent: structured,
+                };
+            } catch (err) {
+                return handleToolError(err, args.path);
+            }
         },
     );
 
@@ -380,19 +419,26 @@ export function createMcpServer(opts: McpServerOptions = {}): McpServer {
             }),
             outputSchema: CreateOutputSchema,
             // Overwrites silently → destructive; same source always produces same file → idempotent.
-            annotations: { destructiveHint: true, idempotentHint: true },
+            annotations: mutatingTool('Create Roadmap', {
+                destructiveHint: true,
+                idempotentHint: true,
+            }),
         },
         async (args) => {
-            const abs = resolveAndGuard(args.path, allowedRoot);
-            const blocked = await diagnosticsErrorBlock(args.source, abs);
-            if (!blocked.ok) return blocked.response;
-            await fs.mkdir(path.dirname(abs), { recursive: true });
-            await fs.writeFile(abs, args.source, 'utf-8');
-            const structured = { ok: true, path: abs };
-            return {
-                content: [{ type: 'text', text: JSON.stringify(structured, null, 2) }],
-                structuredContent: structured,
-            };
+            try {
+                const abs = resolveAndGuard(args.path, allowedRoot);
+                const blocked = await diagnosticsErrorBlock(args.source, abs);
+                if (!blocked.ok) return blocked.response;
+                await fs.mkdir(path.dirname(abs), { recursive: true });
+                await fs.writeFile(abs, args.source, 'utf-8');
+                const structured = { ok: true, path: abs };
+                return {
+                    content: [{ type: 'text', text: JSON.stringify(structured, null, 2) }],
+                    structuredContent: structured,
+                };
+            } catch (err) {
+                return handleToolError(err, args.path);
+            }
         },
     );
 
@@ -411,18 +457,25 @@ export function createMcpServer(opts: McpServerOptions = {}): McpServer {
                 source: z.string().describe('The new .nowline source text.'),
             }),
             outputSchema: UpdateOutputSchema,
-            annotations: { idempotentHint: true },
+            annotations: mutatingTool('Update Roadmap', {
+                destructiveHint: true,
+                idempotentHint: true,
+            }),
         },
         async (args) => {
-            const abs = resolveAndGuard(args.path, allowedRoot);
-            const blocked = await diagnosticsErrorBlock(args.source, abs);
-            if (!blocked.ok) return blocked.response;
-            await fs.writeFile(abs, args.source, 'utf-8');
-            const structured = { ok: true, path: abs };
-            return {
-                content: [{ type: 'text', text: JSON.stringify(structured, null, 2) }],
-                structuredContent: structured,
-            };
+            try {
+                const abs = resolveAndGuard(args.path, allowedRoot);
+                const blocked = await diagnosticsErrorBlock(args.source, abs);
+                if (!blocked.ok) return blocked.response;
+                await fs.writeFile(abs, args.source, 'utf-8');
+                const structured = { ok: true, path: abs };
+                return {
+                    content: [{ type: 'text', text: JSON.stringify(structured, null, 2) }],
+                    structuredContent: structured,
+                };
+            } catch (err) {
+                return handleToolError(err, args.path);
+            }
         },
     );
 
@@ -438,16 +491,20 @@ export function createMcpServer(opts: McpServerOptions = {}): McpServer {
                     .describe('Absolute or relative path of the .nowline file to delete.'),
             }),
             outputSchema: DeleteOutputSchema,
-            annotations: { destructiveHint: true },
+            annotations: mutatingTool('Delete Roadmap', { destructiveHint: true }),
         },
         async (args) => {
-            const abs = resolveAndGuard(args.path, allowedRoot);
-            await fs.unlink(abs);
-            const structured = { path: abs };
-            return {
-                content: [{ type: 'text', text: JSON.stringify(structured, null, 2) }],
-                structuredContent: structured,
-            };
+            try {
+                const abs = resolveAndGuard(args.path, allowedRoot);
+                await fs.unlink(abs);
+                const structured = { path: abs };
+                return {
+                    content: [{ type: 'text', text: JSON.stringify(structured, null, 2) }],
+                    structuredContent: structured,
+                };
+            } catch (err) {
+                return handleToolError(err, args.path);
+            }
         },
     );
 
@@ -470,17 +527,23 @@ export function createMcpServer(opts: McpServerOptions = {}): McpServer {
                     .describe('Whether to scan subdirectories. Defaults to false.'),
             }),
             outputSchema: ListOutputSchema,
-            annotations: { readOnlyHint: true, idempotentHint: true },
+            annotations: readOnlyTool('List Roadmaps'),
         },
         async (args) => {
-            const dir = args.directory ? resolveAndGuard(args.directory, allowedRoot) : allowedRoot;
-            const recursive = args.recursive ?? false;
-            const paths = await listNowlineFiles(dir, recursive);
-            const structured = { paths };
-            return {
-                content: [{ type: 'text', text: JSON.stringify(structured, null, 2) }],
-                structuredContent: structured,
-            };
+            try {
+                const dir = args.directory
+                    ? resolveAndGuard(args.directory, allowedRoot)
+                    : allowedRoot;
+                const recursive = args.recursive ?? false;
+                const paths = await listNowlineFiles(dir, recursive);
+                const structured = { paths };
+                return {
+                    content: [{ type: 'text', text: JSON.stringify(structured, null, 2) }],
+                    structuredContent: structured,
+                };
+            } catch (err) {
+                return handleToolError(err, args.directory);
+            }
         },
     );
 
@@ -549,14 +612,24 @@ export function createMcpServer(opts: McpServerOptions = {}): McpServer {
                     ),
             }),
             outputSchema: RenderOutputSchema,
-            annotations: { readOnlyHint: true, idempotentHint: true },
+            annotations: readOnlyTool('Render Roadmap'),
             _meta: {
                 ui: { resourceUri: PREVIEW_UI_URI },
                 'openai/outputTemplate': PREVIEW_UI_URI,
             },
         },
         async (args) => {
-            const { source, filePath } = await sourceAndPath(args, allowedRoot);
+            // Only the filesystem touchpoints (reading the input, writing the
+            // output) map to structured NL.MCP.* errors; a kernel render fault
+            // bubbles unchanged so it is never mislabeled as a path/IO failure.
+            let source: string;
+            let filePath: string;
+            try {
+                ({ source, filePath } = await sourceAndPath(args, allowedRoot));
+            } catch (err) {
+                return handleToolError(err, args.path);
+            }
+
             const blocked = await diagnosticsErrorBlock(source, filePath);
             if (!blocked.ok) return blocked.response;
 
@@ -615,25 +688,29 @@ export function createMcpServer(opts: McpServerOptions = {}): McpServer {
             const insightsField = insights.length > 0 ? { insights } : {};
 
             if (args.output) {
-                const outAbs = resolveAndGuard(args.output, allowedRoot);
-                await fs.mkdir(path.dirname(outAbs), { recursive: true });
-                await fs.writeFile(outAbs, bytes);
-                const structured = {
-                    format,
-                    path: outAbs,
-                    bytes: bytes.byteLength,
-                    shareUrl,
-                    ...insightsField,
-                };
-                return {
-                    content: [
-                        ...(appActive ? [leanPreviewBlock(previewPayload)] : []),
-                        { type: 'text' as const, text: JSON.stringify(structured, null, 2) },
-                        ...insightHintBlocks,
-                        ...reviewBlocks,
-                    ],
-                    structuredContent: structured,
-                };
+                try {
+                    const outAbs = resolveAndGuard(args.output, allowedRoot);
+                    await fs.mkdir(path.dirname(outAbs), { recursive: true });
+                    await fs.writeFile(outAbs, bytes);
+                    const structured = {
+                        format,
+                        path: outAbs,
+                        bytes: bytes.byteLength,
+                        shareUrl,
+                        ...insightsField,
+                    };
+                    return {
+                        content: [
+                            ...(appActive ? [leanPreviewBlock(previewPayload)] : []),
+                            { type: 'text' as const, text: JSON.stringify(structured, null, 2) },
+                            ...insightHintBlocks,
+                            ...reviewBlocks,
+                        ],
+                        structuredContent: structured,
+                    };
+                } catch (err) {
+                    return handleToolError(err, args.output);
+                }
             }
 
             if (appActive) {
@@ -653,7 +730,12 @@ export function createMcpServer(opts: McpServerOptions = {}): McpServer {
             }
 
             if (format === 'png') {
-                const structured = { format, bytes: bytes.byteLength, shareUrl, ...insightsField };
+                const structured = {
+                    format,
+                    bytes: bytes.byteLength,
+                    shareUrl,
+                    ...insightsField,
+                };
                 return {
                     content: [
                         {
@@ -733,10 +815,20 @@ export function createMcpServer(opts: McpServerOptions = {}): McpServer {
                     ),
             }),
             outputSchema: ExportOutputSchema,
-            annotations: { readOnlyHint: true, idempotentHint: true },
+            annotations: readOnlyTool('Export Roadmap'),
         },
         async (args) => {
-            const { source, filePath } = await sourceAndPath(args, allowedRoot);
+            // Only the filesystem touchpoints (reading the input, writing the
+            // output) map to structured NL.MCP.* errors; a kernel export fault
+            // bubbles unchanged so it is never mislabeled as a path/IO failure.
+            let source: string;
+            let filePath: string;
+            try {
+                ({ source, filePath } = await sourceAndPath(args, allowedRoot));
+            } catch (err) {
+                return handleToolError(err, args.path);
+            }
+
             const blocked = await diagnosticsErrorBlock(source, filePath);
             if (!blocked.ok) return blocked.response;
 
@@ -767,14 +859,18 @@ export function createMcpServer(opts: McpServerOptions = {}): McpServer {
             const isBinary = BINARY_FORMATS.has(format);
 
             if (args.output) {
-                const outAbs = resolveAndGuard(args.output, allowedRoot);
-                await fs.mkdir(path.dirname(outAbs), { recursive: true });
-                await fs.writeFile(outAbs, bytes);
-                const structured = { format, path: outAbs, bytes: bytes.byteLength, shareUrl };
-                return {
-                    content: [{ type: 'text', text: JSON.stringify(structured, null, 2) }],
-                    structuredContent: structured,
-                };
+                try {
+                    const outAbs = resolveAndGuard(args.output, allowedRoot);
+                    await fs.mkdir(path.dirname(outAbs), { recursive: true });
+                    await fs.writeFile(outAbs, bytes);
+                    const structured = { format, path: outAbs, bytes: bytes.byteLength, shareUrl };
+                    return {
+                        content: [{ type: 'text', text: JSON.stringify(structured, null, 2) }],
+                        structuredContent: structured,
+                    };
+                } catch (err) {
+                    return handleToolError(err, args.output);
+                }
             }
 
             if (isBinary) {
@@ -828,47 +924,51 @@ export function createMcpServer(opts: McpServerOptions = {}): McpServer {
                     ),
             }),
             outputSchema: ConvertOutputSchema,
-            annotations: { readOnlyHint: true, idempotentHint: true },
+            annotations: readOnlyTool('Convert Roadmap'),
         },
         async (args) => {
-            if (args.to === 'json') {
-                const { source, filePath } = await sourceAndPath(args, allowedRoot);
-                const host = createNodeHostEnv(filePath);
-                const jsonBytes = await exportDocument(
-                    source,
-                    'json',
-                    {
-                        sourcePath: filePath,
-                        today: todayUtc(),
-                        locale: 'en-US',
-                        theme: 'light',
-                    },
-                    host,
-                );
-                const result = new TextDecoder('utf-8').decode(jsonBytes);
-                const structured = { to: 'json' as const, result };
+            try {
+                if (args.to === 'json') {
+                    const { source, filePath } = await sourceAndPath(args, allowedRoot);
+                    const host = createNodeHostEnv(filePath);
+                    const jsonBytes = await exportDocument(
+                        source,
+                        'json',
+                        {
+                            sourcePath: filePath,
+                            today: todayUtc(),
+                            locale: 'en-US',
+                            theme: 'light',
+                        },
+                        host,
+                    );
+                    const result = new TextDecoder('utf-8').decode(jsonBytes);
+                    const structured = { to: 'json' as const, result };
+                    return {
+                        content: [{ type: 'text', text: result }],
+                        structuredContent: structured,
+                    };
+                }
+
+                // to: 'nowline' — input is a JSON AST string
+                const jsonSource =
+                    args.source ??
+                    (args.path
+                        ? await fs.readFile(resolveAndGuard(args.path, allowedRoot), 'utf-8')
+                        : null);
+                if (!jsonSource) {
+                    throw new InputRequiredError('At least one of `source` or `path` is required.');
+                }
+                const { ast } = parseNowlineJson(jsonSource, args.path ?? 'input.json');
+                const result = printNowlineFile(ast);
+                const structured = { to: 'nowline' as const, result };
                 return {
                     content: [{ type: 'text', text: result }],
                     structuredContent: structured,
                 };
+            } catch (err) {
+                return handleToolError(err, args.path);
             }
-
-            // to: 'nowline' — input is a JSON AST string
-            const jsonSource =
-                args.source ??
-                (args.path
-                    ? await fs.readFile(resolveAndGuard(args.path, allowedRoot), 'utf-8')
-                    : null);
-            if (!jsonSource) {
-                throw new Error('At least one of `source` or `path` is required.');
-            }
-            const { ast } = parseNowlineJson(jsonSource, args.path ?? 'input.json');
-            const result = printNowlineFile(ast);
-            const structured = { to: 'nowline' as const, result };
-            return {
-                content: [{ type: 'text', text: result }],
-                structuredContent: structured,
-            };
         },
     );
 
@@ -881,7 +981,7 @@ export function createMcpServer(opts: McpServerOptions = {}): McpServer {
                 'Return all supported themes, icons, locales, export formats, and template names in a single response.',
             inputSchema: z.object({}),
             outputSchema: CapabilitiesOutputSchema,
-            annotations: { readOnlyHint: true, idempotentHint: true },
+            annotations: readOnlyTool('View Roadmap Capabilities'),
         },
         async () => {
             const structured = {
@@ -906,7 +1006,7 @@ export function createMcpServer(opts: McpServerOptions = {}): McpServer {
             description: 'List supported color themes: light, dark, grayscale.',
             inputSchema: z.object({}),
             outputSchema: ListItemsOutputSchema,
-            annotations: { readOnlyHint: true, idempotentHint: true },
+            annotations: readOnlyTool('List Themes'),
         },
         async () => {
             const structured = { items: [...CAPABILITIES.themes] };
@@ -926,7 +1026,7 @@ export function createMcpServer(opts: McpServerOptions = {}): McpServer {
                 'List built-in capacity-icon names usable in the `capacity-icon:` style property.',
             inputSchema: z.object({}),
             outputSchema: ListItemsOutputSchema,
-            annotations: { readOnlyHint: true, idempotentHint: true },
+            annotations: readOnlyTool('List Icons'),
         },
         async () => {
             const structured = { items: [...CAPABILITIES.icons] };
@@ -945,7 +1045,7 @@ export function createMcpServer(opts: McpServerOptions = {}): McpServer {
             description: 'List supported BCP-47 locale tags.',
             inputSchema: z.object({}),
             outputSchema: ListItemsOutputSchema,
-            annotations: { readOnlyHint: true, idempotentHint: true },
+            annotations: readOnlyTool('List Locales'),
         },
         async () => {
             const structured = { items: [...CAPABILITIES.locales] };
@@ -965,7 +1065,7 @@ export function createMcpServer(opts: McpServerOptions = {}): McpServer {
                 'List all supported export formats (svg, png, pdf, html, mermaid, xlsx, msproj, json).',
             inputSchema: z.object({}),
             outputSchema: ListItemsOutputSchema,
-            annotations: { readOnlyHint: true, idempotentHint: true },
+            annotations: readOnlyTool('List Export Formats'),
         },
         async () => {
             const structured = { items: [...CAPABILITIES.formats] };
@@ -984,7 +1084,7 @@ export function createMcpServer(opts: McpServerOptions = {}): McpServer {
             description: 'List built-in template names usable with `nowline --init --template`.',
             inputSchema: z.object({}),
             outputSchema: ListItemsOutputSchema,
-            annotations: { readOnlyHint: true, idempotentHint: true },
+            annotations: readOnlyTool('List Templates'),
         },
         async () => {
             const structured = { items: [...CAPABILITIES.templates] };
@@ -1009,7 +1109,7 @@ export function createMcpServer(opts: McpServerOptions = {}): McpServer {
                     .describe('Reference format. Defaults to condensed.'),
             }),
             outputSchema: ReferenceOutputSchema,
-            annotations: { readOnlyHint: true, idempotentHint: true },
+            annotations: readOnlyTool('View Roadmap Reference'),
         },
         async (args) => {
             const format = args.format ?? 'condensed';
@@ -1034,7 +1134,7 @@ export function createMcpServer(opts: McpServerOptions = {}): McpServer {
                     .describe('Example name. Omit for the catalog plus minimal inline.'),
             }),
             outputSchema: ExamplesOutputSchema,
-            annotations: { readOnlyHint: true, idempotentHint: true },
+            annotations: readOnlyTool('View Roadmap Examples'),
         },
         async (args) => {
             const exampleNames = EXAMPLES.map((e) => exampleShortName(e.name));
@@ -1085,7 +1185,7 @@ export function createMcpServer(opts: McpServerOptions = {}): McpServer {
                 'Return the structured Nowline DSL key vocabulary (directive keys, entity types, item properties).',
             inputSchema: z.object({}),
             outputSchema: SchemaOutputSchema,
-            annotations: { readOnlyHint: true, idempotentHint: true },
+            annotations: readOnlyTool('View Roadmap Schema'),
         },
         async () => {
             const structured = {

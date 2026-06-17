@@ -183,3 +183,66 @@ swimlane eng "Engineering"
 export function toolDescriptionWithSyntax(base: string): string {
     return `${base}\n\nExample:\n${DSL_SYNTAX_EXAMPLE}\n\n${DSL_SYNTAX_POINTER}`;
 }
+
+// ---- Structured tool errors (Anthropic Software Directory Policy § 5.A) ----
+
+export class PathOutsideRootError extends Error {
+    constructor(
+        public readonly filePath: string,
+        public readonly allowedRoot: string,
+    ) {
+        super(`Path ${filePath} is outside the allowed root ${allowedRoot}`);
+        this.name = 'PathOutsideRootError';
+    }
+}
+
+export class InputRequiredError extends Error {
+    constructor(message: string) {
+        super(message);
+        this.name = 'InputRequiredError';
+    }
+}
+
+export function toolError(code: string, message: string) {
+    const payload = { ok: false as const, error: { code, message } };
+    return {
+        content: [{ type: 'text' as const, text: JSON.stringify(payload, null, 2) }],
+        isError: true as const,
+    };
+}
+
+export function mapFsError(err: unknown, filePath: string): { code: string; message: string } {
+    const errno = (err as NodeJS.ErrnoException | undefined)?.code;
+    switch (errno) {
+        case 'ENOENT':
+            return { code: 'NL.MCP.NOT_FOUND', message: `File not found: ${filePath}` };
+        case 'EACCES':
+        case 'EPERM':
+            return { code: 'NL.MCP.DENIED', message: `Permission denied: ${filePath}` };
+        case 'EISDIR':
+        case 'ENOTDIR':
+            return { code: 'NL.MCP.NOT_A_FILE', message: `Not a file: ${filePath}` };
+        default:
+            return {
+                code: 'NL.MCP.IO',
+                message: err instanceof Error ? err.message : String(err),
+            };
+    }
+}
+
+export function handleToolError(err: unknown, filePath?: string) {
+    if (err instanceof PathOutsideRootError) {
+        return toolError(
+            'NL.MCP.OUT_OF_ROOT',
+            `Path ${err.filePath} is outside the allowed root ${err.allowedRoot}`,
+        );
+    }
+    if (err instanceof InputRequiredError) {
+        return toolError('NL.MCP.INPUT', err.message);
+    }
+    if (filePath !== undefined) {
+        const mapped = mapFsError(err, filePath);
+        return toolError(mapped.code, mapped.message);
+    }
+    return toolError('NL.MCP.IO', err instanceof Error ? err.message : String(err));
+}

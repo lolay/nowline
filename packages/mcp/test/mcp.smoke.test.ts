@@ -122,7 +122,7 @@ describe('@nowline/mcp — tool list and annotations', () => {
         );
     });
 
-    it('read-only tools carry readOnlyHint + idempotentHint', async () => {
+    it('read-only tools carry readOnlyHint + idempotentHint + title + openWorldHint', async () => {
         const { tools } = await client.listTools();
         const readOnly = [
             'validate',
@@ -138,10 +138,13 @@ describe('@nowline/mcp — tool list and annotations', () => {
             expect(tool, `tool ${name} missing`).toBeDefined();
             expect(tool!.annotations?.readOnlyHint, `${name} readOnlyHint`).toBe(true);
             expect(tool!.annotations?.idempotentHint, `${name} idempotentHint`).toBe(true);
+            expect(typeof tool!.annotations?.title, `${name} title`).toBe('string');
+            expect(tool!.annotations!.title!.length, `${name} title`).toBeGreaterThan(0);
+            expect(tool!.annotations?.openWorldHint, `${name} openWorldHint`).toBe(false);
         }
     });
 
-    it('list-* tools carry readOnlyHint + idempotentHint', async () => {
+    it('list-* tools carry readOnlyHint + idempotentHint + title + openWorldHint', async () => {
         const { tools } = await client.listTools();
         const listTools = [
             'list-themes',
@@ -155,29 +158,50 @@ describe('@nowline/mcp — tool list and annotations', () => {
             expect(tool, `tool ${name} missing`).toBeDefined();
             expect(tool!.annotations?.readOnlyHint, `${name} readOnlyHint`).toBe(true);
             expect(tool!.annotations?.idempotentHint, `${name} idempotentHint`).toBe(true);
+            expect(typeof tool!.annotations?.title, `${name} title`).toBe('string');
+            expect(tool!.annotations!.title!.length, `${name} title`).toBeGreaterThan(0);
+            expect(tool!.annotations?.openWorldHint, `${name} openWorldHint`).toBe(false);
         }
     });
 
-    it('create carries destructiveHint + idempotentHint', async () => {
+    it('discovery tools carry title + openWorldHint', async () => {
+        const { tools } = await client.listTools();
+        for (const name of ['reference', 'examples', 'schema']) {
+            const tool = tools.find((t) => t.name === name);
+            expect(tool, `tool ${name} missing`).toBeDefined();
+            expect(typeof tool!.annotations?.title, `${name} title`).toBe('string');
+            expect(tool!.annotations!.title!.length, `${name} title`).toBeGreaterThan(0);
+            expect(tool!.annotations?.openWorldHint, `${name} openWorldHint`).toBe(false);
+        }
+    });
+
+    it('create carries destructiveHint + idempotentHint + title + openWorldHint', async () => {
         const { tools } = await client.listTools();
         const create = tools.find((t) => t.name === 'create');
         expect(create).toBeDefined();
         expect(create!.annotations?.destructiveHint).toBe(true);
         expect(create!.annotations?.idempotentHint).toBe(true);
+        expect(create!.annotations?.title).toBe('Create Roadmap');
+        expect(create!.annotations?.openWorldHint).toBe(false);
     });
 
-    it('delete carries destructiveHint', async () => {
+    it('delete carries destructiveHint + title + openWorldHint', async () => {
         const { tools } = await client.listTools();
         const del = tools.find((t) => t.name === 'delete');
         expect(del).toBeDefined();
         expect(del!.annotations?.destructiveHint).toBe(true);
+        expect(del!.annotations?.title).toBe('Delete Roadmap');
+        expect(del!.annotations?.openWorldHint).toBe(false);
     });
 
-    it('update carries idempotentHint', async () => {
+    it('update carries destructiveHint + idempotentHint + title + openWorldHint', async () => {
         const { tools } = await client.listTools();
         const update = tools.find((t) => t.name === 'update');
         expect(update).toBeDefined();
+        expect(update!.annotations?.destructiveHint).toBe(true);
         expect(update!.annotations?.idempotentHint).toBe(true);
+        expect(update!.annotations?.title).toBe('Update Roadmap');
+        expect(update!.annotations?.openWorldHint).toBe(false);
     });
 
     it('tools declare an outputSchema', async () => {
@@ -195,6 +219,78 @@ describe('@nowline/mcp — tool list and annotations', () => {
         const ui = meta.ui as { resourceUri?: string } | undefined;
         expect(ui?.resourceUri).toBe(PREVIEW_UI_URI);
         expect(meta['openai/outputTemplate']).toBe(PREVIEW_UI_URI);
+    });
+
+    it('resources declare a human-readable title', async () => {
+        const { resources } = await client.listResources();
+        for (const resource of resources) {
+            expect(typeof resource.title, `${resource.uri} title`).toBe('string');
+            expect(resource.title!.length, `${resource.uri} title`).toBeGreaterThan(0);
+        }
+    });
+
+    it('prompts declare a human-readable title', async () => {
+        const { prompts } = await client.listPrompts();
+        for (const prompt of prompts) {
+            expect(typeof prompt.title, `${prompt.name} title`).toBe('string');
+            expect(prompt.title!.length, `${prompt.name} title`).toBeGreaterThan(0);
+        }
+    });
+});
+
+// ---- structured path / fs errors --------------------------------------------
+
+describe('@nowline/mcp — structured path and fs errors', () => {
+    function errorPayload(result: Awaited<ReturnType<Client['callTool']>>) {
+        const textBlock = result.content.find((c) => c.type === 'text') as
+            | { type: 'text'; text: string }
+            | undefined;
+        expect(textBlock).toBeDefined();
+        return JSON.parse(textBlock!.text) as {
+            ok: boolean;
+            error: { code: string; message: string };
+        };
+    }
+
+    it('read on a missing path returns isError with NL.MCP.NOT_FOUND', async () => {
+        const result = await client.callTool({
+            name: 'read',
+            arguments: { path: 'missing.nowline' },
+        });
+        expect(result.isError).toBe(true);
+        const payload = errorPayload(result);
+        expect(payload.ok).toBe(false);
+        expect(payload.error.code).toBe('NL.MCP.NOT_FOUND');
+    });
+
+    it('read on a path outside the allowed root returns isError with NL.MCP.OUT_OF_ROOT', async () => {
+        const result = await client.callTool({
+            name: 'read',
+            arguments: { path: path.join('..', 'outside-root.nowline') },
+        });
+        expect(result.isError).toBe(true);
+        const payload = errorPayload(result);
+        expect(payload.error.code).toBe('NL.MCP.OUT_OF_ROOT');
+    });
+
+    it('delete on a missing path returns isError with NL.MCP.NOT_FOUND', async () => {
+        const result = await client.callTool({
+            name: 'delete',
+            arguments: { path: 'missing.nowline' },
+        });
+        expect(result.isError).toBe(true);
+        const payload = errorPayload(result);
+        expect(payload.error.code).toBe('NL.MCP.NOT_FOUND');
+    });
+
+    it('delete on a path outside the allowed root returns isError with NL.MCP.OUT_OF_ROOT', async () => {
+        const result = await client.callTool({
+            name: 'delete',
+            arguments: { path: path.join('..', 'outside-root.nowline') },
+        });
+        expect(result.isError).toBe(true);
+        const payload = errorPayload(result);
+        expect(payload.error.code).toBe('NL.MCP.OUT_OF_ROOT');
     });
 });
 
@@ -290,6 +386,42 @@ describe('@nowline/mcp — render/export structured errors', () => {
         const parsed = JSON.parse(textBlock!.text) as { ok: boolean; diagnostics: unknown[] };
         expect(parsed.ok).toBe(false);
         expect(parsed.diagnostics.length).toBeGreaterThan(0);
+    });
+
+    function errorPayload(result: Awaited<ReturnType<Client['callTool']>>) {
+        const textBlock = result.content.find((c) => c.type === 'text') as
+            | { type: 'text'; text: string }
+            | undefined;
+        expect(textBlock).toBeDefined();
+        return JSON.parse(textBlock!.text) as {
+            ok: boolean;
+            error: { code: string; message: string };
+        };
+    }
+
+    it('render with an out-of-root output returns OUT_OF_ROOT naming the output path', async () => {
+        const outside = path.join('..', 'escape.svg');
+        const result = await client.callTool({
+            name: 'render',
+            arguments: { source: MINIMAL, format: 'svg', now: '2025-01-15', output: outside },
+        });
+        expect(result.isError).toBe(true);
+        const payload = errorPayload(result);
+        expect(payload.error.code).toBe('NL.MCP.OUT_OF_ROOT');
+        // The guard must reference the offending output path, not the input.
+        expect(payload.error.message).toContain('escape.svg');
+    });
+
+    it('export with an out-of-root output returns OUT_OF_ROOT naming the output path', async () => {
+        const outside = path.join('..', 'escape.pdf');
+        const result = await client.callTool({
+            name: 'export',
+            arguments: { source: MINIMAL, format: 'pdf', output: outside },
+        });
+        expect(result.isError).toBe(true);
+        const payload = errorPayload(result);
+        expect(payload.error.code).toBe('NL.MCP.OUT_OF_ROOT');
+        expect(payload.error.message).toContain('escape.pdf');
     });
 });
 

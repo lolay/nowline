@@ -6,6 +6,14 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ## [Unreleased]
 
+### Added
+
+- **`@nowline/mcp` — human-readable titles on tools, resources, and prompts**: every tool declares `annotations.title` (Title Case, base-verb labels per Anthropic Software Directory Policy § 5.E); resources and prompts declare a top-level `title`; registry `server.json` adds `"title": "Nowline"`.
+
+### Changed
+
+- **`@nowline/mcp` — complete tool annotations for directory policy**: every tool declares `openWorldHint: false` (closed local world); `update` marks `destructiveHint` explicitly; `read`/`delete`/`list` and path/IO failures return structured `{ ok: false, error: { code, message } }` with stable `NL.MCP.*` codes instead of raw JSON-RPC errors (Anthropic Software Directory Policy § 5.A/§ 5.E).
+
 ## [0.8.0] - 2026-06-17
 
 ### Added

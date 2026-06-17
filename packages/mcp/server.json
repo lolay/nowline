@@ -1,6 +1,7 @@
 {
     "$schema": "https://static.modelcontextprotocol.io/schemas/2025-12-11/server.schema.json",
     "name": "io.nowline/nowline",
+    "title": "Nowline",
     "description": "Create and edit your roadmaps in a plain-text format.",
     "repository": {
         "url": "https://github.com/lolay/nowline",
