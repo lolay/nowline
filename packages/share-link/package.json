@@ -1,6 +1,6 @@
 {
     "name": "@nowline/share-link",
-    "version": "0.8.1",
+    "version": "0.8.2",
     "description": "Packs a Nowline roadmap into a shareable link — no server needed, the whole roadmap rides in the URL.",
     "license": "Apache-2.0",
     "engines": {

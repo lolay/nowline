@@ -6,6 +6,8 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ## [Unreleased]
 
+## [0.8.2] - 2026-06-18
+
 ### Added
 
 - **MCP integration harness**: three test legs for `@nowline/mcp` — official `AppBridge` UI e2e (`make mcp-app-e2e`), MCP Inspector CLI cross-process smoke (`make mcp-inspector-smoke`), and gated real-Claude headless e2e (`make mcp-claude-e2e`, skips without `ANTHROPIC_API_KEY`). Deterministic legs run in CI's `mcp-harness` job; Claude leg runs via `.github/workflows/mcp-claude.yml` (`workflow_dispatch`). `.mcpb` staging verify now uses the shared Inspector CLI client.

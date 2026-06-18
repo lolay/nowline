@@ -1,6 +1,6 @@
 {
     "name": "@nowline/export-pdf",
-    "version": "0.8.1",
+    "version": "0.8.2",
     "description": "Exports a Nowline roadmap as a crisp, vector PDF.",
     "license": "Apache-2.0",
     "engines": {

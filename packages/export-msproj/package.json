@@ -1,6 +1,6 @@
 {
     "name": "@nowline/export-msproj",
-    "version": "0.8.1",
+    "version": "0.8.2",
     "description": "Exports a Nowline roadmap to Microsoft Project XML for import into other PM tools.",
     "license": "Apache-2.0",
     "engines": {
