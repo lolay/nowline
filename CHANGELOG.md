@@ -10,6 +10,10 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 - **MCP integration harness**: three test legs for `@nowline/mcp` — official `AppBridge` UI e2e (`make mcp-app-e2e`), MCP Inspector CLI cross-process smoke (`make mcp-inspector-smoke`), and gated real-Claude headless e2e (`make mcp-claude-e2e`, skips without `ANTHROPIC_API_KEY`). Deterministic legs run in CI's `mcp-harness` job; Claude leg runs via `.github/workflows/mcp-claude.yml` (`workflow_dispatch`). `.mcpb` staging verify now uses the shared Inspector CLI client.
 
+### Changed
+
+- **`@nowline/mcp` — slim Claude Desktop `.mcpb` bundle**: `make pack-mcpb` now esbuild-bundles the server into a single `dist/index.js` (~6 MiB) and ships only `@resvg/resvg-wasm`, `pdfkit`, and `langium` (with its vscode-jsonrpc/chevrotain transitives) in `node_modules`. The first two are kept for on-disk WASM/AFM asset I/O; langium is kept because its Node entry uses dynamic `require()` incompatible with esbuild ESM output. Replaces `pnpm deploy --prod --legacy`, which produced ~608 MiB / 55k files via nested workspace `node_modules` duplication. Bundle size guard: 30 MiB max.
+
 ## [0.8.1] - 2026-06-17
 
 ### Fixed
@@ -21,8 +25,6 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 - **`@nowline/mcp` — human-readable titles on tools, resources, and prompts**: every tool declares `annotations.title` (Title Case, base-verb labels per Anthropic Software Directory Policy § 5.E); resources and prompts declare a top-level `title`; registry `server.json` adds `"title": "Nowline"`.
 
 ### Changed
-
-- **`@nowline/mcp` — slim Claude Desktop `.mcpb` bundle**: `make pack-mcpb` now esbuild-bundles the server into a single `dist/index.js` (~6 MiB) and ships only `@resvg/resvg-wasm`, `pdfkit`, and `langium` (with its vscode-jsonrpc/chevrotain transitives) in `node_modules`. The first two are kept for on-disk WASM/AFM asset I/O; langium is kept because its Node entry uses dynamic `require()` incompatible with esbuild ESM output. Replaces `pnpm deploy --prod --legacy`, which produced ~608 MiB / 55k files via nested workspace `node_modules` duplication. Bundle size guard: 30 MiB max.
 
 - **`@nowline/mcp` — complete tool annotations for directory policy**: every tool declares `openWorldHint: false` (closed local world); `update` marks `destructiveHint` explicitly; `read`/`delete`/`list` and path/IO failures return structured `{ ok: false, error: { code, message } }` with stable `NL.MCP.*` codes instead of raw JSON-RPC errors (Anthropic Software Directory Policy § 5.A/§ 5.E).
 
