@@ -2,7 +2,7 @@
     "manifest_version": "0.3",
     "name": "nowline",
     "display_name": "Nowline",
-    "version": "0.8.1",
+    "version": "0.8.2",
     "description": "Create and edit your roadmaps in a plain-text format.",
     "long_description": "Nowline lets you create, edit, render, and export roadmaps written as plain text — no diagramming UI required. Agents get typed tools, structured diagnostics, and an optional in-chat preview.",
     "author": {
@@ -23,11 +23,17 @@
         "entry_point": "dist/index.js",
         "mcp_config": {
             "command": "node",
-            "args": ["${__dirname}/dist/index.js"]
+            "args": [
+                "${__dirname}/dist/index.js"
+            ]
         }
     },
     "compatibility": {
-        "platforms": ["darwin", "win32", "linux"],
+        "platforms": [
+            "darwin",
+            "win32",
+            "linux"
+        ],
         "runtimes": {
             "node": ">=22.0.0"
         }
