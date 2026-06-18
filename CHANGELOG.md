@@ -6,6 +6,11 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ## [Unreleased]
 
+### Fixed
+
+- **`@nowline/mcp` — `.mcpb` bundle crash on startup**: `.mcpbignore` patterns (`src/`, `scripts/`, `test/`) were applied recursively, stripping `node_modules/@chevrotain/regexp-to-ast/lib/src/api.js` from the bundle. Changed to root-anchored patterns (`/src/`, `/scripts/`, `/test/`) so only the top-level staging directories are excluded. Fixes "Server disconnected" on Claude Desktop install.
+- **`@nowline/mcp` — `.mcpb` manifest author corrected**: `author.name` changed from `"Lolay"` to `"Nowline"` so the Claude Desktop Extensions directory shows "Developed by Nowline".
+
 ## [0.8.2] - 2026-06-18
 
 ### Added
