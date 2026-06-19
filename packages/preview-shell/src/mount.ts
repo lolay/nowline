@@ -557,6 +557,9 @@ export function mountPreview(
         state.naturalHeight = h || 600;
     }
 
+    // Tracks the deferred first-fit frame so dispose() can cancel it.
+    let firstFitRaf: number | null = null;
+
     function setSvg(svgString: string): void {
         state.svgString = svgString;
         els.canvas.innerHTML = svgString;
@@ -567,6 +570,21 @@ export function mountPreview(
         if (state.firstRender) {
             applyDefaultFit();
             state.firstRender = false;
+            // The synchronous fit above can run before the viewport's CSS
+            // dimensions settle (e.g. inside a flex container still being laid
+            // out), and no resize event fires to correct it afterwards. Re-fit
+            // once on the next frame, but only if the measured size actually
+            // changed and the user hasn't taken manual control — so the common
+            // already-correct case does no redundant work.
+            const fitW = els.viewport.clientWidth;
+            const fitH = els.viewport.clientHeight;
+            firstFitRaf = win.requestAnimationFrame(() => {
+                firstFitRaf = null;
+                if (state.isDirty) return;
+                const sizeChanged =
+                    els.viewport.clientWidth !== fitW || els.viewport.clientHeight !== fitH;
+                if (sizeChanged) applyDefaultFit();
+            });
         } else {
             applyTransform();
         }
@@ -1430,6 +1448,7 @@ export function mountPreview(
         dispose() {
             if (fadeTimer) clearTimeout(fadeTimer);
             if (resizeTimer) clearTimeout(resizeTimer);
+            if (firstFitRaf !== null) win.cancelAnimationFrame(firstFitRaf);
             for (const c of cleanups) c();
             cleanups.length = 0;
             rootEl.classList.remove('nl-preview-root');
