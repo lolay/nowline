@@ -761,7 +761,7 @@ export function createMcpServer(opts: McpServerOptions = {}): McpServer {
 
     // ---- export -------------------------------------------------------------
 
-    const EXPORT_FORMATS = ['pdf', 'html', 'mermaid', 'xlsx', 'msproj', 'png'] as const;
+    const EXPORT_FORMATS = ['svg', 'pdf', 'html', 'mermaid', 'xlsx', 'msproj', 'png'] as const;
     type NonRenderFormat = (typeof EXPORT_FORMATS)[number];
 
     server.registerTool(
@@ -781,7 +781,7 @@ export function createMcpServer(opts: McpServerOptions = {}): McpServer {
                     ),
                 format: z
                     .enum(EXPORT_FORMATS)
-                    .describe('Export format: pdf, html, mermaid, xlsx, msproj, or png.'),
+                    .describe('Export format: svg, pdf, html, mermaid, xlsx, msproj, or png.'),
                 output: z
                     .string()
                     .optional()
@@ -857,6 +857,7 @@ export function createMcpServer(opts: McpServerOptions = {}): McpServer {
 
             // Default filename: <roadmap-id>.<ext>, used when no output path is given.
             const FORMAT_EXT: Record<string, string> = {
+                svg: '.svg',
                 pdf: '.pdf',
                 xlsx: '.xlsx',
                 png: '.png',

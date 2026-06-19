@@ -966,6 +966,32 @@ describe('@nowline/mcp — export delivery parameter', () => {
         );
         expect(hint).toBeDefined();
     });
+
+    it('accepts svg as an export format and returns inline SVG text by default', async () => {
+        const result = await deliveryClient.callTool({
+            name: 'export',
+            arguments: { source: MINIMAL, format: 'svg', now: '2025-01-15' },
+        });
+        expect(result.isError).toBeFalsy();
+        const textBlock = result.content.find(
+            (c) => c.type === 'text' && 'text' in c && c.text.includes('<svg'),
+        );
+        expect(textBlock).toBeDefined();
+        const sc = result.structuredContent as Record<string, unknown>;
+        expect(sc.format).toBe('svg');
+    });
+
+    it('delivery:"file" writes an svg file with a .svg extension', async () => {
+        const result = await deliveryClient.callTool({
+            name: 'export',
+            arguments: { source: MINIMAL, format: 'svg', now: '2025-01-15', delivery: 'file' },
+        });
+        expect(result.isError).toBeFalsy();
+        const sc = result.structuredContent as Record<string, unknown>;
+        expect(typeof sc.path).toBe('string');
+        expect(sc.path as string).toMatch(/\.svg$/);
+        expect(typeof sc.bytes).toBe('number');
+    });
 });
 
 // ---- Determinism parity (export-determinism spec) ---------------------------
