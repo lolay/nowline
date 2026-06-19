@@ -20,15 +20,18 @@ description: 'Provision pnpm via corepack, set up Node.js with the pnpm cache, t
 # setup-node probes the store path for cache: pnpm.
 #
 # The Node version is governed by the two-tier policy documented in
-# `CONTRIBUTING.md` § "Toolchain & Supported Versions": the default
-# `26` is the dev/CI version, matching `.nvmrc`. Callers can override
-# via the `node-version` input (the unit-test matrix in `ci.yml` does
-# this to also test against the published consumer floor of Node 22).
+# `CONTRIBUTING.md` § "Toolchain & Supported Versions": by default the
+# exact version pinned in `.nvmrc` is installed (single source of truth,
+# so a floating major can't silently pull in a broken patch release like
+# the 26.3.1 fetch regression that broke WIF deploys). Callers can
+# override via the `node-version` input (the unit-test matrix in `ci.yml`
+# does this to also test against the published consumer floor of Node
+# 22); a non-empty input takes precedence over `.nvmrc`.
 inputs:
   node-version:
-    description: 'Node.js major or full version to install (matches .nvmrc by default).'
+    description: 'Node.js version to install. Empty (the default) reads .nvmrc; set it to override, e.g. the ci.yml support matrix.'
     required: false
-    default: '26'
+    default: ''
   skip-install:
     description: 'Skip the workspace `pnpm install`. The caller must run install itself (e.g. with --cpu/--os flags to pull in cross-target optional native deps).'
     required: false
@@ -43,7 +46,10 @@ runs:
     - name: Setup Node.js
       uses: actions/setup-node@v6
       with:
+        # Empty node-version falls through to node-version-file (.nvmrc);
+        # a caller-supplied node-version (e.g. the ci.yml matrix) wins.
         node-version: ${{ inputs.node-version }}
+        node-version-file: .nvmrc
         cache: pnpm
 
     - name: Install dependencies
