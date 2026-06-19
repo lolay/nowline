@@ -63,7 +63,7 @@ Tool names are **identical** to the Nowline Cloud MCP server so agents and users
 | `update` | `{ path: string, source: string }` | `{ path }` | Replaces an existing file after validation. |
 | `delete` | `{ path: string }` | `{ path }` | Deletes a local `.nowline` file. |
 | `list` | `{ directory?: string, recursive?: boolean = false }` | `{ paths: string[] }` | Lists `.nowline` files under `directory` (default: cwd). |
-| `export` | `{ source?: string, path?: string, format: 'pdf' \| 'html' \| 'mermaid' \| 'xlsx' \| 'msproj' \| 'png', ... }` | file resource + metadata | Same `@nowline/export` kernel and format adapters as `nowline <input> -f <format>`, run in-process. Byte-identical to the CLI for the same source + inputs ([export-determinism](./export-determinism.md)). Returns an MCP resource for the rendered artifact. |
+| `export` | `{ source?: string, path?: string, format: 'pdf' \| 'html' \| 'mermaid' \| 'xlsx' \| 'msproj' \| 'png', ... }` | file resource + metadata | Same `@nowline/export` kernel and format adapters as `nowline <input> -f <format>`, run in-process. Byte-identical to the CLI for the same source + inputs ([export-determinism](./export-determinism.md)). Inline binary exports return an embedded MCP resource (`pdf`/`xlsx`) or image block (`png`). |
 
 Cloud-only additions (`search`, cloud `read`/`create`/`update`/`delete` by `id`) live in [`lolay/nowline-api/specs/mcp.md`](https://github.com/lolay/nowline-api/blob/main/specs/mcp.md). This doc covers the OSS local surface only.
 
@@ -79,6 +79,7 @@ Tools beyond the shared contract. They lean on capabilities the CLI already has 
 | `reference` | `{ format?: 'condensed' \| 'full' = condensed }` | `{ format, text }` | Callable DSL reference (condensed cheatsheet or full man page). Mirrors Mermaid's `getMermaidSyntaxGuide`. **Tools mirror** the `nowline://reference` resource because agents call tools but often skip resources. |
 | `examples` | `{ name?: string }` | `{ names?, name?, source? }` | Example catalog (no `name`) or one example's source by name. Mirrors Mermaid's `get_examples`. Mirrors `nowline://examples`. |
 | `schema` | `{}` | `{ directiveKeys, entityTypes, itemPropertyKeys }` | Structured key vocabulary for the DSL. Mirrors Mermaid's frontmatter-schema discovery pattern. |
+| `share` | `{ source?: string, path?: string }` | `{ shareUrl: string }` | Sole share surface. Validates first, then returns a client-side-encoded link (`#text=` / `#url=`, see [`specs/embed.md`](./embed.md) § Share on Nowline) opening `free.nowline.io/open` for view + export. No upload, account, or network call. Tool description and server `instructions` steer agents to prefer `render` for in-chat presentation and call `share` only when the user explicitly wants a portable link. |
 
 **Why both forms.** `capabilities` is one round-trip for the full picture (ideal for priming and for token-frugal agents); the `list-*` family is granular for harnesses that expose each vocabulary as its own affordance and for agents that need a single slice. They never disagree — the `list-*` tools are projections of the same source enums `capabilities` returns.
 
@@ -90,7 +91,7 @@ Every tool also sets a human-readable `annotations.title` (Title Case, base-verb
 
 | Tool | `title` | `readOnlyHint` | `idempotentHint` | `destructiveHint` | `openWorldHint` |
 |------|---------|:--:|:--:|:--:|:--:|
-| `validate`, `read`, `list`, `render`, `export`, `convert`, `capabilities`, `list-*`, `reference`, `examples`, `schema` | ✓ | ✓ | ✓ | — | ✗ |
+| `validate`, `read`, `list`, `render`, `export`, `share`, `convert`, `capabilities`, `list-*`, `reference`, `examples`, `schema` | ✓ | ✓ | ✓ | — | ✗ |
 | `create` | ✓ | — | ✓ | ✓¹ | ✗ |
 | `update` | ✓ | — | ✓ | ✓ | ✗ |
 | `delete` | ✓ | — | — | ✓ | ✗ |
@@ -99,13 +100,13 @@ Every tool also sets a human-readable `annotations.title` (Title Case, base-verb
 
 ### Structured output
 
-Every tool declares an `outputSchema` and returns [structured content](https://modelcontextprotocol.io/specification/2025-11-25/server/tools) (the typed object in the table above) alongside a human-readable text block. This is the point of the server: harnesses get a machine-checkable shape (e.g. `validate` → `{ ok, diagnostics }` with stable `NL.E####` codes, optional `suggestion`, and optional layout `insights`) instead of re-parsing prose. `render`/`export` validate first and return the same `{ ok: false, diagnostics }` shape on error-severity input (never a raw kernel error string). On success, `render`/`validate` also return layout `insights` (informational reflow consequences, not errors). `render`/`export` additionally return the image/document as an MCP resource (and, optionally, a [share link](#share-links)).
+Every tool declares an `outputSchema` and returns [structured content](https://modelcontextprotocol.io/specification/2025-11-25/server/tools) (the typed object in the table above) alongside a human-readable text block. This is the point of the server: harnesses get a machine-checkable shape (e.g. `validate` → `{ ok, diagnostics }` with stable `NL.E####` codes, optional `suggestion`, and optional layout `insights`) instead of re-parsing prose. `render`/`export` validate first and return the same `{ ok: false, diagnostics }` shape on error-severity input (never a raw kernel error string). On success, `render`/`validate` also return layout `insights` (informational reflow consequences, not errors). `render`/`export` additionally return the image or document as inline content: SVG/PNG for `render`; text formats inline for `export`; binary `export` formats return an embedded MCP resource block (`pdf`/`xlsx`) or image block (`png`). When no local `output` path is given for a `pdf`/`xlsx` export (which is not viewable inline), a one-line hint points agents at the [`share`](#share-links) tool for an openable link; inline `png` carries no hint.
 
 `read`, `delete`, `list`, and path/IO guard failures return `{ ok: false, error: { code, message } }` with `isError: true` and stable `NL.MCP.*` codes (e.g. `NL.MCP.NOT_FOUND`, `NL.MCP.OUT_OF_ROOT`, `NL.MCP.INPUT`) rather than raw JSON-RPC error strings — per [Anthropic Software Directory Policy](https://support.claude.com/en/articles/13145358-anthropic-software-directory-policy) § 5.A.
 
 ### Share links
 
-`render` and `export` accept an optional `share?: boolean` arg. When set, the result includes a `shareUrl` built from the OSS share-link grammar (`#text=` / `#url=`, see [`specs/embed.md`](./embed.md) § Share on Nowline) pointing at the public `free.nowline.io/open` viewer. This is the Mermaid-Chart playground-link UX done with infrastructure Nowline already ships from m4 — the agent can hand the user a viewable URL, not just bytes on disk. Purely a convenience: the link is a client-side-decoded fragment, so generating it makes no network call and stays inside the [Open core](#open-core-boundary) (the viewer is OSS; no account or cloud storage is involved).
+The dedicated [`share`](#additional-oss-tools) tool is the **sole** share surface — there is no `share` parameter on `render` or `export`. It validates the roadmap, then returns a `shareUrl` built from the OSS share-link grammar (`#text=` / `#url=`, see [`specs/embed.md`](./embed.md) § Share on Nowline) pointing at the public `free.nowline.io/open` viewer, where anyone with the link can view the roadmap and export to PDF/PNG/SVG. Generation is client-side only (no upload, account, or network call) and stays inside the [Open core](#open-core-boundary). Server `instructions` and the `share` tool description steer agents to prefer `render` for in-chat presentation and call `share` only when the user explicitly wants a portable link.
 
 ## Resources
 
@@ -167,7 +168,7 @@ This path requires these packages and is **optional** — basic stdio operation 
 
 The convention used by the in-chat preview is encoded in `@nowline/preview-shell`'s `applyRenderResult` helper: **a successful render shows the diagram; warnings do not trigger the diagnostics overlay; only errors dim the canvas**. This is intrinsic to `mountLivePreview`'s default apply policy and is also hardened in `mountPreview`'s `setDiagnostics` implementation, so the veil cannot reappear from stale hand-rolled call sequences.
 
-The in-chat preview mounts with `exportControls: 'hide'` — the toolbar is view-only (zoom, pan, fit, theme, now-line, show-links). Clipboard and in-iframe download are unreliable in the MCP Apps sandbox; artifacts come from the `render` and `export` tools instead.
+The in-chat preview mounts with `exportControls: 'hide'` — the toolbar is view-only (zoom, pan, fit, theme, now-line, show-links). There is no download/export button in the widget. Clipboard and in-iframe download are unreliable in the MCP Apps sandbox; artifacts come from the `export` tool and openable links from the `share` tool. Server `instructions` and the `render` tool description tell agents the same.
 
 ### Sizing in size-to-content hosts
 

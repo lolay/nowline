@@ -60,7 +60,6 @@ export const RenderOutputSchema = z.object({
     /** Set when the output was written to disk. */
     path: z.string().optional(),
     bytes: z.number().optional(),
-    shareUrl: z.string().optional(),
     insights: z.array(InsightSchema).optional(),
 });
 
@@ -68,7 +67,10 @@ export const ExportOutputSchema = z.object({
     format: z.string(),
     path: z.string().optional(),
     bytes: z.number().optional(),
-    shareUrl: z.string().optional(),
+});
+
+export const ShareOutputSchema = z.object({
+    shareUrl: z.string(),
 });
 
 export const ConvertOutputSchema = z.object({

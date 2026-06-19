@@ -116,6 +116,7 @@ describe('@nowline/mcp — tool list and annotations', () => {
                 'reference',
                 'render',
                 'schema',
+                'share',
                 'update',
                 'validate',
             ].sort(),
@@ -130,6 +131,7 @@ describe('@nowline/mcp — tool list and annotations', () => {
             'list',
             'render',
             'export',
+            'share',
             'convert',
             'capabilities',
         ];
@@ -804,14 +806,41 @@ describe('@nowline/mcp — structuredContent shapes', () => {
         expect(sc.format).toBe('svg');
     });
 
-    it('render with share=true includes shareUrl pointing to free.nowline.io/open', async () => {
+    it('share returns shareUrl pointing to free.nowline.io/open', async () => {
         const result = await client.callTool({
-            name: 'render',
-            arguments: { source: MINIMAL, format: 'svg', now: '2025-01-15', share: true },
+            name: 'share',
+            arguments: { source: MINIMAL },
         });
-        const sc = result.structuredContent as { format: string; shareUrl?: string };
+        expect(result.isError).toBeFalsy();
+        const sc = result.structuredContent as { shareUrl?: string };
         expect(typeof sc.shareUrl).toBe('string');
         expect(sc.shareUrl).toContain('free.nowline.io/open');
+    });
+
+    it('export pdf returns a resource block; export png returns an image block', async () => {
+        const pdfResult = await client.callTool({
+            name: 'export',
+            arguments: { source: MINIMAL, format: 'pdf', now: '2025-01-15' },
+        });
+        expect(pdfResult.isError).toBeFalsy();
+        const pdfResource = pdfResult.content.find((c) => c.type === 'resource');
+        expect(pdfResource).toBeDefined();
+        expect(pdfResource).toMatchObject({
+            type: 'resource',
+            resource: expect.objectContaining({ mimeType: 'application/pdf' }),
+        });
+
+        const pngResult = await client.callTool({
+            name: 'export',
+            arguments: { source: MINIMAL, format: 'png', now: '2025-01-15' },
+        });
+        expect(pngResult.isError).toBeFalsy();
+        const pngImage = pngResult.content.find((c) => c.type === 'image');
+        expect(pngImage).toBeDefined();
+        expect(pngImage).toMatchObject({
+            type: 'image',
+            mimeType: 'image/png',
+        });
     });
 
     it('capabilities structuredContent has 5 array fields', async () => {

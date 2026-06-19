@@ -109,18 +109,23 @@ export function toolCallContent(inspectorResult) {
     return result;
 }
 
-/** Decode inline base64 image block from an export tool result. */
-export function decodeImageFromToolResult(result) {
+/** Decode inline base64 artifact from an export/render tool result (image or resource block). */
+export function decodeBinaryFromToolResult(result) {
     if (result.isError) {
         throw new Error(`tool returned isError: ${JSON.stringify(result.content)}`);
     }
-    const block = result.content?.find((c) => c.type === 'image');
-    if (!block || typeof block.data !== 'string') {
-        throw new Error(
-            `export result missing inline image block: ${JSON.stringify(result.content)}`,
-        );
+    const imageBlock = result.content?.find((c) => c.type === 'image');
+    if (imageBlock && typeof imageBlock.data === 'string') {
+        return Buffer.from(imageBlock.data, 'base64');
     }
-    return Buffer.from(block.data, 'base64');
+    const resourceBlock = result.content?.find((c) => c.type === 'resource');
+    const blob = resourceBlock?.resource?.blob;
+    if (typeof blob === 'string') {
+        return Buffer.from(blob, 'base64');
+    }
+    throw new Error(
+        `export result missing inline image or resource block: ${JSON.stringify(result.content)}`,
+    );
 }
 
 if (import.meta.url === pathToFileURL(process.argv[1] ?? '').href) {

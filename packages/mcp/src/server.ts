@@ -63,6 +63,7 @@ import {
     ReferenceOutputSchema,
     RenderOutputSchema,
     SchemaOutputSchema,
+    ShareOutputSchema,
     UpdateOutputSchema,
     ValidateOutputSchema,
 } from './schemas.js';
@@ -239,7 +240,11 @@ export function createMcpServer(opts: McpServerOptions = {}): McpServer {
                 'Workflow: 1. call `reference` or `examples` to learn syntax → 2. write `.nowline` → ' +
                 '3. call `render` (validates + renders; or `validate` alone) → 4. fix errors keyed on `NL.E####` ' +
                 'and re-render → 5. review returned layout `insights` (what reflowed) → 6. when uncertain, ' +
-                'call `render` with `review:true` for a final visual check. JSON in `convert` is AST conversion only.',
+                'call `render` with `review:true` for a final visual check. JSON in `convert` is AST conversion only. ' +
+                'Presenting output: default to `render` (in-chat preview / inline image) — the primary presentation. ' +
+                'The in-chat preview is view-only (no download/export button). Use `export` to produce a file. ' +
+                'Use the `share` tool only when the user explicitly wants a link they can open or share ' +
+                '(opens the free Nowline web app, where they can also export).',
         },
     );
 
@@ -554,8 +559,9 @@ export function createMcpServer(opts: McpServerOptions = {}): McpServer {
         'render',
         {
             description: toolDescriptionWithSyntax(
-                'Validate then render a .nowline roadmap to SVG or PNG (combined validate+render+share). ' +
-                    'Returns structured diagnostics on error-severity input instead of a raw kernel error.',
+                'Validate then render a .nowline roadmap to SVG or PNG (combined validate+render). ' +
+                    'Returns structured diagnostics on error-severity input instead of a raw kernel error. ' +
+                    'On MCP Apps hosts the in-chat preview is view-only (no download/export button); use `export` for files and the `share` tool for an openable link.',
             ),
             inputSchema: z.object({
                 source: z.string().optional().describe('Inline .nowline source text.'),
@@ -591,12 +597,6 @@ export function createMcpServer(opts: McpServerOptions = {}): McpServer {
                         'Real local filesystem path to write the output file (e.g. /Users/name/Desktop/roadmap.svg). ' +
                             'Never pass a virtual or sandbox path such as /mnt/user-data/… — ' +
                             'omit this parameter to receive output inline instead.',
-                    ),
-                share: z
-                    .boolean()
-                    .optional()
-                    .describe(
-                        'When true, include a shareUrl pointing to https://free.nowline.io/open.',
                     ),
                 review: z
                     .boolean()
@@ -655,9 +655,6 @@ export function createMcpServer(opts: McpServerOptions = {}): McpServer {
             const bytes = needsRender
                 ? await exportDocument(source, format, inputs, host)
                 : new Uint8Array(0);
-            const shareUrl = args.share
-                ? (buildShareLink({ source, share: true }) ?? undefined)
-                : undefined;
 
             const insights = await collectMcpLayoutInsights({
                 source,
@@ -696,7 +693,6 @@ export function createMcpServer(opts: McpServerOptions = {}): McpServer {
                         format,
                         path: outAbs,
                         bytes: bytes.byteLength,
-                        shareUrl,
                         ...insightsField,
                     };
                     return {
@@ -716,7 +712,6 @@ export function createMcpServer(opts: McpServerOptions = {}): McpServer {
             if (appActive) {
                 const structured = {
                     format,
-                    shareUrl,
                     ...insightsField,
                 };
                 return {
@@ -733,7 +728,6 @@ export function createMcpServer(opts: McpServerOptions = {}): McpServer {
                 const structured = {
                     format,
                     bytes: bytes.byteLength,
-                    shareUrl,
                     ...insightsField,
                 };
                 return {
@@ -750,7 +744,7 @@ export function createMcpServer(opts: McpServerOptions = {}): McpServer {
                 };
             }
             const svgText = new TextDecoder('utf-8').decode(bytes);
-            const structured = { format, shareUrl, ...insightsField };
+            const structured = { format, ...insightsField };
             return {
                 content: [
                     { type: 'text', text: svgText, mimeType: 'image/svg+xml' },
@@ -807,12 +801,6 @@ export function createMcpServer(opts: McpServerOptions = {}): McpServer {
                     .string()
                     .optional()
                     .describe('MS Project start date override (YYYY-MM-DD).'),
-                share: z
-                    .boolean()
-                    .optional()
-                    .describe(
-                        'When true, include a shareUrl pointing to https://free.nowline.io/open.',
-                    ),
             }),
             outputSchema: ExportOutputSchema,
             annotations: readOnlyTool('Export Roadmap'),
@@ -851,9 +839,6 @@ export function createMcpServer(opts: McpServerOptions = {}): McpServer {
             }
             const host = createNodeHostEnv(filePath);
             const bytes = await exportDocument(source, format, inputs, host);
-            const shareUrl = args.share
-                ? (buildShareLink({ source, share: true }) ?? undefined)
-                : undefined;
 
             const BINARY_FORMATS = new Set<ExportFormat>(['png', 'pdf', 'xlsx']);
             const isBinary = BINARY_FORMATS.has(format);
@@ -863,7 +848,7 @@ export function createMcpServer(opts: McpServerOptions = {}): McpServer {
                     const outAbs = resolveAndGuard(args.output, allowedRoot);
                     await fs.mkdir(path.dirname(outAbs), { recursive: true });
                     await fs.writeFile(outAbs, bytes);
-                    const structured = { format, path: outAbs, bytes: bytes.byteLength, shareUrl };
+                    const structured = { format, path: outAbs, bytes: bytes.byteLength };
                     return {
                         content: [{ type: 'text', text: JSON.stringify(structured, null, 2) }],
                         structuredContent: structured,
@@ -874,27 +859,65 @@ export function createMcpServer(opts: McpServerOptions = {}): McpServer {
             }
 
             if (isBinary) {
-                const mimeMap: Record<string, string> = {
-                    png: 'image/png',
-                    pdf: 'application/pdf',
-                    xlsx: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
-                };
-                const structured = { format, bytes: bytes.byteLength, shareUrl };
+                const structured = { format, bytes: bytes.byteLength };
                 return {
-                    content: [
-                        {
-                            type: 'image',
-                            data: Buffer.from(bytes).toString('base64'),
-                            mimeType: mimeMap[format] ?? 'application/octet-stream',
-                        },
-                    ],
+                    content: buildExportInlineContentBlocks(format, bytes),
                     structuredContent: structured,
                 };
             }
             const text = new TextDecoder('utf-8').decode(bytes);
-            const structured = { format, shareUrl };
+            const structured = { format };
             return {
                 content: [{ type: 'text', text }],
+                structuredContent: structured,
+            };
+        },
+    );
+
+    // ---- share --------------------------------------------------------------
+
+    server.registerTool(
+        'share',
+        {
+            description:
+                'Generate a shareable link for a roadmap. The roadmap source is encoded into the URL fragment ' +
+                '(client-side; no upload, no account, no network call) and opens in the free Nowline web app ' +
+                '(free.nowline.io/open), where anyone with the link can view it and export to PDF/PNG/SVG. ' +
+                'Prefer `render` to show a roadmap in chat — that is the default. Use `share` only when the user ' +
+                'explicitly asks for a link to open, send, or export elsewhere.',
+            inputSchema: z.object({
+                source: z.string().optional().describe('Inline .nowline source text.'),
+                path: z
+                    .string()
+                    .optional()
+                    .describe(
+                        'Real local filesystem path to the .nowline file (e.g. /Users/name/Desktop/foo.nowline). ' +
+                            'Never pass a virtual or sandbox path such as /mnt/user-data/… — ' +
+                            'those do not exist on the host filesystem. Pass `source` instead.',
+                    ),
+            }),
+            outputSchema: ShareOutputSchema,
+            annotations: readOnlyTool('Share Roadmap'),
+        },
+        async (args) => {
+            let source: string;
+            let filePath: string;
+            try {
+                ({ source, filePath } = await sourceAndPath(args, allowedRoot));
+            } catch (err) {
+                return handleToolError(err, args.path);
+            }
+
+            const blocked = await diagnosticsErrorBlock(source, filePath);
+            if (!blocked.ok) return blocked.response;
+
+            // buildShareLink returns null only for share:false/'none'; this tool
+            // always requests share:true, so the result is always a link.
+            const shareUrl = buildShareLink({ source, share: true }) as string;
+
+            const structured = { shareUrl };
+            return {
+                content: [{ type: 'text', text: JSON.stringify(structured, null, 2) }],
                 structuredContent: structured,
             };
         },
@@ -1207,7 +1230,44 @@ export function createMcpServer(opts: McpServerOptions = {}): McpServer {
 
 type ContentBlock =
     | { type: 'text'; text: string; mimeType?: string }
-    | { type: 'image'; data: string; mimeType: string };
+    | { type: 'image'; data: string; mimeType: string }
+    | {
+          type: 'resource';
+          resource: { uri: string; mimeType: string; blob: string };
+      };
+
+const EXPORT_BINARY_SHARE_HINT =
+    'No local output path was provided. For an openable link the user can view and export from, call the `share` tool.';
+
+function buildExportInlineContentBlocks(format: ExportFormat, bytes: Uint8Array): ContentBlock[] {
+    const mimeMap: Record<string, string> = {
+        png: 'image/png',
+        pdf: 'application/pdf',
+        xlsx: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+    };
+    const mimeType = mimeMap[format] ?? 'application/octet-stream';
+    const base64 = Buffer.from(bytes).toString('base64');
+
+    // PNG renders inline as an image — no resource wrapper or share hint needed.
+    if (format === 'png') {
+        return [{ type: 'image', data: base64, mimeType }];
+    }
+
+    // pdf/xlsx aren't viewable inline: return an embedded resource (with a
+    // filename-bearing URI so hosts can suggest a download name) and point the
+    // agent at the share tool for an openable link.
+    return [
+        {
+            type: 'resource',
+            resource: {
+                uri: `nowline://export/roadmap.${format}`,
+                mimeType,
+                blob: base64,
+            },
+        },
+        { type: 'text', text: EXPORT_BINARY_SHARE_HINT },
+    ];
+}
 
 async function buildReviewContentBlocks(
     source: string,

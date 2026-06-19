@@ -6,8 +6,21 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ## [Unreleased]
 
+### Added
+
+- **`@nowline/mcp` — `share` tool**: dedicated tool (`{ source?, path? }` → `{ shareUrl }`) as the sole share surface. Encodes the roadmap client-side into a `free.nowline.io/open` link for view + export. Tool description and server `instructions` steer agents to prefer `render` for in-chat presentation.
+
+### Changed
+
+- **`@nowline/mcp` — binary `export` artifacts**: inline `pdf`/`xlsx` results return embedded MCP resource blocks (not mislabeled `image` blocks); inline `png` stays an image block. When no local `output` path is given for `pdf`/`xlsx`, a hint points agents at the `share` tool.
+
+### Removed
+
+- **`@nowline/mcp` — `share` param on `render`/`export`**: share links are generated only via the `share` tool (no `shareUrl` on render/export structured output).
+
 ### Fixed
 
+- **`@nowline/mcp` — export guidance for agents**: server `instructions` and tool descriptions state the in-chat preview is view-only (no download/export button), reducing hallucinated widget export controls.
 - **`@nowline/mcp` — `.mcpb` bundle crash on startup**: `.mcpbignore` patterns (`src/`, `scripts/`, `test/`) were applied recursively, stripping `node_modules/@chevrotain/regexp-to-ast/lib/src/api.js` from the bundle. Changed to root-anchored patterns (`/src/`, `/scripts/`, `/test/`) so only the top-level staging directories are excluded. Fixes "Server disconnected" on Claude Desktop install.
 - **`@nowline/mcp` — `.mcpb` manifest author corrected**: `author.name` changed from `"Lolay"` to `"Nowline"` so the Claude Desktop Extensions directory shows "Developed by Nowline".
 

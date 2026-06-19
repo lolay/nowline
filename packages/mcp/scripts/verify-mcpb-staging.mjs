@@ -16,7 +16,7 @@ import { createRequire } from 'node:module';
 import { tmpdir } from 'node:os';
 import * as path from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { decodeImageFromToolResult, runInspectorCli, toolCallContent } from './inspector-cli.mjs';
+import { decodeBinaryFromToolResult, runInspectorCli, toolCallContent } from './inspector-cli.mjs';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const repoRoot = path.resolve(__dirname, '../../..');
@@ -71,7 +71,7 @@ async function main() {
                 now: '2025-01-15',
             },
         });
-        const png = decodeImageFromToolResult(toolCallContent(pngOut));
+        const png = decodeBinaryFromToolResult(toolCallContent(pngOut));
         if (png.byteLength < 100) {
             throw new Error(`PNG export too small (${png.byteLength} bytes)`);
         }
@@ -90,7 +90,7 @@ async function main() {
                 now: '2025-01-15',
             },
         });
-        const pdf = decodeImageFromToolResult(toolCallContent(pdfOut));
+        const pdf = decodeBinaryFromToolResult(toolCallContent(pdfOut));
         if (pdf.byteLength < 100) {
             throw new Error(`PDF export too small (${pdf.byteLength} bytes)`);
         }
