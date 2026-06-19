@@ -69,6 +69,7 @@ async function main() {
                 source: MINIMAL,
                 format: 'png',
                 now: '2025-01-15',
+                delivery: 'inline',
             },
         });
         const png = decodeBinaryFromToolResult(toolCallContent(pngOut));

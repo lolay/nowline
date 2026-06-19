@@ -107,9 +107,11 @@ Every tool declares an `outputSchema` and returns [structured content](https://m
 - `"file"` — writes to `output` (if provided) or `<allowedRoot>/<roadmap-id>.<ext>` and returns the path in `structuredContent`. No inline bytes.
 - `"inline"` — returns bytes in the response: embedded MCP resource block for `pdf`/`xlsx`, image block for `png`. No file written.
 - `"both"` — writes to disk and also attaches inline bytes.
-- **smart default (no `delivery` specified):** `pdf`/`xlsx` write to disk when the server has a configured root folder (e.g. the Claude Desktop `.mcpb` bundle with an output folder set); otherwise return inline bytes with a hint pointing at `delivery:"file"` and the [`share`](#share-links) tool. `png` and text formats always return inline.
+- **smart default (no `delivery` specified):** `pdf`/`xlsx`/`png` write to disk when the server has a configured root folder (e.g. the Claude Desktop `.mcpb` bundle with an output folder set); otherwise return inline bytes. Text formats (`svg`/`html`/`mermaid`/`msproj`) always return inline so the host can surface them as downloadable artifacts. This follows the MCP "return a reference, not the bytes" convention — binary bytes bloat context and Claude Desktop silently drops inline binary documents anyway.
 
-When no file is written for a `pdf`/`xlsx` inline export, a one-line hint in the response points agents at `output:`/`delivery:"file"` for a real file and `share` for an openable link. Inline `png` carries no hint.
+When no file is written for a binary inline export, a context-aware hint in the response tells agents what to do next: when a root folder is configured, the hint directs agents to omit `delivery` (or use `"file"`) to save to the configured folder; when no root is configured, the hint points at `output:`/`delivery:"file"` and `share`. Inline `png` carries no hint.
+
+Text exports (`svg`/`html`/`mermaid`) are returned as typed `TextContent` (with `mimeType` set for client correctness). The server `instructions` and tool description steer Claude to present them as downloadable artifacts of the matching type (`.svg`/`.html`/`.mermaid`) rather than plain prose.
 
 For why this shape (Claude Desktop drops binary blocks; artifacts are model-created), how other MCP servers deliver files, and per-client behavior (Cursor, VS Code, Claude Code, Goose, ChatGPT), see [`specs/mcp-export-references.md`](./mcp-export-references.md).
 

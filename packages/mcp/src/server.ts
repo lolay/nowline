@@ -246,6 +246,11 @@ export function createMcpServer(opts: McpServerOptions = {}): McpServer {
                 'call `render` with `review:true` for a final visual check. JSON in `convert` is AST conversion only. ' +
                 'Presenting output: default to `render` (in-chat preview / inline image) — the primary presentation. ' +
                 'The in-chat preview is view-only (no download/export button). Use `export` to produce a file. ' +
+                'Export files: binary formats (pdf, xlsx, png) are auto-saved to the configured folder — omit `delivery` ' +
+                'and omit `output` to let the server save the file; never use `delivery:"inline"` for pdf/xlsx on Claude ' +
+                'Desktop (the host cannot display inline documents, so nothing appears). For svg/html/mermaid exports, ' +
+                'present the returned text to the user as a downloadable artifact of the matching type ' +
+                '(.svg / .html / .mermaid) so they can save it. ' +
                 'Use the `share` tool only when the user explicitly wants a link they can open or share ' +
                 '(opens the free Nowline web app, where they can also export).',
         },
@@ -768,7 +773,10 @@ export function createMcpServer(opts: McpServerOptions = {}): McpServer {
         'export',
         {
             description:
-                'Export a .nowline roadmap to any of the eight canonical formats. Byte-identical to `nowline -f <format>` for the same source and inputs.',
+                'Export a .nowline roadmap to any of the eight canonical formats. Byte-identical to `nowline -f <format>` for the same source and inputs. ' +
+                'For pdf/xlsx/png: omit `delivery` and omit `output` — the server auto-saves to the configured folder and returns the path. ' +
+                'Never use `delivery:"inline"` for binary formats on Claude Desktop (inline binary cannot be displayed). ' +
+                'For svg/html/mermaid: the text is returned inline — present it to the user as a downloadable artifact of the matching type.',
             inputSchema: z.object({
                 source: z.string().optional().describe('Inline .nowline source text.'),
                 path: z
@@ -786,10 +794,11 @@ export function createMcpServer(opts: McpServerOptions = {}): McpServer {
                     .string()
                     .optional()
                     .describe(
-                        'Real local filesystem path to write the output (e.g. /Users/name/Desktop/roadmap.pdf). ' +
-                            'Required for binary formats (pdf, xlsx, msproj, png). ' +
-                            'Never pass a virtual or sandbox path such as /mnt/user-data/… — ' +
-                            'those do not exist on the host filesystem.',
+                        'Optional path to write the output file. Omit for binary formats (pdf, xlsx, png) — ' +
+                            'the server auto-saves to the configured folder as <roadmap-id>.<ext>. ' +
+                            'To choose a filename, pass a bare filename (e.g. "roadmap.pdf") — it is saved into the configured folder. ' +
+                            'Never pass a virtual or sandbox path such as /home/claude/…, /mnt/user-data/…, or any path ' +
+                            'outside the configured output folder — those do not exist on the host filesystem.',
                     ),
                 now: z.string().optional().describe('Now-line date as YYYY-MM-DD (UTC).'),
                 theme: z.enum(['light', 'dark', 'grayscale']).optional(),
@@ -811,7 +820,9 @@ export function createMcpServer(opts: McpServerOptions = {}): McpServer {
                         '"file" — write to disk and return the path (no inline bytes). ' +
                             '"inline" — return bytes in the response (embedded resource for pdf/xlsx, image for png, text for other formats). ' +
                             '"both" — write to disk and also attach inline bytes. ' +
-                            'Default is smart per format: pdf/xlsx write to disk when a root folder is configured, else return inline; png and text formats always return inline.',
+                            'Default is smart per format: pdf/xlsx/png write to disk when a root folder is configured, else return inline; text formats (svg/html/mermaid/msproj) always return inline. ' +
+                            'IMPORTANT — for pdf/xlsx/png on Claude Desktop, prefer omitting `delivery` entirely (smart default saves the file). ' +
+                            'Do NOT use delivery:"inline" for pdf/xlsx — Claude Desktop silently drops inline documents, so nothing appears to the user.',
                     ),
             }),
             outputSchema: ExportOutputSchema,
@@ -889,12 +900,15 @@ export function createMcpServer(opts: McpServerOptions = {}): McpServer {
                 doWrite = true;
                 doInline = true;
             } else {
-                // Smart default: pdf/xlsx write to disk when a root folder is configured.
-                if (format === 'pdf' || format === 'xlsx') {
+                // Smart default: binary formats (pdf/xlsx/png) write to the configured root
+                // (return a reference, not bytes — the idiomatic MCP pattern). Text formats
+                // (svg/html/mermaid/msproj) always return inline so Claude can surface them
+                // as downloadable artifacts.
+                if (format === 'pdf' || format === 'xlsx' || format === 'png') {
                     doWrite = rootConfigured;
                     doInline = !rootConfigured;
                 } else {
-                    // png (image block), html/mermaid/msproj (text): always inline.
+                    // svg/html/mermaid/msproj: always inline text.
                     doWrite = false;
                     doInline = true;
                 }
@@ -924,10 +938,19 @@ export function createMcpServer(opts: McpServerOptions = {}): McpServer {
             }
             if (doInline) {
                 if (isBinary) {
-                    contentBlocks.push(...buildExportInlineContentBlocks(format, bytes, !doWrite));
+                    contentBlocks.push(
+                        ...buildExportInlineContentBlocks(format, bytes, !doWrite, rootConfigured),
+                    );
                 } else {
+                    const TEXT_MIME: Record<string, string> = {
+                        svg: 'image/svg+xml',
+                        html: 'text/html',
+                        mermaid: 'text/markdown',
+                        msproj: 'application/xml',
+                    };
                     const text = new TextDecoder('utf-8').decode(bytes);
-                    contentBlocks.push({ type: 'text', text });
+                    const mt = TEXT_MIME[format];
+                    contentBlocks.push({ type: 'text', text, ...(mt ? { mimeType: mt } : {}) });
                 }
             }
 
@@ -1308,15 +1331,22 @@ type ContentBlock =
           resource: { uri: string; mimeType: string; blob: string };
       };
 
-const EXPORT_BINARY_SHARE_HINT =
+const EXPORT_BINARY_SHARE_HINT_NO_ROOT =
     'No file was written. To save a file, pass `output: "/path/to/roadmap.pdf"` or `delivery: "file"` ' +
-    '(on Claude Desktop, configure an output folder in the server settings). ' +
+    '(on Claude Desktop, configure an output folder in the server settings so the server can auto-save). ' +
     'For a shareable link the user can view and export from, call the `share` tool.';
+
+const EXPORT_BINARY_SHARE_HINT_ROOT_CONFIGURED =
+    'No file was written because `delivery:"inline"` was requested. ' +
+    'Claude Desktop cannot display inline pdf/xlsx documents, so nothing appeared. ' +
+    'Omit `delivery` (or use `delivery:"file"`) to let the server save the file to the configured output folder — ' +
+    'then share that local path with the user. Alternatively call the `share` tool for an openable link.';
 
 function buildExportInlineContentBlocks(
     format: ExportFormat,
     bytes: Uint8Array,
     showHint = true,
+    rootConfigured = false,
 ): ContentBlock[] {
     const mimeMap: Record<string, string> = {
         png: 'image/png',
@@ -1344,7 +1374,10 @@ function buildExportInlineContentBlocks(
         },
     ];
     if (showHint) {
-        blocks.push({ type: 'text', text: EXPORT_BINARY_SHARE_HINT });
+        const hint = rootConfigured
+            ? EXPORT_BINARY_SHARE_HINT_ROOT_CONFIGURED
+            : EXPORT_BINARY_SHARE_HINT_NO_ROOT;
+        blocks.push({ type: 'text', text: hint });
     }
     return blocks;
 }

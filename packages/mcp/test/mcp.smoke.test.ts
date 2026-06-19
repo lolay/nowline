@@ -992,6 +992,97 @@ describe('@nowline/mcp — export delivery parameter', () => {
         expect(sc.path as string).toMatch(/\.svg$/);
         expect(typeof sc.bytes).toBe('number');
     });
+
+    it('smart default with rootConfigured:true writes png to disk; no inline image', async () => {
+        const result = await deliveryClient.callTool({
+            name: 'export',
+            arguments: { source: MINIMAL, format: 'png', now: '2025-01-15' },
+        });
+        expect(result.isError).toBeFalsy();
+        const image = result.content.find((c) => c.type === 'image');
+        expect(image).toBeUndefined();
+        const sc = result.structuredContent as Record<string, unknown>;
+        expect(typeof sc.path).toBe('string');
+        expect(sc.path as string).toMatch(/\.png$/);
+        expect(typeof sc.bytes).toBe('number');
+        expect(sc.bytes as number).toBeGreaterThan(100);
+    });
+
+    it('svg export returns inline text (mimeType set server-side; stripped by SDK transport)', async () => {
+        // The server sets mimeType:'image/svg+xml' on the TextContent block.
+        // The MCP SDK strips unknown TextContent fields during transport, so the
+        // client sees only { type:'text', text:'...' } — we assert content only.
+        const result = await deliveryClient.callTool({
+            name: 'export',
+            arguments: { source: MINIMAL, format: 'svg', now: '2025-01-15' },
+        });
+        expect(result.isError).toBeFalsy();
+        const textBlock = result.content.find(
+            (c) =>
+                c.type === 'text' && 'text' in c && (c as { text: string }).text.includes('<svg'),
+        );
+        expect(textBlock).toBeDefined();
+        expect(textBlock).toMatchObject({ type: 'text' });
+    });
+
+    it('html export returns inline text (mimeType set server-side; stripped by SDK transport)', async () => {
+        const result = await deliveryClient.callTool({
+            name: 'export',
+            arguments: { source: MINIMAL, format: 'html', now: '2025-01-15' },
+        });
+        expect(result.isError).toBeFalsy();
+        const textBlock = result.content.find(
+            (c) =>
+                c.type === 'text' &&
+                'text' in c &&
+                (c as { text: string }).text.toLowerCase().includes('<!doctype'),
+        );
+        expect(textBlock).toBeDefined();
+        expect(textBlock).toMatchObject({ type: 'text' });
+    });
+
+    it('delivery:"inline" pdf hint mentions omitting delivery when root is configured', async () => {
+        // root IS configured on this server — hint should steer away from inline,
+        // not tell the model to "configure an output folder"
+        const result = await deliveryClient.callTool({
+            name: 'export',
+            arguments: { source: MINIMAL, format: 'pdf', now: '2025-01-15', delivery: 'inline' },
+        });
+        expect(result.isError).toBeFalsy();
+        const hint = result.content.find(
+            (c) =>
+                c.type === 'text' &&
+                'text' in c &&
+                (c as { text: string }).text.includes('configured output folder'),
+        );
+        expect(hint).toBeDefined();
+        // Should NOT tell them to configure a folder — one is already configured
+        const badHint = result.content.find(
+            (c) =>
+                c.type === 'text' &&
+                'text' in c &&
+                (c as { text: string }).text.includes(
+                    'configure an output folder in the server settings',
+                ),
+        );
+        expect(badHint).toBeUndefined();
+    });
+
+    it('delivery:"inline" pdf hint mentions configuring a folder when no root configured', async () => {
+        // main client — rootConfigured:false
+        const result = await client.callTool({
+            name: 'export',
+            arguments: { source: MINIMAL, format: 'pdf', now: '2025-01-15', delivery: 'inline' },
+        });
+        expect(result.isError).toBeFalsy();
+        const hint = result.content.find(
+            (c) =>
+                c.type === 'text' &&
+                'text' in c &&
+                (c as { text: string }).text.includes('configure an output folder'),
+        );
+        expect(hint).toBeDefined();
+    });
 });
 
 // ---- Determinism parity (export-determinism spec) ---------------------------
