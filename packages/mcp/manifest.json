@@ -23,17 +23,11 @@
         "entry_point": "dist/index.js",
         "mcp_config": {
             "command": "node",
-            "args": [
-                "${__dirname}/dist/index.js"
-            ]
+            "args": ["${__dirname}/dist/index.js"]
         }
     },
     "compatibility": {
-        "platforms": [
-            "darwin",
-            "win32",
-            "linux"
-        ],
+        "platforms": ["darwin", "win32", "linux"],
         "runtimes": {
             "node": ">=22.0.0"
         }
