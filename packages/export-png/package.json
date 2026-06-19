@@ -1,6 +1,6 @@
 {
     "name": "@nowline/export-png",
-    "version": "0.8.3",
+    "version": "0.8.4",
     "description": "Exports a Nowline roadmap as a PNG image.",
     "license": "Apache-2.0",
     "engines": {
