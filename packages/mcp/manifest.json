@@ -1,5 +1,5 @@
 {
-    "manifest_version": "0.3",
+    "manifest_version": "0.4",
     "name": "nowline",
     "display_name": "Nowline",
     "version": "0.8.2",
@@ -18,16 +18,32 @@
     "support": "https://github.com/lolay/nowline/issues",
     "license": "Apache-2.0",
     "icon": "icon.png",
+    "user_config": {
+        "output_dir": {
+            "type": "directory",
+            "title": "Roadmap output folder",
+            "description": "Where exported roadmap files (PDF, XLSX, PNG, …) are saved. Defaults to your Downloads folder.",
+            "default": "${HOME}/Downloads"
+        }
+    },
     "server": {
         "type": "node",
         "entry_point": "dist/index.js",
         "mcp_config": {
             "command": "node",
-            "args": ["${__dirname}/dist/index.js"]
+            "args": [
+                "${__dirname}/dist/index.js",
+                "--root",
+                "${user_config.output_dir}"
+            ]
         }
     },
     "compatibility": {
-        "platforms": ["darwin", "win32", "linux"],
+        "platforms": [
+            "darwin",
+            "win32",
+            "linux"
+        ],
         "runtimes": {
             "node": ">=22.0.0"
         }

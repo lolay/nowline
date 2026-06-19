@@ -9,10 +9,13 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 ### Added
 
 - **`@nowline/mcp` — `share` tool**: dedicated tool (`{ source?, path? }` → `{ shareUrl }`) as the sole share surface. Encodes the roadmap client-side into a `free.nowline.io/open` link for view + export. Tool description and server `instructions` steer agents to prefer `render` for in-chat presentation.
+- **`@nowline/mcp` — `export` `delivery` parameter**: new `delivery: "file" | "inline" | "both"` parameter controls how exported binaries reach the caller. `"file"` writes to disk (defaulting to `<allowedRoot>/<roadmap-id>.<ext>` when no `output` path is given); `"inline"` returns bytes in the response; `"both"` does both. Smart per-format default: `pdf`/`xlsx` write to disk when a root folder is configured, else return inline; `png` and text formats always return inline.
+- **`@nowline/mcp` `.mcpb` — user-configurable output folder**: `manifest.json` now declares a `user_config.output_dir` directory picker (default `~/Downloads`) so Claude Desktop users can set an export destination at install time. The folder is injected as `--root`, enabling the smart delivery default to write `pdf`/`xlsx` files directly to the host filesystem instead of returning inline bytes (which Claude Desktop drops silently). Manifest version updated to `0.4`.
 
 ### Changed
 
 - **`@nowline/mcp` — binary `export` artifacts**: inline `pdf`/`xlsx` results return embedded MCP resource blocks (not mislabeled `image` blocks); inline `png` stays an image block. When no local `output` path is given for `pdf`/`xlsx`, a hint points agents at the `share` tool.
+- **`@nowline/mcp` — `export` hint for binary formats without a written file**: reworded to point at `output:`/`delivery:"file"` (and the server output-folder setting on Claude Desktop) before falling back to `share` for a link.
 
 ### Removed
 

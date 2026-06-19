@@ -63,7 +63,7 @@ Tool names are **identical** to the Nowline Cloud MCP server so agents and users
 | `update` | `{ path: string, source: string }` | `{ path }` | Replaces an existing file after validation. |
 | `delete` | `{ path: string }` | `{ path }` | Deletes a local `.nowline` file. |
 | `list` | `{ directory?: string, recursive?: boolean = false }` | `{ paths: string[] }` | Lists `.nowline` files under `directory` (default: cwd). |
-| `export` | `{ source?: string, path?: string, format: 'pdf' \| 'html' \| 'mermaid' \| 'xlsx' \| 'msproj' \| 'png', ... }` | file resource + metadata | Same `@nowline/export` kernel and format adapters as `nowline <input> -f <format>`, run in-process. Byte-identical to the CLI for the same source + inputs ([export-determinism](./export-determinism.md)). Inline binary exports return an embedded MCP resource (`pdf`/`xlsx`) or image block (`png`). |
+| `export` | `{ source?: string, path?: string, format: 'pdf' \| 'html' \| 'mermaid' \| 'xlsx' \| 'msproj' \| 'png', delivery?: 'file' \| 'inline' \| 'both', ... }` | file resource + metadata | Same `@nowline/export` kernel and format adapters as `nowline <input> -f <format>`, run in-process. Byte-identical to the CLI for the same source + inputs ([export-determinism](./export-determinism.md)). The optional `delivery` parameter controls file vs. inline delivery (see [Structured output](#structured-output) § export delivery). |
 
 Cloud-only additions (`search`, cloud `read`/`create`/`update`/`delete` by `id`) live in [`lolay/nowline-api/specs/mcp.md`](https://github.com/lolay/nowline-api/blob/main/specs/mcp.md). This doc covers the OSS local surface only.
 
@@ -100,7 +100,16 @@ Every tool also sets a human-readable `annotations.title` (Title Case, base-verb
 
 ### Structured output
 
-Every tool declares an `outputSchema` and returns [structured content](https://modelcontextprotocol.io/specification/2025-11-25/server/tools) (the typed object in the table above) alongside a human-readable text block. This is the point of the server: harnesses get a machine-checkable shape (e.g. `validate` → `{ ok, diagnostics }` with stable `NL.E####` codes, optional `suggestion`, and optional layout `insights`) instead of re-parsing prose. `render`/`export` validate first and return the same `{ ok: false, diagnostics }` shape on error-severity input (never a raw kernel error string). On success, `render`/`validate` also return layout `insights` (informational reflow consequences, not errors). `render`/`export` additionally return the image or document as inline content: SVG/PNG for `render`; text formats inline for `export`; binary `export` formats return an embedded MCP resource block (`pdf`/`xlsx`) or image block (`png`). When no local `output` path is given for a `pdf`/`xlsx` export (which is not viewable inline), a one-line hint points agents at the [`share`](#share-links) tool for an openable link; inline `png` carries no hint.
+Every tool declares an `outputSchema` and returns [structured content](https://modelcontextprotocol.io/specification/2025-11-25/server/tools) (the typed object in the table above) alongside a human-readable text block. This is the point of the server: harnesses get a machine-checkable shape (e.g. `validate` → `{ ok, diagnostics }` with stable `NL.E####` codes, optional `suggestion`, and optional layout `insights`) instead of re-parsing prose. `render`/`export` validate first and return the same `{ ok: false, diagnostics }` shape on error-severity input (never a raw kernel error string). On success, `render`/`validate` also return layout `insights` (informational reflow consequences, not errors). `render`/`export` additionally return the image or document as inline content: SVG/PNG for `render`; text formats inline for `export`.
+
+**export delivery.** Binary `export` formats support an explicit `delivery` parameter (`"file"` / `"inline"` / `"both"`):
+
+- `"file"` — writes to `output` (if provided) or `<allowedRoot>/<roadmap-id>.<ext>` and returns the path in `structuredContent`. No inline bytes.
+- `"inline"` — returns bytes in the response: embedded MCP resource block for `pdf`/`xlsx`, image block for `png`. No file written.
+- `"both"` — writes to disk and also attaches inline bytes.
+- **smart default (no `delivery` specified):** `pdf`/`xlsx` write to disk when the server has a configured root folder (e.g. the Claude Desktop `.mcpb` bundle with an output folder set); otherwise return inline bytes with a hint pointing at `delivery:"file"` and the [`share`](#share-links) tool. `png` and text formats always return inline.
+
+When no file is written for a `pdf`/`xlsx` inline export, a one-line hint in the response points agents at `output:`/`delivery:"file"` for a real file and `share` for an openable link. Inline `png` carries no hint.
 
 `read`, `delete`, `list`, and path/IO guard failures return `{ ok: false, error: { code, message } }` with `isError: true` and stable `NL.MCP.*` codes (e.g. `NL.MCP.NOT_FOUND`, `NL.MCP.OUT_OF_ROOT`, `NL.MCP.INPUT`) rather than raw JSON-RPC error strings — per [Anthropic Software Directory Policy](https://support.claude.com/en/articles/13145358-anthropic-software-directory-policy) § 5.A.
 
@@ -238,6 +247,8 @@ Claude Desktop installs the OSS server as a one-click `.mcpb` bundle (`make pack
 | `langium` (+ vscode-jsonrpc / chevrotain transitives) | Langium's Node entry uses dynamic `require()` that esbuild cannot fold into an ESM bundle; kept external so the bundled server still starts. `@nowline/core` remains inlined — only the langium runtime is external. |
 
 **Not external:** DejaVu fallback fonts — embedded as base64 in `@nowline/export-core/generated/bundled-fonts.js` at build time; no on-disk TTF read at runtime.
+
+**User-configurable output folder.** The manifest declares a `user_config.output_dir` directory picker (default `~/Downloads`). Claude Desktop prompts the user to select a folder on first install and injects it as `--root <dir>` in the server arguments. This makes `--root` govern both the export destination and the read/create/list/delete sandbox for the bundle — users can re-point the picker at their roadmaps folder. With a root configured, the smart export default writes `pdf`/`xlsx` files to disk instead of returning inline bytes (which Claude Desktop drops silently). Manifest version bumped to `0.4` (adds `user_config` support).
 
 **Size guard:** `make pack-mcpb` fails if `nowline.mcpb` exceeds 30 MiB (regression guard against the deploy-based layout returning). Staging is smoke-verified by `packages/mcp/scripts/verify-mcpb-staging.mjs` (PNG via resvg WASM, PDF via pdfkit AFM, bundled DejaVu fonts) via MCP Inspector CLI before packing.
 

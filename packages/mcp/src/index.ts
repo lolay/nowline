@@ -90,7 +90,11 @@ if (help) {
     process.exit(0);
 }
 
-const server = createMcpServer({ allowedRoot: root, version: PKG_VERSION });
+const server = createMcpServer({
+    allowedRoot: root,
+    rootConfigured: root !== undefined,
+    version: PKG_VERSION,
+});
 
 if (port !== undefined) {
     // Streamable HTTP transport — stateless (no session management).

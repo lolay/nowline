@@ -15,7 +15,7 @@ import {
     registerAppTool,
 } from '@modelcontextprotocol/ext-apps/server';
 import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
-import { parseNowlineJson, printNowlineFile } from '@nowline/core';
+import { type NowlineFile, parseNowlineJson, printNowlineFile } from '@nowline/core';
 import {
     type ExportFormat,
     exportDocument,
@@ -219,6 +219,8 @@ async function sourceAndPath(
 export interface McpServerOptions {
     /** Working directory — all file paths are resolved relative to this root. Defaults to process.cwd(). */
     allowedRoot?: string;
+    /** Whether the allowed root was explicitly configured (vs. defaulting to cwd). Controls smart export delivery for binary formats. Defaults to false. */
+    rootConfigured?: boolean;
     /** Server name shown in the MCP client. Defaults to 'nowline'. */
     name?: string;
     /** Server version. Defaults to package version. */
@@ -227,6 +229,7 @@ export interface McpServerOptions {
 
 export function createMcpServer(opts: McpServerOptions = {}): McpServer {
     const allowedRoot = opts.allowedRoot ?? process.cwd();
+    const rootConfigured = opts.rootConfigured ?? false;
     const server = new McpServer(
         {
             name: opts.name ?? 'nowline',
@@ -801,6 +804,15 @@ export function createMcpServer(opts: McpServerOptions = {}): McpServer {
                     .string()
                     .optional()
                     .describe('MS Project start date override (YYYY-MM-DD).'),
+                delivery: z
+                    .enum(['file', 'inline', 'both'])
+                    .optional()
+                    .describe(
+                        '"file" — write to disk and return the path (no inline bytes). ' +
+                            '"inline" — return bytes in the response (embedded resource for pdf/xlsx, image for png, text for other formats). ' +
+                            '"both" — write to disk and also attach inline bytes. ' +
+                            'Default is smart per format: pdf/xlsx write to disk when a root folder is configured, else return inline; png and text formats always return inline.',
+                    ),
             }),
             outputSchema: ExportOutputSchema,
             annotations: readOnlyTool('Export Roadmap'),
@@ -843,32 +855,91 @@ export function createMcpServer(opts: McpServerOptions = {}): McpServer {
             const BINARY_FORMATS = new Set<ExportFormat>(['png', 'pdf', 'xlsx']);
             const isBinary = BINARY_FORMATS.has(format);
 
-            if (args.output) {
-                try {
-                    const outAbs = resolveAndGuard(args.output, allowedRoot);
-                    await fs.mkdir(path.dirname(outAbs), { recursive: true });
-                    await fs.writeFile(outAbs, bytes);
-                    const structured = { format, path: outAbs, bytes: bytes.byteLength };
-                    return {
-                        content: [{ type: 'text', text: JSON.stringify(structured, null, 2) }],
-                        structuredContent: structured,
-                    };
-                } catch (err) {
-                    return handleToolError(err, args.output);
+            // Default filename: <roadmap-id>.<ext>, used when no output path is given.
+            const FORMAT_EXT: Record<string, string> = {
+                pdf: '.pdf',
+                xlsx: '.xlsx',
+                png: '.png',
+                html: '.html',
+                mermaid: '.md',
+                msproj: '.xml',
+            };
+            const ext = FORMAT_EXT[format] ?? `.${format}`;
+            const roadmapId =
+                (blocked.doc.parseResult.value as NowlineFile).roadmapDecl?.name ?? 'roadmap';
+            const defaultFilename = `${roadmapId}${ext}`;
+
+            // Resolve delivery mode.
+            const hasExplicitOutput = !!args.output;
+            const delivery = args.delivery;
+            let doWrite: boolean;
+            let doInline: boolean;
+
+            if (hasExplicitOutput) {
+                doWrite = true;
+                doInline = delivery === 'both';
+            } else if (delivery === 'file') {
+                doWrite = true;
+                doInline = false;
+            } else if (delivery === 'inline') {
+                doWrite = false;
+                doInline = true;
+            } else if (delivery === 'both') {
+                doWrite = true;
+                doInline = true;
+            } else {
+                // Smart default: pdf/xlsx write to disk when a root folder is configured.
+                if (format === 'pdf' || format === 'xlsx') {
+                    doWrite = rootConfigured;
+                    doInline = !rootConfigured;
+                } else {
+                    // png (image block), html/mermaid/msproj (text): always inline.
+                    doWrite = false;
+                    doInline = true;
                 }
             }
 
-            if (isBinary) {
-                const structured = { format, bytes: bytes.byteLength };
-                return {
-                    content: buildExportInlineContentBlocks(format, bytes),
-                    structuredContent: structured,
-                };
+            // Write to disk if needed.
+            const outTarget = args.output ?? path.join(allowedRoot, defaultFilename);
+            let writtenPath: string | undefined;
+            if (doWrite) {
+                try {
+                    const outAbs = resolveAndGuard(outTarget, allowedRoot);
+                    await fs.mkdir(path.dirname(outAbs), { recursive: true });
+                    await fs.writeFile(outAbs, bytes);
+                    writtenPath = outAbs;
+                } catch (err) {
+                    return handleToolError(err, args.output ?? outTarget);
+                }
             }
-            const text = new TextDecoder('utf-8').decode(bytes);
-            const structured = { format };
+
+            // Build response content.
+            const contentBlocks: ContentBlock[] = [];
+            if (writtenPath !== undefined) {
+                contentBlocks.push({
+                    type: 'text',
+                    text: `Saved to \`${writtenPath}\` (${bytes.byteLength} bytes).`,
+                });
+            }
+            if (doInline) {
+                if (isBinary) {
+                    contentBlocks.push(...buildExportInlineContentBlocks(format, bytes, !doWrite));
+                } else {
+                    const text = new TextDecoder('utf-8').decode(bytes);
+                    contentBlocks.push({ type: 'text', text });
+                }
+            }
+
+            const structured: Record<string, unknown> = { format };
+            if (writtenPath !== undefined) {
+                structured.path = writtenPath;
+                structured.bytes = bytes.byteLength;
+            } else if (doInline && isBinary) {
+                structured.bytes = bytes.byteLength;
+            }
+
             return {
-                content: [{ type: 'text', text }],
+                content: contentBlocks,
                 structuredContent: structured,
             };
         },
@@ -1237,9 +1308,15 @@ type ContentBlock =
       };
 
 const EXPORT_BINARY_SHARE_HINT =
-    'No local output path was provided. For an openable link the user can view and export from, call the `share` tool.';
+    'No file was written. To save a file, pass `output: "/path/to/roadmap.pdf"` or `delivery: "file"` ' +
+    '(on Claude Desktop, configure an output folder in the server settings). ' +
+    'For a shareable link the user can view and export from, call the `share` tool.';
 
-function buildExportInlineContentBlocks(format: ExportFormat, bytes: Uint8Array): ContentBlock[] {
+function buildExportInlineContentBlocks(
+    format: ExportFormat,
+    bytes: Uint8Array,
+    showHint = true,
+): ContentBlock[] {
     const mimeMap: Record<string, string> = {
         png: 'image/png',
         pdf: 'application/pdf',
@@ -1253,10 +1330,9 @@ function buildExportInlineContentBlocks(format: ExportFormat, bytes: Uint8Array)
         return [{ type: 'image', data: base64, mimeType }];
     }
 
-    // pdf/xlsx aren't viewable inline: return an embedded resource (with a
-    // filename-bearing URI so hosts can suggest a download name) and point the
-    // agent at the share tool for an openable link.
-    return [
+    // pdf/xlsx: embedded resource block, and optionally a hint pointing the agent
+    // at output:/delivery:'file' when no file was also written.
+    const blocks: ContentBlock[] = [
         {
             type: 'resource',
             resource: {
@@ -1265,8 +1341,11 @@ function buildExportInlineContentBlocks(format: ExportFormat, bytes: Uint8Array)
                 blob: base64,
             },
         },
-        { type: 'text', text: EXPORT_BINARY_SHARE_HINT },
     ];
+    if (showHint) {
+        blocks.push({ type: 'text', text: EXPORT_BINARY_SHARE_HINT });
+    }
+    return blocks;
 }
 
 async function buildReviewContentBlocks(

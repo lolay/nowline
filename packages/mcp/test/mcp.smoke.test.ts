@@ -852,6 +852,122 @@ describe('@nowline/mcp — structuredContent shapes', () => {
     });
 });
 
+// ---- export delivery parameter ----------------------------------------------
+
+describe('@nowline/mcp — export delivery parameter', () => {
+    let deliveryClient: Client;
+    let deliveryClientTransport: InMemoryTransport;
+    let deliveryServerTransport: InMemoryTransport;
+    let deliveryTmpDir: string;
+
+    beforeAll(async () => {
+        deliveryTmpDir = mkdtempSync(path.join(os.tmpdir(), 'nowline-mcp-delivery-'));
+        const server = createMcpServer({ allowedRoot: deliveryTmpDir, rootConfigured: true });
+        [deliveryClientTransport, deliveryServerTransport] = InMemoryTransport.createLinkedPair();
+        await server.connect(deliveryServerTransport);
+        deliveryClient = new Client({ name: 'delivery-test-client', version: '1.0.0' });
+        await deliveryClient.connect(deliveryClientTransport);
+    });
+
+    afterAll(async () => {
+        try {
+            await deliveryClientTransport.close();
+        } catch {
+            /* best-effort */
+        }
+        try {
+            await deliveryServerTransport.close();
+        } catch {
+            /* best-effort */
+        }
+        try {
+            rmSync(deliveryTmpDir, { recursive: true, force: true });
+        } catch {
+            /* best-effort */
+        }
+    });
+
+    it('delivery:"inline" returns a resource block + hint for pdf; no file written', async () => {
+        const result = await deliveryClient.callTool({
+            name: 'export',
+            arguments: { source: MINIMAL, format: 'pdf', now: '2025-01-15', delivery: 'inline' },
+        });
+        expect(result.isError).toBeFalsy();
+        const resource = result.content.find((c) => c.type === 'resource');
+        expect(resource).toBeDefined();
+        expect(resource).toMatchObject({
+            type: 'resource',
+            resource: expect.objectContaining({ mimeType: 'application/pdf' }),
+        });
+        const hint = result.content.find(
+            (c) => c.type === 'text' && 'text' in c && c.text.includes('delivery'),
+        );
+        expect(hint).toBeDefined();
+    });
+
+    it('delivery:"file" writes pdf to disk; structuredContent has path+bytes; no resource block', async () => {
+        const result = await deliveryClient.callTool({
+            name: 'export',
+            arguments: { source: MINIMAL, format: 'pdf', now: '2025-01-15', delivery: 'file' },
+        });
+        expect(result.isError).toBeFalsy();
+        const resource = result.content.find((c) => c.type === 'resource');
+        expect(resource).toBeUndefined();
+        const sc = result.structuredContent as Record<string, unknown>;
+        expect(typeof sc.path).toBe('string');
+        expect(typeof sc.bytes).toBe('number');
+        expect(sc.bytes as number).toBeGreaterThan(100);
+        const saved = result.content.find(
+            (c) => c.type === 'text' && 'text' in c && c.text.includes('Saved to'),
+        );
+        expect(saved).toBeDefined();
+    });
+
+    it('delivery:"both" writes pdf to disk and attaches inline resource block', async () => {
+        const result = await deliveryClient.callTool({
+            name: 'export',
+            arguments: { source: MINIMAL, format: 'pdf', now: '2025-01-15', delivery: 'both' },
+        });
+        expect(result.isError).toBeFalsy();
+        const resource = result.content.find((c) => c.type === 'resource');
+        expect(resource).toBeDefined();
+        const saved = result.content.find(
+            (c) => c.type === 'text' && 'text' in c && c.text.includes('Saved to'),
+        );
+        expect(saved).toBeDefined();
+        const sc = result.structuredContent as Record<string, unknown>;
+        expect(typeof sc.path).toBe('string');
+    });
+
+    it('smart default with rootConfigured:true writes pdf to disk; no resource block', async () => {
+        const result = await deliveryClient.callTool({
+            name: 'export',
+            arguments: { source: MINIMAL, format: 'pdf', now: '2025-01-15' },
+        });
+        expect(result.isError).toBeFalsy();
+        const resource = result.content.find((c) => c.type === 'resource');
+        expect(resource).toBeUndefined();
+        const sc = result.structuredContent as Record<string, unknown>;
+        expect(typeof sc.path).toBe('string');
+        expect(typeof sc.bytes).toBe('number');
+    });
+
+    it('smart default with rootConfigured:false returns resource + hint for pdf (no file)', async () => {
+        // main client's server was created without rootConfigured (defaults false)
+        const result = await client.callTool({
+            name: 'export',
+            arguments: { source: MINIMAL, format: 'pdf', now: '2025-01-15' },
+        });
+        expect(result.isError).toBeFalsy();
+        const resource = result.content.find((c) => c.type === 'resource');
+        expect(resource).toBeDefined();
+        const hint = result.content.find(
+            (c) => c.type === 'text' && 'text' in c && c.text.includes('delivery'),
+        );
+        expect(hint).toBeDefined();
+    });
+});
+
 // ---- Determinism parity (export-determinism spec) ---------------------------
 
 describe('@nowline/mcp — determinism parity', () => {

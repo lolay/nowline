@@ -88,6 +88,7 @@ async function main() {
                 source: MINIMAL,
                 format: 'pdf',
                 now: '2025-01-15',
+                delivery: 'inline',
             },
         });
         const pdf = decodeBinaryFromToolResult(toolCallContent(pdfOut));
