@@ -1,0 +1,21 @@
+[
+    "capabilities",
+    "convert",
+    "create",
+    "delete",
+    "examples",
+    "export",
+    "list",
+    "list-formats",
+    "list-icons",
+    "list-locales",
+    "list-templates",
+    "list-themes",
+    "read",
+    "reference",
+    "render",
+    "schema",
+    "share",
+    "update",
+    "validate"
+]

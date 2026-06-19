@@ -4,6 +4,7 @@
 
 import * as path from 'node:path';
 import { fileURLToPath } from 'node:url';
+import expectedToolsJson from './expected-tools.json' with { type: 'json' };
 import { runInspectorCli, toolCallContent } from './inspector-cli.mjs';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
@@ -18,26 +19,7 @@ const MINIMAL = [
     '  item foo "Foo Item" duration:1w',
 ].join('\n');
 
-const EXPECTED_TOOLS = [
-    'capabilities',
-    'convert',
-    'create',
-    'delete',
-    'examples',
-    'export',
-    'list',
-    'list-formats',
-    'list-icons',
-    'list-locales',
-    'list-templates',
-    'list-themes',
-    'read',
-    'reference',
-    'render',
-    'schema',
-    'update',
-    'validate',
-].sort();
+const EXPECTED_TOOLS = [...expectedToolsJson].sort();
 
 function main() {
     const listOut = runInspectorCli({ serverEntry, method: 'tools/list' });

@@ -12,6 +12,7 @@ import * as path from 'node:path';
 import { Client } from '@modelcontextprotocol/sdk/client/index.js';
 import { InMemoryTransport } from '@modelcontextprotocol/sdk/inMemory.js';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
+import EXPECTED_TOOLS_JSON from '../scripts/expected-tools.json';
 import { NOWLINE_MCP_ICONS } from '../src/branding.js';
 import { createMcpServer, PREVIEW_UI_URI } from '../src/server.js';
 import { parsePreviewFromArguments, parsePreviewFromContent } from '../src/ui/payload.js';
@@ -98,29 +99,7 @@ describe('@nowline/mcp — tool list and annotations', () => {
     it('lists the expected set of tools', async () => {
         const { tools } = await client.listTools();
         const names = tools.map((t) => t.name).sort();
-        expect(names).toEqual(
-            [
-                'capabilities',
-                'convert',
-                'create',
-                'delete',
-                'examples',
-                'export',
-                'list',
-                'list-formats',
-                'list-icons',
-                'list-locales',
-                'list-templates',
-                'list-themes',
-                'read',
-                'reference',
-                'render',
-                'schema',
-                'share',
-                'update',
-                'validate',
-            ].sort(),
-        );
+        expect(names).toEqual([...EXPECTED_TOOLS_JSON].sort());
     });
 
     it('read-only tools carry readOnlyHint + idempotentHint + title + openWorldHint', async () => {
