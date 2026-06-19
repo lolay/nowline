@@ -111,6 +111,8 @@ Every tool declares an `outputSchema` and returns [structured content](https://m
 
 When no file is written for a `pdf`/`xlsx` inline export, a one-line hint in the response points agents at `output:`/`delivery:"file"` for a real file and `share` for an openable link. Inline `png` carries no hint.
 
+For why this shape (Claude Desktop drops binary blocks; artifacts are model-created), how other MCP servers deliver files, and per-client behavior (Cursor, VS Code, Claude Code, Goose, ChatGPT), see [`specs/mcp-export-references.md`](./mcp-export-references.md).
+
 `read`, `delete`, `list`, and path/IO guard failures return `{ ok: false, error: { code, message } }` with `isError: true` and stable `NL.MCP.*` codes (e.g. `NL.MCP.NOT_FOUND`, `NL.MCP.OUT_OF_ROOT`, `NL.MCP.INPUT`) rather than raw JSON-RPC error strings — per [Anthropic Software Directory Policy](https://support.claude.com/en/articles/13145358-anthropic-software-directory-policy) § 5.A.
 
 ### Share links
@@ -301,3 +303,4 @@ No account, no API keys, no cloud project. Operates on the developer's local `.n
 - Release + naming convention: [`specs/releasing.md`](./releasing.md) § MCP publishing artifacts
 - Per-channel distribution: [`specs/cli-distribution.md`](./cli-distribution.md) § MCP server distribution
 - Cloud counterpart + full OSS-vs-Cloud matrix: [`lolay/nowline-api/specs/mcp.md`](https://github.com/lolay/nowline-api/blob/main/specs/mcp.md)
+- Export delivery prior art + per-client behavior matrix (so we don't re-research it): [`specs/mcp-export-references.md`](./mcp-export-references.md)
