@@ -17,6 +17,7 @@ import { dirname, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { StdioServerTransport } from '@modelcontextprotocol/sdk/server/stdio.js';
 import { StreamableHTTPServerTransport } from '@modelcontextprotocol/sdk/server/streamableHttp.js';
+import { expandRootPath } from './root-path.js';
 import { createMcpServer } from './server.js';
 
 const __filename = fileURLToPath(import.meta.url);
@@ -90,9 +91,14 @@ if (help) {
     process.exit(0);
 }
 
+// Expand mcpb tokens (${HOME}/~/env vars) so a literal default from the
+// .mcpb directory picker resolves to a real path. An empty/blank value
+// (optional field left unset) collapses to undefined → cwd fallback, inline.
+const expandedRoot = expandRootPath(root);
+
 const server = createMcpServer({
-    allowedRoot: root,
-    rootConfigured: root !== undefined,
+    allowedRoot: expandedRoot,
+    rootConfigured: expandedRoot !== undefined,
     version: PKG_VERSION,
 });
 

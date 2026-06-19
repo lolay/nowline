@@ -1242,3 +1242,55 @@ describe('@nowline/mcp — resource content (generated)', () => {
         expect(CONVERSIONS_GUIDE.length).toBeGreaterThan(50);
     });
 });
+
+// ---- --root expansion (mcpb ${HOME} / ~ / env tokens) -----------------------
+
+describe('@nowline/mcp — expandRootPath', () => {
+    it('expands a literal ${HOME} token (the unexpanded .mcpb default)', async () => {
+        const { expandRootPath } = await import('../src/root-path.js');
+        const expected = path.join(os.homedir(), 'Downloads');
+        expect(expandRootPath('${HOME}/Downloads')).toBe(expected);
+    });
+
+    it('expands the mcpb ${DOWNLOADS} special token', async () => {
+        const { expandRootPath } = await import('../src/root-path.js');
+        expect(expandRootPath('${DOWNLOADS}')).toBe(path.join(os.homedir(), 'Downloads'));
+    });
+
+    it('expands a leading ~', async () => {
+        const { expandRootPath } = await import('../src/root-path.js');
+        expect(expandRootPath('~/roadmaps')).toBe(path.join(os.homedir(), 'roadmaps'));
+    });
+
+    it('expands generic environment variables', async () => {
+        const { expandRootPath } = await import('../src/root-path.js');
+        process.env.NOWLINE_TEST_ROOT = path.join(os.tmpdir(), 'nl-root');
+        try {
+            expect(expandRootPath('${NOWLINE_TEST_ROOT}/out')).toBe(
+                path.resolve(path.join(os.tmpdir(), 'nl-root', 'out')),
+            );
+        } finally {
+            delete process.env.NOWLINE_TEST_ROOT;
+        }
+    });
+
+    it('returns undefined for undefined or blank input (unset optional field)', async () => {
+        const { expandRootPath } = await import('../src/root-path.js');
+        expect(expandRootPath(undefined)).toBeUndefined();
+        expect(expandRootPath('')).toBeUndefined();
+        expect(expandRootPath('   ')).toBeUndefined();
+    });
+
+    it('returns an absolute path unchanged (resolved)', async () => {
+        const { expandRootPath } = await import('../src/root-path.js');
+        const abs = path.join(os.tmpdir(), 'nowline-abs-root');
+        expect(expandRootPath(abs)).toBe(path.resolve(abs));
+    });
+
+    it('leaves unknown tokens intact rather than dropping them', async () => {
+        const { expandRootPath } = await import('../src/root-path.js');
+        delete process.env.NOWLINE_DEFINITELY_UNSET;
+        const result = expandRootPath('${NOWLINE_DEFINITELY_UNSET}/x');
+        expect(result).toContain('${NOWLINE_DEFINITELY_UNSET}');
+    });
+});

@@ -23,6 +23,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ### Fixed
 
+- **`@nowline/mcp` — `.mcpb` `${HOME}` root not expanded**: the server now expands mcpb path tokens (`${HOME}`, `${DESKTOP}`, `${DOCUMENTS}`, `${DOWNLOADS}`), a leading `~`, and generic environment variables in `--root`. Claude Desktop's single-pass substitution can pass the `output_dir` default through verbatim (e.g. literal `${HOME}/Downloads`) when the user installs without opening the directory picker, which left the allowed root pointing at a non-existent path and broke `pdf`/`xlsx` export-to-file. A blank value (optional field left unset) now collapses to the cwd fallback (inline delivery) instead of a bogus root.
 - **`@nowline/mcp` — export guidance for agents**: server `instructions` and tool descriptions state the in-chat preview is view-only (no download/export button), reducing hallucinated widget export controls.
 - **`@nowline/mcp` — `.mcpb` bundle crash on startup**: `.mcpbignore` patterns (`src/`, `scripts/`, `test/`) were applied recursively, stripping `node_modules/@chevrotain/regexp-to-ast/lib/src/api.js` from the bundle. Changed to root-anchored patterns (`/src/`, `/scripts/`, `/test/`) so only the top-level staging directories are excluded. Fixes "Server disconnected" on Claude Desktop install.
 - **`@nowline/mcp` — `.mcpb` manifest author corrected**: `author.name` changed from `"Lolay"` to `"Nowline"` so the Claude Desktop Extensions directory shows "Developed by Nowline".
