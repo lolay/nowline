@@ -52,9 +52,9 @@
     "devDependencies": {
         "@nowline/cli": "workspace:*",
         "@types/mdast": "^4.0.4",
-        "@types/node": "^25.9.1",
-        "esbuild": "^0.28.0",
+        "@types/node": "^25.9.3",
+        "esbuild": "^0.28.1",
         "typescript": "^6.0.3",
-        "vitest": "^4.1.7"
+        "vitest": "^4.1.9"
     }
 }

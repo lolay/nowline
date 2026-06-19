@@ -43,12 +43,11 @@
     },
     "dependencies": {
         "@babel/code-frame": "^7.29.0",
-        "@clack/prompts": "^1.4.0",
+        "@clack/prompts": "^1.5.1",
         "@modelcontextprotocol/sdk": "^1.29.0",
         "@nowline/config": "workspace:*",
         "@nowline/core": "workspace:*",
         "@nowline/export": "workspace:*",
-        "@nowline/mcp": "workspace:*",
         "@nowline/export-core": "workspace:*",
         "@nowline/export-html": "workspace:*",
         "@nowline/export-mermaid": "workspace:*",
@@ -57,19 +56,20 @@
         "@nowline/export-png": "workspace:*",
         "@nowline/export-xlsx": "workspace:*",
         "@nowline/layout": "workspace:*",
+        "@nowline/mcp": "workspace:*",
         "@nowline/renderer": "workspace:*",
         "chalk": "^5.6.2",
         "citty": "^0.2.2",
         "consola": "^3.4.2",
-        "js-yaml": "^4.1.1",
+        "js-yaml": "^4.2.0",
         "langium": "~4.2.4"
     },
     "devDependencies": {
         "@resvg/resvg-wasm": "^2.6.2",
         "@types/babel__code-frame": "^7.27.0",
         "@types/js-yaml": "^4.0.9",
-        "@types/node": "^25.9.1",
+        "@types/node": "^25.9.3",
         "typescript": "^6.0.3",
-        "vitest": "^4.1.7"
+        "vitest": "^4.1.9"
     }
 }

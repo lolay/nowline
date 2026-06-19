@@ -65,9 +65,9 @@
         "vscode-languageserver-protocol": "~3.17.5"
     },
     "devDependencies": {
-        "@types/node": "^25.9.1",
-        "happy-dom": "^20.9.0",
+        "@types/node": "^25.9.3",
+        "happy-dom": "^20.10.6",
         "typescript": "^6.0.3",
-        "vitest": "^4.1.7"
+        "vitest": "^4.1.9"
     }
 }

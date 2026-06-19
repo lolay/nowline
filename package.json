@@ -1,7 +1,7 @@
 {
     "private": true,
     "name": "nowline-monorepo",
-    "packageManager": "pnpm@11.2.2",
+    "packageManager": "pnpm@11.5.3",
     "engines": {
         "node": ">=22",
         "pnpm": ">=11"
@@ -23,7 +23,7 @@
         "langium:generate": "pnpm --filter @nowline/core run langium:generate"
     },
     "devDependencies": {
-        "@biomejs/biome": "^2.4.15",
+        "@biomejs/biome": "^2.5.0",
         "typescript": "^6.0.3"
     }
 }
