@@ -1,6 +1,6 @@
 {
     "name": "@nowline/core",
-    "version": "0.8.2",
+    "version": "0.8.3",
     "description": "Reads and checks the Nowline roadmap language — the parser and validator every Nowline tool builds on.",
     "license": "Apache-2.0",
     "engines": {

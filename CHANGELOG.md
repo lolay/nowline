@@ -6,6 +6,8 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ## [Unreleased]
 
+## [0.8.3] - 2026-06-19
+
 ### Added
 
 - **`@nowline/mcp` — `share` tool**: dedicated tool (`{ source?, path? }` → `{ shareUrl }`) as the sole share surface. Encodes the roadmap client-side into a `free.nowline.io/open` link for view + export. Tool description and server `instructions` steer agents to prefer `render` for in-chat presentation.

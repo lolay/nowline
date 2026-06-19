@@ -1,6 +1,6 @@
 {
     "name": "@nowline/export",
-    "version": "0.8.2",
+    "version": "0.8.3",
     "description": "Nowline export engine — the single code path every tool shares, so a roadmap exports identically everywhere.",
     "license": "Apache-2.0",
     "engines": {

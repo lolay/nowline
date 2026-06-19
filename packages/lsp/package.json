@@ -1,6 +1,6 @@
 {
     "name": "@nowline/lsp",
-    "version": "0.8.2",
+    "version": "0.8.3",
     "description": "Nowline language server — powers editor features like error checking, autocomplete, and hovers in VS Code, Cursor, and other editors.",
     "license": "Apache-2.0",
     "engines": {
