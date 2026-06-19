@@ -68,6 +68,17 @@
             "matchStrings": ["firebase-tools@(?<currentValue>\\d+\\.\\d+\\.\\d+)"],
             "datasourceTemplate": "npm",
             "depNameTemplate": "firebase-tools"
+        },
+        {
+            "customType": "regex",
+            "description": "Track Terraform version pinned in setup-terraform workflow inputs (keep in sync with .terraform-version)",
+            "fileMatch": ["^\\.github/workflows/.+\\.ya?ml$"],
+            "matchStrings": [
+                "terraform_version:\\s*['\"]?(?<currentValue>\\d+\\.\\d+\\.\\d+)['\"]?"
+            ],
+            "datasourceTemplate": "github-releases",
+            "depNameTemplate": "hashicorp/terraform",
+            "extractVersionTemplate": "^v(?<version>.+)$"
         }
     ]
 }
