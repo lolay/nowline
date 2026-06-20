@@ -1,6 +1,6 @@
 import { execFileSync } from 'node:child_process';
 import { dirname, join } from 'node:path';
-import { fileURLToPath } from 'node:url';
+import { fileURLToPath, pathToFileURL } from 'node:url';
 import { describe, it } from 'vitest';
 
 const testRoot = dirname(fileURLToPath(import.meta.url));
@@ -21,7 +21,13 @@ describe('@nowline/lsp-worker (in-process roundtrip)', () => {
         try {
             execFileSync(
                 process.execPath,
-                ['--conditions=browser', '--import', registerHook, '--test', harnessPath],
+                [
+                    '--conditions=browser',
+                    '--import',
+                    pathToFileURL(registerHook).href,
+                    '--test',
+                    harnessPath,
+                ],
                 {
                     cwd: packageRoot,
                     encoding: 'utf8',
