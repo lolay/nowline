@@ -39,7 +39,7 @@ import {
 } from '@nowline/core';
 import type { AstNode, CstNode, LangiumDocument } from 'langium';
 import { CstUtils } from 'langium';
-import type { Range } from 'vscode-languageserver';
+import type { Range } from '../lsp-protocol.js';
 
 /**
  * Property keys whose value(s) name another entity in the same file. Used by

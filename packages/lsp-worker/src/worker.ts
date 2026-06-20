@@ -19,7 +19,7 @@
 import { createNowlineLspServices } from '@nowline/lsp';
 import { EmptyFileSystem } from 'langium';
 import { startLanguageServer } from 'langium/lsp';
-import { createConnection } from 'vscode-languageserver/browser.js';
+import { createConnection } from 'vscode-languageserver/browser';
 import {
     BrowserMessageReader,
     BrowserMessageWriter,

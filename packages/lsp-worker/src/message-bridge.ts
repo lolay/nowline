@@ -10,4 +10,4 @@ export {
     BrowserMessageWriter,
     type MessageReader,
     type MessageWriter,
-} from 'vscode-jsonrpc/browser.js';
+} from 'vscode-jsonrpc/browser';

@@ -42,7 +42,7 @@
         "compile:local": "node scripts/compile.mjs --target=local"
     },
     "dependencies": {
-        "@babel/code-frame": "^7.29.0",
+        "@babel/code-frame": "^8.0.0",
         "@clack/prompts": "^1.5.1",
         "@modelcontextprotocol/sdk": "^1.29.0",
         "@nowline/config": "workspace:*",
@@ -62,7 +62,7 @@
         "citty": "^0.2.2",
         "consola": "^3.4.2",
         "js-yaml": "^4.2.0",
-        "langium": "~4.2.4"
+        "langium": "~4.3.0"
     },
     "devDependencies": {
         "@resvg/resvg-wasm": "^2.6.2",

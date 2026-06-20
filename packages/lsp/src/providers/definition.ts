@@ -1,7 +1,7 @@
 import type { LangiumDocument, MaybePromise } from 'langium';
 import type { DefinitionProvider } from 'langium/lsp';
-import type { CancellationToken, DefinitionParams } from 'vscode-languageserver';
-import { LocationLink } from 'vscode-languageserver';
+import type { CancellationToken, DefinitionParams } from '../lsp-protocol.js';
+import { LocationLink } from '../lsp-protocol.js';
 import type { NowlineLspServices } from '../nowline-lsp-module.js';
 import {
     buildEntityIndex,

@@ -5,7 +5,7 @@ import {
     DefaultCompletionProvider,
     type NextFeature,
 } from 'langium/lsp';
-import { type CompletionItem, CompletionItemKind } from 'vscode-languageserver';
+import { type CompletionItem, CompletionItemKind } from '../lsp-protocol.js';
 import type { NowlineLspServices } from '../nowline-lsp-module.js';
 import {
     BUILTIN_CAPACITY_ICONS,

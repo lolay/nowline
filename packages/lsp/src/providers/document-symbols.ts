@@ -25,8 +25,8 @@ import type {
     DocumentSymbol,
     DocumentSymbolParams,
     Range,
-} from 'vscode-languageserver';
-import { SymbolKind } from 'vscode-languageserver';
+} from '../lsp-protocol.js';
+import { SymbolKind } from '../lsp-protocol.js';
 import type { NowlineLspServices } from '../nowline-lsp-module.js';
 import { entityKind, fileFromDocument, nameRangeOf } from '../references/ast-utils.js';
 

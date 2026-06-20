@@ -10,7 +10,7 @@ import type {
     TextDocumentPositionParams,
     TextEdit,
     WorkspaceEdit,
-} from 'vscode-languageserver';
+} from '../lsp-protocol.js';
 import type { NowlineLspServices } from '../nowline-lsp-module.js';
 import {
     declarationAt,

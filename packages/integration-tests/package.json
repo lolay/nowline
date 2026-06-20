@@ -26,7 +26,7 @@
         "@vitest/browser": "4.1.9",
         "@vitest/browser-playwright": "4.1.9",
         "esbuild": "^0.28.1",
-        "langium": "~4.2.4",
+        "langium": "~4.3.0",
         "playwright": "^1.61.0",
         "typescript": "^6.0.3",
         "vitest": "^4.1.9"

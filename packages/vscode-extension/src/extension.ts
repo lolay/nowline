@@ -153,7 +153,7 @@ function startLanguageClient(context: vscode.ExtensionContext): void {
         synchronize: {
             fileEvents: vscode.workspace.createFileSystemWatcher('**/*.nowline'),
         },
-        outputChannel: vscode.window.createOutputChannel('Nowline Language Server'),
+        outputChannel: vscode.window.createOutputChannel('Nowline Language Server', { log: true }),
     };
 
     client = new LanguageClient('nowline', 'Nowline Language Server', serverOptions, clientOptions);

@@ -1,7 +1,7 @@
 import type { LangiumDocument, MaybePromise } from 'langium';
 import type { HoverProvider } from 'langium/lsp';
-import type { CancellationToken, Hover, HoverParams, Range } from 'vscode-languageserver';
-import { MarkupKind } from 'vscode-languageserver';
+import type { CancellationToken, Hover, HoverParams, Range } from '../lsp-protocol.js';
+import { MarkupKind } from '../lsp-protocol.js';
 import type { NowlineLspServices } from '../nowline-lsp-module.js';
 import {
     buildEntityIndex,

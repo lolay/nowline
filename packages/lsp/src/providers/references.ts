@@ -1,8 +1,8 @@
 import type { CstNode, LangiumDocument, MaybePromise } from 'langium';
 import { CstUtils } from 'langium';
 import type { ReferencesProvider } from 'langium/lsp';
-import type { CancellationToken, ReferenceParams } from 'vscode-languageserver';
-import { Location } from 'vscode-languageserver';
+import type { CancellationToken, ReferenceParams } from '../lsp-protocol.js';
+import { Location } from '../lsp-protocol.js';
 import type { NowlineLspServices } from '../nowline-lsp-module.js';
 import {
     declarationAt,

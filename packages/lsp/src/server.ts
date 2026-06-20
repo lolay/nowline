@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 import { startLanguageServer } from 'langium/lsp';
 import { NodeFileSystem } from 'langium/node';
-import { createConnection, ProposedFeatures } from 'vscode-languageserver/node.js';
+import { createConnection, ProposedFeatures } from 'vscode-languageserver/node';
 import { createNowlineLspServices } from './nowline-lsp-module.js';
 
 /**

@@ -27,8 +27,8 @@ importers:
         specifier: workspace:*
         version: link:../renderer
       langium:
-        specifier: ~4.2.4
-        version: 4.2.4
+        specifier: ~4.3.0
+        version: 4.3.0
     devDependencies:
       '@types/node':
         specifier: ^25.9.3
@@ -46,8 +46,8 @@ importers:
   packages/cli:
     dependencies:
       '@babel/code-frame':
-        specifier: ^7.29.0
-        version: 7.29.0
+        specifier: ^8.0.0
+        version: 8.0.0
       '@clack/prompts':
         specifier: ^1.5.1
         version: 1.5.1
@@ -106,8 +106,8 @@ importers:
         specifier: ^4.2.0
         version: 4.2.0
       langium:
-        specifier: ~4.2.4
-        version: 4.2.4
+        specifier: ~4.3.0
+        version: 4.3.0
     devDependencies:
       '@resvg/resvg-wasm':
         specifier: ^2.6.2
@@ -150,15 +150,15 @@ importers:
   packages/core:
     dependencies:
       langium:
-        specifier: ~4.2.4
-        version: 4.2.4
+        specifier: ~4.3.0
+        version: 4.3.0
     devDependencies:
       '@types/node':
         specifier: ^25.9.3
         version: 25.9.3
       langium-cli:
-        specifier: ~4.2.1
-        version: 4.2.1
+        specifier: ~4.3.0
+        version: 4.3.0
       typescript:
         specifier: ^6.0.3
         version: 6.0.3
@@ -184,8 +184,8 @@ importers:
         specifier: workspace:*
         version: link:../share-link
       langium:
-        specifier: ~4.2.4
-        version: 4.2.4
+        specifier: ~4.3.0
+        version: 4.3.0
     devDependencies:
       '@types/node':
         specifier: ^25.9.3
@@ -240,8 +240,8 @@ importers:
         specifier: ^25.9.3
         version: 25.9.3
       langium:
-        specifier: ~4.2.4
-        version: 4.2.4
+        specifier: ~4.3.0
+        version: 4.3.0
       typescript:
         specifier: ^6.0.3
         version: 6.0.3
@@ -284,8 +284,8 @@ importers:
         specifier: ^25.9.3
         version: 25.9.3
       langium:
-        specifier: ~4.2.4
-        version: 4.2.4
+        specifier: ~4.3.0
+        version: 4.3.0
       typescript:
         specifier: ^6.0.3
         version: 6.0.3
@@ -309,8 +309,8 @@ importers:
         specifier: ^25.9.3
         version: 25.9.3
       langium:
-        specifier: ~4.2.4
-        version: 4.2.4
+        specifier: ~4.3.0
+        version: 4.3.0
       typescript:
         specifier: ^6.0.3
         version: 6.0.3
@@ -334,8 +334,8 @@ importers:
         specifier: ^25.9.3
         version: 25.9.3
       langium:
-        specifier: ~4.2.4
-        version: 4.2.4
+        specifier: ~4.3.0
+        version: 4.3.0
       typescript:
         specifier: ^6.0.3
         version: 6.0.3
@@ -371,8 +371,8 @@ importers:
         specifier: ^0.17.6
         version: 0.17.6
       langium:
-        specifier: ~4.2.4
-        version: 4.2.4
+        specifier: ~4.3.0
+        version: 4.3.0
       typescript:
         specifier: ^6.0.3
         version: 6.0.3
@@ -402,8 +402,8 @@ importers:
         specifier: ^25.9.3
         version: 25.9.3
       langium:
-        specifier: ~4.2.4
-        version: 4.2.4
+        specifier: ~4.3.0
+        version: 4.3.0
       typescript:
         specifier: ^6.0.3
         version: 6.0.3
@@ -430,8 +430,8 @@ importers:
         specifier: ^25.9.3
         version: 25.9.3
       langium:
-        specifier: ~4.2.4
-        version: 4.2.4
+        specifier: ~4.3.0
+        version: 4.3.0
       typescript:
         specifier: ^6.0.3
         version: 6.0.3
@@ -475,8 +475,8 @@ importers:
         specifier: ^0.28.1
         version: 0.28.1
       langium:
-        specifier: ~4.2.4
-        version: 4.2.4
+        specifier: ~4.3.0
+        version: 4.3.0
       playwright:
         specifier: ^1.61.0
         version: 1.61.0
@@ -509,8 +509,8 @@ importers:
         specifier: ^25.9.3
         version: 25.9.3
       langium:
-        specifier: ~4.2.4
-        version: 4.2.4
+        specifier: ~4.3.0
+        version: 4.3.0
       typescript:
         specifier: ^6.0.3
         version: 6.0.3
@@ -524,14 +524,20 @@ importers:
         specifier: workspace:*
         version: link:../core
       langium:
-        specifier: ~4.2.4
-        version: 4.2.4
+        specifier: ~4.3.0
+        version: 4.3.0
       vscode-languageserver:
-        specifier: ~9.0.1
-        version: 9.0.1
+        specifier: ~10.0.0
+        version: 10.0.0
+      vscode-languageserver-protocol:
+        specifier: ~3.18.0
+        version: 3.18.0
       vscode-languageserver-textdocument:
         specifier: ~1.0.12
         version: 1.0.12
+      vscode-languageserver-types:
+        specifier: ~3.18.0
+        version: 3.18.0
     devDependencies:
       '@types/node':
         specifier: ^25.9.3
@@ -552,17 +558,17 @@ importers:
         specifier: workspace:*
         version: link:../lsp
       langium:
-        specifier: ~4.2.4
-        version: 4.2.4
+        specifier: ~4.3.0
+        version: 4.3.0
       vscode-jsonrpc:
-        specifier: 8.2.0
-        version: 8.2.0
+        specifier: 9.0.0
+        version: 9.0.0
       vscode-languageserver:
-        specifier: ~9.0.1
-        version: 9.0.1
+        specifier: ~10.0.0
+        version: 10.0.0
       vscode-languageserver-protocol:
-        specifier: ~3.17.5
-        version: 3.17.5
+        specifier: ~3.18.0
+        version: 3.18.0
     devDependencies:
       '@types/node':
         specifier: ^25.9.3
@@ -576,6 +582,9 @@ importers:
       vitest:
         specifier: ^4.1.9
         version: 4.1.9(@types/node@25.9.3)(@vitest/browser-playwright@4.1.9)(happy-dom@20.10.6)(vite@7.3.2(@types/node@25.9.3))
+      vscode-languageserver-types:
+        specifier: ~3.18.0
+        version: 3.18.0
 
   packages/mcp:
     dependencies:
@@ -613,8 +622,8 @@ importers:
         specifier: ^2.6.2
         version: 2.6.2
       langium:
-        specifier: ~4.2.4
-        version: 4.2.4
+        specifier: ~4.3.0
+        version: 4.3.0
       zod:
         specifier: ^4.4.3
         version: 4.4.3
@@ -729,8 +738,8 @@ importers:
         specifier: ^25.9.3
         version: 25.9.3
       langium:
-        specifier: ~4.2.4
-        version: 4.2.4
+        specifier: ~4.3.0
+        version: 4.3.0
       typescript:
         specifier: ^6.0.3
         version: 6.0.3
@@ -802,11 +811,11 @@ importers:
         specifier: ^2.6.2
         version: 2.6.2
       langium:
-        specifier: ~4.2.4
-        version: 4.2.4
+        specifier: ~4.3.0
+        version: 4.3.0
       vscode-languageclient:
-        specifier: ^9.0.1
-        version: 9.0.1
+        specifier: ^10.0.0
+        version: 10.0.0
     devDependencies:
       '@resvg/resvg-js':
         specifier: ^2.6.2
@@ -891,21 +900,21 @@ packages:
     resolution: {integrity: sha512-RUuewWk9JvWJS5Yiy8/74Lm1rQAWlrU/qg/Bgtk1jIauVRtnb9XKwS5Xg0J+Whwjesq9EVrBIFgQEP8vHxgezA==}
     engines: {node: '>=20'}
 
-  '@babel/code-frame@7.29.0':
-    resolution: {integrity: sha512-9NhCeYjq9+3uxgdtp20LSiJXJvN0FeCtNGpJxuMFZ1Kv3cWUNb6DOhJwUvcVCzKGR66cw4njwM6hrJLqgOwbcw==}
-    engines: {node: '>=6.9.0'}
-
   '@babel/code-frame@7.29.7':
     resolution: {integrity: sha512-Aup7aUOfpbAUg2ROOJN6Iw5f9DMBlzu0mIkm/malLQFN/YQgO48wCj0Kxa3sEHJvPVFg7siR+qRInwXd2qhQKw==}
     engines: {node: '>=6.9.0'}
 
-  '@babel/helper-validator-identifier@7.28.5':
-    resolution: {integrity: sha512-qSs4ifwzKJSV39ucNjsvc6WVHs6b7S03sOh2OcHF9UHfVPqWWALUsNUVzhSBiItjRZoLHx7nIarVjqKVusUZ1Q==}
-    engines: {node: '>=6.9.0'}
+  '@babel/code-frame@8.0.0':
+    resolution: {integrity: sha512-dYYg153EyN2Ekbqw2zAsbd6/JR+9N2SEoC7YV2GyyqMM7x9bLDTjBD6XBhSMLH0wtIVyJj03jWNriQhaN+eoCw==}
+    engines: {node: ^22.18.0 || >=24.11.0}
 
   '@babel/helper-validator-identifier@7.29.7':
     resolution: {integrity: sha512-qehxGkRj55h/ff8EMaJ+cYhyaKlHIxqYDn682wQD7RNp9UujOQsHog2uS0r2vzr4pW+sXf90NeeayjcNaX3fFg==}
     engines: {node: '>=6.9.0'}
+
+  '@babel/helper-validator-identifier@8.0.2':
+    resolution: {integrity: sha512-9Fr9QeyCAyi1BR1jKZ6uYQ24EIhQUx5ReHfQU7drOE+TPOb+w11/dsqLkMOT2U29OdCT71XajrOT8xDc1C7orA==}
+    engines: {node: ^22.18.0 || >=24.11.0}
 
   '@biomejs/biome@2.5.0':
     resolution: {integrity: sha512-4kURkd9hAPrdDM3C9n82ycYgx8hvQcW6MjKTEejruj8rK0N8P3OPpdy8BvI8kt3KWY4ycF5XtDOrktetEfhfuw==}
@@ -2391,11 +2400,11 @@ packages:
   boundary@2.0.0:
     resolution: {integrity: sha512-rJKn5ooC9u8q13IMCrW0RSp31pxBCHE3y9V/tp3TdWSLf8Em3p6Di4NBpfzbJge9YjjFEsD0RtFEjtvHL5VyEA==}
 
-  brace-expansion@1.1.14:
-    resolution: {integrity: sha512-MWPGfDxnyzKU7rNOW9SP/c50vi3xrmrua/+6hfPbCS2ABNWfx24vPidzvC7krjU/RTo235sV776ymlsMtGKj8g==}
+  brace-expansion@1.1.15:
+    resolution: {integrity: sha512-EwOCDEex4quD37XhqM3omwtMoJjr//isUZz1JopUNWms+4Z2ViyM/k1YIRePpoVNnQhENnxtFjLaxNHrT7xIUg==}
 
-  brace-expansion@2.1.0:
-    resolution: {integrity: sha512-TN1kCZAgdgweJhWWpgKYrQaMNHcDULHkWwQIspdtjV4Y5aurRdZpjAqn6yX3FPqTA9ngHCc4hJxMAMgGfve85w==}
+  brace-expansion@2.1.1:
+    resolution: {integrity: sha512-WR1cURNjuvBLMZBMbqM0UoE+WAfdUcEV1ccD8PVBVOI+Z3ND4+SZbN8RsfT2bMuG1qwz5RFvPukSZm5fF2D5eA==}
 
   brace-expansion@5.0.6:
     resolution: {integrity: sha512-kLpxurY4Z4r9sgMsyG0Z9uzsBlgiU/EFKhj/h91/8yHu0edo7XuixOIH3VcJ8kkxs6/jPzoI6U9Vj3WqbMQ94g==}
@@ -2536,9 +2545,9 @@ packages:
     resolution: {integrity: sha512-/rFeCpNJQbhSZjGVwO9RFV3xPqbnERS8MmIQzCtD/zl6gpJuV/bMLuN92oG3F7d8oDEHHRrujSXNUr8fpjntKw==}
     engines: {node: '>=18'}
 
-  commander@14.0.3:
-    resolution: {integrity: sha512-H+y0Jo/T1RZ9qPP4Eh1pkcQcLRglraJaSLoyOtHxu6AapkjWVCy2Sit1QQ4x3Dng8qDlSsZEet7g5Pq06MvTgw==}
-    engines: {node: '>=20'}
+  commander@15.0.0:
+    resolution: {integrity: sha512-z67u4ZhzCL/Tydu1lJARtEZYWbWaN7oYLHbsuzocr6y4N6WZAagG3RQ4FW61V1/0+jImpj293XfrcYnd1qxtPg==}
+    engines: {node: '>=22.12.0'}
 
   compress-commons@4.1.2:
     resolution: {integrity: sha512-D3uMHtGc/fcO1Gt1/L7i1e33VOvD4A9hfQLP+6ewd+BvG/gQ84Yh4oftEhAdjSMgBgwGL+jsppT7JYNpo6MHHg==}
@@ -3142,6 +3151,9 @@ packages:
   js-md5@0.8.3:
     resolution: {integrity: sha512-qR0HB5uP6wCuRMrWPTrkMaev7MJZwJuuw4fnwAzRgP4J4/F8RwtodOKpGp4XpqsLBFzzgqIO42efFAyz2Et6KQ==}
 
+  js-tokens@10.0.0:
+    resolution: {integrity: sha512-lM/UBzQmfJRo9ABXbPWemivdCW8V2G8FHaHdypQaIy523snUjog0W71ayWXTjiR+ixeMyVHN2XcpnTd/liPg/Q==}
+
   js-tokens@4.0.0:
     resolution: {integrity: sha512-RdJUflcE3cUzKiMqQgsCu06FPu9UdIJO0beYbPhHN4k6apgJtifcoCtT9bcxOpYBtpD2kCM6Sbzg4CausW/PKQ==}
 
@@ -3188,16 +3200,16 @@ packages:
   keytar@7.9.0:
     resolution: {integrity: sha512-VPD8mtVtm5JNtA2AErl6Chp06JBfy7diFQ7TQQhdpWOl6MrCRB+eRbvAZUsbGQS9kiMq0coJsy0W0vHpDCkWsQ==}
 
-  langium-cli@4.2.1:
-    resolution: {integrity: sha512-npo1fSoP/wUf4cxUcKUYph48+jHFPEjeLQJ3pQ1UnA4QRuz8JpOxWsLHB/fdmViZSnI0mb98f06Wo7PKecqoUw==}
+  langium-cli@4.3.0:
+    resolution: {integrity: sha512-+TtgkhX8Z3exRBJvTFWV1semhWUCnWMhMP+ZKjpKIeyY6GgnQHehf3ZWyCvVL5T95uqgWZb77aoq9rhI2MPNTA==}
     engines: {node: '>=20.10.0', npm: '>=10.2.3'}
     hasBin: true
 
-  langium-railroad@4.2.0:
-    resolution: {integrity: sha512-LYR22GV14iz0GTUtR91pZY6yNImYRk1HbAuHBP8k8GESMcSkCJh+iewJooH9k8H8dJOteXvvI7aFkz6rfU9oLQ==}
+  langium-railroad@4.3.0:
+    resolution: {integrity: sha512-dbuv149MQe8XcgM48FagH22JBaqN0MvN9RRJKBdRQWDeHUYAASliiOtLdMfgOl3kV+nLx7idSc+LLdcBSduvHw==}
 
-  langium@4.2.4:
-    resolution: {integrity: sha512-J0M9BkTOZ9Izee2YL0eXkUKFdWhrmTYYVLgiZTz6Z3KvK03ooM+vjVrfphKcdGVPWmM2cFYtDnNyIsIIZPrHNA==}
+  langium@4.3.0:
+    resolution: {integrity: sha512-ehV704taQKTYTuNdKRNjv1sD8huezTW8uTlDuQN6FFK5Cu7qR29vbA1JAibXxLznQXZCAliGO342jH58OzywZA==}
     engines: {node: '>=20.10.0', npm: '>=10.2.3'}
 
   lazystream@1.0.1:
@@ -3866,11 +3878,6 @@ packages:
     resolution: {integrity: sha512-cBznnQ9KjJqU67B52RMC65CMarK2600WFnbkcaiwWq3xy/5haFJlshgnpjovMVJ+Hff49d8GEn0b87C5pDQ10g==}
     hasBin: true
 
-  semver@7.8.0:
-    resolution: {integrity: sha512-AcM7dV/5ul4EekoQ29Agm5vri8JNqRyj39o0qpX6vDF2GZrtutZl5RwgD1XnZjiTAfncsJhMI48QQH3sN87YNA==}
-    engines: {node: '>=10'}
-    hasBin: true
-
   semver@7.8.4:
     resolution: {integrity: sha512-rUCObTnP32Q08R2uuIrt7r9PlEonuTmtuXYcW6s5kjdlj3xbnwe+21yXptAUYcMAABLkYYTtnmzb3w3EDZfueA==}
     engines: {node: '>=10'}
@@ -4334,29 +4341,28 @@ packages:
       jsdom:
         optional: true
 
-  vscode-jsonrpc@8.2.0:
-    resolution: {integrity: sha512-C+r0eKJUIfiDIfwJhria30+TYWPtuHJXHtI7J0YlOmKAo7ogxP20T0zxB7HZQIFhIyvoBPwWskjxrvAtfjyZfA==}
+  vscode-jsonrpc@9.0.0:
+    resolution: {integrity: sha512-+VvMmQPJhtvJ+8O+zu2JKIRiLxXF8NW7krWgyMGeOHrp4Cn23T5hc0v2LknNeopDOB70wghHAds7mKtcZ0I4Sg==}
     engines: {node: '>=14.0.0'}
 
-  vscode-jsonrpc@8.2.1:
-    resolution: {integrity: sha512-kdjOSJ2lLIn7r1rtrMbbNCHjyMPfRnowdKjBQ+mGq6NAW5QY2bEZC/khaC5OR8svbbjvLEaIXkOq45e2X9BIbQ==}
-    engines: {node: '>=14.0.0'}
+  vscode-languageclient@10.0.0:
+    resolution: {integrity: sha512-3yRHFkktZQCCg8ehHnD2Z4DZ4mZ17FNo8bxM4OFt8wtpxNBAOZGHmpbIflZSkicvCxi+ozuWntbdeWiY0gP77w==}
+    engines: {vscode: ^1.91.0}
 
-  vscode-languageclient@9.0.1:
-    resolution: {integrity: sha512-JZiimVdvimEuHh5olxhxkht09m3JzUGwggb5eRUkzzJhZ2KjCN0nh55VfiED9oez9DyF8/fz1g1iBV3h+0Z2EA==}
-    engines: {vscode: ^1.82.0}
-
-  vscode-languageserver-protocol@3.17.5:
-    resolution: {integrity: sha512-mb1bvRJN8SVznADSGWM9u/b07H7Ecg0I3OgXDuLdn307rl/J3A9YD6/eYOssqhecL27hK1IPZAsaqh00i/Jljg==}
+  vscode-languageserver-protocol@3.18.0:
+    resolution: {integrity: sha512-Zdz+kJ12Iz6tc11xfZyEo501bBATHXrCjmMfnaR3pMnf1CoqZBKIynba3P+/bi9VEdrMbNtAVKYpKhbODvqy+Q==}
 
   vscode-languageserver-textdocument@1.0.12:
     resolution: {integrity: sha512-cxWNPesCnQCcMPeenjKKsOCKQZ/L6Tv19DTRIGuLWe32lyzWhihGVJ/rcckZXJxfdKCFvRLS3fpBIsV/ZGX4zA==}
 
-  vscode-languageserver-types@3.17.5:
-    resolution: {integrity: sha512-Ld1VelNuX9pdF39h2Hgaeb5hEZM2Z3jUrrMgWQAu82jMtZp7p3vJT3BzToKtZI7NgQssZje5o0zryOrhQvzQAg==}
+  vscode-languageserver-textdocument@1.0.13:
+    resolution: {integrity: sha512-nx0ZHwMGIsVkzFG3/VLeJYBLTaFBRuNdGDvevvjuoayU5EOS2fEYazOhtCM3PI9ClMMg5igc0uwXtAq4tJj+Dw==}
 
-  vscode-languageserver@9.0.1:
-    resolution: {integrity: sha512-woByF3PDpkHFUreUa7Hos7+pUWdeWMXRd26+ZX2A8cFx6v/JPTtd4/uN0/jB6XQHYaOlHbio03NTHCqrgG5n7g==}
+  vscode-languageserver-types@3.18.0:
+    resolution: {integrity: sha512-8TsGPNMIMiiBdkORgRSvLjuiEIiAFtO+KssmYWxQ+uSVvlf7RjK8YKCOjPzZ+YA04jXEV7+7LvkSmHkhpNS99g==}
+
+  vscode-languageserver@10.0.0:
+    resolution: {integrity: sha512-KOdOVuBnNO5EZSejlEDdRPJWpJn/X87vR2TmOXneHsxSYY7mYjgc1SxeZPMoHICcBKTUnM0V19+WP4J92zDd1w==}
     hasBin: true
 
   vscode-uri@3.1.0:
@@ -4573,21 +4579,20 @@ snapshots:
       '@azure/msal-common': 16.9.0
       jsonwebtoken: 9.0.3
 
-  '@babel/code-frame@7.29.0':
-    dependencies:
-      '@babel/helper-validator-identifier': 7.28.5
-      js-tokens: 4.0.0
-      picocolors: 1.1.1
-
   '@babel/code-frame@7.29.7':
     dependencies:
       '@babel/helper-validator-identifier': 7.29.7
       js-tokens: 4.0.0
       picocolors: 1.1.1
 
-  '@babel/helper-validator-identifier@7.28.5': {}
+  '@babel/code-frame@8.0.0':
+    dependencies:
+      '@babel/helper-validator-identifier': 8.0.2
+      js-tokens: 10.0.0
 
   '@babel/helper-validator-identifier@7.29.7': {}
+
+  '@babel/helper-validator-identifier@8.0.2': {}
 
   '@biomejs/biome@2.5.0':
     optionalDependencies:
@@ -5951,12 +5956,12 @@ snapshots:
 
   boundary@2.0.0: {}
 
-  brace-expansion@1.1.14:
+  brace-expansion@1.1.15:
     dependencies:
       balanced-match: 1.0.2
       concat-map: 0.0.1
 
-  brace-expansion@2.1.0:
+  brace-expansion@2.1.1:
     dependencies:
       balanced-match: 1.0.2
 
@@ -6109,7 +6114,7 @@ snapshots:
 
   commander@13.1.0: {}
 
-  commander@14.0.3: {}
+  commander@15.0.0: {}
 
   compress-commons@4.1.2:
     dependencies:
@@ -6773,6 +6778,8 @@ snapshots:
 
   js-md5@0.8.3: {}
 
+  js-tokens@10.0.0: {}
+
   js-tokens@4.0.0: {}
 
   js-yaml@4.2.0:
@@ -6834,31 +6841,30 @@ snapshots:
       prebuild-install: 7.1.3
     optional: true
 
-  langium-cli@4.2.1:
+  langium-cli@4.3.0:
     dependencies:
       chalk: 5.6.2
-      commander: 14.0.3
+      commander: 15.0.0
       fs-extra: 11.3.5
       jsonschema: 1.5.0
-      langium: 4.2.4
-      langium-railroad: 4.2.0
+      langium: 4.3.0
+      langium-railroad: 4.3.0
       lodash: 4.18.1
 
-  langium-railroad@4.2.0:
+  langium-railroad@4.3.0:
     dependencies:
-      langium: 4.2.4
+      langium: 4.3.0
       railroad-diagrams: 1.0.0
 
-  langium@4.2.4:
+  langium@4.3.0:
     dependencies:
       '@chevrotain/regexp-to-ast': 12.0.0
       chevrotain: 12.0.0
       chevrotain-allstar: 0.4.3(chevrotain@12.0.0)
-      vscode-jsonrpc: 8.2.1
-      vscode-languageserver: 9.0.1
-      vscode-languageserver-protocol: 3.17.5
-      vscode-languageserver-textdocument: 1.0.12
-      vscode-languageserver-types: 3.17.5
+      vscode-languageserver: 10.0.0
+      vscode-languageserver-protocol: 3.18.0
+      vscode-languageserver-textdocument: 1.0.13
+      vscode-languageserver-types: 3.18.0
       vscode-uri: 3.1.0
 
   lazystream@1.0.1:
@@ -7172,11 +7178,11 @@ snapshots:
 
   minimatch@3.1.5:
     dependencies:
-      brace-expansion: 1.1.14
+      brace-expansion: 1.1.15
 
   minimatch@5.1.9:
     dependencies:
-      brace-expansion: 2.1.0
+      brace-expansion: 2.1.1
 
   minimist@1.2.8: {}
 
@@ -7610,8 +7616,6 @@ snapshots:
       - supports-color
 
   semver@5.7.2: {}
-
-  semver@7.8.0: {}
 
   semver@7.8.4: {}
 
@@ -8068,28 +8072,29 @@ snapshots:
     transitivePeerDependencies:
       - msw
 
-  vscode-jsonrpc@8.2.0: {}
+  vscode-jsonrpc@9.0.0: {}
 
-  vscode-jsonrpc@8.2.1: {}
-
-  vscode-languageclient@9.0.1:
+  vscode-languageclient@10.0.0:
     dependencies:
-      minimatch: 5.1.9
-      semver: 7.8.0
-      vscode-languageserver-protocol: 3.17.5
+      minimatch: 10.2.5
+      semver: 7.8.4
+      vscode-languageserver-protocol: 3.18.0
+      vscode-languageserver-textdocument: 1.0.13
 
-  vscode-languageserver-protocol@3.17.5:
+  vscode-languageserver-protocol@3.18.0:
     dependencies:
-      vscode-jsonrpc: 8.2.0
-      vscode-languageserver-types: 3.17.5
+      vscode-jsonrpc: 9.0.0
+      vscode-languageserver-types: 3.18.0
 
   vscode-languageserver-textdocument@1.0.12: {}
 
-  vscode-languageserver-types@3.17.5: {}
+  vscode-languageserver-textdocument@1.0.13: {}
 
-  vscode-languageserver@9.0.1:
+  vscode-languageserver-types@3.18.0: {}
+
+  vscode-languageserver@10.0.0:
     dependencies:
-      vscode-languageserver-protocol: 3.17.5
+      vscode-languageserver-protocol: 3.18.0
 
   vscode-uri@3.1.0: {}
 

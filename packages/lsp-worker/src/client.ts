@@ -33,7 +33,7 @@ import {
     type TextDocumentContentChangeEvent,
     TextDocumentSyncKind,
 } from 'vscode-languageserver-protocol';
-import { createProtocolConnection } from 'vscode-languageserver-protocol/browser.js';
+import { createProtocolConnection } from 'vscode-languageserver-protocol/browser';
 import {
     BrowserMessageReader,
     BrowserMessageWriter,
