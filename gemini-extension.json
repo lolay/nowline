@@ -7,6 +7,5 @@
             "command": "npx",
             "args": ["-y", "@nowline/mcp@latest"]
         }
-    },
-    "contextFileName": "GEMINI.md"
+    }
 }
