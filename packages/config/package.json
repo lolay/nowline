@@ -1,6 +1,6 @@
 {
     "name": "@nowline/config",
-    "version": "0.8.4",
+    "version": "0.8.5",
     "description": "Loads Nowline project settings (the .nowlinerc file) for the CLI and editor integrations.",
     "license": "Apache-2.0",
     "engines": {

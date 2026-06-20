@@ -1,6 +1,6 @@
 {
     "name": "@nowline/browser",
-    "version": "0.8.4",
+    "version": "0.8.5",
     "description": "Runs the whole Nowline pipeline — parse, validate, resolve includes, lay out, and render — in the browser, with pluggable I/O hooks. Powers @nowline/embed and the VS Code preview.",
     "license": "Apache-2.0",
     "engines": {

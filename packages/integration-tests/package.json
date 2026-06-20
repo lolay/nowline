@@ -1,6 +1,6 @@
 {
     "name": "@nowline/integration-tests",
-    "version": "0.8.4",
+    "version": "0.8.5",
     "private": true,
     "description": "End-to-end tests for the core → layout → renderer pipeline",
     "license": "Apache-2.0",

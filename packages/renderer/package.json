@@ -1,6 +1,6 @@
 {
     "name": "@nowline/renderer",
-    "version": "0.8.4",
+    "version": "0.8.5",
     "description": "Nowline renderer — draws a laid-out roadmap as an SVG image.",
     "license": "Apache-2.0",
     "engines": {
