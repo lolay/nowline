@@ -10,6 +10,7 @@ export interface MountOptions {
     args: Record<string, unknown>;
     leanPayload: string;
     containerDimensions: { maxHeight: number; maxWidth: number } | null;
+    theme?: 'light' | 'dark';
 }
 
 declare global {
@@ -34,11 +35,11 @@ window.__startNowlineBridge = async (iframe, options) => {
     };
 
     const hostContext: {
-        theme: 'light';
+        theme: 'light' | 'dark';
         displayMode: 'inline';
         containerDimensions?: { maxHeight: number; maxWidth: number };
     } = {
-        theme: 'light',
+        theme: options.theme ?? 'light',
         displayMode: 'inline',
     };
     if (options.containerDimensions) {

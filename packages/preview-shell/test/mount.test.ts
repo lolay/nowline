@@ -519,4 +519,53 @@ describe('mountPreview', () => {
         expect(root.querySelector<HTMLElement>('.links-toggle')).not.toBeNull();
         handle.dispose();
     });
+
+    // ===== Mode resolution + onModeChange =====
+
+    it('onModeChange fires on init and getMode returns the resolved mode', () => {
+        const onModeChange = vi.fn();
+        const root = mountRoot();
+        const handle = mountPreview(root, { mode: 'dark', onModeChange });
+        expect(onModeChange).toHaveBeenCalledWith('dark');
+        expect(handle.getMode()).toBe('dark');
+        handle.dispose();
+    });
+
+    it('setMode fires onModeChange and updates getMode', () => {
+        const onModeChange = vi.fn();
+        const root = mountRoot();
+        const handle = mountPreview(root, { mode: 'light', onModeChange });
+        onModeChange.mockClear();
+        handle.setMode('dark');
+        expect(onModeChange).toHaveBeenCalledWith('dark');
+        expect(handle.getMode()).toBe('dark');
+        handle.dispose();
+    });
+
+    it('prefers-color-scheme change fires onModeChange when mode is system', () => {
+        const onModeChange = vi.fn();
+        const mql = {
+            matches: false,
+            media: '(prefers-color-scheme: dark)',
+            addEventListener: vi.fn(),
+            removeEventListener: vi.fn(),
+        };
+        vi.spyOn(window, 'matchMedia').mockReturnValue(mql as unknown as MediaQueryList);
+
+        const root = mountRoot();
+        const handle = mountPreview(root, { mode: 'system', onModeChange });
+        expect(onModeChange).toHaveBeenCalledWith('light');
+        expect(handle.getMode()).toBe('light');
+
+        onModeChange.mockClear();
+        mql.matches = true;
+        const changeHandler = mql.addEventListener.mock.calls.find((c) => c[0] === 'change')?.[1] as
+            | (() => void)
+            | undefined;
+        expect(changeHandler).toBeTypeOf('function');
+        changeHandler?.();
+        expect(onModeChange).toHaveBeenCalledWith('dark');
+        expect(handle.getMode()).toBe('dark');
+        handle.dispose();
+    });
 });

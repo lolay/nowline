@@ -39,7 +39,7 @@ export type RenderFn = (source: string, opts: RenderOptions) => Promise<RenderRe
 export type ApplyFn = (handle: PreviewHandle, result: RenderResult) => void;
 
 export interface MountLivePreviewOptions
-    extends Omit<MountPreviewOptions, 'onViewOptions' | 'viewBaseline'> {
+    extends Omit<MountPreviewOptions, 'onViewOptions' | 'viewBaseline' | 'onModeChange'> {
     /** Source string to render on mount (may be omitted for late-set callers). */
     source?: string;
     /** Seed view-state (theme, now, showLinks). The shell toolbar reflects these. */
@@ -124,6 +124,8 @@ export function mountLivePreview(
     let currentSource: string = initialSource;
     let debounceTimer: ReturnType<typeof setTimeout> | null = null;
     let disposed = false;
+    let booted = false;
+    let currentMode: 'light' | 'dark' = 'dark';
 
     const viewBaseline: ViewBaseline = {
         theme: viewState.theme,
@@ -134,6 +136,11 @@ export function mountLivePreview(
     const handle = mountPreview(rootEl, {
         ...passThroughOpts,
         viewBaseline,
+        onModeChange(mode) {
+            if (mode === currentMode) return;
+            currentMode = mode;
+            if (booted && viewState.theme === 'auto') scheduleRender(false);
+        },
         onViewOptions(overrides: ViewOptionsOverrides) {
             if (overrides.theme !== undefined) viewState.theme = overrides.theme;
             if (overrides.now !== undefined) viewState.now = overrides.now;
@@ -144,9 +151,11 @@ export function mountLivePreview(
     });
 
     function buildRenderOpts(): RenderOptions {
+        const diagramTheme =
+            viewState.theme === 'auto' ? currentMode : themeOverrideToDiagramTheme(viewState.theme);
         return {
             ...renderOpts,
-            theme: themeOverrideToDiagramTheme(viewState.theme),
+            theme: diagramTheme,
             today: nowOverrideToToday(viewState.now),
             showLinks: viewState.showLinks,
         };
@@ -165,7 +174,10 @@ export function mountLivePreview(
         if (!currentSource) return;
         try {
             const result = await renderFn(currentSource, buildRenderOpts());
-            if (!disposed) applyFn(handle, result);
+            if (!disposed) {
+                applyFn(handle, result);
+                booted = true;
+            }
         } catch (err) {
             if (!disposed) {
                 handle.setFatal(err instanceof Error ? err.message : String(err));

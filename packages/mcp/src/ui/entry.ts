@@ -25,7 +25,7 @@
 declare const __MCP_VERSION__: string;
 
 import { App } from '@modelcontextprotocol/ext-apps';
-import { mountLivePreview } from '@nowline/preview';
+import { type LivePreviewHandle, mountLivePreview } from '@nowline/preview';
 import type { NowOverride, ThemeOverride } from '@nowline/preview-shell';
 import {
     type PreviewPayload,
@@ -59,8 +59,13 @@ function toThemeOverride(theme: string | undefined): ThemeOverride {
 
 let mounted = false;
 let mountedSource: string | undefined;
+let live: LivePreviewHandle | undefined;
 
-function mountFromPayload(payload: PreviewPayload): void {
+function hostTheme(app: App): 'light' | 'dark' | undefined {
+    return app.getHostContext()?.theme;
+}
+
+function mountFromPayload(payload: PreviewPayload, app: App): void {
     const root = document.getElementById('nl-preview-root');
     if (!root || typeof payload.source !== 'string') {
         return;
@@ -72,11 +77,14 @@ function mountFromPayload(payload: PreviewPayload): void {
     // re-invocation on the same iframe) tears down the prior mount first.
     if (mounted) {
         if (payload.source === mountedSource) return;
+        live?.dispose();
+        live = undefined;
         (root as HTMLElement).replaceChildren();
     }
 
-    mountLivePreview(root as HTMLElement, {
+    live = mountLivePreview(root as HTMLElement, {
         source: payload.source,
+        mode: hostTheme(app) ?? 'system',
         initialView: {
             theme: toThemeOverride(payload.theme),
             now: (payload.now ?? 'today') as NowOverride,
@@ -187,7 +195,7 @@ async function bootstrap(): Promise<void> {
     // before the server finishes rendering. Mirrors the official ext-apps examples.
     app.ontoolinput = ({ arguments: args }) => {
         const payload = parsePreviewFromArguments(args as Record<string, unknown> | undefined);
-        if (payload) mountFromPayload(payload);
+        if (payload) mountFromPayload(payload, app);
     };
 
     // Authoritative path: the server-resolved lean preview payload. Reconciles the
@@ -195,11 +203,14 @@ async function bootstrap(): Promise<void> {
     app.ontoolresult = ({ content, isError }) => {
         if (isError) return;
         const payload = parsePreviewFromContent(content);
-        if (payload) mountFromPayload(payload);
+        if (payload) mountFromPayload(payload, app);
     };
 
-    // Re-report when the host changes our width / available height.
-    app.onhostcontextchanged = () => reportHeight(app);
+    // Re-report when the host changes our width / available height / theme.
+    app.onhostcontextchanged = () => {
+        live?.handle.setMode(hostTheme(app) ?? 'system');
+        reportHeight(app);
+    };
 
     await app.connect();
     watchSize(app);
@@ -207,7 +218,7 @@ async function bootstrap(): Promise<void> {
 
     if (!mounted) {
         const fallback = readPayload();
-        if (fallback) mountFromPayload(fallback);
+        if (fallback) mountFromPayload(fallback, app);
     }
 }
 

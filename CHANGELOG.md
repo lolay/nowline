@@ -6,6 +6,10 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ## [Unreleased]
 
+### Fixed
+
+- **`@nowline/mcp` — in-chat preview `auto` theme follows harness dark mode**: the MCP Apps widget reads `getHostContext().theme` from the Claude harness and resolves the default `auto` diagram theme to that light/dark mode (re-rendering on `onhostcontextchanged`). When the host does not report a theme, `auto` falls back to the iframe's `prefers-color-scheme`.
+
 ## [0.8.4] - 2026-06-19
 
 ## [0.8.3] - 2026-06-19

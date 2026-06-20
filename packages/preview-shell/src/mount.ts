@@ -127,6 +127,13 @@ export interface MountPreviewOptions {
     onCopyPngFallback?: (body: Uint8Array) => void;
     onViewOptions?: (overrides: ViewOptionsOverrides) => void;
     onFatal?: (message: string) => void;
+    /**
+     * Fired whenever the resolved chrome color scheme changes (initial mount,
+     * `setMode`, VS Code body-class mutation, or `prefers-color-scheme` change).
+     * Never affects the diagram theme directly — consumers use this to drive
+     * `'auto'` diagram theme resolution.
+     */
+    onModeChange?: (mode: 'light' | 'dark') => void;
 }
 
 export interface PreviewHandle {
@@ -161,6 +168,8 @@ export interface PreviewHandle {
     actualSize(): void;
     getZoom(): number;
     setZoom(scale: number): void;
+    /** Current resolved chrome color scheme (`'light'` or `'dark'`). */
+    getMode(): 'light' | 'dark';
     /** Remove all listeners + DOM and detach the shell from the root element. */
     dispose(): void;
 }
@@ -289,6 +298,7 @@ export function mountPreview(
     function applyMode(resolved: 'light' | 'dark'): void {
         state.mode = resolved;
         rootEl.setAttribute('data-nl-mode', resolved);
+        options.onModeChange?.(resolved);
     }
 
     const rawMode = options.mode ?? 'system';
@@ -1444,6 +1454,9 @@ export function mountPreview(
             state.activeFit = 'manual';
             state.isDirty = true;
             setScale(scale);
+        },
+        getMode() {
+            return state.mode;
         },
         dispose() {
             if (fadeTimer) clearTimeout(fadeTimer);

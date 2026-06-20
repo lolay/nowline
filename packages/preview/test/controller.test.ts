@@ -270,4 +270,54 @@ describe('mountLivePreview', () => {
         expect(diagnostics?.classList.contains('show')).toBe(true);
         handle.dispose();
     });
+
+    // ===== Auto theme follows shell mode =====
+
+    it('auto theme resolves to the shell mode on first render', async () => {
+        const render = vi.fn().mockResolvedValue(SVG_RESULT);
+        const root = mountRoot();
+        mountLivePreview(root, {
+            source: 'roadmap v1 ...',
+            render,
+            mode: 'dark',
+            initialView: { theme: 'auto' },
+        });
+        await vi.waitUntil(() => render.mock.calls.length > 0);
+        const [_src, opts] = render.mock.calls[0] as [string, LiveRenderOptions];
+        expect((opts as { theme?: unknown }).theme).toBe('dark');
+    });
+
+    it('auto theme re-renders when shell mode changes', async () => {
+        const render = vi.fn().mockResolvedValue(SVG_RESULT);
+        const root = mountRoot();
+        const lp = mountLivePreview(root, {
+            source: 'roadmap v1 ...',
+            render,
+            mode: 'dark',
+            initialView: { theme: 'auto' },
+        });
+        await vi.waitUntil(() => render.mock.calls.length > 0);
+        await new Promise((r) => setTimeout(r, 10));
+        lp.handle.setMode('light');
+        await vi.waitUntil(() => render.mock.calls.length > 1);
+        const [_src, opts] = render.mock.calls[1] as [string, LiveRenderOptions];
+        expect((opts as { theme?: unknown }).theme).toBe('light');
+    });
+
+    it('explicit theme ignores shell mode changes', async () => {
+        const render = vi.fn().mockResolvedValue(SVG_RESULT);
+        const root = mountRoot();
+        const lp = mountLivePreview(root, {
+            source: 'roadmap v1 ...',
+            render,
+            mode: 'dark',
+            initialView: { theme: 'light' },
+        });
+        await vi.waitUntil(() => render.mock.calls.length > 0);
+        await new Promise((r) => setTimeout(r, 10));
+        lp.handle.setMode('light');
+        await new Promise((r) => setTimeout(r, 20));
+        expect(render.mock.calls.length).toBe(1);
+        expect((render.mock.calls[0][1] as { theme?: unknown }).theme).toBe('light');
+    });
 });

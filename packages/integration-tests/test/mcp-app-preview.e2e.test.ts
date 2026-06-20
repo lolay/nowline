@@ -90,10 +90,19 @@ interface WidgetResult {
     rootChildren: number;
     hasSvg: boolean;
     svgHeight: number;
+    svgTheme: string | null;
     rootWidth: number;
     viewBox: { w: number; h: number } | null;
     reportedHeights: number[];
     errors: string[];
+}
+
+interface RenderWidgetOptions {
+    csp: string | null;
+    containerDimensions: { maxHeight: number; maxWidth: number } | null;
+    args?: Record<string, unknown>;
+    leanPayload?: string;
+    hostTheme?: 'light' | 'dark';
 }
 
 /** Expected fit-width content height for a viewBox at a given width, clamped. */
@@ -130,10 +139,14 @@ afterAll(async () => {
     await browser?.close();
 });
 
-async function renderWidget(
-    csp: string | null,
-    containerDimensions: { maxHeight: number; maxWidth: number } | null,
-): Promise<WidgetResult> {
+async function renderWidget(options: RenderWidgetOptions): Promise<WidgetResult> {
+    const {
+        csp,
+        containerDimensions,
+        args = ARGS,
+        leanPayload = LEAN,
+        hostTheme = 'light',
+    } = options;
     const page = await browser.newPage();
     const errors: string[] = [];
     page.on('console', (msg) => {
@@ -148,21 +161,23 @@ async function renderWidget(
     await page.addScriptTag({ content: bridgeBundle });
 
     await page.evaluate(
-        async ({ html, args, leanPayload, dims }) => {
+        async ({ html, args: toolArgs, leanPayload: lean, dims, theme }) => {
             const iframe = document.getElementById('f') as HTMLIFrameElement;
             await window.__startNowlineBridge(iframe, {
-                args,
-                leanPayload,
+                args: toolArgs,
+                leanPayload: lean,
                 containerDimensions: dims,
+                theme,
             });
             iframe.srcdoc = html;
             await window.__awaitNowlineBridge();
         },
         {
             html: widgetHtml(csp),
-            args: ARGS,
-            leanPayload: LEAN,
+            args,
+            leanPayload,
             dims: containerDimensions,
+            theme: hostTheme,
         },
     );
     await page.waitForTimeout(3000);
@@ -178,6 +193,7 @@ async function renderWidget(
                   rootChildren: root ? root.childElementCount : -1,
                   hasSvg: !!svg,
                   svgHeight: svg ? Math.round(svg.getBoundingClientRect().height) : 0,
+                  svgTheme: svg?.getAttribute('data-theme') ?? null,
                   rootWidth: root ? Math.round(root.getBoundingClientRect().width) : 0,
                   viewBox:
                       vb && vb.width > 0 && vb.height > 0 ? { w: vb.width, h: vb.height } : null,
@@ -188,6 +204,7 @@ async function renderWidget(
               rootChildren: -1,
               hasSvg: false,
               svgHeight: 0,
+              svgTheme: null,
               rootWidth: 0,
               viewBox: null,
           };
@@ -203,7 +220,10 @@ describe('MCP Apps live preview in a Claude-like sandboxed iframe', () => {
     it('paints and sizes to the diagram (not the container) under strict CSP with a tall maxHeight', async () => {
         // Generous container: the regression is that the iframe must NOT fill it
         // and bury the diagram below the fold — it tracks the diagram height.
-        const r = await renderWidget(STRICT_CSP, { maxHeight: 900, maxWidth: 760 });
+        const r = await renderWidget({
+            csp: STRICT_CSP,
+            containerDimensions: { maxHeight: 900, maxWidth: 760 },
+        });
         expect(r.errors, r.errors.join('\n')).toEqual([]);
         expect(r.rootChildren).toBeGreaterThan(0);
         expect(r.hasSvg).toBe(true);
@@ -225,7 +245,7 @@ describe('MCP Apps live preview in a Claude-like sandboxed iframe', () => {
     }, 60_000);
 
     it('caps at the default max and still sizes to content when the host advertises no dimensions', async () => {
-        const r = await renderWidget(null, null);
+        const r = await renderWidget({ csp: null, containerDimensions: null });
         expect(r.errors, r.errors.join('\n')).toEqual([]);
         expect(r.rootChildren).toBeGreaterThan(0);
         expect(r.hasSvg).toBe(true);
@@ -236,5 +256,25 @@ describe('MCP Apps live preview in a Claude-like sandboxed iframe', () => {
         expect(Math.abs(r.docHeight - want)).toBeLessThanOrEqual(2);
         expect(r.docHeight).toBeLessThanOrEqual(DEFAULT_MAX_HEIGHT_PX);
         expect(r.svgHeight).toBeGreaterThan(r.docHeight * 0.9);
+    }, 60_000);
+
+    it('auto theme follows host dark mode (svg data-theme=dark)', async () => {
+        const autoLean = JSON.stringify({
+            kind: 'nowline.preview',
+            source: SOURCE,
+            now: '2026-07-05',
+            locale: 'en-US',
+        });
+        const autoArgs = { source: SOURCE, now: '2026-07-05' };
+        const r = await renderWidget({
+            csp: null,
+            containerDimensions: null,
+            args: autoArgs,
+            leanPayload: autoLean,
+            hostTheme: 'dark',
+        });
+        expect(r.errors, r.errors.join('\n')).toEqual([]);
+        expect(r.hasSvg).toBe(true);
+        expect(r.svgTheme).toBe('dark');
     }, 60_000);
 });
