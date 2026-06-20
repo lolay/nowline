@@ -1,0 +1,12 @@
+{
+    "name": "nowline",
+    "version": "0.8.5",
+    "description": "Create and edit your roadmaps in a plain-text format.",
+    "mcpServers": {
+        "nowline": {
+            "command": "npx",
+            "args": ["-y", "@nowline/mcp@latest"]
+        }
+    },
+    "contextFileName": "GEMINI.md"
+}

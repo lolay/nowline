@@ -6,6 +6,10 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ## [Unreleased]
 
+### Added
+
+- **`gemini-extension.json`**: root manifest listing Nowline in the [Gemini CLI extension gallery](https://geminicli.com/extensions/browse/). Installs the `@nowline/mcp` server via `npx -y @nowline/mcp@latest`.
+
 ## [0.8.5] - 2026-06-20
 
 ### Fixed

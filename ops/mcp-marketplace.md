@@ -1,6 +1,6 @@
 # nowline (OSS) — MCP marketplace runbook
 
-Operator runbook for `@nowline/mcp` marketplace distribution: the public MCP registry (`io.nowline/nowline`), the Claude Desktop `.mcpb` bundle, and the manual Gemini CLI extension channel. Automated steps live in [`.github/workflows/publish-mcp.yml`](../.github/workflows/publish-mcp.yml); this doc covers one-time setup and the channels CI cannot drive.
+Operator runbook for `@nowline/mcp` marketplace distribution: the public MCP registry (`io.nowline/nowline`), the Claude Desktop `.mcpb` bundle, and the Gemini CLI extension gallery. Automated steps live in [`.github/workflows/publish-mcp.yml`](../.github/workflows/publish-mcp.yml); this doc covers one-time setup and the channels CI cannot drive.
 
 > Conventions: shell snippets are zsh / bash compatible. Registry publish commands are sourced from the Makefile (`make publish-mcp-registry`) — do not invoke `mcp-publisher` directly except during initial credential verification.
 
@@ -13,12 +13,12 @@ Operator runbook for `@nowline/mcp` marketplace distribution: the public MCP reg
 | Attach `.mcpb` to GitHub Release | `publish-mcp.yml` | After npm is live |
 | MCP registry `io.nowline/nowline` | `publish-mcp.yml` (last step) | DNS domain auth via `MCP_PRIVATE_KEY` |
 | Cursor Marketplace + VS Code MCP gallery | — | Registry-sourced; no separate action once registry entry is live |
+| Gemini CLI extension gallery | — | Crawler-sourced; no separate action once `gemini-extension.json` is in the repo and the `gemini-cli-extension` GitHub topic is set (one-time, see below) |
 | Tracking issue for manual channels | `publish-mcp.yml` | Labels `maintainer-only` + `release-ops` |
 
 Manual-only channels (no public submission API):
 
 - Claude Desktop Extensions directory (`.mcpb` upload)
-- Gemini CLI extension channel
 
 Each release opens a tracking issue linking here so these steps do not silently fall behind.
 
@@ -108,15 +108,19 @@ No public submission API — maintainers submit each release by hand until Anthr
 
 Manifest id: `name: nowline` (bare — see [`specs/releasing.md`](../specs/releasing.md) § MCP publishing artifacts).
 
-## Gemini CLI extension channel (manual)
+## Gemini CLI extension gallery (automated after one-time setup)
 
-Gemini CLI extensions are submitted per Google's publishing process (bundle + `GEMINI.md`). There is no API wired into `nowline` CI.
+The [Gemini CLI extension gallery](https://geminicli.com/extensions/browse/) auto-crawls GitHub daily — no form submission, no email. The manifest [`gemini-extension.json`](../gemini-extension.json) at the repo root is already committed. The only one-time step is tagging the repository so the crawler can find it.
 
-1. Build or download the release artifact set for `@nowline/mcp` (npm package + extension metadata as required by the current Gemini CLI docs).
-2. Follow the Gemini CLI extension publishing guide for the `nowline` extension id.
-3. Mark the release tracking issue checklist item complete.
+### One-time: add the GitHub topic
 
-Revisit this section when Google documents a stable, automatable submission path.
+On `lolay/nowline` → **About** (gear icon on the repo homepage) → **Topics** → add `gemini-cli-extension`.
+
+That's all. The crawler indexes tagged repos daily; the extension will appear in the gallery once it passes validation (usually within 24 hours of the topic being added). Updates are picked up automatically from GitHub Releases — no manual action per release.
+
+### Keeping the manifest in sync
+
+`gemini-extension.json` uses `@nowline/mcp@latest` so no version bump is needed on release. If the package name or invocation ever changes, update the manifest in the same PR.
 
 ## Re-running MCP publish only
 
