@@ -1,32 +1,11 @@
-import { createRequire } from 'node:module';
-import { dirname, join } from 'node:path';
 import { defineConfig } from 'vitest/config';
 
-const require = createRequire(import.meta.url);
-
-function browserEntry(pkgName: string): string {
-    const entry = require.resolve(pkgName);
-    return join(dirname(entry), '..', 'browser', 'main.js');
-}
-
-const browserShims: Record<string, string> = {
-    'vscode-jsonrpc/browser': browserEntry('vscode-jsonrpc'),
-    'vscode-languageserver-protocol/browser': browserEntry('vscode-languageserver-protocol'),
-    'vscode-languageserver/browser': browserEntry('vscode-languageserver'),
-};
-
-function vscodeBrowserShimPlugin() {
-    return {
-        name: 'vscode-lsp-browser-shim',
-        enforce: 'pre' as const,
-        resolveId(source: string) {
-            return browserShims[source] ?? null;
-        },
-    };
-}
-
+// The roundtrip suite for this package does not run under vite at all — it
+// shells out to a Node subprocess (see test/worker-roundtrip.test.ts and
+// test-support/) because vscode-languageserver v10's CJS entry can't be loaded
+// through vite's transform under the browser condition. So this config is
+// intentionally minimal; there is no vite-side resolution to configure.
 export default defineConfig({
-    plugins: [vscodeBrowserShimPlugin()],
     test: {
         environment: 'node',
     },
