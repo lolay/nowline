@@ -46,10 +46,11 @@ runs:
     - name: Setup Node.js
       uses: actions/setup-node@v6
       with:
-        # Empty node-version falls through to node-version-file (.nvmrc);
-        # a caller-supplied node-version (e.g. the ci.yml matrix) wins.
-        node-version: ${{ inputs.node-version }}
-        node-version-file: .nvmrc
+        # When node-version is empty, fall back to node-version-file (.nvmrc).
+        # Only one of the two is passed at a time to avoid the "both inputs
+        # specified" warning from actions/setup-node.
+        node-version: ${{ inputs.node-version != '' && inputs.node-version || '' }}
+        node-version-file: ${{ inputs.node-version == '' && '.nvmrc' || '' }}
         cache: pnpm
 
     - name: Install dependencies
