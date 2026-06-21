@@ -98,7 +98,7 @@ Neither form requires a separate binary download. The `nowline` CLI binary's `--
 
 ### Distribution channels (marketplace-first)
 
-Where a harness has an official marketplace, publish there and **only** there. Skip community directories (cursor.directory) and self-hosted deep-link buttons ("Add to Cursor", `vscode:mcp/install`). Manual config is a fallback only where no marketplace exists.
+Where a harness has an official marketplace, publish there and **only** there. Skip community directories (cursor.directory). MCP servers have no public per-server marketplace record page (Cursor and VS Code surface them through in-editor, registry-backed galleries only), so official-client install deep links — "Add to Cursor" (`cursor://anysphere.cursor-deeplink/mcp/install`) and "Install in VS Code" (`vscode:mcp/install`) — are permitted on Nowline-owned surfaces (the `nowline.io/install/mcp` page) as a one-click shortcut to the same registry/`npx @nowline/mcp` config. Manual config is a fallback where neither applies.
 
 | Channel | Form | How | CI |
 |---------|------|-----|-----|

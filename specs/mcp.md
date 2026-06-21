@@ -232,7 +232,7 @@ The OSS local server ships wherever a harness can run a **local** stdio server w
 
 Marketplace distribution status and the release pipeline: [`specs/milestones.md`](./milestones.md) § m4.9, [`specs/releasing.md`](./releasing.md) § MCP publishing artifacts, [`ops/mcp-marketplace.md`](../ops/mcp-marketplace.md).
 
-Marketplace-first: where a harness has an official marketplace, publish there and **only** there — no community directories (`cursor.directory`) or self-hosted deep-link buttons (`Add to Cursor`, `vscode:mcp/install`). Manual config is the fallback where no marketplace exists.
+Marketplace-first: where a harness has an official marketplace, publish there and **only** there — no community directories (`cursor.directory`). Unlike a `.vsix` Marketplace item, an MCP server has no public per-server *record* page to link to (Cursor and VS Code surface MCP servers through an in-editor, registry-backed gallery only). Official-client install deep links — `Add to Cursor` (`cursor://anysphere.cursor-deeplink/mcp/install`) and `Install in VS Code` (`vscode:mcp/install`) — **are** therefore permitted on Nowline-owned surfaces (e.g. the `nowline.io/install/mcp` page) as a one-click shortcut to the same registry/`npx @nowline/mcp` config. Manual config is the fallback where neither a marketplace listing nor a deep link applies.
 
 Distribution detail (release pipeline, naming ids, `.mcpb` build): [`specs/cli-distribution.md`](./cli-distribution.md) § MCP server distribution and [`specs/releasing.md`](./releasing.md) § MCP publishing artifacts.
 
