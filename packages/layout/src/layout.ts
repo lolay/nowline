@@ -1135,13 +1135,25 @@ function computeDateWindow(
     // for any roadmap they want to be reproducible.
     const startDate = parseDate(startRaw) ?? defaultStartDate(today);
     const lengthRaw = propValue(props, 'length');
+    let minDays = 0;
     if (lengthRaw) {
         const days = literalDays(lengthRaw, ctx.cal);
         if (days > 0) {
-            return { startDate, endDate: addDays(startDate, days) };
+            minDays = days;
         }
     }
-    const contentDays = computeContentEndDay(resolved, ctx, startDate, today);
+    // An explicit `length:` bounds the now-line: a far-future `today` must
+    // not stretch a deliberately-sized roadmap (that case stays out of range
+    // and surfaces as an NL.W1000 insight). Content overflow — items,
+    // anchors, milestones — still grows the window below via `padded`, with
+    // `length:` acting purely as the floor. Without `length:`, `today`
+    // extends the window as before so the now-line is always in range.
+    const contentDays = computeContentEndDay(
+        resolved,
+        ctx,
+        startDate,
+        minDays > 0 ? undefined : today,
+    );
     const tickDays = daysPerUnit(scale.unit, ctx.cal);
     // Round up to the smallest tick boundary that is `>= contentDays`. When
     // the latest content lands exactly on a tick boundary the chart ends
@@ -1149,7 +1161,8 @@ function computeDateWindow(
     // next tick so the right edge always sits on a labelled column.
     const padded =
         contentDays > 0 ? Math.ceil(contentDays / tickDays) * tickDays : 4 * ctx.cal.daysPerWeek;
-    return { startDate, endDate: addDays(startDate, Math.max(1, padded)) };
+    const finalDays = Math.max(minDays, padded);
+    return { startDate, endDate: addDays(startDate, Math.max(1, finalDays)) };
 }
 
 /**

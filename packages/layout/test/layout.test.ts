@@ -536,4 +536,22 @@ swimlane web "Web"
         expect(model.edges).toHaveLength(1);
         expect(model.edges[0].fromId).toBe('api');
     });
+
+    it('grows timeline date window when items exceed roadmap length property', async () => {
+        const src = `nowline v1
+
+roadmap r "R" start:2026-01-05 length:4w
+
+swimlane lane "Lane"
+  item support "Support" duration:4w
+  item dev "Dev" duration:2w after:support
+`;
+        const { file, resolved } = await parseAndResolve(src);
+        const model = layoutRoadmap(file, resolved, { theme: 'light' });
+        const diffDays = Math.round(
+            (model.timeline.endDate.getTime() - model.timeline.startDate.getTime()) /
+                (24 * 60 * 60 * 1000),
+        );
+        expect(diffDays).toBe(30); // 6 weeks * 5 business days per week = 30 days
+    });
 });
