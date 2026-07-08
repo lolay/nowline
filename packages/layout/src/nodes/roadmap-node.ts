@@ -17,7 +17,7 @@ import type {
 } from '@nowline/core';
 import { defaultRowBand } from '../band-scale.js';
 import type { CalendarConfig } from '../calendar.js';
-import { daysBetween, resolveCalendar, resolveSizes } from '../calendar.js';
+import { addDays, daysBetween, resolveCalendar, resolveSizes } from '../calendar.js';
 import { parseDate, propValue, propValues } from '../dsl-utils.js';
 import { resolveLocale } from '../i18n.js';
 import type { LayoutOptions, LayoutResult } from '../layout.js';
@@ -50,6 +50,7 @@ import type { ViewPreset } from '../view-preset.js';
 import { buildHeaderTicks, resolveScale } from '../view-preset.js';
 import { fromCalendarConfig } from '../working-calendar.js';
 import { buildAnchors } from './anchor-node.js';
+import { maxLeafItemRightX } from './content-extent.js';
 import { buildFootnotes } from './footnote-node.js';
 import { buildIncludeRegions } from './include-node.js';
 import {
@@ -522,6 +523,45 @@ export class RoadmapNode {
         // placement which the re-pack below overwrites once their
         // centerX is known.
         const milestones = buildMilestones(resolved.content.milestones, ctx);
+
+        // Post-layout timeline extension. `computeDateWindow`'s pre-pass
+        // only knows about logical bar durations; caption spill,
+        // dependency slack, and floating (`after:`) markers can push
+        // real content further right once the swimlane + include passes
+        // run. Measure the rightmost CONTENT BOX edge — leaf item bars
+        // (never a spilled caption, see `maxLeafItemRightX`) and marker
+        // diamonds — and grow the window to the next tick boundary when
+        // content overflows it. Captions may still overhang past the
+        // last column; their boxes may not. This is driven purely by
+        // boxes, never by `today`, so the `length:`-as-minimum + now-line
+        // boundary behavior is unaffected.
+        let maxContentRightX = maxLeafItemRightX(swimlanes);
+        for (const inc of includes) {
+            maxContentRightX = Math.max(maxContentRightX, maxLeafItemRightX(inc.nestedSwimlanes));
+        }
+        for (const e of datePinnedEntries) {
+            maxContentRightX = Math.max(maxContentRightX, e.centerX + e.radius);
+        }
+        for (const m of milestones) {
+            maxContentRightX = Math.max(maxContentRightX, m.center.x + m.radius);
+        }
+        const tickDays = calendar.daysPerUnit(scale.unit);
+        const overflowDays = (maxContentRightX - originX) / ppd;
+        const paddedDays = overflowDays > 0 ? Math.ceil(overflowDays / tickDays) * tickDays : 0;
+        if (paddedDays > spanDays) {
+            const extendedEndDate = addDays(startDate, paddedDays);
+            const extendedWidth = paddedDays * ppd;
+            const extendedScale = new TimeScale({
+                domain: [startDate, extendedEndDate],
+                range: [originX, originX + extendedWidth],
+                calendar,
+            });
+            ctx.scale = extendedScale;
+            timeline.endDate = extendedEndDate;
+            timeline.box.width = extendedWidth;
+            timeline.ticks = buildHeaderTicks(extendedScale, scale, calendar, locale);
+            growChartRightX(ctx, originX + extendedWidth + GUTTER_PX);
+        }
 
         // Unified marker re-pack. Every marker (date-pinned anchor,
         // date-pinned milestone, after-only milestone) participates

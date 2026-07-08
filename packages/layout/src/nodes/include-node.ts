@@ -23,6 +23,7 @@ import type {
     PositionedSwimlane,
     PositionedTrackChild,
 } from '../types.js';
+import { maxLeafItemRightX } from './content-extent.js';
 import { SwimlaneNode } from './swimlane-node.js';
 
 const TAB_RESERVE = 18;
@@ -116,18 +117,16 @@ export function buildIncludeRegions(
         const nestedSwimlanes: PositionedSwimlane[] = [];
         let cursorY = innerStartY;
         let bandIndex = 0;
-        let nestedContentRightX = childCtx.timeline.originX;
         for (const lane of region.content.swimlanes.values()) {
             childCtx.nextParallelId = 0;
             childCtx.nextGroupId = 0;
-            const { positioned, usedHeight, usedRightX } = new SwimlaneNode(
-                { lane, bandIndex },
-                deps,
-            ).place({ x: childCtx.timeline.originX, y: cursorY }, childCtx);
+            const { positioned, usedHeight } = new SwimlaneNode({ lane, bandIndex }, deps).place(
+                { x: childCtx.timeline.originX, y: cursorY },
+                childCtx,
+            );
             nestedSwimlanes.push(positioned);
             cursorY += usedHeight;
             bandIndex++;
-            if (usedRightX > nestedContentRightX) nestedContentRightX = usedRightX;
         }
         const innerEndY = cursorY;
         // Floor the region height to one row's bandwidth so an empty or
@@ -144,8 +143,12 @@ export function buildIncludeRegions(
         // extends into the attribution / right-margin area.
         const boxX = 0;
         const { chromeRightX } = includeChromeGeometry(boxX, label, region.sourcePath);
-        const naturalRightX =
-            Math.max(chromeRightX, nestedContentRightX) + INCLUDE_CONTENT_RIGHT_PAD_PX;
+        // Bars-only extent (never a spilled caption — see
+        // `maxLeafItemRightX`), so a long trailing item caption inside
+        // the include can overhang the dashed bracket instead of
+        // dragging it wider.
+        const barsRightX = maxLeafItemRightX(nestedSwimlanes);
+        const naturalRightX = Math.max(chromeRightX, barsRightX) + INCLUDE_CONTENT_RIGHT_PAD_PX;
         const boxWidth = Math.min(ctx.chartRightX - boxX, naturalRightX - boxX);
         const box: BoundingBox = {
             x: boxX,
