@@ -199,6 +199,12 @@
             "released_at": "2026-08-20T02:18:12.724Z",
             "vscode_version": "1.128.0",
             "source_url": "https://downloads.cursor.com/production/2fdd31c9f33f7fbe501f2d57772dc5bf64b63621/linux/x64/Cursor-3.17.8-x86_64.AppImage"
+        },
+        {
+            "version": "3.17.19",
+            "released_at": "2026-08-24T06:42:14.583Z",
+            "vscode_version": "1.128.0",
+            "source_url": "https://downloads.cursor.com/production/ae3a2b7231dd56194447fe4570dfdc61640b1e9a/linux/x64/Cursor-3.17.19-x86_64.AppImage"
         }
     ]
 }
