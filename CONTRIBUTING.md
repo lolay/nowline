@@ -65,7 +65,7 @@ Tightening any of these — e.g. moving the consumer floor from `>=22` to `>=24`
 | Node | `.nvmrc` (root) | **`26.2.0`** | Latest current; gives us early signal on Node 26 features before it becomes LTS in October 2026. Single source of truth — `nvm use` / `fnm use` picks it up automatically. |
 | Node | `actions/setup-node` calls in `.github/workflows/**` + the composite at `.github/actions/setup-node-pnpm/action.yml` | **`26`** (with a `22` cell in the `ci.yml` unit-test matrix) | Default uses 26 to match `.nvmrc`. The 22-cell exists to exercise the consumer floor on every PR, so we catch any accidental dependence on Node 26-only APIs leaking into published code. |
 | pnpm | root `package.json` `packageManager` field | **`pnpm@12.8.1`** | Pinned to a specific version so every dev gets the same `pnpm install` resolution. CI provisions pnpm via `corepack enable` (reads `packageManager` from `package.json`); `pnpm/action-setup` was dropped because its Windows self-update path crashed intermittently with STATUS_STACK_BUFFER_OVERRUN (pnpm/action-setup#260). |
-| Bun | `bun-version:` in `ci.yml` and `release.yml` | **`1.3.14`** | The Bun runtime is baked into shipped `bun compile` binaries (Homebrew, apt, GitHub Releases). Pinning makes those binaries reproducible. Tracked by a Renovate custom manager. |
+| Bun | `bun-version:` in `ci.yml` and `build.yml` | **`1.4.2`** | The Bun runtime is baked into shipped `bun compile` binaries (Homebrew, apt, GitHub Releases). Pinning makes those binaries reproducible. Tracked by a Renovate custom manager. |
 
 ### How to bump
 
