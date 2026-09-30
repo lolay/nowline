@@ -12,6 +12,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ### Changed
 
+- **`@nowline/mcp` and `nowline --mcp` on MCP TypeScript SDK v2**: the server, the CLI's `--mcp` mode and the MCP Apps preview now build on `@modelcontextprotocol/server` / `node` / `client` 2.x and `@modelcontextprotocol/ext-apps` 2.x (MCP spec 2026-07-28) instead of the v1 `@modelcontextprotocol/sdk`. Tool names, arguments and result shapes are unchanged.
 - **`@nowline/mcp` — `render` `preview: false` forces inline output**: `preview` now overrides host detection in both directions. `true` still forces the in-chat MCP Apps preview, `false` returns inline SVG/PNG even when the host advertises the MCP Apps UI capability, and omitting it follows the host as before. Scripted clients that advertise the capability (MCP Inspector 2.x) can request the bytes directly.
 
 ## [0.8.5] - 2026-06-20

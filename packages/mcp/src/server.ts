@@ -14,7 +14,7 @@ import {
     registerAppResource,
     registerAppTool,
 } from '@modelcontextprotocol/ext-apps/server';
-import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
+import { McpServer } from '@modelcontextprotocol/server';
 import { type NowlineFile, parseNowlineJson, printNowlineFile } from '@nowline/core';
 import {
     type ExportFormat,

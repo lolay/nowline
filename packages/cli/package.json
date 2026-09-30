@@ -44,7 +44,8 @@
     "dependencies": {
         "@babel/code-frame": "^8.0.6",
         "@clack/prompts": "^1.8.1",
-        "@modelcontextprotocol/sdk": "^1.31.0",
+        "@modelcontextprotocol/node": "^2.1.0",
+        "@modelcontextprotocol/server": "^2.2.0",
         "@nowline/config": "workspace:*",
         "@nowline/core": "workspace:*",
         "@nowline/export": "workspace:*",

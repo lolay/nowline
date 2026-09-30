@@ -3,6 +3,8 @@ packages:
 
 allowBuilds:
   "@firebase/util": false
+  # Inspector 2 runs fine from its published build; nothing here needs its scripts.
+  "@modelcontextprotocol/inspector": false
   "@vscode/vsce-sign": true
   esbuild: true
   keytar: true

@@ -15,8 +15,8 @@ import { readFileSync } from 'node:fs';
 import { createServer } from 'node:http';
 import { dirname, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { StdioServerTransport } from '@modelcontextprotocol/sdk/server/stdio.js';
-import { StreamableHTTPServerTransport } from '@modelcontextprotocol/sdk/server/streamableHttp.js';
+import { NodeStreamableHTTPServerTransport } from '@modelcontextprotocol/node';
+import { StdioServerTransport } from '@modelcontextprotocol/server/stdio';
 import { expandRootPath } from './root-path.js';
 import { createMcpServer } from './server.js';
 
@@ -104,7 +104,7 @@ const server = createMcpServer({
 
 if (port !== undefined) {
     // Streamable HTTP transport — stateless (no session management).
-    const transport = new StreamableHTTPServerTransport({
+    const transport = new NodeStreamableHTTPServerTransport({
         sessionIdGenerator: undefined,
     });
     await server.connect(transport);
