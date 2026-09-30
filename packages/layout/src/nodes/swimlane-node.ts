@@ -199,7 +199,6 @@ function firstChildStartX(
 export class SwimlaneNode {
     constructor(
         public readonly input: SwimlaneNodeInput,
-        // biome-ignore lint/correctness/noUnusedPrivateClassMembers: accessed via `const { deps } = this` destructuring inside methods, which the analyzer does not detect.
         private readonly deps: SwimlaneNodeDeps,
     ) {}
 

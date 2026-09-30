@@ -9,8 +9,7 @@
 import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs';
 import * as os from 'node:os';
 import * as path from 'node:path';
-import { Client } from '@modelcontextprotocol/sdk/client/index.js';
-import { InMemoryTransport } from '@modelcontextprotocol/sdk/inMemory.js';
+import { Client, InMemoryTransport } from '@modelcontextprotocol/client';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import EXPECTED_TOOLS_JSON from '../scripts/expected-tools.json';
 import { NOWLINE_MCP_ICONS } from '../src/branding.js';
@@ -1188,6 +1187,30 @@ describe('@nowline/mcp — MCP Apps preview', () => {
                 (c) => c.type === 'text' && 'text' in c && c.text.trimStart().startsWith('<svg'),
             );
             expect(svgBlock).toBeUndefined();
+        } finally {
+            await cleanup();
+        }
+    });
+
+    it('preview: false forces full SVG inline even with the UI capability', async () => {
+        const { client: uiClient, cleanup } = await connectUiClient({
+            [MCP_UI_EXTENSION]: { mimeTypes: ['text/html;profile=mcp-app'] },
+        });
+        try {
+            const result = await uiClient.callTool({
+                name: 'render',
+                arguments: { source: MINIMAL, format: 'svg', now: '2025-01-15', preview: false },
+            });
+            expect(result.isError).toBeFalsy();
+            const svgBlock = result.content.find(
+                (c) => c.type === 'text' && 'text' in c && c.text.trimStart().startsWith('<svg'),
+            );
+            expect(svgBlock).toBeDefined();
+            const previewBlock = result.content.find(
+                (c) =>
+                    c.type === 'text' && 'text' in c && c.text.includes('"kind":"nowline.preview"'),
+            );
+            expect(previewBlock).toBeUndefined();
         } finally {
             await cleanup();
         }

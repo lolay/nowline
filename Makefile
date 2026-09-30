@@ -92,7 +92,7 @@ doctor: ## Check required tools for this repo (read-only). MODE=default|release
 	@triage --profile $(MODE)
 
 clean: ## Remove build, binary, and package artifacts (keeps node_modules)
-	rm -rf dist-bin dist-deb dist-pack dist-action dist-mcpb packages/*/dist packages/*/dist-*
+	rm -rf dist-bin dist-deb dist-pack dist-action dist-mcpb packages/*/dist packages/*/dist-* packages/*/tsconfig.tsbuildinfo
 
 lint-workflows: ## actionlint the GitHub Actions workflows (needs actionlint on PATH)
 	pnpm lint:workflows

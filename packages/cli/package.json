@@ -42,9 +42,10 @@
         "compile:local": "node scripts/compile.mjs --target=local"
     },
     "dependencies": {
-        "@babel/code-frame": "^8.0.0",
-        "@clack/prompts": "^1.5.1",
-        "@modelcontextprotocol/sdk": "^1.29.0",
+        "@babel/code-frame": "^8.0.6",
+        "@clack/prompts": "^1.8.1",
+        "@modelcontextprotocol/node": "^2.1.0",
+        "@modelcontextprotocol/server": "^2.2.0",
         "@nowline/config": "workspace:*",
         "@nowline/core": "workspace:*",
         "@nowline/export": "workspace:*",
@@ -58,18 +59,17 @@
         "@nowline/layout": "workspace:*",
         "@nowline/mcp": "workspace:*",
         "@nowline/renderer": "workspace:*",
-        "chalk": "^5.6.2",
+        "chalk": "^6.0.1",
         "citty": "^0.2.2",
         "consola": "^3.4.2",
-        "js-yaml": "^4.2.0",
-        "langium": "~4.3.0"
+        "js-yaml": "^5.4.2",
+        "langium": "~4.4.0"
     },
     "devDependencies": {
         "@resvg/resvg-wasm": "^2.6.2",
         "@types/babel__code-frame": "^7.27.0",
-        "@types/js-yaml": "^4.0.9",
-        "@types/node": "^25.9.3",
-        "typescript": "^6.0.3",
-        "vitest": "^4.1.9"
+        "@types/node": "^26.6.3",
+        "typescript": "^7.0.2",
+        "vitest": "^5.0.2"
     }
 }

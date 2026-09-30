@@ -53,7 +53,7 @@ jobs:
       # push below actually triggers downstream jobs in this same
       # workflow. GITHUB_TOKEN-pushed tags do not trigger workflow_run /
       # push events to avoid recursion; a user-scoped PAT does.
-      - uses: actions/checkout@v6
+      - uses: actions/checkout@v7
         with:
           fetch-depth: 0
           token: ${{ secrets.RELEASE_TAG_PAT }}
@@ -143,11 +143,11 @@ jobs:
       # artifact downloads below then land inside the checked-out tree.
       - name: Checkout source
         if: matrix.kind == 'npm' || matrix.kind == 'vscode'
-        uses: actions/checkout@v6
+        uses: actions/checkout@v7
 
       - name: Setup Node.js
         if: matrix.kind == 'npm' || matrix.kind == 'vscode'
-        uses: actions/setup-node@v6
+        uses: actions/setup-node@v7
         with:
           node-version-file: .nvmrc
           registry-url: 'https://registry.npmjs.org'
@@ -199,13 +199,13 @@ jobs:
 
       - name: Checkout source
         if: matrix.kind == 'github-release'
-        uses: actions/checkout@v6
+        uses: actions/checkout@v7
         with:
           path: src
 
       - name: Checkout lolay/homebrew-tap
         if: matrix.kind == 'github-release'
-        uses: actions/checkout@v6
+        uses: actions/checkout@v7
         with:
           # Brew tap shorthand `lolay/tap` (used in `brew install
           # lolay/tap/nowline`) maps to the GitHub repo
@@ -417,7 +417,7 @@ jobs:
 
       - name: Checkout lolay/nowline-action
         if: matrix.kind == 'action-mirror'
-        uses: actions/checkout@v6
+        uses: actions/checkout@v7
         with:
           repository: lolay/nowline-action
           token: ${{ secrets.MARKETPLACE_MIRROR_PAT }}

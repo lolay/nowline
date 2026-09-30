@@ -1,6 +1,6 @@
 import { createServer } from 'node:http';
-import { StdioServerTransport } from '@modelcontextprotocol/sdk/server/stdio.js';
-import { StreamableHTTPServerTransport } from '@modelcontextprotocol/sdk/server/streamableHttp.js';
+import { NodeStreamableHTTPServerTransport } from '@modelcontextprotocol/node';
+import { StdioServerTransport } from '@modelcontextprotocol/server/stdio';
 import { createMcpServer } from '@nowline/mcp/server';
 import type { ParsedArgs } from '../cli/args.js';
 
@@ -29,7 +29,7 @@ export async function mcpHandler({ args }: { args: ParsedArgs }): Promise<void> 
             );
         }
 
-        const transport = new StreamableHTTPServerTransport({
+        const transport = new NodeStreamableHTTPServerTransport({
             sessionIdGenerator: undefined,
         });
         await server.connect(transport);

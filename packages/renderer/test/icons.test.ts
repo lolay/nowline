@@ -51,22 +51,19 @@ describe('CAPACITY_ICON_ASCII fallbacks', () => {
         });
     });
 
-    it.each([
-        'multiplier',
-        'person',
-        'people',
-        'points',
-        'time',
-    ])('%s ASCII fallback is 1-3 printable ASCII characters', (name) => {
-        const value = CAPACITY_ICON_ASCII[name];
-        expect(value.length).toBeGreaterThanOrEqual(1);
-        expect(value.length).toBeLessThanOrEqual(3);
-        // Every character in the printable ASCII range (no control chars,
-        // no Unicode).
-        for (const ch of value) {
-            const cp = ch.codePointAt(0)!;
-            expect(cp).toBeGreaterThanOrEqual(0x20);
-            expect(cp).toBeLessThanOrEqual(0x7e);
-        }
-    });
+    it.each(['multiplier', 'person', 'people', 'points', 'time'])(
+        '%s ASCII fallback is 1-3 printable ASCII characters',
+        (name) => {
+            const value = CAPACITY_ICON_ASCII[name];
+            expect(value.length).toBeGreaterThanOrEqual(1);
+            expect(value.length).toBeLessThanOrEqual(3);
+            // Every character in the printable ASCII range (no control chars,
+            // no Unicode).
+            for (const ch of value) {
+                const cp = ch.codePointAt(0)!;
+                expect(cp).toBeGreaterThanOrEqual(0x20);
+                expect(cp).toBeLessThanOrEqual(0x7e);
+            }
+        },
+    );
 });

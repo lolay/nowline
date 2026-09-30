@@ -48,7 +48,7 @@ The Nowline mark appears on every MCP surface that supports icons (MCP spec `202
 | **Claude.ai web custom connector** | Connector URL registrable domain | Root favicon at `https://nowline.io/favicon.ico` | Claude.ai currently ignores `serverInfo.icons` for custom connectors and derives the icon from the root-domain favicon. |
 | **Connectors Directory / ChatGPT App** | Submission metadata | Uploaded PNG at publish time | Same brand asset; not wired through the protocol. |
 
-**Per-tool / per-prompt icons** are deferred: `@modelcontextprotocol/sdk@1.29.0` `registerTool` / `registerPrompt` config types do not yet expose an `icons` field (TypeScript build error if added). When the SDK adds support, add `icons: [...NOWLINE_MCP_ICONS]` to each tool/prompt descriptor in `packages/mcp/src/server.ts` and `prompts.ts`.
+**Per-tool / per-prompt icons** are still deferred, but no longer blocked: `@modelcontextprotocol/server` 2.x exposes an `icons` field on the `registerTool` / `registerPrompt` config types (the v1 `@modelcontextprotocol/sdk` did not). Add `icons: [...NOWLINE_MCP_ICONS]` to each tool/prompt descriptor in `packages/mcp/src/server.ts` and `prompts.ts` as its own change.
 
 ## Shared tool contract
 

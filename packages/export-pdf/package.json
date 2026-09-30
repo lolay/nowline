@@ -29,16 +29,16 @@
     "dependencies": {
         "@kittl/svg-to-pdfkit": "^0.1.12",
         "@nowline/export-core": "workspace:*",
-        "pdfkit": "^0.19.1"
+        "pdfkit": "^0.20.2"
     },
     "devDependencies": {
         "@nowline/core": "workspace:*",
         "@nowline/layout": "workspace:*",
         "@nowline/renderer": "workspace:*",
-        "@types/node": "^25.9.3",
+        "@types/node": "^26.6.3",
         "@types/pdfkit": "^0.17.6",
-        "langium": "~4.3.0",
-        "typescript": "^6.0.3",
-        "vitest": "^4.1.9"
+        "langium": "~4.4.0",
+        "typescript": "^7.0.2",
+        "vitest": "^5.0.2"
     }
 }
