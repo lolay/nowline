@@ -64,7 +64,6 @@ export interface GroupNodeDeps {
 export class GroupNode {
     constructor(
         public readonly node: GroupBlock,
-        // biome-ignore lint/correctness/noUnusedPrivateClassMembers: accessed via `const { deps } = this` destructuring inside methods, which the analyzer does not detect.
         private readonly deps: GroupNodeDeps,
     ) {}
 

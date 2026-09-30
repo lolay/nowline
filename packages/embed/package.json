@@ -53,13 +53,13 @@
         "@nowline/layout": "workspace:*",
         "@nowline/renderer": "workspace:*",
         "@nowline/share-link": "workspace:*",
-        "langium": "~4.3.0"
+        "langium": "~4.4.0"
     },
     "devDependencies": {
-        "@types/node": "^25.9.3",
-        "esbuild": "^0.28.1",
-        "happy-dom": "^20.10.6",
-        "typescript": "^6.0.3",
-        "vitest": "^4.1.9"
+        "@types/node": "^26.6.3",
+        "esbuild": "^0.28.2",
+        "happy-dom": "^20.14.5",
+        "typescript": "^7.0.2",
+        "vitest": "^5.0.2"
     }
 }
