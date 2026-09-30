@@ -616,7 +616,8 @@ export function createMcpServer(opts: McpServerOptions = {}): McpServer {
                     .boolean()
                     .optional()
                     .describe(
-                        'When true, force the in-chat MCP Apps preview. On MCP Apps hosts the preview auto-renders via _meta.ui without this flag.',
+                        'When true, force the in-chat MCP Apps preview; when false, return inline output even on an MCP Apps host. ' +
+                            'Omit to follow the host: on MCP Apps hosts the preview auto-renders via _meta.ui.',
                     ),
             }),
             outputSchema: RenderOutputSchema,
@@ -652,7 +653,8 @@ export function createMcpServer(opts: McpServerOptions = {}): McpServer {
                 pngScale: args.scale,
             };
             const host = createNodeHostEnv(filePath);
-            const appActive = args.preview === true || clientSupportsAppsUi(server);
+            // Explicit true/false wins; undefined follows the host's capabilities.
+            const appActive = args.preview ?? clientSupportsAppsUi(server);
             // Skip the full render when the bytes won't be used: apps host with
             // no write-to-disk path and no review attachment requested.
             const needsRender = !appActive || !!args.output || args.review === true;

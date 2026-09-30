@@ -1193,6 +1193,30 @@ describe('@nowline/mcp — MCP Apps preview', () => {
         }
     });
 
+    it('preview: false forces full SVG inline even with the UI capability', async () => {
+        const { client: uiClient, cleanup } = await connectUiClient({
+            [MCP_UI_EXTENSION]: { mimeTypes: ['text/html;profile=mcp-app'] },
+        });
+        try {
+            const result = await uiClient.callTool({
+                name: 'render',
+                arguments: { source: MINIMAL, format: 'svg', now: '2025-01-15', preview: false },
+            });
+            expect(result.isError).toBeFalsy();
+            const svgBlock = result.content.find(
+                (c) => c.type === 'text' && 'text' in c && c.text.trimStart().startsWith('<svg'),
+            );
+            expect(svgBlock).toBeDefined();
+            const previewBlock = result.content.find(
+                (c) =>
+                    c.type === 'text' && 'text' in c && c.text.includes('"kind":"nowline.preview"'),
+            );
+            expect(previewBlock).toBeUndefined();
+        } finally {
+            await cleanup();
+        }
+    });
+
     it('client with experimental extension entry returns lean nowline.preview JSON', async () => {
         const server = createMcpServer({ allowedRoot: tmpDir });
         const [clientTransport, serverTransport] = InMemoryTransport.createLinkedPair();

@@ -10,6 +10,10 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 - **`gemini-extension.json`**: root manifest listing Nowline in the [Gemini CLI extension gallery](https://geminicli.com/extensions/browse/). Installs the `@nowline/mcp` server via `npx -y @nowline/mcp@latest`.
 
+### Changed
+
+- **`@nowline/mcp` — `render` `preview: false` forces inline output**: `preview` now overrides host detection in both directions. `true` still forces the in-chat MCP Apps preview, `false` returns inline SVG/PNG even when the host advertises the MCP Apps UI capability, and omitting it follows the host as before. Scripted clients that advertise the capability (MCP Inspector 2.x) can request the bytes directly.
+
 ## [0.8.5] - 2026-06-20
 
 ### Fixed

@@ -32,7 +32,8 @@ function inspectorBin() {
  * @param {string} [opts.cwd] - Working directory for the spawned server (defaults to temp dir)
  * @param {string} opts.method - e.g. tools/list, tools/call
  * @param {string} [opts.toolName]
- * @param {Record<string, string>} [opts.toolArgs] - flat key=value args for --tool-arg
+ * @param {Record<string, unknown>} [opts.toolArgs] - tool arguments, passed as one JSON object
+ *   via --tool-args-json so booleans and numbers keep their types
  * @returns {unknown} Parsed JSON from inspector stdout
  */
 export function runInspectorCli({
@@ -57,11 +58,21 @@ export function runInspectorCli({
     };
     writeFileSync(configPath, JSON.stringify(config, null, 2), 'utf8');
 
-    const args = ['--cli', '--config', configPath, '--server', serverName, '--method', method];
+    const args = [
+        '--cli',
+        '--format',
+        'json',
+        '--config',
+        configPath,
+        '--server',
+        serverName,
+        '--method',
+        method,
+    ];
     if (toolName) {
         args.push('--tool-name', toolName);
-        for (const [key, value] of Object.entries(toolArgs)) {
-            args.push('--tool-arg', `${key}=${value}`);
+        if (Object.keys(toolArgs).length > 0) {
+            args.push('--tool-args-json', JSON.stringify(toolArgs));
         }
     }
 
