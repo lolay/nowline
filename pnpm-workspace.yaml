@@ -7,3 +7,11 @@ allowBuilds:
   esbuild: true
   keytar: true
   protobufjs: false
+
+# Keep pnpm-lock.yaml a single YAML document. pnpm 12 otherwise prepends an
+# env document (pnpm's own pin) that GitHub's dependency graph and Dependabot
+# read as "zero dependencies" and close alerts against:
+# https://github.com/dependabot/dependabot-core/issues/15904
+# corepack / pnpm/action-setup still install the packageManager pin, so CI is
+# unaffected; only pnpm's own self-switch check is skipped. Remove once fixed.
+pmOnFail: ignore
