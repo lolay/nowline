@@ -25,7 +25,7 @@ jobs:
     name: Lint workflows (actionlint)
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v6
+      - uses: actions/checkout@v7
       - uses: ./.github/actions/setup-node-pnpm
 
       - name: Install actionlint
@@ -40,10 +40,10 @@ jobs:
     name: triage (env doctor)
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v6
+      - uses: actions/checkout@v7
       - uses: ./.github/actions/setup-node-pnpm
 
-      - uses: lolay/triage-action@v0.3
+      - uses: lolay/triage-action@v0.4
         with:
           profile: ci
 
@@ -73,7 +73,7 @@ jobs:
           - { os: macos-latest, node-version: '26' }
           - { os: windows-latest, node-version: '26' }
     steps:
-      - uses: actions/checkout@v6
+      - uses: actions/checkout@v7
       - uses: ./.github/actions/setup-node-pnpm
         with:
           node-version: ${{ matrix.node-version }}
@@ -94,7 +94,7 @@ jobs:
     name: Embed bundle size gate
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v6
+      - uses: actions/checkout@v7
       - uses: ./.github/actions/setup-node-pnpm
 
       - name: Check bundle size + node:* leak
@@ -110,7 +110,7 @@ jobs:
     name: Export determinism gate
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v6
+      - uses: actions/checkout@v7
       - uses: ./.github/actions/setup-node-pnpm
 
       # Pinned to match the runtime baked into shipped binaries (build.yml).
@@ -146,7 +146,7 @@ jobs:
     name: MCP harness gate
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v6
+      - uses: actions/checkout@v7
       - uses: ./.github/actions/setup-node-pnpm
 
       - name: Build all packages

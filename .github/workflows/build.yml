@@ -79,7 +79,7 @@ jobs:
           - { id: pack-action, kind: action-pack, runner: ubuntu-latest }
           - { id: pack-mcp-mcpb, kind: mcpb-pack, runner: ubuntu-latest }
     steps:
-      - uses: actions/checkout@v6
+      - uses: actions/checkout@v7
       - uses: ./.github/actions/setup-node-pnpm
 
       - name: Install Bun
