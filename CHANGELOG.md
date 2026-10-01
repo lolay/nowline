@@ -8,12 +8,17 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ### Added
 
+- **`@nowline/cli` — machine-readable diagnostics on `--dry-run`**: `--diagnostic-format text|json` now takes effect (it was parsed and ignored) and any other value exits 2. `json` writes one `{ "$nowlineDiagnostics": "1", "diagnostics": [...] }` document to stderr whenever any diagnostic exists, warnings included, so a warnings-only source exits 0 with the document and a clean source prints nothing. When the flag is omitted, `--dry-run --format=json` defaults to `json` (as `specs/cli.md` already documented); every other run stays `text`.
 - **`gemini-extension.json`**: root manifest listing Nowline in the [Gemini CLI extension gallery](https://geminicli.com/extensions/browse/). Installs the `@nowline/mcp` server via `npx -y @nowline/mcp@latest`.
 
 ### Changed
 
 - **`@nowline/mcp` and `nowline --mcp` on MCP TypeScript SDK v2**: the server, the CLI's `--mcp` mode and the MCP Apps preview now build on `@modelcontextprotocol/server` / `node` / `client` 2.x and `@modelcontextprotocol/ext-apps` 2.x (MCP spec 2026-07-28) instead of the v1 `@modelcontextprotocol/sdk`. Tool names, arguments and result shapes are unchanged.
 - **`@nowline/mcp` — `render` `preview: false` forces inline output**: `preview` now overrides host detection in both directions. `true` still forces the in-chat MCP Apps preview, `false` returns inline SVG/PNG even when the host advertises the MCP Apps UI capability, and omitting it follows the host as before. Scripted clients that advertise the capability (MCP Inspector 2.x) can request the bytes directly.
+
+### Fixed
+
+- **`@nowline/cli` — stdin read on a shell redirect**: `nowline - < roadmap.nowline` read an empty document in the compiled standalone binary. Stdin is now read from file descriptor 0, which works for pipes, redirects and here-docs. Empty stdin is an input error (exit 2, `nowline: no input on stdin`) instead of validating an empty document.
 
 ## [0.8.5] - 2026-06-20
 

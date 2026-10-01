@@ -1,4 +1,5 @@
 import { type ParseArgsConfig, parseArgs } from 'node:util';
+import { isDiagnosticFormat } from '../diagnostics/format.js';
 import { CliError, ExitCode } from '../io/exit-codes.js';
 
 export type ModeKind = 'render' | 'serve' | 'init' | 'mcp' | 'help' | 'version';
@@ -67,8 +68,10 @@ export interface ParsedArgs {
     host?: string;
     open: boolean;
 
-    // Validate / dry-run formatting
-    diagnosticFormat?: string;
+    // Validate / dry-run formatting. `text` or `json`; validated in parseArgv.
+    // Undefined means "not given": the render handler defaults to `json` for
+    // `--dry-run --format=json` and `text` otherwise.
+    diagnosticFormat?: 'text' | 'json';
 
     // Init
     template?: string;
@@ -230,6 +233,14 @@ export function parseArgv(argv: readonly string[]): ParsedArgs {
         throw new CliError(ExitCode.InputError, `nowline: unexpected extra arguments: ${extras}.`);
     }
 
+    const rawDiagnosticFormat = stringOrUndefined(values['diagnostic-format']);
+    if (rawDiagnosticFormat !== undefined && !isDiagnosticFormat(rawDiagnosticFormat)) {
+        throw new CliError(
+            ExitCode.InputError,
+            `nowline: invalid --diagnostic-format "${rawDiagnosticFormat}". Expected text or json. Try --help for usage.`,
+        );
+    }
+
     const logLevel: ParsedArgs['logLevel'] =
         values.verbose === true ? 'verbose' : values.quiet === true ? 'quiet' : 'normal';
 
@@ -252,7 +263,7 @@ export function parseArgv(argv: readonly string[]): ParsedArgs {
         port: stringOrUndefined(values.port),
         host: stringOrUndefined(values.host),
         open: values.open === true,
-        diagnosticFormat: stringOrUndefined(values['diagnostic-format']),
+        diagnosticFormat: rawDiagnosticFormat,
         template: stringOrUndefined(values.template),
         pageSize: stringOrUndefined(values['page-size']),
         orientation: stringOrUndefined(values.orientation),

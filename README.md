@@ -111,7 +111,10 @@ nowline roadmap.nowline --dry-run
 nowline roadmap.nowline -n                          # short alias
 cat roadmap.nowline | nowline - --dry-run           # read stdin
 nowline roadmap.nowline -n --diagnostic-format json # machine-readable output
+nowline - -n --format=json < roadmap.nowline        # same, json is the default here
 ```
+
+`--diagnostic-format text|json` picks the stderr format; with `--dry-run --format=json` it defaults to `json`, otherwise `text`. JSON mode writes one `{ "$nowlineDiagnostics": "1", "diagnostics": [...] }` document to stderr whenever any diagnostic exists, warnings included, so a warnings-only source exits 0 with the document. Clean sources print nothing.
 
 ### Convert text ↔ JSON
 
@@ -156,7 +159,7 @@ nowline --init my-project --template=teams  # use the teams template
 |---|---|
 | 0 | Success |
 | 1 | Validation error (parse failure, invalid reference) |
-| 2 | Usage error (missing input, bad flags, unsupported format, file not found, binary→TTY refusal) |
+| 2 | Usage error (missing input, bad flags, unsupported format, file not found, empty stdin, invalid `--diagnostic-format`, binary→TTY refusal) |
 | 3 | Output error (cannot write to destination) |
 
 ### Manual

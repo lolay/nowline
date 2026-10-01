@@ -196,7 +196,7 @@ Mutual exclusivity rules (all exit 2 with a message):
 |------|---------|
 | 0    | Success |
 | 1    | Validation error |
-| 2    | Usage error (missing input, bad flags, unsupported format, file not found, binary→TTY refusal) |
+| 2    | Usage error (missing input, bad flags, unsupported format, file not found, empty stdin, invalid `--diagnostic-format`, binary→TTY refusal) |
 | 3    | Output error (cannot write to destination, exporter failure, page too small for margin) |
 
 ## Configuration: `.nowlinerc`
@@ -240,6 +240,7 @@ Unknown keys are ignored.
 nowline roadmap.nowline --dry-run
 nowline roadmap.nowline -n                       # short alias
 nowline roadmap.nowline -n --diagnostic-format json
+nowline - -n --format=json < roadmap.nowline     # json is the default here
 ```
 
 Each diagnostic is rendered in a biome/oxc-style frame via `@babel/code-frame`:
@@ -253,7 +254,12 @@ roadmap.nowline:7:34 error: Unknown reference 'auth-refactro' in after — did y
   8 |       item audit-log "Audit log v2" size:xl before:code-freeze
 ```
 
-`--diagnostic-format json` emits the stable diagnostic schema:
+`--diagnostic-format text|json` picks the stderr format; any other value is exit 2. With `--dry-run --format=json` it defaults to `json`, otherwise `text`; an explicit `--diagnostic-format text` wins. JSON mode writes one document per run to stderr whenever any diagnostic exists, warnings included (a clean source prints nothing), using the stable schema, version `1`:
+
+```json
+{ "$nowlineDiagnostics": "1", "diagnostics": [ /* Diagnostic[] */ ] }
+```
+
 
 ```ts
 type Diagnostic = {
@@ -264,10 +270,11 @@ type Diagnostic = {
   code: string;
   message: string;
   suggestion?: string;
+  span?: { start: { line: number; column: number }; end: { line: number; column: number } };
 };
 ```
 
-Exit 0 if no errors; exit 1 if any errors. Warnings never change the exit code.
+Exit 0 if no errors; exit 1 if any errors. Warnings never change the exit code, in either format, so a warnings-only source exits 0 (with the JSON document on stderr in `json` mode).
 
 ## JSON AST round-trip
 

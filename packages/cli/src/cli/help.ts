@@ -38,6 +38,11 @@ MODE FLAGS (mutually exclusive)
   -n, --dry-run           Run the full pipeline (parse + validate + layout +
                           format) but skip the write step. Subsumes the old
                           'validate' verb. Exit 0 on success, 1 on errors.
+      --diagnostic-format <f>
+                          Diagnostics on stderr: text | json. json prints one
+                          { "$nowlineDiagnostics": "1", ... } document per run
+                          (warnings included). Default: json with --dry-run
+                          --format=json, else text.
 
 RENDER OPTIONS
   -t, --theme <name>      light | dark | grayscale (greyscale alias)
