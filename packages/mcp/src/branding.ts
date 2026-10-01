@@ -8,9 +8,9 @@
  * Regenerate data URIs after asset changes:
  *   base64 -i branding/marketplace-publisher-icon.png | tr -d '\n'
  *
- * Per-tool / per-prompt icons: add icons: NOWLINE_MCP_ICONS to each registerTool /
- * registerPrompt config once @modelcontextprotocol/sdk exposes icons on those config types
- * (SDK 1.29.0 registerTool config does not include icons yet).
+ * Per-tool / per-prompt icons: @modelcontextprotocol/server 2.x accepts `icons` on the
+ * registerTool / registerPrompt config (the v1 sdk did not). Wiring NOWLINE_MCP_ICONS
+ * into each descriptor is its own change; see specs/mcp.md.
  */
 export const NOWLINE_MCP_ICONS = [
     {

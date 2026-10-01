@@ -3,7 +3,7 @@ description: 'Provision pnpm via corepack, set up Node.js with the pnpm cache, t
 
 # Composite action so every workflow job that needs the standard
 # pnpm + Node toolchain can share one place to bump versions or change
-# install flags. Jobs still call `actions/checkout@v6` themselves
+# install flags. Jobs still call `actions/checkout@v7` themselves
 # because checkout parameters (token, fetch-depth, path) vary across
 # callers — keeping checkout in the workflow keeps this action
 # parameter-free.
@@ -44,7 +44,7 @@ runs:
       run: corepack enable
 
     - name: Setup Node.js
-      uses: actions/setup-node@v6
+      uses: actions/setup-node@v7
       with:
         # When node-version is empty, fall back to node-version-file (.nvmrc).
         # Only one of the two is passed at a time to avoid the "both inputs

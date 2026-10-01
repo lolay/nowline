@@ -23,6 +23,10 @@
 //   - Producer / Creator strings are explicit, version-stable.
 //   - Fonts: registered explicitly via PDFKit `registerFont(name, bytes,
 //     family?)` so glyph subsets are byte-identical across hosts.
+//   - PDFKit's default Helvetica is never loaded (`font: null` below). PDFKit
+//     0.20 resolves its standard-font metrics through `createRequire` at
+//     runtime, which `bun build --compile` cannot embed in the standalone
+//     binary; every glyph comes from the registered pair anyway.
 
 import { PassThrough } from 'node:stream';
 import SVGtoPDF from '@kittl/svg-to-pdfkit';
@@ -101,6 +105,9 @@ export async function exportPdf(
 
     const doc = new PDFDocument({
         autoFirstPage: false,
+        // Skip the default Helvetica load; see the determinism contract above.
+        // @types/pdfkit types `font` as string only, hence the cast.
+        font: null as unknown as string,
         compress: options.compress ?? true,
         pdfVersion: '1.7',
         info: {

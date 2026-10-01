@@ -25,7 +25,6 @@ export interface ParallelNodeDeps {
 export class ParallelNode {
     constructor(
         public readonly node: ParallelBlock,
-        // biome-ignore lint/correctness/noUnusedPrivateClassMembers: accessed via `const { deps } = this` destructuring inside methods, which the analyzer does not detect.
         private readonly deps: ParallelNodeDeps,
     ) {}
 

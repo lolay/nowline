@@ -1,7 +1,7 @@
 // MCP prompt registrations for @nowline/mcp.
 // Wired into the server via registerPrompts(server).
 
-import type { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
+import type { McpServer } from '@modelcontextprotocol/server';
 import { z } from 'zod';
 
 export function registerPrompts(server: McpServer): void {
@@ -13,13 +13,13 @@ export function registerPrompts(server: McpServer): void {
             title: 'Create Roadmap from Description',
             description:
                 'Generate a new .nowline roadmap from a plain-English description. Composes the DSL reference and example files so the LLM has full context.',
-            argsSchema: {
+            argsSchema: z.object({
                 description: z
                     .string()
                     .describe(
                         'Plain-English description of the roadmap you want to create (teams, timeline, key milestones, etc.).',
                     ),
-            },
+            }),
         },
         ({ description }) => ({
             messages: [
@@ -64,7 +64,7 @@ export function registerPrompts(server: McpServer): void {
             title: 'Fix Roadmap Diagnostics',
             description:
                 'Fix validation errors in a .nowline file. Describe the validate→fix→re-validate loop keyed on NL.E#### diagnostic codes.',
-            argsSchema: {
+            argsSchema: z.object({
                 source: z
                     .string()
                     .describe('The .nowline source text that contains validation errors.'),
@@ -74,7 +74,7 @@ export function registerPrompts(server: McpServer): void {
                     .describe(
                         'JSON array of diagnostic objects from the validate tool. Omit to let the LLM call validate itself.',
                     ),
-            },
+            }),
         },
         ({ source, diagnostics }) => {
             const diagSection = diagnostics
@@ -113,7 +113,7 @@ export function registerPrompts(server: McpServer): void {
             title: 'Convert to Nowline',
             description:
                 'Convert a gantt/timeline from another format (Mermaid gantt, MS Project, Excel, Google Sheets, CSV) into Nowline DSL. Uses the conversion guide resource for format-specific rules.',
-            argsSchema: {
+            argsSchema: z.object({
                 source: z
                     .string()
                     .describe('The source content to convert (paste the raw text/CSV/XML here).'),
@@ -130,7 +130,7 @@ export function registerPrompts(server: McpServer): void {
                     .describe(
                         'Source format hint. Use "auto" (default) to let the LLM detect the format.',
                     ),
-            },
+            }),
         },
         ({ source, from }) => {
             const formatHint =
