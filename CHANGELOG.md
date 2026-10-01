@@ -6,6 +6,8 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ## [Unreleased]
 
+## [0.8.6] - 2026-10-01
+
 ### Added
 
 - **`@nowline/cli` — machine-readable diagnostics on `--dry-run`**: `--diagnostic-format text|json` now takes effect (it was parsed and ignored) and any other value exits 2. `json` writes one `{ "$nowlineDiagnostics": "1", "diagnostics": [...] }` document to stderr whenever any diagnostic exists, warnings included, so a warnings-only source exits 0 with the document and a clean source prints nothing. When the flag is omitted, `--dry-run --format=json` defaults to `json` (as `specs/cli.md` already documented); every other run stays `text`.
