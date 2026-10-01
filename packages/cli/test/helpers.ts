@@ -1,5 +1,5 @@
 import { spawn } from 'node:child_process';
-import { promises as fs } from 'node:fs';
+import { closeSync, promises as fs, openSync } from 'node:fs';
 import * as os from 'node:os';
 import * as path from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -18,6 +18,8 @@ export interface RunResult {
 
 export interface RunOptions {
     stdin?: string;
+    /** Connect fd 0 to this file, as a shell redirect (`nowline - < file`) would. Wins over `stdin`. */
+    stdinFile?: string;
     cwd?: string;
     env?: NodeJS.ProcessEnv;
 }
@@ -30,11 +32,13 @@ export interface RunOptions {
 export function runCliBuilt(args: string[], options: RunOptions = {}): Promise<RunResult> {
     const entry = path.join(packageRoot, 'dist', 'index.js');
     return new Promise((resolve, reject) => {
+        const stdinFd = options.stdinFile !== undefined ? openSync(options.stdinFile, 'r') : null;
         const child = spawn(process.execPath, [entry, ...args], {
             cwd: options.cwd ?? packageRoot,
             env: { ...process.env, FORCE_COLOR: '0', NO_COLOR: '1', ...options.env },
-            stdio: ['pipe', 'pipe', 'pipe'],
+            stdio: [stdinFd ?? 'pipe', 'pipe', 'pipe'],
         });
+        if (stdinFd !== null) closeSync(stdinFd);
         let stdout = '';
         let stderr = '';
         child.stdout.on('data', (d: Buffer) => {
@@ -47,6 +51,7 @@ export function runCliBuilt(args: string[], options: RunOptions = {}): Promise<R
         child.on('close', (code) => {
             resolve({ exitCode: code ?? 0, stdout, stderr });
         });
+        if (stdinFd !== null) return;
         if (options.stdin !== undefined) {
             child.stdin.end(options.stdin);
         } else {

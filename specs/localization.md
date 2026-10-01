@@ -153,7 +153,7 @@ Three guarantees:
 
 1. **Code stability**: a code shipped in v1 keeps its meaning forever. Renumbering is a major-version concern.
 2. **Coverage**: CI enforces that every key in `messages.en.ts` exists in `messages.fr.ts`. Keys missing from regional overlays are expected and silent (loader fallback handles them).
-3. **JSON surface**: the `--diagnostic-format json` output already exposed by the CLI emits the code as a top-level field, so machine consumers can switch on the code without parsing localized text.
+3. **JSON surface**: the `--diagnostic-format json` output (the default for `--dry-run --format=json`) emits the code as a top-level field on every diagnostic, warnings included,, so machine consumers can switch on the code without parsing localized text.
 
 ## Render surface: locale flow
 

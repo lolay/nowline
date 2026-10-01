@@ -28,7 +28,11 @@ import { parseNowlineJson } from '../convert/parse-json.js';
 import { printNowlineFile } from '../convert/printer.js';
 import { serializeToJson } from '../convert/schema.js';
 import { parseSource } from '../core/parse.js';
-import { type DiagnosticSource, formatDiagnostics } from '../diagnostics/index.js';
+import {
+    type DiagnosticFormat,
+    type DiagnosticSource,
+    formatDiagnostics,
+} from '../diagnostics/index.js';
 import {
     describeContentLocaleSource,
     operatorLocale,
@@ -125,6 +129,7 @@ export async function renderHandler(options: RenderHandlerOptions): Promise<void
         operatorLocale: opLocale,
         resolvedLocale: resolved,
         verbose: args.logLevel === 'verbose',
+        diagnosticFormat: resolveDiagnosticFormat(args),
     });
 
     if (args.dryRun) {
@@ -216,6 +221,8 @@ interface ProduceArgs {
     resolvedLocale: import('../i18n/locale.js').ResolvedLocale;
     /** True for `--verbose`. Gates the `nowline: locale=...` source-line emission. */
     verbose: boolean;
+    /** How diagnostics are written to stderr. See `resolveDiagnosticFormat`. */
+    diagnosticFormat: DiagnosticFormat;
 }
 
 interface ProduceResult {
@@ -405,8 +412,19 @@ function jsonToNowlineText(contents: string, displayPath: string): string {
 
 async function parseAndValidate(contents: string, args: ProduceArgs) {
     const result = await parseSource(contents, args.displayPath, { validate: true });
+    // Text mode prints only when the run fails. JSON mode prints one document
+    // whenever any diagnostic exists, warnings included, so a warnings-only
+    // run still exits 0 with the document on stderr.
+    if (result.hasErrors || (args.diagnosticFormat === 'json' && result.diagnostics.length > 0)) {
+        emitDiagnostics(
+            result.diagnostics,
+            result.source,
+            args.displayPath,
+            args.operatorLocale,
+            args.diagnosticFormat,
+        );
+    }
     if (result.hasErrors) {
-        emitDiagnostics(result.diagnostics, result.source, args.displayPath, args.operatorLocale);
         throw new CliError(ExitCode.ValidationError, '');
     }
     if (args.verbose) {
@@ -545,14 +563,26 @@ function parseWidthArg(raw: string | undefined): number | undefined {
     return value;
 }
 
+/**
+ * `--diagnostic-format` is the explicit switch. Left unset, a `--dry-run` that
+ * asks for `--format=json` gets JSON diagnostics (the machine-consumer shape
+ * in `specs/cli.md`); every other run keeps the text frames.
+ */
+function resolveDiagnosticFormat(args: ParsedArgs): DiagnosticFormat {
+    if (args.diagnosticFormat) return args.diagnosticFormat;
+    if (args.dryRun && args.format?.toLowerCase() === 'json') return 'json';
+    return 'text';
+}
+
 function emitDiagnostics(
     diagnostics: Parameters<typeof formatDiagnostics>[0],
     source: DiagnosticSource,
     displayPath: string,
     operatorLocale: string,
+    format: DiagnosticFormat,
 ): void {
     const sources = new Map<string, DiagnosticSource>([[displayPath, source]]);
-    const rendered = formatDiagnostics(diagnostics, 'text', sources, {
+    const rendered = formatDiagnostics(diagnostics, format, sources, {
         color: process.stderr.isTTY === true,
         operatorLocale,
     });

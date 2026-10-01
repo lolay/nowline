@@ -205,9 +205,10 @@ Run the full pipeline (parse + validate + layout + format) but skip the write st
 nowline roadmap.nowline --dry-run                     # validate .nowline → svg pipeline
 nowline roadmap.nowline -f pdf --dry-run              # validate full PDF pipeline (m2c)
 nowline roadmap.nowline --dry-run --format=json       # JSON diagnostics on stderr
+nowline roadmap.nowline --dry-run --diagnostic-format json
 ```
 
-Exit 0 on success, 1 on validation error.
+Exit 0 on success, 1 on validation error. Warnings never change the exit code. Diagnostics go to stderr; see [Diagnostics](#diagnostics) for `--diagnostic-format`.
 
 ### `--mcp [--port <n>]` (m4.8)
 
@@ -289,7 +290,7 @@ Existing files are silently overwritten — matches POSIX redirection (`> file`)
 
 - Detected by extension: `.nowline` → DSL, `.json` → AST.
 - `--input-format` overrides for unusual filenames or stdin.
-- Stdin (`-`) defaults to `.nowline`.
+- Stdin (`-`) defaults to `.nowline`. It is read from file descriptor 0, so pipes, shell redirects (`nowline - < roadmap.nowline`) and here-docs all work. On an interactive terminal where the synchronous read reports EAGAIN, it falls back to reading the stream until Ctrl-D. Empty stdin is an input error (exit 2, `nowline: no input on stdin`).
 - The standard `--` "end of options" marker handles filenames that start with `-`.
 
 ## Diagnostics
@@ -305,7 +306,9 @@ roadmap.nowline:7:34 error: Unknown reference 'auth-refactro' in after — did y
   8 |       item audit-log "Audit log v2" size:xl before:code-freeze
 ```
 
-JSON diagnostics (`--format=json` on `--dry-run`) emit `{ "$nowlineDiagnostics": "1", "diagnostics": Diagnostic[] }`. Diagnostic shape:
+`--diagnostic-format text|json` selects how diagnostics are written to stderr; any other value is a usage error (exit 2). When the flag is not given, `--dry-run` combined with `--format=json` defaults to `json` (so `nowline - --dry-run --format=json` is the machine-readable invocation), and every other run defaults to `text`. An explicit `--diagnostic-format text` overrides that default.
+
+In `text` mode diagnostics print only when the run fails (at least one error); a warnings-only source prints nothing. In `json` mode the CLI writes exactly one document per run to stderr whenever at least one diagnostic exists, warnings included, and nothing for a clean source. The document is pretty-printed, schema version `1`: `{ "$nowlineDiagnostics": "1", "diagnostics": Diagnostic[] }`. The format never changes the exit code, so a warnings-only source exits 0 with the document on stderr. Diagnostic shape:
 
 ```ts
 type Diagnostic = {
@@ -316,16 +319,19 @@ type Diagnostic = {
   code: string;
   message: string;
   suggestion?: string;
+  span?: { start: { line: number; column: number }; end: { line: number; column: number } };
 };
 ```
+
+`code` is the stable validator code (`NL.E0600`, `NL.W0700`, ...) when the diagnostic has one, `parse-error` or `lex-error` for syntax errors, and a legacy string such as `validation` for validator messages that predate stable codes. `suggestion` is present when the message offers a "did you mean" target.
 
 ## Exit Codes
 
 | Code | Meaning |
 |------|---------|
 | 0 | Success |
-| 1 | Validation error (parse failure, invalid references) |
-| 2 | Usage error (missing input, invalid flags, mutually-exclusive flags, format unavailable in this build, binary output to TTY, file not found, unreadable input) |
+| 1 | Validation error (parse failure, invalid references). Warnings alone never produce it, in either diagnostic format. |
+| 2 | Usage error (missing input, invalid flags, mutually-exclusive flags, format unavailable in this build, binary output to TTY, file not found, unreadable input, empty stdin, invalid `--diagnostic-format`) |
 | 3 | Output error (cannot write to destination, exporter pipeline failure) |
 
 ## Piping and Composability
