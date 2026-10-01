@@ -10,10 +10,19 @@
 //
 // `measure(ctx)` returns the bar's intrinsic size. `place(origin,
 // ctx)` returns a `PositionedItem`-shaped fragment with the box, row,
-// and `textX`. The shape is byte-stable with the legacy sequenceItem
-// arithmetic when fed the same inputs.
+// `textX`, and the title lines to paint. The shape is byte-stable with
+// the legacy sequenceItem arithmetic when fed the same inputs and the
+// title fits on one line.
+//
+// Caption fit decision (`fitItemCaption`), in order:
+//   1. Title fits one line AND the meta line fits: in-bar, one line.
+//   2. Otherwise, if the meta line fits and a greedy whitespace
+//      word-wrap of the title gives at most
+//      `ITEM_CAPTION_TITLE_MAX_LINES` lines (>= 2), each within the
+//      inner width: in-bar, wrapped.
+//   3. Otherwise: spill to the right of the bar as a single line.
 
-import { ITEM_LINK_ICON_INSET_PX, ITEM_LINK_ICON_TILE_SIZE_PX } from '../item-bar-geometry.js';
+import { ITEM_CAPTION_TITLE_MAX_LINES, itemCaptionInsetX } from '../item-bar-geometry.js';
 import type {
     IntrinsicSize,
     MeasureContext,
@@ -21,13 +30,16 @@ import type {
     Point,
     Renderable,
 } from '../renderable.js';
+import { estimateTextWidth, wrapText } from '../text-measure.js';
 import { ITEM_INSET_PX, MIN_ITEM_WIDTH } from '../themes/shared.js';
 import type { BoundingBox } from '../types.js';
 
 /**
- * Inner padding applied on each side of the title text — the bar's
- * inner-padded text area is `box.width - 2 * TEXT_INSET_PX` wide.
- * Text spills past the bar when either the title or the meta line
+ * Inner padding applied on the RIGHT of the title text (the left inset
+ * comes from `itemCaptionInsetX`, which adds the link-icon column when
+ * present) — the bar's inner-padded text area is
+ * `box.width - itemCaptionInsetX(..) - TEXT_INSET_PX` wide. Text wraps
+ * or spills past the bar when either the title or the meta line
  * exceeds that area.
  */
 const TEXT_INSET_PX = 12;
@@ -84,15 +96,76 @@ export interface PlacedItemGeometry {
     textX: number;
     /** True when text spills past the bar's right edge. */
     textSpills: boolean;
+    /**
+     * The title as it should be painted, one entry per line. Always has
+     * at least one entry. Exactly two entries (never more than
+     * `ITEM_CAPTION_TITLE_MAX_LINES`) when the title word-wrapped inside
+     * the bar; otherwise `[title]`, including when the title spills to
+     * the right (a spilled caption is always a single line).
+     */
+    titleLines: string[];
 }
 
 /**
- * Approx. rendered width of `text` at `fontSizePx`. Matches the legacy
- * `sequenceItem` heuristic (intentionally pessimistic at ~0.58 em/char so
- * borderline-fitting captions trigger spill rather than clip).
+ * Estimated width (px) of an item's whole meta line: `metaText` plus the
+ * trailing capacity suffix (`trailingWidth`, 0 when there is none). Zero
+ * when the item has no meta line. Shared with the row-height predictor so
+ * both feed `fitItemCaption` the same number.
  */
-function estimateTextWidth(text: string, fontSizePx: number): number {
-    return text.length * fontSizePx * 0.58;
+export function estimateItemMetaWidth(metaText: string | undefined, trailingWidth: number): number {
+    const metaTextWidth = metaText ? estimateTextWidth(metaText, META_FONT_SIZE_PX) : 0;
+    return metaTextWidth + trailingWidth;
+}
+
+export interface ItemCaptionFit {
+    /** True when the caption must render to the right of the bar. */
+    textSpills: boolean;
+    /** Title lines to paint; see `PlacedItemGeometry.titleLines`. */
+    titleLines: string[];
+}
+
+/**
+ * Decide how an item's caption sits relative to its bar: one line
+ * in-bar, word-wrapped in-bar, or spilled to the right. This is the
+ * single source of truth for the decision; `ItemNode.place` and the
+ * row-height predictor in `layout.ts` both call it so predicted and
+ * placed geometry agree.
+ *
+ * `metaWidth` is the full estimated width of the meta line (text plus
+ * any trailing capacity suffix), or 0 when the item has no meta line.
+ * A meta line is never wrapped, so one that is wider than `innerWidth`
+ * forces a spill even when the title alone would wrap.
+ *
+ * Words never break mid-word: a single word wider than `innerWidth`, or
+ * a title that needs more than `ITEM_CAPTION_TITLE_MAX_LINES` lines,
+ * spills.
+ */
+export function fitItemCaption(
+    title: string,
+    innerWidth: number,
+    metaWidth: number,
+): ItemCaptionFit {
+    const titleOverflows =
+        title.length > 0 && estimateTextWidth(title, TITLE_FONT_SIZE_PX) > innerWidth;
+    const metaOverflows = metaWidth > innerWidth;
+    if (!titleOverflows && !metaOverflows) {
+        return { textSpills: false, titleLines: [title] };
+    }
+    if (titleOverflows && !metaOverflows) {
+        const lines = wrapText(title, innerWidth, TITLE_FONT_SIZE_PX);
+        // `lines.length >= 2` keeps single-line behavior byte-identical: a
+        // title that only "overflows" because of repeated whitespace in
+        // the raw string (the estimate counts every space) normalizes to
+        // one line, and that case still spills exactly as it always has.
+        if (
+            lines.length >= 2 &&
+            lines.length <= ITEM_CAPTION_TITLE_MAX_LINES &&
+            lines.every((line) => estimateTextWidth(line, TITLE_FONT_SIZE_PX) <= innerWidth)
+        ) {
+            return { textSpills: false, titleLines: lines };
+        }
+    }
+    return { textSpills: true, titleLines: [title] };
 }
 
 export class ItemNode implements Renderable<PlacedItemGeometry> {
@@ -127,30 +200,19 @@ export class ItemNode implements Renderable<PlacedItemGeometry> {
         // The link icon (when present) lives in the bar's upper-left
         // and shares the title's vertical band. The caption indents
         // past the icon so the title doesn't render on top of it.
-        const linkColumn = this.input.hasLinkIcon
-            ? ITEM_LINK_ICON_INSET_PX +
-              ITEM_LINK_ICON_TILE_SIZE_PX +
-              LINK_ICON_TO_CAPTION_GAP_PX -
-              TEXT_INSET_PX
-            : 0;
-        const captionLeftInset = TEXT_INSET_PX + Math.max(0, linkColumn);
+        const captionLeftInset = itemCaptionInsetX(!!this.input.hasLinkIcon);
         const innerWidth = Math.max(0, visualWidth - captionLeftInset - TEXT_INSET_PX);
         const titleStr = this.input.title;
-        const titleWidth = titleStr ? estimateTextWidth(titleStr, TITLE_FONT_SIZE_PX) : 0;
-        const metaTextWidth = this.input.metaText
-            ? estimateTextWidth(this.input.metaText, META_FONT_SIZE_PX)
-            : 0;
-        const trailingWidth = this.input.metaTrailingWidth ?? 0;
         // Trailing decoration (capacity suffix) renders to the right of
         // metaText. When metaText is empty the suffix sits at the
         // caption's leading edge, so its width is the entire meta-line
         // budget; when both exist the suffix needs a small separator gap
         // (rendered via `<tspan dx>` later) included in trailingWidth.
-        const metaWidth = metaTextWidth + trailingWidth;
-        const hasMetaContent = this.input.metaText !== undefined || trailingWidth > 0;
-        const textSpills =
-            (titleStr.length > 0 && titleWidth > innerWidth) ||
-            (hasMetaContent && metaWidth > innerWidth);
+        const metaWidth = estimateItemMetaWidth(
+            this.input.metaText,
+            this.input.metaTrailingWidth ?? 0,
+        );
+        const { textSpills, titleLines } = fitItemCaption(titleStr, innerWidth, metaWidth);
         const textX = textSpills
             ? boxX + visualWidth + TEXT_OUTSIDE_GAP_PX
             : boxX + captionLeftInset;
@@ -160,12 +222,7 @@ export class ItemNode implements Renderable<PlacedItemGeometry> {
             box,
             textX,
             textSpills,
+            titleLines,
         };
     }
 }
-
-/**
- * Horizontal gap (px) between the link-icon tile's right edge and the
- * start of the caption text when both render inside the bar.
- */
-const LINK_ICON_TO_CAPTION_GAP_PX = 4;

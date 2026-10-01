@@ -100,10 +100,11 @@ export interface SwimlaneNodeDeps {
     ) => number;
     newCursor: (x: number, y: number) => TrackCursor;
     estimateTextWidth: (text: string, fontSize: number) => number;
-    /** Predict the extra vertical height an item's wrapped label-chip
-     *  rows will add to its bar; used to size the row-packer's row
-     *  pitch ahead of the call to `sequenceItem`. */
-    predictItemChipExtraHeight: (item: ItemDeclaration, ctx: LayoutContext) => number;
+    /** Predict the extra vertical height an item's bar will grow by
+     *  (a wrapped title over a meta line, or wrapped label-chip rows);
+     *  used to size the row-packer's row pitch ahead of the call to
+     *  `sequenceItem`. */
+    predictItemBarExtraHeight: (item: ItemDeclaration, ctx: LayoutContext) => number;
 }
 
 export interface SwimlaneNodeInput {
@@ -299,15 +300,16 @@ export class SwimlaneNode {
             const desiredEnd = desiredStart + naturalWidth;
             const childId = (child as ItemDeclaration).name ?? '';
 
-            const chipExtra = deps.predictItemChipExtraHeight(child as ItemDeclaration, ctx);
-            const predictedHeight = step + chipExtra;
+            const barExtra = deps.predictItemBarExtraHeight(child as ItemDeclaration, ctx);
+            const predictedHeight = step + barExtra;
             const { rowIndex, y: rowY } = packer.placeItem({
                 childId,
                 desiredStart,
                 desiredEnd,
-                // Row pitch = `step()` + extra chip-row height. Keeps
-                // the inter-row visible gap (= step - bandwidth) intact
-                // when an item's labels wrap and grow the bar.
+                // Row pitch = `step()` + extra bar height. Keeps the
+                // inter-row visible gap (= step - bandwidth) intact
+                // when a title wraps or an item's labels wrap and grow
+                // the bar.
                 predictedHeight,
             });
 
@@ -348,7 +350,13 @@ export class SwimlaneNode {
                 placed: positioned,
                 logicalEnd: itemLogicalEnd,
                 spillReservation,
-                rowHeight: predictedHeight,
+                // Safety net: if the predictor under-shot (it can't see
+                // the exact meta text), the row still grows to the bar
+                // that was actually placed plus the inter-row gap.
+                rowHeight: Math.max(
+                    predictedHeight,
+                    step + (positioned.box.height - ctx.bandScale.bandwidth()),
+                ),
             });
         }
 

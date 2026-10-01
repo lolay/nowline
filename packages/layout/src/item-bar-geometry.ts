@@ -39,6 +39,66 @@ export const ITEM_CAPTION_TITLE_FONT_SIZE_PX = 13;
 /** Font size (px) of the meta text. */
 export const ITEM_CAPTION_META_FONT_SIZE_PX = 11;
 
+/**
+ * Baseline-to-baseline pitch (px) between consecutive TITLE lines when
+ * a long title word-wraps inside the bar. The meta line sits one more
+ * pitch below the last title line for every extra title line, see
+ * `itemCaptionMetaBaselineOffset`.
+ */
+export const ITEM_CAPTION_TITLE_LINE_HEIGHT_PX = 16;
+
+/**
+ * Most title lines layout will wrap a title onto inside the bar. A
+ * title that needs more than this spills to the right of the bar as a
+ * single line instead.
+ */
+export const ITEM_CAPTION_TITLE_MAX_LINES = 2;
+
+/**
+ * Baseline Y (px from the bar's top) of the meta line when the title
+ * occupies `lineCount` lines. One line gives the classic
+ * `ITEM_CAPTION_META_BASELINE_OFFSET_PX`; each extra title line pushes
+ * the meta baseline down by `ITEM_CAPTION_TITLE_LINE_HEIGHT_PX`.
+ */
+export function itemCaptionMetaBaselineOffset(lineCount: number): number {
+    return (
+        ITEM_CAPTION_META_BASELINE_OFFSET_PX +
+        (Math.max(1, lineCount) - 1) * ITEM_CAPTION_TITLE_LINE_HEIGHT_PX
+    );
+}
+
+/**
+ * Baseline Y (px from the bar's top) of the LAST caption line: the
+ * meta line when the item has one, otherwise the final title line.
+ * Anything stacked below the caption (label chips) must clear this.
+ */
+export function itemCaptionLastBaselineOffset(lineCount: number, hasMeta: boolean): number {
+    if (hasMeta) return itemCaptionMetaBaselineOffset(lineCount);
+    return (
+        ITEM_CAPTION_TITLE_BASELINE_OFFSET_PX +
+        (Math.max(1, lineCount) - 1) * ITEM_CAPTION_TITLE_LINE_HEIGHT_PX
+    );
+}
+
+/**
+ * Extra bar height (px) a wrapped title needs on top of the default
+ * `bandwidth`. The default bar is sized so the caption's last baseline
+ * is at most `ITEM_CAPTION_META_BASELINE_OFFSET_PX`; anything below
+ * that grows the bar by the overshoot:
+ *
+ *   - 1 title line (with or without meta): 0.
+ *   - 2 title lines, no meta: line 2 lands at baseline 36, so 0.
+ *   - 2 title lines + meta: meta baseline 54, so 16.
+ *
+ * The same number is the row-pitch increase for the bar's row.
+ */
+export function computeTitleBarExtra(lineCount: number, hasMeta: boolean): number {
+    return Math.max(
+        0,
+        itemCaptionLastBaselineOffset(lineCount, hasMeta) - ITEM_CAPTION_META_BASELINE_OFFSET_PX,
+    );
+}
+
 // ---- Status dot (upper-right glyph) ------------------------------
 
 /** Distance (px) from the bar's right edge to the dot's center. */
@@ -75,6 +135,28 @@ export const ITEM_LINK_ICON_TILE_SIZE_PX = 14;
 
 /** Distance (px) from the bar's right/bottom edges to the tile's edge. */
 export const ITEM_LINK_ICON_INSET_PX = 6;
+
+/**
+ * Horizontal gap (px) between the link-icon tile's right edge and the
+ * start of the caption text when both render inside the bar.
+ */
+export const ITEM_LINK_ICON_TO_CAPTION_GAP_PX = 4;
+
+/**
+ * Left inset (px) of the in-bar caption from the bar's left edge:
+ * `ITEM_CAPTION_INSET_X_PX` normally, pushed right past the link-icon
+ * tile (and its gap) when the bar carries a link icon. With today's
+ * numbers that is 12 without a link icon and 24 with one.
+ */
+export function itemCaptionInsetX(hasLinkIcon: boolean): number {
+    if (!hasLinkIcon) return ITEM_CAPTION_INSET_X_PX;
+    const linkColumn =
+        ITEM_LINK_ICON_INSET_PX +
+        ITEM_LINK_ICON_TILE_SIZE_PX +
+        ITEM_LINK_ICON_TO_CAPTION_GAP_PX -
+        ITEM_CAPTION_INSET_X_PX;
+    return ITEM_CAPTION_INSET_X_PX + Math.max(0, linkColumn);
+}
 
 // ---- Narrow-bar decoration spill --------------------------------
 

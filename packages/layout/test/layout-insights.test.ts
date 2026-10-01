@@ -17,6 +17,23 @@ swimlane eng "Engineering"
         expect(insights.some((i) => i.code === 'NL.I1000')).toBe(true);
     });
 
+    it('does not report NL.I1000 for a title that wraps inside its bar', async () => {
+        // Same title shape as the issue: a 2w bar at scale:2w has a 124px text
+        // area, and "Technology Selection" (~151px) wraps to two lines there
+        // instead of spilling. A wrapped title makes no spill reservation.
+        const src = `nowline v1
+
+roadmap r "R" start:2026-04-06 scale:2w
+
+swimlane eng "Engineering"
+  item x "Technology Selection" duration:2w
+`;
+        const { file, resolved } = await parseAndResolve(src);
+        const layout = layoutRoadmap(file, resolved, { theme: 'light', width: 640 });
+        const insights = collectLayoutInsights(layout, { locale: 'en-US' });
+        expect(insights.some((i) => i.code === 'NL.I1000')).toBe(false);
+    });
+
     it('reports NL.W1000 when today is outside the roadmap window', async () => {
         const src = `nowline v1
 

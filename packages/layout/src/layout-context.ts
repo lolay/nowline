@@ -182,9 +182,11 @@ export interface LayoutHelpers {
     ) => number;
     newCursor: (x: number, y: number) => TrackCursor;
     estimateTextWidth: (text: string, fontSize: number) => number;
-    /** Predict the extra height an item's wrapped label-chip rows will
-     *  add, so callers can size the row pitch BEFORE handing off to
-     *  `sequenceItem`. Returns 0 when the item's labels all fit on a
-     *  single chip row. */
-    predictItemChipExtraHeight: (item: ItemDeclaration, ctx: LayoutContext) => number;
+    /** Predict the extra height an item's bar will grow by (a wrapped
+     *  two-line title over a meta line, or wrapped label-chip rows;
+     *  whichever is larger), so callers can size the row pitch BEFORE
+     *  handing off to `sequenceItem`. Returns 0 when the title fits one
+     *  line (or wraps without needing a taller bar) and the item's
+     *  labels all fit on a single chip row. */
+    predictItemBarExtraHeight: (item: ItemDeclaration, ctx: LayoutContext) => number;
 }

@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { layoutRoadmap } from '../src/index.js';
+import { layoutRoadmap, type PositionedItem, type PositionedTrackChild } from '../src/index.js';
 import { parseAndResolve } from './helpers.js';
 
 describe('layoutRoadmap', () => {
@@ -535,5 +535,241 @@ swimlane web "Web"
         const model = layoutRoadmap(file, resolved, { theme: 'light' });
         expect(model.edges).toHaveLength(1);
         expect(model.edges[0].fromId).toBe('api');
+    });
+});
+
+describe('layoutRoadmap item title wrapping', () => {
+    // The Platform lane from lolay/nowline#59, trimmed. At `scale:2w` a `2w`
+    // item is a 160px logical column: a 148px bar with a 124px text area.
+    // "Technology Selection" estimates at ~151px, so it used to spill and push
+    // "API" down a whole row; wrapped as "Technology" / "Selection" it fits.
+    function issueRoadmap(firstTitle = 'Technology Selection', extraItems = ''): string {
+        return `nowline v1
+
+roadmap "Generative AI" start:2026-04-06 scale:2w calendar:business
+
+swimlane "Platform"
+  item "${firstTitle}" duration:2w status:done
+  item api "API" duration:3w status:done
+  item "Agent Instructions" duration:3w status:in-progress
+  item api-integration "Agent Integration" duration:4w status:planned
+  item "Agent MCP" duration:2w status:planned
+  item platform-e2e-test "E2E Test" duration:2w status:planned
+${extraItems}`;
+    }
+
+    function items(children: PositionedTrackChild[]): PositionedItem[] {
+        const out: PositionedItem[] = [];
+        for (const child of children) {
+            if (child.kind === 'item') out.push(child);
+            else out.push(...items(child.children));
+        }
+        return out;
+    }
+
+    function byTitle(list: PositionedItem[], title: string): PositionedItem {
+        const found = list.find((i) => i.title === title);
+        if (!found) throw new Error(`no item titled ${title}`);
+        return found;
+    }
+
+    async function layout(src: string) {
+        const { file, resolved } = await parseAndResolve(src);
+        return layoutRoadmap(file, resolved, { theme: 'light' });
+    }
+
+    it('keeps "API" on row 0 at the same y as the wrapped "Technology Selection"', async () => {
+        const model = await layout(issueRoadmap());
+        const all = items(model.swimlanes[0].children);
+        const tech = byTitle(all, 'Technology Selection');
+        const api = byTitle(all, 'API');
+        expect(tech.titleLines).toEqual(['Technology', 'Selection']);
+        expect(tech.textSpills).toBe(false);
+        expect(tech.title).toBe('Technology Selection');
+        // Chained in time on the same row; no spill reservation pushed it down.
+        expect(api.box.y).toBe(tech.box.y);
+        // Every item in the lane shares row 0.
+        expect(new Set(all.map((i) => i.box.y)).size).toBe(1);
+        // A title that fits on one line carries no `titleLines` at all.
+        expect(api.titleLines).toBeUndefined();
+        expect('titleLines' in api).toBe(false);
+    });
+
+    it('grows the wrapped bar to 72px when it has a meta line; row-mates stay 56px', async () => {
+        const model = await layout(issueRoadmap());
+        const all = items(model.swimlanes[0].children);
+        const tech = byTitle(all, 'Technology Selection');
+        expect(tech.metaText).toBe('2w');
+        expect(tech.box.height).toBe(72);
+        expect(byTitle(all, 'API').box.height).toBe(56);
+        expect(byTitle(all, 'Agent MCP').box.height).toBe(56);
+    });
+
+    it('makes a lane 16px taller than the one-line version, not a whole 64px row', async () => {
+        // A pinned second item collides with the first and drops to row 1, so
+        // the lane's used height (not its minimum height) decides the band.
+        const pinned = '  item pinned "Pinned" duration:2w date:2026-04-06\n';
+        const wrapped = await layout(issueRoadmap('Technology Selection', pinned));
+        // "Tech Selection" fits one line (105.6px < 124px): same lane, no wrap.
+        const control = await layout(issueRoadmap('Tech Selection', pinned));
+        const controlTech = byTitle(items(control.swimlanes[0].children), 'Tech Selection');
+        expect(controlTech.titleLines).toBeUndefined();
+        expect(controlTech.box.height).toBe(56);
+        expect(wrapped.swimlanes[0].box.height - control.swimlanes[0].box.height).toBe(16);
+    });
+
+    it('grows the issue lane by less than one row, since the minimum lane height absorbs some', async () => {
+        const wrapped = await layout(issueRoadmap('Technology Selection'));
+        const control = await layout(issueRoadmap('Tech Selection'));
+        const growth = wrapped.swimlanes[0].box.height - control.swimlanes[0].box.height;
+        // The single-row lane sits on the `step + 32` minimum band height, so
+        // the 16px row growth shows up as 10px; a spill would have added a
+        // whole 64px row for "API".
+        expect(growth).toBeGreaterThan(0);
+        expect(growth).toBeLessThanOrEqual(16);
+    });
+
+    it('puts label chips below line 2 of a wrapped title and grows the bar to hold them', async () => {
+        const src = `nowline v1
+
+roadmap r "R" start:2026-04-06 scale:2w
+
+label urgent "Urgent"
+
+swimlane "Platform"
+  item "Technology Selection" duration:2w labels:urgent
+`;
+        const model = await layout(src);
+        const tech = byTitle(items(model.swimlanes[0].children), 'Technology Selection');
+        expect(tech.titleLines).toEqual(['Technology', 'Selection']);
+        expect(tech.chipsOutside).toBe(false);
+        expect(tech.labelChips).toHaveLength(1);
+        const chip = tech.labelChips[0];
+        const metaBaselineY = tech.box.y + 54; // 38 + one extra 16px title line
+        const line2BaselineY = tech.box.y + 36; // 20 + 16
+        expect(chip.box.y).toBeGreaterThan(metaBaselineY);
+        expect(chip.box.y).toBeGreaterThan(line2BaselineY);
+        // Chip top = meta baseline + 3px gap; the bar grows so the chip, its
+        // 3px gap above the 4px progress strip, and the strip all fit.
+        expect(chip.box.y).toBe(tech.box.y + 57);
+        expect(tech.box.height).toBe(57 + 13 + 3 + 4);
+        expect(chip.box.y + chip.box.height + 3 + 4).toBeLessThanOrEqual(
+            tech.box.y + tech.box.height,
+        );
+    });
+
+    it('regression guard: a title whose meta line is too wide still spills and does not over-reserve the row', async () => {
+        // The meta "2w Lead Person - 40% remaining"-style line is wider than the
+        // 124px text area, so the caption spills even though the title alone
+        // would wrap. The row predictor must see that (it resolves the real meta
+        // line); assuming the meta fits would reserve a taller row for a bar
+        // that never grows.
+        const src = `nowline v1
+
+roadmap r "R" start:2026-04-06 scale:2w
+
+person lead "Lead Person"
+
+swimlane "Platform"
+  item "Technology Selection" duration:2w owner:lead status:in-progress remaining:50%
+  item api "API" duration:3w
+`;
+        const model = await layout(src);
+        const all = items(model.swimlanes[0].children);
+        const tech = byTitle(all, 'Technology Selection');
+        expect(tech.textSpills).toBe(true);
+        expect(tech.titleLines).toBeUndefined();
+        expect(tech.box.height).toBe(56);
+        // The spill reservation still pushes the next item down exactly one
+        // plain row (step = 64), not 64 + a phantom 16px of wrap growth.
+        expect(byTitle(all, 'API').box.y).toBe(tech.box.y + 64);
+    });
+
+    it('reserves the grown row inside a group so the next row does not overlap', async () => {
+        const src = `nowline v1
+
+roadmap r "R" start:2026-04-06 scale:2w
+
+swimlane "Platform"
+  group "Squad"
+    item "Technology Selection" duration:2w
+    item below "Below" duration:2w date:2026-04-06
+`;
+        const model = await layout(src);
+        const group = model.swimlanes[0].children[0];
+        if (group.kind !== 'group') throw new Error('expected a group');
+        const all = items(group.children);
+        const tech = byTitle(all, 'Technology Selection');
+        const below = byTitle(all, 'Below');
+        expect(tech.box.height).toBe(72);
+        expect(below.box.y).toBeGreaterThanOrEqual(tech.box.y + tech.box.height);
+        // Row pitch is step (64) + the 16px growth, keeping the 8px gap.
+        expect(below.box.y).toBe(tech.box.y + 80);
+        // The group's painted box encloses both rows.
+        expect(group.box.y + group.box.height).toBeGreaterThanOrEqual(
+            below.box.y + below.box.height,
+        );
+    });
+
+    it('reserves the grown row inside a parallel so the next sub-track does not overlap', async () => {
+        const src = `nowline v1
+
+roadmap r "R" start:2026-04-06 scale:2w
+
+swimlane "Platform"
+  parallel
+    item "Technology Selection" duration:2w
+    item below "Below" duration:2w
+`;
+        const model = await layout(src);
+        const parallel = model.swimlanes[0].children[0];
+        if (parallel.kind !== 'parallel') throw new Error('expected a parallel');
+        const all = items(parallel.children);
+        const tech = byTitle(all, 'Technology Selection');
+        const below = byTitle(all, 'Below');
+        expect(tech.box.height).toBe(72);
+        expect(below.box.y).toBeGreaterThanOrEqual(tech.box.y + tech.box.height);
+        expect(below.box.y).toBe(tech.box.y + 80);
+        expect(parallel.box.height).toBe(80 + 64);
+    });
+
+    it('bumps a colliding swimlane item below a wrapped bar by the grown row pitch', async () => {
+        const src = `nowline v1
+
+roadmap r "R" start:2026-04-06 scale:2w
+
+swimlane "Platform"
+  item "Technology Selection" duration:2w
+  item below "Below" duration:2w date:2026-04-06
+`;
+        const model = await layout(src);
+        const all = items(model.swimlanes[0].children);
+        const tech = byTitle(all, 'Technology Selection');
+        const below = byTitle(all, 'Below');
+        expect(below.box.y).toBe(tech.box.y + 80);
+    });
+
+    it('attaches dependency arrows at the grown bar midpoint when the title wrapped', async () => {
+        const src = `nowline v1
+
+roadmap r "R" start:2026-04-06 scale:2w
+
+swimlane a "A"
+  item tech "Technology Selection" duration:2w
+
+swimlane b "B"
+  item downstream "Down" duration:2w after:tech
+`;
+        const model = await layout(src);
+        const tech = byTitle(items(model.swimlanes[0].children), 'Technology Selection');
+        expect(tech.box.height).toBe(72);
+        const edge = model.edges.find((e) => e.fromId === 'tech');
+        expect(edge).toBeDefined();
+        // A wrapped title does not spill, so the arrow leaves the bar's right
+        // edge at the grown bar's midpoint, not along the progress-strip row a
+        // spilled caption would force.
+        const wp = edge?.waypoints ?? [];
+        expect(wp[0].x).toBeCloseTo(tech.box.x + tech.box.width, 1);
+        expect(wp[0].y).toBeCloseTo(tech.box.y + tech.box.height / 2, 1);
     });
 });
