@@ -6,6 +6,14 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ## [Unreleased]
 
+### Changed
+
+- **`@nowline/layout` + `@nowline/renderer` — item titles wrap to two lines inside the bar before spilling right**: a title too wide for one line now word-wraps (at whitespace only, never mid-word) to at most two lines inside its bar, instead of spilling beside it, as long as the meta line fits and each line fits the bar's inner width. A wrapped title with a meta line grows the bar and its row by 16px (a two-line title with no meta line needs no extra height); the next chained item stays on the row instead of dropping to a fresh one, and a wrapped title no longer raises `NL.I1000`. A single word that is too long, a title that needs three or more lines, and a meta line that does not fit still spill to the right as before. `PositionedItem` gains an optional `titleLines`. Wrapping is always on (no new DSL property or style key), so rendered output changes for any roadmap with such a title.
+
+### Fixed
+
+- **`@nowline/renderer` — in-bar caption no longer overlaps the link icon**: the renderer started in-bar captions at the bar's left edge + 12px while the link-icon tile covers 6px to 20px, so the title and meta began under the tile. Captions on bars with a link icon now start at +24px, the inset layout already measured against.
+
 ## [0.8.6] - 2026-10-01
 
 ### Added

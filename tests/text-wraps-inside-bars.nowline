@@ -1,0 +1,61 @@
+nowline v1
+
+// Fixture for item-title wrapping (lolay/nowline#59). A title that is too
+// wide for its bar on one line but fits on at most two whitespace-wrapped
+// lines stays INSIDE the bar instead of spilling to the right. The old
+// spill pushed the next chained item down a whole row.
+//
+// What to look for when rendering this:
+//   - Platform lane: "Technology Selection" (2w at scale:2w, a 148px bar)
+//     wraps to "Technology" / "Selection" inside its bar. The bar grows
+//     16px to hold the second title line plus the meta line, and "API"
+//     stays on the same row instead of dropping to a fresh one.
+//   - Every other title in the issue's roadmap already fits on one line
+//     (short title, or a bar of 3w or more), so it renders as before.
+//   - Link icon lane: "Auth token refactor" wraps too, and its caption
+//     starts past the 14px link-icon tile (24px inset, not 12px), so the
+//     title never sits under the tile.
+//
+// A wrapped item WITHOUT a meta line (the 2-line, no-growth case: line 2
+// lands at baseline 36, so the bar stays 56px) cannot be written in the
+// DSL. Every item needs a `duration:` or `size:`, and either one is
+// rendered as the meta line, so every bar wide enough to wrap carries
+// meta. That case is pinned by the layout unit tests instead.
+//
+// Titles that cannot wrap into two lines still spill to the right; see
+// text-spills-right.nowline and item-bumps-up.nowline (single words).
+
+roadmap text-wraps-inside-bars "Generative AI" start:2026-04-06 scale:2w calendar:business
+
+swimlane platform "Platform"
+  item "Technology Selection" duration:2w status:done
+  item api "API" duration:3w status:done
+  item "Agent Instructions" duration:3w status:in-progress
+  item api-integration "Agent Integration" duration:4w status:planned
+  item "Agent MCP" duration:2w status:planned
+  item platform-e2e-test "E2E Test" duration:2w status:planned
+
+swimlane web "Web"
+  item "Web Prototype" duration:4w status:done
+  item "Web SDK" duration:2w status:planned after:api
+  item "Web Integration" duration:4w status:planned
+  item web-e2e-test "E2E Test" duration:2w status:planned after:api-integration
+
+swimlane mobile "Mobile"
+  parallel
+    group ios "iOS"
+      item "iOS Prototype" duration:4w status:done
+      item "iOS SDK" duration:2w status:planned after:api
+      item "iOS Integration" duration:4w status:planned
+      item ios-e2e-test "E2E Test" duration:2w status:planned after:api-integration
+    group android "Android"
+      item "Android Prototype" duration:4w status:done
+      item "Android SDK" duration:2w status:planned after:api
+      item "Android Integration" duration:4w status:planned
+      item android-e2e-test "E2E Test" duration:2w status:planned after:api-integration
+
+swimlane link-icon "Link icon"
+  item auth-refactor "Auth token refactor" duration:2w status:in-progress link:https://github.com/lolay/nowline/issues/59
+  item "Rollout" duration:3w status:planned
+
+milestone ai-release "AI Release" after:[platform-e2e-test, web-e2e-test, ios-e2e-test, android-e2e-test]
