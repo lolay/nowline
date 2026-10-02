@@ -1,0 +1,34 @@
+nowline v1
+
+// PROPOSED SYNTAX (specs/waves). Today's parser rejects `wave`; see
+// samples/checkout-relaunch.svg for the mocked-up rendering.
+
+roadmap checkout-relaunch "Checkout relaunch" author:"Product Engineering" start:2026-01-05 scale:1w calendar:full
+
+wave foundations "Foundations"
+wave build "Build"
+wave launch "Launch"
+
+swimlane platform "Platform"
+  item auth "Auth service split" duration:4w wave:foundations status:done
+  item payments-api "Payments API v2" duration:8w wave:build status:in-progress remaining:60%
+  item rate-limits "Rate limits" duration:2w wave:launch
+
+swimlane web "Web"
+  item ux-research "Checkout UX research" duration:2w wave:foundations status:done
+  group wave:build
+    item checkout-v2 "Checkout v2" duration:4w status:in-progress remaining:30%
+    item a11y "Accessibility pass" duration:2w
+  item launch-page "Launch page" duration:2w wave:launch
+
+swimlane mobile "Mobile"
+  item wallet-spike "Wallet SDK spike" duration:6w wave:foundations status:done
+  item wallet "Wallet integration" duration:4w wave:build status:in-progress remaining:25%
+  item store-release "App store release" duration:4w wave:launch
+
+// No wave: background work. Never held by a barrier, drawn hatched.
+swimlane ops "Ops"
+  item on-call "On-call and KTLO" duration:18w
+
+milestone beta "Beta" after:build
+milestone ga "GA" after:launch
