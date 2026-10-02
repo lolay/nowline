@@ -18,14 +18,18 @@
 //   footnotes are present (so the inline-date glyph inserts at the LEFT
 //   end of the existing badge cluster rather than reordering it).
 //
-//   Container (group, parallel): glyph sits at the bounding box's top
-//   corners with the standard inset. Containers don't carry status dots
-//   or footnote indicators in their own decoration row, so no
-//   interleaving math is needed. The one exception is a styled group's
-//   title chiclet, which owns the box's top-left corner: there both
-//   glyphs move into the chiclet's row, the `after` glyph one gap past
-//   the chiclet's right edge (see `computeContainerInlineDatePins`).
+//   Container (group, parallel): the box's top corners belong to the
+//   first child row, so the glyphs get a row of their own: a filled
+//   group's title chiclet row inside the box, or the header band every
+//   other container reserves above it (see `computeContainerInlineDatePins`).
+//   Containers don't carry status dots or footnote indicators, so the
+//   only neighbor to clear is the container's own title.
 
+import {
+    CONTAINER_HEADER_BAND_PX,
+    containerHeaderTitleWidth,
+    containerHeaderTitleX,
+} from './container-header-geometry.js';
 import {
     INLINE_DATE_GLYPH_GAP_PX,
     INLINE_DATE_GLYPH_INSET_LEFT_PX,
@@ -134,61 +138,84 @@ export function computeItemInlineDatePins(opts: ItemInlineDatePinInputs): Inline
     return pins;
 }
 
+/**
+ * The row a container's inline-date glyphs sit in. A container's first
+ * child row starts flush with its box's top corners, so the glyphs never
+ * use the corners themselves:
+ *
+ *   - `title-tab-row`: a filled group's chiclet row, inside the box's
+ *     top edge, above the first child (the group's top pad reserves it,
+ *     with or without a title). `titleTabWidth` is the chiclet's width
+ *     (`groupTitleTabWidth`), or undefined for an untitled group.
+ *   - `header-band`: the `CONTAINER_HEADER_BAND_PX` strip above `box.y`
+ *     that a bracket / unstyled group or a parallel reserves for its
+ *     title and glyphs (`groupHeaderBandPx` / `parallelHeaderBandPx`).
+ *     `title` is the title painted in the band, `titleInsetX` its inset
+ *     from `box.x` when no `after` glyph precedes it.
+ */
+export type ContainerGlyphRow =
+    | { kind: 'title-tab-row'; titleTabWidth?: number }
+    | { kind: 'header-band'; title?: string; titleInsetX: number };
+
 export interface ContainerInlineDatePinInputs {
-    /** Bounding box that anchors the glyph corners. For styled groups and
-     *  bracketed parallels this is the visible box; for unstyled groups
-     *  and bare parallels it is the logical bounding box (leftmost child
-     *  start, rightmost child end, top of the highest child row). */
+    /** The container's box: the visible box for a filled group, the
+     *  logical extent (leftmost child start, rightmost child end, top of
+     *  the first child row) for every other container. */
     box: BoundingBox;
     afterDate: string | undefined;
     beforeDate: string | undefined;
-    /** Width (px) of the title chiclet a styled group paints flush in the
-     *  box's top-left corner (`groupTitleTabWidth`), or undefined when the
-     *  container paints none (bracket / unstyled groups, parallels). */
-    titleTabWidth?: number;
+    row: ContainerGlyphRow;
 }
 
 /**
  * Compute inline-date pin glyph placements for a container (group or
- * parallel). The glyphs sit flush to the box's top-LEFT (`after`) and
- * top-RIGHT (`before`) corners with the standard inset; containers
- * never spill.
+ * parallel). Containers never spill. Both glyphs sit in the container's
+ * glyph `row`, vertically centered on it:
  *
- * A styled group's title chiclet owns the top-left corner, so when
- * `titleTabWidth` is set both glyphs join the chiclet's row instead,
- * vertically centered on it (the row sits above the group's first child,
- * inside the chiclet's top-pad reservation):
- *
- *   - `after` sits `INLINE_DATE_GLYPH_GAP_PX` right of the chiclet's
- *     right edge, so the chiclet stays flush in the corner.
- *   - `before` stays flush right, but never slides left onto the
- *     chiclet or the `after` glyph: when the chiclet is wider than the
- *     box leaves room for, it sits one gap past whichever ends last.
+ *   - `after` takes the row's leftmost free slot: one gap past a filled
+ *     group's chiclet (so the chiclet stays flush in the corner), else
+ *     the standard left inset, ahead of a header-band title (which
+ *     `containerHeaderTitleX` shifts past the glyph).
+ *   - `before` sits flush right with the standard inset, but never
+ *     slides left onto the chiclet, the header-band title (estimated
+ *     width), or the `after` glyph: when those run past its slot, it
+ *     sits one gap past whichever ends last, even beyond the box.
  */
 export function computeContainerInlineDatePins(
     opts: ContainerInlineDatePinInputs,
 ): InlineDatePin[] {
-    const { box, afterDate, beforeDate, titleTabWidth } = opts;
+    const { box, afterDate, beforeDate, row } = opts;
     if (!afterDate && !beforeDate) return [];
 
     const pins: InlineDatePin[] = [];
     const tileSize = INLINE_DATE_GLYPH_TILE_SIZE_PX;
-    const hasTab = titleTabWidth !== undefined;
-    const topY = hasTab
-        ? box.y + (GROUP_TITLE_TAB_HEIGHT_PX - tileSize) / 2
-        : box.y + INLINE_DATE_GLYPH_INSET_TOP_PX;
-    // Right edge of whatever already occupies the top-left of the row.
-    let leftClearX = hasTab ? box.x + titleTabWidth : box.x;
+    let topY: number;
+    let afterX: number;
+    // Right edge of whatever already occupies the row's left end.
+    let leftClearX: number;
+    if (row.kind === 'title-tab-row') {
+        topY = box.y + (GROUP_TITLE_TAB_HEIGHT_PX - tileSize) / 2;
+        const tabRight = row.titleTabWidth !== undefined ? box.x + row.titleTabWidth : undefined;
+        afterX =
+            tabRight !== undefined
+                ? tabRight + INLINE_DATE_GLYPH_GAP_PX
+                : box.x + INLINE_DATE_GLYPH_INSET_LEFT_PX;
+        leftClearX = tabRight ?? box.x;
+    } else {
+        topY = box.y - CONTAINER_HEADER_BAND_PX + (CONTAINER_HEADER_BAND_PX - tileSize) / 2;
+        afterX = box.x + INLINE_DATE_GLYPH_INSET_LEFT_PX;
+        leftClearX = row.title
+            ? containerHeaderTitleX(box.x, row.titleInsetX, Boolean(afterDate)) +
+              containerHeaderTitleWidth(row.title)
+            : box.x;
+    }
 
     if (afterDate) {
-        const x = hasTab
-            ? leftClearX + INLINE_DATE_GLYPH_GAP_PX
-            : box.x + INLINE_DATE_GLYPH_INSET_LEFT_PX;
-        leftClearX = x + tileSize;
+        leftClearX = Math.max(leftClearX, afterX + tileSize);
         pins.push({
             side: 'after',
             isoDate: afterDate,
-            glyphTopLeft: { x, y: topY },
+            glyphTopLeft: { x: afterX, y: topY },
             glyphSize: tileSize,
             spilled: false,
         });
@@ -196,13 +223,13 @@ export function computeContainerInlineDatePins(
 
     if (beforeDate) {
         const flushRightX = box.x + box.width - INLINE_DATE_GLYPH_INSET_RIGHT_PX - tileSize;
-        const x = hasTab
-            ? Math.max(flushRightX, leftClearX + INLINE_DATE_GLYPH_GAP_PX)
-            : flushRightX;
         pins.push({
             side: 'before',
             isoDate: beforeDate,
-            glyphTopLeft: { x, y: topY },
+            glyphTopLeft: {
+                x: Math.max(flushRightX, leftClearX + INLINE_DATE_GLYPH_GAP_PX),
+                y: topY,
+            },
             glyphSize: tileSize,
             spilled: false,
         });

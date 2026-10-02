@@ -2,8 +2,9 @@ nowline v1
 
 // Inline date pins on `after:` / `before:` — pin an item, group, or
 // parallel to a specific calendar date without declaring a named
-// `anchor`. The renderer paints a small `calendar` glyph in the
-// entity's top-left (`after`) or top-right (`before`) corner. See
+// `anchor`. The renderer paints a small `calendar` glyph on the
+// entity's left (`after`) or right (`before`): in an item bar's top
+// corner, or in a group's or parallel's title row. See
 // `specs/dsl.md` "Inline date pins" and `specs/rendering.md`
 // "Inline-date glyph".
 
@@ -36,13 +37,16 @@ swimlane platform "Platform"
 swimlane releases "Releases"
 
   // Group with an inline-date `after:` — the whole group starts
-  // on 2026-02-23. Glyph attaches to the group's bounding box.
+  // on 2026-02-23. The glyph sits in the group's title row, ahead of
+  // the title, above the first item.
   group api-track "API track" style:flagged after:2026-02-23
     item api-design "API design" duration:1w
     item api-build "API build" duration:2w
 
   // Parallel with an inline-date `before:` — the whole parallel
-  // must finish by 2026-05-25.
+  // must finish by 2026-05-25. The glyph sits at the right end of
+  // the title row the parallel reserves above its first track (here
+  // just past the title, which is wider than the parallel).
   parallel rollouts "Region rollouts" before:2026-05-25
     item us-rollout "US rollout" duration:2w
     item eu-rollout "EU rollout" duration:2w

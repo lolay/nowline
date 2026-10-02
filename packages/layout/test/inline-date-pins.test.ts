@@ -163,6 +163,144 @@ swimlane s "S"
         expect(before.glyphTopLeft.x).toBeCloseTo(after.glyphTopLeft.x + 12 + 4);
     });
 
+    it('unstyled-group pins sit in the header band, above the first child bar', async () => {
+        // The first child bar starts flush with the group's top edge, so
+        // the glyphs used to sit on it (and the bar, painted later,
+        // covered them).
+        const src = `nowline v1
+roadmap r "R" start:2026-01-05 length:14w
+swimlane s "S"
+  group g "G" after:2026-02-09 before:2026-04-13
+    item a "A" duration:2w
+    item b "B" duration:2w
+`;
+        const { file, resolved } = await parseAndResolve(src);
+        const model = layoutRoadmap(file, resolved, { theme: 'light' });
+        const group = model.swimlanes[0].children.find(isGroup);
+        expect(group).toBeDefined();
+        const { box } = group!;
+        const [after, before] = group!.inlineDatePins ?? [];
+        const firstBar = group!.children.find(isItem)!.box;
+        expect(firstBar.y).toBeCloseTo(box.y);
+        // 12 px band above box.y, glyph tile fills it.
+        expect(after.glyphTopLeft.y).toBeCloseTo(box.y - 12);
+        expect(before.glyphTopLeft.y).toBeCloseTo(box.y - 12);
+        expect(after.glyphTopLeft.y + after.glyphSize).toBeLessThanOrEqual(firstBar.y);
+        // after-glyph above the first bar's left edge (the title moves
+        // past it); before-glyph flush right.
+        expect(after.glyphTopLeft.x).toBeCloseTo(box.x + 6);
+        expect(before.glyphTopLeft.x + 12).toBeCloseTo(box.x + box.width - 6);
+    });
+
+    it('untitled groups reserve a glyph row only when pinned', async () => {
+        const src = (props: string) => `nowline v1
+
+config
+
+style filled
+  bg: blue
+
+roadmap r "R" start:2026-01-05 length:14w
+swimlane s "S"
+  group ${props}
+    item a "A" duration:2w
+`;
+        for (const style of ['', 'style:filled ']) {
+            const pinned = await parseAndResolve(src(`${style}after:2026-01-05`));
+            const bare = await parseAndResolve(src(style.trim()));
+            const pinnedGroup = layoutRoadmap(pinned.file, pinned.resolved, {
+                theme: 'light',
+            }).swimlanes[0].children.find(isGroup)!;
+            const bareGroup = layoutRoadmap(bare.file, bare.resolved, {
+                theme: 'light',
+            }).swimlanes[0].children.find(isGroup)!;
+            const [after] = pinnedGroup.inlineDatePins ?? [];
+            const bar = pinnedGroup.children.find(isItem)!.box;
+            expect(after.glyphTopLeft.y + after.glyphSize).toBeLessThanOrEqual(bar.y);
+            if (style) {
+                // Filled: the chiclet row inside the box, as if titled.
+                expect(after.glyphTopLeft.y).toBeCloseTo(pinnedGroup.box.y + 2);
+                expect(bar.y).toBeCloseTo(pinnedGroup.box.y + 20);
+                expect(bareGroup.children.find(isItem)!.box.y).toBeCloseTo(bareGroup.box.y);
+            } else {
+                // Unstyled: the header band above the box.
+                expect(after.glyphTopLeft.y).toBeCloseTo(pinnedGroup.box.y - 12);
+                expect(pinnedGroup.box.y).toBeCloseTo(bareGroup.box.y + 12);
+            }
+        }
+    });
+
+    it('parallel pins reserve a header band above the first track', async () => {
+        const src = (props: string) => `nowline v1
+roadmap r "R" start:2026-01-05 length:14w
+swimlane s "S"
+  parallel p "P" ${props}
+    item a "A" duration:2w
+    item b "B" duration:2w
+`;
+        const pinned = await parseAndResolve(src('after:2026-01-05 before:2026-04-13'));
+        const bare = await parseAndResolve(src(''));
+        const pinnedPar = layoutRoadmap(pinned.file, pinned.resolved, {
+            theme: 'light',
+        }).swimlanes[0].children.find(isParallel)!;
+        const barePar = layoutRoadmap(bare.file, bare.resolved, {
+            theme: 'light',
+        }).swimlanes[0].children.find(isParallel)!;
+        // Only pins reserve the band; a title-only parallel is unchanged.
+        expect(pinnedPar.box.y).toBeCloseTo(barePar.box.y + 12);
+        expect(pinnedPar.box.height).toBeCloseTo(barePar.box.height);
+        const firstBar = pinnedPar.children.find(isItem)!.box;
+        expect(firstBar.y).toBeCloseTo(pinnedPar.box.y);
+        for (const pin of pinnedPar.inlineDatePins ?? []) {
+            expect(pin.glyphTopLeft.y).toBeCloseTo(pinnedPar.box.y - 12);
+        }
+    });
+
+    it('header-band before-glyph slides past a title wider than the box', async () => {
+        const src = `nowline v1
+roadmap r "R" start:2026-01-05 length:14w
+swimlane s "S"
+  parallel p "Regional rollout waves" after:2026-01-05 before:2026-02-02
+    item a "A" duration:2w
+`;
+        const { file, resolved } = await parseAndResolve(src);
+        const model = layoutRoadmap(file, resolved, { theme: 'light' });
+        const parallel = model.swimlanes[0].children.find(isParallel)!;
+        const { box } = parallel;
+        const [after, before] = parallel.inlineDatePins ?? [];
+        // Title follows the after-glyph (6 px inset + 12 px tile + 4 px
+        // gap) and is estimated at 0.58 em/char of 10 px text; restated
+        // rather than imported so a drift in the shared helpers shows up.
+        const titleEnd = box.x + 6 + 12 + 4 + 22 * 10 * 0.58;
+        // Precondition: the flush-right slot would land on the title.
+        expect(box.x + box.width - 6 - 12).toBeLessThan(titleEnd);
+        expect(after.glyphTopLeft.x).toBeCloseTo(box.x + 6);
+        expect(before.glyphTopLeft.x).toBeCloseTo(titleEnd + 4);
+    });
+
+    it('a same-row sibling bumps past a pinned title row that overflows its box', async () => {
+        const src = `nowline v1
+roadmap r "R" start:2026-01-05 length:14w
+swimlane s "S"
+  parallel p "Regional rollout waves" before:2026-02-02
+    item a "A" duration:2w
+  item next "Next" duration:2w
+`;
+        const { file, resolved } = await parseAndResolve(src);
+        const model = layoutRoadmap(file, resolved, { theme: 'light' });
+        const lane = model.swimlanes[0];
+        const parallel = lane.children.find(isParallel)!;
+        const next = lane.children.find(isItem)!;
+        const [before] = parallel.inlineDatePins ?? [];
+        // Precondition: the glyph overhangs the box toward `next`.
+        expect(before.glyphTopLeft.x + before.glyphSize).toBeGreaterThan(
+            parallel.box.x + parallel.box.width,
+        );
+        // `next` would otherwise chain onto the parallel's row, with its
+        // bar's top edge level with the glyph.
+        expect(next.box.y).toBeGreaterThanOrEqual(parallel.box.y + parallel.box.height);
+    });
+
     it('parallel inline-date pins attach to the parallel bounding box', async () => {
         const src = `nowline v1
 roadmap r "R" start:2026-01-05 length:14w

@@ -111,6 +111,10 @@ export interface BlockCommitInput {
     blockHeight: number;
     /** Logical right edge of the block. */
     blockEnd: number;
+    /** Reserved spill x for block chrome that overflows the block's
+     *  right edge (see `blockTitleRowSpillReservation`). Omitted or
+     *  `null` resets the row's spill reservation to `laneLeftX`. */
+    spillReservation?: number | null;
 }
 
 export class RowPacker {
@@ -184,7 +188,7 @@ export class RowPacker {
         const row = this.rows[input.rowIndex];
         this.growRowHeight(input.rowIndex, input.blockHeight);
         row.rightEdge = input.blockEnd;
-        row.spillX = this.opts.laneLeftX;
+        row.spillX = input.spillReservation ?? this.opts.laneLeftX;
         row.placedChildren.push(input.placed);
     }
 
