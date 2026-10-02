@@ -4,7 +4,7 @@
 // slot; `before:DATE` paints it in the top-RIGHT slot. The two helpers
 // below produce `Point` coordinates for the glyph's top-left corner, plus
 // a `spilled` flag indicating whether the bar was too narrow to host the
-// glyph inside (item case only — containers always have room).
+// glyph inside (item case only — containers never spill).
 //
 // Slot interleaving rules (per specs/rendering.md "Inline-date glyph"):
 //
@@ -21,7 +21,10 @@
 //   Container (group, parallel): glyph sits at the bounding box's top
 //   corners with the standard inset. Containers don't carry status dots
 //   or footnote indicators in their own decoration row, so no
-//   interleaving math is needed.
+//   interleaving math is needed. The one exception is a styled group's
+//   title chiclet, which owns the box's top-left corner: there both
+//   glyphs move into the chiclet's row, the `after` glyph one gap past
+//   the chiclet's right edge (see `computeContainerInlineDatePins`).
 
 import {
     INLINE_DATE_GLYPH_GAP_PX,
@@ -38,6 +41,7 @@ import {
     ITEM_STATUS_DOT_RADIUS_PX,
     MIN_BAR_WIDTH_FOR_INLINE_DATE_PX,
 } from './item-bar-geometry.js';
+import { GROUP_TITLE_TAB_HEIGHT_PX } from './themes/shared.js';
 import type { BoundingBox, InlineDatePin, Point } from './types.js';
 
 export interface ItemInlineDatePinInputs {
@@ -138,43 +142,67 @@ export interface ContainerInlineDatePinInputs {
     box: BoundingBox;
     afterDate: string | undefined;
     beforeDate: string | undefined;
+    /** Width (px) of the title chiclet a styled group paints flush in the
+     *  box's top-left corner (`groupTitleTabWidth`), or undefined when the
+     *  container paints none (bracket / unstyled groups, parallels). */
+    titleTabWidth?: number;
 }
 
 /**
  * Compute inline-date pin glyph placements for a container (group or
  * parallel). The glyphs sit flush to the box's top-LEFT (`after`) and
  * top-RIGHT (`before`) corners with the standard inset; containers
- * never spill (they always have room for a 12 px tile in their own
- * top-decoration row).
+ * never spill.
+ *
+ * A styled group's title chiclet owns the top-left corner, so when
+ * `titleTabWidth` is set both glyphs join the chiclet's row instead,
+ * vertically centered on it (the row sits above the group's first child,
+ * inside the chiclet's top-pad reservation):
+ *
+ *   - `after` sits `INLINE_DATE_GLYPH_GAP_PX` right of the chiclet's
+ *     right edge, so the chiclet stays flush in the corner.
+ *   - `before` stays flush right, but never slides left onto the
+ *     chiclet or the `after` glyph: when the chiclet is wider than the
+ *     box leaves room for, it sits one gap past whichever ends last.
  */
 export function computeContainerInlineDatePins(
     opts: ContainerInlineDatePinInputs,
 ): InlineDatePin[] {
-    const { box, afterDate, beforeDate } = opts;
+    const { box, afterDate, beforeDate, titleTabWidth } = opts;
     if (!afterDate && !beforeDate) return [];
 
     const pins: InlineDatePin[] = [];
     const tileSize = INLINE_DATE_GLYPH_TILE_SIZE_PX;
-    const topY = box.y + INLINE_DATE_GLYPH_INSET_TOP_PX;
+    const hasTab = titleTabWidth !== undefined;
+    const topY = hasTab
+        ? box.y + (GROUP_TITLE_TAB_HEIGHT_PX - tileSize) / 2
+        : box.y + INLINE_DATE_GLYPH_INSET_TOP_PX;
+    // Right edge of whatever already occupies the top-left of the row.
+    let leftClearX = hasTab ? box.x + titleTabWidth : box.x;
 
     if (afterDate) {
+        const x = hasTab
+            ? leftClearX + INLINE_DATE_GLYPH_GAP_PX
+            : box.x + INLINE_DATE_GLYPH_INSET_LEFT_PX;
+        leftClearX = x + tileSize;
         pins.push({
             side: 'after',
             isoDate: afterDate,
-            glyphTopLeft: { x: box.x + INLINE_DATE_GLYPH_INSET_LEFT_PX, y: topY },
+            glyphTopLeft: { x, y: topY },
             glyphSize: tileSize,
             spilled: false,
         });
     }
 
     if (beforeDate) {
+        const flushRightX = box.x + box.width - INLINE_DATE_GLYPH_INSET_RIGHT_PX - tileSize;
+        const x = hasTab
+            ? Math.max(flushRightX, leftClearX + INLINE_DATE_GLYPH_GAP_PX)
+            : flushRightX;
         pins.push({
             side: 'before',
             isoDate: beforeDate,
-            glyphTopLeft: {
-                x: box.x + box.width - INLINE_DATE_GLYPH_INSET_RIGHT_PX - tileSize,
-                y: topY,
-            },
+            glyphTopLeft: { x, y: topY },
             glyphSize: tileSize,
             spilled: false,
         });

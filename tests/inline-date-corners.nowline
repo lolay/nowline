@@ -56,13 +56,22 @@ swimlane mixed-list "Item — mixed list"
 
 swimlane styled-group "Styled group — visible box corners"
 
-  // Filled-style groups paint a chiclet in the upper-left; the
-  // after-glyph sits flush in the box's top-left corner alongside
-  // the chiclet (see specs/rendering.md). The before-glyph anchors
-  // flush right inside the visible box.
+  // Filled-style groups paint a chiclet in the upper-left; both
+  // glyphs join the chiclet's row, the after-glyph just past the
+  // chiclet's right edge (see specs/rendering.md). The before-glyph
+  // anchors flush right inside the visible box.
   group sg "Styled group" style:enterprise after:2026-02-09 before:2026-04-20
     item sg-a "Step A" duration:2w
     item sg-b "Step B" duration:2w
+
+swimlane narrow-styled-group "Styled group — chiclet wider than the box"
+
+  // A one-week styled group whose title chiclet runs past the box's
+  // right edge. The after-glyph still sits past the chiclet, and the
+  // before-glyph slides right of the after-glyph instead of landing on
+  // the chiclet in its usual flush-right slot.
+  group nsg "Narrow styled group" style:enterprise after:2026-02-09 before:2026-02-16
+    item nsg-a "Step" duration:1w
 
 swimlane unstyled-group "Unstyled group — logical extent"
 

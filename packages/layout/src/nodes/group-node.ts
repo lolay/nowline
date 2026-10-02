@@ -15,6 +15,7 @@ import type { EntityProperty, GroupBlock, ItemDeclaration, ParallelBlock } from 
 import { isItemDeclaration } from '@nowline/core';
 import { deriveItemDurationDays } from '../calendar.js';
 import { propValues } from '../dsl-utils.js';
+import { groupHasFill, groupTitleTabWidth } from '../group-title-tab-geometry.js';
 import { computeContainerInlineDatePins, pickInlineDate } from '../inline-date-pin-geometry.js';
 import type { LayoutContext, TrackCursor } from '../layout-context.js';
 import { RowPacker } from '../row-packer.js';
@@ -91,9 +92,10 @@ export class GroupNode {
         const previousFlowKey = ctx.currentFlowKey;
         ctx.nextGroupId += 1;
         ctx.currentFlowKey = `${previousFlowKey}/group:${node.name ?? `group-${ctx.nextGroupId}`}`;
-        // Mirrors `renderGroup`'s `hasFill` decision so the painted box
-        // and the layout's reservation agree on whether a chiclet exists.
-        const hasChiclet = style.bg !== 'none' && style.bg !== '#ffffff' && Boolean(title);
+        // Same `groupHasFill` predicate `renderGroup` paints with, so the
+        // painted box and the layout's reservation agree on whether a
+        // chiclet exists.
+        const hasChiclet = groupHasFill(style.bg) && Boolean(title);
         const topPad = hasChiclet ? GROUP_TITLE_TAB_HEIGHT_PX + GROUP_TITLE_TAB_GUTTER_PX : 0;
         const bottomPad = hasChiclet ? GROUP_BOTTOM_PAD_PX : 0;
         // Bracket-style groups paint their label at `box.y - 2`, so the
@@ -246,6 +248,8 @@ export class GroupNode {
             box,
             afterDate: pickInlineDate(propValues(node.properties, 'after')),
             beforeDate: pickInlineDate(propValues(node.properties, 'before')),
+            // The chiclet owns the box's top-left corner; the glyphs clear it.
+            titleTabWidth: hasChiclet && title ? groupTitleTabWidth(title) : undefined,
         });
         return {
             kind: 'group',

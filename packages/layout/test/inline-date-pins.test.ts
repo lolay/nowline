@@ -100,6 +100,69 @@ swimlane s "S"
         );
     });
 
+    it('styled-group pins join the title chiclet row and clear the chiclet', async () => {
+        // A filled group paints its title chiclet flush in the box's
+        // top-left corner; the after-glyph used to sit on top of it.
+        const src = `nowline v1
+
+config
+
+style filled
+  bg: blue
+
+roadmap r "R" start:2026-01-05 length:14w
+swimlane s "S"
+  group g "Group title" style:filled after:2026-02-09 before:2026-04-13
+    item a "A" duration:3w
+    item b "B" duration:3w
+`;
+        const { file, resolved } = await parseAndResolve(src);
+        const model = layoutRoadmap(file, resolved, { theme: 'light' });
+        const group = model.swimlanes[0].children.find(isGroup);
+        expect(group).toBeDefined();
+        const { box } = group!;
+        const [after, before] = group!.inlineDatePins ?? [];
+        expect([after?.side, before?.side]).toEqual(['after', 'before']);
+        // Chiclet: 11 chars x 5.5 px + 2 x 6 px padding = 72.5 px wide,
+        // 16 px tall, flush in the corner. Restated rather than imported
+        // so a drift in the shared helper shows up here.
+        const chicletRight = box.x + 11 * 5.5 + 2 * 6;
+        expect(after.glyphTopLeft.x).toBeCloseTo(chicletRight + 4);
+        // Both glyphs sit centered on the chiclet's 16 px row, above the
+        // first child row (which starts 20 px down).
+        expect(after.glyphTopLeft.y).toBeCloseTo(box.y + (16 - 12) / 2);
+        expect(before.glyphTopLeft.y).toBeCloseTo(box.y + (16 - 12) / 2);
+        // The before-glyph keeps its flush-right slot.
+        expect(before.glyphTopLeft.x + 12).toBeCloseTo(box.x + box.width - 6);
+    });
+
+    it('styled-group before-glyph slides past a chiclet wider than the box', async () => {
+        const src = `nowline v1
+
+config
+
+style filled
+  bg: blue
+
+roadmap r "R" start:2026-01-05 length:14w
+swimlane s "S"
+  group g "A much longer group title" style:filled after:2026-02-09 before:2026-02-16
+    item a "A" duration:1w
+`;
+        const { file, resolved } = await parseAndResolve(src);
+        const model = layoutRoadmap(file, resolved, { theme: 'light' });
+        const group = model.swimlanes[0].children.find(isGroup);
+        expect(group).toBeDefined();
+        const { box } = group!;
+        const [after, before] = group!.inlineDatePins ?? [];
+        const chicletRight = box.x + 25 * 5.5 + 2 * 6;
+        // Precondition: the chiclet really is wider than the box leaves
+        // room for, so the flush-right slot would land on it.
+        expect(box.x + box.width - 6 - 12).toBeLessThan(chicletRight);
+        expect(after.glyphTopLeft.x).toBeCloseTo(chicletRight + 4);
+        expect(before.glyphTopLeft.x).toBeCloseTo(after.glyphTopLeft.x + 12 + 4);
+    });
+
     it('parallel inline-date pins attach to the parallel bounding box', async () => {
         const src = `nowline v1
 roadmap r "R" start:2026-01-05 length:14w
