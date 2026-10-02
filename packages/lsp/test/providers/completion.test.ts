@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
-import { parseDocument, services } from '../helpers.js';
+import { BUILTIN_STATUSES } from '../../src/references/ast-utils.js';
+import { parseDocument, services, validationErrors } from '../helpers.js';
 
 describe('NowlineCompletionProvider', () => {
     it('proposes sequencing-eligible ids inside `after:` and excludes swimlanes', async () => {
@@ -120,6 +121,59 @@ swimlane backend "Backend"
         expect(labels).toEqual(
             expect.arrayContaining(['planned', 'in-progress', 'done', 'at-risk', 'blocked']),
         );
+    });
+
+    it('proposes the `active` and `completed` status aliases inside `status:`', async () => {
+        const source = `nowline v1
+
+roadmap demo "Demo" start:2026-01-05 scale:1w
+
+swimlane backend "Backend"
+  item api "API" duration:2w status:`;
+        const doc = await parseDocument(source);
+        const provider = services().Nowline.lsp.CompletionProvider!;
+        const list = await provider.getCompletion(doc, {
+            textDocument: { uri: doc.uri.toString() },
+            position: {
+                line: source.split('\n').length - 1,
+                character: source.split('\n').pop()!.length,
+            },
+        });
+        expect(list).toBeDefined();
+        const statuses = list!.items.filter((i) => i.detail === 'built-in status');
+        expect(statuses.map((i) => i.label)).toEqual(
+            expect.arrayContaining(['active', 'completed']),
+        );
+    });
+
+    it('offers exactly the built-in statuses the validator accepts', async () => {
+        // Every completion must validate without a declaration...
+        for (const status of BUILTIN_STATUSES) {
+            const errors = await validationErrors(`nowline v1
+
+roadmap demo "Demo" start:2026-01-05 scale:1w
+
+swimlane backend "Backend"
+  item api "API" duration:2w status:${status}
+`);
+            expect(errors, `status:${status}`).toEqual([]);
+        }
+        // ...and every validator built-in must be offered. The validator lists
+        // its full set when a custom status collides with a built-in.
+        const errors = await validationErrors(`nowline v1
+
+roadmap demo "Demo" start:2026-01-05 scale:1w
+
+status planned
+
+swimlane backend "Backend"
+  item api "API" duration:2w
+`);
+        const builtIns = errors
+            .map((m) => /Built-ins: (.+)\.$/.exec(m)?.[1])
+            .find((m) => m !== undefined);
+        expect(builtIns).toBeDefined();
+        expect([...BUILTIN_STATUSES].sort()).toEqual(builtIns!.split(', ').sort());
     });
 
     it('proposes custom status declarations alongside the built-ins', async () => {
