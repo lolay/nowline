@@ -751,7 +751,7 @@ swimlane "Platform"
         expect(below.box.y).toBe(tech.box.y + 80);
     });
 
-    it('attaches dependency arrows at the grown bar midpoint when the title wrapped', async () => {
+    it('attaches dependency arrows at the nominal row midline when the title wrapped', async () => {
         const src = `nowline v1
 
 roadmap r "R" start:2026-04-06 scale:2w
@@ -768,11 +768,12 @@ swimlane b "B"
         const edge = model.edges.find((e) => e.fromId === 'tech');
         expect(edge).toBeDefined();
         // A wrapped title does not spill, so the arrow leaves the bar's right
-        // edge at the grown bar's midpoint, not along the progress-strip row a
-        // spilled caption would force.
+        // edge on the row's nominal midline (28px below the top, as for any
+        // 56px bar), not along the progress-strip row a spilled caption would
+        // force and not at the grown bar's own mid-height (36px).
         const wp = edge?.waypoints ?? [];
         expect(wp[0].x).toBeCloseTo(tech.box.x + tech.box.width, 1);
-        expect(wp[0].y).toBeCloseTo(tech.box.y + tech.box.height / 2, 1);
+        expect(wp[0].y).toBeCloseTo(tech.box.y + 28, 1);
     });
 });
 
@@ -1302,5 +1303,153 @@ swimlane "Platform"
         }
         const bottom = Math.max(...wide.labelChips.map((c) => c.box.y + c.box.height));
         expect(bottom + 3 + 4).toBeLessThanOrEqual(wide.box.y + wide.box.height);
+    });
+});
+
+describe('layoutRoadmap dependency-arrow attach geometry', () => {
+    // A bar that grew (a wrapped title with a meta line is 72px, not 56px)
+    // still attaches its dependency arrows on the row's NOMINAL midline,
+    // `bandwidth / 2` (28px) below the bar top, so it shares an attach line
+    // with its un-grown row neighbours.
+    const NOMINAL_MID_PX = 28;
+    const PROGRESS_STRIP_HALF_PX = 2;
+
+    function items(children: PositionedTrackChild[]): PositionedItem[] {
+        const out: PositionedItem[] = [];
+        for (const child of children) {
+            if (child.kind === 'item') out.push(child);
+            else out.push(...items(child.children));
+        }
+        return out;
+    }
+
+    async function layout(src: string) {
+        const { file, resolved } = await parseAndResolve(src);
+        return layoutRoadmap(file, resolved, { theme: 'light' });
+    }
+
+    function find(model: Awaited<ReturnType<typeof layout>>, id: string): PositionedItem {
+        const found = model.swimlanes.flatMap((l) => items(l.children)).find((i) => i.id === id);
+        if (!found) throw new Error(`no item ${id}`);
+        return found;
+    }
+
+    it('starts an item-sourced arrow at the bar when the marker band grows', async () => {
+        // The anchor and the milestone label collide, so the marker band grows
+        // to two rows and every chart y shifts down by one row pitch after the
+        // items are placed. The arrow source must shift with the bars.
+        const src = `nowline v1
+
+roadmap repro "Marker band" start:2026-01-05 scale:1w
+
+anchor freeze "code-freeze" date:2026-02-02
+
+swimlane top "Top"
+  item a "Alpha" duration:4w
+
+swimlane bottom "Bottom"
+  item b "Beta work" duration:2w after:a
+
+milestone beta "Beta" after:a
+`;
+        const model = await layout(src);
+        // The shift under test only happens when the band outgrows its sizing.
+        expect(model.timeline.markerRow.height).toBeGreaterThanOrEqual(2 * 26);
+        const a = find(model, 'a');
+        const b = find(model, 'b');
+        expect(a.box.height).toBe(56);
+        const edge = model.edges.find((e) => e.fromId === 'a' && e.toId === 'b');
+        expect(edge).toBeDefined();
+        const wp = edge?.waypoints ?? [];
+        expect(wp[0].x).toBeCloseTo(a.box.x + a.box.width, 1);
+        expect(wp[0].y).toBeCloseTo(a.box.y + NOMINAL_MID_PX, 1);
+        expect(wp[wp.length - 1].x).toBeCloseTo(b.box.x, 1);
+        expect(wp[wp.length - 1].y).toBeCloseTo(b.box.y + NOMINAL_MID_PX, 1);
+    });
+
+    it('draws one straight segment from a grown bar to a normal bar on the same row', async () => {
+        const src = `nowline v1
+
+roadmap gap "Gap" start:2026-01-05 length:16w
+
+swimlane s "S"
+  item a "Auth refactor" duration:3w
+  item b "Next" duration:2w after:a date:2026-02-23
+`;
+        const model = await layout(src);
+        const a = find(model, 'a');
+        const b = find(model, 'b');
+        expect(a.box.height).toBe(72);
+        expect(b.box.height).toBe(56);
+        expect(b.box.y).toBe(a.box.y);
+        const edge = model.edges.find((e) => e.fromId === 'a' && e.toId === 'b');
+        expect(edge).toBeDefined();
+        const wp = edge?.waypoints ?? [];
+        // A single straight segment: two points on one horizontal line.
+        expect(wp).toHaveLength(2);
+        expect(wp[0].y).toBeCloseTo(wp[1].y, 3);
+        expect(wp[0].y).toBeCloseTo(a.box.y + NOMINAL_MID_PX, 1);
+        expect(wp[0].x).toBeCloseTo(a.box.x + a.box.width, 1);
+        expect(wp[1].x).toBeCloseTo(b.box.x, 1);
+    });
+
+    it('draws one straight segment from a normal bar to a grown bar on the same row', async () => {
+        const src = `nowline v1
+
+roadmap gap "Gap" start:2026-01-05 length:16w
+
+swimlane s "S"
+  item a "Plain" duration:3w
+  item b "Auth refactor" duration:3w after:a date:2026-02-23
+`;
+        const model = await layout(src);
+        const a = find(model, 'a');
+        const b = find(model, 'b');
+        expect(a.box.height).toBe(56);
+        expect(b.box.height).toBe(72);
+        const wp = model.edges.find((e) => e.fromId === 'a' && e.toId === 'b')?.waypoints ?? [];
+        expect(wp).toHaveLength(2);
+        expect(wp[0].y).toBeCloseTo(wp[1].y, 3);
+        expect(wp[1].y).toBeCloseTo(b.box.y + NOMINAL_MID_PX, 1);
+    });
+
+    it('draws no arrow between a grown bar and its immediate same-row successor', async () => {
+        // The layout normally suppresses the arrow between file-order chained,
+        // touching bars. A grown bar next to a normal one used to defeat that
+        // check (their mid-heights differ) and drew a small S-jog.
+        const src = `nowline v1
+
+roadmap chain "Chain" start:2026-01-05 length:12w
+
+swimlane s "S"
+  item a "Auth refactor" duration:3w
+  item b "Next" duration:2w after:a
+  item c "Plainer" duration:3w
+  item d "Next" duration:2w after:c
+`;
+        const model = await layout(src);
+        expect(find(model, 'a').box.height).toBe(72);
+        expect(find(model, 'c').box.height).toBe(56);
+        expect(model.edges.find((e) => e.fromId === 'c' && e.toId === 'd')).toBeUndefined();
+        expect(model.edges.find((e) => e.fromId === 'a' && e.toId === 'b')).toBeUndefined();
+    });
+
+    it('keeps the progress-strip attach for a spilled-caption source', async () => {
+        const src = `nowline v1
+
+roadmap spill "Spill" start:2026-01-05 scale:1w
+
+swimlane s "S"
+  item a "Infrastructure" duration:1w
+
+swimlane t "T"
+  item b "Beta" duration:2w after:a
+`;
+        const model = await layout(src);
+        const a = find(model, 'a');
+        expect(a.textSpills).toBe(true);
+        const wp = model.edges.find((e) => e.fromId === 'a' && e.toId === 'b')?.waypoints ?? [];
+        expect(wp[0].x).toBeCloseTo(a.box.x + a.box.width, 1);
+        expect(wp[0].y).toBeCloseTo(a.box.y + a.box.height - PROGRESS_STRIP_HALF_PX, 1);
     });
 });

@@ -615,6 +615,16 @@ export class RoadmapNode {
             for (const [id, y] of ctx.itemSlackAttachY) {
                 ctx.itemSlackAttachY.set(id, y + deltaY);
             }
+            // itemArrowSource is the third absolute-Y map captured during
+            // swimlane place (the dependency-arrow source port). Missing it
+            // leaves every item-sourced arrow starting `deltaY` too high.
+            // The remaining LayoutContext maps need no shift: the edge /
+            // visual-edge maps hold X only, itemFlowKey holds strings,
+            // markerRowPlacements are already final, and slackCorridors are
+            // pass-2 inputs consumed before this block.
+            for (const [id, p] of ctx.itemArrowSource) {
+                ctx.itemArrowSource.set(id, { x: p.x, y: p.y + deltaY });
+            }
             for (const m of milestones) {
                 m.cutTopY = ctx.chartTopY;
                 m.cutBottomY = ctx.swimlaneBottomY;

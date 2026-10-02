@@ -302,12 +302,14 @@ All dependency arrows use orthogonal routing — horizontal and vertical segment
 
 Arrows attach to **visual** edges, never to logical column boundaries — the arrowhead lands on the painted bar edge so the inter-column gutter stays clean.
 
+- **Row midline**: the attach line of an item whose caption stays inside the bar is the row's **nominal midline**, `bar.top + bandwidth / 2` (28 px below the top for the default 56 px band) — not the bar's own mid-height. A bar that grew (a wrapped title with a meta line, or label chips, make it 72 px or more) is taller than its row-mates, so its true mid-height sits lower than theirs; attaching there would bend an arrow between a grown bar and a same-row neighbour into a small jog. On the nominal line, grown and normal bars on one row share an attach line, and a straight arrow between them stays a single straight segment. For an ungrown 56 px bar the two lines coincide. An item whose caption spills keeps the geometry below.
 - **Source** (where the arrow leaves a predecessor):
-    - **Item without overflow**: bar's **right edge** at the row midline (`(visualRight, midY)`).
+    - **Item without overflow**: bar's **right edge** at the row's nominal midline (`(visualRight, bar.top + bandwidth / 2)`).
     - **Item with overflow text** (caption spills past the bar's right edge): bar's **right edge** at the **vertical center of the bottom progress strip** (`(visualRight, box.bottom - PROGRESS_STRIP_HEIGHT_PX / 2)`). Same X as the no-overflow case so the arrow still visually leaves the bar's side; Y drops to the strip so the arrow runs *underneath* the spilled title / meta rather than through it. Mirrors the milestone slack-arrow attach.
     - **Anchor or milestone**: the marker's **vertical cut line** at the *target* item's row midline (`(marker.center.x, target.midY)`). The cut line acts as the visible stem; the arrow is the short horizontal stub from the line into the target's left visual edge.
-- **Target** (where the arrow terminates): the dependent item's **left visual edge** at its row midline (`(visualLeft, midY)`). The arrowhead never pierces the bar's interior.
-- Same-row immediate-successor chains (file-order chained items in one swimlane) skip drawing — the spatial flow already conveys ordering.
+- **Target** (where the arrow terminates): the dependent item's **left visual edge** at its row's nominal midline (`(visualLeft, bar.top + bandwidth / 2)`); an item whose caption spills right keeps the bar's own mid-height (`bar.top + height / 2`). The arrowhead never pierces the bar's interior.
+- Same-row immediate-successor chains (file-order chained items in one swimlane) skip drawing — the spatial flow already conveys ordering. The check compares the attach lines above, so a grown bar next to a normal one skips like any other pair.
+- **Marker-band growth**: the marker band can grow after the swimlanes are placed (a milestone or anchor label collides with another marker and takes a second row), which shifts every chart y down. Every y captured during placement — the target midpoints, the arrow source points and the slack-arrow attach — shifts with it, so an arrow still starts and ends on its bars.
 
 #### Channel Routing
 

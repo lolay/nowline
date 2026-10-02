@@ -817,9 +817,19 @@ function sequenceItem(
     // dependency-arrow target geometry and join flow-key dedup without
     // entering the human-referenceable namespace above.
     const drawKey = id ?? syntheticItemKey(node);
+    // Dependency-arrow attach line: the NOMINAL row midline, `bandwidth / 2`
+    // below the bar top, not the bar's own mid-height. A bar that grew to
+    // enclose a wrapped title or a chip column is taller than its row's
+    // other bars, so its true mid-height sits lower; attaching there would
+    // bend every arrow between a grown bar and a same-row neighbour into a
+    // jog. On a bar that did not grow the two are equal (56px: 28 either
+    // way), so ordinary output is unchanged. Only bars whose caption stays in
+    // the bar are re-aimed: a spilled caption keeps the bar's own mid-height as
+    // the target line and the progress-strip attach as the source (below).
+    const attachMidY = itemBox.y + bandwidth / 2;
     ctx.entityMidpoints.set(drawKey, {
         x: (logicalLeft + logicalRight) / 2,
-        y: itemBox.y + itemBox.height / 2,
+        y: textSpills ? itemBox.y + itemBox.height / 2 : attachMidY,
     });
     // Visual edges — where dependency arrows actually attach. These sit
     // ITEM_INSET_PX inside the column boundaries so the arrows emerge from
@@ -841,7 +851,7 @@ function sequenceItem(
           }
         : {
               x: itemBox.x + itemBox.width,
-              y: itemBox.y + itemBox.height / 2,
+              y: attachMidY,
           };
     ctx.itemArrowSource.set(drawKey, arrowSource);
     ctx.itemFlowKey.set(drawKey, ctx.currentFlowKey);
