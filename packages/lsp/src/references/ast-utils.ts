@@ -73,11 +73,17 @@ export const REFERENCE_PROP_KEYS = new Set([
     'capacity-icon',
 ]);
 
-/** Status value-completion source: built-in statuses ship with the renderer. */
+/**
+ * Status value-completion source: built-in statuses ship with the renderer.
+ * Mirrors `BUILTIN_STATUSES` in the validator, including the `active` and
+ * `completed` aliases for `in-progress` and `done`.
+ */
 export const BUILTIN_STATUSES: readonly string[] = [
     'planned',
     'in-progress',
+    'active',
     'done',
+    'completed',
     'at-risk',
     'blocked',
 ];

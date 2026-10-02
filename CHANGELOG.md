@@ -6,6 +6,11 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ## [Unreleased]
 
+### Fixed
+
+- **VS Code extension — snippets offer only valid values**: the `roadmap` snippet's `scale:` choice list offered `1mo`, which is not a duration literal, and now offers `1m`. The `item` and `item-full` snippets no longer offer `backlog`, which is not a built-in status.
+- **`@nowline/lsp` — status completion includes the aliases**: `status:` completion now offers `active` and `completed`, the built-in aliases for `in-progress` and `done` that the validator already accepts. `BUILTIN_STATUSES` exported from `@nowline/lsp` gains both values.
+
 ## [0.8.6] - 2026-10-01
 
 ### Added
