@@ -16,6 +16,7 @@ export {
     type FrameTabGeometry,
     frameTabGeometry,
 } from './frame-tab-geometry.js';
+export { groupHasFill, groupTitleTabWidth } from './group-title-tab-geometry.js';
 export {
     HEADER_AUTHOR_FONT_SIZE_PX,
     HEADER_AUTHOR_LINE_HEIGHT_PX,

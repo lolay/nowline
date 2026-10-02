@@ -42,11 +42,12 @@ import {
     FRAME_TAB_LABEL_BASELINE_OFFSET_PX,
     frameTabGeometry,
     GROUP_BRACKET_LABEL_OVERHANG_PX,
-    GROUP_TITLE_TAB_CHAR_WIDTH_PX,
     GROUP_TITLE_TAB_HEIGHT_PX,
     GROUP_TITLE_TAB_LABEL_BASELINE_OFFSET_PX,
     GROUP_TITLE_TAB_LABEL_FONT_SIZE_PX,
     GROUP_TITLE_TAB_PAD_X_PX,
+    groupHasFill,
+    groupTitleTabWidth,
     HEADER_AUTHOR_FONT_SIZE_PX,
     HEADER_AUTHOR_LINE_HEIGHT_PX,
     HEADER_CARD_PADDING_TOP,
@@ -1187,7 +1188,7 @@ function renderGroup(
     fonts: FontFamilies,
 ): string {
     const parts: string[] = [];
-    const hasFill = g.style.bg !== 'none' && g.style.bg !== '#ffffff';
+    const hasFill = groupHasFill(g.style.bg);
     if (hasFill) {
         // Filled-box style with a chiclet label flush in the upper-left
         // corner. The painted box matches the layout-reported `box` 1:1
@@ -1208,8 +1209,9 @@ function renderGroup(
             }),
         );
         if (g.title) {
-            const tabW =
-                g.title.length * GROUP_TITLE_TAB_CHAR_WIDTH_PX + 2 * GROUP_TITLE_TAB_PAD_X_PX;
+            // Layout sizes the inline-date glyph clearance off the same
+            // helper, so an `after:` glyph always lands past this edge.
+            const tabW = groupTitleTabWidth(g.title);
             const tabX = g.box.x;
             const tabY = g.box.y;
             const tabH = GROUP_TITLE_TAB_HEIGHT_PX;
