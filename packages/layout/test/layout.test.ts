@@ -1,6 +1,7 @@
 import { isItemDeclaration, isSwimlaneDeclaration, type NowlineFile } from '@nowline/core';
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
 import { layoutRoadmap, type PositionedItem, type PositionedTrackChild } from '../src/index.js';
+import { SwimlaneNode, type SwimlaneNodeDeps } from '../src/nodes/swimlane-node.js';
 import { parseAndResolve } from './helpers.js';
 
 describe('layoutRoadmap', () => {
@@ -1222,6 +1223,34 @@ swimlane "Platform"
         expect(wide.textSpills).toBe(true);
         expect(wide.box.height).toBe(72);
         expect(below.box.y).toBe(wide.box.y + 80);
+    });
+
+    it('predicts exactly the growth the spilled explicit block is placed with', async () => {
+        // Rows commit at max(predicted, placed), so an under-predicting row
+        // predictor never shows in the geometry (the test above passes with a
+        // predictor that returns 0). Hold the predictor the lane was handed to
+        // the placed bar directly: two spilled lines plus meta grow it 16px.
+        const place = vi.spyOn(SwimlaneNode.prototype, 'place');
+        try {
+            const { file, model } = await layout(
+                roadmap(
+                    '  item wide "Internationalization of\\nthe billing service" duration:2w\n',
+                ),
+            );
+            const lane = place.mock.contexts[0] as unknown as { deps: SwimlaneNodeDeps };
+            const ctx = place.mock.calls[0][1];
+            const decl = file.roadmapEntries
+                .filter(isSwimlaneDeclaration)
+                .flatMap((s) => s.content)
+                .find((c) => isItemDeclaration(c) && c.name === 'wide');
+            if (!decl || !isItemDeclaration(decl)) throw new Error('no item wide in the AST');
+            const wide = find(items(model.swimlanes[0].children), 'wide');
+            expect(wide.textSpills).toBe(true);
+            expect(wide.box.height).toBe(72);
+            expect(lane.deps.predictItemBarExtraHeight(decl, ctx)).toBe(16);
+        } finally {
+            place.mockRestore();
+        }
     });
 
     it('stays single-line for a parse-level "a\\\\nb": the literal text a\\nb, not a break', async () => {
