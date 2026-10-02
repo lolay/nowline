@@ -70,3 +70,60 @@ describe('canonical printer rules', () => {
         expect(hpIdx).toBeGreaterThan(calIdx);
     });
 });
+
+describe('symbol declarations', () => {
+    // Regression: printNowlineFile threw "Unknown config entry type:
+    // SymbolDeclaration", breaking JSON -> text for any file with a symbol.
+    const source = [
+        'config',
+        '',
+        'symbol budget "Budget" ascii:"$" unicode:"💰"',
+        'symbol star unicode:"⭐"',
+        'symbol docs "Docs" link:https://example.com/docs ascii:"D" unicode:"📄"',
+        '  description "Documentation glyph"',
+        '',
+        'roadmap r "R"',
+        'swimlane s "S"',
+        '  item x "X" duration:1w',
+        '',
+    ].join('\n');
+
+    async function toJson(text: string) {
+        const r = await parseSource(text, 'test.nowline', { validate: true });
+        expect(r.hasErrors, r.diagnostics.map((d) => d.message).join('\n')).toBe(false);
+        return serializeToJson(r.document, text).ast;
+    }
+
+    it('prints symbol lines as `symbol [id] ["title"] unicode: ascii: link:`', async () => {
+        const out = await canonical(source);
+        expect(out).toContain('\nsymbol budget "Budget" unicode:"💰" ascii:"$"\n');
+        expect(out).toContain('\nsymbol star unicode:"⭐"\n');
+        expect(out).toContain(
+            '\nsymbol docs "Docs" unicode:"📄" ascii:D link:https://example.com/docs\n  description "Documentation glyph"\n',
+        );
+    });
+
+    it('text -> json -> text is stable after first canonicalization', async () => {
+        const text = await canonical(source);
+        expect(printNowlineFile(await toJson(text))).toBe(text);
+    });
+
+    it('json -> text -> json is stable after first canonicalization', async () => {
+        const firstJson = await toJson(await canonical(source));
+        const secondJson = await toJson(printNowlineFile(firstJson));
+        expect(stripPositions(secondJson)).toEqual(stripPositions(firstJson));
+    });
+});
+
+function stripPositions(node: unknown): unknown {
+    if (Array.isArray(node)) return node.map(stripPositions);
+    if (node && typeof node === 'object') {
+        const out: Record<string, unknown> = {};
+        for (const [k, v] of Object.entries(node as Record<string, unknown>)) {
+            if (k === '$position') continue;
+            out[k] = stripPositions(v);
+        }
+        return out;
+    }
+    return node;
+}
