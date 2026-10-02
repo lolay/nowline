@@ -152,19 +152,56 @@ export const ITEM_LINK_ICON_INSET_PX = 6;
 export const ITEM_LINK_ICON_TO_CAPTION_GAP_PX = 4;
 
 /**
- * Left inset (px) of the in-bar caption from the bar's left edge:
- * `ITEM_CAPTION_INSET_X_PX` normally, pushed right past the link-icon
- * tile (and its gap) when the bar carries a link icon. With today's
- * numbers that is 12 without a link icon and 24 with one.
+ * The item carries an inline `after:DATE` glyph, on a bar of the given
+ * painted width. Passed to `itemCaptionInsetX` so the glyph, not just
+ * the link tile, reserves room at the caption's left edge.
  */
-export function itemCaptionInsetX(hasLinkIcon: boolean): number {
-    if (!hasLinkIcon) return ITEM_CAPTION_INSET_X_PX;
-    const linkColumn =
-        ITEM_LINK_ICON_INSET_PX +
-        ITEM_LINK_ICON_TILE_SIZE_PX +
-        ITEM_LINK_ICON_TO_CAPTION_GAP_PX -
-        ITEM_CAPTION_INSET_X_PX;
-    return ITEM_CAPTION_INSET_X_PX + Math.max(0, linkColumn);
+export interface ItemCaptionAfterGlyph {
+    /** Painted bar width (px): `box.width`. Decides whether the glyph spills. */
+    barWidth: number;
+}
+
+/**
+ * Left inset (px) of the in-bar caption from the bar's left edge. It is
+ * `ITEM_CAPTION_INSET_X_PX` normally, pushed right past the link-icon
+ * tile (and its gap) when the bar carries a link icon, and pushed right
+ * past the `after:` inline-date glyph (and a gap) when the bar carries
+ * one INSIDE it:
+ *
+ *   - no link icon, no glyph: 12
+ *   - link icon, no glyph: 24
+ *   - glyph, no link icon: 22 (the glyph spans 6..18, plus a 4 px gap)
+ *   - glyph and link icon: 40 (the glyph spans 24..36, plus a 4 px gap)
+ *
+ * A glyph on a bar narrower than `MIN_BAR_WIDTH_FOR_INLINE_DATE_PX`
+ * spills out of the bar to the left and reserves nothing.
+ *
+ * `hasLinkIcon` is the same flag `computeItemInlineDatePins` places the
+ * glyph with, and the glyph's right edge comes from the same helper
+ * (`itemAfterGlyphInsideLeftX`), so the inset and the glyph can't
+ * disagree. The inset applies to every caption line, not only line 1,
+ * so the caption's left edge stays straight.
+ */
+export function itemCaptionInsetX(
+    hasLinkIcon: boolean,
+    afterGlyph?: ItemCaptionAfterGlyph,
+): number {
+    let inset = ITEM_CAPTION_INSET_X_PX;
+    if (hasLinkIcon) {
+        const linkColumn =
+            ITEM_LINK_ICON_INSET_PX +
+            ITEM_LINK_ICON_TILE_SIZE_PX +
+            ITEM_LINK_ICON_TO_CAPTION_GAP_PX -
+            ITEM_CAPTION_INSET_X_PX;
+        inset = ITEM_CAPTION_INSET_X_PX + Math.max(0, linkColumn);
+    }
+    if (afterGlyph && !inlineDateGlyphSpills(afterGlyph.barWidth)) {
+        // Offsets from a left edge of 0, so the numbers are exact integers.
+        const glyphRight =
+            itemAfterGlyphInsideLeftX(0, hasLinkIcon) + INLINE_DATE_GLYPH_TILE_SIZE_PX;
+        inset = Math.max(inset, glyphRight + ITEM_DECORATION_SPILL_GAP_PX);
+    }
+    return inset;
 }
 
 // ---- Narrow-bar decoration spill --------------------------------
@@ -255,6 +292,39 @@ export const MIN_BAR_WIDTH_FOR_INLINE_DATE_PX =
     INLINE_DATE_GLYPH_GAP_PX +
     INLINE_DATE_GLYPH_TILE_SIZE_PX +
     INLINE_DATE_GLYPH_INSET_RIGHT_PX;
+
+/**
+ * True when a bar of painted width `barWidth` is too narrow to host the
+ * inline-date glyph inside, so it spills (`before:` right, `after:` left).
+ * The one threshold behind the glyph's `spilled` flag and the caption
+ * inset's decision to reserve room for it.
+ */
+export function inlineDateGlyphSpills(barWidth: number): boolean {
+    return barWidth < MIN_BAR_WIDTH_FOR_INLINE_DATE_PX;
+}
+
+/**
+ * Left x of the `after:` inline-date glyph when it sits INSIDE the bar,
+ * for a bar whose left edge is at `leftEdge`:
+ *
+ *   - no link icon: the glyph sits at the leftmost top-decoration slot,
+ *     `INLINE_DATE_GLYPH_INSET_LEFT_PX` (6) from the edge
+ *   - link icon: one `INLINE_DATE_GLYPH_GAP_PX` right of the tile's right
+ *     edge (6 + 14 + 4 = 24 from the edge)
+ *
+ * The one formula behind both the glyph placement
+ * (`computeItemInlineDatePins`) and the caption's left inset
+ * (`itemCaptionInsetX`), so the two can never disagree. Pass
+ * `leftEdge = 0` to get the offset from the bar's left edge.
+ */
+export function itemAfterGlyphInsideLeftX(leftEdge: number, hasLinkIcon: boolean): number {
+    return hasLinkIcon
+        ? leftEdge +
+              ITEM_LINK_ICON_INSET_PX +
+              ITEM_LINK_ICON_TILE_SIZE_PX +
+              INLINE_DATE_GLYPH_GAP_PX
+        : leftEdge + INLINE_DATE_GLYPH_INSET_LEFT_PX;
+}
 
 /**
  * Left x of the `before:` inline-date glyph when it sits INSIDE the bar,

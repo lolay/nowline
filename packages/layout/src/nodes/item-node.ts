@@ -22,6 +22,10 @@
 //      inner width: in-bar, wrapped.
 //   3. Otherwise: spill to the right of the bar as a single line.
 //
+// The caption's left edge (`itemCaptionInsetX`) clears the link tile and
+// the `after:` inline-date glyph in the bar's upper-left. The inset
+// applies to EVERY caption line, so the left edge stays straight.
+//
 // The FIRST title line has a narrower budget than the rest: it shares
 // the bar's upper-right with the status dot, footnote digits and the
 // `before:` glyph, so it stops short of that cluster
@@ -53,8 +57,8 @@ import type { BoundingBox } from '../types.js';
 
 /**
  * Inner padding applied on the RIGHT of the title text (the left inset
- * comes from `itemCaptionInsetX`, which adds the link-icon column when
- * present) — the bar's inner-padded text area is
+ * comes from `itemCaptionInsetX`, which adds the link-icon column and
+ * the `after:` glyph column when present) — the bar's inner-padded text area is
  * `box.width - itemCaptionInsetX(..) - TEXT_INSET_PX` wide. Text wraps
  * or spills past the bar when either the title or the meta line
  * exceeds that area.
@@ -99,6 +103,15 @@ export interface ItemNodeInput {
      * collide with the icon.
      */
     hasLinkIcon?: boolean;
+    /**
+     * True when the item carries an inline `after:DATE`, which paints a
+     * calendar glyph in the bar's upper-left (right of the link tile
+     * when there is one). Caption text indents past the glyph so the
+     * title doesn't run under it. The glyph spills out of a bar narrower
+     * than `MIN_BAR_WIDTH_FOR_INLINE_DATE_PX`; `place` checks the placed
+     * bar width and reserves nothing in that case.
+     */
+    hasAfterGlyph?: boolean;
     /**
      * Space (px) the title's FIRST line leaves free at the bar's right
      * edge, so it clears the status dot, footnote digits and `before:`
@@ -313,10 +326,13 @@ export class ItemNode implements Renderable<PlacedItemGeometry> {
             height: intrinsic.height,
         };
 
-        // The link icon (when present) lives in the bar's upper-left
-        // and shares the title's vertical band. The caption indents
-        // past the icon so the title doesn't render on top of it.
-        const captionLeftInset = itemCaptionInsetX(!!this.input.hasLinkIcon);
+        // The link icon and the `after:` glyph (when present) live in the
+        // bar's upper-left and share the title's vertical band. The
+        // caption indents past them so the title doesn't render on top.
+        const captionLeftInset = itemCaptionInsetX(
+            !!this.input.hasLinkIcon,
+            this.input.hasAfterGlyph ? { barWidth: visualWidth } : undefined,
+        );
         const innerWidth = Math.max(0, visualWidth - captionLeftInset - TEXT_INSET_PX);
         const titleStr = this.input.title;
         // Trailing decoration (capacity suffix) renders to the right of

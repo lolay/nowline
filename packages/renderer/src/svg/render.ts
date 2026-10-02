@@ -960,16 +960,23 @@ function renderItem(
             captionX += ITEM_LINK_ICON_TILE_SIZE_PX + ITEM_DECORATION_SPILL_GAP_PX;
         }
     } else {
-        // Same inset layout used to size the wrap: 12px, or 24px when a
-        // link-icon tile occupies the bar's upper-left (the tile spans
-        // `box.x + 6 .. box.x + 20`). `linkIcon` is the string 'none'
-        // (truthy) for an item without a `link:`, and `noLinks` omits the
-        // tile entirely, so only indent when a tile is really drawn. An
-        // icon that spilled out of the bar forces the caption to spill
-        // too, so that case never reaches here.
-        const linkTileInBar =
-            !options.noLinks && !!i.linkIcon && i.linkIcon !== 'none' && !i.iconSpills;
-        captionX = i.box.x + itemCaptionInsetX(linkTileInBar);
+        // Same inset layout used to size the wrap: 12px, 24px past a
+        // link-icon tile (spanning `box.x + 6 .. box.x + 20`), and past an
+        // in-bar `after:` glyph too (22px, or 40px beside the link tile).
+        // `linkIcon` is the string 'none' (truthy) for an item without a
+        // `link:`, and `noLinks` omits the tile entirely, so only indent
+        // for the tile when it is really drawn. An icon that spilled out
+        // of the bar forces the caption to spill too, so that case never
+        // reaches here.
+        const hasLink = !!i.linkIcon && i.linkIcon !== 'none';
+        const afterPin = i.inlineDatePins?.find((p) => p.side === 'after' && !p.spilled);
+        // Layout placed an `after:` glyph beside the link tile whether or
+        // not `noLinks` hides it, so the glyph's clearance keys off the
+        // `link:` itself rather than off the tile being drawn.
+        const insetX = afterPin
+            ? itemCaptionInsetX(hasLink, { barWidth: i.box.width })
+            : itemCaptionInsetX(!options.noLinks && hasLink && !i.iconSpills);
+        captionX = i.box.x + insetX;
     }
     // When the caption spills outside the bar it renders on the
     // chart / group bg instead of the bar fill — `i.style.text` is

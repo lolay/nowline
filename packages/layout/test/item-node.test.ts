@@ -328,6 +328,112 @@ describe('ItemNode', () => {
         });
     });
 
+    describe('caption indent past an in-bar `after:` glyph', () => {
+        // Logical width 160 -> visual 148. A plain bar leaves 124px of inner
+        // width (inset 12) and a 115px first line. The `after:` glyph pushes
+        // the caption in to 22px (40px beside a link tile), which narrows
+        // both: inner 114 / first line 105 (no link), inner 96 / first line 87.
+        function place(input: {
+            title: string;
+            metaText?: string;
+            hasLinkIcon?: boolean;
+            hasAfterGlyph?: boolean;
+            logicalRightX?: number;
+            titleFirstLineRightReservePx?: number;
+        }) {
+            const node = new ItemNode({
+                id: 'a',
+                logicalLeftX: 0,
+                logicalRightX: 160,
+                ...input,
+            });
+            return node.place({ x: 0, y: 0 }, makeCtx());
+        }
+
+        it('narrows the fit width: a title that fit one line now wraps', () => {
+            // "Ship the thing" is 105.6px: inside the 115px first line, outside 105.
+            expect(place({ title: 'Ship the thing', metaText: '2w' }).titleLines).toEqual([
+                'Ship the thing',
+            ]);
+            const placed = place({
+                title: 'Ship the thing',
+                metaText: '2w',
+                hasAfterGlyph: true,
+            });
+            expect(placed.textSpills).toBe(false);
+            expect(placed.titleLines).toEqual(['Ship the', 'thing']);
+        });
+
+        it('starts the caption at the glyph-cleared inset: 6 + 22 without a link', () => {
+            const placed = place({ title: 'Ship it', hasAfterGlyph: true });
+            expect(placed.textSpills).toBe(false);
+            expect(placed.textX).toBe(6 + 22);
+        });
+
+        it('starts the caption at 6 + 40 beside a link tile', () => {
+            const placed = place({ title: 'Ship it', hasAfterGlyph: true, hasLinkIcon: true });
+            expect(placed.textSpills).toBe(false);
+            expect(placed.textX).toBe(6 + 40);
+        });
+
+        it('narrows the fit width further beside a link tile', () => {
+            // Logical 190 -> visual 178. "Ship the new one" is 120.6px: it fits the
+            // link tile's 24px indent (first line 178 - 24 - 21 = 133px) but not
+            // the 40px one the glyph adds (178 - 40 - 21 = 117px).
+            const title = 'Ship the new one';
+            const withLinkOnly = place({ title, hasLinkIcon: true, logicalRightX: 190 });
+            expect(withLinkOnly.titleLines).toEqual([title]);
+            const withBoth = place({
+                title,
+                hasLinkIcon: true,
+                hasAfterGlyph: true,
+                logicalRightX: 190,
+            });
+            expect(withBoth.textSpills).toBe(false);
+            expect(withBoth.titleLines).toEqual(['Ship the new', 'one']);
+        });
+
+        it('narrows the inner width for every later line and the meta line too', () => {
+            // Inner width 124 -> 114. Line 2 "Internationalize" is 120.6px: it fits
+            // 124 and no longer fits 114, so the wrapped title spills.
+            const base = place({ title: 'Go Internationalize', metaText: '2w' });
+            expect(base.textSpills).toBe(false);
+            const indented = place({
+                title: 'Go Internationalize',
+                metaText: '2w',
+                hasAfterGlyph: true,
+            });
+            expect(indented.textSpills).toBe(true);
+            // Meta line: 19 chars at 11px = 121.2px fits 124 but not 114.
+            const meta = 'x'.repeat(19);
+            expect(place({ title: 'OK', metaText: meta }).textSpills).toBe(false);
+            expect(place({ title: 'OK', metaText: meta, hasAfterGlyph: true }).textSpills).toBe(
+                true,
+            );
+        });
+
+        it('adds no indent when the glyph spills out of a bar narrower than 40px', () => {
+            // Logical 50 -> visual 38. The glyph spills, so the caption keeps
+            // the plain 12px inset. A fixed 12px right reserve keeps the dot
+            // out of the way of this tiny bar.
+            const placed = place({
+                title: 'A',
+                hasAfterGlyph: true,
+                logicalRightX: 50,
+                titleFirstLineRightReservePx: 12,
+            });
+            expect(placed.box.width).toBe(38);
+            expect(placed.textSpills).toBe(false);
+            expect(placed.textX).toBe(6 + 12);
+        });
+
+        it('ignores the flag when no glyph is declared', () => {
+            const placed = place({ title: 'Ship the thing', metaText: '2w', hasAfterGlyph: false });
+            expect(placed.titleLines).toEqual(['Ship the thing']);
+            expect(placed.textX).toBe(6 + 12);
+        });
+    });
+
     describe('explicit title line breaks', () => {
         // Logical width 160 -> visual 148 -> inner width 124, first-line width 115
         // (dot clearance). Logical 400 -> visual 388 -> inner 364, first-line 355.

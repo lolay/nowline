@@ -24,16 +24,14 @@
 //   interleaving math is needed.
 
 import {
-    INLINE_DATE_GLYPH_GAP_PX,
     INLINE_DATE_GLYPH_INSET_LEFT_PX,
     INLINE_DATE_GLYPH_INSET_RIGHT_PX,
     INLINE_DATE_GLYPH_INSET_TOP_PX,
     INLINE_DATE_GLYPH_TILE_SIZE_PX,
     ITEM_CAPTION_SPILL_GAP_PX,
-    ITEM_LINK_ICON_INSET_PX,
-    ITEM_LINK_ICON_TILE_SIZE_PX,
+    inlineDateGlyphSpills,
+    itemAfterGlyphInsideLeftX,
     itemBeforeGlyphInsideLeftX,
-    MIN_BAR_WIDTH_FOR_INLINE_DATE_PX,
 } from './item-bar-geometry.js';
 import type { BoundingBox, InlineDatePin, Point } from './types.js';
 
@@ -65,15 +63,13 @@ export function computeItemInlineDatePins(opts: ItemInlineDatePinInputs): Inline
     const pins: InlineDatePin[] = [];
     const tileSize = INLINE_DATE_GLYPH_TILE_SIZE_PX;
     const topY = box.y + INLINE_DATE_GLYPH_INSET_TOP_PX;
-    const spilled = box.width < MIN_BAR_WIDTH_FOR_INLINE_DATE_PX;
+    const spilled = inlineDateGlyphSpills(box.width);
 
     if (afterDate) {
-        const insideLeftX = hasLinkIcon
-            ? box.x +
-              ITEM_LINK_ICON_INSET_PX +
-              ITEM_LINK_ICON_TILE_SIZE_PX +
-              INLINE_DATE_GLYPH_GAP_PX
-            : box.x + INLINE_DATE_GLYPH_INSET_LEFT_PX;
+        // Walk RIGHT past the link tile when there is one; the formula is
+        // shared with the caption's left inset, see
+        // `itemAfterGlyphInsideLeftX`.
+        const insideLeftX = itemAfterGlyphInsideLeftX(box.x, hasLinkIcon);
         const glyphLeft: Point = spilled
             ? {
                   x: box.x - ITEM_CAPTION_SPILL_GAP_PX - tileSize,

@@ -577,6 +577,7 @@ function sequenceItem(
         metaText,
         metaTrailingWidth: capacityTrailingWidth,
         hasLinkIcon,
+        hasAfterGlyph: pickInlineDate(afterRaw) !== undefined,
         titleFirstLineRightReservePx: resolveTitleFirstLineReserve(
             visualWidthPredict,
             footnoteIndicators,
@@ -1079,7 +1080,13 @@ function predictItemBarExtraHeight(item: ItemDeclaration, ctx: LayoutContext): n
     // Same caption-fit helper `ItemNode.place` runs.
     const hasLinkIcon = !!propValue(props, 'link');
     const titleStr = item.title ?? item.name ?? '';
-    const captionLeftInset = itemCaptionInsetX(hasLinkIcon);
+    // The left inset clears the link tile and the in-bar `after:` glyph,
+    // exactly as `ItemNode.place` computes it.
+    const hasAfterGlyph = pickInlineDate(propValues(props, 'after')) !== undefined;
+    const captionLeftInset = itemCaptionInsetX(
+        hasLinkIcon,
+        hasAfterGlyph ? { barWidth: visualWidth } : undefined,
+    );
     const innerWidth = Math.max(0, visualWidth - captionLeftInset - ITEM_CAPTION_INSET_X_PX);
     // The first title line clears the top-right decoration cluster, found
     // the same way `sequenceItem` finds it (footnotes via `footnoteHosts`,

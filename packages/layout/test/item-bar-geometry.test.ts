@@ -9,11 +9,14 @@ import {
     ITEM_CAPTION_TITLE_LINE_HEIGHT_PX,
     ITEM_CAPTION_TITLE_MAX_LINES,
     ITEM_FOOTNOTE_INDICATOR_FONT_SIZE_PX,
+    inlineDateGlyphSpills,
+    itemAfterGlyphInsideLeftX,
     itemBeforeGlyphInsideLeftX,
     itemCaptionInsetX,
     itemCaptionLastBaselineOffset,
     itemCaptionMetaBaselineOffset,
     itemTitleFirstLineRightReservePx,
+    MIN_BAR_WIDTH_FOR_INLINE_DATE_PX,
 } from '../src/item-bar-geometry.js';
 
 describe('wrapped-title caption constants', () => {
@@ -76,6 +79,75 @@ describe('itemCaptionInsetX', () => {
 
     it('is 24px with a link icon (6 + 14 tile + 4 gap, past the 12px inset)', () => {
         expect(itemCaptionInsetX(true)).toBe(24);
+    });
+
+    describe('with an in-bar `after:` inline-date glyph', () => {
+        // The glyph is 12px wide. Without a link tile it spans 6..18, so the
+        // caption starts 4px past that at 22. Beside a link tile it spans
+        // 24..36 (6 + 14 tile + 4 gap), so the caption starts at 40.
+        it('is 22px without a link icon (glyph right edge 18 + 4px gap)', () => {
+            expect(itemCaptionInsetX(false, { barWidth: 148 })).toBe(22);
+        });
+
+        it('is 40px with a link icon (glyph right edge 36 + 4px gap)', () => {
+            expect(itemCaptionInsetX(true, { barWidth: 148 })).toBe(40);
+        });
+
+        it('is the four values 12, 24, 22 and 40 across the combinations', () => {
+            const bar = { barWidth: 148 };
+            expect([
+                itemCaptionInsetX(false),
+                itemCaptionInsetX(true),
+                itemCaptionInsetX(false, bar),
+                itemCaptionInsetX(true, bar),
+            ]).toEqual([12, 24, 22, 40]);
+        });
+
+        it('adds no indent when the glyph spills out of a bar narrower than the threshold', () => {
+            // MIN_BAR_WIDTH_FOR_INLINE_DATE_PX = 6 + 12 + 4 + 12 + 6 = 40.
+            expect(MIN_BAR_WIDTH_FOR_INLINE_DATE_PX).toBe(40);
+            expect(itemCaptionInsetX(false, { barWidth: 39.9 })).toBe(12);
+            expect(itemCaptionInsetX(true, { barWidth: 39.9 })).toBe(24);
+            expect(itemCaptionInsetX(false, { barWidth: 28 })).toBe(12);
+            expect(itemCaptionInsetX(true, { barWidth: 28 })).toBe(24);
+        });
+
+        it('indents at exactly the threshold width, where the glyph is still in the bar', () => {
+            expect(itemCaptionInsetX(false, { barWidth: 40 })).toBe(22);
+            expect(itemCaptionInsetX(true, { barWidth: 40 })).toBe(40);
+        });
+
+        it('always clears the glyph by the 4px spill gap, whatever the link state', () => {
+            for (const hasLink of [false, true]) {
+                const glyphRight = itemAfterGlyphInsideLeftX(0, hasLink) + 12;
+                expect(itemCaptionInsetX(hasLink, { barWidth: 148 })).toBe(glyphRight + 4);
+            }
+        });
+    });
+});
+
+describe('itemAfterGlyphInsideLeftX', () => {
+    // The one formula behind the `after:` glyph's placement and the
+    // caption's left inset.
+    it('sits at the leftmost slot, 6px in, with no link icon', () => {
+        expect(itemAfterGlyphInsideLeftX(100, false)).toBe(106);
+    });
+
+    it('sits 4px right of the link tile (6 + 14 + 4 = 24px in) with a link icon', () => {
+        expect(itemAfterGlyphInsideLeftX(100, true)).toBe(124);
+    });
+
+    it('measures from a left edge of 0 as an exact inside offset', () => {
+        expect(itemAfterGlyphInsideLeftX(0, false)).toBe(6);
+        expect(itemAfterGlyphInsideLeftX(0, true)).toBe(24);
+    });
+});
+
+describe('inlineDateGlyphSpills', () => {
+    it('spills below the 40px threshold and not at or above it', () => {
+        expect(inlineDateGlyphSpills(39.99)).toBe(true);
+        expect(inlineDateGlyphSpills(40)).toBe(false);
+        expect(inlineDateGlyphSpills(148)).toBe(false);
     });
 });
 

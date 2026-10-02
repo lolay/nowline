@@ -898,6 +898,169 @@ swimlane "Platform"
     });
 });
 
+describe('layoutRoadmap caption indent past an `after:` glyph', () => {
+    // `scale:2w`: a `2w` item is a 148px bar. An in-bar `after:DATE` glyph sits
+    // in the upper-left, so the caption starts at 22px (40px beside a link
+    // tile) instead of 12 / 24: the first line gets 148 - 22 - 21 = 105px
+    // (87px beside a link tile) instead of 115 / 103px, and the whole inner
+    // width shrinks by the same 10 / 16px.
+    function roadmap(body: string): string {
+        return `nowline v1
+
+roadmap r "R" start:2026-04-06 scale:2w
+
+swimlane "Platform"
+${body}`;
+    }
+
+    function items(children: PositionedTrackChild[]): PositionedItem[] {
+        const out: PositionedItem[] = [];
+        for (const child of children) {
+            if (child.kind === 'item') out.push(child);
+            else out.push(...items(child.children));
+        }
+        return out;
+    }
+
+    async function layout(src: string) {
+        const { file, resolved } = await parseAndResolve(src);
+        return layoutRoadmap(file, resolved, { theme: 'light' });
+    }
+
+    function only(model: Awaited<ReturnType<typeof layout>>, title: string): PositionedItem {
+        const found = items(model.swimlanes[0].children).find((i) => i.title === title);
+        if (!found) throw new Error(`no item titled ${title}`);
+        return found;
+    }
+
+    it('wraps a title that clears the dot but would run under the `after:` glyph', async () => {
+        // "Ship the thing" is 105.6px: inside the 115px dot-only first line,
+        // outside the 105px first line the glyph leaves.
+        const control = only(
+            await layout(roadmap('  item "Ship the thing" duration:2w\n')),
+            'Ship the thing',
+        );
+        expect(control.titleLines).toBeUndefined();
+
+        const item = only(
+            await layout(roadmap('  item "Ship the thing" duration:2w after:2026-04-20\n')),
+            'Ship the thing',
+        );
+        const pin = item.inlineDatePins?.find((p) => p.side === 'after');
+        expect(pin?.spilled).toBe(false);
+        // The glyph spans 6..18, so the caption (22) clears it by 4px.
+        expect(pin?.glyphTopLeft.x).toBe(item.box.x + 6);
+        expect(item.textSpills).toBe(false);
+        expect(item.titleLines).toEqual(['Ship the', 'thing']);
+        expect(item.box.height).toBe(72);
+    });
+
+    it('indents past the link tile and the glyph together (40px) when the item has both', async () => {
+        // "Ship it now!!" is 98px: inside the 103px first line a link tile
+        // leaves, outside the 87px first line the glyph beside it leaves.
+        const linked = only(
+            await layout(
+                roadmap(
+                    '  item "Ship it now!!" duration:2w link:https://github.com/acme/team/issues/1\n',
+                ),
+            ),
+            'Ship it now!!',
+        );
+        expect(linked.titleLines).toBeUndefined();
+
+        const item = only(
+            await layout(
+                roadmap(
+                    '  item "Ship it now!!" duration:2w link:https://github.com/acme/team/issues/1 after:2026-04-20\n',
+                ),
+            ),
+            'Ship it now!!',
+        );
+        const pin = item.inlineDatePins?.find((p) => p.side === 'after');
+        expect(pin?.glyphTopLeft.x).toBe(item.box.x + 24);
+        expect(item.textSpills).toBe(false);
+        expect(item.titleLines).toEqual(['Ship it', 'now!!']);
+    });
+
+    it('does not narrow the caption for a glyph that spilled out of a narrow bar', async () => {
+        // A 3-day bar is 36px wide, under the 40px threshold: the `after:` glyph
+        // spills out to the left of the bar, so it reserves nothing at the
+        // caption's left edge. The caption outcome matches the same bar without
+        // `after:` (here both spill: 36px is far too narrow for any title).
+        const plain = only(await layout(roadmap('  item "Tiny" duration:3d\n')), 'Tiny');
+        const dated = only(
+            await layout(roadmap('  item "Tiny" duration:3d after:2026-04-20\n')),
+            'Tiny',
+        );
+        expect(dated.box.width).toBeLessThan(40);
+        expect(dated.inlineDatePins?.find((p) => p.side === 'after')?.spilled).toBe(true);
+        expect(dated.textSpills).toBe(plain.textSpills);
+        expect(dated.titleLines).toEqual(plain.titleLines);
+    });
+
+    it('grows the row of a group item that wraps because of the `after:` glyph', async () => {
+        const src = `nowline v1
+
+roadmap r "R" start:2026-04-06 scale:2w
+
+swimlane "Platform"
+  group "Squad"
+    item tech "Ship the thing" duration:2w after:2026-04-06
+    item below "Below" duration:2w date:2026-04-06
+`;
+        const model = await layout(src);
+        const group = model.swimlanes[0].children[0];
+        if (group.kind !== 'group') throw new Error('expected a group');
+        const all = items(group.children);
+        const tech = all.find((i) => i.title === 'Ship the thing');
+        const below = all.find((i) => i.title === 'Below');
+        if (!tech || !below) throw new Error('missing items');
+        expect(tech.titleLines).toEqual(['Ship the', 'thing']);
+        expect(tech.box.height).toBe(72);
+        expect(below.box.y).toBe(tech.box.y + 80);
+    });
+
+    it('does not over-reserve the row when the glyph turns a would-be wrap into a spill', async () => {
+        // "Go Internationalize" wraps inside the plain 124px inner width (line 2
+        // is 120.6px), so a row predictor that ignored the glyph would reserve
+        // the wrapped bar's 16px of growth. With the glyph's 22px inset the
+        // inner width is 114px: line 2 no longer fits, the caption spills, the
+        // bar stays 56px and the next row sits one plain pitch (64px) below.
+        const src = `nowline v1
+
+roadmap r "R" start:2026-04-06 scale:2w
+
+swimlane "Platform"
+  group "Squad"
+    item tech "Go Internationalize" duration:2w after:2026-04-06
+    item below "Below" duration:2w date:2026-04-06
+`;
+        const model = await layout(src);
+        const group = model.swimlanes[0].children[0];
+        if (group.kind !== 'group') throw new Error('expected a group');
+        const all = items(group.children);
+        const tech = all.find((i) => i.title === 'Go Internationalize');
+        const below = all.find((i) => i.title === 'Below');
+        if (!tech || !below) throw new Error('missing items');
+        expect(tech.textSpills).toBe(true);
+        expect(tech.titleLines).toBeUndefined();
+        expect(tech.box.height).toBe(56);
+        expect(below.box.y).toBe(tech.box.y + 64);
+
+        // Control: the same item without the glyph wraps in-bar and grows its row.
+        const control = await layout(src.replace(' after:2026-04-06', ''));
+        const controlGroup = control.swimlanes[0].children[0];
+        if (controlGroup.kind !== 'group') throw new Error('expected a group');
+        const controlItems = items(controlGroup.children);
+        const plain = controlItems.find((i) => i.title === 'Go Internationalize');
+        const plainBelow = controlItems.find((i) => i.title === 'Below');
+        if (!plain || !plainBelow) throw new Error('missing items');
+        expect(plain.titleLines).toEqual(['Go', 'Internationalize']);
+        expect(plain.box.height).toBe(72);
+        expect(plainBelow.box.y).toBe(plain.box.y + 80);
+    });
+});
+
 describe('layoutRoadmap explicit title line breaks', () => {
     // `scale:2w`: a `2w` item is a 148px bar with a 124px text area (115px for the first line).
     // In the DSL source a `\n` escape is two characters; Langium turns it into a real newline.

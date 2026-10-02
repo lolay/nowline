@@ -48,4 +48,32 @@ describe('NowlineDocumentSymbolProvider', () => {
         const parallel = lane!.children!.find((c) => c.name === 'work');
         expect(parallel!.children!.map((c) => c.name)).toEqual(['search', 'index']);
     });
+
+    it('shows a title with an explicit line break on one line: "Technology Selection"', async () => {
+        const doc = await parseDocument(
+            `nowline v1
+
+roadmap demo "Demo" start:2026-01-05 scale:1w
+
+swimlane backend "Backend"
+  item "Technology\\nSelection" duration:2w
+  item api "API\\nv2" duration:1w
+`,
+        );
+        const provider = services().Nowline.lsp.DocumentSymbolProvider!;
+        const [roadmap] = await provider.getSymbols(doc, {
+            textDocument: { uri: doc.uri.toString() },
+        });
+        const lane = roadmap.children!.find((c) => c.name === 'backend');
+        expect(lane).toBeDefined();
+        // A title-only item is named after its title.
+        const [titleOnly, withId] = lane!.children!;
+        expect(titleOnly.name).toBe('Technology Selection');
+        // An item with an id keeps the id as its name and shows the title as detail.
+        expect(withId.name).toBe('api');
+        expect(withId.detail).toBe('API v2');
+        for (const text of [titleOnly.name, titleOnly.detail, withId.name, withId.detail]) {
+            expect(text).not.toMatch(/[\r\n]/);
+        }
+    });
 });

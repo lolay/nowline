@@ -61,6 +61,7 @@ export {
     ITEM_STATUS_DOT_INSET_RIGHT_PX,
     ITEM_STATUS_DOT_INSET_TOP_PX,
     ITEM_STATUS_DOT_RADIUS_PX,
+    type ItemCaptionAfterGlyph,
     itemCaptionInsetX,
     itemCaptionLastBaselineOffset,
     itemCaptionMetaBaselineOffset,

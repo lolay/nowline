@@ -814,3 +814,157 @@ describe('renderSvg — explicit title line breaks', () => {
         expectNoRawNewlineInText(svg);
     });
 });
+
+describe('renderSvg — caption indent past an `after:` date glyph', () => {
+    // `scale:2w`: a `2w` item is a 148px bar. The `after:DATE` glyph is 12px
+    // wide in the bar's upper-left: bar.x + 6..18 alone, bar.x + 24..36 beside
+    // a link tile (which spans bar.x + 6..20). The caption starts 4px past it.
+    const HEADER = `nowline v1\n\nroadmap r1 "R" start:2026-04-06 scale:2w\n\n`;
+    const LINK = 'link:https://github.com/acme/team/issues/1';
+
+    interface TextNode {
+        x: number;
+        y: number;
+        fontSize: number;
+        content: string;
+    }
+
+    /** The item's `<g>`, closed at its OWN `</g>`: the glyph nests a `<g>` inside it. */
+    function itemFragment(svg: string, itemId: string): string {
+        const open = `<g data-id="${itemId}" data-layer="item">`;
+        const start = svg.indexOf(open);
+        if (start < 0) throw new Error(`no item group for ${itemId}`);
+        let depth = 0;
+        for (const m of svg.slice(start).matchAll(/<g\b|<\/g>/g)) {
+            depth += m[0] === '</g>' ? -1 : 1;
+            if (depth === 0) return svg.slice(start, start + (m.index ?? 0) + m[0].length);
+        }
+        throw new Error(`unbalanced item group for ${itemId}`);
+    }
+
+    function textNodes(fragment: string): TextNode[] {
+        const out: TextNode[] = [];
+        for (const m of fragment.matchAll(/<text ([^>]*)>([^<]*)(?:<tspan[\s\S]*?)?<\/text>/g)) {
+            const attr = (name: string) =>
+                Number(m[1].match(new RegExp(`(?:^|\\s)${name}="([^"]+)"`))?.[1]);
+            out.push({
+                x: attr('x'),
+                y: attr('y'),
+                fontSize: attr('font-size'),
+                content: m[2],
+            });
+        }
+        return out;
+    }
+
+    function barX(fragment: string): number {
+        const m = fragment.match(/<rect [^>]*>/);
+        if (!m) throw new Error('no bar rect');
+        return Number(m[0].match(/ x="([^"]+)"/)?.[1]);
+    }
+
+    /** x of the `after:` glyph's nested `<svg>`, or undefined when none is painted. */
+    function afterGlyphX(fragment: string): number | undefined {
+        const m = fragment.match(/<g [^>]*data-side="after"[^>]*>[\s\S]*?<svg x="([^"]+)"/);
+        return m ? Number(m[1]) : undefined;
+    }
+
+    it('starts the caption 4px past the glyph: bar.x + 22 without a link icon', async () => {
+        const model = await parseToModel(
+            `${HEADER}swimlane s "S"\n  item plan "Plan" duration:2w after:2026-04-20\n`,
+        );
+        const fragment = itemFragment(await renderSvg(model), 'plan');
+        const bar = barX(fragment);
+        const glyph = afterGlyphX(fragment);
+        expect(glyph).toBe(bar + 6);
+        const texts = textNodes(fragment);
+        const titles = texts.filter((t) => t.fontSize === 13);
+        expect(titles).toHaveLength(1);
+        expect(titles[0].x).toBe(bar + 22);
+        // Clears the glyph's right edge (bar + 18) by the 4px gap.
+        expect(titles[0].x).toBeGreaterThanOrEqual((glyph ?? 0) + 12 + 4);
+        // The meta line shares the caption's left edge.
+        const meta = texts.filter((t) => t.fontSize === 11);
+        expect(meta.map((t) => t.content)).toEqual(['2w']);
+        expect(meta[0].x).toBe(titles[0].x);
+    });
+
+    it('starts the caption at bar.x + 40 when the glyph sits beside a link tile', async () => {
+        const model = await parseToModel(
+            `${HEADER}swimlane s "S"\n  item plan "Plan" duration:2w ${LINK} after:2026-04-20\n`,
+        );
+        const fragment = itemFragment(await renderSvg(model), 'plan');
+        const bar = barX(fragment);
+        const tile = fragment.match(/<a [^>]*><rect [^>]*>/)?.[0];
+        expect(tile).toBeDefined();
+        const tileRight =
+            Number(tile?.match(/ x="([^"]+)"/)?.[1]) + Number(tile?.match(/ width="([^"]+)"/)?.[1]);
+        expect(tileRight).toBe(bar + 20);
+        const glyph = afterGlyphX(fragment);
+        expect(glyph).toBe(bar + 24);
+        const titles = textNodes(fragment).filter((t) => t.fontSize === 13);
+        expect(titles).toHaveLength(1);
+        expect(titles[0].x).toBe(bar + 40);
+        expect(titles[0].x).toBeGreaterThanOrEqual((glyph ?? 0) + 12 + 4);
+    });
+
+    it('indents every line of a wrapped caption and the meta line, keeping the left edge straight', async () => {
+        const model = await parseToModel(
+            `${HEADER}swimlane s "S"\n  item ship "Ship the thing" duration:2w after:2026-04-20\n`,
+        );
+        const fragment = itemFragment(await renderSvg(model), 'ship');
+        const bar = barX(fragment);
+        const texts = textNodes(fragment);
+        const titles = texts.filter((t) => t.fontSize === 13);
+        expect(titles.map((t) => t.content)).toEqual(['Ship the', 'thing']);
+        expect(titles.map((t) => t.x)).toEqual([bar + 22, bar + 22]);
+        const meta = texts.filter((t) => t.fontSize === 11);
+        expect(meta[0].x).toBe(bar + 22);
+    });
+
+    it('indents an explicit multi-line title on every line', async () => {
+        const model = await parseToModel(
+            `${HEADER}swimlane s "S"\n  item two "One\\nTwo" duration:2w after:2026-04-20\n`,
+        );
+        const fragment = itemFragment(await renderSvg(model), 'two');
+        const bar = barX(fragment);
+        const titles = textNodes(fragment).filter((t) => t.fontSize === 13);
+        expect(titles.map((t) => t.content)).toEqual(['One', 'Two']);
+        expect(titles.map((t) => t.x)).toEqual([bar + 22, bar + 22]);
+    });
+
+    it('keeps the glyph-cleared indent under noLinks, where layout still placed the glyph beside the tile', async () => {
+        const model = await parseToModel(
+            `${HEADER}swimlane s "S"\n  item plan "Plan" duration:2w ${LINK} after:2026-04-20\n`,
+        );
+        const fragment = itemFragment(await renderSvg(model, { noLinks: true }), 'plan');
+        expect(fragment).not.toContain('<a ');
+        const bar = barX(fragment);
+        // Layout positioned the glyph at bar.x + 24 (past the link tile that
+        // noLinks hides), so the caption must still clear it at bar.x + 40.
+        expect(afterGlyphX(fragment)).toBe(bar + 24);
+        const titles = textNodes(fragment).filter((t) => t.fontSize === 13);
+        expect(titles[0].x).toBe(bar + 40);
+    });
+
+    it('leaves a `before:`-only item at the plain 12px inset', async () => {
+        const model = await parseToModel(
+            `${HEADER}swimlane s "S"\n  item plan "Plan" duration:2w before:2026-06-29\n`,
+        );
+        const fragment = itemFragment(await renderSvg(model), 'plan');
+        const bar = barX(fragment);
+        const titles = textNodes(fragment).filter((t) => t.fontSize === 13);
+        expect(titles[0].x).toBe(bar + 12);
+    });
+
+    it('does not indent a caption that spilled beside the bar', async () => {
+        const model = await parseToModel(
+            `${HEADER}swimlane s "S"\n  item big "Internationalization" duration:2w after:2026-04-20\n`,
+        );
+        const fragment = itemFragment(await renderSvg(model), 'big');
+        const bar = barX(fragment);
+        const titles = textNodes(fragment).filter((t) => t.fontSize === 13);
+        // Spilled: starts past the bar's right edge (148px wide) plus the 6px gap.
+        expect(titles[0].x).toBe(bar + 148 + 6);
+    });
+});

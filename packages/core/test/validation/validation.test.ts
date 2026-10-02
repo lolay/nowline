@@ -1149,3 +1149,33 @@ swimlane s
         expect(warnings).toEqual([]);
     });
 });
+
+describe('diagnostics that echo an item title', () => {
+    // A title can carry an explicit line break (`\n` in the source parses to a
+    // real newline, and the chart paints two lines), but a diagnostic is one
+    // line of text: the break shows as a single space.
+    it('shows "Technology\\nSelection" as "Technology Selection" in a message', async () => {
+        // Title-only item with neither size: nor duration: NL.E0600 echoes its
+        // title (`displayName`).
+        const missing = await parse(`roadmap r\nswimlane s\n  item "Technology\\nSelection"\n`);
+        const e0600 = errorMessages(missing.diagnostics).filter((m) =>
+            /requires a "size:"/.test(m),
+        );
+        expect(e0600).toEqual([
+            'Item "Technology Selection" requires a "size:" or "duration:" property.',
+        ]);
+
+        // An unknown property names the entity (`describeNode`), title-only too.
+        const unknown = await parse(
+            `roadmap r\nswimlane s\n  item "Technology\\nSelection" duration:1w foo:bar\n`,
+        );
+        const w0700 = warningMessages(unknown.diagnostics).filter((m) =>
+            /Unknown property "foo"/.test(m),
+        );
+        expect(w0700).toHaveLength(1);
+        expect(w0700[0]).toContain('item "Technology Selection"');
+
+        // No diagnostic carries a raw line break.
+        for (const m of [...e0600, ...w0700]) expect(m).not.toMatch(/[\r\n]/);
+    });
+});
