@@ -6,6 +6,10 @@
 // helpers in `layout.ts`).
 
 import type { GroupBlock, ItemDeclaration, ParallelBlock } from '@nowline/core';
+import {
+    PARALLEL_HEADER_TITLE_INSET_X_PX,
+    parallelHeaderBandPx,
+} from '../container-header-geometry.js';
 import { propValues } from '../dsl-utils.js';
 import { computeContainerInlineDatePins, pickInlineDate } from '../inline-date-pin-geometry.js';
 import type { LayoutContext, TrackCursor } from '../layout-context.js';
@@ -43,7 +47,14 @@ export class ParallelNode {
         const { deps } = this;
         const style = resolveStyle('parallel', node.properties, ctx.styleCtx);
         const startX = cursor.x;
-        const startY = cursor.y;
+        const afterDate = pickInlineDate(propValues(node.properties, 'after'));
+        const beforeDate = pickInlineDate(propValues(node.properties, 'before'));
+        const title = node.title ?? node.name;
+        // The first track starts flush with the box's top corners, so
+        // inline-date glyphs get a header band above the box (shared
+        // with the title) instead of sitting on the first track's bar.
+        const headerBand = parallelHeaderBandPx(Boolean(afterDate || beforeDate));
+        const startY = cursor.y + headerBand;
         const children: PositionedTrackChild[] = [];
         let maxRight = startX;
         let accumulatedHeight = 0;
@@ -83,7 +94,7 @@ export class ParallelNode {
 
         cursor.x = maxRight + TRACK_BLOCK_TAIL_GUTTER_PX;
         cursor.maxX = Math.max(cursor.maxX, cursor.x);
-        cursor.height = Math.max(cursor.height, accumulatedHeight);
+        cursor.height = Math.max(cursor.height, headerBand + accumulatedHeight);
 
         const id = node.name;
         if (id) {
@@ -93,14 +104,15 @@ export class ParallelNode {
 
         const inlineDatePins = computeContainerInlineDatePins({
             box,
-            afterDate: pickInlineDate(propValues(node.properties, 'after')),
-            beforeDate: pickInlineDate(propValues(node.properties, 'before')),
+            afterDate,
+            beforeDate,
+            row: { kind: 'header-band', title, titleInsetX: PARALLEL_HEADER_TITLE_INSET_X_PX },
         });
 
         return {
             kind: 'parallel',
             id,
-            title: node.title ?? node.name,
+            title,
             box,
             children,
             style,

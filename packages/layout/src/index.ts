@@ -6,6 +6,15 @@ export {
     resolveCapacityIcon,
 } from './capacity.js';
 export {
+    CONTAINER_HEADER_BAND_PX,
+    CONTAINER_HEADER_TITLE_BASELINE_OFFSET_PX,
+    CONTAINER_HEADER_TITLE_FONT_SIZE_PX,
+    containerHeaderTitleX,
+    GROUP_HEADER_TITLE_INSET_X_PX,
+    groupHeaderBandPx,
+    PARALLEL_HEADER_TITLE_INSET_X_PX,
+} from './container-header-geometry.js';
+export {
     FRAME_TAB_INNER_GAP_PX,
     FRAME_TAB_LEFT_INSET_PX,
     FRAME_TAB_MIN_WIDTH_PX,
@@ -16,6 +25,7 @@ export {
     type FrameTabGeometry,
     frameTabGeometry,
 } from './frame-tab-geometry.js';
+export { groupHasFill, groupTitleTabWidth } from './group-title-tab-geometry.js';
 export {
     HEADER_AUTHOR_FONT_SIZE_PX,
     HEADER_AUTHOR_LINE_HEIGHT_PX,

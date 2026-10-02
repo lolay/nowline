@@ -6,6 +6,11 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ## [Unreleased]
 
+### Fixed
+
+- **`@nowline/layout` / `@nowline/renderer` — inline-date glyph on a styled group no longer covers the title chiclet**: a filled group with `after:DATE` painted its calendar glyph in the box's top-left corner, on top of the title chiclet and its text. Both of the group's inline-date glyphs now sit in the chiclet's row, vertically centered on it: the `after` glyph just past the chiclet's right edge, the `before` glyph flush right as before. When the chiclet is wider than the group's box, the `before` glyph moves right past the `after` glyph instead of landing on the chiclet.
+- **`@nowline/layout` / `@nowline/renderer` — inline-date glyph on a bracket-style or unstyled group or a parallel is no longer hidden under the first child bar**: these containers painted their `after:DATE` / `before:DATE` calendar glyph at the box's top corners, where the first child bar starts and is painted on top of it, so the glyph never showed. The glyphs now sit in a 12 px title row above the box, the same strip a bracket group's title already uses: the `after` glyph first (the title moves just past it), the `before` glyph flush right, or just past the title when the title is wider than the box. A pinned parallel or a pinned group without a title reserves that strip, so its children sit 12 px lower; a pinned filled group without a title reserves the chiclet row instead. When a pinned container's title row runs past its right edge, an item chained right after it on the same row moves to the next row instead of covering the glyph.
+
 ## [0.8.6] - 2026-10-01
 
 ### Added
