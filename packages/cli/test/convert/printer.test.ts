@@ -70,3 +70,65 @@ describe('canonical printer rules', () => {
         expect(hpIdx).toBeGreaterThan(calIdx);
     });
 });
+
+describe('string escapes in item titles (lolay/nowline#60)', () => {
+    // Source `"A\nB"` is a title with a real newline; `"A\\nB"` is the four
+    // characters A, \, n, B. The printer must emit each back in the same escape
+    // form so neither silently turns into the other.
+    const roadmap = (titleLiteral: string) =>
+        `roadmap r "R"\nswimlane s "S"\n  item x ${titleLiteral} duration:1w\n`;
+
+    function itemTitle(source: string): Promise<string | undefined> {
+        return parseSource(source, 'test.nowline', { validate: true }).then((r) => {
+            expect(r.hasErrors, r.diagnostics.map((d) => d.message).join('\n')).toBe(false);
+            const ast = serializeToJson(r.document, source).ast as unknown;
+            const find = (node: unknown): string | undefined => {
+                if (Array.isArray(node)) {
+                    for (const n of node) {
+                        const hit = find(n);
+                        if (hit !== undefined) return hit;
+                    }
+                    return undefined;
+                }
+                if (node && typeof node === 'object') {
+                    const obj = node as Record<string, unknown>;
+                    if (obj.$type === 'ItemDeclaration' && typeof obj.title === 'string') {
+                        return obj.title;
+                    }
+                    for (const v of Object.values(obj)) {
+                        const hit = find(v);
+                        if (hit !== undefined) return hit;
+                    }
+                }
+                return undefined;
+            };
+            return find(ast);
+        });
+    }
+
+    it('round-trips a newline escape: "A\\nB" parses to a real newline and prints back as "A\\nB"', async () => {
+        const source = roadmap('"A\\nB"');
+        expect(await itemTitle(source)).toBe('A\nB');
+        const out = await canonical(source);
+        expect(out).toContain('item x "A\\nB" duration:1w');
+        // Printing is idempotent and the reparsed title is unchanged.
+        expect(await canonical(out)).toBe(out);
+        expect(await itemTitle(out)).toBe('A\nB');
+    });
+
+    it('round-trips an escaped backslash: "A\\\\nB" stays the literal text A\\nB', async () => {
+        const source = roadmap('"A\\\\nB"');
+        expect(await itemTitle(source)).toBe('A\\nB');
+        const out = await canonical(source);
+        expect(out).toContain('item x "A\\\\nB" duration:1w');
+        expect(await canonical(out)).toBe(out);
+        // Not promoted to a newline on the way back in.
+        expect(await itemTitle(out)).toBe('A\\nB');
+    });
+
+    it('keeps the two forms distinct', async () => {
+        const brk = await canonical(roadmap('"A\\nB"'));
+        const lit = await canonical(roadmap('"A\\\\nB"'));
+        expect(brk).not.toBe(lit);
+    });
+});

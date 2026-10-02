@@ -61,6 +61,7 @@ import {
     ITEM_CAPTION_TITLE_LINE_HEIGHT_PX,
     ITEM_DECORATION_SPILL_GAP_PX,
     ITEM_FOOTNOTE_INDICATOR_BASELINE_OFFSET_PX,
+    ITEM_FOOTNOTE_INDICATOR_FONT_SIZE_PX,
     ITEM_FOOTNOTE_INDICATOR_INSET_RIGHT_PX,
     ITEM_FOOTNOTE_INDICATOR_STEP_PX,
     ITEM_LINK_ICON_INSET_PX,
@@ -982,12 +983,16 @@ function renderItem(
     const captionOutsideTextColor = palette.entities.item.text;
     const titleColor = i.textSpills ? captionOutsideTextColor : captionInsideTextColor;
     const metaColor = i.textSpills ? captionOutsideTextColor : i.style.fg;
-    // A title that word-wrapped inside the bar arrives pre-split in
-    // `titleLines` (2 lines at most); paint one `<text>` per line, the
-    // same pattern as the header card. Everything else (a single-line
-    // title, or any spilled caption) is just `[title]`.
+    // A title that auto-wrapped inside the bar, or that carries explicit
+    // `\n` breaks (in-bar or spilled), arrives pre-split in `titleLines`;
+    // paint one `<text>` per line at the same baselines either way, the
+    // same pattern as the header card, with the meta line below the last
+    // one. Everything else (a single-line title) is just `[title]`. A blank
+    // line between two explicit breaks keeps its baseline slot but paints
+    // nothing.
     const titleLines = i.titleLines ?? (i.title ? [i.title] : []);
     titleLines.forEach((line, n) => {
+        if (line === '') return;
         parts.push(
             textTag(
                 {
@@ -1053,7 +1058,7 @@ function renderItem(
                             x: num(fx),
                             y: num(footnoteY),
                             'font-family': fonts.sans,
-                            'font-size': 10,
+                            'font-size': ITEM_FOOTNOTE_INDICATOR_FONT_SIZE_PX,
                             'font-weight': 700,
                             fill: captionOutsideTextColor,
                         },
@@ -1072,7 +1077,7 @@ function renderItem(
                             x: num(fx),
                             y: num(footnoteY),
                             'font-family': fonts.sans,
-                            'font-size': 10,
+                            'font-size': ITEM_FOOTNOTE_INDICATOR_FONT_SIZE_PX,
                             'font-weight': 700,
                             fill: i.style.text,
                             'text-anchor': 'end',

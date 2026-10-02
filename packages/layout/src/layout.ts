@@ -53,6 +53,7 @@ import {
     ITEM_STATUS_DOT_RADIUS_PX,
     itemCaptionInsetX,
     itemCaptionLastBaselineOffset,
+    itemTitleFirstLineRightReservePx,
     LABEL_CHIP_GAP_ABOVE_PROGRESS_STRIP_PX,
     LABEL_CHIP_GAP_BETWEEN_PX,
     LABEL_CHIP_HEIGHT_PX,
@@ -64,7 +65,12 @@ import {
 } from './item-bar-geometry.js';
 import { type LayoutContext, newCursor, type TrackCursor } from './layout-context.js';
 import { GroupNode } from './nodes/group-node.js';
-import { estimateItemMetaWidth, fitItemCaption, ItemNode } from './nodes/item-node.js';
+import {
+    estimateItemMetaWidth,
+    fitItemCaption,
+    ItemNode,
+    resolveCaptionTitleLines,
+} from './nodes/item-node.js';
 import { ParallelNode } from './nodes/parallel-node.js';
 import { RoadmapNode } from './nodes/roadmap-node.js';
 import { SwimlaneNode } from './nodes/swimlane-node.js';
@@ -323,6 +329,46 @@ function resolveItemMeta(
     return { metaText, ownerDisplay, capacity, capacityTrailingWidth };
 }
 
+/**
+ * Footnote numbers attached to an item, ascending. Per `specs/dsl.md`,
+ * footnotes attach via the `on:` property on the footnote declaration
+ * only — there is no forward `footnote:` property on the host entity.
+ * Walk `footnoteHosts` (built from each footnote's `on:` list) and
+ * collect every footnote that names this item. Shared by
+ * `sequenceItem` (which paints the indicators) and the row-height
+ * predictor, since both need the footnotes BEFORE the caption is fit.
+ */
+function collectItemFootnoteIndicators(name: string | undefined, ctx: LayoutContext): number[] {
+    const set = new Set<number>();
+    if (name) {
+        for (const [fid, hosts] of ctx.footnoteHosts.entries()) {
+            if (hosts.includes(name)) {
+                const n = ctx.footnoteIndex.get(fid);
+                if (n !== undefined) set.add(n);
+            }
+        }
+    }
+    return [...set].sort((a, b) => a - b);
+}
+
+/**
+ * How far the title's first line must stay from the bar's right edge so
+ * it clears the top-right decoration cluster. `sequenceItem` and the
+ * row-height predictor both call this, so a predicted wrap and a placed
+ * wrap use the same budget.
+ */
+function resolveTitleFirstLineReserve(
+    barWidth: number,
+    footnoteIndicators: readonly number[],
+    beforeRaw: readonly string[],
+): number {
+    return itemTitleFirstLineRightReservePx({
+        barWidth,
+        footnoteLabels: footnoteIndicators.map(String),
+        hasBeforeGlyph: pickInlineDate(beforeRaw) !== undefined,
+    });
+}
+
 // Sequence a set of nodes into a single horizontal track. `parallelInside`
 // indicates the caller is inside a ParallelBlock and each child occupies a
 // fresh sub-track (caller passes a new cursor per call).
@@ -519,6 +565,10 @@ function sequenceItem(
     // logicalLeft/logicalRight; ItemNode computes the inset visual box and
     // whether the title+meta line overflows the bar's inner padded width.
     const titleStr = node.title ?? node.name ?? '';
+    // Footnote indicators and the `before:` glyph share the bar's
+    // upper-right with the title's first line, so resolve them BEFORE the
+    // caption is fit: the first line stops short of that cluster.
+    const footnoteIndicators = collectItemFootnoteIndicators(node.name, ctx);
     const placed = new ItemNode({
         id: node.name ?? '',
         title: titleStr,
@@ -527,6 +577,11 @@ function sequenceItem(
         metaText,
         metaTrailingWidth: capacityTrailingWidth,
         hasLinkIcon,
+        titleFirstLineRightReservePx: resolveTitleFirstLineReserve(
+            visualWidthPredict,
+            footnoteIndicators,
+            beforeRaw,
+        ),
     }).place({ x: logicalLeft, y: cursor.y }, { time: ctx.scale, bands: ctx.bandScale, style });
     const itemBox = placed.box;
     const bandwidth = ctx.bandScale.bandwidth();
@@ -548,12 +603,13 @@ function sequenceItem(
     const iconSpills = hasLinkIcon && itemBox.width < MIN_BAR_WIDTH_FOR_LINK_AND_DOT_PX;
     const footnoteSpillsForNarrow = itemBox.width < MIN_BAR_WIDTH_FOR_FOOTNOTE_PX;
     const textSpills = placed.textSpills || iconSpills;
-    // A title that word-wrapped INSIDE the bar paints on two lines. If a
-    // narrow-bar icon spill forces the caption out anyway, the wrap is
-    // dropped: a spilled caption is always a single line to the right.
-    const wrappedTitleLines =
-        !textSpills && placed.titleLines.length >= 2 ? placed.titleLines : undefined;
-    const titleLineCount = wrappedTitleLines ? wrappedTitleLines.length : 1;
+    // The lines the title paints on. A title that word-wrapped INSIDE the
+    // bar paints on two lines; if a narrow-bar icon spill forces the caption
+    // out anyway, that wrap is dropped (a spilled break-free title is a
+    // single line to the right). A title with explicit `\n` breaks keeps the
+    // author's lines whether it stays in-bar or spills.
+    const captionLines = resolveCaptionTitleLines(titleStr, placed, iconSpills);
+    const titleLineCount = captionLines.length;
 
     // Label chips lay out left → right at natural text width.
     //
@@ -616,13 +672,15 @@ function sequenceItem(
         PROGRESS_STRIP_HEIGHT_PX -
         LABEL_CHIP_HEIGHT_PX -
         LABEL_CHIP_GAP_ABOVE_PROGRESS_STRIP_PX;
-    // A spilled caption is always the un-wrapped title + meta stack, so
-    // chips under it clear the classic meta baseline; an in-bar caption
-    // is cleared at its own last baseline (which a wrapped title pushes
-    // down).
+    // Chips under a SPILLED caption clear the classic meta baseline (38),
+    // or the caption's own last baseline when explicit breaks make the
+    // spilled block taller than that; an in-bar caption is cleared at its
+    // own last baseline (which a wrapped title pushes down).
     const captionStackChipY =
         itemBox.y +
-        (chipsOutside && textSpills ? ITEM_CAPTION_META_BASELINE_OFFSET_PX : captionLastBaseline) +
+        (chipsOutside && textSpills
+            ? Math.max(ITEM_CAPTION_META_BASELINE_OFFSET_PX, captionLastBaseline)
+            : captionLastBaseline) +
         LABEL_CHIP_GAP_ABOVE_PROGRESS_STRIP_PX;
     // Inside-bar chips need to clear the caption's last baseline —
     // the natural `baseChipY` (anchored to bar bottom) sits above
@@ -664,21 +722,8 @@ function sequenceItem(
         chipsRightX = chipSamples.length > 0 ? rowCursorX - LABEL_CHIP_GAP_BETWEEN_PX : chipStartX;
     }
 
-    // Footnote superscript indicators. Per `specs/dsl.md`, footnotes
-    // attach via the `on:` property on the footnote declaration only —
-    // there is no forward `footnote:` property on the host entity. Walk
-    // `footnoteHosts` (built from each footnote's `on:` list) and emit
-    // a superscript for every footnote that names this item.
-    const footnoteIndicatorSet = new Set<number>();
-    if (node.name) {
-        for (const [fid, hosts] of ctx.footnoteHosts.entries()) {
-            if (hosts.includes(node.name)) {
-                const n = ctx.footnoteIndex.get(fid);
-                if (n !== undefined) footnoteIndicatorSet.add(n);
-            }
-        }
-    }
-    const footnoteIndicators = [...footnoteIndicatorSet].sort((a, b) => a - b);
+    // `footnoteIndicators` (one superscript per footnote that names this
+    // item) was resolved above, before the caption fit.
 
     const owner = ownerDisplay ?? ownerOverride ?? propValue(props, 'owner');
     const description = node.description?.text;
@@ -724,7 +769,11 @@ function sequenceItem(
     let captionSpillWidth = 0;
     if (textSpills) {
         if (needGap) spillCursor += ITEM_DECORATION_SPILL_GAP_PX;
-        const titleW = estimateTextWidth(titleStr, ITEM_CAPTION_TITLE_FONT_SIZE_PX);
+        // The widest title LINE: a multi-line spill is as wide as its
+        // longest line, not as the raw string (newlines included).
+        const titleW = Math.max(
+            ...captionLines.map((line) => estimateTextWidth(line, ITEM_CAPTION_TITLE_FONT_SIZE_PX)),
+        );
         // Spill column width is the wider of the title and the *full* meta
         // line (text + capacity suffix). `capacityTrailingWidth` is 0 when
         // no capacity suffix is rendered, so this stays a no-op for items
@@ -828,7 +877,12 @@ function sequenceItem(
         kind: 'item',
         id,
         title: titleStr,
-        ...(wrappedTitleLines ? { titleLines: wrappedTitleLines } : {}),
+        // Only present when the painted lines differ from `[title]`: an
+        // auto-wrap, explicit breaks, or a stray leading/trailing break
+        // that was trimmed away. A plain one-line title carries no key.
+        ...(captionLines.length >= 2 || captionLines[0] !== titleStr
+            ? { titleLines: captionLines }
+            : {}),
         box: itemBox,
         status,
         progressFraction: progress,
@@ -942,9 +996,10 @@ function computeChipBarExtra(
     // Row 0 anchor relative to the bar's TOP — three regimes:
     //
     //   1. chipsOutside + captionSpills → chips stack below the
-    //      spilled meta line. A spilled caption is always the
-    //      un-wrapped title + meta stack, so this clears the classic
-    //      meta baseline regardless of `captionLastBaseline`.
+    //      spilled meta line. A break-free spilled caption is the
+    //      single-line title + meta stack, so this clears the classic
+    //      meta baseline; a spilled block with explicit breaks is
+    //      taller, so it clears its own last baseline instead.
     //   2. chips INSIDE the bar → chip top must clear the caption's
     //      last baseline (meta line, else the last title line); the
     //      natural `baseTop` sits ABOVE the meta line at default
@@ -964,7 +1019,9 @@ function computeChipBarExtra(
         LABEL_CHIP_GAP_ABOVE_PROGRESS_STRIP_PX;
     let chipRow0Top: number;
     if (chipsOutside && captionSpills) {
-        chipRow0Top = ITEM_CAPTION_META_BASELINE_OFFSET_PX + LABEL_CHIP_GAP_ABOVE_PROGRESS_STRIP_PX;
+        chipRow0Top =
+            Math.max(ITEM_CAPTION_META_BASELINE_OFFSET_PX, captionLastBaseline) +
+            LABEL_CHIP_GAP_ABOVE_PROGRESS_STRIP_PX;
     } else if (!chipsOutside) {
         chipRow0Top = Math.max(
             baseTop,
@@ -1022,20 +1079,33 @@ function predictItemBarExtraHeight(item: ItemDeclaration, ctx: LayoutContext): n
     // Same caption-fit helper `ItemNode.place` runs.
     const hasLinkIcon = !!propValue(props, 'link');
     const titleStr = item.title ?? item.name ?? '';
-    const innerWidth = Math.max(
+    const captionLeftInset = itemCaptionInsetX(hasLinkIcon);
+    const innerWidth = Math.max(0, visualWidth - captionLeftInset - ITEM_CAPTION_INSET_X_PX);
+    // The first title line clears the top-right decoration cluster, found
+    // the same way `sequenceItem` finds it (footnotes via `footnoteHosts`,
+    // `before:` via the inline date), so prediction and placement agree.
+    const firstLineWidth = Math.max(
         0,
-        visualWidth - itemCaptionInsetX(hasLinkIcon) - ITEM_CAPTION_INSET_X_PX,
+        visualWidth -
+            captionLeftInset -
+            resolveTitleFirstLineReserve(
+                visualWidth,
+                collectItemFootnoteIndicators(item.name, ctx),
+                propValues(props, 'before'),
+            ),
     );
     const fit = fitItemCaption(
         titleStr,
         innerWidth,
         estimateItemMetaWidth(metaText, capacityTrailingWidth),
+        firstLineWidth,
     );
     // A narrow-bar link icon spills the caption outright (and drops any
-    // wrap), mirroring `iconSpills` in `sequenceItem`.
+    // auto-wrap, though explicit breaks stay), mirroring `iconSpills` in
+    // `sequenceItem`; both resolve the painted lines the same way.
     const iconSpills = hasLinkIcon && visualWidth < MIN_BAR_WIDTH_FOR_LINK_AND_DOT_PX;
     const captionSpills = fit.textSpills || iconSpills;
-    const titleLineCount = captionSpills ? 1 : fit.titleLines.length;
+    const titleLineCount = resolveCaptionTitleLines(titleStr, fit, iconSpills).length;
     const titleExtra = computeTitleBarExtra(titleLineCount, hasMeta);
 
     const labelIds = propValues(props, 'labels');

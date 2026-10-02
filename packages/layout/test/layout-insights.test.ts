@@ -34,6 +34,27 @@ swimlane eng "Engineering"
         expect(insights.some((i) => i.code === 'NL.I1000')).toBe(false);
     });
 
+    it('echoes an id-less item title with its explicit line breaks collapsed to spaces', async () => {
+        // A spilled multi-line title raises NL.I1000, and the insight names the item by
+        // its title (no id here). The message is one line, not a copy of the break.
+        const src = `nowline v1
+
+roadmap r "R" start:2026-04-06 scale:2w
+
+swimlane eng "Engineering"
+  item "Internationalization of\\nthe billing service" duration:2w
+`;
+        const { file, resolved } = await parseAndResolve(src);
+        const layout = layoutRoadmap(file, resolved, { theme: 'light', width: 640 });
+        const insights = collectLayoutInsights(layout, { locale: 'en-US' });
+        const spill = insights.find((i) => i.code === 'NL.I1000');
+        expect(spill).toBeDefined();
+        expect(spill?.message).not.toMatch(/[\r\n]/);
+        expect(spill?.message).toContain('"Internationalization of the billing service"');
+        expect(spill?.entityId).toBe('Internationalization of the billing service');
+        expect(JSON.stringify(spill?.data.args)).not.toContain('\\n');
+    });
+
     it('reports NL.W1000 when today is outside the roadmap window', async () => {
         const src = `nowline v1
 

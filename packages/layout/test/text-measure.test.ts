@@ -36,4 +36,19 @@ describe('wrapText', () => {
     it('normalizes runs of whitespace', () => {
         expect(wrapText('Go    now', 200, 13)).toEqual(['Go now']);
     });
+
+    it('narrows only the first line when firstLineMaxWidth is given', () => {
+        // "Plan the rollout" is 120.6px: one line at 124px, but a 115px first
+        // line pushes "rollout" down. Line 2 keeps the full 124px budget.
+        expect(wrapText('Plan the rollout', 124, 13)).toEqual(['Plan the rollout']);
+        expect(wrapText('Plan the rollout', 124, 13, 115)).toEqual(['Plan the', 'rollout']);
+        // "Internationalize" (120.6px) fits the 124px later-line budget.
+        expect(wrapText('Go Internationalize', 124, 13, 115)).toEqual(['Go', 'Internationalize']);
+    });
+
+    it('defaults the first line to the same budget as the rest', () => {
+        expect(wrapText('Technology Selection', 124, 13, 124)).toEqual(
+            wrapText('Technology Selection', 124, 13),
+        );
+    });
 });

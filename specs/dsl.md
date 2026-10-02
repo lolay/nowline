@@ -20,6 +20,7 @@ Fenced code block: ````nowline`
 6. **Order matters.** Items render and execute sequentially in source order within a swimlane.
 7. **Comments** use `//` for single-line and `/* */` for multi-line.
 8. **Line continuation** uses `\` at the end of a line. The next line continues the same declaration. Indentation on the continuation line is cosmetic. Use `\\` for a literal backslash.
+9. **String escapes.** Inside a double-quoted string, `\n` is a line break, `\\` is a literal backslash and `\"` is a literal double quote, so `"Technology\nSelection"` is a two-line title, `"a\\nb"` shows the four characters `a\nb`, and `"Say \"hi\""` shows `Say "hi"`. A `\n` break is honored in item titles, where the title paints on separate lines (see [`specs/rendering.md`](./rendering.md) "Item Bars"); everywhere else it behaves as whitespace: other chart text (lane, group and milestone titles) shows a single space, and the Mermaid and MS Project exports collapse it to one space (an `.xlsx` Title cell keeps it as an in-cell line break). These escapes are distinct from rule 8: the end-of-line `\` continuation sits outside strings, while the escapes are only recognized inside them.
 
 ## File Structure
 
@@ -1037,7 +1038,7 @@ parallel rollouts before:2026-06-30
 
 ### Line Continuation
 
-A `\` at the end of a line means the next line continues the same declaration. Indentation on the continuation line is cosmetic (ignored by the parser). Only valid at the end of a property line — not inside strings or comments. Use `\\` for a literal backslash.
+A `\` at the end of a line means the next line continues the same declaration. Indentation on the continuation line is cosmetic (ignored by the parser). Only valid at the end of a property line — not inside strings or comments. Use `\\` for a literal backslash. Inside a string, `\` starts an escape instead (`\n`, `\\`, `\"`); see Design Rule 9.
 
 ```nowline
 item auth "Auth refactor" duration:2w status:in-progress \

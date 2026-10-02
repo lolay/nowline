@@ -30,12 +30,9 @@ import {
     INLINE_DATE_GLYPH_INSET_TOP_PX,
     INLINE_DATE_GLYPH_TILE_SIZE_PX,
     ITEM_CAPTION_SPILL_GAP_PX,
-    ITEM_FOOTNOTE_INDICATOR_INSET_RIGHT_PX,
-    ITEM_FOOTNOTE_INDICATOR_STEP_PX,
     ITEM_LINK_ICON_INSET_PX,
     ITEM_LINK_ICON_TILE_SIZE_PX,
-    ITEM_STATUS_DOT_INSET_RIGHT_PX,
-    ITEM_STATUS_DOT_RADIUS_PX,
+    itemBeforeGlyphInsideLeftX,
     MIN_BAR_WIDTH_FOR_INLINE_DATE_PX,
 } from './item-bar-geometry.js';
 import type { BoundingBox, InlineDatePin, Point } from './types.js';
@@ -93,31 +90,17 @@ export function computeItemInlineDatePins(opts: ItemInlineDatePinInputs): Inline
     }
 
     if (beforeDate) {
-        // Walk LEFT from the rightmost top-decoration slot:
-        //   - rightmost footnote anchors at (box.right - INSET_RIGHT_PX)
-        //   - leftmost footnote sits one step further left per extra digit
-        //   - status dot left edge sits at (box.right - INSET_RIGHT - DOT_RADIUS)
-        //   - inline-date glyph sits one INLINE_DATE_GLYPH_GAP_PX further left
+        // Walk LEFT from the rightmost top-decoration slot; the formula is
+        // shared with the title first-line clearance, see
+        // `itemBeforeGlyphInsideLeftX`.
         const rightEdge = box.x + box.width;
-        let anchorRightX: number;
-        if (footnoteCount > 0) {
-            const leftmostFootnoteCenter =
-                rightEdge -
-                ITEM_FOOTNOTE_INDICATOR_INSET_RIGHT_PX -
-                (footnoteCount - 1) * ITEM_FOOTNOTE_INDICATOR_STEP_PX;
-            anchorRightX = leftmostFootnoteCenter - INLINE_DATE_GLYPH_GAP_PX;
-        } else {
-            const dotLeftEdge =
-                rightEdge - ITEM_STATUS_DOT_INSET_RIGHT_PX - ITEM_STATUS_DOT_RADIUS_PX;
-            anchorRightX = dotLeftEdge - INLINE_DATE_GLYPH_GAP_PX;
-        }
-        const insideRightX = anchorRightX - tileSize;
+        const insideLeftX = itemBeforeGlyphInsideLeftX(rightEdge, footnoteCount);
         const glyphLeft: Point = spilled
             ? {
                   x: rightEdge + ITEM_CAPTION_SPILL_GAP_PX,
                   y: topY,
               }
-            : { x: insideRightX, y: topY };
+            : { x: insideLeftX, y: topY };
         pins.push({
             side: 'before',
             isoDate: beforeDate,

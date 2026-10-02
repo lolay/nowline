@@ -1,3 +1,4 @@
+import { isItemDeclaration, isSwimlaneDeclaration, type NowlineFile } from '@nowline/core';
 import { describe, expect, it } from 'vitest';
 import { layoutRoadmap, type PositionedItem, type PositionedTrackChild } from '../src/index.js';
 import { parseAndResolve } from './helpers.js';
@@ -771,5 +772,343 @@ swimlane b "B"
         const wp = edge?.waypoints ?? [];
         expect(wp[0].x).toBeCloseTo(tech.box.x + tech.box.width, 1);
         expect(wp[0].y).toBeCloseTo(tech.box.y + tech.box.height / 2, 1);
+    });
+});
+
+describe('layoutRoadmap title first-line clearance', () => {
+    // `scale:2w`: a `2w` item is a 148px bar with a 124px text area. The first
+    // title line shares the bar's upper-right with the status dot, so it gets
+    // 148 - 12 - 21 = 115px (dot only), 104.2px (dot + one footnote digit) or
+    // 99px (dot + `before:` glyph). Later lines keep the full 124px.
+    function roadmap(body: string, header = ''): string {
+        return `nowline v1
+
+roadmap r "R" start:2026-04-06 scale:2w
+${header}
+swimlane "Platform"
+${body}`;
+    }
+
+    function items(children: PositionedTrackChild[]): PositionedItem[] {
+        const out: PositionedItem[] = [];
+        for (const child of children) {
+            if (child.kind === 'item') out.push(child);
+            else out.push(...items(child.children));
+        }
+        return out;
+    }
+
+    async function layout(src: string) {
+        const { file, resolved } = await parseAndResolve(src);
+        return layoutRoadmap(file, resolved, { theme: 'light' });
+    }
+
+    function only(model: Awaited<ReturnType<typeof layout>>, title: string): PositionedItem {
+        const found = items(model.swimlanes[0].children).find((i) => i.title === title);
+        if (!found) throw new Error(`no item titled ${title}`);
+        return found;
+    }
+
+    it('wraps a title that fits the inner width but would run under the status dot', async () => {
+        // "Plan the rollout" is 120.6px: one line at 124px, over the 115px first line.
+        const model = await layout(roadmap('  item "Plan the rollout" duration:2w\n'));
+        const item = only(model, 'Plan the rollout');
+        expect(item.textSpills).toBe(false);
+        expect(item.titleLines).toEqual(['Plan the', 'rollout']);
+        expect(item.box.height).toBe(72);
+    });
+
+    it('keeps a title that clears the dot on one line', async () => {
+        // "Ship the thing" is 105.6px < 115px.
+        const model = await layout(roadmap('  item "Ship the thing" duration:2w\n'));
+        const item = only(model, 'Ship the thing');
+        expect(item.titleLines).toBeUndefined();
+        expect(item.box.height).toBe(56);
+    });
+
+    it('widens the reserve for a footnote on the item', async () => {
+        const model = await layout(
+            roadmap(
+                '  item tech "Ship the thing" duration:2w\n',
+                '\nfootnote note "Note" on:tech\n',
+            ),
+        );
+        const item = only(model, 'Ship the thing');
+        expect(item.footnoteIndicators).toEqual([1]);
+        // 105.6px > 104.2px first-line width.
+        expect(item.titleLines).toEqual(['Ship the', 'thing']);
+        expect(item.box.height).toBe(72);
+    });
+
+    it('widens the reserve for a `before:` glyph', async () => {
+        const model = await layout(
+            roadmap('  item "Ship the thing" duration:2w before:2026-06-29\n'),
+        );
+        const item = only(model, 'Ship the thing');
+        expect(item.inlineDatePins?.some((p) => p.side === 'before' && !p.spilled)).toBe(true);
+        // 105.6px > 99px first-line width.
+        expect(item.titleLines).toEqual(['Ship the', 'thing']);
+    });
+
+    it('reserves the grown row in a group when only a footnote makes the title wrap', async () => {
+        // The row predictor has to see the footnote too, or the next row lands
+        // 64px below instead of 80px and overlaps the grown bar.
+        const src = `nowline v1
+
+roadmap r "R" start:2026-04-06 scale:2w
+
+footnote note "Note" on:tech
+
+swimlane "Platform"
+  group "Squad"
+    item tech "Ship the thing" duration:2w
+    item below "Below" duration:2w date:2026-04-06
+`;
+        const model = await layout(src);
+        const group = model.swimlanes[0].children[0];
+        if (group.kind !== 'group') throw new Error('expected a group');
+        const all = items(group.children);
+        const tech = all.find((i) => i.title === 'Ship the thing');
+        const below = all.find((i) => i.title === 'Below');
+        if (!tech || !below) throw new Error('missing items');
+        expect(tech.titleLines).toEqual(['Ship the', 'thing']);
+        expect(tech.box.height).toBe(72);
+        expect(below.box.y).toBe(tech.box.y + 80);
+    });
+
+    it('reserves the grown row in a group when only a `before:` glyph makes the title wrap', async () => {
+        const src = `nowline v1
+
+roadmap r "R" start:2026-04-06 scale:2w
+
+swimlane "Platform"
+  group "Squad"
+    item tech "Ship the thing" duration:2w before:2026-06-29
+    item below "Below" duration:2w date:2026-04-06
+`;
+        const model = await layout(src);
+        const group = model.swimlanes[0].children[0];
+        if (group.kind !== 'group') throw new Error('expected a group');
+        const all = items(group.children);
+        const tech = all.find((i) => i.title === 'Ship the thing');
+        const below = all.find((i) => i.title === 'Below');
+        if (!tech || !below) throw new Error('missing items');
+        expect(tech.titleLines).toEqual(['Ship the', 'thing']);
+        expect(below.box.y).toBe(tech.box.y + 80);
+    });
+});
+
+describe('layoutRoadmap explicit title line breaks', () => {
+    // `scale:2w`: a `2w` item is a 148px bar with a 124px text area (115px for the first line).
+    // In the DSL source a `\n` escape is two characters; Langium turns it into a real newline.
+    function items(children: PositionedTrackChild[]): PositionedItem[] {
+        const out: PositionedItem[] = [];
+        for (const child of children) {
+            if (child.kind === 'item') out.push(child);
+            else out.push(...items(child.children));
+        }
+        return out;
+    }
+
+    async function layout(src: string) {
+        const { file, resolved } = await parseAndResolve(src);
+        return { file, model: layoutRoadmap(file, resolved, { theme: 'light' }) };
+    }
+
+    function roadmap(body: string, header = ''): string {
+        return `nowline v1
+
+roadmap r "R" start:2026-04-06 scale:2w
+${header}
+swimlane "Platform"
+${body}`;
+    }
+
+    function find(list: PositionedItem[], id: string): PositionedItem {
+        const found = list.find((i) => i.id === id);
+        if (!found) throw new Error(`no item ${id}`);
+        return found;
+    }
+
+    /** The parsed title of a swimlane item, straight from the AST. */
+    function astTitle(file: NowlineFile, name: string): string | undefined {
+        for (const entry of file.roadmapEntries) {
+            if (!isSwimlaneDeclaration(entry)) continue;
+            for (const child of entry.content) {
+                if (isItemDeclaration(child) && child.name === name) return child.title;
+            }
+        }
+        throw new Error(`no item ${name} in the AST`);
+    }
+
+    it('keeps the raw title and splits it into the author lines', async () => {
+        const { model } = await layout(
+            roadmap('  item tech "Technology\\nSelection" duration:2w status:done\n'),
+        );
+        const tech = find(items(model.swimlanes[0].children), 'tech');
+        expect(tech.title).toBe('Technology\nSelection');
+        expect(tech.titleLines).toEqual(['Technology', 'Selection']);
+        expect(tech.textSpills).toBe(false);
+        expect(tech.box.height).toBe(72);
+    });
+
+    it('breaks a title that would fit one line in a wide bar (explicit beats fit)', async () => {
+        // "Plan rollout" is 90px: one line in a 4w (308px) bar. The break still wins.
+        const { model } = await layout(roadmap('  item plan "Plan\\nrollout" duration:4w\n'));
+        const plan = find(items(model.swimlanes[0].children), 'plan');
+        expect(plan.title).toBe('Plan\nrollout');
+        expect(plan.titleLines).toEqual(['Plan', 'rollout']);
+        expect(plan.textSpills).toBe(false);
+        expect(plan.box.height).toBe(72);
+    });
+
+    it('grows the bar 32px for a three-line explicit title with a meta line, in-bar', async () => {
+        const { model } = await layout(
+            roadmap('  item three "Design\\nBuild\\nShip" duration:2w\n'),
+        );
+        const three = find(items(model.swimlanes[0].children), 'three');
+        expect(three.titleLines).toEqual(['Design', 'Build', 'Ship']);
+        expect(three.textSpills).toBe(false);
+        expect(three.metaText).toBe('2w');
+        // Meta baseline 38 + 2 * 16 = 70: grows 70 - 38 = 32px.
+        expect(three.box.height).toBe(88);
+    });
+
+    it('does not grow a one-line break-free title, and still wraps nothing without a break', async () => {
+        const { model } = await layout(roadmap('  item one "Design" duration:2w\n'));
+        const one = find(items(model.swimlanes[0].children), 'one');
+        expect(one.titleLines).toBeUndefined();
+        expect('titleLines' in one).toBe(false);
+        expect(one.box.height).toBe(56);
+    });
+
+    it('spills a too-wide explicit title as a multi-line block and grows the bar for its height', async () => {
+        const { model } = await layout(
+            roadmap('  item wide "Internationalization of\\nthe billing service" duration:2w\n'),
+        );
+        const wide = find(items(model.swimlanes[0].children), 'wide');
+        expect(wide.textSpills).toBe(true);
+        expect(wide.titleLines).toEqual(['Internationalization of', 'the billing service']);
+        // titleBarExtra applies to the spilled block too, so the row contains the text.
+        expect(wide.box.height).toBe(72);
+    });
+
+    it('reserves the widest title line, not the raw string, as the spill width', async () => {
+        const { model } = await layout(
+            roadmap('  item wide "Internationalization of\\nthe billing service" duration:2w\n'),
+        );
+        const wide = find(items(model.swimlanes[0].children), 'wide');
+        const widest = 'Internationalization of'.length * 13 * 0.58; // 173.4px
+        const rawWhole = 'Internationalization of\nthe billing service'.length * 13 * 0.58;
+        const spillStart = wide.box.x + wide.box.width + 6;
+        // The spill column is as wide as the widest line (the meta line is shorter).
+        // Plus the status dot's column when the dot is inside, which adds nothing here.
+        expect(wide.decorationsRightX - spillStart).toBeCloseTo(widest, 5);
+        expect(wide.decorationsRightX - spillStart).toBeLessThan(rawWhole - 100);
+    });
+
+    it('does not let a spilled explicit block overrun the next chained item', async () => {
+        const { model } = await layout(
+            roadmap(
+                '  item wide "Internationalization of\\nthe billing service" duration:2w\n  item after "Next" duration:2w\n',
+            ),
+        );
+        const all = items(model.swimlanes[0].children);
+        // "Next" sits on a later row: the spill reservation pushed it down.
+        expect(find(all, 'after').box.y).toBeGreaterThan(find(all, 'wide').box.y);
+    });
+
+    it('predicts the grown row of an explicit three-line title so the next row clears it', async () => {
+        // Inside a group the row packer reserves the row BEFORE placing: the next row
+        // must start 64 (step) + 32 (growth) below, with the 8px gap intact.
+        const src = `nowline v1
+
+roadmap r "R" start:2026-04-06 scale:2w
+
+swimlane "Platform"
+  group "Squad"
+    item three "Design\\nBuild\\nShip" duration:2w
+    item below "Below" duration:2w date:2026-04-06
+`;
+        const { model } = await layout(src);
+        const group = model.swimlanes[0].children[0];
+        if (group.kind !== 'group') throw new Error('expected a group');
+        const all = items(group.children);
+        const three = find(all, 'three');
+        const below = find(all, 'below');
+        expect(three.box.height).toBe(88);
+        expect(below.box.y).toBe(three.box.y + 96);
+    });
+
+    it('predicts the grown row of a spilled explicit title too', async () => {
+        const src = `nowline v1
+
+roadmap r "R" start:2026-04-06 scale:2w
+
+swimlane "Platform"
+  group "Squad"
+    item wide "Internationalization of\\nthe billing service" duration:2w
+    item below "Below" duration:2w date:2026-04-06
+`;
+        const { model } = await layout(src);
+        const group = model.swimlanes[0].children[0];
+        if (group.kind !== 'group') throw new Error('expected a group');
+        const all = items(group.children);
+        const wide = find(all, 'wide');
+        const below = find(all, 'below');
+        expect(wide.textSpills).toBe(true);
+        expect(wide.box.height).toBe(72);
+        expect(below.box.y).toBe(wide.box.y + 80);
+    });
+
+    it('stays single-line for a parse-level "a\\\\nb": the literal text a\\nb, not a break', async () => {
+        // Source `"a\\nb"` (an escaped backslash, then n): Langium yields a, \, n, b.
+        const { file, model } = await layout(
+            roadmap('  item lit "a\\\\nb" duration:3w status:planned\n'),
+        );
+        expect(astTitle(file, 'lit')).toBe('a\\nb');
+        const lit = find(items(model.swimlanes[0].children), 'lit');
+        expect(lit.title).toBe('a\\nb');
+        expect(lit.title).toHaveLength(4);
+        expect(lit.titleLines).toBeUndefined();
+        expect(lit.box.height).toBe(56);
+    });
+
+    it('parses the source escape \\n into a real newline in the AST', async () => {
+        const { file } = await layout(roadmap('  item brk "a\\nb" duration:3w\n'));
+        expect(astTitle(file, 'brk')).toBe('a\nb');
+    });
+
+    it('trims leading and trailing breaks off a title and lays it out as an ordinary one', async () => {
+        const { model } = await layout(roadmap('  item trim "\\nPlan\\n" duration:3w\n'));
+        const trim = find(items(model.swimlanes[0].children), 'trim');
+        expect(trim.title).toBe('\nPlan\n');
+        // One line left: painted lines are ["Plan"], not the raw string with its newlines.
+        expect(trim.titleLines).toEqual(['Plan']);
+        expect(trim.textSpills).toBe(false);
+        expect(trim.box.height).toBe(56);
+    });
+
+    it('stacks chips below a spilled multi-line caption instead of overlapping it', async () => {
+        const src = `nowline v1
+
+roadmap r "R" start:2026-04-06 scale:2w
+
+label a-fairly-long-label-id "A"
+label another-long-label-id "B"
+
+swimlane "Platform"
+  item wide "Internationalization of\\nthe billing service" duration:2w labels:[a-fairly-long-label-id, another-long-label-id]
+`;
+        const { model } = await layout(src);
+        const wide = find(items(model.swimlanes[0].children), 'wide');
+        expect(wide.textSpills).toBe(true);
+        expect(wide.chipsOutside).toBe(true);
+        // Meta baseline of a two-line caption is 54; the chips start 3px below it.
+        for (const chip of wide.labelChips) {
+            expect(chip.box.y).toBeGreaterThanOrEqual(wide.box.y + 54 + 3);
+        }
+        const bottom = Math.max(...wide.labelChips.map((c) => c.box.y + c.box.height));
+        expect(bottom + 3 + 4).toBeLessThanOrEqual(wide.box.y + wide.box.height);
     });
 });

@@ -1,0 +1,53 @@
+nowline v1
+
+// Fixture for explicit title line breaks (lolay/nowline#60). A `\n` inside
+// an item title is a hard line break: the author's lines are authoritative,
+// so no auto-wrap runs on them and the two-line cap does not apply. Each
+// line paints as its own <text>, 16px apart, with the meta line below the
+// last one. `\\n` is just the literal text `\n` (single line).
+//
+// What to look for when rendering this:
+//   - Breaks lane: "Technology" / "Selection" is the issue's title, broken
+//     by hand (auto-wrap would give the same split in this 2w bar; "Plan" /
+//     "rollout" is the case that proves the break wins, since "Plan
+//     rollout" fits one line in a 4w bar and still breaks).
+//   - Three lines lane: a 3-line title stays INSIDE the bar. Auto-wrap would
+//     have spilled it (a 2-line cap); an explicit break has no cap. The bar
+//     grows 32px with its meta line (88px), and "Next up" stays on the row.
+//   - Literal lane: `\\n` shows the two characters `\n` on ONE line; it is a
+//     backslash and an n, not a break.
+//   - Too wide lane: line 1 ("Internationalization of") is wider than a 2w
+//     bar's text area, so the whole block spills to the RIGHT with its
+//     breaks preserved (two stacked lines, meta below). The spill reserves
+//     its widest line, so "Follow up" drops to the next row.
+//   - Link + footnote lane: line 1 shares the bar's upper-right with the
+//     status dot and the footnote digit, and the link tile pushes the
+//     caption right, so line 1 has to stop short of that cluster. "Auth
+//     service" just fits (about 90px of a 92px budget); line 2 is below the
+//     dot and uses the full width.
+//
+// A bare break at either end of a title ("Plan\n") is trimmed and the title
+// is then an ordinary one-line title; interior blank lines stay blank.
+
+roadmap title-line-breaks "Explicit title line breaks" start:2026-04-06 scale:2w calendar:business
+
+footnote refactor-note "Line 1 stops short of the footnote digit" on:auth-refactor
+
+swimlane breaks "Breaks"
+  item tech "Technology\nSelection" duration:2w status:done
+  item api "API" duration:3w status:done
+  item plan "Plan\nrollout" duration:4w status:planned
+
+swimlane three-lines "Three lines"
+  item design "Design\nBuild\nShip" duration:2w status:in-progress
+  item next-up "Next up" duration:3w status:planned
+
+swimlane literal "Literal"
+  item literal-n "Plan A\\nB" duration:3w status:planned
+
+swimlane too-wide "Too wide"
+  item wide "Internationalization of\nthe billing service" duration:2w status:planned
+  item follow-up "Follow up" duration:3w status:planned
+
+swimlane link-footnote "Link + footnote"
+  item auth-refactor "Auth service\nrefactor" duration:2w status:in-progress link:https://github.com/lolay/nowline/issues/60

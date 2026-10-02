@@ -32,8 +32,17 @@ function formatIsoDate(d: Date): string {
     return d.toISOString().slice(0, 10);
 }
 
+/**
+ * The name an insight echoes for an item: its id, else its title. A title
+ * can carry explicit `\n` line breaks (they paint as separate lines in the
+ * chart), but an insight message is one line of text, so each break run
+ * collapses to a single space.
+ */
 function itemLabel(item: PositionedItem): string {
-    return item.id ?? item.title;
+    if (item.id !== undefined) return item.id;
+    return /[\r\n]/.test(item.title)
+        ? item.title.replace(/\s*[\r\n]+\s*/g, ' ').trim()
+        : item.title;
 }
 
 function walkTrackChildren(

@@ -23,8 +23,17 @@ export function estimateTextWidth(text: string, fontSize: number): number {
  * the middle. The wrap is greedy (fill each line before starting the
  * next), which yields the minimum possible line count for a given
  * width.
+ *
+ * `firstLineMaxWidth` (default `maxWidth`) narrows only the FIRST line,
+ * for callers whose first line has to stay clear of something the later
+ * lines are below (the item bar's top-right decorations).
  */
-export function wrapText(text: string, maxWidth: number, fontSize: number): string[] {
+export function wrapText(
+    text: string,
+    maxWidth: number,
+    fontSize: number,
+    firstLineMaxWidth: number = maxWidth,
+): string[] {
     if (!text) return [];
     const words = text.split(/\s+/).filter((w) => w.length > 0);
     if (words.length === 0) return [];
@@ -32,7 +41,8 @@ export function wrapText(text: string, maxWidth: number, fontSize: number): stri
     let cur = '';
     for (const word of words) {
         const trial = cur ? `${cur} ${word}` : word;
-        if (cur && estimateTextWidth(trial, fontSize) > maxWidth) {
+        const limit = lines.length === 0 ? firstLineMaxWidth : maxWidth;
+        if (cur && estimateTextWidth(trial, fontSize) > limit) {
             lines.push(cur);
             cur = word;
         } else {

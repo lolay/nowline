@@ -6,6 +6,10 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ## [Unreleased]
 
+### Added
+
+- **`@nowline/layout` + `@nowline/renderer` + `@nowline/export-msproj` — `\n` in an item title forces a line break** ([#60](https://github.com/lolay/nowline/issues/60)): `item tech "Technology\nSelection" duration:2w` paints "Technology" over "Selection" inside the bar. The author's lines are authoritative: no auto-wrap runs on them and the two-line cap does not apply, so a three-line title stays in the bar (and grows it 16px per extra line when it has a meta line). If a line is too wide for the bar, the whole title spills to the right as a stacked block with its breaks kept. `\\n` shows the literal text `\n`. Elsewhere a break behaves as whitespace: the MS Project export collapses it to one space (as the Mermaid export already did), an `.xlsx` Title cell keeps an in-cell break, and `NL.I1000` names the item with its breaks as spaces. `PositionedItem.title` keeps the raw string and `titleLines` carries the lines. Rendered output changes only for titles that contain a break.
+
 ### Changed
 
 - **`@nowline/layout` + `@nowline/renderer` — item titles wrap to two lines inside the bar before spilling right**: a title too wide for one line now word-wraps (at whitespace only, never mid-word) to at most two lines inside its bar, instead of spilling beside it, as long as the meta line fits and each line fits the bar's inner width. A wrapped title with a meta line grows the bar and its row by 16px (a two-line title with no meta line needs no extra height); the next chained item stays on the row instead of dropping to a fresh one, and a wrapped title no longer raises `NL.I1000`. A single word that is too long, a title that needs three or more lines, and a meta line that does not fit still spill to the right as before. `PositionedItem` gains an optional `titleLines`. Wrapping is always on (no new DSL property or style key), so rendered output changes for any roadmap with such a title.
@@ -13,6 +17,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 ### Fixed
 
 - **`@nowline/renderer` — in-bar caption no longer overlaps the link icon**: the renderer started in-bar captions at the bar's left edge + 12px while the link-icon tile covers 6px to 20px, so the title and meta began under the tile. Captions on bars with a link icon now start at +24px, the inset layout already measured against.
+- **`@nowline/layout` — an item title no longer runs under the status dot, footnote indicators or `before:` glyph**: the first title line used to extend to 12px from the bar's right edge, which put its last characters under the status dot (7 to 17px from the edge), the footnote digits and the `before:` inline-date glyph at the same height. The first line now stops 4px short of the leftmost of those that render inside the bar, so a title that previously ran under them wraps to a second line or spills to the right instead. Line 2 and the meta line sit below the decorations and keep the full inner width. Rendered output changes for any roadmap whose first title line used to reach the decorations.
 
 ## [0.8.6] - 2026-10-01
 

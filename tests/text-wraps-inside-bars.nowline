@@ -15,6 +15,12 @@ nowline v1
 //   - Link icon lane: "Auth token refactor" wraps too, and its caption
 //     starts past the 14px link-icon tile (24px inset, not 12px), so the
 //     title never sits under the tile.
+//   - Dot clearance lane: the first title line also stops short of the
+//     status dot (and any footnote digits or `before:` glyph) in the bar's
+//     upper-right. "Authentication refactor" in a 2w bar with a link icon
+//     would put "Authentication" (about 106px) in a 103px first-line
+//     budget, running under the dot, so it spills to the right instead.
+//     This is the regression case for that overlap.
 //
 // A wrapped item WITHOUT a meta line (the 2-line, no-growth case: line 2
 // lands at baseline 36, so the bar stays 56px) cannot be written in the
@@ -55,7 +61,10 @@ swimlane mobile "Mobile"
       item android-e2e-test "E2E Test" duration:2w status:planned after:api-integration
 
 swimlane link-icon "Link icon"
-  item auth-refactor "Auth token refactor" duration:2w status:in-progress link:https://github.com/lolay/nowline/issues/59
+  item auth-token-refactor "Auth token refactor" duration:2w status:in-progress link:https://github.com/lolay/nowline/issues/59
   item "Rollout" duration:3w status:planned
+
+swimlane dot-clearance "Dot clearance"
+  item auth-refactor "Authentication refactor" duration:2w status:in-progress link:https://github.com/lolay/nowline/issues/59
 
 milestone ai-release "AI Release" after:[platform-e2e-test, web-e2e-test, ios-e2e-test, android-e2e-test]
