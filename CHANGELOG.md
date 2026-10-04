@@ -6,6 +6,10 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ## [Unreleased]
 
+### Fixed
+
+- **`@nowline/core` — printer handles `symbol` declarations**: `printNowlineFile` threw `Unknown config entry type: SymbolDeclaration` for any file whose `config` section declared a `symbol`, which broke JSON → text conversion (`nowline roadmap.json -f nowline`) and the `@nowline/mcp` `convert` tool. Symbols now print as `symbol [id] ["title"] unicode:"…" ascii:"…" link:…` with an indented `description` when present.
+
 ## [0.8.6] - 2026-10-01
 
 ### Added
