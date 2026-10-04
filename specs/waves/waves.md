@@ -748,8 +748,9 @@ A warm start from day space would be wrong: divergence (a) can make pixel values
 **Seeds.** Each pass resets the entity maps to the anchor and dated-milestone baseline, then seeds:
 
 - `entityRightEdges[w_k] = E[k]`;
-- `entityLeftEdges[w_k] = S[k]`;
-- `entityVisualRightX[w_k] = E[k]`. A floating milestone bound by a wave therefore sits on the boundary.
+- `entityLeftEdges[w_k] = S[k]`.
+
+A floating milestone's predecessor lookup reads `entityRightEdges` for any ref that is not a placed item, so a floating milestone bound by a wave sits on the boundary.
 
 Effects:
 

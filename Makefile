@@ -77,13 +77,19 @@ lint: ## Static check: biome lint + format-drift + import organization (no write
 format: ## Auto-fix formatting, lint, and import order (biome check --write)
 	pnpm check:fix
 
-typecheck: ## Type-check packages that opt in (vscode-extension tsc --noEmit, etc.)
+typecheck: ## Type-check packages that opt in (needs a prior build: resolves sibling dist/ types)
 	pnpm typecheck
 
 test: build ## Run every package's Vitest suite (build first: CLI integration tests spawn dist/)
 	pnpm -r test
 
-ci: lint typecheck build test ## Run the full pre-push gate (what CI runs)
+# Prerequisite order matters (make runs them left to right). `typecheck` must
+# follow `build`: packages like @nowline/browser resolve sibling @nowline/*
+# types from built dist/ and fail with TS2307 on a fresh clone. `lint` stays
+# first so the cheapest failure surfaces fastest. `typecheck` doesn't
+# hard-depend on `build` so a standalone run on a built tree skips the rebuild;
+# within one `make ci`, `build` still runs once even though `test` needs it too.
+ci: lint build typecheck test ## Run the full pre-push gate (what CI runs)
 
 pre-commit: ci ## Run the local gate before committing or pushing (alias of ci)
 

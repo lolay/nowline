@@ -14,13 +14,15 @@ graph LR
     %% solid = hard prerequisite (make runs the left target first)
     build --> test
     lint --> ci
-    typecheck --> ci
     build --> ci
+    typecheck --> ci
     test --> ci
 
-    %% dotted = consumes the left target's output, but the artifact is a
-    %% separate CI job in the release pipeline, so it is not a hard make
-    %% prerequisite (see "Why publish-* don't hard-depend on build" below)
+    %% dotted = consumes the left target's output but is not a hard make
+    %% prerequisite: typecheck is ordered after build inside ci instead, and
+    %% the release artifacts come from a separate CI job (see "Why publish-*
+    %% don't hard-depend on build" below)
+    build -.-> typecheck
     build -.-> compile
     compile -.-> smoke
     compile -.-> deb
@@ -43,10 +45,12 @@ graph LR
 ```
 
 Solid arrows are hard prerequisites — running a target automatically runs
-everything to its left (`make ci` runs `lint`, `typecheck`, `build`, `test`;
-`make test` runs `build` first). Dotted arrows mark a softer relationship: the
-target consumes another's output (e.g. `publish-npm` publishes the tarballs
-`pack` produces) but does not hard-depend on it, because in the release
+everything to its left (`make ci` runs `lint`, `build`, `typecheck`, `test`,
+in that order; `make test` runs `build` first). Dotted arrows mark a softer
+relationship: the target consumes another's output but does not hard-depend on
+it. `typecheck` reads sibling packages' built `dist/` types, so `ci` orders it
+after `build` rather than making every standalone `make typecheck` rebuild.
+`publish-npm` publishes the tarballs `pack` produces, but in the release
 pipeline that artifact is built in a separate CI job and handed over — see
 [Why `publish-*` don't hard-depend on `build`](#why-publish-dont-hard-depend-on-build).
 
@@ -62,9 +66,9 @@ pipeline that artifact is built in a separate CI job and handed over — see
 | `build-fast` | Build every package but skip the ~30-SVG render — the inner dev loop (`NOWLINE_SKIP_RENDER=1 pnpm build`) |
 | `lint` | Static check: biome lint + format-drift + import organization, no writes (`pnpm check`) |
 | `format` | Auto-fix formatting, lint, and import order (`pnpm check:fix`) |
-| `typecheck` | Type-check the packages that opt in (`pnpm typecheck`) |
+| `typecheck` | Type-check the packages that opt in (`pnpm typecheck`). Needs a prior `build`: several packages resolve sibling `@nowline/*` types from `dist/` |
 | `test` | Run every package's Vitest suite (`pnpm -r test`); depends on `build` |
-| `ci` | The full pre-push gate: `lint` + `typecheck` + `build` + `test` |
+| `ci` | The full pre-push gate: `lint` + `build` + `typecheck` + `test`, in that order. CI's build-test matrix runs this target directly on a clean checkout |
 | `pre-commit` | Local alias of `ci` — run before committing or pushing |
 | `clean` | Remove build / binary / package artifacts (keeps `node_modules`) |
 | `lint-workflows` | actionlint the GitHub Actions workflows (`pnpm lint:workflows`) |
@@ -118,7 +122,7 @@ friction for the command people and agents actually reach for.
 ### Why `publish-*` don't hard-depend on `build`
 
 The standard convention chains heavier targets onto lighter gates so they can't
-be skipped (`ci: lint typecheck build test`, `test: build`). The guarded
+be skipped (`ci: lint build typecheck test`, `test: build`). The guarded
 `publish-*` targets are the one deliberate exception in this repo: nowline's
 release pipeline builds artifacts **once** in [`build.yml`](./.github/workflows/build.yml)
 and hands them to a separate, pure-push publish/deploy job
@@ -141,7 +145,7 @@ keeps per-step logs and the matrix while sourcing the command from one place.
 
 | Workflow | Trigger | What it does | make targets |
 |----------|---------|--------------|--------------|
-| [`ci.yml`](./.github/workflows/ci.yml) | push to `main`, pull requests | Lint workflows; build + lint + typecheck + test across the OS/Node matrix; embed bundle-size gate; release-build smoke (calls `build.yml`) | `lint-workflows`, `build`, `lint`, `typecheck`, `test`, `bundle-size` |
+| [`ci.yml`](./.github/workflows/ci.yml) | push to `main`, pull requests | Lint workflows; the `make ci` gate (lint + build + typecheck + test) on a clean checkout across the OS/Node matrix; embed bundle-size gate; release-build smoke (calls `build.yml`) | `lint-workflows`, `ci`, `bundle-size` |
 | [`build.yml`](./.github/workflows/build.yml) | reusable (called by `ci.yml` smoke + `release.yml`) | 10-cell build/package matrix: compile per-OS/arch binaries, smoke them, build `.deb`s, pack npm tarballs, package the `.vsix`, stage the action mirror + embed CDN bundle | `compile`, `smoke`, `deb`, `pack`, `vsix` |
 | [`release.yml`](./.github/workflows/release.yml) | `v*` tag push, manual dispatch | Cut release (bump + tag), call `build.yml` with upload, publish to npm + Marketplace + Open VSX, GitHub release + Homebrew tap + action mirror, deploy prod embed CDN | `bump`, `publish-npm`, `publish-vscode` (guarded with `CONFIRM_PUBLISH=1`) |
 | [`embed-cdn.yml`](./.github/workflows/embed-cdn.yml) | push to `main`, pull requests, manual dispatch | Build the dev IIFE; continuous-deploy `embed.nowline.dev`; per-PR ephemeral preview channel | `publish-cdn` (guarded with `CONFIRM_DEPLOY=1`, embed-dev job) |

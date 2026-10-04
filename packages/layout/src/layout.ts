@@ -63,6 +63,7 @@ import {
     MIN_BAR_WIDTH_FOR_LINK_AND_DOT_PX,
     packSpillChips,
 } from './item-bar-geometry.js';
+import { itemArrowSourcePort, itemArrowTargetPort } from './item-port-geometry.js';
 import { type LayoutContext, newCursor, type TrackCursor } from './layout-context.js';
 import { GroupNode } from './nodes/group-node.js';
 import {
@@ -815,58 +816,11 @@ function sequenceItem(
     // explicit id when present, else a synthetic, non-referenceable handle
     // (see `syntheticItemKey`). This lets a title-only item register its own
     // dependency-arrow target geometry and join flow-key dedup without
-    // entering the human-referenceable namespace above.
+    // entering the human-referenceable namespace above. The item itself is
+    // registered in `ctx.placedItems` once it is built (below); its arrow
+    // and slack-arrow attach points are derived from its final box later.
     const drawKey = id ?? syntheticItemKey(node);
-    // Dependency-arrow attach line: the NOMINAL row midline, `bandwidth / 2`
-    // below the bar top, not the bar's own mid-height. A bar that grew to
-    // enclose a wrapped title or a chip column is taller than its row's
-    // other bars, so its true mid-height sits lower; attaching there would
-    // bend every arrow between a grown bar and a same-row neighbour into a
-    // jog. On a bar that did not grow the two are equal (56px: 28 either
-    // way), so ordinary output is unchanged. Every bar's target line is the
-    // nominal midline, spilled caption or not; only a spilled caption's
-    // SOURCE side drops to the progress-strip attach (below).
-    const attachMidY = itemBox.y + bandwidth / 2;
-    ctx.entityMidpoints.set(drawKey, {
-        x: (logicalLeft + logicalRight) / 2,
-        y: attachMidY,
-    });
-    // Visual edges — where dependency arrows actually attach. These sit
-    // ITEM_INSET_PX inside the column boundaries so the arrows emerge from
-    // the painted bar edge instead of the inter-column gutter. See
-    // LayoutContext.entityVisualLeftX/RightX.
-    ctx.entityVisualLeftX.set(drawKey, itemBox.x);
-    ctx.entityVisualRightX.set(drawKey, itemBox.x + itemBox.width);
-    // Dependency-arrow source point. Default = the bar's right edge at row
-    // midpoint. When the caption spills past the bar's right edge
-    // (`textSpills`), the spilled title / meta occupy the area immediately
-    // right of the bar at row midline. Keep X on the bar's right edge so the
-    // arrow visually leaves the bar's side, but drop Y to the vertical center
-    // of the bottom progress strip so the arrow runs UNDERNEATH the spilled
-    // text rather than through it. Mirrors the slack-arrow attach below.
-    const arrowSource: Point = textSpills
-        ? {
-              x: itemBox.x + itemBox.width,
-              y: itemBox.y + itemBox.height - PROGRESS_STRIP_HEIGHT_PX / 2,
-          }
-        : {
-              x: itemBox.x + itemBox.width,
-              y: attachMidY,
-          };
-    ctx.itemArrowSource.set(drawKey, arrowSource);
     ctx.itemFlowKey.set(drawKey, ctx.currentFlowKey);
-    // Slack-arrow attach Y. Defaults to the row's nominal midline, the same
-    // line the dependency arrows use, so a grown bar's dotted slack arrow
-    // leaves level with its dependency arrows; when the caption spills past
-    // the bar's right edge, drop to the progress-strip's vertical center so
-    // the arrow aligns with the bottom-edge progress bar instead of running
-    // through the adjacent title/meta text. The `/ 2` keeps the attach point
-    // on the strip's vertical center if `PROGRESS_STRIP_HEIGHT_PX` is ever
-    // bumped.
-    const slackAttachY = textSpills
-        ? itemBox.y + itemBox.height - PROGRESS_STRIP_HEIGHT_PX / 2
-        : attachMidY;
-    ctx.itemSlackAttachY.set(drawKey, slackAttachY);
 
     cursor.x = logicalRight;
     cursor.maxX = Math.max(cursor.maxX, cursor.x);
@@ -924,6 +878,11 @@ function sequenceItem(
         style,
         inlineDatePins: inlineDatePins.length > 0 ? inlineDatePins : undefined,
     };
+    // Register the item object itself, not coordinates sampled from it:
+    // the row packer and the marker-band shift may still move this box
+    // down, and every attach port is read off the final box (see
+    // `item-port-geometry.ts`).
+    ctx.placedItems.set(drawKey, result);
     return result;
 }
 
@@ -1543,36 +1502,38 @@ function buildDependencies(
     const requests: EdgeRouteRequest[] = [];
     const pending: Pending[] = [];
 
+    // Ports are read off each item's FINAL box here, after every row and
+    // marker-band shift has run, never captured while the item was placed.
+    const bandwidth = ctx.bandScale.bandwidth();
     for (const [id, item] of items) {
         const afters = propValues(item.properties, 'after');
-        const targetMid = ctx.entityMidpoints.get(id);
-        const targetVisualLeftX = ctx.entityVisualLeftX.get(id);
-        if (!targetMid || targetVisualLeftX === undefined) continue;
+        const target = ctx.placedItems.get(id);
+        if (!target) continue;
         // The arrow always TERMINATES at the target item's left
-        // visual edge, vertically centered on the bar.
-        const targetPoint: Point = { x: targetVisualLeftX, y: targetMid.y };
+        // visual edge, on its attach line (see `itemArrowTargetPort`).
+        const targetPoint = itemArrowTargetPort(target, bandwidth);
         for (const pred of afters) {
             // Source point depends on what kind of predecessor `pred`
-            // is. For ITEMS we use the per-item arrow source point
-            // — (visualRight, midY) by default, dropping to
+            // is. For ITEMS we use the per-item arrow source port
+            // — (visualRight, nominal midline) by default, dropping to
             // (visualRight, bar.bottom - PROGRESS_STRIP_HEIGHT/2) when
             // the caption spilled past the right edge so the arrow
             // exits below the spilled title / meta text. For ANCHORS
             // / MILESTONES we attach to the marker's vertical CUT
-            // LINE at the TARGET item's row mid-Y — the dashed/solid
+            // LINE at the TARGET item's attach Y — the dashed/solid
             // cut line already drops through the chart and reads as
             // the arrow's stem, so a short horizontal stub from the
             // line into the bar's left edge is the cleanest
             // connection.
-            const itemSource = ctx.itemArrowSource.get(pred);
+            const predItem = ctx.placedItems.get(pred);
             let from: Point;
-            const isMarkerPred = itemSource === undefined;
-            if (itemSource) {
-                from = itemSource;
+            const isMarkerPred = predItem === undefined;
+            if (predItem) {
+                from = itemArrowSourcePort(predItem, bandwidth);
             } else {
                 const markerMid = ctx.entityMidpoints.get(pred);
                 if (!markerMid) continue;
-                from = { x: markerMid.x, y: targetMid.y };
+                from = { x: markerMid.x, y: targetPoint.y };
             }
             // Skip same-row contiguous chains for ITEM → ITEM only:
             // when the target sits immediately to the right of the

@@ -14,6 +14,7 @@
 
 import type { MilestoneDeclaration } from '@nowline/core';
 import { parseDate, propValue, propValues } from '../dsl-utils.js';
+import { itemSlackAttachY } from '../item-port-geometry.js';
 import type { LayoutContext } from '../layout-context.js';
 import { resolveStyle } from '../style-resolution.js';
 import type { BoundingBox, Point, PositionedMilestone } from '../types.js';
@@ -53,10 +54,14 @@ export function collectMilestonePredecessors(
 ): MilestonePredecessor[] {
     const out: MilestonePredecessor[] = [];
     for (const ref of refs) {
-        const visualRight = ctx.entityVisualRightX.get(ref);
-        const x = visualRight ?? ctx.entityRightEdges.get(ref);
+        // Items attach off their FINAL box (see `item-port-geometry.ts`),
+        // so a bar that a row growth moved down still sources its arrow.
+        const item = ctx.placedItems.get(ref);
+        const x = item ? item.box.x + item.box.width : ctx.entityRightEdges.get(ref);
         if (x === undefined) continue;
-        const y = ctx.itemSlackAttachY.get(ref) ?? ctx.entityMidpoints.get(ref)?.y ?? 0;
+        const y = item
+            ? itemSlackAttachY(item, ctx.bandScale.bandwidth())
+            : (ctx.entityMidpoints.get(ref)?.y ?? 0);
         // Markers don't share a flow with anything, so use their id
         // as a unique flow key — every marker stands on its own.
         const flowKey = ctx.itemFlowKey.get(ref) ?? `marker:${ref}`;

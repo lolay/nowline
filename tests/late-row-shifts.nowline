@@ -1,0 +1,51 @@
+nowline v1
+
+// Fixture for geometry that must follow a bar when layout moves it down
+// AFTER placing it. Layout does that in two places:
+//
+//   - Retroactive row growth: an item that lands back on an existing row
+//     and is taller than it grows that row after the rows below it were
+//     placed, so every later row moves down.
+//   - Marker-band growth: when the anchors and milestones need more
+//     marker rows than the band was sized for, the band grows and the
+//     whole chart moves down.
+//
+// What to look for when rendering this:
+//   - Retroactive lane: "Auth refactor" spills, so "Next" and "Plain
+//     thing" drop to row 1. "Next one" fits back on row 0 and wraps,
+//     growing row 0 by 16px after rows 1-3 were placed. The a -> b arrow
+//     must end on "Next"'s midline, the c -> d arrow must leave "Plain
+//     thing" at its progress strip, and the calendar glyphs on "Plain
+//     thing", the filled group's chiclet row and the parallel's header
+//     band must sit on their own (moved) boxes.
+//   - The "Ship" milestone's slack arrow leaves "Gamma" (row 2) at its
+//     progress strip, not 16px above it.
+//   - Marker band: the anchor and the "Beta" milestone collide, so the band
+//     grows to two rows and everything below it moves down. The `after:`
+//     glyph on "Alpha" must sit inside Alpha's bar, not above it.
+
+config
+
+style enterprise
+  bg: blue
+  text: white
+
+roadmap late-row-shifts "Late row shifts" start:2026-01-05 scale:1w
+
+anchor freeze "code-freeze" date:2026-02-02
+
+swimlane retro "Retroactive row growth"
+  item a "Auth refactor" duration:2w
+  item b "Next" duration:2w after:a
+  item c "Plain thing" duration:2w after:2026-01-25
+  group g "Pinned group" style:enterprise after:2026-01-19
+    item g1 "Gamma" duration:2w
+  parallel par "Pinned parallel" before:2026-04-20
+    item p1 "Delta" duration:3w
+  item d "Next one" duration:2w after:c
+
+swimlane band "Marker band growth"
+  item alpha "Alpha" duration:4w after:2026-01-12
+
+milestone beta "Beta" after:alpha
+milestone ship "Ship" after:[g1, d]

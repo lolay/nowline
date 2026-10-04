@@ -78,17 +78,14 @@ jobs:
         with:
           node-version: ${{ matrix.node-version }}
 
-      - name: Build all packages
-        run: make build
-
-      - name: Lint and format check
-        run: make lint
-
-      - name: Typecheck
-        run: make typecheck
-
-      - name: Test
-        run: make test
+      # Run the local gate itself, not a hand-ordered copy of its steps. The
+      # checkout has no dist/, so this is the same fresh-clone `make init &&
+      # make pre-commit` contributors run. Separate build/lint/typecheck/test
+      # steps once ran `build` first and masked a `typecheck` that only passed
+      # against prebuilt dist/ types; one `make ci` keeps CI and the local gate
+      # in the same order by construction (and builds once, not twice).
+      - name: Gate (make ci on a clean checkout)
+        run: make ci
 
   bundle-size:
     name: Embed bundle size gate
