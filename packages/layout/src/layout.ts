@@ -823,13 +823,13 @@ function sequenceItem(
     // other bars, so its true mid-height sits lower; attaching there would
     // bend every arrow between a grown bar and a same-row neighbour into a
     // jog. On a bar that did not grow the two are equal (56px: 28 either
-    // way), so ordinary output is unchanged. Only bars whose caption stays in
-    // the bar are re-aimed: a spilled caption keeps the bar's own mid-height as
-    // the target line and the progress-strip attach as the source (below).
+    // way), so ordinary output is unchanged. Every bar's target line is the
+    // nominal midline, spilled caption or not; only a spilled caption's
+    // SOURCE side drops to the progress-strip attach (below).
     const attachMidY = itemBox.y + bandwidth / 2;
     ctx.entityMidpoints.set(drawKey, {
         x: (logicalLeft + logicalRight) / 2,
-        y: textSpills ? itemBox.y + itemBox.height / 2 : attachMidY,
+        y: attachMidY,
     });
     // Visual edges — where dependency arrows actually attach. These sit
     // ITEM_INSET_PX inside the column boundaries so the arrows emerge from
@@ -855,15 +855,17 @@ function sequenceItem(
           };
     ctx.itemArrowSource.set(drawKey, arrowSource);
     ctx.itemFlowKey.set(drawKey, ctx.currentFlowKey);
-    // Slack-arrow attach Y. Defaults to the bar's row midpoint; when the
-    // caption spills past the bar's right edge, drop to the progress-strip's
-    // vertical center so the arrow aligns with the bottom-edge progress bar
-    // instead of running through the adjacent title/meta text. The `/ 2`
-    // keeps the attach point on the strip's vertical center if
-    // `PROGRESS_STRIP_HEIGHT_PX` is ever bumped.
+    // Slack-arrow attach Y. Defaults to the row's nominal midline, the same
+    // line the dependency arrows use, so a grown bar's dotted slack arrow
+    // leaves level with its dependency arrows; when the caption spills past
+    // the bar's right edge, drop to the progress-strip's vertical center so
+    // the arrow aligns with the bottom-edge progress bar instead of running
+    // through the adjacent title/meta text. The `/ 2` keeps the attach point
+    // on the strip's vertical center if `PROGRESS_STRIP_HEIGHT_PX` is ever
+    // bumped.
     const slackAttachY = textSpills
         ? itemBox.y + itemBox.height - PROGRESS_STRIP_HEIGHT_PX / 2
-        : itemBox.y + itemBox.height / 2;
+        : attachMidY;
     ctx.itemSlackAttachY.set(drawKey, slackAttachY);
 
     cursor.x = logicalRight;

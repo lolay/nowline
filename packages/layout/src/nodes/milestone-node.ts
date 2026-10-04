@@ -28,8 +28,9 @@ import {
  * One predecessor of a milestone with everything the slack-arrow
  * pipeline needs: its source x (visual right edge for items, marker
  * centerX for anchors / other milestones), its attach y (bar bottom
- * strip when text spills, row mid otherwise), and its flow key (used
- * to dedupe so a chained-flow's siblings collapse to the last entry).
+ * strip when text spills, nominal row midline otherwise), and its flow
+ * key (used to dedupe so a chained-flow's siblings collapse to the last
+ * entry).
  */
 export interface MilestonePredecessor {
     ref: string;

@@ -1517,6 +1517,116 @@ swimlane s "S"
         expect(model.edges.find((e) => e.fromId === 'a' && e.toId === 'b')).toBeUndefined();
     });
 
+    it('attaches a grown bar slack arrow on its dependency-arrow line', async () => {
+        // `ui` wraps its title with a meta line, so its bar grew to 72px. Its
+        // dependency arrows (in from `api`, out to `qa`) attach on the nominal
+        // midline; the dotted slack arrow to `beta` must leave on that line
+        // too, not at the grown bar's own mid-height 8px lower.
+        const src = `nowline v1
+
+roadmap slack "Slack" start:2026-01-05 scale:1w
+
+swimlane backend "Backend"
+  item api "API v2" duration:2w
+  item deploy "Deploy" duration:6w
+
+swimlane frontend "Frontend"
+  item ui "New console UI" duration:3w after:api
+
+swimlane test "Test"
+  item qa "QA pass" duration:1w after:ui
+
+milestone beta "Beta" after:[deploy, ui]
+`;
+        const model = await layout(src);
+        const ui = find(model, 'ui');
+        expect(ui.textSpills).toBe(false);
+        expect(ui.box.height).toBe(72);
+        const into = model.edges.find((e) => e.fromId === 'api' && e.toId === 'ui')?.waypoints;
+        const out = model.edges.find((e) => e.fromId === 'ui' && e.toId === 'qa')?.waypoints;
+        expect(into).toBeDefined();
+        expect(out).toBeDefined();
+        const beta = model.milestones.find((m) => m.title === 'Beta');
+        expect(beta?.slackArrows).toHaveLength(1);
+        const slack = beta?.slackArrows?.[0];
+        expect(slack?.x).toBeCloseTo(ui.box.x + ui.box.width, 1);
+        expect(slack?.y).toBeCloseTo(ui.box.y + NOMINAL_MID_PX, 1);
+        expect(slack?.y).toBeCloseTo(into?.[into.length - 1].y ?? Number.NaN, 3);
+        expect(slack?.y).toBeCloseTo(out?.[0].y ?? Number.NaN, 3);
+    });
+
+    it('attaches a chip-grown bar slack arrow on the nominal midline', async () => {
+        const src = `nowline v1
+
+roadmap slack "Slack" start:2026-01-05 scale:1w
+
+label a "Enterprise readiness"
+label b "Low confidence"
+
+swimlane s "S"
+  item wide "Billing" duration:3w labels:[a, b]
+
+swimlane t "T"
+  item long "Long" duration:8w
+
+milestone ship "Ship" after:[wide, long]
+`;
+        const model = await layout(src);
+        const wide = find(model, 'wide');
+        expect(wide.textSpills).toBe(false);
+        expect(wide.box.height).toBeGreaterThan(56);
+        const slack = model.milestones.find((m) => m.title === 'Ship')?.slackArrows?.[0];
+        expect(slack?.y).toBeCloseTo(wide.box.y + NOMINAL_MID_PX, 1);
+    });
+
+    it('terminates arrows into a spilled, chip-grown bar on the nominal midline', async () => {
+        // `auth`'s caption spills right and its chip column grows the bar to
+        // 78px. The arrow from `api` lands on the same nominal midline as any
+        // other target, not at the grown bar's own mid-height 11px lower.
+        const src = `nowline v1
+
+roadmap r "R" start:2026-01-05 scale:1w
+
+label a "Enterprise readiness"
+label b "Low confidence"
+
+swimlane s "S"
+  item api "API" duration:2w
+
+swimlane t "T"
+  item auth "Auth refactor" duration:1w labels:[a, b] after:api
+`;
+        const model = await layout(src);
+        const auth = find(model, 'auth');
+        expect(auth.textSpills).toBe(true);
+        expect(auth.box.height).toBe(78);
+        const wp = model.edges.find((e) => e.fromId === 'api' && e.toId === 'auth')?.waypoints;
+        expect(wp).toBeDefined();
+        const end = wp?.[wp.length - 1];
+        expect(end?.x).toBeCloseTo(auth.box.x, 1);
+        expect(end?.y).toBeCloseTo(auth.box.y + NOMINAL_MID_PX, 1);
+    });
+
+    it('keeps the progress-strip slack attach for a spilled-caption source', async () => {
+        const src = `nowline v1
+
+roadmap spill "Spill" start:2026-01-05 scale:1w
+
+swimlane s "S"
+  item a "Infrastructure" duration:1w
+
+swimlane t "T"
+  item b "Beta" duration:4w
+
+milestone ship "Ship" after:[a, b]
+`;
+        const model = await layout(src);
+        const a = find(model, 'a');
+        expect(a.textSpills).toBe(true);
+        const slack = model.milestones.find((m) => m.title === 'Ship')?.slackArrows?.[0];
+        expect(slack?.y).toBeCloseTo(a.box.y + a.box.height - PROGRESS_STRIP_HALF_PX, 1);
+    });
+
     it('keeps the progress-strip attach for a spilled-caption source', async () => {
         const src = `nowline v1
 

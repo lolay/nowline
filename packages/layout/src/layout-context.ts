@@ -71,12 +71,11 @@ export interface LayoutContext {
     entityLeftEdges: Map<string, number>;
     entityRightEdges: Map<string, number>;
     /**
-     * Midpoint per entity. For an item whose caption stays in the bar, `y`
-     * is the NOMINAL row midline (`bar.y + bandwidth / 2`), not the bar's
-     * own mid-height, so a bar grown by a wrapped title or chips shares an
-     * attach line with its un-grown row neighbours. An item with a spilled
-     * caption keeps the bar's own mid-height. Dependency arrows terminate
-     * here.
+     * Midpoint per entity. For an item, `y` is the NOMINAL row midline
+     * (`bar.y + bandwidth / 2`), not the bar's own mid-height, so a bar
+     * grown by a wrapped title or chips shares an attach line with its
+     * un-grown row neighbours, whether or not its caption spills.
+     * Dependency arrows terminate here.
      */
     entityMidpoints: Map<string, Point>;
     /**
@@ -94,12 +93,13 @@ export interface LayoutContext {
      * Per-item exit point for `after:` dependency arrows leaving
      * this entity. Default = `(visualRight, midY)`. When the
      * caption spills past the bar's right edge (`textSpills`), the
-     * exit drops to `(box.x + box.width / 2, box.y + box.height)`
-     * — the bottom-middle of the progress strip — so the arrow
-     * doesn't visually pierce the spilled title/meta text to the
-     * right of the bar. `midY` is the nominal row midline
-     * (`bar.y + bandwidth / 2`), the same line `entityMidpoints`
-     * uses, so a grown bar and a same-row neighbour line up.
+     * exit drops to `(visualRight, box.y + box.height -
+     * PROGRESS_STRIP_HEIGHT_PX / 2)` — the progress strip's vertical
+     * center — so the arrow doesn't visually pierce the spilled
+     * title/meta text to the right of the bar. `midY` is the nominal
+     * row midline (`bar.y + bandwidth / 2`), the same line
+     * `entityMidpoints` uses, so a grown bar and a same-row neighbour
+     * line up.
      */
     itemArrowSource: Map<string, Point>;
     /**
@@ -121,7 +121,8 @@ export interface LayoutContext {
     currentFlowKey: string;
     /**
      * Y coordinate where milestone slack arrows attach for each item id.
-     * Defaults to the item's row midpoint; when an item's caption spills
+     * Defaults to the nominal row midline (`bar.y + bandwidth / 2`), the
+     * line its dependency arrows use; when an item's caption spills
      * past the bar's right edge, drops to the progress-strip's vertical
      * center (`box.y + box.height - PROGRESS_STRIP_HEIGHT_PX / 2`) so the
      * arrow stays clear of the spilled title/meta line and visually
