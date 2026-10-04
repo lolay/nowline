@@ -202,7 +202,7 @@ swimlane platform
 | `milestone` | A point-in-time marker that depends on work. |
 | `footnote` | A callout anchored to one or more entities. |
 | `person`, `team` | Ownership references. |
-| `style`, `label`, `status`, `duration`, `scale`, `calendar`, `default` | Config and declaration entries. |
+| `style`, `symbol`, `label`, `size`, `status`, `scale`, `calendar`, `default` | Config and declaration entries. |
 
 ### Properties
 
