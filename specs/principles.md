@@ -42,7 +42,7 @@ The DSL, parser, renderer, CLI, embed script, and IDE extensions are **open sour
 
 ## Design Constraints
 
-- **~17 keywords total** in the DSL. If the keyword count grows significantly, the language is getting too complex.
+- **~20 keywords** in the DSL (see [`dsl.md` Design Rule 1](./dsl.md#design-rules) for the current count). If the keyword count grows significantly, the language is getting too complex.
 - **Indentation-significant syntax.** No braces, no XML, no JSON. The file should look like a structured outline.
 - **No lock-in.** Render to SVG, PNG, PDF, HTML, Markdown+Mermaid, XLSX, MS Project XML. Convert bidirectionally between text and JSON. Users can leave at any time.
 - **Render anywhere.** A `.nowline` file should render in a terminal, a browser, a README, an IDE, and a slide deck.

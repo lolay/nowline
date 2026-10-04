@@ -2,6 +2,14 @@
 
 ## [Unreleased]
 
+### Fixed
+
+- Snippets offer only valid values: the `roadmap` snippet's `scale:` choices
+  offer `1m` instead of `1mo`, and the `item` snippets no longer offer
+  `backlog`, which is not a built-in status.
+- `status:` completion offers the `active` and `completed` aliases for
+  `in-progress` and `done`.
+
 ## [0.8.6] - 2026-10-01
 
 ## [0.8.5] - 2026-06-20

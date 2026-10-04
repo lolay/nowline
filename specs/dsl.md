@@ -757,12 +757,12 @@ roadmap platform-2026 "Platform 2026" start:2026-01-06 scale:2w calendar:busines
 ```
 
 - `calendar:business` (default) — engineering working-day arithmetic. `days-per-week:5`, `days-per-month:22`, `days-per-quarter:65`, `days-per-year:260`.
-- `calendar:full` — calendar-day arithmetic including weekends. `days-per-week:7`, `days-per-month:30`, `days-per-quarter:90`, `days-per-year:365`.
+- `calendar:full` — calendar-day arithmetic including weekends. `days-per-week:7`, `days-per-month:30`, `days-per-quarter:91`, `days-per-year:365`.
 - `calendar:custom` — author-supplied values via the `calendar` config block below.
 
 The default is `business` because engineering roadmaps almost always count working days when sizing work.
 
-**No-transitivity rule.** Each `days-per-*` field is independently defined. A duration like `1y` resolves to `days-per-year` directly — not by multiplying through months or weeks. This is why business mode's `1y` = 260d, not `12 × 22d = 264d`. Year, quarter, month, week, and day are each first-class units with their own conversion to days.
+**No-transitivity rule.** Each `days-per-*` field is independently defined. A duration like `1y` resolves to `days-per-year` directly — not by multiplying through months or weeks. This is why business mode's `1y` = 260d, not `12 × 22d = 264d`. Likewise a quarter is 13 weeks in both presets (business `1q` = 65d, full `1q` = 91d), not three months (`3 × 30d = 90d`). Year, quarter, month, week, and day are each first-class units with their own conversion to days.
 
 **Preset reference** — the values baked into `calendar:business` and `calendar:full`, written in the same shape as a custom `calendar` block. These live hardcoded in the runtime; authors cannot and need not write them in a `.nowline` file:
 
@@ -778,7 +778,7 @@ calendar
 calendar
   days-per-week: 7
   days-per-month: 30
-  days-per-quarter: 90
+  days-per-quarter: 91
   days-per-year: 365
 ```
 
@@ -1033,7 +1033,7 @@ parallel rollouts before:2026-06-30
 - Every inline date must be on or after the roadmap's `start:` (Validation Rule 28).
 - ISO 8601 format only (`YYYY-MM-DD`); the date literal terminal already enforces this.
 
-**Visual treatment.** Each inline-date pin renders as a small `calendar` glyph in the entity's top-left corner (`after`) or top-right corner (`before`) decoration row, joining the existing status-dot / footnote-indicator family. There is no inline date caption next to the glyph and no chart-spanning vertical cut line — the lightweight form deliberately stays quiet. The ISO date is available as a tooltip and lives in the source. Authors who want a louder, chart-spanning visual should declare a real `anchor`. See [`specs/rendering.md`](./rendering.md) "Inline-date glyph" for full geometry.
+**Visual treatment.** Each inline-date pin renders as a small `calendar` glyph on the entity's left (`after`) or right (`before`): in an item bar's top-left / top-right decoration row, joining the existing status-dot / footnote-indicator family, and in a group's or parallel's title row, beside its title. There is no inline date caption next to the glyph and no chart-spanning vertical cut line — the lightweight form deliberately stays quiet. The ISO date is available as a tooltip and lives in the source. Authors who want a louder, chart-spanning visual should declare a real `anchor`. See [`specs/rendering.md`](./rendering.md) "Inline-date glyph" for full geometry.
 
 ### Line Continuation
 

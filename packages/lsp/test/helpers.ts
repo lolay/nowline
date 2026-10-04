@@ -32,6 +32,18 @@ export async function parseDocument(source: string): Promise<LangiumDocument<Now
 }
 
 /**
+ * Parse and validate a Nowline source string, returning the error-severity
+ * diagnostic messages (lexer, parser, and validator).
+ */
+export async function validationErrors(source: string): Promise<string[]> {
+    const { shared } = services();
+    const uri = URI.parse(`memory:///lsp-test-${++docCounter}.nowline`);
+    const doc = shared.workspace.LangiumDocumentFactory.fromString<NowlineFile>(source, uri);
+    await shared.workspace.DocumentBuilder.build([doc], { validation: true });
+    return (doc.diagnostics ?? []).filter((d) => d.severity === 1).map((d) => d.message);
+}
+
+/**
  * Read one of the repo's `examples/*.nowline` fixtures. Centralised so tests
  * stay consistent if the layout ever moves.
  */

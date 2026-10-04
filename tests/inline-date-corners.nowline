@@ -2,23 +2,25 @@ nowline v1
 
 // Fixture exercising the inline-date pin glyph (`after:DATE` /
 // `before:DATE`) on every entity type that supports it: items in
-// every decoration-row state, styled groups (visible box), unstyled
-// groups (logical extent), bracketed parallels (bracket footprint),
-// and bare parallels (logical extent). Each scenario lives in its
-// own swimlane so the corner glyphs are easy to compare visually.
+// every decoration-row state, styled groups (chiclet row), and
+// unstyled groups, bracketed parallels, and bare parallels (header
+// band above the box). Each scenario lives in its own swimlane so the
+// glyphs are easy to compare visually. A container's first child bar
+// starts flush with the container's top corners, so no container
+// glyph may sit there: it would be painted over.
 //
 // See specs/dsl.md "Inline date pins" and specs/rendering.md
 // "Inline-date glyph" for the full contract.
 
 config
 
-style flagged
-  border: dashed
-  fg: orange
-
 style enterprise
   bg: blue
   text: white
+
+style bracketed
+  bracket: solid
+  fg: orange
 
 roadmap r "Inline-date pin corners" start:2026-01-05 length:14w
 
@@ -73,23 +75,53 @@ swimlane narrow-styled-group "Styled group — chiclet wider than the box"
   group nsg "Narrow styled group" style:enterprise after:2026-02-09 before:2026-02-16
     item nsg-a "Step" duration:1w
 
-swimlane unstyled-group "Unstyled group — logical extent"
+swimlane anonymous-styled-group "Styled group — no title"
 
-  // Unstyled groups have no visible box. Glyphs attach to the
-  // logical bounding box (leftmost child's left edge, rightmost
-  // child's right edge, top of the highest child row).
+  // No title means no chiclet, but the group still reserves the
+  // chiclet's row for its glyphs instead of letting them sit on the
+  // first child bar.
+  group style:enterprise after:2026-02-09 before:2026-04-20
+    item asg-a "Step A" duration:2w
+    item asg-b "Step B" duration:2w
+
+swimlane unstyled-group "Unstyled group — header band"
+
+  // Unstyled groups paint a bracket, not a box. Their title and
+  // glyphs share the header band above the logical extent (leftmost
+  // child start, rightmost child end): after-glyph first, then the
+  // title, before-glyph flush right.
   group ug after:2026-02-23 before:2026-05-04
     item ug-a "Free A" duration:2w
     item ug-b "Free B" duration:2w
 
-swimlane bracketed-parallel "Bracketed parallel — bracket footprint"
+swimlane anonymous-group "Unstyled group — no title"
 
-  parallel bp style:flagged after:2026-02-09 before:2026-05-11
+  // No title, but the glyphs still get the header band (and the
+  // bracket's top foot wraps it).
+  group after:2026-02-23 before:2026-05-04
+    item ag-a "Free A" duration:2w
+    item ag-b "Free B" duration:2w
+
+swimlane bracketed-parallel "Bracketed parallel — header band"
+
+  // The header band coincides with the bracket's 12 px top padding,
+  // so the glyphs sit inside the [ ] above the first track.
+  parallel bp style:bracketed after:2026-02-09 before:2026-05-11
     item bp-a "Track 1" duration:3w
     item bp-b "Track 2" duration:3w
 
-swimlane bare-parallel "Bare parallel — logical extent"
+swimlane bare-parallel "Bare parallel — header band"
 
   parallel barep after:2026-02-23 before:2026-05-25
     item barep-a "Bare track 1" duration:2w
     item barep-b "Bare track 2" duration:2w
+
+swimlane narrow-parallel "Bare parallel — title wider than the box"
+
+  // The title runs past the box, so the before-glyph slides right of
+  // the title instead of landing on it. The next item would start on
+  // the same row, under that overflow, so it bumps to a fresh row.
+  parallel np "Regional rollout waves" before:2026-03-02
+    item np-a "Wave 1" duration:2w
+    item np-b "Wave 2" duration:2w
+  item np-next "Follow-up" duration:2w

@@ -2,7 +2,7 @@
     "Roadmap header": {
         "prefix": "roadmap",
         "body": [
-            "roadmap ${1:my-roadmap} \"${2:My Roadmap}\" start:${3:2026-01-05} scale:${4|1d,1w,1mo,1q|}"
+            "roadmap ${1:my-roadmap} \"${2:My Roadmap}\" start:${3:2026-01-05} scale:${4|1d,1w,1m,1q|}"
         ],
         "description": "Top-level roadmap declaration"
     },
@@ -14,14 +14,14 @@
     "Item": {
         "prefix": "item",
         "body": [
-            "item ${1:item-id} \"${2:Item title}\" size:${3|sm,md,lg,xl|} status:${4|backlog,planned,in-progress,blocked,done,at-risk|}$0"
+            "item ${1:item-id} \"${2:Item title}\" size:${3|sm,md,lg,xl|} status:${4|planned,in-progress,blocked,done,at-risk|}$0"
         ],
         "description": "Roadmap item"
     },
     "Item with after / owner / labels": {
         "prefix": "item-full",
         "body": [
-            "item ${1:item-id} \"${2:Item title}\" size:${3|sm,md,lg,xl|} after:${4:dependency-id} owner:${5:owner-id} status:${6|backlog,planned,in-progress,blocked,done,at-risk|} labels:[${7:label-id}]$0"
+            "item ${1:item-id} \"${2:Item title}\" size:${3|sm,md,lg,xl|} after:${4:dependency-id} owner:${5:owner-id} status:${6|planned,in-progress,blocked,done,at-risk|} labels:[${7:label-id}]$0"
         ],
         "description": "Roadmap item with common metadata"
     },

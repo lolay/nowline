@@ -9,11 +9,18 @@
 // Filled-style groups paint a title chiclet flush in the upper-left
 // corner of the box; the layout reserves vertical top padding equal
 // to the chiclet height plus a small gutter before the first inner
-// row begins.
+// row begins. Every other group paints its title (and any inline-date
+// glyphs) in a header band it reserves above the box instead; see
+// `container-header-geometry.ts`.
 
 import type { EntityProperty, GroupBlock, ItemDeclaration, ParallelBlock } from '@nowline/core';
 import { isItemDeclaration } from '@nowline/core';
 import { deriveItemDurationDays } from '../calendar.js';
+import {
+    blockTitleRowSpillReservation,
+    GROUP_HEADER_TITLE_INSET_X_PX,
+    groupHeaderBandPx,
+} from '../container-header-geometry.js';
 import { propValues } from '../dsl-utils.js';
 import { groupHasFill, groupTitleTabWidth } from '../group-title-tab-geometry.js';
 import { computeContainerInlineDatePins, pickInlineDate } from '../inline-date-pin-geometry.js';
@@ -22,7 +29,6 @@ import { RowPacker } from '../row-packer.js';
 import { resolveStyle } from '../style-resolution.js';
 import {
     GROUP_BOTTOM_PAD_PX,
-    GROUP_BRACKET_LABEL_OVERHANG_PX,
     GROUP_TITLE_TAB_GUTTER_PX,
     GROUP_TITLE_TAB_HEIGHT_PX,
     ITEM_INSET_PX,
@@ -92,21 +98,29 @@ export class GroupNode {
         const previousFlowKey = ctx.currentFlowKey;
         ctx.nextGroupId += 1;
         ctx.currentFlowKey = `${previousFlowKey}/group:${node.name ?? `group-${ctx.nextGroupId}`}`;
+        const afterDate = pickInlineDate(propValues(node.properties, 'after'));
+        const beforeDate = pickInlineDate(propValues(node.properties, 'before'));
+        const hasPins = Boolean(afterDate || beforeDate);
         // Same `groupHasFill` predicate `renderGroup` paints with, so the
         // painted box and the layout's reservation agree on whether a
         // chiclet exists.
-        const hasChiclet = groupHasFill(style.bg) && Boolean(title);
-        const topPad = hasChiclet ? GROUP_TITLE_TAB_HEIGHT_PX + GROUP_TITLE_TAB_GUTTER_PX : 0;
-        const bottomPad = hasChiclet ? GROUP_BOTTOM_PAD_PX : 0;
-        // Bracket-style groups paint their label at `box.y - 2`, so the
-        // label glyph overhangs ABOVE box.y. Without an explicit
-        // reservation, two bracket-titled groups stacked in a parallel
-        // collide: the previous sibling's bracket-foot ends at its
-        // box.bottom, and the next sibling's label visual top sits just
-        // above box.y — they touch in the gap. Shift `box.y` down by
-        // the overhang amount so the glyph lands in space we own.
-        const bracketLabelOverhang = !hasChiclet && title ? GROUP_BRACKET_LABEL_OVERHANG_PX : 0;
-        const startY = cursor.y + bracketLabelOverhang;
+        const hasFill = groupHasFill(style.bg);
+        const hasChiclet = hasFill && Boolean(title);
+        // The first child row starts flush with the box's top corners,
+        // so a filled group's inline-date glyphs need the chiclet row
+        // reserved even when there is no chiclet to share it with.
+        const hasTabRow = hasChiclet || (hasFill && hasPins);
+        const topPad = hasTabRow ? GROUP_TITLE_TAB_HEIGHT_PX + GROUP_TITLE_TAB_GUTTER_PX : 0;
+        const bottomPad = hasTabRow ? GROUP_BOTTOM_PAD_PX : 0;
+        // Bracket / unstyled groups paint their title at `box.y - 2`
+        // (baseline) and their inline-date glyphs beside it, all ABOVE
+        // box.y. Without an explicit reservation the title collides with
+        // whatever ends just above (two bracket-titled groups stacked in
+        // a parallel: the previous sibling's bracket-foot), and the
+        // glyphs would have to sit on the first child row. Shift `box.y`
+        // down by the header band so both land in space we own.
+        const headerBand = groupHeaderBandPx(hasFill, Boolean(title), hasPins);
+        const startY = cursor.y + headerBand;
 
         const step = ctx.bandScale.step();
         const groupContentLeftX = startX;
@@ -145,6 +159,7 @@ export class GroupNode {
                     placed: positioned,
                     blockHeight,
                     blockEnd,
+                    spillReservation: blockTitleRowSpillReservation(positioned),
                 });
                 timeCursorX = Math.max(timeCursorX, blockEnd);
                 continue;
@@ -237,7 +252,7 @@ export class GroupNode {
         // (bandwidth + gap); groups need to add it explicitly since
         // their painted height is gap-less.
         const interRowGap = ctx.bandScale.step() - ctx.bandScale.bandwidth();
-        cursor.height = Math.max(cursor.height, bracketLabelOverhang + box.height + interRowGap);
+        cursor.height = Math.max(cursor.height, headerBand + box.height + interRowGap);
         const id = node.name;
         if (id) {
             ctx.entityLeftEdges.set(id, box.x);
@@ -246,10 +261,15 @@ export class GroupNode {
         ctx.currentFlowKey = previousFlowKey;
         const inlineDatePins = computeContainerInlineDatePins({
             box,
-            afterDate: pickInlineDate(propValues(node.properties, 'after')),
-            beforeDate: pickInlineDate(propValues(node.properties, 'before')),
-            // The chiclet owns the box's top-left corner; the glyphs clear it.
-            titleTabWidth: hasChiclet && title ? groupTitleTabWidth(title) : undefined,
+            afterDate,
+            beforeDate,
+            row: hasFill
+                ? // The chiclet owns the box's top-left corner; the glyphs clear it.
+                  {
+                      kind: 'title-tab-row',
+                      titleTabWidth: title ? groupTitleTabWidth(title) : undefined,
+                  }
+                : { kind: 'header-band', title, titleInsetX: GROUP_HEADER_TITLE_INSET_X_PX },
         });
         return {
             kind: 'group',
