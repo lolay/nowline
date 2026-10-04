@@ -538,6 +538,89 @@ swimlane web "Web"
         expect(model.edges).toHaveLength(1);
         expect(model.edges[0].fromId).toBe('api');
     });
+
+    it('grows timeline date window when items exceed roadmap length property', async () => {
+        const src = `nowline v1
+
+roadmap r "R" start:2026-01-05 length:4w
+
+swimlane lane "Lane"
+  item support "Support" duration:4w
+  item dev "Dev" duration:2w after:support
+`;
+        const { file, resolved } = await parseAndResolve(src);
+        const model = layoutRoadmap(file, resolved, { theme: 'light' });
+        const diffDays = Math.round(
+            (model.timeline.endDate.getTime() - model.timeline.startDate.getTime()) /
+                (24 * 60 * 60 * 1000),
+        );
+        expect(diffDays).toBe(30); // 6 weeks * 5 business days per week = 30 days
+    });
+
+    it('extends the timeline past the pre-pass window when a spilled group caption pushes a later parallel out of range', async () => {
+        // `g`'s "short" item is a 1-day bar with a caption long enough to
+        // spill far past it; a GROUP's painted box hugs that spill (see
+        // `GroupNode.place`), so the swimlane's sequencing cursor — which
+        // advances past a block's `box.x + box.width` — lands well past
+        // what the pre-pass content estimate (logical bar durations only)
+        // predicted. The `p` parallel that follows (no `after:`/`date:`,
+        // so it sequences at the cursor) should still have its `tail`
+        // item's bar fully inside the (grown) timeline window.
+        const src = `nowline v1
+
+roadmap r "R" start:2026-01-05 scale:1w
+
+swimlane lane "Lane"
+  group g "G"
+    item short "This caption spills a very long way past its narrow bar" duration:1d
+  parallel p "P"
+    item tail "Tail" duration:2w
+`;
+        const { file, resolved } = await parseAndResolve(src);
+        const model = layoutRoadmap(file, resolved, { theme: 'light' });
+        const parallel = model.swimlanes[0].children.find((c) => c.kind === 'parallel');
+        expect(parallel).toBeDefined();
+        const tail = parallel?.children[0];
+        expect(tail?.kind).toBe('item');
+        const tailRightX = (tail?.box.x ?? 0) + (tail?.box.width ?? 0);
+        const timelineRightX = model.timeline.box.x + model.timeline.box.width;
+        expect(tailRightX).toBeLessThanOrEqual(timelineRightX);
+    });
+
+    it('keeps an include region box within the timeline right edge despite a long trailing caption', async () => {
+        // `beta` is a 1-day bar inside the isolated include with a caption
+        // long enough to spill well past it. The dashed include box must
+        // shrink-wrap to the BARS (`alpha` + `beta`), not the spilled
+        // caption, so it stays inside the parent's timeline window even
+        // though the caption itself is allowed to overhang.
+        const parentSrc = `nowline v1
+
+include "./child.nowline" roadmap:isolate
+
+roadmap r "R" start:2026-01-05 scale:1w
+
+swimlane core "Core"
+  item core-api "Core API" duration:5w
+`;
+        const childSrc = `nowline v1
+
+roadmap child "Child" start:2026-01-05 scale:1w
+
+swimlane plugin "Plugin"
+  item alpha "Plugin alpha" duration:3w
+  item beta "This is a very long trailing caption that spills quite far" duration:1d after:alpha
+`;
+        const { file, resolved } = await parseAndResolve(
+            parentSrc,
+            '/virtual/test.nowline',
+            async () => childSrc,
+        );
+        const model = layoutRoadmap(file, resolved, { theme: 'light' });
+        expect(model.includes).toHaveLength(1);
+        const include = model.includes[0];
+        const timelineRightX = model.timeline.box.x + model.timeline.box.width;
+        expect(include.box.x + include.box.width).toBeLessThanOrEqual(timelineRightX);
+    });
 });
 
 describe('layoutRoadmap item title wrapping', () => {
