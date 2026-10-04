@@ -14,6 +14,8 @@ const KEY_ORDER = [
     'remaining',
     'labels',
     'style',
+    'unicode',
+    'ascii',
     'link',
     'author',
     'start',
@@ -94,6 +96,8 @@ class Printer {
                 return this.blockDecl('calendar', asArray(entry.properties));
             case 'StyleDeclaration':
                 return this.styleDecl(entry);
+            case 'SymbolDeclaration':
+                return this.simpleEntity('symbol', entry, 0);
             case 'DefaultDeclaration':
                 return this.defaultDecl(entry);
             default:
