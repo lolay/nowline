@@ -1,5 +1,5 @@
 {
-    "about": "Cross-surface export-determinism goldens. `node` is the canonical SHA-256 every Node surface (compiled CLI binary, kernel-in-Node, MCP) must reproduce. `cli` is a recorded compiled-binary override for the few cells where the bun-compiled runtime diverges from Node (today: every pdf, via zlib). `browser` is a recorded headless-browser override for cells whose bytes diverge from Node in a browser (the deferred ICU date-label leak). The volatile source *directory* is stripped from every artifact before hashing (JSON file.uri / PDF Subject keep only the basename) so goldens are portable across checkouts and CI. Regenerate deliberately with UPDATE_DETERMINISM_GOLDENS=1 on a toolchain-version bump.",
+    "about": "Cross-surface export-determinism goldens. `node` is the canonical SHA-256 every Node surface (compiled CLI binary, kernel-in-Node, MCP) must reproduce. `cli` is a recorded compiled-binary override for the few cells where the bun-compiled runtime diverges from Node (today: every pdf, via zlib). `browser` is a recorded headless-browser override for cells whose bytes diverge from Node in a browser (the deferred ICU date-label leak). The volatile source *directory* is stripped from json artifacts before hashing (file.uri keeps only the basename) and no other format embeds it, so goldens are portable across checkouts and CI. Regenerate deliberately with UPDATE_DETERMINISM_GOLDENS=1 on a toolchain-version bump.",
     "tracking": "Deferred: replace Intl-based axis-label formatting in @nowline/layout with a self-contained formatter (or pin ICU data) so the browser leg reaches full byte-identity. See specs/export-determinism.md § The ICU caveat.",
     "cliTracking": "Deferred: PDFKit FlateDecode goes through the host runtime zlib, so the bun-compiled CLI binary and Node emit different (both valid) PDF bytes. Make the kernel PDF deflate runtime-independent for full binary↔Node identity. See specs/export-determinism.md § The PDF compression caveat.",
     "today": "2026-02-09",
@@ -23,9 +23,9 @@
             "icu": false
         },
         "capacity:pdf": {
-            "node": "16e59749ebe049c0f8e33f7b0948e01e156ac36c478e11ccbbe889d3187d1051",
+            "node": "c9747008e8fae72af0b0b379f6b490ae8c9ec46250d9bb66f29e7f3944688e4e",
             "icu": true,
-            "cli": "2867bb95bad0a6ff391b8f48c4f8672adbf0d902d6dcfe5096dafc58db6caf5f"
+            "cli": "b81b41806cc21931c78f54b799d621918a583652d477d9f98a2a1b84c26766ff"
         },
         "capacity:png": {
             "node": "b3b75e2a59398ba36efd5d85dd0796a385364160d5be32d763888018289ec389",
@@ -56,9 +56,9 @@
             "icu": false
         },
         "clean-quarters:pdf": {
-            "node": "9f532ff83b5010e852ea9bb5473546e383cd853cf7e14e7054658107e812dc03",
+            "node": "277551720d0921360be4c9012461d620c1385be8aacbc75dc61de04df1601da8",
             "icu": false,
-            "cli": "50ff41f9ad4a1f2dadefeaab62e844fd00588679991ebaadaf93fe215559f356"
+            "cli": "75ef70d83488d59c60fe732445ae819b79e49582257712256316d49674b74a8c"
         },
         "clean-quarters:png": {
             "node": "a2a6518eacd2786ebe1d271e911025f9bb30c6caf810e5b89c7ef306da443d20",
@@ -89,9 +89,9 @@
             "icu": false
         },
         "dependencies:pdf": {
-            "node": "f03d26396b637d6b97e53590ceb5d7fe1537fb6ff8b576257bb3cd4f417266a2",
+            "node": "96faef6f1bf05e2c6a2135843bb5505a025cc24849e3f983034f06fb48027183",
             "icu": true,
-            "cli": "8a73fcd3d3d19aa2f5be90d76833fc5e6e28d8dfc4f15664283ad7b250dc3b75"
+            "cli": "5c9e76374f6ce9a8ca207273b535e219831b834bc7c528e3d2feccd9ad99649a"
         },
         "dependencies:png": {
             "node": "938ff4794bad77cd559e06f27ba8fc737cf17010bf7942de210cefd094e671a4",
@@ -122,9 +122,9 @@
             "icu": false
         },
         "isolate-include:pdf": {
-            "node": "11ec27b61115ec8d5caa15e7bf97273f85cc7037d10f540c90179791b8c4949c",
+            "node": "142cbe7f32294472d9d7d1782800823f1c6b634fce97fb744679cc3749114ba0",
             "icu": true,
-            "cli": "5ea6ebe7401705c6403f1064e7d21b6297cae8ae513b3ca622df7f22e9264628"
+            "cli": "52d10df5f187dcb20aa3375e4a37f43fbeb03753d0ae59943a23ba577bd9afbd"
         },
         "isolate-include:png": {
             "node": "d12b198fb9fabcdee3924b15e6031045f7c0a93ae69d07741676d62a5179af3d",
@@ -155,9 +155,9 @@
             "icu": false
         },
         "minimal-fr:pdf": {
-            "node": "c41394d8dd3ca48c10e3c460740345c56b5986d1f09a629584c6cb7aa9ea34a8",
+            "node": "e8d7aaad065771919612c32b74202cc417f2302f358011a6a06841a957199b63",
             "icu": true,
-            "cli": "e3b2377dcc1abd2c725e032ef23529766f05b0bf7f2b4416a96830faa0bc9ce5"
+            "cli": "ac650276e031d6879b78cc4b4f4ded55009805ffef634184c85e4fa4c74350cd"
         },
         "minimal-fr:png": {
             "node": "68060b002da7d02c6c0c004e2df7719d55f9025cc4c508185599ed16969e0b7c",
@@ -188,9 +188,9 @@
             "icu": false
         },
         "minimal:pdf": {
-            "node": "986610abef7e9463e0c6a86acf3a8545c417746458b1b65123fdcfea36259b41",
+            "node": "b56a096a3dfb3fc8b154797b9cb79499309a41eda8534a9ec7822a8af805c603",
             "icu": true,
-            "cli": "d763d6886a80c3082c88c3f245cace10c4cac27a684dbd76109a522c8a461c36"
+            "cli": "547ebd9c65991b9daff1eac6b6690cc69fb51baebcf357e39cbc1728d7a192d9"
         },
         "minimal:png": {
             "node": "16c3456cb9eb027d3b995966cb8a0cc9e4227e7f5651c41e81f98f80b956f2dc",
@@ -221,9 +221,9 @@
             "icu": false
         },
         "nested-both-headers:pdf": {
-            "node": "e418e988029e6a084eeee3a394b470aebb6cf789dffb1d7e6ce03da5aed9767f",
+            "node": "ce9b2d9bdc1e6b1fecac8fdb7aa1f5f2255bdfbcb6d9d352299b2e455d340517",
             "icu": true,
-            "cli": "13737b0a045da591e1f8647057fb41d15b50a7a6479088b8433efc77f9c66fe9"
+            "cli": "93e0bac437593da03630e4c0b11a30e4ec9c8fe803dac705b790e123791aa339"
         },
         "nested-both-headers:png": {
             "node": "b0b5bfaaad9027c8f944c03e7adddca1decec6cfad4ac583b153b3f9dc64449f",
@@ -254,9 +254,9 @@
             "icu": false
         },
         "platform-2026-dark:pdf": {
-            "node": "dcf5a943a482eccb3c61bd0eea948c023d28333ddff5773d4f43307d173d1517",
+            "node": "b60949dffb47a03ac24b323e4235bb62939e6f5a498c7398fe676736228ba44e",
             "icu": true,
-            "cli": "b2f3d3d07559ea69e8672ef4dc239d836777e4041b66a66a8d7d51b309eca670"
+            "cli": "47d02de9045fd8e035a979189bbda69735dc8877c6bf6ba0d88daa71b20f60aa"
         },
         "platform-2026-dark:png": {
             "node": "390a357582d3842905988f811990418c0e3d8176c60361839a7f45dc69397747",
@@ -287,9 +287,9 @@
             "icu": false
         },
         "platform-2026:pdf": {
-            "node": "c3c43df9def6504185c1d3310ae6a77888d5e2d8261d498abf00cfe51950d7ee",
+            "node": "64bffa7c0a8d741f4b5aa5a0490800092bb1e25485345333c62ce02c681b0096",
             "icu": true,
-            "cli": "7d37cc39d3e5c8af6e69f59383942f998d78e624e26ecc74d9753f046ff4159b"
+            "cli": "dd9a60244966dc624bae20f516a2dda6633e3918c08f794dacf850c4d3c9f98e"
         },
         "platform-2026:png": {
             "node": "c37cf12aab3bcd98cfd6bb5fcbf9df561e494a1e60708676e62240457217181e",
@@ -320,9 +320,9 @@
             "icu": false
         },
         "sizing:pdf": {
-            "node": "f8258e75496d87e72fc4958d7d459f9319b781244c6ceca95d2d0ea7e4e4154e",
+            "node": "997550ad88070765d16186478af397c0446959119a8f5fdd9b4b7c8922948306",
             "icu": true,
-            "cli": "83c248f7806421124101c8ed0ae3cb3aa3d76f92c24d534b149b7c87f0c2f5e0"
+            "cli": "5b3f54f4e41748bc0f9d2e4ff7bbae214ba94a65a3974914289b421c2fe0031a"
         },
         "sizing:png": {
             "node": "8c134b79def8d8b069e9ae64933acbd6b7e6b2bfd4af5feb29155a6243e2845d",

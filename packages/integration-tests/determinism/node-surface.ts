@@ -55,19 +55,20 @@ export function sha256(bytes: Uint8Array): string {
 
 // ---- Source-path normalization ----------------------------------------------
 //
-// Two exporters echo the absolute source path into their bytes: the JSON
-// serializer (`file.uri = file://<sourcePath>`) and the PDF exporter (the
-// `Subject` Info-dictionary entry). That path is an *input*, not engine output,
-// and it is machine-specific (`/Users/you/...` vs `/home/runner/...`), so left
-// raw it would make the goldens non-portable across checkouts and CI.
+// The JSON serializer echoes the absolute source path into its bytes
+// (`file.uri = file://<sourcePath>`). That path is an *input*, not engine
+// output, and it is machine-specific (`/Users/you/...` vs `/home/runner/...`),
+// so left raw it would make the goldens non-portable across checkouts and CI.
 //
-// The gate strips the volatile *directory* prefix from every artifact before
-// hashing — uniformly on all surfaces — keeping the stable basename. So the
-// JSON `file.uri` reduces to `file://<basename>` and the PDF `Subject` to the
-// basename, identically everywhere, while every other byte is compared
-// verbatim. The browser leg feeds the basename directly (it has no includes),
-// so it needs no normalization; the Node and CLI legs feed the absolute path
-// (needed for include resolution) and strip it here.
+// For `json` only, the gate strips the volatile *directory* prefix before
+// hashing, keeping the stable basename, so `file.uri` reduces to
+// `file://<basename>` identically on every surface. Every other format is
+// hashed verbatim: none of them embeds the source directory. (PDF used to, via
+// the Info `Subject`; byte-stripping could not fix that because the `/ID` and
+// xref offsets are derived from the full string, so the exporter now writes
+// the basename instead.) The browser leg feeds the basename directly (it has no
+// includes), so it needs no normalization; the Node and CLI legs feed the
+// absolute path (needed for include resolution) and strip it here.
 
 /** Replace every occurrence of `needle` bytes in `haystack` with nothing. */
 function deleteBytes(haystack: Uint8Array, needle: Uint8Array): Uint8Array {
@@ -95,11 +96,16 @@ function deleteBytes(haystack: Uint8Array, needle: Uint8Array): Uint8Array {
 const utf8 = new TextEncoder();
 
 /**
- * Strip the machine-specific source *directory* (keeping the basename) from an
- * artifact's bytes so JSON `file.uri` / PDF `Subject` are portable. `absPath`
- * is the absolute source path that surface embedded.
+ * Strip the machine-specific source *directory* (keeping the basename) from a
+ * `json` artifact's bytes so its `file.uri` is portable. `absPath` is the
+ * absolute source path that surface embedded. Other formats pass through.
  */
-export function stripVolatilePath(bytes: Uint8Array, absPath: string): Uint8Array {
+export function stripVolatilePath(
+    bytes: Uint8Array,
+    format: ExportFormat,
+    absPath: string,
+): Uint8Array {
+    if (format !== 'json') return bytes;
     const dirWithSep = `${path.dirname(absPath)}/`;
     return deleteBytes(bytes, utf8.encode(dirWithSep));
 }
@@ -181,7 +187,7 @@ export async function exportNode(fixture: GateFixture, format: ExportFormat): Pr
 
 export async function hashNode(fixture: GateFixture, format: ExportFormat): Promise<string> {
     const bytes = await exportNode(fixture, format);
-    return sha256(stripVolatilePath(bytes, fixtureSourcePath(fixture)));
+    return sha256(stripVolatilePath(bytes, format, fixtureSourcePath(fixture)));
 }
 
 // ---- ICU-dependence detector ------------------------------------------------
@@ -268,9 +274,9 @@ export function emptyManifest(): DeterminismManifest {
             'every pdf, via zlib). `browser` is a recorded headless-browser ' +
             'override for cells whose bytes diverge from Node in a browser (the ' +
             'deferred ICU date-label leak). The volatile source *directory* is ' +
-            'stripped from every artifact before hashing (JSON file.uri / PDF ' +
-            'Subject keep only the basename) so goldens are portable across ' +
-            'checkouts and CI. Regenerate deliberately with ' +
+            'stripped from json artifacts before hashing (file.uri keeps only ' +
+            'the basename) and no other format embeds it, so goldens are ' +
+            'portable across checkouts and CI. Regenerate deliberately with ' +
             'UPDATE_DETERMINISM_GOLDENS=1 on a toolchain-version bump.',
         tracking: ICU_TRACKING,
         cliTracking: CLI_TRACKING,

@@ -21,6 +21,11 @@
 //     (since 0.13), so a fixed CreationDate yields a stable ID.
 //   - `pdfVersion: '1.7'` pins the PDF spec.
 //   - Producer / Creator strings are explicit, version-stable.
+//   - `info.Subject` defaults to the source *basename*, never the absolute
+//     `inputs.sourcePath`. The `/ID` hashes the Info dict and every xref
+//     offset shifts with its length, so an absolute path would make the bytes
+//     depend on where the source lives (and leak the author's filesystem
+//     layout into a file they share).
 //   - Fonts: registered explicitly via PDFKit `registerFont(name, bytes,
 //     family?)` so glyph subsets are byte-identical across hosts.
 //   - PDFKit's default Helvetica is never loaded (`font: null` below). PDFKit
@@ -56,7 +61,7 @@ export interface PdfOptions {
     author?: string;
     /** Title baked into the PDF Info dict. Defaults to roadmap title. */
     title?: string;
-    /** Subject. Defaults to the source filename. */
+    /** Subject. Defaults to the source filename (basename, no directory). */
     subject?: string;
     /** Producer string. Defaults to `nowline (m2c)`. */
     producer?: string;
@@ -113,7 +118,7 @@ export async function exportPdf(
         info: {
             Title: options.title ?? (inputs.model.header.title || 'Nowline Roadmap'),
             Author: options.author ?? inputs.model.header.author ?? '',
-            Subject: options.subject ?? inputs.sourcePath,
+            Subject: options.subject ?? sourceBasename(inputs.sourcePath),
             Producer: options.producer ?? 'nowline (m2c)',
             Creator: options.producer ?? 'nowline (m2c)',
             CreationDate: creationDate,
@@ -180,6 +185,15 @@ async function resolveOptions(options: PdfOptions): Promise<ResolvedPdfOptions> 
 async function resolveFontsFor(): Promise<ResolvedFontPair> {
     const result = await resolveFonts();
     return { sans: result.sans, mono: result.mono };
+}
+
+/**
+ * Final segment of `sourcePath`. Splits on both `/` and `\` rather than using
+ * `node:path`, so a Windows path reduces to the same basename on any host.
+ */
+function sourceBasename(sourcePath: string): string {
+    const sep = Math.max(sourcePath.lastIndexOf('/'), sourcePath.lastIndexOf('\\'));
+    return sourcePath.slice(sep + 1);
 }
 
 function bufferOf(bytes: Uint8Array): Buffer {

@@ -26,6 +26,14 @@ function sha256(bytes: Uint8Array): string {
     return createHash('sha256').update(bytes).digest('hex');
 }
 
+/** The Info dict's Subject string. PDFKit writes it as an indirect object. */
+function infoSubject(pdf: Uint8Array): string | undefined {
+    const text = Buffer.from(pdf).toString('latin1');
+    const ref = /\/Subject (\d+) 0 R/.exec(text)?.[1];
+    if (!ref) return undefined;
+    return new RegExp(`\\n${ref} 0 obj\\n\\((.*)\\)\\nendobj`).exec(text)?.[1];
+}
+
 describe('exportPdf — output shape', () => {
     it('emits a PDF starting with %PDF- and ending with %%EOF', async () => {
         const { inputs, svg } = await svgFor(MINIMAL_FIXTURE);
@@ -113,6 +121,25 @@ describe('exportPdf — info dict', () => {
         const text = Buffer.from(pdf).toString('latin1');
         expect(text).toContain('Minimal Example');
     });
+
+    it('Subject defaults to the source basename, never the absolute path', async () => {
+        const { inputs, svg } = await svgFor(MINIMAL_FIXTURE);
+        const fonts = await bundledFonts();
+        const pdf = await exportPdf(
+            { ...inputs, sourcePath: '/Users/someone/src/roadmaps/minimal.nowline' },
+            svg,
+            { fonts, compress: false },
+        );
+        expect(infoSubject(pdf)).toBe('minimal.nowline');
+        expect(Buffer.from(pdf).toString('latin1')).not.toContain('/Users/someone');
+    });
+
+    it('an explicit subject still wins over the basename default', async () => {
+        const { inputs, svg } = await svgFor(MINIMAL_FIXTURE);
+        const fonts = await bundledFonts();
+        const pdf = await exportPdf(inputs, svg, { fonts, compress: false, subject: 'Q3 plan' });
+        expect(infoSubject(pdf)).toBe('Q3 plan');
+    });
 });
 
 describe('exportPdf — determinism', () => {
@@ -122,6 +149,20 @@ describe('exportPdf — determinism', () => {
         const a = await exportPdf(inputs, svg, { fonts });
         const b = await exportPdf(inputs, svg, { fonts });
         expect(sha256(a)).toBe(sha256(b));
+    });
+
+    it('bytes do not depend on the source directory', async () => {
+        // Regression: Subject used to embed the absolute sourcePath, and both
+        // the /ID (an MD5 over the Info dict) and every xref offset follow it,
+        // so the same roadmap exported from two checkouts differed byte-wise.
+        const { inputs, svg } = await svgFor(MINIMAL_FIXTURE);
+        const fonts = await bundledFonts();
+        const at = (sourcePath: string) => exportPdf({ ...inputs, sourcePath }, svg, { fonts });
+        const ci = await at('/home/runner/work/nowline/nowline/examples/minimal.nowline');
+        const mac = await at('/Users/someone/src/nowline/examples/minimal.nowline');
+        const win = await at('C:\\Users\\someone\\nowline\\examples\\minimal.nowline');
+        expect(sha256(mac)).toBe(sha256(ci));
+        expect(sha256(win)).toBe(sha256(ci));
     });
 
     it('different page sizes yield different bytes', async () => {
