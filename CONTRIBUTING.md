@@ -334,7 +334,7 @@ The repo uses [Biome](https://biomejs.dev) as a single tool for linting, formatt
 
 `pnpm check` is the gate: lint + format-drift + import organization, all in one Biome invocation. CI fails the PR if it isn't clean.
 
-`pnpm typecheck` is a separate step because most packages type-check as part of `pnpm -r build` (via `tsc -b`); the VS Code extension bundles via esbuild and skips that, so its `tsc --noEmit` runs under `typecheck` instead.
+`pnpm typecheck` is a separate step because most packages type-check as part of `pnpm -r build` (via `tsc -b`); the VS Code extension bundles via esbuild and skips that, so its `tsc --noEmit` runs under `typecheck` instead. Run it after a build: packages like `@nowline/browser` resolve sibling `@nowline/*` types from their built `dist/`, so on a fresh clone it fails with TS2307. `make ci` orders `build` before `typecheck` for this reason.
 
 ### Style baseline
 
@@ -434,7 +434,7 @@ The maintainer moves your entry into a new `## [vX.Y.Z] - YYYY-MM-DD` section as
 
 1. **Fork** the repo (or branch, if you have write access) and create a feature branch: `git checkout -b feat/short-description`.
 2. Make your change. Keep the diff focused — one logical change per PR.
-3. **Run `make pre-commit` locally** before committing or pushing — it chains lint + typecheck + build + test, the same gate CI runs as `make ci` across Linux, macOS, and Windows.
+3. **Run `make pre-commit` locally** before committing or pushing — it chains lint + build + typecheck + test, the same gate CI runs as `make ci` across Linux, macOS, and Windows.
 4. **Update documentation** — package READMEs, the top-level `README.md`, inline comments, plus a `## [Unreleased]` entry in [`CHANGELOG.md`](./CHANGELOG.md) for any user-observable change (see [Changelog entries](#changelog-entries) above).
 5. **Open a PR** against `main` with:
     - A clear summary of the change.
