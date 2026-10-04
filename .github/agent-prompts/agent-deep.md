@@ -46,7 +46,7 @@ in the same shape). To resume:
 Read the plan's `### Files` list. For each file:
 
 - Confirm it's not in a Hard-rule-protected area unless the plan explicitly addresses why the change is sanctioned. Examples:
-  - `lolay/nowline` — `packages/core/src/generated/` is gitignored output; `packages/layout/test/__snapshots__/` is a deliberate baseline.
+  - `lolay/nowline` — `packages/core/src/generated/` is gitignored output; `packages/integration-tests/test/__snapshots__/` is a deliberate baseline.
 - Confirm the plan's `### Testing` section names a concrete test (existing or new). "Run the test suite" is not a test; "extend `packages/cli/test/convert/roundtrip.test.ts` with a fixture for X" is.
 
 If anything looks wrong, stop. Post a comment whose first non-blank line is `agent-verdict: maintainer-decide`, followed by a blank line and a description of the specific concern: which file is in a protected area, or which test isn't concrete enough, plus a one-line ask for the human to refine the plan. `agent-verdict-apply.yml` applies the label.

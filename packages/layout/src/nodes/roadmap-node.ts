@@ -22,6 +22,7 @@ import { parseDate, propValue, propValues } from '../dsl-utils.js';
 import { resolveLocale } from '../i18n.js';
 import type { LayoutOptions, LayoutResult } from '../layout.js';
 import type { LayoutContext, LayoutHelpers } from '../layout-context.js';
+import { shiftIncludeY, shiftSwimlaneY } from '../positioned-shift.js';
 import { resolveStyle, type StyleContext } from '../style-resolution.js';
 import { type Theme, type ThemeName, themes } from '../themes/index.js';
 import {
@@ -370,12 +371,9 @@ export class RoadmapNode {
             entityLeftEdges: new Map(),
             entityRightEdges: new Map(),
             entityMidpoints: new Map(),
-            entityVisualLeftX: new Map(),
-            entityVisualRightX: new Map(),
-            itemArrowSource: new Map(),
+            placedItems: new Map(),
             itemFlowKey: new Map(),
             currentFlowKey: '',
-            itemSlackAttachY: new Map(),
             slackCorridors: [],
             markerRowPlacements,
             chartTopY: timelineY + timelineHeightBudget,
@@ -412,8 +410,8 @@ export class RoadmapNode {
         const baselineEntityRight = new Map(ctx.entityRightEdges);
         const baselineEntityMid = new Map(ctx.entityMidpoints);
         // Item-only maps don't carry baseline entries (date-pinned
-        // markers don't populate visual edges or arrow sources), so
-        // pass-2 reruns reset them to fresh empties.
+        // markers are never placed items), so pass-2 reruns reset them
+        // to fresh empties.
 
         // Build swimlanes (declared order). Inter-band gap comes from
         // the swimlane default style's `spacing` bucket. Default
@@ -466,14 +464,10 @@ export class RoadmapNode {
             ctx.entityLeftEdges = new Map(baselineEntityLeft);
             ctx.entityRightEdges = new Map(baselineEntityRight);
             ctx.entityMidpoints = new Map(baselineEntityMid);
-            // itemSlackAttachY only ever holds item entries (markers
-            // never write to it), so a fresh map is the right reset —
-            // pass 2's items will repopulate. Same applies to the
-            // visual-edge / arrow-source / flow-key maps below.
-            ctx.itemSlackAttachY = new Map();
-            ctx.entityVisualLeftX = new Map();
-            ctx.entityVisualRightX = new Map();
-            ctx.itemArrowSource = new Map();
+            // placedItems and itemFlowKey only ever hold item entries
+            // (markers never write to them), so a fresh map is the right
+            // reset: pass 2's items will repopulate.
+            ctx.placedItems = new Map();
             ctx.itemFlowKey = new Map();
             ctx.currentFlowKey = '';
             ctx.slackCorridors = corridors;
@@ -641,30 +635,15 @@ export class RoadmapNode {
             ctx.chartTopY += deltaY;
             ctx.chartBottomY += deltaY;
             ctx.swimlaneBottomY += deltaY;
-            for (const lane of swimlanes) shiftSwimlaneY(lane, deltaY);
-            for (const inc of includes) shiftIncludeY(inc, deltaY);
-            // Item entityMidpoints were captured during swimlane
-            // place; markers live in markerRowPlacements with their
-            // own centerY that's already final.
-            for (const [id, m] of ctx.entityMidpoints) {
-                if (ctx.markerRowPlacements.has(id)) continue;
-                ctx.entityMidpoints.set(id, { x: m.x, y: m.y + deltaY });
-            }
-            // itemSlackAttachY was sampled at the same pre-shift Y as
-            // the entity midpoints — keep the two in sync.
-            for (const [id, y] of ctx.itemSlackAttachY) {
-                ctx.itemSlackAttachY.set(id, y + deltaY);
-            }
-            // itemArrowSource is the third absolute-Y map captured during
-            // swimlane place (the dependency-arrow source port). Missing it
-            // leaves every item-sourced arrow starting `deltaY` too high.
-            // The remaining LayoutContext maps need no shift: the edge /
-            // visual-edge maps hold X only, itemFlowKey holds strings,
+            // `shiftSwimlaneY` moves every absolute y the positioned model
+            // carries (see `positioned-shift.ts`). No LayoutContext map needs
+            // a shift: item attach ports are derived from the (now-shifted)
+            // boxes in `placedItems` when edges are built below, the edge maps
+            // hold X only, itemFlowKey holds strings, marker midpoints and
             // markerRowPlacements are already final, and slackCorridors are
             // pass-2 inputs consumed before this block.
-            for (const [id, p] of ctx.itemArrowSource) {
-                ctx.itemArrowSource.set(id, { x: p.x, y: p.y + deltaY });
-            }
+            for (const lane of swimlanes) shiftSwimlaneY(lane, deltaY);
+            for (const inc of includes) shiftIncludeY(inc, deltaY);
             for (const m of milestones) {
                 m.cutTopY = ctx.chartTopY;
                 m.cutBottomY = ctx.swimlaneBottomY;
@@ -872,33 +851,6 @@ interface PackedPlacement {
     rowIndex: number;
     labelBox: BoundingBox;
     labelSide: 'left' | 'right';
-}
-
-/**
- * Translate every Y coordinate inside a swimlane subtree by `dy`. Used
- * when the marker band has to grow after items are already placed —
- * the shift cascades from the swimlane box through every track child,
- * including parallels and groups (which are recursive `children`).
- */
-function shiftSwimlaneY(lane: import('../types.js').PositionedSwimlane, dy: number): void {
-    lane.box.y += dy;
-    for (const child of lane.children) shiftTrackChildY(child, dy);
-    for (const nested of lane.nested) shiftSwimlaneY(nested, dy);
-}
-
-function shiftTrackChildY(child: import('../types.js').PositionedTrackChild, dy: number): void {
-    child.box.y += dy;
-    if (child.kind === 'item') {
-        if (child.overflowBox) child.overflowBox.y += dy;
-        for (const chip of child.labelChips) chip.box.y += dy;
-        return;
-    }
-    for (const c of child.children) shiftTrackChildY(c, dy);
-}
-
-function shiftIncludeY(region: import('../types.js').PositionedIncludeRegion, dy: number): void {
-    region.box.y += dy;
-    for (const lane of region.nestedSwimlanes) shiftSwimlaneY(lane, dy);
 }
 
 /**

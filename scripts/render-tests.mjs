@@ -51,6 +51,7 @@ const MANIFEST = [
     { slug: 'utilization-states', theme: 'light', now: NOW },
     { slug: 'nested-both-headers', theme: 'light', now: NOW },
     { slug: 'inline-date-corners', theme: 'light', now: NOW },
+    { slug: 'late-row-shifts', theme: 'light', now: NOW },
 ];
 
 function run(cmd, args, opts = {}) {
