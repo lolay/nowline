@@ -8,6 +8,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ### Fixed
 
+- **`@nowline/core` — printer handles `symbol` declarations**: `printNowlineFile` threw `Unknown config entry type: SymbolDeclaration` for any file whose `config` section declared a `symbol`, which broke JSON → text conversion (`nowline roadmap.json -f nowline`) and the `@nowline/mcp` `convert` tool. Symbols now print as `symbol [id] ["title"] unicode:"…" ascii:"…" link:…` with an indented `description` when present.
 - **`@nowline/layout` / `@nowline/renderer` — inline-date glyph on a styled group no longer covers the title chiclet**: a filled group with `after:DATE` painted its calendar glyph in the box's top-left corner, on top of the title chiclet and its text. Both of the group's inline-date glyphs now sit in the chiclet's row, vertically centered on it: the `after` glyph just past the chiclet's right edge, the `before` glyph flush right as before. When the chiclet is wider than the group's box, the `before` glyph moves right past the `after` glyph instead of landing on the chiclet. Bracket-style and unstyled groups and parallels paint no chiclet and are unchanged.
 
 ## [0.8.6] - 2026-10-01
