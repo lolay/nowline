@@ -432,7 +432,8 @@ Each phase is one PR and ends with `make pre-commit` green.
 - New `packages/core/test/strings-and-ids/wave-identifier.test.ts`:
   - every bare-word use in `waves.md` §4.7 still parses;
   - `wave-1`, `waves` and `wave:` lex as expected;
-  - a `console.warn` spy shows no new parser ambiguity warnings.
+  - the parser self-analysis (`skipValidations: false`) reports no definition errors, and a `console.warn` spy shows no ambiguity warnings;
+  - the residual ambiguity in `waves.md` §4.7 is pinned by tests.
 - `packages/cli/test/convert/printer.test.ts`:
   - a wave declaration prints;
   - `item a duration:2w owner:sam wave:w1 after:x` round-trips in canonical order;
@@ -658,7 +659,7 @@ Each phase is one PR and ends with `make pre-commit` green.
 - **The `EntityName` shim ships with the keyword.** Ship them in the same PR, or existing v1 ids spelled `wave` break.
 - **Call it `EntityName`, not `Identifier`,** so that the generated guard cannot shadow the validator's `isIdentifier`.
 - **`printNowlineFile` throws on unknown entries,** so the printer case ships with the grammar.
-- **`langium generate` is not an ambiguity gate.** ALL(*) resolves ambiguity at parse time, so use parse tests with a `console.warn` spy.
+- **`langium generate` is not an ambiguity gate.** Nowline sets `maxLookahead: 4`, so the runtime parser uses Chevrotain LL(k) (not ALL(*)) with grammar validations skipped, and nothing is logged at parse time. The gate is a test that builds the parser with `skipValidations: false` (`waves.md` §4.7 "Phase 1 check"); a `console.warn` spy is only belt-and-braces.
 
 **Validation and includes**
 

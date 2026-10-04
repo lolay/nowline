@@ -1,4 +1,10 @@
 import { describe, expect, it } from 'vitest';
+import {
+    type EntityProperty,
+    isSwimlaneDeclaration,
+    isWaveDeclaration,
+    type WaveDeclaration,
+} from '../../src/generated/ast.js';
 import { parse } from '../helpers.js';
 
 describe('every keyword', () => {
@@ -303,5 +309,132 @@ swimlane s
         );
         expect(r.lexerErrors).toEqual([]);
         expect(r.parserErrors).toEqual([]);
+    });
+});
+
+// specs/waves.md §4.1-4.2: the `wave` declaration lives in the roadmap section,
+// shaped like `label` / `size` / `status`.
+describe('wave declaration', () => {
+    async function parseWaves(body: string): Promise<WaveDeclaration[]> {
+        const r = await parse(`roadmap r start:2026-01-05\n${body}`, { validate: false });
+        expect(r.lexerErrors).toEqual([]);
+        expect(r.parserErrors).toEqual([]);
+        return r.ast.roadmapEntries.filter(isWaveDeclaration);
+    }
+
+    function props(decl: WaveDeclaration): Array<Pick<EntityProperty, 'key' | 'value' | 'values'>> {
+        return decl.properties.map((p) => ({ key: p.key, value: p.value, values: p.values }));
+    }
+
+    it('parses a bare wave id', async () => {
+        const [w] = await parseWaves('wave build\n');
+        expect(w.$type).toBe('WaveDeclaration');
+        expect(w.name).toBe('build');
+        expect(w.title).toBeUndefined();
+        expect(w.properties).toEqual([]);
+    });
+
+    it('parses a wave id + title', async () => {
+        const [w] = await parseWaves('wave build "Build"\n');
+        expect(w.name).toBe('build');
+        expect(w.title).toBe('Build');
+    });
+
+    it('parses a wave with a single after: floor', async () => {
+        const [w] = await parseWaves(
+            'anchor fy-budget date:2026-02-02\nwave launch "Launch" after:fy-budget\n',
+        );
+        expect(w.name).toBe('launch');
+        expect(w.title).toBe('Launch');
+        expect(props(w)).toEqual([{ key: 'after', value: 'fy-budget', values: [] }]);
+    });
+
+    it('parses a wave with an after: list mixing an id and an ISO date', async () => {
+        const [w] = await parseWaves(
+            'anchor fy-budget date:2026-02-02\nwave launch after:[fy-budget, 2026-02-02]\n',
+        );
+        expect(w.name).toBe('launch');
+        expect(props(w)).toEqual([
+            { key: 'after', value: undefined, values: ['fy-budget', '2026-02-02'] },
+        ]);
+    });
+
+    it('parses a wave with style:', async () => {
+        const [w] = await parseWaves('wave w style:teal\n');
+        expect(w.name).toBe('w');
+        expect(props(w)).toEqual([{ key: 'style', value: 'teal', values: [] }]);
+    });
+
+    it('parses a wave with an indented description', async () => {
+        const [w] = await parseWaves(
+            'wave build "Build"\n  description "Everything that ships behind the flag"\nwave launch\n',
+        );
+        expect(w.name).toBe('build');
+        expect(w.description?.text).toBe('Everything that ships behind the flag');
+    });
+
+    it('parses a title-only wave (no id; the validator reports NL.E1100)', async () => {
+        const [w] = await parseWaves('wave "Untitled"\n');
+        expect(w.name).toBeUndefined();
+        expect(w.title).toBe('Untitled');
+    });
+
+    it('parses a full roadmap with three waves and wave: on items and a group', async () => {
+        // specs/waves/samples/checkout-relaunch.nowline
+        const r = await parse(
+            `nowline v1
+
+roadmap checkout-relaunch "Checkout relaunch" author:"Product Engineering" start:2026-01-05 scale:1w calendar:full
+
+wave foundations "Foundations"
+wave build "Build"
+wave launch "Launch"
+
+swimlane platform "Platform"
+  item auth "Auth service split" duration:4w wave:foundations status:done
+  item payments-api "Payments API v2" duration:8w wave:build status:in-progress remaining:60%
+  item rate-limits "Rate limits" duration:2w wave:launch
+
+swimlane web "Web"
+  item ux-research "Checkout UX research" duration:2w wave:foundations status:done
+  group wave:build
+    item checkout-v2 "Checkout v2" duration:4w status:in-progress remaining:30%
+    item a11y "Accessibility pass" duration:2w
+  item launch-page "Launch page" duration:2w wave:launch
+
+swimlane mobile "Mobile"
+  item wallet-spike "Wallet SDK spike" duration:6w wave:foundations status:done
+  item wallet "Wallet integration" duration:4w wave:build status:in-progress remaining:25%
+  item store-release "App store release" duration:4w wave:launch
+
+// No wave: background work. Never held by a barrier, drawn hatched.
+swimlane ops "Ops"
+  item on-call "On-call and KTLO" duration:18w
+
+milestone beta "Beta" after:build
+milestone ga "GA" after:launch
+`,
+            { validate: false },
+        );
+        expect(r.lexerErrors).toEqual([]);
+        expect(r.parserErrors).toEqual([]);
+        expect(r.ast.roadmapDecl?.name).toBe('checkout-relaunch');
+        const waves = r.ast.roadmapEntries.filter(isWaveDeclaration);
+        expect(waves.map((w) => [w.name, w.title])).toEqual([
+            ['foundations', 'Foundations'],
+            ['build', 'Build'],
+            ['launch', 'Launch'],
+        ]);
+        const lanes = r.ast.roadmapEntries.filter(isSwimlaneDeclaration);
+        expect(lanes.map((l) => l.name)).toEqual(['platform', 'web', 'mobile', 'ops']);
+        const web = lanes[1];
+        const group = web.content[1];
+        expect(group.$type).toBe('GroupBlock');
+        if (group.$type !== 'GroupBlock') throw new Error('expected group');
+        expect(group.name).toBeUndefined();
+        expect(group.properties.map((p) => [p.key, p.value])).toEqual([['wave', 'build']]);
+        const auth = lanes[0].content[0];
+        if (auth.$type !== 'ItemDeclaration') throw new Error('expected item');
+        expect(auth.properties.find((p) => p.key === 'wave')?.value).toBe('foundations');
     });
 });

@@ -32,15 +32,17 @@ CalendarBlock:
     'calendar'
     (INDENT properties+=BlockProperty+ DEDENT)?;
 
+// 'wave' appears here because it is a declaration keyword (WaveDeclaration) that the
+// lexer prefers over ID; a v1 file could already write e.g. `name: wave` in a block.
 BlockPropertyValue returns string:
-    ID | INTEGER | STRING | DURATION_LITERAL;
+    ID | INTEGER | STRING | DURATION_LITERAL | 'wave';
 
 StyleDeclaration:
-    'style' (name=ID)? (title=STRING)?
+    'style' (name=EntityName)? (title=STRING)?
     (INDENT properties+=StyleProperty+ DEDENT)?;
 
 SymbolDeclaration:
-    'symbol' (name=ID)? (title=STRING)?
+    'symbol' (name=EntityName)? (title=STRING)?
     (properties+=EntityProperty)*
     (INDENT description=DescriptionDirective DEDENT)?;
 
@@ -49,9 +51,10 @@ SymbolDeclaration:
 // the keyword in preference to ID. Without the alternation, `capacity-icon:person`
 // (a built-in capacity-icon name) would fail to parse. Other built-in icon names
 // (`none`, `multiplier`, `people`, `points`, `time`, `shield`, `warning`, `lock`)
-// are not grammar keywords and therefore lex as ID without help.
+// are not grammar keywords and therefore lex as ID without help. 'wave' is listed for
+// the same reason (WaveDeclaration keyword), so v1 values such as `icon:wave` keep parsing.
 StylePropertyValue returns string:
-    ID | COLOR_HEX | STRING | 'person';
+    ID | COLOR_HEX | STRING | 'person' | 'wave';
 
 DefaultDeclaration:
     'default' entityType=DefaultEntityType
@@ -64,21 +67,27 @@ DefaultEntityType returns string:
 // --- Roadmap ---
 
 RoadmapDeclaration:
-    'roadmap' (name=ID)? (title=STRING)?
+    'roadmap' (name=EntityName)? (title=STRING)?
     (properties+=EntityProperty)*;
 
 RoadmapEntry:
     PersonDeclaration | TeamDeclaration | AnchorDeclaration |
     LabelDeclaration | SizeDeclaration | StatusDeclaration |
+    WaveDeclaration |
     SwimlaneDeclaration | MilestoneDeclaration | FootnoteDeclaration;
 
+// v1 compatibility: `wave` now lexes as a keyword. EntityName re-admits the bare
+// word everywhere a v1 file could already write an identifier.
+EntityName returns string:
+    ID | 'wave';
+
 PersonDeclaration:
-    'person' (name=ID)? (title=STRING)?
+    'person' (name=EntityName)? (title=STRING)?
     (properties+=EntityProperty)*
     (INDENT description=DescriptionDirective DEDENT)?;
 
 TeamDeclaration:
-    'team' (name=ID)? (title=STRING)?
+    'team' (name=EntityName)? (title=STRING)?
     (properties+=EntityProperty)*
     (INDENT content+=TeamContent+ DEDENT)?;
 
@@ -86,30 +95,37 @@ TeamContent:
     DescriptionDirective | PersonMemberRef | TeamDeclaration;
 
 PersonMemberRef:
-    'person' ref=ID;
+    'person' ref=EntityName;
 
 AnchorDeclaration:
-    'anchor' (name=ID)? (title=STRING)?
+    'anchor' (name=EntityName)? (title=STRING)?
     (properties+=EntityProperty)*
     (INDENT description=DescriptionDirective DEDENT)?;
 
 LabelDeclaration:
-    'label' (name=ID)? (title=STRING)?
+    'label' (name=EntityName)? (title=STRING)?
     (properties+=EntityProperty)*
     (INDENT description=DescriptionDirective DEDENT)?;
 
 SizeDeclaration:
-    'size' (name=ID)? (title=STRING)?
+    'size' (name=EntityName)? (title=STRING)?
     (properties+=EntityProperty)*
     (INDENT description=DescriptionDirective DEDENT)?;
 
 StatusDeclaration:
-    'status' (name=ID)? (title=STRING)?
+    'status' (name=EntityName)? (title=STRING)?
+    (properties+=EntityProperty)*
+    (INDENT description=DescriptionDirective DEDENT)?;
+
+// Barrier that spans swimlanes (specs/waves.md). `name` stays optional in the
+// grammar so the validator reports a missing id as NL.E1100 instead of a parse error.
+WaveDeclaration:
+    'wave' (name=EntityName)? (title=STRING)?
     (properties+=EntityProperty)*
     (INDENT description=DescriptionDirective DEDENT)?;
 
 SwimlaneDeclaration:
-    'swimlane' (name=ID)? (title=STRING)?
+    'swimlane' (name=EntityName)? (title=STRING)?
     (properties+=EntityProperty)*
     (INDENT content+=SwimlaneContent+ DEDENT)?;
 
@@ -117,12 +133,12 @@ SwimlaneContent:
     DescriptionDirective | ItemDeclaration | ParallelBlock | GroupBlock;
 
 ItemDeclaration:
-    'item' (name=ID)? (title=STRING)?
+    'item' (name=EntityName)? (title=STRING)?
     (properties+=EntityProperty)*
     (INDENT description=DescriptionDirective DEDENT)?;
 
 ParallelBlock:
-    'parallel' (name=ID)? (title=STRING)?
+    'parallel' (name=EntityName)? (title=STRING)?
     (properties+=EntityProperty)*
     INDENT content+=ParallelContent+ DEDENT;
 
@@ -130,7 +146,7 @@ ParallelContent:
     DescriptionDirective | ItemDeclaration | GroupBlock;
 
 GroupBlock:
-    'group' (name=ID)? (title=STRING)?
+    'group' (name=EntityName)? (title=STRING)?
     (properties+=EntityProperty)*
     INDENT content+=GroupContent+ DEDENT;
 
@@ -138,12 +154,12 @@ GroupContent:
     DescriptionDirective | ItemDeclaration | ParallelBlock | GroupBlock;
 
 MilestoneDeclaration:
-    'milestone' (name=ID)? (title=STRING)?
+    'milestone' (name=EntityName)? (title=STRING)?
     (properties+=EntityProperty)*
     (INDENT description=DescriptionDirective DEDENT)?;
 
 FootnoteDeclaration:
-    'footnote' (name=ID)? (title=STRING)?
+    'footnote' (name=EntityName)? (title=STRING)?
     (properties+=EntityProperty)*
     (INDENT description=DescriptionDirective DEDENT)?;
 
@@ -169,9 +185,10 @@ StyleProperty:
 
 // 'person' appears here for the same reason as in StylePropertyValue — it is a
 // declaration keyword that the lexer prefers over ID, but it must also be accepted
-// as a property-atom value (e.g. `default swimlane capacity-icon:person`).
+// as a property-atom value (e.g. `default swimlane capacity-icon:person`). 'wave' is
+// listed for the same reason, so v1 values such as `after:wave` and `owner:wave` keep parsing.
 PropertyAtom returns string:
-    ID | STRING | DURATION_LITERAL | PERCENTAGE | URL | DATE_LITERAL | COLOR_HEX | DECIMAL | INTEGER | 'person';
+    ID | STRING | DURATION_LITERAL | PERCENTAGE | URL | DATE_LITERAL | COLOR_HEX | DECIMAL | INTEGER | 'person' | 'wave';
 
 // --- Terminals ---
 // INDENT/DEDENT must be declared before ID to avoid Chevrotain unreachable-token errors.
