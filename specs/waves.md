@@ -1,16 +1,14 @@
 # Nowline Waves
 
-**Status: Proposed. Not prioritized, not implemented.** This is the design record for waves that run across swimlanes. Today's parser rejects the syntax shown here.
+**Status: Accepted. Implementation in progress as milestone m2o.** This is the design record for waves that run across swimlanes.
 
-If the feature is prioritized:
-
-- The normative parts of this file move into [`specs/dsl.md`](../dsl.md) (syntax, validation, includes) and [`specs/rendering.md`](../rendering.md) (layout, rendering, exporters).
-- This file stays as the rationale and the home of the worked examples.
+- The normative parts of this file are mirrored into [`specs/dsl.md`](./dsl.md) (syntax, validation, includes) and [`specs/rendering.md`](./rendering.md) (layout, rendering, exporters).
+- This file keeps the rationale and the worked examples. Where the two disagree, fix whichever is wrong in the same PR.
 
 Related files:
 
-- **Implementation plan:** [`handoff.md`](./handoff.md).
-- **Sample roadmap and mockup diagram:** [`samples/`](./samples/), introduced in [`README.md`](./README.md).
+- **Implementation plan:** [`handoffs/handoff-m2o-waves.md`](./handoffs/handoff-m2o-waves.md).
+- **Sample roadmap and mockup diagram:** [`waves/samples/`](./waves/samples/), introduced in [`waves/README.md`](./waves/README.md).
 
 ## 1. Summary
 
@@ -183,7 +181,7 @@ RoadmapEntry:
     WaveDeclaration |
     SwimlaneDeclaration | MilestoneDeclaration | FootnoteDeclaration;
 
-// Barrier that spans swimlanes (specs/waves/waves.md). `name` stays optional in the
+// Barrier that spans swimlanes (specs/waves.md). `name` stays optional in the
 // grammar so the validator reports a missing id as NL.E1100 instead of a parse error.
 WaveDeclaration:
     'wave' (name=EntityName)? (title=STRING)?
@@ -299,7 +297,7 @@ A roadmap "has waves" when its file declares at least one wave with a valid id. 
 **Counts.**
 
 - `dsl.md` Design Rule 1 moves from "~20 keywords (currently 21)" to "(currently 22)".
-- `principles.md` says "~17 keywords total". That is stale and becomes "~20 keywords (see dsl.md Design Rule 1)".
+- `principles.md` says "~20 keywords" and defers to Design Rule 1 for the count, so it needs no change.
 - The grammar has 22 quoted keyword literals today and 23 after this change. That one-literal discrepancy with `dsl.md` predates waves.
 
 **Justification.** A wave has identity, a title, a semantic order, a description, a link, a style, footnote attachment, include agreement, LSP navigation and its own visual. That is the same class as `swimlane`, `milestone` and `anchor`. No existing keyword can carry it:
@@ -326,7 +324,8 @@ All quantities are offsets in axis days from the roadmap origin (`start:`, or th
   - Items in isolated regions are members, and so are items without ids.
 - **Floor.** `A_k` is the latest date among w_k's `after:` elements (anchor date, dated-milestone date, inline date), converted to an axis offset. It is −∞ when the wave has no floor.
   - Dates are read straight from the declarations.
-  - They are never clamped to a fixed `length:` window, and never looked up through the layout's edge maps.
+  - A date maps to an axis offset the same way each engine already maps an anchor date: engine A uses an unclamped `scale.forward(date)`, and engines B and C use `daysBetween`.
+  - They are never clamped to the date window (`forwardWithinDomain` returns null outside it), and never looked up through the layout's edge maps.
 
 **Barrier recurrence**
 
@@ -348,6 +347,9 @@ lw(parallel P) = ew(P) if P has an effective wave,
 L(C)           = S_{lw(C)} if lw(C) ≠ ⊥, else none
 ```
 
+- The lead wave of an empty group is ⊥.
+- A group whose first child is background work has `lw = ⊥`, even if later children carry a wave. This is intended: the box opens with its first piece of work, wherever that falls.
+
 **Start rule.** Today's rule gains one term:
 
 ```
@@ -364,8 +366,8 @@ end(x)   = start(x) + dur(x)
 - **`aft`** is the existing `after:` maximum. A wave reference `after:w_j` contributes `E_j`.
 - **`L(C)`** never moves an item. It only keeps a container's box and bracket from opening in an earlier column.
 - **Container ends** are unchanged: a group ends when its sequence ends, and a parallel ends at its latest track.
-- **Engine A** keeps its existing start rule, including the fact that `after:` is not floored by the lane cursor (§8.6 divergence (a)). The floor is one more term in the `max`.
-- **Item pins.** The undocumented `date:` and `start:` item pins become `max(pin, F(x))`. When the floor moves an item, layout emits NL.W1001.
+- **Engine A** keeps its existing start rule, including the fact that `after:` is not floored by the lane cursor (§8.6 divergence (a)). The floor is one more term in the `max`, and it applies even when engine A ignores the lane cursor for an `after:`: the barrier holds whichever start term wins.
+- **Item pins.** The undocumented `date:` and `start:` item pins still replace the `seq` and `aft` terms, as they do today. With waves, the pinned start becomes `max(pin, F(x))`. When the floor moves an item, layout emits NL.W1001.
 
 **Wave references**
 
@@ -374,6 +376,13 @@ end(x)   = start(x) + dur(x)
 - **`on:w_k`** attaches a footnote to the wave.
 
 **Wave span.** Wave k spans `[S_k, E_k]`.
+
+**Held by.** `heldBy_k` names the member that sets `E_k`:
+
+- It is the member with the latest end in the engine that computes it: engine A for the positioned model and the strip tooltip, engine C for the XLSX `Waves` sheet.
+- Ties go to the first member in placement order: main lanes in order, then isolated-region lanes in include order, and document order within a lane.
+- It is omitted when no member's end equals `E_k` with `E_k > S_k`: an empty wave, or a wave whose members all end at or before its start floor.
+- On day-level ties, engines A and C can name different members: engine A compares pixel ends (including the `MIN_ITEM_WIDTH` clamp, §8.6 divergence (b)), and engine C compares day ends.
 
 - Without floors, the columns tile `[S_1, E_n]` with no gaps and no overlap.
 - A wave opens at its barrier instant, not at its earliest member's start. A column may therefore begin with idle lanes. That idle time is the honest cost of the barrier.
@@ -413,7 +422,7 @@ end(x) ≤ E_k ≤ S_{k+1} ≤ E_{k+1} ≤ … ≤ S_j ≤ start(y)
 | Dated milestone `after:<wave>` | Pinned to its date. If the wave ends after that date, the existing overrun treatment (a red cut line) applies, plus the info NL.I1007. This is the wave-deadline idiom (Example 11). |
 | Anchors | They are dates. They can floor a wave through its `after:`, and they are never members. |
 | Roadmap `start:` | It is the origin, so `S_1 ≥ 0`. An inline date on a wave requires `start:` (NL.E0412) and must be on or after it (NL.E0413). |
-| Roadmap `length:` | The window stays fixed. Waves past it are computed exactly from unclamped dates and drawn the way items past a fixed window are drawn today. Without `length:`, the extent includes every `S_k` and `E_n`. |
+| Roadmap `length:` | `length:` is a minimum span, not a cap. The content extent includes every `S_k` and `E_n`, so waves that run past `length:` grow the date window to the next tick boundary, like any other content. Floors are still computed from unclamped declaration dates (§5.1). |
 | `calendar:` | Barrier arithmetic is in axis days. Business-calendar behaviour is unchanged. |
 | `status:done`, `remaining:` | No scheduling effect. Done items keep their planned span and still count toward `E_k`. |
 | Capacity and utilization | Computed from the shifted positions. Barrier idle time shows as zero load. There is no leveling. |
@@ -446,7 +455,10 @@ The layout emits L (WV15–WV18).
 
 **Why G also runs on merged scopes.** In merge mode, a child's `after:` can resolve to a parent item through layout's shared maps. No per-file analysis sees that edge, and it can close a barrier cycle.
 
-**Where diagnostics go.** Resolver diagnostics carry codes (§7.4), so the CLI, the export kernel, the browser, MCP and `--serve` can report them with file and line. CLI text mode keeps today's rule: warnings print only when the run fails. JSON mode includes them.
+**Where diagnostics go.** Wave resolver diagnostics carry codes (§7.4), so the export kernel, the browser, MCP and `--serve` can report them with file and line.
+
+- **CLI.** The CLI does not call the resolver itself: resolver errors reach it through `@nowline/export`. Coded resolver diagnostics travel on a typed error and are reported like validator diagnostics: localized, included in `--diagnostic-format json`, and exit 1. Uncoded include errors keep today's behaviour exactly: exit 3, with the same message.
+- **Warnings.** CLI text mode keeps today's rule: warnings print only when the run fails. JSON mode includes them.
 
 **Where the code lives.** All wave rules are pure functions in a new `packages/core/src/language/waves.ts`. The validator and the resolver both call them.
 
@@ -641,7 +653,7 @@ For every include edge `P → C` whose `roadmap:` mode is `merge` or `isolate` a
 | Vocabulary-only child (no roadmap line, no swimlanes, no waves) | Exempt (Example 18). |
 | Child with swimlanes but no waves, under a parent with waves | Error (`child-none`). |
 | `roadmap:isolate` | The child must agree, because the canvas and the barrier are global (like rule 11). Layout maps a region's `wave:x` to the global wave by id (Example 19). |
-| A shared `waves.nowline` that provides waves to other files | Not supported in this proposal (§12). |
+| A shared `waves.nowline` that provides waves to other files | Not supported (§12). |
 
 ### 7.4 Merge mechanics (`packages/core/src/language/include-resolver.ts`)
 
@@ -716,10 +728,10 @@ It never goes through `forwardWithinDomain`, the seeded edge maps or `resolveAft
 
 1. **Monotone.** Every start is a `max` of non-negative-offset terms, so positions are a monotone function of `(S, E)`. `RowPacker` bumps change y only (`roadmap-node.ts:456-462`).
 2. **Bounded dependencies.** For valid input (WV10 holds on every merged scope), a member of wave k depends only on constants, `S_1..S_k` and `E_1..E_{k−1}`.
-3. **At most n + 1 passes.** Pass p computes `E_1..E_p` and `S_1..S_{p+1}` exactly, so every wave is exact after pass n. Entities that read `E_n` (`after:w_n`) become exact in pass n + 1, which also confirms the result.
+3. **At most n + 1 passes.** This is an upper bound, not an exact count. By the end of pass p, at least `E_1..E_p` are exact (floors can make later waves exact sooner), so the driver stops after at most n + 1 passes: entities that read `E_n` (`after:w_n`) are exact in pass n + 1 at the latest, and a pass that changes nothing confirms the result.
 4. **Least fixpoint.** Iteration starts from a valid lower bound and stops at the first fixpoint. By Kleene, the result is the least fixpoint: the earliest schedule that satisfies every constraint.
 5. **Invalid input.** Input that breaks the rules (for example, an LSP preview of a file with NL.E1103) hits the cap. The result is deterministic, and layout emits NL.W1002.
-6. **Cost.** `O((n+1)·(N + R))` for N main nodes and R region nodes. Example 1 converges in exactly 4 passes, Example 19 in 3 and Example 16 in 2.
+6. **Cost.** `O((n+1)·(N + R))` for N main nodes and R region nodes. Example 1 converges in 4 passes, Example 19 in 3 and Example 16 in 2. These counts follow from running the §8.2 algorithm on each example, not from the bound in item 3.
 
 A warm start from day space would be wrong: divergence (a) can make pixel values smaller than day values.
 
@@ -745,7 +757,7 @@ A warm start from day space would be wrong: divergence (a) can make pixel values
 - This is the lane cursor's `itemLogicalEnd` formula (`swimlane-node.ts:322`), including the `MIN_ITEM_WIDTH` clamp.
 - Group boxes and caption spill never enter it.
 
-**Seeds.** Each pass resets the entity maps to the anchor and dated-milestone baseline, then seeds:
+**Seeds.** Each pass resets the entity edge maps to the anchor and dated-milestone baseline, resets `placedItems` and `itemFlowKey`, then seeds:
 
 - `entityRightEdges[w_k] = E[k]`;
 - `entityLeftEdges[w_k] = S[k]`.
@@ -758,13 +770,18 @@ Effects:
 - WV2 makes a collision between a wave id and another id an error, so the shared maps are unambiguous.
 - Resetting each pass keeps forward references dropped exactly as they are today.
 
+`LayoutContext` has no visual-edge maps: dependency-arrow and slack-arrow ports are derived from the final item boxes in `placedItems`, so resetting `placedItems` each pass is enough.
+
 **Pass loop (wave mode only).** `RoadmapNode.place` wraps `runSwimlaneLoop` plus a region pass in `runPass`.
 
 - The region pass runs `buildIncludeRegions` with the shared wave state and accumulates members. Every region placement made inside the loop is **discarded**.
-- After convergence:
-  - the existing slack-corridor rerun (`roadmap-node.ts:463-482`) runs once, with `S`/`E` frozen and the seeds re-applied;
-  - `growChartRightX` runs as it does today;
-  - the existing final region placement (`roadmap-node.ts:507-513`) runs **once**, frozen, without accumulating.
+- The loop must finish before any of the following, which then run in this order:
+  1. the existing slack-corridor rerun, once, with `S`/`E` frozen. It resets the maps like every pass and re-seeds the wave edges. Slack corridors are collected only after convergence;
+  2. `growChartRightX`, as it does today;
+  3. the existing final region placement, **once**, frozen, without accumulating;
+  4. the post-placement extent growth: the step that measures leaf bars and markers, grows the date window to the next tick boundary and replaces `ctx.scale`;
+  5. the unified marker re-pack and its `deltaY` shift.
+- `buildWaves` (§8.7) runs after all of these.
 
 **Visual gutter.** Take `i ∈ M_j` and `l ∈ M_k` with `j < k`:
 
@@ -802,7 +819,7 @@ Engines A and C produce the same schedule unless one of the existing divergences
 - **(c)** caption spill inside a group that has a following sibling;
 - **(d)** a group track that binds a parallel join adds `TRACK_BLOCK_TAIL_GUTTER_PX` (8 px).
 
-The full list, (a)–(f), is in [`handoff.md`](./handoff.md) §4.
+The full list, (a)–(f), is in [`handoffs/handoff-m2o-waves.md`](./handoffs/handoff-m2o-waves.md) §4.
 
 Consequences:
 
@@ -826,7 +843,7 @@ export interface PositionedWave {
     endDate: Date;                 // exclusive
     memberCount: number;
     empty: boolean;
-    heldBy?: string;               // binding member (latest logical end; ties -> first in lane order): id ?? title
+    heldBy?: string;               // binding member, id ?? title (§5.1 "Held by")
     floorRef?: string;             // the after: value that set S_k when it beat E_{k-1}
     columnBox: BoundingBox;        // startX..endX × chartTopY..swimlaneBottomY
     strip: {
@@ -852,7 +869,11 @@ export interface PositionedWaveCrossing { x: number; topY: number; bottomY: numb
 // PositionedMilestone.onWaveBoundary?: boolean            // suppresses the cut line (§9.2)
 // PositionedMilestone.overrunByWave?: string
 // PositionedIncludeRegion.waveCrossings?: PositionedWaveCrossing[]
+// PositionedRoadmap.waveSolve?: { passes: number; capped: boolean }  // drives NL.W1002 and tests
 ```
+
+- **`waveSolve`** records the barrier driver's result. Layout insights see only the positioned model, so NL.W1002 reads `waveSolve.capped`, and tests read `passes`.
+- **NL.W1001** is collected from include-region items as well as main-lane items.
 
 `buildWaves` in a new `packages/layout/src/nodes/wave-node.ts` builds the waves, boundaries, crossings and legend. It runs **after** the marker-row `deltaY` shift (`roadmap-node.ts:596-629`), from the final `chartTopY` and `swimlaneBottomY`.
 
@@ -881,7 +902,7 @@ When n = 0:
 - regions are placed exactly where they are today;
 - the strip and the legend add 0 height;
 - every new model field is omitted;
-- the renderer emits no `wave-*` layers and no new `<defs>`;
+- the renderer emits no `wave-*` layers and no new `<defs>` children (the `<defs>` element itself is always emitted, for shadows and arrowheads);
 - group brackets follow today's rule;
 - exporters add no columns, sheets, tasks or sections;
 - validation is unchanged for files with no `wave` keyword and no `wave:` key.
@@ -890,20 +911,21 @@ The grammar change keeps the AST shape, so JSON hashes are unchanged.
 
 **Gates**
 
-- All 12 `packages/integration-tests/test/__snapshots__/*.svg` files and `packages/integration-tests/determinism/hashes.json` pass **without** `UPDATE_LAYOUT_SNAPSHOTS` or `UPDATE_DETERMINISM_GOLDENS`.
+- All 14 `packages/integration-tests/test/__snapshots__/*.svg` files pass **without** `UPDATE_LAYOUT_SNAPSHOTS` (part of `make pre-commit`).
+- `packages/integration-tests/determinism/hashes.json` passes **without** `UPDATE_DETERMINISM_GOLDENS`. This gate is not part of `make ci`: run `make compile TARGET=local`, then `make determinism`.
 - A test asserts that a `PositionedRoadmap` without waves has no new keys.
 - Running the validator over `examples/` and `tests/` gives diagnostics byte-identical to the baseline.
 
 ## 9. Rendering (`packages/renderer/src/svg/render.ts`)
 
-The mockup in [`samples/checkout-relaunch.svg`](./samples/checkout-relaunch.svg) shows the light-theme design: strip, boundaries, a milestone on a boundary, background hatch and legend.
+The mockup in [`waves/samples/checkout-relaunch.svg`](./waves/samples/checkout-relaunch.svg) shows the light-theme design: strip, boundaries, a milestone on a boundary, background hatch and legend.
 
 ### 9.1 Wave strip
 
 **Panel and cells** (`data-layer="wave-strip"`, emitted right after `renderTimeline`, before lane backgrounds and the grid)
 
 - **Backing panel.** A rect spanning the timeline width at `waveStrip.y`: 20 px high, `rx 4`, fill `timeline.panelFill`, stroke `timeline.border`.
-- **Cells.** One cell per non-empty wave over `[startX, endX]`. The fill is `wave.stripFill` or `wave.stripFillAlt`, by `visibleOrdinal % 2`, so empty waves and gaps never break the alternation.
+- **Cells.** One cell per non-empty wave over `[startX, endX]`. `visibleOrdinal` is 0-based: even ordinals use `wave.stripFill` and odd ordinals use `wave.stripFillAlt`, so empty waves and gaps never break the alternation.
 - **Grid.** Major grid lines, drawn later, cross the cells exactly as they cross the tick panel.
 
 **Labels** (`data-layer="wave-labels"`, after the boundary lines)
@@ -955,12 +977,14 @@ The design rule is to mark the exception, not the rule. In a roadmap with waves,
 
 1. **Hatch.** A diagonal hatch overlay is drawn immediately after the bar's fill rect, before the progress strip, text and decorations.
    - It uses one of two `<pattern>` defs, chosen by the bar fill's relative luminance (the existing `relativeLuminance` helper):
-     - `nl-wave-hatch-dark` (stroke `wave.hatch`) on light fills;
-     - `nl-wave-hatch-light` (stroke `wave.hatchOnDark`) on dark fills.
+     - `${idPrefix}-wave-hatch-dark` (stroke `wave.hatch`) on light fills;
+     - `${idPrefix}-wave-hatch-light` (stroke `wave.hatchOnDark`) on dark fills.
+   - The ids carry the per-SVG prefix, like the shadow filters, because the embed tests forbid ids shared across SVGs on one page.
    - Pattern: 6 px tile, 45°, 2 px stroke at `WAVE_HATCH_OPACITY` (0.13).
+   - **Overlay.** A second rect drawn right after the bar rect, so the bar rect stays the first `<rect>` in the item group. It is inset by half the bar's stroke width and uses the same corner radius, so it does not cover the stroke.
    - Status colour, the progress strip, the status dot and the text stay readable.
-   - Each def is emitted only when at least one bar uses it.
-2. **Crossings.** For every boundary x that a background bar straddles, layout emits a crossing segment from the bar's top to its bottom. The renderer draws it as a 1 px `2 2` dashed line in the boundary colour, **over** the bar. It shows that the barrier does not hold this work (`data-layer="wave-cross"`, drawn after include regions and before edges).
+   - Each def is emitted inside the existing `<defs>`, and only when at least one bar uses it.
+2. **Crossings.** For every boundary x that a background bar's **visual** extent strictly contains (`visualLeft < x < visualRight`), layout emits a crossing segment from the bar's top to its bottom. A boundary at a bar's logical edge falls in the 6 px inset, so it gets no crossing (this is why `oncall` in Example 3 gets none at W6). The renderer draws it as a 1 px `2 2` dashed line in the boundary colour, **over** the bar. It shows that the barrier does not hold this work (`data-layer="wave-cross"`, drawn after include regions and before edges).
 
 Also:
 
@@ -1102,7 +1126,7 @@ All wave output is gated on waves existing. Exporters read waves from `inputs.re
 | Core helpers (`packages/core/src/language/waves.ts`, re-exported from `packages/core/src/index.ts`) | **Membership:** `ownWaves(file)`, `effectiveWave(node, waves)`, `leadWave(node, waves)`, `waveFloorDate(wave, content)`. **Rule sets** (each returns coded findings bound to AST nodes): `checkWaveDeclarations(file)` (S), `evaluateWaveProperties(file, waves)` (P), `evaluateWaveOrder(scope, waves)` (G). **Other:** `localizeResolveDiagnostic(locale, d)`, and `buildWavePlan(resolved)` for layout and exporters. |
 | JSON / AST | A new node, `{"$type":"WaveDeclaration","name":"build","title":"Build","properties":[…]}`, in `roadmapEntries`. `wave:` is a plain `EntityProperty`. The change is additive, so `NOWLINE_SCHEMA_VERSION` stays `'1'`. |
 | Printer (`packages/core/src/convert/printer.ts`) | Add `case 'WaveDeclaration': return this.simpleEntity('wave', entry, depth)`; without it, `printNowlineFile` throws `Unknown roadmap entry type`. Add `'wave'` to `KEY_ORDER` between `'owner'` and `'after'`. |
-| CLI, export kernel, browser, MCP | Coded resolver diagnostics are routed like validator diagnostics (§6.1). The browser uses `code ?? 'include'`. MCP: `entityTypes += 'wave'` and `itemPropertyKeys += 'wave'` (`packages/mcp/src/schema-vocab.ts`), and the cheatsheet is updated (`reference-cheatsheet.ts`). |
+| CLI, export kernel, browser, MCP | Coded resolver diagnostics are routed like validator diagnostics (§6.1). The CLI receives them through `@nowline/export`, on a typed error; uncoded include errors keep today's exit 3 and message. The browser uses `code ?? 'include'`. MCP: `entityTypes += 'wave'` and `itemPropertyKeys += 'wave'` (`packages/mcp/src/schema-vocab.ts`), and the cheatsheet is updated (`reference-cheatsheet.ts`). |
 | XLSX (`packages/export-xlsx/src/index.ts`) | **Items sheet:** a `Wave` column after `Parallel`, holding the effective wave id, blank for background work. **New last sheet, `Waves`:** ID, Title, Order, Start, End (exclusive), Items, Held by, After, Description, with dates from engine C. Existing sheet indices are unchanged. |
 | MS Project (`packages/export-msproj/src/index.ts`) | **Wave-end milestone tasks.** One zero-duration milestone task per wave, `{title} (wave end)`, at outline level 1. Its FS predecessor links come from every member with an id, plus the previous wave's end task. **Barrier links.** Every member of wave k ≥ 2 gains an FS link to wave k−1's end task. **Floors.** An anchor or dated-milestone floor becomes a predecessor; an inline-date floor is dropped and counted. **Limits.** Members without ids are lossy. The exporter stays AST-only and still encodes no implicit lane sequencing (pre-existing). |
 | Mermaid (`packages/export-mermaid/src/index.ts`) | **`section Waves`.** Placed after `section Anchors` and before the lanes, with lines like `{title} (wave end) :milestone, {waveId}, {E_k date}, 0d`, dated from engine C. **Wave tokens.** `startTokenFor` (`:315`) appends `{prevWaveId}` to members in wave k ≥ 2. **Ids.** The milestone id equals the wave id, so `after:build` maps to `after build`. **Floors** are dropped and counted. |
@@ -1129,11 +1153,11 @@ All wave output is gated on waves existing. Exporters read waves from `inputs.re
   | W5 | 02-09 | W11 | 03-23 |
   | W6 | 02-16 | | |
 
-- **Sketches** use one character per week: `|` is a wave boundary, `.` is idle time, letters are work and `/` is background work.
+- **Sketches** use one character per week: `|` is a wave boundary, `.` is idle time, letters are work and `/` is background work. An upper-case letter marks a week painted as red overflow (Example 10's `B`).
 - **Engine agreement.** Every valid example avoids the engine A/C divergences (§8.6), so both engines produce the same tables.
 - **Diagnostics** are listed only where an example has some.
 
-The PM-facing sample in [`samples/checkout-relaunch.nowline`](./samples/checkout-relaunch.nowline) combines Examples 1, 3, 5 and 8 into one roadmap. [`README.md`](./README.md) shows its schedule and mockup.
+The PM-facing sample in [`waves/samples/checkout-relaunch.nowline`](./waves/samples/checkout-relaunch.nowline) combines Examples 1, 3, 5 and 8 into one roadmap. [`waves/README.md`](./waves/README.md) shows its schedule and mockup.
 
 ### Example 1: three lanes, three waves
 
@@ -1270,7 +1294,7 @@ swimlane infra
 | infra-prep | w1 | W0–W3 | lane start |
 | cutover | w2 | W3–W4 | lane = barrier W3 |
 
-Waves: w1 [W0, W3], w2 [W3, W6].
+Waves: w1 [W0, W3], held by infra-prep; w2 [W3, W6], held by migrate.
 
 - **Indirect delay.** Neither `docs` nor `oncall` extends a wave by its own end. But `docs` delays `migrate`, which is what makes w2 end at W6; without `docs`, w2 would be [W3, W5].
 - **Picture.** `docs` and `oncall` are hatched, and the W3 boundary is drawn as a dashed crossing over both bars. `oncall`'s visual right edge sits 6 px inside W6, so it does not cross the closing line.
@@ -1317,7 +1341,7 @@ swimlane mobile
 | mobile-spike | w1 | W0–W5 | lane start |
 
 - **The block.** `streams` spans W1–W7. Its lead wave is `min(w1, w2) = w1`, so the lead floor does not move it.
-- **Waves.** w1 [W0, W5], held by mobile-spike; w2 [W5, W8].
+- **Waves.** w1 [W0, W5], held by mobile-spike; w2 [W5, W8], held by integration.
 - **Order check.** It passes: the block reaches w2 at most, and it is followed by a w2 item.
 - **Bracket.** `api-track` is untitled and unstyled, so it draws no bracket (§9.7).
 
@@ -1448,7 +1472,7 @@ Diagnostics:
 - Line 9 (warning): `NL.W1101 after:schema on "forms" refers to "schema", which is in a later swimlane ("backend"). Layout places swimlanes in order and ignores references to work it has not placed yet, so it ignores this after:. Move swimlane "backend" above swimlane "frontend", or remove the after:.`
 - Line 10 (warning): the same, for `after:api` on "wire-up".
 
-**Fix.** Move `backend` above `frontend`. This gives the schedule of Example 6: forms W2–W3, w1 [W0, W3], api W3–W6, wire-up W6–W8, w2 [W3, W8].
+**Fix.** Move `backend` above `frontend`. This gives the same item dates as Example 6 (which also has `mocks`): forms W2–W3, w1 [W0, W3], api W3–W6, wire-up W6–W8, w2 [W3, W8].
 
 ```
 wk        01|234
@@ -2068,9 +2092,9 @@ swimlane a wave:alpha
 | MS Project implicit lane-sequence links, for all roadmaps | Separate PR, with a deliberate msproj hash bump. |
 | Honour forward `after:` references | Rejected for now. In a roadmap with waves this would change behaviour as soon as the first wave line is added. NL.W1101 makes the problem visible instead. |
 
-## 13. Open questions
+## 13. Open questions (decided)
 
-Each question comes with a recommendation.
+The maintainer adopted every recommendation below for m2o. They are kept as the record of what was asked.
 
 1. **Wave start floors in v1** (`wave … after:<anchor | dated milestone | date>`). *Recommendation:* ship them. They combine with includes through re-declaration, and rule 12 compares resolved dates.
 2. **Strictness of include agreement.** *Recommendation:* ids, order and resolved floor dates must match, as an error. Title and presentation drift is a warning, and the parent wins.
@@ -2083,4 +2107,4 @@ Decided in the planning session (no longer open):
 - background work is marked by hatching and crossing marks (§9.3);
 - waves are strictly sequential (§3.1).
 
-What the mockup tests should confirm is listed in [`README.md`](./README.md).
+What the mockup tests should confirm is listed in [`waves/README.md`](./waves/README.md).

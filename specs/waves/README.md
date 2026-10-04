@@ -1,6 +1,6 @@
-# Waves (proposal)
+# Waves (design sample)
 
-> **This is a proposal.** It is not prioritized, not scheduled and not implemented. Today's parser rejects the `wave` syntax shown here, and the diagram below is a design mockup, not renderer output.
+> **Accepted; implementation in progress as milestone m2o.** The diagram below is a design mockup, not renderer output. The spec is [`../waves.md`](../waves.md).
 
 A **wave** is a batch of work across every team that opens together. No work in the next wave starts until the last work in this one ends. Teams that finish early wait at the boundary; that idle time is the honest cost of keeping everyone in step. Work that should not wait (on-call, KTLO, ongoing support) simply has no wave and is drawn hatched.
 
@@ -60,6 +60,6 @@ Ask these before explaining anything:
 
 ## Files
 
-- [`waves.md`](./waves.md) is the spec: name and prior art, semantics, validation rules, includes, layout, rendering, exporters, and 21 worked examples, including the messy ones.
-- [`handoff.md`](./handoff.md) is a self-contained implementation plan for when this is prioritized: proposed milestones, a decision log, a codebase map, and a phased plan with tests.
-- [`samples/`](./samples/) holds the sample roadmap and the mockup. [`handoff.md`](./handoff.md) §4.8 explains how the mockup was made.
+- [`waves.md`](../waves.md) is the spec: name and prior art, semantics, validation rules, includes, layout, rendering, exporters, and 21 worked examples, including the messy ones.
+- [`handoff-m2o-waves.md`](../handoffs/handoff-m2o-waves.md) is the implementation plan for milestone m2o: the milestone text, a decision log, a codebase map, and a phased plan with tests.
+- [`samples/`](./samples/) holds the sample roadmap and the mockup. [`handoff-m2o-waves.md`](../handoffs/handoff-m2o-waves.md) §4.8 explains how the mockup was made.
