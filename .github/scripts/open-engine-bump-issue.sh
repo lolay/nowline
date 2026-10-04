@@ -181,9 +181,9 @@ The new floor is computed as the **min `vscode_version`** across every tracked f
 In [`packages/vscode-extension/package.json`](packages/vscode-extension/package.json):
 
 - `engines.vscode`: `{current_spec}` → `{target_spec}`
-- `devDependencies["@types/vscode"]`: must match the new `engines.vscode` (the two are intentionally locked together)
+- `devDependencies["@types/vscode"]`: `^X.Y.0` for the newest published `@types/vscode` at or below `{target_spec}` (usually `{target_spec}` itself, never higher; check `npm view @types/vscode versions`, since DefinitelyTyped skips some minors)
 
-After editing, refresh `pnpm-lock.yaml` so the change reflects in the lockfile.
+If `@types/vscode` changed, refresh `pnpm-lock.yaml` so the change reflects in the lockfile.
 
 Do **not** bump any other `engines.*` field, any other dependency, or files outside `packages/vscode-extension/` and `pnpm-lock.yaml`.
 

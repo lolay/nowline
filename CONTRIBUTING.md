@@ -81,7 +81,9 @@ Tightening any of these — e.g. moving the consumer floor from `>=22` to `>=24`
 
 ### VS Code extension engine floor policy
 
-The `engines.vscode` field in `packages/vscode-extension/package.json` and the `@types/vscode` devDependency **always equal each other** and **track the VS Code engine embedded in the latest stable Cursor release**, with a 30-day grace period so users have time to update before the extension requires the newer engine. The floor is expressed as `^MAJOR.MINOR.0` — patch is never floor-specific.
+The `engines.vscode` field in `packages/vscode-extension/package.json` **tracks the VS Code engine embedded in the latest stable Cursor release**, with a 30-day grace period so users have time to update before the extension requires the newer engine. The floor is expressed as `^MAJOR.MINOR.0` — patch is never floor-specific.
+
+The `@types/vscode` devDependency is set to the **newest published `@types/vscode` at or below `engines.vscode`** and never runs ahead of it, so the compiler rejects APIs the floor engine lacks. Usually that is the same `^MAJOR.MINOR.0`, but DefinitelyTyped does not publish every minor (nothing between 1.125.0 and 1.134.0, for example), so when the floor lands on a skipped minor the types stay on the nearest published one below it. With `engines.vscode` at `^1.128.0`, `@types/vscode` is `^1.125.0`.
 
 **What drives changes:**
 
@@ -106,9 +108,9 @@ Two workflows operate in tandem. No custom secrets or PATs are required; both ru
 
 **First-30-days caveat.** A freshly seeded history file whose only entry was observed within the last 30 days produces `floor=` (empty) on the first analyzer run — no issue is opened. The system becomes self-correcting once the seed entry ages past the grace window.
 
-**Manual bump.** Edit `engines.vscode` and `devDependencies["@types/vscode"]` in `packages/vscode-extension/package.json` to the same `^MAJOR.MINOR.0` specifier, run `pnpm install --no-frozen-lockfile` to refresh `pnpm-lock.yaml`, and open a PR.
+**Manual bump.** Edit `engines.vscode` in `packages/vscode-extension/package.json` to the new `^MAJOR.MINOR.0`. Set `devDependencies["@types/vscode"]` to `^X.Y.0`, where `X.Y.0` is the newest version `npm view @types/vscode versions` lists at or below the new floor (usually the floor itself). If that changed `@types/vscode`, run `pnpm install --no-frozen-lockfile` to refresh `pnpm-lock.yaml`. Then open a PR.
 
-**Why not let Renovate handle it:** `@types/vscode` bumps must stay in lock-step with `engines.vscode`. Renovate updates devDependencies independently of `engines.*`, so an unconstrained `@types/vscode` bump breaks `vsce package` (error: "types floor exceeds engines floor"). Pinning `@types/vscode` in Renovate and delegating to the purpose-built workflows is the only way to keep the two in sync automatically.
+**Why not let Renovate handle it:** `@types/vscode` must never run ahead of `engines.vscode`. Renovate updates devDependencies independently of `engines.*`, so an unconstrained `@types/vscode` bump breaks `vsce package` (error: "types floor exceeds engines floor"). Pinning `@types/vscode` in Renovate and delegating to the purpose-built workflows is the only way to keep the two in sync automatically.
 
 ## Getting the code
 

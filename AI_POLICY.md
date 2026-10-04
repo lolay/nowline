@@ -48,7 +48,7 @@ Nowline has a deliberately narrow scope (see [`specs/principles.md`](./specs/pri
 - **Assistance, not automation.** Use AI to draft, refactor, or accelerate; don't paste output without refinement. AI-plausible-but-wrong code is the most common failure mode we see.
 - **Match the existing style.** 4-space TypeScript, 2-space `.nowline`, no narration comments, no emojis in source / commits / user-facing output, named imports, `.js` import specifiers in TS. The style rules in [`CONTRIBUTING.md`](./CONTRIBUTING.md#code-style) are the canonical list.
 - **Discuss before drafting non-trivial changes.** Anything touching the grammar, AST shape, layout, renderer, or scope-of-the-product still needs an issue-first discussion — whether you write the code or an agent does. PRs that skip that step may be closed without review.
-- **Round-trips and snapshots are the regression gate.** If your change moves [`packages/cli/test/convert/roundtrip.test.ts`](./packages/cli/test/convert/roundtrip.test.ts) or [`packages/layout/test/__snapshots__/`](./packages/layout/test/__snapshots__/), say so explicitly and justify the new baseline.
+- **Round-trips and snapshots are the regression gate.** If your change moves [`packages/cli/test/convert/roundtrip.test.ts`](./packages/cli/test/convert/roundtrip.test.ts) or [`packages/integration-tests/test/__snapshots__/`](./packages/integration-tests/test/__snapshots__/), say so explicitly and justify the new baseline.
 
 ## What we will close fast
 
