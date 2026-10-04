@@ -28,7 +28,7 @@ import { displayLabel, getProp, getProps, hasProp, roadmapTitle } from '@nowline
 
 import { buildCalendarsBlock, STANDARD_RESOURCE_CALENDAR_UID } from './calendar.js';
 import { durationToMsProjMinutes, minutesToMsProjDuration } from './duration.js';
-import { escapeXml, tag } from './xml.js';
+import { escapeXml, singleLine, tag } from './xml.js';
 
 export interface MsProjOptions {
     /** Project name attribute. Defaults to roadmap title. */
@@ -348,7 +348,7 @@ function emitTask(t: TaskRow, idToUid: Map<string, number>, lines: string[]): vo
     lines.push('    <Task>');
     lines.push(`      ${tag('UID', t.uid)}`);
     lines.push(`      ${tag('ID', t.id)}`);
-    lines.push(`      ${tag('Name', t.name)}`);
+    lines.push(`      ${tag('Name', singleLine(t.name))}`);
     if (t.isSummary) lines.push(`      <Summary>1</Summary>`);
     if (t.isMilestone) {
         lines.push('      <Milestone>1</Milestone>');
@@ -415,7 +415,7 @@ function emitResource(r: ResourceRow, lines: string[]): void {
     lines.push('    <Resource>');
     lines.push(`      ${tag('UID', r.uid)}`);
     lines.push(`      ${tag('ID', r.id)}`);
-    lines.push(`      ${tag('Name', r.name)}`);
+    lines.push(`      ${tag('Name', singleLine(r.name))}`);
     lines.push(`      <CalendarUID>${STANDARD_RESOURCE_CALENDAR_UID}</CalendarUID>`);
     lines.push('    </Resource>');
 }

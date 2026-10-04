@@ -57,6 +57,7 @@ import {
 } from '../generated/ast.js';
 import type { MessageArgs, MessageCode } from '../i18n/index.js';
 import { tr } from '../i18n/index.js';
+import { singleLine } from '../util/single-line.js';
 import type { NowlineAstType, NowlineServices } from './nowline-module.js';
 
 const SUPPORTED_VERSION = 'v1';
@@ -413,8 +414,13 @@ function resolveLocalStart(file: NowlineFile | undefined): StartState {
     return { kind: 'valid', iso: raw, date: d };
 }
 
+/**
+ * The name a diagnostic echoes for an entity: its id, else its title. A
+ * title can carry explicit line breaks, but a diagnostic is one line of
+ * text, so breaks collapse to a single space (`singleLine`).
+ */
 function displayName(node: { name?: string; title?: string }): string {
-    return node.name ?? node.title ?? '<unnamed>';
+    return node.name ?? (node.title === undefined ? '<unnamed>' : singleLine(node.title));
 }
 
 /**
@@ -2029,7 +2035,7 @@ function locationOf(node: AstNode): string {
 
 function describeNode(node: { $type: string; name?: string; title?: string }): string {
     const kind = node.$type.replace(/Declaration$|Block$/, '').toLowerCase();
-    const label = node.name ?? node.title;
+    const label = node.name ?? (node.title === undefined ? undefined : singleLine(node.title));
     return label ? `${kind} "${label}"` : kind;
 }
 

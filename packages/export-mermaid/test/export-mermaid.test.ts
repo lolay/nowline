@@ -174,4 +174,21 @@ swimlane lane "Lane"
         const headPart = taskLine!.split(':', 1)[0];
         expect(headPart).not.toContain(',');
     });
+
+    it('collapses an explicit line break in a task name to a space (line-oriented format)', async () => {
+        const fixture = `nowline v1
+
+roadmap r "R"
+
+swimlane lane "Lane"
+  item tech "Technology\\nSelection" duration:2w
+`;
+        const inputs = await buildExportInputs(fixture);
+        const md = exportMermaid(inputs);
+        const taskLine = md.split('\n').find((l) => l.includes('Technology'));
+        expect(taskLine).toBeDefined();
+        expect(taskLine).toContain('Technology Selection');
+        // A raw newline would split the gantt task over two lines.
+        expect(md).not.toMatch(/^\s*Selection/m);
+    });
 });

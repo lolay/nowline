@@ -86,6 +86,20 @@ export const SAMPLES: SampleSpec[] = [
     { name: 'capacity-items', sourceFile: 'capacity-items.nowline', dir: 'tests', theme: 'light' },
     // m7: lane-level `capacity:N` badges across the same icon matrix.
     { name: 'capacity-lanes', sourceFile: 'capacity-lanes.nowline', dir: 'tests', theme: 'light' },
+    // lolay/nowline#59: titles word-wrap to two lines inside the bar before spilling right.
+    {
+        name: 'text-wraps-inside-bars',
+        sourceFile: 'text-wraps-inside-bars.nowline',
+        dir: 'tests',
+        theme: 'light',
+    },
+    // lolay/nowline#60: an explicit `\n` in an item title is a hard line break.
+    {
+        name: 'title-line-breaks',
+        sourceFile: 'title-line-breaks.nowline',
+        dir: 'tests',
+        theme: 'light',
+    },
     { name: 'capacity', sourceFile: 'capacity.nowline', theme: 'light' },
     { name: 'sizing', sourceFile: 'sizing.nowline', theme: 'light' },
     // m2m localization: French sample exercises the now-pill, axis labels,

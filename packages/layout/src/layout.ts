@@ -42,6 +42,7 @@ import {
 import { localeStrings } from './i18n.js';
 import { computeItemInlineDatePins, pickInlineDate } from './inline-date-pin-geometry.js';
 import {
+    computeTitleBarExtra,
     ITEM_CAPTION_INSET_X_PX,
     ITEM_CAPTION_META_BASELINE_OFFSET_PX,
     ITEM_CAPTION_SPILL_GAP_PX,
@@ -50,6 +51,9 @@ import {
     ITEM_FOOTNOTE_INDICATOR_STEP_PX,
     ITEM_LINK_ICON_TILE_SIZE_PX,
     ITEM_STATUS_DOT_RADIUS_PX,
+    itemCaptionInsetX,
+    itemCaptionLastBaselineOffset,
+    itemTitleFirstLineRightReservePx,
     LABEL_CHIP_GAP_ABOVE_PROGRESS_STRIP_PX,
     LABEL_CHIP_GAP_BETWEEN_PX,
     LABEL_CHIP_HEIGHT_PX,
@@ -61,11 +65,17 @@ import {
 } from './item-bar-geometry.js';
 import { type LayoutContext, newCursor, type TrackCursor } from './layout-context.js';
 import { GroupNode } from './nodes/group-node.js';
-import { ItemNode } from './nodes/item-node.js';
+import {
+    estimateItemMetaWidth,
+    fitItemCaption,
+    ItemNode,
+    resolveCaptionTitleLines,
+} from './nodes/item-node.js';
 import { ParallelNode } from './nodes/parallel-node.js';
 import { RoadmapNode } from './nodes/roadmap-node.js';
 import { SwimlaneNode } from './nodes/swimlane-node.js';
 import { resolveLabelChipStyle, resolveStyle, type StyleContext } from './style-resolution.js';
+import { estimateTextWidth, wrapText } from './text-measure.js';
 import type { ThemeName } from './themes/index.js';
 import {
     GUTTER_PX,
@@ -94,6 +104,7 @@ import type {
     PositionedRoadmap,
     PositionedSwimlane,
     PositionedTrackChild,
+    ResolvedSize,
     StatusKind,
 } from './types.js';
 import type { ViewPreset } from './view-preset.js';
@@ -201,6 +212,163 @@ function buildLabelChip(
     };
 }
 
+/**
+ * Status kind and 0..1 progress fraction for an item. A pure function of
+ * the item's properties and the layout context, so `sequenceItem` and the
+ * row-height predictor derive the same meta line from it.
+ */
+function resolveItemProgress(
+    props: EntityProperty[],
+    ctx: LayoutContext,
+): { status: StatusKind; progress: number } {
+    // Total work in single-engineer days, used below to normalize a literal
+    // `remaining:` value into a progress fraction. Stays per-engineer
+    // regardless of the item's `capacity:` so a `remaining:1w` always means
+    // "one engineer-week of work left".
+    const totalEffortDays = deriveTotalEffortDays(props, ctx.sizes, ctx.cal);
+    const remainingDays = resolveDuration(propValue(props, 'remaining'), ctx.sizes, ctx.cal);
+    const statusRaw = propValue(props, 'status');
+    const status = statusFromProp(statusRaw);
+    let progress = parseProgressFraction(statusRaw);
+    if (progress === 0 && status === 'done') progress = 1;
+    const remainingPctMatch = /^(\d{1,3})%$/.exec(propValue(props, 'remaining') ?? '');
+    if (progress === 0 && status === 'in-progress' && remainingPctMatch) {
+        const pct = Math.max(0, Math.min(100, parseInt(remainingPctMatch[1], 10))) / 100;
+        progress = 1 - pct;
+    }
+    if (progress === 0 && status === 'in-progress' && remainingDays > 0 && totalEffortDays > 0) {
+        // `remaining:` literal is single-engineer days; `totalEffortDays`
+        // is also single-engineer days, so the ratio is unit-correct.
+        // Clamp to [0, 1] — the renderer paints 100% remaining when the
+        // author overshot, matching the spec's "warn-and-clamp" overflow
+        // behavior. (Validation defers the warn to layout-time today; a
+        // future diagnostics channel can surface it back to the user.)
+        progress = Math.max(0, Math.min(1, 1 - remainingDays / totalEffortDays));
+    }
+    return { status, progress };
+}
+
+interface ResolvedItemMeta {
+    /** Secondary line text under the title, or undefined when none. */
+    metaText: string | undefined;
+    ownerDisplay: string | undefined;
+    capacity: PositionedCapacity | null;
+    /** Estimated px width of the capacity suffix (incl. its separator). */
+    capacityTrailingWidth: number;
+}
+
+/**
+ * Assemble an item's meta line and capacity suffix. Shared by
+ * `sequenceItem` (which paints from it) and `predictItemBarExtraHeight`
+ * (which needs the real meta width to know whether a title wraps or
+ * spills), so the two can never disagree.
+ */
+function resolveItemMeta(
+    props: EntityProperty[],
+    ctx: LayoutContext,
+    ownerOverride: string | undefined,
+    sizeResolved: ResolvedSize | null,
+    status: StatusKind,
+    progress: number,
+    capacityIconName: string,
+): ResolvedItemMeta {
+    // Driver-only meta line (`rendering.md` § Item size chip): exactly one
+    // leading token — the explicit non-empty `duration:LITERAL` when set,
+    // otherwise the size chip when `size:` drives. Never both; bar width
+    // already encodes derived calendar span for sized items.
+    const explicitDurationLiteral = propValue(props, 'duration');
+    const durationDrives =
+        !!explicitDurationLiteral && /^\d+(?:\.\d+)?[dwmqy]$/.test(explicitDurationLiteral);
+    const sizeChipText = sizeResolved ? (sizeResolved.title ?? sizeResolved.name) : '';
+    const driverToken: string | undefined = durationDrives
+        ? explicitDurationLiteral
+        : sizeChipText || undefined;
+    const remainingRaw = propValue(props, 'remaining');
+    const remainingLiteral = resolveDurationLiteral(remainingRaw, ctx);
+    const ownerDisplay = resolveActorDisplay(ownerOverride ?? propValue(props, 'owner'), ctx);
+    const metaHead = (): string => [driverToken, ownerDisplay].filter(Boolean).join(' ');
+    let metaText: string | undefined;
+    if (status === 'in-progress' && remainingLiteral) {
+        const head = metaHead();
+        metaText = head
+            ? `${head} — ${remainingLiteral} remaining`
+            : `${remainingLiteral} remaining`;
+    } else if (status === 'in-progress' && progress > 0 && progress < 1) {
+        const pct = Math.round((1 - progress) * 100);
+        const head = metaHead();
+        metaText = head ? `${head} — ${pct}% remaining` : `${pct}% remaining`;
+    } else if (ownerDisplay || driverToken) {
+        metaText = metaHead() || undefined;
+    }
+
+    // Capacity suffix — appended after metaText at render time. Layout's
+    // job here is to (a) parse the value out of `capacity:`, (b) format
+    // the display number, (c) resolve `capacity-icon` to either a
+    // built-in name or a literal string the renderer can paint directly,
+    // and (d) feed the suffix's estimated width into ItemNode so spill
+    // detection accounts for `2w 5×` rather than just `2w`. The suffix
+    // disappears entirely when capacity is missing or non-positive.
+    const capacityRaw = propValue(props, 'capacity');
+    const capacityValue = parseCapacityValue(capacityRaw);
+    let capacity: PositionedCapacity | null = null;
+    let capacityTrailingWidth = 0;
+    if (capacityValue !== null) {
+        const capacityText = formatCapacityNumber(capacityValue);
+        const capacityIcon = resolveCapacityIcon(capacityIconName, ctx.symbols);
+        capacity = { value: capacityValue, text: capacityText, icon: capacityIcon };
+        const META_FONT_SIZE_PX_LOCAL = 11;
+        // Add a small leading separator (a single space's worth) only when
+        // the suffix sits next to existing meta text, so `m 5×` has air
+        // between the driver token and the count. Standalone suffix needs no
+        // leading separator.
+        const separatorWidth = metaText ? estimateTextWidth(' ', META_FONT_SIZE_PX_LOCAL) : 0;
+        capacityTrailingWidth =
+            separatorWidth +
+            estimateCapacitySuffixWidth(capacityText, capacityIcon, META_FONT_SIZE_PX_LOCAL);
+    }
+    return { metaText, ownerDisplay, capacity, capacityTrailingWidth };
+}
+
+/**
+ * Footnote numbers attached to an item, ascending. Per `specs/dsl.md`,
+ * footnotes attach via the `on:` property on the footnote declaration
+ * only — there is no forward `footnote:` property on the host entity.
+ * Walk `footnoteHosts` (built from each footnote's `on:` list) and
+ * collect every footnote that names this item. Shared by
+ * `sequenceItem` (which paints the indicators) and the row-height
+ * predictor, since both need the footnotes BEFORE the caption is fit.
+ */
+function collectItemFootnoteIndicators(name: string | undefined, ctx: LayoutContext): number[] {
+    const set = new Set<number>();
+    if (name) {
+        for (const [fid, hosts] of ctx.footnoteHosts.entries()) {
+            if (hosts.includes(name)) {
+                const n = ctx.footnoteIndex.get(fid);
+                if (n !== undefined) set.add(n);
+            }
+        }
+    }
+    return [...set].sort((a, b) => a - b);
+}
+
+/**
+ * How far the title's first line must stay from the bar's right edge so
+ * it clears the top-right decoration cluster. `sequenceItem` and the
+ * row-height predictor both call this, so a predicted wrap and a placed
+ * wrap use the same budget.
+ */
+function resolveTitleFirstLineReserve(
+    barWidth: number,
+    footnoteIndicators: readonly number[],
+    beforeRaw: readonly string[],
+): number {
+    return itemTitleFirstLineRightReservePx({
+        barWidth,
+        footnoteLabels: footnoteIndicators.map(String),
+        hasBeforeGlyph: pickInlineDate(beforeRaw) !== undefined,
+    });
+}
+
 // Sequence a set of nodes into a single horizontal track. `parallelInside`
 // indicates the caller is inside a ParallelBlock and each child occupies a
 // fresh sub-track (caller passes a new cursor per call).
@@ -221,15 +389,9 @@ function sequenceItem(
     const sizeRef = propValue(props, 'size');
     const sizeResolved = sizeRef ? (ctx.sizes.get(sizeRef) ?? null) : null;
     const durationDays = deriveItemDurationDays(props, ctx.sizes, ctx.cal);
-    // Total work in single-engineer days, used below to normalize a literal
-    // `remaining:` value into a progress fraction. Stays per-engineer
-    // regardless of the item's `capacity:` so a `remaining:1w` always means
-    // "one engineer-week of work left".
-    const totalEffortDays = deriveTotalEffortDays(props, ctx.sizes, ctx.cal);
     const afterRaw = propValues(props, 'after');
     const beforeRaw = propValues(props, 'before');
     const dateRaw = propValue(props, 'date');
-    const remainingDays = resolveDuration(propValue(props, 'remaining'), ctx.sizes, ctx.cal);
 
     // Resolve start x: explicit date > after-chain > cursor position.
     // `after:` accepts both entity ids (looked up in entityRightEdges) and
@@ -332,24 +494,7 @@ function sequenceItem(
     }
 
     // Progress fraction
-    const statusRaw = propValue(props, 'status');
-    const status = statusFromProp(statusRaw);
-    let progress = parseProgressFraction(statusRaw);
-    if (progress === 0 && status === 'done') progress = 1;
-    const remainingPctMatch = /^(\d{1,3})%$/.exec(propValue(props, 'remaining') ?? '');
-    if (progress === 0 && status === 'in-progress' && remainingPctMatch) {
-        const pct = Math.max(0, Math.min(100, parseInt(remainingPctMatch[1], 10))) / 100;
-        progress = 1 - pct;
-    }
-    if (progress === 0 && status === 'in-progress' && remainingDays > 0 && totalEffortDays > 0) {
-        // `remaining:` literal is single-engineer days; `totalEffortDays`
-        // is also single-engineer days, so the ratio is unit-correct.
-        // Clamp to [0, 1] — the renderer paints 100% remaining when the
-        // author overshot, matching the spec's "warn-and-clamp" overflow
-        // behavior. (Validation defers the warn to layout-time today; a
-        // future diagnostics channel can surface it back to the user.)
-        progress = Math.max(0, Math.min(1, 1 - remainingDays / totalEffortDays));
-    }
+    const { status, progress } = resolveItemProgress(props, ctx);
 
     // Apply the status-tinted item background when the resolved bg is still
     // theme-default. Authors who set explicit `bg:` keep their override.
@@ -403,68 +548,27 @@ function sequenceItem(
         style.fg = STATUS_BORDER[status];
     }
 
-    // Pre-format the secondary line shown inside the item bar.
-    //
-    // Driver-only meta line (`rendering.md` § Item size chip): exactly one
-    // leading token — the explicit non-empty `duration:LITERAL` when set,
-    // otherwise the size chip when `size:` drives. Never both; bar width
-    // already encodes derived calendar span for sized items.
-    const explicitDurationLiteral = propValue(props, 'duration');
-    const durationDrives =
-        !!explicitDurationLiteral && /^\d+(?:\.\d+)?[dwmqy]$/.test(explicitDurationLiteral);
-    const sizeChipText = sizeResolved ? (sizeResolved.title ?? sizeResolved.name) : '';
-    const driverToken: string | undefined = durationDrives
-        ? explicitDurationLiteral
-        : sizeChipText || undefined;
-    const remainingRaw = propValue(props, 'remaining');
-    const remainingLiteral = resolveDurationLiteral(remainingRaw, ctx);
-    const ownerDisplay = resolveActorDisplay(ownerOverride ?? propValue(props, 'owner'), ctx);
-    const metaHead = (): string => [driverToken, ownerDisplay].filter(Boolean).join(' ');
-    let metaText: string | undefined;
-    if (status === 'in-progress' && remainingLiteral) {
-        const head = metaHead();
-        metaText = head
-            ? `${head} — ${remainingLiteral} remaining`
-            : `${remainingLiteral} remaining`;
-    } else if (status === 'in-progress' && progress > 0 && progress < 1) {
-        const pct = Math.round((1 - progress) * 100);
-        const head = metaHead();
-        metaText = head ? `${head} — ${pct}% remaining` : `${pct}% remaining`;
-    } else if (ownerDisplay || driverToken) {
-        metaText = metaHead() || undefined;
-    }
-
-    // Capacity suffix — appended after metaText at render time. Layout's
-    // job here is to (a) parse the value out of `capacity:`, (b) format
-    // the display number, (c) resolve `capacity-icon` to either a
-    // built-in name or a literal string the renderer can paint directly,
-    // and (d) feed the suffix's estimated width into ItemNode so spill
-    // detection accounts for `2w 5×` rather than just `2w`. The suffix
-    // disappears entirely when capacity is missing or non-positive.
-    const capacityRaw = propValue(props, 'capacity');
-    const capacityValue = parseCapacityValue(capacityRaw);
-    let capacity: PositionedCapacity | null = null;
-    let capacityTrailingWidth = 0;
-    if (capacityValue !== null) {
-        const capacityText = formatCapacityNumber(capacityValue);
-        const capacityIcon = resolveCapacityIcon(style.capacityIcon, ctx.symbols);
-        capacity = { value: capacityValue, text: capacityText, icon: capacityIcon };
-        const META_FONT_SIZE_PX_LOCAL = 11;
-        // Add a small leading separator (a single space's worth) only when
-        // the suffix sits next to existing meta text, so `m 5×` has air
-        // between the driver token and the count. Standalone suffix needs no
-        // leading separator.
-        const separatorWidth = metaText ? estimateTextWidth(' ', META_FONT_SIZE_PX_LOCAL) : 0;
-        capacityTrailingWidth =
-            separatorWidth +
-            estimateCapacitySuffixWidth(capacityText, capacityIcon, META_FONT_SIZE_PX_LOCAL);
-    }
+    // Pre-format the secondary line shown inside the item bar, plus the
+    // capacity suffix that renders after it.
+    const { metaText, ownerDisplay, capacity, capacityTrailingWidth } = resolveItemMeta(
+        props,
+        ctx,
+        ownerOverride,
+        sizeResolved,
+        status,
+        progress,
+        style.capacityIcon,
+    );
 
     // Visual bar + caption-spill decision delegated to ItemNode. Logical
     // extent (used by chaining and `after:` lookups) stays on
     // logicalLeft/logicalRight; ItemNode computes the inset visual box and
     // whether the title+meta line overflows the bar's inner padded width.
     const titleStr = node.title ?? node.name ?? '';
+    // Footnote indicators and the `before:` glyph share the bar's
+    // upper-right with the title's first line, so resolve them BEFORE the
+    // caption is fit: the first line stops short of that cluster.
+    const footnoteIndicators = collectItemFootnoteIndicators(node.name, ctx);
     const placed = new ItemNode({
         id: node.name ?? '',
         title: titleStr,
@@ -473,6 +577,12 @@ function sequenceItem(
         metaText,
         metaTrailingWidth: capacityTrailingWidth,
         hasLinkIcon,
+        hasAfterGlyph: pickInlineDate(afterRaw) !== undefined,
+        titleFirstLineRightReservePx: resolveTitleFirstLineReserve(
+            visualWidthPredict,
+            footnoteIndicators,
+            beforeRaw,
+        ),
     }).place({ x: logicalLeft, y: cursor.y }, { time: ctx.scale, bands: ctx.bandScale, style });
     const itemBox = placed.box;
     const bandwidth = ctx.bandScale.bandwidth();
@@ -494,6 +604,13 @@ function sequenceItem(
     const iconSpills = hasLinkIcon && itemBox.width < MIN_BAR_WIDTH_FOR_LINK_AND_DOT_PX;
     const footnoteSpillsForNarrow = itemBox.width < MIN_BAR_WIDTH_FOR_FOOTNOTE_PX;
     const textSpills = placed.textSpills || iconSpills;
+    // The lines the title paints on. A title that word-wrapped INSIDE the
+    // bar paints on two lines; if a narrow-bar icon spill forces the caption
+    // out anyway, that wrap is dropped (a spilled break-free title is a
+    // single line to the right). A title with explicit `\n` breaks keeps the
+    // author's lines whether it stays in-bar or spills.
+    const captionLines = resolveCaptionTitleLines(titleStr, placed, iconSpills);
+    const titleLineCount = captionLines.length;
 
     // Label chips lay out left → right at natural text width.
     //
@@ -508,10 +625,12 @@ function sequenceItem(
     // single-row would have used; subsequent rows stack DOWNWARD by
     // one `LABEL_CHIP_ROW_STEP_PX`.
     //
-    // When chips spill, the BAR ITSELF GROWS DOWNWARD so the chip
-    // column reads as enclosed by the bar — the painted footprint
-    // of the bar is `bandwidth + chipBarExtra` and the bottom
-    // progress strip moves with the new bottom edge. Chip Y is
+    // When chips spill OR the title wrapped over a meta line, the BAR
+    // ITSELF GROWS DOWNWARD so the chip column (or the second title
+    // line plus meta) reads as enclosed by the bar — the painted
+    // footprint of the bar is `bandwidth + barExtra` (the larger of
+    // `titleBarExtra` and `chipBarExtra`) and the bottom progress
+    // strip moves with the new bottom edge. Chip Y is
     // anchored to the ORIGINAL bandwidth (relative to the bar's
     // top), not to the grown box.height, so row 0 stays where a
     // single-row chip would naturally render and rows 1..N grow
@@ -530,15 +649,21 @@ function sequenceItem(
     // line as present whenever EITHER metaText OR a capacity suffix will
     // paint, so chip-row pitch reserves the right amount of vertical space.
     const hasMeta = metaText !== undefined || capacity !== null;
+    // Baseline (px from the bar's top) of the caption's last line: the
+    // meta line when present, else the last title line. Chips stacked
+    // inside the bar must clear it.
+    const captionLastBaseline = itemCaptionLastBaselineOffset(titleLineCount, hasMeta);
+    const titleBarExtra = computeTitleBarExtra(titleLineCount, hasMeta);
     const chipBarExtra = computeChipBarExtra(
         chipsOutside,
         textSpills,
         chipRowCount,
         bandwidth,
-        hasMeta,
+        captionLastBaseline,
     );
-    if (chipBarExtra > 0) {
-        itemBox.height = bandwidth + chipBarExtra;
+    const barExtra = Math.max(titleBarExtra, chipBarExtra);
+    if (barExtra > 0) {
+        itemBox.height = bandwidth + barExtra;
     }
 
     const labelChips: PositionedLabelChip[] = [];
@@ -548,18 +673,29 @@ function sequenceItem(
         PROGRESS_STRIP_HEIGHT_PX -
         LABEL_CHIP_HEIGHT_PX -
         LABEL_CHIP_GAP_ABOVE_PROGRESS_STRIP_PX;
+    // Chips under a SPILLED caption clear the classic meta baseline (38),
+    // or the caption's own last baseline when explicit breaks make the
+    // spilled block taller than that; an in-bar caption is cleared at its
+    // own last baseline (which a wrapped title pushes down).
     const captionStackChipY =
-        itemBox.y + ITEM_CAPTION_META_BASELINE_OFFSET_PX + LABEL_CHIP_GAP_ABOVE_PROGRESS_STRIP_PX;
-    // Inside-bar chips with meta need to clear the meta baseline —
+        itemBox.y +
+        (chipsOutside && textSpills
+            ? Math.max(ITEM_CAPTION_META_BASELINE_OFFSET_PX, captionLastBaseline)
+            : captionLastBaseline) +
+        LABEL_CHIP_GAP_ABOVE_PROGRESS_STRIP_PX;
+    // Inside-bar chips need to clear the caption's last baseline —
     // the natural `baseChipY` (anchored to bar bottom) sits above
-    // the meta line at typical bandwidths, so the chip rect would
-    // overlap the meta text vertically. Use whichever Y is lower.
+    // the meta line at typical bandwidths, and above line 2 of a
+    // wrapped title, so the chip rect would overlap the text
+    // vertically. Use whichever Y is lower. With no meta and a
+    // single-line title the caption bottom is above `baseChipY`, so
+    // this resolves to `baseChipY` as before.
     // Outside-bar chips already reuse `captionStackChipY` when the
     // caption ALSO spills; with caption inside we don't need to
     // shift them since they're horizontally separated from the meta.
-    const stackBelowMeta =
-        (chipsOutside && textSpills) || (!chipsOutside && hasMeta && chipSamples.length > 0);
-    const chipRow0Y = stackBelowMeta ? Math.max(baseChipY, captionStackChipY) : baseChipY;
+    const stackBelowCaption =
+        (chipsOutside && textSpills) || (!chipsOutside && chipSamples.length > 0);
+    const chipRow0Y = stackBelowCaption ? Math.max(baseChipY, captionStackChipY) : baseChipY;
     const chipStartX = chipsOutside
         ? itemBox.x + itemBox.width + ITEM_CAPTION_SPILL_GAP_PX
         : itemBox.x + ITEM_CAPTION_INSET_X_PX;
@@ -587,21 +723,8 @@ function sequenceItem(
         chipsRightX = chipSamples.length > 0 ? rowCursorX - LABEL_CHIP_GAP_BETWEEN_PX : chipStartX;
     }
 
-    // Footnote superscript indicators. Per `specs/dsl.md`, footnotes
-    // attach via the `on:` property on the footnote declaration only —
-    // there is no forward `footnote:` property on the host entity. Walk
-    // `footnoteHosts` (built from each footnote's `on:` list) and emit
-    // a superscript for every footnote that names this item.
-    const footnoteIndicatorSet = new Set<number>();
-    if (node.name) {
-        for (const [fid, hosts] of ctx.footnoteHosts.entries()) {
-            if (hosts.includes(node.name)) {
-                const n = ctx.footnoteIndex.get(fid);
-                if (n !== undefined) footnoteIndicatorSet.add(n);
-            }
-        }
-    }
-    const footnoteIndicators = [...footnoteIndicatorSet].sort((a, b) => a - b);
+    // `footnoteIndicators` (one superscript per footnote that names this
+    // item) was resolved above, before the caption fit.
 
     const owner = ownerDisplay ?? ownerOverride ?? propValue(props, 'owner');
     const description = node.description?.text;
@@ -647,7 +770,11 @@ function sequenceItem(
     let captionSpillWidth = 0;
     if (textSpills) {
         if (needGap) spillCursor += ITEM_DECORATION_SPILL_GAP_PX;
-        const titleW = estimateTextWidth(titleStr, ITEM_CAPTION_TITLE_FONT_SIZE_PX);
+        // The widest title LINE: a multi-line spill is as wide as its
+        // longest line, not as the raw string (newlines included).
+        const titleW = Math.max(
+            ...captionLines.map((line) => estimateTextWidth(line, ITEM_CAPTION_TITLE_FONT_SIZE_PX)),
+        );
         // Spill column width is the wider of the title and the *full* meta
         // line (text + capacity suffix). `capacityTrailingWidth` is 0 when
         // no capacity suffix is rendered, so this stays a no-op for items
@@ -690,9 +817,19 @@ function sequenceItem(
     // dependency-arrow target geometry and join flow-key dedup without
     // entering the human-referenceable namespace above.
     const drawKey = id ?? syntheticItemKey(node);
+    // Dependency-arrow attach line: the NOMINAL row midline, `bandwidth / 2`
+    // below the bar top, not the bar's own mid-height. A bar that grew to
+    // enclose a wrapped title or a chip column is taller than its row's
+    // other bars, so its true mid-height sits lower; attaching there would
+    // bend every arrow between a grown bar and a same-row neighbour into a
+    // jog. On a bar that did not grow the two are equal (56px: 28 either
+    // way), so ordinary output is unchanged. Only bars whose caption stays in
+    // the bar are re-aimed: a spilled caption keeps the bar's own mid-height as
+    // the target line and the progress-strip attach as the source (below).
+    const attachMidY = itemBox.y + bandwidth / 2;
     ctx.entityMidpoints.set(drawKey, {
         x: (logicalLeft + logicalRight) / 2,
-        y: itemBox.y + itemBox.height / 2,
+        y: textSpills ? itemBox.y + itemBox.height / 2 : attachMidY,
     });
     // Visual edges — where dependency arrows actually attach. These sit
     // ITEM_INSET_PX inside the column boundaries so the arrows emerge from
@@ -714,7 +851,7 @@ function sequenceItem(
           }
         : {
               x: itemBox.x + itemBox.width,
-              y: itemBox.y + itemBox.height / 2,
+              y: attachMidY,
           };
     ctx.itemArrowSource.set(drawKey, arrowSource);
     ctx.itemFlowKey.set(drawKey, ctx.currentFlowKey);
@@ -734,10 +871,10 @@ function sequenceItem(
     // The next row in a parallel/group/lane starts at
     // `cursor.y + cursor.height`. Default pitch is `bandScale.step()`
     // (bandwidth + inter-row gap). When the bar grew to enclose a
-    // spilled chip column, the pitch grows by the SAME amount so the
-    // inter-row gap stays constant — the next row's bar starts
-    // `step − bandwidth` px below the (now-taller) bar bottom.
-    cursor.height = Math.max(cursor.height, ctx.bandScale.step() + chipBarExtra);
+    // spilled chip column or a wrapped title, the pitch grows by the
+    // SAME amount so the inter-row gap stays constant — the next row's
+    // bar starts `step − bandwidth` px below the (now-taller) bar bottom.
+    cursor.height = Math.max(cursor.height, ctx.bandScale.step() + barExtra);
 
     const inlineDatePins = computeItemInlineDatePins({
         box: itemBox,
@@ -751,6 +888,12 @@ function sequenceItem(
         kind: 'item',
         id,
         title: titleStr,
+        // Only present when the painted lines differ from `[title]`: an
+        // auto-wrap, explicit breaks, or a stray leading/trailing break
+        // that was trimmed away. A plain one-line title carries no key.
+        ...(captionLines.length >= 2 || captionLines[0] !== titleStr
+            ? { titleLines: captionLines }
+            : {}),
         box: itemBox,
         status,
         progressFraction: progress,
@@ -797,7 +940,7 @@ function sequenceGroup(node: GroupBlock, cursor: TrackCursor, ctx: LayoutContext
         resolveChildStart,
         newCursor,
         estimateTextWidth,
-        predictItemChipExtraHeight,
+        predictItemBarExtraHeight,
     }).place(cursor, ctx);
 }
 
@@ -812,13 +955,6 @@ function sequenceOne(
     throw new Error(
         `Unknown swimlane child type: ${(node as { $type?: string }).$type ?? 'unknown'}`,
     );
-}
-
-// Rough px-width estimate for sans-serif text. Intentionally pessimistic
-// (uses ~0.58 em per char) so we err toward "doesn't fit" and trigger a
-// row bump rather than draw an item with a clipped title.
-function estimateTextWidth(text: string, fontSize: number): number {
-    return text.length * fontSize * 0.58;
 }
 
 /**
@@ -838,40 +974,52 @@ function syntheticItemKey(node: ItemDeclaration): string {
 }
 
 /**
- * Compute the extra vertical px the bar grows when its spilled chip
- * column would otherwise extend below the (single-row) bottom. The
- * bar's painted footprint becomes `bandwidth + chipBarExtra`, the
- * progress strip rides the new bottom, and chip rows pack inside
- * the taller bar (anchored from the bar TOP so row 0 doesn't shift
- * when the bar grows).
+ * Compute the extra vertical px the bar grows to fit its label chips
+ * (a spilled chip column, or inside-bar chips stacked below a caption
+ * that reaches past the default chip row). The bar's painted footprint
+ * becomes `bandwidth + chipBarExtra`, the progress strip rides the new
+ * bottom, and chip rows pack inside the taller bar (anchored from the
+ * bar TOP so row 0 doesn't shift when the bar grows).
  *
  * Returns 0 when chips fit inside the bar, when there are no chips,
  * or when the spilled column happens to fit inside `bandwidth` (a
  * single row with the caption inside, for instance).
  *
- * The same number is the row-pitch increase the swimlane / group
+ * `captionLastBaseline` is the in-bar caption's last text baseline
+ * (px from the bar's top): the meta baseline when the item has a meta
+ * line, otherwise the last title line's baseline. A wrapped title
+ * pushes it down; see `itemCaptionLastBaselineOffset`.
+ *
+ * The bar's final growth is `max(titleBarExtra, chipBarExtra)`; the
+ * same number is the row-pitch increase the swimlane / group
  * row-packer needs to reserve so the next row clears the taller
- * bar — `cursor.height = step + chipBarExtra` and the predict
- * helper returns this verbatim.
+ * bar — `cursor.height = step + barExtra`, and the predict helper
+ * returns it.
  */
 function computeChipBarExtra(
     chipsOutside: boolean,
     captionSpills: boolean,
     chipRowCount: number,
     bandwidth: number,
-    hasMeta: boolean,
+    captionLastBaseline: number,
 ): number {
     if (chipRowCount === 0) return 0;
     // Row 0 anchor relative to the bar's TOP — three regimes:
     //
     //   1. chipsOutside + captionSpills → chips stack below the
-    //      spilled meta line (`captionStackTop`).
-    //   2. chips INSIDE the bar AND meta is present → chip top must
-    //      clear the meta baseline; the natural `baseTop` sits
-    //      ABOVE the meta line at default bandwidth (=56), so we
-    //      take whichever is lower of base/captionStack.
-    //   3. otherwise (in-bar w/o meta, or chipsOutside w/o caption
-    //      spill) → row 0 hugs the bar bottom at `baseTop`.
+    //      spilled meta line. A break-free spilled caption is the
+    //      single-line title + meta stack, so this clears the classic
+    //      meta baseline; a spilled block with explicit breaks is
+    //      taller, so it clears its own last baseline instead.
+    //   2. chips INSIDE the bar → chip top must clear the caption's
+    //      last baseline (meta line, else the last title line); the
+    //      natural `baseTop` sits ABOVE the meta line at default
+    //      bandwidth (=56) and above line 2 of a wrapped title, so we
+    //      take whichever is lower of base/captionStack. For a
+    //      single-line title with no meta the caption bottom is above
+    //      `baseTop`, so this is `baseTop`.
+    //   3. otherwise (chipsOutside w/o caption spill) → row 0 hugs
+    //      the bar bottom at `baseTop`.
     //
     // Cases (2) and (3-with-multi-row-spill) can both grow the bar;
     // case (3-with-single-row-inside-no-meta) never grows.
@@ -880,13 +1028,16 @@ function computeChipBarExtra(
         PROGRESS_STRIP_HEIGHT_PX -
         LABEL_CHIP_HEIGHT_PX -
         LABEL_CHIP_GAP_ABOVE_PROGRESS_STRIP_PX;
-    const captionStackTop =
-        ITEM_CAPTION_META_BASELINE_OFFSET_PX + LABEL_CHIP_GAP_ABOVE_PROGRESS_STRIP_PX;
     let chipRow0Top: number;
     if (chipsOutside && captionSpills) {
-        chipRow0Top = captionStackTop;
-    } else if (!chipsOutside && hasMeta) {
-        chipRow0Top = Math.max(baseTop, captionStackTop);
+        chipRow0Top =
+            Math.max(ITEM_CAPTION_META_BASELINE_OFFSET_PX, captionLastBaseline) +
+            LABEL_CHIP_GAP_ABOVE_PROGRESS_STRIP_PX;
+    } else if (!chipsOutside) {
+        chipRow0Top = Math.max(
+            baseTop,
+            captionLastBaseline + LABEL_CHIP_GAP_ABOVE_PROGRESS_STRIP_PX,
+        );
     } else {
         chipRow0Top = baseTop;
     }
@@ -900,21 +1051,81 @@ function computeChipBarExtra(
 }
 
 /**
- * Predict an item's bar growth (and therefore row-pitch growth) for
- * a multi-row spilled chip column BEFORE the bar is sequenced. Used
- * by the swimlane / group row-packer so neighboring rows on later
- * rows are positioned correctly without a retroactive shift.
+ * Predict an item's bar growth (and therefore row-pitch growth) BEFORE
+ * the bar is sequenced: the larger of the growth a wrapped title needs
+ * and the growth a multi-row spilled chip column needs. Used by the
+ * swimlane / group row-packer so neighboring rows on later rows are
+ * positioned correctly without a retroactive shift.
  *
- * Mirrors the chip-pack + caption-spill arithmetic in
- * `sequenceItem` so prediction and placement agree byte-for-byte.
+ * Mirrors the caption-fit, chip-pack and caption-spill arithmetic in
+ * `sequenceItem` so prediction and placement agree byte-for-byte: it
+ * resolves the same meta line (`resolveItemMeta`) and runs the same
+ * caption-fit helper (`fitItemCaption`) as `ItemNode.place`. The meta
+ * width matters because a meta line wider than the bar makes the
+ * caption spill instead of wrap; predicting a wrap there would reserve
+ * a taller row than the (un-grown) bar needs.
  */
-function predictItemChipExtraHeight(item: ItemDeclaration, ctx: LayoutContext): number {
+function predictItemBarExtraHeight(item: ItemDeclaration, ctx: LayoutContext): number {
     const props = item.properties;
-    const labelIds = propValues(props, 'labels');
-    if (labelIds.length === 0) return 0;
+    const bandwidth = ctx.bandScale.bandwidth();
     const durationDays = deriveItemDurationDays(props, ctx.sizes, ctx.cal);
     const naturalWidth = Math.max(MIN_ITEM_WIDTH, durationDays * ctx.timeline.pixelsPerDay);
     const visualWidth = Math.max(MIN_ITEM_WIDTH, naturalWidth - 2 * ITEM_INSET_PX);
+
+    // The real meta line, exactly as `sequenceItem` assembles it.
+    const sizeRef = propValue(props, 'size');
+    const sizeResolved = sizeRef ? (ctx.sizes.get(sizeRef) ?? null) : null;
+    const { status, progress } = resolveItemProgress(props, ctx);
+    const { metaText, capacity, capacityTrailingWidth } = resolveItemMeta(
+        props,
+        ctx,
+        undefined,
+        sizeResolved,
+        status,
+        progress,
+        resolveStyle('item', props, ctx.styleCtx).capacityIcon,
+    );
+    const hasMeta = metaText !== undefined || capacity !== null;
+
+    // Same caption-fit helper `ItemNode.place` runs.
+    const hasLinkIcon = !!propValue(props, 'link');
+    const titleStr = item.title ?? item.name ?? '';
+    // The left inset clears the link tile and the in-bar `after:` glyph,
+    // exactly as `ItemNode.place` computes it.
+    const hasAfterGlyph = pickInlineDate(propValues(props, 'after')) !== undefined;
+    const captionLeftInset = itemCaptionInsetX(
+        hasLinkIcon,
+        hasAfterGlyph ? { barWidth: visualWidth } : undefined,
+    );
+    const innerWidth = Math.max(0, visualWidth - captionLeftInset - ITEM_CAPTION_INSET_X_PX);
+    // The first title line clears the top-right decoration cluster, found
+    // the same way `sequenceItem` finds it (footnotes via `footnoteHosts`,
+    // `before:` via the inline date), so prediction and placement agree.
+    const firstLineWidth = Math.max(
+        0,
+        visualWidth -
+            captionLeftInset -
+            resolveTitleFirstLineReserve(
+                visualWidth,
+                collectItemFootnoteIndicators(item.name, ctx),
+                propValues(props, 'before'),
+            ),
+    );
+    const fit = fitItemCaption(
+        titleStr,
+        innerWidth,
+        estimateItemMetaWidth(metaText, capacityTrailingWidth),
+        firstLineWidth,
+    );
+    // A narrow-bar link icon spills the caption outright (and drops any
+    // auto-wrap, though explicit breaks stay), mirroring `iconSpills` in
+    // `sequenceItem`; both resolve the painted lines the same way.
+    const iconSpills = hasLinkIcon && visualWidth < MIN_BAR_WIDTH_FOR_LINK_AND_DOT_PX;
+    const captionSpills = fit.textSpills || iconSpills;
+    const titleLineCount = resolveCaptionTitleLines(titleStr, fit, iconSpills).length;
+    const titleExtra = computeTitleBarExtra(titleLineCount, hasMeta);
+
+    const labelIds = propValues(props, 'labels');
     const samples: { id: LabelDeclaration; width: number }[] = [];
     for (const labelId of labelIds) {
         const label = ctx.labels.get(labelId);
@@ -922,7 +1133,7 @@ function predictItemChipExtraHeight(item: ItemDeclaration, ctx: LayoutContext): 
         const sample = buildLabelChip(label, ctx.styleCtx, 0, 0);
         samples.push({ id: label, width: sample.box.width });
     }
-    if (samples.length === 0) return 0;
+    if (samples.length === 0) return titleExtra;
     let chipRowWidth = 0;
     for (let i = 0; i < samples.length; i += 1) {
         if (i > 0) chipRowWidth += LABEL_CHIP_GAP_BETWEEN_PX;
@@ -930,34 +1141,16 @@ function predictItemChipExtraHeight(item: ItemDeclaration, ctx: LayoutContext): 
     }
     const insideAvail = Math.max(0, visualWidth - 2 * ITEM_CAPTION_INSET_X_PX);
     const chipsOutside = chipRowWidth > insideAvail;
-
-    // `hasMeta` mirrors `metaText !== undefined` in `sequenceItem`,
-    // plus the capacity suffix (which renders on the same meta line).
-    // metaText is set whenever an item declares a duration, owner,
-    // or remaining — so we just check those four props. Status
-    // strings (in-progress) only matter when paired with one of
-    // these, so this is an upper bound (false-positives still grow
-    // the bar by exactly the same amount as the renderer would, so
-    // they stay byte-stable).
-    const hasMeta =
-        propValue(props, 'duration') !== undefined ||
-        propValue(props, 'size') !== undefined ||
-        propValue(props, 'owner') !== undefined ||
-        propValue(props, 'remaining') !== undefined ||
-        propValue(props, 'capacity') !== undefined;
-
-    const titleStr = item.title ?? item.name ?? '';
-    const titleW = titleStr ? estimateTextWidth(titleStr, ITEM_CAPTION_TITLE_FONT_SIZE_PX) : 0;
-    const captionSpills = titleW > insideAvail;
     const pack = chipsOutside ? packSpillChips(samples, visualWidth) : null;
-    const chipRowCount = pack ? pack.rows.length : samples.length > 0 ? 1 : 0;
-    return computeChipBarExtra(
+    const chipRowCount = pack ? pack.rows.length : 1;
+    const chipExtra = computeChipBarExtra(
         chipsOutside,
         captionSpills,
         chipRowCount,
-        ctx.bandScale.bandwidth(),
-        hasMeta,
+        bandwidth,
+        itemCaptionLastBaselineOffset(titleLineCount, hasMeta),
     );
+    return Math.max(titleExtra, chipExtra);
 }
 
 // Resolve the desired startX for a swimlane child, honoring `date:` (fixed
@@ -1013,7 +1206,7 @@ function _buildSwimlane(
             resolveChildStart,
             newCursor,
             estimateTextWidth,
-            predictItemChipExtraHeight,
+            predictItemBarExtraHeight,
         },
     ).place({ x: ctx.timeline.originX, y }, ctx);
 }
@@ -1038,28 +1231,6 @@ interface SizedHeader {
     cardWidth: number;
     cardHeight: number;
     boxWidth: number;
-}
-
-// Word-wrap `text` so that no line wider than `maxWidth` (in px). Long single
-// words are kept on their own line even if they overflow — we never split a
-// word in the middle.
-function wrapText(text: string, maxWidth: number, fontSize: number): string[] {
-    if (!text) return [];
-    const words = text.split(/\s+/).filter((w) => w.length > 0);
-    if (words.length === 0) return [];
-    const lines: string[] = [];
-    let cur = '';
-    for (const word of words) {
-        const trial = cur ? `${cur} ${word}` : word;
-        if (cur && estimateTextWidth(trial, fontSize) > maxWidth) {
-            lines.push(cur);
-            cur = word;
-        } else {
-            cur = trial;
-        }
-    }
-    if (cur) lines.push(cur);
-    return lines;
 }
 
 function sizeBesideHeader(title: string, author: string | undefined): SizedHeader {
@@ -1556,7 +1727,7 @@ export function layoutRoadmap(
         resolveChildStart,
         newCursor,
         estimateTextWidth,
-        predictItemChipExtraHeight,
+        predictItemBarExtraHeight,
         computeDateWindow,
         sizeBesideHeader,
         collectItems,

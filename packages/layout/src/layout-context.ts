@@ -70,6 +70,14 @@ export interface LayoutContext {
     bandScale: BandScale;
     entityLeftEdges: Map<string, number>;
     entityRightEdges: Map<string, number>;
+    /**
+     * Midpoint per entity. For an item whose caption stays in the bar, `y`
+     * is the NOMINAL row midline (`bar.y + bandwidth / 2`), not the bar's
+     * own mid-height, so a bar grown by a wrapped title or chips shares an
+     * attach line with its un-grown row neighbours. An item with a spilled
+     * caption keeps the bar's own mid-height. Dependency arrows terminate
+     * here.
+     */
     entityMidpoints: Map<string, Point>;
     /**
      * Visual edges for items (entries with a painted bar). Differs
@@ -89,7 +97,9 @@ export interface LayoutContext {
      * exit drops to `(box.x + box.width / 2, box.y + box.height)`
      * — the bottom-middle of the progress strip — so the arrow
      * doesn't visually pierce the spilled title/meta text to the
-     * right of the bar.
+     * right of the bar. `midY` is the nominal row midline
+     * (`bar.y + bandwidth / 2`), the same line `entityMidpoints`
+     * uses, so a grown bar and a same-row neighbour line up.
      */
     itemArrowSource: Map<string, Point>;
     /**
@@ -182,9 +192,11 @@ export interface LayoutHelpers {
     ) => number;
     newCursor: (x: number, y: number) => TrackCursor;
     estimateTextWidth: (text: string, fontSize: number) => number;
-    /** Predict the extra height an item's wrapped label-chip rows will
-     *  add, so callers can size the row pitch BEFORE handing off to
-     *  `sequenceItem`. Returns 0 when the item's labels all fit on a
-     *  single chip row. */
-    predictItemChipExtraHeight: (item: ItemDeclaration, ctx: LayoutContext) => number;
+    /** Predict the extra height an item's bar will grow by (a wrapped
+     *  two-line title over a meta line, or wrapped label-chip rows;
+     *  whichever is larger), so callers can size the row pitch BEFORE
+     *  handing off to `sequenceItem`. Returns 0 when the title fits one
+     *  line (or wraps without needing a taller bar) and the item's
+     *  labels all fit on a single chip row. */
+    predictItemBarExtraHeight: (item: ItemDeclaration, ctx: LayoutContext) => number;
 }

@@ -98,6 +98,27 @@ describe('exportXlsx — Roadmap sheet (metadata)', () => {
     });
 });
 
+describe('exportXlsx — explicit line breaks in titles (lolay/nowline#60)', () => {
+    it('keeps a line break in the Title cell as an in-cell break (no collapse)', async () => {
+        const fixture = `nowline v1
+
+roadmap r "R" start:2026-04-06
+
+swimlane lane "Lane"
+  item tech "Technology\\nSelection" duration:2w
+`;
+        const inputs = await buildExportInputs(fixture, { today: PINNED_DATE });
+        const wb = await readBack(await exportXlsx(inputs));
+        const sheet = wb.getWorksheet('Items')!;
+        let titleCol = 0;
+        sheet.getRow(1).eachCell((cell, colNumber) => {
+            if (cell.value === 'Title') titleCol = colNumber;
+        });
+        expect(titleCol).toBeGreaterThan(0);
+        expect(sheet.getRow(2).getCell(titleCol).value).toBe('Technology\nSelection');
+    });
+});
+
 describe('exportXlsx — Items sheet', () => {
     it('header row includes ID, Title, Duration (numeric + text), Status, Owner', async () => {
         const inputs = await buildExportInputs(FIXTURE, { today: PINNED_DATE });

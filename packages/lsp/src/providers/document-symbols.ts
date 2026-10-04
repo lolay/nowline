@@ -17,6 +17,7 @@ import {
     type RoadmapDeclaration,
     type SwimlaneContent,
     type SwimlaneDeclaration,
+    singleLine,
 } from '@nowline/core';
 import type { AstNode, LangiumDocument, MaybePromise } from 'langium';
 import type { DocumentSymbolProvider } from 'langium/lsp';
@@ -29,6 +30,16 @@ import type {
 import { SymbolKind } from '../lsp-protocol.js';
 import type { NowlineLspServices } from '../nowline-lsp-module.js';
 import { entityKind, fileFromDocument, nameRangeOf } from '../references/ast-utils.js';
+
+/**
+ * An outline entry is one line of text, but a quoted title can carry
+ * explicit line breaks (`"Technology\nSelection"`), so each break is shown
+ * as a single space. `undefined` stays `undefined` so callers can fall back
+ * (as they must for a title that was only line breaks, which collapses to '').
+ */
+function singleLineTitle(title: string | undefined): string | undefined {
+    return title === undefined ? undefined : singleLine(title);
+}
 
 /**
  * Outline view: roadmap → swimlanes → items, with parallel/group nesting and
@@ -71,8 +82,8 @@ export class NowlineDocumentSymbolProvider implements DocumentSymbolProvider {
         const range = roadmap.$cstNode!.range;
         const nameRange = nameRangeOf(roadmap) ?? range;
         return {
-            name: roadmap.name ?? roadmap.title ?? 'roadmap',
-            detail: roadmap.title && roadmap.name ? roadmap.title : 'roadmap',
+            name: roadmap.name ?? (singleLineTitle(roadmap.title) || 'roadmap'),
+            detail: roadmap.title && roadmap.name ? singleLine(roadmap.title) : 'roadmap',
             kind: SymbolKind.Package,
             range,
             selectionRange: nameRange,
@@ -137,8 +148,8 @@ export class NowlineDocumentSymbolProvider implements DocumentSymbolProvider {
         withChildrenSlot = false,
     ): DocumentSymbol {
         const range: Range = entity.$cstNode!.range;
-        const name = entity.name ?? entity.title ?? entityKind(entity);
-        const detail = entity.title && entity.name ? entity.title : entityKind(entity);
+        const name = entity.name ?? (singleLineTitle(entity.title) || entityKind(entity));
+        const detail = entity.title && entity.name ? singleLine(entity.title) : entityKind(entity);
         const symbol: DocumentSymbol = {
             name,
             detail,

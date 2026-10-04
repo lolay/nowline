@@ -250,7 +250,32 @@ export interface InlineDatePin {
 export interface PositionedItem {
     kind: 'item';
     id?: string;
+    /**
+     * The full, unwrapped title exactly as authored, explicit line breaks
+     * included (`"Technology\nSelection"` keeps its newline here). Always
+     * present, wrapped or not.
+     */
     title: string;
+    /**
+     * The title split into the lines the renderer paints, one `<text>` per
+     * line. Present when the painted lines differ from `[title]`:
+     *
+     *   - the title word-wrapped INSIDE the bar (`length === 2`, at most
+     *     `ITEM_CAPTION_TITLE_MAX_LINES`), or
+     *   - the title carries explicit `\n` breaks (any `length >= 2`, in-bar
+     *     or spilled to the right of the bar). Lines are trimmed, leading
+     *     and trailing empty lines are dropped, interior empty lines stay as
+     *     blank entries. An explicit title never auto-wraps.
+     *
+     * Omitted for a one-line title, and for a break-free title that spilled
+     * to the right (always one line). Line `n` (0-based) sits at baseline
+     * `ITEM_CAPTION_TITLE_BASELINE_OFFSET_PX + n * ITEM_CAPTION_TITLE_LINE_HEIGHT_PX`
+     * from the bar's top, and the meta line follows at
+     * `itemCaptionMetaBaselineOffset(titleLines.length)`. A multi-line
+     * caption with a meta line grows the bar (`box.height`) by 16px per
+     * extra line.
+     */
+    titleLines?: string[];
     box: BoundingBox;
     status: StatusKind;
     progressFraction: number; // 0..1; 1 == fully filled
@@ -286,12 +311,14 @@ export interface PositionedItem {
     // renderer stays palette-and-string-dumb.
     metaText?: string;
     // True when the title OR the meta line is wider than the bar's inner
-    // padded width. We treat title + meta as an atomic block: if either
+    // padded width AND a word-wrap of the title can't make it fit (see
+    // `titleLines`). We treat title + meta as an atomic block: if either
     // one wouldn't fit inside the bar, BOTH get drawn beside the bar
     // (stacked, just past its right edge) so they read as one caption
     // rather than splitting across the bar boundary. The layout also
     // bumps the next item to a fresh row so the spilled caption has
-    // empty space to occupy.
+    // empty space to occupy. A title that wrapped inside the bar has
+    // `textSpills === false` and reserves no spill extent.
     textSpills: boolean;
     /** True when the bar is too narrow to host the status dot inside
      *  with its full inset (`MIN_BAR_WIDTH_FOR_DOT_PX`). The dot

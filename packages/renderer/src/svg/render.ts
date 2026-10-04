@@ -59,14 +59,14 @@ import {
     HEADER_TITLE_FONT_SIZE_PX,
     HEADER_TITLE_LINE_HEIGHT_PX,
     HEADER_TITLE_TO_AUTHOR_GAP_PX,
-    ITEM_CAPTION_INSET_X_PX,
-    ITEM_CAPTION_META_BASELINE_OFFSET_PX,
     ITEM_CAPTION_META_FONT_SIZE_PX,
     ITEM_CAPTION_SPILL_GAP_PX,
     ITEM_CAPTION_TITLE_BASELINE_OFFSET_PX,
     ITEM_CAPTION_TITLE_FONT_SIZE_PX,
+    ITEM_CAPTION_TITLE_LINE_HEIGHT_PX,
     ITEM_DECORATION_SPILL_GAP_PX,
     ITEM_FOOTNOTE_INDICATOR_BASELINE_OFFSET_PX,
+    ITEM_FOOTNOTE_INDICATOR_FONT_SIZE_PX,
     ITEM_FOOTNOTE_INDICATOR_INSET_RIGHT_PX,
     ITEM_FOOTNOTE_INDICATOR_STEP_PX,
     ITEM_LINK_ICON_INSET_PX,
@@ -75,6 +75,8 @@ import {
     ITEM_STATUS_DOT_INSET_TOP_PX,
     ITEM_STATUS_DOT_RADIUS_PX,
     includeChromeGeometry,
+    itemCaptionInsetX,
+    itemCaptionMetaBaselineOffset,
     NOW_PILL_CORNER_RADIUS_PX,
     NOW_PILL_HEIGHT_PX,
     NOW_PILL_LABEL_BASELINE_OFFSET_PX,
@@ -972,7 +974,23 @@ function renderItem(
             captionX += ITEM_LINK_ICON_TILE_SIZE_PX + ITEM_DECORATION_SPILL_GAP_PX;
         }
     } else {
-        captionX = i.box.x + ITEM_CAPTION_INSET_X_PX;
+        // Same inset layout used to size the wrap: 12px, 24px past a
+        // link-icon tile (spanning `box.x + 6 .. box.x + 20`), and past an
+        // in-bar `after:` glyph too (22px, or 40px beside the link tile).
+        // `linkIcon` is the string 'none' (truthy) for an item without a
+        // `link:`, and `noLinks` omits the tile entirely, so only indent
+        // for the tile when it is really drawn. An icon that spilled out
+        // of the bar forces the caption to spill too, so that case never
+        // reaches here.
+        const hasLink = !!i.linkIcon && i.linkIcon !== 'none';
+        const afterPin = i.inlineDatePins?.find((p) => p.side === 'after' && !p.spilled);
+        // Layout placed an `after:` glyph beside the link tile whether or
+        // not `noLinks` hides it, so the glyph's clearance keys off the
+        // `link:` itself rather than off the tile being drawn.
+        const insetX = afterPin
+            ? itemCaptionInsetX(hasLink, { barWidth: i.box.width })
+            : itemCaptionInsetX(!options.noLinks && hasLink && !i.iconSpills);
+        captionX = i.box.x + insetX;
     }
     // When the caption spills outside the bar it renders on the
     // chart / group bg instead of the bar fill — `i.style.text` is
@@ -986,21 +1004,34 @@ function renderItem(
     const captionOutsideTextColor = palette.entities.item.text;
     const titleColor = i.textSpills ? captionOutsideTextColor : captionInsideTextColor;
     const metaColor = i.textSpills ? captionOutsideTextColor : i.style.fg;
-    if (i.title) {
+    // A title that auto-wrapped inside the bar, or that carries explicit
+    // `\n` breaks (in-bar or spilled), arrives pre-split in `titleLines`;
+    // paint one `<text>` per line at the same baselines either way, the
+    // same pattern as the header card, with the meta line below the last
+    // one. Everything else (a single-line title) is just `[title]`. A blank
+    // line between two explicit breaks keeps its baseline slot but paints
+    // nothing.
+    const titleLines = i.titleLines ?? (i.title ? [i.title] : []);
+    titleLines.forEach((line, n) => {
+        if (line === '') return;
         parts.push(
             textTag(
                 {
                     x: num(captionX),
-                    y: num(i.box.y + ITEM_CAPTION_TITLE_BASELINE_OFFSET_PX),
+                    y: num(
+                        i.box.y +
+                            ITEM_CAPTION_TITLE_BASELINE_OFFSET_PX +
+                            n * ITEM_CAPTION_TITLE_LINE_HEIGHT_PX,
+                    ),
                     'font-family': fonts[i.style.font],
                     'font-size': ITEM_CAPTION_TITLE_FONT_SIZE_PX,
                     'font-weight': 600,
                     fill: titleColor,
                 },
-                i.title,
+                line,
             ),
         );
-    }
+    });
     // Meta line and capacity suffix render as a unified SVG fragment.
     // For pure-text suffixes (multiplier, literal glyph, no glyph) the
     // unified path emits a single `<text>` element with `<tspan dx>`
@@ -1014,7 +1045,7 @@ function renderItem(
                 metaText: i.metaText,
                 capacity: i.capacity,
                 x: captionX,
-                baselineY: i.box.y + ITEM_CAPTION_META_BASELINE_OFFSET_PX,
+                baselineY: i.box.y + itemCaptionMetaBaselineOffset(titleLines.length),
                 fontSize: ITEM_CAPTION_META_FONT_SIZE_PX,
                 fontFamily: fonts[i.style.font],
                 color: metaColor,
@@ -1048,7 +1079,7 @@ function renderItem(
                             x: num(fx),
                             y: num(footnoteY),
                             'font-family': fonts.sans,
-                            'font-size': 10,
+                            'font-size': ITEM_FOOTNOTE_INDICATOR_FONT_SIZE_PX,
                             'font-weight': 700,
                             fill: captionOutsideTextColor,
                         },
@@ -1067,7 +1098,7 @@ function renderItem(
                             x: num(fx),
                             y: num(footnoteY),
                             'font-family': fonts.sans,
-                            'font-size': 10,
+                            'font-size': ITEM_FOOTNOTE_INDICATOR_FONT_SIZE_PX,
                             'font-weight': 700,
                             fill: i.style.text,
                             'text-anchor': 'end',

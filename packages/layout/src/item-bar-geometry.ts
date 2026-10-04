@@ -14,6 +14,8 @@
 // `box.width` used as the "right edge" / "bottom edge" anchor where
 // noted.
 
+import { estimateTextWidth } from './text-measure.js';
+
 // ---- Caption (title + meta text) ---------------------------------
 
 /** Horizontal inset (px) for the caption's left edge inside the bar. */
@@ -39,6 +41,66 @@ export const ITEM_CAPTION_TITLE_FONT_SIZE_PX = 13;
 /** Font size (px) of the meta text. */
 export const ITEM_CAPTION_META_FONT_SIZE_PX = 11;
 
+/**
+ * Baseline-to-baseline pitch (px) between consecutive TITLE lines when
+ * a long title word-wraps inside the bar. The meta line sits one more
+ * pitch below the last title line for every extra title line, see
+ * `itemCaptionMetaBaselineOffset`.
+ */
+export const ITEM_CAPTION_TITLE_LINE_HEIGHT_PX = 16;
+
+/**
+ * Most title lines layout will wrap a title onto inside the bar. A
+ * title that needs more than this spills to the right of the bar as a
+ * single line instead.
+ */
+export const ITEM_CAPTION_TITLE_MAX_LINES = 2;
+
+/**
+ * Baseline Y (px from the bar's top) of the meta line when the title
+ * occupies `lineCount` lines. One line gives the classic
+ * `ITEM_CAPTION_META_BASELINE_OFFSET_PX`; each extra title line pushes
+ * the meta baseline down by `ITEM_CAPTION_TITLE_LINE_HEIGHT_PX`.
+ */
+export function itemCaptionMetaBaselineOffset(lineCount: number): number {
+    return (
+        ITEM_CAPTION_META_BASELINE_OFFSET_PX +
+        (Math.max(1, lineCount) - 1) * ITEM_CAPTION_TITLE_LINE_HEIGHT_PX
+    );
+}
+
+/**
+ * Baseline Y (px from the bar's top) of the LAST caption line: the
+ * meta line when the item has one, otherwise the final title line.
+ * Anything stacked below the caption (label chips) must clear this.
+ */
+export function itemCaptionLastBaselineOffset(lineCount: number, hasMeta: boolean): number {
+    if (hasMeta) return itemCaptionMetaBaselineOffset(lineCount);
+    return (
+        ITEM_CAPTION_TITLE_BASELINE_OFFSET_PX +
+        (Math.max(1, lineCount) - 1) * ITEM_CAPTION_TITLE_LINE_HEIGHT_PX
+    );
+}
+
+/**
+ * Extra bar height (px) a wrapped title needs on top of the default
+ * `bandwidth`. The default bar is sized so the caption's last baseline
+ * is at most `ITEM_CAPTION_META_BASELINE_OFFSET_PX`; anything below
+ * that grows the bar by the overshoot:
+ *
+ *   - 1 title line (with or without meta): 0.
+ *   - 2 title lines, no meta: line 2 lands at baseline 36, so 0.
+ *   - 2 title lines + meta: meta baseline 54, so 16.
+ *
+ * The same number is the row-pitch increase for the bar's row.
+ */
+export function computeTitleBarExtra(lineCount: number, hasMeta: boolean): number {
+    return Math.max(
+        0,
+        itemCaptionLastBaselineOffset(lineCount, hasMeta) - ITEM_CAPTION_META_BASELINE_OFFSET_PX,
+    );
+}
+
 // ---- Status dot (upper-right glyph) ------------------------------
 
 /** Distance (px) from the bar's right edge to the dot's center. */
@@ -62,6 +124,13 @@ export const ITEM_FOOTNOTE_INDICATOR_INSET_RIGHT_PX = 22;
 export const ITEM_FOOTNOTE_INDICATOR_BASELINE_OFFSET_PX = 14;
 
 /**
+ * Font size (px) of the footnote indicator digits. The renderer paints
+ * them at this size and layout measures them with it (to find the
+ * cluster's left edge), so both read the same constant.
+ */
+export const ITEM_FOOTNOTE_INDICATOR_FONT_SIZE_PX = 10;
+
+/**
  * Horizontal step (px) between consecutive footnote indicators when
  * an item carries more than one footnote — they walk LEFT from the
  * status dot.
@@ -75,6 +144,65 @@ export const ITEM_LINK_ICON_TILE_SIZE_PX = 14;
 
 /** Distance (px) from the bar's right/bottom edges to the tile's edge. */
 export const ITEM_LINK_ICON_INSET_PX = 6;
+
+/**
+ * Horizontal gap (px) between the link-icon tile's right edge and the
+ * start of the caption text when both render inside the bar.
+ */
+export const ITEM_LINK_ICON_TO_CAPTION_GAP_PX = 4;
+
+/**
+ * The item carries an inline `after:DATE` glyph, on a bar of the given
+ * painted width. Passed to `itemCaptionInsetX` so the glyph, not just
+ * the link tile, reserves room at the caption's left edge.
+ */
+export interface ItemCaptionAfterGlyph {
+    /** Painted bar width (px): `box.width`. Decides whether the glyph spills. */
+    barWidth: number;
+}
+
+/**
+ * Left inset (px) of the in-bar caption from the bar's left edge. It is
+ * `ITEM_CAPTION_INSET_X_PX` normally, pushed right past the link-icon
+ * tile (and its gap) when the bar carries a link icon, and pushed right
+ * past the `after:` inline-date glyph (and a gap) when the bar carries
+ * one INSIDE it:
+ *
+ *   - no link icon, no glyph: 12
+ *   - link icon, no glyph: 24
+ *   - glyph, no link icon: 22 (the glyph spans 6..18, plus a 4 px gap)
+ *   - glyph and link icon: 40 (the glyph spans 24..36, plus a 4 px gap)
+ *
+ * A glyph on a bar narrower than `MIN_BAR_WIDTH_FOR_INLINE_DATE_PX`
+ * spills out of the bar to the left and reserves nothing.
+ *
+ * `hasLinkIcon` is the same flag `computeItemInlineDatePins` places the
+ * glyph with, and the glyph's right edge comes from the same helper
+ * (`itemAfterGlyphInsideLeftX`), so the inset and the glyph can't
+ * disagree. The inset applies to every caption line, not only line 1,
+ * so the caption's left edge stays straight.
+ */
+export function itemCaptionInsetX(
+    hasLinkIcon: boolean,
+    afterGlyph?: ItemCaptionAfterGlyph,
+): number {
+    let inset = ITEM_CAPTION_INSET_X_PX;
+    if (hasLinkIcon) {
+        const linkColumn =
+            ITEM_LINK_ICON_INSET_PX +
+            ITEM_LINK_ICON_TILE_SIZE_PX +
+            ITEM_LINK_ICON_TO_CAPTION_GAP_PX -
+            ITEM_CAPTION_INSET_X_PX;
+        inset = ITEM_CAPTION_INSET_X_PX + Math.max(0, linkColumn);
+    }
+    if (afterGlyph && !inlineDateGlyphSpills(afterGlyph.barWidth)) {
+        // Offsets from a left edge of 0, so the numbers are exact integers.
+        const glyphRight =
+            itemAfterGlyphInsideLeftX(0, hasLinkIcon) + INLINE_DATE_GLYPH_TILE_SIZE_PX;
+        inset = Math.max(inset, glyphRight + ITEM_DECORATION_SPILL_GAP_PX);
+    }
+    return inset;
+}
 
 // ---- Narrow-bar decoration spill --------------------------------
 
@@ -164,6 +292,147 @@ export const MIN_BAR_WIDTH_FOR_INLINE_DATE_PX =
     INLINE_DATE_GLYPH_GAP_PX +
     INLINE_DATE_GLYPH_TILE_SIZE_PX +
     INLINE_DATE_GLYPH_INSET_RIGHT_PX;
+
+/**
+ * True when a bar of painted width `barWidth` is too narrow to host the
+ * inline-date glyph inside, so it spills (`before:` right, `after:` left).
+ * The one threshold behind the glyph's `spilled` flag and the caption
+ * inset's decision to reserve room for it.
+ */
+export function inlineDateGlyphSpills(barWidth: number): boolean {
+    return barWidth < MIN_BAR_WIDTH_FOR_INLINE_DATE_PX;
+}
+
+/**
+ * Left x of the `after:` inline-date glyph when it sits INSIDE the bar,
+ * for a bar whose left edge is at `leftEdge`:
+ *
+ *   - no link icon: the glyph sits at the leftmost top-decoration slot,
+ *     `INLINE_DATE_GLYPH_INSET_LEFT_PX` (6) from the edge
+ *   - link icon: one `INLINE_DATE_GLYPH_GAP_PX` right of the tile's right
+ *     edge (6 + 14 + 4 = 24 from the edge)
+ *
+ * The one formula behind both the glyph placement
+ * (`computeItemInlineDatePins`) and the caption's left inset
+ * (`itemCaptionInsetX`), so the two can never disagree. Pass
+ * `leftEdge = 0` to get the offset from the bar's left edge.
+ */
+export function itemAfterGlyphInsideLeftX(leftEdge: number, hasLinkIcon: boolean): number {
+    return hasLinkIcon
+        ? leftEdge +
+              ITEM_LINK_ICON_INSET_PX +
+              ITEM_LINK_ICON_TILE_SIZE_PX +
+              INLINE_DATE_GLYPH_GAP_PX
+        : leftEdge + INLINE_DATE_GLYPH_INSET_LEFT_PX;
+}
+
+/**
+ * Left x of the `before:` inline-date glyph when it sits INSIDE the bar,
+ * for a bar whose right edge is at `rightEdge`. The glyph walks LEFT
+ * from the rightmost top-decoration slot:
+ *
+ *   - rightmost footnote anchors at (rightEdge - INSET_RIGHT_PX)
+ *   - the leftmost footnote sits one step further left per extra digit
+ *   - the status dot's left edge sits at (rightEdge - INSET_RIGHT - DOT_RADIUS)
+ *   - the glyph sits one `INLINE_DATE_GLYPH_GAP_PX` further left than
+ *     whichever of those is leftmost (footnotes win when present, since
+ *     they are always left of the dot)
+ *
+ * The one formula behind both the glyph placement
+ * (`computeItemInlineDatePins`) and the title first-line clearance
+ * (`itemTitleFirstLineRightReservePx`), so the two can never disagree.
+ * Pass `rightEdge = 0` to get the offset from the bar's right edge
+ * (negative, inside the bar) with exact integer arithmetic.
+ */
+export function itemBeforeGlyphInsideLeftX(rightEdge: number, footnoteCount: number): number {
+    let anchorRightX: number;
+    if (footnoteCount > 0) {
+        const leftmostFootnoteCenter =
+            rightEdge -
+            ITEM_FOOTNOTE_INDICATOR_INSET_RIGHT_PX -
+            (footnoteCount - 1) * ITEM_FOOTNOTE_INDICATOR_STEP_PX;
+        anchorRightX = leftmostFootnoteCenter - INLINE_DATE_GLYPH_GAP_PX;
+    } else {
+        const dotLeftEdge = rightEdge - ITEM_STATUS_DOT_INSET_RIGHT_PX - ITEM_STATUS_DOT_RADIUS_PX;
+        anchorRightX = dotLeftEdge - INLINE_DATE_GLYPH_GAP_PX;
+    }
+    return anchorRightX - INLINE_DATE_GLYPH_TILE_SIZE_PX;
+}
+
+// ---- Title first-line clearance (top-right decoration cluster) ---
+//
+// The status dot, footnote digits and `before:` glyph all sit in the
+// bar's upper-right at the title's first-line height (title baseline
+// 20, cluster y roughly 5-17). Line 2 (baseline 36) and the meta line
+// (baseline 38) are below the cluster, so only the FIRST title line has
+// to stay clear of it; every other caption line may use the full inner
+// width.
+
+export interface ItemTitleFirstLineReserveInputs {
+    /** Painted bar width (px): `box.width`. */
+    barWidth: number;
+    /**
+     * Footnote indicator labels in the order the renderer paints them,
+     * left to right (ascending footnote number). Empty when the item
+     * carries no footnote.
+     */
+    footnoteLabels: readonly string[];
+    /** True when the item has an inline `before:DATE` glyph. */
+    hasBeforeGlyph: boolean;
+}
+
+/**
+ * Right-side space (px) the FIRST title line must leave free, measured
+ * from the bar's right edge: the larger of the plain right inset
+ * (`ITEM_CAPTION_INSET_X_PX`) and the distance to the top-right
+ * cluster's left edge plus `ITEM_DECORATION_SPILL_GAP_PX` of air.
+ *
+ * The cluster is the leftmost of three parts, each counted only when it
+ * renders INSIDE the bar (a narrow bar spills it into the column to the
+ * right instead, where it can't touch the title):
+ *
+ *   - status dot: left edge at (right - 17); absent below
+ *     `MIN_BAR_WIDTH_FOR_DOT_PX`. Dot only gives 21.
+ *   - footnote digits: leftmost digit's left edge at
+ *     (right - 22 - (n-1) * 8 - width); absent when they spill
+ *     (`MIN_BAR_WIDTH_FOR_FOOTNOTE_PX`).
+ *   - `before:` glyph: its left x, from `itemBeforeGlyphInsideLeftX`;
+ *     absent when it spills (`MIN_BAR_WIDTH_FOR_INLINE_DATE_PX`).
+ *
+ * Offsets are computed from a right edge of 0 (inside the bar is
+ * negative) so the common cases are exact integers.
+ */
+export function itemTitleFirstLineRightReservePx(opts: ItemTitleFirstLineReserveInputs): number {
+    const { barWidth, footnoteLabels, hasBeforeGlyph } = opts;
+    let clusterLeft = Number.POSITIVE_INFINITY;
+    if (barWidth >= MIN_BAR_WIDTH_FOR_DOT_PX) {
+        clusterLeft = Math.min(
+            clusterLeft,
+            -(ITEM_STATUS_DOT_INSET_RIGHT_PX + ITEM_STATUS_DOT_RADIUS_PX),
+        );
+    }
+    const footnoteCount = footnoteLabels.length;
+    const footnotesInside = footnoteCount > 0 && barWidth >= MIN_BAR_WIDTH_FOR_FOOTNOTE_PX;
+    if (footnotesInside) {
+        // Digit `k` (0 = leftmost) anchors its RIGHT end at
+        // `-22 - (n-1-k) * 8`, so its left edge is that minus its width.
+        // Normally digit 0 reaches furthest left; checking all of them
+        // also covers a wide late digit (e.g. footnote 100 next to 9).
+        for (let k = 0; k < footnoteCount; k += 1) {
+            const anchorX =
+                -ITEM_FOOTNOTE_INDICATOR_INSET_RIGHT_PX -
+                (footnoteCount - 1 - k) * ITEM_FOOTNOTE_INDICATOR_STEP_PX;
+            const left =
+                anchorX -
+                estimateTextWidth(footnoteLabels[k], ITEM_FOOTNOTE_INDICATOR_FONT_SIZE_PX);
+            clusterLeft = Math.min(clusterLeft, left);
+        }
+    }
+    if (hasBeforeGlyph && barWidth >= MIN_BAR_WIDTH_FOR_INLINE_DATE_PX) {
+        clusterLeft = Math.min(clusterLeft, itemBeforeGlyphInsideLeftX(0, footnoteCount));
+    }
+    return Math.max(ITEM_CAPTION_INSET_X_PX, -clusterLeft + ITEM_DECORATION_SPILL_GAP_PX);
+}
 
 // ---- Label chips (along the bar's bottom) ------------------------
 

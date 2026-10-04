@@ -511,7 +511,10 @@ swimlane "Mobile"
             'Platform',
             'Web',
             'Mobile',
-            'Technology Selection',
+            // "Technology Selection" word-wraps to two <text> lines in its
+            // 2w bar, so each line is painted as its own text node.
+            'Technology',
+            'Selection',
             'iOS Prototype',
             'Android Prototype',
             'Kickoff',
@@ -521,5 +524,447 @@ swimlane "Mobile"
         }
         expect(svg).toContain('data-layer="swimlane"');
         expect(svg).toContain('data-layer="item"');
+    });
+});
+
+describe('renderSvg — wrapped item titles', () => {
+    // The Platform lane from lolay/nowline#59. At `scale:2w` a `2w` item is a
+    // 148px bar with a 124px text area, so "Technology Selection" (~151px)
+    // wraps to two lines instead of spilling to the right.
+    const HEADER = `nowline v1\n\nroadmap r1 "R" start:2026-04-06 scale:2w\n\n`;
+
+    interface TextNode {
+        x: number;
+        y: number;
+        fontSize: number;
+        content: string;
+    }
+
+    function itemFragment(svg: string, itemId: string): string {
+        const m = svg.match(
+            new RegExp(`<g data-id="${itemId}" data-layer="item">[\\s\\S]*?<\\/g>`),
+        );
+        if (!m) throw new Error(`no item group for ${itemId}`);
+        return m[0];
+    }
+
+    function textNodes(fragment: string): TextNode[] {
+        const out: TextNode[] = [];
+        for (const m of fragment.matchAll(/<text ([^>]*)>([^<]*)(?:<tspan[\s\S]*?)?<\/text>/g)) {
+            // Anchor on whitespace so `y` doesn't match inside `font-family="`.
+            const attr = (name: string) =>
+                Number(m[1].match(new RegExp(`(?:^|\\s)${name}="([^"]+)"`))?.[1]);
+            out.push({
+                x: attr('x'),
+                y: attr('y'),
+                fontSize: attr('font-size'),
+                content: m[2],
+            });
+        }
+        return out;
+    }
+
+    function barRect(fragment: string): { x: number; y: number; height: number } {
+        const m = fragment.match(/<rect [^>]*>/);
+        if (!m) throw new Error('no bar rect');
+        const attr = (name: string) => Number(m[0].match(new RegExp(` ${name}="([^"]+)"`))?.[1]);
+        return { x: attr('x'), y: attr('y'), height: attr('height') };
+    }
+
+    it('paints a wrapped title as two <text> lines 16px apart', async () => {
+        const model = await parseToModel(
+            `${HEADER}swimlane s "S"\n  item tech "Technology Selection" duration:2w\n`,
+        );
+        const fragment = itemFragment(await renderSvg(model), 'tech');
+        const bar = barRect(fragment);
+        const titles = textNodes(fragment).filter((t) => t.fontSize === 13);
+        expect(titles.map((t) => t.content)).toEqual(['Technology', 'Selection']);
+        expect(titles[0].y).toBe(bar.y + 20);
+        expect(titles[1].y).toBe(bar.y + 36);
+        expect(titles[1].y - titles[0].y).toBe(16);
+        expect(titles[1].x).toBe(titles[0].x);
+    });
+
+    it('shifts the meta baseline below line 2 and grows the bar for it', async () => {
+        const model = await parseToModel(
+            `${HEADER}swimlane s "S"\n  item tech "Technology Selection" duration:2w\n  item api "API" duration:3w\n`,
+        );
+        const svg = await renderSvg(model);
+        const wrapped = itemFragment(svg, 'tech');
+        const bar = barRect(wrapped);
+        const meta = textNodes(wrapped).filter((t) => t.fontSize === 11);
+        expect(meta).toHaveLength(1);
+        expect(meta[0].content).toBe('2w');
+        // 38 (one-line meta baseline) + 16 (one extra title line).
+        expect(meta[0].y).toBe(bar.y + 54);
+        expect(bar.height).toBe(72);
+
+        // The one-line neighbour on the same row keeps the classic geometry.
+        const plain = itemFragment(svg, 'api');
+        const plainBar = barRect(plain);
+        const plainText = textNodes(plain);
+        expect(plainBar.y).toBe(bar.y);
+        expect(plainBar.height).toBe(56);
+        expect(plainText.filter((t) => t.fontSize === 13)).toHaveLength(1);
+        expect(plainText.find((t) => t.fontSize === 13)?.y).toBe(plainBar.y + 20);
+        expect(plainText.find((t) => t.fontSize === 11)?.y).toBe(plainBar.y + 38);
+    });
+
+    it('keeps a one-line in-bar title at x+12 and a single <text> (byte-stable path)', async () => {
+        const model = await parseToModel(`${HEADER}swimlane s "S"\n  item api "API" duration:3w\n`);
+        const fragment = itemFragment(await renderSvg(model), 'api');
+        const bar = barRect(fragment);
+        const titles = textNodes(fragment).filter((t) => t.fontSize === 13);
+        expect(titles).toHaveLength(1);
+        expect(titles[0].x).toBe(bar.x + 12);
+    });
+
+    it('starts a wrapped caption past the link tile, not underneath it', async () => {
+        const model = await parseToModel(
+            `${HEADER}swimlane s "S"\n  item auth "Auth token refactor" duration:2w link:https://github.com/acme/team/issues/1\n`,
+        );
+        const fragment = itemFragment(await renderSvg(model), 'auth');
+        const bar = barRect(fragment);
+        const tile = fragment.match(/<a [^>]*><rect [^>]*>/)?.[0];
+        expect(tile).toBeDefined();
+        const tileX = Number(tile?.match(/ x="([^"]+)"/)?.[1]);
+        const tileWidth = Number(tile?.match(/ width="([^"]+)"/)?.[1]);
+        const tileRight = tileX + tileWidth;
+        expect(tileRight).toBe(bar.x + 20);
+        const texts = textNodes(fragment);
+        const titles = texts.filter((t) => t.fontSize === 13);
+        expect(titles.map((t) => t.content)).toEqual(['Auth token', 'refactor']);
+        for (const t of texts) expect(t.x).toBeGreaterThan(tileRight);
+        // Layout's 24px inset: the same indent the wrap width was computed with.
+        expect(titles[0].x).toBe(bar.x + 24);
+    });
+
+    it('clears the link tile on a one-line in-bar title too (latent overlap fix)', async () => {
+        const model = await parseToModel(
+            `${HEADER}swimlane s "S"\n  item api "API" duration:3w link:https://github.com/acme/team/issues/1\n`,
+        );
+        const fragment = itemFragment(await renderSvg(model), 'api');
+        const bar = barRect(fragment);
+        const titles = textNodes(fragment).filter((t) => t.fontSize === 13);
+        expect(titles).toHaveLength(1);
+        // Used to be bar.x + 12, inside the tile that spans bar.x + 6 .. bar.x + 20.
+        expect(titles[0].x).toBe(bar.x + 24);
+    });
+
+    it('does not indent past a link tile that noLinks omits', async () => {
+        const model = await parseToModel(
+            `${HEADER}swimlane s "S"\n  item api "API" duration:3w link:https://github.com/acme/team/issues/1\n`,
+        );
+        const fragment = itemFragment(await renderSvg(model, { noLinks: true }), 'api');
+        const bar = barRect(fragment);
+        expect(fragment).not.toContain('<a ');
+        const titles = textNodes(fragment).filter((t) => t.fontSize === 13);
+        expect(titles).toHaveLength(1);
+        expect(titles[0].x).toBe(bar.x + 12);
+    });
+
+    it('still spills a title with an unbreakable word as one line beside the bar', async () => {
+        const model = await parseToModel(
+            `${HEADER}swimlane s "S"\n  item big "Internationalization" duration:2w\n`,
+        );
+        const fragment = itemFragment(await renderSvg(model), 'big');
+        const bar = barRect(fragment);
+        const titles = textNodes(fragment).filter((t) => t.fontSize === 13);
+        expect(titles.map((t) => t.content)).toEqual(['Internationalization']);
+        expect(titles[0].y).toBe(bar.y + 20);
+        expect(bar.height).toBe(56);
+        // Spilled: starts past the bar's right edge (148px wide).
+        expect(titles[0].x).toBeGreaterThan(bar.x + 148);
+    });
+});
+
+describe('renderSvg — explicit title line breaks', () => {
+    // `scale:2w`: a `2w` item is a 148px bar. The `\\n` in a template string below is the
+    // two-character DSL escape; Langium turns it into a real newline in the title.
+    const HEADER = `nowline v1\n\nroadmap r1 "R" start:2026-04-06 scale:2w\n\n`;
+
+    interface TextNode {
+        x: number;
+        y: number;
+        fontSize: number;
+        content: string;
+    }
+
+    function itemFragment(svg: string, itemId: string): string {
+        const m = svg.match(
+            new RegExp(`<g data-id="${itemId}" data-layer="item">[\\s\\S]*?<\\/g>`),
+        );
+        if (!m) throw new Error(`no item group for ${itemId}`);
+        return m[0];
+    }
+
+    function textNodes(fragment: string): TextNode[] {
+        const out: TextNode[] = [];
+        for (const m of fragment.matchAll(/<text ([^>]*)>([^<]*)(?:<tspan[\s\S]*?)?<\/text>/g)) {
+            const attr = (name: string) =>
+                Number(m[1].match(new RegExp(`(?:^|\\s)${name}="([^"]+)"`))?.[1]);
+            out.push({
+                x: attr('x'),
+                y: attr('y'),
+                fontSize: attr('font-size'),
+                content: m[2],
+            });
+        }
+        return out;
+    }
+
+    function barRect(fragment: string): { x: number; y: number; height: number } {
+        const m = fragment.match(/<rect [^>]*>/);
+        if (!m) throw new Error('no bar rect');
+        const attr = (name: string) => Number(m[0].match(new RegExp(` ${name}="([^"]+)"`))?.[1]);
+        return { x: attr('x'), y: attr('y'), height: attr('height') };
+    }
+
+    /** No `<text>` element anywhere in the SVG may carry a raw line break. */
+    function expectNoRawNewlineInText(svg: string): void {
+        for (const m of svg.matchAll(/<text\b[^>]*>([\s\S]*?)<\/text>/g)) {
+            expect(m[1]).not.toMatch(/[\r\n]/);
+        }
+    }
+
+    it('paints in-bar explicit lines as separate <text> elements 16px apart, meta below', async () => {
+        const model = await parseToModel(
+            `${HEADER}swimlane s "S"\n  item three "Design\\nBuild\\nShip" duration:2w\n`,
+        );
+        const svg = await renderSvg(model);
+        const fragment = itemFragment(svg, 'three');
+        const bar = barRect(fragment);
+        const titles = textNodes(fragment).filter((t) => t.fontSize === 13);
+        expect(titles.map((t) => t.content)).toEqual(['Design', 'Build', 'Ship']);
+        expect(titles.map((t) => t.y)).toEqual([bar.y + 20, bar.y + 36, bar.y + 52]);
+        expect(new Set(titles.map((t) => t.x)).size).toBe(1);
+        expect(titles[0].x).toBe(bar.x + 12);
+        const meta = textNodes(fragment).filter((t) => t.fontSize === 11);
+        expect(meta).toHaveLength(1);
+        // 38 + 2 extra title lines * 16.
+        expect(meta[0].y).toBe(bar.y + 70);
+        expect(bar.height).toBe(88);
+        expectNoRawNewlineInText(svg);
+    });
+
+    it('paints a spilled explicit block as stacked <text> lines beside the bar, meta below', async () => {
+        const model = await parseToModel(
+            `${HEADER}swimlane s "S"\n  item wide "Internationalization of\\nthe billing service" duration:2w\n`,
+        );
+        const svg = await renderSvg(model);
+        const fragment = itemFragment(svg, 'wide');
+        const bar = barRect(fragment);
+        const titles = textNodes(fragment).filter((t) => t.fontSize === 13);
+        expect(titles.map((t) => t.content)).toEqual([
+            'Internationalization of',
+            'the billing service',
+        ]);
+        expect(titles.map((t) => t.y)).toEqual([bar.y + 20, bar.y + 36]);
+        // Spilled: both lines start past the bar's right edge (148px wide) at one x.
+        expect(titles[0].x).toBeGreaterThan(bar.x + 148);
+        expect(titles[1].x).toBe(titles[0].x);
+        const meta = textNodes(fragment).filter((t) => t.fontSize === 11);
+        expect(meta).toHaveLength(1);
+        expect(meta[0].x).toBe(titles[0].x);
+        expect(meta[0].y).toBe(bar.y + 54);
+        expect(bar.height).toBe(72);
+        expectNoRawNewlineInText(svg);
+    });
+
+    it('paints an explicit break in a bar that would fit the unbroken title on one line', async () => {
+        const model = await parseToModel(
+            `${HEADER}swimlane s "S"\n  item plan "Plan\\nrollout" duration:4w\n`,
+        );
+        const svg = await renderSvg(model);
+        const titles = textNodes(itemFragment(svg, 'plan')).filter((t) => t.fontSize === 13);
+        expect(titles.map((t) => t.content)).toEqual(['Plan', 'rollout']);
+        expectNoRawNewlineInText(svg);
+    });
+
+    it('paints a blank interior line as a baseline gap, not an empty <text>', async () => {
+        const model = await parseToModel(
+            `${HEADER}swimlane s "S"\n  item gap "A\\n\\nB" duration:3w\n`,
+        );
+        const svg = await renderSvg(model);
+        const fragment = itemFragment(svg, 'gap');
+        const bar = barRect(fragment);
+        const titles = textNodes(fragment).filter((t) => t.fontSize === 13);
+        expect(titles.map((t) => t.content)).toEqual(['A', 'B']);
+        // Line 3 keeps its slot: baseline 20 + 2 * 16.
+        expect(titles.map((t) => t.y)).toEqual([bar.y + 20, bar.y + 52]);
+        expect(fragment).not.toContain('></text>');
+    });
+
+    it('paints the literal characters of "\\\\n" as one <text>, not as a break', async () => {
+        const model = await parseToModel(
+            `${HEADER}swimlane s "S"\n  item lit "Plan A\\\\nB" duration:3w\n`,
+        );
+        const svg = await renderSvg(model);
+        const titles = textNodes(itemFragment(svg, 'lit')).filter((t) => t.fontSize === 13);
+        // The backslash and the n are in the output as two characters.
+        expect(titles.map((t) => t.content)).toEqual(['Plan A\\nB']);
+        expectNoRawNewlineInText(svg);
+    });
+
+    it('never paints a title that contains a newline as one raw <text>', async () => {
+        const model = await parseToModel(
+            `${HEADER}swimlane s "S"\n  item a "One\\nTwo" duration:2w\n  item b "Wide title here\\nsecond" duration:1w\n`,
+        );
+        const svg = await renderSvg(model);
+        expectNoRawNewlineInText(svg);
+    });
+});
+
+describe('renderSvg — caption indent past an `after:` date glyph', () => {
+    // `scale:2w`: a `2w` item is a 148px bar. The `after:DATE` glyph is 12px
+    // wide in the bar's upper-left: bar.x + 6..18 alone, bar.x + 24..36 beside
+    // a link tile (which spans bar.x + 6..20). The caption starts 4px past it.
+    const HEADER = `nowline v1\n\nroadmap r1 "R" start:2026-04-06 scale:2w\n\n`;
+    const LINK = 'link:https://github.com/acme/team/issues/1';
+
+    interface TextNode {
+        x: number;
+        y: number;
+        fontSize: number;
+        content: string;
+    }
+
+    /** The item's `<g>`, closed at its OWN `</g>`: the glyph nests a `<g>` inside it. */
+    function itemFragment(svg: string, itemId: string): string {
+        const open = `<g data-id="${itemId}" data-layer="item">`;
+        const start = svg.indexOf(open);
+        if (start < 0) throw new Error(`no item group for ${itemId}`);
+        let depth = 0;
+        for (const m of svg.slice(start).matchAll(/<g\b|<\/g>/g)) {
+            depth += m[0] === '</g>' ? -1 : 1;
+            if (depth === 0) return svg.slice(start, start + (m.index ?? 0) + m[0].length);
+        }
+        throw new Error(`unbalanced item group for ${itemId}`);
+    }
+
+    function textNodes(fragment: string): TextNode[] {
+        const out: TextNode[] = [];
+        for (const m of fragment.matchAll(/<text ([^>]*)>([^<]*)(?:<tspan[\s\S]*?)?<\/text>/g)) {
+            const attr = (name: string) =>
+                Number(m[1].match(new RegExp(`(?:^|\\s)${name}="([^"]+)"`))?.[1]);
+            out.push({
+                x: attr('x'),
+                y: attr('y'),
+                fontSize: attr('font-size'),
+                content: m[2],
+            });
+        }
+        return out;
+    }
+
+    function barX(fragment: string): number {
+        const m = fragment.match(/<rect [^>]*>/);
+        if (!m) throw new Error('no bar rect');
+        return Number(m[0].match(/ x="([^"]+)"/)?.[1]);
+    }
+
+    /** x of the `after:` glyph's nested `<svg>`, or undefined when none is painted. */
+    function afterGlyphX(fragment: string): number | undefined {
+        const m = fragment.match(/<g [^>]*data-side="after"[^>]*>[\s\S]*?<svg x="([^"]+)"/);
+        return m ? Number(m[1]) : undefined;
+    }
+
+    it('starts the caption 4px past the glyph: bar.x + 22 without a link icon', async () => {
+        const model = await parseToModel(
+            `${HEADER}swimlane s "S"\n  item plan "Plan" duration:2w after:2026-04-20\n`,
+        );
+        const fragment = itemFragment(await renderSvg(model), 'plan');
+        const bar = barX(fragment);
+        const glyph = afterGlyphX(fragment);
+        expect(glyph).toBe(bar + 6);
+        const texts = textNodes(fragment);
+        const titles = texts.filter((t) => t.fontSize === 13);
+        expect(titles).toHaveLength(1);
+        expect(titles[0].x).toBe(bar + 22);
+        // Clears the glyph's right edge (bar + 18) by the 4px gap.
+        expect(titles[0].x).toBeGreaterThanOrEqual((glyph ?? 0) + 12 + 4);
+        // The meta line shares the caption's left edge.
+        const meta = texts.filter((t) => t.fontSize === 11);
+        expect(meta.map((t) => t.content)).toEqual(['2w']);
+        expect(meta[0].x).toBe(titles[0].x);
+    });
+
+    it('starts the caption at bar.x + 40 when the glyph sits beside a link tile', async () => {
+        const model = await parseToModel(
+            `${HEADER}swimlane s "S"\n  item plan "Plan" duration:2w ${LINK} after:2026-04-20\n`,
+        );
+        const fragment = itemFragment(await renderSvg(model), 'plan');
+        const bar = barX(fragment);
+        const tile = fragment.match(/<a [^>]*><rect [^>]*>/)?.[0];
+        expect(tile).toBeDefined();
+        const tileRight =
+            Number(tile?.match(/ x="([^"]+)"/)?.[1]) + Number(tile?.match(/ width="([^"]+)"/)?.[1]);
+        expect(tileRight).toBe(bar + 20);
+        const glyph = afterGlyphX(fragment);
+        expect(glyph).toBe(bar + 24);
+        const titles = textNodes(fragment).filter((t) => t.fontSize === 13);
+        expect(titles).toHaveLength(1);
+        expect(titles[0].x).toBe(bar + 40);
+        expect(titles[0].x).toBeGreaterThanOrEqual((glyph ?? 0) + 12 + 4);
+    });
+
+    it('indents every line of a wrapped caption and the meta line, keeping the left edge straight', async () => {
+        const model = await parseToModel(
+            `${HEADER}swimlane s "S"\n  item ship "Ship the thing" duration:2w after:2026-04-20\n`,
+        );
+        const fragment = itemFragment(await renderSvg(model), 'ship');
+        const bar = barX(fragment);
+        const texts = textNodes(fragment);
+        const titles = texts.filter((t) => t.fontSize === 13);
+        expect(titles.map((t) => t.content)).toEqual(['Ship the', 'thing']);
+        expect(titles.map((t) => t.x)).toEqual([bar + 22, bar + 22]);
+        const meta = texts.filter((t) => t.fontSize === 11);
+        expect(meta[0].x).toBe(bar + 22);
+    });
+
+    it('indents an explicit multi-line title on every line', async () => {
+        const model = await parseToModel(
+            `${HEADER}swimlane s "S"\n  item two "One\\nTwo" duration:2w after:2026-04-20\n`,
+        );
+        const fragment = itemFragment(await renderSvg(model), 'two');
+        const bar = barX(fragment);
+        const titles = textNodes(fragment).filter((t) => t.fontSize === 13);
+        expect(titles.map((t) => t.content)).toEqual(['One', 'Two']);
+        expect(titles.map((t) => t.x)).toEqual([bar + 22, bar + 22]);
+    });
+
+    it('keeps the glyph-cleared indent under noLinks, where layout still placed the glyph beside the tile', async () => {
+        const model = await parseToModel(
+            `${HEADER}swimlane s "S"\n  item plan "Plan" duration:2w ${LINK} after:2026-04-20\n`,
+        );
+        const fragment = itemFragment(await renderSvg(model, { noLinks: true }), 'plan');
+        expect(fragment).not.toContain('<a ');
+        const bar = barX(fragment);
+        // Layout positioned the glyph at bar.x + 24 (past the link tile that
+        // noLinks hides), so the caption must still clear it at bar.x + 40.
+        expect(afterGlyphX(fragment)).toBe(bar + 24);
+        const titles = textNodes(fragment).filter((t) => t.fontSize === 13);
+        expect(titles[0].x).toBe(bar + 40);
+    });
+
+    it('leaves a `before:`-only item at the plain 12px inset', async () => {
+        const model = await parseToModel(
+            `${HEADER}swimlane s "S"\n  item plan "Plan" duration:2w before:2026-06-29\n`,
+        );
+        const fragment = itemFragment(await renderSvg(model), 'plan');
+        const bar = barX(fragment);
+        const titles = textNodes(fragment).filter((t) => t.fontSize === 13);
+        expect(titles[0].x).toBe(bar + 12);
+    });
+
+    it('does not indent a caption that spilled beside the bar', async () => {
+        const model = await parseToModel(
+            `${HEADER}swimlane s "S"\n  item big "Internationalization" duration:2w after:2026-04-20\n`,
+        );
+        const fragment = itemFragment(await renderSvg(model), 'big');
+        const bar = barX(fragment);
+        const titles = textNodes(fragment).filter((t) => t.fontSize === 13);
+        // Spilled: starts past the bar's right edge (148px wide) plus the 6px gap.
+        expect(titles[0].x).toBe(bar + 148 + 6);
     });
 });

@@ -46,3 +46,4 @@ export type { NowlineAddedServices, NowlineServices } from './language/nowline-m
 export { createNowlineServices, NowlineModule } from './language/nowline-module.js';
 export { NowlineValidator, registerValidationChecks } from './language/nowline-validator.js';
 export { TEMPLATE_NAMES, type TemplateName } from './templates.js';
+export { singleLine } from './util/single-line.js';

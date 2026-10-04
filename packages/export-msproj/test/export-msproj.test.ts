@@ -153,3 +153,39 @@ describe('duration mapping', () => {
         expect(minutesToMsProjDuration(0)).toBe('PT0M0S');
     });
 });
+
+describe('exportMsProjXml — explicit line breaks in titles (lolay/nowline#60)', () => {
+    // `\n` in a DSL string is a real newline once parsed. MS Project task names are
+    // single-line, so each break collapses to one space instead of leaving a raw LF
+    // inside <Name>.
+    const BREAK_FIXTURE = `nowline v1
+
+roadmap r "R" start:2026-04-06
+
+swimlane lane "Lane"
+  item tech "Technology\\nSelection" duration:2w
+  item "Title only\\n\\nno id" duration:1w
+`;
+
+    it('collapses a line break in a task name to a single space', async () => {
+        const inputs = await buildExportInputs(BREAK_FIXTURE);
+        const xml = exportMsProjXml(inputs, { onLossy: () => {} });
+        expect(xml).toContain('<Name>Technology Selection</Name>');
+        expect(xml).toContain('<Name>Title only no id</Name>');
+    });
+
+    it('leaves no raw line feed inside any <Name> element', async () => {
+        const inputs = await buildExportInputs(BREAK_FIXTURE);
+        const xml = exportMsProjXml(inputs, { onLossy: () => {} });
+        for (const m of xml.matchAll(/<Name>([\s\S]*?)<\/Name>/g)) {
+            expect(m[1]).not.toMatch(/[\r\n]/);
+        }
+    });
+
+    it('keeps a literal backslash-n (the DSL escape "\\\\n") as two characters', async () => {
+        const fixture = BREAK_FIXTURE.replace('Technology\\nSelection', 'Plan A\\\\nB');
+        const inputs = await buildExportInputs(fixture);
+        const xml = exportMsProjXml(inputs, { onLossy: () => {} });
+        expect(xml).toContain('<Name>Plan A\\nB</Name>');
+    });
+});

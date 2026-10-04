@@ -37,6 +37,11 @@ const MANIFEST = [
     { slug: 'large-swimlane-title', theme: 'light', now: NOW },
     { slug: 'text-fits-inside-bars', theme: 'light', now: NOW },
     { slug: 'text-spills-right', theme: 'light', now: NOW },
+    // Its roadmap starts 2026-04-06, so `now` is pinned inside that window
+    // (the shared NOW would sit before the timeline and hide the now-line).
+    { slug: 'text-wraps-inside-bars', theme: 'light', now: '2026-05-11' },
+    // Same window as text-wraps-inside-bars (starts 2026-04-06).
+    { slug: 'title-line-breaks', theme: 'light', now: '2026-05-11' },
     { slug: 'item-bumps-up', theme: 'light', now: NOW },
     { slug: 'isolate-include-multi', theme: 'light', now: NOW },
     { slug: 'defaults-no-start-no-now', theme: 'light' },
