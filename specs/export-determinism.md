@@ -29,7 +29,9 @@ than a fight against the runtime:
 
 2. **The format exporters are already reproducible by construction.**
    `@nowline/export-pdf` pins `CreationDate` / `ModDate` / `/ID` / `Producer`
-   to `inputs.today`; `@nowline/export-xlsx` pins workbook timestamps and runs
+   to `inputs.today`, and writes only the source *basename* into `Subject`
+   (never the absolute path, which would make the bytes depend on where the
+   file lives); `@nowline/export-xlsx` pins workbook timestamps and runs
    a `normalizeZipTimestamps()` pass to remove per-entry zip nondeterminism.
    Neither calls `new Date()` in the output path.
 
@@ -200,14 +202,22 @@ unit-test matrix on purpose: it needs a compiled binary (Bun) and a browser
 (Playwright), and the binary-format goldens (pdf/png) are pinned per toolchain
 version in one canonical environment rather than per OS.
 
-**Source-path normalization.** Two exporters echo the source path into their
-bytes — the JSON serializer (`file.uri`) and the PDF `Subject`. That path is an
-*input*, not engine output, and is machine-specific (`/Users/you/…` vs
-`/home/runner/…`), so the gate strips the volatile directory (keeping the
-stable basename) from every artifact before hashing, uniformly on all surfaces.
-Every other byte is compared verbatim. This keeps the checked-in goldens
-portable across checkouts and CI without weakening the cross-surface
-comparison.
+**Source-path normalization.** The JSON serializer echoes the absolute source
+path into its bytes (`file.uri`). That path is an *input*, not engine output,
+and is machine-specific (`/Users/you/…` vs `/home/runner/…`), so for `json`
+the gate strips the volatile directory (keeping the stable basename) before
+hashing, uniformly on all surfaces. Every other format is hashed verbatim, so
+the checked-in goldens are portable across checkouts and CI.
+
+Byte-stripping only works for a format whose other bytes don't depend on the
+path. PDF is the counterexample: its `/ID` is an MD5 over the Info dict and
+every xref offset shifts with a string's length, so a path in `Subject` changes
+bytes the strip cannot reach. The PDF exporter therefore defaults `Subject` to
+the source basename instead, and no format other than JSON may embed the source
+directory. `packages/integration-tests/test/pdf-source-path.test.ts` (in `make
+test`) exports the same sources from two directories and asserts identical
+bytes, so a regression fails everywhere rather than only off CI's checkout
+path.
 
 ## Non-goals and explicit opt-outs
 

@@ -105,7 +105,7 @@ export async function hashCli(
         await run(bin, cliArgs(fixture, format, outPath));
         const bytes = await fs.readFile(outPath);
         const view = new Uint8Array(bytes.buffer, bytes.byteOffset, bytes.byteLength);
-        return sha256(stripVolatilePath(view, fixtureSourcePath(fixture)));
+        return sha256(stripVolatilePath(view, format, fixtureSourcePath(fixture)));
     } finally {
         await fs.rm(outPath, { force: true });
     }
