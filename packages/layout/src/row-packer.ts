@@ -14,11 +14,13 @@
 //
 // When a row's height grows after later rows already exist, the packer
 // shifts every subsequent row (and every positioned child placed in it)
-// downward by the delta. Items keep their row-anchored top edge; the
+// downward by the delta, through the shared `shiftTrackChildY` (see
+// `positioned-shift.ts`). Items keep their row-anchored top edge; the
 // row simply gets taller. This keeps the contract "all children in a
 // row share that row's top y" intact while letting individual children
 // grow vertically (e.g. wrapped label-chiclet stacks in m3).
 
+import { shiftTrackChildY } from './positioned-shift.js';
 import type { PositionedItem, PositionedTrackChild, SlackCorridor } from './types.js';
 
 export interface PackedRow {
@@ -243,33 +245,8 @@ export class RowPacker {
             const r = this.rows[i];
             r.y += delta;
             for (const child of r.placedChildren) {
-                shiftPositionedY(child, delta);
+                shiftTrackChildY(child, delta);
             }
         }
-    }
-}
-
-/**
- * Walk a positioned subtree and shift every absolute y by `dy`. Used
- * when an earlier row in the packer grows, retroactively pushing every
- * later row (and its placed subtrees) down to keep them clear.
- *
- * Items: shift the bar box plus label chips and any overflow box.
- * Groups / parallels: shift the container box and recurse into
- * children. The caller's `box.y` already moved with the parent.
- */
-function shiftPositionedY(p: PositionedTrackChild, dy: number): void {
-    p.box.y += dy;
-    if (p.kind === 'item') {
-        for (const chip of p.labelChips) {
-            chip.box.y += dy;
-        }
-        if (p.overflowBox) {
-            p.overflowBox.y += dy;
-        }
-        return;
-    }
-    for (const child of p.children) {
-        shiftPositionedY(child, dy);
     }
 }

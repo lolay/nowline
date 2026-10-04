@@ -98,7 +98,7 @@ Condensed from four read-only research passes over layout, renderer, core plumbi
 **Engine A data.** `LayoutContext` (`layout-context.ts:50-156`) holds:
 
 - `entityLeftEdges` and `entityRightEdges` (`:71-72`): the logical boundaries that `after:` and `before:` read;
-- `entityVisualLeftX` and `entityVisualRightX` (`:83-84`);
+- `placedItems`: every placed item by draw key; dependency-arrow and slack-arrow ports are derived from its final box when arrows are built (`item-port-geometry.ts`). A ref that is not a placed item (anchor, milestone, group, parallel, wave) reads `entityRightEdges` for its x;
 - `itemFlowKey` and `currentFlowKey` (`:103, :111`);
 - `slackCorridors` (`:128`) and `markerRowPlacements` (`:135`);
 - `chartTopY`, `chartBottomY`, `swimlaneBottomY` and `chartRightX` (`:136-147`).
@@ -483,7 +483,7 @@ Each phase is one PR and ends with `make pre-commit` green.
   - `layoutRoadmap` wires up `buildWavePlan`.
 - **`schedule.ts`:** the engine C driver, `resolveAfterDay` for wave ids, a one-level region walk, and `RoadmapSchedule.waves?`.
 - **`nodes/roadmap-node.ts`:**
-  - seeds the wave edges into the baseline maps, including `entityVisualRightX[w] = E_k`;
+  - seeds the wave edges into the baseline maps (`entityRightEdges[w] = E_k`, which a floating milestone's predecessor lookup reads for any ref that is not a placed item);
   - a pass loop around `runSwimlaneLoop` plus the region pass, with in-loop region placements discarded;
   - the slack rerun and the final region placement each run once, frozen;
   - `collectSlackCorridors` skips wave refs.
