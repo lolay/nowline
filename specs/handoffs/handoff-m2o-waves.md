@@ -110,7 +110,7 @@ The map below was written at `4f771b4`. It was re-verified at `26129db` (October
 
 **CLI**
 
-- The CLI does not call the resolver itself; resolver errors reach it through `@nowline/export`. Coded resolver diagnostics will travel on a typed error and be reported like validator diagnostics (localized, `--diagnostic-format json`, exit 1). Uncoded include errors keep today's behaviour exactly (exit 3, same message).
+- Before m2o the CLI did not call the resolver itself; resolver errors reached it only through `@nowline/export`. Task 3.2 has the CLI resolve includes during validation, as `--serve` does, so routed resolver diagnostics are reported with the validator's (localized, `--diagnostic-format json`, exit 1) without moving anything the CLI writes after validation (`specs/waves.md` §6.1). Uncoded include errors keep today's behaviour exactly (exit 3, same message), through the kernel.
 
 **Docs**
 

@@ -4,7 +4,10 @@ import {
     collectDocumentDiagnostics,
     createNowlineServices,
     extractSuggestion,
+    inferCodeFromMessage,
+    isRoutedResolveDiagnostic,
     type NowlineFile,
+    type ResolveDiagnostic,
     resolveDiagnosticCode,
     resolveIncludes,
 } from '@nowline/core';
@@ -91,6 +94,31 @@ export function collectMcpDiagnostics(
     return out;
 }
 
+/**
+ * A routed (wave-rule) include-resolver diagnostic (specs/waves.md §6.1) as
+ * an MCP diagnostic: its stable code, the file it points into and a 1-based
+ * line. WV8, the one uncoded wave rule, is labelled like the validator's copy.
+ */
+export function resolveDiagnosticToMcp(diag: ResolveDiagnostic): McpDiagnostic {
+    const suggestion = extractSuggestion(diag.message);
+    return {
+        file: diag.sourcePath,
+        line: (diag.line ?? 0) + 1,
+        column: 1,
+        severity: diag.severity,
+        code: diag.code ?? inferCodeFromMessage(diag.message),
+        message: diag.message,
+        ...(suggestion === undefined ? {} : { suggestion }),
+    };
+}
+
+/** The routed diagnostics among `diagnostics`, as MCP diagnostics. */
+export function routedResolveDiagnosticsToMcp(
+    diagnostics: readonly ResolveDiagnostic[],
+): McpDiagnostic[] {
+    return diagnostics.filter(isRoutedResolveDiagnostic).map(resolveDiagnosticToMcp);
+}
+
 export function diagnosticsErrorResponse(filePath: string, diagnostics: McpDiagnostic[]) {
     return {
         content: [
@@ -101,6 +129,19 @@ export function diagnosticsErrorResponse(filePath: string, diagnostics: McpDiagn
         ],
         isError: true as const,
     };
+}
+
+/**
+ * The error response when include resolution reports a routed (wave-rule)
+ * error: the validator's diagnostics (warnings only, since `doc` validated)
+ * followed by `routed`.
+ */
+export function includeDiagnosticsResponse(
+    doc: Awaited<ReturnType<typeof buildDocument>>,
+    filePath: string,
+    routed: McpDiagnostic[],
+) {
+    return diagnosticsErrorResponse(filePath, [...collectMcpDiagnostics(doc, filePath), ...routed]);
 }
 
 export async function diagnosticsErrorBlock(
@@ -130,6 +171,11 @@ export interface LayoutInsightInputs {
      *  caller is responsible for passing a doc parsed from the same
      *  `source` (e.g. the one from `diagnosticsErrorBlock`). */
     doc?: Awaited<ReturnType<typeof buildDocument>>;
+    /** Receives the routed (wave-rule) include-resolver diagnostics, errors
+     *  included, once includes are resolved. Not called when the resolver
+     *  reports an uncoded include error: that error takes precedence and the
+     *  routed diagnostics are dropped (specs/waves.md §6.1). */
+    onResolveDiagnostics?: (diagnostics: McpDiagnostic[]) => void;
 }
 
 export async function collectMcpLayoutInsights(inputs: LayoutInsightInputs): Promise<McpInsight[]> {
@@ -145,6 +191,12 @@ export async function collectMcpLayoutInsights(inputs: LayoutInsightInputs): Pro
         services: services.Nowline,
         readFile: inputs.readFile,
     });
+    const legacyError = resolved.diagnostics.some(
+        (d) => d.severity === 'error' && !isRoutedResolveDiagnostic(d),
+    );
+    if (!legacyError) {
+        inputs.onResolveDiagnostics?.(routedResolveDiagnosticsToMcp(resolved.diagnostics));
+    }
     if (resolved.diagnostics.some((d) => d.severity === 'error')) {
         return [];
     }

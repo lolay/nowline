@@ -35,7 +35,7 @@ export interface CliDiagnostic {
      * Stable code + args as captured by the validator. Present on
      * messages that flow through the `tr()` registry; absent for
      * literal-English validator strings, parser/lexer errors, and
-     * include-resolution diagnostics. The CLI re-formats `message`
+     * uncoded include-resolution diagnostics. The CLI re-formats `message`
      * from this when an operator locale is supplied to
      * `formatDiagnostics`.
      */

@@ -2035,7 +2035,12 @@ function locationOf(node: AstNode): string {
     return 'unknown location';
 }
 
-function registerEntity(
+/**
+ * Every explicit id a roadmap entry declares (rule 2), including items,
+ * groups and parallels inside swimlanes and teams nested in teams. Shared
+ * with the include resolver's cross-file wave id check (WV2).
+ */
+export function registerEntity(
     entry: RoadmapEntry,
     register: (name: string | undefined, node: AstNode) => void,
 ): void {

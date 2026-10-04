@@ -54,6 +54,17 @@ export interface WaveOrderScope {
     lookup: WaveRefLookup;
 }
 
+/** Options for `evaluateWaveOrder`. */
+export interface WaveOrderOptions {
+    /**
+     * Leave a reference that closes an explicit `after:`/`before:` cycle to
+     * the circular-dependency check (default true). That check runs per
+     * file, so the include resolver passes false for its merged scopes: a
+     * cycle that crosses files would otherwise go unreported.
+     */
+    suppressCycleRefs?: boolean;
+}
+
 type Work = ItemDeclaration | GroupBlock | ParallelBlock;
 
 // One item, group or parallel in placement order.
@@ -177,7 +188,8 @@ function isPinned(node: Work): boolean {
  *   that the barrier makes unmeetable.
  * - WV12 (NL.W1101). An `after:` or `before:` naming work layout has not
  *   placed yet, or a floating milestone. A reference that closes an explicit
- *   `after:`/`before:` cycle is left to the circular-dependency check.
+ *   `after:`/`before:` cycle is left to the circular-dependency check, unless
+ *   `options.suppressCycleRefs` is false.
  *
  * Swimlane `after:`/`before:` are not implemented by any engine and are
  * ignored here.
@@ -185,6 +197,7 @@ function isPinned(node: Work): boolean {
 export function evaluateWaveOrder(
     scope: WaveOrderScope,
     waves: readonly WaveDeclaration[],
+    options: WaveOrderOptions = {},
 ): WaveFinding[] {
     if (waves.length === 0) return [];
     const waveIds = new Map<string, number>();
@@ -254,7 +267,8 @@ export function evaluateWaveOrder(
     };
 
     const findings: WaveFinding[] = [];
-    const onCycle = cycleTest(slots, lanes, lookup);
+    const onCycle =
+        (options.suppressCycleRefs ?? true) ? cycleTest(slots, lanes, lookup) : () => false;
 
     // --- References: the after: edges layout resolves, and WV12. ---
     for (let v = 0; v < slots.length; v++) {

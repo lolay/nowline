@@ -36,6 +36,7 @@ export type * from './i18n/wave-message-types.js';
 export {
     type IncludeMode,
     type IsolatedRegion,
+    isRoutedResolveDiagnostic,
     type ResolveDiagnostic,
     type ResolvedConfig,
     type ResolvedContent,
@@ -65,6 +66,16 @@ export {
     waveFloorDate,
     waveIndexMap,
 } from './language/waves.js';
-export { evaluateWaveOrder, type WaveOrderScope } from './language/waves-order.js';
+export {
+    evaluateWaveOrder,
+    type WaveOrderOptions,
+    type WaveOrderScope,
+} from './language/waves-order.js';
+export {
+    buildWavePlan,
+    localizeResolveDiagnostic,
+    type WaveFloor,
+    type WavePlan,
+} from './language/waves-plan.js';
 export { TEMPLATE_NAMES, type TemplateName } from './templates.js';
 export { singleLine } from './util/single-line.js';

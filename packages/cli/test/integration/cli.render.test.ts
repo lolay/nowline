@@ -1,5 +1,6 @@
 import { existsSync, promises as fs } from 'node:fs';
 import * as path from 'node:path';
+import { tr } from '@nowline/core';
 import { describe, expect, it } from 'vitest';
 import { examplesDir, packageRoot, runCliBuilt, withTempDir } from '../helpers.js';
 
@@ -469,4 +470,323 @@ describeBuilt('verbless render — locale precedence (two-chain model)', () => {
             expect(r.stderr).toContain('nowline: locale=en-US (default)');
         });
     });
+});
+
+// Wave-rule include diagnostics (specs/waves.md §6.1) are validation
+// diagnostics: file and 1-based line, localized, in the one JSON document,
+// exit 1. Uncoded include errors keep exit 3 and their message.
+describeBuilt('render: include diagnostics', () => {
+    const NO_LOCALE_ENV = { LC_ALL: '', LC_MESSAGES: '', LANG: '' };
+
+    // The include is on line 3; the parent declares waves w1 and w2.
+    const parent = (include: string) =>
+        [
+            'nowline v1',
+            '',
+            include,
+            '',
+            'roadmap r "R" start:2026-01-05',
+            '',
+            'wave w1 "One"',
+            'wave w2 "Two"',
+            '',
+            'swimlane a "A"',
+            '  item x duration:1w wave:w1',
+            '',
+        ].join('\n');
+    const childWithWaves = (lane: string[], config: string[] = []) =>
+        [...config, 'wave w1 "One"', 'wave w2 "Two"', '', ...lane, ''].join('\n');
+    const childNoneArgs = {
+        reason: 'child-none' as const,
+        path: './child.nowline',
+        parent: ['w1', 'w2'],
+    };
+
+    async function writeFiles(dir: string, files: Record<string, string>): Promise<void> {
+        for (const [name, text] of Object.entries(files)) {
+            const file = path.join(dir, name);
+            await fs.mkdir(path.dirname(file), { recursive: true });
+            await fs.writeFile(file, text);
+        }
+    }
+
+    it('a parent with waves including a child without them fails with NL.E0202 (exit 1)', async () => {
+        await withTempDir(async (dir) => {
+            await writeFiles(dir, {
+                'parent.nowline': parent('include "./child.nowline"'),
+                'child.nowline': 'swimlane c "C"\n  item y duration:1w\n',
+            });
+            const r = await runCliBuilt(['parent.nowline', '-o', '-'], {
+                cwd: dir,
+                env: NO_LOCALE_ENV,
+            });
+            expect(r.exitCode).toBe(1);
+            expect(r.stdout).toBe('');
+            expect(r.stderr).toContain(
+                `parent.nowline:3:1 error: ${tr('en-US', 'NL.E0202', childNoneArgs)}`,
+            );
+            expect(r.stderr).not.toContain('export failed');
+        });
+    });
+
+    it('--diagnostic-format json reports NL.E0202 in the one document', async () => {
+        await withTempDir(async (dir) => {
+            await writeFiles(dir, {
+                'parent.nowline': parent('include "./child.nowline"'),
+                'child.nowline': 'swimlane c "C"\n  item y duration:1w\n',
+            });
+            const r = await runCliBuilt(
+                ['parent.nowline', '-o', '-', '--diagnostic-format', 'json'],
+                { cwd: dir, env: NO_LOCALE_ENV },
+            );
+            expect(r.exitCode).toBe(1);
+            const doc = JSON.parse(r.stderr);
+            expect(doc.$nowlineDiagnostics).toBe('1');
+            expect(doc.diagnostics).toEqual([
+                {
+                    file: 'parent.nowline',
+                    line: 3,
+                    column: 1,
+                    severity: 'error',
+                    code: 'NL.E0202',
+                    message: tr('en-US', 'NL.E0202', childNoneArgs),
+                    // The span covers the include line.
+                    span: {
+                        start: { line: 3, column: 1 },
+                        end: { line: 3, column: 'include "./child.nowline"'.length + 1 },
+                    },
+                },
+            ]);
+        });
+    });
+
+    it('--locale fr localizes NL.E0202', async () => {
+        await withTempDir(async (dir) => {
+            await writeFiles(dir, {
+                'parent.nowline': parent('include "./child.nowline"'),
+                'child.nowline': 'swimlane c "C"\n  item y duration:1w\n',
+            });
+            const r = await runCliBuilt(['parent.nowline', '-o', '-', '--locale', 'fr'], {
+                cwd: dir,
+                env: NO_LOCALE_ENV,
+            });
+            expect(r.exitCode).toBe(1);
+            const fr = tr('fr', 'NL.E0202', childNoneArgs);
+            expect(fr).not.toBe(tr('en-US', 'NL.E0202', childNoneArgs));
+            expect(r.stderr).toContain(`parent.nowline:3:1 error: ${fr}`);
+        });
+    });
+
+    it('reports NL.E1101 in a child at the child path and line', async () => {
+        await withTempDir(async (dir) => {
+            await writeFiles(dir, {
+                'parent.nowline': parent('include "./teams/child.nowline"'),
+                'teams/child.nowline': childWithWaves([
+                    'swimlane c "C"',
+                    '  item y duration:1w wave:w9',
+                ]),
+            });
+            const r = await runCliBuilt(['parent.nowline', '-o', '-'], {
+                cwd: dir,
+                env: NO_LOCALE_ENV,
+            });
+            expect(r.exitCode).toBe(1);
+            const message = tr('en-US', 'NL.E1101', {
+                reason: 'unknown',
+                value: 'w9',
+                declared: ['w1', 'w2'],
+            });
+            expect(r.stderr).toContain(
+                `${path.join('teams', 'child.nowline')}:5:3 error: ${message}`,
+            );
+        });
+    });
+
+    it('WV8 in a child is a validation error (exit 1, not 3)', async () => {
+        await withTempDir(async (dir) => {
+            await writeFiles(dir, {
+                'parent.nowline': parent('include "./child.nowline"'),
+                'child.nowline': childWithWaves(
+                    ['swimlane c "C"', '  item y duration:1w wave:w1'],
+                    ['config', 'default item wave:w1', ''],
+                ),
+            });
+            const r = await runCliBuilt(['parent.nowline', '-o', '-'], {
+                cwd: dir,
+                env: NO_LOCALE_ENV,
+            });
+            expect(r.exitCode).toBe(1);
+            expect(r.stderr).toContain(
+                'child.nowline:2:1 error: "wave" cannot be set on "default item".',
+            );
+        });
+    });
+
+    it('merges validator and resolver warnings into one JSON document (exit 0)', async () => {
+        await withTempDir(async (dir) => {
+            // No waves anywhere: `wave:` is ignored with NL.W0702, from the
+            // validator in the parent and from the resolver in the child.
+            await writeFiles(dir, {
+                'parent.nowline': [
+                    'include "./child.nowline"',
+                    'roadmap r "R" start:2026-01-05',
+                    'swimlane a "A"',
+                    '  item x duration:1w wave:w1',
+                    '',
+                ].join('\n'),
+                'child.nowline': 'swimlane c "C"\n  item y duration:1w wave:w1\n',
+            });
+            const r = await runCliBuilt(
+                ['parent.nowline', '-o', '-', '--diagnostic-format', 'json'],
+                { cwd: dir, env: NO_LOCALE_ENV },
+            );
+            expect(r.exitCode).toBe(0);
+            expect(r.stdout.startsWith('<svg')).toBe(true);
+            const doc = JSON.parse(r.stderr);
+            expect(
+                doc.diagnostics.map((d: { file: string; line: number; code: string }) => [
+                    d.file,
+                    d.line,
+                    d.code,
+                ]),
+            ).toEqual([
+                ['parent.nowline', 4, 'NL.W0702'],
+                ['child.nowline', 2, 'NL.W0702'],
+            ]);
+        });
+    });
+
+    it('text mode keeps warnings quiet on a successful run', async () => {
+        await withTempDir(async (dir) => {
+            await writeFiles(dir, {
+                'parent.nowline':
+                    'include "./child.nowline"\nroadmap r "R"\nswimlane a "A"\n  item x duration:1w\n',
+                'child.nowline': 'swimlane c "C"\n  item y duration:1w wave:w1\n',
+            });
+            const r = await runCliBuilt(['parent.nowline', '-o', '-'], {
+                cwd: dir,
+                env: NO_LOCALE_ENV,
+            });
+            expect(r.exitCode).toBe(0);
+            expect(r.stderr).toBe('');
+        });
+    });
+
+    it('REGRESSION: a missing include keeps exit 3 and the same message', async () => {
+        await withTempDir(async (dir) => {
+            const source = path.join(dir, 'parent.nowline');
+            await fs.writeFile(
+                source,
+                'include "./missing.nowline"\nroadmap r "R"\nswimlane a "A"\n  item x duration:1w\n',
+            );
+            for (const extra of [[], ['--diagnostic-format', 'json']]) {
+                const r = await runCliBuilt([source, '-o', '-', ...extra], {
+                    cwd: dir,
+                    env: NO_LOCALE_ENV,
+                });
+                expect(r.exitCode).toBe(3);
+                expect(r.stdout).toBe('');
+                // Captured from the CLI before wave diagnostics were routed.
+                expect(r.stderr).toBe(
+                    `nowline: svg export failed: @nowline/export: include error in ${source}: ` +
+                        `Could not read include "./missing.nowline": ENOENT: no such file or directory, open '${path.join(dir, 'missing.nowline')}'\n`,
+                );
+            }
+        });
+    });
+
+    it('REGRESSION: JSON mode reports validator warnings before a missing-include failure', async () => {
+        await withTempDir(async (dir) => {
+            const source = path.join(dir, 'parent.nowline');
+            await fs.writeFile(
+                source,
+                'include "./missing.nowline"\nroadmap r "R"\nswimlane a "A"\n  item x duration:1w sizee:l\n',
+            );
+            const args = [source, '-o', '-', '--diagnostic-format', 'json'];
+            // Reference: the same parent with the include present reports
+            // only the validator's warnings document.
+            await fs.writeFile(path.join(dir, 'missing.nowline'), 'swimlane c "C"\n');
+            const ok = await runCliBuilt(args, { cwd: dir, env: NO_LOCALE_ENV });
+            expect(ok.exitCode).toBe(0);
+            expect(JSON.parse(ok.stderr).diagnostics.map((d: { code: string }) => d.code)).toEqual([
+                'NL.W0700',
+            ]);
+            await fs.rm(path.join(dir, 'missing.nowline'));
+            const r = await runCliBuilt(args, { cwd: dir, env: NO_LOCALE_ENV });
+            expect(r.exitCode).toBe(3);
+            expect(r.stderr).toBe(
+                `${ok.stderr}nowline: svg export failed: @nowline/export: include error in ${source}: ` +
+                    `Could not read include "./missing.nowline": ENOENT: no such file or directory, open '${path.join(dir, 'missing.nowline')}'\n`,
+            );
+        });
+    });
+
+    // An option error raised after validation still follows the warnings
+    // document, and --verbose's locale line still follows it, with or
+    // without includes (the resolver runs during validation).
+    for (const withInclude of [false, true]) {
+        it(`JSON warnings precede later option errors and the locale line (include: ${withInclude})`, async () => {
+            await withTempDir(async (dir) => {
+                await writeFiles(dir, {
+                    'parent.nowline': [
+                        ...(withInclude ? ['include "./child.nowline"'] : []),
+                        'roadmap r "R" start:2026-01-05',
+                        'swimlane a "A"',
+                        '  item x duration:1w sizee:l',
+                        '',
+                    ].join('\n'),
+                    'child.nowline': 'swimlane c "C"\n  item y duration:1w\n',
+                });
+                const base = ['parent.nowline', '-o', '-', '--diagnostic-format', 'json'];
+                const ok = await runCliBuilt(base, { cwd: dir, env: NO_LOCALE_ENV });
+                expect(ok.exitCode).toBe(0);
+                expect(ok.stderr.startsWith('{')).toBe(true);
+
+                const margin = await runCliBuilt([...base, '--margin', 'bogus'], {
+                    cwd: dir,
+                    env: NO_LOCALE_ENV,
+                });
+                expect(margin.exitCode).toBe(2);
+                expect(margin.stderr.startsWith(ok.stderr)).toBe(true);
+                expect(margin.stderr.slice(ok.stderr.length)).toMatch(
+                    /^nowline: invalid --margin "bogus": [^\n]*\n$/,
+                );
+
+                const verbose = await runCliBuilt([...base, '--verbose'], {
+                    cwd: dir,
+                    env: NO_LOCALE_ENV,
+                });
+                expect(verbose.exitCode).toBe(0);
+                expect(verbose.stderr).toBe(
+                    `nowline: format=svg (resolved)\n${ok.stderr}nowline: locale=en-US (default)\n`,
+                );
+            });
+        });
+    }
+
+    // The committed renderer snapshots predate waves; the CLI writes the same
+    // bytes plus a trailing newline, for a plain file and one with includes.
+    for (const name of ['minimal', 'isolate-include']) {
+        it(`${name}: a file with no waves renders byte-identically`, async () => {
+            const snapshot = await fs.readFile(
+                path.join(
+                    packageRoot,
+                    '..',
+                    'integration-tests',
+                    'test',
+                    '__snapshots__',
+                    `${name}.svg`,
+                ),
+                'utf-8',
+            );
+            const input = path.join(examplesDir, `${name}.nowline`);
+            const r = await runCliBuilt([input, '-o', '-', '--now', '2026-02-09']);
+            expect(r.exitCode).toBe(0);
+            expect(r.stderr).toBe('');
+            expect(r.stdout).toBe(`${snapshot}\n`);
+            const json = await runCliBuilt([input, '-o', '-', '--diagnostic-format', 'json']);
+            expect(json.exitCode).toBe(0);
+            expect(json.stderr).toBe('');
+        });
+    }
 });

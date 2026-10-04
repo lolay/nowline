@@ -405,13 +405,20 @@ Unknown keys are ignored.
 .It 0
 Success.
 .It 1
-Validation error (parse failure, invalid reference, etc.).
+Validation error (parse failure, invalid reference, etc.), including
+the wave rules checked across included files, such as
+.Sy NL.E0202 .
+Those are reported like validator diagnostics, at the file and line
+they point into.
 .It 2
 Usage error (missing input, bad flags, mutually-exclusive flags,
 unsupported format, file not found, binary output to TTY, unreadable
 input).
 .It 3
-Output error (cannot write to destination, exporter pipeline failure).
+Output error (cannot write to destination, exporter pipeline failure),
+including an include that cannot be resolved (unreadable, circular or
+duplicate include, mismatched
+.Cm start: ) .
 .El
 .Sh EXAMPLES
 Render the default SVG to the current directory:

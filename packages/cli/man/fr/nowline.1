@@ -381,14 +381,22 @@ Les clés inconnues sont ignorées.
 .It 0
 Succès.
 .It 1
-Erreur de validation (analyse en échec, référence invalide, etc.).
+Erreur de validation (analyse en échec, référence invalide, etc.), y
+compris les règles de vagues vérifiées à travers les fichiers inclus,
+comme
+.Sy NL.E0202 .
+Elles sont signalées comme les diagnostics du validateur, au fichier et
+à la ligne qu'elles désignent.
 .It 2
 Erreur d'utilisation (entrée manquante, indicateurs incorrects ou
 mutuellement exclusifs, format non pris en charge, fichier introuvable,
 sortie binaire vers un terminal, entrée illisible).
 .It 3
 Erreur de sortie (impossible d'écrire à la destination, échec du
-pipeline d'export).
+pipeline d'export), y compris une inclusion impossible à résoudre
+(inclusion illisible, circulaire ou en double,
+.Cm start:
+différent).
 .El
 .Sh EXEMPLES
 Produire le SVG par défaut dans le dossier courant\ :

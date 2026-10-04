@@ -2,6 +2,7 @@ import { type ChildProcess, spawn } from 'node:child_process';
 import { existsSync, promises as fs } from 'node:fs';
 import * as http from 'node:http';
 import * as path from 'node:path';
+import { tr } from '@nowline/core';
 import { describe, expect, it } from 'vitest';
 import { packageRoot, withTempDir } from '../helpers.js';
 
@@ -31,6 +32,36 @@ async function fetchText(url: string): Promise<string> {
             res.on('end', () => resolve(data));
             res.on('error', reject);
         }).on('error', reject);
+    });
+}
+
+/** The first server-sent event on `/events` after `hello`: the current payload. */
+async function fetchPayloadEvent(url: string): Promise<{ event: string; data: string }> {
+    return new Promise((resolve, reject) => {
+        const req = http.get(url, (res) => {
+            let buf = '';
+            res.setEncoding('utf-8');
+            res.on('data', (chunk: string) => {
+                buf += chunk;
+                for (let end = buf.indexOf('\n\n'); end !== -1; end = buf.indexOf('\n\n')) {
+                    const lines = buf.slice(0, end).split('\n');
+                    buf = buf.slice(end + 2);
+                    const event = (lines.find((l) => l.startsWith('event: ')) ?? '').slice(7);
+                    if (event === 'hello') continue;
+                    req.destroy();
+                    resolve({
+                        event,
+                        data: lines
+                            .filter((l) => l.startsWith('data: '))
+                            .map((l) => l.slice(6))
+                            .join('\n'),
+                    });
+                    return;
+                }
+            });
+            res.on('error', reject);
+        });
+        req.on('error', reject);
     });
 }
 
@@ -107,6 +138,174 @@ describeBuilt('--serve integration (requires `pnpm build`)', () => {
                     if (newSvg !== svg) break;
                 }
                 expect(newSvg).not.toBe(svg);
+            } finally {
+                child.kill('SIGTERM');
+                await new Promise((r) => setTimeout(r, 150));
+                child.kill('SIGKILL');
+            }
+        });
+    }, 15000);
+
+    // Wave-rule include diagnostics (specs/waves.md §6.1) print like
+    // validator diagnostics, at the file and line they point into.
+    it('reports a wave-rule include error like a validator diagnostic', async () => {
+        await withTempDir(async (dir) => {
+            const source = path.join(dir, 'parent.nowline');
+            await fs.writeFile(
+                source,
+                [
+                    'nowline v1',
+                    '',
+                    'include "./child.nowline"',
+                    '',
+                    'roadmap r "R"',
+                    'wave w1',
+                    'wave w2',
+                    'swimlane a "A"',
+                    '  item x duration:1w wave:w1',
+                    '',
+                ].join('\n'),
+            );
+            await fs.writeFile(
+                path.join(dir, 'child.nowline'),
+                'swimlane c "C"\n  item y duration:1w\n',
+            );
+
+            const port = await pickPort();
+            const child: ChildProcess = spawn(
+                process.execPath,
+                [distEntry, '--serve', source, '--port', String(port)],
+                {
+                    cwd: packageRoot,
+                    env: { ...process.env, FORCE_COLOR: '0', NO_COLOR: '1' },
+                    stdio: ['ignore', 'pipe', 'pipe'],
+                },
+            );
+            let stderr = '';
+            child.stderr?.on('data', (d: Buffer) => {
+                stderr += d.toString('utf-8');
+            });
+
+            try {
+                await waitForReady(port);
+                const expected = `${source}:3:1 error: ${tr('en-US', 'NL.E0202', {
+                    reason: 'child-none',
+                    path: './child.nowline',
+                    parent: ['w1', 'w2'],
+                })}`;
+                const start = Date.now();
+                while (!stderr.includes(expected) && Date.now() - start < 3000) {
+                    await new Promise((r) => setTimeout(r, 50));
+                }
+                expect(stderr).toContain(expected);
+                const svg = await fetchText(`http://127.0.0.1:${port}/svg`);
+                expect(svg).not.toContain('data-layer="item"');
+            } finally {
+                child.kill('SIGTERM');
+                await new Promise((r) => setTimeout(r, 150));
+                child.kill('SIGKILL');
+            }
+        });
+    }, 15000);
+
+    // REGRESSION: an uncoded include error keeps its pre-waves form: one
+    // `${sourcePath}: ${message}` line sent to browsers, nothing on stderr.
+    it('broadcasts a missing include as before, without stderr', async () => {
+        await withTempDir(async (dir) => {
+            const source = path.join(dir, 'parent.nowline');
+            await fs.writeFile(
+                source,
+                'include "./missing.nowline"\nroadmap r "R"\nswimlane a "A"\n  item x duration:1w\n',
+            );
+
+            const port = await pickPort();
+            const child: ChildProcess = spawn(
+                process.execPath,
+                [distEntry, '--serve', source, '--port', String(port)],
+                {
+                    cwd: packageRoot,
+                    env: { ...process.env, FORCE_COLOR: '0', NO_COLOR: '1' },
+                    stdio: ['ignore', 'pipe', 'pipe'],
+                },
+            );
+            let stderr = '';
+            child.stderr?.on('data', (d: Buffer) => {
+                stderr += d.toString('utf-8');
+            });
+
+            try {
+                await waitForReady(port);
+                const first = await fetchPayloadEvent(`http://127.0.0.1:${port}/events`);
+                expect(first).toEqual({
+                    event: 'error',
+                    data:
+                        `${source}: Could not read include "./missing.nowline": ` +
+                        `ENOENT: no such file or directory, open '${path.join(dir, 'missing.nowline')}'`,
+                });
+                expect(stderr).not.toContain('error:');
+                expect(stderr).not.toContain('missing.nowline');
+            } finally {
+                child.kill('SIGTERM');
+                await new Promise((r) => setTimeout(r, 150));
+                child.kill('SIGKILL');
+            }
+        });
+    }, 15000);
+
+    // REGRESSION: an uncoded include error takes precedence over wave-rule
+    // diagnostics (specs/waves.md §6.1). With both present, the broadcast
+    // is the legacy one-line payload alone and nothing goes to stderr.
+    it('reports only the missing include when wave-rule errors also occur', async () => {
+        await withTempDir(async (dir) => {
+            const source = path.join(dir, 'parent.nowline');
+            await fs.writeFile(
+                source,
+                [
+                    'nowline v1',
+                    '',
+                    'include "./child.nowline"',
+                    'include "./missing.nowline"',
+                    '',
+                    'roadmap r "R"',
+                    'wave w1',
+                    'wave w2',
+                    'swimlane a "A"',
+                    '  item x duration:1w wave:w1',
+                    '',
+                ].join('\n'),
+            );
+            await fs.writeFile(
+                path.join(dir, 'child.nowline'),
+                'swimlane c "C"\n  item y duration:1w\n',
+            );
+
+            const port = await pickPort();
+            const child: ChildProcess = spawn(
+                process.execPath,
+                [distEntry, '--serve', source, '--port', String(port)],
+                {
+                    cwd: packageRoot,
+                    env: { ...process.env, FORCE_COLOR: '0', NO_COLOR: '1' },
+                    stdio: ['ignore', 'pipe', 'pipe'],
+                },
+            );
+            let stderr = '';
+            child.stderr?.on('data', (d: Buffer) => {
+                stderr += d.toString('utf-8');
+            });
+
+            try {
+                await waitForReady(port);
+                const first = await fetchPayloadEvent(`http://127.0.0.1:${port}/events`);
+                expect(first).toEqual({
+                    event: 'error',
+                    data:
+                        `${source}: Could not read include "./missing.nowline": ` +
+                        `ENOENT: no such file or directory, open '${path.join(dir, 'missing.nowline')}'`,
+                });
+                expect(stderr).not.toContain('error');
+                expect(stderr).not.toContain('NL.E0202');
+                expect(stderr).not.toContain('child.nowline');
             } finally {
                 child.kill('SIGTERM');
                 await new Promise((r) => setTimeout(r, 150));

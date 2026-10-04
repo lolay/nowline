@@ -195,9 +195,9 @@ Mutual exclusivity rules (all exit 2 with a message):
 | Code | Meaning |
 |------|---------|
 | 0    | Success |
-| 1    | Validation error |
+| 1    | Validation error (including a wave rule across included files, e.g. `NL.E0202`) |
 | 2    | Usage error (missing input, bad flags, unsupported format, file not found, empty stdin, invalid `--diagnostic-format`, binary→TTY refusal) |
-| 3    | Output error (cannot write to destination, exporter failure, page too small for margin) |
+| 3    | Output error (cannot write to destination, exporter failure, page too small for margin, unresolvable include) |
 
 ## Configuration: `.nowlinerc`
 
