@@ -16,11 +16,10 @@
 //
 //   arrow source (item) = (box.right, box.y + 28), or (box.right,
 //                         box.bottom - 2) when the caption spilled
-//   arrow target        = (box.x, box.y + 28), or (box.x, box.y +
-//                         box.height / 2) when the caption spilled
+//   arrow target        = (box.x, box.y + 28)
 //   arrow source (marker) starts on the target's attach y
-//   slack arrow         = (box.right, box.y + box.height / 2), or
-//                         (box.right, box.bottom - 2) when the caption spilled
+//   slack arrow         = (box.right, box.y + 28), or (box.right,
+//                         box.bottom - 2) when the caption spilled
 //   item glyph          = top at box.y + 5, inside the bar's top half
 //   container glyph     = inside a filled group's 16px chiclet row
 //                         (box.y .. box.y + 16), else inside the 12px header
@@ -100,13 +99,11 @@ function arrowSourceY(i: PositionedItem): number {
 }
 
 function arrowTargetY(i: PositionedItem): number {
-    return i.textSpills ? i.box.y + i.box.height / 2 : i.box.y + NOMINAL_MID_PX;
+    return i.box.y + NOMINAL_MID_PX;
 }
 
 function slackY(i: PositionedItem): number {
-    return i.textSpills
-        ? i.box.y + i.box.height - PROGRESS_STRIP_HALF_PX
-        : i.box.y + i.box.height / 2;
+    return arrowSourceY(i);
 }
 
 interface FileScan {

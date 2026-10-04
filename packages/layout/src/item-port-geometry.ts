@@ -12,14 +12,16 @@
 // Attach rules (specs/rendering.md "Dependency Arrows", and the slack
 // arrows under "Milestones"):
 //
-//   - Caption in the bar: arrows attach on the row's NOMINAL midline,
+//   - Arrows and slack arrows attach on the row's NOMINAL midline,
 //     `box.y + bandwidth / 2`, not the bar's own mid-height, so a bar
 //     grown by a wrapped title or a chip column shares an attach line
-//     with its un-grown row neighbours.
+//     with its un-grown row neighbours, and a grown bar's slack arrow
+//     leaves level with its dependency arrows.
 //   - Caption spilled past the right edge (`textSpills`): the arrow
-//     target keeps the bar's own mid-height, and the arrow source drops
-//     to the vertical center of the bottom progress strip so the arrow
-//     runs under the spilled title / meta text instead of through it.
+//     target stays on the nominal midline, but the arrow source and the
+//     slack arrow drop to the vertical center of the bottom progress
+//     strip so they run under the spilled title / meta text instead of
+//     through it.
 
 import { PROGRESS_STRIP_HEIGHT_PX } from './themes/shared.js';
 import type { Point, PositionedItem } from './types.js';
@@ -34,7 +36,7 @@ export function itemArrowTargetPort(item: PositionedItem, bandwidth: number): Po
     const { box } = item;
     return {
         x: box.x,
-        y: item.textSpills ? box.y + box.height / 2 : box.y + bandwidth / 2,
+        y: box.y + bandwidth / 2,
     };
 }
 
@@ -48,11 +50,12 @@ export function itemArrowSourcePort(item: PositionedItem, bandwidth: number): Po
 }
 
 /**
- * Y where a milestone slack arrow leaves `item`: the bar's own
- * mid-height, or the progress strip's center when the caption spilled
- * (so the arrow aligns with the strip instead of running through the
- * spilled title / meta text). The arrow's x is the bar's right edge.
+ * Y where a milestone slack arrow leaves `item`: the row's nominal
+ * midline (the line its dependency arrows use), or the progress strip's
+ * center when the caption spilled (so the arrow aligns with the strip
+ * instead of running through the spilled title / meta text). The
+ * arrow's x is the bar's right edge.
  */
-export function itemSlackAttachY(item: PositionedItem): number {
-    return item.textSpills ? progressStripMidY(item) : item.box.y + item.box.height / 2;
+export function itemSlackAttachY(item: PositionedItem, bandwidth: number): number {
+    return item.textSpills ? progressStripMidY(item) : item.box.y + bandwidth / 2;
 }

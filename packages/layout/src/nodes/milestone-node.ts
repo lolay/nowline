@@ -29,8 +29,9 @@ import {
  * One predecessor of a milestone with everything the slack-arrow
  * pipeline needs: its source x (visual right edge for items, marker
  * centerX for anchors / other milestones), its attach y (bar bottom
- * strip when text spills, row mid otherwise), and its flow key (used
- * to dedupe so a chained-flow's siblings collapse to the last entry).
+ * strip when text spills, nominal row midline otherwise), and its flow
+ * key (used to dedupe so a chained-flow's siblings collapse to the last
+ * entry).
  */
 export interface MilestonePredecessor {
     ref: string;
@@ -58,7 +59,9 @@ export function collectMilestonePredecessors(
         const item = ctx.placedItems.get(ref);
         const x = item ? item.box.x + item.box.width : ctx.entityRightEdges.get(ref);
         if (x === undefined) continue;
-        const y = item ? itemSlackAttachY(item) : (ctx.entityMidpoints.get(ref)?.y ?? 0);
+        const y = item
+            ? itemSlackAttachY(item, ctx.bandScale.bandwidth())
+            : (ctx.entityMidpoints.get(ref)?.y ?? 0);
         // Markers don't share a flow with anything, so use their id
         // as a unique flow key — every marker stands on its own.
         const flowKey = ctx.itemFlowKey.get(ref) ?? `marker:${ref}`;
