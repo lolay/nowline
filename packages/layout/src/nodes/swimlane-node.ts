@@ -32,6 +32,7 @@ import {
     parseCapacityValue,
     resolveCapacityIcon,
 } from '../capacity.js';
+import { blockTitleRowSpillReservation } from '../container-header-geometry.js';
 import { propValue } from '../dsl-utils.js';
 import { frameTabGeometry } from '../frame-tab-geometry.js';
 import { computeLaneUtilization, resolveLaneUtilizationThresholds } from '../lane-utilization.js';
@@ -283,6 +284,7 @@ export class SwimlaneNode {
                     placed: positioned,
                     blockHeight,
                     blockEnd,
+                    spillReservation: blockTitleRowSpillReservation(positioned),
                 });
                 timeCursorX = Math.max(timeCursorX, blockEnd);
                 continue;

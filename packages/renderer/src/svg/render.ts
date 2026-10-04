@@ -30,7 +30,10 @@ import {
     ATTRIBUTION_SCALE,
     ATTRIBUTION_TEXT,
     ATTRIBUTION_WORDMARK_FONT_SIZE,
+    CONTAINER_HEADER_TITLE_BASELINE_OFFSET_PX,
+    CONTAINER_HEADER_TITLE_FONT_SIZE_PX,
     CORNER_RADIUS_PX,
+    containerHeaderTitleX,
     EDGE_CORNER_RADIUS,
     estimateCapacitySuffixWidth,
     FONT_STACK,
@@ -41,12 +44,14 @@ import {
     FRAME_TAB_HEIGHT_PX,
     FRAME_TAB_LABEL_BASELINE_OFFSET_PX,
     frameTabGeometry,
-    GROUP_BRACKET_LABEL_OVERHANG_PX,
-    GROUP_TITLE_TAB_CHAR_WIDTH_PX,
+    GROUP_HEADER_TITLE_INSET_X_PX,
     GROUP_TITLE_TAB_HEIGHT_PX,
     GROUP_TITLE_TAB_LABEL_BASELINE_OFFSET_PX,
     GROUP_TITLE_TAB_LABEL_FONT_SIZE_PX,
     GROUP_TITLE_TAB_PAD_X_PX,
+    groupHasFill,
+    groupHeaderBandPx,
+    groupTitleTabWidth,
     HEADER_AUTHOR_FONT_SIZE_PX,
     HEADER_AUTHOR_LINE_HEIGHT_PX,
     HEADER_CARD_PADDING_TOP,
@@ -76,6 +81,7 @@ import {
     NOW_PILL_LABEL_FONT_SIZE_PX,
     NOW_PILL_LABEL_INSET_X_PX,
     NOWLINE_STROKE_WIDTH_PX,
+    PARALLEL_HEADER_TITLE_INSET_X_PX,
     PROGRESS_STRIP_HEIGHT_PX,
     TEXT_SIZE_PX,
     TIMELINE_TICK_LABEL_BASELINE_OFFSET_PX,
@@ -445,6 +451,14 @@ function renderInlineDatePin(pin: InlineDatePin, color: string): string {
 function renderInlineDatePins(pins: InlineDatePin[] | undefined, color: string): string {
     if (!pins || pins.length === 0) return '';
     return pins.map((pin) => renderInlineDatePin(pin, color)).join('');
+}
+
+function hasPins(pins: InlineDatePin[] | undefined): boolean {
+    return (pins?.length ?? 0) > 0;
+}
+
+function hasAfterPin(pins: InlineDatePin[] | undefined): boolean {
+    return pins?.some((pin) => pin.side === 'after') ?? false;
 }
 
 function rectFrame(
@@ -1187,7 +1201,7 @@ function renderGroup(
     fonts: FontFamilies,
 ): string {
     const parts: string[] = [];
-    const hasFill = g.style.bg !== 'none' && g.style.bg !== '#ffffff';
+    const hasFill = groupHasFill(g.style.bg);
     if (hasFill) {
         // Filled-box style with a chiclet label flush in the upper-left
         // corner. The painted box matches the layout-reported `box` 1:1
@@ -1208,8 +1222,9 @@ function renderGroup(
             }),
         );
         if (g.title) {
-            const tabW =
-                g.title.length * GROUP_TITLE_TAB_CHAR_WIDTH_PX + 2 * GROUP_TITLE_TAB_PAD_X_PX;
+            // Layout sizes the inline-date glyph clearance off the same
+            // helper, so an `after:` glyph always lands past this edge.
+            const tabW = groupTitleTabWidth(g.title);
             const tabX = g.box.x;
             const tabY = g.box.y;
             const tabH = GROUP_TITLE_TAB_HEIGHT_PX;
@@ -1252,27 +1267,30 @@ function renderGroup(
         }
     } else {
         const bracketColor = g.style.fg;
+        // Same helper `GroupNode.place` reserves the band with.
+        const headerBand = groupHeaderBandPx(hasFill, Boolean(g.title), hasPins(g.inlineDatePins));
         if (g.style.bracket !== 'none') {
             // Bracket-style groups paint a left-side `[` glyph along
-            // `box.x`. When a title is present the layout has reserved
-            // `GROUP_BRACKET_LABEL_OVERHANG_PX` of vertical space ABOVE
-            // `box.y` (see GroupNode.place); the bracket extends up
-            // through that overhang and adds a top foot mirroring the
-            // bottom foot so the `[` visually wraps the title text that
-            // sits in the reserved region. Title-less bracket groups
-            // keep the historical asymmetric shape (vertical bar + a
-            // single bottom foot) since there's nothing above to wrap.
+            // `box.x`. When the group has a title or inline-date glyphs
+            // the layout has reserved a header band ABOVE `box.y` (see
+            // GroupNode.place); the bracket extends up through that band
+            // and adds a top foot mirroring the bottom foot so the `[`
+            // visually wraps the title and glyphs that sit in it. Bare
+            // bracket groups keep the historical asymmetric shape
+            // (vertical bar + a single bottom foot) since there's
+            // nothing above to wrap.
             const stub = 4;
             const bottom = g.box.y + g.box.height;
             const dash = g.style.bracket === 'dashed' ? '3 2' : null;
-            const bracketPath = g.title
-                ? `M${num(g.box.x + stub)} ${num(g.box.y - GROUP_BRACKET_LABEL_OVERHANG_PX)}` +
-                  ` L${num(g.box.x)} ${num(g.box.y - GROUP_BRACKET_LABEL_OVERHANG_PX)}` +
-                  ` L${num(g.box.x)} ${num(bottom)}` +
-                  ` L${num(g.box.x + stub)} ${num(bottom)}`
-                : `M${num(g.box.x)} ${num(g.box.y)}` +
-                  ` L${num(g.box.x)} ${num(bottom)}` +
-                  ` L${num(g.box.x + stub)} ${num(bottom)}`;
+            const bracketPath =
+                headerBand > 0
+                    ? `M${num(g.box.x + stub)} ${num(g.box.y - headerBand)}` +
+                      ` L${num(g.box.x)} ${num(g.box.y - headerBand)}` +
+                      ` L${num(g.box.x)} ${num(bottom)}` +
+                      ` L${num(g.box.x + stub)} ${num(bottom)}`
+                    : `M${num(g.box.x)} ${num(g.box.y)}` +
+                      ` L${num(g.box.x)} ${num(bottom)}` +
+                      ` L${num(g.box.x + stub)} ${num(bottom)}`;
             parts.push(
                 tag('path', {
                     d: bracketPath,
@@ -1287,9 +1305,17 @@ function renderGroup(
             parts.push(
                 textTag(
                     {
-                        x: num(g.box.x + 6),
-                        y: num(g.box.y - 2),
-                        ...fontAttrs(g.style, fonts, TEXT_SIZE_PX.xs),
+                        // Past the `after:` glyph when there is one; layout
+                        // clamps the `before:` glyph past this text.
+                        x: num(
+                            containerHeaderTitleX(
+                                g.box.x,
+                                GROUP_HEADER_TITLE_INSET_X_PX,
+                                hasAfterPin(g.inlineDatePins),
+                            ),
+                        ),
+                        y: num(g.box.y - CONTAINER_HEADER_TITLE_BASELINE_OFFSET_PX),
+                        ...fontAttrs(g.style, fonts, CONTAINER_HEADER_TITLE_FONT_SIZE_PX),
                         'fill-opacity': 0.7,
                     },
                     g.title,
@@ -1298,9 +1324,8 @@ function renderGroup(
         }
     }
     // Inline-date pins on the group itself (`group ... after:DATE` /
-    // `before:DATE`). Painted before the children so children's bars stay
-    // visually on top — the glyphs only sit in the empty corners of the
-    // bounding box.
+    // `before:DATE`). They sit in the chiclet row or the header band,
+    // never on a child bar, so painting them before the children is safe.
     parts.push(renderInlineDatePins(g.inlineDatePins, g.style.fg));
     for (const c of g.children) {
         parts.push(renderTrackChild(c, options, idPrefix, palette, fonts));
@@ -1352,9 +1377,15 @@ function renderParallel(
         parts.push(
             textTag(
                 {
-                    x: num(p.box.x + 4),
-                    y: num(p.box.y - 2),
-                    ...fontAttrs(p.style, fonts, TEXT_SIZE_PX.xs),
+                    x: num(
+                        containerHeaderTitleX(
+                            p.box.x,
+                            PARALLEL_HEADER_TITLE_INSET_X_PX,
+                            hasAfterPin(p.inlineDatePins),
+                        ),
+                    ),
+                    y: num(p.box.y - CONTAINER_HEADER_TITLE_BASELINE_OFFSET_PX),
+                    ...fontAttrs(p.style, fonts, CONTAINER_HEADER_TITLE_FONT_SIZE_PX),
                     'fill-opacity': 0.7,
                 },
                 p.title,
@@ -1362,7 +1393,8 @@ function renderParallel(
         );
     }
     // Inline-date pins on the parallel itself (`parallel ... after:DATE` /
-    // `before:DATE`). Painted before children so child bars sit on top.
+    // `before:DATE`). They sit in the header band the layout reserves
+    // above the first track, so painting them before children is safe.
     parts.push(renderInlineDatePins(p.inlineDatePins, p.style.fg));
     for (const c of p.children) {
         parts.push(renderTrackChild(c, options, idPrefix, palette, fonts));
