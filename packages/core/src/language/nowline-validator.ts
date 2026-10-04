@@ -54,11 +54,29 @@ import {
     isSwimlaneDeclaration,
     isSymbolDeclaration,
     isTeamDeclaration,
+    isWaveDeclaration,
 } from '../generated/ast.js';
 import type { MessageArgs, MessageCode } from '../i18n/index.js';
 import { tr } from '../i18n/index.js';
-import { singleLine } from '../util/single-line.js';
 import type { NowlineAstType, NowlineServices } from './nowline-module.js';
+import {
+    DATE_RE,
+    defaultBannedMessage,
+    describeNode,
+    displayName,
+    entityTypeLabel,
+    propKey,
+    suggestKey,
+} from './validator-utils.js';
+import {
+    checkWaveDeclarations,
+    evaluateWaveProperties,
+    fileRefLookup,
+    isWaveBannedProperty,
+    ownWaves,
+    type WaveFinding,
+} from './waves.js';
+import { evaluateWaveOrder } from './waves-order.js';
 
 const SUPPORTED_VERSION = 'v1';
 
@@ -277,58 +295,10 @@ const ENTITY_KNOWN_PROPS: Record<string, Set<string>> = {
     LabelDeclaration: new Set(),
     SizeDeclaration: new Set(['effort']),
     StatusDeclaration: new Set(),
+    // The other keys a wave takes are universal; the keys it may not take
+    // are NL.E1105 (`isWaveBannedProperty`), owned by the wave rules.
+    WaveDeclaration: new Set(['after']),
 };
-
-// Levenshtein distance with an early-exit cap: returns `cap + 1` once the running
-// minimum exceeds the cap so we can short-circuit the matcher in the common case
-// where the typo is much further than 2 edits from any valid key. The helper is
-// only used by `checkUnknownEntityProperties` for the "did you mean?" suggestion.
-function levenshteinCapped(a: string, b: string, cap: number): number {
-    if (a === b) return 0;
-    const an = a.length;
-    const bn = b.length;
-    if (Math.abs(an - bn) > cap) return cap + 1;
-    if (an === 0) return bn;
-    if (bn === 0) return an;
-    let prev = new Array<number>(bn + 1);
-    let curr = new Array<number>(bn + 1);
-    for (let j = 0; j <= bn; j++) prev[j] = j;
-    for (let i = 1; i <= an; i++) {
-        curr[0] = i;
-        let rowMin = i;
-        for (let j = 1; j <= bn; j++) {
-            const cost = a.charCodeAt(i - 1) === b.charCodeAt(j - 1) ? 0 : 1;
-            curr[j] = Math.min(
-                prev[j] + 1, // deletion
-                curr[j - 1] + 1, // insertion
-                prev[j - 1] + cost, // substitution
-            );
-            if (curr[j] < rowMin) rowMin = curr[j];
-        }
-        if (rowMin > cap) return cap + 1;
-        const tmp = prev;
-        prev = curr;
-        curr = tmp;
-    }
-    return prev[bn];
-}
-
-// Pick the closest known key within `cap` edits of `key`, or undefined. Ties are
-// broken by the order of `candidates`, so callers should pass entity-specific keys
-// first when both lists are searched.
-function suggestKey(key: string, candidates: Iterable<string>, cap = 2): string | undefined {
-    let best: string | undefined;
-    let bestDist = cap + 1;
-    for (const c of candidates) {
-        const d = levenshteinCapped(key, c, cap);
-        if (d < bestDist) {
-            best = c;
-            bestDist = d;
-            if (d === 0) break;
-        }
-    }
-    return best;
-}
 
 // Conceptual mistakes that aren't typos of a real key — e.g. `progress:60` is a
 // reasonable guess for "60% done", but Nowline models completion as
@@ -359,14 +329,9 @@ function suggestConcept(key: string, known: ReadonlySet<string>): string | undef
     return undefined;
 }
 
-function propKey(prop: { key: string }): string {
-    return prop.key.endsWith(':') ? prop.key.slice(0, -1) : prop.key;
-}
-
 // Matches duration literals including decimals, e.g. `2w`, `0.5d`, `1.5m`.
 const DURATION_RE = /^\d+(?:\.\d+)?[dwmqy]$/;
 const PERCENTAGE_RE = /^\d+%$/;
-const DATE_RE = /^\d{4}-\d{2}-\d{2}$/;
 const HEX_COLOR_RE = /^#[0-9a-fA-F]{3,8}$/;
 const VERSION_RE = /^v\d+$/;
 const INTEGER_RE = /^\d+$/;
@@ -415,26 +380,6 @@ function resolveLocalStart(file: NowlineFile | undefined): StartState {
 }
 
 /**
- * The name a diagnostic echoes for an entity: its id, else its title. A
- * title can carry explicit line breaks, but a diagnostic is one line of
- * text, so breaks collapse to a single space (`singleLine`).
- */
-function displayName(node: { name?: string; title?: string }): string {
-    return node.name ?? (node.title === undefined ? '<unnamed>' : singleLine(node.title));
-}
-
-/**
- * Returns the lowercase entity-type label for an AST node, suitable for
- * embedding inside a validator message (e.g. `"item"`, `"milestone"`,
- * `"swimlane"`). Mirrors `describeNode`'s normalization (strip
- * `Declaration` / `Block` suffix, lowercase) but returns just the type so
- * callers can compose their own message.
- */
-function entityTypeLabel(node: AstNode): string {
-    return node.$type.replace(/Declaration$|Block$/, '').toLowerCase();
-}
-
-/**
  * Emit a localized validator diagnostic.
  *
  * Validator runs at parse time when only the file's locale is in scope.
@@ -464,6 +409,25 @@ function acceptTr<K extends MessageCode>(
     });
 }
 
+// Translate a wave-rule finding (`waves.ts`) into a diagnostic. Coded
+// findings go through `acceptTr`; the one uncoded rule (WV8) keeps its
+// fixed English text, like the rest of rule 23.
+function acceptWaveFinding(accept: ValidationAcceptor, finding: WaveFinding): void {
+    const info: DiagnosticInfo = {
+        node: finding.node,
+        ...(finding.property === undefined
+            ? {}
+            : { property: finding.property as Properties<AstNode> }),
+    };
+    if ('message' in finding) {
+        accept(finding.severity, finding.message, info);
+        return;
+    }
+    // The finding's `args` is the code's argument object; the union of codes
+    // does not narrow through the generic, so widen it to one code here.
+    acceptTr(accept, finding.severity, info, finding.code as 'NL.E1100', finding.args as never);
+}
+
 export function registerValidationChecks(services: NowlineServices): void {
     const registry = services.validation.ValidationRegistry;
     const validator = services.validation.NowlineValidator;
@@ -478,6 +442,7 @@ export function registerValidationChecks(services: NowlineServices): void {
             validator.checkReferenceResolution,
             validator.checkInlineDatePins,
             validator.checkCircularDependencies,
+            validator.checkWaves,
             validator.checkDuplicateSizeIds,
             validator.checkCalendarBlockConsistency,
             validator.checkPersonDeclarations,
@@ -574,6 +539,13 @@ export function registerValidationChecks(services: NowlineServices): void {
             validator.checkEntityIdOrTitle,
             validator.checkStatusDeclaration,
             validator.checkNoRawStyleProperties,
+            validator.checkUnknownEntityProperties,
+        ],
+        // No checkEntityIdOrTitle: a wave without an id is NL.E1100, not NL.E0301.
+        // The S rules run file-wide in checkWaves (one shared id lookup).
+        WaveDeclaration: [
+            validator.checkNoRawStyleProperties,
+            validator.checkNoFootnoteProperty,
             validator.checkUnknownEntityProperties,
         ],
         DefaultDeclaration: [validator.checkDefaultDeclaration, validator.checkUtilizationOrdering],
@@ -761,6 +733,8 @@ export class NowlineValidator {
 
     // --- Property value validation (general) ---
     checkPropertyValues(prop: EntityProperty, accept: ValidationAcceptor): void {
+        // A key a wave may not take is NL.E1105 only (checkWaveDeclarations).
+        if (isWaveBannedProperty(prop)) return;
         const key = propKey(prop);
         const val = prop.value;
         const vals = prop.values;
@@ -1203,6 +1177,9 @@ export class NowlineValidator {
     //   - raw style keys (already an error from `checkNoRawStyleProperties`)
     //   - `footnote` (already an error from `checkNoFootnoteProperty`)
     //   - sizing keys on parallel/group (already an error from `checkNoComputedProperties`)
+    //   - `wave` on every entity (the wave rules own it: NL.W0702 with no waves,
+    //     NL.E1104 / NL.E1105 where it is not allowed)
+    //   - the keys a wave may not take (already NL.E1105)
     //
     // Suggests the closest known key within 2 edits when one exists, so the
     // existing `DID_YOU_MEAN_RE` in `packages/cli/src/diagnostics/adapt.ts` picks
@@ -1229,6 +1206,7 @@ export class NowlineValidator {
             if (STYLE_PROP_KEYS.has(key)) continue;
             if (key === 'footnote') continue;
             if (computedBanned?.has(key)) continue;
+            if (key === 'wave' || isWaveBannedProperty(prop)) continue;
             const candidates: string[] = [...known, ...UNIVERSAL_ENTITY_PROPS];
             const suggested = suggestConcept(key, known) ?? suggestKey(key, candidates) ?? '';
             acceptTr(accept, 'warning', { node: prop, property: 'key' }, 'NL.W0700', {
@@ -1319,6 +1297,21 @@ export class NowlineValidator {
         }
     }
 
+    // --- Waves (specs/waves.md §6.2): set S (WV1/WV3/WV4, wave declarations),
+    // set P (WV5-WV9, `wave:` properties) and, when the roadmap has waves,
+    // set G (WV10-WV12) over the file's own lanes in order ---
+    checkWaves(file: NowlineFile, accept: ValidationAcceptor): void {
+        for (const finding of checkWaveDeclarations(file)) acceptWaveFinding(accept, finding);
+        for (const finding of evaluateWaveProperties(file)) acceptWaveFinding(accept, finding);
+        const waves = ownWaves(file);
+        if (waves.length === 0) return;
+        const scope = {
+            lanes: file.roadmapEntries.filter(isSwimlaneDeclaration),
+            lookup: fileRefLookup(file),
+        };
+        for (const finding of evaluateWaveOrder(scope, waves)) acceptWaveFinding(accept, finding);
+    }
+
     // --- Rule 5: Duplicate size ids ---
     checkDuplicateSizeIds(file: NowlineFile, accept: ValidationAcceptor): void {
         const seen = new Map<string, SizeDeclaration>();
@@ -1400,11 +1393,7 @@ export class NowlineValidator {
             for (const prop of decl.properties) {
                 const key = propKey(prop);
                 if (banned.has(key)) {
-                    accept(
-                        'error',
-                        `"${key}" cannot be set on "default ${decl.entityType}". Identity-defining, sizing, sequencing, reference, and prose properties must be explicit on each entity.`,
-                        { node: prop },
-                    );
+                    accept('error', defaultBannedMessage(key, decl.entityType), { node: prop });
                 }
             }
         }
@@ -1532,6 +1521,7 @@ export class NowlineValidator {
         for (let i = 0; i < file.roadmapEntries.length; i++) {
             const entry = file.roadmapEntries[i];
             visitPropertiesDeep(entry, (prop) => {
+                if (isWaveBannedProperty(prop)) return;
                 const key = propKey(prop);
                 if (key === 'size' && prop.value) {
                     const val = prop.value;
@@ -1590,6 +1580,8 @@ export class NowlineValidator {
             visitPropertiesDeep(entry, (prop) => {
                 const key = propKey(prop);
                 if (key !== 'after' && key !== 'before' && key !== 'on') return;
+                // A wave's before: is NL.E1105 only.
+                if (isWaveBannedProperty(prop)) return;
                 const vals = prop.value ? [prop.value] : prop.values;
                 for (const v of vals) {
                     if (!v) continue;
@@ -1614,7 +1606,9 @@ export class NowlineValidator {
     // An inline ISO date literal in `after:` or `before:` pins the entity
     // directly to a calendar position without a named `anchor` declaration
     // (see specs/dsl.md "Inline date pins"). This check enforces:
-    //   - 24a: inline date allowed only on item / parallel / group
+    //   - 24a: inline date allowed only on item / parallel / group, and on a
+    //          wave's after: (its start floor). A wave's before: is skipped
+    //          entirely: NL.E1105 is its only diagnostic.
     //   - 24b: at most one inline date per direction (per `after:` / `before:`)
     //   -  27: file with any inline date requires roadmap `start:`
     //   -  28: every inline date must be on or after roadmap `start:`
@@ -1629,12 +1623,14 @@ export class NowlineValidator {
 
         const visit = (entry: AstNode): void => {
             const props = (entry as { properties?: EntityProperty[] }).properties ?? [];
+            const wave = isWaveDeclaration(entry);
             const allowed =
-                isItemDeclaration(entry) || isParallelBlock(entry) || isGroupBlock(entry);
+                isItemDeclaration(entry) || isParallelBlock(entry) || isGroupBlock(entry) || wave;
 
             for (const prop of props) {
                 const key = propKey(prop);
                 if (key !== 'after' && key !== 'before') continue;
+                if (wave && key === 'before') continue;
                 const vals = prop.value ? [prop.value] : prop.values;
                 const dateVals = vals.filter((v): v is string => !!v && DATE_RE.test(v));
                 if (dateVals.length === 0) continue;
@@ -1732,6 +1728,12 @@ export class NowlineValidator {
         };
 
         const visitEntry = (entry: AstNode): void => {
+            // A wave's after: names constants (anchors, dated milestones, a
+            // date) and its before: is NL.E1105, so neither is a schedule
+            // edge. Skipping them keeps the wave-deadline idiom
+            // (`wave w2 after:gate` + `milestone gate date:... after:w2`)
+            // from reading as a cycle.
+            if (isWaveDeclaration(entry)) return;
             const id = (entry as { name?: string }).name;
             const props = (entry as { properties?: EntityProperty[] }).properties ?? [];
             indexDependents(id, props, file);
@@ -2033,12 +2035,6 @@ function locationOf(node: AstNode): string {
     return 'unknown location';
 }
 
-function describeNode(node: { $type: string; name?: string; title?: string }): string {
-    const kind = node.$type.replace(/Declaration$|Block$/, '').toLowerCase();
-    const label = node.name ?? (node.title === undefined ? undefined : singleLine(node.title));
-    return label ? `${kind} "${label}"` : kind;
-}
-
 function registerEntity(
     entry: RoadmapEntry,
     register: (name: string | undefined, node: AstNode) => void,
@@ -2063,6 +2059,8 @@ function registerEntity(
     } else if (isSizeDeclaration(entry)) {
         register(entry.name, entry);
     } else if (isStatusDeclaration(entry)) {
+        register(entry.name, entry);
+    } else if (isWaveDeclaration(entry)) {
         register(entry.name, entry);
     }
 }

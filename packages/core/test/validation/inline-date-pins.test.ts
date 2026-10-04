@@ -49,6 +49,16 @@ describe('inline-date pins (after:DATE / before:DATE)', () => {
             expect(errorMessages(r.diagnostics)).toEqual([]);
         });
 
+        it("single inline date on a wave's after: validates cleanly", async () => {
+            const r = await parse(
+                `roadmap r start:2026-01-05\n` +
+                    `wave w1 after:2026-02-09\n` +
+                    `swimlane s\n` +
+                    `  item x duration:1w wave:w1\n`,
+            );
+            expect(r.diagnostics).toEqual([]);
+        });
+
         it('mixed list (id + one date) validates cleanly', async () => {
             const r = await parse(
                 `roadmap r start:2026-01-05\n` +
@@ -116,6 +126,48 @@ describe('inline-date pins (after:DATE / before:DATE)', () => {
                     `  item x duration:1w after:2026-01-15\n`,
             );
             expect(hasError(errorMessages(r.diagnostics), /is before roadmap start/i)).toBe(true);
+        });
+    });
+
+    describe("a wave's after: (start floor)", () => {
+        const codesOf = (diagnostics: { data?: unknown }[]) =>
+            diagnostics.map((d) => (d.data as { code?: string } | undefined)?.code);
+
+        it('NL.E0410: two inline dates in a wave after: list is an error', async () => {
+            const r = await parse(
+                `roadmap r start:2026-01-05\n` +
+                    `wave w1 after:[2026-02-09, 2026-03-09]\n` +
+                    `swimlane s\n` +
+                    `  item x duration:1w wave:w1\n`,
+            );
+            expect(codesOf(r.diagnostics)).toEqual(['NL.E0410']);
+        });
+
+        it('NL.E0412: an inline date on a wave needs roadmap start:', async () => {
+            const r = await parse(
+                `roadmap r\nwave w1 after:2026-02-09\nswimlane s\n  item x duration:1w wave:w1\n`,
+            );
+            expect(codesOf(r.diagnostics)).toEqual(['NL.E0412']);
+        });
+
+        it('NL.E0413: an inline date on a wave must not precede roadmap start:', async () => {
+            const r = await parse(
+                `roadmap r start:2026-02-01\n` +
+                    `wave w1 after:2026-01-15\n` +
+                    `swimlane s\n` +
+                    `  item x duration:1w wave:w1\n`,
+            );
+            expect(codesOf(r.diagnostics)).toEqual(['NL.E0413']);
+        });
+
+        it("NL.E0411 does not fire on a wave's before: (NL.E1105 covers it)", async () => {
+            const r = await parse(
+                `roadmap r start:2026-01-05\n` +
+                    `wave w1 before:2026-02-09\n` +
+                    `swimlane s\n` +
+                    `  item x duration:1w wave:w1\n`,
+            );
+            expect(codesOf(r.diagnostics)).toEqual(['NL.E1105']);
         });
     });
 

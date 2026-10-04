@@ -222,6 +222,7 @@ Mechanical edits that come with it:
 - **Value.** The value is exactly one declared wave id. A one-element list `wave:[w1]` is the same as `wave:w1`; the printer already prints it as a scalar.
 - **NL.E1101** fires for any of these:
   - a list of two or more elements;
+  - a repeated `wave:` key (each later key is reported as a list of every value; the first key applies);
   - an undeclared id;
   - a wave declared below the referencing entry;
   - an id that names something other than a wave.
@@ -477,7 +478,7 @@ The layout emits L (WV15–WV18).
 | WV9 | When the roadmap has no waves, every `wave:` key is ignored. This replaces WV5–WV8 for the file. | warning | **NL.W0702** | P |
 | WV10 | The wave order can be realized: no member is forced to start after its own wave ends (§6.3). | error | **NL.E1103** | G |
 | WV11 | A `before:` can never be met (§6.3). | warning | **NL.W1100** | G |
-| WV12 | In a roadmap with waves, an `after:` or `before:` that layout ignores: a forward reference, or a floating milestone. | warning | **NL.W1101** | G |
+| WV12 | In a roadmap with waves, an `after:` or `before:` that layout ignores: a forward reference, a reference to an enclosing group or parallel, or a floating milestone. | warning | **NL.W1101** | G |
 | WV13 | Include wave agreement (§7.2). | error | **NL.E0202** | I |
 | WV14 | An included wave's presentation differs from the parent's. | warning | **NL.W0701** | I |
 | WV15 | A barrier moved an item pin. | warning | **NL.W1001** | L |
@@ -515,12 +516,14 @@ The layout emits L (WV15–WV18).
 
 - All three rules walk a layout scope in placement order: lanes in their merged order, children in document order, depth first. `place(v)` is a node's position in that walk.
 - `resolve(r, v)` is the last node with id r (an item, group or parallel) whose `place` is less than `place(v)`. This mirrors layout's shared edge maps, including last-writer-wins when merged files reuse an id.
+  - As in layout, a group or parallel enters the maps only once its content is placed. A reference from inside a container to that container is therefore a forward reference.
 - A reference with no `resolve(r, v)`, or one that names a floating milestone, is ignored by every engine. WV12 reports it.
 
 **Lower bounds.** For every node v, WV10 computes the largest `j` such that `start(v) ≥ E_j` is forced.
 
 - **Constraints counted:** flow order, containment, the `after:` edges that layout resolves, barriers and lead floors.
 - **Constraints not counted:** `before:` (it is soft) and dates (they never create `E_j` bounds).
+- **Item pins.** An item pinned by `date:` or `start:` keeps only its wave floor: the pin replaces its flow, containment and `after:` terms (§5.1).
 
 ```
 init lbS(v) = 0, lbE(v) = 0 for every item, group and parallel v
@@ -541,12 +544,12 @@ violation: an item x with ew(x) = k and lbS(x) ≥ k    // forced to start at or
 
 **Reporting.** There is one diagnostic per root cause. For each violation, the check finds the term that achieves the bound and walks its explanation back to the origin. Variants, in order of preference:
 
-1. **`after-wave`.** The bound comes from an `after:w_j` with `j ≥ k`, on x or on the nearest container that owns x. Reported once, on that owner's `after:`.
-2. **`after-item`.** The bound comes from an `after:r` edge whose target's bound is its own wave constant. Reported on the owner of the `after:`: x itself, or its enclosing container ("… inside it").
-3. **`sequence`.** The bound is a flow edge from a predecessor p whose bound is p's own wave constant. Reported once per p, on the first affected item. It lists the run R, the items whose explanation walks back to p. The advice is "move p below the last item of R", which resolves the whole run (Example 13).
-4. **`join`.** The bound is a flow edge from a parallel whose bound comes from a track in a later wave. A block with no id and no title is named by position ("the parallel block on line N").
-5. **Cascade.** When every edge that achieves the bound comes from a violating node that has already been explained, the violation is suppressed and folded into its origin's run.
-6. **`chain`.** Anything else, typically a route through background work across lanes. The path is printed, for example `a2 (wave "w2") → review → b1`. The existing cycle check cannot see these hidden cycles (Example 15).
+1. **`after-wave`.** The bound comes from an `after:w_j` with `j ≥ k`, on x or on the nearest container that owns x. Reported once, on that owner's `after:`. The container form names the container's wave, so an owner without a wave of its own gets the item form, still on its `after:`.
+2. **`after-item`.** The bound comes from an `after:r` edge whose target's bound is its own wave constant. Reported on the owner of the `after:`: x itself, or its enclosing container ("… inside it"). A container without a wave of its own has no wave constant, because it may span waves.
+3. **`sequence`.** The bound is a flow edge from a predecessor p whose bound is p's own wave constant. Reported once per p and wave, on the first affected item. It lists the run R, the items of that wave whose explanation walks back to p. The advice is "move p below the last item of R", which resolves the whole run (Example 13). R lists only the items in p's flow; items elsewhere that fold into the run (for example, through an `after:` from another lane) are not listed. An item that reaches p through other violations is listed after the nearest earlier work in its flow whose wave is later than its own, which is p unless something closer is. A p with no id and no title is named by position ("the group on line N"). A container without a wave of its own is never p, because it may span waves; after such a parallel, see `join`.
+4. **`join`.** The bound is a flow edge from a parallel whose bound comes from a track in a later wave. Reported once per block and wave, on the first affected item of that wave. A block with no id and no title is named by position ("the parallel block on line N").
+5. **Cascade.** When every edge that achieves the bound comes, directly or through other work, from a violating node that has already been explained, the violation is suppressed and folded into its origin's run.
+6. **`chain`.** Anything else, typically a route through background work across lanes. The path is printed, for example `a2 (wave "w2") → review → b1`. A path that starts at an `after:<wave>` names it instead, for example `review (after:w1) → b1`. The existing cycle check cannot see these hidden cycles (Example 15).
 
 **WV11 (warning).** For each `before:r` on x, let `maxW` and `minW` be the largest and smallest effective wave index over the items in a subtree.
 
@@ -555,7 +558,7 @@ violation: an item x with ew(x) = k and lbS(x) ≥ k    // forced to start at or
 - **When r is a wave `w_j`:** warn when `maxW(x) ≥ j`.
 - **Skipped:** background subtrees. Forward targets belong to WV12. Misses driven by dates are never known statically; they stay the layout-time NL.I1003.
 
-**WV12 (warning).** Reported once per ignored reference, and only in roadmaps with waves. Variants: `forward-lane`, `forward-flow` and `floating-milestone`.
+**WV12 (warning).** Reported once per ignored reference, and only in roadmaps with waves. Variants: `forward-lane`, `forward-flow`, `ancestor` and `floating-milestone`. `ancestor` is a reference to a group or parallel that encloses the entity: layout registers a container's id only after its content is placed, so it never resolves such a reference, and moving the target is not possible. A reference that closes an explicit `after:`/`before:` cycle is not reported: the existing "Circular dependency detected" error covers it.
 
 ### 6.4 Messages (en-US)
 
@@ -567,6 +570,7 @@ violation: an item x with ew(x) = k and lbS(x) ≥ k    // forced to start at or
 - `{names}` lists up to five quoted names, then "and N more".
 - `{suggestion}` is empty, or ` Did you mean wave:{id} ("{title}")?`. It is filled only when the existing `suggestKey` Levenshtein helper finds a unique best match within distance 2, or when the value matches a wave title case-insensitively.
 - French strings are written into `messages.fr.ts` during implementation, following that file's U+00A0 punctuation convention.
+- In NL.W1100 and NL.W1101, `"{name}"` names the entity the warning is on. For a group or parallel with no id and no title it reads `the group on line N` or `the parallel block on line N` instead.
 
 | Code | Message |
 |---|---|
@@ -576,7 +580,7 @@ violation: an item x with ew(x) = k and lbS(x) ≥ k    // forced to start at or
 | NL.E1101 `forward` | `Wave "{value}" is used before its declaration on line {line}. Declare waves above the swimlanes that use them.` |
 | NL.E1101 `not-a-wave` | `"wave:" must name a wave, but "{value}" is {kind}.{suggestion}` |
 | NL.E1102 | `{entity} has wave:{wave}, but its enclosing {container} has wave:{containerWave}. A container's wave applies to everything inside it; remove one of the two wave: properties.` |
-| NL.E1103 `sequence` | `{items} {verb} after "{ref}" (wave "{refWave}") in {flow}. Work in a lane or group runs in order, so it must also be ordered by wave: move "{ref}" below "{last}", or change their waves.` (`{items}`: `Item "a2" (wave "w1")` or `Items "a2", "a3" (wave "w1")`; `{verb}`: comes / come) |
+| NL.E1103 `sequence` | `{items} {verb} after "{ref}" (wave "{refWave}") in {flow}. Work in a lane or group runs in order, so it must also be ordered by wave: move "{ref}" below "{last}", or change their waves.` (`{items}`: `Item "a2" (wave "w1")` or `Items "a2", "a3" (wave "w1")`; `{verb}`: comes / come; a `"{ref}"` with no id and no title reads `the group on line 9` or `the parallel block on line 9`) |
 | NL.E1103 `join` | `Item "{name}" (wave "{wave}") comes after {block} in {flow}, and that block cannot end before its track "{track}" (wave "{trackWave}") does. Move "{name}" above the block or into a track of its own, or change one of their waves.` |
 | NL.E1103 `after-item` | `Item "{name}" (wave "{wave}") has after:{refId}, but "{ref}" is in later wave "{refWave}". Wave "{refWave}" cannot start until wave "{wave}" ends, so "{name}" could never start: move it to wave "{refWave}" or later, or remove the after:.` Container form: `{containerKind} "{container}" has after:{refId}, but "{ref}" is in later wave "{refWave}". Wave "{refWave}" cannot start until wave "{wave}" ends, so "{name}" (wave "{wave}") inside it could never start: move "{name}" to wave "{refWave}" or later, or remove the after:.` |
 | NL.E1103 `after-wave` | `Item "{name}" (wave "{wave}") has after:{refId}, but work cannot wait for the end of its own wave or a later one. Use an earlier wave, or move "{name}" to a later wave.` Container form: `{containerKind} "{container}" (wave "{wave}") has after:{refId}, but work cannot wait for the end of its own wave or a later one. Use an earlier wave, or move the {containerKind} to a later wave.` |
@@ -591,12 +595,13 @@ violation: an item x with ew(x) = k and lbS(x) ≥ k    // forced to start at or
 | NL.W1100 `wave` | `before:{ref} on "{name}" can never be met: "{name}" is in wave "{wave}", which cannot finish before wave "{ref}" starts. The overrun will be painted.` |
 | NL.W1101 `forward-lane` | `{key}:{ref} on "{name}" refers to "{ref}", which is in a later swimlane ("{lane}"). Layout places swimlanes in order and ignores references to work it has not placed yet, so it ignores this {key}:. Move swimlane "{lane}" above swimlane "{ownLane}", or remove the {key}:.` |
 | NL.W1101 `forward-flow` | `{key}:{ref} on "{name}" refers to "{ref}", which comes later in {flow}. Layout ignores references to work it has not placed yet, so it ignores this {key}:. Move "{ref}" above "{name}", or remove the {key}:.` |
+| NL.W1101 `ancestor` | `{key}:{ref} on "{name}" refers to "{ref}", which contains it. Layout ignores references to an enclosing group or parallel, so it ignores this {key}:. Remove the {key}:.` |
 | NL.W1101 `floating-milestone` | `{key}:{ref} on "{name}" refers to milestone "{ref}", which has no date. Floating milestones are placed after all work, so layout ignores this {key}:. Reference the milestone's predecessors or a wave instead.` |
-| NL.W0702 | `"wave:" on {target} is ignored: this roadmap declares no waves. Declare waves with "wave <id>" to use it, or remove the property.` (`{target}`: `item "a1"`, `swimlane "a"`, `"default item"`) |
+| NL.W0702 | `"wave:" on {target} is ignored: this roadmap declares no waves. Declare waves with "wave <id>" to use it, or remove the property.` (`{target}`: `item "a1"`, `swimlane "a"`, `"default item"`, or `the parallel block on line 14` for an unnamed block) |
 | NL.E0202 `mismatch` | `Included "{path}" declares waves [{child}], but this file's waves are [{parent}]. Every included roadmap must declare the same waves in the same order: copy this file's wave lines into "{path}".` |
 | NL.E0202 `child-none` | `Included "{path}" declares no waves, but this file's waves are [{parent}]. Copy this file's wave lines into "{path}" so its work joins the waves.` |
 | NL.E0202 `parent-none` | `Included "{path}" declares waves [{child}], but this file declares none. Declare the same waves here so the barriers apply to the whole roadmap.` |
-| NL.E0202 `floor` | `Wave "{id}" in "{path}" opens no earlier than {childFloor}, but this file's wave "{id}" opens no earlier than {parentFloor}. A wave must have the same start floor in every included roadmap.` (`{…Floor}`: an ISO date, or `no floor`) |
+| NL.E0202 `floor` | `Wave "{id}" in "{path}" opens no earlier than {childFloor}, but this file's wave "{id}" opens no earlier than {parentFloor}. A wave must have the same start floor in every included roadmap.` (`{…Floor}` is an ISO date. When the included file has no floor, the first clause reads `Wave "{id}" in "{path}" has no start floor`; when this file has none, the second reads `this file's wave "{id}" has no start floor`.) |
 | NL.W0701 | `Wave "{id}" in "{path}" differs from this file's definition ({fields}); this file's definition is used.` (`{fields}`, for example `title "Discovery" there, "Discover" here`) |
 | NL.W1001 | `Item "{name}" is pinned to {pin} ({key}:), but wave "{wave}" cannot start until {start}; the item starts at the wave start.` |
 | NL.W1002 | `Wave barriers did not settle after {passes} layout passes, so the drawn schedule may not respect the wave order. The roadmap probably has an ordering conflict that validation did not catch.` |

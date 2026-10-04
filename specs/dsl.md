@@ -1266,9 +1266,9 @@ These rules apply to files that use `wave` or `wave:`. A roadmap *has waves* whe
 | WV7 | A descendant's `wave:` equals its container's `wave:`. | error | `NL.E1102` |
 | WV8 | When the roadmap has waves, `wave` is banned on every `default <entity>` line. | error | Rule 23 message |
 | WV9 | When the roadmap has no waves, every `wave:` key is ignored. This replaces WV5–WV8 for the file. | warning | `NL.W0702` |
-| WV10 | The wave order can be realized: no member is forced to start at or after the end of its own wave. In every lane or group flow, assigned waves must not decrease, a block's successor must not be in an earlier wave than any of its tracks, and no `after:` may name work in the same wave or a later one, directly or through a chain of other work. | error | `NL.E1103` |
+| WV10 | The wave order can be realized: no member is forced to start at or after the end of its own wave. In every lane or group flow, assigned waves must not decrease, a block's successor must not be in an earlier wave than any of its tracks, and no `after:` may name the item's own wave, a later wave, or work in a later wave, directly or through a chain of other work. | error | `NL.E1103` |
 | WV11 | A `before:` that the wave structure guarantees can never be met (for example, work in wave 2 with `before:` an item in wave 1). Misses that depend on durations or dates stay the layout-time `NL.I1003`. | warning | `NL.W1100` |
-| WV12 | In a roadmap with waves, an `after:` or `before:` that layout ignores: a forward reference (to a later swimlane, or later in the same flow) or a reference to a floating milestone. | warning | `NL.W1101` |
+| WV12 | In a roadmap with waves, an `after:` or `before:` that layout ignores: a forward reference (to a later swimlane, or later in the same flow), a reference to the group or parallel that encloses it, or a reference to a floating milestone. A reference that closes an explicit cycle is left to rule 25. | warning | `NL.W1101` |
 | WV13 | Include wave agreement (Include Rule 12). | error | `NL.E0202` |
 | WV14 | An included wave's presentation (title, `style:`, `labels:`, `link:`, `description`) differs from the parent's. | warning | `NL.W0701` |
 
