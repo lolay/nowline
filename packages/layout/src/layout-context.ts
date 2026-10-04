@@ -71,37 +71,25 @@ export interface LayoutContext {
     entityLeftEdges: Map<string, number>;
     entityRightEdges: Map<string, number>;
     /**
-     * Midpoint per entity. For an item whose caption stays in the bar, `y`
-     * is the NOMINAL row midline (`bar.y + bandwidth / 2`), not the bar's
-     * own mid-height, so a bar grown by a wrapped title or chips shares an
-     * attach line with its un-grown row neighbours. An item with a spilled
-     * caption keeps the bar's own mid-height. Dependency arrows terminate
-     * here.
+     * Midpoint per MARKER (anchor or milestone), on the marker row.
+     * Dependency arrows from a marker start on its cut line at this `x`,
+     * and a milestone's slack arrow from a marker predecessor reads its
+     * `y`. Items are not in this map: their attach geometry is derived
+     * from `placedItems`.
      */
     entityMidpoints: Map<string, Point>;
     /**
-     * Visual edges for items (entries with a painted bar). Differs
-     * from `entityLeftEdges`/`entityRightEdges` (logical column
-     * boundaries) by `ITEM_INSET_PX` on each side so dependency
-     * arrows attach to the painted bar edge instead of landing in
-     * the inter-column gutter. Anchors and milestones are absent —
-     * their attach geometry uses `(center.x, target.row.midY)` on
-     * the cut line, computed inline by `buildDependencies`.
+     * Every placed item, keyed by its draw key (the explicit id, or the
+     * synthetic handle of an id-less item; see `syntheticItemKey`). The
+     * value is the same `PositionedItem` object the positioned model
+     * carries, so it always holds the item's FINAL box, however many
+     * times a retroactive row growth or a marker-band growth moved it
+     * down after placement. Dependency-arrow ports and slack-arrow attach
+     * points are derived from that box when the arrows are built (see
+     * `item-port-geometry.ts`), never captured as absolute coordinates
+     * while the item is placed.
      */
-    entityVisualLeftX: Map<string, number>;
-    entityVisualRightX: Map<string, number>;
-    /**
-     * Per-item exit point for `after:` dependency arrows leaving
-     * this entity. Default = `(visualRight, midY)`. When the
-     * caption spills past the bar's right edge (`textSpills`), the
-     * exit drops to `(box.x + box.width / 2, box.y + box.height)`
-     * — the bottom-middle of the progress strip — so the arrow
-     * doesn't visually pierce the spilled title/meta text to the
-     * right of the bar. `midY` is the nominal row midline
-     * (`bar.y + bandwidth / 2`), the same line `entityMidpoints`
-     * uses, so a grown bar and a same-row neighbour line up.
-     */
-    itemArrowSource: Map<string, Point>;
+    placedItems: Map<string, PositionedItem>;
     /**
      * Flow key for each item, used to dedupe milestone slack arrows.
      * A "flow" is the deepest enclosing single-track container —
@@ -119,15 +107,6 @@ export interface LayoutContext {
      * value to populate `itemFlowKey`.
      */
     currentFlowKey: string;
-    /**
-     * Y coordinate where milestone slack arrows attach for each item id.
-     * Defaults to the item's row midpoint; when an item's caption spills
-     * past the bar's right edge, drops to the progress-strip's vertical
-     * center (`box.y + box.height - PROGRESS_STRIP_HEIGHT_PX / 2`) so the
-     * arrow stays clear of the spilled title/meta line and visually
-     * aligns with the bottom-edge progress bar instead.
-     */
-    itemSlackAttachY: Map<string, number>;
     /**
      * Horizontal arrow corridors that the swimlane row-packer must avoid.
      * Empty during the first layout pass; populated from the first

@@ -1,6 +1,11 @@
 import { isItemDeclaration, isSwimlaneDeclaration, type NowlineFile } from '@nowline/core';
 import { describe, expect, it, vi } from 'vitest';
-import { layoutRoadmap, type PositionedItem, type PositionedTrackChild } from '../src/index.js';
+import {
+    groupHasFill,
+    layoutRoadmap,
+    type PositionedItem,
+    type PositionedTrackChild,
+} from '../src/index.js';
 import { SwimlaneNode, type SwimlaneNodeDeps } from '../src/nodes/swimlane-node.js';
 import { parseAndResolve } from './helpers.js';
 
@@ -1517,6 +1522,116 @@ swimlane s "S"
         expect(model.edges.find((e) => e.fromId === 'a' && e.toId === 'b')).toBeUndefined();
     });
 
+    it('attaches a grown bar slack arrow on its dependency-arrow line', async () => {
+        // `ui` wraps its title with a meta line, so its bar grew to 72px. Its
+        // dependency arrows (in from `api`, out to `qa`) attach on the nominal
+        // midline; the dotted slack arrow to `beta` must leave on that line
+        // too, not at the grown bar's own mid-height 8px lower.
+        const src = `nowline v1
+
+roadmap slack "Slack" start:2026-01-05 scale:1w
+
+swimlane backend "Backend"
+  item api "API v2" duration:2w
+  item deploy "Deploy" duration:6w
+
+swimlane frontend "Frontend"
+  item ui "New console UI" duration:3w after:api
+
+swimlane test "Test"
+  item qa "QA pass" duration:1w after:ui
+
+milestone beta "Beta" after:[deploy, ui]
+`;
+        const model = await layout(src);
+        const ui = find(model, 'ui');
+        expect(ui.textSpills).toBe(false);
+        expect(ui.box.height).toBe(72);
+        const into = model.edges.find((e) => e.fromId === 'api' && e.toId === 'ui')?.waypoints;
+        const out = model.edges.find((e) => e.fromId === 'ui' && e.toId === 'qa')?.waypoints;
+        expect(into).toBeDefined();
+        expect(out).toBeDefined();
+        const beta = model.milestones.find((m) => m.title === 'Beta');
+        expect(beta?.slackArrows).toHaveLength(1);
+        const slack = beta?.slackArrows?.[0];
+        expect(slack?.x).toBeCloseTo(ui.box.x + ui.box.width, 1);
+        expect(slack?.y).toBeCloseTo(ui.box.y + NOMINAL_MID_PX, 1);
+        expect(slack?.y).toBeCloseTo(into?.[into.length - 1].y ?? Number.NaN, 3);
+        expect(slack?.y).toBeCloseTo(out?.[0].y ?? Number.NaN, 3);
+    });
+
+    it('attaches a chip-grown bar slack arrow on the nominal midline', async () => {
+        const src = `nowline v1
+
+roadmap slack "Slack" start:2026-01-05 scale:1w
+
+label a "Enterprise readiness"
+label b "Low confidence"
+
+swimlane s "S"
+  item wide "Billing" duration:3w labels:[a, b]
+
+swimlane t "T"
+  item long "Long" duration:8w
+
+milestone ship "Ship" after:[wide, long]
+`;
+        const model = await layout(src);
+        const wide = find(model, 'wide');
+        expect(wide.textSpills).toBe(false);
+        expect(wide.box.height).toBeGreaterThan(56);
+        const slack = model.milestones.find((m) => m.title === 'Ship')?.slackArrows?.[0];
+        expect(slack?.y).toBeCloseTo(wide.box.y + NOMINAL_MID_PX, 1);
+    });
+
+    it('terminates arrows into a spilled, chip-grown bar on the nominal midline', async () => {
+        // `auth`'s caption spills right and its chip column grows the bar to
+        // 78px. The arrow from `api` lands on the same nominal midline as any
+        // other target, not at the grown bar's own mid-height 11px lower.
+        const src = `nowline v1
+
+roadmap r "R" start:2026-01-05 scale:1w
+
+label a "Enterprise readiness"
+label b "Low confidence"
+
+swimlane s "S"
+  item api "API" duration:2w
+
+swimlane t "T"
+  item auth "Auth refactor" duration:1w labels:[a, b] after:api
+`;
+        const model = await layout(src);
+        const auth = find(model, 'auth');
+        expect(auth.textSpills).toBe(true);
+        expect(auth.box.height).toBe(78);
+        const wp = model.edges.find((e) => e.fromId === 'api' && e.toId === 'auth')?.waypoints;
+        expect(wp).toBeDefined();
+        const end = wp?.[wp.length - 1];
+        expect(end?.x).toBeCloseTo(auth.box.x, 1);
+        expect(end?.y).toBeCloseTo(auth.box.y + NOMINAL_MID_PX, 1);
+    });
+
+    it('keeps the progress-strip slack attach for a spilled-caption source', async () => {
+        const src = `nowline v1
+
+roadmap spill "Spill" start:2026-01-05 scale:1w
+
+swimlane s "S"
+  item a "Infrastructure" duration:1w
+
+swimlane t "T"
+  item b "Beta" duration:4w
+
+milestone ship "Ship" after:[a, b]
+`;
+        const model = await layout(src);
+        const a = find(model, 'a');
+        expect(a.textSpills).toBe(true);
+        const slack = model.milestones.find((m) => m.title === 'Ship')?.slackArrows?.[0];
+        expect(slack?.y).toBeCloseTo(a.box.y + a.box.height - PROGRESS_STRIP_HALF_PX, 1);
+    });
+
     it('keeps the progress-strip attach for a spilled-caption source', async () => {
         const src = `nowline v1
 
@@ -1534,5 +1649,267 @@ swimlane t "T"
         const wp = model.edges.find((e) => e.fromId === 'a' && e.toId === 'b')?.waypoints ?? [];
         expect(wp[0].x).toBeCloseTo(a.box.x + a.box.width, 1);
         expect(wp[0].y).toBeCloseTo(a.box.y + a.box.height - PROGRESS_STRIP_HALF_PX, 1);
+    });
+});
+
+describe('layoutRoadmap geometry after a late vertical shift', () => {
+    // Layout moves bars down AFTER placing them in two places: a row that
+    // grows retroactively (a taller item lands back on an earlier row)
+    // pushes every later row down, and a marker band that outgrows its
+    // sizing pushes the whole chart down. Everything attached to a bar has
+    // to move with it: dependency-arrow ends, milestone slack arrows, and
+    // inline-date glyphs. The attach rules are restated here (see
+    // specs/rendering.md "Dependency Arrows" and "Inline-date glyph"), not
+    // imported, so the check does not borrow the code under test.
+    const NOMINAL_MID_PX = 28; // bandwidth / 2 for the default 56px band
+    const PROGRESS_STRIP_HALF_PX = 2;
+    const GLYPH_INSET_TOP_PX = 5;
+    const GLYPH_SIZE_PX = 12;
+    const GROUP_TITLE_TAB_HEIGHT_PX = 16;
+    const HEADER_BAND_PX = 12;
+
+    type Model = ReturnType<typeof layoutRoadmap>;
+
+    function entities(children: PositionedTrackChild[]): PositionedTrackChild[] {
+        const out: PositionedTrackChild[] = [];
+        for (const child of children) {
+            out.push(child);
+            if (child.kind !== 'item') out.push(...entities(child.children));
+        }
+        return out;
+    }
+
+    function allEntities(model: Model): PositionedTrackChild[] {
+        return model.swimlanes.flatMap((l) => entities(l.children));
+    }
+
+    function allItems(model: Model): PositionedItem[] {
+        return allEntities(model).filter((e): e is PositionedItem => e.kind === 'item');
+    }
+
+    function find(model: Model, id: string): PositionedItem {
+        const found = allItems(model).find((i) => i.id === id);
+        if (!found) throw new Error(`no item ${id}`);
+        return found;
+    }
+
+    function sourceY(i: PositionedItem): number {
+        return i.textSpills
+            ? i.box.y + i.box.height - PROGRESS_STRIP_HALF_PX
+            : i.box.y + NOMINAL_MID_PX;
+    }
+
+    function targetY(i: PositionedItem): number {
+        return i.textSpills ? i.box.y + i.box.height / 2 : i.box.y + NOMINAL_MID_PX;
+    }
+
+    function slackY(i: PositionedItem): number {
+        return i.textSpills
+            ? i.box.y + i.box.height - PROGRESS_STRIP_HALF_PX
+            : i.box.y + i.box.height / 2;
+    }
+
+    /** Every arrow whose ends are id'd items starts and ends on their final bars. */
+    function arrowMismatches(model: Model): string[] {
+        const byId = new Map(allItems(model).map((i) => [i.id, i]));
+        const out: string[] = [];
+        for (const edge of model.edges) {
+            const to = byId.get(edge.toId);
+            if (!to) continue;
+            const wp = edge.waypoints;
+            const end = wp[wp.length - 1];
+            if (Math.abs(end.x - to.box.x) > 0.01 || Math.abs(end.y - targetY(to)) > 0.01) {
+                out.push(`${edge.fromId}->${edge.toId} ends at (${end.x}, ${end.y})`);
+            }
+            const from = byId.get(edge.fromId);
+            const startY = from ? sourceY(from) : targetY(to);
+            const startX = from ? from.box.x + from.box.width : wp[0].x;
+            if (Math.abs(wp[0].x - startX) > 0.01 || Math.abs(wp[0].y - startY) > 0.01) {
+                out.push(`${edge.fromId}->${edge.toId} starts at (${wp[0].x}, ${wp[0].y})`);
+            }
+        }
+        return out;
+    }
+
+    /** Every slack arrow leaving an item bar's right edge sits on its final attach y. */
+    function slackMismatches(model: Model): string[] {
+        const items = allItems(model);
+        const out: string[] = [];
+        for (const m of model.milestones) {
+            for (const arrow of m.slackArrows ?? []) {
+                const sources = items.filter(
+                    (i) => Math.abs(i.box.x + i.box.width - arrow.x) < 0.01,
+                );
+                if (sources.length === 0) continue;
+                if (!sources.some((i) => Math.abs(slackY(i) - arrow.y) < 0.01)) {
+                    out.push(`${m.id} slack arrow at (${arrow.x}, ${arrow.y})`);
+                }
+            }
+        }
+        return out;
+    }
+
+    /** Every inline-date glyph sits in its entity's own glyph row. */
+    function pinMismatches(model: Model): string[] {
+        const out: string[] = [];
+        for (const e of allEntities(model)) {
+            for (const pin of e.inlineDatePins ?? []) {
+                const { x, y } = pin.glyphTopLeft;
+                const where = `${e.kind} ${e.id} ${pin.side} glyph at (${x}, ${y})`;
+                if (e.kind === 'item') {
+                    // The bar's top row: above the nominal midline.
+                    if (y !== e.box.y + GLYPH_INSET_TOP_PX || y + GLYPH_SIZE_PX > e.box.y + 28) {
+                        out.push(`${where}, bar top ${e.box.y}`);
+                    }
+                    if (
+                        !pin.spilled &&
+                        (x < e.box.x || x + GLYPH_SIZE_PX > e.box.x + e.box.width)
+                    ) {
+                        out.push(`${where}, outside bar x ${e.box.x}..${e.box.x + e.box.width}`);
+                    }
+                    continue;
+                }
+                // A filled group's chiclet row inside the box top; every
+                // other container's header band above the box.
+                const [top, bottom] =
+                    e.kind === 'group' && groupHasFill(e.style.bg)
+                        ? [e.box.y, e.box.y + GROUP_TITLE_TAB_HEIGHT_PX]
+                        : [e.box.y - HEADER_BAND_PX, e.box.y];
+                if (y < top || y + GLYPH_SIZE_PX > bottom) {
+                    out.push(`${where}, glyph row ${top}..${bottom}`);
+                }
+            }
+        }
+        return out;
+    }
+
+    async function layout(src: string): Promise<Model> {
+        const { file, resolved } = await parseAndResolve(src);
+        return layoutRoadmap(file, resolved, { theme: 'light' });
+    }
+
+    it('ends every dependency arrow on its bars after a retroactive row growth', async () => {
+        // "Auth refactor" spills, so b and c drop to row 1. d fits back on
+        // row 0 and wraps ("Next" / "one"), growing row 0 by 16px after
+        // row 1 was placed, so row 1 moves down. The a -> b target and the
+        // c -> d source must move with it.
+        const model = await layout(`nowline v1
+
+roadmap repro "Retroactive shift" start:2026-01-05 scale:1w
+
+swimlane s "S"
+  item a "Auth refactor" duration:2w
+  item b "Next" duration:2w after:a
+  item c "Plain thing" duration:2w
+  item d "Next one" duration:2w after:c
+`);
+        const [a, b, c, d] = ['a', 'b', 'c', 'd'].map((id) => find(model, id));
+        // The shift under test: d grew row 0 after b and c were placed.
+        expect(d.box.y).toBe(a.box.y);
+        expect(d.box.height).toBe(72);
+        expect(b.box.y).toBe(a.box.y + 64 + 16);
+        expect(c.box.y).toBe(b.box.y);
+
+        const ab = model.edges.find((e) => e.fromId === 'a' && e.toId === 'b')?.waypoints ?? [];
+        expect(ab.at(-1)?.y).toBe(b.box.y + NOMINAL_MID_PX);
+        const cd = model.edges.find((e) => e.fromId === 'c' && e.toId === 'd')?.waypoints ?? [];
+        expect(c.textSpills).toBe(true);
+        expect(cd[0]?.y).toBe(c.box.y + c.box.height - PROGRESS_STRIP_HALF_PX);
+        expect(arrowMismatches(model)).toEqual([]);
+    });
+
+    it('moves glyphs and slack arrows with the rows a retroactive growth pushed down', async () => {
+        // Same lane, plus a glyph on c (row 1), a filled group (row 2) and a
+        // parallel (row 3), all placed before d grows row 0. g1 finishes
+        // before d, so "Ship" draws a slack arrow from g1.
+        const model = await layout(`nowline v1
+
+config
+
+style enterprise
+  bg: blue
+  text: white
+
+roadmap repro "Retroactive shift" start:2026-01-05 scale:1w
+
+swimlane s "S"
+  item a "Auth refactor" duration:2w
+  item b "Next" duration:2w after:a
+  item c "Plain thing" duration:2w after:2026-01-25
+  group g "Pinned group" style:enterprise after:2026-01-19
+    item g1 "Gamma" duration:2w
+  parallel par "Pinned parallel" before:2026-04-20
+    item p1 "Delta" duration:3w
+  item d "Next one" duration:2w after:c
+
+milestone ship "Ship" after:[g1, d]
+`);
+        const [a, c, d, g1] = ['a', 'c', 'd', 'g1'].map((id) => find(model, id));
+        expect(d.box.y).toBe(a.box.y);
+        expect(d.box.height).toBe(72);
+        expect(c.box.y).toBe(a.box.y + 64 + 16);
+        const group = allEntities(model).find((e) => e.kind === 'group');
+        const parallel = allEntities(model).find((e) => e.kind === 'parallel');
+        expect(group?.inlineDatePins).toHaveLength(1);
+        expect(parallel?.inlineDatePins).toHaveLength(1);
+        expect(c.inlineDatePins?.[0].glyphTopLeft.y).toBe(c.box.y + GLYPH_INSET_TOP_PX);
+        expect(pinMismatches(model)).toEqual([]);
+
+        const ship = model.milestones.find((m) => m.id === 'ship');
+        expect(ship?.slackArrows).toEqual([{ x: g1.box.x + g1.box.width, y: slackY(g1) }]);
+        expect(slackMismatches(model)).toEqual([]);
+        expect(arrowMismatches(model)).toEqual([]);
+    });
+
+    it('keeps an item `after:` glyph inside its bar when the marker band grows', async () => {
+        // The anchor and the milestone collide, so the marker band grows a
+        // row and the chart moves down 26px after Alpha was placed.
+        const model = await layout(`nowline v1
+
+roadmap repro "Pin after band growth" start:2026-01-05 scale:1w
+
+anchor freeze "code-freeze" date:2026-02-02
+
+swimlane top "Top"
+  item a "Alpha" duration:4w after:2026-01-12
+
+milestone beta "Beta" after:a
+`);
+        expect(model.timeline.markerRow.height).toBeGreaterThanOrEqual(2 * 26);
+        const a = find(model, 'a');
+        expect(a.inlineDatePins?.[0].glyphTopLeft.y).toBe(a.box.y + GLYPH_INSET_TOP_PX);
+        expect(pinMismatches(model)).toEqual([]);
+    });
+
+    it('keeps group and parallel glyphs on their boxes when the marker band grows', async () => {
+        const model = await layout(`nowline v1
+
+config
+
+style enterprise
+  bg: blue
+  text: white
+
+roadmap repro "Pin after band growth" start:2026-01-05 scale:1w
+
+anchor freeze "code-freeze" date:2026-02-02
+
+swimlane top "Top"
+  item a "Alpha" duration:4w after:2026-01-12
+  group g "Filled group" style:enterprise after:2026-01-19 before:2026-03-30
+    item g1 "Gamma" duration:3w
+  group h "Plain group" after:2026-01-19
+    item h1 "Eta" duration:3w
+  parallel par "Pinned parallel" after:2026-01-19 before:2026-04-20
+    item p1 "Delta" duration:3w
+
+milestone beta "Beta" after:a
+`);
+        expect(model.timeline.markerRow.height).toBeGreaterThanOrEqual(2 * 26);
+        const pinned = allEntities(model).filter(
+            (e) => e.kind !== 'item' && (e.inlineDatePins?.length ?? 0) > 0,
+        );
+        expect(pinned.map((e) => e.id)).toEqual(['g', 'h', 'par']);
+        expect(pinMismatches(model)).toEqual([]);
     });
 });
