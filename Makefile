@@ -219,7 +219,7 @@ vsix: ## [pkg] Package the VS Code / Cursor extension into a .vsix
 
 pack-mcpb: ## [pkg] Pack the @nowline/mcp Claude Desktop bundle into dist-mcpb/nowline.mcpb
 	@set -euo pipefail; \
-	node scripts/sync-mcp-metadata.mjs >/dev/null; \
+	node scripts/sync-mcp-metadata.mjs --check >/dev/null; \
 	rm -rf dist-mcpb/staging dist-mcpb/nowline.mcpb; \
 	pnpm --filter "@nowline/mcp..." build; \
 	node packages/mcp/scripts/bundle-server.mjs; \
