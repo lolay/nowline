@@ -22,6 +22,13 @@ export interface JsonAstNode {
 
 export interface SerializeOptions {
     includePositions?: boolean;
+    /**
+     * Emitted verbatim as `file.uri` in place of `document.uri.toString()`.
+     * For callers that parse from a synthetic URI (e.g. the export kernel's
+     * `memory:///kernel-N.nowline`) but must report the real source path.
+     * No normalization or percent-encoding is applied.
+     */
+    uri?: string;
 }
 
 // Keys that Langium adds to AST nodes that we don't want in the JSON form.
@@ -38,7 +45,7 @@ export function serializeToJson(
     return {
         $nowlineSchema: NOWLINE_SCHEMA_VERSION,
         file: {
-            uri: document.uri.toString(),
+            uri: options.uri ?? document.uri.toString(),
             source,
         },
         ast: serializeNode(document.parseResult.value, includePositions),
