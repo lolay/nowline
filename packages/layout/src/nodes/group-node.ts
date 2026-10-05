@@ -13,7 +13,7 @@
 // glyphs) in a header band it reserves above the box instead; see
 // `container-header-geometry.ts`.
 
-import type { EntityProperty, GroupBlock, ItemDeclaration, ParallelBlock } from '@nowline/core';
+import type { GroupBlock, ItemDeclaration, ParallelBlock } from '@nowline/core';
 import { isItemDeclaration } from '@nowline/core';
 import { deriveItemDurationDays } from '../calendar.js';
 import {
@@ -41,6 +41,7 @@ import type {
     PositionedItem,
     PositionedTrackChild,
 } from '../types.js';
+import { waveFloorX } from '../wave-layout.js';
 
 export interface GroupNodeDeps {
     sequenceItem: (
@@ -55,7 +56,7 @@ export interface GroupNodeDeps {
         ctx: LayoutContext,
     ) => PositionedTrackChild;
     resolveChildStart: (
-        props: EntityProperty[],
+        child: ItemDeclaration | GroupBlock | ParallelBlock,
         seqDefault: number,
         laneLeftX: number,
         ctx: LayoutContext,
@@ -90,7 +91,11 @@ export class GroupNode {
         const { node } = this;
         const { deps } = this;
         const style = resolveStyle('group', node.properties, ctx.styleCtx);
-        const startX = cursor.x;
+        // The group's own wave and its lead wave floor its start, so its
+        // box never opens in a column before its first piece of work
+        // (specs/waves.md §5.1). A no-op without waves, and for a lane
+        // child, whose `resolveChildStart` already applied it.
+        const startX = waveFloorX(node, cursor.x, ctx);
         const title = node.title ?? node.name;
 
         // Group children chain in time inside the group, so they
@@ -138,9 +143,8 @@ export class GroupNode {
             if (child.$type === 'DescriptionDirective') continue;
 
             if (!isItemDeclaration(child)) {
-                const blockProps = (child as ParallelBlock | GroupBlock).properties ?? [];
                 const blockStart = deps.resolveChildStart(
-                    blockProps,
+                    child as ParallelBlock | GroupBlock,
                     timeCursorX,
                     groupContentLeftX,
                     ctx,
@@ -167,7 +171,12 @@ export class GroupNode {
             }
 
             const props = (child as ItemDeclaration).properties;
-            const desiredStart = deps.resolveChildStart(props, timeCursorX, groupContentLeftX, ctx);
+            const desiredStart = deps.resolveChildStart(
+                child as ItemDeclaration,
+                timeCursorX,
+                groupContentLeftX,
+                ctx,
+            );
             // Predict logical extent so the row-packer can bump on
             // collision before we hand off to `sequenceItem`. Mirrors
             // SwimlaneNode's pre-flight width math.

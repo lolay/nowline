@@ -2,7 +2,8 @@
 // model. Informational by default; warnings only when author intent is lost
 // (e.g. now-line outside the date window).
 
-import { type MessageCode, tr } from '@nowline/core';
+import { type I1006Args, type MessageCode, tr } from '@nowline/core';
+import { addDays } from './calendar.js';
 import { MIN_BAR_WIDTH_FOR_DOT_PX } from './item-bar-geometry.js';
 import type {
     PositionedItem,
@@ -85,6 +86,23 @@ function collectItemInsights(item: PositionedItem, locale: string, out: LayoutIn
             makeInsight(locale, 'NL.I1003', 'info', { name, anchor: item.overflowAnchorId }, name),
         );
     }
+    collectWavePinInsight(item, locale, out);
+}
+
+/** NL.W1001 (specs/waves.md WV15): a wave floor moved the item's pin. */
+function collectWavePinInsight(item: PositionedItem, locale: string, out: LayoutInsight[]): void {
+    const pin = item.wavePinOverride;
+    if (!pin) return;
+    const name = itemLabel(item);
+    out.push(
+        makeInsight(
+            locale,
+            'NL.W1001',
+            'warning',
+            { name, pin: pin.pin, key: pin.key, wave: pin.wave, start: pin.start },
+            name,
+        ),
+    );
 }
 
 function makeInsight(
@@ -135,6 +153,86 @@ function collectSwimlaneInsights(
 }
 
 /**
+ * Wave insights on the items of an isolated region's lanes. Region items
+ * carry only the wave pin override here (NL.W1001, specs/waves.md §8.7);
+ * the other item and lane insights stay main-lane only, as before waves.
+ */
+function collectWaveItemInsights(
+    lane: PositionedSwimlane,
+    locale: string,
+    out: LayoutInsight[],
+): void {
+    walkTrackChildren(lane.children, (item) => collectWavePinInsight(item, locale, out));
+    for (const nested of lane.nested) {
+        collectWaveItemInsights(nested, locale, out);
+    }
+}
+
+/**
+ * Roadmap-level wave insights (specs/waves.md WV16-WV18): the barrier
+ * driver's pass cap, empty waves (once per roadmap), and dated milestones a
+ * wave overruns. No-ops without waves.
+ */
+function collectWaveInsights(
+    layout: PositionedRoadmap,
+    locale: string,
+    out: LayoutInsight[],
+): void {
+    if (layout.waveSolve?.capped) {
+        out.push(makeInsight(locale, 'NL.W1002', 'warning', { passes: layout.waveSolve.passes }));
+    }
+    const waves = layout.waves ?? [];
+    const empty = waves.filter((w) => w.empty).map((w) => w.id);
+    if (empty.length > 0) {
+        const args: I1006Args =
+            empty.length === waves.length
+                ? { reason: 'all', names: empty }
+                : empty.length === 1
+                  ? { reason: 'one', name: empty[0] }
+                  : { reason: 'many', names: empty };
+        out.push(
+            makeInsight(
+                locale,
+                'NL.I1006',
+                'info',
+                args,
+                args.reason === 'one' ? args.name : undefined,
+            ),
+        );
+    }
+    for (const m of layout.milestones) {
+        if (m.overrunByWave === undefined) continue;
+        const wave = waves.find((w) => w.id === m.overrunByWave);
+        if (!wave) continue;
+        const name = m.id ?? m.title;
+        // The model carries no milestone date (§8.7 keeps `overrunByWave` a
+        // bare wave id), so the day reads back off the timeline. That is
+        // exact because only dated milestones get `overrunByWave`, and
+        // `MilestoneNode.place` sets their center x once, to
+        // `scale.forward(date)` (linear in calendar days); marker-row
+        // packing moves only y. layout-insights.test.ts pins this coupling
+        // with a mid-week date on a fractional-ppd scale and a packed row.
+        const { timeline } = layout;
+        const days = Math.round((m.center.x - timeline.originX) / timeline.pixelsPerDay);
+        const date = addDays(timeline.startDate, days);
+        out.push(
+            makeInsight(
+                locale,
+                'NL.I1007',
+                'info',
+                {
+                    name,
+                    date: formatIsoDate(date),
+                    wave: wave.id,
+                    end: formatIsoDate(wave.endDate),
+                },
+                name,
+            ),
+        );
+    }
+}
+
+/**
  * Collect layout-derived insights from a positioned roadmap. These describe
  * observable reflow consequences (caption spill, lane packing, etc.), not
  * parse/validation errors.
@@ -149,6 +247,12 @@ export function collectLayoutInsights(
     for (const lane of layout.swimlanes) {
         collectSwimlaneInsights(lane, locale, out);
     }
+    for (const region of layout.includes) {
+        for (const lane of region.nestedSwimlanes) {
+            collectWaveItemInsights(lane, locale, out);
+        }
+    }
+    collectWaveInsights(layout, locale, out);
 
     if (context.today) {
         const today = context.today;

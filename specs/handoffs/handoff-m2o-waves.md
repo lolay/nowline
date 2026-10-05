@@ -160,6 +160,7 @@ Items register their edges only when they have an explicit id (`layout.ts:683-68
 | d | 8 px `TRACK_BLOCK_TAIL_GUTTER_PX` after group tracks inside a parallel | `group-node.ts:226` → `parallel-node.ts:72`; `shared.ts:104` |
 | e | `after:` on a group nested in a parallel: honoured in C, ignored in A | `group-node.ts:85`; `schedule.ts:166-177` |
 | f | A uses a monotone `timeCursorX`; B and C use the last child's `prevEnd` | `swimlane-node.ts:262`; `schedule.ts:120-124` |
+| g | Item `start:` pins: A ignores one on a direct parallel track (the track opens at the parallel's start) and lets a lane item's `after:` push it (`max(start, after)`); C keeps the pin in both cases. A `date:` pin replaces `after:` in both | `parallel-node.ts` → `sequenceItem` (`layout.ts`); `schedule.ts` `walkNode` |
 
 **Silently ignored today** (relevant to NL.W1101 and to the order check):
 

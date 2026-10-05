@@ -1,7 +1,7 @@
 // Locale-aware strings used by the layout pipeline. Owns three things:
 //   - The BCP-47 fallback chain (`fr-CA → fr → en-US`).
 //   - A small message table for chrome strings the renderer paints
-//     directly (now-pill, quarter prefix).
+//     directly (now-pill, quarter prefix, wave strip / legend / tooltips).
 //   - The locale token passed to `Intl.DateTimeFormat` for axis labels.
 //
 // Today the table is inline; m-loc-d / m-loc-e (per `specs/localization.md`)
@@ -15,6 +15,27 @@ export interface LocaleStrings {
     nowLabel: string;
     /** Prefix used when the timeline scale is quarters (e.g. `Q1 2026` / `T1 2026`). */
     quarterPrefix: string;
+    /**
+     * Wave strip tooltip: names the member that sets the wave's end
+     * (`Launch · 2026-02-02 – 2026-02-23 · held by i2`; specs/waves.md §9.1).
+     */
+    waveHeldBy: string;
+    /** Marks an empty wave in its tooltip and the legend (`#2 Hardening (TBD) (no items)`). */
+    waveNoItems: string;
+    /** Added to a background item's hover tooltip (specs/waves.md §9.3). */
+    waveBackgroundItem: string;
+    /** Legend entry beside the hatch swatch (specs/waves.md §9.5). */
+    waveLegendBackground: string;
+    /** Legend entry beside the boundary swatch. */
+    waveLegendBoundary: string;
+    /** Prefix of the legend's wave-name list (`Waves: #1 Discover · #2 Build`). */
+    waveLegendPrefix: string;
+    /**
+     * Wave strip placeholder when every wave is empty (specs/waves.md
+     * §9.1). `{names}` is replaced by the wave titles; see
+     * `wavesDeclaredPlaceholder`.
+     */
+    wavesDeclaredPlaceholder: string;
 }
 
 // Bundle entries keyed by language tag. The fallback chain strips the
@@ -29,6 +50,13 @@ const BUNDLES: Record<string, Partial<LocaleStrings>> = {
     'en-US': {
         nowLabel: 'now',
         quarterPrefix: 'Q',
+        waveHeldBy: 'held by',
+        waveNoItems: 'no items',
+        waveBackgroundItem: 'Background (no wave)',
+        waveLegendBackground: 'Background work (not in a wave)',
+        waveLegendBoundary: 'Wave boundary',
+        waveLegendPrefix: 'Waves:',
+        wavesDeclaredPlaceholder: 'Waves declared: {names} — no items assigned yet',
     },
     fr: {
         // Short form of "maintenant"; keeps the pill compact while staying
@@ -37,6 +65,16 @@ const BUNDLES: Record<string, Partial<LocaleStrings>> = {
         nowLabel: 'maint.',
         // `T` for trimestre — the standard French business convention.
         quarterPrefix: 'T',
+        // "Vague" is feminine; the strings agree with it. Colons take a
+        // no-break space (U+00A0), as in `messages.fr.ts`.
+        waveHeldBy: 'retenue par',
+        waveNoItems: 'aucun élément',
+        waveBackgroundItem: 'Travail de fond (hors vague)',
+        waveLegendBackground: 'Travail de fond (dans aucune vague)',
+        waveLegendBoundary: 'Limite de vague',
+        waveLegendPrefix: 'Vagues\u00A0:',
+        wavesDeclaredPlaceholder:
+            'Vagues déclarées\u00A0: {names} — aucun élément affecté pour l’instant',
     },
 };
 
@@ -91,6 +129,15 @@ export function localeStrings(locale: string): LocaleStrings {
     }
     // The root bundle (`en-US`) is always populated, so this cast is safe.
     return result as LocaleStrings;
+}
+
+/**
+ * The all-empty wave strip placeholder (specs/waves.md §9.1), e.g.
+ * `Waves declared: Discover, Build — no items assigned yet`.
+ */
+export function wavesDeclaredPlaceholder(strings: LocaleStrings, names: readonly string[]): string {
+    // A replacer function, so a `$` in a title is never read as a pattern.
+    return strings.wavesDeclaredPlaceholder.replace('{names}', () => names.join(', '));
 }
 
 /**

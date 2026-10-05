@@ -369,6 +369,22 @@ export interface PositionedItem {
      */
     size: ResolvedSize | null;
     style: ResolvedStyle;
+    /**
+     * Wave membership (specs/waves.md §8.7): `member` for an item with an
+     * effective wave, `background` for one without. Set on every item, in
+     * the main lanes and in isolated regions, when the roadmap declares
+     * waves; omitted otherwise.
+     */
+    waveRole?: 'member' | 'background';
+    /**
+     * Present when a wave floor moved the item's `date:` / `start:` pin
+     * (NL.W1001) and the floor is what the item now starts at: `wave` is
+     * the wave id, `key` / `pin` the pin as written, and `start` the wave's
+     * start `S_k` as a whole UTC day (YYYY-MM-DD), which is also the item's
+     * start. Omitted when something else (an `after:`) pushed the item past
+     * the floor.
+     */
+    wavePinOverride?: { wave: string; key: 'date' | 'start'; pin: string; start: string };
 }
 
 /**
@@ -560,6 +576,19 @@ export interface PositionedMilestone {
     // See PositionedAnchor.labelBox — same packing logic applies.
     labelBox: BoundingBox;
     labelSide: 'left' | 'right';
+    /**
+     * True when the diamond sits on a wave boundary (within 0.5 px of any
+     * `S_k` or `E_k` other than the origin; specs/waves.md §9.2). The
+     * boundary line carries the vertical, so the cut line is not drawn.
+     * Omitted when false and when the roadmap has no waves.
+     */
+    onWaveBoundary?: boolean;
+    /**
+     * The wave that runs past this dated milestone: its `after:` lists the
+     * wave and the wave's end `E_k` lies past `date:` (NL.I1007). The
+     * latest-ending such wave; omitted when none.
+     */
+    overrunByWave?: string;
 }
 
 /**
@@ -641,6 +670,37 @@ export interface PositionedIncludeRegion {
     style: ResolvedStyle;
 }
 
+/**
+ * One wave's solved span (specs/waves.md §5.1, §8.7), in declaration order.
+ * Only present in a roadmap that declares waves.
+ */
+export interface PositionedWave {
+    id: string;
+    /** The wave's title, else its id. */
+    title: string;
+    /** 0-based declaration order. */
+    index: number;
+    /** `S_k` in logical px. */
+    startX: number;
+    /** `E_k` in logical px; equals `startX` for an empty wave. */
+    endX: number;
+    /** `S_k` as a whole UTC day. */
+    startDate: Date;
+    /** `E_k` as a whole UTC day, exclusive. */
+    endDate: Date;
+    /** Members placed in the main lanes and first-level isolated regions. */
+    memberCount: number;
+    /** True when the wave has no members (it spans no time). */
+    empty: boolean;
+    /**
+     * The member that sets `E_k` (its id, else its title). Omitted when no
+     * member's end equals `E_k` with `E_k > S_k` (§5.1 "Held by").
+     */
+    heldBy?: string;
+    /** The wave's `after:` value that set `S_k`, when it beat `E_{k-1}`. */
+    floorRef?: string;
+}
+
 // Top-level result handed to the renderer.
 export interface PositionedRoadmap {
     width: number;
@@ -665,4 +725,12 @@ export interface PositionedRoadmap {
     includes: PositionedIncludeRegion[];
     // Frame (chart area) in chart-space. Useful for renderer overlays.
     chartBox: BoundingBox;
+    /**
+     * The wave barrier driver's result (specs/waves.md §8.7): the passes it
+     * ran and whether it hit the `n + 1` cap (NL.W1002, invalid input).
+     * Present only when the roadmap declares waves.
+     */
+    waveSolve?: { passes: number; capped: boolean };
+    /** The waves in declaration order; present only when the roadmap declares waves. */
+    waves?: PositionedWave[];
 }

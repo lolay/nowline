@@ -832,7 +832,7 @@ swimlane platform "Backlog"
             'ios.nowline': [
                 'nowline v1',
                 '',
-                'roadmap ios "iOS" start:2026-01-05 scale:1w',
+                'roadmap ios-app "iOS" start:2026-01-05 scale:1w',
                 '',
                 'wave w1 "Wave 1"',
                 'wave w2 "Wave 2"',
