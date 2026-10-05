@@ -1,6 +1,9 @@
+import { readFileSync } from 'node:fs';
+import { fileURLToPath } from 'node:url';
+import { darkTheme, lightTheme, WAVE_STRIP_LABEL_PAD_PX } from '@nowline/layout';
 import { describe, expect, it } from 'vitest';
 import { renderSvg } from '../src/index.js';
-import { parseToModel } from './helpers.js';
+import { parseFilesToModel, parseToModel } from './helpers.js';
 
 const BASIC_DSL = `nowline v1
 
@@ -966,5 +969,735 @@ describe('renderSvg — caption indent past an `after:` date glyph', () => {
         const titles = textNodes(fragment).filter((t) => t.fontSize === 13);
         // Spilled: starts past the bar's right edge (148px wide) plus the 6px gap.
         expect(titles[0].x).toBe(bar + 148 + 6);
+    });
+});
+
+// --- Waves (specs/waves.md §9) ---
+
+const WAVE_SAMPLE = readFileSync(
+    fileURLToPath(
+        new URL('../../../specs/waves/samples/checkout-relaunch.nowline', import.meta.url),
+    ),
+    'utf-8',
+);
+
+// specs/waves.md §11 Example 1: no background work, every label fits.
+const WAVE_PLAIN_SRC = `nowline v1
+
+roadmap launch-plan "Launch plan" start:2026-01-05 scale:1w
+
+wave discover "Discover"
+wave build "Build"
+wave launch "Launch"
+
+swimlane web "Web"
+  item web-research "UX research" duration:2w wave:discover
+  item web-build "Checkout v2" duration:3w wave:build
+  item web-launch "Launch page" duration:1w wave:launch
+swimlane api "API"
+  item api-spike "API spike" duration:1w wave:discover
+  item api-build "Payments API" duration:4w wave:build
+  item api-launch "Rate limits" duration:1w wave:launch
+swimlane data "Data"
+  item data-audit "Data audit" duration:3w wave:discover
+  item data-build "Pipeline" duration:2w wave:build
+  item data-launch "Dashboards" duration:2w wave:launch
+`;
+
+// Example 12: an empty middle wave.
+const EXAMPLE_12_SRC = `nowline v1
+
+roadmap placeholder "Placeholder" start:2026-01-05 scale:1w
+
+wave w1 "Wave 1"
+wave w2 "Hardening (TBD)"
+wave w3 "Wave 3"
+
+swimlane a
+  item a1 duration:2w wave:w1
+  item a3 duration:1w wave:w3
+swimlane b
+  item b1 duration:1w wave:w1
+  item b3 duration:2w wave:w3
+`;
+
+// Example 11 with the floor anchor two weeks later, so the gap fits its
+// label; the dated milestone is still overrun by the wave.
+const WAVE_GAP_SRC = `nowline v1
+
+roadmap budget-floor "Budget-held rollout" start:2026-01-05 scale:1w calendar:full
+
+anchor fy-budget "FY budget release" date:2026-02-16
+
+wave plan "Plan"
+wave execute "Execute" after:fy-budget
+
+swimlane a
+  item a1 duration:2w wave:plan
+  item a2 duration:5w wave:execute
+swimlane b
+  item b1 duration:3w wave:plan
+  item b2 duration:7w wave:execute
+
+milestone exec-done "Execute complete" date:2026-03-16 after:execute
+`;
+
+// Narrowing spans at scale:1m walk the strip label fit chain.
+const WAVE_FIT_SRC = `nowline v1
+
+roadmap fit "Fit" start:2026-01-05 scale:1m
+
+wave discovery "Discovery"
+wave implementation "Implementation and build-out"
+wave hardening "Hardening and stabilisation"
+wave rollout-everywhere "Rollout everywhere"
+wave launch-day "Launch day"
+
+swimlane a
+  item a1 duration:8w wave:discovery
+  item a2 duration:4w wave:implementation
+  item a3 duration:6w wave:hardening
+  item a4 duration:8d wave:rollout-everywhere
+  item a5 duration:3d wave:launch-day
+`;
+
+// Example 19: an isolated region taking part in the barrier.
+const WAVE_REGION_FILES = {
+    'ios.nowline': `nowline v1
+
+roadmap ios-app "iOS" start:2026-01-05 scale:1w
+
+wave w1 "Wave 1"
+wave w2 "Wave 2"
+
+swimlane ios
+  item ios-offline duration:4w wave:w1
+  item ios-push duration:1w wave:w2
+`,
+    'portfolio.nowline': `nowline v1
+
+include "./ios.nowline" roadmap:isolate
+
+roadmap portfolio "Portfolio" start:2026-01-05 scale:1w
+
+wave w1 "Wave 1"
+wave w2 "Wave 2"
+
+swimlane platform
+  item pf-api duration:2w wave:w1
+  item pf-scale duration:2w wave:w2
+`,
+};
+
+/** Every balanced `<g …>…</g>` whose open tag matches `open`. */
+function groupsMatching(svg: string, open: RegExp): string[] {
+    const out: string[] = [];
+    const re = new RegExp(open.source, 'g');
+    for (const m of svg.matchAll(re)) {
+        const start = m.index ?? 0;
+        let depth = 0;
+        for (const t of svg.slice(start).matchAll(/<g\b|<\/g>/g)) {
+            depth += t[0] === '</g>' ? -1 : 1;
+            if (depth === 0) {
+                out.push(svg.slice(start, start + (t.index ?? 0) + t[0].length));
+                break;
+            }
+        }
+    }
+    return out;
+}
+
+/** The first `<g data-layer="name">`, balanced, or undefined. */
+function waveLayer(svg: string, name: string): string | undefined {
+    return groupsMatching(svg, new RegExp(`<g data-layer="${name}">`))[0];
+}
+
+function itemGroup(svg: string, id: string): string {
+    const g = groupsMatching(svg, new RegExp(`<g data-id="${id}" data-layer="item">`))[0];
+    expect(g).toBeDefined();
+    return g ?? '';
+}
+
+function attrOf(el: string, name: string): string | undefined {
+    return el.match(new RegExp(`\\s${name}="([^"]*)"`))?.[1];
+}
+
+function rectsOf(fragment: string): string[] {
+    return [...fragment.matchAll(/<rect [^>]*>/g)].map((m) => m[0]);
+}
+
+/** A strip cell's fill shapes: square `<rect>`s or end-rounded `<path>`s. */
+function cellShapesOf(fragment: string): string[] {
+    return [...fragment.matchAll(/<(?:rect|path) [^>]*>/g)].map((m) => m[0]);
+}
+
+/** The horizontal extent of a cell `<rect>` or end-rounded `<path>`. */
+function shapeXRange(shape: string): [number, number] {
+    if (shape.startsWith('<rect')) {
+        const x = Number(attrOf(shape, 'x'));
+        return [x, x + Number(attrOf(shape, 'width'))];
+    }
+    const d = attrOf(shape, 'd') ?? '';
+    const xs = [
+        ...[...d.matchAll(/[MH](-?[\d.]+)/g)].map((m) => Number(m[1])),
+        ...[...d.matchAll(/A[\d.]+ [\d.]+ 0 0 1 (-?[\d.]+)/g)].map((m) => Number(m[1])),
+    ];
+    return [Math.min(...xs), Math.max(...xs)];
+}
+
+function linesOf(fragment: string): string[] {
+    return [...fragment.matchAll(/<line [^>]*>/g)].map((m) => m[0]);
+}
+
+const n2 = (v: number): string => String(Math.round(v * 100) / 100);
+
+describe('renderSvg — waves', () => {
+    it('emits the wave layers in z-order for the checkout sample (§9.9)', async () => {
+        const svg = await renderSvg(await parseToModel(WAVE_SAMPLE));
+        const order = [
+            '<defs>',
+            'data-layer="timeline"',
+            'data-layer="wave-strip"',
+            'data-layer="swimlane-bg"',
+            'data-layer="grid"',
+            'data-layer="wave-boundary"',
+            'data-layer="wave-labels"',
+            'data-layer="swimlane"',
+            'data-layer="wave-cross"',
+            'data-layer="milestone"',
+            'data-layer="wave-legend"',
+            'data-layer="attribution"',
+        ].map((needle) => svg.indexOf(needle));
+        expect(order.every((i) => i >= 0)).toBe(true);
+        expect([...order].sort((a, b) => a - b)).toEqual(order);
+        // No styled wave: no tint layer.
+        expect(svg).not.toContain('data-layer="wave-bg"');
+    });
+
+    it('a roadmap without waves has no wave layers and the unchanged <defs>', async () => {
+        const svg = await renderSvg(await parseToModel(BASIC_DSL));
+        expect(svg).not.toContain('wave');
+        const defs = svg.match(/<defs>.*?<\/defs>/)?.[0] ?? '';
+        expect(defs).not.toContain('<pattern');
+        expect(defs.match(/<filter /g)).toHaveLength(3);
+        expect(defs.match(/<marker /g)).toHaveLength(3);
+    });
+
+    it('strip cells alternate by visible ordinal; an empty wave does not break it', async () => {
+        const model = await parseToModel(EXAMPLE_12_SRC);
+        const svg = await renderSvg(model);
+        const strip = waveLayer(svg, 'wave-strip') ?? '';
+        const [panel] = rectsOf(strip);
+        expect(attrOf(panel, 'fill')).toBe(lightTheme.timeline.panelFill);
+        expect(attrOf(panel, 'height')).toBe('20');
+        const cell = (id: string) =>
+            groupsMatching(strip, new RegExp(`<g data-id="${id}">`))[0] ?? '';
+        expect(attrOf(cellShapesOf(cell('w1'))[0], 'fill')).toBe(lightTheme.wave.stripFill);
+        expect(cell('w2')).toBe('');
+        expect(attrOf(cellShapesOf(cell('w3'))[0], 'fill')).toBe(lightTheme.wave.stripFillAlt);
+        // Every cell carries its tooltip.
+        const w1 = model.waves?.[0];
+        expect(cell('w1')).toContain(`<title>${w1?.strip.tooltip}</title>`);
+    });
+
+    it('paints the label fit chain (title, ellipsis, id, #k, none) at scale:1m', async () => {
+        const model = await parseToModel(WAVE_FIT_SRC);
+        const svg = await renderSvg(model);
+        const labels = waveLayer(svg, 'wave-labels') ?? '';
+        const texts = [...labels.matchAll(/<text [^>]*font-weight="600"[^>]*>([^<]*)<\/text>/g)];
+        expect(model.waves?.map((w) => w.strip.labelKind)).toEqual([
+            'title',
+            'ellipsis',
+            'id',
+            'ordinal',
+            'none',
+        ]);
+        expect(texts.map((m) => m[1])).toEqual(['Discovery', 'Implemen…', 'hardening', '#4']);
+        // Each label sits on a halo in its cell's fill, under the text.
+        const halo = rectsOf(labels)[0];
+        expect(attrOf(halo, 'fill')).toBe(lightTheme.wave.stripFill);
+        expect(labels.indexOf(halo)).toBeLessThan(labels.indexOf('>Discovery<'));
+    });
+
+    it('draws an empty wave as a hollow diamond with its tooltip', async () => {
+        const model = await parseToModel(EXAMPLE_12_SRC);
+        const labels = waveLayer(await renderSvg(model), 'wave-labels') ?? '';
+        const marker = model.waves?.[1].strip.marker;
+        expect(marker).toBeDefined();
+        const diamond = labels.match(/<path [^>]*>.*?<\/path>/)?.[0] ?? '';
+        expect(attrOf(diamond, 'stroke')).toBe(lightTheme.wave.boundary);
+        expect(attrOf(diamond, 'd')).toMatch(new RegExp(`^M${n2(marker?.x ?? 0)} `));
+        expect(diamond).toContain('no items</title>');
+    });
+
+    it('shows only the placeholder when every wave is empty', async () => {
+        const svg = await renderSvg(
+            await parseToModel(`nowline v1
+
+roadmap r "R" start:2026-01-05 scale:1w
+
+wave discover "Discover"
+wave build "Build"
+
+swimlane a
+  item a1 duration:2w
+`),
+        );
+        const labels = waveLayer(svg, 'wave-labels') ?? '';
+        expect(labels).toContain('>Waves declared: Discover, Build — no items assigned yet</text>');
+        expect(labels).toContain(`fill="${lightTheme.wave.labelMuted}"`);
+        // On a halo in the backing panel's fill, so grid lines never cut it.
+        const [halo] = rectsOf(labels);
+        expect(attrOf(halo, 'fill')).toBe(lightTheme.timeline.panelFill);
+        expect(labels.indexOf(halo)).toBeLessThan(labels.indexOf('>Waves declared'));
+        const haloX = Number(attrOf(halo, 'x'));
+        const haloW = Number(attrOf(halo, 'width'));
+        const textX = Number(attrOf(labels.match(/<text [^>]*>/)?.[0] ?? '', 'x'));
+        expect(haloX + haloW / 2).toBeCloseTo(textX, 1);
+        expect(haloW).toBeGreaterThan(200);
+        expect(svg.indexOf('data-layer="wave-labels"')).toBeGreaterThan(
+            svg.indexOf('data-layer="grid"'),
+        );
+        expect(labels).not.toContain('<path');
+        expect(rectsOf(waveLayer(svg, 'wave-strip') ?? '')).toHaveLength(1);
+        expect(svg).not.toContain('data-layer="wave-boundary"');
+        expect(svg).not.toContain('data-layer="wave-cross"');
+    });
+
+    it('labels a start-floor gap with its floor reference in muted italics', async () => {
+        const model = await parseToModel(WAVE_GAP_SRC);
+        const gap = model.waves?.[1].strip.gapLabel;
+        expect(gap?.text).toBe('fy-budget');
+        const labels = waveLayer(await renderSvg(model), 'wave-labels') ?? '';
+        const text = labels.match(/<text [^>]*>fy-budget<\/text>/)?.[0] ?? '';
+        expect(attrOf(text, 'font-style')).toBe('italic');
+        expect(attrOf(text, 'fill')).toBe(lightTheme.wave.labelMuted);
+        expect(attrOf(text, 'x')).toBe(n2(gap?.x ?? 0));
+        // No strip cell covers the gap.
+        const strip = waveLayer(await renderSvg(model), 'wave-strip') ?? '';
+        const shapes = cellShapesOf(strip).slice(1);
+        expect(shapes.length).toBeGreaterThan(0);
+        for (const shape of shapes) {
+            const [x1, x2] = shapeXRange(shape);
+            expect(x1 < (gap?.x ?? 0) && (gap?.x ?? 0) < x2).toBe(false);
+        }
+        // The floor label sits on a halo in the backing panel's fill.
+        const before = labels.slice(0, labels.indexOf(text));
+        const halo = rectsOf(before).at(-1) ?? '';
+        expect(attrOf(halo, 'fill')).toBe(lightTheme.timeline.panelFill);
+        expect(Number(attrOf(halo, 'x')) + Number(attrOf(halo, 'width')) / 2).toBeCloseTo(
+            gap?.x ?? 0,
+            2,
+        );
+    });
+
+    it('a styled wave with a dark bg tints its column and its strip cell', async () => {
+        const model = await parseToModel(`nowline v1
+
+config
+
+style night
+  bg: #1e3a8a
+
+roadmap r "R" start:2026-01-05 scale:1w
+
+wave w1 "One"
+wave w2 "Two" style:night
+
+swimlane a
+  item a1 duration:2w wave:w1
+  item a2 duration:2w wave:w2
+`);
+        const svg = await renderSvg(model);
+        const w2 = model.waves?.[1];
+        const tint = waveLayer(svg, 'wave-bg') ?? '';
+        const [rect] = rectsOf(tint);
+        expect(rectsOf(tint)).toHaveLength(1);
+        expect(attrOf(rect, 'fill')).toBe('#1e3a8a');
+        expect(attrOf(rect, 'fill-opacity')).toBe('0.12');
+        expect(attrOf(rect, 'x')).toBe(n2(w2?.columnBox.x ?? 0));
+        expect(attrOf(rect, 'height')).toBe(n2(w2?.columnBox.height ?? 0));
+        // After the lane rows, before the grid.
+        expect(svg.indexOf('data-layer="wave-bg"')).toBeGreaterThan(
+            svg.lastIndexOf('data-layer="swimlane-bg"'),
+        );
+        expect(svg.indexOf('data-layer="wave-bg"')).toBeLessThan(svg.indexOf('data-layer="grid"'));
+        const cell = groupsMatching(waveLayer(svg, 'wave-strip') ?? '', /<g data-id="w2">/)[0];
+        const overlay = cellShapesOf(cell ?? '')[1];
+        expect(attrOf(overlay, 'fill')).toBe('#1e3a8a');
+        expect(attrOf(overlay, 'fill-opacity')).toBe('0.25');
+        expect(waveLayer(svg, 'wave-labels')).toContain(`fill="${w2?.style.text}"`);
+    });
+
+    it('boundary lines span the strip top to the last lane, 2 px', async () => {
+        const model = await parseToModel(WAVE_SAMPLE);
+        const lines = linesOf(waveLayer(await renderSvg(model), 'wave-boundary') ?? '');
+        const lastLane = model.swimlanes[model.swimlanes.length - 1].box;
+        expect(lines).toHaveLength(model.waveBoundaries?.length ?? -1);
+        for (const l of lines) {
+            expect(attrOf(l, 'y1')).toBe(n2(model.timeline.waveStrip?.y ?? -1));
+            expect(attrOf(l, 'y2')).toBe(n2(lastLane.y + lastLane.height));
+            expect(attrOf(l, 'stroke-width')).toBe('2');
+            expect(attrOf(l, 'stroke')).toBe(lightTheme.wave.boundary);
+            expect(attrOf(l, 'stroke-dasharray')).toBeUndefined();
+        }
+    });
+
+    it('a milestone on a boundary has no cut line; an overrun dated one keeps it', async () => {
+        const sample = await parseToModel(WAVE_SAMPLE);
+        expect(sample.milestones.every((m) => m.onWaveBoundary)).toBe(true);
+        const cutLines = (svg: string) =>
+            linesOf(svg).filter((l) => attrOf(l, 'stroke-dasharray') === '6 4');
+        expect(cutLines(await renderSvg(sample))).toEqual([]);
+
+        const overrun = await parseToModel(WAVE_GAP_SRC);
+        const [m] = overrun.milestones;
+        expect(m.isOverrun).toBe(true);
+        expect(m.onWaveBoundary).toBeUndefined();
+        const lines = cutLines(await renderSvg(overrun));
+        expect(lines).toHaveLength(1);
+        expect(attrOf(lines[0], 'stroke')).toBe(lightTheme.milestoneDiamond.cutLineOverrun);
+        expect(attrOf(lines[0], 'x1')).toBe(n2(m.center.x));
+    });
+
+    it('hatches only background bars, after the bar rect, with a tooltip', async () => {
+        const svg = await renderSvg(await parseToModel(WAVE_SAMPLE));
+        const oncall = itemGroup(svg, 'on-call');
+        expect(
+            oncall.startsWith(
+                '<g data-id="on-call" data-layer="item"><title>Background (no wave)</title>',
+            ),
+        ).toBe(true);
+        const [bar, hatch] = rectsOf(oncall);
+        expect(attrOf(bar, 'filter')).toBeDefined();
+        expect(attrOf(hatch, 'fill')).toBe('url(#nl-0-root-wave-hatch-dark)');
+        // Inset by half the 1 px stroke, same corner radius.
+        expect(Number(attrOf(hatch, 'x'))).toBeCloseTo(Number(attrOf(bar, 'x')) + 0.5, 5);
+        expect(Number(attrOf(hatch, 'width'))).toBeCloseTo(Number(attrOf(bar, 'width')) - 1, 5);
+        expect(attrOf(hatch, 'rx')).toBe(attrOf(bar, 'rx'));
+        // Members keep today's look.
+        const auth = itemGroup(svg, 'auth');
+        expect(auth).not.toContain('wave-hatch');
+        expect(auth).not.toContain('<title>');
+        expect(svg).toContain('<pattern height="6" id="nl-0-root-wave-hatch-dark"');
+        expect(svg).not.toContain('wave-hatch-light');
+    });
+
+    it('picks the hatch by bar fill luminance; ids carry the SVG prefix', async () => {
+        const model = await parseToModel(`nowline v1
+
+config
+
+style night
+  bg: #0f172a
+
+roadmap r "R" start:2026-01-05 scale:1w
+
+wave w1 "One"
+
+swimlane a
+  item a1 duration:2w wave:w1
+  item pale duration:2w
+  item dark duration:2w style:night
+`);
+        const svg = await renderSvg(model, { idPrefix: 'emb' });
+        expect(rectsOf(itemGroup(svg, 'pale'))[1]).toContain(
+            'fill="url(#emb-0-root-wave-hatch-dark)"',
+        );
+        expect(rectsOf(itemGroup(svg, 'dark'))[1]).toContain(
+            'fill="url(#emb-0-root-wave-hatch-light)"',
+        );
+        const defs = svg.match(/<defs>.*?<\/defs>/)?.[0] ?? '';
+        const dark = defs.match(
+            /<pattern [^>]*id="emb-0-root-wave-hatch-dark"[^>]*>.*?<\/pattern>/,
+        )?.[0];
+        const light = defs.match(
+            /<pattern [^>]*id="emb-0-root-wave-hatch-light"[^>]*>.*?<\/pattern>/,
+        )?.[0];
+        expect(dark).toContain(`stroke="${lightTheme.wave.hatch}"`);
+        expect(light).toContain(`stroke="${lightTheme.wave.hatchOnDark}"`);
+        expect(dark).toContain('patternTransform="rotate(45)"');
+        // `opacity`, not `stroke-opacity`: svg-to-pdfkit only honours the
+        // former inside a pattern cell (see export-pdf's waves test).
+        expect(dark).toContain('opacity="0.13"');
+        expect(dark).not.toContain('stroke-opacity');
+        expect(svg).not.toContain('nl-0-root-wave-hatch');
+    });
+
+    it('emits no hatch pattern when there is no background work', async () => {
+        const svg = await renderSvg(await parseToModel(EXAMPLE_12_SRC));
+        expect(svg).not.toContain('<pattern');
+        expect(svg).not.toContain('wave-hatch');
+    });
+
+    it('draws crossings over background bars, 1 px dashed in the boundary colour', async () => {
+        const model = await parseToModel(WAVE_SAMPLE);
+        const lines = linesOf(waveLayer(await renderSvg(model), 'wave-cross') ?? '');
+        expect(lines).toHaveLength(model.waveCrossings?.length ?? -1);
+        expect(lines.length).toBeGreaterThan(0);
+        for (const [i, l] of lines.entries()) {
+            const c = model.waveCrossings?.[i];
+            expect(attrOf(l, 'x1')).toBe(n2(c?.x ?? 0));
+            expect(attrOf(l, 'y1')).toBe(n2(c?.topY ?? 0));
+            expect(attrOf(l, 'stroke-dasharray')).toBe('2 2');
+            expect(attrOf(l, 'stroke-width')).toBe('1');
+            expect(attrOf(l, 'stroke')).toBe(lightTheme.wave.boundary);
+        }
+    });
+
+    it('renders the legend swatches and text, and none without a trigger', async () => {
+        const svg = await renderSvg(await parseToModel(WAVE_SAMPLE));
+        const legend = waveLayer(svg, 'wave-legend') ?? '';
+        expect(legend).toContain('>Background work (not in a wave)</text>');
+        expect(legend).toContain('>Wave boundary</text>');
+        expect(rectsOf(legend)[1]).toContain('fill="url(#nl-0-root-wave-hatch-dark)"');
+        const [swatch] = linesOf(legend);
+        expect(attrOf(swatch, 'stroke')).toBe(lightTheme.wave.boundary);
+        expect(svg.indexOf('data-layer="wave-legend"')).toBeGreaterThan(
+            svg.indexOf('data-layer="footnotes"'),
+        );
+
+        const fit = waveLayer(await renderSvg(await parseToModel(WAVE_FIT_SRC)), 'wave-legend');
+        // The wave-name list wraps between waves, one <text> per run.
+        expect(fit).toContain('>Waves: #1 Discovery</text>');
+        expect(fit).toContain('>#4 Rollout everywhere · #5 Launch day</text>');
+
+        const plain = await renderSvg(await parseToModel(WAVE_PLAIN_SRC));
+        expect(plain).not.toContain('wave-legend');
+    });
+
+    it('drops the bracket only for an untitled, unstyled `group wave:x`', async () => {
+        const bracketOf = (svg: string): string[] =>
+            groupsMatching(svg, /<g (?:data-id="[^"]*" )?data-layer="group">/).map((g) => {
+                const own = g.slice(0, g.indexOf('<g', 1));
+                return own.match(/<path [^>]*fill="none"[^>]*>/)?.[0] ?? '';
+            });
+        const groupSrc = (header: string, waves: boolean) => `nowline v1
+
+roadmap r "R" start:2026-01-05 scale:1w
+${waves ? '\nwave w1 "One"\nwave w2 "Two"\n' : ''}
+swimlane a
+  item a1 duration:2w${waves ? ' wave:w1' : ''}
+  ${header}
+    item a2 duration:2w
+`;
+        const waveOnly = await renderSvg(await parseToModel(groupSrc('group wave:w2', true)));
+        expect(bracketOf(waveOnly)).toEqual(['']);
+        const titled = await renderSvg(
+            await parseToModel(groupSrc('group g1 "Build" wave:w2', true)),
+        );
+        expect(bracketOf(titled)[0]).toContain('stroke=');
+        const plain = await renderSvg(await parseToModel(groupSrc('group', false)));
+        expect(bracketOf(plain)[0]).toContain('stroke=');
+    });
+
+    it('re-emits boundaries and crossings inside an isolated region, clipped to it', async () => {
+        const model = await parseFilesToModel(
+            {
+                'ios.nowline': `${WAVE_REGION_FILES['ios.nowline']}swimlane ios-ops\n  item ios-oncall duration:6w\n`,
+                'portfolio.nowline': WAVE_REGION_FILES['portfolio.nowline']
+                    .replace(
+                        'roadmap portfolio',
+                        'config\n\nstyle night\n  bg: #1e3a8a\n\nroadmap portfolio',
+                    )
+                    .replace('wave w2 "Wave 2"', 'wave w2 "Wave 2" style:night'),
+            },
+            'portfolio.nowline',
+        );
+        const svg = await renderSvg(model);
+        const region = groupsMatching(svg, /<g data-layer="include">/)[0] ?? '';
+        const r = model.includes[0].box;
+        const [left, right, top, bottom] = [r.x + 8, r.x + r.width - 8, r.y, r.y + r.height];
+        const boundaries = linesOf(waveLayer(region, 'wave-boundary') ?? '');
+        expect(boundaries.length).toBeGreaterThan(0);
+        for (const l of boundaries) {
+            const x = Number(attrOf(l, 'x1'));
+            expect(x).toBeGreaterThan(left);
+            expect(x).toBeLessThan(right);
+            expect(attrOf(l, 'y1')).toBe(n2(top));
+            expect(attrOf(l, 'y2')).toBe(n2(bottom));
+        }
+        expect(region).not.toContain('clipPath');
+        // Region rect, then the boundaries, then its lanes, then crossings.
+        const at = (needle: string) => region.indexOf(needle);
+        expect(at('data-layer="wave-boundary"')).toBeGreaterThan(at('<rect'));
+        expect(at('data-layer="wave-boundary"')).toBeLessThan(at('data-layer="swimlane"'));
+        expect(at('data-layer="wave-cross"')).toBeGreaterThan(
+            region.lastIndexOf('data-layer="item"'),
+        );
+        expect(linesOf(waveLayer(region, 'wave-cross') ?? '')).toHaveLength(
+            model.includes[0].waveCrossings?.length ?? -1,
+        );
+        expect(itemGroup(region, 'ios-oncall')).toContain('wave-hatch-dark');
+        // The styled wave's column tint, re-emitted inside the region and
+        // clipped to its painted rect, under its boundaries.
+        const tints = rectsOf(waveLayer(region, 'wave-bg') ?? '');
+        expect(tints).toHaveLength(1);
+        const [tint] = tints;
+        const w2 = model.waves?.[1];
+        expect(attrOf(tint, 'fill')).toBe('#1e3a8a');
+        const tx = Number(attrOf(tint, 'x'));
+        const ty = Number(attrOf(tint, 'y'));
+        const tw = Number(attrOf(tint, 'width'));
+        const th = Number(attrOf(tint, 'height'));
+        expect(tx).toBeCloseTo(Math.max(w2?.columnBox.x ?? 0, left), 2);
+        expect(tx).toBeGreaterThanOrEqual(left - 0.01);
+        expect(tx + tw).toBeLessThanOrEqual(right + 0.01);
+        expect(ty).toBeGreaterThanOrEqual(top - 0.01);
+        expect(ty + th).toBeLessThanOrEqual(bottom + 0.01);
+        expect(at('data-layer="wave-bg"')).toBeGreaterThan(at('<rect'));
+        expect(at('data-layer="wave-bg"')).toBeLessThan(at('data-layer="wave-boundary"'));
+    });
+
+    it('moves the marker-row panel below the strip only with waves', async () => {
+        const src = (waves: boolean) => `nowline v1
+
+roadmap r "R" start:2026-01-05 scale:1w
+${waves ? '\nwave w1 "One"\n' : ''}
+anchor kickoff date:2026-01-12
+
+swimlane a
+  item a1 duration:2w${waves ? ' wave:w1' : ''}
+`;
+        const panelYs = async (waves: boolean) => {
+            const model = await parseToModel(src(waves));
+            const timeline = waveLayer(await renderSvg(model), 'timeline') ?? '';
+            return { model, ys: rectsOf(timeline).map((r) => attrOf(r, 'y')) };
+        };
+        const plain = await panelYs(false);
+        const t0 = plain.model.timeline;
+        expect(plain.ys).toEqual([n2(t0.tickPanelY), n2(t0.tickPanelY + t0.tickPanelHeight)]);
+        const waved = await panelYs(true);
+        const t1 = waved.model.timeline;
+        const strip = t1.waveStrip;
+        expect(strip?.y).toBe(t1.tickPanelY + t1.tickPanelHeight);
+        expect(waved.ys).toEqual([n2(t1.tickPanelY), n2((strip?.y ?? 0) + (strip?.height ?? 0))]);
+    });
+
+    it('rounds the outer corners of a cell where it meets the backing panel ends', async () => {
+        const model = await parseToModel(`nowline v1
+
+roadmap r "R" start:2026-01-05 scale:1w length:6w
+
+wave w1 "One"
+wave w2 "Two"
+wave w3 "Three"
+
+swimlane a
+  item a1 duration:2w wave:w1
+  item a2 duration:2w wave:w2
+  item a3 duration:4w wave:w3
+`);
+        const t = model.timeline;
+        const strip = waveLayer(await renderSvg(model), 'wave-strip') ?? '';
+        const [panel] = rectsOf(strip);
+        expect(attrOf(panel, 'rx')).toBe('4');
+        const cell = (id: string) =>
+            cellShapesOf(groupsMatching(strip, new RegExp(`<g data-id="${id}">`))[0] ?? '')[0];
+        const r = '3.5'; // the panel's radius less the 0.5 px inset
+        const arc = `A${r} ${r} 0 0 1`;
+        const [panelLeft, panelRight] = [t.box.x + 0.5, t.box.x + t.box.width - 0.5];
+        // First cell: rounded on the left only, flush with the panel's inset.
+        const first = cell('w1');
+        expect(first.startsWith('<path')).toBe(true);
+        expect(shapeXRange(first)[0]).toBeCloseTo(panelLeft, 5);
+        const firstD = attrOf(first, 'd') ?? '';
+        expect(firstD.split(arc)).toHaveLength(3);
+        expect(firstD).toContain(`${arc} ${n2(panelLeft)} `);
+        // Middle cell: a square rect, nowhere near the panel's ends.
+        const middle = cell('w2');
+        expect(middle.startsWith('<rect')).toBe(true);
+        expect(attrOf(middle, 'rx')).toBeUndefined();
+        // Last cell, clipped at the panel's right end: rounded on the right only.
+        const last = cell('w3');
+        expect(last.startsWith('<path')).toBe(true);
+        expect(shapeXRange(last)[1]).toBeCloseTo(panelRight, 5);
+        const lastD = attrOf(last, 'd') ?? '';
+        expect(lastD.split(arc)).toHaveLength(3);
+        expect(lastD).toContain(`${arc} ${n2(panelRight)} `);
+        expect(lastD).not.toContain(`${arc} ${n2(shapeXRange(last)[0])} `);
+    });
+
+    it('right-aligns footnote superscripts in the cell on their own halo', async () => {
+        const model = await parseToModel(`nowline v1
+
+roadmap r "R" start:2026-01-05 scale:1w
+
+wave w1 "Discover"
+wave w2 "Build"
+
+swimlane a
+  item a1 duration:3w wave:w1
+  item a2 duration:2w wave:w2
+
+footnote a-risk "Risk" on:w2
+footnote b-vendor "Vendor" on:[w1, a1]
+`);
+        const svg = await renderSvg(model);
+        const labels = waveLayer(svg, 'wave-labels') ?? '';
+        const strip = waveLayer(svg, 'wave-strip') ?? '';
+        const texts = [...labels.matchAll(/<text [^>]*>[^<]*<\/text>/g)].map((m) => m[0]);
+        for (const [i, w] of (model.waves ?? []).entries()) {
+            expect(w.strip.footnotesShown).toBe(true);
+            const cellShape = cellShapesOf(
+                groupsMatching(strip, new RegExp(`<g data-id="${w.id}">`))[0] ?? '',
+            )[0];
+            const cellRight = shapeXRange(cellShape)[1];
+            const sup = texts.find((t) => t.endsWith(`>${w.footnoteIndicators[0]}</text>`)) ?? '';
+            expect(attrOf(sup, 'font-size')).toBe('8');
+            expect(attrOf(sup, 'text-anchor')).toBe('end');
+            const supRight = cellRight - WAVE_STRIP_LABEL_PAD_PX;
+            expect(Number(attrOf(sup, 'x'))).toBeCloseTo(supRight, 5);
+            // A halo in the cell's fill under the superscript.
+            const fill = i === 0 ? lightTheme.wave.stripFill : lightTheme.wave.stripFillAlt;
+            const halo = rectsOf(labels).find((r) => {
+                const x = Number(attrOf(r, 'x'));
+                return x < supRight && supRight < x + Number(attrOf(r, 'width'));
+            });
+            expect(halo).toBeDefined();
+            expect(attrOf(halo ?? '', 'fill')).toBe(fill);
+            expect(labels.indexOf(halo ?? '')).toBeLessThan(labels.indexOf(sup));
+            // The label is clamped left of the superscripts.
+            const label = texts.find((t) => t.endsWith(`>${w.strip.label}</text>`)) ?? '';
+            const labelHalo = rectsOf(labels).find(
+                (r) =>
+                    Math.abs(
+                        Number(attrOf(r, 'x')) +
+                            Number(attrOf(r, 'width')) / 2 -
+                            Number(attrOf(label, 'x')),
+                    ) < 0.01,
+            );
+            const labelRight =
+                Number(attrOf(label, 'x')) + (Number(attrOf(labelHalo ?? '', 'width')) - 4) / 2;
+            expect(labelRight).toBeLessThanOrEqual(supRight - 8 + 0.01);
+        }
+        // Superscripts and labels are drawn after the grid.
+        expect(svg.indexOf('data-layer="wave-labels"')).toBeGreaterThan(
+            svg.indexOf('data-layer="grid"'),
+        );
+    });
+
+    it('a status-tinted background bar in the dark theme takes the light hatch', async () => {
+        const model = await parseToModel(
+            `nowline v1
+
+roadmap r "R" start:2026-01-05 scale:1w
+
+wave w1 "One"
+
+swimlane a
+  item a1 duration:2w wave:w1
+  item ops duration:2w status:in-progress
+`,
+            { theme: 'dark' },
+        );
+        const svg = await renderSvg(model);
+        const [bar, hatch] = rectsOf(itemGroup(svg, 'ops'));
+        expect(attrOf(bar, 'fill')).not.toBe(darkTheme.status.inProgress);
+        expect(attrOf(hatch, 'fill')).toBe('url(#nl-0-root-wave-hatch-light)');
+        const light = svg.match(
+            /<pattern [^>]*id="nl-0-root-wave-hatch-light"[^>]*>.*?<\/pattern>/,
+        )?.[0];
+        expect(light).toContain(`stroke="${darkTheme.wave.hatchOnDark}"`);
     });
 });

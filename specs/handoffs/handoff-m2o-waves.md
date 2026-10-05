@@ -586,7 +586,6 @@ Each phase is one PR and ends with `make pre-commit` green.
   - the placeholder;
   - the gap label;
   - styled tints;
-  - `border:none`;
   - the boundary span;
   - the milestone cut line suppressed on a boundary;
   - the hatch overlay and pattern choice by fill luminance;

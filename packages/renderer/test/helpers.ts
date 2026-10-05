@@ -1,3 +1,4 @@
+import * as path from 'node:path';
 import {
     createNowlineServices,
     type NowlineFile,
@@ -28,6 +29,31 @@ export async function parseToModel(
     await shared.workspace.DocumentBuilder.build([doc], { validation: true });
     const resolved = await resolveIncludes(doc.parseResult.value, '/virtual/test.nowline', {
         services: Nowline,
+    });
+    return layoutRoadmap(doc.parseResult.value, resolved, options);
+}
+
+/**
+ * Lay out `files[main]` with its includes resolved from the in-memory
+ * `files` map (paths relative to `/root`).
+ */
+export async function parseFilesToModel(
+    files: Record<string, string>,
+    main: string,
+    options: LayoutOptions = {},
+): Promise<PositionedRoadmap> {
+    const { shared, Nowline } = getServices();
+    const uri = URI.parse(`memory:///test-${++counter}.nowline`);
+    const doc = shared.workspace.LangiumDocumentFactory.fromString<NowlineFile>(files[main], uri);
+    await shared.workspace.DocumentBuilder.build([doc], { validation: true });
+    const readFile = async (abs: string): Promise<string> => {
+        const rel = path.relative('/root', abs).split(path.sep).join('/');
+        if (!(rel in files)) throw new Error(`File not found: ${rel}`);
+        return files[rel];
+    };
+    const resolved = await resolveIncludes(doc.parseResult.value, path.resolve('/root', main), {
+        services: Nowline,
+        readFile,
     });
     return layoutRoadmap(doc.parseResult.value, resolved, options);
 }

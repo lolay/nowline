@@ -166,6 +166,15 @@ export interface PositionedTimelineScale {
     // is purely a date reference for tall canvases.
     bottomTickPanelY?: number;
     bottomTickPanelHeight?: number;
+    /**
+     * The wave strip row (specs/waves.md §8.8): `WAVE_STRIP_HEIGHT_PX`
+     * high, directly under the top tick panel (under the now-pill row
+     * with `timeline-position:bottom`) and above the marker rows, which
+     * move down by its height. `placeholder` is set when every wave is
+     * empty: the strip then shows only that text. Present only when the
+     * roadmap declares waves; the mirrored bottom panel never has one.
+     */
+    waveStrip?: { y: number; height: number; placeholder?: string };
     // When `true`, the renderer draws a faint dotted line at every tick
     // boundary (not just major ticks) using `theme.timeline.minorGridLine`.
     // Mirrors the roadmap's resolved `minor-grid` style property. Default
@@ -377,6 +386,12 @@ export interface PositionedItem {
      */
     waveRole?: 'member' | 'background';
     /**
+     * The hover tooltip line wave membership adds to the bar, localized
+     * (`Background (no wave)`; specs/waves.md §9.3). Set only on
+     * background items; omitted otherwise.
+     */
+    waveTooltip?: string;
+    /**
      * Present when a wave floor moved the item's `date:` / `start:` pin
      * (NL.W1001) and the floor is what the item now starts at: `wave` is
      * the wave id, `key` / `pin` the pin as written, and `start` the wave's
@@ -434,6 +449,13 @@ export interface PositionedGroup {
      *  See `InlineDatePin` and specs/rendering.md "Inline-date glyph". */
     inlineDatePins?: InlineDatePin[];
     style: ResolvedStyle;
+    /**
+     * True for an untitled group with no `style:` and no `labels:` that
+     * carries `wave:`, in a roadmap with waves: it only assigns wave
+     * membership, so the renderer draws no bracket (specs/waves.md §9.7).
+     * Omitted otherwise.
+     */
+    waveOnly?: true;
 }
 
 export interface PositionedParallel {
@@ -668,6 +690,12 @@ export interface PositionedIncludeRegion {
     // tick row above the region.
     nestedSwimlanes: PositionedSwimlane[];
     style: ResolvedStyle;
+    /**
+     * Wave crossings over this region's background bars (specs/waves.md
+     * §9.3, §9.8), re-emitted inside the region because its opaque fill
+     * hides the global layers. Omitted when there are none.
+     */
+    waveCrossings?: PositionedWaveCrossing[];
 }
 
 /**
@@ -699,6 +727,126 @@ export interface PositionedWave {
     heldBy?: string;
     /** The wave's `after:` value that set `S_k`, when it beat `E_{k-1}`. */
     floorRef?: string;
+    /**
+     * 0-based position among the non-empty waves; drives the strip-cell
+     * alternation (even: `wave.stripFill`, odd: `wave.stripFillAlt`), so
+     * empty waves and gaps never break it. Omitted for an empty wave.
+     */
+    visibleOrdinal?: number;
+    /** The wave's column: `startX..endX` × `chartTopY..swimlaneBottomY`. */
+    columnBox: BoundingBox;
+    /** The wave's strip cell (specs/waves.md §9.1). */
+    strip: PositionedWaveStrip;
+    /** Resolved colours (specs/waves.md §9.4). */
+    style: PositionedWaveStyle;
+    /** 1-based numbers of the footnotes whose `on:` names this wave, ascending. */
+    footnoteIndicators: number[];
+}
+
+/** One wave's strip cell (specs/waves.md §9.1). */
+export interface PositionedWaveStrip {
+    /** `startX..endX` at `waveStrip.y`; zero width for an empty wave. */
+    box: BoundingBox;
+    /** The label text; omitted when `labelKind` is `none`. */
+    label?: string;
+    /**
+     * Which step of the fit chain won: the title, the id, the title
+     * ellipsized to 3 or more characters plus "…", the 1-based `#k`, or
+     * no label. Always `none` for an empty wave (it has no cell).
+     */
+    labelKind: 'title' | 'id' | 'ellipsis' | 'ordinal' | 'none';
+    /**
+     * Centre of the visible part of the span (clipped to the timeline);
+     * for an empty wave, the centre of its diamond.
+     */
+    labelX: number;
+    /**
+     * The cell's hover text, e.g. `Launch · 2026-02-02 – 2026-02-23 · held
+     * by i2` (end exclusive). An empty wave reads `title · date · no items`.
+     */
+    tooltip: string;
+    /**
+     * True when `footnoteIndicators` are drawn right-aligned in the cell;
+     * false when there are none or they did not fit (they then move to the
+     * legend).
+     */
+    footnotesShown: boolean;
+    /**
+     * Centre of an empty wave's hollow diamond (`WAVE_EMPTY_MARKER_SIZE_PX`),
+     * mid-strip at `startX`; empty waves sharing an x step
+     * `WAVE_EMPTY_MARKER_STEP_PX` to the right in declaration order.
+     * Omitted for a non-empty wave and when every wave is empty (the strip
+     * then shows only the placeholder).
+     */
+    marker?: Point;
+    /**
+     * The floor reference (`fy-budget`, `2026-02-02`) centred in the gap
+     * this wave's start floor opened before it (`S_k > E_{k-1}`, k >= 2),
+     * when it fits; drawn in muted italics. Omitted otherwise.
+     */
+    gapLabel?: { text: string; x: number };
+}
+
+/** A wave's resolved colours (specs/waves.md §9.4). */
+export interface PositionedWaveStyle {
+    /** The style's `bg`: the column tint and the strip-cell overlay. Omitted when unset. */
+    tint?: string;
+    /** The cell's base fill by `visibleOrdinal` parity. */
+    stripFill: string;
+    /** Label colour: the style's `text`, else `wave.labelText`, else a dark or light pick at 4.5:1. */
+    text: string;
+    /** Boundary colour: the style's `fg`, else `wave.boundary`. */
+    boundary: string;
+    /** `4 2` for `border:dashed`, `1 2` for `dotted`, null for solid. */
+    boundaryDash: string | null;
+}
+
+/**
+ * One wave boundary line (specs/waves.md §9.2), at a distinct x in
+ * `{S_k} ∪ {E_k}` of the non-empty waves other than the origin. It runs
+ * from the top of the strip down to `swimlaneBottomY`.
+ */
+export interface PositionedWaveBoundary {
+    x: number;
+    topY: number;
+    bottomY: number;
+    stroke: string;
+    dash: string | null;
+}
+
+/**
+ * A boundary drawn over a background bar whose visual extent strictly
+ * contains it (specs/waves.md §9.3), from the bar's top to its bottom.
+ */
+export interface PositionedWaveCrossing {
+    x: number;
+    topY: number;
+    bottomY: number;
+    stroke: string;
+}
+
+/** One legend entry (specs/waves.md §9.5). */
+export interface WaveLegendEntry {
+    /** Hatch swatch, boundary swatch, or the wave-name list. */
+    kind: 'background' | 'boundary' | 'waves';
+    /** The entry's full text. */
+    text: string;
+    /**
+     * The swatch box (`background`: a hatched bar; `boundary`: a boundary
+     * line through its centre). Omitted for the wave list.
+     */
+    swatch?: BoundingBox;
+    /**
+     * The text, one run per legend line the entry occupies (the wave list
+     * wraps between waves). `y` is the text baseline.
+     */
+    runs: Array<{ text: string; x: number; y: number }>;
+}
+
+/** The wave legend below the chart (specs/waves.md §9.5). */
+export interface PositionedWaveLegend {
+    box: BoundingBox;
+    entries: WaveLegendEntry[];
 }
 
 // Top-level result handed to the renderer.
@@ -733,4 +881,10 @@ export interface PositionedRoadmap {
     waveSolve?: { passes: number; capped: boolean };
     /** The waves in declaration order; present only when the roadmap declares waves. */
     waves?: PositionedWave[];
+    /** Wave boundary lines, left to right; omitted when there are none. */
+    waveBoundaries?: PositionedWaveBoundary[];
+    /** Crossings over the main lanes' background bars; omitted when there are none. */
+    waveCrossings?: PositionedWaveCrossing[];
+    /** The wave legend; present only when one of its triggers holds (§9.5). */
+    waveLegend?: PositionedWaveLegend;
 }

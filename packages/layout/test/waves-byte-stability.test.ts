@@ -26,9 +26,11 @@ const WAVE_KEYS = [
     'waveLegend',
     'waveStrip',
     'waveRole',
+    'waveTooltip',
     'wavePinOverride',
     'onWaveBoundary',
     'overrunByWave',
+    'waveOnly',
 ];
 
 /** The paths (`a.b[2].c`) of every wave key anywhere in `root`. */
@@ -77,18 +79,37 @@ describe('positioned model without waves (specs/waves.md §8.9)', () => {
     });
 
     it('the key walk finds wave keys in a roadmap with waves (control)', async () => {
+        // A background bar across the w1/w2 boundary, so the model carries
+        // boundaries, crossings and a legend as well as the waves.
         const { file, resolved } = await parseAndResolve(`nowline v1
 
 roadmap r "R" start:2026-01-05 scale:1w
 
 wave w1 "Wave 1"
+wave w2 "Wave 2"
 
 swimlane a
   item a1 duration:1w wave:w1
+  item a2 duration:1w wave:w2
+  group wave:w2
+    item a3 duration:1w
+swimlane b
+  item b1 duration:3w
 `);
         const paths = waveKeyPaths(layoutRoadmap(file, resolved));
-        expect(paths).toContain('waves');
-        expect(paths).toContain('waveSolve');
-        expect(paths).toContain('swimlanes[0].children[0].waveRole');
+        expect(paths).toEqual(
+            expect.arrayContaining([
+                'timeline.waveStrip',
+                'waves',
+                'waveSolve',
+                'waveBoundaries',
+                'waveCrossings',
+                'waveLegend',
+                'swimlanes[0].children[0].waveRole',
+                'swimlanes[1].children[0].waveRole',
+                'swimlanes[1].children[0].waveTooltip',
+                'swimlanes[0].children[2].waveOnly',
+            ]),
+        );
     });
 });

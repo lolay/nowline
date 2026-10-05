@@ -21,7 +21,7 @@ import {
     GROUP_HEADER_TITLE_INSET_X_PX,
     groupHeaderBandPx,
 } from '../container-header-geometry.js';
-import { propValues } from '../dsl-utils.js';
+import { propValue, propValues } from '../dsl-utils.js';
 import { groupHasFill, groupTitleTabWidth } from '../group-title-tab-geometry.js';
 import { computeContainerInlineDatePins, pickInlineDate } from '../inline-date-pin-geometry.js';
 import type { LayoutContext, TrackCursor } from '../layout-context.js';
@@ -288,6 +288,16 @@ export class GroupNode {
                   }
                 : { kind: 'header-band', title, titleInsetX: GROUP_HEADER_TITLE_INSET_X_PX },
         });
+        // In a roadmap with waves, an untitled group with no `style:` and
+        // no `labels:` that carries `wave:` only assigns membership: it
+        // draws no bracket, which would otherwise sit exactly on the wave
+        // boundary its box opens at (specs/waves.md §9.7).
+        const waveOnly =
+            ctx.waves !== undefined &&
+            title === undefined &&
+            propValue(node.properties, 'wave') !== undefined &&
+            propValue(node.properties, 'style') === undefined &&
+            propValues(node.properties, 'labels').length === 0;
         return {
             kind: 'group',
             id,
@@ -296,6 +306,7 @@ export class GroupNode {
             children,
             style,
             inlineDatePins: inlineDatePins.length > 0 ? inlineDatePins : undefined,
+            ...(waveOnly ? { waveOnly: true as const } : {}),
         };
     }
 }

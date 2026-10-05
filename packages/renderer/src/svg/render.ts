@@ -1,4 +1,5 @@
 import type {
+    BoundingBox,
     InlineDatePin,
     Point,
     PositionedAnchor,
@@ -16,6 +17,10 @@ import type {
     PositionedSwimlane,
     PositionedTimelineScale,
     PositionedTrackChild,
+    PositionedWave,
+    PositionedWaveBoundary,
+    PositionedWaveCrossing,
+    PositionedWaveLegend,
     ResolvedStyle,
     Theme,
 } from '@nowline/layout';
@@ -77,6 +82,7 @@ import {
     includeChromeGeometry,
     itemCaptionInsetX,
     itemCaptionMetaBaselineOffset,
+    MARKER_BOLD_WIDTH_FACTOR,
     NOW_PILL_CORNER_RADIUS_PX,
     NOW_PILL_HEIGHT_PX,
     NOW_PILL_LABEL_BASELINE_OFFSET_PX,
@@ -87,6 +93,16 @@ import {
     PROGRESS_STRIP_HEIGHT_PX,
     TEXT_SIZE_PX,
     TIMELINE_TICK_LABEL_BASELINE_OFFSET_PX,
+    WAVE_BOUNDARY_WIDTH_PX,
+    WAVE_CROSS_DASH,
+    WAVE_EMPTY_MARKER_SIZE_PX,
+    WAVE_HATCH_OPACITY,
+    WAVE_HATCH_STROKE_PX,
+    WAVE_HATCH_TILE_PX,
+    WAVE_STRIP_LABEL_FONT_SIZE_PX,
+    WAVE_STRIP_LABEL_PAD_PX,
+    WAVE_STYLED_STRIP_MIX_OPACITY,
+    WAVE_STYLED_TINT_OPACITY,
 } from '@nowline/layout';
 import { BUILTIN_ICON_SVG, CAPACITY_ICON_SVG } from './icons.js';
 import { IdGenerator } from './ids.js';
@@ -647,7 +663,8 @@ function renderTimeline(t: PositionedTimelineScale, palette: Theme, fonts: FontF
     const borderColor = palette.timeline.border;
     const labelColor = palette.timeline.labelText;
     const parts: string[] = [];
-    // Header layout from top: now-pill row → tick-label panel → marker row.
+    // Header layout from top: now-pill row → tick-label panel → (wave
+    // strip) → marker row.
     // The pill row owns its space (no panel rect); the now-line crosses it
     // visually. Marker row is omitted entirely when empty. The top tick
     // panel is also omitted when the roadmap requested
@@ -657,7 +674,12 @@ function renderTimeline(t: PositionedTimelineScale, palette: Theme, fonts: FontF
     const tickPanelHeight = t.tickPanelHeight;
     const hasTopTickPanel = tickPanelHeight > 0;
     const hasMarkerRow = t.markerRow.height > 0;
-    const markerRowY = tickPanelY + tickPanelHeight;
+    // The wave strip, when there is one, sits between the tick panel and
+    // the marker rows (specs/waves.md §8.8); its panel is the wave-strip
+    // layer's.
+    const markerRowY = t.waveStrip
+        ? t.waveStrip.y + t.waveStrip.height
+        : tickPanelY + tickPanelHeight;
     const markerRowHeight = t.markerRow.height;
     const bottomTickPanelY = t.bottomTickPanelY;
     const bottomTickPanelHeight = t.bottomTickPanelHeight ?? 0;
@@ -893,12 +915,18 @@ function renderItem(
     fonts: FontFamilies,
 ): string {
     const parts: string[] = [];
+    // Background work's hover tooltip (specs/waves.md §9.3).
+    if (i.waveTooltip !== undefined) parts.push(`<title>${escText(i.waveTooltip)}</title>`);
     const shadow = shadowFilterUrl(idPrefix, i.style.shadow);
     parts.push(
         rectFrame(i.box.x, i.box.y, i.box.width, i.box.height, i.style, {
             filter: shadow ?? null,
         }),
     );
+    // Background work's hatch overlay: a second rect right after the bar
+    // rect (which stays the item group's first <rect>), under the progress
+    // strip, the status dot and the text.
+    if (i.waveRole === 'background') parts.push(hatchOverlay(i.box, i.style, idPrefix));
     // Status-dot color — the dot communicates status via hue, but
     // the bar bg can range from pale status tints (`#eff6ff`) to
     // saturated mid-tones (`#1e88e5` from `bg:blue` labels) to
@@ -1300,7 +1328,9 @@ function renderGroup(
         const bracketColor = g.style.fg;
         // Same helper `GroupNode.place` reserves the band with.
         const headerBand = groupHeaderBandPx(hasFill, Boolean(g.title), hasPins(g.inlineDatePins));
-        if (g.style.bracket !== 'none') {
+        // A `group wave:x` that only assigns membership draws no bracket:
+        // it would sit exactly on the wave boundary (specs/waves.md §9.7).
+        if (g.style.bracket !== 'none' && !g.waveOnly) {
             // Bracket-style groups paint a left-side `[` glyph along
             // `box.x`. When the group has a title or inline-date glyphs
             // the layout has reserved a header band ABOVE `box.y` (see
@@ -1725,18 +1755,22 @@ function renderMilestoneCutLine(m: PositionedMilestone, palette: Theme): string 
         ? palette.milestoneDiamond.cutLineOverrun
         : palette.milestoneDiamond.cutLineNormal;
     const parts: string[] = [];
-    parts.push(
-        tag('line', {
-            x1: num(m.center.x),
-            y1: num(m.center.y + m.radius + 1),
-            x2: num(m.center.x),
-            y2: num(m.cutBottomY),
-            stroke,
-            'stroke-width': 2,
-            'stroke-dasharray': ACCENT_DASH_PATTERN,
-            'stroke-linecap': 'round',
-        }),
-    );
+    // A milestone on a wave boundary draws no cut line: the boundary
+    // already marks that instant (specs/waves.md §9.2).
+    if (!m.onWaveBoundary) {
+        parts.push(
+            tag('line', {
+                x1: num(m.center.x),
+                y1: num(m.center.y + m.radius + 1),
+                x2: num(m.center.x),
+                y2: num(m.cutBottomY),
+                stroke,
+                'stroke-width': 2,
+                'stroke-dasharray': ACCENT_DASH_PATTERN,
+                'stroke-linecap': 'round',
+            }),
+        );
+    }
     if (m.slackArrows && m.slackArrows.length > 0) {
         const slackColor = palette.milestoneDiamond.slack;
         for (const arrow of m.slackArrows) {
@@ -1909,6 +1943,7 @@ function renderIncludeRegion(
     idPrefix: string,
     palette: Theme,
     fonts: FontFamilies,
+    model?: PositionedRoadmap,
 ): string {
     const border = palette.includeRegion.border;
     const fill = palette.includeRegion.fill;
@@ -2024,6 +2059,17 @@ function renderIncludeRegion(
         r.sourcePath,
     );
 
+    // The opaque region fill hides the global wave layers, so a roadmap
+    // with waves re-emits its styled tints and boundaries over it, clipped
+    // to the painted region rect by rect intersection (no clipPath, no new
+    // defs), and the region's own crossings over its nested lanes
+    // (specs/waves.md §9.8). The strip stays global.
+    const clip: BoundingBox = { x: rx, y: ry, width: rw, height: rh };
+    const waveUnder = model?.waves
+        ? renderWaveTints(model.waves, clip) + renderWaveBoundaries(model.waveBoundaries, clip)
+        : '';
+    const waveOver = model?.waves ? renderWaveCrossings(r.waveCrossings) : '';
+
     // Nested swimlanes (laid out by buildIncludeRegions against the parent's timeline).
     const nested = r.nestedSwimlanes
         .map((s) => renderSwimlane(s, options, idPrefix, palette, fonts))
@@ -2032,7 +2078,16 @@ function renderIncludeRegion(
     return tag(
         'g',
         { 'data-layer': 'include' },
-        region + nested + tab + tabLabel + badge + glyph + sourceHalo + sourceText,
+        region +
+            waveUnder +
+            nested +
+            waveOver +
+            tab +
+            tabLabel +
+            badge +
+            glyph +
+            sourceHalo +
+            sourceText,
     );
 }
 
@@ -2172,6 +2227,586 @@ function bytesToBase64(bytes: Uint8Array): string {
     throw new Error('renderer: no base64 encoder available');
 }
 
+// --- Waves (specs/waves.md §9) ---------------------------------------------
+//
+// Every wave layer is emitted only when it has content, so a roadmap without
+// waves renders byte-identically: no `wave-*` layers and no hatch `<defs>`.
+
+/**
+ * Bar-fill luminance at or above which background work gets the dark hatch
+ * (`wave.hatch`); below it, the light one (`wave.hatchOnDark`). The same
+ * crossover the status dot picks its palette by (`pickStatusDotPalette`), so
+ * the hatch and the dot agree on which bars read as dark.
+ */
+const WAVE_HATCH_LIGHT_FILL_MIN_LUMINANCE = 0.24;
+
+/** Horizontal padding of a strip label's halo on each side. */
+const WAVE_LABEL_HALO_PAD_PX = 2;
+
+/** Vertical inset of a strip label's halo from the strip's top and bottom. */
+const WAVE_LABEL_HALO_INSET_Y_PX = 3;
+
+/** Strip label baseline below the strip's vertical centre (10 px text). */
+const WAVE_LABEL_BASELINE_BELOW_CENTER_PX = 4;
+
+/** Footnote superscripts in the strip: size and baseline below the strip top. */
+const WAVE_SUPERSCRIPT_FONT_SIZE_PX = 8;
+const WAVE_SUPERSCRIPT_BASELINE_OFFSET_PX = 10;
+
+type WaveHatchKind = 'dark' | 'light';
+
+/** The painted fill of a bar, as `rectFrame` paints it. */
+function barFill(style: ResolvedStyle): string {
+    return style.bg === 'none' ? 'transparent' : style.bg;
+}
+
+function waveHatchKind(fill: string): WaveHatchKind {
+    return relativeLuminance(fill) >= WAVE_HATCH_LIGHT_FILL_MIN_LUMINANCE ? 'dark' : 'light';
+}
+
+function waveHatchUrl(idPrefix: string, kind: WaveHatchKind): string {
+    return `url(#${idPrefix}-wave-hatch-${kind})`;
+}
+
+/**
+ * A hatch `<pattern>`: a `WAVE_HATCH_TILE_PX` tile rotated 45°, one
+ * `WAVE_HATCH_STROKE_PX` stroke down its middle (so the tile never clips
+ * it) at `WAVE_HATCH_OPACITY`. The id carries the SVG's prefix, like the
+ * shadow filters, so two SVGs on one page never share it.
+ *
+ * The line carries `opacity`, not `stroke-opacity`. Browsers and resvg draw
+ * the two the same (one stroke, nothing overlaps), but svg-to-pdfkit turns
+ * `stroke-opacity` into a stroke-only `CA` inside the pattern cell, which
+ * poppler ignores, so the PDF hatch drew opaque. With `opacity` it sets the
+ * fill alpha `ca` as well, which poppler and cairo both honour.
+ */
+function waveHatchPatternDef(idPrefix: string, kind: WaveHatchKind, palette: Theme): string {
+    const tile = WAVE_HATCH_TILE_PX;
+    return tag(
+        'pattern',
+        {
+            id: `${idPrefix}-wave-hatch-${kind}`,
+            width: tile,
+            height: tile,
+            patternUnits: 'userSpaceOnUse',
+            patternTransform: 'rotate(45)',
+        },
+        tag('line', {
+            x1: num(tile / 2),
+            y1: 0,
+            x2: num(tile / 2),
+            y2: tile,
+            stroke: kind === 'dark' ? palette.wave.hatch : palette.wave.hatchOnDark,
+            'stroke-width': WAVE_HATCH_STROKE_PX,
+            opacity: WAVE_HATCH_OPACITY,
+        }),
+    );
+}
+
+/**
+ * The hatch patterns the SVG uses, in a fixed order: one per kind that a
+ * background bar (main lanes or isolated regions) or the legend's hatch
+ * swatch needs. Empty without waves.
+ */
+function usedWaveHatchKinds(model: PositionedRoadmap): WaveHatchKind[] {
+    if (!model.waves) return [];
+    const used = new Set<WaveHatchKind>();
+    const walk = (children: PositionedTrackChild[]): void => {
+        for (const c of children) {
+            if (c.kind === 'item') {
+                if (c.waveRole === 'background') used.add(waveHatchKind(barFill(c.style)));
+            } else {
+                walk(c.children);
+            }
+        }
+    };
+    const walkLanes = (lanes: PositionedSwimlane[]): void => {
+        for (const lane of lanes) {
+            walk(lane.children);
+            walkLanes(lane.nested);
+        }
+    };
+    walkLanes(model.swimlanes);
+    for (const r of model.includes) walkLanes(r.nestedSwimlanes);
+    if (model.waveLegend?.entries.some((e) => e.kind === 'background')) {
+        used.add(waveHatchKind(legendSwatchFill(model.palette)));
+    }
+    return (['dark', 'light'] as const).filter((k) => used.has(k));
+}
+
+/**
+ * The hatch overlay over a background bar: the bar's rect inset by half its
+ * 1 px stroke, with the same corner radius, so it never covers the stroke.
+ */
+function hatchOverlay(box: BoundingBox, style: ResolvedStyle, idPrefix: string): string {
+    const inset = 0.5;
+    const rx = Math.min(CORNER_RADIUS_PX[style.cornerRadius] ?? 4, box.height / 2);
+    return tag('rect', {
+        x: num(box.x + inset),
+        y: num(box.y + inset),
+        width: num(Math.max(0, box.width - 2 * inset)),
+        height: num(Math.max(0, box.height - 2 * inset)),
+        rx: num(rx),
+        ry: num(rx),
+        fill: waveHatchUrl(idPrefix, waveHatchKind(barFill(style))),
+    });
+}
+
+/** `a ∩ b`, or undefined when they do not overlap. */
+function intersectBox(a: BoundingBox, b: BoundingBox): BoundingBox | undefined {
+    const x1 = Math.max(a.x, b.x);
+    const y1 = Math.max(a.y, b.y);
+    const x2 = Math.min(a.x + a.width, b.x + b.width);
+    const y2 = Math.min(a.y + a.height, b.y + b.height);
+    if (x2 <= x1 || y2 <= y1) return undefined;
+    return { x: x1, y: y1, width: x2 - x1, height: y2 - y1 };
+}
+
+/** The strip's backing panel corner radius (matches the tick panel's). */
+const WAVE_STRIP_PANEL_RADIUS_PX = 4;
+
+/** How far a strip cell sits inside the backing panel: half its 1 px stroke. */
+const WAVE_CELL_INSET_PX = 0.5;
+
+/**
+ * The strip cell's painted box: the wave's span clipped to the strip's
+ * backing panel, inset by half the panel's 1 px stroke so the cell never
+ * covers it. Undefined for an empty or off-screen wave.
+ */
+function waveCellBox(w: PositionedWave, t: PositionedTimelineScale): BoundingBox | undefined {
+    if (w.empty) return undefined;
+    const inset = WAVE_CELL_INSET_PX;
+    return intersectBox(
+        {
+            x: w.strip.box.x,
+            y: w.strip.box.y + inset,
+            width: w.strip.box.width,
+            height: w.strip.box.height - 2 * inset,
+        },
+        {
+            x: t.box.x + inset,
+            y: w.strip.box.y,
+            width: t.box.width - 2 * inset,
+            height: w.strip.box.height,
+        },
+    );
+}
+
+/**
+ * Corner radii of a cell's left and right ends: a cell that reaches an end
+ * of the backing panel rounds its outer corners there to the panel's radius
+ * less the inset, so it never covers the panel's rounded corner or border.
+ */
+interface WaveCellCorners {
+    left: number;
+    right: number;
+}
+
+function waveCellCorners(cell: BoundingBox, t: PositionedTimelineScale): WaveCellCorners {
+    const r = Math.min(
+        WAVE_STRIP_PANEL_RADIUS_PX - WAVE_CELL_INSET_PX,
+        cell.width / 2,
+        cell.height / 2,
+    );
+    const eps = 1e-6;
+    return {
+        left: cell.x <= t.box.x + WAVE_CELL_INSET_PX + eps ? r : 0,
+        right: cell.x + cell.width >= t.box.x + t.box.width - WAVE_CELL_INSET_PX - eps ? r : 0,
+    };
+}
+
+/** A box as a path with the given left / right corner radii. */
+function roundedEndsPath(box: BoundingBox, c: WaveCellCorners): string {
+    const { x, y, width: w, height: h } = box;
+    const arc = (r: number, ex: number, ey: number): string =>
+        r > 0 ? ` A${num(r)} ${num(r)} 0 0 1 ${num(ex)} ${num(ey)}` : '';
+    return (
+        `M${num(x + c.left)} ${num(y)}` +
+        ` H${num(x + w - c.right)}` +
+        arc(c.right, x + w, y + c.right) +
+        ` V${num(y + h - c.right)}` +
+        arc(c.right, x + w - c.right, y + h) +
+        ` H${num(x + c.left)}` +
+        arc(c.left, x, y + h - c.left) +
+        ` V${num(y + c.left)}` +
+        arc(c.left, x + c.left, y) +
+        ' Z'
+    );
+}
+
+/**
+ * A cell's fill: the strip fill, then the styled `bg` overlay when set.
+ * Square rects, unless `corners` rounds an end that meets the panel's.
+ */
+function waveCellFill(w: PositionedWave, box: BoundingBox, corners?: WaveCellCorners): string {
+    const shape = (fill: Record<string, string | number>): string =>
+        corners && (corners.left > 0 || corners.right > 0)
+            ? tag('path', { d: roundedEndsPath(box, corners), ...fill })
+            : tag('rect', {
+                  x: num(box.x),
+                  y: num(box.y),
+                  width: num(box.width),
+                  height: num(box.height),
+                  ...fill,
+              });
+    const base = shape({ fill: w.style.stripFill });
+    if (!w.style.tint) return base;
+    return (
+        base +
+        shape({
+            fill: w.style.tint,
+            'fill-opacity': WAVE_STYLED_STRIP_MIX_OPACITY,
+        })
+    );
+}
+
+/**
+ * `wave-strip` (§9.1): the backing panel and one cell per non-empty wave,
+ * each with its tooltip. Drawn right after the timeline panels, so the
+ * major grid lines cross the cells as they cross the tick panel.
+ */
+function renderWaveStrip(model: PositionedRoadmap, palette: Theme): string {
+    const t = model.timeline;
+    const strip = t.waveStrip;
+    if (!model.waves || !strip) return '';
+    const parts: string[] = [
+        tag('rect', {
+            x: num(t.box.x),
+            y: num(strip.y),
+            width: num(t.box.width),
+            height: num(strip.height),
+            rx: WAVE_STRIP_PANEL_RADIUS_PX,
+            ry: WAVE_STRIP_PANEL_RADIUS_PX,
+            fill: palette.timeline.panelFill,
+            stroke: palette.timeline.border,
+            'stroke-width': 1,
+        }),
+    ];
+    for (const w of model.waves) {
+        const box = waveCellBox(w, t);
+        if (!box) continue;
+        parts.push(
+            tag(
+                'g',
+                { 'data-id': w.id },
+                `<title>${escText(w.strip.tooltip)}</title>${waveCellFill(w, box, waveCellCorners(box, t))}`,
+            ),
+        );
+    }
+    return tag('g', { 'data-layer': 'wave-strip' }, parts.join(''));
+}
+
+/**
+ * `wave-bg` (§9.4): a column tint over each styled wave's `columnBox`,
+ * clipped to `clip` when given (an include region's painted rect).
+ */
+function renderWaveTints(waves: PositionedWave[], clip?: BoundingBox): string {
+    const parts: string[] = [];
+    for (const w of waves) {
+        if (!w.style.tint || w.empty) continue;
+        const box = clip ? intersectBox(w.columnBox, clip) : w.columnBox;
+        if (!box || box.width <= 0 || box.height <= 0) continue;
+        parts.push(
+            tag('rect', {
+                x: num(box.x),
+                y: num(box.y),
+                width: num(box.width),
+                height: num(box.height),
+                fill: w.style.tint,
+                'fill-opacity': WAVE_STYLED_TINT_OPACITY,
+            }),
+        );
+    }
+    if (parts.length === 0) return '';
+    return tag('g', { 'data-layer': 'wave-bg' }, parts.join(''));
+}
+
+/**
+ * `wave-boundary` (§9.2): the 2 px boundary lines, from the strip top to the
+ * last lane. With `clip`, only the lines strictly inside it, cut to its
+ * vertical extent.
+ */
+function renderWaveBoundaries(
+    boundaries: PositionedWaveBoundary[] | undefined,
+    clip?: BoundingBox,
+): string {
+    const parts: string[] = [];
+    for (const b of boundaries ?? []) {
+        let topY = b.topY;
+        let bottomY = b.bottomY;
+        if (clip) {
+            if (b.x <= clip.x || b.x >= clip.x + clip.width) continue;
+            topY = Math.max(topY, clip.y);
+            bottomY = Math.min(bottomY, clip.y + clip.height);
+            if (bottomY <= topY) continue;
+        }
+        parts.push(
+            tag('line', {
+                x1: num(b.x),
+                y1: num(topY),
+                x2: num(b.x),
+                y2: num(bottomY),
+                stroke: b.stroke,
+                'stroke-width': WAVE_BOUNDARY_WIDTH_PX,
+                'stroke-dasharray': b.dash,
+            }),
+        );
+    }
+    if (parts.length === 0) return '';
+    return tag('g', { 'data-layer': 'wave-boundary' }, parts.join(''));
+}
+
+/** Estimated width of 10 px wave text, bold when `bold`. */
+function waveTextWidth(text: string, bold: boolean): number {
+    const w = estimateCaptionWidthPx(text, WAVE_STRIP_LABEL_FONT_SIZE_PX);
+    return bold ? w * MARKER_BOLD_WIDTH_FACTOR : w;
+}
+
+/**
+ * `wave-labels` (§9.1): strip labels on halos in their cell's fill,
+ * right-aligned footnote superscripts, empty-wave diamonds, gap floor
+ * labels, and the all-empty placeholder. Drawn after the boundaries.
+ */
+function renderWaveLabels(model: PositionedRoadmap, palette: Theme, fonts: FontFamilies): string {
+    const t = model.timeline;
+    const strip = t.waveStrip;
+    if (!model.waves || !strip) return '';
+    const baselineY = strip.y + strip.height / 2 + WAVE_LABEL_BASELINE_BELOW_CENTER_PX;
+    const haloY = strip.y + WAVE_LABEL_HALO_INSET_Y_PX;
+    const haloHeight = strip.height - 2 * WAVE_LABEL_HALO_INSET_Y_PX;
+    const parts: string[] = [];
+    // Muted italics on a halo in the backing panel's fill, so the major
+    // grid lines drawn later never cut through the text (§9.1).
+    const mutedText = (x: number, text: string): string => {
+        const haloWidth = waveTextWidth(text, false) + 2 * WAVE_LABEL_HALO_PAD_PX;
+        return (
+            tag('rect', {
+                x: num(x - haloWidth / 2),
+                y: num(haloY),
+                width: num(haloWidth),
+                height: num(haloHeight),
+                fill: palette.timeline.panelFill,
+            }) +
+            textTag(
+                {
+                    x: num(x),
+                    y: num(baselineY),
+                    'font-family': fonts.sans,
+                    'font-size': WAVE_STRIP_LABEL_FONT_SIZE_PX,
+                    'font-style': 'italic',
+                    fill: palette.wave.labelMuted,
+                    'text-anchor': 'middle',
+                },
+                text,
+            )
+        );
+    };
+
+    if (strip.placeholder !== undefined) {
+        parts.push(mutedText(t.box.x + t.box.width / 2, strip.placeholder));
+    }
+
+    for (const w of model.waves) {
+        // A gap opened by a start floor: no cell, the floor reference in
+        // muted italics on a halo in the backing panel's fill.
+        if (w.strip.gapLabel) {
+            const { text, x } = w.strip.gapLabel;
+            parts.push(mutedText(x, text));
+        }
+
+        // An empty wave: a hollow diamond, with the wave's tooltip.
+        if (w.strip.marker) {
+            const { x, y } = w.strip.marker;
+            const r = WAVE_EMPTY_MARKER_SIZE_PX / 2;
+            parts.push(
+                tag(
+                    'path',
+                    {
+                        d: `M${num(x)} ${num(y - r)} L${num(x + r)} ${num(y)} L${num(x)} ${num(y + r)} L${num(x - r)} ${num(y)} Z`,
+                        fill: palette.timeline.panelFill,
+                        stroke: palette.wave.boundary,
+                        'stroke-width': 1.5,
+                    },
+                    `<title>${escText(w.strip.tooltip)}</title>`,
+                ),
+            );
+        }
+
+        const cell = waveCellBox(w, t);
+        if (!cell) continue;
+        const cellRight = cell.x + cell.width;
+        const superscriptWidth = w.strip.footnotesShown
+            ? w.footnoteIndicators.length * ITEM_FOOTNOTE_INDICATOR_STEP_PX
+            : 0;
+        if (superscriptWidth) {
+            // The superscripts' own halo in the cell's fill, first so the
+            // label's halo never covers them.
+            const right = cellRight - WAVE_STRIP_LABEL_PAD_PX + WAVE_LABEL_HALO_PAD_PX;
+            const left =
+                cellRight - WAVE_STRIP_LABEL_PAD_PX - superscriptWidth - WAVE_LABEL_HALO_PAD_PX;
+            parts.push(
+                waveCellFill(w, { x: left, y: haloY, width: right - left, height: haloHeight }),
+            );
+        }
+        if (w.strip.label !== undefined) {
+            const textWidth = waveTextWidth(w.strip.label, true);
+            // Centred on the visible span, but never under the superscripts.
+            const x = superscriptWidth
+                ? Math.min(
+                      w.strip.labelX,
+                      cellRight - WAVE_STRIP_LABEL_PAD_PX - superscriptWidth - textWidth / 2,
+                  )
+                : w.strip.labelX;
+            const haloWidth = textWidth + 2 * WAVE_LABEL_HALO_PAD_PX;
+            parts.push(
+                waveCellFill(w, {
+                    x: x - haloWidth / 2,
+                    y: haloY,
+                    width: haloWidth,
+                    height: haloHeight,
+                }),
+            );
+            parts.push(
+                textTag(
+                    {
+                        x: num(x),
+                        y: num(baselineY),
+                        'font-family': fonts.sans,
+                        'font-size': WAVE_STRIP_LABEL_FONT_SIZE_PX,
+                        'font-weight': 600,
+                        fill: w.style.text,
+                        'text-anchor': 'middle',
+                    },
+                    w.strip.label,
+                ),
+            );
+        }
+        if (w.strip.footnotesShown) {
+            // Right-aligned in the cell, walking left like an item's.
+            let fx = cellRight - WAVE_STRIP_LABEL_PAD_PX;
+            for (let k = w.footnoteIndicators.length - 1; k >= 0; k--) {
+                parts.push(
+                    textTag(
+                        {
+                            x: num(fx),
+                            y: num(strip.y + WAVE_SUPERSCRIPT_BASELINE_OFFSET_PX),
+                            'font-family': fonts.sans,
+                            'font-size': WAVE_SUPERSCRIPT_FONT_SIZE_PX,
+                            'font-weight': 700,
+                            fill: w.style.text,
+                            'text-anchor': 'end',
+                        },
+                        String(w.footnoteIndicators[k]),
+                    ),
+                );
+                fx -= ITEM_FOOTNOTE_INDICATOR_STEP_PX;
+            }
+        }
+    }
+    if (parts.length === 0) return '';
+    return tag('g', { 'data-layer': 'wave-labels' }, parts.join(''));
+}
+
+/**
+ * `wave-cross` (§9.3): a 1 px dashed boundary over each background bar a
+ * boundary runs through, showing the barrier does not hold that work.
+ */
+function renderWaveCrossings(crossings: PositionedWaveCrossing[] | undefined): string {
+    if (!crossings || crossings.length === 0) return '';
+    const parts = crossings.map((c) =>
+        tag('line', {
+            x1: num(c.x),
+            y1: num(c.topY),
+            x2: num(c.x),
+            y2: num(c.bottomY),
+            stroke: c.stroke,
+            'stroke-width': 1,
+            'stroke-dasharray': WAVE_CROSS_DASH,
+        }),
+    );
+    return tag('g', { 'data-layer': 'wave-cross' }, parts.join(''));
+}
+
+/** The legend's hatch swatch fill: a default item bar. */
+function legendSwatchFill(palette: Theme): string {
+    const bg = palette.entities.item.bg;
+    return bg === 'none' ? 'transparent' : bg;
+}
+
+/**
+ * `wave-legend` (§9.5): a hatched bar swatch for background work, a short
+ * boundary line, and the wave-name runs, all as the layout placed them.
+ */
+function renderWaveLegend(
+    legend: PositionedWaveLegend | undefined,
+    idPrefix: string,
+    palette: Theme,
+    fonts: FontFamilies,
+): string {
+    if (!legend) return '';
+    const parts: string[] = [];
+    for (const entry of legend.entries) {
+        const s = entry.swatch;
+        if (s && entry.kind === 'background') {
+            const fill = legendSwatchFill(palette);
+            const geometry = {
+                x: num(s.x),
+                y: num(s.y),
+                width: num(s.width),
+                height: num(s.height),
+            };
+            parts.push(
+                tag('rect', {
+                    ...geometry,
+                    rx: 2,
+                    ry: 2,
+                    fill,
+                    stroke: palette.entities.item.fg,
+                    'stroke-width': 1,
+                }),
+            );
+            parts.push(
+                tag('rect', {
+                    x: num(s.x + 0.5),
+                    y: num(s.y + 0.5),
+                    width: num(s.width - 1),
+                    height: num(s.height - 1),
+                    rx: 2,
+                    ry: 2,
+                    fill: waveHatchUrl(idPrefix, waveHatchKind(fill)),
+                }),
+            );
+        } else if (s && entry.kind === 'boundary') {
+            const x = s.x + s.width / 2;
+            parts.push(
+                tag('line', {
+                    x1: num(x),
+                    y1: num(s.y),
+                    x2: num(x),
+                    y2: num(s.y + s.height),
+                    stroke: palette.wave.boundary,
+                    'stroke-width': WAVE_BOUNDARY_WIDTH_PX,
+                }),
+            );
+        }
+        for (const run of entry.runs) {
+            parts.push(
+                textTag(
+                    {
+                        x: num(run.x),
+                        y: num(run.y),
+                        'font-family': fonts.sans,
+                        'font-size': WAVE_STRIP_LABEL_FONT_SIZE_PX,
+                        fill: palette.wave.labelText,
+                    },
+                    run.text,
+                ),
+            );
+        }
+    }
+    return tag('g', { 'data-layer': 'wave-legend' }, parts.join(''));
+}
+
 export async function renderSvg(
     model: PositionedRoadmap,
     options: RenderOptions = {},
@@ -2197,6 +2832,10 @@ export async function renderSvg(
         arrowDef('nl-arrow', arrowFillNeutral) +
         arrowDef('nl-arrow-light', arrowFillLight) +
         arrowDef('nl-arrow-dark', arrowFillDark) +
+        // Wave hatch patterns, only those a bar or the legend uses.
+        usedWaveHatchKinds(model)
+            .map((k) => waveHatchPatternDef(idPrefix, k, palette))
+            .join('') +
         `</defs>`;
     parts.push(defs);
 
@@ -2217,17 +2856,28 @@ export async function renderSvg(
     // and minor grid lines never actually rendered in the chart body.
     // They now ship as their own layer below.
     parts.push(renderTimeline(model.timeline, palette, fonts));
+    // Wave strip panel and cells, under the grid like the tick panel.
+    parts.push(renderWaveStrip(model, palette));
 
     // Swimlane backgrounds — emitted as their own pass so the grid
     // lines can be drawn on top of them, then the swimlane content
     // (frame tab + items) sits on top of the grid.
     for (const s of model.swimlanes) parts.push(renderSwimlaneBg(s, palette));
 
+    // Styled wave column tints, over the lane rows and under the grid.
+    if (model.waves) parts.push(renderWaveTints(model.waves));
+
     // Chart-body grid lines (major dotted at every labeled tick, plus
     // optional faint minor lines when minor-grid is set). Drawn after
     // swimlane backgrounds so they actually span the chart body, but
     // before items and overlays so item bars sit cleanly on top.
     parts.push(renderGridLines(model.timeline, model.chartBox.y, palette));
+
+    // Wave boundaries over the grid and the marker-row panel but under
+    // the bars, then the strip labels, diamonds and gap labels on top of
+    // them (specs/waves.md §9.9).
+    parts.push(renderWaveBoundaries(model.waveBoundaries));
+    parts.push(renderWaveLabels(model, palette, fonts));
 
     // m2g+: under-bar dependency edges go BEFORE swimlane / item
     // content. The channel router falls back to under-bar routing when
@@ -2248,7 +2898,10 @@ export async function renderSvg(
     // Include regions (drawn after own swimlanes so the dashed border + tab
     // overlay the chart, with their own nested swimlanes inside).
     for (const r of model.includes)
-        parts.push(renderIncludeRegion(r, options, idPrefix, palette, fonts));
+        parts.push(renderIncludeRegion(r, options, idPrefix, palette, fonts, model));
+
+    // Wave crossings over the main lanes' background bars.
+    parts.push(renderWaveCrossings(model.waveCrossings));
 
     // Normal / overflow dependency edges on top of items but below
     // cut-lines / nowline. Under-bar edges already painted above.
@@ -2270,6 +2923,7 @@ export async function renderSvg(
 
     // Footnotes + header last (always on top)
     parts.push(renderFootnotes(model.footnotes, idPrefix, palette, fonts));
+    parts.push(renderWaveLegend(model.waveLegend, idPrefix, palette, fonts));
     parts.push(renderHeader(model.header, idPrefix, palette, fonts));
     parts.push(renderAttributionMark(model, fonts));
 

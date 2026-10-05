@@ -866,7 +866,7 @@ export interface PositionedWave {
         tooltip: string;
         footnotesShown: boolean;
     };
-    style: { tint?: string; stripFill: string; text: string; boundary: string; boundaryDash: string | null; boundaryVisible: boolean };
+    style: { tint?: string; stripFill: string; text: string; boundary: string; boundaryDash: string | null };
     footnoteIndicators: number[];
 }
 export interface PositionedWaveBoundary { x: number; topY: number; bottomY: number; stroke: string; dash: string | null }
@@ -878,6 +878,8 @@ export interface PositionedWaveCrossing { x: number; topY: number; bottomY: numb
 // PositionedTimelineScale.waveStrip?: { y: number; height: number; placeholder?: string }
 // PositionedItem.waveRole?: 'member' | 'background'      // set on every item when the roadmap has waves
 // PositionedItem.wavePinOverride?: { wave: string; key: 'date' | 'start'; pin: string; start: string }
+// PositionedItem.waveTooltip?: string                  // 'Background (no wave)', localized; background items only (§9.3)
+// PositionedGroup.waveOnly?: true                       // the §9.7 no-bracket case
 // PositionedMilestone.onWaveBoundary?: boolean            // suppresses the cut line (§9.2)
 // PositionedMilestone.overrunByWave?: string
 // PositionedIncludeRegion.waveCrossings?: PositionedWaveCrossing[]
@@ -971,7 +973,6 @@ The mockup in [`waves/samples/checkout-relaunch.svg`](./waves/samples/checkout-r
 - **Layer.** After the grid and before the under-bar edges: **under** bars, **over** the marker-row panel. Diamonds and labels are drawn later, so they stay on top.
 - **Stroke.** `WAVE_BOUNDARY_WIDTH_PX` (2 px), solid, in `style.fg ?? wave.boundary`.
   - Style `border:dashed` gives a `4 2` dash, and `dotted` gives `1 2`.
-  - `none` omits the line.
 - **Positions.** There is one line at every distinct x in `{S_k} ∪ {E_k}`, except the origin:
   - contiguous waves give one line per boundary, plus a closing line at `E_n`;
   - a gap gives two lines;
@@ -992,7 +993,7 @@ The design rule is to mark the exception, not the rule. In a roadmap with waves,
      - `${idPrefix}-wave-hatch-dark` (stroke `wave.hatch`) on light fills;
      - `${idPrefix}-wave-hatch-light` (stroke `wave.hatchOnDark`) on dark fills.
    - The ids carry the per-SVG prefix, like the shadow filters, because the embed tests forbid ids shared across SVGs on one page.
-   - Pattern: 6 px tile, 45°, 2 px stroke at `WAVE_HATCH_OPACITY` (0.13).
+   - Pattern: 6 px tile, 45°, 2 px stroke at `WAVE_HATCH_OPACITY` (0.13), set as the line's `opacity` (not `stroke-opacity`, which svg-to-pdfkit emits as a stroke-only alpha that poppler ignores inside a pattern cell, so the PDF hatch would draw opaque).
    - **Overlay.** A second rect drawn right after the bar rect, so the bar rect stays the first `<rect>` in the item group. It is inset by half the bar's stroke width and uses the same corner radius, so it does not cover the stroke.
    - Status colour, the progress strip, the status dot and the text stay readable.
    - Each def is emitted inside the existing `<defs>`, and only when at least one bar uses it.
@@ -1023,7 +1024,7 @@ A wave whose style sets `bg` opts in:
 | `bg` | **Column tint:** a rect over `columnBox` at `fill-opacity` `WAVE_STYLED_TINT_OPACITY` (0.12), drawn after lane backgrounds and before the grid. **Strip cell:** a `bg` overlay at `WAVE_STYLED_STRIP_MIX_OPACITY` (0.25). |
 | `fg` | Boundary colour. |
 | `text` | Label colour. When absent, and `wave.labelText` would fall below 4.5:1 against the composited cell fill, the renderer picks dark or light text by luminance. |
-| `border` | Boundary dash (`solid`, `dashed`, `dotted`); `none` omits the boundary. |
+| `border` | Boundary dash (`solid`, `dashed`, `dotted`). |
 | everything else | Ignored. |
 
 There is no `default wave` and no `Theme.entities.wave`. `wave-node.ts` reads the named style from `resolved.config.styles` through `resolveColor`.

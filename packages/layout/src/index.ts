@@ -91,6 +91,7 @@ export {
     type LayoutInsightContext,
     type LayoutInsightSeverity,
 } from './layout-insights.js';
+export { MARKER_BOLD_WIDTH_FACTOR } from './nodes/marker-geometry.js';
 export {
     civilDateInZone,
     type NormalizedZone,
@@ -106,6 +107,7 @@ export type {
     ScheduleOptions,
 } from './schedule.js';
 export { scheduleRoadmap } from './schedule.js';
+export { contrastRatio, relativeLuminance } from './themes/contrast.js';
 export {
     darkTheme,
     grayscaleTheme,
@@ -155,5 +157,24 @@ export {
     TIMELINE_TICK_LABEL_BASELINE_OFFSET_PX,
     TIMELINE_TICK_PANEL_HEIGHT_PX,
     TRACK_BLOCK_TAIL_GUTTER_PX,
+    WAVE_BOUNDARY_WIDTH_PX,
+    WAVE_CROSS_DASH,
+    WAVE_EMPTY_MARKER_SIZE_PX,
+    WAVE_EMPTY_MARKER_STEP_PX,
+    WAVE_HATCH_OPACITY,
+    WAVE_HATCH_STROKE_PX,
+    WAVE_HATCH_TILE_PX,
+    WAVE_LEGEND_BASELINE_OFFSET_PX,
+    WAVE_LEGEND_ENTRY_GAP_PX,
+    WAVE_LEGEND_GAP_PX,
+    WAVE_LEGEND_LINE_PX,
+    WAVE_LEGEND_SWATCH_GAP_PX,
+    WAVE_LEGEND_SWATCH_HEIGHT_PX,
+    WAVE_LEGEND_SWATCH_WIDTH_PX,
+    WAVE_STRIP_HEIGHT_PX,
+    WAVE_STRIP_LABEL_FONT_SIZE_PX,
+    WAVE_STRIP_LABEL_PAD_PX,
+    WAVE_STYLED_STRIP_MIX_OPACITY,
+    WAVE_STYLED_TINT_OPACITY,
 } from './themes/shared.js';
 export * from './types.js';

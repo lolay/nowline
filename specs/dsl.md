@@ -583,7 +583,7 @@ A `wave` line accepts:
 | id (positional) | **required** (`NL.E1100`) | The wave's identity. It joins the single shared id namespace (Structural Rule 2). |
 | title (positional) | optional | The strip label. Falls back to the id. |
 | `after:` | optional; one value or a list | **Start floor.** The wave cannot open before the latest of its elements. Each element must be an anchor id, the id of a milestone that has `date:`, or an ISO date (at most one date). Any other kind of entity is `NL.E1106`. Inline dates follow Validation Rules 24b, 27 and 28. |
-| `style:` | optional (universal) | Wave colours: `bg` opts the wave into a column tint, `fg` colours its boundary line, `text` its strip label, `border` sets the boundary dash (`none` omits it). See [`specs/rendering.md`](./rendering.md) "Waves". |
+| `style:` | optional (universal) | Wave colours: `bg` opts the wave into a column tint, `fg` colours its boundary line, `text` its strip label, `border` sets the boundary dash (`solid`, `dashed`, `dotted`). See [`specs/rendering.md`](./rendering.md) "Waves". |
 | `labels:`, `link:`, `description` | optional (universal) | Carried in the AST, JSON and XLSX, and shown in LSP hover. Not painted. |
 | `footnote:` | error | Waves host footnotes through `on:`. |
 | `before:`, `date:`, `start:`, `length:`, `duration:`, `size:`, `capacity:`, `remaining:`, `wave:` | **error** (`NL.E1105`) | A wave's span comes from its items. To give a wave a deadline, add a dated milestone `after:<wave>`; it turns red when the wave runs late. |

@@ -20,7 +20,7 @@ import { defaultRowBand } from '../band-scale.js';
 import type { CalendarConfig } from '../calendar.js';
 import { addDays, daysBetween, resolveCalendar, resolveSizes } from '../calendar.js';
 import { parseDate, propValue, propValues } from '../dsl-utils.js';
-import { resolveLocale } from '../i18n.js';
+import { localeStrings, resolveLocale } from '../i18n.js';
 import type { LayoutOptions, LayoutResult } from '../layout.js';
 import type { LayoutContext, LayoutHelpers } from '../layout-context.js';
 import { shiftIncludeY, shiftSwimlaneY } from '../positioned-shift.js';
@@ -34,6 +34,8 @@ import {
     NOW_PILL_HEIGHT_PX,
     SPACING_PX,
     TIMELINE_TICK_PANEL_HEIGHT_PX,
+    WAVE_LEGEND_GAP_PX,
+    WAVE_STRIP_HEIGHT_PX,
 } from '../themes/shared.js';
 import { TimeScale } from '../time-scale.js';
 import type {
@@ -78,7 +80,7 @@ import {
     latestArrowPredecessor,
 } from './milestone-node.js';
 import { SwimlaneNode } from './swimlane-node.js';
-import { buildWaves } from './wave-node.js';
+import { buildWaveLegend, buildWaves } from './wave-node.js';
 
 const HEADER_CARD_TOP_INSET = 4;
 
@@ -235,8 +237,9 @@ export class RoadmapNode {
         // Header layout (top → bottom):
         //   1. Now-pill row    (16 px) — only when there's a now-line
         //   2. Tick-label panel (24 px) — always
-        //   3. Marker row       (≥26 px) — sized to the packed row count
-        //   4. 8 px gap, then the chart begins
+        //   3. Wave strip      (20 px) — only when the roadmap declares waves
+        //   4. Marker row       (≥26 px) — sized to the packed row count
+        //   5. 8 px gap, then the chart begins
         const willHaveNowline =
             options.today !== undefined && options.today >= startDate && options.today <= endDate;
         const hasMarkerEntities =
@@ -246,6 +249,10 @@ export class RoadmapNode {
         // collapses to height 0 — the now-pill and marker row stack
         // directly without the date strip between them.
         const tickPanelHeight = showTopTickPanel ? TIMELINE_TICK_PANEL_HEIGHT_PX : 0;
+        // The wave strip (specs/waves.md §8.8) has a fixed height, so the
+        // chart top is known before the barrier passes run; it sits above
+        // the marker rows, so the post-hoc marker re-pack never moves it.
+        const waveStripHeight = plan ? WAVE_STRIP_HEIGHT_PX : 0;
 
         // Build the time scale up front — packMarkerRow needs it to
         // resolve date-pinned entity x positions before we can size the
@@ -317,7 +324,8 @@ export class RoadmapNode {
         );
         const markerRowsCount = hasMarkerEntities ? Math.max(1, packed.rowCount) : 0;
         const markerRowHeight = markerRowsCount * MARKER_ROW_PITCH_PX;
-        const headerRowsHeight = pillRowHeight + tickPanelHeight + markerRowHeight;
+        const headerRowsHeight =
+            pillRowHeight + tickPanelHeight + waveStripHeight + markerRowHeight;
         const timelineHeightBudget = headerRowsHeight + 8;
         // In beside-mode the header card's BOTTOM aligns with the bottom
         // of the header rows so it visually anchors to the chart's top.
@@ -329,7 +337,8 @@ export class RoadmapNode {
             : 0;
         const timelineY = Math.max(chartTopY, minHeaderRowsBottomForCard - headerRowsHeight);
         const tickPanelY = timelineY + pillRowHeight;
-        const markerRowY = tickPanelY + tickPanelHeight;
+        const waveStripY = tickPanelY + tickPanelHeight;
+        const markerRowY = waveStripY + waveStripHeight;
         const headerRowsBottomY = markerRowY + markerRowHeight;
 
         const ticks = buildHeaderTicks(timeScale, scale, calendar, locale);
@@ -354,6 +363,7 @@ export class RoadmapNode {
             // re-pack potentially grows the chart), so the panel sits
             // directly above the footnote area.
             minorGrid: headerStyle.minorGrid,
+            ...(plan ? { waveStrip: { y: waveStripY, height: waveStripHeight } } : {}),
         };
 
         // Stitch packed placements together with their final centerY now
@@ -742,8 +752,20 @@ export class RoadmapNode {
         }
 
         // Positioned waves (specs/waves.md §8.7): after the extent growth
-        // (final scale) and the marker-row shift.
-        const positionedWaves = ctx.waves ? buildWaves(ctx.waves, ctx) : undefined;
+        // (final scale) and the marker-row shift, so the columns, the
+        // boundaries and the crossings read final geometry.
+        const strings = localeStrings(locale);
+        const builtWaves = ctx.waves
+            ? buildWaves(ctx.waves, ctx, strings, swimlanes, includes)
+            : undefined;
+        if (builtWaves) {
+            builtWaves.regionCrossings.forEach((crossings, i) => {
+                if (crossings.length > 0) includes[i].waveCrossings = crossings;
+            });
+            if (builtWaves.placeholder !== undefined && timeline.waveStrip) {
+                timeline.waveStrip.placeholder = builtWaves.placeholder;
+            }
+        }
 
         const milestoneXs = new Set<number>(milestones.map((m) => m.center.x));
         const anchors = buildAnchors(resolved.content.anchors, ctx, milestoneXs);
@@ -754,6 +776,14 @@ export class RoadmapNode {
         // timeline panel when present, otherwise at the last swimlane —
         // see `buildNowline`. Footnote panels below do not extend it.
         const nowline = deps.buildNowline(options.today, ctx, locale);
+
+        // The wave legend (specs/waves.md §8.8, §9.5) sits below the chart
+        // and any bottom tick panel, above the footnotes: grow the chart
+        // bottom by its gap and lines before the footnote panel is placed.
+        const waveLegend = builtWaves
+            ? buildWaveLegend(builtWaves, ctx, strings, ctx.chartBottomY + WAVE_LEGEND_GAP_PX)
+            : undefined;
+        if (waveLegend) ctx.chartBottomY += WAVE_LEGEND_GAP_PX + waveLegend.box.height;
 
         // Finalize footnotes at the bottom.
         const foot = buildFootnotes(resolved.content.footnotes, ctx, ctx.chartBottomY);
@@ -840,7 +870,14 @@ export class RoadmapNode {
                 height: ctx.chartBottomY - ctx.chartTopY,
             },
             ...(waveSolve ? { waveSolve } : {}),
-            ...(positionedWaves ? { waves: positionedWaves } : {}),
+            ...(builtWaves ? { waves: builtWaves.waves } : {}),
+            ...(builtWaves && builtWaves.boundaries.length > 0
+                ? { waveBoundaries: builtWaves.boundaries }
+                : {}),
+            ...(builtWaves && builtWaves.crossings.length > 0
+                ? { waveCrossings: builtWaves.crossings }
+                : {}),
+            ...(waveLegend ? { waveLegend } : {}),
         };
         return model;
     }
