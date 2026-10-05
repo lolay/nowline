@@ -9,6 +9,9 @@
   `backlog`, which is not a built-in status.
 - `status:` completion offers the `active` and `completed` aliases for
   `in-progress` and `done`.
+- `status:active` and `status:completed` highlight like the other built-in
+  statuses, and a status word inside a longer id (`done-api`) is no longer
+  highlighted on its own.
 
 ## [0.8.6] - 2026-10-01
 
