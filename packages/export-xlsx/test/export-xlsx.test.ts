@@ -1,4 +1,7 @@
 import { createHash } from 'node:crypto';
+import { readFileSync } from 'node:fs';
+import { fileURLToPath } from 'node:url';
+import { scheduleRoadmap } from '@nowline/layout';
 import ExcelJS from 'exceljs';
 import { describe, expect, it } from 'vitest';
 import { durationToWorkingDays } from '../src/duration.js';
@@ -418,5 +421,226 @@ describe('durationToWorkingDays', () => {
         ['nonsense', 0],
     ] as const)('parses %s → %d days', (input, expected) => {
         expect(durationToWorkingDays(input as string | undefined)).toBe(expected);
+    });
+});
+
+describe('exportXlsx — waves', () => {
+    const SAMPLE = readFileSync(
+        fileURLToPath(
+            new URL('../../../specs/waves/samples/checkout-relaunch.nowline', import.meta.url),
+        ),
+        'utf8',
+    );
+
+    // specs/waves.md Example 11: a start floor on `execute`.
+    const FLOOR_FIXTURE = `nowline v1
+
+roadmap budget-floor "Budget-held rollout" start:2026-01-05 scale:1w calendar:full
+
+anchor fy-budget "FY budget release" date:2026-02-02
+
+wave plan "Plan"
+wave execute "Execute" after:fy-budget
+
+swimlane a
+  item a1 duration:2w wave:plan
+  item a2 duration:5w wave:execute
+swimlane b
+  item b1 duration:3w wave:plan
+  item b2 duration:7w wave:execute
+
+milestone exec-done "Execute complete" date:2026-03-16 after:execute
+`;
+
+    const OLD_ITEM_HEADERS = [
+        'ID',
+        'Title',
+        'Swimlane',
+        'Group',
+        'Parallel',
+        'Duration',
+        'Duration (text)',
+        'Start',
+        'End',
+        'Status',
+        'Remaining',
+        'Owner',
+        'After',
+        'Before',
+        'Labels',
+        'Link',
+        'Description',
+    ];
+
+    function headersOf(sheet: ExcelJS.Worksheet): string[] {
+        return (sheet.getRow(1).values as unknown as string[]).filter(Boolean);
+    }
+
+    /** Rows below the header as objects keyed by header text. */
+    function rowsOf(sheet: ExcelJS.Worksheet): Array<Record<string, unknown>> {
+        const headers = headersOf(sheet);
+        const rows: Array<Record<string, unknown>> = [];
+        sheet.eachRow((row, n) => {
+            if (n === 1) return;
+            const rec: Record<string, unknown> = {};
+            headers.forEach((h, i) => {
+                rec[h] = row.getCell(i + 1).value;
+            });
+            rows.push(rec);
+        });
+        return rows;
+    }
+
+    function iso(v: unknown): string {
+        expect(v).toBeInstanceOf(Date);
+        return (v as Date).toISOString().slice(0, 10);
+    }
+
+    it('adds a Wave column after Parallel with each item effective wave id', async () => {
+        const wb = await readBack(await exportXlsx(await buildExportInputs(SAMPLE)));
+        const items = wb.getWorksheet('Items')!;
+        const headers = headersOf(items);
+        expect(headers).toEqual([
+            ...OLD_ITEM_HEADERS.slice(0, 5),
+            'Wave',
+            ...OLD_ITEM_HEADERS.slice(5),
+        ]);
+        const waveOf = Object.fromEntries(rowsOf(items).map((r) => [r.ID, r.Wave ?? '']));
+        expect(waveOf).toEqual({
+            auth: 'foundations',
+            'payments-api': 'build',
+            'rate-limits': 'launch',
+            'ux-research': 'foundations',
+            // Inherited from `group wave:build`.
+            'checkout-v2': 'build',
+            a11y: 'build',
+            'launch-page': 'launch',
+            'wallet-spike': 'foundations',
+            wallet: 'build',
+            'store-release': 'launch',
+            // Background work.
+            'on-call': '',
+        });
+    });
+
+    it('appends a Waves sheet whose dates match engines A and C', async () => {
+        const inputs = await buildExportInputs(SAMPLE);
+        const wb = await readBack(await exportXlsx(inputs));
+        expect(wb.worksheets.map((s) => s.name)).toEqual([
+            'Roadmap',
+            'Items',
+            'Milestones',
+            'Waves',
+        ]);
+        const sheet = wb.getWorksheet('Waves')!;
+        expect(headersOf(sheet)).toEqual([
+            'ID',
+            'Title',
+            'Order',
+            'Start',
+            'End (exclusive)',
+            'Items',
+            'Held by',
+            'After',
+            'Description',
+        ]);
+        const rows = rowsOf(sheet);
+        expect(rows.map((r) => [r.ID, r.Title, r.Order, r.Items])).toEqual([
+            ['foundations', 'Foundations', 1, 3],
+            ['build', 'Build', 2, 4],
+            ['launch', 'Launch', 3, 3],
+        ]);
+        expect(rows.map((r) => [iso(r.Start), iso(r['End (exclusive)'])])).toEqual([
+            ['2026-01-05', '2026-02-16'],
+            ['2026-02-16', '2026-04-13'],
+            ['2026-04-13', '2026-05-11'],
+        ]);
+        expect(rows.map((r) => r['Held by'])).toEqual([
+            'wallet-spike',
+            'payments-api',
+            'store-release',
+        ]);
+
+        const schedule = scheduleRoadmap(inputs.ast, inputs.resolved, { today: inputs.today });
+        const positioned = inputs.model.waves!;
+        rows.forEach((r, i) => {
+            const c = schedule.waves!.get(r.ID as string)!;
+            expect(r.Start).toEqual(c.start);
+            expect(r['End (exclusive)']).toEqual(c.end);
+            expect(r.Start).toEqual(positioned[i]!.startDate);
+            expect(r['End (exclusive)']).toEqual(positioned[i]!.endDate);
+        });
+    });
+
+    it('reports a start floor in After and the binding member in Held by', async () => {
+        const wb = await readBack(await exportXlsx(await buildExportInputs(FLOOR_FIXTURE)));
+        expect(wb.worksheets.map((s) => s.name)).toEqual([
+            'Roadmap',
+            'Items',
+            'Milestones',
+            'Anchors',
+            'Waves',
+        ]);
+        const rows = rowsOf(wb.getWorksheet('Waves')!);
+        expect(rows).toHaveLength(2);
+        expect(iso(rows[0]!.Start)).toBe('2026-01-05');
+        expect(iso(rows[0]!['End (exclusive)'])).toBe('2026-01-26');
+        expect(rows[0]!['Held by']).toBe('b1');
+        expect(rows[0]!.After ?? '').toBe('');
+        // The gap: execute opens on the floor, not on plan's end.
+        expect(iso(rows[1]!.Start)).toBe('2026-02-02');
+        expect(iso(rows[1]!['End (exclusive)'])).toBe('2026-03-23');
+        expect(rows[1]!['Held by']).toBe('b2');
+        expect(rows[1]!.After).toBe('fy-budget');
+    });
+
+    // `parallel wave:build` with two tracks, one a group holding two items.
+    const PARALLEL_FIXTURE = `nowline v1
+
+roadmap par "Parallel waves" start:2026-01-05
+
+wave plan "Plan"
+wave build "Build"
+
+swimlane eng "Eng"
+  item spec duration:1w wave:plan
+  parallel tracks wave:build
+    item api duration:2w
+    group ui-track "UI track"
+      item ui duration:1w
+      item polish duration:1w
+  item ship duration:1w
+
+swimlane web "Web"
+  parallel web-tracks wave:build
+    item web-a duration:1w
+    item web-b duration:1w
+`;
+
+    it('fills the Wave column for items in parallel tracks and groups', async () => {
+        const wb = await readBack(await exportXlsx(await buildExportInputs(PARALLEL_FIXTURE)));
+        const rows = rowsOf(wb.getWorksheet('Items')!);
+        const waveOf = Object.fromEntries(rows.map((r) => [r.ID, r.Wave ?? '']));
+        expect(waveOf).toEqual({
+            spec: 'plan',
+            api: 'build',
+            ui: 'build',
+            polish: 'build',
+            ship: '',
+            'web-a': 'build',
+            'web-b': 'build',
+        });
+    });
+
+    it('keeps the old columns and sheets for a roadmap without waves', async () => {
+        const wb = await readBack(await exportXlsx(await buildExportInputs(FIXTURE)));
+        expect(wb.worksheets.map((s) => s.name)).toEqual([
+            'Roadmap',
+            'Items',
+            'Milestones',
+            'Anchors',
+            'People and Teams',
+        ]);
+        expect(headersOf(wb.getWorksheet('Items')!)).toEqual(OLD_ITEM_HEADERS);
     });
 });

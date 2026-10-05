@@ -719,7 +719,7 @@ Present only when the roadmap declares waves; always the last sheet, so existing
 | Title | wave title | Falls back to the id |
 | Order | declaration order | 1-based |
 | Start | computed from schedule | Wave start; real date cell |
-| End | computed from schedule | Wave end, exclusive; equals Start for a wave with no items |
+| End (exclusive) | computed from schedule | Wave end, exclusive; equals Start for a wave with no items |
 | Items | member count | Leaf items whose effective wave is this one |
 | Held by | binding member | The member with the latest end (id, falling back to title); blank when no member sets the wave's end (an empty wave, or one whose members all end at or before its start floor) |
 | After | `after:` value(s) | The start floor, semicolon-delimited |
@@ -748,10 +748,10 @@ Key differences: Start/Finish dates are computed by `scheduleRoadmap` from the c
 
 The MS Project exporter reads the AST only (it does not run the schedule) and maps `after:` to finish-to-start predecessor links. When the roadmap declares waves:
 
-- **Wave-end milestone tasks.** One zero-duration milestone task per wave, titled `{title} (wave end)`, at outline level 1. Its finish-to-start predecessors are every member that has an id, plus the previous wave's end task.
-- **Barrier links.** Every member of wave k ≥ 2 gains a finish-to-start link to wave k−1's end task.
-- **Floors.** An anchor or dated-milestone floor becomes a predecessor link; an inline-date floor is dropped and counted.
-- **Limits.** Members without ids cannot be linked to the wave-end task. The exporter still encodes no implicit lane sequencing (unchanged).
+- **Wave-end milestone tasks.** One zero-duration milestone task per wave, titled `{title} (wave end)`, at outline level 1. They are appended after every other task, in declaration order, so the UIDs and IDs of all existing tasks never change. Its finish-to-start predecessors are every member that has an id, plus the previous wave's end task. `after:<wave>` on an item or milestone links to that wave's end task.
+- **Barrier links.** Every member of wave k ≥ 2 gains a finish-to-start link to wave k−1's end task, merged with its own `after:` links without duplicates. Background work gets no wave links.
+- **Floors.** Each `after:` element of a wave that names an anchor or a dated milestone becomes a finish-to-start predecessor of every member of that wave and of the wave's end task (so an empty wave still carries its floor). An inline-date floor is dropped and counted as `wave-floor`.
+- **Limits.** Members without ids still get their barrier and floor links but cannot be linked to their wave-end task; they are counted as `wave-member-no-id`. Both drop kinds are absent when zero. The exporter still encodes no implicit lane sequencing (unchanged).
 
 ### Markdown+Mermaid Bridge
 
@@ -763,7 +763,7 @@ The Mermaid output is a best-effort translation. The Nowline DSL is richer than 
 - Anchors every task with an explicit start token so Mermaid never mis-reads a task id as a start date: declared `after:` deps win, otherwise the task chains `after` the previous item in its lane, otherwise (a lane or parallel-track leader) it anchors at the roadmap's `start:` date (falling back to the layout-computed timeline start when `start:` is omitted). This mirrors Nowline's default "each item starts after the preceding item in its lane" layout.
 - Maps anchors to Mermaid milestones.
 - Drops properties that Mermaid cannot express (labels, footnotes, owners, remaining). Parallel/group structure is flattened (tracks anchor at the block's entry point; the lane then continues after the last track — Mermaid cannot express "after the latest of N tracks").
-- When the roadmap declares waves, emits a `section Waves` after the anchors and before the lanes, with one milestone per wave (`{title} (wave end) :milestone, {waveId}, {end date}, 0d`, dated from the schedule). The milestone id is the wave id, so `after:build` maps to Mermaid `after build`, and every member of wave k ≥ 2 also anchors `after` wave k−1's milestone. Start floors are dropped and counted.
+- When the roadmap declares waves, emits a `section Waves` after the anchors and before the lanes, with one milestone per wave (`{title} (wave end) :milestone, {waveId}, {end date}, 0d`, dated from the schedule; the date is the wave's exclusive end, the day the next wave can start). The milestone id is the wave id, so `after:build` maps to Mermaid `after build`, and every member of wave k ≥ 2 also anchors `after` wave k−1's milestone (added to its existing `after` token, or replacing a lane leader's start date). Start floors are dropped and counted as `wave-floor` in the `%%` summary.
 - Includes a comment noting the lossy conversion.
 
 This output works as a Trojan horse — users can share roadmaps in Mermaid-compatible contexts (GitHub READMEs, Notion, Confluence) and link back to the full Nowline version.

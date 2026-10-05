@@ -34,6 +34,9 @@
 //   - declared `after:` deps  -> `after <ids>`
 //   - otherwise a lane follower -> `after <previous item in the lane>`
 //   - otherwise a lane/track leader -> the roadmap start date
+//   - a member of wave k >= 2 also gets `after <wave k-1 id>`: appended to
+//     its `after` token, or replacing a lane/track leader's start date
+//     (specs/waves.md §10)
 // This mirrors Nowline's default "each item starts after the preceding item in
 // its lane" semantics (specs/rendering.md § Item Bars).
 
@@ -46,9 +49,12 @@ import type {
     ParallelBlock,
     SwimlaneContent,
     SwimlaneDeclaration,
+    WavePlan,
 } from '@nowline/core';
+import { buildWavePlan } from '@nowline/core';
 import type { ExportInputs } from '@nowline/export-core';
 import { displayLabel, getProp, getProps, hasProp, roadmapTitle } from '@nowline/export-core';
+import { scheduleRoadmap } from '@nowline/layout';
 
 import { durationToMermaid } from './duration.js';
 
@@ -68,6 +74,8 @@ interface DropCounts {
     nestedSwimlanes: number;
     description: number;
     style: number;
+    /** Wave start floors (a wave's `after:`); Mermaid has no "no earlier than". */
+    waveFloor: number;
 }
 
 function emptyCounts(): DropCounts {
@@ -82,6 +90,7 @@ function emptyCounts(): DropCounts {
         nestedSwimlanes: 0,
         description: 0,
         style: 0,
+        waveFloor: 0,
     };
 }
 
@@ -92,6 +101,16 @@ function emptyCounts(): DropCounts {
  */
 interface Chain {
     prevId: string | null;
+}
+
+/**
+ * Wave barrier context (specs/waves.md §10): the plan, for membership, and
+ * each wave's end milestone id by 1-based index. Undefined without waves.
+ */
+interface WaveCtx {
+    plan: WavePlan;
+    /** `ids[k - 1]` is wave k's id, which is also its end milestone's id. */
+    ids: readonly string[];
 }
 
 export function exportMermaid(inputs: ExportInputs, options: MermaidOptions = {}): string {
@@ -126,12 +145,22 @@ export function exportMermaid(inputs: ExportInputs, options: MermaidOptions = {}
         }
     }
 
+    // Waves → one end milestone per wave, dated from the day schedule.
+    const waves = emitWaves(inputs, drops, out, startDate);
+
     // Swimlanes → sections; their items become tasks.
     const swimlanes = ast.roadmapEntries.filter(
         (e): e is SwimlaneDeclaration => e.$type === 'SwimlaneDeclaration',
     );
     for (const lane of swimlanes) {
-        emitSwimlane(lane, [lane.name ?? slugify(displayLabel(lane))], drops, out, startDate);
+        emitSwimlane(
+            lane,
+            [lane.name ?? slugify(displayLabel(lane))],
+            drops,
+            out,
+            startDate,
+            waves,
+        );
     }
 
     // Top-level milestones.
@@ -158,12 +187,43 @@ export function exportMermaid(inputs: ExportInputs, options: MermaidOptions = {}
     return out.join('\n');
 }
 
+/**
+ * `section Waves` (specs/waves.md §10): `{title} (wave end) :milestone, {id},
+ * {E_k}, 0d` per wave, in declaration order. `E_k` is the wave's exclusive
+ * end from the day schedule, which is the instant Mermaid starts a task
+ * `after` the milestone, so `after:build` and the barrier tokens both open
+ * on the barrier. Start floors cannot be expressed and are counted as drops.
+ * Returns undefined, emitting nothing, when the roadmap has no waves.
+ */
+function emitWaves(
+    inputs: ExportInputs,
+    drops: DropCounts,
+    out: string[],
+    startDate: string,
+): WaveCtx | undefined {
+    const plan = buildWavePlan(inputs.resolved);
+    if (!plan) return undefined;
+    const schedule = scheduleRoadmap(inputs.ast, inputs.resolved, { today: inputs.today });
+    const ids = plan.waves.map((w) => w.name as string);
+    out.push('    section Waves');
+    plan.waves.forEach((w, i) => {
+        const end = schedule.waves?.get(ids[i]!)?.end;
+        const date = end ? formatIsoDate(end) : startDate;
+        out.push(
+            `    ${escapeTaskName(displayLabel(w))} (wave end) :milestone, ${ids[i]}, ${date}, 0d`,
+        );
+        if (getProps(w, 'after').length > 0) drops.waveFloor += 1;
+    });
+    return { plan, ids };
+}
+
 function emitSwimlane(
     lane: SwimlaneDeclaration,
     breadcrumb: readonly string[],
     drops: DropCounts,
     out: string[],
     startDate: string,
+    waves: WaveCtx | undefined,
 ): void {
     const sectionLabel = breadcrumb.join('.');
     out.push(`    section ${escapeMermaidText(sectionLabel)}`);
@@ -171,7 +231,7 @@ function emitSwimlane(
     // anchors at the roadmap start date.
     const chain: Chain = { prevId: null };
     for (const child of lane.content) {
-        emitSwimlaneChild(child, breadcrumb, drops, out, chain, startDate);
+        emitSwimlaneChild(child, breadcrumb, drops, out, chain, startDate, waves);
     }
     // Nested swimlanes — count for the lossy report.
     // SwimlaneContent doesn't include nested swimlanes per the grammar, so
@@ -186,19 +246,20 @@ function emitSwimlaneChild(
     out: string[],
     chain: Chain,
     startDate: string,
+    waves: WaveCtx | undefined,
 ): void {
     if (child.$type === 'ItemDeclaration') {
-        emitItem(child, drops, out, chain, startDate);
+        emitItem(child, drops, out, chain, startDate, waves);
         return;
     }
     if (child.$type === 'GroupBlock') {
         drops.group += 1;
-        emitGroup(child, breadcrumb, drops, out, chain, startDate);
+        emitGroup(child, breadcrumb, drops, out, chain, startDate, waves);
         return;
     }
     if (child.$type === 'ParallelBlock') {
         drops.parallel += 1;
-        emitParallel(child, breadcrumb, drops, out, chain, startDate);
+        emitParallel(child, breadcrumb, drops, out, chain, startDate, waves);
         return;
     }
     if (child.$type === 'DescriptionDirective') {
@@ -214,18 +275,19 @@ function emitGroup(
     out: string[],
     chain: Chain,
     startDate: string,
+    waves: WaveCtx | undefined,
 ): void {
     // A group is a visual container within a lane — its items continue the
     // lane's sequential chain.
     for (const child of group.content as GroupContent[]) {
         if (child.$type === 'ItemDeclaration') {
-            emitItem(child, drops, out, chain, startDate);
+            emitItem(child, drops, out, chain, startDate, waves);
         } else if (child.$type === 'GroupBlock') {
             drops.group += 1;
-            emitGroup(child, breadcrumb, drops, out, chain, startDate);
+            emitGroup(child, breadcrumb, drops, out, chain, startDate, waves);
         } else if (child.$type === 'ParallelBlock') {
             drops.parallel += 1;
-            emitParallel(child, breadcrumb, drops, out, chain, startDate);
+            emitParallel(child, breadcrumb, drops, out, chain, startDate, waves);
         } else if (child.$type === 'DescriptionDirective') {
             drops.description += 1;
         }
@@ -239,6 +301,7 @@ function emitParallel(
     out: string[],
     chain: Chain,
     startDate: string,
+    waves: WaveCtx | undefined,
 ): void {
     // Tracks run concurrently: each starts from the parallel's entry point
     // (the lane cursor as it was on entry), not after the previous track.
@@ -247,12 +310,12 @@ function emitParallel(
     for (const child of parallel.content) {
         if (child.$type === 'ItemDeclaration') {
             const trackChain: Chain = { prevId: entryId };
-            emitItem(child, drops, out, trackChain, startDate);
+            emitItem(child, drops, out, trackChain, startDate, waves);
             lastTrackEnd = trackChain.prevId;
         } else if (child.$type === 'GroupBlock') {
             drops.group += 1;
             const trackChain: Chain = { prevId: entryId };
-            emitGroup(child, breadcrumb, drops, out, trackChain, startDate);
+            emitGroup(child, breadcrumb, drops, out, trackChain, startDate, waves);
             lastTrackEnd = trackChain.prevId;
         } else if (child.$type === 'DescriptionDirective') {
             drops.description += 1;
@@ -269,13 +332,14 @@ function emitItem(
     out: string[],
     chain: Chain,
     startDate: string,
+    waves: WaveCtx | undefined,
 ): void {
     countDrops(item, drops);
     const id = item.name ?? slugify(displayLabel(item));
     const status = mapStatus(getProp(item, 'status'));
     const after = getProps(item, 'after');
     const duration = durationToMermaid(getProp(item, 'duration') ?? getProp(item, 'size')) ?? '1d';
-    const start = startTokenFor(after, chain, startDate);
+    const start = startTokenFor(after, chain, startDate, previousWaveOf(item, waves));
 
     const meta = [status, id, start, duration].filter((s) => s !== '').join(', ');
     out.push(`    ${escapeTaskName(displayLabel(item))} :${meta}`);
@@ -310,12 +374,31 @@ function emitMilestone(
  * Start token for a task: declared `after:` deps win, otherwise chain after the
  * previous item in the lane, otherwise anchor the lane/track leader at the
  * roadmap start date. Always non-empty so Mermaid never mis-reads the task id
- * as a start date.
+ * as a start date. A member of wave k >= 2 also waits for wave k-1's end
+ * milestone (`barrier`): Mermaid's `after a b` starts at the latest of them,
+ * and a lane leader's start date gives way to the barrier, which is never
+ * earlier.
  */
-function startTokenFor(after: readonly string[], chain: Chain, startDate: string): string {
-    if (after.length > 0) return `after ${after.join(' ')}`;
-    if (chain.prevId) return `after ${chain.prevId}`;
-    return startDate;
+function startTokenFor(
+    after: readonly string[],
+    chain: Chain,
+    startDate: string,
+    barrier?: string,
+): string {
+    let deps: string[];
+    if (after.length > 0) deps = [...after];
+    else if (chain.prevId) deps = [chain.prevId];
+    else if (barrier) deps = [];
+    else return startDate;
+    if (barrier && !deps.includes(barrier)) deps.push(barrier);
+    return `after ${deps.join(' ')}`;
+}
+
+/** The previous wave's id for a member of wave k >= 2; undefined otherwise. */
+function previousWaveOf(item: ItemDeclaration, waves: WaveCtx | undefined): string | undefined {
+    if (!waves) return undefined;
+    const k = waves.plan.memberWave(item);
+    return k !== undefined && k >= 2 ? waves.ids[k - 2] : undefined;
 }
 
 /**
@@ -390,6 +473,7 @@ function formatDrops(drops: DropCounts): string | null {
         'nestedSwimlanes',
         'description',
         'style',
+        'waveFloor',
     ];
     const parts = order
         .filter((key) => drops[key] > 0)
@@ -403,5 +487,6 @@ function formatDrops(drops: DropCounts): string | null {
 
 function formatDropKey(key: keyof DropCounts): string {
     if (key === 'nestedSwimlanes') return 'nested-swimlanes';
+    if (key === 'waveFloor') return 'wave-floor';
     return key;
 }

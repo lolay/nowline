@@ -34,7 +34,10 @@ import type {
     SwimlaneContent,
     SwimlaneDeclaration,
     TeamDeclaration,
+    WaveDeclaration,
+    WavePlan,
 } from '@nowline/core';
+import { buildWavePlan } from '@nowline/core';
 import type { ExportInputs } from '@nowline/export-core';
 import { displayLabel, getProp, getProps, roadmapTitle } from '@nowline/export-core';
 import { type RoadmapSchedule, scheduleRoadmap } from '@nowline/layout';
@@ -66,9 +69,12 @@ export async function exportXlsx(
     wb.title = roadmapTitle(inputs.ast.roadmapDecl ?? undefined);
 
     const schedule = scheduleRoadmap(inputs.ast, inputs.resolved, { today: inputs.today });
+    // Undefined when the roadmap declares no waves: the Wave column and the
+    // Waves sheet are then omitted (specs/waves.md §10).
+    const wavePlan = buildWavePlan(inputs.resolved);
 
     buildRoadmapSheet(wb, inputs, generated);
-    buildItemsSheet(wb, inputs.ast, schedule);
+    buildItemsSheet(wb, inputs.ast, schedule, wavePlan);
 
     const hasMilestones = inputs.ast.roadmapEntries.some((e) => e.$type === 'MilestoneDeclaration');
     if (hasMilestones) {
@@ -85,6 +91,11 @@ export async function exportXlsx(
     );
     if (hasPeopleOrTeams) {
         buildPeopleAndTeamsSheet(wb, inputs.ast);
+    }
+
+    // Always last, so the indices of the existing sheets never change.
+    if (wavePlan) {
+        buildWavesSheet(wb, wavePlan, schedule);
     }
 
     const buf = (await wb.xlsx.writeBuffer()) as ArrayBuffer | Buffer;
@@ -148,6 +159,21 @@ const ITEM_HEADERS: ReadonlyArray<{ header: string; key: string; width: number }
     { header: 'Description', key: 'description', width: 36 },
 ];
 
+/** The Items sheet's `Wave` column, inserted after `Parallel` only when waves exist. */
+const WAVE_HEADER = { header: 'Wave', key: 'wave', width: 16 } as const;
+
+/** The item columns: `ITEM_HEADERS`, plus `Wave` after `Parallel` when the roadmap has waves. */
+function itemHeaders(
+    plan: WavePlan | undefined,
+): Array<{ header: string; key: string; width: number }> {
+    const headers = [...ITEM_HEADERS];
+    if (plan) {
+        const at = headers.findIndex((h) => h.key === 'parallel') + 1;
+        headers.splice(at, 0, { ...WAVE_HEADER });
+    }
+    return headers;
+}
+
 const STATUS_FILLS: Readonly<Record<string, string>> = {
     done: 'FFC8E6C9', // green
     'in-progress': 'FFBBDEFB', // blue
@@ -157,11 +183,15 @@ const STATUS_FILLS: Readonly<Record<string, string>> = {
 };
 
 interface ItemRow {
+    /** The source item; not a column (stripped before the row is added). */
+    node: ItemDeclaration;
     id: string;
     title: string;
     swimlane: string;
     group: string;
     parallel: string;
+    /** The effective wave id; present only when the roadmap has waves. */
+    wave?: string;
     duration: number;
     durationText: string;
     start: Date | undefined;
@@ -176,11 +206,17 @@ interface ItemRow {
     description: string;
 }
 
-function buildItemsSheet(wb: ExcelJS.Workbook, ast: NowlineFile, schedule: RoadmapSchedule): void {
+function buildItemsSheet(
+    wb: ExcelJS.Workbook,
+    ast: NowlineFile,
+    schedule: RoadmapSchedule,
+    plan: WavePlan | undefined,
+): void {
     const sheet = wb.addWorksheet('Items', {
         views: [{ state: 'frozen', xSplit: 0, ySplit: 1 }],
     });
-    sheet.columns = [...ITEM_HEADERS];
+    const headers = itemHeaders(plan);
+    sheet.columns = headers;
 
     // Format the Start/End date columns as ISO dates.
     const startCol = sheet.getColumn('start');
@@ -201,7 +237,10 @@ function buildItemsSheet(wb: ExcelJS.Workbook, ast: NowlineFile, schedule: Roadm
             );
         }
     }
-    for (const r of rows) sheet.addRow(r);
+    if (plan) {
+        for (const r of rows) r.wave = waveIdOf(r.node, plan);
+    }
+    for (const { node: _node, ...r } of rows) sheet.addRow(r);
 
     // Status conditional formatting via per-row fill; ExcelJS ConditionalFormat
     // is supported but the per-row fill is simpler and equally deterministic.
@@ -221,7 +260,7 @@ function buildItemsSheet(wb: ExcelJS.Workbook, ast: NowlineFile, schedule: Roadm
     sheet.getRow(1).font = { bold: true };
     sheet.autoFilter = {
         from: { row: 1, column: 1 },
-        to: { row: Math.max(rows.length + 1, 1), column: ITEM_HEADERS.length },
+        to: { row: Math.max(rows.length + 1, 1), column: headers.length },
     };
 }
 
@@ -321,6 +360,7 @@ function itemRow(
     const scheduled =
         schedule.byNode.get(item) ?? (item.name ? schedule.items.get(item.name) : undefined);
     return {
+        node: item,
         id: item.name ?? '',
         title: item.title ?? '',
         swimlane,
@@ -339,6 +379,12 @@ function itemRow(
         link: getProp(item, 'link') ?? '',
         description: item.description?.text ?? '',
     };
+}
+
+/** The item's effective wave id (specs/waves.md §4.4); blank for background work. */
+function waveIdOf(item: ItemDeclaration, plan: WavePlan): string {
+    const k = plan.memberWave(item);
+    return k === undefined ? '' : (plan.waves[k - 1]?.name ?? '');
 }
 
 // ---------- Sheet 3: Milestones ----------
@@ -454,4 +500,42 @@ function walkTeam(team: TeamDeclaration, parent: string, sheet: ExcelJS.Workshee
             walkTeam(child as TeamDeclaration, team.name ?? '', sheet);
         }
     }
+}
+
+// ---------- Sheet 6: Waves ----------
+
+function buildWavesSheet(wb: ExcelJS.Workbook, plan: WavePlan, schedule: RoadmapSchedule): void {
+    const sheet = wb.addWorksheet('Waves', {
+        views: [{ state: 'frozen', xSplit: 0, ySplit: 1 }],
+    });
+    sheet.columns = [
+        { header: 'ID', key: 'id', width: 18 },
+        { header: 'Title', key: 'title', width: 28 },
+        { header: 'Order', key: 'order', width: 8 },
+        { header: 'Start', key: 'start', width: 14 },
+        { header: 'End (exclusive)', key: 'end', width: 16 },
+        { header: 'Items', key: 'items', width: 8 },
+        { header: 'Held by', key: 'heldBy', width: 18 },
+        { header: 'After', key: 'after', width: 24 },
+        { header: 'Description', key: 'description', width: 36 },
+    ];
+    sheet.getColumn('start').numFmt = 'yyyy-mm-dd';
+    sheet.getColumn('end').numFmt = 'yyyy-mm-dd';
+
+    plan.waves.forEach((w: WaveDeclaration, i) => {
+        const id = w.name ?? '';
+        const scheduled = schedule.waves?.get(id);
+        sheet.addRow({
+            id,
+            title: displayLabel(w),
+            order: i + 1,
+            start: scheduled?.start ?? '',
+            end: scheduled?.end ?? '',
+            items: scheduled?.memberCount ?? 0,
+            heldBy: scheduled?.heldBy ?? '',
+            after: getProps(w, 'after').join('; '),
+            description: w.description?.text ?? '',
+        });
+    });
+    sheet.getRow(1).font = { bold: true };
 }

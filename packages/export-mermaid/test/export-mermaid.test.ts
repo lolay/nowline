@@ -1,3 +1,6 @@
+import { readFileSync } from 'node:fs';
+import { fileURLToPath } from 'node:url';
+import { scheduleRoadmap } from '@nowline/layout';
 import { describe, expect, it } from 'vitest';
 import { exportMermaid } from '../src/index.js';
 import { buildExportInputs, LOSSY_FIXTURE, SIMPLE_FIXTURE } from './helpers.js';
@@ -190,5 +193,180 @@ swimlane lane "Lane"
         expect(taskLine).toContain('Technology Selection');
         // A raw newline would split the gantt task over two lines.
         expect(md).not.toMatch(/^\s*Selection/m);
+    });
+});
+
+describe('exportMermaid — waves', () => {
+    const SAMPLE = readFileSync(
+        fileURLToPath(
+            new URL('../../../specs/waves/samples/checkout-relaunch.nowline', import.meta.url),
+        ),
+        'utf8',
+    );
+
+    // specs/waves.md Example 11: a start floor on `execute`.
+    const FLOOR_FIXTURE = `nowline v1
+
+roadmap budget-floor "Budget-held rollout" start:2026-01-05 scale:1w calendar:full
+
+anchor fy-budget "FY budget release" date:2026-02-02
+
+wave plan "Plan"
+wave execute "Execute" after:fy-budget
+
+swimlane a
+  item a1 duration:2w wave:plan
+  item a2 duration:5w wave:execute
+swimlane b
+  item b1 duration:3w wave:plan
+  item b2 duration:7w wave:execute
+
+milestone exec-done "Execute complete" date:2026-03-16 after:execute
+`;
+
+    function lineFor(md: string, id: string): string {
+        const line = md.split('\n').find((l) => new RegExp(`:[^,]*,? ?${id},`).test(l));
+        expect(line, `task ${id}`).toBeDefined();
+        return line!;
+    }
+
+    it('emits section Waves after the anchors and before the lanes, dated E_k', async () => {
+        const inputs = await buildExportInputs(SAMPLE);
+        const md = exportMermaid(inputs);
+        const lines = md.split('\n');
+        const waves = lines.indexOf('    section Waves');
+        expect(waves).toBeGreaterThan(0);
+        expect(lines.slice(waves + 1, waves + 4)).toEqual([
+            '    Foundations (wave end) :milestone, foundations, 2026-02-16, 0d',
+            '    Build (wave end) :milestone, build, 2026-04-13, 0d',
+            '    Launch (wave end) :milestone, launch, 2026-05-11, 0d',
+        ]);
+        expect(lines[waves + 4]).toBe('    section platform');
+        // The dates are engine C's exclusive wave ends.
+        const schedule = scheduleRoadmap(inputs.ast, inputs.resolved, {});
+        for (const [id, w] of schedule.waves!) {
+            expect(md).toContain(`, ${id}, ${w.end.toISOString().slice(0, 10)}, 0d`);
+        }
+    });
+
+    it('places section Waves after section Anchors', async () => {
+        const inputs = await buildExportInputs(FLOOR_FIXTURE);
+        const lines = exportMermaid(inputs).split('\n');
+        const anchors = lines.indexOf('    section Anchors');
+        const waves = lines.indexOf('    section Waves');
+        expect(anchors).toBeGreaterThan(0);
+        expect(waves).toBe(anchors + 2);
+        expect(lines[waves + 3]).toBe('    section a');
+    });
+
+    it('makes members of wave k >= 2 wait for wave k-1, and leaves others alone', async () => {
+        const md = exportMermaid(await buildExportInputs(SAMPLE));
+        expect(lineFor(md, 'auth')).toContain(', auth, 2026-01-05, 4w');
+        expect(lineFor(md, 'payments-api')).toContain('after auth foundations');
+        expect(lineFor(md, 'rate-limits')).toContain('after payments-api build');
+        // Inherited from the group's wave:build.
+        expect(lineFor(md, 'checkout-v2')).toContain('after ux-research foundations');
+        expect(lineFor(md, 'a11y')).toContain('after checkout-v2 foundations');
+        expect(lineFor(md, 'launch-page')).toContain('after a11y build');
+        // Background work gets no barrier.
+        expect(lineFor(md, 'on-call')).toContain(':on-call, 2026-01-05, 18w');
+        // after:<wave> maps onto the wave-end milestone id.
+        expect(md).toContain('Beta :milestone, beta, after build, 0d');
+        expect(md).toContain('GA :milestone, ga, after launch, 0d');
+    });
+
+    it('replaces a lane leader start date with the barrier', async () => {
+        const md = exportMermaid(await buildExportInputs(FLOOR_FIXTURE));
+        expect(lineFor(md, 'a2')).toContain('after a1 plan');
+        const leader = exportMermaid(
+            await buildExportInputs(`nowline v1
+roadmap r "R" start:2026-01-05
+wave one "One"
+wave two "Two"
+swimlane x
+  item x1 duration:1w wave:one
+swimlane y
+  item y1 duration:1w wave:two
+`),
+        );
+        expect(lineFor(leader, 'y1')).toContain(':y1, after one, 1w');
+    });
+
+    it('only references ids defined earlier in the output', async () => {
+        for (const src of [SAMPLE, FLOOR_FIXTURE]) {
+            const md = exportMermaid(await buildExportInputs(src));
+            const defined = new Set<string>();
+            for (const line of md.split('\n')) {
+                const colon = line.indexOf(' :');
+                if (!line.startsWith('    ') || colon < 0) continue;
+                const fields = line
+                    .slice(colon + 2)
+                    .split(',')
+                    .map((f) => f.trim());
+                const startField = fields.find((f) => f.startsWith('after '));
+                if (startField) {
+                    for (const ref of startField.slice('after '.length).split(/\s+/)) {
+                        expect(defined.has(ref), `${ref} in "${line.trim()}"`).toBe(true);
+                    }
+                }
+                const id = fields.length >= 3 ? fields[fields.length - 3] : undefined;
+                if (id) defined.add(id);
+            }
+            expect(defined.size).toBeGreaterThan(0);
+        }
+    });
+
+    it('drops and counts wave start floors', async () => {
+        const md = exportMermaid(await buildExportInputs(FLOOR_FIXTURE));
+        expect(md).toContain('    Execute (wave end) :milestone, execute, 2026-03-23, 0d');
+        expect(md).toContain('    Plan (wave end) :milestone, plan, 2026-01-26, 0d');
+        const summary = md.split('\n').find((l) => l.startsWith('%%') && l.includes('('));
+        expect(summary).toContain('wave-floor (1)');
+        // The floor itself leaves no trace in the gantt block.
+        expect(lineFor(md, 'a2')).not.toContain('fy-budget');
+    });
+
+    // `parallel wave:build` with two tracks, one a group holding two items.
+    const PARALLEL_FIXTURE = `nowline v1
+
+roadmap par "Parallel waves" start:2026-01-05
+
+wave plan "Plan"
+wave build "Build"
+
+swimlane eng "Eng"
+  item spec duration:1w wave:plan
+  parallel tracks wave:build
+    item api duration:2w
+    group ui-track "UI track"
+      item ui duration:1w
+      item polish duration:1w
+  item ship duration:1w
+
+swimlane web "Web"
+  parallel web-tracks wave:build
+    item web-a duration:1w
+    item web-b duration:1w
+`;
+
+    it('gives every track of a parallel wave:build the previous-wave token', async () => {
+        const md = exportMermaid(await buildExportInputs(PARALLEL_FIXTURE));
+        expect(lineFor(md, 'spec')).toContain(':spec, 2026-01-05, 1w');
+        // Both tracks anchor at the block entry, plus the barrier.
+        expect(lineFor(md, 'api')).toContain(':api, after spec plan, 2w');
+        expect(lineFor(md, 'ui')).toContain(':ui, after spec plan, 1w');
+        // An item inside a track inherits the wave too.
+        expect(lineFor(md, 'polish')).toContain(':polish, after ui plan, 1w');
+        // Leaders of a lane-opening parallel replace the start date.
+        expect(lineFor(md, 'web-a')).toContain(':web-a, after plan, 1w');
+        expect(lineFor(md, 'web-b')).toContain(':web-b, after plan, 1w');
+        // Background work after the block gets no barrier.
+        expect(lineFor(md, 'ship')).toContain(':ship, after polish, 1w');
+    });
+
+    it('emits no wave output and no wave-floor kind without waves', async () => {
+        const md = exportMermaid(await buildExportInputs(LOSSY_FIXTURE));
+        expect(md).not.toContain('section Waves');
+        expect(md).not.toContain('wave-floor');
     });
 });
