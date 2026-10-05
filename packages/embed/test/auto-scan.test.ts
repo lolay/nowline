@@ -37,17 +37,44 @@ describe('auto-scan', () => {
         // `<style>` rule scoped to id `nl-r1-0-x` in one SVG would
         // target the other and the embed would have a silent
         // cross-block bleed bug.
-        //
-        // The arrow `<defs>` (`nl-arrow`, `nl-arrow-dark`, `nl-arrow-light`)
-        // are global — every SVG ships the same shared marker set — so
-        // we filter them out and look only at prefix-scoped ids.
-        const sharedDefs = new Set(['nl-arrow', 'nl-arrow-dark', 'nl-arrow-light']);
-        const prefixedA = collectIds(svgs[0]).filter((id) => !sharedDefs.has(id));
-        const prefixedB = collectIds(svgs[1]).filter((id) => !sharedDefs.has(id));
-        expect(prefixedA.length).toBeGreaterThan(0);
-        expect(prefixedB.length).toBeGreaterThan(0);
-        const overlap = prefixedA.filter((id) => prefixedB.includes(id));
-        expect(overlap, 'expected zero shared per-render ids between the two SVGs').toEqual([]);
+        const idsA = collectIds(svgs[0]);
+        const idsB = collectIds(svgs[1]);
+        expect(idsA.length).toBeGreaterThan(0);
+        expect(idsB.length).toBeGreaterThan(0);
+        const overlap = idsA.filter((id) => idsB.includes(id));
+        expect(overlap, 'expected zero shared ids between the two SVGs').toEqual([]);
+    });
+
+    it('scopes arrowhead <marker> ids per block so themes cannot bleed', async () => {
+        // In one HTML document `url(#id)` resolves to the FIRST element
+        // with that id. If every SVG shipped a global `nl-arrow` marker,
+        // a dark-theme block below a light-theme block would paint the
+        // light block's arrowheads.
+        document.body.innerHTML = `
+            <pre><code class="language-nowline">${ROADMAP_ALPHA}</code></pre>
+            <pre><code class="language-nowline">${ROADMAP_BETA}</code></pre>
+        `;
+        const result = await init();
+        expect(result.rendered).toBe(2);
+
+        const svgs = Array.from(document.querySelectorAll('svg'));
+        const markerIds = svgs.map((svg) =>
+            Array.from(svg.querySelectorAll('marker')).map((m) => m.id),
+        );
+        for (const ids of markerIds) {
+            expect(ids.length).toBeGreaterThan(0);
+            expect(ids.filter((id) => /^nl-arrow/.test(id))).toEqual([]);
+        }
+        const shared = markerIds[0].filter((id) => markerIds[1].includes(id));
+        expect(shared, 'expected zero shared <marker> ids between the two SVGs').toEqual([]);
+
+        // Every `marker-end` reference must resolve inside its own SVG.
+        for (const [i, svg] of svgs.entries()) {
+            for (const el of Array.from(svg.querySelectorAll('[marker-end]'))) {
+                const ref = /^url\(#(.+)\)$/.exec(el.getAttribute('marker-end') ?? '')?.[1];
+                expect(markerIds[i]).toContain(ref);
+            }
+        }
     });
 
     it('skips elements that do not match the configured selector', async () => {
