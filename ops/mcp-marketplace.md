@@ -130,7 +130,9 @@ When a non-MCP publish cell failed but the release is otherwise green:
 2. Enter the semver version (e.g. `0.6.0`).
 3. Confirm the run: npm live check → `.mcpb` attach → registry publish → tracking issue.
 
-The reusable workflow downloads `nowline.mcpb` from the build artifact when present, otherwise from the GitHub Release asset, otherwise rebuilds via `make pack-mcpb`.
+Dispatching from `main` is fine for any version: the reusable workflow checks out the `v<version>` tag, so the registry entry is stamped from that release's `packages/mcp/package.json`, not main's.
+
+The reusable workflow downloads `nowline.mcpb` from the build artifact when present, otherwise from the GitHub Release asset. There is no rebuild fallback: if both are missing, re-run the `pack-mcp-mcpb` cell of the tag's `Release` run first.
 
 ## Related docs
 

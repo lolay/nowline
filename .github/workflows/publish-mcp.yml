@@ -2,7 +2,9 @@ name: Publish MCP
 
 # Reusable MCP marketplace publish workflow. Called by release.yml after the
 # main publish matrix is green (Option B) and by publish-mcp-standalone.yml for
-# maintainer re-runs (Option C). Ordering is intentional:
+# maintainer re-runs (Option C). The job checks out refs/tags/v<version>
+# whatever the caller's ref, so a re-run from main publishes the tag's
+# metadata. Ordering is intentional:
 #   1. verify npm @nowline/mcp@version is live (registry checks npm ownership)
 #   2. attach nowline.mcpb to the GitHub Release
 #   3. MCP registry publish (remote pointer — last)
@@ -27,15 +29,16 @@ jobs:
     name: Publish MCP marketplace
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v7
-
+      # Runs before checkout so the tag ref is known; GH_REPO stands in for
+      # the git remote `gh` would otherwise read from the working tree.
       - id: meta
         env:
           GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+          VERSION_INPUT: ${{ inputs.version }}
         run: |
           set -euo pipefail
-          version="${{ inputs.version }}"
-          version="${version#v}"
+          version="${VERSION_INPUT#v}"
           test -n "$version"
           echo "version=${version}" >> "$GITHUB_OUTPUT"
           # Resolve the run that built this tag's artifacts. When called from
@@ -47,6 +50,25 @@ jobs:
             --branch "v${version}" --json databaseId,status \
             --jq '[.[] | select(.status=="completed")][0].databaseId // empty')"
           echo "artifact_run_id=${run_id:-${GITHUB_RUN_ID}}" >> "$GITHUB_OUTPUT"
+
+      # Pin the job to the released tree, not the caller's ref. A
+      # publish-mcp-standalone.yml dispatch from main for an older version
+      # would otherwise stamp server.json (via make publish-mcp-registry ->
+      # sync-mcp-metadata.mjs) with main's packages/mcp/package.json version.
+      - uses: actions/checkout@v7
+        with:
+          ref: refs/tags/v${{ steps.meta.outputs.version }}
+
+      - name: Verify checkout matches requested version
+        env:
+          VERSION: ${{ steps.meta.outputs.version }}
+        run: |
+          set -euo pipefail
+          pkg_version="$(jq -r .version packages/mcp/package.json)"
+          if [ "${pkg_version}" != "${VERSION}" ]; then
+            echo "packages/mcp/package.json at v${VERSION} is ${pkg_version}, expected ${VERSION}" >&2
+            exit 1
+          fi
 
       - name: Verify npm @nowline/mcp@version is live
         env:
