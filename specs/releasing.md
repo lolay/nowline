@@ -48,9 +48,9 @@ There are two ways to trigger a release; the dispatch UI is the default.
 This kicks off the `cut-release` job, which:
 
 1. Checks out `main` using `RELEASE_TAG_PAT` (a user-scoped PAT — `GITHUB_TOKEN`-pushed tags do not trigger downstream workflows, which would defeat the whole point).
-2. Runs `node .github/scripts/bump-version.mjs <level>` to rewrite every `packages/*/package.json` to the next SemVer.
+2. Runs `node .github/scripts/bump-version.mjs <level>` to rewrite every `packages/*/package.json` to the next SemVer, and to sync that version into the tracked MCP metadata (`packages/mcp/manifest.json` for the `.mcpb`, `packages/mcp/server.json` for the MCP registry) via `scripts/sync-mcp-metadata.mjs`.
 3. Runs `node .github/scripts/release-changelog.mjs <version>` to promote every entry under `## [Unreleased]` in `CHANGELOG.md` and `packages/vscode-extension/CHANGELOG.md` into a new `## [X.Y.Z] - YYYY-MM-DD` section, leaving an empty `## [Unreleased]` skeleton in place.
-4. Commits the bump and changelog promotion as `release vX.Y.Z`.
+4. Commits the bump (package manifests plus the two MCP metadata files) and changelog promotion as `release vX.Y.Z`.
 5. Tags `vX.Y.Z`.
 6. Pushes both the commit and the tag to `main`.
 
@@ -61,7 +61,7 @@ The tag push then re-triggers `release.yml` under `event_name == 'push'`, which 
 If the dispatch flow is unusable (e.g. PAT expired), you can do the same thing locally:
 
 ```bash
-node .github/scripts/bump-version.mjs patch     # or minor / major; prints new version
+node .github/scripts/bump-version.mjs patch     # or minor / major; prints new version, syncs MCP metadata
 node .github/scripts/release-changelog.mjs X.Y.Z  # or: make release-changelog VERSION=X.Y.Z
 git commit -am "release vX.Y.Z"
 git tag vX.Y.Z
@@ -135,7 +135,7 @@ Binary cells use `bun compile` and run the same per-format smoke test (SVG, PNG,
 
 `pack-action` stages the Marketplace action mirror bundle for `lolay/nowline-action`.
 
-`pack-mcp-mcpb` runs `make pack-mcpb`, producing `dist-mcpb/nowline.mcpb` for Claude Desktop Extensions. Marketplace distribution (registry publish, `.mcpb` attach, manual submission tracking) is handled by the separate `publish-mcp` job — see [§ MCP publishing artifacts](#mcp-publishing-artifacts) and [`ops/mcp-marketplace.md`](../ops/mcp-marketplace.md).
+`pack-mcp-mcpb` runs `make pack-mcpb`, producing `dist-mcpb/nowline.mcpb` for Claude Desktop Extensions. The target never rewrites tracked files: it runs `scripts/sync-mcp-metadata.mjs --check` and fails if `packages/mcp/manifest.json` or `server.json` lags `packages/mcp/package.json`, since the release commit is what keeps them in sync. Marketplace distribution (registry publish, `.mcpb` attach, manual submission tracking) is handled by the separate `publish-mcp` job — see [§ MCP publishing artifacts](#mcp-publishing-artifacts) and [`ops/mcp-marketplace.md`](../ops/mcp-marketplace.md).
 
 > **Option B — version-from-tag (future direction).** Today the `cut-release` commit bumps `packages/*/package.json#version`, which is what stamps the binary's `--version`, the embed banner, the .deb control file, the .vsix manifest, and each `pnpm pack` tarball. A future refactor could keep `package.json` at `0.0.0-development` permanently and inject version from the tag at build time, enabling true cache-by-SHA across CI and release — PRs would build the exact same artifacts as the release without any version-bump commit in the way. Out of scope for v0.4.0; revisit after estate cleanups.
 
