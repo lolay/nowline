@@ -11,6 +11,9 @@
 //     reference; all packages are kept lock-step).
 //   - Computes the new version per SemVer.
 //   - Rewrites every packages/<pkg>/package.json with the new version.
+//   - Syncs the new version into packages/mcp/manifest.json and
+//     packages/mcp/server.json (scripts/sync-mcp-metadata.mjs) so the
+//     release commit carries them and they never lag package.json.
 //   - Prints the new version (without `v` prefix) to stdout so the
 //     calling shell can capture it (e.g. `NEW=$(node ...)`).
 //   - Anything else (warnings, etc.) goes to stderr.
@@ -19,6 +22,7 @@
 // at publish time, so we deliberately do NOT rewrite dependency
 // versions. Only the top-level `version` field is touched.
 
+import { execFileSync } from 'node:child_process';
 import { readdirSync, readFileSync, statSync, writeFileSync } from 'node:fs';
 import { dirname, join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -101,6 +105,12 @@ function main() {
         rewriteVersion(path, newVersion);
         process.stderr.write(`bumped ${path} ${currentVersion} -> ${newVersion}\n`);
     }
+
+    // The sync script logs to stdout; route it to stderr so stdout stays the
+    // bare version the caller captures.
+    execFileSync(process.execPath, [join(repoRoot, 'scripts/sync-mcp-metadata.mjs'), newVersion], {
+        stdio: ['ignore', 2, 2],
+    });
 
     process.stdout.write(`${newVersion}\n`);
 }
