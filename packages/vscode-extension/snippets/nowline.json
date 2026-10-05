@@ -18,6 +18,16 @@
         ],
         "description": "Roadmap item"
     },
+    "Item in a wave": {
+        "prefix": "item-wave",
+        "body": ["item ${1:item-id} \"${2:Item title}\" duration:${3:2w} wave:${4:wave-id}$0"],
+        "description": "Roadmap item assigned to a wave"
+    },
+    "Wave": {
+        "prefix": "wave",
+        "body": ["wave ${1:id} \"${2:Title}\"$0"],
+        "description": "Wave declaration (a barrier across every swimlane)"
+    },
     "Item with after / owner / labels": {
         "prefix": "item-full",
         "body": [

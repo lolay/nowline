@@ -3,7 +3,7 @@
 .\" lorsqu'elles existent. Voir specs/localization.md.
 .\"
 .\" Les mots-clés du DSL (nowline, config, roadmap, swimlane, item, parallel,
-.\" group, person, team, anchor, label, size, status, milestone, footnote,
+.\" group, person, team, anchor, label, size, status, wave, milestone, footnote,
 .\" include, style, symbol, default, scale, calendar) ainsi que les noms de
 .\" propriétés (size:, duration:, after:, before:, on:, owner:, capacity:,
 .\" labels:, link:, style:, status:, etc.) et les valeurs intégrées
@@ -65,7 +65,7 @@ Section
 .Sy roadmap
 (obligatoire).
 Contenu\ : personnes, équipes, ancres, étiquettes, tailles, statuts,
-couloirs, éléments, jalons, notes de bas de page.
+vagues, couloirs, éléments, jalons, notes de bas de page.
 .El
 .Pp
 .Sy config
@@ -195,8 +195,8 @@ du fichier inclus.
 La déclaration
 .Sy roadmap
 du fichier inclus, plus tout son contenu (personnes, équipes,
-ancres, étiquettes, tailles, statuts, couloirs, éléments, jalons,
-notes de bas de page).
+ancres, étiquettes, tailles, statuts, vagues, couloirs, éléments,
+jalons, notes de bas de page).
 .El
 .Pp
 Modes
@@ -297,6 +297,40 @@ de fusion
 parce que
 .Sy start:
 définit la base temporelle commune.
+.Pp
+Les vagues ne fusionnent jamais.
+Pour toute inclusion dont le mode
+.Sy roadmap:
+n'est pas
+.Sy ignore ,
+si le fichier enfant déclare un
+.Sy roadmap ,
+possède des couloirs ou déclare des vagues, le parent et l'enfant
+doivent déclarer les mêmes vagues\ : les mêmes identifiants, dans le
+même ordre, avec les mêmes bornes de départ résolues.
+Les bornes sont comparées par la date qu'elles résolvent, de sorte
+que
+.Sy after:fy-budget
+et
+.Sy after:2026-02-02
+concordent lorsque l'ancre tombe à cette date.
+Une discordance, dans un sens comme dans l'autre, est l'erreur
+.Sy NL.E0202 ,
+signalée sur la ligne
+.Sy include
+du parent\ ; deux fichiers sans vagues passent.
+Les vagues sont des barrières sur tout le canevas\ : une liste de
+vagues masquée en silence déplacerait les colonnes de chaque couloir.
+Lorsque identifiants, ordre et bornes concordent, un titre,
+.Sy style: ,
+.Sy labels: ,
+.Sy link:
+ou une description différents donnent l'avertissement
+.Sy NL.W0701
+et la définition du parent est utilisée.
+Un enfant limité au vocabulaire (personnes, équipes, étiquettes,
+tailles, statuts, ancres\ ; ni roadmap, ni couloirs, ni vagues) ne
+participe pas.
 .Sh SECTION CONFIG
 Le marqueur de section facultatif
 .Sy config
@@ -410,6 +444,14 @@ Interdites, par type d'entité\ :
 .Sy date , link , description .
 .It Sy default footnote
 .Sy on , link , description .
+.It Sy chaque ligne default
+.Sy wave
+\(em le séquencement crée des dépendances invisibles, et il n'existe
+pas de
+.Sy default wave .
+C'est une erreur dans une roadmap avec vagues\ ; dans une roadmap
+sans vagues, la clé est ignorée avec l'avertissement
+.Sy NL.W0702 .
 .El
 .Pp
 Les propriétés de style brutes
@@ -603,9 +645,9 @@ Préréglage de taille
 par défaut.
 .El
 .Pp
-Douze mots-clés de la section roadmap\ :
+Treize mots-clés de la section roadmap\ :
 .Sy swimlane , item , parallel , group ,
-.Sy person , team , anchor , label , size , status , milestone ,
+.Sy person , team , anchor , label , size , status , wave , milestone ,
 .Sy footnote .
 Chacun suit le modèle universel
 .Sy [id] ["titre"] [clé:valeur...] .
@@ -825,6 +867,127 @@ au niveau de l'entité.
 Les déclarations
 .Sy status
 doivent précéder toute entité qui les référence.
+.Ss wave \(em barrière à travers tous les couloirs
+.Bd -literal -offset indent
+wave id ["titre"] [after:ancre|jalon|date] \e
+    [style:...] [labels:...] [link:...]
+.Ed
+.Pp
+Une
+.Sy wave
+(vague) est une barrière séquentielle stricte qui traverse tous les
+couloirs\ :
+.Em aucun élément de la vague k+1 ne démarre avant que
+.Em tous les éléments de la vague k soient terminés .
+Une vague s'ouvre pour chaque couloir à l'instant où le membre le
+plus lent de la vague précédente se termine\ ; les couloirs qui
+finissent plus tôt attendent à la frontière.
+Les vagues sont déclarées une seule fois, dans l'ordre, dans la
+section roadmap, et l'ordre de déclaration est l'ordre dans le
+temps.
+Le travail rejoint une vague avec la propriété
+.Sy wave:
+sur un
+.Sy item ,
+un
+.Sy group
+ou un
+.Sy parallel .
+.Bd -literal -offset indent
+wave discover "Discover"
+wave build "Build"
+wave launch "Launch" after:fy-budget
+
+swimlane web "Web"
+  item research "UX research" duration:2w wave:discover
+  group wave:build
+    item checkout "Checkout v2" duration:3w
+    item a11y "Accessibility pass" duration:1w
+  item launch-page "Launch page" duration:1w wave:launch
+swimlane ops "Ops"
+  item on-call "On-call and KTLO" duration:10w
+
+milestone beta "Beta" after:build
+.Ed
+.Pp
+Une ligne
+.Sy wave
+accepte\ :
+.Bl -tag -width "style:"
+.It Sy id
+Obligatoire
+.Pq Sy NL.E1100 .
+Rejoint l'espace de noms d'identifiants unique et partagé.
+.It Sy titre
+Facultatif.
+L'étiquette de la bande\ ; à défaut, l'identifiant.
+.It Sy after:
+Borne de départ facultative.
+La vague ne peut pas s'ouvrir avant le plus tardif de ses éléments.
+Chaque élément doit être un identifiant d'ancre, l'identifiant d'un
+jalon qui possède
+.Sy date: ,
+ou une date ISO (au plus une date)\ ; tout autre type d'entité est
+.Sy NL.E1106 .
+Un écart entre la fin d'une vague et la borne de la suivante est
+permis.
+.It Sy style:
+Couleurs de la vague\ : le
+.Sy bg
+du style teinte la colonne de la vague,
+.Sy fg
+colore sa ligne de frontière,
+.Sy text
+son étiquette de bande et
+.Sy border
+fixe le tracé de la frontière.
+.It Sy labels: , link: , description
+Conservées dans le modèle, l'export JSON et XLSX et l'infobulle
+LSP\ ; non dessinées.
+.El
+.Pp
+Clés non autorisées sur une
+.Sy wave\ :
+.Sy before: , date: , start: , length: , duration: , size: ,
+.Sy capacity: , remaining: , wave:
+.Pq Sy NL.E1105 .
+L'étendue d'une vague provient de ses éléments.
+Pour donner une échéance à une vague, ajoutez un jalon daté
+.Sy after:<vague>\ ;
+il devient rouge lorsque la vague prend du retard.
+.Pp
+Les éléments sans vague effective sont du
+.Em travail de fond
+\(em astreinte, support, maintenance continue.
+Une barrière ne retient jamais le travail de fond et sa propre fin
+n'allonge jamais une vague, mais il suit toujours l'ordre du couloir
+et son propre
+.Sy after: .
+Le travail de fond est dessiné hachuré.
+.Pp
+Un identifiant de vague est une cible valide pour
+.Sy after: ,
+.Sy before:
+et
+.Sy on: .
+.Sy after:<vague>
+démarre au plus tôt à la fin de cette vague, et un
+.Sy milestone after:<vague>
+flottant se place sur la frontière de clôture de la vague.
+.Sy before:<vague>
+doit se terminer avant le début de la vague (souple, comme tout
+.Sy before: ) .
+.Sy on:<vague>
+rattache une note de bas de page à la vague.
+Les références à une vague ne tracent aucune flèche de dépendance.
+.Pp
+Une roadmap
+.Qq a des vagues
+lorsqu'elle déclare au moins une vague avec un identifiant valide.
+Dans une roadmap sans vagues, toute clé
+.Sy wave:
+est ignorée avec l'avertissement
+.Sy NL.W0702 .
 .Ss milestone \(em marqueur de réussite
 .Bd -literal -offset indent
 milestone v1-ga "v1 GA" date:2026-06-30
@@ -854,7 +1017,7 @@ footnote capacity-risk "Team capacity risk" on:[mobile, platform]
 .Pp
 .Sy on:
 est obligatoire et référence un ou plusieurs identifiants
-(élément, couloir, ancre, jalon, personne, équipe).
+(élément, couloir, ancre, jalon, vague, personne, équipe).
 Pour plusieurs cibles, utilisez la notation entre crochets\ :
 .Sy on:[id1, id2] .
 Les notes de bas de page sont numérotées séquentiellement par
@@ -918,8 +1081,8 @@ et la sous-directive
 .Sh PROPRIÉTÉS UNIVERSELLES
 Ces propriétés sont valides sur tous les types d'entités\ :
 éléments, couloirs, blocs parallèles, groupes, jalons, ancres,
-personnes, équipes, étiquettes, tailles, statuts, notes de bas de
-page.
+vagues, personnes, équipes, étiquettes, tailles, statuts, notes de
+bas de page.
 .Bl -tag -width "description"
 .It Sy labels:
 Liste.
@@ -968,6 +1131,9 @@ qui vivent toutes deux dans
 et
 .Sy before
 sont aussi valides sur les couloirs, blocs parallèles et groupes.
+.Sy wave
+est aussi valide sur les blocs parallèles et les groupes, mais pas
+sur les couloirs.
 Les autres sont réservées aux éléments.
 .Bl -tag -width "remaining"
 .It Sy status:
@@ -991,13 +1157,34 @@ Identifiant ou liste entre crochets.
 L'entité démarre après la fin de l'entité référencée.
 .Sy after:[a, b]
 démarre après le dernier des terminaux.
-Accepte des identifiants d'élément, jalon, ancre, parallel ou
-group.
+Accepte des identifiants d'élément, jalon, ancre, parallel, group
+ou vague.
 .It Sy before:
 Identifiant ou liste entre crochets.
 L'entité doit se terminer avant le début de l'entité référencée.
 .Sy before:[a, b]
 se termine avant le premier des démarrants.
+.It Sy wave:
+Identifiant de vague.
+Exactement une
+.Sy wave
+déclarée
+.Po Sy wave:build Pc Ns \ ;
+un élément appartient à une seule vague au plus.
+La vague effective d'un élément est sa propre valeur, sinon celle
+du
+.Sy group
+ou du
+.Sy parallel
+englobant le plus proche qui en porte une\ ; un couloir n'en
+transmet jamais.
+Un descendant peut répéter la valeur de son conteneur mais pas en
+changer
+.Pq Sy NL.E1102 .
+Un bloc sans
+.Sy wave:
+peut contenir des enfants de vagues différentes.
+Significative seulement dans une roadmap avec vagues.
 .It Sy size:
 Alias de taille.
 .Sy size:l
@@ -1341,8 +1528,8 @@ lettres, chiffres, tirets bas et tirets, commençant par une
 lettre ou un tiret bas.
 Ils doivent être uniques sur le résultat fusionné (le fichier et
 toutes ses inclusions)\ ; éléments, blocs parallèles, groupes,
-ancres, personnes, équipes, jalons et notes de bas de page
-partagent un seul espace de noms.
+ancres, vagues, personnes, équipes, jalons et notes de bas de
+page partagent un seul espace de noms.
 .Pp
 La forme idiomatique de Nowline utilise le kebab-case, mais
 .Sy authRefactor ,
@@ -1372,7 +1559,7 @@ et
 .Sy before:
 acceptent chacune un seul identifiant ou une liste entre crochets.
 Les références peuvent viser des éléments, jalons, ancres, blocs
-parallèles ou groupes.
+parallèles, groupes ou vagues.
 .Bl -bullet -offset indent -compact
 .It
 .Sy after:id
@@ -1393,6 +1580,17 @@ référencée (ou avant la date de l'ancre référencée).
 \(em se termine avant le début
 .Em du plus tôt
 des entités référencées.
+.It
+.Sy after:vague
+\(em démarre au plus tôt à la
+.Em fin
+de la vague.
+.Sy before:vague
+\(em doit se terminer avant le
+.Em début
+de la vague.
+.Sy on:vague
+\(em rattache une note de bas de page à la vague.
 .El
 .Pp
 Les dépendances cycliques à travers le graphe complet (y compris
@@ -1439,7 +1637,9 @@ par fichier (sous réserve du mode
 .Sy roadmap: ) .
 .It
 Tous les identifiants sont uniques sur le résultat fusionné.
-Le parent l'emporte en cas de collision, avec un avertissement.
+Le parent l'emporte en cas de collision, avec un avertissement
+(sauf les vagues\ ; voir
+.Sx INCLUSIONS ) .
 .It
 Toute entité doit avoir au moins un identifiant ou un titre (ou
 les deux).
@@ -1469,9 +1669,10 @@ première ligne fautive.
 .It
 Les déclarations
 .Sy label ,
-.Sy size
-et
+.Sy size ,
 .Sy status
+et
+.Sy wave
 doivent apparaître dans la section roadmap.
 Les placer avant
 .Sy roadmap
@@ -1489,12 +1690,14 @@ doivent résoudre vers des identifiants déclarés dans la portée
 fusionnée.
 .It
 Une référence
-.Sy size:
-ou
+.Sy size: ,
 .Sy status:
+ou
+.Sy wave:
 doit résoudre vers une déclaration apparaissant
 .Em plus tôt dans le fichier
-(ou dans une inclusion antérieure).
+(ou dans une inclusion antérieure\ ; les inclusions ne fournissent
+jamais de vagues).
 Les références anticipées sont une erreur.
 .It
 Pas de dépendances cycliques dans les chaînes
@@ -1691,7 +1894,105 @@ identiques.
 Une discordance est une erreur signalée sur la ligne
 .Sy include
 du parent.
+.It
+Pour toute inclusion dont le mode
+.Sy roadmap:
+n'est pas
+.Sy ignore ,
+un enfant participant (qui déclare une roadmap, des couloirs ou des
+vagues) doit déclarer les mêmes vagues, dans le même ordre, avec les
+mêmes bornes de départ résolues, que le parent
+.Pq Sy NL.E0202 .
+Un titre ou une autre présentation différents donnent
+l'avertissement
+.Sy NL.W0701 .
 .El
+.Ss Vagues
+Ces règles s'appliquent aux fichiers qui utilisent
+.Sy wave
+ou
+.Sy wave: .
+Chacune a un code de diagnostic stable.
+.Bl -tag -width "NL.E1100" -offset indent -compact
+.It Sy NL.E1100
+Une déclaration
+.Sy wave
+sans identifiant.
+.It Sy NL.E1101
+Une valeur
+.Sy wave:
+qui n'est pas exactement une vague déclarée plus tôt\ : liste de
+deux ou plus, identifiant non déclaré, référence anticipée ou
+identifiant d'un autre type.
+.It Sy NL.E1102
+Le
+.Sy wave:
+d'un descendant diffère de celui de son conteneur.
+.It Sy NL.E1103
+L'ordre des vagues ne peut pas être réalisé\ : du travail devrait
+démarrer à la fin de sa propre vague ou après, à cause de l'ordre du
+couloir, d'une jointure
+.Sy parallel
+ou d'un
+.Sy after:
+qui désigne la propre vague de l'élément, une vague
+ultérieure ou du travail d'une vague ultérieure
+(directement ou par une chaîne d'autres travaux).
+.It Sy NL.E1104
+.Sy wave:
+sur un couloir, un jalon ou toute entité autre qu'item, group ou
+parallel.
+.It Sy NL.E1105
+Une clé non autorisée sur une vague
+.Po
+.Sy before: , date: , start: , length: , duration: , size: ,
+.Sy capacity: , remaining: , wave:
+.Pc .
+.It Sy NL.E1106
+Le
+.Sy after:
+d'une vague désigne autre chose qu'une ancre, un jalon daté ou une
+date ISO unique.
+.It Sy NL.W1100
+Un
+.Sy before:
+que la structure des vagues rend impossible à respecter.
+.It Sy NL.W1101
+Un
+.Sy after:
+ou
+.Sy before:
+que la mise en page ignore dans une roadmap avec vagues\ : référence
+anticipée, référence au group ou parallel englobant, ou référence à
+un jalon flottant.
+.It Sy NL.W0702
+.Sy wave:
+(y compris sur une ligne
+.Sy default )
+dans une roadmap sans vagues\ ; la clé est ignorée.
+.El
+.Pp
+L'accord des inclusions relève de
+.Sy NL.E0202
+et
+.Sy NL.W0701
+(voir
+.Sx INCLUSIONS ) .
+La mise en page ajoute quatre constats\ :
+.Sy NL.W1001
+(une barrière a déplacé l'épingle
+.Sy date:
+ou
+.Sy start:
+d'un élément),
+.Sy NL.W1002
+(le solveur de barrières ne s'est pas stabilisé),
+.Sy NL.I1006
+(vagues sans éléments) et
+.Sy NL.I1007
+(une vague dépasse un jalon daté dont le
+.Sy after:
+la désigne).
 .Ss parallel et group
 .Bl -bullet -offset indent -compact
 .It
@@ -1735,6 +2036,13 @@ Une déclaration
 qui définit une propriété interdite
 .Pq voir Sx SECTION CONFIG
 est une erreur.
+.It
+.Sy wave
+est interdite sur toute ligne
+.Sy default <entité>\ :
+erreur lorsque la roadmap a des vagues, avertissement
+.Sy NL.W0702
+lorsqu'elle n'en a pas.
 .El
 .Ss Symboles
 .Bl -bullet -offset indent -compact
@@ -1845,6 +2153,38 @@ footnote "Vendor dependency" on:audit-log
   description "Blocked until vendor contract is signed."
 footnote capacity-risk "Team capacity risk" on:[mobile, platform]
   description "Mobile team is down to 2 engineers through Q2."
+.Ed
+.Pp
+Une roadmap compacte avec vagues\ :
+.Bd -literal -offset indent
+nowline v1
+
+roadmap checkout-relaunch "Checkout relaunch" \e
+    start:2026-01-05 scale:1w calendar:full
+
+wave foundations "Foundations"
+wave build "Build"
+wave launch "Launch"
+
+swimlane platform "Platform"
+  item auth "Auth service split" duration:4w wave:foundations
+  item payments-api "Payments API v2" duration:8w wave:build
+  item rate-limits "Rate limits" duration:2w wave:launch
+
+swimlane web "Web"
+  item ux-research "Checkout UX research" duration:2w \e
+    wave:foundations
+  group wave:build
+    item checkout-v2 "Checkout v2" duration:4w
+    item a11y "Accessibility pass" duration:2w
+  item launch-page "Launch page" duration:2w wave:launch
+
+// Sans wave : travail de fond, jamais retenu par une barrière.
+swimlane ops "Ops"
+  item on-call "On-call and KTLO" duration:18w
+
+milestone beta "Beta" after:build
+milestone ga "GA" after:launch
 .Ed
 .Sh VOIR AUSSI
 .Xr nowline 1

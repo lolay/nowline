@@ -48,6 +48,12 @@
         "keywords": {
             "patterns": [
                 {
+                    "match": "^\\s*(wave)(?![\\w-])(?=\\s)",
+                    "captures": {
+                        "1": { "name": "keyword.control.nowline" }
+                    }
+                },
+                {
                     "name": "keyword.control.nowline",
                     "match": "\\b(config|roadmap|include|person|team|anchor|swimlane|item|parallel|group|milestone|footnote|label|style|status|size|scale|calendar|default|description|symbol)\\b(?!\\s*:)"
                 }
@@ -56,7 +62,7 @@
         "properties": {
             "patterns": [
                 {
-                    "match": "\\b(status|owner|after|before|size|duration|remaining|labels|link|style|date|on|start|scale|calendar|effort|name|label-every|days-per-week|days-per-month|days-per-quarter|days-per-year|author|capacity|length|utilization-warn-at|utilization-over-at|logo-size|logo|unicode|ascii)\\s*(:)",
+                    "match": "\\b(status|owner|after|before|size|duration|remaining|labels|link|style|date|on|start|scale|calendar|effort|name|label-every|days-per-week|days-per-month|days-per-quarter|days-per-year|author|capacity|length|utilization-warn-at|utilization-over-at|logo-size|logo|unicode|ascii|wave)\\s*(:)",
                     "captures": {
                         "1": { "name": "entity.other.attribute-name.nowline" },
                         "2": { "name": "punctuation.separator.key-value.nowline" }

@@ -27,10 +27,10 @@ import {
  * (`StyleDeclaration` → `style`, `ItemDeclaration` → `item`, …).
  */
 const REF_KEY_TO_KINDS: Record<string, ReadonlySet<string>> = {
-    after: new Set(['item', 'milestone', 'anchor', 'parallel', 'group']),
-    before: new Set(['item', 'milestone', 'anchor', 'parallel', 'group']),
+    after: new Set(['item', 'milestone', 'anchor', 'parallel', 'group', 'wave']),
+    before: new Set(['item', 'milestone', 'anchor', 'parallel', 'group', 'wave']),
     depends: new Set(['item', 'milestone', 'anchor', 'parallel', 'group']),
-    on: new Set(['item', 'swimlane', 'parallel', 'group', 'milestone']),
+    on: new Set(['item', 'swimlane', 'parallel', 'group', 'milestone', 'wave']),
     owner: new Set(['person', 'team']),
     team: new Set(['team']),
     style: new Set(['style']),
@@ -39,6 +39,7 @@ const REF_KEY_TO_KINDS: Record<string, ReadonlySet<string>> = {
     labels: new Set(['label']),
     icon: new Set(['symbol']),
     'capacity-icon': new Set(['symbol']),
+    wave: new Set(['wave']),
 };
 
 /**
@@ -46,7 +47,7 @@ const REF_KEY_TO_KINDS: Record<string, ReadonlySet<string>> = {
  * completion (free from the grammar) and adds:
  *
  *  - Id-reference completion when the cursor sits in a reference property's
- *    value position (`after:`, `before:`, `style:`, `size:`, `labels:[...]`,
+ *    value position (`after:`, `before:`, `style:`, `size:`, `wave:`, `labels:[...]`,
  *    etc.). Each key only suggests entities whose kind makes sense for it
  *    (see `REF_KEY_TO_KINDS`).
  *  - Status-value completion: built-in values plus custom `status`
@@ -196,6 +197,8 @@ function kindFor(kind: string): CompletionItemKind {
             return CompletionItemKind.Snippet;
         case 'footnote':
             return CompletionItemKind.Text;
+        case 'wave':
+            return CompletionItemKind.Struct;
         default:
             return CompletionItemKind.Reference;
     }
