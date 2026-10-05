@@ -157,7 +157,7 @@ The matrix uses `fail-fast: false` so a flaky npm publish does not cancel an in-
 
 Defined in [`publish-mcp.yml`](./.github/workflows/publish-mcp.yml). Reusable workflow invoked from `release.yml` with `needs: [build, publish]` so the MCP registry pointer is never pushed for a half-failed release or before npm is live. A thin standalone caller ([`publish-mcp-standalone.yml`](./.github/workflows/publish-mcp-standalone.yml)) reuses the same implementation for maintainer re-runs.
 
-Ordered steps inside `publish-mcp.yml`:
+The job checks out `refs/tags/v$VERSION` rather than the caller's ref, so a standalone dispatch from `main` for an older version stamps `server.json` from that tag's `packages/mcp/package.json` (the job fails fast if the two disagree). Ordered steps inside `publish-mcp.yml`:
 
 1. Verify `npm view @nowline/mcp@$VERSION` resolves (waits out npm propagation lag).
 2. Attach `nowline.mcpb` to the GitHub Release (`gh release upload --clobber`).
