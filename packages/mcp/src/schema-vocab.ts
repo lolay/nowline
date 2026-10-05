@@ -31,6 +31,7 @@ export const SCHEMA_VOCABULARY = {
         'label',
         'size',
         'status',
+        'wave',
         'milestone',
         'footnote',
     ],
@@ -41,6 +42,7 @@ export const SCHEMA_VOCABULARY = {
     itemPropertyKeys: [
         'status',
         'owner',
+        'wave',
         'after',
         'before',
         'size',

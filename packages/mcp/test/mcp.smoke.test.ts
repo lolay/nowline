@@ -630,6 +630,8 @@ describe('@nowline/mcp — discovery tools', () => {
         expect(structured.directiveKeys).toContain('start');
         expect(structured.entityTypes).toContain('swimlane');
         expect(structured.itemPropertyKeys).toContain('duration');
+        expect(structured.entityTypes).toContain('wave');
+        expect(structured.itemPropertyKeys).toContain('wave');
     });
 });
 

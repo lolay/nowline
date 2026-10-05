@@ -19,13 +19,13 @@ swimlane <id> "<title>"
   item <id> "<title>" duration:3w
 \`\`\`
 
-Entity types: \`swimlane\`, \`group\`, \`parallel\`, \`item\`, \`milestone\`, \`anchor\`.
+Entity types: \`swimlane\`, \`group\`, \`parallel\`, \`item\`, \`wave\`, \`milestone\`, \`anchor\`.
 
 Items need \`duration:\` or \`size:\`. Use 2-space indentation under parents.
 
 ## Item properties
 
-\`duration:\` (or \`size:\`), \`status:\`, \`remaining:\`, \`owner:\`, \`after:\`, \`before:\`, \`labels:\`, \`link:\`, \`style:\`.
+\`duration:\` (or \`size:\`), \`status:\`, \`remaining:\`, \`owner:\`, \`wave:\`, \`after:\`, \`before:\`, \`labels:\`, \`link:\`, \`style:\`.
 
 There is NO \`progress:\` or \`color:\` key. Show completion with \`status:\` + \`remaining:\`; set visuals with a \`style:\` reference (see full reference).
 
@@ -38,6 +38,20 @@ item api "API redesign" duration:4w status:in-progress remaining:40%
 \`status:\` values: \`planned\`, \`in-progress\` (alias \`active\`), \`done\` (alias \`completed\`), \`at-risk\`, \`blocked\`, or a custom \`status\` you declare earlier.
 
 \`remaining:\` is the work *left*, written as a percent (\`40%\`) or an effort literal (\`1w\`). So an item that is 60% complete is \`remaining:40%\`. Omit \`remaining:\` for a fully open or fully done bar.
+
+## Waves
+
+\`\`\`
+wave build "Build"
+wave launch "Launch"
+swimlane api "API"
+  item core "Core" duration:3w wave:build
+  group wave:launch
+    item docs "Docs" duration:1w
+milestone ship "Ship" after:launch
+\`\`\`
+
+A wave is a strict barrier across every swimlane: no item in the next wave starts until every item in this one ends. Items without \`wave:\` are background work, never held back, drawn hatched.
 
 ## Config / includes (before roadmap)
 

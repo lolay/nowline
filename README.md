@@ -200,6 +200,7 @@ swimlane platform
 | `group` | A logical grouping of items, rendered together. |
 | `anchor` | A named date on the timeline. |
 | `milestone` | A point-in-time marker that depends on work. |
+| `wave` | A barrier across every swimlane: no work in the next wave starts until this one ends. |
 | `footnote` | A callout anchored to one or more entities. |
 | `person`, `team` | Ownership references. |
 | `style`, `symbol`, `label`, `size`, `status`, `scale`, `calendar`, `default` | Config and declaration entries. |
@@ -211,6 +212,7 @@ item auth "Auth refactor"
   duration: 2w              // duration literal: d, w, m, q, y
   status: in-progress       // builtin or custom from config
   owner: sam                // id reference (person or team)
+  wave: build               // barrier the item belongs to (a declared wave)
   after: kickoff            // dependency (single)
   after: [kickoff, approvals] // dependency (list)
   remaining: 30%             // percentage
@@ -242,6 +244,8 @@ include "partner.nowline"  roadmap:isolate  // render child as a separate region
 - `merge` — default: child content is merged; parent definitions win on collision.
 - `ignore` — child content of that kind is discarded.
 - `isolate` — child roadmap is preserved as a self-contained region (requires a `roadmap` in the child).
+
+Waves never merge. Under `roadmap:merge` or `roadmap:isolate`, an included file that declares a roadmap, swimlanes, or waves must declare the same waves as its parent, in the same order with the same start floors (`NL.E0202`).
 
 For the full grammar reference, see [`specs/dsl.md`](./specs/dsl.md).
 
