@@ -335,6 +335,39 @@
         "sizing:xlsx": {
             "node": "53a4d6330256a032d6df7c400689fe083d688e45020763c2f610694b8f472de5",
             "icu": false
+        },
+        "waves:html": {
+            "node": "28b3d09df784d5d7749db922a48e4a1c0a34bfcf9ed8aa4413a695c7c7dac3b9",
+            "icu": true
+        },
+        "waves:json": {
+            "node": "0ececdb89b87167168f8ace048d13bb220a5b7b22396bd7a2e18fd62251a730b",
+            "icu": false
+        },
+        "waves:mermaid": {
+            "node": "69211a0f5bfdb54dac4f9852f510993f5533b4d66414bab4f2fe8a7febd4db28",
+            "icu": false
+        },
+        "waves:msproj": {
+            "node": "7b8c9a011774437a1387779d86b6fcd18a9d5dc86f0d73fbdd51061a794dd792",
+            "icu": false
+        },
+        "waves:pdf": {
+            "node": "60952ef1caffab02445a22068a8c4a008284527419f7fafa12854a7c3c200868",
+            "icu": true,
+            "cli": "a7302dd0cff6c31e7c5a015c58727818d8a25ce9841f2b17524dcda547eace7c"
+        },
+        "waves:png": {
+            "node": "ddd1de82ffeb205f1e7716f6030e5b0b50628dca269d426634cfddd922385e18",
+            "icu": true
+        },
+        "waves:svg": {
+            "node": "f3497a9f092da8a6130616ae83405a3b4c24b3747fcd65fb9d7a5339bb4b00f5",
+            "icu": true
+        },
+        "waves:xlsx": {
+            "node": "128669eef5d680dfe0864bc6354dea102a4fe10cc787faa630aca93327f09a88",
+            "icu": false
         }
     }
 }

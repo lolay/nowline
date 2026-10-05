@@ -260,6 +260,8 @@ Progressively-richer examples are included:
 - [`examples/product.nowline`](./examples/product.nowline) — full config, styles, labels, parallels, groups, descriptions.
 - [`examples/long.nowline`](./examples/long.nowline) — stress test: eight swimlanes, ~160 items, parallels, groups, anchors, milestones, footnotes, cross-cutting labels. Used for layout/render perf.
 - [`examples/nested.nowline`](./examples/nested.nowline) + [`examples/nested/`](./examples/nested) — parent Security swimlane plus five isolated per-team roadmap includes (iOS, Android, Web, Platform, Data). Demonstrates `roadmap:isolate`.
+- [`examples/waves.nowline`](./examples/waves.nowline) — `wave` barriers: three waves (Foundations, Build, Launch) across three lanes, a `group wave:` that assigns its children, unwaved background work, and milestones `after:` a wave.
+- [`examples/waves-program.nowline`](./examples/waves-program.nowline) + [`examples/waves-program/`](./examples/waves-program) — multi-team waves: web and API team files re-declare the same waves (with a start floor), so each renders alone and the program file merges them behind one barrier.
 
 ## Editor support
 

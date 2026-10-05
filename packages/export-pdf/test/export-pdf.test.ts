@@ -196,9 +196,7 @@ describe('exportPdf — validation', () => {
 describe('exportPdf — waves', () => {
     // specs/waves.md §10: svg-to-pdfkit must draw the background-work hatch
     // (a `<pattern>` fill), or the renderer needs its stripe-line fallback.
-    const SAMPLE = fileURLToPath(
-        new URL('../../../specs/waves/samples/checkout-relaunch.nowline', import.meta.url),
-    );
+    const SAMPLE = fileURLToPath(new URL('../../../examples/waves.nowline', import.meta.url));
 
     it('draws the background-work hatch as a PDF pattern', async () => {
         const { inputs, svg } = await svgFor(await readFile(SAMPLE, 'utf-8'));

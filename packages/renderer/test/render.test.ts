@@ -975,9 +975,7 @@ describe('renderSvg — caption indent past an `after:` date glyph', () => {
 // --- Waves (specs/waves.md §9) ---
 
 const WAVE_SAMPLE = readFileSync(
-    fileURLToPath(
-        new URL('../../../specs/waves/samples/checkout-relaunch.nowline', import.meta.url),
-    ),
+    fileURLToPath(new URL('../../../examples/waves.nowline', import.meta.url)),
     'utf-8',
 );
 

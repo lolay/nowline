@@ -8,10 +8,7 @@ import { buildExportInputs } from './helpers.js';
 // Waves in the MS Project export (specs/waves.md §10).
 
 const here = dirname(fileURLToPath(import.meta.url));
-const SAMPLE = readFileSync(
-    resolve(here, '../../../specs/waves/samples/checkout-relaunch.nowline'),
-    'utf8',
-);
+const SAMPLE = readFileSync(resolve(here, '../../../examples/waves.nowline'), 'utf8');
 
 interface ParsedTask {
     uid: number;

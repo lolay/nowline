@@ -52,6 +52,11 @@ const MANIFEST = [
     { slug: 'nested-both-headers', theme: 'light', now: NOW },
     { slug: 'inline-date-corners', theme: 'light', now: NOW },
     { slug: 'late-row-shifts', theme: 'light', now: NOW },
+    { slug: 'waves-empty', theme: 'light', now: NOW },
+    { slug: 'waves-parallel-group', theme: 'light', now: NOW },
+    { slug: 'waves-gap-deadline', theme: 'light', now: NOW },
+    { slug: 'waves-isolate', theme: 'light', now: NOW },
+    { slug: 'waves-coarse', theme: 'light', now: NOW },
 ];
 
 function run(cmd, args, opts = {}) {

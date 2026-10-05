@@ -380,7 +380,7 @@ describe('wave declaration', () => {
     });
 
     it('parses a full roadmap with three waves and wave: on items and a group', async () => {
-        // specs/waves/samples/checkout-relaunch.nowline
+        // examples/waves.nowline
         const r = await parse(
             `nowline v1
 

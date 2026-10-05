@@ -13,6 +13,7 @@ const EXAMPLES = [
     'product.nowline',
     'inline-date-pins.nowline',
     'showcase.nowline',
+    'waves.nowline',
 ];
 
 async function textToJsonString(text: string, file: string): Promise<string> {

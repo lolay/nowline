@@ -426,9 +426,7 @@ describe('durationToWorkingDays', () => {
 
 describe('exportXlsx — waves', () => {
     const SAMPLE = readFileSync(
-        fileURLToPath(
-            new URL('../../../specs/waves/samples/checkout-relaunch.nowline', import.meta.url),
-        ),
+        fileURLToPath(new URL('../../../examples/waves.nowline', import.meta.url)),
         'utf8',
     );
 

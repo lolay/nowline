@@ -2,9 +2,11 @@
 // built from a roadmap that declares no waves carries none of the wave
 // keys, at any depth. Every new field is optional and omitted (never
 // `undefined` or `[]`), so a generic key walk over each `examples/` file is
-// the check; `'key' in obj` also catches a key set to `undefined`.
+// the check; `'key' in obj` also catches a key set to `undefined`. Examples
+// that declare waves (waves.nowline, waves-program.nowline) are skipped: they
+// exist to carry the keys.
 
-import { readdirSync } from 'node:fs';
+import { readdirSync, readFileSync } from 'node:fs';
 import { readFile } from 'node:fs/promises';
 import * as path from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -56,8 +58,13 @@ function waveKeyPaths(root: unknown): string[] {
     return found;
 }
 
+// The wave examples are the only ones that declare waves. Named, not
+// matched, so a new example can never drop out of this check by accident.
+const WAVE_EXAMPLES = new Set(['waves.nowline', 'waves-program.nowline']);
+
 const exampleFiles = readdirSync(EXAMPLES_DIR)
     .filter((f) => f.endsWith('.nowline'))
+    .filter((f) => !WAVE_EXAMPLES.has(f))
     .sort();
 
 async function layExample(name: string) {
@@ -70,6 +77,12 @@ async function layExample(name: string) {
 describe('positioned model without waves (specs/waves.md §8.9)', () => {
     it('finds the examples', () => {
         expect(exampleFiles.length).toBeGreaterThan(5);
+    });
+
+    it('skips only examples that declare waves', () => {
+        for (const name of WAVE_EXAMPLES) {
+            expect(readFileSync(path.join(EXAMPLES_DIR, name), 'utf8')).toMatch(/^wave\s/m);
+        }
     });
 
     it.each(exampleFiles)('%s carries no wave keys', async (name) => {

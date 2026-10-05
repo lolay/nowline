@@ -38,6 +38,11 @@ Most files are near-clones of [`examples/minimal.nowline`](../examples/minimal.n
 | [`size-and-capacity.nowline`](size-and-capacity.nowline) | Size + capacity interaction matrix (driver token, derived duration, capacity suffix, overrides). |
 | [`utilization-states.nowline`](utilization-states.nowline) | Lane utilization underline: healthy, warn threshold, over capacity, coalesced segments, custom thresholds, opt-out. |
 | [`nested-both-headers.nowline`](nested-both-headers.nowline) | Tall roadmap with `timeline-position:both` (mirrored date strip) and `minor-grid:true`. |
+| [`waves-empty.nowline`](waves-empty.nowline) | An empty wave between two populated ones: it spans no time, draws a hollow marker on the shared boundary, reads "(no items)" in the legend, and reports `NL.I1006`. |
+| [`waves-parallel-group.nowline`](waves-parallel-group.nowline) | Waves with `parallel` tracks in different waves, an id-only `group api-track wave:w1` whose children inherit w1, a titled group spanning a boundary, and an anonymous `group wave:w2` that assigns its children and draws nothing itself. |
+| [`waves-gap-deadline.nowline`](waves-gap-deadline.nowline) | Wave start floors (anchor and inline date) that each open a gap (the inline-date gap shows its gap label; the one-week anchor gap is too narrow for one), plus a dated milestone `after:<wave>` that the wave overruns: overrun cut line styling and `NL.I1007`. |
+| [`waves-isolate.nowline`](waves-isolate.nowline) | A `roadmap:isolate` region taking part in the wave barrier: region ids stay private but the waves are global. Uses [`waves-isolate-team.nowline`](waves-isolate-team.nowline) as its included child, which re-declares the same waves. |
+| [`waves-coarse.nowline`](waves-coarse.nowline) | Waves at `scale:1m`: seven waves including an empty one, a start-floor gap, a styled wave, two stacked marker rows, background work crossing boundaries, and a `group wave:x` on a boundary. |
 
 ### Multi-file fixtures
 
