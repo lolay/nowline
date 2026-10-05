@@ -513,4 +513,66 @@ swimlane platform "Backlog"
             ).toBe(false);
         });
     });
+
+    describe('diamond includes', () => {
+        // main includes a and b; both include shared. shared is resolved once
+        // and its cached content reaches main through both paths.
+        async function resolveDiamond(shared: string) {
+            const files = {
+                'main.nowline': `include "./a.nowline"\ninclude "./b.nowline"\nroadmap r "R"\nswimlane s\n  item x duration:1w\n`,
+                'a.nowline': `include "./shared.nowline"\n`,
+                'b.nowline': `include "./shared.nowline"\n`,
+                'shared.nowline': shared,
+            };
+            const { Nowline } = getServices();
+            const main = await parseAtPath(files['main.nowline'], '/root/main.nowline');
+            return resolveIncludes(main, '/root/main.nowline', {
+                services: Nowline,
+                readFile: makeFs(files),
+            });
+        }
+
+        it('merges a title-only entity from the shared file exactly once', async () => {
+            const result = await resolveDiamond(
+                `milestone "Launch" date:2026-05-01\nanchor "Kickoff" date:2026-04-06\nswimlane "Platform"\n  item "Spike" duration:1w\n`,
+            );
+            expect(result.diagnostics).toEqual([]);
+            expect([...result.content.milestones.keys()]).toEqual(['launch']);
+            expect([...result.content.anchors.keys()]).toEqual(['kickoff']);
+            expect([...result.content.swimlanes.keys()]).toEqual(['s', 'platform']);
+        });
+
+        it('merges explicit-id entities and config once with no shadow warning', async () => {
+            const result = await resolveDiamond(
+                `config\nstyle risky\nsymbol star unicode:"*"\nmilestone launch "Launch" date:2026-05-01\nperson sam "Sam"\nswimlane platform "Platform"\n  item spike duration:1w\n`,
+            );
+            expect(result.diagnostics).toEqual([]);
+            expect([...result.content.milestones.keys()]).toEqual(['launch']);
+            expect([...result.content.persons.keys()]).toEqual(['sam']);
+            expect([...result.content.swimlanes.keys()]).toEqual(['s', 'platform']);
+            expect([...result.config.styles.keys()]).toEqual(['risky']);
+            expect([...result.config.symbols.keys()]).toEqual(['star']);
+        });
+
+        it('still warns when a diamond parent shadows a shared explicit id', async () => {
+            const files = {
+                'main.nowline': `include "./a.nowline"\ninclude "./b.nowline"\nroadmap r "R"\nswimlane s\n  item x duration:1w\n`,
+                'a.nowline': `include "./shared.nowline"\nperson sam "Sam A"\n`,
+                'b.nowline': `include "./shared.nowline"\n`,
+                'shared.nowline': `person sam "Sam Shared"\n`,
+            };
+            const { Nowline } = getServices();
+            const main = await parseAtPath(files['main.nowline'], '/root/main.nowline');
+            const result = await resolveIncludes(main, '/root/main.nowline', {
+                services: Nowline,
+                readFile: makeFs(files),
+            });
+            expect(result.content.persons.get('sam')?.title).toBe('Sam A');
+            expect(
+                result.diagnostics.some(
+                    (d) => d.severity === 'warning' && d.message.includes('Person "sam"'),
+                ),
+            ).toBe(true);
+        });
+    });
 });
