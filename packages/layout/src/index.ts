@@ -1,3 +1,5 @@
+export type { CalendarConfig, CalendarMode } from './calendar.js';
+export { type ResolvedCalendar, resolveWorkingCalendar } from './calendar-resolver.js';
 export {
     estimateCapacitySuffixWidth,
     formatCapacityNumber,
@@ -179,3 +181,4 @@ export {
     WAVE_STYLED_TINT_OPACITY,
 } from './themes/shared.js';
 export * from './types.js';
+export type { WorkingCalendar } from './working-calendar.js';

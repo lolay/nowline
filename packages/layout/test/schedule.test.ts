@@ -1095,3 +1095,119 @@ swimlane a
         });
     });
 });
+
+// ScheduledItem.days is engine C's own per-item duration in working days (the
+// number of working days the bar spans), so every exporter reads the chart's
+// duration instead of re-deriving it. Literals are derived by hand from the
+// presets (business 5/22/65/260, full 7/30/91/365) and the custom block below
+// (6/26/78/312).
+describe('scheduleRoadmap — ScheduledItem.days', () => {
+    const CUSTOM_BLOCK = `config
+
+calendar
+  days-per-week: 6
+  days-per-month: 26
+  days-per-quarter: 78
+  days-per-year: 312
+`;
+
+    const HEADERS: Record<'business' | 'full' | 'custom', string> = {
+        business: `nowline v1
+
+roadmap r "R" start:2026-01-05
+`,
+        full: `nowline v1
+
+roadmap r "R" start:2026-01-05 calendar:full
+`,
+        custom: `nowline v1
+
+${CUSTOM_BLOCK}
+roadmap r "R" start:2026-01-05 calendar:custom
+`,
+    };
+
+    async function daysOf(
+        calendar: 'business' | 'full' | 'custom',
+        lane: string,
+        id: string,
+    ): Promise<number | undefined> {
+        const sched = await buildSchedule(
+            `${HEADERS[calendar]}
+size xl effort:1m
+
+swimlane s "S"
+${lane}
+`,
+            PINNED,
+        );
+        return sched.items.get(id)?.days;
+    }
+
+    it.each([
+        ['business', '1w', 5],
+        ['full', '1w', 7],
+        ['custom', '1w', 6],
+        ['business', '1q', 65],
+        ['full', '1q', 91],
+        ['custom', '1q', 78],
+        ['business', '1y', 260],
+        ['full', '1y', 365],
+        ['custom', '1y', 312],
+        ['business', '1m', 22],
+        ['full', '1m', 30],
+        ['custom', '1m', 26],
+        ['business', '1.5w', 7.5],
+        ['business', '3d', 3],
+    ] as const)('%s calendar: duration:%s is %s days', async (calendar, literal, expected) => {
+        expect(await daysOf(calendar, `  item a "A" duration:${literal}`, 'a')).toBe(expected);
+    });
+
+    it.each([
+        ['business', 11],
+        ['full', 15],
+        ['custom', 13],
+    ] as const)(
+        '%s calendar: size xl (effort 1m) with capacity:2 is %s days',
+        async (calendar, expected) => {
+            expect(await daysOf(calendar, '  item a "A" size:xl capacity:2', 'a')).toBe(expected);
+        },
+    );
+
+    it('a declared size without capacity is its full effort in days', async () => {
+        expect(await daysOf('business', '  item a "A" size:xl', 'a')).toBe(22);
+    });
+
+    it('capacity:3 divides the effort without rounding', async () => {
+        expect(await daysOf('business', '  item a "A" size:xl capacity:3', 'a')).toBeCloseTo(
+            22 / 3,
+            10,
+        );
+    });
+
+    it('an explicit duration wins over the size', async () => {
+        expect(await daysOf('business', '  item a "A" size:xl duration:2w', 'a')).toBe(10);
+    });
+
+    it('an undeclared size is 0 days', async () => {
+        expect(await daysOf('business', '  item a "A" size:ghost', 'a')).toBe(0);
+    });
+
+    it('an item with neither size nor duration is 0 days', async () => {
+        expect(await daysOf('business', '  item a "A"', 'a')).toBe(0);
+    });
+
+    it('days is the length of the span the dates describe on a full calendar', async () => {
+        const sched = await buildSchedule(
+            `${HEADERS.full}
+swimlane s "S"
+  item a "A" duration:4w
+`,
+            PINNED,
+        );
+        const a = sched.items.get('a')!;
+        expect(a.days).toBe(28);
+        expect(a.start.toISOString().slice(0, 10)).toBe('2026-01-05');
+        expect(a.end.toISOString().slice(0, 10)).toBe('2026-02-02');
+    });
+});

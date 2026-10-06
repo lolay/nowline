@@ -119,13 +119,13 @@ milestone "Release" after:[technology-selection, api]
 
     it('anchors the lane leader at the roadmap start date', async () => {
         const md = exportMermaid(await buildExportInputs(FIXTURE));
-        expect(md).toContain(':done, technology-selection, 2026-04-06, 2w');
+        expect(md).toContain(':done, technology-selection, 2026-04-06, 10d');
     });
 
     it('chains followers without after: onto the previous lane item', async () => {
         const md = exportMermaid(await buildExportInputs(FIXTURE));
-        expect(md).toContain(':done, api, after technology-selection, 3w');
-        expect(md).toContain(':active, agent-instructions, after api, 3w');
+        expect(md).toContain(':done, api, after technology-selection, 15d');
+        expect(md).toContain(':active, agent-instructions, after api, 15d');
     });
 
     it('emits milestone predecessors from after: (not depends:)', async () => {
@@ -154,8 +154,8 @@ swimlane build "Build"
         const md = exportMermaid(await buildExportInputs(noStart));
         const alpha = md.split('\n').find((l) => l.includes('Alpha'))!;
         // Leader falls back to the layout-computed timeline start (a real date).
-        expect(alpha).toMatch(/:done, alpha, \d{4}-\d{2}-\d{2}, 1w/);
-        expect(md).toContain(':done, beta, after alpha, 1w');
+        expect(alpha).toMatch(/:done, alpha, \d{4}-\d{2}-\d{2}, 5d/);
+        expect(md).toContain(':done, beta, after alpha, 5d');
     });
 });
 
@@ -259,7 +259,7 @@ milestone exec-done "Execute complete" date:2026-03-16 after:execute
 
     it('makes members of wave k >= 2 wait for wave k-1, and leaves others alone', async () => {
         const md = exportMermaid(await buildExportInputs(SAMPLE));
-        expect(lineFor(md, 'auth')).toContain(', auth, 2026-01-05, 4w');
+        expect(lineFor(md, 'auth')).toContain(', auth, 2026-01-05, 28d');
         expect(lineFor(md, 'payments-api')).toContain('after auth foundations');
         expect(lineFor(md, 'rate-limits')).toContain('after payments-api build');
         // Inherited from the group's wave:build.
@@ -267,7 +267,7 @@ milestone exec-done "Execute complete" date:2026-03-16 after:execute
         expect(lineFor(md, 'a11y')).toContain('after checkout-v2 foundations');
         expect(lineFor(md, 'launch-page')).toContain('after a11y build');
         // Background work gets no barrier.
-        expect(lineFor(md, 'on-call')).toContain(':on-call, 2026-01-05, 18w');
+        expect(lineFor(md, 'on-call')).toContain(':on-call, 2026-01-05, 126d');
         // after:<wave> maps onto the wave-end milestone id.
         expect(md).toContain('Beta :milestone, beta, after build, 0d');
         expect(md).toContain('GA :milestone, ga, after launch, 0d');
@@ -287,7 +287,11 @@ swimlane y
   item y1 duration:1w wave:two
 `),
         );
-        expect(lineFor(leader, 'y1')).toContain(':y1, after one, 1w');
+        expect(lineFor(leader, 'y1')).toContain(':y1, after one, 5d');
+        // x1 fills Mon-Fri, so wave one ends (exclusive) on Saturday 01-10; the
+        // milestone is a point and Mermaid never skips an explicit date, so it
+        // opens on the first working day, Monday 01-12.
+        expect(leader).toContain('    One (wave end) :milestone, one, 2026-01-12, 0d');
     });
 
     it('only references ids defined earlier in the output', async () => {
@@ -349,17 +353,25 @@ swimlane web "Web"
 
     it('gives every track of a parallel wave:build the previous-wave token', async () => {
         const md = exportMermaid(await buildExportInputs(PARALLEL_FIXTURE));
-        expect(lineFor(md, 'spec')).toContain(':spec, 2026-01-05, 1w');
+        expect(lineFor(md, 'spec')).toContain(':spec, 2026-01-05, 5d');
         // Both tracks anchor at the block entry, plus the barrier.
-        expect(lineFor(md, 'api')).toContain(':api, after spec plan, 2w');
-        expect(lineFor(md, 'ui')).toContain(':ui, after spec plan, 1w');
+        expect(lineFor(md, 'api')).toContain(':api, after spec plan, 10d');
+        expect(lineFor(md, 'ui')).toContain(':ui, after spec plan, 5d');
         // An item inside a track inherits the wave too.
-        expect(lineFor(md, 'polish')).toContain(':polish, after ui plan, 1w');
+        expect(lineFor(md, 'polish')).toContain(':polish, after ui plan, 5d');
         // Leaders of a lane-opening parallel replace the start date.
-        expect(lineFor(md, 'web-a')).toContain(':web-a, after plan, 1w');
-        expect(lineFor(md, 'web-b')).toContain(':web-b, after plan, 1w');
+        expect(lineFor(md, 'web-a')).toContain(':web-a, after plan, 5d');
+        expect(lineFor(md, 'web-b')).toContain(':web-b, after plan, 5d');
         // Background work after the block gets no barrier.
-        expect(lineFor(md, 'ship')).toContain(':ship, after polish, 1w');
+        expect(lineFor(md, 'ship')).toContain(':ship, after polish, 5d');
+    });
+
+    it('dates the wave-end milestones on the first working day at or after E_k', async () => {
+        const md = exportMermaid(await buildExportInputs(PARALLEL_FIXTURE));
+        // plan ends Saturday 01-10 and build Saturday 01-24 (exclusive), so
+        // both milestones open on the following Monday.
+        expect(md).toContain('    Plan (wave end) :milestone, plan, 2026-01-12, 0d');
+        expect(md).toContain('    Build (wave end) :milestone, build, 2026-01-26, 0d');
     });
 
     it('emits no wave output and no wave-floor kind without waves', async () => {

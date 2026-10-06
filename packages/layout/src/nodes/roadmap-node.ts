@@ -18,7 +18,8 @@ import type {
 } from '@nowline/core';
 import { defaultRowBand } from '../band-scale.js';
 import type { CalendarConfig } from '../calendar.js';
-import { resolveCalendar, resolveSizes } from '../calendar.js';
+import { resolveSizes } from '../calendar.js';
+import { resolveWorkingCalendar } from '../calendar-resolver.js';
 import { parseDate, propValue, propValues } from '../dsl-utils.js';
 import { localeStrings, resolveLocale } from '../i18n.js';
 import type { LayoutOptions, LayoutResult } from '../layout.js';
@@ -65,7 +66,7 @@ import {
     seedWaveEdges,
     WAVE_EDGE_TOLERANCE_PX,
 } from '../wave-layout.js';
-import { fromCalendarConfig, type WorkingCalendar } from '../working-calendar.js';
+import type { WorkingCalendar } from '../working-calendar.js';
 import { buildAnchors } from './anchor-node.js';
 import { maxLeafItemRightX } from './content-extent.js';
 import { buildFootnotes } from './footnote-node.js';
@@ -188,17 +189,16 @@ export class RoadmapNode {
         const width = options.width ?? 1280;
         const locale = resolveLocale(options.locale, directiveLocale(file));
 
-        const cal = resolveCalendar(file, resolved.config.calendar);
+        // The working calendar maps dates to working-day indices for the
+        // window, the axis and every placement (specs/working-calendar.md
+        // §5, §7.1).
+        const { config: cal, working: calendar } = resolveWorkingCalendar(file, resolved);
         const scale = resolveScale(file, resolved.config.scale);
         // Build the resolved-size map once per layout. Sized items look up
         // through this map (instead of the raw `SizeDeclaration`s the
         // include-resolver collected) so item sequencing doesn't pay the
         // literal-to-days conversion every time.
         const sizes = resolveSizes(resolved.content.sizes, cal);
-        // The working calendar maps dates to working-day indices for the
-        // window, the axis and every placement (specs/working-calendar.md
-        // §5, §7.1).
-        const calendar = fromCalendarConfig(cal);
 
         const styleCtx: StyleContext = {
             theme,

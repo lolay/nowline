@@ -4,7 +4,6 @@ import { fileURLToPath } from 'node:url';
 import { scheduleRoadmap } from '@nowline/layout';
 import ExcelJS from 'exceljs';
 import { describe, expect, it } from 'vitest';
-import { durationToWorkingDays } from '../src/duration.js';
 import { exportXlsx } from '../src/index.js';
 import { buildExportInputs, FIXTURE, PINNED_DATE } from './helpers.js';
 
@@ -84,7 +83,7 @@ swimlane work "Work"
 });
 
 describe('exportXlsx — Roadmap sheet (metadata)', () => {
-    it('lists Roadmap title, author, scale, start, generated', async () => {
+    it('lists Roadmap title, author, scale, start, calendar, generated', async () => {
         const inputs = await buildExportInputs(FIXTURE, { today: PINNED_DATE });
         const xlsx = await exportXlsx(inputs);
         const wb = await readBack(xlsx);
@@ -97,7 +96,11 @@ describe('exportXlsx — Roadmap sheet (metadata)', () => {
         expect(sheet.getCell('B3').value).toBe('weeks');
         expect(sheet.getCell('A4').value).toBe('Start');
         expect(sheet.getCell('B4').value).toBe('2026-01-05');
-        expect(sheet.getCell('A5').value).toBe('Generated');
+        expect(sheet.getCell('A5').value).toBe('Calendar');
+        expect(sheet.getCell('B5').value).toBe(
+            'business (Saturday and Sunday off; 5/22/65/260 days per week/month/quarter/year)',
+        );
+        expect(sheet.getCell('A6').value).toBe('Generated');
     });
 });
 
@@ -134,7 +137,8 @@ describe('exportXlsx — Items sheet', () => {
         expect(headers).toContain('Duration');
         expect(headers).toContain('Duration (text)');
         expect(headers).toContain('Start');
-        expect(headers).toContain('End');
+        expect(headers).toContain('End (exclusive)');
+        expect(headers).not.toContain('End');
         expect(headers).toContain('Status');
         expect(headers).toContain('Owner');
         expect(headers).toContain('After');
@@ -180,7 +184,7 @@ describe('exportXlsx — Items sheet', () => {
         sheet.getRow(1).eachCell((cell, col) => {
             if (cell.value === 'Title') titleCol = col;
             if (cell.value === 'Start') startCol = col;
-            if (cell.value === 'End') endCol = col;
+            if (cell.value === 'End (exclusive)') endCol = col;
         });
         expect(startCol).toBeGreaterThan(0);
         expect(endCol).toBeGreaterThan(0);
@@ -373,7 +377,7 @@ swimlane s "S"
         let endCol = 0;
         sheet.getRow(1).eachCell((cell, col) => {
             if (cell.value === 'Start') startCol = col;
-            if (cell.value === 'End') endCol = col;
+            if (cell.value === 'End (exclusive)') endCol = col;
         });
         const days: Array<[string, string]> = [];
         sheet.eachRow({ includeEmpty: false }, (row, rowNumber) => {
@@ -439,25 +443,6 @@ describe('exportXlsx — determinism', () => {
     }, 10000);
 });
 
-describe('durationToWorkingDays', () => {
-    it.each([
-        ['1d', 1],
-        ['1w', 5],
-        ['2w', 10],
-        ['1m', 22],
-        ['xs', 1],
-        ['sm', 3],
-        ['md', 5],
-        ['lg', 10],
-        ['xl', 15],
-        ['', 0],
-        [undefined, 0],
-        ['nonsense', 0],
-    ] as const)('parses %s → %d days', (input, expected) => {
-        expect(durationToWorkingDays(input as string | undefined)).toBe(expected);
-    });
-});
-
 describe('exportXlsx — waves', () => {
     const SAMPLE = readFileSync(
         fileURLToPath(new URL('../../../examples/waves.nowline', import.meta.url)),
@@ -493,7 +478,7 @@ milestone exec-done "Execute complete" date:2026-03-16 after:execute
         'Duration',
         'Duration (text)',
         'Start',
-        'End',
+        'End (exclusive)',
         'Status',
         'Remaining',
         'Owner',

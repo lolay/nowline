@@ -84,6 +84,12 @@ export interface WorkingCalendar {
      * open-ended week (Sat–Sun → Monday); undefined without one.
      */
     readonly weekStart: number | undefined;
+    /**
+     * Weekdays the open-ended week works (0 = Sunday … 6 = Saturday): the
+     * weekly pattern an exporter writes as its base calendar. Dated rules and
+     * bounded recurrences are exceptions to it and never change it.
+     */
+    readonly workingWeekdays: ReadonlySet<number>;
     /** Normalized copies of the valid rules, in input order. */
     readonly rules: ReadonlyArray<CalendarRule>;
 }
@@ -240,7 +246,8 @@ function buildCalendar(unitDays: UnitDays, input: ReadonlyArray<CalendarRule>): 
             piece.kind === 'non-working' ||
             (piece.kind === 'mask' && piece.workingPerWeek < DAYS_PER_WEEK),
     );
-    if (!hasNonWorkingDays) return identityCalendar(unitDays, rules);
+    const workingWeekdays = weekdaysOutside(openMask);
+    if (!hasNonWorkingDays) return identityCalendar(unitDays, rules, workingWeekdays);
 
     const index = new WorkingDayIndex(pieces, titledRules(normalized));
     const dateAtWorkingIndex = (base: Date, workingIndex: number): Date =>
@@ -249,6 +256,7 @@ function buildCalendar(unitDays: UnitDays, input: ReadonlyArray<CalendarRule>): 
         rules,
         hasNonWorkingDays: true,
         weekStart: weekStartOf(openMask),
+        workingWeekdays,
         daysPerUnit: unitDays,
         addUnits: (date, count, unit) => dateAtWorkingIndex(date, count * unitDays(unit)),
         isWorkingDay: (date) => index.isWorkingDay(date),
@@ -258,11 +266,16 @@ function buildCalendar(unitDays: UnitDays, input: ReadonlyArray<CalendarRule>): 
     };
 }
 
-function identityCalendar(unitDays: UnitDays, rules: ReadonlyArray<CalendarRule>): WorkingCalendar {
+function identityCalendar(
+    unitDays: UnitDays,
+    rules: ReadonlyArray<CalendarRule>,
+    workingWeekdays: ReadonlySet<number>,
+): WorkingCalendar {
     return {
         rules,
         hasNonWorkingDays: false,
         weekStart: undefined,
+        workingWeekdays,
         daysPerUnit: unitDays,
         addUnits: (date, count, unit) => addDays(date, count * unitDays(unit)),
         isWorkingDay: () => true,
@@ -325,6 +338,15 @@ function openWeekMask(rules: ReadonlyArray<NormalizedRule>): number {
         else off |= rule.mask;
     }
     return off & ~working;
+}
+
+/** The weekdays a mask leaves working. */
+function weekdaysOutside(mask: number): ReadonlySet<number> {
+    const out = new Set<number>();
+    for (let weekday = 0; weekday < DAYS_PER_WEEK; weekday++) {
+        if ((mask & (1 << weekday)) === 0) out.add(weekday);
+    }
+    return out;
 }
 
 function isOpenEnded(span: DaySpan): boolean {

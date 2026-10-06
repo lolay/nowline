@@ -17,10 +17,13 @@
 // Mon–Fri item ends on Saturday. Anchors and dated milestones keep their own
 // dates. A calendar with no non-working day keeps calendar-day arithmetic.
 //
-// Used by the XLSX exporter to populate the "Start" / "End" date columns and
-// the milestone "Date" cell when no explicit `date:` is set, and by the
-// XLSX and Mermaid exporters for the wave spans. Keeping it separate from
-// `computeContentEndDay` avoids mutating the byte-stable snapshot pipeline.
+// The schedule is every exporter's source for the chart's calendar and
+// durations (handoff m2p decision 16): `calendar` is the file's resolved
+// calendar and `ScheduledItem.days` the duration engine C placed. The XLSX
+// exporter also reads the Start / End dates, the milestone dates and the
+// wave spans; the Mermaid exporter reads the wave spans. Keeping it
+// separate from `computeContentEndDay` avoids mutating the byte-stable
+// snapshot pipeline.
 
 import type {
     GroupBlock,
@@ -32,15 +35,22 @@ import type {
     SwimlaneDeclaration,
 } from '@nowline/core';
 import { buildWavePlan, isGroupBlock, isItemDeclaration, isParallelBlock } from '@nowline/core';
-import { deriveItemDurationDays, resolveCalendar, resolveSizes } from './calendar.js';
+import { deriveItemDurationDays, resolveSizes } from './calendar.js';
+import { type ResolvedCalendar, resolveWorkingCalendar } from './calendar-resolver.js';
 import { parseDate, propValue, propValues } from './dsl-utils.js';
 import { solveWaveBarriers, summarizeWaves, WavePass, waveFloorDays } from './wave-barrier.js';
-import { fromCalendarConfig, spanEndDate } from './working-calendar.js';
+import { spanEndDate } from './working-calendar.js';
 
 /** Per-item scheduled interval, keyed by item id (name). */
 export interface ScheduledItem {
     start: Date;
     end: Date;
+    /**
+     * Duration in working days: the `duration:` literal, or the size's effort
+     * divided by `capacity:`, under the file's calendar. 0 when the item has
+     * neither, or names an undeclared size.
+     */
+    days: number;
 }
 
 /**
@@ -54,6 +64,8 @@ export interface ScheduledItem {
 export interface RoadmapSchedule {
     /** Resolved roadmap start date (UTC midnight). */
     startDate: Date;
+    /** The file's calendar, which every date and `days` here uses. */
+    calendar: ResolvedCalendar;
     /** Named items keyed by their DSL id (`name`). */
     items: Map<string, ScheduledItem>;
     /** Every item keyed by AST node identity (named and anonymous). */
@@ -101,8 +113,8 @@ export function scheduleRoadmap(
     resolved: ResolveResult,
     options: ScheduleOptions = {},
 ): RoadmapSchedule {
-    const cal = resolveCalendar(file, resolved.config.calendar);
-    const calendar = fromCalendarConfig(cal);
+    const resolvedCalendar = resolveWorkingCalendar(file, resolved);
+    const { config: cal, working: calendar } = resolvedCalendar;
     const sizes = resolveSizes(resolved.content.sizes, cal);
 
     // Resolve roadmap start date — same precedence as RoadmapNode.place.
@@ -196,7 +208,11 @@ export function scheduleRoadmap(
                 // becomes max(pin, F).
                 if (wave) start = wave.apply(node, start);
                 const end = start + dur;
-                const scheduled: ScheduledItem = { start: pointAt(start), end: endAt(start, end) };
+                const scheduled: ScheduledItem = {
+                    start: pointAt(start),
+                    end: endAt(start, end),
+                    days: dur,
+                };
                 itemByNode.set(node, scheduled);
                 if (node.name) {
                     scope.itemEnd.set(node.name, end);
@@ -320,6 +336,7 @@ export function scheduleRoadmap(
 
     return {
         startDate,
+        calendar: resolvedCalendar,
         items: itemResults,
         byNode: itemByNode,
         milestones: milestoneResults,
