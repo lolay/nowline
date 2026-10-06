@@ -20,7 +20,7 @@ import {
     type NowlineServices,
     resolveIncludes,
 } from '@nowline/core';
-import { layoutRoadmap, type ThemeName } from '@nowline/layout';
+import { layoutRoadmap, type PositionedRoadmap, type ThemeName } from '@nowline/layout';
 import { renderSvg } from '@nowline/renderer';
 import { URI } from 'langium';
 
@@ -110,6 +110,11 @@ export const SAMPLES: SampleSpec[] = [
 ];
 
 export async function renderSampleSvg(spec: SampleSpec): Promise<string> {
+    return renderSvg(await layoutSample(spec));
+}
+
+/** Parse → resolve → layout, stopping before render (for model invariants). */
+export async function layoutSample(spec: SampleSpec): Promise<PositionedRoadmap> {
     const { shared, Nowline } = getServices();
     const absSource = path.join(sourceRoot(spec), spec.sourceFile);
     const text = await fs.readFile(absSource, 'utf-8');
@@ -120,12 +125,11 @@ export async function renderSampleSvg(spec: SampleSpec): Promise<string> {
     const file = doc.parseResult.value;
     const resolved = await resolveIncludes(file, absSource, { services: Nowline });
 
-    const model = layoutRoadmap(file, resolved, {
+    return layoutRoadmap(file, resolved, {
         theme: spec.theme,
         today: FIXED_TODAY,
         locale: spec.locale,
     });
-    return renderSvg(model);
 }
 
 export async function readSnapshot(name: string): Promise<string | null> {

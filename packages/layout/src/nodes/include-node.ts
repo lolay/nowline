@@ -133,40 +133,50 @@ export function buildIncludeRegions(
             ctx.bandScale.bandwidth(),
             innerEndY - y + REGION_INSET_BOTTOM,
         );
-        // Shrink-wrap the include's bounding box to fit chrome + content
-        // (with a small right pad) instead of stretching to the full
-        // chart width. An include that reaches past the timeline still
-        // gets clamped to the chart's natural right edge so it never
-        // extends into the attribution / right-margin area.
-        const boxX = 0;
-        const { chromeRightX } = includeChromeGeometry(boxX, label, region.sourcePath);
-        // Bars-only extent (never a spilled caption — see
-        // `maxLeafItemRightX`), so a long trailing item caption inside
-        // the include can overhang the dashed bracket instead of
-        // dragging it wider.
-        const barsRightX = maxLeafItemRightX(nestedSwimlanes);
-        const naturalRightX = Math.max(chromeRightX, barsRightX) + INCLUDE_CONTENT_RIGHT_PAD_PX;
-        const boxWidth = Math.min(ctx.chartRightX - boxX, naturalRightX - boxX);
         const box: BoundingBox = {
-            x: boxX,
+            x: 0,
             y,
-            width: boxWidth,
+            width: 0,
             height: regionHeight,
         };
-        // Mirror the shrunk width onto each nested swimlane band so the
-        // tinted background fits inside the dashed bracket instead of
-        // bleeding past it on the right.
-        for (const lane of nestedSwimlanes) {
-            lane.box.width = boxWidth;
-        }
-        out.push({
+        const positioned: PositionedIncludeRegion = {
             sourcePath: region.sourcePath,
             label,
             box,
             nestedSwimlanes,
             style: resolveStyle('swimlane', [], ctx.styleCtx),
-        });
+        };
+        fitIncludeRegionWidth(positioned, ctx.chartRightX);
+        out.push(positioned);
         y += regionHeight;
     }
     return { regions: out, endY: y };
+}
+
+/**
+ * Shrink-wrap an include's bounding box to fit chrome + content (with a
+ * small right pad) instead of stretching to the full chart width. An
+ * include that reaches past the timeline still gets clamped to
+ * `chartRightX` so it never extends into the attribution / right-margin
+ * area. Idempotent for a given `chartRightX`; `RoadmapNode` re-runs it
+ * once the canvas width is final, since the clamp reads the width at
+ * build time and the post-layout timeline extension can still grow it.
+ */
+export function fitIncludeRegionWidth(region: PositionedIncludeRegion, chartRightX: number): void {
+    const boxX = region.box.x;
+    const { chromeRightX } = includeChromeGeometry(boxX, region.label, region.sourcePath);
+    // Bars-only extent (never a spilled caption — see
+    // `maxLeafItemRightX`), so a long trailing item caption inside
+    // the include can overhang the dashed bracket instead of
+    // dragging it wider.
+    const barsRightX = maxLeafItemRightX(region.nestedSwimlanes);
+    const naturalRightX = Math.max(chromeRightX, barsRightX) + INCLUDE_CONTENT_RIGHT_PAD_PX;
+    const boxWidth = Math.min(chartRightX - boxX, naturalRightX - boxX);
+    region.box.width = boxWidth;
+    // Mirror the shrunk width onto each nested swimlane band so the
+    // tinted background fits inside the dashed bracket instead of
+    // bleeding past it on the right.
+    for (const lane of region.nestedSwimlanes) {
+        lane.box.width = boxWidth;
+    }
 }
