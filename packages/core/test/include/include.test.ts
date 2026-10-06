@@ -16,7 +16,8 @@ import { getServices, parse } from '../helpers.js';
 
 function makeFs(files: Record<string, string>): (p: string) => Promise<string> {
     return async (abs) => {
-        const rel = path.relative('/root', abs);
+        // Fixture keys use `/`; Windows resolves `teams/web.nowline` to `teams\web.nowline`.
+        const rel = path.relative('/root', abs).split(path.sep).join('/');
         if (!(rel in files)) throw new Error(`File not found: ${rel}`);
         return files[rel];
     };
