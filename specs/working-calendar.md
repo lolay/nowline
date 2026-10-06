@@ -1,6 +1,6 @@
 # Nowline Working Calendar
 
-**Status: Accepted, scheduled as m2p. Not implemented.** This is the design record for non-working days: weekends, holidays and company-wide closures such as a summit. Today's parser rejects the `non-working` syntax shown here, and today's layout does not skip any day.
+**Status: Accepted, scheduled as m2p. Phases 1–2 (calendar primitives; the working-day schedule under `hide`) are implemented in lolay/nowline#96; Phases 3–5 are pending.** This is the design record for non-working days: weekends, holidays and company-wide closures such as a summit. Today's parser rejects the `non-working` syntax shown here, and today's layout does not skip any day.
 
 The implementation plan, the decisions that close §11 and the codebase map are in [`handoffs/handoff-m2p-working-calendar.md`](./handoffs/handoff-m2p-working-calendar.md). As each phase ships:
 
