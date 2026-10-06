@@ -87,6 +87,7 @@ import {
     PROGRESS_STRIP_HEIGHT_PX,
     TEXT_SIZE_PX,
     TIMELINE_TICK_LABEL_BASELINE_OFFSET_PX,
+    TIMELINE_TICK_LABEL_FONT_SIZE_PX,
 } from '@nowline/layout';
 import { BUILTIN_ICON_SVG, CAPACITY_ICON_SVG } from './icons.js';
 import { IdGenerator } from './ids.js';
@@ -724,7 +725,7 @@ function renderTimeline(t: PositionedTimelineScale, palette: Theme, fonts: FontF
                         x: num(tick.labelX),
                         y: num(tickPanelY + TIMELINE_TICK_LABEL_BASELINE_OFFSET_PX),
                         'font-family': fonts.sans,
-                        'font-size': 10,
+                        'font-size': TIMELINE_TICK_LABEL_FONT_SIZE_PX,
                         fill: labelColor,
                         'text-anchor': 'middle',
                     },
@@ -739,7 +740,7 @@ function renderTimeline(t: PositionedTimelineScale, palette: Theme, fonts: FontF
                         x: num(tick.labelX),
                         y: num(bottomTickPanelY! + TIMELINE_TICK_LABEL_BASELINE_OFFSET_PX),
                         'font-family': fonts.sans,
-                        'font-size': 10,
+                        'font-size': TIMELINE_TICK_LABEL_FONT_SIZE_PX,
                         fill: labelColor,
                         'text-anchor': 'middle',
                     },

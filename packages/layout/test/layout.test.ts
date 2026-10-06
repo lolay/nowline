@@ -628,6 +628,82 @@ swimlane plugin "Plugin"
     });
 });
 
+describe('layoutRoadmap month-scale header past 12 months', () => {
+    const src = (calendar: string) => `nowline v1
+
+roadmap r "R" start:2026-01-05 scale:1m calendar:${calendar}
+
+swimlane a "A"
+  item x "X" duration:12m
+  item y "Y" duration:5m
+`;
+    const isoDay = (d: Date) => d.toISOString().slice(0, 10);
+
+    it('labels a 17-month calendar:full span Jan..Dec, Jan..May on real month starts', async () => {
+        // Regression: ticks stepped by a fixed 30 days and were labelled by
+        // the date each landed on, so after a year they read
+        // `Dec Jan Mar Mar Apr` instead of `Jan Feb Mar Apr May`.
+        const { file, resolved } = await parseAndResolve(src('full'));
+        const { timeline } = layoutRoadmap(file, resolved, { theme: 'light' });
+        const labels = timeline.ticks.map((t) => t.label).filter((l) => l !== undefined);
+        expect(labels).toEqual([
+            'Jan',
+            'Feb',
+            'Mar',
+            'Apr',
+            'May',
+            'Jun',
+            'Jul',
+            'Aug',
+            'Sep',
+            'Oct',
+            'Nov',
+            'Dec',
+            'Jan',
+            'Feb',
+            'Mar',
+            'Apr',
+            'May',
+        ]);
+        // Content ends 2027-05-30 (510d); the window pads to the next
+        // month start, and every interior tick is the 1st of a month.
+        expect(isoDay(timeline.endDate)).toBe('2027-06-01');
+        const tickDays = timeline.ticks.map((t) =>
+            isoDay(
+                new Date(
+                    timeline.startDate.getTime() +
+                        Math.round((t.x - timeline.originX) / timeline.pixelsPerDay) * 86400000,
+                ),
+            ),
+        );
+        expect(tickDays[0]).toBe('2026-01-05');
+        expect(tickDays.slice(1).every((d) => d.endsWith('-01'))).toBe(true);
+    });
+
+    it('labels calendar:business months by the real calendar, not 22-day strides', async () => {
+        // 12m + 5m at 22d/month = 374d, ending 2027-01-14.
+        const { file, resolved } = await parseAndResolve(src('business'));
+        const { timeline } = layoutRoadmap(file, resolved, { theme: 'light' });
+        const labels = timeline.ticks.map((t) => t.label).filter((l) => l !== undefined);
+        expect(labels).toEqual([
+            'Jan',
+            'Feb',
+            'Mar',
+            'Apr',
+            'May',
+            'Jun',
+            'Jul',
+            'Aug',
+            'Sep',
+            'Oct',
+            'Nov',
+            'Dec',
+            'Jan',
+        ]);
+        expect(isoDay(timeline.endDate)).toBe('2027-02-01');
+    });
+});
+
 describe('layoutRoadmap item title wrapping', () => {
     // The Platform lane from lolay/nowline#59, trimmed. At `scale:2w` a `2w`
     // item is a 160px logical column: a 148px bar with a 124px text area.

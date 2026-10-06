@@ -48,7 +48,7 @@ import type {
     SlackCorridor,
 } from '../types.js';
 import type { ViewPreset } from '../view-preset.js';
-import { buildHeaderTicks, resolveScale } from '../view-preset.js';
+import { buildHeaderTicks, resolveScale, tickBoundaryAtOrAfter } from '../view-preset.js';
 import { fromCalendarConfig } from '../working-calendar.js';
 import { buildAnchors } from './anchor-node.js';
 import { maxLeafItemRightX } from './content-extent.js';
@@ -541,7 +541,10 @@ export class RoadmapNode {
         }
         const tickDays = calendar.daysPerUnit(scale.unit);
         const overflowDays = (maxContentRightX - originX) / ppd;
-        const paddedDays = overflowDays > 0 ? Math.ceil(overflowDays / tickDays) * tickDays : 0;
+        const paddedDays =
+            overflowDays > 0
+                ? tickBoundaryAtOrAfter(startDate, overflowDays, scale.unit, tickDays)
+                : 0;
         if (paddedDays > spanDays) {
             const extendedEndDate = addDays(startDate, paddedDays);
             const extendedWidth = paddedDays * ppd;
