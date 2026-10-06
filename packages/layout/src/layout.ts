@@ -108,7 +108,7 @@ import type {
     ResolvedSize,
     StatusKind,
 } from './types.js';
-import type { ViewPreset } from './view-preset.js';
+import { tickBoundaryAtOrAfter, type ViewPreset } from './view-preset.js';
 import { daysPerUnit } from './working-calendar.js';
 
 export interface LayoutOptions {
@@ -1290,9 +1290,15 @@ function computeDateWindow(
     // Round up to the smallest tick boundary that is `>= contentDays`. When
     // the latest content lands exactly on a tick boundary the chart ends
     // exactly there (no extra trailing tick); otherwise we extend to the
-    // next tick so the right edge always sits on a labelled column.
-    const padded =
-        contentDays > 0 ? Math.ceil(contentDays / tickDays) * tickDays : 4 * ctx.cal.daysPerWeek;
+    // next tick so the right edge always sits on a labelled column. For
+    // month / quarter / year scales the boundary is a real month /
+    // quarter / year start, not a multiple of `days-per-month` etc.
+    const padded = tickBoundaryAtOrAfter(
+        startDate,
+        contentDays > 0 ? contentDays : 4 * ctx.cal.daysPerWeek,
+        scale.unit,
+        tickDays,
+    );
     const finalDays = Math.max(minDays, padded);
     return { startDate, endDate: addDays(startDate, Math.max(1, finalDays)) };
 }
