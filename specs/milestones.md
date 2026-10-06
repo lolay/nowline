@@ -172,7 +172,7 @@ First phase of the layout-engine v2 refactor. Replaces the imperative tick math 
 
 - `TimeScale` (d3-scale wrapper) replaces `buildTimelineScale` + `pixelsPerDay` + `xForDate`. Adds `forward(date)` / `invert(x)` / `ticks()` so m3's editor gets click-to-date for free.
 - `ViewPreset` replaces the `LABEL_THINNING` table and per-unit format functions. Multi-row time headers (year over month over day) drop out for free.
-- `WorkingCalendar` lands alongside `CalendarConfig` in [`packages/layout/src/calendar.ts`](../packages/layout/src/calendar.ts) as a strategy: `continuousCalendar()` (default), `weekendsOff()`, `withHolidays(...)`. The DSL's `business` calendar mode becomes a factory call.
+- `WorkingCalendar` lands alongside `CalendarConfig` in [`packages/layout/src/calendar.ts`](../packages/layout/src/calendar.ts) as a strategy: `continuousCalendar()` (default), `weekendsOff()`, `withHolidays(...)`. The DSL's `business` calendar mode becomes a factory call. (Only the continuous strategy shipped; non-working days are now proposed in [`working-calendar.md`](./working-calendar.md).)
 - `PositionedTimelineScale` shape stays stable so the renderer needs no changes.
 
 Validation: existing CLI render tests stay byte-stable on continuous calendars; new tests assert `weekendsOff()` shrinks the chart's `pixelsPerDay` and that `invert(forward(d)) === d` on continuous mode.
