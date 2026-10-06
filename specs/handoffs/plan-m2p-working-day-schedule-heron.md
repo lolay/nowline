@@ -1,7 +1,7 @@
 ```
 --- KICKOFF: begin orchestration at [deep] ---
 
-  Status: 0/3 groups done | last review: — | current: m2p-2 s1-s3 [exec] | updated 2026-10-06
+  Status: 1/3 groups done | last review: wave-1 PASS | current: m2p-2 s4-s5 [deep] (gates 5 and 2 pending) | updated 2026-10-06
 
   review: every-wave (log-only — parent writes Review log; no human review gate)
 
@@ -236,15 +236,15 @@ Same approach as Phase 1, with two differences: the snapshot and golden regenera
 
 --- WAVE 1 [exec] ---
 
-### s1 - [fast] Toolchain check
+### s1 - [fast] Toolchain check (done)
 
 `nvm use` 26.2.0, `pnpm -v` 12.8.1, `make build-fast`. Done when both versions match and the build exits 0.
 
-### s2 - [exec] Write the failing tests and update the existing ones
+### s2 - [exec] Write the failing tests and update the existing ones (done)
 
 Everything in § Tests, written against § Change's names and shapes. Done when every listed case exists and nothing outside `*/test/` changed.
 
-### s3 - [exec] Red run and baselines
+### s3 - [exec] Red run and baselines (done)
 
 - `make test`, and record the failures. Only new or updated tests may fail.
 - Copy every rendered `examples/**/*.svg` and `tests/**/*.svg`, plus the 19 layout snapshots, to `.scratch/p2-baseline/`.
@@ -289,6 +289,17 @@ Done when CI starts on the new head.
 
 ## Review log
 
+review wave-1 (m2p-2-s1-s3): PASS - 66 new tests in three new files plus updates in ten, every § Tests bullet covered with literal values; make-only staged red runs show 142 failures, all in new or updated tests, and the whole suite green with them parked; 59-SVG baseline with checksums; note: the days-scale fixtures put `unit:` in a scale block, which the validator rejects (SCALE_FIELDS), so wave 2 switches them to roadmap `scale:days` - 2026-10-06
+
 ## Token log
 
-Phase 1 total ~$20.42 (PR #96 thread). Phase 2 rows are added per wave.
+Phase 1 total ~$20.42 (PR #96 thread). Input is real transcript usage counted once per message; output is chars/4, so a floor.
+
+| row | model | ~input | ~output | ~cost |
+|---|---|---|---|---|
+| orchestrator (since the Phase 2 request) | claude-opus-5-5 | 25.78M | 36k | $19.91 |
+| planning: 3 explorers + 1 plan review | claude-opus-5-5 | 95.72M | 54k | $27.31 |
+| wave-1 (m2p-2-s1-s3) | claude-sonnet-5-5 | 33.58M | 42k | $8.13 |
+| **running total** | | 155.08M | 132k | **$55.35** |
+
+Model check (canary): wave 1 ran 120 of 120 messages on claude-sonnet-5-5.

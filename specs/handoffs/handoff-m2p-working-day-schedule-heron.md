@@ -4,48 +4,40 @@
 
 ## Where things stand
 
-- **Branch:** `claude/tender-babbage-mjx733`, PR lolay/nowline#96.
-  - Phase 1 is done: `4a596b6` (rules and indices in `WorkingCalendar`) and `92558b9` (removed Phase 1's runner files).
-  - CI is green on `92558b9`, including the browser determinism leg. The PR waits on maintainer review.
-- **Phase 2 plan:** [`plan-m2p-working-day-schedule-heron.md`](./plan-m2p-working-day-schedule-heron.md). It was drafted, then checked against the code by a separate review agent; its fixes are folded in.
-- **Not yet approved.** Nothing is implemented and no wave has been dispatched.
-- The maintainer asked to keep using this branch, so Phase 2 stacks on Phase 1 and PR #96 becomes "phases 1–2". If #96 merges first, the branch restarts from `main` and gets a new PR.
+- **Branch:** `claude/tender-babbage-mjx733`, PR lolay/nowline#96 (Phase 1, CI green, open). Phase 2 stacks on it.
+- **Plan:** [`plan-m2p-working-day-schedule-heron.md`](./plan-m2p-working-day-schedule-heron.md), approved by the maintainer, orchestrated from the session that wrote it.
+- **Wave 1 (`[exec]`, s1–s3) is done and reviewed: PASS.**
+  - 66 new tests in three new files: `packages/layout/test/working-day-schedule.test.ts`, `packages/layout/test/non-working-identity.test.ts` and `packages/renderer/test/non-working.test.ts`.
+  - Updates in ten existing test files. Every § Tests bullet is covered with literal values.
+  - Red runs, staged through `make test` only: 142 failures, all in new or updated tests. The whole suite is green with the new and updated tests parked.
+- **The red tests are not committed.** nowline needs a green `make pre-commit` for every commit, so they were set aside while this file and the plan were committed. If the container is lost, rerun wave 1 from the plan; it took about 25 minutes. The wave 1 report, red list and SVG baseline are in the gitignored `.scratch/`, so they are lost with the container.
 
-## Pending question
+## Pending question (gates 5 and 2, fail closed)
 
-The maintainer rejected the first approval request with:
+> Wave 1 passed review. Approve dispatching wave 2 (s4–s5 on Opus/high: implement Phase 2, then the category review and the deliberate snapshot and golden regeneration)?
 
-> Did this plan use the same type of plan-tier-orchestration skill approach that was used in the prior plan?
+Part of the same approval: wave 2 also switches the days-scale test fixtures from a scale-block `unit: days`, which the validator rejects, to a roadmap `scale:days` plus a scale block holding only `label-every: 2`. The expectations stay the same. That the validator rejects a field `resolveScale` reads is a pre-existing inconsistency (`SCALE_FIELDS` in `nowline-validator.ts`). It is out of m2p scope (decision 17) and will be reported as an incidental finding.
 
-Answer given: yes. It uses `personal-plan-orchestrate` with the Phase 1 Claude Code adaptation:
-- tagged steps in three waves (`[exec]`, `[deep]`, `[exec]`);
-- one-agent Workflow runs with `model` + `effort` (Sonnet high for `[exec]`, Opus high for `[deep]`);
-- canary and exec→deep gates after wave 1, gate 1 on errors or a bundle overrun;
-- a log-only parent review, the token tally, and the runner rules.
-
-There are two differences:
-- the snapshot regeneration step (s5) is `[deep]` and rides wave 2;
-- the plan had a code-grounded review before approval.
-
-The plan is waiting on explicit approval. A non-answer is not approval.
+No answer means no dispatch.
 
 ## How to resume
 
-1. Get explicit approval of the plan.
-2. Run the plan's Kickoff, orchestrating from this chat, as the maintainer chose in Phase 1:
-   - Dispatch wave 1 (`[exec]`, s1–s3) as a one-agent Workflow on sonnet/high. Its prompt follows the skill's subagent context contract and quotes § Change and § Tests verbatim.
-   - At the canary gate, commit the plan and this handoff (red tests set aside), push, and ask gates 5 and 2 together.
+1. If the red tests are missing, rerun wave 1 (s1–s3) from the plan.
+2. With explicit approval, dispatch wave 2 as a one-agent Workflow on opus/high. Its prompt follows the skill's subagent context contract and quotes § Change, § Tests, § Snapshots and the wave 2 steps verbatim.
+3. Wave 1's open points belong to wave 2:
+   - the closing tick's `major` flag;
+   - the `labelX` of a dropped label;
+   - `tickBoundaryAtOrAfter` for months when the count is zero or negative.
 
 ## Gotchas
 
-- **Use `make` targets only.**
-- **Never set `UPDATE_LAYOUT_SNAPSHOTS` or `UPDATE_DETERMINISM_GOLDENS`** except in s5, after the category review.
-- **Never run `playwright install`.** The browser determinism leg cannot run in this container (Playwright 1.63 wants chromium-1243; the image has 1194), so CI covers it.
-- **Embed bundle:** 197.27 KB of 200 KB before Phase 2. Dropping d3 `scaleTime` (plan choice 2) should free about 27 KB minified. Going over budget is a STOP.
-- **Commits:** nowline requires a green `make pre-commit` before every commit, including runner saves.
-- **Decisions in the plan the maintainer may push back on:**
-  - narrow-column labels are judged against a full unit (choice 3);
-  - an after-only milestone takes the point date, Monday, while a span's exclusive end is Saturday (choice 1);
-  - decision 5 ships in Phase 2.
-- **Known limit:** an isolated include on a different calendar than the root places its durations on the root's working-day axis. Not fixed in Phase 2.
-- **Release:** Phases 2 and 3 must ship in the same release.
+- **Use `make` targets only.** `make test` stops at the first failing package. Wave 1 got full red coverage by parking its test edits package by package; the scripts are in the gitignored `.scratch/p2/`.
+- **Regeneration flags.** Never set `UPDATE_LAYOUT_SNAPSHOTS` or `UPDATE_DETERMINISM_GOLDENS`, except in s5 after the category review.
+- **Never run `playwright install`.** CI covers the browser determinism leg.
+- **Bundle budget.** The embed bundle was 197.27 KB of 200 KB before Phase 2. Dropping d3 `scaleTime` should free about 27 KB minified. Going over budget is a STOP.
+- **Choices the maintainer may push back on** (from the plan):
+  - narrow-column labels are judged against a full unit;
+  - an after-only milestone takes the point date, Monday;
+  - decision 5 ships now.
+- **Known limit.** An isolated include on a different calendar than the root places its durations on the root's working-day axis.
+- **Release.** Phases 2 and 3 must ship in the same release.
