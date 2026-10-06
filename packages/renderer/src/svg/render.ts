@@ -1750,7 +1750,7 @@ function renderMilestone(m: PositionedMilestone, palette: Theme, fonts: FontFami
     return tag('g', { 'data-layer': 'milestone', 'data-id': m.id ?? null }, flag + label);
 }
 
-function renderMilestoneCutLine(m: PositionedMilestone, palette: Theme): string {
+function renderMilestoneCutLine(m: PositionedMilestone, idPrefix: string, palette: Theme): string {
     const stroke = m.isOverrun
         ? palette.milestoneDiamond.cutLineOverrun
         : palette.milestoneDiamond.cutLineNormal;
@@ -1782,7 +1782,7 @@ function renderMilestoneCutLine(m: PositionedMilestone, palette: Theme): string 
                     'stroke-width': 1.1,
                     'stroke-dasharray': '3 3',
                     'stroke-linecap': 'round',
-                    'marker-end': 'url(#nl-arrow-dark)',
+                    'marker-end': `url(#${idPrefix}-arrow-dark)`,
                 }),
             );
         }
@@ -1790,7 +1790,7 @@ function renderMilestoneCutLine(m: PositionedMilestone, palette: Theme): string 
     return parts.join('');
 }
 
-function renderEdge(e: PositionedDependencyEdge, palette: Theme): string {
+function renderEdge(e: PositionedDependencyEdge, idPrefix: string, palette: Theme): string {
     const color =
         e.kind === 'overflow' ? palette.dependency.overflowStroke : palette.dependency.edgeStroke;
     const points = e.waypoints;
@@ -1807,7 +1807,7 @@ function renderEdge(e: PositionedDependencyEdge, palette: Theme): string {
         'stroke-width': strokeWidth,
         'stroke-dasharray': e.kind === 'overflow' ? '4 2' : null,
         'stroke-linejoin': 'round',
-        'marker-end': 'url(#nl-arrow)',
+        'marker-end': `url(#${idPrefix}-arrow)`,
     });
 }
 
@@ -2822,6 +2822,10 @@ export async function renderSvg(
     const parts: string[] = [];
 
     // <defs> — shadows + arrowhead markers (palette-driven fills baked in).
+    // Marker ids carry the per-render prefix: several SVGs inlined in one
+    // HTML page share an id namespace and `url(#id)` resolves to the first
+    // match, so a global id would paint one diagram's arrowheads (and theme)
+    // onto another.
     const arrowFillNeutral = palette.arrowhead.neutral;
     const arrowFillLight = palette.arrowhead.light;
     const arrowFillDark = palette.arrowhead.dark;
@@ -2829,9 +2833,9 @@ export async function renderSvg(
         `<marker id="${id}" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto"><path d="M 0 0 L 10 5 L 0 10 z" fill="${fill}"/></marker>`;
     const defs =
         `<defs>${allShadowDefs(idPrefix)}` +
-        arrowDef('nl-arrow', arrowFillNeutral) +
-        arrowDef('nl-arrow-light', arrowFillLight) +
-        arrowDef('nl-arrow-dark', arrowFillDark) +
+        arrowDef(`${idPrefix}-arrow`, arrowFillNeutral) +
+        arrowDef(`${idPrefix}-arrow-light`, arrowFillLight) +
+        arrowDef(`${idPrefix}-arrow-dark`, arrowFillDark) +
         // Wave hatch patterns, only those a bar or the legend uses.
         usedWaveHatchKinds(model)
             .map((k) => waveHatchPatternDef(idPrefix, k, palette))
@@ -2888,7 +2892,7 @@ export async function renderSvg(
     // the arrow body — only the head and stub at the target end stay
     // crisply visible.
     for (const e of model.edges) {
-        if (e.kind === 'underBar') parts.push(renderEdge(e, palette));
+        if (e.kind === 'underBar') parts.push(renderEdge(e, idPrefix, palette));
     }
 
     // Swimlane content (frame tabs + items) on top of the grid lines.
@@ -2906,13 +2910,13 @@ export async function renderSvg(
     // Normal / overflow dependency edges on top of items but below
     // cut-lines / nowline. Under-bar edges already painted above.
     for (const e of model.edges) {
-        if (e.kind !== 'underBar') parts.push(renderEdge(e, palette));
+        if (e.kind !== 'underBar') parts.push(renderEdge(e, idPrefix, palette));
     }
 
     // Anchor + milestone cut lines drawn AFTER items so they overlay the
     // swimlane fills.
     for (const a of model.anchors) parts.push(renderAnchorCutLine(a, palette));
-    for (const m of model.milestones) parts.push(renderMilestoneCutLine(m, palette));
+    for (const m of model.milestones) parts.push(renderMilestoneCutLine(m, idPrefix, palette));
 
     // Marker-row diamonds + labels.
     for (const a of model.anchors) parts.push(renderAnchor(a, palette, fonts));

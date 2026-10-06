@@ -490,7 +490,9 @@ function mergeMap<V>(
 ): void {
     for (const [name, value] of source) {
         if (target.has(name)) {
-            onConflict(name);
+            // The same declaration arriving again through a diamond include
+            // is not a collision.
+            if (target.get(name) !== value) onConflict(name);
             continue;
         }
         target.set(name, value);
@@ -501,14 +503,18 @@ function mergeMap<V>(
  * Merge a child content map into the parent. Explicit-id entries keep the
  * parent-wins-on-collision behavior (and warn). Title-only (auto-slugged)
  * entries are internal and non-referenceable, so they never shadow and never
- * warn — each is re-keyed around the parent's entries and kept.
+ * warn — each is re-keyed around the parent's entries and kept. A declaration
+ * already in the parent (a diamond include delivers the shared file's cached
+ * content through every path) is skipped silently, whatever its key.
  */
 function mergeContentMap<V extends { name?: string; title?: string }>(
     target: Map<string, V>,
     source: Map<string, V>,
     onConflict: (name: string) => void,
 ): void {
+    const merged = new Set(target.values());
     for (const [name, value] of source) {
+        if (merged.has(value)) continue;
         if (!value.name && value.title) {
             target.set(
                 uniqueMapKey(target as Map<string, unknown>, slugifyTitle(value.title)),

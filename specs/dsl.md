@@ -47,7 +47,7 @@ nowline v1 locale:fr-CA
 
 The only directive property today is `locale:`, a BCP-47 tag controlling localized rendering and validator messages. Unknown directive keys are an error so typos surface immediately. See [`specs/localization.md`](./localization.md) for the full locale model, precedence chain, and bundle structure.
 
-`config` and `roadmap` are section markers, not indent-containers. Config keywords (`scale`, `style`, `default`, `calendar`) appear at the top level after `config`. Roadmap keywords (`person`, `team`, `anchor`, `label`, `size`, `status`, `wave`, `swimlane`, `milestone`, `footnote`) appear at the top level after `roadmap`. Indentation is used where nesting is real: style properties under `style`, `scale` and `calendar` block properties under their keyword, team members under `team`, and swimlane contents under `swimlane`.
+`config` and `roadmap` are section markers, not indent-containers. Config keywords (`scale`, `style`, `symbol`, `default`, `calendar`) appear at the top level after `config`. Roadmap keywords (`person`, `team`, `anchor`, `label`, `size`, `status`, `wave`, `swimlane`, `milestone`, `footnote`) appear at the top level after `roadmap`. Indentation is used where nesting is real: style properties under `style`, `scale` and `calendar` block properties under their keyword, team members under `team`, and swimlane contents under `swimlane`.
 
 ## Full Example
 
@@ -680,7 +680,7 @@ Footnotes are numbered sequentially by document order. A superscript number appe
 
 | Category                             | What it contains                                                                                                     | Examples                                                       |
 | ------------------------------------ | -------------------------------------------------------------------------------------------------------------------- | -------------------------------------------------------------- |
-| **Config** (rendering configuration) | scale block, calendar block, styles, defaults                                                                                | Everything between `config` and `roadmap` in the included file |
+| **Config** (rendering configuration) | scale block, calendar block, styles, symbols, defaults                                                                       | Everything between `config` and `roadmap` in the included file |
 | **Roadmap** (content)                | `roadmap` declaration, persons, teams, anchors, labels, sizes, statuses, waves, swimlanes (+ contained items/parallel/groups), milestones, footnotes | Everything after `roadmap` in the included file. Waves never merge: every participating file declares the same waves (Include Rule 12). |
 
 
@@ -720,7 +720,7 @@ Includes are processed in **file order, depth-first**. When the processor encoun
 
 On `merge`, when the parent and child both declare an entity with the same identifier:
 
-- **Config items** (styles): parent wins, child's definition is dropped, warning emitted.
+- **Config items** (styles, symbols): parent wins, child's definition is dropped, warning emitted.
 - **Roadmap entities** (swimlanes, persons, teams, labels, sizes, statuses, anchors, milestones, footnotes, etc.): parent wins, child's entity is dropped, warning emitted. If a swimlane collides, its contained items are also dropped.
 - **Defaults**: `default <entity>` lines can be declared in both parent and child. On collision of entity type, the parent's `default <entity>` wins and a warning is emitted.
 - **Waves** are exempt from parent-wins merge. A child's waves are never merged and never draw a shadow warning: Include Rule 12 requires every participating file to declare the same waves (same ids, order and resolved start floors), so the parent's list is the list. Title and other presentation differences are a warning (`NL.W0701`), and the parent's definition is used.
@@ -765,7 +765,7 @@ swimlane platform owner:platform
 
 #### Scoping rules for `config:isolate`
 
-- Config items (styles, defaults) from the isolated file are **not visible** to the parent or other includes.
+- Config items (styles, symbols, defaults) from the isolated file are **not visible** to the parent or other includes.
 - Config items from the parent are **not visible** to the isolated file's entities.
 - Identifiers (items, swimlanes, anchors, etc.) are governed by `roadmap:` mode, not `config:` mode.
 

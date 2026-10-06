@@ -21,11 +21,12 @@ import {
     type NowlineServices,
     type ResolveDiagnostic,
     resolveIncludes,
+    serializeToJson,
 } from '@nowline/core';
 import type { ExportInputs, ResolvedFontPair } from '@nowline/export-core';
 import { layoutRoadmap, type ThemeName } from '@nowline/layout';
 import { type AssetResolver, type FontFamilies, renderSvg } from '@nowline/renderer';
-import type { AstNode, LangiumDocument } from 'langium';
+import type { LangiumDocument } from 'langium';
 import { URI } from 'langium';
 
 export type { PdfOrientation, ResolvedFontPair } from '@nowline/export-core';
@@ -157,75 +158,24 @@ function freshUri(): URI {
     return URI.parse(`memory:///kernel-${++docCounter}.nowline`);
 }
 
-// ---- Inline JSON serializer ---------------------------------------------------
+// ---- JSON serializer ---------------------------------------------------------
 //
-// Equivalent to packages/cli/src/convert/schema.ts. Inlined here so the kernel
-// has no dependency on @nowline/cli.
-
-const JSON_SCHEMA_VERSION = '1';
-const CONTAINER_KEYS = new Set(['$container', '$containerProperty', '$containerIndex']);
-const RUNTIME_KEYS = new Set(['$cstNode', '$document']);
-
-function isAstNode(v: unknown): v is AstNode {
-    return (
-        v !== null && typeof v === 'object' && typeof (v as { $type?: unknown }).$type === 'string'
-    );
-}
-
-function serializeNode(node: AstNode, includePositions: boolean): Record<string, unknown> {
-    const out: Record<string, unknown> = { $type: node.$type };
-    if (includePositions && node.$cstNode) {
-        const cst = node.$cstNode;
-        out.$position = {
-            start: {
-                line: cst.range.start.line + 1,
-                column: cst.range.start.character + 1,
-                offset: cst.offset,
-            },
-            end: {
-                line: cst.range.end.line + 1,
-                column: cst.range.end.character + 1,
-                offset: cst.end,
-            },
-        };
-    }
-    for (const [key, value] of Object.entries(node)) {
-        if (key.startsWith('$') || CONTAINER_KEYS.has(key) || RUNTIME_KEYS.has(key)) continue;
-        out[key] = serializeValue(value, includePositions);
-    }
-    return out;
-}
-
-function serializeValue(value: unknown, includePositions: boolean): unknown {
-    if (value === null || value === undefined) return value;
-    if (Array.isArray(value)) return value.map((v) => serializeValue(v, includePositions));
-    if (isAstNode(value)) return serializeNode(value, includePositions);
-    if (typeof value === 'object') {
-        const out: Record<string, unknown> = {};
-        for (const [k, v] of Object.entries(value as Record<string, unknown>)) {
-            if (k.startsWith('$') || CONTAINER_KEYS.has(k) || RUNTIME_KEYS.has(k)) continue;
-            out[k] = serializeValue(v, includePositions);
-        }
-        return out;
-    }
-    return value;
-}
+// Delegates to core's `serializeToJson`. The one envelope difference: the
+// kernel parses from a synthetic `memory:///kernel-N.nowline` URI, so it
+// overrides `file.uri` with the raw `file://${sourcePath}` concatenation —
+// not `URI.file()`, which would percent-encode and change the bytes the
+// determinism gate hashes.
 
 function serializeDocumentToJson(
     document: LangiumDocument<NowlineFile>,
     source: string,
     sourcePath: string,
 ): string {
-    const ast = document.parseResult.value;
-    return JSON.stringify(
-        {
-            $nowlineSchema: JSON_SCHEMA_VERSION,
-            file: { uri: `file://${sourcePath}`, source },
-            ast: serializeNode(ast, true),
-        },
-        null,
-        2,
-    );
+    const doc = serializeToJson(document, source, {
+        includePositions: true,
+        uri: `file://${sourcePath}`,
+    });
+    return JSON.stringify(doc, null, 2);
 }
 
 // ---- MIME inference ----------------------------------------------------------

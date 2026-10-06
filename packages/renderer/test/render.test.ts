@@ -1699,3 +1699,63 @@ swimlane a
         expect(light).toContain(`stroke="${darkTheme.wave.hatchOnDark}"`);
     });
 });
+
+describe('renderSvg — arrowhead marker ids', () => {
+    // A cross-lane `after:` draws a dependency edge (`marker-end` on the
+    // neutral marker); the after-only milestone over two parallels draws a
+    // slack arrow (`marker-end` on the dark marker).
+    const ARROWS_DSL = `nowline v1
+
+roadmap r "R" start:2026-01-05
+
+swimlane api "API"
+  item contract "Contract" duration:2w
+swimlane web "Web"
+  item ui "UI" duration:1w after:contract
+  parallel
+    item a "First" duration:1w
+  parallel
+    item b "Second" duration:3w
+  milestone ship "Ship" after:[a, b]
+`;
+
+    const markerIds = (svg: string): string[] =>
+        [...svg.matchAll(/<marker id="([^"]+)"/g)].map((m) => m[1]);
+    const markerRefs = (svg: string): string[] =>
+        [...svg.matchAll(/marker-end="url\(#([^)]+)\)"/g)].map((m) => m[1]);
+
+    it('scopes marker ids to the per-document idPrefix', async () => {
+        // Two SVGs inlined in one HTML page share an id namespace, and
+        // `url(#id)` resolves to the first match. Global `nl-arrow` ids
+        // let a light diagram's arrowheads paint a dark diagram's edges.
+        const light = await parseToModel(ARROWS_DSL, { theme: 'light' });
+        const dark = await parseToModel(ARROWS_DSL, { theme: 'dark' });
+        expect(light.edges.length).toBeGreaterThan(0);
+        expect(light.milestones.some((m) => (m.slackArrows?.length ?? 0) > 0)).toBe(true);
+
+        const svgA = await renderSvg(light, { idPrefix: 'doc-a' });
+        const svgB = await renderSvg(dark, { idPrefix: 'doc-b' });
+        const idsA = markerIds(svgA);
+        const idsB = markerIds(svgB);
+        expect(idsA).toHaveLength(3);
+        expect(idsB).toHaveLength(3);
+        for (const id of [...idsA, ...idsB]) expect(id).not.toMatch(/^nl-arrow/);
+        expect(idsA.filter((id) => idsB.includes(id))).toEqual([]);
+
+        // Every edge and slack arrow references a marker in its own document.
+        for (const [svg, ids] of [
+            [svgA, idsA],
+            [svgB, idsB],
+        ] as const) {
+            const refs = markerRefs(svg);
+            expect(refs.length).toBeGreaterThanOrEqual(2);
+            for (const ref of refs) expect(ids).toContain(ref);
+        }
+    });
+
+    it('keeps the default render free of the legacy global marker ids', async () => {
+        const svg = await renderSvg(await parseToModel(ARROWS_DSL));
+        expect(svg).not.toContain('id="nl-arrow');
+        expect(svg).not.toContain('url(#nl-arrow');
+    });
+});
