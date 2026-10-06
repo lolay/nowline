@@ -105,6 +105,8 @@ Multi-row headers (year over month over day) drop out for free. Adding a new pre
 
 ### WorkingCalendar
 
+> **Superseded.** Only the interface stub landed; no axis compression shipped. Non-working days are now proposed in [`working-calendar.md`](./working-calendar.md), which separates the schedule (always in working days) from the view (`non-working:hide|show`) and replaces the factories below with `non-working` declarations.
+
 Strategy interface for non-continuous time (skip weekends, holidays, custom shutdowns). Slots into `TimeScale` as one optional constructor argument; no other module needs to know it exists.
 
 ```ts
