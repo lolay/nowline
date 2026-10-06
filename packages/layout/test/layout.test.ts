@@ -626,6 +626,85 @@ swimlane plugin "Plugin"
         const timelineRightX = model.timeline.box.x + model.timeline.box.width;
         expect(include.box.x + include.box.width).toBeLessThanOrEqual(timelineRightX);
     });
+
+    it('stretches every swimlane band to the timeline right edge when the post-layout extension fires', async () => {
+        // `fri` sits exactly on the pre-pass window end (day 25), so its
+        // diamond radius overflows the window and the post-layout
+        // extension grows the timeline by one column. The lane bands
+        // must reach the extended canvas, not the pre-extension width.
+        const src = `nowline v1
+
+roadmap r "R" start:2026-01-05 scale:1w calendar:business
+
+milestone fri "Fri Jan 30" date:2026-01-30
+
+swimlane a "A"
+  item w1 "W1" duration:1w
+  item w2 "W2" duration:1w
+  item w3 "W3" duration:1w
+  item w4 "W4" duration:1w
+`;
+        const { file, resolved } = await parseAndResolve(src);
+        const model = layoutRoadmap(file, resolved, { theme: 'light' });
+        // Guard against a vacuous pass: the extension really fired.
+        expect(model.timeline.endDate.getTime()).toBeGreaterThan(Date.UTC(2026, 0, 30));
+        const timelineRightX = model.timeline.box.x + model.timeline.box.width;
+        expect(model.swimlanes).toHaveLength(1);
+        for (const lane of model.swimlanes) {
+            expect(lane.box.x + lane.box.width).toBeGreaterThanOrEqual(timelineRightX);
+            expect(lane.box.width).toBe(model.width);
+        }
+    });
+
+    it('re-fits an include region box against the extended canvas when the post-layout extension fires', async () => {
+        // The child's five-week bars end where the pre-pass window ends,
+        // so the include's shrink-wrap (bars + right pad) is clamped by
+        // the pre-extension canvas width. `fri` then overflows the
+        // window and grows the canvas; the include must re-fit to its
+        // natural width rather than keep the stale clamp. A later
+        // milestone date (no clamp in play) is the reference width.
+        const childSrc = `nowline v1
+
+roadmap c "C" start:2026-01-05 scale:1w calendar:business
+
+swimlane b "B"
+  item x1 "X1" duration:1w
+  item x2 "X2" duration:1w
+  item x3 "X3" duration:1w
+  item x4 "X4" duration:1w
+  item x5 "X5" duration:1w
+`;
+        const parentSrc = (date: string) => `nowline v1
+
+include "./child.nowline" roadmap:isolate
+
+roadmap r "R" start:2026-01-05 scale:1w calendar:business
+
+milestone fri "Fri" date:${date}
+
+swimlane a "A"
+  item w1 "W1" duration:1w
+`;
+        const layoutAt = async (date: string) => {
+            const { file, resolved } = await parseAndResolve(
+                parentSrc(date),
+                '/virtual/test.nowline',
+                async () => childSrc,
+            );
+            return layoutRoadmap(file, resolved, { theme: 'light' });
+        };
+        const extended = await layoutAt('2026-01-30');
+        const reference = await layoutAt('2026-02-06');
+        expect(extended.timeline.endDate.getTime()).toBeGreaterThan(Date.UTC(2026, 0, 30));
+        expect(extended.includes).toHaveLength(1);
+        expect(reference.includes).toHaveLength(1);
+        const include = extended.includes[0];
+        expect(include.box.width).toBe(reference.includes[0].box.width);
+        expect(include.box.x + include.box.width).toBeLessThanOrEqual(extended.width);
+        for (const lane of include.nestedSwimlanes) {
+            expect(lane.box.width).toBe(include.box.width);
+        }
+    });
 });
 
 describe('layoutRoadmap month-scale header past 12 months', () => {
