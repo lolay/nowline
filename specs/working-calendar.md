@@ -141,7 +141,7 @@ On `config:merge` the parent wins on an id collision, with the existing shadowin
 ### 4.4 Lexer and v1 compatibility
 
 - `non-working` would be the first hyphenated keyword. Hyphens are already legal in `ID` and in property keys. Langium sets Chevrotain `longer_alt` for keywords, so `non-working-team` should still lex as `ID`. This needs a grammar test before the name is final (§11).
-- Reserving the word follows the waves precedent (`waves/waves.md` §4.7): an `EntityName` rule keeps bare-word uses such as `item non-working` parsing, and the JSON AST of an existing file stays byte-identical.
+- Reserving the word follows the waves precedent ([`waves.md`](./waves.md) §4.7): an `EntityName` rule keeps bare-word uses such as `item non-working` parsing, and the JSON AST of an existing file stays byte-identical.
 - `through:` and `every:` are new property keys. On any other entity they get the existing unknown-property warning.
 - The printer adds `non-working` to the config section order, after `calendar`, and `through` / `every` to its key order.
 
@@ -180,7 +180,7 @@ interface WorkingCalendar {
 
 ### 5.3 The three engines
 
-The waves spec names them (`waves/handoff.md` §4.1). All three must agree:
+The waves handoff names them ([`handoffs/handoff-m2o-waves.md`](./handoffs/handoff-m2o-waves.md) §4.1). All three must agree:
 
 - **Engine A, the pixel layout.** Under `hide`, x is linear in working index, so the engine's pixel arithmetic is unchanged: only `TimeScale.forward` / `invert` change (§7.1), and every date-to-x conversion already goes through them. Under `show`, positions are computed in the same `hide`-space pixels and then projected (§7.3). The engine's pixel-space quirks (caption spill into the lane cursor, the 8 px track gutter, the minimum bar width; divergences (b)–(d) in the waves handoff) keep working because they stay in `hide` space.
 - **Engine B, the day-space extent** (`computeContentEndDay`, `computeDateWindow` in `layout.ts`). It counts working days, and pins convert with `workingIndexOf`.
