@@ -1,4 +1,5 @@
 import { describe, expect, it } from 'vitest';
+import { contrastRatio } from '../src/themes/contrast.js';
 import {
     darkTheme,
     grayscaleNamed,
@@ -108,4 +109,46 @@ describe('grayscale theme achromatic invariant', () => {
         const chromatic = hexValues.filter((h) => !isAchromatic(h));
         expect(chromatic).toEqual([]);
     });
+});
+
+describe('contrastRatio', () => {
+    it('is 21 for black on white and symmetric', () => {
+        expect(contrastRatio('#000000', '#ffffff')).toBeCloseTo(21, 5);
+        expect(contrastRatio('#fff', '#000')).toBeCloseTo(21, 5);
+    });
+
+    it('is 1 for equal colours', () => {
+        expect(contrastRatio('#0d9488', '#0d9488')).toBeCloseTo(1, 5);
+    });
+});
+
+describe('wave theme contrast floors (specs/waves.md 9.10)', () => {
+    const all = { light: lightTheme, dark: darkTheme, grayscale: grayscaleTheme };
+    for (const [name, t] of Object.entries(all)) {
+        describe(name, () => {
+            const b = t.wave.boundary;
+            it('boundary vs grid lines >= 2.0', () => {
+                expect(contrastRatio(b, t.timeline.gridLine)).toBeGreaterThanOrEqual(2.0);
+                expect(contrastRatio(b, t.timeline.minorGridLine)).toBeGreaterThanOrEqual(2.0);
+            });
+            it('boundary vs lane tints >= 3.0', () => {
+                expect(contrastRatio(b, t.swimlane.rowTintEven)).toBeGreaterThanOrEqual(3.0);
+                expect(contrastRatio(b, t.swimlane.rowTintOdd)).toBeGreaterThanOrEqual(3.0);
+            });
+            it('label text vs strip fills >= 4.5', () => {
+                expect(contrastRatio(t.wave.labelText, t.wave.stripFill)).toBeGreaterThanOrEqual(
+                    4.5,
+                );
+                expect(contrastRatio(t.wave.labelText, t.wave.stripFillAlt)).toBeGreaterThanOrEqual(
+                    4.5,
+                );
+            });
+            it('boundary differs from milestone and anchor cut lines', () => {
+                const norm = (c: string) => c.toLowerCase();
+                expect(norm(b)).not.toBe(norm(t.milestoneDiamond.cutLineNormal));
+                expect(norm(b)).not.toBe(norm(t.milestoneDiamond.cutLineOverrun));
+                expect(norm(b)).not.toBe(norm(t.anchorDiamond.cutLine));
+            });
+        });
+    }
 });

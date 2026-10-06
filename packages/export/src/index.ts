@@ -16,8 +16,10 @@
 import {
     collectDocumentDiagnostics,
     createNowlineServices,
+    isRoutedResolveDiagnostic,
     type NowlineFile,
     type NowlineServices,
+    type ResolveDiagnostic,
     resolveIncludes,
     serializeToJson,
 } from '@nowline/core';
@@ -37,6 +39,25 @@ export {
     resolveToday,
     TimezoneError,
 } from '@nowline/layout';
+
+/**
+ * Thrown when include resolution reports a wave-rule error (a coded or
+ * `rule: 'wave'` diagnostic, specs/waves.md §6.1) and no other include error.
+ * `message` is the same `@nowline/export: include error in …` text as the
+ * plain include error; `diagnostics` carries every resolver diagnostic, errors
+ * and warnings, so a surface can report the routed ones (see
+ * `isRoutedResolveDiagnostic`) with file and line, like validator diagnostics.
+ * Every other include error stays a plain `Error`.
+ */
+export class IncludeResolveError extends Error {
+    readonly diagnostics: ResolveDiagnostic[];
+
+    constructor(message: string, diagnostics: ResolveDiagnostic[]) {
+        super(message);
+        this.name = 'IncludeResolveError';
+        this.diagnostics = diagnostics;
+    }
+}
 
 /** The eight canonical export formats. Every surface produces exactly these. */
 export type ExportFormat = 'svg' | 'png' | 'pdf' | 'html' | 'mermaid' | 'xlsx' | 'msproj' | 'json';
@@ -103,6 +124,14 @@ export interface RenderInputs {
     pngScale?: number;
     /** MS Project start-date override (YYYY-MM-DD). */
     msprojStart?: string;
+
+    // ---- host callbacks ---------------------------------------------------
+    /**
+     * Called before layout with the routed (wave-rule) resolver diagnostics
+     * when include resolution succeeds, which leaves only warnings (possibly
+     * none). Errors throw `IncludeResolveError` instead. Never affects output.
+     */
+    onResolveDiagnostics?: (diagnostics: ResolveDiagnostic[]) => void;
 }
 
 // ---- Langium services singleton -----------------------------------------------
@@ -224,13 +253,19 @@ async function stageDocument(
         services: services.Nowline,
         readFile: host.readSource.bind(host),
     });
-    for (const diag of resolved.diagnostics) {
-        if (diag.severity === 'error') {
-            throw new Error(
-                `@nowline/export: include error in ${inputs.sourcePath}: ${diag.message}`,
-            );
-        }
+    // Include errors are more fundamental than wave-rule errors: any of them
+    // keeps the plain throw. Wave-rule errors alone travel on a typed error.
+    const includeError = (diag: ResolveDiagnostic): string =>
+        `@nowline/export: include error in ${inputs.sourcePath}: ${diag.message}`;
+    const resolveErrors = resolved.diagnostics.filter((d) => d.severity === 'error');
+    const legacyError = resolveErrors.find((d) => !isRoutedResolveDiagnostic(d));
+    if (legacyError) {
+        throw new Error(includeError(legacyError));
     }
+    if (resolveErrors.length > 0) {
+        throw new IncludeResolveError(includeError(resolveErrors[0]), resolved.diagnostics);
+    }
+    inputs.onResolveDiagnostics?.(resolved.diagnostics.filter(isRoutedResolveDiagnostic));
 
     const model = layoutRoadmap(ast, resolved, {
         theme: inputs.theme,

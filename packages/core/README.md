@@ -35,6 +35,7 @@ const resolved = await resolveIncludes(ast, '/absolute/path/to/roadmap.nowline',
 
 resolved.config.styles;        // Map<string, StyleDeclaration>
 resolved.content.swimlanes;    // Map<string, SwimlaneDeclaration>
+resolved.content.waves;        // Map<string, WaveDeclaration> | undefined (set when a file declares waves)
 resolved.content.isolatedRegions;
 resolved.diagnostics;          // Array<ResolveDiagnostic>
 ```

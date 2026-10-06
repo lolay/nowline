@@ -9,6 +9,7 @@ const KEY_ORDER = [
     'duration',
     'status',
     'owner',
+    'wave',
     'after',
     'before',
     'remaining',
@@ -148,6 +149,8 @@ class Printer {
                 return this.simpleEntity('status', entry, depth);
             case 'LabelDeclaration':
                 return this.simpleEntity('label', entry, depth);
+            case 'WaveDeclaration':
+                return this.simpleEntity('wave', entry, depth);
             case 'MilestoneDeclaration':
                 return this.simpleEntity('milestone', entry, depth);
             case 'FootnoteDeclaration':

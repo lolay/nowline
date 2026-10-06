@@ -46,7 +46,7 @@ scale, calendar, symbols.
 .It
 .Sy roadmap
 section (required). Content: persons, teams, anchors, labels, sizes,
-statuses, swimlanes, items, milestones, footnotes.
+statuses, waves, swimlanes, items, milestones, footnotes.
 .El
 .Pp
 .Sy config
@@ -170,7 +170,7 @@ declarations.
 The included file's
 .Sy roadmap
 declaration plus all its content (persons, teams, anchors, labels,
-sizes, statuses, swimlanes, items, milestones, footnotes).
+sizes, statuses, waves, swimlanes, items, milestones, footnotes).
 .El
 .Pp
 .Sy config:
@@ -258,6 +258,38 @@ line; this is an explicit exception to the
 merge behaviour because
 .Sy start:
 defines the shared timeline baseline.
+.Pp
+Waves never merge.
+For any include whose
+.Sy roadmap:
+mode is not
+.Sy ignore ,
+if the child declares a
+.Sy roadmap ,
+has swimlanes, or declares waves, the parent and child must declare
+the same waves: the same ids, in the same order, with the same
+resolved start floors.
+Floors are compared by the date they resolve to, so
+.Sy after:fy-budget
+and
+.Sy after:2026-02-02
+agree when the anchor is on that date.
+A mismatch in either direction is the error
+.Sy NL.E0202 ,
+reported on the parent's
+.Sy include
+line; two files with no waves pass.
+Waves are barriers across the whole canvas, so a silently shadowed
+wave list would move every lane's columns.
+When ids, order and floors agree, a differing title,
+.Sy style: ,
+.Sy labels: ,
+.Sy link: ,
+or description is the warning
+.Sy NL.W0701
+and the parent's definition is used.
+A vocabulary-only child (persons, teams, labels, sizes, statuses,
+anchors; no roadmap, no swimlanes, no waves) does not take part.
 .Sh CONFIG SECTION
 The optional
 .Sy config
@@ -370,6 +402,13 @@ Banned, by entity type:
 .Sy date , link , description .
 .It Sy default footnote
 .Sy on , link , description .
+.It Sy every default line
+.Sy wave
+\(em sequencing creates invisible dependencies, and there is no
+.Sy default wave .
+In a roadmap with waves it is an error; in a roadmap without waves
+it is ignored with the warning
+.Sy NL.W0702 .
 .El
 .Pp
 Raw style properties
@@ -564,9 +603,9 @@ default
 .Sy md .
 .El
 .Pp
-Twelve roadmap-section keywords:
+Thirteen roadmap-section keywords:
 .Sy swimlane , item , parallel , group ,
-.Sy person , team , anchor , label , size , status , milestone ,
+.Sy person , team , anchor , label , size , status , wave , milestone ,
 .Sy footnote .
 Each follows the universal
 .Sy [id] ["title"] [key:value...]
@@ -780,6 +819,119 @@ overrides.
 .Pp
 .Sy status
 declarations must precede any entity that references them.
+.Ss wave \(em barrier across every swimlane
+.Bd -literal -offset indent
+wave id ["title"] [after:anchor|milestone|date] \e
+    [style:...] [labels:...] [link:...]
+.Ed
+.Pp
+A
+.Sy wave
+is a strict, sequential barrier that spans every swimlane:
+.Em no item in wave k+1 starts before every item in wave k has ended .
+A wave opens for every lane at the instant the previous wave's
+slowest member ends, so lanes that finish early wait at the boundary.
+Waves are declared once, in order, in the roadmap section, and
+declaration order is time order.
+Work joins a wave with the
+.Sy wave:
+property on an
+.Sy item ,
+.Sy group ,
+or
+.Sy parallel .
+.Bd -literal -offset indent
+wave discover "Discover"
+wave build "Build"
+wave launch "Launch" after:fy-budget
+
+swimlane web "Web"
+  item research "UX research" duration:2w wave:discover
+  group wave:build
+    item checkout "Checkout v2" duration:3w
+    item a11y "Accessibility pass" duration:1w
+  item launch-page "Launch page" duration:1w wave:launch
+swimlane ops "Ops"
+  item on-call "On-call and KTLO" duration:10w
+
+milestone beta "Beta" after:build
+.Ed
+.Pp
+A
+.Sy wave
+line accepts:
+.Bl -tag -width "style:"
+.It Sy id
+Required
+.Pq Sy NL.E1100 .
+Joins the single shared identifier namespace.
+.It Sy title
+Optional.
+The strip label; falls back to the id.
+.It Sy after:
+Optional start floor.
+The wave cannot open before the latest of its elements.
+Each element must be an anchor id, the id of a milestone that has
+.Sy date: ,
+or an ISO date (at most one date); any other kind of entity is
+.Sy NL.E1106 .
+A gap between one wave's end and the next wave's floor is allowed.
+.It Sy style:
+Wave colours: the style's
+.Sy bg
+opts the wave into a column tint,
+.Sy fg
+colours its boundary line,
+.Sy text
+its strip label, and
+.Sy border
+sets the boundary dash.
+.It Sy labels: , link: , description
+Carried in the model, JSON and XLSX export, and LSP hover; not painted.
+.El
+.Pp
+Keys not allowed on a
+.Sy wave :
+.Sy before: , date: , start: , length: , duration: , size: ,
+.Sy capacity: , remaining: , wave:
+.Pq Sy NL.E1105 .
+A wave's span comes from its items.
+To give a wave a deadline, add a dated milestone
+.Sy after:<wave> ;
+it turns red when the wave runs late.
+.Pp
+Items without an effective wave are
+.Em background work :
+on-call, support, ongoing maintenance.
+A barrier never holds background work back and its own end never
+extends a wave, but it still follows lane order and its own
+.Sy after: .
+Background work is drawn hatched.
+.Pp
+A wave id is a valid
+.Sy after: ,
+.Sy before: ,
+and
+.Sy on:
+target.
+.Sy after:<wave>
+starts no earlier than the end of that wave, and a floating
+.Sy milestone after:<wave>
+sits on the wave's closing boundary.
+.Sy before:<wave>
+should finish before the wave's start (soft, like every
+.Sy before: ) .
+.Sy on:<wave>
+attaches a footnote to the wave.
+Wave references draw no dependency arrow.
+.Pp
+A roadmap
+.Qq has waves
+when it declares at least one wave with a valid id.
+In a roadmap without waves every
+.Sy wave:
+key is ignored with the warning
+.Sy NL.W0702 .
 .Ss milestone \(em achievement marker
 .Bd -literal -offset indent
 milestone v1-ga "v1 GA" date:2026-06-30
@@ -809,7 +961,7 @@ footnote capacity-risk "Team capacity risk" on:[mobile, platform]
 .Pp
 .Sy on:
 is required and references one or more identifiers (item,
-swimlane, anchor, milestone, person, team).
+swimlane, anchor, milestone, wave, person, team).
 Use bracket notation for multiples:
 .Sy on:[id1, id2] .
 Footnotes are numbered sequentially by document order; a
@@ -871,7 +1023,7 @@ and the
 sub-directive.
 .Sh UNIVERSAL PROPERTIES
 These properties are valid on every entity type: items, swimlanes,
-parallel blocks, groups, milestones, anchors, persons, teams,
+parallel blocks, groups, milestones, anchors, waves, persons, teams,
 labels, sizes, statuses, footnotes.
 .Bl -tag -width "description"
 .It Sy labels:
@@ -921,6 +1073,8 @@ lines \(em both of which live in
 and
 .Sy before
 are also valid on swimlanes, parallel blocks, and groups.
+.Sy wave
+is also valid on parallel blocks and groups, but not on swimlanes.
 The rest are item-only.
 .Bl -tag -width "remaining"
 .It Sy status:
@@ -945,12 +1099,30 @@ Identifier or bracketed list.
 The entity starts after the referenced entity finishes.
 .Sy after:[a, b]
 starts after the latest finisher.
-Accepts item, milestone, anchor, parallel, or group ids.
+Accepts item, milestone, anchor, parallel, group, or wave ids.
 .It Sy before:
 Identifier or bracketed list.
 The entity must finish before the referenced entity starts.
 .Sy before:[a, b]
 finishes before the earliest starter.
+.It Sy wave:
+Wave id.
+Exactly one declared
+.Sy wave
+.Pq Sy wave:build ;
+an item belongs to at most one wave.
+The effective wave of an item is its own value, else that of its
+nearest enclosing
+.Sy group
+or
+.Sy parallel
+that carries one; a swimlane never contributes.
+A descendant may repeat its container's value but not differ from it
+.Pq Sy NL.E1102 .
+A block without
+.Sy wave:
+may hold children in different waves.
+Only meaningful in a roadmap with waves.
 .It Sy size:
 Size alias.
 .Sy size:l
@@ -1275,7 +1447,7 @@ Identifiers match
 letters, digits, underscores, and dashes, starting with a letter
 or underscore.
 They must be unique across the merged result (the file and all
-its includes); items, parallel blocks, groups, anchors, persons,
+its includes); items, parallel blocks, groups, anchors, waves, persons,
 teams, milestones, footnotes share one namespace.
 .Pp
 Idiomatic Nowline uses kebab-case but
@@ -1306,7 +1478,7 @@ and
 .Sy before:
 each accept a single identifier or a bracketed list.
 References may target items, milestones, anchors, parallel
-blocks, or groups.
+blocks, groups, or waves.
 .Bl -bullet -offset indent -compact
 .It
 .Sy after:id
@@ -1326,6 +1498,17 @@ referenced entities finish (i.e. after the latest of them).
 \(em finishes before the
 .Em earliest
 of the referenced entities starts.
+.It
+.Sy after:wave
+\(em starts no earlier than the
+.Em end
+of the wave.
+.Sy before:wave
+\(em should finish before the
+.Em start
+of the wave.
+.Sy on:wave
+\(em attaches a footnote to the wave.
 .El
 .Pp
 Circular dependencies across the full graph (including every
@@ -1371,7 +1554,8 @@ declaration per file (subject to
 mode).
 .It
 All identifiers are unique across the merged result.
-Parent wins on collision, with a warning.
+Parent wins on collision, with a warning (waves excepted; see
+.Sx INCLUDES ) .
 .It
 Every entity must have at least an identifier or a title (or
 both).
@@ -1400,8 +1584,9 @@ line.
 .It
 .Sy label ,
 .Sy size ,
+.Sy status ,
 and
-.Sy status
+.Sy wave
 declarations must appear in the roadmap section.
 Placing them before
 .Sy roadmap
@@ -1418,12 +1603,13 @@ and
 must resolve to declared identifiers within the merged scope.
 .It
 A
-.Sy size:
+.Sy size: ,
+.Sy status: ,
 or
-.Sy status:
+.Sy wave:
 reference must resolve to a declaration that appears
 .Em earlier in the file
-(or in an earlier include).
+(or in an earlier include; waves are never contributed by includes).
 Forward references are an error.
 .It
 No circular dependencies in
@@ -1612,7 +1798,104 @@ both absent or both present with identical values.
 A mismatch is an error reported on the parent's
 .Sy include
 line.
+.It
+For any
+.Sy include
+whose
+.Sy roadmap:
+mode is not
+.Sy ignore ,
+a participating child (one that declares a roadmap, swimlanes, or
+waves) must declare the same waves, in the same order, with the same
+resolved start floors, as the parent
+.Pq Sy NL.E0202 .
+A differing title or other presentation is the warning
+.Sy NL.W0701 .
 .El
+.Ss Waves
+These rules apply to files that use
+.Sy wave
+or
+.Sy wave: .
+Each has a stable diagnostic code.
+.Bl -tag -width "NL.E1100" -offset indent -compact
+.It Sy NL.E1100
+A
+.Sy wave
+declaration has no identifier.
+.It Sy NL.E1101
+A
+.Sy wave:
+value is not exactly one wave declared earlier: a list of two or
+more, an undeclared id, a forward reference, or an id of another
+kind.
+.It Sy NL.E1102
+A descendant's
+.Sy wave:
+differs from its container's.
+.It Sy NL.E1103
+The wave order cannot be realized: some work would have to start at
+or after the end of its own wave, because of lane order, a
+.Sy parallel
+join, or an
+.Sy after:
+that names the item's own wave, a later wave, or work in a later wave
+(directly or through a chain of other work).
+.It Sy NL.E1104
+.Sy wave:
+on a swimlane, a milestone, or any entity other than item, group,
+or parallel.
+.It Sy NL.E1105
+A key that is not allowed on a wave
+.Po
+.Sy before: , date: , start: , length: , duration: , size: ,
+.Sy capacity: , remaining: , wave:
+.Pc .
+.It Sy NL.E1106
+A wave's
+.Sy after:
+names something other than an anchor, a dated milestone, or one ISO
+date.
+.It Sy NL.W1100
+A
+.Sy before:
+that the wave structure guarantees can never be met.
+.It Sy NL.W1101
+An
+.Sy after:
+or
+.Sy before:
+that layout ignores in a roadmap with waves: a forward reference, a
+reference to the enclosing group or parallel, or a reference to a
+floating milestone.
+.It Sy NL.W0702
+.Sy wave:
+(including on a
+.Sy default
+line) in a roadmap that declares no waves; the key is ignored.
+.El
+.Pp
+Include agreement is
+.Sy NL.E0202
+and
+.Sy NL.W0701
+(see
+.Sx INCLUDES ) .
+Layout adds four insights:
+.Sy NL.W1001
+(a barrier moved an item's
+.Sy date:
+or
+.Sy start:
+pin),
+.Sy NL.W1002
+(the barrier solver did not settle),
+.Sy NL.I1006
+(waves with no items), and
+.Sy NL.I1007
+(a wave overruns a dated milestone whose
+.Sy after:
+names it).
 .Ss Parallel and group
 .Bl -bullet -offset indent -compact
 .It
@@ -1655,6 +1938,13 @@ A
 that sets a banned property
 .Pq see Sx CONFIG SECTION
 is an error.
+.It
+.Sy wave
+is banned on every
+.Sy default <entity>
+line: an error when the roadmap has waves, the warning
+.Sy NL.W0702
+when it has none.
 .El
 .Ss Symbols
 .Bl -bullet -offset indent -compact
@@ -1765,6 +2055,38 @@ footnote "Vendor dependency" on:audit-log
   description "Blocked until vendor contract is signed."
 footnote capacity-risk "Team capacity risk" on:[mobile, platform]
   description "Mobile team is down to 2 engineers through Q2."
+.Ed
+.Pp
+A compact roadmap with waves:
+.Bd -literal -offset indent
+nowline v1
+
+roadmap checkout-relaunch "Checkout relaunch" \e
+    start:2026-01-05 scale:1w calendar:full
+
+wave foundations "Foundations"
+wave build "Build"
+wave launch "Launch"
+
+swimlane platform "Platform"
+  item auth "Auth service split" duration:4w wave:foundations
+  item payments-api "Payments API v2" duration:8w wave:build
+  item rate-limits "Rate limits" duration:2w wave:launch
+
+swimlane web "Web"
+  item ux-research "Checkout UX research" duration:2w \e
+    wave:foundations
+  group wave:build
+    item checkout-v2 "Checkout v2" duration:4w
+    item a11y "Accessibility pass" duration:2w
+  item launch-page "Launch page" duration:2w wave:launch
+
+// No wave: background work, never held by a barrier.
+swimlane ops "Ops"
+  item on-call "On-call and KTLO" duration:18w
+
+milestone beta "Beta" after:build
+milestone ga "GA" after:launch
 .Ed
 .Sh SEE ALSO
 .Xr nowline 1

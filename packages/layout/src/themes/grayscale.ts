@@ -198,6 +198,15 @@ export const grayscaleTheme: Theme = {
         badgeStroke: '#bdbdbd',
         badgeText: '#595959',
     },
+    wave: {
+        stripFill: '#fafafa',
+        stripFillAlt: '#e0e0e0',
+        labelText: '#212121',
+        labelMuted: '#616161',
+        boundary: '#616161',
+        hatch: '#000000',
+        hatchOnDark: '#ffffff',
+    },
     arrowhead: {
         neutral: '#595959',
         light: '#9e9e9e',

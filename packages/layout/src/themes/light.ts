@@ -199,6 +199,15 @@ export const lightTheme: Theme = {
         badgeStroke: '#cbd5e1',
         badgeText: '#475569',
     },
+    wave: {
+        stripFill: '#f0fdfa',
+        stripFillAlt: '#ccfbf1',
+        labelText: '#134e4a',
+        labelMuted: '#0f766e',
+        boundary: '#0d9488',
+        hatch: '#0f172a',
+        hatchOnDark: '#ffffff',
+    },
     arrowhead: {
         neutral: '#475569',
         light: '#94a3b8',

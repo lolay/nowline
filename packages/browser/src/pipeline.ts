@@ -20,6 +20,7 @@
 import {
     collectDocumentDiagnostics,
     createNowlineServices,
+    isRoutedResolveDiagnostic,
     type NowlineFile,
     type NowlineServices,
     resolveIncludes,
@@ -238,6 +239,14 @@ export async function renderSource(
         readFile,
     });
 
+    // An uncoded include error takes precedence: when one is reported, the
+    // routed (wave-rule) diagnostics are dropped (specs/waves.md §6.1).
+    const hasLegacyError = resolved.diagnostics.some(
+        (d) =>
+            d.severity === 'error' &&
+            !isRoutedResolveDiagnostic(d) &&
+            !isNoOpIncludeDiagnosticMessage(d.message),
+    );
     const rows: DiagnosticRow[] = [...parsed.diagnostics];
     for (const diag of resolved.diagnostics) {
         if (diag.severity === 'error' && isNoOpIncludeDiagnosticMessage(diag.message)) {
@@ -247,6 +256,7 @@ export async function renderSource(
             });
             continue;
         }
+        if (hasLegacyError && isRoutedResolveDiagnostic(diag)) continue;
         rows.push(fromResolveDiagnostic(diag));
     }
     if (rows.some((r) => r.severity === 'error')) {

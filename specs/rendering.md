@@ -43,6 +43,14 @@ This document describes the public **output contract**. The internal layout-engi
 - **Parallel regions** — bounding area for parallel tracks, with optional bracket visual (controlled by `bracket` property)
 - **Group regions** — bounding area for sequential item bundles, with optional label (visible only when styled)
 - **Include regions** — bounding rectangle for `roadmap:isolate` includes, with label and indicator metadata
+- **Waves** (only when the roadmap declares waves; every field below is omitted, never `undefined` or `[]`, when it does not):
+  - `PositionedRoadmap.waves` — one `PositionedWave` per declared wave: id, title, 0-based `index` and `visibleOrdinal`, logical `startX`/`endX` and `startDate`/`endDate` (end exclusive), `memberCount`, `empty`, `heldBy` (the member that set the wave's end), `floorRef` (the `after:` value that held the start back), `columnBox`, the strip cell (box, label and label kind, tooltip), resolved style, and footnote indicators.
+  - `PositionedRoadmap.waveBoundaries` (vertical boundary lines), `waveCrossings` (dashed marks over background bars), `waveLegend` (box and entries), and `waveSolve` (`{ passes, capped }`, the barrier solver's result, which drives `NL.W1002`).
+  - `PositionedTimelineScale.waveStrip` — `{ y, height, placeholder? }` for the strip row.
+  - `PositionedItem.waveRole` (`'member'` or `'background'`, set on every item), `waveTooltip` (the localized `Background (no wave)` hover line, on background items only) and `wavePinOverride` (a `date:`/`start:` pin a barrier moved).
+  - `PositionedGroup.waveOnly` (an untitled, unstyled group with `wave:` and no `labels:`; it draws no bracket).
+  - `PositionedMilestone.onWaveBoundary` (suppresses the cut line) and `overrunByWave` (the wave that overruns a dated milestone).
+  - `PositionedIncludeRegion.waveCrossings` — crossings re-emitted inside an isolated region.
 
 The layout engine is pure computation — no DOM, no SVG, no side effects. It runs identically in Node.js and the browser.
 
@@ -139,6 +147,7 @@ A single-row header displays the scale units (days, weeks, months, quarters, yea
 - **Range**: the first tick mark aligns with the earliest item start or anchor date, with the roadmap's `padding` as whitespace before it. The last tick mark extends to the latest item end, anchor date, or milestone date, with the same padding after. The right edge is the later of `length:` (when set) and the content end rounded up to the next tick boundary (the next month / quarter / year start on those scales), so a `length:` that runs past the content can leave a partial last column.
 - **Custom units**: custom units (e.g., `sprints = 2w`) map to their underlying duration for positioning; labels use the custom unit name
 - **Mirrored bottom strip**: when `timeline-position:bottom` or `timeline-position:both` is set on the roadmap, the renderer emits a second tick-label panel below the chart's last swimlane (and below any isolate-include regions), above the footnote panel. The mirrored strip shares the same fill, border, label color, and tick positions as the top strip — it has no now-pill and no marker row (anchors and milestones still belong to the top header). The default `timeline-position:top` keeps the existing single-strip layout.
+- **Wave strip**: when the roadmap declares waves, a 20 px strip row (`WAVE_STRIP_HEIGHT_PX`) sits between the tick panel and the marker rows (anchors and milestones), so the header stack is now-pill, tick panel, wave strip, marker rows, then the 8 px gap above the chart. The marker-row panel moves down by the strip's height. With `timeline-position:bottom` the tick panel height is 0 and the strip sits directly under the now-pill row; the mirrored bottom panel carries no strip. Roadmaps without waves keep today's header exactly. See [Waves](#waves).
 - **Minor-tick grid lines**: when `minor-grid:true` is set on the roadmap, every tick boundary (not just the labeled major ones) gets a thin dotted grid line drawn in the theme's `timeline.minorGridLine` color — fainter than the major grid lines so the major ticks still dominate. The minor lines drop from the same y as the major lines and stop at the same chart bottom. Default `minor-grid:false` keeps existing renders unchanged.
 
 ### The Now-Line
@@ -292,6 +301,7 @@ Milestones render as a **diamond in the timeline header row** at the milestone's
   - **Slack arrows**: each non-binding predecessor draws one dotted ink arrow from its **visual right edge** to the milestone line. The arrow attaches at the predecessor's **nominal row midline** (`bar.top + bandwidth / 2`, the same line its dependency arrows use, see [Attach geometry](#attach-geometry)) by default, so on a bar grown by a wrapped title or label chips the dotted arrow leaves level with the dependency arrows rather than at the taller bar's own mid-height; when the predecessor's caption spills past the bar's right edge (the title/meta render *adjacent* to the bar instead of inside it) the attach point drops to the **vertical center of the bottom progress strip** (`box.bottom - PROGRESS_STRIP_HEIGHT_PX / 2`) so the arrow stays clear of the spilled text and visually aligns with the progress bar. The horizontal gap + dotted pattern reads as "waiting time / slack before the milestone." No arrow is drawn from the binding (latest) predecessor, since its visual end coincides with the line.
   - **Flow dedupe**: predecessors are grouped by their enclosing **flow** — the deepest single-track container they live in (a swimlane root, a sequential `group { ... }`, or one sub-track of a `parallel { ... }`). Within one flow, only the **latest** predecessor (rightmost x) draws a slack arrow; siblings to its left collapse silently because file order in a single-track container already encodes the chain (an arrow from each chained sibling would be redundant). Across flows (e.g. two predecessors that sit in different `parallel` sub-tracks), each flow's last entry contributes its own slack arrow.
 - If all `after:` predecessors have `status:done`, the milestone renders as complete.
+- **On a wave boundary**: a milestone whose diamond falls on a wave boundary (within 0.5 px, typically `milestone … after:<wave>`) keeps its diamond and label but draws **no cut line**; the boundary already marks that instant. A floating milestone bound by a wave reference sits exactly on the boundary (not 6 px left of it, as for an item predecessor) and draws no slack arrow for the wave. A dated milestone that a wave overruns keeps its red cut line. See [Waves](#waves).
 
 ### Dependency Arrows
 
@@ -445,6 +455,8 @@ Styles defined in `config` control the visual appearance of entities. Style prop
 | `timeline-position` | Where the timeline date strip is rendered. `top` (default), `bottom`, `both`. Roadmap-only. `both` mirrors the strip at the chart's bottom so the dates remain readable on tall canvases without scrolling back to the top. The mirrored strip shares fill, border, label color, and tick positions with the top strip; it has no now-pill and no marker row. The now-line and major grid lines thread through the mirrored strip so the timeline reads as a single sweep; milestone and anchor cut lines stop at the bottom of the last swimlane to keep the date labels uncluttered. |
 | `minor-grid` | When `true`, draws a faint dotted grid line at every tick boundary in addition to the major-tick lines. Roadmap-only. Uses `theme.timeline.minorGridLine` (a step lighter than `gridLine`) so the major lines still dominate. |
 
+**On a `wave`**, only four properties apply: `bg` opts the wave into a column tint and a strip-cell overlay, `fg` colours its boundary line, `text` colours its strip label, and `border` sets the boundary dash (`solid`, `dashed`, `dotted`). Every other property is ignored. There is no `default wave` and no built-in wave style; unstyled waves use the `theme.wave.*` tokens (see [Waves](#waves)).
+
 Text style properties (`font`, `weight`, `italic`, `text-size`) apply to the entity's primary text (title). Secondary text within an entity (owner badge, status label) follows its own rendering rules.
 
 #### Built-in Icon Library
@@ -542,7 +554,9 @@ When a group has `style:`, `labels:`, or other visual properties, it renders as 
 
 #### Group (unstyled)
 
-When a group has no style or labels, it is purely structural — no visible border, background, no chiclet. Items render with the same row-pack flow as a styled group (so collisions still bump to new rows), but the box reserves no top/bottom pad and the renderer paints no border or background. The group is invisible in the rendered output but still governs sequencing and inner row growth.
+When a group has no style or labels, it is purely structural — no visible border, background, no chiclet. Items render with the same row-pack flow as a styled group (so collisions still bump to new rows), but the box reserves no top/bottom pad and the renderer paints no border or background. The default themes still resolve `group` to `bracket: solid`, so the group paints the thin bracket described in [Group (bracket-style with title)](#group-bracket-style-with-title) (title-less form) unless `bracket:none` is set; it still governs sequencing and inner row growth.
+
+**Wave exception.** In a roadmap with waves, a group with no title (an id alone is not one), no `style:`, and no `labels:` that carries `wave:` draws no bracket and nothing else: `group wave:k` opens exactly on a wave boundary, and a slate `[` on every boundary would read as noise. A titled group with `wave:` keeps its bracket. The rule is gated on `wave:` being present.
 
 #### Group (bracket-style with title)
 
@@ -581,6 +595,35 @@ When a file is included with `roadmap:isolate`, all of its content renders insid
 - **Swimlane containment** — swimlanes within the region render normally but are visually contained within the dashed border.
 - **Cross-references** — dependency arrows and predecessor lines that cross the region boundary render normally, passing through the dashed border.
 
+### Waves
+
+A wave is a column that spans every swimlane (see [`specs/dsl.md`](./dsl.md) "Wave Declaration"). Layout computes each wave's span `[S_k, E_k]` with a barrier pass shared by the pixel layout, the day-space extent and the XLSX schedule; it reruns the existing lane loop until the barriers settle (at most n + 1 passes for n waves). Everything below is drawn only when the roadmap declares waves; a roadmap without waves renders byte-identically. The normative detail, including geometry constants and the reasoning behind each choice, is in [`specs/waves.md`](./waves.md) § 8.7–9.10.
+
+- **Strip and labels** (`data-layer="wave-strip"`, `wave-labels`). The strip row's backing panel uses the timeline panel fill and border. Each non-empty wave gets one cell over `[startX, endX]`, alternating `wave.stripFill` (even `visibleOrdinal`, 0-based) and `wave.stripFillAlt` (odd), so empty waves and gaps never break the alternation. Cells are inset 0.5 px from the panel and are square, except that a cell reaching an end of the panel rounds its outer corners there to the panel's radius less the inset (3.5 px), so it never covers the panel's rounded corner or border. Labels are 10 px, weight 600, centred on the visible part of the cell, on a halo in the cell's fill; footnote superscripts are right-aligned in the cell on their own halo in the cell's fill, and the label is pushed left of them. Gap floor labels and the placeholder sit on halos in the panel fill, so major grid lines never cut through strip text. Labels degrade from title to id, to an ellipsized title, to `#k`, to nothing. Every cell has a `<title>` tooltip (`Launch · 2026-02-02 – 2026-02-23 · held by i2`, end exclusive). An empty wave is a hollow 7 px diamond in the strip; a gap opened by a start floor has no cell and shows the floor reference in muted italics when it fits. When no wave has members yet, the strip shows one muted placeholder (`Waves declared: Discover, Build — no items assigned yet`) and nothing else is drawn.
+- **Boundaries** (`data-layer="wave-boundary"`). A 2 px solid line (`wave.boundary`, teal in the light theme) at every distinct x in `{S_k} ∪ {E_k}` except the origin, running from the top of the strip down to the last swimlane. It is drawn after the grid and under the bars, and sits in the 12 px gutter between bars of different waves. A wave's style can recolour it (`fg`), dash it (`border:dashed` `4 2`, `dotted` `1 2`).
+- **Milestone on a boundary.** A milestone whose diamond falls on a boundary keeps its diamond and label but drops its cut line (see [Milestones](#milestones)).
+- **Background work.** An item with no wave is drawn with a diagonal hatch overlay: a second rect drawn right after the bar rect (the bar rect stays the first `<rect>` in the item group), inset by half the bar's stroke width with the same corner radius. It fills with one of two `<pattern>` defs chosen by the bar fill's luminance, `${idPrefix}-wave-hatch-dark` (`wave.hatch`) on light fills and `${idPrefix}-wave-hatch-light` (`wave.hatchOnDark`) on dark fills, emitted inside the existing `<defs>` only when used. The hover tooltip adds `Background (no wave)`.
+- **Crossings** (`data-layer="wave-cross"`). Where a boundary x lies strictly inside a background bar's visual extent (`visualLeft < x < visualRight`), a 1 px `2 2` dashed segment in the boundary colour is drawn over the bar, top to bottom, to show that the barrier does not hold this work.
+- **Styled waves** (`data-layer="wave-bg"`). There is no column tint by default: tinted columns over alternating lane rows would make a four-tone checkerboard. A wave whose style sets `bg` gets a column tint at 0.12 opacity (after lane backgrounds, before the grid) and a 0.25 overlay on its strip cell. `text` colours the label; without it, the renderer keeps the label at 4.5:1 against the cell by picking dark or light text.
+- **Legend** (`data-layer="wave-legend"`). PNG and PDF have no tooltips, so a legend below the chart (and below any bottom tick panel, above the footnotes) explains what the picture abbreviates. It appears when there is background work, an abbreviated label, a dropped footnote indicator, or an empty wave, and lists a hatch swatch (`Background work (not in a wave)`), a boundary swatch (`Wave boundary`), and, when any label is abbreviated or any wave is empty, the full wave names (`Waves: #1 Discover · #2 Build · #3 Hardening (TBD) (no items)`).
+- **Groups that carry `wave:`** draw no bracket when untitled and unstyled (see [Group (unstyled)](#group-unstyled)).
+- **Include regions.** An isolated region's opaque fill would hide the early wave layers, so `renderIncludeRegion` re-emits styled tints and boundaries right after the region fill rect, clipped by rect intersection to the painted region rect (no `clipPath`, no new `<defs>`), and the crossings and hatch overlays for region items after its lanes. The strip stays global.
+- **Z-order.** defs, background, timeline panels then `wave-strip`, lane backgrounds, `wave-bg`, grid, `wave-boundary`, `wave-labels`, under-bar edges, lanes (background bars carry their hatch), include regions (re-emitting their wave layers), `wave-cross`, edges, cut lines (minus those on a boundary), markers, now-line, then footnotes and `wave-legend`, header, attribution and logo.
+
+**Wave theme tokens** (`theme.wave.*`, defined in every built-in theme):
+
+| Token | Light default | Dark default | Grayscale | Notes |
+| --- | --- | --- | --- | --- |
+| `theme.wave.stripFill` | `#f0fdfa` | `#042f2e` | `#fafafa` | Strip cells with an even visible ordinal. |
+| `theme.wave.stripFillAlt` | `#ccfbf1` | `#134e4a` | `#e0e0e0` | Strip cells with an odd visible ordinal. |
+| `theme.wave.labelText` | `#134e4a` | `#99f6e4` | `#212121` | Strip labels and legend text. |
+| `theme.wave.labelMuted` | `#0f766e` | `#5eead4` | `#616161` | Gap floor labels and the placeholder. |
+| `theme.wave.boundary` | `#0d9488` | `#2dd4bf` | `#616161` | Boundary lines, crossings, empty-wave diamonds. |
+| `theme.wave.hatch` | `#0f172a` | `#0f172a` | `#000000` | Hatch stroke on light bar fills. |
+| `theme.wave.hatchOnDark` | `#ffffff` | `#ffffff` | `#ffffff` | Hatch stroke on dark bar fills. |
+
+These values are starting points to be tuned in snapshot review; theme tests enforce contrast floors (boundary against grid lines and both lane tints, labels against both strip fills).
+
 ## Output Formats
 
 | Format | How | Milestone |
@@ -590,12 +633,12 @@ When a file is included with `roadmap:isolate`, all of its content renders insid
 | PDF | Positioned model → vector PDF via PDFKit | m2c |
 | HTML | SVG embedded in a self-contained HTML page with viewport controls | m2c |
 | Markdown+Mermaid | Transpile DSL to closest Mermaid `gantt` representation | m2c |
-| XLSX | Formatted Excel workbook — multiple sheets for items, milestones, anchors, people/teams. See XLSX details below. | m2c |
+| XLSX | Formatted Excel workbook — multiple sheets for items, milestones, anchors, people/teams, and waves when declared. See XLSX details below. | m2c |
 | MS Project XML | MS Project XML (.xml) — items as tasks, swimlanes as summary tasks, `after` as predecessors, milestones as milestones, `owner` as resource assignment. Groups map to summary tasks, parallel items share predecessors. Lossy: labels, styles, footnotes, bracket visuals have no PM tool equivalent. | m2c |
 
 ### XLSX Export
 
-Generated via ExcelJS. The workbook contains up to five sheets modeled on MS Project's Excel export conventions, adapted to the Nowline data model. The Milestones, Anchors, and People and Teams sheets are omitted when the roadmap contains no entities of that type; the Roadmap and Items sheets are always present.
+Generated via ExcelJS. The workbook contains up to six sheets modeled on MS Project's Excel export conventions, adapted to the Nowline data model. The Milestones, Anchors, People and Teams, and Waves sheets are omitted when the roadmap contains no entities of that type; the Roadmap and Items sheets are always present.
 
 #### Sheet 1: "Roadmap" (metadata)
 
@@ -619,6 +662,7 @@ One row per item. This is the primary sheet.
 | Swimlane | parent swimlane id, falling back to title | Dotted path for nested swimlanes (e.g., `engineering.platform`) |
 | Group | parent group id | If inside a `group` block; blank otherwise |
 | Parallel | parent parallel id | If inside a `parallel` block; blank otherwise |
+| Wave | effective wave id | Only when the roadmap declares waves (the column is absent otherwise). Own or inherited `wave:`; blank for background work |
 | Duration | `duration:` working days | Numeric working days (e.g., `10` for `2w`) |
 | Duration (text) | `duration:` literal | Original DSL literal (e.g., `2w`) |
 | Start | computed from schedule | Floating calendar start date (UTC midnight); blank for anonymous items |
@@ -666,6 +710,22 @@ Formatting:
 | Parent Team | parent team id if nested | |
 | Link | `link:` URL | |
 
+#### Sheet 6: "Waves"
+
+Present only when the roadmap declares waves; always the last sheet, so existing sheet indices are unchanged. One row per wave, in declaration order. Dates come from the same schedule as the Items sheet, with the wave barriers applied.
+
+| Column | Source | Notes |
+|--------|--------|-------|
+| ID | wave identifier | |
+| Title | wave title | Falls back to the id |
+| Order | declaration order | 1-based |
+| Start | computed from schedule | Wave start; real date cell |
+| End (exclusive) | computed from schedule | Wave end, exclusive; equals Start for a wave with no items |
+| Items | member count | Leaf items whose effective wave is this one |
+| Held by | binding member | The member with the latest end (id, falling back to title); blank when no member sets the wave's end (an empty wave, or one whose members all end at or before its start floor) |
+| After | `after:` value(s) | The start floor, semicolon-delimited |
+| Description | `description` text | |
+
 #### Mapping to MS Project Conventions
 
 The column design mirrors MS Project's Excel export where concepts align:
@@ -685,6 +745,15 @@ The column design mirrors MS Project's Excel export where concepts align:
 
 Key differences: Start/Finish dates are computed by `scheduleRoadmap` from the chart's sequencing rules (not MS Project's CPM engine), no WBS numbering, milestones are separate entities, and `before:` constraints have no MS Project equivalent.
 
+### MS Project XML Export
+
+The MS Project exporter reads the AST only (it does not run the schedule) and maps `after:` to finish-to-start predecessor links. When the roadmap declares waves:
+
+- **Wave-end milestone tasks.** One zero-duration milestone task per wave, titled `{title} (wave end)`, at outline level 1. They are appended after every other task, in declaration order, so the UIDs and IDs of all existing tasks never change. Its finish-to-start predecessors are every member that has an id, plus the previous wave's end task. `after:<wave>` on an item or milestone links to that wave's end task.
+- **Barrier links.** Every member of wave k ≥ 2 gains a finish-to-start link to wave k−1's end task, merged with its own `after:` links without duplicates. Background work gets no wave links.
+- **Floors.** Each `after:` element of a wave that names an anchor or a dated milestone becomes a finish-to-start predecessor of every member of that wave and of the wave's end task (so an empty wave still carries its floor). An inline-date floor is dropped and counted as `wave-floor`.
+- **Limits.** Members without ids still get their barrier and floor links but cannot be linked to their wave-end task; they are counted as `wave-member-no-id`. Both drop kinds are absent when zero. The exporter still encodes no implicit lane sequencing (unchanged).
+
 ### Markdown+Mermaid Bridge
 
 The Mermaid output is a best-effort translation. The Nowline DSL is richer than Mermaid's `gantt` block — labels, footnotes, anchors, and progress tracking have no direct Mermaid equivalent. The bridge:
@@ -695,6 +764,7 @@ The Mermaid output is a best-effort translation. The Nowline DSL is richer than 
 - Anchors every task with an explicit start token so Mermaid never mis-reads a task id as a start date: declared `after:` deps win, otherwise the task chains `after` the previous item in its lane, otherwise (a lane or parallel-track leader) it anchors at the roadmap's `start:` date (falling back to the layout-computed timeline start when `start:` is omitted). This mirrors Nowline's default "each item starts after the preceding item in its lane" layout.
 - Maps anchors to Mermaid milestones.
 - Drops properties that Mermaid cannot express (labels, footnotes, owners, remaining). Parallel/group structure is flattened (tracks anchor at the block's entry point; the lane then continues after the last track — Mermaid cannot express "after the latest of N tracks").
+- When the roadmap declares waves, emits a `section Waves` after the anchors and before the lanes, with one milestone per wave (`{title} (wave end) :milestone, {waveId}, {end date}, 0d`, dated from the schedule; the date is the wave's exclusive end, the day the next wave can start). The milestone id is the wave id, so `after:build` maps to Mermaid `after build`, and every member of wave k ≥ 2 also anchors `after` wave k−1's milestone (added to its existing `after` token, or replacing a lane leader's start date). Start floors are dropped and counted as `wave-floor` in the `%%` summary.
 - Includes a comment noting the lossy conversion.
 
 This output works as a Trojan horse — users can share roadmaps in Mermaid-compatible contexts (GitHub READMEs, Notion, Confluence) and link back to the full Nowline version.

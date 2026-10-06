@@ -5,13 +5,7 @@
 // reserved 18 px above the first region; subsequent regions are
 // separated by GAP_BETWEEN_REGIONS px.
 
-import type {
-    EntityProperty,
-    GroupBlock,
-    IsolatedRegion,
-    ItemDeclaration,
-    ParallelBlock,
-} from '@nowline/core';
+import type { GroupBlock, IsolatedRegion, ItemDeclaration, ParallelBlock } from '@nowline/core';
 import { resolveSizes } from '../calendar.js';
 import { includeChromeGeometry } from '../include-chrome-geometry.js';
 import type { LayoutContext, TrackCursor } from '../layout-context.js';
@@ -23,6 +17,7 @@ import type {
     PositionedSwimlane,
     PositionedTrackChild,
 } from '../types.js';
+import { seedWaveEdges } from '../wave-layout.js';
 import { maxLeafItemRightX } from './content-extent.js';
 import { SwimlaneNode } from './swimlane-node.js';
 
@@ -50,7 +45,7 @@ export interface IncludeNodeDeps {
         ctx: LayoutContext,
     ) => PositionedTrackChild;
     resolveChildStart: (
-        props: EntityProperty[],
+        child: ItemDeclaration | GroupBlock | ParallelBlock,
         seqDefault: number,
         laneLeftX: number,
         ctx: LayoutContext,
@@ -110,7 +105,16 @@ export function buildIncludeRegions(
             chartRightX: ctx.chartRightX,
             nextParallelId: 0,
             nextGroupId: 0,
+            // Region lanes join the global barriers (specs/waves.md §8.4):
+            // they share the host's wave state, so they are floored and
+            // their members accumulate into the same pass.
+            ...(ctx.waves ? { waves: ctx.waves } : {}),
         };
+        // Region ids stay invisible to the host, but the wave edges are
+        // shared: seed them into the region's otherwise empty edge maps.
+        if (ctx.waves) {
+            seedWaveEdges(ctx.waves, childCtx.entityLeftEdges, childCtx.entityRightEdges);
+        }
         const nestedSwimlanes: PositionedSwimlane[] = [];
         let cursorY = innerStartY;
         let bandIndex = 0;

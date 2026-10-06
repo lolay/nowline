@@ -1,6 +1,8 @@
+import { type ResolveDiagnostic, tr } from '@nowline/core';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import {
     __resetBrowserPipelineForTests,
+    fromResolveDiagnostic,
     parseSource,
     renderSource,
     type SkippedInclude,
@@ -178,6 +180,159 @@ person alice "Alice"
         });
         expect(readFile).toHaveBeenCalledTimes(1);
         expect(result.kind).toBe('svg');
+    });
+});
+
+// Wave-rule resolver diagnostics (specs/waves.md §6.1) keep their stable
+// code; every other resolver diagnostic stays an `include` row.
+describe('renderSource — wave-rule include diagnostics', () => {
+    afterEach(() => {
+        __resetBrowserPipelineForTests();
+    });
+
+    // The include is on line 3; the parent declares waves w1 and w2.
+    const parent = `nowline v1
+
+include "./other.nowline"
+
+roadmap r "R" start:2026-01-05
+wave w1
+wave w2
+swimlane eng "Engineering"
+  item solo duration:1w wave:w1
+`;
+    const render = (child: string) =>
+        renderSource(parent, {
+            filePath: '/workspace/main.nowline',
+            readFile: async () => child,
+        });
+
+    it('reports NL.E0202 on the parent include line', async () => {
+        const result = await render('swimlane c "C"\n  item y duration:1w\n');
+        expect(result.kind).toBe('diagnostics');
+        if (result.kind !== 'diagnostics') return;
+        expect(result.diagnostics).toEqual([
+            {
+                severity: 'error',
+                code: 'NL.E0202',
+                message: tr('en-US', 'NL.E0202', {
+                    reason: 'child-none',
+                    path: './other.nowline',
+                    parent: ['w1', 'w2'],
+                }),
+                file: '/workspace/main.nowline',
+                line: 3,
+                column: 1,
+            },
+        ]);
+    });
+
+    it('reports NL.E1101 at the child path and line', async () => {
+        const result = await render(
+            'wave w1\nwave w2\nswimlane c "C"\n  item y duration:1w wave:w9\n',
+        );
+        expect(result.kind).toBe('diagnostics');
+        if (result.kind !== 'diagnostics') return;
+        expect(result.diagnostics.map((d) => [d.code, d.file, d.line])).toEqual([
+            ['NL.E1101', '/workspace/other.nowline', 4],
+        ]);
+    });
+
+    it('keeps an uncoded include error as an include row, verbatim', async () => {
+        const result = await renderSource(parent, {
+            filePath: '/workspace/main.nowline',
+            readFile: async () => {
+                throw new Error('boom');
+            },
+        });
+        expect(result.kind).toBe('diagnostics');
+        if (result.kind !== 'diagnostics') return;
+        expect(result.diagnostics).toEqual([
+            {
+                severity: 'error',
+                code: 'include',
+                message: 'Could not read include "./other.nowline": boom',
+                file: '/workspace/main.nowline',
+                line: 3,
+                column: 1,
+            },
+        ]);
+    });
+
+    // REGRESSION: an uncoded include error takes precedence; the wave-rule
+    // diagnostics reported alongside it are dropped.
+    it('reports only the include row when wave-rule errors also occur', async () => {
+        const result = await renderSource(
+            parent.replace(
+                'include "./other.nowline"',
+                'include "./other.nowline"\ninclude "./missing.nowline"',
+            ),
+            {
+                filePath: '/workspace/main.nowline',
+                readFile: async (p) => {
+                    if (p.endsWith('missing.nowline')) throw new Error('boom');
+                    return 'swimlane c "C"\n  item y duration:1w\n';
+                },
+            },
+        );
+        expect(result.kind).toBe('diagnostics');
+        if (result.kind !== 'diagnostics') return;
+        expect(result.diagnostics).toEqual([
+            {
+                severity: 'error',
+                code: 'include',
+                message: 'Could not read include "./missing.nowline": boom',
+                file: '/workspace/main.nowline',
+                line: 4,
+                column: 1,
+            },
+        ]);
+    });
+});
+
+describe('fromResolveDiagnostic', () => {
+    const coded: ResolveDiagnostic = {
+        severity: 'error',
+        message: tr('en-US', 'NL.E1101', { reason: 'unknown', value: 'w9', declared: ['w1'] }),
+        sourcePath: '/c.nowline',
+        line: 4,
+        code: 'NL.E1101',
+        args: [{ reason: 'unknown', value: 'w9', declared: ['w1'] }],
+        rule: 'wave',
+    };
+
+    it('localizes a coded diagnostic when a locale is given', () => {
+        const fr = tr('fr', 'NL.E1101', { reason: 'unknown', value: 'w9', declared: ['w1'] });
+        expect(fr).not.toBe(coded.message);
+        expect(fromResolveDiagnostic(coded, 'fr').message).toBe(fr);
+        expect(fromResolveDiagnostic(coded).message).toBe(coded.message);
+        expect(fromResolveDiagnostic(coded).line).toBe(5);
+    });
+
+    it('labels WV8 (uncoded, wave-marked) like the validator, not as an include row', () => {
+        const row = fromResolveDiagnostic({
+            severity: 'error',
+            message: '"wave" cannot be set on "default item".',
+            sourcePath: '/c.nowline',
+            line: 1,
+            rule: 'wave',
+        });
+        expect(row.code).not.toBe('include');
+    });
+
+    it('leaves an uncoded include diagnostic unchanged in any locale', () => {
+        const row = fromResolveDiagnostic(
+            { severity: 'warning', message: 'Person "sam" is shadowed', sourcePath: '/a.nowline' },
+            'fr',
+        );
+        expect(row).toEqual({
+            severity: 'warning',
+            code: 'include',
+            message: 'Person "sam" is shadowed',
+            file: '/a.nowline',
+            line: 1,
+            column: 1,
+        });
     });
 });
 

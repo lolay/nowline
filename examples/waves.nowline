@@ -1,7 +1,7 @@
 nowline v1
 
-// PROPOSED SYNTAX (specs/waves). Today's parser rejects `wave`; see
-// samples/checkout-relaunch.svg for the mocked-up rendering.
+// Lean example: three waves (Foundations, Build, Launch) as barriers across
+// three lanes, plus unwaved background ops work. Details live in specs/waves.md.
 
 roadmap checkout-relaunch "Checkout relaunch" author:"Product Engineering" start:2026-01-05 scale:1w calendar:full
 

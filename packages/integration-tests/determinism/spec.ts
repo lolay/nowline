@@ -157,6 +157,7 @@ export const FIXTURES: readonly GateFixture[] = [
         theme: 'light',
         browser: false,
     },
+    { id: 'waves', sourceFile: 'waves.nowline', dir: 'examples', theme: 'light', browser: false },
 ] as const;
 
 /** Manifest key for a (fixture, format) cell. */

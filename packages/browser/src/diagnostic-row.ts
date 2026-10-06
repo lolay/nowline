@@ -1,7 +1,10 @@
 import {
     extractSuggestion,
+    inferCodeFromMessage,
+    isRoutedResolveDiagnostic,
     type LangiumLikeDiagnostic,
     type LexerErrorLike,
+    localizeResolveDiagnostic,
     type ParserErrorLike,
     type ResolveDiagnostic,
     resolveDiagnosticCode,
@@ -77,14 +80,33 @@ export function fromLexerError(err: LexerErrorLike, file: string): DiagnosticRow
  * undefined for whole-file diagnostics like circular include — fall
  * back to line 1 so a click-to-jump still puts the cursor near the top
  * of the offending file.
+ *
+ * A wave-rule diagnostic (specs/waves.md §6.1) keeps its stable code
+ * (`NL.Exxxx`), and its message is rendered in `locale` when the caller
+ * knows one; WV8, the uncoded wave rule, is labelled like the validator's
+ * copy. Every other resolver diagnostic is an `include` row, verbatim.
  */
-export function fromResolveDiagnostic(diag: ResolveDiagnostic): DiagnosticRow {
+export function fromResolveDiagnostic(diag: ResolveDiagnostic, locale?: string): DiagnosticRow {
+    const line = diag.line !== undefined ? diag.line + 1 : 1;
+    if (!isRoutedResolveDiagnostic(diag)) {
+        return {
+            severity: diag.severity,
+            code: 'include',
+            message: diag.message,
+            file: diag.sourcePath,
+            line,
+            column: 1,
+        };
+    }
+    const message = locale ? localizeResolveDiagnostic(locale, diag) : diag.message;
+    const suggestion = extractSuggestion(message);
     return {
         severity: diag.severity,
-        code: 'include',
-        message: diag.message,
+        code: diag.code ?? inferCodeFromMessage(diag.message),
+        message,
+        ...(suggestion === undefined ? {} : { suggestion }),
         file: diag.sourcePath,
-        line: diag.line !== undefined ? diag.line + 1 : 1,
+        line,
         column: 1,
     };
 }

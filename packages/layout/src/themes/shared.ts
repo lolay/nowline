@@ -374,3 +374,31 @@ export const LABEL_THINNING: Record<'days' | 'weeks' | 'months' | 'quarters' | '
     quarters: 4,
     years: 5,
 };
+
+// Waves (specs/waves.md section 9.10; hatch geometry section 9.3).
+export const WAVE_STRIP_HEIGHT_PX = 20;
+export const WAVE_BOUNDARY_WIDTH_PX = 2;
+export const WAVE_CROSS_DASH = '2 2';
+export const WAVE_HATCH_OPACITY = 0.13;
+export const WAVE_HATCH_TILE_PX = 6;
+export const WAVE_HATCH_STROKE_PX = 2;
+export const WAVE_STYLED_TINT_OPACITY = 0.12;
+export const WAVE_STYLED_STRIP_MIX_OPACITY = 0.25;
+export const WAVE_STRIP_LABEL_FONT_SIZE_PX = 10;
+export const WAVE_EMPTY_MARKER_SIZE_PX = 7;
+export const WAVE_LEGEND_LINE_PX = 14;
+export const WAVE_LEGEND_GAP_PX = 8;
+// Wave strip and legend geometry (specs/waves.md §9.1, §9.5).
+/** Horizontal padding on each side of a strip label in the fit test. */
+export const WAVE_STRIP_LABEL_PAD_PX = 6;
+/** Step between the diamonds of empty waves that share an x. */
+export const WAVE_EMPTY_MARKER_STEP_PX = 9;
+/** Legend swatch (hatched bar or boundary line) size. */
+export const WAVE_LEGEND_SWATCH_WIDTH_PX = 18;
+export const WAVE_LEGEND_SWATCH_HEIGHT_PX = 10;
+/** Gap between a legend swatch and its text. */
+export const WAVE_LEGEND_SWATCH_GAP_PX = 6;
+/** Gap between two legend entries on one line. */
+export const WAVE_LEGEND_ENTRY_GAP_PX = 16;
+/** Legend text baseline below its line's top (10 px text in a 14 px line). */
+export const WAVE_LEGEND_BASELINE_OFFSET_PX = 11;

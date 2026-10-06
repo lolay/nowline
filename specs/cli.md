@@ -325,14 +325,16 @@ type Diagnostic = {
 
 `code` is the stable validator code (`NL.E0600`, `NL.W0700`, ...) when the diagnostic has one, `parse-error` or `lex-error` for syntax errors, and a legacy string such as `validation` for validator messages that predate stable codes. `suggestion` is present when the message offers a "did you mean" target.
 
+**Include diagnostics.** The wave rules that need the included files (include rule 12 `NL.E0202`, the wave checks on included files, and the cross-file `NL.E0300`; `specs/waves.md` §6.1) are reported by include resolution, not by the validator. The CLI reports them exactly like validator diagnostics: `file` is the file the diagnostic points into (an included file is named relative to the input's directory as given, e.g. `examples/teams/web.nowline`), `line` is 1-based and the span covers that line, the message is localized like any validator message, and they share the run's one text report or JSON document with the validator's diagnostics. They are checked only when the input itself has no validation errors. An error among them exits 1. Every other include failure (an unreadable or circular include, a duplicate include, a `start:` mismatch, an isolate without a roadmap) carries no code and keeps its single message on stderr, `nowline: <format> export failed: @nowline/export: include error in <path>: <message>`, with exit 3. When both kinds fail, the uncoded include error wins. `--format nowline` does not resolve includes and reports neither.
+
 ## Exit Codes
 
 | Code | Meaning |
 |------|---------|
 | 0 | Success |
-| 1 | Validation error (parse failure, invalid references). Warnings alone never produce it, in either diagnostic format. |
+| 1 | Validation error (parse failure, invalid references, a coded wave-rule include diagnostic such as `NL.E0202`). Warnings alone never produce it, in either diagnostic format. |
 | 2 | Usage error (missing input, invalid flags, mutually-exclusive flags, format unavailable in this build, binary output to TTY, file not found, unreadable input, empty stdin, invalid `--diagnostic-format`) |
-| 3 | Output error (cannot write to destination, exporter pipeline failure) |
+| 3 | Output error (cannot write to destination, exporter pipeline failure, an uncoded include error such as an unreadable or circular include) |
 
 ## Piping and Composability
 

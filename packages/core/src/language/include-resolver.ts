@@ -19,6 +19,7 @@ import type {
     SwimlaneDeclaration,
     SymbolDeclaration,
     TeamDeclaration,
+    WaveDeclaration,
 } from '../generated/ast.js';
 import {
     isAnchorDeclaration,
@@ -35,9 +36,18 @@ import {
     isSwimlaneDeclaration,
     isSymbolDeclaration,
     isTeamDeclaration,
+    isWaveDeclaration,
 } from '../generated/ast.js';
+import type { MessageCode } from '../i18n/codes.js';
 import { basename, dirname, resolve as resolvePath } from '../util/posix-path.js';
+import {
+    checkWaveAgreement,
+    participates,
+    runResolverWaveChecks,
+    type WaveIncludeEdge,
+} from './include-waves.js';
 import type { NowlineServices } from './nowline-module.js';
+import { ownWaves } from './waves.js';
 
 export type IncludeMode = 'merge' | 'ignore' | 'isolate';
 
@@ -89,6 +99,13 @@ export interface ResolvedContent {
     milestones: Map<string, MilestoneDeclaration>;
     footnotes: Map<string, FootnoteDeclaration>;
     isolatedRegions: IsolatedRegion[];
+    /**
+     * The file's own waves (specs/waves.md §7.4), by id; insertion order is
+     * the wave order. Absent when the file declares none. Children's waves
+     * are never merged in: include rule 12 makes every participating file
+     * declare the same waves. Consumers read `content.waves ?? EMPTY`.
+     */
+    waves?: Map<string, WaveDeclaration>;
 }
 
 export interface IsolatedRegion {
@@ -103,9 +120,35 @@ export interface IsolatedRegion {
 
 export interface ResolveDiagnostic {
     severity: 'error' | 'warning';
+    /** en-US text; `localizeResolveDiagnostic` renders a coded one in another locale. */
     message: string;
+    /** Absolute path of the file the diagnostic points into. */
     sourcePath: string;
+    /** 0-based line in `sourcePath`. */
     line?: number;
+    /**
+     * Stable code of a coded diagnostic (the wave rules, specs/waves.md
+     * §7.4). Absent on every other resolver diagnostic.
+     */
+    code?: MessageCode;
+    /** The message arguments as a rest tuple, as `acceptTr` stores them. */
+    args?: unknown[];
+    /**
+     * `'wave'` on every diagnostic of the wave checks (specs/waves.md §6.1),
+     * coded or not (WV8 reuses an uncoded message). Absent on every other
+     * resolver diagnostic. See `isRoutedResolveDiagnostic`.
+     */
+    rule?: 'wave';
+}
+
+/**
+ * True for a resolver diagnostic that consumers report like a validator
+ * diagnostic (file, line, localized, exit 1): a coded one, or one from the
+ * wave checks. Every other resolver diagnostic keeps the include-error path
+ * (specs/waves.md §6.1).
+ */
+export function isRoutedResolveDiagnostic(d: ResolveDiagnostic): boolean {
+    return d.code !== undefined || d.rule === 'wave';
 }
 
 export interface ResolveResult {
@@ -121,6 +164,14 @@ interface ResolveContext {
     resolving: string[];
     processed: Map<string, { config: ResolvedConfig; content: ResolvedContent }>;
     readFile: (absPath: string) => Promise<string>;
+    /** Every parsed file, the root included, with its absolute path. */
+    files: Map<NowlineFile, string>;
+    /** Include edges whose child was read, per including file, in include order. */
+    edges: Map<string, WaveIncludeEdge[]>;
+    /** Contents returned for a circular include (they never participate). */
+    stubs: Set<ResolvedContent>;
+    /** Children that failed include rule 12 (NL.E0202). */
+    failedWaves: Set<string>;
 }
 
 function emptyConfig(): ResolvedConfig {
@@ -171,9 +222,24 @@ export async function resolveIncludes(
         resolving: [],
         processed: new Map(),
         readFile,
+        files: new Map(),
+        edges: new Map(),
+        stubs: new Set(),
+        failedWaves: new Set(),
     };
     const absPath = resolvePath('', filePath);
     const { config, content } = await resolveFile(file, absPath, ctx);
+    // The wave S, P and G evaluations run once, over everything resolved.
+    ctx.diagnostics.push(
+        ...runResolverWaveChecks({
+            rootFile: file,
+            rootAbs: absPath,
+            rootContent: content,
+            files: ctx.files,
+            edges: ctx.edges,
+            failed: ctx.failedWaves,
+        }),
+    );
     return {
         config,
         content,
@@ -197,11 +263,15 @@ async function resolveFile(
             sourcePath: absPath,
         });
         const empty = { config: emptyConfig(), content: emptyContent() };
+        ctx.stubs.add(empty.content);
         ctx.processed.set(absPath, empty);
         return empty;
     }
 
     ctx.resolving.push(absPath);
+    // The root is parsed from a `memory:` URI by every surface, so files are
+    // mapped by object, never by `$document.uri`.
+    ctx.files.set(file, absPath);
 
     const config = emptyConfig();
     const content = emptyContent();
@@ -210,7 +280,13 @@ async function resolveFile(
     // files shadow to the parent (parent wins) and produce a warning pointing at the child.
     mergeLocalConfig(config, file);
     mergeLocalContent(content, file);
+    const waves = ownWaves(file);
+    if (waves.length > 0) {
+        content.waves = new Map(waves.map((w) => [w.name as string, w]));
+    }
 
+    const edges: WaveIncludeEdge[] = [];
+    ctx.edges.set(absPath, edges);
     const seenIncludes = new Set<string>();
     for (const inc of file.includes) {
         const childRelPath = inc.path;
@@ -249,6 +325,16 @@ async function resolveFile(
             childAbsPath,
             ctx,
         );
+        edges.push({
+            parentAbs: absPath,
+            inc,
+            childRelPath,
+            childAbs: childAbsPath,
+            mode: roadmapMode,
+            childFile,
+            childContent,
+            participates: participates(childFile, childContent, ctx.stubs.has(childContent)),
+        });
 
         applyConfigMode(config, childConfig, configMode, childAbsPath, ctx.diagnostics);
         applyRoadmapMode(
@@ -285,6 +371,16 @@ async function resolveFile(
                 });
             }
         }
+    }
+
+    if (content.waves) rekeyWaveSlugs(content, content.waves);
+
+    // Include rule 12 runs after the include loop, so its result does not
+    // depend on include order (specs/waves.md §7.4).
+    for (const edge of edges) {
+        const { diagnostics, failed } = checkWaveAgreement(file, content, edge);
+        ctx.diagnostics.push(...diagnostics);
+        if (failed) ctx.failedWaves.add(edge.childAbs);
     }
 
     ctx.resolving.pop();
@@ -473,6 +569,8 @@ interface ReservedRoadmapIds {
     footnotes: Set<string>;
 }
 
+// Wave ids are reserved in every map: layout seeds its edge maps by key, so a
+// title-only `milestone "Launch"` must not take the key of `wave launch`.
 function collectExplicitRoadmapIds(entries: RoadmapEntry[]): ReservedRoadmapIds {
     const reserved: ReservedRoadmapIds = {
         swimlanes: new Set(),
@@ -497,8 +595,48 @@ function collectExplicitRoadmapIds(entries: RoadmapEntry[]): ReservedRoadmapIds 
         else if (isStatusDeclaration(entry)) reserved.statuses.add(name);
         else if (isMilestoneDeclaration(entry)) reserved.milestones.add(name);
         else if (isFootnoteDeclaration(entry)) reserved.footnotes.add(name);
+        else if (isWaveDeclaration(entry)) {
+            for (const set of Object.values(reserved)) set.add(name);
+        }
     }
     return reserved;
+}
+
+/**
+ * Re-key every title-only entry whose slug key equals a wave id (merged in
+ * from a child, whose slugs are recomputed by `mergeContentMap`), keeping
+ * each map's insertion order. Layout seeds its edge maps by key.
+ */
+function rekeyWaveSlugs(
+    content: ResolvedContent,
+    waves: ReadonlyMap<string, WaveDeclaration>,
+): void {
+    const maps: Array<Map<string, { name?: string; title?: string }>> = [
+        content.persons,
+        content.teams,
+        content.anchors,
+        content.labels,
+        content.sizes,
+        content.statuses,
+        content.swimlanes,
+        content.milestones,
+        content.footnotes,
+    ];
+    const titleOnlyOnWave = (key: string, v: { name?: string; title?: string }): boolean =>
+        waves.has(key) && !v.name && !!v.title;
+    for (const map of maps) {
+        const entries = [...map];
+        if (!entries.some(([k, v]) => titleOnlyOnWave(k, v))) continue;
+        const reserved = new Set<string>([...map.keys(), ...waves.keys()]);
+        map.clear();
+        for (const [k, v] of entries) {
+            const key = titleOnlyOnWave(k, v)
+                ? uniqueMapKey(map as Map<string, unknown>, k, reserved)
+                : k;
+            reserved.add(key);
+            map.set(key, v);
+        }
+    }
 }
 
 function mergeLocalContent(content: ResolvedContent, file: NowlineFile): void {

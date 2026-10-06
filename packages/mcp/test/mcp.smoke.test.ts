@@ -405,6 +405,187 @@ describe('@nowline/mcp — render/export structured errors', () => {
     });
 });
 
+// ---- wave-rule include diagnostics (specs/waves.md §6.1) --------------------
+
+describe('@nowline/mcp — wave-rule include diagnostics', () => {
+    // The include is on line 3; the parent declares waves w1 and w2.
+    const parent = (child: string) =>
+        [
+            'nowline v1',
+            '',
+            `include "./${child}"`,
+            '',
+            'roadmap r "R" start:2026-01-05',
+            'wave w1',
+            'wave w2',
+            'swimlane a "A"',
+            '  item x duration:1w wave:w1',
+        ].join('\n');
+
+    beforeAll(() => {
+        const dir = path.join(tmpDir, 'waves');
+        mkdirSync(dir, { recursive: true });
+        writeFileSync(path.join(dir, 'parent.nowline'), parent('child.nowline'), 'utf-8');
+        writeFileSync(
+            path.join(dir, 'child.nowline'),
+            'swimlane c "C"\n  item y duration:1w\n',
+            'utf-8',
+        );
+        writeFileSync(path.join(dir, 'missing-parent.nowline'), parent('missing.nowline'), 'utf-8');
+        // Mismatched waves vs child.nowline (NL.E0202) plus a missing include.
+        writeFileSync(
+            path.join(dir, 'combo-parent.nowline'),
+            parent('child.nowline').replace(
+                'include "./child.nowline"',
+                'include "./child.nowline"\ninclude "./missing.nowline"',
+            ),
+            'utf-8',
+        );
+        writeFileSync(
+            path.join(dir, 'warn-parent.nowline'),
+            'include "./warn-child.nowline"\nroadmap r "R"\nswimlane a "A"\n  item x duration:1w\n',
+            'utf-8',
+        );
+        writeFileSync(
+            path.join(dir, 'warn-child.nowline'),
+            'swimlane c "C"\n  item y duration:1w wave:w1\n',
+            'utf-8',
+        );
+    });
+
+    type Diag = { file: string; line: number; severity: string; code: string };
+    const parentPath = () => path.join(tmpDir, 'waves', 'parent.nowline');
+    function diagnosticsOf(result: Awaited<ReturnType<Client['callTool']>>) {
+        const textBlock = result.content.find((c) => c.type === 'text') as
+            | { type: 'text'; text: string }
+            | undefined;
+        expect(textBlock).toBeDefined();
+        return JSON.parse(textBlock!.text) as { ok: boolean; diagnostics: Diag[] };
+    }
+    const brief = (d: Diag) => [d.code, d.severity, d.file, d.line];
+
+    it('validate reports NL.E0202 with file and line, and ok=false', async () => {
+        const result = await client.callTool({
+            name: 'validate',
+            arguments: { path: 'waves/parent.nowline' },
+        });
+        const structured = result.structuredContent as { ok: boolean; diagnostics: Diag[] };
+        expect(structured.ok).toBe(false);
+        expect(structured.diagnostics.map(brief)).toEqual([['NL.E0202', 'error', parentPath(), 3]]);
+    });
+
+    it('validate reports wave-rule warnings in a child and stays ok', async () => {
+        const result = await client.callTool({
+            name: 'validate',
+            arguments: { path: 'waves/warn-parent.nowline' },
+        });
+        const structured = result.structuredContent as { ok: boolean; diagnostics: Diag[] };
+        expect(structured.ok).toBe(true);
+        expect(structured.diagnostics.map(brief)).toEqual([
+            ['NL.W0702', 'warning', path.join(tmpDir, 'waves', 'warn-child.nowline'), 2],
+        ]);
+    });
+
+    it('validate leaves an uncoded include error out, as before', async () => {
+        const result = await client.callTool({
+            name: 'validate',
+            arguments: { path: 'waves/missing-parent.nowline' },
+        });
+        const structured = result.structuredContent as { ok: boolean; diagnostics: Diag[] };
+        expect(structured.ok).toBe(true);
+        expect(structured.diagnostics).toEqual([]);
+    });
+
+    it('render returns structured diagnostics for NL.E0202', async () => {
+        const result = await client.callTool({
+            name: 'render',
+            arguments: { path: 'waves/parent.nowline', format: 'svg', now: '2026-01-15' },
+        });
+        expect(result.isError).toBe(true);
+        const parsed = diagnosticsOf(result);
+        expect(parsed.ok).toBe(false);
+        expect(parsed.diagnostics.map(brief)).toEqual([['NL.E0202', 'error', parentPath(), 3]]);
+    });
+
+    it('render in preview mode (no kernel run) still returns NL.E0202', async () => {
+        const result = await client.callTool({
+            name: 'render',
+            arguments: { path: 'waves/parent.nowline', now: '2026-01-15', preview: true },
+        });
+        expect(result.isError).toBe(true);
+        expect(diagnosticsOf(result).diagnostics.map(brief)).toEqual([
+            ['NL.E0202', 'error', parentPath(), 3],
+        ]);
+    });
+
+    it('export returns structured diagnostics for NL.E0202', async () => {
+        const result = await client.callTool({
+            name: 'export',
+            arguments: { path: 'waves/parent.nowline', format: 'html' },
+        });
+        expect(result.isError).toBe(true);
+        expect(diagnosticsOf(result).diagnostics.map(brief)).toEqual([
+            ['NL.E0202', 'error', parentPath(), 3],
+        ]);
+    });
+
+    it('render keeps the plain include error for an uncoded include failure', async () => {
+        const result = await client.callTool({
+            name: 'render',
+            arguments: { path: 'waves/missing-parent.nowline', format: 'svg', now: '2026-01-15' },
+        });
+        expect(result.isError).toBe(true);
+        const text = result.content
+            .filter((c) => c.type === 'text')
+            .map((c) => (c as { text: string }).text)
+            .join('\n');
+        expect(text).toContain('@nowline/export: include error in');
+        expect(text).toContain('Could not read include "./missing.nowline"');
+    });
+
+    // REGRESSION: an uncoded include error takes precedence over wave-rule
+    // diagnostics (specs/waves.md §6.1) on every path.
+    const comboText = (result: Awaited<ReturnType<Client['callTool']>>) =>
+        result.content
+            .filter((c) => c.type === 'text')
+            .map((c) => (c as { text: string }).text)
+            .join('\n');
+
+    it('render reports only the include error when wave-rule errors also occur', async () => {
+        const result = await client.callTool({
+            name: 'render',
+            arguments: { path: 'waves/combo-parent.nowline', format: 'svg', now: '2026-01-15' },
+        });
+        expect(result.isError).toBe(true);
+        const text = comboText(result);
+        expect(text).toContain('@nowline/export: include error in');
+        expect(text).toContain('Could not read include "./missing.nowline"');
+        expect(text).not.toContain('NL.E0202');
+    });
+
+    it('render in preview mode drops wave-rule diagnostics behind an uncoded include error', async () => {
+        // The preview path never ran the kernel, so before waves a missing
+        // include still returned the preview. Wave-rule errors must not change
+        // that: the combined case previews exactly like the missing include alone.
+        const preview = await client.callTool({
+            name: 'render',
+            arguments: { path: 'waves/combo-parent.nowline', now: '2026-01-15', preview: true },
+        });
+        expect(preview.isError).toBeFalsy();
+        expect(comboText(preview)).not.toContain('NL.E0202');
+    });
+
+    it('validate drops wave-rule diagnostics behind an uncoded include error', async () => {
+        const result = await client.callTool({
+            name: 'validate',
+            arguments: { path: 'waves/combo-parent.nowline' },
+        });
+        const structured = result.structuredContent as { ok: boolean; diagnostics: Diag[] };
+        expect(structured.ok).toBe(true);
+        expect(structured.diagnostics).toEqual([]);
+    });
+});
+
 // ---- discovery tools --------------------------------------------------------
 
 describe('@nowline/mcp — discovery tools', () => {
@@ -449,6 +630,8 @@ describe('@nowline/mcp — discovery tools', () => {
         expect(structured.directiveKeys).toContain('start');
         expect(structured.entityTypes).toContain('swimlane');
         expect(structured.itemPropertyKeys).toContain('duration');
+        expect(structured.entityTypes).toContain('wave');
+        expect(structured.itemPropertyKeys).toContain('wave');
     });
 });
 

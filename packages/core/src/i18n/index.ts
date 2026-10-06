@@ -15,6 +15,7 @@ import { messages as frCAMessages } from './messages.fr-CA.js';
 import { messages as frFRMessages } from './messages.fr-FR.js';
 
 export type { MessageCode } from './codes.js';
+export type * from './wave-message-types.js';
 
 // `messages.en.ts` re-exported with its inferred type so other locales
 // can `satisfies` against it. Each function takes one named-argument

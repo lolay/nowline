@@ -13,7 +13,7 @@
 // glyphs) in a header band it reserves above the box instead; see
 // `container-header-geometry.ts`.
 
-import type { EntityProperty, GroupBlock, ItemDeclaration, ParallelBlock } from '@nowline/core';
+import type { GroupBlock, ItemDeclaration, ParallelBlock } from '@nowline/core';
 import { isItemDeclaration } from '@nowline/core';
 import { deriveItemDurationDays } from '../calendar.js';
 import {
@@ -21,7 +21,7 @@ import {
     GROUP_HEADER_TITLE_INSET_X_PX,
     groupHeaderBandPx,
 } from '../container-header-geometry.js';
-import { propValues } from '../dsl-utils.js';
+import { propValue, propValues } from '../dsl-utils.js';
 import { groupHasFill, groupTitleTabWidth } from '../group-title-tab-geometry.js';
 import { computeContainerInlineDatePins, pickInlineDate } from '../inline-date-pin-geometry.js';
 import type { LayoutContext, TrackCursor } from '../layout-context.js';
@@ -41,6 +41,7 @@ import type {
     PositionedItem,
     PositionedTrackChild,
 } from '../types.js';
+import { waveFloorX } from '../wave-layout.js';
 
 export interface GroupNodeDeps {
     sequenceItem: (
@@ -55,7 +56,7 @@ export interface GroupNodeDeps {
         ctx: LayoutContext,
     ) => PositionedTrackChild;
     resolveChildStart: (
-        props: EntityProperty[],
+        child: ItemDeclaration | GroupBlock | ParallelBlock,
         seqDefault: number,
         laneLeftX: number,
         ctx: LayoutContext,
@@ -90,8 +91,23 @@ export class GroupNode {
         const { node } = this;
         const { deps } = this;
         const style = resolveStyle('group', node.properties, ctx.styleCtx);
-        const startX = cursor.x;
-        const title = node.title ?? node.name;
+        // The group's own wave and its lead wave floor its start, so its
+        // box never opens in a column before its first piece of work
+        // (specs/waves.md §5.1). A no-op without waves, and for a lane
+        // child, whose `resolveChildStart` already applied it.
+        const startX = waveFloorX(node, cursor.x, ctx);
+        // In a roadmap with waves, a group with no title, no `style:` and
+        // no `labels:` that carries `wave:` only assigns membership: it
+        // draws no bracket, which would otherwise sit exactly on the wave
+        // boundary its box opens at, and no id label (specs/waves.md §9.7).
+        // An id alone does not make it titled (Example 4's `api-track`).
+        const waveOnly =
+            ctx.waves !== undefined &&
+            node.title === undefined &&
+            propValue(node.properties, 'wave') !== undefined &&
+            propValue(node.properties, 'style') === undefined &&
+            propValues(node.properties, 'labels').length === 0;
+        const title = waveOnly ? undefined : (node.title ?? node.name);
 
         // Group children chain in time inside the group, so they
         // form one sub-flow under the parent's flow path. See
@@ -138,9 +154,8 @@ export class GroupNode {
             if (child.$type === 'DescriptionDirective') continue;
 
             if (!isItemDeclaration(child)) {
-                const blockProps = (child as ParallelBlock | GroupBlock).properties ?? [];
                 const blockStart = deps.resolveChildStart(
-                    blockProps,
+                    child as ParallelBlock | GroupBlock,
                     timeCursorX,
                     groupContentLeftX,
                     ctx,
@@ -167,7 +182,12 @@ export class GroupNode {
             }
 
             const props = (child as ItemDeclaration).properties;
-            const desiredStart = deps.resolveChildStart(props, timeCursorX, groupContentLeftX, ctx);
+            const desiredStart = deps.resolveChildStart(
+                child as ItemDeclaration,
+                timeCursorX,
+                groupContentLeftX,
+                ctx,
+            );
             // Predict logical extent so the row-packer can bump on
             // collision before we hand off to `sequenceItem`. Mirrors
             // SwimlaneNode's pre-flight width math.
@@ -287,6 +307,7 @@ export class GroupNode {
             children,
             style,
             inlineDatePins: inlineDatePins.length > 0 ? inlineDatePins : undefined,
+            ...(waveOnly ? { waveOnly: true as const } : {}),
         };
     }
 }

@@ -32,9 +32,11 @@ export {
     registerBundle,
     tr,
 } from './i18n/index.js';
+export type * from './i18n/wave-message-types.js';
 export {
     type IncludeMode,
     type IsolatedRegion,
+    isRoutedResolveDiagnostic,
     type ResolveDiagnostic,
     type ResolvedConfig,
     type ResolvedContent,
@@ -45,5 +47,35 @@ export {
 export type { NowlineAddedServices, NowlineServices } from './language/nowline-module.js';
 export { createNowlineServices, NowlineModule } from './language/nowline-module.js';
 export { NowlineValidator, registerValidationChecks } from './language/nowline-validator.js';
+export {
+    assignWaves,
+    type CodedWaveFinding,
+    checkWaveDeclaration,
+    checkWaveDeclarations,
+    effectiveWave,
+    evaluateWaveProperties,
+    fileRefLookup,
+    isWaveBannedProperty,
+    leadWave,
+    ownWaves,
+    type UncodedWaveFinding,
+    type WaveAssignment,
+    type WaveFinding,
+    type WaveFindingCode,
+    type WaveRefLookup,
+    waveFloorDate,
+    waveIndexMap,
+} from './language/waves.js';
+export {
+    evaluateWaveOrder,
+    type WaveOrderOptions,
+    type WaveOrderScope,
+} from './language/waves-order.js';
+export {
+    buildWavePlan,
+    localizeResolveDiagnostic,
+    type WaveFloor,
+    type WavePlan,
+} from './language/waves-plan.js';
 export { TEMPLATE_NAMES, type TemplateName } from './templates.js';
 export { singleLine } from './util/single-line.js';

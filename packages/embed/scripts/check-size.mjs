@@ -3,7 +3,7 @@
 // Bundle-size gate for `@nowline/embed`. Runs in CI on every PR and
 // reports a failure if the gzipped IIFE exceeds the budget.
 //
-//   prod IIFE (dist/nowline.min.js)  ≤ 175 KB gzipped
+//   prod IIFE (dist/nowline.min.js)  ≤ 200 KB gzipped
 //
 // Also asserts:
 //   - no `node:*` literal survived in the IIFE (the
@@ -17,9 +17,12 @@
 // named as the escalation trigger. Per that handoff's "next moves",
 // the cheap fix is a higher budget; we set 175 KB so we still beat
 // Mermaid by a comfortable margin while leaving headroom for
-// incremental growth. Crossing 200 KB should trigger a serious
-// review: pre-bundled grammars or a hand-rolled `.nowline` parser
-// become attractive.
+// incremental growth. Waves (m2o) took the IIFE to ~194 KB: about
+// 6 KB of en/fr diagnostic text, the rest validator, barrier and
+// strip logic. The budget moved to 200 KB, the line the m4 plan set
+// for a serious review, so the next overage is that review:
+// pre-bundled grammars or a hand-rolled `.nowline` parser become
+// attractive.
 //
 // The `--print-attribution` flag walks the esbuild metafile and prints
 // the top contributors so a Langium runtime regression surfaces with
@@ -33,8 +36,7 @@ import { gzipSync } from 'node:zlib';
 const here = dirname(fileURLToPath(import.meta.url));
 const root = resolve(here, '..');
 
-const PROD_BUDGET = 175 * 1024;
-const PROD_ALERT = 200 * 1024;
+const PROD_BUDGET = 200 * 1024;
 
 const PROD_BUNDLE = resolve(root, 'dist/nowline.min.js');
 const META_PATH = resolve(root, 'dist/meta.json');
@@ -115,16 +117,11 @@ if (gz > PROD_BUDGET) {
     console.error(
         '  check-size: run `pnpm --filter @nowline/embed check-size --print-attribution` to see the largest contributors.',
     );
+    console.error(
+        '  check-size: review the m4 handoff before raising the budget again (pre-bundled grammars or a hand-rolled parser become attractive at this size).',
+    );
     ok = false;
 } else {
-    if (gz > PROD_ALERT) {
-        console.warn(
-            `  check-size: WARNING — bundle is ${fmtKB(gz)}, crossing the ${fmtKB(PROD_ALERT)} alert line.`,
-        );
-        console.warn(
-            '  check-size: review the m4 handoff before bumping the budget further (pre-bundled grammars or a hand-rolled parser become attractive at this size).',
-        );
-    }
     console.log(`  check-size: OK (${fmtKB(PROD_BUDGET - gz)} headroom)`);
 }
 

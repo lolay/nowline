@@ -197,6 +197,15 @@ export const darkTheme: Theme = {
         badgeStroke: '#475569',
         badgeText: '#94a3b8',
     },
+    wave: {
+        stripFill: '#042f2e',
+        stripFillAlt: '#134e4a',
+        labelText: '#99f6e4',
+        labelMuted: '#5eead4',
+        boundary: '#2dd4bf',
+        hatch: '#0f172a',
+        hatchOnDark: '#ffffff',
+    },
     arrowhead: {
         neutral: '#94a3b8',
         light: '#64748b',

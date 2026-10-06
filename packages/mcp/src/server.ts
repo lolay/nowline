@@ -20,6 +20,7 @@ import {
     type ExportFormat,
     exportDocument,
     type HostEnv,
+    IncludeResolveError,
     type RenderInputs,
 } from '@nowline/export';
 import { resolveFonts } from '@nowline/export-core';
@@ -35,9 +36,12 @@ import {
     diagnosticsErrorBlock,
     handleToolError,
     InputRequiredError,
+    includeDiagnosticsResponse,
     LAYOUT_INSIGHT_HINT,
+    type McpDiagnostic,
     PathOutsideRootError,
     REVIEW_MAX_WIDTH,
+    routedResolveDiagnosticsToMcp,
     toolDescriptionWithSyntax,
 } from './diagnostics.js';
 import {
@@ -358,8 +362,9 @@ export function createMcpServer(opts: McpServerOptions = {}): McpServer {
                 const { source, filePath } = await sourceAndPath(args, allowedRoot);
                 const doc = await buildDocument(source);
                 const diagnostics = collectMcpDiagnostics(doc, filePath);
-                const ok = diagnostics.every((d) => d.severity !== 'error');
-                const insights = ok
+                // Routed (wave-rule) include diagnostics join the validator's,
+                // with the file and line they point into (specs/waves.md §6.1).
+                const insights = diagnostics.every((d) => d.severity !== 'error')
                     ? await collectMcpLayoutInsights({
                           source,
                           filePath,
@@ -367,8 +372,10 @@ export function createMcpServer(opts: McpServerOptions = {}): McpServer {
                           locale: 'en-US',
                           readFile: createNodeHostEnv(filePath).readSource,
                           doc,
+                          onResolveDiagnostics: (routed) => diagnostics.push(...routed),
                       })
                     : [];
+                const ok = diagnostics.every((d) => d.severity !== 'error');
                 const structured = {
                     ok,
                     diagnostics,
@@ -662,10 +669,26 @@ export function createMcpServer(opts: McpServerOptions = {}): McpServer {
                 const result = await resolveFonts({ headless: true });
                 inputs.fonts = { sans: result.sans, mono: result.mono };
             }
-            const bytes = needsRender
-                ? await exportDocument(source, format, inputs, host)
-                : new Uint8Array(0);
+            let bytes: Uint8Array;
+            try {
+                bytes = needsRender
+                    ? await exportDocument(source, format, inputs, host)
+                    : new Uint8Array(0);
+            } catch (err) {
+                if (!(err instanceof IncludeResolveError)) throw err;
+                return includeDiagnosticsResponse(
+                    blocked.doc,
+                    filePath,
+                    routedResolveDiagnosticsToMcp(err.diagnostics),
+                );
+            }
 
+            // The preview path skips the kernel, so wave-rule include
+            // diagnostics are checked here too. collectMcpLayoutInsights drops
+            // them when the resolver reports an uncoded include error, so that
+            // case keeps the preview it returned before waves existed
+            // (specs/waves.md §6.1).
+            const routed: McpDiagnostic[] = [];
             const insights = await collectMcpLayoutInsights({
                 source,
                 filePath,
@@ -675,7 +698,11 @@ export function createMcpServer(opts: McpServerOptions = {}): McpServer {
                 locale: 'en-US',
                 readFile: host.readSource,
                 doc: blocked.doc,
+                onResolveDiagnostics: (d) => routed.push(...d),
             });
+            if (routed.some((d) => d.severity === 'error')) {
+                return includeDiagnosticsResponse(blocked.doc, filePath, routed);
+            }
 
             const previewPayload: PreviewPayload = {
                 source,
@@ -863,7 +890,17 @@ export function createMcpServer(opts: McpServerOptions = {}): McpServer {
                 inputs.fonts = { sans: result.sans, mono: result.mono };
             }
             const host = createNodeHostEnv(filePath);
-            const bytes = await exportDocument(source, format, inputs, host);
+            let bytes: Uint8Array;
+            try {
+                bytes = await exportDocument(source, format, inputs, host);
+            } catch (err) {
+                if (!(err instanceof IncludeResolveError)) throw err;
+                return includeDiagnosticsResponse(
+                    blocked.doc,
+                    filePath,
+                    routedResolveDiagnosticsToMcp(err.diagnostics),
+                );
+            }
 
             const BINARY_FORMATS = new Set<ExportFormat>(['png', 'pdf', 'xlsx']);
             const isBinary = BINARY_FORMATS.has(format);

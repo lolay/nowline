@@ -4,7 +4,6 @@
 // import on the production composition root in `layout.ts`.
 
 import type {
-    EntityProperty,
     GroupBlock,
     ItemDeclaration,
     LabelDeclaration,
@@ -24,6 +23,7 @@ import type {
     ResolvedSize,
     SlackCorridor,
 } from './types.js';
+import type { WaveLayoutState } from './wave-layout.js';
 import type { WorkingCalendar } from './working-calendar.js';
 
 /** Slim accumulator used while sequencing items into a track. */
@@ -142,6 +142,12 @@ export interface LayoutContext {
      */
     nextParallelId: number;
     nextGroupId: number;
+    /**
+     * Wave barrier state (specs/waves.md §8.4), shared by the main lanes
+     * and every isolated region's context. Undefined when the roadmap
+     * declares no waves.
+     */
+    waves?: WaveLayoutState;
 }
 
 /**
@@ -164,7 +170,7 @@ export interface LayoutHelpers {
         ctx: LayoutContext,
     ) => PositionedTrackChild;
     resolveChildStart: (
-        props: EntityProperty[],
+        child: ItemDeclaration | GroupBlock | ParallelBlock,
         seqDefault: number,
         laneLeftX: number,
         ctx: LayoutContext,

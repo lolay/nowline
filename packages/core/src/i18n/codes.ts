@@ -13,8 +13,10 @@
 //   NL.E0700–E0799  capacity / utilization
 //   NL.E0800–E0899  style / color / symbol
 //   NL.E0900–E0999  config blocks (calendar, scale, default)
+//   NL.E1100–E1199  waves
 //   NL.W0700–W0799  warnings (silently-ignored input)
 //   NL.W1000–W1099  layout warnings (author intent lost)
+//   NL.W1100–W1199  wave warnings
 //   NL.I1000–I1099  layout insights (informational reflow consequences)
 //
 // The full list of allocated codes lives in `messages.en.ts` (one entry
@@ -39,6 +41,7 @@ export type MessageCode =
     // Include (NL.E0200–E0299)
     | 'NL.E0200' // invalid-include-mode
     | 'NL.E0201' // duplicate-include-option
+    | 'NL.E0202' // include-wave-agreement
 
     // Identifier (NL.E0300–E0399)
     | 'NL.E0300' // duplicate-identifier
@@ -72,9 +75,26 @@ export type MessageCode =
 
     // Warnings (NL.W0700–W0799)
     | 'NL.W0700' // unknown-entity-property
+    | 'NL.W0701' // include-wave-presentation
+    | 'NL.W0702' // wave-ignored-no-waves
+
+    // Waves (NL.E1100–E1199)
+    | 'NL.E1100' // wave-needs-id
+    | 'NL.E1101' // wave-ref-invalid
+    | 'NL.E1102' // wave-container-conflict
+    | 'NL.E1103' // wave-order-unrealizable
+    | 'NL.E1104' // wave-disallowed-entity
+    | 'NL.E1105' // wave-disallowed-property
+    | 'NL.E1106' // wave-after-invalid-target
 
     // Layout warnings (NL.W1000–W1099)
     | 'NL.W1000' // now-line-outside-window
+    | 'NL.W1001' // wave-pin-moved
+    | 'NL.W1002' // wave-barrier-cap
+
+    // Wave warnings (NL.W1100–W1199)
+    | 'NL.W1100' // wave-before-unmeetable
+    | 'NL.W1101' // wave-reference-ignored
 
     // Layout insights (NL.I1000–I1099)
     | 'NL.I1000' // caption-spilled-right
@@ -82,7 +102,9 @@ export type MessageCode =
     | 'NL.I1002' // bar-too-narrow
     | 'NL.I1003' // before-overflow
     | 'NL.I1004' // lane-multi-row
-    | 'NL.I1005'; // lane-over-capacity
+    | 'NL.I1005' // lane-over-capacity
+    | 'NL.I1006' // wave-empty
+    | 'NL.I1007'; // wave-overruns-milestone
 
 export const ALL_CODES: ReadonlyArray<MessageCode> = [
     'NL.E0001',
@@ -97,6 +119,7 @@ export const ALL_CODES: ReadonlyArray<MessageCode> = [
     'NL.E0104',
     'NL.E0200',
     'NL.E0201',
+    'NL.E0202',
     'NL.E0300',
     'NL.E0301',
     'NL.E0400',
@@ -120,11 +143,26 @@ export const ALL_CODES: ReadonlyArray<MessageCode> = [
     'NL.E0505',
     'NL.E0600',
     'NL.W0700',
+    'NL.W0701',
+    'NL.W0702',
+    'NL.E1100',
+    'NL.E1101',
+    'NL.E1102',
+    'NL.E1103',
+    'NL.E1104',
+    'NL.E1105',
+    'NL.E1106',
     'NL.W1000',
+    'NL.W1001',
+    'NL.W1002',
+    'NL.W1100',
+    'NL.W1101',
     'NL.I1000',
     'NL.I1001',
     'NL.I1002',
     'NL.I1003',
     'NL.I1004',
     'NL.I1005',
+    'NL.I1006',
+    'NL.I1007',
 ] as const;

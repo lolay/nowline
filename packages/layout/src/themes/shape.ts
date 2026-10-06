@@ -160,6 +160,22 @@ export interface Theme {
         badgeStroke: string;
         badgeText: string;
     };
+    /**
+     * Wave tokens (specs/waves.md section 9.10). `stripFill` and
+     * `stripFillAlt` alternate across the wave strip cells; `labelText`
+     * and `labelMuted` paint strip labels and secondary text; `boundary`
+     * is the vertical wave boundary line; `hatch` and `hatchOnDark` are
+     * the background-work hatch stroke on light and dark bar fills.
+     */
+    wave: {
+        stripFill: string;
+        stripFillAlt: string;
+        labelText: string;
+        labelMuted: string;
+        boundary: string;
+        hatch: string;
+        hatchOnDark: string;
+    };
     // m2.5d: lifted from renderEdge marker defs.
     arrowhead: {
         neutral: string;

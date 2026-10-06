@@ -177,6 +177,82 @@ describe('symbol declarations', () => {
     });
 });
 
+describe('wave declarations', () => {
+    // specs/waves.md §10 'Printer': without the WaveDeclaration case,
+    // printNowlineFile throws "Unknown roadmap entry type" for any file with a wave.
+    const source = [
+        'config',
+        '',
+        'style calm',
+        '  bg: blue',
+        '',
+        'roadmap r "R" start:2026-01-05',
+        '',
+        'anchor fy-budget date:2026-02-02',
+        'milestone gate date:2026-02-09',
+        'person sam "Sam"',
+        'wave build "Build"',
+        'wave launch "Launch" style:calm after:[fy-budget, gate]',
+        '  description "Ship it"',
+        '',
+        'swimlane s "S"',
+        '  item x "X" duration:1w wave:build',
+        '  item a duration:2w after:x wave:[launch] owner:sam',
+        '',
+    ].join('\n');
+
+    async function toJson(text: string) {
+        const r = await parseSource(text, 'test.nowline', { validate: true });
+        expect(r.hasErrors, r.diagnostics.map((d) => d.message).join('\n')).toBe(false);
+        return serializeToJson(r.document, text).ast;
+    }
+
+    it('prints wave lines as `wave [id] ["title"] after: style:` with a description', async () => {
+        const out = await canonical(source);
+        expect(out).toContain('\nwave build "Build"\n');
+        expect(out).toContain(
+            '\nwave launch "Launch" after:[fy-budget, gate] style:calm\n  description "Ship it"\n',
+        );
+    });
+
+    it('orders wave: between owner: and after:', async () => {
+        const out = await canonical(source);
+        expect(out).toContain('\n  item a duration:2w owner:sam wave:launch after:x\n');
+        expect(out).toContain('\n  item x "X" duration:1w wave:build\n');
+    });
+
+    it('keeps `item a duration:2w owner:sam wave:w1 after:x` canonical', async () => {
+        const line = '  item a duration:2w owner:sam wave:w1 after:x';
+        const canonicalText = `roadmap r "R"\nwave w1\nswimlane s "S"\n  item x duration:1w\n${line}\n`;
+        const out = await canonical(canonicalText);
+        expect(out.split('\n')).toContain(line);
+        expect(printNowlineFile(await toJson(out))).toBe(out);
+        const scrambled = await canonical(
+            `roadmap r "R"\nwave w1\nswimlane s "S"\n  item x duration:1w\n  item a after:x wave:w1 owner:sam duration:2w\n`,
+        );
+        expect(scrambled).toBe(out);
+    });
+
+    it('prints a one-element `wave:[w1]` list as `wave:w1`', async () => {
+        const out = await canonical(
+            `roadmap r "R"\nwave w1\nswimlane s "S"\n  item a duration:1w wave:[w1]\n`,
+        );
+        expect(out).toContain('\n  item a duration:1w wave:w1\n');
+        expect(out).not.toContain('wave:[');
+    });
+
+    it('text -> json -> text is stable after first canonicalization', async () => {
+        const text = await canonical(source);
+        expect(printNowlineFile(await toJson(text))).toBe(text);
+    });
+
+    it('json -> text -> json is stable after first canonicalization', async () => {
+        const firstJson = await toJson(await canonical(source));
+        const secondJson = await toJson(printNowlineFile(firstJson));
+        expect(stripPositions(secondJson)).toEqual(stripPositions(firstJson));
+    });
+});
+
 function stripPositions(node: unknown): unknown {
     if (Array.isArray(node)) return node.map(stripPositions);
     if (node && typeof node === 'object') {

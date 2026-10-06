@@ -1,7 +1,7 @@
 import { type FSWatcher, promises as fs, watch as fsWatch } from 'node:fs';
 import * as http from 'node:http';
 import * as path from 'node:path';
-import { resolveIncludes } from '@nowline/core';
+import { isRoutedResolveDiagnostic, resolveIncludes } from '@nowline/core';
 import {
     layoutRoadmap,
     type NormalizedZone,
@@ -13,7 +13,11 @@ import {
 import { renderSvg } from '@nowline/renderer';
 import type { ParsedArgs } from '../cli/args.js';
 import { getServices, parseSource } from '../core/parse.js';
-import { type DiagnosticSource, formatDiagnostics } from '../diagnostics/index.js';
+import {
+    adaptResolveDiagnostic,
+    type DiagnosticSource,
+    formatDiagnostics,
+} from '../diagnostics/index.js';
 import {
     describeContentLocaleSource,
     operatorLocale,
@@ -105,14 +109,47 @@ export async function serveHandler(options: ServeHandlerOptions): Promise<void> 
                 const { tag, source } = describeContentLocaleSource(directive, resolvedLocale);
                 process.stderr.write(`nowline: locale=${tag} (${source})\n`);
             }
+            // Included files' text, kept for the code frames of routed diagnostics.
+            const sources = new Map<string, DiagnosticSource>([[inputPath, parse.source]]);
             const resolved = await resolveIncludes(parse.ast, inputPath, {
                 services: getServices().Nowline,
+                readFile: async (absPath) => {
+                    const contents = await fs.readFile(absPath, 'utf-8');
+                    sources.set(absPath, { file: absPath, contents });
+                    return contents;
+                },
             });
             if (resolved.diagnostics.some((d) => d.severity === 'error')) {
-                const msg = resolved.diagnostics
-                    .filter((d) => d.severity === 'error')
+                // Uncoded include errors keep their one-line form, broadcast
+                // only, and take precedence: when any is present, routed
+                // (wave-rule) diagnostics are dropped. Otherwise routed
+                // diagnostics are reported like validator diagnostics
+                // (specs/waves.md §6.1).
+                const legacy = resolved.diagnostics
+                    .filter((d) => d.severity === 'error' && !isRoutedResolveDiagnostic(d))
                     .map((d) => `${d.sourcePath}: ${d.message}`)
                     .join('\n');
+                let msg = legacy;
+                const routed = resolved.diagnostics.filter(isRoutedResolveDiagnostic);
+                if (!legacy && routed.some((d) => d.severity === 'error')) {
+                    const rendered = formatDiagnostics(
+                        [
+                            ...parse.diagnostics,
+                            ...routed.map((d) =>
+                                adaptResolveDiagnostic(
+                                    d,
+                                    d.sourcePath,
+                                    sources.get(d.sourcePath)?.contents,
+                                ),
+                            ),
+                        ],
+                        'text',
+                        sources,
+                        { color: false, operatorLocale: opLocale },
+                    );
+                    process.stderr.write(`${rendered}\n`);
+                    msg = rendered;
+                }
                 lastPayload = { kind: 'error', body: msg };
                 broadcast(clients, 'error', msg);
                 return;

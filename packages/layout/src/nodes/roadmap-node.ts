@@ -14,12 +14,13 @@ import type {
     NowlineFile,
     ResolveResult,
     SwimlaneDeclaration,
+    WavePlan,
 } from '@nowline/core';
 import { defaultRowBand } from '../band-scale.js';
 import type { CalendarConfig } from '../calendar.js';
 import { addDays, daysBetween, resolveCalendar, resolveSizes } from '../calendar.js';
 import { parseDate, propValue, propValues } from '../dsl-utils.js';
-import { resolveLocale } from '../i18n.js';
+import { localeStrings, resolveLocale } from '../i18n.js';
 import type { LayoutOptions, LayoutResult } from '../layout.js';
 import type { LayoutContext, LayoutHelpers } from '../layout-context.js';
 import { shiftIncludeY, shiftSwimlaneY } from '../positioned-shift.js';
@@ -33,6 +34,8 @@ import {
     NOW_PILL_HEIGHT_PX,
     SPACING_PX,
     TIMELINE_TICK_PANEL_HEIGHT_PX,
+    WAVE_LEGEND_GAP_PX,
+    WAVE_STRIP_HEIGHT_PX,
 } from '../themes/shared.js';
 import { TimeScale } from '../time-scale.js';
 import type {
@@ -49,6 +52,14 @@ import type {
 } from '../types.js';
 import type { ViewPreset } from '../view-preset.js';
 import { buildHeaderTicks, resolveScale, tickBoundaryAtOrAfter } from '../view-preset.js';
+import { solveWaveBarriers } from '../wave-barrier.js';
+import {
+    beginWavePass,
+    createWaveLayoutState,
+    freezeWaves,
+    seedWaveEdges,
+    WAVE_EDGE_TOLERANCE_PX,
+} from '../wave-layout.js';
 import { fromCalendarConfig } from '../working-calendar.js';
 import { buildAnchors } from './anchor-node.js';
 import { maxLeafItemRightX } from './content-extent.js';
@@ -66,8 +77,10 @@ import {
     buildMilestones,
     collectMilestonePredecessors,
     lastPredecessorPerFlow,
+    latestArrowPredecessor,
 } from './milestone-node.js';
 import { SwimlaneNode } from './swimlane-node.js';
+import { buildWaveLegend, buildWaves } from './wave-node.js';
 
 const HEADER_CARD_TOP_INSET = 4;
 
@@ -114,6 +127,7 @@ export interface RoadmapNodeDeps extends LayoutHelpers {
         resolved: ResolveResult,
         today: Date | undefined,
         scale: ViewPreset,
+        plan: WavePlan | undefined,
     ) => { startDate: Date; endDate: Date };
     sizeBesideHeader: (title: string, author: string | undefined) => SizedHeader;
     collectItems: (swimlanes: SwimlaneDeclaration[]) => Map<string, ItemDeclaration>;
@@ -131,10 +145,16 @@ export interface RoadmapNodeDeps extends LayoutHelpers {
 }
 
 export class RoadmapNode {
+    /**
+     * `plan` is the roadmap's wave plan (`buildWavePlan`), or undefined
+     * when it declares no waves; it drives the date window (engine B) and
+     * the barrier passes below (engine A).
+     */
     place(
         file: NowlineFile,
         resolved: ResolveResult,
         options: LayoutOptions,
+        plan: WavePlan | undefined,
         deps: RoadmapNodeDeps,
     ): LayoutResult {
         const themeName: ThemeName = options.theme ?? 'light';
@@ -167,6 +187,7 @@ export class RoadmapNode {
             resolved,
             options.today,
             scale,
+            plan,
         );
 
         // Determine header position + timeline placement via `default roadmap`
@@ -216,8 +237,9 @@ export class RoadmapNode {
         // Header layout (top → bottom):
         //   1. Now-pill row    (16 px) — only when there's a now-line
         //   2. Tick-label panel (24 px) — always
-        //   3. Marker row       (≥26 px) — sized to the packed row count
-        //   4. 8 px gap, then the chart begins
+        //   3. Wave strip      (20 px) — only when the roadmap declares waves
+        //   4. Marker row       (≥26 px) — sized to the packed row count
+        //   5. 8 px gap, then the chart begins
         const willHaveNowline =
             options.today !== undefined && options.today >= startDate && options.today <= endDate;
         const hasMarkerEntities =
@@ -227,6 +249,10 @@ export class RoadmapNode {
         // collapses to height 0 — the now-pill and marker row stack
         // directly without the date strip between them.
         const tickPanelHeight = showTopTickPanel ? TIMELINE_TICK_PANEL_HEIGHT_PX : 0;
+        // The wave strip (specs/waves.md §8.8) has a fixed height, so the
+        // chart top is known before the barrier passes run; it sits above
+        // the marker rows, so the post-hoc marker re-pack never moves it.
+        const waveStripHeight = plan ? WAVE_STRIP_HEIGHT_PX : 0;
 
         // Build the time scale up front — packMarkerRow needs it to
         // resolve date-pinned entity x positions before we can size the
@@ -298,7 +324,8 @@ export class RoadmapNode {
         );
         const markerRowsCount = hasMarkerEntities ? Math.max(1, packed.rowCount) : 0;
         const markerRowHeight = markerRowsCount * MARKER_ROW_PITCH_PX;
-        const headerRowsHeight = pillRowHeight + tickPanelHeight + markerRowHeight;
+        const headerRowsHeight =
+            pillRowHeight + tickPanelHeight + waveStripHeight + markerRowHeight;
         const timelineHeightBudget = headerRowsHeight + 8;
         // In beside-mode the header card's BOTTOM aligns with the bottom
         // of the header rows so it visually anchors to the chart's top.
@@ -310,7 +337,8 @@ export class RoadmapNode {
             : 0;
         const timelineY = Math.max(chartTopY, minHeaderRowsBottomForCard - headerRowsHeight);
         const tickPanelY = timelineY + pillRowHeight;
-        const markerRowY = tickPanelY + tickPanelHeight;
+        const waveStripY = tickPanelY + tickPanelHeight;
+        const markerRowY = waveStripY + waveStripHeight;
         const headerRowsBottomY = markerRowY + markerRowHeight;
 
         const ticks = buildHeaderTicks(timeScale, scale, calendar, locale);
@@ -335,6 +363,7 @@ export class RoadmapNode {
             // re-pack potentially grows the chart), so the panel sits
             // directly above the footnote area.
             minorGrid: headerStyle.minorGrid,
+            ...(plan ? { waveStrip: { y: waveStripY, height: waveStripHeight } } : {}),
         };
 
         // Stitch packed placements together with their final centerY now
@@ -382,6 +411,9 @@ export class RoadmapNode {
             chartRightX: finalChartRightX,
             nextParallelId: 0,
             nextGroupId: 0,
+            // Wave floors are dates projected with the unclamped scale
+            // (specs/waves.md §5.1), from the axis origin.
+            ...(plan ? { waves: createWaveLayoutState(plan, timeScale, originX) } : {}),
         };
 
         // Seed the entity-edge maps from the date-pinned pack so item
@@ -411,7 +443,22 @@ export class RoadmapNode {
         const baselineEntityMid = new Map(ctx.entityMidpoints);
         // Item-only maps don't carry baseline entries (date-pinned
         // markers are never placed items), so pass-2 reruns reset them
-        // to fresh empties.
+        // to fresh empties. With waves, every reset re-seeds the wave
+        // edges (`entityRightEdges[w_k] = E_k`, `entityLeftEdges[w_k] =
+        // S_k`) on top of the baseline, so forward references stay
+        // dropped exactly as they are without waves.
+        const resetEntityMaps = (): void => {
+            ctx.entityLeftEdges = new Map(baselineEntityLeft);
+            ctx.entityRightEdges = new Map(baselineEntityRight);
+            ctx.entityMidpoints = new Map(baselineEntityMid);
+            // placedItems and itemFlowKey only ever hold item entries
+            // (markers never write to them), so a fresh map is the right
+            // reset: the next pass's items will repopulate.
+            ctx.placedItems = new Map();
+            ctx.itemFlowKey = new Map();
+            ctx.currentFlowKey = '';
+            if (ctx.waves) seedWaveEdges(ctx.waves, ctx.entityLeftEdges, ctx.entityRightEdges);
+        };
 
         // Build swimlanes (declared order). Inter-band gap comes from
         // the swimlane default style's `spacing` bucket. Default
@@ -447,8 +494,44 @@ export class RoadmapNode {
             return { swimlanes: out, nextY: cursorY, maxRightX };
         };
 
-        // Pass 1 — place items without corridor knowledge.
-        let pass = runSwimlaneLoop();
+        const isolated = resolved.content.isolatedRegions;
+
+        // Pass 1 — place items without corridor knowledge. With waves
+        // (specs/waves.md §8.3-§8.4) it is the barrier driver's pass
+        // loop: each pass resets the maps, re-seeds the wave edges, places
+        // the lanes with the pass's floors, then places the isolated
+        // regions only to accumulate their members (those region
+        // placements are discarded). The driver iterates to the least
+        // fixpoint; its last pass ran with the solved S/E, so its lane
+        // placements are kept.
+        let pass: ReturnType<typeof runSwimlaneLoop>;
+        let waveSolve: PositionedRoadmap['waveSolve'];
+        const waves = ctx.waves;
+        if (waves) {
+            let last: ReturnType<typeof runSwimlaneLoop> | undefined;
+            const solved = solveWaveBarriers(
+                waves.ids.length,
+                waves.origin,
+                waves.floors,
+                (S, E) => {
+                    beginWavePass(waves, S, E);
+                    resetEntityMaps();
+                    last = runSwimlaneLoop();
+                    if (isolated.length > 0) {
+                        buildIncludeRegions(isolated, ctx, last.nextY + 8, deps);
+                    }
+                    return waves.pass;
+                },
+                WAVE_EDGE_TOLERANCE_PX,
+            );
+            // From here on the barrier is frozen: later placements floor
+            // with the solved S/E and accumulate nothing.
+            freezeWaves(waves, solved);
+            waveSolve = { passes: solved.passes, capped: solved.capped };
+            pass = last as ReturnType<typeof runSwimlaneLoop>;
+        } else {
+            pass = runSwimlaneLoop();
+        }
         let swimlanes = pass.swimlanes;
         let y = pass.nextY;
 
@@ -458,18 +541,12 @@ export class RoadmapNode {
         // the swimlane loop with corridors known so the row-packer can
         // bump the offending items down to a clear row. Bumping never
         // changes an item's x, so corridors stay valid across the rerun;
-        // no fixed-point iteration needed.
+        // no fixed-point iteration needed. With waves the rerun runs once,
+        // after the barrier has settled: it floors with the frozen S/E,
+        // and the reset re-seeds the wave edges.
         const corridors = collectSlackCorridors(resolved.content.milestones, ctx);
         if (corridors.length > 0) {
-            ctx.entityLeftEdges = new Map(baselineEntityLeft);
-            ctx.entityRightEdges = new Map(baselineEntityRight);
-            ctx.entityMidpoints = new Map(baselineEntityMid);
-            // placedItems and itemFlowKey only ever hold item entries
-            // (markers never write to them), so a fresh map is the right
-            // reset: pass 2's items will repopulate.
-            ctx.placedItems = new Map();
-            ctx.itemFlowKey = new Map();
-            ctx.currentFlowKey = '';
+            resetEntityMaps();
             ctx.slackCorridors = corridors;
             pass = runSwimlaneLoop();
             swimlanes = pass.swimlanes;
@@ -489,8 +566,8 @@ export class RoadmapNode {
         // Include regions under the swimlanes. Reserve the 8 px gap +
         // tab-reserve only when there's at least one isolated region —
         // otherwise the now-line and chart bottom would extend past the
-        // last swimlane into empty space.
-        const isolated = resolved.content.isolatedRegions;
+        // last swimlane into empty space. With waves this is the one kept
+        // region placement, floored with the frozen S/E.
         let includes: PositionedIncludeRegion[] = [];
         if (isolated.length > 0) {
             const r = buildIncludeRegions(isolated, ctx, y + 8, deps);
@@ -683,6 +760,22 @@ export class RoadmapNode {
             ctx.chartBottomY += gapAbovePanel + TIMELINE_TICK_PANEL_HEIGHT_PX;
         }
 
+        // Positioned waves (specs/waves.md §8.7): after the extent growth
+        // (final scale) and the marker-row shift, so the columns, the
+        // boundaries and the crossings read final geometry.
+        const strings = localeStrings(locale);
+        const builtWaves = ctx.waves
+            ? buildWaves(ctx.waves, ctx, strings, swimlanes, includes)
+            : undefined;
+        if (builtWaves) {
+            builtWaves.regionCrossings.forEach((crossings, i) => {
+                if (crossings.length > 0) includes[i].waveCrossings = crossings;
+            });
+            if (builtWaves.placeholder !== undefined && timeline.waveStrip) {
+                timeline.waveStrip.placeholder = builtWaves.placeholder;
+            }
+        }
+
         const milestoneXs = new Set<number>(milestones.map((m) => m.center.x));
         const anchors = buildAnchors(resolved.content.anchors, ctx, milestoneXs);
         const itemsMap = deps.collectItems(laneEntries);
@@ -692,6 +785,14 @@ export class RoadmapNode {
         // timeline panel when present, otherwise at the last swimlane —
         // see `buildNowline`. Footnote panels below do not extend it.
         const nowline = deps.buildNowline(options.today, ctx, locale);
+
+        // The wave legend (specs/waves.md §8.8, §9.5) sits below the chart
+        // and any bottom tick panel, above the footnotes: grow the chart
+        // bottom by its gap and lines before the footnote panel is placed.
+        const waveLegend = builtWaves
+            ? buildWaveLegend(builtWaves, ctx, strings, ctx.chartBottomY + WAVE_LEGEND_GAP_PX)
+            : undefined;
+        if (waveLegend) ctx.chartBottomY += WAVE_LEGEND_GAP_PX + waveLegend.box.height;
 
         // Finalize footnotes at the bottom.
         const foot = buildFootnotes(resolved.content.footnotes, ctx, ctx.chartBottomY);
@@ -777,6 +878,15 @@ export class RoadmapNode {
                 width: ctx.chartRightX - chartLeftX,
                 height: ctx.chartBottomY - ctx.chartTopY,
             },
+            ...(waveSolve ? { waveSolve } : {}),
+            ...(builtWaves ? { waves: builtWaves.waves } : {}),
+            ...(builtWaves && builtWaves.boundaries.length > 0
+                ? { waveBoundaries: builtWaves.boundaries }
+                : {}),
+            ...(builtWaves && builtWaves.crossings.length > 0
+                ? { waveCrossings: builtWaves.crossings }
+                : {}),
+            ...(waveLegend ? { waveLegend } : {}),
         };
         return model;
     }
@@ -791,7 +901,9 @@ export class RoadmapNode {
  * Each non-binding predecessor (`x < maxEnd`, `y > 0`) becomes one
  * corridor; date-pinned milestones whose latest predecessor overruns
  * the date contribute a single back-pointing corridor between the
- * pinned column and the predecessor's right edge.
+ * pinned column and the predecessor's right edge. Wave predecessors draw
+ * no slack arrow, so they never own a corridor (a floating milestone
+ * bound by a wave still sets `maxEnd`).
  */
 function collectSlackCorridors(
     milestones: Map<string, import('@nowline/core').MilestoneDeclaration>,
@@ -813,10 +925,8 @@ function collectSlackCorridors(
         if (date) {
             const milestoneX = ctx.scale.forwardWithinDomain(date);
             if (milestoneX === null) continue;
-            let maxPred = null as ReturnType<typeof collectMilestonePredecessors>[number] | null;
-            for (const p of dedupedPreds) {
-                if (!maxPred || p.x > maxPred.x) maxPred = p;
-            }
+            // Wave references draw no arrow, so they own no corridor.
+            const maxPred = latestArrowPredecessor(dedupedPreds);
             if (maxPred && maxPred.x > milestoneX && maxPred.y > 0) {
                 out.push({
                     xStart: Math.min(maxPred.x, milestoneX),
@@ -833,7 +943,7 @@ function collectSlackCorridors(
         const maxEnd = dedupedPreds[0].x;
         for (let i = 1; i < dedupedPreds.length; i++) {
             const p = dedupedPreds[i];
-            if (p.x < maxEnd && p.y > 0) {
+            if (p.x < maxEnd && p.y > 0 && p.wave === undefined) {
                 out.push({
                     xStart: p.x,
                     xEnd: maxEnd,

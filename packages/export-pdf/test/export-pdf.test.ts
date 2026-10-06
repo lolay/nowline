@@ -1,4 +1,6 @@
 import { createHash } from 'node:crypto';
+import { readFile } from 'node:fs/promises';
+import { fileURLToPath } from 'node:url';
 import { resolveFonts } from '@nowline/export-core';
 import { renderSvg } from '@nowline/renderer';
 import { describe, expect, it } from 'vitest';
@@ -188,5 +190,38 @@ describe('exportPdf — validation', () => {
         const fonts = await bundledFonts();
         const pdf = await exportPdf(inputs, svg, { fonts, pageSize: '8.5x11in' });
         expect(ascii(pdf, 0, 5)).toBe(PDF_HEAD);
+    });
+});
+
+describe('exportPdf — waves', () => {
+    // specs/waves.md §10: svg-to-pdfkit must draw the background-work hatch
+    // (a `<pattern>` fill), or the renderer needs its stripe-line fallback.
+    const SAMPLE = fileURLToPath(new URL('../../../examples/waves.nowline', import.meta.url));
+
+    it('draws the background-work hatch as a PDF pattern', async () => {
+        const { inputs, svg } = await svgFor(await readFile(SAMPLE, 'utf-8'));
+        expect(svg).toMatch(/<pattern [^>]*id="[^"]+-wave-hatch-dark"/);
+        const fonts = await bundledFonts();
+        const pdf = Buffer.from(await exportPdf(inputs, svg, { fonts, compress: false })).toString(
+            'latin1',
+        );
+        expect(pdf).toMatch(/\/PatternType 1\b/);
+        expect(pdf).toMatch(/\/Pattern\s*<</);
+        expect(pdf).toMatch(/\/Pattern cs/);
+        // The hatch line's `opacity` (WAVE_HATCH_OPACITY) reaches the PDF as
+        // both a fill (`ca`) and a stroke (`CA`) alpha. A stroke-only `CA`,
+        // which `stroke-opacity` produced, is ignored by poppler inside a
+        // pattern cell, so the hatch drew opaque there.
+        expect(pdf).toMatch(/\/ca 0\.13\b/);
+        expect(pdf).toMatch(/\/CA 0\.13\b/);
+    });
+
+    it('a roadmap without background work has no pattern', async () => {
+        const { inputs, svg } = await svgFor(MINIMAL_FIXTURE);
+        const fonts = await bundledFonts();
+        const pdf = Buffer.from(await exportPdf(inputs, svg, { fonts, compress: false })).toString(
+            'latin1',
+        );
+        expect(pdf).not.toMatch(/\/PatternType/);
     });
 });

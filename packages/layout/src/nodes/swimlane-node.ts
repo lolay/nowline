@@ -18,7 +18,6 @@
 //     preserved.
 
 import type {
-    EntityProperty,
     GroupBlock,
     ItemDeclaration,
     ParallelBlock,
@@ -94,7 +93,7 @@ export interface SwimlaneNodeDeps {
         ctx: LayoutContext,
     ) => PositionedTrackChild;
     resolveChildStart: (
-        props: EntityProperty[],
+        child: ItemDeclaration | GroupBlock | ParallelBlock,
         seqDefault: number,
         laneLeftX: number,
         ctx: LayoutContext,
@@ -190,10 +189,12 @@ function firstChildStartX(
 ): number | undefined {
     for (const child of lane.content) {
         if (child.$type === 'DescriptionDirective') continue;
-        const props = isItemDeclaration(child)
-            ? child.properties
-            : ((child as ParallelBlock | GroupBlock).properties ?? []);
-        return deps.resolveChildStart(props, laneLeftX, laneLeftX, ctx);
+        return deps.resolveChildStart(
+            child as ItemDeclaration | GroupBlock | ParallelBlock,
+            laneLeftX,
+            laneLeftX,
+            ctx,
+        );
     }
     return undefined;
 }
@@ -268,8 +269,12 @@ export class SwimlaneNode {
             if (child.$type === 'DescriptionDirective') continue;
 
             if (!isItemDeclaration(child)) {
-                const blockProps = (child as ParallelBlock | GroupBlock).properties ?? [];
-                const blockStart = deps.resolveChildStart(blockProps, timeCursorX, laneLeftX, ctx);
+                const blockStart = deps.resolveChildStart(
+                    child as ParallelBlock | GroupBlock,
+                    timeCursorX,
+                    laneLeftX,
+                    ctx,
+                );
                 const { rowIndex, y: blockY } = packer.placeBlock();
                 const cursor = deps.newCursor(blockStart, blockY);
                 const positioned = deps.sequenceOne(
@@ -292,7 +297,12 @@ export class SwimlaneNode {
             }
 
             const props = (child as ItemDeclaration).properties;
-            const desiredStart = deps.resolveChildStart(props, timeCursorX, laneLeftX, ctx);
+            const desiredStart = deps.resolveChildStart(
+                child as ItemDeclaration,
+                timeCursorX,
+                laneLeftX,
+                ctx,
+            );
             // Predict the item's logical extent so the row-pack can decide
             // BEFORE handing off to sequenceItem. The arithmetic mirrors
             // the duration → width math in `sequenceItem` (see

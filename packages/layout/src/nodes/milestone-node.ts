@@ -18,6 +18,7 @@ import { itemSlackAttachY } from '../item-port-geometry.js';
 import type { LayoutContext } from '../layout-context.js';
 import { resolveStyle } from '../style-resolution.js';
 import type { BoundingBox, Point, PositionedMilestone } from '../types.js';
+import { isOnWaveBoundary, WAVE_EDGE_TOLERANCE_PX } from '../wave-layout.js';
 import {
     MARKER_BOLD_WIDTH_FACTOR,
     MARKER_DIAMOND_RADIUS_PX,
@@ -38,6 +39,11 @@ export interface MilestonePredecessor {
     x: number;
     y: number;
     flowKey: string;
+    /**
+     * Set when `ref` names a wave: `x` is the seeded wave end `E_k`.
+     * Wave references draw no slack arrows (specs/waves.md §5.3).
+     */
+    wave?: string;
 }
 
 /**
@@ -62,6 +68,12 @@ export function collectMilestonePredecessors(
         const y = item
             ? itemSlackAttachY(item, ctx.bandScale.bandwidth())
             : (ctx.entityMidpoints.get(ref)?.y ?? 0);
+        // A wave reads its seeded end `E_k` (logical, not inset), so a
+        // milestone bound by it sits exactly on the boundary.
+        if (!item && ctx.waves?.plan.index.has(ref)) {
+            out.push({ ref, x, y, flowKey: `wave:${ref}`, wave: ref });
+            continue;
+        }
         // Markers don't share a flow with anything, so use their id
         // as a unique flow key — every marker stands on its own.
         const flowKey = ctx.itemFlowKey.get(ref) ?? `marker:${ref}`;
@@ -86,6 +98,35 @@ export function lastPredecessorPerFlow(preds: MilestonePredecessor[]): Milestone
         if (!existing || p.x > existing.x) m.set(p.flowKey, p);
     }
     return Array.from(m.values());
+}
+
+/**
+ * The predecessor a dated milestone's overrun arrow starts from: the
+ * rightmost one that is not a wave (wave references draw no slack
+ * arrows). `collectSlackCorridors` uses the same choice.
+ */
+export function latestArrowPredecessor(preds: MilestonePredecessor[]): MilestonePredecessor | null {
+    let maxPred: MilestonePredecessor | null = null;
+    for (const p of preds) {
+        if (p.wave !== undefined) continue;
+        if (!maxPred || p.x > maxPred.x) maxPred = p;
+    }
+    return maxPred;
+}
+
+/**
+ * The wave that overruns a dated milestone at `x`: the latest-ending
+ * wave predecessor whose end lies past `x` (by more than the boundary
+ * tolerance, so a wave ending on the date does not count). Ties keep the
+ * first listed.
+ */
+function overrunningWave(preds: MilestonePredecessor[], x: number): string | undefined {
+    let latest: MilestonePredecessor | undefined;
+    for (const p of preds) {
+        if (p.wave === undefined || p.x - x < WAVE_EDGE_TOLERANCE_PX) continue;
+        if (!latest || p.x > latest.x) latest = p;
+    }
+    return latest?.wave;
 }
 
 function decideLabelBoxForCanvas(
@@ -139,6 +180,7 @@ export class MilestoneNode {
         let fixed = false;
         let slackArrows: Array<{ x: number; y: number }> | undefined;
         let isOverrun = false;
+        let overrunByWave: string | undefined;
 
         if (date) {
             const x = ctx.scale.forwardWithinDomain(date);
@@ -159,10 +201,7 @@ export class MilestoneNode {
             // arrows from sibling items in one chained flow.
             const preds = collectMilestonePredecessors(afterRaw, ctx);
             const dedupedPreds = lastPredecessorPerFlow(preds);
-            let maxPred: MilestonePredecessor | null = null;
-            for (const p of dedupedPreds) {
-                if (!maxPred || p.x > maxPred.x) maxPred = p;
-            }
+            const maxPred = latestArrowPredecessor(dedupedPreds);
             if (maxPred && maxPred.x > x) {
                 isOverrun = true;
                 slackArrows = [
@@ -172,6 +211,11 @@ export class MilestoneNode {
                     },
                 ];
             }
+            // The wave-deadline idiom (specs/waves.md §5.3, Example 11): a
+            // wave listed in `after:` that ends past the date overruns the
+            // milestone. It gets the red cut line, but no arrow.
+            overrunByWave = overrunningWave(dedupedPreds, x);
+            if (overrunByWave !== undefined) isOverrun = true;
         } else if (afterRaw.length > 0) {
             // Float to the rightmost (binding) predecessor; every
             // last-of-flow predecessor that finishes EARLIER than the
@@ -215,7 +259,9 @@ export class MilestoneNode {
             const arrows: Array<{ x: number; y: number }> = [];
             for (let i = 1; i < dedupedPreds.length; i++) {
                 const p = dedupedPreds[i];
-                if (p.x < maxEnd && p.y > 0) arrows.push({ x: p.x, y: p.y });
+                if (p.x < maxEnd && p.y > 0 && p.wave === undefined) {
+                    arrows.push({ x: p.x, y: p.y });
+                }
             }
             if (arrows.length > 0) slackArrows = arrows;
         }
@@ -239,7 +285,7 @@ export class MilestoneNode {
         ctx.entityLeftEdges.set(this.id, center.x);
         ctx.entityRightEdges.set(this.id, center.x);
         ctx.entityMidpoints.set(this.id, center);
-        return {
+        const positioned: PositionedMilestone = {
             id: this.id,
             title,
             center,
@@ -253,6 +299,14 @@ export class MilestoneNode {
             labelBox,
             labelSide,
         };
+        // On a wave boundary the boundary line carries the vertical. An
+        // overrun milestone keeps its red cut line, so it never counts as
+        // on a boundary.
+        if (ctx.waves && !isOverrun && isOnWaveBoundary(ctx.waves, center.x)) {
+            positioned.onWaveBoundary = true;
+        }
+        if (overrunByWave !== undefined) positioned.overrunByWave = overrunByWave;
+        return positioned;
     }
 }
 

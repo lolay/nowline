@@ -6,6 +6,8 @@
 //   - Resolution 6: Standard calendar block (Mon–Fri, 8h, fixed UIDs 1/2).
 //   - Resolution 9: single stderr summary line on lossy drops; never an error.
 //   - Lossy export policy: `--strict` does not escalate.
+//   - Waves (specs/waves.md §10): one wave-end milestone task per wave,
+//     appended after every other task so existing UIDs never renumber.
 //
 // Determinism: no `new Date()`. Anchoring date comes from `options.startDate`
 // or `inputs.today`; calendar UIDs are fixed; Tasks numbered sequentially.
@@ -22,7 +24,9 @@ import type {
     SwimlaneContent,
     SwimlaneDeclaration,
     TeamDeclaration,
+    WavePlan,
 } from '@nowline/core';
+import { buildWavePlan } from '@nowline/core';
 import type { ExportInputs } from '@nowline/export-core';
 import { displayLabel, getProp, getProps, hasProp, roadmapTitle } from '@nowline/export-core';
 
@@ -54,6 +58,10 @@ interface DropCounts {
     progress: number;
     before: number;
     description: number;
+    /** Wave members without an id: no link to their wave-end task. */
+    waveNoId: number;
+    /** Inline-date wave floors: MS Project links tasks, not dates. */
+    waveFloor: number;
 }
 
 interface TaskRow {
@@ -68,6 +76,10 @@ interface TaskRow {
     nowlineId?: string;
     ownerRefs: string[];
     startsAt?: string;
+    /** The source item, for wave membership. */
+    node?: ItemDeclaration;
+    /** Links by UID, added after `predecessors`, skipping UIDs already linked. */
+    extraPredecessorUids?: number[];
 }
 
 interface ResourceRow {
@@ -89,6 +101,8 @@ export function exportMsProjXml(inputs: ExportInputs, options: MsProjOptions = {
         progress: 0,
         before: 0,
         description: 0,
+        waveNoId: 0,
+        waveFloor: 0,
     };
 
     const projectName = escapeXml(
@@ -106,6 +120,11 @@ export function exportMsProjXml(inputs: ExportInputs, options: MsProjOptions = {
     const idToUid = new Map<string, number>();
     for (const t of tasks) {
         if (t.nowlineId) idToUid.set(t.nowlineId, t.uid);
+    }
+    // Undefined when the roadmap declares no waves: nothing below changes.
+    const wavePlan = buildWavePlan(inputs.resolved);
+    if (wavePlan) {
+        addWaveTasks(ast, wavePlan, tasks, idToUid, drops);
     }
     const idToUidResource = new Map<string, number>();
     for (const r of resources) {
@@ -333,6 +352,7 @@ function emitTaskRow(
         predecessors: getProps(item, 'after') as string[],
         nowlineId: item.name,
         ownerRefs: getProps(item, 'owner') as string[],
+        node: item,
     });
 }
 
@@ -360,16 +380,109 @@ function emitTask(t: TaskRow, idToUid: Map<string, number>, lines: string[]): vo
     if (t.startsAt) {
         lines.push(`      <Start>${t.startsAt}T08:00:00</Start>`);
     }
+    const linked = new Set<number>();
     for (const pred of t.predecessors) {
         const uid = idToUid.get(pred);
         if (uid !== undefined) {
-            lines.push('      <PredecessorLink>');
-            lines.push(`        ${tag('PredecessorUID', uid)}`);
-            lines.push('        <Type>1</Type>'); // FS
-            lines.push('      </PredecessorLink>');
+            emitPredecessorLink(uid, lines);
+            linked.add(uid);
         }
     }
+    for (const uid of t.extraPredecessorUids ?? []) {
+        if (linked.has(uid)) continue;
+        emitPredecessorLink(uid, lines);
+        linked.add(uid);
+    }
     lines.push('    </Task>');
+}
+
+function emitPredecessorLink(uid: number, lines: string[]): void {
+    lines.push('      <PredecessorLink>');
+    lines.push(`        ${tag('PredecessorUID', uid)}`);
+    lines.push('        <Type>1</Type>'); // FS
+    lines.push('      </PredecessorLink>');
+}
+
+// ---------- Waves ----------
+
+const ISO_DATE_RE = /^\d{4}-\d{2}-\d{2}$/;
+
+/**
+ * Waves (specs/waves.md §10). Appends one zero-duration milestone task per
+ * wave, `{title} (wave end)`, after every other task (so existing UIDs and
+ * IDs never renumber), and wires the barrier as FS links:
+ *   - wave-end task k <- every member of wave k with an id, and wave k-1's end;
+ *   - every member of wave k >= 2 <- wave k-1's end task;
+ *   - a floor (`after:` on the wave naming an anchor or a dated milestone)
+ *     <- every member of wave k and wave k's end task (the end task covers an
+ *     empty wave); an inline-date floor is dropped and counted.
+ * Wave ids join `idToUid`, so `after:<wave>` links to the wave-end task.
+ * Background work gets nothing.
+ */
+function addWaveTasks(
+    ast: NowlineFile,
+    plan: WavePlan,
+    tasks: TaskRow[],
+    idToUid: Map<string, number>,
+    drops: DropCounts,
+): void {
+    const datedTargets = new Set<string>();
+    for (const entry of ast.roadmapEntries) {
+        if (entry.$type === 'AnchorDeclaration') {
+            const a = entry as AnchorDeclaration;
+            if (a.name) datedTargets.add(a.name);
+        } else if (entry.$type === 'MilestoneDeclaration') {
+            const m = entry as MilestoneDeclaration;
+            if (m.name && getProp(m, 'date') !== undefined) datedTargets.add(m.name);
+        }
+    }
+
+    const last = tasks[tasks.length - 1];
+    let uid = (last?.uid ?? 0) + 1;
+    let id = (last?.id ?? 0) + 1;
+    const endUids = plan.waves.map(() => uid++);
+
+    const floorUids = plan.waves.map((wave) => {
+        const out: number[] = [];
+        for (const ref of getProps(wave, 'after') as string[]) {
+            if (ISO_DATE_RE.test(ref)) {
+                drops.waveFloor += 1;
+                continue;
+            }
+            const target = datedTargets.has(ref) ? idToUid.get(ref) : undefined;
+            if (target !== undefined) out.push(target);
+        }
+        return out;
+    });
+
+    const memberUids: number[][] = plan.waves.map(() => []);
+    for (const t of tasks) {
+        const k = t.node ? plan.memberWave(t.node) : undefined;
+        if (k === undefined) continue;
+        const extra = [...floorUids[k - 1]];
+        if (k >= 2) extra.unshift(endUids[k - 2]);
+        if (extra.length > 0) t.extraPredecessorUids = extra;
+        if (t.nowlineId) memberUids[k - 1].push(t.uid);
+        else drops.waveNoId += 1;
+    }
+
+    plan.waves.forEach((wave, i) => {
+        const preds = [...memberUids[i], ...floorUids[i]];
+        if (i > 0) preds.push(endUids[i - 1]);
+        tasks.push({
+            uid: endUids[i],
+            id: id++,
+            name: `${displayLabel(wave)} (wave end)`,
+            outlineLevel: 1,
+            isSummary: false,
+            isMilestone: true,
+            durationMinutes: 0,
+            predecessors: [],
+            ownerRefs: [],
+            extraPredecessorUids: preds,
+        });
+        if (wave.name && !idToUid.has(wave.name)) idToUid.set(wave.name, endUids[i]);
+    });
 }
 
 // ---------- Resources ----------
@@ -461,10 +574,18 @@ function formatDrops(drops: DropCounts): string | null {
         'progress',
         'before',
         'description',
+        'waveNoId',
+        'waveFloor',
     ];
-    const parts = order.filter((k) => drops[k] > 0).map((k) => `${k} (${drops[k]})`);
+    const parts = order.filter((k) => drops[k] > 0).map((k) => `${formatDropKey(k)} (${drops[k]})`);
     if (parts.length === 0) return null;
     return `nowline: msproj export dropped ${parts.length} feature kinds: ${parts.join(', ')}`;
+}
+
+function formatDropKey(key: keyof DropCounts): string {
+    if (key === 'waveNoId') return 'wave-member-no-id';
+    if (key === 'waveFloor') return 'wave-floor';
+    return key;
 }
 
 // ---------- helpers ----------

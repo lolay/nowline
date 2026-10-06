@@ -107,6 +107,13 @@ export const SAMPLES: SampleSpec[] = [
     // declares `locale:fr-CA` on the directive — no override needed.
     { name: 'minimal-fr', sourceFile: 'minimal.fr.nowline', theme: 'light' },
     { name: 'platform-2026-grayscale', sourceFile: 'platform-2026.nowline', theme: 'grayscale' },
+    // Waves: the lean example in all three themes, plus a coarse-scale fixture
+    // (gap, empty and styled waves, stacked marker rows) and an isolated region.
+    { name: 'waves', sourceFile: 'waves.nowline', theme: 'light' },
+    { name: 'waves-dark', sourceFile: 'waves.nowline', theme: 'dark' },
+    { name: 'waves-grayscale', sourceFile: 'waves.nowline', theme: 'grayscale' },
+    { name: 'waves-coarse', sourceFile: 'waves-coarse.nowline', dir: 'tests', theme: 'light' },
+    { name: 'waves-isolate', sourceFile: 'waves-isolate.nowline', dir: 'tests', theme: 'light' },
 ];
 
 export async function renderSampleSvg(spec: SampleSpec): Promise<string> {

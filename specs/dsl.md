@@ -12,7 +12,7 @@ Fenced code block: ````nowline`
 
 ## Design Rules
 
-1. **~20 keywords (currently 21).** If the keyword count grows beyond ~20, the language is too complex. The `symbol` declaration was added to support custom-named symbols for `icon:` and `capacity-icon:`; further additions should stay rare.
+1. **~20 keywords (currently 22).** If the keyword count grows beyond ~20, the language is too complex. The `symbol` declaration was added to support custom-named symbols for `icon:` and `capacity-icon:`, and the `wave` declaration to support barriers that span swimlanes (see [`specs/waves.md`](./waves.md) § 4.8 for its justification); further additions should stay rare.
 2. **Indentation-significant.** Two-space or one-tab indent defines nesting. Spaces and tabs must not be mixed within a file — the parser rejects mixed indentation with a clear error identifying the first offending line. No braces, brackets, or explicit block delimiters.
 3. **Strings are double-quoted.** `"Auth refactor"`, not `Auth refactor` or `'Auth refactor'`.
 4. **Properties are key:value pairs** on the same line as the entity. All key-value pairs use `:` as the single separator — the DSL does not use `=`. Values containing spaces must be double-quoted.
@@ -47,7 +47,7 @@ nowline v1 locale:fr-CA
 
 The only directive property today is `locale:`, a BCP-47 tag controlling localized rendering and validator messages. Unknown directive keys are an error so typos surface immediately. See [`specs/localization.md`](./localization.md) for the full locale model, precedence chain, and bundle structure.
 
-`config` and `roadmap` are section markers, not indent-containers. Config keywords (`scale`, `style`, `symbol`, `default`, `calendar`) appear at the top level after `config`. Roadmap keywords (`person`, `team`, `anchor`, `label`, `size`, `status`, `swimlane`, `milestone`, `footnote`) appear at the top level after `roadmap`. Indentation is used where nesting is real: style properties under `style`, `scale` and `calendar` block properties under their keyword, team members under `team`, and swimlane contents under `swimlane`.
+`config` and `roadmap` are section markers, not indent-containers. Config keywords (`scale`, `style`, `symbol`, `default`, `calendar`) appear at the top level after `config`. Roadmap keywords (`person`, `team`, `anchor`, `label`, `size`, `status`, `wave`, `swimlane`, `milestone`, `footnote`) appear at the top level after `roadmap`. Indentation is used where nesting is real: style properties under `style`, `scale` and `calendar` block properties under their keyword, team members under `team`, and swimlane contents under `swimlane`.
 
 ## Full Example
 
@@ -180,7 +180,8 @@ footnote capacity-risk "Team capacity risk" on:[mobile, platform]
 | `label`     | Semantic tag / chip vocabulary     | `[id] ["title"]`. Optional `style:id` plus universal properties (`labels:`, `link:`, `description`). Raw style properties are not allowed — declare a `style` in config and reference it. |
 | `size`      | Named effort budget calibrated to single-engineer scale | `[id] ["title"]`. Required `effort:<duration literal>` (decimal-aware: `0.5d`, `2w`, `1m`). Universal properties (`description`, `link:`) also allowed. Must be declared before any entity referencing `size:NAME`. An item with `size:` derives its duration as `effort ÷ item_capacity` (item `capacity:` defaults to `1` when absent). |
 | `status`    | Custom status value                | `[id] ["title"]`. Extends the built-in set (`planned`, `in-progress` (alias `active`), `done` (alias `completed`), `at-risk`, `blocked`). Universal properties (`description`, `link:`) also allowed. Must be declared before any entity referencing `status:NAME`. |
-| `milestone` | Achievement marker                 | `[id] ["title"]`. At least one of `date:` or `after:` is required. `after:` accepts a single id or a list of item/milestone/anchor ids. |
+| `wave`      | Barrier that spans every swimlane  | `id ["title"]` (the id is required). Optional `after:` start floor (anchor, dated milestone, or one ISO date) plus universal properties. Declaration order is time order: no item in wave k+1 starts before every item in wave k ends. Work joins a wave with `wave:<id>` on `item`, `group`, or `parallel`. Must be declared before any entry referencing `wave:NAME`. See "Wave Declaration" below. |
+| `milestone` | Achievement marker                 | `[id] ["title"]`. At least one of `date:` or `after:` is required. `after:` accepts a single id or a list of item/milestone/anchor/wave ids. |
 | `item`      | Work item inside a swimlane        | `[id] ["title"]`. Indented under a swimlane.                                             |
 | `parallel`  | Parallel execution block           | `[id] ["title"]`. Children run in parallel. Implicit join on dedent.                     |
 | `group`     | Sequential item bundle             | `[id] ["title"]`. Children run sequentially. Works inside swimlanes and parallel blocks. |
@@ -241,7 +242,7 @@ swimlane platform
 - Items inside a group execute sequentially (same as swimlane behavior). The renderer uses the same row-pack engine swimlanes use, so an item whose desired start collides with a sibling's logical right edge, an upstream caption's spill reservation, or a slack-arrow corridor bumps to a new inner row inside the group's content area. The group's bounding box grows vertically to encompass every populated row.
 - Inside a swimlane (outside a parallel block), the group is sequential with respect to its siblings — `deploy` starts after `api-docs` finishes.
 - **Styled group** — when a group has `style:`, `labels:`, or other visual properties, it renders with a visible bounding box plus a small title chiclet anchored flush in the box's upper-left corner. The chiclet sits entirely inside the box (no overhang) and the box reserves vertical pad above the first inner row plus a symmetric pad below the last row. See `specs/rendering.md` "Group (styled)" for the full chiclet contract.
-- **Unstyled group** — when a group has no style or labels, it is purely structural. No visible artifact in the rendered output; it only governs sequencing and inner row growth.
+- **Unstyled group** — when a group has no style or labels, it draws no box, fill, or chiclet; it governs sequencing and inner row growth. The default themes still give `group` a thin `bracket: solid` `[` along its left edge (`bracket:none` on `default group` removes it). **Exception:** in a roadmap with waves, a group with no title (an id alone is not one), no `style:`, and no `labels:` that carries `wave:` draws nothing at all; it only assigns membership (see "Wave Declaration").
 
 #### `parallel` with `group` — parallel sequential tracks
 
@@ -276,6 +277,7 @@ Both `parallel` and `group` support universal properties (`labels`, `style`, `li
 | `owner`  | person or team ref | Accountable owner for the block.                                   |
 | `after`  | identifier, ISO date, or list | The entire block starts after the referenced entity finishes (or after the inline ISO date). Single id: `after:kickoff`. Single date: `after:2026-03-15`. List: `after:[a, b, 2026-03-15]` — starts after the latest of all elements. Accepts item, milestone, anchor, parallel, or group ids. **At most one inline date per direction**; multiple dates are a validation error. See "Inline date pins" below. |
 | `before` | identifier, ISO date, or list | The entire block must finish before the referenced entity starts (or before the inline ISO date). List form finishes before the earliest of all elements. **At most one inline date per direction.** See "Inline date pins" below. |
+| `wave`   | wave ref           | The block and every descendant belong to the referenced wave (`wave:build`), and the block's own start is held at the wave's start. A descendant may repeat the value; a different value is an error. A block without `wave:` may hold children in different waves. Only in a roadmap with waves. See "Wave Declaration" below. |
 
 
 **Not supported** on parallel/group (computed from children):
@@ -321,7 +323,7 @@ These properties and directives are valid on every entity type: items, swimlanes
 
 ### Item Properties
 
-These properties are specific to items. `status`, `owner`, `after`, and `before` are also valid on swimlanes, parallel blocks, and groups.
+These properties are specific to items. `status`, `owner`, `after`, and `before` are also valid on swimlanes, parallel blocks, and groups. `wave` is also valid on parallel blocks and groups, but not on swimlanes.
 
 
 | Property    | Type                  | Description                                                                                                                             |
@@ -334,6 +336,7 @@ These properties are specific to items. `status`, `owner`, `after`, and `before`
 | `duration`  | duration literal      | Raw duration literal only (`duration:2w`, `duration:3m`, `duration:0.5d`). No alias names; `size:` is the alias mechanism. When set alongside `size:`, this wins for bar width and meta-line driver (size chip omitted). Items only — not valid on parallel or group. |
 | `remaining` | percentage or literal | Work remaining. Two equivalent forms — author picks whichever reads naturally: percent (`remaining:30%`) or single-eng effort literal (`remaining:1w`, `remaining:0.5d`). When a literal is given, the system computes `remaining_literal ÷ total_effort` to derive the percent (capacity divides the literal: `total_effort = size.effort` for sized items, or `duration × item_capacity` for duration-literal'd items). Both forms render identically — a percent of the bar. `status:done` takes priority. Items only — not valid on parallel or group. |
 | `capacity`  | number                | Concurrent capacity consumed by this item while it runs. Positive integer (`capacity:2`), decimal (`capacity:0.5`), or percent literal (`capacity:50%`) which parses to a decimal. Items only — not valid on parallel or group. See "Capacity" below. |
+| `wave`      | wave ref              | The single wave this item belongs to (`wave:build`). Must name a `wave` declared earlier in the roadmap section (Validation Rule 15). Inherited from the nearest enclosing `group` or `parallel` that carries `wave:`; never from a swimlane. An item with no effective wave is background work. See "Wave Declaration" below. |
 
 
 ### Capacity
@@ -550,13 +553,65 @@ The id is the identifier used as the lookup key on entities via `status:NAME`. T
 
 Custom statuses have no inherent semantics beyond what renderers assign — the DSL only guarantees the value resolves and can carry a display title. Renderers may map custom statuses to visual treatments via `default item style:…` or entity-level `style:` overrides.
 
+### Wave Declaration
+
+A `wave` is a strict, sequential barrier that spans every swimlane: **no item in wave k+1 starts before every item in wave k has ended.** A wave opens for every lane at the instant the previous wave's slowest member ends, so lanes that finish early wait at the boundary. Waves are declared once, in order, in the roadmap section, and work joins a wave through the `wave:` property on `item`, `group`, or `parallel`. The rationale, the layout algorithm, and 21 worked examples live in [`specs/waves.md`](./waves.md).
+
+```nowline
+anchor fy-budget "FY budget" date:2026-03-02
+
+wave discover "Discover"
+wave build "Build"
+wave launch "Launch" after:fy-budget
+
+swimlane web "Web"
+  item research "UX research" duration:2w wave:discover
+  group wave:build
+    item checkout "Checkout v2" duration:3w
+    item a11y "Accessibility pass" duration:1w
+  item launch-page "Launch page" duration:1w wave:launch
+swimlane ops "Ops"
+  item on-call "On-call and KTLO" duration:10w
+
+milestone beta "Beta" after:build
+```
+
+A `wave` line accepts:
+
+| Slot or key | Status | Meaning |
+| --- | --- | --- |
+| id (positional) | **required** (`NL.E1100`) | The wave's identity. It joins the single shared id namespace (Structural Rule 2). |
+| title (positional) | optional | The strip label. Falls back to the id. |
+| `after:` | optional; one value or a list | **Start floor.** The wave cannot open before the latest of its elements. Each element must be an anchor id, the id of a milestone that has `date:`, or an ISO date (at most one date). Any other kind of entity is `NL.E1106`. Inline dates follow Validation Rules 24b, 27 and 28. |
+| `style:` | optional (universal) | Wave colours: `bg` opts the wave into a column tint, `fg` colours its boundary line, `text` its strip label, `border` sets the boundary dash (`solid`, `dashed`, `dotted`). See [`specs/rendering.md`](./rendering.md) "Waves". |
+| `labels:`, `link:`, `description` | optional (universal) | Carried in the AST, JSON and XLSX, and shown in LSP hover. Not painted. |
+| `footnote:` | error | Waves host footnotes through `on:`. |
+| `before:`, `date:`, `start:`, `length:`, `duration:`, `size:`, `capacity:`, `remaining:`, `wave:` | **error** (`NL.E1105`) | A wave's span comes from its items. To give a wave a deadline, add a dated milestone `after:<wave>`; it turns red when the wave runs late. |
+| any other key | warning (`NL.W0700`) | Ignored. |
+| raw style properties | error (Validation Rule 20) | — |
+
+**Membership and inheritance.** The `wave:` value is exactly one declared wave id (`wave:[w1]` is the same as `wave:w1`; a list of two or more is an error). The *effective wave* of an item is its own `wave:` value, else that of its nearest enclosing `group` or `parallel` that carries one; swimlanes never contribute.
+
+- `wave:` is allowed on `item`, `group`, and `parallel` only. On a `swimlane` it is an error (a lane spans every wave; wrap its items in `group wave:<id>` instead), and so it is on `milestone` (use `after:<wave>` to mark the end of a wave) and every other entity (`NL.E1104`).
+- A descendant may repeat its container's `wave:` value. A **different** value is an error (`NL.E1102`), so a descendant cannot opt out of its container's wave.
+- A `group` or `parallel` with no `wave:` may hold children in different waves. That is how a group spans waves and how parallel tracks sit in different waves.
+- `group wave:<id>` is the idiom for a run of a lane's work. When it has no title, no `style:`, and no `labels:`, it draws nothing; it only assigns membership. Prefer per-item `wave:` for one to three items.
+
+**Background work.** An item whose effective wave is empty is *background work* (on-call, KTLO, ongoing support). It produces no diagnostic. A barrier never holds it back and its own end never extends a wave, but it still follows lane order and its own `after:`, so it can delay a later member of its own lane. The renderer draws it hatched.
+
+**Scheduling.** Each wave spans `[S_k, E_k]` on the time axis. `S_1` is the roadmap start (or the wave's floor, if later); `E_k` is the later of `S_k` and the latest end of any member (so an empty wave has zero width); `S_{k+1}` is `E_k`, or the wave's floor if that is later, which leaves a gap. Inside a wave every lane schedules exactly as it does today; an item in wave k simply cannot start before `S_k`. A wave id is a valid `after:`, `before:`, and `on:` target (see "Dependencies and Anchoring").
+
+**Ordering.** Wave order is declaration order (Design Rule 6). A `wave:` property must name a wave declared earlier in the roadmap section than the top-level entry that contains it, the same forward-declaration rule `size:` and `status:` follow (Validation Rule 15). `after:`, `before:`, and `on:` may name waves from anywhere in the file, like any other id. Recommended style: declare all waves together, after sizes and statuses and before the first swimlane. There is no `default wave`, and `wave` is not allowed on any `default <entity>` line (see "Banned on `default`").
+
+**A roadmap "has waves"** when its file declares at least one wave with a valid id. In a roadmap without waves, every `wave:` key (including one on a `default` line) is ignored with the warning `NL.W0702`, so v1 files that already carry a stray `wave:` key keep rendering. The bare word `wave` stays a valid identifier and value (`item wave`, `after:wave`, `labels:[wave]`); `waves`, `wave-1`, and `wavefront` are ordinary identifiers.
+
 ### Milestone Properties
 
 
 | Property | Type                  | Description                                                                                                                                          |
 | -------- | --------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------- |
 | `date`   | ISO date              | Fixed date for the milestone. Optional if `after:` is present; required if `after:` is absent.                                                        |
-| `after`  | identifier or list    | `after:id` or `after:[id1, id2]` — the milestone is met when all referenced entities finish (i.e. after the latest of them). Optional if `date:` is present; required if `date:` is absent. |
+| `after`  | identifier or list    | `after:id` or `after:[id1, id2]` — the milestone is met when all referenced entities finish (i.e. after the latest of them). A wave id means the end of that wave (`milestone beta after:build`). Optional if `date:` is present; required if `date:` is absent. |
 
 
 At least one of `date:` or `after:` is required on every milestone. Three valid forms:
@@ -612,7 +667,7 @@ footnote capacity-risk "Team capacity risk" on:[mobile, platform]
   description "Both teams are understaffed through Q2."
 ```
 
-The `on:` property is required and references one or more identifiers (item, swimlane, anchor, milestone, person, team). When referencing multiple entities, use bracket notation: `on:[id1, id2]`. Footnotes follow the universal `[id] ["title"]` pattern — a footnote with an id can itself be referenced.
+The `on:` property is required and references one or more identifiers (item, swimlane, anchor, milestone, wave, person, team). When referencing multiple entities, use bracket notation: `on:[id1, id2]`. Footnotes follow the universal `[id] ["title"]` pattern — a footnote with an id can itself be referenced.
 
 Footnotes are numbered sequentially by document order. A superscript number appears in the upper-right corner of every entity the footnote is attached to. The full footnote text renders in a footnote section below the roadmap. See `rendering.md` for visual treatment.
 
@@ -626,7 +681,7 @@ Footnotes are numbered sequentially by document order. A superscript number appe
 | Category                             | What it contains                                                                                                     | Examples                                                       |
 | ------------------------------------ | -------------------------------------------------------------------------------------------------------------------- | -------------------------------------------------------------- |
 | **Config** (rendering configuration) | scale block, calendar block, styles, symbols, defaults                                                                       | Everything between `config` and `roadmap` in the included file |
-| **Roadmap** (content)                | `roadmap` declaration, persons, teams, anchors, labels, sizes, statuses, swimlanes (+ contained items/parallel/groups), milestones, footnotes | Everything after `roadmap` in the included file                |
+| **Roadmap** (content)                | `roadmap` declaration, persons, teams, anchors, labels, sizes, statuses, waves, swimlanes (+ contained items/parallel/groups), milestones, footnotes | Everything after `roadmap` in the included file. Waves never merge: every participating file declares the same waves (Include Rule 12). |
 
 
 #### `config:` mode
@@ -668,6 +723,7 @@ On `merge`, when the parent and child both declare an entity with the same ident
 - **Config items** (styles, symbols): parent wins, child's definition is dropped, warning emitted.
 - **Roadmap entities** (swimlanes, persons, teams, labels, sizes, statuses, anchors, milestones, footnotes, etc.): parent wins, child's entity is dropped, warning emitted. If a swimlane collides, its contained items are also dropped.
 - **Defaults**: `default <entity>` lines can be declared in both parent and child. On collision of entity type, the parent's `default <entity>` wins and a warning is emitted.
+- **Waves** are exempt from parent-wins merge. A child's waves are never merged and never draw a shadow warning: Include Rule 12 requires every participating file to declare the same waves (same ids, order and resolved start floors), so the parent's list is the list. Title and other presentation differences are a warning (`NL.W0701`), and the parent's definition is used.
 
 #### Diamond Includes (same file via multiple paths)
 
@@ -719,6 +775,7 @@ swimlane platform owner:platform
 - The child's swimlanes, items, anchors, milestones, and footnotes render inside a dashed-border region labeled with the child's roadmap title.
 - The region includes an indicator (icon or badge) to distinguish it from native content.
 - Timeline scale is shared — the child's content aligns to the parent's scale/axis.
+- Waves are shared like the time axis: the child must declare the same waves (Include Rule 12), and its lanes take part in the global barriers. Its `wave:` values map to the parent's waves by id; its other ids stay invisible to the parent.
 - The child must contain a `roadmap` declaration (error if missing).
 
 #### General rules
@@ -911,6 +968,8 @@ default group padding:xs spacing:xs
 | `default anchor`   | `date`, `link`, `description`                                           | `date` is required and anchor-specific.                                                                                                         |
 | `default footnote` | `on`, `link`, `description`                                             | `on` is the attachment target — identity-defining.                                                                                              |
 
+**`wave` is banned on every `default <entity>` line**, for the same reason as `after:` (sequencing creates invisible dependencies). The check depends on the roadmap: when it has waves, `default <entity> wave:…` is an error with the Validation Rule 23 message; when it has none, it is the warning `NL.W0702`, because v1 files may already carry the key. There is no `default wave`.
+
 Allowed on every `default <entity>`: presentation properties (`style:` and raw style properties — see next paragraph), bulk-state (`status:`, `labels:`), plus any non-banned entity-specific property.
 
 `capacity` is allowed on `default item` (e.g. `default item capacity:1`). It is **not** allowed on `default swimlane` because each lane's budget is intentionally explicit at its declaration site. `utilization-warn-at:`, `utilization-over-at:`, and `capacity-icon:` (the capacity-adjacent properties), in contrast, are allowed on `default swimlane` and `default item` per the usual presentation-property rule.
@@ -963,13 +1022,13 @@ The `nowline` directive is a simple two-token line: the keyword `nowline` follow
 
 ### Universal Declaration Pattern
 
-Every entity declaration (`item`, `anchor`, `label`, `duration`, `status`, `milestone`, `footnote`, `swimlane`, `parallel`, `group`, `person`, `team`, `roadmap`) follows the same pattern:
+Every entity declaration (`item`, `anchor`, `label`, `duration`, `status`, `wave`, `milestone`, `footnote`, `swimlane`, `parallel`, `group`, `person`, `team`, `roadmap`) follows the same pattern:
 
 ```
 keyword [id] ["title"] [key:value ...]
 ```
 
-- **Positional slots are only `id` and `title`.** At least one of the two must be present.
+- **Positional slots are only `id` and `title`.** At least one of the two must be present. A `wave` must have an id, because work references it with `wave:<id>` (WV1).
 - **Identifier** — unquoted, matches `[a-zA-Z_][a-zA-Z0-9_-]*`. Used for referencing. Optional — auto-generated from the title (kebab-cased) if omitted.
 - **Title** — a double-quoted string. Human-readable display name. Optional. **Titles are always double-quoted, even single-word titles** (the quote is how the parser distinguishes id from title).
 - The parser distinguishes them by format: unquoted = identifier, quoted = title.
@@ -1005,7 +1064,7 @@ The `link` property takes a bare URL (no quotes). One link per entity.
 
 ### Dependencies and Anchoring
 
-Both `after:` and `before:` accept a single identifier, a single ISO date literal, or a bracketed list mixing both. References may target items, milestones, anchors, parallel blocks, or groups.
+Both `after:` and `before:` accept a single identifier, a single ISO date literal, or a bracketed list mixing both. References may target items, milestones, anchors, parallel blocks, groups, or waves.
 
 - `after:id` — this entity starts after the referenced entity finishes (or after the referenced anchor date).
 - `after:2026-03-15` — **inline date pin.** This entity starts on the given date with no `anchor` declaration required. See "Inline date pins" below.
@@ -1013,8 +1072,12 @@ Both `after:` and `before:` accept a single identifier, a single ISO date litera
 - `before:id` — this entity must finish before the referenced entity starts (or before the referenced anchor date).
 - `before:2026-05-01` — **inline date pin.** This entity must finish on or before the given date. See "Inline date pins" below.
 - `before:[id1, id2, ...]` — this entity must finish before the **earliest** of the referenced entities starts. List elements may be ids, an ISO date literal, or a mix.
+- `after:<wave>` — this entity starts no earlier than the **end** of the wave (for a wave with no members, its start). Use it for background work and milestones that wait for a whole wave; a floating `milestone … after:<wave>` sits exactly on the wave's closing boundary. On work in the same wave or an earlier one it is an error (`NL.E1103`).
+- `before:<wave>` — this entity should finish before the **start** of the wave. Like every `before:`, it is soft: nothing moves, and a miss paints the existing red overflow.
 
-Circular dependencies across the full graph (including every element of list-form references) are a validation error. Inline date literals are not graph nodes and do not participate in cycle detection.
+Wave references draw no dependency arrow. A wave's own `after:` accepts only constants (an anchor, a dated milestone, or one ISO date); see "Wave Declaration".
+
+Circular dependencies across the full graph (including every element of list-form references) are a validation error. Inline date literals are not graph nodes and do not participate in cycle detection, and neither are a wave's own `after:` edges (their targets are constants).
 
 #### Inline date pins
 
@@ -1030,7 +1093,7 @@ parallel rollouts before:2026-06-30
 
 **Rules:**
 
-- Inline dates are valid on `item`, `parallel`, and `group`. They are **not** valid on `milestone` (which already has its own `date:`), `swimlane`, `anchor`, `footnote`, `person`, or `team`. Using an inline date on those entity types is a validation error.
+- Inline dates are valid on `item`, `parallel`, and `group`, and on a wave's `after:` (a start floor). They are **not** valid on `milestone` (which already has its own `date:`), `swimlane`, `anchor`, `footnote`, `person`, or `team`. Using an inline date on those entity types is a validation error. (A wave's `before:` is rejected outright by `NL.E1105`.)
 - **At most one inline date per direction.** `after:[2026-03-15, 2026-04-01]` is a validation error — collapse to a single binding date instead. Mixing one date with any number of id references in the same list (`after:[kickoff, 2026-03-15]`) is allowed.
 - The roadmap must declare `start:` whenever the file contains any inline date (same rule as for `anchor` declarations and dated `milestone`s — see Validation Rule 27).
 - Every inline date must be on or after the roadmap's `start:` (Validation Rule 28).
@@ -1065,7 +1128,7 @@ The parser enforces these rules and produces clear error messages with file posi
 ### Structural rules
 
 1. Exactly one `roadmap` declaration per file. Included files' `roadmap` declarations are governed by the `roadmap:` mode.
-2. All identifiers are unique across the merged result (items, parallel blocks, groups, anchors, persons, teams, milestones, footnotes share one namespace). On merge collision, parent wins and a warning is emitted.
+2. All identifiers are unique across the merged result (items, parallel blocks, groups, anchors, persons, teams, milestones, footnotes, waves share one namespace). On merge collision, parent wins and a warning is emitted (waves excepted; see Include Rule 12).
 3. Every entity must have at least an identifier or a title (or both).
 4. File structure must follow the section order: `nowline` directive (optional), includes, `config`, `roadmap`. The `nowline` directive, if present, must be the first non-comment, non-blank line.
 5. The `nowline` directive version must match `v\d+`. If the version is newer than the parser supports, emit an error identifying the required version.
@@ -1074,6 +1137,7 @@ The parser enforces these rules and produces clear error messages with file posi
 8. `label` declarations must appear in the roadmap section, not under `config`. A `label` line placed before `roadmap` is an error. The error message should suggest moving the declaration under `roadmap`.
 9. `size` declarations must appear in the roadmap section, not under `config`. A `size` line placed before `roadmap` is an error. The error message should suggest moving the declaration under `roadmap`.
 10. `status` declarations must appear in the roadmap section, not under `config`. A `status` line placed before `roadmap` is an error. The error message should suggest moving the declaration under `roadmap`.
+11. `wave` declarations must appear in the roadmap section, like `label`, `size`, and `status`. A `wave` line placed before `roadmap` makes the following `roadmap` line a parse error.
 
 ### Reference rules
 
@@ -1107,7 +1171,7 @@ The parser enforces these rules and produces clear error messages with file posi
 **Status, labels, remaining**
 
 14. `status` values are a built-in value (`planned`, `in-progress` (alias `active`), `done` (alias `completed`), `at-risk`, `blocked`) or a value declared by a `status` declaration in the roadmap section.
-15. A `size:` or `status:` property reference must resolve to a declaration that appears **earlier in the file** (or in an earlier include, per `config:`/`roadmap:` mode). Forward references are a validation error. The error message should point to both the reference site and suggest the declaration location.
+15. A `size:`, `status:`, or `wave:` property reference must resolve to a declaration that appears **earlier in the file** (or in an earlier include, per `config:`/`roadmap:` mode). Forward references are a validation error. The error message should point to both the reference site and suggest the declaration location. For `wave:`, "earlier" means earlier in the roadmap section of the same file than the top-level entry that contains the reference (includes never contribute waves; see Include Rule 12), and the error is `NL.E1101` (WV6).
 16. `labels` values are identifiers (rule 5). Undeclared labels are valid (no config entry required).
 17. `remaining` values are either a percentage (`0%`–`100%`) or a single-eng effort literal (`\d+(\.\d+)?[dwmqy]`, e.g. `1w`, `0.5d`). Both forms normalize to a percent of the item's total effort during layout: `percent = remaining_literal ÷ total_effort`, where `total_effort = size.effort` for sized items, or `duration_literal × item_capacity` for duration-literal'd items (`item_capacity` defaults to `1`). When the literal exceeds total effort (computed percent `> 100%`), the layout step emits a soft warning and clamps the painted bar to 100% remaining; rendering is never blocked.
 
@@ -1145,20 +1209,20 @@ Non-rules (intentionally not validated):
 
 21. The first positional argument after `default` must be one of the supported entity types: `item`, `label`, `swimlane`, `roadmap`, `parallel`, `group`, `milestone`, `footnote`, `anchor`.
 22. Duplicate `default <entity>` declarations for the same entity type within a single file are an error. On include with `config:merge`, the parent's `default <entity>` wins over the child (existing merge semantics apply).
-23. A `default <entity>` declaration that sets a banned property (see the "Banned on `default`" table) is an error. The error names the banned property, the entity type, and points to the table.
+23. A `default <entity>` declaration that sets a banned property (see the "Banned on `default`" table) is an error. The error names the banned property, the entity type, and points to the table. `wave` is banned on every `default <entity>` line when the roadmap has waves; when it has none, the key draws the warning `NL.W0702` instead (WV8 and WV9).
 
 **Dependencies**
 
-24. `after:` and `before:` on any entity accept a single identifier, a single ISO date literal, or a bracketed list mixing both. Each non-date element must resolve to a declared item, milestone, anchor, parallel, or group identifier.
-24a. **Inline date pins are valid only on `item`, `parallel`, and `group`.** An ISO date literal in `after:` or `before:` on `milestone`, `swimlane`, `anchor`, `footnote`, `person`, or `team` is a validation error (`NL.E0411`).
+24. `after:` and `before:` on any entity accept a single identifier, a single ISO date literal, or a bracketed list mixing both. Each non-date element must resolve to a declared item, milestone, anchor, parallel, group, or wave identifier. A wave's own `after:` is narrower: see WV4.
+24a. **Inline date pins are valid only on `item`, `parallel`, and `group`, and on a wave's `after:`.** An ISO date literal in `after:` or `before:` on `milestone`, `swimlane`, `anchor`, `footnote`, `person`, or `team` is a validation error (`NL.E0411`: "Allowed only on item, parallel, and group, and on a wave's after:"). A wave's `before:` is reported only by `NL.E1105`, never by `NL.E0411`.
 24b. **At most one inline date per direction.** A list with two or more ISO date literals in the same `after:` or the same `before:` property is a validation error (`NL.E0410`). Mixing one date with any number of id references in the same list is allowed.
-25. Circular dependency detection operates on the full graph across all `after:`/`before:` references (including every element of list-form references). **Inline date literals are not graph nodes** and do not participate in cycle detection.
+25. Circular dependency detection operates on the full graph across all `after:`/`before:` references (including every element of list-form references). **Inline date literals are not graph nodes** and do not participate in cycle detection. **A wave's own `after:` edges are skipped**: their targets are constants, so `wave w2 after:gate` together with `milestone gate date:… after:w2` (the wave-deadline idiom) is not a cycle. Cycles that run through wave barriers are WV10.
 
 **Roadmap `start:`**
 
 26. `roadmap` `start:` values are valid ISO 8601 dates (format `YYYY-MM-DD`, calendar-valid).
-27. If a file contains any `anchor` declaration, any `milestone` with a `date:` property, or any `item`/`parallel`/`group` with an inline date literal in `after:` or `before:`, the `roadmap` declaration must also declare `start:`. One error is emitted per offending dated entity (`NL.E0412` for inline-date offenders).
-28. Every `anchor` date, every dated `milestone`'s `date:`, and every inline date literal in `after:`/`before:` must be on or after the roadmap's `start:`. One error is emitted per offender.
+27. If a file contains any `anchor` declaration, any `milestone` with a `date:` property, any `item`/`parallel`/`group` with an inline date literal in `after:` or `before:`, or any `wave` with an inline date literal in `after:`, the `roadmap` declaration must also declare `start:`. One error is emitted per offending dated entity (`NL.E0412` for inline-date offenders).
+28. Every `anchor` date, every dated `milestone`'s `date:`, and every inline date literal in `after:`/`before:` (including a wave's `after:`) must be on or after the roadmap's `start:`. One error is emitted per offender (`NL.E0413` for inline dates).
 29. If `start:` is present but fails the date-format rule, the two rules above are suppressed for that file — the user sees only the format error until they fix it.
 
 **Persons and teams**
@@ -1180,6 +1244,7 @@ Non-rules (intentionally not validated):
 9. On `config:isolate`, `style:` references within the isolated file must resolve within that file's own config. References to parent config are a validation error. Label, size, and status references are governed by `roadmap:isolate`, not `config:isolate`, because labels, sizes, and statuses are roadmap content.
 10. On `roadmap:isolate`, the included file must contain a `roadmap` declaration (needed for the region label).
 11. For any `include` whose `roadmap:` mode is not `ignore` (i.e. `merge` or `isolate`), if the child file declares a `roadmap`, the parent and child must agree on `start:`: both absent, or both present with identical values. A mismatch is an error reported on the parent's `include` line. **This is an explicit exception to rule 8's "parent wins with warning" merge behaviour.** `start:` defines the shared timeline baseline, so silently shadowing a child's `start:` would cause rendered dates to drift from what the author wrote. `roadmap:ignore` is exempt because the child's roadmap content is dropped entirely.
+12. For any `include` whose `roadmap:` mode is not `ignore` (i.e. `merge` or `isolate`), if the child *participates* (it declares a `roadmap`, has at least one swimlane, or declares at least one wave), the parent and child must declare the same waves: the same ids, in the same order, with the same resolved start floors. Floors are compared by the date they resolve to, not by how they are written (`after:fy-budget` and `after:2026-02-02` agree when the anchor is on that date); a wave with no floor matches only a wave with no floor. Both directions are errors (`NL.E0202`), reported on the parent's `include` line: a parent with waves and a participating child without them (its work would silently become background work), and a child with waves and a parent without them (its waves would vanish in the merge). Two files with no waves pass. **Like rule 11, this is an explicit exception to rule 8's "parent wins with warning" merge behaviour.** Waves are barriers across the whole canvas, so a silently shadowed wave list would move every lane's columns. When ids, order and floors agree, a differing title, `style:`, `labels:`, `link:`, or `description` is a warning (`NL.W0701`) and the parent's definition is used. Each edge is compared against its direct parent, so by induction every file agrees with the root, and the check runs after all of a file's includes, so include order does not matter. A vocabulary-only child (persons, teams, labels, sizes, statuses, anchors; no roadmap, no swimlanes, no waves) does not participate. `roadmap:ignore` is exempt because the child's roadmap content is dropped entirely. A child that failed to read, or whose waves lack ids (`NL.E1100`), is not compared.
 
 ### Parallel and group rules
 
@@ -1188,3 +1253,29 @@ Non-rules (intentionally not validated):
 3. `size`, `duration`, and `remaining` are not valid on `parallel` or `group` (computed from children).
 4. `parallel` is valid inside swimlane or group. `group` is valid inside swimlane, parallel, or group.
 
+### Wave rules
+
+These rules apply to files that use `wave` or `wave:`. A roadmap *has waves* when its file declares at least one wave with a valid id. Every wave rule has a stable diagnostic code; messages are listed in [`specs/waves.md`](./waves.md) § 6.4. WV1–WV9 run per file (and, through `resolveIncludes`, on every participating included file, which is parsed without validation); WV10–WV12 run over a *layout scope* (the merged main lanes, and each isolated region), so they see `after:` edges that cross merged files; WV13–WV14 run on include edges. The WV numbers match [`specs/waves.md`](./waves.md) § 6.2, which also defines the layout insights WV15–WV18.
+
+| # | Rule | Severity | Code |
+| --- | --- | --- | --- |
+| WV1 | A `wave` declaration has an explicit id. | error | `NL.E1100` |
+| WV2 | Wave ids share the global id namespace (Structural Rule 2). Across includes, a participating file's explicit ids must not equal the root's wave ids. | error | `NL.E0300` |
+| WV3 | A `wave` declaration does not take `before:`, `date:`, `start:`, `length:`, `duration:`, `size:`, `capacity:`, `remaining:`, or `wave:`. | error | `NL.E1105` |
+| WV4 | Each element of a wave's `after:` resolves to an anchor, a milestone with `date:`, or (at most once) an ISO date. Rules 24b, 27 and 28 apply to the date. | error | `NL.E1106` |
+| WV5 | `wave:` appears only on `item`, `group`, and `parallel`. | error | `NL.E1104` |
+| WV6 | A `wave:` value is exactly one wave declared earlier (Value Rule 15): not a list of two or more, not undeclared, not declared below the referencing entry, not an id of another kind. | error | `NL.E1101` |
+| WV7 | A descendant's `wave:` equals its container's `wave:`. | error | `NL.E1102` |
+| WV8 | When the roadmap has waves, `wave` is banned on every `default <entity>` line. | error | Rule 23 message |
+| WV9 | When the roadmap has no waves, every `wave:` key is ignored. This replaces WV5–WV8 for the file. | warning | `NL.W0702` |
+| WV10 | The wave order can be realized: no member is forced to start at or after the end of its own wave. In every lane or group flow, assigned waves must not decrease, a block's successor must not be in an earlier wave than any of its tracks, and no `after:` may name the item's own wave, a later wave, or work in a later wave, directly or through a chain of other work. | error | `NL.E1103` |
+| WV11 | A `before:` that the wave structure guarantees can never be met (for example, work in wave 2 with `before:` an item in wave 1). Misses that depend on durations or dates stay the layout-time `NL.I1003`. | warning | `NL.W1100` |
+| WV12 | In a roadmap with waves, an `after:` or `before:` that layout ignores: a forward reference (to a later swimlane, or later in the same flow), a reference to the group or parallel that encloses it, or a reference to a floating milestone. A reference that closes an explicit cycle is left to rule 25. | warning | `NL.W1101` |
+| WV13 | Include wave agreement (Include Rule 12). | error | `NL.E0202` |
+| WV14 | An included wave's presentation (title, `style:`, `labels:`, `link:`, `description`) differs from the parent's. | warning | `NL.W0701` |
+
+WV10 reports one diagnostic per root cause, in one of five forms: `sequence` (a run of items placed after work in a later wave), `join` (an item after a `parallel` block with a track in a later wave), `after-item`, `after-wave`, and `chain` (a hidden route through background work, which the cycle check in rule 25 cannot see). An item with no wave never produces a diagnostic.
+
+**No duplicate diagnostics.** `wave` never draws the generic unknown-property warning `NL.W0700`; a wave's `before:` gets only `NL.E1105` (never `NL.E0411`); an element of a wave's `after:` that resolves to nothing gets only the existing "does not resolve" error, and one that resolves to the wrong kind gets only `NL.E1106`. An invalid `wave:` value makes the item background work for the later rules, and a container's wave wins over a conflicting descendant's.
+
+**Layout insights (WV15–WV18).** Four more codes come from layout, not validation: `NL.W1001` (a barrier moved an item's `date:`/`start:` pin), `NL.W1002` (the barrier solver hit its pass cap; unreachable for valid input), `NL.I1006` (one or more waves have no members), and `NL.I1007` (a wave overruns a dated milestone whose `after:` names it). See [`specs/rendering.md`](./rendering.md) "Waves".

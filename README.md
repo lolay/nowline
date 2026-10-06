@@ -158,9 +158,9 @@ nowline --init my-project --template=teams  # use the teams template
 | Code | Meaning |
 |---|---|
 | 0 | Success |
-| 1 | Validation error (parse failure, invalid reference) |
+| 1 | Validation error (parse failure, invalid reference, a wave rule across included files) |
 | 2 | Usage error (missing input, bad flags, unsupported format, file not found, empty stdin, invalid `--diagnostic-format`, binary→TTY refusal) |
-| 3 | Output error (cannot write to destination) |
+| 3 | Output error (cannot write to destination, unresolvable include) |
 
 ### Manual
 
@@ -200,6 +200,7 @@ swimlane platform
 | `group` | A logical grouping of items, rendered together. |
 | `anchor` | A named date on the timeline. |
 | `milestone` | A point-in-time marker that depends on work. |
+| `wave` | A barrier across every swimlane: no work in the next wave starts until this one ends. |
 | `footnote` | A callout anchored to one or more entities. |
 | `person`, `team` | Ownership references. |
 | `style`, `symbol`, `label`, `size`, `status`, `scale`, `calendar`, `default` | Config and declaration entries. |
@@ -211,6 +212,7 @@ item auth "Auth refactor"
   duration: 2w              // duration literal: d, w, m, q, y
   status: in-progress       // builtin or custom from config
   owner: sam                // id reference (person or team)
+  wave: build               // barrier the item belongs to (a declared wave)
   after: kickoff            // dependency (single)
   after: [kickoff, approvals] // dependency (list)
   remaining: 30%             // percentage
@@ -243,6 +245,8 @@ include "partner.nowline"  roadmap:isolate  // render child as a separate region
 - `ignore` — child content of that kind is discarded.
 - `isolate` — child roadmap is preserved as a self-contained region (requires a `roadmap` in the child).
 
+Waves never merge. Under `roadmap:merge` or `roadmap:isolate`, an included file that declares a roadmap, swimlanes, or waves must declare the same waves as its parent, in the same order with the same start floors (`NL.E0202`).
+
 For the full grammar reference, see [`specs/dsl.md`](./specs/dsl.md).
 
 ## Examples
@@ -256,6 +260,8 @@ Progressively-richer examples are included:
 - [`examples/product.nowline`](./examples/product.nowline) — full config, styles, labels, parallels, groups, descriptions.
 - [`examples/long.nowline`](./examples/long.nowline) — stress test: eight swimlanes, ~160 items, parallels, groups, anchors, milestones, footnotes, cross-cutting labels. Used for layout/render perf.
 - [`examples/nested.nowline`](./examples/nested.nowline) + [`examples/nested/`](./examples/nested) — parent Security swimlane plus five isolated per-team roadmap includes (iOS, Android, Web, Platform, Data). Demonstrates `roadmap:isolate`.
+- [`examples/waves.nowline`](./examples/waves.nowline) — `wave` barriers: three waves (Foundations, Build, Launch) across three lanes, a `group wave:` that assigns its children, unwaved background work, and milestones `after:` a wave.
+- [`examples/waves-program.nowline`](./examples/waves-program.nowline) + [`examples/waves-program/`](./examples/waves-program) — multi-team waves: web and API team files re-declare the same waves (with a start floor), so each renders alone and the program file merges them behind one barrier.
 
 ## Editor support
 

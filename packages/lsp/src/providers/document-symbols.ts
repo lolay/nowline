@@ -13,6 +13,7 @@ import {
     isStatusDeclaration,
     isSwimlaneDeclaration,
     isTeamDeclaration,
+    isWaveDeclaration,
     type ParallelBlock,
     type RoadmapDeclaration,
     type SwimlaneContent,
@@ -44,7 +45,7 @@ function singleLineTitle(title: string | undefined): string | undefined {
 /**
  * Outline view: roadmap → swimlanes → items, with parallel/group nesting and
  * top-level anchors / milestones / footnotes / people / teams / labels /
- * sizes / statuses surfaced as siblings of the swimlanes. Mirrors the layout
+ * sizes / statuses / waves surfaced as siblings of the swimlanes. Mirrors the layout
  * engine's traversal so what authors see in the outline matches what gets
  * rendered.
  */
@@ -101,6 +102,7 @@ export class NowlineDocumentSymbolProvider implements DocumentSymbolProvider {
         if (isLabelDeclaration(entry)) return this.simpleSymbol(entry, SymbolKind.EnumMember);
         if (isSizeDeclaration(entry)) return this.simpleSymbol(entry, SymbolKind.Number);
         if (isStatusDeclaration(entry)) return this.simpleSymbol(entry, SymbolKind.Enum);
+        if (isWaveDeclaration(entry)) return this.simpleSymbol(entry, SymbolKind.Struct);
         return undefined;
     }
 

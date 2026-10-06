@@ -1,6 +1,12 @@
 import { promises as fs } from 'node:fs';
 import * as path from 'node:path';
 import {
+    isRoutedResolveDiagnostic,
+    type NowlineFile,
+    type ResolveDiagnostic,
+    resolveIncludes,
+} from '@nowline/core';
+import {
     type ExportFormat,
     exportDocument,
     type HostEnv,
@@ -27,8 +33,10 @@ import { resolveRenderOutputPath } from '../cli/output-path.js';
 import { parseNowlineJson } from '../convert/parse-json.js';
 import { printNowlineFile } from '../convert/printer.js';
 import { serializeToJson } from '../convert/schema.js';
-import { parseSource } from '../core/parse.js';
+import { getServices, parseSource } from '../core/parse.js';
 import {
+    adaptResolveDiagnostic,
+    type CliDiagnostic,
     type DiagnosticFormat,
     type DiagnosticSource,
     formatDiagnostics,
@@ -248,8 +256,9 @@ async function produce(args: ProduceArgs): Promise<ProduceResult> {
     // Pre-validate with locale-aware diagnostic formatting so validation
     // errors reach the operator in their locale. The kernel will re-parse
     // the same source below — double work accepted in exchange for faithful
-    // stderr output.
-    await parseAndValidate(sourceText, args);
+    // stderr output. Routed include-resolver diagnostics join the validator's
+    // here, so they are reported at the same point and in the same report.
+    await parseAndValidate(sourceText, args, { resolveIncludes: true });
 
     const assetRoot = args.assetRoot
         ? path.resolve(args.assetRoot)
@@ -299,6 +308,18 @@ async function produce(args: ProduceArgs): Promise<ProduceResult> {
             `nowline: ${args.format} export failed: ${message}`,
         );
     }
+}
+
+/**
+ * How an included file is named in diagnostics: relative to the input's
+ * display path, so `examples/a.nowline` including `./teams/b.nowline` prints
+ * `examples/teams/b.nowline` (absolute when the input was given absolute).
+ */
+function includeDisplayPath(absPath: string, args: ProduceArgs): string {
+    const rel = path.relative(path.dirname(args.absInputPath), absPath);
+    if (path.isAbsolute(rel)) return rel;
+    const base = args.isStdin ? '' : path.dirname(args.displayPath);
+    return path.join(base, rel);
 }
 
 // ---- Node HostEnv -----------------------------------------------------------
@@ -410,21 +431,40 @@ function jsonToNowlineText(contents: string, displayPath: string): string {
     return printNowlineFile(ast);
 }
 
-async function parseAndValidate(contents: string, args: ProduceArgs) {
+/**
+ * Parse and validate; on errors, report them and throw. With
+ * `resolveIncludes`, a file that has includes is also run through the
+ * include resolver, and its routed (wave-rule) diagnostics are reported with
+ * the validator's, in the same report (specs/waves.md §6.1). Every other
+ * resolver diagnostic is left to the kernel, which re-resolves.
+ */
+async function parseAndValidate(
+    contents: string,
+    args: ProduceArgs,
+    options: { resolveIncludes?: boolean } = {},
+) {
     const result = await parseSource(contents, args.displayPath, { validate: true });
+    const diagnostics = [...result.diagnostics];
+    const sources = new Map<string, DiagnosticSource>([[args.displayPath, result.source]]);
+    let failed = result.hasErrors;
+    if (!failed && options.resolveIncludes && result.ast.includes.length > 0) {
+        const included = new Map<string, string>();
+        for (const d of await resolveRoutedDiagnostics(result.ast, args, included)) {
+            const isRoot = d.sourcePath === args.absInputPath;
+            const file = isRoot ? args.displayPath : includeDisplayPath(d.sourcePath, args);
+            const text = isRoot ? result.source.contents : included.get(d.sourcePath);
+            if (text !== undefined) sources.set(file, { file, contents: text });
+            diagnostics.push(adaptResolveDiagnostic(d, file, text));
+            if (d.severity === 'error') failed = true;
+        }
+    }
     // Text mode prints only when the run fails. JSON mode prints one document
     // whenever any diagnostic exists, warnings included, so a warnings-only
     // run still exits 0 with the document on stderr.
-    if (result.hasErrors || (args.diagnosticFormat === 'json' && result.diagnostics.length > 0)) {
-        emitDiagnostics(
-            result.diagnostics,
-            result.source,
-            args.displayPath,
-            args.operatorLocale,
-            args.diagnosticFormat,
-        );
+    if (failed || (args.diagnosticFormat === 'json' && diagnostics.length > 0)) {
+        emitDiagnostics(diagnostics, sources, args.operatorLocale, args.diagnosticFormat);
     }
-    if (result.hasErrors) {
+    if (failed) {
         throw new CliError(ExitCode.ValidationError, '');
     }
     if (args.verbose) {
@@ -433,6 +473,37 @@ async function parseAndValidate(contents: string, args: ProduceArgs) {
         process.stderr.write(`nowline: locale=${tag} (${source})\n`);
     }
     return result;
+}
+
+/**
+ * The routed (wave-rule) diagnostics of resolving `ast`'s includes, reading
+ * files as the kernel does; `included` collects each read file's text for
+ * code frames. Empty when the resolver reports any other include error: that
+ * one is more fundamental, and the kernel reports it as before (exit 3).
+ */
+async function resolveRoutedDiagnostics(
+    ast: NowlineFile,
+    args: ProduceArgs,
+    included: Map<string, string>,
+): Promise<ResolveDiagnostic[]> {
+    let diagnostics: ResolveDiagnostic[];
+    try {
+        ({ diagnostics } = await resolveIncludes(ast, args.absInputPath, {
+            services: getServices().Nowline,
+            readFile: async (absPath) => {
+                const text = await fs.readFile(absPath, 'utf-8');
+                included.set(absPath, text);
+                return text;
+            },
+        }));
+    } catch {
+        // The kernel resolves again and reports the failure.
+        return [];
+    }
+    const legacyError = diagnostics.some(
+        (d) => d.severity === 'error' && !isRoutedResolveDiagnostic(d),
+    );
+    return legacyError ? [] : diagnostics.filter(isRoutedResolveDiagnostic);
 }
 
 async function loadConfigFor(
@@ -575,13 +646,11 @@ function resolveDiagnosticFormat(args: ParsedArgs): DiagnosticFormat {
 }
 
 function emitDiagnostics(
-    diagnostics: Parameters<typeof formatDiagnostics>[0],
-    source: DiagnosticSource,
-    displayPath: string,
+    diagnostics: CliDiagnostic[],
+    sources: Map<string, DiagnosticSource>,
     operatorLocale: string,
     format: DiagnosticFormat,
 ): void {
-    const sources = new Map<string, DiagnosticSource>([[displayPath, source]]);
     const rendered = formatDiagnostics(diagnostics, format, sources, {
         color: process.stderr.isTTY === true,
         operatorLocale,

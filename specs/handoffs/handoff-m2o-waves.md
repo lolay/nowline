@@ -1,28 +1,27 @@
-# Waves handoff: implementation plan (proposed, not scheduled)
+# Waves handoff: implementation plan (m2o)
 
-> **Status: proposed. Not prioritized, not implemented.** This handoff turns [`waves.md`](./waves.md) into a phased plan. It is self-contained: a fresh agent can pick it up without redoing the research behind it, which covered prior art, the scheduling engines, the renderer, the include resolver and the validator.
+> **Status: feature-complete (m2o).** Delivered as one PR with one commit per phase. It stays as the record of the plan, the decisions and the codebase map; [`waves.md`](../waves.md) is the reference. This handoff turns [`waves.md`](../waves.md) into a phased plan. It is self-contained: a fresh agent can pick it up without redoing the research behind it, which covered prior art, the scheduling engines, the renderer, the include resolver and the validator.
 
 ## 1. How to pick this up
 
-1. **Confirm the scope** with the maintainer.
-   - The open questions are in `waves.md` §13 and §9 below.
-   - `README.md` lists the feedback questions for the mockup. Read any answers that came back before you start.
-2. **Re-verify code references.** Every `file:line` in this document was checked against commit `4f771b4` (October 2026). Before you trust a line number, re-run the grep in that row of §4.
-3. **Read `waves.md` §3–§9 before coding.** §5 (semantics), §6 (rules), §8 (layout) and §9 (rendering) are normative. The worked examples in §11 double as test fixtures.
+1. **Scope is decided.** The maintainer adopted every recommendation in §9 (and `waves.md` §13): start floors ship in v1; include agreement is strict, comparing resolved floor dates; no column tint by default; MS Project and Mermaid stay AST-only; a single milestone, m2o.
+   - §10 lists the feedback questions for testers. None were answered before implementation; ask them against the rendered `examples/waves.nowline` before changing the visuals.
+2. **Re-verify code references.** Every `file:line` in this document was checked against commit `4f771b4` (October 2026), and §4.0 records what changed by `26129db`. Before you trust a line number, re-run the grep in that row of §4.
+3. **Read `waves.md` §3–§9 before coding.** §5 (semantics), §6 (rules), §8 (layout) and §9 (rendering) are normative, and their normative parts are mirrored into `dsl.md` and `rendering.md`. The worked examples in §11 double as test fixtures.
 4. **Gate every phase.** Run `make pre-commit` for each phase, and re-run it after any later edit (AGENTS.md). Use `make` targets only.
-5. **Do Phase 0 first.** Phase 0 creates the milestone and moves this handoff into `specs/handoffs/`. Until then, `specs/milestones.md` says nothing about waves.
+5. **Phase 0 is being done now.** It creates milestone m2o in `specs/milestones.md`, moves the spec to `specs/waves.md` and this handoff into `specs/handoffs/`, and mirrors the normative text into `dsl.md`, `rendering.md` and `ide.md`. Phases 1–7 follow, one commit each.
 
-## 2. Proposed milestones
+## 2. Milestones
 
-No milestone exists yet. When this work is prioritized, create one of the following.
+The maintainer chose the single milestone (§9, question 5); Phase 0 adds it to `specs/milestones.md`. The split below is kept for reference only.
 
-**Default: a single milestone, `m2o — Waves`.**
+**Chosen: a single milestone, `m2o — Waves`.**
 
 - DSL enhancements live in the m2 series by logical position, not by shipping date.
 - `specs/milestones.md` already places m2l, m2m and m2n there, though they landed after m3c, and m2n (inline date pins) is labelled a "DSL enhancement".
 - m2o is the next free letter.
 
-**Optional split, if scope must shrink:**
+**Optional split, not used:**
 
 | Milestone | Phases | Ships |
 |---|---|---|
@@ -32,7 +31,7 @@ No milestone exists yet. When this work is prioritized, create one of the follow
 
 The split is safe because m2o leaves wave-free output byte-identical, and a waved file still renders, just without barriers. If you split, add a temporary validator warning to m2o saying that waves are not yet laid out, and remove it in m2p.
 
-**Ready-to-paste text for `specs/milestones.md`, single-milestone form:**
+**Text for `specs/milestones.md`, single-milestone form** (links are relative to `specs/`):
 
 Summary-table row, inserted after the m2n row:
 
@@ -75,9 +74,47 @@ Each decision below was made on purpose. Do not reopen one without new informati
 | CLI output | Unchanged: text mode prints warnings only when a run fails | Printing wave warnings on success | Rejected, so `cli.md` stays consistent. |
 | Codes | E1100–E1106, W1100–W1101 (waves range); E0202 (include); W0701–W0702 (ignored input); W1001–W1002, I1006–I1007 (layout) | — | Next free codes as of `4f771b4` (§4.6). |
 
-## 4. Codebase map (as of `4f771b4`)
+## 4. Codebase map (as of `4f771b4`; see §4.0 for `26129db`)
 
 Condensed from four read-only research passes over layout, renderer, core plumbing and prior art. Re-verify line numbers before you edit.
+
+### 4.0 Re-verified at `26129db`
+
+The map below was written at `4f771b4`. It was re-verified at `26129db` (October 2026), and these are the differences that matter for waves. Line numbers elsewhere in §4 were not rewritten, so re-grep before you trust one. `waves.md` has already been corrected for every spec-level item.
+
+**Layout**
+
+- **`length:` is a minimum, not a cap.** Content past it grows the date window to the next tick boundary (CHANGELOG `[Unreleased]`, Fixed). Waves past `length:` grow the window like any other content. Floors are still computed from unclamped declaration dates (`waves.md` §5.3).
+- **Arrow ports come from final boxes.** `LayoutContext` no longer has `entityVisualLeftX`/`RightX`; dependency-arrow and slack-arrow ports are derived from the final item boxes in `placedItems`. A barrier pass therefore resets `placedItems` and `itemFlowKey` along with the entity edge maps.
+- **Pass loop placement.** The loop wraps `runSwimlaneLoop` plus the region pass inside `RoadmapNode.place`, and must finish before, in order: the slack-corridor rerun, `growChartRightX` and the final region placement, the post-placement extent growth (which measures bars and markers, grows the date window and replaces `ctx.scale`), and the marker re-pack with its `deltaY` shift. `buildWaves` runs after all of those. Every pass, including the slack rerun, resets the edge maps to the anchor and dated-milestone baseline and re-seeds the wave edges. Slack corridors are collected only after convergence (`waves.md` §8.4).
+- **Pass count is an upper bound.** By the end of pass p, at least `E_1..E_p` are exact; floors can make later waves exact sooner. The example counts (4, 3, 2) come from running the algorithm (`waves.md` §8.3).
+- **Layout insights see only the positioned model** and walk lanes only. Hence the new `PositionedRoadmap.waveSolve?: { passes, capped }` for NL.W1002, and NL.W1001 must also be collected from include-region items (`waves.md` §8.7).
+
+**i18n**
+
+- `MessageArgs<K>` is inferred from the parameters of the en-US message function (`packages/core/src/i18n/index.ts`). There is no message-variant pattern yet: model variants as one function taking a discriminated `{ reason, … }` argument.
+
+**Renderer**
+
+- `<defs>` is always emitted (shadow filters, arrowheads). Byte stability therefore means no new `<defs>` children, not no `<defs>`; the hatch patterns go inside the existing element, with ids `${idPrefix}-wave-hatch-dark` / `-light` (the embed tests forbid ids shared across SVGs).
+- Tests treat the first `<rect>` in an item `<g>` as the bar, so the hatch overlay is a second rect drawn after it, inset by half the stroke width with the same corner radius.
+- The group bracket dash is `3 2`, not `3 3` (§4.3 is corrected); the parallel bracket dash is `3 3`.
+- `@kittl/svg-to-pdfkit` 0.1.12 supports `<pattern>` fills, so the PDF path should draw the hatch without the stripe fallback. Keep the PDF test.
+
+**Tests and gates**
+
+- There are 14 SVG snapshots, not 12. The determinism gate is not part of `make ci`: run `make compile TARGET=local`, then `make determinism`.
+- No theme contrast tests exist yet; Phase 5 adds the first ones.
+- `snippets.test.ts` allows choice lists only for `scale`, `status` and `size`, so a `wave` snippet uses plain placeholders.
+- `attach-geometry`, `caption-clearance` and `container-glyph-clearance` sweep every top-level file in `examples/` and `tests/`, so new wave fixtures are swept automatically and must pass them.
+
+**CLI**
+
+- Before m2o the CLI did not call the resolver itself; resolver errors reached it only through `@nowline/export`. Task 3.2 has the CLI resolve includes during validation, as `--serve` does, so routed resolver diagnostics are reported with the validator's (localized, `--diagnostic-format json`, exit 1) without moving anything the CLI writes after validation (`specs/waves.md` §6.1). Uncoded include errors keep today's behaviour exactly (exit 3, same message), through the kernel.
+
+**Docs**
+
+- The §7 findings are all resolved (#73, #74). `principles.md:45` and the `README.md` Entities table were fixed there, so Phase 0 and Phase 7 no longer carry those fixes.
 
 ### 4.1 Scheduling: three engines
 
@@ -123,6 +160,7 @@ Items register their edges only when they have an explicit id (`layout.ts:683-68
 | d | 8 px `TRACK_BLOCK_TAIL_GUTTER_PX` after group tracks inside a parallel | `group-node.ts:226` → `parallel-node.ts:72`; `shared.ts:104` |
 | e | `after:` on a group nested in a parallel: honoured in C, ignored in A | `group-node.ts:85`; `schedule.ts:166-177` |
 | f | A uses a monotone `timeCursorX`; B and C use the last child's `prevEnd` | `swimlane-node.ts:262`; `schedule.ts:120-124` |
+| g | Item `start:` pins: A ignores one on a direct parallel track (the track opens at the parallel's start) and lets a lane item's `after:` push it (`max(start, after)`); C keeps the pin in both cases. A `date:` pin replaces `after:` in both | `parallel-node.ts` → `sequenceItem` (`layout.ts`); `schedule.ts` `walkNode` |
 
 **Silently ignored today** (relevant to NL.W1101 and to the order check):
 
@@ -203,7 +241,7 @@ The chart starts at `chartTopY = timelineY + headerRowsHeight + 8` (`roadmap-nod
   - its source-path halo (`:1944-1952`) is the precedent for label halos.
 - **Hatching and patterns:** the renderer has no `<pattern>` and no hatching anywhere. This is why hatch was chosen for background work.
 
-**Dash patterns already in use.** Author `border:` styles (`strokeDash`, `:469`), group and parallel brackets (`3 3`), anchor cut lines (`1 3`), milestone cut lines (`ACCENT_DASH_PATTERN` `6 4`, `shared.ts:182`), slack arrows (`3 3`) and overflow edges (`4 2`).
+**Dash patterns already in use.** Author `border:` styles (`strokeDash`, `:469`), group brackets (`3 2`), parallel brackets (`3 3`), anchor cut lines (`1 3`), milestone cut lines (`ACCENT_DASH_PATTERN` `6 4`, `shared.ts:182`), slack arrows (`3 3`) and overflow edges (`4 2`).
 
 **Themes.**
 
@@ -284,7 +322,7 @@ The chart starts at `chartTopY = timelineY + headerRowsHeight + 8` (`roadmap-nod
 | Snippets | `packages/vscode-extension/snippets/nowline.json` | Add `wave` and `item-wave`. |
 | Man pages | `packages/cli/man/nowline.5`: ROADMAP SECTION `:509` (`.Ss milestone` `:783`), ITEM PROPERTIES `:919`, Dependencies `:1303`, References `:1410`, Includes `:1561` (`start:` text `:1603-1615`), Defaults `:1639`, EXAMPLES `:1684`. Also `packages/cli/man/fr/nowline.5`. | `nowline://reference` is generated from the man page (`packages/mcp/scripts/bundle-resources.mjs:17-19`). |
 | MCP vocabulary | `packages/mcp/src/schema-vocab.ts` (`entityTypes` `:25-38`, `itemPropertyKeys` `:44-57`), `packages/mcp/src/reference-cheatsheet.ts` | Hand-maintained; this is the anti-hallucination list. `nowline://examples` bundles every top-level `examples/*.nowline` automatically. |
-| Keyword lists in docs | `specs/dsl.md:15` (count), `:49` (prose), `:170-187` (table); `specs/principles.md:45`; `README.md:192-205` (already stale) | Update in Phase 0 or Phase 7. |
+| Keyword lists in docs | `specs/dsl.md:15` (count), `:49` (prose), `:170-187` (table); the `README.md` Entities table | `dsl.md` in Phase 0; `README.md` in Phase 7. `principles.md:45` already points at Design Rule 1 and needs no change. |
 
 ### 4.6 Exporters
 
@@ -298,7 +336,7 @@ The chart starts at `chartTopY = timelineY + headerRowsHeight + 8` (`roadmap-nod
 ### 4.7 Gates and fixtures
 
 - **SVG byte snapshots.**
-  - 12 files under `packages/integration-tests/test/__snapshots__/*.svg`, listed in `SAMPLES` (`snapshot.helpers.ts:74-95`), rendered with `FIXED_TODAY = 2026-02-09`.
+  - 14 files under `packages/integration-tests/test/__snapshots__/*.svg`, listed in `SAMPLES` (`snapshot.helpers.ts:74-95`), rendered with `FIXED_TODAY = 2026-02-09`.
   - Regenerate only deliberately, with `UPDATE_LAYOUT_SNAPSHOTS=1`.
   - `packages/layout/test/__snapshots__/` does not exist.
 - **Determinism goldens.**
@@ -313,7 +351,7 @@ The chart starts at `chartTopY = timelineY + headerRowsHeight + 8` (`roadmap-nod
 
 ### 4.8 How the mockup was made
 
-`samples/checkout-relaunch.svg` is today's renderer output with the wave visuals spliced in. A future agent can reproduce it, or replace it with real output once Phase 5 lands.
+`samples/checkout-relaunch.svg` was the renderer output of the time with the wave visuals spliced in. It was removed at close-out, along with the rest of `specs/waves/`, because `examples/waves.nowline` now renders the real thing. The recipe is kept for reference.
 
 1. **Write a wave-free equivalent of the sample.**
    - Use the same lanes and items, but drop the anonymous group, because it draws nothing.
@@ -368,10 +406,11 @@ Each phase is one PR and ends with `make pre-commit` green.
   - XLSX (the `Wave` column and Sheet 6, "Waves");
   - MS Project;
   - Mermaid.
-- **`specs/principles.md:45`:** "~20 keywords (see dsl.md Design Rule 1)".
 - **`specs/ide.md`:** the keyword and autocomplete rows.
 
 **Exit:** the maintainer has approved the open questions (§9), and a second reviewer has re-derived every example table in `waves.md` §11.
+
+**Exit status (met).** The maintainer adopted every §9 recommendation. An independent re-derivation of every valid §11 table found no numeric mismatches.
 
 ### Phase 1: Grammar, AST, printer
 
@@ -394,7 +433,8 @@ Each phase is one PR and ends with `make pre-commit` green.
 - New `packages/core/test/strings-and-ids/wave-identifier.test.ts`:
   - every bare-word use in `waves.md` §4.7 still parses;
   - `wave-1`, `waves` and `wave:` lex as expected;
-  - a `console.warn` spy shows no new parser ambiguity warnings.
+  - the parser self-analysis (`skipValidations: false`) reports no definition errors, and a `console.warn` spy shows no ambiguity warnings;
+  - the residual ambiguity in `waves.md` §4.7 is pinned by tests.
 - `packages/cli/test/convert/printer.test.ts`:
   - a wave declaration prints;
   - `item a duration:2w owner:sam wave:w1 after:x` round-trips in canonical order;
@@ -502,7 +542,7 @@ Each phase is one PR and ends with `make pre-commit` green.
   - pass counts of 4, 3 and 2 for Examples 1, 19 and 16;
   - the 12 px gutter invariant;
   - the lead floor;
-  - a floor past a fixed `length:` window;
+  - a floor past the `length:` window (which grows the window, `length:` being a minimum);
   - a floating milestone bound to a wave sits exactly at `E_k`, with `onWaveBoundary` set;
   - an empty first wave;
   - nested regions contribute nothing;
@@ -513,7 +553,7 @@ Each phase is one PR and ends with `make pre-commit` green.
 - `schedule.test.ts`: barrier cases.
 - `layout-insights.test.ts`: the new insight codes.
 
-**Exit:** the 12 SVG snapshots and `hashes.json` pass without `UPDATE_*` flags.
+**Exit:** the 14 SVG snapshots and `hashes.json` pass without `UPDATE_*` flags (`make pre-commit`, then `make compile TARGET=local` and `make determinism`).
 
 ### Phase 5: Tokens, strip, background cues, renderer
 
@@ -534,19 +574,18 @@ Each phase is one PR and ends with `make pre-commit` green.
   - no bracket for an untitled, unstyled `group wave:x`;
   - re-emitted wave layers inside `renderIncludeRegion`;
   - everything gated on `model.waves`.
-- **The mockup in `specs/waves/samples/` is the visual target.**
+- **The mockup (then in `specs/waves/samples/`) was the visual target.**
 
 **Tests that fail without the change**
 
 - `renderer/test/render.test.ts`:
-  - layers and z-order, with no `<defs>` when there are no waves;
+  - layers and z-order, with no new `<defs>` children (no hatch patterns) when there are no waves;
   - strip alternation;
   - the label fit chain;
   - empty-wave diamonds;
   - the placeholder;
   - the gap label;
   - styled tints;
-  - `border:none`;
   - the boundary span;
   - the milestone cut line suppressed on a boundary;
   - the hatch overlay and pattern choice by fill luminance;
@@ -592,7 +631,7 @@ Each phase is one PR and ends with `make pre-commit` green.
 
 **Files**
 
-- **LSP and editor:** everything in §4.5, the man pages (en and fr), the MCP vocabulary and cheatsheet, `README.md`, and `packages/core/README.md`.
+- **LSP and editor:** everything in §4.5, the man pages (en and fr), the MCP vocabulary and cheatsheet, the `wave` row in the `README.md` Entities table, and `packages/core/README.md`.
 - **Examples:**
   - move `specs/waves/samples/checkout-relaunch.nowline` to `examples/waves.nowline`;
   - add `examples/waves-program.nowline` plus `examples/waves-program/{web,api}.nowline` (Example 16).
@@ -620,7 +659,7 @@ Each phase is one PR and ends with `make pre-commit` green.
 - **The `EntityName` shim ships with the keyword.** Ship them in the same PR, or existing v1 ids spelled `wave` break.
 - **Call it `EntityName`, not `Identifier`,** so that the generated guard cannot shadow the validator's `isIdentifier`.
 - **`printNowlineFile` throws on unknown entries,** so the printer case ships with the grammar.
-- **`langium generate` is not an ambiguity gate.** ALL(*) resolves ambiguity at parse time, so use parse tests with a `console.warn` spy.
+- **`langium generate` is not an ambiguity gate.** Nowline sets `maxLookahead: 4`, so the runtime parser uses Chevrotain LL(k) (not ALL(*)) with grammar validations skipped, and nothing is logged at parse time. The gate is a test that builds the parser with `skipValidations: false` (`waves.md` §4.7 "Phase 1 check"); a `console.warn` spy is only belt-and-braces.
 
 **Validation and includes**
 
@@ -634,7 +673,7 @@ Each phase is one PR and ends with `make pre-commit` green.
 
 - **Reset and re-seed every pass.** Otherwise pass 2 starts honouring forward references.
 - **Region placements inside the loop are discarded.** The final region placement runs once, frozen. Engine B recurses into every region level today; in wave mode, B and C walk exactly one level, matching engine A.
-- **Floors use unclamped dates.** `forwardWithinDomain` returns null outside a fixed `length:` window (`roadmap-node.ts:254-255`).
+- **Floors use unclamped dates.** `forwardWithinDomain` returns null outside the date window (`roadmap-node.ts:254-255`). `length:` is a minimum now, but the initial window is still computed before the lanes run.
 - **`calendar:business` places dates by calendar-day distance but uses 5-day weeks:** one `scale:1w` column is 5 calendar days, and tick labels step by 5 days. Use `calendar:full` for date fixtures; the sample does.
 
 **Rendering**
@@ -652,22 +691,22 @@ Each phase is one PR and ends with `make pre-commit` green.
 **Byte stability**
 
 - **Omit optional model fields; never set them to `undefined` or `[]`.**
-- **Emit no unconditional `<defs>` and no empty `<g>` layers.**
+- **Emit no unconditional `<defs>` children (hatch patterns only when used) and no empty `<g>` layers.**
 - **Gate exporter columns, sheets and sections on waves existing.**
 
-## 7. Incidental findings (out of scope, verified)
+## 7. Incidental findings (resolved)
 
-Found during the research and confirmed at `4f771b4`. None blocks waves. Each is a candidate for its own small PR.
+Found during the research and confirmed at `4f771b4`. None blocked waves. **All five are resolved:** 1 by #74, and 2–5 by #73. They are kept as a record.
 
-1. **The printer throws on `symbol`.** `configEntry` in `packages/core/src/convert/printer.ts:89-102` has no `SymbolDeclaration` case. `printNowlineFile`, and therefore JSON → text conversion, throws `Unknown config entry type` for any file that declares a `symbol`.
-2. **The quarter length drifts between code and spec.** `calendar:full` uses `daysPerQuarter: 91` in `packages/layout/src/calendar.ts:35`, but `specs/dsl.md:781` says 90.
-3. **The snippets offer invalid values.** `packages/vscode-extension/snippets/nowline.json` offers `1mo` as a `scale` choice (`:5`), which is not a valid duration literal. It also offers `backlog` as a status (`:17`, `:24`), which is not a built-in status.
-4. **LSP built-in statuses are incomplete.** `BUILTIN_STATUSES` (`packages/lsp/src/references/ast-utils.ts:77-83`) lacks the `active` and `completed` aliases.
-5. **Keyword counts and tables are stale.** `specs/principles.md:45` says "~17 keywords". `README.md:192-205` lists `duration` as a keyword and omits `size` and `symbol`.
+1. **The printer throws on `symbol`.** *(Resolved by #74.)* `configEntry` in `packages/core/src/convert/printer.ts:89-102` has no `SymbolDeclaration` case. `printNowlineFile`, and therefore JSON → text conversion, throws `Unknown config entry type` for any file that declares a `symbol`.
+2. **The quarter length drifts between code and spec.** *(Resolved by #73.)* `calendar:full` uses `daysPerQuarter: 91` in `packages/layout/src/calendar.ts:35`, but `specs/dsl.md:781` says 90.
+3. **The snippets offer invalid values.** *(Resolved by #73.)* `packages/vscode-extension/snippets/nowline.json` offers `1mo` as a `scale` choice (`:5`), which is not a valid duration literal. It also offers `backlog` as a status (`:17`, `:24`), which is not a built-in status.
+4. **LSP built-in statuses are incomplete.** *(Resolved by #73.)* `BUILTIN_STATUSES` (`packages/lsp/src/references/ast-utils.ts:77-83`) lacks the `active` and `completed` aliases.
+5. **Keyword counts and tables are stale.** *(Resolved by #73.)* `specs/principles.md:45` says "~17 keywords". `README.md:192-205` lists `duration` as a keyword and omits `size` and `symbol`.
 
 ## 8. Files to reference
 
-- **Specs:** [`waves.md`](./waves.md), [`../dsl.md`](../dsl.md), [`../rendering.md`](../rendering.md), [`../cli.md`](../cli.md), [`../principles.md`](../principles.md), and the precedent handoffs [`../handoffs/handoff-m2n-inline-date-pins.md`](../handoffs/handoff-m2n-inline-date-pins.md) and [`../handoffs/handoff-m9-utilization.md`](../handoffs/handoff-m9-utilization.md).
+- **Specs:** [`../waves.md`](../waves.md), [`../dsl.md`](../dsl.md), [`../rendering.md`](../rendering.md), [`../ide.md`](../ide.md), [`../cli.md`](../cli.md), [`../principles.md`](../principles.md), and the precedent handoffs [`handoff-m2n-inline-date-pins.md`](./handoff-m2n-inline-date-pins.md) and [`handoff-m9-utilization.md`](./handoff-m9-utilization.md).
 - **Critical code:**
   - `packages/core/src/language/{nowline.langium, nowline-validator.ts, include-resolver.ts}`
   - `packages/core/src/convert/printer.ts`
@@ -679,12 +718,23 @@ Found during the research and confirmed at `4f771b4`. None blocks waves. Each is
   - `packages/export-{xlsx,msproj,mermaid}/src/index.ts`
   - `packages/lsp/src/references/ast-utils.ts`
 
-## 9. Open questions for the maintainer
+## 9. Open questions for the maintainer (decided)
 
-Each comes with a recommendation; the same list is in `waves.md` §13.
+The maintainer adopted every recommendation below for m2o; the same list is in `waves.md` §13.
 
 1. **Ship wave start floors in v1?** *Recommendation:* yes.
 2. **How strict should include agreement be?** *Recommendation:* ids, order and resolved floors must match (an error); presentation drift is a warning.
 3. **Default look.** *Recommendation:* no column tint; use the strip and the boundary lines.
 4. **MS Project and Mermaid stay AST-only.** *Recommendation:* accept the approximation for the first release.
 5. **Single milestone or the three-milestone split** (§2)? *Recommendation:* a single m2o, unless the layout phase needs to slip independently.
+
+## 10. Tester questions
+
+These came with the design sample, which was removed at close-out. Ask them against the rendered [`examples/waves.nowline`](../../examples/waves.nowline) before explaining anything:
+
+1. Without being told, what do you think the teal lines and the strip under the dates mean?
+2. Can you tell which bars belong to a wave and which are background work? Is the hatching obvious enough to catch a bar someone forgot to assign?
+3. Does it read as "nobody starts Build until all of Foundations is done"? Is the idle time before Feb 16 a useful signal or noise?
+4. Is "wave" the right word for you? Would you have expected "phase", "stage", or something else?
+5. Writing it: would you put `wave:build` on each item, wrap items in `group wave:build`, or want something else?
+6. Do the Beta and GA diamonds on the boundaries read as "when the wave is done"?

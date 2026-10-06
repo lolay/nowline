@@ -64,6 +64,15 @@ const MANIFEST = [
         now: NOW,
     },
     { slug: 'showcase', source: 'examples/showcase.nowline', theme: 'light', now: NOW },
+    { slug: 'waves', source: 'examples/waves.nowline', theme: 'light', now: NOW },
+    { slug: 'waves-dark', source: 'examples/waves.nowline', theme: 'dark', now: NOW },
+    {
+        slug: 'waves-grayscale',
+        source: 'examples/waves.nowline',
+        theme: 'grayscale',
+        now: NOW,
+    },
+    { slug: 'waves-program', source: 'examples/waves-program.nowline', theme: 'light', now: NOW },
 ];
 
 function run(cmd, args, opts = {}) {

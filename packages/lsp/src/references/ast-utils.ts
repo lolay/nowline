@@ -18,6 +18,7 @@ import type {
     SwimlaneDeclaration,
     SymbolDeclaration,
     TeamDeclaration,
+    WaveDeclaration,
 } from '@nowline/core';
 import {
     isAnchorDeclaration,
@@ -36,9 +37,10 @@ import {
     isSwimlaneDeclaration,
     isSymbolDeclaration,
     isTeamDeclaration,
+    isWaveDeclaration,
 } from '@nowline/core';
 import type { AstNode, CstNode, LangiumDocument } from 'langium';
-import { CstUtils } from 'langium';
+import { CstUtils, GrammarUtils } from 'langium';
 import type { Range } from '../lsp-protocol.js';
 
 /**
@@ -71,6 +73,7 @@ export const REFERENCE_PROP_KEYS = new Set([
     'labels',
     'icon',
     'capacity-icon',
+    'wave',
 ]);
 
 /**
@@ -143,7 +146,8 @@ type RoadmapEntryNamed =
     | TeamDeclaration
     | LabelDeclaration
     | SizeDeclaration
-    | StatusDeclaration;
+    | StatusDeclaration
+    | WaveDeclaration;
 
 /**
  * Walk the `NowlineFile` and collect every entity that owns an `id`. Covers
@@ -195,7 +199,8 @@ export function collectNamedEntities(file: NowlineFile): NamedEntity[] {
             isFootnoteDeclaration(entry) ||
             isLabelDeclaration(entry) ||
             isSizeDeclaration(entry) ||
-            isStatusDeclaration(entry)
+            isStatusDeclaration(entry) ||
+            isWaveDeclaration(entry)
         ) {
             if (entry.name) out.push(entry);
         }
@@ -303,13 +308,16 @@ export function propertyValueAt(
 
 /**
  * When `leaf` is the `name=ID` token of a named entity declaration, return the
- * declaring entity. Returns `undefined` for any other position.
+ * declaring entity. Returns `undefined` for any other position, including the
+ * declaration keyword (`wave wave "W"` names its wave after the keyword).
  */
 export function declarationAt(leaf: CstNode | undefined): NamedEntity | undefined {
     if (!leaf) return undefined;
     const owner = leaf.astNode as AstNode & { name?: string };
     if (!owner || typeof owner.name !== 'string') return undefined;
     if (owner.name !== leaf.text) return undefined;
+    const nameNode = nameNodeOf(owner);
+    if (!nameNode || leaf.offset < nameNode.offset || leaf.end > nameNode.end) return undefined;
     if (
         isSwimlaneDeclaration(owner) ||
         isItemDeclaration(owner) ||
@@ -323,6 +331,7 @@ export function declarationAt(leaf: CstNode | undefined): NamedEntity | undefine
         isLabelDeclaration(owner) ||
         isSizeDeclaration(owner) ||
         isStatusDeclaration(owner) ||
+        isWaveDeclaration(owner) ||
         isStyleDeclaration(owner) ||
         isSymbolDeclaration(owner)
     ) {
@@ -361,18 +370,21 @@ export function entityKind(entity: AstNode): string {
 }
 
 /**
- * Find the CST node that holds the given entity's `name=ID` token. Walks the
- * entity's CST subtree and returns the first leaf whose text equals the
- * entity's resolved name. Returns `undefined` when the entity has no `name`
- * (anonymous declaration), no CST node, or no matching leaf.
+ * Find the range of the given entity's `name=ID` token. Uses the grammar
+ * assignment rather than matching leaf text, so a name that equals the
+ * declaration keyword (`wave wave "W"`) resolves to the name, not the
+ * keyword. Returns `undefined` when the entity has no `name` (anonymous
+ * declaration) or no CST node.
  */
 export function nameRangeOf(entity: AstNode): Range | undefined {
+    return nameNodeOf(entity)?.range;
+}
+
+// The CST node assigned to the entity's `name` property.
+function nameNodeOf(entity: AstNode): CstNode | undefined {
     const name = (entity as { name?: string }).name;
     if (!name || !entity.$cstNode) return undefined;
-    for (const leaf of CstUtils.flattenCst(entity.$cstNode)) {
-        if (leaf.text === name) return leaf.range;
-    }
-    return undefined;
+    return GrammarUtils.findNodeForProperty(entity.$cstNode, 'name');
 }
 
 /**

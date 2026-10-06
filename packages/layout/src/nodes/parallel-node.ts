@@ -16,6 +16,7 @@ import type { LayoutContext, TrackCursor } from '../layout-context.js';
 import { resolveStyle } from '../style-resolution.js';
 import { TRACK_BLOCK_TAIL_GUTTER_PX } from '../themes/shared.js';
 import type { BoundingBox, PositionedParallel, PositionedTrackChild } from '../types.js';
+import { waveFloorX } from '../wave-layout.js';
 
 export interface ParallelNodeDeps {
     sequenceOne: (
@@ -46,7 +47,10 @@ export class ParallelNode {
         const { node } = this;
         const { deps } = this;
         const style = resolveStyle('parallel', node.properties, ctx.styleCtx);
-        const startX = cursor.x;
+        // The block's own wave and its lead wave floor the shared start
+        // (specs/waves.md §5.1); each track is floored again by its own
+        // wave where it is placed. A no-op without waves.
+        const startX = waveFloorX(node, cursor.x, ctx);
         const afterDate = pickInlineDate(propValues(node.properties, 'after'));
         const beforeDate = pickInlineDate(propValues(node.properties, 'before'));
         const title = node.title ?? node.name;
