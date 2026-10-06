@@ -1,7 +1,7 @@
 ```
 --- KICKOFF: begin orchestration at [deep] ---
 
-  Status: 1/3 groups done | last review: wave-1 PASS | current: m2p-3 s4-s5 [deep] (gates 5 and 2 pending) | updated 2026-10-06
+  Status: 2/3 groups done | last review: wave-2 PASS | current: m2p-3 s6-s7 [exec] | updated 2026-10-06
 
   review: every-wave (log-only — parent writes Review log; no human review gate)
 
@@ -319,7 +319,7 @@ Done when the red list exists, every baseline hash matches `hashes.json`, and no
 
 --- WAVE 2 [deep] ---
 
-### s4 - [deep] Implement Phase 3
+### s4 - [deep] Implement Phase 3 (done)
 
 Implement § Decisions and § Change until `make test` and `make lint` pass. Determinism is excepted until s5.
 - Change a test only where it contradicts the plan, and list each edit.
@@ -327,7 +327,7 @@ Implement § Decisions and § Change until `make test` and `make lint` pass. Det
 
 Done when tests pass and the size is under budget.
 
-### s5 - [deep] Category review, then regenerate the goldens
+### s5 - [deep] Category review, then regenerate the goldens (done)
 
 Follow § Determinism. The review script and report come first. Regenerate only when nothing disallowed moved; otherwise stop and report. Done when:
 - determinism is green;
@@ -352,15 +352,18 @@ Done when CI starts on the new head.
 
 review wave-1 (m2p-3-s1-s3): PASS - four new test files (layout calendar-resolver, and a calendar suite per exporter) plus updates in four, every § Tests bullet covered with literal values; make-only staged red runs show 100 failures (layout 41, mermaid 27, msproj 9, xlsx 23), all in new or updated tests, with every guard green (among them the business msproj `<WeekDays>` block, `1w` and unsized durations, and the full-calendar Mermaid wave end); nothing outside `*/test/` changed; 33/33 baselines from `packages/cli/dist/index.js` match `hashes.json` node cells; extras beyond the plan: `workingWeekdays` for an open-week rule (Sunday to Thursday) and for dated and bounded rules, which wave 2 must satisfy - 2026-10-06
 
+review wave-2 (m2p-3-s4-s5): PASS - § Decisions 1–5 and the code half of § Change implemented with no test edits (the wave 1 files still match their backup checksums); `workingWeekdays` comes from the open-week mask, never the preset name; the wave's transcript shows `make pre-commit` exit 0 after s4 and again after regeneration (22 packages; layout 814, mermaid 57, msproj 44, xlsx 51, integration-tests 154), `make bundle-size` 188.45 KB with 11.55 KB headroom, and `make determinism` 266/266 with the compiled-CLI leg run; the category review script (`.scratch/p3w2/review.mjs`, which recomputes engine C's days independently) found no disallowed move; `hashes.json` changed only the `node` value of the 27 expected cells; parent spot checks of the sizing and waves mermaid and xlsx and the platform-2026 msproj agree; no layout snapshot moved; note: the Roadmap sheet's value column stays 36 wide, so the Calendar string spills into column C, cosmetic and left as is because widening it would move all 11 xlsx goldens again - 2026-10-06
+
 ## Token log
 
 Phase 1 ~$20.42; Phase 2 ~$66.4. Input is real transcript usage counted once per message; output is chars/4, so a floor.
 
 | row | tier | ~input | ~output | ~cost |
 |---|---|---|---|---|
-| orchestrator (since the Phase 3 request) | orchestrator | 22.24M | 26k | $17.96 |
+| orchestrator (since the Phase 3 request) | orchestrator | 30.13M | 36k | $21.99 |
 | planning: 3 explorers + 1 plan review | orchestrator | 62.24M | 45k | $19.43 |
 | wave-1 (m2p-3-s1-s3) | [exec] | 7.89M | 18k | $2.28 |
-| **running total** | | 92.37M | 89k | **$39.67** |
+| wave-2 (m2p-3-s4-s5) | [deep] | 8.17M | 18k | $2.83 |
+| **running total** | | 108.43M | 117k | **$46.53** |
 
-Model check (canary): wave 1 ran 50 of 50 messages on the [exec] tier's model.
+Model check (canary): wave 1 ran 50 of 50 messages on the [exec] tier's model; wave 2 ran 53 of 53 on the [deep] tier's model.
