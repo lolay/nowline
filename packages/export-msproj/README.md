@@ -47,7 +47,7 @@ because XML is ambiguous (could be SVG-XML, generic XML, etc.).
   <Name>Q1 2026 Plan</Name>
   <StartDate>2026-01-06T00:00:00</StartDate>
   <Calendars>
-    <!-- Standard base calendar (Mon-Fri, 8h) + Standard resource calendar -->
+    <!-- Standard base calendar (the file's working weekdays, 8h) + Standard resource calendar -->
   </Calendars>
   <Tasks>
     <Task><UID>1</UID><Name>Auth refactor</Name>...</Task>
@@ -66,16 +66,22 @@ because XML is ambiguous (could be SVG-XML, generic XML, etc.).
 ## Calendar fidelity
 
 Per spec Resolution 6, this exporter emits a **single Standard base
-calendar** (`UID="1"`, Mon–Fri 08:00–12:00 / 13:00–17:00, weekends off)
+calendar** (`UID="1"`, 08:00–12:00 / 13:00–17:00 on each working day)
 plus a Standard resource calendar (`UID="2"`) that every `<Resource>`
 references. This matches Microsoft's own default template and reliably
 imports across MS Project versions.
 
-Nowline's richer `calendar:` modes (`full` for 7-day weeks, `custom` for
-per-region holidays / half-days) are **not** projected into the export —
-duration math is recomputed against MS Project's Standard calendar so a
-`duration: 2w` item lands on the same 10 working days you'd see in
-Nowline's default `business` calendar.
+The base calendar's working weekdays come from the file's calendar:
+Mon–Fri under `calendar:business` (the default, weekends off), and all
+seven days under `calendar:full` and `calendar:custom`. Each task's
+duration is the chart's own day count for the item (sizes, `q` and
+`capacity:` included) times 480 minutes, so a `duration: 2w` item lasts
+`PT4800M0S` on `business` (10 working days) and `PT6720M0S` on `full`
+(14). An item with no duration stays a one-day task.
+
+Dated days off and half-days are **not** projected yet (`<Exceptions>`
+and `<WorkWeeks>` come with the `non-working` declarations). The export
+still starts at the export date or `--start`, not the roadmap's `start:`.
 
 ## Lossy export policy
 
@@ -85,7 +91,7 @@ The following Nowline features are dropped from the export:
 - `footnote` annotations
 - `description` directives (the bridge to `<Notes>` is reserved for a
   future milestone)
-- Custom calendar configuration
+- Dated days off and half-days (no `non-working` declarations yet)
 
 When any drops occur, the exporter emits a single stderr summary line
 (via the CLI; the library function returns the XML and lets the caller

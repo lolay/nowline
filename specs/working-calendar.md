@@ -1,6 +1,6 @@
 # Nowline Working Calendar
 
-**Status: Accepted, scheduled as m2p. Phases 1–2 (calendar primitives; the working-day schedule under `hide`) are implemented in lolay/nowline#96; Phases 3–5 are pending.** This is the design record for non-working days: weekends, holidays and company-wide closures such as a summit. Today's parser rejects the `non-working` syntax shown here, and today's layout does not skip any day.
+**Status: Accepted, scheduled as m2p. Phases 1–3 (calendar primitives; the working-day schedule under `hide`; the exporters read the file's calendar) are implemented in lolay/nowline#96; Phases 4–5 are pending.** This is the design record for non-working days: weekends, holidays and company-wide closures such as a summit. Today's parser rejects the `non-working` syntax shown here, and today's layout does not skip any day.
 
 The implementation plan, the decisions that close §11 and the codebase map are in [`handoffs/handoff-m2p-working-calendar.md`](./handoffs/handoff-m2p-working-calendar.md). As each phase ships:
 
@@ -51,6 +51,8 @@ The surfaces also disagree with each other, because each one hardcodes its own c
 | Mermaid (`export-mermaid/src/duration.ts`) | `1w` passed through (Mermaid reads 7 calendar days); `1m` → 22d; `1y` → 252d; no `excludes` |
 | XLSX (`export-xlsx/src/duration.ts`) | 5 / 22 / 252 working days per w / m / y, whatever the `calendar:`; no `q` |
 | MS Project (`export-msproj/src/calendar.ts`) | always a Mon–Fri Standard calendar, even for `calendar:full` |
+
+That table is the state before Phases 2 and 3. Phase 2 put the axis and the schedulers on working days. Phase 3 replaced the three exporters' duration tables and the MS Project calendar with engine C's calendar and durations (§8): all of them now match the chart, and the sizes, `q` and `capacity:` that the tables ignored now count.
 
 ## 3. Model
 
@@ -277,15 +279,17 @@ The root roadmap's calendar and display setting define the axis. An isolated inc
 
 ## 8. Exporters
 
-Every exporter reads engine C's dates and the same calendar.
+Every exporter reads engine C's dates, durations and calendar. `resolveWorkingCalendar(file, resolved)` in `@nowline/layout` is the one resolver; `RoadmapSchedule.calendar` carries its result and `ScheduledItem.days` each item's duration in working days (0 when it has none), so no exporter keeps its own duration table. `WorkingCalendar.workingWeekdays` is the open-ended week's working weekdays (0 = Sunday): Monday to Friday for business, all seven for full and custom.
 
-| Exporter | Proposed |
-|---|---|
-| XLSX | Start / End from engine C; the working-day duration column uses the file's `days-per-*` and supports `q`. |
-| MS Project | `<WeekDays>` from the recurring declarations (all seven working under `calendar:full`); `<Exceptions>` from the dated ones. |
-| Mermaid | `excludes` with weekday names and ISO dates, which Mermaid also excludes from task durations; durations emitted as working-day `Nd`. |
-| JSON AST | New `NonWorkingDeclaration` node in `serializeToJson`; printer support; the round-trip test covers a fixture that uses it. |
-| SVG / PNG / PDF / HTML | Follow the layout and the display setting. |
+| Exporter | Phase 3 (built; the presets, since a file declares no days off yet) | Phase 5 (declarations) |
+|---|---|---|
+| XLSX | Start / End (exclusive) from engine C. The Duration column is `days` (`q`, declared sizes and `capacity:` included; 0 when there is none). The Roadmap sheet gains a `Calendar` row after `Start`, e.g. `business (Saturday and Sunday off; 5/22/65/260 days per week/month/quarter/year)`. | — |
+| MS Project | `<WeekDays>` from `workingWeekdays`: Mon–Fri under business, byte-identical to before, and seven working days under `calendar:full` and `calendar:custom`. A task lasts `days` × 480 minutes (480 when it has no duration). | `<WeekDays>` from the recurring declarations; `<Exceptions>` from the dated ones; `<WorkWeeks>` where a bounded recurrence changes the week. |
+| Mermaid | Business emits `excludes saturday, sunday` after `dateFormat`; full and custom emit none. Durations are `Nd` from `days` (`28d` for a full `4w`). The roadmap start and wave-end milestones move to the first working day at or after them, because Mermaid never checks a start against `excludes`; anchors and dated milestones keep their dates (rule 5). | `excludes` with weekday names and ISO dates, which Mermaid also excludes from task durations. |
+| JSON AST | Not in Phase 3. | New `NonWorkingDeclaration` node in `serializeToJson`; printer support; the round-trip test covers a fixture that uses it. |
+| SVG / PNG / PDF / HTML | Follow the layout and the display setting. | Same. |
+
+Known limits, not fixed in Phase 3: MS Project ignores the roadmap's `start:` (it uses the export date or `--start`) and has no implicit lane sequencing, so its schedule cannot match the chart; it writes no `<MinutesPerWeek>` or `<DaysPerMonth>`, so a full-calendar `1w` displays as 1.4 default weeks; Mermaid ignores item `date:` / `start:` pins, writes `after:DATE` verbatim and rounds fractional days; exporters walk only the root file, so merged and isolated include items are not exported.
 
 ## 9. Rollout and byte stability
 
@@ -293,12 +297,12 @@ Every exporter reads engine C's dates and the same calendar.
 
 | Input | Change |
 |---|---|
-| `calendar:full`, no `non-working` declarations | None. The mapping is the identity. |
-| `calendar:custom`, no `every:` | None, plus NW4 when `days-per-week` is not 7. |
+| `calendar:full`, no `non-working` declarations | None to layout and rendering: the mapping is the identity. Export cells move in Phase 3, as fixes: durations count 7 / 30 / 91 / 365 and the MS Project calendar gets seven working days. |
+| `calendar:custom`, no `every:` | None to layout and rendering, plus NW4 when `days-per-week` is not 7. Export cells move in Phase 3, as fixes: durations follow the file's `days-per-*` and the MS Project calendar gets seven working days. |
 | `calendar:business` (the default), `hide` | Sequenced items that start on a working day keep their x. Week ticks keep their x and change label (`Jan 10` → `Jan 12`). Date-pinned entities, the now-line and the window end move to the right day. |
 | `calendar:business`, `show` | Everything after the first weekend moves right, by design. |
 
-The 14 business-calendar layout snapshots (of 19; the five waves samples use `calendar:full`) and every business determinism cell that renders a picture change. For a fixture without date pins and without a now-line in its window, the only change is week-label text. The CHANGELOG entry goes under `### Changed`: the business calendar now does what `dsl.md` already says it does ("engineering working-day arithmetic").
+The 14 business-calendar layout snapshots (of 19; the five waves samples use `calendar:full`) and every business determinism cell that renders a picture change. For a fixture without date pins and without a now-line in its window, the only change is week-label text. Phase 3 moves every `xlsx` and `mermaid` determinism cell (the Calendar row, `End (exclusive)` and the durations; `excludes` on business) and the `msproj` cells with sized items or the full calendar. The CHANGELOG entry goes under `### Changed`: the business calendar now does what `dsl.md` already says it does ("engineering working-day arithmetic").
 
 ### 9.2 Phases
 

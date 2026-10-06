@@ -1,6 +1,6 @@
 # Working calendar handoff: implementation plan (m2p)
 
-> **Status: Phases 1-2 are implemented in PR lolay/nowline#96, still open; Phases 3-5 are not started.** This handoff turns [`working-calendar.md`](../working-calendar.md) into a phased plan for a fresh agent. It is self-contained: the decisions that close the spec's open questions are in §3, the codebase map is in §4, and the target API is in §5. Do not redo the research; re-verify line numbers instead (§1, step 2).
+> **Status: Phases 1-3 are implemented in PR lolay/nowline#96, still open; Phases 4-5 are not started.** This handoff turns [`working-calendar.md`](../working-calendar.md) into a phased plan for a fresh agent. It is self-contained: the decisions that close the spec's open questions are in §3, the codebase map is in §4, and the target API is in §5. Do not redo the research; re-verify line numbers instead (§1, step 2).
 
 ## 1. How to pick this up
 
@@ -8,7 +8,7 @@
 2. **Re-verify code references.** Every `file:line` in §4 was checked against commit `9725e9d` (waves merged, October 2026). Before you trust a line number, re-run a grep for the symbol named in that row.
 3. **Read `working-calendar.md` §3, §5 and §7 before coding.** They are normative. The worked examples in §10 double as test fixtures; the numbers in them are the acceptance criteria.
 4. **One PR per phase,** merged in order, each ending with `make pre-commit` green (AGENTS.md; use `make` targets only). Phases 2 and 3 must land in the same release: do not cut a release between them, or the exporters disagree with the chart.
-5. **Byte stability is the safety net.** A calendar with no non-working days must be the identity everywhere. Every `calendar:full` fixture, including all five waves snapshots, must stay byte-identical through every phase. If one moves, you broke the identity path.
+5. **Byte stability is the safety net.** A calendar with no non-working days must be the identity everywhere. Every `calendar:full` fixture, including all five waves snapshots, must stay byte-identical through every phase. If one moves, you broke the identity path. The rule covers layout and rendering (the SVG, PNG, PDF, HTML and JSON cells and every layout snapshot). Phase 3's exporter fixes move `calendar:full` export cells (durations, and the MS Project week) by design.
 
 ## 2. Milestone and PR shape
 
@@ -19,16 +19,16 @@ Milestone **m2p — Working calendar** is already in `specs/milestones.md` (summ
 | 0 | this handoff | milestone, spec status, this plan | none |
 | 1 | calendar primitives | `WorkingCalendar` non-working set, index ↔ date functions, business weekend | none (no caller uses them yet) |
 | 2 | working-day schedule, `hide` | engines B and C in working days, `TimeScale` hide mapping, window and ticks, now-line, wave floors, positioned `nonWorking` runs | every business-calendar render |
-| 3 | exporters | XLSX, MS Project and Mermaid read the file's calendar | business-calendar `xlsx`, `msproj`, `mermaid` cells |
+| 3 | exporters | XLSX, MS Project and Mermaid read the file's calendar | every `xlsx` and `mermaid` cell, and the `msproj` cells with sized items or the full calendar |
 | 4 | `show` and the display setting | `non-working:` style key, `--non-working` on every surface, show mapping in engine A, shading | none by default (`hide` stays default) |
-| 5 | declarations | `non-working` keyword, `date:` / `through:` / `every:`, includes, named seams and bands, exporter exceptions, editor and agent tooling | none for files without the keyword |
+| 5 | declarations | `non-working` and `working` keywords, `date:` / `start:` / `end:` / `every:`, includes, named seams and bands, exporter exceptions, editor and agent tooling | none for files without the keyword |
 
 ## 3. Decision log
 
 | # | Decision | Chosen | Rejected | Why |
 |---|---|---|---|---|
-| 1 | Keyword | `non-working`, verified by the Phase 5 lexer spike before any other Phase 5 work | `nonworking`, `closure`, `holiday`, `off` | The maintainer asked for one name across declaration, setting, flag and model. If the spike shows the hyphenated keyword cannot lex cleanly, **stop and ask**; do not rename silently. |
-| 2 | Ranges | `date:` plus optional inclusive `through:` | a list of dates (`date:[…]`) | One form is enough for m2p; a long shutdown reads better as a range. Lists can be added later without breaking anything. |
+| 1 | Keyword | `non-working`, verified by the Phase 5 lexer spike before any other Phase 5 work. **Amended 2026-10-06 (maintainer, Phase 1 design):** two keywords, `non-working` and `working` (a declaration that makes a day working again), both behind the Phase 5 lexer spike (Design Rule 1 count 22 → 24, with a justification like waves') | `nonworking`, `closure`, `holiday`, `off` | The maintainer asked for one name across declaration, setting, flag and model. If the spike shows the hyphenated keyword cannot lex cleanly, **stop and ask**; do not rename silently. |
+| 2 | Ranges | `date:` plus optional inclusive `through:`. **Amended 2026-10-06 (maintainer, Phase 1 design):** `date:` takes one date or a list ([`dsl.md`](../dsl.md) "Lists"); `start:` / `end:` (inclusive) give a range or bound `every:`, open-ended on an omitted side; `through:` is dropped | a list of dates (`date:[…]`) | One form is enough for m2p; a long shutdown reads better as a range. Lists can be added later without breaking anything. |
 | 3 | Narrow columns under `hide` | A column narrowed by hidden days drops its label when the label does not fit (`estimateTextWidth` at `TIMELINE_TICK_LABEL_FONT_SIZE_PX`); the tick stays | Letting the label overflow into a neighbour | Extends the edge-column rule from #92. Applies only to columns that contain hidden days, so `calendar:full` stays byte-identical. |
 | 4 | Thinning at the `days` scale under `hide` | Count visible columns. The default `labelEvery` for `days` becomes the number of working weekdays in the recurring pattern (5 for business). **Amended 2026-10-06 (maintainer, Phase 2):** at the `days` scale under `hide`, default thinning labels week starts instead, because "every N visible columns" drifts once a week has six working days. An explicit `label-every` still counts visible columns. | Keeping 7 | Seven visible columns is no longer a week once weekends are hidden. |
 | 5 | Markers on a hidden day | The label is unchanged; the marker's SVG `<title>` carries its real ISO date | Adding the date to the label | Keeps marker-row packing unchanged; the seam already says the day is hidden. |
@@ -44,6 +44,9 @@ Milestone **m2p — Working calendar** is already in `specs/milestones.md` (summ
 | 15 | Diagnostic codes | Assign at implementation from the next free numbers in each family (§4.5); placeholders NW1–NW7 are in spec §6 | — | Codes are cheap to pick and easy to collide; pick them in the PR that adds them. |
 | 16 | Exporter calendar access | Phase 3 adds one exported resolver (Phases 1–2 build the calendar with `fromCalendarConfig` inside layout), `resolveWorkingCalendar(file, resolved)` → `{ config: CalendarConfig, working: WorkingCalendar }`, used by layout, engine C and every exporter; `RoadmapSchedule` carries the result. Exporter durations come from the same code path as layout (`deriveItemDurationDays` with the file's calendar and sizes), which also fixes the missing `q` and the ignored `size:` declarations | Passing `CalendarConfig` piecemeal; keeping the exporters' own duration tables | Three hardcoded calendars are how the surfaces drifted apart (§4.7). One resolver keeps Phase 5's declarations flowing to every exporter for free. |
 | 17 | Incidental findings (§7.1) | Not fixed in m2p | Folding them in | Each is unrelated to the calendar; separate small PRs. |
+| 18 | Precedence between declarations | Specificity: a dated declaration (`date:`) beats a bounded recurrence (`every:` with `start:` / `end:`), which beats the open-ended week. `working` wins ties. Declaration order never matters | Last declaration wins | Added 2026-10-06 (maintainer, Phase 1 design). The result cannot depend on file or include order. |
+| 19 | Durations stay in estimate units | `days-per-*` define what `1w`, `1m`, `1q` and `1y` mean in days; those days are then laid on working days, so a non-working day inside a bar pulls the work in and pushes the end out | — | Added 2026-10-06 (maintainer, Phase 1 design). Phase 3 already behaves this way: exporters report engine C's `days` (estimate units). |
+| 20 | Knock-ons of decisions 1, 2 and 18 | NW1 (`date:` alone; `start:` + `end:` without `every:`; `every:` with optional bounds), NW2 (`end:` is not before `start:`; `checkPropertyValues` gains `case 'end':` for NL.E0405), `start:` / `end:` hover text per entity in the LSP, `KEY_ORDER` in the printer (`every` before `start`, `end` right after `start`), NW3 against the open-ended week (bounded windows may close all seven days), NW4 against the open-ended week | — | Added 2026-10-06 (maintainer, Phase 1 design). [`working-calendar.md`](../working-calendar.md) §4.1, §5 and §6 are rewritten to match in Phase 5. Decision 14 is unchanged. |
 
 ## 4. Codebase map (as of `9725e9d`)
 
