@@ -79,7 +79,7 @@
                 },
                 {
                     "name": "constant.language.status.nowline",
-                    "match": "\\b(planned|in-progress|done|at-risk|blocked)\\b"
+                    "match": "(?<![\\w-])(planned|in-progress|active|done|completed|at-risk|blocked)(?![\\w-])"
                 },
                 {
                     "name": "constant.language.enum.nowline",
