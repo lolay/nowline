@@ -5,14 +5,21 @@
 //
 // `resolveScale` parses the DSL `scale:` property (and any nested
 // `scale` block) into a `ViewPreset`. `buildHeaderTicks` produces
-// the `PositionedTick[]` byte-stable with the legacy generator: same
-// x positions, same labelX positions, same major/minor flags, same
-// label text.
+// the `PositionedTick[]`. Day and week ticks keep the legacy fixed
+// stride (byte-stable with the legacy generator); month, quarter, and
+// year ticks sit on real calendar boundaries, because a fixed day
+// count (30d, 22d, 65d, ...) drifts across month edges and mislabels
+// columns once the span runs long enough.
 
 import type { NowlineFile, ScaleBlock } from '@nowline/core';
-import { addDays } from './calendar.js';
+import { addDays, daysBetween } from './calendar.js';
 import { DEFAULT_LOCALE, localeStrings } from './i18n.js';
-import { DEFAULT_PIXELS_PER_DAY, LABEL_THINNING } from './themes/shared.js';
+import { estimateTextWidth } from './text-measure.js';
+import {
+    DEFAULT_PIXELS_PER_DAY,
+    LABEL_THINNING,
+    TIMELINE_TICK_LABEL_FONT_SIZE_PX,
+} from './themes/shared.js';
 import type { TimeScale } from './time-scale.js';
 import type { PositionedTick } from './types.js';
 import type { WorkingCalendar } from './working-calendar.js';
@@ -124,11 +131,73 @@ function unitPx(unit: ScaleUnit): number {
     }
 }
 
+type CalendarAlignedUnit = 'months' | 'quarters' | 'years';
+
+// Months, quarters, and years vary in length (28-31d, 90-92d,
+// 365-366d), so their ticks follow the real calendar instead of the
+// `calendar:` preset's `days-per-*` count. That count is duration
+// arithmetic for `1m` / `1q` / `1y` literals, not the length of a
+// month on the date axis.
+function isCalendarAligned(unit: ScaleUnit): unit is CalendarAlignedUnit {
+    return unit === 'months' || unit === 'quarters' || unit === 'years';
+}
+
+/** First month / quarter / year start strictly after `date` (UTC). */
+function nextUnitStart(date: Date, unit: CalendarAlignedUnit): Date {
+    const year = date.getUTCFullYear();
+    const month = date.getUTCMonth();
+    switch (unit) {
+        case 'months':
+            return new Date(Date.UTC(year, month + 1, 1));
+        case 'quarters':
+            return new Date(Date.UTC(year, month - (month % 3) + 3, 1));
+        case 'years':
+            return new Date(Date.UTC(year + 1, 0, 1));
+    }
+}
+
+function isUnitStart(date: Date, unit: CalendarAlignedUnit): boolean {
+    if (date.getUTCDate() !== 1) return false;
+    const month = date.getUTCMonth();
+    switch (unit) {
+        case 'months':
+            return true;
+        case 'quarters':
+            return month % 3 === 0;
+        case 'years':
+            return month === 0;
+    }
+}
+
 /**
- * Build header ticks for the chart. The ith tick sits at
- * `originX + i * stridePx`. The last tick is rendered (so the chart
- * has a closing edge) but its label is suppressed because there's no
- * following column.
+ * Day offset from `start` of the first tick boundary at or after
+ * `start + days`. Used to pad the date window so the chart's right
+ * edge lands on a column boundary. Day and week units round up to a
+ * multiple of the fixed stride (`tickDays`); month, quarter, and year
+ * units round up to the next real month / quarter / year start.
+ */
+export function tickBoundaryAtOrAfter(
+    start: Date,
+    days: number,
+    unit: ScaleUnit,
+    tickDays: number,
+): number {
+    if (!isCalendarAligned(unit)) return Math.ceil(days / tickDays) * tickDays;
+    // `days` can arrive from pixel arithmetic (`x / pixelsPerDay`), so
+    // absorb float noise before rounding up; otherwise content that ends
+    // exactly on a boundary would pad out a whole extra column.
+    const target = addDays(start, Math.ceil(days - 1e-6));
+    return daysBetween(start, isUnitStart(target, unit) ? target : nextUnitStart(target, unit));
+}
+
+/**
+ * Build header ticks for the chart. The last tick is rendered (so the
+ * chart has a closing edge) but its label is suppressed because there's
+ * no following column.
+ *
+ * Day and week ticks use a fixed stride: the ith tick sits at
+ * `originX + i * stridePx`. Month, quarter, and year ticks sit on real
+ * calendar boundaries; see `buildCalendarAlignedTicks`.
  */
 export function buildHeaderTicks(
     scale: TimeScale,
@@ -136,6 +205,9 @@ export function buildHeaderTicks(
     calendar: WorkingCalendar,
     locale: string = DEFAULT_LOCALE,
 ): PositionedTick[] {
+    if (isCalendarAligned(preset.unit)) {
+        return buildCalendarAlignedTicks(scale, preset, preset.unit, locale);
+    }
     const dayPerTick = calendar.daysPerUnit(preset.unit);
     const stridePx = dayPerTick * scale.pixelsPerDay;
     const totalDays = Math.max(1, Math.round(scale.widthPx / scale.pixelsPerDay));
@@ -157,6 +229,51 @@ export function buildHeaderTicks(
         });
     }
     return ticks;
+}
+
+/**
+ * Ticks at the chart's left edge, every real month / quarter / year
+ * start inside the window, and the chart's right edge. The first and
+ * last columns can be partial (a roadmap starting Jan 5 opens with a
+ * Jan 5 - Feb 1 column); each column is labelled from its own start
+ * date, so a partial column still names the month it sits in.
+ * Thinning (`labelEvery`) counts ticks from the left edge, as the
+ * fixed-stride generator does.
+ */
+function buildCalendarAlignedTicks(
+    scale: TimeScale,
+    preset: ViewPreset,
+    unit: CalendarAlignedUnit,
+    locale: string,
+): PositionedTick[] {
+    const [start, end] = scale.domain;
+    const dates: Date[] = [start];
+    for (let d = nextUnitStart(start, unit); d < end; d = nextUnitStart(d, unit)) {
+        dates.push(d);
+    }
+    if (end > start) dates.push(end);
+    const xs = dates.map((d) => scale.forward(d));
+    const lastIndex = dates.length - 1;
+    return dates.map((date, i) => {
+        const x = xs[i];
+        const isMajor = i % preset.labelEvery === 0;
+        if (i === lastIndex) return { x, labelX: undefined, major: isMajor, label: undefined };
+        const columnPx = xs[i + 1] - x;
+        let label = isMajor ? formatTickLabel(unit, date, i, locale) : undefined;
+        // A partial edge column can be a sliver (a roadmap starting Mar
+        // 29, or `length:` ending just past a month start). Its centered
+        // label would spill past the chart edge, so drop the label when
+        // it doesn't fit; the tick and grid line stay.
+        const isEdgeColumn = i === 0 || i === lastIndex - 1;
+        if (
+            label !== undefined &&
+            isEdgeColumn &&
+            estimateTextWidth(label, TIMELINE_TICK_LABEL_FONT_SIZE_PX) > columnPx
+        ) {
+            label = undefined;
+        }
+        return { x, labelX: x + columnPx / 2, major: isMajor, label };
+    });
 }
 
 function formatTickLabel(unit: ScaleUnit, date: Date, _index: number, locale: string): string {

@@ -95,6 +95,13 @@ export const TIMELINE_TICK_PANEL_HEIGHT_PX = 24;
 export const TIMELINE_TICK_LABEL_BASELINE_OFFSET_PX = 15;
 
 /**
+ * Font size of the tick labels. Layout reads it to decide whether a
+ * partial edge column is wide enough to hold its label; the renderer
+ * paints at the same size.
+ */
+export const TIMELINE_TICK_LABEL_FONT_SIZE_PX = 10;
+
+/**
  * Horizontal breathing room (px) added to a track-block's right edge
  * after sequencing. Applied to `group { ... }` and `parallel { ... }`
  * blocks so successive blocks don't crowd each other. Items butt up

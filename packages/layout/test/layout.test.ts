@@ -626,6 +626,161 @@ swimlane plugin "Plugin"
         const timelineRightX = model.timeline.box.x + model.timeline.box.width;
         expect(include.box.x + include.box.width).toBeLessThanOrEqual(timelineRightX);
     });
+
+    it('stretches every swimlane band to the timeline right edge when the post-layout extension fires', async () => {
+        // `fri` sits exactly on the pre-pass window end (day 25), so its
+        // diamond radius overflows the window and the post-layout
+        // extension grows the timeline by one column. The lane bands
+        // must reach the extended canvas, not the pre-extension width.
+        const src = `nowline v1
+
+roadmap r "R" start:2026-01-05 scale:1w calendar:business
+
+milestone fri "Fri Jan 30" date:2026-01-30
+
+swimlane a "A"
+  item w1 "W1" duration:1w
+  item w2 "W2" duration:1w
+  item w3 "W3" duration:1w
+  item w4 "W4" duration:1w
+`;
+        const { file, resolved } = await parseAndResolve(src);
+        const model = layoutRoadmap(file, resolved, { theme: 'light' });
+        // Guard against a vacuous pass: the extension really fired.
+        expect(model.timeline.endDate.getTime()).toBeGreaterThan(Date.UTC(2026, 0, 30));
+        const timelineRightX = model.timeline.box.x + model.timeline.box.width;
+        expect(model.swimlanes).toHaveLength(1);
+        for (const lane of model.swimlanes) {
+            expect(lane.box.x + lane.box.width).toBeGreaterThanOrEqual(timelineRightX);
+            expect(lane.box.width).toBe(model.width);
+        }
+    });
+
+    it('re-fits an include region box against the extended canvas when the post-layout extension fires', async () => {
+        // The child's five-week bars end where the pre-pass window ends,
+        // so the include's shrink-wrap (bars + right pad) is clamped by
+        // the pre-extension canvas width. `fri` then overflows the
+        // window and grows the canvas; the include must re-fit to its
+        // natural width rather than keep the stale clamp. A later
+        // milestone date (no clamp in play) is the reference width.
+        const childSrc = `nowline v1
+
+roadmap c "C" start:2026-01-05 scale:1w calendar:business
+
+swimlane b "B"
+  item x1 "X1" duration:1w
+  item x2 "X2" duration:1w
+  item x3 "X3" duration:1w
+  item x4 "X4" duration:1w
+  item x5 "X5" duration:1w
+`;
+        const parentSrc = (date: string) => `nowline v1
+
+include "./child.nowline" roadmap:isolate
+
+roadmap r "R" start:2026-01-05 scale:1w calendar:business
+
+milestone fri "Fri" date:${date}
+
+swimlane a "A"
+  item w1 "W1" duration:1w
+`;
+        const layoutAt = async (date: string) => {
+            const { file, resolved } = await parseAndResolve(
+                parentSrc(date),
+                '/virtual/test.nowline',
+                async () => childSrc,
+            );
+            return layoutRoadmap(file, resolved, { theme: 'light' });
+        };
+        const extended = await layoutAt('2026-01-30');
+        const reference = await layoutAt('2026-02-06');
+        expect(extended.timeline.endDate.getTime()).toBeGreaterThan(Date.UTC(2026, 0, 30));
+        expect(extended.includes).toHaveLength(1);
+        expect(reference.includes).toHaveLength(1);
+        const include = extended.includes[0];
+        expect(include.box.width).toBe(reference.includes[0].box.width);
+        expect(include.box.x + include.box.width).toBeLessThanOrEqual(extended.width);
+        for (const lane of include.nestedSwimlanes) {
+            expect(lane.box.width).toBe(include.box.width);
+        }
+    });
+});
+
+describe('layoutRoadmap month-scale header past 12 months', () => {
+    const src = (calendar: string) => `nowline v1
+
+roadmap r "R" start:2026-01-05 scale:1m calendar:${calendar}
+
+swimlane a "A"
+  item x "X" duration:12m
+  item y "Y" duration:5m
+`;
+    const isoDay = (d: Date) => d.toISOString().slice(0, 10);
+
+    it('labels a 17-month calendar:full span Jan..Dec, Jan..May on real month starts', async () => {
+        // Regression: ticks stepped by a fixed 30 days and were labelled by
+        // the date each landed on, so after a year they read
+        // `Dec Jan Mar Mar Apr` instead of `Jan Feb Mar Apr May`.
+        const { file, resolved } = await parseAndResolve(src('full'));
+        const { timeline } = layoutRoadmap(file, resolved, { theme: 'light' });
+        const labels = timeline.ticks.map((t) => t.label).filter((l) => l !== undefined);
+        expect(labels).toEqual([
+            'Jan',
+            'Feb',
+            'Mar',
+            'Apr',
+            'May',
+            'Jun',
+            'Jul',
+            'Aug',
+            'Sep',
+            'Oct',
+            'Nov',
+            'Dec',
+            'Jan',
+            'Feb',
+            'Mar',
+            'Apr',
+            'May',
+        ]);
+        // Content ends 2027-05-30 (510d); the window pads to the next
+        // month start, and every interior tick is the 1st of a month.
+        expect(isoDay(timeline.endDate)).toBe('2027-06-01');
+        const tickDays = timeline.ticks.map((t) =>
+            isoDay(
+                new Date(
+                    timeline.startDate.getTime() +
+                        Math.round((t.x - timeline.originX) / timeline.pixelsPerDay) * 86400000,
+                ),
+            ),
+        );
+        expect(tickDays[0]).toBe('2026-01-05');
+        expect(tickDays.slice(1).every((d) => d.endsWith('-01'))).toBe(true);
+    });
+
+    it('labels calendar:business months by the real calendar, not 22-day strides', async () => {
+        // 12m + 5m at 22d/month = 374d, ending 2027-01-14.
+        const { file, resolved } = await parseAndResolve(src('business'));
+        const { timeline } = layoutRoadmap(file, resolved, { theme: 'light' });
+        const labels = timeline.ticks.map((t) => t.label).filter((l) => l !== undefined);
+        expect(labels).toEqual([
+            'Jan',
+            'Feb',
+            'Mar',
+            'Apr',
+            'May',
+            'Jun',
+            'Jul',
+            'Aug',
+            'Sep',
+            'Oct',
+            'Nov',
+            'Dec',
+            'Jan',
+        ]);
+        expect(isoDay(timeline.endDate)).toBe('2027-02-01');
+    });
 });
 
 describe('layoutRoadmap item title wrapping', () => {

@@ -6,6 +6,7 @@
 import { describe, expect, it } from 'vitest';
 import {
     isUpdateMode,
+    layoutSample,
     readSnapshot,
     renderSampleSvg,
     SAMPLES,
@@ -26,6 +27,31 @@ describe('layout v2 sample snapshots', () => {
                 return;
             }
             expect(actual).toBe(expected);
+        });
+    }
+});
+
+// Geometry invariants checked on the model, independent of the byte
+// snapshots. A byte snapshot pins whatever the layout produced, bugs
+// included (platform-2026's lane bands stopped 40 px short of the
+// canvas for as long as the snapshot existed); these hold for every
+// sample, so a regression fails here even when it is snapshotted.
+describe('layout v2 sample invariants', () => {
+    for (const sample of SAMPLES) {
+        it(`${sample.name}: swimlane bands span the canvas and includes stay inside it`, async () => {
+            const model = await layoutSample(sample);
+            const timelineRightX = model.timeline.box.x + model.timeline.box.width;
+            for (const lane of model.swimlanes) {
+                expect(lane.box.x).toBe(0);
+                expect(lane.box.width).toBe(model.width);
+                expect(lane.box.x + lane.box.width).toBeGreaterThanOrEqual(timelineRightX);
+            }
+            for (const inc of model.includes) {
+                expect(inc.box.x + inc.box.width).toBeLessThanOrEqual(model.width);
+                for (const lane of inc.nestedSwimlanes) {
+                    expect(lane.box.width).toBe(inc.box.width);
+                }
+            }
         });
     }
 });

@@ -820,6 +820,8 @@ roadmap platform-2026 "Platform 2026" start:2026-01-06 scale:2w calendar:busines
 
 The default is `business` because engineering roadmaps almost always count working days when sizing work.
 
+The calendar governs duration arithmetic only. The date axis itself is calendar days, and month, quarter, and year ticks sit on real month / quarter / year starts whatever the calendar says (see [`rendering.md` § Timeline Scale](./rendering.md#timeline-scale)), so under `calendar:business` a `duration:1m` bar (22 days) is shorter than a month column.
+
 **No-transitivity rule.** Each `days-per-*` field is independently defined. A duration like `1y` resolves to `days-per-year` directly — not by multiplying through months or weeks. This is why business mode's `1y` = 260d, not `12 × 22d = 264d`. Likewise a quarter is 13 weeks in both presets (business `1q` = 65d, full `1q` = 91d), not three months (`3 × 30d = 90d`). Year, quarter, month, week, and day are each first-class units with their own conversion to days.
 
 **Preset reference** — the values baked into `calendar:business` and `calendar:full`, written in the same shape as a custom `calendar` block. These live hardcoded in the runtime; authors cannot and need not write them in a `.nowline` file:

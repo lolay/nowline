@@ -51,7 +51,7 @@ import type {
     SlackCorridor,
 } from '../types.js';
 import type { ViewPreset } from '../view-preset.js';
-import { buildHeaderTicks, resolveScale } from '../view-preset.js';
+import { buildHeaderTicks, resolveScale, tickBoundaryAtOrAfter } from '../view-preset.js';
 import { solveWaveBarriers } from '../wave-barrier.js';
 import {
     beginWavePass,
@@ -64,7 +64,7 @@ import { fromCalendarConfig } from '../working-calendar.js';
 import { buildAnchors } from './anchor-node.js';
 import { maxLeafItemRightX } from './content-extent.js';
 import { buildFootnotes } from './footnote-node.js';
-import { buildIncludeRegions } from './include-node.js';
+import { buildIncludeRegions, fitIncludeRegionWidth } from './include-node.js';
 import {
     MARKER_BOLD_WIDTH_FACTOR,
     MARKER_DIAMOND_RADIUS_PX,
@@ -563,15 +563,6 @@ export class RoadmapNode {
         // (made at init) in the canvas-extent ledger.
         growChartRightX(ctx, pass.maxRightX + GUTTER_PX);
 
-        // Each swimlane band reads the canvas width once during its
-        // place pass, before the spill expansion above. Re-stretch every
-        // band so the lane background contains its own spilled captions
-        // (text-spills-right's "1w — 50% remaining" extends 22 px past
-        // the unstretched lane edge otherwise).
-        for (const lane of swimlanes) {
-            lane.box.width = ctx.chartRightX;
-        }
-
         // Include regions under the swimlanes. Reserve the 8 px gap +
         // tab-reserve only when there's at least one isolated region —
         // otherwise the now-line and chart bottom would extend past the
@@ -618,7 +609,10 @@ export class RoadmapNode {
         }
         const tickDays = calendar.daysPerUnit(scale.unit);
         const overflowDays = (maxContentRightX - originX) / ppd;
-        const paddedDays = overflowDays > 0 ? Math.ceil(overflowDays / tickDays) * tickDays : 0;
+        const paddedDays =
+            overflowDays > 0
+                ? tickBoundaryAtOrAfter(startDate, overflowDays, scale.unit, tickDays)
+                : 0;
         if (paddedDays > spanDays) {
             const extendedEndDate = addDays(startDate, paddedDays);
             const extendedWidth = paddedDays * ppd;
@@ -632,6 +626,21 @@ export class RoadmapNode {
             timeline.box.width = extendedWidth;
             timeline.ticks = buildHeaderTicks(extendedScale, scale, calendar, locale);
             growChartRightX(ctx, originX + extendedWidth + GUTTER_PX);
+        }
+
+        // `ctx.chartRightX` is final from here on. Each swimlane band
+        // and include region read the canvas width once during its place
+        // pass, before the spill expansion and the timeline extension
+        // above. Re-stretch every band so the lane background contains
+        // its own spilled captions (text-spills-right's "1w — 50%
+        // remaining" extends 22 px past the unstretched lane edge
+        // otherwise) and reaches the extended tick panel, and re-fit
+        // each include so its right-edge clamp reads the final width.
+        for (const lane of swimlanes) {
+            lane.box.width = ctx.chartRightX;
+        }
+        for (const inc of includes) {
+            fitIncludeRegionWidth(inc, ctx.chartRightX);
         }
 
         // Unified marker re-pack. Every marker (date-pinned anchor,
