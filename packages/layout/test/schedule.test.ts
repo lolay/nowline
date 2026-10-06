@@ -12,8 +12,8 @@ import {
 } from '@nowline/core';
 import { URI } from 'langium';
 import { describe, expect, it } from 'vitest';
-import { daysBetween } from '../src/calendar.js';
 import { type RoadmapSchedule, scheduleRoadmap } from '../src/schedule.js';
+import { continuousCalendar, fromCalendarConfig } from '../src/working-calendar.js';
 import { parseAndResolve } from './helpers.js';
 
 let services:
@@ -72,11 +72,12 @@ swimlane s "S"
         const b = sched.items.get('b');
         expect(a).toBeDefined();
         expect(b).toBeDefined();
-        // b starts where a ended
-        expect(b!.start.toISOString().slice(0, 10)).toBe(a!.end.toISOString().slice(0, 10));
-        // 2w = 10 days → end is 10 days after start
-        const expectedEnd = new Date(b!.start.getTime() + 10 * 86400000);
-        expect(b!.end.toISOString().slice(0, 10)).toBe(expectedEnd.toISOString().slice(0, 10));
+        // a is Mon-Fri, so its exclusive end is Saturday; b starts on the
+        // next working day (rule 4), Monday.
+        expect(a!.end.toISOString().slice(0, 10)).toBe('2026-01-10');
+        expect(b!.start.toISOString().slice(0, 10)).toBe('2026-01-12');
+        // 2w = 10 working days → Mon Jan 12 to Fri Jan 23, exclusive end Saturday Jan 24.
+        expect(b!.end.toISOString().slice(0, 10)).toBe('2026-01-24');
     });
 
     it('after: chain overrides sequential default', async () => {
@@ -96,6 +97,8 @@ swimlane s "S"
     });
 
     it('date: property pins the item start absolutely', async () => {
+        // 2026-02-01 is a Sunday: rule 1 moves the start to the next working
+        // day, Monday 02-02 (the end is Saturday 02-07, exclusive).
         const sched = await buildSchedule(
             `nowline v1
 roadmap r "R" start:2026-01-05
@@ -107,7 +110,95 @@ swimlane s "S"
         );
         const b = sched.items.get('b');
         expect(b).toBeDefined();
-        expect(b!.start.toISOString().slice(0, 10)).toBe('2026-02-01');
+        expect(b!.start.toISOString().slice(0, 10)).toBe('2026-02-02');
+        expect(b!.end.toISOString().slice(0, 10)).toBe('2026-02-07');
+    });
+
+    it('a date: pin on a working day keeps its date', async () => {
+        const sched = await buildSchedule(
+            `nowline v1
+roadmap r "R" start:2026-01-05
+swimlane s "S"
+  item a "A" duration:1w
+  item b "B" duration:1w date:2026-02-02
+`,
+            PINNED,
+        );
+        const b = sched.items.get('b');
+        expect(b!.start.toISOString().slice(0, 10)).toBe('2026-02-02');
+        expect(b!.end.toISOString().slice(0, 10)).toBe('2026-02-07');
+    });
+
+    it('a start: pin on a Saturday starts the item on Monday', async () => {
+        const sched = await buildSchedule(
+            `nowline v1
+roadmap r "R" start:2026-01-05
+swimlane s "S"
+  item a "A" duration:1w start:2026-01-10
+`,
+            PINNED,
+        );
+        const a = sched.items.get('a');
+        expect(a!.start.toISOString().slice(0, 10)).toBe('2026-01-12');
+        expect(a!.end.toISOString().slice(0, 10)).toBe('2026-01-17');
+    });
+
+    it('an after:DATE on a Saturday opens the dependent on the next Monday', async () => {
+        const sched = await buildSchedule(
+            `nowline v1
+roadmap r "R" start:2026-01-05
+swimlane s "S"
+  item a "A" duration:1w after:2026-01-17
+`,
+            PINNED,
+        );
+        const a = sched.items.get('a');
+        expect(a!.start.toISOString().slice(0, 10)).toBe('2026-01-19');
+    });
+
+    it('a roadmap start on a Saturday begins on the Monday after', async () => {
+        const sched = await buildSchedule(
+            `nowline v1
+roadmap r "R" start:2026-01-10
+swimlane s "S"
+  item a "A" duration:1w
+`,
+            PINNED,
+        );
+        const a = sched.items.get('a');
+        expect(a!.start.toISOString().slice(0, 10)).toBe('2026-01-12');
+        expect(a!.end.toISOString().slice(0, 10)).toBe('2026-01-17');
+    });
+
+    it('a sequence across a weekend skips it: 3d + 3d from Monday', async () => {
+        // a: Mon-Wed (end Thu 01-08), b: Thu-Mon, exclusive end Tue 01-13.
+        const sched = await buildSchedule(
+            `nowline v1
+roadmap r "R" start:2026-01-05
+swimlane s "S"
+  item a "A" duration:3d
+  item b "B" duration:3d
+`,
+            PINNED,
+        );
+        expect(sched.items.get('a')!.end.toISOString().slice(0, 10)).toBe('2026-01-08');
+        expect(sched.items.get('b')!.start.toISOString().slice(0, 10)).toBe('2026-01-08');
+        expect(sched.items.get('b')!.end.toISOString().slice(0, 10)).toBe('2026-01-13');
+    });
+
+    it('calendar:full keeps calendar-day arithmetic', async () => {
+        const sched = await buildSchedule(
+            `nowline v1
+roadmap r "R" start:2026-01-05 calendar:full
+swimlane s "S"
+  item a "A" duration:1w
+  item b "B" duration:1w date:2026-02-01
+`,
+            PINNED,
+        );
+        expect(sched.items.get('a')!.end.toISOString().slice(0, 10)).toBe('2026-01-12');
+        expect(sched.items.get('b')!.start.toISOString().slice(0, 10)).toBe('2026-02-01');
+        expect(sched.items.get('b')!.end.toISOString().slice(0, 10)).toBe('2026-02-08');
     });
 });
 
@@ -141,8 +232,23 @@ milestone done "Done" after:[a]
         const m = sched.milestones.get('done');
         expect(a).toBeDefined();
         expect(m).toBeDefined();
-        // milestone floats to a's end
-        expect(m!.toISOString().slice(0, 10)).toBe(a!.end.toISOString().slice(0, 10));
+        // a is Mon-Fri x 2 (exclusive end Sat 01-17); the milestone is a
+        // point, so it floats to the next working day, Monday 01-19.
+        expect(a!.end.toISOString().slice(0, 10)).toBe('2026-01-17');
+        expect(m!.toISOString().slice(0, 10)).toBe('2026-01-19');
+    });
+
+    it('a dated milestone keeps its own date, even on a Saturday', async () => {
+        const sched = await buildSchedule(
+            `nowline v1
+roadmap r "R" start:2026-01-05
+milestone sat "Sat" date:2026-01-10
+swimlane s "S"
+  item a "A" duration:1w
+`,
+            PINNED,
+        );
+        expect(sched.milestones.get('sat')!.toISOString().slice(0, 10)).toBe('2026-01-10');
     });
 });
 
@@ -186,9 +292,11 @@ swimlane s "S"
 
 // --- Wave barriers (specs/waves.md §5.1, §8.5, §11) ---
 //
-// Engine C works in calendar-day offsets from the start: under the default
-// `calendar:business` one week is 5 days, under `calendar:full` it is 7. The
-// tables below are the spec's week offsets; `weeks` converts back.
+// Engine C works in working-day indices from the start: under the default
+// `calendar:business` one week is 5 working days, under `calendar:full` it is
+// 7 calendar days. The tables below are the spec's week offsets; `weeks`
+// converts a date back through the matching calendar (a business week is
+// five working days of seven calendar days).
 
 async function buildWaveSchedule(source: string) {
     const { shared, Nowline } = getServices();
@@ -221,8 +329,18 @@ async function buildIncludeSchedule(files: Record<string, string>, main: string)
 const BUSINESS_WEEK = 5;
 const FULL_WEEK = 7;
 
+const BUSINESS_CALENDAR = fromCalendarConfig({
+    mode: 'business',
+    daysPerWeek: 5,
+    daysPerMonth: 22,
+    daysPerQuarter: 65,
+    daysPerYear: 260,
+});
+const FULL_CALENDAR = continuousCalendar();
+
 function weeks(sched: RoadmapSchedule, d: Date, perWeek: number): number {
-    return daysBetween(sched.startDate, d) / perWeek;
+    const calendar = perWeek === BUSINESS_WEEK ? BUSINESS_CALENDAR : FULL_CALENDAR;
+    return calendar.workingIndexOf(sched.startDate, d) / perWeek;
 }
 
 function itemWeeks(

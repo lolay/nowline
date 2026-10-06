@@ -152,3 +152,37 @@ describe('wave theme contrast floors (specs/waves.md 9.10)', () => {
         });
     }
 });
+
+describe('non-working seam theme token (specs/working-calendar.md 7.4)', () => {
+    const all = { light: lightTheme, dark: darkTheme, grayscale: grayscaleTheme };
+    for (const [name, t] of Object.entries(all)) {
+        describe(name, () => {
+            // Read from the theme object, never a literal colour: the seam is
+            // a faint dotted line between two working days.
+            const seam = t.timeline.nonWorkingSeam;
+            it('is a colour string on the theme', () => {
+                expect(typeof seam).toBe('string');
+                expect(seam).toMatch(/^#[0-9a-fA-F]{6}$/);
+            });
+            it('seam vs both row tints >= 1.8', () => {
+                expect(contrastRatio(seam, t.swimlane.rowTintEven)).toBeGreaterThanOrEqual(1.8);
+                expect(contrastRatio(seam, t.swimlane.rowTintOdd)).toBeGreaterThanOrEqual(1.8);
+            });
+            it('seam vs grid line >= 1.3', () => {
+                expect(contrastRatio(seam, t.timeline.gridLine)).toBeGreaterThanOrEqual(1.3);
+            });
+            it('seam differs from the milestone and anchor cut lines', () => {
+                const norm = (c: string) => c.toLowerCase();
+                expect(norm(seam)).not.toBe(norm(t.milestoneDiamond.cutLineNormal));
+                expect(norm(seam)).not.toBe(norm(t.milestoneDiamond.cutLineOverrun));
+                expect(norm(seam)).not.toBe(norm(t.anchorDiamond.cutLine));
+            });
+        });
+    }
+
+    it('the grayscale seam is achromatic', () => {
+        const seam = grayscaleTheme.timeline.nonWorkingSeam;
+        expect(typeof seam).toBe('string');
+        expect(isAchromatic(seam)).toBe(true);
+    });
+});

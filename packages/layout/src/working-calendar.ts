@@ -113,6 +113,23 @@ export function continuousCalendar(): WorkingCalendar {
     return buildCalendar(continuousDaysPerUnit, []);
 }
 
+/**
+ * The exclusive end date of a span of working-day indices [s, e) from
+ * `base` (specs/working-calendar.md §5.2): the day after the last whole
+ * working day the span covers, so a Mon–Fri item ends on Saturday. A span
+ * covering no whole working day ends on its start date. Indices floor, as
+ * in `dateAtWorkingIndex`.
+ *
+ * On the identity path it is `addDays(base, e)`, truncation included, so
+ * calendar-day spans keep their exact dates.
+ */
+export function spanEndDate(calendar: WorkingCalendar, base: Date, s: number, e: number): Date {
+    if (!calendar.hasNonWorkingDays) return addDays(base, e);
+    const last = Math.floor(e);
+    if (last <= Math.floor(s)) return calendar.dateAtWorkingIndex(base, s);
+    return addDays(calendar.dateAtWorkingIndex(base, last - 1), 1);
+}
+
 export function daysPerUnit(unit: ScaleUnit, cal: CalendarConfig): number {
     return daysPerUnitForCalendar(unit, cal);
 }

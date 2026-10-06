@@ -1,6 +1,6 @@
 # Working calendar handoff: implementation plan (m2p)
 
-> **Status: planned, not started.** This handoff turns [`working-calendar.md`](../working-calendar.md) into a phased plan for a fresh agent. It is self-contained: the decisions that close the spec's open questions are in §3, the codebase map is in §4, and the target API is in §5. Do not redo the research; re-verify line numbers instead (§1, step 2).
+> **Status: Phases 1-2 are implemented in PR lolay/nowline#96, still open; Phases 3-5 are not started.** This handoff turns [`working-calendar.md`](../working-calendar.md) into a phased plan for a fresh agent. It is self-contained: the decisions that close the spec's open questions are in §3, the codebase map is in §4, and the target API is in §5. Do not redo the research; re-verify line numbers instead (§1, step 2).
 
 ## 1. How to pick this up
 
@@ -30,7 +30,7 @@ Milestone **m2p — Working calendar** is already in `specs/milestones.md` (summ
 | 1 | Keyword | `non-working`, verified by the Phase 5 lexer spike before any other Phase 5 work | `nonworking`, `closure`, `holiday`, `off` | The maintainer asked for one name across declaration, setting, flag and model. If the spike shows the hyphenated keyword cannot lex cleanly, **stop and ask**; do not rename silently. |
 | 2 | Ranges | `date:` plus optional inclusive `through:` | a list of dates (`date:[…]`) | One form is enough for m2p; a long shutdown reads better as a range. Lists can be added later without breaking anything. |
 | 3 | Narrow columns under `hide` | A column narrowed by hidden days drops its label when the label does not fit (`estimateTextWidth` at `TIMELINE_TICK_LABEL_FONT_SIZE_PX`); the tick stays | Letting the label overflow into a neighbour | Extends the edge-column rule from #92. Applies only to columns that contain hidden days, so `calendar:full` stays byte-identical. |
-| 4 | Thinning at the `days` scale under `hide` | Count visible columns. The default `labelEvery` for `days` becomes the number of working weekdays in the recurring pattern (5 for business) | Keeping 7 | Seven visible columns is no longer a week once weekends are hidden. |
+| 4 | Thinning at the `days` scale under `hide` | Count visible columns. The default `labelEvery` for `days` becomes the number of working weekdays in the recurring pattern (5 for business). **Amended 2026-10-06 (maintainer, Phase 2):** at the `days` scale under `hide`, default thinning labels week starts instead, because "every N visible columns" drifts once a week has six working days. An explicit `label-every` still counts visible columns. | Keeping 7 | Seven visible columns is no longer a week once weekends are hidden. |
 | 5 | Markers on a hidden day | The label is unchanged; the marker's SVG `<title>` carries its real ISO date | Adding the date to the label | Keeps marker-row packing unchanged; the seam already says the day is hidden. |
 | 6 | Versioning | `### Changed` under `nowline v1`, no opt-in | An opt-in flag or a DSL version bump | The business calendar now does what `dsl.md` already says it does ("engineering working-day arithmetic"). |
 | 7 | Per-swimlane calendars | Out of m2p | — | Spec §11.7: only on demand. |

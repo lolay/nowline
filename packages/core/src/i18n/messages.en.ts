@@ -26,6 +26,7 @@ import type {
     FlowRef,
     I1006Args,
     I1007Args,
+    I1008Args,
     W0701Args,
     W0702Args,
     W1001Args,
@@ -364,4 +365,6 @@ export const messages = {
     },
     'NL.I1007': (a: I1007Args) =>
         `Milestone "${a.name}" (${a.date}) is overrun: wave "${a.wave}" ends ${a.end}.`,
+    'NL.I1008': (a: I1008Args) =>
+        `Item "${a.name}" is pinned to ${a.pin} (${a.key}:), a non-working day; it starts on ${a.start}.`,
 };

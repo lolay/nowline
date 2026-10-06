@@ -104,7 +104,8 @@ export type MessageCode =
     | 'NL.I1004' // lane-multi-row
     | 'NL.I1005' // lane-over-capacity
     | 'NL.I1006' // wave-empty
-    | 'NL.I1007'; // wave-overruns-milestone
+    | 'NL.I1007' // wave-overruns-milestone
+    | 'NL.I1008'; // pin-on-non-working-day
 
 export const ALL_CODES: ReadonlyArray<MessageCode> = [
     'NL.E0001',
@@ -165,4 +166,5 @@ export const ALL_CODES: ReadonlyArray<MessageCode> = [
     'NL.I1005',
     'NL.I1006',
     'NL.I1007',
+    'NL.I1008',
 ] as const;

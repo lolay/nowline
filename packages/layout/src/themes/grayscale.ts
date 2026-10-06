@@ -126,6 +126,7 @@ export const grayscaleTheme: Theme = {
     timeline: {
         gridLine: '#bdbdbd',
         minorGridLine: '#d4d4d4',
+        nonWorkingSeam: '#9a9a9a',
         tickMark: '#bdbdbd',
         labelText: '#737373',
         panelFill: '#ffffff',

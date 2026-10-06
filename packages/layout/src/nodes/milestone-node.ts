@@ -13,7 +13,7 @@
 // bottom-first slot once every centerX is known.
 
 import type { MilestoneDeclaration } from '@nowline/core';
-import { parseDate, propValue, propValues } from '../dsl-utils.js';
+import { formatIsoDate, parseDate, propValue, propValues } from '../dsl-utils.js';
 import { itemSlackAttachY } from '../item-port-geometry.js';
 import type { LayoutContext } from '../layout-context.js';
 import { resolveStyle } from '../style-resolution.js';
@@ -305,7 +305,13 @@ export class MilestoneNode {
         if (ctx.waves && !isOverrun && isOnWaveBoundary(ctx.waves, center.x)) {
             positioned.onWaveBoundary = true;
         }
-        if (overrunByWave !== undefined) positioned.overrunByWave = overrunByWave;
+        if (overrunByWave !== undefined && date) {
+            positioned.overrunByWave = overrunByWave;
+            positioned.overrunDate = formatIsoDate(date);
+        }
+        // A date the axis hides keeps its own day as a tooltip
+        // (specs/working-calendar.md §7.4).
+        if (date && !ctx.calendar.isWorkingDay(date)) positioned.hiddenDate = formatIsoDate(date);
         return positioned;
     }
 }

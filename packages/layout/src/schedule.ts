@@ -10,10 +10,17 @@
 //     its wave's start S_k, iterated to a fixpoint by `solveWaveBarriers`
 //     (specs/waves.md §8.5)
 //
+// Offsets are working-day indices from the start (specs/working-calendar.md
+// §5): dates convert with `workingIndexOf`, so a pin on a non-working day
+// starts on the next working day. A start (and an after-only milestone) is a
+// point, `dateAtWorkingIndex`; an exclusive end is `spanEndDate`, so a
+// Mon–Fri item ends on Saturday. Anchors and dated milestones keep their own
+// dates. A calendar with no non-working day keeps calendar-day arithmetic.
+//
 // Used by the XLSX exporter to populate the "Start" / "End" date columns and
-// the milestone "Date" cell when no explicit `date:` is set. Keeping it
-// separate from `computeContentEndDay` avoids mutating the byte-stable snapshot
-// pipeline.
+// the milestone "Date" cell when no explicit `date:` is set, and by the
+// XLSX and Mermaid exporters for the wave spans. Keeping it separate from
+// `computeContentEndDay` avoids mutating the byte-stable snapshot pipeline.
 
 import type {
     GroupBlock,
@@ -25,15 +32,10 @@ import type {
     SwimlaneDeclaration,
 } from '@nowline/core';
 import { buildWavePlan, isGroupBlock, isItemDeclaration, isParallelBlock } from '@nowline/core';
-import {
-    addDays,
-    daysBetween,
-    deriveItemDurationDays,
-    resolveCalendar,
-    resolveSizes,
-} from './calendar.js';
+import { deriveItemDurationDays, resolveCalendar, resolveSizes } from './calendar.js';
 import { parseDate, propValue, propValues } from './dsl-utils.js';
 import { solveWaveBarriers, summarizeWaves, WavePass, waveFloorDays } from './wave-barrier.js';
+import { fromCalendarConfig, spanEndDate } from './working-calendar.js';
 
 /** Per-item scheduled interval, keyed by item id (name). */
 export interface ScheduledItem {
@@ -100,11 +102,17 @@ export function scheduleRoadmap(
     options: ScheduleOptions = {},
 ): RoadmapSchedule {
     const cal = resolveCalendar(file, resolved.config.calendar);
+    const calendar = fromCalendarConfig(cal);
     const sizes = resolveSizes(resolved.content.sizes, cal);
 
     // Resolve roadmap start date — same precedence as RoadmapNode.place.
     const startRaw = propValue(file.roadmapDecl?.properties ?? [], 'start');
     const startDate = parseDate(startRaw) ?? utcMidnight(options.today ?? new Date());
+    // Working-day index of a date, and back: a point and an exclusive end.
+    const dayOf = (date: Date): number => calendar.workingIndexOf(startDate, date);
+    const pointAt = (day: number): Date => calendar.dateAtWorkingIndex(startDate, day);
+    const endAt = (start: number, end: number): Date =>
+        spanEndDate(calendar, startDate, start, end);
 
     // These maps accumulate end-day offsets (from startDate) for cross-entity
     // `after:` resolution, matching computeContentEndDay exactly. In a
@@ -125,9 +133,8 @@ export function scheduleRoadmap(
     for (const [id, anchor] of resolved.content.anchors) {
         const d = parseDate(propValue(anchor.properties, 'date'));
         if (d) {
-            const day = daysBetween(startDate, d);
-            anchorEnd.set(id, day);
-            anchorResults.set(id, addDays(startDate, day));
+            anchorEnd.set(id, dayOf(d));
+            anchorResults.set(id, d);
         }
     }
 
@@ -148,7 +155,7 @@ export function scheduleRoadmap(
         // Resolve a single `after:` element to a day-offset.
         const resolveAfterDay = (ref: string): number => {
             const inlineDate = parseDate(ref);
-            if (inlineDate) return daysBetween(startDate, inlineDate);
+            if (inlineDate) return dayOf(inlineDate);
             if (scope.itemEnd.has(ref)) return scope.itemEnd.get(ref)!;
             if (scope.anchorEnd.has(ref)) return scope.anchorEnd.get(ref)!;
             if (scope.milestoneEnd.has(ref)) return scope.milestoneEnd.get(ref)!;
@@ -179,9 +186,9 @@ export function scheduleRoadmap(
                 const afterRefs = propValues(node.properties, 'after');
                 let start = prevEnd;
                 if (dateProp) {
-                    start = daysBetween(startDate, dateProp);
+                    start = dayOf(dateProp);
                 } else if (startProp) {
-                    start = daysBetween(startDate, startProp);
+                    start = dayOf(startProp);
                 } else if (afterRefs.length > 0) {
                     start = Math.max(prevEnd, ...afterRefs.map(resolveAfterDay));
                 }
@@ -189,10 +196,7 @@ export function scheduleRoadmap(
                 // becomes max(pin, F).
                 if (wave) start = wave.apply(node, start);
                 const end = start + dur;
-                const scheduled: ScheduledItem = {
-                    start: addDays(startDate, start),
-                    end: addDays(startDate, end),
-                };
+                const scheduled: ScheduledItem = { start: pointAt(start), end: endAt(start, end) };
                 itemByNode.set(node, scheduled);
                 if (node.name) {
                     scope.itemEnd.set(node.name, end);
@@ -245,7 +249,7 @@ export function scheduleRoadmap(
         // Wave barriers (specs/waves.md §8.5): iterate the lane walk to the
         // least fixpoint. The final pass's results are the schedule.
         const ids = plan.waves.map((w) => w.name as string);
-        const floors = waveFloorDays(plan, startDate);
+        const floors = waveFloorDays(plan, startDate, calendar);
         let finalPass: WavePass | undefined;
         const result = solveWaveBarriers(ids.length, 0, floors, (S, E) => {
             // Reset the item maps, keep the anchors, and seed each wave id
@@ -283,8 +287,8 @@ export function scheduleRoadmap(
         for (const span of summarizeWaves(plan, result, finalPass!, 0, floors)) {
             waves.set(span.id, {
                 index: span.index,
-                start: addDays(startDate, span.start),
-                end: addDays(startDate, span.end),
+                start: pointAt(span.start),
+                end: endAt(span.start, span.end),
                 memberCount: span.memberCount,
                 ...(span.heldBy !== undefined ? { heldBy: span.heldBy } : {}),
                 ...(span.floorRef !== undefined ? { floorRef: span.floorRef } : {}),
@@ -298,17 +302,16 @@ export function scheduleRoadmap(
     for (const [id, ms] of resolved.content.milestones) {
         const d = parseDate(propValue(ms.properties, 'date'));
         if (d) {
-            const day = daysBetween(startDate, d);
-            const resolved2 = addDays(startDate, day);
-            milestoneEnd.set(id, day);
-            milestoneResults.set(id, resolved2);
-            milestoneByNode.set(ms, resolved2);
+            milestoneEnd.set(id, dayOf(d));
+            milestoneResults.set(id, d);
+            milestoneByNode.set(ms, d);
             continue;
         }
         const after = propValues(ms.properties, 'after');
         if (after.length > 0) {
+            // A point at the latest predecessor end: the next working day.
             const day = Math.max(0, ...after.map(resolveAfterDay));
-            const resolved2 = addDays(startDate, day);
+            const resolved2 = pointAt(day);
             milestoneEnd.set(id, day);
             milestoneResults.set(id, resolved2);
             milestoneByNode.set(ms, resolved2);

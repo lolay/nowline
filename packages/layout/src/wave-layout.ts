@@ -8,12 +8,12 @@
 // and every helper here is a no-op, so wave-free output is unchanged.
 
 import type { ItemDeclaration, WavePlan } from '@nowline/core';
-import { addDays } from './calendar.js';
 import { parseDate, propValue } from './dsl-utils.js';
 import type { LayoutContext } from './layout-context.js';
 import type { TimeScale } from './time-scale.js';
 import type { PositionedItem } from './types.js';
 import { type WaveBarrierResult, type WaveNode, WavePass } from './wave-barrier.js';
+import { spanEndDate } from './working-calendar.js';
 
 /**
  * Sub-pixel tolerance for wave edges: a milestone whose center is closer
@@ -191,11 +191,30 @@ export function isOnWaveBoundary(state: WaveLayoutState, x: number): boolean {
     return false;
 }
 
+/** The whole working-day index nearest to `x` on the timeline. */
+function dayAtX(x: number, ctx: LayoutContext): number {
+    return Math.round((x - ctx.timeline.originX) / ctx.timeline.pixelsPerDay);
+}
+
 /**
- * The whole UTC day nearest to `x` on the timeline. Extent growth never
- * moves the origin or the pixels-per-day, so this is stable across it.
+ * The working day whose start is nearest `x` on the timeline: a point,
+ * such as a start (UTC midnight). Extent growth never moves the origin or
+ * the pixels-per-day, so this is stable across it.
  */
 export function dateAtX(x: number, ctx: LayoutContext): Date {
-    const days = Math.round((x - ctx.timeline.originX) / ctx.timeline.pixelsPerDay);
-    return addDays(ctx.timeline.startDate, days);
+    return ctx.calendar.dateAtWorkingIndex(ctx.timeline.startDate, dayAtX(x, ctx));
+}
+
+/**
+ * The exclusive end date of the span [startX, endX] on the timeline
+ * (`spanEndDate` over the nearest whole working days): a Mon–Fri span
+ * ends on Saturday.
+ */
+export function spanEndDateAtX(startX: number, endX: number, ctx: LayoutContext): Date {
+    return spanEndDate(
+        ctx.calendar,
+        ctx.timeline.startDate,
+        dayAtX(startX, ctx),
+        dayAtX(endX, ctx),
+    );
 }

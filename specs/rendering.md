@@ -51,6 +51,11 @@ This document describes the public **output contract**. The internal layout-engi
   - `PositionedGroup.waveOnly` (an untitled, unstyled group with `wave:` and no `labels:`; it draws no bracket).
   - `PositionedMilestone.onWaveBoundary` (suppresses the cut line) and `overrunByWave` (the wave that overruns a dated milestone).
   - `PositionedIncludeRegion.waveCrossings` — crossings re-emitted inside an isolated region.
+- **Non-working days** (`calendar:business`, whose weekend is hidden; every field below is omitted when it does not apply, so `calendar:full` and `calendar:custom` models carry none of them; see [`working-calendar.md` § 7.5](./working-calendar.md)):
+  - `PositionedTimelineScale.nonWorkingDisplay` (`'hide'`) and `nonWorking` — one `PositionedNonWorkingRun` per run of hidden days in or straddling the window: `x`, `width` (0 under `hide`), `from`, `through` (inclusive), `titles?` and `seam?` (days scale only; the renderer draws a seam line there).
+  - `PositionedAnchor.hiddenDate` and `PositionedMilestone.hiddenDate` — the real ISO date of a marker dated on a hidden day (it sits at the seam; the renderer adds it as an SVG `<title>`).
+  - `PositionedMilestone.overrunDate` — the date NL.I1007 reports, so insights never read a date back off x.
+  - `PositionedItem.nonWorkingPin` — the pin (`date:`, `start:` or the date in `after:`) that fell on a hidden day, behind NL.I1008.
 
 The layout engine is pure computation — no DOM, no SVG, no side effects. It runs identically in Node.js and the browser.
 
@@ -143,7 +148,15 @@ A single-row header displays the scale units (days, weeks, months, quarters, yea
   - Months: show every 3rd (quarterly markers)
   - Quarters: show every 4th (yearly markers)
   - Years: show every 5th
-- **Tick positions**: day and week ticks step from the roadmap start by a fixed stride (`1` day; `days-per-week` from the calendar preset). Month, quarter, and year ticks sit on real calendar boundaries: the 1st of each month, of Jan / Apr / Jul / Oct, or of January. The calendar preset's `days-per-month` / `-quarter` / `-year` only converts `1m` / `1q` / `1y` durations into days; it never sets the length of a column on the date axis, because a fixed day count drifts across month edges. The chart's left edge is always a tick, so a roadmap starting mid-period opens with a partial column, and every column is labelled from its own start date. When a partial column at either edge is too narrow for its label, the tick stays and the label is dropped. Label thinning counts ticks from the left edge.
+- **Tick positions**: day and week ticks step from the roadmap start by a fixed stride (`1` day; `days-per-week` from the calendar preset). Month, quarter, and year ticks sit on real calendar boundaries: the 1st of each month, of Jan / Apr / Jul / Oct, or of January. The calendar preset's `days-per-month` / `-quarter` / `-year` only converts `1m` / `1q` / `1y` durations into days; it never sets the length of a column on the date axis, because a fixed day count drifts across month edges. The chart's left edge is always a tick, so a roadmap starting mid-period opens with a partial column, and every column is labelled from its own start date. When a partial column at either edge is too narrow for its label, the tick stays and the label is dropped. Label thinning counts ticks from the left edge. Under a calendar with hidden days the tick rules change; see "Hidden days" below.
+- **Hidden days** (`calendar:business`): the axis counts working days, so `pixelsPerDay` is pixels per visible day and a business week column is 40 px at the default week scale, not 56. The rules that differ from the calendar-day axis:
+  - *Week ticks* fall on week starts: Monday under the business weekend, found by stepping from the roadmap start (the tick at the chart's left edge is the start itself). Labels read `Jan 05, 12, 19`, not `Jan 05, 10, 15`. A calendar with no recurring weekend keeps stepping from the roadmap start.
+  - *Month, quarter and year ticks* keep their real boundaries. A boundary that falls on a hidden day (Feb 1 2026 is a Sunday) sits at the seam, the start of the next working day, and keeps its own label.
+  - *Dropped columns*: a column with no visible day (zero width) is dropped with its label. At the days scale that is every weekend day.
+  - *Narrow-column rule*: a label is dropped when it is wider than its column and the column is narrower than a full unit, the #92 edge-column rule applied to every column. The tick stays, the label keeps its `labelX`, and the closing tick's `major` flag follows the same column rule.
+  - *Thinning* counts visible columns. The one exception is the days scale's default (no `label-every`, not a `scale:` literal), which labels week starts instead of every Nth column, because "every N visible columns" drifts once a week has six working days. An explicit `label-every` still counts columns.
+  - *Seams*: at the days scale only, a faint 1 px dotted line (`timeline.nonWorkingSeam`; light `#a0aec0`, dark `#6b7a90`, grayscale `#9a9a9a`) marks hidden days, spanning the minor-grid range. It is drawn strictly inside the chart and only where no grid line already sits. Week scale and above draw none.
+  - *Dated entities*: anchors, milestones, date pins and the now-line sit at their working-day x. One dated on a hidden day sits at the seam, and its real date is in the marker's tooltip.
 - **Range**: the first tick mark aligns with the earliest item start or anchor date, with the roadmap's `padding` as whitespace before it. The last tick mark extends to the latest item end, anchor date, or milestone date, with the same padding after. The right edge is the later of `length:` (when set) and the content end rounded up to the next tick boundary (the next month / quarter / year start on those scales), so a `length:` that runs past the content can leave a partial last column.
 - **Custom units**: custom units (e.g., `sprints = 2w`) map to their underlying duration for positioning; labels use the custom unit name
 - **Mirrored bottom strip**: when `timeline-position:bottom` or `timeline-position:both` is set on the roadmap, the renderer emits a second tick-label panel below the chart's last swimlane (and below any isolate-include regions), above the footnote panel. The mirrored strip shares the same fill, border, label color, and tick positions as the top strip — it has no now-pill and no marker row (anchors and milestones still belong to the top header). The default `timeline-position:top` keeps the existing single-strip layout.
@@ -406,7 +419,7 @@ Swimlanes with `capacity:` paint a **tri-state utilization underline** (green / 
 
 - Height: 2px, matching the milestone-line stroke weight.
 - Y-position: flush with the bottom edge of the lane band, inside the band (not below).
-- X-positions: align to the timestep event boundaries (item start/end), not arbitrary day grid lines. Use `pixelsPerDay` arithmetic from the time scale.
+- X-positions: align to the timestep event boundaries (item start/end), not arbitrary day grid lines. Use `pixelsPerDay` arithmetic from the time scale (pixels per visible day under `calendar:business`).
 - The underline spans the full lane lifetime — from the first item's left edge to the last item's right edge — so adjacent green segments make the lane read as a continuous bar.
 
 **Theme tokens:**

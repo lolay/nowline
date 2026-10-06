@@ -1,5 +1,7 @@
 // Wave diagnostics (NL.E1100-E1106, NL.W1100/W1101, NL.W0702, NL.E0202,
-// NL.W0701, NL.W1001/W1002, NL.I1006/I1007, and the NL.E0411 rewrite).
+// NL.W0701, NL.W1001/W1002, NL.I1006/I1007, and the NL.E0411 rewrite), plus
+// NL.I1008 (a pin on a non-working day), which shares the pin-insight shape
+// of NL.W1001 and the French structure checks below.
 // en-US strings are asserted verbatim against specs/waves.md section 6.4 and
 // the worked examples; fr is asserted structurally (every variant renders,
 // and it follows the U+00A0 punctuation convention of messages.fr.ts).
@@ -723,6 +725,65 @@ describe('NL.I1006 / NL.I1007', () => {
     });
 });
 
+describe('NL.I1008', () => {
+    it('is registered', () => {
+        expect(ALL_CODES).toContain('NL.I1008');
+    });
+    it('date: pin on a Saturday', () => {
+        expect(
+            en('NL.I1008', {
+                name: 'a2',
+                pin: '2026-01-10',
+                key: 'date',
+                start: '2026-01-12',
+            }),
+        ).toBe(
+            'Item "a2" is pinned to 2026-01-10 (date:), a non-working day; it starts on 2026-01-12.',
+        );
+    });
+    it('start: pin', () => {
+        expect(
+            en('NL.I1008', {
+                name: 'a2',
+                pin: '2026-01-11',
+                key: 'start',
+                start: '2026-01-12',
+            }),
+        ).toBe(
+            'Item "a2" is pinned to 2026-01-11 (start:), a non-working day; it starts on 2026-01-12.',
+        );
+    });
+    it('after:DATE pin', () => {
+        expect(
+            en('NL.I1008', {
+                name: 'Launch page',
+                pin: '2026-01-17',
+                key: 'after',
+                start: '2026-01-19',
+            }),
+        ).toBe(
+            'Item "Launch page" is pinned to 2026-01-17 (after:), a non-working day; it starts on 2026-01-19.',
+        );
+    });
+    it('French: guillemets, U+00A0 before the semicolon', () => {
+        expect(
+            fr('NL.I1008', {
+                name: 'a2',
+                pin: '2026-01-10',
+                key: 'date',
+                start: '2026-01-12',
+            }),
+        ).toBe(
+            "L'élément «\u00A0a2\u00A0» est épinglé à 2026-01-10 (date:), un jour non ouvré\u00A0; il démarre le 2026-01-12.",
+        );
+    });
+    it('fr-CA and fr-FR inherit the fr message', () => {
+        const args = { name: 'a2', pin: '2026-01-10', key: 'after' as const, start: '2026-01-12' };
+        expect(tr('fr-CA', 'NL.I1008', args)).toBe(fr('NL.I1008', args));
+        expect(tr('fr-FR', 'NL.I1008', args)).toBe(fr('NL.I1008', args));
+    });
+});
+
 describe('NL.E0411', () => {
     it('allows a wave after: and still names the disallowed type', () => {
         const msg = en('NL.E0411', { key: 'after', type: 'milestone' });
@@ -1006,6 +1067,9 @@ describe('fr bundle', () => {
             wave: 'execute',
             end: '2026-03-23',
         });
+        push('NL.I1008', { name: 'a2', pin: '2026-01-10', key: 'date', start: '2026-01-12' });
+        push('NL.I1008', { name: 'a2', pin: '2026-01-11', key: 'start', start: '2026-01-12' });
+        push('NL.I1008', { name: 'a2', pin: '2026-01-17', key: 'after', start: '2026-01-19' });
         push('NL.E0411', { key: 'after', type: 'milestone' });
         return out;
     };
@@ -1021,7 +1085,7 @@ describe('fr bundle', () => {
     it('covers every new wave code', () => {
         const seen = new Set(sample().map(([code]) => code));
         for (const code of ALL_CODES) {
-            if (/^NL\.(E110\d|W110\d|W100[12]|I100[67]|E0202|W070[12])$/.test(code)) {
+            if (/^NL\.(E110\d|W110\d|W100[12]|I100[678]|E0202|W070[12])$/.test(code)) {
                 expect(seen.has(code), code).toBe(true);
             }
         }

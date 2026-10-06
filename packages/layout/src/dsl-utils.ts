@@ -1,9 +1,9 @@
 // Tiny DSL utilities shared between `layout.ts` and the per-entity nodes
 // under `nodes/`. Kept intentionally trivial and pure: a `:`-trim,
 // property lookup helpers against the AST's `EntityProperty[]`, and an
-// ISO-date parser. Anything that needs configuration or non-trivial
-// resolution (durations, calendars, styles) stays in the modules that
-// own those concerns.
+// ISO-date parser and formatter. Anything that needs configuration or
+// non-trivial resolution (durations, calendars, styles) stays in the
+// modules that own those concerns.
 
 import type { EntityProperty } from '@nowline/core';
 
@@ -27,4 +27,9 @@ export function parseDate(raw: string | undefined): Date | null {
     if (!m) return null;
     const d = new Date(Date.UTC(parseInt(m[1], 10), parseInt(m[2], 10) - 1, parseInt(m[3], 10)));
     return Number.isNaN(d.getTime()) ? null : d;
+}
+
+/** A UTC-midnight date as `YYYY-MM-DD`, the inverse of `parseDate`. */
+export function formatIsoDate(date: Date): string {
+    return date.toISOString().slice(0, 10);
 }

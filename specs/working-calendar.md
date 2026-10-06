@@ -163,19 +163,28 @@ Fractional durations (`0.5d`, `1.5w`) consume fractions of a working day. Progre
 
 ### 5.2 Working-day index space
 
-Every scheduler works in working-day indices and converts to dates only at the edges. Index 0 is the first working day at or after the roadmap start. The calendar exposes:
+Every scheduler works in working-day indices and converts to dates only at the edges. Index 0 is the first working day at or after the base date, the roadmap start. The calendar carries no start of its own, so the index functions take the base as their first argument (UTC midnight). As shipped:
 
 ```ts
 interface WorkingCalendar {
-    daysPerUnit(unit: ScaleUnit): number;          // unchanged: duration arithmetic
+    daysPerUnit(unit: ScaleUnit): number;                  // unchanged: duration arithmetic
+    addUnits(date: Date, count: number, unit: ScaleUnit): Date;
+    readonly hasNonWorkingDays: boolean;                   // false: every function is plain calendar-day math
     isWorkingDay(date: Date): boolean;
-    workingIndexOf(date: Date): number;            // a non-working date maps to the next working day's index
-    dateAtWorkingIndex(index: number): Date;
+    workingIndexOf(base: Date, date: Date): number;        // a non-working date maps to the next working day's index
+    dateAtWorkingIndex(base: Date, index: number): Date;   // fractions floor
     nonWorkingRuns(from: Date, to: Date): NonWorkingRun[];
+    readonly weekStart: number | undefined;                // first working weekday after the weekend (Monday for Sat/Sun)
+    readonly rules: ReadonlyArray<CalendarRule>;
 }
+
+// working-calendar.ts, beside the interface
+function spanEndDate(calendar: WorkingCalendar, base: Date, start: number, end: number): Date;
 ```
 
-`fromCalendarConfig(cal)` (`working-calendar.ts`) gains the non-working set. With an empty set, `workingIndexOf` is `daysBetween(start, date)` and every function is the identity of today's code, which is what keeps `calendar:full` byte-stable.
+`spanEndDate` is the exclusive end date of a span of indices `[start, end)`: the day after the last whole working day the span covers, so a Mon–Fri item ends on Saturday. A span that covers no whole working day ends on its start date. Engine C uses it for every item and wave end, and engine A for a wave's end date (`spanEndDateAtX`). Dates that are points (a start, a milestone, an after-only milestone) come from `dateAtWorkingIndex`; anchors and dated milestones keep their own dates.
+
+`fromCalendarConfig(cal)` (`working-calendar.ts`) builds the calendar from the resolved `CalendarConfig` and its rules (the preset's, by default). With no non-working day, `workingIndexOf` is `daysBetween(base, date)`, `dateAtWorkingIndex` is `addDays` and `spanEndDate` is `addDays(base, end)`: every function is the identity of today's code, which is what keeps `calendar:full` byte-stable.
 
 ### 5.3 The three engines
 
@@ -197,7 +206,7 @@ Codes are placeholders; final `NL.*` codes are assigned at implementation, with 
 | NW4 | warning | `days-per-week` differs from the number of weekdays that recurring declarations leave working. (`calendar:custom` with `days-per-week: 6` and no `every:` triggers it.) |
 | NW5 | error | Duplicate `non-working` id within one file. Include collisions use the existing config-merge warning. |
 | NW6 | error | `non-working:` on `default roadmap` is `hide` or `show`. |
-| NW7 | info (layout insight) | An item's pinned start falls on a non-working day and moved (§5.1 rule 6). |
+| NW7 | info (layout insight) | An item's pinned start falls on a non-working day and moved (§5.1 rule 6). Shipped as **`NL.I1008`**; it covers `date:`, `start:` and the date in an `after:`, for main-lane and isolated-region items alike. A tie between the pin and another constraint (the lane cursor, an `after:` reference) still reports. |
 
 ## 7. Rendering
 
@@ -215,9 +224,9 @@ Because the density is shared, `show` is wider than `hide` by the non-working da
 - **The seam rule.** Every date on a hidden day maps to the seam. That covers milestones and anchors on a weekend, the now-line on a Sunday, a month start on a weekend (Feb 1 2026 is a Sunday), and a week start after a Monday holiday.
 - **Ticks.** A tick takes its label from its boundary date (`Feb`, `May 25`) and its x from `forward`. Week boundaries are the first day after the recurring weekend (Monday for Sat/Sun). With no recurring declaration, week ticks keep stepping from the roadmap start, as today.
 - **Zero-width columns are dropped,** with their labels: a fully closed week, or every weekend day at the `days` scale.
-- **Narrow columns.** A week holding two holidays is 24 px wide at the default scale. The edge-column rule from [#92](https://github.com/lolay/nowline/pull/92) extends to every column under `hide`: a label wider than its column is dropped, and the tick stays (§11).
-- **Thinning** counts visible columns.
-- **Seams.** An unnamed seam (a plain weekend) draws nothing at week scale and above, where it coincides with a week tick or is too dense to matter. At the `days` scale it draws a faint seam line. A named seam always draws (§7.4).
+- **Narrow columns.** A week holding two holidays is 24 px wide at the default scale. The edge-column rule from [#92](https://github.com/lolay/nowline/pull/92) extends to every column under `hide`: a label wider than a column that is narrower than a full unit is dropped, and the tick stays (§11). A dropped label keeps its `labelX`. The closing tick's `major` flag follows the same column rule as the ticks before it.
+- **Thinning** counts visible columns. At the `days` scale the default thinning labels week starts (Mondays under the business weekend) instead of every Nth visible column, which drifts once a week has six working days (handoff decision 4, amended by the maintainer on 2026-10-06). An explicit `label-every` still counts visible columns.
+- **Seams.** An unnamed seam (a plain weekend) draws nothing at week scale and above, where it coincides with a week tick or is too dense to matter. At the `days` scale it draws a faint seam line: 1 px, dotted (`1 3`), in `timeline.nonWorkingSeam`, across the minor-grid range, only strictly inside the chart and only where no grid line already sits. A named seam always draws (§7.4).
 
 ### 7.3 `show`
 
@@ -237,18 +246,28 @@ New theme tokens: `timeline.nonWorkingFill` and `timeline.nonWorkingSeam`.
 
 ### 7.5 Positioned model
 
-`PositionedTimelineScale` gains:
+As built, `PositionedTimelineScale` gains two optional keys, set only when the window holds a non-working day under `hide` and omitted otherwise (so `calendar:full` and `calendar:custom` models carry neither):
 
 ```ts
-nonWorkingDisplay: 'hide' | 'show';
-nonWorking: Array<{
+nonWorkingDisplay?: 'hide';                 // 'show' arrives with Phase 4
+nonWorking?: PositionedNonWorkingRun[];
+
+interface PositionedNonWorkingRun {
     x: number;          // seam x under hide, band left edge under show
     width: number;      // 0 under hide
     from: Date;         // first non-working date of the run
     through: Date;      // last non-working date, inclusive
-    titles: string[];   // titled declarations in the run; empty for a plain weekend
-}>;
+    titles?: string[];  // titled declarations in the run; omitted for a plain weekend
+    seam?: true;        // days scale only: strictly inside the chart, no grid line at x; the renderer draws a seam
+}
 ```
+
+Other optional keys, each omitted when empty:
+
+- `PositionedAnchor.hiddenDate` and `PositionedMilestone.hiddenDate`: the real ISO date of a marker dated on a hidden day. The marker sits at the seam; the renderer adds it as an SVG `<title>`.
+- `PositionedMilestone.overrunDate`: the milestone's own date, so NL.I1007 no longer reads a date back off x.
+- `PositionedItem.nonWorkingPin`: `{ key: 'date' | 'start' | 'after'; pin: string; start: string }`, the source of NL.I1008.
+- Theme token `timeline.nonWorkingSeam` (light `#a0aec0`, dark `#6b7a90`, grayscale `#9a9a9a`). `timeline.nonWorkingFill` arrives with `show` (Phase 4).
 
 Consumers that do date math from `pixelsPerDay` must use `forward` / `invert` instead. That includes the test helpers added in [#92](https://github.com/lolay/nowline/pull/92) that recover tick dates from x.
 

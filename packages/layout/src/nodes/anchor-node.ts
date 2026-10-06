@@ -6,7 +6,7 @@
 // the same row stack — see `LayoutContext.markerRowPlacements`.
 
 import type { AnchorDeclaration } from '@nowline/core';
-import { parseDate, propValue } from '../dsl-utils.js';
+import { formatIsoDate, parseDate, propValue } from '../dsl-utils.js';
 import type { LayoutContext } from '../layout-context.js';
 import { resolveStyle } from '../style-resolution.js';
 import type { Point, PositionedAnchor } from '../types.js';
@@ -47,7 +47,7 @@ export class AnchorNode {
         ctx.entityLeftEdges.set(this.id, x);
         ctx.entityRightEdges.set(this.id, x);
         ctx.entityMidpoints.set(this.id, center);
-        return {
+        const positioned: PositionedAnchor = {
             id: this.id,
             title: this.anchor.title ?? this.id,
             center,
@@ -60,6 +60,10 @@ export class AnchorNode {
             labelBox,
             labelSide,
         };
+        // A date the axis hides keeps its own day as a tooltip
+        // (specs/working-calendar.md §7.4).
+        if (!ctx.calendar.isWorkingDay(date)) positioned.hiddenDate = formatIsoDate(date);
+        return positioned;
     }
 }
 

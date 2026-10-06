@@ -82,6 +82,11 @@ export interface Theme {
         // when the roadmap's resolved `minor-grid` style is `true`. A step
         // lighter than `gridLine` so the major lines still dominate.
         minorGridLine: string;
+        // Faint dotted seam where hidden non-working days collapse between
+        // two working-day columns and no grid line already marks the spot
+        // (specs/working-calendar.md §7.4). Darker than `gridLine`, so it
+        // reads as a join rather than a column boundary.
+        nonWorkingSeam: string;
         tickMark: string;
         labelText: string;
         // m2.5d: lifted from renderTimeline.

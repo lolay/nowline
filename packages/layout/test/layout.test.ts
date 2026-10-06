@@ -559,7 +559,18 @@ swimlane lane "Lane"
             (model.timeline.endDate.getTime() - model.timeline.startDate.getTime()) /
                 (24 * 60 * 60 * 1000),
         );
-        expect(diffDays).toBe(30); // 6 weeks * 5 business days per week = 30 days
+        // 6 weeks * 5 working days = 30 working days = 6 calendar weeks of
+        // 7 days, from Mon Jan 5 to Mon Feb 16.
+        expect(diffDays).toBe(42);
+        expect(model.timeline.endDate.toISOString().slice(0, 10)).toBe('2026-02-16');
+    });
+
+    it('sizes a length: window in working days: length:6w is 240 px wide, ending Feb 16', async () => {
+        const src = `nowline v1\n\nroadmap r "R" start:2026-01-05 length:6w\n\nswimlane a "A"\n  item x duration:1w\n`;
+        const { file, resolved } = await parseAndResolve(src);
+        const model = layoutRoadmap(file, resolved, { theme: 'light' });
+        expect(model.timeline.endDate.toISOString().slice(0, 10)).toBe('2026-02-16');
+        expect(model.timeline.box.width).toBe(240);
     });
 
     it('extends the timeline past the pre-pass window when a spilled group caption pushes a later parallel out of range', async () => {
@@ -628,15 +639,15 @@ swimlane plugin "Plugin"
     });
 
     it('stretches every swimlane band to the timeline right edge when the post-layout extension fires', async () => {
-        // `fri` sits exactly on the pre-pass window end (day 25), so its
-        // diamond radius overflows the window and the post-layout
-        // extension grows the timeline by one column. The lane bands
-        // must reach the extended canvas, not the pre-extension width.
+        // `mon` sits exactly on the pre-pass window end (working-day index
+        // 20, Mon Feb 2), so its diamond radius overflows the window and the
+        // post-layout extension grows the timeline by one column. The lane
+        // bands must reach the extended canvas, not the pre-extension width.
         const src = `nowline v1
 
 roadmap r "R" start:2026-01-05 scale:1w calendar:business
 
-milestone fri "Fri Jan 30" date:2026-01-30
+milestone mon "Mon Feb 2" date:2026-02-02
 
 swimlane a "A"
   item w1 "W1" duration:1w
@@ -646,8 +657,10 @@ swimlane a "A"
 `;
         const { file, resolved } = await parseAndResolve(src);
         const model = layoutRoadmap(file, resolved, { theme: 'light' });
-        // Guard against a vacuous pass: the extension really fired.
-        expect(model.timeline.endDate.getTime()).toBeGreaterThan(Date.UTC(2026, 0, 30));
+        // Guard against a vacuous pass: the extension really fired, by one
+        // week column (index 25 is Mon Feb 9; 25 working days at 8 px).
+        expect(model.timeline.endDate.toISOString().slice(0, 10)).toBe('2026-02-09');
+        expect(model.timeline.box.width).toBe(200);
         const timelineRightX = model.timeline.box.x + model.timeline.box.width;
         expect(model.swimlanes).toHaveLength(1);
         for (const lane of model.swimlanes) {
@@ -657,12 +670,13 @@ swimlane a "A"
     });
 
     it('re-fits an include region box against the extended canvas when the post-layout extension fires', async () => {
-        // The child's five-week bars end where the pre-pass window ends,
-        // so the include's shrink-wrap (bars + right pad) is clamped by
-        // the pre-extension canvas width. `fri` then overflows the
-        // window and grows the canvas; the include must re-fit to its
-        // natural width rather than keep the stale clamp. A later
-        // milestone date (no clamp in play) is the reference width.
+        // The child's five-week bars end where the pre-pass window ends
+        // (working-day index 25, Mon Feb 9), so the include's shrink-wrap
+        // (bars + right pad) is clamped by the pre-extension canvas width.
+        // The milestone dated Feb 9 then overflows the window and grows the
+        // canvas; the include must re-fit to its natural width rather than
+        // keep the stale clamp. A later milestone date (Fri Feb 13, index
+        // 29: no clamp in play) is the reference width.
         const childSrc = `nowline v1
 
 roadmap c "C" start:2026-01-05 scale:1w calendar:business
@@ -680,7 +694,7 @@ include "./child.nowline" roadmap:isolate
 
 roadmap r "R" start:2026-01-05 scale:1w calendar:business
 
-milestone fri "Fri" date:${date}
+milestone ext "Ext" date:${date}
 
 swimlane a "A"
   item w1 "W1" duration:1w
@@ -693,9 +707,9 @@ swimlane a "A"
             );
             return layoutRoadmap(file, resolved, { theme: 'light' });
         };
-        const extended = await layoutAt('2026-01-30');
-        const reference = await layoutAt('2026-02-06');
-        expect(extended.timeline.endDate.getTime()).toBeGreaterThan(Date.UTC(2026, 0, 30));
+        const extended = await layoutAt('2026-02-09');
+        const reference = await layoutAt('2026-02-13');
+        expect(extended.timeline.endDate.getTime()).toBeGreaterThan(Date.UTC(2026, 1, 9));
         expect(extended.includes).toHaveLength(1);
         expect(reference.includes).toHaveLength(1);
         const include = extended.includes[0];
@@ -704,6 +718,42 @@ swimlane a "A"
         for (const lane of include.nestedSwimlanes) {
             expect(lane.box.width).toBe(include.box.width);
         }
+    });
+});
+
+describe('layoutRoadmap working-day extension pass', () => {
+    const src = (calendar: string) => `nowline v1
+
+roadmap r "R" start:2026-01-05 scale:1w calendar:${calendar}
+
+milestone m "Gate" date:2026-02-02
+anchor a "Kickoff" date:2026-02-02
+
+swimlane a "A"
+  item w1 "W1" duration:1w
+  item w2 "W2" duration:1w
+  item w3 "W3" duration:1w
+  item w4 "W4" duration:1w
+`;
+
+    it('puts an anchor (extended scale) and a milestone (original scale) on one date at one x', async () => {
+        // The milestone is placed on the pre-extension scale and the anchor
+        // on the extended one. Both must carry the working calendar, so the
+        // date Feb 2 (index 20) lands at 160 px from the origin on both.
+        const { file, resolved } = await parseAndResolve(src('business'));
+        const model = layoutRoadmap(file, resolved, { theme: 'light' });
+        expect(model.timeline.endDate.toISOString().slice(0, 10)).toBe('2026-02-09');
+        const origin = model.timeline.originX;
+        expect(model.milestones[0].center.x - origin).toBe(160);
+        expect(model.anchors[0].center.x - origin).toBe(160);
+    });
+
+    it('keeps calendar-day x under calendar:full: Feb 2 is 28 days, 160 px at 40 px a week', async () => {
+        const { file, resolved } = await parseAndResolve(src('full'));
+        const model = layoutRoadmap(file, resolved, { theme: 'light' });
+        const origin = model.timeline.originX;
+        expect(model.milestones[0].center.x).toBe(model.anchors[0].center.x);
+        expect(model.milestones[0].center.x - origin).toBeCloseTo(160, 6);
     });
 });
 
@@ -760,7 +810,9 @@ swimlane a "A"
     });
 
     it('labels calendar:business months by the real calendar, not 22-day strides', async () => {
-        // 12m + 5m at 22d/month = 374d, ending 2027-01-14.
+        // 12m + 5m at 22 working days a month = 374 working days: the last
+        // one is Thu 2027-06-10, so the content ends (exclusive) Fri 06-11
+        // and the window pads to the next month start, 2027-07-01.
         const { file, resolved } = await parseAndResolve(src('business'));
         const { timeline } = layoutRoadmap(file, resolved, { theme: 'light' });
         const labels = timeline.ticks.map((t) => t.label).filter((l) => l !== undefined);
@@ -778,8 +830,13 @@ swimlane a "A"
             'Nov',
             'Dec',
             'Jan',
+            'Feb',
+            'Mar',
+            'Apr',
+            'May',
+            'Jun',
         ]);
-        expect(isoDay(timeline.endDate)).toBe('2027-02-01');
+        expect(isoDay(timeline.endDate)).toBe('2027-07-01');
     });
 });
 
@@ -1976,7 +2033,9 @@ swimlane s "S"
     it('moves glyphs and slack arrows with the rows a retroactive growth pushed down', async () => {
         // Same lane, plus a glyph on c (row 1), a filled group (row 2) and a
         // parallel (row 3), all placed before d grows row 0. g1 finishes
-        // before d, so "Ship" draws a slack arrow from g1.
+        // before d, so "Ship" draws a slack arrow from g1. c opens at b's end
+        // (working-day index 20, Mon Feb 2) and g at index 14 (Fri Jan 23),
+        // so the rows are the same as on a calendar-day axis.
         const model = await layout(`nowline v1
 
 config
@@ -1990,8 +2049,8 @@ roadmap repro "Retroactive shift" start:2026-01-05 scale:1w
 swimlane s "S"
   item a "Auth refactor" duration:2w
   item b "Next" duration:2w after:a
-  item c "Plain thing" duration:2w after:2026-01-25
-  group g "Pinned group" style:enterprise after:2026-01-19
+  item c "Plain thing" duration:2w after:2026-02-02
+  group g "Pinned group" style:enterprise after:2026-01-23
     item g1 "Gamma" duration:2w
   parallel par "Pinned parallel" before:2026-04-20
     item p1 "Delta" duration:3w
@@ -2018,12 +2077,15 @@ milestone ship "Ship" after:[g1, d]
 
     it('keeps an item `after:` glyph inside its bar when the marker band grows', async () => {
         // The anchor and the milestone collide, so the marker band grows a
-        // row and the chart moves down 26px after Alpha was placed.
+        // row and the chart moves down 26px after Alpha was placed. Alpha
+        // ends at working-day index 25 (Mon Feb 9), so the milestone sits
+        // there; the anchor is dated Fri Feb 6 (index 24), one working day
+        // (8 px) before it, close enough for the diamonds to overlap.
         const model = await layout(`nowline v1
 
 roadmap repro "Pin after band growth" start:2026-01-05 scale:1w
 
-anchor freeze "code-freeze" date:2026-02-02
+anchor freeze "code-freeze" date:2026-02-06
 
 swimlane top "Top"
   item a "Alpha" duration:4w after:2026-01-12
@@ -2037,6 +2099,8 @@ milestone beta "Beta" after:a
     });
 
     it('keeps group and parallel glyphs on their boxes when the marker band grows', async () => {
+        // The anchor is dated Fri Feb 6, one working day (8 px) before the
+        // milestone that floats to Alpha's end (index 25, Mon Feb 9).
         const model = await layout(`nowline v1
 
 config
@@ -2047,7 +2111,7 @@ style enterprise
 
 roadmap repro "Pin after band growth" start:2026-01-05 scale:1w
 
-anchor freeze "code-freeze" date:2026-02-02
+anchor freeze "code-freeze" date:2026-02-06
 
 swimlane top "Top"
   item a "Alpha" duration:4w after:2026-01-12
