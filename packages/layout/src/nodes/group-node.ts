@@ -96,7 +96,18 @@ export class GroupNode {
         // (specs/waves.md §5.1). A no-op without waves, and for a lane
         // child, whose `resolveChildStart` already applied it.
         const startX = waveFloorX(node, cursor.x, ctx);
-        const title = node.title ?? node.name;
+        // In a roadmap with waves, a group with no title, no `style:` and
+        // no `labels:` that carries `wave:` only assigns membership: it
+        // draws no bracket, which would otherwise sit exactly on the wave
+        // boundary its box opens at, and no id label (specs/waves.md §9.7).
+        // An id alone does not make it titled (Example 4's `api-track`).
+        const waveOnly =
+            ctx.waves !== undefined &&
+            node.title === undefined &&
+            propValue(node.properties, 'wave') !== undefined &&
+            propValue(node.properties, 'style') === undefined &&
+            propValues(node.properties, 'labels').length === 0;
+        const title = waveOnly ? undefined : (node.title ?? node.name);
 
         // Group children chain in time inside the group, so they
         // form one sub-flow under the parent's flow path. See
@@ -288,16 +299,6 @@ export class GroupNode {
                   }
                 : { kind: 'header-band', title, titleInsetX: GROUP_HEADER_TITLE_INSET_X_PX },
         });
-        // In a roadmap with waves, an untitled group with no `style:` and
-        // no `labels:` that carries `wave:` only assigns membership: it
-        // draws no bracket, which would otherwise sit exactly on the wave
-        // boundary its box opens at (specs/waves.md §9.7).
-        const waveOnly =
-            ctx.waves !== undefined &&
-            title === undefined &&
-            propValue(node.properties, 'wave') !== undefined &&
-            propValue(node.properties, 'style') === undefined &&
-            propValues(node.properties, 'labels').length === 0;
         return {
             kind: 'group',
             id,

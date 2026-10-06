@@ -1,9 +1,9 @@
 nowline v1
 
-// Wave fixture: parallel tracks in different waves, an id-only
-// `group api-track wave:w1` whose children inherit w1, a titled group that
-// spans a boundary, and an anonymous `group wave:w2` that assigns its
-// children and draws nothing itself.
+// Wave fixture: parallel tracks in different waves; an id-only
+// `group api-track wave:w1` and an anonymous `group wave:w2` that assign
+// their children and draw nothing themselves (no bracket, no label); and a
+// titled group that spans a boundary and keeps its bracket.
 
 roadmap waves-parallel-group "Parallel and group waves" start:2026-01-05 scale:1w
 

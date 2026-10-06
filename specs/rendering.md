@@ -555,7 +555,7 @@ When a group has `style:`, `labels:`, or other visual properties, it renders as 
 
 When a group has no style or labels, it is purely structural — no visible border, background, no chiclet. Items render with the same row-pack flow as a styled group (so collisions still bump to new rows), but the box reserves no top/bottom pad and the renderer paints no border or background. The default themes still resolve `group` to `bracket: solid`, so the group paints the thin bracket described in [Group (bracket-style with title)](#group-bracket-style-with-title) (title-less form) unless `bracket:none` is set; it still governs sequencing and inner row growth.
 
-**Wave exception.** In a roadmap with waves, a group with no title, no `style:`, and no `labels:` that carries `wave:` draws no bracket and nothing else: `group wave:k` opens exactly on a wave boundary, and a slate `[` on every boundary would read as noise. A titled group with `wave:` keeps its bracket. The rule is gated on `wave:` being present.
+**Wave exception.** In a roadmap with waves, a group with no title (an id alone is not one), no `style:`, and no `labels:` that carries `wave:` draws no bracket and nothing else: `group wave:k` opens exactly on a wave boundary, and a slate `[` on every boundary would read as noise. A titled group with `wave:` keeps its bracket. The rule is gated on `wave:` being present.
 
 #### Group (bracket-style with title)
 

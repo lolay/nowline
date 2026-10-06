@@ -776,7 +776,7 @@ swimlane a
         expect((await groupIn('group wave:w2')).waveOnly).toBe(true);
         for (const header of [
             'group "Build" wave:w2',
-            'group g1 wave:w2',
+            'group g1 "Build" wave:w2',
             'group wave:w2 style:s',
             'group wave:w2 labels:x',
             'group',
@@ -784,5 +784,15 @@ swimlane a
             expect('waveOnly' in (await groupIn(header))).toBe(false);
         }
         expect('waveOnly' in (await groupIn('group', false))).toBe(false);
+    });
+
+    it('an id alone does not title a wave-only group (Example 4)', async () => {
+        const group = await groupIn('group g1 wave:w2');
+        expect(group.waveOnly).toBe(true);
+        expect(group.id).toBe('g1');
+        // No id label: the group draws nothing and reserves no header band.
+        expect(group.title).toBeUndefined();
+        // Without waves the id still labels the group, as it always has.
+        expect((await groupIn('group g1', false)).title).toBe('g1');
     });
 });

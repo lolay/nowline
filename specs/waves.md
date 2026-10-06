@@ -1062,7 +1062,7 @@ PNG and PDF have no tooltips, so the legend is the fallback for anything the pic
 
 ### 9.7 Groups that carry `wave:`
 
-- In a roadmap with waves, a group with no title, no `style:` and no `labels:` that carries `wave:` draws no bracket. It exists only to assign membership.
+- In a roadmap with waves, a group with no title, no `style:` and no `labels:` that carries `wave:` draws no bracket and no label. It exists only to assign membership. An id alone is not a title: `group api-track wave:w1` draws nothing either (Example 4).
 - Without this rule, the default themes' `bracket: solid` would paint a slate `[` exactly over the boundary at `S_k`, because `group wave:k` opens there.
 - A titled group with `wave:` keeps its bracket.
 - The rule is gated on `wave:` being present.
