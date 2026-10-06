@@ -1,12 +1,11 @@
 # Nowline Working Calendar
 
-**Status: Proposed. Not prioritized, not implemented.** This is the design record for non-working days: weekends, holidays and company-wide closures such as a summit. Today's parser rejects the `non-working` syntax shown here, and today's layout does not skip any day.
+**Status: Accepted, scheduled as m2p. Not implemented.** This is the design record for non-working days: weekends, holidays and company-wide closures such as a summit. Today's parser rejects the `non-working` syntax shown here, and today's layout does not skip any day.
 
-If the feature is prioritized:
+The implementation plan, the decisions that close §11 and the codebase map are in [`handoffs/handoff-m2p-working-calendar.md`](./handoffs/handoff-m2p-working-calendar.md). As each phase ships:
 
-- The normative parts of this file move into [`dsl.md`](./dsl.md) (syntax, validation, includes) and [`rendering.md`](./rendering.md) (layout, rendering, exporters).
-- This file stays as the rationale and the home of the worked examples.
-- A milestone is created in [`milestones.md`](./milestones.md) at that point, not before.
+- its normative parts move into [`dsl.md`](./dsl.md) (syntax, validation, includes) and [`rendering.md`](./rendering.md) (layout, rendering, exporters);
+- this file stays as the rationale and the home of the worked examples.
 
 This proposal supersedes the `WorkingCalendar` plan in [`rendering-v2.md`](./rendering-v2.md) § WorkingCalendar and [`milestones.md`](./milestones.md) § m2.5a (`weekendsOff()`, `withHolidays()`). See §12.
 
@@ -143,7 +142,7 @@ On `config:merge` the parent wins on an id collision, with the existing shadowin
 - `non-working` would be the first hyphenated keyword. Hyphens are already legal in `ID` and in property keys. Langium sets Chevrotain `longer_alt` for keywords, so `non-working-team` should still lex as `ID`. This needs a grammar test before the name is final (§11).
 - Reserving the word follows the waves precedent ([`waves.md`](./waves.md) §4.7): an `EntityName` rule keeps bare-word uses such as `item non-working` parsing, and the JSON AST of an existing file stays byte-identical.
 - `through:` and `every:` are new property keys. On any other entity they get the existing unknown-property warning.
-- The printer adds `non-working` to the config section order, after `calendar`, and `through` / `every` to its key order.
+- The printer prints config entries in source order (it never sorts them), so `non-working` declarations stay where the author wrote them. `through` and `every` join its key order.
 
 ## 5. Scheduling semantics
 
@@ -155,7 +154,7 @@ On `config:merge` the parent wins on an id collision, with the existing shadowin
 4. **Successor.** A sequenced successor, or an `after:` dependent, starts on the next working day.
 5. **Calendar-bound entities keep their dates.** `date:` on milestones and anchors, `after:DATE`, `before:DATE`, `start:` on the roadmap and the now-line are calendar dates. A milestone on a Saturday is legitimate and stays on Saturday.
 6. **Snapping is reported.** When rule 1 moves an item's pinned start (`date:` or `after:DATE` on a non-working day), the layout emits an info insight naming the item, the pinned date and the date used.
-7. **`before:DATE`** compares the finish (rule 3) with the end of the pinned day.
+7. **`before:DATE`** keeps today's cap: the finish (rule 3) may not pass the start of the pinned day. A hidden pinned day maps to the seam like any other date.
 8. **`length:`** on the roadmap is a duration, so it counts working days like any other.
 
 Dates mark the start of their day, as they do today: a milestone dated on the last working day of a piece of work sits one day before that work's finish.
@@ -182,7 +181,7 @@ interface WorkingCalendar {
 
 The waves handoff names them ([`handoffs/handoff-m2o-waves.md`](./handoffs/handoff-m2o-waves.md) §4.1). All three must agree:
 
-- **Engine A, the pixel layout.** Under `hide`, x is linear in working index, so the engine's pixel arithmetic is unchanged: only `TimeScale.forward` / `invert` change (§7.1), and every date-to-x conversion already goes through them. Under `show`, positions are computed in the same `hide`-space pixels and then projected (§7.3). The engine's pixel-space quirks (caption spill into the lane cursor, the 8 px track gutter, the minimum bar width; divergences (b)–(d) in the waves handoff) keep working because they stay in `hide` space.
+- **Engine A, the pixel layout.** Under `hide`, x is linear in working index, so the engine's pixel arithmetic is unchanged: `TimeScale.forward` / `invert` change (§7.1), and so do the few places that convert between pixels and days by hand instead of through them (listed in the handoff's codebase map). Under `show`, the few duration-to-width sites advance through the calendar and every start snaps to a working day (§7.3). The engine's pixel-space quirks (caption spill into the lane cursor, the 8 px track gutter, the minimum bar width; divergences (b)–(d) in the waves handoff) stay in pixels; a quirk that pushes a start onto a hidden day snaps to the next working day like any other start.
 - **Engine B, the day-space extent** (`computeContentEndDay`, `computeDateWindow` in `layout.ts`). It counts working days, and pins convert with `workingIndexOf`.
 - **Engine C, the day-space schedule** (`scheduleRoadmap` in `schedule.ts`). Same change; its output dates come from `dateAtWorkingIndex`. It becomes the date source for every exporter (§8).
 
@@ -225,7 +224,7 @@ Because the density is shared, `show` is wider than `hide` by the non-working da
 - Non-working days are shaded bands behind all content, at day and week scale. At month scale and above, plain weekends are not shaded (about 5 px each); named runs still are.
 - **Anything that spans a visible non-working day paints straight across it:** bars, groups, parallels, include brackets, wave strips and dependency arrows.
 - A bar ends at the end of its last working day. It is not stretched over a trailing weekend, so chained items show the gap. Seeing that gap is the point of `show`.
-- **Projection from `hide` space.** Engine A positions everything in `hide` space, then each time-anchored x is projected. A seam is one point in `hide` space but two in `show` space, so the projection is sided: a box start, a milestone or anchor date, and an arrow head project to the right side of the seam (the next working day's start); a box end and an arrow tail project to the left (the end of the last working day). Offsets that are measurements, such as caption gaps and text widths, are not projected.
+- **Sides of a seam.** A seam is one point in `hide` space but two in `show` space: a start (a box start, a dated milestone or anchor, an arrow head) belongs on the right side, at the next working day's start, and a finish (a box end, an arrow tail) on the left, at the end of the last working day. Engine A gets this natively: under `show` it advances every duration through the calendar and snaps every start to a working day, rather than projecting a finished `hide` layout. See decision 8 in the [handoff](./handoffs/handoff-m2p-working-calendar.md).
 
 ### 7.4 Named non-working days
 
@@ -280,7 +279,7 @@ Every exporter reads engine C's dates and the same calendar.
 | `calendar:business` (the default), `hide` | Sequenced items that start on a working day keep their x. Week ticks keep their x and change label (`Jan 10` → `Jan 12`). Date-pinned entities, the now-line and the window end move to the right day. |
 | `calendar:business`, `show` | Everything after the first weekend moves right, by design. |
 
-Every committed layout snapshot (all 14 use the business calendar) and every determinism cell that renders a picture changes. For a fixture without date pins and without a now-line in its window, the only change is week-label text. The CHANGELOG entry goes under `### Changed`: the business calendar now does what `dsl.md` already says it does ("engineering working-day arithmetic").
+The 14 business-calendar layout snapshots (of 19; the five waves samples use `calendar:full`) and every business determinism cell that renders a picture change. For a fixture without date pins and without a now-line in its window, the only change is week-label text. The CHANGELOG entry goes under `### Changed`: the business calendar now does what `dsl.md` already says it does ("engineering working-day arithmetic").
 
 ### 9.2 Phases
 
@@ -361,7 +360,7 @@ The file's `weekend` replaces the preset's. `1w` is Sunday through Thursday, wee
 
 **Non-goals.** `principles.md` rules out Gantt-chart scheduling and resource contention. So: no per-person time off, no working hours or partial days, no capacity reduction on a non-working day, no recurrence rules beyond weekly (holiday files list their dates), and no time zones (dates stay floating). A code freeze is not a non-working day; work continues through it, so it belongs to an annotation feature, not to the calendar.
 
-**Open questions.**
+**Open questions** (all decided; see §3 of the [handoff](./handoffs/handoff-m2p-working-calendar.md)).
 
 1. **The keyword.** Confirm that `non-working` lexes as a keyword with `longer_alt` (a grammar test), and that spending the keyword budget on it is acceptable.
 2. **Ranges.** `through:` versus a list of dates (`date:[2026-12-24, 2026-12-25]`). Both are cheap; a long shutdown reads better with `through:`.
