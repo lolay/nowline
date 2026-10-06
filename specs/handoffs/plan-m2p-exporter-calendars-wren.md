@@ -1,13 +1,12 @@
 ```
 --- KICKOFF: begin orchestration at [deep] ---
 
-  Status: 0/3 groups done | last review: — | current: m2p-3 s1-s3 [exec] | updated 2026-10-06
+  Status: 1/3 groups done | last review: wave-1 PASS | current: m2p-3 s4-s5 [deep] (gates 5 and 2 pending) | updated 2026-10-06
 
   review: every-wave (log-only — parent writes Review log; no human review gate)
 
   Next model
-    Cursor:      claude-opus-5-5[effort=high]
-    Claude Code: /model opus                (/effort high)
+    The [deep] tier at high effort; the skill's model picker names the model per tool.
 
   Prompt to paste into the next chat:
     Read specs/handoffs/plan-m2p-exporter-calendars-wren.md on branch
@@ -285,7 +284,7 @@ The browser leg doesn't cover these formats.
 
 ## Orchestration (personal-plan-orchestrate, as in Phases 1–2)
 
-- **Waves.** Three waves, each a one-agent Workflow with `model` + `effort` overrides: `[exec]` sonnet/high, `[deep]` opus/high. Orchestrated from this chat.
+- **Waves.** Three waves, each a one-agent Workflow with the `model` and `effort` overrides the skill's model picker gives each tier, at high effort. Orchestrated from this chat.
 - **Gates.**
   - After wave 1: gates 5 and 2, asked together.
   - Gate 1 on any error, weak output, or a disallowed determinism move. Guards marked above are expected green in the red run.
@@ -300,18 +299,18 @@ The browser leg doesn't cover these formats.
 
 --- WAVE 1 [exec] ---
 
-### s1 - [fast] Toolchain check
+### s1 - [fast] Toolchain check (done)
 
 `nvm use` 26.2.0, `pnpm -v` 12.8.1, `make build-fast`. Done when both versions match and the build exits 0.
 
-### s2 - [exec] Write the failing tests and update the existing ones
+### s2 - [exec] Write the failing tests and update the existing ones (done)
 
 Write everything in § Tests against § Decisions' names and shapes. Done when:
 - every case exists;
 - nothing outside `*/test/` changed;
 - `make lint` passes.
 
-### s3 - [exec] Red run and baselines
+### s3 - [exec] Red run and baselines (done)
 
 - `make test`, parking packages as in Phase 2 when one failure hides the rest. Record the failures, and confirm the guards are green.
 - Capture the 33 baselines into `.scratch/p3-baseline/` per § Determinism.
@@ -351,6 +350,17 @@ Done when CI starts on the new head.
 
 ## Review log
 
+review wave-1 (m2p-3-s1-s3): PASS - four new test files (layout calendar-resolver, and a calendar suite per exporter) plus updates in four, every § Tests bullet covered with literal values; make-only staged red runs show 100 failures (layout 41, mermaid 27, msproj 9, xlsx 23), all in new or updated tests, with every guard green (among them the business msproj `<WeekDays>` block, `1w` and unsized durations, and the full-calendar Mermaid wave end); nothing outside `*/test/` changed; 33/33 baselines from `packages/cli/dist/index.js` match `hashes.json` node cells; extras beyond the plan: `workingWeekdays` for an open-week rule (Sunday to Thursday) and for dated and bounded rules, which wave 2 must satisfy - 2026-10-06
+
 ## Token log
 
-Phase 1 ~$20.42; Phase 2 ~$66.4. Phase 3 rows are added per wave.
+Phase 1 ~$20.42; Phase 2 ~$66.4. Input is real transcript usage counted once per message; output is chars/4, so a floor.
+
+| row | tier | ~input | ~output | ~cost |
+|---|---|---|---|---|
+| orchestrator (since the Phase 3 request) | orchestrator | 22.24M | 26k | $17.96 |
+| planning: 3 explorers + 1 plan review | orchestrator | 62.24M | 45k | $19.43 |
+| wave-1 (m2p-3-s1-s3) | [exec] | 7.89M | 18k | $2.28 |
+| **running total** | | 92.37M | 89k | **$39.67** |
+
+Model check (canary): wave 1 ran 50 of 50 messages on the [exec] tier's model.
