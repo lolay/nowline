@@ -1,11 +1,11 @@
 # Waves handoff: implementation plan (m2o)
 
-> **Status: in progress (m2o).** Delivered as one PR with one commit per phase; the work is orchestrated as tasks. This handoff turns [`waves.md`](../waves.md) into a phased plan. It is self-contained: a fresh agent can pick it up without redoing the research behind it, which covered prior art, the scheduling engines, the renderer, the include resolver and the validator.
+> **Status: feature-complete (m2o).** Delivered as one PR with one commit per phase. It stays as the record of the plan, the decisions and the codebase map; [`waves.md`](../waves.md) is the reference. This handoff turns [`waves.md`](../waves.md) into a phased plan. It is self-contained: a fresh agent can pick it up without redoing the research behind it, which covered prior art, the scheduling engines, the renderer, the include resolver and the validator.
 
 ## 1. How to pick this up
 
 1. **Scope is decided.** The maintainer adopted every recommendation in §9 (and `waves.md` §13): start floors ship in v1; include agreement is strict, comparing resolved floor dates; no column tint by default; MS Project and Mermaid stay AST-only; a single milestone, m2o.
-   - [`../waves/README.md`](../waves/README.md) lists the feedback questions for the mockup. Read any answers that came back before you change the visuals.
+   - §10 lists the feedback questions for testers. None were answered before implementation; ask them against the rendered `examples/waves.nowline` before changing the visuals.
 2. **Re-verify code references.** Every `file:line` in this document was checked against commit `4f771b4` (October 2026), and §4.0 records what changed by `26129db`. Before you trust a line number, re-run the grep in that row of §4.
 3. **Read `waves.md` §3–§9 before coding.** §5 (semantics), §6 (rules), §8 (layout) and §9 (rendering) are normative, and their normative parts are mirrored into `dsl.md` and `rendering.md`. The worked examples in §11 double as test fixtures.
 4. **Gate every phase.** Run `make pre-commit` for each phase, and re-run it after any later edit (AGENTS.md). Use `make` targets only.
@@ -351,7 +351,7 @@ The chart starts at `chartTopY = timelineY + headerRowsHeight + 8` (`roadmap-nod
 
 ### 4.8 How the mockup was made
 
-`samples/checkout-relaunch.svg` is today's renderer output with the wave visuals spliced in. A future agent can reproduce it, or replace it with real output once Phase 5 lands.
+`samples/checkout-relaunch.svg` was the renderer output of the time with the wave visuals spliced in. It was removed at close-out, along with the rest of `specs/waves/`, because `examples/waves.nowline` now renders the real thing. The recipe is kept for reference.
 
 1. **Write a wave-free equivalent of the sample.**
    - Use the same lanes and items, but drop the anonymous group, because it draws nothing.
@@ -574,7 +574,7 @@ Each phase is one PR and ends with `make pre-commit` green.
   - no bracket for an untitled, unstyled `group wave:x`;
   - re-emitted wave layers inside `renderIncludeRegion`;
   - everything gated on `model.waves`.
-- **The mockup in `specs/waves/samples/` is the visual target.**
+- **The mockup (then in `specs/waves/samples/`) was the visual target.**
 
 **Tests that fail without the change**
 
@@ -727,3 +727,14 @@ The maintainer adopted every recommendation below for m2o; the same list is in `
 3. **Default look.** *Recommendation:* no column tint; use the strip and the boundary lines.
 4. **MS Project and Mermaid stay AST-only.** *Recommendation:* accept the approximation for the first release.
 5. **Single milestone or the three-milestone split** (§2)? *Recommendation:* a single m2o, unless the layout phase needs to slip independently.
+
+## 10. Tester questions
+
+These came with the design sample, which was removed at close-out. Ask them against the rendered [`examples/waves.nowline`](../../examples/waves.nowline) before explaining anything:
+
+1. Without being told, what do you think the teal lines and the strip under the dates mean?
+2. Can you tell which bars belong to a wave and which are background work? Is the hatching obvious enough to catch a bar someone forgot to assign?
+3. Does it read as "nobody starts Build until all of Foundations is done"? Is the idle time before Feb 16 a useful signal or noise?
+4. Is "wave" the right word for you? Would you have expected "phase", "stage", or something else?
+5. Writing it: would you put `wave:build` on each item, wrap items in `group wave:build`, or want something else?
+6. Do the Beta and GA diamonds on the boundaries read as "when the wave is done"?

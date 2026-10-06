@@ -2,6 +2,16 @@
 
 ## [Unreleased]
 
+### Added
+
+- Waves (strict barriers across every swimlane): `wave` declarations and the
+  `wave:` property are highlighted, with new `wave` and `item-wave` snippets.
+  Go to definition, find references and rename work from a wave and from
+  `wave:`, `after:`, `before:` and `on:` references; `wave:` completes the
+  declared waves in order; waves appear in the outline; hover shows a wave's
+  position and members and an item's wave or background status. The live
+  preview draws the wave strip, boundaries and background hatch.
+
 ### Fixed
 
 - Snippets offer only valid values: the `roadmap` snippet's `scale:` choices

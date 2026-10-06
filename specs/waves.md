@@ -8,7 +8,7 @@
 Related files:
 
 - **Implementation plan:** [`handoffs/handoff-m2o-waves.md`](./handoffs/handoff-m2o-waves.md).
-- **Sample roadmap and mockup diagram:** [`waves/samples/`](./waves/samples/), introduced in [`waves/README.md`](./waves/README.md).
+- **Sample roadmaps:** [`examples/waves.nowline`](../examples/waves.nowline) (the checkout relaunch in §11) and [`examples/waves-program.nowline`](../examples/waves-program.nowline) (Example 16's re-declared waves across includes). `make build` renders both.
 
 ## 1. Summary
 
@@ -932,7 +932,7 @@ The grammar change keeps the AST shape, so JSON hashes are unchanged.
 
 ## 9. Rendering (`packages/renderer/src/svg/render.ts`)
 
-The mockup in [`waves/samples/checkout-relaunch.svg`](./waves/samples/checkout-relaunch.svg) shows the light-theme design: strip, boundaries, a milestone on a boundary, background hatch and legend.
+Rendering [`examples/waves.nowline`](../examples/waves.nowline) shows the light-theme design: strip, boundaries, a milestone on a boundary, background hatch and legend. Its SVG snapshots (light, dark and grayscale) are in `packages/integration-tests/test/__snapshots__/`.
 
 ### 9.1 Wave strip
 
@@ -1170,7 +1170,13 @@ All wave output is gated on waves existing. Exporters read waves from `inputs.re
 - **Engine agreement.** Every valid example avoids the engine A/C divergences (§8.6), so both engines produce the same tables.
 - **Diagnostics** are listed only where an example has some.
 
-The PM-facing sample in [`waves/samples/checkout-relaunch.nowline`](./waves/samples/checkout-relaunch.nowline) combines Examples 1, 3, 5 and 8 into one roadmap. [`waves/README.md`](./waves/README.md) shows its schedule and mockup.
+The PM-facing sample, [`examples/waves.nowline`](../examples/waves.nowline), combines Examples 1, 3, 5 and 8 into one roadmap. Its schedule:
+
+| Wave | Weeks | Dates | Held by |
+|---|---|---|---|
+| Foundations | W0–W6 | Jan 5 – Feb 16 | Wallet SDK spike (6w) |
+| Build | W6–W14 | Feb 16 – Apr 13 | Payments API v2 (8w) |
+| Launch | W14–W18 | Apr 13 – May 11 | App store release (4w) |
 
 ### Example 1: three lanes, three waves
 
@@ -1663,7 +1669,7 @@ Offsets: `fy-budget` (2026-02-02) is W4, and `exec-done` (2026-03-16) is W10.
 
 Waves: plan [W0, W3]; **gap [W3, W4]**; execute [W4, W11], ending 2026-03-23 (exclusive).
 
-- **The gap.** It has no strip cell, shows `fy-budget` in muted italics, and has two boundary lines. The anchor's own dotted cut line also lands at W4.
+- **The gap.** It has no strip cell, shows `fy-budget` in muted italics when the label fits the gap (a one-week gap at the default width is too narrow, so it shows none; §9.1), and has two boundary lines. The anchor's own dotted cut line also lands at W4.
 - **Without the floor,** execute would be [W3, W10] and the milestone would be met.
 - **No cycle.** `checkCircularDependencies` skips a wave's own `after:` edges (§6.2), so the floor and the milestone do not form one.
 
@@ -2120,4 +2126,4 @@ Decided in the planning session (no longer open):
 - background work is marked by hatching and crossing marks (§9.3);
 - waves are strictly sequential (§3.1).
 
-What the mockup tests should confirm is listed in [`waves/README.md`](./waves/README.md).
+What tester sessions should confirm is listed in [the handoff, §10](./handoffs/handoff-m2o-waves.md#10-tester-questions).

@@ -177,7 +177,7 @@ When `share` is not `false`/`'none'`, the embed appends a small anchor immediate
 
 The encoding grammar is shared, by construction, with every downstream receiver:
 
-- The **embed** (this package) only *encodes*. It imports a single fflate function — `zlibSync` — plus a few lines of base64url normalization, keeping it well within the [≤ 175 KB gzipped bundle budget](#bundle-size-target).
+- The **embed** (this package) only *encodes*. It imports a single fflate function — `zlibSync` — plus a few lines of base64url normalization, keeping it well within the [≤ 200 KB gzipped bundle budget](#bundle-size-target).
 - **nowline-app** (the Free SPA at `free.nowline.io/open`, and in m6 the Pro app at `pro.nowline.io/open`) only *decodes*. It imports `unzlibSync` from the **same `fflate` library** and applies the inverse base64url normalization.
 
 Because both sides use the same library and the same zlib (RFC 1950) framing, encode and decode are byte-identical by construction — there is no second format to keep in sync. The grammar is also byte-compatible with the native `CompressionStream('deflate')` / `DecompressionStream`, so either side can migrate to the platform API later without a wire-format change. This compatibility is what makes the cross-app origin swap described in [§`/open` is a cross-app Nowline convention](#open-is-a-cross-app-nowline-convention) safe: the fragment is identical on both origins.
@@ -211,7 +211,7 @@ Open the URL in DevTools or `curl` it to confirm exactly which build is running.
 
 ## Bundle Size Target
 
-**≤ 175 KB gzipped.** First measurement landed at ~163 KB; the 175 KB ceiling buys ~12 KB headroom for incremental growth and still beats Mermaid by a comfortable margin. Crossing 200 KB triggers a serious review (pre-bundled grammars, hand-rolled parser, etc.) — the m4 plan documents the escalation. The `bundle-size` CI job (`packages/embed/scripts/check-size.mjs`) gates every PR.
+**≤ 200 KB gzipped.** First measurement landed at ~163 KB under a 175 KB ceiling. Waves (m2o) took the bundle to ~194 KB (about 6 KB of en/fr diagnostic text, the rest validator, barrier and strip logic), so the budget moved to 200 KB, the line the m4 plan set for a serious review. The next overage is that review (pre-bundled grammars, hand-rolled parser, etc.), not another bump; the m4 plan documents the escalation. The `bundle-size` CI job (`packages/embed/scripts/check-size.mjs`) gates every PR.
 
 For comparison:
 - Mermaid embed: ~200KB gzipped
