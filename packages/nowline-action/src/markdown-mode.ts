@@ -6,7 +6,7 @@ import * as core from '@actions/core';
 import fastGlob from 'fast-glob';
 
 import { ensureCli, renderOnce } from './cli.js';
-import type { ActionInputs, RunResult } from './inputs.js';
+import type { ActionInputs, RunResult, Theme } from './inputs.js';
 import { applyEdits, type BlockEdit } from './markdown-edit.js';
 import { type ScannedBlock, scanMarkdown } from './markdown-scan.js';
 
@@ -81,7 +81,7 @@ interface ProcessMarkdownFileArgs {
     mdPath: string;
     outputDir: string;
     format: 'svg' | 'png';
-    theme: 'light' | 'dark';
+    theme: Theme;
     nonWorking?: 'hide' | 'show';
 }
 
@@ -135,7 +135,7 @@ interface RenderBlockArgs {
     block: ScannedBlock;
     outPath: string;
     format: 'svg' | 'png';
-    theme: 'light' | 'dark';
+    theme: Theme;
     nonWorking?: 'hide' | 'show';
 }
 
