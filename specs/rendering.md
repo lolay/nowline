@@ -70,7 +70,7 @@ These join the style system alongside `bg`, `fg`, etc.:
 
 - `padding` — inset padding within the entity. On `roadmap`, this is the outer canvas margin. On items, swimlanes, groups, footnotes — content inset. Values: `none`, `xs`, `sm`, `md`, `lg`, `xl`. Default varies by entity type.
 - `spacing` — space between children within a container entity. Applies to swimlanes (vertical space between items/child swimlanes), groups (space between sequential items), and parallel blocks (vertical space between tracks). Values: `none`, `xs`, `sm`, `md`, `lg`, `xl`. Default: `none` for swimlanes (adjacent bands separated by lines, no vertical gap).
-- `header-height` — height of the timeline scale header row. Roadmap-only — ignored on all other entities. Values: `none`, `xs`, `sm`, `md`, `lg`, `xl`. Default: `md`.
+- `header-height` — height of the timeline scale header row. Roadmap-only — ignored on all other entities (the validator warns `NL.W0703` on another entity's `default` line). Values: `none`, `xs`, `sm`, `md`, `lg`, `xl`. Default: `md`.
 
 The system owns the pixel mapping for all size presets internally. Users pick the semantic size; the renderer determines actual pixels.
 
