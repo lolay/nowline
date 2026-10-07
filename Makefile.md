@@ -91,7 +91,7 @@ by any CI workflow. Requires `gh` on PATH and authentication (`gh auth login`).
 | Target | Description |
 |--------|-------------|
 | `compile` | Compile standalone CLI binaries (`TARGET=bun-<os>-<arch>` or `local`; omit for all). Needs Bun and a prior `build`. |
-| `smoke` | Smoke-test a compiled binary across every export format (host-derived, or `MATRIX_*` from CI) |
+| `smoke` | Smoke-test a compiled binary across every export format (host-derived, or `MATRIX_*` from CI). Runs it only if the host can execute it (same OS and arch, or darwin-x64 under Rosetta) and skips otherwise; under GitHub Actions a skip fails unless `SMOKE_ALLOW_CROSS_TARGET=1`. |
 | `deb` | Build a `.deb` wrapping the compiled binary (`ARCH=amd64\|arm64`) |
 | `pack` | Pack the publishable `@nowline/*` npm tarballs into `dist-pack/` (dependency order) |
 | `vsix` | Package the VS Code / Cursor extension into a `.vsix` |
@@ -148,7 +148,7 @@ keeps per-step logs and the matrix while sourcing the command from one place.
 | Workflow | Trigger | What it does | make targets |
 |----------|---------|--------------|--------------|
 | [`ci.yml`](./.github/workflows/ci.yml) | push to `main`, pull requests | Lint workflows; the full `make ci` gate (lint + build + typecheck + test) on a clean checkout on `ubuntu-latest` Node 26, and `make ci-platform` (build-fast + Vitest) on the Node 22, macOS, and Windows cells; embed bundle-size gate; export-determinism and MCP harness gates; release-build smoke (calls `build.yml`, in parallel with the test matrix); the aggregate `CI gate` job, the only check the `main` ruleset requires | `lint-workflows`, `ci`, `ci-platform`, `bundle-size`, `build-fast`, `compile`, `determinism`, `determinism-browser`, `mcp-inspector-smoke`, `mcp-app-e2e` |
-| [`build.yml`](./.github/workflows/build.yml) | reusable (called by `ci.yml` smoke + `release.yml`) | 10-cell build/package matrix: compile per-OS/arch binaries, smoke them, build `.deb`s, pack npm tarballs, package the `.vsix`, stage the action mirror + embed CDN bundle | `compile`, `smoke`, `deb`, `pack`, `vsix` |
+| [`build.yml`](./.github/workflows/build.yml) | reusable (called by `ci.yml` smoke + `release.yml`) | 10-cell build/package matrix: compile per-OS/arch binaries and smoke each on a runner that can execute it (native `ubuntu-24.04-arm` / `windows-11-arm` for arm64, Rosetta for macOS x64), build `.deb`s, pack npm tarballs, package the `.vsix`, stage the action mirror + embed CDN bundle | `compile`, `smoke`, `deb`, `pack`, `vsix` |
 | [`release.yml`](./.github/workflows/release.yml) | `v*` tag push, manual dispatch | Cut release (bump + tag), call `build.yml` with upload, publish to npm + Marketplace + Open VSX, GitHub release + Homebrew tap + action mirror, deploy prod embed CDN | `bump`, `publish-npm`, `publish-vscode` (guarded with `CONFIRM_PUBLISH=1`) |
 | [`embed-cdn.yml`](./.github/workflows/embed-cdn.yml) | push to `main`, pull requests, manual dispatch | Build the dev IIFE; continuous-deploy `embed.nowline.dev`; per-PR ephemeral preview channel | `publish-cdn` (guarded with `CONFIRM_DEPLOY=1`, embed-dev job) |
 
