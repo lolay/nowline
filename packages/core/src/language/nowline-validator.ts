@@ -120,9 +120,8 @@ const STYLE_PROP_KEYS = new Set([
 
 // `non-working:` values (specs/working-calendar.md §4.2). Kept out of
 // `STYLE_PROP_ENUMS` on purpose: the key reports its own coded NL.E0800,
-// and the generic enum check would add a second error (NL.E0802) and let a
-// colour literal through. Mirrors `NON_WORKING_DISPLAYS` in @nowline/layout,
-// which core cannot import.
+// and the generic enum check would add a second error (NL.E0802). Mirrors
+// `NON_WORKING_DISPLAYS` in @nowline/layout, which core cannot import.
 const NON_WORKING_VALUES = new Set(['hide', 'show']);
 
 // Built-in capacity-icon vocabulary. Renderer-curated SVG glyphs (plus 'multiplier'
@@ -981,7 +980,7 @@ export class NowlineValidator {
                         }
                     } else if (key in STYLE_PROP_ENUMS) {
                         const allowed = STYLE_PROP_ENUMS[key];
-                        if (val && !allowed.has(val) && !isColorValue(val)) {
+                        if (val && !allowed.has(val)) {
                             acceptTr(
                                 accept,
                                 'error',
