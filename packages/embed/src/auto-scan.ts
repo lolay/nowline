@@ -3,7 +3,7 @@
 // with its rendered SVG. Each block gets a unique `idPrefix` so two
 // roadmaps on the same page never share `<style>` ids.
 
-import type { ThemeName } from '@nowline/layout';
+import type { NonWorkingDisplay, ThemeName } from '@nowline/layout';
 import { type EmbedRenderOptions, renderSource } from './pipeline.js';
 import { buildShareLink, type ShareOption } from './share.js';
 
@@ -12,6 +12,8 @@ export interface AutoScanInputs {
     theme?: ThemeName;
     locale?: string;
     width?: number;
+    /** See {@link EmbedRenderOptions.nonWorking}. */
+    nonWorking?: NonWorkingDisplay;
     /** See {@link EmbedRenderOptions.today} — accepts Date, string, null, or undefined. */
     today?: Date | string | null;
     /** See {@link EmbedRenderOptions.timezone}. */
@@ -70,6 +72,7 @@ export async function runAutoScan(inputs: AutoScanInputs): Promise<AutoScanResul
             theme: inputs.theme,
             locale: inputs.locale,
             width: inputs.width,
+            nonWorking: inputs.nonWorking,
             today: inputs.today,
             timezone: inputs.timezone,
             idPrefix,

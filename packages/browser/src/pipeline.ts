@@ -28,6 +28,7 @@ import {
 import {
     collectLayoutInsights,
     layoutRoadmap,
+    type NonWorkingDisplay,
     type NormalizedZone,
     normalizeZone,
     resolveToday,
@@ -137,6 +138,13 @@ export interface RenderOptions extends ParseOptions {
     locale?: string;
     /** Total canvas width in px. Layout's default is 1280. */
     width?: number;
+    /**
+     * How a calendar's non-working days appear: `hide` collapses them,
+     * `show` draws them as shaded bands. Wins over the file's
+     * `default roadmap non-working:` key; leave it undefined to let the key
+     * apply, then `hide`.
+     */
+    nonWorking?: NonWorkingDisplay;
     /**
      * Override the deterministic id prefix used for in-SVG `<style>`
      * scoping. Multi-block surfaces (auto-scan) supply a fresh prefix
@@ -296,6 +304,7 @@ export async function renderSource(
         today,
         locale: options.locale,
         width: options.width,
+        nonWorking: options.nonWorking,
     });
 
     const diagnosticLevel = options.diagnosticLevel ?? 'error';

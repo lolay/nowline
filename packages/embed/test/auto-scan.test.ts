@@ -1,6 +1,12 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { __resetForTests, init, initialize } from '../src/index.js';
-import { ROADMAP_ALPHA, ROADMAP_BETA } from './fixtures.js';
+import {
+    NON_WORKING_LAYER,
+    ROADMAP_ALPHA,
+    ROADMAP_BETA,
+    ROADMAP_BUSINESS,
+    ROADMAP_BUSINESS_FILE_SHOW,
+} from './fixtures.js';
 
 describe('auto-scan', () => {
     afterEach(() => {
@@ -120,3 +126,36 @@ function collectIds(node: Element): string[] {
     }
     return ids;
 }
+
+describe('auto-scan: the non-working display', () => {
+    afterEach(() => {
+        document.body.innerHTML = '';
+        __resetForTests();
+        vi.restoreAllMocks();
+    });
+
+    const block = (source: string): string =>
+        `<pre><code class="language-nowline">${source}</code></pre>`;
+
+    it('initialize({ nonWorking: "show" }) adds the layer to scanned blocks', async () => {
+        document.body.innerHTML = block(ROADMAP_BUSINESS);
+        initialize({ startOnLoad: false, nonWorking: 'show' });
+        const result = await init();
+        expect(result.rendered).toBe(1);
+        expect(document.querySelector('svg')?.outerHTML).toContain(NON_WORKING_LAYER);
+    });
+
+    it('a file key show with no option has the layer', async () => {
+        document.body.innerHTML = block(ROADMAP_BUSINESS_FILE_SHOW);
+        initialize({ startOnLoad: false });
+        await init();
+        expect(document.querySelector('svg')?.outerHTML).toContain(NON_WORKING_LAYER);
+    });
+
+    it('init({ nonWorking: "hide" }) overrides a file key show', async () => {
+        document.body.innerHTML = block(ROADMAP_BUSINESS_FILE_SHOW);
+        initialize({ startOnLoad: false });
+        await init({ nonWorking: 'hide' });
+        expect(document.querySelector('svg')?.outerHTML).not.toContain(NON_WORKING_LAYER);
+    });
+});

@@ -28,3 +28,26 @@ roadmap withInclude "With Include" start:2026-01-05 scale:2w
 swimlane eng "Engineering"
   item solo "Solo" duration:1w status:done
 `;
+
+// A business-calendar roadmap at the weeks scale: the `show` display draws
+// each weekend as a shaded band. `ROADMAP_BUSINESS_FILE_SHOW` picks the
+// display from the file's own `default roadmap non-working:` key.
+const BUSINESS_BODY = `roadmap biz "Business" start:2026-01-05 scale:1w calendar:business
+swimlane eng "Engineering"
+  item w1 "W1" duration:1w
+  item w2 "W2" duration:1w
+`;
+
+export const ROADMAP_BUSINESS = `nowline v1
+
+${BUSINESS_BODY}`;
+
+export const ROADMAP_BUSINESS_FILE_SHOW = `nowline v1
+
+config
+
+default roadmap non-working:show
+
+${BUSINESS_BODY}`;
+
+export const NON_WORKING_LAYER = 'data-layer="non-working"';

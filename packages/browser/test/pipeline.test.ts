@@ -10,6 +10,8 @@ import {
 import {
     ROADMAP_ALPHA,
     ROADMAP_BETA,
+    ROADMAP_BUSINESS,
+    ROADMAP_BUSINESS_FILE_SHOW,
     ROADMAP_LEXER_ERROR,
     ROADMAP_PARSE_ERROR,
     ROADMAP_WITH_INCLUDE,
@@ -395,5 +397,38 @@ swimlane eng "Engineering"
         expect(result.kind).toBe('svg');
         if (result.kind !== 'svg') return;
         expect(result.warnings.some((w) => w.code === 'NL.I1000')).toBe(true);
+    });
+});
+
+describe('renderSource: the non-working display', () => {
+    const LAYER = 'data-layer="non-working"';
+
+    afterEach(() => {
+        __resetBrowserPipelineForTests();
+    });
+
+    async function svgOf(source: string, nonWorking?: 'hide' | 'show'): Promise<string> {
+        const result = await renderSource(source, {
+            today: null,
+            ...(nonWorking === undefined ? {} : { nonWorking }),
+        });
+        if (result.kind !== 'svg') throw new Error('expected an svg result');
+        return result.svg;
+    }
+
+    it('the option show adds the non-working layer', async () => {
+        expect(await svgOf(ROADMAP_BUSINESS, 'show')).toContain(LAYER);
+    });
+
+    it('a file key show with no option has the layer (unset stays undefined)', async () => {
+        expect(await svgOf(ROADMAP_BUSINESS_FILE_SHOW)).toContain(LAYER);
+    });
+
+    it('a file key show with the option hide has no layer', async () => {
+        expect(await svgOf(ROADMAP_BUSINESS_FILE_SHOW, 'hide')).not.toContain(LAYER);
+    });
+
+    it('stays hide with no key and no option', async () => {
+        expect(await svgOf(ROADMAP_BUSINESS)).not.toContain(LAYER);
     });
 });

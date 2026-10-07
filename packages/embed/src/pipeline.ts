@@ -20,7 +20,7 @@ import {
     type DiagnosticRow,
     type ParseResult,
 } from '@nowline/browser';
-import type { ThemeName } from '@nowline/layout';
+import type { NonWorkingDisplay, ThemeName } from '@nowline/layout';
 
 const EMBED_SOURCE_PATH = '/embed.nowline';
 
@@ -46,6 +46,13 @@ export interface EmbedRenderOptions {
     timezone?: string;
     locale?: string;
     width?: number;
+    /**
+     * How a calendar's non-working days appear: `'hide'` collapses them,
+     * `'show'` draws them as shaded bands. Wins over the roadmap's own
+     * `default roadmap non-working:` key; leave it `undefined` to let the key
+     * apply, then `'hide'`.
+     */
+    nonWorking?: NonWorkingDisplay;
     /**
      * Override the deterministic id prefix used for in-SVG `<style>`
      * scoping. Each block on a page should use a unique prefix so two
@@ -86,6 +93,7 @@ export async function renderSource(
         timezone: options.timezone,
         locale: options.locale,
         width: options.width,
+        nonWorking: options.nonWorking,
         idPrefix: options.idPrefix,
         onSkippedInclude: () => {
             if (!includeWarningEmitted) {
