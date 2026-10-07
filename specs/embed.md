@@ -326,7 +326,7 @@ The action:
 | `files` | Glob pattern for markdown files (markdown mode) | `**/*.md` |
 | `output-dir` | Directory for markdown-mode rendered images, relative to repo root | `.nowline/` |
 | `format` | `svg` or `png` | `svg` |
-| `theme` | `light` or `dark` | `light` |
+| `theme` | `light`, `dark`, or `grayscale` (`greyscale` alias) | `light` |
 | `non-working` | `hide` or `show`: how a business calendar's non-working days appear. Empty follows the roadmap's own `default roadmap non-working:` key, then `hide`. Any other value fails the input check. | (empty) |
 | `cli-version` | Version of `@nowline/cli` to install on the runner | (action version) |
 
