@@ -19,6 +19,19 @@
 ---
 ```
 
+**Cost (API-equiv, Claude Code models)**
+
+| wave | expected tokens | expected $ |
+|---|---|---|
+| 1 [exec] m2p-4 s1-s3 | ~3.6M | ~$1.3 |
+| 2 [deep] m2p-4 s4-s6 | ~7.3M | ~$3.9 |
+| 3 [exec] m2p-4 s7-s8 | ~4.0M | ~$1.4 |
+| 4 [exec] m2p-4 s9-s10 | ~2.0M | ~$0.70 |
+| orchestrator | ~6.7M | ~$6.0 |
+| **Total** | ~24M | ~$13 |
+
+Expected values are estimates, good to about 2-3× per wave. Phases 1-3 actuals ran well above their anchors, so read these as a floor. The kickoff ran in the m2p planning session and is not in the orchestrator row.
+
 # m2p Phase 4: `show` and the display setting
 
 ## Context
@@ -421,5 +434,13 @@ Everything under § Change "Docs". Done when `make lint` passes.
 ## Review log
 
 ## Token log
+
+**Counting header (Claude Code)**
+
+- Line, one per model a chat ran, appended below: `tokens <row> <group-id> (<model>): input ~X / cache read ~R / cache write ~W / output ~Y | ~$C API-equiv`. `<row>` is `wave-N`, `orchestrator-wave-N`, or `wave-N-fix` for a fix-up wave; `<group-id>` is the wave's group id with hyphens (`m2p-4-s1-s3`); `<model>` is `message.model` without a date suffix. Round counts to two significant figures with `k` or `M`.
+- Usage: `~/.claude/projects/<slug>/$CLAUDE_CODE_SESSION_ID.jsonl` plus `<session-id>/subagents/**/agent-*.jsonl`. Sum `message.usage` over assistant lines once per `message.id`, from the line with `stop_reason`: input `input_tokens`, cache read `cache_read_input_tokens`, cache write `cache_creation.ephemeral_5m_input_tokens` (and `ephemeral_1h_input_tokens`, marked `1h`), output `output_tokens`. Calls with no `stop_reason` line: estimate output and mark the line `(output est.) session <id>`.
+- Rates by `<model>`, $ per Mtok input / cached / output: `claude-opus-5-5` 4.00 / 0.20 / 20.00; `claude-sonnet-5-5` 2.00 / 0.20 / 10.00.
+- `$C` = (input × in + cache read × cached + 5m write × in × 1.25 + 1h write × in × 2.00 + output × out) / 1M.
+- In another harness, or on a model not listed here, count and price per plan-execution.md "Token accounting" and "Model price table" instead.
 
 Phase 1 ~$20.42; Phase 2 ~$66.4; Phase 3 ~$51.05. Phase 4 planning in the m2p session: 3 explorers and a design pass. Rows are added per wave by the executing session.
