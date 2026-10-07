@@ -656,6 +656,23 @@ function renderGridLines(t: PositionedTimelineScale, swimlaneTopY: number, palet
             );
         }
     }
+    // Seams where hidden non-working days collapse and no grid line
+    // already marks the join (specs/working-calendar.md §7.2): faint and
+    // dotted, on the minor line's span. Layout marks which runs get one.
+    for (const run of t.nonWorking ?? []) {
+        if (!run.seam) continue;
+        parts.push(
+            tag('line', {
+                x1: num(run.x),
+                y1: num(minorTopY),
+                x2: num(run.x),
+                y2: num(minorBottomY),
+                stroke: palette.timeline.nonWorkingSeam,
+                'stroke-width': 1,
+                'stroke-dasharray': '1 3',
+            }),
+        );
+    }
     return tag('g', { 'data-layer': 'grid' }, parts.join(''));
 }
 
@@ -1706,7 +1723,11 @@ function renderAnchor(a: PositionedAnchor, palette: Theme, fonts: FontFamilies):
     };
     if (a.labelSide === 'left') labelAttrs['text-anchor'] = 'end';
     const label = a.title ? textTag(labelAttrs, a.title) : '';
-    return tag('g', { 'data-layer': 'anchor', 'data-id': a.id ?? null }, diamond + label);
+    return tag(
+        'g',
+        { 'data-layer': 'anchor', 'data-id': a.id ?? null },
+        hiddenDateTitle(a.hiddenDate) + diamond + label,
+    );
 }
 
 function renderAnchorCutLine(a: PositionedAnchor, palette: Theme): string {
@@ -1748,7 +1769,21 @@ function renderMilestone(m: PositionedMilestone, palette: Theme, fonts: FontFami
     };
     if (m.labelSide === 'left') labelAttrs['text-anchor'] = 'end';
     const label = m.title ? textTag(labelAttrs, m.title) : '';
-    return tag('g', { 'data-layer': 'milestone', 'data-id': m.id ?? null }, flag + label);
+    return tag(
+        'g',
+        { 'data-layer': 'milestone', 'data-id': m.id ?? null },
+        hiddenDateTitle(m.hiddenDate) + flag + label,
+    );
+}
+
+/**
+ * A marker dated on a day the axis hides sits at the next working day's
+ * x, so its own date rides along as a native tooltip, the way
+ * `renderInlineDatePin` titles its glyph (specs/working-calendar.md
+ * §7.4). Empty for a working-day date.
+ */
+function hiddenDateTitle(hiddenDate: string | undefined): string {
+    return hiddenDate === undefined ? '' : `<title>${escText(hiddenDate)}</title>`;
 }
 
 function renderMilestoneCutLine(m: PositionedMilestone, idPrefix: string, palette: Theme): string {

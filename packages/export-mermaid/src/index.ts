@@ -16,12 +16,22 @@
 //   gantt
 //       title <title>
 //       dateFormat YYYY-MM-DD
-//       axisFormat ...
+//       excludes saturday, sunday     (only when the open week has days off)
 //       section <swimlane>
 //       <Task name>: <status>, <id>, <after-or-date>, <duration>
 //   ```
 //
 //   <%% lossy comment %%>
+//
+// Calendar (specs/working-calendar.md §8): the file's calendar comes from
+// engine C (`scheduleRoadmap`, built once per export). `excludes` lists the
+// open week's non-working days, Monday first, so Mermaid counts `Nd` in
+// working days; every duration is engine C's `days` written as `Nd` (a
+// full-calendar `4w` is `28d`). Mermaid never checks a task's explicit start
+// against `excludes`, so the dates this exporter derives are working days:
+// the roadmap start is snapped to its first working day, and a wave-end
+// milestone is the first working day at or after the wave's exclusive end.
+// Declared anchor and milestone dates are written as given.
 //
 // Every emitted task carries an explicit start token (`after <id>` or an
 // absolute `YYYY-MM-DD` date). Mermaid's positional task parser strips a
@@ -54,9 +64,9 @@ import type {
 import { buildWavePlan } from '@nowline/core';
 import type { ExportInputs } from '@nowline/export-core';
 import { displayLabel, getProp, getProps, hasProp, roadmapTitle } from '@nowline/export-core';
-import { scheduleRoadmap } from '@nowline/layout';
+import { type RoadmapSchedule, scheduleRoadmap, type WorkingCalendar } from '@nowline/layout';
 
-import { durationToMermaid } from './duration.js';
+import { daysToMermaid } from './duration.js';
 
 export interface MermaidOptions {
     /** Append the trailing `%%` lossy comment. Defaults to true. */
@@ -113,10 +123,22 @@ interface WaveCtx {
     ids: readonly string[];
 }
 
+/** What every item line reads besides its own lane chain. */
+interface EmitCtx {
+    /** The roadmap start, on a working day (`YYYY-MM-DD`). */
+    startDate: string;
+    schedule: RoadmapSchedule;
+    waves: WaveCtx | undefined;
+}
+
 export function exportMermaid(inputs: ExportInputs, options: MermaidOptions = {}): string {
     const ast = inputs.ast;
     const title = roadmapTitle(ast.roadmapDecl ?? undefined);
-    const startDate = resolveStartDate(inputs);
+    const schedule = scheduleRoadmap(ast, inputs.resolved, { today: inputs.today });
+    const { working } = schedule.calendar;
+    const startDate = formatIsoDate(
+        working.dateAtWorkingIndex(parseIsoDate(resolveStartDate(inputs)), 0),
+    );
     const drops = emptyCounts();
 
     const out: string[] = [];
@@ -126,6 +148,8 @@ export function exportMermaid(inputs: ExportInputs, options: MermaidOptions = {}
     out.push('gantt');
     out.push(`    title ${escapeMermaidText(title)}`);
     out.push('    dateFormat YYYY-MM-DD');
+    const excludes = excludedWeekdays(working);
+    if (excludes.length > 0) out.push(`    excludes ${excludes.join(', ')}`);
 
     // Footnotes are file-level; counted once.
     drops.footnote += ast.roadmapEntries.filter((e) => e.$type === 'FootnoteDeclaration').length;
@@ -146,21 +170,15 @@ export function exportMermaid(inputs: ExportInputs, options: MermaidOptions = {}
     }
 
     // Waves → one end milestone per wave, dated from the day schedule.
-    const waves = emitWaves(inputs, drops, out, startDate);
+    const waves = emitWaves(inputs, schedule, drops, out, startDate);
+    const ctx: EmitCtx = { startDate, schedule, waves };
 
     // Swimlanes → sections; their items become tasks.
     const swimlanes = ast.roadmapEntries.filter(
         (e): e is SwimlaneDeclaration => e.$type === 'SwimlaneDeclaration',
     );
     for (const lane of swimlanes) {
-        emitSwimlane(
-            lane,
-            [lane.name ?? slugify(displayLabel(lane))],
-            drops,
-            out,
-            startDate,
-            waves,
-        );
+        emitSwimlane(lane, [lane.name ?? slugify(displayLabel(lane))], drops, out, ctx);
     }
 
     // Top-level milestones.
@@ -189,26 +207,29 @@ export function exportMermaid(inputs: ExportInputs, options: MermaidOptions = {}
 
 /**
  * `section Waves` (specs/waves.md §10): `{title} (wave end) :milestone, {id},
- * {E_k}, 0d` per wave, in declaration order. `E_k` is the wave's exclusive
- * end from the day schedule, which is the instant Mermaid starts a task
- * `after` the milestone, so `after:build` and the barrier tokens both open
- * on the barrier. Start floors cannot be expressed and are counted as drops.
- * Returns undefined, emitting nothing, when the roadmap has no waves.
+ * {date}, 0d` per wave, in declaration order. The date is the first working
+ * day at or after `E_k`, the wave's exclusive end from the day schedule: the
+ * instant Mermaid starts a task `after` the milestone, so `after:build` and
+ * the barrier tokens both open on the barrier, and on a working day, since
+ * Mermaid never moves an explicit date off an excluded day. Start floors
+ * cannot be expressed and are counted as drops. Returns undefined, emitting
+ * nothing, when the roadmap has no waves.
  */
 function emitWaves(
     inputs: ExportInputs,
+    schedule: RoadmapSchedule,
     drops: DropCounts,
     out: string[],
     startDate: string,
 ): WaveCtx | undefined {
     const plan = buildWavePlan(inputs.resolved);
     if (!plan) return undefined;
-    const schedule = scheduleRoadmap(inputs.ast, inputs.resolved, { today: inputs.today });
+    const { working } = schedule.calendar;
     const ids = plan.waves.map((w) => w.name as string);
     out.push('    section Waves');
     plan.waves.forEach((w, i) => {
         const end = schedule.waves?.get(ids[i]!)?.end;
-        const date = end ? formatIsoDate(end) : startDate;
+        const date = end ? formatIsoDate(working.dateAtWorkingIndex(end, 0)) : startDate;
         out.push(
             `    ${escapeTaskName(displayLabel(w))} (wave end) :milestone, ${ids[i]}, ${date}, 0d`,
         );
@@ -222,8 +243,7 @@ function emitSwimlane(
     breadcrumb: readonly string[],
     drops: DropCounts,
     out: string[],
-    startDate: string,
-    waves: WaveCtx | undefined,
+    ctx: EmitCtx,
 ): void {
     const sectionLabel = breadcrumb.join('.');
     out.push(`    section ${escapeMermaidText(sectionLabel)}`);
@@ -231,7 +251,7 @@ function emitSwimlane(
     // anchors at the roadmap start date.
     const chain: Chain = { prevId: null };
     for (const child of lane.content) {
-        emitSwimlaneChild(child, breadcrumb, drops, out, chain, startDate, waves);
+        emitSwimlaneChild(child, breadcrumb, drops, out, chain, ctx);
     }
     // Nested swimlanes — count for the lossy report.
     // SwimlaneContent doesn't include nested swimlanes per the grammar, so
@@ -245,21 +265,20 @@ function emitSwimlaneChild(
     drops: DropCounts,
     out: string[],
     chain: Chain,
-    startDate: string,
-    waves: WaveCtx | undefined,
+    ctx: EmitCtx,
 ): void {
     if (child.$type === 'ItemDeclaration') {
-        emitItem(child, drops, out, chain, startDate, waves);
+        emitItem(child, drops, out, chain, ctx);
         return;
     }
     if (child.$type === 'GroupBlock') {
         drops.group += 1;
-        emitGroup(child, breadcrumb, drops, out, chain, startDate, waves);
+        emitGroup(child, breadcrumb, drops, out, chain, ctx);
         return;
     }
     if (child.$type === 'ParallelBlock') {
         drops.parallel += 1;
-        emitParallel(child, breadcrumb, drops, out, chain, startDate, waves);
+        emitParallel(child, breadcrumb, drops, out, chain, ctx);
         return;
     }
     if (child.$type === 'DescriptionDirective') {
@@ -274,20 +293,19 @@ function emitGroup(
     drops: DropCounts,
     out: string[],
     chain: Chain,
-    startDate: string,
-    waves: WaveCtx | undefined,
+    ctx: EmitCtx,
 ): void {
     // A group is a visual container within a lane — its items continue the
     // lane's sequential chain.
     for (const child of group.content as GroupContent[]) {
         if (child.$type === 'ItemDeclaration') {
-            emitItem(child, drops, out, chain, startDate, waves);
+            emitItem(child, drops, out, chain, ctx);
         } else if (child.$type === 'GroupBlock') {
             drops.group += 1;
-            emitGroup(child, breadcrumb, drops, out, chain, startDate, waves);
+            emitGroup(child, breadcrumb, drops, out, chain, ctx);
         } else if (child.$type === 'ParallelBlock') {
             drops.parallel += 1;
-            emitParallel(child, breadcrumb, drops, out, chain, startDate, waves);
+            emitParallel(child, breadcrumb, drops, out, chain, ctx);
         } else if (child.$type === 'DescriptionDirective') {
             drops.description += 1;
         }
@@ -300,8 +318,7 @@ function emitParallel(
     drops: DropCounts,
     out: string[],
     chain: Chain,
-    startDate: string,
-    waves: WaveCtx | undefined,
+    ctx: EmitCtx,
 ): void {
     // Tracks run concurrently: each starts from the parallel's entry point
     // (the lane cursor as it was on entry), not after the previous track.
@@ -310,12 +327,12 @@ function emitParallel(
     for (const child of parallel.content) {
         if (child.$type === 'ItemDeclaration') {
             const trackChain: Chain = { prevId: entryId };
-            emitItem(child, drops, out, trackChain, startDate, waves);
+            emitItem(child, drops, out, trackChain, ctx);
             lastTrackEnd = trackChain.prevId;
         } else if (child.$type === 'GroupBlock') {
             drops.group += 1;
             const trackChain: Chain = { prevId: entryId };
-            emitGroup(child, breadcrumb, drops, out, trackChain, startDate, waves);
+            emitGroup(child, breadcrumb, drops, out, trackChain, ctx);
             lastTrackEnd = trackChain.prevId;
         } else if (child.$type === 'DescriptionDirective') {
             drops.description += 1;
@@ -331,15 +348,14 @@ function emitItem(
     drops: DropCounts,
     out: string[],
     chain: Chain,
-    startDate: string,
-    waves: WaveCtx | undefined,
+    ctx: EmitCtx,
 ): void {
     countDrops(item, drops);
     const id = item.name ?? slugify(displayLabel(item));
     const status = mapStatus(getProp(item, 'status'));
     const after = getProps(item, 'after');
-    const duration = durationToMermaid(getProp(item, 'duration') ?? getProp(item, 'size')) ?? '1d';
-    const start = startTokenFor(after, chain, startDate, previousWaveOf(item, waves));
+    const duration = daysToMermaid(ctx.schedule.byNode.get(item)?.days) ?? '1d';
+    const start = startTokenFor(after, chain, ctx.startDate, previousWaveOf(item, ctx.waves));
 
     const meta = [status, id, start, duration].filter((s) => s !== '').join(', ');
     out.push(`    ${escapeTaskName(displayLabel(item))} :${meta}`);
@@ -411,6 +427,29 @@ function resolveStartDate(inputs: ExportInputs): string {
     const declared = decl ? getProp(decl, 'start') : undefined;
     if (declared && /^\d{4}-\d{2}-\d{2}$/.test(declared.trim())) return declared.trim();
     return formatIsoDate(inputs.model.timeline.startDate);
+}
+
+function parseIsoDate(iso: string): Date {
+    const [y, m, d] = iso.split('-').map(Number);
+    return new Date(Date.UTC(y, m - 1, d));
+}
+
+/** Monday first, as Mermaid's docs write `excludes`. */
+const WEEKDAY_NAMES_MONDAY_FIRST: ReadonlyArray<[number, string]> = [
+    [1, 'monday'],
+    [2, 'tuesday'],
+    [3, 'wednesday'],
+    [4, 'thursday'],
+    [5, 'friday'],
+    [6, 'saturday'],
+    [0, 'sunday'],
+];
+
+/** The open week's non-working days, as Mermaid `excludes` names. */
+function excludedWeekdays(working: WorkingCalendar): string[] {
+    return WEEKDAY_NAMES_MONDAY_FIRST.filter(
+        ([weekday]) => !working.workingWeekdays.has(weekday),
+    ).map(([, name]) => name);
 }
 
 function formatIsoDate(d: Date): string {

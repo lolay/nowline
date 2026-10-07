@@ -18,7 +18,8 @@ import type {
 } from '@nowline/core';
 import { defaultRowBand } from '../band-scale.js';
 import type { CalendarConfig } from '../calendar.js';
-import { addDays, daysBetween, resolveCalendar, resolveSizes } from '../calendar.js';
+import { resolveSizes } from '../calendar.js';
+import { resolveWorkingCalendar } from '../calendar-resolver.js';
 import { parseDate, propValue, propValues } from '../dsl-utils.js';
 import { localeStrings, resolveLocale } from '../i18n.js';
 import type { LayoutOptions, LayoutResult } from '../layout.js';
@@ -51,7 +52,12 @@ import type {
     SlackCorridor,
 } from '../types.js';
 import type { ViewPreset } from '../view-preset.js';
-import { buildHeaderTicks, resolveScale, tickBoundaryAtOrAfter } from '../view-preset.js';
+import {
+    buildHeaderTicks,
+    buildNonWorkingRuns,
+    resolveScale,
+    tickBoundaryAtOrAfter,
+} from '../view-preset.js';
 import { solveWaveBarriers } from '../wave-barrier.js';
 import {
     beginWavePass,
@@ -60,7 +66,7 @@ import {
     seedWaveEdges,
     WAVE_EDGE_TOLERANCE_PX,
 } from '../wave-layout.js';
-import { fromCalendarConfig } from '../working-calendar.js';
+import type { WorkingCalendar } from '../working-calendar.js';
 import { buildAnchors } from './anchor-node.js';
 import { maxLeafItemRightX } from './content-extent.js';
 import { buildFootnotes } from './footnote-node.js';
@@ -106,6 +112,23 @@ function growChartRightX(ctx: LayoutContext, rightX: number): void {
     if (rightX > ctx.chartRightX) ctx.chartRightX = rightX;
 }
 
+/**
+ * Set (or refresh) the timeline's hidden non-working runs from its current
+ * ticks. Both keys stay omitted when the window holds no non-working day,
+ * so a calendar without one keeps its exact model shape. The extension
+ * pass only grows the window, so a refresh never loses the runs.
+ */
+function setNonWorkingRuns(
+    timeline: PositionedTimelineScale,
+    scale: TimeScale,
+    unit: ViewPreset['unit'],
+): void {
+    const runs = buildNonWorkingRuns(scale, timeline.ticks, unit, timeline.minorGrid);
+    if (!runs) return;
+    timeline.nonWorkingDisplay = 'hide';
+    timeline.nonWorking = runs;
+}
+
 /** Sized output from the beside-mode header word-wrap pass. */
 export interface SizedHeader {
     titleLines: string[];
@@ -123,7 +146,11 @@ export interface SizedHeader {
 export interface RoadmapNodeDeps extends LayoutHelpers {
     computeDateWindow: (
         file: NowlineFile,
-        ctx: { cal: CalendarConfig; sizes: Map<string, import('../types.js').ResolvedSize> },
+        ctx: {
+            cal: CalendarConfig;
+            sizes: Map<string, import('../types.js').ResolvedSize>;
+            calendar?: WorkingCalendar;
+        },
         resolved: ResolveResult,
         today: Date | undefined,
         scale: ViewPreset,
@@ -162,7 +189,10 @@ export class RoadmapNode {
         const width = options.width ?? 1280;
         const locale = resolveLocale(options.locale, directiveLocale(file));
 
-        const cal = resolveCalendar(file, resolved.config.calendar);
+        // The working calendar maps dates to working-day indices for the
+        // window, the axis and every placement (specs/working-calendar.md
+        // §5, §7.1).
+        const { config: cal, working: calendar } = resolveWorkingCalendar(file, resolved);
         const scale = resolveScale(file, resolved.config.scale);
         // Build the resolved-size map once per layout. Sized items look up
         // through this map (instead of the raw `SizeDeclaration`s the
@@ -183,7 +213,7 @@ export class RoadmapNode {
         // now-line) instead of defaulting to a 180-day desert.
         const { startDate, endDate } = deps.computeDateWindow(
             file,
-            { cal, sizes },
+            { cal, sizes, calendar },
             resolved,
             options.today,
             scale,
@@ -225,9 +255,8 @@ export class RoadmapNode {
         // chrome padding, capped at the max — no floor. The two
         // `GUTTER_PX` insets keep the header card and attribution
         // wordmark from butting against the canvas edges.
-        const calendar = fromCalendarConfig(cal);
         const ppd = scale.pixelsPerUnit / calendar.daysPerUnit(scale.unit);
-        const spanDays = Math.max(1, daysBetween(startDate, endDate));
+        const spanDays = Math.max(1, calendar.workingIndexOf(startDate, endDate));
         const naturalWidth = spanDays * ppd;
         const originX = chartLeftX + GUTTER_PX;
         const totalChartWidth = naturalWidth;
@@ -365,6 +394,7 @@ export class RoadmapNode {
             minorGrid: headerStyle.minorGrid,
             ...(plan ? { waveStrip: { y: waveStripY, height: waveStripHeight } } : {}),
         };
+        setNonWorkingRuns(timeline, timeScale, scale.unit);
 
         // Stitch packed placements together with their final centerY now
         // that markerRowY is known. AnchorNode + MilestoneNode read this
@@ -611,10 +641,10 @@ export class RoadmapNode {
         const overflowDays = (maxContentRightX - originX) / ppd;
         const paddedDays =
             overflowDays > 0
-                ? tickBoundaryAtOrAfter(startDate, overflowDays, scale.unit, tickDays)
+                ? tickBoundaryAtOrAfter(startDate, overflowDays, scale.unit, tickDays, calendar)
                 : 0;
         if (paddedDays > spanDays) {
-            const extendedEndDate = addDays(startDate, paddedDays);
+            const extendedEndDate = calendar.dateAtWorkingIndex(startDate, paddedDays);
             const extendedWidth = paddedDays * ppd;
             const extendedScale = new TimeScale({
                 domain: [startDate, extendedEndDate],
@@ -625,6 +655,7 @@ export class RoadmapNode {
             timeline.endDate = extendedEndDate;
             timeline.box.width = extendedWidth;
             timeline.ticks = buildHeaderTicks(extendedScale, scale, calendar, locale);
+            setNonWorkingRuns(timeline, extendedScale, scale.unit);
             growChartRightX(ctx, originX + extendedWidth + GUTTER_PX);
         }
 

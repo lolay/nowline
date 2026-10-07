@@ -57,7 +57,7 @@ Conversion rules:
 - `title` → `roadmap` `"<title>"`; extract `dateFormat` for the `start:` date of the first task.
 - Each `section` → one `swimlane`.
 - Each task line `<label> :<status>, <id>, <start/after>, <duration>` → one `item`. Map Mermaid statuses: `done→done`, `active→in-progress`, `crit→at-risk`, no tag→`planned`.
-- `<duration>` in `Nd` → `<N>d`; `Nw` → `<N>w`. If only dates given, compute the duration as the day difference.
+- `<duration>` in `Nd` → `<N>d`; `Nw` → `<N>w`. If only dates given, compute the duration as the day difference. A gantt with `excludes weekends` (or `excludes saturday, sunday`) counts `Nd` in working days, so it maps to the business calendar's days (`calendar:business`, the default: `10d` is `2w`); without `excludes`, `Nd` counts every calendar day, so use `calendar:full`.
 - `:milestone` → `milestone` keyword; date from the explicit date field.
 - `after <id>` dependencies → `after:<id>` on the target item.
 

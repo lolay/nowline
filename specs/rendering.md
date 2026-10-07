@@ -51,6 +51,11 @@ This document describes the public **output contract**. The internal layout-engi
   - `PositionedGroup.waveOnly` (an untitled, unstyled group with `wave:` and no `labels:`; it draws no bracket).
   - `PositionedMilestone.onWaveBoundary` (suppresses the cut line) and `overrunByWave` (the wave that overruns a dated milestone).
   - `PositionedIncludeRegion.waveCrossings` — crossings re-emitted inside an isolated region.
+- **Non-working days** (`calendar:business`, whose weekend is hidden; every field below is omitted when it does not apply, so `calendar:full` and `calendar:custom` models carry none of them; see [`working-calendar.md` § 7.5](./working-calendar.md)):
+  - `PositionedTimelineScale.nonWorkingDisplay` (`'hide'`) and `nonWorking` — one `PositionedNonWorkingRun` per run of hidden days in or straddling the window: `x`, `width` (0 under `hide`), `from`, `through` (inclusive), `titles?` and `seam?` (days scale only; the renderer draws a seam line there).
+  - `PositionedAnchor.hiddenDate` and `PositionedMilestone.hiddenDate` — the real ISO date of a marker dated on a hidden day (it sits at the seam; the renderer adds it as an SVG `<title>`).
+  - `PositionedMilestone.overrunDate` — the date NL.I1007 reports, so insights never read a date back off x.
+  - `PositionedItem.nonWorkingPin` — the pin (`date:`, `start:` or the date in `after:`) that fell on a hidden day, behind NL.I1008.
 
 The layout engine is pure computation — no DOM, no SVG, no side effects. It runs identically in Node.js and the browser.
 
@@ -143,7 +148,15 @@ A single-row header displays the scale units (days, weeks, months, quarters, yea
   - Months: show every 3rd (quarterly markers)
   - Quarters: show every 4th (yearly markers)
   - Years: show every 5th
-- **Tick positions**: day and week ticks step from the roadmap start by a fixed stride (`1` day; `days-per-week` from the calendar preset). Month, quarter, and year ticks sit on real calendar boundaries: the 1st of each month, of Jan / Apr / Jul / Oct, or of January. The calendar preset's `days-per-month` / `-quarter` / `-year` only converts `1m` / `1q` / `1y` durations into days; it never sets the length of a column on the date axis, because a fixed day count drifts across month edges. The chart's left edge is always a tick, so a roadmap starting mid-period opens with a partial column, and every column is labelled from its own start date. When a partial column at either edge is too narrow for its label, the tick stays and the label is dropped. Label thinning counts ticks from the left edge.
+- **Tick positions**: day and week ticks step from the roadmap start by a fixed stride (`1` day; `days-per-week` from the calendar preset). Month, quarter, and year ticks sit on real calendar boundaries: the 1st of each month, of Jan / Apr / Jul / Oct, or of January. The calendar preset's `days-per-month` / `-quarter` / `-year` only converts `1m` / `1q` / `1y` durations into days; it never sets the length of a column on the date axis, because a fixed day count drifts across month edges. The chart's left edge is always a tick, so a roadmap starting mid-period opens with a partial column, and every column is labelled from its own start date. When a partial column at either edge is too narrow for its label, the tick stays and the label is dropped. Label thinning counts ticks from the left edge. Under a calendar with hidden days the tick rules change; see "Hidden days" below.
+- **Hidden days** (`calendar:business`): the axis counts working days, so `pixelsPerDay` is pixels per visible day and a business week column is 40 px at the default week scale, not 56. The rules that differ from the calendar-day axis:
+  - *Week ticks* fall on week starts: Monday under the business weekend, found by stepping from the roadmap start (the tick at the chart's left edge is the start itself). Labels read `Jan 05, 12, 19`, not `Jan 05, 10, 15`. A calendar with no recurring weekend keeps stepping from the roadmap start.
+  - *Month, quarter and year ticks* keep their real boundaries. A boundary that falls on a hidden day (Feb 1 2026 is a Sunday) sits at the seam, the start of the next working day, and keeps its own label.
+  - *Dropped columns*: a column with no visible day (zero width) is dropped with its label. At the days scale that is every weekend day.
+  - *Narrow-column rule*: a label is dropped when it is wider than its column and the column is narrower than a full unit, the #92 edge-column rule applied to every column. The tick stays, the label keeps its `labelX`, and the closing tick's `major` flag follows the same column rule.
+  - *Thinning* counts visible columns. The one exception is the days scale's default (no `label-every`, not a `scale:` literal), which labels week starts instead of every Nth column, because "every N visible columns" drifts once a week has six working days. An explicit `label-every` still counts columns.
+  - *Seams*: at the days scale only, a faint 1 px dotted line (`timeline.nonWorkingSeam`; light `#a0aec0`, dark `#6b7a90`, grayscale `#9a9a9a`) marks hidden days, spanning the minor-grid range. It is drawn strictly inside the chart and only where no grid line already sits. Week scale and above draw none.
+  - *Dated entities*: anchors, milestones, date pins and the now-line sit at their working-day x. One dated on a hidden day sits at the seam, and its real date is in the marker's tooltip.
 - **Range**: the first tick mark aligns with the earliest item start or anchor date, with the roadmap's `padding` as whitespace before it. The last tick mark extends to the latest item end, anchor date, or milestone date, with the same padding after. The right edge is the later of `length:` (when set) and the content end rounded up to the next tick boundary (the next month / quarter / year start on those scales), so a `length:` that runs past the content can leave a partial last column.
 - **Custom units**: custom units (e.g., `sprints = 2w`) map to their underlying duration for positioning; labels use the custom unit name
 - **Mirrored bottom strip**: when `timeline-position:bottom` or `timeline-position:both` is set on the roadmap, the renderer emits a second tick-label panel below the chart's last swimlane (and below any isolate-include regions), above the footnote panel. The mirrored strip shares the same fill, border, label color, and tick positions as the top strip — it has no now-pill and no marker row (anchors and milestones still belong to the top header). The default `timeline-position:top` keeps the existing single-strip layout.
@@ -406,7 +419,7 @@ Swimlanes with `capacity:` paint a **tri-state utilization underline** (green / 
 
 - Height: 2px, matching the milestone-line stroke weight.
 - Y-position: flush with the bottom edge of the lane band, inside the band (not below).
-- X-positions: align to the timestep event boundaries (item start/end), not arbitrary day grid lines. Use `pixelsPerDay` arithmetic from the time scale.
+- X-positions: align to the timestep event boundaries (item start/end), not arbitrary day grid lines. Use `pixelsPerDay` arithmetic from the time scale (pixels per visible day under `calendar:business`).
 - The underline spans the full lane lifetime — from the first item's left edge to the last item's right edge — so adjacent green segments make the lane read as a continuous bar.
 
 **Theme tokens:**
@@ -649,7 +662,11 @@ Key-value summary of the roadmap:
 | Roadmap | Platform 2026 |
 | Author | Acme Engineering |
 | Scale | weeks |
+| Start | 2026-01-05 |
+| Calendar | business (Saturday and Sunday off; 5/22/65/260 days per week/month/quarter/year) |
 | Generated | 2026-04-14T12:00:00Z |
+
+`Start` is the roadmap's `start:` literal (blank when omitted). `Calendar` names the calendar the Duration column counts in: the mode, the weekdays the open-ended week takes off (Monday first, or `no days off`), and the days per week, month, quarter and year. `calendar:full` reads `full (no days off; 7/30/91/365 days per week/month/quarter/year)`, and a custom calendar reads `custom (no days off; 6/26/78/312 days per week/month/quarter/year)` for those four values.
 
 #### Sheet 2: "Items" (data table)
 
@@ -663,10 +680,10 @@ One row per item. This is the primary sheet.
 | Group | parent group id | If inside a `group` block; blank otherwise |
 | Parallel | parent parallel id | If inside a `parallel` block; blank otherwise |
 | Wave | effective wave id | Only when the roadmap declares waves (the column is absent otherwise). Own or inherited `wave:`; blank for background work |
-| Duration | `duration:` working days | Numeric working days (e.g., `10` for `2w`) |
+| Duration | computed from schedule | Numeric days in the file's calendar, the chart's own count: `10` for `2w` on business, `14` on `calendar:full`. Covers `q`, a declared `size … effort:` and `capacity:`; `0` when the item has no duration |
 | Duration (text) | `duration:` literal | Original DSL literal (e.g., `2w`) |
-| Start | computed from schedule | Floating calendar start date (UTC midnight); blank for anonymous items |
-| End | computed from schedule | Floating calendar end date (UTC midnight); blank for anonymous items |
+| Start | computed from schedule | Floating calendar start date (UTC midnight); anonymous items included |
+| End (exclusive) | computed from schedule | Floating calendar end date (UTC midnight), exclusive, the day after the last working day: Saturday for an item that ends on a Friday under `calendar:business`; anonymous items included |
 | Status | `status:` value | e.g., `done`, `at-risk`, `planned` |
 | Remaining | `remaining:` value | e.g., `30%` |
 | Owner | `owner:` value | Person or team identifier |
@@ -747,7 +764,12 @@ Key differences: Start/Finish dates are computed by `scheduleRoadmap` from the c
 
 ### MS Project XML Export
 
-The MS Project exporter reads the AST only (it does not run the schedule) and maps `after:` to finish-to-start predecessor links. When the roadmap declares waves:
+The MS Project exporter runs the schedule (`scheduleRoadmap`) to read the file's calendar and each item's duration, and maps `after:` to finish-to-start predecessor links. It still writes the export date (or `--start`) as the project start, no `<Finish>`, and no implicit lane sequencing.
+
+- **Calendar.** The Standard base calendar's working weekdays are the open-ended week's (`WorkingCalendar.workingWeekdays`): Monday to Friday under `calendar:business`, byte-identical to before, and all seven days, each with `WorkingTimes`, under `calendar:full` and `calendar:custom`. Dated days off, `<Exceptions>` and `<WorkWeeks>` are not written; they come with the Phase 5 declarations ([`specs/working-calendar.md`](./working-calendar.md) § 8).
+- **Duration.** A task's `<Duration>` is the schedule's day count for the item times 480 minutes (`PT{n}M0S`), so `1w` is `PT2400M0S` on business and `PT3360M0S` on `calendar:full`. An item with no duration keeps 480 minutes, so it stays a one-day task rather than a zero-length one, which MS Project shows as a milestone. The exporter writes no `<MinutesPerWeek>` or `<DaysPerMonth>`, so MS Project displays a full-calendar week as 1.4 default weeks.
+
+When the roadmap declares waves:
 
 - **Wave-end milestone tasks.** One zero-duration milestone task per wave, titled `{title} (wave end)`, at outline level 1. They are appended after every other task, in declaration order, so the UIDs and IDs of all existing tasks never change. Its finish-to-start predecessors are every member that has an id, plus the previous wave's end task. `after:<wave>` on an item or milestone links to that wave's end task.
 - **Barrier links.** Every member of wave k ≥ 2 gains a finish-to-start link to wave k−1's end task, merged with its own `after:` links without duplicates. Background work gets no wave links.
@@ -759,12 +781,13 @@ The MS Project exporter reads the AST only (it does not run the schedule) and ma
 The Mermaid output is a best-effort translation. The Nowline DSL is richer than Mermaid's `gantt` block — labels, footnotes, anchors, and progress tracking have no direct Mermaid equivalent. The bridge:
 
 - Maps swimlanes to Mermaid `section` blocks.
-- Maps items to Mermaid tasks with duration.
+- Maps items to Mermaid tasks with a duration in days (`Nd`, up to two decimals, e.g. `10d`, `7.5d`, `7.33d`), the schedule's count for the item in the file's calendar, so it includes `q`, declared sizes and `capacity:`. An item with no duration is written as `1d`. A `calendar:full` `4w` is `28d`.
+- On `calendar:business`, emits `excludes saturday, sunday` directly after `dateFormat YYYY-MM-DD`, so Mermaid counts `Nd` in working days like the chart. `calendar:full` and `calendar:custom` have no days off in the open-ended week and emit no `excludes` line. Dated days off and Mermaid date excludes for declarations come with Phase 5.
 - Maps `after` dependencies to Mermaid `after` syntax.
-- Anchors every task with an explicit start token so Mermaid never mis-reads a task id as a start date: declared `after:` deps win, otherwise the task chains `after` the previous item in its lane, otherwise (a lane or parallel-track leader) it anchors at the roadmap's `start:` date (falling back to the layout-computed timeline start when `start:` is omitted). This mirrors Nowline's default "each item starts after the preceding item in its lane" layout.
-- Maps anchors to Mermaid milestones.
+- Anchors every task with an explicit start token so Mermaid never mis-reads a task id as a start date: declared `after:` deps win, otherwise the task chains `after` the previous item in its lane, otherwise (a lane or parallel-track leader) it anchors at the roadmap's `start:` date (falling back to the layout-computed timeline start when `start:` is omitted), moved to the first working day at or after it. Mermaid never checks a task's start against `excludes`, so explicit dates must be working days. This mirrors Nowline's default "each item starts after the preceding item in its lane" layout.
+- Maps anchors to Mermaid milestones. Declared anchor and milestone dates are written as given, even on a weekend.
 - Drops properties that Mermaid cannot express (labels, footnotes, owners, remaining). Parallel/group structure is flattened (tracks anchor at the block's entry point; the lane then continues after the last track — Mermaid cannot express "after the latest of N tracks").
-- When the roadmap declares waves, emits a `section Waves` after the anchors and before the lanes, with one milestone per wave (`{title} (wave end) :milestone, {waveId}, {end date}, 0d`, dated from the schedule; the date is the wave's exclusive end, the day the next wave can start). The milestone id is the wave id, so `after:build` maps to Mermaid `after build`, and every member of wave k ≥ 2 also anchors `after` wave k−1's milestone (added to its existing `after` token, or replacing a lane leader's start date). Start floors are dropped and counted as `wave-floor` in the `%%` summary.
+- When the roadmap declares waves, emits a `section Waves` after the anchors and before the lanes, with one milestone per wave (`{title} (wave end) :milestone, {waveId}, {end date}, 0d`, dated from the schedule; the date is the first working day at or after the wave's exclusive end, the day the next wave can start, so a wave that ends on a Friday is dated Monday, not Saturday). The milestone id is the wave id, so `after:build` maps to Mermaid `after build`, and every member of wave k ≥ 2 also anchors `after` wave k−1's milestone (added to its existing `after` token, or replacing a lane leader's start date). Start floors are dropped and counted as `wave-floor` in the `%%` summary.
 - Includes a comment noting the lossy conversion.
 
 This output works as a Trojan horse — users can share roadmaps in Mermaid-compatible contexts (GitHub READMEs, Notion, Confluence) and link back to the full Nowline version.

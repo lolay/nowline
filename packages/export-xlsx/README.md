@@ -32,8 +32,8 @@ const xlsx = await exportXlsx(inputs, {
 
 | Sheet              | Columns | Notes |
 |--------------------|---------|-------|
-| **Roadmap**        | Title, Author, Generated, Source path                                 | Workbook overview. |
-| **Items**          | id, title, swimlane, group, parallel, status, owner, after, before, duration (working days), duration (text), labels, description | One row per item. The numeric duration column is in working days for SUM and filters; the text column preserves the original DSL literal (`2w`, `1m`, etc.). |
+| **Roadmap**        | Roadmap, Author, Scale, Start, Calendar, Generated                    | Workbook overview. `Calendar` names the calendar the Duration column counts in, e.g. `business (Saturday and Sunday off; 5/22/65/260 days per week/month/quarter/year)`. |
+| **Items**          | id, title, swimlane, group, parallel, status, owner, after, before, duration (days), duration (text), labels, description | One row per item. The numeric duration column is the chart's own day count under the file's calendar (sizes, `q` and `capacity:` included; 0 when the item has none) for SUM and filters; the text column preserves the original DSL literal (`2w`, `1m`, etc.). `End` is exclusive. |
 | **Milestones**     | id, title, after / before, date                                       | One row per milestone. |
 | **Anchors**        | id, title, date                                                       | One row per anchor. |
 | **People & Teams** | id, name, type (person\|team)                                          | Ownership references. |

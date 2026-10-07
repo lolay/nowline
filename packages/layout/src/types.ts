@@ -180,6 +180,35 @@ export interface PositionedTimelineScale {
     // Mirrors the roadmap's resolved `minor-grid` style property. Default
     // `false` preserves byte-stable output for existing roadmaps.
     minorGrid: boolean;
+    /**
+     * How the axis shows non-working days (specs/working-calendar.md §7):
+     * `hide` collapses them to zero width. Present, with `nonWorking`, only
+     * when the window holds a non-working day.
+     */
+    nonWorkingDisplay?: 'hide';
+    /** The window's non-working runs, left to right; see `PositionedNonWorkingRun`. */
+    nonWorking?: PositionedNonWorkingRun[];
+}
+
+/**
+ * One maximal run of non-working days in (or straddling) the window
+ * (specs/working-calendar.md §7.5). Under `hide` its `width` is 0 and `x`
+ * is the start of the next working day.
+ */
+export interface PositionedNonWorkingRun {
+    x: number;
+    width: number;
+    /** First non-working date of the run (UTC midnight). */
+    from: Date;
+    /** Last non-working date of the run, inclusive. */
+    through: Date;
+    /** Titles of the dated rules inside it; omitted for a plain weekend. */
+    titles?: string[];
+    /**
+     * Set at the days scale when the run lies strictly inside the chart and
+     * no grid line is drawn at its x; the renderer draws a seam there.
+     */
+    seam?: true;
 }
 
 /**
@@ -400,6 +429,15 @@ export interface PositionedItem {
      * the floor.
      */
     wavePinOverride?: { wave: string; key: 'date' | 'start'; pin: string; start: string };
+    /**
+     * Present when the item's `date:`, `start:` or `after:DATE` pin falls on
+     * a non-working day and that pin set the start (NL.I1008,
+     * specs/working-calendar.md §6): `key` / `pin` are the pin as written,
+     * `start` the working day the item starts on (YYYY-MM-DD). Omitted when
+     * a later `after:` ref, the lane cursor or a wave floor set the start,
+     * and whenever `wavePinOverride` is set.
+     */
+    nonWorkingPin?: { key: 'date' | 'start' | 'after'; pin: string; start: string };
 }
 
 /**
@@ -577,6 +615,12 @@ export interface PositionedAnchor {
     // (start-anchored text) — no further geometry decisions.
     labelBox: BoundingBox;
     labelSide: 'left' | 'right';
+    /**
+     * The anchor's `date:` (YYYY-MM-DD) when it falls on a non-working day
+     * the axis hides; the renderer surfaces it as a `<title>`. Omitted on a
+     * working day and under a calendar with no non-working days.
+     */
+    hiddenDate?: string;
 }
 
 export interface PositionedMilestone {
@@ -611,6 +655,18 @@ export interface PositionedMilestone {
      * latest-ending such wave; omitted when none.
      */
     overrunByWave?: string;
+    /**
+     * The milestone's own `date:` (YYYY-MM-DD), set together with
+     * `overrunByWave`, so NL.I1007 never reads the date back off x.
+     */
+    overrunDate?: string;
+    /**
+     * The milestone's `date:` (YYYY-MM-DD) when it falls on a non-working
+     * day the axis hides; the renderer surfaces it as a `<title>`. Omitted
+     * on a working day, for after-only milestones, and under a calendar
+     * with no non-working days.
+     */
+    hiddenDate?: string;
 }
 
 /**

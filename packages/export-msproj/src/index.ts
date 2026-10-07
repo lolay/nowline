@@ -3,7 +3,10 @@
 //
 // Spec: specs/handoffs/m2c.md § 8.
 // Decisions:
-//   - Resolution 6: Standard calendar block (Mon–Fri, 8h, fixed UIDs 1/2).
+//   - Resolution 6: Standard calendar block (8h days, fixed UIDs 1/2). Its
+//     working weekdays and every task Duration come from engine C
+//     (`scheduleRoadmap`) under the file's calendar, so they match the chart
+//     (specs/working-calendar.md §8).
 //   - Resolution 9: single stderr summary line on lossy drops; never an error.
 //   - Lossy export policy: `--strict` does not escalate.
 //   - Waves (specs/waves.md §10): one wave-end milestone task per wave,
@@ -29,9 +32,10 @@ import type {
 import { buildWavePlan } from '@nowline/core';
 import type { ExportInputs } from '@nowline/export-core';
 import { displayLabel, getProp, getProps, hasProp, roadmapTitle } from '@nowline/export-core';
+import { type RoadmapSchedule, scheduleRoadmap } from '@nowline/layout';
 
 import { buildCalendarsBlock, STANDARD_RESOURCE_CALENDAR_UID } from './calendar.js';
-import { durationToMsProjMinutes, minutesToMsProjDuration } from './duration.js';
+import { minutesToMsProjDuration, workingDaysToMinutes } from './duration.js';
 import { escapeXml, singleLine, tag } from './xml.js';
 
 export interface MsProjOptions {
@@ -109,12 +113,13 @@ export function exportMsProjXml(inputs: ExportInputs, options: MsProjOptions = {
         options.projectName ?? roadmapTitle(ast.roadmapDecl ?? undefined),
     );
     const startDate = resolveStartDate(options.startDate, inputs.today);
+    const schedule = scheduleRoadmap(ast, inputs.resolved, { today: inputs.today });
 
     // Resources
     const resources = collectResources(ast);
 
     // Tasks (walk roadmap entries in source order)
-    const tasks = collectTasks(ast, drops, startDate);
+    const tasks = collectTasks(ast, drops, schedule);
 
     // Predecessor lookup uses Nowline ids → task UIDs.
     const idToUid = new Map<string, number>();
@@ -140,7 +145,7 @@ export function exportMsProjXml(inputs: ExportInputs, options: MsProjOptions = {
     lines.push(`  <StartDate>${startDate}T08:00:00</StartDate>`);
     lines.push('  <ScheduleFromStart>1</ScheduleFromStart>');
     lines.push('  <CalendarUID>1</CalendarUID>');
-    lines.push(buildCalendarsBlock());
+    lines.push(buildCalendarsBlock(schedule.calendar.working.workingWeekdays));
 
     // Tasks block
     lines.push('  <Tasks>');
@@ -182,7 +187,7 @@ export function exportMsProjXml(inputs: ExportInputs, options: MsProjOptions = {
 
 // ---------- Tasks ----------
 
-function collectTasks(ast: NowlineFile, drops: DropCounts, startDate: string): TaskRow[] {
+function collectTasks(ast: NowlineFile, drops: DropCounts, schedule: RoadmapSchedule): TaskRow[] {
     const tasks: TaskRow[] = [];
     const ctx = { uid: 1, id: 1 };
 
@@ -203,7 +208,7 @@ function collectTasks(ast: NowlineFile, drops: DropCounts, startDate: string): T
                 ownerRefs: getProps(lane, 'owner') as string[],
             });
             for (const child of lane.content) {
-                walkSwimlaneChild(child, 2, ctx, drops, tasks, startDate);
+                walkSwimlaneChild(child, 2, ctx, drops, tasks, schedule);
             }
             // Summary spans all child rows — implicit in MSProject by id ranges,
             // but we don't bother computing FinishDate / actuals.
@@ -250,10 +255,10 @@ function walkSwimlaneChild(
     ctx: { uid: number; id: number },
     drops: DropCounts,
     tasks: TaskRow[],
-    startDate: string,
+    schedule: RoadmapSchedule,
 ): void {
     if (child.$type === 'ItemDeclaration') {
-        emitTaskRow(child, outline, ctx, drops, tasks);
+        emitTaskRow(child, outline, ctx, drops, tasks, schedule);
     } else if (child.$type === 'GroupBlock') {
         const group = child as GroupBlock;
         tasks.push({
@@ -269,13 +274,13 @@ function walkSwimlaneChild(
             ownerRefs: [],
         });
         for (const grandchild of group.content as GroupContent[]) {
-            walkGroupChild(grandchild, outline + 1, ctx, drops, tasks, startDate);
+            walkGroupChild(grandchild, outline + 1, ctx, drops, tasks, schedule);
         }
     } else if (child.$type === 'ParallelBlock') {
         const parallel = child as ParallelBlock;
         for (const grandchild of parallel.content) {
             if (grandchild.$type === 'ItemDeclaration') {
-                emitTaskRow(grandchild, outline, ctx, drops, tasks);
+                emitTaskRow(grandchild, outline, ctx, drops, tasks, schedule);
             } else if (grandchild.$type === 'GroupBlock') {
                 walkSwimlaneChild(
                     grandchild as unknown as SwimlaneContent,
@@ -283,7 +288,7 @@ function walkSwimlaneChild(
                     ctx,
                     drops,
                     tasks,
-                    startDate,
+                    schedule,
                 );
             }
         }
@@ -298,10 +303,10 @@ function walkGroupChild(
     ctx: { uid: number; id: number },
     drops: DropCounts,
     tasks: TaskRow[],
-    startDate: string,
+    schedule: RoadmapSchedule,
 ): void {
     if (child.$type === 'ItemDeclaration') {
-        emitTaskRow(child, outline, ctx, drops, tasks);
+        emitTaskRow(child, outline, ctx, drops, tasks, schedule);
     } else if (child.$type === 'GroupBlock') {
         const group = child as GroupBlock;
         tasks.push({
@@ -317,13 +322,13 @@ function walkGroupChild(
             ownerRefs: [],
         });
         for (const grandchild of group.content as GroupContent[]) {
-            walkGroupChild(grandchild, outline + 1, ctx, drops, tasks, startDate);
+            walkGroupChild(grandchild, outline + 1, ctx, drops, tasks, schedule);
         }
     } else if (child.$type === 'ParallelBlock') {
         const parallel = child as ParallelBlock;
         for (const grandchild of parallel.content) {
             if (grandchild.$type === 'ItemDeclaration') {
-                emitTaskRow(grandchild, outline, ctx, drops, tasks);
+                emitTaskRow(grandchild, outline, ctx, drops, tasks, schedule);
             }
         }
     } else if (child.$type === 'DescriptionDirective') {
@@ -337,6 +342,7 @@ function emitTaskRow(
     ctx: { uid: number; id: number },
     drops: DropCounts,
     tasks: TaskRow[],
+    schedule: RoadmapSchedule,
 ): void {
     countDrops(item, drops);
     tasks.push({
@@ -346,9 +352,7 @@ function emitTaskRow(
         outlineLevel: outline,
         isSummary: false,
         isMilestone: false,
-        durationMinutes: durationToMsProjMinutes(
-            getProp(item, 'duration') ?? getProp(item, 'size'),
-        ),
+        durationMinutes: workingDaysToMinutes(schedule.byNode.get(item)?.days),
         predecessors: getProps(item, 'after') as string[],
         nowlineId: item.name,
         ownerRefs: getProps(item, 'owner') as string[],

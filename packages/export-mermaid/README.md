@@ -47,7 +47,7 @@ nowline roadmap.nowline -o roadmap.md            # extension-inferred
 gantt
     title <title>
     dateFormat YYYY-MM-DD
-    axisFormat %b %d
+    excludes saturday, sunday
     section <swimlane>
     Item one : done, item-one, 2026-01-06, 5d
     Item two : active, item-two, after item-one, 10d
@@ -57,7 +57,15 @@ gantt
 ```
 
 The first line of the Markdown is the roadmap title. The fenced
-```` ```mermaid ```` block contains a valid `gantt` diagram; the trailing
+```` ```mermaid ```` block contains a valid `gantt` diagram. Under
+`calendar:business` (the default) `excludes saturday, sunday` follows
+`dateFormat`, so Mermaid counts each `Nd` in working days like the chart;
+`calendar:full` and `calendar:custom` have no days off and emit no
+`excludes` line. Durations are the chart's own day count for the item
+(sizes, `q` and `capacity:` included), written as `Nd` with up to two
+decimals (`10d`, `7.5d`), so a `full` `4w` is `28d`. The roadmap start and
+wave-end milestones fall on working days; anchor and milestone dates are
+written as declared. The trailing
 `%%` comment line lists Nowline features that don't have a Mermaid
 equivalent and have been dropped.
 

@@ -25,6 +25,7 @@ import type {
     FlowRef,
     I1006Args,
     I1007Args,
+    I1008Args,
     W0701Args,
     W0702Args,
     W1001Args,
@@ -382,4 +383,6 @@ export const messages: MessageBundle = {
     },
     'NL.I1007': (a: I1007Args) =>
         `Le jalon ${q(a.name)} (${a.date}) est dépassé\u00A0: la vague ${q(a.wave)} se termine le ${a.end}.`,
+    'NL.I1008': (a: I1008Args) =>
+        `L'élément ${q(a.name)} est épinglé à ${a.pin} (${a.key}:), un jour non ouvré\u00A0; il démarre le ${a.start}.`,
 };

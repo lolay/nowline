@@ -5,7 +5,9 @@
 //   - Resolution 5 (working-day duration): the "Duration" cell is a NUMBER
 //     of working days; an extra "Duration (text)" column preserves the
 //     original DSL literal. Excel can SUM and filter the numeric column
-//     without a custom formatter.
+//     without a custom formatter. The number is engine C's `days` under the
+//     file's calendar (sizes, `capacity:`, `q` included), so it matches the
+//     chart; the Roadmap sheet's "Calendar" row names that calendar.
 //   - Resolution 8 (deterministic ExcelJS): pin a single ExcelJS version in
 //     `package.json`. Any zip-level non-determinism is patched at write time
 //     by re-emitting the package's content streams in deterministic order.
@@ -40,10 +42,10 @@ import type {
 import { buildWavePlan } from '@nowline/core';
 import type { ExportInputs } from '@nowline/export-core';
 import { displayLabel, getProp, getProps, roadmapTitle } from '@nowline/export-core';
-import { type RoadmapSchedule, scheduleRoadmap } from '@nowline/layout';
+import { type ResolvedCalendar, type RoadmapSchedule, scheduleRoadmap } from '@nowline/layout';
 import ExcelJS from 'exceljs';
 
-import { durationLiteralToText, durationToWorkingDays } from './duration.js';
+import { durationLiteralToText } from './duration.js';
 import { normalizeZipTimestamps } from './zip-normalize.js';
 
 export interface XlsxOptions {
@@ -73,7 +75,7 @@ export async function exportXlsx(
     // Waves sheet are then omitted (specs/waves.md §10).
     const wavePlan = buildWavePlan(inputs.resolved);
 
-    buildRoadmapSheet(wb, inputs, generated);
+    buildRoadmapSheet(wb, inputs, schedule.calendar, generated);
     buildItemsSheet(wb, inputs.ast, schedule, wavePlan);
 
     const hasMilestones = inputs.ast.roadmapEntries.some((e) => e.$type === 'MilestoneDeclaration');
@@ -113,7 +115,12 @@ function inferAuthor(ast: NowlineFile): string | undefined {
 
 // ---------- Sheet 1: Roadmap ----------
 
-function buildRoadmapSheet(wb: ExcelJS.Workbook, inputs: ExportInputs, generated: Date): void {
+function buildRoadmapSheet(
+    wb: ExcelJS.Workbook,
+    inputs: ExportInputs,
+    calendar: ResolvedCalendar,
+    generated: Date,
+): void {
     const sheet = wb.addWorksheet('Roadmap');
     const decl = inputs.ast.roadmapDecl;
     const scale = decl ? getProp(decl, 'scale') : undefined;
@@ -124,17 +131,54 @@ function buildRoadmapSheet(wb: ExcelJS.Workbook, inputs: ExportInputs, generated
         ['Author', inputs.ast.roadmapDecl ? (getProp(inputs.ast.roadmapDecl, 'author') ?? '') : ''],
         ['Scale', scale ?? ''],
         ['Start', start ?? ''],
+        ['Calendar', calendarLabel(calendar)],
         ['Generated', generated],
     ];
-    rows.forEach((row, idx) => {
+    for (const row of rows) {
         const r = sheet.addRow(row);
         r.getCell(1).font = { bold: true };
-        if (idx === 4) r.getCell(2).numFmt = 'yyyy-mm-dd';
-    });
+        if (row[0] === 'Generated') r.getCell(2).numFmt = 'yyyy-mm-dd';
+    }
     sheet.columns = [
         { key: 'field', width: 16 },
         { key: 'value', width: 36 },
     ];
+}
+
+/** Monday first, so a Saturday and Sunday weekend reads in week order. */
+const WEEKDAY_NAMES_MONDAY_FIRST: ReadonlyArray<[number, string]> = [
+    [1, 'Monday'],
+    [2, 'Tuesday'],
+    [3, 'Wednesday'],
+    [4, 'Thursday'],
+    [5, 'Friday'],
+    [6, 'Saturday'],
+    [0, 'Sunday'],
+];
+
+/**
+ * The Calendar row: the mode, the open week's days off and the unit day
+ * counts, e.g. `business (Saturday and Sunday off; 5/22/65/260 days per
+ * week/month/quarter/year)`. It explains the Duration column's numbers.
+ */
+function calendarLabel({ config, working }: ResolvedCalendar): string {
+    const off = WEEKDAY_NAMES_MONDAY_FIRST.filter(
+        ([weekday]) => !working.workingWeekdays.has(weekday),
+    ).map(([, name]) => name);
+    const daysOff = off.length === 0 ? 'no days off' : `${joinWithAnd(off)} off`;
+    const counts = [
+        config.daysPerWeek,
+        config.daysPerMonth,
+        config.daysPerQuarter,
+        config.daysPerYear,
+    ].join('/');
+    return `${config.mode} (${daysOff}; ${counts} days per week/month/quarter/year)`;
+}
+
+/** `a`, `a and b`, `a, b and c`. */
+function joinWithAnd(words: readonly string[]): string {
+    if (words.length <= 1) return words.join('');
+    return `${words.slice(0, -1).join(', ')} and ${words[words.length - 1]}`;
 }
 
 // ---------- Sheet 2: Items ----------
@@ -148,7 +192,7 @@ const ITEM_HEADERS: ReadonlyArray<{ header: string; key: string; width: number }
     { header: 'Duration', key: 'duration', width: 12 },
     { header: 'Duration (text)', key: 'durationText', width: 16 },
     { header: 'Start', key: 'start', width: 14 },
-    { header: 'End', key: 'end', width: 14 },
+    { header: 'End (exclusive)', key: 'end', width: 16 },
     { header: 'Status', key: 'status', width: 14 },
     { header: 'Remaining', key: 'remaining', width: 12 },
     { header: 'Owner', key: 'owner', width: 14 },
@@ -366,7 +410,7 @@ function itemRow(
         swimlane,
         group,
         parallel,
-        duration: durationToWorkingDays(durationLiteral),
+        duration: scheduled?.days ?? 0,
         durationText: durationLiteralToText(durationLiteral),
         start: scheduled?.start,
         end: scheduled?.end,

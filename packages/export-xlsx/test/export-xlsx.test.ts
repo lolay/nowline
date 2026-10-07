@@ -4,7 +4,6 @@ import { fileURLToPath } from 'node:url';
 import { scheduleRoadmap } from '@nowline/layout';
 import ExcelJS from 'exceljs';
 import { describe, expect, it } from 'vitest';
-import { durationToWorkingDays } from '../src/duration.js';
 import { exportXlsx } from '../src/index.js';
 import { buildExportInputs, FIXTURE, PINNED_DATE } from './helpers.js';
 
@@ -84,7 +83,7 @@ swimlane work "Work"
 });
 
 describe('exportXlsx — Roadmap sheet (metadata)', () => {
-    it('lists Roadmap title, author, scale, start, generated', async () => {
+    it('lists Roadmap title, author, scale, start, calendar, generated', async () => {
         const inputs = await buildExportInputs(FIXTURE, { today: PINNED_DATE });
         const xlsx = await exportXlsx(inputs);
         const wb = await readBack(xlsx);
@@ -97,7 +96,11 @@ describe('exportXlsx — Roadmap sheet (metadata)', () => {
         expect(sheet.getCell('B3').value).toBe('weeks');
         expect(sheet.getCell('A4').value).toBe('Start');
         expect(sheet.getCell('B4').value).toBe('2026-01-05');
-        expect(sheet.getCell('A5').value).toBe('Generated');
+        expect(sheet.getCell('A5').value).toBe('Calendar');
+        expect(sheet.getCell('B5').value).toBe(
+            'business (Saturday and Sunday off; 5/22/65/260 days per week/month/quarter/year)',
+        );
+        expect(sheet.getCell('A6').value).toBe('Generated');
     });
 });
 
@@ -134,7 +137,8 @@ describe('exportXlsx — Items sheet', () => {
         expect(headers).toContain('Duration');
         expect(headers).toContain('Duration (text)');
         expect(headers).toContain('Start');
-        expect(headers).toContain('End');
+        expect(headers).toContain('End (exclusive)');
+        expect(headers).not.toContain('End');
         expect(headers).toContain('Status');
         expect(headers).toContain('Owner');
         expect(headers).toContain('After');
@@ -167,8 +171,9 @@ describe('exportXlsx — Items sheet', () => {
     });
 
     it('Start and End are Date objects for named items', async () => {
-        // auth item: after:kickoff (2026-01-06), duration:2w (10 business days)
-        //   → start 2026-01-06, end 2026-01-16
+        // auth item: after:kickoff (2026-01-06), duration:2w (10 working days)
+        //   → start Tue 2026-01-06, last working day Mon 2026-01-19, so the
+        //   exclusive end is Tue 2026-01-20 (the weekend is skipped).
         const inputs = await buildExportInputs(FIXTURE, { today: PINNED_DATE });
         const xlsx = await exportXlsx(inputs);
         const wb = await readBack(xlsx);
@@ -179,7 +184,7 @@ describe('exportXlsx — Items sheet', () => {
         sheet.getRow(1).eachCell((cell, col) => {
             if (cell.value === 'Title') titleCol = col;
             if (cell.value === 'Start') startCol = col;
-            if (cell.value === 'End') endCol = col;
+            if (cell.value === 'End (exclusive)') endCol = col;
         });
         expect(startCol).toBeGreaterThan(0);
         expect(endCol).toBeGreaterThan(0);
@@ -194,8 +199,8 @@ describe('exportXlsx — Items sheet', () => {
                 expect(end).toBeInstanceOf(Date);
                 // start = 2026-01-06 (kickoff anchor date)
                 expect((start as Date).toISOString().slice(0, 10)).toBe('2026-01-06');
-                // end = start + 10 business days (2w) = 2026-01-16
-                expect((end as Date).toISOString().slice(0, 10)).toBe('2026-01-16');
+                // end = 10 working days after the start, exclusive = 2026-01-20
+                expect((end as Date).toISOString().slice(0, 10)).toBe('2026-01-20');
                 foundAuth = true;
             }
         });
@@ -349,10 +354,43 @@ milestone floating "Float" after:[a]
         const wb = await readBack(xlsx);
         const sheet = wb.getWorksheet('Milestones')!;
         const dateVal = sheet.getCell('C2').value;
-        // a starts 2026-01-06, duration 2w (10 days) → end 2026-01-16
-        // milestone floats to a's end
+        // a starts Tue 2026-01-06, duration 2w (10 working days) → ends
+        // (exclusive) Tue 2026-01-20. The milestone is a point at a's end:
+        // the first working day it can start on, 2026-01-20 (a Tuesday).
         expect(dateVal).toBeInstanceOf(Date);
-        expect((dateVal as Date).toISOString().slice(0, 10)).toBe('2026-01-16');
+        expect((dateVal as Date).toISOString().slice(0, 10)).toBe('2026-01-20');
+    });
+
+    it('Start and End skip the weekend through the public scheduleRoadmap', async () => {
+        // a: Mon-Fri (exclusive end Sat 01-10); b opens the next working day,
+        // Monday 01-12, and its exclusive end is Saturday 01-17.
+        const fixture = `nowline v1
+roadmap r "R" start:2026-01-05
+swimlane s "S"
+  item a "A" duration:1w
+  item b "B" duration:1w
+`;
+        const inputs = await buildExportInputs(fixture, { today: PINNED_DATE });
+        const wb = await readBack(await exportXlsx(inputs));
+        const sheet = wb.getWorksheet('Items')!;
+        let startCol = 0;
+        let endCol = 0;
+        sheet.getRow(1).eachCell((cell, col) => {
+            if (cell.value === 'Start') startCol = col;
+            if (cell.value === 'End (exclusive)') endCol = col;
+        });
+        const days: Array<[string, string]> = [];
+        sheet.eachRow({ includeEmpty: false }, (row, rowNumber) => {
+            if (rowNumber === 1) return;
+            days.push([
+                (row.getCell(startCol).value as Date).toISOString().slice(0, 10),
+                (row.getCell(endCol).value as Date).toISOString().slice(0, 10),
+            ]);
+        });
+        expect(days).toEqual([
+            ['2026-01-05', '2026-01-10'],
+            ['2026-01-12', '2026-01-17'],
+        ]);
     });
 
     it('Anchors sheet lists every anchor with Date objects', async () => {
@@ -405,25 +443,6 @@ describe('exportXlsx — determinism', () => {
     }, 10000);
 });
 
-describe('durationToWorkingDays', () => {
-    it.each([
-        ['1d', 1],
-        ['1w', 5],
-        ['2w', 10],
-        ['1m', 22],
-        ['xs', 1],
-        ['sm', 3],
-        ['md', 5],
-        ['lg', 10],
-        ['xl', 15],
-        ['', 0],
-        [undefined, 0],
-        ['nonsense', 0],
-    ] as const)('parses %s → %d days', (input, expected) => {
-        expect(durationToWorkingDays(input as string | undefined)).toBe(expected);
-    });
-});
-
 describe('exportXlsx — waves', () => {
     const SAMPLE = readFileSync(
         fileURLToPath(new URL('../../../examples/waves.nowline', import.meta.url)),
@@ -459,7 +478,7 @@ milestone exec-done "Execute complete" date:2026-03-16 after:execute
         'Duration',
         'Duration (text)',
         'Start',
-        'End',
+        'End (exclusive)',
         'Status',
         'Remaining',
         'Owner',

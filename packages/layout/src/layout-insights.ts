@@ -3,7 +3,6 @@
 // (e.g. now-line outside the date window).
 
 import { type I1006Args, type MessageCode, tr } from '@nowline/core';
-import { addDays } from './calendar.js';
 import { MIN_BAR_WIDTH_FOR_DOT_PX } from './item-bar-geometry.js';
 import type {
     PositionedItem,
@@ -87,6 +86,7 @@ function collectItemInsights(item: PositionedItem, locale: string, out: LayoutIn
         );
     }
     collectWavePinInsight(item, locale, out);
+    collectNonWorkingPinInsight(item, locale, out);
 }
 
 /** NL.W1001 (specs/waves.md WV15): a wave floor moved the item's pin. */
@@ -100,6 +100,26 @@ function collectWavePinInsight(item: PositionedItem, locale: string, out: Layout
             'NL.W1001',
             'warning',
             { name, pin: pin.pin, key: pin.key, wave: pin.wave, start: pin.start },
+            name,
+        ),
+    );
+}
+
+/** NL.I1008 (specs/working-calendar.md §6): a pin on a non-working day set the start. */
+function collectNonWorkingPinInsight(
+    item: PositionedItem,
+    locale: string,
+    out: LayoutInsight[],
+): void {
+    const pin = item.nonWorkingPin;
+    if (!pin) return;
+    const name = itemLabel(item);
+    out.push(
+        makeInsight(
+            locale,
+            'NL.I1008',
+            'info',
+            { name, pin: pin.pin, key: pin.key, start: pin.start },
             name,
         ),
     );
@@ -153,16 +173,20 @@ function collectSwimlaneInsights(
 }
 
 /**
- * Wave insights on the items of an isolated region's lanes. Region items
- * carry only the wave pin override here (NL.W1001, specs/waves.md §8.7);
- * the other item and lane insights stay main-lane only, as before waves.
+ * Pin insights on the items of an isolated region's lanes. Region items
+ * carry only the wave pin override (NL.W1001, specs/waves.md §8.7) and the
+ * non-working pin (NL.I1008) here; the other item and lane insights stay
+ * main-lane only, as before waves.
  */
 function collectWaveItemInsights(
     lane: PositionedSwimlane,
     locale: string,
     out: LayoutInsight[],
 ): void {
-    walkTrackChildren(lane.children, (item) => collectWavePinInsight(item, locale, out));
+    walkTrackChildren(lane.children, (item) => {
+        collectWavePinInsight(item, locale, out);
+        collectNonWorkingPinInsight(item, locale, out);
+    });
     for (const nested of lane.nested) {
         collectWaveItemInsights(nested, locale, out);
     }
@@ -201,20 +225,13 @@ function collectWaveInsights(
         );
     }
     for (const m of layout.milestones) {
-        if (m.overrunByWave === undefined) continue;
+        // Only dated milestones get `overrunByWave`, and each carries its
+        // own date as `overrunDate`: x cannot give it back, since a hidden
+        // day shares the next working day's x.
+        if (m.overrunByWave === undefined || m.overrunDate === undefined) continue;
         const wave = waves.find((w) => w.id === m.overrunByWave);
         if (!wave) continue;
         const name = m.id ?? m.title;
-        // The model carries no milestone date (§8.7 keeps `overrunByWave` a
-        // bare wave id), so the day reads back off the timeline. That is
-        // exact because only dated milestones get `overrunByWave`, and
-        // `MilestoneNode.place` sets their center x once, to
-        // `scale.forward(date)` (linear in calendar days); marker-row
-        // packing moves only y. layout-insights.test.ts pins this coupling
-        // with a mid-week date on a fractional-ppd scale and a packed row.
-        const { timeline } = layout;
-        const days = Math.round((m.center.x - timeline.originX) / timeline.pixelsPerDay);
-        const date = addDays(timeline.startDate, days);
         out.push(
             makeInsight(
                 locale,
@@ -222,7 +239,7 @@ function collectWaveInsights(
                 'info',
                 {
                     name,
-                    date: formatIsoDate(date),
+                    date: m.overrunDate,
                     wave: wave.id,
                     end: formatIsoDate(wave.endDate),
                 },

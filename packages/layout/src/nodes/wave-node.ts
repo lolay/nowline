@@ -44,7 +44,12 @@ import type {
     WaveLegendEntry,
 } from '../types.js';
 import { summarizeWaves } from '../wave-barrier.js';
-import { dateAtX, WAVE_EDGE_TOLERANCE_PX, type WaveLayoutState } from '../wave-layout.js';
+import {
+    dateAtX,
+    spanEndDateAtX,
+    WAVE_EDGE_TOLERANCE_PX,
+    type WaveLayoutState,
+} from '../wave-layout.js';
 import { MARKER_BOLD_WIDTH_FACTOR } from './marker-geometry.js';
 
 /** WCAG AA floor for the strip label against its composited cell fill. */
@@ -106,7 +111,7 @@ export function buildWaves(
         const title = decl.title ?? span.id;
         const empty = span.memberCount === 0;
         const startDate = dateAtX(span.start, ctx);
-        const endDate = dateAtX(span.end, ctx);
+        const endDate = spanEndDateAtX(span.start, span.end, ctx);
         const visibleOrdinal = empty ? undefined : ordinal++;
         const footnoteIndicators = waveFootnoteIndicators(span.id, ctx);
         const style = waveStyle(decl.properties, visibleOrdinal, ctx);

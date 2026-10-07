@@ -282,6 +282,12 @@ swimlane a
         );
     });
 
+    // The next two tests run under calendar:full, the identity path. They are
+    // kept as identity guards: the insight reads each milestone's own date
+    // (`overrunDate`) off the model, not back off its x, and for a calendar
+    // with no non-working days that must match what x-readback used to give,
+    // mid-week and on a fractional ppd. The business-calendar cases, where
+    // x-readback would be wrong, live in working-day-schedule.test.ts.
     it('reports NL.I1007 when a wave overruns a dated milestone (Example 11)', async () => {
         const insights = await waveInsights(`nowline v1
 

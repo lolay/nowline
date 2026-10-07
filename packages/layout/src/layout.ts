@@ -11,8 +11,6 @@ import type {
 } from '@nowline/core';
 import { buildWavePlan, isGroupBlock, isItemDeclaration, isParallelBlock } from '@nowline/core';
 import {
-    addDays,
-    daysBetween,
     deriveItemDurationDays,
     deriveTotalEffortDays,
     resolveDuration,
@@ -24,7 +22,7 @@ import {
     parseCapacityValue,
     resolveCapacityIcon,
 } from './capacity.js';
-import { parseDate, propValue, propValues } from './dsl-utils.js';
+import { formatIsoDate, parseDate, propValue, propValues } from './dsl-utils.js';
 import {
     ChannelGrid,
     collectRoutingObstacles,
@@ -112,8 +110,15 @@ import type {
 } from './types.js';
 import { tickBoundaryAtOrAfter, type ViewPreset } from './view-preset.js';
 import { solveWaveBarriers, WavePass, waveFloorDays } from './wave-barrier.js';
-import { accumulateWaveMember, waveFloorX, wavePinOverrideOf, waveRoleOf } from './wave-layout.js';
-import { daysPerUnit } from './working-calendar.js';
+import {
+    accumulateWaveMember,
+    dateAtX,
+    WAVE_EDGE_TOLERANCE_PX,
+    waveFloorX,
+    wavePinOverrideOf,
+    waveRoleOf,
+} from './wave-layout.js';
+import { daysPerUnit, fromCalendarConfig, type WorkingCalendar } from './working-calendar.js';
 
 export interface LayoutOptions {
     theme?: ThemeName;
@@ -431,6 +436,9 @@ function sequenceItem(
         startX = waveFloorX(node, startX, ctx);
         wavePinOverride = wavePinOverrideOf(node, startX, ctx);
     }
+    // NL.I1008 defers to NL.W1001: a pin a wave floor moved reports there.
+    const nonWorkingPin =
+        wavePinOverride === undefined ? nonWorkingPinOf(props, startX, ctx) : undefined;
 
     const naturalWidth = Math.max(MIN_ITEM_WIDTH, durationDays * ctx.timeline.pixelsPerDay);
     // Logical extent — what the item "owns" in time (used for chaining,
@@ -900,6 +908,7 @@ function sequenceItem(
     const waveRole = waveRoleOf(node, ctx);
     if (waveRole !== undefined) result.waveRole = waveRole;
     if (wavePinOverride !== undefined) result.wavePinOverride = wavePinOverride;
+    if (nonWorkingPin !== undefined) result.nonWorkingPin = nonWorkingPin;
     // Register the item object itself, not coordinates sampled from it:
     // the row packer and the marker-band shift may still move this box
     // down, and every attach port is read off the final box (see
@@ -1193,6 +1202,45 @@ function resolvePinnedOrSequentialStart(
     return seqDefault;
 }
 
+/**
+ * The pin on a non-working day that set an item's start (NL.I1008,
+ * specs/working-calendar.md §6), for an item placed at `startX`. The pin
+ * follows the start precedence of `resolvePinnedOrSequentialStart`:
+ * `date:`, then `start:`, then the inline date of `after:`. It reports only
+ * when it set the start, that is when the item starts at the pin's x
+ * (within the edge tolerance): a later `after:` ref, the lane cursor or a
+ * wave floor that pushed the item past it never reports. A pin on a
+ * working day or outside the date window reports nothing.
+ */
+function nonWorkingPinOf(
+    props: EntityProperty[],
+    startX: number,
+    ctx: LayoutContext,
+): PositionedItem['nonWorkingPin'] {
+    if (!ctx.calendar.hasNonWorkingDays) return undefined;
+    const pin = startPinOf(props);
+    if (!pin || ctx.calendar.isWorkingDay(pin.date)) return undefined;
+    const pinX = ctx.scale.forwardWithinDomain(pin.date);
+    if (pinX === null || Math.abs(startX - pinX) >= WAVE_EDGE_TOLERANCE_PX) return undefined;
+    return { key: pin.key, pin: pin.raw, start: formatIsoDate(dateAtX(startX, ctx)) };
+}
+
+/** The dated pin that can set an item's start, by the start precedence. */
+function startPinOf(
+    props: EntityProperty[],
+): { key: 'date' | 'start' | 'after'; raw: string; date: Date } | undefined {
+    for (const key of ['date', 'start'] as const) {
+        const raw = propValue(props, key);
+        const date = parseDate(raw);
+        if (raw !== undefined && date) return { key, raw, date };
+    }
+    for (const raw of propValues(props, 'after')) {
+        const date = parseDate(raw);
+        if (date) return { key: 'after', raw, date };
+    }
+    return undefined;
+}
+
 function _buildSwimlane(
     lane: SwimlaneDeclaration,
     y: number,
@@ -1289,6 +1337,11 @@ function sizeBesideHeader(title: string, author: string | undefined): SizedHeade
 // `plan` is the roadmap's wave plan (`buildWavePlan`, built once per
 // layout), or undefined when it declares no waves.
 //
+// Every day count is a working-day index from the start
+// (specs/working-calendar.md §5): `ctx.calendar` maps dates to indices and
+// back, built from `ctx.cal` when absent. A calendar with no non-working
+// day keeps calendar-day arithmetic.
+//
 // Exported for tests (engine B, specs/waves.md §8.5); not part of the
 // package surface.
 export function computeDateWindow(
@@ -1296,6 +1349,7 @@ export function computeDateWindow(
     ctx: {
         cal: import('./calendar.js').CalendarConfig;
         sizes: Map<string, import('./types.js').ResolvedSize>;
+        calendar?: WorkingCalendar;
     },
     resolved: ResolveResult,
     today: Date | undefined,
@@ -1329,9 +1383,10 @@ export function computeDateWindow(
     // anchors, milestones — still grows the window below via `padded`, with
     // `length:` acting purely as the floor. Without `length:`, `today`
     // extends the window as before so the now-line is always in range.
+    const calendar = ctx.calendar ?? fromCalendarConfig(ctx.cal);
     const contentDays = computeContentEndDay(
         resolved,
-        ctx,
+        { cal: ctx.cal, sizes: ctx.sizes, calendar },
         startDate,
         minDays > 0 ? undefined : today,
         plan,
@@ -1348,9 +1403,13 @@ export function computeDateWindow(
         contentDays > 0 ? contentDays : 4 * ctx.cal.daysPerWeek,
         scale.unit,
         tickDays,
+        calendar,
     );
     const finalDays = Math.max(minDays, padded);
-    return { startDate, endDate: addDays(startDate, Math.max(1, finalDays)) };
+    return {
+        startDate,
+        endDate: calendar.dateAtWorkingIndex(startDate, Math.max(1, finalDays)),
+    };
 }
 
 /**
@@ -1388,6 +1447,9 @@ function literalDays(literal: string, cal: import('./calendar.js').CalendarConfi
 // Walk every dated/sequenced entity in the resolved content and return the
 // latest day-offset from `startDate`. Mirrors the sequencer's start-rules
 // (date: > start: > after: > previous-in-lane) without producing positions.
+// Offsets are working-day indices: every date converts through
+// `ctx.calendar.workingIndexOf`, so a date on a non-working day counts as
+// the next working day.
 //
 // With waves (`plan` set, specs/waves.md §8.5) the lane walk runs inside the
 // barrier driver: starts are floored by their wave's `S_k`, isolated regions
@@ -1399,11 +1461,13 @@ function computeContentEndDay(
     ctx: {
         cal: import('./calendar.js').CalendarConfig;
         sizes: Map<string, import('./types.js').ResolvedSize>;
+        calendar: WorkingCalendar;
     },
     startDate: Date,
     today: Date | undefined,
     plan?: WavePlan,
 ): number {
+    const dayOf = (date: Date): number => ctx.calendar.workingIndexOf(startDate, date);
     let itemEnd = new Map<string, number>();
     const anchorEnd = new Map<string, number>();
     const milestoneEnd = new Map<string, number>();
@@ -1414,7 +1478,7 @@ function computeContentEndDay(
     for (const anchor of resolved.content.anchors.values()) {
         const d = parseDate(propValue(anchor.properties, 'date'));
         if (d && anchor.name) {
-            const day = daysBetween(startDate, d);
+            const day = dayOf(d);
             anchorEnd.set(anchor.name, day);
             maxDay = Math.max(maxDay, day);
         }
@@ -1440,12 +1504,12 @@ function computeContentEndDay(
         // Resolve a single `after:` element to a day-offset from `startDate`.
         // The element is either an entity id (looked up in itemEnd /
         // anchorEnd / milestoneEnd) or an inline ISO date literal (converted
-        // directly via `daysBetween`). The validator already enforces "at
+        // directly via `dayOf`). The validator already enforces "at
         // most one inline date per direction", so at most one element per
         // list will hit the date path.
         const resolveAfterDay = (ref: string): number => {
             const inlineDate = parseDate(ref);
-            if (inlineDate) return daysBetween(startDate, inlineDate);
+            if (inlineDate) return dayOf(inlineDate);
             if (scope.itemEnd.has(ref)) return scope.itemEnd.get(ref)!;
             if (scope.anchorEnd.has(ref)) return scope.anchorEnd.get(ref)!;
             if (scope.milestoneEnd.has(ref)) return scope.milestoneEnd.get(ref)!;
@@ -1476,9 +1540,9 @@ function computeContentEndDay(
                 const afterRefs = propValues(node.properties, 'after');
                 let start = prevEnd;
                 if (dateProp) {
-                    start = daysBetween(startDate, dateProp);
+                    start = dayOf(dateProp);
                 } else if (startProp) {
-                    start = daysBetween(startDate, startProp);
+                    start = dayOf(startProp);
                 } else if (afterRefs.length > 0) {
                     start = Math.max(prevEnd, ...afterRefs.map(resolveAfterDay));
                 }
@@ -1544,40 +1608,45 @@ function computeContentEndDay(
         const reachPass = (day: number): void => {
             passMax = Math.max(passMax, day);
         };
-        const barrier = solveWaveBarriers(ids.length, 0, waveFloorDays(plan, startDate), (S, E) => {
-            // Reset the item maps, keep the anchors, and seed each wave
-            // id with E_k so `after:<wave>` resolves to the wave's end.
-            const seeds = ids.map((id, i): [string, number] => [id, E[i]]);
-            itemEnd = new Map(seeds);
-            passMax = 0;
-            const pass = new WavePass(plan, S);
-            const { walkLane } = makeWalker(mainScope(), pass, reachPass);
-            for (const lane of resolved.content.swimlanes.values()) {
-                walkLane(lane.content, 0);
-            }
-            // Exactly one level of isolated regions, each with fresh id
-            // maps seeded only with the wave edges (engine A's region
-            // `childCtx`). This replaces the post-hoc region recursion.
-            // In wave mode region anchors, region milestones and nested
-            // regions do not extend the window, matching engine A, which
-            // draws none of them.
-            for (const region of resolved.content.isolatedRegions) {
-                const regionWalker = makeWalker(
-                    {
-                        itemEnd: new Map(seeds),
-                        anchorEnd: new Map(),
-                        milestoneEnd: new Map(),
-                        sizes: resolveSizes(region.content.sizes, ctx.cal),
-                    },
-                    pass,
-                    reachPass,
-                );
-                for (const lane of region.content.swimlanes.values()) {
-                    regionWalker.walkLane(lane.content, 0);
+        const barrier = solveWaveBarriers(
+            ids.length,
+            0,
+            waveFloorDays(plan, startDate, ctx.calendar),
+            (S, E) => {
+                // Reset the item maps, keep the anchors, and seed each wave
+                // id with E_k so `after:<wave>` resolves to the wave's end.
+                const seeds = ids.map((id, i): [string, number] => [id, E[i]]);
+                itemEnd = new Map(seeds);
+                passMax = 0;
+                const pass = new WavePass(plan, S);
+                const { walkLane } = makeWalker(mainScope(), pass, reachPass);
+                for (const lane of resolved.content.swimlanes.values()) {
+                    walkLane(lane.content, 0);
                 }
-            }
-            return pass;
-        });
+                // Exactly one level of isolated regions, each with fresh id
+                // maps seeded only with the wave edges (engine A's region
+                // `childCtx`). This replaces the post-hoc region recursion.
+                // In wave mode region anchors, region milestones and nested
+                // regions do not extend the window, matching engine A, which
+                // draws none of them.
+                for (const region of resolved.content.isolatedRegions) {
+                    const regionWalker = makeWalker(
+                        {
+                            itemEnd: new Map(seeds),
+                            anchorEnd: new Map(),
+                            milestoneEnd: new Map(),
+                            sizes: resolveSizes(region.content.sizes, ctx.cal),
+                        },
+                        pass,
+                        reachPass,
+                    );
+                    for (const lane of region.content.swimlanes.values()) {
+                        regionWalker.walkLane(lane.content, 0);
+                    }
+                }
+                return pass;
+            },
+        );
         // The final pass ran with the solved S/E. The content end covers the
         // last wave's end and every wave start, so floors and empty trailing
         // waves stay inside the window.
@@ -1590,7 +1659,7 @@ function computeContentEndDay(
     for (const ms of resolved.content.milestones.values()) {
         const d = parseDate(propValue(ms.properties, 'date'));
         if (d) {
-            const day = daysBetween(startDate, d);
+            const day = dayOf(d);
             if (ms.name) milestoneEnd.set(ms.name, day);
             maxDay = Math.max(maxDay, day);
             continue;
@@ -1628,7 +1697,7 @@ function computeContentEndDay(
     }
 
     if (today) {
-        const t = daysBetween(startDate, today);
+        const t = dayOf(today);
         if (t > 0) maxDay = Math.max(maxDay, t);
     }
 

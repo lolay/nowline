@@ -1,5 +1,5 @@
 // Argument shapes for the wave diagnostics (NL.E1100-E1106, NL.W1100,
-// NL.W1101, NL.W1001, NL.W1002, NL.I1006, NL.I1007, NL.W0702, NL.E0202,
+// NL.W1101, NL.W1001, NL.W1002, NL.I1006, NL.I1007, NL.I1008, NL.W0702, NL.E0202,
 // NL.W0701). Every message takes exactly one object so layout insights can
 // call `tr(locale, code, args)` uniformly.
 //
@@ -206,3 +206,11 @@ export type I1006Args =
     | { reason: 'all'; names: string[] };
 
 export type I1007Args = { name: string; date: string; wave: string; end: string };
+
+/** NL.I1008: an item pinned to a non-working day starts on the next working day. */
+export type I1008Args = {
+    name: string;
+    pin: string;
+    key: 'date' | 'start' | 'after';
+    start: string;
+};

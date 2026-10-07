@@ -1,6 +1,6 @@
 # Nowline Working Calendar
 
-**Status: Accepted, scheduled as m2p. Not implemented.** This is the design record for non-working days: weekends, holidays and company-wide closures such as a summit. Today's parser rejects the `non-working` syntax shown here, and today's layout does not skip any day.
+**Status: Accepted, scheduled as m2p. Phases 1–3 (calendar primitives; the working-day schedule under `hide`; the exporters read the file's calendar) are implemented in lolay/nowline#96; Phases 4–5 are pending.** This is the design record for non-working days: weekends, holidays and company-wide closures such as a summit. Today's parser rejects the `non-working` syntax shown here, and today's layout does not skip any day.
 
 The implementation plan, the decisions that close §11 and the codebase map are in [`handoffs/handoff-m2p-working-calendar.md`](./handoffs/handoff-m2p-working-calendar.md). As each phase ships:
 
@@ -51,6 +51,8 @@ The surfaces also disagree with each other, because each one hardcodes its own c
 | Mermaid (`export-mermaid/src/duration.ts`) | `1w` passed through (Mermaid reads 7 calendar days); `1m` → 22d; `1y` → 252d; no `excludes` |
 | XLSX (`export-xlsx/src/duration.ts`) | 5 / 22 / 252 working days per w / m / y, whatever the `calendar:`; no `q` |
 | MS Project (`export-msproj/src/calendar.ts`) | always a Mon–Fri Standard calendar, even for `calendar:full` |
+
+That table is the state before Phases 2 and 3. Phase 2 put the axis and the schedulers on working days. Phase 3 replaced the three exporters' duration tables and the MS Project calendar with engine C's calendar and durations (§8): all of them now match the chart, and the sizes, `q` and `capacity:` that the tables ignored now count.
 
 ## 3. Model
 
@@ -163,19 +165,28 @@ Fractional durations (`0.5d`, `1.5w`) consume fractions of a working day. Progre
 
 ### 5.2 Working-day index space
 
-Every scheduler works in working-day indices and converts to dates only at the edges. Index 0 is the first working day at or after the roadmap start. The calendar exposes:
+Every scheduler works in working-day indices and converts to dates only at the edges. Index 0 is the first working day at or after the base date, the roadmap start. The calendar carries no start of its own, so the index functions take the base as their first argument (UTC midnight). As shipped:
 
 ```ts
 interface WorkingCalendar {
-    daysPerUnit(unit: ScaleUnit): number;          // unchanged: duration arithmetic
+    daysPerUnit(unit: ScaleUnit): number;                  // unchanged: duration arithmetic
+    addUnits(date: Date, count: number, unit: ScaleUnit): Date;
+    readonly hasNonWorkingDays: boolean;                   // false: every function is plain calendar-day math
     isWorkingDay(date: Date): boolean;
-    workingIndexOf(date: Date): number;            // a non-working date maps to the next working day's index
-    dateAtWorkingIndex(index: number): Date;
+    workingIndexOf(base: Date, date: Date): number;        // a non-working date maps to the next working day's index
+    dateAtWorkingIndex(base: Date, index: number): Date;   // fractions floor
     nonWorkingRuns(from: Date, to: Date): NonWorkingRun[];
+    readonly weekStart: number | undefined;                // first working weekday after the weekend (Monday for Sat/Sun)
+    readonly rules: ReadonlyArray<CalendarRule>;
 }
+
+// working-calendar.ts, beside the interface
+function spanEndDate(calendar: WorkingCalendar, base: Date, start: number, end: number): Date;
 ```
 
-`fromCalendarConfig(cal)` (`working-calendar.ts`) gains the non-working set. With an empty set, `workingIndexOf` is `daysBetween(start, date)` and every function is the identity of today's code, which is what keeps `calendar:full` byte-stable.
+`spanEndDate` is the exclusive end date of a span of indices `[start, end)`: the day after the last whole working day the span covers, so a Mon–Fri item ends on Saturday. A span that covers no whole working day ends on its start date. Engine C uses it for every item and wave end, and engine A for a wave's end date (`spanEndDateAtX`). Dates that are points (a start, a milestone, an after-only milestone) come from `dateAtWorkingIndex`; anchors and dated milestones keep their own dates.
+
+`fromCalendarConfig(cal)` (`working-calendar.ts`) builds the calendar from the resolved `CalendarConfig` and its rules (the preset's, by default). With no non-working day, `workingIndexOf` is `daysBetween(base, date)`, `dateAtWorkingIndex` is `addDays` and `spanEndDate` is `addDays(base, end)`: every function is the identity of today's code, which is what keeps `calendar:full` byte-stable.
 
 ### 5.3 The three engines
 
@@ -197,7 +208,7 @@ Codes are placeholders; final `NL.*` codes are assigned at implementation, with 
 | NW4 | warning | `days-per-week` differs from the number of weekdays that recurring declarations leave working. (`calendar:custom` with `days-per-week: 6` and no `every:` triggers it.) |
 | NW5 | error | Duplicate `non-working` id within one file. Include collisions use the existing config-merge warning. |
 | NW6 | error | `non-working:` on `default roadmap` is `hide` or `show`. |
-| NW7 | info (layout insight) | An item's pinned start falls on a non-working day and moved (§5.1 rule 6). |
+| NW7 | info (layout insight) | An item's pinned start falls on a non-working day and moved (§5.1 rule 6). Shipped as **`NL.I1008`**; it covers `date:`, `start:` and the date in an `after:`, for main-lane and isolated-region items alike. A tie between the pin and another constraint (the lane cursor, an `after:` reference) still reports. |
 
 ## 7. Rendering
 
@@ -215,9 +226,9 @@ Because the density is shared, `show` is wider than `hide` by the non-working da
 - **The seam rule.** Every date on a hidden day maps to the seam. That covers milestones and anchors on a weekend, the now-line on a Sunday, a month start on a weekend (Feb 1 2026 is a Sunday), and a week start after a Monday holiday.
 - **Ticks.** A tick takes its label from its boundary date (`Feb`, `May 25`) and its x from `forward`. Week boundaries are the first day after the recurring weekend (Monday for Sat/Sun). With no recurring declaration, week ticks keep stepping from the roadmap start, as today.
 - **Zero-width columns are dropped,** with their labels: a fully closed week, or every weekend day at the `days` scale.
-- **Narrow columns.** A week holding two holidays is 24 px wide at the default scale. The edge-column rule from [#92](https://github.com/lolay/nowline/pull/92) extends to every column under `hide`: a label wider than its column is dropped, and the tick stays (§11).
-- **Thinning** counts visible columns.
-- **Seams.** An unnamed seam (a plain weekend) draws nothing at week scale and above, where it coincides with a week tick or is too dense to matter. At the `days` scale it draws a faint seam line. A named seam always draws (§7.4).
+- **Narrow columns.** A week holding two holidays is 24 px wide at the default scale. The edge-column rule from [#92](https://github.com/lolay/nowline/pull/92) extends to every column under `hide`: a label wider than a column that is narrower than a full unit is dropped, and the tick stays (§11). A dropped label keeps its `labelX`. The closing tick's `major` flag follows the same column rule as the ticks before it.
+- **Thinning** counts visible columns. At the `days` scale the default thinning labels week starts (Mondays under the business weekend) instead of every Nth visible column, which drifts once a week has six working days (handoff decision 4, amended by the maintainer on 2026-10-06). An explicit `label-every` still counts visible columns.
+- **Seams.** An unnamed seam (a plain weekend) draws nothing at week scale and above, where it coincides with a week tick or is too dense to matter. At the `days` scale it draws a faint seam line: 1 px, dotted (`1 3`), in `timeline.nonWorkingSeam`, across the minor-grid range, only strictly inside the chart and only where no grid line already sits. A named seam always draws (§7.4).
 
 ### 7.3 `show`
 
@@ -237,18 +248,28 @@ New theme tokens: `timeline.nonWorkingFill` and `timeline.nonWorkingSeam`.
 
 ### 7.5 Positioned model
 
-`PositionedTimelineScale` gains:
+As built, `PositionedTimelineScale` gains two optional keys, set only when the window holds a non-working day under `hide` and omitted otherwise (so `calendar:full` and `calendar:custom` models carry neither):
 
 ```ts
-nonWorkingDisplay: 'hide' | 'show';
-nonWorking: Array<{
+nonWorkingDisplay?: 'hide';                 // 'show' arrives with Phase 4
+nonWorking?: PositionedNonWorkingRun[];
+
+interface PositionedNonWorkingRun {
     x: number;          // seam x under hide, band left edge under show
     width: number;      // 0 under hide
     from: Date;         // first non-working date of the run
     through: Date;      // last non-working date, inclusive
-    titles: string[];   // titled declarations in the run; empty for a plain weekend
-}>;
+    titles?: string[];  // titled declarations in the run; omitted for a plain weekend
+    seam?: true;        // days scale only: strictly inside the chart, no grid line at x; the renderer draws a seam
+}
 ```
+
+Other optional keys, each omitted when empty:
+
+- `PositionedAnchor.hiddenDate` and `PositionedMilestone.hiddenDate`: the real ISO date of a marker dated on a hidden day. The marker sits at the seam; the renderer adds it as an SVG `<title>`.
+- `PositionedMilestone.overrunDate`: the milestone's own date, so NL.I1007 no longer reads a date back off x.
+- `PositionedItem.nonWorkingPin`: `{ key: 'date' | 'start' | 'after'; pin: string; start: string }`, the source of NL.I1008.
+- Theme token `timeline.nonWorkingSeam` (light `#a0aec0`, dark `#6b7a90`, grayscale `#9a9a9a`). `timeline.nonWorkingFill` arrives with `show` (Phase 4).
 
 Consumers that do date math from `pixelsPerDay` must use `forward` / `invert` instead. That includes the test helpers added in [#92](https://github.com/lolay/nowline/pull/92) that recover tick dates from x.
 
@@ -258,15 +279,17 @@ The root roadmap's calendar and display setting define the axis. An isolated inc
 
 ## 8. Exporters
 
-Every exporter reads engine C's dates and the same calendar.
+Every exporter reads engine C's dates, durations and calendar. `resolveWorkingCalendar(file, resolved)` in `@nowline/layout` is the one resolver; `RoadmapSchedule.calendar` carries its result and `ScheduledItem.days` each item's duration in working days (0 when it has none), so no exporter keeps its own duration table. `WorkingCalendar.workingWeekdays` is the open-ended week's working weekdays (0 = Sunday): Monday to Friday for business, all seven for full and custom.
 
-| Exporter | Proposed |
-|---|---|
-| XLSX | Start / End from engine C; the working-day duration column uses the file's `days-per-*` and supports `q`. |
-| MS Project | `<WeekDays>` from the recurring declarations (all seven working under `calendar:full`); `<Exceptions>` from the dated ones. |
-| Mermaid | `excludes` with weekday names and ISO dates, which Mermaid also excludes from task durations; durations emitted as working-day `Nd`. |
-| JSON AST | New `NonWorkingDeclaration` node in `serializeToJson`; printer support; the round-trip test covers a fixture that uses it. |
-| SVG / PNG / PDF / HTML | Follow the layout and the display setting. |
+| Exporter | Phase 3 (built; the presets, since a file declares no days off yet) | Phase 5 (declarations) |
+|---|---|---|
+| XLSX | Start / End (exclusive) from engine C. The Duration column is `days` (`q`, declared sizes and `capacity:` included; 0 when there is none). The Roadmap sheet gains a `Calendar` row after `Start`, e.g. `business (Saturday and Sunday off; 5/22/65/260 days per week/month/quarter/year)`. | — |
+| MS Project | `<WeekDays>` from `workingWeekdays`: Mon–Fri under business, byte-identical to before, and seven working days under `calendar:full` and `calendar:custom`. A task lasts `days` × 480 minutes (480 when it has no duration). | `<WeekDays>` from the recurring declarations; `<Exceptions>` from the dated ones; `<WorkWeeks>` where a bounded recurrence changes the week. |
+| Mermaid | Business emits `excludes saturday, sunday` after `dateFormat`; full and custom emit none. Durations are `Nd` from `days` (`28d` for a full `4w`). The roadmap start and wave-end milestones move to the first working day at or after them, because Mermaid never checks a start against `excludes`; anchors and dated milestones keep their dates (rule 5). | `excludes` with weekday names and ISO dates, which Mermaid also excludes from task durations. |
+| JSON AST | Not in Phase 3. | New `NonWorkingDeclaration` node in `serializeToJson`; printer support; the round-trip test covers a fixture that uses it. |
+| SVG / PNG / PDF / HTML | Follow the layout and the display setting. | Same. |
+
+Known limits, not fixed in Phase 3: MS Project ignores the roadmap's `start:` (it uses the export date or `--start`) and has no implicit lane sequencing, so its schedule cannot match the chart; it writes no `<MinutesPerWeek>` or `<DaysPerMonth>`, so a full-calendar `1w` displays as 1.4 default weeks; Mermaid ignores item `date:` / `start:` pins, writes `after:DATE` verbatim and rounds fractional days; exporters walk only the root file, so merged and isolated include items are not exported.
 
 ## 9. Rollout and byte stability
 
@@ -274,12 +297,12 @@ Every exporter reads engine C's dates and the same calendar.
 
 | Input | Change |
 |---|---|
-| `calendar:full`, no `non-working` declarations | None. The mapping is the identity. |
-| `calendar:custom`, no `every:` | None, plus NW4 when `days-per-week` is not 7. |
+| `calendar:full`, no `non-working` declarations | None to layout and rendering: the mapping is the identity. Export cells move in Phase 3, as fixes: durations count 7 / 30 / 91 / 365 and the MS Project calendar gets seven working days. |
+| `calendar:custom`, no `every:` | None to layout and rendering, plus NW4 when `days-per-week` is not 7. Export cells move in Phase 3, as fixes: durations follow the file's `days-per-*` and the MS Project calendar gets seven working days. |
 | `calendar:business` (the default), `hide` | Sequenced items that start on a working day keep their x. Week ticks keep their x and change label (`Jan 10` → `Jan 12`). Date-pinned entities, the now-line and the window end move to the right day. |
 | `calendar:business`, `show` | Everything after the first weekend moves right, by design. |
 
-The 14 business-calendar layout snapshots (of 19; the five waves samples use `calendar:full`) and every business determinism cell that renders a picture change. For a fixture without date pins and without a now-line in its window, the only change is week-label text. The CHANGELOG entry goes under `### Changed`: the business calendar now does what `dsl.md` already says it does ("engineering working-day arithmetic").
+The 14 business-calendar layout snapshots (of 19; the five waves samples use `calendar:full`) and every business determinism cell that renders a picture change. For a fixture without date pins and without a now-line in its window, the only change is week-label text. Phase 3 moves every `xlsx` and `mermaid` determinism cell (the Calendar row, `End (exclusive)` and the durations; `excludes` on business) and the `msproj` cells with sized items or the full calendar. The CHANGELOG entry goes under `### Changed`: the business calendar now does what `dsl.md` already says it does ("engineering working-day arithmetic").
 
 ### 9.2 Phases
 

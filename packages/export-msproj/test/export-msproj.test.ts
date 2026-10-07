@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from 'vitest';
-import { durationToMsProjMinutes, minutesToMsProjDuration } from '../src/duration.js';
+import { minutesToMsProjDuration } from '../src/duration.js';
 import { exportMsProjXml } from '../src/index.js';
 import { buildExportInputs, SIMPLE_FIXTURE } from './helpers.js';
 
@@ -139,15 +139,6 @@ swimlane work "Work"
 });
 
 describe('duration mapping', () => {
-    it('1w under Standard calendar = 5 working days = 2400 minutes', () => {
-        expect(durationToMsProjMinutes('1w')).toBe(5 * 8 * 60);
-    });
-    it('xs = 1 day = 480 minutes', () => {
-        expect(durationToMsProjMinutes('xs')).toBe(480);
-    });
-    it('blank duration defaults to 1d', () => {
-        expect(durationToMsProjMinutes(undefined)).toBe(480);
-    });
     it('minutesToMsProjDuration formats as PT<m>M0S', () => {
         expect(minutesToMsProjDuration(480)).toBe('PT480M0S');
         expect(minutesToMsProjDuration(0)).toBe('PT0M0S');

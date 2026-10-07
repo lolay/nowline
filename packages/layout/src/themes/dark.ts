@@ -125,6 +125,7 @@ export const darkTheme: Theme = {
     timeline: {
         gridLine: '#475569',
         minorGridLine: '#334155',
+        nonWorkingSeam: '#6b7a90',
         tickMark: '#334155',
         labelText: '#cbd5e1',
         panelFill: '#0f172a',

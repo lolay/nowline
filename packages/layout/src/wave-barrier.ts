@@ -11,8 +11,8 @@
 // `floors` and `memberEnd`.
 
 import type { GroupBlock, ItemDeclaration, ParallelBlock, WavePlan } from '@nowline/core';
-import { daysBetween } from './calendar.js';
 import { parseDate } from './dsl-utils.js';
+import type { WorkingCalendar } from './working-calendar.js';
 
 /** A node the walkers floor: a leaf item or a container. */
 export type WaveNode = ItemDeclaration | GroupBlock | ParallelBlock;
@@ -96,14 +96,19 @@ function sameArray(a: readonly number[], b: readonly number[]): boolean {
 }
 
 /**
- * Floor offsets `A_k` in days from `startDate`, from the plan's unclamped
- * declaration dates (§5.1). A floor before the start yields a negative
+ * Floor offsets `A_k` in working days from `startDate`, from the plan's
+ * unclamped declaration dates (§5.1). A floor on a non-working day counts
+ * as the next working day. A floor before the start yields a negative
  * offset; `S_1 = max(0, A_1)` absorbs it.
  */
-export function waveFloorDays(plan: WavePlan, startDate: Date): Array<number | null> {
+export function waveFloorDays(
+    plan: WavePlan,
+    startDate: Date,
+    calendar: WorkingCalendar,
+): Array<number | null> {
     return plan.floors.map((f) => {
         const d = f ? parseDate(f.date) : null;
-        return d ? daysBetween(startDate, d) : null;
+        return d ? calendar.workingIndexOf(startDate, d) : null;
     });
 }
 

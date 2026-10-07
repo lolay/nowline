@@ -20,7 +20,7 @@ import {
     type SwimlaneDeclaration,
 } from '@nowline/core';
 import { describe, expect, it } from 'vitest';
-import { daysBetween, resolveCalendar } from '../src/calendar.js';
+import { resolveCalendar } from '../src/calendar.js';
 import { layoutRoadmap } from '../src/layout.js';
 import { scheduleRoadmap } from '../src/schedule.js';
 import { ITEM_INSET_PX, TRACK_BLOCK_TAIL_GUTTER_PX } from '../src/themes/shared.js';
@@ -33,6 +33,7 @@ import type {
     PositionedSwimlane,
     PositionedTrackChild,
 } from '../src/types.js';
+import { fromCalendarConfig, type WorkingCalendar } from '../src/working-calendar.js';
 import { parseAndResolve } from './helpers.js';
 import {
     EXAMPLE_1,
@@ -51,6 +52,8 @@ interface Laid {
     resolved: ResolveResult;
     model: PositionedRoadmap;
     perWeek: number;
+    /** The roadmap's working calendar: dates convert to day counts through it. */
+    calendar: WorkingCalendar;
 }
 
 function errorsOf(file: NowlineFile): string[] {
@@ -84,8 +87,14 @@ async function layIncludes(files: Record<string, string>, main: string): Promise
 
 function finish(file: NowlineFile, resolved: ResolveResult): Laid {
     const model = layoutRoadmap(file, resolved);
-    const perWeek = resolveCalendar(file, resolved.config.calendar).daysPerWeek;
-    return { file, resolved, model, perWeek };
+    const config = resolveCalendar(file, resolved.config.calendar);
+    return {
+        file,
+        resolved,
+        model,
+        perWeek: config.daysPerWeek,
+        calendar: fromCalendarConfig(config),
+    };
 }
 
 const round = (v: number): number => Math.round(v * 1e6) / 1e6;
@@ -186,7 +195,8 @@ function placedAstItems(resolved: ResolveResult): ItemDeclaration[] {
 /** Engine C: `[start, end]` in weeks for every placed item with an id. */
 function engineCWeeks(laid: Laid): Record<string, [number, number]> {
     const sched = scheduleRoadmap(laid.file, laid.resolved);
-    const weeks = (d: Date): number => round(daysBetween(sched.startDate, d) / laid.perWeek);
+    const weeks = (d: Date): number =>
+        round(laid.calendar.workingIndexOf(sched.startDate, d) / laid.perWeek);
     const out: Record<string, [number, number]> = {};
     for (const node of placedAstItems(laid.resolved)) {
         const s = sched.byNode.get(node);
@@ -539,9 +549,13 @@ swimlane api
             ['ios-offline', 'member'],
             ['ios-push', 'member'],
         ]);
-        // Engines A, B and C agree that the domain ends at W6.
+        // Engines A, B and C agree that the domain ends at W6: 30 working
+        // days, so Mon Feb 16.
         const { timeline } = laid.model;
-        expect(daysBetween(timeline.startDate, timeline.endDate)).toBe(6 * laid.perWeek);
+        expect(laid.calendar.workingIndexOf(timeline.startDate, timeline.endDate)).toBe(
+            6 * laid.perWeek,
+        );
+        expect(timeline.endDate.toISOString().slice(0, 10)).toBe('2026-02-16');
         expectBarriers(laid);
     });
 
@@ -1081,8 +1095,8 @@ function expectWaves(laid: Laid, expected: Array<Record<string, unknown>>): void
     const { timeline } = laid.model;
     for (const w of laid.model.waves ?? []) {
         const days = (x: number): number => round((x - timeline.originX) / timeline.pixelsPerDay);
-        expect(days(w.startX)).toBe(daysBetween(timeline.startDate, w.startDate));
-        expect(days(w.endX)).toBe(daysBetween(timeline.startDate, w.endDate));
+        expect(days(w.startX)).toBe(laid.calendar.workingIndexOf(timeline.startDate, w.startDate));
+        expect(days(w.endX)).toBe(laid.calendar.workingIndexOf(timeline.startDate, w.endDate));
         expect(w.empty).toBe(w.memberCount === 0);
     }
 }
