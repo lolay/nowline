@@ -258,6 +258,11 @@ export const messages: MessageBundle = {
     // Style
     'NL.E0800': (a: { value: string }) =>
         `Valeur non-working invalide «\u00A0${a.value}\u00A0». Utilisez hide ou show.`,
+    'NL.E0801': (a: { value: string; key: string }) =>
+        `Couleur invalide «\u00A0${a.value}\u00A0» pour «\u00A0${a.key}\u00A0». Utilisez une couleur nommée, une valeur hexadécimale ou «\u00A0none\u00A0».`,
+    'NL.E0802': (a: { value: string; key: string; allowed: string }) =>
+        `Valeur invalide «\u00A0${a.value}\u00A0» pour «\u00A0${a.key}\u00A0». Valeurs admises\u00A0: ${a.allowed}.`,
+    'NL.E0803': (a: { key: string }) => `Propriété de style inconnue «\u00A0${a.key}\u00A0».`,
 
     // Avertissements
     'NL.W0700': (a: { key: string; entity: string; suggested: string }) =>
