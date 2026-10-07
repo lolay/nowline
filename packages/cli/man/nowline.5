@@ -545,6 +545,43 @@ is
 .Sy 260d ,
 not
 .Sy 12 \(mu 22d = 264d .
+.Ss non-working \(em day display
+Under
+.Sy calendar:business
+the weekend is non-working: durations count working days only, and the
+chart either hides those days or draws them.
+The display is a roadmap-only style key, set on the
+.Sy default roadmap
+line (raw style keys are not allowed on the
+.Sy roadmap
+line itself):
+.Bd -literal -offset indent
+config
+
+default roadmap non-working:show
+.Ed
+.Bl -tag -width "show"
+.It Sy hide Pq default
+Non-working days take no width; each run collapses to a seam.
+.It Sy show
+Non-working days are drawn at full width and shaded.
+A bar paints across a weekend but ends at the end of its last working day,
+so the gap between chained bars shows.
+.El
+.Pp
+The display never changes the schedule, so Mermaid, MS Project, and XLSX
+output is the same in both views.
+It can also be chosen at render time; the first of these wins: the
+.Fl -non-working
+option (or the equivalent option on another surface), the file's
+.Sy default roadmap non-working:
+key, then
+.Sy hide .
+Under
+.Sy calendar:full
+and
+.Sy calendar:custom
+there are no non-working days and the key has no effect.
 .Sh ROADMAP SECTION
 The
 .Sy roadmap
@@ -1060,7 +1097,8 @@ Raw style properties
 .Sy bg , Sy fg , Sy text , Sy border , Sy icon , Sy shadow ,
 .Sy font , Sy weight , Sy italic , Sy text-size , Sy padding ,
 .Sy spacing , Sy header-height , Sy corner-radius , Sy bracket ,
-.Sy capacity-icon , Sy timeline-position , Sy minor-grid
+.Sy capacity-icon , Sy timeline-position , Sy minor-grid ,
+.Sy non-working
 .Pc
 may only appear in
 .Sy style
@@ -1400,6 +1438,21 @@ Roadmap-only.
 When
 .Sy true ,
 draws faint dotted grid lines at every tick boundary.
+.It Sy non-working
+.Sy hide Pq default | show .
+Roadmap-only; set it on
+.Sy default roadmap .
+Under a calendar that has non-working days
+.Pq Sy calendar:business ,
+.Sy hide
+collapses them to a seam and
+.Sy show
+draws each run at full width as a shaded band that bars paint across.
+The
+.Fl -non-working
+option of
+.Xr nowline 1
+and its equivalent on every other surface override it.
 .El
 .Pp
 Built-in icon names are rendered from a curated SVG library
@@ -1676,6 +1729,20 @@ an identifier matching a
 declaration in scope, or a double-quoted Unicode literal.
 Same contract for
 .Sy icon: .
+.It
+.Sy non-working:
+value must be
+.Sy hide
+or
+.Sy show ,
+on
+.Sy default roadmap
+and in a
+.Sy style
+block.
+Any other value is
+.Sy NL.E0800
+(one error per value).
 .It
 .Sy remaining:
 is either a percentage

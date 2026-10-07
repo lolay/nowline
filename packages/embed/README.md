@@ -26,6 +26,7 @@ block on the page renders on `DOMContentLoaded`.
     selector: 'pre code.language-nowline',
     locale: 'fr-CA',
     width: 1024,
+    nonWorking: 'show',    // 'hide' | 'show'; optional (see below)
   });
 </script>
 ```
@@ -35,6 +36,18 @@ Theme precedence (highest to lowest):
 1. The `initialize({ theme })` flag.
 2. The file's own `nowline v1 theme:` directive.
 3. `prefers-color-scheme` — captured **once** on init, not reactive.
+
+Non-working days (a `calendar:business` roadmap's weekends) can be collapsed or
+drawn as shaded bands that bars paint across. Precedence (highest to lowest):
+
+1. `nonWorking` on a single call (`nowline.render(source, { nonWorking })`, or the
+   `overrides` argument of `nowline.init()`).
+2. `initialize({ nonWorking })`.
+3. The roadmap's own `default roadmap non-working:show` (or `hide`) key.
+4. `hide`.
+
+Leave `nonWorking` unset to let each roadmap's key apply. The schedule is the
+same in both views, so only the picture changes.
 
 ## Manual rendering
 

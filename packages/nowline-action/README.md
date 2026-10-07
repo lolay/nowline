@@ -104,6 +104,7 @@ without duplicating the markdown.
 | `output-dir`   | Directory where markdown-mode rendered images are written, relative to the repo root       | `.nowline/`        |
 | `format`       | `svg` or `png`                                                                             | `svg`              |
 | `theme`        | `light` or `dark`                                                                          | `light`            |
+| `non-working`  | `hide` or `show`: how a business calendar's non-working days appear. Empty follows the roadmap's own `default roadmap non-working:` key, then `hide`. | (empty)            |
 | `cli-version`  | Version of `@nowline/cli` to install on the runner. Defaults to the action version.        | (action version)   |
 
 ## Outputs
@@ -119,7 +120,9 @@ without duplicating the markdown.
 1. Installs `@nowline/cli@<cli-version>` globally on the runner
    (skipped when the requested version is already on PATH).
 2. Shells out to `nowline <input> -o <output> -f <format> -t <theme>`
-   for each render.
+   for each render, adding `--non-working <value>` only when the
+   `non-working` input is set (older CLIs reject unknown flags, so a
+   workflow that does not use the input keeps working against them).
 3. (Markdown mode) parses each markdown file with
    [`remark`](https://github.com/remarkjs/remark), finds ` ```nowline `
    fenced code blocks, and for each block:

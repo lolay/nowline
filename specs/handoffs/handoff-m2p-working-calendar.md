@@ -1,6 +1,6 @@
 # Working calendar handoff: implementation plan (m2p)
 
-> **Status: Phases 1-3 are implemented in PR lolay/nowline#96, still open; Phases 4-5 are not started.** This handoff turns [`working-calendar.md`](../working-calendar.md) into a phased plan for a fresh agent. It is self-contained: the decisions that close the spec's open questions are in §3, the codebase map is in §4, and the target API is in §5. Do not redo the research; re-verify line numbers instead (§1, step 2).
+> **Status: Phases 1-3 are implemented in PR lolay/nowline#96 (merged as `9c0982d`); Phase 4 (`show` and the display setting) is implemented in the Phase 4 PR; Phase 5 is not started.** This handoff turns [`working-calendar.md`](../working-calendar.md) into a phased plan for a fresh agent. It is self-contained: the decisions that close the spec's open questions are in §3, the codebase map is in §4, and the target API is in §5. Do not redo the research; re-verify line numbers instead (§1, step 2).
 
 ## 1. How to pick this up
 
@@ -20,7 +20,7 @@ Milestone **m2p — Working calendar** is already in `specs/milestones.md` (summ
 | 1 | calendar primitives | `WorkingCalendar` non-working set, index ↔ date functions, business weekend | none (no caller uses them yet) |
 | 2 | working-day schedule, `hide` | engines B and C in working days, `TimeScale` hide mapping, window and ticks, now-line, wave floors, positioned `nonWorking` runs | every business-calendar render |
 | 3 | exporters | XLSX, MS Project and Mermaid read the file's calendar | every `xlsx` and `mermaid` cell, and the `msproj` cells with sized items or the full calendar |
-| 4 | `show` and the display setting | `non-working:` style key, `--non-working` on every surface, show mapping in engine A, shading | none by default (`hide` stays default) |
+| 4 | `show` and the display setting (implemented) | `non-working:` style key (`NL.E0800`), `--non-working` and its equivalents on every surface, show mapping in engine A, shading | none under `hide`; two deliberate additions: the `weekends-show` layout snapshot and its 8 determinism cells |
 | 5 | declarations | `non-working` and `working` keywords, `date:` / `start:` / `end:` / `every:`, includes, named seams and bands, exporter exceptions, editor and agent tooling | none for files without the keyword |
 
 ## 3. Decision log
@@ -47,6 +47,8 @@ Milestone **m2p — Working calendar** is already in `specs/milestones.md` (summ
 | 18 | Precedence between declarations | Specificity: a dated declaration (`date:`) beats a bounded recurrence (`every:` with `start:` / `end:`), which beats the open-ended week. `working` wins ties. Declaration order never matters | Last declaration wins | Added 2026-10-06 (maintainer, Phase 1 design). The result cannot depend on file or include order. |
 | 19 | Durations stay in estimate units | `days-per-*` define what `1w`, `1m`, `1q` and `1y` mean in days, and those days are laid on the working calendar: a working exception such as a crunch Saturday pulls the work in, and a non-working day inside a bar pushes its end out | — | Added 2026-10-06 (maintainer, Phase 1 design). Phase 3 already behaves this way: exporters report engine C's `days` (estimate units). |
 | 20 | Knock-ons of decisions 1, 2 and 18 | NW1 (`date:` alone; `start:` + `end:` without `every:`; `every:` with optional bounds), NW2 (`end:` is not before `start:`; `checkPropertyValues` gains `case 'end':` for NL.E0405), `start:` / `end:` hover text per entity in the LSP, `KEY_ORDER` in the printer (`every` before `start`, `end` right after `start`), NW3 against the open-ended week (bounded windows may close all seven days), NW4 against the open-ended week | — | Added 2026-10-06 (maintainer, Phase 1 design). [`working-calendar.md`](../working-calendar.md) §4.1, §5 and §6 are rewritten to match in Phase 5. Decision 14 is unchanged. |
+
+**Phase 4 deviation from §6 (decision 5 of the Phase 4 plan).** §6 Phase 4 says "every start-resolution site (pins, `after:`, the lane cursor, wave floors) goes through `startX`". As built, starts snap only where they become geometry: `sequenceItem`'s placed start (after `waveFloorX`, `wavePinOverrideOf` and `nonWorkingPinOf` ran on the pre-snap value), group and parallel box left edges, and the row packer's predicted extent and `firstChildStartX`. Lane cursor seeds, wave floors and include regions are not snapped. The geometry is the same, because a start that lands on a non-working day snaps forward when it is placed anyway, and the raw seeds keep `NL.I1008`, `NL.W1001` and their tie rules identical in both views and keep wave floors raw per decision 11. Two further Phase 4 limits worth knowing: at month scale and above, a closing column with no working day merges into the column before it, while a leading sliver keeps its tick and loses its label (known limit); and the band model clamps each run to the window while `from` / `through` keep the real dates, with `band` set at the days and weeks scales and never `seam`. [`rendering.md` § Timeline Scale](../rendering.md#timeline-scale) is the normative text.
 
 ## 4. Codebase map (as of `9725e9d`)
 

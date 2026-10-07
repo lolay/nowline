@@ -43,11 +43,14 @@ That's it. Any ` ```nowline ` block in the page will render automatically on `DO
 <script>
   nowline.initialize({
     theme: 'dark',           // 'light' | 'dark' | 'grayscale' | 'auto' (reads prefers-color-scheme once); 'greyscale' accepted as alias
+    nonWorking: 'show',      // 'hide' | 'show'; optional, see below
     startOnLoad: true,
     selector: 'pre code.language-nowline'  // custom selector
   });
 </script>
 ```
+
+**Non-working days.** Under `calendar:business`, `nonWorking` chooses how weekends appear on every block: `'hide'` collapses them to a seam, `'show'` draws them as shaded bands that bars paint across (see [`rendering.md` § Timeline Scale](./rendering.md#timeline-scale)). Precedence, first hit wins: the per-call `nonWorking` option (`nowline.render(source, { nonWorking })`, or the `overrides` argument to `nowline.init()`), then the value given to `initialize`, then each roadmap's own `default roadmap non-working:` key, then `hide`. Leave it unset to let each file's key apply. It is a render-time view only: the schedule, and therefore every exporter's output, is the same either way. `NonWorkingDisplay` is exported as a type.
 
 **Theme vocabulary.** `'auto'` (shown as **Auto** in UIs) is the follow-ambient value on the Theme axis everywhere — no per-surface rename. `system` is the Mode-axis counterpart, used only where tooling chrome exists (e.g. the interactive preview-shell or Free SPA); the embed has no Mode axis. The vocabulary is identical across surfaces; only sampling cadence differs: the embed samples `prefers-color-scheme` **once on init** (deterministic, screenshot-stable), the interactive preview-shell (IDE/Free SPA) samples **live**, and CLI / GitHub Action offer `light` / `dark` only (no `auto`). See `editor-ux.md` in `nowline-app` for the full Mode/Theme axis definitions.
 
@@ -70,7 +73,7 @@ That's it. Any ` ```nowline ` block in the page will render automatically on `DO
 
 | Call                            | Returns                  | Use for |
 |---------------------------------|--------------------------|---------|
-| `nowline.initialize(options?)`  | `void`                   | Configure theme / selector / locale once on page load. |
+| `nowline.initialize(options?)`  | `void`                   | Configure theme / selector / locale / non-working display once on page load. |
 | `nowline.render(source, opts?)` | `Promise<string>` (SVG)  | Render a single source string to SVG (custom containers, dynamic loads). |
 | `nowline.parse(source)`         | `Promise<{ ast, errors }>` | Parse without layout / render — for editor experiences. |
 | `nowline.init()` / `.run()`     | `Promise<{ rendered, failed }>` | Manually re-scan after the page mutates. |
@@ -324,6 +327,7 @@ The action:
 | `output-dir` | Directory for markdown-mode rendered images, relative to repo root | `.nowline/` |
 | `format` | `svg` or `png` | `svg` |
 | `theme` | `light` or `dark` | `light` |
+| `non-working` | `hide` or `show`: how a business calendar's non-working days appear. Empty follows the roadmap's own `default roadmap non-working:` key, then `hide`. Any other value fails the input check. | (empty) |
 | `cli-version` | Version of `@nowline/cli` to install on the runner | (action version) |
 
 ### Action Outputs
@@ -336,7 +340,7 @@ The action:
 
 ### How It Works Under the Hood
 
-The action installs the `nowline` CLI (from npm) on the runner — skipped when the requested version is already on PATH — then runs `nowline <input> -o <output> -f <format> -t <theme>` for each render. No Docker image required; it runs directly on the GitHub Actions runner.
+The action installs the `nowline` CLI (from npm) on the runner — skipped when the requested version is already on PATH — then runs `nowline <input> -o <output> -f <format> -t <theme>` for each render, adding `--non-working <value>` only when the `non-working` input is set (an older CLI rejects unknown flags, so a workflow that does not use the input keeps working against it). No Docker image required; it runs directly on the GitHub Actions runner.
 
 ## Host-Side Add-In Integrations
 
