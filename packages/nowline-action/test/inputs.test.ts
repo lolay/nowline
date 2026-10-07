@@ -10,6 +10,7 @@ const INPUT_KEYS = [
     'INPUT_OUTPUT-DIR',
     'INPUT_FORMAT',
     'INPUT_THEME',
+    'INPUT_NON-WORKING',
     'INPUT_CLI-VERSION',
 ];
 
@@ -78,5 +79,37 @@ describe('parseInputs', () => {
     it('rejects an unknown theme', () => {
         setInputs({ mode: 'markdown', theme: 'sepia' });
         expect(() => parseInputs()).toThrow(/theme must be/);
+    });
+});
+
+describe('parseInputs: non-working', () => {
+    beforeEach(() => {
+        for (const key of INPUT_KEYS) delete process.env[key];
+    });
+
+    afterEach(() => {
+        for (const key of INPUT_KEYS) delete process.env[key];
+    });
+
+    it('leaves nonWorking undefined when the input is unset', () => {
+        setInputs({ mode: 'markdown' });
+        expect(parseInputs().nonWorking).toBeUndefined();
+    });
+
+    it('treats an empty input (the action.yml default) as unset', () => {
+        setInputs({ mode: 'markdown', 'non-working': '' });
+        expect(parseInputs().nonWorking).toBeUndefined();
+    });
+
+    it('accepts show and hide', () => {
+        setInputs({ mode: 'markdown', 'non-working': 'show' });
+        expect(parseInputs().nonWorking).toBe('show');
+        setInputs({ mode: 'markdown', 'non-working': 'hide' });
+        expect(parseInputs().nonWorking).toBe('hide');
+    });
+
+    it('rejects an unknown value', () => {
+        setInputs({ mode: 'markdown', 'non-working': 'maybe' });
+        expect(() => parseInputs()).toThrow(/non-working must be "hide" or "show" \(got "maybe"\)/);
     });
 });

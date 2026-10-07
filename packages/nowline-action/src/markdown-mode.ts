@@ -41,6 +41,7 @@ export async function runMarkdownMode(inputs: ActionInputs): Promise<RunResult> 
             outputDir,
             format: inputs.format,
             theme: inputs.theme,
+            nonWorking: inputs.nonWorking,
         });
         rendered += fileResult.rendered;
         failed += fileResult.failed;
@@ -81,10 +82,11 @@ interface ProcessMarkdownFileArgs {
     outputDir: string;
     format: 'svg' | 'png';
     theme: 'light' | 'dark';
+    nonWorking?: 'hide' | 'show';
 }
 
 async function processMarkdownFile(args: ProcessMarkdownFileArgs): Promise<FileResult> {
-    const { mdPath, outputDir, format, theme } = args;
+    const { mdPath, outputDir, format, theme, nonWorking } = args;
     const source = await fs.readFile(mdPath, 'utf-8');
     const { blocks } = scanMarkdown(source);
 
@@ -103,7 +105,7 @@ async function processMarkdownFile(args: ProcessMarkdownFileArgs): Promise<FileR
 
     for (const block of blocks) {
         const outPath = path.join(outputDir, `nowline-${block.slug}.${format}`);
-        const success = await renderBlock({ block, outPath, format, theme });
+        const success = await renderBlock({ block, outPath, format, theme, nonWorking });
         if (success) {
             rendered += 1;
             renderedPaths.push(outPath);
@@ -134,6 +136,7 @@ interface RenderBlockArgs {
     outPath: string;
     format: 'svg' | 'png';
     theme: 'light' | 'dark';
+    nonWorking?: 'hide' | 'show';
 }
 
 async function renderBlock(args: RenderBlockArgs): Promise<boolean> {
@@ -149,6 +152,7 @@ async function renderBlock(args: RenderBlockArgs): Promise<boolean> {
             output: args.outPath,
             format: args.format,
             theme: args.theme,
+            nonWorking: args.nonWorking,
         });
         return true;
     } catch (err) {

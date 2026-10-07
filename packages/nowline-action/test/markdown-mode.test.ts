@@ -4,6 +4,8 @@ import * as path from 'node:path';
 
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
+const renderCalls = vi.hoisted(() => [] as Array<{ nonWorking?: 'hide' | 'show' }>);
+
 vi.mock('../src/cli.js', () => ({
     ensureCli: vi.fn(async () => '0.0.0-test'),
     renderOnce: vi.fn(
@@ -12,7 +14,9 @@ vi.mock('../src/cli.js', () => ({
             output: string;
             format: 'svg' | 'png';
             theme: 'light' | 'dark';
+            nonWorking?: 'hide' | 'show';
         }) => {
+            renderCalls.push({ nonWorking: args.nonWorking });
             await fs.mkdir(path.dirname(args.output), { recursive: true });
             const source = await fs.readFile(args.input, 'utf-8');
             await fs.writeFile(
@@ -46,6 +50,7 @@ describe('runMarkdownMode', () => {
     let originalCwd: string;
 
     beforeEach(async () => {
+        renderCalls.length = 0;
         originalCwd = process.cwd();
         workdir = await fs.mkdtemp(path.join(os.tmpdir(), 'nowline-action-test-'));
         process.chdir(workdir);
@@ -138,5 +143,28 @@ describe('runMarkdownMode', () => {
         expect(result.rendered).toBe(0);
         expect(result.failed).toBe(0);
         expect(result.changedFiles).toEqual([]);
+    });
+
+    it('passes nonWorking through to every block render when set', async () => {
+        await runMarkdownMode({
+            mode: 'markdown',
+            files: '**/*.md',
+            outputDir: '.nowline/',
+            format: 'svg',
+            theme: 'light',
+            nonWorking: 'show',
+        });
+        expect(renderCalls).toEqual([{ nonWorking: 'show' }, { nonWorking: 'show' }]);
+    });
+
+    it('leaves nonWorking undefined for every block when the input is unset', async () => {
+        await runMarkdownMode({
+            mode: 'markdown',
+            files: '**/*.md',
+            outputDir: '.nowline/',
+            format: 'svg',
+            theme: 'light',
+        });
+        expect(renderCalls).toEqual([{ nonWorking: undefined }, { nonWorking: undefined }]);
     });
 });

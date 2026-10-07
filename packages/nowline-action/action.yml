@@ -33,6 +33,10 @@ inputs:
         description: 'light or dark'
         required: false
         default: 'light'
+    non-working:
+        description: "hide or show: how a business calendar's non-working days appear. Leave empty to follow the roadmap's own `default roadmap non-working:` key (then hide). Needs a CLI that supports --non-working; the flag is passed only when this is set."
+        required: false
+        default: ''
     cli-version:
         description: 'Version of @nowline/cli to install on the runner. Defaults to the action version (lock-step).'
         required: false

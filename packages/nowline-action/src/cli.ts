@@ -44,22 +44,28 @@ export interface RenderArgs {
     output: string;
     format: 'svg' | 'png';
     theme: 'light' | 'dark';
+    /** Undefined leaves `--non-working` off, so the file's own key applies. */
+    nonWorking?: 'hide' | 'show';
 }
 
 /**
- * Run `nowline <input> -o <output> -f <format> -t <theme>`.
+ * The argument list for `nowline <input> -o <output> -f <format> -t <theme>`,
+ * plus `--non-working <mode>` only when it is set. A CLI older than the
+ * display option rejects an unknown flag, so an unset input must not mention
+ * it. Pure, so it is unit-testable without running the CLI.
+ */
+export function buildRenderArgs(args: RenderArgs): string[] {
+    const argv = [args.input, '-o', args.output, '-f', args.format, '-t', args.theme];
+    if (args.nonWorking) argv.push('--non-working', args.nonWorking);
+    return argv;
+}
+
+/**
+ * Run `nowline` with the arguments from {@link buildRenderArgs}.
  *
  * Throws if the CLI exits non-zero. Stdout / stderr stream into the GitHub
  * Actions log via `@actions/exec`'s default behaviour.
  */
 export async function renderOnce(args: RenderArgs): Promise<void> {
-    await exec.exec('nowline', [
-        args.input,
-        '-o',
-        args.output,
-        '-f',
-        args.format,
-        '-t',
-        args.theme,
-    ]);
+    await exec.exec('nowline', buildRenderArgs(args));
 }
