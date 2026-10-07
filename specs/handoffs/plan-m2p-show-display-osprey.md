@@ -1,7 +1,7 @@
 ```
 --- KICKOFF: begin orchestration at [deep] ---
 
-  Status: 3/4 groups done | last review: wave-3 PASS | current: m2p-4 s9-s10 [exec] | updated 2026-10-07
+  Status: 4/4 groups done; s10 driving lolay/nowline#97 to green | last review: wave-4 PASS | updated 2026-10-07
 
   review: every-wave (log-only — parent writes Review log; human gates only where marked)
 
@@ -422,7 +422,7 @@ Decision 18 and byte identity step 3.
 
 --- WAVE 4 [exec] ---
 
-### s9 - [exec] Docs
+### s9 - [exec] Docs (done)
 Everything under § Change "Docs". Done when `make lint` passes.
 
 ### s10 - [exec] Gates, commit, push, PR
@@ -436,6 +436,7 @@ Everything under § Change "Docs". Done when `make lint` passes.
 review wave-1 (m2p-4 s1-s3) 92c9ec3..602bf3b: PASS - Node 26.2.0/pnpm 12.8.1, 40-hash hide baseline, determinism 266 green; 58 red tests on assertions, 2 TimeScale guards red only because startX/advanceX do not exist yet, printer order test cannot fail pre-change, indexAtX untested - 2026-10-07
 review wave-2 (m2p-4 s4-s6) 7c68a9a..1a2736e: PASS - 40/40 hide hashes OK, no snapshot change, determinism 266 green with hashes.json unchanged, embed 189.36 KB, pre-commit green, all 58 wave-1 tests green; ResolvedStyle.nonWorking (decision 2) made the identity walk skip the string-valued setting, FR test fixed to translate from {code,args}, indexAtX test added - 2026-10-07
 review wave-3 (m2p-4 s7-s8) a5455b0..b98db81: PASS - every decision-17 surface plumbed test-first; 40/40 hide hashes OK, only new snapshot weekends-show.svg, hashes.json +33/-0 (8 weekends-show cells), determinism 290 green, embed 189.40 KB, pre-commit and pack-mcpb green; VS Code toolbar File overrides the setting like theme auto; man pages live under packages/cli/man; vitest called directly for per-package red runs (gates via make) - 2026-10-07
+review wave-4 (m2p-4 s9-s10) 24cb738..5ea9db5: PASS - docs only (14 files: specs, man nowline.5 EN/FR, READMEs, both changelogs, m2p handoff); pre-commit, pack-mcpb, bundle 189.40 KB, 40/40 hide hashes, hashes.json unchanged, determinism 290 green; weekends-show.svg matches Example A; PR lolay/nowline#97 opened by the orchestrator - 2026-10-07
 
 ## Token log
 
@@ -455,3 +456,5 @@ tokens wave-2 m2p-4-s4-s6 (claude-opus-5-5): input ~220 / cache read ~23M / cach
 tokens orchestrator-wave-2 plan-m2p-show-display-osprey (claude-opus-5-5): input ~30 / cache read ~2.1M / cache write ~22k 1h / output ~18k | ~$0.95 API-equiv (output est.) session 1ace5e35-cfdf-5791-b5ba-c2e888455b0c
 tokens wave-3 m2p-4-s7-s8 (claude-sonnet-5-5): input ~210 / cache read ~23M / cache write ~330k / output ~160k | ~$7.07 API-equiv (output est.) session 1ace5e35-cfdf-5791-b5ba-c2e888455b0c
 tokens orchestrator-wave-3 plan-m2p-show-display-osprey (claude-opus-5-5): input ~14 / cache read ~1.1M / cache write ~9.3k 1h / output ~9.6k | ~$0.47 API-equiv (output est.) session 1ace5e35-cfdf-5791-b5ba-c2e888455b0c
+tokens wave-4 m2p-4-s9-s10 (claude-sonnet-5-5): input ~140 / cache read ~11M / cache write ~170k / output ~93k | ~$3.61 API-equiv (output est.) session 1ace5e35-cfdf-5791-b5ba-c2e888455b0c
+tokens orchestrator-wave-4 plan-m2p-show-display-osprey (claude-opus-5-5): input ~20 / cache read ~1.7M / cache write ~17k 1h / output ~22k | ~$0.93 API-equiv (output est.) session 1ace5e35-cfdf-5791-b5ba-c2e888455b0c
