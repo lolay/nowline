@@ -13,6 +13,7 @@
 .Op Fl o Ar chemin
 .Op Fl t Ar thème
 .Op Fl -now Ar date
+.Op Fl -timezone Ar fuseau
 .Op Ar options
 .Ar entrée
 .Nm
@@ -193,12 +194,50 @@ comme
 .It Fl -now Ar date
 Ancrage
 .Sq Maintenant
-pour la ligne de temps présent et le calcul des dates, au format
-.Pa AAAA-MM-JJ .
-Par défaut\ : aujourd'hui (date civile UTC du système).
+pour la ligne de temps présent et le calcul des dates.
+Accepte une date nue
+.Pa AAAA-MM-JJ
+(flottante\ ; indépendante du fuseau) ou un instant ISO\~8601 complet tel que
+.Pa 2026-06-04T23:00:00Z
+ou
+.Pa 2026-06-05T06:00:00+07:00
+(un Z ou un décalage \(+-HH:MM intégré l'emporte sur
+.Fl -timezone ) .
+Une date nue ou un instant sans décalage est flottant\ : la partie date
+écrite est utilisée et
+.Fl -timezone
+est ignoré.
+Par défaut\ : la date civile du jour dans le fuseau de l'hôte (ou celui de
+.Fl -timezone
+s'il est indiqué).
 Indiquez
 .Fl -now Sq -
 pour supprimer entièrement la ligne de temps présent.
+.It Fl -timezone Ar fuseau
+Fuseau horaire utilisé pour la valeur par défaut
+.Dq aujourd'hui
+fondée sur l'horloge\ ; consulté uniquement lorsque
+.Fl -now
+est omis.
+Formes acceptées\ :
+.Bl -tag -width "America/Los_Angeles" -compact
+.It Sy local
+Fuseau de l'hôte ou du lecteur (par défaut si l'option est absente).
+.It Sy UTC
+UTC.
+.It Sy Z , +00:00
+Raccourci pour un décalage nul (équivaut à
+.Sy UTC ) .
+.It Sy \(+-HH , \(+-HH:MM , \(+-HHMM
+Décalage fixe (ignore l'heure d'été\ ; limitation documentée).
+.It Sy America/Los_Angeles
+Tout nom de fuseau IANA valide.
+.El
+Les abréviations ambiguës telles que
+.Sy PST
+et
+.Sy IST
+sont rejetées avec un message d'erreur explicite.
 .It Fl -locale Ar bcp47
 Étiquette de langue BCP-47 pour les messages CLI de l'opérateur
 (diagnostics de validation sur la sortie d'erreur,
