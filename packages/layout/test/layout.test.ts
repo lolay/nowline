@@ -1548,7 +1548,8 @@ swimlane "Platform"
             const wide = find(items(model.swimlanes[0].children), 'wide');
             expect(wide.textSpills).toBe(true);
             expect(wide.box.height).toBe(72);
-            expect(lane.deps.predictItemBarExtraHeight(decl, ctx)).toBe(16);
+            // `wide` is the lane's first item, so its predicted start is the origin.
+            expect(lane.deps.predictItemBarExtraHeight(decl, ctx.timeline.originX, ctx)).toBe(16);
         } finally {
             place.mockRestore();
         }

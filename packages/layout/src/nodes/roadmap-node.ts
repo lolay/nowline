@@ -18,12 +18,13 @@ import type {
 } from '@nowline/core';
 import { defaultRowBand } from '../band-scale.js';
 import type { CalendarConfig } from '../calendar.js';
-import { resolveSizes } from '../calendar.js';
+import { daysBetween, resolveSizes } from '../calendar.js';
 import { resolveWorkingCalendar } from '../calendar-resolver.js';
 import { parseDate, propValue, propValues } from '../dsl-utils.js';
 import { localeStrings, resolveLocale } from '../i18n.js';
 import type { LayoutOptions, LayoutResult } from '../layout.js';
 import type { LayoutContext, LayoutHelpers } from '../layout-context.js';
+import { isNonWorkingDisplay } from '../non-working-display.js';
 import { shiftIncludeY, shiftSwimlaneY } from '../positioned-shift.js';
 import { resolveStyle, type StyleContext } from '../style-resolution.js';
 import { type Theme, type ThemeName, themes } from '../themes/index.js';
@@ -125,7 +126,7 @@ function setNonWorkingRuns(
 ): void {
     const runs = buildNonWorkingRuns(scale, timeline.ticks, unit, timeline.minorGrid);
     if (!runs) return;
-    timeline.nonWorkingDisplay = 'hide';
+    timeline.nonWorkingDisplay = scale.showsNonWorking ? 'show' : 'hide';
     timeline.nonWorking = runs;
 }
 
@@ -234,6 +235,14 @@ export class RoadmapNode {
         const showTopTickPanel = headerStyle.timelinePosition !== 'bottom';
         const showBottomTickPanel =
             headerStyle.timelinePosition === 'bottom' || headerStyle.timelinePosition === 'both';
+        // How non-working days are drawn: the surface option, then the
+        // file's `default roadmap non-working:` key (resolved to `hide` when
+        // absent). It reaches every placement through the time scale.
+        const nonWorking = isNonWorkingDisplay(options.nonWorking)
+            ? options.nonWorking
+            : headerStyle.nonWorking;
+        // `TimeScale.showsNonWorking`, needed here to size the scale's range.
+        const showsNonWorking = nonWorking === 'show' && calendar.hasNonWorkingDays;
 
         // Pre-size the beside-mode header card. Width = max line width +
         // padding, clamped to MIN..MAX with word-wrap once the title
@@ -257,7 +266,11 @@ export class RoadmapNode {
         // wordmark from butting against the canvas edges.
         const ppd = scale.pixelsPerUnit / calendar.daysPerUnit(scale.unit);
         const spanDays = Math.max(1, calendar.workingIndexOf(startDate, endDate));
-        const naturalWidth = spanDays * ppd;
+        // Under `show` every calendar day takes `ppd`, so the chart widens by
+        // the non-working days in the window.
+        const naturalWidth = showsNonWorking
+            ? Math.max(1, daysBetween(startDate, endDate)) * ppd
+            : spanDays * ppd;
         const originX = chartLeftX + GUTTER_PX;
         const totalChartWidth = naturalWidth;
         const desiredCanvas = chartLeftX + GUTTER_PX + totalChartWidth + GUTTER_PX;
@@ -290,6 +303,7 @@ export class RoadmapNode {
             domain: [startDate, endDate],
             range: [originX, originX + naturalWidth],
             calendar,
+            nonWorking,
         });
         // Initial canvas extent = natural date window + canonical
         // gutters. Item caption spills are unknown until the swimlane
@@ -638,18 +652,26 @@ export class RoadmapNode {
             maxContentRightX = Math.max(maxContentRightX, m.center.x + m.radius);
         }
         const tickDays = calendar.daysPerUnit(scale.unit);
-        const overflowDays = (maxContentRightX - originX) / ppd;
+        // Working-day counts on both sides of the comparison: under `show` x
+        // is linear in calendar days, so the overflow is read back through
+        // the scale and the window keeps its working-day span.
+        const overflowDays = ctx.scale.showsNonWorking
+            ? ctx.scale.indexAtX(maxContentRightX)
+            : (maxContentRightX - originX) / ppd;
         const paddedDays =
             overflowDays > 0
                 ? tickBoundaryAtOrAfter(startDate, overflowDays, scale.unit, tickDays, calendar)
                 : 0;
         if (paddedDays > spanDays) {
             const extendedEndDate = calendar.dateAtWorkingIndex(startDate, paddedDays);
-            const extendedWidth = paddedDays * ppd;
+            const extendedWidth = ctx.scale.showsNonWorking
+                ? daysBetween(startDate, extendedEndDate) * ppd
+                : paddedDays * ppd;
             const extendedScale = new TimeScale({
                 domain: [startDate, extendedEndDate],
                 range: [originX, originX + extendedWidth],
                 calendar,
+                nonWorking,
             });
             ctx.scale = extendedScale;
             timeline.endDate = extendedEndDate;

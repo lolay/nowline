@@ -42,6 +42,7 @@ import type {
     PositionedTrackChild,
 } from '../types.js';
 import { waveFloorX } from '../wave-layout.js';
+import { itemSpanPx } from '../working-span.js';
 
 export interface GroupNodeDeps {
     sequenceItem: (
@@ -67,7 +68,11 @@ export interface GroupNodeDeps {
      *  (a wrapped title over a meta line, or wrapped label-chip rows);
      *  used to size the row-packer's row pitch ahead of the call to
      *  `sequenceItem`. */
-    predictItemBarExtraHeight: (item: ItemDeclaration, ctx: LayoutContext) => number;
+    predictItemBarExtraHeight: (
+        item: ItemDeclaration,
+        startX: number,
+        ctx: LayoutContext,
+    ) => number;
 }
 
 export class GroupNode {
@@ -191,16 +196,26 @@ export class GroupNode {
             // Predict logical extent so the row-packer can bump on
             // collision before we hand off to `sequenceItem`. Mirrors
             // SwimlaneNode's pre-flight width math.
+            // Under `show` the predicted extent starts where `sequenceItem`
+            // will snap the bar to; the cursor below keeps the raw start.
             const durationDays = deriveItemDurationDays(props, ctx.sizes, ctx.cal);
-            const naturalWidth = Math.max(MIN_ITEM_WIDTH, durationDays * ctx.timeline.pixelsPerDay);
-            const desiredEnd = desiredStart + naturalWidth;
+            const predictedStart = ctx.scale.startX(desiredStart);
+            const naturalWidth = Math.max(
+                MIN_ITEM_WIDTH,
+                itemSpanPx(ctx, predictedStart, durationDays),
+            );
+            const desiredEnd = predictedStart + naturalWidth;
             const childId = (child as ItemDeclaration).name ?? '';
 
-            const barExtra = deps.predictItemBarExtraHeight(child as ItemDeclaration, ctx);
+            const barExtra = deps.predictItemBarExtraHeight(
+                child as ItemDeclaration,
+                predictedStart,
+                ctx,
+            );
             const predictedHeight = step + barExtra;
             const { rowIndex, y: rowY } = packer.placeItem({
                 childId,
-                desiredStart,
+                desiredStart: predictedStart,
                 desiredEnd,
                 // Row pitch = `step()` + extra bar height. Keeps the
                 // inter-row visible gap (= step - bandwidth) intact
@@ -262,10 +277,17 @@ export class GroupNode {
         // different rows of the parent swimlane. The painted box and
         // the logical cursor advance are intentionally decoupled here.
         const visualRightX = Math.max(timeCursorX, packer.usedRightX());
+        // Under `show` the box opens on a working day; its children keep the
+        // raw start as their cursor seed, so their pins and ties read as
+        // under `hide`, and are snapped where they are placed.
+        const boxLeftX = ctx.scale.showsNonWorking ? ctx.scale.startX(startX) : startX;
+        const boxRightX = ctx.scale.showsNonWorking
+            ? Math.max(boxLeftX, visualRightX)
+            : visualRightX;
         const box: BoundingBox = {
-            x: startX,
+            x: boxLeftX,
             y: startY,
-            width: visualRightX - startX,
+            width: boxRightX - boxLeftX,
             height: topPad + innerHeight + bottomPad,
         };
         cursor.x = timeCursorX + TRACK_BLOCK_TAIL_GUTTER_PX;

@@ -61,8 +61,11 @@ export class AnchorNode {
             labelSide,
         };
         // A date the axis hides keeps its own day as a tooltip
-        // (specs/working-calendar.md §7.4).
-        if (!ctx.calendar.isWorkingDay(date)) positioned.hiddenDate = formatIsoDate(date);
+        // (specs/working-calendar.md §7.4). Under `show` the day is drawn,
+        // and the anchor sits on it.
+        if (!ctx.scale.showsNonWorking && !ctx.calendar.isWorkingDay(date)) {
+            positioned.hiddenDate = formatIsoDate(date);
+        }
         return positioned;
     }
 }

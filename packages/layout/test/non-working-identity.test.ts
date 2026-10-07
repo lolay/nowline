@@ -26,6 +26,17 @@ const REPO_ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..
 /** Every key the working-day schedule adds to the positioned model. */
 const NON_WORKING_KEYS = ['nonWorking', 'nonWorkingDisplay', 'hiddenDate', 'nonWorkingPin'];
 
+/**
+ * Every `ResolvedStyle` carries the resolved `non-working` display as the
+ * string `nonWorking` (m2p phase 4, decision 2), next to `minorGrid` and
+ * `timelinePosition`, on every calendar. It is a setting, not a key the
+ * working-day schedule adds, so the walk skips it; the timeline's
+ * `nonWorking` runs are an array and still count.
+ */
+function isDisplaySetting(key: string, value: unknown): boolean {
+    return key === 'nonWorking' && typeof value === 'string';
+}
+
 /** The paths (`a.b[2].c`) of every non-working key anywhere in `root`. */
 function nonWorkingKeyPaths(root: unknown): string[] {
     const found: string[] = [];
@@ -41,8 +52,11 @@ function nonWorkingKeyPaths(root: unknown): string[] {
             return;
         }
         for (const key of Object.keys(value)) {
-            if (NON_WORKING_KEYS.includes(key)) found.push(at ? `${at}.${key}` : key);
-            walk((value as Record<string, unknown>)[key], at ? `${at}.${key}` : key);
+            const child = (value as Record<string, unknown>)[key];
+            if (NON_WORKING_KEYS.includes(key) && !isDisplaySetting(key, child)) {
+                found.push(at ? `${at}.${key}` : key);
+            }
+            walk(child, at ? `${at}.${key}` : key);
         }
     };
     walk(root, '');

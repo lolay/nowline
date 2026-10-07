@@ -8,6 +8,7 @@
 // and every helper here is a no-op, so wave-free output is unchanged.
 
 import type { ItemDeclaration, WavePlan } from '@nowline/core';
+import { addDays } from './calendar.js';
 import { parseDate, propValue } from './dsl-utils.js';
 import type { LayoutContext } from './layout-context.js';
 import type { TimeScale } from './time-scale.js';
@@ -191,9 +192,17 @@ export function isOnWaveBoundary(state: WaveLayoutState, x: number): boolean {
     return false;
 }
 
-/** The whole working-day index nearest to `x` on the timeline. */
+/**
+ * The whole working-day index nearest to `x` on the timeline. Under `show`
+ * x is linear in calendar days, so the nearest calendar day is read first
+ * and then counted in working days (a non-working day counts as the next
+ * working day), which keeps the dates engine A reports equal to engine C's.
+ */
 function dayAtX(x: number, ctx: LayoutContext): number {
-    return Math.round((x - ctx.timeline.originX) / ctx.timeline.pixelsPerDay);
+    const days = Math.round((x - ctx.timeline.originX) / ctx.timeline.pixelsPerDay);
+    if (!ctx.scale.showsNonWorking) return days;
+    const start = ctx.timeline.startDate;
+    return ctx.calendar.workingIndexOf(start, addDays(start, days));
 }
 
 /**

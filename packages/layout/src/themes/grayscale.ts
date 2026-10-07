@@ -127,6 +127,7 @@ export const grayscaleTheme: Theme = {
         gridLine: '#bdbdbd',
         minorGridLine: '#d4d4d4',
         nonWorkingSeam: '#9a9a9a',
+        nonWorkingFill: '#737373',
         tickMark: '#bdbdbd',
         labelText: '#737373',
         panelFill: '#ffffff',

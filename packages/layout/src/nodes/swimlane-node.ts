@@ -46,6 +46,7 @@ import type {
     PositionedSwimlane,
     PositionedTrackChild,
 } from '../types.js';
+import { itemSpanPx } from '../working-span.js';
 
 /**
  * Font size (px) the renderer uses for the lane capacity badge. Mirrors
@@ -104,7 +105,11 @@ export interface SwimlaneNodeDeps {
      *  (a wrapped title over a meta line, or wrapped label-chip rows);
      *  used to size the row-packer's row pitch ahead of the call to
      *  `sequenceItem`. */
-    predictItemBarExtraHeight: (item: ItemDeclaration, ctx: LayoutContext) => number;
+    predictItemBarExtraHeight: (
+        item: ItemDeclaration,
+        startX: number,
+        ctx: LayoutContext,
+    ) => number;
 }
 
 export interface SwimlaneNodeInput {
@@ -189,11 +194,14 @@ function firstChildStartX(
 ): number | undefined {
     for (const child of lane.content) {
         if (child.$type === 'DescriptionDirective') continue;
-        return deps.resolveChildStart(
-            child as ItemDeclaration | GroupBlock | ParallelBlock,
-            laneLeftX,
-            laneLeftX,
-            ctx,
+        // Snapped like the start it predicts (a no-op under `hide`).
+        return ctx.scale.startX(
+            deps.resolveChildStart(
+                child as ItemDeclaration | GroupBlock | ParallelBlock,
+                laneLeftX,
+                laneLeftX,
+                ctx,
+            ),
         );
     }
     return undefined;
@@ -307,16 +315,26 @@ export class SwimlaneNode {
             // BEFORE handing off to sequenceItem. The arithmetic mirrors
             // the duration → width math in `sequenceItem` (see
             // packages/layout/src/layout.ts).
+            // Under `show` the predicted extent starts where `sequenceItem`
+            // will snap the bar to; the cursor below keeps the raw start.
             const durationDays = deriveItemDurationDays(props, ctx.sizes, ctx.cal);
-            const naturalWidth = Math.max(MIN_ITEM_WIDTH, durationDays * ctx.timeline.pixelsPerDay);
-            const desiredEnd = desiredStart + naturalWidth;
+            const predictedStart = ctx.scale.startX(desiredStart);
+            const naturalWidth = Math.max(
+                MIN_ITEM_WIDTH,
+                itemSpanPx(ctx, predictedStart, durationDays),
+            );
+            const desiredEnd = predictedStart + naturalWidth;
             const childId = (child as ItemDeclaration).name ?? '';
 
-            const barExtra = deps.predictItemBarExtraHeight(child as ItemDeclaration, ctx);
+            const barExtra = deps.predictItemBarExtraHeight(
+                child as ItemDeclaration,
+                predictedStart,
+                ctx,
+            );
             const predictedHeight = step + barExtra;
             const { rowIndex, y: rowY } = packer.placeItem({
                 childId,
-                desiredStart,
+                desiredStart: predictedStart,
                 desiredEnd,
                 // Row pitch = `step()` + extra bar height. Keeps the
                 // inter-row visible gap (= step - bandwidth) intact

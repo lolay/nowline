@@ -155,7 +155,8 @@ function daysPerUnitForCalendar(unit: ScaleUnit, cal: CalendarConfig): number {
     }
 }
 
-function continuousDaysPerUnit(unit: ScaleUnit): number {
+/** Calendar days per `1<unit>` when every day counts (`calendar:full`). */
+export function continuousDaysPerUnit(unit: ScaleUnit): number {
     switch (unit) {
         case 'days':
             return 1;

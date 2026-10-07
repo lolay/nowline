@@ -789,6 +789,35 @@ describe('TimeScale under nonWorking show', () => {
     });
 });
 
+describe('TimeScale.indexAtX (the extension pass reads the overflow through it)', () => {
+    // Same show scale: Sat Jan 10 and Sun Jan 11 are x 40-56. An x inside a
+    // non-working day reads as the start of the next working day (index 5);
+    // an x inside a working day keeps its fraction.
+    const show = displayScale('show', fromCalendarConfig(businessCal), [0, 224]);
+    const hide = displayScale('hide', fromCalendarConfig(businessCal), [0, 160]);
+
+    it('counts working days under show, a weekend x reading as Monday', () => {
+        const cases: Array<[number, number]> = [
+            [0, 0],
+            [20, 2.5],
+            [36, 4.5],
+            [40, 5],
+            [48, 5],
+            [56, 5],
+            [60, 5.5],
+            [224, 20],
+        ];
+        for (const [x, expected] of cases) {
+            expect(show.indexAtX(x), `indexAtX(${x})`).toBeCloseTo(expected, 6);
+        }
+    });
+
+    it('is linear in x under hide', () => {
+        expect(hide.indexAtX(40)).toBe(5);
+        expect(hide.indexAtX(60)).toBe(7.5);
+    });
+});
+
 describe('TimeScale display guards (hide and calendars without a weekend are unchanged)', () => {
     it('hide keeps working-day geometry and does not show non-working days', () => {
         const hide = displayScale('hide', fromCalendarConfig(businessCal), [0, 160]);
