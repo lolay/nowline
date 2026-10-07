@@ -25,7 +25,7 @@ SHELL := bash
 
 .DEFAULT_GOAL := help
 
-.PHONY: help init build build-fast test lint format typecheck ci pre-commit doctor clean \
+.PHONY: help init build build-fast test lint format typecheck ci ci-platform pre-commit doctor clean \
         lint-workflows bundle-size gh-runs-list gh-runs-watch gh-runs-status \
         determinism determinism-browser determinism-update mcp-app-e2e mcp-inspector-smoke mcp-claude-e2e \
         compile smoke deb pack vsix pack-mcpb bump snapshot-version release-changelog \
@@ -92,6 +92,16 @@ test: build ## Run every package's Vitest suite (build first: CLI integration te
 ci: lint build typecheck test ## Run the full pre-push gate (what CI runs)
 
 pre-commit: ci ## Run the local gate before committing or pushing (alias of ci)
+
+# Slim gate for the non-canonical CI cells (ubuntu/node 22, macOS, Windows).
+# Only the ubuntu/node 26 cell runs the full `ci`. Lint (Biome, native),
+# typecheck (TypeScript 7, native), and the SVG render have never behaved
+# differently by OS or Node version; every platform bug so far was a Windows
+# path bug that Vitest caught. So these cells build (no render) and run
+# Vitest. The recipe calls `pnpm -r test` itself instead of depending on
+# `test`, whose `build` prerequisite would re-run the full build + render.
+ci-platform: build-fast ## Slim CI gate for the OS/Node cells: build-fast + Vitest (no lint, typecheck, or render)
+	pnpm -r test
 
 doctor: ## Check required tools for this repo (read-only). MODE=default|release
 	@command -v triage >/dev/null 2>&1 || { printf 'triage not found - install: brew install lolay/tap/triage\n' >&2; exit 1; }

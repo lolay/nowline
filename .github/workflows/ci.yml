@@ -56,6 +56,16 @@ jobs:
     # the floor cell only on Linux keeps the matrix at 4 cells instead
     # of doubling it on every OS — macOS/Windows cells exist to catch
     # OS-specific issues, not Node-version regressions.
+    #
+    # Gate per cell: only {ubuntu-latest, node 26} runs the full `make ci`
+    # (lint + build + typecheck + test), so `make pre-commit` locally equals
+    # exactly one CI cell. The other three run `make ci-platform` (build-fast
+    # + Vitest). Lint (Biome, a native binary), typecheck (TypeScript 7, the
+    # native compiler), and the SVG render have never behaved differently by
+    # OS or Node version; every platform bug in this repo's history was a
+    # Windows path bug, and Vitest caught each one. Keep Vitest on every cell.
+    #
+    # The job `name:` below is a check context; keep it byte-identical.
     name: Build & test (${{ matrix.os }}, node ${{ matrix.node-version }})
     runs-on: ${{ matrix.os }}
     # Run every step under bash on all three OSes so the `make` gate steps
@@ -68,24 +78,25 @@ jobs:
       fail-fast: false
       matrix:
         include:
-          - { os: ubuntu-latest, node-version: '22' }
-          - { os: ubuntu-latest, node-version: '26' }
-          - { os: macos-latest, node-version: '26' }
-          - { os: windows-latest, node-version: '26' }
+          - { os: ubuntu-latest, node-version: '22', gate: ci-platform }
+          - { os: ubuntu-latest, node-version: '26', gate: ci }
+          - { os: macos-latest, node-version: '26', gate: ci-platform }
+          - { os: windows-latest, node-version: '26', gate: ci-platform }
     steps:
       - uses: actions/checkout@v7
       - uses: ./.github/actions/setup-node-pnpm
         with:
           node-version: ${{ matrix.node-version }}
 
-      # Run the local gate itself, not a hand-ordered copy of its steps. The
-      # checkout has no dist/, so this is the same fresh-clone `make init &&
-      # make pre-commit` contributors run. Separate build/lint/typecheck/test
-      # steps once ran `build` first and masked a `typecheck` that only passed
-      # against prebuilt dist/ types; one `make ci` keeps CI and the local gate
-      # in the same order by construction (and builds once, not twice).
-      - name: Gate (make ci on a clean checkout)
-        run: make ci
+      # Run a make gate itself, not a hand-ordered copy of its steps. The
+      # checkout has no dist/, so on the canonical cell this is the same
+      # fresh-clone `make init && make pre-commit` contributors run. Separate
+      # build/lint/typecheck/test steps once ran `build` first and masked a
+      # `typecheck` that only passed against prebuilt dist/ types; one `make
+      # ci` keeps CI and the local gate in the same order by construction
+      # (and builds once, not twice).
+      - name: Gate (make ${{ matrix.gate }} on a clean checkout)
+        run: make ${{ matrix.gate }}
 
   bundle-size:
     name: Embed bundle size gate
@@ -146,8 +157,10 @@ jobs:
       - uses: actions/checkout@v7
       - uses: ./.github/actions/setup-node-pnpm
 
+      # build-fast: neither leg reads the rendered examples/ or tests/ SVGs
+      # (both use inline sources against packages/mcp/dist).
       - name: Build all packages
-        run: make build
+        run: make build-fast
 
       - name: MCP Inspector CLI smoke
         run: make mcp-inspector-smoke
@@ -159,11 +172,16 @@ jobs:
 
   release-build-smoke:
     name: Release build smoke (no upload)
-    needs: build-test
+    # No `needs:`: this matrix starts in parallel with build-test instead of
+    # waiting about 2 minutes for the slowest OS cell. Standard runners are
+    # free on this public repo, so running it when tests fail costs nothing,
+    # and the `CI gate` job below still blocks the merge if either fails.
+    #
     # Skip the full 10-cell matrix on version-bump commits authored by the
     # release bot. Lint / typecheck / test (build-test above) still run —
     # only the expensive compile+package matrix is skipped, because release.yml
-    # is about to run the same matrix with upload:true in parallel.
+    # is about to run the same matrix with upload:true in parallel. The
+    # `CI gate` job treats this skip as a pass.
     #
     # CROSS-REFERENCE: the email literal below must match the
     # `GIT_AUTHOR_EMAIL` env var set at the TOP of release.yml
@@ -175,3 +193,35 @@ jobs:
     uses: ./.github/workflows/build.yml
     with:
       upload: false
+
+  ci-gate:
+    # Aggregate required check. The `main` ruleset requires only this
+    # context (scripts/apply-branch-policies.sh), so matrix and job-name
+    # changes above never need a lockstep ruleset edit. `if: always()` makes
+    # it report even when a dependency fails; it fails when any job below
+    # failed or was cancelled. `skipped` passes, because release-build-smoke
+    # is legitimately skipped on release-bot pushes. Keep `needs:` listing
+    # every other job in this workflow, and keep the `name:` exact.
+    name: CI gate
+    if: always()
+    needs:
+      - lint-workflows
+      - triage
+      - build-test
+      - bundle-size
+      - determinism
+      - mcp-harness
+      - release-build-smoke
+    runs-on: ubuntu-latest
+    permissions: {}
+    steps:
+      - name: Check every job passed or was skipped
+        env:
+          NEEDS_JSON: ${{ toJSON(needs) }}
+        run: |
+          printf '%s' "$NEEDS_JSON" | jq -r 'to_entries[] | "\(.key): \(.value.result)"'
+          bad=$(printf '%s' "$NEEDS_JSON" | jq -r '[to_entries[] | select(.value.result == "failure" or .value.result == "cancelled") | .key] | join(", ")')
+          if [ -n "$bad" ]; then
+            echo "::error::Failed or cancelled: $bad"
+            exit 1
+          fi

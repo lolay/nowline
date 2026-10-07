@@ -434,7 +434,7 @@ The maintainer moves your entry into a new `## [vX.Y.Z] - YYYY-MM-DD` section as
 
 1. **Fork** the repo (or branch, if you have write access) and create a feature branch: `git checkout -b feat/short-description`.
 2. Make your change. Keep the diff focused — one logical change per PR.
-3. **Run `make pre-commit` locally** before committing or pushing — it chains lint + build + typecheck + test, the same gate CI runs as `make ci` across Linux, macOS, and Windows.
+3. **Run `make pre-commit` locally** before committing or pushing — it chains lint + build + typecheck + test, the same gate CI's canonical cell (Linux, Node 26) runs as `make ci`. The other cells (Linux Node 22, macOS, Windows) run `make ci-platform`: build plus the Vitest suites.
 4. **Update documentation** — package READMEs, the top-level `README.md`, inline comments, plus a `## [Unreleased]` entry in [`CHANGELOG.md`](./CHANGELOG.md) for any user-observable change (see [Changelog entries](#changelog-entries) above).
 5. **Open a PR** against `main` with:
     - A clear summary of the change.
@@ -449,7 +449,7 @@ For changes touching the language or the published AST JSON schema, please open 
 
 ### Auto-merge policy
 
-`main` is protected by a [branch ruleset](https://github.com/lolay/nowline/settings/rules) that requires **every job in [`ci.yml`](./.github/workflows/ci.yml) to pass *and* one approving review** before any PR can merge — auto or manual. A human clicks **Approve** on every PR; nothing lands on green CI alone. The Copilot `agent-merge.yml` auto-merge workflow is **retired** (see [`ops/branch-policies.md`](./ops/branch-policies.md)).
+`main` is protected by a [branch ruleset](https://github.com/lolay/nowline/settings/rules) that requires **every job in [`ci.yml`](./.github/workflows/ci.yml) to pass (through the aggregate `CI gate` check) *and* one approving review** before any PR can merge — auto or manual. A human clicks **Approve** on every PR; nothing lands on green CI alone. The Copilot `agent-merge.yml` auto-merge workflow is **retired** (see [`ops/branch-policies.md`](./ops/branch-policies.md)).
 
 GitHub's native auto-merge is still available as a convenience: enable it and the PR squash-merges automatically once CI is green **and** the required approval is in place. It no longer lands a PR hands-off, because the approval is always required. (The solo maintainer can't self-approve, but the OrgAdmin ruleset bypass lets them merge their own work directly — see `ops/branch-policies.md`.)
 

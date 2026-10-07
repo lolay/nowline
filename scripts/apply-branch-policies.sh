@@ -15,6 +15,10 @@
 # shaped this way, when to re-run, how to extend, known gaps).  This
 # script is the spec; that runbook is the wrapper.
 #
+# ORDERING: the `main` ruleset requires the `CI gate` check from
+# .github/workflows/ci.yml.  That job must be merged to `main` before
+# this script runs, or every PR blocks.  See the Tier 1 section below.
+#
 # Idempotency: GET rulesets first; PUT by id when a ruleset with the
 # target name already exists, POST when none does.  Safe to re-run at
 # any time.
@@ -142,23 +146,33 @@ trap 'rm -rf "$TMP"' EXIT
 # ──────────────────────────────────────────────────────────────────────────────
 # Tier 1 — OSS: lolay/nowline
 #
-# Required CI contexts taken from .github/workflows/ci.yml's job names.
-# Names must match exactly; a renamed job needs the script updated and
-# re-run before the next PR or merges block on a missing-but-required
-# check.  strict_required_status_checks_policy: true requires the PR
-# branch be up-to-date with main before merging.  Defence-in-depth:
+# The only required CI context is `CI gate`, the aggregate job at the
+# end of .github/workflows/ci.yml.  It `needs:` every other ci.yml job,
+# runs `if: always()`, and fails when any of them failed or was
+# cancelled (a skipped job passes).  So adding, renaming, or reshaping a
+# ci.yml job or matrix cell needs no change here; only renaming the
+# `CI gate` job itself does, and that needs the script updated and
+# re-run in lockstep or every PR blocks on a missing-but-required check.
+# strict_required_status_checks_policy: true requires the PR branch be
+# up-to-date with main before merging.  Defence-in-depth:
 # required_approving_review_count: 1 (see ops/branch-policies.md § 1).
+#
+# ORDERING (read before running): the `CI gate` job must already exist
+# on `main` (merged) before this ruleset is switched to require it.
+# Applying it earlier blocks every PR: a branch whose ci.yml has no
+# `CI gate` job never reports that context, so the required check
+# waits forever.  Merge the ci.yml change first, confirm a `CI gate`
+# check reported on main, then run this script.
 # ──────────────────────────────────────────────────────────────────────────────
 echo ""
 echo "=== Tier 1: OSS — ${ORG}/nowline ==="
 
 OSS_BYPASS_JSON=$(bypass_actors_json "${ORG}/nowline")
-# NOTE: Reusable-workflow check names below use the caller job's `name:`
-# field (NOT its job ID) — `Release build smoke (no upload)` not
-# `release-build-smoke`. Confirmed by observation on PR #42 (Phase 1
-# prep), pre-merge. If `ci.yml`'s `release-build-smoke` job ever
-# changes its `name:` value, these contexts must be updated in lockstep
-# or PRs will block on stale check names.
+# NOTE: Check contexts use the job's `name:` field, not its job ID
+# (`CI gate`, not `ci-gate`).  The per-job contexts this list used to
+# hold (lint, the four build-test cells, bundle size, and the ten
+# `Release build smoke (no upload) / Build ...` cells) are covered by
+# `CI gate` now; the stale `Build pack-embed` context went with them.
 cat > "$TMP/nowline.json" <<JSON
 {
   "name": "main: CI must pass",
@@ -190,22 +204,7 @@ cat > "$TMP/nowline.json" <<JSON
         "strict_required_status_checks_policy": true,
         "do_not_enforce_on_create": false,
         "required_status_checks": [
-          { "context": "Lint workflows (actionlint)" },
-          { "context": "Build & test (ubuntu-latest, node 22)" },
-          { "context": "Build & test (ubuntu-latest, node 26)" },
-          { "context": "Build & test (macos-latest, node 26)" },
-          { "context": "Build & test (windows-latest, node 26)" },
-          { "context": "Embed bundle size gate" },
-          { "context": "Release build smoke (no upload) / Build bin-macos-arm64" },
-          { "context": "Release build smoke (no upload) / Build bin-macos-x64" },
-          { "context": "Release build smoke (no upload) / Build bin-linux-x64" },
-          { "context": "Release build smoke (no upload) / Build bin-linux-arm64" },
-          { "context": "Release build smoke (no upload) / Build bin-windows-x64" },
-          { "context": "Release build smoke (no upload) / Build bin-windows-arm64" },
-          { "context": "Release build smoke (no upload) / Build pack-npm" },
-          { "context": "Release build smoke (no upload) / Build pack-vsix" },
-          { "context": "Release build smoke (no upload) / Build pack-action" },
-          { "context": "Release build smoke (no upload) / Build pack-embed" }
+          { "context": "CI gate" }
         ]
       }
     }

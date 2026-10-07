@@ -17,6 +17,7 @@ graph LR
     build --> ci
     typecheck --> ci
     test --> ci
+    build_fast["build-fast"] --> ci_platform["ci-platform"]
 
     %% dotted = consumes the left target's output but is not a hard make
     %% prerequisite: typecheck is ordered after build inside ci instead, and
@@ -34,7 +35,6 @@ graph LR
 
     %% standalone
     init
-    build_fast["build-fast"]
     format
     clean
     lint_workflows["lint-workflows"]
@@ -46,7 +46,8 @@ graph LR
 
 Solid arrows are hard prerequisites — running a target automatically runs
 everything to its left (`make ci` runs `lint`, `build`, `typecheck`, `test`,
-in that order; `make test` runs `build` first). Dotted arrows mark a softer
+in that order; `make test` runs `build` first; `make ci-platform` runs
+`build-fast` first and never reaches `build`). Dotted arrows mark a softer
 relationship: the target consumes another's output but does not hard-depend on
 it. `typecheck` reads sibling packages' built `dist/` types, so `ci` orders it
 after `build` rather than making every standalone `make typecheck` rebuild.
@@ -68,7 +69,8 @@ pipeline that artifact is built in a separate CI job and handed over — see
 | `format` | Auto-fix formatting, lint, and import order (`pnpm check:fix`) |
 | `typecheck` | Type-check the packages that opt in (`pnpm typecheck`). Needs a prior `build`: several packages resolve sibling `@nowline/*` types from `dist/` |
 | `test` | Run every package's Vitest suite (`pnpm -r test`); depends on `build` |
-| `ci` | The full pre-push gate: `lint` + `build` + `typecheck` + `test`, in that order. CI's build-test matrix runs this target directly on a clean checkout |
+| `ci` | The full pre-push gate: `lint` + `build` + `typecheck` + `test`, in that order. The canonical CI cell (`ubuntu-latest`, Node 26) runs this target directly on a clean checkout |
+| `ci-platform` | Slim gate for the other build-test cells (`ubuntu-latest` Node 22, macOS, Windows): `build-fast`, then `pnpm -r test`. No lint, typecheck, or render: those have never differed by OS or Node version, while every platform bug so far was a Windows path bug that Vitest caught. Calls `pnpm -r test` itself rather than depending on `test`, so it never re-runs the full `build` |
 | `pre-commit` | Local alias of `ci` — run before committing or pushing |
 | `clean` | Remove build / binary / package artifacts (keeps `node_modules`) |
 | `lint-workflows` | actionlint the GitHub Actions workflows (`pnpm lint:workflows`) |
@@ -145,7 +147,7 @@ keeps per-step logs and the matrix while sourcing the command from one place.
 
 | Workflow | Trigger | What it does | make targets |
 |----------|---------|--------------|--------------|
-| [`ci.yml`](./.github/workflows/ci.yml) | push to `main`, pull requests | Lint workflows; the `make ci` gate (lint + build + typecheck + test) on a clean checkout across the OS/Node matrix; embed bundle-size gate; release-build smoke (calls `build.yml`) | `lint-workflows`, `ci`, `bundle-size` |
+| [`ci.yml`](./.github/workflows/ci.yml) | push to `main`, pull requests | Lint workflows; the full `make ci` gate (lint + build + typecheck + test) on a clean checkout on `ubuntu-latest` Node 26, and `make ci-platform` (build-fast + Vitest) on the Node 22, macOS, and Windows cells; embed bundle-size gate; export-determinism and MCP harness gates; release-build smoke (calls `build.yml`, in parallel with the test matrix); the aggregate `CI gate` job, the only check the `main` ruleset requires | `lint-workflows`, `ci`, `ci-platform`, `bundle-size`, `build-fast`, `compile`, `determinism`, `determinism-browser`, `mcp-inspector-smoke`, `mcp-app-e2e` |
 | [`build.yml`](./.github/workflows/build.yml) | reusable (called by `ci.yml` smoke + `release.yml`) | 10-cell build/package matrix: compile per-OS/arch binaries, smoke them, build `.deb`s, pack npm tarballs, package the `.vsix`, stage the action mirror + embed CDN bundle | `compile`, `smoke`, `deb`, `pack`, `vsix` |
 | [`release.yml`](./.github/workflows/release.yml) | `v*` tag push, manual dispatch | Cut release (bump + tag), call `build.yml` with upload, publish to npm + Marketplace + Open VSX, GitHub release + Homebrew tap + action mirror, deploy prod embed CDN | `bump`, `publish-npm`, `publish-vscode` (guarded with `CONFIRM_PUBLISH=1`) |
 | [`embed-cdn.yml`](./.github/workflows/embed-cdn.yml) | push to `main`, pull requests, manual dispatch | Build the dev IIFE; continuous-deploy `embed.nowline.dev`; per-PR ephemeral preview channel | `publish-cdn` (guarded with `CONFIRM_DEPLOY=1`, embed-dev job) |

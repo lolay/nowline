@@ -28,8 +28,12 @@ The result is a "1 approval + CI are the gates, two trusted bypass actors" model
 
 | Tier | Repo | Ruleset name | Required approvals | Required CI contexts | Bypass actors |
 |---|---|---|---|---|---|
-| OSS | `lolay/nowline` | `main: CI must pass` | 1 | 9 contexts (lint + matrix build/test + bundle size + bun smoke), `strict: true` | OrgAdmin (Gary) `always` + `lolay-nowline-release` App `always` |
+| OSS | `lolay/nowline` | `main: CI must pass` | 1 1 context: `CI gate` (the aggregate job in `ci.yml`), `strict: true` | OrgAdmin (Gary) `always` + `lolay-nowline-release` App `always` |
 | Follower | `lolay/nowline-action` | `main: protected (follower)` | 0 *(flag: see note below)* | none (publish-only) | OrgAdmin (Gary) `always` + `lolay-nowline-release` App `always` |
+
+`CI gate` is the last job in [`ci.yml`](../.github/workflows/ci.yml). It `needs:` every other job in that workflow, runs `if: always()`, and fails when any of them failed or was cancelled. A skipped job counts as a pass, because `release-build-smoke` is legitimately skipped on release-bot pushes. Requiring only this one context means adding, renaming, or reshaping a `ci.yml` job or matrix cell never needs a lockstep ruleset edit. (The old per-job list had already drifted: it required `Release build smoke (no upload) / Build pack-embed`, a cell that no longer exists, and omitted determinism, the MCP harness, and triage.)
+
+> **Ordering.** The `CI gate` job must exist on `main` (merged) before the ruleset is switched to require it. Run the script earlier and every PR blocks: a branch whose `ci.yml` has no `CI gate` job never reports that context, so the required check waits forever. Merge the `ci.yml` change first, confirm a `CI gate` check reported on `main`, then run the script.
 
 Every ruleset additionally enforces:
 
@@ -97,8 +101,8 @@ That is the OrgAdmin bypass working as designed; the push still succeeds. If the
 ## 5. When to re-run
 
 - **App install changes.** Anyone toggles the `lolay-nowline-release` App's installation on `lolay/nowline` or `lolay/nowline-action` (install or uninstall via <https://github.com/settings/apps/lolay-nowline-release/installations>). Re-run to add or drop the App from that repo's bypass list.
-- **A required status-check name changes.** The OSS ruleset hardcodes 9 context names from `lolay/nowline:.github/workflows/ci.yml`. If a job is renamed, update the script and re-run before the next PR — required-but-missing checks block merges indefinitely.
-- **`lolay/nowline:ci.yml` adds or removes a required job.** Add or remove the corresponding `{ "context": "..." }` entry in the script's OSS body and re-run.
+- **The `CI gate` job is renamed.** The OSS ruleset hardcodes that one context name from `lolay/nowline:.github/workflows/ci.yml`. If its `name:` changes, update the script and re-run before the next PR — required-but-missing checks block merges indefinitely.
+- **`lolay/nowline:ci.yml` adds or removes a job.** No ruleset change. Add the new job to (or drop it from) the `needs:` list of the `CI gate` job in `ci.yml` instead; a job missing from that list is not gated.
 - **The approval or bypass policy changes.** If the required-approvals count changes (e.g. raising the Follower to `1`), or if the bypass-actor list needs updating, this runbook + script are the single change point for the OSS half.
 
 ## 6. Known gaps — `lolay/nowline` PAT→App migration (queued)
@@ -141,6 +145,10 @@ The bump commit / cron commit lands on `main`, downstream workflows fire (for th
 ## 7. How to extend
 
 ### Add a status check to the OSS repo
+
+For a job in `ci.yml`, add its job ID to the `needs:` list of the `CI gate` job. That is the whole change; the ruleset already requires `CI gate`.
+
+For a job in another workflow (one that `CI gate` cannot `needs:`):
 
 1. Confirm the workflow's job actually runs on every PR to `main`, including PRs that touch only docs / `.md` files. A path-filtered check that's "Expected" but skipped will block all merges.
 2. Find the exact `name` field as it appears in `statusCheckRollup`:
