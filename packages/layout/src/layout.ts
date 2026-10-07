@@ -409,32 +409,12 @@ function sequenceItem(
     const durationDays = deriveItemDurationDays(props, ctx.sizes, ctx.cal);
     const afterRaw = propValues(props, 'after');
     const beforeRaw = propValues(props, 'before');
-    const dateRaw = propValue(props, 'date');
 
-    // Resolve start x: explicit date > after-chain > cursor position.
-    // `after:` accepts both entity ids (looked up in entityRightEdges) and
-    // inline ISO date literals (resolved through the time scale). The
-    // validator enforces "at most one inline date per direction" so at most
-    // one element will hit the date path per item.
-    let startX = cursor.x;
-    const explicitDate = parseDate(dateRaw);
-    if (explicitDate) {
-        const xd = ctx.scale.forwardWithinDomain(explicitDate);
-        if (xd !== null) startX = xd;
-    } else if (afterRaw.length > 0) {
-        let maxEnd = cursor.x;
-        for (const ref of afterRaw) {
-            const inlineDate = parseDate(ref);
-            if (inlineDate) {
-                const xd = ctx.scale.forwardWithinDomain(inlineDate);
-                if (xd !== null) maxEnd = Math.max(maxEnd, xd);
-                continue;
-            }
-            const endX = ctx.entityRightEdges.get(ref);
-            if (endX !== undefined) maxEnd = Math.max(maxEnd, endX);
-        }
-        startX = Math.max(cursor.x, maxEnd);
-    }
+    // Resolve start x with the swimlane child precedence: `date:` > `start:`
+    // > after-chain > cursor position. A lane or group child's cursor
+    // already sits at that start; a direct parallel track's cursor sits at
+    // the block's start, so this is where its pin applies.
+    let startX = resolvePinnedOrSequentialStart(props, cursor.x, cursor.x, ctx);
     // Wave barrier (specs/waves.md §5.1, §8.4): the floor is one more term
     // in the max, after the pin and `after:` logic, so a pin becomes
     // max(pin, F). Parallel tracks reach this function directly, so this

@@ -149,13 +149,10 @@ export function waveRoleOf(node: ItemDeclaration, ctx: LayoutContext): Positione
  *
  * Two tests, both with the boundary tolerance:
  * - the floor lies past the pin, so the wave could have moved it. This
- *   compares the pin with the floor, not with the final start: engine A
- *   ignores a `start:` pin on a direct parallel track and lets `after:`
- *   refs push a lane item's `start:` pin, and neither of those moves is
- *   the wave's doing;
- * - the item starts at the floor, so the floor is the binding term. An
- *   `after:` that pushed the item past the floor moved it, not the wave,
- *   and NL.W1001's "the item starts at the wave start" would be false.
+ *   compares the pin with the floor, not with the final start, so only a
+ *   move the wave made can report;
+ * - the item starts at the floor, so the floor is the binding term and
+ *   NL.W1001's "the item starts at the wave start" holds.
  */
 export function wavePinOverrideOf(
     node: ItemDeclaration,
