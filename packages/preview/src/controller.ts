@@ -20,7 +20,9 @@ import {
     applyRenderResult as defaultApply,
     type MountPreviewOptions,
     mountPreview,
+    type NonWorkingOverride,
     type NowOverride,
+    nonWorkingOverrideToDisplay,
     nowOverrideToToday,
     type PreviewHandle,
     type ThemeOverride,
@@ -30,7 +32,7 @@ import {
 } from '@nowline/preview-shell';
 
 /** Options forwarded to every `renderSource` call (view-state fields managed internally). */
-export type LiveRenderOptions = Omit<RenderOptions, 'theme' | 'today' | 'showLinks'>;
+export type LiveRenderOptions = Omit<RenderOptions, 'theme' | 'today' | 'showLinks' | 'nonWorking'>;
 
 /** Signature for an injectable render function. */
 export type RenderFn = (source: string, opts: RenderOptions) => Promise<RenderResult>;
@@ -42,8 +44,17 @@ export interface MountLivePreviewOptions
     extends Omit<MountPreviewOptions, 'onViewOptions' | 'viewBaseline' | 'onModeChange'> {
     /** Source string to render on mount (may be omitted for late-set callers). */
     source?: string;
-    /** Seed view-state (theme, now, showLinks). The shell toolbar reflects these. */
-    initialView?: { theme?: ThemeOverride; now?: NowOverride; showLinks?: boolean };
+    /**
+     * Seed view-state (theme, now, nonWorking, showLinks). The shell toolbar
+     * reflects these. `nonWorking` `'file'` (or omitted) leaves the choice to
+     * the file's own key.
+     */
+    initialView?: {
+        theme?: ThemeOverride;
+        now?: NowOverride;
+        nonWorking?: NonWorkingOverride;
+        showLinks?: boolean;
+    };
     /** Static render options threaded into every render call. */
     renderOptions?: LiveRenderOptions;
     /**
@@ -117,6 +128,7 @@ export function mountLivePreview(
     const viewState = {
         theme: (initialView?.theme ?? 'auto') as ThemeOverride,
         now: (initialView?.now ?? 'today') as NowOverride,
+        nonWorking: (initialView?.nonWorking ?? 'file') as NonWorkingOverride,
         showLinks: initialView?.showLinks !== false,
     };
 
@@ -130,6 +142,7 @@ export function mountLivePreview(
     const viewBaseline: ViewBaseline = {
         theme: viewState.theme,
         now: viewState.now,
+        nonWorking: viewState.nonWorking,
         showLinks: viewState.showLinks,
     };
 
@@ -144,6 +157,7 @@ export function mountLivePreview(
         onViewOptions(overrides: ViewOptionsOverrides) {
             if (overrides.theme !== undefined) viewState.theme = overrides.theme;
             if (overrides.now !== undefined) viewState.now = overrides.now;
+            if (overrides.nonWorking !== undefined) viewState.nonWorking = overrides.nonWorking;
             if (overrides.showLinks !== undefined) viewState.showLinks = overrides.showLinks;
             callerOnViewOptions?.(overrides);
             scheduleRender(false);
@@ -157,6 +171,7 @@ export function mountLivePreview(
             ...renderOpts,
             theme: diagramTheme,
             today: nowOverrideToToday(viewState.now),
+            nonWorking: nonWorkingOverrideToDisplay(viewState.nonWorking),
             showLinks: viewState.showLinks,
         };
     }

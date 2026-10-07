@@ -14,7 +14,11 @@ import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import EXPECTED_TOOLS_JSON from '../scripts/expected-tools.json';
 import { NOWLINE_MCP_ICONS } from '../src/branding.js';
 import { createMcpServer, PREVIEW_UI_URI } from '../src/server.js';
-import { parsePreviewFromArguments, parsePreviewFromContent } from '../src/ui/payload.js';
+import {
+    parsePreviewFromArguments,
+    parsePreviewFromContent,
+    toNonWorkingOverride,
+} from '../src/ui/payload.js';
 
 // ---- Fixtures ---------------------------------------------------------------
 
@@ -1295,6 +1299,232 @@ describe('@nowline/mcp — determinism parity', () => {
             | undefined;
         expect(svgBlock).toBeDefined();
         expect(svgBlock!.text).toBe(directSvg);
+    });
+});
+
+// ---- Non-working display (m2p phase 4) --------------------------------------
+
+// `nonWorking` on `render` and `export` is the render-time option of the
+// non-working display. Precedence: the argument, then the file's
+// `default roadmap non-working:` key, then hide. Unset stays undefined.
+const NW_BODY = [
+    'roadmap biz "Business" start:2026-01-05 scale:1w calendar:business',
+    '',
+    'swimlane eng "Engineering"',
+    '  item w1 "W1" duration:1w',
+    '  item w2 "W2" duration:1w',
+].join('\n');
+const NW_PLAIN = `nowline v1\n\n${NW_BODY}`;
+const NW_FILE_SHOW = `nowline v1\n\nconfig\n\ndefault roadmap non-working:show\n\n${NW_BODY}`;
+const NW_LAYER = 'data-layer="non-working"';
+
+function textBlocks(result: { content: Array<{ type: string }> }): string[] {
+    return result.content
+        .filter((c): c is { type: 'text'; text: string } => c.type === 'text' && 'text' in c)
+        .map((c) => c.text);
+}
+
+function svgOf(result: { content: Array<{ type: string }> }): string {
+    const svg = textBlocks(result).find((t) => t.trimStart().startsWith('<svg'));
+    expect(svg, 'an inline svg block').toBeDefined();
+    return svg as string;
+}
+
+describe('@nowline/mcp — non-working display', () => {
+    it('render with nonWorking show adds the non-working layer', async () => {
+        const result = await client.callTool({
+            name: 'render',
+            arguments: { source: NW_PLAIN, format: 'svg', now: '2026-01-07', nonWorking: 'show' },
+        });
+        expect(result.isError).toBeFalsy();
+        expect(svgOf(result)).toContain(NW_LAYER);
+    });
+
+    it('render of a file-show source with no argument has the layer', async () => {
+        const result = await client.callTool({
+            name: 'render',
+            arguments: { source: NW_FILE_SHOW, format: 'svg', now: '2026-01-07' },
+        });
+        expect(result.isError).toBeFalsy();
+        expect(svgOf(result)).toContain(NW_LAYER);
+    });
+
+    it('render of a file-show source with nonWorking hide has no layer', async () => {
+        const result = await client.callTool({
+            name: 'render',
+            arguments: {
+                source: NW_FILE_SHOW,
+                format: 'svg',
+                now: '2026-01-07',
+                nonWorking: 'hide',
+            },
+        });
+        expect(result.isError).toBeFalsy();
+        expect(svgOf(result)).not.toContain(NW_LAYER);
+    });
+
+    it('render rejects a value other than hide or show', async () => {
+        const result = await client.callTool({
+            name: 'render',
+            arguments: { source: NW_PLAIN, format: 'svg', nonWorking: 'maybe' },
+        });
+        expect(result.isError).toBe(true);
+    });
+
+    it('render parity: the MCP svg equals exportDocument with the same nonWorking', async () => {
+        const { exportDocument } = await import('@nowline/export');
+        const { readFile } = await import('node:fs/promises');
+        const dummyPath = path.join(tmpDir, 'unnamed.nowline');
+        const host = {
+            readSource: (p: string): Promise<string> => readFile(p, 'utf-8'),
+            async readAsset(): Promise<Uint8Array> {
+                throw new Error('no assets');
+            },
+            async loadWasm(): Promise<ArrayBuffer> {
+                throw new Error('loadWasm not needed for SVG');
+            },
+        };
+        for (const nonWorking of ['show', 'hide', undefined] as const) {
+            const direct = await exportDocument(
+                NW_FILE_SHOW,
+                'svg',
+                {
+                    sourcePath: dummyPath,
+                    today: new Date('2026-01-07T00:00:00Z'),
+                    locale: 'en-US',
+                    theme: 'light',
+                    nonWorking,
+                },
+                host,
+            );
+            const viaMcp = await client.callTool({
+                name: 'render',
+                arguments: {
+                    source: NW_FILE_SHOW,
+                    format: 'svg',
+                    now: '2026-01-07',
+                    ...(nonWorking ? { nonWorking } : {}),
+                },
+            });
+            expect(svgOf(viaMcp), `nonWorking ${nonWorking}`).toBe(
+                new TextDecoder('utf-8').decode(direct),
+            );
+        }
+    });
+
+    it('export svg with nonWorking show adds the layer', async () => {
+        const result = await client.callTool({
+            name: 'export',
+            arguments: { source: NW_PLAIN, format: 'svg', now: '2026-01-07', nonWorking: 'show' },
+        });
+        expect(result.isError).toBeFalsy();
+        expect(svgOf(result)).toContain(NW_LAYER);
+    });
+
+    it('export svg of a file-show source with no argument has the layer', async () => {
+        const result = await client.callTool({
+            name: 'export',
+            arguments: { source: NW_FILE_SHOW, format: 'svg', now: '2026-01-07' },
+        });
+        expect(result.isError).toBeFalsy();
+        expect(svgOf(result)).toContain(NW_LAYER);
+    });
+
+    it('export svg of a file-show source with nonWorking hide has no layer', async () => {
+        const result = await client.callTool({
+            name: 'export',
+            arguments: {
+                source: NW_FILE_SHOW,
+                format: 'svg',
+                now: '2026-01-07',
+                nonWorking: 'hide',
+            },
+        });
+        expect(result.isError).toBeFalsy();
+        expect(svgOf(result)).not.toContain(NW_LAYER);
+    });
+
+    it('the lean preview payload carries nonWorking when set, and omits it when unset', async () => {
+        const { client: uiClient, cleanup } = await connectUiClient({
+            [MCP_UI_EXTENSION]: { mimeTypes: ['text/html;profile=mcp-app'] },
+        });
+        try {
+            const payloadOf = async (args: Record<string, unknown>) => {
+                const result = await uiClient.callTool({ name: 'render', arguments: args });
+                expect(result.isError).toBeFalsy();
+                const block = textBlocks(result).find((t) =>
+                    t.includes('"kind":"nowline.preview"'),
+                );
+                expect(block, 'a lean preview block').toBeDefined();
+                return JSON.parse(block as string) as Record<string, unknown>;
+            };
+            const withShow = await payloadOf({ source: NW_PLAIN, nonWorking: 'show' });
+            expect(withShow.nonWorking).toBe('show');
+            const withHide = await payloadOf({ source: NW_FILE_SHOW, nonWorking: 'hide' });
+            expect(withHide.nonWorking).toBe('hide');
+            const unset = await payloadOf({ source: NW_FILE_SHOW });
+            expect('nonWorking' in unset).toBe(false);
+        } finally {
+            await cleanup();
+        }
+    });
+
+    it('parsePreviewFromArguments maps nonWorking and drops anything but hide or show', () => {
+        expect(
+            parsePreviewFromArguments({ source: NW_PLAIN, nonWorking: 'show' })?.nonWorking,
+        ).toBe('show');
+        expect(
+            parsePreviewFromArguments({ source: NW_PLAIN, nonWorking: 'hide' })?.nonWorking,
+        ).toBe('hide');
+        expect(parsePreviewFromArguments({ source: NW_PLAIN })?.nonWorking).toBeUndefined();
+        expect(
+            parsePreviewFromArguments({ source: NW_PLAIN, nonWorking: 'maybe' })?.nonWorking,
+        ).toBeUndefined();
+        expect(parsePreviewFromArguments({ source: NW_PLAIN, nonWorking: 1 })?.nonWorking).toBe(
+            undefined,
+        );
+    });
+
+    it('render layout insights follow the display: a 2w "Search" bar spills under hide, not show', async () => {
+        // Drawn at full width under show, the two-week bar is wider, so the
+        // title that spills under hide (NL.I1000) fits. The insights must see
+        // the same display the render uses.
+        const source = [
+            'nowline v1',
+            '',
+            'roadmap r "R" start:2026-01-05 scale:1w calendar:business',
+            '',
+            'swimlane eng "Engineering"',
+            '  item x "Search" duration:2w',
+        ].join('\n');
+        const insightsFor = async (nonWorking: 'hide' | 'show') => {
+            const result = await client.callTool({
+                name: 'render',
+                arguments: { source, format: 'svg', now: '2026-01-07', nonWorking },
+            });
+            expect(result.isError).toBeFalsy();
+            return (
+                (result.structuredContent as { insights?: Array<{ code: string }> }).insights ?? []
+            ).map((i) => i.code);
+        };
+        expect(await insightsFor('hide')).toEqual(['NL.I1000']);
+        expect(await insightsFor('show')).toEqual([]);
+    });
+
+    it('toNonWorkingOverride maps a payload value to the shell dropdown value', () => {
+        expect(toNonWorkingOverride('show')).toBe('show');
+        expect(toNonWorkingOverride('hide')).toBe('hide');
+        expect(toNonWorkingOverride(undefined)).toBe('file');
+        expect(toNonWorkingOverride('maybe')).toBe('file');
+    });
+
+    it('parsePreviewFromContent keeps nonWorking from the lean block', () => {
+        const lean = JSON.stringify({
+            kind: 'nowline.preview',
+            source: NW_PLAIN,
+            nonWorking: 'show',
+        });
+        expect(parsePreviewFromContent([{ type: 'text', text: lean }])?.nonWorking).toBe('show');
     });
 });
 

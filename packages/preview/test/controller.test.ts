@@ -1,4 +1,4 @@
-import type { RenderResult } from '@nowline/browser';
+import type { RenderOptions, RenderResult } from '@nowline/browser';
 import type { DiagnosticRow } from '@nowline/preview-shell';
 import { __resetPreviewShellStylesheetForTests, mountPreview } from '@nowline/preview-shell';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
@@ -319,5 +319,103 @@ describe('mountLivePreview', () => {
         await new Promise((r) => setTimeout(r, 20));
         expect(render.mock.calls.length).toBe(1);
         expect((render.mock.calls[0][1] as { theme?: unknown }).theme).toBe('light');
+    });
+});
+
+// The non-working display (m2p phase 4). Precedence: the toolbar choice, then
+// the surface's own option, then the file's `default roadmap non-working:` key,
+// then hide. 'file' is the toolbar's "no override" and maps to undefined, as
+// the theme dropdown's 'auto' does.
+describe('mountLivePreview: the non-working display', () => {
+    const LAYER = 'data-layer="non-working"';
+    const BODY = `roadmap biz "Business" start:2026-01-05 scale:1w calendar:business
+swimlane eng "Engineering"
+  item w1 "W1" duration:1w
+  item w2 "W2" duration:1w
+`;
+    const PLAIN = `nowline v1\n\n${BODY}`;
+    const FILE_SHOW = `nowline v1\n\nconfig\n\ndefault roadmap non-working:show\n\n${BODY}`;
+
+    beforeEach(() => {
+        document.head.innerHTML = '';
+        document.body.innerHTML = '';
+        __resetPreviewShellStylesheetForTests();
+    });
+
+    afterEach(() => {
+        document.body.innerHTML = '';
+        vi.restoreAllMocks();
+    });
+
+    /** Mount with the real browser pipeline and capture every result it renders. */
+    async function renderedSvg(
+        source: string,
+        initialView?: { nonWorking?: 'file' | 'hide' | 'show' },
+    ): Promise<string> {
+        const results: RenderResult[] = [];
+        mountLivePreview(mountRoot(), {
+            source,
+            initialView,
+            renderOptions: { diagnosticLevel: 'error' },
+            apply: (_handle, result) => {
+                results.push(result);
+            },
+        });
+        await vi.waitUntil(() => results.length > 0, { timeout: 5000 });
+        const result = results[0];
+        if (result.kind !== 'svg') throw new Error('expected an svg result');
+        return result.svg;
+    }
+
+    it('initialView nonWorking show adds the non-working layer', async () => {
+        expect(await renderedSvg(PLAIN, { nonWorking: 'show' })).toContain(LAYER);
+    });
+
+    it('a file key show with no option has the layer (unset stays undefined)', async () => {
+        expect(await renderedSvg(FILE_SHOW)).toContain(LAYER);
+        expect(await renderedSvg(FILE_SHOW, { nonWorking: 'file' })).toContain(LAYER);
+    });
+
+    it('a file key show with the option hide has no layer', async () => {
+        expect(await renderedSvg(FILE_SHOW, { nonWorking: 'hide' })).not.toContain(LAYER);
+    });
+
+    it('passes nonWorking undefined to the render fn for file, and the value otherwise', async () => {
+        const render = vi.fn().mockResolvedValue(SVG_RESULT);
+        mountLivePreview(mountRoot(), { source: PLAIN, render });
+        await vi.waitUntil(() => render.mock.calls.length > 0);
+        const first = render.mock.calls[0][1] as RenderOptions;
+        expect(first.nonWorking).toBeUndefined();
+
+        const render2 = vi.fn().mockResolvedValue(SVG_RESULT);
+        mountLivePreview(mountRoot(), {
+            source: PLAIN,
+            render: render2,
+            initialView: { nonWorking: 'show' },
+        });
+        await vi.waitUntil(() => render2.mock.calls.length > 0);
+        expect((render2.mock.calls[0][1] as RenderOptions).nonWorking).toBe('show');
+    });
+
+    it('choosing Show in the toolbar re-renders with nonWorking show', async () => {
+        const render = vi.fn().mockResolvedValue(SVG_RESULT);
+        const root = mountRoot();
+        const onViewOptions = vi.fn();
+        mountLivePreview(root, { source: PLAIN, render, onViewOptions });
+        await vi.waitUntil(() => render.mock.calls.length === 1);
+
+        root.querySelector<HTMLButtonElement>('.more-toggle')?.click();
+        root.querySelector<HTMLButtonElement>('.nonworking-toggle')?.click();
+        root.querySelector<HTMLButtonElement>('.nonworking-opt[data-value="show"]')?.click();
+
+        await vi.waitUntil(() => render.mock.calls.length === 2);
+        expect((render.mock.calls[1][1] as RenderOptions).nonWorking).toBe('show');
+        expect(onViewOptions).toHaveBeenCalledWith({ nonWorking: 'show' });
+
+        // Back to File: the file's own key applies again.
+        root.querySelector<HTMLButtonElement>('.nonworking-toggle')?.click();
+        root.querySelector<HTMLButtonElement>('.nonworking-opt[data-value="file"]')?.click();
+        await vi.waitUntil(() => render.mock.calls.length === 3);
+        expect((render.mock.calls[2][1] as RenderOptions).nonWorking).toBeUndefined();
     });
 });

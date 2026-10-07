@@ -26,6 +26,14 @@ export type ThemeOverride = 'auto' | 'light' | 'dark' | 'grayscale' | 'greyscale
  */
 export type NowOverride = 'today' | 'hide' | (string & {});
 
+/**
+ * Non-working-days display override. `'file'` means "no override": the
+ * file's own `default roadmap non-working:` key applies, then `hide`. It is
+ * the dropdown's default and plays the role the theme dropdown's `'auto'`
+ * does. `'hide'` and `'show'` override the file.
+ */
+export type NonWorkingOverride = 'file' | 'hide' | 'show';
+
 export type InitialFit = 'fitPage' | 'fitWidth' | 'actual';
 
 /**
@@ -56,6 +64,7 @@ export interface ExportRequest {
 export interface ViewOptionsOverrides {
     theme?: ThemeOverride;
     now?: NowOverride;
+    nonWorking?: NonWorkingOverride;
     showLinks?: boolean;
 }
 
@@ -68,6 +77,7 @@ export interface ViewBaseline {
     theme?: ThemeOverride;
     /** `'today'` | `'hide'` | `'YYYY-MM-DD'` | legacy `'auto'` / `'none'` values are accepted. */
     now?: NowOverride | 'auto' | 'none' | string;
+    nonWorking?: NonWorkingOverride;
     showLinks?: boolean;
 }
 
@@ -197,8 +207,9 @@ interface InternalState {
     view: {
         theme: ThemeOverride;
         now: NowOverride;
+        nonWorking: NonWorkingOverride;
         showLinks: boolean;
-        overridden: { theme: boolean; now: boolean; showLinks: boolean };
+        overridden: { theme: boolean; now: boolean; nonWorking: boolean; showLinks: boolean };
     };
 }
 
@@ -257,8 +268,9 @@ export function mountPreview(
         view: {
             theme: 'auto',
             now: 'today',
+            nonWorking: 'file',
             showLinks: true,
-            overridden: { theme: false, now: false, showLinks: false },
+            overridden: { theme: false, now: false, nonWorking: false, showLinks: false },
         },
     };
 
@@ -912,6 +924,7 @@ export function mountPreview(
         els.formatMenu.hidden = true;
         els.themeMenu.hidden = true;
         els.nowPicker.hidden = true;
+        els.nonWorkingMenu.hidden = true;
         els.linksMenu.hidden = true;
     }
 
@@ -1335,6 +1348,43 @@ export function mountPreview(
         els.nowLabel.textContent = label;
     }
 
+    // ===== Non-working days dropdown =====
+    on(els.nonWorkingToggle, 'click', (e: MouseEvent) => {
+        e.stopPropagation();
+        const opening = els.nonWorkingMenu.hidden;
+        closeSubMenus();
+        if (opening) {
+            els.nonWorkingMenu.hidden = false;
+            placeFlyout(els.nonWorkingMenu, 'left');
+        }
+    });
+
+    on(els.nonWorkingMenu, 'click', (e: Event) => {
+        e.stopPropagation();
+        const btn = (e.target as HTMLElement).closest<HTMLButtonElement>('.nonworking-opt');
+        if (!btn) return;
+        const value = btn.getAttribute('data-value');
+        if (value !== 'file' && value !== 'hide' && value !== 'show') return;
+        state.view.nonWorking = value;
+        state.view.overridden.nonWorking = true;
+        refreshNonWorkingToggle();
+        els.nonWorkingMenu.hidden = true;
+        postViewOverrides();
+    });
+
+    function refreshNonWorkingToggle(): void {
+        const label = { file: 'File', hide: 'Hide', show: 'Show' }[state.view.nonWorking];
+        els.nonWorkingToggle.textContent = `${label} \u25be`;
+        for (const btn of Array.from(
+            els.nonWorkingMenu.querySelectorAll<HTMLButtonElement>('.nonworking-opt'),
+        )) {
+            btn.setAttribute(
+                'data-active',
+                (btn.getAttribute('data-value') === state.view.nonWorking).toString(),
+            );
+        }
+    }
+
     // ===== Show-links dropdown =====
     on(els.linksToggle, 'click', (e: MouseEvent) => {
         e.stopPropagation();
@@ -1378,6 +1428,7 @@ export function mountPreview(
         const overrides: ViewOptionsOverrides = {};
         if (state.view.overridden.theme) overrides.theme = state.view.theme;
         if (state.view.overridden.now) overrides.now = state.view.now;
+        if (state.view.overridden.nonWorking) overrides.nonWorking = state.view.nonWorking;
         if (state.view.overridden.showLinks) overrides.showLinks = state.view.showLinks;
         options.onViewOptions?.(overrides);
     }
@@ -1385,6 +1436,7 @@ export function mountPreview(
     function refreshAll(): void {
         refreshThemeToggle();
         refreshNowToggle();
+        refreshNonWorkingToggle();
         refreshLinksToggle();
         refreshFormatToggle();
     }
@@ -1488,11 +1540,14 @@ function applyBaseline(
             state.view.now = 'today';
         }
     }
+    if (baseline.nonWorking !== undefined && !state.view.overridden.nonWorking) {
+        state.view.nonWorking = baseline.nonWorking;
+    }
     if (baseline.showLinks !== undefined && !state.view.overridden.showLinks) {
         state.view.showLinks = baseline.showLinks !== false;
     }
     if (resetOverrides) {
-        state.view.overridden = { theme: false, now: false, showLinks: false };
+        state.view.overridden = { theme: false, now: false, nonWorking: false, showLinks: false };
     }
 }
 

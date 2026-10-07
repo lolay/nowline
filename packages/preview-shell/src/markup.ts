@@ -42,6 +42,10 @@ export interface ViewportElements {
     nowLabel: HTMLElement;
     /** Calendar picker panel — populated by mount.ts on open. */
     nowPicker: HTMLElement;
+    /** Non-working-days sub-dropdown toggle (File / Hide / Show). */
+    nonWorkingToggle: HTMLButtonElement;
+    /** Non-working-days sub-dropdown list. */
+    nonWorkingMenu: HTMLUListElement;
     /** Show-links sub-dropdown toggle. */
     linksToggle: HTMLButtonElement;
     /** Show-links sub-dropdown list. */
@@ -111,6 +115,17 @@ const TEMPLATE = `
                         <div class="now-picker" hidden></div>
                     </div>
                 </div>
+                <div class="more-row nonworking-control-row">
+                    <span class="more-label">Non-working days:</span>
+                    <div class="dropdown">
+                        <button class="btn more-sub-toggle nonworking-toggle">File \u25be</button>
+                        <ul class="more-sub-menu nonworking-menu" hidden>
+                            <li><button class="btn nonworking-opt" data-value="file">File</button></li>
+                            <li><button class="btn nonworking-opt" data-value="hide">Hide</button></li>
+                            <li><button class="btn nonworking-opt" data-value="show">Show</button></li>
+                        </ul>
+                    </div>
+                </div>
                 <div class="more-row">
                     <span class="more-label">Show links:</span>
                     <div class="dropdown">
@@ -175,6 +190,8 @@ export function buildViewport(rootEl: HTMLElement): ViewportElements {
         nowToggle: q<HTMLButtonElement>(rootEl, '.now-toggle'),
         nowLabel: q<HTMLElement>(rootEl, '.now-label'),
         nowPicker: q<HTMLElement>(rootEl, '.now-picker'),
+        nonWorkingToggle: q<HTMLButtonElement>(rootEl, '.nonworking-toggle'),
+        nonWorkingMenu: q<HTMLUListElement>(rootEl, '.nonworking-menu'),
         linksToggle: q<HTMLButtonElement>(rootEl, '.links-toggle'),
         linksMenu: q<HTMLUListElement>(rootEl, '.links-menu'),
         collapseBtn: q<HTMLButtonElement>(rootEl, '.collapse-btn'),

@@ -4,6 +4,7 @@ import type { PreviewHandle } from '../src/index.js';
 import {
     applyRenderResult,
     classifyRenderResult,
+    nonWorkingOverrideToDisplay,
     nowOverrideToToday,
     themeOverrideToDiagramTheme,
 } from '../src/index.js';
@@ -143,5 +144,23 @@ describe('nowOverrideToToday', () => {
 
     it('arbitrary string (e.g. ISO instant) passes through', () => {
         expect(nowOverrideToToday('2026-06-01T00:00:00Z')).toBe('2026-06-01T00:00:00Z');
+    });
+});
+
+// ===== nonWorkingOverrideToDisplay =====
+
+describe('nonWorkingOverrideToDisplay', () => {
+    it("maps 'show' and 'hide' to the display of the same name", () => {
+        expect(nonWorkingOverrideToDisplay('show')).toBe('show');
+        expect(nonWorkingOverrideToDisplay('hide')).toBe('hide');
+    });
+
+    it("maps 'file' and undefined to undefined, so the file's own key applies", () => {
+        expect(nonWorkingOverrideToDisplay('file')).toBeUndefined();
+        expect(nonWorkingOverrideToDisplay(undefined)).toBeUndefined();
+    });
+
+    it('maps an unknown value to undefined rather than guessing a display', () => {
+        expect(nonWorkingOverrideToDisplay('maybe' as never)).toBeUndefined();
     });
 });
