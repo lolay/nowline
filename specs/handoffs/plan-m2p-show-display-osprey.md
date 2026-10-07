@@ -1,7 +1,7 @@
 ```
 --- KICKOFF: begin orchestration at [deep] ---
 
-  Status: 1/4 groups done | last review: wave-1 PASS | current: m2p-4 s4-s6 [deep] (gates 5+2 approved) | updated 2026-10-07
+  Status: 2/4 groups done | last review: wave-2 PASS | current: m2p-4 s7-s8 [exec] | updated 2026-10-07
 
   review: every-wave (log-only — parent writes Review log; human gates only where marked)
 
@@ -394,13 +394,13 @@ Byte identity step 1. Done when the baseline hash file exists and determinism is
 
 --- WAVE 2 [deep] ---
 
-### s4 - [deep] Implement layout and renderer
+### s4 - [deep] Implement layout and renderer (done)
 Decisions 1–14 and 16. One agent works serially, because the layout files overlap.
 
-### s5 - [deep] Implement core
+### s5 - [deep] Implement core (done)
 Decision 15.
 
-### s6 - [deep] Prove hide unchanged, then commit
+### s6 - [deep] Prove hide unchanged, then commit (done)
 - Byte identity step 2.
 - All s3 tests green.
 - `make bundle-size`.
@@ -434,6 +434,7 @@ Everything under § Change "Docs". Done when `make lint` passes.
 ## Review log
 
 review wave-1 (m2p-4 s1-s3) 92c9ec3..602bf3b: PASS - Node 26.2.0/pnpm 12.8.1, 40-hash hide baseline, determinism 266 green; 58 red tests on assertions, 2 TimeScale guards red only because startX/advanceX do not exist yet, printer order test cannot fail pre-change, indexAtX untested - 2026-10-07
+review wave-2 (m2p-4 s4-s6) 7c68a9a..1a2736e: PASS - 40/40 hide hashes OK, no snapshot change, determinism 266 green with hashes.json unchanged, embed 189.36 KB, pre-commit green, all 58 wave-1 tests green; ResolvedStyle.nonWorking (decision 2) made the identity walk skip the string-valued setting, FR test fixed to translate from {code,args}, indexAtX test added - 2026-10-07
 
 ## Token log
 
@@ -449,3 +450,5 @@ Phase 1 ~$20.42; Phase 2 ~$66.4; Phase 3 ~$51.05. Phase 4 planning in the m2p se
 
 tokens wave-1 m2p-4-s1-s3 (claude-sonnet-5-5): input ~140 / cache read ~11M / cache write ~200k / output ~130k | ~$3.96 API-equiv (output est.) session 1ace5e35-cfdf-5791-b5ba-c2e888455b0c
 tokens orchestrator-wave-1 plan-m2p-show-display-osprey (claude-opus-5-5): input ~40 / cache read ~2.3M / cache write ~100k 1h / output ~15k | ~$1.57 API-equiv (output est.) session 1ace5e35-cfdf-5791-b5ba-c2e888455b0c
+tokens wave-2 m2p-4-s4-s6 (claude-opus-5-5): input ~220 / cache read ~23M / cache write ~290k / output ~150k | ~$8.97 API-equiv (output est.) session 1ace5e35-cfdf-5791-b5ba-c2e888455b0c
+tokens orchestrator-wave-2 plan-m2p-show-display-osprey (claude-opus-5-5): input ~30 / cache read ~2.1M / cache write ~22k 1h / output ~18k | ~$0.95 API-equiv (output est.) session 1ace5e35-cfdf-5791-b5ba-c2e888455b0c
