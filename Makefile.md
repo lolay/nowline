@@ -38,6 +38,7 @@ graph LR
     format
     clean
     lint_workflows["lint-workflows"]
+    lint_man["lint-man"]
     bundle_size["bundle-size"]
     bump
     gh_runs_list["gh-runs-list"]
@@ -72,6 +73,7 @@ pipeline that artifact is built in a separate CI job and handed over — see
 | `pre-commit` | Local alias of `ci` — run before committing or pushing |
 | `clean` | Remove build / binary / package artifacts (keeps `node_modules`) |
 | `lint-workflows` | actionlint the GitHub Actions workflows (`pnpm lint:workflows`) |
+| `lint-man` | `mandoc -T lint` every man page at warning level, minus the two warnings translated pages raise for their localized `NAME` section. Needs `mandoc` on PATH (apt `mandoc`; ships with macOS). Not part of `ci`: Windows has no mandoc, so CI runs it in one Linux job |
 | `bundle-size` | Build the embed dependency graph and run the CDN bundle-size + `node:*` leak gate |
 
 ### GitHub
@@ -145,7 +147,7 @@ keeps per-step logs and the matrix while sourcing the command from one place.
 
 | Workflow | Trigger | What it does | make targets |
 |----------|---------|--------------|--------------|
-| [`ci.yml`](./.github/workflows/ci.yml) | push to `main`, pull requests | Lint workflows; the `make ci` gate (lint + build + typecheck + test) on a clean checkout across the OS/Node matrix; embed bundle-size gate; release-build smoke (calls `build.yml`) | `lint-workflows`, `ci`, `bundle-size` |
+| [`ci.yml`](./.github/workflows/ci.yml) | push to `main`, pull requests | Lint workflows; lint man pages; the `make ci` gate (lint + build + typecheck + test) on a clean checkout across the OS/Node matrix; embed bundle-size gate; release-build smoke (calls `build.yml`) | `lint-workflows`, `lint-man`, `ci`, `bundle-size` |
 | [`build.yml`](./.github/workflows/build.yml) | reusable (called by `ci.yml` smoke + `release.yml`) | 10-cell build/package matrix: compile per-OS/arch binaries, smoke them, build `.deb`s, pack npm tarballs, package the `.vsix`, stage the action mirror + embed CDN bundle | `compile`, `smoke`, `deb`, `pack`, `vsix` |
 | [`release.yml`](./.github/workflows/release.yml) | `v*` tag push, manual dispatch | Cut release (bump + tag), call `build.yml` with upload, publish to npm + Marketplace + Open VSX, GitHub release + Homebrew tap + action mirror, deploy prod embed CDN | `bump`, `publish-npm`, `publish-vscode` (guarded with `CONFIRM_PUBLISH=1`) |
 | [`embed-cdn.yml`](./.github/workflows/embed-cdn.yml) | push to `main`, pull requests, manual dispatch | Build the dev IIFE; continuous-deploy `embed.nowline.dev`; per-PR ephemeral preview channel | `publish-cdn` (guarded with `CONFIRM_DEPLOY=1`, embed-dev job) |
