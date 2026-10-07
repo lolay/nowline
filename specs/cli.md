@@ -92,6 +92,14 @@ Render options
   -s, --scale <n>        Raster scale factor (PNG only; default 1)
   --strict               Promote asset / sanitizer warnings to errors
   -w, --width <px>       Canvas width in pixels (default: 1280)
+  --non-working <mode>   How a business calendar's non-working days appear:
+                         `hide` (collapse them; the default) or `show` (draw
+                         them as shaded bands). Overrides the file's
+                         `default roadmap non-working:` key; omit it to let
+                         the key apply. An invalid value exits 2 with
+                         `nowline: invalid --non-working "x". Expected hide
+                         or show.` Mermaid, MS Project, and XLSX output is the
+                         same in both views. `--serve` takes it too.
   --asset-root <dir>     Directory from which logo / image assets may be loaded
 
 Format-specific options
@@ -171,6 +179,7 @@ Options:
 | `--host <host>` | `127.0.0.1` | Interface; `0.0.0.0` exposes on the LAN |
 | `--open` | off | Open the browser on start |
 | `-o, --output <path>` | none | Opt-in: also write the rendered output to this path on every rebuild. `-o -` is rejected for `--serve`. |
+| `--non-working <mode>` | file key, else `hide` | `hide` \| `show`; same meaning and validation as for render. |
 
 `--serve` rejects `--dry-run`.
 

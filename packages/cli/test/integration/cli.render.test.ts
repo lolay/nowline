@@ -790,3 +790,60 @@ describeBuilt('render: include diagnostics', () => {
         });
     }
 });
+
+// The render-time non-working display (specs/working-calendar.md §4.2; m2p
+// phase 4). Precedence: --non-working, then the file's
+// `default roadmap non-working:` key, then hide. "Unset" is undefined, so the
+// file key still applies when the flag is omitted.
+describeBuilt('render: --non-working', () => {
+    const BODY = [
+        'roadmap r "R" start:2026-01-05 scale:1w calendar:business',
+        '',
+        'swimlane a "A"',
+        '  item w1 "W1" duration:1w',
+        '  item w2 "W2" duration:1w',
+        '',
+    ].join('\n');
+    const PLAIN = `nowline v1\n\n${BODY}`;
+    const FILE_SHOW = `nowline v1\n\nconfig\n\ndefault roadmap non-working:show\n\n${BODY}`;
+    const LAYER = 'data-layer="non-working"';
+
+    it('--non-working show adds the non-working layer', async () => {
+        const r = await runCliBuilt(['-', '-o', '-', '--now', '-', '--non-working', 'show'], {
+            stdin: PLAIN,
+        });
+        expect(r.exitCode).toBe(0);
+        expect(r.stdout).toContain(LAYER);
+    });
+
+    it('a file key show with no flag has the layer', async () => {
+        const r = await runCliBuilt(['-', '-o', '-', '--now', '-'], { stdin: FILE_SHOW });
+        expect(r.exitCode).toBe(0);
+        expect(r.stdout).toContain(LAYER);
+    });
+
+    it('a file key show with --non-working hide has no layer', async () => {
+        const r = await runCliBuilt(['-', '-o', '-', '--now', '-', '--non-working', 'hide'], {
+            stdin: FILE_SHOW,
+        });
+        expect(r.exitCode).toBe(0);
+        expect(r.stdout).not.toContain(LAYER);
+    });
+
+    it('an invalid value fails with exit 2 and names the accepted values', async () => {
+        const r = await runCliBuilt(['-', '-o', '-', '--non-working', 'maybe'], { stdin: PLAIN });
+        expect(r.exitCode).toBe(2);
+        expect(r.stderr).toContain(
+            'nowline: invalid --non-working "maybe". Expected hide or show.',
+        );
+        expect(r.stdout).toBe('');
+    });
+
+    it('an empty value is unset, so the file key still applies', async () => {
+        const r = await runCliBuilt(['-', '-o', '-', '--now', '-', '--non-working', ''], {
+            stdin: FILE_SHOW,
+        });
+        expect(r.exitCode).toBe(0);
+        expect(r.stdout).toContain(LAYER);
+    });
+});

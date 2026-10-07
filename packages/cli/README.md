@@ -110,6 +110,7 @@ nowline roadmap.nowline --headless               # bundled DejaVu fonts (determi
 | `-s, --scale <n>`     | `1`          | Raster scale (PNG only).                    |
 | `--strict`            | (off)        | Promote asset / sanitizer warnings to errors. |
 | `-w, --width <px>`    | `1280`       | Canvas width.                                |
+| `--non-working <mode>` | (file key, else `hide`) | `hide` \| `show`. How a business calendar's non-working days appear: collapsed, or drawn as shaded bands. Overrides the file's `default roadmap non-working:` key; omit it to let the key apply. Also accepted by `--serve`. |
 | `--asset-root <dir>`  | input dir    | Root for `logo:` / image refs.              |
 
 ### Format-specific options

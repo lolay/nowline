@@ -24,13 +24,13 @@ import {
     serializeToJson,
 } from '@nowline/core';
 import type { ExportInputs, ResolvedFontPair } from '@nowline/export-core';
-import { layoutRoadmap, type ThemeName } from '@nowline/layout';
+import { layoutRoadmap, type NonWorkingDisplay, type ThemeName } from '@nowline/layout';
 import { type AssetResolver, type FontFamilies, renderSvg } from '@nowline/renderer';
 import type { LangiumDocument } from 'langium';
 import { URI } from 'langium';
 
 export type { PdfOrientation, ResolvedFontPair } from '@nowline/export-core';
-export type { ThemeName } from '@nowline/layout';
+export type { NonWorkingDisplay, ThemeName } from '@nowline/layout';
 export {
     civilDateInZone,
     type NormalizedZone,
@@ -108,6 +108,14 @@ export interface RenderInputs {
     // ---- layout / render knobs ------------------------------------------
     /** Optional fixed canvas width in px. */
     width?: number;
+    /**
+     * How the chart shows a calendar's non-working days (`hide` collapses them,
+     * `show` draws shaded bands). Wins over the file's
+     * `default roadmap non-working:` key; leave it unset (undefined) to let the
+     * key apply, then `hide`. The schedule exporters (mermaid, msproj, xlsx)
+     * take no display input, so their bytes are the same in both views.
+     */
+    nonWorking?: NonWorkingDisplay;
     /** Drop `<a>` links from the rendered SVG. */
     noLinks?: boolean;
     /** Treat render warnings (e.g. missing assets) as hard errors. */
@@ -272,6 +280,7 @@ async function stageDocument(
         today: inputs.today,
         width: inputs.width,
         locale: inputs.locale,
+        nonWorking: inputs.nonWorking,
     });
 
     const assetResolver: AssetResolver = async (ref: string) => {
