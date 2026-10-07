@@ -911,7 +911,7 @@ Style properties:
 | `text-size`     | enum            | Text size preset: `xs`, `sm`, `md` (default), `lg`, `xl`. System owns the absolute pixel mapping.                                                       |
 | `padding`       | enum            | Inset padding: `none`, `xs`, `sm`, `md` (default), `lg`, `xl`.                                                                                          |
 | `spacing`       | enum            | Space between children: `none`, `xs`, `sm`, `md`, `lg`, `xl`. Default varies by entity.                                                                 |
-| `header-height` | enum            | Timeline header row height. Roadmap-only: `none`, `xs`, `sm`, `md` (default), `lg`, `xl`.                                                               |
+| `header-height` | enum            | Timeline date-strip height. Roadmap-only: `none` (no date strip, top or bottom), `xs` 16 px, `sm` 20 px, `md` 24 px (default), `lg` 32 px, `xl` 40 px.  |
 | `corner-radius` | enum            | Corner rounding: `none`, `xs`, `sm`, `md`, `lg`, `xl`, `full`.                                                                                          |
 | `bracket`       | enum            | Bracket/join line on parallel blocks: `none` (default), `solid`, `dashed`. Parallel-only.                                                               |
 | `capacity-icon` | identifier or string | Glyph used as the suffix to capacity numbers on lanes and items. Built-in identifiers (rendered from the same curated SVG library as `icon:`): `none`, `multiplier` (default — `×`), `person`, `people`, `points` (`★`), `time` (`⏱`). Custom: any identifier declared by a `symbol` declaration in config. Inline: a double-quoted Unicode literal — font-dependent. |

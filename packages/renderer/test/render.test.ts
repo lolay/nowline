@@ -1,6 +1,12 @@
 import { readFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
-import { darkTheme, lightTheme, WAVE_STRIP_LABEL_PAD_PX } from '@nowline/layout';
+import {
+    darkTheme,
+    HEADER_HEIGHT_PX,
+    lightTheme,
+    timelineTickLabelBaselineOffsetPx,
+    WAVE_STRIP_LABEL_PAD_PX,
+} from '@nowline/layout';
 import { describe, expect, it } from 'vitest';
 import { renderSvg } from '../src/index.js';
 import { parseFilesToModel, parseToModel } from './helpers.js';
@@ -1570,6 +1576,40 @@ swimlane a
         const strip = t1.waveStrip;
         expect(strip?.y).toBe(t1.tickPanelY + t1.tickPanelHeight);
         expect(waved.ys).toEqual([n2(t1.tickPanelY), n2((strip?.y ?? 0) + (strip?.height ?? 0))]);
+    });
+
+    it('sizes the tick panels and centers their labels from header-height', async () => {
+        const src = (height: string) => `nowline v1
+
+config
+
+default roadmap header-height:${height} timeline-position:both
+
+roadmap r "R" start:2026-01-05 scale:1w
+
+swimlane a
+  item a1 duration:3w
+`;
+        const panels = async (height: string) => {
+            const model = await parseToModel(src(height));
+            const timeline = waveLayer(await renderSvg(model), 'timeline') ?? '';
+            const labels = [...timeline.matchAll(/<text [^>]*>/g)].map((m) => attrOf(m[0], 'y'));
+            return { t: model.timeline, rects: rectsOf(timeline), labels };
+        };
+        const lg = await panels('lg');
+        expect(lg.t.tickPanelHeight).toBe(HEADER_HEIGHT_PX.lg);
+        expect(lg.rects.map((r) => attrOf(r, 'height'))).toEqual([
+            n2(HEADER_HEIGHT_PX.lg),
+            n2(HEADER_HEIGHT_PX.lg),
+        ]);
+        const offset = timelineTickLabelBaselineOffsetPx(HEADER_HEIGHT_PX.lg);
+        expect(new Set(lg.labels)).toEqual(
+            new Set([n2(lg.t.tickPanelY + offset), n2((lg.t.bottomTickPanelY ?? 0) + offset)]),
+        );
+        // `none` drops both strips: no panel rects and no date labels.
+        const none = await panels('none');
+        expect(none.rects).toEqual([]);
+        expect(none.labels).toEqual([]);
     });
 
     it('rounds the outer corners of a cell where it meets the backing panel ends', async () => {
