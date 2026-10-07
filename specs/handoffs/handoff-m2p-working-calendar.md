@@ -1,13 +1,13 @@
 # Working calendar handoff: implementation plan (m2p)
 
-> **Status: Phases 1-3 are implemented in PR lolay/nowline#96 (merged as `9c0982d`); Phase 4 (`show` and the display setting) is implemented in the Phase 4 PR; Phase 5 is not started.** This handoff turns [`working-calendar.md`](../working-calendar.md) into a phased plan for a fresh agent. It is self-contained: the decisions that close the spec's open questions are in §3, the codebase map is in §4, and the target API is in §5. Do not redo the research; re-verify line numbers instead (§1, step 2).
+> **Status: Phases 1-3 are implemented in PR lolay/nowline#96 (merged as `9c0982d`); Phase 4 (`show` and the display setting) in PR lolay/nowline#97 (merged as `c74c795`); Phase 5 is not started and ships as two PRs, 5a and 5b (§6).** This handoff turns [`working-calendar.md`](../working-calendar.md) into a phased plan for a fresh agent. It is self-contained: the decisions that close the spec's open questions are in §3, the codebase map is in §4, and the target API is in §5. Do not redo the research; re-verify line numbers instead (§1, step 2).
 
 ## 1. How to pick this up
 
 1. **Scope is decided.** §3 closes every open question in `working-calendar.md` §11 and records the implementation choices made while writing this plan. The maintainer approved them by merging this handoff. Do not reopen one without new information.
 2. **Re-verify code references.** Every `file:line` in §4 was checked against commit `9725e9d` (waves merged, October 2026). Before you trust a line number, re-run a grep for the symbol named in that row.
 3. **Read `working-calendar.md` §3, §5 and §7 before coding.** They are normative. The worked examples in §10 double as test fixtures; the numbers in them are the acceptance criteria.
-4. **One PR per phase,** merged in order, each ending with `make pre-commit` green (AGENTS.md; use `make` targets only). Phases 2 and 3 must land in the same release: do not cut a release between them, or the exporters disagree with the chart.
+4. **One PR per phase (Phase 5 is two: 5a, then 5b),** merged in order, each ending with `make pre-commit` green (AGENTS.md; use `make` targets only). Phases 2 and 3 must land in the same release: do not cut a release between them, or the exporters disagree with the chart.
 5. **Byte stability is the safety net.** A calendar with no non-working days must be the identity everywhere. Every `calendar:full` fixture, including all five waves snapshots, must stay byte-identical through every phase. If one moves, you broke the identity path. The rule covers layout and rendering (the SVG, PNG, PDF, HTML and JSON cells and every layout snapshot). Phase 3's exporter fixes move `calendar:full` export cells (durations, and the MS Project week) by design.
 
 ## 2. Milestone and PR shape
@@ -20,8 +20,9 @@ Milestone **m2p — Working calendar** is already in `specs/milestones.md` (summ
 | 1 | calendar primitives | `WorkingCalendar` non-working set, index ↔ date functions, business weekend | none (no caller uses them yet) |
 | 2 | working-day schedule, `hide` | engines B and C in working days, `TimeScale` hide mapping, window and ticks, now-line, wave floors, positioned `nonWorking` runs | every business-calendar render |
 | 3 | exporters | XLSX, MS Project and Mermaid read the file's calendar | every `xlsx` and `mermaid` cell, and the `msproj` cells with sized items or the full calendar |
-| 4 | `show` and the display setting (implemented) | `non-working:` style key (`NL.E0800`), `--non-working` and its equivalents on every surface, show mapping in engine A, shading | none under `hide`; two deliberate additions: the `weekends-show` layout snapshot and its 8 determinism cells |
-| 5 | declarations | `non-working` and `working` keywords, `date:` / `start:` / `end:` / `every:`, includes, named seams and bands, exporter exceptions, editor and agent tooling | none for files without the keyword |
+| 4 | `show` and the display setting (merged, `c74c795`) | `non-working:` style key (`NL.E0800`), `--non-working` and its equivalents on every surface, show mapping in engine A, shading | none under `hide`; two deliberate additions: the `weekends-show` layout snapshot and its 8 determinism cells |
+| 5a | declarations reach the schedule | lexer spike, `non-working` and `working` keywords, `date:` / `start:` / `end:` / `every:`, printer, validator (NW1–NW5), include merge, declarations feed the working calendar (precedence, the file's `weekend`), language docs | none for files without the keywords |
+| 5b | declarations on the chart and in exports | labelled seams and bands for titled runs, MS Project `<Exceptions>` and Mermaid `excludes` dates, editor and agent tooling, fixtures and snapshots | none for files without the keywords; deliberate additions only |
 
 ## 3. Decision log
 
@@ -150,12 +151,12 @@ Condensed from three read-only research passes (time and scheduling; DSL plumbin
 | Terminals | `nowline.langium:216-222` | `PROPERTY_KEY_WITH_COLON` and `ID` both allow hyphens. Langium (`token-builder.js:77-111`) gives each keyword `longer_alt` fallbacks in the order `PROPERTY_KEY_WITH_COLON`, `ID`, so `non-working:` lexes as a key and `non-working-team` / `nonworking` as `ID`. No hyphenated keyword exists yet. `maxLookahead: 4` (`nowline-module.ts:89-91`). |
 | Ambiguity gate | `test/strings-and-ids/wave-identifier.test.ts` | Console spies (`:42-59`), `parseClean` (`:61-67`), lexer cases (`:88-99`), every bare-word slot (`:101-236`), residual cases (`:247-305`) and the validations-on parser build (`:307-330`, **the real gate**). Copy it as `non-working-identifier.test.ts`. Expected residual ambiguity: a bare `style` or `symbol` line followed by a `non-working …` line takes `non-working` as its name; a bare `style` / `symbol` is already NL.E0301. |
 | Keyword tests | `test/parser/keywords.test.ts:315-440` | The `wave declaration` block is the template. |
-| Printer | `src/convert/printer.ts:92-107` `configEntry` | The default case throws `Unknown config entry type`, so the new case ships with the grammar. Config entries print in source order (`:65-72`); there is no config sort. `KEY_ORDER` (`:4-28`): put `through` after `date` and `every` after it. |
+| Printer | `src/convert/printer.ts:92-107` `configEntry` | The default case throws `Unknown config entry type`, so the new case ships with the grammar. Config entries print in source order (`:65-72`); there is no config sort. `KEY_ORDER` (`:4-28`): `every` before `start`, and `end` right after `start` (decision 20). |
 | JSON AST | `src/convert/schema.ts:55-88`, `parse-json.ts:8-40` | Generic walkers; a new `ConfigEntry` alternative needs no JSON code and leaves existing hashes alone. |
 | Validator registry | `nowline-validator.ts:431-556` | `SymbolDeclaration` checks at `:526` are the template. Do **not** register `checkEntityIdOrTitle`: id-less, title-less declarations are valid. |
-| Own-key check | `checkSymbolDeclaration` `:1842-1888` | Use this pattern for `date` / `through` / `every`, **not** `checkUnknownEntityProperties` (`:1187-1218`), which skips `wave:` (`:1209`) and would silently accept `non-working x … wave:w`. |
+| Own-key check | `checkSymbolDeclaration` `:1842-1888` | Use this pattern for `date` / `start` / `end` / `every`, **not** `checkUnknownEntityProperties` (`:1187-1218`), which skips `wave:` (`:1209`) and would silently accept `non-working x … wave:w`. |
 | Duplicate ids | `checkDuplicateSymbolIds` `:1890-1911` | Template for NW5. |
-| Dates | `checkPropertyValues` `case 'date': case 'start':` `:803-811` | Add `case 'through':` to get NL.E0405 for free. |
+| Dates | `checkPropertyValues` `case 'date': case 'start':` `:803-811` | Add `case 'end':` to get NL.E0405 for free (decision 20). |
 | Calendar rules | `checkCalendarBlockConsistency` `:1404-1441`, `checkCalendarBlock` `:1444-1471` | NW4 goes next to these. |
 | Display key | `STYLE_PROP_KEYS` `:98-118`, `STYLE_PROP_ENUMS` `:149-164` | Add the key `non-working` with the values `hide` and `show`. The default branch of `checkPropertyValues` (`:950-977`) lets any colour-shaped value through (`:965`), so NW6 needs its own check. "Roadmap-only" is not enforced for `timeline-position` / `minor-grid` either; match them. |
 | Type labels | `validator-utils.ts:105-113` `entityTypeLabel` / `describeNode`; LSP `ast-utils.ts:365-370` `entityKind` | Both turn `NonWorkingDeclaration` into `nonworking`. Special-case it to `non-working`. |
@@ -168,10 +169,10 @@ Condensed from three read-only research passes (time and scheduling; DSL plumbin
 | Rule (spec §6) | Range | Next free |
 |---|---|---|
 | NW1–NW5 (declarations) | `E0900–E0999` config blocks, unused | `NL.E0900`… |
-| NW2 `through:` date shape | reuse `NL.E0405` | — |
+| NW2 `end:` date shape | reuse `NL.E0405` | — |
 | NW4 (`days-per-week` mismatch) | `W07xx` or a new config-warning slot; decide in the PR | `NL.W0703` |
-| NW6 (`non-working:` value) | `E0800–E0899` style, unused | `NL.E0800` |
-| NW7 (start moved off a hidden day) | `I10xx` layout insights | `NL.I1008` |
+| NW6 (`non-working:` value) | shipped in Phase 4 | `NL.E0800` |
+| NW7 (start moved off a hidden day) | shipped in Phase 2 | `NL.I1008` |
 
 ### 4.6 Option plumbing for the display setting
 
@@ -232,8 +233,8 @@ The export kernel (`packages/export/src/index.ts`) dispatches Mermaid (`:379-383
 
 | Surface | Where |
 |---|---|
-| LSP | `packages/lsp/src/references/ast-utils.ts` (`collectNamedEntities` config loop `:162-165`, `declarationAt` `:321-337`, `entityKind` `:365-370`); `providers/completion.ts` (value completion exists only for status / icon / capacity-icon, `:86-115`; add `hide` / `show` and weekday names); `providers/hover.ts:90-99` (add `through`, `every`). Test template: `test/providers/waves.test.ts`. |
-| TextMate | `grammars/nowline.tmLanguage.json`: copy the start-of-line `wave` pattern (`:50-55`) as `^\s*(non-working)(?![\w-])(?=\s)` (a plain `\b…\b` would match inside `non-working-team`); property keys `:65` (`through`, `every`); style keys `:80` (`non-working`); enum constants `:92` (`hide`, `show`). `packages/lsp/test/textmate-wave.test.ts:15-17` indexes patterns by position: append, or update it. |
+| LSP | `packages/lsp/src/references/ast-utils.ts` (`collectNamedEntities` config loop `:162-165`, `declarationAt` `:321-337`, `entityKind` `:365-370`); `providers/completion.ts` (value completion exists only for status / icon / capacity-icon, `:86-115`; add `hide` / `show` and weekday names); `providers/hover.ts:90-99` (add `every`, and `start:` / `end:` text per entity, decision 20). Test template: `test/providers/waves.test.ts`. |
+| TextMate | `grammars/nowline.tmLanguage.json`: copy the start-of-line `wave` pattern (`:50-55`) as `^\s*(non-working|working)(?![\w-])(?=\s)` (a plain `\b…\b` would match inside `non-working-team`); property key `:65` (`every`). The style key `non-working` and the enum constants `hide` / `show` shipped in Phase 4. `packages/lsp/test/textmate-wave.test.ts:15-17` indexes patterns by position: append, or update it. |
 | Snippets | `packages/vscode-extension/snippets/nowline.json` (wave snippet `:26-30`). |
 | Man pages | `packages/cli/man/nowline.5`: FILE STRUCTURE `:43-45`, CONFIG SECTION and "Five config keywords" `:293-307`, `.Ss calendar` `:486-547` (add `.Ss non-working` after it), style keys `:1059-1063`, `:1392-1397`, validation `:1689-1708`. French `man/fr/nowline.5`: `:5-7`, `:335-350`, `:530`, `:1467-1473`, `:1782`. `nowline.1` options from `:122` (Phase 4). |
 | MCP | `packages/mcp/src/reference-cheatsheet.ts` "Config / includes" `:56-58`. `schema-vocab.ts` has no config-keyword list (`entityTypes` `:23-37` is roadmap-only); adding one also touches `schemas.ts:105-107`, `server.ts:1348-1352` and `test/mcp.smoke.test.ts:626-634`. `nowline://reference` is generated from `nowline.5`; `examples/*.nowline` are bundled automatically. |
@@ -397,22 +398,58 @@ nonWorking?: Array<{ x: number; width: number; from: Date; through: Date; titles
 - Wave boundaries per decision 11.
 - Each surface's option reaches layout (one test per surface, modelled on the existing `--theme` tests).
 
-### Phase 5: `non-working` declarations
+### Phase 5: declarations (two PRs)
+
+Phase 5 ships as two PRs, merged in order. 5a gets the declarations into the language and the schedule; 5b puts them on the chart, in the exports and in the editor. Each is planned at its start against the current `main` (fresh code maps, line numbers re-verified), then run like Phase 4.
+
+**Read the decision log first.** The 2026-10-06 amendments to decisions 1, 2, 18, 19 and 20 replace the original syntax: there are two keywords (`non-working` and `working`), `through:` is dropped, `date:` takes one date or a list, and `start:` / `end:` (inclusive) give a range or bound an `every:`. [`working-calendar.md`](../working-calendar.md) §4.1, §4.4, §5, §6, §9.2 and examples B and C still show `through:`; 5a rewrites them.
+
+#### Phase 5a: declarations reach the schedule
 
 **Change**
 
-1. **Lexer spike first.** A test that builds the parser with `skipValidations: false` and asserts: `non-working` lexes as the keyword; `non-working-team` lexes as `ID`; `non-working:` lexes as a property key, as `calendar:` and `wave:` do today; no ambiguity warnings. If any assertion fails, stop and ask (decision 1).
-2. **Grammar:** `NonWorkingDeclaration` in `ConfigEntry`; extend the waves `EntityName` shim so bare-word uses keep parsing; add `non-working` wherever waves added `wave` for values.
-3. **Printer and JSON:** the config-entry case (entries keep source order; the printer has no config sort), `through` and `every` in `KEY_ORDER`; no JSON code is needed (§4.5), but add round-trip coverage.
-4. **Validator and i18n:** NW1–NW5 (spec §6) with EN and FR messages; `through:` and `every:` on other entities get the existing unknown-property warning.
-5. **Includes:** config-merge with parent-wins and the existing shadowing warning; unnamed declarations always merge.
-6. **Calendar:** declarations feed `NonWorkingSet` (`dated` and `weekly`); a file's `non-working weekend` replaces the preset's (decision 14); NW4 compares `days-per-week` with the recurring set.
-7. **Rendering:** named runs get a labelled seam (`hide`) or labelled band (`show`) with the label packed into the marker row by the existing packer (spec §7.4).
-8. **Exporters:** MS Project `<Exceptions>` for dated runs; Mermaid `excludes` with ISO dates.
-9. **Tooling:** LSP completion and hover, TextMate grammar, snippets, `nowline.5`, MCP vocabulary and reference resources, `ide.md`, `dsl.md` (keyword tables, Design Rule 1 count, a `### Non-working Declaration` section, rules), README keyword table.
-10. **Fixtures:** `examples/working-calendar.nowline` (holidays plus a summit), `tests/non-working-hide.nowline` and `tests/non-working-show.nowline` (one axis each), snapshots for both, a determinism fixture.
+1. **Lexer spike first,** before any other 5a work. A test that builds the parser with `skipValidations: false` (copy `test/strings-and-ids/wave-identifier.test.ts`, §4.5) asserts, for both keywords: `non-working` and `working` lex as keywords; `non-working-team` and `working-group` lex as `ID`; `non-working:` and `working:` lex as property keys; every bare-word slot that accepts `wave` still parses each word as a name; no ambiguity warnings beyond the expected `style` / `symbol` residuals. `working` is an ordinary English word, so also sweep `examples/`, `tests/` and the test fixtures for it as an id. **If any assertion fails, stop and ask** (decision 1); do not rename silently.
+2. **Grammar:** `NonWorkingDeclaration` and `WorkingDeclaration` (one rule with a keyword alternative is fine) in `ConfigEntry`, shaped like `SymbolDeclaration` without the description; both words added to the `EntityName` shim and to the value rules that list `'wave'` (§4.5). The shim ships with the keywords.
+3. **Properties** (decisions 2, 13): `date:` one ISO date or a list; `start:` / `end:` inclusive ISO dates, either side optional; `every:` one weekday or a list of `sun mon tue wed thu fri sat`.
+4. **Printer and JSON:** the config-entry case for both keywords (source order, no sort); `KEY_ORDER` per decision 20; round-trip coverage. No JSON code (§4.5).
+5. **Validator and i18n** (decision 20; codes from `NL.E0900` and `NL.W0703`, §4.5, EN and FR):
+   - NW1 shape: `date:` alone; `start:` + `end:` without `every:` (a range); or `every:` with optional `start:` / `end:` bounds. Any other mix is an error.
+   - NW2: `end:` is not before `start:`; `case 'end':` gives NL.E0405 for a malformed date.
+   - NW3: `every:` values are weekday names without duplicates; the open-ended week may not close all seven days (a bounded window may).
+   - NW4 (warning): `days-per-week` differs from the working days the open-ended week leaves.
+   - NW5: duplicate id within one file, per keyword.
+   - `every:` on any other entity gets the existing unknown-property warning; use the own-key check, not `checkUnknownEntityProperties` (§4.5, §7).
+   - Type labels: special-case `non-working` in `entityTypeLabel` and the LSP `entityKind`.
+6. **Includes:** a list (or slug keys) so unnamed declarations always merge; named ones are parent-wins with the existing shadowing warning; isolated regions keep the child's own config (§4.5).
+7. **Calendar:** declarations feed the `WorkingCalendar` through `resolveWorkingCalendar` (decision 16), so engines A, B and C and every exporter's durations and dates pick them up with no further change. Extend `NonWorkingSet` (§5.1) for lists, bounded recurrences and `working` exceptions. Precedence is specificity and never source or include order (decision 18): a dated declaration beats a bounded recurrence, which beats the open-ended week, and `working` wins ties. A file's `non-working weekend` replaces the preset's (decision 14). Durations stay in estimate units (decision 19): a working exception pulls work in, a non-working day inside a bar pushes its end out. Titles flow into `NonWorkingRun.titles`; no label is drawn yet (5b).
+8. **Docs** (the syntax ships here, so its docs do too): `working-calendar.md` (§4.1, §4.3, §4.4, §5, §6, §9.2, examples B and C in the new syntax, status); `dsl.md` (Design Rule 1 count 22 → 24 with a justification like waves', the Config Keywords table, a `### Non-working Declaration` section, the rules); `nowline.5` EN and FR (§4.9); the README keyword table; CHANGELOG `### Added`.
 
-**Tests:** spec §10 examples B and C as layout tests (B in both views); the validator rules; include merge and override; the exporter exceptions; every bare-word use of `non-working` that parses today still parses.
+**Tests**
+
+- The spike (step 1), kept as the permanent ambiguity gate.
+- Parser, printer round-trip and JSON for every property shape; every bare-word use of either word that parses today still parses.
+- Each validator rule, EN and FR text.
+- Include merge: unnamed always merge, named parent-wins with the warning, isolated regions untouched.
+- Calendar precedence: dated over bounded over open-ended, `working` wins ties, and the result is identical when declarations or includes are reordered.
+- Example B (rewritten with `date:` or `start:` / `end:`) as a layout test in both views: Checkout 0–40 and QA 40–56 under `hide`; Checkout 0–72 and QA 72–88 under `show`; milestone at 24 and 40. Engine C: Checkout uses Nov 23–25, 30 and Dec 1; QA uses Dec 2–3. Labels are 5b.
+- Example C: the file's `weekend` replaces the preset's, `1w` is Sunday through Thursday, week ticks fall on Sundays, NW4 stays quiet.
+- A working exception (a crunch Saturday) pulls a bar's end in by one day.
+
+**Byte impact:** none for files without the keywords. Every layout snapshot, determinism cell and rendered example stays byte-identical; take a hide baseline before any source edit, as in Phase 4.
+
+#### Phase 5b: declarations on the chart and in exports
+
+**Change**
+
+1. **Rendering** (spec §7.4): a run with a titled declaration is labelled in both views. Under `hide`, a thin cut line at the seam (lighter than an anchor's, token `timeline.nonWorkingSeam`) at every scale, with its label (`Company summit · 3d`) packed into the marker row by the existing packer. Under `show`, the band (token `timeline.nonWorkingFill`, already `band: true` for titled runs since Phase 4) gets its label packed into the marker row at the band's left edge. Plain weekends are unchanged.
+2. **Exporters:** MS Project `<Exceptions>` on the calendar for dated non-working runs, and working exceptions where the format allows; Mermaid `excludes` gains ISO dates for dated runs. Mermaid has no working exceptions: document it as a known limit in `working-calendar.md` §8.
+3. **Tooling** (§4.9): LSP completion (both keywords, `every:` weekday names, and the `hide` / `show` values left out of Phase 4) and hover; the TextMate keyword pattern and the `every` property key; a snippet; the MCP cheatsheet and vocabulary; `ide.md`.
+4. **Fixtures:** `examples/working-calendar.nowline` (holidays plus a summit), `tests/non-working-hide.nowline` and `tests/non-working-show.nowline` (one axis each), layout snapshots for both, and a determinism fixture.
+5. **Docs:** `rendering.md` (labelled seams and bands), `working-calendar.md` §7.4 and §8, CHANGELOG `### Added`.
+
+**Tests:** example B's labels in both views (`Thanksgiving · 2d` on the seam under `hide`, the band label under `show`); label packing against a milestone on the same date; the MS Project exceptions and Mermaid dates for example B; LSP completion and hover; TextMate captures for both keywords, including that `non-working-team` and `working-group` are not keywords.
+
+**Byte impact:** none for files without the keywords. Deliberate additions only: the new fixtures' snapshots and determinism cells.
 
 ## 7. Gotchas
 

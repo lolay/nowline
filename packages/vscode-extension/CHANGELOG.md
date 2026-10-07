@@ -33,6 +33,9 @@
 - `status:active` and `status:completed` highlight like the other built-in
   statuses, and a status word inside a longer id (`done-api`) is no longer
   highlighted on its own.
+- Keywords, keys and enum values no longer highlight inside a hyphenated
+  word: in `#fff-team` or `2w-item` the tail is no longer coloured as the
+  `team` or `item` keyword.
 
 ## [0.8.6] - 2026-10-01
 

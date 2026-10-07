@@ -316,6 +316,44 @@ swimlane s
         expect(hasError(errorMessages(r.diagnostics), /minor-grid|maybe/i)).toBe(true);
     });
 
+    // No enum key accepts a colour (rule 19), so a colour-shaped value on a
+    // `default` line is the same single error it is in a `style` block.
+    it('Rule 18: a hex colour for minor-grid on a default line is exactly one error', async () => {
+        const r = await parse(
+            `config\ndefault roadmap minor-grid:#fff\nroadmap r\nswimlane s\n  item x duration:1w\n`,
+        );
+        expect(errorMessages(r.diagnostics)).toEqual([
+            'Invalid value "#fff" for "minor-grid". Allowed: true, false.',
+        ]);
+    });
+
+    it('Rule 18: a named colour for timeline-position on a default line is exactly one error', async () => {
+        const r = await parse(
+            `config\ndefault roadmap timeline-position:red\nroadmap r\nswimlane s\n  item x duration:1w\n`,
+        );
+        expect(errorMessages(r.diagnostics)).toEqual([
+            'Invalid value "red" for "timeline-position". Allowed: top, bottom, both.',
+        ]);
+    });
+
+    it('Rule 18: default lines and style blocks agree on colour-shaped enum values', async () => {
+        const body = 'roadmap r\nswimlane s\n  item x duration:1w\n';
+        const cases: Array<[string, string]> = [
+            ['minor-grid', '#fff'],
+            ['timeline-position', 'red'],
+            ['border', 'none'],
+            ['header-height', 'navy'],
+            ['bracket', '#123456'],
+        ];
+        for (const [key, value] of cases) {
+            const fromDefault = await parse(`config\ndefault roadmap ${key}:${value}\n${body}`);
+            const fromStyle = await parse(`config\nstyle s1\n  ${key}: ${value}\n${body}`);
+            const expected = errorMessages(fromStyle.diagnostics);
+            expect(expected).toHaveLength(1);
+            expect(errorMessages(fromDefault.diagnostics)).toEqual(expected);
+        }
+    });
+
     it('Rule 20: raw timeline-position on roadmap declaration is an error', async () => {
         const r = await parse(
             `roadmap r timeline-position:both\nswimlane s\n  item x duration:1w\n`,
