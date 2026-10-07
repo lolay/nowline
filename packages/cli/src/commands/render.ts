@@ -16,7 +16,6 @@ import { lengthToPoints, parseLength } from '@nowline/export-core';
 import {
     type NonWorkingDisplay,
     type NormalizedZone,
-    normalizeThemeName,
     normalizeZone,
     resolveToday,
     type ThemeName,
@@ -32,6 +31,7 @@ import {
 } from '../cli/formats.js';
 import { parseNonWorkingArg } from '../cli/non-working.js';
 import { resolveRenderOutputPath } from '../cli/output-path.js';
+import { parseThemeArg } from '../cli/theme.js';
 import { parseNowlineJson } from '../convert/parse-json.js';
 import { printNowlineFile } from '../convert/printer.js';
 import { serializeToJson } from '../convert/schema.js';
@@ -118,7 +118,7 @@ export async function renderHandler(options: RenderHandlerOptions): Promise<void
         displayPath: input.displayPath,
         absInputPath: input.isStdin ? path.resolve(cwd, 'stdin.nowline') : input.path,
         isStdin: input.isStdin,
-        theme: parseTheme(args.theme),
+        theme: parseThemeArg(args.theme),
         today: resolveNowCli(args),
         width: parseWidthArg(args.width),
         nonWorking: parseNonWorkingArg(args.nonWorking),
@@ -527,19 +527,6 @@ async function loadConfigFor(
     } catch {
         return null;
     }
-}
-
-function parseTheme(raw: string | undefined): ThemeName {
-    if (!raw) return 'light';
-    // `greyscale` (UK) is accepted and canonicalized to `grayscale` (US).
-    const theme = normalizeThemeName(raw);
-    if (!theme) {
-        throw new CliError(
-            ExitCode.InputError,
-            `nowline: invalid --theme "${raw}". Expected light, dark, or grayscale.`,
-        );
-    }
-    return theme;
 }
 
 // Resolve the now-line date from the CLI flags.
