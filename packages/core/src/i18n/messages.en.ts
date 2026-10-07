@@ -229,6 +229,11 @@ export const messages = {
     // Style
     'NL.E0800': (a: { value: string }) =>
         `Invalid non-working value "${a.value}". Use hide or show.`,
+    'NL.E0801': (a: { value: string; key: string }) =>
+        `Invalid color "${a.value}" for "${a.key}". Use a named color, hex value, or "none".`,
+    'NL.E0802': (a: { value: string; key: string; allowed: string }) =>
+        `Invalid value "${a.value}" for "${a.key}". Allowed: ${a.allowed}.`,
+    'NL.E0803': (a: { key: string }) => `Unknown style property "${a.key}".`,
 
     // Warnings
     'NL.W0700': (a: { key: string; entity: string; suggested: string }) =>

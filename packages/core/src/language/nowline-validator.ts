@@ -120,9 +120,8 @@ const STYLE_PROP_KEYS = new Set([
 
 // `non-working:` values (specs/working-calendar.md §4.2). Kept out of
 // `STYLE_PROP_ENUMS` on purpose: the key reports its own coded NL.E0800,
-// and the generic enum check would add an uncoded message and let a colour
-// literal through. Mirrors `NON_WORKING_DISPLAYS` in @nowline/layout, which
-// core cannot import.
+// and the generic enum check would add a second error (NL.E0802). Mirrors
+// `NON_WORKING_DISPLAYS` in @nowline/layout, which core cannot import.
 const NON_WORKING_VALUES = new Set(['hide', 'show']);
 
 // Built-in capacity-icon vocabulary. Renderer-curated SVG glyphs (plus 'multiplier'
@@ -968,24 +967,29 @@ export class NowlineValidator {
                 if (STYLE_PROP_KEYS.has(key)) {
                     if (key === 'bg' || key === 'fg' || key === 'text') {
                         if (val && !isColorValue(val)) {
-                            accept(
+                            acceptTr(
+                                accept,
                                 'error',
-                                `Invalid color "${val}" for "${key}". Use a named color, hex value, or "none".`,
+                                { node: prop, property: 'value' },
+                                'NL.E0801',
                                 {
-                                    node: prop,
-                                    property: 'value',
+                                    value: val,
+                                    key,
                                 },
                             );
                         }
                     } else if (key in STYLE_PROP_ENUMS) {
                         const allowed = STYLE_PROP_ENUMS[key];
-                        if (val && !allowed.has(val) && !isColorValue(val)) {
-                            accept(
+                        if (val && !allowed.has(val)) {
+                            acceptTr(
+                                accept,
                                 'error',
-                                `Invalid value "${val}" for "${key}". Allowed: ${[...allowed].join(', ')}.`,
+                                { node: prop, property: 'value' },
+                                'NL.E0802',
                                 {
-                                    node: prop,
-                                    property: 'value',
+                                    value: val,
+                                    key,
+                                    allowed: [...allowed].join(', '),
                                 },
                             );
                         }
@@ -1252,34 +1256,24 @@ export class NowlineValidator {
 
         if (key === 'bg' || key === 'fg' || key === 'text') {
             if (!isColorValue(val)) {
-                accept(
-                    'error',
-                    `Invalid color "${val}" for "${key}". Use a named color, hex value, or "none".`,
-                    {
-                        node: prop,
-                        property: 'value',
-                    },
-                );
+                acceptTr(accept, 'error', { node: prop, property: 'value' }, 'NL.E0801', {
+                    value: val,
+                    key,
+                });
             }
         } else if (key === 'non-working') {
             checkNonWorkingValue(val, prop, accept);
         } else if (key in STYLE_PROP_ENUMS) {
             const allowed = STYLE_PROP_ENUMS[key];
             if (!allowed.has(val)) {
-                accept(
-                    'error',
-                    `Invalid value "${val}" for "${key}". Allowed: ${[...allowed].join(', ')}.`,
-                    {
-                        node: prop,
-                        property: 'value',
-                    },
-                );
+                acceptTr(accept, 'error', { node: prop, property: 'value' }, 'NL.E0802', {
+                    value: val,
+                    key,
+                    allowed: [...allowed].join(', '),
+                });
             }
         } else if (!STYLE_PROP_KEYS.has(key)) {
-            accept('error', `Unknown style property "${key}".`, {
-                node: prop,
-                property: 'key',
-            });
+            acceptTr(accept, 'error', { node: prop, property: 'key' }, 'NL.E0803', { key });
         }
     }
 
