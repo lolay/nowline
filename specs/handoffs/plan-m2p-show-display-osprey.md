@@ -1,7 +1,7 @@
 ```
---- KICKOFF: begin orchestration at [deep] ---
+--- KICKOFF: plan complete ---
 
-  Status: 4/4 groups done; s10 driving lolay/nowline#97 to green | last review: wave-4 PASS | updated 2026-10-07
+  Status: 4/4 groups done | completed 2026-10-07 | PR lolay/nowline#97 green, waiting on maintainer review
 
   review: every-wave (log-only — parent writes Review log; human gates only where marked)
 
@@ -21,14 +21,14 @@
 
 **Cost (API-equiv, Claude Code models)**
 
-| wave | expected tokens | expected $ |
-|---|---|---|
-| 1 [exec] m2p-4 s1-s3 | ~3.6M | ~$1.3 |
-| 2 [deep] m2p-4 s4-s6 | ~7.3M | ~$3.9 |
-| 3 [exec] m2p-4 s7-s8 | ~4.0M | ~$1.4 |
-| 4 [exec] m2p-4 s9-s10 | ~2.0M | ~$0.70 |
-| orchestrator | ~6.7M | ~$6.0 |
-| **Total** | ~24M | ~$13 |
+| wave | expected tokens | expected $ | actual tokens | actual $ |
+|---|---|---|---|---|
+| 1 [exec] m2p-4 s1-s3 | ~3.6M | ~$1.3 | ~11M | ~$3.96 (output est.) |
+| 2 [deep] m2p-4 s4-s6 | ~7.3M | ~$3.9 | ~23M | ~$8.97 (output est.) |
+| 3 [exec] m2p-4 s7-s8 | ~4.0M | ~$1.4 | ~23M | ~$7.07 (output est.) |
+| 4 [exec] m2p-4 s9-s10 | ~2.0M | ~$0.70 | ~12M | ~$3.61 (output est.) |
+| orchestrator | ~6.7M | ~$6.0 | ~7.5M | ~$4.0 (output est.) |
+| **Total** | ~24M | ~$13 | ~77M | ~$27.6 (output est.) |
 
 Expected values are estimates, good to about 2-3× per wave. Phases 1-3 actuals ran well above their anchors, so read these as a floor. The kickoff ran in the m2p planning session and is not in the orchestrator row.
 
@@ -425,7 +425,7 @@ Decision 18 and byte identity step 3.
 ### s9 - [exec] Docs (done)
 Everything under § Change "Docs". Done when `make lint` passes.
 
-### s10 - [exec] Gates, commit, push, PR
+### s10 - [exec] Gates, commit, push, PR (done)
 1. Run § Verification in full.
 2. Commit with the exact trailers, and push.
 3. Open a PR to `main`, titled "Show non-working days as shaded bands (m2p phase 4)". The body follows the template. It lists the byte impact (none under hide; two deliberate additions), the decision 5, 9 and 10 deviations, and the incidental findings.
@@ -458,3 +458,7 @@ tokens wave-3 m2p-4-s7-s8 (claude-sonnet-5-5): input ~210 / cache read ~23M / ca
 tokens orchestrator-wave-3 plan-m2p-show-display-osprey (claude-opus-5-5): input ~14 / cache read ~1.1M / cache write ~9.3k 1h / output ~9.6k | ~$0.47 API-equiv (output est.) session 1ace5e35-cfdf-5791-b5ba-c2e888455b0c
 tokens wave-4 m2p-4-s9-s10 (claude-sonnet-5-5): input ~140 / cache read ~11M / cache write ~170k / output ~93k | ~$3.61 API-equiv (output est.) session 1ace5e35-cfdf-5791-b5ba-c2e888455b0c
 tokens orchestrator-wave-4 plan-m2p-show-display-osprey (claude-opus-5-5): input ~20 / cache read ~1.7M / cache write ~17k 1h / output ~22k | ~$0.93 API-equiv (output est.) session 1ace5e35-cfdf-5791-b5ba-c2e888455b0c
+
+## Completion summary
+
+m2p Phase 4 ran in four waves (Sonnet, Opus, Sonnet, Sonnet, each a one-agent Workflow at high effort) under an Opus high orchestrator, with one human gate (5 and 2 after wave 1). Hide output stayed byte-identical throughout (40/40 baseline hashes, no snapshot change, hashes.json additions only). PR lolay/nowline#97 opened with CI green on every leg. Actuals ran about 2x the expected total, in line with phases 1-3; the waves that build and test the whole repo cost 3x their anchors. This plan and its runner handoff are removed as the branch's last commit.
