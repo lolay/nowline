@@ -6,20 +6,16 @@
 
 - **Phases 1–3** merged in lolay/nowline#96 as `9c0982d` on `main`.
 - **Phase 4 plan:** [`plan-m2p-show-display-osprey.md`](./plan-m2p-show-display-osprey.md). It was drafted in the m2p session from three read-only code maps (engine A and `TimeScale`; style key, validation and renderer; option plumbing on every surface) and a design pass, all at a tree equal to `9c0982d`.
-- **The plan is not approved yet.** Nothing is implemented, and no session has been started for it.
+- **Plan approved; orchestration running** in session https://claude.ai/code/session_019XnAqjLpNjhKnEgWQTkaen on branch `claude/tender-babbage-mjx733`.
+- **Wave 1 done** (`602bf3b`): Node 26.2.0 in `$HOME/node-v26.2.0-linux-x64/bin` (container-local, reinstall if the container is new), 40-hash hide baseline in `.scratch/m2p-p4/hide-baseline.sha256` (container-local; rebuild from `9c0982d` if lost), 58 red tests committed.
 
 ## Pending question
 
-Approval of the Phase 4 plan.
-- The maintainer asked for it with "should we do phase 4? lets plan here and then move to execute in a new agent".
-- A worker restart dropped plan mode before the plan could be shown, so it is presented again for approval.
-- No answer means no new session.
+Gates 5 and 2, asked together: the canary (wave 1 ran on Sonnet at high effort, confirmed from the transcript) and the review of wave 1's red tests (`92c9ec3..602bf3b`) before Opus wave 2 (s4-s6) is dispatched. No answer means no wave 2.
 
 ## How to resume
 
-With explicit approval:
-1. The m2p session creates a new cloud session from this branch, using the kickoff prompt at the top of the plan.
-2. That session runs the plan with the personal-plan-orchestrate skill, and stops at gates 5 and 2 after wave 1.
+With explicit approval, dispatch wave 2 [deep] (s4-s6) as a one-agent Opus high Workflow per the plan, then waves 3 and 4. If the container is new, reinstall Node 26.2.0 and rebuild the hide baseline from `9c0982d` before wave 2 edits source.
 
 ## Gotchas
 
