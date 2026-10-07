@@ -1255,3 +1255,80 @@ describe('non-working style key', () => {
         );
     });
 });
+
+// Rule 20: header-height, timeline-position, minor-grid and non-working are
+// read only from the roadmap's style. On another entity's `default` line they
+// do nothing, so they warn (NL.W0703). Style blocks are left alone: one block
+// can serve the roadmap and other entities alike.
+describe('NL.W0703: roadmap-only style key on another default', () => {
+    const body = 'roadmap r\nswimlane s\n  item x duration:1w\n';
+    const NBSP = ' ';
+
+    type Outcome = Awaited<ReturnType<typeof parse>>;
+
+    const w0703 = (r: Outcome) =>
+        r.diagnostics.filter((d) => (d.data as { code?: string } | undefined)?.code === 'NL.W0703');
+
+    it.each([
+        ['item', 'minor-grid:true'],
+        ['swimlane', 'non-working:show'],
+        ['group', 'header-height:lg'],
+        ['milestone', 'timeline-position:both'],
+    ])('warns on default %s %s', async (entity, prop) => {
+        const key = prop.split(':')[0];
+        const r = await parse(`config\ndefault ${entity} ${prop}\n${body}`);
+        expect(errorMessages(r.diagnostics)).toEqual([]);
+        expect(warningMessages(r.diagnostics)).toEqual([
+            `"${key}" on "default ${entity}" is ignored: it is a roadmap-only style key. Set it on "default roadmap" instead.`,
+        ]);
+        expect(w0703(r)).toHaveLength(1);
+    });
+
+    it('warns once per roadmap-only key on the same line', async () => {
+        const r = await parse(
+            `config\ndefault swimlane minor-grid:true non-working:show padding:sm\n${body}`,
+        );
+        expect(w0703(r).map((d) => (d.data as { args: [{ key: string }] }).args[0].key)).toEqual([
+            'minor-grid',
+            'non-working',
+        ]);
+    });
+
+    it('stays clean on default roadmap', async () => {
+        const r = await parse(
+            `config\ndefault roadmap minor-grid:true non-working:show header-height:lg timeline-position:both\n${body}`,
+        );
+        expect(errorMessages(r.diagnostics)).toEqual([]);
+        expect(warningMessages(r.diagnostics)).toEqual([]);
+    });
+
+    it('does not check style blocks', async () => {
+        const r = await parse(
+            `config\nstyle grid\n  minor-grid: true\n  non-working: show\ndefault swimlane style:grid\n${body}`,
+        );
+        expect(errorMessages(r.diagnostics)).toEqual([]);
+        expect(w0703(r)).toEqual([]);
+    });
+
+    it('keeps the value error alongside the warning for a bad value', async () => {
+        const r = await parse(`config\ndefault item non-working:maybe\n${body}`);
+        expect(errorMessages(r.diagnostics)).toEqual([
+            'Invalid non-working value "maybe". Use hide or show.',
+        ]);
+        expect(w0703(r)).toHaveLength(1);
+    });
+
+    it('translates the message into French', async () => {
+        const r = await parse(
+            `nowline v1 locale:fr\nconfig\ndefault item minor-grid:true\n${body}`,
+        );
+        const [diag] = w0703(r);
+        const { code, args } = diag.data as {
+            code: 'NL.W0703';
+            args: [{ key: string; entityType: string }];
+        };
+        expect(tr('fr', code, ...args)).toBe(
+            `«${NBSP}minor-grid${NBSP}» sur «${NBSP}default item${NBSP}» est ignoré${NBSP}: c'est une clé de style propre à la roadmap. Définissez-la plutôt sur «${NBSP}default roadmap${NBSP}».`,
+        );
+    });
+});

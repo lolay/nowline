@@ -80,6 +80,7 @@ export type MessageCode =
     | 'NL.W0700' // unknown-entity-property
     | 'NL.W0701' // include-wave-presentation
     | 'NL.W0702' // wave-ignored-no-waves
+    | 'NL.W0703' // roadmap-only-key-on-default
 
     // Waves (NL.E1100–E1199)
     | 'NL.E1100' // wave-needs-id
@@ -150,6 +151,7 @@ export const ALL_CODES: ReadonlyArray<MessageCode> = [
     'NL.W0700',
     'NL.W0701',
     'NL.W0702',
+    'NL.W0703',
     'NL.E1100',
     'NL.E1101',
     'NL.E1102',
