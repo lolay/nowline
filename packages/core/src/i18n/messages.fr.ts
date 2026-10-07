@@ -255,6 +255,10 @@ export const messages: MessageBundle = {
     'NL.E0600': (a: { name: string }) =>
         `L'élément «\u00A0${a.name}\u00A0» exige une propriété «\u00A0size:\u00A0» ou «\u00A0duration:\u00A0».`,
 
+    // Style
+    'NL.E0800': (a: { value: string }) =>
+        `Valeur non-working invalide «\u00A0${a.value}\u00A0». Utilisez hide ou show.`,
+
     // Avertissements
     'NL.W0700': (a: { key: string; entity: string; suggested: string }) =>
         `Propriété inconnue «\u00A0${a.key}\u00A0» sur ${a.entity}. Le moteur de rendu l'ignore.${

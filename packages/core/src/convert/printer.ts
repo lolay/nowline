@@ -25,6 +25,7 @@ const KEY_ORDER = [
     'header-position',
     'timeline-position',
     'minor-grid',
+    'non-working',
 ];
 
 const INDENT = '  ';

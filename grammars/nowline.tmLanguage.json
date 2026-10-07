@@ -77,7 +77,7 @@
                     }
                 },
                 {
-                    "match": "\\b(bg|fg|text|border|icon|shadow|font|weight|italic|text-size|padding|spacing|header-height|corner-radius|bracket|capacity-icon|timeline-position|minor-grid)\\s*(:)",
+                    "match": "\\b(bg|fg|text|border|icon|shadow|font|weight|italic|text-size|padding|spacing|header-height|corner-radius|bracket|capacity-icon|timeline-position|minor-grid|non-working)\\s*(:)",
                     "captures": {
                         "1": { "name": "entity.other.attribute-name.style.nowline" },
                         "2": { "name": "punctuation.separator.key-value.nowline" }
@@ -89,7 +89,7 @@
                 },
                 {
                     "name": "constant.language.enum.nowline",
-                    "match": "\\b(solid|dashed|dotted|subtle|soft|hard|sans|serif|mono|thin|light|normal|bold|true|false|none|xs|sm|md|lg|xl|full|business|full|custom|merge|ignore|isolate)\\b"
+                    "match": "\\b(solid|dashed|dotted|subtle|soft|hard|sans|serif|mono|thin|light|normal|bold|true|false|none|xs|sm|md|lg|xl|full|business|full|custom|merge|ignore|isolate|hide|show)\\b"
                 }
             ]
         },

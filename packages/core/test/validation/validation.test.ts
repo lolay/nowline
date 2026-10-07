@@ -1,4 +1,5 @@
 import { describe, expect, it } from 'vitest';
+import { tr } from '../../src/i18n/index.js';
 import { errorMessages, parse, warningMessages } from '../helpers.js';
 
 function hasError(diags: ReturnType<typeof errorMessages>, pattern: RegExp): boolean {
@@ -1239,13 +1240,18 @@ describe('non-working style key', () => {
         expect(e0800(r)).toEqual([]);
     });
 
+    // The validator always writes the en-US text and stashes `{ code, args }`
+    // for a surface to re-render in the operator's locale (specs/
+    // localization.md), so the French text is checked from that data.
     it('translates the message into French', async () => {
         const r = await parse(
             `nowline v1 locale:fr\nconfig\ndefault roadmap non-working:maybe\n${body}`,
         );
-        expect(errorMessages(r.diagnostics)).toEqual([
-            `Valeur non-working invalide \u00AB${NBSP}maybe${NBSP}\u00BB. Utilisez hide ou show.`,
-        ]);
+        const [diag] = e0800(r);
         expect(e0800(r)).toHaveLength(1);
+        const { code, args } = diag.data as { code: 'NL.E0800'; args: [{ value: string }] };
+        expect(tr('fr', code, ...args)).toBe(
+            `Valeur non-working invalide \u00AB${NBSP}maybe${NBSP}\u00BB. Utilisez hide ou show.`,
+        );
     });
 });
