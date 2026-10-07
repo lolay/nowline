@@ -1,7 +1,7 @@
 ```
 --- KICKOFF: begin orchestration at [deep] ---
 
-  Status: 0/4 groups done | last review: — | current: m2p-4 s1-s3 [exec] | updated 2026-10-07
+  Status: 1/4 groups done | last review: wave-1 PASS | current: m2p-4 s4-s6 [deep] | BLOCKED at gates 5 and 2 | updated 2026-10-07
 
   review: every-wave (log-only — parent writes Review log; human gates only where marked)
 
@@ -375,13 +375,13 @@ Where they go:
 
 --- WAVE 1 [exec] ---
 
-### s1 - [fast] Branch and toolchain
+### s1 - [fast] Branch and toolchain (done)
 `nvm use` 26.2.0 and `pnpm -v` 12.8.1. Then `make init && make build-fast`. The plan and handoff are already on the branch.
 
-### s2 - [exec] Hide baselines
+### s2 - [exec] Hide baselines (done)
 Byte identity step 1. Done when the baseline hash file exists and determinism is green with the CLI leg run.
 
-### s3 - [exec] Failing tests (layout, renderer, core)
+### s3 - [exec] Failing tests (layout, renderer, core) (done)
 - Write every case in § Tests except Surfaces, with literal values.
 - Run `make test`, parking packages as in Phase 2 when one failure hides the rest.
 - Done when:
@@ -433,6 +433,8 @@ Everything under § Change "Docs". Done when `make lint` passes.
 
 ## Review log
 
+review wave-1 (m2p-4 s1-s3) 92c9ec3..602bf3b: PASS - Node 26.2.0/pnpm 12.8.1, 40-hash hide baseline, determinism 266 green; 58 red tests on assertions, 2 TimeScale guards red only because startX/advanceX do not exist yet, printer order test cannot fail pre-change, indexAtX untested - 2026-10-07
+
 ## Token log
 
 **Counting header (Claude Code)**
@@ -444,3 +446,6 @@ Everything under § Change "Docs". Done when `make lint` passes.
 - In another harness, or on a model not listed here, count and price per plan-execution.md "Token accounting" and "Model price table" instead.
 
 Phase 1 ~$20.42; Phase 2 ~$66.4; Phase 3 ~$51.05. Phase 4 planning in the m2p session: 3 explorers and a design pass. Rows are added per wave by the executing session.
+
+tokens wave-1 m2p-4-s1-s3 (claude-sonnet-5-5): input ~140 / cache read ~11M / cache write ~200k / output ~130k | ~$3.96 API-equiv (output est.) session 1ace5e35-cfdf-5791-b5ba-c2e888455b0c
+tokens orchestrator-wave-1 plan-m2p-show-display-osprey (claude-opus-5-5): input ~40 / cache read ~2.3M / cache write ~100k 1h / output ~15k | ~$1.57 API-equiv (output est.) session 1ace5e35-cfdf-5791-b5ba-c2e888455b0c
