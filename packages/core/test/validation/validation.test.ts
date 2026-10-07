@@ -1,4 +1,5 @@
 import { describe, expect, it } from 'vitest';
+import { resolveDiagnosticCode } from '../../src/diagnostics/index.js';
 import { tr } from '../../src/i18n/index.js';
 import { errorMessages, parse, warningMessages } from '../helpers.js';
 
@@ -314,6 +315,44 @@ swimlane s
             `config\ndefault roadmap minor-grid:maybe\nroadmap r\nswimlane s\n  item x duration:1w\n`,
         );
         expect(hasError(errorMessages(r.diagnostics), /minor-grid|maybe/i)).toBe(true);
+    });
+
+    // No enum key accepts a colour (rule 19), so a colour-shaped value on a
+    // `default` line is the same single error it is in a `style` block.
+    it('Rule 18: a hex colour for minor-grid on a default line is exactly one error', async () => {
+        const r = await parse(
+            `config\ndefault roadmap minor-grid:#fff\nroadmap r\nswimlane s\n  item x duration:1w\n`,
+        );
+        expect(errorMessages(r.diagnostics)).toEqual([
+            'Invalid value "#fff" for "minor-grid". Allowed: true, false.',
+        ]);
+    });
+
+    it('Rule 18: a named colour for timeline-position on a default line is exactly one error', async () => {
+        const r = await parse(
+            `config\ndefault roadmap timeline-position:red\nroadmap r\nswimlane s\n  item x duration:1w\n`,
+        );
+        expect(errorMessages(r.diagnostics)).toEqual([
+            'Invalid value "red" for "timeline-position". Allowed: top, bottom, both.',
+        ]);
+    });
+
+    it('Rule 18: default lines and style blocks agree on colour-shaped enum values', async () => {
+        const body = 'roadmap r\nswimlane s\n  item x duration:1w\n';
+        const cases: Array<[string, string]> = [
+            ['minor-grid', '#fff'],
+            ['timeline-position', 'red'],
+            ['border', 'none'],
+            ['header-height', 'navy'],
+            ['bracket', '#123456'],
+        ];
+        for (const [key, value] of cases) {
+            const fromDefault = await parse(`config\ndefault roadmap ${key}:${value}\n${body}`);
+            const fromStyle = await parse(`config\nstyle s1\n  ${key}: ${value}\n${body}`);
+            const expected = errorMessages(fromStyle.diagnostics);
+            expect(expected).toHaveLength(1);
+            expect(errorMessages(fromDefault.diagnostics)).toEqual(expected);
+        }
     });
 
     it('Rule 20: raw timeline-position on roadmap declaration is an error', async () => {
@@ -1184,7 +1223,7 @@ describe('diagnostics that echo an item title', () => {
 // `non-working` is a roadmap style key (specs/dsl.md style table, rule 19 and
 // 20; specs/working-calendar.md 4.2): `hide` or `show`, set on the config
 // default line. Any other value is exactly one NL.E0800. The key is not in the
-// generic enum table, so no uncoded message and no colour bypass reaches it.
+// generic enum table, so no NL.E0802 and no colour bypass reaches it.
 describe('non-working style key', () => {
     const body = 'roadmap r\nswimlane s\n  item x duration:1w\n';
     const NBSP = '\u00A0';
@@ -1253,5 +1292,95 @@ describe('non-working style key', () => {
         expect(tr('fr', code, ...args)).toBe(
             `Valeur non-working invalide \u00AB${NBSP}maybe${NBSP}\u00BB. Utilisez hide ou show.`,
         );
+    });
+});
+
+// Rule 19 style values and unknown style keys carry stable codes (NL.E0801
+// colour, NL.E0802 enum, NL.E0803 unknown key). The English text predates the
+// codes and must not change, so each case pins it exactly. Both paths are
+// covered: a `style` block (checkStylePropertyEnum) and a `default` line
+// (the entity-property switch).
+describe('style value codes', () => {
+    const body = 'roadmap r\nswimlane s\n  item x duration:1w\n';
+    const NBSP = '\u00A0';
+
+    type Outcome = Awaited<ReturnType<typeof parse>>;
+    type Coded = { code: string; args: unknown[] };
+
+    const coded = (r: Outcome) =>
+        r.diagnostics
+            .filter((d) => d.severity === 1)
+            .map((d) => ({ message: d.message, data: d.data as Coded | undefined }));
+
+    const cases: Array<{
+        name: string;
+        src: string;
+        code: string;
+        en: string;
+        fr: string;
+    }> = [
+        {
+            name: 'bad colour in a style block',
+            src: `config\nstyle s1\n  bg: chartreuse-ish\n${body}`,
+            code: 'NL.E0801',
+            en: 'Invalid color "chartreuse-ish" for "bg". Use a named color, hex value, or "none".',
+            fr: `Couleur invalide \u00AB${NBSP}chartreuse-ish${NBSP}\u00BB pour \u00AB${NBSP}bg${NBSP}\u00BB. Utilisez une couleur nommée, une valeur hexadécimale ou \u00AB${NBSP}none${NBSP}\u00BB.`,
+        },
+        {
+            name: 'bad colour on a default line',
+            src: `config\ndefault item fg:chartreuse-ish\n${body}`,
+            code: 'NL.E0801',
+            en: 'Invalid color "chartreuse-ish" for "fg". Use a named color, hex value, or "none".',
+            fr: `Couleur invalide \u00AB${NBSP}chartreuse-ish${NBSP}\u00BB pour \u00AB${NBSP}fg${NBSP}\u00BB. Utilisez une couleur nommée, une valeur hexadécimale ou \u00AB${NBSP}none${NBSP}\u00BB.`,
+        },
+        {
+            name: 'bad enum value in a style block',
+            src: `config\nstyle s1\n  border: wavy\n${body}`,
+            code: 'NL.E0802',
+            en: 'Invalid value "wavy" for "border". Allowed: solid, dashed, dotted.',
+            fr: `Valeur invalide \u00AB${NBSP}wavy${NBSP}\u00BB pour \u00AB${NBSP}border${NBSP}\u00BB. Valeurs admises${NBSP}: solid, dashed, dotted.`,
+        },
+        {
+            name: 'bad enum value on a default line',
+            src: `config\ndefault item shadow:loud\n${body}`,
+            code: 'NL.E0802',
+            en: 'Invalid value "loud" for "shadow". Allowed: none, subtle, soft, hard.',
+            fr: `Valeur invalide \u00AB${NBSP}loud${NBSP}\u00BB pour \u00AB${NBSP}shadow${NBSP}\u00BB. Valeurs admises${NBSP}: none, subtle, soft, hard.`,
+        },
+        {
+            name: 'unknown key in a style block',
+            src: `config\nstyle s1\n  sparkle: lots\n${body}`,
+            code: 'NL.E0803',
+            en: 'Unknown style property "sparkle".',
+            fr: `Propriété de style inconnue \u00AB${NBSP}sparkle${NBSP}\u00BB.`,
+        },
+    ];
+
+    for (const c of cases) {
+        it(`${c.name} is exactly one ${c.code} with unchanged English text`, async () => {
+            const r = await parse(c.src);
+            const errors = coded(r);
+            expect(errors.map((e) => e.message)).toEqual([c.en]);
+            expect(errors[0].data?.code).toBe(c.code);
+        });
+
+        it(`${c.name} renders ${c.code} in French from its data`, async () => {
+            const r = await parse(c.src);
+            const [error] = coded(r);
+            // One code stands in for the case's code: `tr` is generic per code,
+            // and the runtime lookup goes by the string either way.
+            const { code, args } = error.data as { code: 'NL.E0803'; args: [{ key: string }] };
+            expect(tr('fr', code, ...args)).toBe(c.fr);
+        });
+    }
+
+    // Before the code, these messages fell to the text heuristic, which
+    // mislabels a key or value that happens to contain one of its trigger
+    // words (here "duration"). The stable code now wins.
+    it('resolves to the stable code, not the message heuristic', async () => {
+        const r = await parse(`config\nstyle s1\n  duration: long\n${body}`);
+        const [diag] = r.diagnostics.filter((d) => d.severity === 1);
+        expect(diag.message).toBe('Unknown style property "duration".');
+        expect(resolveDiagnosticCode(diag)).toBe('NL.E0803');
     });
 });

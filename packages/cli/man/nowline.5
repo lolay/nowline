@@ -1719,6 +1719,28 @@ fraction, or
 When both numeric thresholds are set,
 .Sy warn-at \(<= over-at .
 .It
+Style values, in a
+.Sy style
+block or on a
+.Sy default
+line:
+.Sy bg: , fg: ,
+and
+.Sy text:
+take a named color, a hex value, or
+.Sy none
+.Pq Sy NL.E0801 ;
+a key with a fixed set of values, such as
+.Sy border: , shadow: ,
+or
+.Sy font: ,
+takes one of them
+.Pq Sy NL.E0802 .
+A key in a
+.Sy style
+block that is not a style property is
+.Sy NL.E0803 .
+.It
 .Sy capacity-icon:
 value must be a built-in identifier
 .Po
