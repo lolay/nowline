@@ -24,7 +24,11 @@ import {
 } from './themes/shared.js';
 import type { TimeScale } from './time-scale.js';
 import type { PositionedNonWorkingRun, PositionedTick } from './types.js';
-import type { WorkingCalendar } from './working-calendar.js';
+import {
+    continuousDaysPerUnit,
+    type NonWorkingRun,
+    type WorkingCalendar,
+} from './working-calendar.js';
 
 export type ScaleUnit = 'days' | 'weeks' | 'months' | 'quarters' | 'years';
 
@@ -316,6 +320,11 @@ export function buildHeaderTicks(
  * either edge); a full business week keeps a label wider than its 40 px.
  * Months and up keep the #92 rule: an edge column drops a label it cannot
  * hold. A dropped label keeps its `labelX`.
+ *
+ * Under `show` the same boundaries apply on the calendar-day scale, so no
+ * column has zero width: week ticks still fall on week starts, a full unit
+ * counts calendar days, and at months and up a closing column with no
+ * working day merges into the one before it.
  */
 function buildHiddenDayTicks(
     scale: TimeScale,
@@ -339,7 +348,9 @@ function buildHiddenDayTicks(
     candidates.forEach((date, i) => {
         const x = scale.forward(date);
         const nextX = i + 1 < candidates.length ? scale.forward(candidates[i + 1]) : endX;
-        if (nextX > x) kept.push({ date, x });
+        if (nextX > x && !isShownEmptyClosingColumn(scale, unit, candidates, i)) {
+            kept.push({ date, x });
+        }
     });
 
     const weekStartMajors =
@@ -348,7 +359,12 @@ function buildHiddenDayTicks(
         weekStartMajors
             ? date.getUTCDay() === calendar.weekStart
             : column % preset.labelEvery === 0;
-    const fullUnitPx = calendar.daysPerUnit(unit) * scale.pixelsPerDay;
+    // A full unit is its working days under `hide` and its calendar days
+    // under `show`, where every day has width.
+    const fullUnitDays = scale.showsNonWorking
+        ? continuousDaysPerUnit(unit)
+        : calendar.daysPerUnit(unit);
+    const fullUnitPx = fullUnitDays * scale.pixelsPerDay;
 
     const ticks: PositionedTick[] = kept.map(({ date, x }, column) => {
         const columnPx = (column + 1 < kept.length ? kept[column + 1].x : endX) - x;
@@ -375,12 +391,32 @@ function buildHiddenDayTicks(
 }
 
 /**
+ * True under `show` for the last candidate boundary at months and up when
+ * its closing column holds no working day (a Sunday Feb 1 before a window
+ * that ends Mon Feb 2). That column is merged into the one before it, as
+ * `hide` drops it for having zero width. A leading sliver keeps its tick.
+ */
+function isShownEmptyClosingColumn(
+    scale: TimeScale,
+    unit: ScaleUnit,
+    candidates: ReadonlyArray<Date>,
+    i: number,
+): boolean {
+    const calendar = scale.calendar;
+    if (!scale.showsNonWorking || !calendar || !isCalendarAligned(unit)) return false;
+    if (i === 0 || i !== candidates.length - 1) return false;
+    const [start, end] = scale.domain;
+    return calendar.workingIndexOf(start, candidates[i]) >= calendar.workingIndexOf(start, end);
+}
+
+/**
  * The window's non-working runs for the model (specs/working-calendar.md
  * §7.5), or undefined when the window holds no non-working day (always
  * the case on the identity path). Under `hide` a run has zero width at the
  * x of the next working day. At the days scale a run is marked `seam` when
  * it lies strictly inside the chart and no grid line falls at its x: no
- * major tick there, and no tick at all when the minor grid is on.
+ * major tick there, and no tick at all when the minor grid is on. Under
+ * `show` a run spans its days instead; see `shownNonWorkingRun`.
  */
 export function buildNonWorkingRuns(
     scale: TimeScale,
@@ -393,6 +429,7 @@ export function buildNonWorkingRuns(
     const runs = calendar.nonWorkingRuns(scale.domain[0], scale.domain[1]);
     if (runs.length === 0) return undefined;
     const [left, right] = scale.range;
+    if (scale.showsNonWorking) return runs.map((run) => shownNonWorkingRun(scale, run, unit));
     const hasGridLineAt = (x: number): boolean =>
         ticks.some((t) => Math.abs(t.x - x) < SAME_X_TOLERANCE_PX && (t.major || minorGrid));
     return runs.map((run) => {
@@ -408,6 +445,31 @@ export function buildNonWorkingRuns(
         if (unit === 'days' && isInside && !hasGridLineAt(x)) out.seam = true;
         return out;
     });
+}
+
+/**
+ * A run under `show` (specs/working-calendar.md §7.3): it spans its days,
+ * clamped to the window, and never has a seam. At the days and weeks
+ * scales, or when it has titles, it is flagged `band` for the renderer to
+ * shade; a plain weekend at months and up stays unpainted.
+ */
+function shownNonWorkingRun(
+    scale: TimeScale,
+    run: NonWorkingRun,
+    unit: ScaleUnit,
+): PositionedNonWorkingRun {
+    const [left, right] = scale.range;
+    const x = Math.max(left, scale.forward(run.from));
+    const rightX = Math.min(right, scale.forward(addDays(run.through, 1)));
+    const out: PositionedNonWorkingRun = {
+        x,
+        width: rightX - x,
+        from: run.from,
+        through: run.through,
+    };
+    if (run.titles.length > 0) out.titles = run.titles;
+    if (unit === 'days' || unit === 'weeks' || run.titles.length > 0) out.band = true;
+    return out;
 }
 
 /**

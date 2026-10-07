@@ -11,6 +11,17 @@
   declared waves in order; waves appear in the outline; hover shows a wave's
   position and members and an item's wave or background status. The live
   preview draws the wave strip, boundaries and background hatch.
+- Non-working days display: the new `nowline.preview.nonWorking` setting
+  (`file`, `hide` or `show`, default `file`) and a **Non-working days** menu in
+  the preview toolbar (**File** / **Hide** / **Show**) draw a business
+  calendar's weekends as shaded bands that bars paint across, or collapse
+  them. Precedence is the toolbar, the setting, the roadmap's own
+  `default roadmap non-working:` key, then `hide`; **File** means no override,
+  so it wins over the setting. Save, copy and Export use the same value, and
+  `--non-working` is passed to an explicit `nowline.export.cliPath` binary only
+  when the value is `hide` or `show`. `non-working:` is highlighted as a style
+  key with `hide` and `show` as its values. Files without the key render
+  exactly as before.
 
 ### Fixed
 

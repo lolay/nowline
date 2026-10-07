@@ -158,6 +158,15 @@ export const FIXTURES: readonly GateFixture[] = [
         browser: false,
     },
     { id: 'waves', sourceFile: 'waves.nowline', dir: 'examples', theme: 'light', browser: false },
+    // m2p phase 4: `non-working:show` comes from the file key, so no leg needs a
+    // render option. Compiled-CLI and kernel-in-Node legs only (no browser leg).
+    {
+        id: 'weekends-show',
+        sourceFile: 'weekends-show.nowline',
+        dir: 'tests',
+        theme: 'light',
+        browser: false,
+    },
 ] as const;
 
 /** Manifest key for a (fixture, format) cell. */

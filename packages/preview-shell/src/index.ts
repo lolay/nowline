@@ -10,6 +10,7 @@ export type { DiagnosticRow } from '@nowline/browser';
 export {
     applyRenderResult,
     classifyRenderResult,
+    nonWorkingOverrideToDisplay,
     nowOverrideToToday,
     themeOverrideToDiagramTheme,
 } from './apply-result.js';
@@ -20,6 +21,7 @@ export {
     type InitialFit,
     type MountPreviewOptions,
     mountPreview,
+    type NonWorkingOverride,
     type NowOverride,
     type PreviewHandle,
     type ThemeOverride,

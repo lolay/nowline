@@ -215,6 +215,87 @@ describe('mountPreview', () => {
         expect(onViewOptions.mock.calls[0][0]).toEqual({ theme: 'light' });
     });
 
+    // ===== Non-working days dropdown (m2p phase 4) =====
+
+    function openNonWorkingMenu(root: HTMLElement): void {
+        root.querySelector<HTMLButtonElement>('.more-toggle')?.click();
+        root.querySelector<HTMLButtonElement>('.nonworking-toggle')?.click();
+    }
+
+    it('offers three non-working options, File, Hide and Show, with File first', () => {
+        const root = mountRoot();
+        mountPreview(root);
+        const opts = Array.from(root.querySelectorAll<HTMLButtonElement>('.nonworking-opt'));
+        expect(opts.map((b) => b.getAttribute('data-value'))).toEqual(['file', 'hide', 'show']);
+        expect(opts.map((b) => b.textContent?.trim())).toEqual(['File', 'Hide', 'Show']);
+        expect(root.querySelector('.nonworking-toggle')?.textContent).toContain('File');
+    });
+
+    it('choosing Show fires onViewOptions with only { nonWorking: "show" }', () => {
+        const root = mountRoot();
+        const onViewOptions = vi.fn();
+        mountPreview(root, { onViewOptions });
+        openNonWorkingMenu(root);
+        root.querySelector<HTMLButtonElement>('.nonworking-opt[data-value="show"]')?.click();
+        expect(onViewOptions).toHaveBeenCalledTimes(1);
+        expect(onViewOptions.mock.calls[0][0]).toEqual({ nonWorking: 'show' });
+        expect(root.querySelector('.nonworking-toggle')?.textContent).toContain('Show');
+        expect(root.querySelector<HTMLElement>('.nonworking-menu')?.hidden).toBe(true);
+    });
+
+    it('choosing File after Show fires { nonWorking: "file" }', () => {
+        const root = mountRoot();
+        const onViewOptions = vi.fn();
+        mountPreview(root, { onViewOptions });
+        openNonWorkingMenu(root);
+        root.querySelector<HTMLButtonElement>('.nonworking-opt[data-value="show"]')?.click();
+        root.querySelector<HTMLButtonElement>('.nonworking-toggle')?.click();
+        root.querySelector<HTMLButtonElement>('.nonworking-opt[data-value="file"]')?.click();
+        expect(onViewOptions.mock.calls[1][0]).toEqual({ nonWorking: 'file' });
+    });
+
+    it('a baseline nonWorking sets the checkmark but does not set overridden', () => {
+        const root = mountRoot();
+        const onViewOptions = vi.fn();
+        const handle = mountPreview(root, { onViewOptions });
+        handle.setViewBaseline({ nonWorking: 'show' });
+        const active = root.querySelector('.nonworking-opt[data-active="true"]');
+        expect(active?.getAttribute('data-value')).toBe('show');
+        expect(onViewOptions).not.toHaveBeenCalled();
+
+        // Another override does not drag the baseline along with it.
+        root.querySelector<HTMLButtonElement>('.more-toggle')?.click();
+        root.querySelector<HTMLButtonElement>('.theme-toggle')?.click();
+        root.querySelector<HTMLButtonElement>('.theme-opt[data-value="light"]')?.click();
+        expect(onViewOptions).toHaveBeenCalledTimes(1);
+        expect(onViewOptions.mock.calls[0][0]).toEqual({ theme: 'light' });
+    });
+
+    it('a new baseline replaces the old one until the user has chosen', () => {
+        const root = mountRoot();
+        const handle = mountPreview(root, { onViewOptions: vi.fn() });
+        handle.setViewBaseline({ nonWorking: 'show' });
+        handle.setViewBaseline({ nonWorking: 'hide' });
+        expect(
+            root.querySelector('.nonworking-opt[data-active="true"]')?.getAttribute('data-value'),
+        ).toBe('hide');
+        openNonWorkingMenu(root);
+        root.querySelector<HTMLButtonElement>('.nonworking-opt[data-value="show"]')?.click();
+        handle.setViewBaseline({ nonWorking: 'hide' });
+        expect(
+            root.querySelector('.nonworking-opt[data-active="true"]')?.getAttribute('data-value'),
+        ).toBe('show');
+    });
+
+    it('opening another sub-menu closes the non-working menu', () => {
+        const root = mountRoot();
+        mountPreview(root);
+        openNonWorkingMenu(root);
+        expect(root.querySelector<HTMLElement>('.nonworking-menu')?.hidden).toBe(false);
+        root.querySelector<HTMLButtonElement>('.theme-toggle')?.click();
+        expect(root.querySelector<HTMLElement>('.nonworking-menu')?.hidden).toBe(true);
+    });
+
     it('keyboard preset 1 triggers fitPage', () => {
         const root = mountRoot();
         const handle = mountPreview(root);

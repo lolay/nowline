@@ -71,6 +71,12 @@ describe('parseArgv — flags and short aliases', () => {
         expect(parseArgv(['foo.nowline', '-w', '1600']).width).toBe('1600');
     });
 
+    it('--non-working maps to nonWorking, and unset stays undefined', () => {
+        expect(parseArgv(['foo.nowline', '--non-working', 'show']).nonWorking).toBe('show');
+        expect(parseArgv(['foo.nowline', '--non-working=hide']).nonWorking).toBe('hide');
+        expect(parseArgv(['foo.nowline']).nonWorking).toBeUndefined();
+    });
+
     it('-v is verbose, -q is quiet, -V is version', () => {
         expect(parseArgv(['foo.nowline', '-v']).logLevel).toBe('verbose');
         expect(parseArgv(['foo.nowline', '-q']).logLevel).toBe('quiet');

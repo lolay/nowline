@@ -21,6 +21,7 @@ export async function runFileMode(inputs: ActionInputs): Promise<RunResult> {
             output: inputs.output,
             format: inputs.format,
             theme: inputs.theme,
+            nonWorking: inputs.nonWorking,
         });
         rendered = 1;
         changedFiles.push(inputs.output);

@@ -321,3 +321,59 @@ describeBuilt('--serve integration (requires `pnpm build`)', () => {
         expect(r.stderr).toMatch(/stdout|-o -/i);
     });
 });
+
+// `--serve` takes the same --non-working option as render (m2p phase 4).
+describeBuilt('--serve --non-working (requires `pnpm build`)', () => {
+    const BODY = [
+        'roadmap r "R" start:2026-01-05 scale:1w calendar:business',
+        '',
+        'swimlane a "A"',
+        '  item w1 "W1" duration:1w',
+        '  item w2 "W2" duration:1w',
+        '',
+    ].join('\n');
+    const PLAIN = `nowline v1\n\n${BODY}`;
+    const FILE_SHOW = `nowline v1\n\nconfig\n\ndefault roadmap non-working:show\n\n${BODY}`;
+    const LAYER = 'data-layer="non-working"';
+
+    async function servedSvg(source: string, extraArgs: string[]): Promise<string> {
+        let svg = '';
+        await withTempDir(async (dir) => {
+            const file = path.join(dir, 'sample.nowline');
+            await fs.writeFile(file, source);
+            const port = await pickPort();
+            const child: ChildProcess = spawn(
+                process.execPath,
+                [distEntry, '--serve', file, '--port', String(port), '--now', '-', ...extraArgs],
+                {
+                    cwd: packageRoot,
+                    env: { ...process.env, FORCE_COLOR: '0', NO_COLOR: '1' },
+                    stdio: ['ignore', 'pipe', 'pipe'],
+                },
+            );
+            try {
+                await waitForReady(port);
+                svg = await fetchText(`http://127.0.0.1:${port}/svg`);
+            } finally {
+                child.kill('SIGTERM');
+                await new Promise((r) => setTimeout(r, 150));
+                child.kill('SIGKILL');
+            }
+        });
+        return svg;
+    }
+
+    it('--non-working show adds the non-working layer', async () => {
+        expect(await servedSvg(PLAIN, ['--non-working', 'show'])).toContain(LAYER);
+    }, 15000);
+
+    it('a file key show with no flag has the layer', async () => {
+        expect(await servedSvg(FILE_SHOW, [])).toContain(LAYER);
+    }, 15000);
+
+    it('a file key show with --non-working hide has no layer', async () => {
+        const svg = await servedSvg(FILE_SHOW, ['--non-working', 'hide']);
+        expect(svg).toContain('data-layer="item"');
+        expect(svg).not.toContain(LAYER);
+    }, 15000);
+});

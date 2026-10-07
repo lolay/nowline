@@ -87,6 +87,10 @@ export interface Theme {
         // (specs/working-calendar.md §7.4). Darker than `gridLine`, so it
         // reads as a join rather than a column boundary.
         nonWorkingSeam: string;
+        // Fill of a non-working band under the `show` display, painted at
+        // `NON_WORKING_FILL_OPACITY` over the row tints (specs/working-
+        // calendar.md §7.3): a faint shade a grid line still reads over.
+        nonWorkingFill: string;
         tickMark: string;
         labelText: string;
         // m2.5d: lifted from renderTimeline.

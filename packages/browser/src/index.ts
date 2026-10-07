@@ -13,8 +13,12 @@
 export type { LangiumLikeDiagnostic } from '@nowline/core';
 export {
     civilDateInZone,
+    isNonWorkingDisplay,
+    NON_WORKING_DISPLAYS,
+    type NonWorkingDisplay,
     type NormalizedZone,
     normalizeZone,
+    parseNonWorkingDisplay,
     type ResolveTodayOptions,
     resolveToday,
     TimezoneError,

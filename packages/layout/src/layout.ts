@@ -75,6 +75,7 @@ import {
 import { ParallelNode } from './nodes/parallel-node.js';
 import { RoadmapNode } from './nodes/roadmap-node.js';
 import { SwimlaneNode } from './nodes/swimlane-node.js';
+import type { NonWorkingDisplay } from './non-working-display.js';
 import { resolveLabelChipStyle, resolveStyle, type StyleContext } from './style-resolution.js';
 import { estimateTextWidth, wrapText } from './text-measure.js';
 import type { ThemeName } from './themes/index.js';
@@ -119,6 +120,7 @@ import {
     waveRoleOf,
 } from './wave-layout.js';
 import { daysPerUnit, fromCalendarConfig, type WorkingCalendar } from './working-calendar.js';
+import { itemSpanPx } from './working-span.js';
 
 export interface LayoutOptions {
     theme?: ThemeName;
@@ -131,6 +133,12 @@ export interface LayoutOptions {
      * then to `en-US`. See `specs/localization.md`.
      */
     locale?: string;
+    /**
+     * How a calendar's non-working days are drawn (specs/working-calendar.md
+     * §4.2). Overrides the file's `default roadmap non-working:` key; when
+     * undefined the key applies, then `hide`.
+     */
+    nonWorking?: NonWorkingDisplay;
 }
 
 export type LayoutResult = PositionedRoadmap;
@@ -440,11 +448,16 @@ function sequenceItem(
     const nonWorkingPin =
         wavePinOverride === undefined ? nonWorkingPinOf(props, startX, ctx) : undefined;
 
-    const naturalWidth = Math.max(MIN_ITEM_WIDTH, durationDays * ctx.timeline.pixelsPerDay);
+    // Under `show` a start that lands in a non-working day moves to the next
+    // working day. The floor, the pin override and NL.I1008 above read the
+    // unsnapped start, so their ties and texts match `hide`; the identity
+    // under `hide`.
+    const placedStartX = ctx.scale.startX(startX);
+    const naturalWidth = Math.max(MIN_ITEM_WIDTH, itemSpanPx(ctx, placedStartX, durationDays));
     // Logical extent — what the item "owns" in time (used for chaining,
     // `after:` lookups, dependency-arrow attach points).
-    const logicalLeft = startX;
-    const logicalRight = startX + naturalWidth;
+    const logicalLeft = placedStartX;
+    const logicalRight = placedStartX + naturalWidth;
 
     const linkRaw = propValue(props, 'link');
     const linkInfo = parseLinkIcon(linkRaw);
@@ -1055,13 +1068,18 @@ function computeChipBarExtra(
  * caption-fit helper (`fitItemCaption`) as `ItemNode.place`. The meta
  * width matters because a meta line wider than the bar makes the
  * caption spill instead of wrap; predicting a wrap there would reserve
- * a taller row than the (un-grown) bar needs.
+ * a taller row than the (un-grown) bar needs. `startX` is the snapped
+ * predicted start, the one `sequenceItem` places the bar at.
  */
-function predictItemBarExtraHeight(item: ItemDeclaration, ctx: LayoutContext): number {
+function predictItemBarExtraHeight(
+    item: ItemDeclaration,
+    startX: number,
+    ctx: LayoutContext,
+): number {
     const props = item.properties;
     const bandwidth = ctx.bandScale.bandwidth();
     const durationDays = deriveItemDurationDays(props, ctx.sizes, ctx.cal);
-    const naturalWidth = Math.max(MIN_ITEM_WIDTH, durationDays * ctx.timeline.pixelsPerDay);
+    const naturalWidth = Math.max(MIN_ITEM_WIDTH, itemSpanPx(ctx, startX, durationDays));
     const visualWidth = Math.max(MIN_ITEM_WIDTH, naturalWidth - 2 * ITEM_INSET_PX);
 
     // The real meta line, exactly as `sequenceItem` assembles it.

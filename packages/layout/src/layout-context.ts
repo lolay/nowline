@@ -182,6 +182,11 @@ export interface LayoutHelpers {
      *  whichever is larger), so callers can size the row pitch BEFORE
      *  handing off to `sequenceItem`. Returns 0 when the title fits one
      *  line (or wraps without needing a taller bar) and the item's
-     *  labels all fit on a single chip row. */
-    predictItemBarExtraHeight: (item: ItemDeclaration, ctx: LayoutContext) => number;
+     *  labels all fit on a single chip row. `startX` is the snapped
+     *  predicted start the bar will be placed at. */
+    predictItemBarExtraHeight: (
+        item: ItemDeclaration,
+        startX: number,
+        ctx: LayoutContext,
+    ) => number;
 }

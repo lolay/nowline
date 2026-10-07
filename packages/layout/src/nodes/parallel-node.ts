@@ -59,8 +59,11 @@ export class ParallelNode {
         // with the title) instead of sitting on the first track's bar.
         const headerBand = parallelHeaderBandPx(Boolean(afterDate || beforeDate));
         const startY = cursor.y + headerBand;
+        // Under `show` the box opens on a working day; each track keeps the
+        // raw start as its cursor seed and is snapped where it is placed.
+        const boxLeftX = ctx.scale.showsNonWorking ? ctx.scale.startX(startX) : startX;
         const children: PositionedTrackChild[] = [];
-        let maxRight = startX;
+        let maxRight = boxLeftX;
         let accumulatedHeight = 0;
 
         // Each child of a parallel block lives on its own sub-track,
@@ -90,9 +93,9 @@ export class ParallelNode {
         ctx.currentFlowKey = previousFlowKey;
 
         const box: BoundingBox = {
-            x: startX,
+            x: boxLeftX,
             y: startY,
-            width: maxRight - startX,
+            width: maxRight - boxLeftX,
             height: accumulatedHeight,
         };
 

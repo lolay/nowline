@@ -3,6 +3,8 @@ import * as core from '@actions/core';
 export type Mode = 'file' | 'markdown';
 export type Format = 'svg' | 'png';
 export type Theme = 'light' | 'dark';
+/** A non-working display. Core and layout keep their own copies; the Action cannot depend on them. */
+export type NonWorking = 'hide' | 'show';
 
 export interface ActionInputs {
     mode: Mode;
@@ -12,6 +14,8 @@ export interface ActionInputs {
     outputDir: string;
     format: Format;
     theme: Theme;
+    /** Undefined when the input is empty, so the file's own key still applies. */
+    nonWorking?: NonWorking;
     cliVersion?: string;
 }
 
@@ -45,6 +49,15 @@ function readTheme(): Theme {
     return raw;
 }
 
+function readNonWorking(): NonWorking | undefined {
+    const raw = core.getInput('non-working');
+    if (raw === '') return undefined;
+    if (raw !== 'hide' && raw !== 'show') {
+        throw new Error(`non-working must be "hide" or "show" (got "${raw}")`);
+    }
+    return raw;
+}
+
 export function parseInputs(): ActionInputs {
     const mode = readMode();
     const input = core.getInput('input') || undefined;
@@ -66,6 +79,7 @@ export function parseInputs(): ActionInputs {
         outputDir,
         format: readFormat(),
         theme: readTheme(),
+        nonWorking: readNonWorking(),
         cliVersion,
     };
 }

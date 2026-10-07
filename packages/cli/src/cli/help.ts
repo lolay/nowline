@@ -67,6 +67,13 @@ RENDER OPTIONS
   -s, --scale <n>         Raster scale factor (PNG only; default 1).
       --strict            Promote asset / sanitizer warnings to errors.
   -w, --width <px>        Canvas width in pixels (default: 1280).
+      --non-working <hide|show>
+                          How a business calendar's non-working days appear:
+                          hide collapses them (the default), show draws them
+                          as shaded bands. Overrides the file's
+                          'default roadmap non-working:' key; omit it to let
+                          the key apply. Mermaid, MS Project, and XLSX output
+                          is the same in both views.
       --asset-root <dir>  Root for logo / image assets (default: input dir).
       --locale <bcp47>    BCP-47 locale (e.g. fr, fr-CA) for CLI message
                           output (validator diagnostics, --help, errors).

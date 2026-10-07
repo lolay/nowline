@@ -251,6 +251,20 @@ Facteur d'échelle pour le rendu raster (PNG uniquement\ ; 1 par défaut).
 Promeut les avertissements (assets, sanitiseur) en erreurs.
 .It Fl w , -width Ar px
 Largeur du canevas en pixels (1280 par défaut).
+.It Fl -non-working Ar mode
+Façon dont un calendrier ouvré affiche ses jours non travaillés sur le
+graphique\ :
+.Sy hide
+les replie (par défaut),
+.Sy show
+les dessine en bandes grisées.
+Prévaut sur la clé
+.Sy default roadmap non-working:
+du fichier\ ; sans option, la clé s'applique, puis
+.Sy hide .
+Toute autre valeur se termine avec le code 2.
+L'ordonnancement est identique dans les deux vues\ : les sorties Mermaid,
+MS Project et XLSX ne changent pas.
 .It Fl -asset-root Ar dossier
 Dossier à partir duquel les ressources logo / image peuvent être
 chargées (par défaut\ : dossier du fichier d'entrée).

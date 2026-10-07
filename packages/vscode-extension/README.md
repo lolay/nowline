@@ -72,10 +72,11 @@ Use the built-in VS Code shortcuts when you want more space:
 
 ### View toolbar overrides (per-panel, not persisted)
 
-The preview's *View ▾* dropdown adds three per-session toggles that override the resolved settings without writing them back:
+The preview's *View ▾* dropdown adds four per-session toggles that override the resolved settings without writing them back:
 
 - **Theme** — `Auto` / `Light` / `Dark` / `Grayscale` (overrides `nowline.preview.theme` for screenshots).
 - **Now-line** — `Today` / `Hide` (mirrors `--now` / `--now -`).
+- **Non-working days** — `File` / `Hide` / `Show` (mirrors `--non-working`). `File` follows the roadmap's own `default roadmap non-working:` key, so it also overrides a `hide` or `show` value of `nowline.preview.nonWorking`. The saved and exported SVG, PNG and PDF match what the preview shows.
 - **Show links** — toggles the link icon tile (mirrors `--no-links`).
 
 Locale, strict, width, and asset-root stay settings-only — they aren't things you flip while skimming a roadmap.
@@ -132,6 +133,7 @@ Locale uses two chains, mirroring the CLI:
 | `nowline.preview.now` | `auto` | `--now` | `auto` (today) / `none` (hide) / `YYYY-MM-DD` (snapshot). |
 | `nowline.preview.strict` | `false` | `--strict` | Promote asset / sanitizer warnings to errors in the diagnostic table. |
 | `nowline.preview.showLinks` | `true` | inverse of `--no-links` | Show link icons inside item bars. |
+| `nowline.preview.nonWorking` | `file` | `--non-working` | How a business calendar's non-working days appear: `file` follows the roadmap's `default roadmap non-working:` key (then `hide`); `hide` collapses them; `show` draws shaded bands. Settings-only: there is no `.nowlinerc` key. Applies to the preview and to every export. |
 | `nowline.preview.width` | `0` | `--width` | Canvas width in px. `0` leaves it unset (preview has zoom anyway). |
 | `nowline.preview.assetRoot` | `""` | `--asset-root` | Asset-resolver root. Empty uses the source file's directory. |
 

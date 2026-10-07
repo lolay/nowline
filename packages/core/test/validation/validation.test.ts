@@ -1,4 +1,5 @@
 import { describe, expect, it } from 'vitest';
+import { tr } from '../../src/i18n/index.js';
 import { errorMessages, parse, warningMessages } from '../helpers.js';
 
 function hasError(diags: ReturnType<typeof errorMessages>, pattern: RegExp): boolean {
@@ -1177,5 +1178,80 @@ describe('diagnostics that echo an item title', () => {
 
         // No diagnostic carries a raw line break.
         for (const m of [...e0600, ...w0700]) expect(m).not.toMatch(/[\r\n]/);
+    });
+});
+
+// `non-working` is a roadmap style key (specs/dsl.md style table, rule 19 and
+// 20; specs/working-calendar.md 4.2): `hide` or `show`, set on the config
+// default line. Any other value is exactly one NL.E0800. The key is not in the
+// generic enum table, so no uncoded message and no colour bypass reaches it.
+describe('non-working style key', () => {
+    const body = 'roadmap r\nswimlane s\n  item x duration:1w\n';
+    const NBSP = '\u00A0';
+
+    type Outcome = Awaited<ReturnType<typeof parse>>;
+
+    const e0800 = (r: Outcome) =>
+        r.diagnostics.filter((d) => (d.data as { code?: string } | undefined)?.code === 'NL.E0800');
+
+    it('accepts hide and show on the default roadmap line', async () => {
+        for (const value of ['hide', 'show']) {
+            const r = await parse(`config\ndefault roadmap non-working:${value}\n${body}`);
+            expect(errorMessages(r.diagnostics)).toEqual([]);
+        }
+    });
+
+    it('rejects a word that is not hide or show with exactly one NL.E0800', async () => {
+        const r = await parse(`config\ndefault roadmap non-working:maybe\n${body}`);
+        expect(errorMessages(r.diagnostics)).toEqual([
+            'Invalid non-working value "maybe". Use hide or show.',
+        ]);
+        expect(e0800(r)).toHaveLength(1);
+    });
+
+    it('rejects a colour literal with exactly one NL.E0800 (no colour bypass)', async () => {
+        const r = await parse(`config\ndefault roadmap non-working:#fff\n${body}`);
+        expect(errorMessages(r.diagnostics)).toEqual([
+            'Invalid non-working value "#fff". Use hide or show.',
+        ]);
+        expect(e0800(r)).toHaveLength(1);
+    });
+
+    it('rejects a bad value in a style block with exactly one NL.E0800', async () => {
+        const r = await parse(`config\nstyle night\n  non-working: maybe\n${body}`);
+        expect(errorMessages(r.diagnostics)).toEqual([
+            'Invalid non-working value "maybe". Use hide or show.',
+        ]);
+        expect(e0800(r)).toHaveLength(1);
+    });
+
+    it('accepts hide and show in a style block', async () => {
+        for (const value of ['hide', 'show']) {
+            const r = await parse(`config\nstyle night\n  non-working: ${value}\n${body}`);
+            expect(errorMessages(r.diagnostics)).toEqual([]);
+        }
+    });
+
+    it('rejects the key raw on the roadmap line with only the Rule 20 error', async () => {
+        const r = await parse(`roadmap r non-working:show\nswimlane s\n  item x duration:1w\n`);
+        const errors = errorMessages(r.diagnostics);
+        expect(errors).toHaveLength(1);
+        expect(errors[0]).toMatch(/Raw style property "non-working"/i);
+        expect(e0800(r)).toEqual([]);
+    });
+
+    // The validator always writes the en-US text and stashes `{ code, args }`
+    // for a surface to re-render in the operator's locale (specs/
+    // localization.md), so the French text is checked from that data.
+    it('translates the message into French', async () => {
+        const r = await parse(
+            `nowline v1 locale:fr\nconfig\ndefault roadmap non-working:maybe\n${body}`,
+        );
+        const [diag] = e0800(r);
+        expect(e0800(r)).toHaveLength(1);
+        const { code, args } = diag.data as { code: 'NL.E0800'; args: [{ value: string }] };
+        expect(tr('fr', code, ...args)).toBe(
+            `Valeur non-working invalide \u00AB${NBSP}maybe${NBSP}\u00BB. Utilisez hide ou show.`,
+        );
     });
 });

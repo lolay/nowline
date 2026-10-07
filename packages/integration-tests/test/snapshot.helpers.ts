@@ -114,6 +114,9 @@ export const SAMPLES: SampleSpec[] = [
     { name: 'waves-grayscale', sourceFile: 'waves.nowline', theme: 'grayscale' },
     { name: 'waves-coarse', sourceFile: 'waves-coarse.nowline', dir: 'tests', theme: 'light' },
     { name: 'waves-isolate', sourceFile: 'waves-isolate.nowline', dir: 'tests', theme: 'light' },
+    // m2p phase 4: a business calendar drawn with `non-working:show` (shaded
+    // weekend bands). The only deliberate addition to the snapshot set.
+    { name: 'weekends-show', sourceFile: 'weekends-show.nowline', dir: 'tests', theme: 'light' },
 ];
 
 export async function renderSampleSvg(spec: SampleSpec): Promise<string> {

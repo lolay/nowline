@@ -38,6 +38,12 @@ export interface ParsedArgs {
     scale?: string;
     strict: boolean;
     width?: string;
+    /**
+     * Raw `--non-working` value (`hide` or `show`). Undefined means unset, so
+     * the file's `default roadmap non-working:` key still applies. Validated
+     * by the render and serve commands, like `--width`.
+     */
+    nonWorking?: string;
     assetRoot?: string;
 
     // Format-specific options (m2c)
@@ -133,6 +139,7 @@ export function parseArgv(argv: readonly string[]): ParsedArgs {
             scale: { type: 'string', short: 's' },
             strict: { type: 'boolean' },
             width: { type: 'string', short: 'w' },
+            'non-working': { type: 'string' },
             'asset-root': { type: 'string' },
 
             port: { type: 'string', short: 'p' },
@@ -259,6 +266,7 @@ export function parseArgv(argv: readonly string[]): ParsedArgs {
         scale: stringOrUndefined(values.scale),
         strict: values.strict === true,
         width: stringOrUndefined(values.width),
+        nonWorking: stringOrUndefined(values['non-working']),
         assetRoot: stringOrUndefined(values['asset-root']),
         port: stringOrUndefined(values.port),
         host: stringOrUndefined(values.host),

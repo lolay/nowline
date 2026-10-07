@@ -1,0 +1,39 @@
+nowline v1
+
+// Non-working display fixture (m2p phase 4, specs/working-calendar.md §4.2,
+// §7.3, §10 Example A). `default roadmap non-working:show` draws each weekend
+// of a business calendar as a full-width shaded band, so a week is 7 days wide
+// (56 px at this scale) instead of 5. A bar paints across the band but ends at
+// the end of its last working day, which is what leaves the gap visible.
+//
+// The lanes stress one thing each:
+//   - Chained weeks: Example A, four 1w bars with a band between each pair.
+//   - Wednesday start: a bar that starts mid-week and crosses a weekend.
+//   - Group after Friday: a group that begins after a bar ends on a Friday
+//     starts on the next Monday, not inside the weekend.
+// The milestones sit on their own dates: Friday Jan 30 and Saturday Jan 31
+// (the Saturday one lands inside the last band).
+
+config
+
+default roadmap non-working:show
+
+roadmap weekends-show "Weekends shown" start:2026-01-05 scale:1w calendar:business
+
+milestone fri "Fri Jan 30" date:2026-01-30
+milestone sat "Sat Jan 31" date:2026-01-31
+
+swimlane chain "Chained weeks"
+  item w1 "W1" duration:1w
+  item w2 "W2" duration:1w
+  item w3 "W3" duration:1w
+  item w4 "W4" duration:1w
+
+swimlane wed "Wednesday start"
+  item mid "Mid-week start" duration:1w date:2026-01-07
+
+swimlane after "Group after Friday"
+  item lead "Lead" duration:1w
+  group g "Then a group"
+    item x "X" duration:1w
+    item y "Y" duration:1w

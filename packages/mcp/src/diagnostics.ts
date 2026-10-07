@@ -11,7 +11,12 @@ import {
     resolveDiagnosticCode,
     resolveIncludes,
 } from '@nowline/core';
-import { collectLayoutInsights, type LayoutInsight, layoutRoadmap } from '@nowline/layout';
+import {
+    collectLayoutInsights,
+    type LayoutInsight,
+    layoutRoadmap,
+    type NonWorkingDisplay,
+} from '@nowline/layout';
 import { URI } from 'langium';
 
 export interface McpDiagnostic {
@@ -165,6 +170,8 @@ export interface LayoutInsightInputs {
     today?: Date;
     theme?: 'light' | 'dark' | 'grayscale';
     width?: number;
+    /** The render-time non-working display; undefined lets the file's key apply. */
+    nonWorking?: NonWorkingDisplay;
     locale?: string;
     readFile?: (absPath: string) => Promise<string>;
     /** Pre-built document to reuse instead of re-parsing `source`. The
@@ -205,6 +212,7 @@ export async function collectMcpLayoutInsights(inputs: LayoutInsightInputs): Pro
         today: inputs.today,
         theme: inputs.theme ?? 'light',
         width: inputs.width,
+        nonWorking: inputs.nonWorking,
         locale: inputs.locale ?? 'en-US',
     });
 

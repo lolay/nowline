@@ -13,6 +13,8 @@ export interface PreviewPayload {
     theme?: string;
     now?: string;
     width?: number;
+    /** The render-time non-working display; absent lets the file's own key apply. */
+    nonWorking?: 'hide' | 'show';
     locale?: string;
     showLinks?: boolean;
     showMinimap?: boolean;
@@ -58,6 +60,17 @@ export function parsePreviewFromArguments(
         theme: typeof args.theme === 'string' ? args.theme : undefined,
         now: typeof args.now === 'string' ? args.now : undefined,
         width: typeof args.width === 'number' ? args.width : undefined,
+        nonWorking:
+            args.nonWorking === 'hide' || args.nonWorking === 'show' ? args.nonWorking : undefined,
         locale: 'en-US',
     };
+}
+
+/**
+ * The shell's non-working dropdown value for a payload. A payload with no
+ * `nonWorking` maps to `'file'` (no override), so the file's own key applies;
+ * anything other than `hide` or `show` is treated as unset.
+ */
+export function toNonWorkingOverride(nonWorking: unknown): 'file' | 'hide' | 'show' {
+    return nonWorking === 'hide' || nonWorking === 'show' ? nonWorking : 'file';
 }

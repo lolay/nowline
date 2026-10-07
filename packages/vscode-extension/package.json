@@ -162,6 +162,21 @@
                     "minimum": 0,
                     "description": "Canvas width in pixels for the preview render. 0 leaves it unset (defaults to 1280); the preview's pan/zoom usually makes this irrelevant."
                 },
+                "nowline.preview.nonWorking": {
+                    "type": "string",
+                    "enum": [
+                        "file",
+                        "hide",
+                        "show"
+                    ],
+                    "enumDescriptions": [
+                        "Follow the file: its `default roadmap non-working:` key, then hide.",
+                        "Collapse a business calendar's non-working days (the Nowline default).",
+                        "Draw a business calendar's non-working days as shaded bands."
+                    ],
+                    "default": "file",
+                    "description": "How the preview shows a calendar's non-working days. 'file' follows the roadmap's own `default roadmap non-working:` key (then hide); 'hide' and 'show' override it. The preview toolbar's Non-working days menu overrides this per panel; exports made from an open preview match its choice. There is no .nowlinerc key."
+                },
                 "nowline.preview.assetRoot": {
                     "type": "string",
                     "default": "",

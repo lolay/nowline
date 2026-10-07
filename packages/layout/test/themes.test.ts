@@ -8,6 +8,7 @@ import {
     normalizeThemeName,
     resolveColor,
 } from '../src/themes/index.js';
+import * as shared from '../src/themes/shared.js';
 
 // Pin the alias canonicalization at the theme boundary. Authors who type
 // `bg:grey` should land on the same paint as `bg:gray`; same for
@@ -184,5 +185,65 @@ describe('non-working seam theme token (specs/working-calendar.md 7.4)', () => {
         const seam = grayscaleTheme.timeline.nonWorkingSeam;
         expect(typeof seam).toBe('string');
         expect(isAchromatic(seam)).toBe(true);
+    });
+});
+
+// The show view paints a non-working day as a band: `timeline.nonWorkingFill`
+// at `NON_WORKING_FILL_OPACITY` over the row tint (specs/working-calendar.md
+// 7.3). The band must stay a faint shade of the row, and a grid line drawn over
+// it must stay visible.
+describe('non-working band theme token (specs/working-calendar.md 7.3)', () => {
+    const all = { light: lightTheme, dark: darkTheme, grayscale: grayscaleTheme };
+    const OPACITY = 0.1;
+
+    const fillOf = (t: typeof lightTheme): string | undefined =>
+        (t.timeline as { nonWorkingFill?: string }).nonWorkingFill;
+
+    /** `fill` at `OPACITY` over an opaque `under`, as a 6-digit hex. */
+    function over(fill: string, under: string): string {
+        const f = hexToRgb(fill);
+        const u = hexToRgb(under);
+        const mix = f.map((c, i) => Math.round(c * OPACITY + u[i] * (1 - OPACITY)));
+        return `#${mix.map((c) => c.toString(16).padStart(2, '0')).join('')}`;
+    }
+
+    it('the fill opacity is 0.1', () => {
+        expect((shared as { NON_WORKING_FILL_OPACITY?: number }).NON_WORKING_FILL_OPACITY).toBe(
+            OPACITY,
+        );
+    });
+
+    for (const [name, t] of Object.entries(all)) {
+        describe(name, () => {
+            it('is a 6-digit hex colour on the theme', () => {
+                expect(fillOf(t) ?? '').toMatch(/^#[0-9a-fA-F]{6}$/);
+            });
+
+            it('band over each row tint: contrast against the tint in [1.08, 1.30]', () => {
+                const fill = fillOf(t) ?? '';
+                expect(fill).toMatch(/^#[0-9a-fA-F]{6}$/);
+                for (const tint of [t.swimlane.rowTintEven, t.swimlane.rowTintOdd]) {
+                    const ratio = contrastRatio(over(fill, tint), tint);
+                    expect(ratio).toBeGreaterThanOrEqual(1.08);
+                    expect(ratio).toBeLessThanOrEqual(1.3);
+                }
+            });
+
+            it('grid line over the band: contrast >= 1.25', () => {
+                const fill = fillOf(t) ?? '';
+                expect(fill).toMatch(/^#[0-9a-fA-F]{6}$/);
+                for (const tint of [t.swimlane.rowTintEven, t.swimlane.rowTintOdd]) {
+                    expect(
+                        contrastRatio(t.timeline.gridLine, over(fill, tint)),
+                    ).toBeGreaterThanOrEqual(1.25);
+                }
+            });
+        });
+    }
+
+    it('the grayscale fill is achromatic', () => {
+        const fill = fillOf(grayscaleTheme) ?? '';
+        expect(fill).toMatch(/^#[0-9a-fA-F]{6}$/);
+        expect(isAchromatic(fill)).toBe(true);
     });
 });

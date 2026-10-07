@@ -83,6 +83,7 @@ import {
     itemCaptionInsetX,
     itemCaptionMetaBaselineOffset,
     MARKER_BOLD_WIDTH_FACTOR,
+    NON_WORKING_FILL_OPACITY,
     NOW_PILL_CORNER_RADIUS_PX,
     NOW_PILL_HEIGHT_PX,
     NOW_PILL_LABEL_BASELINE_OFFSET_PX,
@@ -674,6 +675,46 @@ function renderGridLines(t: PositionedTimelineScale, swimlaneTopY: number, palet
         );
     }
     return tag('g', { 'data-layer': 'grid' }, parts.join(''));
+}
+
+/**
+ * Non-working days under `show` (specs/working-calendar.md §7.3): a faint
+ * band over each run layout flagged `band`, on the seam / minor-grid span
+ * (from the top of the chart body to the timeline bottom), clipped to
+ * `clip` when given (an include region's painted rect). Empty under `hide`,
+ * where no run has `band`, so that view emits no bytes.
+ */
+function renderNonWorkingBands(
+    t: PositionedTimelineScale,
+    chartTopY: number,
+    palette: Theme,
+    clip?: BoundingBox,
+): string {
+    const bottomY = t.box.y + t.box.height;
+    const parts: string[] = [];
+    for (const run of t.nonWorking ?? []) {
+        if (!run.band) continue;
+        const span: BoundingBox = {
+            x: run.x,
+            y: chartTopY,
+            width: run.width,
+            height: bottomY - chartTopY,
+        };
+        const box = clip ? intersectBox(span, clip) : span;
+        if (!box || box.width <= 0 || box.height <= 0) continue;
+        parts.push(
+            tag('rect', {
+                x: num(box.x),
+                y: num(box.y),
+                width: num(box.width),
+                height: num(box.height),
+                fill: palette.timeline.nonWorkingFill,
+                'fill-opacity': NON_WORKING_FILL_OPACITY,
+            }),
+        );
+    }
+    if (parts.length === 0) return '';
+    return tag('g', { 'data-layer': 'non-working' }, parts.join(''));
 }
 
 function renderTimeline(t: PositionedTimelineScale, palette: Theme, fonts: FontFamilies): string {
@@ -2101,6 +2142,11 @@ function renderIncludeRegion(
     // defs), and the region's own crossings over its nested lanes
     // (specs/waves.md §9.8). The strip stays global.
     const clip: BoundingBox = { x: rx, y: ry, width: rw, height: rh };
+    // The same opaque fill hides the global non-working bands, so they are
+    // re-emitted over it the same way, under the wave layers.
+    const bandsUnder = model
+        ? renderNonWorkingBands(model.timeline, model.chartBox.y, palette, clip)
+        : '';
     const waveUnder = model?.waves
         ? renderWaveTints(model.waves, clip) + renderWaveBoundaries(model.waveBoundaries, clip)
         : '';
@@ -2115,6 +2161,7 @@ function renderIncludeRegion(
         'g',
         { 'data-layer': 'include' },
         region +
+            bandsUnder +
             waveUnder +
             nested +
             waveOver +
@@ -2903,6 +2950,10 @@ export async function renderSvg(
     // lines can be drawn on top of them, then the swimlane content
     // (frame tab + items) sits on top of the grid.
     for (const s of model.swimlanes) parts.push(renderSwimlaneBg(s, palette));
+
+    // Non-working bands under `show`, over the lane rows and under the
+    // wave tints and the grid; nothing under `hide`.
+    parts.push(renderNonWorkingBands(model.timeline, model.chartBox.y, palette));
 
     // Styled wave column tints, over the lane rows and under the grid.
     if (model.waves) parts.push(renderWaveTints(model.waves));

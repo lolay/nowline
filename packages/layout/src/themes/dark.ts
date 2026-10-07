@@ -126,6 +126,7 @@ export const darkTheme: Theme = {
         gridLine: '#475569',
         minorGridLine: '#334155',
         nonWorkingSeam: '#6b7a90',
+        nonWorkingFill: '#94a3b8',
         tickMark: '#334155',
         labelText: '#cbd5e1',
         panelFill: '#0f172a',

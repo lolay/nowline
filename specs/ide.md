@@ -128,7 +128,7 @@ The viewport chrome is provided by `@nowline/preview-shell`'s `mountPreview()` (
 - **Collapse / restore.** A `«` control collapses the toolbar to a translucent puck (just the drag grip and a `»` restore arrow); `»` expands it again. (Replaces the earlier `×` hide-and-auto-fade affordance.)
 - **Tab-frame expand / collapse.** A `$(screen-full)` button in the preview panel's VS Code title bar (next to **Show Source**) maximizes the editor group so the preview fills the entire editor area — exactly the "fill the window" button on the free web app. Clicking it again (now a `$(screen-normal)` icon) restores the previous layout. Implemented via VS Code's built-in `workbench.action.toggleMaximizeEditorGroup`; the icon swap is driven by the `nowline.previewMaximized` context key. Closing a maximized preview clears the context so the icon never strands in the "restore" state.
 - **Fit controls.** Separate **Fit width** (`↔`) and **Fit page** (`⤢`) buttons, mirroring the `3` / `1` keyboard presets.
-- **More-menu.** Format, Copy, Export, Theme, Now (calendar), and Show-links live in a `▾ more` menu. The Export action uses a download glyph; Copy / Export each take half the action row and are centred. Sub-menus size to their content (no dead whitespace). Format / Copy / Export are gated by `@nowline/preview-shell`'s `exportControls` option (default `'show'`; hidden in MCP Apps in-chat previews where export is tool-owned).
+- **More-menu.** Format, Copy, Export, Theme, Non-working days, Now (calendar), and Show-links live in a `▾ more` menu. The Export action uses a download glyph; Copy / Export each take half the action row and are centred. Sub-menus size to their content (no dead whitespace). Format / Copy / Export are gated by `@nowline/preview-shell`'s `exportControls` option (default `'show'`; hidden in MCP Apps in-chat previews where export is tool-owned).
 - **Stay in view.** The more-menu, its sub-dropdowns, and the Now calendar flip and clamp so they always render inside the preview root and respect the gutter — they never run off-screen, regardless of where the toolbar sits.
 
 ### Configuration
@@ -167,6 +167,7 @@ Locale uses two chains, mirroring the CLI's [`packages/cli/src/i18n/locale.ts`](
 | `nowline.preview.now` | `auto` | `--now` | `auto` / `none` / `YYYY-MM-DD`. Ships in m3d. |
 | `nowline.preview.strict` | `false` | `--strict` | Promotes asset / sanitizer warnings to errors. Ships in m3d. |
 | `nowline.preview.showLinks` | `true` | inverse of `--no-links` | Toggle link icons in rendered items. Ships in m3d. |
+| `nowline.preview.nonWorking` | `file` | `--non-working` | `file` / `hide` / `show`. `file` leaves the option unset so the roadmap's own `default roadmap non-working:` key applies (then `hide`); `hide` or `show` forces that view in the preview and in every export command. Settings-only: there is no `.nowlinerc` key. |
 | `nowline.preview.width` | `0` | `--width` | `0` = unset; preview has zoom anyway. Ships in m3d. |
 | `nowline.preview.assetRoot` | `""` | `--asset-root` | Empty = source file's directory. Ships in m3d. |
 | `nowline.export.cliPath` | `nowline` | — | Path to the `nowline` binary; PATH lookup by default. `${workspaceFolder}` substitution supported. Ships in m3e. |
@@ -187,10 +188,11 @@ Honored keys for the preview: `theme`, `width`, `locale`, `assetRoot`. The expor
 
 #### Toolbar overrides
 
-The preview toolbar adds three per-session controls that don't write back to settings:
+The preview toolbar adds four per-session controls that don't write back to settings:
 
 - **Theme** — **Auto** / `light` / `dark` / `grayscale` (overrides the resolved diagram theme for screenshots). **Auto** is a client-side meta-option — Title-case in the UI, not a CLI token — meaning "follow the active Mode." The real theme tokens (`light`, `dark`, `grayscale`) are lowercase and code-styled throughout, matching `nowline.preview.theme` and `--theme`. The UK spelling `greyscale` is accepted as an alias and canonicalizes to `grayscale`.
 - **Now-line** — show today / show as-of date / hide (`--now` parity).
+- **Non-working days** — **File** / **Hide** / **Show** (`--non-working` parity), in the more-menu. **File** is a client-side meta-option meaning "no override": the preview follows the file's `default roadmap non-working:` key. Because **File** means unset, choosing it also overrides a `hide` or `show` value of `nowline.preview.nonWorking`, the way the Theme menu's **Auto** ignores `nowline.preview.theme`. The precedence for the display is toolbar, then the `nowline.preview.nonWorking` setting, then the file's key, then `hide`; there is no `.nowlinerc` key. The save, copy and export commands use the same resolved value, so a saved SVG, PNG or PDF matches the preview. When `nowline.export.cliPath` points at an explicit binary, `--non-working` is passed only when the resolved value is `hide` or `show`, because older CLIs reject unknown flags. The preview webview has no test harness; this behaviour is covered by typecheck and a manual check (see the extension's changelog).
 - **Show links** — Yes / No dropdown in the toolbar more-menu; the initial state reflects the `nowline.preview.showLinks` setting (which still applies).
 
 **Theme vs Mode.** *Theme* (`nowline.preview.theme`) is the diagram render palette — `auto`, `light`, `dark`, or `grayscale` (`greyscale` accepted as alias). *Mode* is the color scheme of the tooling chrome (toolbar, VS Code workbench), driven by VS Code's `onDidChangeActiveColorTheme`. `auto` on the Theme axis means "follow the active Mode"; `system` is the Mode-axis equivalent where chrome is present (e.g. the Free SPA). The embed has no Mode axis — it samples `prefers-color-scheme` once on init.

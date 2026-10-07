@@ -12,7 +12,7 @@
 // Convention reference: specs/architecture.md § Surfaces / @nowline/preview-shell.
 
 import type { DiagnosticRow, RenderResult } from '@nowline/browser';
-import type { NowOverride, PreviewHandle, ThemeOverride } from './mount.js';
+import type { NonWorkingOverride, NowOverride, PreviewHandle, ThemeOverride } from './mount.js';
 
 /**
  * Maps the browser pipeline's `RenderResult` to the VS Code extension
@@ -86,4 +86,18 @@ export function nowOverrideToToday(now: NowOverride | undefined): Date | string 
     if (now === undefined || now === 'today') return undefined;
     if (now === 'hide') return null;
     return now;
+}
+
+/**
+ * Coerce a shell `NonWorkingOverride` to the `nonWorking` option accepted by
+ * `renderSource`. `'file'` and `undefined` both return `undefined`, so the
+ * file's own `default roadmap non-working:` key applies (the same posture as
+ * `themeOverrideToDiagramTheme`'s `'auto'`); `'hide'` and `'show'` pass
+ * through and win over the file. Anything else is treated as unset rather
+ * than guessed at.
+ */
+export function nonWorkingOverrideToDisplay(
+    value: NonWorkingOverride | undefined,
+): 'hide' | 'show' | undefined {
+    return value === 'hide' || value === 'show' ? value : undefined;
 }

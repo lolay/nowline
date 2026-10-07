@@ -375,6 +375,10 @@ export const LABEL_THINNING: Record<'days' | 'weeks' | 'months' | 'quarters' | '
     years: 5,
 };
 
+// Opacity of a non-working band (`timeline.nonWorkingFill`) under the
+// `show` display (specs/working-calendar.md §7.3).
+export const NON_WORKING_FILL_OPACITY = 0.1;
+
 // Waves (specs/waves.md section 9.10; hatch geometry section 9.3).
 export const WAVE_STRIP_HEIGHT_PX = 20;
 export const WAVE_BOUNDARY_WIDTH_PX = 2;

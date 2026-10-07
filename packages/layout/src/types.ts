@@ -3,6 +3,8 @@
 // top-left. All colors in `ResolvedStyle` are concrete hex strings baked
 // in by style-resolution; the renderer is palette-dumb.
 
+import type { NonWorkingDisplay } from './non-working-display.js';
+
 export type SizeBucket = 'none' | 'xs' | 'sm' | 'md' | 'lg' | 'xl' | 'full';
 export type ShadowKind = 'none' | 'subtle' | 'soft' | 'hard';
 export type BorderKind = 'solid' | 'dashed' | 'dotted';
@@ -19,7 +21,7 @@ export type TimelinePosition = 'top' | 'bottom' | 'both';
 export type StatusKind = 'planned' | 'in-progress' | 'done' | 'at-risk' | 'blocked' | 'neutral';
 
 // The 17 style properties from specs/dsl.md § Style Properties plus header-position
-// and the two roadmap-only readability knobs (`timeline-position`, `minor-grid`).
+// and the roadmap-only knobs (`timeline-position`, `minor-grid`, `non-working`).
 // Every one has a concrete value after resolution (theme + defaults fill gaps).
 export interface ResolvedStyle {
     bg: string; // hex or 'none'
@@ -50,6 +52,12 @@ export interface ResolvedStyle {
     capacityIcon: string;
     timelinePosition: TimelinePosition;
     minorGrid: boolean;
+    /**
+     * How a calendar's non-working days are drawn (roadmap-only, from
+     * `default roadmap non-working:`). Default `'hide'`; a surface option
+     * overrides it (`LayoutOptions.nonWorking`).
+     */
+    nonWorking: NonWorkingDisplay;
 }
 
 export interface BoundingBox {
@@ -182,10 +190,11 @@ export interface PositionedTimelineScale {
     minorGrid: boolean;
     /**
      * How the axis shows non-working days (specs/working-calendar.md §7):
-     * `hide` collapses them to zero width. Present, with `nonWorking`, only
-     * when the window holds a non-working day.
+     * `hide` collapses them to zero width, `show` draws them at full width.
+     * Present, with `nonWorking`, only when the window holds a non-working
+     * day.
      */
-    nonWorkingDisplay?: 'hide';
+    nonWorkingDisplay?: NonWorkingDisplay;
     /** The window's non-working runs, left to right; see `PositionedNonWorkingRun`. */
     nonWorking?: PositionedNonWorkingRun[];
 }
@@ -193,7 +202,9 @@ export interface PositionedTimelineScale {
 /**
  * One maximal run of non-working days in (or straddling) the window
  * (specs/working-calendar.md §7.5). Under `hide` its `width` is 0 and `x`
- * is the start of the next working day.
+ * is the start of the next working day. Under `show` it spans its days,
+ * with `x` and the right edge clamped to the window; `from` / `through`
+ * keep the run's real dates.
  */
 export interface PositionedNonWorkingRun {
     x: number;
@@ -207,8 +218,15 @@ export interface PositionedNonWorkingRun {
     /**
      * Set at the days scale when the run lies strictly inside the chart and
      * no grid line is drawn at its x; the renderer draws a seam there.
+     * Never set under `show`.
      */
     seam?: true;
+    /**
+     * Set under `show` at the days and weeks scales, or when the run has
+     * titles: the renderer paints the run as a shaded band. Coarser scales
+     * leave a plain weekend unpainted.
+     */
+    band?: true;
 }
 
 /**

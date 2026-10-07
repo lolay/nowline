@@ -696,3 +696,155 @@ describe('resolveScale', () => {
         });
     });
 });
+
+// --- The show view (specs/working-calendar.md §7.3, m2p phase 4 decision 3) ---
+//
+// Under `show` the scale is linear in calendar days and draws a non-working
+// day at full width. The members it gains (`showsNonWorking`, `startX`,
+// `advanceX`) are reached through a loose type, so a scale that lacks one
+// fails an assertion instead of the compile or a TypeError.
+
+interface DisplayScale {
+    readonly showsNonWorking?: boolean;
+    startX?(x: number): number;
+    advanceX?(x: number, n: number): number;
+}
+
+type Display = 'hide' | 'show';
+
+function displayScale(
+    display: Display | undefined,
+    calendar: ReturnType<typeof fromCalendarConfig>,
+    range: [number, number],
+): TimeScale {
+    return new TimeScale({
+        domain: [utc(2026, 1, 5), utc(2026, 2, 2)],
+        range,
+        calendar,
+        ...(display ? { nonWorking: display } : {}),
+    } as ConstructorParameters<typeof TimeScale>[0]);
+}
+
+function startXOf(scale: TimeScale, x: number): number {
+    const fn = (scale as DisplayScale).startX;
+    expect(fn, 'TimeScale.startX').toBeTypeOf('function');
+    return (fn as (x: number) => number).call(scale, x);
+}
+
+function advanceXOf(scale: TimeScale, x: number, n: number): number {
+    const fn = (scale as DisplayScale).advanceX;
+    expect(fn, 'TimeScale.advanceX').toBeTypeOf('function');
+    return (fn as (x: number, n: number) => number).call(scale, x, n);
+}
+
+describe('TimeScale under nonWorking show', () => {
+    // 2026-01-05 (Mon) to 2026-02-02 (Mon) is 28 calendar days; at 224 px
+    // that is 8 px per calendar day, so a week is 56 px and the Saturday and
+    // Sunday of the first week are x 40-56.
+    const scale = displayScale('show', fromCalendarConfig(businessCal), [0, 224]);
+
+    it('spreads the range over calendar days: 8 px a day', () => {
+        expect((scale as DisplayScale).showsNonWorking).toBe(true);
+        expect(scale.pixelsPerDay).toBe(8);
+    });
+
+    it('forward is linear in calendar days, weekends included', () => {
+        expect(scale.forward(utc(2026, 1, 10))).toBeCloseTo(40, 6); // Saturday
+        expect(scale.forward(utc(2026, 1, 30))).toBeCloseTo(200, 6);
+        expect(scale.forward(utc(2026, 2, 2))).toBeCloseTo(224, 6);
+    });
+
+    it('invert returns a calendar date, a Saturday included', () => {
+        expect(scale.invert(40).toISOString().slice(0, 10)).toBe('2026-01-10');
+    });
+
+    it('startX moves forward only when x lies in a non-working day', () => {
+        const cases: Array<[number, number]> = [
+            [0, 0],
+            [16, 16],
+            [20, 20],
+            [40, 56],
+            [44, 56],
+            [48, 56],
+            [40 - 1e-9, 56],
+        ];
+        for (const [x, expected] of cases) {
+            expect(startXOf(scale, x), `startX(${x})`).toBeCloseTo(expected, 6);
+        }
+    });
+
+    it('advanceX is the end of the n-th working day from startX, fractions interpolated', () => {
+        const cases: Array<[number, number, number]> = [
+            [0, 5, 40],
+            [16, 5, 72],
+            [40, 5, 96],
+            [56, 5, 96],
+            [36, 1, 60],
+            [0, 0.5, 4],
+            [0, 0, 0],
+        ];
+        for (const [x, n, expected] of cases) {
+            expect(advanceXOf(scale, x, n), `advanceX(${x}, ${n})`).toBeCloseTo(expected, 6);
+        }
+    });
+});
+
+describe('TimeScale.indexAtX (the extension pass reads the overflow through it)', () => {
+    // Same show scale: Sat Jan 10 and Sun Jan 11 are x 40-56. An x inside a
+    // non-working day reads as the start of the next working day (index 5);
+    // an x inside a working day keeps its fraction.
+    const show = displayScale('show', fromCalendarConfig(businessCal), [0, 224]);
+    const hide = displayScale('hide', fromCalendarConfig(businessCal), [0, 160]);
+
+    it('counts working days under show, a weekend x reading as Monday', () => {
+        const cases: Array<[number, number]> = [
+            [0, 0],
+            [20, 2.5],
+            [36, 4.5],
+            [40, 5],
+            [48, 5],
+            [56, 5],
+            [60, 5.5],
+            [224, 20],
+        ];
+        for (const [x, expected] of cases) {
+            expect(show.indexAtX(x), `indexAtX(${x})`).toBeCloseTo(expected, 6);
+        }
+    });
+
+    it('is linear in x under hide', () => {
+        expect(hide.indexAtX(40)).toBe(5);
+        expect(hide.indexAtX(60)).toBe(7.5);
+    });
+});
+
+describe('TimeScale display guards (hide and calendars without a weekend are unchanged)', () => {
+    it('hide keeps working-day geometry and does not show non-working days', () => {
+        const hide = displayScale('hide', fromCalendarConfig(businessCal), [0, 160]);
+        expect(Boolean((hide as DisplayScale).showsNonWorking)).toBe(false);
+        expect(hide.pixelsPerDay).toBe(8);
+        expect(hide.forward(utc(2026, 1, 10))).toBe(40);
+        expect(hide.forward(utc(2026, 2, 2))).toBe(160);
+    });
+
+    // These two call members the scale gains in m2p phase 4, so they stay red
+    // until the implementation lands and then pin the identity path.
+    it('hide: startX is the identity and advanceX is x + n * pixelsPerDay', () => {
+        const hide = displayScale('hide', fromCalendarConfig(businessCal), [0, 160]);
+        expect(startXOf(hide, 40)).toBe(40);
+        expect(advanceXOf(hide, 16, 5)).toBe(56);
+    });
+
+    it('calendar:full with show does not show: advanceX(40, 5) is 80', () => {
+        const full = displayScale('show', fromCalendarConfig(fullCal), [0, 224]);
+        expect((full as DisplayScale).showsNonWorking).toBe(false);
+        expect(advanceXOf(full, 40, 5)).toBe(80);
+    });
+
+    it('calendar:full with show keeps today geometry: 8 px a day, linear forward', () => {
+        const full = displayScale('show', fromCalendarConfig(fullCal), [0, 224]);
+        expect(Boolean((full as DisplayScale).showsNonWorking)).toBe(false);
+        expect(full.pixelsPerDay).toBe(8);
+        expect(full.forward(utc(2026, 1, 10))).toBe(40);
+    });
+});

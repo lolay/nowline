@@ -1,14 +1,15 @@
 // Rendering of the hidden-weekend view (specs/working-calendar.md §7.2, §7.4):
 // a marked seam is a faint dotted line in the grid layer, and a milestone or
-// anchor dated on a hidden day carries its date as a `<title>`.
+// anchor dated on a hidden day carries its date as a `<title>`. The show view
+// (§7.3, m2p phase 4) draws the weekends as shaded bands in their own layer.
 
 import type { NowlineFile } from '@nowline/core';
-import type { Theme, ThemeName } from '@nowline/layout';
+import type { LayoutOptions, Theme, ThemeName } from '@nowline/layout';
 import { darkTheme, grayscaleTheme, lightTheme } from '@nowline/layout';
 import { URI } from 'langium';
 import { describe, expect, it } from 'vitest';
 import { renderSvg } from '../src/index.js';
-import { getServices, parseToModel } from './helpers.js';
+import { getServices, parseFilesToModel, parseToModel } from './helpers.js';
 
 type Attrs = Record<string, string>;
 
@@ -211,5 +212,195 @@ swimlane a "A"
         );
         expect(entityMarkup(svg, 'milestone', 'sat')).not.toContain('<title>');
         expect(entityMarkup(svg, 'anchor', 'sun')).not.toContain('<title>');
+    });
+});
+
+// --- The show view: shaded bands (specs/working-calendar.md §7.3) ---
+
+/** `LayoutOptions` plus the render-time display this phase adds. */
+type ShowOptions = LayoutOptions & { nonWorking?: 'hide' | 'show' };
+
+const SHOW: ShowOptions = { nonWorking: 'show' };
+
+/** Example A of specs/working-calendar.md §10: four chained 1w items, a Friday milestone. */
+const EXAMPLE_A = `nowline v1
+
+roadmap r "R" start:2026-01-05 scale:1w calendar:business
+
+milestone fri "Fri Jan 30" date:2026-01-30
+
+swimlane a "A"
+  item w1 "W1" duration:1w
+  item w2 "W2" duration:1w
+  item w3 "W3" duration:1w
+  item w4 "W4" duration:1w
+`;
+
+/** Every balanced `<g ...>...</g>` whose open tag matches `open`. */
+function groupsMatching(svg: string, open: RegExp): string[] {
+    const out: string[] = [];
+    const re = new RegExp(open.source, 'g');
+    for (const m of svg.matchAll(re)) {
+        const start = m.index ?? 0;
+        let depth = 0;
+        for (const t of svg.slice(start).matchAll(/<g\b|<\/g>/g)) {
+            depth += t[0] === '</g>' ? -1 : 1;
+            if (depth === 0) {
+                out.push(svg.slice(start, start + (t.index ?? 0) + t[0].length));
+                break;
+            }
+        }
+    }
+    return out;
+}
+
+/** The `<rect>` elements of a fragment, as attribute maps. */
+function rectsOf(fragment: string): Attrs[] {
+    return [...fragment.matchAll(/<rect ([^>]*?)\/>/g)].map((r) =>
+        Object.fromEntries([...r[1].matchAll(/([\w-]+)="([^"]*)"/g)].map((a) => [a[1], a[2]])),
+    );
+}
+
+/** The `<g data-layer="non-working">` layers of `svg`, balanced. */
+function bandLayers(svg: string): string[] {
+    return groupsMatching(svg, /<g data-layer="non-working">/);
+}
+
+describe('non-working bands under show', () => {
+    it('draws one band per weekend at o+40/96/152/208, 16 wide, chart top to timeline bottom', async () => {
+        const model = await parseToModel(EXAMPLE_A, { theme: 'light', ...SHOW });
+        const layers = bandLayers(await renderSvg(model));
+        expect(layers).toHaveLength(1);
+        const rects = rectsOf(layers[0]);
+        const o = model.timeline.originX;
+        expect(rects.map((r) => Number(r.x) - o)).toEqual([40, 96, 152, 208]);
+        const bottom = model.timeline.box.y + model.timeline.box.height;
+        for (const r of rects) {
+            expect(r.width).toBe('16');
+            expect(Number(r.y)).toBe(model.chartBox.y);
+            expect(Number(r.y) + Number(r.height)).toBe(bottom);
+            expect(r.fill).toBe(lightTheme.timeline.nonWorkingFill);
+            expect(r.fill).toBe('#64748b');
+            expect(r['fill-opacity']).toBe('0.1');
+        }
+    });
+
+    for (const [name, , theme] of themes) {
+        const fills: Record<string, string> = {
+            light: '#64748b',
+            dark: '#94a3b8',
+            grayscale: '#737373',
+        };
+        it(`uses the ${name} theme's own fill token`, async () => {
+            const model = await parseToModel(EXAMPLE_A, { theme, ...SHOW });
+            const [layer] = bandLayers(await renderSvg(model));
+            expect(layer).toBeDefined();
+            const rects = rectsOf(layer ?? '');
+            expect(rects).toHaveLength(4);
+            for (const r of rects) expect(r.fill).toBe(fills[name]);
+            expect(model.palette.timeline.nonWorkingFill).toBe(fills[name]);
+        });
+    }
+
+    it('layers after the swimlane backgrounds and before the wave tint and the grid', async () => {
+        const model = await parseToModel(
+            `nowline v1
+
+config
+
+style night
+  bg: #1e3a8a
+
+roadmap r "R" start:2026-01-05 scale:1w
+
+wave w1 "One"
+wave w2 "Two" style:night
+
+swimlane a
+  item a1 duration:2w wave:w1
+  item a2 duration:2w wave:w2
+`,
+            { theme: 'light', ...SHOW },
+        );
+        const svg = await renderSvg(model);
+        const at = (needle: string) => svg.indexOf(needle);
+        expect(at('data-layer="non-working"')).toBeGreaterThan(-1);
+        expect(at('data-layer="non-working"')).toBeGreaterThan(
+            svg.lastIndexOf('data-layer="swimlane-bg"'),
+        );
+        expect(at('data-layer="non-working"')).toBeLessThan(at('data-layer="wave-bg"'));
+        expect(at('data-layer="wave-bg"')).toBeLessThan(at('data-layer="grid"'));
+    });
+
+    it('re-emits the layer inside an include region, between its rect and its lanes, with no clipPath', async () => {
+        const model = await parseFilesToModel(
+            {
+                'ios.nowline': `nowline v1
+
+roadmap ios-app "iOS" start:2026-01-05 scale:1w
+
+swimlane ios
+  item ios-offline duration:4w
+`,
+                'portfolio.nowline': `nowline v1
+
+include "./ios.nowline" roadmap:isolate
+
+roadmap portfolio "Portfolio" start:2026-01-05 scale:1w
+
+swimlane platform
+  item pf-api duration:2w
+  item pf-scale duration:2w
+`,
+            },
+            'portfolio.nowline',
+            { theme: 'light', ...SHOW },
+        );
+        const svg = await renderSvg(model);
+        const region = groupsMatching(svg, /<g data-layer="include">/)[0] ?? '';
+        expect(region).not.toBe('');
+        const [regionRect] = rectsOf(region);
+        const layers = bandLayers(region);
+        expect(layers).toHaveLength(1);
+        const bands = rectsOf(layers[0]);
+        expect(bands.length).toBeGreaterThan(0);
+        // Clipped to the painted region rect by intersection, not a clipPath.
+        const [left, top] = [Number(regionRect.x), Number(regionRect.y)];
+        const right = left + Number(regionRect.width);
+        const bottom = top + Number(regionRect.height);
+        for (const b of bands) {
+            expect(Number(b.x)).toBeGreaterThanOrEqual(left - 0.01);
+            expect(Number(b.x) + Number(b.width)).toBeLessThanOrEqual(right + 0.01);
+            expect(Number(b.y)).toBeGreaterThanOrEqual(top - 0.01);
+            expect(Number(b.y) + Number(b.height)).toBeLessThanOrEqual(bottom + 0.01);
+        }
+        expect(region).not.toContain('clipPath');
+        const at = (needle: string) => region.indexOf(needle);
+        expect(at('data-layer="non-working"')).toBeGreaterThan(at('<rect'));
+        expect(at('data-layer="non-working"')).toBeLessThan(at('data-layer="swimlane"'));
+    });
+
+    // Guards: hide and the month scale carry no band, so their SVG is byte-stable.
+    it('draws no layer under hide (guard)', async () => {
+        const svg = await renderSvg(await parseToModel(EXAMPLE_A, { theme: 'light' }));
+        expect(svg).not.toContain('data-layer="non-working"');
+        const hidden = await renderSvg(
+            await parseToModel(EXAMPLE_A, { theme: 'light', nonWorking: 'hide' } as ShowOptions),
+        );
+        expect(hidden).toBe(svg);
+    });
+
+    it('draws no layer at the month scale, even under show (guard)', async () => {
+        const model = await parseToModel(
+            `nowline v1
+
+roadmap r "R" start:2026-01-05 scale:1m
+
+swimlane a "A"
+  item a1 "A1" duration:3w
+`,
+            { theme: 'light', ...SHOW },
+        );
+        expect(await renderSvg(model)).not.toContain('data-layer="non-working"');
     });
 });

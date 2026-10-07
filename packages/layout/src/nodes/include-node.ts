@@ -52,7 +52,11 @@ export interface IncludeNodeDeps {
     ) => number;
     newCursor: (x: number, y: number) => TrackCursor;
     estimateTextWidth: (text: string, fontSize: number) => number;
-    predictItemBarExtraHeight: (item: ItemDeclaration, ctx: LayoutContext) => number;
+    predictItemBarExtraHeight: (
+        item: ItemDeclaration,
+        startX: number,
+        ctx: LayoutContext,
+    ) => number;
 }
 
 export function buildIncludeRegions(

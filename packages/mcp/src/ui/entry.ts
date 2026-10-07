@@ -31,6 +31,7 @@ import {
     type PreviewPayload,
     parsePreviewFromArguments,
     parsePreviewFromContent,
+    toNonWorkingOverride,
 } from './payload.js';
 
 function readPayload(): PreviewPayload | undefined {
@@ -88,6 +89,7 @@ function mountFromPayload(payload: PreviewPayload, app: App): void {
         initialView: {
             theme: toThemeOverride(payload.theme),
             now: (payload.now ?? 'today') as NowOverride,
+            nonWorking: toNonWorkingOverride(payload.nonWorking),
             showLinks: payload.showLinks !== false,
         },
         renderOptions: {

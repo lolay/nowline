@@ -13,6 +13,7 @@
 import {
     type DiagnosticRow,
     mountPreview,
+    type NonWorkingOverride,
     type PreviewHandle,
     type ThemeOverride,
 } from '@nowline/preview-shell';
@@ -29,6 +30,7 @@ interface InitMessage {
     showMinimap?: boolean;
     theme?: ThemeOverride;
     now?: string;
+    nonWorking?: NonWorkingOverride;
     showLinks?: boolean;
     locale?: string;
 }
@@ -39,6 +41,7 @@ interface ConfigChangeMessage {
     showMinimap?: boolean;
     theme?: ThemeOverride;
     now?: string;
+    nonWorking?: NonWorkingOverride;
     showLinks?: boolean;
     locale?: string;
 }
@@ -121,7 +124,12 @@ function bootstrap(): void {
                 if (msg.defaultFit) handle.setDefaultFit(msg.defaultFit);
                 if (msg.showMinimap !== undefined) handle.setShowMinimap(!!msg.showMinimap);
                 handle.setViewBaseline(
-                    { theme: msg.theme, now: msg.now, showLinks: msg.showLinks },
+                    {
+                        theme: msg.theme,
+                        now: msg.now,
+                        nonWorking: msg.nonWorking,
+                        showLinks: msg.showLinks,
+                    },
                     /* resetOverrides */ true,
                 );
                 break;
@@ -132,7 +140,12 @@ function bootstrap(): void {
                 if (msg.showMinimap !== undefined) handle.setShowMinimap(!!msg.showMinimap);
                 if (msg.locale) handle.setLocale(msg.locale);
                 handle.setViewBaseline(
-                    { theme: msg.theme, now: msg.now, showLinks: msg.showLinks },
+                    {
+                        theme: msg.theme,
+                        now: msg.now,
+                        nonWorking: msg.nonWorking,
+                        showLinks: msg.showLinks,
+                    },
                     /* resetOverrides */ false,
                 );
                 break;

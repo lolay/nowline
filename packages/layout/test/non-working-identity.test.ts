@@ -8,18 +8,34 @@
 //
 // `WAVE_KEYS` in waves-byte-stability.test.ts is deliberately not extended; the
 // wave walk and this one are independent.
+//
+// The show view (m2p phase 4) is gated on `calendar.hasNonWorkingDays`, so the
+// same inputs under `{ nonWorking: 'show' }` must still equal the default
+// layout and carry none of those keys. `{ nonWorking: 'hide' }` is the
+// default, so it must change nothing on any input.
 
 import { readFile } from 'node:fs/promises';
 import * as path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { describe, expect, it } from 'vitest';
-import { layoutRoadmap } from '../src/layout.js';
+import { type LayoutOptions, layoutRoadmap } from '../src/layout.js';
 import { parseAndResolve } from './helpers.js';
 
 const REPO_ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../../..');
 
 /** Every key the working-day schedule adds to the positioned model. */
 const NON_WORKING_KEYS = ['nonWorking', 'nonWorkingDisplay', 'hiddenDate', 'nonWorkingPin'];
+
+/**
+ * Every `ResolvedStyle` carries the resolved `non-working` display as the
+ * string `nonWorking` (m2p phase 4, decision 2), next to `minorGrid` and
+ * `timelinePosition`, on every calendar. It is a setting, not a key the
+ * working-day schedule adds, so the walk skips it; the timeline's
+ * `nonWorking` runs are an array and still count.
+ */
+function isDisplaySetting(key: string, value: unknown): boolean {
+    return key === 'nonWorking' && typeof value === 'string';
+}
 
 /** The paths (`a.b[2].c`) of every non-working key anywhere in `root`. */
 function nonWorkingKeyPaths(root: unknown): string[] {
@@ -36,19 +52,28 @@ function nonWorkingKeyPaths(root: unknown): string[] {
             return;
         }
         for (const key of Object.keys(value)) {
-            if (NON_WORKING_KEYS.includes(key)) found.push(at ? `${at}.${key}` : key);
-            walk((value as Record<string, unknown>)[key], at ? `${at}.${key}` : key);
+            const child = (value as Record<string, unknown>)[key];
+            if (NON_WORKING_KEYS.includes(key) && !isDisplaySetting(key, child)) {
+                found.push(at ? `${at}.${key}` : key);
+            }
+            walk(child, at ? `${at}.${key}` : key);
         }
     };
     walk(root, '');
     return found;
 }
 
-async function layFile(rel: string) {
+/** `LayoutOptions` plus the render-time display this phase adds. */
+type DisplayOptions = LayoutOptions & { nonWorking?: 'hide' | 'show' };
+
+// A fixed `today` keeps two layouts of one file comparable across a clock tick.
+const TODAY = new Date(Date.UTC(2026, 0, 1));
+
+async function layFile(rel: string, options: DisplayOptions = {}) {
     const abs = path.join(REPO_ROOT, rel);
     const source = await readFile(abs, 'utf8');
     const { file, resolved } = await parseAndResolve(source, abs, (p) => readFile(p, 'utf8'));
-    return { source, model: layoutRoadmap(file, resolved) };
+    return { source, model: layoutRoadmap(file, resolved, { today: TODAY, ...options }) };
 }
 
 // Calendars without a non-working day: `calendar:full`, or `calendar:custom`
@@ -72,6 +97,16 @@ describe('the positioned model of a calendar with no non-working day (identity p
         expect(model.timeline.nonWorking).toBeUndefined();
         expect(model.timeline.nonWorkingDisplay).toBeUndefined();
     });
+
+    it.each(IDENTITY_INPUTS)(
+        '$file under { nonWorking: show } equals the default layout and carries no key',
+        async ({ file }) => {
+            const shown = (await layFile(file, { nonWorking: 'show' })).model;
+            const plain = (await layFile(file)).model;
+            expect(nonWorkingKeyPaths(shown)).toEqual([]);
+            expect(shown).toEqual(plain);
+        },
+    );
 
     it('calendar:full carries none even with a Saturday milestone, pin and anchor', async () => {
         const { file, resolved } = await parseAndResolve(`nowline v1
@@ -126,9 +161,28 @@ swimlane a "A"
         );
     });
 
+    it('carries nonWorkingDisplay show on a business roadmap under { nonWorking: show }', async () => {
+        const { model } = await layFile('examples/platform-2026.nowline', { nonWorking: 'show' });
+        expect(model.timeline.nonWorkingDisplay).toBe('show');
+        expect(nonWorkingKeyPaths(model)).toContain('timeline.nonWorking');
+    });
+
     it('finds nonWorking on the business sample examples/platform-2026.nowline', async () => {
         const { source, model } = await layFile('examples/platform-2026.nowline');
         expect(source).toMatch(/calendar:business/);
         expect(nonWorkingKeyPaths(model)).toContain('timeline.nonWorking');
+    });
+});
+
+// Guard: `hide` is the default display, so asking for it changes nothing.
+describe('{ nonWorking: hide } is the default layout', () => {
+    it.each([
+        'examples/minimal.nowline',
+        'examples/platform-2026.nowline',
+        'examples/dependencies.nowline',
+    ])('%s', async (file) => {
+        const hidden = (await layFile(file, { nonWorking: 'hide' })).model;
+        const plain = (await layFile(file)).model;
+        expect(hidden).toEqual(plain);
     });
 });

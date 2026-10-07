@@ -310,8 +310,11 @@ export class MilestoneNode {
             positioned.overrunDate = formatIsoDate(date);
         }
         // A date the axis hides keeps its own day as a tooltip
-        // (specs/working-calendar.md §7.4).
-        if (date && !ctx.calendar.isWorkingDay(date)) positioned.hiddenDate = formatIsoDate(date);
+        // (specs/working-calendar.md §7.4). Under `show` the day is drawn,
+        // and the milestone sits on it.
+        if (date && !ctx.scale.showsNonWorking && !ctx.calendar.isWorkingDay(date)) {
+            positioned.hiddenDate = formatIsoDate(date);
+        }
         return positioned;
     }
 }

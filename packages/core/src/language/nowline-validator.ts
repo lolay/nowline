@@ -115,7 +115,15 @@ const STYLE_PROP_KEYS = new Set([
     'capacity-icon',
     'timeline-position',
     'minor-grid',
+    'non-working',
 ]);
+
+// `non-working:` values (specs/working-calendar.md §4.2). Kept out of
+// `STYLE_PROP_ENUMS` on purpose: the key reports its own coded NL.E0800,
+// and the generic enum check would add an uncoded message and let a colour
+// literal through. Mirrors `NON_WORKING_DISPLAYS` in @nowline/layout, which
+// core cannot import.
+const NON_WORKING_VALUES = new Set(['hide', 'show']);
 
 // Built-in capacity-icon vocabulary. Renderer-curated SVG glyphs (plus 'multiplier'
 // which renders as the U+00D7 text character and 'none' which suppresses the glyph).
@@ -947,6 +955,15 @@ export class NowlineValidator {
                 // Same handling as capacity-icon.
                 break;
 
+            case 'non-working':
+                // Raw on an entity line the key is Rule 20's error alone
+                // (checkNoRawStyleProperties); the value is checked where the
+                // key may be set, on a `default` line.
+                if (isDefaultDeclaration(prop.$container)) {
+                    checkNonWorkingValue(val, prop, accept);
+                }
+                break;
+
             default:
                 if (STYLE_PROP_KEYS.has(key)) {
                     if (key === 'bg' || key === 'fg' || key === 'text') {
@@ -1244,6 +1261,8 @@ export class NowlineValidator {
                     },
                 );
             }
+        } else if (key === 'non-working') {
+            checkNonWorkingValue(val, prop, accept);
         } else if (key in STYLE_PROP_ENUMS) {
             const allowed = STYLE_PROP_ENUMS[key];
             if (!allowed.has(val)) {
@@ -1975,6 +1994,16 @@ export class NowlineValidator {
 
 function isColorValue(val: string): boolean {
     return COLOR_NAMES.has(val) || HEX_COLOR_RE.test(val);
+}
+
+/** NL.E0800 unless `value` is a `non-working:` value (`hide` or `show`). */
+function checkNonWorkingValue(
+    value: string | undefined,
+    node: EntityProperty | StyleProperty,
+    accept: ValidationAcceptor,
+): void {
+    if (value === undefined || NON_WORKING_VALUES.has(value)) return;
+    acceptTr(accept, 'error', { node, property: 'value' }, 'NL.E0800', { value });
 }
 
 function isIdentifier(val: string): boolean {

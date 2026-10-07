@@ -1,6 +1,6 @@
 # Nowline Working Calendar
 
-**Status: Accepted, scheduled as m2p. Phases 1–3 (calendar primitives; the working-day schedule under `hide`; the exporters read the file's calendar) are implemented in lolay/nowline#96; Phases 4–5 are pending.** This is the design record for non-working days: weekends, holidays and company-wide closures such as a summit. Today's parser rejects the `non-working` syntax shown here, and today's layout does not skip any day.
+**Status: Accepted, scheduled as m2p. Phases 1–3 (calendar primitives; the working-day schedule under `hide`; the exporters read the file's calendar) are implemented in lolay/nowline#96; Phase 4 (`show` and the display setting) is implemented in the Phase 4 PR; Phase 5 (the `non-working` declarations) is pending.** This is the design record for non-working days: weekends, holidays and company-wide closures such as a summit. The `non-working:` display key and the render-time option work today; the parser still rejects the `non-working` declaration syntax shown in §4.1, which arrives with Phase 5.
 
 The implementation plan, the decisions that close §11 and the codebase map are in [`handoffs/handoff-m2p-working-calendar.md`](./handoffs/handoff-m2p-working-calendar.md). As each phase ships:
 
@@ -110,7 +110,7 @@ Exactly one of `date:` and `every:` is required. The title labels the day on the
 
 ### 4.2 The display setting
 
-`non-working:` joins `timeline-position` and `minor-grid` as a roadmap-only style key. Raw style keys are not allowed on the roadmap declaration, so it is set on the `default roadmap` line:
+`non-working:` joins `timeline-position` and `minor-grid` as a roadmap-only style key (shipped in Phase 4). Raw style keys are not allowed on the roadmap declaration (Rule 20 rejects `roadmap r non-working:show`), so it is set on the `default roadmap` line:
 
 ```nowline
 config
@@ -125,9 +125,11 @@ default roadmap non-working:show
 
 The setting never affects the schedule, so it can also be chosen at render time. Precedence, first hit wins:
 
-1. `--non-working hide|show` on the CLI, or the same option in `@nowline/embed`, the VS Code preview and the MCP `render` / `export` tools;
+1. `--non-working hide|show` on the CLI, or the same option on every other surface: `nonWorking` in `@nowline/embed`, `@nowline/browser` and the MCP `render` / `export` tools, the `non-working` input of the GitHub Action, the preview toolbar's "Non-working days" menu and the `nowline.preview.nonWorking` setting in VS Code;
 2. the file's `default roadmap non-working:`;
 3. `hide`.
+
+"Unset" is `undefined` on every surface and falls through to the file's key; no surface defaults the option to `hide`. In the VS Code preview the toolbar choice comes before the setting, and the toolbar's "File" entry means unset, so it also overrides a `hide` or `show` setting. There is no `.nowlinerc` key. A value other than `hide` or `show` in the file is `NL.E0800` (the shipped code for NW6); an invalid CLI value exits 2.
 
 ### 4.3 Includes
 
@@ -207,7 +209,7 @@ Codes are placeholders; final `NL.*` codes are assigned at implementation, with 
 | NW3 | error | `every:` values are weekday names, without duplicates, and do not cover all seven days. |
 | NW4 | warning | `days-per-week` differs from the number of weekdays that recurring declarations leave working. (`calendar:custom` with `days-per-week: 6` and no `every:` triggers it.) |
 | NW5 | error | Duplicate `non-working` id within one file. Include collisions use the existing config-merge warning. |
-| NW6 | error | `non-working:` on `default roadmap` is `hide` or `show`. |
+| NW6 | error | `non-working:` on `default roadmap` is `hide` or `show`. Shipped as **`NL.E0800`**; it also covers a `non-working:` value inside a `style` block, one error per bad value. |
 | NW7 | info (layout insight) | An item's pinned start falls on a non-working day and moved (§5.1 rule 6). Shipped as **`NL.I1008`**; it covers `date:`, `start:` and the date in an `after:`, for main-lane and isolated-region items alike. A tie between the pin and another constraint (the lane cursor, an `after:` reference) still reports. |
 
 ## 7. Rendering
@@ -237,6 +239,16 @@ Because the density is shared, `show` is wider than `hide` by the non-working da
 - A bar ends at the end of its last working day. It is not stretched over a trailing weekend, so chained items show the gap. Seeing that gap is the point of `show`.
 - **Sides of a seam.** A seam is one point in `hide` space but two in `show` space: a start (a box start, a dated milestone or anchor, an arrow head) belongs on the right side, at the next working day's start, and a finish (a box end, an arrow tail) on the left, at the end of the last working day. Engine A gets this natively: under `show` it advances every duration through the calendar and snaps every start to a working day, rather than projecting a finished `hide` layout. See decision 8 in the [handoff](./handoffs/handoff-m2p-working-calendar.md).
 
+As built (Phase 4), the rules above resolve to these specifics, normative text in [`rendering.md` § Timeline Scale](./rendering.md#timeline-scale):
+
+- **Bands.** Each non-working run is one `PositionedNonWorkingRun` with its `x` and right edge clamped to the window and its `from` / `through` kept as the run's real dates, so a run that straddles the window edge reads as the part inside it. A run carries `band: true` at the days and weeks scales, or when it has titles (Phase 5); it never carries `seam`. At month scale and above no plain weekend carries `band`, so none is shaded, but the runs still exist and keep their meaning for consumers.
+- **Layer.** `<g data-layer="non-working">` sits after the lane backgrounds and before `wave-bg` and the grid (the name must not contain "wave"). It is re-emitted inside an isolated include region right after the region's fill rect and before the wave layers, clipped by rect intersection, with no `clipPath`. When no run is banded the layer is not emitted, so `hide` output gains no bytes.
+- **Y-range.** From `chartBox.y` to the bottom of the timeline box, the span the seam and minor-grid lines use, so a band covers the lanes and not the header or marker rows. Fill is `timeline.nonWorkingFill` (light `#64748b`, dark `#94a3b8`, grayscale `#737373`) at `fill-opacity` 0.1 (`NON_WORKING_FILL_OPACITY`, exported from `@nowline/layout`).
+- **Month-scale rule.** `fullUnitPx` counts calendar days under `show`. At month scale and above, a closing column that holds no working day is merged into the column before it. Engine B ends a window on Monday Feb 2 after a Sunday Feb 1 boundary, and `hide` already drops that column for having zero width; without the merge `show` would draw a one-day `Feb` sliver at the right edge.
+- **Sliver merge limit.** The merge is for the closing column only. A leading sliver (a window that starts on a Sunday, so the first column holds no working day) keeps its tick, and its label is dropped by the #92 edge-column rule. This is a known limit.
+- **Snap sites.** Starts snap to a working day (`TimeScale.startX`) only where they become geometry: `sequenceItem`'s placed start (after `waveFloorX`, `wavePinOverrideOf` and `nonWorkingPinOf` have run on the pre-snap value), group and parallel box left edges (a group's width is `max(snapped, timeCursorX, usedRightX) − snapped`), and the row packer's predicted extent and `firstChildStartX`. Lane cursor seeds, wave floors and include regions are not snapped. This is a deliberate deviation from the handoff's §6 wording ("the lane cursor, wave floors go through `startX`") with the same resulting geometry: it keeps `NL.I1008`, `NL.W1001` and their tie rules identical in both views and keeps floors raw, as decision 11 requires.
+- **Widths.** One helper, `itemSpanPx` in `working-span.ts`, serves all four duration-to-width sites. Under `hide` it returns the legacy `days × pixelsPerDay` verbatim, so there is no float drift; under `show` it returns `advanceX(startX, days) − startX`.
+
 ### 7.4 Named non-working days
 
 A run that contains a titled declaration is labelled in both views:
@@ -251,16 +263,17 @@ New theme tokens: `timeline.nonWorkingFill` and `timeline.nonWorkingSeam`.
 As built, `PositionedTimelineScale` gains two optional keys, set only when the window holds a non-working day under `hide` and omitted otherwise (so `calendar:full` and `calendar:custom` models carry neither):
 
 ```ts
-nonWorkingDisplay?: 'hide';                 // 'show' arrives with Phase 4
+nonWorkingDisplay?: NonWorkingDisplay;      // 'hide' | 'show'
 nonWorking?: PositionedNonWorkingRun[];
 
 interface PositionedNonWorkingRun {
-    x: number;          // seam x under hide, band left edge under show
-    width: number;      // 0 under hide
-    from: Date;         // first non-working date of the run
-    through: Date;      // last non-working date, inclusive
+    x: number;          // seam x under hide, band left edge under show (clamped to the window)
+    width: number;      // 0 under hide; the clamped band width under show
+    from: Date;         // first non-working date of the run (real date, never clamped)
+    through: Date;      // last non-working date, inclusive (real date, never clamped)
     titles?: string[];  // titled declarations in the run; omitted for a plain weekend
-    seam?: true;        // days scale only: strictly inside the chart, no grid line at x; the renderer draws a seam
+    seam?: true;        // hide, days scale only: strictly inside the chart, no grid line at x; the renderer draws a seam
+    band?: true;        // show, days and weeks scales or a run with titles: the renderer shades it; never with seam
 }
 ```
 
@@ -269,7 +282,9 @@ Other optional keys, each omitted when empty:
 - `PositionedAnchor.hiddenDate` and `PositionedMilestone.hiddenDate`: the real ISO date of a marker dated on a hidden day. The marker sits at the seam; the renderer adds it as an SVG `<title>`.
 - `PositionedMilestone.overrunDate`: the milestone's own date, so NL.I1007 no longer reads a date back off x.
 - `PositionedItem.nonWorkingPin`: `{ key: 'date' | 'start' | 'after'; pin: string; start: string }`, the source of NL.I1008.
-- Theme token `timeline.nonWorkingSeam` (light `#a0aec0`, dark `#6b7a90`, grayscale `#9a9a9a`). `timeline.nonWorkingFill` arrives with `show` (Phase 4).
+- `ResolvedStyle.nonWorking` (`'hide'` | `'show'`, default `'hide'`): the roadmap's resolved display setting, carried by every resolved style object in every calendar like `minorGrid` and `timelinePosition`. The render-time option replaces it when the layout is built, so `timeline.nonWorkingDisplay` is the value that was drawn.
+- `hiddenDate` is set only when the marker's date is hidden (`!showsNonWorking && !isWorkingDay`). Under `show` a marker dated on a weekend sits on its own date.
+- Theme tokens `timeline.nonWorkingSeam` (light `#a0aec0`, dark `#6b7a90`, grayscale `#9a9a9a`) and `timeline.nonWorkingFill` (light `#64748b`, dark `#94a3b8`, grayscale `#737373`, drawn at 0.1 opacity).
 
 Consumers that do date math from `pixelsPerDay` must use `forward` / `invert` instead. That includes the test helpers added in [#92](https://github.com/lolay/nowline/pull/92) that recover tick dates from x.
 

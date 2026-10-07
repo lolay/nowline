@@ -73,6 +73,9 @@ export type MessageCode =
     // Item (NL.E0600–E0699)
     | 'NL.E0600' // item-requires-size-or-duration
 
+    // Style / color / symbol (NL.E0800–E0899)
+    | 'NL.E0800' // invalid-non-working
+
     // Warnings (NL.W0700–W0799)
     | 'NL.W0700' // unknown-entity-property
     | 'NL.W0701' // include-wave-presentation
@@ -143,6 +146,7 @@ export const ALL_CODES: ReadonlyArray<MessageCode> = [
     'NL.E0504',
     'NL.E0505',
     'NL.E0600',
+    'NL.E0800',
     'NL.W0700',
     'NL.W0701',
     'NL.W0702',

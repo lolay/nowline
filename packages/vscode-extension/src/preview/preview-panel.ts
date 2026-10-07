@@ -1,7 +1,12 @@
 import * as path from 'node:path';
+import type { NonWorkingDisplay } from '@nowline/layout';
 import * as vscode from 'vscode';
 import type { RcConfigCache } from '../io/rc-config.js';
-import { resolvePreviewOptions, resolveTodayAnchor } from './option-resolver.js';
+import {
+    resolveNonWorkingDisplay,
+    resolvePreviewOptions,
+    resolveTodayAnchor,
+} from './option-resolver.js';
 import { type RenderOutcome, renderDocument } from './render-pipeline.js';
 import { getShellHtml } from './shell-html.js';
 
@@ -11,6 +16,9 @@ export type RefreshTrigger = 'keystroke' | 'save';
 // the active VS Code color theme.
 export type ThemeMode = 'auto' | 'light' | 'dark' | 'grayscale';
 export type DefaultFit = 'fitPage' | 'fitWidth' | 'actual';
+// Non-working-days axis. `'file'` is "no override": the roadmap's own
+// `default roadmap non-working:` key applies, then `hide`.
+export type NonWorkingMode = 'file' | 'hide' | 'show';
 
 export interface PreviewSettings {
     refreshOn: RefreshTrigger;
@@ -28,6 +36,12 @@ export interface PreviewSettings {
      * Empty string means use the host local zone.
      */
     timezone: string;
+    /**
+     * Non-working days display: `'file'` (default) follows the roadmap's own
+     * key; `'hide'` / `'show'` override it. The toolbar override wins over
+     * this; there is no `.nowlinerc` key.
+     */
+    nonWorking: NonWorkingMode;
     strict: boolean;
     showLinks: boolean;
     /** Canvas width in px; `0` leaves it unset. */
@@ -45,6 +59,8 @@ export interface ToolbarOverrides {
     theme?: ThemeMode;
     /** `'today'` mirrors the default; `'hide'` mirrors `--now -`; `Date` pins. */
     now?: 'today' | 'hide' | Date;
+    /** `'file'` is an explicit "follow the file", which beats the setting. */
+    nonWorking?: NonWorkingMode;
     showLinks?: boolean;
 }
 
@@ -69,6 +85,7 @@ export type PreviewWebviewMessage =
 export interface ViewOptionsPayload {
     theme?: ThemeMode;
     now?: 'today' | 'hide' | string;
+    nonWorking?: NonWorkingMode;
     showLinks?: boolean;
 }
 
@@ -205,6 +222,7 @@ export class NowlinePreview {
                 today: resolved.today,
                 locale: resolved.locale,
                 width: resolved.width,
+                nonWorking: resolved.nonWorking,
                 showLinks: resolved.showLinks,
                 strict: resolved.strict,
                 assetRoot: resolved.assetRoot,
@@ -289,6 +307,17 @@ export class NowlinePreview {
     }
 
     /**
+     * The non-working display currently shown in this preview panel: the
+     * toolbar override wins over the `nowline.preview.nonWorking` setting, and
+     * `'file'` (from either) is `undefined`, so the roadmap's own key applies.
+     * Use this when re-exporting so the saved file matches the preview. Shares
+     * {@link resolveNonWorkingDisplay} with the live render.
+     */
+    resolvedNonWorking(): NonWorkingDisplay | undefined {
+        return resolveNonWorkingDisplay(this.toolbarOverrides.nonWorking, this.settings.nonWorking);
+    }
+
+    /**
      * Whether link icons are currently shown in this preview panel — toolbar
      * override wins over the persistent setting. Use this when re-exporting so
      * the saved file's link visibility matches what the preview displayed.
@@ -326,6 +355,7 @@ export class NowlinePreview {
                 if (parsed) next.now = parsed;
             }
         }
+        if (isNonWorkingMode(payload.nonWorking)) next.nonWorking = payload.nonWorking;
         if (payload.showLinks !== undefined) next.showLinks = payload.showLinks;
         this.toolbarOverrides = next;
         void this.refreshNow();
@@ -361,6 +391,7 @@ export class NowlinePreview {
             showLinks: this.settings.showLinks,
             theme: this.settings.theme,
             now: this.settings.now,
+            nonWorking: this.settings.nonWorking,
             locale: this.vscodeLanguage,
         });
     }
@@ -373,6 +404,7 @@ export class NowlinePreview {
             showLinks: this.settings.showLinks,
             theme: this.settings.theme,
             now: this.settings.now,
+            nonWorking: this.settings.nonWorking,
             locale: this.vscodeLanguage,
         });
     }
@@ -399,4 +431,8 @@ function parseIsoDate(value: string): Date | undefined {
     const m = /^(\d{4})-(\d{2})-(\d{2})$/.exec(value);
     if (!m) return undefined;
     return new Date(Date.UTC(parseInt(m[1], 10), parseInt(m[2], 10) - 1, parseInt(m[3], 10)));
+}
+
+function isNonWorkingMode(value: unknown): value is NonWorkingMode {
+    return value === 'file' || value === 'hide' || value === 'show';
 }

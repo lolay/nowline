@@ -12,6 +12,7 @@
 declare const __NOWLINE_EMBED_VERSION__: string;
 declare const __NOWLINE_EMBED_SHA__: string;
 
+import type { NonWorkingDisplay } from '@nowline/layout';
 import {
     __resetAutoScanForTests,
     type AutoScanInputs,
@@ -34,6 +35,7 @@ export {
     type EmbedParseResult,
     EmbedRenderError,
     type EmbedTheme,
+    type NonWorkingDisplay,
     type ShareOption,
 };
 
@@ -74,6 +76,13 @@ export interface InitializeOptions {
     /** Layout canvas width in pixels. Layout's default is 1280. */
     width?: number;
     /**
+     * How a calendar's non-working days appear on every block: `'hide'`
+     * collapses them, `'show'` draws them as shaded bands. Wins over a
+     * roadmap's own `default roadmap non-working:` key. Leave it unset to let
+     * each roadmap's key apply, then `'hide'`.
+     */
+    nonWorking?: NonWorkingDisplay;
+    /**
      * "Today" override for the now-line. Accepts a `Date`, a YYYY-MM-DD string,
      * a full ISO 8601 instant (with Z or ±offset), or `null` to suppress the
      * now-line. Defaults to the local civil date when omitted.
@@ -109,6 +118,7 @@ interface ResolvedConfig {
     selector: string;
     locale?: string;
     width?: number;
+    nonWorking?: NonWorkingDisplay;
     today?: Date | string | null;
     timezone?: string;
     /** System theme captured at init; not reactive to OS theme flips mid-session. */
@@ -137,6 +147,7 @@ export function initialize(options: InitializeOptions = {}): void {
         selector: options.selector ?? config.selector,
         locale: options.locale ?? config.locale,
         width: options.width ?? config.width,
+        nonWorking: options.nonWorking ?? config.nonWorking,
         today: options.today !== undefined ? options.today : config.today,
         timezone: options.timezone ?? config.timezone,
         share: options.share ?? config.share,
@@ -155,6 +166,7 @@ function renderOptionsFromConfig(): EmbedRenderOptions {
         theme: effectiveTheme(config.theme, config.systemTheme),
         locale: config.locale,
         width: config.width,
+        nonWorking: config.nonWorking,
         today: config.today,
         timezone: config.timezone,
     };
@@ -193,6 +205,7 @@ export async function init(overrides?: Partial<AutoScanInputs>): Promise<AutoSca
         theme: overrides?.theme ?? renderOptionsFromConfig().theme,
         locale: overrides?.locale ?? config.locale,
         width: overrides?.width ?? config.width,
+        nonWorking: overrides?.nonWorking ?? config.nonWorking,
         today: overrides?.today !== undefined ? overrides.today : config.today,
         timezone: overrides?.timezone ?? config.timezone,
         share: overrides?.share ?? config.share,

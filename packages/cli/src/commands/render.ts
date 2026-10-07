@@ -14,6 +14,7 @@ import {
 } from '@nowline/export';
 import { lengthToPoints, parseLength } from '@nowline/export-core';
 import {
+    type NonWorkingDisplay,
     type NormalizedZone,
     normalizeThemeName,
     normalizeZone,
@@ -29,6 +30,7 @@ import {
     type OutputFormat,
     resolveFormat,
 } from '../cli/formats.js';
+import { parseNonWorkingArg } from '../cli/non-working.js';
 import { resolveRenderOutputPath } from '../cli/output-path.js';
 import { parseNowlineJson } from '../convert/parse-json.js';
 import { printNowlineFile } from '../convert/printer.js';
@@ -119,6 +121,7 @@ export async function renderHandler(options: RenderHandlerOptions): Promise<void
         theme: parseTheme(args.theme),
         today: resolveNowCli(args),
         width: parseWidthArg(args.width),
+        nonWorking: parseNonWorkingArg(args.nonWorking),
         noLinks: args.noLinks,
         strict: args.strict,
         assetRoot: args.assetRoot,
@@ -207,6 +210,7 @@ interface ProduceArgs {
     theme: ThemeName;
     today?: Date;
     width?: number;
+    nonWorking?: NonWorkingDisplay;
     noLinks: boolean;
     strict: boolean;
     assetRoot?: string;
@@ -279,6 +283,7 @@ async function produce(args: ProduceArgs): Promise<ProduceResult> {
         theme: args.theme,
         fonts,
         width: args.width,
+        nonWorking: args.nonWorking,
         noLinks: args.noLinks,
         strict: args.strict,
         pageSize: args.pageSize,

@@ -277,6 +277,19 @@ Raster scale factor (PNG only; default 1).
 Promote asset / sanitizer warnings to errors.
 .It Fl w , -width Ar px
 Canvas width in pixels (default 1280).
+.It Fl -non-working Ar mode
+How a business calendar's non-working days appear on the chart:
+.Sy hide
+collapses them (the default),
+.Sy show
+draws them as shaded bands.
+Overrides the file's
+.Sy default roadmap non-working:
+key; leave it unset and the key applies, then
+.Sy hide .
+Any other value exits with status 2.
+The schedule is the same in both views, so Mermaid, MS Project, and XLSX output
+does not change.
 .It Fl -asset-root Ar dir
 Directory from which logo / image assets may be loaded
 (default: input file's directory).

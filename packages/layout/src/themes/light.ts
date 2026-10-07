@@ -128,6 +128,7 @@ export const lightTheme: Theme = {
         gridLine: '#cbd5e1',
         minorGridLine: '#e2e8f0',
         nonWorkingSeam: '#a0aec0',
+        nonWorkingFill: '#64748b',
         tickMark: '#cbd5e1',
         labelText: '#64748b',
         panelFill: '#ffffff',

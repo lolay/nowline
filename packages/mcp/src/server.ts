@@ -111,6 +111,7 @@ interface PreviewPayload {
     theme?: string;
     now?: string;
     width?: number;
+    nonWorking?: 'hide' | 'show';
     locale?: string;
 }
 
@@ -123,6 +124,7 @@ function leanPreviewBlock(payload: PreviewPayload) {
             theme: payload.theme,
             now: payload.now,
             width: payload.width,
+            nonWorking: payload.nonWorking,
             locale: payload.locale,
         }),
     };
@@ -567,6 +569,15 @@ export function createMcpServer(opts: McpServerOptions = {}): McpServer {
         },
     );
 
+    const nonWorkingSchema = z
+        .enum(['hide', 'show'])
+        .optional()
+        .describe(
+            "How a business calendar's non-working days appear: hide collapses them, " +
+                "show draws them as shaded bands. Overrides the file's `default roadmap non-working:` key; " +
+                'omit to let the key apply (then hide). The schedule exports (mermaid, msproj, xlsx) are the same either way.',
+        );
+
     // ---- render -------------------------------------------------------------
 
     registerAppTool(
@@ -601,6 +612,7 @@ export function createMcpServer(opts: McpServerOptions = {}): McpServer {
                     .optional()
                     .describe('Now-line date as YYYY-MM-DD (UTC). Omit to suppress.'),
                 width: z.number().optional().describe('Canvas width in px.'),
+                nonWorking: nonWorkingSchema,
                 scale: z
                     .number()
                     .optional()
@@ -657,6 +669,7 @@ export function createMcpServer(opts: McpServerOptions = {}): McpServer {
                 locale: 'en-US',
                 theme: args.theme ?? 'light',
                 width: args.width,
+                nonWorking: args.nonWorking,
                 pngScale: args.scale,
             };
             const host = createNodeHostEnv(filePath);
@@ -695,6 +708,7 @@ export function createMcpServer(opts: McpServerOptions = {}): McpServer {
                 today,
                 theme: args.theme ?? 'light',
                 width: args.width,
+                nonWorking: args.nonWorking,
                 locale: 'en-US',
                 readFile: host.readSource,
                 doc: blocked.doc,
@@ -709,6 +723,7 @@ export function createMcpServer(opts: McpServerOptions = {}): McpServer {
                 theme: args.theme,
                 now: args.now,
                 width: args.width,
+                nonWorking: args.nonWorking,
                 locale: 'en-US',
             };
 
@@ -831,6 +846,7 @@ export function createMcpServer(opts: McpServerOptions = {}): McpServer {
                     ),
                 now: z.string().optional().describe('Now-line date as YYYY-MM-DD (UTC).'),
                 theme: z.enum(['light', 'dark', 'grayscale']).optional(),
+                nonWorking: nonWorkingSchema,
                 scale: z.number().optional().describe('PNG scale factor.'),
                 pageSize: z.string().optional().describe('PDF page size.'),
                 orientation: z
@@ -879,6 +895,7 @@ export function createMcpServer(opts: McpServerOptions = {}): McpServer {
                 today,
                 locale: 'en-US',
                 theme: args.theme ?? 'light',
+                nonWorking: args.nonWorking,
                 pngScale: args.scale,
                 pageSize: args.pageSize,
                 orientation: args.orientation,

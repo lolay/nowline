@@ -586,6 +586,47 @@ C'est pourquoi le mode business donne
 .Sy 1y = 260d
 et non
 .Sy 12 \(mu 22d = 264d .
+.Ss non-working \(em affichage des jours
+Avec
+.Sy calendar:business ,
+le week-end est non ouvré\ : les durées ne comptent que les jours ouvrés,
+et le graphique masque ces jours ou les dessine.
+L'affichage est une clé de style réservée à
+.Sy roadmap ,
+posée sur la ligne
+.Sy default roadmap
+(les clés de style brutes sont interdites sur la ligne
+.Sy roadmap
+elle-même)\ :
+.Bd -literal -offset indent
+config
+
+default roadmap non-working:show
+.Ed
+.Bl -tag -width "show"
+.It Sy hide Pq par défaut
+Les jours non ouvrés n'occupent aucune largeur\ ; chaque série se réduit à
+une couture.
+.It Sy show
+Les jours non ouvrés sont tracés à pleine largeur et ombrés.
+Une barre traverse un week-end mais s'arrête à la fin de son dernier jour
+ouvré, de sorte que l'écart entre des barres enchaînées reste visible.
+.El
+.Pp
+L'affichage ne modifie jamais le calendrier d'exécution\ : les sorties
+Mermaid, MS Project et XLSX sont identiques dans les deux vues.
+Il peut aussi être choisi au rendu\ ; la première source qui s'applique
+l'emporte\ : l'option
+.Fl -non-working
+(ou l'option équivalente d'une autre surface), la clé
+.Sy default roadmap non-working:
+du fichier, puis
+.Sy hide .
+Avec
+.Sy calendar:full
+et
+.Sy calendar:custom ,
+il n'y a pas de jours non ouvrés et la clé est sans effet.
 .Sh SECTION ROADMAP
 Le marqueur de section
 .Sy roadmap
@@ -1119,7 +1160,8 @@ Les propriétés de style brutes
 .Sy bg , Sy fg , Sy text , Sy border , Sy icon , Sy shadow ,
 .Sy font , Sy weight , Sy italic , Sy text-size , Sy padding ,
 .Sy spacing , Sy header-height , Sy corner-radius , Sy bracket ,
-.Sy capacity-icon , Sy timeline-position , Sy minor-grid
+.Sy capacity-icon , Sy timeline-position , Sy minor-grid ,
+.Sy non-working
 .Pc
 ne peuvent apparaître que dans des blocs
 .Sy style
@@ -1478,6 +1520,24 @@ Lorsque
 .Sy true ,
 trace de fines lignes de grille pointillées à chaque frontière de
 graduation.
+.It Sy non-working
+.Sy hide Pq par défaut | show .
+Réservée à
+.Sy roadmap ;
+à placer sur
+.Sy default roadmap .
+Avec un calendrier qui comporte des jours non ouvrés
+.Pq Sy calendar:business ,
+.Sy hide
+les réduit à une couture et
+.Sy show
+trace chaque série à pleine largeur sous forme de bande ombrée que les
+barres traversent.
+L'option
+.Fl -non-working
+de
+.Xr nowline 1
+et son équivalent sur chaque autre surface la remplacent.
 .El
 .Pp
 Les noms d'icône intégrés sont rendus à partir d'une bibliothèque
@@ -1769,6 +1829,20 @@ un identifiant correspondant à une déclaration
 en portée, ou un littéral Unicode entre guillemets doubles.
 Même contrat pour
 .Sy icon: .
+.It
+La valeur de
+.Sy non-working:
+doit être
+.Sy hide
+ou
+.Sy show ,
+sur
+.Sy default roadmap
+et dans un bloc
+.Sy style .
+Toute autre valeur est
+.Sy NL.E0800
+(une erreur par valeur).
 .It
 .Sy remaining:
 est soit un pourcentage

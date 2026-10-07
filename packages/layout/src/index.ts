@@ -95,6 +95,12 @@ export {
 } from './layout-insights.js';
 export { MARKER_BOLD_WIDTH_FACTOR } from './nodes/marker-geometry.js';
 export {
+    isNonWorkingDisplay,
+    NON_WORKING_DISPLAYS,
+    type NonWorkingDisplay,
+    parseNonWorkingDisplay,
+} from './non-working-display.js';
+export {
     civilDateInZone,
     type NormalizedZone,
     normalizeZone,
@@ -147,6 +153,7 @@ export {
     GROUP_TITLE_TAB_LABEL_BASELINE_OFFSET_PX,
     GROUP_TITLE_TAB_LABEL_FONT_SIZE_PX,
     GROUP_TITLE_TAB_PAD_X_PX,
+    NON_WORKING_FILL_OPACITY,
     NOW_PILL_CORNER_RADIUS_PX,
     NOW_PILL_HEIGHT_PX,
     NOW_PILL_LABEL_BASELINE_OFFSET_PX,

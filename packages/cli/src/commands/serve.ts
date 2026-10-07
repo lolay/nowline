@@ -12,6 +12,7 @@ import {
 } from '@nowline/layout';
 import { renderSvg } from '@nowline/renderer';
 import type { ParsedArgs } from '../cli/args.js';
+import { parseNonWorkingArg } from '../cli/non-working.js';
 import { getServices, parseSource } from '../core/parse.js';
 import {
     adaptResolveDiagnostic,
@@ -67,6 +68,7 @@ export async function serveHandler(options: ServeHandlerOptions): Promise<void> 
     const port = parsePort(args.port);
     const host = args.host ?? '127.0.0.1';
     const theme = parseTheme(args.theme);
+    const nonWorking = parseNonWorkingArg(args.nonWorking);
     const today = resolveNowArg(args);
     const resolvedLocale = resolveLocaleOverride({ flag: args.locale, env: process.env });
     const locale = resolvedLocale.tag;
@@ -154,7 +156,7 @@ export async function serveHandler(options: ServeHandlerOptions): Promise<void> 
                 broadcast(clients, 'error', msg);
                 return;
             }
-            const model = layoutRoadmap(parse.ast, resolved, { theme, today, locale });
+            const model = layoutRoadmap(parse.ast, resolved, { theme, today, locale, nonWorking });
             const svg = await renderSvg(model, {
                 assetResolver: createAssetResolver(assetRoot),
                 warn: (m) => process.stderr.write(`warning: ${m}\n`),

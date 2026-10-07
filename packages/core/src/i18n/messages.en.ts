@@ -226,6 +226,10 @@ export const messages = {
     'NL.E0600': (a: { name: string }) =>
         `Item "${a.name}" requires a "size:" or "duration:" property.`,
 
+    // Style
+    'NL.E0800': (a: { value: string }) =>
+        `Invalid non-working value "${a.value}". Use hide or show.`,
+
     // Warnings
     'NL.W0700': (a: { key: string; entity: string; suggested: string }) =>
         `Unknown property "${a.key}" on ${a.entity}. The renderer ignores it.${

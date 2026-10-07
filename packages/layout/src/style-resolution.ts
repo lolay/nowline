@@ -5,6 +5,7 @@ import type {
     StyleDeclaration,
     StyleProperty,
 } from '@nowline/core';
+import { isNonWorkingDisplay } from './non-working-display.js';
 import { resolveColor } from './themes/index.js';
 import type { EntityStyle, Theme } from './themes/shape.js';
 import type { ResolvedStyle, SizeBucket } from './types.js';
@@ -61,6 +62,7 @@ function entityStyleToResolved(e: EntityStyle, theme: Theme): ResolvedStyle {
         // single-top-strip layout and keep the major-ticks-only grid.
         timelinePosition: 'top',
         minorGrid: false,
+        nonWorking: 'hide',
     };
 }
 
@@ -135,6 +137,9 @@ function applyProp(target: ResolvedStyle, key: string, value: string, theme: The
             break;
         case 'minor-grid':
             target.minorGrid = value === 'true';
+            break;
+        case 'non-working':
+            if (isNonWorkingDisplay(value)) target.nonWorking = value;
             break;
         default:
             break;
