@@ -1818,6 +1818,28 @@ fraction décimale positive, ou
 Lorsque les deux seuils numériques sont définis,
 .Sy warn-at \(<= over-at .
 .It
+Valeurs de style, dans un bloc
+.Sy style
+ou sur une ligne
+.Sy default ,
+les clés
+.Sy bg: , fg:
+et
+.Sy text:
+prennent une couleur nommée, une valeur hexadécimale ou
+.Sy none
+.Pq Sy NL.E0801 ;
+une clé à ensemble de valeurs fixe, comme
+.Sy border: , shadow:
+ou
+.Sy font: ,
+prend l'une de ces valeurs
+.Pq Sy NL.E0802 .
+Une clé d'un bloc
+.Sy style
+qui n'est pas une propriété de style est
+.Sy NL.E0803 .
+.It
 La valeur de
 .Sy capacity-icon:
 doit être un identifiant intégré
