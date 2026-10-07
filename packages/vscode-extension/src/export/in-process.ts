@@ -20,6 +20,7 @@ import {
     exportDocument,
     type HostEnv,
     type ExportFormat as KernelFormat,
+    type NonWorkingDisplay,
     type RenderInputs,
     resolveToday,
 } from '@nowline/export';
@@ -99,6 +100,11 @@ export interface ExportOverrides {
     locale?: string;
     /** Drop `<a>` link icons from the render. Defaults to `false` (links shown). */
     noLinks?: boolean;
+    /**
+     * Non-working display. `undefined` leaves the choice to the roadmap's own
+     * `default roadmap non-working:` key (then `hide`).
+     */
+    nonWorking?: NonWorkingDisplay;
 }
 
 const BINARY_FORMATS = new Set<KernelFormat>(['png', 'pdf', 'xlsx']);
@@ -124,7 +130,7 @@ export async function exportInProcess(
 ): Promise<InProcessExportResult> {
     const source = await fs.readFile(sourcePath, 'utf-8');
 
-    const { today, theme, locale, noLinks } = overrides;
+    const { today, theme, locale, noLinks, nonWorking } = overrides;
     // `null`  → suppress the now-line (RenderInputs.today = undefined)
     // `Date`  → pin to that UTC midnight
     // missing → default to today (local civil date via resolveToday)
@@ -134,6 +140,7 @@ export async function exportInProcess(
         locale: locale ?? 'en-US',
         theme: theme ?? 'light',
         noLinks: noLinks ?? false,
+        nonWorking,
         // Canvas width is a deliberate export setting (not preview-coupled):
         // a *maximum* cap, no floor. `0`/unset leaves it at the layout default
         // (1280), keeping byte-for-byte parity with the `nowline` CLI default.

@@ -20,7 +20,7 @@ import {
     type RenderResult,
 } from '@nowline/browser';
 import { BUNDLED_MONO_FAMILY, BUNDLED_SANS_FAMILY } from '@nowline/export-core';
-import type { ThemeName } from '@nowline/layout';
+import type { NonWorkingDisplay, ThemeName } from '@nowline/layout';
 import { classifyRenderResult } from '@nowline/preview-shell';
 import type { AssetResolver, FontFamilies } from '@nowline/renderer';
 
@@ -50,6 +50,11 @@ export interface RenderInputs {
     locale?: string;
     /** Total canvas width in px. Layout's default is 1280. */
     width?: number;
+    /**
+     * The render-time non-working display. `undefined` lets the file's own
+     * `default roadmap non-working:` key apply (then `hide`).
+     */
+    nonWorking?: NonWorkingDisplay;
     /** Inverse of the CLI's `--no-links`. When false, link icons are dropped. */
     showLinks?: boolean;
     /** Promote asset / sanitizer warnings to errors in the diagnostic table. */
@@ -104,6 +109,7 @@ export async function renderDocument(inputs: RenderInputs): Promise<RenderOutcom
         today: inputs.today,
         locale: inputs.locale,
         width: inputs.width,
+        nonWorking: inputs.nonWorking,
         showLinks: inputs.showLinks,
         strict: inputs.strict,
         readFile: async (absPath: string) => {

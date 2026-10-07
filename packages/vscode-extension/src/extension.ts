@@ -1,5 +1,6 @@
 import * as os from 'node:os';
 import * as path from 'node:path';
+import type { NonWorkingDisplay } from '@nowline/layout';
 import * as vscode from 'vscode';
 import {
     LanguageClient,
@@ -12,10 +13,11 @@ import { exportInProcess, initExportRuntime } from './export/in-process.js';
 import { runNewRoadmapCommand } from './export/new-roadmap.js';
 import { DisagreementTracker } from './io/disagreement-check.js';
 import { RcConfigCache } from './io/rc-config.js';
-import { resolveTodayAnchor } from './preview/option-resolver.js';
+import { resolveNonWorkingDisplay, resolveTodayAnchor } from './preview/option-resolver.js';
 import { PreviewManager } from './preview/preview-manager.js';
 import type {
     DefaultFit,
+    NonWorkingMode,
     NowlinePreview,
     PreviewSettings,
     PreviewWebviewMessage,
@@ -257,6 +259,7 @@ function readPreviewSettings(): PreviewSettings {
     const locale = cfg.get<string>('locale') ?? '';
     const now = cfg.get<string>('now') ?? 'auto';
     const timezone = cfg.get<string>('timezone') ?? '';
+    const nonWorking = (cfg.get<string>('nonWorking') ?? 'file') as NonWorkingMode;
     const strict = cfg.get<boolean>('strict') ?? false;
     const showLinks = cfg.get<boolean>('showLinks') ?? true;
     const width = cfg.get<number>('width') ?? 0;
@@ -270,6 +273,7 @@ function readPreviewSettings(): PreviewSettings {
         locale,
         now,
         timezone,
+        nonWorking,
         strict,
         showLinks,
         width,
@@ -338,6 +342,22 @@ function resolveLocaleForExport(sourceUri: vscode.Uri): string | undefined {
     if (fromSettings.length > 0) return fromSettings;
     const lang = vscode.env.language;
     return typeof lang === 'string' && lang.length > 0 ? lang : undefined;
+}
+
+/**
+ * Resolve the non-working display to use for an export of `sourceUri`.
+ *
+ *  1. `NowlinePreview.resolvedNonWorking()` when a preview is open (respects
+ *     the toolbar's Non-working days menu).
+ *  2. `nowline.preview.nonWorking` setting (default `file`).
+ *
+ * `undefined` leaves the choice to the roadmap's own
+ * `default roadmap non-working:` key, then `hide`.
+ */
+function resolveNonWorkingForExport(sourceUri: vscode.Uri): NonWorkingDisplay | undefined {
+    const preview = previewManager?.getForSource(sourceUri);
+    if (preview) return preview.resolvedNonWorking();
+    return resolveNonWorkingDisplay(undefined, readPreviewSettings().nonWorking);
 }
 
 /**
@@ -433,6 +453,7 @@ async function handleSave(
         today: source.resolvedToday(),
         locale: source.resolvedLocale(),
         noLinks: !source.resolvedShowLinks(),
+        nonWorking: source.resolvedNonWorking(),
     };
 
     if (format === 'png') {
@@ -495,6 +516,7 @@ async function handleCopyPngFallback(_body: Uint8Array, source: NowlinePreview):
             theme: source.resolvedTheme(),
             locale: source.resolvedLocale(),
             noLinks: !source.resolvedShowLinks(),
+            nonWorking: source.resolvedNonWorking(),
         });
         pngBytes = result.rendered as Uint8Array;
     } catch (err) {
@@ -538,6 +560,7 @@ async function handleExport(uri: vscode.Uri | undefined): Promise<void> {
         today: resolveNowForExport(target),
         locale: resolveLocaleForExport(target),
         showLinks: resolveShowLinksForExport(target),
+        nonWorking: resolveNonWorkingForExport(target),
     });
 }
 

@@ -1,6 +1,7 @@
 import { spawn } from 'node:child_process';
 import { promises as fs } from 'node:fs';
 import * as path from 'node:path';
+import type { NonWorkingDisplay } from '@nowline/layout';
 import * as vscode from 'vscode';
 import { type ExportFormat, exportInProcess } from './in-process.js';
 
@@ -49,6 +50,13 @@ export interface RunExportArgs {
      * preview. `undefined` defaults to links shown.
      */
     showLinks?: boolean;
+    /**
+     * Resolved non-working display. When a preview panel is open, pass
+     * `NowlinePreview.resolvedNonWorking()` so the export matches the preview.
+     * `undefined` leaves the choice to the roadmap's own
+     * `default roadmap non-working:` key.
+     */
+    nonWorking?: NonWorkingDisplay;
 }
 
 /**
@@ -136,7 +144,8 @@ const EXPORT_TARGETS: ExportTarget[] = [
  * See `specs/ide.md` § Export to other formats.
  */
 export async function runExportCommand(args: RunExportArgs): Promise<void> {
-    const { sourceUri, settings, outputChannel, theme, today, locale, showLinks } = args;
+    const { sourceUri, settings, outputChannel, theme, today, locale, showLinks, nonWorking } =
+        args;
     const noLinks = showLinks === undefined ? undefined : !showLinks;
 
     const target = await pickExportTarget();
@@ -165,6 +174,7 @@ export async function runExportCommand(args: RunExportArgs): Promise<void> {
             today,
             locale,
             noLinks,
+            nonWorking,
         });
         outputChannel.appendLine(`$ ${quote(cliPath)} ${cliArgs.map(quote).join(' ')}`);
         try {
@@ -192,6 +202,7 @@ export async function runExportCommand(args: RunExportArgs): Promise<void> {
                     theme,
                     locale,
                     noLinks,
+                    nonWorking,
                 },
             );
             const bytes = result.isBinary
@@ -274,9 +285,10 @@ function buildCliArgs(
         today?: Date | null;
         locale?: string;
         noLinks?: boolean;
+        nonWorking?: NonWorkingDisplay;
     } = {},
 ): string[] {
-    const { theme, today, locale, noLinks } = overrides;
+    const { theme, today, locale, noLinks, nonWorking } = overrides;
     const args: string[] = [sourcePath, '-f', target.format, '-o', destPath];
     if (theme) args.push('--theme', theme);
     // `null`  → suppress the now-line (CLI: `--now -`)
@@ -292,6 +304,9 @@ function buildCliArgs(
     }
     if (locale) args.push('--locale', locale);
     if (noLinks) args.push('--no-links');
+    // Only when set: a CLI older than the display option rejects an unknown
+    // flag, and unset must let the file's own key apply.
+    if (nonWorking) args.push('--non-working', nonWorking);
     // Width cap (deliberate export setting; not preview-coupled). `0`/unset
     // omits the flag so the CLI keeps its 1280 default.
     if (settings.width > 0) args.push('--width', String(settings.width));

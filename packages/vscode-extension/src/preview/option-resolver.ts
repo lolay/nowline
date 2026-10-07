@@ -1,5 +1,6 @@
 import type { NowlineRc } from '@nowline/config';
 import {
+    type NonWorkingDisplay,
     type NormalizedZone,
     normalizeThemeName,
     normalizeZone,
@@ -24,6 +25,12 @@ export interface ResolvedRenderOptions {
     today: Date | null;
     locale: string | undefined;
     width: number | undefined;
+    /**
+     * The render-time non-working display, or `undefined` to let the file's
+     * `default roadmap non-working:` key apply (then `hide`). Never carries
+     * `'file'`.
+     */
+    nonWorking: NonWorkingDisplay | undefined;
     showLinks: boolean;
     strict: boolean;
     assetRoot: string | undefined;
@@ -51,6 +58,10 @@ export function resolvePreviewOptions(ctx: ResolveContext): ResolvedRenderOption
         today: resolveTodayForPreview(ctx),
         locale: resolveLocale(ctx),
         width: resolveWidth(ctx),
+        nonWorking: resolveNonWorkingDisplay(
+            ctx.toolbarOverrides?.nonWorking,
+            ctx.settings.nonWorking,
+        ),
         showLinks: resolveShowLinks(ctx),
         strict: ctx.settings.strict,
         assetRoot: resolveAssetRoot(ctx),
@@ -168,6 +179,25 @@ function resolveWidth(ctx: ResolveContext): number | undefined {
     }
     if (typeof ctx.rc.width === 'number' && ctx.rc.width > 0) return ctx.rc.width;
     return undefined;
+}
+
+/**
+ * Resolve the non-working display from the toolbar override and the persistent
+ * setting. Precedence: toolbar, setting, then the file's own key (which is the
+ * `undefined` result), then `hide`. The toolbar's `'file'` is an explicit
+ * choice to follow the file, so it beats a `show` or `hide` setting, the way
+ * the theme toolbar's `'auto'` beats a forced theme setting. There is no
+ * `.nowlinerc` key.
+ *
+ * Shared by the live render and the export path
+ * (`NowlinePreview.resolvedNonWorking()`).
+ */
+export function resolveNonWorkingDisplay(
+    toolbar: ToolbarOverrides['nonWorking'],
+    setting: PreviewSettings['nonWorking'],
+): NonWorkingDisplay | undefined {
+    const effective = toolbar ?? setting;
+    return effective === 'hide' || effective === 'show' ? effective : undefined;
 }
 
 function resolveShowLinks(ctx: ResolveContext): boolean {
