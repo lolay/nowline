@@ -43,6 +43,7 @@ Most files are near-clones of [`examples/minimal.nowline`](../examples/minimal.n
 | [`waves-gap-deadline.nowline`](waves-gap-deadline.nowline) | Wave start floors (anchor and inline date) that each open a gap (the inline-date gap shows its gap label; the one-week anchor gap is too narrow for one), plus a dated milestone `after:<wave>` that the wave overruns: overrun cut line styling and `NL.I1007`. |
 | [`waves-isolate.nowline`](waves-isolate.nowline) | A `roadmap:isolate` region taking part in the wave barrier: region ids stay private but the waves are global. Uses [`waves-isolate-team.nowline`](waves-isolate-team.nowline) as its included child, which re-declares the same waves. |
 | [`waves-coarse.nowline`](waves-coarse.nowline) | Waves at `scale:1m`: seven waves including an empty one, a start-floor gap, a styled wave, two stacked marker rows, background work crossing boundaries, and a `group wave:x` on a boundary. |
+| [`weekends-show.nowline`](weekends-show.nowline) | The `show` display of a business calendar (`default roadmap non-working:show`): each weekend is a full-width shaded band, a bar paints across it but ends at the end of its last working day, a Wednesday-start bar crosses a weekend, a group after a Friday end starts on the next Monday, and a Saturday milestone sits on its own date inside a band. Example A of [`specs/working-calendar.md`](../specs/working-calendar.md) §10 plus three extra lanes. Snapshotted and in the determinism gate. |
 
 ### Multi-file fixtures
 
