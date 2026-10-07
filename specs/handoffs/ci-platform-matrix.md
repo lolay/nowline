@@ -1,6 +1,6 @@
 # CI platform matrix: what has to run where
 
-Status: research, pending a decision. Nothing in CI has changed yet. Remove this file, or promote the chosen design into `specs/` and `Makefile.md`, before the branch merges.
+Status: Tier 1 and Tier 3 are implemented on this branch (commits `056e3a0`, `89e6063`) and wait on a CI run, which needs a PR. Tier 2 (merge queue or the no-queue fallback) is the maintainer's open decision. After merge, the `main` ruleset still has to be re-applied with `scripts/apply-branch-policies.sh` so it requires only `CI gate`. Remove this file, or promote the chosen design into `specs/` and `Makefile.md`, before the branch merges.
 
 ## Answer
 
@@ -91,7 +91,7 @@ The estimates come from one run's step timings. Setup time on Windows (35 s for 
 
 ## Open decision
 
-Which tier to implement, and specifically: merge queue (Tier 2, step 5) or the no-queue fallback (macOS Vitest on push to `main` only)?
+Tier 1 and Tier 3 are chosen and implemented. Still open: merge queue (Tier 2, step 5) or the no-queue fallback (macOS Vitest on push to `main` only)?
 
 ## Risks and gotchas
 
