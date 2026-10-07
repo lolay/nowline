@@ -274,6 +274,8 @@ export const messages = {
                   ? `the ${a.target.kind === 'parallel' ? 'parallel block' : a.target.kind} on line ${a.target.line}`
                   : `${a.target.kind} "${a.target.name}"`
         } is ignored: this roadmap declares no waves. Declare waves with "wave <id>" to use it, or remove the property.`,
+    'NL.W0703': (a: { key: string; entityType: string }) =>
+        `"${a.key}" on "default ${a.entityType}" is ignored: it is a roadmap-only style key. Set it on "default roadmap" instead.`,
 
     // Waves
     'NL.E1100': (a: E1100Args) =>

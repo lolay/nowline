@@ -308,6 +308,8 @@ export const messages: MessageBundle = {
                       : `${a.target.kind} à la ligne ${a.target.line}`
                   : `${a.target.kind} ${q(a.target.name)}`
         } est ignoré\u00A0: cette roadmap ne déclare aucune vague. Déclarez des vagues avec «\u00A0wave <id>\u00A0» pour l'utiliser, ou retirez la propriété.`,
+    'NL.W0703': (a: { key: string; entityType: string }) =>
+        `${q(a.key)} sur ${q(`default ${a.entityType}`)} est ignoré\u00A0: c'est une clé de style propre à la roadmap. Définissez-la plutôt sur «\u00A0default roadmap\u00A0».`,
 
     // Vagues
     'NL.E1100': (a: E1100Args) =>

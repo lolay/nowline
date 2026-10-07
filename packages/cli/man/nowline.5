@@ -1777,6 +1777,22 @@ Any other value is
 .Sy NL.E0800
 (one error per value).
 .It
+The roadmap-only style keys
+.Sy header-height , timeline-position , minor-grid ,
+and
+.Sy non-working
+take effect only on
+.Sy default roadmap
+(or in a
+.Sy style
+block the roadmap references).
+On any other
+.Sy default
+line they are ignored with the warning
+.Sy NL.W0703 .
+.Sy style
+blocks are not checked.
+.It
 .Sy remaining:
 is either a percentage
 .Pq Sy 0% \(en Sy 100%
