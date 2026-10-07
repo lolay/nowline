@@ -1384,3 +1384,207 @@ describe('style value codes', () => {
         expect(resolveDiagnosticCode(diag)).toBe('NL.E0803');
     });
 });
+
+// Rule 20 raw style properties and the symbol rules (17f–17k) carry stable
+// codes (NL.E0804–E0812). As with the style value codes above, the English
+// text predates the codes and must not change, so each case pins it exactly.
+describe('raw style and symbol codes', () => {
+    const body = 'roadmap r\nswimlane s\n  item x duration:1w\n';
+    const NBSP = ' ';
+    const q = (s: string) => `«${NBSP}${s}${NBSP}»`;
+    const iconBuiltins =
+        'calendar, lock, multiplier, none, people, person, points, shield, time, warning';
+    const capacityBuiltins = 'multiplier, none, people, person, points, time';
+
+    type Outcome = Awaited<ReturnType<typeof parse>>;
+    type Coded = { code: string; args: unknown[] };
+
+    const coded = (r: Outcome) =>
+        r.diagnostics
+            .filter((d) => d.severity === 1)
+            .map((d) => ({ message: d.message, data: d.data as Coded | undefined }));
+
+    const cases: Array<{
+        name: string;
+        src: string;
+        code: string;
+        en: string;
+        fr: string;
+    }> = [
+        {
+            name: 'raw style property on an item',
+            src: 'roadmap r\nswimlane s\n  item x duration:1w bg:red\n',
+            code: 'NL.E0804',
+            en: 'Raw style property "bg" is not allowed on item "x". Declare a named style in config and reference it via "style:id".',
+            fr: `La propriété de style brute ${q('bg')} n'est pas permise sur item "x". Déclarez un style nommé dans la config et référencez-le avec ${q('style:id')}.`,
+        },
+        {
+            name: 'symbol id shadowing a built-in icon',
+            src: `config\nsymbol points unicode:"💰"\n${body}`,
+            code: 'NL.E0805',
+            en: `Symbol id "points" collides with a built-in icon name. Reserved built-ins: ${iconBuiltins}.`,
+            fr: `L'identifiant de symbole ${q('points')} entre en conflit avec le nom d'une icône intégrée. Noms réservés${NBSP}: ${iconBuiltins}.`,
+        },
+        {
+            name: 'symbol without unicode:',
+            src: `config\nsymbol budget "Budget"\n${body}`,
+            code: 'NL.E0806',
+            en: 'Symbol "budget" requires a "unicode:" property (e.g. unicode:"💰" or unicode:"\\u{1F464}").',
+            fr: `Le symbole ${q('budget')} exige une propriété ${q('unicode:')} (p.${NBSP}ex. unicode:"💰" ou unicode:"\\u{1F464}").`,
+        },
+        {
+            name: 'symbol with an empty unicode:',
+            src: `config\nsymbol budget unicode:""\n${body}`,
+            code: 'NL.E0807',
+            en: 'Symbol "budget" unicode: must be a non-empty value.',
+            fr: `La propriété ${q('unicode:')} du symbole ${q('budget')} doit avoir une valeur non vide.`,
+        },
+        {
+            name: 'symbol ascii: too long',
+            src: `config\nsymbol budget unicode:"💰" ascii:"BUDG"\n${body}`,
+            code: 'NL.E0808',
+            en: 'Symbol "budget" ascii: must be 1-3 ASCII characters (got 4 characters).',
+            fr: `La propriété ${q('ascii:')} du symbole ${q('budget')} doit compter de 1 à 3 caractères ASCII (reçu${NBSP}: 4 caractères).`,
+        },
+        {
+            name: 'symbol ascii: one non-ASCII character',
+            src: `config\nsymbol budget unicode:"💰" ascii:"é"\n${body}`,
+            code: 'NL.E0808',
+            en: 'Symbol "budget" ascii: must be 1-3 ASCII characters (got 1 character).',
+            fr: `La propriété ${q('ascii:')} du symbole ${q('budget')} doit compter de 1 à 3 caractères ASCII (reçu${NBSP}: 1 caractère).`,
+        },
+        {
+            name: 'unknown symbol property',
+            src: `config\nsymbol budget unicode:"💰" color:red\n${body}`,
+            code: 'NL.E0809',
+            en: 'Unknown symbol property "color". Allowed: unicode, ascii, link, description.',
+            fr: `Propriété de symbole inconnue ${q('color')}. Valeurs admises${NBSP}: unicode, ascii, link, description.`,
+        },
+        {
+            name: 'duplicate symbol id',
+            src: `config\nsymbol budget unicode:"💰"\nsymbol budget unicode:"$"\n${body}`,
+            code: 'NL.E0810',
+            en: 'Duplicate symbol id "budget". First declared at line 2.',
+            fr: `Identifiant de symbole en double ${q('budget')}. Première déclaration à line 2.`,
+        },
+        {
+            name: 'capacity-icon naming an unknown symbol',
+            src: `config\nstyle finance\n  capacity-icon: nonesuch\n${body}`,
+            code: 'NL.E0811',
+            en: `capacity-icon: "nonesuch" is neither a built-in (${capacityBuiltins}) nor a declared symbol. Add "symbol nonesuch unicode:..." earlier in config or use a quoted Unicode literal.`,
+            fr: `capacity-icon: ${q('nonesuch')} n'est ni une icône intégrée (${capacityBuiltins}) ni un symbole déclaré. Ajoutez ${q('symbol nonesuch unicode:...')} plus haut dans la config ou utilisez un littéral Unicode entre guillemets.`,
+        },
+        {
+            name: 'icon on a default line naming an unknown symbol',
+            src: `config\ndefault item icon:mystery\n${body}`,
+            code: 'NL.E0811',
+            en: `icon: "mystery" is neither a built-in (${iconBuiltins}) nor a declared symbol. Add "symbol mystery unicode:..." earlier in config or use a quoted Unicode literal.`,
+            fr: `icon: ${q('mystery')} n'est ni une icône intégrée (${iconBuiltins}) ni un symbole déclaré. Ajoutez ${q('symbol mystery unicode:...')} plus haut dans la config ou utilisez un littéral Unicode entre guillemets.`,
+        },
+        {
+            name: 'capacity-icon referencing a later symbol',
+            src: `config\nstyle finance\n  capacity-icon: budget\nsymbol budget unicode:"💰"\n${body}`,
+            code: 'NL.E0812',
+            en: 'capacity-icon: symbol "budget" is referenced before its declaration. Move "symbol budget" above this entry.',
+            fr: `capacity-icon: le symbole ${q('budget')} est référencé avant sa déclaration. Déplacez ${q('symbol budget')} au-dessus de cette entrée.`,
+        },
+    ];
+
+    for (const c of cases) {
+        it(`${c.name} is exactly one ${c.code} with unchanged English text`, async () => {
+            const r = await parse(c.src);
+            const errors = coded(r);
+            expect(errors.map((e) => e.message)).toEqual([c.en]);
+            expect(errors[0].data?.code).toBe(c.code);
+            expect(resolveDiagnosticCode(r.diagnostics.filter((d) => d.severity === 1)[0])).toBe(
+                c.code,
+            );
+        });
+
+        it(`${c.name} renders ${c.code} in French from its data`, async () => {
+            const r = await parse(c.src);
+            const [error] = coded(r);
+            // One code stands in for the case's code: `tr` is generic per code,
+            // and the runtime lookup goes by the string either way.
+            const { code, args } = error.data as { code: 'NL.E0809'; args: [{ key: string }] };
+            expect(tr('fr', code, ...args)).toBe(c.fr);
+        });
+    }
+});
+
+// Rule 20: header-height, timeline-position, minor-grid and non-working are
+// read only from the roadmap's style. On another entity's `default` line they
+// do nothing, so they warn (NL.W0703). Style blocks are left alone: one block
+// can serve the roadmap and other entities alike.
+describe('NL.W0703: roadmap-only style key on another default', () => {
+    const body = 'roadmap r\nswimlane s\n  item x duration:1w\n';
+    const NBSP = ' ';
+
+    type Outcome = Awaited<ReturnType<typeof parse>>;
+
+    const w0703 = (r: Outcome) =>
+        r.diagnostics.filter((d) => (d.data as { code?: string } | undefined)?.code === 'NL.W0703');
+
+    it.each([
+        ['item', 'minor-grid:true'],
+        ['swimlane', 'non-working:show'],
+        ['group', 'header-height:lg'],
+        ['milestone', 'timeline-position:both'],
+    ])('warns on default %s %s', async (entity, prop) => {
+        const key = prop.split(':')[0];
+        const r = await parse(`config\ndefault ${entity} ${prop}\n${body}`);
+        expect(errorMessages(r.diagnostics)).toEqual([]);
+        expect(warningMessages(r.diagnostics)).toEqual([
+            `"${key}" on "default ${entity}" is ignored: it is a roadmap-only style key. Set it on "default roadmap" instead.`,
+        ]);
+        expect(w0703(r)).toHaveLength(1);
+    });
+
+    it('warns once per roadmap-only key on the same line', async () => {
+        const r = await parse(
+            `config\ndefault swimlane minor-grid:true non-working:show padding:sm\n${body}`,
+        );
+        expect(w0703(r).map((d) => (d.data as { args: [{ key: string }] }).args[0].key)).toEqual([
+            'minor-grid',
+            'non-working',
+        ]);
+    });
+
+    it('stays clean on default roadmap', async () => {
+        const r = await parse(
+            `config\ndefault roadmap minor-grid:true non-working:show header-height:lg timeline-position:both\n${body}`,
+        );
+        expect(errorMessages(r.diagnostics)).toEqual([]);
+        expect(warningMessages(r.diagnostics)).toEqual([]);
+    });
+
+    it('does not check style blocks', async () => {
+        const r = await parse(
+            `config\nstyle grid\n  minor-grid: true\n  non-working: show\ndefault swimlane style:grid\n${body}`,
+        );
+        expect(errorMessages(r.diagnostics)).toEqual([]);
+        expect(w0703(r)).toEqual([]);
+    });
+
+    it('keeps the value error alongside the warning for a bad value', async () => {
+        const r = await parse(`config\ndefault item non-working:maybe\n${body}`);
+        expect(errorMessages(r.diagnostics)).toEqual([
+            'Invalid non-working value "maybe". Use hide or show.',
+        ]);
+        expect(w0703(r)).toHaveLength(1);
+    });
+
+    it('translates the message into French', async () => {
+        const r = await parse(
+            `nowline v1 locale:fr\nconfig\ndefault item minor-grid:true\n${body}`,
+        );
+        const [diag] = w0703(r);
+        const { code, args } = diag.data as {
+            code: 'NL.W0703';
+            args: [{ key: string; entityType: string }];
+        };
+        expect(tr('fr', code, ...args)).toBe(
+            `«${NBSP}minor-grid${NBSP}» sur «${NBSP}default item${NBSP}» est ignoré${NBSP}: c'est une clé de style propre à la roadmap. Définissez-la plutôt sur «${NBSP}default roadmap${NBSP}».`,
+        );
+    });
+});

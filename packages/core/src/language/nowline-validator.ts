@@ -124,6 +124,17 @@ const STYLE_PROP_KEYS = new Set([
 // `NON_WORKING_DISPLAYS` in @nowline/layout, which core cannot import.
 const NON_WORKING_VALUES = new Set(['hide', 'show']);
 
+// Style keys only the roadmap reads (specs/dsl.md style table). On another
+// entity's `default` line they are a silent no-op, so they warn (NL.W0703).
+// Style blocks are not checked: one block can be referenced by the roadmap
+// and by other entities alike, so the key there is not necessarily wrong.
+const ROADMAP_ONLY_STYLE_KEYS = new Set([
+    'header-height',
+    'timeline-position',
+    'minor-grid',
+    'non-working',
+]);
+
 // Built-in capacity-icon vocabulary. Renderer-curated SVG glyphs (plus 'multiplier'
 // which renders as the U+00D7 text character and 'none' which suppresses the glyph).
 const BUILTIN_CAPACITY_ICONS = new Set([
@@ -1179,12 +1190,10 @@ export class NowlineValidator {
         for (const prop of node.properties) {
             const key = propKey(prop);
             if (STYLE_PROP_KEYS.has(key)) {
-                accept(
-                    'error',
-                    `Raw style property "${key}" is not allowed on ${describeNode(node)}. ` +
-                        `Declare a named style in config and reference it via "style:id".`,
-                    { node: prop },
-                );
+                acceptTr(accept, 'error', { node: prop }, 'NL.E0804', {
+                    key,
+                    entity: describeNode(node),
+                });
             }
         }
     }
@@ -1372,6 +1381,7 @@ export class NowlineValidator {
     }
 
     // --- Defaults rules 21-23: entity-type whitelist, duplicate-per-entity, banned props ---
+    // Plus rule 20's roadmap-only keys on another entity's default (NL.W0703).
     checkDefaultDeclaration(decl: DefaultDeclaration, accept: ValidationAcceptor): void {
         if (!DEFAULT_ENTITY_TYPES.has(decl.entityType)) {
             accept(
@@ -1407,6 +1417,18 @@ export class NowlineValidator {
                 const key = propKey(prop);
                 if (banned.has(key)) {
                     accept('error', defaultBannedMessage(key, decl.entityType), { node: prop });
+                }
+            }
+        }
+
+        if (decl.entityType !== 'roadmap') {
+            for (const prop of decl.properties) {
+                const key = propKey(prop);
+                if (ROADMAP_ONLY_STYLE_KEYS.has(key)) {
+                    acceptTr(accept, 'warning', { node: prop, property: 'key' }, 'NL.W0703', {
+                        key,
+                        entityType: decl.entityType,
+                    });
                 }
             }
         }
@@ -1854,24 +1876,18 @@ export class NowlineValidator {
     // `unicode:foo`, which we treat permissively (it's a single-grapheme literal).
     checkSymbolDeclaration(decl: SymbolDeclaration, accept: ValidationAcceptor): void {
         if (decl.name && BUILTIN_ICON_NAMES.has(decl.name)) {
-            accept(
-                'error',
-                `Symbol id "${decl.name}" collides with a built-in icon name. Reserved built-ins: ${[...BUILTIN_ICON_NAMES].sort().join(', ')}.`,
-                { node: decl, property: 'name' },
-            );
+            acceptTr(accept, 'error', { node: decl, property: 'name' }, 'NL.E0805', {
+                name: decl.name,
+                builtins: [...BUILTIN_ICON_NAMES].sort().join(', '),
+            });
         }
 
         const unicodeProp = decl.properties.find((p) => propKey(p) === 'unicode');
         if (!unicodeProp) {
-            accept(
-                'error',
-                `Symbol "${displayName(decl)}" requires a "unicode:" property (e.g. unicode:"💰" or unicode:"\\u{1F464}").`,
-                { node: decl },
-            );
+            acceptTr(accept, 'error', { node: decl }, 'NL.E0806', { name: displayName(decl) });
         } else if (!unicodeProp.value || unicodeProp.value.length === 0) {
-            accept('error', `Symbol "${displayName(decl)}" unicode: must be a non-empty value.`, {
-                node: unicodeProp,
-                property: 'value',
+            acceptTr(accept, 'error', { node: unicodeProp, property: 'value' }, 'NL.E0807', {
+                name: displayName(decl),
             });
         }
 
@@ -1879,22 +1895,17 @@ export class NowlineValidator {
         if (asciiProp) {
             const raw = asciiProp.value ?? '';
             if (!ASCII_FALLBACK_RE.test(raw)) {
-                accept(
-                    'error',
-                    `Symbol "${displayName(decl)}" ascii: must be 1-3 ASCII characters (got ${raw.length} character${raw.length === 1 ? '' : 's'}).`,
-                    { node: asciiProp, property: 'value' },
-                );
+                acceptTr(accept, 'error', { node: asciiProp, property: 'value' }, 'NL.E0808', {
+                    name: displayName(decl),
+                    length: raw.length,
+                });
             }
         }
 
         for (const prop of decl.properties) {
             const key = propKey(prop);
             if (key !== 'unicode' && key !== 'ascii' && key !== 'link' && key !== 'description') {
-                accept(
-                    'error',
-                    `Unknown symbol property "${key}". Allowed: unicode, ascii, link, description.`,
-                    { node: prop, property: 'key' },
-                );
+                acceptTr(accept, 'error', { node: prop, property: 'key' }, 'NL.E0809', { key });
             }
         }
     }
@@ -1906,11 +1917,10 @@ export class NowlineValidator {
             if (isSymbolDeclaration(entry) && entry.name) {
                 const existing = seen.get(entry.name);
                 if (existing) {
-                    accept(
-                        'error',
-                        `Duplicate symbol id "${entry.name}". First declared at ${locationOf(existing)}.`,
-                        { node: entry, property: 'name' },
-                    );
+                    acceptTr(accept, 'error', { node: entry, property: 'name' }, 'NL.E0810', {
+                        name: entry.name,
+                        location: locationOf(existing),
+                    });
                 } else {
                     seen.set(entry.name, entry);
                 }
@@ -1955,17 +1965,16 @@ export class NowlineValidator {
                     key === 'capacity-icon'
                         ? [...BUILTIN_CAPACITY_ICONS].sort().join(', ')
                         : [...BUILTIN_ICON_NAMES].sort().join(', ');
-                accept(
-                    'error',
-                    `${key}: "${val}" is neither a built-in (${builtins}) nor a declared symbol. Add "symbol ${val} unicode:..." earlier in config or use a quoted Unicode literal.`,
-                    { node: propNode, property: 'value' },
-                );
+                acceptTr(accept, 'error', { node: propNode, property: 'value' }, 'NL.E0811', {
+                    key,
+                    value: val,
+                    builtins,
+                });
             } else if (declIdx >= entryIdx) {
-                accept(
-                    'error',
-                    `${key}: symbol "${val}" is referenced before its declaration. Move "symbol ${val}" above this entry.`,
-                    { node: propNode, property: 'value' },
-                );
+                acceptTr(accept, 'error', { node: propNode, property: 'value' }, 'NL.E0812', {
+                    key,
+                    value: val,
+                });
             }
         };
 

@@ -8,15 +8,21 @@ import { grayscaleNamed, grayscaleTheme } from './grayscale.js';
 import { lightNamed, lightTheme } from './light.js';
 import type { NamedColors, Theme } from './shape.js';
 
-export type ThemeName = 'light' | 'dark' | 'grayscale';
+// The one list of theme names. `ThemeName` derives from it and `themes` /
+// `namedColors` are keyed by it, so a new theme is added here and tsc then
+// demands its palette. Every surface that validates a theme (CLI `render` /
+// `serve`, the GitHub Action) goes through `normalizeThemeName` below.
+export const THEME_NAMES = ['light', 'dark', 'grayscale'] as const;
 
-export const themes: { light: Theme; dark: Theme; grayscale: Theme } = {
+export type ThemeName = (typeof THEME_NAMES)[number];
+
+export const themes: Record<ThemeName, Theme> = {
     light: lightTheme,
     dark: darkTheme,
     grayscale: grayscaleTheme,
 };
 
-export const namedColors: { light: NamedColors; dark: NamedColors; grayscale: NamedColors } = {
+export const namedColors: Record<ThemeName, NamedColors> = {
     light: lightNamed,
     dark: darkNamed,
     grayscale: grayscaleNamed,
@@ -37,10 +43,7 @@ const THEME_ALIASES: Record<string, ThemeName> = {
 export function normalizeThemeName(raw: string): ThemeName | undefined {
     const lower = raw.toLowerCase();
     const canonical = THEME_ALIASES[lower] ?? lower;
-    if (canonical === 'light' || canonical === 'dark' || canonical === 'grayscale') {
-        return canonical;
-    }
-    return undefined;
+    return THEME_NAMES.find((name) => name === canonical);
 }
 
 // Aliases collapse internationally-friendlier spellings onto the canonical

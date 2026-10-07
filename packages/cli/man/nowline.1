@@ -180,7 +180,9 @@ Default: inferred from extension; standard input defaults to
 .Sh RENDER OPTIONS
 .Bl -tag -width Fl
 .It Fl t , -theme Ar name
-.Sy light | dark .
+.Sy light | dark | grayscale ;
+.Sy greyscale
+is accepted as an alias.
 .It Fl -now Ar date
 .Sq Now
 anchor for the now-line and date math.
@@ -190,7 +192,7 @@ Accepts a bare
 .Pa 2026-06-04T23:00:00Z
 or
 .Pa 2026-06-05T06:00:00+07:00
-(an embedded Z or \(pmHH:MM offset overrides
+(an embedded Z or \(+-HH:MM offset overrides
 .Fl -timezone ) .
 A bare date or an instant without an offset is floating: the written date
 part is used and
@@ -217,7 +219,7 @@ UTC.
 .It Sy Z , +00:00
 Zero-offset shorthand (equivalent to
 .Sy UTC ) .
-.It Sy \(pmHH , \(pmHH:MM , \(pmHHMM
+.It Sy \(+-HH , \(+-HH:MM , \(+-HHMM
 Fixed offset (DST-naive; documented caveat).
 .It Sy America/Los_Angeles
 Any valid IANA timezone name.

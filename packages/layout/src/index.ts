@@ -121,6 +121,7 @@ export {
     grayscaleTheme,
     lightTheme,
     normalizeThemeName,
+    THEME_NAMES,
     type Theme,
     type ThemeName,
     themes,

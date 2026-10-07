@@ -2,6 +2,11 @@
 .\" prennent la forme de surcouches dans packages/cli/man/<locale>/nowline.5
 .\" lorsqu'elles existent. Voir specs/localization.md.
 .\"
+.\" Empreinte de la page anglaise relue pour cette traduction. Après avoir
+.\" reporté une modification de la page anglaise, remplacez-la par la ligne
+.\" qu'affiche packages/cli/test/man/translation-parity.test.ts.
+.\" translated-from: nowline.5 sha256:58764670274f918425db9061b0f54d616b51c164cc95d03788c23616c8ecb27b
+.\"
 .\" Les mots-clés du DSL (nowline, config, roadmap, swimlane, item, parallel,
 .\" group, person, team, anchor, label, size, status, wave, milestone, footnote,
 .\" include, style, symbol, default, scale, calendar) ainsi que les noms de
@@ -1849,6 +1854,17 @@ Une clé d'un bloc
 qui n'est pas une propriété de style est
 .Sy NL.E0803 .
 .It
+Une propriété de style brute
+.Pq Sy bg: , Sy icon: , Sy capacity-icon: , No ...
+sur une entité de la section roadmap est
+.Sy NL.E0804 ;
+déclarez un
+.Sy style
+nommé dans
+.Sy config
+et référencez-le avec
+.Sy style:id .
+.It
 La valeur de
 .Sy capacity-icon:
 doit être un identifiant intégré
@@ -1874,6 +1890,23 @@ et dans un bloc
 Toute autre valeur est
 .Sy NL.E0800
 (une erreur par valeur).
+.It
+Les clés de style propres à la roadmap
+.Sy header-height , timeline-position , minor-grid
+et
+.Sy non-working
+ne s'appliquent que sur
+.Sy default roadmap
+(ou dans un bloc
+.Sy style
+référencé par la roadmap).
+Sur toute autre ligne
+.Sy default ,
+elles sont ignorées avec l'avertissement
+.Sy NL.W0703 .
+Les blocs
+.Sy style
+ne sont pas vérifiés.
 .It
 .Sy remaining:
 est soit un pourcentage
@@ -2159,23 +2192,40 @@ Toute déclaration
 .Sy symbol
 doit spécifier une valeur
 .Sy unicode:"<chaîne>"
-non vide.
+.Pq Sy NL.E0806 ,
+non vide
+.Pq Sy NL.E0807 .
 .It
 .Sy ascii: ,
 si présente, doit être une chaîne entre guillemets de longueur
-\(<= 3 caractères ASCII.
+\(<= 3 caractères ASCII
+.Pq Sy NL.E0808 .
+.It
+Un
+.Sy symbol
+n'accepte que
+.Sy unicode: , ascii: , link:
+et
+.Sy description: ;
+toute autre propriété est
+.Sy NL.E0809 .
 .It
 Un identifiant de
 .Sy symbol
-ne doit pas masquer un nom d'icône intégré.
+ne doit pas masquer un nom d'icône intégré
+.Pq Sy NL.E0805
+et doit être unique dans le fichier
+.Pq Sy NL.E0810 .
 .It
 Une référence
 .Sy symbol
 .Pq Sy icon:NOM ou Sy capacity-icon:NOM
 doit résoudre vers un nom intégré ou vers une déclaration
 .Sy symbol
-antérieure.
-Les références anticipées sont une erreur.
+antérieure
+.Pq Sy NL.E0811 .
+Les références anticipées sont une erreur
+.Pq Sy NL.E0812 .
 .El
 .Sh EXEMPLES
 Un fichier

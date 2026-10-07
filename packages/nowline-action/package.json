@@ -51,6 +51,7 @@
     },
     "devDependencies": {
         "@nowline/cli": "workspace:*",
+        "@nowline/layout": "workspace:*",
         "@types/mdast": "^4.0.4",
         "@types/node": "^26.6.3",
         "esbuild": "^0.28.2",

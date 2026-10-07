@@ -1751,6 +1751,17 @@ A key in a
 block that is not a style property is
 .Sy NL.E0803 .
 .It
+A raw style property
+.Pq Sy bg: , Sy icon: , Sy capacity-icon: , No ...
+on an entity in the roadmap section is
+.Sy NL.E0804 ;
+declare a named
+.Sy style
+in
+.Sy config
+and reference it with
+.Sy style:id .
+.It
 .Sy capacity-icon:
 value must be a built-in identifier
 .Po
@@ -1775,6 +1786,22 @@ block.
 Any other value is
 .Sy NL.E0800
 (one error per value).
+.It
+The roadmap-only style keys
+.Sy header-height , timeline-position , minor-grid ,
+and
+.Sy non-working
+take effect only on
+.Sy default roadmap
+(or in a
+.Sy style
+block the roadmap references).
+On any other
+.Sy default
+line they are ignored with the warning
+.Sy NL.W0703 .
+.Sy style
+blocks are not checked.
 .It
 .Sy remaining:
 is either a percentage
@@ -2052,16 +2079,32 @@ when it has none.
 .It
 Every
 .Sy symbol
-declaration must specify a non-empty
-.Sy unicode:"<string>" .
+declaration must specify
+.Sy unicode:"<string>"
+.Pq Sy NL.E0806 ,
+and it must be non-empty
+.Pq Sy NL.E0807 .
 .It
 .Sy ascii: ,
 if present, must be a quoted string of length \(<= 3 ASCII
-characters.
+characters
+.Pq Sy NL.E0808 .
 .It
 A
 .Sy symbol
-id must not shadow a built-in icon name.
+takes only
+.Sy unicode: , ascii: , link: ,
+and
+.Sy description: ;
+any other property is
+.Sy NL.E0809 .
+.It
+A
+.Sy symbol
+id must not shadow a built-in icon name
+.Pq Sy NL.E0805
+and must be unique in the file
+.Pq Sy NL.E0810 .
 .It
 A
 .Sy symbol
@@ -2069,8 +2112,10 @@ reference
 .Pq Sy icon:NAME or Sy capacity-icon:NAME
 must resolve to a built-in or an earlier
 .Sy symbol
-declaration.
-Forward references are an error.
+declaration
+.Pq Sy NL.E0811 .
+Forward references are an error
+.Pq Sy NL.E0812 .
 .El
 .Sh EXAMPLES
 A complete

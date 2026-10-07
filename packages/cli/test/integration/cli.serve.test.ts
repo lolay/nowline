@@ -314,6 +314,45 @@ describeBuilt('--serve integration (requires `pnpm build`)', () => {
         });
     }, 15000);
 
+    it('--theme grayscale serves the grayscale palette on light chrome', async () => {
+        await withTempDir(async (dir) => {
+            const source = path.join(dir, 'sample.nowline');
+            await fs.writeFile(
+                source,
+                'nowline v1\n\nroadmap r "R"\n\nswimlane a "A"\n  item x duration:1w\n',
+            );
+            const port = await pickPort();
+            const child: ChildProcess = spawn(
+                process.execPath,
+                [distEntry, '--serve', source, '--port', String(port), '--theme', 'grayscale'],
+                {
+                    cwd: packageRoot,
+                    env: { ...process.env, FORCE_COLOR: '0', NO_COLOR: '1' },
+                    stdio: ['ignore', 'pipe', 'pipe'],
+                },
+            );
+            try {
+                await waitForReady(port);
+                const html = await fetchText(`http://127.0.0.1:${port}/`);
+                expect(html).toContain('background: #ffffff');
+                const svg = await fetchText(`http://127.0.0.1:${port}/svg`);
+                expect(svg).toContain('data-layer="item"');
+                expect(svg).toContain('data-theme="grayscale"');
+            } finally {
+                child.kill('SIGTERM');
+                await new Promise((r) => setTimeout(r, 150));
+                child.kill('SIGKILL');
+            }
+        });
+    }, 15000);
+
+    it('--theme with an unknown name is an input error', async () => {
+        const { runCliBuilt } = await import('../helpers.js');
+        const r = await runCliBuilt(['--serve', 'foo.nowline', '--theme', 'sepia']);
+        expect(r.exitCode).toBe(2);
+        expect(r.stderr).toContain('invalid --theme "sepia". Expected light, dark, or grayscale.');
+    });
+
     it('--serve -o - is a usage error', async () => {
         const { runCliBuilt } = await import('../helpers.js');
         const r = await runCliBuilt(['--serve', 'foo.nowline', '-o', '-']);
