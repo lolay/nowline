@@ -21,7 +21,7 @@ import {
 } from '@nowline/core';
 import { describe, expect, it } from 'vitest';
 import { resolveCalendar } from '../src/calendar.js';
-import { layoutRoadmap } from '../src/layout.js';
+import { type LayoutOptions, layoutRoadmap } from '../src/layout.js';
 import { scheduleRoadmap } from '../src/schedule.js';
 import { ITEM_INSET_PX, TRACK_BLOCK_TAIL_GUTTER_PX } from '../src/themes/shared.js';
 import type {
@@ -1485,5 +1485,119 @@ describe('layoutRoadmap — barrier theorem on generated roadmaps', () => {
                 }
             }
         }
+    });
+});
+
+// Waves under the show view (m2p phase 4, decision 13; specs/working-calendar.md
+// §7.3). `E_k` is the latest member's logical end, `S_{k+1} = max(E_k,
+// forward(floor))` with the raw floor, and only item starts snap off a
+// non-working day. Pixels are relative to `timeline.originX`, at 8 px a day
+// under show (a week is 56 px) and 8 px a working day under hide (40 px).
+describe('layoutRoadmap — waves under nonWorking show', () => {
+    type Display = 'hide' | 'show';
+    // The render-time display this phase adds to `LayoutOptions`.
+    type DisplayOptions = LayoutOptions & { nonWorking?: Display };
+
+    const fixture = (wave = '', extra = '') => `nowline v1
+
+roadmap r "R" start:2026-01-05 scale:1w
+
+wave a "A"
+wave b "B"${wave}
+
+swimlane s
+  item x duration:1w wave:a
+  item z duration:1w wave:b
+swimlane t
+  item y duration:3d wave:a
+  item q duration:2d wave:b date:2026-01-07
+${extra}`;
+
+    /** `source` laid out with the file key (a config block) or the option. */
+    async function layDisplay(source: string, key?: Display, option?: Display): Promise<Laid> {
+        const keyed = key
+            ? source.replace(
+                  '\nroadmap ',
+                  `\nconfig\n\ndefault roadmap non-working:${key}\n\nroadmap `,
+              )
+            : source;
+        const { file, resolved } = await parseAndResolve(keyed);
+        const options: DisplayOptions = option ? { nonWorking: option } : {};
+        const model = layoutRoadmap(file, resolved, options);
+        const config = resolveCalendar(file, resolved.config.calendar);
+        return {
+            file,
+            resolved,
+            model,
+            perWeek: config.daysPerWeek,
+            calendar: fromCalendarConfig(config),
+        };
+    }
+
+    const left = (laid: Laid, id: string): number =>
+        item(laid, id).box.x - laid.model.timeline.originX;
+    const iso = (d: Date | undefined): string | undefined => d?.toISOString().slice(0, 10);
+    const waveOf = (laid: Laid, index: number) => {
+        const w = laid.model.waves?.[index];
+        expect(w, `wave ${index}`).toBeDefined();
+        return w as NonNullable<PositionedRoadmap['waves']>[number];
+    };
+    const pinned = { wave: 'b', key: 'date', pin: '2026-01-07', start: '2026-01-12' };
+
+    it('show: E_a is 40, S_b is 40, z and q start at 62, the dates read as in hide', async () => {
+        const laid = await layDisplay(fixture(), 'show');
+        const o = laid.model.timeline.originX;
+        expect(waveOf(laid, 0).endX - o).toBe(40);
+        expect(waveOf(laid, 1).startX - o).toBe(40);
+        expect(left(laid, 'z')).toBe(62);
+        expect(left(laid, 'q')).toBe(62);
+        expect(iso(waveOf(laid, 0).endDate)).toBe('2026-01-10');
+        expect(iso(waveOf(laid, 1).startDate)).toBe('2026-01-12');
+        expect(laid.model.waveSolve?.capped).toBe(false);
+    });
+
+    it('show: NL.W1001 for q reads the same as in hide', async () => {
+        const laid = await layDisplay(fixture(), 'show');
+        expect(item(laid, 'q').wavePinOverride).toEqual(pinned);
+        expect(left(laid, 'q')).toBe(62);
+    });
+
+    it('hide: E_a is 40, S_b is 40, z and q start at 46 (guard)', async () => {
+        const laid = await layDisplay(fixture());
+        const o = laid.model.timeline.originX;
+        expect(waveOf(laid, 0).endX - o).toBe(40);
+        expect(waveOf(laid, 1).startX - o).toBe(40);
+        expect(left(laid, 'z')).toBe(46);
+        expect(left(laid, 'q')).toBe(46);
+        expect(iso(waveOf(laid, 0).endDate)).toBe('2026-01-10');
+        expect(iso(waveOf(laid, 1).startDate)).toBe('2026-01-12');
+        expect(item(laid, 'q').wavePinOverride).toEqual(pinned);
+    });
+
+    it('a floor on Sunday Jan 11: S_b is 48 under show (40 under hide), z at 62', async () => {
+        const floor = fixture(' after:2026-01-11');
+        const show = await layDisplay(floor, 'show');
+        expect(waveOf(show, 1).startX - show.model.timeline.originX).toBe(48);
+        expect(left(show, 'z')).toBe(62);
+        const hide = await layDisplay(floor);
+        expect(waveOf(hide, 1).startX - hide.model.timeline.originX).toBe(40);
+    });
+
+    it('a floor on Monday Jan 12: S_b is 56 under show', async () => {
+        const show = await layDisplay(fixture(' after:2026-01-12'), 'show');
+        expect(waveOf(show, 1).startX - show.model.timeline.originX).toBe(56);
+    });
+
+    it('a Monday milestone is on the wave boundary under hide, not under show', async () => {
+        const source = fixture('', '\nmilestone m "M" date:2026-01-12\n');
+        const hide = await layDisplay(source);
+        expect(milestone(hide, 'm').onWaveBoundary).toBe(true);
+        const show = await layDisplay(source, 'show');
+        expect(milestone(show, 'm').onWaveBoundary ?? false).toBe(false);
+    });
+
+    it('the option beats the file key for waves too', async () => {
+        const laid = await layDisplay(fixture(), 'show', 'hide');
+        expect(left(laid, 'z')).toBe(46);
     });
 });
