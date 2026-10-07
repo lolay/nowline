@@ -55,21 +55,21 @@
                 },
                 {
                     "name": "keyword.control.nowline",
-                    "match": "\\b(config|roadmap|include|person|team|anchor|swimlane|item|parallel|group|milestone|footnote|label|style|status|size|scale|calendar|default|description|symbol)\\b(?!\\s*:)"
+                    "match": "(?<![\\w-])(config|roadmap|include|person|team|anchor|swimlane|item|parallel|group|milestone|footnote|label|style|status|size|scale|calendar|default|description|symbol)(?![\\w-])(?!\\s*:)"
                 }
             ]
         },
         "properties": {
             "patterns": [
                 {
-                    "match": "\\b(status|owner|after|before|size|duration|remaining|labels|link|style|date|on|start|scale|calendar|effort|name|label-every|days-per-week|days-per-month|days-per-quarter|days-per-year|author|capacity|length|utilization-warn-at|utilization-over-at|logo-size|logo|unicode|ascii|wave)\\s*(:)",
+                    "match": "(?<![\\w-])(status|owner|after|before|size|duration|remaining|labels|link|style|date|on|start|scale|calendar|effort|name|label-every|days-per-week|days-per-month|days-per-quarter|days-per-year|author|capacity|length|utilization-warn-at|utilization-over-at|logo-size|logo|unicode|ascii|wave)\\s*(:)",
                     "captures": {
                         "1": { "name": "entity.other.attribute-name.nowline" },
                         "2": { "name": "punctuation.separator.key-value.nowline" }
                     }
                 },
                 {
-                    "match": "\\b(config|roadmap)\\s*(:)\\s*(merge|ignore|isolate)\\b",
+                    "match": "(?<![\\w-])(config|roadmap)\\s*(:)\\s*(merge|ignore|isolate)(?![\\w-])",
                     "captures": {
                         "1": { "name": "entity.other.attribute-name.include-mode.nowline" },
                         "2": { "name": "punctuation.separator.key-value.nowline" },
@@ -77,7 +77,7 @@
                     }
                 },
                 {
-                    "match": "\\b(bg|fg|text|border|icon|shadow|font|weight|italic|text-size|padding|spacing|header-height|corner-radius|bracket|capacity-icon|timeline-position|minor-grid|non-working)\\s*(:)",
+                    "match": "(?<![\\w-])(bg|fg|text|border|icon|shadow|font|weight|italic|text-size|padding|spacing|header-height|corner-radius|bracket|capacity-icon|timeline-position|minor-grid|non-working)\\s*(:)",
                     "captures": {
                         "1": { "name": "entity.other.attribute-name.style.nowline" },
                         "2": { "name": "punctuation.separator.key-value.nowline" }
@@ -89,7 +89,7 @@
                 },
                 {
                     "name": "constant.language.enum.nowline",
-                    "match": "\\b(solid|dashed|dotted|subtle|soft|hard|sans|serif|mono|thin|light|normal|bold|true|false|none|xs|sm|md|lg|xl|full|business|full|custom|merge|ignore|isolate|hide|show)\\b"
+                    "match": "(?<![\\w-])(solid|dashed|dotted|subtle|soft|hard|sans|serif|mono|thin|light|normal|bold|true|false|none|xs|sm|md|lg|xl|full|business|full|custom|merge|ignore|isolate|hide|show)(?![\\w-])"
                 }
             ]
         },

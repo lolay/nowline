@@ -75,6 +75,9 @@ export type MessageCode =
 
     // Style / color / symbol (NL.E0800–E0899)
     | 'NL.E0800' // invalid-non-working
+    | 'NL.E0801' // invalid-style-color
+    | 'NL.E0802' // invalid-style-value
+    | 'NL.E0803' // unknown-style-property
 
     // Warnings (NL.W0700–W0799)
     | 'NL.W0700' // unknown-entity-property
@@ -148,6 +151,9 @@ export const ALL_CODES: ReadonlyArray<MessageCode> = [
     'NL.E0505',
     'NL.E0600',
     'NL.E0800',
+    'NL.E0801',
+    'NL.E0802',
+    'NL.E0803',
     'NL.W0700',
     'NL.W0701',
     'NL.W0702',
