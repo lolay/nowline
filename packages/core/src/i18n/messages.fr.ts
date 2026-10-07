@@ -263,6 +263,26 @@ export const messages: MessageBundle = {
     'NL.E0802': (a: { value: string; key: string; allowed: string }) =>
         `Valeur invalide «\u00A0${a.value}\u00A0» pour «\u00A0${a.key}\u00A0». Valeurs admises\u00A0: ${a.allowed}.`,
     'NL.E0803': (a: { key: string }) => `Propriété de style inconnue «\u00A0${a.key}\u00A0».`,
+    'NL.E0804': (a: { key: string; entity: string }) =>
+        `La propriété de style brute «\u00A0${a.key}\u00A0» n'est pas permise sur ${a.entity}. ` +
+        `Déclarez un style nommé dans la config et référencez-le avec «\u00A0style:id\u00A0».`,
+    'NL.E0805': (a: { name: string; builtins: string }) =>
+        `L'identifiant de symbole «\u00A0${a.name}\u00A0» entre en conflit avec le nom d'une icône intégrée. Noms réservés\u00A0: ${a.builtins}.`,
+    'NL.E0806': (a: { name: string }) =>
+        `Le symbole «\u00A0${a.name}\u00A0» exige une propriété «\u00A0unicode:\u00A0» (p.\u00A0ex. unicode:"💰" ou unicode:"\\u{1F464}").`,
+    'NL.E0807': (a: { name: string }) =>
+        `La propriété «\u00A0unicode:\u00A0» du symbole «\u00A0${a.name}\u00A0» doit avoir une valeur non vide.`,
+    // Le français met le singulier à 0 et à 1.
+    'NL.E0808': (a: { name: string; length: number }) =>
+        `La propriété «\u00A0ascii:\u00A0» du symbole «\u00A0${a.name}\u00A0» doit compter de 1 à 3 caractères ASCII (reçu\u00A0: ${a.length} caractère${a.length > 1 ? 's' : ''}).`,
+    'NL.E0809': (a: { key: string }) =>
+        `Propriété de symbole inconnue «\u00A0${a.key}\u00A0». Valeurs admises\u00A0: unicode, ascii, link, description.`,
+    'NL.E0810': (a: { name: string; location: string }) =>
+        `Identifiant de symbole en double «\u00A0${a.name}\u00A0». Première déclaration à ${a.location}.`,
+    'NL.E0811': (a: { key: string; value: string; builtins: string }) =>
+        `${a.key}: «\u00A0${a.value}\u00A0» n'est ni une icône intégrée (${a.builtins}) ni un symbole déclaré. Ajoutez «\u00A0symbol ${a.value} unicode:...\u00A0» plus haut dans la config ou utilisez un littéral Unicode entre guillemets.`,
+    'NL.E0812': (a: { key: string; value: string }) =>
+        `${a.key}: le symbole «\u00A0${a.value}\u00A0» est référencé avant sa déclaration. Déplacez «\u00A0symbol ${a.value}\u00A0» au-dessus de cette entrée.`,
 
     // Avertissements
     'NL.W0700': (a: { key: string; entity: string; suggested: string }) =>

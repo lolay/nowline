@@ -78,6 +78,15 @@ export type MessageCode =
     | 'NL.E0801' // invalid-style-color
     | 'NL.E0802' // invalid-style-value
     | 'NL.E0803' // unknown-style-property
+    | 'NL.E0804' // raw-style-property
+    | 'NL.E0805' // symbol-id-reserved
+    | 'NL.E0806' // symbol-requires-unicode
+    | 'NL.E0807' // symbol-empty-unicode
+    | 'NL.E0808' // symbol-invalid-ascii
+    | 'NL.E0809' // unknown-symbol-property
+    | 'NL.E0810' // duplicate-symbol-id
+    | 'NL.E0811' // unknown-icon-reference
+    | 'NL.E0812' // icon-forward-reference
 
     // Warnings (NL.W0700–W0799)
     | 'NL.W0700' // unknown-entity-property
@@ -153,6 +162,15 @@ export const ALL_CODES: ReadonlyArray<MessageCode> = [
     'NL.E0801',
     'NL.E0802',
     'NL.E0803',
+    'NL.E0804',
+    'NL.E0805',
+    'NL.E0806',
+    'NL.E0807',
+    'NL.E0808',
+    'NL.E0809',
+    'NL.E0810',
+    'NL.E0811',
+    'NL.E0812',
     'NL.W0700',
     'NL.W0701',
     'NL.W0702',

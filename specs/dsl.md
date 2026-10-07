@@ -1193,18 +1193,18 @@ Non-rules (intentionally not validated):
 
 **Symbol declarations**
 
-17f. Every `symbol` declaration must specify a `unicode:"<string>"` property. Missing `unicode:` is a validation error.
-17g. `unicode:` value must be a non-empty quoted string. May contain Unicode escapes (`\u{...}`) or literal Unicode characters. May be a multi-codepoint grapheme cluster.
-17h. `ascii:` value, if present, must be a quoted string of length ≤ 3 ASCII characters.
-17i. A `symbol` id must not match any built-in icon name (`none`, `multiplier`, `person`, `people`, `points`, `time`, `shield`, `warning`, `lock`, `calendar`, plus any other built-ins the renderer reserves). Shadowing is an error.
-17j. Duplicate `symbol` declaration ids within a single file are an error (same rule as duplicate `status` or `label` ids).
-17k. A `symbol` reference (`icon:NAME` or `capacity-icon:NAME`) must resolve to either a built-in or an earlier `symbol` declaration. Forward references are an error.
+17f. Every `symbol` declaration must specify a `unicode:"<string>"` property. Missing `unicode:` is a validation error (`NL.E0806`).
+17g. `unicode:` value must be a non-empty quoted string. May contain Unicode escapes (`\u{...}`) or literal Unicode characters. May be a multi-codepoint grapheme cluster. An empty value is `NL.E0807`.
+17h. `ascii:` value, if present, must be a quoted string of length ≤ 3 ASCII characters (`NL.E0808`). A `symbol` line takes only `unicode:`, `ascii:`, `link:`, and `description`; any other property is `NL.E0809`.
+17i. A `symbol` id must not match any built-in icon name (`none`, `multiplier`, `person`, `people`, `points`, `time`, `shield`, `warning`, `lock`, `calendar`, plus any other built-ins the renderer reserves). Shadowing is an error (`NL.E0805`).
+17j. Duplicate `symbol` declaration ids within a single file are an error (same rule as duplicate `status` or `label` ids), reported as `NL.E0810`.
+17k. A `symbol` reference (`icon:NAME` or `capacity-icon:NAME`) must resolve to either a built-in or an earlier `symbol` declaration. A name that is neither is `NL.E0811`; forward references are an error (`NL.E0812`).
 
 **Styles and content/rendering separation**
 
 18. `style:` references on entities and labels must resolve to a style declared in the applicable `config` scope.
 19. Style property values must be valid for their type: color properties (`bg`, `fg`, `text`) must be named colors (including aliases `grey` for `gray` and `violet` for `purple`), hex values, or `none`; `border` must be `solid`, `dashed`, or `dotted`; `shadow` must be `none`, `subtle`, `soft`, or `hard`; `font` must be `sans`, `serif`, or `mono`; `weight` must be `thin`, `light`, `normal`, or `bold`; `italic` must be `true` or `false`; `text-size`, `padding`, `spacing`, `header-height` must be `none`, `xs`, `sm`, `md`, `lg`, or `xl`; `corner-radius` must be `none`, `xs`, `sm`, `md`, `lg`, `xl`, or `full`; `bracket` must be `none`, `solid`, or `dashed`; `capacity-icon` must be `none`, `multiplier`, `person`, `people`, `points`, `time`, a custom `symbol` id, or a double-quoted Unicode literal; `timeline-position` must be `top`, `bottom`, or `both`; `minor-grid` must be `true` or `false`; `non-working` must be `hide` or `show` (any other value is `NL.E0800`, one error per value). An invalid color is `NL.E0801` and a value outside an enumerated key's list is `NL.E0802`, in a `style` block or on a `default` line; a key in a `style` block that is not a style property is `NL.E0803`.
-20. Raw style properties (`bg`, `fg`, `text`, `border`, `icon`, `shadow`, `font`, `weight`, `italic`, `text-size`, `padding`, `spacing`, `header-height`, `corner-radius`, `bracket`, `capacity-icon`, `timeline-position`, `minor-grid`, `non-working`) may only appear in `style` blocks and `default <entity>` lines (both in config). Using them on any roadmap-section entity is an error, including `non-working` on the `roadmap` line itself: write `default roadmap non-working:show` in config. Roadmap-only keys such as `non-working` are not rejected on other entities' defaults, the same as `minor-grid`.
+20. Raw style properties (`bg`, `fg`, `text`, `border`, `icon`, `shadow`, `font`, `weight`, `italic`, `text-size`, `padding`, `spacing`, `header-height`, `corner-radius`, `bracket`, `capacity-icon`, `timeline-position`, `minor-grid`, `non-working`) may only appear in `style` blocks and `default <entity>` lines (both in config). Using them on any roadmap-section entity is an error (`NL.E0804`), including `non-working` on the `roadmap` line itself: write `default roadmap non-working:show` in config. Roadmap-only keys such as `non-working` are not rejected on other entities' defaults, the same as `minor-grid`.
 
 **Defaults**
 
