@@ -1866,6 +1866,23 @@ Toute autre valeur est
 .Sy NL.E0800
 (une erreur par valeur).
 .It
+Les clés de style propres à la roadmap
+.Sy header-height , timeline-position , minor-grid
+et
+.Sy non-working
+ne s'appliquent que sur
+.Sy default roadmap
+(ou dans un bloc
+.Sy style
+référencé par la roadmap).
+Sur toute autre ligne
+.Sy default ,
+elles sont ignorées avec l'avertissement
+.Sy NL.W0703 .
+Les blocs
+.Sy style
+ne sont pas vérifiés.
+.It
 .Sy remaining:
 est soit un pourcentage
 .Pq Sy 0% \(en Sy 100%

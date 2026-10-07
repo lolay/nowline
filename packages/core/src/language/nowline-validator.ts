@@ -124,6 +124,17 @@ const STYLE_PROP_KEYS = new Set([
 // `NON_WORKING_DISPLAYS` in @nowline/layout, which core cannot import.
 const NON_WORKING_VALUES = new Set(['hide', 'show']);
 
+// Style keys only the roadmap reads (specs/dsl.md style table). On another
+// entity's `default` line they are a silent no-op, so they warn (NL.W0703).
+// Style blocks are not checked: one block can be referenced by the roadmap
+// and by other entities alike, so the key there is not necessarily wrong.
+const ROADMAP_ONLY_STYLE_KEYS = new Set([
+    'header-height',
+    'timeline-position',
+    'minor-grid',
+    'non-working',
+]);
+
 // Built-in capacity-icon vocabulary. Renderer-curated SVG glyphs (plus 'multiplier'
 // which renders as the U+00D7 text character and 'none' which suppresses the glyph).
 const BUILTIN_CAPACITY_ICONS = new Set([
@@ -1372,6 +1383,7 @@ export class NowlineValidator {
     }
 
     // --- Defaults rules 21-23: entity-type whitelist, duplicate-per-entity, banned props ---
+    // Plus rule 20's roadmap-only keys on another entity's default (NL.W0703).
     checkDefaultDeclaration(decl: DefaultDeclaration, accept: ValidationAcceptor): void {
         if (!DEFAULT_ENTITY_TYPES.has(decl.entityType)) {
             accept(
@@ -1407,6 +1419,18 @@ export class NowlineValidator {
                 const key = propKey(prop);
                 if (banned.has(key)) {
                     accept('error', defaultBannedMessage(key, decl.entityType), { node: prop });
+                }
+            }
+        }
+
+        if (decl.entityType !== 'roadmap') {
+            for (const prop of decl.properties) {
+                const key = propKey(prop);
+                if (ROADMAP_ONLY_STYLE_KEYS.has(key)) {
+                    acceptTr(accept, 'warning', { node: prop, property: 'key' }, 'NL.W0703', {
+                        key,
+                        entityType: decl.entityType,
+                    });
                 }
             }
         }
