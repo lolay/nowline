@@ -36,6 +36,21 @@ jobs:
       - name: Lint workflows
         run: make lint-workflows
 
+  lint-man:
+    # Linux only: mandoc lint depends only on the page text, and Windows has
+    # no mandoc package. The apt version floats with the runner image, so a
+    # new mandoc can surface new warnings without a change here.
+    name: Lint man pages (mandoc)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+
+      - name: Install mandoc
+        run: sudo apt-get update -q && sudo apt-get install -y -q mandoc
+
+      - name: Lint man pages
+        run: make lint-man
+
   triage:
     name: triage (env doctor)
     runs-on: ubuntu-latest
@@ -206,6 +221,7 @@ jobs:
     if: always()
     needs:
       - lint-workflows
+      - lint-man
       - triage
       - build-test
       - bundle-size

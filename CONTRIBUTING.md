@@ -180,6 +180,7 @@ Run these from the repo root. Most are simple pnpm re-runs across the workspace.
 | Format only | `pnpm format` (writes) / `pnpm format:check` (read-only) |
 | Lint only | `pnpm lint` (read-only) / `pnpm lint:fix` (writes safe fixes) |
 | Lint GitHub Actions workflows | `pnpm lint:workflows` (requires `brew install actionlint`) |
+| Lint man pages | `make lint-man` (requires mandoc; ships with macOS) |
 | Type-check (vscode-extension; other packages type-check via `pnpm -r build`) | `pnpm typecheck` |
 | Regenerate Langium AST only | `pnpm langium:generate` |
 | Compile standalone binaries | `pnpm --filter @nowline/cli compile` (requires Bun) |
@@ -382,6 +383,16 @@ pnpm lint:workflows
 ```
 
 CI runs the same `pnpm lint:workflows` step on every PR — catches YAML errors, action-input mismatches, expression typos, and bash issues inside `run:` blocks (via shellcheck) before they break a workflow run.
+
+## Editing man pages
+
+The CLI's man pages live in `packages/cli/man/` (English) and `packages/cli/man/<locale>/` (translations). Lint them with mandoc before pushing:
+
+```
+make lint-man
+```
+
+macOS ships mandoc; on Debian or Ubuntu, `apt-get install mandoc`. CI runs the same target in a Linux job. Any English edit also needs the matching translation update and a new `translated-from` stamp, or `make test` fails; see [`specs/localization.md` § Keeping translations in sync](./specs/localization.md#keeping-translations-in-sync).
 
 ## Tests
 

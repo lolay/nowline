@@ -26,7 +26,7 @@ SHELL := bash
 .DEFAULT_GOAL := help
 
 .PHONY: help init build build-fast test lint format typecheck ci ci-platform pre-commit doctor clean \
-        lint-workflows bundle-size gh-runs-list gh-runs-watch gh-runs-status \
+        lint-workflows lint-man bundle-size gh-runs-list gh-runs-watch gh-runs-status \
         determinism determinism-browser determinism-update mcp-app-e2e mcp-inspector-smoke mcp-claude-e2e \
         compile smoke deb pack vsix pack-mcpb bump snapshot-version release-changelog \
         publish-npm publish-vscode publish-cdn publish-mcp-registry
@@ -112,6 +112,19 @@ clean: ## Remove build, binary, and package artifacts (keeps node_modules)
 
 lint-workflows: ## actionlint the GitHub Actions workflows (needs actionlint on PATH)
 	pnpm lint:workflows
+
+# mandoc's lint has no per-message suppression, so filter the two warnings
+# every translated page raises by design: its first section is the localized
+# NOM, not NAME. Kept out of `ci` like lint-workflows: Windows has no mandoc,
+# and lint output depends only on the page text, so one Linux job covers it.
+MAN_PAGES := $(wildcard packages/cli/man/nowline.[1-9] packages/cli/man/*/nowline.[1-9])
+MAN_LINT_EXPECTED := /man/[^/]+/nowline\.[1-9]:[0-9]+:[0-9]+: WARNING: (first section is not "NAME"|description line outside NAME section)
+
+lint-man: ## mandoc -T lint every man page, warnings included (needs mandoc on PATH)
+	@command -v mandoc >/dev/null 2>&1 || { printf 'mandoc not found - install: apt-get install mandoc (ships with macOS)\n' >&2; exit 1; }
+	@out=$$(mandoc -T lint -W warning $(MAN_PAGES) 2>&1 | grep -vE '$(MAN_LINT_EXPECTED)'); \
+	if [ -n "$$out" ]; then printf '%s\n' "$$out" >&2; exit 1; fi; \
+	printf 'mandoc lint clean: %s\n' "$(MAN_PAGES)"
 
 bundle-size: ## Build the embed graph and run the CDN bundle-size + node:* leak gate
 	pnpm -r --filter @nowline/core --filter @nowline/share-link --filter @nowline/layout --filter @nowline/renderer --filter @nowline/browser --filter @nowline/embed run build

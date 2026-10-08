@@ -1407,6 +1407,21 @@ Default varies by entity.
 .It Sy header-height
 .Sy none | xs | sm | md Pq default | lg | xl .
 Roadmap-only.
+Height of the timeline date strip: 16, 20, 24, 32 or 40 px from
+.Sy xs
+to
+.Sy xl ,
+with the date labels kept vertically centred.
+It sizes the top strip and the mirrored bottom strip alike.
+.Sy none
+removes every date strip, including the ones
+.Sy timeline-position
+asks for; with
+.Sy bottom
+or
+.Sy both
+that draws the warning
+.Sy NL.W0704 .
 .It Sy corner-radius
 .Sy none | xs | sm | md | lg | xl | full .
 .It Sy bracket
@@ -1792,6 +1807,25 @@ line they are ignored with the warning
 .Sy NL.W0703 .
 .Sy style
 blocks are not checked.
+.It
+When the roadmap's style sets
+.Sy header-height:none
+together with
+.Sy timeline-position:bottom
+or
+.Sy both ,
+no date strip is drawn at all, which draws the warning
+.Sy NL.W0704 .
+The style resolves from
+.Sy default roadmap ,
+then the style of each label on the
+.Sy roadmap
+line (the first label winning), then its own
+.Sy style: ,
+a later key winning.
+Only styles and labels declared in the same file are read; a
+.Sy style:
+or label from an include leaves the check silent.
 .It
 .Sy remaining:
 is either a percentage

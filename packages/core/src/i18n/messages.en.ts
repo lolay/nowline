@@ -276,6 +276,8 @@ export const messages = {
         } is ignored: this roadmap declares no waves. Declare waves with "wave <id>" to use it, or remove the property.`,
     'NL.W0703': (a: { key: string; entityType: string }) =>
         `"${a.key}" on "default ${a.entityType}" is ignored: it is a roadmap-only style key. Set it on "default roadmap" instead.`,
+    'NL.W0704': (a: { position: string }) =>
+        `"timeline-position:${a.position}" draws no dates: "header-height:none" removes every timeline date strip. Set header-height to xs, sm, md, lg or xl to show them.`,
 
     // Waves
     'NL.E1100': (a: E1100Args) =>

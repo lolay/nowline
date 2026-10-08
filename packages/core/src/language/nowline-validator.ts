@@ -29,6 +29,7 @@ import type {
     ScaleBlock,
     SizeDeclaration,
     StatusDeclaration,
+    StyleDeclaration,
     StyleProperty,
     SwimlaneContent,
     SwimlaneDeclaration,
@@ -463,6 +464,7 @@ export function registerValidationChecks(services: NowlineServices): void {
             validator.checkWaves,
             validator.checkDuplicateSizeIds,
             validator.checkCalendarBlockConsistency,
+            validator.checkHiddenTimelineStrip,
             validator.checkPersonDeclarations,
             validator.checkDuplicateSymbolIds,
             validator.checkSymbolReferences,
@@ -1432,6 +1434,72 @@ export class NowlineValidator {
                 }
             }
         }
+    }
+
+    // --- Rule 20: header-height:none hides the timeline-position strips (NL.W0704) ---
+    // `none` drops every date strip, so `timeline-position:bottom|both` draws
+    // nothing. Walks the roadmap's style chain the way @nowline/layout's
+    // resolveStyle does: `default roadmap` (its `style:` block, then its own
+    // keys), then the style of each label on the roadmap line from last to
+    // first (so the first label wins), then the roadmap's own `style:`, a later
+    // key winning. A style or label this file does not declare (one from an
+    // include) could reset either key, so the check stays silent then.
+    checkHiddenTimelineStrip(file: NowlineFile, accept: ValidationAcceptor): void {
+        const roadmap = file.roadmapDecl;
+        if (!roadmap) return;
+
+        const styles = new Map<string, StyleDeclaration>();
+        let defaultRoadmap: DefaultDeclaration | undefined;
+        for (const entry of file.configEntries) {
+            if (isStyleDeclaration(entry) && entry.name && !styles.has(entry.name)) {
+                styles.set(entry.name, entry);
+            } else if (isDefaultDeclaration(entry) && entry.entityType === 'roadmap') {
+                defaultRoadmap ??= entry;
+            }
+        }
+        const labelStyles = new Map<string, string | undefined>();
+        for (const entry of file.roadmapEntries) {
+            if (isLabelDeclaration(entry) && entry.name && !labelStyles.has(entry.name)) {
+                const ref = entry.properties.find((p) => propKey(p) === 'style');
+                labelStyles.set(entry.name, ref?.value);
+            }
+        }
+
+        let headerHeight: EntityProperty | StyleProperty | undefined;
+        let position: EntityProperty | StyleProperty | undefined;
+        const apply = (props: Array<EntityProperty | StyleProperty>): void => {
+            for (const prop of props) {
+                const key = propKey(prop);
+                if (key === 'header-height') headerHeight = prop;
+                else if (key === 'timeline-position') position = prop;
+            }
+        };
+        // False when the style is not declared in this file.
+        const applyStyle = (id: string | undefined): boolean => {
+            if (!id) return true;
+            const decl = styles.get(id);
+            if (decl) apply(decl.properties);
+            return decl !== undefined;
+        };
+
+        if (defaultRoadmap) {
+            const ref = defaultRoadmap.properties.find((p) => propKey(p) === 'style');
+            if (!applyStyle(ref?.value)) return;
+            apply(defaultRoadmap.properties);
+        }
+        const labelsProp = roadmap.properties.find((p) => propKey(p) === 'labels');
+        const labelIds = labelsProp?.value ? [labelsProp.value] : (labelsProp?.values ?? []);
+        for (const id of [...labelIds].reverse()) {
+            if (!labelStyles.has(id) || !applyStyle(labelStyles.get(id))) return;
+        }
+        const styleProp = roadmap.properties.find((p) => propKey(p) === 'style');
+        if (!applyStyle(styleProp?.value)) return;
+
+        if (headerHeight?.value !== 'none') return;
+        if (position?.value !== 'bottom' && position?.value !== 'both') return;
+        acceptTr(accept, 'warning', { node: position, property: 'value' }, 'NL.W0704', {
+            position: position.value,
+        });
     }
 
     // --- Rule 7 (calendar): calendar block only valid when roadmap calendar:custom ---
