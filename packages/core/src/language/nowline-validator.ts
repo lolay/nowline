@@ -1440,7 +1440,8 @@ export class NowlineValidator {
     // `none` drops every date strip, so `timeline-position:bottom|both` draws
     // nothing. Walks the roadmap's style chain the way @nowline/layout's
     // resolveStyle does: `default roadmap`, then the style of each label on the
-    // roadmap line, then the roadmap's own `style:`, a later key winning. A
+    // roadmap line from last to first (so the first label wins), then the
+    // roadmap's own `style:`, a later key winning. A
     // style or label this file does not declare (one from an include) could
     // reset either key, so the check stays silent then.
     checkHiddenTimelineStrip(file: NowlineFile, accept: ValidationAcceptor): void {
@@ -1484,7 +1485,7 @@ export class NowlineValidator {
         if (defaultRoadmap) apply(defaultRoadmap.properties);
         const labelsProp = roadmap.properties.find((p) => propKey(p) === 'labels');
         const labelIds = labelsProp?.value ? [labelsProp.value] : (labelsProp?.values ?? []);
-        for (const id of labelIds) {
+        for (const id of [...labelIds].reverse()) {
             if (!labelStyles.has(id) || !applyStyle(labelStyles.get(id))) return;
         }
         const styleProp = roadmap.properties.find((p) => propKey(p) === 'style');
