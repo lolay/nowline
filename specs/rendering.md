@@ -528,7 +528,7 @@ When multiple style sources apply to an entity, the renderer resolves them in th
 4. **Config `defaults`** — the `default <entity>` line for the entity type. Its `style:` reference applies first and the line's raw style properties apply on top of it, the same order levels 1 and 2 use on the entity, so `default item style:subtle bg:red` reads as "`subtle`, but red". Both sit below every label and entity style.
 5. **Nowline system defaults** — built-in colors and styling when nothing is specified.
 
-When an entity has multiple labels with different styles, the first label's style takes precedence.
+When an entity has multiple labels with different styles, the first label's style takes precedence: on any property two labels' styles both set, the label listed first in `labels:` wins. A property only a later label's style sets still applies.
 
 **Isolate scoping:** When an entity originates from an included file, style resolution uses the scope determined by the include's modes: `style:` references (levels 2 and 3) and `defaults` (level 4) resolve against whichever config scope is active under `config:isolate` / `config:merge`; label entities themselves are governed by `roadmap:isolate` / `roadmap:merge`, matching their roadmap-section classification.
 
