@@ -5,7 +5,7 @@
 .\" Empreinte de la page anglaise relue pour cette traduction. Après avoir
 .\" reporté une modification de la page anglaise, remplacez-la par la ligne
 .\" qu'affiche packages/cli/test/man/translation-parity.test.ts.
-.\" translated-from: nowline.5 sha256:e12c75e1b2d4e7478d6bed8d938e252a584a9261fbab7a4218f4b3943e6c8c2f
+.\" translated-from: nowline.5 sha256:58764670274f918425db9061b0f54d616b51c164cc95d03788c23616c8ecb27b
 .\"
 .\" Les mots-clés du DSL (nowline, config, roadmap, swimlane, item, parallel,
 .\" group, person, team, anchor, label, size, status, wave, milestone, footnote,
@@ -1490,6 +1490,15 @@ La valeur par défaut varie selon l'entité.
 .Sy none | xs | sm | md Pq par défaut | lg | xl .
 Réservée à
 .Sy roadmap .
+Hauteur du bandeau des dates de la frise : 16, 20, 24, 32 ou 40 px de
+.Sy xs
+à
+.Sy xl ,
+les libellés restant centrés verticalement.
+Elle s'applique au bandeau du haut comme au bandeau miroir du bas.
+.Sy none
+supprime tous les bandeaux de dates, y compris ceux que demande
+.Sy timeline-position .
 .It Sy corner-radius
 .Sy none | xs | sm | md | lg | xl | full .
 .It Sy bracket

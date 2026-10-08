@@ -1,0 +1,27 @@
+nowline v1
+
+// Timeline header height fixture (specs/rendering.md § Timeline Scale).
+// `default roadmap header-height:none` drops every tick panel, so neither
+// date strip draws even though `timeline-position:both` asks for both. The
+// now-pill, wave strip and marker row stack directly, and the now-line stops
+// at the last swimlane. Compare against header-height-xl.
+
+config
+
+default roadmap header-height:none timeline-position:both
+
+roadmap header-height-none "Header height: none" start:2026-01-05 scale:2w
+
+wave alpha "Alpha"
+wave beta "Beta"
+
+anchor kickoff date:2026-01-06
+milestone launch "Launch" date:2026-03-16
+
+swimlane platform "Platform"
+  item api "API gateway" duration:4w wave:alpha status:done
+  item search "Search v2" duration:3w wave:beta status:in-progress remaining:40%
+
+swimlane web "Web"
+  item redesign "Web redesign" duration:3w after:kickoff wave:alpha
+  item billing "Billing portal" duration:2w wave:beta

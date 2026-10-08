@@ -70,7 +70,7 @@ These join the style system alongside `bg`, `fg`, etc.:
 
 - `padding` — inset padding within the entity. On `roadmap`, this is the outer canvas margin. On items, swimlanes, groups, footnotes — content inset. Values: `none`, `xs`, `sm`, `md`, `lg`, `xl`. Default varies by entity type.
 - `spacing` — space between children within a container entity. Applies to swimlanes (vertical space between items/child swimlanes), groups (space between sequential items), and parallel blocks (vertical space between tracks). Values: `none`, `xs`, `sm`, `md`, `lg`, `xl`. Default: `none` for swimlanes (adjacent bands separated by lines, no vertical gap).
-- `header-height` — height of the timeline scale header row. Roadmap-only — ignored on all other entities (the validator warns `NL.W0703` on another entity's `default` line). Values: `none`, `xs`, `sm`, `md`, `lg`, `xl`. Default: `md`.
+- `header-height` — height of the timeline scale header row (the date strip). Roadmap-only — ignored on all other entities (the validator warns `NL.W0703` on another entity's `default` line). Values: `none` (0), `xs` (16 px), `sm` (20 px), `md` (24 px), `lg` (32 px), `xl` (40 px). Default: `md`. Applies to the top strip and the mirrored bottom strip alike; tick labels stay at 10 px and are re-centered in the taller or shorter strip. `none` removes every date strip, including the ones `timeline-position:bottom|both` asks for; the now-pill, wave strip and marker row then stack directly and the now-line stops at the last swimlane.
 
 The system owns the pixel mapping for all size presets internally. Users pick the semantic size; the renderer determines actual pixels.
 
@@ -140,7 +140,7 @@ Logo resolution is a render-time concern:
 
 ### Timeline Scale
 
-A single-row header displays the scale units (days, weeks, months, quarters, years) as defined in `config`. Height controlled by `header-height` on the `roadmap` entity.
+A single-row header displays the scale units (days, weeks, months, quarters, years) as defined in `config`. Height controlled by `default roadmap header-height:` (`md` = 24 px; see the style-key list above for every bucket). `header-height:none` hides the date labels entirely.
 
 - **Grid lines**: light, dotted vertical lines drop from each labeled tick mark down through all swimlanes for visual tracking
 - **Label thinning**: when too many tick marks exist, show every Nth label to reduce density. Default thinning thresholds:
@@ -473,7 +473,7 @@ Styles defined in `config` control the visual appearance of entities. Style prop
 | `text-size` | Font size for the entity's primary text (title). Named preset (`xs`, `sm`, `md`, `lg`, `xl`); system owns the absolute pixel mapping. |
 | `padding` | Inset padding within the entity. Named preset (`none`, `xs`, `sm`, `md`, `lg`, `xl`). |
 | `spacing` | Space between children within a container entity. Named preset (`none`, `xs`, `sm`, `md`, `lg`, `xl`). |
-| `header-height` | Height of the timeline scale header row. Roadmap-only. Named preset (`none`, `xs`, `sm`, `md`, `lg`, `xl`). |
+| `header-height` | Height of the timeline scale header row (date strip), top and mirrored bottom alike. Roadmap-only. Named preset: `none` (no date strip), `xs` 16 px, `sm` 20 px, `md` 24 px (default), `lg` 32 px, `xl` 40 px. |
 | `corner-radius` | Corner rounding for the entity's bounding shape. Maps to SVG `rx`/`ry`. Values: `none`, `xs`, `sm`, `md`, `lg`, `xl`, `full`. `full` computes radius as half the rendered height. |
 | `bracket` | Bracket/join line on parallel blocks. `none` (default), `solid`, `dashed`. Parallel-only — ignored on other entities. |
 | `capacity-icon` | Glyph used as the suffix to capacity numbers on lanes and items. Built-in names (`none`, `multiplier` (default — `×`), `person`, `people`, `points` (`★`), `time` (`⏱`)) render from the renderer's curated SVG glyph library — consistent across all platforms. Custom names from `symbol` declarations and inline Unicode literals (`"💰"`) are font-dependent. ASCII fallback per the glyph definition. |

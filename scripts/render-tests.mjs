@@ -50,6 +50,8 @@ const MANIFEST = [
     { slug: 'size-and-capacity', theme: 'light', now: NOW },
     { slug: 'utilization-states', theme: 'light', now: NOW },
     { slug: 'nested-both-headers', theme: 'light', now: NOW },
+    { slug: 'header-height-xl', theme: 'light', now: NOW },
+    { slug: 'header-height-none', theme: 'light', now: NOW },
     { slug: 'inline-date-corners', theme: 'light', now: NOW },
     { slug: 'late-row-shifts', theme: 'light', now: NOW },
     { slug: 'waves-empty', theme: 'light', now: NOW },

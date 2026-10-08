@@ -33,9 +33,9 @@ import {
     ATTRIBUTION_GLYPH_WIDTH,
     GUTTER_PX,
     HEADER_ABOVE_HEIGHT_PX,
+    HEADER_HEIGHT_PX,
     NOW_PILL_HEIGHT_PX,
     SPACING_PX,
-    TIMELINE_TICK_PANEL_HEIGHT_PX,
     WAVE_LEGEND_GAP_PX,
     WAVE_STRIP_HEIGHT_PX,
 } from '../themes/shared.js';
@@ -232,9 +232,16 @@ export class RoadmapNode {
         // at the top because anchors / milestones live there); `both`
         // mirrors the strip at the chart bottom too. See specs/dsl.md
         // and specs/rendering.md § Timeline Scale.
-        const showTopTickPanel = headerStyle.timelinePosition !== 'bottom';
+        // `header-height` sizes every tick panel (top and mirrored bottom);
+        // `none` drops them all, whatever `timeline-position` asks for.
+        const tickPanelBucketHeight =
+            HEADER_HEIGHT_PX[headerStyle.headerHeight as keyof typeof HEADER_HEIGHT_PX] ??
+            HEADER_HEIGHT_PX.md;
+        const showTopTickPanel =
+            tickPanelBucketHeight > 0 && headerStyle.timelinePosition !== 'bottom';
         const showBottomTickPanel =
-            headerStyle.timelinePosition === 'bottom' || headerStyle.timelinePosition === 'both';
+            tickPanelBucketHeight > 0 &&
+            (headerStyle.timelinePosition === 'bottom' || headerStyle.timelinePosition === 'both');
         // How non-working days are drawn: the surface option, then the
         // file's `default roadmap non-working:` key (resolved to `hide` when
         // absent). It reaches every placement through the time scale.
@@ -278,7 +285,8 @@ export class RoadmapNode {
 
         // Header layout (top → bottom):
         //   1. Now-pill row    (16 px) — only when there's a now-line
-        //   2. Tick-label panel (24 px) — always
+        //   2. Tick-label panel (`header-height`, 24 px at md) — unless
+        //      `timeline-position:bottom` or `header-height:none`
         //   3. Wave strip      (20 px) — only when the roadmap declares waves
         //   4. Marker row       (≥26 px) — sized to the packed row count
         //   5. 8 px gap, then the chart begins
@@ -287,10 +295,10 @@ export class RoadmapNode {
         const hasMarkerEntities =
             resolved.content.anchors.size + resolved.content.milestones.size > 0;
         const pillRowHeight = willHaveNowline ? NOW_PILL_HEIGHT_PX : 0;
-        // When `timeline-position:bottom` is set, the top tick panel
-        // collapses to height 0 — the now-pill and marker row stack
-        // directly without the date strip between them.
-        const tickPanelHeight = showTopTickPanel ? TIMELINE_TICK_PANEL_HEIGHT_PX : 0;
+        // When `timeline-position:bottom` or `header-height:none` is set,
+        // the top tick panel collapses to height 0 — the now-pill and
+        // marker row stack directly without the date strip between them.
+        const tickPanelHeight = showTopTickPanel ? tickPanelBucketHeight : 0;
         // The wave strip (specs/waves.md §8.8) has a fixed height, so the
         // chart top is known before the barrier passes run; it sits above
         // the marker rows, so the post-hoc marker re-pack never moves it.
@@ -809,8 +817,8 @@ export class RoadmapNode {
         if (showBottomTickPanel) {
             const gapAbovePanel = 8;
             ctx.timeline.bottomTickPanelY = ctx.chartBottomY + gapAbovePanel;
-            ctx.timeline.bottomTickPanelHeight = TIMELINE_TICK_PANEL_HEIGHT_PX;
-            ctx.chartBottomY += gapAbovePanel + TIMELINE_TICK_PANEL_HEIGHT_PX;
+            ctx.timeline.bottomTickPanelHeight = tickPanelBucketHeight;
+            ctx.chartBottomY += gapAbovePanel + tickPanelBucketHeight;
         }
 
         // Positioned waves (specs/waves.md §8.7): after the extent growth

@@ -21,15 +21,6 @@ export const PADDING_PX: Record<'none' | 'xs' | 'sm' | 'md' | 'lg' | 'xl', numbe
     xl: 32,
 };
 
-export const HEADER_HEIGHT_PX: Record<'none' | 'xs' | 'sm' | 'md' | 'lg' | 'xl', number> = {
-    none: 0,
-    xs: 24,
-    sm: 36,
-    md: 56,
-    lg: 80,
-    xl: 112,
-};
-
 export const TEXT_SIZE_PX: Record<'none' | 'xs' | 'sm' | 'md' | 'lg' | 'xl', number> = {
     none: 0,
     xs: 10,
@@ -80,19 +71,36 @@ export const MIN_ITEM_WIDTH = 8;
 export const PROGRESS_STRIP_HEIGHT_PX = 4;
 
 // Timeline tick header band — a single row that holds the date labels
-// (e.g. "Jan 05", "Feb 14"). Layout sizes the panel; the renderer
-// paints the labels at a fixed baseline offset from the panel's top.
-//
-// Bumping the panel height without re-centering the baseline mis-centers
-// the dates — keep both knobs together so a change to either one is
-// visible at a glance.
-export const TIMELINE_TICK_PANEL_HEIGHT_PX = 24;
+// (e.g. "Jan 05", "Feb 14"). The roadmap's `header-height` style key
+// picks the panel height from this table; `none` drops the panel (top
+// and mirrored bottom) entirely. Layout sizes the panel; the renderer
+// paints the labels at `timelineTickLabelBaselineOffsetPx(height)` from
+// the panel's top, so the dates stay centered at every bucket.
+export const HEADER_HEIGHT_PX: Record<'none' | 'xs' | 'sm' | 'md' | 'lg' | 'xl', number> = {
+    none: 0,
+    xs: 16,
+    sm: 20,
+    md: 24,
+    lg: 32,
+    xl: 40,
+};
+
+/** Tick panel height at the default `header-height:md`. */
+export const TIMELINE_TICK_PANEL_HEIGHT_PX = HEADER_HEIGHT_PX.md;
 
 /**
- * Baseline Y of the tick-label text relative to the tick panel's top.
- * Approximately vertically centers a 10 pt label in the panel.
+ * Baseline Y of the tick-label text relative to the tick panel's top,
+ * for a panel `panelHeightPx` tall. Approximately vertically centers a
+ * 10 pt label: half the panel plus ~3 px of descender allowance.
  */
-export const TIMELINE_TICK_LABEL_BASELINE_OFFSET_PX = 15;
+export function timelineTickLabelBaselineOffsetPx(panelHeightPx: number): number {
+    return Math.round(panelHeightPx / 2 + 3);
+}
+
+/** Tick-label baseline offset at the default panel height. */
+export const TIMELINE_TICK_LABEL_BASELINE_OFFSET_PX = timelineTickLabelBaselineOffsetPx(
+    TIMELINE_TICK_PANEL_HEIGHT_PX,
+);
 
 /**
  * Font size of the tick labels. Layout reads it to decide whether a
