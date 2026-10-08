@@ -179,7 +179,7 @@ Run these from the repo root. Most are simple pnpm re-runs across the workspace.
 | Auto-fix lint and format | `pnpm check:fix` |
 | Format only | `pnpm format` (writes) / `pnpm format:check` (read-only) |
 | Lint only | `pnpm lint` (read-only) / `pnpm lint:fix` (writes safe fixes) |
-| Lint GitHub Actions workflows | `pnpm lint:workflows` (requires `brew install actionlint`) |
+| Lint GitHub Actions workflows | `make lint-workflows` (requires `brew install actionlint shellcheck`) |
 | Lint man pages | `make lint-man` (requires mandoc; ships with macOS) |
 | Type-check (vscode-extension; other packages type-check via `pnpm -r build`) | `pnpm typecheck` |
 | Regenerate Langium AST only | `pnpm langium:generate` |
@@ -378,11 +378,11 @@ The Biome extension reads [`biome.json`](./biome.json) automatically, so the IDE
 Install [actionlint](https://github.com/rhysd/actionlint) and run it locally before pushing changes to `.github/workflows/`:
 
 ```
-brew install actionlint
-pnpm lint:workflows
+brew install actionlint shellcheck
+make lint-workflows
 ```
 
-CI runs the same `pnpm lint:workflows` step on every PR — catches YAML errors, action-input mismatches, expression typos, and bash issues inside `run:` blocks (via shellcheck) before they break a workflow run.
+CI runs the same `make lint-workflows` step on every PR — catches YAML errors, action-input mismatches, expression typos, and bash issues inside `run:` blocks (via shellcheck) before they break a workflow run.
 
 ## Editing man pages
 

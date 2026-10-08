@@ -74,7 +74,7 @@ pipeline that artifact is built in a separate CI job and handed over — see
 | `ci-platform` | Slim gate for the other build-test cells (`ubuntu-latest` Node 22, macOS, Windows): `build-fast`, then `pnpm -r test`. No lint, typecheck, or render: those have never differed by OS or Node version, while every platform bug so far was a Windows path bug that Vitest caught. Calls `pnpm -r test` itself rather than depending on `test`, so it never re-runs the full `build` |
 | `pre-commit` | Local alias of `ci` — run before committing or pushing |
 | `clean` | Remove build / binary / package artifacts (keeps `node_modules`) |
-| `lint-workflows` | actionlint the GitHub Actions workflows (`pnpm lint:workflows`) |
+| `lint-workflows` | actionlint the GitHub Actions workflows (`pnpm lint:workflows`); fails fast without shellcheck on PATH, since actionlint would otherwise skip the `run:` script checks CI does |
 | `lint-man` | `mandoc -T lint` every man page at warning level, minus the two warnings translated pages raise for their localized `NAME` section. Needs `mandoc` on PATH (apt `mandoc`; ships with macOS). Not part of `ci`: Windows has no mandoc, so CI runs it in one Linux job |
 | `bundle-size` | Build the embed dependency graph and run the CDN bundle-size + `node:*` leak gate |
 

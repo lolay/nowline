@@ -66,7 +66,7 @@ jobs:
           # count both paths. The API lists at most 300 files, so a full
           # list is treated as code rather than trusted.
           files=$(gh api "repos/$REPO/compare/$BASE...$HEAD" \
-            --jq '(.files // []) as $f | if ($f | length) >= 300 then "<truncated>" else ($f[] | .filename, (.previous_filename // empty)) end')
+            --jq '.files // [] | if length >= 300 then "<truncated>" else (.[] | .filename, (.previous_filename // empty)) end')
           code=false
           while IFS= read -r f; do
             [[ -z "$f" ]] && continue

@@ -110,7 +110,11 @@ doctor: ## Check required tools for this repo (read-only). MODE=default|release
 clean: ## Remove build, binary, and package artifacts (keeps node_modules)
 	rm -rf dist-bin dist-deb dist-pack dist-action dist-mcpb packages/*/dist packages/*/dist-* packages/*/tsconfig.tsbuildinfo
 
-lint-workflows: ## actionlint the GitHub Actions workflows (needs actionlint on PATH)
+# actionlint runs shellcheck over every `run:` script only when shellcheck is
+# on PATH, and skips that silently otherwise. CI's ubuntu runners have it, so
+# without it a local run passes what CI rejects. Require it here.
+lint-workflows: ## actionlint the GitHub Actions workflows (needs actionlint + shellcheck on PATH)
+	@command -v shellcheck >/dev/null 2>&1 || { printf 'shellcheck not found: actionlint would skip the run: script checks CI does. Install: brew install shellcheck (or apt-get install shellcheck)\n' >&2; exit 1; }
 	pnpm lint:workflows
 
 # mandoc's lint has no per-message suppression, so filter the two warnings
