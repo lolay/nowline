@@ -27,6 +27,62 @@ concurrency:
   cancel-in-progress: ${{ github.event_name == 'pull_request' }}
 
 jobs:
+  # Docs-only fast path. On pull_request and merge_group, a change that
+  # touches nothing but Markdown outside packages/ and .github/ skips the
+  # build, test, determinism, MCP, bundle-size and release-smoke jobs; the
+  # skips count as passes in `CI gate`. Push to main never skips: main
+  # always gets the full run, so a release cut from it was fully tested.
+  #
+  # Docs here means `*.md` anywhere except:
+  #   packages/**     READMEs ship in npm tarballs, the .vsix (vsce checks
+  #                   its README) and the action mirror; test fixtures too.
+  #   .github/**      the agent-*.md files compile to workflow lock files.
+  #   specs/dsl.md    packages/layout/test/calendar.test.ts reads it.
+  # Add a doc to the exception list when a test or build step starts
+  # reading it. Biome ignores Markdown, so lint has nothing to check.
+  changes:
+    name: Detect docs-only change
+    runs-on: ubuntu-latest
+    outputs:
+      code: ${{ steps.classify.outputs.code }}
+    steps:
+      - name: Classify changed files
+        id: classify
+        env:
+          GH_TOKEN: ${{ github.token }}
+          EVENT: ${{ github.event_name }}
+          REPO: ${{ github.repository }}
+          BASE: ${{ github.event.pull_request.base.sha || github.event.merge_group.base_sha }}
+          HEAD: ${{ github.event.pull_request.head.sha || github.event.merge_group.head_sha }}
+        run: |
+          set -euo pipefail
+          if [[ "$EVENT" == push ]]; then
+            echo "push to main: full run"
+            echo "code=true" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+          # Three-dot compare: everything on HEAD since its merge base with
+          # BASE (for merge_group, every PR in the queued group). Renames
+          # count both paths. The API lists at most 300 files, so a full
+          # list is treated as code rather than trusted.
+          files=$(gh api "repos/$REPO/compare/$BASE...$HEAD" \
+            --jq '(.files // []) as $f | if ($f | length) >= 300 then "<truncated>" else ($f[] | .filename, (.previous_filename // empty)) end')
+          code=false
+          while IFS= read -r f; do
+            [[ -z "$f" ]] && continue
+            case "$f" in
+              packages/* | .github/* | specs/dsl.md | "<truncated>") code=true ;;
+              *.md) ;;
+              *) code=true ;;
+            esac
+            if [[ "$code" == true ]]; then
+              echo "code change: $f"
+              break
+            fi
+          done <<< "$files"
+          [[ "$code" == false ]] && echo "docs-only change: skipping build and test jobs"
+          echo "code=$code" >> "$GITHUB_OUTPUT"
+
   lint-workflows:
     name: Lint workflows (actionlint)
     runs-on: ubuntu-latest
@@ -69,6 +125,9 @@ jobs:
           profile: ci
 
   build-test:
+    # Docs-only skip: see the `changes` job.
+    needs: changes
+    if: needs.changes.outputs.code == 'true'
     # Matrix layout: every supported OS runs on the dev/CI Node version
     # (26, matching .nvmrc), plus an extra Linux-only cell on Node 22 to
     # exercise the published consumer floor (`engines.node: ">=22"` in
@@ -127,6 +186,8 @@ jobs:
 
   bundle-size:
     name: Embed bundle size gate
+    needs: changes
+    if: needs.changes.outputs.code == 'true'
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v7
@@ -143,6 +204,8 @@ jobs:
     # environment (ubuntu, Node from .nvmrc) keeps the binary-format goldens
     # (pdf/png) stable — they are pinned per toolchain version, not per OS.
     name: Export determinism gate
+    needs: changes
+    if: needs.changes.outputs.code == 'true'
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v7
@@ -179,6 +242,8 @@ jobs:
     # the Inspector CLI smoke against the built stdio server. Not part of the
     # multi-OS matrix for the same reasons as determinism above.
     name: MCP harness gate
+    needs: changes
+    if: needs.changes.outputs.code == 'true'
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v7
@@ -219,7 +284,8 @@ jobs:
     #
     # pull_request builds only the Linux binary and pack cells; the merge
     # queue and push to main build and smoke all ten.
-    if: ${{ github.event_name != 'push' || github.event.head_commit.author.email != 'nowline-release-bot@lolay.com' }}
+    needs: changes
+    if: ${{ needs.changes.outputs.code == 'true' && (github.event_name != 'push' || github.event.head_commit.author.email != 'nowline-release-bot@lolay.com') }}
     uses: ./.github/workflows/build.yml
     with:
       upload: false
@@ -231,11 +297,13 @@ jobs:
     # changes above never need a lockstep ruleset edit. `if: always()` makes
     # it report even when a dependency fails; it fails when any job below
     # failed or was cancelled. `skipped` passes, because release-build-smoke
-    # is legitimately skipped on release-bot pushes. Keep `needs:` listing
+    # is legitimately skipped on release-bot pushes and the build and test
+    # jobs on docs-only changes (`changes` failing still fails the gate). Keep `needs:` listing
     # every other job in this workflow, and keep the `name:` exact.
     name: CI gate
     if: always()
     needs:
+      - changes
       - lint-workflows
       - lint-man
       - triage

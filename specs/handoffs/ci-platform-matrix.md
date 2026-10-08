@@ -1,6 +1,6 @@
 # CI platform matrix: what has to run where
 
-Status: Tiers 1, 2 (merge queue, step 5) and 3 are implemented on this branch and wait on a CI run, which needs a PR. Tier 2 step 6 (docs-only fast path) is not done. Rollout order: merge this branch first, confirm `CI gate` reported on `main`, then run `scripts/apply-branch-policies.sh`, which switches the required check to `CI gate`, turns on the merge queue and drops `strict`. Remove this file, or promote the chosen design into `specs/` and `Makefile.md`, before the branch merges.
+Status: Tiers 1, 2 (merge queue and the docs-only fast path) and 3 are implemented on this branch, PR #111. Push to `main` keeps the full matrix on purpose, so `main` is always fully tested before a release. Rollout order: merge this branch first, confirm `CI gate` reported on `main`, then run `scripts/apply-branch-policies.sh`, which switches the required check to `CI gate`, turns on the merge queue and drops `strict`. Remove this file, or promote the chosen design into `specs/` and `Makefile.md`, before the branch merges.
 
 ## Answer
 
@@ -91,7 +91,7 @@ The estimates come from one run's step timings. Setup time on Windows (35 s for 
 
 ## Open decision
 
-Decided: merge queue. Still open: whether to add the docs-only fast path (Tier 2, step 6), and whether push to `main` should keep running the full matrix now that the queue already ran it on the same tree.
+Decided: merge queue, docs-only fast path, and the full matrix on every push to `main`. Nothing open on design.
 
 ## Risks and gotchas
 
