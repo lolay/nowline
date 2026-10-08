@@ -183,10 +183,11 @@ function applyLabelStyleRefs(
     const labelsProp = props.find((p) => propKey(p) === 'labels');
     if (!labelsProp) return;
     const names: string[] = labelsProp.value ? [labelsProp.value] : labelsProp.values;
-    for (const name of names) {
+    // Walk last to first so the first label's style is applied last and wins
+    // on any key several labels set (specs/rendering.md § Style Precedence).
+    for (const name of [...names].reverse()) {
         const label = ctx.labels.get(name);
         if (!label) continue;
-        // Label's `style:` ref gets applied.
         const styleRef = label.properties.find((p) => propKey(p) === 'style');
         if (styleRef?.value) {
             applyStyleDecl(target, ctx.styles.get(styleRef.value), ctx.theme);
@@ -207,7 +208,7 @@ function applyEntityStyleRef(
 // Five-level precedence chain from specs/rendering.md § Style Precedence:
 // 1. system default (theme's EntityStyle for this type)
 // 2. config `default <entity>` properties
-// 3. label `style:` refs (per applied label)
+// 3. label `style:` refs (per applied label; the first label wins a shared key)
 // 4. entity's own `style:` ref
 // 5. inline style properties on the entity (banned by validator for roadmap
 //    entities; still supported for declared styles / defaults)

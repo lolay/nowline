@@ -1591,8 +1591,8 @@ describe('NL.W0703: roadmap-only style key on another default', () => {
 
 // Rule 20: header-height:none removes every timeline date strip, so a
 // timeline-position of bottom or both draws no dates (NL.W0704). The roadmap's
-// style resolves as in layout: `default roadmap`, the roadmap's label styles,
-// then its own `style:`, a later key winning.
+// style resolves as in layout: `default roadmap`, the roadmap's label styles
+// (the first label winning), then its own `style:`, a later key winning.
 describe('NL.W0704: header-height:none hides the timeline-position strip', () => {
     const body = 'swimlane s\n  item x duration:1w\n';
     const NBSP = '\u00A0';
@@ -1627,6 +1627,17 @@ describe('NL.W0704: header-height:none hides the timeline-position strip', () =>
             `config\nstyle low\n  timeline-position: bottom\ndefault roadmap header-height:none\nroadmap r labels:flat\nlabel flat style:low\n${body}`,
         );
         expect(w0704(r)).toHaveLength(1);
+    });
+
+    it.each([
+        ['[roomy, flat]', []],
+        ['[flat, roomy]', ['NL.W0704']],
+    ])('gives the first label precedence with labels:%s', async (labels, codes) => {
+        const r = await parse(
+            `config\nstyle tall\n  header-height: lg\nstyle dense\n  header-height: none\ndefault roadmap timeline-position:both\nroadmap r labels:${labels}\nlabel roomy style:tall\nlabel flat style:dense\n${body}`,
+        );
+        expect(errorMessages(r.diagnostics)).toEqual([]);
+        expect(w0704(r).map((d) => (d.data as { code: string }).code)).toEqual(codes);
     });
 
     it.each([
