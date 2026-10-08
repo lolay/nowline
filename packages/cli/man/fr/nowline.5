@@ -5,7 +5,7 @@
 .\" Empreinte de la page anglaise relue pour cette traduction. Après avoir
 .\" reporté une modification de la page anglaise, remplacez-la par la ligne
 .\" qu'affiche packages/cli/test/man/translation-parity.test.ts.
-.\" translated-from: nowline.5 sha256:58764670274f918425db9061b0f54d616b51c164cc95d03788c23616c8ecb27b
+.\" translated-from: nowline.5 sha256:029f6caec99c3575f50e8adf42b43f48d6f2470a9931457b202fc3c3a5fa9593
 .\"
 .\" Les mots-clés du DSL (nowline, config, roadmap, swimlane, item, parallel,
 .\" group, person, team, anchor, label, size, status, wave, milestone, footnote,
@@ -1498,7 +1498,13 @@ les libellés restant centrés verticalement.
 Elle s'applique au bandeau du haut comme au bandeau miroir du bas.
 .Sy none
 supprime tous les bandeaux de dates, y compris ceux que demande
-.Sy timeline-position .
+.Sy timeline-position\ ;
+avec
+.Sy bottom
+ou
+.Sy both ,
+cela déclenche l'avertissement
+.Sy NL.W0704 .
 .It Sy corner-radius
 .Sy none | xs | sm | md | lg | xl | full .
 .It Sy bracket
@@ -1907,6 +1913,25 @@ elles sont ignorées avec l'avertissement
 Les blocs
 .Sy style
 ne sont pas vérifiés.
+.It
+Lorsque le style de la roadmap définit
+.Sy header-height:none
+avec
+.Sy timeline-position:bottom
+ou
+.Sy both ,
+aucun bandeau de dates n'est dessiné, ce qui déclenche l'avertissement
+.Sy NL.W0704 .
+Le style se résout à partir de
+.Sy default roadmap ,
+puis du style de chaque label de la ligne
+.Sy roadmap ,
+puis de son propre
+.Sy style: ,
+la dernière clé l'emportant.
+Seuls les styles et labels déclarés dans le même fichier sont lus\ ; un
+.Sy style:
+ou un label venant d'un include laisse la vérification silencieuse.
 .It
 .Sy remaining:
 est soit un pourcentage
