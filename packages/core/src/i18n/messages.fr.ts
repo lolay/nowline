@@ -310,6 +310,8 @@ export const messages: MessageBundle = {
         } est ignoré\u00A0: cette roadmap ne déclare aucune vague. Déclarez des vagues avec «\u00A0wave <id>\u00A0» pour l'utiliser, ou retirez la propriété.`,
     'NL.W0703': (a: { key: string; entityType: string }) =>
         `${q(a.key)} sur ${q(`default ${a.entityType}`)} est ignoré\u00A0: c'est une clé de style propre à la roadmap. Définissez-la plutôt sur «\u00A0default roadmap\u00A0».`,
+    'NL.W0704': (a: { position: string }) =>
+        `${q(`timeline-position:${a.position}`)} n'affiche aucune date\u00A0: ${q('header-height:none')} retire tous les bandeaux de dates de la frise. Donnez à header-height la valeur xs, sm, md, lg ou xl pour les afficher.`,
 
     // Vagues
     'NL.E1100': (a: E1100Args) =>

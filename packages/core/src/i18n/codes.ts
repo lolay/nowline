@@ -93,6 +93,7 @@ export type MessageCode =
     | 'NL.W0701' // include-wave-presentation
     | 'NL.W0702' // wave-ignored-no-waves
     | 'NL.W0703' // roadmap-only-key-on-default
+    | 'NL.W0704' // timeline-strip-hidden
 
     // Waves (NL.E1100–E1199)
     | 'NL.E1100' // wave-needs-id
@@ -176,6 +177,7 @@ export const ALL_CODES: ReadonlyArray<MessageCode> = [
     'NL.W0701',
     'NL.W0702',
     'NL.W0703',
+    'NL.W0704',
     'NL.E1100',
     'NL.E1101',
     'NL.E1102',

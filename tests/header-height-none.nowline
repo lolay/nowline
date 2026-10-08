@@ -4,7 +4,8 @@ nowline v1
 // `default roadmap header-height:none` drops every tick panel, so neither
 // date strip draws even though `timeline-position:both` asks for both. The
 // now-pill, wave strip and marker row stack directly, and the now-line stops
-// at the last swimlane. Compare against header-height-xl.
+// at the last swimlane. The validator flags the combination with the
+// warning NL.W0704. Compare against header-height-xl.
 
 config
 
