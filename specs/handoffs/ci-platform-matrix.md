@@ -1,6 +1,6 @@
 # CI platform matrix: what has to run where
 
-Status: Tier 1 and Tier 3 are implemented on this branch (commits `056e3a0`, `89e6063`) and wait on a CI run, which needs a PR. Tier 2 (merge queue or the no-queue fallback) is the maintainer's open decision. After merge, the `main` ruleset still has to be re-applied with `scripts/apply-branch-policies.sh` so it requires only `CI gate`. Remove this file, or promote the chosen design into `specs/` and `Makefile.md`, before the branch merges.
+Status: Tiers 1, 2 (merge queue, step 5) and 3 are implemented on this branch and wait on a CI run, which needs a PR. Tier 2 step 6 (docs-only fast path) is not done. Rollout order: merge this branch first, confirm `CI gate` reported on `main`, then run `scripts/apply-branch-policies.sh`, which switches the required check to `CI gate`, turns on the merge queue and drops `strict`. Remove this file, or promote the chosen design into `specs/` and `Makefile.md`, before the branch merges.
 
 ## Answer
 
@@ -91,7 +91,7 @@ The estimates come from one run's step timings. Setup time on Windows (35 s for 
 
 ## Open decision
 
-Tier 1 and Tier 3 are chosen and implemented. Still open: merge queue (Tier 2, step 5) or the no-queue fallback (macOS Vitest on push to `main` only)?
+Decided: merge queue. Still open: whether to add the docs-only fast path (Tier 2, step 6), and whether push to `main` should keep running the full matrix now that the queue already ran it on the same tree.
 
 ## Risks and gotchas
 

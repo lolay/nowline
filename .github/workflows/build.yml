@@ -18,6 +18,10 @@ on:
         description: 'Upload built artifacts (release mode). When false, runs as a build-only smoke.'
         type: boolean
         default: false
+      platforms:
+        description: 'Which cells to run: all (default; release.yml, merge queue, push to main) or linux (pull_request: the Linux binary and pack cells only).'
+        type: string
+        default: all
 
 # Defense-in-depth concurrency. `ci.yml` has its own workflow-level
 # concurrency block (added in step 1.2 of the v0.4.0 plan); when CI
@@ -42,6 +46,42 @@ permissions:
   contents: read
 
 jobs:
+  # Picks the cells for this call. The ten-cell list lives here, once, so
+  # the `platforms: linux` subset can't drift from what a release builds.
+  # A matrix can't be filtered by an input any other way: `include`
+  # entries that match no base combination are added, never dropped.
+  plan:
+    name: Plan cells
+    runs-on: ubuntu-latest
+    outputs:
+      include: ${{ steps.cells.outputs.include }}
+    steps:
+      - name: Select cells
+        id: cells
+        env:
+          PLATFORMS: ${{ inputs.platforms }}
+        run: |
+          set -euo pipefail
+          case "$PLATFORMS" in all|linux) ;; *) echo "::error::platforms must be all or linux (got '$PLATFORMS')"; exit 1 ;; esac
+          cells=$(cat <<'JSON'
+          [
+            { "id": "bin-macos-arm64",   "os": "macos",   "kind": "binary",     "runner": "macos-latest",     "target": "bun-darwin-arm64",  "suffix": "macos-arm64" },
+            { "id": "bin-macos-x64",     "os": "macos",   "kind": "binary",     "runner": "macos-latest",     "target": "bun-darwin-x64",    "suffix": "macos-x64" },
+            { "id": "bin-linux-x64",     "os": "linux",   "kind": "binary",     "runner": "ubuntu-latest",    "target": "bun-linux-x64",     "suffix": "linux-x64",   "deb_arch": "amd64" },
+            { "id": "bin-linux-arm64",   "os": "linux",   "kind": "binary",     "runner": "ubuntu-24.04-arm", "target": "bun-linux-arm64",   "suffix": "linux-arm64", "deb_arch": "arm64" },
+            { "id": "bin-windows-x64",   "os": "windows", "kind": "binary",     "runner": "windows-latest",   "target": "bun-windows-x64",   "suffix": "windows-x64.exe" },
+            { "id": "bin-windows-arm64", "os": "windows", "kind": "binary",     "runner": "windows-11-arm",   "target": "bun-windows-arm64", "suffix": "windows-arm64.exe" },
+            { "id": "pack-npm",          "os": "linux",   "kind": "npm-pack",   "runner": "ubuntu-latest" },
+            { "id": "pack-vsix",         "os": "linux",   "kind": "vsix-pack",  "runner": "ubuntu-latest" },
+            { "id": "pack-action",       "os": "linux",   "kind": "action-pack", "runner": "ubuntu-latest" },
+            { "id": "pack-mcp-mcpb",     "os": "linux",   "kind": "mcpb-pack",  "runner": "ubuntu-latest" }
+          ]
+          JSON
+          )
+          include=$(jq -c --arg p "$PLATFORMS" '[.[] | select($p == "all" or .os == "linux")]' <<<"$cells")
+          jq -r '.[].id' <<<"$include"
+          echo "include=$include" >> "$GITHUB_OUTPUT"
+
   # One job, one matrix, ten cells. Heterogeneous on purpose so the
   # caller (publish in release.yml) can `needs: build` and inherit
   # "wait for every cell" gating from GitHub Actions for free — no
@@ -72,21 +112,13 @@ jobs:
   #   pack-mcp-mcpb `make pack-mcpb` for the Claude Desktop .mcpb bundle.
   build:
     name: Build ${{ matrix.id }}
+    needs: plan
     runs-on: ${{ matrix.runner }}
     strategy:
       fail-fast: false
       matrix:
-        include:
-          - { id: bin-macos-arm64, kind: binary, runner: macos-latest, target: bun-darwin-arm64, suffix: macos-arm64 }
-          - { id: bin-macos-x64, kind: binary, runner: macos-latest, target: bun-darwin-x64, suffix: macos-x64 }
-          - { id: bin-linux-x64, kind: binary, runner: ubuntu-latest, target: bun-linux-x64, suffix: linux-x64, deb_arch: amd64 }
-          - { id: bin-linux-arm64, kind: binary, runner: ubuntu-24.04-arm, target: bun-linux-arm64, suffix: linux-arm64, deb_arch: arm64 }
-          - { id: bin-windows-x64, kind: binary, runner: windows-latest, target: bun-windows-x64, suffix: windows-x64.exe }
-          - { id: bin-windows-arm64, kind: binary, runner: windows-11-arm, target: bun-windows-arm64, suffix: windows-arm64.exe }
-          - { id: pack-npm, kind: npm-pack, runner: ubuntu-latest }
-          - { id: pack-vsix, kind: vsix-pack, runner: ubuntu-latest }
-          - { id: pack-action, kind: action-pack, runner: ubuntu-latest }
-          - { id: pack-mcp-mcpb, kind: mcpb-pack, runner: ubuntu-latest }
+        # The cell list is in the plan job above.
+        include: ${{ fromJSON(needs.plan.outputs.include) }}
     steps:
       - uses: actions/checkout@v7
       - uses: ./.github/actions/setup-node-pnpm

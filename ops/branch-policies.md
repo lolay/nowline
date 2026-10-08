@@ -20,7 +20,7 @@ Three independent forces shape the rules:
 
 1. **Solo-maintainer friction.** Gary needs to push directly to `main` on every repo without forcing a PR through himself. This is the OrgAdmin bypass with `bypass_mode: always`.
 2. **Automated release flows.** `lolay/nowline:.github/workflows/release.yml` does `git push origin HEAD` to commit a version bump back to `main` before tagging, and `editor-release-monitor.yml` pushes a daily `[skip ci]` history-update commit. Both run as bots; without an App bypass they'd fail the protection rules. (Today `release.yml` uses a personal PAT and `editor-release-monitor.yml` uses `github-actions[bot]` — both queued for migration to the App; see § 6.)
-3. **Defence-in-depth approval.** `required_approving_review_count: 1` ensures no token can merge a PR without a human approval — CI passes *and* a human clicks Approve. The Copilot agent-merge workflow (`agent-merge.yml`) is **retired**; there is no `gh pr merge --auto` in any automation. The Copilot agent flow now emits `maintainer-pr-safe` / `maintainer-pr-review` confidence labels; a maintainer reviews and clicks Approve + Merge in the UI (the maintainer can approve because Copilot, not the maintainer, authored the PR). The OrgAdmin `always` bypass lets the solo maintainer still push directly to `main` and merge their own PRs unblocked. Bypass actors must use `bypass_mode: always` (which still respects `required_status_checks`), never `bypass_mode: pull_request` (which would short-circuit the CI gate); `github-actions[bot]` remains intentionally **not** a bypass actor on any ruleset.
+3. **Defence-in-depth approval.** `required_approving_review_count: 1` ensures no token can merge a PR without a human approval — CI passes *and* a human clicks Approve. The Copilot agent-merge workflow (`agent-merge.yml`) is **retired**; there is no `gh pr merge --auto` in any automation. The Copilot agent flow now emits `maintainer-pr-safe` / `maintainer-pr-review` confidence labels; a maintainer reviews, clicks Approve, then **Merge when ready** to queue it (the maintainer can approve because Copilot, not the maintainer, authored the PR). The OrgAdmin `always` bypass lets the solo maintainer still push directly to `main` and merge their own PRs unblocked. Bypass actors must use `bypass_mode: always` (which still respects `required_status_checks`), never `bypass_mode: pull_request` (which would short-circuit the CI gate); `github-actions[bot]` remains intentionally **not** a bypass actor on any ruleset.
 
 The result is a "1 approval + CI are the gates, two trusted bypass actors" model for the Tier-1 OSS repo. Tier-3 Follower is publish-only with no PR CI; its approval count is kept at 0 pending confirmation (see § 2 note and § 5).
 
@@ -28,12 +28,14 @@ The result is a "1 approval + CI are the gates, two trusted bypass actors" model
 
 | Tier | Repo | Ruleset name | Required approvals | Required CI contexts | Bypass actors |
 |---|---|---|---|---|---|
-| OSS | `lolay/nowline` | `main: CI must pass` | 1 1 context: `CI gate` (the aggregate job in `ci.yml`), `strict: true` | OrgAdmin (Gary) `always` + `lolay-nowline-release` App `always` |
+| OSS | `lolay/nowline` | `main: CI must pass` | 1 | 1 context: `CI gate` (the aggregate job in `ci.yml`), `strict: false`, merge queue on (squash) | OrgAdmin (Gary) `always` + `lolay-nowline-release` App `always` |
 | Follower | `lolay/nowline-action` | `main: protected (follower)` | 0 *(flag: see note below)* | none (publish-only) | OrgAdmin (Gary) `always` + `lolay-nowline-release` App `always` |
 
 `CI gate` is the last job in [`ci.yml`](../.github/workflows/ci.yml). It `needs:` every other job in that workflow, runs `if: always()`, and fails when any of them failed or was cancelled. A skipped job counts as a pass, because `release-build-smoke` is legitimately skipped on release-bot pushes. Requiring only this one context means adding, renaming, or reshaping a `ci.yml` job or matrix cell never needs a lockstep ruleset edit. (The old per-job list had already drifted: it required `Release build smoke (no upload) / Build pack-embed`, a cell that no longer exists, and omitted determinism, the MCP harness, and triage.)
 
-> **Ordering.** The `CI gate` job must exist on `main` (merged) before the ruleset is switched to require it. Run the script earlier and every PR blocks: a branch whose `ci.yml` has no `CI gate` job never reports that context, so the required check waits forever. Merge the `ci.yml` change first, confirm a `CI gate` check reported on `main`, then run the script.
+**Merge queue.** `main` merges through GitHub's merge queue (squash, `ALLGREEN`, up to 5 entries built at once, 60-minute check timeout). A PR's own CI runs on `pull_request`, which builds and tests only the Linux cells, so a push gets feedback without waiting on macOS or Windows. Once the PR is approved and its `CI gate` is green, **Merge when ready** queues it. The queue builds the PR on top of `main` plus anything ahead of it and runs the full `ci.yml` on that `merge_group` commit: the macOS and Windows test cells and all ten build cells. `CI gate` must pass there too before the commit lands. Every platform still gates `main`; only the PR iteration loop got shorter. The queue also replaces `strict: true`: it always tests against the latest `main`, so open PRs no longer need updating and re-running after every merge. Bypass actors skip the queue, which `release.yml`'s direct version-bump push relies on.
+
+> **Ordering.** The `CI gate` job and `ci.yml`'s `merge_group` trigger must exist on `main` (merged) before the script runs. Run it earlier and every PR blocks: a branch whose `ci.yml` has no `CI gate` job never reports that context, so the required check waits forever, and a queue entry that no workflow answers fails after the 60-minute timeout. Merge the `ci.yml` change first, confirm a `CI gate` check reported on `main`, then run the script.
 
 Every ruleset additionally enforces:
 
@@ -150,7 +152,7 @@ For a job in `ci.yml`, add its job ID to the `needs:` list of the `CI gate` job.
 
 For a job in another workflow (one that `CI gate` cannot `needs:`):
 
-1. Confirm the workflow's job actually runs on every PR to `main`, including PRs that touch only docs / `.md` files. A path-filtered check that's "Expected" but skipped will block all merges.
+1. Confirm the workflow's job actually runs on every PR to `main`, including PRs that touch only docs / `.md` files, **and** on `merge_group` (add `merge_group: types: [checks_requested]` to its `on:`). A path-filtered check that's "Expected" but skipped will block all merges, and a required check with no `merge_group` trigger stalls every queue entry until it times out.
 2. Find the exact `name` field as it appears in `statusCheckRollup`:
    ```bash
    gh api "repos/lolay/nowline/pulls/<pr>/statusCheckRollup" --jq '.[].name' | sort -u

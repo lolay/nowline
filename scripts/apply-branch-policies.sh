@@ -16,8 +16,11 @@
 # script is the spec; that runbook is the wrapper.
 #
 # ORDERING: the `main` ruleset requires the `CI gate` check from
-# .github/workflows/ci.yml.  That job must be merged to `main` before
-# this script runs, or every PR blocks.  See the Tier 1 section below.
+# .github/workflows/ci.yml and turns on the merge queue.  ci.yml's
+# `CI gate` job and its `merge_group` trigger must be merged to `main`
+# before this script runs, or every PR blocks (no `CI gate` on the PR)
+# and every queue entry times out (no workflow answers `merge_group`).
+# See the Tier 1 section below.
 #
 # Idempotency: GET rulesets first; PUT by id when a ruleset with the
 # target name already exists, POST when none does.  Safe to re-run at
@@ -153,16 +156,26 @@ trap 'rm -rf "$TMP"' EXIT
 # ci.yml job or matrix cell needs no change here; only renaming the
 # `CI gate` job itself does, and that needs the script updated and
 # re-run in lockstep or every PR blocks on a missing-but-required check.
-# strict_required_status_checks_policy: true requires the PR branch be
-# up-to-date with main before merging.  Defence-in-depth:
-# required_approving_review_count: 1 (see ops/branch-policies.md § 1).
 #
-# ORDERING (read before running): the `CI gate` job must already exist
-# on `main` (merged) before this ruleset is switched to require it.
-# Applying it earlier blocks every PR: a branch whose ci.yml has no
-# `CI gate` job never reports that context, so the required check
-# waits forever.  Merge the ci.yml change first, confirm a `CI gate`
-# check reported on main, then run this script.
+# Merge queue: a PR enters the queue once its own `CI gate` (Linux cells
+# only on pull_request) is green and it has its approval.  The queue
+# builds the PR on top of main plus anything ahead of it and runs the
+# full ci.yml on that `merge_group` commit, macOS and Windows included;
+# `CI gate` must pass there too before it lands.  That replaces
+# strict_required_status_checks_policy (now false): the queue already
+# tests against the latest main, so PR branches no longer need updating
+# and re-running after every merge.  Defence-in-depth:
+# required_approving_review_count: 1 (see ops/branch-policies.md § 1).
+# The bypass actors (OrgAdmin, release App) bypass the queue as well,
+# which release.yml's direct version-bump push to main relies on.
+#
+# ORDERING (read before running): the `CI gate` job and ci.yml's
+# `merge_group` trigger must already exist on `main` (merged) before
+# this script runs.  Applying it earlier blocks every PR: a branch
+# whose ci.yml has no `CI gate` job never reports that context, so the
+# required check waits forever, and a queue entry nothing answers fails
+# after check_response_timeout_minutes.  Merge the ci.yml change first,
+# confirm a `CI gate` check reported on main, then run this script.
 # ──────────────────────────────────────────────────────────────────────────────
 echo ""
 echo "=== Tier 1: OSS — ${ORG}/nowline ==="
@@ -199,9 +212,21 @@ cat > "$TMP/nowline.json" <<JSON
       }
     },
     {
+      "type": "merge_queue",
+      "parameters": {
+        "merge_method": "SQUASH",
+        "grouping_strategy": "ALLGREEN",
+        "min_entries_to_merge": 1,
+        "min_entries_to_merge_wait_minutes": 5,
+        "max_entries_to_merge": 5,
+        "max_entries_to_build": 5,
+        "check_response_timeout_minutes": 60
+      }
+    },
+    {
       "type": "required_status_checks",
       "parameters": {
-        "strict_required_status_checks_policy": true,
+        "strict_required_status_checks_policy": false,
         "do_not_enforce_on_create": false,
         "required_status_checks": [
           { "context": "CI gate" }
