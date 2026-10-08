@@ -207,7 +207,7 @@ function applyEntityStyleRef(
 
 // Five-level precedence chain from specs/rendering.md § Style Precedence:
 // 1. system default (theme's EntityStyle for this type)
-// 2. config `default <entity>` properties
+// 2. config `default <entity>`: its `style:` ref, then its raw properties
 // 3. label `style:` refs (per applied label; the first label wins a shared key)
 // 4. entity's own `style:` ref
 // 5. inline style properties on the entity (banned by validator for roadmap
@@ -220,14 +220,13 @@ export function resolveStyle(
     const baseEntity = ctx.theme.entities[entityType];
     const out = entityStyleToResolved(baseEntity, ctx.theme);
 
-    // Level 2: config defaults
+    // Level 2: config defaults. The line's `style:` ref applies first and its
+    // raw props on top, the same order levels 4 and 5 use on the entity, so
+    // `default item style:subtle bg:red` is "subtle, but red".
     const defaultDecl = ctx.defaults.get(entityType);
     if (defaultDecl) {
-        for (const p of defaultDecl.properties) {
-            if (p.value !== undefined) {
-                applyProp(out, propKey(p), p.value, ctx.theme);
-            }
-        }
+        applyEntityStyleRef(out, defaultDecl.properties, ctx);
+        applyProperties(out, defaultDecl.properties, ctx.theme);
     }
 
     // Level 3: label styles (labels on this entity, each label's `style:` ref)

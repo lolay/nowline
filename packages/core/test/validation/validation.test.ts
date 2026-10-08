@@ -1591,8 +1591,9 @@ describe('NL.W0703: roadmap-only style key on another default', () => {
 
 // Rule 20: header-height:none removes every timeline date strip, so a
 // timeline-position of bottom or both draws no dates (NL.W0704). The roadmap's
-// style resolves as in layout: `default roadmap`, the roadmap's label styles
-// (the first label winning), then its own `style:`, a later key winning.
+// style resolves as in layout: `default roadmap` (its `style:` block, then its
+// own keys), the roadmap's label styles (the first label winning), then its own
+// `style:`, a later key winning.
 describe('NL.W0704: header-height:none hides the timeline-position strip', () => {
     const body = 'swimlane s\n  item x duration:1w\n';
     const NBSP = '\u00A0';
@@ -1627,6 +1628,28 @@ describe('NL.W0704: header-height:none hides the timeline-position strip', () =>
             `config\nstyle low\n  timeline-position: bottom\ndefault roadmap header-height:none\nroadmap r labels:flat\nlabel flat style:low\n${body}`,
         );
         expect(w0704(r)).toHaveLength(1);
+    });
+
+    it("warns when the default roadmap line's style block supplies the key", async () => {
+        const r = await parse(
+            `config\nstyle dense\n  header-height: none\ndefault roadmap style:dense timeline-position:both\nroadmap r\n${body}`,
+        );
+        expect(errorMessages(r.diagnostics)).toEqual([]);
+        expect(w0704(r)).toHaveLength(1);
+    });
+
+    it("stays silent when the default roadmap line's own key overrides its style block", async () => {
+        const r = await parse(
+            `config\nstyle dense\n  header-height: none\n  timeline-position: both\ndefault roadmap header-height:md style:dense\nroadmap r\n${body}`,
+        );
+        expect(w0704(r)).toEqual([]);
+    });
+
+    it('stays silent when the default roadmap style is not declared in this file', async () => {
+        const r = await parse(
+            `config\ndefault roadmap header-height:none timeline-position:both style:elsewhere\nroadmap r\n${body}`,
+        );
+        expect(w0704(r)).toEqual([]);
     });
 
     it.each([
