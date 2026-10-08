@@ -1588,3 +1588,86 @@ describe('NL.W0703: roadmap-only style key on another default', () => {
         );
     });
 });
+
+// Rule 20: header-height:none removes every timeline date strip, so a
+// timeline-position of bottom or both draws no dates (NL.W0704). The roadmap's
+// style resolves as in layout: `default roadmap`, the roadmap's label styles,
+// then its own `style:`, a later key winning.
+describe('NL.W0704: header-height:none hides the timeline-position strip', () => {
+    const body = 'swimlane s\n  item x duration:1w\n';
+    const NBSP = '\u00A0';
+
+    type Outcome = Awaited<ReturnType<typeof parse>>;
+
+    const w0704 = (r: Outcome) =>
+        r.diagnostics.filter((d) => (d.data as { code?: string } | undefined)?.code === 'NL.W0704');
+
+    it.each(['bottom', 'both'])('warns on default roadmap timeline-position:%s', async (pos) => {
+        const r = await parse(
+            `config\ndefault roadmap header-height:none timeline-position:${pos}\nroadmap r\n${body}`,
+        );
+        expect(errorMessages(r.diagnostics)).toEqual([]);
+        expect(warningMessages(r.diagnostics)).toEqual([
+            `"timeline-position:${pos}" draws no dates: "header-height:none" removes every timeline date strip. Set header-height to xs, sm, md, lg or xl to show them.`,
+        ]);
+        const [diag] = w0704(r);
+        expect(diag.range.start.line).toBe(1);
+    });
+
+    it('warns when a referenced style block supplies either key', async () => {
+        const r = await parse(
+            `config\nstyle dense\n  header-height: none\ndefault roadmap timeline-position:both\nroadmap r style:dense\n${body}`,
+        );
+        expect(errorMessages(r.diagnostics)).toEqual([]);
+        expect(w0704(r)).toHaveLength(1);
+    });
+
+    it('warns when a label style on the roadmap supplies the key', async () => {
+        const r = await parse(
+            `config\nstyle low\n  timeline-position: bottom\ndefault roadmap header-height:none\nroadmap r labels:flat\nlabel flat style:low\n${body}`,
+        );
+        expect(w0704(r)).toHaveLength(1);
+    });
+
+    it.each([
+        ['top', 'default roadmap header-height:none timeline-position:top'],
+        ['a visible strip', 'default roadmap header-height:xs timeline-position:both'],
+        ['no position', 'default roadmap header-height:none'],
+        ['another entity', 'default item header-height:none timeline-position:both'],
+    ])('stays silent for %s', async (_case, line) => {
+        const r = await parse(`config\n${line}\nroadmap r\n${body}`);
+        expect(w0704(r)).toEqual([]);
+    });
+
+    it("stays silent when the roadmap's style overrides header-height", async () => {
+        const r = await parse(
+            `config\nstyle tall\n  header-height: lg\ndefault roadmap header-height:none timeline-position:both\nroadmap r style:tall\n${body}`,
+        );
+        expect(w0704(r)).toEqual([]);
+    });
+
+    it('stays silent for a style block the roadmap does not reference', async () => {
+        const r = await parse(
+            `config\nstyle dense\n  header-height: none\n  timeline-position: both\nroadmap r\n${body}`,
+        );
+        expect(w0704(r)).toEqual([]);
+    });
+
+    it('stays silent when the roadmap style is not declared in this file', async () => {
+        const r = await parse(
+            `config\ndefault roadmap header-height:none timeline-position:both\nroadmap r style:elsewhere\n${body}`,
+        );
+        expect(w0704(r)).toEqual([]);
+    });
+
+    it('translates the message into French', async () => {
+        const r = await parse(
+            `nowline v1 locale:fr\nconfig\ndefault roadmap header-height:none timeline-position:bottom\nroadmap r\n${body}`,
+        );
+        const [diag] = w0704(r);
+        const { code, args } = diag.data as { code: 'NL.W0704'; args: [{ position: string }] };
+        expect(tr('fr', code, ...args)).toBe(
+            `«${NBSP}timeline-position:bottom${NBSP}» n'affiche aucune date${NBSP}: «${NBSP}header-height:none${NBSP}» retire tous les bandeaux de dates de la frise. Donnez à header-height la valeur xs, sm, md, lg ou xl pour les afficher.`,
+        );
+    });
+});
