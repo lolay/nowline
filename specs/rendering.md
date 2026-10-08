@@ -525,7 +525,7 @@ When multiple style sources apply to an entity, the renderer resolves them in th
 1. **Entity inline properties** — style properties set directly on the entity (e.g., `item auth-refactor bg:red`).
 2. **Entity `style:` reference** — a named style referenced on the entity (e.g., `item auth-refactor style:risky`).
 3. **Label `style:` reference** — the named style referenced by the label.
-4. **Config `defaults`** — fallback properties for the entity type (e.g., `defaults` > `item style:subtle`).
+4. **Config `defaults`** — the `default <entity>` line for the entity type. Its `style:` reference applies first and the line's raw style properties apply on top of it, the same order levels 1 and 2 use on the entity, so `default item style:subtle bg:red` reads as "`subtle`, but red". Both sit below every label and entity style.
 5. **Nowline system defaults** — built-in colors and styling when nothing is specified.
 
 When an entity has multiple labels with different styles, the first label's style takes precedence.
