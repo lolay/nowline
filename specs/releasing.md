@@ -32,7 +32,7 @@ Before cutting a release, on `main`:
 1. **CI is green** on the latest `main` commit (Linux, macOS, Windows).
 2. **`CHANGELOG.md` is up to date.** See [Changelog workflow](#changelog-workflow) below — contributors should already have appended entries to `## [Unreleased]` as part of their PRs; the `cut-release` job automatically moves them into a new `## [vX.Y.Z] - YYYY-MM-DD` section. No manual edit is required before triggering the dispatch.
 3. **Examples render cleanly.** `pnpm build` (which runs `pnpm samples` and `pnpm fixtures`) should produce the expected SVGs without warnings.
-4. **Smoke-test the standalone binary locally** with `pnpm --filter @nowline/cli compile:local`, then run `examples/minimal.nowline` through every export format using the platform-suffixed binary the script produces — `./packages/cli/dist-bin/nowline-<platform>-<arch>` (e.g. `nowline-macos-arm64` on Apple Silicon, `nowline-linux-x64` on Linux/amd64). This catches `bun compile` regressions that the CI smoke test cannot reach for cross-platform binaries.
+4. **Smoke-test the standalone binary locally** with `pnpm --filter @nowline/cli compile:local`, then run `examples/minimal.nowline` through every export format using the platform-suffixed binary the script produces — `./packages/cli/dist-bin/nowline-<platform>-<arch>` (e.g. `nowline-macos-arm64` on Apple Silicon, `nowline-linux-x64` on Linux/amd64). CI smoke-tests all six binaries on native runners (`make smoke` runs the same checks); the local run is a last check against the exact toolchain on your machine.
 5. **Required secrets are in place.** All five secrets in the [Required secrets](#required-secrets) table below must exist on `lolay/nowline`. The first-ever release also needed the `lolay/homebrew-tap` repo seeded and the Marketplace / Open VSX namespaces created — that one-time setup is now done; subsequent releases skip it. (Forking maintainers can recreate the namespaces from each registry's "create publisher" flow; the formula seed lives at [`scripts/homebrew-tap/`](../scripts/homebrew-tap/).)
 
 ## Cutting the release
@@ -113,17 +113,17 @@ Defined in [`build.yml`](./.github/workflows/build.yml). One job, one matrix, te
 | Cell id | Runner | Produces |
 |---|---|---|
 | `bin-macos-arm64` | macos-latest | `nowline-macos-arm64` artifact |
-| `bin-macos-x64` | macos-latest | `nowline-macos-x64` artifact |
+| `bin-macos-x64` | macos-latest (arm64; smoke runs under Rosetta) | `nowline-macos-x64` artifact |
 | `bin-linux-x64` | ubuntu-latest | `nowline-linux-x64` + `nowline_amd64.deb` artifacts |
-| `bin-linux-arm64` | ubuntu-latest | `nowline-linux-arm64` + `nowline_arm64.deb` artifacts |
+| `bin-linux-arm64` | ubuntu-24.04-arm | `nowline-linux-arm64` + `nowline_arm64.deb` artifacts |
 | `bin-windows-x64` | windows-latest | `nowline-windows-x64.exe` artifact |
-| `bin-windows-arm64` | windows-latest | `nowline-windows-arm64.exe` artifact |
+| `bin-windows-arm64` | windows-11-arm | `nowline-windows-arm64.exe` artifact |
 | `pack-npm` | ubuntu-latest | `npm-tarballs` artifact (eighteen `.tgz` files) |
 | `pack-vsix` | ubuntu-latest | `nowline-vscode.vsix` artifact |
 | `pack-action` | ubuntu-latest | `action-mirror` bundle artifact |
 | `pack-mcp-mcpb` | ubuntu-latest | `nowline.mcpb` artifact (Claude Desktop Extensions bundle built from `packages/mcp/`) |
 
-Binary cells use `bun compile` and run the same per-format smoke test (SVG, PNG, PDF, HTML, Mermaid, XLSX, MS Project XML) against `examples/minimal.nowline`, except cross-target combinations that cannot execute on the runner. The two linux cells additionally invoke [`scripts/build-deb.sh`](../scripts/build-deb.sh) on the binary they just produced — keeping the binary→deb chain intra-cell skips an artifact upload/download round-trip.
+Binary cells use `bun compile` and run the same per-format smoke test (SVG, PNG, PDF, HTML, Mermaid, XLSX, MS Project XML) against `examples/minimal.nowline` via `make smoke` ([`scripts/smoke-binary.sh`](../scripts/smoke-binary.sh)). Every cell runs on a runner that can execute its own binary, so all six shipped binaries are executed: the arm64 Linux and Windows cells use the native `ubuntu-24.04-arm` and `windows-11-arm` runners (free for public repos), and `bin-macos-x64` runs under Rosetta on the arm64 `macos-latest`. The script decides from the host's `uname` whether it can execute a binary; under GitHub Actions a cross-target skip fails the step unless the cell sets `SMOKE_ALLOW_CROSS_TARGET=1`. The two linux cells additionally invoke [`scripts/build-deb.sh`](../scripts/build-deb.sh) on the binary they just produced — keeping the binary→deb chain intra-cell skips an artifact upload/download round-trip.
 
 `pack-npm` runs `pnpm pack` for the eighteen publishable packages in dependency order (`@nowline/core`, `@nowline/layout`, `@nowline/renderer`, `@nowline/browser`, `@nowline/embed`, `@nowline/preview-shell`, `@nowline/lsp`, `@nowline/lsp-worker`, `@nowline/export-core`, the six per-format `@nowline/export-*` packages, `@nowline/config`, `@nowline/cli`, `@nowline/mcp`). pnpm 10 rewrites `workspace:*` to the resolved version inside each tarball, so the publish phase uses plain `npm publish <tarball>` with no workspace-protocol shenanigans.
 

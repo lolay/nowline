@@ -15,6 +15,13 @@
 # shaped this way, when to re-run, how to extend, known gaps).  This
 # script is the spec; that runbook is the wrapper.
 #
+# ORDERING: the `main` ruleset requires the `CI gate` check from
+# .github/workflows/ci.yml and turns on the merge queue.  ci.yml's
+# `CI gate` job and its `merge_group` trigger must be merged to `main`
+# before this script runs, or every PR blocks (no `CI gate` on the PR)
+# and every queue entry times out (no workflow answers `merge_group`).
+# See the Tier 1 section below.
+#
 # Idempotency: GET rulesets first; PUT by id when a ruleset with the
 # target name already exists, POST when none does.  Safe to re-run at
 # any time.
@@ -142,23 +149,43 @@ trap 'rm -rf "$TMP"' EXIT
 # ──────────────────────────────────────────────────────────────────────────────
 # Tier 1 — OSS: lolay/nowline
 #
-# Required CI contexts taken from .github/workflows/ci.yml's job names.
-# Names must match exactly; a renamed job needs the script updated and
-# re-run before the next PR or merges block on a missing-but-required
-# check.  strict_required_status_checks_policy: true requires the PR
-# branch be up-to-date with main before merging.  Defence-in-depth:
+# The only required CI context is `CI gate`, the aggregate job at the
+# end of .github/workflows/ci.yml.  It `needs:` every other ci.yml job,
+# runs `if: always()`, and fails when any of them failed or was
+# cancelled (a skipped job passes).  So adding, renaming, or reshaping a
+# ci.yml job or matrix cell needs no change here; only renaming the
+# `CI gate` job itself does, and that needs the script updated and
+# re-run in lockstep or every PR blocks on a missing-but-required check.
+#
+# Merge queue: a PR enters the queue once its own `CI gate` (Linux cells
+# only on pull_request) is green and it has its approval.  The queue
+# builds the PR on top of main plus anything ahead of it and runs the
+# full ci.yml on that `merge_group` commit, macOS and Windows included;
+# `CI gate` must pass there too before it lands.  That replaces
+# strict_required_status_checks_policy (now false): the queue already
+# tests against the latest main, so PR branches no longer need updating
+# and re-running after every merge.  Defence-in-depth:
 # required_approving_review_count: 1 (see ops/branch-policies.md § 1).
+# The bypass actors (OrgAdmin, release App) bypass the queue as well,
+# which release.yml's direct version-bump push to main relies on.
+#
+# ORDERING (read before running): the `CI gate` job and ci.yml's
+# `merge_group` trigger must already exist on `main` (merged) before
+# this script runs.  Applying it earlier blocks every PR: a branch
+# whose ci.yml has no `CI gate` job never reports that context, so the
+# required check waits forever, and a queue entry nothing answers fails
+# after check_response_timeout_minutes.  Merge the ci.yml change first,
+# confirm a `CI gate` check reported on main, then run this script.
 # ──────────────────────────────────────────────────────────────────────────────
 echo ""
 echo "=== Tier 1: OSS — ${ORG}/nowline ==="
 
 OSS_BYPASS_JSON=$(bypass_actors_json "${ORG}/nowline")
-# NOTE: Reusable-workflow check names below use the caller job's `name:`
-# field (NOT its job ID) — `Release build smoke (no upload)` not
-# `release-build-smoke`. Confirmed by observation on PR #42 (Phase 1
-# prep), pre-merge. If `ci.yml`'s `release-build-smoke` job ever
-# changes its `name:` value, these contexts must be updated in lockstep
-# or PRs will block on stale check names.
+# NOTE: Check contexts use the job's `name:` field, not its job ID
+# (`CI gate`, not `ci-gate`).  The per-job contexts this list used to
+# hold (lint, the four build-test cells, bundle size, and the ten
+# `Release build smoke (no upload) / Build ...` cells) are covered by
+# `CI gate` now; the stale `Build pack-embed` context went with them.
 cat > "$TMP/nowline.json" <<JSON
 {
   "name": "main: CI must pass",
@@ -185,27 +212,24 @@ cat > "$TMP/nowline.json" <<JSON
       }
     },
     {
+      "type": "merge_queue",
+      "parameters": {
+        "merge_method": "SQUASH",
+        "grouping_strategy": "ALLGREEN",
+        "min_entries_to_merge": 1,
+        "min_entries_to_merge_wait_minutes": 5,
+        "max_entries_to_merge": 5,
+        "max_entries_to_build": 5,
+        "check_response_timeout_minutes": 60
+      }
+    },
+    {
       "type": "required_status_checks",
       "parameters": {
-        "strict_required_status_checks_policy": true,
+        "strict_required_status_checks_policy": false,
         "do_not_enforce_on_create": false,
         "required_status_checks": [
-          { "context": "Lint workflows (actionlint)" },
-          { "context": "Build & test (ubuntu-latest, node 22)" },
-          { "context": "Build & test (ubuntu-latest, node 26)" },
-          { "context": "Build & test (macos-latest, node 26)" },
-          { "context": "Build & test (windows-latest, node 26)" },
-          { "context": "Embed bundle size gate" },
-          { "context": "Release build smoke (no upload) / Build bin-macos-arm64" },
-          { "context": "Release build smoke (no upload) / Build bin-macos-x64" },
-          { "context": "Release build smoke (no upload) / Build bin-linux-x64" },
-          { "context": "Release build smoke (no upload) / Build bin-linux-arm64" },
-          { "context": "Release build smoke (no upload) / Build bin-windows-x64" },
-          { "context": "Release build smoke (no upload) / Build bin-windows-arm64" },
-          { "context": "Release build smoke (no upload) / Build pack-npm" },
-          { "context": "Release build smoke (no upload) / Build pack-vsix" },
-          { "context": "Release build smoke (no upload) / Build pack-action" },
-          { "context": "Release build smoke (no upload) / Build pack-embed" }
+          { "context": "CI gate" }
         ]
       }
     }
