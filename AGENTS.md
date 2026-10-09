@@ -70,6 +70,7 @@ Specs ship in-repo so PRs update them alongside code. Skim the relevant spec bef
 - [`specs/architecture.md`](./specs/architecture.md) — package graph, tech choices, `AssetResolver` contract.
 - [`specs/cli.md`](./specs/cli.md), [`specs/rendering.md`](./specs/rendering.md), [`specs/ide.md`](./specs/ide.md), [`specs/embed.md`](./specs/embed.md) — surface-area specs.
 - [`specs/milestones.md`](./specs/milestones.md), [`specs/releasing.md`](./specs/releasing.md) — roadmap and release process.
+- [`specs/ci.md`](./specs/ci.md) — what CI runs on which platform and event, and why.
 - [`specs/handoffs/`](./specs/handoffs/) — version-controlled handoffs between milestones.
 
 ## Don't do this

@@ -155,6 +155,7 @@ Before making a non-trivial change, skim the specs under [`specs/`](./specs) —
 - [`specs/cli.md`](./specs/cli.md), [`specs/rendering.md`](./specs/rendering.md), [`specs/ide.md`](./specs/ide.md), [`specs/embed.md`](./specs/embed.md) — surface-area specs for the rest of the toolchain.
 - [`specs/milestones.md`](./specs/milestones.md) — OSS roadmap (m1–m4.5).
 - [`specs/releasing.md`](./specs/releasing.md) — maintainer release process (tagging, npm publish order, Homebrew tap update).
+- [`specs/ci.md`](./specs/ci.md) — what CI runs on which platform and event (pull requests, merge queue, `main`), and why.
 
 ## Common tasks
 
