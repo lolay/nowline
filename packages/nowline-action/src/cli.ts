@@ -1,6 +1,7 @@
 import * as core from '@actions/core';
 import * as exec from '@actions/exec';
 
+import type { Theme } from './inputs.js';
 import { ACTION_VERSION } from './version.js';
 
 /**
@@ -43,7 +44,7 @@ export interface RenderArgs {
     input: string;
     output: string;
     format: 'svg' | 'png';
-    theme: 'light' | 'dark';
+    theme: Theme;
     /** Undefined leaves `--non-working` off, so the file's own key applies. */
     nonWorking?: 'hide' | 'show';
 }

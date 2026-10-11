@@ -229,6 +229,29 @@ export const messages = {
     // Style
     'NL.E0800': (a: { value: string }) =>
         `Invalid non-working value "${a.value}". Use hide or show.`,
+    'NL.E0801': (a: { value: string; key: string }) =>
+        `Invalid color "${a.value}" for "${a.key}". Use a named color, hex value, or "none".`,
+    'NL.E0802': (a: { value: string; key: string; allowed: string }) =>
+        `Invalid value "${a.value}" for "${a.key}". Allowed: ${a.allowed}.`,
+    'NL.E0803': (a: { key: string }) => `Unknown style property "${a.key}".`,
+    'NL.E0804': (a: { key: string; entity: string }) =>
+        `Raw style property "${a.key}" is not allowed on ${a.entity}. ` +
+        `Declare a named style in config and reference it via "style:id".`,
+    'NL.E0805': (a: { name: string; builtins: string }) =>
+        `Symbol id "${a.name}" collides with a built-in icon name. Reserved built-ins: ${a.builtins}.`,
+    'NL.E0806': (a: { name: string }) =>
+        `Symbol "${a.name}" requires a "unicode:" property (e.g. unicode:"💰" or unicode:"\\u{1F464}").`,
+    'NL.E0807': (a: { name: string }) => `Symbol "${a.name}" unicode: must be a non-empty value.`,
+    'NL.E0808': (a: { name: string; length: number }) =>
+        `Symbol "${a.name}" ascii: must be 1-3 ASCII characters (got ${a.length} character${a.length === 1 ? '' : 's'}).`,
+    'NL.E0809': (a: { key: string }) =>
+        `Unknown symbol property "${a.key}". Allowed: unicode, ascii, link, description.`,
+    'NL.E0810': (a: { name: string; location: string }) =>
+        `Duplicate symbol id "${a.name}". First declared at ${a.location}.`,
+    'NL.E0811': (a: { key: string; value: string; builtins: string }) =>
+        `${a.key}: "${a.value}" is neither a built-in (${a.builtins}) nor a declared symbol. Add "symbol ${a.value} unicode:..." earlier in config or use a quoted Unicode literal.`,
+    'NL.E0812': (a: { key: string; value: string }) =>
+        `${a.key}: symbol "${a.value}" is referenced before its declaration. Move "symbol ${a.value}" above this entry.`,
 
     // Warnings
     'NL.W0700': (a: { key: string; entity: string; suggested: string }) =>
@@ -251,6 +274,10 @@ export const messages = {
                   ? `the ${a.target.kind === 'parallel' ? 'parallel block' : a.target.kind} on line ${a.target.line}`
                   : `${a.target.kind} "${a.target.name}"`
         } is ignored: this roadmap declares no waves. Declare waves with "wave <id>" to use it, or remove the property.`,
+    'NL.W0703': (a: { key: string; entityType: string }) =>
+        `"${a.key}" on "default ${a.entityType}" is ignored: it is a roadmap-only style key. Set it on "default roadmap" instead.`,
+    'NL.W0704': (a: { position: string }) =>
+        `"timeline-position:${a.position}" draws no dates: "header-height:none" removes every timeline date strip. Set header-height to xs, sm, md, lg or xl to show them.`,
 
     // Waves
     'NL.E1100': (a: E1100Args) =>

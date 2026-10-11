@@ -76,9 +76,21 @@ describe('parseInputs', () => {
         expect(() => parseInputs()).toThrow(/format must be/);
     });
 
-    it('rejects an unknown theme', () => {
+    it('accepts the grayscale theme', () => {
+        setInputs({ mode: 'markdown', theme: 'grayscale' });
+        expect(parseInputs().theme).toBe('grayscale');
+    });
+
+    it('canonicalizes greyscale and case like the CLI', () => {
+        setInputs({ mode: 'markdown', theme: 'Greyscale' });
+        expect(parseInputs().theme).toBe('grayscale');
+    });
+
+    it('rejects an unknown theme and names every accepted one', () => {
         setInputs({ mode: 'markdown', theme: 'sepia' });
-        expect(() => parseInputs()).toThrow(/theme must be/);
+        expect(() => parseInputs()).toThrow(
+            'theme must be one of "light", "dark", "grayscale" (got "sepia")',
+        );
     });
 });
 

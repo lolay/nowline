@@ -829,7 +829,7 @@ Engines A and C produce the same schedule unless one of the existing divergences
 - **(a)** an `after:` that ends before the lane cursor, or an `after:` that does not resolve, falls back toward the lane start in engine A;
 - **(c)** caption spill inside a group that has a following sibling;
 - **(d)** a group track that binds a parallel join adds `TRACK_BLOCK_TAIL_GUTTER_PX` (8 px);
-- **(g)** item `start:` pins: engine A ignores a `start:` pin on an item that is a direct parallel track (the track opens at the parallel's start), and lets a lane item's `after:` push its `start:` pin (`max(start, after)`), while engine C keeps the pin in both cases. A `date:` pin replaces `after:` in both engines. This predates waves; with waves the floor is one more term in each engine's `max`, and NL.W1001 fires only when the floor itself is the item's start.
+- **(g)** item `start:` pins (fixed): both engines resolve an item's start as `date:` > `start:` > `after:` > track cursor, on a lane or group item and on an item that is a direct parallel track alike. Engine A used to ignore a `start:` pin on a direct parallel track and let a lane item's `after:` push its `start:` pin (`max(start, after)`). With waves the floor is one more term in each engine's `max`, and NL.W1001 fires only when the floor itself is the item's start.
 
 The full list, (a)–(g), is in [`handoffs/handoff-m2o-waves.md`](./handoffs/handoff-m2o-waves.md) §4.
 
@@ -2107,7 +2107,7 @@ swimlane a wave:alpha
 | Bake or cool-down time between waves (`gap:`) | Defer. A wave `after:` date or an explicit buffer item covers it today. |
 | Barrier slack visuals (per-lane idle segments), and "current wave" emphasis at the now-line | Defer. Both are optional additions that don't change the model. |
 | `default wave` and a wave `owner:` | Defer. |
-| Fix engine A divergences (a)–(g) | Separate PR, with a deliberate snapshot bump. |
+| Fix the remaining engine A divergences ((g) is fixed) | Separate PR, with a deliberate snapshot bump. |
 | MS Project implicit lane-sequence links, for all roadmaps | Separate PR, with a deliberate msproj hash bump. |
 | Honour forward `after:` references | Rejected for now. In a roadmap with waves this would change behaviour as soon as the first wave line is added. NL.W1101 makes the problem visible instead. |
 

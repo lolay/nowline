@@ -93,8 +93,8 @@ import {
     PARALLEL_HEADER_TITLE_INSET_X_PX,
     PROGRESS_STRIP_HEIGHT_PX,
     TEXT_SIZE_PX,
-    TIMELINE_TICK_LABEL_BASELINE_OFFSET_PX,
     TIMELINE_TICK_LABEL_FONT_SIZE_PX,
+    timelineTickLabelBaselineOffsetPx,
     WAVE_BOUNDARY_WIDTH_PX,
     WAVE_CROSS_DASH,
     WAVE_EMPTY_MARKER_SIZE_PX,
@@ -803,7 +803,7 @@ function renderTimeline(t: PositionedTimelineScale, palette: Theme, fonts: FontF
                 textTag(
                     {
                         x: num(tick.labelX),
-                        y: num(tickPanelY + TIMELINE_TICK_LABEL_BASELINE_OFFSET_PX),
+                        y: num(tickPanelY + timelineTickLabelBaselineOffsetPx(tickPanelHeight)),
                         'font-family': fonts.sans,
                         'font-size': TIMELINE_TICK_LABEL_FONT_SIZE_PX,
                         fill: labelColor,
@@ -818,7 +818,10 @@ function renderTimeline(t: PositionedTimelineScale, palette: Theme, fonts: FontF
                 textTag(
                     {
                         x: num(tick.labelX),
-                        y: num(bottomTickPanelY! + TIMELINE_TICK_LABEL_BASELINE_OFFSET_PX),
+                        y: num(
+                            bottomTickPanelY! +
+                                timelineTickLabelBaselineOffsetPx(bottomTickPanelHeight),
+                        ),
                         'font-family': fonts.sans,
                         'font-size': TIMELINE_TICK_LABEL_FONT_SIZE_PX,
                         fill: labelColor,

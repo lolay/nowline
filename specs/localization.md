@@ -187,6 +187,15 @@ Channel-by-channel install:
 
 `man -L fr nowline` then resolves to the translated page on any system that respects the standard `man` locale-search path.
 
+### Keeping translations in sync
+
+[`packages/cli/test/man/translation-parity.test.ts`](../packages/cli/test/man/translation-parity.test.ts) runs in `make test` and checks every `man/<locale>/` page against its English source two ways:
+
+- **Anchor parity.** Within each `.Sh` section, the macros a translator never translates (`Fl`, `Cm`, `Ic`, `Ev`, `Er`, `Xr`) and the number of `.It` entries must match. A missing option, list entry, or cross-reference fails with the section and macro named.
+- **Source stamp.** Each translated page carries `.\" translated-from: <page> sha256:<hash>`, the hash of the English page (comment lines excluded) it was last reviewed against. Any English edit fails the test until someone carries the change into every translation and replaces the stamp with the line the failure prints. Updating the stamp is the review sign-off, so don't paste it without doing the review.
+
+The stamps were introduced at a point where the anchors matched; that baseline does not certify the older French prose sentence by sentence.
+
 ## Non-goals
 
 - **DSL keyword translation.** Every peer that tried it regretted it.

@@ -1,4 +1,5 @@
 import { describe, expect, it } from 'vitest';
+import { resolveDiagnosticCode } from '../../src/diagnostics/index.js';
 import { tr } from '../../src/i18n/index.js';
 import { errorMessages, parse, warningMessages } from '../helpers.js';
 
@@ -314,6 +315,44 @@ swimlane s
             `config\ndefault roadmap minor-grid:maybe\nroadmap r\nswimlane s\n  item x duration:1w\n`,
         );
         expect(hasError(errorMessages(r.diagnostics), /minor-grid|maybe/i)).toBe(true);
+    });
+
+    // No enum key accepts a colour (rule 19), so a colour-shaped value on a
+    // `default` line is the same single error it is in a `style` block.
+    it('Rule 18: a hex colour for minor-grid on a default line is exactly one error', async () => {
+        const r = await parse(
+            `config\ndefault roadmap minor-grid:#fff\nroadmap r\nswimlane s\n  item x duration:1w\n`,
+        );
+        expect(errorMessages(r.diagnostics)).toEqual([
+            'Invalid value "#fff" for "minor-grid". Allowed: true, false.',
+        ]);
+    });
+
+    it('Rule 18: a named colour for timeline-position on a default line is exactly one error', async () => {
+        const r = await parse(
+            `config\ndefault roadmap timeline-position:red\nroadmap r\nswimlane s\n  item x duration:1w\n`,
+        );
+        expect(errorMessages(r.diagnostics)).toEqual([
+            'Invalid value "red" for "timeline-position". Allowed: top, bottom, both.',
+        ]);
+    });
+
+    it('Rule 18: default lines and style blocks agree on colour-shaped enum values', async () => {
+        const body = 'roadmap r\nswimlane s\n  item x duration:1w\n';
+        const cases: Array<[string, string]> = [
+            ['minor-grid', '#fff'],
+            ['timeline-position', 'red'],
+            ['border', 'none'],
+            ['header-height', 'navy'],
+            ['bracket', '#123456'],
+        ];
+        for (const [key, value] of cases) {
+            const fromDefault = await parse(`config\ndefault roadmap ${key}:${value}\n${body}`);
+            const fromStyle = await parse(`config\nstyle s1\n  ${key}: ${value}\n${body}`);
+            const expected = errorMessages(fromStyle.diagnostics);
+            expect(expected).toHaveLength(1);
+            expect(errorMessages(fromDefault.diagnostics)).toEqual(expected);
+        }
     });
 
     it('Rule 20: raw timeline-position on roadmap declaration is an error', async () => {
@@ -1184,7 +1223,7 @@ describe('diagnostics that echo an item title', () => {
 // `non-working` is a roadmap style key (specs/dsl.md style table, rule 19 and
 // 20; specs/working-calendar.md 4.2): `hide` or `show`, set on the config
 // default line. Any other value is exactly one NL.E0800. The key is not in the
-// generic enum table, so no uncoded message and no colour bypass reaches it.
+// generic enum table, so no NL.E0802 and no colour bypass reaches it.
 describe('non-working style key', () => {
     const body = 'roadmap r\nswimlane s\n  item x duration:1w\n';
     const NBSP = '\u00A0';
@@ -1252,6 +1291,417 @@ describe('non-working style key', () => {
         const { code, args } = diag.data as { code: 'NL.E0800'; args: [{ value: string }] };
         expect(tr('fr', code, ...args)).toBe(
             `Valeur non-working invalide \u00AB${NBSP}maybe${NBSP}\u00BB. Utilisez hide ou show.`,
+        );
+    });
+});
+
+// Rule 19 style values and unknown style keys carry stable codes (NL.E0801
+// colour, NL.E0802 enum, NL.E0803 unknown key). The English text predates the
+// codes and must not change, so each case pins it exactly. Both paths are
+// covered: a `style` block (checkStylePropertyEnum) and a `default` line
+// (the entity-property switch).
+describe('style value codes', () => {
+    const body = 'roadmap r\nswimlane s\n  item x duration:1w\n';
+    const NBSP = '\u00A0';
+
+    type Outcome = Awaited<ReturnType<typeof parse>>;
+    type Coded = { code: string; args: unknown[] };
+
+    const coded = (r: Outcome) =>
+        r.diagnostics
+            .filter((d) => d.severity === 1)
+            .map((d) => ({ message: d.message, data: d.data as Coded | undefined }));
+
+    const cases: Array<{
+        name: string;
+        src: string;
+        code: string;
+        en: string;
+        fr: string;
+    }> = [
+        {
+            name: 'bad colour in a style block',
+            src: `config\nstyle s1\n  bg: chartreuse-ish\n${body}`,
+            code: 'NL.E0801',
+            en: 'Invalid color "chartreuse-ish" for "bg". Use a named color, hex value, or "none".',
+            fr: `Couleur invalide \u00AB${NBSP}chartreuse-ish${NBSP}\u00BB pour \u00AB${NBSP}bg${NBSP}\u00BB. Utilisez une couleur nommée, une valeur hexadécimale ou \u00AB${NBSP}none${NBSP}\u00BB.`,
+        },
+        {
+            name: 'bad colour on a default line',
+            src: `config\ndefault item fg:chartreuse-ish\n${body}`,
+            code: 'NL.E0801',
+            en: 'Invalid color "chartreuse-ish" for "fg". Use a named color, hex value, or "none".',
+            fr: `Couleur invalide \u00AB${NBSP}chartreuse-ish${NBSP}\u00BB pour \u00AB${NBSP}fg${NBSP}\u00BB. Utilisez une couleur nommée, une valeur hexadécimale ou \u00AB${NBSP}none${NBSP}\u00BB.`,
+        },
+        {
+            name: 'bad enum value in a style block',
+            src: `config\nstyle s1\n  border: wavy\n${body}`,
+            code: 'NL.E0802',
+            en: 'Invalid value "wavy" for "border". Allowed: solid, dashed, dotted.',
+            fr: `Valeur invalide \u00AB${NBSP}wavy${NBSP}\u00BB pour \u00AB${NBSP}border${NBSP}\u00BB. Valeurs admises${NBSP}: solid, dashed, dotted.`,
+        },
+        {
+            name: 'bad enum value on a default line',
+            src: `config\ndefault item shadow:loud\n${body}`,
+            code: 'NL.E0802',
+            en: 'Invalid value "loud" for "shadow". Allowed: none, subtle, soft, hard.',
+            fr: `Valeur invalide \u00AB${NBSP}loud${NBSP}\u00BB pour \u00AB${NBSP}shadow${NBSP}\u00BB. Valeurs admises${NBSP}: none, subtle, soft, hard.`,
+        },
+        {
+            name: 'unknown key in a style block',
+            src: `config\nstyle s1\n  sparkle: lots\n${body}`,
+            code: 'NL.E0803',
+            en: 'Unknown style property "sparkle".',
+            fr: `Propriété de style inconnue \u00AB${NBSP}sparkle${NBSP}\u00BB.`,
+        },
+    ];
+
+    for (const c of cases) {
+        it(`${c.name} is exactly one ${c.code} with unchanged English text`, async () => {
+            const r = await parse(c.src);
+            const errors = coded(r);
+            expect(errors.map((e) => e.message)).toEqual([c.en]);
+            expect(errors[0].data?.code).toBe(c.code);
+        });
+
+        it(`${c.name} renders ${c.code} in French from its data`, async () => {
+            const r = await parse(c.src);
+            const [error] = coded(r);
+            // One code stands in for the case's code: `tr` is generic per code,
+            // and the runtime lookup goes by the string either way.
+            const { code, args } = error.data as { code: 'NL.E0803'; args: [{ key: string }] };
+            expect(tr('fr', code, ...args)).toBe(c.fr);
+        });
+    }
+
+    // Before the code, these messages fell to the text heuristic, which
+    // mislabels a key or value that happens to contain one of its trigger
+    // words (here "duration"). The stable code now wins.
+    it('resolves to the stable code, not the message heuristic', async () => {
+        const r = await parse(`config\nstyle s1\n  duration: long\n${body}`);
+        const [diag] = r.diagnostics.filter((d) => d.severity === 1);
+        expect(diag.message).toBe('Unknown style property "duration".');
+        expect(resolveDiagnosticCode(diag)).toBe('NL.E0803');
+    });
+});
+
+// Rule 20 raw style properties and the symbol rules (17f–17k) carry stable
+// codes (NL.E0804–E0812). As with the style value codes above, the English
+// text predates the codes and must not change, so each case pins it exactly.
+describe('raw style and symbol codes', () => {
+    const body = 'roadmap r\nswimlane s\n  item x duration:1w\n';
+    const NBSP = ' ';
+    const q = (s: string) => `«${NBSP}${s}${NBSP}»`;
+    const iconBuiltins =
+        'calendar, lock, multiplier, none, people, person, points, shield, time, warning';
+    const capacityBuiltins = 'multiplier, none, people, person, points, time';
+
+    type Outcome = Awaited<ReturnType<typeof parse>>;
+    type Coded = { code: string; args: unknown[] };
+
+    const coded = (r: Outcome) =>
+        r.diagnostics
+            .filter((d) => d.severity === 1)
+            .map((d) => ({ message: d.message, data: d.data as Coded | undefined }));
+
+    const cases: Array<{
+        name: string;
+        src: string;
+        code: string;
+        en: string;
+        fr: string;
+    }> = [
+        {
+            name: 'raw style property on an item',
+            src: 'roadmap r\nswimlane s\n  item x duration:1w bg:red\n',
+            code: 'NL.E0804',
+            en: 'Raw style property "bg" is not allowed on item "x". Declare a named style in config and reference it via "style:id".',
+            fr: `La propriété de style brute ${q('bg')} n'est pas permise sur item "x". Déclarez un style nommé dans la config et référencez-le avec ${q('style:id')}.`,
+        },
+        {
+            name: 'symbol id shadowing a built-in icon',
+            src: `config\nsymbol points unicode:"💰"\n${body}`,
+            code: 'NL.E0805',
+            en: `Symbol id "points" collides with a built-in icon name. Reserved built-ins: ${iconBuiltins}.`,
+            fr: `L'identifiant de symbole ${q('points')} entre en conflit avec le nom d'une icône intégrée. Noms réservés${NBSP}: ${iconBuiltins}.`,
+        },
+        {
+            name: 'symbol without unicode:',
+            src: `config\nsymbol budget "Budget"\n${body}`,
+            code: 'NL.E0806',
+            en: 'Symbol "budget" requires a "unicode:" property (e.g. unicode:"💰" or unicode:"\\u{1F464}").',
+            fr: `Le symbole ${q('budget')} exige une propriété ${q('unicode:')} (p.${NBSP}ex. unicode:"💰" ou unicode:"\\u{1F464}").`,
+        },
+        {
+            name: 'symbol with an empty unicode:',
+            src: `config\nsymbol budget unicode:""\n${body}`,
+            code: 'NL.E0807',
+            en: 'Symbol "budget" unicode: must be a non-empty value.',
+            fr: `La propriété ${q('unicode:')} du symbole ${q('budget')} doit avoir une valeur non vide.`,
+        },
+        {
+            name: 'symbol ascii: too long',
+            src: `config\nsymbol budget unicode:"💰" ascii:"BUDG"\n${body}`,
+            code: 'NL.E0808',
+            en: 'Symbol "budget" ascii: must be 1-3 ASCII characters (got 4 characters).',
+            fr: `La propriété ${q('ascii:')} du symbole ${q('budget')} doit compter de 1 à 3 caractères ASCII (reçu${NBSP}: 4 caractères).`,
+        },
+        {
+            name: 'symbol ascii: one non-ASCII character',
+            src: `config\nsymbol budget unicode:"💰" ascii:"é"\n${body}`,
+            code: 'NL.E0808',
+            en: 'Symbol "budget" ascii: must be 1-3 ASCII characters (got 1 character).',
+            fr: `La propriété ${q('ascii:')} du symbole ${q('budget')} doit compter de 1 à 3 caractères ASCII (reçu${NBSP}: 1 caractère).`,
+        },
+        {
+            name: 'unknown symbol property',
+            src: `config\nsymbol budget unicode:"💰" color:red\n${body}`,
+            code: 'NL.E0809',
+            en: 'Unknown symbol property "color". Allowed: unicode, ascii, link, description.',
+            fr: `Propriété de symbole inconnue ${q('color')}. Valeurs admises${NBSP}: unicode, ascii, link, description.`,
+        },
+        {
+            name: 'duplicate symbol id',
+            src: `config\nsymbol budget unicode:"💰"\nsymbol budget unicode:"$"\n${body}`,
+            code: 'NL.E0810',
+            en: 'Duplicate symbol id "budget". First declared at line 2.',
+            fr: `Identifiant de symbole en double ${q('budget')}. Première déclaration à line 2.`,
+        },
+        {
+            name: 'capacity-icon naming an unknown symbol',
+            src: `config\nstyle finance\n  capacity-icon: nonesuch\n${body}`,
+            code: 'NL.E0811',
+            en: `capacity-icon: "nonesuch" is neither a built-in (${capacityBuiltins}) nor a declared symbol. Add "symbol nonesuch unicode:..." earlier in config or use a quoted Unicode literal.`,
+            fr: `capacity-icon: ${q('nonesuch')} n'est ni une icône intégrée (${capacityBuiltins}) ni un symbole déclaré. Ajoutez ${q('symbol nonesuch unicode:...')} plus haut dans la config ou utilisez un littéral Unicode entre guillemets.`,
+        },
+        {
+            name: 'icon on a default line naming an unknown symbol',
+            src: `config\ndefault item icon:mystery\n${body}`,
+            code: 'NL.E0811',
+            en: `icon: "mystery" is neither a built-in (${iconBuiltins}) nor a declared symbol. Add "symbol mystery unicode:..." earlier in config or use a quoted Unicode literal.`,
+            fr: `icon: ${q('mystery')} n'est ni une icône intégrée (${iconBuiltins}) ni un symbole déclaré. Ajoutez ${q('symbol mystery unicode:...')} plus haut dans la config ou utilisez un littéral Unicode entre guillemets.`,
+        },
+        {
+            name: 'capacity-icon referencing a later symbol',
+            src: `config\nstyle finance\n  capacity-icon: budget\nsymbol budget unicode:"💰"\n${body}`,
+            code: 'NL.E0812',
+            en: 'capacity-icon: symbol "budget" is referenced before its declaration. Move "symbol budget" above this entry.',
+            fr: `capacity-icon: le symbole ${q('budget')} est référencé avant sa déclaration. Déplacez ${q('symbol budget')} au-dessus de cette entrée.`,
+        },
+    ];
+
+    for (const c of cases) {
+        it(`${c.name} is exactly one ${c.code} with unchanged English text`, async () => {
+            const r = await parse(c.src);
+            const errors = coded(r);
+            expect(errors.map((e) => e.message)).toEqual([c.en]);
+            expect(errors[0].data?.code).toBe(c.code);
+            expect(resolveDiagnosticCode(r.diagnostics.filter((d) => d.severity === 1)[0])).toBe(
+                c.code,
+            );
+        });
+
+        it(`${c.name} renders ${c.code} in French from its data`, async () => {
+            const r = await parse(c.src);
+            const [error] = coded(r);
+            // One code stands in for the case's code: `tr` is generic per code,
+            // and the runtime lookup goes by the string either way.
+            const { code, args } = error.data as { code: 'NL.E0809'; args: [{ key: string }] };
+            expect(tr('fr', code, ...args)).toBe(c.fr);
+        });
+    }
+});
+
+// Rule 20: header-height, timeline-position, minor-grid and non-working are
+// read only from the roadmap's style. On another entity's `default` line they
+// do nothing, so they warn (NL.W0703). Style blocks are left alone: one block
+// can serve the roadmap and other entities alike.
+describe('NL.W0703: roadmap-only style key on another default', () => {
+    const body = 'roadmap r\nswimlane s\n  item x duration:1w\n';
+    const NBSP = ' ';
+
+    type Outcome = Awaited<ReturnType<typeof parse>>;
+
+    const w0703 = (r: Outcome) =>
+        r.diagnostics.filter((d) => (d.data as { code?: string } | undefined)?.code === 'NL.W0703');
+
+    it.each([
+        ['item', 'minor-grid:true'],
+        ['swimlane', 'non-working:show'],
+        ['group', 'header-height:lg'],
+        ['milestone', 'timeline-position:both'],
+    ])('warns on default %s %s', async (entity, prop) => {
+        const key = prop.split(':')[0];
+        const r = await parse(`config\ndefault ${entity} ${prop}\n${body}`);
+        expect(errorMessages(r.diagnostics)).toEqual([]);
+        expect(warningMessages(r.diagnostics)).toEqual([
+            `"${key}" on "default ${entity}" is ignored: it is a roadmap-only style key. Set it on "default roadmap" instead.`,
+        ]);
+        expect(w0703(r)).toHaveLength(1);
+    });
+
+    it('warns once per roadmap-only key on the same line', async () => {
+        const r = await parse(
+            `config\ndefault swimlane minor-grid:true non-working:show padding:sm\n${body}`,
+        );
+        expect(w0703(r).map((d) => (d.data as { args: [{ key: string }] }).args[0].key)).toEqual([
+            'minor-grid',
+            'non-working',
+        ]);
+    });
+
+    it('stays clean on default roadmap', async () => {
+        const r = await parse(
+            `config\ndefault roadmap minor-grid:true non-working:show header-height:lg timeline-position:both\n${body}`,
+        );
+        expect(errorMessages(r.diagnostics)).toEqual([]);
+        expect(warningMessages(r.diagnostics)).toEqual([]);
+    });
+
+    it('does not check style blocks', async () => {
+        const r = await parse(
+            `config\nstyle grid\n  minor-grid: true\n  non-working: show\ndefault swimlane style:grid\n${body}`,
+        );
+        expect(errorMessages(r.diagnostics)).toEqual([]);
+        expect(w0703(r)).toEqual([]);
+    });
+
+    it('keeps the value error alongside the warning for a bad value', async () => {
+        const r = await parse(`config\ndefault item non-working:maybe\n${body}`);
+        expect(errorMessages(r.diagnostics)).toEqual([
+            'Invalid non-working value "maybe". Use hide or show.',
+        ]);
+        expect(w0703(r)).toHaveLength(1);
+    });
+
+    it('translates the message into French', async () => {
+        const r = await parse(
+            `nowline v1 locale:fr\nconfig\ndefault item minor-grid:true\n${body}`,
+        );
+        const [diag] = w0703(r);
+        const { code, args } = diag.data as {
+            code: 'NL.W0703';
+            args: [{ key: string; entityType: string }];
+        };
+        expect(tr('fr', code, ...args)).toBe(
+            `«${NBSP}minor-grid${NBSP}» sur «${NBSP}default item${NBSP}» est ignoré${NBSP}: c'est une clé de style propre à la roadmap. Définissez-la plutôt sur «${NBSP}default roadmap${NBSP}».`,
+        );
+    });
+});
+
+// Rule 20: header-height:none removes every timeline date strip, so a
+// timeline-position of bottom or both draws no dates (NL.W0704). The roadmap's
+// style resolves as in layout: `default roadmap` (its `style:` block, then its
+// own keys), the roadmap's label styles (the first label winning), then its own
+// `style:`, a later key winning.
+describe('NL.W0704: header-height:none hides the timeline-position strip', () => {
+    const body = 'swimlane s\n  item x duration:1w\n';
+    const NBSP = '\u00A0';
+
+    type Outcome = Awaited<ReturnType<typeof parse>>;
+
+    const w0704 = (r: Outcome) =>
+        r.diagnostics.filter((d) => (d.data as { code?: string } | undefined)?.code === 'NL.W0704');
+
+    it.each(['bottom', 'both'])('warns on default roadmap timeline-position:%s', async (pos) => {
+        const r = await parse(
+            `config\ndefault roadmap header-height:none timeline-position:${pos}\nroadmap r\n${body}`,
+        );
+        expect(errorMessages(r.diagnostics)).toEqual([]);
+        expect(warningMessages(r.diagnostics)).toEqual([
+            `"timeline-position:${pos}" draws no dates: "header-height:none" removes every timeline date strip. Set header-height to xs, sm, md, lg or xl to show them.`,
+        ]);
+        const [diag] = w0704(r);
+        expect(diag.range.start.line).toBe(1);
+    });
+
+    it('warns when a referenced style block supplies either key', async () => {
+        const r = await parse(
+            `config\nstyle dense\n  header-height: none\ndefault roadmap timeline-position:both\nroadmap r style:dense\n${body}`,
+        );
+        expect(errorMessages(r.diagnostics)).toEqual([]);
+        expect(w0704(r)).toHaveLength(1);
+    });
+
+    it('warns when a label style on the roadmap supplies the key', async () => {
+        const r = await parse(
+            `config\nstyle low\n  timeline-position: bottom\ndefault roadmap header-height:none\nroadmap r labels:flat\nlabel flat style:low\n${body}`,
+        );
+        expect(w0704(r)).toHaveLength(1);
+    });
+
+    it("warns when the default roadmap line's style block supplies the key", async () => {
+        const r = await parse(
+            `config\nstyle dense\n  header-height: none\ndefault roadmap style:dense timeline-position:both\nroadmap r\n${body}`,
+        );
+        expect(errorMessages(r.diagnostics)).toEqual([]);
+        expect(w0704(r)).toHaveLength(1);
+    });
+
+    it("stays silent when the default roadmap line's own key overrides its style block", async () => {
+        const r = await parse(
+            `config\nstyle dense\n  header-height: none\n  timeline-position: both\ndefault roadmap header-height:md style:dense\nroadmap r\n${body}`,
+        );
+        expect(w0704(r)).toEqual([]);
+    });
+
+    it('stays silent when the default roadmap style is not declared in this file', async () => {
+        const r = await parse(
+            `config\ndefault roadmap header-height:none timeline-position:both style:elsewhere\nroadmap r\n${body}`,
+        );
+        expect(w0704(r)).toEqual([]);
+    });
+
+    it.each([
+        ['[roomy, flat]', []],
+        ['[flat, roomy]', ['NL.W0704']],
+    ])('gives the first label precedence with labels:%s', async (labels, codes) => {
+        const r = await parse(
+            `config\nstyle tall\n  header-height: lg\nstyle dense\n  header-height: none\ndefault roadmap timeline-position:both\nroadmap r labels:${labels}\nlabel roomy style:tall\nlabel flat style:dense\n${body}`,
+        );
+        expect(errorMessages(r.diagnostics)).toEqual([]);
+        expect(w0704(r).map((d) => (d.data as { code: string }).code)).toEqual(codes);
+    });
+
+    it.each([
+        ['top', 'default roadmap header-height:none timeline-position:top'],
+        ['a visible strip', 'default roadmap header-height:xs timeline-position:both'],
+        ['no position', 'default roadmap header-height:none'],
+        ['another entity', 'default item header-height:none timeline-position:both'],
+    ])('stays silent for %s', async (_case, line) => {
+        const r = await parse(`config\n${line}\nroadmap r\n${body}`);
+        expect(w0704(r)).toEqual([]);
+    });
+
+    it("stays silent when the roadmap's style overrides header-height", async () => {
+        const r = await parse(
+            `config\nstyle tall\n  header-height: lg\ndefault roadmap header-height:none timeline-position:both\nroadmap r style:tall\n${body}`,
+        );
+        expect(w0704(r)).toEqual([]);
+    });
+
+    it('stays silent for a style block the roadmap does not reference', async () => {
+        const r = await parse(
+            `config\nstyle dense\n  header-height: none\n  timeline-position: both\nroadmap r\n${body}`,
+        );
+        expect(w0704(r)).toEqual([]);
+    });
+
+    it('stays silent when the roadmap style is not declared in this file', async () => {
+        const r = await parse(
+            `config\ndefault roadmap header-height:none timeline-position:both\nroadmap r style:elsewhere\n${body}`,
+        );
+        expect(w0704(r)).toEqual([]);
+    });
+
+    it('translates the message into French', async () => {
+        const r = await parse(
+            `nowline v1 locale:fr\nconfig\ndefault roadmap header-height:none timeline-position:bottom\nroadmap r\n${body}`,
+        );
+        const [diag] = w0704(r);
+        const { code, args } = diag.data as { code: 'NL.W0704'; args: [{ position: string }] };
+        expect(tr('fr', code, ...args)).toBe(
+            `«${NBSP}timeline-position:bottom${NBSP}» n'affiche aucune date${NBSP}: «${NBSP}header-height:none${NBSP}» retire tous les bandeaux de dates de la frise. Donnez à header-height la valeur xs, sm, md, lg ou xl pour les afficher.`,
         );
     });
 });

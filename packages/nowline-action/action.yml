@@ -30,7 +30,7 @@ inputs:
         required: false
         default: 'svg'
     theme:
-        description: 'light or dark'
+        description: 'light, dark, or grayscale (greyscale is accepted as an alias)'
         required: false
         default: 'light'
     non-working:

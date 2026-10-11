@@ -13,7 +13,7 @@ vi.mock('../src/cli.js', () => ({
             input: string;
             output: string;
             format: 'svg' | 'png';
-            theme: 'light' | 'dark';
+            theme: Theme;
             nonWorking?: 'hide' | 'show';
         }) => {
             renderCalls.push({ nonWorking: args.nonWorking });
@@ -28,6 +28,7 @@ vi.mock('../src/cli.js', () => ({
     ),
 }));
 
+import type { Theme } from '../src/inputs.js';
 import { runMarkdownMode } from '../src/markdown-mode.js';
 
 const MARKDOWN_FIXTURE = [

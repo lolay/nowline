@@ -13,6 +13,7 @@ import {
 import { renderSvg } from '@nowline/renderer';
 import type { ParsedArgs } from '../cli/args.js';
 import { parseNonWorkingArg } from '../cli/non-working.js';
+import { parseThemeArg } from '../cli/theme.js';
 import { getServices, parseSource } from '../core/parse.js';
 import {
     adaptResolveDiagnostic,
@@ -67,7 +68,7 @@ export async function serveHandler(options: ServeHandlerOptions): Promise<void> 
 
     const port = parsePort(args.port);
     const host = args.host ?? '127.0.0.1';
-    const theme = parseTheme(args.theme);
+    const theme = parseThemeArg(args.theme);
     const nonWorking = parseNonWorkingArg(args.nonWorking);
     const today = resolveNowArg(args);
     const resolvedLocale = resolveLocaleOverride({ flag: args.locale, env: process.env });
@@ -256,14 +257,6 @@ function parsePort(raw: string | undefined): number {
     return port;
 }
 
-function parseTheme(raw: string | undefined): ThemeName {
-    const lower = (raw ?? 'light').toLowerCase();
-    if (lower !== 'light' && lower !== 'dark') {
-        throw new CliError(ExitCode.InputError, `nowline: invalid --theme "${raw}".`);
-    }
-    return lower;
-}
-
 // Resolve the now-line date from the CLI flags. Mirrors render.ts.
 // Delegates to the shared resolveToday; see render.ts for the full precedence table.
 function resolveNowArg(args: { now?: string; timezone?: string }): Date | undefined {
@@ -335,6 +328,7 @@ const emptySvg =
     '<svg xmlns="http://www.w3.org/2000/svg" width="400" height="60"><text x="10" y="30" font-family="system-ui" font-size="14" fill="#999">no output yet</text></svg>';
 
 function shellHtml(theme: ThemeName): string {
+    // Only dark needs dark chrome; grayscale sits on the light page.
     const bg = theme === 'dark' ? '#121212' : '#ffffff';
     const fg = theme === 'dark' ? '#e0e0e0' : '#212121';
     return `<!doctype html>

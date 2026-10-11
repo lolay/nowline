@@ -2,6 +2,11 @@
 .\" prennent la forme de surcouches dans packages/cli/man/<locale>/nowline.5
 .\" lorsqu'elles existent. Voir specs/localization.md.
 .\"
+.\" Empreinte de la page anglaise relue pour cette traduction. Après avoir
+.\" reporté une modification de la page anglaise, remplacez-la par la ligne
+.\" qu'affiche packages/cli/test/man/translation-parity.test.ts.
+.\" translated-from: nowline.5 sha256:1fdc731ef699234936c5a7b395a972461f2fa80e130d3f0f503208ab2ff75905
+.\"
 .\" Les mots-clés du DSL (nowline, config, roadmap, swimlane, item, parallel,
 .\" group, person, team, anchor, label, size, status, wave, milestone, footnote,
 .\" include, style, symbol, default, scale, calendar) ainsi que les noms de
@@ -1485,6 +1490,21 @@ La valeur par défaut varie selon l'entité.
 .Sy none | xs | sm | md Pq par défaut | lg | xl .
 Réservée à
 .Sy roadmap .
+Hauteur du bandeau des dates de la frise : 16, 20, 24, 32 ou 40 px de
+.Sy xs
+à
+.Sy xl ,
+les libellés restant centrés verticalement.
+Elle s'applique au bandeau du haut comme au bandeau miroir du bas.
+.Sy none
+supprime tous les bandeaux de dates, y compris ceux que demande
+.Sy timeline-position\ ;
+avec
+.Sy bottom
+ou
+.Sy both ,
+cela déclenche l'avertissement
+.Sy NL.W0704 .
 .It Sy corner-radius
 .Sy none | xs | sm | md | lg | xl | full .
 .It Sy bracket
@@ -1818,6 +1838,39 @@ fraction décimale positive, ou
 Lorsque les deux seuils numériques sont définis,
 .Sy warn-at \(<= over-at .
 .It
+Valeurs de style, dans un bloc
+.Sy style
+ou sur une ligne
+.Sy default ,
+les clés
+.Sy bg: , fg:
+et
+.Sy text:
+prennent une couleur nommée, une valeur hexadécimale ou
+.Sy none
+.Pq Sy NL.E0801 ;
+une clé à ensemble de valeurs fixe, comme
+.Sy border: , shadow:
+ou
+.Sy font: ,
+prend l'une de ces valeurs
+.Pq Sy NL.E0802 .
+Une clé d'un bloc
+.Sy style
+qui n'est pas une propriété de style est
+.Sy NL.E0803 .
+.It
+Une propriété de style brute
+.Pq Sy bg: , Sy icon: , Sy capacity-icon: , No ...
+sur une entité de la section roadmap est
+.Sy NL.E0804 ;
+déclarez un
+.Sy style
+nommé dans
+.Sy config
+et référencez-le avec
+.Sy style:id .
+.It
 La valeur de
 .Sy capacity-icon:
 doit être un identifiant intégré
@@ -1843,6 +1896,42 @@ et dans un bloc
 Toute autre valeur est
 .Sy NL.E0800
 (une erreur par valeur).
+.It
+Les clés de style propres à la roadmap
+.Sy header-height , timeline-position , minor-grid
+et
+.Sy non-working
+ne s'appliquent que sur
+.Sy default roadmap
+(ou dans un bloc
+.Sy style
+référencé par la roadmap).
+Sur toute autre ligne
+.Sy default ,
+elles sont ignorées avec l'avertissement
+.Sy NL.W0703 .
+Les blocs
+.Sy style
+ne sont pas vérifiés.
+.It
+Lorsque le style de la roadmap définit
+.Sy header-height:none
+avec
+.Sy timeline-position:bottom
+ou
+.Sy both ,
+aucun bandeau de dates n'est dessiné, ce qui déclenche l'avertissement
+.Sy NL.W0704 .
+Le style se résout à partir de
+.Sy default roadmap ,
+puis du style de chaque label de la ligne
+.Sy roadmap
+(le premier label l'emportant), puis de son propre
+.Sy style: ,
+la dernière clé l'emportant.
+Seuls les styles et labels déclarés dans le même fichier sont lus\ ; un
+.Sy style:
+ou un label venant d'un include laisse la vérification silencieuse.
 .It
 .Sy remaining:
 est soit un pourcentage
@@ -2128,23 +2217,40 @@ Toute déclaration
 .Sy symbol
 doit spécifier une valeur
 .Sy unicode:"<chaîne>"
-non vide.
+.Pq Sy NL.E0806 ,
+non vide
+.Pq Sy NL.E0807 .
 .It
 .Sy ascii: ,
 si présente, doit être une chaîne entre guillemets de longueur
-\(<= 3 caractères ASCII.
+\(<= 3 caractères ASCII
+.Pq Sy NL.E0808 .
+.It
+Un
+.Sy symbol
+n'accepte que
+.Sy unicode: , ascii: , link:
+et
+.Sy description: ;
+toute autre propriété est
+.Sy NL.E0809 .
 .It
 Un identifiant de
 .Sy symbol
-ne doit pas masquer un nom d'icône intégré.
+ne doit pas masquer un nom d'icône intégré
+.Pq Sy NL.E0805
+et doit être unique dans le fichier
+.Pq Sy NL.E0810 .
 .It
 Une référence
 .Sy symbol
 .Pq Sy icon:NOM ou Sy capacity-icon:NOM
 doit résoudre vers un nom intégré ou vers une déclaration
 .Sy symbol
-antérieure.
-Les références anticipées sont une erreur.
+antérieure
+.Pq Sy NL.E0811 .
+Les références anticipées sont une erreur
+.Pq Sy NL.E0812 .
 .El
 .Sh EXEMPLES
 Un fichier

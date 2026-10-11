@@ -29,6 +29,7 @@ import type {
     ScaleBlock,
     SizeDeclaration,
     StatusDeclaration,
+    StyleDeclaration,
     StyleProperty,
     SwimlaneContent,
     SwimlaneDeclaration,
@@ -120,10 +121,20 @@ const STYLE_PROP_KEYS = new Set([
 
 // `non-working:` values (specs/working-calendar.md §4.2). Kept out of
 // `STYLE_PROP_ENUMS` on purpose: the key reports its own coded NL.E0800,
-// and the generic enum check would add an uncoded message and let a colour
-// literal through. Mirrors `NON_WORKING_DISPLAYS` in @nowline/layout, which
-// core cannot import.
+// and the generic enum check would add a second error (NL.E0802). Mirrors
+// `NON_WORKING_DISPLAYS` in @nowline/layout, which core cannot import.
 const NON_WORKING_VALUES = new Set(['hide', 'show']);
+
+// Style keys only the roadmap reads (specs/dsl.md style table). On another
+// entity's `default` line they are a silent no-op, so they warn (NL.W0703).
+// Style blocks are not checked: one block can be referenced by the roadmap
+// and by other entities alike, so the key there is not necessarily wrong.
+const ROADMAP_ONLY_STYLE_KEYS = new Set([
+    'header-height',
+    'timeline-position',
+    'minor-grid',
+    'non-working',
+]);
 
 // Built-in capacity-icon vocabulary. Renderer-curated SVG glyphs (plus 'multiplier'
 // which renders as the U+00D7 text character and 'none' which suppresses the glyph).
@@ -453,6 +464,7 @@ export function registerValidationChecks(services: NowlineServices): void {
             validator.checkWaves,
             validator.checkDuplicateSizeIds,
             validator.checkCalendarBlockConsistency,
+            validator.checkHiddenTimelineStrip,
             validator.checkPersonDeclarations,
             validator.checkDuplicateSymbolIds,
             validator.checkSymbolReferences,
@@ -968,24 +980,29 @@ export class NowlineValidator {
                 if (STYLE_PROP_KEYS.has(key)) {
                     if (key === 'bg' || key === 'fg' || key === 'text') {
                         if (val && !isColorValue(val)) {
-                            accept(
+                            acceptTr(
+                                accept,
                                 'error',
-                                `Invalid color "${val}" for "${key}". Use a named color, hex value, or "none".`,
+                                { node: prop, property: 'value' },
+                                'NL.E0801',
                                 {
-                                    node: prop,
-                                    property: 'value',
+                                    value: val,
+                                    key,
                                 },
                             );
                         }
                     } else if (key in STYLE_PROP_ENUMS) {
                         const allowed = STYLE_PROP_ENUMS[key];
-                        if (val && !allowed.has(val) && !isColorValue(val)) {
-                            accept(
+                        if (val && !allowed.has(val)) {
+                            acceptTr(
+                                accept,
                                 'error',
-                                `Invalid value "${val}" for "${key}". Allowed: ${[...allowed].join(', ')}.`,
+                                { node: prop, property: 'value' },
+                                'NL.E0802',
                                 {
-                                    node: prop,
-                                    property: 'value',
+                                    value: val,
+                                    key,
+                                    allowed: [...allowed].join(', '),
                                 },
                             );
                         }
@@ -1175,12 +1192,10 @@ export class NowlineValidator {
         for (const prop of node.properties) {
             const key = propKey(prop);
             if (STYLE_PROP_KEYS.has(key)) {
-                accept(
-                    'error',
-                    `Raw style property "${key}" is not allowed on ${describeNode(node)}. ` +
-                        `Declare a named style in config and reference it via "style:id".`,
-                    { node: prop },
-                );
+                acceptTr(accept, 'error', { node: prop }, 'NL.E0804', {
+                    key,
+                    entity: describeNode(node),
+                });
             }
         }
     }
@@ -1252,34 +1267,24 @@ export class NowlineValidator {
 
         if (key === 'bg' || key === 'fg' || key === 'text') {
             if (!isColorValue(val)) {
-                accept(
-                    'error',
-                    `Invalid color "${val}" for "${key}". Use a named color, hex value, or "none".`,
-                    {
-                        node: prop,
-                        property: 'value',
-                    },
-                );
+                acceptTr(accept, 'error', { node: prop, property: 'value' }, 'NL.E0801', {
+                    value: val,
+                    key,
+                });
             }
         } else if (key === 'non-working') {
             checkNonWorkingValue(val, prop, accept);
         } else if (key in STYLE_PROP_ENUMS) {
             const allowed = STYLE_PROP_ENUMS[key];
             if (!allowed.has(val)) {
-                accept(
-                    'error',
-                    `Invalid value "${val}" for "${key}". Allowed: ${[...allowed].join(', ')}.`,
-                    {
-                        node: prop,
-                        property: 'value',
-                    },
-                );
+                acceptTr(accept, 'error', { node: prop, property: 'value' }, 'NL.E0802', {
+                    value: val,
+                    key,
+                    allowed: [...allowed].join(', '),
+                });
             }
         } else if (!STYLE_PROP_KEYS.has(key)) {
-            accept('error', `Unknown style property "${key}".`, {
-                node: prop,
-                property: 'key',
-            });
+            acceptTr(accept, 'error', { node: prop, property: 'key' }, 'NL.E0803', { key });
         }
     }
 
@@ -1378,6 +1383,7 @@ export class NowlineValidator {
     }
 
     // --- Defaults rules 21-23: entity-type whitelist, duplicate-per-entity, banned props ---
+    // Plus rule 20's roadmap-only keys on another entity's default (NL.W0703).
     checkDefaultDeclaration(decl: DefaultDeclaration, accept: ValidationAcceptor): void {
         if (!DEFAULT_ENTITY_TYPES.has(decl.entityType)) {
             accept(
@@ -1416,6 +1422,84 @@ export class NowlineValidator {
                 }
             }
         }
+
+        if (decl.entityType !== 'roadmap') {
+            for (const prop of decl.properties) {
+                const key = propKey(prop);
+                if (ROADMAP_ONLY_STYLE_KEYS.has(key)) {
+                    acceptTr(accept, 'warning', { node: prop, property: 'key' }, 'NL.W0703', {
+                        key,
+                        entityType: decl.entityType,
+                    });
+                }
+            }
+        }
+    }
+
+    // --- Rule 20: header-height:none hides the timeline-position strips (NL.W0704) ---
+    // `none` drops every date strip, so `timeline-position:bottom|both` draws
+    // nothing. Walks the roadmap's style chain the way @nowline/layout's
+    // resolveStyle does: `default roadmap` (its `style:` block, then its own
+    // keys), then the style of each label on the roadmap line from last to
+    // first (so the first label wins), then the roadmap's own `style:`, a later
+    // key winning. A style or label this file does not declare (one from an
+    // include) could reset either key, so the check stays silent then.
+    checkHiddenTimelineStrip(file: NowlineFile, accept: ValidationAcceptor): void {
+        const roadmap = file.roadmapDecl;
+        if (!roadmap) return;
+
+        const styles = new Map<string, StyleDeclaration>();
+        let defaultRoadmap: DefaultDeclaration | undefined;
+        for (const entry of file.configEntries) {
+            if (isStyleDeclaration(entry) && entry.name && !styles.has(entry.name)) {
+                styles.set(entry.name, entry);
+            } else if (isDefaultDeclaration(entry) && entry.entityType === 'roadmap') {
+                defaultRoadmap ??= entry;
+            }
+        }
+        const labelStyles = new Map<string, string | undefined>();
+        for (const entry of file.roadmapEntries) {
+            if (isLabelDeclaration(entry) && entry.name && !labelStyles.has(entry.name)) {
+                const ref = entry.properties.find((p) => propKey(p) === 'style');
+                labelStyles.set(entry.name, ref?.value);
+            }
+        }
+
+        let headerHeight: EntityProperty | StyleProperty | undefined;
+        let position: EntityProperty | StyleProperty | undefined;
+        const apply = (props: Array<EntityProperty | StyleProperty>): void => {
+            for (const prop of props) {
+                const key = propKey(prop);
+                if (key === 'header-height') headerHeight = prop;
+                else if (key === 'timeline-position') position = prop;
+            }
+        };
+        // False when the style is not declared in this file.
+        const applyStyle = (id: string | undefined): boolean => {
+            if (!id) return true;
+            const decl = styles.get(id);
+            if (decl) apply(decl.properties);
+            return decl !== undefined;
+        };
+
+        if (defaultRoadmap) {
+            const ref = defaultRoadmap.properties.find((p) => propKey(p) === 'style');
+            if (!applyStyle(ref?.value)) return;
+            apply(defaultRoadmap.properties);
+        }
+        const labelsProp = roadmap.properties.find((p) => propKey(p) === 'labels');
+        const labelIds = labelsProp?.value ? [labelsProp.value] : (labelsProp?.values ?? []);
+        for (const id of [...labelIds].reverse()) {
+            if (!labelStyles.has(id) || !applyStyle(labelStyles.get(id))) return;
+        }
+        const styleProp = roadmap.properties.find((p) => propKey(p) === 'style');
+        if (!applyStyle(styleProp?.value)) return;
+
+        if (headerHeight?.value !== 'none') return;
+        if (position?.value !== 'bottom' && position?.value !== 'both') return;
+        acceptTr(accept, 'warning', { node: position, property: 'value' }, 'NL.W0704', {
+            position: position.value,
+        });
     }
 
     // --- Rule 7 (calendar): calendar block only valid when roadmap calendar:custom ---
@@ -1860,24 +1944,18 @@ export class NowlineValidator {
     // `unicode:foo`, which we treat permissively (it's a single-grapheme literal).
     checkSymbolDeclaration(decl: SymbolDeclaration, accept: ValidationAcceptor): void {
         if (decl.name && BUILTIN_ICON_NAMES.has(decl.name)) {
-            accept(
-                'error',
-                `Symbol id "${decl.name}" collides with a built-in icon name. Reserved built-ins: ${[...BUILTIN_ICON_NAMES].sort().join(', ')}.`,
-                { node: decl, property: 'name' },
-            );
+            acceptTr(accept, 'error', { node: decl, property: 'name' }, 'NL.E0805', {
+                name: decl.name,
+                builtins: [...BUILTIN_ICON_NAMES].sort().join(', '),
+            });
         }
 
         const unicodeProp = decl.properties.find((p) => propKey(p) === 'unicode');
         if (!unicodeProp) {
-            accept(
-                'error',
-                `Symbol "${displayName(decl)}" requires a "unicode:" property (e.g. unicode:"💰" or unicode:"\\u{1F464}").`,
-                { node: decl },
-            );
+            acceptTr(accept, 'error', { node: decl }, 'NL.E0806', { name: displayName(decl) });
         } else if (!unicodeProp.value || unicodeProp.value.length === 0) {
-            accept('error', `Symbol "${displayName(decl)}" unicode: must be a non-empty value.`, {
-                node: unicodeProp,
-                property: 'value',
+            acceptTr(accept, 'error', { node: unicodeProp, property: 'value' }, 'NL.E0807', {
+                name: displayName(decl),
             });
         }
 
@@ -1885,22 +1963,17 @@ export class NowlineValidator {
         if (asciiProp) {
             const raw = asciiProp.value ?? '';
             if (!ASCII_FALLBACK_RE.test(raw)) {
-                accept(
-                    'error',
-                    `Symbol "${displayName(decl)}" ascii: must be 1-3 ASCII characters (got ${raw.length} character${raw.length === 1 ? '' : 's'}).`,
-                    { node: asciiProp, property: 'value' },
-                );
+                acceptTr(accept, 'error', { node: asciiProp, property: 'value' }, 'NL.E0808', {
+                    name: displayName(decl),
+                    length: raw.length,
+                });
             }
         }
 
         for (const prop of decl.properties) {
             const key = propKey(prop);
             if (key !== 'unicode' && key !== 'ascii' && key !== 'link' && key !== 'description') {
-                accept(
-                    'error',
-                    `Unknown symbol property "${key}". Allowed: unicode, ascii, link, description.`,
-                    { node: prop, property: 'key' },
-                );
+                acceptTr(accept, 'error', { node: prop, property: 'key' }, 'NL.E0809', { key });
             }
         }
     }
@@ -1912,11 +1985,10 @@ export class NowlineValidator {
             if (isSymbolDeclaration(entry) && entry.name) {
                 const existing = seen.get(entry.name);
                 if (existing) {
-                    accept(
-                        'error',
-                        `Duplicate symbol id "${entry.name}". First declared at ${locationOf(existing)}.`,
-                        { node: entry, property: 'name' },
-                    );
+                    acceptTr(accept, 'error', { node: entry, property: 'name' }, 'NL.E0810', {
+                        name: entry.name,
+                        location: locationOf(existing),
+                    });
                 } else {
                     seen.set(entry.name, entry);
                 }
@@ -1961,17 +2033,16 @@ export class NowlineValidator {
                     key === 'capacity-icon'
                         ? [...BUILTIN_CAPACITY_ICONS].sort().join(', ')
                         : [...BUILTIN_ICON_NAMES].sort().join(', ');
-                accept(
-                    'error',
-                    `${key}: "${val}" is neither a built-in (${builtins}) nor a declared symbol. Add "symbol ${val} unicode:..." earlier in config or use a quoted Unicode literal.`,
-                    { node: propNode, property: 'value' },
-                );
+                acceptTr(accept, 'error', { node: propNode, property: 'value' }, 'NL.E0811', {
+                    key,
+                    value: val,
+                    builtins,
+                });
             } else if (declIdx >= entryIdx) {
-                accept(
-                    'error',
-                    `${key}: symbol "${val}" is referenced before its declaration. Move "symbol ${val}" above this entry.`,
-                    { node: propNode, property: 'value' },
-                );
+                acceptTr(accept, 'error', { node: propNode, property: 'value' }, 'NL.E0812', {
+                    key,
+                    value: val,
+                });
             }
         };
 

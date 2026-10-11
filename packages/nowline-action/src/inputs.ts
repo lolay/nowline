@@ -1,9 +1,10 @@
 import * as core from '@actions/core';
+import { normalizeThemeName, THEME_NAMES, type ThemeName } from '@nowline/layout';
 
 export type Mode = 'file' | 'markdown';
 export type Format = 'svg' | 'png';
-export type Theme = 'light' | 'dark';
-/** A non-working display. Core and layout keep their own copies; the Action cannot depend on them. */
+export type Theme = ThemeName;
+/** A non-working display. Duplicates layout's `NonWorkingDisplay`, which the Action could now import as it does themes. */
 export type NonWorking = 'hide' | 'show';
 
 export interface ActionInputs {
@@ -43,10 +44,14 @@ function readFormat(): Format {
 
 function readTheme(): Theme {
     const raw = core.getInput('theme') || 'light';
-    if (raw !== 'light' && raw !== 'dark') {
-        throw new Error(`theme must be "light" or "dark" (got "${raw}")`);
+    // Layout's parser, bundled (tree-shaken to a few hundred bytes), so the
+    // Action accepts exactly the themes the lock-step CLI renders.
+    const theme = normalizeThemeName(raw);
+    if (!theme) {
+        const choices = THEME_NAMES.map((name) => `"${name}"`).join(', ');
+        throw new Error(`theme must be one of ${choices} (got "${raw}")`);
     }
-    return raw;
+    return theme;
 }
 
 function readNonWorking(): NonWorking | undefined {

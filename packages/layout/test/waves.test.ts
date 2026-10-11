@@ -858,13 +858,11 @@ swimlane b
         expect('wavePinOverride' in item(onStart, 'a2')).toBe(false);
     });
 
-    it('records no pin override when something other than the floor moved the pin', async () => {
+    it('keeps a start: pin on a direct parallel track and over a lane after: (no floor, no override)', async () => {
         // w1 has no floor, so S_1 is the origin and can move nothing. p1's
-        // `start:` pin (W1) is ignored on a direct parallel track (the track
-        // opens at the parallel's start, W3), and x's `start:` pin (W1) is
-        // pushed by its `after:` (W3). Both items start past their pins.
-        // Engine C honors both pins, an existing divergence, so only engine
-        // A is checked here.
+        // `start:` pin (W1) places it ahead of the parallel's start (W3),
+        // and x's `start:` pin (W1) wins over its `after:` (W3), in both
+        // engines. Neither pin is moved, so neither reports.
         const laid = await lay(`nowline v1
 
 roadmap pins "Pins" start:2026-01-05 scale:1w calendar:full
@@ -879,18 +877,22 @@ swimlane a
 swimlane b
   item x duration:1w wave:w1 start:2026-01-12 after:a0
 `);
-        expect(engineAWeeks(laid)).toEqual({ a0: [0, 3], p1: [3, 4], p2: [3, 4], x: [3, 4] });
+        expectTable(laid, { a0: [0, 3], p1: [1, 2], p2: [3, 4], x: [1, 2] });
         expect('wavePinOverride' in item(laid, 'p1')).toBe(false);
         expect('wavePinOverride' in item(laid, 'x')).toBe(false);
     });
 
-    it('records no pin override when an after: pushed the item past the floor', async () => {
-        // a2's `start:` pin (W2) is below w2's floor (W4), but its
-        // `after:budget` (W5) wins in engine A (divergence (g)), so the
-        // floor is not what a2 starts at and NL.W1001 would be false.
+    it('records the start: pin a floor moved even when the item also has an after:', async () => {
+        // a2's `start:` pin (W2) wins over its `after:budget` (W5), and w2's
+        // floor (W4) then moves the pin, so the floor is a2's start.
         const laid = await lay(EXAMPLE_9.replace(' A2_PIN', ' start:2026-01-19 after:budget'));
-        expect(engineAWeeks(laid).a2).toEqual([5, 7]);
-        expect('wavePinOverride' in item(laid, 'a2')).toBe(false);
+        expectTable(laid, { a2: [4, 6] });
+        expect(item(laid, 'a2').wavePinOverride).toEqual({
+            wave: 'w2',
+            key: 'start',
+            pin: '2026-01-19',
+            start: '2026-02-02',
+        });
     });
 
     it('hits the pass cap on input that breaks the order rule (Example 13)', async () => {

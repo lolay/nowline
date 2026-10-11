@@ -178,6 +178,7 @@ Options:
 | `-p, --port <n>` | `4318` | Port to bind |
 | `--host <host>` | `127.0.0.1` | Interface; `0.0.0.0` exposes on the LAN |
 | `--open` | off | Open the browser on start |
+| `-t, --theme <name>` | `light` | Same names and validation as for render. The page around the chart is dark only for `dark`; `grayscale` uses the light page. |
 | `-o, --output <path>` | none | Opt-in: also write the rendered output to this path on every rebuild. `-o -` is rejected for `--serve`. |
 | `--non-working <mode>` | file key, else `hide` | `hide` \| `show`; same meaning and validation as for render. |
 

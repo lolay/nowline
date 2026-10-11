@@ -674,6 +674,9 @@ importers:
       '@nowline/cli':
         specifier: workspace:*
         version: link:../cli
+      '@nowline/layout':
+        specifier: workspace:*
+        version: link:../layout
       '@types/mdast':
         specifier: ^4.0.4
         version: 4.0.4

@@ -5,8 +5,11 @@ import {
     grayscaleNamed,
     grayscaleTheme,
     lightTheme,
+    namedColors,
     normalizeThemeName,
     resolveColor,
+    THEME_NAMES,
+    themes,
 } from '../src/themes/index.js';
 import * as shared from '../src/themes/shared.js';
 
@@ -73,6 +76,19 @@ describe('normalizeThemeName', () => {
     it('returns undefined for unknown tokens', () => {
         expect(normalizeThemeName('auto')).toBeUndefined();
         expect(normalizeThemeName('sepia')).toBeUndefined();
+    });
+
+    it('accepts every name in THEME_NAMES', () => {
+        for (const name of THEME_NAMES) expect(normalizeThemeName(name)).toBe(name);
+    });
+});
+
+// THEME_NAMES is the one list surfaces validate against; the palettes must
+// cover exactly that list.
+describe('THEME_NAMES', () => {
+    it('matches the keys of themes and namedColors', () => {
+        expect(Object.keys(themes)).toEqual([...THEME_NAMES]);
+        expect(Object.keys(namedColors)).toEqual([...THEME_NAMES]);
     });
 });
 

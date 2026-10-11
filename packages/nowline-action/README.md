@@ -103,7 +103,7 @@ without duplicating the markdown.
 | `files`        | Glob pattern for markdown files to scan (markdown mode)                                    | `**/*.md`          |
 | `output-dir`   | Directory where markdown-mode rendered images are written, relative to the repo root       | `.nowline/`        |
 | `format`       | `svg` or `png`                                                                             | `svg`              |
-| `theme`        | `light` or `dark`                                                                          | `light`            |
+| `theme`        | `light`, `dark`, or `grayscale` (`greyscale` alias)                                        | `light`            |
 | `non-working`  | `hide` or `show`: how a business calendar's non-working days appear. Empty follows the roadmap's own `default roadmap non-working:` key, then `hide`. | (empty)            |
 | `cli-version`  | Version of `@nowline/cli` to install on the runner. Defaults to the action version.        | (action version)   |
 
