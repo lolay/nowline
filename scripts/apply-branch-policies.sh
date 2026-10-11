@@ -158,16 +158,23 @@ trap 'rm -rf "$TMP"' EXIT
 # re-run in lockstep or every PR blocks on a missing-but-required check.
 #
 # Merge queue: a PR enters the queue once its own `CI gate` (Linux cells
-# only on pull_request) is green and it has its approval.  The queue
+# only on pull_request) is green.  The queue
 # builds the PR on top of main plus anything ahead of it and runs the
 # full ci.yml on that `merge_group` commit, macOS and Windows included;
 # `CI gate` must pass there too before it lands.  That replaces
 # strict_required_status_checks_policy (now false): the queue already
 # tests against the latest main, so PR branches no longer need updating
-# and re-running after every merge.  Defence-in-depth:
-# required_approving_review_count: 1 (see ops/branch-policies.md § 1).
-# The bypass actors (OrgAdmin, release App) bypass the queue as well,
-# which release.yml's direct version-bump push to main relies on.
+# and re-running after every merge.
+#
+# required_approving_review_count: 0.  GitHub never lets a PR's author
+# approve it, so with 1 the solo maintainer could merge their own PRs
+# only through the OrgAdmin bypass, which skips the queue and every
+# check.  The human gate is the maintainer queueing the PR (Merge when
+# ready); no automation merges or queues a PR except Renovate's
+# minor/patch auto-merge, which still goes through the queue (see
+# ops/branch-policies.md § 1).  The bypass actors (OrgAdmin, release
+# App) skip the queue too, which release.yml's direct version-bump push
+# to main relies on; routine merges should not use the bypass.
 #
 # ORDERING (read before running): the `CI gate` job and ci.yml's
 # `merge_group` trigger must already exist on `main` (merged) before
@@ -203,7 +210,7 @@ cat > "$TMP/nowline.json" <<JSON
     {
       "type": "pull_request",
       "parameters": {
-        "required_approving_review_count": 1,
+        "required_approving_review_count": 0,
         "dismiss_stale_reviews_on_push": false,
         "require_code_owner_review": false,
         "require_last_push_approval": false,
