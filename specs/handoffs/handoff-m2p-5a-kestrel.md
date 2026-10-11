@@ -4,7 +4,7 @@
 
 ## Where things stand
 
-- **Phases 1–4** are on `main` (lolay/nowline#96 as `9c0982d`, lolay/nowline#97 as `c74c795`). This branch, `claude/beautiful-turing-yolfjg`, starts from `main` `27187f3`.
+- **Phases 1–4** are on `main` (lolay/nowline#96 as `9c0982d`, lolay/nowline#97 as `c74c795`). This branch, `claude/beautiful-turing-yolfjg`, starts from `main` `27187f3`; `main` `2e0c375` was merged in on 2026-10-11 (`797d9c2`) and the plan re-verified against it (NW4 moved to NL.W0705, the man-page translation gate added to s9, line refs refreshed, the probe re-run with identical values).
 - **Lexer spike: passed** on the first run, for both keywords (`spike-m2p-5a-kestrel/`). The grammar stub was reverted; the test is kept for s1/s3.
 - **5a plan:** [`plan-m2p-5a-kestrel.md`](./plan-m2p-5a-kestrel.md). It was drafted from three read-only code maps (core DSL plumbing; calendar and engines; gates, fixtures and docs) and a layout probe that injected the equivalent `CalendarRule`s through a mocked resolver to produce the literal test values. The probe file was deleted.
 - **Nothing is implemented** and no execution session exists.
@@ -26,4 +26,6 @@ With explicit approval:
 - **`fromCalendarConfig` throws** when an unbounded stretch has no working weekday; the resolver falls back to the preset.
 - **NW4 fires on two shipped `calendar:custom` files** (`examples/product.nowline`, `tests/grammar-properties.nowline`) by spec design; it is a warning, so render bytes don't move.
 - **5a and 5b ship in the same release:** Mermaid has no dated `excludes` and MS Project no `<Exceptions>` until 5b.
+- **NL.W0703 and NL.W0704 are taken on `main`;** NW4 is NL.W0705.
+- **The French `nowline.5` has a translation stamp** checked by `make test`; carry every English edit into it, then replace the stamp with the line the failing test prints.
 - **Node 26.2.0** from the official tarball (checksummed) on `PATH` in every shell; `make` targets only; never `playwright install`.

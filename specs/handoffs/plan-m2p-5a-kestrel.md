@@ -1,7 +1,7 @@
 ```
 --- KICKOFF: begin orchestration at [deep] (pending approval) ---
 
-  Status: 0/3 groups done | last review: — | current: m2p-5a s1-s5 [exec] | updated 2026-10-07
+  Status: 0/3 groups done | last review: — | current: m2p-5a s1-s5 [exec] | updated 2026-10-11
 
   review: every-wave (log-only — parent writes Review log; human gates only where marked)
 
@@ -50,14 +50,15 @@ Phases 1–4 are on `main` (`9c0982d`, `c74c795`). The calendar engine already d
 - every bare-word slot that accepts `wave` takes each word as a name;
 - the parser builds with `skipValidations: false`.
 
-Residuals are the waves class only: a bare `style`, `symbol`, `non-working` or `working` line takes the next line's keyword as its id. The full `make test` run was green with the stub, and all 51 `.nowline` files in the repo produced byte-identical JSON ASTs with and without it. No file in `examples/`, `tests/`, `specs/` or any test fixture uses either word as an id. The stub was reverted, so `main`'s tree is still the baseline.
+Residuals are the waves class only: a bare `style`, `symbol`, `non-working` or `working` line takes the next line's keyword as its id. The full `make test` run was green with the stub, and all 51 `.nowline` files then in the repo produced byte-identical JSON ASTs with and without it. No file in `examples/`, `tests/`, `specs/` or any test fixture uses either word as an id. The stub was reverted, so `main`'s tree is still the baseline.
 
 **Scope and byte impact:** none for files without the keywords. Every layout snapshot, determinism cell and rendered example stays byte-identical, and nothing is added to `__snapshots__/` or `hashes.json` (fixtures are 5b). One deliberate diagnostic change: NW4 fires on `calendar:custom` files whose `days-per-week` differs from 7 with no `every:` declaration (spec §6, §9.1), which includes `examples/product.nowline` and `tests/grammar-properties.nowline`. It is a warning, so render bytes don't move.
 
 **Shape and execution:**
 - One PR from `main`, on the harness branch of the executing session.
 - A new cloud session runs it with personal-plan-orchestrate.
-- The research behind this plan was three read-only code maps and a layout probe (a mocked resolver, now deleted) at `f7d3d94` (`main` `27187f3` plus the spike commit). Line refs below are from that tree.
+- The research behind this plan was three read-only code maps and a layout probe (a mocked resolver, now deleted) at `f7d3d94` (`main` `27187f3` plus the spike commit).
+- Re-verified on 2026-10-11 after merging `main` `2e0c375` into this branch (`797d9c2`). The 16 new commits on `main` don't touch the grammar, printer, include resolver or calendar resolver; their layout changes (header height, style precedence) don't touch calendar code, and the probe re-run on the merged tree gave identical values, so the spike and every literal below stand. They do take NL.W0703 and NL.W0704 (lolay/nowline#103, #108), code the style and symbol errors as NL.E0801-E0812 (#99, #101, #104), add a man-page translation gate (#106), and add a merge queue (#111, #113). Line refs below are from the merged tree.
 
 ## Decisions
 
@@ -75,11 +76,11 @@ Residuals are the waves class only: a bare `style`, `symbol`, `non-working` or `
    - `KEY_ORDER` (`:4-29`): `every` goes immediately before `start` (`:22`) and `end` immediately after it (decision 20), so a declaration prints `date`, `every`, `start`, `end`.
    - No JSON code changes (`schema.ts`, `parse-json.ts` are generic).
    - Known side effect: an unknown `end:` or `every:` on any other entity now prints in that position instead of alphabetically after the known keys. No file in the repo has one; the round-trip and byte gates confirm it.
-4. **Validator.** One shared `checkCalendarDeclaration(decl, accept)` is registered for both types, beside `SymbolDeclaration` (`nowline-validator.ts:534`). It does not register `checkEntityIdOrTitle`: id-less, title-less declarations are valid.
+4. **Validator.** One shared `checkCalendarDeclaration(decl, accept)` is registered for both types, beside `SymbolDeclaration` (`nowline-validator.ts:546`). It does not register `checkEntityIdOrTitle`: id-less, title-less declarations are valid.
    - **NL.E0900, NW1 shape.** Exactly one of three shapes: `date:` alone; `start:` + `end:` without `every:` (a range); or `every:` with optional `start:` and/or `end:`. Anything else is one NL.E0900 on the declaration. That covers no properties, `date:` with any other key, and a lone `start:` or `end:`.
-   - **NL.E0901, own keys.** Allowed keys are `date`, `start`, `end` and `every`. Any other key, including `style:`, `labels:`, `link:` and `wave:`, is NL.E0901 on the property. This copies the own-key pattern of `checkSymbolDeclaration` (`:1861-1906`), not `checkUnknownEntityProperties` (`:1204-1235`), which skips `wave:`.
+   - **NL.E0901, own keys.** Allowed keys are `date`, `start`, `end` and `every`. Any other key, including `style:`, `labels:`, `link:` and `wave:`, is NL.E0901 on the property. This copies the coded own-key pattern of `checkSymbolDeclaration` (`:1945-1979`, NL.E0809), not `checkUnknownEntityProperties` (`:1219-1250`), which skips `wave:`.
    - **NL.E0902.** `start:` or `end:` given a list.
-   - **NL.E0405 for every date.** `checkPropertyValues` gains `case 'end':` beside `case 'date': case 'start':` (`:811`), per decision 20. List elements of `date:` are checked inside `checkCalendarDeclaration`, one NL.E0405 per bad element, because `checkPropertyValues` only checks single values and widening it would add errors on other entities.
+   - **NL.E0405 for every date.** `checkPropertyValues` gains `case 'end':` beside `case 'date': case 'start':` (`:823`), per decision 20. List elements of `date:` are checked inside `checkCalendarDeclaration`, one NL.E0405 per bad element, because `checkPropertyValues` only checks single values and widening it would add errors on other entities.
    - **NL.E0903, NW2.** `end:` is before `start:` (equal is fine).
    - **NL.E0904 / NL.E0905, NW3.** E0904 is a value that isn't a weekday name; E0905 is a duplicate weekday within one `every:`.
    - **NL.E0906, NW3, an unbounded stretch with no working day.**
@@ -87,12 +88,12 @@ Residuals are the waves class only: a bare `style`, `symbol`, `non-working` or `
      - If *O* covers all seven days, report E0906 on each open-ended `non-working` declaration.
      - Then, for each `non-working … every:` with exactly one bound, if *O* ∪ its days covers all seven, report E0906 on it.
      - A recurrence bounded on both sides may close all seven days. The rule is the validator's mirror of `buildCalendar`'s `RangeError` (`working-calendar.ts:240-244`) for the root file.
-   - **NL.W0703, NW4.** `days-per-week` differs from 7 − |*O*|, using the same *O*. Report it on the custom block's `days-per-week` property when a custom block exists, else on the roadmap's `calendar:` property, else on the first open-ended declaration, else on the roadmap declaration. Business with no declarations has |*O*| = 2 against 5, so it is quiet. Full with no declarations is 0 against 7, also quiet. Example C (`non-working weekend every:[fri, sat]` on business) is 2 against 5, quiet. Custom with 5 and no `every:` is 0 against 5, so it warns.
+   - **NL.W0705, NW4.** `days-per-week` differs from 7 − |*O*|, using the same *O*. Report it on the custom block's `days-per-week` property when a custom block exists, else on the roadmap's `calendar:` property, else on the first open-ended declaration, else on the roadmap declaration. Business with no declarations has |*O*| = 2 against 5, so it is quiet. Full with no declarations is 0 against 7, also quiet. Example C (`non-working weekend every:[fri, sat]` on business) is 2 against 5, quiet. Custom with 5 and no `every:` is 0 against 5, so it warns.
    - **NL.E0907, NW5.** A duplicate id within one file, per keyword: `non-working x` with `working x` is fine.
    - **Out of scope here.** Include collisions use the resolver's shadowing warning (decision 6). The validator sees only its own file, so a `non-working weekend` in an include does not feed *O*. That limit is documented, not fixed.
-   - **NL.W0700 elsewhere.** `every:` or `end:` on any other entity gets the existing NL.W0700 unchanged (neither key is in `ENTITY_KNOWN_PROPS`, `:259-309`). A test pins it.
+   - **NL.W0700 elsewhere.** `every:` or `end:` on any other entity gets the existing NL.W0700 unchanged (neither key is in `ENTITY_KNOWN_PROPS`, `:270-320`). A test pins it.
    - **Type labels.** `entityTypeLabel` (`validator-utils.ts:105`) returns `non-working` for `NonWorkingDeclaration`. The LSP `entityKind` (`lsp/src/references/ast-utils.ts:365`) does the same. `WorkingDeclaration` already gives `working`.
-5. **Codes and messages** (decision 15; ranges from `codes.ts:5-20`). Every message ships in EN and FR, the coverage test requires both, and each is emitted through `acceptTr`. Messages contain no uncoded "requires … date:" text (`diagnostics/index.ts:127`).
+5. **Codes and messages** (decision 15; ranges from `codes.ts:5-20`). NL.W0700-W0704 and NL.E0800-E0812 are taken on `main`; E09xx is unused, so NW4 takes the next free warning, NL.W0705. Every message ships in EN and FR, the coverage test requires both, and each is emitted through `acceptTr`. Messages contain no uncoded "requires … date:" text (`diagnostics/index.ts:127`).
 
    | Code | EN | FR |
    |---|---|---|
@@ -104,7 +105,7 @@ Residuals are the waves class only: a bare `style`, `symbol`, `non-working` or `
    | NL.E0905 | `Weekday "${value}" is listed more than once.` | `Le jour « ${value} » apparaît plusieurs fois.` |
    | NL.E0906 | `This leaves no working day in the week with no end date. Keep at least one weekday working.` | `Il ne reste aucun jour ouvré dans la semaine sans date de fin. Gardez au moins un jour ouvré.` |
    | NL.E0907 | `Duplicate ${kind} id "${name}".` | `Identifiant ${kind} « ${name} » en double.` |
-   | NL.W0703 | `days-per-week is ${daysPerWeek}, but the week leaves ${working} working days.` | `days-per-week vaut ${daysPerWeek}, mais la semaine laisse ${working} jours ouvrés.` |
+   | NL.W0705 | `days-per-week is ${daysPerWeek}, but the week leaves ${working} working days.` | `days-per-week vaut ${daysPerWeek}, mais la semaine laisse ${working} jours ouvrés.` |
 
    `${kind}` is `non-working` or `working`, verbatim in both languages. The Rule 20 / dsl.md rule numbers come in s9.
 6. **Includes** (`core/src/language/include-resolver.ts`).
@@ -125,7 +126,7 @@ Residuals are the waves class only: a bare `style`, `symbol`, `non-working` or `
    - **Canonical order** (decision 18): the rules are sorted by first date (none sorts first), then title, then id, then `working`, then the `every` mask, then start and end. The probe showed why: `titledRules` (`working-calendar.ts:482-493`) breaks ties by input order, so two titled rules starting the same day swap their `NonWorkingRun.titles` when the file is reordered. `rules` and every downstream list are then independent of file and include order.
    - **Robustness:** if `fromCalendarConfig` throws `RangeError` (an included file closes the whole week; the root file would have had NL.E0906), fall back to the preset calendar instead of crashing layout or export.
    - `ResolvedCalendar.working` docs say "the preset and the file's declarations".
-   - Engine B's fallback `ctx.calendar ?? fromCalendarConfig(ctx.cal)` (`layout.ts:1404`) is only reached by tests that call `computeDateWindow` directly; leave it.
+   - Engine B's fallback `ctx.calendar ?? fromCalendarConfig(ctx.cal)` (`layout.ts:1384`) is only reached by tests that call `computeDateWindow` directly; leave it.
 8. **Durations stay in estimate units** (decision 19). Nothing changes in `daysPerUnit`, `deriveItemDurationDays` or the exporters' `days`. A working exception pulls an end in; a holiday inside a bar pushes it out. That is the calendar's job, and engines A, B and C already ask it.
 9. **Exporters move only through the calendar.**
    - For a file with an open-ended declaration (Example C), the MS Project `<WeekDays>`, the Mermaid `excludes friday, saturday` and the XLSX Calendar row (`business (Friday and Saturday off; 5/22/65/260 days per week/month/quarter/year)`) follow `workingWeekdays`.
@@ -161,18 +162,19 @@ Residuals are the waves class only: a bare `style`, `symbol`, `non-working` or `
 - `specs/dsl.md`:
   - Design Rule 1 (`:15`) count 22 → 24, with a justification like the `wave` one;
   - config prose (`:50`);
-  - the Config Keywords table (`:159-168`);
+  - the Config Keywords table (`:159-170`);
   - a `### Non-working Declaration` section after `### Config Section`'s Calendar paragraph (`:811-859`), modelled on `### Wave Declaration` (`:556-607`);
   - include collisions (`:683, :692, :719-726`);
-  - value rules (calendar group `:1158-1163`) and include rule 7 (`:1243`).
+  - value rules (calendar group `:1160-1165`) and include rule 7 (`:1245`).
 - `specs/handoffs/handoff-m2p-working-calendar.md`: status, the 5a row and §4 notes this plan corrected.
 - `packages/cli/man/nowline.5`:
   - FILE STRUCTURE `:43-45`;
   - CONFIG SECTION "Five config keywords" `:302-307` → seven;
   - a `.Ss non-working and working` after `.Ss calendar` (`:486-547`), before the display `.Ss non-working` (`:548-584`), renaming that one to make the two distinct;
   - include text `:176-193`;
-  - VALIDATION (Calendar `:1756-1775`, Includes `:1814-1881`).
-- `man/fr/nowline.5`: the same places (`:5-7, :59-63, :345-350, :530-629, :1856-1875, :1918`).
+  - VALIDATION (Calendar `:1839-1858`, Includes `:1897-1964`).
+- `man/fr/nowline.5`: the same places (the DSL keyword comment `:10-12`, FILE STRUCTURE `:65`, "Cinq mots-clés" `:345-350`, `.Ss calendar` and the display `.Ss non-working` `:535-634`, include text `:184-209`, VALIDATION Calendrier `:1945-1964`, Inclusions `:2007-2073`).
+  - **Translation gate** (`packages/cli/test/man/translation-parity.test.ts`, lolay/nowline#106, run by `make test`): within each `.Sh` section the `Fl`/`Cm`/`Ic`/`Ev`/`Er`/`Xr` macros and the `.It` count must match the English page, and the French page's stamp (`man/fr/nowline.5:8`, `.\" translated-from: nowline.5 sha256:…`) must equal the hash of the English page. Carry every English edit into the French page first, then replace the stamp with the line the failing test prints. The stamp is the review sign-off (`specs/localization.md:195`), so never paste it without doing the translation.
 - `README.md` keyword table (`:194-206`).
 - `CHANGELOG.md` `### Added` (`:9`).
 
@@ -234,7 +236,7 @@ swimlane a "A"
 - **hide:** boxes 6–34, 46–74, 86–114. Ticks `[0,'Jan 04'],[40,'Jan 11'],[80,'Jan 18'],[120,'Jan 25'],[160,'Feb 01'],[200,'Feb 08'],[240,undefined]`. The first run is `[40,0,'2026-01-09','2026-01-10']`, with no Saturday–Sunday run.
 - **show:** boxes 6–34, 62–90, 118–146; ticks every 56 from `Jan 04`.
 - **Engine C:** w1 `2026-01-04`–`2026-01-09`, w2 `2026-01-11`–`2026-01-16`, w3 `2026-01-18`–`2026-01-23`.
-- **Validator:** no NL.W0703. `resolveWorkingCalendar(...).working.workingWeekdays` is `{0,1,2,3,4}`, and `weekStart` is 0.
+- **Validator:** no NL.W0705. `resolveWorkingCalendar(...).working.workingWeekdays` is `{0,1,2,3,4}`, and `weekStart` is 0.
 
 **A working exception** (Example A of `non-working-show.test.ts:102-113` plus `working crunch "Crunch Saturday" date:2026-01-10`):
 - **hide:** item boxes keep their x (6–34, 46–74, 86–114, 126–154). The milestone moves 152 → 160. Ticks `[0,'Jan 05'],[48,'Jan 12'],[88,'Jan 19'],[128,'Jan 26'],[168,'Feb 02'],[208,undefined]`. The first run is `[48,0,'2026-01-11','2026-01-11']`.
@@ -276,7 +278,7 @@ swimlane a "A"
   - a config with a `style`, a `non-working`, a `working` and a `default` keeps that order;
   - each shape round-trips text → JSON → text and JSON → text → JSON;
   - a one-element list prints bare (`date:2026-01-01`), matching `renderProperty` (`:285-299`).
-- `validation/non-working-declarations.test.ts`. Each code's EN text is asserted exactly and FR through `tr('fr', code, args)`, as in `validation.test.ts:1188-1260`:
+- `validation/non-working-declarations.test.ts`. Each code's EN text is asserted exactly and FR through `tr('fr', code, args)`, as in `validation.test.ts` `non-working style key` (`:1227-1296`) and `raw style and symbol codes` (`:1391-1513`):
   - NL.E0900:
     - no properties;
     - `date:` with `every:`;
@@ -295,8 +297,8 @@ swimlane a "A"
   - NL.E0906:
     - `non-working every:[mon, tue, wed, thu, fri]` on business (Sat/Sun from the preset);
     - `non-working every:[mon, tue, wed, thu, fri] start:2026-01-01` (half-open).
-    - No E0906: `non-working every:[sun, mon, tue, wed, thu, fri, sat] start:2026-12-24 end:2027-01-01` (a closed window); and `non-working weekend every:[mon, tue, wed, thu, fri]` (it replaces the preset weekend, so Sat and Sun stay working; NL.W0703 fires, 2 against 5).
-  - NL.W0703:
+    - No E0906: `non-working every:[sun, mon, tue, wed, thu, fri, sat] start:2026-12-24 end:2027-01-01` (a closed window); and `non-working weekend every:[mon, tue, wed, thu, fri]` (it replaces the preset weekend, so Sat and Sun stay working; NL.W0705 fires, 2 against 5).
+  - NL.W0705:
     - custom with `days-per-week: 6` and no declarations, on the property;
     - business with no `calendar:` property and `working every:sat` (6 against 5), on the declaration.
     - Quiet: business, full, Example C, and custom 7.
@@ -322,8 +324,8 @@ swimlane a "A"
 1. **Baseline (s2, before any source edit):**
    - `make build && make test`;
    - `make compile TARGET=local && make determinism`;
-   - hash the 41 rendered SVGs (19 `examples/*.svg` from `render-samples.mjs`, 22 `tests/*.svg` from `render-tests.mjs`) into `.scratch/m2p-5a/hide-baseline.sha256`;
-   - dump the JSON AST of all 51 repo `.nowline` files into `.scratch/m2p-5a/ast-baseline.json`. No `make` target does this: the planning session used a throwaway Vitest file that parses every `.nowline` (outside `node_modules`, `dist` and dot-directories) with `test/helpers.ts` `parse(…, { validate: false })` and writes `JSON.stringify` of each AST without `$`-keys other than `$type`. Place it in `packages/core/test/` only while dumping, run it with Vitest directly, delete it, and never commit it.
+   - hash the 43 rendered SVGs (19 `examples/*.svg` from `render-samples.mjs`, 24 `tests/*.svg` from `render-tests.mjs`) into `.scratch/m2p-5a/hide-baseline.sha256`;
+   - dump the JSON AST of every repo `.nowline` file (53 at `2e0c375`) into `.scratch/m2p-5a/ast-baseline.json`. No `make` target does this: the planning session used a throwaway Vitest file that parses every `.nowline` (outside `node_modules`, `dist` and dot-directories) with `test/helpers.ts` `parse(…, { validate: false })` and writes `JSON.stringify` of each AST without `$`-keys other than `$type`. Place it in `packages/core/test/` only while dumping, run it with Vitest directly, delete it, and never commit it.
 2. **After s3, after W2, and at the final gate:**
    - `make build`, then `sha256sum -c` on the baseline: every line OK;
    - `make test` with no snapshot diff (never set `UPDATE_LAYOUT_SNAPSHOTS`);
@@ -342,24 +344,24 @@ swimlane a "A"
 **Not in m2p:** per-region calendars for isolated includes; NW4 seeing included declarations.
 
 **Findings to list in the PR, not fix:**
-- the include shadowing warnings and the symbol own-key and duplicate-id errors are uncoded;
+- the include shadowing warnings are uncoded (the style and symbol errors got codes in lolay/nowline#104);
 - `checkPropertyValues` never date-checks list values on any entity;
-- the `build-fast` help text says "~30-SVG" (41 now);
+- the `build-fast` help text says "~30-SVG" (43 now);
 - `handoff-m2p-working-calendar.md` §4.8 says 19 snapshot samples (20 now);
 - the general TextMate keyword list (`grammars/nowline.tmLanguage.json:58`) lacks `wave`;
-- engine B's preset-only fallback at `layout.ts:1404`.
+- engine B's preset-only fallback at `layout.ts:1384`.
 
 ## Verification
 
 - `make pre-commit` green;
 - `make pack-mcpb`;
-- `make bundle-size` under 200 KB (embed is 189.40 KB on `main`; the grammar grows it slightly);
+- `make bundle-size` under 200 KB (embed is 190.48 KB on `main` `2e0c375`, 9.52 KB headroom; the grammar grows it slightly);
 - every byte-identity step above;
 - CI green on the PR head, including the determinism gate.
 
 ## Hand-off from this session (after approval)
 
-1. This planning session has committed the spike and this plan (plus its handoff) to `claude/beautiful-turing-yolfjg`, a branch off `main` `27187f3`. That is all it pushes for 5a.
+1. This planning session has committed the spike and this plan (plus its handoff) to `claude/beautiful-turing-yolfjg`, a branch off `main` `27187f3` with `main` `2e0c375` merged in (`797d9c2`). That is all it pushes for 5a.
 2. Create a new cloud session with `create_session`:
    - repository `lolay/nowline`, starting from `claude/beautiful-turing-yolfjg`;
    - same environment, same model;
@@ -406,6 +408,7 @@ swimlane a "A"
 Ran before any other 5a work and passed on the first run (§ Context). The test and the grammar stub it ran against are in `specs/handoffs/spike-m2p-5a-kestrel/`. s3 moves the test to `packages/core/test/strings-and-ids/non-working-identifier.test.ts` unchanged, where it becomes the permanent ambiguity gate. If it fails after the move, gate 1: decision 1 says stop and ask, never rename.
 
 ### s2 - [exec] Toolchain and baselines
+- If `main` has moved past `2e0c375`, merge it into the branch first (a merge commit, no rebase) and re-check the codes and line refs this plan cites; gate 1 if a code or a cited site moved.
 - Install the toolchain (§ Orchestration), then `make init && make build-fast`.
 - Then byte identity step 1, before any source edit.
 - Done when both baseline files exist and determinism is green with `hashes.json` unchanged.
@@ -459,7 +462,7 @@ Decisions 7–10. Done when every s5 resolver, layout and export case is green, 
 --- WAVE 3 [exec] ---
 
 ### s9 - [exec] Docs
-Everything under § Change "Docs". The `working-calendar.md` examples must match § Tests literally. Done when `make lint` passes.
+Everything under § Change "Docs". The `working-calendar.md` examples must match § Tests literally. Done when `make lint` passes and the man-page translation gate is green: the French `nowline.5` carries every English change and its stamp is replaced with the line the test prints.
 
 ### s10 - [exec] Gates, commit, push, PR
 1. Run § Verification in full.
@@ -470,7 +473,7 @@ Everything under § Change "Docs". The `working-calendar.md` examples must match
    - the same-release rule with 5b (decision 9);
    - the decision 3 printer side effect;
    - the findings from § Out of scope.
-5. Subscribe to the PR, and drive it to green.
+5. Subscribe to the PR, and drive it to green. `main` now lands PRs through a merge queue with no approving review required (lolay/nowline#111, #113): a maintainer still queues the PR, and a failure in the queue's run counts as red CI.
 
 ## Review log
 
