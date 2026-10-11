@@ -20,15 +20,15 @@ Three independent forces shape the rules:
 
 1. **Solo-maintainer friction.** Gary needs to push directly to `main` on every repo without forcing a PR through himself. This is the OrgAdmin bypass with `bypass_mode: always`.
 2. **Automated release flows.** `lolay/nowline:.github/workflows/release.yml` does `git push origin HEAD` to commit a version bump back to `main` before tagging, and `editor-release-monitor.yml` pushes a daily `[skip ci]` history-update commit. Both run as bots; without an App bypass they'd fail the protection rules. (Today `release.yml` uses a personal PAT and `editor-release-monitor.yml` uses `github-actions[bot]` — both queued for migration to the App; see § 6.)
-3. **Defence-in-depth approval.** `required_approving_review_count: 1` ensures no token can merge a PR without a human approval — CI passes *and* a human clicks Approve. The Copilot agent-merge workflow (`agent-merge.yml`) is **retired**; there is no `gh pr merge --auto` in any automation. The Copilot agent flow now emits `maintainer-pr-safe` / `maintainer-pr-review` confidence labels; a maintainer reviews, clicks Approve, then **Merge when ready** to queue it (the maintainer can approve because Copilot, not the maintainer, authored the PR). The OrgAdmin `always` bypass lets the solo maintainer still push directly to `main` and merge their own PRs unblocked. Bypass actors must use `bypass_mode: always` (which still respects `required_status_checks`), never `bypass_mode: pull_request` (which would short-circuit the CI gate); `github-actions[bot]` remains intentionally **not** a bypass actor on any ruleset.
+3. **A human merges; no approval is required.** `required_approving_review_count: 0`. GitHub never lets a PR's author approve it, so with one required approval the solo maintainer could merge their own PRs only through the OrgAdmin bypass, and a bypass skips every rule: the merge queue, its full-matrix run and the required checks (#112 merged that way, with no `merge_group` run). With 0, the gates are `CI gate` on the PR and then the merge queue's full-matrix run, and the human gate is the maintainer clicking **Merge when ready**. No automation merges or queues a PR: the Copilot agent-merge workflow (`agent-merge.yml`) is **retired**, there is no `gh pr merge --auto` in any workflow, and agents never merge (`AGENTS.md`). The one exception is Renovate minor/patch updates, which auto-merge through the queue once its full matrix is green; set `automerge: false` in `.github/renovate-shared.json` to require a click there too. The Copilot agent flow emits `maintainer-pr-safe` / `maintainer-pr-review` confidence labels; a maintainer reviews and clicks **Merge when ready**. Bypass actors use `bypass_mode: always`, never `bypass_mode: pull_request`; the bypass is for `release.yml`'s version-bump push and for emergencies, not routine merges. `github-actions[bot]` remains intentionally **not** a bypass actor on any ruleset.
 
-The result is a "1 approval + CI are the gates, two trusted bypass actors" model for the Tier-1 OSS repo. Tier-3 Follower is publish-only with no PR CI; its approval count is kept at 0 pending confirmation (see § 2 note and § 5).
+The result is a "CI and the merge queue are the gates, a human queues every merge, two trusted bypass actors" model for the Tier-1 OSS repo. Tier-3 Follower is publish-only with no PR CI; its approval count is kept at 0 pending confirmation (see § 2 note and § 5).
 
 ## 2. The policy
 
 | Tier | Repo | Ruleset name | Required approvals | Required CI contexts | Bypass actors |
 |---|---|---|---|---|---|
-| OSS | `lolay/nowline` | `main: CI must pass` | 1 | 1 context: `CI gate` (the aggregate job in `ci.yml`), `strict: false`, merge queue on (squash) | OrgAdmin (Gary) `always` + `lolay-nowline-release` App `always` |
+| OSS | `lolay/nowline` | `main: CI must pass` | 0 | 1 context: `CI gate` (the aggregate job in `ci.yml`), `strict: false`, merge queue on (squash) | OrgAdmin (Gary) `always` + `lolay-nowline-release` App `always` |
 | Follower | `lolay/nowline-action` | `main: protected (follower)` | 0 *(flag: see note below)* | none (publish-only) | OrgAdmin (Gary) `always` + `lolay-nowline-release` App `always` |
 
 `CI gate` is the last job in [`ci.yml`](../.github/workflows/ci.yml). It `needs:` every other job in that workflow, runs `if: always()`, and fails when any of them failed or was cancelled. A skipped job counts as a pass, because `release-build-smoke` is legitimately skipped on release-bot pushes. Requiring only this one context means adding, renaming, or reshaping a `ci.yml` job or matrix cell never needs a lockstep ruleset edit. (The old per-job list had already drifted: it required `Release build smoke (no upload) / Build pack-embed`, a cell that no longer exists, and omitted determinism, the MCP harness, and triage.)
@@ -41,7 +41,7 @@ Every ruleset additionally enforces:
 
 - `deletion` blocked
 - `non_fast_forward` blocked
-- `pull_request` rule with `required_approving_review_count: 1` (Tier-1 OSS) or `0` (Tier-3 Follower — see note below), `allowed_merge_methods: [squash, merge, rebase]`
+- `pull_request` rule with `required_approving_review_count: 0` (see § 1 for Tier-1 OSS, and the note below for Tier-3 Follower), `allowed_merge_methods: [squash, merge, rebase]`
 
 Every repo additionally has these settings (also patched by the script):
 

@@ -49,14 +49,16 @@ So the Vitest suites stay on every cell, Windows included, and lint, typecheck a
 
 `main` merges through GitHub's merge queue (squash, `ALLGREEN`). The flow:
 
-1. A PR's own `CI gate` (Linux cells) is green and it has its approval.
+1. A PR's own `CI gate` (Linux cells) is green.
 2. **Merge when ready** queues it.
 3. The queue builds the PR on top of `main` plus any entries ahead of it, and runs the full `ci.yml` on that `merge_group` commit.
 4. `CI gate` passes there too, and the commit lands.
 
 The queue replaces the ruleset's old "branch must be up to date" requirement (`strict: true`). The queue always tests against the latest `main`, so open PRs no longer need updating and re-running after every merge.
 
-Bypass actors skip the queue. `release.yml`'s direct version-bump push to `main` relies on that.
+No approving review is required: GitHub never lets a PR's author approve it, so the human gate is the maintainer clicking **Merge when ready** ([`ops/branch-policies.md`](../ops/branch-policies.md) § 1).
+
+Bypass actors skip the queue and every check. `release.yml`'s direct version-bump push to `main` relies on that; routine merges shouldn't, because a bypassed merge reaches `main` without the macOS and Windows run.
 
 ## `CI gate`
 
