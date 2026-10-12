@@ -46,5 +46,6 @@ Assisted-by: <e.g. Claude Opus 4.7, GPT-5.5, Cursor Composer 2.5, or "None">
 - [ ] I ran `make pre-commit` locally.
 - [ ] I added or updated tests where the change affects observable behavior.
 - [ ] I updated documentation (READMEs, `specs/`, inline comments) where the change affects observable behavior.
+- [ ] I added a `.changelog/` fragment for any user-observable change, or the PR is labelled `no-changelog` (see [`.changelog/README.md`](../.changelog/README.md)).
 - [ ] I have disclosed any AI assistance above with an `Assisted-by:` line (see [AI_POLICY.md](../AI_POLICY.md)).
 - [ ] I have read [CONTRIBUTING.md](../CONTRIBUTING.md) and agree to license my contribution under Apache 2.0.

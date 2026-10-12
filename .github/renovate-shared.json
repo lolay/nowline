@@ -10,7 +10,7 @@
     ],
     "timezone": "UTC",
     "schedule": ["before 09:00 on Friday"],
-    "labels": ["dependencies", "automated"],
+    "labels": ["dependencies", "automated", "no-changelog"],
     "assignees": ["copilot-swe-agent[bot]"],
     "reviewersFromCodeOwners": true,
     "prConcurrentLimit": 10,
