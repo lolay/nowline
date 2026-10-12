@@ -46,6 +46,7 @@ import type {
     PositionedDependencyEdge,
     PositionedHeader,
     PositionedIncludeRegion,
+    PositionedNonWorkingRun,
     PositionedNowline,
     PositionedRoadmap,
     PositionedSwimlane,
@@ -111,6 +112,61 @@ const HEADER_CARD_TOP_INSET = 4;
  */
 function growChartRightX(ctx: LayoutContext, rightX: number): void {
     if (rightX > ctx.chartRightX) ctx.chartRightX = rightX;
+}
+
+/** The marker-row id of a titled non-working run: `nonworking:<ISO from>`. */
+function nonWorkingRunMarkerId(run: PositionedNonWorkingRun): string {
+    return `nonworking:${run.from.toISOString().slice(0, 10)}`;
+}
+
+/**
+ * Marker-row entries for the titled runs (specs/working-calendar.md
+ * §7.4): a zero-radius marker at the run's x (the seam under `hide`, the
+ * band's left edge under `show`) whose title is the run's label. Callers
+ * append them after the anchors and milestones, so the stable sort in
+ * `packMarkerRow` places a marker that ties a run on x first.
+ */
+function nonWorkingRunEntries(
+    runs: ReadonlyArray<PositionedNonWorkingRun> | undefined,
+): MarkerEntity[] {
+    const entries: MarkerEntity[] = [];
+    for (const run of runs ?? []) {
+        if (run.label === undefined) continue;
+        entries.push({
+            id: nonWorkingRunMarkerId(run),
+            centerX: run.x,
+            radius: 0,
+            title: run.label,
+            fontSize: 10,
+            bold: false,
+        });
+    }
+    return entries;
+}
+
+/**
+ * The canvas right edge the run labels need. A run label that fits
+ * neither right of its x (against `chartRightX`) nor left of it (against
+ * `chartLeftX`) would fall back to the left and draw over a beside header
+ * card, so the canvas grows to hold it on the right instead. Anchors and
+ * milestones keep the left fallback.
+ */
+function runLabelsRightX(
+    entries: ReadonlyArray<MarkerEntity>,
+    chartLeftX: number,
+    chartRightX: number,
+    estimateTextWidth: (text: string, fontSize: number) => number,
+): number {
+    let rightX = chartRightX;
+    for (const e of entries) {
+        const labelWidth = estimateTextWidth(e.title, e.fontSize);
+        const rightEnd = e.centerX + e.radius + MARKER_LABEL_GAP_PX + labelWidth;
+        const leftStart = e.centerX - e.radius - MARKER_LABEL_GAP_PX - labelWidth;
+        if (rightEnd > chartRightX && leftStart < chartLeftX) {
+            rightX = Math.max(rightX, rightEnd + GUTTER_PX);
+        }
+    }
+    return rightX;
 }
 
 /**
@@ -292,8 +348,6 @@ export class RoadmapNode {
         //   5. 8 px gap, then the chart begins
         const willHaveNowline =
             options.today !== undefined && options.today >= startDate && options.today <= endDate;
-        const hasMarkerEntities =
-            resolved.content.anchors.size + resolved.content.milestones.size > 0;
         const pillRowHeight = willHaveNowline ? NOW_PILL_HEIGHT_PX : 0;
         // When `timeline-position:bottom` or `header-height:none` is set,
         // the top tick panel collapses to height 0 — the now-pill and
@@ -313,6 +367,16 @@ export class RoadmapNode {
             calendar,
             nonWorking,
         });
+        // Titled non-working runs join the marker row (5b). These runs are
+        // provisional: they size the band before the timeline exists, and
+        // their ticks only decide `seam`, which the labels never read. The
+        // re-pack below reads the final runs.
+        const provisionalRunEntries = nonWorkingRunEntries(
+            buildNonWorkingRuns(timeScale, [], scale.unit, false),
+        );
+        const hasMarkerEntities =
+            resolved.content.anchors.size + resolved.content.milestones.size > 0 ||
+            provisionalRunEntries.length > 0;
         // Initial canvas extent = natural date window + canonical
         // gutters. Item caption spills are unknown until the swimlane
         // pass runs and grow the canvas via `growChartRightX`. The
@@ -367,10 +431,17 @@ export class RoadmapNode {
         // entries claim row 0; later ones drop to row 1+ when their
         // bounding box (diamond + label) overlaps an already-placed
         // entry. The renderer reads `labelBox.x/y` directly.
+        // Titled runs pack after the markers, against the right edge the
+        // post-layout canvas growth will give their labels.
         const packed = packMarkerRow(
-            datePinnedEntries,
+            [...datePinnedEntries, ...provisionalRunEntries],
             chartLeftX,
-            finalChartRightX,
+            runLabelsRightX(
+                provisionalRunEntries,
+                chartLeftX,
+                finalChartRightX,
+                deps.estimateTextWidth,
+            ),
             deps.estimateTextWidth,
         );
         const markerRowsCount = hasMarkerEntities ? Math.max(1, packed.rowCount) : 0;
@@ -689,6 +760,15 @@ export class RoadmapNode {
             growChartRightX(ctx, originX + extendedWidth + GUTTER_PX);
         }
 
+        // Run labels (5b) from the final runs: the extension pass above
+        // rebuilt them, so never the pre-pack's copies. A label that fits
+        // neither side grows the canvas so the re-pack places it right.
+        const runEntries = nonWorkingRunEntries(timeline.nonWorking);
+        growChartRightX(
+            ctx,
+            runLabelsRightX(runEntries, chartLeftX, ctx.chartRightX, deps.estimateTextWidth),
+        );
+
         // `ctx.chartRightX` is final from here on. Each swimlane band
         // and include region read the canvas width once during its place
         // pass, before the spill expansion and the timeline extension
@@ -730,6 +810,7 @@ export class RoadmapNode {
                 bold: true,
             });
         }
+        allMarkerEntries.push(...runEntries);
         const repacked = packMarkerRow(
             allMarkerEntries,
             chartLeftX,
@@ -759,6 +840,13 @@ export class RoadmapNode {
             m.labelBox = placement.labelBox;
             m.labelSide = placement.labelSide;
         }
+        for (const run of timeline.nonWorking ?? []) {
+            if (run.label === undefined) continue;
+            const placement = ctx.markerRowPlacements.get(nonWorkingRunMarkerId(run));
+            if (!placement) continue;
+            run.labelBox = placement.labelBox;
+            run.labelSide = placement.labelSide;
+        }
         for (const e of datePinnedEntries) {
             const p = ctx.markerRowPlacements.get(e.id);
             if (!p) continue;
@@ -774,7 +862,8 @@ export class RoadmapNode {
         // it. Anchors, edges, nowline, footnotes, and the attribution
         // mark are built AFTER this block so they pick up the new ctx
         // values without further work.
-        const actualRowCount = hasMarkerEntities ? Math.max(1, repacked.rowCount) : 0;
+        const actualRowCount =
+            hasMarkerEntities || runEntries.length > 0 ? Math.max(1, repacked.rowCount) : 0;
         if (actualRowCount > markerRowsCount) {
             const deltaY = (actualRowCount - markerRowsCount) * MARKER_ROW_PITCH_PX;
             ctx.timeline.markerRow.height = actualRowCount * MARKER_ROW_PITCH_PX;

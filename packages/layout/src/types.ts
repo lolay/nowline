@@ -216,6 +216,25 @@ export interface PositionedNonWorkingRun {
     /** Titles of the dated rules inside it; omitted for a plain weekend. */
     titles?: string[];
     /**
+     * The marker-row label of a titled run: its titles joined with `, `,
+     * then ` · Nd` for the N working days of the open-ended week the run
+     * closes (dropped when N is 0). Omitted on a run without titles.
+     */
+    label?: string;
+    /**
+     * Resolved placement of `label` in the marker row, exactly like
+     * `PositionedMilestone.labelBox` / `labelSide`. Omitted on a run
+     * without titles.
+     */
+    labelBox?: BoundingBox;
+    labelSide?: 'left' | 'right';
+    /**
+     * Set under `hide` on a titled run, at every scale: the renderer draws
+     * the named cut line at `x` from the label row down through the chart
+     * (spec §7.2, "a named seam always draws"). Independent of `seam`.
+     */
+    cut?: true;
+    /**
      * Set at the days scale when the run lies strictly inside the chart and
      * no grid line is drawn at its x; the renderer draws a seam there.
      * Never set under `show`.
