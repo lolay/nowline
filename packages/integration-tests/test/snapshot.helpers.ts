@@ -130,6 +130,13 @@ export const SAMPLES: SampleSpec[] = [
         dir: 'tests',
         theme: 'light',
     },
+    // A bounded recurrence narrows a run of weeks; their labels alternate.
+    {
+        name: 'non-working-recurrence',
+        sourceFile: 'non-working-recurrence.nowline',
+        dir: 'tests',
+        theme: 'light',
+    },
 ];
 
 export async function renderSampleSvg(spec: SampleSpec): Promise<string> {

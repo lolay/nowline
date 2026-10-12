@@ -65,6 +65,8 @@ const MANIFEST = [
     // Both start 2026-11-23, so `now` is pinned inside the window (m2p phase 5b).
     { slug: 'non-working-hide', theme: 'light', now: '2026-11-25' },
     { slug: 'non-working-show', theme: 'light', now: '2026-11-25' },
+    // Starts 2026-06-01; `now` sits inside the Summer Fridays run.
+    { slug: 'non-working-recurrence', theme: 'light', now: '2026-07-15' },
 ];
 
 function run(cmd, args, opts = {}) {
