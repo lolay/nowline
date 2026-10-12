@@ -14,24 +14,27 @@
 - **Wave 1 [exec] s1-s5** `6fdd05b..ea4d596` (nowline s1,s2,s3,s4,s5): s1 and s2 empty commits (toolchain and baselines: 43 SVG hashes, 53 AST files, in `.scratch/m2p-5a/`, which dies with the container); s3 grammar, printer, type labels; s4 validator and i18n (NL.E0900-E0907, NL.W0705); s5 46 red cases (core include 8, layout 33, export-xlsx 3, integration-tests 2). `check_wave.py` passed.
 - **1-fix [exec]** `6fdd05b..369f12f` (nowline s1,s2,s3,s4,s5): `369f12f` s4 date-checks one-element `start:`/`end:` brackets (NL.E0405), with three tests. `check_wave.py` passed. Commit body records the s5 red-test exception (46 reds, all s5's).
 - **Wave 2 [deep] s6-s8** `32860f4..d00c35d` (nowline s6,s7,s8): s6 `d4f23cb` include merge; s7 `8f1297f` calendar resolver; s8 `d00c35d` (empty) byte identity: 43/43 SVG OK, 2987 tests, determinism 290 green, `hashes.json` unchanged, 53 AST files equal, bundle 192.84 KB of 200 KB, `make pre-commit` green. `check_wave.py` passed.
+- **Wave 3 [exec] s9-s10** `9edcc34..ba90722` (nowline s9,s10): s9 `733e8c0` docs (working-calendar.md, dsl.md, the m2p handoff, both man pages with the French stamp, README, CHANGELOG); s10 `ba90722` (empty) § Verification: pack-mcpb ok, bundle 192.84 KB, 43/43 SVG OK, 2987 tests, determinism 290, `hashes.json` unchanged, AST equal. `check_wave.py` passed.
 
 ## Review log verdicts
 
 - wave-1: CONCERNS. A one-element bracket on `start:`/`end:` gets no date check (`start:[2026-13-01]` gives no NL.E0405). Fix-up 1-fix ran, no gate (a first review CONCERNS).
 - wave-1-fix: PASS.
 - wave-2: PASS, no findings.
+- wave-3: CONCERNS. dsl.md:1017's `raw style properties` row says Validation Rule 20; the validator reports NL.E0901. Fix-up 3-fix runs next, no gate (a first review CONCERNS).
 
 ## Fix-ups, retries, checkpoints
 
 - 1-fix [exec]: the wave-1 review concern above. Its commit ran `make pre-commit` with the s5 exception (lint, build, typecheck green; only the 46 s5 reds fail), since the s5 reds stay red until wave 2.
+- 3-fix [exec]: the wave-3 review concern above.
 
 ## Spend
 
-Token log: ~$15.93 of ~$18 expected (wave 1 ~$7.04 against ~$4.5 planned, 1-fix ~$0.53, wave 2 ~$4.55 against ~$6.0, orchestrator ~$3.81 so far, with the open orchestrator-wave-2 stretch not yet logged).
+Token log: ~$23.32 of ~$18 expected, over expected (wave 1 ~$7.04 against ~$4.5, 1-fix ~$0.53, wave 2 ~$4.55 against ~$6.0, wave 3 ~$6.36 against ~$3.5, orchestrator ~$4.84). Guard limit $54.
 
 ## Next unit
 
-Wave 3 [exec] `nowline s9,s10` (Sonnet, high), no gate. Then final completion: the parent removes the plan, the handoff and the spike directory as the last commit, pushes, opens the PR and drives it to green.
+3-fix [exec] `nowline s9,s10`, from `9edcc34`. Then final completion: the parent removes the plan, the handoff and the spike directory as the last commit, pushes, opens the PR and drives it to green.
 
 ## How to resume
 
@@ -58,6 +61,7 @@ None. Gate 2 was approved 2026-10-12 ("yes, approve gate 2, launch wave 2").
 - wave-2: the resolver's "malformed" equals the validator's `isWellFormedCalendarDeclaration`: only the first `date`/`start`/`end`/`every` key counts, unknown keys beside a valid shape are ignored, duplicate weekdays merge, dates must be real days (round-tripped through `formatIsoDate`).
 - wave-2: weekend replacement counts every `non-working` named `weekend`, malformed ones included (the validator does the same).
 - wave-2: the canonical sort covers the preset rule too, with a final tie-break on the sorted remaining dates; only `RangeError` falls back to the preset, other errors rethrow.
+- wave-3: dsl.md's `### Non-working Declaration` section sits after the whole Config Section, before Person & Team Declarations, with a pointer from the Calendar paragraph. The man page's display section is renamed `non-working: (em) day display`; the new one is `non-working and working (em) declarations`. Examples D (working exception) and E (precedence) were added to working-calendar.md.
 - wave-2: local `main` was stale at `369c6e3`; the parent moved it to `origin/main` (`e419aa5`). Byte identity step 3 compares against `origin/main`.
 
 ## Environment notes
@@ -66,6 +70,7 @@ None. Gate 2 was approved 2026-10-12 ("yes, approve gate 2, launch wave 2").
 - env: the AST dump test is kept at `/workspace/nowline/.scratch/m2p-5a/ast-dump.test.ts`. To re-run: copy it to `packages/core/test/ast-dump.test.ts`, run `AST_OUT=<path> npx vitest run test/ast-dump.test.ts` in `packages/core`, `cmp` against `.scratch/m2p-5a/ast-baseline.json`, then delete the copy.
 - env: the CLI prints no validator warnings in text or dry-run mode; W0705 was verified by running the core validator directly over every `.nowline` file.
 - env: `make test` stops at the first failing package; to list every red case, run `npx vitest run` per package (core, layout, export-xlsx, integration-tests).
+- env: never `pkill -f` by pattern (it killed the agent's own shell); wait with a foreground `until grep ...; do sleep N; done` loop, since a bare `sleep N` is blocked. No mandoc or groff in the container.
 - env: the 7 Biome warnings in `make lint` pre-exist.
 - env: (original) the container ships Node 22. s2 installs the official Node 26.2.0 linux-x64 tarball into `$HOME` (verified against `SHASUMS256.txt`); every shell must put its `bin` first on `PATH` (shell state does not persist between tool calls). pnpm 12.8.1 is already installed. Never run `playwright install`.
 
