@@ -717,6 +717,55 @@ function renderNonWorkingBands(
     return tag('g', { 'data-layer': 'non-working' }, parts.join(''));
 }
 
+/**
+ * Labels of the titled non-working runs (specs/working-calendar.md §7.4):
+ * each run's text in the marker row, placed by the layout like an anchor
+ * label, and under `hide` a dotted cut line at the seam from the label
+ * row's centre to the timeline bottom, since the zero-width seam has no
+ * band to name. Empty when no run has a label, so a roadmap without one
+ * emits no bytes.
+ */
+function renderNonWorkingLabels(
+    t: PositionedTimelineScale,
+    palette: Theme,
+    fonts: FontFamilies,
+): string {
+    const bottomY = t.box.y + t.box.height;
+    const parts: string[] = [];
+    for (const run of t.nonWorking ?? []) {
+        if (run.label === undefined || !run.labelBox) continue;
+        const box = run.labelBox;
+        const centerY = box.y + 4;
+        if (run.cut) {
+            parts.push(
+                tag('line', {
+                    x1: num(run.x),
+                    y1: num(centerY),
+                    x2: num(run.x),
+                    y2: num(bottomY),
+                    stroke: palette.timeline.nonWorkingSeam,
+                    'stroke-width': 1,
+                    'stroke-dasharray': '1 3',
+                }),
+            );
+        }
+        // Left-side labels end-anchor at the box's right edge, as anchor
+        // labels do: the box width is a pessimistic estimate.
+        const isLeft = run.labelSide === 'left';
+        const labelAttrs: Record<string, string | number | null | undefined> = {
+            x: num(isLeft ? box.x + box.width : box.x),
+            y: num(centerY + 4),
+            'font-family': fonts.sans,
+            'font-size': 10,
+            fill: palette.timeline.labelText,
+        };
+        if (isLeft) labelAttrs['text-anchor'] = 'end';
+        parts.push(textTag(labelAttrs, run.label));
+    }
+    if (parts.length === 0) return '';
+    return tag('g', { 'data-layer': 'non-working-label' }, parts.join(''));
+}
+
 function renderTimeline(t: PositionedTimelineScale, palette: Theme, fonts: FontFamilies): string {
     const panelFill = palette.timeline.panelFill;
     const borderColor = palette.timeline.border;
@@ -3007,6 +3056,10 @@ export async function renderSvg(
     // swimlane fills.
     for (const a of model.anchors) parts.push(renderAnchorCutLine(a, palette));
     for (const m of model.milestones) parts.push(renderMilestoneCutLine(m, idPrefix, palette));
+
+    // Titled non-working runs: their marker-row labels, and under `hide`
+    // the named cut lines, over the bars like the milestone cut lines.
+    parts.push(renderNonWorkingLabels(model.timeline, palette, fonts));
 
     // Marker-row diamonds + labels.
     for (const a of model.anchors) parts.push(renderAnchor(a, palette, fonts));
