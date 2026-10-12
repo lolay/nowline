@@ -475,3 +475,52 @@ describe('an included file that closes the whole week', () => {
         expect(() => scheduleRoadmap(file, resolved)).not.toThrow();
     });
 });
+
+describe('declarations the resolver leaves out or reads leniently', () => {
+    /** Is each of Thu Jan 8, Fri Jan 9 and Sat Jan 10 2026 a working day? */
+    async function weekOf(declarations: string[]): Promise<boolean[]> {
+        const { file, resolved } = await parseAndResolve(declared(declarations));
+        const { working } = resolveWorkingCalendar(file, resolved);
+        return [8, 9, 10].map((day) => working.isWorkingDay(utc(2026, 1, day)));
+    }
+
+    it('reads a one-element start: and end: bracket as the single date', async () => {
+        expect(await weekOf(['non-working start:[2026-01-09] end:[2026-01-09]'])).toEqual([
+            true,
+            false,
+            false,
+        ]);
+    });
+
+    it.each([
+        [
+            'a date that is not a real day (it would roll over to Jan 9)',
+            'non-working date:2025-12-40',
+        ],
+        ['a date list with one bad element', 'non-working date:[2026-01-09, 2026-13-01]'],
+        ['an end before its start', 'non-working start:2026-01-09 end:2026-01-08'],
+        ['a start: given two dates', 'non-working start:[2026-01-08, 2026-01-09] end:2026-01-09'],
+        ['an unknown weekday', 'non-working every:[fri, funday]'],
+        ['date: with every:', 'non-working date:2026-01-09 every:fri'],
+        ['a lone start:', 'non-working start:2026-01-09'],
+    ])('leaves out %s, keeping the preset week', async (_name, declaration) => {
+        expect(await weekOf([declaration])).toEqual([true, true, false]);
+    });
+
+    it('ignores an unknown key beside a well-formed shape, as the validator does', async () => {
+        expect(await weekOf(['non-working date:2026-01-09 style:x'])).toEqual([true, false, false]);
+    });
+
+    it('leaves out a malformed declaration from an include, which is not validated', async () => {
+        const { file, resolved } = await parseAndResolveFiles({
+            'main.nowline': `nowline v1\n\ninclude "./cal.nowline"\n\nroadmap r "R" start:2026-01-05\n\n${ITEM}`,
+            'cal.nowline':
+                'nowline v1\n\nconfig\n\nnon-working date:2026-02-30\nnon-working date:2026-01-08\n',
+        });
+        const { working } = resolveWorkingCalendar(file, resolved);
+        expect(working.rules.map((r) => r.dates?.map(iso) ?? r.id)).toEqual([
+            'weekend',
+            ['2026-01-08'],
+        ]);
+    });
+});
