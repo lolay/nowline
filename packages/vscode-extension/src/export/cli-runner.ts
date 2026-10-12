@@ -16,7 +16,7 @@ export interface ExportSettings {
     headlessFonts: boolean;
     pngScale: number;
     msprojStart: string;
-    /** Canvas-width cap in px. `0` leaves it at the layout default (1280). */
+    /** Canvas-width cap in px. `0` leaves it unset, so the canvas fits its content. */
     width: number;
 }
 
@@ -308,7 +308,7 @@ function buildCliArgs(
     // flag, and unset must let the file's own key apply.
     if (nonWorking) args.push('--non-working', nonWorking);
     // Width cap (deliberate export setting; not preview-coupled). `0`/unset
-    // omits the flag so the CLI keeps its 1280 default.
+    // omits the flag so the CLI fits the canvas to its content.
     if (settings.width > 0) args.push('--width', String(settings.width));
 
     if (target.format === 'pdf') {

@@ -668,6 +668,32 @@ describe('@nowline/mcp — render review and insights', () => {
         expect(textBlock).toBeDefined();
     });
 
+    it('render with review:true caps the review raster at 1024 px wide', async () => {
+        // ~38 weeks at 40 px/week is ~1520 px of timeline: wider than the cap.
+        const wide = [
+            'nowline v1',
+            '',
+            'roadmap r "R" start:2026-01-05 scale:1w',
+            '',
+            'swimlane eng "Engineering"',
+            '  item a "A" duration:12w',
+            '  item b "B" duration:12w',
+            '  item c "C" duration:14w',
+        ].join('\n');
+        const result = await client.callTool({
+            name: 'render',
+            arguments: { source: wide, format: 'svg', now: '2026-01-15', review: true },
+        });
+        expect(result.isError).toBeFalsy();
+        const image = result.content.find((c) => c.type === 'image') as
+            | { type: 'image'; data: string }
+            | undefined;
+        expect(image).toBeDefined();
+        // PNG IHDR: the pixel width is the big-endian uint32 at byte 16.
+        const png = Buffer.from(image?.data ?? '', 'base64');
+        expect(png.readUInt32BE(16)).toBeLessThanOrEqual(1024);
+    });
+
     it('validate on valid source can return insights and hint for spill-prone source', async () => {
         const longTitle = [
             'nowline v1',

@@ -155,6 +155,23 @@ describeBuilt('verbless render (requires `pnpm build`)', () => {
         expect(a.stdout).toBe(b.stdout);
     });
 
+    it('--width caps a wide canvas and leaves a narrow one alone', async () => {
+        const canvasWidth = (svg: string): number =>
+            Number(/viewBox="0 0 ([\d.]+) /.exec(svg)?.[1] ?? Number.NaN);
+        const wide = path.join(examplesDir, 'long.nowline');
+        const natural = await runCliBuilt([wide, '-o', '-']);
+        const capped = await runCliBuilt([wide, '-w', '900', '-o', '-']);
+        expect(natural.exitCode).toBe(0);
+        expect(capped.exitCode).toBe(0);
+        expect(canvasWidth(natural.stdout)).toBeGreaterThan(2000);
+        expect(canvasWidth(capped.stdout)).toBeLessThanOrEqual(900);
+
+        const narrow = path.join(examplesDir, 'minimal.nowline');
+        const fit = await runCliBuilt([narrow, '-o', '-']);
+        const roomy = await runCliBuilt([narrow, '-w', '4000', '-o', '-']);
+        expect(roomy.stdout).toBe(fit.stdout);
+    });
+
     it('--theme dark emits dark-theme marker', async () => {
         const light = await runCliBuilt([
             path.join(examplesDir, 'minimal.nowline'),

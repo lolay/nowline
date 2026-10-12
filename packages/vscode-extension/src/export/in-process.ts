@@ -142,8 +142,8 @@ export async function exportInProcess(
         noLinks: noLinks ?? false,
         nonWorking,
         // Canvas width is a deliberate export setting (not preview-coupled):
-        // a *maximum* cap, no floor. `0`/unset leaves it at the layout default
-        // (1280), keeping byte-for-byte parity with the `nowline` CLI default.
+        // a best-effort *maximum* cap, no floor. `0`/unset fits the content,
+        // keeping byte-for-byte parity with the `nowline` CLI default.
         width: settings.width > 0 ? settings.width : undefined,
         // Font-requiring formats resolve lazily below.
         pngScale: settings.pngScale > 0 ? settings.pngScale : undefined,

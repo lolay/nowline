@@ -91,7 +91,10 @@ Render options
   --no-links             Omit link icons from output
   -s, --scale <n>        Raster scale factor (PNG only; default 1)
   --strict               Promote asset / sanitizer warnings to errors
-  -w, --width <px>       Canvas width in pixels (default: 1280)
+  -w, --width <px>       Maximum canvas width in pixels (default: fit the
+                         content). Best-effort: the timeline shrinks to fit,
+                         down to 1 px per day; spilled captions can still
+                         overflow. See rendering.md § Canvas width.
   --non-working <mode>   How a business calendar's non-working days appear:
                          `hide` (collapse them; the default) or `show` (draw
                          them as shaded bands). Overrides the file's

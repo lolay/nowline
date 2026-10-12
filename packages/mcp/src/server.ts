@@ -611,7 +611,12 @@ export function createMcpServer(opts: McpServerOptions = {}): McpServer {
                     .string()
                     .optional()
                     .describe('Now-line date as YYYY-MM-DD (UTC). Omit to suppress.'),
-                width: z.number().optional().describe('Canvas width in px.'),
+                width: z
+                    .number()
+                    .optional()
+                    .describe(
+                        'Maximum canvas width in px. Unset fits the content; a wider roadmap shrinks its timeline to fit.',
+                    ),
                 nonWorking: nonWorkingSchema,
                 scale: z
                     .number()

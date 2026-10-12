@@ -1,6 +1,6 @@
 # Plan: make `LayoutOptions.width` do something (or remove it)
 
-Status: waiting on a product pick (a / b / c / d). Nothing implemented yet.
+Status: (done) picked (a), best-effort cap with a ppd floor, default unset. Implemented on `claude/stoic-darwin-r467wd`.
 
 ## Finding
 

@@ -20,6 +20,7 @@ import { defaultRowBand } from '../band-scale.js';
 import type { CalendarConfig } from '../calendar.js';
 import { daysBetween, resolveSizes } from '../calendar.js';
 import { resolveWorkingCalendar } from '../calendar-resolver.js';
+import { cappedPixelsPerDay } from '../canvas-width.js';
 import { parseDate, propValue, propValues } from '../dsl-utils.js';
 import { localeStrings, resolveLocale } from '../i18n.js';
 import type { LayoutOptions, LayoutResult } from '../layout.js';
@@ -243,7 +244,6 @@ export class RoadmapNode {
     ): LayoutResult {
         const themeName: ThemeName = options.theme ?? 'light';
         const theme: Theme = themes[themeName];
-        const width = options.width ?? 1280;
         const locale = resolveLocale(options.locale, directiveLocale(file));
 
         // The working calendar maps dates to working-day indices for the
@@ -322,22 +322,28 @@ export class RoadmapNode {
         const chartLeftX = isBeside ? sizedHeader.boxWidth : 0;
         const chartTopY = isBeside ? 8 : HEADER_ABOVE_HEIGHT_PX + 8;
 
-        // `options.width` is treated as a *maximum* canvas width. The
-        // chart sizes to natural content width (date window × ppd) plus
-        // chrome padding, capped at the max — no floor. The two
-        // `GUTTER_PX` insets keep the header card and attribution
-        // wordmark from butting against the canvas edges.
-        const ppd = scale.pixelsPerUnit / calendar.daysPerUnit(scale.unit);
+        // The chart sizes to natural content width (date window × ppd) plus
+        // chrome padding. `options.width`, when set, is a best-effort
+        // maximum canvas width: it shrinks ppd (never below
+        // `MIN_PIXELS_PER_DAY`) so header card + gutters + timeline fit,
+        // but caption spills and run labels can still grow the canvas
+        // past it below. The two `GUTTER_PX` insets keep the header card
+        // and attribution wordmark from butting against the canvas edges.
         const spanDays = Math.max(1, calendar.workingIndexOf(startDate, endDate));
         // Under `show` every calendar day takes `ppd`, so the chart widens by
         // the non-working days in the window.
-        const naturalWidth = showsNonWorking
-            ? Math.max(1, daysBetween(startDate, endDate)) * ppd
-            : spanDays * ppd;
+        const timelineDays = showsNonWorking
+            ? Math.max(1, daysBetween(startDate, endDate))
+            : spanDays;
+        const ppd = cappedPixelsPerDay({
+            naturalPixelsPerDay: scale.pixelsPerUnit / calendar.daysPerUnit(scale.unit),
+            dayCount: timelineDays,
+            chromeWidth: chartLeftX + 2 * GUTTER_PX,
+            maxWidth: options.width,
+        });
+        const naturalWidth = timelineDays * ppd;
         const originX = chartLeftX + GUTTER_PX;
         const totalChartWidth = naturalWidth;
-        const desiredCanvas = chartLeftX + GUTTER_PX + totalChartWidth + GUTTER_PX;
-        const chartRightX = Math.min(width, desiredCanvas);
 
         // Header layout (top → bottom):
         //   1. Now-pill row    (16 px) — only when there's a now-line
@@ -382,7 +388,7 @@ export class RoadmapNode {
         // pass runs and grow the canvas via `growChartRightX`. The
         // now-pill doesn't contribute here — `buildNowline` flips it to
         // flag mode whenever a centered pill would clip an edge.
-        const finalChartRightX = Math.max(chartRightX, originX + totalChartWidth + GUTTER_PX);
+        const finalChartRightX = originX + totalChartWidth + GUTTER_PX;
 
         // Resolve each date-pinned anchor and milestone's x. Used both for
         // the marker-row pack and for `after:` resolution downstream — an

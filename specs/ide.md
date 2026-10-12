@@ -168,7 +168,7 @@ Locale uses two chains, mirroring the CLI's [`packages/cli/src/i18n/locale.ts`](
 | `nowline.preview.strict` | `false` | `--strict` | Promotes asset / sanitizer warnings to errors. Ships in m3d. |
 | `nowline.preview.showLinks` | `true` | inverse of `--no-links` | Toggle link icons in rendered items. Ships in m3d. |
 | `nowline.preview.nonWorking` | `file` | `--non-working` | `file` / `hide` / `show`. `file` leaves the option unset so the roadmap's own `default roadmap non-working:` key applies (then `hide`); `hide` or `show` forces that view in the preview and in every export command. Settings-only: there is no `.nowlinerc` key. |
-| `nowline.preview.width` | `0` | `--width` | `0` = unset; preview has zoom anyway. Ships in m3d. |
+| `nowline.preview.width` | `0` | `--width` | Maximum canvas width ([`rendering.md` § Canvas width](./rendering.md#canvas-width)). `0` = unset (fit content); preview has zoom anyway. Ships in m3d. |
 | `nowline.preview.assetRoot` | `""` | `--asset-root` | Empty = source file's directory. Ships in m3d. |
 | `nowline.export.cliPath` | `nowline` | — | Path to the `nowline` binary; PATH lookup by default. `${workspaceFolder}` substitution supported. Ships in m3e. |
 | `nowline.export.pdf.pageSize` | `letter` | `--page-size` | Ships in m3e. |

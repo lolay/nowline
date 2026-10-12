@@ -278,7 +278,10 @@ Raster scale factor (PNG only; default 1).
 .It Fl -strict
 Promote asset / sanitizer warnings to errors.
 .It Fl w , -width Ar px
-Canvas width in pixels (default 1280).
+Maximum canvas width in pixels.
+By default the canvas fits its content.
+A wider roadmap shrinks its timeline to fit, down to one pixel per day;
+captions that spill past their bars can still make the canvas wider.
 .It Fl -non-working Ar mode
 How a business calendar's non-working days appear on the chart:
 .Sy hide

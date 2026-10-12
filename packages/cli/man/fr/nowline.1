@@ -5,7 +5,7 @@
 .\" Empreinte de la page anglaise relue pour cette traduction. Après avoir
 .\" reporté une modification de la page anglaise, remplacez-la par la ligne
 .\" qu'affiche packages/cli/test/man/translation-parity.test.ts.
-.\" translated-from: nowline.1 sha256:41d2bc75c2dbe5593a60d0c818809f57c0430e41e06078c587488a0c9566364f
+.\" translated-from: nowline.1 sha256:0b8fa65a597927a2618b661115c3e76f9b5a7a836373ea3a84814199110fdfd5
 .Dd $Mdocdate$
 .Dt NOWLINE 1
 .Os
@@ -295,7 +295,11 @@ Facteur d'échelle pour le rendu raster (PNG uniquement\ ; 1 par défaut).
 .It Fl -strict
 Promeut les avertissements (assets, sanitiseur) en erreurs.
 .It Fl w , -width Ar px
-Largeur du canevas en pixels (1280 par défaut).
+Largeur maximale du canevas en pixels.
+Par défaut, le canevas s'ajuste au contenu.
+Une feuille de route plus large resserre sa frise pour tenir, jusqu'à un pixel
+par jour\ ; les légendes qui débordent de leurs barres peuvent encore élargir le
+canevas.
 .It Fl -non-working Ar mode
 Façon dont un calendrier ouvré affiche ses jours non travaillés sur le
 graphique\ :

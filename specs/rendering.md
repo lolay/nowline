@@ -64,6 +64,18 @@ The layout engine is pure computation — no DOM, no SVG, no side effects. It ru
 
 All spacing and sizing values are **style properties** — no separate `config > layout` block needed. They follow the standard style precedence chain (inline > `style:` ref > label > defaults > system defaults).
 
+### Canvas width
+
+The canvas fits its content: header card (beside mode), a `GUTTER_PX` inset, the timeline at the scale's natural pixels-per-day (`pixelsPerUnit / daysPerUnit`), another `GUTTER_PX`, then whatever caption spills and non-working run labels add on the right.
+
+`LayoutOptions.width` (CLI `-w/--width`, `.nowlinerc` `width`, `nowline.preview.width` / `nowline.export.width`, and the `width` option of `@nowline/embed`, `@nowline/browser`, `@nowline/export` and the MCP `render` / `export` tools) is a **best-effort maximum**. Unset, the default, means content-fit. When header card plus gutters plus timeline would exceed it, layout shrinks pixels-per-day to `(width − chrome) / days` (`cappedPixelsPerDay` in [`canvas-width.ts`](../packages/layout/src/canvas-width.ts)). Every x position, item width, tick and band goes through that one density, so the date window and schedule are unchanged and only the pixels move.
+
+- **Shrink only.** A cap wider than the content leaves the layout byte-identical to an unset one; the cap never stretches a chart.
+- **Floor.** Pixels-per-day never drops below `MIN_PIXELS_PER_DAY` (1). A density already below the floor (a very coarse custom scale) is left alone, not raised. At the floor the canvas exceeds the cap.
+- **Best-effort.** Text does not scale. Captions that no longer fit a narrower bar spill right, non-working run labels and the beside-mode header card keep their size, and any of them can grow the canvas past the cap after the timeline is placed. Tick labels can crowd at heavy compression. Layout does not re-run to chase the cap.
+
+History: m2b treated `width` as a floor that stretched the chart. m2d–m2h moved to content-fit and documented `width` as a maximum, but a trailing `max()` restored the natural width, so from then until this fix the option had no effect.
+
 ### Spacing Style Properties
 
 These join the style system alongside `bg`, `fg`, etc.:

@@ -4,18 +4,16 @@ Branch: `claude/stoic-darwin-r467wd` (harness-assigned).
 
 ## Done
 
-Research only. Traced the regression (`9116144`, 2026-04-29; floor removed in `33e5bc8`), inventoried every surface that passes `width`, and measured natural canvas widths across `examples/`, `tests/`, snapshots and determinism fixtures. Findings and options are in [`plan-layout-width-ember.md`](./plan-layout-width-ember.md).
+- Research and options: [`plan-layout-width-ember.md`](./plan-layout-width-ember.md).
+- Pick: (a) best-effort maximum, default unset, pixels-per-day floor of 1 (`MIN_PIXELS_PER_DAY`), never raised above natural.
+- Implementation: `packages/layout/src/canvas-width.ts` (`cappedPixelsPerDay`), wired in `nodes/roadmap-node.ts`; the dead `min`/`max` pair is gone.
+- Tests (each fails without the fix): `packages/layout/test/canvas-width.test.ts`, CLI `--width` case in `packages/cli/test/integration/cli.render.test.ts`, MCP review-raster cap in `packages/mcp/test/mcp.smoke.test.ts`.
+- Docs: help.ts, man en + fr (fr stamp refreshed), `specs/cli.md`, `specs/rendering.md` § Canvas width, `specs/ide.md`, CLI and VS Code READMEs, both VS Code width setting descriptions, MCP schema text, JSDoc on every surface, CHANGELOG `### Fixed`.
+- Verified: `make pre-commit` green; all 46 `examples/` + `tests/` SVGs byte-identical before and after; no snapshot changed; `make determinism` (Node + CLI legs) 314/314 with unchanged goldens.
 
-## Pending question (verbatim to the user)
+## Pending
 
-Pick one: (a) real maximum with default unset (recommended), (a-1280) maximum keeping the 1280 default, (b) floor/stretch, (c) remove, (d) output scaling. Also, for (a): best-effort cap (timeline fits, text spill may overflow) or iterate to get closer?
-
-## Resume
-
-After the pick: failing test in `packages/layout/test/` plus a CLI `--width` test, implement in `packages/layout/src/nodes/roadmap-node.ts` (lines ~246, ~325-340, ~385), then docs (help.ts, `packages/cli/man/` en + fr, `specs/cli.md`, `specs/rendering.md`, VS Code `nowline.preview.width` description), `CHANGELOG.md` `## [Unreleased]`, `make pre-commit`.
-
-## Gotchas
-
-- Clone was shallow; `git fetch --unshallow origin main` before `git log -L`.
-- CLI syntax is `nowline <input> [options]` (no `render` subcommand); `--now` seeds the now-line.
+- PR not opened (waits on the user).
+- Browser determinism leg not run locally; default path is the same code as the Node leg.
 - Remove these two handoff files (or promote) as the last commit before merge.
+- Related card: CLI reading `width` from `.nowlinerc` can now proceed.

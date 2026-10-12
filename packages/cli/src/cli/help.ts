@@ -66,7 +66,9 @@ RENDER OPTIONS
       --no-links          Omit link icons from rendered items.
   -s, --scale <n>         Raster scale factor (PNG only; default 1).
       --strict            Promote asset / sanitizer warnings to errors.
-  -w, --width <px>        Canvas width in pixels (default: 1280).
+  -w, --width <px>        Maximum canvas width in pixels. Default: fit the
+                          content. A wider roadmap shrinks its timeline to
+                          fit; long captions can still overflow it.
       --non-working <hide|show>
                           How a business calendar's non-working days appear:
                           hide collapses them (the default), show draws them
