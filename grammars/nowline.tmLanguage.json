@@ -89,7 +89,7 @@
                 },
                 {
                     "name": "constant.language.enum.nowline",
-                    "match": "(?<![\\w-])(solid|dashed|dotted|subtle|soft|hard|sans|serif|mono|thin|light|normal|bold|true|false|none|xs|sm|md|lg|xl|full|business|full|custom|merge|ignore|isolate|hide|show|beside|above)(?![\\w-])"
+                    "match": "(?<![\\w-])(solid|dashed|dotted|subtle|soft|hard|sans|serif|mono|thin|light|normal|bold|true|false|none|xs|sm|md|lg|xl|full|business|full|custom|merge|ignore|isolate|hide|show|beside|above|top|bottom|both)(?![\\w-])"
                 }
             ]
         },
