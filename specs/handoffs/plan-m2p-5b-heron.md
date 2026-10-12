@@ -1,7 +1,7 @@
 ```
 --- KICKOFF: begin orchestration at [deep] ---
 
-  Status: 1/3 groups done | last review: wave-1 PASS | current: m2p-5b s4-s6 [deep] | updated 2026-10-12
+  Status: 2/3 groups done | last review: wave-2 PASS | current: m2p-5b s7-s10 [exec] | updated 2026-10-12 | passed unattended: gate 2 before wave 2
   mode: unattended | proposed unattended (harness=claude-code runner=cloud; plan written in a planning session, kickoff question asked by the executing session) | guard 3x min $50 | fixups 2 | confirmed 2026-10-12 session d2e6b266-7085-567a-b805-c4269ef5a3e8: unattended
 
   review: every-wave (log-only — parent writes Review log; human gates only where marked)
@@ -403,13 +403,13 @@ Phase 5a is on `main` as `e3b2479` (lolay/nowline#115): a file's `non-working` a
 
 --- WAVE 2 [deep] ---
 
-### s4 - [deep] Labels, packing and canvas growth
+### s4 - [deep] Labels, packing and canvas growth (done)
 Decisions 1-3. Done when every s3 layout case is green with its literal unchanged. A derived literal that disagrees is gate 1: report the value, the reason, and whether the decision or the literal is wrong.
 
-### s5 - [deep] Renderer
+### s5 - [deep] Renderer (done)
 Decision 4. Done when every s3 renderer case is green.
 
-### s6 - [deep] Prove nothing moved, then commit
+### s6 - [deep] Prove nothing moved, then commit (done)
 - Byte identity step 2 in full, then `make bundle-size`, then `make pre-commit`.
 - Then commit and push.
 - Gate 1 on any byte move.
@@ -452,6 +452,7 @@ Everything under § Change "Docs". The `working-calendar.md` §10 Example B text
 ## Review log
 
 review wave-1 (nowline s1,s2,s3) 72b4376..84f3b6d: PASS - baselines under .scratch/m2p-5b/ (43 SVG hashes, 52 Mermaid/MS Project export pairs pinned with --now 2026-02-09); probe bounds re-checked unchanged; s2 tooling matches Decision 8 (rename and references skip calendar declarations since declarationAt now returns them; snippet test wraps in a roadmap with a swimlane because NL.E0004 rejects the plan's swimlane-less wrapper); s3 adds 12 layout and 7 renderer red cases, all assertion failures, literals match § Tests; make lint green - 2026-10-12
+review wave-2 (nowline s4,s5,s6) 9a6b159..50206d6: PASS - Decisions 1-4 implemented; all 12 s3 layout and 7 renderer cases green with literals unchanged, no test file edited; byte identity step 2 clean (43 SVG hashes, 52 export pairs, snapshots, determinism hashes.json); bundle 193.33 KB of 200 KB (192.84 before); pre-pack packs against a right edge widened for provisional run labels (not in decision 3, accepted: no effect on files without titled runs) - 2026-10-12; passed unattended: gate 2
 
 ## Token log
 
@@ -467,3 +468,6 @@ Phase 1 ~$20.42; Phase 2 ~$66.4; Phase 3 ~$51.05; Phase 4 ~$27.6; Phase 5a expec
 tokens orchestrator-resume plan-m2p-5b-heron (claude-opus-5-5): input ~34 / cache read ~2M / cache write ~0 5m + ~190k 1h / output ~12k | ~$2.16 API-equiv
 tokens wave-1 nowline-s1-s2-s3 (claude-sonnet-5-5): input ~130 / cache read ~8.7M / cache write ~200k / output ~64k | ~$2.88 API-equiv (output est.) session d2e6b266-7085-567a-b805-c4269ef5a3e8
 tokens review-wave-1 nowline-s1-s2-s3 (claude-opus-5-5): input ~50 / cache read ~1.5M / cache write ~82k / output ~24k | ~$1.18 API-equiv (output est.) session d2e6b266-7085-567a-b805-c4269ef5a3e8
+tokens orchestrator-wave-1 nowline-s1-s2-s3 (claude-opus-5-5): input ~14 / cache read ~980k / cache write ~0 5m + ~19k 1h / output ~8.6k | ~$0.52 API-equiv
+tokens wave-2 nowline-s4-s5-s6 (claude-opus-5-5): input ~96 / cache read ~5.9M / cache write ~150k / output ~48k | ~$2.90 API-equiv (output est.) session d2e6b266-7085-567a-b805-c4269ef5a3e8
+tokens review-wave-2 nowline-s4-s5-s6 (claude-opus-5-5): input ~20 / cache read ~400k / cache write ~59k / output ~10k | ~$0.57 API-equiv (output est.) session d2e6b266-7085-567a-b805-c4269ef5a3e8
