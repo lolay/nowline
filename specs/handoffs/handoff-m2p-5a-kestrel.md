@@ -12,22 +12,24 @@
 ## Done
 
 - **Wave 1 [exec] s1-s5** `6fdd05b..ea4d596` (nowline s1,s2,s3,s4,s5): s1 and s2 empty commits (toolchain and baselines: 43 SVG hashes, 53 AST files, in `.scratch/m2p-5a/`, which dies with the container); s3 grammar, printer, type labels; s4 validator and i18n (NL.E0900-E0907, NL.W0705); s5 46 red cases (core include 8, layout 33, export-xlsx 3, integration-tests 2). `check_wave.py` passed.
+- **1-fix [exec]** `6fdd05b..369f12f` (nowline s1,s2,s3,s4,s5): `369f12f` s4 date-checks one-element `start:`/`end:` brackets (NL.E0405), with three tests. `check_wave.py` passed. Commit body records the s5 red-test exception (46 reds, all s5's).
 
 ## Review log verdicts
 
-- wave-1: CONCERNS. A one-element bracket on `start:`/`end:` gets no date check (`start:[2026-13-01]` gives no NL.E0405). Fix-up 1-fix runs next, no gate (a first review CONCERNS).
+- wave-1: CONCERNS. A one-element bracket on `start:`/`end:` gets no date check (`start:[2026-13-01]` gives no NL.E0405). Fix-up 1-fix ran, no gate (a first review CONCERNS).
+- wave-1-fix: PASS.
 
 ## Fix-ups, retries, checkpoints
 
-- 1-fix [exec]: the wave-1 review concern above.
+- 1-fix [exec]: the wave-1 review concern above. Its commit ran `make pre-commit` with the s5 exception (lint, build, typecheck green; only the 46 s5 reds fail), since the s5 reds stay red until wave 2.
 
 ## Spend
 
-Token log: ~$8.98 of ~$18 expected (wave 1 ~$7.04 against ~$4.5 planned; kickoff ~$1.94).
+Token log: ~$10.74 of ~$18 expected (wave 1 ~$7.04 against ~$4.5 planned, 1-fix ~$0.53, orchestrator ~$3.17).
 
 ## Next unit
 
-1-fix [exec] `nowline s1,s2,s3,s4,s5`, from `6fdd05b`. Then gate 2 before wave 2 [deep] s6-s8: a stop, asked.
+Wave 2 [deep] `nowline s6,s7,s8` (Opus, high), behind gate 2.
 
 ## How to resume
 
@@ -35,7 +37,9 @@ Paste the plan's Kickoff prompt into a new session on this branch.
 
 ## Pending question
 
-None.
+BLOCKED at gate 2 (tier change [exec] -> [deep], the plan's marked STOP "gates 5 and 2"; gate 5 does not fire on a one-group wave). Asked verbatim:
+
+> Wave 1 and its fix-up are reviewed and pushed (`6fdd05b..369f12f`, PASS after one fix-up). Approve gate 2 to launch wave 2 [deep] s6-s8 (include merge, calendar resolver, byte-identity proof) on Opus at high effort, ~$6 expected?
 
 ## Decisions so far
 
