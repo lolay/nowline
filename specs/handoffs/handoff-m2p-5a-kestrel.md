@@ -27,7 +27,7 @@
 
 ## Spend
 
-Token log: ~$16.78 of ~$18 expected (wave 1 ~$7.04 against ~$4.5 planned, 1-fix ~$0.53, wave 2 ~$4.55 against ~$6.0, orchestrator ~$3.81 so far).
+Token log: ~$15.93 of ~$18 expected (wave 1 ~$7.04 against ~$4.5 planned, 1-fix ~$0.53, wave 2 ~$4.55 against ~$6.0, orchestrator ~$3.81 so far, with the open orchestrator-wave-2 stretch not yet logged).
 
 ## Next unit
 
@@ -53,6 +53,12 @@ None. Gate 2 was approved 2026-10-12 ("yes, approve gate 2, launch wave 2").
 - wave-1 (review accepted): the plan's Example B guard "milestone 24 with hiddenDate" for the file without the declaration is wrong; today's code puts it at x=40 (24 is the with-declaration value). The guard asserts 40, and s7 must not change it.
 - wave-1: some § Tests cases are guards by nature and pass before and after: the two working-wins tie cases, the config:isolate host-calendar check, the closed-week robustness case, and the reorder variants of the tie files.
 - wave-1: `calendarDeclarations` is read through cast-tolerant `declarationsOf` helpers in the include and resolver tests; s6 adds the field and the casts can go. `parseAndResolveFiles` in `layout/test/helpers.ts` resolves in-memory includes.
+- wave-1-fix: a one-element `start:`/`end:` bracket on a declaration is date-checked (NL.E0405 on the element); the resolver treats a one-element bracket as the single date.
+- wave-2: a child's named declaration collides only with ids the parent held before that merge; a child's own duplicate id is NL.E0907 in the child, and both copies merge. Collisions are per keyword.
+- wave-2: the resolver's "malformed" equals the validator's `isWellFormedCalendarDeclaration`: only the first `date`/`start`/`end`/`every` key counts, unknown keys beside a valid shape are ignored, duplicate weekdays merge, dates must be real days (round-tripped through `formatIsoDate`).
+- wave-2: weekend replacement counts every `non-working` named `weekend`, malformed ones included (the validator does the same).
+- wave-2: the canonical sort covers the preset rule too, with a final tie-break on the sorted remaining dates; only `RangeError` falls back to the preset, other errors rethrow.
+- wave-2: local `main` was stale at `369c6e3`; the parent moved it to `origin/main` (`e419aa5`). Byte identity step 3 compares against `origin/main`.
 
 ## Environment notes
 
