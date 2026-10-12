@@ -68,7 +68,7 @@ init: ## Install workspace dependencies from the frozen lockfile
 build: ## Build every package and render examples/ + tests/ to SVG
 	pnpm build
 
-build-fast: ## Build every package but skip the ~30-SVG render (inner dev loop)
+build-fast: ## Build every package but skip rendering examples/ + tests/ (inner dev loop)
 	NOWLINE_SKIP_RENDER=1 pnpm build
 
 lint: ## Static check: biome lint + format-drift + import organization (no writes)
