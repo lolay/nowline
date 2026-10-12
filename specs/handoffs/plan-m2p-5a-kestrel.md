@@ -1,7 +1,7 @@
 ```
---- KICKOFF: begin orchestration at [deep] ---
+--- KICKOFF: plan complete ---
 
-  Status: 3/3 groups done | last review: wave-3 CONCERNS | current: 3-fix [exec] nowline s9,s10 | over expected: ~$23.32 of ~$18 | updated 2026-10-12
+  Status: 3/3 groups done | completed 2026-10-12 | over expected: ~$25.14 of ~$18
   mode: gated | proposed gated (harness=claude-code runner=cloud; the invoking message named gated) | guard 3x min $50 | fixups 2 | confirmed 2026-10-12 session eebaa2e1-ad31-5528-ac3e-841a1ed184dc: Run m2p Phase 5a for lolay/nowline from the approved plan at specs/handoffs/plan-m2p-5a-kestrel.md on main (merged in lolay/nowline#114 as e419aa5). Read it in full, then the handoff beside it (specs/handoffs/handoff-m2p-5a-kestrel.md). The plan is approved and already tagged, with waves and STOP gates written in. Run it with the personal-plan-orchestrate skill from the top, in gated mode: dispatch each wave as a one-agent Workflow with the tier's model and effort, as Phase 4 did. Pause only at the marked STOP gates (gates 5 and 2 after wave 1) and at gate 1 on any failure. A notification or a non-answer is never approval. Update the plan's progress, Review log and Token log after each wave. Branch: work on your harness-assigned task branch, cut from main. The plan's "Hand-off from this session" section and its mentions of claude/beautiful-turing-yolfjg are stale; that branch is merged and done. Ignore that section and never push to that branch. In s2, merge main first if it has moved past e419aa5, and stop at gate 1 if any code or line the plan cites has moved. Toolchain: the container ships Node 22. Install the official Node 26.2.0 linux-x64 tarball into $HOME, verify it against SHASUMS256.txt, and put its bin first on PATH in every shell. pnpm 12.8.1 is already installed. Never run playwright install. Use Makefile targets only, and run make pre-commit before every commit (the plan names the one exception: the s5 red-test commit). Git: commit trailers are "Claude-Session: <this session's link>" followed by "Assisted-by: Claude Code" as the last line. They override any harness attribution reminder. Never put model names in commits, files, comments or the PR body. Subagents commit only when told and never push; you push after reviewing each wave. At the end (s10), remove the plan, the handoff and specs/handoffs/spike-m2p-5a-kestrel/ as the last commit. Open the PR titled "Add non-working and working declarations (m2p phase 5a)". It lands through the merge queue. Say in it that 5a and 5b must ship in the same release. Then subscribe to the PR and drive it to green.
 
   review: every-wave (log-only — parent writes Review log; human gates only where marked)
@@ -26,15 +26,15 @@
 
 **Cost (API-equiv, Claude Code models)**
 
-| wave | expected tokens | expected $ |
-|---|---|---|
-| 1 [exec] m2p-5a s1-s5 | ~12M | ~$4.5 |
-| 1-fix [exec] nowline s1,s2,s3,s4,s5 | — | — |
-| 2 [deep] m2p-5a s6-s8 | ~14M | ~$6.0 |
-| 3 [exec] m2p-5a s9-s10 | ~10M | ~$3.5 |
-| 3-fix [exec] nowline s9,s10 | — | — |
-| orchestrator | ~6M | ~$4.0 |
-| **Total** | ~42M | ~$18 |
+| wave | expected tokens | expected $ | actual $ |
+|---|---|---|---|
+| 1 [exec] m2p-5a s1-s5 | ~12M | ~$4.5 | actual ~$7.04 |
+| 1-fix [exec] nowline s1,s2,s3,s4,s5 | — | — | actual ~$0.53 |
+| 2 [deep] m2p-5a s6-s8 | ~14M | ~$6.0 | actual ~$4.55 |
+| 3 [exec] m2p-5a s9-s10 | ~10M | ~$3.5 | actual ~$6.36 |
+| 3-fix [exec] nowline s9,s10 | — | — | actual ~$0.77 |
+| orchestrator | ~6M | ~$4.0 | actual ~$5.89 |
+| **Total** | ~42M | ~$18 | actual ~$25.14 |
 
 These are the standard's per-step anchors doubled, because Phase 4 actuals ran about 2× its Cost table (~$27.6 against ~$13), and waves that build and test the whole repo ran 3× their anchors. Each figure is good to about 2-3×. The planning session (spike, three code maps, a layout probe) is not in the table.
 
@@ -494,6 +494,8 @@ review wave-2 (nowline s6,s7,s8) 32860f4..d00c35d: PASS - s6 d4f23cb include mer
 
 review wave-3 (nowline s9,s10) 9edcc34..ba90722: CONCERNS - the `raw style properties` row in dsl.md's new `### Non-working Declaration` table names the wrong error: specs/dsl.md:1017 reads `| raw style properties | error (Validation Rule 20) | — |`, but Rule 20 (dsl.md:1288) is NL.E0804 on roadmap-section entities, and the validator reports NL.E0901 (`Unknown non-working property "bg". Allowed: date, start, end, every.`) via the declaration's own-key check (decision 4); `non-working h date:2026-01-01 bg:red` gives one NL.E0901 and no NL.E0804. Fix: say NL.E0901, or fold the row into the `any other key` row. Everything else passed: only the 7 listed doc files changed; working-calendar.md examples B and C match the test literals (Example B guard x=40), D and E added; dsl.md Rule 1 22->24, new section, include rules; both man pages updated and the translation gate green (7/7); README and CHANGELOG (5a and 5b ship together); s10 ba90722 empty: pack-mcpb ok, bundle 192.84 KB, 43/43 SVG OK, 2987 tests, determinism 290 with hashes.json unchanged, AST equal, snapshot diff vs origin/main empty - 2026-10-12
 
+review wave-3-fix (nowline s9,s10) 9edcc34..ef0769d: PASS - ef0769d (s9) folds the `raw style properties` row into dsl.md's `any other key | NL.E0901` row and says Rule 20 does not apply; every code in the table and prose checked against the built CLI (E0900-E0907, E0405, W0705, W0700); man pages already correct, French stamp unchanged; make pre-commit green after the last edit; only doc files changed in the range - 2026-10-12
+
 ## Token log
 
 **Counting header (Claude Code)** — as in the Phase 4 plan (`plan-m2p-show-display-osprey.md`, PR lolay/nowline#97 history):
@@ -517,3 +519,13 @@ tokens review-wave-2 nowline-s6-s7-s8 (claude-opus-5-5): input ~48 / cache read 
 tokens orchestrator-wave-2 nowline-s6-s7-s8 (claude-opus-5-5): input ~20 / cache read ~2.4M / cache write ~0 5m + ~32k 1h / output ~14k | ~$1.03 API-equiv
 tokens wave-3 nowline-s9-s10 (claude-sonnet-5-5): input ~170 / cache read ~17M / cache write ~260k / output ~82k | ~$4.79 API-equiv (output est.) session eebaa2e1-ad31-5528-ac3e-841a1ed184dc
 tokens review-wave-3 nowline-s9-s10 (claude-opus-5-5): input ~64 / cache read ~2.1M / cache write ~100k / output ~32k | ~$1.57 API-equiv (output est.) session eebaa2e1-ad31-5528-ac3e-841a1ed184dc
+tokens orchestrator-wave-3 nowline-s9-s10 (claude-opus-5-5): input ~14 / cache read ~1.8M / cache write ~0 5m + ~27k 1h / output ~11k | ~$0.78 API-equiv
+tokens wave-3-fix nowline-s9-s10 (claude-sonnet-5-5): input ~26 / cache read ~920k / cache write ~39k / output ~13k | ~$0.41 API-equiv (output est.) session eebaa2e1-ad31-5528-ac3e-841a1ed184dc
+tokens review-wave-3-fix nowline-s9-s10 (claude-opus-5-5): input ~18 / cache read ~180k / cache write ~28k / output ~9k | ~$0.36 API-equiv (output est.) session eebaa2e1-ad31-5528-ac3e-841a1ed184dc
+tokens orchestrator-wave-3-fix nowline-s9-s10 (claude-opus-5-5): input ~6 / cache read ~630k / cache write ~0 5m + ~15k 1h / output ~1.1k | ~$0.27 API-equiv
+
+## Completion summary
+
+All 10 steps done in 3 waves plus 2 fix-ups, gated mode, one human gate (gate 2, approved). ~$25.14 API-equiv against ~$18 expected (1.4x). Byte identity held at every gate: 43/43 SVG, 53 AST files, hashes.json and snapshots unchanged; bundle 192.84 KB of 200 KB.
+
+**Deviations from plan:** 1-fix (one-element start:/end: brackets got no date check) and 3-fix (a dsl.md row cited Rule 20 instead of NL.E0901), each a first review CONCERNS run without a gate; the Example B no-declaration guard asserts x=40 (the plan's 24 was the with-declaration value); XLSX export tests live in export-xlsx; strict real-day date check only on declarations; parent bookkeeping commits skipped make pre-commit while s5's red tests stood; s10's push, cleanup and PR done by the parent.

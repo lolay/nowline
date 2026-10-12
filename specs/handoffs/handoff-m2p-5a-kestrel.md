@@ -21,6 +21,7 @@
 - wave-1: CONCERNS. A one-element bracket on `start:`/`end:` gets no date check (`start:[2026-13-01]` gives no NL.E0405). Fix-up 1-fix ran, no gate (a first review CONCERNS).
 - wave-1-fix: PASS.
 - wave-2: PASS, no findings.
+- wave-3-fix: PASS (`ef0769d`).
 - wave-3: CONCERNS. dsl.md:1017's `raw style properties` row says Validation Rule 20; the validator reports NL.E0901. Fix-up 3-fix runs next, no gate (a first review CONCERNS).
 
 ## Fix-ups, retries, checkpoints
@@ -30,11 +31,11 @@
 
 ## Spend
 
-Token log: ~$23.32 of ~$18 expected, over expected (wave 1 ~$7.04 against ~$4.5, 1-fix ~$0.53, wave 2 ~$4.55 against ~$6.0, wave 3 ~$6.36 against ~$3.5, orchestrator ~$4.84). Guard limit $54.
+Token log: ~$25.14 of ~$18 expected, over expected (3-fix ~$0.77, orchestrator total ~$5.89) (wave 1 ~$7.04 against ~$4.5, 1-fix ~$0.53, wave 2 ~$4.55 against ~$6.0, wave 3 ~$6.36 against ~$3.5, orchestrator ~$4.84). Guard limit $54.
 
 ## Next unit
 
-3-fix [exec] `nowline s9,s10`, from `9edcc34`. Then final completion: the parent removes the plan, the handoff and the spike directory as the last commit, pushes, opens the PR and drives it to green.
+None: plan complete. Next is the cleanup commit (remove this handoff, the plan and the spike directory), push, and the PR.
 
 ## How to resume
 
