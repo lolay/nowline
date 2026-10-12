@@ -2,7 +2,7 @@
 
 All notable changes to Nowline are documented in this file.
 
-The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). Packages in this monorepo share a single version and ship together. Contributors append entries to `## [Unreleased]` as part of their PR; maintainers move them into a new `## [vX.Y.Z]` section as part of the release-cut commit (see [`specs/releasing.md`](./specs/releasing.md#changelog-workflow)).
+The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). Packages in this monorepo share a single version and ship together. Don't edit this file in a PR: add a fragment to [`.changelog/`](./.changelog/README.md), and the release cut folds every pending fragment into a new `## [X.Y.Z]` section (see [`specs/releasing.md`](./specs/releasing.md#changelog-workflow)). The `## [Unreleased]` section below predates fragments; the next release folds it in and drops the heading.
 
 ## [Unreleased]
 
