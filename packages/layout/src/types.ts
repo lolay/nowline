@@ -20,8 +20,9 @@ export type HeaderPosition = 'beside' | 'above';
 export type TimelinePosition = 'top' | 'bottom' | 'both';
 export type StatusKind = 'planned' | 'in-progress' | 'done' | 'at-risk' | 'blocked' | 'neutral';
 
-// The 17 style properties from specs/dsl.md § Style Properties plus header-position
-// and the roadmap-only knobs (`timeline-position`, `minor-grid`, `non-working`).
+// The style properties from specs/dsl.md § Style Properties, including the
+// roadmap-only knobs (`header-height`, `header-position`, `timeline-position`,
+// `minor-grid`, `non-working`).
 // Every one has a concrete value after resolution (theme + defaults fill gaps).
 export interface ResolvedStyle {
     bg: string; // hex or 'none'
