@@ -578,7 +578,26 @@ The id and the title are both optional.
 Durations count working days only, so an item that spans a non-working
 day ends later, and an item that spans a working exception ends
 sooner.
-The title is carried on the model; a label for it is not drawn yet.
+The chart labels a dated declaration that has a title
+.Po
+.Sy date:
+or
+.Sy start:
+with
+.Sy end:
+and no
+.Sy every:
+.Pc
+with its title and the number of working days it removes, for example
+.Dq Thanksgiving \[u00B7] 2d .
+Under
+.Sy hide
+the label sits on a cut line at the seam, and under
+.Sy show
+at the left edge of the shaded band.
+A title on a recurrence or on a
+.Sy working
+declaration is not drawn.
 A declaration takes these properties:
 .Bl -tag -width "every:"
 .It Sy date:

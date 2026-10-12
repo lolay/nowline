@@ -22,6 +22,7 @@ import {
     declarationAt,
     entityKind,
     fileFromDocument,
+    isCalendarDeclaration,
     leafAt,
     type NamedEntity,
     propertyValueAt,
@@ -41,6 +42,9 @@ import {
  * description and member count; an item in a roadmap with waves shows its
  * effective wave, or `background (no wave)`. Waves come from the file's own
  * declarations only — the LSP does not resolve includes.
+ *
+ * Calendar declarations (`non-working`, `working`, specs/working-calendar.md):
+ * the declaration shows its id, title, and `date`, `every`, `start` and `end`.
  */
 export class NowlineHoverProvider implements HoverProvider {
     constructor(_services: NowlineLspServices) {
@@ -87,16 +91,7 @@ export class NowlineHoverProvider implements HoverProvider {
         const props =
             (entity as { properties?: { key: string; value?: string; values?: string[] }[] })
                 .properties ?? [];
-        const surfaced = [
-            'status',
-            'owner',
-            'link',
-            'date',
-            'duration',
-            'size',
-            'effort',
-            'capacity',
-        ];
+        const surfaced = isCalendarDeclaration(entity) ? CALENDAR_SURFACED : ITEM_SURFACED;
         const rendered: string[] = [];
         for (const key of surfaced) {
             const prop = props.find((p) => propKey(p as { key: string }) === key);
@@ -118,6 +113,12 @@ export class NowlineHoverProvider implements HoverProvider {
         };
     }
 }
+
+const ITEM_SURFACED = ['status', 'owner', 'link', 'date', 'duration', 'size', 'effort', 'capacity'];
+
+// A `non-working` / `working` declaration is described by its days, not by an
+// item's status or duration (specs/working-calendar.md §4.1).
+const CALENDAR_SURFACED = ['date', 'every', 'start', 'end'];
 
 /**
  * Wave lines for the hover: the wave summary on a wave declaration, the

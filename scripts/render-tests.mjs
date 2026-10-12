@@ -62,6 +62,9 @@ const MANIFEST = [
     // Its roadmap starts 2026-01-05 and runs to Feb 2, so `now` is pinned inside
     // that window (the shared NOW would sit after it and hide the now-line).
     { slug: 'weekends-show', theme: 'light', now: '2026-01-14' },
+    // Both start 2026-11-23, so `now` is pinned inside the window (m2p phase 5b).
+    { slug: 'non-working-hide', theme: 'light', now: '2026-11-25' },
+    { slug: 'non-working-show', theme: 'light', now: '2026-11-25' },
 ];
 
 function run(cmd, args, opts = {}) {

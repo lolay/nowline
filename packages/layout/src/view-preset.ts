@@ -440,11 +440,36 @@ export function buildNonWorkingRuns(
             from: run.from,
             through: run.through,
         };
-        if (run.titles.length > 0) out.titles = run.titles;
+        if (run.titles.length > 0) {
+            out.titles = run.titles;
+            out.label = nonWorkingRunLabel(run, calendar.workingWeekdays);
+            out.cut = true;
+        }
         const isInside = x - left > SAME_X_TOLERANCE_PX && right - x > SAME_X_TOLERANCE_PX;
         if (unit === 'days' && isInside && !hasGridLineAt(x)) out.seam = true;
         return out;
     });
+}
+
+/** Separator between a run's titles and its day count: U+00B7 with a space each side. */
+const RUN_LABEL_DAY_SEPARATOR = ' \u00b7 ';
+
+/**
+ * The marker-row label of a titled run (specs/working-calendar.md §7.4):
+ * its titles joined with `, `, then ` · Nd`, where N counts the days of
+ * `[from, through]` the open-ended week would work, so the closure's cost
+ * reads in the DSL's working-day `d`. The suffix is dropped when N is 0.
+ */
+export function nonWorkingRunLabel(
+    run: Pick<NonWorkingRun, 'from' | 'through' | 'titles'>,
+    workingWeekdays: ReadonlySet<number>,
+): string {
+    let workingDays = 0;
+    for (let day = run.from; day <= run.through; day = addDays(day, 1)) {
+        if (workingWeekdays.has(day.getUTCDay())) workingDays++;
+    }
+    const text = run.titles.join(', ');
+    return workingDays > 0 ? `${text}${RUN_LABEL_DAY_SEPARATOR}${workingDays}d` : text;
 }
 
 /**
@@ -467,7 +492,10 @@ function shownNonWorkingRun(
         from: run.from,
         through: run.through,
     };
-    if (run.titles.length > 0) out.titles = run.titles;
+    if (run.titles.length > 0) {
+        out.titles = run.titles;
+        if (scale.calendar) out.label = nonWorkingRunLabel(run, scale.calendar.workingWeekdays);
+    }
     if (unit === 'days' || unit === 'weeks' || run.titles.length > 0) out.band = true;
     return out;
 }

@@ -79,9 +79,15 @@ duration is the chart's own day count for the item (sizes, `q` and
 `PT4800M0S` on `business` (10 working days) and `PT6720M0S` on `full`
 (14). An item with no duration stays a one-day task.
 
-Dated days off and half-days are **not** projected yet (`<Exceptions>`
-and `<WorkWeeks>` come with the `non-working` declarations). The export
-still starts at the export date or `--start`, not the roadmap's `start:`.
+Declared days off and working exceptions are written as `<Exceptions>` in
+the base calendar, right after `<WeekDays>`: one `<Exception>` per run of
+days the file's calendar differs from its open week, with a `<Name>` from
+the titles of the dated declarations behind it. A holiday is
+`<DayWorking>0</DayWorking>`; a working Saturday is `<DayWorking>1</DayWorking>`
+with the usual two `<WorkingTime>` blocks. There is no `<WorkWeeks>`: a
+bounded recurrence becomes one exception per run of days it changes. Half-days
+are not projected. The export still starts at the export date or `--start`,
+not the roadmap's `start:`.
 
 ## Lossy export policy
 
@@ -91,7 +97,7 @@ The following Nowline features are dropped from the export:
 - `footnote` annotations
 - `description` directives (the bridge to `<Notes>` is reserved for a
   future milestone)
-- Dated days off and half-days (no `non-working` declarations yet)
+- Half-days (a `non-working` declaration covers whole days only)
 
 When any drops occur, the exporter emits a single stderr summary line
 (via the CLI; the library function returns the XML and lets the caller

@@ -64,7 +64,13 @@ import type {
 import { buildWavePlan } from '@nowline/core';
 import type { ExportInputs } from '@nowline/export-core';
 import { displayLabel, getProp, getProps, hasProp, roadmapTitle } from '@nowline/export-core';
-import { type RoadmapSchedule, scheduleRoadmap, type WorkingCalendar } from '@nowline/layout';
+import {
+    type CalendarException,
+    calendarExceptions,
+    type RoadmapSchedule,
+    scheduleRoadmap,
+    type WorkingCalendar,
+} from '@nowline/layout';
 
 import { daysToMermaid } from './duration.js';
 
@@ -86,6 +92,8 @@ interface DropCounts {
     style: number;
     /** Wave start floors (a wave's `after:`); Mermaid has no "no earlier than". */
     waveFloor: number;
+    /** Days a `working` exception opens inside a closed week; Mermaid has no `includes`. */
+    workingDay: number;
 }
 
 function emptyCounts(): DropCounts {
@@ -101,6 +109,7 @@ function emptyCounts(): DropCounts {
         description: 0,
         style: 0,
         waveFloor: 0,
+        workingDay: 0,
     };
 }
 
@@ -148,8 +157,14 @@ export function exportMermaid(inputs: ExportInputs, options: MermaidOptions = {}
     out.push('gantt');
     out.push(`    title ${escapeMermaidText(title)}`);
     out.push('    dateFormat YYYY-MM-DD');
-    const excludes = excludedWeekdays(working);
+    const exceptions = calendarExceptions(
+        working,
+        inputs.model.timeline.startDate,
+        inputs.model.timeline.endDate,
+    );
+    const excludes = [...excludedWeekdays(working), ...excludedDates(exceptions)];
     if (excludes.length > 0) out.push(`    excludes ${excludes.join(', ')}`);
+    drops.workingDay += workingDayCount(exceptions);
 
     // Footnotes are file-level; counted once.
     drops.footnote += ast.roadmapEntries.filter((e) => e.$type === 'FootnoteDeclaration').length;
@@ -452,6 +467,30 @@ function excludedWeekdays(working: WorkingCalendar): string[] {
     ).map(([, name]) => name);
 }
 
+const DAY_MS = 86_400_000;
+
+/** The ISO date of every day in every non-working exception, ascending. */
+function excludedDates(exceptions: readonly CalendarException[]): string[] {
+    const dates: string[] = [];
+    for (const exception of exceptions) {
+        if (exception.working) continue;
+        for (let t = exception.from.getTime(); t <= exception.through.getTime(); t += DAY_MS) {
+            dates.push(formatIsoDate(new Date(t)));
+        }
+    }
+    return dates;
+}
+
+/** Days across the working exceptions. */
+function workingDayCount(exceptions: readonly CalendarException[]): number {
+    let days = 0;
+    for (const exception of exceptions) {
+        if (!exception.working) continue;
+        days += Math.round((exception.through.getTime() - exception.from.getTime()) / DAY_MS) + 1;
+    }
+    return days;
+}
+
 function formatIsoDate(d: Date): string {
     const y = d.getUTCFullYear();
     const m = String(d.getUTCMonth() + 1).padStart(2, '0');
@@ -513,6 +552,7 @@ function formatDrops(drops: DropCounts): string | null {
         'description',
         'style',
         'waveFloor',
+        'workingDay',
     ];
     const parts = order
         .filter((key) => drops[key] > 0)
@@ -527,5 +567,6 @@ function formatDrops(drops: DropCounts): string | null {
 function formatDropKey(key: keyof DropCounts): string {
     if (key === 'nestedSwimlanes') return 'nested-swimlanes';
     if (key === 'waveFloor') return 'wave-floor';
+    if (key === 'workingDay') return 'working-day';
     return key;
 }

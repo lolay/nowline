@@ -136,6 +136,110 @@ export function spanEndDate(calendar: WorkingCalendar, base: Date, s: number, e:
     return addDays(calendar.dateAtWorkingIndex(base, last - 1), 1);
 }
 
+/**
+ * A maximal run of consecutive days on which the calendar differs from its
+ * open-ended week (specs/working-calendar.md §8): a holiday, a closure, a
+ * bounded recurrence's closed days, or a working day inside a closed weekend.
+ * The MS Project `<Exceptions>` and the Mermaid dated `excludes` both read it.
+ */
+export interface CalendarException {
+    /** First day of the run (UTC midnight). */
+    from: Date;
+    /** Last day of the run (UTC midnight), inclusive. */
+    through: Date;
+    /** True: a working day the open week closes. False: a closure the open week works. */
+    working: boolean;
+    /** Titles of the dated or ranged rules behind it; omitted when there are none. */
+    titles?: string[];
+}
+
+/**
+ * The days in the horizon whose working state differs from the open-ended
+ * week (`workingWeekdays`), as maximal runs split wherever the state flips.
+ *
+ * The horizon is [from, to) together with every finite bound of every rule:
+ * its `dates`, and its `start` / `end` when set. A half-open bounded
+ * recurrence is therefore expanded only inside that horizon, so a declared
+ * holiday outside the roadmap window is still listed and nothing iterates
+ * forever. Titles come from the dated or ranged rules (no `every`) whose
+ * `working` equals the run's state and that cover a day of it, in
+ * `working.rules` order, de-duplicated.
+ */
+export function calendarExceptions(
+    working: WorkingCalendar,
+    from: Date,
+    to: Date,
+): CalendarException[] {
+    const windows: DaySpan[] = [];
+    const add = (start: number, end: number) => {
+        if (!Number.isNaN(start) && !Number.isNaN(end) && start < end) windows.push({ start, end });
+    };
+    add(dayNumber(from), dayNumber(to));
+    for (const rule of working.rules) {
+        for (const date of rule.dates ?? []) add(dayNumber(date), dayNumber(date) + 1);
+        const start = rule.start === undefined ? undefined : dayNumber(rule.start);
+        const end = rule.end === undefined ? undefined : dayNumber(rule.end);
+        if (start !== undefined) add(start, start + 1);
+        if (end !== undefined) add(end, end + 1);
+        if (start !== undefined && end !== undefined) add(start, end + 1);
+    }
+    windows.sort((a, b) => a.start - b.start || a.end - b.end);
+
+    const out: CalendarException[] = [];
+    let open: { from: number; through: number; working: boolean } | undefined;
+    const close = () => {
+        if (!open) return;
+        const titles = exceptionTitles(working.rules, open.from, open.through, open.working);
+        out.push({
+            from: dateOfDay(open.from),
+            through: dateOfDay(open.through),
+            working: open.working,
+            ...(titles.length > 0 ? { titles } : {}),
+        });
+        open = undefined;
+    };
+
+    let day = -Infinity;
+    for (const window of windows) {
+        for (let d = Math.max(day, window.start); d < window.end; d++) {
+            const state = working.isWorkingDay(dateOfDay(d));
+            if (state === working.workingWeekdays.has(weekdayOf(d))) {
+                close();
+            } else if (open && open.through === d - 1 && open.working === state) {
+                open.through = d;
+            } else {
+                close();
+                open = { from: d, through: d, working: state };
+            }
+            day = d + 1;
+        }
+    }
+    close();
+    return out;
+}
+
+/** Titles of the dated or ranged rules of `state` that cover a day in [from, through]. */
+function exceptionTitles(
+    rules: ReadonlyArray<CalendarRule>,
+    from: number,
+    through: number,
+    state: boolean,
+): string[] {
+    const titles: string[] = [];
+    for (const rule of rules) {
+        if (rule.every !== undefined || rule.working !== state || rule.title === undefined)
+            continue;
+        const covers = rule.dates
+            ? rule.dates.some((date) => dayNumber(date) >= from && dayNumber(date) <= through)
+            : rule.start !== undefined &&
+              rule.end !== undefined &&
+              dayNumber(rule.start) <= through &&
+              dayNumber(rule.end) >= from;
+        if (covers && !titles.includes(rule.title)) titles.push(rule.title);
+    }
+    return titles;
+}
+
 export function daysPerUnit(unit: ScaleUnit, cal: CalendarConfig): number {
     return daysPerUnitForCalendar(unit, cal);
 }

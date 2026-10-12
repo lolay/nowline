@@ -5,7 +5,7 @@
 .\" Empreinte de la page anglaise relue pour cette traduction. Après avoir
 .\" reporté une modification de la page anglaise, remplacez-la par la ligne
 .\" qu'affiche packages/cli/test/man/translation-parity.test.ts.
-.\" translated-from: nowline.5 sha256:44c29a7f1eb3af4ff2f36ea2a2466e99b5115f5e590ffa84418e547c49983fd0
+.\" translated-from: nowline.5 sha256:3546d281d6ee4b9b9ecd2de13819101ac555ef110bb577e78cd4d8c132d8fe9a
 .\"
 .\" Les mots-clés du DSL (nowline, config, roadmap, swimlane, item, parallel,
 .\" group, person, team, anchor, label, size, status, wave, milestone, footnote,
@@ -627,8 +627,26 @@ L'identifiant et le titre sont tous deux facultatifs.
 Les durées ne comptent que les jours ouvrés\ : un élément qui traverse
 un jour non ouvré se termine plus tard, et un élément qui traverse une
 exception ouvrée se termine plus tôt.
-Le titre est porté par le modèle\ ; son étiquette n'est pas encore
-dessinée.
+Le graphique étiquette une déclaration datée qui a un titre
+.Po
+.Sy date:
+ou
+.Sy start:
+avec
+.Sy end:
+et sans
+.Sy every:
+.Pc
+avec son titre et le nombre de jours ouvrés qu'elle retire, par exemple
+.Dq Thanksgiving \[u00B7] 2d .
+Sous
+.Sy hide
+l'étiquette est posée sur un trait de coupe à la jointure, et sous
+.Sy show
+au bord gauche de la bande grisée.
+Un titre sur une récurrence ou sur une déclaration
+.Sy working
+n'est pas dessiné.
 Une déclaration accepte ces propriétés\ :
 .Bl -tag -width "every:"
 .It Sy date:

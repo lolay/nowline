@@ -203,7 +203,7 @@ swimlane platform
 | `wave` | A barrier across every swimlane: no work in the next wave starts until this one ends. |
 | `footnote` | A callout anchored to one or more entities. |
 | `person`, `team` | Ownership references. |
-| `non-working`, `working` | Days that consume no work (weekends, holidays, closures) and the exceptions that give them back. Config entries with `date:`, `start:` / `end:` or `every:`; a declaration named `weekend` replaces the business weekend. |
+| `non-working`, `working` | Days that consume no work (weekends, holidays, closures) and the exceptions that give them back. Config entries with `date:`, `start:` / `end:` or `every:`; a declaration named `weekend` replaces the business weekend. A dated closure with a title is labelled on the chart (`Thanksgiving · 2d`) and carried into the MS Project and Mermaid exports. |
 | `style`, `symbol`, `label`, `size`, `status`, `scale`, `calendar`, `default` | Config and declaration entries. |
 
 ### Properties

@@ -3,6 +3,7 @@
 // anchor dated on a hidden day carries its date as a `<title>`. The show view
 // (§7.3, m2p phase 4) draws the weekends as shaded bands in their own layer.
 
+import { readFileSync } from 'node:fs';
 import type { NowlineFile } from '@nowline/core';
 import type { LayoutOptions, Theme, ThemeName } from '@nowline/layout';
 import { darkTheme, grayscaleTheme, lightTheme } from '@nowline/layout';
@@ -402,5 +403,189 @@ swimlane a "A"
             { theme: 'light', ...SHOW },
         );
         expect(await renderSvg(model)).not.toContain('data-layer="non-working"');
+    });
+});
+
+// --- Named runs: the label layer (m2p phase 5b, specs/working-calendar.md §7.4) ---
+
+// A titled run draws a label in the marker row. Under hide it also draws a
+// dotted cut line from the label row to the timeline bottom, since the seam is
+// a zero-width gap and has no band to name.
+type LabelBox = { x: number; y: number; width: number; height: number };
+type LabelledRun = {
+    label?: string;
+    labelBox?: LabelBox;
+    labelSide?: 'left' | 'right';
+    cut?: true;
+    titles?: string[];
+};
+
+/** Example B of specs/working-calendar.md §10: Thanksgiving, a holiday inside a bar. */
+const EXAMPLE_B = `nowline v1
+
+config
+
+non-working thanksgiving "Thanksgiving" start:2026-11-26 end:2026-11-27
+
+roadmap r "R" start:2026-11-23 scale:1w calendar:business
+
+milestone launch "Launch" date:2026-11-28
+
+swimlane a "A"
+  item checkout "Checkout" duration:1w
+  item qa "QA" duration:2d
+`;
+
+const LABEL_LAYER = /<g data-layer="non-working-label">/;
+
+/** The balanced `non-working-label` layers of `svg`. */
+function labelLayers(svg: string): string[] {
+    return groupsMatching(svg, LABEL_LAYER);
+}
+
+/** The `<line>` elements of a fragment, as attribute maps. */
+function linesOf(fragment: string): Attrs[] {
+    return [...fragment.matchAll(/<line ([^>]*?)\/>/g)].map((l) =>
+        Object.fromEntries([...l[1].matchAll(/([\w-]+)="([^"]*)"/g)].map((a) => [a[1], a[2]])),
+    );
+}
+
+/** The `<text>` elements of a fragment: attribute map plus content. */
+function textsOf(fragment: string): Array<{ attrs: Attrs; content: string }> {
+    return [...fragment.matchAll(/<text ([^>]*?)>(.*?)<\/text>/g)].map((t) => ({
+        attrs: Object.fromEntries(
+            [...t[1].matchAll(/([\w-]+)="([^"]*)"/g)].map((a) => [a[1], a[2]]),
+        ),
+        content: t[2],
+    }));
+}
+
+describe('non-working labels under hide', () => {
+    it('draws exactly one label layer, with one cut line and the label text', async () => {
+        const model = await parseToModel(EXAMPLE_B, { theme: 'light' });
+        const layers = labelLayers(await renderSvg(model));
+        expect(layers).toHaveLength(1);
+        const o = model.timeline.originX;
+        const lines = linesOf(layers[0]);
+        expect(lines).toHaveLength(1);
+        const run = (model.timeline.nonWorking ?? [])[0] as LabelledRun;
+        const [line] = lines;
+        expect(line.x1).toBe('156');
+        expect(line.x2).toBe('156');
+        expect(Number(line.x1) - o).toBe(24);
+        expect(line.stroke).toBe('#a0aec0');
+        expect(line['stroke-width']).toBe('1');
+        expect(line['stroke-dasharray']).toBe('1 3');
+        expect(Number(line.y1)).toBe(run.labelBox!.y + 4);
+        expect(Number(line.y2)).toBe(model.timeline.box.y + model.timeline.box.height);
+
+        const texts = textsOf(layers[0]);
+        expect(texts).toHaveLength(1);
+        expect(texts[0].content).toBe('Thanksgiving · 2d');
+        expect(texts[0].attrs.x).toBe('162');
+        expect(texts[0].attrs['font-size']).toBe('10');
+        expect(texts[0].attrs.fill).toBe('#64748b');
+        expect(texts[0].attrs['text-anchor']).toBeUndefined();
+        expect(Number(texts[0].attrs.y)).toBe(run.labelBox!.y + 8);
+    });
+
+    it('layers after the milestone cut lines and before the marker diamonds', async () => {
+        const model = await parseToModel(EXAMPLE_B, { theme: 'light' });
+        const svg = await renderSvg(model);
+        const layerAt = svg.search(LABEL_LAYER);
+        expect(layerAt).toBeGreaterThan(-1);
+        const firstMilestone = svg.search(/data-layer="milestone"/);
+        expect(firstMilestone).toBeGreaterThan(-1);
+        expect(layerAt).toBeLessThan(firstMilestone);
+        const cutLine = svg.lastIndexOf(
+            `stroke="${lightTheme.milestoneDiamond.cutLineNormal}"`,
+            firstMilestone,
+        );
+        expect(cutLine).toBeGreaterThan(-1);
+        expect(layerAt).toBeGreaterThan(cutLine);
+    });
+
+    const tokens: Record<string, { line: string; text: string }> = {
+        light: { line: '#a0aec0', text: '#64748b' },
+        dark: { line: '#6b7a90', text: '#cbd5e1' },
+        grayscale: { line: '#9a9a9a', text: '#737373' },
+    };
+    for (const [name, palette, theme] of themes) {
+        it(`uses the ${name} theme's seam and label tokens`, async () => {
+            const model = await parseToModel(EXAMPLE_B, { theme });
+            const [layer] = labelLayers(await renderSvg(model));
+            expect(layer).toBeDefined();
+            const [line] = linesOf(layer ?? '');
+            const [text] = textsOf(layer ?? '');
+            expect(line?.stroke).toBe(tokens[name].line);
+            expect(line?.stroke).toBe(palette.timeline.nonWorkingSeam);
+            expect(text?.attrs.fill).toBe(tokens[name].text);
+            expect(text?.attrs.fill).toBe(palette.timeline.labelText);
+        });
+    }
+
+    it('is deterministic byte for byte', async () => {
+        const model = await parseToModel(EXAMPLE_B, { theme: 'light' });
+        expect(await renderSvg(model)).toBe(await renderSvg(model));
+    });
+});
+
+describe('non-working labels under show', () => {
+    it('draws the label text and no cut line, and leaves the band alone', async () => {
+        const model = await parseToModel(EXAMPLE_B, { theme: 'light', ...SHOW });
+        const svg = await renderSvg(model);
+        const layers = labelLayers(svg);
+        expect(layers).toHaveLength(1);
+        expect(linesOf(layers[0])).toEqual([]);
+        const texts = textsOf(layers[0]);
+        expect(texts).toHaveLength(1);
+        expect(texts[0].content).toBe('Thanksgiving · 2d');
+        expect(texts[0].attrs.x).toBe('162');
+        expect(texts[0].attrs['text-anchor']).toBeUndefined();
+
+        // The band `<rect>` is what 5a drew: x 24 from the origin, 32 wide.
+        const rects = rectsOf(bandLayers(svg)[0] ?? '');
+        const o = model.timeline.originX;
+        expect(rects.map((r) => [Number(r.x) - o, Number(r.width)])).toEqual([
+            [24, 32],
+            [96, 16],
+        ]);
+    });
+});
+
+describe('non-working labels on the left side', () => {
+    it('anchors the text at the label box right edge with text-anchor end', async () => {
+        const model = await parseToModel(EXAMPLE_B, { theme: 'light' });
+        const run = (model.timeline.nonWorking ?? [])[0] as LabelledRun;
+        // Hand-built: the packer puts run labels on the right, so force the left.
+        run.label = 'Thanksgiving · 2d';
+        run.labelBox = { x: 40, y: 41, width: 98.6, height: 12 };
+        run.labelSide = 'left';
+        run.cut = true;
+        const [layer] = labelLayers(await renderSvg(model));
+        expect(layer).toBeDefined();
+        const [text] = textsOf(layer ?? '');
+        expect(text?.attrs['text-anchor']).toBe('end');
+        expect(Number(text?.attrs.x)).toBeCloseTo(138.6, 2);
+        expect(Number(text?.attrs.y)).toBe(49);
+    });
+});
+
+describe('non-working labels: no label, no layer (guard)', () => {
+    it('emits nothing for a roadmap with no titled run, in either view', async () => {
+        for (const options of [{ theme: 'light' as const }, { theme: 'light' as const, ...SHOW }]) {
+            const svg = await renderSvg(await parseToModel(EXAMPLE_A, options));
+            expect(svg).not.toContain('non-working-label');
+        }
+    });
+
+    it('emits nothing for the weekends-show fixture', async () => {
+        const source = readFileSync(
+            new URL('../../../tests/weekends-show.nowline', import.meta.url),
+            'utf8',
+        );
+        const svg = await renderSvg(await parseToModel(source, { theme: 'light' }));
+        expect(svg).toContain('data-layer="non-working"');
+        expect(svg).not.toContain('non-working-label');
     });
 });

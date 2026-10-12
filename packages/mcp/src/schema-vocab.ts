@@ -35,6 +35,13 @@ export const SCHEMA_VOCABULARY = {
         'milestone',
         'footnote',
     ],
+    // Keywords of the `config` section. `non-working` and `working` declare
+    // calendar days (specs/working-calendar.md); the others configure the
+    // chart's scale, calendar, styles, symbols and per-entity defaults.
+    configKeywords: ['scale', 'calendar', 'style', 'symbol', 'default', 'non-working', 'working'],
+    // Properties of a `non-working` / `working` declaration: one day (`date`),
+    // a range (`start`, `end`), or a recurring weekday (`every`).
+    calendarDeclarationKeys: ['date', 'start', 'end', 'every'],
     // Properties valid on `item` declarations: item-specific keys plus the
     // universal properties (`labels`, `link`, `style`, `description`).
     // Visual treatment is a single `style:` reference — raw color/style

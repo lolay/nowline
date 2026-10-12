@@ -32,7 +32,7 @@ import type {
 import { buildWavePlan } from '@nowline/core';
 import type { ExportInputs } from '@nowline/export-core';
 import { displayLabel, getProp, getProps, hasProp, roadmapTitle } from '@nowline/export-core';
-import { type RoadmapSchedule, scheduleRoadmap } from '@nowline/layout';
+import { calendarExceptions, type RoadmapSchedule, scheduleRoadmap } from '@nowline/layout';
 
 import { buildCalendarsBlock, STANDARD_RESOURCE_CALENDAR_UID } from './calendar.js';
 import { minutesToMsProjDuration, workingDaysToMinutes } from './duration.js';
@@ -145,7 +145,14 @@ export function exportMsProjXml(inputs: ExportInputs, options: MsProjOptions = {
     lines.push(`  <StartDate>${startDate}T08:00:00</StartDate>`);
     lines.push('  <ScheduleFromStart>1</ScheduleFromStart>');
     lines.push('  <CalendarUID>1</CalendarUID>');
-    lines.push(buildCalendarsBlock(schedule.calendar.working.workingWeekdays));
+    const { working } = schedule.calendar;
+    const { startDate: windowStart, endDate: windowEnd } = inputs.model.timeline;
+    lines.push(
+        buildCalendarsBlock(
+            working.workingWeekdays,
+            calendarExceptions(working, windowStart, windowEnd),
+        ),
+    );
 
     // Tasks block
     lines.push('  <Tasks>');

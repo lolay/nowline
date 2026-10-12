@@ -167,6 +167,14 @@ export const FIXTURES: readonly GateFixture[] = [
         theme: 'light',
         browser: false,
     },
+    // m2p phase 5b: titled closures (labelled seams, MS Project and Mermaid exceptions).
+    {
+        id: 'working-calendar',
+        sourceFile: 'working-calendar.nowline',
+        dir: 'examples',
+        theme: 'light',
+        browser: false,
+    },
 ] as const;
 
 /** Manifest key for a (fixture, format) cell. */

@@ -28,6 +28,16 @@
         "body": ["wave ${1:id} \"${2:Title}\"$0"],
         "description": "Wave declaration (a barrier across every swimlane)"
     },
+    "Non-working days": {
+        "prefix": "non-working",
+        "body": ["non-working ${1:id} \"${2:Title}\" start:${3:2026-11-26} end:${4:2026-11-27}$0"],
+        "description": "Non-working days declaration (a holiday or closure, in config)"
+    },
+    "Working exception": {
+        "prefix": "working",
+        "body": ["working ${1:id} \"${2:Title}\" date:${3:2026-01-10}$0"],
+        "description": "Working exception declaration (a day that works despite the calendar, in config)"
+    },
     "Item with after / owner / labels": {
         "prefix": "item-full",
         "body": [

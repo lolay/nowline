@@ -8,6 +8,7 @@ import {
     declarationAt,
     fileFromDocument,
     findDeclarationRange,
+    isCalendarDeclaration,
     leafAt,
     propertyValueAt,
     propKey,
@@ -66,6 +67,7 @@ export class NowlineReferencesProvider implements ReferencesProvider {
 
 function resolveTargetId(leaf: CstNode): string | undefined {
     const decl = declarationAt(leaf);
+    if (decl && isCalendarDeclaration(decl)) return undefined;
     if (decl?.name) return decl.name;
     const propHit = propertyValueAt(leaf);
     if (propHit && REFERENCE_PROP_KEYS.has(propKey(propHit.prop))) {
