@@ -452,7 +452,7 @@ Everything under § Change "Docs". The `working-calendar.md` §10 Example B text
 ## Review log
 
 review wave-1 (nowline s1,s2,s3) 72b4376..84f3b6d: PASS - baselines under .scratch/m2p-5b/ (43 SVG hashes, 52 Mermaid/MS Project export pairs pinned with --now 2026-02-09); probe bounds re-checked unchanged; s2 tooling matches Decision 8 (rename and references skip calendar declarations since declarationAt now returns them; snippet test wraps in a roadmap with a swimlane because NL.E0004 rejects the plan's swimlane-less wrapper); s3 adds 12 layout and 7 renderer red cases, all assertion failures, literals match § Tests; make lint green - 2026-10-12
-review wave-2 (nowline s4,s5,s6) 9a6b159..50206d6: PASS - Decisions 1-4 implemented; all 12 s3 layout and 7 renderer cases green with literals unchanged, no test file edited; byte identity step 2 clean (43 SVG hashes, 52 export pairs, snapshots, determinism hashes.json); bundle 193.33 KB of 200 KB (192.84 before); pre-pack packs against a right edge widened for provisional run labels (not in decision 3, accepted: no effect on files without titled runs) - 2026-10-12; passed unattended: gate 2
+review wave-2 (nowline s4,s5,s6) 9a6b159..50206d6: PASS - Decisions 1-4 implemented; all 12 s3 layout and 7 renderer cases green with literals unchanged, no test file edited; byte identity step 2 clean (43 SVG hashes, 52 export pairs, snapshots, determinism hashes.json); bundle 193.33 KB of 200 KB (192.84 before); pre-pack packs against a right edge widened for provisional run labels (not in decision 3, accepted: no effect on files without titled runs); passed unattended: gate 2 - 2026-10-12
 
 ## Token log
 
