@@ -1,20 +1,25 @@
 ```
---- KICKOFF: begin orchestration at [deep] (pending approval) ---
+--- KICKOFF: begin orchestration at [deep] ---
 
-  Status: 0/3 groups done | last review: — | current: m2p-5a s1-s5 [exec] | updated 2026-10-11
+  Status: 0/3 groups done | last review: — | current: m2p-5a s1-s5 [exec] | updated 2026-10-12
+  mode: gated | proposed gated (harness=claude-code runner=cloud; the invoking message named gated) | guard 3x min $50 | fixups 2 | confirmed 2026-10-12 session eebaa2e1-ad31-5528-ac3e-841a1ed184dc: Run m2p Phase 5a for lolay/nowline from the approved plan at specs/handoffs/plan-m2p-5a-kestrel.md on main (merged in lolay/nowline#114 as e419aa5). Read it in full, then the handoff beside it (specs/handoffs/handoff-m2p-5a-kestrel.md). The plan is approved and already tagged, with waves and STOP gates written in. Run it with the personal-plan-orchestrate skill from the top, in gated mode: dispatch each wave as a one-agent Workflow with the tier's model and effort, as Phase 4 did. Pause only at the marked STOP gates (gates 5 and 2 after wave 1) and at gate 1 on any failure. A notification or a non-answer is never approval. Update the plan's progress, Review log and Token log after each wave. Branch: work on your harness-assigned task branch, cut from main. The plan's "Hand-off from this session" section and its mentions of claude/beautiful-turing-yolfjg are stale; that branch is merged and done. Ignore that section and never push to that branch. In s2, merge main first if it has moved past e419aa5, and stop at gate 1 if any code or line the plan cites has moved. Toolchain: the container ships Node 22. Install the official Node 26.2.0 linux-x64 tarball into $HOME, verify it against SHASUMS256.txt, and put its bin first on PATH in every shell. pnpm 12.8.1 is already installed. Never run playwright install. Use Makefile targets only, and run make pre-commit before every commit (the plan names the one exception: the s5 red-test commit). Git: commit trailers are "Claude-Session: <this session's link>" followed by "Assisted-by: Claude Code" as the last line. They override any harness attribution reminder. Never put model names in commits, files, comments or the PR body. Subagents commit only when told and never push; you push after reviewing each wave. At the end (s10), remove the plan, the handoff and specs/handoffs/spike-m2p-5a-kestrel/ as the last commit. Open the PR titled "Add non-working and working declarations (m2p phase 5a)". It lands through the merge queue. Say in it that 5a and 5b must ship in the same release. Then subscribe to the PR and drive it to green.
 
   review: every-wave (log-only — parent writes Review log; human gates only where marked)
 
   Next model
-    The [deep] tier at high effort; the skill's model picker names the model per tool.
+    The [deep] tier at high effort: Claude Code Opus 5.5 at high effort; Cursor Opus 5.5 high.
 
   Prompt to paste into the next chat:
-    Read specs/handoffs/plan-m2p-5a-kestrel.md on your branch of
-    lolay/nowline. The plan is already tagged. Run the
-    personal-plan-orchestrate skill from the top: dispatch each wave as a
-    one-agent Workflow with the tier's model and effort, pause only at the
-    marked STOP gates, and update plan progress after each wave. You are
-    the kickoff destination chat; begin immediately.
+    In lolay/nowline, read specs/handoffs/plan-m2p-5a-kestrel.md. The plan is already tagged.
+    On branch claude/wizardly-heisenberg-jfdezu (task branch): subagents commit each finished step.
+    Run in gated mode.
+    Run the personal-plan-orchestrate skill from the top: walk to
+    each tier boundary, dispatch subagents per the skill's procedure,
+    and pause only where the recorded mode stops. Do not execute plan
+    work inline. Update plan progress after each wave returns per the
+    skill's procedure. The mode line above is the kickoff answer. If the
+    Status line shows BLOCKED, re-post that question and wait; otherwise
+    record the mode, print the kickoff summary and begin dispatching.
 
 ---
 ```
@@ -360,6 +365,8 @@ swimlane a "A"
 - CI green on the PR head, including the determinism gate.
 
 ## Hand-off from this session (after approval)
+
+**Stale, done:** the planning session's hand-off below is complete and `claude/beautiful-turing-yolfjg` is merged (lolay/nowline#114, `e419aa5`). The execution session works on its own harness branch; ignore this section.
 
 1. This planning session has committed the spike and this plan (plus its handoff) to `claude/beautiful-turing-yolfjg`, a branch off `main` `27187f3` with `main` `2e0c375` merged in (`797d9c2`). That is all it pushes for 5a.
 2. Create a new cloud session with `create_session`:
