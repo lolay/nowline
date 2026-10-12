@@ -14,6 +14,7 @@ const EXAMPLES = [
     'inline-date-pins.nowline',
     'showcase.nowline',
     'waves.nowline',
+    'working-calendar.nowline',
 ];
 
 async function textToJsonString(text: string, file: string): Promise<string> {

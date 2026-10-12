@@ -401,6 +401,39 @@
         "weekends-show:xlsx": {
             "node": "a9ed3dc0542227237f51f8d40cf2822a287f107c75f816f9e2a95357366554c8",
             "icu": false
+        },
+        "working-calendar:html": {
+            "node": "6a32b88f68577c56f79cb47a112f4de609eac5137ced75aa719eaf89b67d2598",
+            "icu": true
+        },
+        "working-calendar:json": {
+            "node": "f1a859aae4b8f1fd587618fbeb5199292e10f7639f8c5e5d093907a7b5a53c21",
+            "icu": false
+        },
+        "working-calendar:mermaid": {
+            "node": "480a954b0892868bb4c73ce71dd4354f77e4c8925c448027fe72c25baafdd502",
+            "icu": false
+        },
+        "working-calendar:msproj": {
+            "node": "6091ce4087aee5950fa4d31942c5783cf81a681665b21fc09ec6129c3b74c368",
+            "icu": false
+        },
+        "working-calendar:pdf": {
+            "node": "cb4aae2d334c1ad720fd87f3b75da57c6d1b0de767a4d99b084fa29cf4d53c67",
+            "icu": true,
+            "cli": "cfb6b6d03144937f38e8534ad5e823d57574ab08d2dd499eb047305f352de0c9"
+        },
+        "working-calendar:png": {
+            "node": "700b66e16bf3c2d10d91eaa16e35f583397d860588e0597c0fb7886683e4909e",
+            "icu": true
+        },
+        "working-calendar:svg": {
+            "node": "07bf5ffb83ce09562585da184fb7f315548d8cf10c489ba95af01dd4f8f5726b",
+            "icu": true
+        },
+        "working-calendar:xlsx": {
+            "node": "ea6a7d6af6f8682505af5c50775b3832d7f566148d9ad0a4ea8cf20ce9b4327f",
+            "icu": false
         }
     }
 }

@@ -73,6 +73,12 @@ const MANIFEST = [
         now: NOW,
     },
     { slug: 'waves-program', source: 'examples/waves-program.nowline', theme: 'light', now: NOW },
+    {
+        slug: 'working-calendar',
+        source: 'examples/working-calendar.nowline',
+        theme: 'light',
+        now: NOW,
+    },
 ];
 
 function run(cmd, args, opts = {}) {

@@ -117,6 +117,19 @@ export const SAMPLES: SampleSpec[] = [
     // m2p phase 4: a business calendar drawn with `non-working:show` (shaded
     // weekend bands). The only deliberate addition to the snapshot set.
     { name: 'weekends-show', sourceFile: 'weekends-show.nowline', dir: 'tests', theme: 'light' },
+    // m2p phase 5b: labelled seams and bands; the only deliberate additions.
+    {
+        name: 'non-working-hide',
+        sourceFile: 'non-working-hide.nowline',
+        dir: 'tests',
+        theme: 'light',
+    },
+    {
+        name: 'non-working-show',
+        sourceFile: 'non-working-show.nowline',
+        dir: 'tests',
+        theme: 'light',
+    },
 ];
 
 export async function renderSampleSvg(spec: SampleSpec): Promise<string> {
