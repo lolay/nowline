@@ -1,7 +1,7 @@
 ```
---- KICKOFF: begin orchestration at [deep] ---
+--- KICKOFF: plan complete ---
 
-  Status: 2/3 groups done | last review: wave-2 PASS | current: m2p-5b s7-s10 [exec] | updated 2026-10-12 | passed unattended: gate 2 before wave 2
+  Status: 3/3 groups done | completed 2026-10-12
   mode: unattended | proposed unattended (harness=claude-code runner=cloud; plan written in a planning session, kickoff question asked by the executing session) | guard 3x min $50 | fixups 2 | confirmed 2026-10-12 session d2e6b266-7085-567a-b805-c4269ef5a3e8: unattended
 
   review: every-wave (log-only — parent writes Review log; human gates only where marked)
@@ -26,13 +26,13 @@
 
 **Cost (API-equiv, Claude Code models)**
 
-| wave | expected tokens | expected $ |
-|---|---|---|
-| 1 [exec] m2p-5b s1-s3 | ~14M | ~$5.0 |
-| 2 [deep] m2p-5b s4-s6 | ~16M | ~$7.0 |
-| 3 [exec] m2p-5b s7-s10 | ~18M | ~$6.5 |
-| orchestrator | ~6M | ~$4.0 |
-| **Total** | ~54M | ~$23 |
+| wave | expected tokens | expected $ | actual tokens | actual $ |
+|---|---|---|---|---|
+| 1 [exec] m2p-5b s1-s3 | ~14M | ~$5.0 | ~11M (output est.) | ~$4.06 (output est.) |
+| 2 [deep] m2p-5b s4-s6 | ~16M | ~$7.0 | ~6.6M (output est.) | ~$3.47 (output est.) |
+| 3 [exec] m2p-5b s7-s10 | ~18M | ~$6.5 | ~19M (output est.) | ~$6.06 (output est.) |
+| orchestrator | ~6M | ~$4.0 | ~5.6M | ~$3.89 |
+| **Total** | ~54M | ~$23 | ~42M | ~$17.48 |
 
 Same basis as the 5a plan (the standard's per-step anchors doubled, since Phase 4 ran about 2× its table), scaled up for 5b's wider surface: six packages, two man pages and three new fixtures against 5a's three packages. Each figure is good to about 2-3×. The guard limit is 3× or $50, whichever is higher: ~$69. The planning session (three code maps, a layout and packing probe) is not in the table.
 
@@ -416,11 +416,11 @@ Decision 4. Done when every s3 renderer case is green.
 
 --- WAVE 3 [exec] ---
 
-### s7 - [exec] Exceptions, MS Project and Mermaid
+### s7 - [exec] Exceptions, MS Project and Mermaid (done)
 - Decisions 5-7, test first: write the `calendarExceptions`, MS Project and Mermaid cases from § Tests red, then implement.
 - Done when they are green, byte identity step 2 passes (export diff empty: no existing fixture has a dated or bounded rule) and `make pre-commit` is green. Then commit.
 
-### s8 - [exec] Fixtures, snapshots, determinism
+### s8 - [exec] Fixtures, snapshots, determinism (done)
 - Write the three fixtures. Each is in canonical printer form: run `node packages/cli/dist/index.js <file> -f nowline -o -` and keep its output, so the `examples/` round-trip test (`packages/cli/test/convert/roundtrip.test.ts`) passes. Each opens with a comment block like `tests/weekends-show.nowline:3-14`.
   - `tests/non-working-hide.nowline`: Example B renamed `roadmap non-working-hide "Named days hidden"`, plus `non-working summit "Company summit" start:2026-12-09 end:2026-12-11` and a third item `item rollout "Rollout" duration:2w`, so the chart shows `Thanksgiving · 2d`, `Company summit · 3d` and the shared-x packing with Launch.
   - `tests/non-working-show.nowline`: the same body with `default roadmap non-working:show` in its config and `roadmap non-working-show "Named days shown"`. The one stressed axis is the view.
@@ -435,10 +435,10 @@ Decision 4. Done when every s3 renderer case is green.
 - Add `FIXTURES` entry `{ id: 'working-calendar', sourceFile: 'working-calendar.nowline', dir: 'examples', theme: 'light', browser: false }` after `weekends-show`. Then `make compile TARGET=local && make determinism-update`, and `make determinism` green.
 - Done when byte identity step 3 holds and `make pre-commit` is green. Then commit.
 
-### s9 - [exec] Docs
+### s9 - [exec] Docs (done)
 Everything under § Change "Docs". The `working-calendar.md` §10 Example B text must match § Tests literally (labels, the MS Project block, the Mermaid line). Done when `make lint` passes and the man-page translation gate (`packages/cli/test/man/translation-parity.test.ts`) is green: the French `nowline.5` carries every English change first, and only then is its stamp replaced with the line the failing test prints. Then commit.
 
-### s10 - [exec] Gates, commit, push, PR
+### s10 - [exec] Gates, commit, push, PR (done)
 1. Run § Verification in full.
 2. Commit with the exact trailers, and push.
 3. Remove this plan and its handoff as the last commit, and push.
@@ -453,6 +453,7 @@ Everything under § Change "Docs". The `working-calendar.md` §10 Example B text
 
 review wave-1 (nowline s1,s2,s3) 72b4376..84f3b6d: PASS - baselines under .scratch/m2p-5b/ (43 SVG hashes, 52 Mermaid/MS Project export pairs pinned with --now 2026-02-09); probe bounds re-checked unchanged; s2 tooling matches Decision 8 (rename and references skip calendar declarations since declarationAt now returns them; snippet test wraps in a roadmap with a swimlane because NL.E0004 rejects the plan's swimlane-less wrapper); s3 adds 12 layout and 7 renderer red cases, all assertion failures, literals match § Tests; make lint green - 2026-10-12
 review wave-2 (nowline s4,s5,s6) 9a6b159..50206d6: PASS - Decisions 1-4 implemented; all 12 s3 layout and 7 renderer cases green with literals unchanged, no test file edited; byte identity step 2 clean (43 SVG hashes, 52 export pairs, snapshots, determinism hashes.json); bundle 193.33 KB of 200 KB (192.84 before); pre-pack packs against a right edge widened for provisional run labels (not in decision 3, accepted: no effect on files without titled runs); passed unattended: gate 2 - 2026-10-12
+review wave-3 (nowline s7,s8,s9,s10) 09eb264..fb564b5: PASS - calendarExceptions, MS Project <Exceptions> and Mermaid dated excludes plus working-day count match Decisions 5-7 with the § Tests literals; three fixtures canonical, SVGs carry their labels, byte identity step 3 holds (two new snapshots, eight working-calendar hashes.json cells only); docs incl. working-calendar.md §10 literal match, French nowline.5 stamp replaced; § Verification green, s10 empty; PR drafted, not opened; minor doc nits noted, not defects - 2026-10-12
 
 ## Token log
 
@@ -471,3 +472,24 @@ tokens review-wave-1 nowline-s1-s2-s3 (claude-opus-5-5): input ~50 / cache read 
 tokens orchestrator-wave-1 nowline-s1-s2-s3 (claude-opus-5-5): input ~14 / cache read ~980k / cache write ~0 5m + ~19k 1h / output ~8.6k | ~$0.52 API-equiv
 tokens wave-2 nowline-s4-s5-s6 (claude-opus-5-5): input ~96 / cache read ~5.9M / cache write ~150k / output ~48k | ~$2.90 API-equiv (output est.) session d2e6b266-7085-567a-b805-c4269ef5a3e8
 tokens review-wave-2 nowline-s4-s5-s6 (claude-opus-5-5): input ~20 / cache read ~400k / cache write ~59k / output ~10k | ~$0.57 API-equiv (output est.) session d2e6b266-7085-567a-b805-c4269ef5a3e8
+tokens orchestrator-wave-2 nowline-s4-s5-s6 (claude-opus-5-5): input ~22 / cache read ~1.9M / cache write ~0 5m + ~30k 1h / output ~18k | ~$0.99 API-equiv
+tokens wave-3 nowline-s7-s8-s9-s10 (claude-sonnet-5-5): input ~200 / cache read ~17M / cache write ~250k / output ~98k | ~$4.93 API-equiv (output est.) session d2e6b266-7085-567a-b805-c4269ef5a3e8
+tokens review-wave-3 nowline-s7-s8-s9-s10 (claude-opus-5-5): input ~32 / cache read ~1.2M / cache write ~110k / output ~16k | ~$1.13 API-equiv (output est.) session d2e6b266-7085-567a-b805-c4269ef5a3e8
+tokens orchestrator-wave-3 nowline-s7-s8-s9-s10 (claude-opus-5-5): input ~3 / cache read ~420k / cache write ~0 5m + ~15k 1h / output ~810 | ~$0.22 API-equiv
+
+## Completion summary
+
+**Completed**: 2026-10-12
+**What shipped**: m2p phase 5b on `claude/plan-m2p-5b-heron-5bcx5v` (`72b4376..fb564b5`, ten step commits over three waves, every review PASS). Titled dated non-working runs are labelled in the marker row (`Thanksgiving · 2d`), with a named dotted cut line under `hide` and a label at the band's edge under `show`, and the canvas grows on the right for run labels. `calendarExceptions` in `@nowline/layout` feeds MS Project `<Exceptions>` and Mermaid dated `excludes` (working exceptions counted as `working-day`). LSP completion and hover, TextMate, two snippets, the MCP vocabulary and cheatsheet, three fixtures with their snapshots and a determinism fixture, and docs (working-calendar.md, rendering.md, dsl.md, ide.md, exporter READMEs, nowline(5) en/fr, CHANGELOG). No existing byte moved.
+**Deviations from plan**:
+- Kickoff question deferred to the executing session; answered `unattended`. The branch is this session's assigned `claude/plan-m2p-5b-heron-5bcx5v`, not the planning session's `claude/hopeful-dirac-g9dll4`.
+- Gate 2 (exec to deep, before wave 2) passed as an unattended checkpoint. No retries, no fix-ups.
+- Wave 2 committed per step (s4 under the red-test exception for the s3 renderer cases, s6 empty) instead of one s6 commit.
+- s10 split: the worker ran Verification and made the empty s10 commit and drafted the PR; removing the plan and handoff, opening the PR and subscribing wait for the maintainer.
+- Pre-pack packs against a right edge widened for provisional run labels (beyond decision 3; no effect on files without titled runs).
+- calendarExceptions walks merged windows rather than one span (same result as decision 5's horizon). The working-calendar example's anchor gained the title "Kickoff".
+**Follow-ups**:
+- Anchors and milestones keep the left fallback that can draw over a beside header (`packMarkerRow`).
+- The general TextMate keyword list lacks `wave`.
+- The `build-fast` help text says "~30-SVG"; it is 46 now.
+- The 5a CHANGELOG entry still calls the exports "phase 5b"; fine while 5a and 5b ship together, worth a tidy at release cut.
