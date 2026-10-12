@@ -346,6 +346,36 @@ describeBuilt('--serve integration (requires `pnpm build`)', () => {
         });
     }, 15000);
 
+    it('.nowlinerc theme applies to served SVG when -t is absent', async () => {
+        await withTempDir(async (dir) => {
+            const source = path.join(dir, 'sample.nowline');
+            await fs.writeFile(
+                source,
+                'nowline v1\n\nroadmap r "R"\n\nswimlane a "A"\n  item x duration:1w\n',
+            );
+            await fs.writeFile(path.join(dir, '.nowlinerc'), 'theme: dark\n');
+            const port = await pickPort();
+            const child: ChildProcess = spawn(
+                process.execPath,
+                [distEntry, '--serve', source, '--port', String(port)],
+                {
+                    cwd: packageRoot,
+                    env: { ...process.env, FORCE_COLOR: '0', NO_COLOR: '1' },
+                    stdio: ['ignore', 'pipe', 'pipe'],
+                },
+            );
+            try {
+                await waitForReady(port);
+                const svg = await fetchText(`http://127.0.0.1:${port}/svg`);
+                expect(svg).toContain('data-theme="dark"');
+            } finally {
+                child.kill('SIGTERM');
+                await new Promise((r) => setTimeout(r, 150));
+                child.kill('SIGKILL');
+            }
+        });
+    }, 15000);
+
     it('--theme with an unknown name is an input error', async () => {
         const { runCliBuilt } = await import('../helpers.js');
         const r = await runCliBuilt(['--serve', 'foo.nowline', '--theme', 'sepia']);

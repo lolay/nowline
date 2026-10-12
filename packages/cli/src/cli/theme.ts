@@ -20,6 +20,26 @@ export function parseThemeArg(raw: string | undefined): ThemeName {
     return theme;
 }
 
+/**
+ * Resolve the render theme with the CLI's usual precedence: the `--theme`
+ * flag, then the `.nowlinerc` `theme` key, then `light`. The rc value goes
+ * through the same normalization as the flag, so `greyscale` and any casing
+ * work there too; an unrecognized rc value is an input error that names the
+ * rc file rather than a flag the user never passed.
+ */
+export function resolveTheme(flag: string | undefined, rcValue: unknown): ThemeName {
+    if (flag) return parseThemeArg(flag);
+    if (rcValue === undefined || rcValue === null) return 'light';
+    const theme = typeof rcValue === 'string' ? normalizeThemeName(rcValue) : undefined;
+    if (!theme) {
+        throw new CliError(
+            ExitCode.InputError,
+            `nowline: invalid .nowlinerc theme "${String(rcValue)}". Expected ${formatChoices(THEME_NAMES)}.`,
+        );
+    }
+    return theme;
+}
+
 // `a`, `a or b`, `a, b, or c`.
 function formatChoices(names: readonly string[]): string {
     if (names.length <= 2) return names.join(' or ');

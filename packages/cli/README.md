@@ -202,7 +202,7 @@ Mutual exclusivity rules (all exit 2 with a message):
 
 ## Configuration: `.nowlinerc`
 
-On any operation that takes an `<input>` file, `nowline` walks up from the input file's directory looking for a `.nowlinerc` (JSON or YAML). The nearest one wins. CLI flags override config values. Environment variables are not consulted.
+On any operation that takes an `<input>` file, `nowline` walks up from the input file's directory looking for a `.nowlinerc` (JSON or YAML). The nearest one wins. Each key is the default for its flag: a flag on the command line wins, then the key, then the built-in default. An invalid value is a usage error that names the key. `--serve` reads `theme` and `locale`. Environment variables are not consulted, except the locale variables, which rank above the `locale` key.
 
 ```yaml
 # .nowlinerc (YAML)
@@ -217,6 +217,7 @@ pdfMargin: 0.5in           # --margin
 fontSans: sf               # --font-sans  (alias or path)
 fontMono: sf-mono          # --font-mono
 headlessFonts: false       # --headless
+useSystemFonts: false      # --use-system-fonts
 ```
 
 ```json
@@ -229,7 +230,8 @@ headlessFonts: false       # --headless
   "pdfMargin": "0.5in",
   "fontSans": "sf",
   "fontMono": "sf-mono",
-  "headlessFonts": false
+  "headlessFonts": false,
+  "useSystemFonts": false
 }
 ```
 
