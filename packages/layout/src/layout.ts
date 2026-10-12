@@ -74,7 +74,6 @@ import {
 } from './nodes/item-node.js';
 import { ParallelNode } from './nodes/parallel-node.js';
 import { RoadmapNode } from './nodes/roadmap-node.js';
-import { SwimlaneNode } from './nodes/swimlane-node.js';
 import type { NonWorkingDisplay } from './non-working-display.js';
 import { resolveLabelChipStyle, resolveStyle, type StyleContext } from './style-resolution.js';
 import { estimateTextWidth, wrapText } from './text-measure.js';
@@ -1237,25 +1236,6 @@ function startPinOf(
         if (date) return { key: 'after', raw, date };
     }
     return undefined;
-}
-
-function _buildSwimlane(
-    lane: SwimlaneDeclaration,
-    y: number,
-    bandIndex: number,
-    ctx: LayoutContext,
-): { positioned: PositionedSwimlane; usedHeight: number } {
-    return new SwimlaneNode(
-        { lane, bandIndex },
-        {
-            sequenceItem,
-            sequenceOne,
-            resolveChildStart,
-            newCursor,
-            estimateTextWidth,
-            predictItemBarExtraHeight,
-        },
-    ).place({ x: ctx.timeline.originX, y }, ctx);
 }
 
 // Card-sizing constants for beside-mode headers live in
