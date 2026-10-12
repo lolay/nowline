@@ -2055,6 +2055,20 @@ export class NowlineValidator {
             const prop = own.get(key);
             if (prop && isCalendarDateList(prop)) {
                 acceptTr(accept, 'error', { node: prop }, 'NL.E0902', { kind, key });
+            } else if (
+                prop &&
+                prop.values.length === 1 &&
+                !isValidDateLiteral(prop.values[0], true)
+            ) {
+                // A one-element bracket is the single date; checkPropertyValues reads `value`
+                // only, so the element is checked here.
+                acceptTr(
+                    accept,
+                    'error',
+                    { node: prop, property: 'values', index: 0 },
+                    'NL.E0405',
+                    { key, value: prop.values[0] },
+                );
             }
         }
 

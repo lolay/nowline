@@ -197,6 +197,24 @@ describe('NL.E0405: every date is checked', () => {
         expect(f.message).toBe(invalid('start', '2026-02-30'));
     });
 
+    it('rejects an impossible month in a one-element start: bracket', async () => {
+        const [f, ...rest] = await check('non-working h start:[2026-13-01] end:2026-01-05');
+        expect(rest).toEqual([]);
+        expect(f.code).toBe('NL.E0405');
+        expect(f.message).toBe(invalid('start', '2026-13-01'));
+    });
+
+    it('rejects an impossible day in a one-element end: bracket', async () => {
+        const [f, ...rest] = await check('non-working h start:2026-01-01 end:[2026-02-30]');
+        expect(rest).toEqual([]);
+        expect(f.code).toBe('NL.E0405');
+        expect(f.message).toBe(invalid('end', '2026-02-30'));
+    });
+
+    it('accepts one-element brackets on start: and end:', async () => {
+        expect(await check('non-working h start:[2026-01-01] end:[2026-01-05]')).toEqual([]);
+    });
+
     it('renders the French text', async () => {
         const [f] = await check('non-working h date:2026-13-01');
         const { code, args } = f.data as {
