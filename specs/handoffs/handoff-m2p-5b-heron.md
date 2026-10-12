@@ -6,7 +6,7 @@
 
 - **Phases 1–4 and 5a** are on `main`: lolay/nowline#96 as `9c0982d`, #97 as `c74c795`, #115 as `e3b2479`. The plan was written against `main` `a758c72` (2026-10-12).
 - **Branch:** `claude/plan-m2p-5b-heron-5bcx5v`, the executing session's harness-assigned branch, cut from `main` at `7ac0d44` (the plan PR, lolay/nowline#117). The planning session's `claude/hopeful-dirac-g9dll4` is gone; the Kickoff prompt's `On branch` line now names this branch.
-- **Mode:** unattended, confirmed 2026-10-12 by the executing session (session `d2e6b266-7085-567a-b805-c4269ef5a3e8`). Gate 2 before wave 2 is a logged checkpoint.
+- **Mode:** unattended (wave 3 next), confirmed 2026-10-12 by the executing session (session `d2e6b266-7085-567a-b805-c4269ef5a3e8`). Gate 2 before wave 2 is a logged checkpoint.
 - **Done:** wave 1 `[exec]` s1-s3, `72b4376..84f3b6d`, review PASS (s1 `2210b06` empty baseline commit, s2 `ad7b7cb` tooling, s3 `84f3b6d` red layout and renderer tests). Wave 2 `[deep]` s4-s6, `9a6b159..50206d6`, review PASS (s4 `a204075` labels and packing, s5 `20995fa` renderer, s6 `50206d6` empty: byte identity clean, bundle 193.33 KB of 200 KB). Byte-identity baselines live in `.scratch/m2p-5b/` (gitignored; rebuild per § Byte identity step 1 if the container is lost).
   - The research is in the plan: three read-only code maps and a scratch probe.
   - The probe laid out Example B in both views, ran `packMarkerRow` with the real re-pack bounds, and exported Examples B, D and E row 1 to Mermaid and MS Project. It was deleted afterwards, and `dist/` was restored.
@@ -24,6 +24,7 @@ Start a cloud session on `lolay/nowline` from branch `claude/plan-m2p-5b-heron-5
 ## Deviations
 
 - **Gate 2 passed as an unattended checkpoint** before wave 2 (exec to deep), per the recorded mode.
+- **s10 is split.** Wave 3's worker runs § Verification and makes the s10 commit, and drafts the PR title and body in its artifact. Removing the plan and handoff, opening the PR and subscribing to it are outward or final steps: the orchestrator asks the maintainer at completion.
 - **Wave 2 commits per step.** The plan has s6 commit and push; the orchestrator had s4 and s5 commit their own steps (s4 under the red-test exception for the s3 renderer cases), s6 an empty commit after the proof, and the parent push.
 
 - **The kickoff question was deferred** (answered `unattended` on 2026-10-12 by the executing session). The skill asks it right after the plan is written. Here the planning session wrote the Kickoff block in its pending form (`mode: pending`, Status `BLOCKED at gate mode`, no mode line in the prompt) and left the question to the executing session. That session needs the maintainer's approval of the plan PR first, and was asked to drive only the 5b plan. `plan_state.py` reports only `gate-mode`.
