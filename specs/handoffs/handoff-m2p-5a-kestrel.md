@@ -13,11 +13,13 @@
 
 - **Wave 1 [exec] s1-s5** `6fdd05b..ea4d596` (nowline s1,s2,s3,s4,s5): s1 and s2 empty commits (toolchain and baselines: 43 SVG hashes, 53 AST files, in `.scratch/m2p-5a/`, which dies with the container); s3 grammar, printer, type labels; s4 validator and i18n (NL.E0900-E0907, NL.W0705); s5 46 red cases (core include 8, layout 33, export-xlsx 3, integration-tests 2). `check_wave.py` passed.
 - **1-fix [exec]** `6fdd05b..369f12f` (nowline s1,s2,s3,s4,s5): `369f12f` s4 date-checks one-element `start:`/`end:` brackets (NL.E0405), with three tests. `check_wave.py` passed. Commit body records the s5 red-test exception (46 reds, all s5's).
+- **Wave 2 [deep] s6-s8** `32860f4..d00c35d` (nowline s6,s7,s8): s6 `d4f23cb` include merge; s7 `8f1297f` calendar resolver; s8 `d00c35d` (empty) byte identity: 43/43 SVG OK, 2987 tests, determinism 290 green, `hashes.json` unchanged, 53 AST files equal, bundle 192.84 KB of 200 KB, `make pre-commit` green. `check_wave.py` passed.
 
 ## Review log verdicts
 
 - wave-1: CONCERNS. A one-element bracket on `start:`/`end:` gets no date check (`start:[2026-13-01]` gives no NL.E0405). Fix-up 1-fix ran, no gate (a first review CONCERNS).
 - wave-1-fix: PASS.
+- wave-2: PASS, no findings.
 
 ## Fix-ups, retries, checkpoints
 
@@ -25,11 +27,11 @@
 
 ## Spend
 
-Token log: ~$10.74 of ~$18 expected (wave 1 ~$7.04 against ~$4.5 planned, 1-fix ~$0.53, orchestrator ~$3.17).
+Token log: ~$16.78 of ~$18 expected (wave 1 ~$7.04 against ~$4.5 planned, 1-fix ~$0.53, wave 2 ~$4.55 against ~$6.0, orchestrator ~$3.81 so far).
 
 ## Next unit
 
-Wave 2 [deep] `nowline s6,s7,s8` (Opus, high), behind gate 2.
+Wave 3 [exec] `nowline s9,s10` (Sonnet, high), no gate. Then final completion: the parent removes the plan, the handoff and the spike directory as the last commit, pushes, opens the PR and drives it to green.
 
 ## How to resume
 
@@ -37,7 +39,7 @@ Paste the plan's Kickoff prompt into a new session on this branch.
 
 ## Pending question
 
-None. Gate 2 approved 2026-10-12: "yes, approve gate 2, launch wave 2". Wave 2 [deep] s6-s8 launched.
+None. Gate 2 was approved 2026-10-12 ("yes, approve gate 2, launch wave 2").
 
 ## Decisions so far
 
@@ -63,7 +65,16 @@ None. Gate 2 approved 2026-10-12: "yes, approve gate 2, launch wave 2". Wave 2 [
 
 ## Deviations from plan
 
+- s10's push, cleanup commit and PR are the parent's: workers never push or open PRs. The wave-3 worker runs § Verification and commits; the parent then removes the plan, handoff and spike directory as the last commit, pushes, and opens the PR the user asked for in the invoking message.
+
 - Parent bookkeeping commits (the plan and this handoff only) skip `make pre-commit`: they touch only these two markdown files, and after wave 1 the tree carries the s5 red tests by design, so pre-commit would fail on them until wave 2.
+
+## PR findings to list (not fixed)
+
+- From the plan's § Out of scope: include shadowing warnings are uncoded; `checkPropertyValues` never date-checks list values on any entity; `build-fast` help says "~30-SVG" (43 now); `handoff-m2p-working-calendar.md` §4.8 says 19 snapshot samples (20 now); the TextMate keyword list (`grammars/nowline.tmLanguage.json:58`) lacks `wave`; engine B's preset-only fallback at `layout.ts:1384`.
+- wave-1: date checks on other entities use V8's rolling `Date` parse, so `2026-02-30` passes on items, anchors and milestones; declarations got a strict check.
+- wave-2: the weekday table and the well-formedness rules exist twice, in the core validator and the layout resolver (core's helpers are private); they agree today.
+- wave-1: the plan's Example B guard value (milestone 24 without the declaration) was wrong; the test asserts today's 40.
 
 ## Gotchas
 

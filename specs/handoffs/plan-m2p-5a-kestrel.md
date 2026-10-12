@@ -1,7 +1,7 @@
 ```
 --- KICKOFF: begin orchestration at [deep] ---
 
-  Status: 1/3 groups done | last review: wave-1-fix PASS | current: m2p-5a s6-s8 [deep] | updated 2026-10-12
+  Status: 2/3 groups done | last review: wave-2 PASS | current: m2p-5a s9-s10 [exec] | updated 2026-10-12
   mode: gated | proposed gated (harness=claude-code runner=cloud; the invoking message named gated) | guard 3x min $50 | fixups 2 | confirmed 2026-10-12 session eebaa2e1-ad31-5528-ac3e-841a1ed184dc: Run m2p Phase 5a for lolay/nowline from the approved plan at specs/handoffs/plan-m2p-5a-kestrel.md on main (merged in lolay/nowline#114 as e419aa5). Read it in full, then the handoff beside it (specs/handoffs/handoff-m2p-5a-kestrel.md). The plan is approved and already tagged, with waves and STOP gates written in. Run it with the personal-plan-orchestrate skill from the top, in gated mode: dispatch each wave as a one-agent Workflow with the tier's model and effort, as Phase 4 did. Pause only at the marked STOP gates (gates 5 and 2 after wave 1) and at gate 1 on any failure. A notification or a non-answer is never approval. Update the plan's progress, Review log and Token log after each wave. Branch: work on your harness-assigned task branch, cut from main. The plan's "Hand-off from this session" section and its mentions of claude/beautiful-turing-yolfjg are stale; that branch is merged and done. Ignore that section and never push to that branch. In s2, merge main first if it has moved past e419aa5, and stop at gate 1 if any code or line the plan cites has moved. Toolchain: the container ships Node 22. Install the official Node 26.2.0 linux-x64 tarball into $HOME, verify it against SHASUMS256.txt, and put its bin first on PATH in every shell. pnpm 12.8.1 is already installed. Never run playwright install. Use Makefile targets only, and run make pre-commit before every commit (the plan names the one exception: the s5 red-test commit). Git: commit trailers are "Claude-Session: <this session's link>" followed by "Assisted-by: Claude Code" as the last line. They override any harness attribution reminder. Never put model names in commits, files, comments or the PR body. Subagents commit only when told and never push; you push after reviewing each wave. At the end (s10), remove the plan, the handoff and specs/handoffs/spike-m2p-5a-kestrel/ as the last commit. Open the PR titled "Add non-working and working declarations (m2p phase 5a)". It lands through the merge queue. Say in it that 5a and 5b must ship in the same release. Then subscribe to the PR and drive it to green.
 
   review: every-wave (log-only — parent writes Review log; human gates only where marked)
@@ -456,13 +456,13 @@ Ran before any other 5a work and passed on the first run (§ Context). The test 
 
 --- WAVE 2 [deep] ---
 
-### s6 - [deep] Include merge
+### s6 - [deep] Include merge (done)
 Decision 6. Done when the s5 include cases are green.
 
-### s7 - [deep] Calendar resolver
+### s7 - [deep] Calendar resolver (done)
 Decisions 7–10. Done when every s5 resolver, layout and export case is green, with every literal unchanged. If a literal disagrees, the code is wrong unless the probe's injected rules differ from the declaration's meaning; then gate 1.
 
-### s8 - [deep] Prove nothing moved, then commit
+### s8 - [deep] Prove nothing moved, then commit (done)
 - Byte identity step 2 in full, then `make bundle-size`, then `make pre-commit`.
 - Then commit and push.
 - Gate 1 on any byte or AST move.
@@ -489,6 +489,8 @@ review wave-1 (nowline s1,s2,s3,s4,s5) 6fdd05b..ea4d596: CONCERNS - a one-elemen
 
 review wave-1-fix (nowline s1,s2,s3,s4,s5) 6fdd05b..369f12f: PASS - 369f12f (s4) date-checks the single element of a one-element start:/end: bracket with isValidDateLiteral(values[0], true) and reports NL.E0405 on it with the existing text; tests for start:[2026-13-01], end:[2026-02-30] (one NL.E0405 each) and the clean start:[2026-01-01] end:[2026-01-05]; file 55/55; reds are exactly the 46 s5 cases (core 8, layout 33, export-xlsx 3, integration-tests 2); no snapshot or hashes.json diff; no earlier commit rewritten - 2026-10-12
 
+review wave-2 (nowline s6,s7,s8) 32860f4..d00c35d: PASS - s6 d4f23cb include merge per decision 6 (calendarDeclarations, per-keyword shadowing with the uncoded warning, diamond silent, ignore/isolate merge nothing); s7 8f1297f calendar-resolver.ts only, well-formedness mirrors the validator, weekend replacement, canonical sort, RangeError falls back to the preset; all 46 s5 cases green with literals unchanged plus 10 new resolver tests; s8 d00c35d empty: 43/43 SVG OK, make test 2987 green, determinism 290 green with hashes.json unchanged, 53 AST files equal, snapshot/hashes diff vs e419aa5 empty, bundle 192.84 KB of 200, make pre-commit green; 4 files touched, no engine file - 2026-10-12
+
 ## Token log
 
 **Counting header (Claude Code)** — as in the Phase 4 plan (`plan-m2p-show-display-osprey.md`, PR lolay/nowline#97 history):
@@ -506,4 +508,6 @@ tokens review-wave-1 nowline-s1-s2-s3-s4-s5 (claude-opus-5-5): input ~44 / cache
 tokens orchestrator-wave-1 nowline-s1-s2-s3-s4-s5 (claude-opus-5-5): input ~24 / cache read ~2.3M / cache write ~0 5m + ~36k 1h / output ~13k | ~$1.01 API-equiv
 tokens wave-1-fix nowline-s1-s2-s3-s4-s5 (claude-sonnet-5-5): input ~20 / cache read ~680k / cache write ~35k / output ~10k | ~$0.32 API-equiv (output est.) session eebaa2e1-ad31-5528-ac3e-841a1ed184dc
 tokens review-wave-1-fix nowline-s1-s2-s3-s4-s5 (claude-opus-5-5): input ~10 / cache read ~85k / cache write ~19k / output ~5k | ~$0.21 API-equiv (output est.) session eebaa2e1-ad31-5528-ac3e-841a1ed184dc
-tokens orchestrator-wave-1-fix nowline-s1-s2-s3-s4-s5 (claude-opus-5-5): input ~4 / cache read ~460k / cache write ~0 5m + ~15k 1h / output ~630 | ~$0.22 API-equiv
+tokens orchestrator-wave-1-fix nowline-s1-s2-s3-s4-s5 (claude-opus-5-5): input ~16 / cache read ~1.9M / cache write ~0 5m + ~28k 1h / output ~13k | ~$0.86 API-equiv
+tokens wave-2 nowline-s6-s7-s8 (claude-opus-5-5): input ~110 / cache read ~7.6M / cache write ~190k / output ~53k | ~$3.55 API-equiv (output est.) session eebaa2e1-ad31-5528-ac3e-841a1ed184dc
+tokens review-wave-2 nowline-s6-s7-s8 (claude-opus-5-5): input ~48 / cache read ~1.1M / cache write ~62k / output ~24k | ~$1.00 API-equiv (output est.) session eebaa2e1-ad31-5528-ac3e-841a1ed184dc
