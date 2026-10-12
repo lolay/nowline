@@ -103,6 +103,8 @@ export function displayName(node: { name?: string; title?: string }): string {
  * callers can compose their own message.
  */
 export function entityTypeLabel(node: { $type: string }): string {
+    // `NonWorkingDeclaration` would lowercase to `nonworking`; the keyword is hyphenated.
+    if (node.$type === 'NonWorkingDeclaration') return 'non-working';
     return node.$type.replace(/Declaration$|Block$/, '').toLowerCase();
 }
 

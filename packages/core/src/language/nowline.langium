@@ -22,7 +22,8 @@ IncludeOption:
 // --- Config Entries ---
 
 ConfigEntry:
-    ScaleBlock | CalendarBlock | StyleDeclaration | SymbolDeclaration | DefaultDeclaration;
+    ScaleBlock | CalendarBlock | StyleDeclaration | SymbolDeclaration | DefaultDeclaration |
+    NonWorkingDeclaration | WorkingDeclaration;
 
 ScaleBlock:
     'scale'
@@ -34,8 +35,9 @@ CalendarBlock:
 
 // 'wave' appears here because it is a declaration keyword (WaveDeclaration) that the
 // lexer prefers over ID; a v1 file could already write e.g. `name: wave` in a block.
+// 'non-working' and 'working' are listed for the same reason (calendar declaration keywords).
 BlockPropertyValue returns string:
-    ID | INTEGER | STRING | DURATION_LITERAL | 'wave';
+    ID | INTEGER | STRING | DURATION_LITERAL | 'wave' | 'non-working' | 'working';
 
 StyleDeclaration:
     'style' (name=EntityName)? (title=STRING)?
@@ -53,8 +55,20 @@ SymbolDeclaration:
 // (`none`, `multiplier`, `people`, `points`, `time`, `shield`, `warning`, `lock`)
 // are not grammar keywords and therefore lex as ID without help. 'wave' is listed for
 // the same reason (WaveDeclaration keyword), so v1 values such as `icon:wave` keep parsing.
+// 'non-working' and 'working' (NonWorkingDeclaration / WorkingDeclaration keywords) follow
+// the 'wave' precedent. Longer words such as `non-working-team` still lex as ID.
 StylePropertyValue returns string:
-    ID | COLOR_HEX | STRING | 'person' | 'wave';
+    ID | COLOR_HEX | STRING | 'person' | 'wave' | 'non-working' | 'working';
+
+// Calendar declarations (specs/working-calendar.md). Id and title are optional; the
+// property shapes (date, start, end, every) are enforced by the validator, not the grammar.
+NonWorkingDeclaration:
+    'non-working' (name=EntityName)? (title=STRING)?
+    (properties+=EntityProperty)*;
+
+WorkingDeclaration:
+    'working' (name=EntityName)? (title=STRING)?
+    (properties+=EntityProperty)*;
 
 DefaultDeclaration:
     'default' entityType=DefaultEntityType
@@ -77,9 +91,10 @@ RoadmapEntry:
     SwimlaneDeclaration | MilestoneDeclaration | FootnoteDeclaration;
 
 // v1 compatibility: `wave` now lexes as a keyword. EntityName re-admits the bare
-// word everywhere a v1 file could already write an identifier.
+// word everywhere a v1 file could already write an identifier. 'non-working' and
+// 'working' are admitted for the same reason.
 EntityName returns string:
-    ID | 'wave';
+    ID | 'wave' | 'non-working' | 'working';
 
 PersonDeclaration:
     'person' (name=EntityName)? (title=STRING)?
@@ -187,8 +202,10 @@ StyleProperty:
 // declaration keyword that the lexer prefers over ID, but it must also be accepted
 // as a property-atom value (e.g. `default swimlane capacity-icon:person`). 'wave' is
 // listed for the same reason, so v1 values such as `after:wave` and `owner:wave` keep parsing.
+// 'non-working' and 'working' are listed for the same reason, so a bare value such as
+// `owner:working` keeps parsing.
 PropertyAtom returns string:
-    ID | STRING | DURATION_LITERAL | PERCENTAGE | URL | DATE_LITERAL | COLOR_HEX | DECIMAL | INTEGER | 'person' | 'wave';
+    ID | STRING | DURATION_LITERAL | PERCENTAGE | URL | DATE_LITERAL | COLOR_HEX | DECIMAL | INTEGER | 'person' | 'wave' | 'non-working' | 'working';
 
 // --- Terminals ---
 // INDENT/DEDENT must be declared before ID to avoid Chevrotain unreachable-token errors.

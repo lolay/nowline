@@ -8,6 +8,7 @@ import type {
     IncludeDeclaration,
     LabelDeclaration,
     MilestoneDeclaration,
+    NonWorkingDeclaration,
     NowlineFile,
     PersonDeclaration,
     RoadmapDeclaration,
@@ -20,6 +21,7 @@ import type {
     SymbolDeclaration,
     TeamDeclaration,
     WaveDeclaration,
+    WorkingDeclaration,
 } from '../generated/ast.js';
 import {
     isAnchorDeclaration,
@@ -28,6 +30,7 @@ import {
     isFootnoteDeclaration,
     isLabelDeclaration,
     isMilestoneDeclaration,
+    isNonWorkingDeclaration,
     isPersonDeclaration,
     isScaleBlock,
     isSizeDeclaration,
@@ -37,6 +40,7 @@ import {
     isSymbolDeclaration,
     isTeamDeclaration,
     isWaveDeclaration,
+    isWorkingDeclaration,
 } from '../generated/ast.js';
 import type { MessageCode } from '../i18n/codes.js';
 import { basename, dirname, resolve as resolvePath } from '../util/posix-path.js';
@@ -85,7 +89,18 @@ export interface ResolvedConfig {
     // a built-in identifier or an inline Unicode literal. See specs/dsl.md §
     // Symbol Declaration.
     symbols: Map<string, SymbolDeclaration>;
+    /**
+     * Every `non-working` and `working` declaration of the file and its merged
+     * includes (specs/working-calendar.md §4). Unnamed ones always merge; a
+     * child's named one is dropped, with a warning, when the parent already
+     * holds one with the same keyword and name. The order carries no meaning:
+     * the layout's calendar resolver sorts the rules it builds from them.
+     */
+    calendarDeclarations: CalendarDeclaration[];
 }
+
+/** A `non-working` or `working` config declaration. */
+type CalendarDeclaration = NonWorkingDeclaration | WorkingDeclaration;
 
 export interface ResolvedContent {
     roadmap?: RoadmapDeclaration;
@@ -179,6 +194,7 @@ function emptyConfig(): ResolvedConfig {
         styles: new Map(),
         defaults: new Map(),
         symbols: new Map(),
+        calendarDeclarations: [],
     };
 }
 
@@ -432,6 +448,9 @@ function applyConfigMode(
     mergeMap(target.styles, child.styles, (name) => warn(name, 'Style'));
     mergeMap(target.defaults, child.defaults, (name) => warn(name, 'Default'));
     mergeMap(target.symbols, child.symbols, (name) => warn(name, 'Symbol'));
+    mergeCalendarDeclarations(target.calendarDeclarations, child.calendarDeclarations, (decl) =>
+        warn(decl.name as string, calendarKeywordLabel(decl)),
+    );
     if (child.scale && !target.scale) {
         target.scale = child.scale;
     }
@@ -500,6 +519,44 @@ function mergeMap<V>(
 }
 
 /**
+ * Append a child's calendar declarations to the parent's list. An unnamed
+ * declaration always merges. A named one is dropped, and reported, when the
+ * list already holds one with the same keyword and name (parent wins); a
+ * `non-working h` and a `working h` never collide. A declaration already in
+ * the list (a diamond include delivers the shared file's cached config
+ * through every path) is skipped silently.
+ */
+function mergeCalendarDeclarations(
+    target: CalendarDeclaration[],
+    source: readonly CalendarDeclaration[],
+    onConflict: (decl: CalendarDeclaration) => void,
+): void {
+    const merged = new Set(target);
+    // Names held before this merge: a child's own duplicate id is NL.E0907 in
+    // that file, not a shadowing by the parent, so both of its copies merge.
+    const held = new Set(target.filter((t) => t.name).map(calendarDeclarationKey));
+    for (const decl of source) {
+        if (merged.has(decl)) continue;
+        if (decl.name && held.has(calendarDeclarationKey(decl))) {
+            onConflict(decl);
+            continue;
+        }
+        target.push(decl);
+        merged.add(decl);
+    }
+}
+
+/** Keyword and id: the identity two named calendar declarations collide on. */
+function calendarDeclarationKey(decl: CalendarDeclaration): string {
+    return `${decl.$type}:${decl.name}`;
+}
+
+/** The shadow-warning category of a calendar declaration: its keyword, capitalized. */
+function calendarKeywordLabel(decl: CalendarDeclaration): string {
+    return isNonWorkingDeclaration(decl) ? 'Non-working' : 'Working';
+}
+
+/**
  * Merge a child content map into the parent. Explicit-id entries keep the
  * parent-wins-on-collision behavior (and warn). Title-only (auto-slugged)
  * entries are internal and non-referenceable, so they never shadow and never
@@ -553,6 +610,10 @@ function addConfigEntry(config: ResolvedConfig, entry: ConfigEntry): void {
         if (!config.defaults.has(entry.entityType)) {
             config.defaults.set(entry.entityType, entry);
         }
+    } else if (isNonWorkingDeclaration(entry) || isWorkingDeclaration(entry)) {
+        // Every declaration of the file, named or not: a duplicate id in one
+        // file is the validator's NL.E0907, not a merge question.
+        config.calendarDeclarations.push(entry);
     }
 }
 

@@ -203,6 +203,7 @@ swimlane platform
 | `wave` | A barrier across every swimlane: no work in the next wave starts until this one ends. |
 | `footnote` | A callout anchored to one or more entities. |
 | `person`, `team` | Ownership references. |
+| `non-working`, `working` | Days that consume no work (weekends, holidays, closures) and the exceptions that give them back. Config entries with `date:`, `start:` / `end:` or `every:`; a declaration named `weekend` replaces the business weekend. |
 | `style`, `symbol`, `label`, `size`, `status`, `scale`, `calendar`, `default` | Config and declaration entries. |
 
 ### Properties

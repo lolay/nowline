@@ -253,6 +253,21 @@ export const messages = {
     'NL.E0812': (a: { key: string; value: string }) =>
         `${a.key}: symbol "${a.value}" is referenced before its declaration. Move "symbol ${a.value}" above this entry.`,
 
+    // Calendar declarations (non-working and working)
+    'NL.E0900': (a: { kind: string }) =>
+        `A ${a.kind} declaration takes date:, or start: and end:, or every: with optional start: and end:.`,
+    'NL.E0901': (a: { kind: string; key: string }) =>
+        `Unknown ${a.kind} property "${a.key}". Allowed: date, start, end, every.`,
+    'NL.E0902': (a: { kind: string; key: string }) =>
+        `${a.key}: on a ${a.kind} declaration takes one date, not a list.`,
+    'NL.E0903': (a: { start: string; end: string }) => `end: ${a.end} is before start: ${a.start}.`,
+    'NL.E0904': (a: { value: string }) =>
+        `Invalid weekday "${a.value}". Use sun, mon, tue, wed, thu, fri or sat.`,
+    'NL.E0905': (a: { value: string }) => `Weekday "${a.value}" is listed more than once.`,
+    'NL.E0906': () =>
+        'This leaves no working day in the week with no end date. Keep at least one weekday working.',
+    'NL.E0907': (a: { kind: string; name: string }) => `Duplicate ${a.kind} id "${a.name}".`,
+
     // Warnings
     'NL.W0700': (a: { key: string; entity: string; suggested: string }) =>
         `Unknown property "${a.key}" on ${a.entity}. The renderer ignores it.${
@@ -278,6 +293,8 @@ export const messages = {
         `"${a.key}" on "default ${a.entityType}" is ignored: it is a roadmap-only style key. Set it on "default roadmap" instead.`,
     'NL.W0704': (a: { position: string }) =>
         `"timeline-position:${a.position}" draws no dates: "header-height:none" removes every timeline date strip. Set header-height to xs, sm, md, lg or xl to show them.`,
+    'NL.W0705': (a: { daysPerWeek: number; working: number }) =>
+        `days-per-week is ${a.daysPerWeek}, but the week leaves ${a.working} working days.`,
 
     // Waves
     'NL.E1100': (a: E1100Args) =>

@@ -88,12 +88,23 @@ export type MessageCode =
     | 'NL.E0811' // unknown-icon-reference
     | 'NL.E0812' // icon-forward-reference
 
+    // Config blocks (NL.E0900–E0999): non-working and working declarations
+    | 'NL.E0900' // calendar-declaration-shape
+    | 'NL.E0901' // unknown-calendar-declaration-property
+    | 'NL.E0902' // calendar-declaration-date-list
+    | 'NL.E0903' // calendar-declaration-end-before-start
+    | 'NL.E0904' // invalid-weekday
+    | 'NL.E0905' // duplicate-weekday
+    | 'NL.E0906' // no-working-weekday
+    | 'NL.E0907' // duplicate-calendar-declaration-id
+
     // Warnings (NL.W0700–W0799)
     | 'NL.W0700' // unknown-entity-property
     | 'NL.W0701' // include-wave-presentation
     | 'NL.W0702' // wave-ignored-no-waves
     | 'NL.W0703' // roadmap-only-key-on-default
     | 'NL.W0704' // timeline-strip-hidden
+    | 'NL.W0705' // days-per-week-mismatch
 
     // Waves (NL.E1100–E1199)
     | 'NL.E1100' // wave-needs-id
@@ -173,11 +184,20 @@ export const ALL_CODES: ReadonlyArray<MessageCode> = [
     'NL.E0810',
     'NL.E0811',
     'NL.E0812',
+    'NL.E0900',
+    'NL.E0901',
+    'NL.E0902',
+    'NL.E0903',
+    'NL.E0904',
+    'NL.E0905',
+    'NL.E0906',
+    'NL.E0907',
     'NL.W0700',
     'NL.W0701',
     'NL.W0702',
     'NL.W0703',
     'NL.W0704',
+    'NL.W0705',
     'NL.E1100',
     'NL.E1101',
     'NL.E1102',
