@@ -226,3 +226,144 @@ describe('exportMsProjXml — Duration comes from the file calendar and engine C
         expect(durationOf(xml, 'A')).toBe('PT480M0S');
     });
 });
+
+// ---------------------------------------------------------------------------
+// <Exceptions>: named closures and working days (specs/working-calendar.md
+// §8, §10; m2p phase 5b). Every case is one base-calendar <Exceptions> block.
+// ---------------------------------------------------------------------------
+
+const EXAMPLE_B_BODY = `roadmap r "R" start:2026-11-23 scale:1w calendar:business
+
+milestone launch "Launch" date:2026-11-28
+
+swimlane a "A"
+  item checkout "Checkout" duration:1w
+  item qa "QA" duration:2d
+`;
+
+const EXAMPLE_A_BODY = `roadmap r "R" start:2026-01-05 scale:1w calendar:business
+
+milestone fri "Fri Jan 30" date:2026-01-30
+
+swimlane a "A"
+  item w1 "W1" duration:1w
+  item w2 "W2" duration:1w
+  item w3 "W3" duration:1w
+  item w4 "W4" duration:1w
+`;
+
+function declared(body: string, declarations: string[]): string {
+    if (declarations.length === 0) return `nowline v1\n\n${body}`;
+    return `nowline v1\n\nconfig\n\n${declarations.join('\n')}\n\n${body}`;
+}
+
+async function xmlOf(src: string): Promise<string> {
+    return exportMsProjXml(await buildExportInputs(src), { onLossy: () => {} });
+}
+
+/** The base calendar's `<Exceptions>` block, or undefined without one. */
+function exceptionsOf(xml: string): string | undefined {
+    return / {6}<Exceptions>[\s\S]*? {6}<\/Exceptions>/.exec(xml)?.[0];
+}
+
+const THANKSGIVING = 'non-working thanksgiving "Thanksgiving" start:2026-11-26 end:2026-11-27';
+
+describe('exportMsProjXml — <Exceptions> carries named closures', () => {
+    it('Example B: one Thanksgiving exception right after </WeekDays>, before </Calendar>', async () => {
+        const xml = await xmlOf(declared(EXAMPLE_B_BODY, [THANKSGIVING]));
+        const block = `      </WeekDays>
+      <Exceptions>
+      <Exception>
+        <EnteredByOccurrences>0</EnteredByOccurrences>
+        <TimePeriod>
+          <FromDate>2026-11-26T00:00:00</FromDate>
+          <ToDate>2026-11-27T23:59:00</ToDate>
+        </TimePeriod>
+        <Occurrences>1</Occurrences>
+        <Name>Thanksgiving</Name>
+        <Type>1</Type>
+        <DayWorking>0</DayWorking>
+      </Exception>
+      </Exceptions>
+    </Calendar>`;
+        expect(xml).toContain(block);
+    });
+
+    it('Example B: <WeekDays> still marks Saturday and Sunday non-working', async () => {
+        const xml = await xmlOf(declared(EXAMPLE_B_BODY, [THANKSGIVING]));
+        expect(weekDaysOf(xml)).toBe(BUSINESS_WEEK_DAYS);
+    });
+
+    it('Example B: the resource calendar (UID 2) is unchanged', async () => {
+        const xml = await xmlOf(declared(EXAMPLE_B_BODY, [THANKSGIVING]));
+        expect(xml).toContain(`    <Calendar>
+      <UID>2</UID>
+      <Name>Standard</Name>
+      <IsBaseCalendar>0</IsBaseCalendar>
+      <BaseCalendarUID>1</BaseCalendarUID>
+    </Calendar>
+  </Calendars>`);
+        expect(xml.match(/<Exceptions>/g)).toHaveLength(1);
+    });
+
+    it('Example D: a working Saturday is one exception with the two WorkingTime blocks', async () => {
+        const xml = await xmlOf(
+            declared(EXAMPLE_A_BODY, ['working crunch "Crunch Saturday" date:2026-01-10']),
+        );
+        expect(exceptionsOf(xml)).toBe(`      <Exceptions>
+      <Exception>
+        <EnteredByOccurrences>0</EnteredByOccurrences>
+        <TimePeriod>
+          <FromDate>2026-01-10T00:00:00</FromDate>
+          <ToDate>2026-01-10T23:59:00</ToDate>
+        </TimePeriod>
+        <Occurrences>1</Occurrences>
+        <Name>Crunch Saturday</Name>
+        <Type>1</Type>
+        <DayWorking>1</DayWorking>
+        <WorkingTimes>
+          <WorkingTime>
+            <FromTime>08:00:00</FromTime>
+            <ToTime>12:00:00</ToTime>
+          </WorkingTime>
+          <WorkingTime>
+            <FromTime>13:00:00</FromTime>
+            <ToTime>17:00:00</ToTime>
+          </WorkingTime>
+        </WorkingTimes>
+      </Exception>
+      </Exceptions>`);
+    });
+
+    it('Example E row 1: a bounded Friday closure is two exceptions with no <Name>', async () => {
+        const xml = await xmlOf(
+            declared(EXAMPLE_A_BODY, ['non-working every:fri start:2026-01-12 end:2026-01-25']),
+        );
+        const block = exceptionsOf(xml);
+        expect(block).toBeDefined();
+        expect(block!.match(/<Exception>/g)).toHaveLength(2);
+        expect(block).toContain('<FromDate>2026-01-16T00:00:00</FromDate>');
+        expect(block).toContain('<FromDate>2026-01-23T00:00:00</FromDate>');
+        expect(block).not.toContain('<Name>');
+    });
+
+    it('escapes the title', async () => {
+        const xml = await xmlOf(
+            declared(EXAMPLE_B_BODY, ['non-working offsite "R&D \\"offsite\\"" date:2026-11-26']),
+        );
+        expect(xml).toContain('<Name>R&amp;D &quot;offsite&quot;</Name>');
+    });
+
+    it('Example C: an open-ended week alone writes no <Exceptions> (guard)', async () => {
+        const xml = await xmlOf(
+            declared(EXAMPLE_A_BODY, ['non-working weekend "Weekend" every:[fri, sat]']),
+        );
+        expect(xml).not.toContain('<Exceptions>');
+    });
+
+    it('business with no declaration writes no <Exceptions> (guard)', async () => {
+        const xml = await exportOf('business', '  item a "A" duration:1w');
+        expect(xml).not.toContain('<Exceptions>');
+        expect(weekDaysOf(xml)).toBe(BUSINESS_WEEK_DAYS);
+    });
+});

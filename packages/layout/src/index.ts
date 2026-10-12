@@ -191,4 +191,5 @@ export {
     WAVE_STYLED_TINT_OPACITY,
 } from './themes/shared.js';
 export * from './types.js';
-export type { WorkingCalendar } from './working-calendar.js';
+export type { CalendarException, WorkingCalendar } from './working-calendar.js';
+export { calendarExceptions } from './working-calendar.js';

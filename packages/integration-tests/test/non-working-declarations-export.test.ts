@@ -5,9 +5,10 @@
 // The XLSX Calendar row and the dated Checkout row are in
 // export-xlsx/test/non-working-declarations.test.ts, which owns `exceljs`.
 //
-// Dated rules move engine C's dates in every exporter, but the MS Project
-// `<Exceptions>` and Mermaid's dated `excludes` are phase 5b, so only the
-// open-ended week is asserted here.
+// Dated rules move engine C's dates in every exporter. The open-ended week
+// goes into the base calendar and the `excludes` line (phase 5a); a named
+// closure adds an MS Project `<Exceptions>` entry and Mermaid's dated
+// `excludes` (phase 5b, Example B at the bottom).
 
 import * as path from 'node:path';
 import { exportDocument, type HostEnv, type RenderInputs } from '@nowline/export';
@@ -98,6 +99,62 @@ describe('the same roadmap with no declaration (guard)', () => {
 
     it('MS Project keeps Saturday and Sunday non-working', async () => {
         const xml = await text(BUSINESS, 'msproj');
+        expect(weekDays(xml)).toEqual({
+            '1': '0',
+            '2': '1',
+            '3': '1',
+            '4': '1',
+            '5': '1',
+            '6': '1',
+            '7': '0',
+        });
+    });
+});
+
+// Example B (specs/working-calendar.md §10): Thanksgiving inside a bar.
+const EXAMPLE_B = `nowline v1
+
+config
+
+non-working thanksgiving "Thanksgiving" start:2026-11-26 end:2026-11-27
+
+roadmap r "R" start:2026-11-23 scale:1w calendar:business
+
+milestone launch "Launch" date:2026-11-28
+
+swimlane a "A"
+  item checkout "Checkout" duration:1w
+  item qa "QA" duration:2d after:checkout
+`;
+
+describe('Example B through the export kernel (phase 5b)', () => {
+    it('Mermaid names the two holiday dates after the weekend', async () => {
+        const md = await text(EXAMPLE_B, 'mermaid');
+        expect(md).toContain('    excludes saturday, sunday, 2026-11-26, 2026-11-27');
+        expect(md.match(/excludes/g)).toHaveLength(1);
+        expect(md).toContain('Checkout :checkout, 2026-11-23, 5d');
+        expect(md).toContain('QA :qa, after checkout, 2d');
+        expect(md).toContain('Launch :milestone, launch, 2026-11-28, 0d');
+        expect(md).not.toContain('Mermaid lossy export');
+    });
+
+    it('MS Project writes one Thanksgiving exception and keeps the weekend', async () => {
+        const xml = await text(EXAMPLE_B, 'msproj');
+        expect(xml).toContain(`      </WeekDays>
+      <Exceptions>
+      <Exception>
+        <EnteredByOccurrences>0</EnteredByOccurrences>
+        <TimePeriod>
+          <FromDate>2026-11-26T00:00:00</FromDate>
+          <ToDate>2026-11-27T23:59:00</ToDate>
+        </TimePeriod>
+        <Occurrences>1</Occurrences>
+        <Name>Thanksgiving</Name>
+        <Type>1</Type>
+        <DayWorking>0</DayWorking>
+      </Exception>
+      </Exceptions>
+    </Calendar>`);
         expect(weekDays(xml)).toEqual({
             '1': '0',
             '2': '1',

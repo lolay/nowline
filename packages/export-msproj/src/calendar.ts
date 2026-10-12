@@ -8,8 +8,17 @@
 //     `calendar:full` and `calendar:custom`.
 //   - One resource calendar (UID=2, Name=Standard, BaseCalendarUID=1).
 //
+//   - `<Exceptions>` in the base calendar (UID=1), right after `</WeekDays>`,
+//     one per `CalendarException`: a named closure, a bounded recurrence's
+//     closed days, or a working day the open week closes (m2p phase 5b).
+//     There is no `<WorkWeeks>`: a bounded recurrence becomes one exception
+//     per run of days it changes, and the exceptions never overlap.
+//
 // Calendar UIDs are fixed (1 / 2). No timestamps in the calendar block →
 // deterministic across runs.
+
+import type { CalendarException } from '@nowline/layout';
+import { escapeXml } from './xml.js';
 
 const DAY_NAMES = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
 
@@ -36,8 +45,57 @@ function dayBlock(dayIndex: number, isWorking: boolean): string {
       </WeekDay>`;
 }
 
-/** `workingWeekdays`: 0 = Sunday … 6 = Saturday. */
-export function buildCalendarsBlock(workingWeekdays: ReadonlySet<number>): string {
+function isoDate(date: Date): string {
+    return date.toISOString().slice(0, 10);
+}
+
+/** One `<Exception>`: element order follows the MSPDI schema. */
+function exceptionBlock(exception: CalendarException): string {
+    const lines = [
+        '      <Exception>',
+        '        <EnteredByOccurrences>0</EnteredByOccurrences>',
+        '        <TimePeriod>',
+        `          <FromDate>${isoDate(exception.from)}T00:00:00</FromDate>`,
+        `          <ToDate>${isoDate(exception.through)}T23:59:00</ToDate>`,
+        '        </TimePeriod>',
+        '        <Occurrences>1</Occurrences>',
+    ];
+    if (exception.titles && exception.titles.length > 0) {
+        lines.push(`        <Name>${escapeXml(exception.titles.join(', '))}</Name>`);
+    }
+    lines.push('        <Type>1</Type>');
+    lines.push(`        <DayWorking>${exception.working ? 1 : 0}</DayWorking>`);
+    if (exception.working) {
+        lines.push(
+            '        <WorkingTimes>',
+            '          <WorkingTime>',
+            '            <FromTime>08:00:00</FromTime>',
+            '            <ToTime>12:00:00</ToTime>',
+            '          </WorkingTime>',
+            '          <WorkingTime>',
+            '            <FromTime>13:00:00</FromTime>',
+            '            <ToTime>17:00:00</ToTime>',
+            '          </WorkingTime>',
+            '        </WorkingTimes>',
+        );
+    }
+    lines.push('      </Exception>');
+    return lines.join('\n');
+}
+
+function exceptionsBlock(exceptions: readonly CalendarException[]): string {
+    if (exceptions.length === 0) return '';
+    return `\n      <Exceptions>\n${exceptions.map(exceptionBlock).join('\n')}\n      </Exceptions>`;
+}
+
+/**
+ * `workingWeekdays`: 0 = Sunday … 6 = Saturday. `exceptions`: the days the
+ * file's calendar differs from that week (`calendarExceptions`), ascending.
+ */
+export function buildCalendarsBlock(
+    workingWeekdays: ReadonlySet<number>,
+    exceptions: readonly CalendarException[],
+): string {
     const weekDays = [0, 1, 2, 3, 4, 5, 6]
         .map((dayIndex) => dayBlock(dayIndex, workingWeekdays.has(dayIndex)))
         .join('\n');
@@ -49,7 +107,7 @@ export function buildCalendarsBlock(workingWeekdays: ReadonlySet<number>): strin
       <BaseCalendarUID>-1</BaseCalendarUID>
       <WeekDays>
 ${weekDays}
-      </WeekDays>
+      </WeekDays>${exceptionsBlock(exceptions)}
     </Calendar>
     <Calendar>
       <UID>2</UID>

@@ -215,3 +215,106 @@ swimlane y
         expect(md).toContain('    One (wave end) :milestone, one, 2026-01-10, 0d');
     });
 });
+
+// ---------------------------------------------------------------------------
+// Dated `excludes` and the working-day drop (specs/working-calendar.md §8,
+// §10; m2p phase 5b). Mermaid can name a date to skip, but cannot name a
+// working day inside a closed weekend, so working exceptions are counted.
+// ---------------------------------------------------------------------------
+
+const EXAMPLE_B_BODY = `roadmap r "R" start:2026-11-23 scale:1w calendar:business
+
+milestone launch "Launch" date:2026-11-28
+
+swimlane a "A"
+  item checkout "Checkout" duration:1w
+  item qa "QA" duration:2d after:checkout
+`;
+
+const EXAMPLE_A_BODY = `roadmap r "R" start:2026-01-05 scale:1w calendar:business
+
+milestone fri "Fri Jan 30" date:2026-01-30
+
+swimlane a "A"
+  item w1 "W1" duration:1w
+  item w2 "W2" duration:1w
+  item w3 "W3" duration:1w
+  item w4 "W4" duration:1w
+`;
+
+function declared(body: string, declarations: string[]): string {
+    if (declarations.length === 0) return `nowline v1\n\n${body}`;
+    return `nowline v1\n\nconfig\n\n${declarations.join('\n')}\n\n${body}`;
+}
+
+const excludesLines = (md: string): string[] =>
+    md.split('\n').filter((l) => l.trimStart().startsWith('excludes'));
+
+describe('exportMermaid — dated excludes', () => {
+    it('Example B: weekdays then the two holiday dates, on one line', async () => {
+        const md = await mermaidOf(
+            declared(EXAMPLE_B_BODY, [
+                'non-working thanksgiving "Thanksgiving" start:2026-11-26 end:2026-11-27',
+            ]),
+        );
+        expect(excludesLines(md)).toEqual([
+            '    excludes saturday, sunday, 2026-11-26, 2026-11-27',
+        ]);
+        expect(md).toContain('Checkout :checkout, 2026-11-23, 5d');
+        expect(md).toContain('QA :qa, after checkout, 2d');
+        expect(md).toContain('Launch :milestone, launch, 2026-11-28, 0d');
+        expect(md).not.toContain('Mermaid lossy export');
+    });
+
+    it('Example E row 1: each bounded Friday is a date', async () => {
+        const md = await mermaidOf(
+            declared(EXAMPLE_A_BODY, ['non-working every:fri start:2026-01-12 end:2026-01-25']),
+        );
+        expect(excludesLines(md)).toEqual([
+            '    excludes saturday, sunday, 2026-01-16, 2026-01-23',
+        ]);
+    });
+
+    it('calendar:full with a holiday gets an excludes line with only the date', async () => {
+        const md = await mermaidOf(
+            declared(
+                `roadmap r "R" start:2026-03-02 calendar:full\n\nswimlane a "A"\n  item one "One" duration:2w\n`,
+                ['non-working h date:2026-03-02'],
+            ),
+        );
+        expect(excludesLines(md)).toEqual(['    excludes 2026-03-02']);
+    });
+
+    it('Example C keeps `excludes friday, saturday` (guard)', async () => {
+        const md = await mermaidOf(
+            declared(EXAMPLE_A_BODY, ['non-working weekend "Weekend" every:[fri, sat]']),
+        );
+        expect(excludesLines(md)).toEqual(['    excludes friday, saturday']);
+    });
+
+    it('business with no declaration keeps `excludes saturday, sunday` (guard)', async () => {
+        const md = await mermaidOf(declared(EXAMPLE_A_BODY, []));
+        expect(excludesLines(md)).toEqual(['    excludes saturday, sunday']);
+    });
+});
+
+describe('exportMermaid — working exceptions are counted, not written', () => {
+    it('Example D: excludes stays the open week and the summary counts one working day', async () => {
+        const md = await mermaidOf(
+            declared(EXAMPLE_A_BODY, ['working crunch "Crunch Saturday" date:2026-01-10']),
+        );
+        expect(excludesLines(md)).toEqual(['    excludes saturday, sunday']);
+        expect(md).toContain('%% Mermaid lossy export — Nowline features dropped:');
+        expect(md).toContain('%% working-day (1)');
+    });
+
+    it('counts the days, and lists working-day last', async () => {
+        const md = await mermaidOf(
+            declared(
+                `roadmap r "R" start:2026-01-05 scale:1w calendar:business\n\nswimlane a "A"\n  item one "One" duration:2w owner:sam\n`,
+                ['working crunch "Crunch" start:2026-01-10 end:2026-01-11'],
+            ),
+        );
+        expect(md).toMatch(/%% .*owner \(1\).*working-day \(2\)\s*$/m);
+    });
+});
