@@ -1,0 +1,58 @@
+diff --git a/packages/core/src/language/nowline.langium b/packages/core/src/language/nowline.langium
+index 670d82d..04b51d7 100644
+--- a/packages/core/src/language/nowline.langium
++++ b/packages/core/src/language/nowline.langium
+@@ -22,7 +22,8 @@ IncludeOption:
+ // --- Config Entries ---
+ 
+ ConfigEntry:
+-    ScaleBlock | CalendarBlock | StyleDeclaration | SymbolDeclaration | DefaultDeclaration;
++    ScaleBlock | CalendarBlock | StyleDeclaration | SymbolDeclaration | DefaultDeclaration |
++    NonWorkingDeclaration | WorkingDeclaration;
+ 
+ ScaleBlock:
+     'scale'
+@@ -35,7 +36,7 @@ CalendarBlock:
+ // 'wave' appears here because it is a declaration keyword (WaveDeclaration) that the
+ // lexer prefers over ID; a v1 file could already write e.g. `name: wave` in a block.
+ BlockPropertyValue returns string:
+-    ID | INTEGER | STRING | DURATION_LITERAL | 'wave';
++    ID | INTEGER | STRING | DURATION_LITERAL | 'wave' | 'non-working' | 'working';
+ 
+ StyleDeclaration:
+     'style' (name=EntityName)? (title=STRING)?
+@@ -54,7 +55,15 @@ SymbolDeclaration:
+ // are not grammar keywords and therefore lex as ID without help. 'wave' is listed for
+ // the same reason (WaveDeclaration keyword), so v1 values such as `icon:wave` keep parsing.
+ StylePropertyValue returns string:
+-    ID | COLOR_HEX | STRING | 'person' | 'wave';
++    ID | COLOR_HEX | STRING | 'person' | 'wave' | 'non-working' | 'working';
++
++NonWorkingDeclaration:
++    'non-working' (name=EntityName)? (title=STRING)?
++    (properties+=EntityProperty)*;
++
++WorkingDeclaration:
++    'working' (name=EntityName)? (title=STRING)?
++    (properties+=EntityProperty)*;
+ 
+ DefaultDeclaration:
+     'default' entityType=DefaultEntityType
+@@ -79,7 +88,7 @@ RoadmapEntry:
+ // v1 compatibility: `wave` now lexes as a keyword. EntityName re-admits the bare
+ // word everywhere a v1 file could already write an identifier.
+ EntityName returns string:
+-    ID | 'wave';
++    ID | 'wave' | 'non-working' | 'working';
+ 
+ PersonDeclaration:
+     'person' (name=EntityName)? (title=STRING)?
+@@ -188,7 +197,7 @@ StyleProperty:
+ // as a property-atom value (e.g. `default swimlane capacity-icon:person`). 'wave' is
+ // listed for the same reason, so v1 values such as `after:wave` and `owner:wave` keep parsing.
+ PropertyAtom returns string:
+-    ID | STRING | DURATION_LITERAL | PERCENTAGE | URL | DATE_LITERAL | COLOR_HEX | DECIMAL | INTEGER | 'person' | 'wave';
++    ID | STRING | DURATION_LITERAL | PERCENTAGE | URL | DATE_LITERAL | COLOR_HEX | DECIMAL | INTEGER | 'person' | 'wave' | 'non-working' | 'working';
+ 
+ // --- Terminals ---
+ // INDENT/DEDENT must be declared before ID to avoid Chevrotain unreachable-token errors.
