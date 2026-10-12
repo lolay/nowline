@@ -2,12 +2,18 @@ import * as path from 'node:path';
 import type { AstNode } from 'langium';
 import { URI } from 'langium';
 import { describe, expect, it } from 'vitest';
-import type { NowlineFile, SwimlaneDeclaration } from '../../src/generated/ast.js';
+import type {
+    NonWorkingDeclaration,
+    NowlineFile,
+    SwimlaneDeclaration,
+    WorkingDeclaration,
+} from '../../src/generated/ast.js';
 import { isGroupBlock, isItemDeclaration, isParallelBlock } from '../../src/generated/ast.js';
 import { tr } from '../../src/i18n/index.js';
 import {
     isRoutedResolveDiagnostic,
     type ResolveDiagnostic,
+    type ResolvedConfig,
     type ResolveResult,
     resolveIncludes,
 } from '../../src/language/include-resolver.js';
@@ -21,6 +27,27 @@ function makeFs(files: Record<string, string>): (p: string) => Promise<string> {
         if (!(rel in files)) throw new Error(`File not found: ${rel}`);
         return files[rel];
     };
+}
+
+type CalendarDeclaration = NonWorkingDeclaration | WorkingDeclaration;
+
+// `ResolvedConfig.calendarDeclarations` is typed loosely here and read as empty when
+// absent, so these cases compile and fail on their assertions, not a crash.
+function declarationsOf(config: ResolvedConfig): CalendarDeclaration[] {
+    return (
+        (config as ResolvedConfig & { calendarDeclarations?: CalendarDeclaration[] })
+            .calendarDeclarations ?? []
+    );
+}
+
+/** `type:name:date` per declaration, sorted: the list's order carries no meaning. */
+function summaryOf(declarations: CalendarDeclaration[]): string[] {
+    return declarations
+        .map((d) => {
+            const date = d.properties.find((p) => p.key.replace(/:$/, '') === 'date')?.value;
+            return `${d.$type === 'NonWorkingDeclaration' ? 'non-working' : 'working'}:${d.name ?? '-'}:${date}`;
+        })
+        .sort();
 }
 
 async function parseAtPath(text: string, absPath: string) {
@@ -387,6 +414,120 @@ describe('include resolver', () => {
                 readFile: makeFs(files),
             });
             expect(result.config.symbols.size).toBe(0);
+        });
+    });
+
+    describe('calendar declarations in resolved config', () => {
+        const body = 'roadmap r\nswimlane s\n  item x duration:1w\n';
+
+        async function resolveFiles(files: Record<string, string>): Promise<ResolveResult> {
+            const { Nowline } = getServices();
+            const main = await parseAtPath(files['main.nowline'], '/root/main.nowline');
+            return resolveIncludes(main, '/root/main.nowline', {
+                services: Nowline,
+                readFile: makeFs(files),
+            });
+        }
+
+        const shadowWarnings = (result: ResolveResult) =>
+            result.diagnostics.filter((d) => d.severity === 'warning').map((d) => d.message);
+
+        it('collects the root file declarations into ResolvedConfig.calendarDeclarations', async () => {
+            const result = await resolveFiles({
+                'main.nowline': `config\nnon-working h "Holiday" date:2026-12-25\nworking date:2026-12-26\n${body}`,
+            });
+            expect(result.diagnostics.filter((d) => d.severity === 'error')).toEqual([]);
+            expect(summaryOf(declarationsOf(result.config))).toEqual([
+                'non-working:h:2026-12-25',
+                'working:-:2026-12-26',
+            ]);
+        });
+
+        it('keeps unnamed declarations from the parent and the child, never colliding', async () => {
+            const result = await resolveFiles({
+                'main.nowline': `include "./a.nowline"\nconfig\nnon-working date:2026-01-01\n${body}`,
+                'a.nowline': `config\nnon-working date:2026-01-02\nworking date:2026-01-03\n`,
+            });
+            expect(summaryOf(declarationsOf(result.config))).toEqual([
+                'non-working:-:2026-01-01',
+                'non-working:-:2026-01-02',
+                'working:-:2026-01-03',
+            ]);
+            expect(shadowWarnings(result)).toEqual([]);
+        });
+
+        it('keeps two unnamed declarations that are alike', async () => {
+            const result = await resolveFiles({
+                'main.nowline': `include "./a.nowline"\nconfig\nnon-working date:2026-01-01\n${body}`,
+                'a.nowline': `config\nnon-working date:2026-01-01\n`,
+            });
+            expect(declarationsOf(result.config)).toHaveLength(2);
+            expect(shadowWarnings(result)).toEqual([]);
+        });
+
+        it("keeps the parent's declaration on a named collision and warns", async () => {
+            const result = await resolveFiles({
+                'main.nowline': `include "./child.nowline"\nconfig\nnon-working h date:2026-12-25\n${body}`,
+                'child.nowline': `config\nnon-working h date:2026-12-31\n`,
+            });
+            expect(summaryOf(declarationsOf(result.config))).toEqual(['non-working:h:2026-12-25']);
+            expect(shadowWarnings(result)).toEqual([
+                'Non-working "h" from child.nowline is shadowed by the parent\'s definition.',
+            ]);
+        });
+
+        it('names the working keyword in its own shadow warning', async () => {
+            const result = await resolveFiles({
+                'main.nowline': `include "./child.nowline"\nconfig\nworking h date:2026-12-25\n${body}`,
+                'child.nowline': `config\nworking h date:2026-12-31\n`,
+            });
+            expect(summaryOf(declarationsOf(result.config))).toEqual(['working:h:2026-12-25']);
+            expect(shadowWarnings(result)).toEqual([
+                'Working "h" from child.nowline is shadowed by the parent\'s definition.',
+            ]);
+        });
+
+        it('does not collide a working and a non-working declaration with one name', async () => {
+            const result = await resolveFiles({
+                'main.nowline': `include "./child.nowline"\nconfig\nnon-working h date:2026-12-25\n${body}`,
+                'child.nowline': `config\nworking h date:2026-12-25\n`,
+            });
+            expect(summaryOf(declarationsOf(result.config))).toEqual([
+                'non-working:h:2026-12-25',
+                'working:h:2026-12-25',
+            ]);
+            expect(shadowWarnings(result)).toEqual([]);
+        });
+
+        it('merges a declaration reached through a diamond once, with no warning', async () => {
+            const result = await resolveFiles({
+                'main.nowline': `include "./a.nowline"\ninclude "./b.nowline"\n${body}`,
+                'a.nowline': `include "./shared.nowline"\n`,
+                'b.nowline': `include "./shared.nowline"\n`,
+                'shared.nowline': `config\nnon-working h date:2026-12-25\n`,
+            });
+            expect(summaryOf(declarationsOf(result.config))).toEqual(['non-working:h:2026-12-25']);
+            expect(result.diagnostics).toEqual([]);
+        });
+
+        it('config:ignore merges nothing', async () => {
+            const result = await resolveFiles({
+                'main.nowline': `include "./a.nowline" config:ignore\n${body}`,
+                'a.nowline': `config\nnon-working h date:2026-12-25\nworking date:2026-12-26\n`,
+            });
+            expect(declarationsOf(result.config)).toEqual([]);
+        });
+
+        it("config:isolate keeps the child's declarations in isolatedRegions[0].config", async () => {
+            const result = await resolveFiles({
+                'main.nowline': `include "./a.nowline" config:isolate roadmap:isolate\n${body}`,
+                'a.nowline': `config\nnon-working h date:2026-12-25\nroadmap child "Child"\nswimlane cs\n  item y duration:1w\n`,
+            });
+            expect(result.content.isolatedRegions).toHaveLength(1);
+            expect(summaryOf(declarationsOf(result.content.isolatedRegions[0].config))).toEqual([
+                'non-working:h:2026-12-25',
+            ]);
+            expect(declarationsOf(result.config)).toEqual([]);
         });
     });
 

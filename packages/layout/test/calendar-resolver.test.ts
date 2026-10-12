@@ -11,13 +11,15 @@ import { describe, expect, it } from 'vitest';
 import {
     type CalendarConfig,
     type CalendarMode,
+    layoutRoadmap,
+    type PositionedNonWorkingRun,
     type ResolvedCalendar,
     resolveWorkingCalendar,
     scheduleRoadmap,
     type WorkingCalendar,
 } from '../src/index.js';
 import { continuousCalendar, fromCalendarConfig } from '../src/working-calendar.js';
-import { parseAndResolve } from './helpers.js';
+import { parseAndResolve, parseAndResolveFiles } from './helpers.js';
 
 const CUSTOM_BLOCK = `config
 
@@ -215,5 +217,263 @@ describe('RoadmapSchedule.calendar', () => {
         const { file, resolved } = await parseAndResolve(SOURCES.custom);
         const schedule = scheduleRoadmap(file, resolved, {});
         expect(schedule.calendar.config).toEqual(resolveWorkingCalendar(file, resolved).config);
+    });
+});
+
+// ---------------------------------------------------------------------------
+// Declarations (m2p phase 5a): `non-working` and `working` in `config` become
+// the calendar's rules (specs/working-calendar.md §4, §5). `(guard)` marks a
+// case that is green before and after the change.
+// ---------------------------------------------------------------------------
+
+const utc = (y: number, m: number, d: number): Date => new Date(Date.UTC(y, m - 1, d));
+const iso = (d: Date): string => d.toISOString().slice(0, 10);
+
+const ITEM = 'swimlane s "S"\n  item a "A" duration:1w\n';
+
+/** A file whose config block holds `declarations`, on the given roadmap properties. */
+const declared = (declarations: string[], roadmapProps = ''): string =>
+    `nowline v1\n\nconfig\n\n${declarations.join('\n')}\n\nroadmap r "R" start:2026-01-05${roadmapProps}\n\n${ITEM}`;
+
+async function weekdaysOf(source: string): Promise<number[]> {
+    const { file, resolved } = await parseAndResolve(source);
+    return sorted(resolveWorkingCalendar(file, resolved).working.workingWeekdays);
+}
+
+describe('weekend replacement (decision 14)', () => {
+    it('adds: business with non-working fridays every:fri works Monday to Thursday', async () => {
+        expect(await weekdaysOf(declared(['non-working fridays every:fri']))).toEqual([1, 2, 3, 4]);
+    });
+
+    it('replaces: business with non-working weekend every:[fri, sat] works Sunday to Thursday', async () => {
+        expect(await weekdaysOf(declared(['non-working weekend every:[fri, sat]']))).toEqual([
+            0, 1, 2, 3, 4,
+        ]);
+    });
+
+    it('replaces on any preset: full with non-working weekend every:[sat, sun] works Monday to Friday', async () => {
+        expect(
+            await weekdaysOf(declared(['non-working weekend every:[sat, sun]'], ' calendar:full')),
+        ).toEqual([1, 2, 3, 4, 5]);
+    });
+
+    it("a config:merge child's non-working weekend replaces the preset in the parent", async () => {
+        const { file, resolved } = await parseAndResolveFiles({
+            'main.nowline': `nowline v1\n\ninclude "./child.nowline" config:merge\n\nroadmap r "R" start:2026-01-05 calendar:business\n\n${ITEM}`,
+            'child.nowline': 'nowline v1\n\nconfig\n\nnon-working weekend every:[fri, sat]\n',
+        });
+        expect(resolved.diagnostics.filter((d) => d.severity === 'error')).toEqual([]);
+        expect(sorted(resolveWorkingCalendar(file, resolved).working.workingWeekdays)).toEqual([
+            0, 1, 2, 3, 4,
+        ]);
+    });
+
+    it('a working declaration named weekend leaves the preset in place', async () => {
+        expect(await weekdaysOf(declared(['working weekend every:sat']))).toEqual([
+            1, 2, 3, 4, 5, 6,
+        ]);
+    });
+
+    it('with no declarations each preset keeps its rules and workingWeekdays (guard)', async () => {
+        const rulesOf = async (mode: CalendarMode) => {
+            const { working } = await resolve(mode);
+            return working.rules.map((r) => ({
+                id: r.id,
+                title: r.title,
+                working: r.working,
+                every: [...(r.every ?? [])].sort((a, b) => a - b),
+            }));
+        };
+        expect(await rulesOf('business')).toEqual([
+            { id: 'weekend', title: 'Weekend', working: false, every: [0, 6] },
+        ]);
+        expect(await rulesOf('full')).toEqual([]);
+        expect(await rulesOf('custom')).toEqual([]);
+        expect(sorted((await resolve('business')).working.workingWeekdays)).toEqual([
+            1, 2, 3, 4, 5,
+        ]);
+        expect(sorted((await resolve('full')).working.workingWeekdays)).toEqual([
+            0, 1, 2, 3, 4, 5, 6,
+        ]);
+    });
+});
+
+describe('reorder invariance (decision 18)', () => {
+    // Example A (four chained 1w items and a Friday milestone) plus declarations.
+    const exampleA = (config: string, include = '') =>
+        `nowline v1\n\n${include}${config}roadmap r "R" start:2026-01-05 scale:1w calendar:business
+
+milestone fri "Fri Jan 30" date:2026-01-30
+
+swimlane a "A"
+  item w1 "W1" duration:1w
+  item w2 "W2" duration:1w
+  item w3 "W3" duration:1w
+  item w4 "W4" duration:1w
+`;
+    const inFile = (declarations: string[]) => exampleA(`config\n\n${declarations.join('\n')}\n\n`);
+
+    // Each pair of declarations in its source order and the reverse, with engine C's W4.
+    const cases: Array<{ name: string; declarations: [string, string]; w4: [string, string] }> = [
+        {
+            name: 'a dated closure over a bounded working Saturday',
+            declarations: [
+                'working every:sat start:2026-01-12 end:2026-01-25',
+                'non-working date:2026-01-17',
+            ],
+            w4: ['2026-01-24', '2026-01-30'],
+        },
+        {
+            name: 'a dated working tie (guard)',
+            declarations: ['non-working date:2026-01-14', 'working date:2026-01-14'],
+            w4: ['2026-01-26', '2026-01-31'],
+        },
+        {
+            name: 'a bounded working tie (guard)',
+            declarations: [
+                'non-working every:wed start:2026-01-12 end:2026-01-25',
+                'working every:wed start:2026-01-12 end:2026-01-25',
+            ],
+            w4: ['2026-01-26', '2026-01-31'],
+        },
+    ];
+
+    async function results(source: string, files?: Record<string, string>) {
+        const { file, resolved } = files
+            ? await parseAndResolveFiles({ 'main.nowline': source, ...files })
+            : await parseAndResolve(source);
+        const model = layoutRoadmap(file, resolved, {
+            theme: 'light',
+            today: utc(2026, 2, 9),
+            nonWorking: 'hide',
+        } as Parameters<typeof layoutRoadmap>[2]);
+        const schedule = scheduleRoadmap(file, resolved);
+        const w4 = schedule.items.get('w4')!;
+        return {
+            model,
+            w4: [iso(w4.start), iso(w4.end)],
+            items: [...schedule.items].map(([id, i]) => [id, iso(i.start), iso(i.end)]),
+            rules: schedule.calendar.working.rules,
+        };
+    }
+
+    for (const { name, declarations, w4 } of cases) {
+        const reversed = [...declarations].reverse();
+
+        it(`${name}: either order gives the same layout and engine C`, async () => {
+            const forward = await results(inFile(declarations));
+            const backward = await results(inFile(reversed));
+            expect(forward.w4).toEqual(w4);
+            expect(backward.w4).toEqual(w4);
+            expect(backward.items).toEqual(forward.items);
+            expect(backward.model).toEqual(forward.model);
+            expect(backward.rules).toEqual(forward.rules);
+        });
+
+        it(`${name}: the same declarations in a config:merge include give the same results`, async () => {
+            const direct = await results(inFile(declarations));
+            for (const order of [declarations, reversed]) {
+                const merged = await results(
+                    exampleA('', 'include "./cal.nowline" config:merge\n\n'),
+                    { 'cal.nowline': `config\n\n${order.join('\n')}\n` },
+                );
+                expect(merged.w4).toEqual(w4);
+                expect(merged.items).toEqual(direct.items);
+                expect(merged.model).toEqual(direct.model);
+            }
+        });
+    }
+
+    describe('two titled dated rules that start the same day', () => {
+        const beta = 'non-working "Beta" start:2026-12-24 end:2026-12-25';
+        const alpha = 'non-working "Alpha" date:2026-12-24';
+        const file = (declarations: string[]) =>
+            `nowline v1\n\nconfig\n\n${declarations.join('\n')}\n\nroadmap r "R" start:2026-12-21 scale:1w\n\n${ITEM}`;
+
+        async function calendarOf(declarations: string[]) {
+            const { file: ast, resolved } = await parseAndResolve(file(declarations));
+            const { working } = resolveWorkingCalendar(ast, resolved);
+            const model = layoutRoadmap(ast, resolved, {
+                theme: 'light',
+                today: utc(2026, 2, 9),
+            });
+            return { working, model };
+        }
+
+        it('lists Alpha before Beta in the run titles, whichever is written first', async () => {
+            for (const order of [
+                [beta, alpha],
+                [alpha, beta],
+            ]) {
+                const { working } = await calendarOf(order);
+                const run = working
+                    .nonWorkingRuns(utc(2026, 12, 21), utc(2026, 12, 29))
+                    .find((r) => iso(r.from) === '2026-12-24');
+                expect(run, 'the holiday run').toBeDefined();
+                expect(iso(run!.through)).toBe('2026-12-27');
+                expect(run!.titles).toEqual(['Alpha', 'Beta']);
+            }
+        });
+
+        it('draws the same titles in the layout run, whichever is written first', async () => {
+            for (const order of [
+                [beta, alpha],
+                [alpha, beta],
+            ]) {
+                const { model } = await calendarOf(order);
+                const run = ((model.timeline.nonWorking ?? []) as PositionedNonWorkingRun[]).find(
+                    (r) => iso(r.from) === '2026-12-24',
+                );
+                expect(run?.titles).toEqual(['Alpha', 'Beta']);
+            }
+        });
+
+        it('keeps working.rules in one order for either file order', async () => {
+            const forward = await calendarOf([beta, alpha]);
+            const backward = await calendarOf([alpha, beta]);
+            expect(forward.working.rules.map((r) => r.title)).toEqual(
+                backward.working.rules.map((r) => r.title),
+            );
+            expect(forward.working.rules.map((r) => r.title)).toContain('Alpha');
+        });
+    });
+});
+
+describe('an included file that closes the whole week', () => {
+    const closeAll = 'non-working every:[sun, mon, tue, wed, thu, fri, sat]';
+    const files = {
+        'main.nowline': `nowline v1\n\ninclude "./closed.nowline"\n\nroadmap r "R" start:2026-01-05 calendar:business\n\n${ITEM}`,
+        'closed.nowline': `nowline v1\n\nconfig\n\n${closeAll}\n`,
+    };
+
+    it('neither layoutRoadmap nor scheduleRoadmap throws (guard until the resolver reads declarations)', async () => {
+        const { file, resolved } = await parseAndResolveFiles(files);
+        expect(() =>
+            layoutRoadmap(file, resolved, { theme: 'light', today: utc(2026, 2, 9) }),
+        ).not.toThrow();
+        expect(() => scheduleRoadmap(file, resolved)).not.toThrow();
+    });
+
+    it('falls back to the preset calendar', async () => {
+        const { file, resolved } = await parseAndResolveFiles(files);
+        const { working } = resolveWorkingCalendar(file, resolved);
+        expect(sorted(working.workingWeekdays)).toEqual([1, 2, 3, 4, 5]);
+        expect(working.hasNonWorkingDays).toBe(true);
+        expect(working.isWorkingDay(utc(2026, 1, 9))).toBe(true);
+        expect(working.isWorkingDay(utc(2026, 1, 10))).toBe(false);
+    });
+
+    it('the include really is parsed: its declaration reaches the resolved config', async () => {
+        const { resolved } = await parseAndResolveFiles(files);
+        const declarations =
+            (resolved.config as { calendarDeclarations?: unknown[] }).calendarDeclarations ?? [];
+        expect(declarations).toHaveLength(1);
+    });
+
+    it('a root file that closes every day is also kept off the engine: the preset stands', async () => {
+        const source = declared([closeAll]);
+        const { file, resolved } = await parseAndResolve(source);
+        expect(() => resolveWorkingCalendar(file, resolved)).not.toThrow();
+        expect(() => scheduleRoadmap(file, resolved)).not.toThrow();
     });
 });

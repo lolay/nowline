@@ -1,3 +1,4 @@
+import * as path from 'node:path';
 import {
     createNowlineServices,
     type NowlineFile,
@@ -36,4 +37,20 @@ export async function parseAndResolve(
         readFile,
     });
     return { file, resolved };
+}
+
+/**
+ * Resolve `main` out of an in-memory file set, includes and all. Keys use `/`
+ * and sit under `/root`, so the same fixtures work on Windows.
+ */
+export async function parseAndResolveFiles(
+    files: Record<string, string>,
+    main = 'main.nowline',
+): Promise<{ file: NowlineFile; resolved: ResolveResult }> {
+    const readFile = async (abs: string): Promise<string> => {
+        const rel = path.relative('/root', abs).split(path.sep).join('/');
+        if (!(rel in files)) throw new Error(`File not found: ${rel}`);
+        return files[rel];
+    };
+    return parseAndResolve(files[main], path.resolve('/root', main), readFile);
 }
