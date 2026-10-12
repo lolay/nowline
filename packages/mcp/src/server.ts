@@ -196,6 +196,13 @@ function todayUtc(): Date {
     return new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate()));
 }
 
+// `-` suppresses the now-line, the same sentinel as the CLI's `--now -`.
+// Omitted means today (UTC); the schema has already checked the date shape.
+function resolveNow(now: string | undefined): Date | undefined {
+    if (now === '-') return undefined;
+    return now ? new Date(`${now}T00:00:00Z`) : todayUtc();
+}
+
 function exampleShortName(fullName: string): string {
     return fullName.endsWith('.nowline') ? fullName.slice(0, -'.nowline'.length) : fullName;
 }
@@ -578,6 +585,15 @@ export function createMcpServer(opts: McpServerOptions = {}): McpServer {
                 'omit to let the key apply (then hide). The schedule exports (mermaid, msproj, xlsx) are the same either way.',
         );
 
+    const nowSchema = z
+        .string()
+        .regex(/^(\d{4}-\d{2}-\d{2}|-)$/, 'Expected YYYY-MM-DD or "-".')
+        .optional()
+        .describe(
+            'Now-line date as YYYY-MM-DD (UTC). Omit to draw it at today (UTC); ' +
+                'pass "-" to suppress the now-line (same as the CLI\'s `--now -`).',
+        );
+
     // ---- render -------------------------------------------------------------
 
     registerAppTool(
@@ -607,10 +623,7 @@ export function createMcpServer(opts: McpServerOptions = {}): McpServer {
                     .enum(['light', 'dark', 'grayscale'])
                     .optional()
                     .describe('Color theme. Defaults to light.'),
-                now: z
-                    .string()
-                    .optional()
-                    .describe('Now-line date as YYYY-MM-DD (UTC). Omit to suppress.'),
+                now: nowSchema,
                 width: z.number().optional().describe('Canvas width in px.'),
                 nonWorking: nonWorkingSchema,
                 scale: z
@@ -662,7 +675,7 @@ export function createMcpServer(opts: McpServerOptions = {}): McpServer {
             if (!blocked.ok) return blocked.response;
 
             const format: ExportFormat = args.format ?? 'svg';
-            const today = args.now ? new Date(`${args.now}T00:00:00Z`) : todayUtc();
+            const today = resolveNow(args.now);
             const inputs: RenderInputs = {
                 sourcePath: filePath,
                 today,
@@ -844,7 +857,7 @@ export function createMcpServer(opts: McpServerOptions = {}): McpServer {
                             'Never pass a virtual or sandbox path such as /home/claude/…, /mnt/user-data/…, or any path ' +
                             'outside the configured output folder — those do not exist on the host filesystem.',
                     ),
-                now: z.string().optional().describe('Now-line date as YYYY-MM-DD (UTC).'),
+                now: nowSchema,
                 theme: z.enum(['light', 'dark', 'grayscale']).optional(),
                 nonWorking: nonWorkingSchema,
                 scale: z.number().optional().describe('PNG scale factor.'),
@@ -889,7 +902,7 @@ export function createMcpServer(opts: McpServerOptions = {}): McpServer {
             if (!blocked.ok) return blocked.response;
 
             const format: ExportFormat = args.format as NonRenderFormat;
-            const today = args.now ? new Date(`${args.now}T00:00:00Z`) : todayUtc();
+            const today = resolveNow(args.now);
             const inputs: RenderInputs = {
                 sourcePath: filePath,
                 today,

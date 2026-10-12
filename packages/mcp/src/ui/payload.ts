@@ -74,3 +74,13 @@ export function parsePreviewFromArguments(
 export function toNonWorkingOverride(nonWorking: unknown): 'file' | 'hide' | 'show' {
     return nonWorking === 'hide' || nonWorking === 'show' ? nonWorking : 'file';
 }
+
+/**
+ * The shell's now-line value for a payload's `now`. Omitted means today; `-`
+ * (the CLI's `--now -` sentinel, also accepted by the `render` tool) hides the
+ * now-line; a date passes through.
+ */
+export function toNowOverride(now: unknown): string {
+    if (now === '-') return 'hide';
+    return typeof now === 'string' && now.length > 0 ? now : 'today';
+}

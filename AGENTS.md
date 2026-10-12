@@ -38,7 +38,7 @@ workspace for the full estate-level mapping.
 
 ```bash
 make init        # install dependencies from the frozen lockfile
-make build-fast  # build every package, skipping the ~30-SVG render
+make build-fast  # build every package, skipping the examples/ + tests/ render
 make test        # run the Vitest suites (builds first)
 ```
 

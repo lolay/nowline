@@ -18,6 +18,7 @@ import {
     parsePreviewFromArguments,
     parsePreviewFromContent,
     toNonWorkingOverride,
+    toNowOverride,
 } from '../src/ui/payload.js';
 
 // ---- Fixtures ---------------------------------------------------------------
@@ -1539,6 +1540,132 @@ describe('@nowline/mcp — non-working display', () => {
             nonWorking: 'show',
         });
         expect(parsePreviewFromContent([{ type: 'text', text: lean }])?.nonWorking).toBe('show');
+    });
+});
+
+// ---- Now-line (`now` on render and export) ----------------------------------
+
+// `now` follows the CLI's `--now`: a YYYY-MM-DD date, omitted for today (UTC),
+// or `-` to suppress the now-line.
+const NOW_LAYER = 'data-layer="nowline"';
+
+function isoDaysFromToday(days: number): string {
+    const now = new Date();
+    return new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate() + days))
+        .toISOString()
+        .slice(0, 10);
+}
+
+// A roadmap that starts two weeks ago and runs eight weeks, so today (and the
+// explicit date below) fall inside it and the now-line is drawn.
+function sourceSpanningToday(): string {
+    return [
+        'nowline v1',
+        '',
+        `roadmap r "R" start:${isoDaysFromToday(-14)} scale:1w`,
+        '',
+        'swimlane eng "Engineering"',
+        '  item x "X" duration:8w',
+    ].join('\n');
+}
+
+describe('@nowline/mcp — now-line', () => {
+    it('render and export describe omitted as today and "-" as suppress', async () => {
+        const { tools } = await client.listTools();
+        for (const name of ['render', 'export']) {
+            const tool = tools.find((t) => t.name === name);
+            const now = (tool?.inputSchema.properties as Record<string, { description?: string }>)
+                ?.now;
+            expect(now?.description, `${name} now description`).toBe(
+                'Now-line date as YYYY-MM-DD (UTC). Omit to draw it at today (UTC); ' +
+                    'pass "-" to suppress the now-line (same as the CLI\'s `--now -`).',
+            );
+        }
+    });
+
+    it('render with now omitted draws the now-line at today', async () => {
+        const source = sourceSpanningToday();
+        const omitted = await client.callTool({
+            name: 'render',
+            arguments: { source, format: 'svg' },
+        });
+        expect(omitted.isError).toBeFalsy();
+        expect(svgOf(omitted)).toContain(NOW_LAYER);
+        const explicitToday = await client.callTool({
+            name: 'render',
+            arguments: { source, format: 'svg', now: isoDaysFromToday(0) },
+        });
+        expect(svgOf(omitted)).toBe(svgOf(explicitToday));
+    });
+
+    it('render with now "-" suppresses the now-line', async () => {
+        const source = sourceSpanningToday();
+        const result = await client.callTool({
+            name: 'render',
+            arguments: { source, format: 'svg', now: '-' },
+        });
+        expect(result.isError).toBeFalsy();
+        expect(svgOf(result)).not.toContain(NOW_LAYER);
+    });
+
+    it('render with an explicit date draws the now-line', async () => {
+        const result = await client.callTool({
+            name: 'render',
+            arguments: { source: sourceSpanningToday(), format: 'svg', now: isoDaysFromToday(7) },
+        });
+        expect(result.isError).toBeFalsy();
+        expect(svgOf(result)).toContain(NOW_LAYER);
+    });
+
+    it('export with now "-" suppresses the now-line; omitted draws it', async () => {
+        const source = sourceSpanningToday();
+        const exportSvg = async (args: Record<string, unknown>) => {
+            const result = await client.callTool({
+                name: 'export',
+                arguments: { source, format: 'svg', ...args },
+            });
+            expect(result.isError).toBeFalsy();
+            return svgOf(result);
+        };
+        expect(await exportSvg({ now: '-' })).not.toContain(NOW_LAYER);
+        expect(await exportSvg({})).toContain(NOW_LAYER);
+    });
+
+    it('render and export reject a now that is neither YYYY-MM-DD nor "-"', async () => {
+        for (const name of ['render', 'export']) {
+            for (const now of ['none', 'today', '2026-1-5']) {
+                const result = await client.callTool({
+                    name,
+                    arguments: { source: MINIMAL, format: 'svg', now },
+                });
+                expect(result.isError, `${name} now=${now}`).toBe(true);
+            }
+        }
+    });
+
+    it('the lean preview payload passes "-" through and the shell maps it to hide', async () => {
+        const { client: uiClient, cleanup } = await connectUiClient({
+            [MCP_UI_EXTENSION]: { mimeTypes: ['text/html;profile=mcp-app'] },
+        });
+        try {
+            const result = await uiClient.callTool({
+                name: 'render',
+                arguments: { source: MINIMAL, now: '-' },
+            });
+            expect(result.isError).toBeFalsy();
+            const block = textBlocks(result).find((t) => t.includes('"kind":"nowline.preview"'));
+            expect(block, 'a lean preview block').toBeDefined();
+            expect((JSON.parse(block as string) as { now?: string }).now).toBe('-');
+        } finally {
+            await cleanup();
+        }
+    });
+
+    it('toNowOverride maps a payload now to the shell now-line value', () => {
+        expect(toNowOverride('-')).toBe('hide');
+        expect(toNowOverride(undefined)).toBe('today');
+        expect(toNowOverride('')).toBe('today');
+        expect(toNowOverride('2026-01-07')).toBe('2026-01-07');
     });
 });
 

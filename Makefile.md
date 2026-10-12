@@ -65,7 +65,7 @@ pipeline that artifact is built in a separate CI job and handed over — see
 | `help` | List targets, grouped (the default goal) |
 | `init` | Install workspace dependencies from the frozen lockfile (`pnpm install --frozen-lockfile`) |
 | `build` | Build every package and render `examples/` + `tests/` to SVG (`pnpm build`) |
-| `build-fast` | Build every package but skip the ~30-SVG render — the inner dev loop (`NOWLINE_SKIP_RENDER=1 pnpm build`) |
+| `build-fast` | Build every package but skip rendering `examples/` + `tests/` — the inner dev loop (`NOWLINE_SKIP_RENDER=1 pnpm build`) |
 | `lint` | Static check: biome lint + format-drift + import organization, no writes (`pnpm check`) |
 | `format` | Auto-fix formatting, lint, and import order (`pnpm check:fix`) |
 | `typecheck` | Type-check the packages that opt in (`pnpm typecheck`). Needs a prior `build`: several packages resolve sibling `@nowline/*` types from `dist/` |
