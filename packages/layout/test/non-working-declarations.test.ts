@@ -541,3 +541,227 @@ describe('config:isolate', () => {
         expect([...working.workingWeekdays].sort((a, b) => a - b)).toEqual([1, 2, 3, 4, 5]);
     });
 });
+
+// ---------------------------------------------------------------------------
+// Phase 5b: a titled run carries a label, packed into the marker row
+// (specs/working-calendar.md §7.4, §10 Example B; plan decisions 1-3)
+// ---------------------------------------------------------------------------
+//
+// Widths are `estimateTextWidth`: characters x 10 x 0.58, so `Thanksgiving · 2d`
+// (17 characters) is 98.6 px and `Launch` (bold) 36.54 px. A label box's `y` is
+// its marker-row centre minus 4, and rows are 26 px apart. Values marked
+// "probed" were measured at a758c72 before the change; "derived" values follow
+// from the probed bounds and the decisions, and a derived literal that
+// disagrees after an honest implementation is a decision to escalate, never a
+// silent edit.
+
+/** A run with the fields 5b adds; `undefined` until the layout sets them. */
+type LabelledRun = Run & {
+    label?: string;
+    labelBox?: { x: number; y: number; width: number; height: number };
+    labelSide?: 'left' | 'right';
+    cut?: true;
+};
+
+function labelledRuns(model: PositionedRoadmap): LabelledRun[] {
+    return (model.timeline.nonWorking ?? []) as LabelledRun[];
+}
+
+/** The titled run: the first run that has titles. */
+function titledRun(model: PositionedRoadmap): LabelledRun {
+    const run = labelledRuns(model).find((r) => 'titles' in r);
+    expect(run, 'a titled run').toBeDefined();
+    return run as LabelledRun;
+}
+
+/** The weekend run (no titles): Saturday and Sunday Dec 5-6. */
+function weekendRun(model: PositionedRoadmap): LabelledRun {
+    const run = labelledRuns(model).find((r) => iso(r.from) === '2026-12-05');
+    expect(run, 'the Dec 5-6 weekend run').toBeDefined();
+    return run as LabelledRun;
+}
+
+/** The label box of `run`, relative to the origin. */
+function labelBoxOf(model: PositionedRoadmap, run: LabelledRun) {
+    expect(run.labelBox, 'labelBox').toBeDefined();
+    return { ...run.labelBox!, x: run.labelBox!.x - model.timeline.originX };
+}
+
+const LABEL_KEYS = ['label', 'labelBox', 'labelSide', 'cut'] as const;
+
+describe('Example B labels (5b)', () => {
+    describe('under hide', () => {
+        it('labels the titled run `Thanksgiving · 2d` and cuts the seam', async () => {
+            const { model } = await lay(exampleB(), 'hide');
+            const run = titledRun(model);
+            expect(run.label).toBe('Thanksgiving · 2d');
+            expect(run.cut).toBe(true);
+            expect(run.labelSide).toBe('right');
+        });
+
+        it('puts the label box at x 30, 98.6 wide and 12 high, on row 0', async () => {
+            const { model } = await lay(exampleB(), 'hide');
+            const box = labelBoxOf(model, titledRun(model));
+            expect(box.x).toBeCloseTo(30, 5);
+            expect(box.width).toBeCloseTo(98.6, 5);
+            expect(box.height).toBe(12);
+            expect(box.y).toBe(model.timeline.markerRow.y - 4);
+        });
+
+        it('places Launch after the run on the same x: row 1, label to its right', async () => {
+            const { model } = await lay(exampleB(), 'hide');
+            const m = milestoneX(model, 'launch');
+            expect(m.center.x - model.timeline.originX).toBe(24);
+            expect(m.hiddenDate).toBe('2026-11-28');
+            expect(m.labelSide).toBe('right');
+            expect(m.labelBox.x - model.timeline.originX).toBeCloseTo(36, 5);
+            expect(m.labelBox.width).toBeCloseTo(36.54, 5);
+            expect(m.center.y).toBe(model.timeline.markerRow.y + 26);
+        });
+
+        it('grows the marker row to two rows', async () => {
+            const { model } = await lay(exampleB(), 'hide');
+            expect(model.timeline.markerRow.height).toBe(52);
+        });
+
+        it('grows the canvas to 272.6 so the label sits on the right (it was 250.32)', async () => {
+            const { model } = await lay(exampleB(), 'hide');
+            expect(model.width).toBeCloseTo(272.6, 5);
+        });
+
+        it('never falls back to the left over the header card (regression pin)', async () => {
+            const { model } = await lay(exampleB(), 'hide');
+            const run = titledRun(model);
+            expect(run.labelSide).toBe('right');
+            const box = run.labelBox!;
+            // The beside header card ends at the origin less the 12 px gutter (chartLeftX 120).
+            expect(box.x).toBeGreaterThanOrEqual(model.timeline.originX - 12);
+            // The fallback would put it at -80.6 relative to the origin.
+            expect(box.x - model.timeline.originX).toBeGreaterThan(0);
+            expect(box.x + box.width + 12).toBeLessThanOrEqual(model.width + 0.001);
+        });
+
+        it('keeps the weekend run free of label keys', async () => {
+            const { model } = await lay(exampleB(), 'hide');
+            const weekend = weekendRun(model);
+            for (const key of LABEL_KEYS) expect(key in weekend, key).toBe(false);
+        });
+    });
+
+    describe('under show', () => {
+        it('labels the titled run `Thanksgiving · 2d` with no cut', async () => {
+            const { model } = await lay(exampleB(), 'show');
+            const run = titledRun(model);
+            expect(run.label).toBe('Thanksgiving · 2d');
+            expect('cut' in run).toBe(false);
+            expect(run.labelSide).toBe('right');
+        });
+
+        it('puts the label box at x 30 and 98.6 wide, on row 1', async () => {
+            const { model } = await lay(exampleB(), 'show');
+            const box = labelBoxOf(model, titledRun(model));
+            expect(box.x).toBeCloseTo(30, 5);
+            expect(box.width).toBeCloseTo(98.6, 5);
+            expect(box.y).toBe(model.timeline.markerRow.y + 22);
+        });
+
+        it('keeps Launch on row 0 at x 40, its label at 52', async () => {
+            const { model } = await lay(exampleB(), 'show');
+            const m = milestoneX(model, 'launch');
+            expect(m.center.x - model.timeline.originX).toBe(40);
+            expect(m.labelSide).toBe('right');
+            expect(m.labelBox.x - model.timeline.originX).toBeCloseTo(52, 5);
+            expect(m.labelBox.width).toBeCloseTo(36.54, 5);
+            expect(m.center.y).toBe(model.timeline.markerRow.y);
+        });
+
+        it('has a two-row marker row and keeps the 282.32 canvas', async () => {
+            const { model } = await lay(exampleB(), 'show');
+            expect(model.timeline.markerRow.height).toBe(52);
+            expect(model.width).toBeCloseTo(282.32, 5);
+        });
+
+        it('keeps the weekend band free of label keys', async () => {
+            const { model } = await lay(exampleB(), 'show');
+            const weekend = weekendRun(model);
+            for (const key of LABEL_KEYS) expect(key in weekend, key).toBe(false);
+        });
+    });
+
+    it('leaves the 5a model values untouched: runs, ticks and boxes (guard)', async () => {
+        for (const display of ['hide', 'show'] as const) {
+            const { model } = await lay(exampleB(), display);
+            const run = runsOf(model)[0];
+            expect(run).toMatchObject({
+                x: 24,
+                from: '2026-11-26',
+                through: '2026-11-29',
+                titles: ['Thanksgiving'],
+            });
+            expect(model.timeline.endDate.toISOString().slice(0, 10)).toBe('2026-12-07');
+        }
+    });
+
+    it('draws no label and keeps one marker row without the declaration (guard)', async () => {
+        const { model } = await lay(exampleB([]), 'hide');
+        for (const run of labelledRuns(model)) {
+            for (const key of LABEL_KEYS) expect(key in run, key).toBe(false);
+        }
+        expect(model.timeline.markerRow.height).toBe(26);
+        expect(model.width).toBeCloseTo(250.32, 5);
+    });
+});
+
+describe('titled run labels: text (5b decision 1)', () => {
+    // Example E's titles: two titled dated rules that start the same day, in either order.
+    const ITEM = '  item w1 "W1" duration:1w\n';
+    const exampleE = (declarations: string[]) =>
+        withDeclarations(
+            `roadmap r "R" start:2026-12-21 scale:1w\n\nswimlane s "S"\n${ITEM}`,
+            declarations,
+        );
+    const beta = 'non-working "Beta" start:2026-12-24 end:2026-12-25';
+    const alpha = 'non-working "Alpha" date:2026-12-24';
+
+    it('joins the titles with a comma and counts the 2 working days: `Alpha, Beta · 2d`', async () => {
+        for (const order of [
+            [beta, alpha],
+            [alpha, beta],
+        ]) {
+            const { model } = await lay(exampleE(order), 'hide');
+            expect(titledRun(model).label, order.join(' / ')).toBe('Alpha, Beta · 2d');
+        }
+    });
+
+    it('drops the day count when the run holds no working day: `Sat off`', async () => {
+        const source = exampleB(['non-working "Sat off" date:2026-11-28']);
+        for (const display of ['hide', 'show'] as const) {
+            const { model } = await lay(source, display);
+            const run = titledRun(model);
+            expect(run.label, display).toBe('Sat off');
+            expect(iso(run.from)).toBe('2026-11-28');
+            expect(iso(run.through)).toBe('2026-11-29');
+        }
+    });
+});
+
+describe('a file whose only marker-row content is a titled run (5b decision 3)', () => {
+    const noMilestone = (declarations: string[]) =>
+        withDeclarations(
+            `roadmap r "R" start:2026-11-23 scale:1w calendar:business\n\nswimlane a "A"\n  item checkout "Checkout" duration:1w\n  item qa "QA" duration:2d\n`,
+            declarations,
+        );
+
+    it('gets a marker row of one row (26) where it would have none', async () => {
+        for (const display of ['hide', 'show'] as const) {
+            const { model } = await lay(noMilestone([THANKSGIVING]), display);
+            expect(model.timeline.markerRow.height, display).toBe(26);
+            expect(titledRun(model).label, display).toBe('Thanksgiving · 2d');
+        }
+    });
+
+    it('has no marker row without the declaration (guard)', async () => {
+        const { model } = await lay(noMilestone([]), 'hide');
+        expect(model.timeline.markerRow.height).toBe(0);
+    });
+});
