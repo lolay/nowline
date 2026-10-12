@@ -1013,8 +1013,7 @@ A declaration accepts:
 | `start:` | one ISO date | Inclusive. The first day of a range, or the day a recurrence begins. |
 | `end:` | one ISO date | Inclusive. The last day of a range, or the day a recurrence stops. Not before `start:` (`NL.E0903`; equal is fine). |
 | `every:` | one weekday or a list of `sun`, `mon`, `tue`, `wed`, `thu`, `fri`, `sat` | A weekly recurrence. A name that is not a weekday is `NL.E0904`, and a weekday listed twice is `NL.E0905`. |
-| any other key | error (`NL.E0901`) | Including `style:`, `labels:`, `link:` and `wave:`. |
-| raw style properties | error (Validation Rule 20) | — |
+| any other key | error (`NL.E0901`) | Including `style:`, `labels:`, `link:`, `wave:` and raw style properties such as `bg:`. The declaration checks its own keys, so Rule 20 does not apply. |
 
 **Three shapes (`NL.E0900`).** A declaration is exactly one of:
 
