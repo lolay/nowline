@@ -47,6 +47,7 @@ Every repo additionally has these settings (also patched by the script):
 
 - `allow_auto_merge: true`
 - `allow_squash_merge: true`
+- `squash_merge_commit_title: PR_TITLE` and `squash_merge_commit_message: PR_BODY`, so a squash commit, the merge queue's included, carries the PR title and description (and so its `Assisted-by:` trailer last) instead of GitHub's default list of every branch commit
 - `delete_branch_on_merge: true`
 
 > **Follower approval-count flag (for parent review).** `lolay/nowline-action` is publish-only with no PR CI.  Bumping it to `required_approving_review_count: 1` adds defence-in-depth but could impede a future automated publish flow.  The script currently leaves it at `0`.  A maintainer should confirm: raise to `1` (consistent posture), or keep at `0` (friction-free publish path) and explicitly accept the risk.  Edit the follower body in `scripts/apply-branch-policies.sh` and re-run once decided.
@@ -63,7 +64,7 @@ Per repo it will:
 
 1. Probe whether the `lolay-nowline-release` App is installed (creates and immediately deletes a disabled probe ruleset; logs `release App: installed — adding to bypass` or `release App: not installed — OrgAdmin-only bypass`).
 2. PUT (update) the named ruleset if one already exists, or POST (create) it if not.
-3. PATCH the repo to enable auto-merge / squash-merge / delete-branch-on-merge.
+3. PATCH the repo to enable auto-merge / squash-merge / delete-branch-on-merge, and set the squash commit message to the PR title and description.
 
 The script is idempotent and converges to the desired state — safe to re-run any time. Total runtime is ~5s for the two OSS repos.
 
@@ -86,9 +87,9 @@ done
 
 # Repo settings.
 for repo in nowline nowline-action; do
-  gh api repos/lolay/$repo --jq '{r: "'$repo'", auto_merge: .allow_auto_merge, squash: .allow_squash_merge, delete_branch: .delete_branch_on_merge}'
+  gh api repos/lolay/$repo --jq '{r: "'$repo'", auto_merge: .allow_auto_merge, squash: .allow_squash_merge, squash_title: .squash_merge_commit_title, squash_message: .squash_merge_commit_message, delete_branch: .delete_branch_on_merge}'
 done
-# expect: auto_merge=true, squash=true, delete_branch=true on both
+# expect: auto_merge=true, squash=true, squash_title=PR_TITLE, squash_message=PR_BODY, delete_branch=true on both
 ```
 
 A direct push to `main` from a clone of either repo — done as Gary — should print a remote-side note like:
