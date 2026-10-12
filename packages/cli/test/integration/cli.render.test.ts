@@ -752,6 +752,16 @@ describeBuilt('render: include diagnostics', () => {
                     /^nowline: invalid --margin "bogus": [^\n]*\n$/,
                 );
 
+                const pageSize = await runCliBuilt([...base, '--page-size', 'bogus'], {
+                    cwd: dir,
+                    env: NO_LOCALE_ENV,
+                });
+                expect(pageSize.exitCode).toBe(2);
+                expect(pageSize.stderr.startsWith(ok.stderr)).toBe(true);
+                expect(pageSize.stderr.slice(ok.stderr.length)).toMatch(
+                    /^nowline: invalid --page-size "bogus": [^\n]*\n$/,
+                );
+
                 const verbose = await runCliBuilt([...base, '--verbose'], {
                     cwd: dir,
                     env: NO_LOCALE_ENV,

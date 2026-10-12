@@ -72,4 +72,19 @@ describeBuilt('.nowlinerc render keys (requires `pnpm build`)', () => {
         expect(r.exitCode).toBe(2);
         expect(r.stderr).toContain('invalid .nowlinerc pdfMargin "wide"');
     });
+
+    // Page size is validated for every format, not only when a PDF is written.
+    for (const format of ['svg', 'pdf']) {
+        it(`an invalid rc pdfPageSize is an input error naming .nowlinerc (-f ${format})`, async () => {
+            const r = await renderWithRc('pdfPageSize: huge\n', ['-f', format, '--headless']);
+            expect(r.exitCode).toBe(2);
+            expect(r.stderr).toContain('invalid .nowlinerc pdfPageSize "huge": expected preset');
+        });
+    }
+
+    it('a valid --page-size wins over an invalid rc pdfPageSize', async () => {
+        const r = await renderWithRc('pdfPageSize: huge\n', ['--page-size', 'a4']);
+        expect(r.exitCode).toBe(0);
+        expect(r.stdout).toContain('<svg');
+    });
 });

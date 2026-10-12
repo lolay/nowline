@@ -122,8 +122,12 @@ export interface RenderInputs {
     strict?: boolean;
 
     // ---- format-specific options ----------------------------------------
-    /** PDF page size — a preset name or a custom dimensions string. */
-    pageSize?: string;
+    /**
+     * PDF page size: a preset name, a custom dimensions string, or a value
+     * already parsed with `parsePageSize` (so a caller can reject a bad one
+     * before rendering).
+     */
+    pageSize?: import('@nowline/export-core').PdfPageSize | string;
     /** PDF orientation. */
     orientation?: import('@nowline/export-core').PdfOrientation;
     /** PDF margin in points. */

@@ -106,7 +106,9 @@ Format-specific options
   --page-size <size>     PDF page size: preset (letter | legal | tabloid |
                          ledger | a1..a5 | b3..b5), `content` for auto-fit,
                          or `WxHunit` for custom (e.g. 8.5x11in, 210x297mm).
-                         Default: letter.
+                         Default: letter. Like --orientation and --margin, an
+                         invalid value is a usage error (exit 2) for every
+                         output format, not only PDF.
   --orientation <name>   PDF orientation: portrait | landscape | auto.
                          Default: auto.
   --margin <length>      PDF page margin. Bare numbers are points;
@@ -386,7 +388,7 @@ Each recognized key is the default for one flag, resolved flag > `.nowlinerc` > 
 | `theme` | `-t, --theme` | Same names and `greyscale` alias as the flag. Also read by `--serve`. |
 | `defaultFormat` | `-f, --format` | Step 3 of the format-resolution chain: used when neither `-f` nor a recognized `-o` extension is present. |
 | `width` | `-w, --width` | Integer ≥ 320. Passed to `LayoutOptions.width`, which layout does not apply yet, so it has no visible effect for now. |
-| `pdfPageSize` | `--page-size` | |
+| `pdfPageSize` | `--page-size` | Validated for every output format, like `pdfOrientation` and `pdfMargin`. |
 | `pdfOrientation` | `--orientation` | |
 | `pdfMargin` | `--margin` | A bare number (YAML/JSON number or string) is points. |
 | `fontSans` / `fontMono` | `--font-sans` / `--font-mono` | |
