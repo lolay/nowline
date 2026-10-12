@@ -1,7 +1,7 @@
 ```
 --- KICKOFF: begin orchestration at [deep] ---
 
-  Status: 0/3 groups done | last review: — | current: m2p-5b s1-s3 [exec] | updated 2026-10-12
+  Status: 1/3 groups done | last review: wave-1 PASS | current: m2p-5b s4-s6 [deep] | updated 2026-10-12
   mode: unattended | proposed unattended (harness=claude-code runner=cloud; plan written in a planning session, kickoff question asked by the executing session) | guard 3x min $50 | fixups 2 | confirmed 2026-10-12 session d2e6b266-7085-567a-b805-c4269ef5a3e8: unattended
 
   review: every-wave (log-only — parent writes Review log; human gates only where marked)
@@ -372,18 +372,18 @@ Phase 5a is on `main` as `e3b2479` (lolay/nowline#115): a file's `non-working` a
 
 --- WAVE 1 [exec] ---
 
-### s1 - [exec] Toolchain and baselines
+### s1 - [exec] Toolchain and baselines (done)
 - If `main` has moved past `a758c72`, merge it into the branch first (a merge commit, no rebase). Re-check every `file:line` this plan cites, and the probe's bounds (Example B: `chartLeftX` 120, `chartRightX` 250.32 / 282.32). Gate 1 if a cited site or a probed value moved.
 - Install the toolchain (§ Orchestration), then `make init && make build-fast`.
 - Then byte identity step 1, before any source edit.
 - Done when both baselines exist and determinism is green with `hashes.json` unchanged.
 
-### s2 - [exec] Tooling, test first
+### s2 - [exec] Tooling, test first (done)
 - Decision 8, test first: write the LSP, TextMate, snippet and MCP cases from § Tests red, then implement.
 - Update `specs/ide.md` (`:25`, `:27`, `:44`, `:48`) in this step, since it describes exactly this behaviour.
 - Done when those tests are green, byte identity step 2 passes (tooling touches no render path) and `make pre-commit` is green. Then commit.
 
-### s3 - [exec] Failing tests for labels and the renderer
+### s3 - [exec] Failing tests for labels and the renderer (done)
 - Write the layout and renderer cases in § Tests (Example B labels, the packing pin, Example E's label, the weekend-only label, the marker-row-only file, the renderer cases), with their literals. `calendarExceptions` and the exporters are tested first in s7, so W2's commit gate can go green.
 - Done when:
   - each new case fails on an assertion, not a crash, where possible;
@@ -451,6 +451,8 @@ Everything under § Change "Docs". The `working-calendar.md` §10 Example B text
 
 ## Review log
 
+review wave-1 (nowline s1,s2,s3) 72b4376..84f3b6d: PASS - baselines under .scratch/m2p-5b/ (43 SVG hashes, 52 Mermaid/MS Project export pairs pinned with --now 2026-02-09); probe bounds re-checked unchanged; s2 tooling matches Decision 8 (rename and references skip calendar declarations since declarationAt now returns them; snippet test wraps in a roadmap with a swimlane because NL.E0004 rejects the plan's swimlane-less wrapper); s3 adds 12 layout and 7 renderer red cases, all assertion failures, literals match § Tests; make lint green - 2026-10-12
+
 ## Token log
 
 **Counting header (Claude Code)** — as in the 5a plan (`plan-m2p-5a-kestrel.md`, lolay/nowline#114):
@@ -461,3 +463,7 @@ Everything under § Change "Docs". The `working-calendar.md` §10 Example B text
 - `$C` = (input × in + cache read × cached + 5m write × in × 1.25 + 1h write × in × 2.00 + output × out) / 1M.
 
 Phase 1 ~$20.42; Phase 2 ~$66.4; Phase 3 ~$51.05; Phase 4 ~$27.6; Phase 5a expected ~$18. Rows are added per wave by the executing session.
+
+tokens orchestrator-resume plan-m2p-5b-heron (claude-opus-5-5): input ~34 / cache read ~2M / cache write ~0 5m + ~190k 1h / output ~12k | ~$2.16 API-equiv
+tokens wave-1 nowline-s1-s2-s3 (claude-sonnet-5-5): input ~130 / cache read ~8.7M / cache write ~200k / output ~64k | ~$2.88 API-equiv (output est.) session d2e6b266-7085-567a-b805-c4269ef5a3e8
+tokens review-wave-1 nowline-s1-s2-s3 (claude-opus-5-5): input ~50 / cache read ~1.5M / cache write ~82k / output ~24k | ~$1.18 API-equiv (output est.) session d2e6b266-7085-567a-b805-c4269ef5a3e8
