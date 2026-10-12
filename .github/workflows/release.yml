@@ -82,7 +82,8 @@ jobs:
         run: |
           set -euo pipefail
           git add packages/*/package.json packages/mcp/manifest.json packages/mcp/server.json \
-            CHANGELOG.md packages/vscode-extension/CHANGELOG.md
+            CHANGELOG.md packages/vscode-extension/CHANGELOG.md \
+            .changelog packages/vscode-extension/.changelog
           git commit -m "release v${NEW_VERSION}"
           git tag "v${NEW_VERSION}"
           git push origin HEAD
