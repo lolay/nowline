@@ -501,7 +501,7 @@ Found while mapping the code at `9725e9d`. None blocks this milestone (decision 
 
 1. **The CLI ignores `.nowlinerc` `theme` and `width`.** `cli/src/commands/render.ts:119, :121` read only the flags, although `nowline.1` documents both keys. The VS Code extension does read the rc theme.
 2. **Stale theme docs.** The `nowline.1` `-t` entry and the GitHub Action (`nowline-action/src/inputs.ts:40-46`) accept only `light | dark`; `grayscale` exists.
-3. **MCP `render` describes `now` as "Omit to suppress",** but the code defaults to `todayUtc()` (`mcp/src/server.ts:599-602` vs `:653`).
+3. **MCP `render` describes `now` as "Omit to suppress",** but the code defaults to `todayUtc()` (`mcp/src/server.ts:599-602` vs `:653`). Fixed after m2p: `render` and `export` now describe the today default and accept `-` to suppress, matching the CLI's `--now -`.
 4. **`LayoutOptions.width` has no effect.** `roadmap-node.ts:235` caps the canvas at `width`, then `:270` takes the max with the natural width, which always wins.
 5. **Dead code:** `_buildSwimlane` (`layout.ts:1196-1213`) and `formatDurationDays` (`calendar.ts:182-200`).
 
