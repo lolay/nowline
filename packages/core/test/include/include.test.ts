@@ -13,7 +13,6 @@ import { tr } from '../../src/i18n/index.js';
 import {
     isRoutedResolveDiagnostic,
     type ResolveDiagnostic,
-    type ResolvedConfig,
     type ResolveResult,
     resolveIncludes,
 } from '../../src/language/include-resolver.js';
@@ -30,15 +29,6 @@ function makeFs(files: Record<string, string>): (p: string) => Promise<string> {
 }
 
 type CalendarDeclaration = NonWorkingDeclaration | WorkingDeclaration;
-
-// `ResolvedConfig.calendarDeclarations` is typed loosely here and read as empty when
-// absent, so these cases compile and fail on their assertions, not a crash.
-function declarationsOf(config: ResolvedConfig): CalendarDeclaration[] {
-    return (
-        (config as ResolvedConfig & { calendarDeclarations?: CalendarDeclaration[] })
-            .calendarDeclarations ?? []
-    );
-}
 
 /** `type:name:date` per declaration, sorted: the list's order carries no meaning. */
 function summaryOf(declarations: CalendarDeclaration[]): string[] {
@@ -437,7 +427,7 @@ describe('include resolver', () => {
                 'main.nowline': `config\nnon-working h "Holiday" date:2026-12-25\nworking date:2026-12-26\n${body}`,
             });
             expect(result.diagnostics.filter((d) => d.severity === 'error')).toEqual([]);
-            expect(summaryOf(declarationsOf(result.config))).toEqual([
+            expect(summaryOf(result.config.calendarDeclarations)).toEqual([
                 'non-working:h:2026-12-25',
                 'working:-:2026-12-26',
             ]);
@@ -448,7 +438,7 @@ describe('include resolver', () => {
                 'main.nowline': `include "./a.nowline"\nconfig\nnon-working date:2026-01-01\n${body}`,
                 'a.nowline': `config\nnon-working date:2026-01-02\nworking date:2026-01-03\n`,
             });
-            expect(summaryOf(declarationsOf(result.config))).toEqual([
+            expect(summaryOf(result.config.calendarDeclarations)).toEqual([
                 'non-working:-:2026-01-01',
                 'non-working:-:2026-01-02',
                 'working:-:2026-01-03',
@@ -461,7 +451,7 @@ describe('include resolver', () => {
                 'main.nowline': `include "./a.nowline"\nconfig\nnon-working date:2026-01-01\n${body}`,
                 'a.nowline': `config\nnon-working date:2026-01-01\n`,
             });
-            expect(declarationsOf(result.config)).toHaveLength(2);
+            expect(result.config.calendarDeclarations).toHaveLength(2);
             expect(shadowWarnings(result)).toEqual([]);
         });
 
@@ -470,7 +460,9 @@ describe('include resolver', () => {
                 'main.nowline': `include "./child.nowline"\nconfig\nnon-working h date:2026-12-25\n${body}`,
                 'child.nowline': `config\nnon-working h date:2026-12-31\n`,
             });
-            expect(summaryOf(declarationsOf(result.config))).toEqual(['non-working:h:2026-12-25']);
+            expect(summaryOf(result.config.calendarDeclarations)).toEqual([
+                'non-working:h:2026-12-25',
+            ]);
             expect(shadowWarnings(result)).toEqual([
                 'Non-working "h" from child.nowline is shadowed by the parent\'s definition.',
             ]);
@@ -481,7 +473,7 @@ describe('include resolver', () => {
                 'main.nowline': `include "./child.nowline"\nconfig\nworking h date:2026-12-25\n${body}`,
                 'child.nowline': `config\nworking h date:2026-12-31\n`,
             });
-            expect(summaryOf(declarationsOf(result.config))).toEqual(['working:h:2026-12-25']);
+            expect(summaryOf(result.config.calendarDeclarations)).toEqual(['working:h:2026-12-25']);
             expect(shadowWarnings(result)).toEqual([
                 'Working "h" from child.nowline is shadowed by the parent\'s definition.',
             ]);
@@ -492,7 +484,7 @@ describe('include resolver', () => {
                 'main.nowline': `include "./child.nowline"\nconfig\nnon-working h date:2026-12-25\n${body}`,
                 'child.nowline': `config\nworking h date:2026-12-25\n`,
             });
-            expect(summaryOf(declarationsOf(result.config))).toEqual([
+            expect(summaryOf(result.config.calendarDeclarations)).toEqual([
                 'non-working:h:2026-12-25',
                 'working:h:2026-12-25',
             ]);
@@ -506,7 +498,9 @@ describe('include resolver', () => {
                 'b.nowline': `include "./shared.nowline"\n`,
                 'shared.nowline': `config\nnon-working h date:2026-12-25\n`,
             });
-            expect(summaryOf(declarationsOf(result.config))).toEqual(['non-working:h:2026-12-25']);
+            expect(summaryOf(result.config.calendarDeclarations)).toEqual([
+                'non-working:h:2026-12-25',
+            ]);
             expect(result.diagnostics).toEqual([]);
         });
 
@@ -515,7 +509,7 @@ describe('include resolver', () => {
                 'main.nowline': `include "./a.nowline" config:ignore\n${body}`,
                 'a.nowline': `config\nnon-working h date:2026-12-25\nworking date:2026-12-26\n`,
             });
-            expect(declarationsOf(result.config)).toEqual([]);
+            expect(result.config.calendarDeclarations).toEqual([]);
         });
 
         it("config:isolate keeps the child's declarations in isolatedRegions[0].config", async () => {
@@ -524,10 +518,10 @@ describe('include resolver', () => {
                 'a.nowline': `config\nnon-working h date:2026-12-25\nroadmap child "Child"\nswimlane cs\n  item y duration:1w\n`,
             });
             expect(result.content.isolatedRegions).toHaveLength(1);
-            expect(summaryOf(declarationsOf(result.content.isolatedRegions[0].config))).toEqual([
-                'non-working:h:2026-12-25',
-            ]);
-            expect(declarationsOf(result.config)).toEqual([]);
+            expect(
+                summaryOf(result.content.isolatedRegions[0].config.calendarDeclarations),
+            ).toEqual(['non-working:h:2026-12-25']);
+            expect(result.config.calendarDeclarations).toEqual([]);
         });
     });
 

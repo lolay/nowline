@@ -465,9 +465,7 @@ describe('an included file that closes the whole week', () => {
 
     it('the include really is parsed: its declaration reaches the resolved config', async () => {
         const { resolved } = await parseAndResolveFiles(files);
-        const declarations =
-            (resolved.config as { calendarDeclarations?: unknown[] }).calendarDeclarations ?? [];
-        expect(declarations).toHaveLength(1);
+        expect(resolved.config.calendarDeclarations).toHaveLength(1);
     });
 
     it('a root file that closes every day is also kept off the engine: the preset stands', async () => {
