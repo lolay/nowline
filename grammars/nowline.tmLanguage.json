@@ -77,7 +77,7 @@
                     }
                 },
                 {
-                    "match": "(?<![\\w-])(bg|fg|text|border|icon|shadow|font|weight|italic|text-size|padding|spacing|header-height|corner-radius|bracket|header-position|capacity-icon|timeline-position|minor-grid|non-working)\\s*(:)",
+                    "match": "(?<![\\w-])(bg|fg|text|border|icon|shadow|font|weight|italic|text-size|padding|spacing|header-height|header-position|corner-radius|bracket|capacity-icon|timeline-position|minor-grid|non-working)\\s*(:)",
                     "captures": {
                         "1": { "name": "entity.other.attribute-name.style.nowline" },
                         "2": { "name": "punctuation.separator.key-value.nowline" }

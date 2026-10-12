@@ -5,7 +5,7 @@
 .\" Empreinte de la page anglaise relue pour cette traduction. Après avoir
 .\" reporté une modification de la page anglaise, remplacez-la par la ligne
 .\" qu'affiche packages/cli/test/man/translation-parity.test.ts.
-.\" translated-from: nowline.1 sha256:41d2bc75c2dbe5593a60d0c818809f57c0430e41e06078c587488a0c9566364f
+.\" translated-from: nowline.1 sha256:99c7bf54b42d489323e6929c91bb37a137022d041b3e093b70baae290bf7e5ad
 .Dd $Mdocdate$
 .Dt NOWLINE 1
 .Os
@@ -198,6 +198,11 @@ comme
 .Sy light | dark | grayscale ;
 .Sy greyscale
 est accepté comme alias.
+Par défaut\ :
+.Pa .nowlinerc
+.Sy theme ,
+sinon
+.Sy light .
 .It Fl -now Ar date
 Ancrage
 .Sq Maintenant
@@ -295,7 +300,11 @@ Facteur d'échelle pour le rendu raster (PNG uniquement\ ; 1 par défaut).
 .It Fl -strict
 Promeut les avertissements (assets, sanitiseur) en erreurs.
 .It Fl w , -width Ar px
-Largeur du canevas en pixels (1280 par défaut).
+Largeur du canevas en pixels.
+Par défaut\ :
+.Pa .nowlinerc
+.Sy width ,
+sinon 1280.
 .It Fl -non-working Ar mode
 Façon dont un calendrier ouvré affiche ses jours non travaillés sur le
 graphique\ :
@@ -429,10 +438,43 @@ pour la matrice de résolution.
 Fichier de configuration JSON ou YAML facultatif.
 Recherché en remontant depuis le dossier du fichier d'entrée\ ; le plus
 proche l'emporte.
-Les indicateurs CLI surclassent les valeurs de configuration.
-Clés reconnues\ :
-.Sy theme , defaultFormat , width , pdfPageSize , pdfOrientation ,
-.Sy pdfMargin , fontSans , fontMono , headlessFonts , locale .
+Chaque clé reconnue sert de valeur par défaut à un indicateur\ :
+l'indicateur l'emporte s'il est fourni, puis la clé, puis la valeur
+par défaut intégrée.
+.Sy theme
+.Pq Fl t ,
+.Sy defaultFormat
+.Pq Fl f ,
+.Sy width
+.Pq Fl w ,
+.Sy pdfPageSize
+.Pq Fl -page-size ,
+.Sy pdfOrientation
+.Pq Fl -orientation ,
+.Sy pdfMargin
+.Pq Fl -margin ,
+.Sy fontSans
+.Pq Fl -font-sans ,
+.Sy fontMono
+.Pq Fl -font-mono ,
+.Sy headlessFonts
+.Pq Fl -headless ,
+.Sy useSystemFonts
+.Pq Fl -use-system-fonts ,
+.Sy locale
+.Pq Fl -locale .
+.Sy defaultFormat
+ne s'applique que si l'extension de
+.Fl o
+n'est pas reconnue\ ;
+.Sy locale
+passe après les variables d'environnement de langue.
+.Fl -serve
+lit
+.Sy theme
+et
+.Sy locale .
+Une valeur invalide est une erreur d'utilisation qui nomme la clé.
 Les clés inconnues sont ignorées.
 .El
 .Sh CODES DE SORTIE

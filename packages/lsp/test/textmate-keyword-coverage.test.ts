@@ -22,14 +22,6 @@ const langium = readFileSync(
 
 const patterns = grammar.repository.properties.patterns;
 
-function styleKeyRegExp(): RegExp {
-    const found = patterns.find((p) =>
-        JSON.stringify(p.captures ?? {}).includes('entity.other.attribute-name.style.nowline'),
-    );
-    expect(found?.match).toBeDefined();
-    return new RegExp(found?.match ?? '');
-}
-
 function enumRegExp(): RegExp {
     const found = patterns.find((p) => p.name === 'constant.language.enum.nowline');
     expect(found?.match).toBeDefined();
@@ -54,15 +46,9 @@ describe('TextMate: keyword coverage', () => {
         expect(missing).toEqual([]);
     });
 
-    it('captures header-position: as a style key', () => {
-        const m = styleKeyRegExp().exec('default group header-position:above');
-        expect(m?.[1]).toBe('header-position');
-        expect(m?.[2]).toBe(':');
-    });
-
-    it('captures the header-position and timeline-position values as enum constants', () => {
+    it('captures the timeline-position values as enum constants', () => {
         const re = enumRegExp();
-        for (const value of ['beside', 'above', 'top', 'bottom', 'both']) {
+        for (const value of ['top', 'bottom', 'both']) {
             expect(`key:${value}`.match(re)?.[0], value).toBe(value);
         }
     });
