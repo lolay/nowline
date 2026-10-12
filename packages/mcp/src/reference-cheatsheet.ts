@@ -53,6 +53,17 @@ milestone ship "Ship" after:launch
 
 A wave is a strict barrier across every swimlane: no item in the next wave starts until every item in this one ends. Items without \`wave:\` are background work, never held back, drawn hatched.
 
+## Working calendar
+
+\`\`\`
+config
+
+non-working thanksgiving "Thanksgiving" start:2026-11-26 end:2026-11-27
+working crunch "Crunch Saturday" date:2026-01-10
+\`\`\`
+
+\`non-working\` takes \`date:\`, \`start:\` with \`end:\`, or \`every:\` (weekday names, \`every:[sat, sun]\`); \`working\` gives days back. Durations count working days only. \`default roadmap non-working:hide\` (the default) collapses closed days to a seam; \`show\` draws them as bands.
+
 ## Config / includes (before roadmap)
 
 \`config\` blocks, \`include "path.nowline"\` — see full reference for ordering rules.

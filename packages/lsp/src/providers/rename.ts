@@ -16,6 +16,7 @@ import {
     declarationAt,
     fileFromDocument,
     findDeclarationRange,
+    isCalendarDeclaration,
     leafAt,
     propertyValueAt,
     propKey,
@@ -93,7 +94,7 @@ function renameRangeAt(document: LangiumDocument, position: Position): RenameTar
     const leaf = leafAt(document, offset);
     if (!leaf) return undefined;
     const decl = declarationAt(leaf);
-    if (decl?.name === leaf.text) {
+    if (decl && !isCalendarDeclaration(decl) && decl.name === leaf.text) {
         return { id: decl.name, range: leaf.range };
     }
     const hit = propertyValueAt(leaf);

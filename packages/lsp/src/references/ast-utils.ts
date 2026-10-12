@@ -7,6 +7,7 @@ import type {
     ItemDeclaration,
     LabelDeclaration,
     MilestoneDeclaration,
+    NonWorkingDeclaration,
     NowlineFile,
     ParallelBlock,
     ParallelContent,
@@ -19,6 +20,7 @@ import type {
     SymbolDeclaration,
     TeamDeclaration,
     WaveDeclaration,
+    WorkingDeclaration,
 } from '@nowline/core';
 import {
     isAnchorDeclaration,
@@ -27,6 +29,7 @@ import {
     isItemDeclaration,
     isLabelDeclaration,
     isMilestoneDeclaration,
+    isNonWorkingDeclaration,
     isNowlineFile,
     isParallelBlock,
     isPersonDeclaration,
@@ -38,6 +41,7 @@ import {
     isSymbolDeclaration,
     isTeamDeclaration,
     isWaveDeclaration,
+    isWorkingDeclaration,
 } from '@nowline/core';
 import type { AstNode, CstNode, LangiumDocument } from 'langium';
 import { CstUtils, GrammarUtils } from 'langium';
@@ -116,6 +120,12 @@ export const BUILTIN_ICON_NAMES: readonly string[] = [
     'lock',
 ];
 
+/** Weekday names accepted by `every:`, Sunday first (the order of `Date#getUTCDay`). */
+export const WEEKDAY_NAMES: readonly string[] = ['sun', 'mon', 'tue', 'wed', 'thu', 'fri', 'sat'];
+
+/** Values of the `non-working:` display key on `default roadmap`. */
+export const NON_WORKING_DISPLAYS: readonly string[] = ['hide', 'show'];
+
 /** Strip the trailing `:` an `EntityProperty.key` carries from the grammar. */
 export function propKey(prop: { key: string }): string {
     return prop.key.endsWith(':') ? prop.key.slice(0, -1) : prop.key;
@@ -128,6 +138,11 @@ export function propKey(prop: { key: string }): string {
  * Includes both roadmap-section declarations (item, swimlane, person, …) and
  * config-section declarations (`style`, `symbol`) so cmd+click on
  * `style:enterprise-style` and `icon:my-symbol` resolves to the right place.
+ *
+ * `non-working` and `working` declarations are here so `declarationAt` (hover)
+ * sees them, but `collectNamedEntities` skips them: nothing references a
+ * calendar declaration by id, so they stay out of reference completion,
+ * definition and rename.
  */
 export type NamedEntity =
     | RoadmapEntryNamed
@@ -135,7 +150,9 @@ export type NamedEntity =
     | ParallelBlock
     | GroupBlock
     | StyleDeclaration
-    | SymbolDeclaration;
+    | SymbolDeclaration
+    | NonWorkingDeclaration
+    | WorkingDeclaration;
 
 type RoadmapEntryNamed =
     | SwimlaneDeclaration
@@ -148,6 +165,15 @@ type RoadmapEntryNamed =
     | SizeDeclaration
     | StatusDeclaration
     | WaveDeclaration;
+
+/**
+ * True for a `non-working` or `working` declaration. Hover describes them, but
+ * nothing references a calendar declaration by id, so definition, references
+ * and rename leave them alone.
+ */
+export function isCalendarDeclaration(entity: AstNode): boolean {
+    return isNonWorkingDeclaration(entity) || isWorkingDeclaration(entity);
+}
 
 /**
  * Walk the `NowlineFile` and collect every entity that owns an `id`. Covers
@@ -333,7 +359,9 @@ export function declarationAt(leaf: CstNode | undefined): NamedEntity | undefine
         isStatusDeclaration(owner) ||
         isWaveDeclaration(owner) ||
         isStyleDeclaration(owner) ||
-        isSymbolDeclaration(owner)
+        isSymbolDeclaration(owner) ||
+        isNonWorkingDeclaration(owner) ||
+        isWorkingDeclaration(owner)
     ) {
         return owner as NamedEntity;
     }

@@ -22,9 +22,9 @@ Ships in the OSS monorepo at `grammars/nowline.tmLanguage.json`.
 
 | Token | Scope | Example |
 |-------|-------|---------|
-| Keywords | `keyword.control.nowline` | `config`, `roadmap`, `include`, `person`, `team`, `anchor`, `swimlane`, `item`, `parallel`, `group`, `milestone`, `label`, `duration`, `status`, `wave`, `footnote`. `wave` is matched only at the start of a line (`^\s*(wave)(?![\w-])(?=\s)`), so `wave-1`, `item wave`, and `after:wave` are not coloured as the keyword. |
+| Keywords | `keyword.control.nowline` | `config`, `roadmap`, `include`, `person`, `team`, `anchor`, `swimlane`, `item`, `parallel`, `group`, `milestone`, `label`, `duration`, `status`, `wave`, `footnote`. `wave`, `non-working` and `working` are matched only at the start of a line (`^\s*(wave\|non-working\|working)(?![\w-])(?=\s)`), so `wave-1`, `non-working-team`, `item working`, `after:working`, and a style key such as `non-working:show` are not coloured as the keyword. |
 | Strings | `string.quoted.double.nowline` | `"Auth refactor"` |
-| Properties | `entity.other.attribute-name.nowline` | `status:`, `owner:`, `after:`, `before:`, `duration:`, `length:`, `remaining:`, `labels:`, `link:`, `style:`, `depends:`, `date:`, `on:`, `wave:` |
+| Properties | `entity.other.attribute-name.nowline` | `status:`, `owner:`, `after:`, `before:`, `duration:`, `length:`, `remaining:`, `labels:`, `link:`, `style:`, `depends:`, `date:`, `on:`, `wave:`, `start:`, `end:`, `every:` |
 | Property values | `constant.other.nowline` | `done`, `in-progress`, `at-risk`, `blocked`, `planned`, `merge`, `ignore`, `isolate` |
 | Identifiers | `variable.other.nowline` | `auth-refactor`, `audit-log` |
 | Identifiers (references) | `entity.name.tag.nowline` | `sam`, `jen`, `platform` (in `owner:`, `on:`, `depends:`, `after:`, `before:`) |
@@ -41,11 +41,11 @@ Langium generates an LSP server from the grammar definition. The server runs as 
 
 | Feature | Description |
 |---------|-------------|
-| Autocomplete | Keyword completion (`swimlane`, `item`, `parallel`, `group`, `milestone`, `wave`, etc.), property name completion (`status:`, `owner:`, `duration:`, `wave:`, etc.), property value completion (`done`, `in-progress`, etc.), ID reference completion in `after:`, `before:`, `owner:`, `depends:[]`, `on:`, `labels:[]`. `wave:` completes the declared wave ids, and `after:`, `before:`, and `on:` also offer wave ids. |
+| Autocomplete | Keyword completion (`swimlane`, `item`, `parallel`, `group`, `milestone`, `wave`, etc.), property name completion (`status:`, `owner:`, `duration:`, `wave:`, etc.), property value completion (`done`, `in-progress`, etc.), ID reference completion in `after:`, `before:`, `owner:`, `depends:[]`, `on:`, `labels:[]`. `wave:` completes the declared wave ids, and `after:`, `before:`, and `on:` also offer wave ids. In `config`, `non-working` and `working` complete as declaration keywords; `every:` completes the weekday names (`sun` to `sat`, also inside `every:[...]`), and `default roadmap non-working:` completes `hide` and `show`. |
 | Validation | Real-time error reporting — parse errors, unknown references, circular dependencies, invalid enum values |
 | Go-to-definition | Jump from `after:auth-refactor` to the item with `id:auth-refactor`; from `wave:build`, `after:build`, or `on:build` to `wave build` |
 | Find references | Find all usages of an `id` across the file |
-| Hover | Show item details on hover (title, status, owner, links). On a wave: "wave k of n", its title, description, and member count. On an item in a roadmap with waves: its effective wave ("inherited from group …" when it comes from a container), or "background (no wave)" |
+| Hover | Show item details on hover (title, status, owner, links). On a wave: "wave k of n", its title, description, and member count. On an item in a roadmap with waves: its effective wave ("inherited from group …" when it comes from a container), or "background (no wave)". On a `non-working` or `working` declaration: its id, title, and the `date:`, `every:`, `start:` and `end:` it sets. Calendar declarations are not referenced by id, so they do not appear in reference completion, go-to-definition, find references, or rename |
 | Rename | Rename an `id` and update all references, including `wave:` values (renaming `wave wave` edits the name, not the keyword) |
 | Document symbols | Outline view showing roadmap → swimlanes → items hierarchy; waves appear as `Struct` symbols |
 | Folding | Fold swimlane blocks |

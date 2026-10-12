@@ -1356,7 +1356,7 @@ export function createMcpServer(opts: McpServerOptions = {}): McpServer {
         'schema',
         {
             description:
-                'Return the structured Nowline DSL key vocabulary (directive keys, entity types, item properties).',
+                'Return the structured Nowline DSL key vocabulary (directive keys, entity types, item properties, config keywords, calendar declaration keys).',
             inputSchema: z.object({}),
             outputSchema: SchemaOutputSchema,
             annotations: readOnlyTool('View Roadmap Schema'),
@@ -1366,6 +1366,8 @@ export function createMcpServer(opts: McpServerOptions = {}): McpServer {
                 directiveKeys: [...SCHEMA_VOCABULARY.directiveKeys],
                 entityTypes: [...SCHEMA_VOCABULARY.entityTypes],
                 itemPropertyKeys: [...SCHEMA_VOCABULARY.itemPropertyKeys],
+                configKeywords: [...SCHEMA_VOCABULARY.configKeywords],
+                calendarDeclarationKeys: [...SCHEMA_VOCABULARY.calendarDeclarationKeys],
             };
             return {
                 content: [{ type: 'text', text: JSON.stringify(structured, null, 2) }],

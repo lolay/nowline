@@ -630,12 +630,26 @@ describe('@nowline/mcp — discovery tools', () => {
             directiveKeys: string[];
             entityTypes: string[];
             itemPropertyKeys: string[];
+            configKeywords: string[];
+            calendarDeclarationKeys: string[];
         };
         expect(structured.directiveKeys).toContain('start');
         expect(structured.entityTypes).toContain('swimlane');
         expect(structured.itemPropertyKeys).toContain('duration');
         expect(structured.entityTypes).toContain('wave');
         expect(structured.itemPropertyKeys).toContain('wave');
+        // Working calendar (m2p phase 5b): the declaration keywords and their keys.
+        expect(structured.configKeywords).toContain('non-working');
+        expect(structured.configKeywords).toContain('working');
+        expect(structured.calendarDeclarationKeys).toEqual(['date', 'start', 'end', 'every']);
+    });
+
+    it('reference with no format teaches the working calendar declarations', async () => {
+        const result = await client.callTool({ name: 'reference', arguments: {} });
+        expect(result.isError).toBeFalsy();
+        const structured = result.structuredContent as { format: string; text: string };
+        expect(structured.text).toContain('non-working');
+        expect(structured.text).toContain('## Working calendar');
     });
 });
 

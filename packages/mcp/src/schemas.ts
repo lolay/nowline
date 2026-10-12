@@ -105,4 +105,6 @@ export const SchemaOutputSchema = z.object({
     directiveKeys: z.array(z.string()),
     entityTypes: z.array(z.string()),
     itemPropertyKeys: z.array(z.string()),
+    configKeywords: z.array(z.string()),
+    calendarDeclarationKeys: z.array(z.string()),
 });

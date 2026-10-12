@@ -6,7 +6,7 @@
 import { readFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import { describe, expect, it } from 'vitest';
-import { validationErrors } from './helpers.js';
+import { parseAndValidate, validationErrors } from './helpers.js';
 
 const SNIPPETS = fileURLToPath(
     new URL('../../vscode-extension/snippets/nowline.json', import.meta.url),
@@ -54,6 +54,47 @@ describe('VS Code snippets', () => {
             for (const choice of choices) {
                 expect(await validationErrors(source(choice)), `${key}:${choice}`).toEqual([]);
             }
+        }
+    });
+});
+
+describe('VS Code snippets: working calendar declarations', () => {
+    const snippets = JSON.parse(readFileSync(SNIPPETS, 'utf-8')) as Record<
+        string,
+        { prefix: string; body: string[] }
+    >;
+
+    /** The snippet body with each `${N:default}` placeholder at its default and `$0` removed. */
+    function expand(prefix: string): string {
+        const found = Object.values(snippets).find((s) => s.prefix === prefix);
+        expect(found, `snippet with prefix ${prefix}`).toBeDefined();
+        return found!.body
+            .join('\n')
+            .replace(/\$\{\d+:([^}]*)\}/g, '$1')
+            .replace(/\$0/g, '');
+    }
+
+    // The roadmap carries one swimlane: a file with none is itself an error.
+    const inConfig = (line: string) =>
+        `nowline v1\n\nconfig\n\n${line}\n\nroadmap r "R" start:2026-01-05\n\nswimlane s\n  item a duration:1w\n`;
+
+    it('expands non-working to the documented declaration', () => {
+        expect(expand('non-working')).toBe(
+            'non-working id "Title" start:2026-11-26 end:2026-11-27',
+        );
+    });
+
+    it('expands working to the documented declaration', () => {
+        expect(expand('working')).toBe('working id "Title" date:2026-01-10');
+    });
+
+    it('validates both snippets at their defaults with no diagnostics', async () => {
+        for (const prefix of ['non-working', 'working']) {
+            const diagnostics = await parseAndValidate(inConfig(expand(prefix)));
+            expect(
+                diagnostics.map((d) => d.message),
+                prefix,
+            ).toEqual([]);
         }
     });
 });

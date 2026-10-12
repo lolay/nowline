@@ -15,7 +15,9 @@ import {
     entityKind,
     fileFromDocument,
     type NamedEntity,
+    NON_WORKING_DISPLAYS,
     REFERENCE_PROP_KEYS,
+    WEEKDAY_NAMES,
 } from '../references/ast-utils.js';
 
 /**
@@ -53,6 +55,8 @@ const REF_KEY_TO_KINDS: Record<string, ReadonlySet<string>> = {
  *  - Status-value completion: built-in values plus custom `status`
  *    declarations.
  *  - Icon / capacity-icon built-in vocabulary plus user-declared symbols.
+ *  - Working-calendar values: the weekday names after `every:` and `hide` /
+ *    `show` after the `non-working:` display key.
  */
 export class NowlineCompletionProvider extends DefaultCompletionProvider {
     constructor(services: NowlineLspServices) {
@@ -90,6 +94,26 @@ export class NowlineCompletionProvider extends DefaultCompletionProvider {
                     kind: CompletionItemKind.EnumMember,
                     detail: 'built-in status',
                     insertText: status,
+                });
+            }
+        }
+        if (hint.key === 'every') {
+            for (const day of WEEKDAY_NAMES) {
+                acceptor(context, {
+                    label: day,
+                    kind: CompletionItemKind.EnumMember,
+                    detail: 'weekday',
+                    insertText: day,
+                });
+            }
+        }
+        if (hint.key === 'non-working') {
+            for (const display of NON_WORKING_DISPLAYS) {
+                acceptor(context, {
+                    label: display,
+                    kind: CompletionItemKind.EnumMember,
+                    detail: 'non-working display',
+                    insertText: display,
                 });
             }
         }
