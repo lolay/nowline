@@ -1,8 +1,8 @@
 ```
---- KICKOFF: begin orchestration at [deep] (pending approval) ---
+--- KICKOFF: begin orchestration at [deep] ---
 
-  Status: 0/3 groups done | last review: — | current: m2p-5b s1-s3 [exec] | BLOCKED at gate mode | updated 2026-10-12
-  mode: pending | proposed unattended (harness=claude-code runner=cloud; plan written in a planning session, kickoff question asked by the executing session) | guard 3x min $50 | fixups 2
+  Status: 0/3 groups done | last review: — | current: m2p-5b s1-s3 [exec] | updated 2026-10-12
+  mode: unattended | proposed unattended (harness=claude-code runner=cloud; plan written in a planning session, kickoff question asked by the executing session) | guard 3x min $50 | fixups 2 | confirmed 2026-10-12 session d2e6b266-7085-567a-b805-c4269ef5a3e8: unattended
 
   review: every-wave (log-only — parent writes Review log; human gates only where marked)
 
@@ -11,7 +11,8 @@
 
   Prompt to paste into the next chat:
     In lolay/nowline, read specs/handoffs/plan-m2p-5b-heron.md. The plan is already tagged.
-    On branch claude/hopeful-dirac-g9dll4 (task branch): subagents commit each finished step.
+    On branch claude/plan-m2p-5b-heron-5bcx5v (task branch): subagents commit each finished step.
+    Run in unattended mode.
     Run the personal-plan-orchestrate skill from the top: walk to
     each tier boundary, dispatch subagents per the skill's procedure,
     and pause only where the recorded mode stops. Do not execute plan

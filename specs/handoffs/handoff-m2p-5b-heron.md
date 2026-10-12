@@ -5,8 +5,8 @@
 ## Where things stand
 
 - **Phases 1–4 and 5a** are on `main`: lolay/nowline#96 as `9c0982d`, #97 as `c74c795`, #115 as `e3b2479`. The plan was written against `main` `a758c72` (2026-10-12).
-- **Branch:** `claude/hopeful-dirac-g9dll4`. It was harness-assigned to the planning session, and it holds only this plan and this handoff. The executing session uses its own assigned branch, cut from `main` after the plan PR merges, and rewrites the Kickoff prompt's `On branch` line to match.
-- **Mode:** pending. Status is `BLOCKED at gate mode`.
+- **Branch:** `claude/plan-m2p-5b-heron-5bcx5v`, the executing session's harness-assigned branch, cut from `main` at `7ac0d44` (the plan PR, lolay/nowline#117). The planning session's `claude/hopeful-dirac-g9dll4` is gone; the Kickoff prompt's `On branch` line now names this branch.
+- **Mode:** unattended, confirmed 2026-10-12 by the executing session (session `d2e6b266-7085-567a-b805-c4269ef5a3e8`). Gate 2 before wave 2 is a logged checkpoint.
 - **Done:** nothing is implemented.
   - The research is in the plan: three read-only code maps and a scratch probe.
   - The probe laid out Example B in both views, ran `packMarkerRow` with the real re-pack bounds, and exported Examples B, D and E row 1 to Mermaid and MS Project. It was deleted afterwards, and `dist/` was restored.
@@ -15,24 +15,15 @@
 
 ## Pending question
 
-Two questions, in order.
-
-1. **Approval of the plan PR** (the maintainer's review of decisions 1–8). The ones most worth a look:
-   - the label day count (decision 1);
-   - canvas growth for run labels only (decision 3);
-   - no `<WorkWeeks>`, a deviation from spec §8 (decision 6);
-   - Mermaid working exceptions as a lossy count (decision 7).
-2. **The kickoff question**, which the executing session asks after the PR merges. Expected form: 3 waves, ~$23 API-equiv, gate 2 before wave 2, `Runner detected (CLAUDE_CODE_REMOTE=true). Proposed mode: unattended.`, guard ~$69.
+None. Wave 1 `[exec]` (s1-s3) is the next launch.
 
 ## How to resume
 
-1. Merge the plan PR.
-2. Start a cloud session on `lolay/nowline` from `main`.
-3. Paste the plan's Kickoff prompt. The session asks the kickoff question, records the answer, and dispatches.
+Start a cloud session on `lolay/nowline` from branch `claude/plan-m2p-5b-heron-5bcx5v` and paste the plan's Kickoff prompt.
 
 ## Deviations
 
-- **The kickoff question is deferred.** The skill asks it right after the plan is written. Here the planning session wrote the Kickoff block in its pending form (`mode: pending`, Status `BLOCKED at gate mode`, no mode line in the prompt) and left the question to the executing session. That session needs the maintainer's approval of the plan PR first, and was asked to drive only the 5b plan. `plan_state.py` reports only `gate-mode`.
+- **The kickoff question was deferred** (answered `unattended` on 2026-10-12 by the executing session). The skill asks it right after the plan is written. Here the planning session wrote the Kickoff block in its pending form (`mode: pending`, Status `BLOCKED at gate mode`, no mode line in the prompt) and left the question to the executing session. That session needs the maintainer's approval of the plan PR first, and was asked to drive only the 5b plan. `plan_state.py` reports only `gate-mode`.
 - **Decision 6 deviates from spec §8** (no `<WorkWeeks>`). s9 updates the spec in the 5b PR.
 - **Decision 3 adds a run-label canvas growth** that the milestone handoff doesn't mention. Without it, Example B's label under `hide` draws over the header card. The probe showed this.
 
