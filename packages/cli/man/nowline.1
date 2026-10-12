@@ -183,6 +183,11 @@ Default: inferred from extension; standard input defaults to
 .Sy light | dark | grayscale ;
 .Sy greyscale
 is accepted as an alias.
+Default:
+.Pa .nowlinerc
+.Sy theme ,
+else
+.Sy light .
 .It Fl -now Ar date
 .Sq Now
 anchor for the now-line and date math.
@@ -279,7 +284,10 @@ Raster scale factor (PNG only; default 1).
 Promote asset / sanitizer warnings to errors.
 .It Fl w , -width Ar px
 Maximum canvas width in pixels.
-By default the canvas fits its content.
+Default:
+.Pa .nowlinerc
+.Sy width ,
+else unset, so the canvas fits its content.
 A wider roadmap shrinks its timeline to fit, down to one pixel per day;
 captions that spill past their bars can still make the canvas wider.
 .It Fl -non-working Ar mode
@@ -412,10 +420,42 @@ for the resolution matrix.
 .It Pa .nowlinerc
 Optional JSON or YAML configuration file.
 Walked up from the input file's directory; nearest one wins.
-CLI flags override config values.
-Recognized keys:
-.Sy theme , defaultFormat , width , pdfPageSize , pdfOrientation ,
-.Sy pdfMargin , fontSans , fontMono , headlessFonts , locale .
+Each recognized key is the default for one flag: the flag wins when
+given, then the key, then the built-in default.
+.Sy theme
+.Pq Fl t ,
+.Sy defaultFormat
+.Pq Fl f ,
+.Sy width
+.Pq Fl w ,
+.Sy pdfPageSize
+.Pq Fl -page-size ,
+.Sy pdfOrientation
+.Pq Fl -orientation ,
+.Sy pdfMargin
+.Pq Fl -margin ,
+.Sy fontSans
+.Pq Fl -font-sans ,
+.Sy fontMono
+.Pq Fl -font-mono ,
+.Sy headlessFonts
+.Pq Fl -headless ,
+.Sy useSystemFonts
+.Pq Fl -use-system-fonts ,
+.Sy locale
+.Pq Fl -locale .
+.Sy defaultFormat
+applies only when
+.Fl o
+has no recognized extension;
+.Sy locale
+ranks below the locale environment variables.
+.Fl -serve
+reads
+.Sy theme
+and
+.Sy locale .
+An invalid value is a usage error that names the key.
 Unknown keys are ignored.
 .El
 .Sh EXIT STATUS

@@ -5,7 +5,7 @@
 .\" Empreinte de la page anglaise relue pour cette traduction. Après avoir
 .\" reporté une modification de la page anglaise, remplacez-la par la ligne
 .\" qu'affiche packages/cli/test/man/translation-parity.test.ts.
-.\" translated-from: nowline.5 sha256:3546d281d6ee4b9b9ecd2de13819101ac555ef110bb577e78cd4d8c132d8fe9a
+.\" translated-from: nowline.5 sha256:5f205668d1d94a52f5340930739f2540842634f3cec4dad4f716e55c853ccb03
 .\"
 .\" Les mots-clés du DSL (nowline, config, roadmap, swimlane, item, parallel,
 .\" group, person, team, anchor, label, size, status, wave, milestone, footnote,
@@ -1299,8 +1299,8 @@ Les propriétés de style brutes
 .Sy bg , Sy fg , Sy text , Sy border , Sy icon , Sy shadow ,
 .Sy font , Sy weight , Sy italic , Sy text-size , Sy padding ,
 .Sy spacing , Sy header-height , Sy corner-radius , Sy bracket ,
-.Sy capacity-icon , Sy timeline-position , Sy minor-grid ,
-.Sy non-working
+.Sy header-position , Sy capacity-icon , Sy timeline-position ,
+.Sy minor-grid , Sy non-working
 .Pc
 ne peuvent apparaître que dans des blocs
 .Sy style
@@ -1660,6 +1660,17 @@ Identifiants intégrés\ :
 Personnalisé\ : tout identifiant
 .Sy symbol \ ;
 en ligne\ : un littéral Unicode entre guillemets doubles.
+.It Sy header-position
+.Sy beside Pq par défaut | above .
+Réservée à
+.Sy roadmap .
+Emplacement de la carte d'en-tête de la roadmap (titre et auteur)\ :
+.Sy beside
+la place dans une colonne à gauche du graphique, large de 120 à 240 px,
+le titre passant à la ligne pour tenir\ ;
+.Sy above
+la place dans un bandeau pleine largeur de 72 px de haut au-dessus du
+graphique, qui s'étend alors sur toute la largeur du canevas.
 .It Sy timeline-position
 .Sy top Pq par défaut | bottom | both .
 Réservée à
@@ -2032,7 +2043,8 @@ Toute autre valeur est
 (une erreur par valeur).
 .It
 Les clés de style propres à la roadmap
-.Sy header-height , timeline-position , minor-grid
+.Sy header-height , header-position , timeline-position ,
+.Sy minor-grid
 et
 .Sy non-working
 ne s'appliquent que sur

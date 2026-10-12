@@ -1224,8 +1224,8 @@ Raw style properties
 .Sy bg , Sy fg , Sy text , Sy border , Sy icon , Sy shadow ,
 .Sy font , Sy weight , Sy italic , Sy text-size , Sy padding ,
 .Sy spacing , Sy header-height , Sy corner-radius , Sy bracket ,
-.Sy capacity-icon , Sy timeline-position , Sy minor-grid ,
-.Sy non-working
+.Sy header-position , Sy capacity-icon , Sy timeline-position ,
+.Sy minor-grid , Sy non-working
 .Pc
 may only appear in
 .Sy style
@@ -1569,6 +1569,16 @@ Built-in identifiers:
 Custom: any
 .Sy symbol
 id; inline: a double-quoted Unicode literal.
+.It Sy header-position
+.Sy beside Pq default | above .
+Roadmap-only.
+Where the roadmap header card (title and author) sits:
+.Sy beside
+puts it in a column left of the chart, 120 to 240 px wide, with the
+title wrapping to fit;
+.Sy above
+puts it in a full-width 72 px band above the chart, which then spans
+the whole canvas width.
 .It Sy timeline-position
 .Sy top Pq default | bottom | both .
 Roadmap-only.
@@ -1920,7 +1930,8 @@ Any other value is
 (one error per value).
 .It
 The roadmap-only style keys
-.Sy header-height , timeline-position , minor-grid ,
+.Sy header-height , header-position , timeline-position ,
+.Sy minor-grid ,
 and
 .Sy non-working
 take effect only on

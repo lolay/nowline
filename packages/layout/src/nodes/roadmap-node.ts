@@ -99,8 +99,8 @@ const HEADER_CARD_TOP_INSET = 4;
  * it wants the canvas to contain, with any breathing-room margin
  * (typically `GUTTER_PX`) baked in. Concentrating growth here makes
  * it trivial to grep for every contributor — today: item caption
- * spills; future: anchor/milestone label spills, footnote panels
- * wider than the chart, etc.
+ * spills, the timeline extension and marker-row labels; future:
+ * footnote panels wider than the chart, etc.
  *
  * Initial seed lives at the start of `place(...)` (the natural date
  * window with `GUTTER_PX` insets on each side); everything that
@@ -146,13 +146,13 @@ function nonWorkingRunEntries(
 }
 
 /**
- * The canvas right edge the run labels need. A run label that fits
- * neither right of its x (against `chartRightX`) nor left of it (against
- * `chartLeftX`) would fall back to the left and draw over a beside header
- * card, so the canvas grows to hold it on the right instead. Anchors and
- * milestones keep the left fallback.
+ * The canvas right edge the marker-row labels need. A label (anchor,
+ * milestone or titled run) that fits neither right of its x (against
+ * `chartRightX`) nor left of it (against `chartLeftX`) would fall back to
+ * the left and draw over a beside header card, so the canvas grows to
+ * hold it on the right instead.
  */
-function runLabelsRightX(
+function markerLabelsRightX(
     entries: ReadonlyArray<MarkerEntity>,
     chartLeftX: number,
     chartRightX: number,
@@ -160,7 +160,7 @@ function runLabelsRightX(
 ): number {
     let rightX = chartRightX;
     for (const e of entries) {
-        const labelWidth = estimateTextWidth(e.title, e.fontSize);
+        const labelWidth = markerLabelWidth(e, estimateTextWidth);
         const rightEnd = e.centerX + e.radius + MARKER_LABEL_GAP_PX + labelWidth;
         const leftStart = e.centerX - e.radius - MARKER_LABEL_GAP_PX - labelWidth;
         if (rightEnd > chartRightX && leftStart < chartLeftX) {
@@ -437,13 +437,14 @@ export class RoadmapNode {
         // entries claim row 0; later ones drop to row 1+ when their
         // bounding box (diamond + label) overlaps an already-placed
         // entry. The renderer reads `labelBox.x/y` directly.
-        // Titled runs pack after the markers, against the right edge the
-        // post-layout canvas growth will give their labels.
+        // Titled runs pack after the markers. Every entry packs against
+        // the right edge the post-layout canvas growth will give its label.
+        const preliminaryEntries = [...datePinnedEntries, ...provisionalRunEntries];
         const packed = packMarkerRow(
-            [...datePinnedEntries, ...provisionalRunEntries],
+            preliminaryEntries,
             chartLeftX,
-            runLabelsRightX(
-                provisionalRunEntries,
+            markerLabelsRightX(
+                preliminaryEntries,
                 chartLeftX,
                 finalChartRightX,
                 deps.estimateTextWidth,
@@ -766,37 +767,11 @@ export class RoadmapNode {
             growChartRightX(ctx, originX + extendedWidth + GUTTER_PX);
         }
 
-        // Run labels (5b) from the final runs: the extension pass above
+        // Every marker (date-pinned anchor, date-pinned milestone,
+        // after-only milestone, titled run) with its final centerX. Run
+        // labels come from the final runs: the extension pass above
         // rebuilt them, so never the pre-pack's copies. A label that fits
         // neither side grows the canvas so the re-pack places it right.
-        const runEntries = nonWorkingRunEntries(timeline.nonWorking);
-        growChartRightX(
-            ctx,
-            runLabelsRightX(runEntries, chartLeftX, ctx.chartRightX, deps.estimateTextWidth),
-        );
-
-        // `ctx.chartRightX` is final from here on. Each swimlane band
-        // and include region read the canvas width once during its place
-        // pass, before the spill expansion and the timeline extension
-        // above. Re-stretch every band so the lane background contains
-        // its own spilled captions (text-spills-right's "1w — 50%
-        // remaining" extends 22 px past the unstretched lane edge
-        // otherwise) and reaches the extended tick panel, and re-fit
-        // each include so its right-edge clamp reads the final width.
-        for (const lane of swimlanes) {
-            lane.box.width = ctx.chartRightX;
-        }
-        for (const inc of includes) {
-            fitIncludeRegionWidth(inc, ctx.chartRightX);
-        }
-
-        // Unified marker re-pack. Every marker (date-pinned anchor,
-        // date-pinned milestone, after-only milestone) participates
-        // with its final centerX — so packMarkerRow can sort by tick
-        // and assign rows + label sides bottom-first. This is the
-        // single source of truth for `ctx.markerRowPlacements`; the
-        // pre-pack only existed to size the marker band before
-        // swimlanes ran.
         const allMarkerEntries: MarkerEntity[] = datePinnedEntries.map((e) => ({
             id: e.id,
             centerX: e.centerX,
@@ -816,7 +791,38 @@ export class RoadmapNode {
                 bold: true,
             });
         }
+        const runEntries = nonWorkingRunEntries(timeline.nonWorking);
         allMarkerEntries.push(...runEntries);
+        growChartRightX(
+            ctx,
+            markerLabelsRightX(
+                allMarkerEntries,
+                chartLeftX,
+                ctx.chartRightX,
+                deps.estimateTextWidth,
+            ),
+        );
+
+        // `ctx.chartRightX` is final from here on. Each swimlane band
+        // and include region read the canvas width once during its place
+        // pass, before the spill expansion and the timeline extension
+        // above. Re-stretch every band so the lane background contains
+        // its own spilled captions (text-spills-right's "1w — 50%
+        // remaining" extends 22 px past the unstretched lane edge
+        // otherwise) and reaches the extended tick panel, and re-fit
+        // each include so its right-edge clamp reads the final width.
+        for (const lane of swimlanes) {
+            lane.box.width = ctx.chartRightX;
+        }
+        for (const inc of includes) {
+            fitIncludeRegionWidth(inc, ctx.chartRightX);
+        }
+
+        // Unified marker re-pack over `allMarkerEntries`, so
+        // packMarkerRow can sort by tick and assign rows + label sides
+        // bottom-first. This is the single source of truth for
+        // `ctx.markerRowPlacements`; the pre-pack only existed to size
+        // the marker band before swimlanes ran.
         const repacked = packMarkerRow(
             allMarkerEntries,
             chartLeftX,
@@ -1122,6 +1128,14 @@ interface MarkerEntity {
     bold: boolean;
 }
 
+/** A marker label's width: bold labels widen by `MARKER_BOLD_WIDTH_FACTOR`. */
+function markerLabelWidth(
+    e: MarkerEntity,
+    estimateTextWidth: (text: string, fontSize: number) => number,
+): number {
+    return estimateTextWidth(e.title, e.fontSize) * (e.bold ? MARKER_BOLD_WIDTH_FACTOR : 1);
+}
+
 interface PackedPlacement {
     rowIndex: number;
     labelBox: BoundingBox;
@@ -1163,8 +1177,7 @@ export function packMarkerRow(
 
     type Side = 'left' | 'right';
     for (const e of sorted) {
-        const labelWidth =
-            estimateTextWidth(e.title, e.fontSize) * (e.bold ? MARKER_BOLD_WIDTH_FACTOR : 1);
+        const labelWidth = markerLabelWidth(e, estimateTextWidth);
         const naturalRightX = e.centerX + e.radius + MARKER_LABEL_GAP_PX;
         const naturalLeftX = e.centerX - e.radius - MARKER_LABEL_GAP_PX - labelWidth;
         const fitsRightCanvas = naturalRightX + labelWidth <= chartRightX;

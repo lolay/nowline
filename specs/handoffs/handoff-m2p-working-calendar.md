@@ -1,6 +1,6 @@
 # Working calendar handoff: implementation plan (m2p)
 
-> **Status: Phases 1-3 are implemented in PR lolay/nowline#96 (merged as `9c0982d`); Phase 4 (`show` and the display setting) in PR lolay/nowline#97 (merged as `c74c795`); Phase 5 ships as two PRs, 5a and 5b (§6): 5a (declarations reach the language, the validator and the schedule) is merged as `e3b2479` (lolay/nowline#115), and 5b (declarations on the chart and in exports, editor and agent tooling) is implemented in the Phase 5b PR. 5a and 5b must ship in the same release.** This handoff turns [`working-calendar.md`](../working-calendar.md) into a phased plan for a fresh agent. It is self-contained: the decisions that close the spec's open questions are in §3, the codebase map is in §4, and the target API is in §5. Do not redo the research; re-verify line numbers instead (§1, step 2).
+> **Status: Phases 1-3 are implemented in PR lolay/nowline#96 (merged as `9c0982d`); Phase 4 (`show` and the display setting) in PR lolay/nowline#97 (merged as `c74c795`); Phase 5 ships as two PRs, 5a and 5b (§6): 5a (declarations reach the language, the validator and the schedule) is merged as `e3b2479` (lolay/nowline#115), and 5b (declarations on the chart and in exports, editor and agent tooling) is merged as `56345c7` (lolay/nowline#118). m2p is complete.** This handoff turns [`working-calendar.md`](../working-calendar.md) into a phased plan for a fresh agent. It is self-contained: the decisions that close the spec's open questions are in §3, the codebase map is in §4, and the target API is in §5. Do not redo the research; re-verify line numbers instead (§1, step 2).
 
 ## 1. How to pick this up
 
@@ -21,8 +21,8 @@ Milestone **m2p — Working calendar** is already in `specs/milestones.md` (summ
 | 2 | working-day schedule, `hide` | engines B and C in working days, `TimeScale` hide mapping, window and ticks, now-line, wave floors, positioned `nonWorking` runs | every business-calendar render |
 | 3 | exporters | XLSX, MS Project and Mermaid read the file's calendar | every `xlsx` and `mermaid` cell, and the `msproj` cells with sized items or the full calendar |
 | 4 | `show` and the display setting (merged, `c74c795`) | `non-working:` style key (`NL.E0800`), `--non-working` and its equivalents on every surface, show mapping in engine A, shading | none under `hide`; two deliberate additions: the `weekends-show` layout snapshot and its 8 determinism cells |
-| 5a (built; the Phase 5a PR) | declarations reach the schedule | lexer spike, `non-working` and `working` keywords, `date:` / `start:` / `end:` / `every:`, printer, validator (NW1–NW5: `NL.E0900`–`NL.E0907`, `NL.W0705`), include merge, declarations feed the working calendar (precedence, the file's `weekend`), language docs | none for files without the keywords; NW4 warns on the two `calendar:custom` files (`examples/product.nowline`, `tests/grammar-properties.nowline`) |
-| 5b (built; the Phase 5b PR) | declarations on the chart and in exports | labelled seams and bands for titled runs, MS Project `<Exceptions>` and Mermaid `excludes` dates, editor and agent tooling, fixtures and snapshots | none for files without the keywords; deliberate additions only |
+| 5a (merged, `e3b2479`) | declarations reach the schedule | lexer spike, `non-working` and `working` keywords, `date:` / `start:` / `end:` / `every:`, printer, validator (NW1–NW5: `NL.E0900`–`NL.E0907`, `NL.W0705`), include merge, declarations feed the working calendar (precedence, the file's `weekend`), language docs | none for files without the keywords; NW4 warns on the two `calendar:custom` files (`examples/product.nowline`, `tests/grammar-properties.nowline`) |
+| 5b (merged, `56345c7`) | declarations on the chart and in exports | labelled seams and bands for titled runs, MS Project `<Exceptions>` and Mermaid `excludes` dates, editor and agent tooling, fixtures and snapshots | none for files without the keywords; deliberate additions only |
 
 ## 3. Decision log
 
@@ -501,7 +501,7 @@ Found while mapping the code at `9725e9d`. None blocks this milestone (decision 
 
 1. **The CLI ignores `.nowlinerc` `theme` and `width`.** `cli/src/commands/render.ts:119, :121` read only the flags, although `nowline.1` documents both keys. The VS Code extension does read the rc theme.
 2. **Stale theme docs.** The `nowline.1` `-t` entry and the GitHub Action (`nowline-action/src/inputs.ts:40-46`) accept only `light | dark`; `grayscale` exists.
-3. **MCP `render` describes `now` as "Omit to suppress",** but the code defaults to `todayUtc()` (`mcp/src/server.ts:599-602` vs `:653`).
+3. **MCP `render` describes `now` as "Omit to suppress",** but the code defaults to `todayUtc()` (`mcp/src/server.ts:599-602` vs `:653`). Fixed after m2p: `render` and `export` now describe the today default and accept `-` to suppress, matching the CLI's `--now -`.
 4. **`LayoutOptions.width` has no effect.** `roadmap-node.ts:235` caps the canvas at `width`, then `:270` takes the max with the natural width, which always wins.
 5. **Dead code:** `_buildSwimlane` (`layout.ts:1196-1213`) and `formatDurationDays` (`calendar.ts:182-200`).
 

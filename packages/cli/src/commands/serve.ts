@@ -13,7 +13,7 @@ import {
 import { renderSvg } from '@nowline/renderer';
 import type { ParsedArgs } from '../cli/args.js';
 import { parseNonWorkingArg } from '../cli/non-working.js';
-import { parseThemeArg } from '../cli/theme.js';
+import { resolveTheme } from '../cli/theme.js';
 import { getServices, parseSource } from '../core/parse.js';
 import {
     adaptResolveDiagnostic,
@@ -27,7 +27,7 @@ import {
     resolveLocaleOverride,
 } from '../i18n/locale.js';
 import { CliError, ExitCode } from '../io/exit-codes.js';
-import { createAssetResolver } from './render.js';
+import { createAssetResolver, loadConfigFor } from './render.js';
 
 export interface ServeHandlerOptions {
     args: ParsedArgs;
@@ -68,10 +68,15 @@ export async function serveHandler(options: ServeHandlerOptions): Promise<void> 
 
     const port = parsePort(args.port);
     const host = args.host ?? '127.0.0.1';
-    const theme = parseThemeArg(args.theme);
+    const config = await loadConfigFor(args.positional, cwd);
+    const theme = resolveTheme(args.theme, config?.theme);
     const nonWorking = parseNonWorkingArg(args.nonWorking);
     const today = resolveNowArg(args);
-    const resolvedLocale = resolveLocaleOverride({ flag: args.locale, env: process.env });
+    const resolvedLocale = resolveLocaleOverride({
+        flag: args.locale,
+        env: process.env,
+        rc: typeof config?.locale === 'string' ? config.locale : undefined,
+    });
     const locale = resolvedLocale.tag;
     const opLocale = operatorLocale(resolvedLocale);
 
