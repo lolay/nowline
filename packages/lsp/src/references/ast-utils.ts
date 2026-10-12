@@ -363,6 +363,8 @@ export function findDeclarationRange(file: NowlineFile, id: string): Range | und
  * Render a one-line "type id" label used by hover and document-symbols.
  */
 export function entityKind(entity: AstNode): string {
+    // `NonWorkingDeclaration` would lowercase to `nonworking`; the keyword is hyphenated.
+    if (entity.$type === 'NonWorkingDeclaration') return 'non-working';
     return entity.$type
         .replace(/Declaration$/, '')
         .replace(/Block$/, '')

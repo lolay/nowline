@@ -1,9 +1,13 @@
 import { describe, expect, it } from 'vitest';
 import {
     type EntityProperty,
+    isNonWorkingDeclaration,
     isSwimlaneDeclaration,
     isWaveDeclaration,
+    isWorkingDeclaration,
+    type NonWorkingDeclaration,
     type WaveDeclaration,
+    type WorkingDeclaration,
 } from '../../src/generated/ast.js';
 import { parse } from '../helpers.js';
 
@@ -438,3 +442,137 @@ milestone ga "GA" after:launch
         expect(auth.properties.find((p) => p.key === 'wave')?.value).toBe('foundations');
     });
 });
+
+// specs/working-calendar.md §4: `non-working` and `working` are config keywords.
+// Both take an optional id and title and any property list; the validator, not the
+// grammar, enforces the date / start / end / every shapes.
+type CalendarDeclaration = NonWorkingDeclaration | WorkingDeclaration;
+
+function calendarDeclarationSuite(
+    keyword: 'non-working' | 'working',
+    typeName: CalendarDeclaration['$type'],
+    isDeclaration: (node: unknown) => node is CalendarDeclaration,
+): void {
+    describe(`${keyword} declaration`, () => {
+        async function parseDeclarations(body: string): Promise<CalendarDeclaration[]> {
+            const r = await parse(`config\n\n${body}\nroadmap r start:2026-01-05\n`, {
+                validate: false,
+            });
+            expect(r.lexerErrors).toEqual([]);
+            expect(r.parserErrors).toEqual([]);
+            return r.ast.configEntries.filter(isDeclaration);
+        }
+
+        function props(
+            decl: CalendarDeclaration,
+        ): Array<Pick<EntityProperty, 'key' | 'value' | 'values'>> {
+            return decl.properties.map((p) => ({ key: p.key, value: p.value, values: p.values }));
+        }
+
+        it('parses a bare keyword with no id, title or properties', async () => {
+            const [d] = await parseDeclarations(`${keyword}\n`);
+            expect(d.$type).toBe(typeName);
+            expect(d.name).toBeUndefined();
+            expect(d.title).toBeUndefined();
+            expect(d.properties).toEqual([]);
+        });
+
+        it('parses an id and a title', async () => {
+            const [d] = await parseDeclarations(`${keyword} holiday "Holiday" date:2026-12-25\n`);
+            expect(d.name).toBe('holiday');
+            expect(d.title).toBe('Holiday');
+        });
+
+        it('parses a title with no id', async () => {
+            const [d] = await parseDeclarations(`${keyword} "Holiday" date:2026-12-25\n`);
+            expect(d.name).toBeUndefined();
+            expect(d.title).toBe('Holiday');
+        });
+
+        it('parses an id with no title', async () => {
+            const [d] = await parseDeclarations(`${keyword} holiday date:2026-12-25\n`);
+            expect(d.name).toBe('holiday');
+            expect(d.title).toBeUndefined();
+        });
+
+        it('parses date: with one date', async () => {
+            const [d] = await parseDeclarations(`${keyword} h date:2026-12-25\n`);
+            expect(props(d)).toEqual([{ key: 'date', value: '2026-12-25', values: [] }]);
+        });
+
+        it('parses date: with a list of dates', async () => {
+            const [d] = await parseDeclarations(`${keyword} h date:[2026-12-24, 2026-12-25]\n`);
+            expect(props(d)).toEqual([
+                { key: 'date', value: undefined, values: ['2026-12-24', '2026-12-25'] },
+            ]);
+        });
+
+        it('parses start: and end: as a range', async () => {
+            const [d] = await parseDeclarations(`${keyword} h start:2026-12-24 end:2026-12-26\n`);
+            expect(props(d)).toEqual([
+                { key: 'start', value: '2026-12-24', values: [] },
+                { key: 'end', value: '2026-12-26', values: [] },
+            ]);
+        });
+
+        it('parses every: with one weekday', async () => {
+            const [d] = await parseDeclarations(`${keyword} h every:fri\n`);
+            expect(props(d)).toEqual([{ key: 'every', value: 'fri', values: [] }]);
+        });
+
+        it('parses every: with a list of weekdays', async () => {
+            const [d] = await parseDeclarations(`${keyword} h every:[sat, sun]\n`);
+            expect(props(d)).toEqual([{ key: 'every', value: undefined, values: ['sat', 'sun'] }]);
+        });
+
+        it('parses every: bounded on one side and on both sides', async () => {
+            const [open, closed] = await parseDeclarations(
+                `${keyword} a every:fri start:2026-01-12\n${keyword} b every:fri start:2026-01-12 end:2026-01-25\n`,
+            );
+            expect(props(open).map((p) => p.key)).toEqual(['every', 'start']);
+            expect(props(closed).map((p) => p.key)).toEqual(['every', 'start', 'end']);
+        });
+
+        it('parses a shape the validator rejects (the grammar accepts any property)', async () => {
+            const [d] = await parseDeclarations(`${keyword} h date:2026-01-01 style:x\n`);
+            expect(props(d).map((p) => p.key)).toEqual(['date', 'style']);
+        });
+
+        it('keeps source order among the config entries', async () => {
+            const r = await parse(
+                `config
+
+style calm
+  bg: blue
+
+non-working a date:2026-01-01
+working b date:2026-01-02
+symbol star unicode:"x"
+${keyword} c date:2026-01-03
+default item style:calm
+
+roadmap r start:2026-01-05
+`,
+                { validate: false },
+            );
+            expect(r.lexerErrors).toEqual([]);
+            expect(r.parserErrors).toEqual([]);
+            expect(r.ast.configEntries.map((e) => e.$type)).toEqual([
+                'StyleDeclaration',
+                'NonWorkingDeclaration',
+                'WorkingDeclaration',
+                'SymbolDeclaration',
+                typeName,
+                'DefaultDeclaration',
+            ]);
+        });
+
+        it('takes the keyword as a name in the slots that accept wave', async () => {
+            const [d] = await parseDeclarations(`${keyword} working date:2026-01-01\n`);
+            expect(d.name).toBe('working');
+        });
+    });
+}
+
+calendarDeclarationSuite('non-working', 'NonWorkingDeclaration', isNonWorkingDeclaration);
+calendarDeclarationSuite('working', 'WorkingDeclaration', isWorkingDeclaration);

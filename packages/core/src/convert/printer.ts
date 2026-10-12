@@ -19,7 +19,9 @@ const KEY_ORDER = [
     'ascii',
     'link',
     'author',
+    'every',
     'start',
+    'end',
     'scale',
     'calendar',
     'header-position',
@@ -100,6 +102,10 @@ class Printer {
                 return this.styleDecl(entry);
             case 'SymbolDeclaration':
                 return this.simpleEntity('symbol', entry, 0);
+            case 'NonWorkingDeclaration':
+                return this.simpleEntity('non-working', entry, 0);
+            case 'WorkingDeclaration':
+                return this.simpleEntity('working', entry, 0);
             case 'DefaultDeclaration':
                 return this.defaultDecl(entry);
             default:
