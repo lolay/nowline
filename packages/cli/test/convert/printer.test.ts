@@ -264,7 +264,7 @@ describe('calendar declarations', () => {
         ['a recurrence', 'non-working weekend "Weekend" every:[fri, sat]'],
         ['a bounded recurrence', 'non-working every:fri start:2026-01-12 end:2026-01-25'],
         ['a half-open recurrence', 'working every:sat start:2026-01-12'],
-        ['no id, title or properties', 'non-working'],
+        ['no id or title', 'non-working date:2026-01-01'],
     ];
 
     async function toJson(text: string) {

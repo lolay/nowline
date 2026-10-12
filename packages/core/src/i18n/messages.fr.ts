@@ -284,6 +284,23 @@ export const messages: MessageBundle = {
     'NL.E0812': (a: { key: string; value: string }) =>
         `${a.key}: le symbole «\u00A0${a.value}\u00A0» est référencé avant sa déclaration. Déplacez «\u00A0symbol ${a.value}\u00A0» au-dessus de cette entrée.`,
 
+    // Déclarations de calendrier (non-working et working)
+    'NL.E0900': (a: { kind: string }) =>
+        `Une déclaration ${a.kind} prend date:, ou start: et end:, ou every: avec start: et end: facultatifs.`,
+    'NL.E0901': (a: { kind: string; key: string }) =>
+        `Propriété ${a.kind} inconnue «\u00A0${a.key}\u00A0». Autorisées\u00A0: date, start, end, every.`,
+    'NL.E0902': (a: { kind: string; key: string }) =>
+        `${a.key}: sur une déclaration ${a.kind} prend une seule date, pas une liste.`,
+    'NL.E0903': (a: { start: string; end: string }) => `end: ${a.end} précède start: ${a.start}.`,
+    'NL.E0904': (a: { value: string }) =>
+        `Jour de semaine invalide «\u00A0${a.value}\u00A0». Utilisez sun, mon, tue, wed, thu, fri ou sat.`,
+    'NL.E0905': (a: { value: string }) =>
+        `Le jour «\u00A0${a.value}\u00A0» apparaît plusieurs fois.`,
+    'NL.E0906': () =>
+        'Il ne reste aucun jour ouvré dans la semaine sans date de fin. Gardez au moins un jour ouvré.',
+    'NL.E0907': (a: { kind: string; name: string }) =>
+        `Identifiant ${a.kind} «\u00A0${a.name}\u00A0» en double.`,
+
     // Avertissements
     'NL.W0700': (a: { key: string; entity: string; suggested: string }) =>
         `Propriété inconnue «\u00A0${a.key}\u00A0» sur ${a.entity}. Le moteur de rendu l'ignore.${
@@ -312,6 +329,8 @@ export const messages: MessageBundle = {
         `${q(a.key)} sur ${q(`default ${a.entityType}`)} est ignoré\u00A0: c'est une clé de style propre à la roadmap. Définissez-la plutôt sur «\u00A0default roadmap\u00A0».`,
     'NL.W0704': (a: { position: string }) =>
         `${q(`timeline-position:${a.position}`)} n'affiche aucune date\u00A0: ${q('header-height:none')} retire tous les bandeaux de dates de la frise. Donnez à header-height la valeur xs, sm, md, lg ou xl pour les afficher.`,
+    'NL.W0705': (a: { daysPerWeek: number; working: number }) =>
+        `days-per-week vaut ${a.daysPerWeek}, mais la semaine laisse ${a.working} jours ouvrés.`,
 
     // Vagues
     'NL.E1100': (a: E1100Args) =>

@@ -19,6 +19,7 @@ import type {
     IncludeOption,
     ItemDeclaration,
     MilestoneDeclaration,
+    NonWorkingDeclaration,
     NowlineDirective,
     NowlineFile,
     ParallelBlock,
@@ -35,6 +36,7 @@ import type {
     SwimlaneDeclaration,
     SymbolDeclaration,
     TeamDeclaration,
+    WorkingDeclaration,
 } from '../generated/ast.js';
 import {
     isAnchorDeclaration,
@@ -46,6 +48,7 @@ import {
     isItemDeclaration,
     isLabelDeclaration,
     isMilestoneDeclaration,
+    isNonWorkingDeclaration,
     isParallelBlock,
     isPersonDeclaration,
     isPersonMemberRef,
@@ -56,6 +59,7 @@ import {
     isSymbolDeclaration,
     isTeamDeclaration,
     isWaveDeclaration,
+    isWorkingDeclaration,
 } from '../generated/ast.js';
 import type { MessageArgs, MessageCode } from '../i18n/index.js';
 import { tr } from '../i18n/index.js';
@@ -468,6 +472,8 @@ export function registerValidationChecks(services: NowlineServices): void {
             validator.checkPersonDeclarations,
             validator.checkDuplicateSymbolIds,
             validator.checkSymbolReferences,
+            validator.checkCalendarWeek,
+            validator.checkDuplicateCalendarDeclarationIds,
         ],
         NowlineDirective: [validator.checkDirectiveVersion, validator.checkDirectiveProperties],
         IncludeOption: [validator.checkIncludeMode],
@@ -544,6 +550,10 @@ export function registerValidationChecks(services: NowlineServices): void {
         StyleDeclaration: [validator.checkEntityIdOrTitle],
         StyleProperty: [validator.checkStylePropertyEnum],
         SymbolDeclaration: [validator.checkEntityIdOrTitle, validator.checkSymbolDeclaration],
+        // No checkEntityIdOrTitle: an id-less, title-less declaration is valid. The own-key
+        // check replaces checkUnknownEntityProperties, which skips `wave:` and style keys.
+        NonWorkingDeclaration: [validator.checkCalendarDeclaration],
+        WorkingDeclaration: [validator.checkCalendarDeclaration],
         LabelDeclaration: [
             validator.checkEntityIdOrTitle,
             validator.checkNoRawStyleProperties,
@@ -822,7 +832,10 @@ export class NowlineValidator {
 
             case 'date':
             case 'start':
-                if (val && (!DATE_RE.test(val) || Number.isNaN(new Date(val).getTime()))) {
+            case 'end':
+                // A calendar declaration's dates are checked for a real calendar day
+                // (`2026-02-30` rolls over in `Date`, and would silently move a holiday).
+                if (val && !isValidDateLiteral(val, isCalendarDeclaration(prop.$container))) {
                     acceptTr(accept, 'error', { node: prop, property: 'value' }, 'NL.E0405', {
                         key,
                         value: val,
@@ -1996,6 +2009,171 @@ export class NowlineValidator {
         }
     }
 
+    // --- NW1-NW3: one `non-working` / `working` declaration (specs/working-calendar.md §6) ---
+    // Shared by both keywords. The shape is judged over the four own keys only; any other
+    // key is NL.E0901 on its own, so `date:2026-01-01 style:x` reports just that key.
+    checkCalendarDeclaration(
+        decl: NonWorkingDeclaration | WorkingDeclaration,
+        accept: ValidationAcceptor,
+    ): void {
+        const kind = entityTypeLabel(decl);
+        const own = calendarOwnProps(decl);
+
+        for (const prop of decl.properties) {
+            if (!CALENDAR_DECLARATION_KEYS.has(propKey(prop))) {
+                acceptTr(accept, 'error', { node: prop, property: 'key' }, 'NL.E0901', {
+                    kind,
+                    key: propKey(prop),
+                });
+            }
+        }
+
+        if (!hasCalendarShape(own)) {
+            acceptTr(accept, 'error', { node: decl }, 'NL.E0900', { kind });
+        }
+
+        // `date:` elements. A single value is checked by checkPropertyValues.
+        const dateProp = own.get('date');
+        if (dateProp && dateProp.values.length > 0) {
+            dateProp.values.forEach((value, index) => {
+                if (!isValidDateLiteral(value, true)) {
+                    acceptTr(
+                        accept,
+                        'error',
+                        { node: dateProp, property: 'values', index },
+                        'NL.E0405',
+                        {
+                            key: 'date',
+                            value,
+                        },
+                    );
+                }
+            });
+        }
+
+        for (const key of ['start', 'end']) {
+            const prop = own.get(key);
+            if (prop && isCalendarDateList(prop)) {
+                acceptTr(accept, 'error', { node: prop }, 'NL.E0902', { kind, key });
+            }
+        }
+
+        const start = scalarDate(own.get('start'));
+        const end = scalarDate(own.get('end'));
+        if (start && end && end < start) {
+            acceptTr(accept, 'error', { node: own.get('end')!, property: 'value' }, 'NL.E0903', {
+                start,
+                end,
+            });
+        }
+
+        const everyProp = own.get('every');
+        if (everyProp) {
+            const seen = new Set<string>();
+            calendarPropValues(everyProp).forEach((value, index) => {
+                const info: DiagnosticInfo =
+                    everyProp.values.length > 0
+                        ? { node: everyProp, property: 'values', index }
+                        : { node: everyProp, property: 'value' };
+                if (!(value in WEEKDAY_INDEX)) {
+                    acceptTr(accept, 'error', info, 'NL.E0904', { value });
+                } else if (seen.has(value)) {
+                    acceptTr(accept, 'error', info, 'NL.E0905', { value });
+                }
+                seen.add(value);
+            });
+        }
+    }
+
+    // --- NW3 / NW4: the open-ended week of the root file ---
+    // Mirrors `resolveWorkingCalendar` in @nowline/layout for the file alone: an include's
+    // declarations are not visible here, so they never feed the week (documented limit).
+    checkCalendarWeek(file: NowlineFile, accept: ValidationAcceptor): void {
+        const roadmap = file.roadmapDecl;
+        // A file with no roadmap is an include; the roadmap that pulls it in owns the calendar.
+        if (!roadmap) return;
+
+        const declarations = file.configEntries.filter(isCalendarDeclaration);
+        const usable = declarations.filter(isWellFormedCalendarDeclaration);
+        const openEnded = usable.filter((d) => isOpenEndedRecurrence(d));
+
+        const calendarProp = roadmap.properties.find((p) => propKey(p) === 'calendar');
+        const block = file.configEntries.find(isCalendarBlock);
+        const isCustom = calendarProp?.value === 'custom' && block !== undefined;
+        const isFull = calendarProp?.value === 'full';
+        const daysPerWeekProp = isCustom
+            ? block.properties.find((p) => propKey(p) === 'days-per-week')
+            : undefined;
+        const declaredDays = parseInt(daysPerWeekProp?.value ?? '', 10);
+        const daysPerWeek = isCustom
+            ? Number.isFinite(declaredDays) && declaredDays > 0
+                ? declaredDays
+                : BUSINESS_DAYS_PER_WEEK
+            : isFull
+              ? 7
+              : BUSINESS_DAYS_PER_WEEK;
+
+        // The preset weekend, unless a non-working declaration is named `weekend`.
+        const replacesWeekend = declarations.some(
+            (d) => isNonWorkingDeclaration(d) && d.name === 'weekend',
+        );
+        const open = new Set<number>(!isCustom && !isFull && !replacesWeekend ? [0, 6] : []);
+        for (const decl of openEnded) {
+            if (isNonWorkingDeclaration(decl)) {
+                for (const day of weekdaysOf(decl)) open.add(day);
+            }
+        }
+        for (const decl of openEnded) {
+            if (isWorkingDeclaration(decl)) {
+                for (const day of weekdaysOf(decl)) open.delete(day);
+            }
+        }
+
+        if (open.size === 7) {
+            for (const decl of openEnded) {
+                if (isNonWorkingDeclaration(decl)) {
+                    acceptTr(accept, 'error', { node: decl }, 'NL.E0906');
+                }
+            }
+        }
+        for (const decl of usable) {
+            if (!isNonWorkingDeclaration(decl) || !isHalfBoundedRecurrence(decl)) continue;
+            const days = new Set([...open, ...weekdaysOf(decl)]);
+            if (days.size === 7) acceptTr(accept, 'error', { node: decl }, 'NL.E0906');
+        }
+
+        const working = 7 - open.size;
+        // With no working day left the error above is the finding.
+        if (working === 0 || working === daysPerWeek) return;
+        const info: DiagnosticInfo = isCustom
+            ? daysPerWeekProp
+                ? { node: daysPerWeekProp, property: 'value' }
+                : { node: block }
+            : calendarProp
+              ? { node: calendarProp }
+              : openEnded.length > 0
+                ? { node: openEnded[0] }
+                : { node: roadmap };
+        acceptTr(accept, 'warning', info, 'NL.W0705', { daysPerWeek, working });
+    }
+
+    // --- NW5: duplicate declaration ids in one file, per keyword ---
+    checkDuplicateCalendarDeclarationIds(file: NowlineFile, accept: ValidationAcceptor): void {
+        const seen = new Map<string, NonWorkingDeclaration | WorkingDeclaration>();
+        for (const entry of file.configEntries) {
+            if (!isCalendarDeclaration(entry) || !entry.name) continue;
+            const key = `${entry.$type}:${entry.name}`;
+            if (seen.has(key)) {
+                acceptTr(accept, 'error', { node: entry, property: 'name' }, 'NL.E0907', {
+                    kind: entityTypeLabel(entry),
+                    name: entry.name,
+                });
+            } else {
+                seen.set(key, entry);
+            }
+        }
+    }
+
     // --- Rule 17k: icon: / capacity-icon: references resolve to a built-in,
     // a quoted Unicode literal, or an earlier symbol declaration. Forward
     // references are an error. Walks both StyleDeclaration.properties and
@@ -2125,6 +2303,124 @@ function parseUtilizationFraction(val: string | undefined): number | null {
         return Number.isFinite(n) && n > 0 ? n : null;
     }
     return null;
+}
+
+// --- Calendar declarations (`non-working` / `working`) ---
+
+const CALENDAR_DECLARATION_KEYS = new Set(['date', 'start', 'end', 'every']);
+
+// Weekday names the `every:` key takes, as UTC weekday numbers (Sunday is 0), the same
+// numbering as `CalendarRule.every` in @nowline/layout.
+const WEEKDAY_INDEX: Record<string, number> = {
+    sun: 0,
+    mon: 1,
+    tue: 2,
+    wed: 3,
+    thu: 4,
+    fri: 5,
+    sat: 6,
+};
+
+const BUSINESS_DAYS_PER_WEEK = 5;
+
+type CalendarDeclaration = NonWorkingDeclaration | WorkingDeclaration;
+
+function isCalendarDeclaration(node: unknown): node is CalendarDeclaration {
+    return isNonWorkingDeclaration(node) || isWorkingDeclaration(node);
+}
+
+/** The four own keys of a declaration, first occurrence of each. */
+function calendarOwnProps(decl: CalendarDeclaration): Map<string, EntityProperty> {
+    const own = new Map<string, EntityProperty>();
+    for (const prop of decl.properties) {
+        const key = propKey(prop);
+        if (CALENDAR_DECLARATION_KEYS.has(key) && !own.has(key)) own.set(key, prop);
+    }
+    return own;
+}
+
+/** Exactly one of: `date:` alone; `start:` + `end:`; `every:` with optional `start:` / `end:`. */
+function hasCalendarShape(own: ReadonlyMap<string, EntityProperty>): boolean {
+    if (own.has('date')) return !own.has('every') && !own.has('start') && !own.has('end');
+    if (own.has('every')) return true;
+    return own.has('start') && own.has('end');
+}
+
+function calendarPropValues(prop: EntityProperty): string[] {
+    return prop.value !== undefined ? [prop.value] : [...prop.values];
+}
+
+/** A `start:` / `end:` given two or more dates. A one-element bracket is the single date. */
+function isCalendarDateList(prop: EntityProperty): boolean {
+    return prop.values.length > 1;
+}
+
+/** The single, real date a `start:` / `end:` names, or undefined when absent or not one date. */
+function scalarDate(prop: EntityProperty | undefined): string | undefined {
+    if (!prop || isCalendarDateList(prop)) return undefined;
+    const [value] = calendarPropValues(prop);
+    return value !== undefined && isValidDateLiteral(value, true) ? value : undefined;
+}
+
+/**
+ * True for `YYYY-MM-DD` that `Date` can read. `strict` also requires a real calendar day:
+ * `Date` rolls `2026-02-30` over to March 2, which the generic checks accept.
+ */
+function isValidDateLiteral(value: string, strict: boolean): boolean {
+    if (!DATE_RE.test(value) || Number.isNaN(new Date(value).getTime())) return false;
+    if (!strict) return true;
+    const [year, month, day] = value.split('-').map((part) => parseInt(part, 10));
+    const probe = new Date(0);
+    probe.setUTCFullYear(year, month - 1, day);
+    return (
+        probe.getUTCFullYear() === year &&
+        probe.getUTCMonth() === month - 1 &&
+        probe.getUTCDate() === day
+    );
+}
+
+function weekdaysOf(decl: CalendarDeclaration): number[] {
+    const every = calendarOwnProps(decl).get('every');
+    if (!every) return [];
+    return calendarPropValues(every)
+        .map((name) => WEEKDAY_INDEX[name])
+        .filter((day): day is number => day !== undefined);
+}
+
+/**
+ * A declaration the calendar resolver would use: a valid shape, real single dates, weekday
+ * names it knows, and an end that is not before the start. Anything else is reported by
+ * `checkCalendarDeclaration` and left out of the week.
+ */
+function isWellFormedCalendarDeclaration(decl: CalendarDeclaration): boolean {
+    const own = calendarOwnProps(decl);
+    if (!hasCalendarShape(own)) return false;
+    const date = own.get('date');
+    if (date && !calendarPropValues(date).every((value) => isValidDateLiteral(value, true))) {
+        return false;
+    }
+    for (const key of ['start', 'end']) {
+        const prop = own.get(key);
+        if (prop && scalarDate(prop) === undefined) return false;
+    }
+    const start = scalarDate(own.get('start'));
+    const end = scalarDate(own.get('end'));
+    if (start && end && end < start) return false;
+    const every = own.get('every');
+    if (every && !calendarPropValues(every).every((name) => name in WEEKDAY_INDEX)) return false;
+    return true;
+}
+
+/** `every:` with neither `start:` nor `end:`: it changes the week with no end date. */
+function isOpenEndedRecurrence(decl: CalendarDeclaration): boolean {
+    const own = calendarOwnProps(decl);
+    return own.has('every') && !own.has('start') && !own.has('end');
+}
+
+/** `every:` with exactly one of `start:` and `end:`: unbounded on one side. */
+function isHalfBoundedRecurrence(decl: CalendarDeclaration): boolean {
+    const own = calendarOwnProps(decl);
+    return own.has('every') && own.has('start') !== own.has('end');
 }
 
 function locationOf(node: AstNode): string {
