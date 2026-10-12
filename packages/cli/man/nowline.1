@@ -302,8 +302,12 @@ Any other value exits with status 2.
 The schedule is the same in both views, so Mermaid, MS Project, and XLSX output
 does not change.
 .It Fl -asset-root Ar dir
-Directory from which logo / image assets may be loaded
-(default: input file's directory).
+Directory from which logo / image assets may be loaded,
+relative to the current directory.
+Default: the
+.Pa .nowlinerc
+.Sy assetRoot
+key, else the input file's directory.
 .El
 .Sh FORMAT-SPECIFIC OPTIONS
 .Bl -tag -width Fl
@@ -441,18 +445,25 @@ given, then the key, then the built-in default.
 .Sy useSystemFonts
 .Pq Fl -use-system-fonts ,
 .Sy locale
-.Pq Fl -locale .
+.Pq Fl -locale ,
+.Sy assetRoot
+.Pq Fl -asset-root .
 .Sy defaultFormat
 applies only when
 .Fl o
 has no recognized extension;
 .Sy locale
-ranks below the locale environment variables.
+ranks below the locale environment variables;
+a relative
+.Sy assetRoot
+resolves against the directory holding the
+.Pa .nowlinerc .
 .Fl -serve
 reads
-.Sy theme
+.Sy theme ,
+.Sy locale ,
 and
-.Sy locale .
+.Sy assetRoot .
 An invalid value is a usage error that names the key.
 Unknown keys are ignored.
 .El

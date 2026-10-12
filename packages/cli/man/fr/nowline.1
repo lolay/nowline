@@ -5,7 +5,7 @@
 .\" Empreinte de la page anglaise relue pour cette traduction. Après avoir
 .\" reporté une modification de la page anglaise, remplacez-la par la ligne
 .\" qu'affiche packages/cli/test/man/translation-parity.test.ts.
-.\" translated-from: nowline.1 sha256:99c7bf54b42d489323e6929c91bb37a137022d041b3e093b70baae290bf7e5ad
+.\" translated-from: nowline.1 sha256:981251e347301531f8fbdfcce50318666d95b0e86f409bc658437b1ea409b7fe
 .Dd $Mdocdate$
 .Dt NOWLINE 1
 .Os
@@ -321,7 +321,12 @@ L'ordonnancement est identique dans les deux vues\ : les sorties Mermaid,
 MS Project et XLSX ne changent pas.
 .It Fl -asset-root Ar dossier
 Dossier à partir duquel les ressources logo / image peuvent être
-chargées (par défaut\ : dossier du fichier d'entrée).
+chargées, relatif au dossier courant.
+Par défaut\ : la clé
+.Sy assetRoot
+de
+.Pa .nowlinerc ,
+sinon le dossier du fichier d'entrée.
 .El
 .Sh OPTIONS SPÉCIFIQUES AU FORMAT
 .Bl -tag -width Fl
@@ -462,18 +467,25 @@ par défaut intégrée.
 .Sy useSystemFonts
 .Pq Fl -use-system-fonts ,
 .Sy locale
-.Pq Fl -locale .
+.Pq Fl -locale ,
+.Sy assetRoot
+.Pq Fl -asset-root .
 .Sy defaultFormat
 ne s'applique que si l'extension de
 .Fl o
 n'est pas reconnue\ ;
 .Sy locale
-passe après les variables d'environnement de langue.
+passe après les variables d'environnement de langue\ ;
+un
+.Sy assetRoot
+relatif se résout par rapport au dossier qui contient le
+.Pa .nowlinerc .
 .Fl -serve
 lit
-.Sy theme
+.Sy theme ,
+.Sy locale
 et
-.Sy locale .
+.Sy assetRoot .
 Une valeur invalide est une erreur d'utilisation qui nomme la clé.
 Les clés inconnues sont ignorées.
 .El

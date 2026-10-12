@@ -101,6 +101,9 @@ Render options
                          or show.` Mermaid, MS Project, and XLSX output is the
                          same in both views. `--serve` takes it too.
   --asset-root <dir>     Directory from which logo / image assets may be loaded
+                         (relative to the current directory). Default:
+                         `.nowlinerc` `assetRoot`, else the input file's
+                         directory. `--serve` takes it too.
 
 Format-specific options
   --page-size <size>     PDF page size: preset (letter | legal | tabloid |
@@ -393,6 +396,7 @@ Each recognized key is the default for one flag, resolved flag > `.nowlinerc` > 
 | `headlessFonts` | `--headless` | Boolean; either source turns it on. |
 | `useSystemFonts` | `--use-system-fonts` | Boolean; either source turns it on. |
 | `locale` | `--locale` | Ranks below the locale environment variables (see below). Also read by `--serve`. |
+| `assetRoot` | `--asset-root` | A relative path resolves against the directory holding the `.nowlinerc`, not the current directory, so the same rc gives the same root from any directory (the flag resolves against the current directory). Must be a string; empty means unset. Also read by `--serve`. `--verbose` prints the resolved root and its source. |
 
 An invalid rc value is a usage error (exit 2) that names the key, for example `nowline: invalid .nowlinerc theme "sepia". Expected light, dark, or grayscale.`, rather than a flag the user never passed. A valid flag still wins over an invalid key. Unknown keys are ignored.
 
