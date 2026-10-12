@@ -27,7 +27,8 @@ import {
     resolveLocaleOverride,
 } from '../i18n/locale.js';
 import { CliError, ExitCode } from '../io/exit-codes.js';
-import { createAssetResolver, loadConfigFor } from './render.js';
+import { createLog, type Log } from '../io/log.js';
+import { createAssetResolver, errorsOnlyWhenQuiet, loadConfigFor } from './render.js';
 
 export interface ServeHandlerOptions {
     args: ParsedArgs;
@@ -66,6 +67,7 @@ export async function serveHandler(options: ServeHandlerOptions): Promise<void> 
         );
     }
 
+    const log = createLog(args.logLevel);
     const port = parsePort(args.port);
     const host = args.host ?? '127.0.0.1';
     const config = await loadConfigFor(args.positional, cwd);
@@ -103,20 +105,21 @@ export async function serveHandler(options: ServeHandlerOptions): Promise<void> 
             const parse = await parseSource(text, inputPath, { validate: true });
             if (parse.hasErrors) {
                 const sources = new Map<string, DiagnosticSource>([[inputPath, parse.source]]);
-                const rendered = formatDiagnostics(parse.diagnostics, 'text', sources, {
-                    color: false,
-                    operatorLocale: opLocale,
-                });
+                const format = (diagnostics: typeof parse.diagnostics): string =>
+                    formatDiagnostics(diagnostics, 'text', sources, {
+                        color: false,
+                        operatorLocale: opLocale,
+                    });
+                // The browser always gets the full report; stderr honors -q.
+                const rendered = format(parse.diagnostics);
                 lastPayload = { kind: 'error', body: rendered };
-                process.stderr.write(`${rendered}\n`);
+                process.stderr.write(`${format(errorsOnlyWhenQuiet(parse.diagnostics, log))}\n`);
                 broadcast(clients, 'error', rendered);
                 return;
             }
-            if (args.logLevel === 'verbose') {
-                const directive = readDirectiveLocale(parse.ast);
-                const { tag, source } = describeContentLocaleSource(directive, resolvedLocale);
-                process.stderr.write(`nowline: locale=${tag} (${source})\n`);
-            }
+            const directive = readDirectiveLocale(parse.ast);
+            const { tag, source } = describeContentLocaleSource(directive, resolvedLocale);
+            log.verbose(`nowline: locale=${tag} (${source})`);
             // Included files' text, kept for the code frames of routed diagnostics.
             const sources = new Map<string, DiagnosticSource>([[inputPath, parse.source]]);
             const resolved = await resolveIncludes(parse.ast, inputPath, {
@@ -140,23 +143,23 @@ export async function serveHandler(options: ServeHandlerOptions): Promise<void> 
                 let msg = legacy;
                 const routed = resolved.diagnostics.filter(isRoutedResolveDiagnostic);
                 if (!legacy && routed.some((d) => d.severity === 'error')) {
-                    const rendered = formatDiagnostics(
-                        [
-                            ...parse.diagnostics,
-                            ...routed.map((d) =>
-                                adaptResolveDiagnostic(
-                                    d,
-                                    d.sourcePath,
-                                    sources.get(d.sourcePath)?.contents,
-                                ),
+                    const diagnostics = [
+                        ...parse.diagnostics,
+                        ...routed.map((d) =>
+                            adaptResolveDiagnostic(
+                                d,
+                                d.sourcePath,
+                                sources.get(d.sourcePath)?.contents,
                             ),
-                        ],
-                        'text',
-                        sources,
-                        { color: false, operatorLocale: opLocale },
-                    );
-                    process.stderr.write(`${rendered}\n`);
-                    msg = rendered;
+                        ),
+                    ];
+                    const format = (shown: typeof diagnostics): string =>
+                        formatDiagnostics(shown, 'text', sources, {
+                            color: false,
+                            operatorLocale: opLocale,
+                        });
+                    process.stderr.write(`${format(errorsOnlyWhenQuiet(diagnostics, log))}\n`);
+                    msg = format(diagnostics);
                 }
                 lastPayload = { kind: 'error', body: msg };
                 broadcast(clients, 'error', msg);
@@ -165,15 +168,13 @@ export async function serveHandler(options: ServeHandlerOptions): Promise<void> 
             const model = layoutRoadmap(parse.ast, resolved, { theme, today, locale, nonWorking });
             const svg = await renderSvg(model, {
                 assetResolver: createAssetResolver(assetRoot),
-                warn: (m) => process.stderr.write(`warning: ${m}\n`),
+                warn: (m) => log.notice(`warning: ${m}`),
             });
             lastPayload = { kind: 'svg', body: svg };
             if (fileSink) {
                 try {
                     await fs.writeFile(fileSink, svg);
-                    if (args.logLevel === 'verbose') {
-                        process.stderr.write(`nowline: wrote ${fileSink}\n`);
-                    }
+                    log.verbose(`nowline: wrote ${fileSink}`);
                 } catch (err) {
                     const msg = err instanceof Error ? err.message : String(err);
                     process.stderr.write(`nowline: failed to write ${fileSink}: ${msg}\n`);
@@ -228,7 +229,7 @@ export async function serveHandler(options: ServeHandlerOptions): Promise<void> 
     process.stdout.write(`nowline serve: http://${host}:${port}\n`);
 
     if (args.open) {
-        await openBrowser(`http://${host}:${port}`);
+        await openBrowser(`http://${host}:${port}`, log);
     }
 
     const shutdown = async (): Promise<void> => {
@@ -316,7 +317,7 @@ function watchFile(target: string, onChange: () => Promise<void>): FSWatcher {
     return w;
 }
 
-async function openBrowser(url: string): Promise<void> {
+async function openBrowser(url: string, log: Log): Promise<void> {
     const { spawn } = await import('node:child_process');
     const platform = process.platform;
     const command = platform === 'darwin' ? 'open' : platform === 'win32' ? 'cmd' : 'xdg-open';
@@ -325,7 +326,7 @@ async function openBrowser(url: string): Promise<void> {
         const child = spawn(command, argList, { stdio: 'ignore', detached: true });
         child.unref();
     } catch {
-        process.stderr.write(`nowline: warning — failed to open browser; visit ${url} manually.\n`);
+        log.notice(`nowline: warning — failed to open browser; visit ${url} manually.`);
     }
 }
 

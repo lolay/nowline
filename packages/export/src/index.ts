@@ -140,6 +140,12 @@ export interface RenderInputs {
      * none). Errors throw `IncludeResolveError` instead. Never affects output.
      */
     onResolveDiagnostics?: (diagnostics: ResolveDiagnostic[]) => void;
+    /**
+     * Receives non-fatal notices about the artifact, such as the MS Project
+     * lossy-feature summary. Never affects output. Omit to keep each
+     * exporter's default (stderr), as before.
+     */
+    onNotice?: (message: string) => void;
 }
 
 // ---- Langium services singleton -----------------------------------------------
@@ -395,6 +401,7 @@ export async function exportDocument(
         const mod = await import('@nowline/export-msproj');
         const xml = mod.exportMsProjXml(stage.exportInputs, {
             startDate: inputs.msprojStart,
+            onLossy: inputs.onNotice,
         });
         return toUtf8(xml);
     }
