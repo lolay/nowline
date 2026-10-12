@@ -135,6 +135,7 @@ const NON_WORKING_VALUES = new Set(['hide', 'show']);
 // and by other entities alike, so the key there is not necessarily wrong.
 const ROADMAP_ONLY_STYLE_KEYS = new Set([
     'header-height',
+    'header-position',
     'timeline-position',
     'minor-grid',
     'non-working',
