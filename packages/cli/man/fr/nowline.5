@@ -5,11 +5,12 @@
 .\" Empreinte de la page anglaise relue pour cette traduction. Après avoir
 .\" reporté une modification de la page anglaise, remplacez-la par la ligne
 .\" qu'affiche packages/cli/test/man/translation-parity.test.ts.
-.\" translated-from: nowline.5 sha256:1fdc731ef699234936c5a7b395a972461f2fa80e130d3f0f503208ab2ff75905
+.\" translated-from: nowline.5 sha256:44c29a7f1eb3af4ff2f36ea2a2466e99b5115f5e590ffa84418e547c49983fd0
 .\"
 .\" Les mots-clés du DSL (nowline, config, roadmap, swimlane, item, parallel,
 .\" group, person, team, anchor, label, size, status, wave, milestone, footnote,
-.\" include, style, symbol, default, scale, calendar) ainsi que les noms de
+.\" include, style, symbol, default, scale, calendar, non-working, working)
+.\" ainsi que les noms de
 .\" propriétés (size:, duration:, after:, before:, on:, owner:, capacity:,
 .\" labels:, link:, style:, status:, etc.) et les valeurs intégrées
 .\" (planned, in-progress, active, done, completed, at-risk, blocked,
@@ -65,7 +66,7 @@ Section
 .Sy config
 (facultative).
 Configuration de production\ : styles, valeurs par défaut, échelle,
-calendrier, symboles.
+calendrier, symboles, jours non ouvrés et ouvrés.
 .It
 Section
 .Sy roadmap
@@ -193,9 +194,11 @@ Les déclarations
 .Sy scale ,
 .Sy style ,
 .Sy symbol ,
-.Sy default
+.Sy default ,
+.Sy calendar ,
+.Sy non-working
 et
-.Sy calendar
+.Sy working
 du fichier inclus.
 .It Sy Roadmap
 La déclaration
@@ -215,6 +218,13 @@ En cas de collision, le
 .Em parent l'emporte
 et l'analyseur émet un avertissement identifiant la définition
 masquée et son fichier source.
+Une déclaration
+.Sy non-working
+ou
+.Sy working
+n'entre en collision qu'avec une déclaration du parent portant le même
+mot-clé et le même nom\ ; une déclaration sans nom n'entre jamais en
+collision et est toujours fusionnée.
 .It Sy ignore
 La configuration de l'enfant est entièrement abandonnée.
 Si le contenu roadmap de l'enfant est fusionné, il résout les
@@ -345,14 +355,16 @@ apparaît avant
 Les mots-clés de configuration se trouvent au plus haut niveau (et
 non indentés sous le marqueur) et définissent vocabulaire de
 production, valeurs par défaut, paramètres d'axe, arithmétique des
-jours et symboles personnalisés.
+jours, jours non ouvrés et symboles personnalisés.
 .Pp
-Cinq mots-clés de configuration\ :
+Sept mots-clés de configuration\ :
 .Sy scale ,
 .Sy style ,
 .Sy symbol ,
 .Sy default ,
-.Sy calendar .
+.Sy calendar ,
+.Sy non-working ,
+.Sy working .
 Toute entrée de configuration est facultative\ ; si
 .Sy config
 est omise, toutes les valeurs intégrées par défaut s'appliquent.
@@ -591,7 +603,111 @@ C'est pourquoi le mode business donne
 .Sy 1y = 260d
 et non
 .Sy 12 \(mu 22d = 264d .
-.Ss non-working \(em affichage des jours
+.Ss non-working et working \(em déclarations
+Une déclaration
+.Sy non-working
+retire des jours du calendrier d'exécution\ : week-ends, jours fériés,
+fermetures.
+Une déclaration
+.Sy working
+en remet\ : un samedi de rattrapage ou un jour de récupération.
+Les deux sont des mots-clés de configuration et partagent une même
+forme\ :
+.Bd -literal -offset indent
+config
+
+non-working weekend "Weekend" every:[fri, sat]
+non-working new-year "New Year's Day" date:2027-01-01
+non-working summit "Company summit" start:2026-09-14 end:2026-09-16
+non-working fridays every:fri start:2026-07-01 end:2026-08-31
+working crunch "Crunch Saturday" date:2026-01-10
+.Ed
+.Pp
+L'identifiant et le titre sont tous deux facultatifs.
+Les durées ne comptent que les jours ouvrés\ : un élément qui traverse
+un jour non ouvré se termine plus tard, et un élément qui traverse une
+exception ouvrée se termine plus tôt.
+Le titre est porté par le modèle\ ; son étiquette n'est pas encore
+dessinée.
+Une déclaration accepte ces propriétés\ :
+.Bl -tag -width "every:"
+.It Sy date:
+Une date ISO ou une liste de dates.
+.It Sy start:
+Une date ISO, incluse\ : le premier jour d'une plage, ou le jour où une
+récurrence commence.
+.It Sy end:
+Une date ISO, incluse\ : le dernier jour d'une plage, ou le jour où une
+récurrence s'arrête.
+Elle ne doit pas précéder
+.Sy start: .
+.It Sy every:
+Un jour de semaine ou une liste de
+.Sy sun , mon , tue , wed , thu , fri , sat .
+Une récurrence hebdomadaire.
+.El
+.Pp
+Une déclaration a exactement l'une de ces trois formes\ :
+.Sy date:
+seul\ ; une plage
+.Sy start:
+et
+.Sy end:
+sans
+.Sy every: \ ;
+ou
+.Sy every:
+avec des bornes
+.Sy start:
+et
+.Sy end:
+facultatives.
+Sans borne, une récurrence est sans fin et vaut chaque semaine.
+.Pp
+Un jour donné, la déclaration la plus précise l'emporte, et
+.Sy working
+l'emporte à égalité\ :
+.Bl -enum -offset indent -compact
+.It
+une déclaration datée, soit une liste
+.Sy date:
+soit une plage\ ;
+.It
+une récurrence bornée\ ;
+.It
+la semaine sans fin.
+.El
+.Pp
+L'ordre n'a jamais d'importance\ : les mêmes déclarations dans un ordre
+quelconque, dans le fichier ou dans des inclusions, donnent le même
+calendrier.
+.Sy calendar:business
+fournit une déclaration
+.Sy non-working weekend
+pour le samedi et le dimanche.
+Une déclaration
+.Sy non-working
+nommée
+.Sy weekend
+la remplace, quel que soit le préréglage, de sorte qu'une semaine
+vendredi-samedi n'exige pas de calendrier personnalisé\ ; tout autre nom
+s'ajoute au préréglage.
+.Pp
+La semaine sans fin doit garder un jour ouvré, et
+.Sy days-per-week
+doit concorder avec les jours de semaine qu'elle laisse ouvrés
+.Pq voir Sx VALIDATION .
+Une déclaration dont une valeur ou la forme est malformée est ignorée
+lors de la construction du calendrier.
+Avec
+.Sy config:isolate ,
+les déclarations de l'enfant restent dans sa région et n'ont pas encore
+d'effet sur le graphique\ : la région est tracée sur le calendrier de
+l'hôte.
+Le validateur ne lit que son propre fichier\ : une déclaration d'une
+inclusion n'est donc pas prise en compte par les vérifications de la
+semaine sans fin.
+.Ss non-working: \(em affichage des jours
 Avec
 .Sy calendar:business ,
 le week-end est non ouvré\ : les durées ne comptent que les jours ouvrés,
@@ -1961,6 +2077,65 @@ Lorsque
 les quatre entrées
 .Sy days-per-*
 sont obligatoires et doivent être des entiers positifs.
+.It
+Une déclaration
+.Sy non-working
+ou
+.Sy working
+a l'une de trois formes\ : un
+.Sy date:
+seul\ ;
+.Sy start:
+et
+.Sy end:
+sans
+.Sy every: \ ;
+ou
+.Sy every:
+avec des bornes facultatives
+.Pq Sy NL.E0900 .
+Ses seules clés sont
+.Sy date: , start: , end:
+et
+.Sy every:
+.Pq Sy NL.E0901 ,
+et
+.Sy start:
+et
+.Sy end:
+prennent chacun une seule date
+.Pq Sy NL.E0902 .
+.It
+Chaque date d'une déclaration de calendrier est un jour réel du
+calendrier
+.Pq Sy NL.E0405 ,
+et
+.Sy end:
+ne précède pas
+.Sy start:
+.Pq Sy NL.E0903 .
+.It
+Les valeurs de
+.Sy every:
+sont des noms de jours de semaine
+.Pq Sy NL.E0904
+et chacune apparaît au plus une fois
+.Pq Sy NL.E0905 .
+.It
+La semaine sans fin garde au moins un jour ouvré
+.Pq Sy NL.E0906 .
+.Sy days-per-week
+concorde avec les jours de semaine qu'elle laisse ouvrés\ ; un écart
+donne l'avertissement
+.Sy NL.W0705 .
+.It
+Un identifiant de déclaration est unique pour son mot-clé dans un
+fichier
+.Pq Sy NL.E0907 .
+.Sy non-working
+et
+.Sy working
+ne partagent pas d'espace de noms.
 .El
 .Ss Propriété roadmap start
 .Bl -bullet -offset indent -compact
@@ -2070,6 +2245,16 @@ mêmes bornes de départ résolues, que le parent
 Un titre ou une autre présentation différents donnent
 l'avertissement
 .Sy NL.W0701 .
+.It
+Avec
+.Sy config:merge ,
+une déclaration
+.Sy non-working
+ou
+.Sy working
+n'entre en collision qu'avec une déclaration du parent portant le même
+mot-clé et le même nom, et le parent l'emporte avec un avertissement\ ;
+les déclarations sans nom n'entrent jamais en collision.
 .El
 .Ss Vagues
 Ces règles s'appliquent aux fichiers qui utilisent

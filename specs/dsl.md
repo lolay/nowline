@@ -12,7 +12,7 @@ Fenced code block: ````nowline`
 
 ## Design Rules
 
-1. **~20 keywords (currently 22).** If the keyword count grows beyond ~20, the language is too complex. The `symbol` declaration was added to support custom-named symbols for `icon:` and `capacity-icon:`, and the `wave` declaration to support barriers that span swimlanes (see [`specs/waves.md`](./waves.md) § 4.8 for its justification); further additions should stay rare.
+1. **~20 keywords (currently 24).** If the keyword count grows beyond ~20, the language is too complex. The `symbol` declaration was added to support custom-named symbols for `icon:` and `capacity-icon:`, the `wave` declaration to support barriers that span swimlanes (see [`specs/waves.md`](./waves.md) § 4.8 for its justification), and the `non-working` and `working` declarations to take days out of the schedule and put them back, so weekends, holidays and closures are data rather than code (see [`specs/working-calendar.md`](./working-calendar.md) § 4.1 and the handoff's decision 1 for the justification: they are one mechanism with one name, and no existing keyword can carry a dated or recurring list of days); further additions should stay rare.
 2. **Indentation-significant.** Two-space or one-tab indent defines nesting. Spaces and tabs must not be mixed within a file — the parser rejects mixed indentation with a clear error identifying the first offending line. No braces, brackets, or explicit block delimiters.
 3. **Strings are double-quoted.** `"Auth refactor"`, not `Auth refactor` or `'Auth refactor'`.
 4. **Properties are key:value pairs** on the same line as the entity. All key-value pairs use `:` as the single separator — the DSL does not use `=`. Values containing spaces must be double-quoted.
@@ -47,7 +47,7 @@ nowline v1 locale:fr-CA
 
 The only directive property today is `locale:`, a BCP-47 tag controlling localized rendering and validator messages. Unknown directive keys are an error so typos surface immediately. See [`specs/localization.md`](./localization.md) for the full locale model, precedence chain, and bundle structure.
 
-`config` and `roadmap` are section markers, not indent-containers. Config keywords (`scale`, `style`, `symbol`, `default`, `calendar`) appear at the top level after `config`. Roadmap keywords (`person`, `team`, `anchor`, `label`, `size`, `status`, `wave`, `swimlane`, `milestone`, `footnote`) appear at the top level after `roadmap`. Indentation is used where nesting is real: style properties under `style`, `scale` and `calendar` block properties under their keyword, team members under `team`, and swimlane contents under `swimlane`.
+`config` and `roadmap` are section markers, not indent-containers. Config keywords (`scale`, `style`, `symbol`, `default`, `calendar`, `non-working`, `working`) appear at the top level after `config`. Roadmap keywords (`person`, `team`, `anchor`, `label`, `size`, `status`, `wave`, `swimlane`, `milestone`, `footnote`) appear at the top level after `roadmap`. Indentation is used where nesting is real: style properties under `style`, `scale` and `calendar` block properties under their keyword, team members under `team`, and swimlane contents under `swimlane`.
 
 ## Full Example
 
@@ -166,6 +166,8 @@ footnote capacity-risk "Team capacity risk" on:[mobile, platform]
 | `symbol`    | Named declaration of a custom symbol for use by `icon:` and `capacity-icon:` style properties. `[id] ["title"] unicode:"..."` (required) plus optional `ascii:"..."` fallback and universal properties. |
 | `default`   | Default property values for a given entity type. One `default <entity> <properties>` declaration per entity type. |
 | `calendar`  | Day-arithmetic overrides (properties indented beneath). Only valid when `roadmap` declares `calendar:custom`. |
+| `non-working` | Days that consume no work: weekends, holidays, closures. `[id] ["title"]` plus exactly one of `date:` (a date or a list), `start:` and `end:` (an inclusive range), or `every:` (weekdays, with optional `start:` and `end:` bounds). Both id and title are optional. A declaration named `weekend` replaces the business preset's Saturday and Sunday. See "Non-working Declaration" below. |
+| `working`   | Days that work again after a `non-working` declaration took them: a crunch Saturday, a make-up day. Same shape and properties as `non-working`. A `working` declaration wins a tie. See "Non-working Declaration" below. |
 
 
 ### Roadmap Keywords (after `roadmap`)
@@ -680,7 +682,7 @@ Footnotes are numbered sequentially by document order. A superscript number appe
 
 | Category                             | What it contains                                                                                                     | Examples                                                       |
 | ------------------------------------ | -------------------------------------------------------------------------------------------------------------------- | -------------------------------------------------------------- |
-| **Config** (rendering configuration) | scale block, calendar block, styles, symbols, defaults                                                                       | Everything between `config` and `roadmap` in the included file |
+| **Config** (rendering configuration) | scale block, calendar block, styles, symbols, defaults, `non-working` and `working` declarations                                                                       | Everything between `config` and `roadmap` in the included file |
 | **Roadmap** (content)                | `roadmap` declaration, persons, teams, anchors, labels, sizes, statuses, waves, swimlanes (+ contained items/parallel/groups), milestones, footnotes | Everything after `roadmap` in the included file. Waves never merge: every participating file declares the same waves (Include Rule 12). |
 
 
@@ -689,7 +691,7 @@ Footnotes are numbered sequentially by document order. A superscript number appe
 
 | Mode                     | Behavior                                                                                                                                                                                                                                                                    |
 | ------------------------ | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `config:merge` (default) | The child's config items are merged into the parent's config. On name collision, the **parent wins** and the parser emits a **warning** per collision identifying the shadowed definition and its source file. Config is always merged before roadmap content is processed. |
+| `config:merge` (default) | The child's config items are merged into the parent's config. On name collision, the **parent wins** and the parser emits a **warning** per collision identifying the shadowed definition and its source file. A `non-working` or `working` declaration collides only with a parent declaration of the same keyword and name; unnamed ones never collide and always merge. Config is always merged before roadmap content is processed. |
 | `config:ignore`          | The child's config items are dropped entirely. If the child's roadmap content is merged (`roadmap:merge`), it resolves styles from the parent's post-merge config.                                                                                                          |
 | `config:isolate`         | The child's config items are only available within the child file. The parent's config is only available in the parent file (and to any already-merged roadmap items in the parent). Neither side's config bleeds into the other.                                           |
 
@@ -721,6 +723,7 @@ Includes are processed in **file order, depth-first**. When the processor encoun
 On `merge`, when the parent and child both declare an entity with the same identifier:
 
 - **Config items** (styles, symbols): parent wins, child's definition is dropped, warning emitted.
+- **Calendar declarations** (`non-working`, `working`): collisions are per keyword, so `non-working h` and `working h` coexist. A child's named declaration is dropped with the shadowing warning when the parent already held one with the same keyword and name; the warning reads `Non-working "h" from child.nowline is shadowed by the parent's definition.` (or `Working "h" …`) and has no code. Unnamed declarations never collide, so they all merge, and the order they merge in changes nothing (see "Non-working Declaration"). A child's own duplicate id is `NL.E0907` in the child, not a collision.
 - **Roadmap entities** (swimlanes, persons, teams, labels, sizes, statuses, anchors, milestones, footnotes, etc.): parent wins, child's entity is dropped, warning emitted. If a swimlane collides, its contained items are also dropped.
 - **Defaults**: `default <entity>` lines can be declared in both parent and child. On collision of entity type, the parent's `default <entity>` wins and a warning is emitted.
 - **Waves** are exempt from parent-wins merge. A child's waves are never merged and never draw a shadow warning: Include Rule 12 requires every participating file to declare the same waves (same ids, order and resolved start floors), so the parent's list is the list. Title and other presentation differences are a warning (`NL.W0701`), and the parent's definition is used.
@@ -819,6 +822,8 @@ roadmap platform-2026 "Platform 2026" start:2026-01-06 scale:2w calendar:busines
 - `calendar:custom` — author-supplied values via the `calendar` config block below.
 
 The default is `business` because engineering roadmaps almost always count working days when sizing work.
+
+**Non-working and working days** — `non-working` and `working` declarations, beside `calendar`, say which dates consume no work and which are exceptions to that. They have their own section, "Non-working Declaration" below.
 
 Under `calendar:business` the date axis counts working days and hides weekends, so a `duration:1m` bar (22 working days) spans about one month column. Month, quarter, and year ticks still sit on real month / quarter / year starts, and a boundary that falls on a weekend sits at the seam (see [`rendering.md` § Timeline Scale](./rendering.md#timeline-scale)). Under `calendar:full` and `calendar:custom` the axis counts calendar days and nothing is hidden.
 
@@ -980,6 +985,76 @@ Allowed on every `default <entity>`: presentation properties (`style:` and raw s
 **Raw style properties are allowed on `default`** as a catch-all escape hatch (e.g. `default item shadow:subtle padding:md`). `default` lives in config, which is the presentation section, so the ban on raw style properties applies to roadmap-section entities, not to `default` lines.
 
 All config entries are optional. If `config` is omitted, all built-in defaults apply.
+
+### Non-working Declaration
+
+A `non-working` declaration takes days out of the schedule, and a `working` declaration puts them back. Durations count working days only, so an item that spans a non-working day ends later, and an item that spans a working exception ends sooner. Both keywords are config entries, declared in the `config` section beside `calendar`, and both share one shape. The rationale, the layout and the worked examples live in [`specs/working-calendar.md`](./working-calendar.md).
+
+```nowline
+config
+
+non-working weekend "Weekend" every:[fri, sat]
+non-working new-year "New Year's Day" date:2027-01-01
+non-working summit "Company summit" start:2026-09-14 end:2026-09-16
+non-working shutdown "Year-end shutdown" date:[2026-12-24, 2026-12-25, 2026-12-28]
+non-working fridays every:fri start:2026-07-01 end:2026-08-31
+working crunch "Crunch Saturday" date:2026-01-10
+
+roadmap r "Platform" start:2026-01-05 calendar:business
+```
+
+A declaration accepts:
+
+| Slot or key | Status | Meaning |
+| --- | --- | --- |
+| id (positional) | optional | Needed only to be the file's `weekend` or to tell two declarations apart in an include collision. It joins no shared namespace: `non-working x` and `working x` are fine together, and `NL.E0907` reports a duplicate within one keyword and one file. |
+| title (positional) | optional | The label the chart draws for the day (a later phase draws it; today the title is carried on the run). |
+| `date:` | one ISO date, or a list | The dates the declaration covers. Each element is a real calendar day (`NL.E0405`). |
+| `start:` | one ISO date | Inclusive. The first day of a range, or the day a recurrence begins. |
+| `end:` | one ISO date | Inclusive. The last day of a range, or the day a recurrence stops. Not before `start:` (`NL.E0903`; equal is fine). |
+| `every:` | one weekday or a list of `sun`, `mon`, `tue`, `wed`, `thu`, `fri`, `sat` | A weekly recurrence. A name that is not a weekday is `NL.E0904`, and a weekday listed twice is `NL.E0905`. |
+| any other key | error (`NL.E0901`) | Including `style:`, `labels:`, `link:` and `wave:`. |
+| raw style properties | error (Validation Rule 20) | — |
+
+**Three shapes (`NL.E0900`).** A declaration is exactly one of:
+
+- **dates:** `date:` alone;
+- **a range:** `start:` and `end:` without `every:`, the same as listing every date between them;
+- **a recurrence:** `every:`, with `start:` and `end:` both optional. With neither it is **open-ended**: it holds in every week of the file. With one it is open on the other side, and with both it holds only inside the window.
+
+Anything else is `NL.E0900`, once on the declaration: no properties, `date:` with any other key, or a lone `start:` or `end:`. `start:` and `end:` take one date each; a list of two or more is `NL.E0902` (a one-element bracket is that date).
+
+**Precedence.** On a given day the most specific declaration decides, and a `working` declaration wins a tie:
+
+1. a dated declaration (`date:`, or a range);
+2. a bounded recurrence (`every:` with `start:` and/or `end:`);
+3. the open-ended week.
+
+Order never matters: the declarations in any order in the file, or merged from includes in any order, give the same schedule. `calendar:business` supplies `non-working weekend "Weekend" every:[sat, sun]` at level 3; `calendar:full` and `calendar:custom` supply nothing.
+
+**The weekend.** A `non-working` declaration named `weekend` replaces the preset's Saturday and Sunday (for any preset), so a Friday and Saturday week is `non-working weekend every:[fri, sat]`, with no custom calendar. A declaration with any other name adds to the preset. The replacement counts every `non-working` named `weekend`, malformed ones included.
+
+**The open-ended week must keep a working day.** Take the open-ended recurrences of the file, plus the business weekend unless the file replaces it, minus the open-ended `working … every:`. If that covers all seven days, `NL.E0906` is reported on each open-ended `non-working` declaration. A recurrence with exactly one bound that would close the last open weekday is reported too. A recurrence bounded on both sides may close all seven days. `days-per-week` should agree with the working weekdays that remain; when it does not, the warning is `NL.W0705` (a custom calendar with `days-per-week: 6` and no `every:`, or business with `working every:sat`). Business, `calendar:full` and the Friday and Saturday week above are quiet.
+
+**Diagnostics.** The kind in a message is `non-working` or `working`, verbatim in every language.
+
+| Code | Severity | Meaning |
+| --- | --- | --- |
+| `NL.E0900` | error | Not one of the three shapes. |
+| `NL.E0901` | error | A key other than `date`, `start`, `end` and `every`. |
+| `NL.E0902` | error | `start:` or `end:` given a list. |
+| `NL.E0903` | error | `end:` is before `start:`. |
+| `NL.E0904` | error | An `every:` value that is not a weekday name. |
+| `NL.E0905` | error | A weekday listed twice in one `every:`. |
+| `NL.E0906` | error | The open-ended week leaves no working day. |
+| `NL.E0907` | error | Duplicate id within one keyword in one file. |
+| `NL.W0705` | warning | `days-per-week` differs from the working days the open-ended week leaves. |
+| `NL.E0405` | error | A date that is not a real calendar day (on a calendar declaration `2026-02-30` is rejected; other entities keep the looser check). |
+| `NL.W0700` | warning | `end:` or `every:` on any other entity: the key is ignored. |
+
+**Includes.** Calendar declarations follow `config:` modes (see "Include Declaration"). On `config:merge` they merge, a named child declaration is shadowed by the parent's of the same keyword and name, and unnamed ones always merge. `config:ignore` merges none. On `config:isolate` the child's declarations stay in its region's config and have no effect on the chart yet: an isolated region is laid out on the host's calendar, and per-region calendars are not part of this release. The validator reads only its own file, so a `non-working weekend` or an open-ended recurrence in an include is not counted by `NL.E0906` and `NL.W0705`; the calendar falls back to the preset if an included file closes the whole week. A malformed declaration in an include is skipped.
+
+**Bare words.** `non-working` and `working` are keywords where a declaration starts, but stay valid as identifiers and values (`item non-working`, `after:working`, `labels:[working]`). `non-working-team`, `working-group`, `nonworking` and `workings` are ordinary identifiers. A bare `style`, `symbol`, `non-working` or `working` line takes the next line's keyword as its id, as with `wave`.
 
 ### Person & Team Declarations
 
@@ -1163,6 +1238,10 @@ The parser enforces these rules and produces clear error messages with file posi
 7. A `calendar` config block is only meaningful when the roadmap declares `calendar:custom`. Presence of a `calendar` config block when the roadmap declares `calendar:business`, `calendar:full`, or the default is an error.
 8. When `calendar:custom` is declared, the `calendar` config block must be present and must declare **all four** entries: `days-per-week`, `days-per-month`, `days-per-quarter`, `days-per-year`. Missing any entry is an error. Empty or absent block is an error.
 9. `days-per-week`, `days-per-month`, `days-per-quarter`, `days-per-year` values must be positive integers.
+9a. A `non-working` or `working` declaration is exactly one of three shapes: `date:` alone; `start:` and `end:` without `every:`; or `every:` with optional `start:` and `end:` (`NL.E0900`). Its only keys are `date`, `start`, `end` and `every` (`NL.E0901`), and `start:` and `end:` take one date each (`NL.E0902`).
+9b. Every date on a calendar declaration is a real calendar day (`NL.E0405`), and `end:` is not before `start:` (`NL.E0903`).
+9c. `every:` values are `sun`, `mon`, `tue`, `wed`, `thu`, `fri` or `sat` (`NL.E0904`), each at most once per `every:` (`NL.E0905`). The open-ended week keeps at least one working weekday (`NL.E0906`), and `days-per-week` agrees with the weekdays it leaves working (`NL.W0705`, a warning).
+9d. A `non-working` or `working` id is unique within its keyword in one file (`NL.E0907`). The two keywords do not share a namespace.
 
 **Required properties per entity**
 
@@ -1242,7 +1321,7 @@ Non-rules (intentionally not validated):
 4. Duplicate `include` of the same file in a single file is an error. Diamond includes (same file via different parents) are valid — the file is processed once.
 5. `config:` on `include` must be `merge`, `ignore`, or `isolate`.
 6. `roadmap:` on `include` must be `merge`, `ignore`, or `isolate`.
-7. On `config:merge`, if a child config entry collides with a parent entry, the parent wins and the parser emits a warning with the source file path and shadowed name.
+7. On `config:merge`, if a child config entry collides with a parent entry, the parent wins and the parser emits a warning with the source file path and shadowed name. A `non-working` or `working` declaration collides only with a parent declaration of the same keyword and name; an unnamed declaration never collides and always merges.
 8. On `roadmap:merge`, if a child entity collides with a parent entity, the parent wins and the parser emits a warning. Swimlane collisions also drop contained items.
 9. On `config:isolate`, `style:` references within the isolated file must resolve within that file's own config. References to parent config are a validation error. Label, size, and status references are governed by `roadmap:isolate`, not `config:isolate`, because labels, sizes, and statuses are roadmap content.
 10. On `roadmap:isolate`, the included file must contain a `roadmap` declaration (needed for the region label).

@@ -1,6 +1,6 @@
 # Nowline Working Calendar
 
-**Status: Accepted, scheduled as m2p. Phases 1–3 (calendar primitives; the working-day schedule under `hide`; the exporters read the file's calendar) are implemented in lolay/nowline#96; Phase 4 (`show` and the display setting) is implemented in the Phase 4 PR; Phase 5 (the `non-working` declarations) is pending.** This is the design record for non-working days: weekends, holidays and company-wide closures such as a summit. The `non-working:` display key and the render-time option work today; the parser still rejects the `non-working` declaration syntax shown in §4.1, which arrives with Phase 5.
+**Status: Accepted, scheduled as m2p. Phases 1–3 (calendar primitives; the working-day schedule under `hide`; the exporters read the file's calendar) are implemented in lolay/nowline#96; Phase 4 (`show` and the display setting) is implemented in the Phase 4 PR; Phase 5a (the `non-working` and `working` declarations reach the language, the validator and the schedule) is implemented in the Phase 5a PR; Phase 5b (what the declarations draw, MS Project `<Exceptions>`, Mermaid dated `excludes`, editor and agent tooling) is pending, and 5a and 5b must ship in the same release.** This is the design record for non-working days: weekends, holidays and company-wide closures such as a summit. The declarations in §4.1 parse and validate, and they feed the working calendar, so the chart's axis, engines A, B and C and every exporter's dates, durations and calendar follow them. Until 5b, a titled run is shaded under `show` but carries no label, and MS Project and Mermaid know only the open-ended week from a file, not its dated days (§8).
 
 The implementation plan, the decisions that close §11 and the codebase map are in [`handoffs/handoff-m2p-working-calendar.md`](./handoffs/handoff-m2p-working-calendar.md). As each phase ships:
 
@@ -14,7 +14,7 @@ This proposal supersedes the `WorkingCalendar` plan in [`rendering-v2.md`](./ren
 **A calendar decides which days count as work. The schedule counts only working days; the chart decides whether to draw the days that don't count.**
 
 - **One name.** The concept is a *non-working day*. The declaration keyword is `non-working`, the display setting is `non-working:`, the render-time override is `--non-working`, and the positioned model carries `timeline.nonWorking`.
-- **One mechanism.** Weekends, holidays and closures are all `non-working` declarations, recurring (`every:`) or dated (`date:` and optional `through:`). `calendar:business` supplies one: `non-working weekend "Weekend" every:[sat, sun]`. Business gets no other special handling.
+- **One mechanism.** Weekends, holidays and closures are all `non-working` declarations, recurring (`every:`) or dated (`date:`, or `start:` and `end:`), and a `working` declaration gives days back. `calendar:business` supplies one: `non-working weekend "Weekend" every:[sat, sun]`. Business gets no other special handling.
 - **One schedule, two views.** Durations always count working days. The display setting only changes how dates map to x: `hide` (the default) collapses non-working days to a seam, and `show` draws them as shaded bands that work paints straight across.
 - **The default changes little visually.** Under `hide`, a sequenced business roadmap that starts on a working day keeps today's item geometry. What changes is what was wrong: week labels, and every date-pinned entity, now land on the right day.
 
@@ -22,7 +22,7 @@ This proposal supersedes the `WorkingCalendar` plan in [`rendering-v2.md`](./ren
 config
 
 non-working new-year "New Year's Day" date:2027-01-01
-non-working summit "Company summit" date:2026-09-14 through:2026-09-16
+non-working summit "Company summit" start:2026-09-14 end:2026-09-16
 
 default roadmap non-working:hide
 
@@ -61,7 +61,7 @@ That table is the state before Phases 2 and 3. Phase 2 put the axis and the sche
 A calendar does two separate jobs:
 
 1. **Duration arithmetic.** `days-per-week`, `days-per-month`, `days-per-quarter`, `days-per-year` convert `1w` / `1m` / `1q` / `1y` into a count of working days. Unchanged, including the no-transitivity rule (`dsl.md` § Calendar).
-2. **Non-working days.** The set of calendar dates that consume no work: the union of every recurring and dated `non-working` declaration in effect.
+2. **Non-working days.** The set of calendar dates that consume no work: the preset's weekend and the file's `non-working` declarations, with the file's `working` declarations giving days back. Which one wins on a day is decided by specificity, never by order (§4.1).
 
 `1d` is one working day. A duration of N working days starts on a working day and ends at the end of the Nth working day.
 
@@ -90,23 +90,48 @@ With holidays declared, a long duration spans correspondingly more calendar time
 
 ## 4. Syntax
 
-### 4.1 The `non-working` declaration
+### 4.1 The `non-working` and `working` declarations
 
-A config keyword, beside `scale`, `calendar`, `style`, `symbol` and `default`:
+Two config keywords, beside `scale`, `calendar`, `style`, `symbol` and `default`. `non-working` takes days out of the schedule. `working` puts them back: a crunch Saturday, or a make-up day after a closure.
 
 ```
 NonWorkingDeclaration:
-    'non-working' (name=ID)? (title=STRING)?
+    'non-working' (name=EntityName)? (title=STRING)?
+    (properties+=EntityProperty)*;
+
+WorkingDeclaration:
+    'working' (name=EntityName)? (title=STRING)?
     (properties+=EntityProperty)*;
 ```
 
+Neither takes a description. `EntityName` is the waves precedent (§4.4): the bare words `non-working` and `working` stay valid as ids and values.
+
 | Property | Value | Meaning |
 |---|---|---|
-| `date:` | ISO date | The first (or only) non-working date. |
-| `through:` | ISO date | Optional, with `date:`. The last non-working date, inclusive. |
-| `every:` | weekday or list: `sun mon tue wed thu fri sat` | A recurring weekly non-working day. |
+| `date:` | one ISO date, or a list | The dates the declaration covers: `date:2026-12-24`, `date:[2026-12-24, 2026-12-25]`. |
+| `start:` | one ISO date | The first day of a range, or the day a recurrence begins. Inclusive. |
+| `end:` | one ISO date | The last day of a range, or the day a recurrence stops. Inclusive. |
+| `every:` | weekday or list: `sun mon tue wed thu fri sat` | A weekly recurrence. |
 
-Exactly one of `date:` and `every:` is required. The title labels the day on the chart (§7.4). An id is required only to override or reference the declaration (`weekend`).
+**Three shapes (NW1).** A declaration is exactly one of:
+
+- **dates:** `date:` alone;
+- **a range:** `start:` and `end:` without `every:`, which is the same as listing every date between them;
+- **a recurrence:** `every:`, with `start:` and `end:` both optional. Without either bound it is open-ended, the weekly pattern that holds for every week of the file. With one bound it is open on the other side. With both it holds only inside the window.
+
+Anything else is `NL.E0900`: no properties, `date:` with any other key, or a lone `start:` or `end:`. `start:` and `end:` take one date each (a one-element bracket is that date; two or more is `NL.E0902`). Any key other than the four is `NL.E0901`, including `style:`, `labels:`, `link:` and `wave:`.
+
+**Precedence, by specificity (decision 18).** On any day, the most specific declaration that covers it decides, and a `working` declaration wins a tie:
+
+1. a dated declaration (`date:`, or a `start:` / `end:` range);
+2. a bounded recurrence (`every:` with `start:` and/or `end:`);
+3. the open-ended week.
+
+Declaration order, file order and include order never matter: the same declarations in any order give the same schedule, run titles and exports. `calendar:business` contributes its `weekend` to level 3. A `non-working` declaration **named `weekend`** replaces the preset's, whichever preset it is and whatever its shape (§3.2, example C); the rule counts every `non-working weekend`, malformed ones included, as the validator does.
+
+The title labels the day on the chart (§7.4, Phase 5b). An id is needed only to be the `weekend` or to be told apart in an include collision (§4.3).
+
+A declaration whose value or shape is malformed is skipped by the resolver, because the validator already reported it in the root file and an include is not validated. "Malformed" is the validator's rule exactly: only the first `date:`, `start:`, `end:` and `every:` keys count, unknown keys beside a valid shape change nothing, a weekday listed twice merges, and every date must be a real calendar day (`2026-02-30` is `NL.E0405`, not March 2).
 
 ### 4.2 The display setting
 
@@ -133,33 +158,41 @@ The setting never affects the schedule, so it can also be chosen at render time.
 
 ### 4.3 Includes
 
-`non-working` declarations are config, so they follow `config:` modes with no new rules. A shared holiday file is a style-library-shaped include:
+`non-working` and `working` declarations are config, so they follow `config:` modes. A shared holiday file is a style-library-shaped include:
 
 ```nowline
 include "holidays-us-2026.nowline" roadmap:ignore
 ```
 
-On `config:merge` the parent wins on an id collision, with the existing shadowing warning. Unnamed declarations never collide; they all merge.
+- **`config:merge`.** Every declaration of the child lands in the parent's list. A named child declaration is dropped, with the existing uncoded shadowing warning, when the parent already held one with the same keyword and name before this merge: `Non-working "x" from child.nowline is shadowed by the parent's definition.` (`Working "x" from …` for the other keyword). Collisions are per keyword, so `non-working h` and `working h` coexist. Unnamed declarations never collide; they all merge.
+- **A child's own duplicate id** is `NL.E0907` in the child (§6, NW5), not a collision: both copies merge.
+- **A diamond** (the same object reached twice) is skipped silently, as every other config map is.
+- **`config:ignore`** merges nothing.
+- **`config:isolate`** keeps the child's declarations in its isolated region's config, where they have no effect yet. The layout draws a region on the host's calendar (§7.6), and per-region calendars stay out of m2p (§11, question 7).
+- **Order carries no meaning** (decision 18), so include order cannot change the schedule.
+- **The validator sees only its own file.** A `non-working weekend` in an include does not feed NW3 or NW4 (§6), and an included file that closes the whole week is not reported (the root file would have had `NL.E0906`). The resolver falls back to the preset calendar rather than failing layout or export.
 
 ### 4.4 Lexer and v1 compatibility
 
-- `non-working` would be the first hyphenated keyword. Hyphens are already legal in `ID` and in property keys. Langium sets Chevrotain `longer_alt` for keywords, so `non-working-team` should still lex as `ID`. This needs a grammar test before the name is final (§11).
-- Reserving the word follows the waves precedent ([`waves.md`](./waves.md) §4.7): an `EntityName` rule keeps bare-word uses such as `item non-working` parsing, and the JSON AST of an existing file stays byte-identical.
-- `through:` and `every:` are new property keys. On any other entity they get the existing unknown-property warning.
-- The printer prints config entries in source order (it never sorts them), so `non-working` declarations stay where the author wrote them. `through` and `every` join its key order.
+- `non-working` is the first hyphenated keyword, and `working` is an ordinary English word. A lexer spike passed before any other work: both lex as keywords, `non-working-team`, `working-group`, `nonworking` and `workings` lex as `ID`, `non-working:` and `working:` lex as property keys, and the parser builds with `skipValidations: false`. It is kept as the permanent gate, `packages/core/test/strings-and-ids/non-working-identifier.test.ts`.
+- Reserving the words follows the waves precedent ([`waves.md`](./waves.md) §4.7): an `EntityName` rule and the value rules list both, so `item non-working` and `after:working` keep parsing, and the JSON AST of an existing file stays byte-identical. The residual is the waves class: a bare `style`, `symbol`, `non-working` or `working` line takes the next line's keyword as its id.
+- `end:` and `every:` are new property keys. On any other entity they get the existing unknown-property warning `NL.W0700`.
+- The printer prints config entries in source order (it never sorts them), so declarations stay where the author wrote them. `every`, `start` and `end` join its key order, so a declaration prints `date`, `every`, `start`, `end`. Known side effect: an unknown `end:` or `every:` on any other entity now prints in that position instead of alphabetically after the known keys.
+- The JSON AST carries `NonWorkingDeclaration` and `WorkingDeclaration` nodes with no code of their own (the JSON walkers are generic).
 
 ## 5. Scheduling semantics
 
 ### 5.1 Rules
 
 1. **Start.** An item starts on the first working day at or after its computed start (`date:`, `start:`, `after:`, or the lane cursor).
-2. **Consumption.** It consumes N working days, where N is its calendar duration in working days (`duration:`, or `size:` effort divided by `capacity:` as today).
+2. **Consumption.** It consumes N working days, where N is its calendar duration in working days (`duration:`, or `size:` effort divided by `capacity:` as today). Durations stay in estimate units (decision 19): `1w` is `days-per-week` working days, laid on whatever the calendar leaves working. A `working` exception pulls an end in, and a `non-working` day inside a bar pushes it out.
 3. **Finish.** It finishes at the end of its Nth working day.
 4. **Successor.** A sequenced successor, or an `after:` dependent, starts on the next working day.
 5. **Calendar-bound entities keep their dates.** `date:` on milestones and anchors, `after:DATE`, `before:DATE`, `start:` on the roadmap and the now-line are calendar dates. A milestone on a Saturday is legitimate and stays on Saturday.
 6. **Snapping is reported.** When rule 1 moves an item's pinned start (`date:` or `after:DATE` on a non-working day), the layout emits an info insight naming the item, the pinned date and the date used.
 7. **`before:DATE`** keeps today's cap: the finish (rule 3) may not pass the start of the pinned day. A hidden pinned day maps to the seam like any other date.
 8. **`length:`** on the roadmap is a duration, so it counts working days like any other.
+9. **Which days work** is decided by specificity (§4.1): dated declarations over bounded recurrences over the open-ended week, `working` winning a tie, and nothing depends on declaration or include order. The rules are put in a canonical order (first date, title, id, `working`, the weekday set, start and end) before the calendar is built, because the engine breaks ties between titled runs by input order.
 
 Dates mark the start of their day, as they do today: a milestone dated on the last working day of a piece of work sits one day before that work's finish.
 
@@ -200,17 +233,25 @@ The waves handoff names them ([`handoffs/handoff-m2o-waves.md`](./handoffs/hando
 
 ## 6. Validation rules
 
-Codes are placeholders; final `NL.*` codes are assigned at implementation, with EN and FR messages.
+The `non-working` and `working` declarations share one check, and the kind in a message is `non-working` or `working`, verbatim in both languages. Messages are in EN and FR.
 
 | Rule | Severity | Check |
 |---|---|---|
-| NW1 | error | A `non-working` declaration has exactly one of `date:` and `every:`. |
-| NW2 | error | `through:` requires `date:` and must not be earlier than it. |
-| NW3 | error | `every:` values are weekday names, without duplicates, and do not cover all seven days. |
-| NW4 | warning | `days-per-week` differs from the number of weekdays that recurring declarations leave working. (`calendar:custom` with `days-per-week: 6` and no `every:` triggers it.) |
-| NW5 | error | Duplicate `non-working` id within one file. Include collisions use the existing config-merge warning. |
+| NW1 | error | A declaration is one of the three shapes of §4.1: `date:` alone; `start:` and `end:` without `every:`; or `every:` with optional `start:` and `end:`. Anything else is **`NL.E0900`**, once on the declaration. Any key other than `date`, `start`, `end` and `every` is **`NL.E0901`** on the property. `start:` or `end:` given a list is **`NL.E0902`**. |
+| NW2 | error | Every date is a real ISO date (**`NL.E0405`**, one error per bad element, including the elements of a `date:` list and the single element of a bracketed `start:` / `end:`), and `end:` is not before `start:` (**`NL.E0903`**; equal is fine). |
+| NW3 | error | `every:` values are weekday names (**`NL.E0904`**) without duplicates (**`NL.E0905`**), and the open-ended week keeps one weekday working (**`NL.E0906`**). See below. |
+| NW4 | warning | `days-per-week` differs from the number of weekdays the open-ended week leaves working (**`NL.W0705`**). `calendar:custom` with `days-per-week: 6` and no `every:` triggers it. |
+| NW5 | error | Duplicate id within one file, per keyword (**`NL.E0907`**): `non-working x` beside `working x` is fine. Include collisions use the existing config-merge warning (§4.3). |
 | NW6 | error | `non-working:` on `default roadmap` is `hide` or `show`. Shipped as **`NL.E0800`**; it also covers a `non-working:` value inside a `style` block, one error per bad value. |
 | NW7 | info (layout insight) | An item's pinned start falls on a non-working day and moved (§5.1 rule 6). Shipped as **`NL.I1008`**; it covers `date:`, `start:` and the date in an `after:`, for main-lane and isolated-region items alike. A tie between the pin and another constraint (the lane cursor, an `after:` reference) still reports. |
+
+**The open-ended week** is the file's `non-working … every:` declarations with neither `start:` nor `end:`, plus the business preset's Saturday and Sunday unless the file declares `non-working weekend`, minus the file's open-ended `working … every:`. NW3 and NW4 both read it.
+
+- **NW3.** If the open-ended week covers all seven days, `NL.E0906` is reported on each open-ended `non-working` declaration. Then, for each `non-working … every:` with exactly one bound, if the open-ended week plus its days covers all seven, it is reported too. A recurrence bounded on both sides may close all seven days (a closed window such as a year-end shutdown). The rule is the validator's mirror of the calendar's own `RangeError` for the root file.
+- **NW4.** Reported on the custom block's `days-per-week` property when there is one, else on the roadmap's `calendar:` property, else on the first open-ended declaration, else on the roadmap declaration. Business with no declarations leaves 5 against 5, `calendar:full` 7 against 7, and example C 5 against 5, so all are quiet. It is skipped when no working weekday is left (`NL.E0906` reports that).
+- A file with no `roadmap` declaration (an include) is skipped by NW3 and NW4, and a malformed declaration is left out of the open-ended week.
+- **`NL.E0405`** on a calendar declaration checks that the date is a real calendar day. Other entities keep the looser check, which accepts `2026-02-30`.
+- **`end:` and `every:` on any other entity** get the existing `NL.W0700`.
 
 ## 7. Rendering
 
@@ -251,7 +292,7 @@ As built (Phase 4), the rules above resolve to these specifics, normative text i
 
 ### 7.4 Named non-working days
 
-A run that contains a titled declaration is labelled in both views:
+A run that contains a titled declaration is labelled in both views. This is Phase 5b; Phase 5a puts the titles on the model (`titles`, §7.5) and draws none, so a titled run is shaded under `show` and a seam under `hide` stays unlabelled until then:
 
 - under `hide`, as a thin cut line at the seam, styled like an anchor's but lighter, with its label (`Company summit · 3d`) packed into the marker row by the existing marker packer;
 - under `show`, as a band whose label is packed into the marker row at the band's left edge.
@@ -301,8 +342,10 @@ Every exporter reads engine C's dates, durations and calendar. `resolveWorkingCa
 | XLSX | Start / End (exclusive) from engine C. The Duration column is `days` (`q`, declared sizes and `capacity:` included; 0 when there is none). The Roadmap sheet gains a `Calendar` row after `Start`, e.g. `business (Saturday and Sunday off; 5/22/65/260 days per week/month/quarter/year)`. | — |
 | MS Project | `<WeekDays>` from `workingWeekdays`: Mon–Fri under business, byte-identical to before, and seven working days under `calendar:full` and `calendar:custom`. A task lasts `days` × 480 minutes (480 when it has no duration). | `<WeekDays>` from the recurring declarations; `<Exceptions>` from the dated ones; `<WorkWeeks>` where a bounded recurrence changes the week. |
 | Mermaid | Business emits `excludes saturday, sunday` after `dateFormat`; full and custom emit none. Durations are `Nd` from `days` (`28d` for a full `4w`). The roadmap start and wave-end milestones move to the first working day at or after them, because Mermaid never checks a start against `excludes`; anchors and dated milestones keep their dates (rule 5). | `excludes` with weekday names and ISO dates, which Mermaid also excludes from task durations. |
-| JSON AST | Not in Phase 3. | New `NonWorkingDeclaration` node in `serializeToJson`; printer support; the round-trip test covers a fixture that uses it. |
+| JSON AST | Not in Phase 3. | Built in 5a: `NonWorkingDeclaration` and `WorkingDeclaration` nodes (no JSON code, the walkers are generic); printer support; the round-trip tests cover every shape. |
 | SVG / PNG / PDF / HTML | Follow the layout and the display setting. | Same. |
+
+**Phase 5a.** A file's declarations reach every exporter through the one resolver, with no exporter change. An open-ended recurrence moves what follows `workingWeekdays`: the MS Project `<WeekDays>`, the Mermaid `excludes friday, saturday` line and the XLSX Calendar row (`business (Friday and Saturday off; 5/22/65/260 days per week/month/quarter/year)` for example C). Dated and bounded rules move engine C's start and end dates in every exporter, but MS Project `<Exceptions>` and `<WorkWeeks>` and Mermaid's dated `excludes` are Phase 5b. Until then Mermaid lays a holiday-spanning `Nd` across the holiday, and MS Project does not know the closure. **5a and 5b must ship in the same release**, as Phases 2 and 3 did, or the exporters disagree with the chart.
 
 Known limits, not fixed in Phase 3: MS Project ignores the roadmap's `start:` (it uses the export date or `--start`) and has no implicit lane sequencing, so its schedule cannot match the chart; it writes no `<MinutesPerWeek>` or `<DaysPerMonth>`, so a full-calendar `1w` displays as 1.4 default weeks; Mermaid ignores item `date:` / `start:` pins, writes `after:DATE` verbatim and rounds fractional days; exporters walk only the root file, so merged and isolated include items are not exported.
 
@@ -313,9 +356,11 @@ Known limits, not fixed in Phase 3: MS Project ignores the roadmap's `start:` (i
 | Input | Change |
 |---|---|
 | `calendar:full`, no `non-working` declarations | None to layout and rendering: the mapping is the identity. Export cells move in Phase 3, as fixes: durations count 7 / 30 / 91 / 365 and the MS Project calendar gets seven working days. |
-| `calendar:custom`, no `every:` | None to layout and rendering, plus NW4 when `days-per-week` is not 7. Export cells move in Phase 3, as fixes: durations follow the file's `days-per-*` and the MS Project calendar gets seven working days. |
+| `calendar:custom`, no `every:` | None to layout and rendering, plus NW4 (`NL.W0705`) when `days-per-week` is not 7 (Phase 5a: it fires on `examples/product.nowline` and `tests/grammar-properties.nowline`; it is a warning, so render bytes do not move). Export cells move in Phase 3, as fixes: durations follow the file's `days-per-*` and the MS Project calendar gets seven working days. |
 | `calendar:business` (the default), `hide` | Sequenced items that start on a working day keep their x. Week ticks keep their x and change label (`Jan 10` → `Jan 12`). Date-pinned entities, the now-line and the window end move to the right day. |
 | `calendar:business`, `show` | Everything after the first weekend moves right, by design. |
+| A file with no `non-working` or `working` declaration (Phase 5a) | None: every layout snapshot, determinism cell and rendered example stays byte-identical, and so does every JSON AST. |
+| A file with declarations (Phase 5a) | The calendar changes, so dates, x and run titles follow it. A titled run is shaded under `show` at every scale, and unlabelled until 5b. |
 
 The 14 business-calendar layout snapshots (of 19; the five waves samples use `calendar:full`) and every business determinism cell that renders a picture change. For a fixture without date pins and without a now-line in its window, the only change is week-label text. Phase 3 moves every `xlsx` and `mermaid` determinism cell (the Calendar row, `End (exclusive)` and the durations; `excludes` on business) and the `msproj` cells with sized items or the full calendar. The CHANGELOG entry goes under `### Changed`: the business calendar now does what `dsl.md` already says it does ("engineering working-day arithmetic").
 
@@ -323,7 +368,9 @@ The 14 business-calendar layout snapshots (of 19; the five waves samples use `ca
 
 1. **Weekends, hidden.** `WorkingCalendar` with recurring non-working days; the business preset's `weekend`; the `hide` projection and `invert`; engines B and C in working days; ticks and window end; MS Project, Mermaid and XLSX read the calendar. No new syntax. This phase removes the compression.
 2. **`show`.** The sided projection, shading, the `non-working:` display key, and `--non-working` across CLI, embed, VS Code and MCP.
-3. **Declarations.** `non-working` with `date:` / `through:` / `every:`, overriding `weekend`, includes, named seams and bands, exporter exceptions, validator rules, LSP completion, TextMate grammar.
+3. **Declarations,** in two PRs that ship in the same release.
+   - **5a, declarations reach the schedule.** `non-working` and `working` with `date:` / `start:` / `end:` / `every:`, overriding `weekend`, validator rules NW1–NW5, include merge, and the resolver that feeds engines A, B and C and every exporter's calendar.
+   - **5b, declarations on the chart and in exports.** Labelled seams and bands, MS Project `<Exceptions>`, Mermaid dated `excludes`, LSP completion, the TextMate grammar and the other editor and agent tooling.
 4. **Per-swimlane calendars,** only on demand (§11).
 
 ## 10. Worked examples
@@ -362,7 +409,7 @@ nowline v1
 
 config
 
-non-working thanksgiving "Thanksgiving" date:2026-11-26 through:2026-11-27
+non-working thanksgiving "Thanksgiving" start:2026-11-26 end:2026-11-27
 
 roadmap r "R" start:2026-11-23 scale:1w calendar:business
 
@@ -373,10 +420,24 @@ swimlane a "A"
   item qa "QA" duration:2d
 ```
 
-Schedule: Checkout uses Mon Nov 23, Tue 24, Wed 25, Mon 30 and Tue Dec 1. QA uses Wed Dec 2 and Thu Dec 3.
+Schedule: Checkout uses Mon Nov 23, Tue 24, Wed 25, Mon 30 and Tue Dec 1. QA uses Wed Dec 2 and Thu Dec 3. Pixels are relative to the timeline origin. A box sits 6 px inside its logical extent, and QA's `hide` box is the 8 px minimum width.
 
-- **`hide`:** Checkout 0–40, QA 40–56. Thursday through Sunday collapse into one seam at x = 24, labelled `Thanksgiving · 2d`. The Saturday milestone sits on that seam. The first week column is 24 px wide, so its `Nov 23` label is dropped under the narrow-column rule.
-- **`show`:** Checkout 0–72, painted across the shaded Nov 26–29 band (24–56; the `Thanksgiving` label covers Thursday and Friday). QA 72–88. The milestone sits at 40, on its Saturday.
+| | `hide` | `show` |
+|---|---|---|
+| Checkout box | 6–34 (logical 0–40) | 6–66 (logical 0–72) |
+| QA box | 46–54 (logical 40–56, minimum width) | 78–86 (logical 72–88) |
+| Milestone x | 24, `hiddenDate` `2026-11-28` | 40, no `hiddenDate` |
+| Ticks | `[0,undefined]`, `[24,'Nov 30']`, `[64,undefined]` | `[0,'Nov 23']`, `[56,'Nov 30']`, `[112,undefined]` |
+| Width, `endDate` | 64, 2026-12-07 | 112, 2026-12-07 |
+| Runs | `[24,0,'2026-11-26','2026-11-29',['Thanksgiving']]` and `[64,0,'2026-12-05','2026-12-06']` (no `titles` key) | `[24,32,…,['Thanksgiving'],band]` and `[96,16,'2026-12-05','2026-12-06',band]` |
+
+Runs read `[x, width, from, through, titles, band]`.
+
+- **`hide`:** Thursday through Sunday collapse into one seam at x = 24. The Saturday milestone sits on that seam. The first week column is 24 px wide, so its `Nov 23` label is dropped under the narrow-column rule. Phase 5b labels the seam `Thanksgiving · 2d`; Phase 5a carries the title on the run only.
+- **`show`:** Checkout is painted across the shaded Nov 26–29 band (24–56). QA follows at 72–88. The milestone sits at 40, on its Saturday.
+- **Engine C**, the same in both views: checkout `2026-11-23` to `2026-12-02` (exclusive, 5 days), qa `2026-12-02` to `2026-12-04` (2 days), launch `2026-11-28`.
+- **`date:[2026-11-26, 2026-11-27]`** in place of `start:` and `end:` gives the same model under `hide` and the same engine C.
+- Without the declaration the file lays out as it always did: Checkout 6–34, QA 46–54, the milestone at x = 40 with `hiddenDate`, and no titled run.
 
 ### Example C: a Sunday–Thursday week
 
@@ -388,9 +449,48 @@ config
 non-working weekend "Weekend" every:[fri, sat]
 
 roadmap r "R" start:2026-01-04 scale:1w calendar:business
+
+swimlane a "A"
+  item w1 "W1" duration:1w
+  item w2 "W2" duration:1w
+  item w3 "W3" duration:1w
 ```
 
 The file's `weekend` replaces the preset's. `1w` is Sunday through Thursday, week ticks fall on Sundays, and `days-per-week: 5` agrees with the five working days, so NW4 stays quiet.
+
+- **`hide`:** boxes 6–34, 46–74 and 86–114. Ticks `[0,'Jan 04']`, `[40,'Jan 11']`, `[80,'Jan 18']`, `[120,'Jan 25']`, `[160,'Feb 01']`, `[200,'Feb 08']` and `[240,undefined]`. The first run is `[40,0,'2026-01-09','2026-01-10']`, and there is no Saturday–Sunday run.
+- **`show`:** boxes 6–34, 62–90 and 118–146, with ticks every 56 from `Jan 04`.
+- **Engine C:** w1 `2026-01-04` to `2026-01-09`, w2 `2026-01-11` to `2026-01-16`, w3 `2026-01-18` to `2026-01-23` (exclusive ends).
+- **Calendar:** `resolveWorkingCalendar(...).working.workingWeekdays` is `{0,1,2,3,4}` and `weekStart` is 0. Mermaid emits `excludes friday, saturday`, MS Project marks Friday and Saturday non-working, and the XLSX Calendar row reads `business (Friday and Saturday off; 5/22/65/260 days per week/month/quarter/year)`.
+
+### Example D: a working exception
+
+Example A plus one declaration:
+
+```nowline
+config
+
+working crunch "Crunch Saturday" date:2026-01-10
+```
+
+The crunch Saturday is a working day, so work that crosses it ends a day sooner.
+
+- **`hide`:** the item boxes keep their x (6–34, 46–74, 86–114, 126–154). The Friday milestone moves from 152 to 160. Ticks `[0,'Jan 05']`, `[48,'Jan 12']`, `[88,'Jan 19']`, `[128,'Jan 26']`, `[168,'Feb 02']` and `[208,undefined]`. The first run is `[48,0,'2026-01-11','2026-01-11']`.
+- **`show`:** W2 46–82, W3 94–138 and W4 150–194. W4 was 174–202, so its end comes in by one day. The first run is `[48,8,'2026-01-11','2026-01-11',band]`.
+- **Engine C:** w2 `2026-01-10` to `2026-01-16`, w3 `2026-01-16` to `2026-01-23`, w4 `2026-01-23` to `2026-01-30` (it was `2026-01-26` to `2026-01-31`).
+
+### Example E: precedence
+
+Each row adds the declarations to Example A and reports engine C's W4 and the `hide` runs (`[x, width, from, through]`). Example A's own W4 is `2026-01-26` to `2026-01-31`.
+
+| Declarations | Engine C | `hide` runs |
+|---|---|---|
+| `non-working every:fri start:2026-01-12 end:2026-01-25` (a bounded recurrence over the open week) | w2 `01-12`–`01-20`, w3 `01-20`–`01-28`, w4 `01-28`–`02-04` | `[72,0,'2026-01-16','2026-01-18']`, `[104,0,'2026-01-23','2026-01-25']` |
+| `working every:sat start:2026-01-12 end:2026-01-25` and `non-working date:2026-01-17` (dated beats bounded) | w4 `01-24`–`01-30` | `[80,0,'2026-01-17','2026-01-18']`, `[128,0,'2026-01-25','2026-01-25']` |
+| `non-working date:2026-01-14` and `working date:2026-01-14` (`working` wins a dated tie) | equal to Example A | equal to Example A |
+| `non-working every:wed start:2026-01-12 end:2026-01-25` and `working every:wed start:2026-01-12 end:2026-01-25` (`working` wins a bounded tie) | equal to Example A | equal to Example A |
+
+Any order of the declarations, in the file or in a `config:merge` include, gives the same result. Two titled dated rules that start the same day (`non-working "Beta" start:2026-12-24 end:2026-12-25` and `non-working "Alpha" date:2026-12-24`) give the run `2026-12-24` to `2026-12-27` the titles `['Alpha','Beta']` in either order.
 
 ## 11. Scope, non-goals and open questions
 
@@ -400,8 +500,8 @@ The file's `weekend` replaces the preset's. `1w` is Sunday through Thursday, wee
 
 **Open questions** (all decided; see §3 of the [handoff](./handoffs/handoff-m2p-working-calendar.md)).
 
-1. **The keyword.** Confirm that `non-working` lexes as a keyword with `longer_alt` (a grammar test), and that spending the keyword budget on it is acceptable.
-2. **Ranges.** `through:` versus a list of dates (`date:[2026-12-24, 2026-12-25]`). Both are cheap; a long shutdown reads better with `through:`.
+1. **The keyword.** Decided: `non-working`, plus `working` for exceptions, and the lexer spike passed (decision 1 in the handoff's decision log; `dsl.md` Design Rule 1 goes from 22 to 24 keywords).
+2. **Ranges.** Decided: `date:` takes one date or a list, and `start:` / `end:` (inclusive) give a range or bound an `every:`; `through:` is dropped (decision 2, amended 2026-10-06).
 3. **Narrow columns under `hide`.** Dropping the label is the simple rule. The alternative lets a label extend into a neighbouring column whose own label is thinned.
 4. **Thinning at the `days` scale.** The default thins to every 7th day ("weekly markers"). Under `hide` that should become every Nth visible day, where N is the working days per week.
 5. **Markers on hidden days.** A Saturday milestone under `hide` sits on the seam. Should its label carry the date (`Launch (Sat Nov 28)`), or is the hover title enough?

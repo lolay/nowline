@@ -42,7 +42,7 @@ files.
 .It
 .Sy config
 section (optional). Rendering configuration: styles, defaults,
-scale, calendar, symbols.
+scale, calendar, symbols, non-working and working days.
 .It
 .Sy roadmap
 section (required). Content: persons, teams, anchors, labels, sizes,
@@ -163,8 +163,10 @@ The included file's
 .Sy style ,
 .Sy symbol ,
 .Sy default ,
+.Sy calendar ,
+.Sy non-working ,
 and
-.Sy calendar
+.Sy working
 declarations.
 .It Sy Roadmap
 The included file's
@@ -182,6 +184,12 @@ On collision, the
 .Em parent wins
 and the parser emits a warning identifying the shadowed definition
 and source file.
+A
+.Sy non-working
+or
+.Sy working
+declaration collides only with a parent declaration of the same keyword
+and name; an unnamed one never collides and always merges.
 .It Sy ignore
 Child config is dropped entirely.
 If child roadmap content is merged, it resolves styles from the
@@ -297,14 +305,16 @@ section marker appears before
 .Sy roadmap .
 Config keywords sit at the top level (not indented under the
 marker) and define rendering vocabulary, defaults, axis settings,
-day arithmetic, and custom symbols.
+day arithmetic, non-working days, and custom symbols.
 .Pp
-Five config keywords:
+Seven config keywords:
 .Sy scale ,
 .Sy style ,
 .Sy symbol ,
 .Sy default ,
-.Sy calendar .
+.Sy calendar ,
+.Sy non-working ,
+.Sy working .
 Every config entry is optional; if
 .Sy config
 is omitted, all built-in defaults apply.
@@ -545,7 +555,105 @@ is
 .Sy 260d ,
 not
 .Sy 12 \(mu 22d = 264d .
-.Ss non-working \(em day display
+.Ss non-working and working \(em declarations
+A
+.Sy non-working
+declaration takes days out of the schedule: weekends, holidays,
+closures.
+A
+.Sy working
+declaration puts days back, for a crunch Saturday or a make-up day.
+Both are config keywords and share one shape:
+.Bd -literal -offset indent
+config
+
+non-working weekend "Weekend" every:[fri, sat]
+non-working new-year "New Year's Day" date:2027-01-01
+non-working summit "Company summit" start:2026-09-14 end:2026-09-16
+non-working fridays every:fri start:2026-07-01 end:2026-08-31
+working crunch "Crunch Saturday" date:2026-01-10
+.Ed
+.Pp
+The id and the title are both optional.
+Durations count working days only, so an item that spans a non-working
+day ends later, and an item that spans a working exception ends
+sooner.
+The title is carried on the model; a label for it is not drawn yet.
+A declaration takes these properties:
+.Bl -tag -width "every:"
+.It Sy date:
+One ISO date or a list of dates.
+.It Sy start:
+One ISO date, inclusive: the first day of a range, or the day a
+recurrence begins.
+.It Sy end:
+One ISO date, inclusive: the last day of a range, or the day a
+recurrence stops.
+It must not be before
+.Sy start: .
+.It Sy every:
+One weekday or a list of
+.Sy sun , mon , tue , wed , thu , fri , sat .
+A weekly recurrence.
+.El
+.Pp
+A declaration is exactly one of three shapes:
+.Sy date:
+alone; a range of
+.Sy start:
+and
+.Sy end:
+without
+.Sy every: ;
+or
+.Sy every:
+with optional
+.Sy start:
+and
+.Sy end:
+bounds.
+With neither bound a recurrence is open-ended and holds in every week.
+.Pp
+On a given day the most specific declaration decides, and
+.Sy working
+wins a tie:
+.Bl -enum -offset indent -compact
+.It
+a dated declaration, a
+.Sy date:
+list or a range;
+.It
+a bounded recurrence;
+.It
+the open-ended week.
+.El
+.Pp
+Order never matters: the same declarations in any order, in the file
+or in includes, give the same schedule.
+.Sy calendar:business
+supplies a
+.Sy non-working weekend
+declaration for Saturday and Sunday.
+A
+.Sy non-working
+declaration named
+.Sy weekend
+replaces it, for any preset, so a Friday and Saturday week needs no
+custom calendar; any other name adds to the preset.
+.Pp
+The open-ended week must keep a working day, and
+.Sy days-per-week
+should agree with the weekdays it leaves working
+.Pq see Sx VALIDATION .
+A declaration whose value or shape is malformed is skipped when the
+calendar is built.
+Under
+.Sy config:isolate
+the child's declarations stay in its region and have no effect on the
+chart yet: the region is laid out on the host's calendar.
+The validator reads only its own file, so a declaration in an include
+is not counted by the open-ended week checks.
+.Ss non-working: \(em day display
 Under
 .Sy calendar:business
 the weekend is non-working: durations count working days only, and the
@@ -1855,6 +1963,60 @@ When
 all four
 .Sy days-per-*
 entries are required and must be positive integers.
+.It
+A
+.Sy non-working
+or
+.Sy working
+declaration is one of three shapes: a lone
+.Sy date: ;
+.Sy start:
+and
+.Sy end:
+without
+.Sy every: ;
+or
+.Sy every:
+with optional bounds
+.Pq Sy NL.E0900 .
+Its only keys are
+.Sy date: , start: , end: ,
+and
+.Sy every:
+.Pq Sy NL.E0901 ,
+and
+.Sy start:
+and
+.Sy end:
+take one date each
+.Pq Sy NL.E0902 .
+.It
+Every date on a calendar declaration is a real calendar day
+.Pq Sy NL.E0405 ,
+and
+.Sy end:
+is not before
+.Sy start:
+.Pq Sy NL.E0903 .
+.It
+.Sy every:
+values are weekday names
+.Pq Sy NL.E0904
+and each appears at most once
+.Pq Sy NL.E0905 .
+.It
+The open-ended week keeps at least one working weekday
+.Pq Sy NL.E0906 .
+.Sy days-per-week
+agrees with the weekdays it leaves working; a mismatch is the warning
+.Sy NL.W0705 .
+.It
+A declaration id is unique within its keyword in one file
+.Pq Sy NL.E0907 .
+.Sy non-working
+and
+.Sy working
+do not share a namespace.
 .El
 .Ss Roadmap start property
 .Bl -bullet -offset indent -compact
@@ -1961,6 +2123,16 @@ resolved start floors, as the parent
 .Pq Sy NL.E0202 .
 A differing title or other presentation is the warning
 .Sy NL.W0701 .
+.It
+On
+.Sy config:merge ,
+a
+.Sy non-working
+or
+.Sy working
+declaration collides only with a parent declaration of the same keyword
+and name, and the parent wins with a warning; unnamed declarations
+never collide.
 .El
 .Ss Waves
 These rules apply to files that use
