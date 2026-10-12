@@ -37,9 +37,7 @@ Paste the plan's Kickoff prompt into a new session on this branch.
 
 ## Pending question
 
-BLOCKED at gate 2 (tier change [exec] -> [deep], the plan's marked STOP "gates 5 and 2"; gate 5 does not fire on a one-group wave). Asked verbatim:
-
-> Wave 1 and its fix-up are reviewed and pushed (`6fdd05b..369f12f`, PASS after one fix-up). Approve gate 2 to launch wave 2 [deep] s6-s8 (include merge, calendar resolver, byte-identity proof) on Opus at high effort, ~$6 expected?
+None. Gate 2 approved 2026-10-12: "yes, approve gate 2, launch wave 2". Wave 2 [deep] s6-s8 launched.
 
 ## Decisions so far
 
