@@ -765,3 +765,166 @@ describe('a file whose only marker-row content is a titled run (5b decision 3)',
         expect(model.timeline.markerRow.height).toBe(0);
     });
 });
+
+// ---------------------------------------------------------------------------
+// Working exceptions: a titled dated `working` rule is labelled `· +Nd`
+// (specs/working-calendar.md §7.4, §10 Example D)
+// ---------------------------------------------------------------------------
+//
+// `Crunch Saturday · +1d` (21 characters) is 121.8 px and `Make-up day · +1d`
+// 98.6 px. Every value here was probed with the layout API after the change;
+// before it, `timeline.workingExceptions` did not exist, so each test fails on
+// the old code at its first expectation.
+
+type Exception = NonNullable<PositionedRoadmap['timeline']['workingExceptions']>[number];
+
+function exceptionsOf(model: PositionedRoadmap): Exception[] {
+    return model.timeline.workingExceptions ?? [];
+}
+
+function onlyException(model: PositionedRoadmap): Exception {
+    const exceptions = exceptionsOf(model);
+    expect(exceptions, 'one working exception').toHaveLength(1);
+    return exceptions[0];
+}
+
+describe('Example D: a titled working Saturday is labelled', () => {
+    for (const display of ['hide', 'show'] as const) {
+        it(`${display}: labels Sat Jan 10 \`Crunch Saturday · +1d\` at x 40, its label to the right`, async () => {
+            const { model } = await lay(exampleA([CRUNCH]), display);
+            const exception = onlyException(model);
+            expect(exception.label).toBe('Crunch Saturday · +1d');
+            expect(exception.titles).toEqual(['Crunch Saturday']);
+            expect(iso(exception.from)).toBe('2026-01-10');
+            expect(iso(exception.through)).toBe('2026-01-10');
+            expect(exception.x - model.timeline.originX).toBe(40);
+            expect(exception.labelSide).toBe('right');
+            const box = exception.labelBox!;
+            expect(box.x - model.timeline.originX).toBeCloseTo(46, 5);
+            expect(box.width).toBeCloseTo(121.8, 5);
+            expect(box.height).toBe(12);
+        });
+
+        it(`${display}: draws no cut line, band or width: the entry has only its seven keys`, async () => {
+            const { model } = await lay(exampleA([CRUNCH]), display);
+            expect(Object.keys(onlyException(model)).sort()).toEqual([
+                'from',
+                'label',
+                'labelBox',
+                'labelSide',
+                'through',
+                'titles',
+                'x',
+            ]);
+            // No non-working run gains a cut or a title from the working day either.
+            for (const run of labelledRuns(model)) {
+                expect('cut' in run).toBe(false);
+                expect('titles' in run).toBe(false);
+            }
+        });
+    }
+
+    it('hide: the label packs under the Friday milestone, which keeps row 0 (two rows)', async () => {
+        const { model } = await lay(exampleA([CRUNCH]), 'hide');
+        expect(onlyException(model).labelBox!.y).toBe(model.timeline.markerRow.y + 22);
+        expect(milestoneX(model, 'fri').center.y).toBe(model.timeline.markerRow.y);
+        expect(model.timeline.markerRow.height).toBe(52);
+    });
+
+    it('show: the label shares row 0 with the Friday milestone (one row)', async () => {
+        const { model } = await lay(exampleA([CRUNCH]), 'show');
+        expect(onlyException(model).labelBox!.y).toBe(model.timeline.markerRow.y - 4);
+        expect(model.timeline.markerRow.height).toBe(26);
+    });
+});
+
+describe('a working exception packs against a nearby milestone', () => {
+    // `Ship` on Fri Jan 9 sits at x 32, one day left of the crunch Saturday at 40.
+    const SHIP_BODY = EXAMPLE_A_BODY.replace(
+        'milestone fri "Fri Jan 30" date:2026-01-30',
+        'milestone ship "Ship" date:2026-01-09',
+    );
+    const ship = (declarations: string[]) => withDeclarations(SHIP_BODY, declarations);
+
+    for (const display of ['hide', 'show'] as const) {
+        it(`${display}: Ship keeps the bottom row and the label takes a new top row`, async () => {
+            const { model } = await lay(ship([CRUNCH]), display);
+            const m = milestoneX(model, 'ship');
+            expect(m.center.x - model.timeline.originX).toBe(32);
+            expect(m.center.y).toBe(model.timeline.markerRow.y + 26);
+            expect(m.labelSide).toBe('right');
+            const exception = onlyException(model);
+            expect(exception.labelBox!.y).toBe(model.timeline.markerRow.y - 4);
+            expect(exception.labelSide).toBe('right');
+            expect(model.timeline.markerRow.height).toBe(52);
+        });
+    }
+
+    it('without the declaration Ship has the one row to itself (guard)', async () => {
+        for (const display of ['hide', 'show'] as const) {
+            const { model } = await lay(ship([]), display);
+            expect(milestoneX(model, 'ship').center.y).toBe(model.timeline.markerRow.y);
+            expect(model.timeline.markerRow.height, display).toBe(26);
+        }
+    });
+});
+
+describe('a weekday make-up day inside a titled closure is labelled', () => {
+    // Wed Dec 30 works inside Winter break (Thu Dec 24 to Fri Jan 1), which
+    // splits the closure into two titled runs. The open week works a Wednesday,
+    // so `calendarExceptions` sees nothing to report: the label comes from
+    // precedence, where the dated working rule beats the dated closure.
+    const source = withDeclarations(
+        `roadmap r "R" start:2026-12-21 scale:1w calendar:business\n\nswimlane s "S"\n  item w1 "W1" duration:3w\n`,
+        [
+            'non-working winter-break "Winter break" start:2026-12-24 end:2027-01-01',
+            'working makeup "Make-up day" date:2026-12-30',
+        ],
+    );
+    const expected = { hide: { x: 24, runs: [24, 32] }, show: { x: 72, runs: [24, 80] } };
+
+    for (const display of ['hide', 'show'] as const) {
+        it(`${display}: labels Dec 30 \`Make-up day · +1d\` between the two Winter break runs`, async () => {
+            const { model } = await lay(source, display);
+            const exception = onlyException(model);
+            expect(exception.label).toBe('Make-up day · +1d');
+            expect(iso(exception.from)).toBe('2026-12-30');
+            expect(iso(exception.through)).toBe('2026-12-30');
+            expect(exception.x - model.timeline.originX).toBe(expected[display].x);
+            const titled = labelledRuns(model).filter((run) => run.label !== undefined);
+            expect(titled.map((run) => [run.x - model.timeline.originX, run.label])).toEqual([
+                [expected[display].runs[0], 'Winter break · 4d'],
+                [expected[display].runs[1], 'Winter break · 2d'],
+            ]);
+            expect(model.timeline.markerRow.height).toBe(78);
+        });
+    }
+});
+
+describe('working rules that turn no titled day draw nothing', () => {
+    const cases: Array<[string, string[]]> = [
+        ['an untitled working Saturday', ['working crunch date:2026-01-10']],
+        [
+            'a titled working rule on a day the week already works',
+            ['working "Tuesday" date:2026-01-06'],
+        ],
+        [
+            'a titled working Saturday a bounded working recurrence already opens',
+            [
+                'working "Saturdays" every:sat start:2026-01-05 end:2026-01-18',
+                'working "Crunch" date:2026-01-10',
+            ],
+        ],
+    ];
+    for (const [name, declarations] of cases) {
+        it(`${name}: no workingExceptions key, one marker row (guard)`, async () => {
+            for (const display of ['hide', 'show'] as const) {
+                const { model } = await lay(exampleA(declarations), display);
+                expect('workingExceptions' in model.timeline, display).toBe(false);
+                expect(model.timeline.markerRow.height, display).toBe(26);
+                const hasNoRunLabel = labelledRuns(model).every((run) => run.label === undefined);
+                expect(hasNoRunLabel, display).toBe(true);
+            }
+        });
+    }
+});

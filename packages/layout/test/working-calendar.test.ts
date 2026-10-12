@@ -1015,6 +1015,100 @@ describe('nonWorkingRuns windows', () => {
     });
 });
 
+describe('workingExceptionRuns (specs/working-calendar.md §7.4)', () => {
+    const crunch = (title: string, ...dates: Date[]): CalendarRule => ({
+        working: true,
+        dates,
+        title,
+    });
+    const summary = (cal: WorkingCalendar, from: Date, to: Date) =>
+        cal
+            .workingExceptionRuns(from, to)
+            .map((run) => [ymd(run.from), ymd(run.through), run.titles]);
+
+    it('lists a titled working Saturday, and nothing for an untitled one', () => {
+        expect(
+            summary(
+                businessWith(crunch('Crunch', utc(2026, 1, 10))),
+                utc(2026, 1, 5),
+                utc(2026, 2, 2),
+            ),
+        ).toEqual([['2026-01-10', '2026-01-10', ['Crunch']]]);
+        const untitled = businessWith({ working: true, dates: [utc(2026, 1, 10)] });
+        expect(untitled.workingExceptionRuns(utc(2026, 1, 5), utc(2026, 2, 2))).toEqual([]);
+    });
+
+    it('counts only the days a titled range turns: Sat and Sun of a Mon-Mon crunch week', () => {
+        const cal = businessWith({
+            working: true,
+            start: utc(2026, 1, 5),
+            end: utc(2026, 1, 12),
+            title: 'Crunch week',
+        });
+        expect(summary(cal, utc(2026, 1, 1), utc(2026, 2, 1))).toEqual([
+            ['2026-01-10', '2026-01-11', ['Crunch week']],
+        ]);
+    });
+
+    it('turns a weekday inside a dated closure, which calendarExceptions cannot see', () => {
+        const cal = businessWith(
+            {
+                working: false,
+                start: utc(2026, 12, 24),
+                end: utc(2027, 1, 1),
+                title: 'Winter break',
+            },
+            crunch('Make-up day', utc(2026, 12, 30)),
+        );
+        expect(summary(cal, utc(2026, 12, 21), utc(2027, 1, 11))).toEqual([
+            ['2026-12-30', '2026-12-30', ['Make-up day']],
+        ]);
+    });
+
+    it('does not turn a day a bounded working recurrence already opens', () => {
+        const cal = businessWith(
+            { working: true, every: days(SAT), start: utc(2026, 1, 5), end: utc(2026, 1, 18) },
+            crunch('Crunch', utc(2026, 1, 10), utc(2026, 1, 24)),
+        );
+        expect(summary(cal, utc(2026, 1, 5), utc(2026, 2, 2))).toEqual([
+            ['2026-01-24', '2026-01-24', ['Crunch']],
+        ]);
+    });
+
+    it('joins adjacent turned days into one run, titles by first date in either order', () => {
+        const sat = crunch('Saturday', utc(2026, 1, 10));
+        const sun = crunch('Sunday', utc(2026, 1, 11));
+        for (const rules of [
+            [sat, sun],
+            [sun, sat],
+        ]) {
+            expect(summary(businessWith(...rules), utc(2026, 1, 5), utc(2026, 1, 19))).toEqual([
+                ['2026-01-10', '2026-01-11', ['Saturday', 'Sunday']],
+            ]);
+        }
+    });
+
+    it('keeps real dates for a run straddling the window, and drops one outside it', () => {
+        const cal = businessWith(crunch('Weekend', utc(2026, 1, 10), utc(2026, 1, 11)));
+        expect(summary(cal, utc(2026, 1, 11), utc(2026, 1, 12))).toEqual([
+            ['2026-01-10', '2026-01-11', ['Weekend']],
+        ]);
+        expect(cal.workingExceptionRuns(utc(2026, 1, 12), utc(2026, 1, 19))).toEqual([]);
+        expect(cal.workingExceptionRuns(utc(2026, 1, 5), utc(2026, 1, 10))).toEqual([]);
+    });
+
+    it('works on the identity path when a titled working day cancels a closure', () => {
+        const cal = fromCalendarConfig(fullCal, [
+            { working: false, dates: [utc(2026, 1, 14)] },
+            crunch('Back on', utc(2026, 1, 14)),
+        ]);
+        expect(cal.hasNonWorkingDays).toBe(false);
+        expect(summary(cal, utc(2026, 1, 5), utc(2026, 2, 2))).toEqual([
+            ['2026-01-14', '2026-01-14', ['Back on']],
+        ]);
+    });
+});
+
 describe('a calendar parsed from a roadmap file', () => {
     const source = (extra: string) =>
         `nowline v1\n\nroadmap r start:2026-01-05${extra}\n\nswimlane s\n  item a duration:1w\n`;

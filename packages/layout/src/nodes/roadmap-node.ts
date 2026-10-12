@@ -51,12 +51,14 @@ import type {
     PositionedRoadmap,
     PositionedSwimlane,
     PositionedTimelineScale,
+    PositionedWorkingException,
     SlackCorridor,
 } from '../types.js';
 import type { ViewPreset } from '../view-preset.js';
 import {
     buildHeaderTicks,
     buildNonWorkingRuns,
+    buildWorkingExceptions,
     resolveScale,
     tickBoundaryAtOrAfter,
 } from '../view-preset.js';
@@ -119,6 +121,16 @@ function nonWorkingRunMarkerId(run: PositionedNonWorkingRun): string {
     return `nonworking:${run.from.toISOString().slice(0, 10)}`;
 }
 
+/** The marker-row id of a working exception: `working:<ISO from>`. */
+function workingExceptionMarkerId(exception: PositionedWorkingException): string {
+    return `working:${exception.from.toISOString().slice(0, 10)}`;
+}
+
+/** A zero-radius marker-row entry for a calendar label at `x`. */
+function calendarLabelEntry(id: string, x: number, label: string): MarkerEntity {
+    return { id, centerX: x, radius: 0, title: label, fontSize: 10, bold: false };
+}
+
 /**
  * Marker-row entries for the titled runs (specs/working-calendar.md
  * §7.4): a zero-radius marker at the run's x (the seam under `hide`, the
@@ -132,20 +144,26 @@ function nonWorkingRunEntries(
     const entries: MarkerEntity[] = [];
     for (const run of runs ?? []) {
         if (run.label === undefined) continue;
-        entries.push({
-            id: nonWorkingRunMarkerId(run),
-            centerX: run.x,
-            radius: 0,
-            title: run.label,
-            fontSize: 10,
-            bold: false,
-        });
+        entries.push(calendarLabelEntry(nonWorkingRunMarkerId(run), run.x, run.label));
     }
     return entries;
 }
 
 /**
- * The canvas right edge the run labels need. A run label that fits
+ * Marker-row entries for the working exceptions (specs/working-calendar.md
+ * §7.4), packed beside the titled runs' and on the same terms: a zero-radius
+ * marker at the first turned day's x.
+ */
+function workingExceptionEntries(
+    exceptions: ReadonlyArray<PositionedWorkingException> | undefined,
+): MarkerEntity[] {
+    return (exceptions ?? []).map((exception) =>
+        calendarLabelEntry(workingExceptionMarkerId(exception), exception.x, exception.label),
+    );
+}
+
+/**
+ * The canvas right edge the calendar labels need. A label that fits
  * neither right of its x (against `chartRightX`) nor left of it (against
  * `chartLeftX`) would fall back to the left and draw over a beside header
  * card, so the canvas grows to hold it on the right instead. Anchors and
@@ -170,20 +188,25 @@ function runLabelsRightX(
 }
 
 /**
- * Set (or refresh) the timeline's hidden non-working runs from its current
- * ticks. Both keys stay omitted when the window holds no non-working day,
- * so a calendar without one keeps its exact model shape. The extension
- * pass only grows the window, so a refresh never loses the runs.
+ * Set (or refresh) the timeline's non-working runs from its current ticks,
+ * and its working exceptions. `nonWorkingDisplay` and `nonWorking` stay
+ * omitted when the window holds no non-working day, and `workingExceptions`
+ * when it holds no exception, so a calendar without either keeps its exact
+ * model shape. The extension pass only grows the window, so a refresh never
+ * loses an entry.
  */
-function setNonWorkingRuns(
+function setCalendarRuns(
     timeline: PositionedTimelineScale,
     scale: TimeScale,
     unit: ViewPreset['unit'],
 ): void {
     const runs = buildNonWorkingRuns(scale, timeline.ticks, unit, timeline.minorGrid);
-    if (!runs) return;
-    timeline.nonWorkingDisplay = scale.showsNonWorking ? 'show' : 'hide';
-    timeline.nonWorking = runs;
+    if (runs) {
+        timeline.nonWorkingDisplay = scale.showsNonWorking ? 'show' : 'hide';
+        timeline.nonWorking = runs;
+    }
+    const exceptions = buildWorkingExceptions(scale);
+    if (exceptions) timeline.workingExceptions = exceptions;
 }
 
 /** Sized output from the beside-mode header word-wrap pass. */
@@ -367,13 +390,14 @@ export class RoadmapNode {
             calendar,
             nonWorking,
         });
-        // Titled non-working runs join the marker row (5b). These runs are
-        // provisional: they size the band before the timeline exists, and
-        // their ticks only decide `seam`, which the labels never read. The
-        // re-pack below reads the final runs.
-        const provisionalRunEntries = nonWorkingRunEntries(
-            buildNonWorkingRuns(timeScale, [], scale.unit, false),
-        );
+        // Titled non-working runs and working exceptions join the marker
+        // row (5b). These are provisional: they size the band before the
+        // timeline exists, and their ticks only decide `seam`, which the
+        // labels never read. The re-pack below reads the final ones.
+        const provisionalRunEntries = [
+            ...nonWorkingRunEntries(buildNonWorkingRuns(timeScale, [], scale.unit, false)),
+            ...workingExceptionEntries(buildWorkingExceptions(timeScale)),
+        ];
         const hasMarkerEntities =
             resolved.content.anchors.size + resolved.content.milestones.size > 0 ||
             provisionalRunEntries.length > 0;
@@ -487,7 +511,7 @@ export class RoadmapNode {
             minorGrid: headerStyle.minorGrid,
             ...(plan ? { waveStrip: { y: waveStripY, height: waveStripHeight } } : {}),
         };
-        setNonWorkingRuns(timeline, timeScale, scale.unit);
+        setCalendarRuns(timeline, timeScale, scale.unit);
 
         // Stitch packed placements together with their final centerY now
         // that markerRowY is known. AnchorNode + MilestoneNode read this
@@ -756,14 +780,17 @@ export class RoadmapNode {
             timeline.endDate = extendedEndDate;
             timeline.box.width = extendedWidth;
             timeline.ticks = buildHeaderTicks(extendedScale, scale, calendar, locale);
-            setNonWorkingRuns(timeline, extendedScale, scale.unit);
+            setCalendarRuns(timeline, extendedScale, scale.unit);
             growChartRightX(ctx, originX + extendedWidth + GUTTER_PX);
         }
 
-        // Run labels (5b) from the final runs: the extension pass above
-        // rebuilt them, so never the pre-pack's copies. A label that fits
+        // Calendar labels (5b) from the final runs and working exceptions:
+        // the extension pass above rebuilt them, so never the pre-pack's copies. A label that fits
         // neither side grows the canvas so the re-pack places it right.
-        const runEntries = nonWorkingRunEntries(timeline.nonWorking);
+        const runEntries = [
+            ...nonWorkingRunEntries(timeline.nonWorking),
+            ...workingExceptionEntries(timeline.workingExceptions),
+        ];
         growChartRightX(
             ctx,
             runLabelsRightX(runEntries, chartLeftX, ctx.chartRightX, deps.estimateTextWidth),
@@ -846,6 +873,12 @@ export class RoadmapNode {
             if (!placement) continue;
             run.labelBox = placement.labelBox;
             run.labelSide = placement.labelSide;
+        }
+        for (const exception of timeline.workingExceptions ?? []) {
+            const placement = ctx.markerRowPlacements.get(workingExceptionMarkerId(exception));
+            if (!placement) continue;
+            exception.labelBox = placement.labelBox;
+            exception.labelSide = placement.labelSide;
         }
         for (const e of datePinnedEntries) {
             const p = ctx.markerRowPlacements.get(e.id);

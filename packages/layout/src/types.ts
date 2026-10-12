@@ -197,6 +197,33 @@ export interface PositionedTimelineScale {
     nonWorkingDisplay?: NonWorkingDisplay;
     /** The window's non-working runs, left to right; see `PositionedNonWorkingRun`. */
     nonWorking?: PositionedNonWorkingRun[];
+    /**
+     * The window's labelled working exceptions, left to right; see
+     * `PositionedWorkingException`. Omitted when there are none.
+     */
+    workingExceptions?: PositionedWorkingException[];
+}
+
+/**
+ * One run of days that titled dated `working` rules turn from non-working
+ * to working (specs/working-calendar.md §7.4, §7.5). It is labelled in the
+ * marker row like a titled non-working run, but never drawn as a cut line
+ * or a band: a working day removes no time.
+ */
+export interface PositionedWorkingException {
+    /** The run's first day: its column start under `hide`, its day start under `show` (clamped to the window). */
+    x: number;
+    /** First day the rules turn (UTC midnight). */
+    from: Date;
+    /** Last day the rules turn, inclusive (UTC midnight). */
+    through: Date;
+    /** Titles of the titled dated working rules that turn a day of the run. */
+    titles: string[];
+    /** The titles joined with `, `, then ` · +Nd` for the N days turned. */
+    label: string;
+    /** Resolved placement of `label` in the marker row, like `PositionedNonWorkingRun.labelBox`. */
+    labelBox?: BoundingBox;
+    labelSide?: 'left' | 'right';
 }
 
 /**

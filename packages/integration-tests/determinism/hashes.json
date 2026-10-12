@@ -403,11 +403,11 @@
             "icu": false
         },
         "working-calendar:html": {
-            "node": "6a32b88f68577c56f79cb47a112f4de609eac5137ced75aa719eaf89b67d2598",
+            "node": "ec6a51ab6d847805d867ccd1a7a4e3314aba314a95f92e6f58b5dcf880652d0c",
             "icu": true
         },
         "working-calendar:json": {
-            "node": "f1a859aae4b8f1fd587618fbeb5199292e10f7639f8c5e5d093907a7b5a53c21",
+            "node": "3af10d22498790b6cc0ec3bb470cb1a03f8cb92f2e7c01d3ddd5c98639d218d7",
             "icu": false
         },
         "working-calendar:mermaid": {
@@ -419,16 +419,16 @@
             "icu": false
         },
         "working-calendar:pdf": {
-            "node": "cb4aae2d334c1ad720fd87f3b75da57c6d1b0de767a4d99b084fa29cf4d53c67",
+            "node": "b17f92aba2cb6c7bb530cea71ab26d74597dd2fc7db6b00911375ce649c4a2dc",
             "icu": true,
-            "cli": "cfb6b6d03144937f38e8534ad5e823d57574ab08d2dd499eb047305f352de0c9"
+            "cli": "b1581d1b23cbf1c09fc10c38df0042e8be47e7a8389d7ed678057074807052c6"
         },
         "working-calendar:png": {
-            "node": "700b66e16bf3c2d10d91eaa16e35f583397d860588e0597c0fb7886683e4909e",
+            "node": "fcb90e84e2b67972cf32df1b52e51b42ddc4b6e5d1494d9a2e094d02c8f5d487",
             "icu": true
         },
         "working-calendar:svg": {
-            "node": "07bf5ffb83ce09562585da184fb7f315548d8cf10c489ba95af01dd4f8f5726b",
+            "node": "1229f7213a1790b7bd33a63c965d73c0298538972d2210be0a3478fac3296a0e",
             "icu": true
         },
         "working-calendar:xlsx": {
