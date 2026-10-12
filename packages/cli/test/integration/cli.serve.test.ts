@@ -78,6 +78,44 @@ async function waitForReady(port: number, timeoutMs = 5000): Promise<void> {
     throw new Error(`serve never became ready on port ${port}`);
 }
 
+/**
+ * Serves `docs/sample.nowline` with a `.nowlinerc` one level up and
+ * `--verbose`, and returns stderr once the server is ready.
+ */
+async function serveVerbose(rc: string, extraArgs: string[]): Promise<string> {
+    let stderr = '';
+    await withTempDir(async (dir) => {
+        await fs.mkdir(path.join(dir, 'docs'));
+        const source = path.join(dir, 'docs', 'sample.nowline');
+        await fs.writeFile(
+            source,
+            'nowline v1\n\nroadmap r "R"\n\nswimlane a "A"\n  item x duration:1w\n',
+        );
+        await fs.writeFile(path.join(dir, '.nowlinerc'), rc);
+        const port = await pickPort();
+        const child: ChildProcess = spawn(
+            process.execPath,
+            [distEntry, '--serve', source, '--port', String(port), '--verbose', ...extraArgs],
+            {
+                cwd: packageRoot,
+                env: { ...process.env, FORCE_COLOR: '0', NO_COLOR: '1' },
+                stdio: ['ignore', 'pipe', 'pipe'],
+            },
+        );
+        child.stderr?.on('data', (d: Buffer) => {
+            stderr += d.toString('utf-8');
+        });
+        try {
+            await waitForReady(port);
+        } finally {
+            child.kill('SIGTERM');
+            await new Promise((r) => setTimeout(r, 150));
+            child.kill('SIGKILL');
+        }
+    });
+    return stderr;
+}
+
 describeBuilt('--serve integration (requires `pnpm build`)', () => {
     it('serves HTML shell and rebuilds on file changes', async () => {
         await withTempDir(async (dir) => {
@@ -374,6 +412,18 @@ describeBuilt('--serve integration (requires `pnpm build`)', () => {
                 child.kill('SIGKILL');
             }
         });
+    }, 15000);
+
+    it('.nowlinerc assetRoot sets the asset root, relative to the rc file', async () => {
+        const stderr = await serveVerbose('assetRoot: brand\n', []);
+        expect(stderr).toMatch(
+            /nowline: asset-root=\S*[\\/]nowline-cli-\w+[\\/]brand \(\.nowlinerc assetRoot\)/,
+        );
+    }, 15000);
+
+    it('--asset-root overrides the .nowlinerc assetRoot', async () => {
+        const stderr = await serveVerbose('assetRoot: brand\n', ['--asset-root', 'flag-assets']);
+        expect(stderr).toMatch(/nowline: asset-root=\S*[\\/]flag-assets \(--asset-root\)/);
     }, 15000);
 
     it('--theme with an unknown name is an input error', async () => {

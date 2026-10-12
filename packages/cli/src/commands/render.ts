@@ -77,7 +77,8 @@ export async function renderHandler(options: RenderHandlerOptions): Promise<void
     }
 
     const isStdoutOutput = args.output === '-';
-    const config = await loadConfigFor(args.positional, cwd);
+    const rc = await loadConfigFor(args.positional, cwd);
+    const { config } = rc;
 
     const format = resolveFormatOrThrow({
         flag: args.format,
@@ -103,6 +104,13 @@ export async function renderHandler(options: RenderHandlerOptions): Promise<void
 
     const input = await readInput(args.positional, { cwd });
 
+    const assetRoot = resolveAssetRoot({
+        flag: args.assetRoot,
+        cwd,
+        rc,
+        inputDir: input.isStdin ? cwd : path.dirname(input.path),
+    });
+
     const resolved = resolveLocaleOverride({
         flag: args.locale,
         env: process.env,
@@ -125,7 +133,7 @@ export async function renderHandler(options: RenderHandlerOptions): Promise<void
         nonWorking: parseNonWorkingArg(args.nonWorking),
         noLinks: args.noLinks,
         strict: args.strict,
-        assetRoot: args.assetRoot,
+        assetRoot,
         // m2c format-specific options. Strings get parsed inside the format
         // dispatch; the CLI just passes them through.
         pageSize: args.pageSize ?? stringFromConfig(config, 'pdfPageSize'),
@@ -214,7 +222,7 @@ interface ProduceArgs {
     nonWorking?: NonWorkingDisplay;
     noLinks: boolean;
     strict: boolean;
-    assetRoot?: string;
+    assetRoot: ResolvedAssetRoot;
     // m2c format-specific
     pageSize?: string;
     /** Parsed after validation, so its error follows any diagnostics. */
@@ -233,7 +241,7 @@ interface ProduceArgs {
     operatorLocale: string;
     /** Resolved locale override metadata, used for the verbose-mode source line. */
     resolvedLocale: import('../i18n/locale.js').ResolvedLocale;
-    /** True for `--verbose`. Gates the `nowline: locale=...` source-line emission. */
+    /** True for `--verbose`. Gates the `nowline: locale=...` and `asset-root=...` source lines. */
     verbose: boolean;
     /** How diagnostics are written to stderr. See `resolveDiagnosticFormat`. */
     diagnosticFormat: DiagnosticFormat;
@@ -266,11 +274,13 @@ async function produce(args: ProduceArgs): Promise<ProduceResult> {
     // here, so they are reported at the same point and in the same report.
     await parseAndValidate(sourceText, args, { resolveIncludes: true });
 
-    const assetRoot = args.assetRoot
-        ? path.resolve(args.assetRoot)
-        : path.dirname(args.absInputPath);
-
-    const host = createNodeHostEnv(assetRoot);
+    // After validation, like the locale line, so diagnostics lead stderr.
+    if (args.verbose) {
+        process.stderr.write(
+            `nowline: asset-root=${args.assetRoot.dir} (${args.assetRoot.source})\n`,
+        );
+    }
+    const host = createNodeHostEnv(args.assetRoot.dir);
 
     // Resolve fonts lazily — only for formats that rasterize or embed them.
     let fonts: RenderInputs['fonts'];
@@ -513,19 +523,55 @@ async function resolveRoutedDiagnostics(
     return legacyError ? [] : diagnostics.filter(isRoutedResolveDiagnostic);
 }
 
-export async function loadConfigFor(inputArg: string, cwd: string): Promise<NowlineRc | null> {
+/** A discovered `.nowlinerc`: `config` is null when the file failed to parse. */
+export interface LoadedRc {
+    config: NowlineRc | null;
+    /** Absolute path of the rc file, when one was found. */
+    path?: string;
+}
+
+export async function loadConfigFor(inputArg: string, cwd: string): Promise<LoadedRc> {
     try {
-        if (inputArg === '-') {
-            const { config } = await loadConfig(cwd);
-            return config;
-        }
-        const abs = path.resolve(cwd, inputArg);
-        const dir = path.dirname(abs);
-        const { config } = await loadConfig(dir);
-        return config;
+        const startDir = inputArg === '-' ? cwd : path.dirname(path.resolve(cwd, inputArg));
+        return await loadConfig(startDir);
     } catch {
-        return null;
+        return { config: null };
     }
+}
+
+export interface ResolvedAssetRoot {
+    /** Absolute directory assets resolve against. */
+    dir: string;
+    /** Where `dir` came from, for the `--verbose` source line. */
+    source: '--asset-root' | '.nowlinerc assetRoot' | 'input directory';
+}
+
+/**
+ * Resolve the asset root: `--asset-root` (relative to cwd), then the
+ * `.nowlinerc` `assetRoot` (relative to the rc file's directory), then the
+ * input file's directory. The rc value is anchored to the rc file so a
+ * project's rc means the same thing from any working directory and in the
+ * editor preview, which reads the same key.
+ */
+export function resolveAssetRoot(inputs: {
+    flag: string | undefined;
+    cwd: string;
+    rc: LoadedRc;
+    inputDir: string;
+}): ResolvedAssetRoot {
+    const { flag, cwd, rc, inputDir } = inputs;
+    if (flag) return { dir: path.resolve(cwd, flag), source: '--asset-root' };
+    const raw = rc.config?.assetRoot;
+    if (raw !== undefined && raw !== null && raw !== '' && rc.path) {
+        if (typeof raw !== 'string') {
+            throw new CliError(
+                ExitCode.InputError,
+                `nowline: invalid .nowlinerc assetRoot "${String(raw)}". Expected a directory path.`,
+            );
+        }
+        return { dir: path.resolve(path.dirname(rc.path), raw), source: '.nowlinerc assetRoot' };
+    }
+    return { dir: inputDir, source: 'input directory' };
 }
 
 // Resolve the now-line date from the CLI flags.

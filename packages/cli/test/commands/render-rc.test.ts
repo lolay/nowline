@@ -1,5 +1,6 @@
 import { promises as fs } from 'node:fs';
 import * as path from 'node:path';
+import type { HostEnv } from '@nowline/export';
 import type { LayoutOptions } from '@nowline/layout';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { parseArgv } from '../../src/cli/args.js';
@@ -10,6 +11,7 @@ import { withTempDir } from '../helpers.js';
 // kernel, without changing either: the real implementations still run.
 const layoutCalls = vi.hoisted(() => [] as LayoutOptions[]);
 const exportCalls = vi.hoisted(() => [] as Array<Record<string, unknown>>);
+const exportHosts = vi.hoisted(() => [] as HostEnv[]);
 
 vi.mock('@nowline/layout', async (importOriginal) => {
     const actual = await importOriginal<typeof import('@nowline/layout')>();
@@ -28,6 +30,7 @@ vi.mock('@nowline/export', async (importOriginal) => {
         ...actual,
         exportDocument: (...args: Parameters<typeof actual.exportDocument>) => {
             exportCalls.push(args[2] as unknown as Record<string, unknown>);
+            exportHosts.push(args[3]);
             return actual.exportDocument(...args);
         },
     };
@@ -47,6 +50,7 @@ async function dryRunWithRc(rc: string, flags: string[] = []): Promise<void> {
 afterEach(() => {
     layoutCalls.length = 0;
     exportCalls.length = 0;
+    exportHosts.length = 0;
 });
 
 describe('render: .nowlinerc reaches LayoutOptions', () => {
@@ -83,5 +87,50 @@ describe('render: .nowlinerc reaches LayoutOptions', () => {
             'portrait',
         ]);
         expect(exportCalls[0]).toMatchObject({ pageSize: 'letter', orientation: 'portrait' });
+    });
+});
+
+describe('render: .nowlinerc assetRoot', () => {
+    // <dir>/project/.nowlinerc sets the root; the input sits one level down in
+    // docs/ and the CLI runs from <dir>/elsewhere, so each candidate root
+    // (rc dir, input dir, cwd) holds a different logo.svg.
+    async function readLogoVia(rc: string, flags: string[] = []): Promise<string> {
+        return withTempDir(async (dir) => {
+            const project = path.join(dir, 'project');
+            const cwd = path.join(dir, 'elsewhere');
+            const files: Record<string, string> = {
+                'project/brand/logo.svg': 'rc-root',
+                'project/docs/logo.svg': 'input-dir',
+                'elsewhere/flag-assets/logo.svg': 'flag-root',
+                'elsewhere/brand/logo.svg': 'cwd-relative',
+            };
+            for (const [rel, body] of Object.entries(files)) {
+                const abs = path.join(dir, rel);
+                await fs.mkdir(path.dirname(abs), { recursive: true });
+                await fs.writeFile(abs, body);
+            }
+            await fs.writeFile(path.join(project, 'docs', 'sample.nowline'), SAMPLE);
+            await fs.writeFile(path.join(project, '.nowlinerc'), rc);
+            const input = path.join(project, 'docs', 'sample.nowline');
+            const args = parseArgv([input, '--dry-run', '--now', '-', ...flags]);
+            await renderHandler({ args, cwd });
+            expect(exportHosts).toHaveLength(1);
+            const bytes = await exportHosts[0].readAsset('logo.svg');
+            return new TextDecoder().decode(bytes);
+        });
+    }
+
+    it('an rc assetRoot with no --asset-root resolves assets from the rc-relative root', async () => {
+        expect(await readLogoVia('assetRoot: brand\n')).toBe('rc-root');
+    });
+
+    it('--asset-root overrides the rc and resolves against cwd', async () => {
+        expect(await readLogoVia('assetRoot: brand\n', ['--asset-root', 'flag-assets'])).toBe(
+            'flag-root',
+        );
+    });
+
+    it('no rc assetRoot and no flag keeps the input directory', async () => {
+        expect(await readLogoVia('theme: dark\n')).toBe('input-dir');
     });
 });

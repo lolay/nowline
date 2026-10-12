@@ -73,3 +73,41 @@ describeBuilt('.nowlinerc render keys (requires `pnpm build`)', () => {
         expect(r.stderr).toContain('invalid .nowlinerc pdfMargin "wide"');
     });
 });
+
+describeBuilt('.nowlinerc assetRoot (requires `pnpm build`)', () => {
+    // The rc sits in the project root and the input one level down, so a
+    // relative rc assetRoot must resolve against the rc file, not the input
+    // directory or cwd.
+    async function verboseRender(rc: string, extraArgs: string[] = []) {
+        return withTempDir(async (dir) => {
+            await fs.mkdir(path.join(dir, 'docs'));
+            await fs.writeFile(path.join(dir, 'docs', 'sample.nowline'), SAMPLE);
+            await fs.writeFile(path.join(dir, '.nowlinerc'), rc);
+            return runCliBuilt(['sample.nowline', '--dry-run', '--verbose', ...extraArgs], {
+                cwd: path.join(dir, 'docs'),
+            });
+        });
+    }
+
+    it('an rc assetRoot sets the asset root, relative to the rc file', async () => {
+        const r = await verboseRender('assetRoot: brand\n');
+        expect(r.exitCode).toBe(0);
+        expect(r.stderr).toMatch(
+            /nowline: asset-root=\S*[\\/]nowline-cli-\w+[\\/]brand \(\.nowlinerc assetRoot\)/,
+        );
+    });
+
+    it('--asset-root overrides the rc', async () => {
+        const r = await verboseRender('assetRoot: brand\n', ['--asset-root', 'flag-assets']);
+        expect(r.exitCode).toBe(0);
+        expect(r.stderr).toMatch(
+            /nowline: asset-root=\S*[\\/]docs[\\/]flag-assets \(--asset-root\)/,
+        );
+    });
+
+    it('a non-string rc assetRoot is an input error naming .nowlinerc', async () => {
+        const r = await renderWithRc('assetRoot: 42\n');
+        expect(r.exitCode).toBe(2);
+        expect(r.stderr).toContain('invalid .nowlinerc assetRoot "42". Expected a directory path.');
+    });
+});

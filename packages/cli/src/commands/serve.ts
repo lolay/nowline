@@ -27,7 +27,7 @@ import {
     resolveLocaleOverride,
 } from '../i18n/locale.js';
 import { CliError, ExitCode } from '../io/exit-codes.js';
-import { createAssetResolver, loadConfigFor } from './render.js';
+import { createAssetResolver, loadConfigFor, resolveAssetRoot } from './render.js';
 
 export interface ServeHandlerOptions {
     args: ParsedArgs;
@@ -68,7 +68,8 @@ export async function serveHandler(options: ServeHandlerOptions): Promise<void> 
 
     const port = parsePort(args.port);
     const host = args.host ?? '127.0.0.1';
-    const config = await loadConfigFor(args.positional, cwd);
+    const rc = await loadConfigFor(args.positional, cwd);
+    const { config } = rc;
     const theme = resolveTheme(args.theme, config?.theme);
     const nonWorking = parseNonWorkingArg(args.nonWorking);
     const today = resolveNowArg(args);
@@ -87,7 +88,15 @@ export async function serveHandler(options: ServeHandlerOptions): Promise<void> 
         throw new CliError(ExitCode.InputError, `nowline: file not found: ${args.positional}`);
     }
 
-    const assetRoot = args.assetRoot ? path.resolve(cwd, args.assetRoot) : path.dirname(inputPath);
+    const { dir: assetRoot, source: assetRootSource } = resolveAssetRoot({
+        flag: args.assetRoot,
+        cwd,
+        rc,
+        inputDir: path.dirname(inputPath),
+    });
+    if (args.logLevel === 'verbose') {
+        process.stderr.write(`nowline: asset-root=${assetRoot} (${assetRootSource})\n`);
+    }
 
     const fileSink = args.output ? path.resolve(cwd, args.output) : undefined;
 

@@ -22,6 +22,8 @@ export interface NowlineRc {
     /** Opt in to system-font probing for raster/PDF export (bundled-first by default). */
     useSystemFonts?: boolean;
     locale?: string;
+    /** Asset (logo) root directory; a relative path resolves against the rc file's directory. */
+    assetRoot?: string;
     [key: string]: unknown;
 }
 

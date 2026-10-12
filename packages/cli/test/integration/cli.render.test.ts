@@ -757,8 +757,10 @@ describeBuilt('render: include diagnostics', () => {
                     env: NO_LOCALE_ENV,
                 });
                 expect(verbose.exitCode).toBe(0);
-                expect(verbose.stderr).toBe(
-                    `nowline: format=svg (resolved)\n${ok.stderr}nowline: locale=en-US (default)\n`,
+                const head = `nowline: format=svg (resolved)\n${ok.stderr}nowline: locale=en-US (default)\n`;
+                expect(verbose.stderr.startsWith(head)).toBe(true);
+                expect(verbose.stderr.slice(head.length)).toMatch(
+                    /^nowline: asset-root=[^\n]+ \(input directory\)\n$/,
                 );
             });
         });
