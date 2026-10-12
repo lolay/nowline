@@ -1,6 +1,6 @@
 # Nowline Working Calendar
 
-**Status: Accepted, scheduled as m2p. Phases 1–3 (calendar primitives; the working-day schedule under `hide`; the exporters read the file's calendar) are implemented in lolay/nowline#96; Phase 4 (`show` and the display setting) is implemented in the Phase 4 PR; Phase 5a (the `non-working` and `working` declarations reach the language, the validator and the schedule) is implemented in the Phase 5a PR; Phase 5b (what the declarations draw, MS Project `<Exceptions>`, Mermaid dated `excludes`, editor and agent tooling) is pending, and 5a and 5b must ship in the same release.** This is the design record for non-working days: weekends, holidays and company-wide closures such as a summit. The declarations in §4.1 parse and validate, and they feed the working calendar, so the chart's axis, engines A, B and C and every exporter's dates, durations and calendar follow them. Until 5b, a titled run is shaded under `show` but carries no label, and MS Project and Mermaid know only the open-ended week from a file, not its dated days (§8).
+**Status: Accepted, scheduled as m2p. Phases 1–3 (calendar primitives; the working-day schedule under `hide`; the exporters read the file's calendar) are implemented in lolay/nowline#96; Phase 4 (`show` and the display setting) is implemented in the Phase 4 PR; Phase 5a (the `non-working` and `working` declarations reach the language, the validator and the schedule) is implemented in lolay/nowline#115; Phase 5b (what the declarations draw, MS Project `<Exceptions>`, Mermaid dated `excludes`, editor and agent tooling) is implemented in the Phase 5b PR, and 5a and 5b ship in the same release.** This is the design record for non-working days: weekends, holidays and company-wide closures such as a summit. The declarations in §4.1 parse and validate, and they feed the working calendar, so the chart's axis, engines A, B and C and every exporter's dates, durations and calendar follow them. A dated, titled `non-working` declaration is labelled on the chart (§7.4), and MS Project and Mermaid carry its days (§8).
 
 The implementation plan, the decisions that close §11 and the codebase map are in [`handoffs/handoff-m2p-working-calendar.md`](./handoffs/handoff-m2p-working-calendar.md). As each phase ships:
 
@@ -129,7 +129,7 @@ Anything else is `NL.E0900`: no properties, `date:` with any other key, or a lon
 
 Declaration order, file order and include order never matter: the same declarations in any order give the same schedule, run titles and exports. `calendar:business` contributes its `weekend` to level 3. A `non-working` declaration **named `weekend`** replaces the preset's, whichever preset it is and whatever its shape (§3.2, example C); the rule counts every `non-working weekend`, malformed ones included, as the validator does.
 
-The title labels the day on the chart (§7.4, Phase 5b). An id is needed only to be the `weekend` or to be told apart in an include collision (§4.3).
+The title labels the day on the chart (§7.4). An id is needed only to be the `weekend` or to be told apart in an include collision (§4.3).
 
 A declaration whose value or shape is malformed is skipped by the resolver, because the validator already reported it in the root file and an include is not validated. "Malformed" is the validator's rule exactly: only the first `date:`, `start:`, `end:` and `every:` keys count, unknown keys beside a valid shape change nothing, a weekday listed twice merges, and every date must be a real calendar day (`2026-02-30` is `NL.E0405`, not March 2).
 
@@ -292,12 +292,21 @@ As built (Phase 4), the rules above resolve to these specifics, normative text i
 
 ### 7.4 Named non-working days
 
-A run that contains a titled declaration is labelled in both views. This is Phase 5b; Phase 5a puts the titles on the model (`titles`, §7.5) and draws none, so a titled run is shaded under `show` and a seam under `hide` stays unlabelled until then:
+A run that contains a titled declaration is labelled in both views:
 
 - under `hide`, as a thin cut line at the seam, styled like an anchor's but lighter, with its label (`Company summit · 3d`) packed into the marker row by the existing marker packer;
 - under `show`, as a band whose label is packed into the marker row at the band's left edge.
 
-New theme tokens: `timeline.nonWorkingFill` and `timeline.nonWorkingSeam`.
+New theme tokens: `timeline.nonWorkingFill` and `timeline.nonWorkingSeam`. The cut line uses the seam token and the label the `timeline.labelText` token, so labels need no new one.
+
+As built (Phase 5b), normative text in [`rendering.md` § Timeline Scale](./rendering.md#timeline-scale):
+
+- **Label text.** The run's `titles` joined with `, `, then ` · Nd` (U+00B7, one space each side), where N counts the days in `[from, through]` whose weekday is in the open-ended week's `workingWeekdays`: the working days the closure removes, which is what the DSL's `d` counts. The suffix is dropped when N is 0 (a titled run made only of weekend days), so `non-working "Sat off" date:2026-11-28` reads `Sat off`. A Wednesday-to-Friday summit reads `Company summit · 3d`; two declarations on the same days read `Alpha, Beta · 2d`.
+- **Which rules are labelled.** Only dated, titled, non-working rules give a run titles. A titled bounded recurrence (`every:` with `start:` or `end:`) and a titled `working` exception are never labelled on the chart. This is a known limit, not a bug; the days still shape the schedule and the exports.
+- **The cut line.** Under `hide`, a titled run always draws its cut line, at every scale, independent of `seam` (which keeps its Phase 4 meaning: unnamed, days scale, off a grid line). Spec §7.2: a named seam always draws. The line runs from the label's row to the bottom of the timeline.
+- **Packing.** A titled run is one more entry in the marker row, placed after the anchors and milestones, so a marker that ties it on x is placed first. A file whose only marker-row content is a titled run still gets a marker row. Under `hide`, Example B's Saturday Launch and the Thanksgiving label share x = 24, so Launch takes row 1 and the label a new top row.
+- **Canvas growth.** If a run's label fits neither to the right of its x nor to the left of the chart, the chart grows on the right until it fits, so a label never falls onto the header card beside the chart. Anchors and milestones keep their existing left fallback; this growth covers run labels only.
+- **Layer.** `<g data-layer="non-working-label">` follows the milestone cut lines and precedes the marker diamonds, so the cut lines sit over the bars, as milestone cut lines do. It is omitted when no run has a label. The name must not contain "wave".
 
 ### 7.5 Positioned model
 
@@ -315,8 +324,14 @@ interface PositionedNonWorkingRun {
     titles?: string[];  // titled declarations in the run; omitted for a plain weekend
     seam?: true;        // hide, days scale only: strictly inside the chart, no grid line at x; the renderer draws a seam
     band?: true;        // show, days and weeks scales or a run with titles: the renderer shades it; never with seam
+    label?: string;     // titled runs only: `Thanksgiving · 2d` (§7.4)
+    labelBox?: BoundingBox;      // titled runs only: the label's box in the marker row, like PositionedMilestone.labelBox
+    labelSide?: 'left' | 'right'; // titled runs only: which side of `x` the label sits on
+    cut?: true;         // hide only, titled runs only: the renderer draws the named cut line at x
 }
 ```
+
+The four label keys are omitted on every run without titles (never `undefined` or `[]`), so a plain weekend's model is unchanged.
 
 Other optional keys, each omitted when empty:
 
@@ -340,14 +355,22 @@ Every exporter reads engine C's dates, durations and calendar. `resolveWorkingCa
 | Exporter | Phase 3 (built; the presets, since a file declares no days off yet) | Phase 5 (declarations) |
 |---|---|---|
 | XLSX | Start / End (exclusive) from engine C. The Duration column is `days` (`q`, declared sizes and `capacity:` included; 0 when there is none). The Roadmap sheet gains a `Calendar` row after `Start`, e.g. `business (Saturday and Sunday off; 5/22/65/260 days per week/month/quarter/year)`. | — |
-| MS Project | `<WeekDays>` from `workingWeekdays`: Mon–Fri under business, byte-identical to before, and seven working days under `calendar:full` and `calendar:custom`. A task lasts `days` × 480 minutes (480 when it has no duration). | `<WeekDays>` from the recurring declarations; `<Exceptions>` from the dated ones; `<WorkWeeks>` where a bounded recurrence changes the week. |
-| Mermaid | Business emits `excludes saturday, sunday` after `dateFormat`; full and custom emit none. Durations are `Nd` from `days` (`28d` for a full `4w`). The roadmap start and wave-end milestones move to the first working day at or after them, because Mermaid never checks a start against `excludes`; anchors and dated milestones keep their dates (rule 5). | `excludes` with weekday names and ISO dates, which Mermaid also excludes from task durations. |
+| MS Project | `<WeekDays>` from `workingWeekdays`: Mon–Fri under business, byte-identical to before, and seven working days under `calendar:full` and `calendar:custom`. A task lasts `days` × 480 minutes (480 when it has no duration). | `<WeekDays>` from the recurring declarations; one `<Exception>` per run of days the file's calendar differs from that week (a dated closure, a bounded recurrence's closed days, a working day inside a closed weekend), titled when a titled dated rule is behind it. No `<WorkWeeks>`: see below. |
+| Mermaid | Business emits `excludes saturday, sunday` after `dateFormat`; full and custom emit none. Durations are `Nd` from `days` (`28d` for a full `4w`). The roadmap start and wave-end milestones move to the first working day at or after them, because Mermaid never checks a start against `excludes`; anchors and dated milestones keep their dates (rule 5). | One `excludes` line: the weekday names, then the ISO date of every day in every non-working exception, ascending (`excludes saturday, sunday, 2026-11-26, 2026-11-27`). Mermaid takes the dates out of task durations too. A `working` exception cannot be expressed; it is counted in the lossy summary as `working-day`. |
 | JSON AST | Not in Phase 3. | Built in 5a: `NonWorkingDeclaration` and `WorkingDeclaration` nodes (no JSON code, the walkers are generic); printer support; the round-trip tests cover every shape. |
 | SVG / PNG / PDF / HTML | Follow the layout and the display setting. | Same. |
 
-**Phase 5a.** A file's declarations reach every exporter through the one resolver, with no exporter change. An open-ended recurrence moves what follows `workingWeekdays`: the MS Project `<WeekDays>`, the Mermaid `excludes friday, saturday` line and the XLSX Calendar row (`business (Friday and Saturday off; 5/22/65/260 days per week/month/quarter/year)` for example C). Dated and bounded rules move engine C's start and end dates in every exporter, but MS Project `<Exceptions>` and `<WorkWeeks>` and Mermaid's dated `excludes` are Phase 5b. Until then Mermaid lays a holiday-spanning `Nd` across the holiday, and MS Project does not know the closure. **5a and 5b must ship in the same release**, as Phases 2 and 3 did, or the exporters disagree with the chart.
+**Phases 5a and 5b.** A file's declarations reach every exporter through the one resolver. An open-ended recurrence moves what follows `workingWeekdays`: the MS Project `<WeekDays>`, the Mermaid `excludes friday, saturday` line and the XLSX Calendar row (`business (Friday and Saturday off; 5/22/65/260 days per week/month/quarter/year)` for example C). Dated and bounded rules move engine C's start and end dates in every exporter (5a), and 5b writes the days themselves. `calendarExceptions(working, from, to)` in `@nowline/layout` is the one derivation both exporters call: each exception is a maximal run of consecutive days whose working state differs from the open-ended week, split wherever the state flips.
 
-Known limits, not fixed in Phase 3: MS Project ignores the roadmap's `start:` (it uses the export date or `--start`) and has no implicit lane sequencing, so its schedule cannot match the chart; it writes no `<MinutesPerWeek>` or `<DaysPerMonth>`, so a full-calendar `1w` displays as 1.4 default weeks; Mermaid ignores item `date:` / `start:` pins, writes `after:DATE` verbatim and rounds fractional days; exporters walk only the root file, so merged and isolated include items are not exported.
+- **Horizon.** `[from, to)`, the roadmap's window, together with every finite bound of every rule (its `dates`, and its `start` / `end` when set). A declared holiday outside the window is still exported, a half-open bounded recurrence is expanded only inside the horizon, and nothing iterates forever.
+- **Titles.** The titles of the dated or ranged rules (no `every`) whose `working` equals the exception's state and that cover a day of it, in the resolver's canonical order, de-duplicated. The key is omitted when there are none.
+- **MS Project.** `<Exceptions>` goes in base calendar UID 1 right after `</WeekDays>`; the resource calendar is unchanged. Each `<Exception>` has `TimePeriod` (`FromDate` at `T00:00:00`, `ToDate` at `T23:59:00`), `Occurrences` 1, `Name` (the titles joined with `, `, XML-escaped, omitted without titles), `Type` 1 (daily) and `DayWorking` 0 or 1; a working exception repeats the `WorkingTimes` of a weekday (08:00-12:00 and 13:00-17:00).
+- **No `<WorkWeeks>`.** An earlier draft of this section had a bounded recurrence become a `<WorkWeeks>` entry. Phase 5b writes `<Exceptions>` instead: a bounded recurrence becomes one exception per run of days it changes, and the exceptions never overlap. This deviates from the earlier wording of this section, and the deviation is deliberate.
+- **Mermaid.** The dated `excludes` follow the weekday names on the same line; the line is written when either list is non-empty, so `calendar:full` with a holiday gets `excludes 2026-03-02`.
+
+**5a and 5b ship in the same release**, as Phases 2 and 3 did, or the exporters disagree with the chart: until 5b, Mermaid lays a holiday-spanning `Nd` across the holiday, and MS Project does not know the closure.
+
+Known limits: Mermaid has no working exceptions (its parser has an undocumented `includes` keyword, but the gantt docs do not list it and GitHub's bundled Mermaid may lack it), so a `working` day inside a closed week is counted as `working-day` in the lossy summary and written nowhere else; only dated, titled, non-working rules are labelled on the chart (§7.4). Not fixed in Phase 3: MS Project ignores the roadmap's `start:` (it uses the export date or `--start`) and has no implicit lane sequencing, so its schedule cannot match the chart; it writes no `<MinutesPerWeek>` or `<DaysPerMonth>`, so a full-calendar `1w` displays as 1.4 default weeks; Mermaid ignores item `date:` / `start:` pins, writes `after:DATE` verbatim and rounds fractional days; exporters walk only the root file, so merged and isolated include items are not exported.
 
 ## 9. Rollout and byte stability
 
@@ -360,7 +383,8 @@ Known limits, not fixed in Phase 3: MS Project ignores the roadmap's `start:` (i
 | `calendar:business` (the default), `hide` | Sequenced items that start on a working day keep their x. Week ticks keep their x and change label (`Jan 10` → `Jan 12`). Date-pinned entities, the now-line and the window end move to the right day. |
 | `calendar:business`, `show` | Everything after the first weekend moves right, by design. |
 | A file with no `non-working` or `working` declaration (Phase 5a) | None: every layout snapshot, determinism cell and rendered example stays byte-identical, and so does every JSON AST. |
-| A file with declarations (Phase 5a) | The calendar changes, so dates, x and run titles follow it. A titled run is shaded under `show` at every scale, and unlabelled until 5b. |
+| A file with declarations (Phases 5a, 5b) | The calendar changes, so dates, x and run titles follow it. A titled run is shaded under `show` at every scale and labelled in both views (5b). MS Project gains `<Exceptions>` and Mermaid dated `excludes`. |
+| A file with no declaration (Phase 5b) | None: the label keys, the `non-working-label` layer, `<Exceptions>` and dated `excludes` all need a declaration. The deliberate additions are two snapshot samples (`non-working-hide`, `non-working-show`), one determinism fixture (`working-calendar`, eight cells), one rendered example and two rendered test fixtures. |
 
 The 14 business-calendar layout snapshots (of 19; the five waves samples use `calendar:full`) and every business determinism cell that renders a picture change. For a fixture without date pins and without a now-line in its window, the only change is week-label text. Phase 3 moves every `xlsx` and `mermaid` determinism cell (the Calendar row, `End (exclusive)` and the durations; `excludes` on business) and the `msproj` cells with sized items or the full calendar. The CHANGELOG entry goes under `### Changed`: the business calendar now does what `dsl.md` already says it does ("engineering working-day arithmetic").
 
@@ -370,7 +394,7 @@ The 14 business-calendar layout snapshots (of 19; the five waves samples use `ca
 2. **`show`.** The sided projection, shading, the `non-working:` display key, and `--non-working` across CLI, embed, VS Code and MCP.
 3. **Declarations,** in two PRs that ship in the same release.
    - **5a, declarations reach the schedule.** `non-working` and `working` with `date:` / `start:` / `end:` / `every:`, overriding `weekend`, validator rules NW1–NW5, include merge, and the resolver that feeds engines A, B and C and every exporter's calendar.
-   - **5b, declarations on the chart and in exports.** Labelled seams and bands, MS Project `<Exceptions>`, Mermaid dated `excludes`, LSP completion, the TextMate grammar and the other editor and agent tooling.
+   - **5b, declarations on the chart and in exports (built).** Labelled seams and bands, MS Project `<Exceptions>`, Mermaid dated `excludes`, LSP completion, the TextMate grammar and the other editor and agent tooling.
 4. **Per-swimlane calendars,** only on demand (§11).
 
 ## 10. Worked examples
@@ -430,14 +454,40 @@ Schedule: Checkout uses Mon Nov 23, Tue 24, Wed 25, Mon 30 and Tue Dec 1. QA use
 | Ticks | `[0,undefined]`, `[24,'Nov 30']`, `[64,undefined]` | `[0,'Nov 23']`, `[56,'Nov 30']`, `[112,undefined]` |
 | Width, `endDate` | 64, 2026-12-07 | 112, 2026-12-07 |
 | Runs | `[24,0,'2026-11-26','2026-11-29',['Thanksgiving']]` and `[64,0,'2026-12-05','2026-12-06']` (no `titles` key) | `[24,32,…,['Thanksgiving'],band]` and `[96,16,'2026-12-05','2026-12-06',band]` |
+| Label of the titled run | `Thanksgiving · 2d`, `cut: true`, `labelSide` `right`, `labelBox` x 30, 98.6 wide, 12 high | `Thanksgiving · 2d`, no `cut`, `labelSide` `right`, `labelBox` x 30, 98.6 wide, 12 high |
+| Marker rows | The run on row 0 (`labelBox.y` = `markerRow.y − 4`), Launch on row 1 (`center.y` = `markerRow.y + 26`); `markerRow.height` 52 | Launch on row 0 (`center.y` = `markerRow.y`), the run on row 1 (`labelBox.y` = `markerRow.y + 22`); `markerRow.height` 52 |
+| Launch label | `labelSide` `right`, `labelBox` x 36, 36.54 wide | `labelSide` `right`, `labelBox` x 52, 36.54 wide |
+| Model `width` | 272.6 (250.32 without the label; the canvas grows so the label sits on the right) | 282.32 |
+| Weekend run `2026-12-05` to `2026-12-06` | No `label`, `labelBox`, `labelSide` or `cut` key | Same |
 
-Runs read `[x, width, from, through, titles, band]`.
+Runs read `[x, width, from, through, titles, band]`. The label, `labelBox`, `labelSide` and `cut` columns are positions in the marker row relative to the timeline origin, like a milestone's.
 
-- **`hide`:** Thursday through Sunday collapse into one seam at x = 24. The Saturday milestone sits on that seam. The first week column is 24 px wide, so its `Nov 23` label is dropped under the narrow-column rule. Phase 5b labels the seam `Thanksgiving · 2d`; Phase 5a carries the title on the run only.
-- **`show`:** Checkout is painted across the shaded Nov 26–29 band (24–56). QA follows at 72–88. The milestone sits at 40, on its Saturday.
+- **`hide`:** Thursday through Sunday collapse into one seam at x = 24. The Saturday milestone sits on that seam. The first week column is 24 px wide, so its `Nov 23` label is dropped under the narrow-column rule. The seam is labelled `Thanksgiving · 2d`, with a cut line from the label down to the bottom of the timeline. Launch and the label share x = 24, so Launch is placed first, on row 0 of the marker row, and the label takes a row above it; the marker row grows from one row to two.
+- **`show`:** Checkout is painted across the shaded Nov 26–29 band (24–56). QA follows at 72–88. The milestone sits at 40, on its Saturday. The band's label `Thanksgiving · 2d` sits at x = 30, on the second marker row, with no cut line.
 - **Engine C**, the same in both views: checkout `2026-11-23` to `2026-12-02` (exclusive, 5 days), qa `2026-12-02` to `2026-12-04` (2 days), launch `2026-11-28`.
 - **`date:[2026-11-26, 2026-11-27]`** in place of `start:` and `end:` gives the same model under `hide` and the same engine C.
 - Without the declaration the file lays out as it always did: Checkout 6–34, QA 46–54, the milestone at x = 40 with `hiddenDate`, and no titled run.
+- **MS Project** writes the closure in the base calendar (UID 1), right after `</WeekDays>` and before `</Calendar>`. `<WeekDays>` still marks Saturday and Sunday non-working, and the resource calendar (UID 2) is unchanged:
+
+  ```xml
+        </WeekDays>
+        <Exceptions>
+        <Exception>
+          <EnteredByOccurrences>0</EnteredByOccurrences>
+          <TimePeriod>
+            <FromDate>2026-11-26T00:00:00</FromDate>
+            <ToDate>2026-11-27T23:59:00</ToDate>
+          </TimePeriod>
+          <Occurrences>1</Occurrences>
+          <Name>Thanksgiving</Name>
+          <Type>1</Type>
+          <DayWorking>0</DayWorking>
+        </Exception>
+        </Exceptions>
+      </Calendar>
+  ```
+
+- **Mermaid** writes one `excludes` line, `    excludes saturday, sunday, 2026-11-26, 2026-11-27`, and the task lines stay as they were (`Checkout :checkout, 2026-11-23, 5d`, `QA :qa, after checkout, 2d`, `Launch :milestone, launch, 2026-11-28, 0d`). With the dates excluded, Mermaid ends Checkout on Dec 2 (exclusive), agreeing with engine C. There is no drop summary.
 
 ### Example C: a Sunday–Thursday week
 

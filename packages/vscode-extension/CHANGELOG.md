@@ -11,6 +11,13 @@
   declared waves in order; waves appear in the outline; hover shows a wave's
   position and members and an item's wave or background status. The live
   preview draws the wave strip, boundaries and background hatch.
+- `non-working` and `working` declarations: both keywords are highlighted at
+  the start of a declaration line, with `end:` and `every:` as property keys,
+  and new `non-working` and `working` snippets. In `config` they complete as
+  keywords, `every:` completes the weekday names and `non-working:` completes
+  `hide` and `show`. Hovering a declaration shows its id, title and `date:`,
+  `every:`, `start:` and `end:`. The live preview labels a dated, titled
+  closure (`Thanksgiving · 2d`).
 - Non-working days display: the new `nowline.preview.nonWorking` setting
   (`file`, `hide` or `show`, default `file`) and a **Non-working days** menu in
   the preview toolbar (**File** / **Hide** / **Show**) draw a business

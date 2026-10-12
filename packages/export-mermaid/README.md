@@ -61,7 +61,11 @@ The first line of the Markdown is the roadmap title. The fenced
 `calendar:business` (the default) `excludes saturday, sunday` follows
 `dateFormat`, so Mermaid counts each `Nd` in working days like the chart;
 `calendar:full` and `calendar:custom` have no days off and emit no
-`excludes` line. Durations are the chart's own day count for the item
+`excludes` line, unless the file declares days off: each day of a
+`non-working` closure follows the weekday names as an ISO date
+(`excludes saturday, sunday, 2026-11-26, 2026-11-27`). A `working`
+exception can't be written, so its days are counted as `working-day` in the
+`%%` comment. Durations are the chart's own day count for the item
 (sizes, `q` and `capacity:` included), written as `Nd` with up to two
 decimals (`10d`, `7.5d`), so a `full` `4w` is `28d`. The roadmap start and
 wave-end milestones fall on working days; anchor and milestone dates are
