@@ -69,15 +69,20 @@ upsert_ruleset() {
 }
 
 # patch_repo_settings REPO
-#   Enables auto-merge, squash-merge, and branch-deletion-on-merge.
+#   Enables auto-merge, squash-merge, and branch-deletion-on-merge, and makes
+#   a squash commit's message the PR title and description.  The merge queue
+#   squashes with these defaults; GitHub's own default lists every branch
+#   commit instead, so the PR's trailers would not end the message.
 patch_repo_settings() {
   local repo="$1"
-  echo "  [PATCH] repos/${repo} — allow_auto_merge / squash / delete_branch"
+  echo "  [PATCH] repos/${repo} — allow_auto_merge / squash / squash message / delete_branch"
   gh api -X PATCH "repos/${repo}" \
     -F allow_auto_merge=true \
     -F allow_squash_merge=true \
+    -f squash_merge_commit_title=PR_TITLE \
+    -f squash_merge_commit_message=PR_BODY \
     -F delete_branch_on_merge=true \
-    --jq '{allow_auto_merge, allow_squash_merge, delete_branch_on_merge}' \
+    --jq '{allow_auto_merge, allow_squash_merge, squash_merge_commit_title, squash_merge_commit_message, delete_branch_on_merge}' \
     | sed 's/^/    /'
 }
 
@@ -301,5 +306,5 @@ echo "=== Done ==="
 echo "Verify with:"
 echo "  gh api repos/${ORG}/nowline/rulesets"
 echo "  gh api repos/${ORG}/nowline-action/rulesets"
-echo "  gh api repos/${ORG}/{nowline,nowline-action} --jq '{allow_auto_merge,allow_squash_merge,delete_branch_on_merge}'"
+echo "  gh api repos/${ORG}/{nowline,nowline-action} --jq '{allow_auto_merge,allow_squash_merge,squash_merge_commit_title,squash_merge_commit_message,delete_branch_on_merge}'"
 echo "  ./scripts/apply-branch-policies.sh   # re-run; should be a no-op"
