@@ -141,6 +141,105 @@ describe('calendar declarations: hover', () => {
     });
 });
 
+describe('calendar declarations: hover note on a title the chart never draws', () => {
+    const BOUNDED = '_Title not drawn on the chart: bounded recurrences are not labelled._';
+    const WORKING = '_Title not drawn on the chart: working days are not labelled._';
+
+    /** Hover text on `decl`'s id, the declaration on its own in a config block. */
+    async function declHover(decl: string, id: string) {
+        const source = `nowline v1\n\nconfig\n\n${decl}\n\nroadmap r "R" start:2026-01-05 scale:1w calendar:business\n\nswimlane a "A"\n  item w1 "W1" duration:1w\n`;
+        return hoverText(source, at(source, ` ${id} `, 2));
+    }
+
+    it('notes a titled recurrence bounded on both sides, in its own paragraph', async () => {
+        const text = await declHover(
+            'non-working fridays "Summer Fridays" every:fri start:2026-07-01 end:2026-08-31',
+            'fridays',
+        );
+        expect(text).toBe(
+            [
+                '**non-working `fridays`**',
+                '_Summer Fridays_',
+                '',
+                '- `every:` fri',
+                '- `start:` 2026-07-01',
+                '- `end:` 2026-08-31',
+                '',
+                BOUNDED,
+            ].join('\n'),
+        );
+    });
+
+    it('notes a titled recurrence bounded on one side only', async () => {
+        const fromStart = await declHover(
+            'non-working fridays "Summer Fridays" every:fri start:2026-07-01',
+            'fridays',
+        );
+        expect(fromStart?.endsWith(`\n\n${BOUNDED}`)).toBe(true);
+        const toEnd = await declHover(
+            'non-working fridays "Summer Fridays" every:fri end:2026-08-31',
+            'fridays',
+        );
+        expect(toEnd?.endsWith(`\n\n${BOUNDED}`)).toBe(true);
+    });
+
+    it('adds no note to a titled dated closure', async () => {
+        const single = await declHover('non-working ny "New Year" date:2026-01-01', 'ny');
+        expect(single).not.toContain('not drawn');
+        const range = await hoverText(exampleB, at(exampleB, 'thanksgiving', 3));
+        expect(range).not.toContain('not drawn');
+    });
+
+    it('adds no note to an untitled bounded recurrence', async () => {
+        const text = await declHover(
+            'non-working fridays every:fri start:2026-07-01 end:2026-08-31',
+            'fridays',
+        );
+        expect(text).toBeDefined();
+        expect(text).not.toContain('not drawn');
+    });
+
+    it('adds no note to a titled open-ended recurrence', async () => {
+        const text = await declHover('non-working weekend "Weekend" every:[sat, sun]', 'weekend');
+        expect(text).toBeDefined();
+        expect(text).not.toContain('not drawn');
+    });
+
+    it('adds no note to a malformed declaration', async () => {
+        const text = await declHover(
+            'non-working fridays "Summer Fridays" every:fri date:2026-07-03 start:2026-07-01',
+            'fridays',
+        );
+        expect(text).toBeDefined();
+        expect(text).not.toContain('not drawn');
+    });
+
+    it('counts only the first of a repeated key', async () => {
+        const text = await declHover(
+            'non-working fridays "Summer Fridays" every:fri start:2026-07-01 start:2026-07-02',
+            'fridays',
+        );
+        expect(text?.endsWith(`\n\n${BOUNDED}`)).toBe(true);
+    });
+
+    // specs/working-calendar.md §7.4: a titled `working` exception is never labelled.
+    it('notes a titled working declaration, dated or recurring', async () => {
+        const dated = await hoverText(exampleD, at(exampleD, 'crunch', 2));
+        expect(dated?.endsWith(`\n\n${WORKING}`)).toBe(true);
+        const recurring = await declHover(
+            'working sat "Saturday shift" every:sat start:2026-02-01',
+            'sat',
+        );
+        expect(recurring?.endsWith(`\n\n${WORKING}`)).toBe(true);
+    });
+
+    it('adds no note to an untitled working declaration', async () => {
+        const text = await declHover('working crunch date:2026-01-10', 'crunch');
+        expect(text).toBeDefined();
+        expect(text).not.toContain('not drawn');
+    });
+});
+
 describe('calendar declarations: no reference leakage', () => {
     it('does not offer the declaration id after after:', async () => {
         const source = exampleB.replace('after:checkout\n', 'after:');
