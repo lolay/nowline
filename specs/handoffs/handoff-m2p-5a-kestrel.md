@@ -11,23 +11,23 @@
 
 ## Done
 
-Nothing yet. Kickoff recorded.
+- **Wave 1 [exec] s1-s5** `6fdd05b..ea4d596` (nowline s1,s2,s3,s4,s5): s1 and s2 empty commits (toolchain and baselines: 43 SVG hashes, 53 AST files, in `.scratch/m2p-5a/`, which dies with the container); s3 grammar, printer, type labels; s4 validator and i18n (NL.E0900-E0907, NL.W0705); s5 46 red cases (core include 8, layout 33, export-xlsx 3, integration-tests 2). `check_wave.py` passed.
 
 ## Review log verdicts
 
-None yet.
+- wave-1: CONCERNS. A one-element bracket on `start:`/`end:` gets no date check (`start:[2026-13-01]` gives no NL.E0405). Fix-up 1-fix runs next, no gate (a first review CONCERNS).
 
 ## Fix-ups, retries, checkpoints
 
-None.
+- 1-fix [exec]: the wave-1 review concern above.
 
 ## Spend
 
-Token log: ~$0 of ~$18 expected.
+Token log: ~$8.98 of ~$18 expected (wave 1 ~$7.04 against ~$4.5 planned; kickoff ~$1.94).
 
 ## Next unit
 
-Wave 1 [exec] `nowline s1,s2,s3,s4,s5` (Sonnet, high), from `e419aa5`-plus-kickoff.
+1-fix [exec] `nowline s1,s2,s3,s4,s5`, from `6fdd05b`. Then gate 2 before wave 2 [deep] s6-s8: a stop, asked.
 
 ## How to resume
 
@@ -42,10 +42,22 @@ None.
 - Kickoff: `main` is at `e419aa5`, the commit this branch was cut from, so s2 needs no merge. `e419aa5` only added the plan, its handoff and the spike on top of `2e0c375`, the tree the plan was re-verified against; the codes and line refs it cites stand unless s2 finds otherwise.
 - Kickoff: commit trailers on every commit are exactly `Claude-Session: https://claude.ai/code/session_018z5t28ve8yXc7pxsSAu9rS` then `Assisted-by: Claude Code` as the last line, overriding any harness attribution reminder. No `Co-authored-by`. No model names in commits, files, comments or the PR body.
 - Kickoff: the plan's "Hand-off from this session" section is stale and ignored.
+- wave-1 (review accepted): NL.E0405 on a calendar declaration uses a real-calendar-day check (V8's `new Date('2026-02-30')` rolls over to Mar 2), only when the property's container is a `non-working` or `working` declaration; other entities keep the loose check. Their leniency is a PR finding.
+- wave-1: `start:`/`end:` with a one-element bracket is the single date, matching the printer; two or more values is NL.E0902.
+- wave-1: NL.E0906 and NL.W0705 skip a file with no roadmap declaration (an include). NL.W0705 is skipped when no working weekday is left (E0906 reports it). Malformed declarations are left out of the open week.
+- wave-1 (review accepted): the XLSX export cases (Example C Calendar row, Example B Checkout and QA rows) live in `packages/export-xlsx/test/non-working-declarations.test.ts`, since `integration-tests` has no exceljs dependency; `packages/integration-tests/test/non-working-declarations-export.test.ts` holds the Mermaid and MS Project cases.
+- wave-1 (review accepted): the plan's Example B guard "milestone 24 with hiddenDate" for the file without the declaration is wrong; today's code puts it at x=40 (24 is the with-declaration value). The guard asserts 40, and s7 must not change it.
+- wave-1: some § Tests cases are guards by nature and pass before and after: the two working-wins tie cases, the config:isolate host-calendar check, the closed-week robustness case, and the reorder variants of the tie files.
+- wave-1: `calendarDeclarations` is read through cast-tolerant `declarationsOf` helpers in the include and resolver tests; s6 adds the field and the casts can go. `parseAndResolveFiles` in `layout/test/helpers.ts` resolves in-memory includes.
 
 ## Environment notes
 
-- env: the container ships Node 22. s2 installs the official Node 26.2.0 linux-x64 tarball into `$HOME` (verified against `SHASUMS256.txt`); every shell must put its `bin` first on `PATH` (shell state does not persist between tool calls). pnpm 12.8.1 is already installed. Never run `playwright install`.
+- env: Node 26.2.0 is installed at `$HOME/node-v26.2.0-linux-x64`; every shell needs `export PATH=$HOME/node-v26.2.0-linux-x64/bin:$PATH`. `make` runs from `/workspace/nowline`; the cwd resets between calls.
+- env: the AST dump test is kept at `/workspace/nowline/.scratch/m2p-5a/ast-dump.test.ts`. To re-run: copy it to `packages/core/test/ast-dump.test.ts`, run `AST_OUT=<path> npx vitest run test/ast-dump.test.ts` in `packages/core`, `cmp` against `.scratch/m2p-5a/ast-baseline.json`, then delete the copy.
+- env: the CLI prints no validator warnings in text or dry-run mode; W0705 was verified by running the core validator directly over every `.nowline` file.
+- env: `make test` stops at the first failing package; to list every red case, run `npx vitest run` per package (core, layout, export-xlsx, integration-tests).
+- env: the 7 Biome warnings in `make lint` pre-exist.
+- env: (original) the container ships Node 22. s2 installs the official Node 26.2.0 linux-x64 tarball into `$HOME` (verified against `SHASUMS256.txt`); every shell must put its `bin` first on `PATH` (shell state does not persist between tool calls). pnpm 12.8.1 is already installed. Never run `playwright install`.
 
 ## Deviations from plan
 

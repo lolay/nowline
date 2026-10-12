@@ -1,7 +1,7 @@
 ```
 --- KICKOFF: begin orchestration at [deep] ---
 
-  Status: 0/3 groups done | last review: — | current: m2p-5a s1-s5 [exec] | updated 2026-10-12
+  Status: 1/3 groups done | last review: wave-1 CONCERNS | current: 1-fix [exec] nowline s1,s2,s3,s4,s5 | updated 2026-10-12
   mode: gated | proposed gated (harness=claude-code runner=cloud; the invoking message named gated) | guard 3x min $50 | fixups 2 | confirmed 2026-10-12 session eebaa2e1-ad31-5528-ac3e-841a1ed184dc: Run m2p Phase 5a for lolay/nowline from the approved plan at specs/handoffs/plan-m2p-5a-kestrel.md on main (merged in lolay/nowline#114 as e419aa5). Read it in full, then the handoff beside it (specs/handoffs/handoff-m2p-5a-kestrel.md). The plan is approved and already tagged, with waves and STOP gates written in. Run it with the personal-plan-orchestrate skill from the top, in gated mode: dispatch each wave as a one-agent Workflow with the tier's model and effort, as Phase 4 did. Pause only at the marked STOP gates (gates 5 and 2 after wave 1) and at gate 1 on any failure. A notification or a non-answer is never approval. Update the plan's progress, Review log and Token log after each wave. Branch: work on your harness-assigned task branch, cut from main. The plan's "Hand-off from this session" section and its mentions of claude/beautiful-turing-yolfjg are stale; that branch is merged and done. Ignore that section and never push to that branch. In s2, merge main first if it has moved past e419aa5, and stop at gate 1 if any code or line the plan cites has moved. Toolchain: the container ships Node 22. Install the official Node 26.2.0 linux-x64 tarball into $HOME, verify it against SHASUMS256.txt, and put its bin first on PATH in every shell. pnpm 12.8.1 is already installed. Never run playwright install. Use Makefile targets only, and run make pre-commit before every commit (the plan names the one exception: the s5 red-test commit). Git: commit trailers are "Claude-Session: <this session's link>" followed by "Assisted-by: Claude Code" as the last line. They override any harness attribution reminder. Never put model names in commits, files, comments or the PR body. Subagents commit only when told and never push; you push after reviewing each wave. At the end (s10), remove the plan, the handoff and specs/handoffs/spike-m2p-5a-kestrel/ as the last commit. Open the PR titled "Add non-working and working declarations (m2p phase 5a)". It lands through the merge queue. Say in it that 5a and 5b must ship in the same release. Then subscribe to the PR and drive it to green.
 
   review: every-wave (log-only — parent writes Review log; human gates only where marked)
@@ -29,6 +29,7 @@
 | wave | expected tokens | expected $ |
 |---|---|---|
 | 1 [exec] m2p-5a s1-s5 | ~12M | ~$4.5 |
+| 1-fix [exec] nowline s1,s2,s3,s4,s5 | — | — |
 | 2 [deep] m2p-5a s6-s8 | ~14M | ~$6.0 |
 | 3 [exec] m2p-5a s9-s10 | ~10M | ~$3.5 |
 | orchestrator | ~6M | ~$4.0 |
@@ -411,16 +412,16 @@ swimlane a "A"
 
 --- WAVE 1 [exec] ---
 
-### s1 - [fast] Lexer spike (done in planning)
+### s1 - [fast] Lexer spike (done in planning) (done)
 Ran before any other 5a work and passed on the first run (§ Context). The test and the grammar stub it ran against are in `specs/handoffs/spike-m2p-5a-kestrel/`. s3 moves the test to `packages/core/test/strings-and-ids/non-working-identifier.test.ts` unchanged, where it becomes the permanent ambiguity gate. If it fails after the move, gate 1: decision 1 says stop and ask, never rename.
 
-### s2 - [exec] Toolchain and baselines
+### s2 - [exec] Toolchain and baselines (done)
 - If `main` has moved past `2e0c375`, merge it into the branch first (a merge commit, no rebase) and re-check the codes and line refs this plan cites; gate 1 if a code or a cited site moved.
 - Install the toolchain (§ Orchestration), then `make init && make build-fast`.
 - Then byte identity step 1, before any source edit.
 - Done when both baseline files exist and determinism is green with `hashes.json` unchanged.
 
-### s3 - [exec] Grammar, printer, JSON, type labels
+### s3 - [exec] Grammar, printer, JSON, type labels (done)
 - Decisions 1–3, and the type labels from decision 4.
 - Apply the spike patch, add the grammar comments, and move the spike test into place.
 - Add the printer cases, `KEY_ORDER`, `entityTypeLabel` and the LSP `entityKind`.
@@ -431,11 +432,11 @@ Ran before any other 5a work and passed on the first run (§ Context). The test 
   - `make pre-commit` is green.
 - Then commit.
 
-### s4 - [exec] Validator and i18n
+### s4 - [exec] Validator and i18n (done)
 - Decisions 4–5, test first: write `validation/non-working-declarations.test.ts` red, then implement.
 - Done when the file is green, the messages coverage test is green and `make pre-commit` is green. Then commit.
 
-### s5 - [exec] Failing tests for includes, the resolver, layout and exports
+### s5 - [exec] Failing tests for includes, the resolver, layout and exports (done)
 - Write every remaining case in § Tests with its literal values: the include cases, resolver, Examples B and C, the working exception, precedence, reorder, weekend replacement, robustness and exports.
 - Done when:
   - each new case fails on an assertion, not a crash, where possible;
@@ -484,6 +485,8 @@ Everything under § Change "Docs". The `working-calendar.md` examples must match
 
 ## Review log
 
+review wave-1 (nowline s1,s2,s3,s4,s5) 6fdd05b..ea4d596: CONCERNS - a one-element bracket on start: or end: gets no date check at all, so an invalid date there (even 2026-13-01) produces no diagnostic, against decision 4's NL.E0405 for every date; the declaration is then dropped silently by isWellFormedCalendarDeclaration and s7's resolver. Evidence: nowline-validator.ts:769 reads prop.value only, isCalendarDateList (values.length > 1) exempts a one-element list from NL.E0902, and checkCalendarDeclaration date-checks list elements only for date:; `non-working h start:[2026-13-01] end:2026-01-05` and `non-working h start:2026-01-01 end:[2026-02-30]` give no diagnostics. Fix: date-check the single element of a one-element start:/end: list with isValidDateLiteral(…, true) and report NL.E0405 on it, with a test. Everything else passed: grammar is the spike patch plus comments, spike test moved unchanged, printer/KEY_ORDER/labels per decisions 1-3, codes E0900-E0907 and W0705 EN text exact, 46 s5 red cases all AssertionErrors, guards green, 43/43 SVG hashes OK, no snapshot or hashes.json change - 2026-10-12
+
 ## Token log
 
 **Counting header (Claude Code)** — as in the Phase 4 plan (`plan-m2p-show-display-osprey.md`, PR lolay/nowline#97 history):
@@ -494,3 +497,7 @@ Everything under § Change "Docs". The `working-calendar.md` examples must match
 - `$C` = (input × in + cache read × cached + 5m write × in × 1.25 + 1h write × in × 2.00 + output × out) / 1M.
 
 Phase 1 ~$20.42; Phase 2 ~$66.4; Phase 3 ~$51.05; Phase 4 ~$27.6. Rows are added per wave by the executing session.
+
+tokens orchestrator-kickoff plan-m2p-5a-kestrel (claude-opus-5-5): input ~30 / cache read ~2.2M / cache write ~0 5m + ~140k 1h / output ~18k | ~$1.94 API-equiv
+tokens wave-1 nowline-s1-s2-s3-s4-s5 (claude-sonnet-5-5): input ~200 / cache read ~20M / cache write ~320k / output ~100k | ~$5.73 API-equiv (output est.) session eebaa2e1-ad31-5528-ac3e-841a1ed184dc
+tokens review-wave-1 nowline-s1-s2-s3-s4-s5 (claude-opus-5-5): input ~44 / cache read ~1.6M / cache write ~110k / output ~22k | ~$1.31 API-equiv (output est.) session eebaa2e1-ad31-5528-ac3e-841a1ed184dc
