@@ -3,8 +3,8 @@
 - **Plan:** `specs/handoffs/plan-nowline-review-lantern.md`
 - **Branch:** `claude/ecstatic-babbage-qsrxbx` in `lolay/nowline` (task branch the cloud session was assigned; fast-forwarded from 86ac76c to origin/main 0062df3 at kickoff). One working directory: `/workspace/nowline`.
 - **Mode:** unattended, confirmed 2026-10-13 in session 8c78f794-2944-59bb-8116-4413104e9100 (`harness=claude-code runner=cloud`). Guard 3x min $50 (limit ~$63 against ~$21 expected). Fix-up cap 2 per group.
-- **Status:** 1/4 groups done. Wave 1's m1 part (`nowline m1 s1`) passed review. Next unit: wave 1 [exec], `nowline m2 s1-s6` (gate 4 passes unattended as a checkpoint; then wave 2 [deep] `nowline m3 s1-s3`, wave 3 [xdeep] `nowline m3 s4`).
-- **Spend:** ~$10.16 of ~$21 expected. The orchestrator-kickoff line covers this session from its start, so it includes the review conversation that preceded the kickoff (the explore agents are not counted).
+- **Status:** 2/4 groups done. Wave 1 (`nowline m1 s1`, `nowline m2 s1-s6`) passed review. Next unit: wave 2 [deep] `nowline m3 s1-s3` (gates 4 and 2 pass unattended as checkpoints), then wave 3 [xdeep] `nowline m3 s4`).
+- **Spend:** ~$13.21 of ~$21 expected. The orchestrator-kickoff line covers this session from its start, so it includes the review conversation that preceded the kickoff (the explore agents are not counted).
 - **Resume:** paste the plan's Kickoff prompt into a session on this branch.
 
 ## Pending question (verbatim)
@@ -14,11 +14,13 @@ None. Gary answered the kickoff question `unattended` (2026-10-13), compacted, t
 ## Done
 
 - m1.s1 (c233919): `specs/handoffs/review-since-v086-lantern.md`, the public-repo review with file:line refs re-checked at HEAD.
+- m2.s1-s6 (8e636a2..8759cdd): MCP theme/pageSize/nonWorking through shared normalizers; malformed `.nowlinerc` is a usage error (exit 2); `sanitizeSvg` drops `class`; LSP offers `calendar`; stale comments and public docs fixed; Renovate `@nowline/**` rule. Four `release-note:fixed` fragments. `make ci` green.
 
 ## Review log verdicts, fix-ups, retries, checkpoints
 
 - review wave-1 (nowline m1 s1) 0357e12..c233919: PASS. No fix-ups, retries or checkpoints.
 - gate-4 (entering m2) passed unattended as a checkpoint.
+- review wave-1 (nowline m2 s1-s6) aa4631f..8759cdd: PASS. No fix-ups or retries.
 
 ## Decisions so far
 
@@ -30,6 +32,7 @@ None. Gary answered the kickoff question `unattended` (2026-10-13), compacted, t
 - `node_modules` is not installed in `/workspace/nowline`: run `pnpm install --frozen-lockfile` before building or testing. The npm registry is reachable through the session proxy.
 - Node is 22.22.0 (`.nvmrc` pins 26.2.0 for development; `engines.node` is `>=22`). pnpm 12.8.1 is installed. If a build or test needs Node 26 and fails on 22, say so under `env:` rather than working around it.
 - `make ci` runs lint, build, typecheck and test; CLI integration tests need a prior build (`make build` or `pnpm -r build`).
+- wave-1 (m2): Node 22.22.0 is enough for `make ci`. A single package build needs its workspace deps built first: `pnpm -r --filter <pkg>... build` (`pnpm --filter @nowline/cli build` alone fails with TS2307 for `@nowline/config`). `pnpm lint` has 7 pre-existing `noTemplateCurlyInString` warnings in `mcp.smoke.test.ts`; it exits 0.
 
 ## Deviations from plan
 

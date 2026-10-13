@@ -1,7 +1,7 @@
 ```text
 --- KICKOFF: begin orchestration at [deep] ---
 
-  Status: 1/4 groups done | last review: wave-1 PASS | current: nowline m2 s1-s6 [exec] | updated 2026-10-13
+  Status: 2/4 groups done | last review: wave-1 PASS | current: nowline m3 s1-s3 [deep] | passed unattended: gate-4 (m2) | updated 2026-10-13
 
   mode: unattended | proposed unattended (harness=claude-code runner=cloud; CLAUDE_CODE_REMOTE=true, assigned branch) | guard 3x min $50 | fixups 2 | confirmed 2026-10-13 session 8c78f794-2944-59bb-8116-4413104e9100 by Kickoff prompt: Run in unattended mode.
 
@@ -99,31 +99,31 @@ Acceptance: the file exists; every file:line in it resolves at HEAD to the code 
 
 ### m2 - Quick fixes
 
-#### s1 - [exec] Route MCP options through the shared normalizers
+#### s1 - [exec] Route MCP options through the shared normalizers (done)
 
 In `packages/mcp/src`: validate `pageSize` with `parsePageSize` from `@nowline/export-core` (`packages/export-core/src/pdf-page.ts:75`) for every format, not only PDF, returning the tool's normal input-error result with the parser's detail when it throws `PageSizeParseError` (mirror the CLI's `parsePageSizeSetting`, `packages/cli/src/commands/render.ts:618`). Accept `theme` as a string normalized with `normalizeThemeName` from `@nowline/layout` (so `Greyscale` and the `greyscale` alias work), rejecting unknown names with a message that lists `THEME_NAMES`; replace the hard-coded theme lists and alias switches in `server.ts` (~623, ~866, ~1198), `capabilities.ts:19`, `diagnostics.ts:171` and `ui/entry.ts:49-58` with those exports. Build `nonWorking`'s enum from `NON_WORKING_DISPLAYS`. Do not change `now`, `width`, or anything outside `packages/mcp`.
 
 Acceptance: tests in `packages/mcp/test` cover an invalid `pageSize` on a non-PDF export (rejected), `theme: "Greyscale"` (accepted, renders grayscale), an unknown theme (rejected, lists names); the package's tests and `pnpm lint` pass. Changelog fragment `.changelog/mcp-option-normalizers.txt` (`release-note:fixed`).
 
-#### s2 - [exec] Report a malformed .nowlinerc as a usage error
+#### s2 - [exec] Report a malformed .nowlinerc as a usage error (done)
 
 `loadConfigFor` (`packages/cli/src/commands/render.ts:519-532`) catches every error and returns `null`, so a malformed YAML or JSON rc is silently ignored, contradicting `specs/cli.md:404` (an invalid rc value is a usage error, exit 2). Keep returning `null` when no rc file exists; when one exists but can't be parsed, raise the CLI's usage error naming the file and the parser's reason (match the cli.md:404 message style, `nowline: invalid .nowlinerc ...`). `--serve` uses the same function and gets the same behavior. Update `specs/cli.md` only if its wording needs to name this case.
 
 Acceptance: an integration test in `packages/cli/test/integration/` renders with a malformed `.nowlinerc` beside the input and asserts exit code 2 and the message; a missing rc still renders; CLI tests and `pnpm lint` pass. Changelog fragment `.changelog/cli-malformed-nowlinerc.txt` (`release-note:fixed`).
 
-#### s3 - [exec] Drop class attributes from sanitized SVG logos
+#### s3 - [exec] Drop class attributes from sanitized SVG logos (done)
 
 `sanitizeSvg` (`packages/renderer/src/svg/sanitize.ts`) now folds plain `<style>` class rules into presentation attributes but still emits each element's `class`, so CSS on the host page (another inline SVG's `.cls-1` rule, under the embed) can restyle the logo. After `applyStyles` has folded the rules, drop `class` from the emitted attributes without a warning (it is bookkeeping once inlined). Keep everything else in the sanitizer as is.
 
 Acceptance: `packages/renderer/test/sanitize.test.ts` covers an Illustrator-style `<style>.cls-1{fill:#123456}</style>` logo whose output has the fill as an attribute and no `class`; existing sanitizer tests updated only where they asserted `class` survives; `tests/logo-*.nowline` renders unchanged; renderer tests and `pnpm lint` pass. Changelog fragment `.changelog/sanitizer-drop-class.txt` (`release-note:fixed`).
 
-#### s4 - [fast] Offer the calendar icon in LSP completion
+#### s4 - [fast] Offer the calendar icon in LSP completion (done)
 
 Add `'calendar'` to `BUILTIN_ICON_NAMES` in `packages/lsp/src/references/ast-utils.ts:116`, in the same position the validator's built-in icon list uses (see `packages/core/src/language/nowline-validator.ts` ~164). Add or extend an LSP completion test asserting `calendar` is offered where icon names complete.
 
 Acceptance: the LSP test passes; `pnpm lint` passes. Changelog fragment `.changelog/lsp-calendar-icon.txt` (`release-note:fixed`).
 
-#### s5 - [exec] Fix stale comments and public docs
+#### s5 - [exec] Fix stale comments and public docs (done)
 
 - `packages/core/src/i18n/codes.ts` header: change the `NL.E0900–E0999` line to `NL.E0900–E0999  calendar declarations (non-working / working)`.
 - `specs/embed.md:147`: replace "keeps `/edit` + `/d/{id}` free for m5c's persisted-diagram routes" with "keeps other paths free for the paid editor's persisted-diagram routes", and "(no persistence until m5c)" with "(the free viewer never persists a diagram)". Change nothing else in the paragraph.
@@ -133,7 +133,7 @@ Acceptance: the LSP test passes; `pnpm lint` passes. Changelog fragment `.change
 
 Acceptance: only those lines change; `python3 scripts/changelog.py check` and `pnpm lint` pass. No changelog fragment (docs and comments).
 
-#### s6 - [fast] Exempt @nowline packages from the Renovate release-age wait
+#### s6 - [fast] Exempt @nowline packages from the Renovate release-age wait (done)
 
 In `.github/renovate-shared.json`, append a last `packageRules` entry matching `@nowline/**` that sets `minimumReleaseAge` to `"0 days"`, with a `description` saying consumers should pick up a nowline release the week it ships (lockstep with the CLI). It must come after the `major` rule so it also overrides that rule's 30 days.
 
@@ -166,6 +166,7 @@ Write `specs/layout-phases.md` for R2, building on `specs/rendering-v2.md` (m2.5
 ## Review log
 
 review wave-1 (nowline m1 s1) 0357e12..c233919: PASS - review doc written; six drifted file:line refs corrected (layout.ts status tints :531, sequenceItem 410-928, calendar-resolver.ts 105-135, lsp hover.ts full path, cli render.ts loadConfigFor 520-533, style-resolution.ts 178-196); no private-repo content - 2026-10-13
+review wave-1 (nowline m2 s1-s6) aa4631f..8759cdd: PASS - all six steps as specified; four release-note:fixed fragments; make ci and changelog check green; MCP theme/pageSize via shared normalizers, malformed rc exits 2, sanitizer drops class, LSP calendar icon, docs, Renovate @nowline/** rule last; checkpoint gate-4 - 2026-10-13
 
 ## Token log
 
@@ -180,3 +181,6 @@ review wave-1 (nowline m1 s1) 0357e12..c233919: PASS - review doc written; six d
 tokens orchestrator-kickoff plan-nowline-review-lantern (claude-opus-5-5): input ~210 / cache read ~20M / cache write ~0 5m + ~370k 1h / output ~94k | ~$8.80 API-equiv
 tokens wave-1 nowline-m1-s1 (claude-sonnet-5-5): input ~34 / cache read ~1.4M / cache write ~110k / output ~17k | ~$0.71 API-equiv (output est.) session 8c78f794-2944-59bb-8116-4413104e9100
 tokens review-wave-1 nowline-m1-s1 (claude-opus-5-5): input ~36 / cache read ~480k / cache write ~41k / output ~17k | ~$0.65 API-equiv (output est.) session 8c78f794-2944-59bb-8116-4413104e9100
+tokens orchestrator-wave-1 nowline-m1-s1 (claude-opus-5-5): input ~26 / cache read ~1.4M / cache write ~0 5m + ~25k 1h / output ~10k | ~$0.69 API-equiv
+tokens wave-1 nowline-m2-s1-s6 (claude-sonnet-5-5): input ~92 / cache read ~5.4M / cache write ~110k / output ~46k | ~$1.81 API-equiv (output est.) session 8c78f794-2944-59bb-8116-4413104e9100
+tokens review-wave-1 nowline-m2-s1-s6 (claude-opus-5-5): input ~26 / cache read ~360k / cache write ~40k / output ~14k | ~$0.55 API-equiv (output est.) session 8c78f794-2944-59bb-8116-4413104e9100
