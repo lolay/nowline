@@ -173,3 +173,5 @@ Write `specs/layout-phases.md` for R2, building on `specs/rendering-v2.md` (m2.5
 - Rates by `<model>`, $ per Mtok input / cached / output: `claude-opus-5-5` 4.00 / 0.20 / 20.00; `claude-sonnet-5-5` 2.00 / 0.20 / 10.00.
 - `$C` = (input × in + cache read × cached + 5m write × in × 1.25 + 1h write × in × 2.00 + output × out) / 1M.
 - In another harness, or on a model not listed here, count and price per plan-execution.md "Token accounting" and "Model price table" instead.
+
+tokens orchestrator-kickoff plan-nowline-review-lantern (claude-opus-5-5): input ~180 / cache read ~17M / cache write ~0 5m + ~330k 1h / output ~83k | ~$7.64 API-equiv

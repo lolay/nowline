@@ -4,7 +4,7 @@
 - **Branch:** `claude/ecstatic-babbage-qsrxbx` in `lolay/nowline` (task branch the cloud session was assigned; fast-forwarded from 86ac76c to origin/main 0062df3 at kickoff). One working directory: `/workspace/nowline`.
 - **Mode:** pending (proposed unattended: `harness=claude-code runner=cloud`). Guard 3x min $50 (limit ~$63 against ~$21 expected). Fix-up cap 2 per group.
 - **Status:** kickoff written; no unit launched. Next unit: wave 1 [exec], `nowline m1 s1` (then `nowline m2 s1-s6`, wave 2 [deep] `nowline m3 s1-s3`, wave 3 [xdeep] `nowline m3 s4`).
-- **Spend:** $0 of ~$21 expected (orchestrator kickoff not yet tallied).
+- **Spend:** ~$7.64 of ~$21 expected. The orchestrator-kickoff line covers this session from its start, so it includes the review conversation that preceded the kickoff (the explore agents are not counted).
 - **Resume:** paste the plan's Kickoff prompt into a session on this branch.
 
 ## Pending question (verbatim)
