@@ -2,9 +2,9 @@
 
 - **Branch:** `claude/zealous-thompson-tur82q` (lolay/nowline), assigned by the cloud harness. Started on it at `c34804c` (= `origin/main`).
 - **Plan:** `specs/handoffs/plan-core-utilities-heron.md`. Spec: `specs/core-ast-utilities.md`.
-- **Mode:** pending. Proposed unattended (harness=claude-code runner=cloud).
-- **Status:** kickoff written, nothing dispatched. 0/5 waves done.
-- **Spend:** ~$5.6 logged (kickoff and planning) against ~$24 expected (guard ~$72).
+- **Mode:** unattended, confirmed 2026-10-13 in session 462f378b-01ae-572c-b81b-c39199f8207a (harness=claude-code runner=cloud).
+- **Status:** kickoff answered, nothing dispatched. 0/5 waves done. Halted for Gary's `/compact`.
+- **Spend:** ~$5.8 logged (kickoff and planning) against ~$24 expected (guard ~$72).
 
 ## Waves
 
@@ -20,7 +20,7 @@ Gates on the way: 2 before waves 2 and 4; 4 before wave 4 (m2) and before the m3
 
 ## Pending question (verbatim)
 
-The kickoff question, asked in the chat at the end of the kickoff turn: "Reply unattended or gated." After the answer is recorded and pushed, the session stops so Gary can run `/compact`; no wave dispatches until he pastes the plan's Kickoff prompt.
+None. The kickoff question was answered `unattended`. The session halted so Gary can run `/compact`; no wave dispatches until he pastes the plan's Kickoff prompt.
 
 ## How to resume
 

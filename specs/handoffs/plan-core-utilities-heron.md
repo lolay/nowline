@@ -1,9 +1,9 @@
 ```
 --- KICKOFF: begin orchestration at [deep] ---
 
-  Status: 0/5 groups done | last review: — | current: nowline m1 s1 [exec] | BLOCKED at gate mode | updated 2026-10-13
+  Status: 0/5 groups done | last review: — | current: nowline m1 s1 [exec] | updated 2026-10-13
 
-  mode: pending | proposed unattended (harness=claude-code runner=cloud; assigned branch, CLAUDE_CODE_REMOTE=true) | guard 3x min $50 | fixups 2
+  mode: unattended | proposed unattended (harness=claude-code runner=cloud; assigned branch, CLAUDE_CODE_REMOTE=true) | guard 3x min $50 | fixups 2 | confirmed 2026-10-13 session 462f378b-01ae-572c-b81b-c39199f8207a: unattended
 
   review: every-wave (log-only)
 
@@ -14,6 +14,7 @@
   Prompt to paste into the next chat:
     In lolay/nowline, read specs/handoffs/plan-core-utilities-heron.md. The plan is already tagged.
     On branch claude/zealous-thompson-tur82q (task branch): subagents commit each finished step.
+    Run in unattended mode.
     Run the personal-plan-orchestrate skill from the top: walk to
     each tier boundary, dispatch subagents per the skill's
     procedure, and pause only where the recorded mode stops. Do not
@@ -210,4 +211,4 @@ Per spec m3.s3 and decision 3: delete `effectiveWave` and `leadWave` (`waves.ts:
 - `$C` = (input x in + cache read x cached + 5m write x in x 1.25 + 1h write x in x 2.00 + output x out) / 1M.
 - In another harness, or on a model not listed here, count and price per plan-execution.md "Token accounting" and "Model price table" instead.
 
-tokens orchestrator-kickoff plan-core-utilities-heron (claude-opus-5-5): input ~100 / cache read ~6.7M / cache write ~76k 5m + ~340k 1h / output ~55k | ~$5.58 API-equiv (output est.) (combined: orchestrator-kickoff, two plan-mode Explore agents) session 462f378b-01ae-572c-b81b-c39199f8207a
+tokens orchestrator-kickoff plan-core-utilities-heron (claude-opus-5-5): input ~110 / cache read ~7.5M / cache write ~76k 5m + ~350k 1h / output ~59k | ~$5.82 API-equiv (output est.) (combined: orchestrator-kickoff, two plan-mode Explore agents) session 462f378b-01ae-572c-b81b-c39199f8207a
