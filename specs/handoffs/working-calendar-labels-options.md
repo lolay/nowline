@@ -6,7 +6,7 @@
 
 1. **Titled `working` exception: label it before 5a/5b ship (option W1).** It is the one titled form MS Project already names, so the chart is the odd surface out; the cost is one more marker-row entry, one example and one determinism fixture. Label only, no cut line, suffix `+Nd`.
 2. **Titled bounded recurrence: leave it unlabelled.** Neither per-occurrence option survives the week scale. The good option (a period bracket, R3) is the primitive of the annotation feature §11 deferred (code freezes), so build it there, once, not as a calendar one-off.
-3. **Fix the real harm separately.** A recurrence under `hide` blanks the week tick labels for its whole window at the default scale (below). That is worse than the missing label and is a tick-thinning problem, not a label problem. Worth its own issue.
+3. **Fix the real harm separately.** A recurrence under `hide` blanks the week tick labels for its whole window at the default scale (below). That is worse than the missing label and is a tick-thinning problem, not a label problem. Worth its own issue. **Done 2026-10-12:** the narrow-column runs rule ([`working-calendar.md`](../working-calendar.md) §7.2, decision 3 amended) keeps every other label in the window, `Jul 06`, `Jul 20`, `Aug 03`, `Aug 17`.
 4. **Make the limit discoverable either way.** The LSP hover on a titled bounded recurrence should say the title is not drawn. Zero render bytes.
 
 Timing matters: 5a and 5b are both under `## [Unreleased]` (the last release is 0.8.6). No user file carries these declarations yet, so any change now costs only repo goldens. After the release, a change moves rendered bytes for real files.
@@ -17,10 +17,10 @@ Measured with the layout API on `tests/non-working-{hide,show}.nowline` plus one
 
 | | `hide`, days / weeks | `hide`, months / quarters | `show`, days / weeks | `show`, months / quarters |
 |---|---|---|---|---|
-| Titled bounded recurrence | Weeks in the window are 4 working days (32 px), so the narrow-column rule (decision 3) **drops every week tick label** from Jun 29 to Aug 24 at `1w`. No seam drawn (week scale). | Columns a little narrower; nothing marks why. | Fri to Sun bands are 24 px against 16 px for a plain weekend. Readable if you know to look. | Nothing: untitled runs are not banded at month scale and above. |
+| Titled bounded recurrence | Weeks in the window are 4 working days (32 px), so the narrow-column rule (decision 3) **dropped every week tick label** from Jun 29 to Aug 24 at `1w`; since the narrow-column runs fix the labels alternate (`Jul 06`, `Jul 20`, `Aug 03`, `Aug 17`). No seam drawn (week scale). | Columns a little narrower; nothing marks why. | Fri to Sun bands are 24 px against 16 px for a plain weekend. Readable if you know to look. | Nothing: untitled runs are not banded at month scale and above. |
 | Titled `working` exception | The Saturday becomes an 8 px slice of a 48 px week column. Invisible. | Invisible. | A gap in one weekend band (Sunday shaded, Saturday not). | Invisible. |
 
-So the missing label does hurt, but differently. For the recurrence, the information that matters is a period ("summer runs at four days a week"), and under the default view the axis goes blank across that period with nothing to explain it. For the working exception, the information is one day, and the only trace is the exporter.
+So the missing label does hurt, but differently. For the recurrence, the information that matters is a period ("summer runs at four days a week"), and under the default view the axis went blank across that period with nothing to explain it. The axis keeps its dates now, but nothing on the chart still says why those weeks are narrower. For the working exception, the information is one day, and the only trace is the exporter.
 
 A related quirk the working option would also fix: a weekday make-up day inside a titled closure (`working makeup "Make-up day" date:2026-12-30` inside Winter break) splits the closure into two labelled seams 8 px apart, `Winter break · 4d` and `Winter break · 2d`, with nothing saying why.
 
@@ -49,6 +49,8 @@ row 0                                                   (empty)
 row 1    ◆ Kickoff ...
 lanes    [API v2 ------------------------][Data migration --------]
 ```
+
+Since the narrow-column runs fix the axis labels alternate across the window (`Jul 06`, `Jul 20`, `Aug 03`, `Aug 17`). The option mockups below keep the old blank axis; only the marker rows differ.
 
 **R1, a label on every occurrence** (`Summer Fridays · 1d` at each run's seam or band edge):
 
@@ -92,7 +94,7 @@ Marker rows (26 px each) for the Summer Fridays example, then the fixture with `
 
 - **R1** is dead on arrival: +3 to +5 rows at month and quarter scale for nine Fridays, and a summer-long recurrence is the normal case. Code is small (relax `titledRules`, attribute a recurrence title per day rather than per span, or a `every:wed` title leaks onto the Sat/Sun runs inside its window).
 - **R2** is cheap (+0 or +1 row) and misleading: under `hide` a cut line means "a closure is here", and `· 9d` on Jul 3 reads as a nine-day closure on Jul 3. Fixing the wording does not fix the line.
-- **R3** costs +0 or +1 row and reads at every scale, because it is anchored to two dates, not to N days. It is the only option that also explains the blank axis. It is also the most new machinery: `packMarkerRow` is point-based (a centre, a radius, a right-or-left label), so a span needs a third placement mode with fixed left anchoring; a new model array (`PositionedNonWorkingRun` is per run, the bracket is per rule); a renderer element; a new `tests/` fixture and snapshot sample.
+- **R3** costs +0 or +1 row and reads at every scale, because it is anchored to two dates, not to N days. It is the only option that also explains why the weeks in the window are narrower (the axis itself is no longer blank). It is also the most new machinery: `packMarkerRow` is point-based (a centre, a radius, a right-or-left label), so a span needs a third placement mode with fixed left anchoring; a new model array (`PositionedNonWorkingRun` is per run, the bracket is per rule); a renderer element; a new `tests/` fixture and snapshot sample.
 - **Byte identity.** No file in `examples/`, `tests/` or the determinism fixtures has a bounded `every:`, so R1 to R3 move no existing golden. Every option needs a new fixture.
 - **Bundle.** The whole 5b chart feature (labels, packing, canvas growth, `calendarExceptions`) cost +1.51 KB raw, +0.49 KB gzipped (measured: `make bundle-size` at `7ac0d44` against `56345c7`). R1 and R2 are a fraction of that; R3 is the largest, still well under 1 KB gzipped against 6.67 KB of headroom (193.33 of 200 KB). Not a constraint for any option here.
 - **Spec and docs surface.** `working-calendar.md` §7.4, §7.5 (R3 adds a model type), §8 known limits; `rendering.md` § Timeline Scale (the `non-working-label` paragraph); `dsl.md` § Non-working Declaration (the title row); `nowline(5)` en and fr; the MCP reference resource; the 5b CHANGELOG entry (still unreleased, so edited in place).
