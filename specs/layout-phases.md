@@ -10,7 +10,7 @@ m2.5c promised a tree of measure/place nodes with `layout.ts` collapsed "to the 
 
 | Phase it really is | Lines of `RoadmapNode.place` | What happens |
 |---|---|---|
-| Date window | 279-312 | theme, locale, working calendar, view preset, sizes, style context; the window from engine B (`deps.computeDateWindow`, 305-312) |
+| Date window | 279-312 | theme, locale, working calendar, view preset, sizes, style context; the window from the day schedule (`deps.computeDateWindow(file, schedule, …)`, 305-312) |
 | Measure | 314-558 | roadmap style (318-342); header sizing (344-365); pixels per day (374-388); header rows (397-407); time scale (412-417); marker pre-pack (418-498); timeline y and the beside-card push (499-515); timeline (517-541); marker placements (543-558) |
 | Place | 560-761 | context literal (560-591); edge seeds (593-603); footnote index (605-609); lane passes, wave barrier and corridor rerun (611-728); regions (740-750); milestones (756-761) |
 | Finalize | 763-1127 | the fixups P7 to P20 of §1.2, then the model |
@@ -480,7 +480,7 @@ No step touches an exporter or the schedule, so R1's G3 does not apply; a step t
 | m2.s1, m2.s2 | — | soft (R1 m2.s3) | both move the item's duration read; after m2 it is one line in `measureItem` |
 | m3.s1 to m3.s3 | R1 m1, m2 | soft | edit `RoadmapNode.place` and `LayoutContext`, which R1 m1.s3, m2.s1 and m2.s3 edit |
 | m4.s1, m4.s2 | R1 m1, m2 | soft | edit `RoadmapNode.place` |
-| m5.s1 | R1 m1.s3, m2.s1 | **hard** | the phase consumes `computeDateWindow(file, schedule, …)` and `LayoutOptions.schedule`; before them it would wrap engine B and be redone |
+| m5.s1 | R1 m1.s3, m2.s1 | **hard** | the phase consumes `computeDateWindow(file, schedule, …)` and `LayoutOptions.schedule`; without them it would wrap a window computed from a separate day walk and be redone |
 | m5.s2 to m5.s5, m6 | R1 m1.s3, m2.s1 | **hard**, through m5.s1 | built on the date-window phase; m5.s5 also moves the start rules after R1 m1.s4 |
 
 No R2 step needs R1 m3 (tests) or R1's follow-ups. R1 F3 would make f2 rarer and R1 F4 would cut P1's passes; neither changes this plan.

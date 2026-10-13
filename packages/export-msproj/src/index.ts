@@ -29,7 +29,6 @@ import type {
     TeamDeclaration,
     WavePlan,
 } from '@nowline/core';
-import { buildWavePlan } from '@nowline/core';
 import type { ExportInputs } from '@nowline/export-core';
 import { displayLabel, getProp, getProps, hasProp, roadmapTitle } from '@nowline/export-core';
 import { calendarExceptions, type RoadmapSchedule, scheduleRoadmap } from '@nowline/layout';
@@ -113,7 +112,8 @@ export function exportMsProjXml(inputs: ExportInputs, options: MsProjOptions = {
         options.projectName ?? roadmapTitle(ast.roadmapDecl ?? undefined),
     );
     const startDate = resolveStartDate(options.startDate, inputs.today);
-    const schedule = scheduleRoadmap(ast, inputs.resolved, { today: inputs.today });
+    const schedule =
+        inputs.schedule ?? scheduleRoadmap(ast, inputs.resolved, { today: inputs.today });
 
     // Resources
     const resources = collectResources(ast);
@@ -127,7 +127,7 @@ export function exportMsProjXml(inputs: ExportInputs, options: MsProjOptions = {
         if (t.nowlineId) idToUid.set(t.nowlineId, t.uid);
     }
     // Undefined when the roadmap declares no waves: nothing below changes.
-    const wavePlan = buildWavePlan(inputs.resolved);
+    const wavePlan = schedule.plan;
     if (wavePlan) {
         addWaveTasks(ast, wavePlan, tasks, idToUid, drops);
     }

@@ -7,15 +7,9 @@ import type {
     ParallelBlock,
     ResolveResult,
     SwimlaneDeclaration,
-    WavePlan,
 } from '@nowline/core';
 import { buildWavePlan, isGroupBlock, isItemDeclaration, isParallelBlock } from '@nowline/core';
-import {
-    deriveItemDurationDays,
-    deriveTotalEffortDays,
-    resolveDuration,
-    resolveSizes,
-} from './calendar.js';
+import { deriveTotalEffortDays, literalToDays, resolveDuration } from './calendar.js';
 import {
     estimateCapacitySuffixWidth,
     formatCapacityNumber,
@@ -67,7 +61,12 @@ import {
     packSpillChips,
 } from './item-bar-geometry.js';
 import { itemArrowSourcePort, itemArrowTargetPort } from './item-port-geometry.js';
-import { type LayoutContext, newCursor, type TrackCursor } from './layout-context.js';
+import {
+    type LayoutContext,
+    newCursor,
+    scheduledItemDays,
+    type TrackCursor,
+} from './layout-context.js';
 import { GroupNode } from './nodes/group-node.js';
 import {
     estimateItemMetaWidth,
@@ -78,6 +77,8 @@ import {
 import { ParallelNode } from './nodes/parallel-node.js';
 import { RoadmapNode, type SizedHeader } from './nodes/roadmap-node.js';
 import type { NonWorkingDisplay } from './non-working-display.js';
+import { type RoadmapSchedule, scheduleRoadmap } from './schedule.js';
+import { startTermsOf } from './start-terms.js';
 import { resolveLabelChipStyle, resolveStyle, type StyleContext } from './style-resolution.js';
 import { estimateTextWidth, wrapText } from './text-measure.js';
 import type { ThemeName } from './themes/index.js';
@@ -112,7 +113,6 @@ import type {
     StatusKind,
 } from './types.js';
 import { tickBoundaryAtOrAfter, type ViewPreset } from './view-preset.js';
-import { solveWaveBarriers, WavePass, waveFloorDays } from './wave-barrier.js';
 import {
     accumulateWaveMember,
     dateAtX,
@@ -121,7 +121,7 @@ import {
     wavePinOverrideOf,
     waveRoleOf,
 } from './wave-layout.js';
-import { daysPerUnit, fromCalendarConfig, type WorkingCalendar } from './working-calendar.js';
+import { daysPerUnit } from './working-calendar.js';
 import { itemSpanPx } from './working-span.js';
 
 export interface LayoutOptions {
@@ -156,6 +156,17 @@ export interface LayoutOptions {
      * header then lays out as if no logo were declared.
      */
     logo?: LogoDimensions;
+    /**
+     * A day schedule the caller already built for this roadmap
+     * (`scheduleRoadmap`, with the wave plan as `schedule.plan`). Layout
+     * reuses it when `schedule.resolved` is the very `ResolveResult` passed
+     * to `layoutRoadmap`, so a staging step that builds the plan and the
+     * schedule once hands them on (specs/scheduler-unification.md §3.6).
+     * A schedule built from another `ResolveResult` is ignored and rebuilt.
+     * Build it with the same `today` as this call's `today`: the window and
+     * the default start date come from it.
+     */
+    schedule?: RoadmapSchedule;
 }
 
 export type LayoutResult = PositionedRoadmap;
@@ -423,7 +434,7 @@ function sequenceItem(
     // The validator requires one of the two on every item.
     const sizeRef = propValue(props, 'size');
     const sizeResolved = sizeRef ? (ctx.sizes.get(sizeRef) ?? null) : null;
-    const durationDays = deriveItemDurationDays(props, ctx.sizes, ctx.cal);
+    const durationDays = scheduledItemDays(ctx, node);
     const afterRaw = propValues(props, 'after');
     const beforeRaw = propValues(props, 'before');
 
@@ -431,7 +442,7 @@ function sequenceItem(
     // > after-chain > cursor position. A lane or group child's cursor
     // already sits at that start; a direct parallel track's cursor sits at
     // the block's start, so this is where its pin applies.
-    let startX = resolvePinnedOrSequentialStart(props, cursor.x, cursor.x, ctx);
+    let startX = resolvePinnedOrSequentialStart(props, cursor.x, ctx);
     // Wave barrier (specs/waves.md §5.1, §8.4): the floor is one more term
     // in the max, after the pin and `after:` logic, so a pin becomes
     // max(pin, F). Parallel tracks reach this function directly, so this
@@ -1075,7 +1086,7 @@ function predictItemBarExtraHeight(
 ): number {
     const props = item.properties;
     const bandwidth = ctx.bandScale.bandwidth();
-    const durationDays = deriveItemDurationDays(props, ctx.sizes, ctx.cal);
+    const durationDays = scheduledItemDays(ctx, item);
     const naturalWidth = Math.max(MIN_ITEM_WIDTH, itemSpanPx(ctx, startX, durationDays));
     const visualWidth = Math.max(MIN_ITEM_WIDTH, naturalWidth - 2 * ITEM_INSET_PX);
 
@@ -1177,12 +1188,14 @@ function predictItemBarExtraHeight(
 function resolveChildStart(
     child: ItemDeclaration | GroupBlock | ParallelBlock,
     seqDefault: number,
-    laneLeftX: number,
+    // Unused since F1 (`after:` starts at the lane cursor, not the lane's
+    // left edge); the `*Deps` signatures still thread it until R2 merges them.
+    _laneLeftX: number,
     ctx: LayoutContext,
 ): number {
     return waveFloorX(
         child,
-        resolvePinnedOrSequentialStart(child.properties, seqDefault, laneLeftX, ctx),
+        resolvePinnedOrSequentialStart(child.properties, seqDefault, ctx),
         ctx,
     );
 }
@@ -1190,29 +1203,25 @@ function resolveChildStart(
 function resolvePinnedOrSequentialStart(
     props: EntityProperty[],
     seqDefault: number,
-    laneLeftX: number,
     ctx: LayoutContext,
 ): number {
-    const explicitDate =
-        parseDate(propValue(props, 'date')) ?? parseDate(propValue(props, 'start'));
-    if (explicitDate) {
-        const xd = ctx.scale.forwardWithinDomain(explicitDate);
+    const { pin, after } = startTermsOf(props);
+    if (pin) {
+        const xd = ctx.scale.forwardWithinDomain(pin.date);
         if (xd !== null) return xd;
     }
-    const afterRefs = propValues(props, 'after');
-    if (afterRefs.length > 0) {
-        let maxEnd = laneLeftX;
-        for (const ref of afterRefs) {
-            const inlineDate = parseDate(ref);
-            if (inlineDate) {
-                const xd = ctx.scale.forwardWithinDomain(inlineDate);
+    if (after.length > 0) {
+        let maxEnd = seqDefault;
+        for (const term of after) {
+            if ('date' in term) {
+                const xd = ctx.scale.forwardWithinDomain(term.date);
                 if (xd !== null) maxEnd = Math.max(maxEnd, xd);
                 continue;
             }
-            const endX = ctx.entityRightEdges.get(ref);
+            const endX = ctx.entityRightEdges.get(term.ref);
             if (endX !== undefined) maxEnd = Math.max(maxEnd, endX);
         }
-        return Math.max(laneLeftX, maxEnd);
+        return maxEnd;
     }
     return seqDefault;
 }
@@ -1244,14 +1253,10 @@ function nonWorkingPinOf(
 function startPinOf(
     props: EntityProperty[],
 ): { key: 'date' | 'start' | 'after'; raw: string; date: Date } | undefined {
-    for (const key of ['date', 'start'] as const) {
-        const raw = propValue(props, key);
-        const date = parseDate(raw);
-        if (raw !== undefined && date) return { key, raw, date };
-    }
-    for (const raw of propValues(props, 'after')) {
-        const date = parseDate(raw);
-        if (date) return { key: 'after', raw, date };
+    const { pin, after } = startTermsOf(props);
+    if (pin) return pin;
+    for (const term of after) {
+        if ('date' in term) return { key: 'after', raw: term.raw, date: term.date };
     }
     return undefined;
 }
@@ -1330,59 +1335,40 @@ function sizeBesideHeader(
     };
 }
 
-// Compute a sensible [startDate, endDate] window.
+// Compute a sensible [startDate, endDate] window from the roadmap's day
+// schedule (`scheduleRoadmap`, specs/scheduler-unification.md §3.3).
 //
 // Precedence:
 //   1. An explicit `length:` is a minimum span; content (including wave
 //      barriers E_n and every S_k) past it grows the window to the next
 //      tick boundary.
 //   2. Otherwise we derive the end day from the actual content extent
-//      (latest item end, anchor date, milestone date/after, and today's
-//      now-line if it falls past the content). This keeps the rendered
-//      chart from defaulting to a 180-day desert when the content only
-//      spans a few weeks.
+//      (`schedule.extent.contentEndDay`: latest lane cursor, anchor date,
+//      milestone date/after, wave edge) and today's now-line if it falls
+//      past the content. This keeps the rendered chart from defaulting to
+//      a 180-day desert when the content only spans a few weeks.
 //   3. As a last resort (no content + no length), fall back to a small
 //      4-week placeholder so an empty roadmap still draws a sensible axis.
 //
-// `plan` is the roadmap's wave plan (`buildWavePlan`, built once per
-// layout), or undefined when it declares no waves.
+// The start is `schedule.startDate`: the roadmap's `start:`, else `today`
+// (see `scheduleRoadmap`). Every day count is a working-day index from the
+// start (specs/working-calendar.md §5) under the schedule's calendar. A
+// calendar with no non-working day keeps calendar-day arithmetic.
 //
-// Every day count is a working-day index from the start
-// (specs/working-calendar.md §5): `ctx.calendar` maps dates to indices and
-// back, built from `ctx.cal` when absent. A calendar with no non-working
-// day keeps calendar-day arithmetic.
-//
-// Exported for tests (engine B, specs/waves.md §8.5); not part of the
-// package surface.
+// Exported for tests; not part of the package surface.
 export function computeDateWindow(
     file: NowlineFile,
-    ctx: {
-        cal: import('./calendar.js').CalendarConfig;
-        sizes: Map<string, import('./types.js').ResolvedSize>;
-        calendar?: WorkingCalendar;
-    },
-    resolved: ResolveResult,
+    schedule: RoadmapSchedule,
     today: Date | undefined,
     scale: ViewPreset,
-    plan: WavePlan | undefined,
 ): { startDate: Date; endDate: Date } {
-    const roadmap = file.roadmapDecl;
-    const props = roadmap?.properties ?? [];
-    const startRaw = propValue(props, 'start');
-    // Spec (`specs/dsl.md`): "A roadmap with no `start:` and no dates is
-    // purely relative — renderers choose their own reference date (e.g.
-    // the day of rendering)." Use the caller's `today` (the resolved
-    // `--now`) when present so the start lines up with the now-line, and
-    // fall back to actual today's UTC midnight otherwise. Either default
-    // is dangerous — output drifts day-to-day — but it's strictly better
-    // than the legacy "Jan 1 of the current year" fallback that drifted
-    // every January 1 by 365 days at once. Authors should set `start:`
-    // for any roadmap they want to be reproducible.
-    const startDate = parseDate(startRaw) ?? defaultStartDate(today);
+    const props = file.roadmapDecl?.properties ?? [];
+    const { config: cal, working: calendar } = schedule.calendar;
+    const { startDate } = schedule;
     const lengthRaw = propValue(props, 'length');
     let minDays = 0;
     if (lengthRaw) {
-        const days = literalDays(lengthRaw, ctx.cal);
+        const days = literalToDays(lengthRaw, cal);
         if (days > 0) {
             minDays = days;
         }
@@ -1392,16 +1378,13 @@ export function computeDateWindow(
     // and surfaces as an NL.W1000 insight). Content overflow — items,
     // anchors, milestones — still grows the window below via `padded`, with
     // `length:` acting purely as the floor. Without `length:`, `today`
-    // extends the window as before so the now-line is always in range.
-    const calendar = ctx.calendar ?? fromCalendarConfig(ctx.cal);
-    const contentDays = computeContentEndDay(
-        resolved,
-        { cal: ctx.cal, sizes: ctx.sizes, calendar },
-        startDate,
-        minDays > 0 ? undefined : today,
-        plan,
-    );
-    const tickDays = daysPerUnit(scale.unit, ctx.cal);
+    // extends the window so the now-line is always in range.
+    let contentDays = schedule.extent.contentEndDay;
+    if (today && !(minDays > 0)) {
+        const t = calendar.workingIndexOf(startDate, today);
+        if (t > 0) contentDays = Math.max(contentDays, t);
+    }
+    const tickDays = daysPerUnit(scale.unit, cal);
     // Round up to the smallest tick boundary that is `>= contentDays`. When
     // the latest content lands exactly on a tick boundary the chart ends
     // exactly there (no extra trailing tick); otherwise we extend to the
@@ -1410,7 +1393,7 @@ export function computeDateWindow(
     // quarter / year start, not a multiple of `days-per-month` etc.
     const padded = tickBoundaryAtOrAfter(
         startDate,
-        contentDays > 0 ? contentDays : 4 * ctx.cal.daysPerWeek,
+        contentDays > 0 ? contentDays : 4 * cal.daysPerWeek,
         scale.unit,
         tickDays,
         calendar,
@@ -1420,298 +1403,6 @@ export function computeDateWindow(
         startDate,
         endDate: calendar.dateAtWorkingIndex(startDate, Math.max(1, finalDays)),
     };
-}
-
-/**
- * Reference date used when a roadmap omits `start:`. Prefers the
- * caller-supplied `today` (UTC midnight already, when it comes from
- * the CLI); falls back to actual today's UTC midnight so the layout
- * still produces a valid window for direct API callers that don't pass
- * a `today`. Date components are taken in UTC to match `parseDate`.
- */
-function defaultStartDate(today: Date | undefined): Date {
-    const ref = today ?? new Date();
-    return new Date(Date.UTC(ref.getUTCFullYear(), ref.getUTCMonth(), ref.getUTCDate()));
-}
-
-function literalDays(literal: string, cal: import('./calendar.js').CalendarConfig): number {
-    const m = /^(\d+(?:\.\d+)?)([dwmqy])$/.exec(literal);
-    if (!m) return 0;
-    const n = parseFloat(m[1]);
-    switch (m[2]) {
-        case 'd':
-            return n;
-        case 'w':
-            return n * cal.daysPerWeek;
-        case 'm':
-            return n * cal.daysPerMonth;
-        case 'q':
-            return n * cal.daysPerQuarter;
-        case 'y':
-            return n * cal.daysPerYear;
-        default:
-            return 0;
-    }
-}
-
-// Walk every dated/sequenced entity in the resolved content and return the
-// latest day-offset from `startDate`. Mirrors the sequencer's start-rules
-// (date: > start: > after: > previous-in-lane) without producing positions.
-// Offsets are working-day indices: every date converts through
-// `ctx.calendar.workingIndexOf`, so a date on a non-working day counts as
-// the next working day.
-//
-// With waves (`plan` set, specs/waves.md §8.5) the lane walk runs inside the
-// barrier driver: starts are floored by their wave's `S_k`, isolated regions
-// are walked in-pass (one level, fresh id maps seeded with the wave edges)
-// instead of by the post-hoc recursion, and the result includes `E_n` and
-// every `S_k`.
-function computeContentEndDay(
-    resolved: ResolveResult,
-    ctx: {
-        cal: import('./calendar.js').CalendarConfig;
-        sizes: Map<string, import('./types.js').ResolvedSize>;
-        calendar: WorkingCalendar;
-    },
-    startDate: Date,
-    today: Date | undefined,
-    plan?: WavePlan,
-): number {
-    const dayOf = (date: Date): number => ctx.calendar.workingIndexOf(startDate, date);
-    let itemEnd = new Map<string, number>();
-    const anchorEnd = new Map<string, number>();
-    const milestoneEnd = new Map<string, number>();
-    let maxDay = 0;
-
-    // Pre-seed anchors fixed by `date:` so items that reference them get a
-    // valid end-day during the lane walk.
-    for (const anchor of resolved.content.anchors.values()) {
-        const d = parseDate(propValue(anchor.properties, 'date'));
-        if (d && anchor.name) {
-            const day = dayOf(d);
-            anchorEnd.set(anchor.name, day);
-            maxDay = Math.max(maxDay, day);
-        }
-    }
-
-    // The id maps one walk resolves `after:` against: the main lanes share
-    // the maps above; an isolated region (wave mode only) gets fresh maps.
-    interface WalkScope {
-        itemEnd: Map<string, number>;
-        anchorEnd: ReadonlyMap<string, number>;
-        milestoneEnd: ReadonlyMap<string, number>;
-        sizes: Map<string, import('./types.js').ResolvedSize>;
-    }
-    const mainScope = (): WalkScope => ({ itemEnd, anchorEnd, milestoneEnd, sizes: ctx.sizes });
-
-    // `wave` is the current barrier pass (undefined without waves); `reach`
-    // receives every lane cursor so the caller can track the content end.
-    const makeWalker = (
-        scope: WalkScope,
-        wave: WavePass | undefined,
-        reach: (day: number) => void,
-    ) => {
-        // Resolve a single `after:` element to a day-offset from `startDate`.
-        // The element is either an entity id (looked up in itemEnd /
-        // anchorEnd / milestoneEnd) or an inline ISO date literal (converted
-        // directly via `dayOf`). The validator already enforces "at
-        // most one inline date per direction", so at most one element per
-        // list will hit the date path.
-        const resolveAfterDay = (ref: string): number => {
-            const inlineDate = parseDate(ref);
-            if (inlineDate) return dayOf(inlineDate);
-            if (scope.itemEnd.has(ref)) return scope.itemEnd.get(ref)!;
-            if (scope.anchorEnd.has(ref)) return scope.anchorEnd.get(ref)!;
-            if (scope.milestoneEnd.has(ref)) return scope.milestoneEnd.get(ref)!;
-            return 0;
-        };
-
-        const walkLane = (
-            children: SwimlaneDeclaration['content'],
-            baselineEnd: number,
-        ): number => {
-            let prevEnd = baselineEnd;
-            for (const child of children) {
-                if (child.$type === 'DescriptionDirective') continue;
-                prevEnd = walkNode(child as ItemDeclaration | GroupBlock | ParallelBlock, prevEnd);
-                reach(prevEnd);
-            }
-            return prevEnd;
-        };
-
-        const walkNode = (
-            node: ItemDeclaration | GroupBlock | ParallelBlock,
-            prevEnd: number,
-        ): number => {
-            if (isItemDeclaration(node)) {
-                const dur = deriveItemDurationDays(node.properties, scope.sizes, ctx.cal);
-                const dateProp = parseDate(propValue(node.properties, 'date'));
-                const startProp = parseDate(propValue(node.properties, 'start'));
-                const afterRefs = propValues(node.properties, 'after');
-                let start = prevEnd;
-                if (dateProp) {
-                    start = dayOf(dateProp);
-                } else if (startProp) {
-                    start = dayOf(startProp);
-                } else if (afterRefs.length > 0) {
-                    start = Math.max(prevEnd, ...afterRefs.map(resolveAfterDay));
-                }
-                // The barrier floor is one more term in the max; a pin
-                // becomes max(pin, F).
-                if (wave) start = wave.apply(node, start);
-                const end = start + dur;
-                if (node.name) scope.itemEnd.set(node.name, end);
-                wave?.accumulate(node, end);
-                return end;
-            }
-            if (isParallelBlock(node)) {
-                // All children share the parallel's start; the block's
-                // effective end is the maximum child end. The parallel's own
-                // `after:` (including inline-date pins) widens that shared
-                // start, and so does its wave floor.
-                const afterRefs = propValues(node.properties, 'after');
-                let containerStart =
-                    afterRefs.length > 0
-                        ? Math.max(prevEnd, ...afterRefs.map(resolveAfterDay))
-                        : prevEnd;
-                if (wave) containerStart = wave.apply(node, containerStart);
-                let parallelEnd = containerStart;
-                for (const child of node.content) {
-                    if (child.$type === 'DescriptionDirective') continue;
-                    const childEnd = walkNode(
-                        child as ItemDeclaration | GroupBlock,
-                        containerStart,
-                    );
-                    parallelEnd = Math.max(parallelEnd, childEnd);
-                }
-                return parallelEnd;
-            }
-            if (isGroupBlock(node)) {
-                // The group's own `after:` (including inline-date pins) widens
-                // the baseline before walking the inner sequential lane, and
-                // so does its wave floor.
-                const afterRefs = propValues(node.properties, 'after');
-                let containerStart =
-                    afterRefs.length > 0
-                        ? Math.max(prevEnd, ...afterRefs.map(resolveAfterDay))
-                        : prevEnd;
-                if (wave) containerStart = wave.apply(node, containerStart);
-                return walkLane(node.content as SwimlaneDeclaration['content'], containerStart);
-            }
-            return prevEnd;
-        };
-
-        return { walkLane, resolveAfterDay };
-    };
-
-    const reachMax = (day: number): void => {
-        maxDay = Math.max(maxDay, day);
-    };
-    if (!plan) {
-        const { walkLane } = makeWalker(mainScope(), undefined, reachMax);
-        for (const lane of resolved.content.swimlanes.values()) {
-            walkLane(lane.content, 0);
-        }
-    } else {
-        const ids = plan.waves.map((w) => w.name as string);
-        let passMax = 0;
-        const reachPass = (day: number): void => {
-            passMax = Math.max(passMax, day);
-        };
-        const barrier = solveWaveBarriers(
-            ids.length,
-            0,
-            waveFloorDays(plan, startDate, ctx.calendar),
-            (S, E) => {
-                // Reset the item maps, keep the anchors, and seed each wave
-                // id with E_k so `after:<wave>` resolves to the wave's end.
-                const seeds = ids.map((id, i): [string, number] => [id, E[i]]);
-                itemEnd = new Map(seeds);
-                passMax = 0;
-                const pass = new WavePass(plan, S);
-                const { walkLane } = makeWalker(mainScope(), pass, reachPass);
-                for (const lane of resolved.content.swimlanes.values()) {
-                    walkLane(lane.content, 0);
-                }
-                // Exactly one level of isolated regions, each with fresh id
-                // maps seeded only with the wave edges (engine A's region
-                // `childCtx`). This replaces the post-hoc region recursion.
-                // In wave mode region anchors, region milestones and nested
-                // regions do not extend the window, matching engine A, which
-                // draws none of them.
-                for (const region of resolved.content.isolatedRegions) {
-                    const regionWalker = makeWalker(
-                        {
-                            itemEnd: new Map(seeds),
-                            anchorEnd: new Map(),
-                            milestoneEnd: new Map(),
-                            sizes: resolveSizes(region.content.sizes, ctx.cal),
-                        },
-                        pass,
-                        reachPass,
-                    );
-                    for (const lane of region.content.swimlanes.values()) {
-                        regionWalker.walkLane(lane.content, 0);
-                    }
-                }
-                return pass;
-            },
-        );
-        // The final pass ran with the solved S/E. The content end covers the
-        // last wave's end and every wave start, so floors and empty trailing
-        // waves stay inside the window.
-        maxDay = Math.max(maxDay, passMax, ...barrier.S, ...barrier.E.slice(-1));
-    }
-
-    // Milestones (after items so `after:` references can resolve, including
-    // wave ids to their E_k).
-    const { resolveAfterDay } = makeWalker(mainScope(), undefined, reachMax);
-    for (const ms of resolved.content.milestones.values()) {
-        const d = parseDate(propValue(ms.properties, 'date'));
-        if (d) {
-            const day = dayOf(d);
-            if (ms.name) milestoneEnd.set(ms.name, day);
-            maxDay = Math.max(maxDay, day);
-            continue;
-        }
-        const after = propValues(ms.properties, 'after');
-        if (after.length > 0) {
-            // Milestones disallow inline date literals at the validator
-            // level (rule 24a — milestones already have `date:`). The
-            // shared `resolveAfterDay` helper still handles such input
-            // gracefully if it slips past, treating the date as the
-            // milestone's effective day.
-            const day = Math.max(0, ...after.map(resolveAfterDay));
-            if (ms.name) milestoneEnd.set(ms.name, day);
-            maxDay = Math.max(maxDay, day);
-        }
-    }
-
-    // Isolated includes contribute their own content extent against the
-    // shared timeline. With waves they were walked in-pass above.
-    if (!plan) {
-        for (const region of resolved.content.isolatedRegions) {
-            const nestedMax = computeContentEndDay(
-                {
-                    config: region.config,
-                    content: region.content,
-                    diagnostics: [],
-                    processedFiles: new Set(),
-                },
-                ctx,
-                startDate,
-                undefined,
-            );
-            maxDay = Math.max(maxDay, nestedMax);
-        }
-    }
-
-    if (today) {
-        const t = dayOf(today);
-        if (t > 0) maxDay = Math.max(maxDay, t);
-    }
-
-    return maxDay;
 }
 
 function buildDependencies(
@@ -1915,10 +1606,20 @@ export function layoutRoadmap(
     resolved: ResolveResult,
     options: LayoutOptions = {},
 ): LayoutResult {
-    // The wave plan is built once and shared by engine B (the date window)
-    // and engine A (the barrier passes); undefined without waves.
-    const plan = buildWavePlan(resolved);
-    return new RoadmapNode().place(file, resolved, options, plan, {
+    // The wave plan and the day schedule (engine C) are built once per
+    // layout, unless the caller already built them for this very
+    // `ResolveResult` (specs/scheduler-unification.md §3.6). The schedule
+    // carries the plan (`schedule.plan`, undefined without waves); engine A
+    // reads it for the barrier passes and the date window is a projection of
+    // the schedule.
+    const schedule =
+        options.schedule?.resolved === resolved
+            ? options.schedule
+            : scheduleRoadmap(file, resolved, {
+                  today: options.today,
+                  plan: buildWavePlan(resolved) ?? null,
+              });
+    return new RoadmapNode().place(file, resolved, options, schedule, {
         sequenceItem,
         sequenceOne,
         resolveChildStart,

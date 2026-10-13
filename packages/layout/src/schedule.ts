@@ -1,8 +1,11 @@
 // scheduleRoadmap — compute the floating calendar start/end date for every
 // named entity (items, milestones, anchors) without running the full layout.
 //
-// The sequencing rules exactly mirror `computeContentEndDay` in `layout.ts`
-// plus the roadmap-start resolution in `RoadmapNode.place`:
+// This is the only day-level scheduler (specs/scheduler-unification.md): the
+// date window reads its content day from `extent`, and the exporters read the
+// dates. The pixel layout keeps its own placement and differs from it in the
+// catalogued ways of `test/engine-divergences.json`. The rules, with the
+// roadmap-start resolution of `RoadmapNode.place`:
 //   - date: / start:  — absolute pin (date: wins over start:)
 //   - after:[id|DATE]  — start after the maximum predecessor end
 //   - sequential default — start where the previous item in the lane ended
@@ -21,9 +24,7 @@
 // durations (handoff m2p decision 16): `calendar` is the file's resolved
 // calendar and `ScheduledItem.days` the duration engine C placed. The XLSX
 // exporter also reads the Start / End dates, the milestone dates and the
-// wave spans; the Mermaid exporter reads the wave spans. Keeping it
-// separate from `computeContentEndDay` avoids mutating the byte-stable
-// snapshot pipeline.
+// wave spans; the Mermaid exporter reads the wave spans.
 
 import type {
     GroupBlock,
@@ -31,13 +32,16 @@ import type {
     MilestoneDeclaration,
     NowlineFile,
     ParallelBlock,
+    ResolvedContent,
     ResolveResult,
     SwimlaneDeclaration,
+    WavePlan,
 } from '@nowline/core';
 import { buildWavePlan, isGroupBlock, isItemDeclaration, isParallelBlock } from '@nowline/core';
 import { deriveItemDurationDays, resolveSizes } from './calendar.js';
 import { type ResolvedCalendar, resolveWorkingCalendar } from './calendar-resolver.js';
-import { parseDate, propValue, propValues } from './dsl-utils.js';
+import { parseDate, propValue } from './dsl-utils.js';
+import { type AfterTerm, startTermsOf } from './start-terms.js';
 import { solveWaveBarriers, summarizeWaves, WavePass, waveFloorDays } from './wave-barrier.js';
 import { spanEndDate } from './working-calendar.js';
 
@@ -81,6 +85,12 @@ export interface RoadmapSchedule {
      * when the roadmap declares waves.
      */
     waves?: Map<string, ScheduledWave>;
+    /** The wave plan the schedule ran with; undefined without waves. */
+    plan?: WavePlan;
+    /** The `ResolveResult` this schedule was built from. */
+    resolved: ResolveResult;
+    /** What the date window needs (specs/scheduler-unification.md §3.3). */
+    extent: ScheduleExtent;
 }
 
 /** A wave's solved span (specs/waves.md §5.1). */
@@ -102,6 +112,23 @@ export interface ScheduledWave {
 export interface ScheduleOptions {
     /** Passed as the reference date when the roadmap omits `start:`. */
     today?: Date;
+    /**
+     * The roadmap's wave plan from `buildWavePlan(resolved)`, when the caller
+     * already built it; `null` means "built, no waves". Omitted: built here.
+     */
+    plan?: WavePlan | null;
+}
+
+/** What the date window needs from the schedule (specs/scheduler-unification.md §3.2). */
+export interface ScheduleExtent {
+    /**
+     * Latest working-day offset from `startDate` reached by any lane cursor
+     * (item ends and container starts), any dated anchor, any milestone, and,
+     * with waves, every `S_k` and `E_n`. Isolated regions count too: without
+     * waves every region at any depth with its anchors and milestones, with
+     * waves the first-level regions' lanes. `today` is not included.
+     */
+    contentEndDay: number;
 }
 
 /**
@@ -126,9 +153,15 @@ export function scheduleRoadmap(
     const endAt = (start: number, end: number): Date =>
         spanEndDate(calendar, startDate, start, end);
 
+    // The latest day any lane cursor, anchor, milestone or wave edge reaches.
+    let contentEndDay = 0;
+    const reachMax = (day: number): void => {
+        contentEndDay = Math.max(contentEndDay, day);
+    };
+
     // These maps accumulate end-day offsets (from startDate) for cross-entity
-    // `after:` resolution, matching computeContentEndDay exactly. In a
-    // roadmap with waves the item maps are rebuilt on every barrier pass.
+    // `after:` resolution. In a roadmap with waves the item maps are rebuilt on
+    // every barrier pass.
     let itemEnd = new Map<string, number>(); // id → end day
     const anchorEnd = new Map<string, number>(); // id → date day
     const milestoneEnd = new Map<string, number>(); // id → date day
@@ -145,13 +178,15 @@ export function scheduleRoadmap(
     for (const [id, anchor] of resolved.content.anchors) {
         const d = parseDate(propValue(anchor.properties, 'date'));
         if (d) {
-            anchorEnd.set(id, dayOf(d));
+            const day = dayOf(d);
+            anchorEnd.set(id, day);
             anchorResults.set(id, d);
+            reachMax(day);
         }
     }
 
     // The id maps one walk resolves `after:` against: the main lanes share
-    // the maps above; an isolated region (wave mode only) gets fresh maps.
+    // the maps above; an isolated region gets fresh maps.
     interface WalkScope {
         itemEnd: Map<string, number>;
         anchorEnd: ReadonlyMap<string, number>;
@@ -159,15 +194,30 @@ export function scheduleRoadmap(
         sizes: typeof sizes;
         /** Id-keyed results; omitted for a region, whose ids stay invisible. */
         itemResults?: Map<string, ScheduledItem>;
+        /** False for a nested region: its items count in the extent only. */
+        inByNode: boolean;
     }
-    const mainScope = (): WalkScope => ({ itemEnd, anchorEnd, milestoneEnd, sizes, itemResults });
+    const mainScope = (): WalkScope => ({
+        itemEnd,
+        anchorEnd,
+        milestoneEnd,
+        sizes,
+        itemResults,
+        inByNode: true,
+    });
 
-    // `wave` is the current barrier pass, undefined when there are no waves.
-    const makeWalker = (scope: WalkScope, wave: WavePass | undefined) => {
+    // `wave` is the current barrier pass, undefined when there are no waves;
+    // `reach` receives every lane cursor, so a container start that passes
+    // every child (an empty `group after:x`) still counts in the extent.
+    const makeWalker = (
+        scope: WalkScope,
+        wave: WavePass | undefined,
+        reach: (day: number) => void,
+    ) => {
         // Resolve a single `after:` element to a day-offset.
-        const resolveAfterDay = (ref: string): number => {
-            const inlineDate = parseDate(ref);
-            if (inlineDate) return dayOf(inlineDate);
+        const resolveAfterDay = (term: AfterTerm): number => {
+            if ('date' in term) return dayOf(term.date);
+            const ref = term.ref;
             if (scope.itemEnd.has(ref)) return scope.itemEnd.get(ref)!;
             if (scope.anchorEnd.has(ref)) return scope.anchorEnd.get(ref)!;
             if (scope.milestoneEnd.has(ref)) return scope.milestoneEnd.get(ref)!;
@@ -183,6 +233,7 @@ export function scheduleRoadmap(
             for (const child of children) {
                 if (child.$type === 'DescriptionDirective') continue;
                 prevEnd = walkNode(child as ItemDeclaration | GroupBlock | ParallelBlock, prevEnd);
+                reach(prevEnd);
             }
             return prevEnd;
         };
@@ -193,16 +244,12 @@ export function scheduleRoadmap(
         ): number => {
             if (isItemDeclaration(node)) {
                 const dur = deriveItemDurationDays(node.properties, scope.sizes, cal);
-                const dateProp = parseDate(propValue(node.properties, 'date'));
-                const startProp = parseDate(propValue(node.properties, 'start'));
-                const afterRefs = propValues(node.properties, 'after');
+                const { pin, after } = startTermsOf(node.properties);
                 let start = prevEnd;
-                if (dateProp) {
-                    start = dayOf(dateProp);
-                } else if (startProp) {
-                    start = dayOf(startProp);
-                } else if (afterRefs.length > 0) {
-                    start = Math.max(prevEnd, ...afterRefs.map(resolveAfterDay));
+                if (pin) {
+                    start = dayOf(pin.date);
+                } else if (after.length > 0) {
+                    start = Math.max(prevEnd, ...after.map(resolveAfterDay));
                 }
                 // The barrier floor is one more term in the max; a pin
                 // becomes max(pin, F).
@@ -213,7 +260,7 @@ export function scheduleRoadmap(
                     end: endAt(start, end),
                     days: dur,
                 };
-                itemByNode.set(node, scheduled);
+                if (scope.inByNode) itemByNode.set(node, scheduled);
                 if (node.name) {
                     scope.itemEnd.set(node.name, end);
                     scope.itemResults?.set(node.name, scheduled);
@@ -222,11 +269,9 @@ export function scheduleRoadmap(
                 return end;
             }
             if (isParallelBlock(node)) {
-                const afterRefs = propValues(node.properties, 'after');
+                const { after } = startTermsOf(node.properties);
                 let containerStart =
-                    afterRefs.length > 0
-                        ? Math.max(prevEnd, ...afterRefs.map(resolveAfterDay))
-                        : prevEnd;
+                    after.length > 0 ? Math.max(prevEnd, ...after.map(resolveAfterDay)) : prevEnd;
                 if (wave) containerStart = wave.apply(node, containerStart);
                 let parallelEnd = containerStart;
                 for (const child of node.content) {
@@ -240,11 +285,9 @@ export function scheduleRoadmap(
                 return parallelEnd;
             }
             if (isGroupBlock(node)) {
-                const afterRefs = propValues(node.properties, 'after');
+                const { after } = startTermsOf(node.properties);
                 let containerStart =
-                    afterRefs.length > 0
-                        ? Math.max(prevEnd, ...afterRefs.map(resolveAfterDay))
-                        : prevEnd;
+                    after.length > 0 ? Math.max(prevEnd, ...after.map(resolveAfterDay)) : prevEnd;
                 if (wave) containerStart = wave.apply(node, containerStart);
                 return walkLane(node.content as SwimlaneDeclaration['content'], containerStart);
             }
@@ -254,10 +297,60 @@ export function scheduleRoadmap(
         return { walkLane, resolveAfterDay };
     };
 
-    const plan = buildWavePlan(resolved);
+    // A milestone is a point: its `date:`, else its latest predecessor end.
+    // Returns the day, or undefined when it has neither.
+    const milestoneDay = (
+        ms: MilestoneDeclaration,
+        resolveAfterDay: (term: AfterTerm) => number,
+    ): number | undefined => {
+        const d = parseDate(propValue(ms.properties, 'date'));
+        if (d) return dayOf(d);
+        const { after } = startTermsOf(ms.properties);
+        return after.length > 0 ? Math.max(0, ...after.map(resolveAfterDay)) : undefined;
+    };
+
+    // An isolated region in a roadmap without waves: fresh id maps, its own
+    // sizes (specs/scheduler-unification.md §8, decision 2), its anchors and
+    // milestones (resolved inside the region and counted in the extent, never
+    // in the results) and its nested regions.
+    // First-level region items join `byNode`; their ids stay out of `items`.
+    const scheduleRegion = (content: ResolvedContent, firstLevel: boolean): void => {
+        const regionItemEnd = new Map<string, number>();
+        const regionAnchorEnd = new Map<string, number>();
+        const regionMilestoneEnd = new Map<string, number>();
+        for (const [id, anchor] of content.anchors) {
+            const d = parseDate(propValue(anchor.properties, 'date'));
+            if (d) {
+                const day = dayOf(d);
+                regionAnchorEnd.set(id, day);
+                reachMax(day);
+            }
+        }
+        const { walkLane, resolveAfterDay } = makeWalker(
+            {
+                itemEnd: regionItemEnd,
+                anchorEnd: regionAnchorEnd,
+                milestoneEnd: regionMilestoneEnd,
+                sizes: resolveSizes(content.sizes, cal),
+                inByNode: firstLevel,
+            },
+            undefined,
+            reachMax,
+        );
+        for (const lane of content.swimlanes.values()) walkLane(lane.content, 0);
+        for (const [id, ms] of content.milestones) {
+            const day = milestoneDay(ms, resolveAfterDay);
+            if (day === undefined) continue;
+            regionMilestoneEnd.set(id, day);
+            reachMax(day);
+        }
+        for (const nested of content.isolatedRegions) scheduleRegion(nested.content, false);
+    };
+
+    const plan = options.plan !== undefined ? (options.plan ?? undefined) : buildWavePlan(resolved);
     let waves: Map<string, ScheduledWave> | undefined;
     if (!plan) {
-        const { walkLane } = makeWalker(mainScope(), undefined);
+        const { walkLane } = makeWalker(mainScope(), undefined, reachMax);
         for (const lane of resolved.content.swimlanes.values()) {
             walkLane(lane.content, 0);
         }
@@ -267,6 +360,11 @@ export function scheduleRoadmap(
         const ids = plan.waves.map((w) => w.name as string);
         const floors = waveFloorDays(plan, startDate, calendar);
         let finalPass: WavePass | undefined;
+        // The extent of the latest pass; the final one ran with the solved S/E.
+        let passMax = 0;
+        const reachPass = (day: number): void => {
+            passMax = Math.max(passMax, day);
+        };
         const result = solveWaveBarriers(ids.length, 0, floors, (S, E) => {
             // Reset the item maps, keep the anchors, and seed each wave id
             // with E_k so `after:<wave>` resolves to the wave's end.
@@ -274,14 +372,17 @@ export function scheduleRoadmap(
             itemEnd = new Map(seeds);
             itemResults = new Map();
             itemByNode = new WeakMap();
+            passMax = 0;
             const pass = new WavePass(plan, S);
-            const { walkLane } = makeWalker(mainScope(), pass);
+            const { walkLane } = makeWalker(mainScope(), pass, reachPass);
             for (const lane of resolved.content.swimlanes.values()) {
                 walkLane(lane.content, 0);
             }
             // Exactly one level of isolated regions, each with fresh id maps
             // seeded only with the wave edges. Region items join the barrier
-            // and `byNode`; their ids stay out of `items`.
+            // and `byNode`; their ids stay out of `items`. Region anchors,
+            // region milestones and nested regions are not walked: engine A
+            // draws none of them.
             for (const region of resolved.content.isolatedRegions) {
                 const regionWalker = makeWalker(
                     {
@@ -289,8 +390,10 @@ export function scheduleRoadmap(
                         anchorEnd: new Map(),
                         milestoneEnd: new Map(),
                         sizes: resolveSizes(region.content.sizes, cal),
+                        inByNode: true,
                     },
                     pass,
+                    reachPass,
                 );
                 for (const lane of region.content.swimlanes.values()) {
                     regionWalker.walkLane(lane.content, 0);
@@ -299,6 +402,9 @@ export function scheduleRoadmap(
             finalPass = pass;
             return pass;
         });
+        // The content end covers the last wave's end and every wave start,
+        // so floors and empty trailing waves stay inside the window.
+        reachMax(Math.max(passMax, ...result.S, ...result.E.slice(-1)));
         waves = new Map();
         for (const span of summarizeWaves(plan, result, finalPass!, 0, floors)) {
             waves.set(span.id, {
@@ -312,25 +418,25 @@ export function scheduleRoadmap(
         }
     }
 
-    // Milestones — same pass order as computeContentEndDay (after items so
-    // after: can resolve item end-days, and wave ids their E_k).
-    const { resolveAfterDay } = makeWalker(mainScope(), undefined);
+    // Milestones, after the items so after: can resolve item end-days, and
+    // wave ids their E_k.
+    const { resolveAfterDay } = makeWalker(mainScope(), undefined, reachMax);
     for (const [id, ms] of resolved.content.milestones) {
-        const d = parseDate(propValue(ms.properties, 'date'));
-        if (d) {
-            milestoneEnd.set(id, dayOf(d));
-            milestoneResults.set(id, d);
-            milestoneByNode.set(ms, d);
-            continue;
-        }
-        const after = propValues(ms.properties, 'after');
-        if (after.length > 0) {
-            // A point at the latest predecessor end: the next working day.
-            const day = Math.max(0, ...after.map(resolveAfterDay));
-            const resolved2 = pointAt(day);
-            milestoneEnd.set(id, day);
-            milestoneResults.set(id, resolved2);
-            milestoneByNode.set(ms, resolved2);
+        const day = milestoneDay(ms, resolveAfterDay);
+        if (day === undefined) continue;
+        // A dated milestone keeps its own date; an after-only one is a point
+        // at the latest predecessor end: the next working day.
+        const date = parseDate(propValue(ms.properties, 'date')) ?? pointAt(day);
+        milestoneEnd.set(id, day);
+        milestoneResults.set(id, date);
+        milestoneByNode.set(ms, date);
+        reachMax(day);
+    }
+
+    // Isolated regions without waves (with waves they joined the passes).
+    if (!plan) {
+        for (const region of resolved.content.isolatedRegions) {
+            scheduleRegion(region.content, true);
         }
     }
 
@@ -343,6 +449,9 @@ export function scheduleRoadmap(
         milestoneByNode,
         anchors: anchorResults,
         ...(waves ? { waves } : {}),
+        ...(plan ? { plan } : {}),
+        resolved,
+        extent: { contentEndDay },
     };
 }
 

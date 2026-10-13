@@ -202,6 +202,37 @@ swimlane s "S"
     });
 });
 
+describe('scheduleRoadmap — start: pins', () => {
+    // Layout's pixel expectations for the same sources are in layout.test.ts.
+    it('honours start: on an item that is a direct parallel track', async () => {
+        const sched = await buildSchedule(
+            `nowline v1
+roadmap r "R" start:2026-01-05 scale:1w
+swimlane s "S"
+  parallel
+    item a "A" duration:2w
+    item b "B" duration:1w start:2026-01-12
+`,
+            PINNED,
+        );
+        expect(sched.items.get('a')!.start.toISOString().slice(0, 10)).toBe('2026-01-05');
+        expect(sched.items.get('b')!.start.toISOString().slice(0, 10)).toBe('2026-01-12');
+    });
+
+    it('lets start: win over after: on a lane item', async () => {
+        const sched = await buildSchedule(
+            `nowline v1
+roadmap r "R" start:2026-01-05 scale:1w
+swimlane s "S"
+  item a "A" duration:3w
+  item b "B" duration:1w start:2026-01-12 after:a
+`,
+            PINNED,
+        );
+        expect(sched.items.get('b')!.start.toISOString().slice(0, 10)).toBe('2026-01-12');
+    });
+});
+
 describe('scheduleRoadmap — milestones', () => {
     it('date-pinned milestone resolves to its date:', async () => {
         const sched = await buildSchedule(
@@ -539,6 +570,30 @@ swimlane infra
         });
     });
 
+    it('Example 3 without docs: w2 ends at W5', async () => {
+        const { sched } = await buildWaveSchedule(`nowline v1
+
+roadmap background "Background work" start:2026-01-05 scale:1w
+
+wave w1 "Foundations"
+wave w2 "Rollout"
+
+swimlane core
+  item schema duration:2w wave:w1
+  item migrate duration:2w wave:w2
+swimlane ops
+  item oncall "On-call rotation" duration:6w
+swimlane infra
+  item infra-prep duration:3w wave:w1
+  item cutover duration:1w wave:w2
+`);
+        expectItems(sched, BUSINESS_WEEK, { migrate: [3, 5], cutover: [3, 4] });
+        expectWaves(sched, BUSINESS_WEEK, {
+            w1: { span: [0, 3], members: 2, heldBy: 'infra-prep' },
+            w2: { span: [3, 5], members: 2, heldBy: 'migrate' },
+        });
+    });
+
     it('Example 4: parallel tracks in different waves', async () => {
         const { sched } = await buildWaveSchedule(`nowline v1
 
@@ -634,6 +689,29 @@ swimlane frontend
         });
     });
 
+    it('Example 6 without the dependency: w1 closes at W2 and the later wave moves up', async () => {
+        const { sched } = await buildWaveSchedule(`nowline v1
+
+roadmap same-wave "Same-wave dependency" start:2026-01-05 scale:1w
+
+wave w1 "Wave 1"
+wave w2 "Wave 2"
+
+swimlane backend
+  item schema duration:2w wave:w1
+  item api duration:3w wave:w2
+swimlane frontend
+  item mocks duration:1w wave:w1
+  item forms duration:1w wave:w1
+  item wire-up duration:2w wave:w2 after:api
+`);
+        expectItems(sched, BUSINESS_WEEK, { api: [2, 5], 'wire-up': [5, 7] });
+        expectWaves(sched, BUSINESS_WEEK, {
+            w1: { span: [0, 2], members: 3, heldBy: 'schema' },
+            w2: { span: [2, 7], members: 2, heldBy: 'wire-up' },
+        });
+    });
+
     it('Example 8: after:<wave> on background work and milestones', async () => {
         const { sched } = await buildWaveSchedule(`nowline v1
 
@@ -696,6 +774,9 @@ swimlane apps
             w1: { span: [0, 4], members: 2, heldBy: 'i1' },
             w2: { span: [4, 7], members: 2, heldBy: 'i2' },
         });
+        const w1 = sched.waves?.get('w1');
+        expect(w1?.start.toISOString().slice(0, 10)).toBe('2026-01-05');
+        expect(w1?.end.toISOString().slice(0, 10)).toBe('2026-02-02');
         const w2 = sched.waves?.get('w2');
         expect(w2?.start.toISOString().slice(0, 10)).toBe('2026-02-02');
         expect(w2?.end.toISOString().slice(0, 10)).toBe('2026-02-23');
@@ -748,6 +829,23 @@ swimlane api
         });
     });
 
+    it('Example 10 without waves: web-b runs W2-W4 and meets the freeze', async () => {
+        const { sched } = await buildWaveSchedule(`nowline v1
+
+roadmap deadline "Deadline vs barrier" start:2026-01-05 scale:1w calendar:full
+
+anchor freeze "Code freeze" date:2026-02-16
+
+swimlane web
+  item web-a duration:2w
+  item web-b duration:2w before:freeze
+swimlane api
+  item api-a duration:5w
+`);
+        expect('waves' in sched).toBe(false);
+        expectItems(sched, FULL_WEEK, { 'web-a': [0, 2], 'web-b': [2, 4], 'api-a': [0, 5] });
+    });
+
     it('Example 11: a start floor opens a gap; a dated milestone stays pinned', async () => {
         const { sched } = await buildWaveSchedule(`nowline v1
 
@@ -779,6 +877,34 @@ milestone exec-done "Execute complete" date:2026-03-16 after:execute
         });
         expect(sched.waves?.get('execute')?.end.toISOString().slice(0, 10)).toBe('2026-03-23');
         expect(sched.milestones.get('exec-done')?.toISOString().slice(0, 10)).toBe('2026-03-16');
+    });
+
+    it('Example 11 without the floor: execute is [W3, W10] and the milestone is met', async () => {
+        const { sched } = await buildWaveSchedule(`nowline v1
+
+roadmap budget-floor "Budget-held rollout" start:2026-01-05 scale:1w calendar:full
+
+anchor fy-budget "FY budget release" date:2026-02-02
+
+wave plan "Plan"
+wave execute "Execute"
+
+swimlane a
+  item a1 duration:2w wave:plan
+  item a2 duration:5w wave:execute
+swimlane b
+  item b1 duration:3w wave:plan
+  item b2 duration:7w wave:execute
+
+milestone exec-done "Execute complete" date:2026-03-16 after:execute
+`);
+        expectItems(sched, FULL_WEEK, { a2: [3, 8], b2: [3, 10] });
+        expectWaves(sched, FULL_WEEK, {
+            plan: { span: [0, 3], members: 2, heldBy: 'b1' },
+            execute: { span: [3, 10], members: 2, heldBy: 'b2' },
+        });
+        // exec-done sits at W10 (2026-03-16) and the wave ends there, so it is met.
+        expect(weeks(sched, sched.milestones.get('exec-done')!, FULL_WEEK)).toBe(10);
     });
 
     it('Example 12: an empty wave has zero width and no holder', async () => {
@@ -1004,6 +1130,96 @@ swimlane backend
             w1: { span: [0, 2], members: 2, heldBy: 'schema' },
             w2: { span: [2, 5], members: 2, heldBy: 'api' },
         });
+    });
+
+    it('Example 7 fix: moving backend above frontend gives the Example 6 dates', async () => {
+        const { sched } = await buildWaveSchedule(`nowline v1
+
+roadmap lane-order "Lane order" start:2026-01-05 scale:1w
+
+wave w1 "Wave 1"
+wave w2 "Wave 2"
+
+swimlane backend
+  item schema duration:2w wave:w1
+  item api duration:3w wave:w2
+swimlane frontend
+  item mocks duration:1w wave:w1
+  item forms duration:1w wave:w1 after:schema
+  item wire-up duration:2w wave:w2 after:api
+`);
+        expectItems(sched, BUSINESS_WEEK, {
+            forms: [2, 3],
+            api: [3, 6],
+            'wire-up': [6, 8],
+        });
+        expectWaves(sched, BUSINESS_WEEK, {
+            w1: { span: [0, 3], members: 3, heldBy: 'forms' },
+            w2: { span: [3, 8], members: 2, heldBy: 'wire-up' },
+        });
+    });
+
+    // Example 13's two fixes leave zero diagnostics and give the same schedule.
+    const EXAMPLE_13_FIX_SCHEDULE = {
+        items: { a2: [0, 1], a3: [1, 2], a1: [2, 4] } as Record<string, [number, number]>,
+        waves: {
+            w1: { span: [0, 2], members: 2, heldBy: 'a3' },
+            w2: { span: [2, 4], members: 1, heldBy: 'a1' },
+        } as Record<string, WaveRow>,
+    };
+
+    it('Example 13 fix 1: moving a1 below a3 schedules a2, a3, a1 in order', async () => {
+        const { sched } = await buildWaveSchedule(`nowline v1
+
+roadmap order "Order" start:2026-01-05 scale:1w
+
+wave w1 "Wave 1"
+wave w2 "Wave 2"
+
+swimlane a
+  item a2 duration:1w wave:w1
+  item a3 duration:1w wave:w1
+  item a1 duration:2w wave:w2
+`);
+        expectItems(sched, BUSINESS_WEEK, EXAMPLE_13_FIX_SCHEDULE.items);
+        expectWaves(sched, BUSINESS_WEEK, EXAMPLE_13_FIX_SCHEDULE.waves);
+    });
+
+    it('Example 13 fix 2: a1 in a parallel track beside a group of a2 and a3', async () => {
+        const { sched } = await buildWaveSchedule(`nowline v1
+
+roadmap order "Order" start:2026-01-05 scale:1w
+
+wave w1 "Wave 1"
+wave w2 "Wave 2"
+
+swimlane a
+  parallel
+    item a1 duration:2w wave:w2
+    group
+      item a2 duration:1w wave:w1
+      item a3 duration:1w wave:w1
+`);
+        expectItems(sched, BUSINESS_WEEK, EXAMPLE_13_FIX_SCHEDULE.items);
+        expectWaves(sched, BUSINESS_WEEK, EXAMPLE_13_FIX_SCHEDULE.waves);
+    });
+
+    it('Example 15 fix: review below b1 runs W4-W5 as background work', async () => {
+        const { sched } = await buildWaveSchedule(`nowline v1
+
+roadmap hidden "Hidden chain" start:2026-01-05 scale:1w
+
+wave w1 "Wave 1"
+wave w2 "Wave 2"
+
+swimlane a
+  item a1 duration:2w wave:w1
+  item a2 duration:2w wave:w2
+swimlane b
+  item b1 duration:1w wave:w1
+  item review "Vendor review" duration:1w after:a2
+`);
+        expectItems(sched, BUSINESS_WEEK, { b1: [0, 1], review: [4, 5] });
     });
 
     it('a dated milestone can be a wave floor', async () => {

@@ -1,8 +1,7 @@
 // Wave barriers (specs/waves.md §5.1, §8.2-§8.5).
 //
-// One unit-agnostic driver serves the three schedulers: engine A (pixel
-// layout), engine B (`computeContentEndDay`, days) and engine C
-// (`scheduleRoadmap`, days). Each engine wraps its existing lane walk in a
+// One unit-agnostic driver serves both schedulers: engine A (pixel layout)
+// and engine C (`scheduleRoadmap`, days). Each wraps its lane walk in a
 // `runPass(S, E)` callback that floors starts by the barrier and reports the
 // latest member end per wave; the driver iterates to the least fixpoint.
 //
@@ -11,7 +10,7 @@
 // `floors` and `memberEnd`.
 
 import type { GroupBlock, ItemDeclaration, ParallelBlock, WavePlan } from '@nowline/core';
-import { parseDate } from './dsl-utils.js';
+import { waveFloorDates } from './start-terms.js';
 import type { WorkingCalendar } from './working-calendar.js';
 
 /** A node the walkers floor: a leaf item or a container. */
@@ -106,15 +105,12 @@ export function waveFloorDays(
     startDate: Date,
     calendar: WorkingCalendar,
 ): Array<number | null> {
-    return plan.floors.map((f) => {
-        const d = f ? parseDate(f.date) : null;
-        return d ? calendar.workingIndexOf(startDate, d) : null;
-    });
+    return waveFloorDates(plan).map((d) => (d ? calendar.workingIndexOf(startDate, d) : null));
 }
 
 /**
- * Per-pass wave state for the day engines (B and C): the floor of a node and
- * the member-end accumulator. One instance per pass.
+ * Per-pass wave state, in the caller's units (days for engine C, px for engine
+ * A): the floor of a node and the member-end accumulator. One instance per pass.
  */
 export class WavePass {
     /** Latest member end per wave (0-based); `-Infinity` when the wave has no member. */
