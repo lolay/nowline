@@ -8,7 +8,7 @@ last commit before the PR merges.
 
 - Repo `lolay/nowline`, branch `claude/serene-archimedes-ida865` (assigned by
   the cloud session; task branch). Started on it; nothing cut.
-- Mode: pending. Proposed unattended (harness=claude-code runner=cloud).
+- Mode: unattended, confirmed 2026-10-13 by Gary in session 3d92f75d (harness=claude-code runner=cloud).
 - Guard: 3x the Cost table Total, min $50 (about $66). Fix-up cap 2 per group.
 
 ## Done
@@ -29,16 +29,14 @@ None yet.
 
 Wave 1 [deep] nowline m1 s1 (add the schema to `@nowline/config`).
 
-## Pending question (verbatim)
+## Pending question
 
-The kickoff question, asked in chat on 2026-10-13, ending
-`Proposed mode: unattended.` and `Reply unattended or gated.`
+None. Kickoff answered `unattended`. Halted for Gary's `/compact` before
+any dispatch.
 
 ## How to resume
 
-Gary will `/compact` after answering. Resume by pasting the plan's Kickoff
-prompt. If Status still shows `BLOCKED at gate mode`, re-post the kickoff
-question and wait.
+Paste the plan's Kickoff prompt.
 
 ## Decisions so far
 
