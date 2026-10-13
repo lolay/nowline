@@ -1,7 +1,7 @@
 ```
 --- KICKOFF: begin orchestration at [deep] ---
 
-  Status: 8/10 groups done | last review: wave-6 PASS | current: nowline m6 s1-s2 [deep] | updated 2026-10-13 | passed unattended: gate 4 before wave 6 (m5) | over expected: ~$49.29 of ~$46
+  Status: 9/10 groups done | last review: wave-6 PASS | current: nowline m6 s3 [exec] | updated 2026-10-13 | passed unattended: gate 4 before wave 6 (m6) | over expected: ~$56.34 of ~$46
 
   mode: unattended | proposed unattended (harness=claude-code runner=cloud; CLAUDE_CODE_REMOTE=true, assigned branch) | guard 3x min $50 | fixups 2 | confirmed 2026-10-13 session 7e027fcc-1ca6-51b0-b005-63e1163df819 by Kickoff prompt: Run in unattended mode.
 
@@ -164,11 +164,11 @@ Add `phases/finalize.ts`: `FinalizeContext`, `CanvasExtent` with `grow`/`freeze`
 
 ## m6 - After the phases
 
-#### s1 - [deep] *Behaviour:* reserve the now-pill row on an extended axis
+#### s1 - [deep] *Behaviour:* reserve the now-pill row on an extended axis (done)
 
 L2 (spec §1.3, §8 decision 2). First reproduce it on the current code: `examples/platform-2026.nowline` with `length:1w` added and `--now 2026-03-17` should lay out with `pillRowHeight` 0 and the pill on the tick panel's y. If R1 already changed this repro, find one that still hits L2 and say so in the commit body. Then f7 becomes `growHeaderRows` in full: when f2 brought `today` into the axis and the pill row is 0, the header rows grow by `NOW_PILL_HEIGHT_PX` above the tick panel, so the tick panel, wave strip, marker band and chart move down together, in the same shift as the marker-band growth; the new timeline y follows the beside-card rule rather than adding the height blindly. Regression test from the repro (fails on the base). Fragment: create `.changelog/layout-phases.txt` with one `release-note:fixed` block describing L2 in the style of the existing fragments. G1 and G3 against the default base: empty (no sample changes). G2.
 
-#### s2 - [deep] *Behaviour:* beside card hugs the grown header rows
+#### s2 - [deep] *Behaviour:* beside card hugs the grown header rows (done)
 
 F1 (spec §5, §8 decision 3). f15 passes the final header-rows bottom, after f7 (so it also covers s1's pill row), instead of `estimatedRowsBottomY`, which goes away. Expected changes: the renders of `examples/dependencies`, `tests/late-row-shifts` and `tests/marker-left-overflow` in all three themes; the layout snapshots `dependencies.svg` and `marker-left-overflow.svg` under `packages/integration-tests/test/__snapshots__/`; and the `dependencies` cells of the determinism goldens. Re-measure before committing (R1's F1 changed `late-row-shifts`): run the gate with `--expect` listing the nine SVG renders, and if the changed set of renders, snapshots or golden cells differs from this list, return `needs_info` with the actual set instead of committing. Update only those snapshots and golden cells, confirm in each changed render that the card bottom equals the header rows' bottom, add a regression test (fails on the base), and append a `release-note:fixed` block to `.changelog/layout-phases.txt`. The commit body names every changed render, snapshot and golden cell. G2 after the deliberate update.
 
@@ -196,6 +196,7 @@ review wave-5 (nowline m3 s1-s2) bb92ae0..1dd90a6: PASS - createLayoutContext pe
 review wave-6 (nowline m3 s3) cb898b5..3112f70: PASS - reviewer re-ran the gate script vs 9c71cbb: GATES PASSED; N2 lane width 0 at placement (P9 overwrites), N4 no region fit at placement, N7 MilestonePlacement + positionMilestones at P11 with the old key order and shared slackArrows arrays; chartRightX gone from LayoutContext, private CanvasExtent grown at P3/P7/P8; buildNowline, buildWaveLegend, buildFootnotePanel take chartRightX; estimatedCenterY kept as a named stale read (§3.10 rule 4); new placement-canvas tests fail on the base; passed unattended: gate 2 - 2026-10-13
 review wave-6 (nowline m4 s1-s2) af7a82e..bc8e31d: PASS - HeaderNode/MeasuredHeader/HeaderFrame/PositionedHeaderParts per §3.7; sizeBesideHeader, HEADER_CARD_OUTER_PAD, HEADER_CARD_TOP_INSET moved verbatim; timelineY operands unchanged; provisional header box dropped (every path overwrote it, named in the body); key order kept, attributionBox added last; estimatedRowsBottomY rename for L1; header tests 69 pass, tsc clean; G1/G3 empty per worker; passed unattended: gate 4 - 2026-10-13
 review wave-6 (nowline m5 s1-s5) dad67df..56d00f7: PASS - reviewer re-ran the gate script vs 9c71cbb: GATES PASSED, layout vitest 1282 pass, lint 9 pre-existing warnings; f2-f16 match old P7-P20 at dad67df; moved bodies verbatim (diff -w) apart from export and N5; order check and four guard tests present; coverage register over 60 samples, §1.2 deltas listed in the m5.s4 body (f1 29/26, f2 7/6, f4 35/32 from R1's F1; f6 7/9 by definition); sequenceItem in nodes/sequence-item.ts to avoid an import cycle; minor: module-level setFinalizeTrace, readdir sample list, boolean FinalizeStep.run, CanvasExtent.provisional; passed unattended: gate 4 - 2026-10-13
+review wave-6 (nowline m6 s1-s2) ab6488c..c064e10: PASS - L2 reproduced on the base (pillRowHeight 0, pillTopY = tickPanelY = 8) and fixed (pill row 16, rows and chart shift by 16); shared headerRowsTimelineY beside-card rule; f5 packs the marker band at its final top (deviation in mechanism, same outcome); F1: estimatedRowsBottomY gone, f15 reads the guarded rowsBottom slot; gate with --expect showed exactly the nine declared renders, snapshots dependencies.svg and marker-left-overflow.svg, dependencies svg/html/png/pdf golden cells; card bottoms 74->100 and 100->126 equal the rows bottom; layout vitest 1292 pass, snapshot 52 pass, lint 9 warnings, bundle 199.86 KB of 200; passed unattended: gate 4 - 2026-10-13
 
 ## Token log
 
@@ -231,3 +232,6 @@ tokens review-wave-6 nowline-m4-s1-s2 (claude-opus-5-5): input ~20 / cache read 
 tokens orchestrator-wave-6 nowline-m4-s1-s2 (claude-opus-5-5): input ~10 / cache read ~1.1M / cache write ~0 5m + ~23k 1h / output ~12k | ~$0.64 API-equiv
 tokens wave-6 nowline-m5-s1-s5 (claude-opus-5-5): input ~240 / cache read ~33M / cache write ~1M / output ~120k | ~$14.33 API-equiv (output est.) session 7e027fcc-1ca6-51b0-b005-63e1163df819
 tokens review-wave-6 nowline-m5-s1-s5 (claude-opus-5-5): input ~76 / cache read ~3.5M / cache write ~140k / output ~36k | ~$2.12 API-equiv (output est.) session 7e027fcc-1ca6-51b0-b005-63e1163df819
+tokens orchestrator-wave-6 nowline-m5-s1-s5 (claude-opus-5-5): input ~26 / cache read ~3.4M / cache write ~0 5m + ~35k 1h / output ~17k | ~$1.32 API-equiv
+tokens wave-6 nowline-m6-s1-s2 (claude-opus-5-5): input ~130 / cache read ~10M / cache write ~220k / output ~65k | ~$4.42 API-equiv (output est.) session 7e027fcc-1ca6-51b0-b005-63e1163df819
+tokens review-wave-6 nowline-m6-s1-s2 (claude-opus-5-5): input ~62 / cache read ~1.7M / cache write ~76k / output ~29k | ~$1.32 API-equiv (output est.) session 7e027fcc-1ca6-51b0-b005-63e1163df819
