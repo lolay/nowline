@@ -1,7 +1,7 @@
 ```text
 --- KICKOFF: begin orchestration at [deep] ---
 
-  Status: 2/4 groups done | last review: wave-1 PASS | current: nowline m3 s1-s3 [deep] | passed unattended: gate-4 (m2) | updated 2026-10-13
+  Status: 3/4 groups done | last review: wave-2 CONCERNS | current: nowline m3 s1-s3 [deep] fix-up 2-fix | passed unattended: gate-4 (m2), gate-4 (m3), gate-2 | updated 2026-10-13
 
   mode: unattended | proposed unattended (harness=claude-code runner=cloud; CLAUDE_CODE_REMOTE=true, assigned branch) | guard 3x min $50 | fixups 2 | confirmed 2026-10-13 session 8c78f794-2944-59bb-8116-4413104e9100 by Kickoff prompt: Run in unattended mode.
 
@@ -145,15 +145,15 @@ Acceptance: `npx --yes renovate-config-validator .github/renovate-shared.json` p
 
 Each step writes one design spec in `specs/` (lowercase-kebab name, no `-spec` suffix) and changes no code and no other file. Read `specs/handoffs/review-since-v086-lantern.md` (written in m1.s1) first. Each spec has: Problem (with evidence as file:line at HEAD), Goals and non-goals, Design, a migration plan as milestones `m1..` with steps `s1..`, each independently mergeable and gated on byte-identical renders of every `examples/` and `tests/*.nowline` sample, Test strategy, Risks, and Open questions for Gary. Name a proposed milestone ID but don't edit `specs/milestones.md`. No changelog fragment.
 
-#### s1 - [deep] Spec R1: one day-level scheduler
+#### s1 - [deep] Spec R1: one day-level scheduler (done)
 
 Write `specs/scheduler-unification.md` for R1. Cover how engines A (`sequenceItem`, `resolvePinnedOrSequentialStart`, `wave-layout.ts`), B (`computeContentEndDay`, `layout.ts:1469-1715`) and C (`scheduleRoadmap`, `schedule.ts`) differ today, which one becomes canonical and why, how the date window and pixel placement derive from it, how `wave-barrier.ts`'s fixpoint is shared, how the wave plan and schedule reach exporters once through `ExportInputs` (`packages/export-core`), and how the A=B=C agreement tests (`packages/layout/test/waves.test.ts`, `layout.test.ts`) are replaced.
 
-#### s2 - [deep] Spec R3: core AST, style and calendar utilities
+#### s2 - [deep] Spec R3: core AST, style and calendar utilities (done)
 
 Write `specs/core-ast-utilities.md` for R3: the `ast-walk.ts` module and its API (replacing the walks in `waves.ts`, `include-waves.ts`, the validator's `registerEntity`/`collectReferenceableIds`/`visitPropertiesDeep`, and LSP `ast-utils.ts`), removing the `include-resolver` to validator import, the style-precedence chain moved into core and consumed by layout's `style-resolution.ts` and NL.W0704, one calendar-declaration classifier shared by the validator, `layout/src/calendar-resolver.ts` and LSP hover, the validator split into per-feature modules, and the consolidation of `DATE_RE`/`propKey`/`stripColon` copies.
 
-#### s3 - [deep] Spec R4: shared surface options and one staging function
+#### s3 - [deep] Spec R4: shared surface options and one staging function (done)
 
 Write `specs/surface-options.md` for R4: an options schema in `packages/config` (theme, width, now, page-size, non-working; one `.nowlinerc` merge replacing the per-field code in `cli/src/commands/render.ts`) consumed by the CLI, `--serve`, MCP and the VS Code extension; one staging function (parse, resolve includes, load assets such as the logo, layout) used by the export kernel, `packages/browser/src/pipeline.ts`, `--serve` and MCP layout insights, so `--serve` stops ignoring `--width`/`--no-links`/`--strict` and the logo is read once. Resolve the `now` default (UTC in MCP, local in the CLI) as an open question with a recommendation.
 
@@ -167,6 +167,7 @@ Write `specs/layout-phases.md` for R2, building on `specs/rendering-v2.md` (m2.5
 
 review wave-1 (nowline m1 s1) 0357e12..c233919: PASS - review doc written; six drifted file:line refs corrected (layout.ts status tints :531, sequenceItem 410-928, calendar-resolver.ts 105-135, lsp hover.ts full path, cli render.ts loadConfigFor 520-533, style-resolution.ts 178-196); no private-repo content - 2026-10-13
 review wave-1 (nowline m2 s1-s6) aa4631f..8759cdd: PASS - all six steps as specified; four release-note:fixed fragments; make ci and changelog check green; MCP theme/pageSize via shared normalizers, malformed rc exits 2, sanitizer drops class, LSP calendar icon, docs, Renovate @nowline/** rule last; checkpoint gate-4 - 2026-10-13
+review wave-2 (nowline m3 s1-s3) ba86954..4fc1c28: CONCERNS - three specs written (R1 m4.11, R3 m4.12, R4 m4.13); (1) gate G1 in all three specs compares only make-build SVGs, so 6 samples never rendered by scripts/render-samples.mjs or render-tests.mjs (examples/continuation, examples/minimal.fr, tests/grammar-properties, grammar-properties-include, partner-multi, waves-isolate-team) are skipped, and the loop's exit status is only the last cmp's; render every sample directly on both commits and fail on any diff; (2) surface-options.md:27 cites load-config.ts mergeConfig at 99-106 and NowlineRc at 18-33, actually 91-97 and 10; (3) surface-options.md:45 says an MCP render parses three times, it parses twice (insights reuse the doc); checkpoints gate-4, gate-2 - 2026-10-13
 
 ## Token log
 
@@ -184,3 +185,6 @@ tokens review-wave-1 nowline-m1-s1 (claude-opus-5-5): input ~36 / cache read ~48
 tokens orchestrator-wave-1 nowline-m1-s1 (claude-opus-5-5): input ~26 / cache read ~1.4M / cache write ~0 5m + ~25k 1h / output ~10k | ~$0.69 API-equiv
 tokens wave-1 nowline-m2-s1-s6 (claude-sonnet-5-5): input ~92 / cache read ~5.4M / cache write ~110k / output ~46k | ~$1.81 API-equiv (output est.) session 8c78f794-2944-59bb-8116-4413104e9100
 tokens review-wave-1 nowline-m2-s1-s6 (claude-opus-5-5): input ~26 / cache read ~360k / cache write ~40k / output ~14k | ~$0.55 API-equiv (output est.) session 8c78f794-2944-59bb-8116-4413104e9100
+tokens orchestrator-wave-1 nowline-m2-s1-s6 (claude-opus-5-5): input ~16 / cache read ~1M / cache write ~0 5m + ~23k 1h / output ~8.3k | ~$0.55 API-equiv
+tokens wave-2 nowline-m3-s1-s3 (claude-opus-5-5): input ~270 / cache read ~36M / cache write ~440k / output ~130k | ~$12.02 API-equiv (output est.) session 8c78f794-2944-59bb-8116-4413104e9100
+tokens review-wave-2 nowline-m3-s1-s3 (claude-opus-5-5): input ~56 / cache read ~2M / cache write ~100k / output ~28k | ~$1.46 API-equiv (output est.) session 8c78f794-2944-59bb-8116-4413104e9100
