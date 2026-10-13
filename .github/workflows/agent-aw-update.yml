@@ -74,5 +74,6 @@ jobs:
           gh pr create \
             --title "chore(aw): sync agentic workflows from upstream" \
             --body-file /tmp/aw-pr-body.md \
+            --label no-changelog \
             --head "$branch" \
             --base main

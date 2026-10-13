@@ -154,7 +154,10 @@ trap 'rm -rf "$TMP"' EXIT
 # ──────────────────────────────────────────────────────────────────────────────
 # Tier 1 — OSS: lolay/nowline
 #
-# The only required CI context is `CI gate`, the aggregate job at the
+# Two required CI contexts.  `Changelog` (.github/workflows/changelog.yml)
+# checks the PR's .changelog/ fragment; it lives outside ci.yml so adding
+# or removing the no-changelog label re-runs it without the full matrix.
+# The other is `CI gate`, the aggregate job at the
 # end of .github/workflows/ci.yml.  It `needs:` every other ci.yml job,
 # runs `if: always()`, and fails when any of them failed or was
 # cancelled (a skipped job passes).  So adding, renaming, or reshaping a
@@ -188,6 +191,9 @@ trap 'rm -rf "$TMP"' EXIT
 # required check waits forever, and a queue entry nothing answers fails
 # after check_response_timeout_minutes.  Merge the ci.yml change first,
 # confirm a `CI gate` check reported on main, then run this script.
+# The same holds for changelog.yml and the `Changelog` check, and the
+# `no-changelog` label must exist before Renovate or agent-aw-update.yml
+# opens a PR (`gh pr create --label` fails on a missing label).
 # ──────────────────────────────────────────────────────────────────────────────
 echo ""
 echo "=== Tier 1: OSS — ${ORG}/nowline ==="
@@ -241,7 +247,8 @@ cat > "$TMP/nowline.json" <<JSON
         "strict_required_status_checks_policy": false,
         "do_not_enforce_on_create": false,
         "required_status_checks": [
-          { "context": "CI gate" }
+          { "context": "CI gate" },
+          { "context": "Changelog" }
         ]
       }
     }

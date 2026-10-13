@@ -29,6 +29,7 @@ SHELL := bash
         lint-workflows lint-man bundle-size gh-runs-list gh-runs-watch gh-runs-status \
         determinism determinism-browser determinism-update mcp-app-e2e mcp-inspector-smoke mcp-claude-e2e \
         compile smoke deb pack vsix pack-mcpb bump snapshot-version release-changelog \
+        changelog-check changelog-preview \
         publish-npm publish-vscode publish-cdn publish-mcp-registry
 
 # Overridable inputs for the package / guarded targets. The release and
@@ -264,8 +265,17 @@ bump: ## [pkg] Bump every package version (LEVEL=patch|minor|major); prints the 
 snapshot-version: ## [pkg] Compute and write 0.0.0-dev.<ts>.g<sha> to every package.json; prints the version
 	@node .github/scripts/snapshot-version.mjs
 
-release-changelog: ## [pkg] Promote [Unreleased] into a dated [X.Y.Z] section in both CHANGELOGs (VERSION=X.Y.Z)
-	@node .github/scripts/release-changelog.mjs $(VERSION)
+release-changelog: ## [pkg] Fold .changelog/ fragments into a dated [X.Y.Z] section in both CHANGELOGs (VERSION=X.Y.Z)
+	@python3 scripts/changelog.py release $(VERSION)
+
+# BASE is the ref the branch is diffed against (CI passes the PR base SHA);
+# REQUIRE=1 also fails when the branch adds no fragment. Without BASE it only
+# validates the fragment files.
+changelog-check: ## [pkg] Validate .changelog/ fragments (BASE=<ref> to diff a branch, REQUIRE=1 to demand one)
+	@python3 scripts/changelog.py check $(if $(BASE),--base $(BASE)) $(if $(REQUIRE),--require)
+
+changelog-preview: ## [pkg] Print the section each CHANGELOG would gain at the next release
+	@python3 scripts/changelog.py preview
 
 ##@ Danger
 

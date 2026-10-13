@@ -124,7 +124,14 @@ import { itemSpanPx } from './working-span.js';
 export interface LayoutOptions {
     theme?: ThemeName;
     today?: Date;
-    width?: number; // total SVG width in px; default 1280
+    /**
+     * Best-effort maximum canvas width in px. Unset (the default) sizes the
+     * canvas to its content. When the content is wider, pixels-per-day
+     * shrinks to fit, down to `MIN_PIXELS_PER_DAY`; spilled captions and
+     * run labels can still widen the canvas past it. See
+     * `specs/rendering.md` § Canvas width.
+     */
+    width?: number;
     /**
      * BCP-47 tag controlling axis labels, the now-pill string, and the
      * quarter prefix. Resolved by the caller (CLI flag → env vars). When
