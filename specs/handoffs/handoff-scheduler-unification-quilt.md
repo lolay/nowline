@@ -50,3 +50,4 @@ The plan's "Decisions made while planning" (1-8) stand. Added by wave 1 (review 
 - A PR (lolay/nowline#148) was opened from the Claude Code UI before any step ran; Gary asked for it to go, so it is closed and unsubscribed. The milestone PR is still opened only after Gary says yes at completion (a new PR from this branch).
 - Wave 1 spent ~$9.2 against ~$5.0 planned; the run is over its ~$16 expected total at ~$17.9 (a note, not a stop; the guard is $50).
 - Open for completion: m1.s2 added public `@nowline/layout` API (`ScheduleOptions.plan`, `RoadmapSchedule.plan`, `.resolved`, `.extent`, `ScheduleExtent`) with no `added` changelog block, per plan decision 5. Raise with Gary at the PR ask.
+- Before wave 2: merged `origin/main` (`ff8eb8b`, #149: env doctor floor-aware, Makefile/CI only, no layout code) with merge commit `52dd496`; no conflicts. Wave 2's `from` is the merge, so its G1 base includes it.
