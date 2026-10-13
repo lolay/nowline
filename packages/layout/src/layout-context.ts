@@ -12,6 +12,7 @@ import type {
 } from '@nowline/core';
 import type { BandScale } from './band-scale.js';
 import type { resolveCalendar } from './calendar.js';
+import type { ItemMeasure } from './nodes/item-measure.js';
 import type { RoadmapSchedule } from './schedule.js';
 import type { StyleContext } from './style-resolution.js';
 import type { TimeScale } from './time-scale.js';
@@ -183,10 +184,16 @@ export interface LayoutContext {
  * receive the helpers at construction time via this struct.
  */
 export interface LayoutHelpers {
+    /**
+     * Place an item. `measure` is the item's measure at the snapped start it
+     * will be placed at (the row track measures before it packs the row);
+     * without one, `sequenceItem` measures where it places.
+     */
     sequenceItem: (
         child: ItemDeclaration,
         cursor: TrackCursor,
         ctx: LayoutContext,
+        measure?: ItemMeasure,
     ) => PositionedItem;
     sequenceOne: (
         child: ItemDeclaration | GroupBlock | ParallelBlock,
@@ -201,16 +208,4 @@ export interface LayoutHelpers {
     ) => number;
     newCursor: (x: number, y: number) => TrackCursor;
     estimateTextWidth: (text: string, fontSize: number) => number;
-    /** Predict the extra height an item's bar will grow by (a wrapped
-     *  two-line title over a meta line, or wrapped label-chip rows;
-     *  whichever is larger), so callers can size the row pitch BEFORE
-     *  handing off to `sequenceItem`. Returns 0 when the title fits one
-     *  line (or wraps without needing a taller bar) and the item's
-     *  labels all fit on a single chip row. `startX` is the snapped
-     *  predicted start the bar will be placed at. */
-    predictItemBarExtraHeight: (
-        item: ItemDeclaration,
-        startX: number,
-        ctx: LayoutContext,
-    ) => number;
 }

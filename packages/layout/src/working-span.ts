@@ -1,7 +1,7 @@
 // The width of an item's logical extent (m2p phase 4, decision 4). Every
-// site that turns a duration into pixels goes through here, so the row
-// packer's prediction, the bar-height predictor and `sequenceItem` agree on
-// the same start and the same formula.
+// site that turns a duration into pixels goes through here, so the item
+// measure the row packer and `sequenceItem` share, and every other span,
+// use the same formula.
 
 import type { LayoutContext } from './layout-context.js';
 

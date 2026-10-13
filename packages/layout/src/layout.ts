@@ -2,7 +2,6 @@ import type {
     EntityProperty,
     GroupBlock,
     ItemDeclaration,
-    LabelDeclaration,
     NowlineFile,
     ParallelBlock,
     ResolveResult,
@@ -33,7 +32,6 @@ import type { LogoDimensions } from './header-logo.js';
 import { localeStrings } from './i18n.js';
 import { computeItemInlineDatePins, pickInlineDate } from './inline-date-pin-geometry.js';
 import {
-    computeTitleBarExtra,
     ITEM_CAPTION_INSET_X_PX,
     ITEM_CAPTION_META_BASELINE_OFFSET_PX,
     ITEM_CAPTION_SPILL_GAP_PX,
@@ -42,41 +40,18 @@ import {
     ITEM_FOOTNOTE_INDICATOR_STEP_PX,
     ITEM_LINK_ICON_TILE_SIZE_PX,
     ITEM_STATUS_DOT_RADIUS_PX,
-    itemCaptionInsetX,
-    itemCaptionLastBaselineOffset,
     LABEL_CHIP_GAP_ABOVE_PROGRESS_STRIP_PX,
     LABEL_CHIP_GAP_BETWEEN_PX,
     LABEL_CHIP_HEIGHT_PX,
     LABEL_CHIP_ROW_STEP_PX,
     MIN_BAR_WIDTH_FOR_DOT_PX,
     MIN_BAR_WIDTH_FOR_FOOTNOTE_PX,
-    MIN_BAR_WIDTH_FOR_LINK_AND_DOT_PX,
-    packSpillChips,
 } from './item-bar-geometry.js';
 import { itemArrowSourcePort, itemArrowTargetPort } from './item-port-geometry.js';
-import {
-    type LayoutContext,
-    newCursor,
-    scheduledItemDays,
-    type TrackCursor,
-} from './layout-context.js';
+import { type LayoutContext, newCursor, type TrackCursor } from './layout-context.js';
 import { GroupNode } from './nodes/group-node.js';
-import {
-    buildLabelChip,
-    collectItemFootnoteIndicators,
-    computeChipBarExtra,
-    measureItem,
-    resolveItemMeta,
-    resolveItemProgress,
-    resolveTitleFirstLineReserve,
-} from './nodes/item-measure.js';
-import {
-    estimateItemMetaWidth,
-    fitItemCaption,
-    ItemNode,
-    resolveCaptionTitleLines,
-    traceItemNode,
-} from './nodes/item-node.js';
+import { buildLabelChip, type ItemMeasure, measureItem } from './nodes/item-measure.js';
+import { ItemNode, traceItemNode } from './nodes/item-node.js';
 import { ParallelNode } from './nodes/parallel-node.js';
 import { RoadmapNode, type SizedHeader } from './nodes/roadmap-node.js';
 import type { NonWorkingDisplay } from './non-working-display.js';
@@ -90,7 +65,6 @@ import {
     HEADER_BESIDE_MAX_WIDTH_PX,
     HEADER_BESIDE_MIN_WIDTH_PX,
     ITEM_INSET_PX,
-    MIN_ITEM_WIDTH,
     NOW_PILL_LABEL_FONT_SIZE_PX,
     NOW_PILL_LABEL_INSET_X_PX,
     NOW_PILL_WIDTH_PX,
@@ -120,7 +94,6 @@ import {
     waveRoleOf,
 } from './wave-layout.js';
 import { daysPerUnit } from './working-calendar.js';
-import { itemSpanPx } from './working-span.js';
 
 export interface LayoutOptions {
     theme?: ThemeName;
@@ -176,6 +149,7 @@ function sequenceItem(
     node: ItemDeclaration,
     cursor: TrackCursor,
     ctx: LayoutContext,
+    measured?: ItemMeasure,
 ): PositionedItem {
     const props = node.properties;
     const afterRaw = propValues(props, 'after');
@@ -205,8 +179,16 @@ function sequenceItem(
     // under `hide`.
     const placedStartX = ctx.scale.startX(startX);
     // Width, style and tint, progress, meta line, chips, caption fit and
-    // the bar's growth (specs/layout-phases.md §3.6).
-    const measure = measureItem(node, placedStartX, ctx);
+    // the bar's growth (specs/layout-phases.md §3.6). A lane or group row
+    // track measured the item at this same start to size its row (the
+    // cursor sits at `resolveChildStart`, which a pin, an `after:` chain and
+    // the wave floor all return unchanged); a parallel track measures here.
+    const measure = measured ?? measureItem(node, placedStartX, ctx);
+    if (measure.startX !== placedStartX) {
+        throw new Error(
+            `layout: item "${node.name ?? node.title ?? '(unnamed)'}" was measured at x ${measure.startX} but placed at x ${placedStartX}`,
+        );
+    }
     const { naturalWidth, style, status, progress, footnoteIndicators, caption } = measure;
     const { metaText, ownerDisplay, capacity, capacityTrailingWidth } = measure.meta;
     const linkInfo = measure.link;
@@ -564,7 +546,6 @@ function sequenceGroup(node: GroupBlock, cursor: TrackCursor, ctx: LayoutContext
         resolveChildStart,
         newCursor,
         estimateTextWidth,
-        predictItemBarExtraHeight,
     }).place(cursor, ctx);
 }
 
@@ -595,113 +576,6 @@ function sequenceOne(
 function syntheticItemKey(node: ItemDeclaration): string {
     const start = node.$cstNode?.range.start;
     return `#item@${start ? start.line + 1 : 0}:${start ? start.character + 1 : 0}`;
-}
-
-/**
- * Predict an item's bar growth (and therefore row-pitch growth) BEFORE
- * the bar is sequenced: the larger of the growth a wrapped title needs
- * and the growth a multi-row spilled chip column needs. Used by the
- * swimlane / group row-packer so neighboring rows on later rows are
- * positioned correctly without a retroactive shift.
- *
- * Mirrors the caption-fit, chip-pack and caption-spill arithmetic in
- * `sequenceItem` so prediction and placement agree byte-for-byte: it
- * resolves the same meta line (`resolveItemMeta`) and runs the same
- * caption-fit helper (`fitItemCaption`) as `ItemNode.place`. The meta
- * width matters because a meta line wider than the bar makes the
- * caption spill instead of wrap; predicting a wrap there would reserve
- * a taller row than the (un-grown) bar needs. `startX` is the snapped
- * predicted start, the one `sequenceItem` places the bar at.
- */
-function predictItemBarExtraHeight(
-    item: ItemDeclaration,
-    startX: number,
-    ctx: LayoutContext,
-): number {
-    const props = item.properties;
-    const bandwidth = ctx.bandScale.bandwidth();
-    const durationDays = scheduledItemDays(ctx, item);
-    const naturalWidth = Math.max(MIN_ITEM_WIDTH, itemSpanPx(ctx, startX, durationDays));
-    const visualWidth = Math.max(MIN_ITEM_WIDTH, naturalWidth - 2 * ITEM_INSET_PX);
-
-    // The real meta line, exactly as `sequenceItem` assembles it.
-    const sizeRef = propValue(props, 'size');
-    const sizeResolved = sizeRef ? (ctx.sizes.get(sizeRef) ?? null) : null;
-    const { status, progress } = resolveItemProgress(props, ctx);
-    const { metaText, capacity, capacityTrailingWidth } = resolveItemMeta(
-        props,
-        ctx,
-        sizeResolved,
-        status,
-        progress,
-        resolveStyle('item', props, ctx.styleCtx).capacityIcon,
-    );
-    const hasMeta = metaText !== undefined || capacity !== null;
-
-    // Same caption-fit helper `ItemNode.place` runs.
-    const hasLinkIcon = !!propValue(props, 'link');
-    const titleStr = item.title ?? item.name ?? '';
-    // The left inset clears the link tile and the in-bar `after:` glyph,
-    // exactly as `ItemNode.place` computes it.
-    const hasAfterGlyph = pickInlineDate(propValues(props, 'after')) !== undefined;
-    const captionLeftInset = itemCaptionInsetX(
-        hasLinkIcon,
-        hasAfterGlyph ? { barWidth: visualWidth } : undefined,
-    );
-    const innerWidth = Math.max(0, visualWidth - captionLeftInset - ITEM_CAPTION_INSET_X_PX);
-    // The first title line clears the top-right decoration cluster, found
-    // the same way `sequenceItem` finds it (footnotes via `footnoteHosts`,
-    // `before:` via the inline date), so prediction and placement agree.
-    const firstLineWidth = Math.max(
-        0,
-        visualWidth -
-            captionLeftInset -
-            resolveTitleFirstLineReserve(
-                visualWidth,
-                collectItemFootnoteIndicators(item.name, ctx),
-                propValues(props, 'before'),
-            ),
-    );
-    const fit = fitItemCaption(
-        titleStr,
-        innerWidth,
-        estimateItemMetaWidth(metaText, capacityTrailingWidth),
-        firstLineWidth,
-    );
-    // A narrow-bar link icon spills the caption outright (and drops any
-    // auto-wrap, though explicit breaks stay), mirroring `iconSpills` in
-    // `sequenceItem`; both resolve the painted lines the same way.
-    const iconSpills = hasLinkIcon && visualWidth < MIN_BAR_WIDTH_FOR_LINK_AND_DOT_PX;
-    const captionSpills = fit.textSpills || iconSpills;
-    const titleLineCount = resolveCaptionTitleLines(titleStr, fit, iconSpills).length;
-    const titleExtra = computeTitleBarExtra(titleLineCount, hasMeta);
-
-    const labelIds = propValues(props, 'labels');
-    const samples: { id: LabelDeclaration; width: number }[] = [];
-    for (const labelId of labelIds) {
-        const label = ctx.labels.get(labelId);
-        if (!label) continue;
-        const sample = buildLabelChip(label, ctx.styleCtx, 0, 0);
-        samples.push({ id: label, width: sample.box.width });
-    }
-    if (samples.length === 0) return titleExtra;
-    let chipRowWidth = 0;
-    for (let i = 0; i < samples.length; i += 1) {
-        if (i > 0) chipRowWidth += LABEL_CHIP_GAP_BETWEEN_PX;
-        chipRowWidth += samples[i].width;
-    }
-    const insideAvail = Math.max(0, visualWidth - 2 * ITEM_CAPTION_INSET_X_PX);
-    const chipsOutside = chipRowWidth > insideAvail;
-    const pack = chipsOutside ? packSpillChips(samples, visualWidth) : null;
-    const chipRowCount = pack ? pack.rows.length : 1;
-    const chipExtra = computeChipBarExtra(
-        chipsOutside,
-        captionSpills,
-        chipRowCount,
-        bandwidth,
-        itemCaptionLastBaselineOffset(titleLineCount, hasMeta),
-    );
-    return Math.max(titleExtra, chipExtra);
 }
 
 // Resolve the desired startX for a swimlane child, honoring `date:` (fixed
@@ -1158,7 +1032,6 @@ export function layoutRoadmap(
         resolveChildStart,
         newCursor,
         estimateTextWidth,
-        predictItemBarExtraHeight,
         computeDateWindow,
         sizeBesideHeader,
         collectItems,

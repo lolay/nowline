@@ -167,8 +167,8 @@ export interface PlacedItemGeometry {
 /**
  * Estimated width (px) of an item's whole meta line: `metaText` plus the
  * trailing capacity suffix (`trailingWidth`, 0 when there is none). Zero
- * when the item has no meta line. Shared with the row-height predictor so
- * both feed `fitItemCaption` the same number.
+ * when the item has no meta line. `measureItemCaption` feeds it to
+ * `fitItemCaption`.
  */
 export function estimateItemMetaWidth(metaText: string | undefined, trailingWidth: number): number {
     const metaTextWidth = metaText ? estimateTextWidth(metaText, META_FONT_SIZE_PX) : 0;
@@ -218,9 +218,9 @@ export function titleBreakLines(title: string): string[] | undefined {
 /**
  * Decide how an item's caption sits relative to its bar: one line
  * in-bar, word-wrapped in-bar, or spilled to the right. This is the
- * single source of truth for the decision; `measureItemCaption` and the
- * row-height predictor in `layout.ts` both call it so predicted and
- * placed geometry agree.
+ * single source of truth for the decision; `measureItemCaption` calls it,
+ * and the row track and `sequenceItem` share that one measure, so the
+ * reserved row and the placed bar agree.
  *
  * `metaWidth` is the full estimated width of the meta line (text plus
  * any trailing capacity suffix), or 0 when the item has no meta line.
@@ -299,8 +299,7 @@ export function fitItemCaption(
  * The title lines an item finally paints. `fit` is the caption-fit
  * decision; `forcedSpill` is true when something outside it pushes the
  * caption out of the bar anyway (a narrow-bar link icon, `iconSpills`).
- * Shared by `sequenceItem` and the row-height predictor so the two
- * agree on the line count.
+ * `measureItem` calls it; the line count sets the bar's growth.
  *
  *   - Explicit breaks keep the author's lines, in-bar or spilled.
  *   - An auto-wrap (two lines) survives only while the caption stays

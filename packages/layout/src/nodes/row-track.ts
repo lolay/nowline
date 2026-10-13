@@ -1,8 +1,8 @@
 // Row track — the child loop that `SwimlaneNode` and `GroupNode` share
 // (specs/layout-phases.md §3.8). Feeds a lane's or a group's content to
-// a `RowPacker` in DSL order: an item's extent and height are predicted
-// so the packer can bump it to a fresh row before `sequenceItem` places
-// it; a parallel or nested group takes a fresh row of its own through
+// a `RowPacker` in DSL order: an item is measured (`measureItem`) so the
+// packer can bump it to a fresh row before `sequenceItem` places it with
+// the same measure; a parallel or nested group takes a fresh row of its own through
 // `sequenceOne`. The callers keep what differs between them: the lane
 // its title tab and top-pad collapse, the group its chiclet, header band
 // and box. Both read the packer's used height and right edge, and the
@@ -16,11 +16,11 @@ import type {
 } from '@nowline/core';
 import { isItemDeclaration } from '@nowline/core';
 import { blockTitleRowSpillReservation } from '../container-header-geometry.js';
-import { type LayoutContext, type LayoutHelpers, scheduledItemDays } from '../layout-context.js';
+import type { LayoutContext, LayoutHelpers } from '../layout-context.js';
 import { RowPacker } from '../row-packer.js';
-import { ITEM_INSET_PX, MIN_ITEM_WIDTH } from '../themes/shared.js';
+import { ITEM_INSET_PX } from '../themes/shared.js';
 import type { PositionedTrackChild } from '../types.js';
-import { itemSpanPx } from '../working-span.js';
+import { measureItem } from './item-measure.js';
 
 export interface RowTrackOrigin {
     /** Left edge of the track: the lane's left x, or the group's content left x. */
@@ -93,45 +93,30 @@ export function sequenceRowTrack(
             continue;
         }
 
-        const desiredStart = helpers.resolveChildStart(
-            child as ItemDeclaration,
-            timeCursorX,
-            leftX,
-            ctx,
-        );
-        // Predict the item's logical extent so the row-pack can decide
-        // BEFORE handing off to sequenceItem. The arithmetic mirrors
-        // the duration → width math in `sequenceItem`.
-        // Under `show` the predicted extent starts where `sequenceItem`
-        // will snap the bar to; the cursor below keeps the raw start.
-        const durationDays = scheduledItemDays(ctx, child as ItemDeclaration);
+        const item = child as ItemDeclaration;
+        const desiredStart = helpers.resolveChildStart(item, timeCursorX, leftX, ctx);
+        // Measure the item where `sequenceItem` will place it, so the row
+        // pack can decide BEFORE handing off: the measure gives the logical
+        // extent and the bar's growth, and `sequenceItem` reuses it. Under
+        // `show` the bar snaps to a working day; the cursor below keeps the
+        // raw start.
         const predictedStart = ctx.scale.startX(desiredStart);
-        const naturalWidth = Math.max(
-            MIN_ITEM_WIDTH,
-            itemSpanPx(ctx, predictedStart, durationDays),
-        );
-        const desiredEnd = predictedStart + naturalWidth;
-        const childId = (child as ItemDeclaration).name ?? '';
-
-        const barExtra = helpers.predictItemBarExtraHeight(
-            child as ItemDeclaration,
-            predictedStart,
-            ctx,
-        );
-        const predictedHeight = step + barExtra;
+        const measure = measureItem(item, predictedStart, ctx);
+        const desiredEnd = predictedStart + measure.naturalWidth;
+        // Row pitch = `step()` + the bar's growth. Keeps the inter-row
+        // visible gap (= step - bandwidth) intact when a title wraps or an
+        // item's labels wrap and grow the bar. The placed box is
+        // `bandwidth + barExtra` tall, so this is also the placed pitch.
+        const pitch = step + measure.barExtra;
         const { rowIndex, y: rowY } = packer.placeItem({
-            childId,
+            childId: item.name ?? '',
             desiredStart: predictedStart,
             desiredEnd,
-            // Row pitch = `step()` + extra bar height. Keeps the
-            // inter-row visible gap (= step - bandwidth) intact
-            // when a title wraps or an item's labels wrap and grow
-            // the bar.
-            predictedHeight,
+            predictedHeight: pitch,
         });
 
         const cursor = helpers.newCursor(desiredStart, rowY);
-        const positioned = helpers.sequenceItem(child as ItemDeclaration, cursor, ctx);
+        const positioned = helpers.sequenceItem(item, cursor, ctx, measure);
         children.push(positioned);
 
         // Item end in LOGICAL space (one ITEM_INSET_PX past the visual
@@ -167,13 +152,7 @@ export function sequenceRowTrack(
             placed: positioned,
             logicalEnd: itemLogicalEnd,
             spillReservation,
-            // Safety net: if the predictor under-shot (it can't see
-            // the exact meta text), the row still grows to the bar
-            // that was actually placed plus the inter-row gap.
-            rowHeight: Math.max(
-                predictedHeight,
-                step + (positioned.box.height - ctx.bandScale.bandwidth()),
-            ),
+            rowHeight: pitch,
         });
     }
 

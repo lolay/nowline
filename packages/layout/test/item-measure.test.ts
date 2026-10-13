@@ -116,3 +116,91 @@ describe('ItemNode.measure on the sample corpus', () => {
         expect(grown).toBeGreaterThan(0);
     });
 });
+
+// The row track sizes each row from the item's measure (`step + barExtra`)
+// and `sequenceItem` places the bar from the same measure. The corpus never
+// exercised a case where an old predictor and the placed bar disagreed, so
+// these fixtures pin the cases that used to need their own prediction code.
+// In each, `first` grows its bar and `second` collides with it (same start),
+// so the packer drops `second` one row pitch below.
+describe('row pitch from the item measure', () => {
+    function roadmap(first: string, header = ''): string {
+        return `nowline v1
+
+roadmap r "R" start:2026-04-06 scale:2w
+${header}
+swimlane "Platform"
+  item first ${first}
+  item second "Second" duration:2w date:2026-04-06
+`;
+    }
+
+    async function layoutPair(src: string): Promise<{
+        first: PositionedItem;
+        second: PositionedItem;
+        measuredHeight: number;
+        bandwidth: number;
+        step: number;
+    }> {
+        const traced = new Map<string, Traced>();
+        setItemNodeTrace((node, ctx, item) => traced.set(item.id ?? '', { node, ctx }));
+        const { file, resolved } = await parseAndResolve(src);
+        const model = layoutRoadmap(file, resolved, { theme: 'light' });
+        setItemNodeTrace(undefined);
+        const placed = trackItems(model.swimlanes[0].children);
+        const first = placed.find((i) => i.id === 'first');
+        const second = placed.find((i) => i.id === 'second');
+        const entry = traced.get('first');
+        if (!first || !second || !entry) throw new Error('fixture items not placed');
+        return {
+            first,
+            second,
+            measuredHeight: entry.node.measure(entry.ctx).height,
+            bandwidth: entry.ctx.bands.bandwidth(),
+            step: entry.ctx.bands.step(),
+        };
+    }
+
+    /** The predicted pitch (`step + barExtra`) is the pitch the placed bar needs. */
+    function expectPitchMatchesPlacedBar(pair: Awaited<ReturnType<typeof layoutPair>>): void {
+        const { first, second, measuredHeight, bandwidth, step } = pair;
+        expect(first.box.height).toBeGreaterThan(bandwidth);
+        expect(measuredHeight).toBe(first.box.height);
+        expect(second.box.y - first.box.y).toBe(step + (first.box.height - bandwidth));
+    }
+
+    it('reserves the grown row of a wrapped title', async (): Promise<void> => {
+        const pair = await layoutPair(roadmap('"Technology Selection" duration:2w status:done'));
+        expect(pair.first.titleLines).toEqual(['Technology', 'Selection']);
+        expect(pair.first.textSpills).toBe(false);
+        expectPitchMatchesPlacedBar(pair);
+    });
+
+    it('reserves the grown row of a spilled chip column', async (): Promise<void> => {
+        const pair = await layoutPair(
+            roadmap(
+                '"Chips" duration:1w labels:[a-fairly-long-label-id, another-long-label-id, third-long-label-id]',
+                `label a-fairly-long-label-id "A"
+label another-long-label-id "B"
+label third-long-label-id "C"
+`,
+            ),
+        );
+        expect(pair.first.chipsOutside).toBe(true);
+        expect(pair.first.labelChips.length).toBe(3);
+        expectPitchMatchesPlacedBar(pair);
+    });
+
+    it('reserves the grown row when a narrow-bar link spill forces the caption out', async (): Promise<void> => {
+        const pair = await layoutPair(
+            roadmap(
+                '"Go" duration:1d link:https://github.com/acme/team/issues/1 labels:[a-fairly-long-label-id]',
+                'label a-fairly-long-label-id "A"\n',
+            ),
+        );
+        expect(pair.first.iconSpills).toBe(true);
+        expect(pair.first.textSpills).toBe(true);
+        expect(pair.first.chipsOutside).toBe(true);
+        expectPitchMatchesPlacedBar(pair);
+    });
+});
