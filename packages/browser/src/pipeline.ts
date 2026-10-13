@@ -136,7 +136,7 @@ export interface RenderOptions extends ParseOptions {
     timezone?: string;
     /** BCP-47 locale forwarded to the layout engine for axis labels. */
     locale?: string;
-    /** Total canvas width in px. Layout's default is 1280. */
+    /** Best-effort maximum canvas width in px. Unset fits the content. */
     width?: number;
     /**
      * How a calendar's non-working days appear: `hide` collapses them,

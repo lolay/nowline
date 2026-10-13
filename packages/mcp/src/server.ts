@@ -624,7 +624,12 @@ export function createMcpServer(opts: McpServerOptions = {}): McpServer {
                     .optional()
                     .describe('Color theme. Defaults to light.'),
                 now: nowSchema,
-                width: z.number().optional().describe('Canvas width in px.'),
+                width: z
+                    .number()
+                    .optional()
+                    .describe(
+                        'Maximum canvas width in px. Unset fits the content; a wider roadmap shrinks its timeline to fit.',
+                    ),
                 nonWorking: nonWorkingSchema,
                 scale: z
                     .number()

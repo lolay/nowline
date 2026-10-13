@@ -106,7 +106,7 @@ export interface RenderInputs {
     fonts?: ResolvedFontPair;
 
     // ---- layout / render knobs ------------------------------------------
-    /** Optional fixed canvas width in px. */
+    /** Optional best-effort maximum canvas width in px; unset fits the content. */
     width?: number;
     /**
      * How the chart shows a calendar's non-working days (`hide` collapses them,

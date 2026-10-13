@@ -30,7 +30,7 @@ The `+...` suffix is informational metadata only; npm and the VS Code Marketplac
 Before cutting a release, on `main`:
 
 1. **CI is green** on the latest `main` commit (Linux, macOS, Windows).
-2. **`CHANGELOG.md` is up to date.** See [Changelog workflow](#changelog-workflow) below — contributors should already have appended entries to `## [Unreleased]` as part of their PRs; the `cut-release` job automatically moves them into a new `## [vX.Y.Z] - YYYY-MM-DD` section. No manual edit is required before triggering the dispatch.
+2. **The pending changelog describes what ships.** `make changelog-preview` prints the section each `CHANGELOG.md` will gain. See [Changelog workflow](#changelog-workflow) below — contributors add `.changelog/` fragments in their PRs; the `cut-release` job folds them into a new `## [X.Y.Z] - YYYY-MM-DD` section. No manual edit is required before triggering the dispatch.
 3. **Examples render cleanly.** `pnpm build` (which runs `pnpm samples` and `pnpm fixtures`) should produce the expected SVGs without warnings.
 4. **Smoke-test the standalone binary locally** with `pnpm --filter @nowline/cli compile:local`, then run `examples/minimal.nowline` through every export format using the platform-suffixed binary the script produces — `./packages/cli/dist-bin/nowline-<platform>-<arch>` (e.g. `nowline-macos-arm64` on Apple Silicon, `nowline-linux-x64` on Linux/amd64). CI smoke-tests all six binaries on native runners (`make smoke` runs the same checks); the local run is a last check against the exact toolchain on your machine.
 5. **Required secrets are in place.** All five secrets in the [Required secrets](#required-secrets) table below must exist on `lolay/nowline`. The first-ever release also needed the `lolay/homebrew-tap` repo seeded and the Marketplace / Open VSX namespaces created — that one-time setup is now done; subsequent releases skip it. (Forking maintainers can recreate the namespaces from each registry's "create publisher" flow; the formula seed lives at [`scripts/homebrew-tap/`](../scripts/homebrew-tap/).)
@@ -49,8 +49,8 @@ This kicks off the `cut-release` job, which:
 
 1. Checks out `main` using `RELEASE_TAG_PAT` (a user-scoped PAT — `GITHUB_TOKEN`-pushed tags do not trigger downstream workflows, which would defeat the whole point).
 2. Runs `node .github/scripts/bump-version.mjs <level>` to rewrite every `packages/*/package.json` to the next SemVer, and to sync that version into the tracked MCP metadata (`packages/mcp/manifest.json` for the `.mcpb`, `packages/mcp/server.json` for the MCP registry) via `scripts/sync-mcp-metadata.mjs`.
-3. Runs `node .github/scripts/release-changelog.mjs <version>` to promote every entry under `## [Unreleased]` in `CHANGELOG.md` and `packages/vscode-extension/CHANGELOG.md` into a new `## [X.Y.Z] - YYYY-MM-DD` section, leaving an empty `## [Unreleased]` skeleton in place.
-4. Commits the bump (package manifests plus the two MCP metadata files) and changelog promotion as `release vX.Y.Z`.
+3. Runs `make release-changelog VERSION=<version>` (`python3 scripts/changelog.py release <version>`) to fold every fragment in `.changelog/` and `packages/vscode-extension/.changelog/` into a new `## [X.Y.Z] - YYYY-MM-DD` section of the `CHANGELOG.md` beside it, and delete the fragments.
+4. Commits the bump (package manifests plus the two MCP metadata files), the changelog sections and the fragment deletions as `release vX.Y.Z`.
 5. Tags `vX.Y.Z`.
 6. Pushes both the commit and the tag to `main`.
 
@@ -62,7 +62,7 @@ If the dispatch flow is unusable (e.g. PAT expired), you can do the same thing l
 
 ```bash
 node .github/scripts/bump-version.mjs patch     # or minor / major; prints new version, syncs MCP metadata
-node .github/scripts/release-changelog.mjs X.Y.Z  # or: make release-changelog VERSION=X.Y.Z
+make release-changelog VERSION=X.Y.Z               # folds .changelog/ fragments, deletes them
 git commit -am "release vX.Y.Z"
 git tag vX.Y.Z
 git push origin main
@@ -260,14 +260,15 @@ See [`specs/mcp.md`](./mcp.md) and [`specs/cli-distribution.md`](./cli-distribut
 
 ## Changelog workflow
 
-`CHANGELOG.md` follows [Keep a Changelog](https://keepachangelog.com). Two roles, one file:
+`CHANGELOG.md` follows [Keep a Changelog](https://keepachangelog.com). Entries ship as fragment files, the model HashiCorp's go-changelog uses, because every PR that appended to a shared `## [Unreleased]` section edited the same lines and conflicted with every other open PR.
 
-- **Contributors** append an entry to the `## [Unreleased]` section as part of their PR. Use the existing subsections (`Added`, `Changed`, `Deprecated`, `Removed`, `Fixed`, `Security`) and link to the PR number where useful.
-- **`cut-release`** automatically moves every entry under `## [Unreleased]` into a new `## [X.Y.Z] - YYYY-MM-DD` section directly above the previous release, leaving an empty `## [Unreleased]` skeleton for the next cycle. This is handled by `.github/scripts/release-changelog.mjs` (the `release-changelog` Make target) and runs as part of the `cut-release` job — no manual edit is required.
+- **Contributors** add `.changelog/<name>.txt` (branch slug or PR number) holding one ` ```release-note:<kind> ` block per entry, `<kind>` being `added`, `changed`, `deprecated`, `removed`, `fixed` or `security`. VS Code extension entries go in `packages/vscode-extension/.changelog/`. The format is in [`.changelog/README.md`](../.changelog/README.md).
+- **The `Changelog` check** ([`.github/workflows/changelog.yml`](../.github/workflows/changelog.yml), `make changelog-check`) validates every fragment and fails a PR that adds none unless it carries the `no-changelog` label, or that adds an entry or heading to a `CHANGELOG.md` above its latest release. Fixing a released entry in place is allowed.
+- **`cut-release`** runs [`scripts/changelog.py`](../scripts/changelog.py) `release X.Y.Z` (the `release-changelog` Make target), which writes a new `## [X.Y.Z] - YYYY-MM-DD` section into each `CHANGELOG.md` that has a `.changelog/` beside it, grouped by kind and in merge order, then deletes the fragments it used. `.changelog/` therefore holds exactly what's pending. No manual edit is required.
 
-Both `CHANGELOG.md` (root) and `packages/vscode-extension/CHANGELOG.md` are promoted in the same commit.
+Entries still under a `## [Unreleased]` heading from before fragments were adopted are folded into the next release ahead of the fragments, under the same headings, and the heading is dropped. Edit them in place until then; don't move them into fragments.
 
-> **Empty `[Unreleased]` section.** If `## [Unreleased]` has no entries when a release is cut, the script still succeeds and emits an empty `## [X.Y.Z] - YYYY-MM-DD` section. A fail-on-empty pre-flight guard remains a possible future enhancement.
+> **Nothing pending.** If there are no fragments and no `## [Unreleased]` entries, the release still succeeds with an empty `## [X.Y.Z] - YYYY-MM-DD` section and prints a note.
 
 ## After release
 

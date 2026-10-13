@@ -1,6 +1,6 @@
 # Continuous integration
 
-This document explains what CI runs, on which platforms and events, and why. The workflows are [`.github/workflows/ci.yml`](../.github/workflows/ci.yml) and the reusable [`.github/workflows/build.yml`](../.github/workflows/build.yml). Every command they run is a `make` target ([`Makefile.md`](../Makefile.md)). The branch ruleset and the merge queue are covered in [`ops/branch-policies.md`](../ops/branch-policies.md) and applied by [`scripts/apply-branch-policies.sh`](../scripts/apply-branch-policies.sh).
+This document explains what CI runs, on which platforms and events, and why. The workflows are [`.github/workflows/ci.yml`](../.github/workflows/ci.yml), the reusable [`.github/workflows/build.yml`](../.github/workflows/build.yml), and the changelog fragment check in [`.github/workflows/changelog.yml`](../.github/workflows/changelog.yml). Every command they run is a `make` target ([`Makefile.md`](../Makefile.md)). The branch ruleset and the merge queue are covered in [`ops/branch-policies.md`](../ops/branch-policies.md) and applied by [`scripts/apply-branch-policies.sh`](../scripts/apply-branch-policies.sh).
 
 ## Principles
 
@@ -22,6 +22,7 @@ This document explains what CI runs, on which platforms and events, and why. The
 | Bundle size, export determinism, MCP harness | yes | yes | yes |
 | Release build smoke (`build.yml`) | Linux cells (`platforms: linux`) | all ten cells | all ten cells |
 | `CI gate` | yes | yes | yes |
+| `Changelog` (`changelog.yml`): fragment check | yes, and on label changes | validates fragments only | no |
 
 On `pull_request` and `merge_group`, a docs-only change skips every job in that table except `changes`, the two lint jobs, triage and `CI gate`.
 

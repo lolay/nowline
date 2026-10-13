@@ -48,7 +48,7 @@ export interface RenderInputs {
      * before passing it in.
      */
     locale?: string;
-    /** Total canvas width in px. Layout's default is 1280. */
+    /** Best-effort maximum canvas width in px. Unset fits the content. */
     width?: number;
     /**
      * The render-time non-working display. `undefined` lets the file's own
