@@ -4,7 +4,7 @@
 ```
 --- KICKOFF: begin orchestration at [deep] ---
 
-  Status: 2/4 groups done | last review: wave-2 CONCERNS | current: nowline m1 s4-s5 [exec] fix-up 2-fix | updated 2026-10-13 | over expected: ~$22.33 of ~$16
+  Status: 2/4 groups done | last review: wave-2-fix PASS | current: nowline m2 s1-s3 [exec] | updated 2026-10-13 | over expected: ~$23.96 of ~$16 | passed unattended: gate 4 before wave 2 (m2)
 
   mode: unattended | proposed unattended (harness=claude-code runner=cloud; CLAUDE_CODE_REMOTE=true, assigned branch) | guard 3x min $50 | fixups 2 | confirmed 2026-10-13 session 65f2e917-181e-5b0f-94c9-28d8d9b1c93d: unattended
 
@@ -149,6 +149,7 @@ Per step: the gate procedure above (G1 `diff -r` empty except m1.s5's declared s
 
 review wave-1 (nowline m1 s1-s3) c8caff3..8af7add: PASS - register matches the §1.3 probe (10 item roadmaps, 4 region-scope); C extent equals the frozen B oracle on 60 samples, 60 generated roadmaps and 5 scope fixtures; window projected from schedule.extent and schedule.calendar; G1/G3 trees identical; accepted deviation: nested.nowline keeps 50 region-scope entries (region anchors resolve in C, not in A); nits: stale engine-B comments in schedule.ts header, wave-barrier.ts and the register test header, left for m3.s3 - 2026-10-13
 review wave-2 (nowline m1 s4-s5) 921ce16..f2027ee: CONCERNS - m1.s4 pure refactor byte-identical; F1 G1 diff exactly showcase, sizing, late-row-shifts x3 themes, G3 unchanged, only sizing.svg snapshot and sizing render cells bumped; but showcase Ship is drawn at day 42.2, not day 40 (the (d) parallel tail gutter, F3, out of scope), so spec §5 F1 row ("showcase draws Ship on day 40, matching its exports"), the release-note:changed block ("the chart now matches them ... where the exports put it") and the register reasons must say Ship now follows the parallel and differs from the exports only by the (d) tail gutter until F3 - 2026-10-13
+review wave-2-fix (nowline m1 s4-s5) 921ce16..6cc27e6: PASS - 6cc27e6 corrects the spec §5 F1 row (Ship at 42.2 working days against the exports' 40, the 2.2 days being the (d) tail gutter F3 closes) and the release-note:changed block; register reasons already accurate; G1/G3 unchanged against f2027ee; changelog-check green; passed unattended: gate 1 (fix-up 1 of 2) - 2026-10-13
 
 ## Token log
 
@@ -168,3 +169,6 @@ tokens review-wave-1 nowline-m1-s1-s3 (claude-opus-5-5): input ~54 / cache read 
 tokens orchestrator-wave-1 nowline-m1-s1-s3 (claude-opus-5-5): input ~22 / cache read ~1.7M / cache write ~0 5m + ~45k 1h / output ~18k | ~$1.05 API-equiv
 tokens wave-2 nowline-m1-s4-s5 (claude-sonnet-5-5): input ~150 / cache read ~8.9M / cache write ~130k / output ~73k | ~$2.85 API-equiv (output est.) session 65f2e917-181e-5b0f-94c9-28d8d9b1c93d
 tokens review-wave-2 nowline-m1-s4-s5 (claude-opus-5-5): input ~22 / cache read ~400k / cache write ~45k / output ~11k | ~$0.52 API-equiv (output est.) session 65f2e917-181e-5b0f-94c9-28d8d9b1c93d
+tokens orchestrator-wave-2 nowline-m1-s4-s5 (claude-opus-5-5): input ~24 / cache read ~2.1M / cache write ~0 5m + ~34k 1h / output ~13k | ~$0.94 API-equiv
+tokens wave-2-fix nowline-m1-s4-s5 (claude-sonnet-5-5): input ~20 / cache read ~680k / cache write ~35k / output ~9.7k | ~$0.32 API-equiv (output est.) session 65f2e917-181e-5b0f-94c9-28d8d9b1c93d
+tokens review-wave-2-fix nowline-m1-s4-s5 (claude-opus-5-5): input ~20 / cache read ~220k / cache write ~25k / output ~10k | ~$0.37 API-equiv (output est.) session 65f2e917-181e-5b0f-94c9-28d8d9b1c93d

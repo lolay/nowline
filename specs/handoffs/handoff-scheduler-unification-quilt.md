@@ -6,9 +6,9 @@ Plan: [`plan-scheduler-unification-quilt.md`](./plan-scheduler-unification-quilt
 
 - **Branch:** `claude/eloquent-archimedes-fkbc5e` (harness-assigned task branch, cut from `origin/main` at `c34804c`, pushed). Single working directory, `lolay/nowline`.
 - **Mode:** unattended, confirmed 2026-10-13 by Gary's answer `unattended`. Kickoff prompt carries `Run in unattended mode.`
-- **Done:** wave 1 `[deep]` `nowline m1 s1-s3`, `c8caff3..8af7add` (m1.s1 `b25a2e0`, m1.s2 `1f0f970`, m1.s3 `8af7add`), review PASS. Wave 2 unit 1 `[exec]` `nowline m1 s4-s5`, `921ce16..f2027ee` (m1.s4 `e2889f5`, m1.s5 F1 `f2027ee`), review CONCERNS (showcase Ship drawn at day 42.2, not 40; docs overclaim).
-- **Spend:** ~$22.3 API-equiv so far against ~$16 expected total (over expected; wave 1 ran ~$9.2 against ~$5.0 planned); guard stops past $50.
-- **Next unit:** fix-up `2-fix` `[exec]` on `nowline m1 s4-s5` (automatic, 1 of 2), then wave 2 units m2 and m3.
+- **Done:** wave 1 `[deep]` `nowline m1 s1-s3`, `c8caff3..8af7add` (m1.s1 `b25a2e0`, m1.s2 `1f0f970`, m1.s3 `8af7add`), review PASS. Wave 2 unit 1 `[exec]` `nowline m1 s4-s5`, `921ce16..f2027ee` (m1.s4 `e2889f5`, m1.s5 F1 `f2027ee`), review CONCERNS (showcase Ship drawn at day 42.2, not 40; docs overclaim); fix-up `2-fix` `6cc27e6` corrected the spec F1 row and changelog, review PASS.
+- **Spend:** ~$24.0 API-equiv so far against ~$16 expected total (over expected; wave 1 ran ~$9.2 against ~$5.0 planned); guard stops past $50.
+- **Next unit:** wave 2 `[exec]` `nowline m2 s1-s3` (gate 4 passed unattended), then m3.
 
 ## How to resume
 
@@ -20,7 +20,7 @@ None. The kickoff question was answered `unattended`.
 
 ## Milestone notes (gate 4)
 
-- m1 (engine B becomes a projection of C, plus F1 as m1.s5): s1-s5 done (`c8caff3..f2027ee`); fix-up 2-fix pending on s4-s5.
+- m1 (engine B becomes a projection of C, plus F1 as m1.s5): **done**, `c8caff3..6cc27e6` (merge of main `52dd496` inside). Outcome: engine C has B's scope and `extent`; the date window is projected from the schedule (`computeContentEndDay`, `literalDays`, `defaultStartDate` gone); start terms parsed once in `start-terms.ts`; F1 landed: `after:` in a lane starts at `max(lane cursor, refs)`. F1 changed showcase, sizing, late-row-shifts renders (x3 themes), the `sizing.svg` snapshot and the `sizing:{html,pdf node+cli,png,svg}` determinism cells. Showcase Ship draws at day 42.2 vs the exports' 40 ((d) tail gutter, F3). Register keeps (b)-(f) entries plus nested.nowline's region-scope entries. Gate 4 into m2 passed unattended.
 - m2 (one plan and one schedule per staging): not started. R2 (m4.14) steps that touch `RoadmapNode.place` may start once m1 and m2 are done; say so here when they are.
 - m3 (tests describe behaviour, not agreement): not started.
 
@@ -57,4 +57,4 @@ The plan's "Decisions made while planning" (1-8) stand. Added by wave 1 (review 
 - Wave 1 spent ~$9.2 against ~$5.0 planned; the run is over its ~$16 expected total at ~$17.9 (a note, not a stop; the guard is $50).
 - Open for completion: m1.s2 added public `@nowline/layout` API (`ScheduleOptions.plan`, `RoadmapSchedule.plan`, `.resolved`, `.extent`, `ScheduleExtent`) with no `added` changelog block, per plan decision 5. Raise with Gary at the PR ask.
 - Before wave 2: merged `origin/main` (`ff8eb8b`, #149: env doctor floor-aware, Makefile/CI only, no layout code) with merge commit `52dd496`; no conflicts. Wave 2's `from` is the merge, so its G1 base includes it.
-- Wave 2 unit 1 review CONCERNS: automatic fix-up `2-fix` (1 of 2), no gate (first CONCERNS on the group). The m1.s5 commit body's "as in the exports" claim stays in history (review concerns are fixed with new commits); the PR body will state the 42.2-day result.
+- Wave 2 unit 1 review CONCERNS: automatic fix-up `2-fix` (1 of 2), no gate (first CONCERNS on the group); it passed (`6cc27e6`). Checkpoint: gate 1 (fix-up 1 of 2); gate 4 before m2. The m1.s5 commit body's "as in the exports" claim stays in history (review concerns are fixed with new commits); the PR body will state the 42.2-day result.
