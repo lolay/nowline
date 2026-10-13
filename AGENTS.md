@@ -25,8 +25,7 @@ Prohibited (hard rule -- do not add exceptions without estate-level sign-off):
 
 **Consumers pull; `nowline` does not push:**
 - `nowline-app` installs `@nowline/*` from npm; Renovate handles updates.
-- `nowline-site` pulls docs via the `external/nowline` git submodule
-  (`branch = main`) + `sync-docs`; Renovate handles updates.
+- `nowline-site` pulls docs via the `external/nowline` git submodule + `sync-docs`; its build checks out the latest release tag.
 - A consumer-owned schedule or consumer/human-initiated `repository_dispatch`
   may trigger a deploy -- but the initiator must never be `nowline`.
 
