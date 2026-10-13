@@ -3,25 +3,27 @@
 - **Plan:** `specs/handoffs/plan-nowline-review-lantern.md`
 - **Branch:** `claude/ecstatic-babbage-qsrxbx` in `lolay/nowline` (task branch the cloud session was assigned; fast-forwarded from 86ac76c to origin/main 0062df3 at kickoff). One working directory: `/workspace/nowline`.
 - **Mode:** unattended, confirmed 2026-10-13 in session 8c78f794-2944-59bb-8116-4413104e9100 (`harness=claude-code runner=cloud`). Guard 3x min $50 (limit ~$63 against ~$21 expected). Fix-up cap 2 per group.
-- **Status:** kickoff done, mode re-confirmed by Kickoff prompt after `/compact`; wave 1 launching. Next unit: wave 1 [exec], `nowline m1 s1` (then `nowline m2 s1-s6`, wave 2 [deep] `nowline m3 s1-s3`, wave 3 [xdeep] `nowline m3 s4`).
-- **Spend:** ~$8.04 of ~$21 expected. The orchestrator-kickoff line covers this session from its start, so it includes the review conversation that preceded the kickoff (the explore agents are not counted).
+- **Status:** 1/4 groups done. Wave 1's m1 part (`nowline m1 s1`) passed review. Next unit: wave 1 [exec], `nowline m2 s1-s6` (gate 4 passes unattended as a checkpoint; then wave 2 [deep] `nowline m3 s1-s3`, wave 3 [xdeep] `nowline m3 s4`).
+- **Spend:** ~$10.16 of ~$21 expected. The orchestrator-kickoff line covers this session from its start, so it includes the review conversation that preceded the kickoff (the explore agents are not counted).
 - **Resume:** paste the plan's Kickoff prompt into a session on this branch.
 
 ## Pending question (verbatim)
 
-None. Gary answered the kickoff question `unattended` (2026-10-13), compacted, then pasted the Kickoff prompt; mode re-confirmed by that paste. Dispatching wave 1.
+None. Gary answered the kickoff question `unattended` (2026-10-13), compacted, then pasted the Kickoff prompt; mode re-confirmed by that paste.
 
 ## Done
 
-Nothing yet.
+- m1.s1 (c233919): `specs/handoffs/review-since-v086-lantern.md`, the public-repo review with file:line refs re-checked at HEAD.
 
 ## Review log verdicts, fix-ups, retries, checkpoints
 
-None yet.
+- review wave-1 (nowline m1 s1) 0357e12..c233919: PASS. No fix-ups, retries or checkpoints.
+- gate-4 (entering m2) passed unattended as a checkpoint.
 
 ## Decisions so far
 
 - Gary, 2026-10-13: this run covers only the public repos (`lolay/nowline`, and `lolay/nowline-action` as a release mirror that gets no direct edits). Write nothing about the private sibling repos (`nowline-app`, `nowline-api`, `nowline-infra`, `nowline-site`, `nowline-workspace`, `nowline-commercial`) into this repo; their findings are his own follow-up.
+- wave-1 (nowline m1 s1), 2026-10-13: HEAD's source equals 0062df3, and six of the plan's file:line refs had drifted. Corrected values: `packages/cli/src/commands/render.ts` `loadConfigFor` is lines 520-533 (the plan's m2 s2 text says 519-532); `layout.ts` status tints start at :531 (not :568); `sequenceItem` is 410-928; `calendar-resolver.ts` classifier `declarationRule` is 105-135; LSP hover is `packages/lsp/src/providers/hover.ts:136-149`; `style-resolution.ts` label precedence is 178-196. Use these over the plan's numbers.
 
 ## Environment notes
 

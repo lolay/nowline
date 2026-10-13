@@ -1,7 +1,7 @@
 ```text
 --- KICKOFF: begin orchestration at [deep] ---
 
-  Status: 0/4 groups done | last review: — | current: nowline m1 s1 [exec] | updated 2026-10-13
+  Status: 1/4 groups done | last review: wave-1 PASS | current: nowline m2 s1-s6 [exec] | updated 2026-10-13
 
   mode: unattended | proposed unattended (harness=claude-code runner=cloud; CLAUDE_CODE_REMOTE=true, assigned branch) | guard 3x min $50 | fixups 2 | confirmed 2026-10-13 session 8c78f794-2944-59bb-8116-4413104e9100 by Kickoff prompt: Run in unattended mode.
 
@@ -91,7 +91,7 @@ Standards for every worker: `AGENTS.md`, `CONTRIBUTING.md`, `.changelog/README.m
 
 ### m1 - Record the review
 
-#### s1 - [exec] Write the standalone review doc
+#### s1 - [exec] Write the standalone review doc (done)
 
 Create `specs/handoffs/review-since-v086-lantern.md`: a title, a one-paragraph context (what was reviewed: v0.8.6 to main 0062df3, public repos only), then this plan's sections "Verdict", "Findings since v0.8.6" and "Recommended refactors (priority order)" copied in, with the "Latest main (#142-#144)" paragraph kept. Re-check every `file:line` reference against HEAD and correct any that drifted; keep the wording otherwise. Add nothing about private repos.
 
@@ -165,6 +165,8 @@ Write `specs/layout-phases.md` for R2, building on `specs/rendering-v2.md` (m2.5
 
 ## Review log
 
+review wave-1 (nowline m1 s1) 0357e12..c233919: PASS - review doc written; six drifted file:line refs corrected (layout.ts status tints :531, sequenceItem 410-928, calendar-resolver.ts 105-135, lsp hover.ts full path, cli render.ts loadConfigFor 520-533, style-resolution.ts 178-196); no private-repo content - 2026-10-13
+
 ## Token log
 
 **Counting header (Claude Code)**
@@ -175,4 +177,6 @@ Write `specs/layout-phases.md` for R2, building on `specs/rendering-v2.md` (m2.5
 - `$C` = (input × in + cache read × cached + 5m write × in × 1.25 + 1h write × in × 2.00 + output × out) / 1M.
 - In another harness, or on a model not listed here, count and price per plan-execution.md "Token accounting" and "Model price table" instead.
 
-tokens orchestrator-kickoff plan-nowline-review-lantern (claude-opus-5-5): input ~190 / cache read ~18M / cache write ~0 5m + ~330k 1h / output ~88k | ~$8.04 API-equiv
+tokens orchestrator-kickoff plan-nowline-review-lantern (claude-opus-5-5): input ~210 / cache read ~20M / cache write ~0 5m + ~370k 1h / output ~94k | ~$8.80 API-equiv
+tokens wave-1 nowline-m1-s1 (claude-sonnet-5-5): input ~34 / cache read ~1.4M / cache write ~110k / output ~17k | ~$0.71 API-equiv (output est.) session 8c78f794-2944-59bb-8116-4413104e9100
+tokens review-wave-1 nowline-m1-s1 (claude-opus-5-5): input ~36 / cache read ~480k / cache write ~41k / output ~17k | ~$0.65 API-equiv (output est.) session 8c78f794-2944-59bb-8116-4413104e9100
