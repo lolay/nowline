@@ -5,18 +5,12 @@
 // reserved 18 px above the first region; subsequent regions are
 // separated by GAP_BETWEEN_REGIONS px.
 
-import type { GroupBlock, IsolatedRegion, ItemDeclaration, ParallelBlock } from '@nowline/core';
+import type { IsolatedRegion } from '@nowline/core';
 import { resolveSizes } from '../calendar.js';
 import { includeChromeGeometry } from '../include-chrome-geometry.js';
-import type { LayoutContext, TrackCursor } from '../layout-context.js';
+import type { LayoutContext, LayoutHelpers } from '../layout-context.js';
 import { resolveStyle } from '../style-resolution.js';
-import type {
-    BoundingBox,
-    PositionedIncludeRegion,
-    PositionedItem,
-    PositionedSwimlane,
-    PositionedTrackChild,
-} from '../types.js';
+import type { BoundingBox, PositionedIncludeRegion, PositionedSwimlane } from '../types.js';
 import { seedWaveEdges } from '../wave-layout.js';
 import { maxLeafItemRightX } from './content-extent.js';
 import { SwimlaneNode } from './swimlane-node.js';
@@ -32,38 +26,11 @@ const GAP_BETWEEN_REGIONS = 16;
 // chart-width whitespace left over from full-width sizing.
 const INCLUDE_CONTENT_RIGHT_PAD_PX = 32;
 
-export interface IncludeNodeDeps {
-    sequenceItem: (
-        child: ItemDeclaration,
-        cursor: TrackCursor,
-        ctx: LayoutContext,
-        ownerOverride?: string,
-    ) => PositionedItem;
-    sequenceOne: (
-        child: ItemDeclaration | GroupBlock | ParallelBlock,
-        cursor: TrackCursor,
-        ctx: LayoutContext,
-    ) => PositionedTrackChild;
-    resolveChildStart: (
-        child: ItemDeclaration | GroupBlock | ParallelBlock,
-        seqDefault: number,
-        laneLeftX: number,
-        ctx: LayoutContext,
-    ) => number;
-    newCursor: (x: number, y: number) => TrackCursor;
-    estimateTextWidth: (text: string, fontSize: number) => number;
-    predictItemBarExtraHeight: (
-        item: ItemDeclaration,
-        startX: number,
-        ctx: LayoutContext,
-    ) => number;
-}
-
 export function buildIncludeRegions(
     regions: IsolatedRegion[],
     ctx: LayoutContext,
     startY: number,
-    deps: IncludeNodeDeps,
+    deps: LayoutHelpers,
 ): { regions: PositionedIncludeRegion[]; endY: number } {
     let y = startY + TAB_RESERVE;
     const out: PositionedIncludeRegion[] = [];

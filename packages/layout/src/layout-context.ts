@@ -187,7 +187,6 @@ export interface LayoutHelpers {
         child: ItemDeclaration,
         cursor: TrackCursor,
         ctx: LayoutContext,
-        ownerOverride?: string,
     ) => PositionedItem;
     sequenceOne: (
         child: ItemDeclaration | GroupBlock | ParallelBlock,

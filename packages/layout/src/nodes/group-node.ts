@@ -23,7 +23,12 @@ import {
 import { propValue, propValues } from '../dsl-utils.js';
 import { groupHasFill, groupTitleTabWidth } from '../group-title-tab-geometry.js';
 import { computeContainerInlineDatePins, pickInlineDate } from '../inline-date-pin-geometry.js';
-import { type LayoutContext, scheduledItemDays, type TrackCursor } from '../layout-context.js';
+import {
+    type LayoutContext,
+    type LayoutHelpers,
+    scheduledItemDays,
+    type TrackCursor,
+} from '../layout-context.js';
 import { RowPacker } from '../row-packer.js';
 import { resolveStyle } from '../style-resolution.js';
 import {
@@ -34,50 +39,14 @@ import {
     MIN_ITEM_WIDTH,
     TRACK_BLOCK_TAIL_GUTTER_PX,
 } from '../themes/shared.js';
-import type {
-    BoundingBox,
-    PositionedGroup,
-    PositionedItem,
-    PositionedTrackChild,
-} from '../types.js';
+import type { BoundingBox, PositionedGroup, PositionedTrackChild } from '../types.js';
 import { waveFloorX } from '../wave-layout.js';
 import { itemSpanPx } from '../working-span.js';
-
-export interface GroupNodeDeps {
-    sequenceItem: (
-        child: ItemDeclaration,
-        cursor: TrackCursor,
-        ctx: LayoutContext,
-        ownerOverride?: string,
-    ) => PositionedItem;
-    sequenceOne: (
-        child: ItemDeclaration | GroupBlock | ParallelBlock,
-        cursor: TrackCursor,
-        ctx: LayoutContext,
-    ) => PositionedTrackChild;
-    resolveChildStart: (
-        child: ItemDeclaration | GroupBlock | ParallelBlock,
-        seqDefault: number,
-        laneLeftX: number,
-        ctx: LayoutContext,
-    ) => number;
-    newCursor: (x: number, y: number) => TrackCursor;
-    estimateTextWidth: (text: string, fontSize: number) => number;
-    /** Predict the extra vertical height an item's bar will grow by
-     *  (a wrapped title over a meta line, or wrapped label-chip rows);
-     *  used to size the row-packer's row pitch ahead of the call to
-     *  `sequenceItem`. */
-    predictItemBarExtraHeight: (
-        item: ItemDeclaration,
-        startX: number,
-        ctx: LayoutContext,
-    ) => number;
-}
 
 export class GroupNode {
     constructor(
         public readonly node: GroupBlock,
-        private readonly deps: GroupNodeDeps,
+        private readonly deps: LayoutHelpers,
     ) {}
 
     get id(): string {

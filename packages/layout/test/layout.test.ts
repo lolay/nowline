@@ -6,7 +6,8 @@ import {
     type PositionedItem,
     type PositionedTrackChild,
 } from '../src/index.js';
-import { SwimlaneNode, type SwimlaneNodeDeps } from '../src/nodes/swimlane-node.js';
+import type { LayoutHelpers } from '../src/layout-context.js';
+import { SwimlaneNode } from '../src/nodes/swimlane-node.js';
 import { ITEM_INSET_PX } from '../src/themes/shared.js';
 import { parseAndResolve } from './helpers.js';
 
@@ -1539,7 +1540,7 @@ swimlane "Platform"
                     '  item wide "Internationalization of\\nthe billing service" duration:2w\n',
                 ),
             );
-            const lane = place.mock.contexts[0] as unknown as { deps: SwimlaneNodeDeps };
+            const lane = place.mock.contexts[0] as unknown as { deps: LayoutHelpers };
             const ctx = place.mock.calls[0][1];
             const decl = file.roadmapEntries
                 .filter(isSwimlaneDeclaration)

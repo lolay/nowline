@@ -12,25 +12,16 @@ import {
 } from '../container-header-geometry.js';
 import { propValues } from '../dsl-utils.js';
 import { computeContainerInlineDatePins, pickInlineDate } from '../inline-date-pin-geometry.js';
-import type { LayoutContext, TrackCursor } from '../layout-context.js';
+import type { LayoutContext, LayoutHelpers, TrackCursor } from '../layout-context.js';
 import { resolveStyle } from '../style-resolution.js';
 import { TRACK_BLOCK_TAIL_GUTTER_PX } from '../themes/shared.js';
 import type { BoundingBox, PositionedParallel, PositionedTrackChild } from '../types.js';
 import { waveFloorX } from '../wave-layout.js';
 
-export interface ParallelNodeDeps {
-    sequenceOne: (
-        child: ItemDeclaration | GroupBlock | ParallelBlock,
-        cursor: TrackCursor,
-        ctx: LayoutContext,
-    ) => PositionedTrackChild;
-    newCursor: (x: number, y: number) => TrackCursor;
-}
-
 export class ParallelNode {
     constructor(
         public readonly node: ParallelBlock,
-        private readonly deps: ParallelNodeDeps,
+        private readonly deps: Pick<LayoutHelpers, 'sequenceOne' | 'newCursor'>,
     ) {}
 
     get id(): string {

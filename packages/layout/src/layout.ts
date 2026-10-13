@@ -313,7 +313,6 @@ interface ResolvedItemMeta {
 function resolveItemMeta(
     props: EntityProperty[],
     ctx: LayoutContext,
-    ownerOverride: string | undefined,
     sizeResolved: ResolvedSize | null,
     status: StatusKind,
     progress: number,
@@ -332,7 +331,7 @@ function resolveItemMeta(
         : sizeChipText || undefined;
     const remainingRaw = propValue(props, 'remaining');
     const remainingLiteral = resolveDurationLiteral(remainingRaw, ctx);
-    const ownerDisplay = resolveActorDisplay(ownerOverride ?? propValue(props, 'owner'), ctx);
+    const ownerDisplay = resolveActorDisplay(propValue(props, 'owner'), ctx);
     const metaHead = (): string => [driverToken, ownerDisplay].filter(Boolean).join(' ');
     let metaText: string | undefined;
     if (status === 'in-progress' && remainingLiteral) {
@@ -454,7 +453,6 @@ function sequenceItem(
     node: ItemDeclaration,
     cursor: TrackCursor,
     ctx: LayoutContext,
-    ownerOverride?: string,
 ): PositionedItem {
     const props = node.properties;
     const resolvedStyle = resolveStyle('item', props, ctx.styleCtx);
@@ -583,7 +581,6 @@ function sequenceItem(
     const { metaText, ownerDisplay, capacity, capacityTrailingWidth } = resolveItemMeta(
         props,
         ctx,
-        ownerOverride,
         sizeResolved,
         status,
         progress,
@@ -756,7 +753,7 @@ function sequenceItem(
     // `footnoteIndicators` (one superscript per footnote that names this
     // item) was resolved above, before the caption fit.
 
-    const owner = ownerDisplay ?? ownerOverride ?? propValue(props, 'owner');
+    const owner = ownerDisplay ?? propValue(props, 'owner');
     const description = node.description?.text;
 
     // Footnote glyphs only need to spill when there's at least one
@@ -1084,7 +1081,6 @@ function predictItemBarExtraHeight(
     const { metaText, capacity, capacityTrailingWidth } = resolveItemMeta(
         props,
         ctx,
-        undefined,
         sizeResolved,
         status,
         progress,
@@ -1176,7 +1172,7 @@ function resolveChildStart(
     child: ItemDeclaration | GroupBlock | ParallelBlock,
     seqDefault: number,
     // Unused since F1 (`after:` starts at the lane cursor, not the lane's
-    // left edge); the `*Deps` signatures still thread it until R2 merges them.
+    // left edge); `LayoutHelpers.resolveChildStart` still threads it.
     _laneLeftX: number,
     ctx: LayoutContext,
 ): number {

@@ -34,14 +34,13 @@ import { blockTitleRowSpillReservation } from '../container-header-geometry.js';
 import { propValue } from '../dsl-utils.js';
 import { frameTabGeometry } from '../frame-tab-geometry.js';
 import { computeLaneUtilization, resolveLaneUtilizationThresholds } from '../lane-utilization.js';
-import { type LayoutContext, scheduledItemDays, type TrackCursor } from '../layout-context.js';
+import { type LayoutContext, type LayoutHelpers, scheduledItemDays } from '../layout-context.js';
 import { RowPacker } from '../row-packer.js';
 import { resolveStyle } from '../style-resolution.js';
 import { ITEM_INSET_PX, MIN_ITEM_WIDTH } from '../themes/shared.js';
 import type {
     BoundingBox,
     PositionedCapacity,
-    PositionedItem,
     PositionedSwimlane,
     PositionedTrackChild,
 } from '../types.js';
@@ -77,38 +76,6 @@ function resolveLaneCapacity(
         capacity: { value, text, icon },
         badgeWidthPx,
     };
-}
-
-/** Helpers that SwimlaneNode delegates to until the rest of m2.5c lands. */
-export interface SwimlaneNodeDeps {
-    sequenceItem: (
-        child: ItemDeclaration,
-        cursor: TrackCursor,
-        ctx: LayoutContext,
-        ownerOverride?: string,
-    ) => PositionedItem;
-    sequenceOne: (
-        child: ItemDeclaration | GroupBlock | ParallelBlock,
-        cursor: TrackCursor,
-        ctx: LayoutContext,
-    ) => PositionedTrackChild;
-    resolveChildStart: (
-        child: ItemDeclaration | GroupBlock | ParallelBlock,
-        seqDefault: number,
-        laneLeftX: number,
-        ctx: LayoutContext,
-    ) => number;
-    newCursor: (x: number, y: number) => TrackCursor;
-    estimateTextWidth: (text: string, fontSize: number) => number;
-    /** Predict the extra vertical height an item's bar will grow by
-     *  (a wrapped title over a meta line, or wrapped label-chip rows);
-     *  used to size the row-packer's row pitch ahead of the call to
-     *  `sequenceItem`. */
-    predictItemBarExtraHeight: (
-        item: ItemDeclaration,
-        startX: number,
-        ctx: LayoutContext,
-    ) => number;
 }
 
 export interface SwimlaneNodeInput {
@@ -189,7 +156,7 @@ function firstChildStartX(
     lane: SwimlaneDeclaration,
     laneLeftX: number,
     ctx: LayoutContext,
-    deps: Pick<SwimlaneNodeDeps, 'resolveChildStart'>,
+    deps: Pick<LayoutHelpers, 'resolveChildStart'>,
 ): number | undefined {
     for (const child of lane.content) {
         if (child.$type === 'DescriptionDirective') continue;
@@ -209,7 +176,7 @@ function firstChildStartX(
 export class SwimlaneNode {
     constructor(
         public readonly input: SwimlaneNodeInput,
-        private readonly deps: SwimlaneNodeDeps,
+        private readonly deps: LayoutHelpers,
     ) {}
 
     get id(): string {
