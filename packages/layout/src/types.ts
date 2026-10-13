@@ -99,8 +99,13 @@ export interface Point {
 
 // Header + attribution mark + optional logo.
 export interface PositionedLogo {
+    // Drawn box in canvas coordinates. Its aspect ratio matches the asset's,
+    // so the logo fills it exactly.
     box: BoundingBox;
     assetRef?: string; // path as declared in DSL; renderer resolves via AssetResolver
+    // The asset's own size (SVG width/height or viewBox, raster pixels),
+    // which the renderer scales from.
+    intrinsic?: { width: number; height: number };
 }
 
 export interface PositionedHeader {
@@ -119,6 +124,10 @@ export interface PositionedHeader {
     // height grows for wrapped lines).
     cardBox: BoundingBox;
     logo?: PositionedLogo;
+    // Offset applied to every title and author line, set only when a logo
+    // shares the card: `x` clears the logo, `y` centers the text block
+    // when the logo made the card taller than the text needs.
+    textInset?: Point;
     style: ResolvedStyle;
     // Attribution mark (Nowline wordmark + link) lives in the top-right.
     attributionBox: BoundingBox;

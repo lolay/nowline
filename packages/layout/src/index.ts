@@ -39,10 +39,19 @@ export {
     HEADER_CARD_PADDING_BOTTOM,
     HEADER_CARD_PADDING_TOP,
     HEADER_CARD_PADDING_X,
+    HEADER_LOGO_GAP_PX,
+    HEADER_LOGO_MAX_WIDTH_PX,
+    HEADER_LOGO_PAD_Y_PX,
     HEADER_TITLE_FONT_SIZE_PX,
     HEADER_TITLE_LINE_HEIGHT_PX,
     HEADER_TITLE_TO_AUTHOR_GAP_PX,
 } from './header-card-geometry.js';
+export {
+    type LogoDimensions,
+    type LogoSizePreset,
+    roadmapLogoRef,
+    scaleLogo,
+} from './header-logo.js';
 export {
     INCLUDE_CHROME_BADGE_GAP_PX,
     INCLUDE_CHROME_BADGE_SIZE_PX,

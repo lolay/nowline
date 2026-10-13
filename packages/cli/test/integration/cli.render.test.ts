@@ -874,3 +874,93 @@ describeBuilt('render: --non-working', () => {
         expect(r.stdout).toContain(LAYER);
     });
 });
+
+describeBuilt('roadmap logo: (requires `pnpm build`)', () => {
+    const logoDsl = (ref: string): string =>
+        `nowline v1\n\nroadmap r "R" logo:"${ref}" start:2026-01-05\n\nswimlane a "A"\n  item x duration:1w\n`;
+
+    it('embeds the logo scaled to logo-size, aspect ratio kept', async () => {
+        await withTempDir(async (dir) => {
+            await fs.writeFile(
+                path.join(dir, 'acme.svg'),
+                '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 300 100"><rect width="300" height="100"/></svg>',
+            );
+            await fs.writeFile(path.join(dir, 'r.nowline'), logoDsl('./acme.svg'));
+            const r = await runCliBuilt(['r.nowline', '-o', '-'], { cwd: dir });
+            expect(r.exitCode).toBe(0);
+            expect(r.stderr).toBe('');
+            expect(r.stdout).toMatch(/<svg data-layer="logo" height="36"[^>]* width="108"/);
+        });
+    });
+
+    it('warns on a missing logo and renders without it', async () => {
+        await withTempDir(async (dir) => {
+            await fs.writeFile(path.join(dir, 'r.nowline'), logoDsl('./missing.svg'));
+            const r = await runCliBuilt(['r.nowline', '-o', '-'], { cwd: dir });
+            expect(r.exitCode).toBe(0);
+            expect(r.stderr).toContain('warning: logo file not found: ./missing.svg');
+            expect(r.stdout).toContain('</svg>');
+            expect(r.stdout).not.toContain('data-layer="logo"');
+        });
+    });
+
+    it('treats a URL as a path that does not resolve', async () => {
+        await withTempDir(async (dir) => {
+            await fs.writeFile(
+                path.join(dir, 'r.nowline'),
+                logoDsl('https://example.com/acme.svg'),
+            );
+            const r = await runCliBuilt(['r.nowline', '-o', '-'], { cwd: dir });
+            expect(r.exitCode).toBe(0);
+            expect(r.stderr).toContain(
+                'warning: logo file not found: https://example.com/acme.svg',
+            );
+            expect(r.stdout).not.toContain('data-layer="logo"');
+        });
+    });
+
+    it('passes --strict with an editor-saved SVG and keeps its colors', async () => {
+        await withTempDir(async (dir) => {
+            await fs.writeFile(
+                path.join(dir, 'acme.svg'),
+                '<?xml version="1.0"?>\n<svg width="120mm" height="40mm" viewBox="0 0 120 40" version="1.1" ' +
+                    'xmlns:inkscape="http://www.inkscape.org/namespaces/inkscape" xmlns="http://www.w3.org/2000/svg">' +
+                    '<g inkscape:groupmode="layer"><rect style="fill:#1e3a8a;stroke:none" width="120" height="40"/></g></svg>',
+            );
+            await fs.writeFile(path.join(dir, 'r.nowline'), logoDsl('./acme.svg'));
+            const r = await runCliBuilt(['r.nowline', '-o', '-', '--strict'], { cwd: dir });
+            expect(r.exitCode).toBe(0);
+            expect(r.stderr).toBe('');
+            expect(r.stdout).toContain('fill="#1e3a8a"');
+        });
+    });
+
+    it('reports removed SVG content in one line, and fails it under --strict', async () => {
+        await withTempDir(async (dir) => {
+            await fs.writeFile(
+                path.join(dir, 'acme.svg'),
+                '<svg viewBox="0 0 3 1"><script>alert(1)</script><rect onclick="x()" width="3" height="1"/></svg>',
+            );
+            await fs.writeFile(path.join(dir, 'r.nowline'), logoDsl('./acme.svg'));
+            const line =
+                'logo ./acme.svg: removed unsupported SVG content: <script>, event handler onclick';
+            const warned = await runCliBuilt(['r.nowline', '-o', '-'], { cwd: dir });
+            expect(warned.exitCode).toBe(0);
+            expect(warned.stderr.trim()).toBe(`warning: ${line}`);
+            expect(warned.stdout).toContain('data-layer="logo"');
+            const strict = await runCliBuilt(['r.nowline', '-o', '-', '--strict'], { cwd: dir });
+            expect(strict.exitCode).toBe(3);
+            expect(strict.stderr).toContain(line);
+        });
+    });
+
+    it('fails a missing logo under --strict', async () => {
+        await withTempDir(async (dir) => {
+            await fs.writeFile(path.join(dir, 'r.nowline'), logoDsl('./missing.svg'));
+            const r = await runCliBuilt(['r.nowline', '-o', '-', '--strict'], { cwd: dir });
+            // An exporter pipeline failure (specs/cli.md § Exit codes).
+            expect(r.exitCode).toBe(3);
+            expect(r.stderr).toContain('logo file not found: ./missing.svg');
+        });
+    });
+});

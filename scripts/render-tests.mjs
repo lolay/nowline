@@ -71,6 +71,8 @@ const MANIFEST = [
     { slug: 'marker-left-overflow', theme: 'light', now: '2026-01-07' },
     // Starts 2026-06-01; `now` sits inside the Summer Fridays run.
     { slug: 'non-working-recurrence', theme: 'light', now: '2026-07-15' },
+    { slug: 'logo-beside', theme: 'light', now: NOW },
+    { slug: 'logo-above-xl', theme: 'light', now: NOW },
 ];
 
 function run(cmd, args, opts = {}) {

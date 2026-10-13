@@ -298,6 +298,7 @@ async function produce(args: ProduceArgs): Promise<ProduceResult> {
         pngScale: parseScale(args.scale),
         msprojStart: args.start,
         onNotice: (message) => args.log.notice(message),
+        onWarning: (message) => args.log.notice(`warning: ${message}`),
     };
 
     try {

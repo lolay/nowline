@@ -111,8 +111,8 @@ The pure SVG renderer takes the positioned model and produces an SVG string. It 
 The roadmap header renders as a contained box in the top-left corner, above and to the left of the timeline:
 
 - Title on the first line, author (if set) on a second line in smaller muted text — both in the same box
-- **Company logo (optional)** — when the roadmap declares `logo:`, the logo renders to the **left of the title**, vertically centered with the title line. Logo height follows `logo-size:` (default `md`) and is capped at the header box height; aspect ratio is preserved by scaling width to match.
-- Minimal vertical footprint — the box height is determined by content, not a fixed size. The company logo does not expand the header — if the logo's natural height at the selected `logo-size` exceeds the box, it is scaled down to fit.
+- **Company logo (optional)** — when the roadmap declares `logo:`, the logo renders inside the header card, **left of the title and author**, vertically centered in the card. The title and author shift right by the logo width plus a 12 px gap (`HEADER_LOGO_GAP_PX`). Both `header-position:beside` and `above` place it this way; see § Company Logo Size Presets for how big it draws.
+- Minimal vertical footprint — the box height is determined by content, not a fixed size. A logo taller than the title and author text grows the card to the logo height plus 10 px above and below (`HEADER_LOGO_PAD_Y_PX`), and the text block centers vertically in the taller card. In `above` mode the 72 px band grows the same way, which only `logo-size:xl` triggers, and the chart moves down by the difference.
 - A Nowline attribution mark — small version of the Nowline logo rendered in the bottom-right corner of the header box, scaled down as a subtle attribution mark. Links to `nowline.io`. The user's company logo does **not** replace or displace this mark.
 - The header box does not span the full width of the chart; it sits to the left of the timeline header
 
@@ -122,33 +122,49 @@ The roadmap header renders as a contained box in the top-left corner, above and 
 
 | Extension | Embedding strategy |
 |-----------|--------------------|
-| `.svg` | Inlined as an SVG `<symbol>`/`<g>` inside the output. The logo's `<defs>` / IDs are namespaced (`nl-logo-*`) to avoid collisions with the renderer's own SVG. `<script>`, external `href`, and foreign-object content are stripped during embedding (sanitized inline SVG only). |
-| `.png`, `.jpg` / `.jpeg`, `.webp` | Base64-encoded and embedded as `<image href="data:image/<type>;base64,...">`. The raster is read from disk once at render time; no re-encoding. |
+| `.svg` | Sanitized (see below) with its ids namespaced (`<idPrefix>-logo-*`), then inlined inside a nested `<svg data-layer="logo">` viewport sized to the logo box. The asset's root `<svg>` loses its own `x` / `y` / `width` / `height` so it fills that viewport, and the viewport's `viewBox` (the asset's intrinsic size) scales it. |
+| `.png`, `.jpg` / `.jpeg`, `.webp` | Base64-encoded and embedded as `<image data-layer="logo" href="data:image/<type>;base64,...">` at the logo box's width and height. No re-encoding. |
 
-All embedding is synchronous during render — the output artifact is self-contained and has no external references for the logo.
+The output artifact is self-contained and has no external references for the logo.
+
+**SVG sanitizing.** The sanitizer is an allow-list walker (`packages/renderer/src/svg/sanitize.ts`): an element or attribute it does not know is removed, never passed through. What it does with the rest:
+
+- **Removed, with a warning:** `<script>`, `<foreignObject>`, animation elements, event handlers (`on*`), any `href` or `url()` that is not a local `#fragment` (no external fetches), `data:` / `javascript:` values and CSS escapes, and unknown elements and attributes that could draw something.
+- **Styles kept as attributes:** an inline `style` and the rules of a `<style>` sheet whose selectors are plain classes (`.cls-1, .cls-2 { ... }`, as Illustrator and Figma export) become presentation attributes, in cascade order (attribute, then class rules in sheet order, then inline `style`). Only presentation properties survive (`fill`, `stroke*`, `opacity`, `font-*`, `display`, `visibility` and the like), and each value passes the same checks as an attribute. Editors keep a logo's colors here, so dropping styles would draw it black. Other selectors and at-rules are not applied and draw a warning; the `<style>` element is never emitted.
+- **Removed silently:** editor bookkeeping that never draws: `<metadata>`, namespaced elements and attributes (`inkscape:*`, `sodipodi:*`, `xmlns:*`, `xml:space`), `data-*`, `version`, vendor-prefixed style properties, typographic properties the renderer does not draw (`line-height`, `font-variant-ligatures`, ...), and any unsupported property set to `none`, `normal` or `auto`. A logo saved straight from Inkscape or Illustrator therefore draws no warning at all.
+
+The warnings for one logo collapse into a single line: `logo <path>: removed unsupported SVG content: <script>, event handler onclick`.
+
+**Load before layout.** The logo's size depends on its aspect ratio, which layout cannot read (it never touches asset bytes). So each render pipeline (the export kernel behind `nowline` render, `nowline serve`, and the browser pipeline behind the VS Code preview) loads the asset first with `loadLogo` from `@nowline/renderer`. It reads the intrinsic size from the file header (PNG `IHDR`, the JPEG start-of-frame, the WebP `VP8 ` / `VP8L` / `VP8X` chunk, or the SVG root's pixel `width` and `height`, else its `viewBox`) and passes it to `layoutRoadmap` as `LayoutOptions.logo`. A surface with no asset resolver (the embed) skips the logo silently.
 
 #### Company Logo Size Presets
 
-`logo-size:` maps to a logical height relative to the title text. Concrete pixel values are renderer-owned (same convention as `text-size` and `padding`):
+`logo-size:` sets the drawn logo **height**; the width follows the logo's intrinsic aspect ratio. Because the logo box always has the asset's own shape, the asset is scaled to fill it exactly, up or down: a 4000 px source and a 40 px source of the same shape draw at the same size. A raster smaller than its slot is upscaled and may look soft; supply a larger raster or an SVG.
 
-- `xs` — roughly the x-height of the title text
-- `sm` — roughly the cap-height of the title text
-- `md` *(default)* — roughly the full line-height of the title
-- `lg` — title line-height + author line-height (fills the header content box)
-- `xl` — 1.25× the full header content box; triggers a header height bump so the logo fits
+| Preset | Height |
+|--------|--------|
+| `xs` | 18 px |
+| `sm` | 24 px |
+| `md` *(default)* | 36 px |
+| `lg` | 48 px |
+| `xl` | 72 px |
 
-Width is derived from the logo's intrinsic aspect ratio. Logos wider than the default title column push the title text to the right within the header box rather than overflowing it.
+A logo that would be wider than 160 px (`HEADER_LOGO_MAX_WIDTH_PX`) at its preset height scales down uniformly until it is 160 px wide, so a long wordmark draws shorter than the preset. In `beside` mode the logo slot widens the card past the 240 px text-column cap; the title still wraps at the same width.
+
+**Fit, not fill or stretch.** The renderer draws the logo with `preserveAspectRatio="xMidYMid meet"`. Since the box matches the asset's aspect ratio, `meet` (fit) and `slice` (fill) produce the same picture. `meet` only matters if the two ever disagree (an SVG whose declared size and drawing differ), and then it letterboxes rather than cropping part of a wordmark (`slice`) or distorting it (`none`).
 
 #### Company Logo Error Handling
 
-Logo resolution is a render-time concern:
+Logo resolution is a render-time concern. Each failure is a warning, and the chart renders exactly as if no logo were declared:
 
-- **Missing file** — warning `logo file not found: <path>`; render proceeds without the logo.
-- **Unsupported extension** — warning `unsupported logo format: <ext>` (only `.svg`, `.png`, `.jpg`, `.jpeg`, `.webp` are accepted); render proceeds without the logo.
-- **Corrupt / unparseable** — warning `logo could not be parsed: <path>`; render proceeds without the logo.
-- **Non-local URL** (`http://`, `https://`, `file://`, `data:`) — this is a parser error and never reaches the renderer; see `dsl.md`.
+- **Unsupported extension** (anything but `.svg`, `.png`, `.jpg`, `.jpeg`, `.webp`) — `unsupported logo format: <ext> (<path>)`. The file is not read.
+- **Missing file**, or a path the asset resolver refuses (one that escapes `--asset-root`) — `logo file not found: <path> (<reason>)`.
+- **Unreadable** — `logo could not be parsed: <path> (<reason>)`: a raster whose header does not match its extension, or an SVG with neither a `viewBox` nor a pixel `width` and `height` on its root.
+- **URL** (`http://`, `https://`, `file://`, `data:`) — not special-cased: it is treated as a local path, fails to resolve, and draws the missing-file warning. The renderer never fetches remote assets.
 
-`nowline <input> --strict` promotes all logo warnings to errors with a non-zero exit code.
+- **Unsafe or unsupported SVG content** — the one-line summary above; the logo still draws, minus what was removed.
+
+`nowline <input> --strict` promotes all logo warnings to errors (exit code 3, like any export pipeline failure). Without `--strict` the CLI prints them to stderr as `warning: ...`, which `-q` silences.
 
 ### Timeline Scale
 

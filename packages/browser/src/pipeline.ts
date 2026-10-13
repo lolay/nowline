@@ -32,10 +32,11 @@ import {
     type NormalizedZone,
     normalizeZone,
     resolveToday,
+    roadmapLogoRef,
     type ThemeName,
     TimezoneError,
 } from '@nowline/layout';
-import { type AssetResolver, type FontFamilies, renderSvg } from '@nowline/renderer';
+import { type AssetResolver, type FontFamilies, loadLogo, renderSvg } from '@nowline/renderer';
 import { URI } from 'langium';
 import {
     type DiagnosticRow,
@@ -299,12 +300,19 @@ export async function renderSource(
     // Pass today as-is: null suppresses the now-line, undefined defaults to
     // local today (or zone), a string is parsed, a Date is used directly.
     const today = resolveToday({ now: options.today, zone });
+    // Renderer warnings, starting with the logo load: a failed load lays out
+    // as if no logo were declared and reports like any render warning.
+    const warnMessages: string[] = [];
+    const logo = await loadLogo(roadmapLogoRef(parsed.ast), options.assetResolver, (msg) =>
+        warnMessages.push(msg),
+    );
     const model = layoutRoadmap(parsed.ast, resolved, {
         theme: options.theme,
         today,
         locale: options.locale,
         width: options.width,
         nonWorking: options.nonWorking,
+        logo,
     });
 
     const diagnosticLevel = options.diagnosticLevel ?? 'error';
@@ -316,7 +324,6 @@ export async function renderSource(
 
     const showLinks = options.showLinks !== false;
     const strict = options.strict === true;
-    const warnMessages: string[] = [];
 
     const svg = await renderSvg(model, {
         idPrefix: options.idPrefix,

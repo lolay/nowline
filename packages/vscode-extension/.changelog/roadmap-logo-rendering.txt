@@ -1,0 +1,3 @@
+```release-note:fixed
+The preview and exports now draw the roadmap's `logo:` in the header card, sized by `logo-size:`. A missing or unreadable logo is skipped (an error in the diagnostics table when `nowline.preview.strict` is on).
+```

@@ -5,7 +5,7 @@
 .\" Empreinte de la page anglaise relue pour cette traduction. Après avoir
 .\" reporté une modification de la page anglaise, remplacez-la par la ligne
 .\" qu'affiche packages/cli/test/man/translation-parity.test.ts.
-.\" translated-from: nowline.5 sha256:e4e70c070b97e5ae77cc5cb0cdfbdba7208505c4d0c848db151db857390545cc
+.\" translated-from: nowline.5 sha256:61fbb79d49a1a102967c74a04ad445c886a22e6cf6f5b5e48646aca5174d6442
 .\"
 .\" Les mots-clés du DSL (nowline, config, roadmap, swimlane, item, parallel,
 .\" group, person, team, anchor, label, size, status, wave, milestone, footnote,
@@ -821,14 +821,32 @@ résolu relativement au répertoire du fichier
 .Pa .nowline .
 Barres obliques sur toutes les plateformes\ ; seuls les chemins
 locaux sont acceptés.
+Le logo est dessiné à gauche du titre dans la carte d'en-tête,
+centré verticalement, et intégré à la sortie (SVG en ligne, image
+matricielle en URI de données base64).
 La résolution des ressources a lieu au moment du rendu, pas de
 l'analyse \(em un fichier référant un logo absent reste un
 document valide.
+Un logo absent, d'un format non pris en charge ou illisible produit
+un avertissement et le graphique est rendu comme si aucun logo
+n'était déclaré\ ; avec
+.Fl -strict ,
+c'est une erreur.
 .It Sy logo-size:
 Préréglage de taille
 .Pq Sy xs | sm | md | lg | xl ,
 .Sy md
 par défaut.
+Fixe la hauteur du logo dessiné (18, 24, 36, 48 ou 72\ px)\ ; la
+largeur suit les proportions du logo, si bien qu'une source plus
+grande ou plus petite est mise à l'échelle pour remplir le même
+emplacement.
+Un logo plus large que 160\ px à cette hauteur est réduit pour tenir.
+Un logo plus haut que le titre et l'auteur agrandit la carte
+d'en-tête\ ;
+.Sy xl
+agrandit aussi la bande de 72\ px de
+.Sy header-position:above .
 .El
 .Pp
 Treize mots-clés de la section roadmap\ :
