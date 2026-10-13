@@ -30,7 +30,7 @@ last commit before the PR merges.
 - wave-3 (nowline m2 s1): PASS (check_wave.py false positive on main's commit, see Deviations).
 - wave-4 (nowline m2 s2): PASS.
 - wave-5 (nowline m2 s3): PASS. Checkpoint: gate 2 ([deep] after [exec]) passed unattended before wave 5.
-- wave-6 (nowline m2 s4-s7): CONCERNS (worker disclosed breach; review PASS). Gate 1, stopped.
+- wave-6 (nowline m2 s4-s7): CONCERNS (worker disclosed breach; review PASS). Gate 1: Gary waived it ("waive", 2026-10-13).
 - No fix-ups or retries. Checkpoints: gate 4 (new milestone m2) and gate 2 ([deep] after [exec]) passed unattended before wave 3.
 
 ## Spend
@@ -39,11 +39,11 @@ last commit before the PR merges.
 
 ## Next unit
 
-Depends on Gary's answer: a waiver leads to final verification and completion; a fix-up leads to unit 6-fix (re-run the s4-s7 gates through the Makefile only).
+Final verification (make ci, make pack-mcpb, changelog check), then completion.
 
 ## Pending question
 
-Wave 6 (m2.s4-s7, 9b64c58..9d12547) is done and its review passed, but the worker disclosed a breach, which stops the run at gate 1. It ran vitest directly (`npx vitest` on single files in packages/mcp and packages/cli, plus one `pnpm --filter @nowline/integration-tests exec vitest` browser run) instead of going through the Makefile. The reviewer also found one undisclosed `npm exec -- tsc --noEmit` in packages/cli. All of it was local and read-only: nothing was pushed, tagged or published, and the final gates ran through make. Reply `waive` to accept it and go to final verification (make ci, make pack-mcpb, changelog check), or `fix-up` to have a worker re-run every gate for s4-s7 through the Makefile only.
+None.
 
 ## How to resume
 
