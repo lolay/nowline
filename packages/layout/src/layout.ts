@@ -8,7 +8,6 @@ import type {
     SwimlaneDeclaration,
 } from '@nowline/core';
 import { buildWavePlan, isGroupBlock, isItemDeclaration, isParallelBlock } from '@nowline/core';
-import { literalToDays } from './calendar.js';
 import { formatIsoDate, parseDate, propValue, propValues } from './dsl-utils.js';
 import {
     ChannelGrid,
@@ -70,7 +69,6 @@ import type {
     PositionedSwimlane,
     PositionedTrackChild,
 } from './types.js';
-import { tickBoundaryAtOrAfter, type ViewPreset } from './view-preset.js';
 import {
     accumulateWaveMember,
     dateAtX,
@@ -79,7 +77,6 @@ import {
     wavePinOverrideOf,
     waveRoleOf,
 } from './wave-layout.js';
-import { daysPerUnit } from './working-calendar.js';
 
 export interface LayoutOptions {
     theme?: ThemeName;
@@ -654,76 +651,6 @@ function startPinOf(
     return undefined;
 }
 
-// Compute a sensible [startDate, endDate] window from the roadmap's day
-// schedule (`scheduleRoadmap`, specs/scheduler-unification.md §3.3).
-//
-// Precedence:
-//   1. An explicit `length:` is a minimum span; content (including wave
-//      barriers E_n and every S_k) past it grows the window to the next
-//      tick boundary.
-//   2. Otherwise we derive the end day from the actual content extent
-//      (`schedule.extent.contentEndDay`: latest lane cursor, anchor date,
-//      milestone date/after, wave edge) and today's now-line if it falls
-//      past the content. This keeps the rendered chart from defaulting to
-//      a 180-day desert when the content only spans a few weeks.
-//   3. As a last resort (no content + no length), fall back to a small
-//      4-week placeholder so an empty roadmap still draws a sensible axis.
-//
-// The start is `schedule.startDate`: the roadmap's `start:`, else `today`
-// (see `scheduleRoadmap`). Every day count is a working-day index from the
-// start (specs/working-calendar.md §5) under the schedule's calendar. A
-// calendar with no non-working day keeps calendar-day arithmetic.
-//
-// Exported for tests; not part of the package surface.
-export function computeDateWindow(
-    file: NowlineFile,
-    schedule: RoadmapSchedule,
-    today: Date | undefined,
-    scale: ViewPreset,
-): { startDate: Date; endDate: Date } {
-    const props = file.roadmapDecl?.properties ?? [];
-    const { config: cal, working: calendar } = schedule.calendar;
-    const { startDate } = schedule;
-    const lengthRaw = propValue(props, 'length');
-    let minDays = 0;
-    if (lengthRaw) {
-        const days = literalToDays(lengthRaw, cal);
-        if (days > 0) {
-            minDays = days;
-        }
-    }
-    // An explicit `length:` bounds the now-line: a far-future `today` must
-    // not stretch a deliberately-sized roadmap (that case stays out of range
-    // and surfaces as an NL.W1000 insight). Content overflow — items,
-    // anchors, milestones — still grows the window below via `padded`, with
-    // `length:` acting purely as the floor. Without `length:`, `today`
-    // extends the window so the now-line is always in range.
-    let contentDays = schedule.extent.contentEndDay;
-    if (today && !(minDays > 0)) {
-        const t = calendar.workingIndexOf(startDate, today);
-        if (t > 0) contentDays = Math.max(contentDays, t);
-    }
-    const tickDays = daysPerUnit(scale.unit, cal);
-    // Round up to the smallest tick boundary that is `>= contentDays`. When
-    // the latest content lands exactly on a tick boundary the chart ends
-    // exactly there (no extra trailing tick); otherwise we extend to the
-    // next tick so the right edge always sits on a labelled column. For
-    // month / quarter / year scales the boundary is a real month /
-    // quarter / year start, not a multiple of `days-per-month` etc.
-    const padded = tickBoundaryAtOrAfter(
-        startDate,
-        contentDays > 0 ? contentDays : 4 * cal.daysPerWeek,
-        scale.unit,
-        tickDays,
-        calendar,
-    );
-    const finalDays = Math.max(minDays, padded);
-    return {
-        startDate,
-        endDate: calendar.dateAtWorkingIndex(startDate, Math.max(1, finalDays)),
-    };
-}
-
 function buildDependencies(
     items: Map<string, ItemDeclaration>,
     swimlanes: PositionedSwimlane[],
@@ -949,7 +876,6 @@ export function layoutRoadmap(
         resolveChildStart,
         newCursor,
         estimateTextWidth,
-        computeDateWindow,
         collectItems,
         buildDependencies,
         buildNowline,

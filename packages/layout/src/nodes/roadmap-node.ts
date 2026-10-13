@@ -4,8 +4,8 @@
 // helpers) to produce the final `PositionedRoadmap` model.
 //
 // RoadmapNode does NOT import the sequencer helpers or the orchestration
-// helpers (`computeDateWindow`, `collectItems`, `buildDependencies`,
-// `buildNowline`) at module-init time. They live in
+// helpers (`collectItems`, `buildDependencies`, `buildNowline`) at
+// module-init time. They live in
 // `layout.ts` and are passed in via the `deps` argument. This avoids a
 // runtime cycle while keeping the composition logic in a dedicated file.
 
@@ -18,18 +18,16 @@ import type {
 } from '@nowline/core';
 import { defaultRowBand } from '../band-scale.js';
 import { daysBetween } from '../calendar.js';
-import { resolveWorkingCalendar } from '../calendar-resolver.js';
 import { cappedPixelsPerDay } from '../canvas-width.js';
 import { parseDate, propValue } from '../dsl-utils.js';
 import { resolveHeaderLogo } from '../header-logo.js';
-import { localeStrings, resolveLocale } from '../i18n.js';
+import { localeStrings } from '../i18n.js';
 import type { LayoutOptions, LayoutResult } from '../layout.js';
 import { createLayoutContext, type LayoutContext, type LayoutHelpers } from '../layout-context.js';
-import { isNonWorkingDisplay } from '../non-working-display.js';
+import { resolveDateWindow, resolveScope } from '../phases/date-window.js';
 import { shiftIncludeY, shiftSwimlaneY } from '../positioned-shift.js';
 import type { RoadmapSchedule } from '../schedule.js';
-import { resolveStyle, type StyleContext } from '../style-resolution.js';
-import { type Theme, type ThemeName, themes } from '../themes/index.js';
+import { resolveStyle } from '../style-resolution.js';
 import {
     ATTRIBUTION_GLYPH_HEIGHT,
     ATTRIBUTION_GLYPH_WIDTH,
@@ -52,13 +50,12 @@ import type {
     PositionedSwimlane,
     PositionedTimelineScale,
 } from '../types.js';
-import type { ViewPreset } from '../view-preset.js';
 import {
     buildHeaderTicks,
     buildNonWorkingRuns,
     buildWorkingExceptions,
-    resolveScale,
     tickBoundaryAtOrAfter,
+    type ViewPreset,
 } from '../view-preset.js';
 import { solveWaveBarriers } from '../wave-barrier.js';
 import {
@@ -149,12 +146,6 @@ function setCalendarRuns(
  * once when calling `RoadmapNode.place(...)`.
  */
 export interface RoadmapNodeDeps extends LayoutHelpers {
-    computeDateWindow: (
-        file: NowlineFile,
-        schedule: RoadmapSchedule,
-        today: Date | undefined,
-        scale: ViewPreset,
-    ) => { startDate: Date; endDate: Date };
     collectItems: (swimlanes: SwimlaneDeclaration[]) => Map<string, ItemDeclaration>;
     buildDependencies: (
         items: Map<string, ItemDeclaration>,
@@ -184,36 +175,30 @@ export class RoadmapNode {
         schedule: RoadmapSchedule,
         deps: RoadmapNodeDeps,
     ): LayoutResult {
-        const themeName: ThemeName = options.theme ?? 'light';
-        const theme: Theme = themes[themeName];
-        const locale = resolveLocale(options.locale, directiveLocale(file));
-
-        // The working calendar maps dates to working-day indices for the
-        // window, the axis and every placement (specs/working-calendar.md
-        // §5, §7.1).
-        const { config: cal, working: calendar } = resolveWorkingCalendar(file, resolved);
-        const scale = resolveScale(file, resolved.config.scale);
-        const styleCtx: StyleContext = {
-            theme,
-            styles: resolved.config.styles,
-            defaults: resolved.config.defaults,
-            labels: resolved.content.labels,
-        };
-
-        // Date window + header geometry. Window is content-aware: when
-        // `length:` is omitted we derive the end day from the latest
-        // dated/sequenced entity (item, anchor, milestone, today's
-        // now-line) instead of defaulting to a 180-day desert. The window is
-        // a projection of the day schedule (specs/scheduler-unification.md
-        // §3.3).
+        // Phase 1, the date window (specs/layout-phases.md §3.2): the scope
+        // (theme, locale, style context, `default roadmap` style) and the
+        // natural window, a projection of the day schedule
+        // (specs/scheduler-unification.md §3.3).
+        const scope = resolveScope(file, resolved, options);
+        const window = resolveDateWindow(file, resolved, options, scope, schedule);
+        const { themeName, theme, locale, styleCtx } = scope;
+        const {
+            cal,
+            calendar,
+            preset: scale,
+            startDate,
+            spanDays,
+            timelineDays,
+            nonWorking,
+        } = window;
+        // The natural end: the timeline extension below may grow the axis
+        // past it, and the now-pill row is reserved against it (L2).
+        const endDate = window.naturalEndDate;
         const plan = schedule.plan;
-        const { startDate, endDate } = deps.computeDateWindow(file, schedule, options.today, scale);
 
-        // Determine header position + timeline placement via `default roadmap`
-        // / theme. Raw style props (including `timeline-position` and
-        // `minor-grid`) are banned on the roadmap declaration itself, so the
-        // values come from the level-2 `default roadmap` line in config.
-        const headerStyle = resolveStyle('roadmap', file.roadmapDecl?.properties ?? [], styleCtx);
+        // Header position and the timeline placement come from the
+        // `default roadmap` style.
+        const headerStyle = scope.roadmapStyle;
         // `top` (default) keeps the legacy single-strip header; `bottom`
         // suppresses the top tick panel (now-pill and marker row stay
         // at the top because anchors / milestones live there); `both`
@@ -229,14 +214,6 @@ export class RoadmapNode {
         const showBottomTickPanel =
             tickPanelBucketHeight > 0 &&
             (headerStyle.timelinePosition === 'bottom' || headerStyle.timelinePosition === 'both');
-        // How non-working days are drawn: the surface option, then the
-        // file's `default roadmap non-working:` key (resolved to `hide` when
-        // absent). It reaches every placement through the time scale.
-        const nonWorking = isNonWorkingDisplay(options.nonWorking)
-            ? options.nonWorking
-            : headerStyle.nonWorking;
-        // `TimeScale.showsNonWorking`, needed here to size the scale's range.
-        const showsNonWorking = nonWorking === 'show' && calendar.hasNonWorkingDays;
 
         // Measure the header: the beside card's size or the above band's
         // height, which fix the chart's left edge and top. The company logo
@@ -260,12 +237,6 @@ export class RoadmapNode {
         // but caption spills and run labels can still grow the canvas
         // past it below. The two `GUTTER_PX` insets keep the header card
         // and attribution wordmark from butting against the canvas edges.
-        const spanDays = Math.max(1, calendar.workingIndexOf(startDate, endDate));
-        // Under `show` every calendar day takes `ppd`, so the chart widens by
-        // the non-working days in the window.
-        const timelineDays = showsNonWorking
-            ? Math.max(1, daysBetween(startDate, endDate))
-            : spanDays;
         const ppd = cappedPixelsPerDay({
             naturalPixelsPerDay: scale.pixelsPerUnit / calendar.daysPerUnit(scale.unit),
             dayCount: timelineDays,
@@ -952,16 +923,4 @@ export class RoadmapNode {
         };
         return model;
     }
-}
-
-// Read the optional `locale:` property from the file's `nowline` directive.
-// Layout receives an already-parsed AST, so this is a cheap lookup with no
-// validation work — that's the validator's job in `@nowline/core`.
-function directiveLocale(file: NowlineFile): string | undefined {
-    const prop = file.directive?.properties.find((p) => stripColon(p.key) === 'locale');
-    return prop?.value;
-}
-
-function stripColon(key: string): string {
-    return key.endsWith(':') ? key.slice(0, -1) : key;
 }
