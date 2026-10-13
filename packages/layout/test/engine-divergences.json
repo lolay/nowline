@@ -1,0 +1,345 @@
+{
+    "$comment": [
+        "Engine divergence register (specs/scheduler-unification.md §4 m1.s1, §6), checked by engine-divergence-register.test.ts.",
+        "Every place where engine A (the pixel layout) and engine C (scheduleRoadmap) give a sample's named item or wave a different span, keyed by sample path, then by item id, '<include path>#<id>' for an item of a first-level isolated region, or 'wave:<id>'.",
+        "classes lists every divergence of spec §1.2 that contributes, (a) to (f), or region-scope when C does not schedule the item at all. Fixing a divergence removes its letter, and the entry once no letter is left."
+    ],
+    "divergences": {
+        "examples/inline-date-pins.nowline": {
+            "us-rollout": {
+                "classes": ["(c)"],
+                "reason": "follows the api-track group, whose caption spills past its last child, and A's lane cursor advances to the group's box edge"
+            },
+            "eu-rollout": {
+                "classes": ["(c)"],
+                "reason": "a track of the same parallel as us-rollout, after the api-track group's caption spill"
+            }
+        },
+        "examples/isolate-include.nowline": {
+            "./partner.nowline#plugin-alpha": {
+                "classes": ["region-scope"],
+                "reason": "engine C does not schedule an isolated region in a roadmap without waves"
+            },
+            "./partner.nowline#plugin-beta": {
+                "classes": ["region-scope"],
+                "reason": "engine C does not schedule an isolated region in a roadmap without waves"
+            }
+        },
+        "examples/nested.nowline": {
+            "./nested/platform.nowline#pf-auth-refactor": {
+                "classes": ["region-scope"],
+                "reason": "engine C does not schedule an isolated region in a roadmap without waves"
+            },
+            "./nested/platform.nowline#pf-service-mesh": {
+                "classes": ["region-scope"],
+                "reason": "engine C does not schedule an isolated region in a roadmap without waves"
+            },
+            "./nested/platform.nowline#pf-api-gateway": {
+                "classes": ["region-scope"],
+                "reason": "engine C does not schedule an isolated region in a roadmap without waves"
+            },
+            "./nested/platform.nowline#pf-events": {
+                "classes": ["region-scope"],
+                "reason": "engine C does not schedule an isolated region in a roadmap without waves"
+            },
+            "./nested/platform.nowline#pf-telemetry": {
+                "classes": ["region-scope"],
+                "reason": "engine C does not schedule an isolated region in a roadmap without waves"
+            },
+            "./nested/platform.nowline#pf-agent-runtime": {
+                "classes": ["region-scope"],
+                "reason": "engine C does not schedule an isolated region in a roadmap without waves"
+            },
+            "./nested/platform.nowline#pf-agent-sdk": {
+                "classes": ["region-scope"],
+                "reason": "engine C does not schedule an isolated region in a roadmap without waves"
+            },
+            "./nested/platform.nowline#pf-ss-catalog": {
+                "classes": ["region-scope"],
+                "reason": "engine C does not schedule an isolated region in a roadmap without waves"
+            },
+            "./nested/platform.nowline#pf-ss-onboarding": {
+                "classes": ["region-scope"],
+                "reason": "engine C does not schedule an isolated region in a roadmap without waves"
+            },
+            "./nested/platform.nowline#pf-ss-billing": {
+                "classes": ["region-scope"],
+                "reason": "engine C does not schedule an isolated region in a roadmap without waves"
+            },
+            "./nested/ios.nowline#ios-offline": {
+                "classes": ["region-scope"],
+                "reason": "engine C does not schedule an isolated region in a roadmap without waves"
+            },
+            "./nested/ios.nowline#ios-push": {
+                "classes": ["region-scope"],
+                "reason": "engine C does not schedule an isolated region in a roadmap without waves"
+            },
+            "./nested/ios.nowline#ios-widgets": {
+                "classes": ["region-scope"],
+                "reason": "engine C does not schedule an isolated region in a roadmap without waves"
+            },
+            "./nested/ios.nowline#ios-agent-surface": {
+                "classes": ["region-scope"],
+                "reason": "engine C does not schedule an isolated region in a roadmap without waves"
+            },
+            "./nested/ios.nowline#ios-agent-voice": {
+                "classes": ["region-scope"],
+                "reason": "engine C does not schedule an isolated region in a roadmap without waves"
+            },
+            "./nested/ios.nowline#ios-performance": {
+                "classes": ["region-scope"],
+                "reason": "engine C does not schedule an isolated region in a roadmap without waves"
+            },
+            "./nested/ios.nowline#ios-onboarding": {
+                "classes": ["region-scope"],
+                "reason": "engine C does not schedule an isolated region in a roadmap without waves"
+            },
+            "./nested/ios.nowline#ios-camera": {
+                "classes": ["region-scope"],
+                "reason": "engine C does not schedule an isolated region in a roadmap without waves"
+            },
+            "./nested/ios.nowline#ios-crash": {
+                "classes": ["region-scope"],
+                "reason": "engine C does not schedule an isolated region in a roadmap without waves"
+            },
+            "./nested/ios.nowline#ios-agent-chat": {
+                "classes": ["region-scope"],
+                "reason": "engine C does not schedule an isolated region in a roadmap without waves"
+            },
+            "./nested/android.nowline#and-offline": {
+                "classes": ["region-scope"],
+                "reason": "engine C does not schedule an isolated region in a roadmap without waves"
+            },
+            "./nested/android.nowline#and-push": {
+                "classes": ["region-scope"],
+                "reason": "engine C does not schedule an isolated region in a roadmap without waves"
+            },
+            "./nested/android.nowline#and-material-you": {
+                "classes": ["region-scope"],
+                "reason": "engine C does not schedule an isolated region in a roadmap without waves"
+            },
+            "./nested/android.nowline#and-performance": {
+                "classes": ["region-scope"],
+                "reason": "engine C does not schedule an isolated region in a roadmap without waves"
+            },
+            "./nested/android.nowline#and-agent-surface": {
+                "classes": ["region-scope"],
+                "reason": "engine C does not schedule an isolated region in a roadmap without waves"
+            },
+            "./nested/android.nowline#and-agent-voice": {
+                "classes": ["region-scope"],
+                "reason": "engine C does not schedule an isolated region in a roadmap without waves"
+            },
+            "./nested/android.nowline#and-onboarding": {
+                "classes": ["region-scope"],
+                "reason": "engine C does not schedule an isolated region in a roadmap without waves"
+            },
+            "./nested/android.nowline#and-camera": {
+                "classes": ["region-scope"],
+                "reason": "engine C does not schedule an isolated region in a roadmap without waves"
+            },
+            "./nested/android.nowline#and-crash": {
+                "classes": ["region-scope"],
+                "reason": "engine C does not schedule an isolated region in a roadmap without waves"
+            },
+            "./nested/android.nowline#and-agent-chat": {
+                "classes": ["region-scope"],
+                "reason": "engine C does not schedule an isolated region in a roadmap without waves"
+            },
+            "./nested/web.nowline#web-spa-upgrade": {
+                "classes": ["region-scope"],
+                "reason": "engine C does not schedule an isolated region in a roadmap without waves"
+            },
+            "./nested/web.nowline#web-design-system": {
+                "classes": ["region-scope"],
+                "reason": "engine C does not schedule an isolated region in a roadmap without waves"
+            },
+            "./nested/web.nowline#web-agent-console": {
+                "classes": ["region-scope"],
+                "reason": "engine C does not schedule an isolated region in a roadmap without waves"
+            },
+            "./nested/web.nowline#web-agent-playground": {
+                "classes": ["region-scope"],
+                "reason": "engine C does not schedule an isolated region in a roadmap without waves"
+            },
+            "./nested/web.nowline#web-ss-portal": {
+                "classes": ["region-scope"],
+                "reason": "engine C does not schedule an isolated region in a roadmap without waves"
+            },
+            "./nested/web.nowline#web-ss-docs": {
+                "classes": ["region-scope"],
+                "reason": "engine C does not schedule an isolated region in a roadmap without waves"
+            },
+            "./nested/web.nowline#web-ss-onboarding": {
+                "classes": ["region-scope"],
+                "reason": "engine C does not schedule an isolated region in a roadmap without waves"
+            },
+            "./nested/web.nowline#web-a11y": {
+                "classes": ["region-scope"],
+                "reason": "engine C does not schedule an isolated region in a roadmap without waves"
+            },
+            "./nested/web.nowline#web-perf-budget": {
+                "classes": ["region-scope"],
+                "reason": "engine C does not schedule an isolated region in a roadmap without waves"
+            },
+            "./nested/web.nowline#web-search": {
+                "classes": ["region-scope"],
+                "reason": "engine C does not schedule an isolated region in a roadmap without waves"
+            },
+            "./nested/data.nowline#data-warehouse": {
+                "classes": ["region-scope"],
+                "reason": "engine C does not schedule an isolated region in a roadmap without waves"
+            },
+            "./nested/data.nowline#data-streaming": {
+                "classes": ["region-scope"],
+                "reason": "engine C does not schedule an isolated region in a roadmap without waves"
+            },
+            "./nested/data.nowline#data-agent-features": {
+                "classes": ["region-scope"],
+                "reason": "engine C does not schedule an isolated region in a roadmap without waves"
+            },
+            "./nested/data.nowline#data-agent-eval": {
+                "classes": ["region-scope"],
+                "reason": "engine C does not schedule an isolated region in a roadmap without waves"
+            },
+            "./nested/data.nowline#data-ss-exports": {
+                "classes": ["region-scope"],
+                "reason": "engine C does not schedule an isolated region in a roadmap without waves"
+            },
+            "./nested/data.nowline#data-ss-sql": {
+                "classes": ["region-scope"],
+                "reason": "engine C does not schedule an isolated region in a roadmap without waves"
+            },
+            "./nested/data.nowline#data-catalog": {
+                "classes": ["region-scope"],
+                "reason": "engine C does not schedule an isolated region in a roadmap without waves"
+            },
+            "./nested/data.nowline#data-lineage": {
+                "classes": ["region-scope"],
+                "reason": "engine C does not schedule an isolated region in a roadmap without waves"
+            },
+            "./nested/data.nowline#data-governance": {
+                "classes": ["region-scope"],
+                "reason": "engine C does not schedule an isolated region in a roadmap without waves"
+            },
+            "./nested/data.nowline#data-pii-scan": {
+                "classes": ["region-scope"],
+                "reason": "engine C does not schedule an isolated region in a roadmap without waves"
+            }
+        },
+        "examples/platform-2026.nowline": {
+            "platform-qa": {
+                "classes": ["(d)"],
+                "reason": "follows a parallel whose audit-track group track adds the 8 px track tail gutter in A"
+            }
+        },
+        "examples/product.nowline": {
+            "platform-qa": {
+                "classes": ["(d)"],
+                "reason": "follows a parallel whose audit-track group track adds the 8 px track tail gutter in A"
+            }
+        },
+        "examples/showcase.nowline": {
+            "ship": {
+                "classes": ["(a)", "(b)"],
+                "reason": "after:integrate ignores the lane cursor in A (day 20 against 40), and the 1w bar is under the minimum width"
+            },
+            "brief": {
+                "classes": ["(b)"],
+                "reason": "a 1w bar at scale:1m is under the minimum bar width, so A's logical end runs past C's"
+            },
+            "announce": {
+                "classes": ["(a)", "(b)"],
+                "reason": "after:ship inherits ship's early start in A, and the 1w bar is under the minimum width"
+            }
+        },
+        "examples/sizing.nowline": {
+            "search-v2": {
+                "classes": ["(a)"],
+                "reason": "after:header-refresh ignores the lane cursor in A (day 5 against 16)"
+            }
+        },
+        "examples/waves.nowline": {
+            "launch-page": {
+                "classes": ["(c)"],
+                "reason": "follows the wave:build group, whose box includes a11y's spilled caption, and A's lane cursor advances to that edge"
+            }
+        },
+        "tests/grammar-properties.nowline": {
+            "./grammar-properties-include.nowline#stub-item": {
+                "classes": ["region-scope"],
+                "reason": "engine C does not schedule an isolated region in a roadmap without waves"
+            }
+        },
+        "tests/isolate-include-multi.nowline": {
+            "./partner-multi.nowline#plugin-alpha": {
+                "classes": ["region-scope"],
+                "reason": "engine C does not schedule an isolated region in a roadmap without waves"
+            },
+            "./partner-multi.nowline#plugin-beta": {
+                "classes": ["region-scope"],
+                "reason": "engine C does not schedule an isolated region in a roadmap without waves"
+            },
+            "./partner-multi.nowline#docs-draft": {
+                "classes": ["region-scope"],
+                "reason": "engine C does not schedule an isolated region in a roadmap without waves"
+            },
+            "./partner-multi.nowline#docs-review": {
+                "classes": ["region-scope"],
+                "reason": "engine C does not schedule an isolated region in a roadmap without waves"
+            },
+            "./partner-multi.nowline#support-training": {
+                "classes": ["region-scope"],
+                "reason": "engine C does not schedule an isolated region in a roadmap without waves"
+            },
+            "./partner-multi.nowline#support-launch": {
+                "classes": ["region-scope"],
+                "reason": "engine C does not schedule an isolated region in a roadmap without waves"
+            }
+        },
+        "tests/late-row-shifts.nowline": {
+            "c": {
+                "classes": ["(a)"],
+                "reason": "after:2026-01-25 ignores the lane cursor in A (day 15 against b's end, 20)"
+            },
+            "g1": {
+                "classes": ["(a)"],
+                "reason": "the lane-level group g has after:2026-01-19, which ignores the lane cursor in A (day 10 against 30)"
+            },
+            "p1": {
+                "classes": ["(a)", "(c)"],
+                "reason": "follows group g, which A starts early by (a), and A's lane cursor advances to the Pinned group caption's edge"
+            },
+            "d": {
+                "classes": ["(a)", "(c)"],
+                "reason": "after:c ignores the lane cursor in A, and once it honours it the cursor still carries the group's caption spill"
+            }
+        },
+        "tests/non-working-hide.nowline": {
+            "qa": {
+                "classes": ["(b)"],
+                "reason": "a 2d bar is under the minimum bar width, so A's logical end runs past C's"
+            },
+            "rollout": {
+                "classes": ["(b)"],
+                "reason": "follows qa, and A's lane cursor advances to qa's minimum-width bar"
+            }
+        },
+        "tests/non-working-show.nowline": {
+            "qa": {
+                "classes": ["(b)"],
+                "reason": "a 2d bar is under the minimum bar width, so A's logical end runs past C's"
+            },
+            "rollout": {
+                "classes": ["(b)"],
+                "reason": "follows qa, and A's lane cursor advances to qa's minimum-width bar"
+            }
+        },
+        "tests/size-and-capacity.nowline": {
+            "f1": {
+                "classes": ["(b)"],
+                "reason": "a 1d bar (md effort over capacity 5) is under the minimum bar width"
+            }
+        }
+    }
+}
