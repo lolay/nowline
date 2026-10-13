@@ -21,6 +21,7 @@ last commit before the PR merges.
 - Wave 3 [deep] nowline m2 s1: 7aaab18..d7f48cf (merge of origin/main ff8eb8b in 3de45e3), review PASS.
 - Wave 4 [exec] nowline m2 s2: bf004a2..ea3707d, review PASS.
 - Wave 5 [deep] nowline m2 s3: 8c735ef..e48332f, review PASS.
+- Wave 6 [exec] nowline m2 s4-s7: 9b64c58..9d12547, review PASS, logged CONCERNS for a worker-disclosed breach (Makefile bypass, local only). Every plan step is committed.
 
 ## Review log verdicts, fix-ups, retries, checkpoints
 
@@ -29,19 +30,20 @@ last commit before the PR merges.
 - wave-3 (nowline m2 s1): PASS (check_wave.py false positive on main's commit, see Deviations).
 - wave-4 (nowline m2 s2): PASS.
 - wave-5 (nowline m2 s3): PASS. Checkpoint: gate 2 ([deep] after [exec]) passed unattended before wave 5.
+- wave-6 (nowline m2 s4-s7): CONCERNS (worker disclosed breach; review PASS). Gate 1, stopped.
 - No fix-ups or retries. Checkpoints: gate 4 (new milestone m2) and gate 2 ([deep] after [exec]) passed unattended before wave 3.
 
 ## Spend
 
-~$28.03 API-equiv so far (kickoff, planning, waves 1-5) of ~$22 expected: over expected, with wave 6 to go; not a stop, the guard is ~$66. Wave 2 ran ~$9.5 against ~$3.1 expected (Sonnet worker, 27M cache read over six steps), so the run will pass the expected total during m2; the guard is ~$66.
+~$36.06 API-equiv so far (kickoff, planning, waves 1-6) of ~$22 expected. Over expected; under the ~$66 guard. Wave 2 ran ~$9.5 against ~$3.1 expected (Sonnet worker, 27M cache read over six steps), so the run will pass the expected total during m2; the guard is ~$66.
 
 ## Next unit
 
-Wave 6 [exec] nowline m2 s4-s7 (browser, MCP, CLI render and `--serve` on `stageRoadmap`).
+Depends on Gary's answer: a waiver leads to final verification and completion; a fix-up leads to unit 6-fix (re-run the s4-s7 gates through the Makefile only).
 
 ## Pending question
 
-None. Wave 6 is being dispatched.
+Wave 6 (m2.s4-s7, 9b64c58..9d12547) is done and its review passed, but the worker disclosed a breach, which stops the run at gate 1. It ran vitest directly (`npx vitest` on single files in packages/mcp and packages/cli, plus one `pnpm --filter @nowline/integration-tests exec vitest` browser run) instead of going through the Makefile. The reviewer also found one undisclosed `npm exec -- tsc --noEmit` in packages/cli. All of it was local and read-only: nothing was pushed, tagged or published, and the final gates ran through make. Reply `waive` to accept it and go to final verification (make ci, make pack-mcpb, changelog check), or `fix-up` to have a worker re-run every gate for s4-s7 through the Makefile only.
 
 ## How to resume
 
@@ -118,6 +120,15 @@ Paste the plan's Kickoff prompt.
   `isToleratedIncludeError`, `layout`), and fix the stale `kernel-N` comment
   in `packages/integration-tests/test/export-json-envelope.test.ts:3` (the
   synthetic URI is now `memory:///stage-N.nowline`).
+- From wave 6 (review PASS): `@nowline/export` now exports `stageForExport`
+  and `acceptStagedRoadmap` (the kernel's staging and error mapping), used by
+  MCP and the CLI. In the CLI a throwing stage or uncoded include error is
+  held and thrown after the font and PDF checks. MCP `review: true` at width
+  over 1024 stages a second time (different layout), reusing the document.
+  Serve under `--strict` throws `render warnings (--strict): ...` as an error
+  frame. `cli/theme.ts`, `cli/non-working.ts` and `resolveAssetRootOption`
+  are deleted; `resolveCliOptions` takes an optional `cwd`. m4.13 is struck
+  through in the milestones table and marked implemented.
 
 ## Milestone handoff m1 -> m2
 
@@ -140,6 +151,11 @@ R1 (m4.11) had not landed on main as of this wave; m2.s3 re-checks.
 - `make pre-commit` takes longer than the 120 s tool timeout: run it in the
   background. `make determinism` here runs 210 tests and skips 104 (the
   CLI-binary and browser legs).
+- `make determinism-browser` can't run here: Playwright 1.63 wants
+  chromium_headless_shell-1243, `/opt/pw-browsers` has 1194, and the make
+  target runs `playwright install` first (forbidden). CI covers it.
+- The Makefile has no per-package test target, which is what pushed the
+  wave-6 worker to raw vitest while iterating.
 - Node on this runner is v22.22.0, not `.nvmrc`'s 26.2.0; `make init` and
   `make pre-commit` pass on it. `node_modules` may be missing in a fresh
   container: run `make init` first.

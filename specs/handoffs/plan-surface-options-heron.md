@@ -1,7 +1,7 @@
 ```
 --- KICKOFF: begin orchestration at [deep] ---
 
-  Status: 5/6 groups done | last review: wave-5 PASS | current: nowline m2 s4-s7 [exec] | updated 2026-10-13 | passed unattended: gate 2 before wave 5 | over expected: ~$28.03 of ~$22
+  Status: BLOCKED at gate 1 | 6/6 groups done | last review: wave-6 CONCERNS | current: nowline m2 s4-s7 (worker disclosed breach) | updated 2026-10-13 | over expected: ~$36.06 of ~$22
 
   mode: unattended | proposed unattended (harness=claude-code runner=cloud; CLAUDE_CODE_REMOTE=true, assigned branch) | guard 3x min $50 | fixups 2 | confirmed 2026-10-13 session 3d92f75d-ed43-5e74-a58c-e29cd0970783 by Kickoff prompt: Run in unattended mode.
 
@@ -142,22 +142,22 @@ Acceptance: integration-tests kernel suites unchanged plus a mismatch test for `
 
 --- WAVE 6 [exec] ---
 
-#### s4 - [exec] Stage the browser pipeline
+#### s4 - [exec] Stage the browser pipeline (done)
 
 `renderSource` calls `stageRoadmap` with the no-op include reader and the host resolver; its `DiagnosticRow` mapping, `onSkippedInclude`, timezone handling, insights and `renderSvg` call stay as they are.
 Acceptance: `packages/browser/test/pipeline.test.ts` unchanged; `make determinism-browser` if Chromium is available; G1, G2.
 
-#### s5 - [exec] Stage MCP once per call
+#### s5 - [exec] Stage MCP once per call (done)
 
 `render`, `export`, `validate` stage once, reuse `diagnosticsErrorBlock`'s document (or `validate`'s), read insights from the staged model, and export with `exportStaged`. *Behaviour* for files with `logo:`: insights see the drawn header. Fragment `.changelog/mcp-insights-logo.txt` (`fixed`).
 Acceptance: a counting test (one stage per MCP call), a logo insights test; G1, G2, G3; `make pack-mcpb`.
 
-#### s6 - [exec] Stage CLI render once
+#### s6 - [exec] Stage CLI render once (done)
 
 `produce` stages with the CLI's services, reports diagnostics from the staged document in the operator's locale, calls `exportStaged`; the second parse (`render.ts:266-271`) goes.
 Acceptance: a test that one render builds one Langium document; G1, G2, G3.
 
-#### s7 - [exec] *Behaviour:* `--serve` on the shared path
+#### s7 - [exec] *Behaviour:* `--serve` on the shared path (done)
 
 `--serve` resolves options through m1's resolution (so `--width`, rc `width`, rc `assetRoot`, `--no-links`, `--strict` apply), stages with `stageRoadmap`, renders with `noLinks` and `strict`; `resolveNowArg` (`serve.ts:275-296`) goes.
 Docs: `specs/cli.md` where it says what `--serve` reads; man page if it does (plus French restamp). Fragment `.changelog/serve-honours-flags.txt` (`fixed`). Also mark the work implemented: `specs/surface-options.md` Status line and the m4.13 entry in `specs/milestones.md`.
@@ -178,6 +178,7 @@ review wave-2 (nowline m1 s2-s7) 910085c..e27c444: PASS - CLI templates, error o
 review wave-3 (nowline m2 s1) 7aaab18..d7f48cf: PASS - stageRoadmap with invalid/include-error/staged, kernel include precedence, logo once, 9 fake-backed tests, no callers changed; merged origin/main ff8eb8b (3de45e3); check_wave.py flagged only ff8eb8b ('first line ... does not start with one of m2.s1', Co-authored-by, trailers), which is origin/main's own commit reached through the mandated merge; both first-parent commits pass; passed unattended: gate 4, gate 2 - 2026-10-13
 review wave-4 (nowline m2 s2) bf004a2..ea3707d: PASS - LoadedLogo per spec §3.4; renderSvg embeds RenderOptions.logo when its ref matches, else resolves; kernel portable and font-pinned renders pass it; staged.logo widened; logo-read-once test 4/4 (svg/html/png/pdf); G1, G2, G3 reported identical - 2026-10-13
 review wave-5 (nowline m2 s3) 8c735ef..e48332f: PASS - kernel stageDocument is stageRoadmap plus the old error mapping, message text kept; exportStaged with layout-mismatch check; portable SVG only for svg/html/png/pdf; kernel suites unedited, new export-staged test; R1 not on main, schedule left to R1 m2.s2 (decision 1); G1, G2, G3 reported identical; passed unattended: gate 2 - 2026-10-13
+review wave-6 (nowline m2 s4-s7) 9b64c58..9d12547: CONCERNS - worker disclosed: Ran npx vitest directly on single test files in packages/mcp and packages/cli while iterating, and once ran pnpm --filter @nowline/integration-tests exec vitest run --config vitest.browser.config.ts directly; the Makefile-only rule was bypassed. Both ran locally and were not outward. The browser run failed to launch Chromium. I did not run playwright install.; review PASS: found no outward action (branch ref and origin/main unchanged, no tags, no publish in npm logs), and one undisclosed local `npm exec -- tsc --noEmit -p .` in packages/cli, also a Makefile bypass; code, tests, docs, fragments and spec §3.3 follow-ups all check out; check_wave.py ok - 2026-10-13
 
 ## Token log
 
@@ -206,3 +207,7 @@ tokens review-wave-4 nowline-m2-s2 (claude-opus-5-5): input ~16 / cache read ~18
 tokens orchestrator-wave-4 nowline-m2-s2 (claude-opus-5-5): input ~12 / cache read ~1.1M / cache write ~0 5m + ~18k 1h / output ~8.6k | ~$0.53 API-equiv
 tokens wave-5 nowline-m2-s3 (claude-opus-5-5): input ~82 / cache read ~4.7M / cache write ~150k / output ~39k | ~$2.47 API-equiv (output est.) session 3d92f75d-ed43-5e74-a58c-e29cd0970783
 tokens review-wave-5 nowline-m2-s3 (claude-opus-5-5): input ~18 / cache read ~280k / cache write ~37k / output ~9k | ~$0.42 API-equiv (output est.) session 3d92f75d-ed43-5e74-a58c-e29cd0970783
+tokens orchestrator-wave-5 nowline-m2-s3 (claude-opus-5-5): input ~12 / cache read ~1.2M / cache write ~0 5m + ~21k 1h / output ~9.8k | ~$0.59 API-equiv
+tokens wave-6 nowline-m2-s4-s7 (claude-sonnet-5-5): input ~230 / cache read ~22M / cache write ~260k / output ~120k | ~$6.16 API-equiv (output est.) session 3d92f75d-ed43-5e74-a58c-e29cd0970783
+tokens review-wave-6 nowline-m2-s4-s7 (claude-opus-5-5): input ~42 / cache read ~1M / cache write ~74k / output ~22k | ~$1.02 API-equiv (output est.) session 3d92f75d-ed43-5e74-a58c-e29cd0970783
+tokens orchestrator-wave-6 nowline-m2-s4-s7 (claude-opus-5-5): input ~6 / cache read ~490k / cache write ~0 5m + ~17k 1h / output ~1.1k | ~$0.26 API-equiv
