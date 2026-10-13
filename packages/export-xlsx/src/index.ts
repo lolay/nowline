@@ -39,7 +39,6 @@ import type {
     WaveDeclaration,
     WavePlan,
 } from '@nowline/core';
-import { buildWavePlan } from '@nowline/core';
 import type { ExportInputs } from '@nowline/export-core';
 import { displayLabel, getProp, getProps, roadmapTitle } from '@nowline/export-core';
 import { type ResolvedCalendar, type RoadmapSchedule, scheduleRoadmap } from '@nowline/layout';
@@ -70,10 +69,11 @@ export async function exportXlsx(
     wb.modified = generated;
     wb.title = roadmapTitle(inputs.ast.roadmapDecl ?? undefined);
 
-    const schedule = scheduleRoadmap(inputs.ast, inputs.resolved, { today: inputs.today });
+    const schedule =
+        inputs.schedule ?? scheduleRoadmap(inputs.ast, inputs.resolved, { today: inputs.today });
     // Undefined when the roadmap declares no waves: the Wave column and the
     // Waves sheet are then omitted (specs/waves.md §10).
-    const wavePlan = buildWavePlan(inputs.resolved);
+    const wavePlan = schedule.plan;
 
     buildRoadmapSheet(wb, inputs, schedule.calendar, generated);
     buildItemsSheet(wb, inputs.ast, schedule, wavePlan);

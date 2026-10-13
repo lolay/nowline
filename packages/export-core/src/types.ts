@@ -4,7 +4,7 @@
 // here — see specs/handoffs/m2c.md § 1.
 
 import type { NowlineFile, ResolveResult } from '@nowline/core';
-import type { PositionedRoadmap } from '@nowline/layout';
+import type { PositionedRoadmap, RoadmapSchedule } from '@nowline/layout';
 
 /** Bundle of inputs every export function consumes. */
 export interface ExportInputs {
@@ -14,6 +14,13 @@ export interface ExportInputs {
     ast: NowlineFile;
     /** Include-resolved data — needed for XLSX joins. */
     resolved: ResolveResult;
+    /**
+     * The day schedule the layout used (`scheduleRoadmap`), wave plan
+     * included as `schedule.plan`. Exporters read dates, durations and wave
+     * spans from it. Optional so callers outside the kernel keep working:
+     * an exporter given none schedules the roadmap itself.
+     */
+    schedule?: RoadmapSchedule;
     /**
      * Display path for the source. Use `'<stdin>'` when piped. Used in
      * footers / metadata; never for filesystem reads.

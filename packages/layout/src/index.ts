@@ -126,6 +126,7 @@ export type {
     RoadmapSchedule,
     ScheduledItem,
     ScheduledWave,
+    ScheduleExtent,
     ScheduleOptions,
 } from './schedule.js';
 export { scheduleRoadmap } from './schedule.js';

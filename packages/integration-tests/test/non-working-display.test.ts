@@ -3,7 +3,7 @@
 // option every surface forwards. Precedence: the option, then the file's
 // `default roadmap non-working:` key, then `hide`.
 //
-// Engines B and C take no display input, so the schedule and every exporter
+// Engine C takes no display input, so the schedule and every exporter
 // built on it (Mermaid, MS Project, XLSX) produce the same bytes in both views.
 
 import * as path from 'node:path';

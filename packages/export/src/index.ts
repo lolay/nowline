@@ -1,8 +1,8 @@
 // @nowline/export — the shared export kernel.
 //
 // The single code path from `.nowline` source to any of the eight export
-// artifacts (stageRoadmap: parse → resolve includes → load logo → layout;
-// then renderSvg → format adapter).
+// artifacts (stageRoadmap: parse → resolve includes → load logo → schedule →
+// layout; then renderSvg → format adapter).
 // Every surface — the CLI, the `@nowline/mcp` server, the VS Code extension,
 // and the Free/Pro web apps — runs this same code with the same inputs, so
 // they all produce byte-for-byte identical output for the same source and the
@@ -458,6 +458,7 @@ export async function exportStaged(
         model: stage.model,
         ast: stage.ast,
         resolved: stage.resolved,
+        schedule: stage.schedule,
         sourcePath: inputs.sourcePath,
         today: inputs.today,
     };

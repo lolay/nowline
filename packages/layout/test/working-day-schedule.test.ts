@@ -1,5 +1,5 @@
 // The business calendar (the default) puts the axis, the date window, the
-// ticks, the now-line and engines B and C on working days, and `hide`s the
+// ticks, the now-line and the day schedule on working days, and `hide`s the
 // weekends (specs/working-calendar.md §5, §7.1, §7.2, §7.5, §10 A).
 //
 // Every expectation here is a literal date or pixel, derived by hand from the
@@ -530,11 +530,11 @@ milestone wed "Wednesday gate" date:2026-01-14 after:w1
 
 // --- Waves ---
 
-describe('business waves: engines A and C agree on wave dates', () => {
+describe('business waves: a Saturday floor opens the next wave on Monday', () => {
     // w1 holds a 3d item (last day Wed Jan 7); w2 waits for after:Saturday.
     // a2 is a full week: a bar narrower than its insets plus MIN_ITEM_WIDTH
     // (a 2d bar is 16 px) widens engine A's logical end (specs/waves.md
-    // §8.4), which engine C does not model.
+    // §8.4), which the day schedule does not model.
     const source = `nowline v1
 
 roadmap r "R" start:2026-01-05 scale:1w
@@ -558,6 +558,13 @@ swimlane a
         expect(model.waves![1].startDate.getUTCDay()).toBe(1);
     });
 
+    it('places the wave columns at working-day indexes 3 and 5 (24 px and 40 px)', async () => {
+        const { model } = await lay(source);
+        const o = model.timeline.originX;
+        expect((model.waves![1].startX - o) / 8).toBe(5);
+        expect((model.waves![0].endX - o) / 8).toBe(3);
+    });
+
     it('opens wave 2 on Monday Jan 12 in engine C', async () => {
         const { file, resolved } = await parseAndResolve(source);
         const sched = scheduleRoadmap(file, resolved);
@@ -571,18 +578,6 @@ swimlane a
             ['w2', '2026-01-12', '2026-01-17'],
         ]);
         expect(sched.waves!.get('w2')!.floorRef).toBe('2026-01-10');
-    });
-
-    it('the two engines report equal wave dates', async () => {
-        const { file, resolved, model } = await lay(source);
-        const sched = scheduleRoadmap(file, resolved);
-        const a = (model.waves ?? []).map((w) => [w.id, iso(w.startDate), iso(w.endDate)]);
-        const c = [...(sched.waves ?? new Map())].map(([id, w]) => [id, iso(w.start), iso(w.end)]);
-        expect(a).toEqual(c);
-        // And the bars sit where the dates say: w2 opens at index 5 (40 px).
-        const o = model.timeline.originX;
-        expect((model.waves![1].startX - o) / 8).toBe(5);
-        expect((model.waves![0].endX - o) / 8).toBe(3);
     });
 
     it('a1 ends Thu Jan 8 and the Saturday floor, not that end, sets wave 2', async () => {

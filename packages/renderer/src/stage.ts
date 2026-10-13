@@ -1,10 +1,12 @@
 // One staging function for every render surface (specs/surface-options.md
 // §3.3): parse and validate, resolve includes, apply the include-error
-// precedence, load the logo, lay out. Rendering, diagnostics formatting,
+// precedence, load the logo, build the wave plan and the day schedule, lay
+// out. Rendering, diagnostics formatting,
 // `strict` and layout insights stay with each caller, which maps the result
 // to its own shape.
 
 import {
+    buildWavePlan,
     collectDocumentDiagnostics,
     isRoutedResolveDiagnostic,
     type NowlineFile,
@@ -13,12 +15,15 @@ import {
     type ResolveDiagnostic,
     type ResolveResult,
     resolveIncludes,
+    type WavePlan,
 } from '@nowline/core';
 import {
     type LayoutOptions,
     layoutRoadmap,
     type PositionedRoadmap,
+    type RoadmapSchedule,
     roadmapLogoRef,
+    scheduleRoadmap,
 } from '@nowline/layout';
 import { type LangiumDocument, type LangiumSharedCoreServices, URI } from 'langium';
 import { type LoadedLogo, loadLogo } from './logo.js';
@@ -82,6 +87,14 @@ export type StageResult =
           logo?: LoadedLogo;
           /** Asset warnings (missing or unreadable logo); the caller applies `strict`. */
           warnings: string[];
+          /** The wave plan (`buildWavePlan`); `null` when the roadmap declares no waves. */
+          plan: WavePlan | null;
+          /**
+           * The day schedule `model` was laid out with (`scheduleRoadmap`,
+           * `plan` included as `schedule.plan`); exporters reuse it through
+           * `ExportInputs.schedule` (specs/scheduler-unification.md §3.6).
+           */
+          schedule: RoadmapSchedule;
           model: PositionedRoadmap;
           /** The layout options `model` was laid out with, picked from `StageInputs.layout`. */
           layout: StageLayout;
@@ -114,7 +127,7 @@ function isErrorDiagnostic(raw: RawDiagnostic): boolean {
 }
 
 /**
- * Parse, validate, resolve includes, load the logo and lay out `source`.
+ * Parse, validate, resolve includes, load the logo, schedule and lay out `source`.
  * Returns `invalid` on a lexer, parser or validator error, `include-error`
  * on a resolver error, and `staged` with the positioned model otherwise.
  */
@@ -152,6 +165,27 @@ export async function stageRoadmap(inputs: StageInputs): Promise<StageResult> {
     // Named keys, not a spread: a caller may pass a wider options object.
     const { theme, today, width, locale, nonWorking } = inputs.layout;
     const layout: StageLayout = { theme, today, width, locale, nonWorking };
-    const model = layoutRoadmap(ast, resolved, { ...layout, logo: logo?.dimensions });
-    return { kind: 'staged', document, ast, resolved, routed, logo, warnings, model, layout };
+    // One wave plan and one day schedule per staging: layout reuses the
+    // schedule and the exporters read it from `ExportInputs`
+    // (specs/scheduler-unification.md §3.6).
+    const plan = buildWavePlan(resolved) ?? null;
+    const schedule = scheduleRoadmap(ast, resolved, { today, plan });
+    const model = layoutRoadmap(ast, resolved, {
+        ...layout,
+        schedule,
+        logo: logo?.dimensions,
+    });
+    return {
+        kind: 'staged',
+        document,
+        ast,
+        resolved,
+        routed,
+        logo,
+        warnings,
+        plan,
+        schedule,
+        model,
+        layout,
+    };
 }

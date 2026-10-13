@@ -12,6 +12,7 @@ import type {
 } from '@nowline/core';
 import type { BandScale } from './band-scale.js';
 import type { resolveCalendar } from './calendar.js';
+import type { RoadmapSchedule } from './schedule.js';
 import type { StyleContext } from './style-resolution.js';
 import type { TimeScale } from './time-scale.js';
 import type {
@@ -43,12 +44,36 @@ export function newCursor(x: number, y: number): TrackCursor {
 }
 
 /**
+ * The working-day duration the day schedule gave `item`. Every item engine A
+ * lays out is in `schedule.byNode` (the main lanes and the first-level
+ * isolated regions it draws), so a miss is an invariant violation, a
+ * schedule built for another roadmap or a walker that skipped a node, and
+ * throws instead of falling back to a second derivation that could drift.
+ */
+export function scheduledItemDays(ctx: LayoutContext, item: ItemDeclaration): number {
+    const scheduled = ctx.schedule.byNode.get(item);
+    if (!scheduled) {
+        throw new Error(
+            `layout: item "${item.name ?? item.title ?? '(unnamed)'}" is not in the day schedule`,
+        );
+    }
+    return scheduled.days;
+}
+
+/**
  * Shared layout state passed through the per-entity sequencers and
  * Renderable nodes. Owns the resolved calendar/timeline/style scope plus
  * the running entity-edge maps that `after:` / `before:` references read.
  */
 export interface LayoutContext {
     cal: ReturnType<typeof resolveCalendar>;
+    /**
+     * The roadmap's day schedule (engine C), shared by the main lanes and
+     * every isolated region's context. Item durations in working days come
+     * from `schedule.byNode` (`scheduledItemDays`), never from re-deriving
+     * them against the sizes (specs/scheduler-unification.md §3.4).
+     */
+    schedule: RoadmapSchedule;
     styleCtx: StyleContext;
     sizes: Map<string, ResolvedSize>;
     labels: Map<string, LabelDeclaration>;

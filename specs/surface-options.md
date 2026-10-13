@@ -1,6 +1,6 @@
 # Nowline — Shared Surface Options and One Staging Function
 
-**Status: Accepted, implemented as m4.13 (migration milestones m1 and m2; the schedule and wave plan stay with R1's m2.s2, §7 decision 1).** Milestone **m4.13** in [`milestones.md`](./milestones.md); decisions in the last section. This is refactor R4 from [`review-since-v086.md`](./review-since-v086.md): one options schema in `@nowline/config` that every render surface reads, and one staging function (parse, resolve includes, load assets, lay out) that every pipeline calls. Every `file:line` below was checked at the commit that adds this spec (source identical to 0062df3 plus the m2 fixes of the same review).
+**Status: Accepted, implemented as m4.13 (migration milestones m1 and m2; `stageRoadmap` also builds R1's wave plan and schedule, §7 decision 1).** Milestone **m4.13** in [`milestones.md`](./milestones.md); decisions in the last section. This is refactor R4 from [`review-since-v086.md`](./review-since-v086.md): one options schema in `@nowline/config` that every render surface reads, and one staging function (parse, resolve includes, load assets, lay out) that every pipeline calls. Every `file:line` below was checked at the commit that adds this spec (source identical to 0062df3 plus the m2 fixes of the same review).
 
 ## 1. Problem
 
@@ -192,6 +192,10 @@ export type StageResult =
           logo?: LoadedLogo;
           /** Asset warnings (missing or unreadable logo); the caller applies `strict`. */
           warnings: string[];
+          /** The wave plan (`buildWavePlan`); `null` when the roadmap declares no waves. */
+          plan: WavePlan | null;
+          /** The day schedule `model` was laid out with (`scheduleRoadmap`, `plan` as `schedule.plan`). */
+          schedule: RoadmapSchedule;
           model: PositionedRoadmap;
           /** The layout options `model` was laid out with; `exportStaged` checks them against its inputs. */
           layout: StageLayout;
@@ -203,7 +207,7 @@ export type StagedRoadmap = Extract<StageResult, { kind: 'staged' }>;
 export function stageRoadmap(inputs: StageInputs): Promise<StageResult>;
 ```
 
-- **What it owns.** Parse and validate (or reuse `document`), resolve includes, apply the include-error precedence once, load the logo once, lay out. With R1 ([`scheduler-unification.md`](./scheduler-unification.md)) it also builds the wave plan and the schedule once and returns them.
+- **What it owns.** Parse and validate (or reuse `document`), resolve includes, apply the include-error precedence once, load the logo once, build the wave plan and the day schedule once (`buildWavePlan`, then `scheduleRoadmap` with the stage's `today` and that plan; [`scheduler-unification.md`](./scheduler-unification.md) §3.6), and lay out with that schedule (`LayoutOptions.schedule`). It returns `plan` and `schedule`; `exportStaged` puts the stage's `schedule` in `ExportInputs`, so XLSX, Mermaid and MS Project reuse it, and every other caller lays out with the same schedule.
 - **What it does not own.** Rendering, diagnostics formatting, `strict`, layout insights. Each caller maps the result to its own shape: the kernel throws (`Error`, `IncludeResolveError`), the browser returns `DiagnosticRow`s, `--serve` broadcasts text frames, MCP returns `McpDiagnostic`s.
 - **Where it lives.** `packages/renderer/src/stage.ts`, exported from `@nowline/renderer`: the logo loader and the `AssetResolver` contract already live there, and the kernel, the browser pipeline and the CLI already depend on it. Renderer gains a direct `@nowline/core` dependency, which it already has transitively through layout, so no bundle grows; every consumer of renderer (browser, embed, export, the CLI and the VS Code extension) already depends on core and layout, so no package gains an edge. The cost is renderer's wider role (it now runs the pipeline as well as drawing it) and that a standalone renderer install loads core's Langium parser when it stages (§7, decision 3).
 
@@ -340,7 +344,7 @@ Add `packages/renderer/src/stage.ts` (§3.3) with tests for each result kind: va
 
 Gary, 2026-10-13:
 
-1. **Milestone ID.** Yes: m4.13. If R1 has landed, m2.s3 builds the schedule inside `stageRoadmap`; if not, R1's m2.s2 adds it there later.
+1. **Milestone ID.** Yes: m4.13. If R1 has landed, `stageRoadmap` builds the wave plan and the schedule and returns them; if not, R1's m2.s2 adds it there later. (R1 landed first, in #150; merging it moved the kernel's plan and schedule construction into `stageRoadmap`.)
 2. **The `now` default.** The local civil date everywhere, keeping the local-default decision of 497de7d, with an optional MCP `timezone` argument (m1.s6). MCP's UTC default, and #122's wording of it, were the exception.
 3. **Where `stageRoadmap` lives.** `@nowline/renderer` (§3). No package gains a dependency edge; the cost is renderer's wider role.
 4. **One width rule.** Yes: the CLI's integer ≥ 320 everywhere. MCP returns its input error, and VS Code reports a bad setting or rc value in the preview's diagnostic table.

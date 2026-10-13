@@ -1,6 +1,6 @@
 # Nowline — Scheduler Unification
 
-**Status: Accepted (design only, no code yet).** Milestone **m4.11** in [`milestones.md`](./milestones.md); decisions in the last section. This is refactor R1 from [`review-since-v086.md`](./review-since-v086.md): one day-level scheduler instead of three hand-synced copies. Every `file:line` below was checked at the commit that adds this spec (source identical to 0062df3 plus the m2 fixes of the same review).
+**Status: Implemented: m1 to m3 and F1; F2 to F4 open.** Milestone **m4.11** in [`milestones.md`](./milestones.md); decisions and as-built notes in the last two sections. Sections 1 and 3 describe the code before m1 (engine B and `computeContentEndDay` are gone); §4 says what each step did and §9 records where the build differs from this text. This is refactor R1 from [`review-since-v086.md`](./review-since-v086.md): one day-level scheduler instead of three hand-synced copies. Every `file:line` below was checked at the commit that adds this spec (source identical to 0062df3 plus the m2 fixes of the same review).
 
 ## 1. Problem
 
@@ -162,7 +162,7 @@ export function computeDateWindow(
 | Item duration in working days | `deriveItemDurationDays` called in `sequenceItem` (`layout.ts:426`), the lane predictor (`swimlane-node.ts:320`) and the group loop | `schedule.byNode.get(node).days` | same function, same sizes, same calendar |
 | Start terms (`date:`, `start:`, `after:` ids and inline dates) | parsed five times (§1.4) | one `startTermsOf(props)` in `layout/src/start-terms.ts`, used by C's walker, `resolvePinnedOrSequentialStart`, `startPinOf` and `wavePinOverrideOf` | pure refactor of parsing; each caller keeps its own `max` rule |
 | Wave floor dates | parsed in days and in px | one `waveFloorDates(plan)` returning `Date \| null` per wave; C maps it with `workingIndexOf`, A with `scale.forward` | same parse, same projections |
-| Item starts | A's own rule | unchanged (divergences (a), (e)) | — |
+| Item starts | A's own rule | unchanged (divergence (e); (a) settled by F1) | — |
 | Barrier `S_k`/`E_k` | A's own pixel passes | unchanged | the barrier must hold on A's own ends ([`waves.md`](./waves.md) §8.6) |
 
 `startTermsOf` returns the parsed terms, not a start:
@@ -176,7 +176,7 @@ export interface StartTerms {
 }
 ```
 
-The day walker keeps `max(prevEnd, …after)`; the pixel walker keeps `max(laneLeftX, …after)`. F1 settles divergence (a) in C's favour (§8, decision 3): the pixel walker's rule becomes `max(laneCursor, …after)`, a one-line change with a test that names it.
+The day walker keeps `max(prevEnd, …after)`. The pixel walker's rule was `max(laneLeftX, …after)`; F1 settled divergence (a) in C's favour (§8, decision 3) and it is now `max(laneCursor, …after)`, a one-line change with a test that names it.
 
 ### 3.5 The wave-barrier fixpoint
 
@@ -259,7 +259,7 @@ Add `packages/layout/test/engine-divergence-register.test.ts` and `engine-diverg
 
 #### s2 - Give engine C engine B's scope
 
-Implement §3.2: `ScheduleOptions.plan`, `RoadmapSchedule.plan`, `.resolved`, `.extent`; the `reach` hook; non-wave region scheduling. Add an oracle test that keeps a frozen copy of today's `computeContentEndDay` under `test/` and asserts `extent.contentEndDay` equals it for every sample, the 60 generated roadmaps of `waves.test.ts:1456-1491`, and fixtures for each scope rule (empty `group after:`, nested region, region milestone, undated anchor, waves with an empty trailing wave). The register's `region-scope` entries disappear in this step. G1, G2, G3.
+Implement §3.2: `ScheduleOptions.plan`, `RoadmapSchedule.plan`, `.resolved`, `.extent`; the `reach` hook; non-wave region scheduling. Add an oracle test that keeps a frozen copy of today's `computeContentEndDay` under `test/` and asserts `extent.contentEndDay` equals it for every sample, the 60 generated roadmaps of `waves.test.ts:1456-1491`, and fixtures for each scope rule (empty `group after:`, nested region, region milestone, undated anchor, waves with an empty trailing wave). The register's `region-scope` entries disappear in this step, except `nested.nowline`'s (§9). G1, G2, G3.
 
 #### s3 - Derive the date window from the schedule
 
@@ -287,15 +287,15 @@ Add `ExportInputs.schedule`. The kernel's staging builds plan, schedule and layo
 
 #### s1 - Assert the worked examples on each engine directly
 
-Move the §11 tables into a new `packages/layout/test/schedule-waves.test.ts` that asserts them on C. In `waves.test.ts`, `expectTable` and `expectWaves` assert A against the same tables and drop `engineCWeeks` / `engineCWaveSpans` (`:196-206`, `:1072-1084`). Each example is still checked twice, against the spec's numbers instead of against each other. Test-only.
+Make sure every §11 worked example is asserted on C in the existing `packages/layout/test/schedule.test.ts` (its "§11 worked examples" and "wave barrier details" blocks), adding what is missing, rather than in a duplicate `schedule-waves.test.ts` (§9). In `waves.test.ts`, `expectTable` and `expectWaves` assert A against the same tables and drop `engineCWeeks` / `engineCWaveSpans` (`:196-206`, `:1072-1084`). Each example is still checked twice, against the spec's numbers instead of against each other. Test-only.
 
 #### s2 - Retire the remaining agreement tests and the oracle
 
-Split `layout.test.ts:2139-2198` and `working-day-schedule.test.ts:533-595` into a pixel expectation and a day expectation; drop "the two engines report equal wave dates", which the register covers. Delete the frozen `computeContentEndDay` oracle from m1.s2. Rewrite `date-window.test.ts` against `computeDateWindow(file, schedule, …)` and add direct `extent` tests. Test-only.
+Split `layout.test.ts:2139-2198` and `working-day-schedule.test.ts:533-595` into a pixel expectation and a day expectation; drop "the two engines report equal wave dates", which the register covers. Delete the frozen `computeContentEndDay` oracle from m1.s2. Rewrite `date-window.test.ts` against `computeDateWindow(file, schedule, …)` and add direct `extent` tests (the scope fixtures of m1.s2 become literal `extent` expectations). Test-only.
 
 #### s3 - Update the specs
 
-[`waves.md`](./waves.md) §8.2, §8.5 and §8.6 (engine B removed, the register replaces "avoid by construction"), [`working-calendar.md`](./working-calendar.md) and [`rendering.md`](./rendering.md) where they name engine B, and the `schedule.ts` header. Docs-only.
+[`waves.md`](./waves.md) §8.2, §8.5 and §8.6 (engine B removed, the register replaces "avoid by construction"), [`working-calendar.md`](./working-calendar.md), [`rendering.md`](./rendering.md) and [`layout-phases.md`](./layout-phases.md) where they name engine B, the stale engine-B comments in `schedule.ts`, `wave-barrier.ts` and the register test, and this file's status line. Docs-only.
 
 ## 5. Follow-ups outside this migration
 
@@ -303,7 +303,7 @@ Each of these changes rendered or exported bytes, so none is part of the byte-id
 
 | # | Change | Changes | Evidence |
 |---|---|---|---|
-| F1 | Divergence (a), decided: `after:` on a lane or group child starts at `max(previous item end, refs)`, so it only ever delays (A adopts C). [`dsl.md`](./dsl.md) gains that sentence | the SVG of 3 samples; `showcase` draws Ship on day 40, matching its exports | showcase, sizing, late-row-shifts |
+| F1 | Divergence (a), decided: `after:` on a lane or group child starts at `max(previous item end, refs)`, so it only ever delays (A adopts C). [`dsl.md`](./dsl.md) gains that sentence | the SVG of 3 samples; `showcase` now draws Ship after the parallel it waits on, at 42.2 working days against the exports' 40 (the remaining 2.2 days are the (d) tail gutter, closed by F3) | showcase, sizing, late-row-shifts |
 | F2 | Decide divergence (e): `after:` on a group inside a parallel | as F1 | no sample today |
 | F3 | Keep the pixel quirks (b), (c), (d), (f) out of the lane cursor, or document them as presentation | SVG of 7 samples | §1.3 |
 | F4 | After F1 and F2: floor A's starts from C, and warm-start A's barrier passes from C's `S_k` | nothing (same fixpoint); `waveSolve.passes` drops | §3.1 |
@@ -311,8 +311,8 @@ Each of these changes rendered or exported bytes, so none is part of the byte-id
 ## 6. Test strategy
 
 - **Register** (m1.s1): the A/C differences on the real corpus are an explicit, reviewed list. A refactor that introduces a new one fails; a fix that removes one must delete its entry.
-- **Oracle** (m1.s2 to m3.s2): the frozen engine B proves `extent.contentEndDay` is the same number on every sample, the generated corpus and scope fixtures before B is deleted, then goes away.
-- **Direct tables** (m3.s1): the §11 worked examples assert C in days and A in px against the spec's own numbers. The barrier theorem on 60 generated roadmaps (`waves.test.ts:1456-1491`) stays A-only.
+- **Oracle** (m1.s2 to m3.s2): the frozen engine B proved `extent.contentEndDay` is the same number on every sample, the generated corpus and scope fixtures while B was being replaced. m3.s2 deleted it; `schedule-extent.test.ts` keeps the scope fixtures as literal `extent` expectations.
+- **Direct tables** (m3.s1): the §11 worked examples assert C in days (`schedule.test.ts`) and A in weeks (`waves.test.ts`) against the spec's own numbers. The barrier theorem on 60 generated roadmaps (`waves.test.ts:1456-1491`) stays A-only.
 - **Reuse** (m2.s1, m2.s2): `buildWavePlan` and `scheduleRoadmap` run once per kernel export (spy); `layoutRoadmap` rebuilds the schedule when handed one built from another `ResolveResult`; each exporter still runs without `inputs.schedule`.
 - **Gates** G1 to G3 on every step (§4).
 
@@ -335,3 +335,18 @@ Gary, 2026-10-13:
 2. **Region sizes in the window.** Yes: m1.s3 uses the region's own sizes and ships a `fixed` fragment; no sample changes.
 3. **Divergence (a), the meaning of `after:` on a lane item (F1).** The exports' reading: an item with `after:` starts once both the previous item in its lane and every referenced item have finished, so `after:` only ever delays. Engine A adopts C's rule in F1, which changes the chart for `showcase`, `sizing` and `late-row-shifts`, and [`dsl.md`](./dsl.md) states the rule. This reverses the draft's recommendation (chart canonical).
 4. **Order with R2.** Yes: m1 and m2 land before R2's first step that touches `RoadmapNode.place`.
+
+## 9. As built
+
+Where the implementation differs from the text above, or makes a choice the text left open:
+
+- **F1 is `m1.s5`.** It landed right after `m1.s4`, in the one function (`resolvePinnedOrSequentialStart`) that step rewrote onto `startTermsOf`. It also moves lane-level groups and parallels with `after:`, which take the same path. Only showcase, sizing and late-row-shifts changed (G1).
+- **showcase `Ship` is not on day 40 in the chart.** Engine A draws it at 42.2 working days against the exports' 40: the lane cursor takes the parallel's box edge, which includes the 8 px track tail gutter of divergence (d). Closing that is F3. The register records showcase `ship` and `announce` as (b)+(d) and `assets` as (b).
+- **The register's `classes` is an array**, because some mismatches have two causes (showcase `ship` and `announce` were (a)+(b); late-row-shifts `p1` and `d` were (a)+(c)). F1 deleted the (a)-only entries and the letter (a) from the others.
+- **`nested.nowline` keeps its 50 `region-scope` register entries.** Each nested region declares its own `anchor kickoff` and starts lanes `after:kickoff`; C resolves it inside the region (day 1), while A has no region anchors and starts at day 0. The other three region-scope samples have no entries.
+- **`computeDateWindow` takes its calendar from the schedule** (`schedule.calendar`), since the §3.3 sketch drops the context that `literalToDays` needs; `RoadmapNodeDeps.computeDateWindow` changed with it.
+- **Only first-level region items join `byNode`.** Deeper nested regions count in `extent` only, and `scheduledItemDays` throws on a node missing from `byNode`, which engine A never asks for because it lays out first-level regions only.
+- **Staging moved to `stageRoadmap`.** R4 ([`surface-options.md`](./surface-options.md) §3.3) replaced the kernel's `stageDocument` with `@nowline/renderer`'s `stageRoadmap`, which now builds the plan and the schedule as in §3.6, lays out with the schedule and returns both on the staged result; the kernel's `exportStaged` fills `ExportInputs.schedule` from it. The browser pipeline, `--serve` and MCP stage through it too.
+- **Public API.** `ScheduleOptions.plan`, `RoadmapSchedule.plan`, `.resolved`, `.extent` (`ScheduleExtent`), `LayoutOptions.schedule` and `ExportInputs.schedule` are new; the changelog fragment `scheduler-unification.txt` names them.
+- **m3.s1** asserts C in the existing `schedule.test.ts` instead of a new `schedule-waves.test.ts`; it already held the §11 blocks, so the review added only what the blocks lacked: Example 7's fix variant, Example 9's wave dates, and then (after review) the numbered variants of Examples 3 (without `docs`), 6 (without the dependency), 10 (without waves), 11 (without the floor), 13 (both fixes) and 15 (the move fix).
+- **The 60-roadmap generator** moved to `test/generated-roadmaps.ts`; the barrier theorem in `waves.test.ts` stays A-only, and `schedule-extent.test.ts` checks that `extent` reaches every item and wave end on the same roadmaps.
