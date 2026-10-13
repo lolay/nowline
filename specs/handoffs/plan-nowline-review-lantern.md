@@ -1,7 +1,7 @@
 ```text
 --- KICKOFF: begin orchestration at [deep] ---
 
-  Status: 4/4 groups done | last review: wave-3 CONCERNS | current: nowline m3 s4 [xdeep] fix-up 3-fix | passed unattended: gate-4 (m2), gate-4 (m3), gate-2, gate-7 | BLOCKED at gate 7 | updated 2026-10-13
+  Status: 4/4 groups done | last review: wave-3 CONCERNS | current: nowline m3 s4 [xdeep] fix-up 3-fix | passed unattended: gate-4 (m2), gate-4 (m3), gate-2, gate-7 | updated 2026-10-13
 
   mode: unattended | proposed unattended (harness=claude-code runner=cloud; CLAUDE_CODE_REMOTE=true, assigned branch) | guard 3x min $50 | fixups 2 | confirmed 2026-10-13 session 8c78f794-2944-59bb-8116-4413104e9100 by Kickoff prompt: Run in unattended mode.
 
