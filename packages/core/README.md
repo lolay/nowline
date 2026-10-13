@@ -65,6 +65,14 @@ const ast = doc.parseResult.value;
 - **Validator**: 32 validation rules covering file structure, identifiers, property values, include semantics, parallel/group constraints, and more.
 - **Include resolver**: multi-file resolution with merge/ignore/isolate modes, circular-include detection, diamond deduplication.
 
+## `@nowline/core/internal`
+
+The `./internal` subpath holds helpers that the other `@nowline/*` packages share, such as the one walk over a roadmap's declarations (`ast-walk`). It is **unstable** and meant for other `@nowline/*` packages only: every package versions in lock-step, so a change here ships with its callers. Don't depend on it from outside this repo. Anything you need from it that is missing from the supported API is worth an issue.
+
+```ts
+import { declarations, trackNodes } from '@nowline/core/internal';
+```
+
 ## Regenerate AST
 
 After editing the grammar, regenerate:

@@ -341,7 +341,8 @@ function dateProp(node: AstNode): string | undefined {
 
 // Ids that `after:`, `before:` and `on:` can name, mirroring the validator's
 // `collectReferenceableIds`. The first declaration of a repeated id wins.
-function collectDeclarations(file: NowlineFile): Map<string, AstNode> {
+/** @internal Kept only for the `ast-walk.ts` equivalence test; removed in m1.s3. */
+export function collectDeclarations(file: NowlineFile): Map<string, AstNode> {
     const ids = new Map<string, AstNode>();
     const add = (node: AstNode): void => {
         const name = (node as { name?: string }).name;
@@ -527,7 +528,8 @@ type W0702Kind = Exclude<W0702Target, { kind: 'default' }>['kind'];
 // Every node that can carry a `wave:` key, outside wave declarations (the S
 // rules own those): the roadmap line, roadmap entries and their content,
 // people inside teams, and `default <entity>` lines.
-function collectWaveHosts(file: NowlineFile): AstNode[] {
+/** @internal Kept only for the `ast-walk.ts` equivalence test; removed in m1.s3. */
+export function collectWaveHosts(file: NowlineFile): AstNode[] {
     const out: AstNode[] = [];
     const add = (node: AstNode): void => {
         if (isWaveDeclaration(node)) return;

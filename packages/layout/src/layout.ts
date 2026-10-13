@@ -1568,7 +1568,8 @@ function buildNowline(
 // Mutable layout-time context shared across helpers.
 
 // Traverse the full content tree to build an `items` map keyed by id.
-function collectItems(swimlanes: SwimlaneDeclaration[]): Map<string, ItemDeclaration> {
+/** @internal Kept only for the `ast-walk.ts` equivalence test; removed in m1.s3. */
+export function collectItems(swimlanes: SwimlaneDeclaration[]): Map<string, ItemDeclaration> {
     const out = new Map<string, ItemDeclaration>();
     const walk = (node: ItemDeclaration | GroupBlock | ParallelBlock): void => {
         if (isItemDeclaration(node)) {

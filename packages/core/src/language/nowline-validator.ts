@@ -2481,7 +2481,8 @@ export function registerEntity(
     }
 }
 
-function registerTeam(
+/** @internal Kept only for the `ast-walk.ts` equivalence test; removed in m1.s2. */
+export function registerTeam(
     team: TeamDeclaration,
     register: (name: string | undefined, node: AstNode) => void,
 ): void {
@@ -2494,7 +2495,8 @@ function registerTeam(
     }
 }
 
-function registerSwimlaneContent(
+/** @internal Kept only for the `ast-walk.ts` equivalence test; removed in m1.s2. */
+export function registerSwimlaneContent(
     child: SwimlaneContent | GroupContent | ParallelContent,
     register: (name: string | undefined, node: AstNode) => void,
 ): void {
@@ -2513,7 +2515,8 @@ function registerSwimlaneContent(
     }
 }
 
-function visitPropertiesDeep(node: AstNode, visit: (prop: EntityProperty) => void): void {
+/** @internal Kept only for the `ast-walk.ts` equivalence test; removed in m1.s2. */
+export function visitPropertiesDeep(node: AstNode, visit: (prop: EntityProperty) => void): void {
     const walk = (n: AstNode) => {
         const props = (n as unknown as { properties?: EntityProperty[] }).properties;
         if (Array.isArray(props)) {
@@ -2532,7 +2535,8 @@ function visitPropertiesDeep(node: AstNode, visit: (prop: EntityProperty) => voi
     walk(node);
 }
 
-function collectReferenceableIds(file: NowlineFile): Set<string> {
+/** @internal Kept only for the `ast-walk.ts` equivalence test; removed in m1.s2. */
+export function collectReferenceableIds(file: NowlineFile): Set<string> {
     const ids = new Set<string>();
     if (file.roadmapDecl?.name) ids.add(file.roadmapDecl.name);
 
