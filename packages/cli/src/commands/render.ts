@@ -12,7 +12,13 @@ import {
     type HostEnv,
     type RenderInputs,
 } from '@nowline/export';
-import { lengthToPoints, parseLength } from '@nowline/export-core';
+import {
+    lengthToPoints,
+    PageSizeParseError,
+    type PdfPageSize,
+    parseLength,
+    parsePageSize,
+} from '@nowline/export-core';
 import {
     type NonWorkingDisplay,
     type NormalizedZone,
@@ -126,9 +132,9 @@ export async function renderHandler(options: RenderHandlerOptions): Promise<void
         noLinks: args.noLinks,
         strict: args.strict,
         assetRoot: args.assetRoot,
-        // m2c format-specific options. Strings get parsed inside the format
-        // dispatch; the CLI just passes them through.
-        pageSize: args.pageSize ?? stringFromConfig(config, 'pdfPageSize'),
+        // m2c format-specific options. The PDF settings parse in `produce`,
+        // after validation, for every format.
+        pageSize: pickSetting(args.pageSize, '--page-size', config, 'pdfPageSize'),
         orientation: pickSetting(args.orientation, '--orientation', config, 'pdfOrientation'),
         margin: pickSetting(args.margin, '--margin', config, 'pdfMargin'),
         fontSans: args.fontSans ?? stringFromConfig(config, 'fontSans'),
@@ -214,8 +220,8 @@ interface ProduceArgs {
     strict: boolean;
     assetRoot?: string;
     // m2c format-specific
-    pageSize?: string;
     /** Parsed after validation, so its error follows any diagnostics. */
+    pageSize?: Setting;
     orientation?: Setting;
     margin?: Setting;
     fontSans?: string;
@@ -286,7 +292,7 @@ async function produce(args: ProduceArgs): Promise<ProduceResult> {
         nonWorking: args.nonWorking,
         noLinks: args.noLinks,
         strict: args.strict,
-        pageSize: args.pageSize,
+        pageSize: parsePageSizeSetting(args.pageSize),
         orientation: parseOrientation(args.orientation),
         marginPt: parseMargin(args.margin),
         pngScale: parseScale(args.scale),
@@ -606,6 +612,23 @@ function parseOrientation(
         ExitCode.InputError,
         `nowline: invalid ${setting.name} "${String(setting.raw)}". Expected portrait, landscape, or auto.`,
     );
+}
+
+function parsePageSizeSetting(setting: Setting | undefined): PdfPageSize | undefined {
+    if (!setting || setting.raw === '') return undefined;
+    const raw = String(setting.raw);
+    try {
+        return parsePageSize(raw);
+    } catch (err) {
+        if (!(err instanceof PageSizeParseError)) throw err;
+        // The parser's message names a generic "page size"; swap that lead
+        // for the flag or rc key the value came from.
+        const detail = err.message.replace(/^invalid page size "[^"]*": /, '');
+        throw new CliError(
+            ExitCode.InputError,
+            `nowline: invalid ${setting.name} "${raw}": ${detail}`,
+        );
+    }
 }
 
 function parseMargin(setting: Setting | undefined): number | undefined {

@@ -69,7 +69,7 @@ describe('render: .nowlinerc reaches LayoutOptions', () => {
     it('rc pdfPageSize, pdfOrientation and a bare-number pdfMargin reach the export kernel', async () => {
         await dryRunWithRc('pdfPageSize: a4\npdfOrientation: Landscape\npdfMargin: 36\n');
         expect(exportCalls[0]).toMatchObject({
-            pageSize: 'a4',
+            pageSize: { kind: 'preset', name: 'a4' },
             orientation: 'landscape',
             marginPt: 36,
         });
@@ -82,6 +82,9 @@ describe('render: .nowlinerc reaches LayoutOptions', () => {
             '--orientation',
             'portrait',
         ]);
-        expect(exportCalls[0]).toMatchObject({ pageSize: 'letter', orientation: 'portrait' });
+        expect(exportCalls[0]).toMatchObject({
+            pageSize: { kind: 'preset', name: 'letter' },
+            orientation: 'portrait',
+        });
     });
 });
