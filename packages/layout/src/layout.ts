@@ -505,6 +505,11 @@ function sequenceItem(
     if (waveRole !== undefined) result.waveRole = waveRole;
     if (wavePinOverride !== undefined) result.wavePinOverride = wavePinOverride;
     if (nonWorkingPin !== undefined) result.nonWorkingPin = nonWorkingPin;
+    // A background item carries its localized hover line from placement
+    // on (specs/waves.md §9.3); members and wave-free items carry none.
+    if (waveRole === 'background' && ctx.waves) {
+        result.waveTooltip = ctx.waves.backgroundTooltip;
+    }
     // Register the item object itself, not coordinates sampled from it:
     // the row packer and the marker-band shift may still move this box
     // down, and every attach port is read off the final box (see

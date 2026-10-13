@@ -51,13 +51,23 @@ export interface WaveLayoutState {
     frozen: boolean;
     /** The driver's result, set with `frozen`. */
     solve?: WaveBarrierResult;
+    /**
+     * The localized hover line of a background item
+     * (`PositionedItem.waveTooltip`), set where the item is placed: the
+     * renderer has no locale table (specs/waves.md §9.3).
+     */
+    readonly backgroundTooltip: string;
 }
 
-/** Fresh state for a roadmap with waves; `scale` maps the floor dates. */
+/**
+ * Fresh state for a roadmap with waves; `scale` maps the floor dates and
+ * `backgroundTooltip` is the locale's background-item line.
+ */
 export function createWaveLayoutState(
     plan: WavePlan,
     scale: TimeScale,
     origin: number,
+    backgroundTooltip: string,
 ): WaveLayoutState {
     const S = plan.waves.map(() => origin);
     return {
@@ -69,6 +79,7 @@ export function createWaveLayoutState(
         E: S,
         pass: new WavePass(plan, S),
         frozen: false,
+        backgroundTooltip,
     };
 }
 

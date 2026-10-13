@@ -15,21 +15,19 @@ import type {
     ResolveResult,
     SwimlaneDeclaration,
 } from '@nowline/core';
-import { defaultRowBand } from '../band-scale.js';
 import { daysBetween } from '../calendar.js';
 import { localeStrings } from '../i18n.js';
 import type { LayoutOptions, LayoutResult } from '../layout.js';
-import { createLayoutContext, type LayoutContext, type LayoutHelpers } from '../layout-context.js';
+import type { LayoutContext, LayoutHelpers } from '../layout-context.js';
 import { resolveDateWindow, resolveScope } from '../phases/date-window.js';
 import { measureRoadmap, setCalendarRuns } from '../phases/measure.js';
+import { placeChart } from '../phases/place.js';
 import { shiftIncludeY, shiftSwimlaneY } from '../positioned-shift.js';
 import type { RoadmapSchedule } from '../schedule.js';
-import { resolveStyle } from '../style-resolution.js';
 import {
     ATTRIBUTION_GLYPH_HEIGHT,
     ATTRIBUTION_GLYPH_WIDTH,
     GUTTER_PX,
-    SPACING_PX,
     WAVE_LEGEND_GAP_PX,
 } from '../themes/shared.js';
 import { TimeScale } from '../time-scale.js';
@@ -43,18 +41,10 @@ import type {
     PositionedSwimlane,
 } from '../types.js';
 import { buildHeaderTicks, tickBoundaryAtOrAfter } from '../view-preset.js';
-import { solveWaveBarriers } from '../wave-barrier.js';
-import {
-    beginWavePass,
-    createWaveLayoutState,
-    freezeWaves,
-    seedWaveEdges,
-    WAVE_EDGE_TOLERANCE_PX,
-} from '../wave-layout.js';
 import { buildAnchors } from './anchor-node.js';
 import { maxLeafItemRightX } from './content-extent.js';
-import { buildFootnotePanel, indexFootnotes } from './footnote-node.js';
-import { buildIncludeRegions, fitIncludeRegionWidth } from './include-node.js';
+import { buildFootnotePanel } from './footnote-node.js';
+import { fitIncludeRegionWidth } from './include-node.js';
 import {
     calendarMarkerEntries,
     type MarkerEntity,
@@ -65,8 +55,7 @@ import {
     workingExceptionMarkerId,
 } from './marker-band.js';
 import { MARKER_ROW_PITCH_PX } from './marker-geometry.js';
-import { buildMilestones, collectSlackCorridors, positionMilestones } from './milestone-node.js';
-import { SwimlaneNode } from './swimlane-node.js';
+import { positionMilestones } from './milestone-node.js';
 import { buildWaveLegend, buildWaves } from './wave-node.js';
 
 /**
@@ -140,9 +129,8 @@ export class RoadmapNode {
         // (specs/scheduler-unification.md §3.3).
         const scope = resolveScope(file, resolved, options);
         const window = resolveDateWindow(file, resolved, options, scope, schedule);
-        const { themeName, theme, locale, styleCtx } = scope;
-        const { cal, calendar, preset: scale, startDate, spanDays, nonWorking } = window;
-        const plan = schedule.plan;
+        const { themeName, theme, locale } = scope;
+        const { calendar, preset: scale, startDate, spanDays, nonWorking } = window;
 
         // Phase 2, measure (specs/layout-phases.md §3.3): the header, the
         // natural axis, the header rows with the marker-band estimate, and
@@ -150,201 +138,27 @@ export class RoadmapNode {
         const measured = measureRoadmap(file, resolved, options, scope, window);
         const { header: measuredHeader, headerNode, bands, timeline } = measured;
         const { chartLeftX } = measuredHeader;
-        const { originX, ppd, scale: timeScale } = measured.axis;
+        const { originX, ppd } = measured.axis;
         const { markerRowY, estimatedMarkerRows: markerRowsCount, estimatedRowsBottomY } = bands;
         const datePinnedEntries = measured.markers.datePinned;
         const hasMarkerEntities = measured.markers.hasEntities;
 
-        // Footnotes index must exist before sequencing items reference
-        // them.
-        const ctx = createLayoutContext(
-            resolved,
-            {
-                theme,
-                cal,
-                schedule,
-                timeline,
-                scale: timeScale,
-                calendar,
-                bandScale: defaultRowBand(),
-                waves: plan ? createWaveLayoutState(plan, timeScale, originX) : undefined,
-            },
-            {
-                chartTopY: bands.chartTopY,
-                chartBottomY: 0,
-                swimlaneBottomY: 0,
-            },
-            {
-                footnotes: indexFootnotes(resolved.content.footnotes),
-                // A copy: the final pack (P10) replaces the context's
-                // placements, and the estimate stays as measured.
-                markerRowPlacements: new Map(measured.markers.placements),
-            },
-        );
-        // Placement never reads the canvas; only the post-placement steps
-        // below grow and read it.
+        // Phase 3, place (specs/layout-phases.md §3.4): the context, the
+        // entity-edge seeds, the footnote index, the barrier passes (P1),
+        // the corridor rerun (P2), the kept regions (P4), the chart bottom
+        // (P5) and the milestones (P6). Placement never reads the canvas.
+        const chart = placeChart(resolved, scope, window, measured, deps);
+        const { ctx, swimlanes, includes, laneEntries, waveSolve } = chart;
+        const milestonePlacements = chart.milestones;
+
+        // The canvas extent: the natural axis, grown first to fit any
+        // caption that spilled past its bar (`textSpills`, f1). Otherwise
+        // the long captions on narrow charts — e.g. `examples/minimal.svg`
+        // and `tests/text-spills-right.svg` — would land outside the SVG's
+        // viewBox and clip in browsers. The marker re-pack below sees the
+        // expanded width and picks a less aggressive label side.
         const canvas = new CanvasExtent(measured.naturalChartRightX);
-
-        // Seed the entity-edge maps from the date-pinned pack so item
-        // `after:kickoff` references resolve before swimlanes run. Mid
-        // points use the row-aware centerY so dependency arrows from the
-        // anchor land on the diamond's actual row.
-        for (const e of datePinnedEntries) {
-            const placement = ctx.markerRowPlacements.get(e.id);
-            if (!placement) continue;
-            ctx.entityLeftEdges.set(e.id, e.centerX);
-            ctx.entityRightEdges.set(e.id, e.centerX);
-            ctx.entityMidpoints.set(e.id, { x: e.centerX, y: placement.centerY });
-        }
-
-        // Snapshot the entity maps after pre-positioning so we can reset
-        // them between the two swimlane passes. Date-pinned anchors and
-        // milestones live in this baseline; item-derived entries get
-        // re-added on each pass.
-        const baselineEntityLeft = new Map(ctx.entityLeftEdges);
-        const baselineEntityRight = new Map(ctx.entityRightEdges);
-        const baselineEntityMid = new Map(ctx.entityMidpoints);
-        // Item-only maps don't carry baseline entries (date-pinned
-        // markers are never placed items), so pass-2 reruns reset them
-        // to fresh empties. With waves, every reset re-seeds the wave
-        // edges (`entityRightEdges[w_k] = E_k`, `entityLeftEdges[w_k] =
-        // S_k`) on top of the baseline, so forward references stay
-        // dropped exactly as they are without waves.
-        const resetEntityMaps = (): void => {
-            ctx.entityLeftEdges = new Map(baselineEntityLeft);
-            ctx.entityRightEdges = new Map(baselineEntityRight);
-            ctx.entityMidpoints = new Map(baselineEntityMid);
-            // placedItems and itemFlowKey only ever hold item entries
-            // (markers never write to them), so a fresh map is the right
-            // reset: the next pass's items will repopulate.
-            ctx.placedItems = new Map();
-            ctx.itemFlowKey = new Map();
-            ctx.currentFlowKey = '';
-            if (ctx.waves) seedWaveEdges(ctx.waves, ctx.entityLeftEdges, ctx.entityRightEdges);
-        };
-
-        // Build swimlanes (declared order). Inter-band gap comes from
-        // the swimlane default style's `spacing` bucket. Default
-        // `spacing: none` keeps existing samples byte-stable; bumping to
-        // `md` introduces an 8 px gap.
-        const laneEntries = [...resolved.content.swimlanes.values()];
-        const swimlaneDefaultStyle = resolveStyle('swimlane', [], styleCtx);
-        const interBandGapPx =
-            SPACING_PX[swimlaneDefaultStyle.spacing as keyof typeof SPACING_PX] ?? 0;
-
-        const runSwimlaneLoop = (): {
-            swimlanes: PositionedSwimlane[];
-            nextY: number;
-            maxRightX: number;
-        } => {
-            ctx.nextParallelId = 0;
-            ctx.nextGroupId = 0;
-            const out: PositionedSwimlane[] = [];
-            let cursorY = ctx.chartTopY;
-            let bIndex = 0;
-            let maxRightX = ctx.timeline.originX;
-            for (const lane of laneEntries) {
-                if (bIndex > 0) cursorY += interBandGapPx;
-                const { positioned, usedHeight, usedRightX } = new SwimlaneNode(
-                    { lane, bandIndex: bIndex },
-                    deps,
-                ).place({ x: ctx.timeline.originX, y: cursorY }, ctx);
-                out.push(positioned);
-                cursorY += usedHeight;
-                if (usedRightX > maxRightX) maxRightX = usedRightX;
-                bIndex++;
-            }
-            return { swimlanes: out, nextY: cursorY, maxRightX };
-        };
-
-        const isolated = resolved.content.isolatedRegions;
-
-        // Pass 1 — place items without corridor knowledge. With waves
-        // (specs/waves.md §8.3-§8.4) it is the barrier driver's pass
-        // loop: each pass resets the maps, re-seeds the wave edges, places
-        // the lanes with the pass's floors, then places the isolated
-        // regions only to accumulate their members (those region
-        // placements are discarded). The driver iterates to the least
-        // fixpoint; its last pass ran with the solved S/E, so its lane
-        // placements are kept.
-        let pass: ReturnType<typeof runSwimlaneLoop>;
-        let waveSolve: PositionedRoadmap['waveSolve'];
-        const waves = ctx.waves;
-        if (waves) {
-            let last: ReturnType<typeof runSwimlaneLoop> | undefined;
-            const solved = solveWaveBarriers(
-                waves.ids.length,
-                waves.origin,
-                waves.floors,
-                (S, E) => {
-                    beginWavePass(waves, S, E);
-                    resetEntityMaps();
-                    last = runSwimlaneLoop();
-                    if (isolated.length > 0) {
-                        buildIncludeRegions(isolated, ctx, last.nextY + 8, deps);
-                    }
-                    return waves.pass;
-                },
-                WAVE_EDGE_TOLERANCE_PX,
-            );
-            // From here on the barrier is frozen: later placements floor
-            // with the solved S/E and accumulate nothing.
-            freezeWaves(waves, solved);
-            waveSolve = { passes: solved.passes, capped: solved.capped };
-            pass = last as ReturnType<typeof runSwimlaneLoop>;
-        } else {
-            pass = runSwimlaneLoop();
-        }
-        let swimlanes = pass.swimlanes;
-        let y = pass.nextY;
-
-        // Collect slack-arrow corridors from the milestones (mirrors
-        // MilestoneNode.place's pred resolution). When the result is
-        // non-empty, an item sat inside an arrow's path on pass 1 — rerun
-        // the swimlane loop with corridors known so the row-packer can
-        // bump the offending items down to a clear row. Bumping never
-        // changes an item's x, so corridors stay valid across the rerun;
-        // no fixed-point iteration needed. With waves the rerun runs once,
-        // after the barrier has settled: it floors with the frozen S/E,
-        // and the reset re-seeds the wave edges.
-        const corridors = collectSlackCorridors(resolved.content.milestones, ctx);
-        if (corridors.length > 0) {
-            resetEntityMaps();
-            ctx.slackCorridors = corridors;
-            pass = runSwimlaneLoop();
-            swimlanes = pass.swimlanes;
-            y = pass.nextY;
-        }
-
-        // Expand the canvas to fit any caption that spilled past its bar
-        // (`textSpills`). Otherwise the long captions on narrow charts —
-        // e.g. `examples/minimal.svg` and `tests/text-spills-right.svg`
-        // — would land outside the SVG's viewBox and clip in browsers.
-        // The marker re-pack below sees the expanded width and picks a
-        // less aggressive label side.
-        canvas.grow(pass.maxRightX + GUTTER_PX);
-
-        // Include regions under the swimlanes. Reserve the 8 px gap +
-        // tab-reserve only when there's at least one isolated region —
-        // otherwise the now-line and chart bottom would extend past the
-        // last swimlane into empty space. With waves this is the one kept
-        // region placement, floored with the frozen S/E.
-        let includes: PositionedIncludeRegion[] = [];
-        if (isolated.length > 0) {
-            const r = buildIncludeRegions(isolated, ctx, y + 8, deps);
-            includes = r.regions;
-            y = r.endY;
-        }
-
-        ctx.chartBottomY = y;
-        ctx.swimlaneBottomY = y;
-        timeline.box.height = ctx.chartBottomY - timeline.box.y;
-
-        // Milestones first so anchors know which xs are occupied (for
-        // collision bumps). Placement gives each its x, slack arrows and
-        // overrun; its marker row and label box come from the re-pack
-        // below, once every centerX is known and the canvas is final.
-        const milestonePlacements = buildMilestones(resolved.content.milestones, ctx);
+        canvas.grow(chart.maxRightX + GUTTER_PX);
 
         // Post-layout timeline extension. `computeDateWindow`'s pre-pass
         // only knows about logical bar durations; caption spill,

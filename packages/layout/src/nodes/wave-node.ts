@@ -214,11 +214,9 @@ export function buildWaves(
 
     const boundaries = allEmpty ? [] : buildBoundaries(waves, state.origin, strip.y, ctx);
     const mainBackground = backgroundItems(swimlanes);
+    // Background items already carry their tooltip: `sequenceItem` sets it
+    // where it places them.
     const regionBackground = includes.map((inc) => backgroundItems(inc.nestedSwimlanes));
-    // The renderer has no locale table: hand it the background tooltip.
-    for (const item of [...mainBackground, ...regionBackground.flat()]) {
-        item.waveTooltip = strings.waveBackgroundItem;
-    }
     const built: BuiltWaves = {
         waves,
         boundaries,
