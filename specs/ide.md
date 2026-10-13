@@ -45,7 +45,7 @@ Langium generates an LSP server from the grammar definition. The server runs as 
 | Validation | Real-time error reporting — parse errors, unknown references, circular dependencies, invalid enum values |
 | Go-to-definition | Jump from `after:auth-refactor` to the item with `id:auth-refactor`; from `wave:build`, `after:build`, or `on:build` to `wave build` |
 | Find references | Find all usages of an `id` across the file |
-| Hover | Show item details on hover (title, status, owner, links). On a wave: "wave k of n", its title, description, and member count. On an item in a roadmap with waves: its effective wave ("inherited from group …" when it comes from a container), or "background (no wave)". On a `non-working` or `working` declaration: its id, title, and the `date:`, `every:`, `start:` and `end:` it sets. Calendar declarations are not referenced by id, so they do not appear in reference completion, go-to-definition, find references, or rename |
+| Hover | Show item details on hover (title, status, owner, links). On a wave: "wave k of n", its title, description, and member count. On an item in a roadmap with waves: its effective wave ("inherited from group …" when it comes from a container), or "background (no wave)". On a `non-working` or `working` declaration: its id, title, and the `date:`, `every:`, `start:` and `end:` it sets, plus an italic note when the chart never draws its title: a titled bounded recurrence (`every:` with `start:` or `end:`) or a titled `working` declaration ([`working-calendar.md`](./working-calendar.md) §7.4). A malformed declaration gets no note. Calendar declarations are not referenced by id, so they do not appear in reference completion, go-to-definition, find references, or rename |
 | Rename | Rename an `id` and update all references, including `wave:` values (renaming `wave wave` edits the name, not the keyword) |
 | Document symbols | Outline view showing roadmap → swimlanes → items hierarchy; waves appear as `Struct` symbols |
 | Folding | Fold swimlane blocks |
@@ -168,7 +168,7 @@ Locale uses two chains, mirroring the CLI's [`packages/cli/src/i18n/locale.ts`](
 | `nowline.preview.strict` | `false` | `--strict` | Promotes asset / sanitizer warnings to errors. Ships in m3d. |
 | `nowline.preview.showLinks` | `true` | inverse of `--no-links` | Toggle link icons in rendered items. Ships in m3d. |
 | `nowline.preview.nonWorking` | `file` | `--non-working` | `file` / `hide` / `show`. `file` leaves the option unset so the roadmap's own `default roadmap non-working:` key applies (then `hide`); `hide` or `show` forces that view in the preview and in every export command. Settings-only: there is no `.nowlinerc` key. |
-| `nowline.preview.width` | `0` | `--width` | `0` = unset; preview has zoom anyway. Ships in m3d. |
+| `nowline.preview.width` | `0` | `--width` | Maximum canvas width ([`rendering.md` § Canvas width](./rendering.md#canvas-width)). `0` = unset (fit content); preview has zoom anyway. Ships in m3d. |
 | `nowline.preview.assetRoot` | `""` | `--asset-root` | Empty = source file's directory. Ships in m3d. |
 | `nowline.export.cliPath` | `nowline` | — | Path to the `nowline` binary; PATH lookup by default. `${workspaceFolder}` substitution supported. Ships in m3e. |
 | `nowline.export.pdf.pageSize` | `letter` | `--page-size` | Ships in m3e. |

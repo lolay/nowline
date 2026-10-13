@@ -2,9 +2,11 @@ import {
     assignWaves,
     isGroupBlock,
     isItemDeclaration,
+    isNonWorkingDeclaration,
     isParallelBlock,
     isSwimlaneDeclaration,
     isWaveDeclaration,
+    isWorkingDeclaration,
     type NowlineFile,
     ownWaves,
     singleLine,
@@ -44,7 +46,8 @@ import {
  * declarations only — the LSP does not resolve includes.
  *
  * Calendar declarations (`non-working`, `working`, specs/working-calendar.md):
- * the declaration shows its id, title, and `date`, `every`, `start` and `end`.
+ * the declaration shows its id, title, and `date`, `every`, `start` and `end`,
+ * plus a note when its title is never drawn on the chart (§7.4).
  */
 export class NowlineHoverProvider implements HoverProvider {
     constructor(_services: NowlineLspServices) {
@@ -103,6 +106,8 @@ export class NowlineHoverProvider implements HoverProvider {
             lines.push('');
             lines.push(...rendered);
         }
+        const note = undrawnTitleNote(entity);
+        if (note) lines.push('', `_${note}_`);
 
         return {
             range,
@@ -119,6 +124,34 @@ const ITEM_SURFACED = ['status', 'owner', 'link', 'date', 'duration', 'size', 'e
 // A `non-working` / `working` declaration is described by its days, not by an
 // item's status or duration (specs/working-calendar.md §4.1).
 const CALENDAR_SURFACED = ['date', 'every', 'start', 'end'];
+
+/**
+ * Why a calendar declaration's title is never drawn, or undefined when it is
+ * drawn, there is no title, or the shape is malformed (NW1, §4.1: only the
+ * first of each key counts, so presence is all the shape needs). Only dated,
+ * titled `non-working` declarations are labelled (specs/working-calendar.md
+ * §7.4 "Which rules are labelled"); the open-ended week is the baseline and
+ * gets no note.
+ */
+function undrawnTitleNote(entity: NamedEntity): string | undefined {
+    if (!isNonWorkingDeclaration(entity) && !isWorkingDeclaration(entity)) return undefined;
+    if (!entity.title) return undefined;
+    const keys = new Set(entity.properties.map((p) => propKey(p)));
+    const has = (key: string) => keys.has(key);
+    const isDated = has('date') && !has('every') && !has('start') && !has('end');
+    const isRange = !has('date') && !has('every') && has('start') && has('end');
+    const isRecurrence = !has('date') && has('every');
+    if (!isDated && !isRange && !isRecurrence) return undefined;
+    // §7.4 leaves every titled `working` declaration unlabelled. Drop this
+    // case when the chart starts labelling them.
+    if (isWorkingDeclaration(entity)) {
+        return 'Title not drawn on the chart: working days are not labelled.';
+    }
+    if (isRecurrence && (has('start') || has('end'))) {
+        return 'Title not drawn on the chart: bounded recurrences are not labelled.';
+    }
+    return undefined;
+}
 
 /**
  * Wave lines for the hover: the wave summary on a wave declaration, the

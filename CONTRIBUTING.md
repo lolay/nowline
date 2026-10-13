@@ -438,16 +438,28 @@ Nowline ships [`AGENTS.md`](./AGENTS.md) and welcomes AI-assisted PRs. Read [`AI
 
 ### Changelog entries
 
-User-observable changes — DSL syntax, CLI flags, AST JSON shape, exporter output, extension UX, the `embed.nowline.io` surface — should land with an entry appended to `## [Unreleased]` in [`CHANGELOG.md`](./CHANGELOG.md). Use the right [Keep-a-Changelog](https://keepachangelog.com) heading (`Added` / `Changed` / `Deprecated` / `Removed` / `Fixed` / `Security`) and link to the PR or issue where it helps. Internal-only changes (build scripts, CI, dependency bumps with no behavior change) don't need an entry.
+User-observable changes — DSL syntax, CLI flags, AST JSON shape, exporter output, extension UX, the `embed.nowline.io` surface — land with a changelog fragment, not an edit to [`CHANGELOG.md`](./CHANGELOG.md). Every PR that edits the same `## [Unreleased]` lines conflicts with every other open PR; a file of your own can't.
 
-The maintainer moves your entry into a new `## [vX.Y.Z] - YYYY-MM-DD` section as part of the release-cut commit — see [Changelog workflow](./specs/releasing.md#changelog-workflow) in `specs/releasing.md` for the full contract.
+Add `.changelog/<name>.txt` (your branch slug or the PR number), with one fenced block per entry:
+
+````text
+```release-note:fixed
+`nowline --serve` accepts `--theme grayscale`.
+```
+````
+
+The kind is a [Keep-a-Changelog](https://keepachangelog.com) heading in lowercase: `added`, `changed`, `deprecated`, `removed`, `fixed`, or `security`. Link to the PR or issue where it helps. VS Code extension UX also gets a fragment in `packages/vscode-extension/.changelog/`, which feeds that package's `CHANGELOG.md`. `make changelog-check` validates your fragment and `make changelog-preview` shows the next release's section. Details: [`.changelog/README.md`](./.changelog/README.md).
+
+Internal-only changes (build scripts, CI, dependency bumps with no behavior change) need no fragment: label the PR `no-changelog`. The `Changelog` check fails a PR with neither, and one that adds entries to `CHANGELOG.md` above the latest release. Fixing an entry that already shipped is a direct edit to `CHANGELOG.md`.
+
+The release cut folds every fragment into a new `## [X.Y.Z] - YYYY-MM-DD` section and deletes them — see [Changelog workflow](./specs/releasing.md#changelog-workflow) in `specs/releasing.md` for the full contract.
 
 ### Pull requests
 
 1. **Fork** the repo (or branch, if you have write access) and create a feature branch: `git checkout -b feat/short-description`.
 2. Make your change. Keep the diff focused — one logical change per PR.
 3. **Run `make pre-commit` locally** before committing or pushing — it chains lint + build + typecheck + test, the same gate CI's canonical cell (Linux, Node 26) runs as `make ci`. The other cells (Linux Node 22, macOS, Windows) run `make ci-platform`: build plus the Vitest suites. A PR push runs only the two Linux cells; macOS and Windows run in the merge queue and on `main`.
-4. **Update documentation** — package READMEs, the top-level `README.md`, inline comments, plus a `## [Unreleased]` entry in [`CHANGELOG.md`](./CHANGELOG.md) for any user-observable change (see [Changelog entries](#changelog-entries) above).
+4. **Update documentation** — package READMEs, the top-level `README.md`, inline comments, plus a `.changelog/` fragment for any user-observable change (see [Changelog entries](#changelog-entries) above).
 5. **Open a PR** against `main` with:
     - A clear summary of the change.
     - The motivation (linked issue, bug repro, or design doc).

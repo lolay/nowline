@@ -230,9 +230,8 @@ Concretely, that decomposes into:
 **Layout:**
 - [`packages/layout/src/capacity.ts`](../../packages/layout/src/capacity.ts) — pure helpers; the load sweep
   belongs nearby.
-- [`packages/layout/src/calendar.ts`](../../packages/layout/src/calendar.ts) — `deriveItemDurationDays`,
-  `deriveTotalEffortDays`, `formatDurationDays`; mirror their patterns
-  for any new helpers.
+- [`packages/layout/src/calendar.ts`](../../packages/layout/src/calendar.ts) — `deriveItemDurationDays`
+  and `deriveTotalEffortDays`; mirror their patterns for any new helpers.
 - [`packages/layout/src/types.ts`](../../packages/layout/src/types.ts) — `PositionedSwimlane`,
   `PositionedCapacity`; add `PositionedLaneUtilization` here.
 - [`packages/layout/src/nodes/swimlane-node.ts`](../../packages/layout/src/nodes/swimlane-node.ts) — `resolveLaneCapacity`

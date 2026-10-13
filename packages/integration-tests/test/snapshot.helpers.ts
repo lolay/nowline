@@ -130,6 +130,14 @@ export const SAMPLES: SampleSpec[] = [
         dir: 'tests',
         theme: 'light',
     },
+    // Marker labels that fit on neither side grow the canvas instead of
+    // falling back onto the beside header card; a deliberate addition.
+    {
+        name: 'marker-left-overflow',
+        sourceFile: 'marker-left-overflow.nowline',
+        dir: 'tests',
+        theme: 'light',
+    },
     // A bounded recurrence narrows a run of weeks; their labels alternate.
     {
         name: 'non-working-recurrence',
