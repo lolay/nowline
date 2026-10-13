@@ -120,15 +120,35 @@ describe('core import layering', () => {
 
     it('keeps the split validator modules under language/validator/ behind nowline-validator.ts', () => {
         const modules = files.filter((f) => f.startsWith(VALIDATOR_DIR));
-        expect(modules).toContain('language/validator/tables.ts');
-        expect(modules).toContain('language/validator/support.ts');
-        // The class imports the modules and the modules never import it back, so
-        // the check bodies stay plain functions and no import cycle forms.
-        const loadedByClass = new Set(
-            (imports.get(VALIDATOR) ?? []).map((e) => e.target).filter(Boolean),
-        );
+        for (const name of [
+            'tables',
+            'support',
+            'structure',
+            'properties',
+            'entities',
+            'style',
+            'calendar',
+            'references',
+            'symbols',
+        ]) {
+            expect(modules).toContain(`${VALIDATOR_DIR}${name}.ts`);
+        }
+        // The class reaches every module (directly or through another module) and
+        // the modules never import it back, so the check bodies stay plain
+        // functions and no import cycle forms.
+        const reached = new Set<SourcePath>();
+        const pending: SourcePath[] = [VALIDATOR];
+        while (pending.length > 0) {
+            const file = pending.pop() as SourcePath;
+            for (const edge of imports.get(file) ?? []) {
+                if (edge.target?.startsWith(VALIDATOR_DIR) && !reached.has(edge.target)) {
+                    reached.add(edge.target);
+                    pending.push(edge.target);
+                }
+            }
+        }
         for (const module of modules) {
-            expect(loadedByClass.has(module)).toBe(true);
+            expect(reached.has(module)).toBe(true);
             const back = (imports.get(module) ?? []).filter((e) => e.target === VALIDATOR);
             expect(back.map((e) => e.specifier)).toEqual([]);
         }
