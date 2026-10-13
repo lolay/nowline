@@ -16,6 +16,8 @@ packages/embed/firebase/prod/public/
 packages/embed/firebase/dev/public/
 *.tsbuildinfo
 .scratch/
+# triage --command-log output (make doctor runs triage); not .triage*, which would hide .triage.yaml
+.triage/
 .pnpm-store/
 .pnpm-bin/
 
