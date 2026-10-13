@@ -1,13 +1,14 @@
 // The engine divergence register (specs/scheduler-unification.md §4 m1.s1,
 // §6). Engine A (the pixel layout) and engine C (`scheduleRoadmap`) place
 // the same roadmap differently in a few catalogued ways (§1.2, divergences
-// (a) to (f)), and C leaves isolated regions without waves unscheduled
-// (`region-scope`). This test lays out every sample under `examples/` and
-// `tests/`, converts A's logical span of every named item and every wave back
-// to working days, compares it with C's, and checks the mismatches against
-// `engine-divergences.json`. A mismatch the register does not list fails, and
-// so does a registered one that no longer happens: a fix deletes its entry,
-// or its letter from an entry with several causes.
+// (b) to (f); (a) was settled by F1), and `region-scope` marks a region whose
+// own anchors C resolves and A does not see (nested.nowline). This test lays
+// out every sample under `examples/` and `tests/`, converts A's logical span
+// of every named item and every wave back to working days, compares it with
+// C's, and checks the mismatches against `engine-divergences.json`. A
+// mismatch the register does not list fails, and so does a registered one
+// that no longer happens: a fix deletes its entry, or its letter from an
+// entry with several causes.
 //
 // Samples are laid out the way `nowline <file> --now 2026-02-09` lays them
 // out (no width, theme or display override), so the register describes the

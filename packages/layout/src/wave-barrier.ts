@@ -1,8 +1,7 @@
 // Wave barriers (specs/waves.md §5.1, §8.2-§8.5).
 //
-// One unit-agnostic driver serves the three schedulers: engine A (pixel
-// layout), engine B (`computeContentEndDay`, days) and engine C
-// (`scheduleRoadmap`, days). Each engine wraps its existing lane walk in a
+// One unit-agnostic driver serves both schedulers: engine A (pixel layout)
+// and engine C (`scheduleRoadmap`, days). Each wraps its lane walk in a
 // `runPass(S, E)` callback that floors starts by the barrier and reports the
 // latest member end per wave; the driver iterates to the least fixpoint.
 //
@@ -110,8 +109,8 @@ export function waveFloorDays(
 }
 
 /**
- * Per-pass wave state for the day engines (B and C): the floor of a node and
- * the member-end accumulator. One instance per pass.
+ * Per-pass wave state, in the caller's units (days for engine C, px for engine
+ * A): the floor of a node and the member-end accumulator. One instance per pass.
  */
 export class WavePass {
     /** Latest member end per wave (0-based); `-Infinity` when the wave has no member. */

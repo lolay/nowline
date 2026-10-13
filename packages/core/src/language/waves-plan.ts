@@ -1,7 +1,7 @@
 // The wave plan of a resolved roadmap (specs/waves.md §5.1, §7.3), and the
-// locale helper for coded resolver diagnostics (§7.4). Layout (engines A, B
-// and C) and the exporters read waves through `buildWavePlan` so they agree
-// on membership and floors.
+// locale helper for coded resolver diagnostics (§7.4). Layout (engines A and C)
+// and the exporters read waves through `buildWavePlan` so they agree on
+// membership and floors.
 
 import type { AstNode } from 'langium';
 import type { SwimlaneDeclaration, WaveDeclaration } from '../generated/ast.js';

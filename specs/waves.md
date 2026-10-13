@@ -325,7 +325,7 @@ All quantities are offsets in axis days from the roadmap origin (`start:`, or th
   - Items in isolated regions are members, and so are items without ids.
 - **Floor.** `A_k` is the latest date among w_k's `after:` elements (anchor date, dated-milestone date, inline date), converted to an axis offset. It is −∞ when the wave has no floor.
   - Dates are read straight from the declarations.
-  - A date maps to an axis offset the same way each engine already maps an anchor date: engine A uses an unclamped `scale.forward(date)`, and engines B and C use `daysBetween`.
+  - A date maps to an axis offset the same way each engine already maps an anchor date: engine A uses an unclamped `scale.forward(date)`, and engine C uses `daysBetween`.
   - They are never clamped to the date window (`forwardWithinDomain` returns null outside it), and never looked up through the layout's edge maps.
 
 **Barrier recurrence**
@@ -706,11 +706,10 @@ For every include edge `P → C` whose `roadmap:` mode is `merge` or `isolate` a
 
 ### 8.2 Barrier driver (new `packages/layout/src/wave-barrier.ts`)
 
-One driver, independent of units, serves all three schedulers:
+One driver, independent of units, serves both schedulers:
 
 - engine A, the pixel layout;
-- engine B, `computeContentEndDay` (days);
-- engine C, `scheduleRoadmap` (days).
+- engine C, `scheduleRoadmap` (days). The date window reads its content day from C's result (`RoadmapSchedule.extent`), so there is no third day-space walk.
 
 ```
 solveWaveBarriers(n, origin, A[1..n], runPass):     // runPass(S, E) -> memberEnd[1..n] (−∞ if no member)
@@ -729,9 +728,9 @@ solveWaveBarriers(n, origin, A[1..n], runPass):     // runPass(S, E) -> memberEn
 `A[k]` is computed directly from each floor element's own date:
 
 - the anchor's `date:`, the dated milestone's `date:`, or the inline date;
-- projected with an unclamped `scale.forward(date)` in engine A, and with `daysBetween` in engines B and C.
+- projected with an unclamped `scale.forward(date)` in engine A, and with `daysBetween` in engine C.
 
-It never goes through `forwardWithinDomain`, the seeded edge maps or `resolveAfterDay`. B and C fill `milestoneEnd` only after their lane walk, so reading a floor through those paths would return 0.
+It never goes through `forwardWithinDomain`, the seeded edge maps or `resolveAfterDay`. C fills `milestoneEnd` only after its lane walk, so reading a floor through those paths would return 0.
 
 ### 8.3 Termination and least schedule
 
@@ -801,41 +800,37 @@ Effects:
 
 So bars of different waves always have a gutter of at least 12 px between them (2 × `ITEM_INSET_PX`), including inside isolated regions. The boundary line sits in that gutter.
 
-### 8.5 Engines B and C (days)
+### 8.5 Engine C (days)
 
-Both run the same driver. Inside `runPass` they walk:
+`scheduleRoadmap` runs the driver. Inside `runPass` it walks:
 
 - the main lanes;
 - **exactly one level** of isolated-region lanes. Each region gets fresh id maps seeded only with the wave edges, matching engine A's region `childCtx`.
 
-Nested regions contribute nothing in any engine, because engine A does not draw them.
-
-**Engine B** (`computeContentEndDay`, `layout.ts:1190`)
-
-- The in-pass walk replaces the post-hoc region recursion (`layout.ts:1318-1331`). That recursion is kept for n = 0.
-- The content end includes `E_n` and every `S_k`. Without this, the domain would be too short: ticks cover only the domain, and `forwardWithinDomain` drops date pins.
-
-**Engine C** (`scheduleRoadmap`, `schedule.ts:72`)
+Nested regions contribute nothing to the barrier, because engine A does not draw them. Without waves, C still walks nested regions, but only to size the date window (`extent`); their items stay out of `byNode` and `items`.
 
 - `resolveAfterDay` resolves wave ids to `E_k`.
 - `RoadmapSchedule` gains `waves?: Map<id, { index, start, end, memberCount, heldBy?, floorRef? }>`.
-
-B and C share the driver and a small `floorAndAccumulate` helper. Their walkers are **not** merged in this change, to keep the risk down.
+- `RoadmapSchedule.extent.contentEndDay` includes `E_n` and every `S_k`. Without this, the domain would be too short: ticks cover only the domain, and `forwardWithinDomain` drops date pins.
+- Each pass builds a `WavePass` (`wave-barrier.ts`): `WavePass.apply` floors a node's start by its wave's `S_k`, and `WavePass.accumulate` records a placed member's end. Engine A's pixel passes use the same class through `wave-layout.ts`.
 
 ### 8.6 Agreement between engines
 
-Engines A and C produce the same schedule unless one of the existing divergences triggers:
+Engines A and C produce the same schedule unless one of the divergences of [`scheduler-unification.md`](./scheduler-unification.md) §1.2 triggers. The engine divergence register (`packages/layout/test/engine-divergences.json`, checked by `engine-divergence-register.test.ts` on every sample under `examples/` and `tests/`) lists each place they differ on the corpus: a new difference fails the test, and a fix has to delete its entry.
 
-- **(a)** an `after:` that ends before the lane cursor, or an `after:` that does not resolve, falls back toward the lane start in engine A;
+- **(a)** settled by F1: an `after:` on a lane or group child starts at `max(previous item end, refs)` in both engines, so the register carries no entry for it;
+- **(b)** a short item: engine A's bar is at least `MIN_ITEM_WIDTH` wide, and the lane cursor advances past it;
 - **(c)** caption spill inside a group that has a following sibling;
 - **(d)** a group track that binds a parallel join adds `TRACK_BLOCK_TAIL_GUTTER_PX` (8 px);
+- **(e)** an `after:` on a group nested in a parallel: engine A ignores it;
+- **(f)** engine A's lane cursor is monotone;
 - **(g)** item `start:` pins (fixed): both engines resolve an item's start as `date:` > `start:` > `after:` > track cursor, on a lane or group item and on an item that is a direct parallel track alike. Engine A used to ignore a `start:` pin on a direct parallel track and let a lane item's `after:` push its `start:` pin (`max(start, after)`). With waves the floor is one more term in each engine's `max`, and NL.W1001 fires only when the floor itself is the item's start.
 
-The full list, (a)–(g), is in [`handoffs/handoff-m2o-waves.md`](./handoffs/handoff-m2o-waves.md) §4.
+The history of (a)–(g) is in [`handoffs/handoff-m2o-waves.md`](./handoffs/handoff-m2o-waves.md) §4.
 
 Consequences:
 
-- The worked examples avoid these divergences by construction, and the layout tests assert A = C exactly on them.
+- Each worked example in §11 is asserted on both engines against the spec's own numbers: on C in `schedule.test.ts`, on A in `waves.test.ts`. Neither test compares the engines with each other, so an example does not have to dodge the divergences, and the register, not the choice of examples, catches a new one.
 - A separate test pins divergence (d) with waves present.
 - Waves add **no** wave-only cursor rule. Engine A's barrier is computed from engine A's own ends, so the barrier's correctness never depends on the engines agreeing.
 
@@ -1167,7 +1162,7 @@ All wave output is gated on waves existing. Exporters read waves from `inputs.re
   | W6 | 02-16 | | |
 
 - **Sketches** use one character per week: `|` is a wave boundary, `.` is idle time, letters are work and `/` is background work. An upper-case letter marks a week painted as red overflow (Example 10's `B`).
-- **Engine agreement.** Every valid example avoids the engine A/C divergences (§8.6), so both engines produce the same tables.
+- **Engine agreement.** Every valid example's tables hold for both engines (§8.6): `schedule.test.ts` asserts them on engine C and `waves.test.ts` on engine A.
 - **Diagnostics** are listed only where an example has some.
 
 The PM-facing sample, [`examples/waves.nowline`](../examples/waves.nowline), combines Examples 1, 3, 5 and 8 into one roadmap. Its schedule:
@@ -2005,7 +2000,7 @@ Waves: w1 [W0, W4], w2 [W4, W6].
 
 - **Isolation.** `pf-scale` cannot write `after:ios-offline`, but the barrier still holds it.
 - **Rendering.** Boundaries are re-emitted inside the dashed region, clipped to its painted rect.
-- **Engines.** Engine A converges in 3 passes, and engines A, B and C agree that the domain ends at W6.
+- **Engines.** Engine A converges in 3 passes, and the date window (engine C's `extent`) ends at W6.
 - **Standalone.** `ios.nowline` rendered on its own gives w1 [W0, W4] and w2 [W4, W5].
 
 ```

@@ -1,8 +1,11 @@
 // scheduleRoadmap — compute the floating calendar start/end date for every
 // named entity (items, milestones, anchors) without running the full layout.
 //
-// The sequencing rules exactly mirror `computeContentEndDay` in `layout.ts`
-// plus the roadmap-start resolution in `RoadmapNode.place`:
+// This is the only day-level scheduler (specs/scheduler-unification.md): the
+// date window reads its content day from `extent`, and the exporters read the
+// dates. The pixel layout keeps its own placement and differs from it in the
+// catalogued ways of `test/engine-divergences.json`. The rules, with the
+// roadmap-start resolution of `RoadmapNode.place`:
 //   - date: / start:  — absolute pin (date: wins over start:)
 //   - after:[id|DATE]  — start after the maximum predecessor end
 //   - sequential default — start where the previous item in the lane ended
@@ -21,9 +24,7 @@
 // durations (handoff m2p decision 16): `calendar` is the file's resolved
 // calendar and `ScheduledItem.days` the duration engine C placed. The XLSX
 // exporter also reads the Start / End dates, the milestone dates and the
-// wave spans; the Mermaid exporter reads the wave spans. Keeping it
-// separate from `computeContentEndDay` avoids mutating the byte-stable
-// snapshot pipeline.
+// wave spans; the Mermaid exporter reads the wave spans.
 
 import type {
     GroupBlock,
@@ -159,8 +160,8 @@ export function scheduleRoadmap(
     };
 
     // These maps accumulate end-day offsets (from startDate) for cross-entity
-    // `after:` resolution, matching computeContentEndDay exactly. In a
-    // roadmap with waves the item maps are rebuilt on every barrier pass.
+    // `after:` resolution. In a roadmap with waves the item maps are rebuilt on
+    // every barrier pass.
     let itemEnd = new Map<string, number>(); // id → end day
     const anchorEnd = new Map<string, number>(); // id → date day
     const milestoneEnd = new Map<string, number>(); // id → date day
@@ -308,10 +309,10 @@ export function scheduleRoadmap(
         return after.length > 0 ? Math.max(0, ...after.map(resolveAfterDay)) : undefined;
     };
 
-    // An isolated region in a roadmap without waves, the way engine B walked
-    // it: fresh id maps, its own sizes (specs/scheduler-unification.md §8,
-    // decision 2), its anchors and milestones (resolved inside the region and
-    // counted in the extent, never in the results) and its nested regions.
+    // An isolated region in a roadmap without waves: fresh id maps, its own
+    // sizes (specs/scheduler-unification.md §8, decision 2), its anchors and
+    // milestones (resolved inside the region and counted in the extent, never
+    // in the results) and its nested regions.
     // First-level region items join `byNode`; their ids stay out of `items`.
     const scheduleRegion = (content: ResolvedContent, firstLevel: boolean): void => {
         const regionItemEnd = new Map<string, number>();
@@ -417,8 +418,8 @@ export function scheduleRoadmap(
         }
     }
 
-    // Milestones — same pass order as computeContentEndDay (after items so
-    // after: can resolve item end-days, and wave ids their E_k).
+    // Milestones, after the items so after: can resolve item end-days, and
+    // wave ids their E_k.
     const { resolveAfterDay } = makeWalker(mainScope(), undefined, reachMax);
     for (const [id, ms] of resolved.content.milestones) {
         const day = milestoneDay(ms, resolveAfterDay);

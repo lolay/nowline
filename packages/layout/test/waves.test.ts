@@ -539,8 +539,7 @@ swimlane api
             ['ios-offline', 'member'],
             ['ios-push', 'member'],
         ]);
-        // Engines A, B and C agree that the domain ends at W6: 30 working
-        // days, so Mon Feb 16.
+        // The domain ends at W6: 30 working days, so Mon Feb 16.
         const { timeline } = laid.model;
         expect(laid.calendar.workingIndexOf(timeline.startDate, timeline.endDate)).toBe(
             6 * laid.perWeek,
