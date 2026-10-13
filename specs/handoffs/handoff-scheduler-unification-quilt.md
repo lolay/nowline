@@ -6,9 +6,9 @@ Plan: [`plan-scheduler-unification-quilt.md`](./plan-scheduler-unification-quilt
 
 - **Branch:** `claude/eloquent-archimedes-fkbc5e` (harness-assigned task branch, cut from `origin/main` at `c34804c`, pushed). Single working directory, `lolay/nowline`.
 - **Mode:** unattended, confirmed 2026-10-13 by Gary's answer `unattended`. Kickoff prompt carries `Run in unattended mode.`
-- **Done:** wave 1 `[deep]` `nowline m1 s1-s3`, `c8caff3..8af7add` (m1.s1 `b25a2e0`, m1.s2 `1f0f970`, m1.s3 `8af7add`), review PASS. Wave 2 unit 1 `[exec]` `nowline m1 s4-s5`, `921ce16..f2027ee` (m1.s4 `e2889f5`, m1.s5 F1 `f2027ee`), review CONCERNS (showcase Ship drawn at day 42.2, not 40; docs overclaim); fix-up `2-fix` `6cc27e6` corrected the spec F1 row and changelog, review PASS. Wave 2 unit 2 `[exec]` `nowline m2 s1-s3`, `7e5ce18..2de5e41` (m2.s1 `e46d779`, m2.s2 `c699ea2`, m2.s3 `2de5e41`), review PASS. Wave 2 unit 3 `[exec]` `nowline m3 s1-s3`, `2f75d35..18d9067` (m3.s1 `773d436`, m3.s2 `d068a56`, m3.s3 `18d9067`), review CONCERNS (Example 13 fixes and Example 6 variant not asserted on C).
-- **Spend:** ~$32.5 API-equiv so far against ~$16 expected total (over expected; wave 1 ran ~$9.2 against ~$5.0 planned); guard stops past $50.
-- **Next unit:** fix-up `2-fix` `[exec]` on `nowline m3 s1-s3` (automatic, 1 of 2), then completion.
+- **Done:** wave 1 `[deep]` `nowline m1 s1-s3`, `c8caff3..8af7add` (m1.s1 `b25a2e0`, m1.s2 `1f0f970`, m1.s3 `8af7add`), review PASS. Wave 2 unit 1 `[exec]` `nowline m1 s4-s5`, `921ce16..f2027ee` (m1.s4 `e2889f5`, m1.s5 F1 `f2027ee`), review CONCERNS (showcase Ship drawn at day 42.2, not 40; docs overclaim); fix-up `2-fix` `6cc27e6` corrected the spec F1 row and changelog, review PASS. Wave 2 unit 2 `[exec]` `nowline m2 s1-s3`, `7e5ce18..2de5e41` (m2.s1 `e46d779`, m2.s2 `c699ea2`, m2.s3 `2de5e41`), review PASS. Wave 2 unit 3 `[exec]` `nowline m3 s1-s3`, `2f75d35..18d9067` (m3.s1 `773d436`, m3.s2 `d068a56`, m3.s3 `18d9067`), review CONCERNS (Example 13 fixes and Example 6 variant not asserted on C); fix-up `2-fix` `f71bd73`, `afa2fb7`, review PASS.
+- **Spend:** ~$34.0 API-equiv so far against ~$16 expected total (over expected; wave 1 ran ~$9.2 against ~$5.0 planned); guard stops past $50.
+- **Next unit:** none; completion (final verification, cleanup commit, then ask Gary about the PR).
 
 ## How to resume
 
@@ -22,7 +22,7 @@ None. The kickoff question was answered `unattended`.
 
 - m1 (engine B becomes a projection of C, plus F1 as m1.s5): **done**, `c8caff3..6cc27e6` (merge of main `52dd496` inside). Outcome: engine C has B's scope and `extent`; the date window is projected from the schedule (`computeContentEndDay`, `literalDays`, `defaultStartDate` gone); start terms parsed once in `start-terms.ts`; F1 landed: `after:` in a lane starts at `max(lane cursor, refs)`. F1 changed showcase, sizing, late-row-shifts renders (x3 themes), the `sizing.svg` snapshot and the `sizing:{html,pdf node+cli,png,svg}` determinism cells. Showcase Ship draws at day 42.2 vs the exports' 40 ((d) tail gutter, F3). Register keeps (b)-(f) entries plus nested.nowline's region-scope entries. Gate 4 into m2 passed unattended.
 - m2 (one plan and one schedule per staging): **done**, `7e5ce18..2de5e41`. `LayoutOptions.schedule` lets layout reuse a schedule; `stageDocument` builds plan, schedule and layout once and carries the schedule on `ExportInputs.schedule`; engine A reads item durations from `schedule.byNode` (via `scheduledItemDays`, which throws on a missing node). **m1 and m2 are done, so R2 (m4.14) steps that touch `RoadmapNode.place` may start** (they build on this branch until it merges). Gate 4 into m3 passed unattended.
-- m3 (tests describe behaviour, not agreement): s1-s3 done (`2f75d35..18d9067`); fix-up pending for the missing Example 13/6 C assertions.
+- m3 (tests describe behaviour, not agreement): **done**, `2f75d35..afa2fb7`.
 
 ## Decisions so far
 

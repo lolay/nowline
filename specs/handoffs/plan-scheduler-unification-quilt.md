@@ -4,7 +4,7 @@
 ```
 --- KICKOFF: begin orchestration at [deep] ---
 
-  Status: 4/4 groups done | last review: wave-2 CONCERNS | current: nowline m3 s1-s3 [exec] fix-up | updated 2026-10-13 | over expected: ~$32.45 of ~$16 | passed unattended: gate 4 before wave 2 (m3)
+  Status: 4/4 groups done | last review: wave-2-fix PASS | current: completion | updated 2026-10-13 | over expected: ~$34.03 of ~$16 | passed unattended: gate 1 (fix-up 1 of 2)
 
   mode: unattended | proposed unattended (harness=claude-code runner=cloud; CLAUDE_CODE_REMOTE=true, assigned branch) | guard 3x min $50 | fixups 2 | confirmed 2026-10-13 session 65f2e917-181e-5b0f-94c9-28d8d9b1c93d: unattended
 
@@ -153,6 +153,7 @@ review wave-2 (nowline m1 s4-s5) 921ce16..f2027ee: CONCERNS - m1.s4 pure refacto
 review wave-2-fix (nowline m1 s4-s5) 921ce16..6cc27e6: PASS - 6cc27e6 corrects the spec §5 F1 row (Ship at 42.2 working days against the exports' 40, the 2.2 days being the (d) tail gutter F3 closes) and the release-note:changed block; register reasons already accurate; G1/G3 unchanged against f2027ee; changelog-check green; passed unattended: gate 1 (fix-up 1 of 2) - 2026-10-13
 review wave-2 (nowline m2 s1-s3) 7e5ce18..2de5e41: PASS - layout reuses a matching schedule (rebuild/reuse test); stageDocument builds plan, schedule, layout once and xlsx/mermaid/msproj read inputs.schedule (spy test over 4 formats, with/without waves); engine A reads durations from schedule.byNode and throws on a miss (A only lays out first-level regions, so byNode covers it); added changelog block per Gary; G1 empty at every step, G3 identical, determinism green; passed unattended: gate 4 - 2026-10-13
 review wave-2 (nowline m3 s1-s3) 2f75d35..18d9067: CONCERNS - m3.s1 misses waves.md §11 Example 13's two fixes on engine C (waves.md:1735: both fixes give a2 W0-W1, a3 W1-W2, a1 W2-W4; fixtures EXAMPLE_13_FIX_MOVE / EXAMPLE_13_FIX_PARALLEL in packages/core/test/validation/wave-fixtures.ts:281,294 are used only for diagnostics); add both to schedule.test.ts (items a2 [0,1], a3 [1,2], a1 [2,4]; waves w1 [0,2], w2 [2,4]), plus Example 6's "Without the dependency" variant (waves.md:1445: w1 [W0,W2], api W2-W5, wire-up W5-W7), and correct the scheduler-unification.md §9 sentence claiming only Example 7 fix and Example 9 were missing; rest PASS (G1 empty, oracle gone, specs updated, comments-only src edits) - 2026-10-13
+review wave-2-fix (nowline m3 s1-s3) 2f75d35..afa2fb7: PASS - f71bd73 asserts Example 13 both fixes, Example 6 without the dependency and the sweep's other variants (Ex 3 without docs, Ex 10 without waves, Ex 11 without the floor, Ex 15 move fix) on C against waves.md numbers; afa2fb7 corrects scheduler-unification.md §9; no src, snapshot or golden change; G1 empty against 18d9067; passed unattended: gate 1 (fix-up 1 of 2) - 2026-10-13
 
 ## Token log
 
@@ -181,3 +182,6 @@ tokens review-wave-2 nowline-m2-s1-s3 (claude-opus-5-5): input ~40 / cache read 
 tokens orchestrator-wave-2 nowline-m2-s1-s3 (claude-opus-5-5): input ~9 / cache read ~1.3M / cache write ~0 5m + ~35k 1h / output ~14k | ~$0.82 API-equiv
 tokens wave-2 nowline-m3-s1-s3 (claude-sonnet-5-5): input ~110 / cache read ~8.6M / cache write ~170k / output ~57k | ~$2.72 API-equiv (output est.) session 65f2e917-181e-5b0f-94c9-28d8d9b1c93d
 tokens review-wave-2 nowline-m3-s1-s3 (claude-opus-5-5): input ~58 / cache read ~1.9M / cache write ~98k / output ~29k | ~$1.45 API-equiv (output est.) session 65f2e917-181e-5b0f-94c9-28d8d9b1c93d
+tokens orchestrator-wave-2 nowline-m3-s1-s3 (claude-opus-5-5): input ~12 / cache read ~1.5M / cache write ~0 5m + ~27k 1h / output ~8.3k | ~$0.69 API-equiv
+tokens wave-2-fix nowline-m3-s1-s3 (claude-sonnet-5-5): input ~26 / cache read ~980k / cache write ~50k / output ~13k | ~$0.45 API-equiv (output est.) session 65f2e917-181e-5b0f-94c9-28d8d9b1c93d
+tokens review-wave-2-fix nowline-m3-s1-s3 (claude-opus-5-5): input ~22 / cache read ~280k / cache write ~37k / output ~10k | ~$0.44 API-equiv (output est.) session 65f2e917-181e-5b0f-94c9-28d8d9b1c93d
