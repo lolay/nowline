@@ -1,14 +1,14 @@
 // Header card geometry — sizing and text-stack metrics for the
 // "header card" that sits beside the timeline (title + author block).
 //
-// Layout owns the card *size* (computed up-front in `sizeBesideHeader`
+// Layout owns the card *size* (computed up-front in `HeaderNode.measure`
 // from wrapped title/author text). The renderer paints the rectangle +
 // text using the *same* paddings, line heights, and font sizes so the
 // card is laid out and drawn consistently.
 //
 // Bumping any of these constants changes the visible size of the
 // header card and the position of every text line inside it. Always
-// keep the layout's `sizeBesideHeader` and the renderer's
+// keep the layout's `HeaderNode` and the renderer's
 // `renderHeader` aligned by going through this module.
 
 /** Horizontal padding (px) inside the card from edge to text. */

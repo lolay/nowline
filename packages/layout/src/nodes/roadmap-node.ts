@@ -4,8 +4,8 @@
 // helpers) to produce the final `PositionedRoadmap` model.
 //
 // RoadmapNode does NOT import the sequencer helpers or the orchestration
-// helpers (`computeDateWindow`, `sizeBesideHeader`, `collectItems`,
-// `buildDependencies`, `buildNowline`) at module-init time. They live in
+// helpers (`computeDateWindow`, `collectItems`, `buildDependencies`,
+// `buildNowline`) at module-init time. They live in
 // `layout.ts` and are passed in via the `deps` argument. This avoids a
 // runtime cycle while keeping the composition logic in a dedicated file.
 
@@ -21,8 +21,8 @@ import { daysBetween } from '../calendar.js';
 import { resolveWorkingCalendar } from '../calendar-resolver.js';
 import { cappedPixelsPerDay } from '../canvas-width.js';
 import { parseDate, propValue } from '../dsl-utils.js';
-import { HEADER_CARD_PADDING_X, HEADER_LOGO_PAD_Y_PX } from '../header-card-geometry.js';
-import { type LogoDimensions, resolveHeaderLogo } from '../header-logo.js';
+import { HEADER_CARD_PADDING_X } from '../header-card-geometry.js';
+import { resolveHeaderLogo } from '../header-logo.js';
 import { localeStrings, resolveLocale } from '../i18n.js';
 import type { LayoutOptions, LayoutResult } from '../layout.js';
 import { createLayoutContext, type LayoutContext, type LayoutHelpers } from '../layout-context.js';
@@ -35,7 +35,6 @@ import {
     ATTRIBUTION_GLYPH_HEIGHT,
     ATTRIBUTION_GLYPH_WIDTH,
     GUTTER_PX,
-    HEADER_ABOVE_HEIGHT_PX,
     HEADER_HEIGHT_PX,
     NOW_PILL_HEIGHT_PX,
     SPACING_PX,
@@ -73,6 +72,7 @@ import {
 import { buildAnchors } from './anchor-node.js';
 import { maxLeafItemRightX } from './content-extent.js';
 import { buildFootnotePanel, indexFootnotes } from './footnote-node.js';
+import { HeaderNode } from './header-node.js';
 import { buildIncludeRegions, fitIncludeRegionWidth } from './include-node.js';
 import {
     type MarkerEntity,
@@ -91,8 +91,6 @@ import {
 import { buildMilestones, collectSlackCorridors, positionMilestones } from './milestone-node.js';
 import { SwimlaneNode } from './swimlane-node.js';
 import { buildWaveLegend, buildWaves } from './wave-node.js';
-
-const HEADER_CARD_TOP_INSET = 4;
 
 /**
  * The canvas right edge, owned by `RoadmapNode.place` and never part of
@@ -146,20 +144,6 @@ function setCalendarRuns(
     if (exceptions) timeline.workingExceptions = exceptions;
 }
 
-/** Sized output from the beside-mode header word-wrap pass. */
-export interface SizedHeader {
-    titleLines: string[];
-    authorLines: string[];
-    cardWidth: number;
-    /** Card height, grown to fit the logo when it is taller than the text. */
-    cardHeight: number;
-    /** Card height the title / author text alone needs. */
-    textCardHeight: number;
-    /** Width the logo takes left of the text, gap included; 0 without a logo. */
-    logoSlot: number;
-    boxWidth: number;
-}
-
 /**
  * Bundle of orchestration + sequencer helpers RoadmapNode delegates to.
  * `layout.ts` builds this struct from its private helpers and passes it
@@ -172,11 +156,6 @@ export interface RoadmapNodeDeps extends LayoutHelpers {
         today: Date | undefined,
         scale: ViewPreset,
     ) => { startDate: Date; endDate: Date };
-    sizeBesideHeader: (
-        title: string,
-        author: string | undefined,
-        logo?: LogoDimensions,
-    ) => SizedHeader;
     collectItems: (swimlanes: SwimlaneDeclaration[]) => Map<string, ItemDeclaration>;
     buildDependencies: (
         items: Map<string, ItemDeclaration>,
@@ -261,28 +240,25 @@ export class RoadmapNode {
         // `TimeScale.showsNonWorking`, needed here to size the scale's range.
         const showsNonWorking = nonWorking === 'show' && calendar.hasNonWorkingDays;
 
-        // Pre-size the beside-mode header card. Width = max line width +
-        // padding, clamped to MIN..MAX with word-wrap once the title
-        // exceeds MAX. Above-mode keeps the existing fixed-strip
-        // geometry (full canvas width, fixed height).
+        // Measure the header: the beside card's size or the above band's
+        // height, which fix the chart's left edge and top. The company logo
+        // (when the caller loaded one) widens the card by its slot and can
+        // make it taller; see header-logo.ts.
         const titleStr = file.roadmapDecl?.title ?? file.roadmapDecl?.name ?? '';
         const authorStr = propValue(file.roadmapDecl?.properties ?? [], 'author');
-        // The company logo (when the caller loaded one) widens the card by
-        // its slot and can make it taller; see header-logo.ts.
         const headerLogo = resolveHeaderLogo(file, options.logo);
-        const sizedHeader = deps.sizeBesideHeader(titleStr, authorStr, headerLogo);
-        // Above-mode strip: fixed height, bumped only when the logo plus
-        // its clearance is taller (`logo-size:xl`).
-        const aboveHeight = headerLogo
-            ? Math.max(HEADER_ABOVE_HEIGHT_PX, headerLogo.height + 2 * HEADER_LOGO_PAD_Y_PX)
-            : HEADER_ABOVE_HEIGHT_PX;
+        const measuredHeader = new HeaderNode({
+            title: titleStr,
+            author: authorStr,
+            style: headerStyle,
+            logo: headerLogo,
+        }).measure();
 
         const headerBox = isBeside
-            ? { x: 0, y: 0, width: sizedHeader.boxWidth, height: 0 }
-            : { x: 0, y: 0, width: 0, height: aboveHeight };
+            ? { x: 0, y: 0, width: measuredHeader.chartLeftX, height: 0 }
+            : { x: 0, y: 0, width: 0, height: measuredHeader.aboveHeight };
 
-        const chartLeftX = isBeside ? sizedHeader.boxWidth : 0;
-        const chartTopY = isBeside ? 8 : aboveHeight + 8;
+        const { chartLeftX, chartTopY } = measuredHeader;
 
         // The chart sizes to natural content width (date window × ppd) plus
         // chrome padding. `options.width`, when set, is a best-effort
@@ -425,10 +401,7 @@ export class RoadmapNode {
         // When the card is taller than the natural rows + a 4 px top
         // inset, push the timeline down so the card has room without
         // clipping above the canvas.
-        const minHeaderRowsBottomForCard = isBeside
-            ? sizedHeader.cardHeight + HEADER_CARD_TOP_INSET
-            : 0;
-        const timelineY = Math.max(chartTopY, minHeaderRowsBottomForCard - headerRowsHeight);
+        const timelineY = Math.max(chartTopY, measuredHeader.minRowsBottomY - headerRowsHeight);
         const tickPanelY = timelineY + pillRowHeight;
         const waveStripY = tickPanelY + tickPanelHeight;
         const markerRowY = waveStripY + waveStripHeight;
@@ -927,11 +900,11 @@ export class RoadmapNode {
         const cardBox: BoundingBox = isBeside
             ? {
                   x: 6,
-                  y: headerRowsBottomY - sizedHeader.cardHeight,
-                  width: sizedHeader.cardWidth,
-                  height: sizedHeader.cardHeight,
+                  y: headerRowsBottomY - measuredHeader.cardHeight,
+                  width: measuredHeader.cardWidth,
+                  height: measuredHeader.cardHeight,
               }
-            : { x: 0, y: 0, width: chartRightX, height: aboveHeight };
+            : { x: 0, y: 0, width: chartRightX, height: measuredHeader.aboveHeight };
         // Logo at the card's left padding, vertically centered; the text
         // shifts right past it and centers in the (possibly taller) card.
         let logo: PositionedHeader['logo'];
@@ -948,8 +921,8 @@ export class RoadmapNode {
                 intrinsic: headerLogo.intrinsic,
             };
             textInset = {
-                x: sizedHeader.logoSlot,
-                y: Math.max(0, (cardBox.height - sizedHeader.textCardHeight) / 2),
+                x: measuredHeader.logoSlot,
+                y: Math.max(0, (cardBox.height - measuredHeader.textCardHeight) / 2),
             };
         }
 
@@ -984,8 +957,8 @@ export class RoadmapNode {
             position: headerStyle.headerPosition,
             title: titleStr,
             author: authorStr,
-            titleLines: sizedHeader.titleLines,
-            authorLines: sizedHeader.authorLines,
+            titleLines: measuredHeader.titleLines,
+            authorLines: measuredHeader.authorLines,
             cardBox,
             logo,
             ...(textInset ? { textInset } : {}),

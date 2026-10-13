@@ -16,18 +16,6 @@ import {
     type EdgeRouteRequest,
     routeChannelEdges,
 } from './edge-routing.js';
-import {
-    HEADER_AUTHOR_FONT_SIZE_PX,
-    HEADER_AUTHOR_LINE_HEIGHT_PX,
-    HEADER_CARD_PADDING_BOTTOM,
-    HEADER_CARD_PADDING_TOP,
-    HEADER_CARD_PADDING_X,
-    HEADER_LOGO_GAP_PX,
-    HEADER_LOGO_PAD_Y_PX,
-    HEADER_TITLE_FONT_SIZE_PX,
-    HEADER_TITLE_LINE_HEIGHT_PX,
-    HEADER_TITLE_TO_AUTHOR_GAP_PX,
-} from './header-card-geometry.js';
 import type { LogoDimensions } from './header-logo.js';
 import { localeStrings } from './i18n.js';
 import { computeItemInlineDatePins, pickInlineDate } from './inline-date-pin-geometry.js';
@@ -53,17 +41,15 @@ import { GroupNode } from './nodes/group-node.js';
 import { buildLabelChip, type ItemMeasure, measureItem } from './nodes/item-measure.js';
 import { ItemNode, traceItemNode } from './nodes/item-node.js';
 import { ParallelNode } from './nodes/parallel-node.js';
-import { RoadmapNode, type SizedHeader } from './nodes/roadmap-node.js';
+import { RoadmapNode } from './nodes/roadmap-node.js';
 import type { NonWorkingDisplay } from './non-working-display.js';
 import { type RoadmapSchedule, scheduleRoadmap } from './schedule.js';
 import { startTermsOf } from './start-terms.js';
 import { resolveStyle } from './style-resolution.js';
-import { estimateTextWidth, wrapText } from './text-measure.js';
+import { estimateTextWidth } from './text-measure.js';
 import type { ThemeName } from './themes/index.js';
 import {
     GUTTER_PX,
-    HEADER_BESIDE_MAX_WIDTH_PX,
-    HEADER_BESIDE_MIN_WIDTH_PX,
     ITEM_INSET_PX,
     NOW_PILL_LABEL_FONT_SIZE_PX,
     NOW_PILL_LABEL_INSET_X_PX,
@@ -668,80 +654,6 @@ function startPinOf(
     return undefined;
 }
 
-// Card-sizing constants for beside-mode headers live in
-// `header-card-geometry.ts` so the renderer can paint with the same
-// numbers the layout sized against. Title and author both wrap at
-// MAX_CONTENT_WIDTH (= MAX header width minus 2 * padding). The card
-// hugs its content in the MIN..MAX range and grows vertically when
-// wrapping is needed.
-//
-// Left margin between the canvas's left edge and the visible card. The
-// matching right-side breathing room is owned by `GUTTER_PX` (the canonical
-// content gutter, applied between `chartLeftX` and `originX`), so the gap
-// from the card's right edge to the timeline strip is the same as the gap
-// between two adjacent items.
-const HEADER_CARD_OUTER_PAD = 6;
-
-function sizeBesideHeader(
-    title: string,
-    author: string | undefined,
-    logo?: LogoDimensions,
-): SizedHeader {
-    const maxContentWidth = HEADER_BESIDE_MAX_WIDTH_PX - 2 * HEADER_CARD_PADDING_X;
-    const titleLines = wrapText(title, maxContentWidth, HEADER_TITLE_FONT_SIZE_PX);
-    const authorLines = wrapText(author ?? '', maxContentWidth, HEADER_AUTHOR_FONT_SIZE_PX);
-
-    let widest = 0;
-    for (const line of titleLines)
-        widest = Math.max(widest, estimateTextWidth(line, HEADER_TITLE_FONT_SIZE_PX));
-    for (const line of authorLines)
-        widest = Math.max(widest, estimateTextWidth(line, HEADER_AUTHOR_FONT_SIZE_PX));
-
-    // A logo sits left of the text and widens the card past the text-only
-    // MAX clamp (which bounds the text column, not the logo slot).
-    const hasText = titleLines.length > 0 || authorLines.length > 0;
-    const logoSlot = logo ? logo.width + (hasText ? HEADER_LOGO_GAP_PX : 0) : 0;
-
-    const naturalCardWidth = widest + 2 * HEADER_CARD_PADDING_X;
-    // `HEADER_BESIDE_{MIN,MAX}_WIDTH_PX` bound the **boxWidth** (= cardWidth
-    // + left outer pad). Subtract one outer pad to derive the cardWidth
-    // bounds.
-    const cardWidth = Math.max(
-        HEADER_BESIDE_MIN_WIDTH_PX - HEADER_CARD_OUTER_PAD,
-        Math.min(HEADER_BESIDE_MAX_WIDTH_PX - HEADER_CARD_OUTER_PAD, naturalCardWidth) + logoSlot,
-    );
-
-    const titleBlockHeight =
-        titleLines.length > 0 ? (titleLines.length - 1) * HEADER_TITLE_LINE_HEIGHT_PX : 0;
-    const authorBlockHeight =
-        authorLines.length > 0
-            ? HEADER_TITLE_TO_AUTHOR_GAP_PX +
-              (authorLines.length - 1) * HEADER_AUTHOR_LINE_HEIGHT_PX
-            : 0;
-    const textCardHeight =
-        HEADER_CARD_PADDING_TOP + titleBlockHeight + authorBlockHeight + HEADER_CARD_PADDING_BOTTOM;
-    // A logo taller than the text block grows the card; logo and text are
-    // then both centered vertically.
-    const cardHeight = logo
-        ? Math.max(textCardHeight, logo.height + 2 * HEADER_LOGO_PAD_Y_PX)
-        : textCardHeight;
-
-    // `boxWidth` only includes the LEFT outer pad — the right-side breathing
-    // room between the card and the chart is owned by `GUTTER_PX` in
-    // `RoadmapNode`. So `boxWidth` doubles as `chartLeftX` (the card's right
-    // edge in canvas coordinates).
-    const boxWidth = cardWidth + HEADER_CARD_OUTER_PAD;
-    return {
-        titleLines,
-        authorLines,
-        cardWidth,
-        cardHeight,
-        textCardHeight,
-        logoSlot,
-        boxWidth,
-    };
-}
-
 // Compute a sensible [startDate, endDate] window from the roadmap's day
 // schedule (`scheduleRoadmap`, specs/scheduler-unification.md §3.3).
 //
@@ -1038,7 +950,6 @@ export function layoutRoadmap(
         newCursor,
         estimateTextWidth,
         computeDateWindow,
-        sizeBesideHeader,
         collectItems,
         buildDependencies,
         buildNowline,
