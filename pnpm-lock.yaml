@@ -748,19 +748,19 @@ importers:
 
   packages/renderer:
     dependencies:
-      '@nowline/layout':
-        specifier: workspace:*
-        version: link:../layout
-    devDependencies:
       '@nowline/core':
         specifier: workspace:*
         version: link:../core
-      '@types/node':
-        specifier: ^26.6.3
-        version: 26.6.3
+      '@nowline/layout':
+        specifier: workspace:*
+        version: link:../layout
       langium:
         specifier: ~4.4.0
         version: 4.4.0
+    devDependencies:
+      '@types/node':
+        specifier: ^26.6.3
+        version: 26.6.3
       typescript:
         specifier: ^7.0.2
         version: 7.0.2
