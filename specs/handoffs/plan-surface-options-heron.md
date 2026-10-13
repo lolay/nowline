@@ -1,7 +1,7 @@
 ```
---- KICKOFF: begin orchestration at [deep] ---
+--- KICKOFF: plan complete ---
 
-  Status: 6/6 groups done | last review: wave-6 WAIVED | current: final verification | updated 2026-10-13 | over expected: ~$36.06 of ~$22
+  Status: 6/6 groups done | completed 2026-10-13
 
   mode: unattended | proposed unattended (harness=claude-code runner=cloud; CLAUDE_CODE_REMOTE=true, assigned branch) | guard 3x min $50 | fixups 2 | confirmed 2026-10-13 session 3d92f75d-ed43-5e74-a58c-e29cd0970783 by Kickoff prompt: Run in unattended mode.
 
@@ -29,16 +29,16 @@
 
 **Cost (API-equiv, Claude Code models)**
 
-| wave | expected tokens | expected $ |
-|---|---|---|
-| 1 [deep] nowline m1 s1 | ~2.7M | ~$1.4 |
-| 2 [exec] nowline m1 s2-s7 | ~8.3M | ~$3.1 |
-| 3 [deep] nowline m2 s1 | ~2.7M | ~$1.4 |
-| 4 [exec] nowline m2 s2 | ~2.0M | ~$0.90 |
-| 5 [deep] nowline m2 s3 | ~6.1M | ~$3.2 |
-| 6 [exec] nowline m2 s4-s7 | ~9.0M | ~$3.3 |
-| orchestrator | ~11M | ~$9.2 |
-| **Total** | ~42M | ~$22 |
+| wave | expected tokens | expected $ | actual tokens | actual $ |
+|---|---|---|---|---|
+| 1 [deep] nowline m1 s1 | ~2.7M | ~$1.4 | ~4.9M | ~$2.74 |
+| 2 [exec] nowline m1 s2-s7 | ~8.3M | ~$3.1 | ~31M | ~$9.52 |
+| 3 [deep] nowline m2 s1 | ~2.7M | ~$1.4 | ~4.6M | ~$2.70 |
+| 4 [exec] nowline m2 s2 | ~2.0M | ~$0.90 | ~3.3M | ~$1.46 |
+| 5 [deep] nowline m2 s3 | ~6.1M | ~$3.2 | ~5.2M | ~$2.89 |
+| 6 [exec] nowline m2 s4-s7 | ~9.0M | ~$3.3 | ~23M | ~$7.18 |
+| orchestrator | ~11M | ~$9.2 | ~19M | ~$10.73 |
+| **Total** | ~42M | ~$22 | ~91M | ~$37.22 |
 
 Expected values are estimates, good to about 2-3× per wave.
 
@@ -211,4 +211,22 @@ tokens review-wave-5 nowline-m2-s3 (claude-opus-5-5): input ~18 / cache read ~28
 tokens orchestrator-wave-5 nowline-m2-s3 (claude-opus-5-5): input ~12 / cache read ~1.2M / cache write ~0 5m + ~21k 1h / output ~9.8k | ~$0.59 API-equiv
 tokens wave-6 nowline-m2-s4-s7 (claude-sonnet-5-5): input ~230 / cache read ~22M / cache write ~260k / output ~120k | ~$6.16 API-equiv (output est.) session 3d92f75d-ed43-5e74-a58c-e29cd0970783
 tokens review-wave-6 nowline-m2-s4-s7 (claude-opus-5-5): input ~42 / cache read ~1M / cache write ~74k / output ~22k | ~$1.02 API-equiv (output est.) session 3d92f75d-ed43-5e74-a58c-e29cd0970783
-tokens orchestrator-wave-6 nowline-m2-s4-s7 (claude-opus-5-5): input ~6 / cache read ~490k / cache write ~0 5m + ~17k 1h / output ~1.1k | ~$0.26 API-equiv
+tokens orchestrator-wave-6 nowline-m2-s4-s7 (claude-opus-5-5): input ~26 / cache read ~2.9M / cache write ~0 5m + ~31k 1h / output ~10k | ~$1.03 API-equiv
+tokens orchestrator-final verification-nowline (claude-opus-5-5): input ~20 / cache read ~190k / cache write ~31k / output ~10k | ~$0.39 API-equiv (output est.) session 3d92f75d-ed43-5e74-a58c-e29cd0970783
+
+## Completion summary
+
+- **Done:** m1 (one options schema) and m2 (one staging function), 14 steps in 6 waves, one commit per step: m1.s1 5231496, m1.s2 2229e57, m1.s3 55f7bb1, m1.s4 3ed7afd, m1.s5 7fe1cbd, m1.s6 d1705a2, m1.s7 e27c444, m2.s1 d7f48cf (after merge 3de45e3 of origin/main ff8eb8b), m2.s2 ea3707d, m2.s3 e48332f, m2.s4 d4da29a, m2.s5 57d711d, m2.s6 8ccb470, m2.s7 9d12547.
+- **Reviews:** waves 1-5 PASS; wave 6 review PASS, logged CONCERNS for a worker-disclosed Makefile bypass (local only), waived by Gary.
+- **Final verification (read-only reviewer on b38315e):** `make ci` exit 0; `make pack-mcpb` exit 0; `make changelog-check BASE=origin/main REQUIRE=1` exit 0 with 7 fragments; every behaviour step has its fragment and docs; no new mention of private sibling repos. G1/G3 rest on each refactor step's worker report against `ref-ff8eb8b` (identical to `ref-c34804c`).
+- **Decision 1:** R1 (m4.11) had not landed on main, so the schedule and wave plan stay with R1's m2.s2.
+- **Spend:** ~$37.22 API-equiv against ~$22 expected (waves 2 and 6, the multi-step Sonnet waves, ran about 3x and 2x their estimates). Subagent lines are `(output est.)`.
+
+**Deviations from plan**
+
+- Checkpoints passed unattended: gate 4 and gate 2 before wave 3; gate 2 before wave 5.
+- Gate 4's milestone handoff file was written as a section of the session handoff, since this plan's m1/m2 are the spec's internal milestones inside repo milestone m4.13.
+- Wave 3: `check_wave.py` failed only on ff8eb8b, origin/main's own commit reached through the mandated merge; logged PASS with the failure quoted, since a fix-up would have to reword a commit on main.
+- Wave 6: worker ran vitest (and once tsc) outside the Makefile while iterating; gate 1, waived. `make determinism-browser` was not run (Playwright wants chromium_headless_shell-1243, the runner has 1194, and the target runs `playwright install`).
+- Parent bookkeeping commits a2fb3b2 and 910085c have `Assisted-by:` above `Claude-Session:`; left as is (dropped by the squash merge).
+- No fix-ups and no automatic retries.

@@ -35,19 +35,19 @@ last commit before the PR merges.
 
 ## Spend
 
-~$36.06 API-equiv so far (kickoff, planning, waves 1-6) of ~$22 expected. Over expected; under the ~$66 guard. Wave 2 ran ~$9.5 against ~$3.1 expected (Sonnet worker, 27M cache read over six steps), so the run will pass the expected total during m2; the guard is ~$66.
+~$37.22 API-equiv in total (Cost table actuals in the plan) of ~$22 expected. Wave 2 ran ~$9.5 against ~$3.1 expected (Sonnet worker, 27M cache read over six steps), so the run will pass the expected total during m2; the guard is ~$66.
 
 ## Next unit
 
-Final verification (make ci, make pack-mcpb, changelog check), then completion.
+None: plan complete 2026-10-13. Final verification passed (make ci, make pack-mcpb, changelog check). See the plan's Completion summary.
 
 ## Pending question
 
-None.
+Whether to open the PR (asked after the cleanup commit that removes this file and the plan).
 
 ## How to resume
 
-Paste the plan's Kickoff prompt.
+Nothing to resume; the run is complete.
 
 ## Decisions so far
 
