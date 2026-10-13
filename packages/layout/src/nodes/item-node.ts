@@ -1,18 +1,16 @@
-// ItemNode — first Renderable entity in the m2.5c port. Owns the
-// geometry of a single item bar: its visual box (insets + height) and
-// its caption x (inside vs. spilled past the bar).
+// ItemNode — the Renderable for a single item bar: its visual box
+// (insets + height) and its caption x (inside vs. spilled past the bar).
 //
-// Constructed from already-resolved inputs (start/end x, status,
-// remaining, meta text) so this node stays small and pure. The
-// dependency-resolution logic in layout.ts (after/before chains,
-// cursor.x, footnote indexing) remains where it is for now; m2.5c's
-// remaining work is to migrate the rest into sibling node files.
+// Built from the item's measure (`measureItem`, `item-measure.ts`), which
+// has already resolved the width, the caption fit and the bar's growth,
+// so this node stays small and pure. The start resolution (`after:`
+// chains, pins, the wave floor) and the `before:` caps stay in
+// `sequenceItem`.
 //
-// `measure(ctx)` returns the bar's intrinsic size. `place(origin,
-// ctx)` returns a `PositionedItem`-shaped fragment with the box, row,
-// `textX`, and the title lines to paint. The shape is byte-stable with
-// the legacy sequenceItem arithmetic when fed the same inputs and the
-// title fits on one line.
+// `measure(ctx)` returns the bar's intrinsic size: the logical width and
+// the band height plus the growth a wrapped title or a chip column adds.
+// `place(origin, ctx)` returns a `PositionedItem`-shaped fragment with the
+// box at that grown height, `textX`, and the title lines to paint.
 //
 // Caption fit decision (`fitItemCaption`), in order:
 //   1. Title fits one line AND the meta line fits: in-bar, one line.
@@ -53,7 +51,7 @@ import type {
 } from '../renderable.js';
 import { estimateTextWidth, wrapText } from '../text-measure.js';
 import { ITEM_INSET_PX, MIN_ITEM_WIDTH } from '../themes/shared.js';
-import type { BoundingBox } from '../types.js';
+import type { BoundingBox, PositionedItem } from '../types.js';
 
 /**
  * Inner padding applied on the RIGHT of the title text (the left inset
@@ -76,13 +74,11 @@ const TEXT_OUTSIDE_GAP_PX = 4;
 const TITLE_FONT_SIZE_PX = 13;
 const META_FONT_SIZE_PX = 11;
 
-export interface ItemNodeInput {
-    id: string;
+/** What the caption fit needs to know about a bar. */
+export interface ItemCaptionInput {
     title: string;
-    /** Logical left x of the column the bar lives in. */
-    logicalLeftX: number;
-    /** Logical right x of the column the bar lives in. */
-    logicalRightX: number;
+    /** Width of the visible bar box (the logical width less the insets). */
+    visualWidth: number;
     /** Caption text shown under the title (e.g. "1w - 50% remaining"). */
     metaText?: string;
     /**
@@ -108,8 +104,8 @@ export interface ItemNodeInput {
      * calendar glyph in the bar's upper-left (right of the link tile
      * when there is one). Caption text indents past the glyph so the
      * title doesn't run under it. The glyph spills out of a bar narrower
-     * than `MIN_BAR_WIDTH_FOR_INLINE_DATE_PX`; `place` checks the placed
-     * bar width and reserves nothing in that case.
+     * than `MIN_BAR_WIDTH_FOR_INLINE_DATE_PX`; the fit checks the bar
+     * width and reserves nothing in that case.
      */
     hasAfterGlyph?: boolean;
     /**
@@ -118,10 +114,31 @@ export interface ItemNodeInput {
      * glyph in the upper-right. Layout computes it with
      * `itemTitleFirstLineRightReservePx` once it knows the item's
      * footnotes and `before:` date. Defaults to the status-dot-only
-     * reserve for the placed bar width, because the dot is always
-     * present.
+     * reserve for the bar width, because the dot is always present.
      */
     titleFirstLineRightReservePx?: number;
+}
+
+/** The caption's left indent inside the bar and its fit decision. */
+export interface ItemCaptionMeasure {
+    /** Indent (px) from the bar's left edge to an in-bar caption. */
+    leftInset: number;
+    fit: ItemCaptionFit;
+}
+
+/**
+ * The part of an item's measure (`ItemMeasure`, `item-measure.ts`) that
+ * `ItemNode` needs to report its size and place its box.
+ */
+export interface ItemNodeGeometry {
+    id: string;
+    /** Logical width, `MIN_ITEM_WIDTH` clamp included. */
+    naturalWidth: number;
+    /** Width of the visible bar box. */
+    visualWidth: number;
+    caption: ItemCaptionMeasure;
+    /** Growth over the band height (a wrapped title, a chip column); 0 for none. */
+    barExtra: number;
 }
 
 export interface PlacedItemGeometry {
@@ -156,6 +173,11 @@ export interface PlacedItemGeometry {
 export function estimateItemMetaWidth(metaText: string | undefined, trailingWidth: number): number {
     const metaTextWidth = metaText ? estimateTextWidth(metaText, META_FONT_SIZE_PX) : 0;
     return metaTextWidth + trailingWidth;
+}
+
+/** The visible bar width for a logical width: `ITEM_INSET_PX` off each side, `MIN_ITEM_WIDTH` floor. */
+export function itemVisualWidth(logicalWidth: number): number {
+    return Math.max(MIN_ITEM_WIDTH, logicalWidth - 2 * ITEM_INSET_PX);
 }
 
 export interface ItemCaptionFit {
@@ -196,7 +218,7 @@ export function titleBreakLines(title: string): string[] | undefined {
 /**
  * Decide how an item's caption sits relative to its bar: one line
  * in-bar, word-wrapped in-bar, or spilled to the right. This is the
- * single source of truth for the decision; `ItemNode.place` and the
+ * single source of truth for the decision; `measureItemCaption` and the
  * row-height predictor in `layout.ts` both call it so predicted and
  * placed geometry agree.
  *
@@ -297,76 +319,101 @@ export function resolveCaptionTitleLines(
     return [broken ? (broken[0] ?? '') : title];
 }
 
+/**
+ * Fit an item's caption to its bar: the left indent past the link tile
+ * and the `after:` glyph, the inner and first-line widths, and the
+ * `fitItemCaption` decision on them.
+ */
+export function measureItemCaption(input: ItemCaptionInput): ItemCaptionMeasure {
+    const { visualWidth } = input;
+    // The link icon and the `after:` glyph (when present) live in the
+    // bar's upper-left and share the title's vertical band. The
+    // caption indents past them so the title doesn't render on top.
+    const leftInset = itemCaptionInsetX(
+        !!input.hasLinkIcon,
+        input.hasAfterGlyph ? { barWidth: visualWidth } : undefined,
+    );
+    const innerWidth = Math.max(0, visualWidth - leftInset - TEXT_INSET_PX);
+    // Trailing decoration (capacity suffix) renders to the right of
+    // metaText. When metaText is empty the suffix sits at the
+    // caption's leading edge, so its width is the entire meta-line
+    // budget; when both exist the suffix needs a small separator gap
+    // (rendered via `<tspan dx>` later) included in trailingWidth.
+    const metaWidth = estimateItemMetaWidth(input.metaText, input.metaTrailingWidth ?? 0);
+    const firstLineWidth = Math.max(
+        0,
+        visualWidth -
+            leftInset -
+            (input.titleFirstLineRightReservePx ??
+                itemTitleFirstLineRightReservePx({
+                    barWidth: visualWidth,
+                    footnoteLabels: [],
+                    hasBeforeGlyph: false,
+                })),
+    );
+    return {
+        leftInset,
+        fit: fitItemCaption(input.title, innerWidth, metaWidth, firstLineWidth),
+    };
+}
+
+/**
+ * Optional observer of every `ItemNode` that `sequenceItem` places, with
+ * the context it was placed in and the item it became. Tests set it to
+ * check a node's measure against the item's final box; layout never does.
+ */
+export type ItemNodeTrace = (node: ItemNode, ctx: PlaceContext, item: PositionedItem) => void;
+
+let itemNodeTrace: ItemNodeTrace | undefined;
+
+/** Install (or, with `undefined`, remove) the `ItemNodeTrace`. */
+export function setItemNodeTrace(trace: ItemNodeTrace | undefined): void {
+    itemNodeTrace = trace;
+}
+
+/** Report a placed node to the `ItemNodeTrace`, when one is installed. */
+export function traceItemNode(node: ItemNode, ctx: PlaceContext, item: PositionedItem): void {
+    itemNodeTrace?.(node, ctx, item);
+}
+
+/**
+ * One item bar, built from its measure. `measure` reports the logical
+ * width and the grown height (`bandwidth + barExtra`), and `place`
+ * returns the box at that height, so no caller patches it afterwards.
+ */
 export class ItemNode implements Renderable<PlacedItemGeometry> {
-    constructor(public readonly input: ItemNodeInput) {}
+    constructor(public readonly geometry: ItemNodeGeometry) {}
 
     get id(): string {
-        return this.input.id;
+        return this.geometry.id;
     }
 
     measure(ctx: MeasureContext): IntrinsicSize {
-        const naturalWidth = Math.max(
-            MIN_ITEM_WIDTH,
-            this.input.logicalRightX - this.input.logicalLeftX,
-        );
         return {
-            width: naturalWidth,
-            height: ctx.bands.bandwidth(),
+            width: this.geometry.naturalWidth,
+            height: ctx.bands.bandwidth() + this.geometry.barExtra,
         };
     }
 
     place(origin: Point, ctx: PlaceContext): PlacedItemGeometry {
-        const intrinsic = this.measure(ctx);
-        const visualWidth = Math.max(MIN_ITEM_WIDTH, intrinsic.width - 2 * ITEM_INSET_PX);
+        const { visualWidth, caption, barExtra } = this.geometry;
+        const bandwidth = ctx.bands.bandwidth();
         const boxX = origin.x + ITEM_INSET_PX;
         const box: BoundingBox = {
             x: boxX,
             y: origin.y,
             width: visualWidth,
-            height: intrinsic.height,
+            // The bar grows downward to enclose a wrapped title or a chip
+            // column; an ungrown bar is exactly the band height.
+            height: barExtra > 0 ? bandwidth + barExtra : bandwidth,
         };
-
-        // The link icon and the `after:` glyph (when present) live in the
-        // bar's upper-left and share the title's vertical band. The
-        // caption indents past them so the title doesn't render on top.
-        const captionLeftInset = itemCaptionInsetX(
-            !!this.input.hasLinkIcon,
-            this.input.hasAfterGlyph ? { barWidth: visualWidth } : undefined,
-        );
-        const innerWidth = Math.max(0, visualWidth - captionLeftInset - TEXT_INSET_PX);
-        const titleStr = this.input.title;
-        // Trailing decoration (capacity suffix) renders to the right of
-        // metaText. When metaText is empty the suffix sits at the
-        // caption's leading edge, so its width is the entire meta-line
-        // budget; when both exist the suffix needs a small separator gap
-        // (rendered via `<tspan dx>` later) included in trailingWidth.
-        const metaWidth = estimateItemMetaWidth(
-            this.input.metaText,
-            this.input.metaTrailingWidth ?? 0,
-        );
-        const firstLineWidth = Math.max(
-            0,
-            visualWidth -
-                captionLeftInset -
-                (this.input.titleFirstLineRightReservePx ??
-                    itemTitleFirstLineRightReservePx({
-                        barWidth: visualWidth,
-                        footnoteLabels: [],
-                        hasBeforeGlyph: false,
-                    })),
-        );
-        const { textSpills, titleLines } = fitItemCaption(
-            titleStr,
-            innerWidth,
-            metaWidth,
-            firstLineWidth,
-        );
+        const { textSpills, titleLines } = caption.fit;
         const textX = textSpills
             ? boxX + visualWidth + TEXT_OUTSIDE_GAP_PX
-            : boxX + captionLeftInset;
+            : boxX + caption.leftInset;
 
         return {
-            id: this.input.id,
+            id: this.geometry.id,
             box,
             textX,
             textSpills,
