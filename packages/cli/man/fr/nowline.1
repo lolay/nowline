@@ -5,7 +5,7 @@
 .\" Empreinte de la page anglaise relue pour cette traduction. Après avoir
 .\" reporté une modification de la page anglaise, remplacez-la par la ligne
 .\" qu'affiche packages/cli/test/man/translation-parity.test.ts.
-.\" translated-from: nowline.1 sha256:2a02a887c8bf70320b7cd3005003a40337149edae4ac6e370211db82ddfafcac
+.\" translated-from: nowline.1 sha256:54414db70f005af02dc3d3ab67a486041302d83bbf9cdacf4b49a09fafb48d98
 .Dd $Mdocdate$
 .Dt NOWLINE 1
 .Os
@@ -143,6 +143,9 @@ rendu réussi.
 L'option
 .Fl o Ar chemin
 écrit également le résultat sur le disque à chaque reconstruction.
+Il accepte les mêmes options de rendu qu'un rendu simple (thème,
+largeur, liens, mode strict, etc.) et affiche ce qu'afficherait un
+rendu simple du fichier avec les mêmes options.
 .It Fl -init Op Ar nom
 Crée un fichier
 .Pa .nowline
@@ -491,6 +494,7 @@ est résolue par rapport au dossier de travail.
 .Fl -serve
 lit
 .Sy theme ,
+.Sy width ,
 .Sy assetRoot
 et
 .Sy locale .

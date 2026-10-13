@@ -133,15 +133,17 @@ export interface CliOptions {
 
 /**
  * Resolve the CLI's options over the flag layer, then the `.nowlinerc` layer.
- * Nothing throws here: a caller reads `defaultFormat` early and reports bad
+ * `render` and `--serve` both call this, so they read the same keys the same
+ * way. `cwd` is what a relative `--asset-root` resolves against (default: the
+ * process's). Nothing throws here: a caller reads `defaultFormat` early and reports bad
  * values at the point it always did, through `assertValid`.
  */
 export function resolveCliOptions(
     args: ParsedArgs,
     config: NowlineRc | null,
-    context: { rcPath?: string; clock?: () => Date } = {},
+    context: { rcPath?: string; cwd?: string; clock?: () => Date } = {},
 ): CliOptions {
-    const { rcPath, clock } = context;
+    const { rcPath, cwd, clock } = context;
     const layers = [flagLayer(args), rcLayer(config ?? {}, CLI_OPTION_SPECS)];
 
     // `--timezone` is validated even when `--now` is explicit, as it always was.
@@ -169,7 +171,7 @@ export function resolveCliOptions(
         fontMono: values.fontMono,
         headless: values.headless ?? false,
         useSystemFonts: values.useSystemFonts ?? false,
-        assetRoot: absoluteAssetRoot(values.assetRoot, args.assetRoot !== undefined, rcPath),
+        assetRoot: absoluteAssetRoot(values.assetRoot, args.assetRoot !== undefined, rcPath, cwd),
         rcLocale: values.locale,
         assertValid: () =>
             throwFirst([
@@ -242,28 +244,6 @@ function absoluteAssetRoot(
     if (value === undefined) return undefined;
     if (fromFlag || rcPath === undefined) return path.resolve(cwd ?? '.', value);
     return path.resolve(path.dirname(rcPath), value);
-}
-
-/**
- * Resolve just the asset root, for `--serve`, which does not read the other
- * rc-backed options yet. Same precedence and errors as `render`: the flag,
- * then the rc `assetRoot`, with a non-string rc value a usage error.
- */
-export function resolveAssetRootOption(
-    flag: string | undefined,
-    config: NowlineRc | null,
-    context: { rcPath?: string; cwd: string },
-): string | undefined {
-    const specs = { assetRoot: CLI_OPTION_SPECS.assetRoot };
-    const { values, errors } = resolveOptions(specs, [
-        {
-            source: () => ({ kind: 'flag', name: '--asset-root' }),
-            values: { assetRoot: flag },
-        },
-        rcLayer(config ?? {}, specs),
-    ]);
-    if (errors[0]) throw new CliError(ExitCode.InputError, formatOptionError(errors[0]));
-    return absoluteAssetRoot(values.assetRoot, flag !== undefined, context.rcPath, context.cwd);
 }
 
 // ---- Error text -------------------------------------------------------------

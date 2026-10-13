@@ -1,12 +1,7 @@
 import * as path from 'node:path';
 import { describe, expect, it } from 'vitest';
 import { parseArgv } from '../../src/cli/args.js';
-import {
-    formatOptionError,
-    resolveAssetRootOption,
-    resolveCliOptions,
-} from '../../src/cli/options.js';
-import { resolveTheme } from '../../src/cli/theme.js';
+import { formatOptionError, resolveCliOptions } from '../../src/cli/options.js';
 import { CliError } from '../../src/io/exit-codes.js';
 
 function resolve(argv: string[], rc: Record<string, unknown> | null = null, rcPath?: string) {
@@ -140,18 +135,18 @@ describe('formatOptionError', () => {
     });
 });
 
-describe('resolveTheme', () => {
+describe('theme', () => {
     it('resolves flag, then rc, then light', () => {
-        expect(resolveTheme('dark', 'grayscale')).toBe('dark');
-        expect(resolveTheme(undefined, 'GREYSCALE')).toBe('grayscale');
-        expect(resolveTheme('', undefined)).toBe('light');
+        expect(resolve(['-t', 'dark'], { theme: 'grayscale' }).surface.theme).toBe('dark');
+        expect(resolve([], { theme: 'GREYSCALE' }).surface.theme).toBe('grayscale');
+        expect(resolve(['--theme', ''], {}).surface.theme).toBe('light');
     });
 
     it('names the source of a bad value', () => {
-        expect(failure(() => resolveTheme('x', undefined))).toBe(
+        expect(failure(() => resolve(['--theme', 'x']).assertValid())).toBe(
             'nowline: invalid --theme "x". Expected light, dark, or grayscale.',
         );
-        expect(failure(() => resolveTheme(undefined, 'x'))).toBe(
+        expect(failure(() => resolve([], { theme: 'x' }).assertValid())).toBe(
             'nowline: invalid .nowlinerc theme "x". Expected light, dark, or grayscale.',
         );
     });
@@ -197,17 +192,19 @@ describe('asset root', () => {
         ).not.toThrow();
     });
 
-    it('resolves for serve with the same precedence and error', () => {
+    it("resolves a flag against the caller's working directory when it passes one", () => {
         const cwd = path.resolve('/work');
-        expect(resolveAssetRootOption(undefined, { assetRoot: 'assets' }, { rcPath, cwd })).toBe(
-            path.join(repo, 'assets'),
+        const options = resolveCliOptions(
+            parseArgv(['in.nowline', '--asset-root', 'flagged']),
+            { assetRoot: 'assets' },
+            { rcPath, cwd },
         );
-        expect(resolveAssetRootOption('flagged', { assetRoot: 'assets' }, { rcPath, cwd })).toBe(
-            path.join(cwd, 'flagged'),
+        expect(options.assetRoot).toBe(path.join(cwd, 'flagged'));
+        const fromRc = resolveCliOptions(
+            parseArgv(['in.nowline']),
+            { assetRoot: 'assets' },
+            { rcPath, cwd },
         );
-        expect(resolveAssetRootOption(undefined, {}, { rcPath, cwd })).toBeUndefined();
-        expect(
-            failure(() => resolveAssetRootOption(undefined, { assetRoot: 5 }, { rcPath, cwd })),
-        ).toBe('nowline: invalid .nowlinerc assetRoot "5". Must be a directory path.');
+        expect(fromRc.assetRoot).toBe(path.join(repo, 'assets'));
     });
 });

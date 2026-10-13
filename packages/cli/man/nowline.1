@@ -128,6 +128,9 @@ successful render.
 Opt-in
 .Fl o Ar path
 also writes the rendered output to disk on each rebuild.
+It takes the same render options as a plain render (theme, width, links,
+strict mode, and the rest) and draws what a plain render of the file
+draws for the same options.
 .It Fl -init Op Ar name
 Scaffold a starter
 .Pa .nowline
@@ -468,6 +471,7 @@ is resolved against the working directory.
 .Fl -serve
 reads
 .Sy theme ,
+.Sy width ,
 .Sy assetRoot
 and
 .Sy locale .

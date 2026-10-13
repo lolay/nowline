@@ -1,21 +1,11 @@
 import { type FSWatcher, promises as fs, watch as fsWatch } from 'node:fs';
 import * as http from 'node:http';
 import * as path from 'node:path';
-import { isRoutedResolveDiagnostic, resolveIncludes } from '@nowline/core';
-import {
-    layoutRoadmap,
-    type NormalizedZone,
-    normalizeZone,
-    resolveToday,
-    roadmapLogoRef,
-    type ThemeName,
-    TimezoneError,
-} from '@nowline/layout';
-import { loadLogo, renderSvg } from '@nowline/renderer';
+import { isRoutedResolveDiagnostic } from '@nowline/core';
+import type { ThemeName } from '@nowline/layout';
+import { renderSvg, stageRoadmap } from '@nowline/renderer';
 import type { ParsedArgs } from '../cli/args.js';
-import { parseNonWorkingArg } from '../cli/non-working.js';
-import { resolveAssetRootOption } from '../cli/options.js';
-import { resolveTheme } from '../cli/theme.js';
+import { resolveCliOptions } from '../cli/options.js';
 import { getServices, parseSource } from '../core/parse.js';
 import {
     adaptResolveDiagnostic,
@@ -73,13 +63,15 @@ export async function serveHandler(options: ServeHandlerOptions): Promise<void> 
     const port = parsePort(args.port);
     const host = args.host ?? '127.0.0.1';
     const { config, path: rcPath } = await loadConfigFor(args.positional, cwd);
-    const theme = resolveTheme(args.theme, config.theme);
-    const nonWorking = parseNonWorkingArg(args.nonWorking);
-    const today = resolveNowArg(args);
+    // The same resolution as render: flag > .nowlinerc > default, so --width,
+    // the rc width, --no-links and --strict apply here too.
+    const cliOptions = resolveCliOptions(args, config, { rcPath, cwd });
+    cliOptions.assertValid();
+    const { theme, today, width, nonWorking } = cliOptions.surface;
     const resolvedLocale = resolveLocaleOverride({
         flag: args.locale,
         env: process.env,
-        rc: typeof config.locale === 'string' ? config.locale : undefined,
+        rc: cliOptions.rcLocale,
     });
     const locale = resolvedLocale.tag;
     const opLocale = operatorLocale(resolvedLocale);
@@ -93,8 +85,7 @@ export async function serveHandler(options: ServeHandlerOptions): Promise<void> 
 
     // `--asset-root`, else the rc `assetRoot` (relative to the `.nowlinerc`), else
     // the input's directory.
-    const assetRoot =
-        resolveAssetRootOption(args.assetRoot, config, { rcPath, cwd }) ?? path.dirname(inputPath);
+    const assetRoot = cliOptions.assetRoot ?? path.dirname(inputPath);
 
     const fileSink = args.output ? path.resolve(cwd, args.output) : undefined;
 
@@ -127,30 +118,39 @@ export async function serveHandler(options: ServeHandlerOptions): Promise<void> 
             log.verbose(`nowline: locale=${tag} (${source})`);
             // Included files' text, kept for the code frames of routed diagnostics.
             const sources = new Map<string, DiagnosticSource>([[inputPath, parse.source]]);
-            const resolved = await resolveIncludes(parse.ast, inputPath, {
-                services: getServices().Nowline,
-                readFile: async (absPath) => {
+            const assetResolver = createAssetResolver(assetRoot);
+            const stage = await stageRoadmap({
+                source: text,
+                sourcePath: inputPath,
+                services: getServices(),
+                readSource: async (absPath) => {
                     const contents = await fs.readFile(absPath, 'utf-8');
                     sources.set(absPath, { file: absPath, contents });
                     return contents;
                 },
+                assetResolver,
+                document: parse.document,
+                layout: { theme, today, locale, width, nonWorking },
             });
-            if (resolved.diagnostics.some((d) => d.severity === 'error')) {
+            if (stage.kind === 'invalid') {
+                // The parse above found no errors, so the stage cannot disagree.
+                throw new Error(`${inputPath} failed validation.`);
+            }
+            if (stage.kind === 'include-error') {
                 // Uncoded include errors keep their one-line form, broadcast
                 // only, and take precedence: when any is present, routed
                 // (wave-rule) diagnostics are dropped. Otherwise routed
                 // diagnostics are reported like validator diagnostics
                 // (specs/waves.md §6.1).
-                const legacy = resolved.diagnostics
+                const legacy = stage.resolved.diagnostics
                     .filter((d) => d.severity === 'error' && !isRoutedResolveDiagnostic(d))
                     .map((d) => `${d.sourcePath}: ${d.message}`)
                     .join('\n');
                 let msg = legacy;
-                const routed = resolved.diagnostics.filter(isRoutedResolveDiagnostic);
-                if (!legacy && routed.some((d) => d.severity === 'error')) {
+                if (!legacy && stage.routed.some((d) => d.severity === 'error')) {
                     const diagnostics = [
                         ...parse.diagnostics,
-                        ...routed.map((d) =>
+                        ...stage.routed.map((d) =>
                             adaptResolveDiagnostic(
                                 d,
                                 d.sourcePath,
@@ -170,17 +170,20 @@ export async function serveHandler(options: ServeHandlerOptions): Promise<void> 
                 broadcast(clients, 'error', msg);
                 return;
             }
-            const assetResolver = createAssetResolver(assetRoot);
-            const warn = (m: string): void => log.notice(`warning: ${m}`);
-            const logo = await loadLogo(roadmapLogoRef(parse.ast), assetResolver, warn);
-            const model = layoutRoadmap(parse.ast, resolved, {
-                theme,
-                today,
-                locale,
-                nonWorking,
-                logo: logo?.dimensions,
+            // The logo's load warnings, then the renderer's; `--strict` makes
+            // any of them an error, as in render.
+            const warnings = [...stage.warnings];
+            const svg = await renderSvg(stage.model, {
+                assetResolver,
+                logo: stage.logo,
+                noLinks: args.noLinks,
+                strict: args.strict,
+                warn: (m) => warnings.push(m),
             });
-            const svg = await renderSvg(model, { assetResolver, logo, warn });
+            if (args.strict && warnings.length > 0) {
+                throw new Error(`render warnings (--strict): ${warnings.join('; ')}`);
+            }
+            for (const m of warnings) log.notice(`warning: ${m}`);
             lastPayload = { kind: 'svg', body: svg };
             if (fileSink) {
                 try {
@@ -272,31 +275,6 @@ function parsePort(raw: string | undefined): number {
         throw new CliError(ExitCode.InputError, `nowline: invalid --port "${raw}".`);
     }
     return port;
-}
-
-// Resolve the now-line date from the CLI flags. Mirrors render.ts.
-// Delegates to the shared resolveToday; see render.ts for the full precedence table.
-function resolveNowArg(args: { now?: string; timezone?: string }): Date | undefined {
-    let zone: NormalizedZone | undefined;
-    if (args.timezone) {
-        try {
-            zone = normalizeZone(args.timezone);
-        } catch (err) {
-            if (err instanceof TimezoneError) {
-                throw new CliError(ExitCode.InputError, err.message);
-            }
-            throw err;
-        }
-    }
-    const result = resolveToday({ now: args.now, zone });
-    if (result === undefined && args.now !== undefined && args.now !== '-') {
-        throw new CliError(
-            ExitCode.InputError,
-            `nowline: invalid --now "${args.now}". ` +
-                `Expected YYYY-MM-DD, YYYY-MM-DDTHH:MM:SS[Z|±HH:MM], or "-".`,
-        );
-    }
-    return result;
 }
 
 function sendEvent(res: http.ServerResponse, event: string, data: string): void {
