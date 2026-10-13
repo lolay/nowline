@@ -18,24 +18,26 @@ last commit before the PR merges.
   markers, Cost table, Review log and Token log written.
 - Wave 1 [deep] nowline m1 s1: a2fb3b2..5231496, review PASS.
 - Wave 2 [exec] nowline m1 s2-s7: 910085c..e27c444, review PASS. m1 complete.
+- Wave 3 [deep] nowline m2 s1: 7aaab18..d7f48cf (merge of origin/main ff8eb8b in 3de45e3), review PASS.
 
 ## Review log verdicts, fix-ups, retries, checkpoints
 
 - wave-1 (nowline m1 s1): PASS.
 - wave-2 (nowline m1 s2-s7): PASS.
+- wave-3 (nowline m2 s1): PASS (check_wave.py false positive on main's commit, see Deviations).
 - No fix-ups or retries. Checkpoints: gate 4 (new milestone m2) and gate 2 ([deep] after [exec]) passed unattended before wave 3.
 
 ## Spend
 
-~$19.02 API-equiv so far (kickoff, planning, waves 1-2) of ~$22 expected. Wave 2 ran ~$9.5 against ~$3.1 expected (Sonnet worker, 27M cache read over six steps), so the run will pass the expected total during m2; the guard is ~$66.
+~$22.42 API-equiv so far (kickoff, planning, waves 1-3) of ~$22 expected: at the expected total now, with waves 4-6 to go. Wave 2 ran ~$9.5 against ~$3.1 expected (Sonnet worker, 27M cache read over six steps), so the run will pass the expected total during m2; the guard is ~$66.
 
 ## Next unit
 
-Wave 3 [deep] nowline m2 s1 (add `stageRoadmap` to `@nowline/renderer`).
+Wave 4 [exec] nowline m2 s2 (read the logo once).
 
 ## Pending question
 
-None. Wave 3 is being dispatched.
+None. Wave 4 is being dispatched.
 
 ## How to resume
 
@@ -77,6 +79,17 @@ Paste the plan's Kickoff prompt.
   width wins, falls back to fit-content and yields a warning row (code
   `invalid-option`), not an error row. A bad rc theme stays silently ignored.
   The extension resolves a relative rc assetRoot against the rc directory.
+- From wave 3 (review PASS), `packages/renderer/src/stage.ts`: `staged.logo`
+  is `LogoDimensions` for now; m2.s2 widens it to `LoadedLogo`. Core's
+  `RawDiagnostic` stands in for the spec's nonexistent `RawDocumentDiagnostic`.
+  Services type is `LangiumSharedCoreServices`. Two additions beyond spec
+  §3.3: `include-error` also carries `resolved: ResolveResult` (the kernel's
+  `IncludeResolveError` and the browser need every resolver diagnostic), and
+  optional `StageInputs.isToleratedIncludeError(diag)`, which the browser
+  passes (its no-op tag check) in m2.s4 so single-file mode reaches layout.
+  m2.s7 should add both to spec §3.3 when it marks the spec implemented.
+  `langium ~4.4.0` and `@nowline/core` are renderer runtime deps. Layout
+  options are picked by name, not spread.
 
 ## Milestone handoff m1 -> m2
 
@@ -92,7 +105,9 @@ R1 (m4.11) had not landed on main as of this wave; m2.s3 re-checks.
 
 - Cloud runner: Chromium at `/opt/pw-browsers`; do not run `playwright install`.
 - Gate reference renders go in `.scratch/gates/ref-<sha>/` (gitignored),
-  built from the last merged `origin/main` (c34804c at kickoff).
+  built from the last merged `origin/main`: c34804c at kickoff, ff8eb8b
+  since wave 3 (`ref-ff8eb8b`, identical to `ref-c34804c`).
+  `.scratch/gates/run.sh` exists.
 - Node on this runner is v22.22.0, not `.nvmrc`'s 26.2.0; `make init` and
   `make pre-commit` pass on it. `node_modules` may be missing in a fresh
   container: run `make init` first.
@@ -115,3 +130,13 @@ R1 (m4.11) had not landed on main as of this wave; m2.s3 re-checks.
   above. Step commits are correct. Left as is: they are pushed, rewording
   would change the worker SHAs the Review log cites, and the squash merge
   drops them.
+- Wave 3: `check_wave.py` failed on ff8eb8b only, origin/main's own commit
+  (subject not starting with the step ID, Co-authored-by, no trailers),
+  reached through the merge commit the plan's run-wide rule requires. The
+  checker walks `from..HEAD` including the merge's second parent. Both
+  first-parent commits (3de45e3, d7f48cf) pass. A fix-up would have to
+  reword a commit on main, which the plan forbids (never rebase), so the
+  wave is logged PASS with the failure quoted in its note instead of
+  CONCERNS. Any later wave that merges main gets the same handling, after
+  the same check (upstream commit on origin/main, first-parent commits
+  clean).

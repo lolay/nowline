@@ -1,7 +1,7 @@
 ```
 --- KICKOFF: begin orchestration at [deep] ---
 
-  Status: 2/6 groups done | last review: wave-2 PASS | current: nowline m2 s1 [deep] | updated 2026-10-13 | passed unattended: gate 4, gate 2 before wave 3
+  Status: 3/6 groups done | last review: wave-3 PASS | current: nowline m2 s2 [exec] | updated 2026-10-13 | passed unattended: gate 4, gate 2 before wave 3
 
   mode: unattended | proposed unattended (harness=claude-code runner=cloud; CLAUDE_CODE_REMOTE=true, assigned branch) | guard 3x min $50 | fixups 2 | confirmed 2026-10-13 session 3d92f75d-ed43-5e74-a58c-e29cd0970783 by Kickoff prompt: Run in unattended mode.
 
@@ -121,7 +121,7 @@ Acceptance: CLI tests for rc relative path, flag override, bad type; G1, G2.
 
 --- WAVE 3 [deep] ---
 
-#### s1 - [deep] Add `stageRoadmap`
+#### s1 - [deep] Add `stageRoadmap` (done)
 
 Add `packages/renderer/src/stage.ts` per spec §3.3 (`StageInputs`, `StageResult` with `invalid` / `include-error` / `staged`), exported from `@nowline/renderer`; make `@nowline/core` a runtime dependency of renderer. It parses and validates (or reuses `document`), resolves includes, applies the include-error precedence once (first uncoded error wins and hides routed ones, `waves.md` §6.1; match `export/src/index.ts:288-298` and `browser/src/pipeline.ts:253-270`, leaving the browser's no-op-include filtering to the browser caller), loads the logo once (warnings returned, `strict` left to callers), lays out. No callers change.
 Acceptance: tests per result kind with in-memory `readSource` and `AssetResolver` fakes: validator errors, uncoded include error hiding routed ones, routed errors alone, missing logo (warning, laid out without it), success; G2.
@@ -175,6 +175,7 @@ Acceptance: `cli.serve.test.ts` tests for each flag; a served SVG equals `nowlin
 
 review wave-1 (nowline m1 s1) a2fb3b2..5231496: PASS - schema, parsers, rc-key table and surface-registered spec tables match spec §3.1 and today's CLI rules; 72/72 config tests; no caller changes - 2026-10-13
 review wave-2 (nowline m1 s2-s7) 910085c..e27c444: PASS - CLI templates, error order and empty-string handling unchanged; MCP and extension through the schema; width rule, MCP local now plus timezone, rc assetRoot with docs, fragments and French man restamp; G1 tree equals ref-c34804c; make pre-commit green - 2026-10-13
+review wave-3 (nowline m2 s1) 7aaab18..d7f48cf: PASS - stageRoadmap with invalid/include-error/staged, kernel include precedence, logo once, 9 fake-backed tests, no callers changed; merged origin/main ff8eb8b (3de45e3); check_wave.py flagged only ff8eb8b ('first line ... does not start with one of m2.s1', Co-authored-by, trailers), which is origin/main's own commit reached through the mandated merge; both first-parent commits pass; passed unattended: gate 4, gate 2 - 2026-10-13
 
 ## Token log
 
@@ -194,3 +195,6 @@ tokens review-wave-1 nowline-m1-s1 (claude-opus-5-5): input ~28 / cache read ~62
 tokens orchestrator-wave-1 nowline-m1-s1 (claude-opus-5-5): input ~18 / cache read ~1.2M / cache write ~0 5m + ~21k 1h / output ~10k | ~$0.61 API-equiv
 tokens wave-2 nowline-m1-s2-s7 (claude-sonnet-5-5): input ~260 / cache read ~27M / cache write ~330k / output ~130k | ~$7.55 API-equiv (output est.) session 3d92f75d-ed43-5e74-a58c-e29cd0970783
 tokens review-wave-2 nowline-m1-s2-s7 (claude-opus-5-5): input ~76 / cache read ~3.1M / cache write ~120k / output ~37k | ~$1.97 API-equiv (output est.) session 3d92f75d-ed43-5e74-a58c-e29cd0970783
+tokens orchestrator-wave-2 nowline-m1-s2-s7 (claude-opus-5-5): input ~18 / cache read ~1.4M / cache write ~0 5m + ~27k 1h / output ~11k | ~$0.71 API-equiv
+tokens wave-3 nowline-m2-s1 (claude-opus-5-5): input ~82 / cache read ~4.1M / cache write ~130k / output ~41k | ~$2.29 API-equiv (output est.) session 3d92f75d-ed43-5e74-a58c-e29cd0970783
+tokens review-wave-3 nowline-m2-s1 (claude-opus-5-5): input ~16 / cache read ~220k / cache write ~41k / output ~8.1k | ~$0.41 API-equiv (output est.) session 3d92f75d-ed43-5e74-a58c-e29cd0970783
