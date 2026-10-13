@@ -1,7 +1,7 @@
 ```
 --- KICKOFF: begin orchestration at [deep] ---
 
-  Status: 6/10 groups done | last review: wave-6 PASS | current: nowline m4 s1-s2 [deep] | updated 2026-10-13 | passed unattended: gate 2 before wave 6
+  Status: 7/10 groups done | last review: wave-6 PASS | current: nowline m5 s1-s5 [deep] | updated 2026-10-13 | passed unattended: gate 4 before wave 6 (m4)
 
   mode: unattended | proposed unattended (harness=claude-code runner=cloud; CLAUDE_CODE_REMOTE=true, assigned branch) | guard 3x min $50 | fixups 2 | confirmed 2026-10-13 session 7e027fcc-1ca6-51b0-b005-63e1163df819 by Kickoff prompt: Run in unattended mode.
 
@@ -132,11 +132,11 @@ Lanes no longer set their width (N2), regions are fitted only after P8 (N4), and
 
 ## m4 - `HeaderNode`
 
-#### s1 - [deep] Measure the header
+#### s1 - [deep] Measure the header (done)
 
 Add `packages/layout/src/nodes/header-node.ts` with `HeaderNode` and `measure()` returning `MeasuredHeader` (spec §3.7), absorbing `sizeBesideHeader` and `HEADER_CARD_OUTER_PAD` from `layout.ts`, the above-mode height, `chartLeftX` and `chartTopY`, and the card's minimum with `HEADER_CARD_TOP_INSET`; drop `sizeBesideHeader` from `RoadmapNodeDeps`. Measure-phase code still turns `minRowsBottomY` into the timeline y as today. Covered by the header-height and header-logo tests (beside, above, every logo size). G1, G2, G3.
 
-#### s2 - [deep] Place the header
+#### s2 - [deep] Place the header (done)
 
 `HeaderNode.place(measured, { rowsBottomY, chartBottomY, canvasRightX })` builds the header box, card box, logo box, text inset and header object; `RoadmapNode.place` passes `rowsBottomY` as the estimated rows bottom it uses today (renamed `estimatedRowsBottomY`, §3.10 rule 4). The attribution box stays where it is (f16 later). G1, G2, G3.
 
@@ -194,6 +194,7 @@ review wave-3 (nowline m1 s4) 4400fbd..bbab969: PASS - pure move confirmed line 
 review wave-4 (nowline m2 s1-s2) f354568..f5a6416: PASS - reviewer re-ran the gate script vs 570254b: GATES PASSED; moved helpers arithmetic-identical; measureItem reads no entity edges or placed items; ItemMeasure keeps visualWidth and naturalVisualWidth by name for byte identity; safety-net Math.max replaced by the pitch (G1 empty); predictItemBarExtraHeight gone, one computeChipBarExtra caller; both identity claims hold; corpus test and three fixtures fail on the base; passed unattended: gate 4, gate 2 - 2026-10-13
 review wave-5 (nowline m3 s1-s2) bb92ae0..1dd90a6: PASS - createLayoutContext per §3.8, no LayoutContext literal left in place or buildIncludeRegions, chart fields pass through, regions get empty footnotes and marker placements; indexFootnotes pure, buildFootnotePanel built once at P19; dropped values (pre-panel with chartBottomY 0, P19 map reassignment) named; new tests fail on the base; G1/G3 empty per worker; non-blocking: specs/waves.md and m3.s3 text still say buildFootnotes (now buildFootnotePanel); passed unattended: gate 4 - 2026-10-13
 review wave-6 (nowline m3 s3) cb898b5..3112f70: PASS - reviewer re-ran the gate script vs 9c71cbb: GATES PASSED; N2 lane width 0 at placement (P9 overwrites), N4 no region fit at placement, N7 MilestonePlacement + positionMilestones at P11 with the old key order and shared slackArrows arrays; chartRightX gone from LayoutContext, private CanvasExtent grown at P3/P7/P8; buildNowline, buildWaveLegend, buildFootnotePanel take chartRightX; estimatedCenterY kept as a named stale read (§3.10 rule 4); new placement-canvas tests fail on the base; passed unattended: gate 2 - 2026-10-13
+review wave-6 (nowline m4 s1-s2) af7a82e..bc8e31d: PASS - HeaderNode/MeasuredHeader/HeaderFrame/PositionedHeaderParts per §3.7; sizeBesideHeader, HEADER_CARD_OUTER_PAD, HEADER_CARD_TOP_INSET moved verbatim; timelineY operands unchanged; provisional header box dropped (every path overwrote it, named in the body); key order kept, attributionBox added last; estimatedRowsBottomY rename for L1; header tests 69 pass, tsc clean; G1/G3 empty per worker; passed unattended: gate 4 - 2026-10-13
 
 ## Token log
 
@@ -223,3 +224,6 @@ tokens review-wave-5 nowline-m3-s1-s2 (claude-opus-5-5): input ~20 / cache read 
 tokens orchestrator-wave-5 nowline-m3-s1-s2 (claude-opus-5-5): input ~16 / cache read ~1.7M / cache write ~0 5m + ~23k 1h / output ~10k | ~$0.73 API-equiv
 tokens wave-6 nowline-m3-s3 (claude-opus-5-5): input ~92 / cache read ~7.5M / cache write ~440k / output ~46k | ~$4.59 API-equiv (output est.) session 7e027fcc-1ca6-51b0-b005-63e1163df819
 tokens review-wave-6 nowline-m3-s3 (claude-opus-5-5): input ~34 / cache read ~850k / cache write ~74k / output ~16k | ~$0.87 API-equiv (output est.) session 7e027fcc-1ca6-51b0-b005-63e1163df819
+tokens orchestrator-wave-6 nowline-m3-s3 (claude-opus-5-5): input ~12 / cache read ~1.3M / cache write ~0 5m + ~22k 1h / output ~11k | ~$0.65 API-equiv
+tokens wave-6 nowline-m4-s1-s2 (claude-opus-5-5): input ~84 / cache read ~5.5M / cache write ~170k / output ~42k | ~$2.81 API-equiv (output est.) session 7e027fcc-1ca6-51b0-b005-63e1163df819
+tokens review-wave-6 nowline-m4-s1-s2 (claude-opus-5-5): input ~20 / cache read ~350k / cache write ~52k / output ~9.2k | ~$0.52 API-equiv (output est.) session 7e027fcc-1ca6-51b0-b005-63e1163df819
