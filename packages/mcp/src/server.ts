@@ -18,8 +18,10 @@ import { McpServer } from '@modelcontextprotocol/server';
 import type { SurfaceOptions } from '@nowline/config';
 import { type NowlineFile, parseNowlineJson, printNowlineFile } from '@nowline/core';
 import {
+    acceptStagedRoadmap,
     type ExportFormat,
     exportDocument,
+    exportStaged,
     type HostEnv,
     IncludeResolveError,
     type RenderInputs,
@@ -33,17 +35,20 @@ import { CAPABILITIES } from './capabilities.js';
 import {
     buildDocument,
     collectMcpDiagnostics,
-    collectMcpLayoutInsights,
     DEFAULT_RENDER_WIDTH,
     diagnosticsErrorBlock,
+    diagnosticsErrorResponse,
     handleToolError,
     InputRequiredError,
     includeDiagnosticsResponse,
     LAYOUT_INSIGHT_HINT,
-    type McpDiagnostic,
+    layoutInsightsFromStage,
+    type McpInsight,
     PathOutsideRootError,
     REVIEW_MAX_WIDTH,
     routedResolveDiagnosticsToMcp,
+    stageMcpRoadmap,
+    stageRoutedDiagnostics,
     toolDescriptionWithSyntax,
 } from './diagnostics.js';
 import {
@@ -402,19 +407,26 @@ export function createMcpServer(opts: McpServerOptions = {}): McpServer {
                 const { source, filePath } = await sourceAndPath(args, allowedRoot);
                 const doc = await buildDocument(source);
                 const diagnostics = collectMcpDiagnostics(doc, filePath);
-                // Routed (wave-rule) include diagnostics join the validator's,
-                // with the file and line they point into (specs/waves.md §6.1).
-                const insights = diagnostics.every((d) => d.severity !== 'error')
-                    ? await collectMcpLayoutInsights({
-                          source,
-                          filePath,
-                          today: options.today,
-                          locale: 'en-US',
-                          readFile: createNodeHostEnv(filePath).readSource,
-                          doc,
-                          onResolveDiagnostics: (routed) => diagnostics.push(...routed),
-                      })
-                    : [];
+                // One stage: the routed (wave-rule) include diagnostics join
+                // the validator's, with the file and line they point into
+                // (specs/waves.md §6.1), and the insights come from the same
+                // layout, logo included.
+                let insights: McpInsight[] = [];
+                if (diagnostics.every((d) => d.severity !== 'error')) {
+                    const stage = await stageMcpRoadmap(
+                        doc,
+                        source,
+                        {
+                            sourcePath: filePath,
+                            today: options.today,
+                            locale: 'en-US',
+                            theme: 'light',
+                        },
+                        createNodeHostEnv(filePath),
+                    );
+                    diagnostics.push(...stageRoutedDiagnostics(stage));
+                    if (stage.kind === 'staged') insights = layoutInsightsFromStage(stage);
+                }
                 const ok = diagnostics.every((d) => d.severity !== 'error');
                 const structured = {
                     ok,
@@ -718,41 +730,29 @@ export function createMcpServer(opts: McpServerOptions = {}): McpServer {
                 const result = await resolveFonts({ headless: true });
                 inputs.fonts = { sans: result.sans, mono: result.mono };
             }
-            let bytes: Uint8Array;
-            try {
-                bytes = needsRender
-                    ? await exportDocument(source, format, inputs, host)
-                    : new Uint8Array(0);
-            } catch (err) {
-                if (!(err instanceof IncludeResolveError)) throw err;
-                return includeDiagnosticsResponse(
-                    blocked.doc,
+            // One stage serves the render, the insights and the include check.
+            const stage = await stageMcpRoadmap(blocked.doc, source, inputs, host);
+            if (stage.kind === 'invalid') {
+                return diagnosticsErrorResponse(
                     filePath,
-                    routedResolveDiagnosticsToMcp(err.diagnostics),
+                    collectMcpDiagnostics(blocked.doc, filePath),
                 );
             }
-
-            // The preview path skips the kernel, so wave-rule include
-            // diagnostics are checked here too. collectMcpLayoutInsights drops
-            // them when the resolver reports an uncoded include error, so that
-            // case keeps the preview it returned before waves existed
-            // (specs/waves.md §6.1).
-            const routed: McpDiagnostic[] = [];
-            const insights = await collectMcpLayoutInsights({
-                source,
-                filePath,
-                today,
-                theme: options.theme,
-                width: options.width,
-                nonWorking: options.nonWorking,
-                locale: 'en-US',
-                readFile: host.readSource,
-                doc: blocked.doc,
-                onResolveDiagnostics: (d) => routed.push(...d),
-            });
+            // Wave-rule include errors are reported as diagnostics. An uncoded
+            // include error throws from a render, as the kernel's does; the
+            // preview path, which draws nothing here, keeps the preview it
+            // returned before waves existed (specs/waves.md §6.1).
+            const routed = stageRoutedDiagnostics(stage);
             if (routed.some((d) => d.severity === 'error')) {
                 return includeDiagnosticsResponse(blocked.doc, filePath, routed);
             }
+            if (stage.kind === 'include-error' && needsRender) acceptStagedRoadmap(stage, inputs);
+            const staged = stage.kind === 'staged' ? stage : undefined;
+            const insights = staged ? layoutInsightsFromStage(staged) : [];
+            const bytes =
+                needsRender && staged
+                    ? await exportStaged(staged, format, inputs, host)
+                    : new Uint8Array(0);
 
             const previewPayload: PreviewPayload = {
                 source,
@@ -765,7 +765,14 @@ export function createMcpServer(opts: McpServerOptions = {}): McpServer {
 
             const reviewBlocks =
                 args.review === true
-                    ? await buildReviewContentBlocks(source, format, bytes, inputs, host)
+                    ? await buildReviewContentBlocks(
+                          blocked.doc,
+                          source,
+                          format,
+                          bytes,
+                          inputs,
+                          host,
+                      )
                     : [];
 
             const insightHintBlocks =
@@ -956,7 +963,11 @@ export function createMcpServer(opts: McpServerOptions = {}): McpServer {
             const host = createNodeHostEnv(filePath);
             let bytes: Uint8Array;
             try {
-                bytes = await exportDocument(source, format, inputs, host);
+                const staged = acceptStagedRoadmap(
+                    await stageMcpRoadmap(blocked.doc, source, inputs, host),
+                    inputs,
+                );
+                bytes = await exportStaged(staged, format, inputs, host);
             } catch (err) {
                 if (!(err instanceof IncludeResolveError)) throw err;
                 return includeDiagnosticsResponse(
@@ -1491,6 +1502,7 @@ function buildExportInlineContentBlocks(
 }
 
 async function buildReviewContentBlocks(
+    doc: Awaited<ReturnType<typeof buildDocument>>,
     source: string,
     format: ExportFormat,
     artifactBytes: Uint8Array,
@@ -1521,7 +1533,13 @@ async function buildReviewContentBlocks(
             const fonts = await resolveFonts({ headless: true });
             reviewInputs.fonts = { sans: fonts.sans, mono: fonts.mono };
         }
-        inspectionBytes = await exportDocument(source, 'png', reviewInputs, host);
+        // A narrower review width is a different layout, so it stages again
+        // (the parsed document is reused).
+        const reviewStage = acceptStagedRoadmap(
+            await stageMcpRoadmap(doc, source, reviewInputs, host),
+            reviewInputs,
+        );
+        inspectionBytes = await exportStaged(reviewStage, 'png', reviewInputs, host);
     }
 
     if (format !== 'png' || inspectionBytes.byteLength !== artifactBytes.byteLength) {

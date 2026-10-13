@@ -29,7 +29,9 @@ import {
     type FontFamilies,
     renderSvg,
     type StagedRoadmap,
+    type StageInputs,
     type StageLayout,
+    type StageResult,
     stageRoadmap,
 } from '@nowline/renderer';
 import type { LangiumDocument } from 'langium';
@@ -44,7 +46,7 @@ export {
     resolveToday,
     TimezoneError,
 } from '@nowline/layout';
-export type { StagedRoadmap } from '@nowline/renderer';
+export type { StagedRoadmap, StageResult } from '@nowline/renderer';
 
 /**
  * Thrown when include resolution reports a wave-rule error (a coded or
@@ -277,25 +279,44 @@ function errorMessages(diagnostics: RawDiagnostic[]): string[] {
     return errors;
 }
 
+/** What a caller that has already parsed `source` may hand to {@link stageForExport}. */
+export interface StageForExportOptions {
+    /** A document the caller already parsed and validated from `source`. */
+    document?: StageInputs['document'];
+    /** The caller's Langium services, which built `document`. Omitted: the kernel's own. */
+    services?: StageInputs['services'];
+}
+
 /**
- * Stage `source` and map the result to the kernel's contract: validation and
- * include errors throw, routed warnings reach `onResolveDiagnostics`, and logo
- * warnings reach `onWarning` (or throw under `strict`).
+ * Stage `source` the way the kernel does (`stageRoadmap` with the host's
+ * source and asset reads, laid out with `inputs`) and return the raw result:
+ * `invalid`, `include-error` or `staged`. A surface that reports the stage's
+ * own diagnostics maps them itself, then hands a `staged` result to
+ * {@link exportStaged}; {@link acceptStagedRoadmap} is the kernel's mapping.
  */
-async function stageDocument(
+export function stageForExport(
     source: string,
     inputs: RenderInputs,
     host: HostEnv,
-): Promise<StagedRoadmap> {
-    const stage = await stageRoadmap({
+    options: StageForExportOptions = {},
+): Promise<StageResult> {
+    return stageRoadmap({
         source,
         sourcePath: inputs.sourcePath,
-        services: getExportServices(),
+        services: options.services ?? getExportServices(),
         readSource: host.readSource.bind(host),
         assetResolver: hostAssetResolver(host),
+        document: options.document,
         layout: inputs,
     });
+}
 
+/**
+ * Map a stage result to the kernel's contract: validation and include errors
+ * throw, routed warnings reach `onResolveDiagnostics`, and logo warnings
+ * reach `onWarning` (or throw under `strict`). Returns the staged roadmap.
+ */
+export function acceptStagedRoadmap(stage: StageResult, inputs: RenderInputs): StagedRoadmap {
     if (stage.kind === 'invalid') {
         throw new Error(
             `@nowline/export: validation errors in ${inputs.sourcePath}: ${errorMessages(stage.diagnostics).join('; ')}`,
@@ -323,6 +344,15 @@ async function stageDocument(
     for (const msg of stage.warnings) inputs.onWarning?.(msg);
 
     return stage;
+}
+
+/** Stage `source` and map the result to the kernel's contract. */
+async function stageDocument(
+    source: string,
+    inputs: RenderInputs,
+    host: HostEnv,
+): Promise<StagedRoadmap> {
+    return acceptStagedRoadmap(await stageForExport(source, inputs, host), inputs);
 }
 
 // ---- Rendering ---------------------------------------------------------------
