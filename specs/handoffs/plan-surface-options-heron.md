@@ -1,3 +1,46 @@
+```
+--- KICKOFF: begin orchestration at [deep] ---
+
+  Status: BLOCKED at gate mode | updated 2026-10-13
+
+  mode: pending | proposed unattended (harness=claude-code runner=cloud; CLAUDE_CODE_REMOTE=true, assigned branch) | guard 3x min $50 | fixups 2
+
+  review: every-wave (log-only)
+
+  Next model
+    Cursor:      claude-opus-5-5[effort=high]
+    Claude Code: /model opus                (/effort high)
+
+  Prompt to paste into the next chat:
+    In lolay/nowline, read specs/handoffs/plan-surface-options-heron.md. The plan is already tagged.
+    On branch claude/serene-archimedes-ida865 (task branch): subagents commit each finished step.
+    Run the personal-plan-orchestrate skill from the top: walk to
+    each tier boundary, dispatch subagents per the skill's
+    procedure, and pause only where the recorded mode stops. Do not
+    execute plan work inline. Update plan progress after each wave
+    returns per the skill's procedure. The mode line above is the
+    kickoff answer. If the Status line shows BLOCKED, re-post that
+    question and wait; otherwise record the mode, print the kickoff
+    summary and begin dispatching.
+
+---
+```
+
+**Cost (API-equiv, Claude Code models)**
+
+| wave | expected tokens | expected $ |
+|---|---|---|
+| 1 [deep] nowline m1 s1 | ~2.7M | ~$1.4 |
+| 2 [exec] nowline m1 s2-s7 | ~8.3M | ~$3.1 |
+| 3 [deep] nowline m2 s1 | ~2.7M | ~$1.4 |
+| 4 [exec] nowline m2 s2 | ~2.0M | ~$0.90 |
+| 5 [deep] nowline m2 s3 | ~6.1M | ~$3.2 |
+| 6 [exec] nowline m2 s4-s7 | ~9.0M | ~$3.3 |
+| orchestrator | ~11M | ~$9.2 |
+| **Total** | ~42M | ~$22 |
+
+Expected values are estimates, good to about 2-3× per wave.
+
 # Plan: m4.13 shared surface options and one staging function (R4)
 
 Saved at kickoff as `specs/handoffs/plan-surface-options-heron.md` on branch `claude/serene-archimedes-ida865`; handoff beside it.
@@ -31,10 +74,14 @@ Read before any step: `specs/surface-options.md` (all), `AGENTS.md`, `CONTRIBUTI
 
 ## m1 - One options schema
 
+--- WAVE 1 [deep] ---
+
 #### s1 - [deep] Add the schema to `@nowline/config`
 
 Add `packages/config/src/surface-options.ts` per spec §3.1: `SurfaceOptionKey`, `SurfaceOptions`, `OptionSource`, `OptionLayer`, `OptionError`, `NowPolicy`, `resolveSurfaceOptions`, `rcLayer`, one parser per option (theme via `normalizeThemeName`; width via the CLI's exact `parseInt` integer ≥ 320 rule; now via `resolveToday`, `-` suppresses; pageSize via `parsePageSize`; nonWorking via `NON_WORKING_DISPLAYS`), and the rc-key table (`theme`, `width`, `pdfPageSize`; `now`/`nonWorking` none). Include `assetRoot` in the key table only as a recorded rc key with no consumer yet (m1.s7 wires it). Expose a way for a surface to register extra option specs (the CLI-only keys in s2) on the same layer mechanism. Type `NowlineRc`'s schema-owned keys. Add `@nowline/layout` and `@nowline/export-core` deps (no cycle). Export from `src/index.ts`.
 Acceptance: table-driven tests per option and per source kind, precedence, exact `OptionError` fields, "a valid higher layer hides a bad lower one"; no caller changes; G2.
+
+--- WAVE 2 [exec] ---
 
 #### s2 - [exec] Use it in CLI render
 
@@ -71,20 +118,28 @@ Acceptance: CLI tests for rc relative path, flag override, bad type; G1, G2.
 
 ## m2 - One staging function
 
+--- WAVE 3 [deep] ---
+
 #### s1 - [deep] Add `stageRoadmap`
 
 Add `packages/renderer/src/stage.ts` per spec §3.3 (`StageInputs`, `StageResult` with `invalid` / `include-error` / `staged`), exported from `@nowline/renderer`; make `@nowline/core` a runtime dependency of renderer. It parses and validates (or reuses `document`), resolves includes, applies the include-error precedence once (first uncoded error wins and hides routed ones, `waves.md` §6.1; match `export/src/index.ts:288-298` and `browser/src/pipeline.ts:253-270`, leaving the browser's no-op-include filtering to the browser caller), loads the logo once (warnings returned, `strict` left to callers), lays out. No callers change.
 Acceptance: tests per result kind with in-memory `readSource` and `AssetResolver` fakes: validator errors, uncoded include error hiding routed ones, routed errors alone, missing logo (warning, laid out without it), success; G2.
+
+--- WAVE 4 [exec] ---
 
 #### s2 - [exec] Read the logo once
 
 `loadLogo` returns `LoadedLogo {ref, dimensions, asset}` (spec §3.4); `renderSvg` accepts `RenderOptions.logo` and embeds those bytes instead of resolving; without it, it resolves as today. Kernel portable and font-pinned renders both pass it; browser and `--serve` callers adapt to the new return type without behaviour change.
 Acceptance: a test counting resolver calls: one per kernel export, raster included; G1, G2, G3.
 
+--- WAVE 5 [deep] ---
+
 #### s3 - [deep] Stage the export kernel
 
 `stageDocument` becomes `stageRoadmap` plus the kernel's error mapping (plain `Error`, `IncludeResolveError`, `strict` on logo warnings, `onResolveDiagnostics`, `onWarning`). Add `exportStaged(stage, format, inputs, host)`; `exportDocument` = `stageRoadmap` + `exportStaged`, unchanged for callers. `exportStaged` throws when the stage's layout inputs (theme, today, width, locale, non-working) differ from `inputs`. Render the portable SVG only for svg/html/png/pdf. If R1 has landed on main by now, build the wave plan and schedule inside `stageRoadmap` and return them (decision 1); otherwise leave it to R1's m2.s2 and record that in the artifact.
 Acceptance: integration-tests kernel suites unchanged plus a mismatch test for `exportStaged`; G1, G2, G3.
+
+--- WAVE 6 [exec] ---
 
 #### s4 - [exec] Stage the browser pipeline
 
@@ -114,3 +169,19 @@ Acceptance: `cli.serve.test.ts` tests for each flag; a served SVG equals `nowlin
 ## Waves (no-thrash grouping, applied at kickoff)
 
 1 [deep] m1.s1 · 2 [exec] m1.s2-s7 · 3 [deep] m2.s1 · 4 [exec] m2.s2 · 5 [deep] m2.s3 · 6 [exec] m2.s4-s7. One working directory, so one group per wave and no canary. Gates crossed: 4 and 2 before wave 3, 2 before wave 5. Rough expected total ~$22 API-equiv (~42M tokens) including the orchestrator; exact Cost table written at kickoff. Runner, so the kickoff question proposes unattended.
+
+## Review log
+
+## Token log
+
+**Counting header (Claude Code)**
+
+- Line, one per model a chat ran, appended below: `tokens <row> <group-id> (<model>): input ~X / cache read ~R / cache write ~W / output ~Y | ~$C API-equiv`. `<row>` is `wave-N`, `review-wave-N`, or `wave-N-fix` and `review-wave-N-fix` for a fix-up wave; `<group-id>` is the wave's group id with hyphens (`nowline-m1-s2-s7`); `<model>` is `message.model` without a date suffix. Round counts to two significant figures with `k` or `M`.
+- Usage: `~/.claude/projects/<slug>/$CLAUDE_CODE_SESSION_ID.jsonl` (`<slug>` is the working directory with every character but a letter or digit turned into `-`, matched by prefix when long; without the id, the newest `.jsonl` there), plus its subagents' `<session-id>/subagents/**/agent-*.jsonl` in the same directory. Sum `message.usage` over assistant lines once per `message.id`, from the line with `stop_reason`: input `input_tokens`, cache read `cache_read_input_tokens`, cache write `cache_creation.ephemeral_5m_input_tokens` (with `ephemeral_1h_input_tokens` too, `cache write ~40k 5m + ~8k 1h`), output `output_tokens`. A call with no `stop_reason` line keeps its input-side counts, takes output as about 1,000, and its line ends `(output est.) session <id>`.
+- Rates by `<model>`, $ per Mtok input / cached / output: `claude-opus-5-5` 4.00 / 0.20 / 20.00; `claude-sonnet-5-5` 2.00 / 0.20 / 10.00.
+- `$C` = (input × in + cache read × cached + 5m write × in × 1.25 + 1h write × in × 2.00 + output × out) / 1M.
+- In another harness, or on a model not listed here, count and price per plan-execution.md "Token accounting" and "Model price table" instead.
+
+tokens orchestrator-kickoff explore-options (claude-opus-5-5): input ~28 / cache read ~850k / cache write ~61k / output ~13k | ~$0.74 API-equiv (output est.) session 3d92f75d-ed43-5e74-a58c-e29cd0970783
+tokens orchestrator-kickoff explore-staging (claude-opus-5-5): input ~16 / cache read ~420k / cache write ~44k / output ~8k | ~$0.47 API-equiv (output est.) session 3d92f75d-ed43-5e74-a58c-e29cd0970783
+tokens orchestrator-kickoff plan-surface-options-heron (claude-opus-5-5): input ~62 / cache read ~4.1M / cache write ~0 5m + ~280k 1h / output ~23k | ~$3.50 API-equiv
