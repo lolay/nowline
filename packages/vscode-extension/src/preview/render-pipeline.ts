@@ -67,7 +67,8 @@ export interface RenderInputs {
 }
 
 export type RenderOutcome =
-    | { kind: 'svg'; svg: string }
+    /** `warnings` are rows to show beside the diagram without dimming it. */
+    | { kind: 'svg'; svg: string; warnings?: DiagnosticRow[] }
     | { kind: 'diagnostics'; rows: DiagnosticRow[] };
 
 /**

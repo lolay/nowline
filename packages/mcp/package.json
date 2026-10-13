@@ -40,6 +40,7 @@
         "@modelcontextprotocol/node": "^2.1.0",
         "@modelcontextprotocol/server": "^2.2.0",
         "@nowline/browser": "workspace:*",
+        "@nowline/config": "workspace:*",
         "@nowline/core": "workspace:*",
         "@nowline/export": "workspace:*",
         "@nowline/export-core": "workspace:*",

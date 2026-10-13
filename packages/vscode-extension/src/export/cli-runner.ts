@@ -1,7 +1,7 @@
 import { spawn } from 'node:child_process';
 import { promises as fs } from 'node:fs';
 import * as path from 'node:path';
-import type { NonWorkingDisplay } from '@nowline/layout';
+import type { NonWorkingDisplay, ThemeName } from '@nowline/layout';
 import * as vscode from 'vscode';
 import { type ExportFormat, exportInProcess } from './in-process.js';
 
@@ -30,7 +30,7 @@ export interface RunExportArgs {
      * otherwise the caller should resolve `nowline.preview.theme` against the
      * active VS Code color theme. Defaults to `'light'` when omitted.
      */
-    theme?: 'light' | 'dark' | 'grayscale';
+    theme?: ThemeName;
     /**
      * Resolved now-line anchor. Pass a `Date` (UTC midnight) to pin the
      * now-line; pass `null` to suppress it (mirrors `--now -`); leave
@@ -281,7 +281,7 @@ function buildCliArgs(
     destPath: string,
     settings: ExportSettings,
     overrides: {
-        theme?: 'light' | 'dark' | 'grayscale';
+        theme?: ThemeName;
         today?: Date | null;
         locale?: string;
         noLinks?: boolean;

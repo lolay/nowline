@@ -1,6 +1,6 @@
 import * as path from 'node:path';
 import { describe, expect, it } from 'vitest';
-import { loadConfig, mergeConfig, parseConfig } from '../../src/io/config.js';
+import { loadConfig, parseConfig } from '../../src/io/config.js';
 
 describe('.nowlinerc discovery', () => {
     it('walks up from the input directory until a .nowlinerc is found', async () => {
@@ -55,18 +55,5 @@ describe('.nowlinerc parsing', () => {
 
     it('rejects non-object roots', () => {
         expect(() => parseConfig('- a\n- b\n', '/x/.nowlinerc')).toThrow(/top-level/i);
-    });
-});
-
-describe('.nowlinerc merge behavior', () => {
-    it('CLI flags override config file values', () => {
-        const merged = mergeConfig({ theme: 'dark', width: 1200 }, { width: 1600 });
-        expect(merged.theme).toBe('dark');
-        expect(merged.width).toBe(1600);
-    });
-
-    it('undefined CLI flags do not clobber config values', () => {
-        const merged = mergeConfig({ theme: 'dark' }, { theme: undefined });
-        expect(merged.theme).toBe('dark');
     });
 });

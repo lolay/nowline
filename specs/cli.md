@@ -104,6 +104,9 @@ Render options
                          or show.` Mermaid, MS Project, and XLSX output is the
                          same in both views. `--serve` takes it too.
   --asset-root <dir>     Directory from which logo / image assets may be loaded
+                         (default: the `.nowlinerc` `assetRoot` key, then the
+                         input file's directory). A relative flag resolves
+                         against the working directory. `--serve` takes it too.
 
 Format-specific options
   --page-size <size>     PDF page size: preset (letter | legal | tabloid |
@@ -188,6 +191,12 @@ Options:
 | `-t, --theme <name>` | `light` | Same names and validation as for render. The page around the chart is dark only for `dark`; `grayscale` uses the light page. |
 | `-o, --output <path>` | none | Opt-in: also write the rendered output to this path on every rebuild. `-o -` is rejected for `--serve`. |
 | `--non-working <mode>` | file key, else `hide` | `hide` \| `show`; same meaning and validation as for render. |
+| `-w, --width <px>` | `.nowlinerc` `width`, else fit the content | Same rule as for render: an integer ≥ 320. |
+| `--no-links` | off | Drop the link icons from the served SVG, as for render. |
+| `--strict` | off | A render warning, such as a missing logo, is shown as an error instead of a chart, as for render. |
+| `--now`, `--timezone`, `--locale`, `--asset-root` | as for render | Same meaning and validation as for render. `--asset-root` defaults to the `.nowlinerc` `assetRoot`. |
+
+`--serve` resolves these options exactly as render does (flag, then `.nowlinerc`, then the built-in default) and stages the roadmap through the same function, so the served SVG is the SVG `nowline <input>` writes for the same flags. A bad value is the same usage error (exit 2) at start-up. Page size, orientation, margin, fonts and `--format` do not apply: `--serve` shows SVG only.
 
 `--serve` rejects `--dry-run`.
 
@@ -392,13 +401,14 @@ Each recognized key is the default for one flag, resolved flag > `.nowlinerc` > 
 |---|---|---|
 | `theme` | `-t, --theme` | Same names and `greyscale` alias as the flag. Also read by `--serve`. |
 | `defaultFormat` | `-f, --format` | Step 3 of the format-resolution chain: used when neither `-f` nor a recognized `-o` extension is present. |
-| `width` | `-w, --width` | Integer ≥ 320. Best-effort maximum canvas width, passed to `LayoutOptions.width` (see [`rendering.md` § Canvas width](./rendering.md#canvas-width)). |
+| `width` | `-w, --width` | Integer ≥ 320. Best-effort maximum canvas width, passed to `LayoutOptions.width` (see [`rendering.md` § Canvas width](./rendering.md#canvas-width)). Also read by `--serve`. |
 | `pdfPageSize` | `--page-size` | Validated for every output format, like `pdfOrientation` and `pdfMargin`. |
 | `pdfOrientation` | `--orientation` | |
 | `pdfMargin` | `--margin` | A bare number (YAML/JSON number or string) is points. |
 | `fontSans` / `fontMono` | `--font-sans` / `--font-mono` | |
 | `headlessFonts` | `--headless` | Boolean; either source turns it on. |
 | `useSystemFonts` | `--use-system-fonts` | Boolean; either source turns it on. |
+| `assetRoot` | `--asset-root` | A directory path. A relative value resolves against the directory of the `.nowlinerc` that holds it (a relative flag resolves against the working directory), so a checked-in `assetRoot: assets` means the same directory wherever `nowline` is run from. Must be a string: any other type is a usage error. Also read by `--serve` and the VS Code preview. |
 | `locale` | `--locale` | Ranks below the locale environment variables (see below). Also read by `--serve`. |
 
 An invalid rc value is a usage error (exit 2) that names the key, for example `nowline: invalid .nowlinerc theme "sepia". Expected light, dark, or grayscale.`, rather than a flag the user never passed. A valid flag still wins over an invalid key. Unknown keys are ignored. A `.nowlinerc` that cannot be parsed (malformed YAML or JSON, or a top level that is not a mapping) is the same usage error, `nowline: invalid .nowlinerc: <reason>`, with the file path in the reason; no `.nowlinerc` at all is not an error.

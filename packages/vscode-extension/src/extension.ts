@@ -1,6 +1,6 @@
 import * as os from 'node:os';
 import * as path from 'node:path';
-import type { NonWorkingDisplay } from '@nowline/layout';
+import type { NonWorkingDisplay, ThemeName } from '@nowline/layout';
 import * as vscode from 'vscode';
 import {
     LanguageClient,
@@ -294,7 +294,7 @@ function readPreviewSettings(): PreviewSettings {
  * This ensures every export surface (toolbar save, Export… command, file
  * context menu) produces an artifact that matches the preview.
  */
-function resolveThemeForExport(sourceUri: vscode.Uri): 'light' | 'dark' | 'grayscale' {
+function resolveThemeForExport(sourceUri: vscode.Uri): ThemeName {
     const preview = previewManager?.getForSource(sourceUri);
     if (preview) return preview.resolvedTheme();
     // No preview open — fall back to the preview setting + VS Code color theme.

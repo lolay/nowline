@@ -15,16 +15,19 @@ import {
     registerAppTool,
 } from '@modelcontextprotocol/ext-apps/server';
 import { McpServer } from '@modelcontextprotocol/server';
+import type { SurfaceOptions } from '@nowline/config';
 import { type NowlineFile, parseNowlineJson, printNowlineFile } from '@nowline/core';
 import {
+    acceptStagedRoadmap,
     type ExportFormat,
     exportDocument,
+    exportStaged,
     type HostEnv,
     IncludeResolveError,
     type RenderInputs,
 } from '@nowline/export';
-import { type PdfPageSize, resolveFonts } from '@nowline/export-core';
-import { NON_WORKING_DISPLAYS, THEME_NAMES, type ThemeName } from '@nowline/layout';
+import { resolveFonts } from '@nowline/export-core';
+import { NON_WORKING_DISPLAYS, THEME_NAMES } from '@nowline/layout';
 import { buildShareLink } from '@nowline/share-link';
 import { z } from 'zod';
 import { NOWLINE_MCP_ICONS } from './branding.js';
@@ -32,19 +35,20 @@ import { CAPABILITIES } from './capabilities.js';
 import {
     buildDocument,
     collectMcpDiagnostics,
-    collectMcpLayoutInsights,
     DEFAULT_RENDER_WIDTH,
     diagnosticsErrorBlock,
+    diagnosticsErrorResponse,
     handleToolError,
     InputRequiredError,
     includeDiagnosticsResponse,
     LAYOUT_INSIGHT_HINT,
-    type McpDiagnostic,
+    layoutInsightsFromStage,
+    type McpInsight,
     PathOutsideRootError,
-    parsePageSizeArg,
-    parseThemeArg,
     REVIEW_MAX_WIDTH,
     routedResolveDiagnosticsToMcp,
+    stageMcpRoadmap,
+    stageRoutedDiagnostics,
     toolDescriptionWithSyntax,
 } from './diagnostics.js';
 import {
@@ -54,6 +58,7 @@ import {
     REFERENCE_MAN_PAGE,
 } from './generated/resources.js';
 import { PREVIEW_HTML } from './generated/ui-bundle.js';
+import { type McpResolvedOptions, resolveMcpOptions } from './options.js';
 import { registerPrompts } from './prompts.js';
 import { REFERENCE_CHEATSHEET } from './reference-cheatsheet.js';
 import { SCHEMA_VOCABULARY } from './schema-vocab.js';
@@ -193,18 +198,6 @@ function createNodeHostEnv(sourcePath: string): HostEnv {
 }
 
 // ---- Helpers ----------------------------------------------------------------
-
-function todayUtc(): Date {
-    const now = new Date();
-    return new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate()));
-}
-
-// `-` suppresses the now-line, the same sentinel as the CLI's `--now -`.
-// Omitted means today (UTC); the schema has already checked the date shape.
-function resolveNow(now: string | undefined): Date | undefined {
-    if (now === '-') return undefined;
-    return now ? new Date(`${now}T00:00:00Z`) : todayUtc();
-}
 
 function exampleShortName(fullName: string): string {
     return fullName.endsWith('.nowline') ? fullName.slice(0, -'.nowline'.length) : fullName;
@@ -351,6 +344,43 @@ export function createMcpServer(opts: McpServerOptions = {}): McpServer {
 
     registerPrompts(server);
 
+    const nonWorkingSchema = z
+        .enum(NON_WORKING_DISPLAYS)
+        .optional()
+        .describe(
+            "How a business calendar's non-working days appear: hide collapses them, " +
+                "show draws them as shaded bands. Overrides the file's `default roadmap non-working:` key; " +
+                'omit to let the key apply (then hide). The schedule exports (mermaid, msproj, xlsx) are the same either way.',
+        );
+
+    // A string, not an enum, so `Greyscale` and the `greyscale` alias reach
+    // `resolveMcpOptions`, which rejects an unknown name with the theme list.
+    const themeSchema = z
+        .string()
+        .optional()
+        .describe(
+            `Color theme: ${THEME_NAMES.join(', ')} ("greyscale" is accepted). Defaults to light.`,
+        );
+
+    const nowSchema = z
+        .string()
+        .regex(/^(\d{4}-\d{2}-\d{2}|-)$/, 'Expected YYYY-MM-DD or "-".')
+        .optional()
+        .describe(
+            "Now-line date as YYYY-MM-DD. Omit to draw it at today's date in `timezone` " +
+                "(the server's local zone when `timezone` is omitted too); " +
+                'pass "-" to suppress the now-line (same as the CLI\'s `--now -`).',
+        );
+
+    const timezoneSchema = z
+        .string()
+        .optional()
+        .describe(
+            "Timezone that decides today's date when `now` is omitted (ignored when `now` is a date): " +
+                '"local" (the default), "UTC", an ISO 8601 offset ("+05:30", "-07:00", "Z"), ' +
+                'or an IANA name ("America/Los_Angeles"). The same forms as the CLI\'s `--timezone`.',
+        );
+
     // ---- validate -----------------------------------------------------------
 
     server.registerTool(
@@ -365,28 +395,38 @@ export function createMcpServer(opts: McpServerOptions = {}): McpServer {
                     .string()
                     .optional()
                     .describe('Absolute or relative path to a .nowline file to validate.'),
+                now: nowSchema,
+                timezone: timezoneSchema,
             }),
             outputSchema: ValidateOutputSchema,
             annotations: readOnlyTool('Validate Roadmap'),
         },
         async (args) => {
             try {
+                const { options } = resolveMcpOptions(args);
                 const { source, filePath } = await sourceAndPath(args, allowedRoot);
                 const doc = await buildDocument(source);
                 const diagnostics = collectMcpDiagnostics(doc, filePath);
-                // Routed (wave-rule) include diagnostics join the validator's,
-                // with the file and line they point into (specs/waves.md §6.1).
-                const insights = diagnostics.every((d) => d.severity !== 'error')
-                    ? await collectMcpLayoutInsights({
-                          source,
-                          filePath,
-                          today: todayUtc(),
-                          locale: 'en-US',
-                          readFile: createNodeHostEnv(filePath).readSource,
-                          doc,
-                          onResolveDiagnostics: (routed) => diagnostics.push(...routed),
-                      })
-                    : [];
+                // One stage: the routed (wave-rule) include diagnostics join
+                // the validator's, with the file and line they point into
+                // (specs/waves.md §6.1), and the insights come from the same
+                // layout, logo included.
+                let insights: McpInsight[] = [];
+                if (diagnostics.every((d) => d.severity !== 'error')) {
+                    const stage = await stageMcpRoadmap(
+                        doc,
+                        source,
+                        {
+                            sourcePath: filePath,
+                            today: options.today,
+                            locale: 'en-US',
+                            theme: 'light',
+                        },
+                        createNodeHostEnv(filePath),
+                    );
+                    diagnostics.push(...stageRoutedDiagnostics(stage));
+                    if (stage.kind === 'staged') insights = layoutInsightsFromStage(stage);
+                }
                 const ok = diagnostics.every((d) => d.severity !== 'error');
                 const structured = {
                     ok,
@@ -579,33 +619,6 @@ export function createMcpServer(opts: McpServerOptions = {}): McpServer {
         },
     );
 
-    const nonWorkingSchema = z
-        .enum(NON_WORKING_DISPLAYS)
-        .optional()
-        .describe(
-            "How a business calendar's non-working days appear: hide collapses them, " +
-                "show draws them as shaded bands. Overrides the file's `default roadmap non-working:` key; " +
-                'omit to let the key apply (then hide). The schedule exports (mermaid, msproj, xlsx) are the same either way.',
-        );
-
-    // A string, not an enum, so `Greyscale` and the `greyscale` alias reach
-    // `parseThemeArg`, which rejects an unknown name with the theme list.
-    const themeSchema = z
-        .string()
-        .optional()
-        .describe(
-            `Color theme: ${THEME_NAMES.join(', ')} ("greyscale" is accepted). Defaults to light.`,
-        );
-
-    const nowSchema = z
-        .string()
-        .regex(/^(\d{4}-\d{2}-\d{2}|-)$/, 'Expected YYYY-MM-DD or "-".')
-        .optional()
-        .describe(
-            'Now-line date as YYYY-MM-DD (UTC). Omit to draw it at today (UTC); ' +
-                'pass "-" to suppress the now-line (same as the CLI\'s `--now -`).',
-        );
-
     // ---- render -------------------------------------------------------------
 
     registerAppTool(
@@ -633,11 +646,12 @@ export function createMcpServer(opts: McpServerOptions = {}): McpServer {
                     .describe('Output format. Defaults to svg.'),
                 theme: themeSchema,
                 now: nowSchema,
+                timezone: timezoneSchema,
                 width: z
                     .number()
                     .optional()
                     .describe(
-                        'Maximum canvas width in px. Unset fits the content; a wider roadmap shrinks its timeline to fit.',
+                        'Maximum canvas width in px, an integer of at least 320. Unset fits the content; a wider roadmap shrinks its timeline to fit.',
                     ),
                 nonWorking: nonWorkingSchema,
                 scale: z
@@ -677,12 +691,13 @@ export function createMcpServer(opts: McpServerOptions = {}): McpServer {
             // Only the filesystem touchpoints (reading the input, writing the
             // output) map to structured NL.MCP.* errors; a kernel render fault
             // bubbles unchanged so it is never mislabeled as a path/IO failure.
-            let theme: ThemeName | undefined;
+            let resolved: McpResolvedOptions;
             try {
-                theme = parseThemeArg(args.theme);
+                resolved = resolveMcpOptions(args);
             } catch (err) {
                 return handleToolError(err);
             }
+            const { theme, options } = resolved;
             let source: string;
             let filePath: string;
             try {
@@ -695,14 +710,14 @@ export function createMcpServer(opts: McpServerOptions = {}): McpServer {
             if (!blocked.ok) return blocked.response;
 
             const format: ExportFormat = args.format ?? 'svg';
-            const today = resolveNow(args.now);
+            const today = options.today;
             const inputs: RenderInputs = {
                 sourcePath: filePath,
                 today,
                 locale: 'en-US',
-                theme: theme ?? 'light',
-                width: args.width,
-                nonWorking: args.nonWorking,
+                theme: options.theme,
+                width: options.width,
+                nonWorking: options.nonWorking,
                 pngScale: args.scale,
             };
             const host = createNodeHostEnv(filePath);
@@ -715,54 +730,49 @@ export function createMcpServer(opts: McpServerOptions = {}): McpServer {
                 const result = await resolveFonts({ headless: true });
                 inputs.fonts = { sans: result.sans, mono: result.mono };
             }
-            let bytes: Uint8Array;
-            try {
-                bytes = needsRender
-                    ? await exportDocument(source, format, inputs, host)
-                    : new Uint8Array(0);
-            } catch (err) {
-                if (!(err instanceof IncludeResolveError)) throw err;
-                return includeDiagnosticsResponse(
-                    blocked.doc,
+            // One stage serves the render, the insights and the include check.
+            const stage = await stageMcpRoadmap(blocked.doc, source, inputs, host);
+            if (stage.kind === 'invalid') {
+                return diagnosticsErrorResponse(
                     filePath,
-                    routedResolveDiagnosticsToMcp(err.diagnostics),
+                    collectMcpDiagnostics(blocked.doc, filePath),
                 );
             }
-
-            // The preview path skips the kernel, so wave-rule include
-            // diagnostics are checked here too. collectMcpLayoutInsights drops
-            // them when the resolver reports an uncoded include error, so that
-            // case keeps the preview it returned before waves existed
-            // (specs/waves.md §6.1).
-            const routed: McpDiagnostic[] = [];
-            const insights = await collectMcpLayoutInsights({
-                source,
-                filePath,
-                today,
-                theme: theme ?? 'light',
-                width: args.width,
-                nonWorking: args.nonWorking,
-                locale: 'en-US',
-                readFile: host.readSource,
-                doc: blocked.doc,
-                onResolveDiagnostics: (d) => routed.push(...d),
-            });
+            // Wave-rule include errors are reported as diagnostics. An uncoded
+            // include error throws from a render, as the kernel's does; the
+            // preview path, which draws nothing here, keeps the preview it
+            // returned before waves existed (specs/waves.md §6.1).
+            const routed = stageRoutedDiagnostics(stage);
             if (routed.some((d) => d.severity === 'error')) {
                 return includeDiagnosticsResponse(blocked.doc, filePath, routed);
             }
+            if (stage.kind === 'include-error' && needsRender) acceptStagedRoadmap(stage, inputs);
+            const staged = stage.kind === 'staged' ? stage : undefined;
+            const insights = staged ? layoutInsightsFromStage(staged) : [];
+            const bytes =
+                needsRender && staged
+                    ? await exportStaged(staged, format, inputs, host)
+                    : new Uint8Array(0);
 
             const previewPayload: PreviewPayload = {
                 source,
                 theme,
                 now: args.now,
-                width: args.width,
-                nonWorking: args.nonWorking,
+                width: options.width,
+                nonWorking: options.nonWorking,
                 locale: 'en-US',
             };
 
             const reviewBlocks =
                 args.review === true
-                    ? await buildReviewContentBlocks(source, format, bytes, inputs, host)
+                    ? await buildReviewContentBlocks(
+                          blocked.doc,
+                          source,
+                          format,
+                          bytes,
+                          inputs,
+                          host,
+                      )
                     : [];
 
             const insightHintBlocks =
@@ -878,6 +888,7 @@ export function createMcpServer(opts: McpServerOptions = {}): McpServer {
                             'outside the configured output folder — those do not exist on the host filesystem.',
                     ),
                 now: nowSchema,
+                timezone: timezoneSchema,
                 theme: themeSchema,
                 nonWorking: nonWorkingSchema,
                 scale: z.number().optional().describe('PNG scale factor.'),
@@ -915,11 +926,9 @@ export function createMcpServer(opts: McpServerOptions = {}): McpServer {
             // Only the filesystem touchpoints (reading the input, writing the
             // output) map to structured NL.MCP.* errors; a kernel export fault
             // bubbles unchanged so it is never mislabeled as a path/IO failure.
-            let theme: ThemeName | undefined;
-            let pageSize: PdfPageSize | undefined;
+            let options: SurfaceOptions;
             try {
-                theme = parseThemeArg(args.theme);
-                pageSize = parsePageSizeArg(args.pageSize);
+                ({ options } = resolveMcpOptions(args));
             } catch (err) {
                 return handleToolError(err);
             }
@@ -935,15 +944,14 @@ export function createMcpServer(opts: McpServerOptions = {}): McpServer {
             if (!blocked.ok) return blocked.response;
 
             const format: ExportFormat = args.format as NonRenderFormat;
-            const today = resolveNow(args.now);
             const inputs: RenderInputs = {
                 sourcePath: filePath,
-                today,
+                today: options.today,
                 locale: 'en-US',
-                theme: theme ?? 'light',
-                nonWorking: args.nonWorking,
+                theme: options.theme,
+                nonWorking: options.nonWorking,
                 pngScale: args.scale,
-                pageSize,
+                pageSize: options.pageSize,
                 orientation: args.orientation,
                 marginPt: args.marginPt,
                 msprojStart: args.msprojStart,
@@ -955,7 +963,11 @@ export function createMcpServer(opts: McpServerOptions = {}): McpServer {
             const host = createNodeHostEnv(filePath);
             let bytes: Uint8Array;
             try {
-                bytes = await exportDocument(source, format, inputs, host);
+                const staged = acceptStagedRoadmap(
+                    await stageMcpRoadmap(blocked.doc, source, inputs, host),
+                    inputs,
+                );
+                bytes = await exportStaged(staged, format, inputs, host);
             } catch (err) {
                 if (!(err instanceof IncludeResolveError)) throw err;
                 return includeDiagnosticsResponse(
@@ -1151,12 +1163,15 @@ export function createMcpServer(opts: McpServerOptions = {}): McpServer {
                 if (args.to === 'json') {
                     const { source, filePath } = await sourceAndPath(args, allowedRoot);
                     const host = createNodeHostEnv(filePath);
+                    // The JSON AST does not depend on today's date, so convert
+                    // takes no `now`; the kernel still wants a concrete one.
+                    const { options } = resolveMcpOptions({});
                     const jsonBytes = await exportDocument(
                         source,
                         'json',
                         {
                             sourcePath: filePath,
-                            today: todayUtc(),
+                            today: options.today,
                             locale: 'en-US',
                             theme: 'light',
                         },
@@ -1487,6 +1502,7 @@ function buildExportInlineContentBlocks(
 }
 
 async function buildReviewContentBlocks(
+    doc: Awaited<ReturnType<typeof buildDocument>>,
     source: string,
     format: ExportFormat,
     artifactBytes: Uint8Array,
@@ -1517,7 +1533,13 @@ async function buildReviewContentBlocks(
             const fonts = await resolveFonts({ headless: true });
             reviewInputs.fonts = { sans: fonts.sans, mono: fonts.mono };
         }
-        inspectionBytes = await exportDocument(source, 'png', reviewInputs, host);
+        // A narrower review width is a different layout, so it stages again
+        // (the parsed document is reused).
+        const reviewStage = acceptStagedRoadmap(
+            await stageMcpRoadmap(doc, source, reviewInputs, host),
+            reviewInputs,
+        );
+        inspectionBytes = await exportStaged(reviewStage, 'png', reviewInputs, host);
     }
 
     if (format !== 'png' || inspectionBytes.byteLength !== artifactBytes.byteLength) {

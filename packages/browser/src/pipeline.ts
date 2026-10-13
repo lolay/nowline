@@ -23,21 +23,19 @@ import {
     isRoutedResolveDiagnostic,
     type NowlineFile,
     type NowlineServices,
-    resolveIncludes,
+    type RawDiagnostic,
 } from '@nowline/core';
 import {
     collectLayoutInsights,
-    layoutRoadmap,
     type NonWorkingDisplay,
     type NormalizedZone,
     normalizeZone,
     resolveToday,
-    roadmapLogoRef,
     type ThemeName,
     TimezoneError,
 } from '@nowline/layout';
-import { type AssetResolver, type FontFamilies, loadLogo, renderSvg } from '@nowline/renderer';
-import { URI } from 'langium';
+import { type AssetResolver, type FontFamilies, renderSvg, stageRoadmap } from '@nowline/renderer';
+import { type LangiumDocument, URI } from 'langium';
 import {
     type DiagnosticRow,
     fromLangiumDiagnostic,
@@ -209,20 +207,25 @@ export async function parseSource(
     const doc = docFactory.fromString<NowlineFile>(source, freshUri());
     await services.shared.workspace.DocumentBuilder.build([doc], { validation: true });
 
-    // collectDocumentDiagnostics owns the de-dup: Langium re-folds lexer +
-    // parser errors into doc.diagnostics, so the shared collector skips those
-    // copies and we map each origin to a row here.
-    const diagnostics: DiagnosticRow[] = [];
-    for (const raw of collectDocumentDiagnostics(doc)) {
-        if (raw.origin === 'lexer') {
-            diagnostics.push(fromLexerError(raw.error, filePath));
-        } else if (raw.origin === 'parser') {
-            diagnostics.push(fromParserError(raw.error, filePath));
-        } else {
-            diagnostics.push(fromLangiumDiagnostic(raw.diagnostic, filePath));
-        }
-    }
-    return { ast: doc.parseResult.value, diagnostics };
+    return { ast: doc.parseResult.value, diagnostics: documentRows(doc, filePath) };
+}
+
+/**
+ * Parse and validation diagnostics of a built document as rows.
+ * collectDocumentDiagnostics owns the de-dup: Langium re-folds lexer +
+ * parser errors into doc.diagnostics, so the shared collector skips those
+ * copies and we map each origin to a row here.
+ */
+function documentRows(doc: LangiumDocument<NowlineFile>, filePath: string): DiagnosticRow[] {
+    return rawRows(collectDocumentDiagnostics(doc), filePath);
+}
+
+function rawRows(raws: readonly RawDiagnostic[], filePath: string): DiagnosticRow[] {
+    return raws.map((raw) => {
+        if (raw.origin === 'lexer') return fromLexerError(raw.error, filePath);
+        if (raw.origin === 'parser') return fromParserError(raw.error, filePath);
+        return fromLangiumDiagnostic(raw.diagnostic, filePath);
+    });
 }
 
 /**
@@ -236,28 +239,51 @@ export async function renderSource(
     options: RenderOptions = {},
 ): Promise<RenderResult> {
     const filePath = options.filePath ?? DEFAULT_SYNTHETIC_PATH;
-    const parsed = await parseSource(source, { filePath });
-    if (parsed.diagnostics.some((d) => d.severity === 'error')) {
-        return { kind: 'diagnostics', diagnostics: parsed.diagnostics };
-    }
-
     const services = getServices();
-    const readFile = options.readFile ?? noOpIncludeReadFile;
-    const resolved = await resolveIncludes(parsed.ast, filePath, {
-        services: services.Nowline,
-        readFile,
+
+    // A bad timezone is reported after validation and include errors, as it
+    // always was: stage with no now-line, then return the timezone row only
+    // if the roadmap staged.
+    let zone: NormalizedZone | undefined;
+    let zoneError: TimezoneError | undefined;
+    if (options.timezone) {
+        try {
+            zone = normalizeZone(options.timezone);
+        } catch (err) {
+            if (!(err instanceof TimezoneError)) throw err;
+            zoneError = err;
+        }
+    }
+    // Pass today as-is: null suppresses the now-line, undefined defaults to
+    // local today (or zone), a string is parsed, a Date is used directly.
+    const today = zoneError ? undefined : resolveToday({ now: options.today, zone });
+
+    const stage = await stageRoadmap({
+        source,
+        sourcePath: filePath,
+        services,
+        readSource: options.readFile ?? noOpIncludeReadFile,
+        assetResolver: options.assetResolver,
+        // The no-op reader's skipped includes are not errors in single-file
+        // mode: they are reported through `onSkippedInclude` instead.
+        isToleratedIncludeError: (d) => isNoOpIncludeDiagnosticMessage(d.message),
+        layout: {
+            theme: options.theme,
+            today,
+            locale: options.locale,
+            width: options.width,
+            nonWorking: options.nonWorking,
+        },
     });
+    if (stage.kind === 'invalid') {
+        return { kind: 'diagnostics', diagnostics: rawRows(stage.diagnostics, filePath) };
+    }
 
     // An uncoded include error takes precedence: when one is reported, the
     // routed (wave-rule) diagnostics are dropped (specs/waves.md §6.1).
-    const hasLegacyError = resolved.diagnostics.some(
-        (d) =>
-            d.severity === 'error' &&
-            !isRoutedResolveDiagnostic(d) &&
-            !isNoOpIncludeDiagnosticMessage(d.message),
-    );
-    const rows: DiagnosticRow[] = [...parsed.diagnostics];
-    for (const diag of resolved.diagnostics) {
+    const hasLegacyError = stage.kind === 'include-error' && stage.legacy !== undefined;
+    const rows: DiagnosticRow[] = documentRows(stage.document, filePath);
+    for (const diag of stage.resolved.diagnostics) {
         if (diag.severity === 'error' && isNoOpIncludeDiagnosticMessage(diag.message)) {
             options.onSkippedInclude?.({
                 sourcePath: diag.sourcePath,
@@ -268,52 +294,32 @@ export async function renderSource(
         if (hasLegacyError && isRoutedResolveDiagnostic(diag)) continue;
         rows.push(fromResolveDiagnostic(diag));
     }
-    if (rows.some((r) => r.severity === 'error')) {
+    if (stage.kind === 'include-error' || rows.some((r) => r.severity === 'error')) {
         return { kind: 'diagnostics', diagnostics: rows };
     }
 
-    let zone: NormalizedZone | undefined;
-    if (options.timezone) {
-        try {
-            zone = normalizeZone(options.timezone);
-        } catch (err) {
-            if (err instanceof TimezoneError) {
-                // Surface timezone errors as a diagnostic row rather than throwing
-                // so the caller gets a structured result instead of an uncaught error.
-                return {
-                    kind: 'diagnostics',
-                    diagnostics: [
-                        {
-                            severity: 'error' as const,
-                            code: 'invalid-timezone',
-                            message: err.message,
-                            file: filePath,
-                            line: 1,
-                            column: 1,
-                        },
-                    ],
-                };
-            }
-            throw err;
-        }
+    if (zoneError) {
+        // Surface timezone errors as a diagnostic row rather than throwing
+        // so the caller gets a structured result instead of an uncaught error.
+        return {
+            kind: 'diagnostics',
+            diagnostics: [
+                {
+                    severity: 'error' as const,
+                    code: 'invalid-timezone',
+                    message: zoneError.message,
+                    file: filePath,
+                    line: 1,
+                    column: 1,
+                },
+            ],
+        };
     }
-    // Pass today as-is: null suppresses the now-line, undefined defaults to
-    // local today (or zone), a string is parsed, a Date is used directly.
-    const today = resolveToday({ now: options.today, zone });
+
     // Renderer warnings, starting with the logo load: a failed load lays out
     // as if no logo were declared and reports like any render warning.
-    const warnMessages: string[] = [];
-    const logo = await loadLogo(roadmapLogoRef(parsed.ast), options.assetResolver, (msg) =>
-        warnMessages.push(msg),
-    );
-    const model = layoutRoadmap(parsed.ast, resolved, {
-        theme: options.theme,
-        today,
-        locale: options.locale,
-        width: options.width,
-        nonWorking: options.nonWorking,
-        logo,
-    });
+    const warnMessages: string[] = [...stage.warnings];
+    const { logo, model } = stage;
 
     const diagnosticLevel = options.diagnosticLevel ?? 'error';
     // Filtered once below as part of the combined `warnings` array.
@@ -328,6 +334,7 @@ export async function renderSource(
     const svg = await renderSvg(model, {
         idPrefix: options.idPrefix,
         assetResolver: options.assetResolver,
+        logo,
         noLinks: !showLinks,
         strict,
         warn: (msg) => warnMessages.push(msg),

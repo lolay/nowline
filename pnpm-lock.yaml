@@ -130,6 +130,12 @@ importers:
 
   packages/config:
     dependencies:
+      '@nowline/export-core':
+        specifier: workspace:*
+        version: link:../export-core
+      '@nowline/layout':
+        specifier: workspace:*
+        version: link:../layout
       js-yaml:
         specifier: ^5.4.2
         version: 5.4.2
@@ -600,6 +606,9 @@ importers:
       '@nowline/browser':
         specifier: workspace:*
         version: link:../browser
+      '@nowline/config':
+        specifier: workspace:*
+        version: link:../config
       '@nowline/core':
         specifier: workspace:*
         version: link:../core
@@ -720,6 +729,9 @@ importers:
       '@nowline/browser':
         specifier: workspace:*
         version: link:../browser
+      '@nowline/layout':
+        specifier: workspace:*
+        version: link:../layout
     devDependencies:
       '@types/node':
         specifier: ^26.6.3
@@ -736,19 +748,19 @@ importers:
 
   packages/renderer:
     dependencies:
-      '@nowline/layout':
-        specifier: workspace:*
-        version: link:../layout
-    devDependencies:
       '@nowline/core':
         specifier: workspace:*
         version: link:../core
-      '@types/node':
-        specifier: ^26.6.3
-        version: 26.6.3
+      '@nowline/layout':
+        specifier: workspace:*
+        version: link:../layout
       langium:
         specifier: ~4.4.0
         version: 4.4.0
+    devDependencies:
+      '@types/node':
+        specifier: ^26.6.3
+        version: 26.6.3
       typescript:
         specifier: ^7.0.2
         version: 7.0.2
@@ -844,6 +856,9 @@ importers:
       typescript:
         specifier: ^7.0.2
         version: 7.0.2
+      vitest:
+        specifier: ^5.0.2
+        version: 5.0.2(@types/node@26.6.3)(@vitest/browser-playwright@5.0.2)(@vitest/ui@5.0.2)(happy-dom@20.14.5)(vite@8.3.1(@types/node@26.6.3))
 
 packages:
 

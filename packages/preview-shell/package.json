@@ -47,7 +47,8 @@
         "test:watch": "vitest"
     },
     "dependencies": {
-        "@nowline/browser": "workspace:*"
+        "@nowline/browser": "workspace:*",
+        "@nowline/layout": "workspace:*"
     },
     "devDependencies": {
         "@types/node": "^26.6.3",

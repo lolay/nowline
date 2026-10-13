@@ -1,4 +1,14 @@
-import type { NowlineRc } from '@nowline/config';
+import * as path from 'node:path';
+import type { DiagnosticRow } from '@nowline/browser';
+import {
+    ASSET_ROOT_SPEC,
+    type NowlineRc,
+    type OptionError,
+    type OptionLayer,
+    rcLayer,
+    resolveOptions,
+    SURFACE_OPTION_SPECS,
+} from '@nowline/config';
 import {
     type NonWorkingDisplay,
     type NormalizedZone,
@@ -8,6 +18,7 @@ import {
     type ThemeName,
 } from '@nowline/layout';
 import type { PreviewSettings, ToolbarOverrides } from './preview-panel.js';
+import type { RenderOutcome } from './render-pipeline.js';
 
 /**
  * Render-affecting options after the precedence chain has been
@@ -34,6 +45,13 @@ export interface ResolvedRenderOptions {
     showLinks: boolean;
     strict: boolean;
     assetRoot: string | undefined;
+    /**
+     * Options whose value was rejected and replaced by the default, as rows
+     * for the preview's diagnostic table (specs/surface-options.md §7,
+     * decision 4). Today only `width`; a theme from `.nowlinerc` that the
+     * schema rejects is still ignored without a row.
+     */
+    problems: DiagnosticRow[];
 }
 
 export interface ResolveContext {
@@ -45,6 +63,59 @@ export interface ResolveContext {
     isDarkTheme: boolean;
     /** Per-panel toolbar overrides; not persisted. */
     toolbarOverrides?: ToolbarOverrides;
+    /** The `.nowlinerc` the config came from, so a bad rc value's row can open it. */
+    rcPath?: string;
+}
+
+// The options the preview reads through the shared schema, so a value reads
+// the same here as in `nowline <file>`. A theme the schema rejects is ignored
+// (the chain moves on to the editor theme); a bad width is reported (below).
+const SCHEMA_SPECS = {
+    theme: SURFACE_OPTION_SPECS.theme,
+    width: SURFACE_OPTION_SPECS.width,
+    assetRoot: ASSET_ROOT_SPEC,
+};
+type SchemaKey = keyof typeof SCHEMA_SPECS;
+
+const WIDTH_SETTING = 'nowline.preview.width';
+
+/**
+ * The width setting as a layer. `0` is the setting's "unset" (its default), so
+ * it is left out and the rc width can apply; any other value goes through the
+ * schema's rule, so `100` is an error rather than a silent ignore.
+ */
+function settingLayer(settings: PreviewSettings): OptionLayer<SchemaKey> {
+    return {
+        source: (key) => ({ kind: 'setting', name: `nowline.preview.${key}` }),
+        values: { width: settings.width === 0 ? undefined : settings.width },
+    };
+}
+
+/** A row for the diagnostic table; the preview still renders, so it is a warning. */
+function widthProblemRow(error: OptionError<SchemaKey>, rcPath: string | undefined): DiagnosticRow {
+    const name = error.source.kind === 'rc' ? '.nowlinerc width' : WIDTH_SETTING;
+    return {
+        severity: 'warning',
+        code: 'invalid-option',
+        message: `Invalid ${name} "${String(error.raw)}": ${error.detail}. The preview fits its content instead.`,
+        // A bad rc value opens the rc file; a setting has no file to open.
+        file: error.source.kind === 'rc' ? (rcPath ?? '') : '',
+        line: 1,
+        column: 1,
+    };
+}
+
+/**
+ * Put option problems in front of an outcome's own rows. A rendered diagram
+ * carries them as warnings, which the shell shows without dimming it.
+ */
+export function withOptionProblems(
+    outcome: RenderOutcome,
+    problems: DiagnosticRow[],
+): RenderOutcome {
+    if (problems.length === 0) return outcome;
+    if (outcome.kind === 'svg') return { ...outcome, warnings: problems };
+    return { kind: 'diagnostics', rows: [...problems, ...outcome.rows] };
 }
 
 /**
@@ -53,22 +124,29 @@ export interface ResolveContext {
  * stays trivially testable and we can re-use it from the export runner.
  */
 export function resolvePreviewOptions(ctx: ResolveContext): ResolvedRenderOptions {
+    const { values, errors } = resolveOptions(SCHEMA_SPECS, [
+        settingLayer(ctx.settings),
+        rcLayer(ctx.rc, SCHEMA_SPECS),
+    ]);
     return {
-        theme: resolveTheme(ctx),
+        theme: resolveTheme(ctx, values.theme),
         today: resolveTodayForPreview(ctx),
         locale: resolveLocale(ctx),
-        width: resolveWidth(ctx),
+        width: values.width,
         nonWorking: resolveNonWorkingDisplay(
             ctx.toolbarOverrides?.nonWorking,
             ctx.settings.nonWorking,
         ),
         showLinks: resolveShowLinks(ctx),
         strict: ctx.settings.strict,
-        assetRoot: resolveAssetRoot(ctx),
+        assetRoot: resolveAssetRoot(ctx, values.assetRoot),
+        problems: errors
+            .filter((error) => error.key === 'width')
+            .map((error) => widthProblemRow(error, ctx.rcPath)),
     };
 }
 
-function resolveTheme(ctx: ResolveContext): ThemeName {
+function resolveTheme(ctx: ResolveContext, rcTheme: ThemeName | undefined): ThemeName {
     const override = ctx.toolbarOverrides?.theme;
     const setting = override ?? ctx.settings.theme;
     // An explicit Theme token (light / dark / grayscale; `greyscale` accepted
@@ -78,13 +156,8 @@ function resolveTheme(ctx: ResolveContext): ThemeName {
         const explicit = normalizeThemeName(setting);
         if (explicit) return explicit;
     }
-    const rc = rcThemeOverride(ctx.rc);
-    if (rc) return rc;
+    if (rcTheme) return rcTheme;
     return ctx.isDarkTheme ? 'dark' : 'light';
-}
-
-function rcThemeOverride(rc: NowlineRc): ThemeName | undefined {
-    return typeof rc.theme === 'string' ? normalizeThemeName(rc.theme) : undefined;
 }
 
 /**
@@ -173,14 +246,6 @@ function resolveLocale(ctx: ResolveContext): string | undefined {
     return undefined;
 }
 
-function resolveWidth(ctx: ResolveContext): number | undefined {
-    if (typeof ctx.settings.width === 'number' && ctx.settings.width > 0) {
-        return ctx.settings.width;
-    }
-    if (typeof ctx.rc.width === 'number' && ctx.rc.width > 0) return ctx.rc.width;
-    return undefined;
-}
-
 /**
  * Resolve the non-working display from the toolbar override and the persistent
  * setting. Precedence: toolbar, setting, then the file's own key (which is the
@@ -206,11 +271,18 @@ function resolveShowLinks(ctx: ResolveContext): boolean {
     return ctx.settings.showLinks;
 }
 
-function resolveAssetRoot(ctx: ResolveContext): string | undefined {
+/**
+ * The asset root: the setting, else the rc `assetRoot`. A relative rc value is
+ * relative to the `.nowlinerc` that holds it, as for `nowline --asset-root`'s
+ * default, so it means the same directory for every source file below it.
+ */
+function resolveAssetRoot(
+    ctx: ResolveContext,
+    rcAssetRoot: string | undefined,
+): string | undefined {
     if (nonEmpty(ctx.settings.assetRoot)) return ctx.settings.assetRoot;
-    const rcAssetRoot = ctx.rc.assetRoot;
-    if (typeof rcAssetRoot === 'string' && rcAssetRoot !== '') return rcAssetRoot;
-    return undefined;
+    if (rcAssetRoot === undefined) return undefined;
+    return ctx.rcPath ? path.resolve(path.dirname(ctx.rcPath), rcAssetRoot) : rcAssetRoot;
 }
 
 function nonEmpty(value: string | undefined): value is string {

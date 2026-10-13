@@ -98,7 +98,7 @@ Dependencies flow downward only. No upward or sideways imports. The graph is enf
 
 - **@nowline/core** — Langium grammar, parser, typed AST, and validator. Pure TypeScript; no DOM, no Node-specific APIs in the hot path. Zero internal deps.
 - **@nowline/layout** — Layout engine. Takes the AST and produces a positioned model (x/y coordinates, dimensions, connection points). Pure computation, no rendering.
-- **@nowline/renderer** — SVG renderer. Takes the positioned model and produces a deterministic SVG string. Reads local assets referenced from the roadmap (e.g. company logos) via an injectable asset resolver so the package stays browser-safe — see § Local Asset Resolution.
+- **@nowline/renderer** — SVG renderer. Takes the positioned model and produces a deterministic SVG string. Reads local assets referenced from the roadmap (e.g. company logos) via an injectable asset resolver so the package stays browser-safe — see § Local Asset Resolution. Also owns `stageRoadmap`, the one staging function (parse and validate, resolve includes, include-error precedence, logo load, layout) that the render pipelines share — see [`surface-options.md`](./surface-options.md) §3.3. It therefore depends on core as well as layout.
 
 ### Export packages
 
