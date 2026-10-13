@@ -1,7 +1,7 @@
 ```
 --- KICKOFF: begin orchestration at [deep] ---
 
-  Status: 0/6 groups done | last review: — | current: nowline m1 s1 [deep] | updated 2026-10-13
+  Status: 1/6 groups done | last review: wave-1 PASS | current: nowline m1 s2-s7 [exec] | updated 2026-10-13
 
   mode: unattended | proposed unattended (harness=claude-code runner=cloud; CLAUDE_CODE_REMOTE=true, assigned branch) | guard 3x min $50 | fixups 2 | confirmed 2026-10-13 session 3d92f75d-ed43-5e74-a58c-e29cd0970783 by Kickoff prompt: Run in unattended mode.
 
@@ -77,7 +77,7 @@ Read before any step: `specs/surface-options.md` (all), `AGENTS.md`, `CONTRIBUTI
 
 --- WAVE 1 [deep] ---
 
-#### s1 - [deep] Add the schema to `@nowline/config`
+#### s1 - [deep] Add the schema to `@nowline/config` (done)
 
 Add `packages/config/src/surface-options.ts` per spec §3.1: `SurfaceOptionKey`, `SurfaceOptions`, `OptionSource`, `OptionLayer`, `OptionError`, `NowPolicy`, `resolveSurfaceOptions`, `rcLayer`, one parser per option (theme via `normalizeThemeName`; width via the CLI's exact `parseInt` integer ≥ 320 rule; now via `resolveToday`, `-` suppresses; pageSize via `parsePageSize`; nonWorking via `NON_WORKING_DISPLAYS`), and the rc-key table (`theme`, `width`, `pdfPageSize`; `now`/`nonWorking` none). Include `assetRoot` in the key table only as a recorded rc key with no consumer yet (m1.s7 wires it). Expose a way for a surface to register extra option specs (the CLI-only keys in s2) on the same layer mechanism. Type `NowlineRc`'s schema-owned keys. Add `@nowline/layout` and `@nowline/export-core` deps (no cycle). Export from `src/index.ts`.
 Acceptance: table-driven tests per option and per source kind, precedence, exact `OptionError` fields, "a valid higher layer hides a bad lower one"; no caller changes; G2.
@@ -173,6 +173,8 @@ Acceptance: `cli.serve.test.ts` tests for each flag; a served SVG equals `nowlin
 
 ## Review log
 
+review wave-1 (nowline m1 s1) a2fb3b2..5231496: PASS - schema, parsers, rc-key table and surface-registered spec tables match spec §3.1 and today's CLI rules; 72/72 config tests; no caller changes - 2026-10-13
+
 ## Token log
 
 **Counting header (Claude Code)**
@@ -185,4 +187,6 @@ Acceptance: `cli.serve.test.ts` tests for each flag; a served SVG equals `nowlin
 
 tokens orchestrator-kickoff explore-options (claude-opus-5-5): input ~28 / cache read ~850k / cache write ~61k / output ~13k | ~$0.74 API-equiv (output est.) session 3d92f75d-ed43-5e74-a58c-e29cd0970783
 tokens orchestrator-kickoff explore-staging (claude-opus-5-5): input ~16 / cache read ~420k / cache write ~44k / output ~8k | ~$0.47 API-equiv (output est.) session 3d92f75d-ed43-5e74-a58c-e29cd0970783
-tokens orchestrator-kickoff plan-surface-options-heron (claude-opus-5-5): input ~62 / cache read ~4.1M / cache write ~0 5m + ~280k 1h / output ~23k | ~$3.50 API-equiv
+tokens orchestrator-kickoff plan-surface-options-heron (claude-opus-5-5): input ~96 / cache read ~6.4M / cache write ~0 5m + ~370k 1h / output ~36k | ~$4.94 API-equiv
+tokens wave-1 nowline-m1-s1 (claude-opus-5-5): input ~66 / cache read ~4M / cache write ~110k / output ~33k | ~$2.02 API-equiv (output est.) session 3d92f75d-ed43-5e74-a58c-e29cd0970783
+tokens review-wave-1 nowline-m1-s1 (claude-opus-5-5): input ~28 / cache read ~620k / cache write ~63k / output ~14k | ~$0.72 API-equiv (output est.) session 3d92f75d-ed43-5e74-a58c-e29cd0970783

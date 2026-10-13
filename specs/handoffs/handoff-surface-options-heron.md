@@ -16,23 +16,23 @@ last commit before the PR merges.
 
 - Plan written and approved by Gary (2026-10-13). Kickoff block, wave
   markers, Cost table, Review log and Token log written.
-- No wave has run.
+- Wave 1 [deep] nowline m1 s1: a2fb3b2..5231496, review PASS.
 
 ## Review log verdicts, fix-ups, retries, checkpoints
 
-None yet.
+- wave-1 (nowline m1 s1): PASS. No fix-ups, retries or checkpoints.
 
 ## Spend
 
-~$4.71 API-equiv so far (kickoff and planning) of ~$22 expected.
+~$8.89 API-equiv so far (kickoff, planning, wave 1) of ~$22 expected.
 
 ## Next unit
 
-Wave 1 [deep] nowline m1 s1 (add the schema to `@nowline/config`).
+Wave 2 [exec] nowline m1 s2-s7 (CLI, MCP and VS Code use the schema; width rule, MCP local now, rc assetRoot).
 
 ## Pending question
 
-None. Wave 1 is being dispatched.
+None. Wave 2 is being dispatched.
 
 ## How to resume
 
@@ -46,11 +46,30 @@ Paste the plan's Kickoff prompt.
   lenient `parseInt` rule (byte-identity); the VS Code extension gains a
   minimal vitest setup in m1.s4; one PR at the end with one commit per step.
 
+- From wave 1 (review PASS), `packages/config/src/surface-options.ts`:
+  surfaces register their own keys by passing their own `OptionSpecTable<S>`
+  to `resolveOptions` and `rcLayer(config, specs)` (no mutable registry). Per
+  key, the first layer whose value is not undefined/null wins; a bad winning
+  value is reported and falls back to the default, lower layers unread. An
+  empty string for width, pageSize or nonWorking means unset and still blocks
+  lower layers (matches CLI `pickSetting`). An empty string for theme is an
+  error, so in s2 the CLI must leave an empty `--theme ""` out of its flag
+  layer to stay byte-identical. Errors come back in key order (theme, width,
+  now, pageSize, nonWorking), so in s2 the CLI must throw the one it throws
+  today (theme, then now, then width) to keep exit text unchanged.
+  `mergeConfig` is untouched; s2 decides whether it goes.
+
 ## Environment notes
 
 - Cloud runner: Chromium at `/opt/pw-browsers`; do not run `playwright install`.
 - Gate reference renders go in `.scratch/gates/ref-<sha>/` (gitignored),
   built from the last merged `origin/main` (c34804c at kickoff).
+- Node on this runner is v22.22.0, not `.nvmrc`'s 26.2.0; `make init` and
+  `make pre-commit` pass on it. `node_modules` may be missing in a fresh
+  container: run `make init` first.
+- Pre-existing type error in `packages/config/test/load-config.test.ts:64`
+  (mergeConfig's return type lacks theme); no gate catches it since the config
+  package has no typecheck script and vitest doesn't type-check.
 
 ## Deviations from plan
 
