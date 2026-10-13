@@ -220,6 +220,23 @@ describeBuilt('m2c — flags', () => {
         expect(r.stderr).toMatch(/margin/i);
     });
 
+    for (const format of ['svg', 'pdf']) {
+        it(`rejects invalid --page-size as an input error (-f ${format})`, async () => {
+            const r = await runCliBuilt([
+                sampleInput,
+                '-f',
+                format,
+                '-o',
+                '-',
+                '--page-size',
+                'huge',
+                '--headless',
+            ]);
+            expect(r.exitCode).toBe(2);
+            expect(r.stderr).toContain('nowline: invalid --page-size "huge": expected preset');
+        });
+    }
+
     it('rejects invalid --scale', async () => {
         const r = await runCliBuilt([
             sampleInput,

@@ -52,7 +52,7 @@ The PR meets all of these:
 - **Diff matches the plan.** No surprise files, no unrelated drive-by changes, no scope expansion. If the plan said "edit `path/to/foo.ts` and add a test," the PR edits exactly those two files.
 - **Hard rules respected.** The diff doesn't edit generated code, doesn't touch protected snapshot files casually, doesn't drop `prevent_destroy` blocks, doesn't widen scope past `specs/principles.md` (or the analogous boundary doc).
 - **Tests present per `CONTRIBUTING.md`.** A regression test for a bug fix; coverage for a new feature. For `lolay/nowline`: round-trip tests still pass and any snapshot bumps have a justification in the PR body.
-- **AI disclosure complete.** Commits carry `Assisted-by: <model>` trailers. PR body has `## AI assistance` section filled in with the matching `Assisted-by:` line. PR body has `Closes #<issue>` on its own line.
+- **AI disclosure complete.** Commits carry `Assisted-by: <tool>` trailers (`GitHub Copilot` for a delegated session) and no agent `Co-authored-by:`. PR body ends with the `## AI assistance` section, filled in with the matching `Assisted-by:` line. PR body has `Closes #<issue>` on its own line.
 - **CI is green or pending.** All required checks have run and are passing, or are still in progress. If any required check is failing, this is `maintainer-pr-review`.
 - **Target branch is the default branch.** `release/v*.*` and similar hotfix branches are always `maintainer-pr-review`.
 
@@ -65,7 +65,7 @@ Any of these triggers `maintainer-pr-review`. List them all in the comment, not 
 - **Scope drift.** The diff exceeds the plan in surface area or intent — adds files the plan didn't list, refactors adjacent code, changes public API beyond what was specified.
 - **Hard-rule sensitivity.** The diff modifies a protected area in a way that warrants human eyes: snapshot updates without justification in the PR body, generated code edits, `prevent_destroy` removal, anything that would change `specs/` substantively.
 - **Test gap.** Bug fix without regression test; new feature without coverage; round-trip / snapshot impact not addressed for `lolay/nowline`.
-- **Disclosure issue.** `Assisted-by:` absent or names the wrong agent; `## AI assistance` section missing or empty; `Closes #N` missing or wrong issue number.
+- **Disclosure issue.** `Assisted-by:` absent, names a model instead of the tool, or isn't the last paragraph of the body; `## AI assistance` section missing or empty; `Closes #N` missing or wrong issue number.
 - **CI red.** Required check failing in a way that suggests the diff itself is broken (not a flake — for flakes, leave a comment naming the flake and let CI re-run). If the failure is genuine, `maintainer-pr-review`.
 - **Hotfix branch target.** PR targets `release/v*.*` or another hotfix branch.
 - **Style mismatch.** Indentation, quote style, import grouping, or naming that diverges from the surrounding file. Auto-merge with a style miss erodes the bar.

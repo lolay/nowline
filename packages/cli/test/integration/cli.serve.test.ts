@@ -446,3 +446,132 @@ describeBuilt('--serve --non-working (requires `pnpm build`)', () => {
         expect(svg).not.toContain(LAYER);
     }, 15000);
 });
+
+// Under -q a failed rebuild prints only errors on stderr, while the browser
+// still gets the full report, warnings included (lolay/nowline#135).
+describeBuilt('--serve -q (requires `pnpm build`)', () => {
+    // `sizee:` is an unknown property (a warning); `item y` lacks size and
+    // duration (an error).
+    const MIXED = [
+        'nowline v1',
+        '',
+        'roadmap r "R"',
+        '',
+        'swimlane a "A"',
+        '  item x duration:1w sizee:l',
+        '  item y',
+        '',
+    ].join('\n');
+
+    async function withServe(
+        source: string,
+        extraArgs: string[],
+        check: (port: number, stderr: () => string) => Promise<void>,
+    ): Promise<void> {
+        const port = await pickPort();
+        const child: ChildProcess = spawn(
+            process.execPath,
+            [distEntry, '--serve', source, '--port', String(port), ...extraArgs],
+            {
+                cwd: packageRoot,
+                env: { ...process.env, FORCE_COLOR: '0', NO_COLOR: '1' },
+                stdio: ['ignore', 'pipe', 'pipe'],
+            },
+        );
+        let stderr = '';
+        child.stderr?.on('data', (d: Buffer) => {
+            stderr += d.toString('utf-8');
+        });
+        try {
+            await waitForReady(port);
+            await check(port, () => stderr);
+        } finally {
+            child.kill('SIGTERM');
+            await new Promise((r) => setTimeout(r, 150));
+            child.kill('SIGKILL');
+        }
+    }
+
+    // Warnings print before errors, so once the error line is in, any
+    // warning from the same rebuild has arrived too.
+    async function waitForStderr(stderr: () => string, needle: string): Promise<void> {
+        const start = Date.now();
+        while (!stderr().includes(needle) && Date.now() - start < 3000) {
+            await new Promise((r) => setTimeout(r, 50));
+        }
+    }
+
+    it('prints warnings and errors on stderr without -q', async () => {
+        await withTempDir(async (dir) => {
+            const source = path.join(dir, 'in.nowline');
+            await fs.writeFile(source, MIXED);
+            await withServe(source, [], async (_port, stderr) => {
+                const errorLine = `${source}:7:3 error:`;
+                await waitForStderr(stderr, errorLine);
+                expect(stderr()).toContain(errorLine);
+                expect(stderr()).toContain('warning:');
+                expect(stderr()).toContain('Unknown property');
+            });
+        });
+    }, 15000);
+
+    it('-q keeps validator warnings off stderr but sends them to the browser', async () => {
+        await withTempDir(async (dir) => {
+            const source = path.join(dir, 'in.nowline');
+            await fs.writeFile(source, MIXED);
+            await withServe(source, ['-q'], async (port, stderr) => {
+                const errorLine = `${source}:7:3 error:`;
+                await waitForStderr(stderr, errorLine);
+                expect(stderr()).toContain(errorLine);
+                expect(stderr()).not.toContain('warning:');
+                expect(stderr()).not.toContain('Unknown property');
+
+                const payload = await fetchPayloadEvent(`http://127.0.0.1:${port}/events`);
+                expect(payload.event).toBe('error');
+                expect(payload.data).toContain(errorLine);
+                expect(payload.data).toContain('Unknown property');
+            });
+        });
+    }, 15000);
+
+    it('-q keeps parent warnings off stderr on a wave-rule include error', async () => {
+        await withTempDir(async (dir) => {
+            const source = path.join(dir, 'parent.nowline');
+            await fs.writeFile(
+                source,
+                [
+                    'nowline v1',
+                    '',
+                    'include "./child.nowline"',
+                    '',
+                    'roadmap r "R"',
+                    'wave w1',
+                    'wave w2',
+                    'swimlane a "A"',
+                    '  item x duration:1w wave:w1 sizee:l',
+                    '',
+                ].join('\n'),
+            );
+            await fs.writeFile(
+                path.join(dir, 'child.nowline'),
+                'swimlane c "C"\n  item y duration:1w\n',
+            );
+            await withServe(source, ['-q'], async (port, stderr) => {
+                const expected = `${source}:3:1 error: ${tr('en-US', 'NL.E0202', {
+                    reason: 'child-none',
+                    path: './child.nowline',
+                    parent: ['w1', 'w2'],
+                })}`;
+                await waitForStderr(stderr, expected);
+                expect(stderr()).toContain(expected);
+                expect(stderr()).not.toContain('warning:');
+                expect(stderr()).not.toContain('Unknown property');
+
+                const payload = await fetchPayloadEvent(`http://127.0.0.1:${port}/events`);
+                expect(payload.event).toBe('error');
+                expect(payload.data).toContain(expected);
+                expect(payload.data).toContain('Unknown property');
+            });
+        });
+    }, 15000);
+});

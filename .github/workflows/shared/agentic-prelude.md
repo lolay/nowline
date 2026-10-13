@@ -52,13 +52,11 @@ Post the verdict marker as the **first non-blank line** of your comment, then a 
 When a phase opens a PR (`agent-deep` and `agent-exec` only, via `safe-outputs: assign-to-agent` delegating to a Copilot session), the resulting PR **MUST** include all four of the following. These are not aspirational — they are gates: PRs missing any of them will (a) fail to auto-close the issue, (b) fail downstream review, and (c) eventually be enforced by a CI check that rejects the PR.
 
 1. **`Closes #<issue number>`** on its own line in the PR body. This is what drives GitHub's auto-close-on-merge and the `agent-pr-merged.yml` linkage. Smoke test C (2026-05-25) proved that without this line, the issue stays open after merge and the state machine can't terminate cleanly.
-2. **`## AI assistance`** section in the PR body with an `Assisted-by:` line naming the agent's product name and version. Use the model carried into the Copilot session by the workflow that delegated to you:
-   - From `agent-deep` → `Assisted-by: Claude Opus 4.7`
-   - From `agent-exec` → `Assisted-by: Claude Sonnet 4.5`
-3. **`Assisted-by: <same string as above>`** as a trailer on **every commit** on the PR branch (standard Git footer, last line of the commit body).
+2. **`## AI assistance`** section in the PR body with the line `Assisted-by: GitHub Copilot`. Per `AI_POLICY.md` it names the tool, not the model, whichever model the delegating workflow chose. Keep this section last in the PR body, with the `Assisted-by:` line as its final paragraph: the squash commit on `main` is the PR description, and Git reads trailers only from the last paragraph.
+3. **`Assisted-by: GitHub Copilot`** as a trailer on **every commit** on the PR branch (standard Git footer, last line of the commit body). Never add a `Co-authored-by:` trailer for an agent.
 4. **The plan reproduced verbatim** in the PR description under a heading like `## Plan from issue` so reviewers don't need to dig back into the issue.
 
-`Assisted-by: None` is reserved for entirely hand-written PRs; never use it for an agent-opened PR. If you can't determine the model name (because the workflow that delegated to you didn't say so), default to `Claude Sonnet 4.5` and flag it in the PR description — but this should never happen because the delegating workflow's prompt body always names the model.
+`Assisted-by: None` is reserved for entirely hand-written PRs; never use it for an agent-opened PR.
 
 ## 5. Repo Hard rules override this prelude
 

@@ -8,7 +8,6 @@ import * as yaml from 'js-yaml';
  * file is sparse and any key may be absent.
  */
 export interface NowlineRc {
-    quiet?: boolean;
     format?: string;
     theme?: string;
     defaultFormat?: string;

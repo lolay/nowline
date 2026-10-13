@@ -370,7 +370,9 @@ The logging flags are mutually exclusive.
 Print extra diagnostics to standard error (config path, pipeline
 timings, font resolution, fallback decisions).
 .It Fl q , -quiet
-Suppress non-error standard error.
+Suppress non-error standard error: warnings, notices, and the warnings
+in a failed run's diagnostic report.
+Errors and JSON diagnostics still print, and the exit code is unchanged.
 .El
 .Sh STANDARD OPTIONS
 .Bl -tag -width Fl
@@ -457,6 +459,13 @@ and
 .Sy locale .
 An invalid value is a usage error that names the key.
 Unknown keys are ignored.
+There is no logging key:
+.Sy quiet
+is ignored, and
+.Fl q
+and
+.Fl v
+apply only on the command line.
 .El
 .Sh EXIT STATUS
 .Bl -tag -width Ds

@@ -128,10 +128,10 @@ const CALENDAR_SURFACED = ['date', 'every', 'start', 'end'];
 /**
  * Why a calendar declaration's title is never drawn, or undefined when it is
  * drawn, there is no title, or the shape is malformed (NW1, §4.1: only the
- * first of each key counts, so presence is all the shape needs). Only dated,
- * titled `non-working` declarations are labelled (specs/working-calendar.md
- * §7.4 "Which rules are labelled"); the open-ended week is the baseline and
- * gets no note.
+ * first of each key counts, so presence is all the shape needs). Dated,
+ * titled declarations are labelled, `non-working` or `working`; a titled
+ * bounded recurrence is not (specs/working-calendar.md §7.4 "Which rules are
+ * labelled"). The open-ended week is the baseline and gets no note.
  */
 function undrawnTitleNote(entity: NamedEntity): string | undefined {
     if (!isNonWorkingDeclaration(entity) && !isWorkingDeclaration(entity)) return undefined;
@@ -142,11 +142,6 @@ function undrawnTitleNote(entity: NamedEntity): string | undefined {
     const isRange = !has('date') && !has('every') && has('start') && has('end');
     const isRecurrence = !has('date') && has('every');
     if (!isDated && !isRange && !isRecurrence) return undefined;
-    // §7.4 leaves every titled `working` declaration unlabelled. Drop this
-    // case when the chart starts labelling them.
-    if (isWorkingDeclaration(entity)) {
-        return 'Title not drawn on the chart: working days are not labelled.';
-    }
     if (isRecurrence && (has('start') || has('end'))) {
         return 'Title not drawn on the chart: bounded recurrences are not labelled.';
     }

@@ -8,13 +8,15 @@
 //    holidays, closures, recurring windows and working exceptions) decides
 //    which UTC dates consume no work. `workingIndexOf` and
 //    `dateAtWorkingIndex` map between dates and a working-day index;
-//    `nonWorkingRuns` lists the maximal non-working stretches to draw.
+//    `nonWorkingRuns` lists the maximal non-working stretches to draw, and
+//    `workingExceptionRuns` the days titled `working` rules put back.
 //
 // Precedence is resolved once, at construction, into a sorted list of
 // disjoint pieces covering every day: a weekly mask (the open-ended week or
 // a bounded recurrence pattern) or an all-working / all-non-working dated
 // stretch. Queries cost O(pieces in the span) with whole-week arithmetic
-// inside a piece; nothing walks day by day.
+// inside a piece; nothing walks day by day except the one-off pass over the
+// finite days of titled dated `working` rules.
 //
 // Identity guarantee: a calendar with no non-working day (`calendar:full`,
 // `calendar:custom`, `continuousCalendar()`, or rules that cancel out)
@@ -57,6 +59,20 @@ export interface NonWorkingRun {
     titles: string[];
 }
 
+/**
+ * A maximal run of consecutive days that titled dated `working` rules turn
+ * from non-working to working (specs/working-calendar.md §7.4): days a
+ * dated closure, a bounded recurrence or the open-ended week would close.
+ */
+export interface WorkingExceptionRun {
+    /** First day of the run (UTC midnight). */
+    from: Date;
+    /** Last day of the run (UTC midnight), inclusive. */
+    through: Date;
+    /** Titles of the titled dated working rules that turn a day of it, never empty. */
+    titles: string[];
+}
+
 export interface WorkingCalendar {
     /** Days per `1<unit>` literal (e.g. `1w` → 5 for business). */
     daysPerUnit(unit: ScaleUnit): number;
@@ -79,6 +95,8 @@ export interface WorkingCalendar {
     dateAtWorkingIndex(base: Date, index: number): Date;
     /** Maximal non-working runs intersecting [from, to), extended past both ends. */
     nonWorkingRuns(from: Date, to: Date): NonWorkingRun[];
+    /** Working-exception runs intersecting [from, to), with their real dates. */
+    workingExceptionRuns(from: Date, to: Date): WorkingExceptionRun[];
     /**
      * First working weekday after the longest recurring non-working run of the
      * open-ended week (Sat–Sun → Monday); undefined without one.
@@ -335,10 +353,11 @@ function buildCalendar(unitDays: UnitDays, input: ReadonlyArray<CalendarRule>): 
     const rules = normalized.map((rule) => rule.copy);
 
     const openMask = openWeekMask(normalized);
-    const pieces = overlay(
-        recurringSegments(openMask, boundedSpans(normalized)),
-        datedSegments(normalized),
-    );
+    const segments = recurringSegments(openMask, boundedSpans(normalized));
+    const pieces = overlay(segments, datedSegments(normalized));
+    const exceptionRuns = titledWorkingRuns(normalized, segments);
+    const workingExceptionRuns = (from: Date, to: Date): WorkingExceptionRun[] =>
+        runsIntersecting(exceptionRuns, from, to);
     const first = pieces[0];
     const last = pieces[pieces.length - 1];
     for (const piece of [first, last]) {
@@ -352,9 +371,11 @@ function buildCalendar(unitDays: UnitDays, input: ReadonlyArray<CalendarRule>): 
             (piece.kind === 'mask' && piece.workingPerWeek < DAYS_PER_WEEK),
     );
     const workingWeekdays = weekdaysOutside(openMask);
-    if (!hasNonWorkingDays) return identityCalendar(unitDays, rules, workingWeekdays);
+    if (!hasNonWorkingDays) {
+        return identityCalendar(unitDays, rules, workingWeekdays, workingExceptionRuns);
+    }
 
-    const index = new WorkingDayIndex(pieces, titledRules(normalized));
+    const index = new WorkingDayIndex(pieces, titledRules(normalized, false));
     const dateAtWorkingIndex = (base: Date, workingIndex: number): Date =>
         index.dateAt(base, workingIndex);
     return {
@@ -368,6 +389,7 @@ function buildCalendar(unitDays: UnitDays, input: ReadonlyArray<CalendarRule>): 
         workingIndexOf: (base, date) => index.indexOf(base, date),
         dateAtWorkingIndex,
         nonWorkingRuns: (from, to) => index.runs(from, to),
+        workingExceptionRuns,
     };
 }
 
@@ -375,6 +397,7 @@ function identityCalendar(
     unitDays: UnitDays,
     rules: ReadonlyArray<CalendarRule>,
     workingWeekdays: ReadonlySet<number>,
+    workingExceptionRuns: WorkingCalendar['workingExceptionRuns'],
 ): WorkingCalendar {
     return {
         rules,
@@ -387,6 +410,7 @@ function identityCalendar(
         workingIndexOf: (base, date) => daysBetween(base, date),
         dateAtWorkingIndex: (base, index) => addDays(base, index),
         nonWorkingRuns: () => [],
+        workingExceptionRuns,
     };
 }
 
@@ -582,18 +606,86 @@ function maskPiece(start: number, end: number, mask: number): Piece {
     return { start, end, kind: 'mask', off, workingPerWeek };
 }
 
-/** Titled dated non-working rules, by first date then input order. */
-function titledRules(rules: ReadonlyArray<NormalizedRule>): TitledRule[] {
+/** Titled dated rules of one state, by first date then input order. */
+function titledRules(rules: ReadonlyArray<NormalizedRule>, working: boolean): TitledRule[] {
     const titled: Array<TitledRule & { first: number; order: number }> = [];
     for (const [order, rule] of rules.entries()) {
         const title = rule.copy.title;
-        if (rule.mask !== undefined || rule.working || title === undefined) continue;
+        if (rule.mask !== undefined || rule.working !== working || title === undefined) continue;
         if (rule.spans.length === 0) continue;
         const first = rule.spans.reduce((min, span) => Math.min(min, span.start), Infinity);
         titled.push({ title, spans: rule.spans, first, order });
     }
     titled.sort((a, b) => a.first - b.first || a.order - b.order);
     return titled.map(({ title, spans }) => ({ title, spans }));
+}
+
+/**
+ * The runs of days a titled dated `working` rule turns from non-working to
+ * working, under the precedence of specs/working-calendar.md §4.1. A dated
+ * working rule wins every day it covers, so it turns a day exactly when the
+ * calendar without the dated working rules (the weekly segments under the
+ * dated closures) closes it. That catches a weekday make-up day inside a
+ * dated closure, which `calendarExceptions` cannot see because the open
+ * week works it. Dated rules are finite, so this walks their days once.
+ */
+function titledWorkingRuns(
+    rules: ReadonlyArray<NormalizedRule>,
+    segments: ReadonlyArray<MaskSegment>,
+): WorkingExceptionRun[] {
+    const titled = titledRules(rules, true);
+    if (titled.length === 0) return [];
+    const closures = rules.filter((rule) => !rule.working);
+    const baseline = overlay(segments, datedSegments(closures));
+
+    // Each turned day, with the indices (into `titled`) of the rules that turn it.
+    const turned = new Map<number, Set<number>>();
+    titled.forEach((rule, i) => {
+        for (const span of rule.spans) {
+            for (let day = span.start; day < span.end; day++) {
+                if (!isNonWorkingIn(baseline, day)) continue;
+                const owners = turned.get(day) ?? new Set<number>();
+                owners.add(i);
+                turned.set(day, owners);
+            }
+        }
+    });
+
+    const days = [...turned.keys()].sort((a, b) => a - b);
+    const out: WorkingExceptionRun[] = [];
+    for (let i = 0; i < days.length; ) {
+        let j = i;
+        const owners = new Set<number>();
+        while (j < days.length && days[j] - days[i] === j - i) {
+            for (const owner of turned.get(days[j]) ?? []) owners.add(owner);
+            j++;
+        }
+        out.push({
+            from: dateOfDay(days[i]),
+            through: dateOfDay(days[j - 1]),
+            titles: [...owners].sort((a, b) => a - b).map((owner) => titled[owner].title),
+        });
+        i = j;
+    }
+    return out;
+}
+
+/** Copies of the runs with a day in [from, to). */
+function runsIntersecting(
+    runs: ReadonlyArray<WorkingExceptionRun>,
+    fromDate: Date,
+    toDate: Date,
+): WorkingExceptionRun[] {
+    const from = dayNumber(fromDate);
+    const to = dayNumber(toDate);
+    if (Number.isNaN(from) || Number.isNaN(to)) return [];
+    return runs
+        .filter((run) => dayNumber(run.from) < to && dayNumber(run.through) >= from)
+        .map((run) => ({
+            from: new Date(run.from.getTime()),
+            through: new Date(run.through.getTime()),
+            titles: [...run.titles],
+        }));
 }
 
 /** First working weekday after the longest cyclic non-working run; ties go Sunday-first. */
@@ -631,6 +723,24 @@ function weekdayOf(day: number): number {
 
 function remainderScanError(): Error {
     return new Error('working calendar: remainder scan exceeded its cap (internal error)');
+}
+
+/** The index of the piece holding `day`. */
+function pieceIndexAt(pieces: ReadonlyArray<Piece>, day: number): number {
+    let low = 0;
+    let high = pieces.length - 1;
+    while (low < high) {
+        const middle = (low + high) >> 1;
+        if (day >= pieces[middle].end) low = middle + 1;
+        else high = middle;
+    }
+    return low;
+}
+
+function isNonWorkingIn(pieces: ReadonlyArray<Piece>, day: number): boolean {
+    const piece = pieces[pieceIndexAt(pieces, day)];
+    if (piece.kind === 'mask') return piece.off[weekdayOf(day)];
+    return piece.kind === 'non-working';
 }
 
 /** Working days in [from, to), both finite and inside `piece`. */
@@ -721,20 +831,11 @@ class WorkingDayIndex {
     }
 
     private pieceAt(day: number): number {
-        let low = 0;
-        let high = this.pieces.length - 1;
-        while (low < high) {
-            const middle = (low + high) >> 1;
-            if (day >= this.pieces[middle].end) low = middle + 1;
-            else high = middle;
-        }
-        return low;
+        return pieceIndexAt(this.pieces, day);
     }
 
     private isNonWorking(day: number): boolean {
-        const piece = this.pieces[this.pieceAt(day)];
-        if (piece.kind === 'mask') return piece.off[weekdayOf(day)];
-        return piece.kind === 'non-working';
+        return isNonWorkingIn(this.pieces, day);
     }
 
     /** Working days in [from, to), from <= to. */

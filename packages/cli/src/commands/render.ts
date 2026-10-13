@@ -12,7 +12,13 @@ import {
     type HostEnv,
     type RenderInputs,
 } from '@nowline/export';
-import { lengthToPoints, parseLength } from '@nowline/export-core';
+import {
+    lengthToPoints,
+    PageSizeParseError,
+    type PdfPageSize,
+    parseLength,
+    parsePageSize,
+} from '@nowline/export-core';
 import {
     type NonWorkingDisplay,
     type NormalizedZone,
@@ -51,6 +57,7 @@ import {
 } from '../i18n/locale.js';
 import { loadConfig, type NowlineRc } from '../io/config.js';
 import { CliError, ExitCode } from '../io/exit-codes.js';
+import { createLog, type Log } from '../io/log.js';
 import { readInput } from '../io/read.js';
 import { writeOutput } from '../io/write.js';
 
@@ -77,6 +84,7 @@ export async function renderHandler(options: RenderHandlerOptions): Promise<void
     }
 
     const isStdoutOutput = args.output === '-';
+    const log = createLog(args.logLevel);
     const config = await loadConfigFor(args.positional, cwd);
 
     const format = resolveFormatOrThrow({
@@ -86,9 +94,7 @@ export async function renderHandler(options: RenderHandlerOptions): Promise<void
         isStdout: isStdoutOutput,
     });
 
-    if (args.logLevel === 'verbose') {
-        process.stderr.write(`nowline: format=${format} (resolved)\n`);
-    }
+    log.verbose(`nowline: format=${format} (resolved)`);
 
     const resolvedOutput = resolveRenderOutputPath({
         outputArg: args.output,
@@ -126,9 +132,9 @@ export async function renderHandler(options: RenderHandlerOptions): Promise<void
         noLinks: args.noLinks,
         strict: args.strict,
         assetRoot: args.assetRoot,
-        // m2c format-specific options. Strings get parsed inside the format
-        // dispatch; the CLI just passes them through.
-        pageSize: args.pageSize ?? stringFromConfig(config, 'pdfPageSize'),
+        // m2c format-specific options. The PDF settings parse in `produce`,
+        // after validation, for every format.
+        pageSize: pickSetting(args.pageSize, '--page-size', config, 'pdfPageSize'),
         orientation: pickSetting(args.orientation, '--orientation', config, 'pdfOrientation'),
         margin: pickSetting(args.margin, '--margin', config, 'pdfMargin'),
         fontSans: args.fontSans ?? stringFromConfig(config, 'fontSans'),
@@ -140,14 +146,12 @@ export async function renderHandler(options: RenderHandlerOptions): Promise<void
         locale,
         operatorLocale: opLocale,
         resolvedLocale: resolved,
-        verbose: args.logLevel === 'verbose',
+        log,
         diagnosticFormat: resolveDiagnosticFormat(args),
     });
 
     if (args.dryRun) {
-        if (args.logLevel === 'verbose') {
-            process.stderr.write('nowline: --dry-run; skipping write\n');
-        }
+        log.verbose('nowline: --dry-run; skipping write');
         return;
     }
 
@@ -158,8 +162,8 @@ export async function renderHandler(options: RenderHandlerOptions): Promise<void
         { cwd },
     );
 
-    if (args.logLevel === 'verbose' && !resolvedOutput.isStdout) {
-        process.stderr.write(`nowline: wrote ${resolvedOutput.path}\n`);
+    if (!resolvedOutput.isStdout) {
+        log.verbose(`nowline: wrote ${resolvedOutput.path}`);
     }
 }
 
@@ -216,8 +220,8 @@ interface ProduceArgs {
     strict: boolean;
     assetRoot?: string;
     // m2c format-specific
-    pageSize?: string;
     /** Parsed after validation, so its error follows any diagnostics. */
+    pageSize?: Setting;
     orientation?: Setting;
     margin?: Setting;
     fontSans?: string;
@@ -233,8 +237,8 @@ interface ProduceArgs {
     operatorLocale: string;
     /** Resolved locale override metadata, used for the verbose-mode source line. */
     resolvedLocale: import('../i18n/locale.js').ResolvedLocale;
-    /** True for `--verbose`. Gates the `nowline: locale=...` source-line emission. */
-    verbose: boolean;
+    /** `-v` / `-q` gate: verbose lines, warnings, and text-mode warning diagnostics. */
+    log: Log;
     /** How diagnostics are written to stderr. See `resolveDiagnosticFormat`. */
     diagnosticFormat: DiagnosticFormat;
 }
@@ -288,11 +292,12 @@ async function produce(args: ProduceArgs): Promise<ProduceResult> {
         nonWorking: args.nonWorking,
         noLinks: args.noLinks,
         strict: args.strict,
-        pageSize: args.pageSize,
+        pageSize: parsePageSizeSetting(args.pageSize),
         orientation: parseOrientation(args.orientation),
         marginPt: parseMargin(args.margin),
         pngScale: parseScale(args.scale),
         msprojStart: args.start,
+        onNotice: (message) => args.log.notice(message),
     };
 
     try {
@@ -399,20 +404,20 @@ async function resolveNodeFonts(
         if (args.strict) {
             throw new CliError(ExitCode.InputError, `nowline: ${message}`);
         }
-        process.stderr.write(`warning: ${message}\n`);
+        args.log.notice(`warning: ${message}`);
     }
 
     // Bundled fallback after an opted-in probe found no usable system font.
     // Only meaningful when --use-system-fonts is set; warn under --strict.
     if (args.strict) {
         if (result.sansFellBackToBundled) {
-            process.stderr.write(
-                'warning: sans font fell back to bundled DejaVu (no platform font found)\n',
+            args.log.notice(
+                'warning: sans font fell back to bundled DejaVu (no platform font found)',
             );
         }
         if (result.monoFellBackToBundled) {
-            process.stderr.write(
-                'warning: mono font fell back to bundled DejaVu (no platform font found)\n',
+            args.log.notice(
+                'warning: mono font fell back to bundled DejaVu (no platform font found)',
             );
         }
     }
@@ -469,16 +474,14 @@ async function parseAndValidate(
     // whenever any diagnostic exists, warnings included, so a warnings-only
     // run still exits 0 with the document on stderr.
     if (failed || (args.diagnosticFormat === 'json' && diagnostics.length > 0)) {
-        emitDiagnostics(diagnostics, sources, args.operatorLocale, args.diagnosticFormat);
+        emitDiagnostics(diagnostics, sources, args.operatorLocale, args.diagnosticFormat, args.log);
     }
     if (failed) {
         throw new CliError(ExitCode.ValidationError, '');
     }
-    if (args.verbose) {
-        const directive = readDirectiveLocale(result.ast);
-        const { tag, source } = describeContentLocaleSource(directive, args.resolvedLocale);
-        process.stderr.write(`nowline: locale=${tag} (${source})\n`);
-    }
+    const directive = readDirectiveLocale(result.ast);
+    const { tag, source } = describeContentLocaleSource(directive, args.resolvedLocale);
+    args.log.verbose(`nowline: locale=${tag} (${source})`);
     return result;
 }
 
@@ -611,6 +614,23 @@ function parseOrientation(
     );
 }
 
+function parsePageSizeSetting(setting: Setting | undefined): PdfPageSize | undefined {
+    if (!setting || setting.raw === '') return undefined;
+    const raw = String(setting.raw);
+    try {
+        return parsePageSize(raw);
+    } catch (err) {
+        if (!(err instanceof PageSizeParseError)) throw err;
+        // The parser's message names a generic "page size"; swap that lead
+        // for the flag or rc key the value came from.
+        const detail = err.message.replace(/^invalid page size "[^"]*": /, '');
+        throw new CliError(
+            ExitCode.InputError,
+            `nowline: invalid ${setting.name} "${raw}": ${detail}`,
+        );
+    }
+}
+
 function parseMargin(setting: Setting | undefined): number | undefined {
     if (!setting || setting.raw === '') return undefined;
     // A bare number is points; YAML and JSON hand the rc one over as a number.
@@ -674,12 +694,23 @@ function emitDiagnostics(
     sources: Map<string, DiagnosticSource>,
     operatorLocale: string,
     format: DiagnosticFormat,
+    log: Log,
 ): void {
-    const rendered = formatDiagnostics(diagnostics, format, sources, {
+    // JSON is machine output and always prints whole; text drops warnings under -q.
+    const shown = format === 'text' ? errorsOnlyWhenQuiet(diagnostics, log) : diagnostics;
+    const rendered = formatDiagnostics(shown, format, sources, {
         color: process.stderr.isTTY === true,
         operatorLocale,
     });
     if (rendered) process.stderr.write(`${rendered}\n`);
+}
+
+/** Under `-q`, text-mode diagnostics keep only errors. Shared with serve. */
+export function errorsOnlyWhenQuiet<T extends { severity: string }>(
+    diagnostics: T[],
+    log: Log,
+): T[] {
+    return log.quiet ? diagnostics.filter((d) => d.severity === 'error') : diagnostics;
 }
 
 // ---- Asset resolver (still used by serve.ts) --------------------------------

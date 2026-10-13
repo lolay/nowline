@@ -122,8 +122,12 @@ export interface RenderInputs {
     strict?: boolean;
 
     // ---- format-specific options ----------------------------------------
-    /** PDF page size — a preset name or a custom dimensions string. */
-    pageSize?: string;
+    /**
+     * PDF page size: a preset name, a custom dimensions string, or a value
+     * already parsed with `parsePageSize` (so a caller can reject a bad one
+     * before rendering).
+     */
+    pageSize?: import('@nowline/export-core').PdfPageSize | string;
     /** PDF orientation. */
     orientation?: import('@nowline/export-core').PdfOrientation;
     /** PDF margin in points. */
@@ -140,6 +144,12 @@ export interface RenderInputs {
      * none). Errors throw `IncludeResolveError` instead. Never affects output.
      */
     onResolveDiagnostics?: (diagnostics: ResolveDiagnostic[]) => void;
+    /**
+     * Receives non-fatal notices about the artifact, such as the MS Project
+     * lossy-feature summary. Never affects output. Omit to keep each
+     * exporter's default (stderr), as before.
+     */
+    onNotice?: (message: string) => void;
 }
 
 // ---- Langium services singleton -----------------------------------------------
@@ -395,6 +405,7 @@ export async function exportDocument(
         const mod = await import('@nowline/export-msproj');
         const xml = mod.exportMsProjXml(stage.exportInputs, {
             startDate: inputs.msprojStart,
+            onLossy: inputs.onNotice,
         });
         return toUtf8(xml);
     }

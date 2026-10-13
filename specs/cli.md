@@ -109,7 +109,9 @@ Format-specific options
   --page-size <size>     PDF page size: preset (letter | legal | tabloid |
                          ledger | a1..a5 | b3..b5), `content` for auto-fit,
                          or `WxHunit` for custom (e.g. 8.5x11in, 210x297mm).
-                         Default: letter.
+                         Default: letter. Like --orientation and --margin, an
+                         invalid value is a usage error (exit 2) for every
+                         output format, not only PDF.
   --orientation <name>   PDF orientation: portrait | landscape | auto.
                          Default: auto.
   --margin <length>      PDF page margin. Bare numbers are points;
@@ -139,6 +141,8 @@ Standard
 `nowline` with **zero arguments** prints help and exits 0 (matches git, kubectl, gh, cargo, docker). `nowline -f pdf` (has flags, no input) exits 2 with a "missing input file" error.
 
 `-V` (uppercase) is `--version`; lowercase `-v` is `--verbose`. Matches curl / ssh / wget / gpg convention.
+
+`-q` drops every stderr line that is not an error: `warning:` lines (font substitution, renderer asset warnings under `--serve`), the MS Project lossy-feature summary, the `--mcp --port` listening banner, and warning-severity diagnostics from the text report of a failing run. It never changes the exit code. Errors still print, and so does machine output: the `--diagnostic-format json` document (including `--dry-run --format=json`) prints whole, warnings included, because a script asked for it. `--serve` still prints its URL to stdout. `-q` and `-v` are command-line only; `.nowlinerc` has no logging key (a `quiet` key is ignored like any unknown key), so a project file cannot silence warnings for everyone who runs it.
 
 ## Examples
 
@@ -389,7 +393,7 @@ Each recognized key is the default for one flag, resolved flag > `.nowlinerc` > 
 | `theme` | `-t, --theme` | Same names and `greyscale` alias as the flag. Also read by `--serve`. |
 | `defaultFormat` | `-f, --format` | Step 3 of the format-resolution chain: used when neither `-f` nor a recognized `-o` extension is present. |
 | `width` | `-w, --width` | Integer ≥ 320. Best-effort maximum canvas width, passed to `LayoutOptions.width` (see [`rendering.md` § Canvas width](./rendering.md#canvas-width)). |
-| `pdfPageSize` | `--page-size` | |
+| `pdfPageSize` | `--page-size` | Validated for every output format, like `pdfOrientation` and `pdfMargin`. |
 | `pdfOrientation` | `--orientation` | |
 | `pdfMargin` | `--margin` | A bare number (YAML/JSON number or string) is points. |
 | `fontSans` / `fontMono` | `--font-sans` / `--font-mono` | |
