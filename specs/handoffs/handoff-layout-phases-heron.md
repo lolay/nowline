@@ -3,7 +3,7 @@
 - **Plan:** `specs/handoffs/plan-layout-phases-heron.md`
 - **Branch:** `claude/vibrant-hopper-ac4s73` (harness-assigned task branch; started at ff8eb8b, fast-forwarded to `origin/main` 4498948 at kickoff, no commits of its own before this one)
 - **Mode:** unattended (confirmed 2026-10-13, session 7e027fcc-1ca6-51b0-b005-63e1163df819; harness=claude-code runner=cloud)
-- **Status:** kicked off, mode confirmed. Halted for Gary's `/compact`; no wave has run.
+- **Status:** resumed by Kickoff prompt after Gary's `/compact` (same session, mode re-confirmed). Dispatching wave 1.
 
 ## What's done
 
@@ -30,15 +30,15 @@ None yet.
 
 ## Next unit
 
-Wave 1 [exec] nowline m1 s1-s2, once Gary pastes the Kickoff prompt.
+Wave 1 [exec] nowline m1 s1-s2 (launching).
 
 ## How to resume
 
-Paste the plan's Kickoff prompt. Per Gary's instruction, after the kickoff answer is recorded and pushed this session stops so he can run `/compact`; he resumes by pasting the Kickoff prompt. No wave is dispatched before that.
+Paste the plan's Kickoff prompt.
 
 ## Pending question (verbatim)
 
-None. Kickoff answered: "Unattended".
+None. Kickoff answered: "Unattended"; re-confirmed by the pasted Kickoff prompt.
 
 ## Decisions so far
 
