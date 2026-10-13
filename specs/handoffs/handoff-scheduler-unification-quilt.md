@@ -16,7 +16,23 @@ Gary runs `/compact` after the kickoff answer is recorded and pushed, then paste
 
 ## Pending question (verbatim)
 
-Plan plan-scheduler-unification-quilt: 2 waves (4 dispatch units), expected ~$16 API-equiv (Cost table in the plan). Reply unattended or gated.
+```
+Plan plan-scheduler-unification-quilt: 2 waves in 4 dispatch units, expected ~$16 API-equiv (Cost table in the plan; ~$6.2 already spent on kickoff and planning).
+  Wave 1 [deep] m1 s1-s3 (register, C gains B's scope, window from schedule).
+  Wave 2 [exec] m1 s4-s5 (start terms, F1), then m2 s1-s3, then m3 s1-s3.
+Gates it crosses: 4 before the m2 unit and before the m3 unit. No canary (one group per unit), no gate 2/3/7.
+Runner detected (CLAUDE_CODE_REMOTE=true). Proposed mode: unattended.
+  unattended: gate 4 is logged, not asked. A failed commit check or a CONCERNS gets an automatic
+    fix-up, up to 2 per group. I stop to ask for information, at a plan error, a scope breach, a
+    worker's disclosed breach, a failure after one retry, a group's third failed check or review,
+    a merge from main that conflicts, F1 moving any sample beyond showcase/sizing/late-row-shifts,
+    unplanned [xdeep] or Fable work, or projected spend past 3x expected or $50, whichever is higher ($50).
+  gated: every gate stops, and so does every failed check or repeat CONCERNS.
+Either way, after every unit I commit and push the plan and its handoff
+(specs/handoffs/handoff-scheduler-unification-quilt.md). Opening the PR waits for you.
+Per your instructions I stop after recording this answer so you can /compact, then resume from the Kickoff prompt.
+Reply unattended or gated.
+```
 
 ## Milestone notes (gate 4)
 
