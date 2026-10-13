@@ -130,6 +130,12 @@ importers:
 
   packages/config:
     dependencies:
+      '@nowline/export-core':
+        specifier: workspace:*
+        version: link:../export-core
+      '@nowline/layout':
+        specifier: workspace:*
+        version: link:../layout
       js-yaml:
         specifier: ^5.4.2
         version: 5.4.2

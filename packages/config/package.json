@@ -27,6 +27,8 @@
         "test:watch": "vitest"
     },
     "dependencies": {
+        "@nowline/export-core": "workspace:*",
+        "@nowline/layout": "workspace:*",
         "js-yaml": "^5.4.2"
     },
     "devDependencies": {
