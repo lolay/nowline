@@ -317,14 +317,19 @@ export function buildHeaderTicks(
  *
  * Thinning counts the kept columns. Under the default days thinning the
  * majors are the week starts instead (the first tick only when it is
- * one). The closing tick never has a label; its `major` flag follows the
- * same rule, as on the fixed-stride path.
+ * one); under `hide` that is the first working day of each week, so a
+ * hidden Monday moves its week's label to Tuesday. The closing tick never
+ * has a label; its `major` flag follows the same rule, as on the
+ * fixed-stride path.
  *
  * At days and weeks a label is dropped only when it is wider than its
  * column and the column is narrower than a full unit (a partial week at
  * either edge); a full business week keeps a label wider than its 40 px.
  * Months and up keep the #92 rule: an edge column drops a label it cannot
- * hold. A dropped label keeps its `labelX`.
+ * hold. A dropped label keeps its `labelX`. Inside a run of two or more
+ * narrowed columns, a dropped label is restored when it fits its column
+ * plus half of each neighbour whose label is absent; see
+ * `restoreLabelsInNarrowRuns`.
  *
  * Under `show` the same boundaries apply on the calendar-day scale, so no
  * column has zero width: week ticks still fall on week starts, a full unit
@@ -362,7 +367,7 @@ function buildHiddenDayTicks(
         unit === 'days' && preset.labelEveryDefault === true && calendar.weekStart !== undefined;
     const isMajor = (date: Date, column: number): boolean =>
         weekStartMajors
-            ? date.getUTCDay() === calendar.weekStart
+            ? isFirstVisibleDayOfWeek(date, calendar, scale.showsNonWorking)
             : column % preset.labelEvery === 0;
     // A full unit is its working days under `hide` and its calendar days
     // under `show`, where every day has width.
@@ -371,19 +376,26 @@ function buildHiddenDayTicks(
         : calendar.daysPerUnit(unit);
     const fullUnitPx = fullUnitDays * scale.pixelsPerDay;
 
-    const ticks: PositionedTick[] = kept.map(({ date, x }, column) => {
+    const columns: TickColumn[] = kept.map(({ date, x }, column) => {
         const columnPx = (column + 1 < kept.length ? kept[column + 1].x : endX) - x;
         const major = isMajor(date, column);
-        let label = major ? formatTickLabel(unit, date, column, locale) : undefined;
-        if (label !== undefined) {
-            const tooWide = estimateTextWidth(label, TIMELINE_TICK_LABEL_FONT_SIZE_PX) > columnPx;
-            const isNarrowed = isCalendarAligned(unit)
-                ? column === 0 || column === kept.length - 1
-                : columnPx < fullUnitPx - NARROW_COLUMN_TOLERANCE_PX;
-            if (tooWide && isNarrowed) label = undefined;
-        }
-        return { x, labelX: x + columnPx / 2, major, label };
+        const label = major ? formatTickLabel(unit, date, column, locale) : undefined;
+        const labelPx =
+            label === undefined ? 0 : estimateTextWidth(label, TIMELINE_TICK_LABEL_FONT_SIZE_PX);
+        const isNarrowed = isCalendarAligned(unit)
+            ? column === 0 || column === kept.length - 1
+            : columnPx < fullUnitPx - NARROW_COLUMN_TOLERANCE_PX;
+        const isShown = label !== undefined && !(labelPx > columnPx && isNarrowed);
+        return { x, columnPx, major, label, labelPx, isNarrowed, isShown };
     });
+    if (!isCalendarAligned(unit)) restoreLabelsInNarrowRuns(columns);
+
+    const ticks: PositionedTick[] = columns.map((c) => ({
+        x: c.x,
+        labelX: c.x + c.columnPx / 2,
+        major: c.major,
+        label: c.isShown ? c.label : undefined,
+    }));
     if (end > start) {
         ticks.push({
             x: endX,
@@ -393,6 +405,74 @@ function buildHiddenDayTicks(
         });
     }
     return ticks;
+}
+
+interface TickColumn {
+    x: number;
+    columnPx: number;
+    major: boolean;
+    label: string | undefined;
+    labelPx: number;
+    isNarrowed: boolean;
+    /** False when thinned or dropped by the narrow-column rule. */
+    isShown: boolean;
+}
+
+/**
+ * Days and weeks: inside a run of two or more consecutive narrowed
+ * columns (specs/working-calendar.md §7.2), a label the narrow-column rule
+ * dropped comes back when, centred on its column, it fits the column plus
+ * half of each neighbouring column whose label is absent (thinned or
+ * dropped). A neighbour with a label, or the chart edge, lends nothing.
+ *
+ * A bounded recurrence (Summer Fridays) narrows every week in its window,
+ * so dropping each label blanks the axis for the whole stretch. Read left
+ * to right, the run's labels alternate instead: the first one after a
+ * labelled full week stays dropped, the next borrows from it, and so on.
+ * A label that needs to borrow cannot sit next to a restored one, so the
+ * greedy pass never has to revisit a decision.
+ *
+ * A lone narrowed column (one holiday week) is not a run and keeps the
+ * plain rule. So does a run of two at `label-every` 1: each of its columns
+ * has a labelled full week on one side.
+ */
+function restoreLabelsInNarrowRuns(columns: TickColumn[]): void {
+    const roomBeside = (j: number): number => {
+        const neighbour = columns[j];
+        if (neighbour === undefined || neighbour.isShown) return 0;
+        return neighbour.columnPx / 2;
+    };
+    columns.forEach((c, i) => {
+        if (c.label === undefined || c.isShown || !c.isNarrowed) return;
+        const isInRun = columns[i - 1]?.isNarrowed === true || columns[i + 1]?.isNarrowed === true;
+        if (!isInRun) return;
+        const halfLabel = c.labelPx / 2;
+        const halfColumn = c.columnPx / 2;
+        c.isShown =
+            halfLabel <= halfColumn + roomBeside(i - 1) &&
+            halfLabel <= halfColumn + roomBeside(i + 1);
+    });
+}
+
+/**
+ * The days scale's default majors: a week start (the recurring weekend's
+ * next day). Under `hide` a hidden week start has no column, so the week's
+ * first working day takes its label instead: a Monday holiday, or a
+ * recurrence that takes Mondays out for a stretch, would otherwise leave
+ * those weeks unlabelled.
+ */
+function isFirstVisibleDayOfWeek(
+    date: Date,
+    calendar: WorkingCalendar,
+    showsNonWorking: boolean,
+): boolean {
+    const weekStart = calendar.weekStart as number;
+    if (showsNonWorking) return date.getUTCDay() === weekStart;
+    const sinceWeekStart = (date.getUTCDay() - weekStart + DAYS_PER_WEEK) % DAYS_PER_WEEK;
+    for (let back = 1; back <= sinceWeekStart; back++) {
+        if (calendar.isWorkingDay(addDays(date, -back))) return false;
+    }
+    return true;
 }
 
 /**
