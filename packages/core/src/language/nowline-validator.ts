@@ -2318,7 +2318,8 @@ function isCalendarDeclaration(node: unknown): node is CalendarDeclaration {
 }
 
 /** The four own keys of a declaration, first occurrence of each. */
-function calendarOwnProps(decl: CalendarDeclaration): Map<string, EntityProperty> {
+/** @internal Exported for the m2.s3 equivalence test only. */
+export function calendarOwnProps(decl: CalendarDeclaration): Map<string, EntityProperty> {
     const own = new Map<string, EntityProperty>();
     for (const prop of decl.properties) {
         const key = propKey(prop);
@@ -2328,7 +2329,8 @@ function calendarOwnProps(decl: CalendarDeclaration): Map<string, EntityProperty
 }
 
 /** Exactly one of: `date:` alone; `start:` + `end:`; `every:` with optional `start:` / `end:`. */
-function hasCalendarShape(own: ReadonlyMap<string, EntityProperty>): boolean {
+/** @internal Exported for the m2.s3 equivalence test only. */
+export function hasCalendarShape(own: ReadonlyMap<string, EntityProperty>): boolean {
     if (own.has('date')) return !own.has('every') && !own.has('start') && !own.has('end');
     if (own.has('every')) return true;
     return own.has('start') && own.has('end');
@@ -2344,13 +2346,15 @@ function isCalendarDateList(prop: EntityProperty): boolean {
 }
 
 /** The single, real date a `start:` / `end:` names, or undefined when absent or not one date. */
-function scalarDate(prop: EntityProperty | undefined): string | undefined {
+/** @internal Exported for the m2.s3 equivalence test only. */
+export function scalarDate(prop: EntityProperty | undefined): string | undefined {
     if (!prop || isCalendarDateList(prop)) return undefined;
     const [value] = calendarPropValues(prop);
     return value !== undefined && isRealIsoDate(value) ? value : undefined;
 }
 
-function weekdaysOf(decl: CalendarDeclaration): number[] {
+/** @internal Exported for the m2.s3 equivalence test only. */
+export function weekdaysOf(decl: CalendarDeclaration): number[] {
     const every = calendarOwnProps(decl).get('every');
     if (!every) return [];
     return calendarPropValues(every)
@@ -2363,7 +2367,8 @@ function weekdaysOf(decl: CalendarDeclaration): number[] {
  * names it knows, and an end that is not before the start. Anything else is reported by
  * `checkCalendarDeclaration` and left out of the week.
  */
-function isWellFormedCalendarDeclaration(decl: CalendarDeclaration): boolean {
+/** @internal Exported for the m2.s3 equivalence test only. */
+export function isWellFormedCalendarDeclaration(decl: CalendarDeclaration): boolean {
     const own = calendarOwnProps(decl);
     if (!hasCalendarShape(own)) return false;
     const date = own.get('date');
@@ -2383,13 +2388,15 @@ function isWellFormedCalendarDeclaration(decl: CalendarDeclaration): boolean {
 }
 
 /** `every:` with neither `start:` nor `end:`: it changes the week with no end date. */
-function isOpenEndedRecurrence(decl: CalendarDeclaration): boolean {
+/** @internal Exported for the m2.s3 equivalence test only. */
+export function isOpenEndedRecurrence(decl: CalendarDeclaration): boolean {
     const own = calendarOwnProps(decl);
     return own.has('every') && !own.has('start') && !own.has('end');
 }
 
 /** `every:` with exactly one of `start:` and `end:`: unbounded on one side. */
-function isHalfBoundedRecurrence(decl: CalendarDeclaration): boolean {
+/** @internal Exported for the m2.s3 equivalence test only. */
+export function isHalfBoundedRecurrence(decl: CalendarDeclaration): boolean {
     const own = calendarOwnProps(decl);
     return own.has('every') && own.has('start') !== own.has('end');
 }

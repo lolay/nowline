@@ -133,7 +133,8 @@ const CALENDAR_SURFACED = ['date', 'every', 'start', 'end'];
  * bounded recurrence is not (specs/working-calendar.md §7.4 "Which rules are
  * labelled"). The open-ended week is the baseline and gets no note.
  */
-function undrawnTitleNote(entity: NamedEntity): string | undefined {
+/** @internal Exported for the m2.s3 equivalence test only. */
+export function undrawnTitleNote(entity: NamedEntity): string | undefined {
     if (!isNonWorkingDeclaration(entity) && !isWorkingDeclaration(entity)) return undefined;
     if (!entity.title) return undefined;
     const keys = new Set(entity.properties.map((p) => propKey(p)));

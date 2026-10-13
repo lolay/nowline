@@ -103,7 +103,8 @@ function calendarRules(
  * value is malformed. Only the first `date:`, `start:`, `end:` and `every:`
  * count; any other key is the validator's NL.E0901 and changes nothing here.
  */
-function declarationRule(decl: CalendarDeclaration): CalendarRule | undefined {
+/** @internal Exported for the m2.s3 equivalence test only. */
+export function declarationRule(decl: CalendarDeclaration): CalendarRule | undefined {
     const props = decl.properties;
     const has = (key: string) => findProp(props, key) !== undefined;
     const rule: CalendarRule = { working: decl.$type === 'WorkingDeclaration' };

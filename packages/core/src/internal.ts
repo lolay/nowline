@@ -3,5 +3,6 @@
 // Nothing here may import the validator.
 
 export * from './language/ast-walk.js';
+export * from './language/calendar-declarations.js';
 export * from './language/style-chain.js';
 export * from './util/props.js';
