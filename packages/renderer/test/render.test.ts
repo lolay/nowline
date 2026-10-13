@@ -104,6 +104,39 @@ swimlane a "A"
         expect(svg).toContain('<rect');
     });
 
+    it('fits a declared SVG logo into the layout slot and shifts the title right', async () => {
+        const plain = await parseToModel(
+            'nowline v1\n\nroadmap r1 "R"\n\nswimlane a "A"\n  item x duration:1w\n',
+        );
+        const model = await parseToModel(
+            'nowline v1\n\nroadmap r1 "R" logo:"brand/logo.svg"\n\nswimlane a "A"\n  item x duration:1w\n',
+        );
+        const slot = model.header.logo?.box;
+        expect(slot).toBeDefined();
+        const refs: string[] = [];
+        const svg = await renderSvg(model, {
+            assetResolver: async (ref) => {
+                refs.push(ref);
+                return {
+                    bytes: new TextEncoder().encode(
+                        '<svg width="400" height="100"><rect id="mark" width="400" height="100"/></svg>',
+                    ),
+                    mime: 'image/svg+xml',
+                };
+            },
+        });
+        expect(refs).toEqual(['brand/logo.svg']);
+        // The logo's root <svg> takes the slot and scales via the derived viewBox.
+        expect(svg).toContain(
+            `<svg height="${slot?.height}" preserveAspectRatio="xMidYMid meet" viewBox="0 0 400 100" width="${slot?.width}" x="${slot?.x}" y="${slot?.y}">`,
+        );
+        // Title x moves right by the logo column.
+        const titleX = (s: string) =>
+            Number(/<text [^>]* x="([\d.]+)"[^>]*>R<\/text>/.exec(s)?.[1]);
+        const plainSvg = await renderSvg(plain);
+        expect(titleX(svg) - titleX(plainSvg)).toBe(model.header.textOffsetX);
+    });
+
     it('embeds raster logos as base64 data URIs', async () => {
         const model = await parseToModel(BASIC_DSL);
         model.header.logo = {

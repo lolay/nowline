@@ -648,12 +648,12 @@ The `roadmap` declaration accepts an optional company logo. The logo renders nex
 roadmap platform-2026 "Platform 2026" author:"Acme Engineering" logo:"./brand/acme.svg"
 ```
 
-- `logo:"path"` — path to the logo file, resolved relative to the `.nowline` file's directory. Forward slashes on all platforms (same rule as `include`). Only local paths are accepted; `http://`, `https://`, `file://`, and `data:` URLs are rejected by the parser. Absolute paths are discouraged but allowed for authoring tools that resolve against a known root.
+- `logo:"path"` — path to the logo file, resolved against the asset root: `--asset-root` (or the editor's `nowline.preview.assetRoot`), else the `.nowlinerc` `assetRoot`, else the `.nowline` file's directory. Paths that escape the asset root are refused. Forward slashes on all platforms (same rule as `include`). Only local paths are accepted; `http://`, `https://`, `file://`, and `data:` URLs are rejected by the parser. Absolute paths are discouraged but allowed for authoring tools that resolve against a known root.
 - `logo-size:<preset>` — size preset (`xs | sm | md | lg | xl`). Defaults to `md`. The rendered logo height is bounded by the roadmap header box; see `rendering.md` § Roadmap Header.
 
 **Supported formats.** The renderer accepts `.svg`, `.png`, `.jpg` / `.jpeg`, and `.webp`. Format is determined by file extension; content-type is not sniffed. Any other extension is a validation error.
 
-**Asset resolution.** Logo resolution happens at render time, not at parse time, so a `.nowline` file referencing a missing logo is still a valid document (`nowline <input> --dry-run` does not require the asset to exist). At render time, when the asset is missing or has an unsupported extension the renderer emits a warning and renders the header without the logo; `nowline <input> --strict` (and the equivalent renderer option) promotes warnings to errors.
+**Asset resolution.** Logo resolution happens at render time, not at parse time, so a `.nowline` file referencing a missing logo is still a valid document (`nowline <input> --dry-run` does not require the asset to exist). At render time, when the asset is missing or has an unsupported extension the renderer emits a warning and renders the header without the logo (its slot stays empty, since layout reserves it without reading the asset); `nowline <input> --strict` (and the equivalent renderer option) promotes warnings to errors.
 
 **Portability.** Because `logo:` is a path, a `.nowline` file is not self-contained. To ship a self-contained artifact, inline the logo at export time (the renderer embeds SVG inline and raster formats as base64 `data:` URIs; see `rendering.md` § Roadmap Header). The DSL itself does not accept `data:` URIs to keep the text readable.
 

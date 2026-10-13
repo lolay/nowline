@@ -99,8 +99,8 @@ The pure SVG renderer takes the positioned model and produces an SVG string. It 
 The roadmap header renders as a contained box in the top-left corner, above and to the left of the timeline:
 
 - Title on the first line, author (if set) on a second line in smaller muted text — both in the same box
-- **Company logo (optional)** — when the roadmap declares `logo:`, the logo renders to the **left of the title**, vertically centered with the title line. Logo height follows `logo-size:` (default `md`) and is capped at the header box height; aspect ratio is preserved by scaling width to match.
-- Minimal vertical footprint — the box height is determined by content, not a fixed size. The company logo does not expand the header — if the logo's natural height at the selected `logo-size` exceeds the box, it is scaled down to fit.
+- **Company logo (optional)** — when the roadmap declares `logo:`, layout reserves a **square slot** at the left of the header card, sized by `logo-size:` (default `md`), and the title and author shift right of it by the slot plus a 12 px gap. Layout never reads the asset, so it cannot know the logo's aspect ratio: the renderer fits the logo inside the square with its aspect ratio preserved (`xMidYMid meet`), so a wide logo is letterboxed to the slot's width. An SVG logo's root `<svg>` becomes a nested viewport sized to the slot (a `viewBox` is derived from its own `width` / `height` when it has none); a raster logo is an `<image>` sized to the slot. A logo that fails to load leaves its slot empty.
+- Minimal vertical footprint — the box height is determined by content, not a fixed size. In `beside` mode the card widens by the logo column and, when the slot plus 10 px above and below is taller than the text, grows to fit it; the slot and the text block are then both vertically centered in the card. In `above` mode the strip keeps its fixed 72 px height, so the slot is capped at 52 px.
 - A Nowline attribution mark — small version of the Nowline logo rendered in the bottom-right corner of the header box, scaled down as a subtle attribution mark. Links to `nowline.io`. The user's company logo does **not** replace or displace this mark.
 - The header box does not span the full width of the chart; it sits to the left of the timeline header
 
@@ -117,15 +117,13 @@ All embedding is synchronous during render — the output artifact is self-conta
 
 #### Company Logo Size Presets
 
-`logo-size:` maps to a logical height relative to the title text. Concrete pixel values are renderer-owned (same convention as `text-size` and `padding`):
+`logo-size:` sets the side of the square logo slot. Pixel values are layout-owned (`LOGO_SIZE_PX`, same convention as `text-size` and `padding`):
 
-- `xs` — roughly the x-height of the title text
-- `sm` — roughly the cap-height of the title text
-- `md` *(default)* — roughly the full line-height of the title
-- `lg` — title line-height + author line-height (fills the header content box)
-- `xl` — 1.25× the full header content box; triggers a header height bump so the logo fits
-
-Width is derived from the logo's intrinsic aspect ratio. Logos wider than the default title column push the title text to the right within the header box rather than overflowing it.
+- `xs` — 18 px
+- `sm` — 24 px
+- `md` *(default)* — 36 px, about a title line plus an author line
+- `lg` — 48 px
+- `xl` — 72 px; grows a `beside` card past the usual title-and-author height
 
 #### Company Logo Error Handling
 

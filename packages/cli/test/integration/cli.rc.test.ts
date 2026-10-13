@@ -105,6 +105,38 @@ describeBuilt('.nowlinerc assetRoot (requires `pnpm build`)', () => {
         );
     });
 
+    it('the logo renders from the rc assetRoot, and is missing without it', async () => {
+        const LOGO_SRC =
+            'nowline v1\n\nroadmap r "R" logo:"logo.svg"\n\nswimlane a "A"\n  item x duration:1w\n';
+        const run = (rc: string | undefined, extraArgs: string[] = []) =>
+            withTempDir(async (dir) => {
+                await fs.mkdir(path.join(dir, 'docs'));
+                await fs.mkdir(path.join(dir, 'brand'));
+                await fs.writeFile(path.join(dir, 'docs', 'sample.nowline'), LOGO_SRC);
+                await fs.writeFile(
+                    path.join(dir, 'brand', 'logo.svg'),
+                    '<svg width="40" height="20"><rect width="40" height="20" fill="#123456"/></svg>',
+                );
+                if (rc !== undefined) await fs.writeFile(path.join(dir, '.nowlinerc'), rc);
+                return runCliBuilt(['sample.nowline', '-o', '-', ...extraArgs], {
+                    cwd: path.join(dir, 'docs'),
+                });
+            });
+        const withRc = await run('assetRoot: brand\n');
+        expect(withRc.exitCode).toBe(0);
+        expect(withRc.stdout).toContain('fill="#123456"');
+        expect(withRc.stdout).toContain('viewBox="0 0 40 20"');
+
+        const withoutRc = await run(undefined);
+        expect(withoutRc.exitCode).toBe(0);
+        expect(withoutRc.stdout).not.toContain('fill="#123456"');
+        // Without the rc the logo is looked up beside the input, where it is
+        // missing; --strict turns that into a failure.
+        const strict = await run(undefined, ['--strict']);
+        expect(strict.exitCode).not.toBe(0);
+        expect(strict.stderr).toContain('logo.svg');
+    });
+
     it('a non-string rc assetRoot is an input error naming .nowlinerc', async () => {
         const r = await renderWithRc('assetRoot: 42\n');
         expect(r.exitCode).toBe(2);

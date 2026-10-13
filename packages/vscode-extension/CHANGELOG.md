@@ -32,6 +32,9 @@
 
 ### Fixed
 
+- Roadmap logos: `logo:` drew nothing in the preview or any export because
+  layout never placed it. It now renders at the left of the header card,
+  sized by `logo-size:`.
 - Asset root: a relative `.nowlinerc` `assetRoot` resolved against the editor
   process's working directory, so the preview could not find assets the CLI
   found. It now resolves against the rc file's directory, the same rule as

@@ -21,6 +21,7 @@ import type { CalendarConfig } from '../calendar.js';
 import { daysBetween, resolveSizes } from '../calendar.js';
 import { resolveWorkingCalendar } from '../calendar-resolver.js';
 import { parseDate, propValue, propValues } from '../dsl-utils.js';
+import { HEADER_CARD_PADDING_X, HEADER_LOGO_PADDING_Y_PX } from '../header-card-geometry.js';
 import { localeStrings, resolveLocale } from '../i18n.js';
 import type { LayoutOptions, LayoutResult } from '../layout.js';
 import type { LayoutContext, LayoutHelpers } from '../layout-context.js';
@@ -34,6 +35,7 @@ import {
     GUTTER_PX,
     HEADER_ABOVE_HEIGHT_PX,
     HEADER_HEIGHT_PX,
+    LOGO_SIZE_PX,
     NOW_PILL_HEIGHT_PX,
     SPACING_PX,
     WAVE_LEGEND_GAP_PX,
@@ -193,6 +195,10 @@ export interface SizedHeader {
     cardWidth: number;
     cardHeight: number;
     boxWidth: number;
+    /** Title-block shift right of the logo slot (0 without a logo). */
+    textOffsetX: number;
+    /** Title-block shift down when the logo made the card taller (0 otherwise). */
+    textOffsetY: number;
 }
 
 /**
@@ -213,7 +219,7 @@ export interface RoadmapNodeDeps extends LayoutHelpers {
         scale: ViewPreset,
         plan: WavePlan | undefined,
     ) => { startDate: Date; endDate: Date };
-    sizeBesideHeader: (title: string, author: string | undefined) => SizedHeader;
+    sizeBesideHeader: (title: string, author: string | undefined, logoSize?: number) => SizedHeader;
     collectItems: (swimlanes: SwimlaneDeclaration[]) => Map<string, ItemDeclaration>;
     buildDependencies: (
         items: Map<string, ItemDeclaration>,
@@ -312,8 +318,23 @@ export class RoadmapNode {
         // exceeds MAX. Above-mode keeps the existing fixed-strip
         // geometry (full canvas width, fixed height).
         const titleStr = file.roadmapDecl?.title ?? file.roadmapDecl?.name ?? '';
-        const authorStr = propValue(file.roadmapDecl?.properties ?? [], 'author');
-        const sizedHeader = deps.sizeBesideHeader(titleStr, authorStr);
+        const roadmapProps = file.roadmapDecl?.properties ?? [];
+        const authorStr = propValue(roadmapProps, 'author');
+        // Company logo: a square slot of the `logo-size:` preset at the
+        // card's left. Layout never reads the asset (the renderer fits it
+        // into the slot), so the slot is square whatever the aspect ratio.
+        // Beside-mode's card grows to fit the slot; above-mode's strip has a
+        // fixed height, so the slot is capped to it.
+        const logoRef = propValue(roadmapProps, 'logo');
+        const logoPreset =
+            LOGO_SIZE_PX[propValue(roadmapProps, 'logo-size') as keyof typeof LOGO_SIZE_PX] ??
+            LOGO_SIZE_PX.md;
+        const logoSize = !logoRef
+            ? 0
+            : isBeside
+              ? logoPreset
+              : Math.min(logoPreset, HEADER_ABOVE_HEIGHT_PX - 2 * HEADER_LOGO_PADDING_Y_PX);
+        const sizedHeader = deps.sizeBesideHeader(titleStr, authorStr, logoSize);
 
         const headerBox = isBeside
             ? { x: 0, y: 0, width: sizedHeader.boxWidth, height: 0 }
@@ -1002,9 +1023,27 @@ export class RoadmapNode {
             titleLines: sizedHeader.titleLines,
             authorLines: sizedHeader.authorLines,
             cardBox,
-            logo: undefined,
             style: headerStyle,
             attributionBox,
+            // Only with a logo, so logo-free models stay byte-identical.
+            ...(logoRef
+                ? {
+                      logo: {
+                          box: {
+                              x: headerBox.x + cardBox.x + HEADER_CARD_PADDING_X,
+                              y:
+                                  headerBox.y +
+                                  cardBox.y +
+                                  Math.round((cardBox.height - logoSize) / 2),
+                              width: logoSize,
+                              height: logoSize,
+                          },
+                          assetRef: logoRef,
+                      },
+                      textOffsetX: sizedHeader.textOffsetX,
+                      textOffsetY: isBeside ? sizedHeader.textOffsetY : 0,
+                  }
+                : {}),
         };
 
         const model: PositionedRoadmap = {

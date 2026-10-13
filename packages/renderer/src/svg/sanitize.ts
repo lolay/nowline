@@ -123,6 +123,11 @@ export interface SanitizeOptions {
     idPrefix?: string;
     // Called when the sanitizer rejects a construct, for test/diagnostic use.
     onWarn?: (message: string) => void;
+    // Place the root <svg> in this box (already-formatted numbers): its x / y /
+    // width / height are replaced, a viewBox is derived from its own numeric
+    // width / height when it has none (so the content scales instead of
+    // overflowing), and preserveAspectRatio defaults to `xMidYMid meet`.
+    rootViewport?: { x: string; y: string; width: string; height: string };
 }
 
 interface Token {
@@ -277,6 +282,20 @@ function rewriteRef(v: string, idMap: Map<string, string>): string | null {
     return null;
 }
 
+function fitRootSvg(
+    attrs: Record<string, string>,
+    box: NonNullable<SanitizeOptions['rootViewport']>,
+): Record<string, string> {
+    const fitted: Record<string, string> = { ...attrs, ...box };
+    if (!attrs.viewBox) {
+        const w = Number.parseFloat(attrs.width ?? '');
+        const h = Number.parseFloat(attrs.height ?? '');
+        if (w > 0 && h > 0) fitted.viewBox = `0 0 ${w} ${h}`;
+    }
+    if (!attrs.preserveAspectRatio) fitted.preserveAspectRatio = 'xMidYMid meet';
+    return fitted;
+}
+
 export function sanitizeSvg(input: string, options: SanitizeOptions = {}): string {
     const prefix = options.idPrefix ?? 'nl-logo';
     const warn = options.onWarn ?? ((): void => {});
@@ -334,10 +353,14 @@ export function sanitizeSvg(input: string, options: SanitizeOptions = {}): strin
                 if (t.kind === 'open') stack.push(false);
                 continue;
             }
+            const attrs =
+                name === 'svg' && stack.length === 0 && options.rootViewport
+                    ? fitRootSvg(t.attrs ?? {}, options.rootViewport)
+                    : (t.attrs ?? {});
             const parts: string[] = [`<${name}`];
-            const keys = Object.keys(t.attrs ?? {}).sort();
+            const keys = Object.keys(attrs).sort();
             for (const key of keys) {
-                const value = (t.attrs as Record<string, string>)[key];
+                const value = attrs[key];
                 if (/^on/i.test(key)) {
                     warn(`sanitizer: dropping event handler ${key}`);
                     continue;

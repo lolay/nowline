@@ -64,10 +64,16 @@ noise.
 
 ## Logo embedding
 
-- **SVG logos**: read → `sanitizeSvg()` → id-namespaced → embedded as `<g>`.
+Layout places a square slot (`model.header.logo.box`); the renderer fits the
+logo into it with its aspect ratio preserved.
+
+- **SVG logos**: read → `sanitizeSvg()` → id-namespaced → the root `<svg>`
+  becomes a nested viewport sized to the slot (`rootViewport`), with a
+  `viewBox` derived from its own `width`/`height` when it has none.
 - **Raster logos** (`.png`/`.jpg`/`.jpeg`/`.webp`): base64-encoded and embedded
-  as `<image href="data:image/<type>;base64,...">`. No re-encoding.
-- **Missing/unsupported/corrupt** → `warn()`, placeholder rendered. `strict:
+  as `<image href="data:image/<type>;base64,...">` sized to the slot. No
+  re-encoding.
+- **Missing/unsupported/corrupt** → `warn()`, slot left empty. `strict:
   true` promotes to an exception.
 
 All IO goes through the injected `AssetResolver`. The renderer never touches

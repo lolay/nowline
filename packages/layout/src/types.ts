@@ -118,7 +118,14 @@ export interface PositionedHeader {
     // its content (width = max line width + padding, clamped to MIN..MAX;
     // height grows for wrapped lines).
     cardBox: BoundingBox;
+    // Square slot for the roadmap's `logo:`, at the card's left; absent
+    // without a logo. The renderer fits the asset inside it.
     logo?: PositionedLogo;
+    // Shift (px) applied to the title and author lines: right of the logo
+    // slot, and down when the logo made the card taller than the text.
+    // Absent (0) without a logo.
+    textOffsetX?: number;
+    textOffsetY?: number;
     style: ResolvedStyle;
     // Attribution mark (Nowline wordmark + link) lives in the top-right.
     attributionBox: BoundingBox;

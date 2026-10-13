@@ -519,6 +519,10 @@ function renderHeader(
     const cardY = h.box.y + h.cardBox.y;
     const cardWidth = h.cardBox.width;
     const cardHeight = h.cardBox.height;
+    // Title block origin: right of the logo slot and re-centered when the
+    // logo made the card taller (both 0 without a logo).
+    const textX = cardX + HEADER_CARD_PADDING_X + (h.textOffsetX ?? 0);
+    const textTopY = cardY + (h.textOffsetY ?? 0);
     const cardFill = h.style.bg === 'none' ? palette.surface.headerBox : h.style.bg;
     const borderColor = palette.header.cardBorder;
     const card = tag('rect', {
@@ -541,8 +545,8 @@ function renderHeader(
         titleParts.push(
             textTag(
                 {
-                    x: num(cardX + HEADER_CARD_PADDING_X),
-                    y: num(cardY + HEADER_CARD_PADDING_TOP + i * HEADER_TITLE_LINE_HEIGHT_PX),
+                    x: num(textX),
+                    y: num(textTopY + HEADER_CARD_PADDING_TOP + i * HEADER_TITLE_LINE_HEIGHT_PX),
                     'font-family': fonts[h.style.font],
                     'font-size': HEADER_TITLE_FONT_SIZE_PX,
                     'font-weight': 600,
@@ -554,7 +558,7 @@ function renderHeader(
     });
     const titleText = titleParts.join('');
     const lastTitleY =
-        cardY +
+        textTopY +
         HEADER_CARD_PADDING_TOP +
         Math.max(0, h.titleLines.length - 1) * HEADER_TITLE_LINE_HEIGHT_PX;
     const authorColor = palette.header.author;
@@ -563,7 +567,7 @@ function renderHeader(
         authorParts.push(
             textTag(
                 {
-                    x: num(cardX + HEADER_CARD_PADDING_X),
+                    x: num(textX),
                     y: num(
                         lastTitleY +
                             HEADER_TITLE_TO_AUTHOR_GAP_PX +
@@ -2305,9 +2309,7 @@ async function embedLogo(
     resolver: AssetResolver | undefined,
     idPrefix: string,
     options: RenderOptions,
-    x: number,
-    y: number,
-    size: number,
+    box: BoundingBox,
 ): Promise<string> {
     if (!resolver) return '';
     let asset: AssetBytes;
@@ -2322,8 +2324,19 @@ async function embedLogo(
     const mime = (asset.mime ?? '').toLowerCase();
     if (mime === 'image/svg+xml') {
         const raw = new TextDecoder().decode(asset.bytes);
-        const cleaned = sanitizeSvg(raw, { idPrefix: `${idPrefix}-logo`, onWarn: options.warn });
-        return tag('g', { transform: `translate(${num(x)} ${num(y)})` }, cleaned);
+        // The root <svg> becomes a nested viewport sized to the layout slot,
+        // so the logo scales into it (aspect preserved) instead of drawing at
+        // its intrinsic size.
+        return sanitizeSvg(raw, {
+            idPrefix: `${idPrefix}-logo`,
+            onWarn: options.warn,
+            rootViewport: {
+                x: num(box.x),
+                y: num(box.y),
+                width: num(box.width),
+                height: num(box.height),
+            },
+        });
     }
     if (
         mime === 'image/png' ||
@@ -2334,10 +2347,10 @@ async function embedLogo(
         const b64 = bytesToBase64(asset.bytes);
         return tag('image', {
             href: `data:${mime};base64,${b64}`,
-            x: num(x),
-            y: num(y),
-            width: num(size),
-            height: num(size),
+            x: num(box.x),
+            y: num(box.y),
+            width: num(box.width),
+            height: num(box.height),
             preserveAspectRatio: 'xMidYMid meet',
         });
     }
@@ -3081,9 +3094,7 @@ export async function renderSvg(
             options.assetResolver,
             idPrefix,
             options,
-            model.header.logo.box.x,
-            model.header.logo.box.y,
-            Math.max(model.header.logo.box.width, model.header.logo.box.height),
+            model.header.logo.box,
         );
         if (logoSvg) parts.push(logoSvg);
     }

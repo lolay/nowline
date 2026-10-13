@@ -95,8 +95,9 @@ full distribution spec.
   mode; a one-shot `console.warn` fires when a multi-file roadmap is
   loaded. Use the CLI or the GitHub Action for multi-file rendering.
 - **No asset resolver.** `<script>` tags can't read the host
-  filesystem; logos are not embedded by the browser bundle. The CLI
-  is the path for embedded raster assets.
+  filesystem; logos are not embedded by the browser bundle, so a
+  roadmap's `logo:` slot stays empty. The CLI is the path for embedded
+  assets.
 - **Hosts that strip `<script>` tags** (GitHub READMEs, email,
   Slack, Discord, Confluence rich text) cannot run the embed. The
   GitHub Action exists for those.

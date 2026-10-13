@@ -70,4 +70,39 @@ describe('sanitizeSvg', () => {
         const b = sanitizeSvg(input);
         expect(a).toBe(b);
     });
+
+    describe('rootViewport', () => {
+        const viewport = { x: '10', y: '20', width: '36', height: '36' };
+
+        it('places the root <svg> in the viewport and keeps its viewBox', () => {
+            const out = sanitizeSvg(
+                '<svg viewBox="0 0 200 100" width="200" height="100"><rect width="200" height="100"/></svg>',
+                { rootViewport: viewport },
+            );
+            expect(out).toMatch(/^<svg [^>]*\bx="10"/);
+            expect(out).toMatch(/^<svg [^>]*\by="20"/);
+            expect(out).toMatch(/^<svg [^>]*\bwidth="36"/);
+            expect(out).toMatch(/^<svg [^>]*\bheight="36"/);
+            expect(out).toMatch(/^<svg [^>]*viewBox="0 0 200 100"/);
+            expect(out).toMatch(/^<svg [^>]*preserveAspectRatio="xMidYMid meet"/);
+            // Only the root is touched.
+            expect(out).toContain('<rect height="100" width="200"/>');
+        });
+
+        it('derives a viewBox from a sized root without one, so it scales', () => {
+            const out = sanitizeSvg('<svg width="200px" height="100"><rect/></svg>', {
+                rootViewport: viewport,
+            });
+            expect(out).toMatch(/^<svg [^>]*viewBox="0 0 200 100"/);
+            expect(out).toMatch(/^<svg [^>]*\bwidth="36"/);
+        });
+
+        it("keeps the author's preserveAspectRatio", () => {
+            const out = sanitizeSvg(
+                '<svg viewBox="0 0 1 1" preserveAspectRatio="xMinYMin slice"></svg>',
+                { rootViewport: viewport },
+            );
+            expect(out).toContain('preserveAspectRatio="xMinYMin slice"');
+        });
+    });
 });

@@ -35,6 +35,8 @@ import {
     HEADER_CARD_PADDING_BOTTOM,
     HEADER_CARD_PADDING_TOP,
     HEADER_CARD_PADDING_X,
+    HEADER_LOGO_GAP_PX,
+    HEADER_LOGO_PADDING_Y_PX,
     HEADER_TITLE_FONT_SIZE_PX,
     HEADER_TITLE_LINE_HEIGHT_PX,
     HEADER_TITLE_TO_AUTHOR_GAP_PX,
@@ -1258,10 +1260,17 @@ interface SizedHeader {
     cardWidth: number;
     cardHeight: number;
     boxWidth: number;
+    textOffsetX: number;
+    textOffsetY: number;
 }
 
-function sizeBesideHeader(title: string, author: string | undefined): SizedHeader {
-    const maxContentWidth = HEADER_BESIDE_MAX_WIDTH_PX - 2 * HEADER_CARD_PADDING_X;
+// `logoSize` is the side (px) of the square logo slot, 0 for no logo. The
+// slot takes a column at the card's left; the text wraps in what is left,
+// and when the slot is taller than the text the card grows to fit it and
+// the text block is re-centered vertically.
+function sizeBesideHeader(title: string, author: string | undefined, logoSize = 0): SizedHeader {
+    const logoColumn = logoSize > 0 ? logoSize + HEADER_LOGO_GAP_PX : 0;
+    const maxContentWidth = HEADER_BESIDE_MAX_WIDTH_PX - 2 * HEADER_CARD_PADDING_X - logoColumn;
     const titleLines = wrapText(title, maxContentWidth, HEADER_TITLE_FONT_SIZE_PX);
     const authorLines = wrapText(author ?? '', maxContentWidth, HEADER_AUTHOR_FONT_SIZE_PX);
 
@@ -1271,7 +1280,7 @@ function sizeBesideHeader(title: string, author: string | undefined): SizedHeade
     for (const line of authorLines)
         widest = Math.max(widest, estimateTextWidth(line, HEADER_AUTHOR_FONT_SIZE_PX));
 
-    const naturalCardWidth = widest + 2 * HEADER_CARD_PADDING_X;
+    const naturalCardWidth = widest + 2 * HEADER_CARD_PADDING_X + logoColumn;
     // `HEADER_BESIDE_{MIN,MAX}_WIDTH_PX` bound the **boxWidth** (= cardWidth
     // + left outer pad). Subtract one outer pad to derive the cardWidth
     // bounds.
@@ -1287,15 +1296,25 @@ function sizeBesideHeader(title: string, author: string | undefined): SizedHeade
             ? HEADER_TITLE_TO_AUTHOR_GAP_PX +
               (authorLines.length - 1) * HEADER_AUTHOR_LINE_HEIGHT_PX
             : 0;
-    const cardHeight =
+    const textHeight =
         HEADER_CARD_PADDING_TOP + titleBlockHeight + authorBlockHeight + HEADER_CARD_PADDING_BOTTOM;
+    const cardHeight =
+        logoSize > 0 ? Math.max(textHeight, logoSize + 2 * HEADER_LOGO_PADDING_Y_PX) : textHeight;
 
     // `boxWidth` only includes the LEFT outer pad — the right-side breathing
     // room between the card and the chart is owned by `GUTTER_PX` in
     // `RoadmapNode`. So `boxWidth` doubles as `chartLeftX` (the card's right
     // edge in canvas coordinates).
     const boxWidth = cardWidth + HEADER_CARD_OUTER_PAD;
-    return { titleLines, authorLines, cardWidth, cardHeight, boxWidth };
+    return {
+        titleLines,
+        authorLines,
+        cardWidth,
+        cardHeight,
+        boxWidth,
+        textOffsetX: logoColumn,
+        textOffsetY: Math.round((cardHeight - textHeight) / 2),
+    };
 }
 
 // Compute a sensible [startDate, endDate] window.
