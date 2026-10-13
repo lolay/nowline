@@ -4,7 +4,7 @@
 ```
 --- KICKOFF: begin orchestration at [deep] ---
 
-  Status: 0/4 groups done | last review: — | current: nowline m1 s1-s3 [deep] | updated 2026-10-13
+  Status: 1/4 groups done | last review: wave-1 PASS | current: nowline m1 s4-s5 [exec] | updated 2026-10-13 | over expected: ~$17.91 of ~$16
 
   mode: unattended | proposed unattended (harness=claude-code runner=cloud; CLAUDE_CODE_REMOTE=true, assigned branch) | guard 3x min $50 | fixups 2 | confirmed 2026-10-13 session 65f2e917-181e-5b0f-94c9-28d8d9b1c93d: unattended
 
@@ -84,15 +84,15 @@ Environment: Node is 22.22.0 here (`.nvmrc` pins 26.2.0; `engines.node` is `>=22
 
 --- WAVE 1 [deep] ---
 
-#### s1 - [deep] Add the engine divergence register
+#### s1 - [deep] Add the engine divergence register (done)
 
 Spec §4 m1.s1. Add `packages/layout/test/engine-divergence-register.test.ts` and `engine-divergences.json`. Lay out every roadmap under `examples/` and `tests/` (with `--now`-equivalent `today` 2026-02-09), convert A's logical span of every named item and every wave span back to working days, compare with `scheduleRoadmap`, and check mismatches against the committed register keyed by sample and item, each classified `(a)`-`(f)` or `region-scope` with a one-line reason. A new mismatch fails; a registered one that disappears fails. Seed from HEAD; the result should match the spec's §1.3 probe (10 of 53 roadmaps disagree on an item; region-scope for isolate-include, nested, grammar-properties, isolate-include-multi) — explain any difference in the commit body. Container cases of divergence (a) (lane-level groups/parallels with `after:`) are classified `(a)` too. Test-only. Gates: G1, G2.
 
-#### s2 - [deep] Give engine C engine B's scope
+#### s2 - [deep] Give engine C engine B's scope (done)
 
 Spec §3.2 and §4 m1.s2. `ScheduleOptions.plan` (`WavePlan | null`, omitted = build here); `RoadmapSchedule.plan`, `.resolved`, `.extent: { contentEndDay }`; port B's `reach` callback (`layout.ts:1509-1540`, called after every lane child) into C's `makeWalker` (`schedule.ts:166-255`) and fill `extent` in the no-wave walk and the barrier wiring (B's fold: `max(maxDay, passMax, ...S, E[last])`, `layout.ts:1663`); schedule isolated regions without waves the way B's recursion does (`layout.ts:1692-1707`: fresh id maps per region, nested regions recursively, region anchors/milestones counted in `extent` only; first-level region items join `byNode`, ids stay out of `items`), using the **region's own sizes** (decision 2). Add an oracle test with a frozen copy of today's `computeContentEndDay` under `packages/layout/test/` asserting `extent.contentEndDay` equals it for every sample, the 60 generated roadmaps of `waves.test.ts:1456-1491`, and one fixture per scope rule (empty `group after:`, nested region, region milestone, undated anchor, waves with an empty trailing wave); no fixture with region-only sizes (that difference is m1.s3's). The register's `region-scope` entries are deleted. Exporter bytes must not move (exporters walk the root AST). Gates: G1, G2, G3.
 
-#### s3 - [deep] Derive the date window from the schedule
+#### s3 - [deep] Derive the date window from the schedule (done)
 
 Spec §3.3 and §4 m1.s3. `RoadmapNode.place` calls `scheduleRoadmap(file, resolved, { today, plan })` once and passes the schedule to `computeDateWindow(file, schedule, today, scale)`; the window keeps its rounding, `length:` and 4-week rules, takes `contentDays` from `schedule.extent.contentEndDay`, applies `today` only when there is no `length:` (as B did via `minDays > 0 ? undefined : today`), and takes its calendar from `schedule.calendar`. Update `RoadmapNodeDeps.computeDateWindow` and `layoutRoadmap`'s deps bundle. Delete `computeContentEndDay`, `literalDays` (use `literalToDays`) and `defaultStartDate` (one helper with `utcMidnight`). Keep the post-placement extension (`roadmap-node.ts:763-812`; R2 owns it). Update `date-window.test.ts` to the new signature (full rewrite is m3.s2). Add a regression test: a roadmap whose isolated region declares a size only it has gets a window from the region's own sizes. Create `.changelog/scheduler-unification.txt` with a `release-note:fixed` block saying the date window of a roadmap whose isolated include declares its own sizes now uses those sizes. Gates: G1, G2, changelog-check.
 
@@ -146,6 +146,8 @@ Per step: the gate procedure above (G1 `diff -r` empty except m1.s5's declared s
 
 ## Review log
 
+review wave-1 (nowline m1 s1-s3) c8caff3..8af7add: PASS - register matches the §1.3 probe (10 item roadmaps, 4 region-scope); C extent equals the frozen B oracle on 60 samples, 60 generated roadmaps and 5 scope fixtures; window projected from schedule.extent and schedule.calendar; G1/G3 trees identical; accepted deviation: nested.nowline keeps 50 region-scope entries (region anchors resolve in C, not in A); nits: stale engine-B comments in schedule.ts header, wave-barrier.ts and the register test header, left for m3.s3 - 2026-10-13
+
 ## Token log
 
 **Counting header (Claude Code)**
@@ -156,6 +158,8 @@ Per step: the gate procedure above (G1 `diff -r` empty except m1.s5's declared s
 - `$C` = (input × in + cache read × cached + 5m write × in × 1.25 + 1h write × in × 2.00 + output × out) / 1M.
 - In another harness, or on a model not listed here, count and price per plan-execution.md "Token accounting" and "Model price table" instead.
 
-tokens orchestrator-kickoff plan-scheduler-unification-quilt (claude-opus-5-5): input ~62 / cache read ~4.8M / cache write ~0 5m + ~190k 1h / output ~29k | ~$3.10 API-equiv
+tokens orchestrator-kickoff plan-scheduler-unification-quilt (claude-opus-5-5): input ~120 / cache read ~8.5M / cache write ~0 5m + ~350k 1h / output ~52k | ~$5.55 API-equiv
 tokens orchestrator-kickoff plan-scheduler-unification-quilt (claude-opus-5-5): input ~56 / cache read ~2.2M / cache write ~120k / output ~27k | ~$1.55 API-equiv (output est.) session 65f2e917-181e-5b0f-94c9-28d8d9b1c93d
 tokens orchestrator-kickoff plan-scheduler-unification-quilt (claude-opus-5-5): input ~38 / cache read ~1.9M / cache write ~150k / output ~22k | ~$1.59 API-equiv (output est.) session 65f2e917-181e-5b0f-94c9-28d8d9b1c93d
+tokens wave-1 nowline-m1-s1-s3 (claude-opus-5-5): input ~220 / cache read ~22M / cache write ~280k / output ~110k | ~$7.90 API-equiv (output est.) session 65f2e917-181e-5b0f-94c9-28d8d9b1c93d
+tokens review-wave-1 nowline-m1-s1-s3 (claude-opus-5-5): input ~54 / cache read ~1.7M / cache write ~93k / output ~26k | ~$1.32 API-equiv (output est.) session 65f2e917-181e-5b0f-94c9-28d8d9b1c93d
