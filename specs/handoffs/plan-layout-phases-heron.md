@@ -1,7 +1,7 @@
 ```
 --- KICKOFF: begin orchestration at [deep] ---
 
-  Status: 1/10 groups done | last review: wave-1 PASS | current: nowline m1 s3 [deep] | updated 2026-10-13
+  Status: 2/10 groups done | last review: wave-2 PASS | current: nowline m1 s4 [exec] | updated 2026-10-13 | passed unattended: gate 2 before wave 2
 
   mode: unattended | proposed unattended (harness=claude-code runner=cloud; CLAUDE_CODE_REMOTE=true, assigned branch) | guard 3x min $50 | fixups 2 | confirmed 2026-10-13 session 7e027fcc-1ca6-51b0-b005-63e1163df819 by Kickoff prompt: Run in unattended mode.
 
@@ -90,7 +90,7 @@ Replace `SwimlaneNodeDeps`, `GroupNodeDeps`, `IncludeNodeDeps` and `ParallelNode
 
 --- WAVE 2 [deep] ---
 
-#### s3 - [deep] One row-track loop for lanes and groups
+#### s3 - [deep] One row-track loop for lanes and groups (done)
 
 Add `packages/layout/src/nodes/row-track.ts` with `sequenceRowTrack(content, origin, ctx, helpers): RowTrackResult` (spec §3.8), the shared child loop of `SwimlaneNode` and `GroupNode`. Diff the two loops first (strip comments, rename `laneLeftX`/`groupContentLeftX` and `cursor`/`innerCursor`); the spec found only the iterated content differs. Any further difference becomes a parameter and goes in the commit body, never silently unified. `SwimlaneNode` keeps its tab and top-pad logic and `GroupNode` its chiclet, header band and box; both read `usedHeight`, `usedRightX` and `timeCursorX` from the result. Side-effect order and arithmetic unchanged. Covered by the lane and group tests, `tests/late-row-shifts.nowline` and the attach-geometry sweep. G1, G2, G3.
 
@@ -189,6 +189,7 @@ Out of scope: F2 (local coordinates), F3 (after R1 F3), R5 renderer status table
 ## Review log
 
 review wave-1 (nowline m1 s1-s2) 0b49f7c..28771a2: PASS - gate script re-run by reviewer on 28771a2: 360 renders, 0 differing paths, compile and determinism 314/314; make pre-commit green; statusTint values match §3.9; four Deps interfaces gone, ownerOverride dropped - 2026-10-13
+review wave-2 (nowline m1 s3) b448282..7e64d9c: PASS - loops diffed: only iterated content differs, no extra parameter; RowTrackResult {children, timeCursorX, packer} per §3.8; side-effect order unchanged; G1/G3 empty, pre-commit green; SwimlaneNode never read timeCursorX at the base, so only GroupNode reads it; passed unattended: gate 2 - 2026-10-13
 
 ## Token log
 
@@ -203,3 +204,6 @@ review wave-1 (nowline m1 s1-s2) 0b49f7c..28771a2: PASS - gate script re-run by 
 tokens orchestrator-kickoff plan-layout-phases-heron (claude-opus-5-5): input ~100 / cache read ~8.3M / cache write ~0 5m + ~300k 1h / output ~53k | ~$5.11 API-equiv
 tokens wave-1 nowline-m1-s1-s2 (claude-sonnet-5-5): input ~96 / cache read ~6.4M / cache write ~180k / output ~46k | ~$2.19 API-equiv (output est.) session 7e027fcc-1ca6-51b0-b005-63e1163df819
 tokens review-wave-1 nowline-m1-s1-s2 (claude-opus-5-5): input ~32 / cache read ~510k / cache write ~49k / output ~16k | ~$0.66 API-equiv (output est.) session 7e027fcc-1ca6-51b0-b005-63e1163df819
+tokens orchestrator-wave-1 nowline-m1-s1-s2 (claude-opus-5-5): input ~14 / cache read ~1.1M / cache write ~0 5m + ~23k 1h / output ~9.8k | ~$0.60 API-equiv
+tokens wave-2 nowline-m1-s3 (claude-opus-5-5): input ~58 / cache read ~2.7M / cache write ~120k / output ~28k | ~$1.70 API-equiv (output est.) session 7e027fcc-1ca6-51b0-b005-63e1163df819
+tokens review-wave-2 nowline-m1-s3 (claude-opus-5-5): input ~20 / cache read ~260k / cache write ~34k / output ~10k | ~$0.43 API-equiv (output est.) session 7e027fcc-1ca6-51b0-b005-63e1163df819
