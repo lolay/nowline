@@ -24,8 +24,8 @@ export interface SerializeOptions {
     includePositions?: boolean;
     /**
      * Emitted verbatim as `file.uri` in place of `document.uri.toString()`.
-     * For callers that parse from a synthetic URI (e.g. the export kernel's
-     * `memory:///kernel-N.nowline`) but must report the real source path.
+     * For callers that parse from a synthetic URI (e.g. `stageRoadmap`'s
+     * `memory:///stage-N.nowline`) but must report the real source path.
      * No normalization or percent-encoding is applied.
      */
     uri?: string;

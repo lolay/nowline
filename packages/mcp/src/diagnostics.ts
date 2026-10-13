@@ -9,18 +9,15 @@ import {
     type NowlineFile,
     type ResolveDiagnostic,
     resolveDiagnosticCode,
-    resolveIncludes,
 } from '@nowline/core';
-import { PageSizeParseError, type PdfPageSize, parsePageSize } from '@nowline/export-core';
 import {
-    collectLayoutInsights,
-    type LayoutInsight,
-    layoutRoadmap,
-    type NonWorkingDisplay,
-    normalizeThemeName,
-    THEME_NAMES,
-    type ThemeName,
-} from '@nowline/layout';
+    type HostEnv,
+    type RenderInputs,
+    type StagedRoadmap,
+    type StageResult,
+    stageForExport,
+} from '@nowline/export';
+import { collectLayoutInsights, type LayoutInsight } from '@nowline/layout';
 import { URI } from 'langium';
 
 export interface McpDiagnostic {
@@ -168,61 +165,41 @@ export async function diagnosticsErrorBlock(
     return { ok: true, doc };
 }
 
-export interface LayoutInsightInputs {
-    source: string;
-    filePath: string;
-    today?: Date;
-    theme?: ThemeName;
-    width?: number;
-    /** The render-time non-working display; undefined lets the file's key apply. */
-    nonWorking?: NonWorkingDisplay;
-    locale?: string;
-    readFile?: (absPath: string) => Promise<string>;
-    /** Pre-built document to reuse instead of re-parsing `source`. The
-     *  caller is responsible for passing a doc parsed from the same
-     *  `source` (e.g. the one from `diagnosticsErrorBlock`). */
-    doc?: Awaited<ReturnType<typeof buildDocument>>;
-    /** Receives the routed (wave-rule) include-resolver diagnostics, errors
-     *  included, once includes are resolved. Not called when the resolver
-     *  reports an uncoded include error: that error takes precedence and the
-     *  routed diagnostics are dropped (specs/waves.md §6.1). */
-    onResolveDiagnostics?: (diagnostics: McpDiagnostic[]) => void;
+/**
+ * Stage a validated document once for a tool call: the render, the export,
+ * the insights and the routed include diagnostics all read this one result.
+ * `doc` is the document `diagnosticsErrorBlock` (or `validate`) already built
+ * from `source`, so nothing is parsed again.
+ */
+export function stageMcpRoadmap(
+    doc: Awaited<ReturnType<typeof buildDocument>>,
+    source: string,
+    inputs: RenderInputs,
+    host: HostEnv,
+): Promise<StageResult> {
+    return stageForExport(source, inputs, host, { document: doc, services: getMcpServices() });
 }
 
-export async function collectMcpLayoutInsights(inputs: LayoutInsightInputs): Promise<McpInsight[]> {
-    const doc = inputs.doc ?? (await buildDocument(inputs.source));
-    const diagnostics = collectMcpDiagnostics(doc, inputs.filePath);
-    if (diagnostics.some((d) => d.severity === 'error')) {
-        return [];
+/**
+ * The routed (wave-rule) include diagnostics a stage reports, as MCP
+ * diagnostics, errors included. An uncoded include error takes precedence and
+ * hides them, as does a validator error (specs/waves.md §6.1).
+ */
+export function stageRoutedDiagnostics(stage: StageResult): McpDiagnostic[] {
+    if (stage.kind === 'staged' || (stage.kind === 'include-error' && !stage.legacy)) {
+        return stage.routed.map(resolveDiagnosticToMcp);
     }
+    return [];
+}
 
-    const services = getMcpServices();
-    const file = doc.parseResult.value;
-    const resolved = await resolveIncludes(file, inputs.filePath, {
-        services: services.Nowline,
-        readFile: inputs.readFile,
-    });
-    const legacyError = resolved.diagnostics.some(
-        (d) => d.severity === 'error' && !isRoutedResolveDiagnostic(d),
-    );
-    if (!legacyError) {
-        inputs.onResolveDiagnostics?.(routedResolveDiagnosticsToMcp(resolved.diagnostics));
-    }
-    if (resolved.diagnostics.some((d) => d.severity === 'error')) {
-        return [];
-    }
-
-    const layout = layoutRoadmap(file, resolved, {
-        today: inputs.today,
-        theme: inputs.theme ?? 'light',
-        width: inputs.width,
-        nonWorking: inputs.nonWorking,
-        locale: inputs.locale ?? 'en-US',
-    });
-
-    return collectLayoutInsights(layout, {
-        today: inputs.today,
-        locale: inputs.locale ?? 'en-US',
+/**
+ * Layout insights read from a staged roadmap's model: the layout the render
+ * draws, logo included, so the insights describe the same header and chart.
+ */
+export function layoutInsightsFromStage(stage: StagedRoadmap): McpInsight[] {
+    return collectLayoutInsights(stage.model, {
+        today: stage.layout.today,
+        locale: stage.layout.locale ?? 'en-US',
     }).map(layoutInsightToMcp);
 }
 
@@ -264,40 +241,6 @@ export class InputRequiredError extends Error {
     constructor(message: string) {
         super(message);
         this.name = 'InputRequiredError';
-    }
-}
-
-/**
- * Normalize a tool's `theme` argument with the same `normalizeThemeName` the
- * CLI uses, so `Greyscale` and the `greyscale` alias resolve to `grayscale`.
- * Throws `InputRequiredError` (the tool's input-error result) for an unknown
- * name; an omitted theme stays `undefined` so each caller applies its default.
- */
-export function parseThemeArg(raw: string | undefined): ThemeName | undefined {
-    if (raw === undefined) return undefined;
-    const theme = normalizeThemeName(raw);
-    if (theme === undefined) {
-        throw new InputRequiredError(
-            `Unknown theme "${raw}". Expected one of: ${THEME_NAMES.join(', ')}.`,
-        );
-    }
-    return theme;
-}
-
-/**
- * Validate a tool's `pageSize` argument with `parsePageSize`, for every export
- * format (a bad value fails the same way whether or not the format is PDF).
- * Mirrors the CLI's `parsePageSizeSetting`: an empty string means unset, and
- * the parser's detail is kept under a lead naming the argument.
- */
-export function parsePageSizeArg(raw: string | undefined): PdfPageSize | undefined {
-    if (raw === undefined || raw === '') return undefined;
-    try {
-        return parsePageSize(raw);
-    } catch (err) {
-        if (!(err instanceof PageSizeParseError)) throw err;
-        const detail = err.message.replace(/^invalid page size "[^"]*": /, '');
-        throw new InputRequiredError(`Invalid pageSize "${raw}": ${detail}`);
     }
 }
 

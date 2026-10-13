@@ -131,15 +131,19 @@ describe('loadLogo', () => {
             'a.png': png(64, 32),
             'b.svg': bytes('<svg viewBox="0 0 9 3"/>'),
         });
-        expect(await loadLogo('a.png', resolver, (m) => warn.push(m))).toEqual({
-            width: 64,
-            height: 32,
-        });
-        expect(await loadLogo('b.svg', resolver, (m) => warn.push(m))).toEqual({
-            width: 9,
-            height: 3,
-        });
+        const png64 = await loadLogo('a.png', resolver, (m) => warn.push(m));
+        expect(png64?.ref).toBe('a.png');
+        expect(png64?.dimensions).toEqual({ width: 64, height: 32 });
+        const svg93 = await loadLogo('b.svg', resolver, (m) => warn.push(m));
+        expect(svg93?.ref).toBe('b.svg');
+        expect(svg93?.dimensions).toEqual({ width: 9, height: 3 });
         expect(warn).toEqual([]);
+    });
+
+    it('keeps the bytes and MIME type it read', async () => {
+        const file = png(64, 32);
+        const loaded = await loadLogo('a.png', resolverFor({ 'a.png': file }), () => {});
+        expect(loaded?.asset).toEqual({ bytes: file, mime: 'application/octet-stream' });
     });
 
     it('warns and returns undefined for a missing file', async () => {
@@ -236,6 +240,41 @@ swimlane a "A"
         expect(warnings).toEqual([
             'logo ./acme.svg: removed unsupported SVG content: <script>, event handler onclick, event handler onload',
         ]);
+    });
+
+    it('embeds a loaded logo without resolving the asset again', async () => {
+        const model = await parseToModel(DSL, { logo: { width: 300, height: 100 } });
+        const asset = {
+            bytes: bytes('<svg viewBox="0 0 30 10"><rect width="30" height="10"/></svg>'),
+            mime: 'image/svg+xml',
+        };
+        let reads = 0;
+        const assetResolver = async () => {
+            reads++;
+            return asset;
+        };
+        const loaded = { ref: './acme.svg', dimensions: { width: 300, height: 100 }, asset };
+        const viaLogo = await renderSvg(model, { assetResolver, logo: loaded });
+        expect(reads).toBe(0);
+        // Same bytes in, same SVG out.
+        expect(viaLogo).toBe(await renderSvg(model, { assetResolver }));
+        expect(reads).toBe(1);
+        // Without a resolver the loaded bytes still embed.
+        expect(await renderSvg(model, { logo: loaded })).toBe(viaLogo);
+    });
+
+    it('resolves the asset when the loaded logo is for another ref', async () => {
+        const model = await parseToModel(DSL, { logo: { width: 300, height: 100 } });
+        const asset = { bytes: bytes('<svg viewBox="0 0 30 10"/>'), mime: 'image/svg+xml' };
+        let reads = 0;
+        await renderSvg(model, {
+            assetResolver: async () => {
+                reads++;
+                return asset;
+            },
+            logo: { ref: './other.svg', dimensions: { width: 300, height: 100 }, asset },
+        });
+        expect(reads).toBe(1);
     });
 
     it('shifts the title right of the logo', async () => {

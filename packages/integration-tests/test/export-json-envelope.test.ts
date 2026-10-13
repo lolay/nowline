@@ -1,6 +1,6 @@
 // Regression gate: the kernel's `json` export delegates to core's
 // `serializeToJson`, but keeps its own envelope `file.uri`. The kernel parses
-// from a synthetic `memory:///kernel-N.nowline` URI, so it passes the raw
+// from a synthetic `memory:///stage-N.nowline` URI, so it passes the raw
 // `file://${sourcePath}` string through the `uri` option. That string must
 // reach the output verbatim (no percent-encoding, no `memory:` URI), since the
 // determinism gate hashes these bytes.

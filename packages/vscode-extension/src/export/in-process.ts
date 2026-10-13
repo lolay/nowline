@@ -25,6 +25,7 @@ import {
     resolveToday,
 } from '@nowline/export';
 import { lengthToPoints, parseLength, resolveFonts } from '@nowline/export-core';
+import type { ThemeName } from '@nowline/layout';
 import type { ExportSettings } from './cli-runner.js';
 
 // ---- WASM path registration -------------------------------------------------
@@ -95,7 +96,7 @@ export interface ExportOverrides {
      */
     today?: Date | null;
     /** Theme. Defaults to `'light'` when omitted. */
-    theme?: 'light' | 'dark' | 'grayscale';
+    theme?: ThemeName;
     /** BCP-47 operator-chain locale. Defaults to `'en-US'` when omitted. */
     locale?: string;
     /** Drop `<a>` link icons from the render. Defaults to `false` (links shown). */

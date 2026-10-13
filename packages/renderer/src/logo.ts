@@ -7,7 +7,7 @@
 
 import type { LogoDimensions } from '@nowline/layout';
 import { type RasterLogoMime, rasterSize } from './image-size.js';
-import type { AssetResolver } from './svg/render.js';
+import type { AssetBytes, AssetResolver } from './svg/render.js';
 import { svgIntrinsicSize } from './svg/sanitize.js';
 
 const LOGO_MIME_BY_EXTENSION: Record<string, 'image/svg+xml' | RasterLogoMime> = {
@@ -25,8 +25,22 @@ function extensionOf(ref: string): string {
 }
 
 /**
+ * A logo read once: its size for layout and the bytes for the renderer, so no
+ * later step resolves the asset again.
+ */
+export interface LoadedLogo {
+    /** The `logo:` reference, as the roadmap declared it. */
+    ref: string;
+    /** The intrinsic size, passed to layout as `LayoutOptions.logo`. */
+    dimensions: LogoDimensions;
+    /** The bytes and MIME type the resolver returned, which `renderSvg` embeds. */
+    asset: AssetBytes;
+}
+
+/**
  * Load the `logo:` asset and read its intrinsic size, to pass to layout as
- * `LayoutOptions.logo`. Returns undefined, after a `warn` call, when the
+ * `LayoutOptions.logo` (`.dimensions`), keeping the bytes for
+ * `RenderOptions.logo`. Returns undefined, after a `warn` call, when the
  * extension is unsupported or the file is missing or unreadable. Returns
  * undefined silently when there is no `ref` or no resolver (a surface with
  * no asset access, such as the embed).
@@ -35,7 +49,7 @@ export async function loadLogo(
     ref: string | undefined,
     resolver: AssetResolver | undefined,
     warn: (message: string) => void,
-): Promise<LogoDimensions | undefined> {
+): Promise<LoadedLogo | undefined> {
     if (!ref || !resolver) return undefined;
     const ext = extensionOf(ref);
     const mime = LOGO_MIME_BY_EXTENSION[ext];
@@ -43,14 +57,15 @@ export async function loadLogo(
         warn(`unsupported logo format: ${ext || '(none)'} (${ref})`);
         return undefined;
     }
-    let bytes: Uint8Array;
+    let asset: AssetBytes;
     try {
-        bytes = (await resolver(ref)).bytes;
+        asset = await resolver(ref);
     } catch (err) {
         const reason = err instanceof Error ? err.message : String(err);
         warn(`logo file not found: ${ref} (${reason})`);
         return undefined;
     }
+    const bytes = asset.bytes;
     const size =
         mime === 'image/svg+xml'
             ? svgIntrinsicSize(new TextDecoder().decode(bytes))
@@ -63,5 +78,5 @@ export async function loadLogo(
         warn(`logo could not be parsed: ${ref} (${why})`);
         return undefined;
     }
-    return size;
+    return { ref, dimensions: size, asset };
 }

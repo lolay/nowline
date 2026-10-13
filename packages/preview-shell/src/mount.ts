@@ -10,6 +10,7 @@
 // no `acquireVsCodeApi()`, no `postMessage`, no host coupling.
 
 import type { DiagnosticRow } from '@nowline/browser';
+import type { ThemeName } from '@nowline/layout';
 import { buildViewport } from './markup.js';
 import { PREVIEW_SHELL_CSS } from './styles.js';
 
@@ -18,7 +19,10 @@ import { PREVIEW_SHELL_CSS } from './styles.js';
  * light/dark. `'grayscale'` is a fully available theme (`'greyscale'`
  * is accepted as an alias).
  */
-export type ThemeOverride = 'auto' | 'light' | 'dark' | 'grayscale' | 'greyscale';
+export type ThemeOverride = 'auto' | ThemeName | 'greyscale';
+
+/** The diagram themes the Theme dropdown offers unless the host narrows them. */
+const DEFAULT_THEMES: ThemeName[] = ['light', 'dark', 'grayscale'];
 
 /**
  * Now-line override. `'today'` and `'hide'` are the named sentinels;
@@ -1458,7 +1462,7 @@ export function mountPreview(
     }
 
     // ===== Apply initial theme menu + baselines =====
-    buildThemeMenu(options.availableThemes ?? ['light', 'dark', 'grayscale']);
+    buildThemeMenu(options.availableThemes ?? DEFAULT_THEMES);
 
     if (options.viewBaseline) {
         applyBaseline(state, options.viewBaseline, true);

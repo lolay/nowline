@@ -1,32 +1,17 @@
 import { promises as fs } from 'node:fs';
 import * as path from 'node:path';
+import type { ResolveDiagnostic } from '@nowline/core';
 import {
-    isRoutedResolveDiagnostic,
-    type NowlineFile,
-    type ResolveDiagnostic,
-    resolveIncludes,
-} from '@nowline/core';
-import {
+    acceptStagedRoadmap,
     type ExportFormat,
-    exportDocument,
+    exportStaged,
     type HostEnv,
     type RenderInputs,
+    type StageResult,
+    stageForExport,
 } from '@nowline/export';
-import {
-    lengthToPoints,
-    PageSizeParseError,
-    type PdfPageSize,
-    parseLength,
-    parsePageSize,
-} from '@nowline/export-core';
-import {
-    type NonWorkingDisplay,
-    type NormalizedZone,
-    normalizeZone,
-    resolveToday,
-    type ThemeName,
-    TimezoneError,
-} from '@nowline/layout';
+import type { PdfPageSize } from '@nowline/export-core';
+import type { NonWorkingDisplay, ThemeName } from '@nowline/layout';
 import type { AssetResolver } from '@nowline/renderer';
 import type { ParsedArgs } from '../cli/args.js';
 import {
@@ -35,9 +20,8 @@ import {
     type OutputFormat,
     resolveFormat,
 } from '../cli/formats.js';
-import { parseNonWorkingArg } from '../cli/non-working.js';
+import { type PdfOrientation, resolveCliOptions } from '../cli/options.js';
 import { resolveRenderOutputPath } from '../cli/output-path.js';
-import { resolveTheme } from '../cli/theme.js';
 import { parseNowlineJson } from '../convert/parse-json.js';
 import { printNowlineFile } from '../convert/printer.js';
 import { serializeToJson } from '../convert/schema.js';
@@ -55,7 +39,7 @@ import {
     readDirectiveLocale,
     resolveLocaleOverride,
 } from '../i18n/locale.js';
-import { loadConfig, type NowlineRc } from '../io/config.js';
+import { type LoadConfigResult, loadConfig } from '../io/config.js';
 import { CliError, ExitCode } from '../io/exit-codes.js';
 import { createLog, type Log } from '../io/log.js';
 import { readInput } from '../io/read.js';
@@ -85,12 +69,15 @@ export async function renderHandler(options: RenderHandlerOptions): Promise<void
 
     const isStdoutOutput = args.output === '-';
     const log = createLog(args.logLevel);
-    const config = await loadConfigFor(args.positional, cwd);
+    const { config, path: rcPath } = await loadConfigFor(args.positional, cwd);
+    // Every rc-backed setting resolves flag > .nowlinerc > default; a bad
+    // value is reported by `assertValid` below, where it always has been.
+    const cliOptions = resolveCliOptions(args, config, { rcPath });
 
     const format = resolveFormatOrThrow({
         flag: args.format,
         outputPath: args.output,
-        configFormat: typeof config?.defaultFormat === 'string' ? config.defaultFormat : undefined,
+        configFormat: cliOptions.defaultFormat,
         isStdout: isStdoutOutput,
     });
 
@@ -112,10 +99,11 @@ export async function renderHandler(options: RenderHandlerOptions): Promise<void
     const resolved = resolveLocaleOverride({
         flag: args.locale,
         env: process.env,
-        rc: stringFromConfig(config, 'locale'),
+        rc: cliOptions.rcLocale,
     });
     const locale = resolved.tag;
     const opLocale = operatorLocale(resolved);
+    cliOptions.assertValid();
 
     const { rendered, isBinary } = await produce({
         format,
@@ -124,23 +112,23 @@ export async function renderHandler(options: RenderHandlerOptions): Promise<void
         displayPath: input.displayPath,
         absInputPath: input.isStdin ? path.resolve(cwd, 'stdin.nowline') : input.path,
         isStdin: input.isStdin,
-        // Every rc-backed setting resolves flag > .nowlinerc > default.
-        theme: resolveTheme(args.theme, config?.theme),
-        today: resolveNowCli(args),
-        width: parseWidth(pickSetting(args.width, '--width', config, 'width')),
-        nonWorking: parseNonWorkingArg(args.nonWorking),
+        theme: cliOptions.surface.theme,
+        today: cliOptions.surface.today,
+        width: cliOptions.surface.width,
+        nonWorking: cliOptions.surface.nonWorking,
         noLinks: args.noLinks,
         strict: args.strict,
-        assetRoot: args.assetRoot,
+        assetRoot: cliOptions.assetRoot,
         // m2c format-specific options. The PDF settings parse in `produce`,
         // after validation, for every format.
-        pageSize: pickSetting(args.pageSize, '--page-size', config, 'pdfPageSize'),
-        orientation: pickSetting(args.orientation, '--orientation', config, 'pdfOrientation'),
-        margin: pickSetting(args.margin, '--margin', config, 'pdfMargin'),
-        fontSans: args.fontSans ?? stringFromConfig(config, 'fontSans'),
-        fontMono: args.fontMono ?? stringFromConfig(config, 'fontMono'),
-        headless: args.headless || boolFromConfig(config, 'headlessFonts'),
-        useSystemFonts: args.useSystemFonts || boolFromConfig(config, 'useSystemFonts'),
+        pageSize: cliOptions.surface.pageSize,
+        orientation: cliOptions.orientation,
+        marginPt: cliOptions.margin,
+        assertPdfSettingsValid: () => cliOptions.assertPdfSettingsValid(),
+        fontSans: cliOptions.fontSans,
+        fontMono: cliOptions.fontMono,
+        headless: cliOptions.headless,
+        useSystemFonts: cliOptions.useSystemFonts,
         scale: args.scale,
         start: args.start,
         locale,
@@ -220,10 +208,12 @@ interface ProduceArgs {
     strict: boolean;
     assetRoot?: string;
     // m2c format-specific
-    /** Parsed after validation, so its error follows any diagnostics. */
-    pageSize?: Setting;
-    orientation?: Setting;
-    margin?: Setting;
+    pageSize?: PdfPageSize;
+    orientation?: PdfOrientation;
+    /** Page margin in points. */
+    marginPt?: number;
+    /** Reports a bad PDF setting; run after validation so its error follows any diagnostics. */
+    assertPdfSettingsValid: () => void;
     fontSans?: string;
     fontMono?: string;
     headless: boolean;
@@ -263,18 +253,38 @@ async function produce(args: ProduceArgs): Promise<ProduceResult> {
             ? jsonToNowlineText(args.contents, args.displayPath)
             : args.contents;
 
-    // Pre-validate with locale-aware diagnostic formatting so validation
-    // errors reach the operator in their locale. The kernel will re-parse
-    // the same source below — double work accepted in exchange for faithful
-    // stderr output. Routed include-resolver diagnostics join the validator's
-    // here, so they are reported at the same point and in the same report.
-    await parseAndValidate(sourceText, args, { resolveIncludes: true });
-
     const assetRoot = args.assetRoot
         ? path.resolve(args.assetRoot)
         : path.dirname(args.absInputPath);
 
-    const host = createNodeHostEnv(assetRoot);
+    // Included files' text, kept for the code frames of routed diagnostics.
+    const included = new Map<string, string>();
+    const nodeHost = createNodeHostEnv(assetRoot);
+    const host: HostEnv = {
+        ...nodeHost,
+        readSource: async (absPath) => {
+            const text = await nodeHost.readSource(absPath);
+            included.set(absPath, text);
+            return text;
+        },
+    };
+
+    // What the stage lays out with; the export below must ask for the same.
+    const layoutInputs: RenderInputs = {
+        sourcePath: args.absInputPath,
+        today: args.today,
+        locale: args.locale ?? 'und',
+        theme: args.theme,
+        width: args.width,
+        nonWorking: args.nonWorking,
+    };
+
+    // Parse and stage once. Validation diagnostics come out in the operator's
+    // locale, and routed include-resolver diagnostics join the validator's
+    // here, so they are reported at the same point and in the same report.
+    const { stage, stageFailure } = await parseAndValidate(sourceText, args, {
+        stage: { inputs: layoutInputs, host, included },
+    });
 
     // Resolve fonts lazily — only for formats that rasterize or embed them.
     let fonts: RenderInputs['fonts'];
@@ -282,19 +292,16 @@ async function produce(args: ProduceArgs): Promise<ProduceResult> {
         fonts = await resolveNodeFonts(args);
     }
 
+    args.assertPdfSettingsValid();
+
     const kernelInputs: RenderInputs = {
-        sourcePath: args.absInputPath,
-        today: args.today,
-        locale: args.locale ?? 'und',
-        theme: args.theme,
+        ...layoutInputs,
         fonts,
-        width: args.width,
-        nonWorking: args.nonWorking,
         noLinks: args.noLinks,
         strict: args.strict,
-        pageSize: parsePageSizeSetting(args.pageSize),
-        orientation: parseOrientation(args.orientation),
-        marginPt: parseMargin(args.margin),
+        pageSize: args.pageSize,
+        orientation: args.orientation,
+        marginPt: args.marginPt,
         pngScale: parseScale(args.scale),
         msprojStart: args.start,
         onNotice: (message) => args.log.notice(message),
@@ -302,12 +309,11 @@ async function produce(args: ProduceArgs): Promise<ProduceResult> {
     };
 
     try {
-        const bytes = await exportDocument(
-            sourceText,
-            args.format as ExportFormat,
-            kernelInputs,
-            host,
-        );
+        // A stage failure or an uncoded include error was held back until
+        // here, so a bad font or PDF setting is still reported first.
+        if (!stage) throw stageFailure;
+        const staged = acceptStagedRoadmap(stage, kernelInputs);
+        const bytes = await exportStaged(staged, args.format as ExportFormat, kernelInputs, host);
         const isBinary = BINARY_FORMATS.has(args.format);
         const rendered: string | Uint8Array = isBinary
             ? bytes
@@ -444,31 +450,54 @@ function jsonToNowlineText(contents: string, displayPath: string): string {
     return printNowlineFile(ast);
 }
 
+/** What `parseAndValidate` stages with, once the source validates. */
+interface StageRequest {
+    /** The layout inputs the export that follows will ask for. */
+    inputs: RenderInputs;
+    host: HostEnv;
+    /** Collects the text of each file the stage reads, for code frames. */
+    included: Map<string, string>;
+}
+
 /**
- * Parse and validate; on errors, report them and throw. With
- * `resolveIncludes`, a file that has includes is also run through the
- * include resolver, and its routed (wave-rule) diagnostics are reported with
- * the validator's, in the same report (specs/waves.md §6.1). Every other
- * resolver diagnostic is left to the kernel, which re-resolves.
+ * Parse and validate; on errors, report them and throw. With `stage`, the
+ * validated document is also staged (include resolution, logo, layout) and a
+ * file that has includes reports the routed (wave-rule) diagnostics of that
+ * stage with the validator's, in the same report (specs/waves.md §6.1). The
+ * stage is returned for the export to reuse. Every other include error, and a
+ * stage that throws, is left for the caller to report where the kernel always
+ * did (exit 3).
  */
 async function parseAndValidate(
     contents: string,
     args: ProduceArgs,
-    options: { resolveIncludes?: boolean } = {},
+    options: { stage?: StageRequest } = {},
 ) {
     const result = await parseSource(contents, args.displayPath, { validate: true });
     const diagnostics = [...result.diagnostics];
     const sources = new Map<string, DiagnosticSource>([[args.displayPath, result.source]]);
     let failed = result.hasErrors;
-    if (!failed && options.resolveIncludes && result.ast.includes.length > 0) {
-        const included = new Map<string, string>();
-        for (const d of await resolveRoutedDiagnostics(result.ast, args, included)) {
-            const isRoot = d.sourcePath === args.absInputPath;
-            const file = isRoot ? args.displayPath : includeDisplayPath(d.sourcePath, args);
-            const text = isRoot ? result.source.contents : included.get(d.sourcePath);
-            if (text !== undefined) sources.set(file, { file, contents: text });
-            diagnostics.push(adaptResolveDiagnostic(d, file, text));
-            if (d.severity === 'error') failed = true;
+    let stage: StageResult | undefined;
+    let stageFailure: unknown;
+    if (!failed && options.stage) {
+        const { inputs, host, included } = options.stage;
+        try {
+            stage = await stageForExport(contents, inputs, host, {
+                document: result.document,
+                services: getServices(),
+            });
+        } catch (err) {
+            stageFailure = err;
+        }
+        if (stage && result.ast.includes.length > 0) {
+            for (const d of routedDiagnostics(stage)) {
+                const isRoot = d.sourcePath === args.absInputPath;
+                const file = isRoot ? args.displayPath : includeDisplayPath(d.sourcePath, args);
+                const text = isRoot ? result.source.contents : included.get(d.sourcePath);
+                if (text !== undefined) sources.set(file, { file, contents: text });
+                diagnostics.push(adaptResolveDiagnostic(d, file, text));
+                if (d.severity === 'error') failed = true;
+            }
         }
     }
     // Text mode prints only when the run fails. JSON mode prints one document
@@ -483,38 +512,19 @@ async function parseAndValidate(
     const directive = readDirectiveLocale(result.ast);
     const { tag, source } = describeContentLocaleSource(directive, args.resolvedLocale);
     args.log.verbose(`nowline: locale=${tag} (${source})`);
-    return result;
+    return { ...result, stage, stageFailure };
 }
 
 /**
- * The routed (wave-rule) diagnostics of resolving `ast`'s includes, reading
- * files as the kernel does; `included` collects each read file's text for
- * code frames. Empty when the resolver reports any other include error: that
- * one is more fundamental, and the kernel reports it as before (exit 3).
+ * The routed (wave-rule) diagnostics of a stage's include resolution. Empty
+ * when the resolver reports any other include error: that one is more
+ * fundamental, and the export reports it as before (exit 3).
  */
-async function resolveRoutedDiagnostics(
-    ast: NowlineFile,
-    args: ProduceArgs,
-    included: Map<string, string>,
-): Promise<ResolveDiagnostic[]> {
-    let diagnostics: ResolveDiagnostic[];
-    try {
-        ({ diagnostics } = await resolveIncludes(ast, args.absInputPath, {
-            services: getServices().Nowline,
-            readFile: async (absPath) => {
-                const text = await fs.readFile(absPath, 'utf-8');
-                included.set(absPath, text);
-                return text;
-            },
-        }));
-    } catch {
-        // The kernel resolves again and reports the failure.
-        return [];
+function routedDiagnostics(stage: StageResult): ResolveDiagnostic[] {
+    if (stage.kind === 'staged' || (stage.kind === 'include-error' && !stage.legacy)) {
+        return stage.routed;
     }
-    const legacyError = diagnostics.some(
-        (d) => d.severity === 'error' && !isRoutedResolveDiagnostic(d),
-    );
-    return legacyError ? [] : diagnostics.filter(isRoutedResolveDiagnostic);
+    return [];
 }
 
 // Walk up from the input (or `cwd` for stdin) to the nearest `.nowlinerc`.
@@ -522,59 +532,17 @@ async function resolveRoutedDiagnostics(
 // a usage error (specs/cli.md, `.nowlinerc`): silently ignoring it would
 // render with settings the user believes they changed. The loader's reason
 // already names the file, so it is passed through. `--serve` shares this.
-export async function loadConfigFor(inputArg: string, cwd: string): Promise<NowlineRc | null> {
+export async function loadConfigFor(inputArg: string, cwd: string): Promise<LoadConfigResult> {
     try {
-        if (inputArg === '-') {
-            const { config } = await loadConfig(cwd);
-            return config;
-        }
+        if (inputArg === '-') return await loadConfig(cwd);
         const abs = path.resolve(cwd, inputArg);
-        const dir = path.dirname(abs);
-        const { config } = await loadConfig(dir);
-        return config;
+        return await loadConfig(path.dirname(abs));
     } catch (err) {
         throw new CliError(
             ExitCode.InputError,
             `nowline: invalid .nowlinerc: ${err instanceof Error ? err.message : String(err)}`,
         );
     }
-}
-
-// Resolve the now-line date from the CLI flags.
-//
-// Precedence:
-//   1. `--now -`                           → undefined (suppress now-line)
-//   2. `--now YYYY-MM-DD`                  → floating date; zone ignored
-//   3. `--now YYYY-MM-DDTHH:MM:SS[±HH:MM]` → civil date at embedded offset; --timezone ignored
-//   4. `--now YYYY-MM-DDTHH:MM:SSZ`        → civil date in UTC; --timezone ignored
-//   5. `--now YYYY-MM-DDTHH:MM:SS`         → floating; written date part; zone ignored
-//   6. flag omitted                        → civil date of today in --timezone (default: local)
-//
-// `--timezone` is only consulted for case 6. Authored dates in the roadmap
-// (bars, milestones, axis) are floating and are never affected.
-function resolveNowCli(args: { now?: string; timezone?: string }): Date | undefined {
-    let zone: NormalizedZone | undefined;
-    if (args.timezone) {
-        try {
-            zone = normalizeZone(args.timezone);
-        } catch (err) {
-            if (err instanceof TimezoneError) {
-                throw new CliError(ExitCode.InputError, err.message);
-            }
-            throw err;
-        }
-    }
-    const result = resolveToday({ now: args.now, zone });
-    // resolveToday returns undefined for unrecognised strings; surface that as
-    // an input error so the user gets a clear message instead of a silent no-line.
-    if (result === undefined && args.now !== undefined && args.now !== '-') {
-        throw new CliError(
-            ExitCode.InputError,
-            `nowline: invalid --now "${args.now}". ` +
-                `Expected YYYY-MM-DD, YYYY-MM-DDTHH:MM:SS[Z|±HH:MM], or "-".`,
-        );
-    }
-    return result;
 }
 
 function parseScale(raw: string | undefined): number | undefined {
@@ -584,104 +552,6 @@ function parseScale(raw: string | undefined): number | undefined {
         throw new CliError(
             ExitCode.InputError,
             `nowline: invalid --scale "${raw}". Must be a positive number.`,
-        );
-    }
-    return value;
-}
-
-/**
- * A raw setting and the name to report it under: the flag when one was
- * passed, else the `.nowlinerc` key, so an error points at what the user
- * actually wrote.
- */
-interface Setting {
-    raw: unknown;
-    name: string;
-}
-
-function pickSetting(
-    flag: string | undefined,
-    flagName: string,
-    config: NowlineRc | null,
-    rcKey: string,
-): Setting | undefined {
-    if (flag !== undefined) return { raw: flag, name: flagName };
-    const raw = config?.[rcKey];
-    if (raw === undefined || raw === null) return undefined;
-    return { raw, name: `.nowlinerc ${rcKey}` };
-}
-
-function parseOrientation(
-    setting: Setting | undefined,
-): 'portrait' | 'landscape' | 'auto' | undefined {
-    if (!setting || setting.raw === '') return undefined;
-    const lower = typeof setting.raw === 'string' ? setting.raw.toLowerCase() : undefined;
-    if (lower === 'portrait' || lower === 'landscape' || lower === 'auto') return lower;
-    throw new CliError(
-        ExitCode.InputError,
-        `nowline: invalid ${setting.name} "${String(setting.raw)}". Expected portrait, landscape, or auto.`,
-    );
-}
-
-function parsePageSizeSetting(setting: Setting | undefined): PdfPageSize | undefined {
-    if (!setting || setting.raw === '') return undefined;
-    const raw = String(setting.raw);
-    try {
-        return parsePageSize(raw);
-    } catch (err) {
-        if (!(err instanceof PageSizeParseError)) throw err;
-        // The parser's message names a generic "page size"; swap that lead
-        // for the flag or rc key the value came from.
-        const detail = err.message.replace(/^invalid page size "[^"]*": /, '');
-        throw new CliError(
-            ExitCode.InputError,
-            `nowline: invalid ${setting.name} "${raw}": ${detail}`,
-        );
-    }
-}
-
-function parseMargin(setting: Setting | undefined): number | undefined {
-    if (!setting || setting.raw === '') return undefined;
-    // A bare number is points; YAML and JSON hand the rc one over as a number.
-    if (typeof setting.raw === 'number' && Number.isFinite(setting.raw) && setting.raw >= 0) {
-        return setting.raw;
-    }
-    const raw = String(setting.raw);
-    if (/^\d+(?:\.\d+)?$/.test(raw)) return Number(raw);
-    try {
-        return lengthToPoints(parseLength(raw));
-    } catch (err) {
-        const message = err instanceof Error ? err.message : String(err);
-        throw new CliError(
-            ExitCode.InputError,
-            `nowline: invalid ${setting.name} "${raw}": ${message}`,
-        );
-    }
-}
-
-function stringFromConfig(
-    config: { [key: string]: unknown } | null,
-    key: string,
-): string | undefined {
-    if (!config) return undefined;
-    const value = config[key];
-    return typeof value === 'string' ? value : undefined;
-}
-
-function boolFromConfig(config: { [key: string]: unknown } | null, key: string): boolean {
-    if (!config) return false;
-    const value = config[key];
-    return value === true;
-}
-
-function parseWidth(setting: Setting | undefined): number | undefined {
-    if (!setting || setting.raw === '') return undefined;
-    const { raw } = setting;
-    const value = typeof raw === 'number' ? raw : typeof raw === 'string' ? parseInt(raw, 10) : NaN;
-    if (!Number.isInteger(value) || value < 320) {
-        throw new CliError(
-            ExitCode.InputError,
-            `nowline: invalid ${setting.name} "${String(raw)}". Must be an integer ≥ 320.`,
         );
     }
     return value;

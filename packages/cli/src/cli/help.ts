@@ -76,7 +76,8 @@ RENDER OPTIONS
                           'default roadmap non-working:' key; omit it to let
                           the key apply. Mermaid, MS Project, and XLSX output
                           is the same in both views.
-      --asset-root <dir>  Root for logo / image assets (default: input dir).
+      --asset-root <dir>  Root for logo / image assets (default: the
+                          .nowlinerc assetRoot key, then the input dir).
       --locale <bcp47>    BCP-47 locale (e.g. fr, fr-CA) for CLI message
                           output (validator diagnostics, --help, errors).
                           Used as a fallback for the rendered drawing only
