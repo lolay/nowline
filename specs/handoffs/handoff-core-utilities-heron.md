@@ -3,8 +3,8 @@
 - **Branch:** `claude/zealous-thompson-tur82q` (lolay/nowline), assigned by the cloud harness. Started on it at `c34804c` (= `origin/main`).
 - **Plan:** `specs/handoffs/plan-core-utilities-heron.md`. Spec: `specs/core-ast-utilities.md`.
 - **Mode:** unattended, confirmed 2026-10-13 in session 462f378b-01ae-572c-b81b-c39199f8207a (harness=claude-code runner=cloud), re-confirmed by the pasted Kickoff prompt after `/compact`.
-- **Status:** m1 and m2 complete (wave 5 unit 1, m2.s4, PASS `a80548c..3305f9e`). Next: wave 5 unit 2 [exec] m3.s1-s3 (gate 4, a checkpoint). Milestone handoffs: `specs/handoffs/handoff-m2-core-utilities.md`, `specs/handoffs/handoff-m3-core-utilities.md`.
-- **Spend:** ~$36 logged against ~$24 expected (guard ~$72). Over expected: wave 4 cost ~$13 against ~$6.8 (a 45-minute [deep] run over five commits).
+- **Status:** complete. 5/5 waves done, every step of spec m1-m3 committed and reviewed (wave 5 m3 unit PASS `40dc162..59238e5`). Pending: Gary's go-ahead to open the PR.
+- **Spend:** ~$45.7 logged against ~$24 expected (guard ~$72). Over expected: wave 4 cost ~$13 against ~$6.8 (a 45-minute [deep] run over five commits).
 
 ## Waves
 
@@ -14,13 +14,13 @@
 | 2 | deep | m1.s2-s3 | PASS `b889c77..2286068` (gate 2 passed unattended) |
 | 3 | exec | m1.s4 | CONCERNS then WAIVED `3cdb1ed..3b46f6d` (worker disclosed a direct `npx vitest` run; review PASS; Gary: `waive`) |
 | 4 | deep | m2.s1-s3 | PASS `02f8880..8ef9df2` (gate 4 and gate 2 passed unattended) |
-| 5 | exec | m2.s4, then m3.s1-s3 (two units) | m2.s4 PASS `a80548c..3305f9e`; m3 unit next |
+| 5 | exec | m2.s4, then m3.s1-s3 (two units) | m2.s4 PASS `a80548c..3305f9e`; m3 PASS `40dc162..59238e5` (gate 4 passed unattended) |
 
 Gates on the way: 2 before waves 2 and 4; 4 before wave 4 (m2) and before the m3 unit of wave 5. No canary (one working directory), no gate 7.
 
 ## Pending question (verbatim)
 
-None.
+Open the PR for `claude/zealous-thompson-tur82q` into `main`? The last commit removes the plan, this handoff and the two milestone handoffs (the spec, `.changelog/core-ast-utilities.txt` and the Completion summary in history carry what is durable).
 
 ## How to resume
 
@@ -58,3 +58,7 @@ Paste the plan's Kickoff prompt (in the plan's Kickoff block). Before each unit 
 - Gary waived gate 1 on wave 3 (`waive`); main merged again before wave 4.
 - Wave 3 stopped at gate 1 on a worker-disclosed breach (a direct `npx vitest` run, local); unattended mode has no automatic fix-up for a disclosure.
 - Wave 2 passed gate 2 (a `[deep]` wave after an `[exec]` one) as an unattended checkpoint.
+
+## Completion summary
+
+See the plan's Completion summary (same commit).

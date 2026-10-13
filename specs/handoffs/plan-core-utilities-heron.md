@@ -1,7 +1,7 @@
 ```
---- KICKOFF: begin orchestration at [deep] ---
+--- KICKOFF: plan complete ---
 
-  Status: 4/5 groups done | last review: wave-5 PASS | current: nowline m3 s1-s3 [exec] | updated 2026-10-13 | passed unattended: gate 4 before wave 5 (m3) | over expected: ~$36 of ~$24
+  Status: 5/5 groups done | completed 2026-10-13
 
   mode: unattended | proposed unattended (harness=claude-code runner=cloud; assigned branch, CLAUDE_CODE_REMOTE=true) | guard 3x min $50 | fixups 2 | confirmed 2026-10-13 session 462f378b-01ae-572c-b81b-c39199f8207a by Kickoff prompt: Run in unattended mode.
 
@@ -29,15 +29,15 @@
 
 **Cost (API-equiv, Claude Code models)**
 
-| wave | expected tokens | expected $ |
-|---|---|---|
-| 1 [exec] m1 s1 | ~4.0M | ~$1.6 |
-| 2 [deep] m1 s2-s3 | ~4.4M | ~$2.3 |
-| 3 [exec] m1 s4 | ~2.0M | ~$0.89 |
-| 4 [deep] m2 s1-s3 | ~13M | ~$6.8 |
-| 5 [exec] m2 s4, m3 s1-s3 | ~7.3M | ~$3.0 |
-| orchestrator | ~12M | ~$9.9 |
-| **Total** | ~43M | ~$24 |
+| wave | expected tokens | expected $ | actual tokens | actual $ |
+|---|---|---|---|---|
+| 1 [exec] m1 s1 | ~4.0M | ~$1.6 | ~5.6M | ~$2.80 (output est.) |
+| 2 [deep] m1 s2-s3 | ~4.4M | ~$2.3 | ~13M | ~$5.88 (output est.) |
+| 3 [exec] m1 s4 | ~2.0M | ~$0.89 | ~2.2M | ~$1.28 (output est.) |
+| 4 [deep] m2 s1-s3 | ~13M | ~$6.8 | ~36M | ~$13.06 (output est.) |
+| 5 [exec] m2 s4, m3 s1-s3 | ~7.3M | ~$3.0 | ~14M | ~$8.36 (output est.) |
+| orchestrator | ~12M | ~$9.9 | ~19M | ~$14.33 (output est.) |
+| **Total** | ~43M | ~$24 | ~90M | ~$45.71 |
 
 Expected values are estimates, good to about 2-3x per wave. Sizes: m1.s1, m2.s1, m2.s3, m3.s2 large (3x); m2.s4 small (0.3x); the rest medium. Wave 5 runs as two units (m2, then m3), each with its own review. Orchestrator: kickoff, one resume after Gary's /compact, six units of bookkeeping, one wait (the kickoff answer).
 
@@ -175,15 +175,15 @@ Per spec m2.s4: add `packages/core/src/language/value-tables.ts` (`BUILTIN_STATU
 
 ### m3 - The validator split
 
-#### s1 - [exec] Move tables and support code
+#### s1 - [exec] Move tables and support code (done)
 
 Per spec §3.6 and m3.s1: move `packages/core/src/language/validator/tables.ts` and `validator/support.ts` out of `nowline-validator.ts`. Pure move, no logic change. Extend the layering test for `validator/` (decision 5). G1, G2, G3.
 
-#### s2 - [exec] Move the checks by feature
+#### s2 - [exec] Move the checks by feature (done)
 
 Per spec §3.6 and m3.s2: move check bodies into `validator/structure.ts`, `properties.ts`, `entities.ts`, `style.ts`, `calendar.ts`, `references.ts`, `symbols.ts`, one module per commit (each `m3.s2 Move <feature> checks into validator/<module>.ts`); each exports plain `(node, accept) => void` functions; `NowlineValidator` keeps one forwarding method per check, every method name, and `registerValidationChecks` and its order unchanged. `checkWaves` stays a thin call into `language/waves.ts`. Pure move. G1, G2, G3 per commit (G3 is the order proof).
 
-#### s3 - [exec] Remove the unused wave exports
+#### s3 - [exec] Remove the unused wave exports (done)
 
 Per spec m3.s3 and decision 3: delete `effectiveWave` and `leadWave` (`waves.ts:210-267`, `core/src/index.ts:55`, `:59`); rewrite the `waves.test.ts` tests that call them as direct expectations on `assignWaves` (same 16 nodes, same expected waves and leads); drop them from `specs/waves.md:1139`; append a `removed` block to `.changelog/core-ast-utilities.txt`. Update `specs/core-ast-utilities.md`'s Status line to implemented (m4.12) and note the deviations (one PR; decisions 2 and 4). G1, G2.
 
@@ -210,6 +210,7 @@ review wave-3 (nowline m1 s4) 3cdb1ed..3b46f6d: CONCERNS - worker disclosed: Ran
 review wave-3 (nowline m1 s4) 3cdb1ed..3b46f6d: WAIVED - waive - 2026-10-13
 review wave-4 (nowline m2 s1-s3) 02f8880..8ef9df2: PASS - props.ts per §3.5 replaces every §1.5 strip and date-regex copy (keeps: nowline-module parse-time strip, mcp now regex, preview-shell mount.ts, export-core getProp/getProps/hasProp); behaviour commit 2754e83 makes layout and validator strict (NL.E0405 on every date key incl. items, en+fr tests, fixed fragment, dsl.md, working-calendar.md, spec §3.5 and §7.5); style-chain.ts used by resolveStyle and NL.W0704 (W0704 skips the inline layer, caller-side, tested); calendar-declarations.ts used by validator, layout and hover, copies deleted; m2.s3 also fixes `every:[constructor]` (now NL.E0904, no layout rule; in the fixed block and spec §3.4); G1+G3 identical per commit and 02f8880..8ef9df2 (parent re-ran); notes: inline pins `after:2026-02-30` get no E0405 and layout now ignores them, `--now 2026-02-30` still rolls over, dsl.md rule 1 omits items; passed unattended: gate 4, gate 2 - 2026-10-13
 review wave-5 (nowline m2 s4) a80548c..3305f9e: PASS - value-tables.ts (statuses, capacity icons, icon names, non-working displays, WEEKDAYS re-export) via internal.ts and a layering leaf; validator, layout (non-working-display re-export, plus capacity.ts's third icon copy) and LSP (tables, WEEKDAY_NAMES) import it; tables identical before the switch; @nowline/layout exports unchanged (types narrowed to readonly tuples, all consumers type-check); G1+G3 identical (180/120); bundle 197.68 KB of 200 - 2026-10-13
+review wave-5 (nowline m3 s1-s3) 40dc162..59238e5: PASS - validator split into language/validator/{tables,support,structure,properties,entities,style,calendar,references,symbols}.ts as a pure move (line-by-line diff), 46 forwarding methods kept, registerValidationChecks and checkWaves bodies byte-identical; isNestedTeam regression test (3f745e9) before the first move, mutation-checked; layering test covers validator/ by transitive reachability; effectiveWave/leadWave removed, waves.test.ts on assignWaves (16 nodes), waves.md row, removed block, spec Status implemented (m4.12), dsl.md rule 1 lists items; G1+G3 identical per commit and 40dc162..59238e5 (parent re-ran); changelog-check green; bundle 197.94 KB of 200; passed unattended: gate 4 - 2026-10-13
 
 ## Token log
 
@@ -238,3 +239,28 @@ tokens review-wave-4 nowline-m2-s1-s3 (claude-opus-5-5): input ~64 / cache read 
 tokens orchestrator-wave-4 nowline-m2-s1-s3 (claude-opus-5-5): input ~16 / cache read ~1.5M / cache write ~7.3k 5m + ~200k 1h / output ~12k | ~$2.19 API-equiv
 tokens wave-5 nowline-m2-s4 (claude-sonnet-5-5): input ~52 / cache read ~2.1M / cache write ~200k / output ~26k | ~$1.20 API-equiv (output est.) session 462f378b-01ae-572c-b81b-c39199f8207a
 tokens review-wave-5 nowline-m2-s4 (claude-opus-5-5): input ~22 / cache read ~310k / cache write ~37k / output ~11k | ~$0.47 API-equiv (output est.) session 462f378b-01ae-572c-b81b-c39199f8207a
+tokens orchestrator-wave-5 nowline-m2-s4 (claude-opus-5-5): input ~10 / cache read ~1.1M / cache write ~0 5m + ~19k 1h / output ~10k | ~$0.57 API-equiv
+tokens wave-5 nowline-m3-s1-s3 (claude-sonnet-5-5): input ~150 / cache read ~9M / cache write ~1.2M / output ~73k | ~$5.59 API-equiv (output est.) session 462f378b-01ae-572c-b81b-c39199f8207a
+tokens review-wave-5 nowline-m3-s1-s3 (claude-opus-5-5): input ~46 / cache read ~1.2M / cache write ~79k / output ~23k | ~$1.10 API-equiv (output est.) session 462f378b-01ae-572c-b81b-c39199f8207a
+tokens orchestrator-wave-5 nowline-m3-s1-s3 (claude-opus-5-5): input ~5 / cache read ~620k / cache write ~0 5m + ~260k 1h / output ~2.8k | ~$2.23 API-equiv
+
+## Completion summary
+
+**Completed**: 2026-10-13
+**What shipped**: Spec m4.12 (R3) milestones m1-m3 on `claude/zealous-thompson-tur82q`. One content walk (`ast-walk.ts`) replaces the copies in the validator, include resolver, waves, layout and the LSP, and the resolver no longer imports the validator (`layering.test.ts` holds the rule). `util/props.ts`, `style-chain.ts`, `calendar-declarations.ts` and `value-tables.ts` replace the copied property/date helpers, style precedence chain, calendar classifier and value tables across core, layout, the LSP, the CLI and two exporters. All new modules ship only through `@nowline/core/internal`. Dates are strict everywhere (`2754e83`, the one behaviour commit): NL.E0405 for an impossible day on every date key, and layout reads one as no date. The validator is split into nine `language/validator/` modules. `effectiveWave` and `leadWave` are removed. G1 (180 renders) and G3 (120) identical at every commit; `make pre-commit` green at every commit; one changelog file with `fixed` and `removed` blocks.
+**Deviations from plan**:
+- One PR at the end instead of one per spec step (Gary).
+- `origin/main` merged four times by the parent between units, outside worker ranges: before wave 1 (#149, #150 R1), before wave 4 (#151 R4), before wave 5 (#152).
+- Gate script fixed after wave 1: G3 output quoted an absolute checkout path for one sample; the script now rewrites the checkout root.
+- Wave 3 (m1.s4) stopped at gate 1 on a worker-disclosed breach (a direct `npx vitest` run, local); Gary waived it (`waive`), and later prompts allowed a direct single-file `vitest run` for the inner loop.
+- Unattended checkpoints: gate 2 before wave 2; gate 4 and gate 2 before wave 4; gate 4 before wave 5's m3 unit. No retries, no fix-ups.
+- Rules 24 and 25 keep a caller-side `isNestedTeam` filter (spec §6), pinned by a test in m3.s2.
+- m2.s3 also fixed `every:[constructor]` passing validation (now NL.E0904); recorded in the `fixed` block and spec §3.4.
+- m2.s1's refactor was one commit across all packages; NL.W0704 skips the `inline` style layer (caller-side); layout's `capacity.ts` icon copy was also replaced in m2.s4; m3.s3 also fixed `specs/dsl.md` rule 1.
+- Cost: ~$45.7 against ~$24 expected (wave 4 ~$13 against ~$6.8); under the ~$72 guard.
+**Follow-ups**:
+- Inline date pins (`after:2026-02-30`) get no NL.E0405; the validator compares the rolled-over date for NL.E0413 while layout now ignores the pin.
+- `--now 2026-02-30` still rolls over (`layout/src/resolve-today.ts`).
+- The mermaid exporter's `resolveStartDate`/local `parseIsoDate`, `include-resolver`'s `readStartProp` and the VS Code preview's `parseIsoDate` are still lenient.
+- `schedule.ts`'s `walkLane`/`walkNode` and the layout sequencers' child loops are outside spec §1.1 and still hand-rolled (R2 territory).
+- `make bundle-size` is 197.94 KB of 200 KB.
