@@ -1,9 +1,9 @@
 ```text
 --- KICKOFF: begin orchestration at [deep] ---
 
-  Status: 0/4 groups done | last review: — | current: nowline m1 s1 [exec] | BLOCKED at gate mode | updated 2026-10-13
+  Status: 0/4 groups done | last review: — | current: nowline m1 s1 [exec] | updated 2026-10-13
 
-  mode: pending | proposed unattended (harness=claude-code runner=cloud; CLAUDE_CODE_REMOTE=true, assigned branch) | guard 3x min $50 | fixups 2
+  mode: unattended | proposed unattended (harness=claude-code runner=cloud; CLAUDE_CODE_REMOTE=true, assigned branch) | guard 3x min $50 | fixups 2 | confirmed 2026-10-13 session 8c78f794-2944-59bb-8116-4413104e9100: unattended
 
   review: every-wave (log-only)
 
@@ -14,6 +14,7 @@
   Prompt to paste into the next chat:
     In lolay/nowline, read specs/handoffs/plan-nowline-review-lantern.md. The plan is already tagged.
     On branch claude/ecstatic-babbage-qsrxbx (task branch): subagents commit each finished step.
+    Run in unattended mode.
     Run the personal-plan-orchestrate skill from the top: walk to
     each tier boundary, dispatch subagents per the skill's
     procedure, and pause only where the recorded mode stops. Do not
@@ -174,4 +175,4 @@ Write `specs/layout-phases.md` for R2, building on `specs/rendering-v2.md` (m2.5
 - `$C` = (input × in + cache read × cached + 5m write × in × 1.25 + 1h write × in × 2.00 + output × out) / 1M.
 - In another harness, or on a model not listed here, count and price per plan-execution.md "Token accounting" and "Model price table" instead.
 
-tokens orchestrator-kickoff plan-nowline-review-lantern (claude-opus-5-5): input ~180 / cache read ~17M / cache write ~0 5m + ~330k 1h / output ~83k | ~$7.64 API-equiv
+tokens orchestrator-kickoff plan-nowline-review-lantern (claude-opus-5-5): input ~190 / cache read ~18M / cache write ~0 5m + ~330k 1h / output ~88k | ~$8.04 API-equiv
