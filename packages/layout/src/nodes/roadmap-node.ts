@@ -21,7 +21,7 @@ import { defaultRowBand } from '../band-scale.js';
 import { daysBetween, resolveSizes } from '../calendar.js';
 import { resolveWorkingCalendar } from '../calendar-resolver.js';
 import { cappedPixelsPerDay } from '../canvas-width.js';
-import { parseDate, propValue, propValues } from '../dsl-utils.js';
+import { parseIsoDate, propValue, propValues } from '../dsl-utils.js';
 import { HEADER_CARD_PADDING_X, HEADER_LOGO_PAD_Y_PX } from '../header-card-geometry.js';
 import { type LogoDimensions, resolveHeaderLogo } from '../header-logo.js';
 import { localeStrings, resolveLocale } from '../i18n.js';
@@ -432,7 +432,7 @@ export class RoadmapNode {
         // once their predecessors are known.
         const datePinnedEntries: Array<MarkerEntity & { date: Date; isMilestone: boolean }> = [];
         for (const [id, anchor] of resolved.content.anchors) {
-            const date = parseDate(propValue(anchor.properties, 'date'));
+            const date = parseIsoDate(propValue(anchor.properties, 'date'));
             if (!date) continue;
             const x = timeScale.forwardWithinDomain(date);
             if (x === null) continue;
@@ -448,7 +448,7 @@ export class RoadmapNode {
             });
         }
         for (const [id, milestone] of resolved.content.milestones) {
-            const date = parseDate(propValue(milestone.properties, 'date'));
+            const date = parseIsoDate(propValue(milestone.properties, 'date'));
             if (!date) continue;
             const x = timeScale.forwardWithinDomain(date);
             if (x === null) continue;
@@ -1141,7 +1141,7 @@ function collectSlackCorridors(
     for (const [id, m] of milestones) {
         const dateRaw = propValue(m.properties, 'date');
         const afterRaw = propValues(m.properties, 'after');
-        const date = parseDate(dateRaw);
+        const date = parseIsoDate(dateRaw);
         // Reuse MilestoneNode's helpers so the corridor set agrees
         // exactly with the rendered slack-arrow set: same source x
         // (visual edge for items / cut-line for markers), same

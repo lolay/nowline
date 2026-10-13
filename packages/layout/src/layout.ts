@@ -17,7 +17,7 @@ import {
     parseCapacityValue,
     resolveCapacityIcon,
 } from './capacity.js';
-import { formatIsoDate, parseDate, propValue, propValues } from './dsl-utils.js';
+import { formatIsoDate, parseIsoDate, propValue, propValues } from './dsl-utils.js';
 import {
     ChannelGrid,
     collectRoutingObstacles,
@@ -515,7 +515,7 @@ function sequenceItem(
         let earliestCapX: number | undefined;
         let earliestCapRef: string | undefined;
         for (const ref of beforeRaw) {
-            const inlineDate = parseDate(ref);
+            const inlineDate = parseIsoDate(ref);
             const capX = inlineDate
                 ? (ctx.scale.forwardWithinDomain(inlineDate) ?? undefined)
                 : ctx.entityLeftEdges.get(ref);

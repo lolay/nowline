@@ -389,10 +389,8 @@ function resolveLocalStart(file: NowlineFile | undefined): StartState {
     const prop = file?.roadmapDecl?.properties.find((p) => propKey(p) === 'start');
     if (!prop) return { kind: 'missing' };
     const raw = prop.value;
-    if (!raw || !ISO_DATE_RE.test(raw)) return { kind: 'invalid' };
-    const d = new Date(raw);
-    if (Number.isNaN(d.getTime())) return { kind: 'invalid' };
-    return { kind: 'valid', iso: raw, date: d };
+    if (!raw || !isRealIsoDate(raw)) return { kind: 'invalid' };
+    return { kind: 'valid', iso: raw, date: new Date(raw) };
 }
 
 /**
@@ -826,9 +824,9 @@ export class NowlineValidator {
             case 'date':
             case 'start':
             case 'end':
-                // A calendar declaration's dates are checked for a real calendar day
-                // (`2026-02-30` rolls over in `Date`, and would silently move a holiday).
-                if (val && !isValidDateLiteral(val, isCalendarDeclaration(prop.$container))) {
+                // A date must name a real calendar day: `Date` would roll `2026-02-30`
+                // over to March 2, and layout reads an impossible day as no date.
+                if (val && !isRealIsoDate(val)) {
                     acceptTr(accept, 'error', { node: prop, property: 'value' }, 'NL.E0405', {
                         key,
                         value: val,
@@ -1031,9 +1029,8 @@ export class NowlineValidator {
         const dateProp = anchor.properties.find((p) => propKey(p) === 'date');
         if (!dateProp?.value) return;
         const raw = dateProp.value;
-        if (!ISO_DATE_RE.test(raw)) return;
+        if (!isRealIsoDate(raw)) return;
         const anchorDate = new Date(raw);
-        if (Number.isNaN(anchorDate.getTime())) return;
 
         const start = resolveLocalStart(anchor.$container);
         switch (start.kind) {
@@ -1072,9 +1069,8 @@ export class NowlineValidator {
         const dateProp = milestone.properties.find((p) => propKey(p) === 'date');
         if (!dateProp?.value) return;
         const raw = dateProp.value;
-        if (!ISO_DATE_RE.test(raw)) return;
+        if (!isRealIsoDate(raw)) return;
         const milestoneDate = new Date(raw);
-        if (Number.isNaN(milestoneDate.getTime())) return;
 
         const start = resolveLocalStart(milestone.$container);
         switch (start.kind) {
@@ -2013,7 +2009,7 @@ export class NowlineValidator {
         const dateProp = own.get('date');
         if (dateProp && dateProp.values.length > 0) {
             dateProp.values.forEach((value, index) => {
-                if (!isValidDateLiteral(value, true)) {
+                if (!isRealIsoDate(value)) {
                     acceptTr(
                         accept,
                         'error',
@@ -2032,11 +2028,7 @@ export class NowlineValidator {
             const prop = own.get(key);
             if (prop && isCalendarDateList(prop)) {
                 acceptTr(accept, 'error', { node: prop }, 'NL.E0902', { kind, key });
-            } else if (
-                prop &&
-                prop.values.length === 1 &&
-                !isValidDateLiteral(prop.values[0], true)
-            ) {
+            } else if (prop && prop.values.length === 1 && !isRealIsoDate(prop.values[0])) {
                 // A one-element bracket is the single date; checkPropertyValues reads `value`
                 // only, so the element is checked here.
                 acceptTr(
@@ -2350,16 +2342,7 @@ function isCalendarDateList(prop: EntityProperty): boolean {
 function scalarDate(prop: EntityProperty | undefined): string | undefined {
     if (!prop || isCalendarDateList(prop)) return undefined;
     const [value] = calendarPropValues(prop);
-    return value !== undefined && isValidDateLiteral(value, true) ? value : undefined;
-}
-
-/**
- * True for `YYYY-MM-DD` that `Date` can read. `strict` also requires a real calendar day:
- * `Date` rolls `2026-02-30` over to March 2, which the generic checks accept.
- */
-function isValidDateLiteral(value: string, strict: boolean): boolean {
-    if (strict) return isRealIsoDate(value);
-    return ISO_DATE_RE.test(value) && !Number.isNaN(new Date(value).getTime());
+    return value !== undefined && isRealIsoDate(value) ? value : undefined;
 }
 
 function weekdaysOf(decl: CalendarDeclaration): number[] {
@@ -2379,7 +2362,7 @@ function isWellFormedCalendarDeclaration(decl: CalendarDeclaration): boolean {
     const own = calendarOwnProps(decl);
     if (!hasCalendarShape(own)) return false;
     const date = own.get('date');
-    if (date && !calendarPropValues(date).every((value) => isValidDateLiteral(value, true))) {
+    if (date && !calendarPropValues(date).every((value) => isRealIsoDate(value))) {
         return false;
     }
     for (const key of ['start', 'end']) {

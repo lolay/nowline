@@ -1706,3 +1706,74 @@ describe('NL.W0704: header-height:none hides the timeline-position strip', () =>
         );
     });
 });
+
+// NL.E0405 checks every date key for a real calendar day, not only the keys of
+// calendar declarations (specs/core-ast-utilities.md §7, decision 5): `Date`
+// would roll 2026-02-30 over to 2026-03-02, and layout reads it as no date.
+describe('NL.E0405: an impossible day on any date key', () => {
+    const NBSP = ' ';
+    const BODY = 'swimlane s\n  item x duration:1w\n';
+
+    type Coded = { code: 'NL.E0405'; args: [{ key: string; value: string }] };
+
+    async function coded(source: string): Promise<{ code?: string; message: string }[]> {
+        const r = await parse(source);
+        return r.diagnostics.map((d) => ({
+            code: (d.data as Coded | undefined)?.code,
+            message: d.message,
+        }));
+    }
+
+    async function e0405(source: string): Promise<Coded> {
+        const r = await parse(source);
+        const found = r.diagnostics.filter(
+            (d) => (d.data as Coded | undefined)?.code === 'NL.E0405',
+        );
+        expect(found).toHaveLength(1);
+        return found[0].data as Coded;
+    }
+
+    it('rejects a milestone date:2026-02-30, in English and French', async (): Promise<void> => {
+        const source = `roadmap r start:2026-01-05\nmilestone m date:2026-02-30\n${BODY}`;
+        expect(await coded(source)).toEqual([
+            {
+                code: 'NL.E0405',
+                message: 'Invalid date "2026-02-30". Use ISO 8601 format: YYYY-MM-DD.',
+            },
+        ]);
+        const { code, args } = await e0405(source);
+        expect(tr('fr', code, ...args)).toBe(
+            `date invalide «${NBSP}2026-02-30${NBSP}». Utilisez le format ISO 8601${NBSP}: AAAA-MM-JJ.`,
+        );
+    });
+
+    it('rejects a roadmap start:2026-02-30, in English and French', async (): Promise<void> => {
+        const source = `roadmap r start:2026-02-30\n${BODY}`;
+        expect(await coded(source)).toEqual([
+            {
+                code: 'NL.E0405',
+                message: 'Invalid start "2026-02-30". Use ISO 8601 format: YYYY-MM-DD.',
+            },
+        ]);
+        const { code, args } = await e0405(source);
+        expect(tr('fr', code, ...args)).toBe(
+            `start invalide «${NBSP}2026-02-30${NBSP}». Utilisez le format ISO 8601${NBSP}: AAAA-MM-JJ.`,
+        );
+    });
+
+    it('rejects an anchor date:2025-12-40', async (): Promise<void> => {
+        const source = `roadmap r start:2025-12-01\nanchor a date:2025-12-40\n${BODY}`;
+        expect((await coded(source)).map((d) => d.code)).toEqual(['NL.E0405']);
+    });
+
+    it('does not compare an impossible milestone date with start:', async (): Promise<void> => {
+        // Rolled over, 2026-02-30 would be 2026-03-02, before start: and so NL.E0504 too.
+        const source = `roadmap r start:2026-03-05\nmilestone m date:2026-02-30\n${BODY}`;
+        expect((await coded(source)).map((d) => d.code)).toEqual(['NL.E0405']);
+    });
+
+    it('accepts a leap day in a leap year', async (): Promise<void> => {
+        const source = `roadmap r start:2024-01-01\nmilestone m date:2024-02-29\n${BODY}`;
+        expect(await coded(source)).toEqual([]);
+    });
+});

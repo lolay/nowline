@@ -1049,7 +1049,7 @@ Order never matters: the declarations in any order in the file, or merged from i
 | `NL.E0906` | error | The open-ended week leaves no working day. |
 | `NL.E0907` | error | Duplicate id within one keyword in one file. |
 | `NL.W0705` | warning | `days-per-week` differs from the working days the open-ended week leaves. |
-| `NL.E0405` | error | A date that is not a real calendar day (on a calendar declaration `2026-02-30` is rejected; other entities keep the looser check). |
+| `NL.E0405` | error | A date that is not a real calendar day (`2026-02-30`), on a calendar declaration as on every other entity's `date:`, `start:` or `end:`. |
 | `NL.W0700` | warning | `end:` or `every:` on any other entity: the key is ignored. |
 
 **Includes.** Calendar declarations follow `config:` modes (see "Include Declaration"). On `config:merge` they merge, a named child declaration is shadowed by the parent's of the same keyword and name, and unnamed ones always merge. `config:ignore` merges none. On `config:isolate` the child's declarations stay in its region's config and have no effect on the chart yet: an isolated region is laid out on the host's calendar, and per-region calendars are not part of this release. The validator reads only its own file, so a `non-working weekend` or an open-ended recurrence in an include is not counted by `NL.E0906` and `NL.W0705`; the calendar falls back to the preset if an included file closes the whole week. A malformed declaration in an include is skipped.
@@ -1228,7 +1228,7 @@ The parser enforces these rules and produces clear error messages with file posi
 
 **Dates, durations, sizes, scales**
 
-1. `anchor` `date:` values and dated `milestone` `date:` values are valid ISO 8601 dates.
+1. `date:`, `start:` and `end:` values (on the roadmap, an anchor, a milestone or a calendar declaration) are ISO 8601 dates that name a real calendar day: `2026-02-30` is `NL.E0405`, not March 2, and the layout reads it as no date.
 2. `duration:` property values must match the raw duration pattern (`\d+(\.\d+)?[dwmqy]`) — literal only, no alias name lookup. `scale:` property values use the same raw duration pattern.
 3. `size:` property values must reference a `size` declaration in the roadmap section. Forward references are an error (rule 15 applies to `size:` the same way it applied to `duration:`).
 4. A `size` declaration's id must not match the raw duration pattern `\d+(\.\d+)?[dwmqy]` and must not be a bare `d`, `w`, `m`, `q`, or `y`. This avoids ambiguity at the call site.

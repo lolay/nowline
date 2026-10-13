@@ -35,7 +35,7 @@ import {
 } from '../generated/ast.js';
 import type { MessageArgs } from '../i18n/index.js';
 import type { WaveKind, WaveSuggestion } from '../i18n/wave-message-types.js';
-import { ISO_DATE_RE, propKey } from '../util/props.js';
+import { ISO_DATE_RE, isRealIsoDate, propKey } from '../util/props.js';
 import { singleLine } from '../util/single-line.js';
 import {
     type DeclarationNode,
@@ -328,10 +328,6 @@ export function assignWaves(
 /** Resolves an id to its declaration. Layout and includes pass merged lookups. */
 export type WaveRefLookup = (id: string) => AstNode | undefined;
 
-function isValidIsoDate(v: string): boolean {
-    return ISO_DATE_RE.test(v) && !Number.isNaN(new Date(v).getTime());
-}
-
 function dateProp(node: AstNode): string | undefined {
     const props = (node as { properties?: EntityProperty[] }).properties ?? [];
     return props.find((p) => propKey(p) === 'date')?.value;
@@ -371,7 +367,7 @@ export function waveFloorDate(
                     date = dateProp(target);
                 }
             }
-            if (date === undefined || !isValidIsoDate(date)) continue;
+            if (date === undefined || !isRealIsoDate(date)) continue;
             if (best === null || date > best.date) best = { date, ref: v };
         }
     }

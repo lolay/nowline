@@ -20,7 +20,7 @@ import type {
 } from '@nowline/core';
 import { findProp } from '@nowline/core/internal';
 import { type CalendarConfig, resolveCalendar } from './calendar.js';
-import { formatIsoDate, parseDate, propValues } from './dsl-utils.js';
+import { parseIsoDate, propValues } from './dsl-utils.js';
 import {
     type CalendarRule,
     fromCalendarConfig,
@@ -112,8 +112,8 @@ function declarationRule(decl: CalendarDeclaration): CalendarRule | undefined {
 
     if (has('date')) {
         if (has('every') || has('start') || has('end')) return undefined;
-        const dates = propValues(props, 'date').map(realDate);
-        if (dates.length === 0 || dates.some((date) => date === undefined)) return undefined;
+        const dates = propValues(props, 'date').map((raw) => parseIsoDate(raw));
+        if (dates.length === 0 || dates.some((date) => date === null)) return undefined;
         rule.dates = dates as Date[];
         return rule;
     }
@@ -138,17 +138,7 @@ function declarationRule(decl: CalendarDeclaration): CalendarRule | undefined {
 /** The one date a `start:` / `end:` names; a one-element bracket is that date. */
 function singleDate(props: EntityProperty[], key: 'start' | 'end'): Date | undefined {
     const values = propValues(props, key);
-    return values.length === 1 ? realDate(values[0]) : undefined;
-}
-
-/**
- * A `YYYY-MM-DD` that names a real calendar day, at UTC midnight. `parseDate`
- * rolls `2026-02-30` over to March 2; the validator rejects it (NL.E0405), so
- * the resolver does too.
- */
-function realDate(raw: string): Date | undefined {
-    const date = parseDate(raw);
-    return date && formatIsoDate(date) === raw ? date : undefined;
+    return (values.length === 1 && parseIsoDate(values[0])) || undefined;
 }
 
 /**

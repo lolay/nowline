@@ -13,7 +13,7 @@
 // bottom-first slot once every centerX is known.
 
 import type { MilestoneDeclaration } from '@nowline/core';
-import { formatIsoDate, parseDate, propValue, propValues } from '../dsl-utils.js';
+import { formatIsoDate, parseIsoDate, propValue, propValues } from '../dsl-utils.js';
 import { itemSlackAttachY } from '../item-port-geometry.js';
 import type { LayoutContext } from '../layout-context.js';
 import { resolveStyle } from '../style-resolution.js';
@@ -168,7 +168,7 @@ export class MilestoneNode {
         const style = resolveStyle('milestone', m.properties, ctx.styleCtx);
         const dateRaw = propValue(m.properties, 'date');
         const afterRaw = propValues(m.properties, 'after');
-        const date = parseDate(dateRaw);
+        const date = parseIsoDate(dateRaw);
         const inRowY = ctx.timeline.markerRow.y;
         const radius = MARKER_DIAMOND_RADIUS_PX;
         const title = m.title ?? this.id;

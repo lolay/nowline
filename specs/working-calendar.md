@@ -249,7 +249,7 @@ The `non-working` and `working` declarations share one check, and the kind in a 
 - **NW3.** If the open-ended week covers all seven days, `NL.E0906` is reported on each open-ended `non-working` declaration. Then, for each `non-working … every:` with exactly one bound, if the open-ended week plus its days covers all seven, it is reported too. A recurrence bounded on both sides may close all seven days (a closed window such as a year-end shutdown). The rule is the validator's mirror of the calendar's own `RangeError` for the root file.
 - **NW4.** Reported on the custom block's `days-per-week` property when there is one, else on the roadmap's `calendar:` property, else on the first open-ended declaration, else on the roadmap declaration. Business with no declarations leaves 5 against 5, `calendar:full` 7 against 7, and example C 5 against 5, so all are quiet. It is skipped when no working weekday is left (`NL.E0906` reports that).
 - A file with no `roadmap` declaration (an include) is skipped by NW3 and NW4, and a malformed declaration is left out of the open-ended week.
-- **`NL.E0405`** on a calendar declaration checks that the date is a real calendar day. Other entities keep the looser check, which accepts `2026-02-30`.
+- **`NL.E0405`** checks that the date is a real calendar day, on a calendar declaration as on every other entity (`2026-02-30` is rejected everywhere).
 - **`end:` and `every:` on any other entity** get the existing `NL.W0700`.
 
 ## 7. Rendering

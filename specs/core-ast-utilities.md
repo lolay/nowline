@@ -268,10 +268,10 @@ export function isRealIsoDate(raw: string): boolean;
 
 and a `packages/core/src/language/value-tables.ts` with `BUILTIN_STATUSES`, `BUILTIN_CAPACITY_ICONS`, `BUILTIN_ICON_NAMES` and `NON_WORKING_DISPLAYS` (plus `WEEKDAYS` from §3.4). Layout re-exports `NON_WORKING_DISPLAYS` from core, so `@nowline/layout`'s public export and the MCP and browser code that import it are unchanged.
 
-- Every listed copy (§1.5) imports these instead. Each keeps its current semantics; where two copies differ (`export-core`'s `getProp` returns the first list element, layout's `propValue` does not), the caller keeps its own function built on `findProp`.
+- Every listed copy (§1.5) imports these instead. Each keeps its current semantics; where two copies differ (`export-core`'s `getProp` returns the first list element, layout's `propValue` does not), the caller keeps its own function. `export-core`'s `getProp`, `getProps` and `hasProp` also compare keys with `===` and never strip a `:`, which `findProp` would change, so they keep their own lookup.
 - `printer.ts` keeps its strip: it formats hand-written JSON whose keys may end in `:`. It uses `propKey`.
 - `@nowline/preview-shell` keeps its inline regex (`mount.ts:1537`): it deliberately has no engine dependency ([`architecture.md`](./architecture.md), preview-shell entry).
-- `parseIsoDate` is strict (§7, decision 4): it drops the roll-over of `dsl-utils.ts:24-30`, so layout reads `2026-02-30` as no date, the same as the validator. Only callers that skip validation can see the difference; the step that switches layout to it is marked *behaviour*, carries a `fixed` fragment, and G1 confirms no sample relies on roll-over.
+- `parseIsoDate` is strict (§7, decisions 4 and 5): it drops the roll-over of layout's old `parseDate`, so layout reads `2026-02-30` as no date. The validator was strict only inside calendar declarations, and `resolveLocalStart` and the wave rules' `isValidIsoDate` accepted `2026-02-30` (which `Date` rolls to 2026-03-02), so the same commit makes the validator strict too: `NL.E0405` fires for an impossible day on every `date:`, `start:` and `end:`, and `resolveLocalStart` and the wave start floor use `isRealIsoDate`. That commit is marked *behaviour*, carries a `fixed` fragment, and G1 and G3 confirm no sample relies on roll-over.
 
 ### 3.6 The validator split
 
@@ -396,3 +396,4 @@ Gary, 2026-10-13:
 2. **`effectiveWave` and `leadWave`.** Remove them in m3.s3, with no deprecation step: nothing outside core's own tests calls them. A `removed` fragment covers the published package.
 3. **Publishing the new helpers.** Through a `@nowline/core/internal` subpath, documented as unstable, not as supported `@nowline/core` API. Every consumer is another `@nowline/*` package in lock-step. This reverses the draft's recommendation.
 4. **Strict dates in layout.** Make `parseIsoDate` strict, so layout agrees with the validator on impossible dates (§3.5). This reverses the draft's recommendation.
+5. **Strict dates in the validator too.** Decision 4 assumed the validator already rejected impossible days everywhere; it did so only in calendar declarations. The behaviour commit of m2.s1 makes both strict: `NL.E0405` fires for `2026-02-30` on every date key, and layout reads it as no date (§3.5). One `fixed` fragment covers both.
