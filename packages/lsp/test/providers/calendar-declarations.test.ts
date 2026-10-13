@@ -143,7 +143,6 @@ describe('calendar declarations: hover', () => {
 
 describe('calendar declarations: hover note on a title the chart never draws', () => {
     const BOUNDED = '_Title not drawn on the chart: bounded recurrences are not labelled._';
-    const WORKING = '_Title not drawn on the chart: working days are not labelled._';
 
     /** Hover text on `decl`'s id, the declaration on its own in a config block. */
     async function declHover(decl: string, id: string) {
@@ -222,15 +221,26 @@ describe('calendar declarations: hover note on a title the chart never draws', (
         expect(text?.endsWith(`\n\n${BOUNDED}`)).toBe(true);
     });
 
-    // specs/working-calendar.md §7.4: a titled `working` exception is never labelled.
-    it('notes a titled working declaration, dated or recurring', async () => {
+    // specs/working-calendar.md §7.4: a dated, titled `working` declaration is
+    // labelled on the chart; a titled bounded working recurrence is not.
+    it('adds no note to a titled dated working declaration', async () => {
         const dated = await hoverText(exampleD, at(exampleD, 'crunch', 2));
-        expect(dated?.endsWith(`\n\n${WORKING}`)).toBe(true);
+        expect(dated).toBeDefined();
+        expect(dated).not.toContain('not drawn');
+        const range = await declHover(
+            'working weekend "Crunch weekend" start:2026-01-10 end:2026-01-11',
+            'weekend',
+        );
+        expect(range).toBeDefined();
+        expect(range).not.toContain('not drawn');
+    });
+
+    it('notes a titled bounded working recurrence like a non-working one', async () => {
         const recurring = await declHover(
             'working sat "Saturday shift" every:sat start:2026-02-01',
             'sat',
         );
-        expect(recurring?.endsWith(`\n\n${WORKING}`)).toBe(true);
+        expect(recurring?.endsWith(`\n\n${BOUNDED}`)).toBe(true);
     });
 
     it('adds no note to an untitled working declaration', async () => {
