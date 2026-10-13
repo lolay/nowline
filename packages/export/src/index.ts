@@ -319,7 +319,7 @@ async function stageDocument(
         width: inputs.width,
         locale: inputs.locale,
         nonWorking: inputs.nonWorking,
-        logo,
+        logo: logo?.dimensions,
     });
 
     // `report` forwards non-strict warnings to `onWarning`; only the
@@ -328,6 +328,7 @@ async function stageDocument(
         const warnings: string[] = [];
         const svg = await renderSvg(model, {
             assetResolver,
+            logo,
             noLinks: inputs.noLinks ?? false,
             strict: inputs.strict ?? false,
             warn: (msg) => warnings.push(msg),

@@ -16,13 +16,12 @@ import {
 } from '@nowline/core';
 import {
     type LayoutOptions,
-    type LogoDimensions,
     layoutRoadmap,
     type PositionedRoadmap,
     roadmapLogoRef,
 } from '@nowline/layout';
 import { type LangiumDocument, type LangiumSharedCoreServices, URI } from 'langium';
-import { loadLogo } from './logo.js';
+import { type LoadedLogo, loadLogo } from './logo.js';
 import type { AssetResolver } from './svg/render.js';
 
 /** Langium's `DiagnosticSeverity.Error`. */
@@ -73,8 +72,8 @@ export type StageResult =
           resolved: ResolveResult;
           /** Routed warnings (no errors). */
           routed: ResolveDiagnostic[];
-          /** The logo's intrinsic size, as layout received it. */
-          logo?: LogoDimensions;
+          /** The loaded logo: size for layout, bytes for `RenderOptions.logo`. */
+          logo?: LoadedLogo;
           /** Asset warnings (missing or unreadable logo); the caller applies `strict`. */
           warnings: string[];
           model: PositionedRoadmap;
@@ -141,6 +140,13 @@ export async function stageRoadmap(inputs: StageInputs): Promise<StageResult> {
     );
     // Named keys, not a spread: a caller may pass a wider options object.
     const { theme, today, width, locale, nonWorking } = inputs.layout;
-    const model = layoutRoadmap(ast, resolved, { theme, today, width, locale, nonWorking, logo });
+    const model = layoutRoadmap(ast, resolved, {
+        theme,
+        today,
+        width,
+        locale,
+        nonWorking,
+        logo: logo?.dimensions,
+    });
     return { kind: 'staged', document, ast, resolved, routed, logo, warnings, model };
 }

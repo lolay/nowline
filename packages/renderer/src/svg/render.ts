@@ -107,6 +107,7 @@ import {
     WAVE_STYLED_STRIP_MIX_OPACITY,
     WAVE_STYLED_TINT_OPACITY,
 } from '@nowline/layout';
+import type { LoadedLogo } from '../logo.js';
 import { BUILTIN_ICON_SVG, CAPACITY_ICON_SVG } from './icons.js';
 import { IdGenerator } from './ids.js';
 import { sanitizeSvg, svgIntrinsicSize } from './sanitize.js';
@@ -134,6 +135,12 @@ export type FontFamilies = Record<'sans' | 'serif' | 'mono', string>;
 
 export interface RenderOptions {
     assetResolver?: AssetResolver;
+    /**
+     * The logo `loadLogo` already read. Its bytes are embedded as they are,
+     * so the asset is not resolved a second time. Omitted: `renderSvg`
+     * resolves the logo through `assetResolver`.
+     */
+    logo?: LoadedLogo;
     noLinks?: boolean;
     strict?: boolean;
     warn?: (message: string) => void;
@@ -2335,7 +2342,7 @@ function renderAttributionMark(model: PositionedRoadmap, fonts: FontFamilies): s
 // disagree, and then it letterboxes rather than cropping or distorting.
 async function embedLogo(
     logo: PositionedLogo,
-    resolver: AssetResolver,
+    resolver: AssetResolver | undefined,
     idPrefix: string,
     options: RenderOptions,
 ): Promise<string> {
@@ -2343,7 +2350,13 @@ async function embedLogo(
     const { x, y, width, height } = logo.box;
     let asset: AssetBytes;
     try {
-        asset = await resolver(logoRef);
+        if (options.logo && options.logo.ref === logoRef) {
+            asset = options.logo.asset;
+        } else if (resolver) {
+            asset = await resolver(logoRef);
+        } else {
+            return '';
+        }
     } catch (err) {
         const msg = `logo file not found: ${logoRef} (${err instanceof Error ? err.message : String(err)})`;
         if (options.strict) throw err;
@@ -3137,7 +3150,7 @@ export async function renderSvg(
     parts.push(renderAttributionMark(model, fonts));
 
     // Logo (if header carries one)
-    if (model.header.logo && options.assetResolver) {
+    if (model.header.logo && (options.logo || options.assetResolver)) {
         const logoSvg = await embedLogo(
             model.header.logo,
             options.assetResolver,

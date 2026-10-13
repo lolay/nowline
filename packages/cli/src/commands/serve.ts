@@ -178,9 +178,9 @@ export async function serveHandler(options: ServeHandlerOptions): Promise<void> 
                 today,
                 locale,
                 nonWorking,
-                logo,
+                logo: logo?.dimensions,
             });
-            const svg = await renderSvg(model, { assetResolver, warn });
+            const svg = await renderSvg(model, { assetResolver, logo, warn });
             lastPayload = { kind: 'svg', body: svg };
             if (fileSink) {
                 try {

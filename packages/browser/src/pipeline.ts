@@ -312,7 +312,7 @@ export async function renderSource(
         locale: options.locale,
         width: options.width,
         nonWorking: options.nonWorking,
-        logo,
+        logo: logo?.dimensions,
     });
 
     const diagnosticLevel = options.diagnosticLevel ?? 'error';
@@ -328,6 +328,7 @@ export async function renderSource(
     const svg = await renderSvg(model, {
         idPrefix: options.idPrefix,
         assetResolver: options.assetResolver,
+        logo,
         noLinks: !showLinks,
         strict,
         warn: (msg) => warnMessages.push(msg),

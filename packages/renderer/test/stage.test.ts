@@ -149,7 +149,8 @@ describe('stageRoadmap', () => {
         if (result.kind !== 'staged') return;
         expect(result.warnings).toEqual([]);
         expect(result.routed).toEqual([]);
-        expect(result.logo).toEqual({ width: 30, height: 10 });
+        expect(result.logo?.ref).toBe('./acme.svg');
+        expect(result.logo?.dimensions).toEqual({ width: 30, height: 10 });
         expect(result.model.header.logo?.box).toBeDefined();
         expect(result.model.theme).toBe('dark');
         expect(result.resolved.processedFiles.has('/workspace/lane.nowline')).toBe(true);
