@@ -3,7 +3,7 @@
 - **Plan:** `specs/handoffs/plan-layout-phases-heron.md`
 - **Branch:** `claude/vibrant-hopper-ac4s73` (harness-assigned task branch; started at ff8eb8b, fast-forwarded to `origin/main` 4498948 at kickoff, no commits of its own before this one)
 - **Mode:** unattended (confirmed 2026-10-13, session 7e027fcc-1ca6-51b0-b005-63e1163df819; harness=claude-code runner=cloud)
-- **Status:** waves 1-5 PASS (m1, m2, m3 s1-s2). Dispatching wave 6, unit m3 s3.
+- **Status:** m1-m3 complete (waves 1-5 and wave 6's m3 unit PASS). Dispatching wave 6, unit m4 s1-s2.
 
 ## What's done
 
@@ -27,6 +27,11 @@
 - wave-3 (nowline m1 s4) 4400fbd..bbab969: PASS. m1.s4 bbab969 (`nodes/marker-band.ts`; `collectSlackCorridors` into `milestone-node.ts`). Pure move.
 - wave-4 (nowline m2 s1-s2) f354568..f5a6416: PASS. m2.s1 51c95bd (`nodes/item-measure.ts`, `ItemNode` from the measure, N6), m2.s2 f5a6416 (prediction from the measure, predictor deleted, row height = pitch). G1/G3 empty vs 570254b.
 - wave-5 (nowline m3 s1-s2) bb92ae0..1dd90a6: PASS. m3.s1 a517539 (`createLayoutContext`), m3.s2 1dd90a6 (`indexFootnotes` + `buildFootnotePanel`). G1/G3 empty vs 9c71cbb.
+- wave-6 m3 unit (nowline m3 s3) cb898b5..3112f70: PASS. m3.s3 3112f70 (N2, N4, N7; `CanvasExtent` replaces `LayoutContext.chartRightX`). G1/G3 empty vs 9c71cbb.
+
+## Milestone m3 summary (milestone handoff)
+
+m3 is done: one `createLayoutContext` builder, footnotes indexed once (`indexFootnotes` + `buildFootnotePanel`), and placement no longer reads the canvas (lanes width 0 until P9, regions fitted only after P8, milestones placed as `MilestonePlacement` and positioned at P11). `chartRightX` lives in a private `CanvasExtent` in `roadmap-node.ts` until m5.s4. Byte-identical. m4 starts from 3112f70.
 
 ## Milestone m2 summary (milestone handoff)
 
@@ -41,15 +46,17 @@ m1 is done: status tints are theme tokens (`Theme.statusTint`, applied by a loca
 - Gate 2 before wave 2 ([exec] to [deep]) passed as an unattended checkpoint.
 - Gate 4 (m1 to m2) and gate 2 before wave 4 passed as unattended checkpoints. The milestone handoff core.md asks for at gate 4 is kept as a section of this session handoff ("Milestone m1 summary") rather than a separate `handoff-m2-*.md`, since every run file is removed in the last commit.
 - Gate 4 (m2 to m3) passed as a checkpoint before wave 5; m2 summary kept in this handoff the same way.
-- Gate 2 before wave 6 ([exec] to [deep]) passes as a checkpoint.
+- Gate 2 before wave 6 ([exec] to [deep]) passed as a checkpoint.
+- Gate 4 (m3 to m4) passes as a checkpoint before wave 6's m4 unit; m3 summary kept in this handoff.
+- m3.s3's worker briefly copied two test files into the gitignored `.scratch/g1/base-4498948` tree while checking its tests fail on the base, then removed them; inside the working directory, nothing tracked touched.
 
 ## Spend
 
-~$22.02 of ~$46 expected (guard 3x min $50 = $138). Wave 1 ran ~$2.85 against ~$0.75 expected (cold gate-script build, 5-minute gate runs); later waves' gate runs are warm.
+~$28.21 of ~$46 expected (guard 3x min $50 = $138). Wave 1 ran ~$2.85 against ~$0.75 expected (cold gate-script build, 5-minute gate runs); later waves' gate runs are warm.
 
 ## Next unit
 
-Wave 6 [deep], unit m3 s3 (then m4, m5 and m6 s1-s2 as their own units).
+Wave 6 [deep], unit m4 s1-s2 (then m5 and m6 s1-s2).
 
 ## How to resume
 
@@ -71,6 +78,7 @@ None. Kickoff answered: "Unattended"; re-confirmed by the pasted Kickoff prompt.
 - From wave 3 (PASS): `nodes/marker-band.ts` also holds `calendarLabelEntry`, `MarkerEntity` (exported), `markerLabelWidth` and `PackedPlacement`; `collectSlackCorridors` sits after `buildMilestones` in `milestone-node.ts`.
 - From wave 4 (PASS): `ItemNode` takes `ItemNodeGeometry` (id, naturalWidth, visualWidth, caption {leftInset, fit}, barExtra), a structural subset that `ItemMeasure` extends. `ItemMeasure` keeps two named widths for byte identity: `visualWidth` (box width, `(startX + naturalWidth) - startX`) and `naturalVisualWidth` (naturalWidth less insets, read by chip fit and first-line reserve); it also carries id, size, caption.title/leftInset/lastBaseline. `sequenceItem` throws if a handed measure's start differs from the placement start. The corpus test uses a test-only `setItemNodeTrace` hook. Moved helpers stay exported from `item-measure.ts`. The row height is now the pitch (`step + barExtra`).
 - From wave 5 (PASS): `createLayoutContext` resolves sizes itself from `source.content.sizes` under `shared.cal`; `init` has `footnotes` and `markerRowPlacements`; `waves` is spread in only when set. `buildFootnotes` is now `indexFootnotes(footnotes): FootnoteIndex` (type in `footnote-node.ts`) plus `buildFootnotePanel(...): PositionedFootnoteArea`; where later step text (m3.s3) says `buildFootnotes`, read `buildFootnotePanel`. `place` indexes once, before building the context, and hands the index in through `init.footnotes`.
+- From wave 6 m3 unit (PASS): `CanvasExtent` is private to `roadmap-node.ts` with only `grow` and `rightX`; its seed is `naturalChartRightX`, grown at P3, P7, P8, and a final `chartRightX` after P8 feeds P9, P10, the header, the attribution and the model (m5.s4 moves it to `phases/finalize.ts` and adds `freeze`/`final`). `MilestoneNode.place` returns `MilestonePlacement`; `positionMilestones(placements, rows)` builds `PositionedMilestone` at P11 and throws on a missing re-pack row. `MilestoneNode.place` still writes each milestone's entity midpoint with a pre-pack y named `estimatedCenterY` (stale read kept, §3.10 rule 4; marker-predecessor slack arrows read it). `buildNowline`, `buildWaveLegend`, `buildFootnotePanel` take `chartRightX` as their last argument. `specs/waves.md` still says `buildFootnotes`; m6.s3's spec update fixes it.
 
 ## Environment notes
 
@@ -85,3 +93,4 @@ None. Kickoff answered: "Unattended"; re-confirmed by the pasted Kickoff prompt.
 - After a merge of `main` the gate's merge-base moves and the first gate run rebuilds the base cold (~5 min).
 - In `packages/layout`, vitest is `packages/layout/node_modules/.bin/vitest`.
 - Run `make format` after edits; `make lint` flags Biome format drift (line width).
+- To check a new test fails on the base without `git worktree`: copy it into `.scratch/g1/base-<merge-base>/packages/layout/test/`, run that tree's `node_modules/.bin/vitest run <file>`, then delete the copy. Use the current merge-base's tree, not an older one.

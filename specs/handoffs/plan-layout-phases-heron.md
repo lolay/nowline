@@ -1,7 +1,7 @@
 ```
 --- KICKOFF: begin orchestration at [deep] ---
 
-  Status: 5/10 groups done | last review: wave-5 PASS | current: nowline m3 s3 [deep] | updated 2026-10-13 | passed unattended: gate 4 before wave 5
+  Status: 6/10 groups done | last review: wave-6 PASS | current: nowline m4 s1-s2 [deep] | updated 2026-10-13 | passed unattended: gate 2 before wave 6
 
   mode: unattended | proposed unattended (harness=claude-code runner=cloud; CLAUDE_CODE_REMOTE=true, assigned branch) | guard 3x min $50 | fixups 2 | confirmed 2026-10-13 session 7e027fcc-1ca6-51b0-b005-63e1163df819 by Kickoff prompt: Run in unattended mode.
 
@@ -126,7 +126,7 @@ Split `buildFootnotes` into a pure `indexFootnotes(footnotes)` (index and hosts)
 
 --- WAVE 6 [deep] ---
 
-#### s3 - [deep] Placement stops reading the canvas
+#### s3 - [deep] Placement stops reading the canvas (done)
 
 Lanes no longer set their width (N2), regions are fitted only after P8 (N4), and milestones no longer compute a provisional row and label box (N7, with `decideLabelBoxForCanvas`): `MilestoneNode.place` returns a `MilestonePlacement`, and the positioned milestone is built where P11 patches it today. `chartRightX` moves from `LayoutContext` into a `CanvasExtent` that `RoadmapNode.place` owns until m5.s4; the builders that read it after placement (`buildNowline`, `buildWaveLegend`, `buildFootnotes`) take it as an argument. The commit body names the overwrite of each dropped value (P9, P10, P11). Tests: every milestone the model carries has a re-pack placement; the snapshot invariant (lanes span the canvas, regions stay inside it) still holds; a unit fixture for a region whose bars reach the canvas edge, because no sample exercises a re-fit. G1, G2, G3.
 
@@ -193,6 +193,7 @@ review wave-2 (nowline m1 s3) b448282..7e64d9c: PASS - loops diffed: only iterat
 review wave-3 (nowline m1 s4) 4400fbd..bbab969: PASS - pure move confirmed line by line (only export keywords, header and imports differ); marker-band.ts also carries calendarLabelEntry, MarkerEntity (exported), markerLabelWidth, PackedPlacement; collectSlackCorridors after buildMilestones; no test imported the moved symbols; G1/G3 empty per worker - 2026-10-13
 review wave-4 (nowline m2 s1-s2) f354568..f5a6416: PASS - reviewer re-ran the gate script vs 570254b: GATES PASSED; moved helpers arithmetic-identical; measureItem reads no entity edges or placed items; ItemMeasure keeps visualWidth and naturalVisualWidth by name for byte identity; safety-net Math.max replaced by the pitch (G1 empty); predictItemBarExtraHeight gone, one computeChipBarExtra caller; both identity claims hold; corpus test and three fixtures fail on the base; passed unattended: gate 4, gate 2 - 2026-10-13
 review wave-5 (nowline m3 s1-s2) bb92ae0..1dd90a6: PASS - createLayoutContext per §3.8, no LayoutContext literal left in place or buildIncludeRegions, chart fields pass through, regions get empty footnotes and marker placements; indexFootnotes pure, buildFootnotePanel built once at P19; dropped values (pre-panel with chartBottomY 0, P19 map reassignment) named; new tests fail on the base; G1/G3 empty per worker; non-blocking: specs/waves.md and m3.s3 text still say buildFootnotes (now buildFootnotePanel); passed unattended: gate 4 - 2026-10-13
+review wave-6 (nowline m3 s3) cb898b5..3112f70: PASS - reviewer re-ran the gate script vs 9c71cbb: GATES PASSED; N2 lane width 0 at placement (P9 overwrites), N4 no region fit at placement, N7 MilestonePlacement + positionMilestones at P11 with the old key order and shared slackArrows arrays; chartRightX gone from LayoutContext, private CanvasExtent grown at P3/P7/P8; buildNowline, buildWaveLegend, buildFootnotePanel take chartRightX; estimatedCenterY kept as a named stale read (§3.10 rule 4); new placement-canvas tests fail on the base; passed unattended: gate 2 - 2026-10-13
 
 ## Token log
 
@@ -219,3 +220,6 @@ tokens review-wave-4 nowline-m2-s1-s2 (claude-opus-5-5): input ~36 / cache read 
 tokens orchestrator-wave-4 nowline-m2-s1-s2 (claude-opus-5-5): input ~16 / cache read ~1.5M / cache write ~0 5m + ~24k 1h / output ~10k | ~$0.69 API-equiv
 tokens wave-5 nowline-m3-s1-s2 (claude-sonnet-5-5): input ~48 / cache read ~1.9M / cache write ~310k / output ~24k | ~$1.39 API-equiv (output est.) session 7e027fcc-1ca6-51b0-b005-63e1163df819
 tokens review-wave-5 nowline-m3-s1-s2 (claude-opus-5-5): input ~20 / cache read ~270k / cache write ~39k / output ~10k | ~$0.45 API-equiv (output est.) session 7e027fcc-1ca6-51b0-b005-63e1163df819
+tokens orchestrator-wave-5 nowline-m3-s1-s2 (claude-opus-5-5): input ~16 / cache read ~1.7M / cache write ~0 5m + ~23k 1h / output ~10k | ~$0.73 API-equiv
+tokens wave-6 nowline-m3-s3 (claude-opus-5-5): input ~92 / cache read ~7.5M / cache write ~440k / output ~46k | ~$4.59 API-equiv (output est.) session 7e027fcc-1ca6-51b0-b005-63e1163df819
+tokens review-wave-6 nowline-m3-s3 (claude-opus-5-5): input ~34 / cache read ~850k / cache write ~74k / output ~16k | ~$0.87 API-equiv (output est.) session 7e027fcc-1ca6-51b0-b005-63e1163df819
