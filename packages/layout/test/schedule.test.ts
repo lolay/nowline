@@ -202,6 +202,37 @@ swimlane s "S"
     });
 });
 
+describe('scheduleRoadmap — start: pins', () => {
+    // Layout's pixel expectations for the same sources are in layout.test.ts.
+    it('honours start: on an item that is a direct parallel track', async () => {
+        const sched = await buildSchedule(
+            `nowline v1
+roadmap r "R" start:2026-01-05 scale:1w
+swimlane s "S"
+  parallel
+    item a "A" duration:2w
+    item b "B" duration:1w start:2026-01-12
+`,
+            PINNED,
+        );
+        expect(sched.items.get('a')!.start.toISOString().slice(0, 10)).toBe('2026-01-05');
+        expect(sched.items.get('b')!.start.toISOString().slice(0, 10)).toBe('2026-01-12');
+    });
+
+    it('lets start: win over after: on a lane item', async () => {
+        const sched = await buildSchedule(
+            `nowline v1
+roadmap r "R" start:2026-01-05 scale:1w
+swimlane s "S"
+  item a "A" duration:3w
+  item b "B" duration:1w start:2026-01-12 after:a
+`,
+            PINNED,
+        );
+        expect(sched.items.get('b')!.start.toISOString().slice(0, 10)).toBe('2026-01-12');
+    });
+});
+
 describe('scheduleRoadmap — milestones', () => {
     it('date-pinned milestone resolves to its date:', async () => {
         const sched = await buildSchedule(

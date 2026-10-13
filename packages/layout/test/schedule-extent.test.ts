@@ -1,93 +1,36 @@
-// `RoadmapSchedule.extent.contentEndDay` against the frozen engine B
-// (specs/scheduler-unification.md §3.2, §4 m1.s2, §6 "Oracle"): the schedule
-// must reach exactly the content day `computeContentEndDay` reached, without
-// `today`, on every sample, the generated wave roadmaps of the barrier
-// theorem, and one fixture per scope rule B had. m3.s2 retires the oracle
-// and keeps the fixtures as direct `extent` expectations.
+// `RoadmapSchedule.extent.contentEndDay` (specs/scheduler-unification.md
+// §3.2): the latest working-day offset from the roadmap start that any lane
+// cursor, container start, dated anchor, milestone or wave barrier reaches,
+// without `today`. One fixture per scope rule, with the day derived by hand.
 
-import { readdirSync } from 'node:fs';
-import { readFile } from 'node:fs/promises';
-import * as path from 'node:path';
-import { fileURLToPath } from 'node:url';
-import { buildWavePlan, type NowlineFile, type ResolveResult } from '@nowline/core';
+import { buildWavePlan } from '@nowline/core';
 import { describe, expect, it } from 'vitest';
-import { resolveSizes } from '../src/calendar.js';
-import { resolveWorkingCalendar } from '../src/calendar-resolver.js';
 import { scheduleRoadmap } from '../src/schedule.js';
-import { computeContentEndDay } from './content-end-day-oracle.js';
 import { generateRoadmap, mulberry32 } from './generated-roadmaps.js';
 import { parseAndResolve, parseAndResolveFiles } from './helpers.js';
 
-const HERE = path.dirname(fileURLToPath(import.meta.url));
-const REPO = path.resolve(HERE, '../../..');
-
-/** The `--now` the G1 gate renders with; it only sets an undated start. */
-const TODAY = new Date(Date.UTC(2026, 1, 9));
-
-/** Every `examples/**.nowline` and `tests/*.nowline`, repo-relative, sorted. */
-function sampleFiles(): string[] {
-    const out: string[] = [];
-    const walk = (rel: string, recurse: boolean): void => {
-        for (const entry of readdirSync(path.join(REPO, rel), { withFileTypes: true })) {
-            const child = `${rel}/${entry.name}`;
-            if (entry.isDirectory() && recurse) walk(child, true);
-            else if (entry.isFile() && entry.name.endsWith('.nowline')) out.push(child);
-        }
-    };
-    walk('examples', true);
-    walk('tests', false);
-    return out.sort();
-}
-
-/** The schedule's extent and the frozen engine B's day, for the same start. */
-function bothEngines(
-    file: NowlineFile,
-    resolved: ResolveResult,
-): { extent: number; oracle: number } {
-    const schedule = scheduleRoadmap(file, resolved, { today: TODAY });
-    const { config: cal, working: calendar } = resolveWorkingCalendar(file, resolved);
-    const oracle = computeContentEndDay(
-        resolved,
-        { cal, sizes: resolveSizes(resolved.content.sizes, cal), calendar },
-        schedule.startDate,
-        undefined,
-        buildWavePlan(resolved),
-    );
-    return { extent: schedule.extent.contentEndDay, oracle };
-}
-
 async function expectExtent(source: string, expected: number): Promise<void> {
     const { file, resolved } = await parseAndResolve(source);
-    const { extent, oracle } = bothEngines(file, resolved);
-    expect(extent).toBe(oracle);
-    expect(extent).toBe(expected);
+    expect(scheduleRoadmap(file, resolved).extent.contentEndDay).toBe(expected);
 }
 
-describe('schedule extent equals engine B on the samples', () => {
-    const samples = sampleFiles();
-
-    it('finds the samples', () => {
-        expect(samples.length).toBeGreaterThan(50);
-    });
-
-    it.each(samples)('%s', async (sample) => {
-        const abs = path.join(REPO, sample);
-        const source = await readFile(abs, 'utf8');
-        const { file, resolved } = await parseAndResolve(source, abs, (p) => readFile(p, 'utf8'));
-        const { extent, oracle } = bothEngines(file, resolved);
-        expect(extent).toBe(oracle);
-    });
-});
-
-describe('schedule extent equals engine B on generated wave roadmaps', () => {
-    it('the 60 roadmaps of the barrier theorem', async () => {
+describe('schedule extent: lower bounds on generated wave roadmaps', () => {
+    it('reaches every item end and every wave end of the 60 barrier-theorem roadmaps', async () => {
         // Same seed and count as waves.test.ts, so the same roadmaps.
         const rand = mulberry32(0x5eed);
         for (let i = 0; i < 60; i++) {
             const gen = generateRoadmap(rand, i);
             const { file, resolved } = await parseAndResolve(gen.source);
-            const { extent, oracle } = bothEngines(file, resolved);
-            expect(extent, gen.source).toBe(oracle);
+            const sched = scheduleRoadmap(file, resolved);
+            const days = (d: Date): number =>
+                sched.calendar.working.workingIndexOf(sched.startDate, d);
+            const ends = [
+                ...[...sched.items.values()].map((it) => days(it.end)),
+                ...[...(sched.waves?.values() ?? [])].map((w) => days(w.end)),
+            ];
+            expect(sched.extent.contentEndDay, gen.source).toBeGreaterThanOrEqual(
+                Math.max(0, ...ends),
+            );
         }
     });
 });
@@ -95,6 +38,82 @@ describe('schedule extent equals engine B on generated wave roadmaps', () => {
 // One fixture per scope rule. Every roadmap starts Mon 2026-01-05 under the
 // default business calendar: a week is 5 working days.
 describe('schedule extent: scope rules', () => {
+    it('is the latest lane cursor of the roadmap', async () => {
+        // The 3w lane ends last: 15 working days.
+        await expectExtent(
+            `nowline v1
+
+roadmap r "R" start:2026-01-05 scale:1w
+
+swimlane a
+  item a1 duration:2w
+swimlane b
+  item b1 duration:1w
+  item b2 duration:2w
+`,
+            15,
+        );
+    });
+
+    it('counts a dated milestone and a dated anchor past the last item', async () => {
+        // Feb 2 is 4 weeks in; Mar 2 is 8 weeks in; the item ends at 1 week.
+        await expectExtent(
+            `nowline v1
+
+roadmap r "R" start:2026-01-05 scale:1w
+
+milestone beta "Beta" date:2026-02-02
+
+anchor go "Go" date:2026-03-02
+
+swimlane a
+  item a1 duration:1w
+`,
+            40,
+        );
+    });
+
+    it('ends at E_n with waves, not at the unbarriered lane ends', async () => {
+        // Example 1 of specs/waves.md: E_launch is W9; without waves W7.
+        await expectExtent(
+            `nowline v1
+
+roadmap launch-plan "Launch plan" start:2026-01-05 scale:1w
+
+wave discover "Discover"
+wave build "Build"
+wave launch "Launch"
+
+swimlane web "Web"
+  item web-research duration:2w wave:discover
+  item web-build duration:3w wave:build
+  item web-launch duration:1w wave:launch
+swimlane api "API"
+  item api-spike duration:1w wave:discover
+  item api-build duration:4w wave:build
+  item api-launch duration:1w wave:launch
+swimlane data "Data"
+  item data-audit duration:3w wave:discover
+  item data-build duration:2w wave:build
+  item data-launch duration:2w wave:launch
+`,
+            45,
+        );
+    });
+
+    it('leaves today out: only the date window adds it', async () => {
+        const { file, resolved } = await parseAndResolve(`nowline v1
+
+roadmap r "R" start:2026-01-05 scale:1w
+
+swimlane a
+  item a1 duration:2w
+`);
+        const today = new Date(Date.UTC(2026, 5, 1));
+        expect(scheduleRoadmap(file, resolved, { today }).extent.contentEndDay).toBe(10);
+        expect(scheduleRoadmap(file, resolved).extent.contentEndDay).toBe(10);
+    });
+
     it('an empty group with after: reaches its start', async () => {
         // Nothing ends on Apr 6, but the lane cursor does: 13 weeks.
         await expectExtent(
@@ -140,9 +159,7 @@ swimlane d
 `,
         });
         expect(resolved.diagnostics).toEqual([]);
-        const { extent, oracle } = bothEngines(file, resolved);
-        expect(extent).toBe(oracle);
-        expect(extent).toBe(100);
+        expect(scheduleRoadmap(file, resolved).extent.contentEndDay).toBe(100);
     });
 
     it("a region milestone extends the extent but stays out of the schedule's milestones", async () => {
@@ -167,11 +184,10 @@ milestone ga "GA" date:2026-06-01
 `,
         });
         expect(resolved.diagnostics).toEqual([]);
-        const { extent, oracle } = bothEngines(file, resolved);
-        expect(extent).toBe(oracle);
+        const schedule = scheduleRoadmap(file, resolved);
         // Jun 1 is 21 weeks after Jan 5.
-        expect(extent).toBe(105);
-        expect(scheduleRoadmap(file, resolved).milestones.has('ga')).toBe(false);
+        expect(schedule.extent.contentEndDay).toBe(105);
+        expect(schedule.milestones.has('ga')).toBe(false);
     });
 
     it('an undated anchor does not extend the extent and resolves after: to day 0', async () => {

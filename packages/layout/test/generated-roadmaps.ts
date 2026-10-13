@@ -1,5 +1,5 @@
 // A seeded generator of roadmaps with waves, shared by the barrier theorem
-// (waves.test.ts) and the schedule extent oracle (schedule-extent.test.ts).
+// (waves.test.ts) and the schedule extent test (schedule-extent.test.ts).
 //
 // It writes roadmaps that satisfy the order rules
 // (specs/waves.md §6.3): in every lane, group and parallel-track flow the

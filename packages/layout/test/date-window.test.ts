@@ -14,10 +14,14 @@ const isoDay = (d: Date): string => d.toISOString().slice(0, 10);
 
 // The window is counted in working days: the business calendar skips
 // weekends, `calendar:full` (the identity path) counts every day.
-function window(file: NowlineFile, resolved: ResolveResult): { days: number; endDate: string } {
+function window(
+    file: NowlineFile,
+    resolved: ResolveResult,
+    today?: Date,
+): { days: number; endDate: string } {
     const schedule = scheduleRoadmap(file, resolved);
     const scale = resolveScale(file, resolved.config.scale);
-    const { startDate, endDate } = computeDateWindow(file, schedule, undefined, scale);
+    const { startDate, endDate } = computeDateWindow(file, schedule, today, scale);
     const calendar = schedule.calendar.working;
     return { days: calendar.workingIndexOf(startDate, endDate), endDate: isoDay(endDate) };
 }
@@ -223,5 +227,33 @@ swimlane s
         expect(resolved.content.sizes.has('xl')).toBe(false);
         expect(windowDays(file, resolved)).toBe(12 * 5);
         expect(window(file, resolved).endDate).toBe('2026-03-30');
+    });
+});
+
+describe('computeDateWindow — today', () => {
+    const roadmap = (props: string): string => `nowline v1
+
+roadmap r "R" start:2026-01-05 scale:1w${props}
+
+swimlane a "A"
+  item a1 "A1" duration:2w
+`;
+    const MAR_2 = new Date(Date.UTC(2026, 2, 2)); // 8 weeks (40 working days) in
+    const BEFORE_START = new Date(Date.UTC(2025, 11, 15));
+
+    it('extends a window without length: so the now-line is in range', async () => {
+        const { file, resolved } = await parseAndResolve(roadmap(''));
+        expect(window(file, resolved).days).toBe(2 * 5);
+        expect(window(file, resolved, MAR_2)).toEqual({ days: 8 * 5, endDate: '2026-03-02' });
+    });
+
+    it('is bounded by an explicit length:', async () => {
+        const { file, resolved } = await parseAndResolve(roadmap(' length:4w'));
+        expect(window(file, resolved, MAR_2)).toEqual({ days: 4 * 5, endDate: '2026-02-02' });
+    });
+
+    it('does nothing before the roadmap start', async () => {
+        const { file, resolved } = await parseAndResolve(roadmap(''));
+        expect(window(file, resolved, BEFORE_START)).toEqual(window(file, resolved));
     });
 });
