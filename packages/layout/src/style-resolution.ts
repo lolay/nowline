@@ -5,7 +5,7 @@ import type {
     StyleDeclaration,
     StyleProperty,
 } from '@nowline/core';
-import { propKey } from '@nowline/core/internal';
+import { propKey, styleLayers } from '@nowline/core/internal';
 import { isNonWorkingDisplay } from './non-working-display.js';
 import { resolveColor } from './themes/index.js';
 import type { EntityStyle, Theme } from './themes/shape.js';
@@ -163,7 +163,11 @@ function applyStyleDecl(
     }
 }
 
-function applyProperties(target: ResolvedStyle, props: EntityProperty[], theme: Theme): void {
+function applyProperties(
+    target: ResolvedStyle,
+    props: readonly EntityProperty[],
+    theme: Theme,
+): void {
     for (const p of props) {
         const key = propKey(p);
         if (p.value !== undefined) {
@@ -172,43 +176,14 @@ function applyProperties(target: ResolvedStyle, props: EntityProperty[], theme: 
     }
 }
 
-function applyLabelStyleRefs(
-    target: ResolvedStyle,
-    props: EntityProperty[],
-    ctx: StyleContext,
-): void {
-    const labelsProp = props.find((p) => propKey(p) === 'labels');
-    if (!labelsProp) return;
-    const names: string[] = labelsProp.value ? [labelsProp.value] : labelsProp.values;
-    // Walk last to first so the first label's style is applied last and wins
-    // on any key several labels set (specs/rendering.md § Style Precedence).
-    for (const name of [...names].reverse()) {
-        const label = ctx.labels.get(name);
-        if (!label) continue;
-        const styleRef = label.properties.find((p) => propKey(p) === 'style');
-        if (styleRef?.value) {
-            applyStyleDecl(target, ctx.styles.get(styleRef.value), ctx.theme);
-        }
-    }
-}
-
-function applyEntityStyleRef(
-    target: ResolvedStyle,
-    props: EntityProperty[],
-    ctx: StyleContext,
-): void {
-    const styleProp = props.find((p) => propKey(p) === 'style');
-    if (!styleProp?.value) return;
-    applyStyleDecl(target, ctx.styles.get(styleProp.value), ctx.theme);
-}
-
 // Five-level precedence chain from specs/rendering.md § Style Precedence:
 // 1. system default (theme's EntityStyle for this type)
-// 2. config `default <entity>`: its `style:` ref, then its raw properties
-// 3. label `style:` refs (per applied label; the first label wins a shared key)
-// 4. entity's own `style:` ref
-// 5. inline style properties on the entity (banned by validator for roadmap
-//    entities; still supported for declared styles / defaults)
+// 2-5. core's `styleLayers`: the config `default <entity>` line (its `style:`
+//    ref, then its raw properties), label `style:` refs (the first label wins
+//    a shared key), the entity's own `style:` ref, then its inline properties
+//    (banned by the validator for roadmap entities; still supported for
+//    declared styles / defaults). A style or label this file does not declare
+//    changes nothing.
 export function resolveStyle(
     entityType: EntityTypeKey,
     props: EntityProperty[],
@@ -216,25 +191,18 @@ export function resolveStyle(
 ): ResolvedStyle {
     const baseEntity = ctx.theme.entities[entityType];
     const out = entityStyleToResolved(baseEntity, ctx.theme);
-
-    // Level 2: config defaults. The line's `style:` ref applies first and its
-    // raw props on top, the same order levels 4 and 5 use on the entity, so
-    // `default item style:subtle bg:red` is "subtle, but red".
-    const defaultDecl = ctx.defaults.get(entityType);
-    if (defaultDecl) {
-        applyEntityStyleRef(out, defaultDecl.properties, ctx);
-        applyProperties(out, defaultDecl.properties, ctx.theme);
+    for (const layer of styleLayers(entityType, props, ctx)) {
+        switch (layer.level) {
+            case 'default':
+            case 'inline':
+                applyProperties(out, layer.props, ctx.theme);
+                break;
+            case 'label':
+                break;
+            default:
+                applyStyleDecl(out, layer.decl, ctx.theme);
+        }
     }
-
-    // Level 3: label styles (labels on this entity, each label's `style:` ref)
-    applyLabelStyleRefs(out, props, ctx);
-
-    // Level 4: entity's own `style:` ref
-    applyEntityStyleRef(out, props, ctx);
-
-    // Level 5: inline props on the entity
-    applyProperties(out, props, ctx.theme);
-
     return out;
 }
 

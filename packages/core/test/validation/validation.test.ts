@@ -1695,6 +1695,28 @@ describe('NL.W0704: header-height:none hides the timeline-position strip', () =>
         expect(w0704(r)).toEqual([]);
     });
 
+    it('stays silent when a roadmap label is not declared in this file', async () => {
+        const r = await parse(
+            `config\ndefault roadmap header-height:none timeline-position:both\nroadmap r labels:elsewhere\n${body}`,
+        );
+        expect(w0704(r)).toEqual([]);
+    });
+
+    it('stays silent when a roadmap label style is not declared in this file', async () => {
+        const r = await parse(
+            `config\ndefault roadmap header-height:none timeline-position:both\nroadmap r labels:flat\nlabel flat style:elsewhere\n${body}`,
+        );
+        expect(w0704(r)).toEqual([]);
+    });
+
+    it("does not read the roadmap line's own keys", async () => {
+        // Raw style keys on the roadmap line are an error of their own.
+        const r = await parse(
+            `config\ndefault roadmap header-height:none\nroadmap r timeline-position:bottom\n${body}`,
+        );
+        expect(w0704(r)).toEqual([]);
+    });
+
     it('translates the message into French', async () => {
         const r = await parse(
             `nowline v1 locale:fr\nconfig\ndefault roadmap header-height:none timeline-position:bottom\nroadmap r\n${body}`,
