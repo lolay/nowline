@@ -1,32 +1,24 @@
-// Engine B (`computeContentEndDay`, via `computeDateWindow`): the date window
-// covers the wave barriers (specs/waves.md §5.3 `length:`, §8.5).
+// The date window (`computeDateWindow`, a projection of the day schedule,
+// specs/scheduler-unification.md §3.3) covers the wave barriers
+// (specs/waves.md §5.3 `length:`, §8.5).
 
 import * as path from 'node:path';
-import { buildWavePlan, type NowlineFile, type ResolveResult } from '@nowline/core';
+import type { NowlineFile, ResolveResult } from '@nowline/core';
 import { describe, expect, it } from 'vitest';
-import { resolveCalendar, resolveSizes } from '../src/calendar.js';
 import { computeDateWindow } from '../src/layout.js';
+import { scheduleRoadmap } from '../src/schedule.js';
 import { resolveScale } from '../src/view-preset.js';
-import { fromCalendarConfig } from '../src/working-calendar.js';
-import { parseAndResolve } from './helpers.js';
+import { parseAndResolve, parseAndResolveFiles } from './helpers.js';
 
 const isoDay = (d: Date): string => d.toISOString().slice(0, 10);
 
 // The window is counted in working days: the business calendar skips
 // weekends, `calendar:full` (the identity path) counts every day.
 function window(file: NowlineFile, resolved: ResolveResult): { days: number; endDate: string } {
-    const cal = resolveCalendar(file, resolved.config.calendar);
-    const calendar = fromCalendarConfig(cal);
-    const sizes = resolveSizes(resolved.content.sizes, cal);
+    const schedule = scheduleRoadmap(file, resolved);
     const scale = resolveScale(file, resolved.config.scale);
-    const { startDate, endDate } = computeDateWindow(
-        file,
-        { cal, sizes, calendar },
-        resolved,
-        undefined,
-        scale,
-        buildWavePlan(resolved),
-    );
+    const { startDate, endDate } = computeDateWindow(file, schedule, undefined, scale);
+    const calendar = schedule.calendar.working;
     return { days: calendar.workingIndexOf(startDate, endDate), endDate: isoDay(endDate) };
 }
 
@@ -66,7 +58,7 @@ swimlane data "Data"
   item data-launch "Dashboards" duration:2w wave:launch
 `;
 
-describe('computeDateWindow — wave barriers (engine B)', () => {
+describe('computeDateWindow — wave barriers', () => {
     it('Example 1: the window ends at E_n (W9), not at the unbarriered W7', async () => {
         // calendar:business: one week is 5 working days.
         expect(await windowOf(EXAMPLE_1.replace(' LENGTH', ''))).toBe(9 * 5);
@@ -199,5 +191,37 @@ swimlane a "A"
         // barrier the content would end at W5 (ios-push).
         expect(windowDays(file, resolved)).toBe(6 * 5);
         expect(window(file, resolved).endDate).toBe('2026-02-16');
+    });
+});
+
+describe('computeDateWindow — isolated regions', () => {
+    it("a region's own size sets the window (not the parent's sizes)", async () => {
+        // Only the region declares `xl`. The window used to resolve region
+        // items against the parent's sizes, so s1 had no duration and the
+        // window stopped at a1's 1w; it now covers s1's 12 weeks.
+        const { file, resolved } = await parseAndResolveFiles({
+            'main.nowline': `nowline v1
+
+include "./squad.nowline" roadmap:isolate
+
+roadmap main "Main" start:2026-01-05 scale:1w
+
+swimlane a
+  item a1 duration:1w
+`,
+            'squad.nowline': `nowline v1
+
+roadmap squad "Squad" start:2026-01-05 scale:1w
+
+size xl effort:12w
+
+swimlane s
+  item s1 size:xl
+`,
+        });
+        expect(resolved.diagnostics).toEqual([]);
+        expect(resolved.content.sizes.has('xl')).toBe(false);
+        expect(windowDays(file, resolved)).toBe(12 * 5);
+        expect(window(file, resolved).endDate).toBe('2026-03-30');
     });
 });

@@ -17,7 +17,6 @@ import type {
     WavePlan,
 } from '@nowline/core';
 import { defaultRowBand } from '../band-scale.js';
-import type { CalendarConfig } from '../calendar.js';
 import { daysBetween, resolveSizes } from '../calendar.js';
 import { resolveWorkingCalendar } from '../calendar-resolver.js';
 import { cappedPixelsPerDay } from '../canvas-width.js';
@@ -29,6 +28,7 @@ import type { LayoutOptions, LayoutResult } from '../layout.js';
 import type { LayoutContext, LayoutHelpers } from '../layout-context.js';
 import { isNonWorkingDisplay } from '../non-working-display.js';
 import { shiftIncludeY, shiftSwimlaneY } from '../positioned-shift.js';
+import { type RoadmapSchedule, scheduleRoadmap } from '../schedule.js';
 import { resolveStyle, type StyleContext } from '../style-resolution.js';
 import { type Theme, type ThemeName, themes } from '../themes/index.js';
 import {
@@ -73,7 +73,6 @@ import {
     seedWaveEdges,
     WAVE_EDGE_TOLERANCE_PX,
 } from '../wave-layout.js';
-import type { WorkingCalendar } from '../working-calendar.js';
 import { buildAnchors } from './anchor-node.js';
 import { maxLeafItemRightX } from './content-extent.js';
 import { buildFootnotes } from './footnote-node.js';
@@ -234,15 +233,9 @@ export interface SizedHeader {
 export interface RoadmapNodeDeps extends LayoutHelpers {
     computeDateWindow: (
         file: NowlineFile,
-        ctx: {
-            cal: CalendarConfig;
-            sizes: Map<string, import('../types.js').ResolvedSize>;
-            calendar?: WorkingCalendar;
-        },
-        resolved: ResolveResult,
+        schedule: RoadmapSchedule,
         today: Date | undefined,
         scale: ViewPreset,
-        plan: WavePlan | undefined,
     ) => { startDate: Date; endDate: Date };
     sizeBesideHeader: (
         title: string,
@@ -266,8 +259,8 @@ export interface RoadmapNodeDeps extends LayoutHelpers {
 export class RoadmapNode {
     /**
      * `plan` is the roadmap's wave plan (`buildWavePlan`), or undefined
-     * when it declares no waves; it drives the date window (engine B) and
-     * the barrier passes below (engine A).
+     * when it declares no waves; it drives the day schedule that sizes the
+     * date window (engine C) and the barrier passes below (engine A).
      */
     place(
         file: NowlineFile,
@@ -301,15 +294,14 @@ export class RoadmapNode {
         // Date window + header geometry. Window is content-aware: when
         // `length:` is omitted we derive the end day from the latest
         // dated/sequenced entity (item, anchor, milestone, today's
-        // now-line) instead of defaulting to a 180-day desert.
-        const { startDate, endDate } = deps.computeDateWindow(
-            file,
-            { cal, sizes, calendar },
-            resolved,
-            options.today,
-            scale,
-            plan,
-        );
+        // now-line) instead of defaulting to a 180-day desert. The day
+        // schedule is computed once here and the window is a projection of
+        // it (specs/scheduler-unification.md §3.3).
+        const schedule = scheduleRoadmap(file, resolved, {
+            today: options.today,
+            plan: plan ?? null,
+        });
+        const { startDate, endDate } = deps.computeDateWindow(file, schedule, options.today, scale);
 
         // Determine header position + timeline placement via `default roadmap`
         // / theme. Raw style props (including `timeline-position` and
