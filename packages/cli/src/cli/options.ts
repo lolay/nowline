@@ -5,9 +5,10 @@
 // `CLI_OPTION_SPECS` rather than a hand-written merge in each command
 // (specs/surface-options.md §3.1).
 
+import * as path from 'node:path';
 import {
+    ASSET_ROOT_SPEC,
     type NowlineRc,
-    type NowPolicy,
     type OptionError,
     type OptionLayer,
     type OptionParse,
@@ -74,6 +75,7 @@ export const CLI_OPTION_SPECS = Object.freeze({
     headless: { rcKey: 'headlessFonts', parse: lenientSwitch } as OptionSpec<boolean>,
     useSystemFonts: { rcKey: 'useSystemFonts', parse: lenientSwitch } as OptionSpec<boolean>,
     locale: { rcKey: 'locale', parse: lenientString } as OptionSpec<string>,
+    assetRoot: ASSET_ROOT_SPEC as OptionSpec<string>,
 });
 
 type CliSpecs = typeof CLI_OPTION_SPECS;
@@ -93,6 +95,7 @@ const FLAG_NAMES: Readonly<Partial<Record<CliOptionKey, string>>> = {
     fontMono: '--font-mono',
     headless: '--headless',
     useSystemFonts: '--use-system-fonts',
+    assetRoot: '--asset-root',
 };
 
 // ---- Resolution -------------------------------------------------------------
@@ -109,6 +112,11 @@ export interface CliOptions {
     fontMono?: string;
     headless: boolean;
     useSystemFonts: boolean;
+    /**
+     * Where `logo:` assets are read from, as an absolute path: `--asset-root`,
+     * else the rc `assetRoot`. Unset means the input file's directory.
+     */
+    assetRoot?: string;
     /** The rc `locale`; the flag and `NOWLINE_LOCALE` rank above it (`resolveLocaleOverride`). */
     rcLocale?: string;
     /**
@@ -131,8 +139,9 @@ export interface CliOptions {
 export function resolveCliOptions(
     args: ParsedArgs,
     config: NowlineRc | null,
-    clock?: () => Date,
+    context: { rcPath?: string; clock?: () => Date } = {},
 ): CliOptions {
+    const { rcPath, clock } = context;
     const layers = [flagLayer(args), rcLayer(config ?? {}, CLI_OPTION_SPECS)];
 
     // `--timezone` is validated even when `--now` is explicit, as it always was.
@@ -160,6 +169,7 @@ export function resolveCliOptions(
         fontMono: values.fontMono,
         headless: values.headless ?? false,
         useSystemFonts: values.useSystemFonts ?? false,
+        assetRoot: absoluteAssetRoot(values.assetRoot, args.assetRoot !== undefined, rcPath),
         rcLocale: values.locale,
         assertValid: () =>
             throwFirst([
@@ -168,6 +178,7 @@ export function resolveCliOptions(
                 failure('now'),
                 failure('width'),
                 failure('nonWorking'),
+                failure('assetRoot'),
             ]),
         assertPdfSettingsValid: () =>
             throwFirst([failure('pageSize'), failure('orientation'), failure('margin')]),
@@ -194,6 +205,7 @@ function flagLayer(args: ParsedArgs): OptionLayer<CliOptionKey> {
             margin: args.margin,
             fontSans: args.fontSans,
             fontMono: args.fontMono,
+            assetRoot: args.assetRoot,
             // A switch flag is absent or on; absent leaves the rc to decide.
             headless: args.headless || undefined,
             useSystemFonts: args.useSystemFonts || undefined,
@@ -211,6 +223,47 @@ function readZone(raw: string | undefined): { zone?: NormalizedZone; error?: Cli
         }
         throw err;
     }
+}
+
+// ---- Asset root -------------------------------------------------------------
+
+/**
+ * The asset root as an absolute path. A flag resolves against `cwd` (the
+ * process's, unless a caller passes its own); an rc value against the
+ * directory of the `.nowlinerc` it came from, so a checked-in `assetRoot:
+ * assets` means the same directory wherever `nowline` is run from.
+ */
+function absoluteAssetRoot(
+    value: string | undefined,
+    fromFlag: boolean,
+    rcPath: string | undefined,
+    cwd?: string,
+): string | undefined {
+    if (value === undefined) return undefined;
+    if (fromFlag || rcPath === undefined) return path.resolve(cwd ?? '.', value);
+    return path.resolve(path.dirname(rcPath), value);
+}
+
+/**
+ * Resolve just the asset root, for `--serve`, which does not read the other
+ * rc-backed options yet. Same precedence and errors as `render`: the flag,
+ * then the rc `assetRoot`, with a non-string rc value a usage error.
+ */
+export function resolveAssetRootOption(
+    flag: string | undefined,
+    config: NowlineRc | null,
+    context: { rcPath?: string; cwd: string },
+): string | undefined {
+    const specs = { assetRoot: CLI_OPTION_SPECS.assetRoot };
+    const { values, errors } = resolveOptions(specs, [
+        {
+            source: () => ({ kind: 'flag', name: '--asset-root' }),
+            values: { assetRoot: flag },
+        },
+        rcLayer(config ?? {}, specs),
+    ]);
+    if (errors[0]) throw new CliError(ExitCode.InputError, formatOptionError(errors[0]));
+    return absoluteAssetRoot(values.assetRoot, flag !== undefined, context.rcPath, context.cwd);
 }
 
 // ---- Error text -------------------------------------------------------------

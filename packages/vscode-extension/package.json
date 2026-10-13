@@ -180,7 +180,7 @@
                 "nowline.preview.assetRoot": {
                     "type": "string",
                     "default": "",
-                    "description": "Directory from which logo / image assets may be loaded. Empty uses the source file's directory (the same default the CLI uses without --asset-root)."
+                    "description": "Directory from which logo / image assets may be loaded. Empty falls through to the `assetRoot` key of `.nowlinerc` (relative to that file), then the source file's directory (the same default the CLI uses without --asset-root)."
                 },
                 "nowline.export.cliPath": {
                     "type": "string",

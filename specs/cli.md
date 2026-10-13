@@ -104,6 +104,9 @@ Render options
                          or show.` Mermaid, MS Project, and XLSX output is the
                          same in both views. `--serve` takes it too.
   --asset-root <dir>     Directory from which logo / image assets may be loaded
+                         (default: the `.nowlinerc` `assetRoot` key, then the
+                         input file's directory). A relative flag resolves
+                         against the working directory. `--serve` takes it too.
 
 Format-specific options
   --page-size <size>     PDF page size: preset (letter | legal | tabloid |
@@ -399,6 +402,7 @@ Each recognized key is the default for one flag, resolved flag > `.nowlinerc` > 
 | `fontSans` / `fontMono` | `--font-sans` / `--font-mono` | |
 | `headlessFonts` | `--headless` | Boolean; either source turns it on. |
 | `useSystemFonts` | `--use-system-fonts` | Boolean; either source turns it on. |
+| `assetRoot` | `--asset-root` | A directory path. A relative value resolves against the directory of the `.nowlinerc` that holds it (a relative flag resolves against the working directory), so a checked-in `assetRoot: assets` means the same directory wherever `nowline` is run from. Must be a string: any other type is a usage error. Also read by `--serve` and the VS Code preview. |
 | `locale` | `--locale` | Ranks below the locale environment variables (see below). Also read by `--serve`. |
 
 An invalid rc value is a usage error (exit 2) that names the key, for example `nowline: invalid .nowlinerc theme "sepia". Expected light, dark, or grayscale.`, rather than a flag the user never passed. A valid flag still wins over an invalid key. Unknown keys are ignored. A `.nowlinerc` that cannot be parsed (malformed YAML or JSON, or a top level that is not a mapping) is the same usage error, `nowline: invalid .nowlinerc: <reason>`, with the file path in the reason; no `.nowlinerc` at all is not an error.

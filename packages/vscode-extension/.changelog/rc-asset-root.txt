@@ -1,0 +1,3 @@
+```release-note:fixed
+A relative `assetRoot` in `.nowlinerc` resolves against the directory of that file instead of the extension host's working directory, matching `nowline --asset-root`. An `assetRoot` that is not a string is ignored.
+```

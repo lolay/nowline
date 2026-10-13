@@ -41,7 +41,7 @@ import {
     readDirectiveLocale,
     resolveLocaleOverride,
 } from '../i18n/locale.js';
-import { loadConfig, type NowlineRc } from '../io/config.js';
+import { type LoadConfigResult, loadConfig } from '../io/config.js';
 import { CliError, ExitCode } from '../io/exit-codes.js';
 import { createLog, type Log } from '../io/log.js';
 import { readInput } from '../io/read.js';
@@ -71,10 +71,10 @@ export async function renderHandler(options: RenderHandlerOptions): Promise<void
 
     const isStdoutOutput = args.output === '-';
     const log = createLog(args.logLevel);
-    const config = await loadConfigFor(args.positional, cwd);
+    const { config, path: rcPath } = await loadConfigFor(args.positional, cwd);
     // Every rc-backed setting resolves flag > .nowlinerc > default; a bad
     // value is reported by `assertValid` below, where it always has been.
-    const cliOptions = resolveCliOptions(args, config);
+    const cliOptions = resolveCliOptions(args, config, { rcPath });
 
     const format = resolveFormatOrThrow({
         flag: args.format,
@@ -120,7 +120,7 @@ export async function renderHandler(options: RenderHandlerOptions): Promise<void
         nonWorking: cliOptions.surface.nonWorking,
         noLinks: args.noLinks,
         strict: args.strict,
-        assetRoot: args.assetRoot,
+        assetRoot: cliOptions.assetRoot,
         // m2c format-specific options. The PDF settings parse in `produce`,
         // after validation, for every format.
         pageSize: cliOptions.surface.pageSize,
@@ -516,16 +516,11 @@ async function resolveRoutedDiagnostics(
 // a usage error (specs/cli.md, `.nowlinerc`): silently ignoring it would
 // render with settings the user believes they changed. The loader's reason
 // already names the file, so it is passed through. `--serve` shares this.
-export async function loadConfigFor(inputArg: string, cwd: string): Promise<NowlineRc | null> {
+export async function loadConfigFor(inputArg: string, cwd: string): Promise<LoadConfigResult> {
     try {
-        if (inputArg === '-') {
-            const { config } = await loadConfig(cwd);
-            return config;
-        }
+        if (inputArg === '-') return await loadConfig(cwd);
         const abs = path.resolve(cwd, inputArg);
-        const dir = path.dirname(abs);
-        const { config } = await loadConfig(dir);
-        return config;
+        return await loadConfig(path.dirname(abs));
     } catch (err) {
         throw new CliError(
             ExitCode.InputError,

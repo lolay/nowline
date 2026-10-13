@@ -100,9 +100,10 @@ export type OptionKeyOf<S> = Extract<keyof S, string>;
 
 /**
  * The `.nowlinerc` key of every setting the schema owns; `undefined` means
- * the option has no rc key. `assetRoot` is recorded as the default for
- * `--asset-root` (specs/surface-options.md §7, decision 5); it has no option
- * spec, so no resolution reads it yet.
+ * the option has no rc key. `assetRoot` is the default for `--asset-root`
+ * (specs/surface-options.md §7, decision 5). It is not a shared option (a
+ * path means something different to each surface), so it has its own spec,
+ * {@link ASSET_ROOT_SPEC}, that a surface adds to its table.
  */
 export const SURFACE_RC_KEYS = Object.freeze({
     theme: 'theme',
@@ -184,6 +185,23 @@ function parseNonWorking(raw: unknown): OptionParse<NonWorkingDisplay> {
     if (isNonWorkingDisplay(raw)) return { ok: true, value: raw };
     return { ok: false, detail: 'must be a non-working display', expected: NON_WORKING_DISPLAYS };
 }
+
+function parseAssetRoot(raw: unknown): OptionParse<string> {
+    if (raw === '') return { ok: true, value: undefined };
+    if (typeof raw === 'string') return { ok: true, value: raw };
+    return { ok: false, detail: 'must be a directory path' };
+}
+
+/**
+ * How `assetRoot` is read: a path, kept as written. Resolving a relative one
+ * is the surface's job, because the base differs: a flag or setting resolves
+ * against the working directory, an rc value against the `.nowlinerc`'s own
+ * directory. Empty means unset.
+ */
+export const ASSET_ROOT_SPEC: Readonly<OptionSpec<string>> = Object.freeze({
+    rcKey: SURFACE_RC_KEYS.assetRoot,
+    parse: parseAssetRoot,
+});
 
 export interface SurfaceOptionSpecs {
     theme: OptionSpec<ThemeName>;

@@ -2,6 +2,7 @@
 // the editor's own theme. The rc values read through the shared options
 // schema, and a value it rejects is ignored rather than reported.
 
+import * as path from 'node:path';
 import { describe, expect, it } from 'vitest';
 import { resolvePreviewOptions, withOptionProblems } from '../src/preview/option-resolver.js';
 import type { PreviewSettings } from '../src/preview/preview-panel.js';
@@ -206,6 +207,17 @@ describe('resolvePreviewOptions: the other options', () => {
         expect(
             resolve({ settings: { assetRoot: '/set' }, rc: { assetRoot: '/rc' } }).assetRoot,
         ).toBe('/set');
+    });
+
+    it('resolves a relative rc asset root against the .nowlinerc directory', () => {
+        const options = resolve({ rc: { assetRoot: 'assets' }, rcPath: '/repo/.nowlinerc' });
+        expect(options.assetRoot).toBe(path.resolve('/repo', 'assets'));
+    });
+
+    it('ignores an rc asset root that is not a path, without a problem row', () => {
+        const options = resolve({ rc: { assetRoot: 5 } });
+        expect(options.assetRoot).toBeUndefined();
+        expect(options.problems).toEqual([]);
     });
 
     it('takes the locale from the setting, then the rc, then the editor language', () => {

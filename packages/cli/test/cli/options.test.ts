@@ -1,11 +1,16 @@
+import * as path from 'node:path';
 import { describe, expect, it } from 'vitest';
 import { parseArgv } from '../../src/cli/args.js';
-import { formatOptionError, resolveCliOptions } from '../../src/cli/options.js';
+import {
+    formatOptionError,
+    resolveAssetRootOption,
+    resolveCliOptions,
+} from '../../src/cli/options.js';
 import { resolveTheme } from '../../src/cli/theme.js';
 import { CliError } from '../../src/io/exit-codes.js';
 
-function resolve(argv: string[], rc: Record<string, unknown> | null = null) {
-    return resolveCliOptions(parseArgv(['in.nowline', ...argv]), rc);
+function resolve(argv: string[], rc: Record<string, unknown> | null = null, rcPath?: string) {
+    return resolveCliOptions(parseArgv(['in.nowline', ...argv]), rc, { rcPath });
 }
 
 function failure(fn: () => void): string {
@@ -71,7 +76,7 @@ describe('resolveCliOptions', () => {
     it('anchors the default now-line in the --timezone zone', () => {
         const clock = () => new Date('2026-02-09T23:30:00Z');
         const args = parseArgv(['in.nowline', '--timezone', '+05:00']);
-        expect(resolveCliOptions(args, null, clock).surface.today).toEqual(
+        expect(resolveCliOptions(args, null, { clock }).surface.today).toEqual(
             new Date(Date.UTC(2026, 1, 10)),
         );
     });
@@ -149,5 +154,60 @@ describe('resolveTheme', () => {
         expect(failure(() => resolveTheme(undefined, 'x'))).toBe(
             'nowline: invalid .nowlinerc theme "x". Expected light, dark, or grayscale.',
         );
+    });
+});
+
+describe('asset root', () => {
+    const repo = path.resolve('/repo');
+    const rcPath = path.join(repo, '.nowlinerc');
+
+    it('is unset when neither the flag nor the rc sets it', () => {
+        expect(resolve([], {}, rcPath).assetRoot).toBeUndefined();
+        expect(
+            resolve(['--asset-root', ''], { assetRoot: 'assets' }, rcPath).assetRoot,
+        ).toBeUndefined();
+    });
+
+    it('resolves a relative rc value against the .nowlinerc directory', () => {
+        expect(resolve([], { assetRoot: 'assets' }, rcPath).assetRoot).toBe(
+            path.join(repo, 'assets'),
+        );
+        expect(resolve([], { assetRoot: '../shared' }, rcPath).assetRoot).toBe(
+            path.resolve('/shared'),
+        );
+    });
+
+    it('keeps an absolute rc value', () => {
+        const abs = path.resolve('/srv/assets');
+        expect(resolve([], { assetRoot: abs }, rcPath).assetRoot).toBe(abs);
+    });
+
+    it('resolves a flag against the working directory and lets it win', () => {
+        const options = resolve(['--asset-root', 'flagged'], { assetRoot: 'assets' }, rcPath);
+        expect(options.assetRoot).toBe(path.resolve('flagged'));
+    });
+
+    it('rejects a non-string rc value, naming the key, unless a flag wins', () => {
+        const bad = resolve([], { assetRoot: 5 }, rcPath);
+        expect(failure(() => bad.assertValid())).toBe(
+            'nowline: invalid .nowlinerc assetRoot "5". Must be a directory path.',
+        );
+        expect(() =>
+            resolve(['--asset-root', 'x'], { assetRoot: 5 }, rcPath).assertValid(),
+        ).not.toThrow();
+    });
+
+    it('resolves for serve with the same precedence and error', () => {
+        const cwd = path.resolve('/work');
+        expect(resolveAssetRootOption(undefined, { assetRoot: 'assets' }, { rcPath, cwd })).toBe(
+            path.join(repo, 'assets'),
+        );
+        expect(resolveAssetRootOption('flagged', { assetRoot: 'assets' }, { rcPath, cwd })).toBe(
+            path.join(cwd, 'flagged'),
+        );
+        expect(resolveAssetRootOption(undefined, {}, { rcPath, cwd })).toBeUndefined();
+        expect(
+            failure(() => resolveAssetRootOption(undefined, { assetRoot: 5 }, { rcPath, cwd })),
+        ).toBe('nowline: invalid .nowlinerc assetRoot "5". Must be a directory path.');
     });
 });

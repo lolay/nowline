@@ -1,5 +1,7 @@
+import * as path from 'node:path';
 import type { DiagnosticRow } from '@nowline/browser';
 import {
+    ASSET_ROOT_SPEC,
     type NowlineRc,
     type OptionError,
     type OptionLayer,
@@ -68,7 +70,11 @@ export interface ResolveContext {
 // The options the preview reads through the shared schema, so a value reads
 // the same here as in `nowline <file>`. A theme the schema rejects is ignored
 // (the chain moves on to the editor theme); a bad width is reported (below).
-const SCHEMA_SPECS = { theme: SURFACE_OPTION_SPECS.theme, width: SURFACE_OPTION_SPECS.width };
+const SCHEMA_SPECS = {
+    theme: SURFACE_OPTION_SPECS.theme,
+    width: SURFACE_OPTION_SPECS.width,
+    assetRoot: ASSET_ROOT_SPEC,
+};
 type SchemaKey = keyof typeof SCHEMA_SPECS;
 
 const WIDTH_SETTING = 'nowline.preview.width';
@@ -133,7 +139,7 @@ export function resolvePreviewOptions(ctx: ResolveContext): ResolvedRenderOption
         ),
         showLinks: resolveShowLinks(ctx),
         strict: ctx.settings.strict,
-        assetRoot: resolveAssetRoot(ctx),
+        assetRoot: resolveAssetRoot(ctx, values.assetRoot),
         problems: errors
             .filter((error) => error.key === 'width')
             .map((error) => widthProblemRow(error, ctx.rcPath)),
@@ -265,11 +271,18 @@ function resolveShowLinks(ctx: ResolveContext): boolean {
     return ctx.settings.showLinks;
 }
 
-function resolveAssetRoot(ctx: ResolveContext): string | undefined {
+/**
+ * The asset root: the setting, else the rc `assetRoot`. A relative rc value is
+ * relative to the `.nowlinerc` that holds it, as for `nowline --asset-root`'s
+ * default, so it means the same directory for every source file below it.
+ */
+function resolveAssetRoot(
+    ctx: ResolveContext,
+    rcAssetRoot: string | undefined,
+): string | undefined {
     if (nonEmpty(ctx.settings.assetRoot)) return ctx.settings.assetRoot;
-    const rcAssetRoot = ctx.rc.assetRoot;
-    if (typeof rcAssetRoot === 'string' && rcAssetRoot !== '') return rcAssetRoot;
-    return undefined;
+    if (rcAssetRoot === undefined) return undefined;
+    return ctx.rcPath ? path.resolve(path.dirname(ctx.rcPath), rcAssetRoot) : rcAssetRoot;
 }
 
 function nonEmpty(value: string | undefined): value is string {

@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import {
+    ASSET_ROOT_SPEC,
     type NowlineRc,
     type OptionLayer,
     type OptionSource,
@@ -365,7 +366,7 @@ describe('resolveSurfaceOptions: the now policy', () => {
 });
 
 describe('the rc key table', () => {
-    it('records each option rc key, and assetRoot with no option yet', (): void => {
+    it('records each option rc key, and assetRoot as a spec of its own', (): void => {
         expect(SURFACE_RC_KEYS).toEqual({
             theme: 'theme',
             width: 'width',
@@ -432,5 +433,44 @@ describe('surface-registered option specs', () => {
 
     it('leaves a key with no value in any layer out of the result', (): void => {
         expect(resolveOptions(CLI_SPECS, [])).toEqual({ values: {}, errors: [] });
+    });
+});
+
+describe('the assetRoot spec', () => {
+    const specs = { assetRoot: ASSET_ROOT_SPEC };
+
+    it('reads the assetRoot rc key as written', () => {
+        const { values, errors } = resolveOptions(specs, [rcLayer({ assetRoot: 'assets' }, specs)]);
+        expect(values).toEqual({ assetRoot: 'assets' });
+        expect(errors).toEqual([]);
+    });
+
+    it('treats an empty string as unset', () => {
+        const { values, errors } = resolveOptions(specs, [rcLayer({ assetRoot: '' }, specs)]);
+        expect(values).toEqual({});
+        expect(errors).toEqual([]);
+    });
+
+    it('reports a value that is not a path, naming the rc key', () => {
+        const { values, errors } = resolveOptions(specs, [rcLayer({ assetRoot: 5 }, specs)]);
+        expect(values).toEqual({});
+        expect(errors).toEqual([
+            {
+                key: 'assetRoot',
+                source: { kind: 'rc', key: 'assetRoot' },
+                raw: 5,
+                detail: 'must be a directory path',
+            },
+        ]);
+    });
+
+    it('lets a flag beat the rc value and hides a bad rc value under it', () => {
+        const flag = {
+            source: (): OptionSource => ({ kind: 'flag', name: '--asset-root' }),
+            values: { assetRoot: 'flagged' },
+        };
+        const { values, errors } = resolveOptions(specs, [flag, rcLayer({ assetRoot: 5 }, specs)]);
+        expect(values).toEqual({ assetRoot: 'flagged' });
+        expect(errors).toEqual([]);
     });
 });

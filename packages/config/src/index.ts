@@ -6,6 +6,7 @@ export {
     parseConfig,
 } from './load-config.js';
 export {
+    ASSET_ROOT_SPEC,
     MIN_WIDTH,
     type NowPolicy,
     type OptionError,

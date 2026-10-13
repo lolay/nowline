@@ -14,6 +14,7 @@ import {
 import { loadLogo, renderSvg } from '@nowline/renderer';
 import type { ParsedArgs } from '../cli/args.js';
 import { parseNonWorkingArg } from '../cli/non-working.js';
+import { resolveAssetRootOption } from '../cli/options.js';
 import { resolveTheme } from '../cli/theme.js';
 import { getServices, parseSource } from '../core/parse.js';
 import {
@@ -71,14 +72,14 @@ export async function serveHandler(options: ServeHandlerOptions): Promise<void> 
     const log = createLog(args.logLevel);
     const port = parsePort(args.port);
     const host = args.host ?? '127.0.0.1';
-    const config = await loadConfigFor(args.positional, cwd);
-    const theme = resolveTheme(args.theme, config?.theme);
+    const { config, path: rcPath } = await loadConfigFor(args.positional, cwd);
+    const theme = resolveTheme(args.theme, config.theme);
     const nonWorking = parseNonWorkingArg(args.nonWorking);
     const today = resolveNowArg(args);
     const resolvedLocale = resolveLocaleOverride({
         flag: args.locale,
         env: process.env,
-        rc: typeof config?.locale === 'string' ? config.locale : undefined,
+        rc: typeof config.locale === 'string' ? config.locale : undefined,
     });
     const locale = resolvedLocale.tag;
     const opLocale = operatorLocale(resolvedLocale);
@@ -90,7 +91,10 @@ export async function serveHandler(options: ServeHandlerOptions): Promise<void> 
         throw new CliError(ExitCode.InputError, `nowline: file not found: ${args.positional}`);
     }
 
-    const assetRoot = args.assetRoot ? path.resolve(cwd, args.assetRoot) : path.dirname(inputPath);
+    // `--asset-root`, else the rc `assetRoot` (relative to the `.nowlinerc`), else
+    // the input's directory.
+    const assetRoot =
+        resolveAssetRootOption(args.assetRoot, config, { rcPath, cwd }) ?? path.dirname(inputPath);
 
     const fileSink = args.output ? path.resolve(cwd, args.output) : undefined;
 
