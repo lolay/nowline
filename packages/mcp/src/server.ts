@@ -15,7 +15,7 @@ import {
     registerAppTool,
 } from '@modelcontextprotocol/ext-apps/server';
 import { McpServer } from '@modelcontextprotocol/server';
-import type { NowPolicy, SurfaceOptions } from '@nowline/config';
+import type { SurfaceOptions } from '@nowline/config';
 import { type NowlineFile, parseNowlineJson, printNowlineFile } from '@nowline/core';
 import {
     type ExportFormat,
@@ -194,14 +194,6 @@ function createNodeHostEnv(sourcePath: string): HostEnv {
 
 // ---- Helpers ----------------------------------------------------------------
 
-function todayUtc(): Date {
-    const now = new Date();
-    return new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate()));
-}
-
-// An omitted `now` is today in UTC until the local default lands (m1.s6).
-const UTC_NOW_POLICY: NowPolicy = { zone: { kind: 'utc' } };
-
 function exampleShortName(fullName: string): string {
     return fullName.endsWith('.nowline') ? fullName.slice(0, -'.nowline'.length) : fullName;
 }
@@ -347,6 +339,43 @@ export function createMcpServer(opts: McpServerOptions = {}): McpServer {
 
     registerPrompts(server);
 
+    const nonWorkingSchema = z
+        .enum(NON_WORKING_DISPLAYS)
+        .optional()
+        .describe(
+            "How a business calendar's non-working days appear: hide collapses them, " +
+                "show draws them as shaded bands. Overrides the file's `default roadmap non-working:` key; " +
+                'omit to let the key apply (then hide). The schedule exports (mermaid, msproj, xlsx) are the same either way.',
+        );
+
+    // A string, not an enum, so `Greyscale` and the `greyscale` alias reach
+    // `resolveMcpOptions`, which rejects an unknown name with the theme list.
+    const themeSchema = z
+        .string()
+        .optional()
+        .describe(
+            `Color theme: ${THEME_NAMES.join(', ')} ("greyscale" is accepted). Defaults to light.`,
+        );
+
+    const nowSchema = z
+        .string()
+        .regex(/^(\d{4}-\d{2}-\d{2}|-)$/, 'Expected YYYY-MM-DD or "-".')
+        .optional()
+        .describe(
+            "Now-line date as YYYY-MM-DD. Omit to draw it at today's date in `timezone` " +
+                "(the server's local zone when `timezone` is omitted too); " +
+                'pass "-" to suppress the now-line (same as the CLI\'s `--now -`).',
+        );
+
+    const timezoneSchema = z
+        .string()
+        .optional()
+        .describe(
+            "Timezone that decides today's date when `now` is omitted (ignored when `now` is a date): " +
+                '"local" (the default), "UTC", an ISO 8601 offset ("+05:30", "-07:00", "Z"), ' +
+                'or an IANA name ("America/Los_Angeles"). The same forms as the CLI\'s `--timezone`.',
+        );
+
     // ---- validate -----------------------------------------------------------
 
     server.registerTool(
@@ -361,12 +390,15 @@ export function createMcpServer(opts: McpServerOptions = {}): McpServer {
                     .string()
                     .optional()
                     .describe('Absolute or relative path to a .nowline file to validate.'),
+                now: nowSchema,
+                timezone: timezoneSchema,
             }),
             outputSchema: ValidateOutputSchema,
             annotations: readOnlyTool('Validate Roadmap'),
         },
         async (args) => {
             try {
+                const { options } = resolveMcpOptions(args);
                 const { source, filePath } = await sourceAndPath(args, allowedRoot);
                 const doc = await buildDocument(source);
                 const diagnostics = collectMcpDiagnostics(doc, filePath);
@@ -376,7 +408,7 @@ export function createMcpServer(opts: McpServerOptions = {}): McpServer {
                     ? await collectMcpLayoutInsights({
                           source,
                           filePath,
-                          today: todayUtc(),
+                          today: options.today,
                           locale: 'en-US',
                           readFile: createNodeHostEnv(filePath).readSource,
                           doc,
@@ -575,33 +607,6 @@ export function createMcpServer(opts: McpServerOptions = {}): McpServer {
         },
     );
 
-    const nonWorkingSchema = z
-        .enum(NON_WORKING_DISPLAYS)
-        .optional()
-        .describe(
-            "How a business calendar's non-working days appear: hide collapses them, " +
-                "show draws them as shaded bands. Overrides the file's `default roadmap non-working:` key; " +
-                'omit to let the key apply (then hide). The schedule exports (mermaid, msproj, xlsx) are the same either way.',
-        );
-
-    // A string, not an enum, so `Greyscale` and the `greyscale` alias reach
-    // `resolveMcpOptions`, which rejects an unknown name with the theme list.
-    const themeSchema = z
-        .string()
-        .optional()
-        .describe(
-            `Color theme: ${THEME_NAMES.join(', ')} ("greyscale" is accepted). Defaults to light.`,
-        );
-
-    const nowSchema = z
-        .string()
-        .regex(/^(\d{4}-\d{2}-\d{2}|-)$/, 'Expected YYYY-MM-DD or "-".')
-        .optional()
-        .describe(
-            'Now-line date as YYYY-MM-DD (UTC). Omit to draw it at today (UTC); ' +
-                'pass "-" to suppress the now-line (same as the CLI\'s `--now -`).',
-        );
-
     // ---- render -------------------------------------------------------------
 
     registerAppTool(
@@ -629,6 +634,7 @@ export function createMcpServer(opts: McpServerOptions = {}): McpServer {
                     .describe('Output format. Defaults to svg.'),
                 theme: themeSchema,
                 now: nowSchema,
+                timezone: timezoneSchema,
                 width: z
                     .number()
                     .optional()
@@ -675,7 +681,7 @@ export function createMcpServer(opts: McpServerOptions = {}): McpServer {
             // bubbles unchanged so it is never mislabeled as a path/IO failure.
             let resolved: McpResolvedOptions;
             try {
-                resolved = resolveMcpOptions(args, UTC_NOW_POLICY);
+                resolved = resolveMcpOptions(args);
             } catch (err) {
                 return handleToolError(err);
             }
@@ -875,6 +881,7 @@ export function createMcpServer(opts: McpServerOptions = {}): McpServer {
                             'outside the configured output folder — those do not exist on the host filesystem.',
                     ),
                 now: nowSchema,
+                timezone: timezoneSchema,
                 theme: themeSchema,
                 nonWorking: nonWorkingSchema,
                 scale: z.number().optional().describe('PNG scale factor.'),
@@ -914,7 +921,7 @@ export function createMcpServer(opts: McpServerOptions = {}): McpServer {
             // bubbles unchanged so it is never mislabeled as a path/IO failure.
             let options: SurfaceOptions;
             try {
-                ({ options } = resolveMcpOptions(args, UTC_NOW_POLICY));
+                ({ options } = resolveMcpOptions(args));
             } catch (err) {
                 return handleToolError(err);
             }
@@ -1145,12 +1152,15 @@ export function createMcpServer(opts: McpServerOptions = {}): McpServer {
                 if (args.to === 'json') {
                     const { source, filePath } = await sourceAndPath(args, allowedRoot);
                     const host = createNodeHostEnv(filePath);
+                    // The JSON AST does not depend on today's date, so convert
+                    // takes no `now`; the kernel still wants a concrete one.
+                    const { options } = resolveMcpOptions({});
                     const jsonBytes = await exportDocument(
                         source,
                         'json',
                         {
                             sourcePath: filePath,
-                            today: todayUtc(),
+                            today: options.today,
                             locale: 'en-US',
                             theme: 'light',
                         },

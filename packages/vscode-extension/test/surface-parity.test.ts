@@ -6,7 +6,7 @@
 // The surfaces are reached by source path: the CLI and MCP modules are not
 // package exports, and the point is to hold their resolution side by side.
 
-import { describe, expect, it } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { parseArgv } from '../../cli/src/cli/args.js';
 import { resolveCliOptions } from '../../cli/src/cli/options.js';
 import { resolveMcpOptions } from '../../mcp/src/options.js';
@@ -19,6 +19,8 @@ interface Inputs {
     width?: number;
     /** `YYYY-MM-DD`, or `-` to suppress the now-line. */
     now?: string;
+    /** Zone for the default now-line date; only read when `now` is omitted. */
+    timezone?: string;
     nonWorking?: 'hide' | 'show';
 }
 
@@ -50,6 +52,7 @@ function cliArgv(inputs: Inputs): string[] {
     if (inputs.theme !== undefined) argv.push('--theme', inputs.theme);
     if (inputs.width !== undefined) argv.push(`--width=${inputs.width}`);
     if (inputs.now !== undefined) argv.push('--now', inputs.now);
+    if (inputs.timezone !== undefined) argv.push('--timezone', inputs.timezone);
     if (inputs.nonWorking !== undefined) argv.push('--non-working', inputs.nonWorking);
     return argv;
 }
@@ -62,7 +65,7 @@ function throughCli(inputs: Inputs): Resolved {
 }
 
 function throughMcp(inputs: Inputs): Resolved {
-    const { options } = resolveMcpOptions(inputs, { zone: { kind: 'utc' } });
+    const { options } = resolveMcpOptions(inputs);
     const { theme, width, today, nonWorking } = options;
     return { theme, width, today, nonWorking };
 }
@@ -74,6 +77,7 @@ function throughExtension(inputs: Inputs): { resolved: Resolved; problems: numbe
         width: inputs.width ?? 0,
         // The setting spells "no now-line" `none`, and "today" `auto`.
         now: inputs.now === '-' ? 'none' : (inputs.now ?? 'auto'),
+        timezone: inputs.timezone ?? '',
         nonWorking: inputs.nonWorking ?? 'file',
     };
     const options = resolvePreviewOptions({
@@ -141,6 +145,47 @@ describe('surface parity: accepted values', () => {
             expect(extension.problems).toBe(0);
         });
     }
+});
+
+describe('surface parity: the default now-line date', () => {
+    // 23:30 on Feb 9 in San Francisco: already Feb 10 in UTC and in Tokyo.
+    const instant = new Date('2026-02-09T23:30:00-08:00');
+    const civil = (y: number, m: number, d: number) => new Date(Date.UTC(y, m, d));
+
+    beforeEach(() => {
+        vi.useFakeTimers({ now: instant });
+    });
+    afterEach(() => {
+        vi.useRealTimers();
+    });
+
+    it('is the local civil date on every surface when nothing sets it', () => {
+        const local = civil(instant.getFullYear(), instant.getMonth(), instant.getDate());
+        expect(throughCli({}).today).toEqual(local);
+        expect(throughMcp({}).today).toEqual(local);
+        expect(throughExtension({}).resolved.today).toEqual(local);
+    });
+
+    for (const [timezone, expected] of [
+        ['America/Los_Angeles', civil(2026, 1, 9)],
+        ['UTC', civil(2026, 1, 10)],
+        ['+09:00', civil(2026, 1, 10)],
+        ['Asia/Tokyo', civil(2026, 1, 10)],
+    ] as const) {
+        it(`follows the timezone ${timezone} on every surface`, () => {
+            expect(throughCli({ timezone }).today).toEqual(expected);
+            expect(throughMcp({ timezone }).today).toEqual(expected);
+            expect(throughExtension({ timezone }).resolved.today).toEqual(expected);
+        });
+    }
+
+    it('lets an explicit now win over the timezone on every surface', () => {
+        const inputs = { now: '2026-02-09', timezone: 'Asia/Tokyo' };
+        const expected = civil(2026, 1, 9);
+        expect(throughCli(inputs).today).toEqual(expected);
+        expect(throughMcp(inputs).today).toEqual(expected);
+        expect(throughExtension(inputs).resolved.today).toEqual(expected);
+    });
 });
 
 describe('surface parity: one width rule', () => {

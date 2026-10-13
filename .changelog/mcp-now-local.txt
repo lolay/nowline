@@ -1,0 +1,3 @@
+```release-note:changed
+MCP `render`, `export` and `validate` draw the default now-line at today's local date instead of today in UTC, as the CLI, the VS Code preview and the browser pipeline do. A roadmap with no `start:` begins on that date, so a call made on the evening of one day in the Americas no longer starts on the next. The new optional `timezone` argument takes `--timezone`'s forms (`UTC`, an offset such as `+05:30`, or an IANA name); `validate` also gains `now`.
+```
