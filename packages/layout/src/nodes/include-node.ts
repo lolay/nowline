@@ -6,9 +6,8 @@
 // separated by GAP_BETWEEN_REGIONS px.
 
 import type { IsolatedRegion } from '@nowline/core';
-import { resolveSizes } from '../calendar.js';
 import { includeChromeGeometry } from '../include-chrome-geometry.js';
-import type { LayoutContext, LayoutHelpers } from '../layout-context.js';
+import { createLayoutContext, type LayoutContext, type LayoutHelpers } from '../layout-context.js';
 import { resolveStyle } from '../style-resolution.js';
 import type { BoundingBox, PositionedIncludeRegion, PositionedSwimlane } from '../types.js';
 import { seedWaveEdges } from '../wave-layout.js';
@@ -40,48 +39,26 @@ export function buildIncludeRegions(
         isFirst = false;
         const label = region.content.roadmap?.title ?? region.sourcePath;
         const innerStartY = y + REGION_INSET_TOP;
-        const childCtx: LayoutContext = {
-            cal: ctx.cal,
-            schedule: ctx.schedule,
-            styleCtx: {
+        const childCtx = createLayoutContext(
+            region,
+            {
                 theme: ctx.styleCtx.theme,
-                styles: region.config.styles,
-                defaults: region.config.defaults,
-                labels: region.content.labels,
+                cal: ctx.cal,
+                schedule: ctx.schedule,
+                timeline: ctx.timeline,
+                scale: ctx.scale,
+                calendar: ctx.calendar,
+                bandScale: ctx.bandScale,
+                waves: ctx.waves,
             },
-            // Each include region declares its own sizes; resolve them under
-            // the parent's calendar so child sized items render at the same
-            // pixels-per-day scale as the host roadmap.
-            sizes: resolveSizes(region.content.sizes, ctx.cal),
-            labels: region.content.labels,
-            teams: region.content.teams,
-            persons: region.content.persons,
-            symbols: region.config.symbols,
-            footnoteIndex: new Map(),
-            footnoteHosts: new Map(),
-            timeline: ctx.timeline,
-            scale: ctx.scale,
-            calendar: ctx.calendar,
-            bandScale: ctx.bandScale,
-            entityLeftEdges: new Map(),
-            entityRightEdges: new Map(),
-            entityMidpoints: new Map(),
-            placedItems: new Map(),
-            itemFlowKey: new Map(),
-            currentFlowKey: '',
-            slackCorridors: [],
-            markerRowPlacements: new Map(),
-            chartTopY: innerStartY,
-            chartBottomY: innerStartY,
-            swimlaneBottomY: innerStartY,
-            chartRightX: ctx.chartRightX,
-            nextParallelId: 0,
-            nextGroupId: 0,
-            // Region lanes join the global barriers (specs/waves.md §8.4):
-            // they share the host's wave state, so they are floored and
-            // their members accumulate into the same pass.
-            ...(ctx.waves ? { waves: ctx.waves } : {}),
-        };
+            {
+                chartTopY: innerStartY,
+                chartBottomY: innerStartY,
+                swimlaneBottomY: innerStartY,
+                chartRightX: ctx.chartRightX,
+            },
+            {},
+        );
         // Region ids stay invisible to the host, but the wave edges are
         // shared: seed them into the region's otherwise empty edge maps.
         if (ctx.waves) {

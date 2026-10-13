@@ -17,7 +17,7 @@ import type {
     WavePlan,
 } from '@nowline/core';
 import { defaultRowBand } from '../band-scale.js';
-import { daysBetween, resolveSizes } from '../calendar.js';
+import { daysBetween } from '../calendar.js';
 import { resolveWorkingCalendar } from '../calendar-resolver.js';
 import { cappedPixelsPerDay } from '../canvas-width.js';
 import { parseDate, propValue } from '../dsl-utils.js';
@@ -25,7 +25,7 @@ import { HEADER_CARD_PADDING_X, HEADER_LOGO_PAD_Y_PX } from '../header-card-geom
 import { type LogoDimensions, resolveHeaderLogo } from '../header-logo.js';
 import { localeStrings, resolveLocale } from '../i18n.js';
 import type { LayoutOptions, LayoutResult } from '../layout.js';
-import type { LayoutContext, LayoutHelpers } from '../layout-context.js';
+import { createLayoutContext, type LayoutContext, type LayoutHelpers } from '../layout-context.js';
 import { isNonWorkingDisplay } from '../non-working-display.js';
 import { shiftIncludeY, shiftSwimlaneY } from '../positioned-shift.js';
 import type { RoadmapSchedule } from '../schedule.js';
@@ -206,12 +206,6 @@ export class RoadmapNode {
         // §5, §7.1).
         const { config: cal, working: calendar } = resolveWorkingCalendar(file, resolved);
         const scale = resolveScale(file, resolved.config.scale);
-        // Build the resolved-size map once per layout. Sized items look up
-        // through this map (instead of the raw `SizeDeclaration`s the
-        // include-resolver collected) so item sequencing doesn't pay the
-        // literal-to-days conversion every time.
-        const sizes = resolveSizes(resolved.content.sizes, cal);
-
         const styleCtx: StyleContext = {
             theme,
             styles: resolved.config.styles,
@@ -474,39 +468,32 @@ export class RoadmapNode {
             });
         }
 
-        const ctx: LayoutContext = {
-            cal,
-            schedule,
-            styleCtx,
-            sizes,
-            labels: resolved.content.labels,
-            teams: resolved.content.teams,
-            persons: resolved.content.persons,
-            symbols: resolved.config.symbols,
-            footnoteIndex: new Map(),
-            footnoteHosts: new Map(),
-            timeline,
-            scale: timeScale,
-            calendar,
-            bandScale: defaultRowBand(),
-            entityLeftEdges: new Map(),
-            entityRightEdges: new Map(),
-            entityMidpoints: new Map(),
-            placedItems: new Map(),
-            itemFlowKey: new Map(),
-            currentFlowKey: '',
-            slackCorridors: [],
-            markerRowPlacements,
-            chartTopY: timelineY + timelineHeightBudget,
-            chartBottomY: 0,
-            swimlaneBottomY: 0,
-            chartRightX: finalChartRightX,
-            nextParallelId: 0,
-            nextGroupId: 0,
-            // Wave floors are dates projected with the unclamped scale
-            // (specs/waves.md §5.1), from the axis origin.
-            ...(plan ? { waves: createWaveLayoutState(plan, timeScale, originX) } : {}),
-        };
+        const ctx = createLayoutContext(
+            resolved,
+            {
+                theme,
+                cal,
+                schedule,
+                timeline,
+                scale: timeScale,
+                calendar,
+                bandScale: defaultRowBand(),
+                waves: plan ? createWaveLayoutState(plan, timeScale, originX) : undefined,
+            },
+            {
+                chartTopY: timelineY + timelineHeightBudget,
+                chartBottomY: 0,
+                swimlaneBottomY: 0,
+                chartRightX: finalChartRightX,
+            },
+            { markerRowPlacements },
+        );
+
+        // Footnotes index must be built before sequencing items reference
+        // them.
+        const pre = buildFootnotes(resolved.content.footnotes, ctx, 0);
+        ctx.footnoteIndex = pre.index;
+        ctx.footnoteHosts = pre.hosts;
 
         // Seed the entity-edge maps from the date-pinned pack so item
         // `after:kickoff` references resolve before swimlanes run. Mid
@@ -519,12 +506,6 @@ export class RoadmapNode {
             ctx.entityRightEdges.set(e.id, e.centerX);
             ctx.entityMidpoints.set(e.id, { x: e.centerX, y: placement.centerY });
         }
-
-        // Footnotes index must be built before sequencing items reference
-        // them.
-        const pre = buildFootnotes(resolved.content.footnotes, ctx, 0);
-        ctx.footnoteIndex = pre.index;
-        ctx.footnoteHosts = pre.hosts;
 
         // Snapshot the entity maps after pre-positioning so we can reset
         // them between the two swimlane passes. Date-pinned anchors and

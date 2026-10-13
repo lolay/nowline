@@ -8,13 +8,16 @@ import type {
     ItemDeclaration,
     LabelDeclaration,
     ParallelBlock,
+    ResolvedConfig,
+    ResolvedContent,
     SymbolDeclaration,
 } from '@nowline/core';
 import type { BandScale } from './band-scale.js';
-import type { resolveCalendar } from './calendar.js';
+import { type resolveCalendar, resolveSizes } from './calendar.js';
 import type { ItemMeasure } from './nodes/item-measure.js';
 import type { RoadmapSchedule } from './schedule.js';
 import type { StyleContext } from './style-resolution.js';
+import type { Theme } from './themes/shape.js';
 import type { TimeScale } from './time-scale.js';
 import type {
     MarkerRowPlacement,
@@ -174,6 +177,81 @@ export interface LayoutContext {
      * declares no waves.
      */
     waves?: WaveLayoutState;
+}
+
+/** The per-file half of a context: the root file, or an isolated region. */
+export interface ContextSource {
+    config: Pick<ResolvedConfig, 'styles' | 'defaults' | 'symbols'>;
+    content: Pick<ResolvedContent, 'sizes' | 'labels' | 'teams' | 'persons'>;
+}
+
+/**
+ * Build a `LayoutContext` for the root file or for an isolated region.
+ * `chart` passes the chart extents through unchanged: the root sets
+ * `chartTopY` from the timeline with both bottoms at 0, a region sets all
+ * three y fields to its inner start and takes the host's `chartRightX`.
+ * A region passes no footnotes and no marker placements. The caller seeds
+ * the wave edges.
+ */
+export function createLayoutContext(
+    source: ContextSource,
+    shared: {
+        theme: Theme;
+        cal: ReturnType<typeof resolveCalendar>;
+        schedule: RoadmapSchedule;
+        timeline: PositionedTimelineScale;
+        scale: TimeScale;
+        calendar: WorkingCalendar;
+        bandScale: BandScale;
+        waves?: WaveLayoutState;
+    },
+    chart: Pick<LayoutContext, 'chartTopY' | 'chartBottomY' | 'swimlaneBottomY' | 'chartRightX'>,
+    init: {
+        markerRowPlacements?: Map<string, MarkerRowPlacement>;
+    },
+): LayoutContext {
+    return {
+        cal: shared.cal,
+        schedule: shared.schedule,
+        styleCtx: {
+            theme: shared.theme,
+            styles: source.config.styles,
+            defaults: source.config.defaults,
+            labels: source.content.labels,
+        },
+        // Each file declares its own sizes, resolved under the host's
+        // calendar so a region's sized items render at the host's
+        // pixels-per-day scale.
+        sizes: resolveSizes(source.content.sizes, shared.cal),
+        labels: source.content.labels,
+        teams: source.content.teams,
+        persons: source.content.persons,
+        symbols: source.config.symbols,
+        footnoteIndex: new Map(),
+        footnoteHosts: new Map(),
+        timeline: shared.timeline,
+        scale: shared.scale,
+        calendar: shared.calendar,
+        bandScale: shared.bandScale,
+        entityLeftEdges: new Map(),
+        entityRightEdges: new Map(),
+        entityMidpoints: new Map(),
+        placedItems: new Map(),
+        itemFlowKey: new Map(),
+        currentFlowKey: '',
+        slackCorridors: [],
+        markerRowPlacements: init.markerRowPlacements ?? new Map(),
+        chartTopY: chart.chartTopY,
+        chartBottomY: chart.chartBottomY,
+        swimlaneBottomY: chart.swimlaneBottomY,
+        chartRightX: chart.chartRightX,
+        nextParallelId: 0,
+        nextGroupId: 0,
+        // Wave floors are dates projected with the unclamped scale
+        // (specs/waves.md §5.1); a region shares the host's wave state
+        // (§8.4) so its lanes are floored and accumulate into the same pass.
+        ...(shared.waves ? { waves: shared.waves } : {}),
+    };
 }
 
 /**
