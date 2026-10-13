@@ -274,6 +274,15 @@ describe('NL.E0904 and NL.E0905: weekday names (NW3)', () => {
         ]);
     });
 
+    it('rejects a name only Object.prototype holds', async () => {
+        // Read with `in`, `constructor` passed as a weekday before m2.s3.
+        const found = await check('non-working h every:[constructor, toString]');
+        expect(found.map((f) => [f.code, f.message])).toEqual([
+            ['NL.E0904', 'Invalid weekday "constructor". Use sun, mon, tue, wed, thu, fri or sat.'],
+            ['NL.E0904', 'Invalid weekday "toString". Use sun, mon, tue, wed, thu, fri or sat.'],
+        ]);
+    });
+
     it('rejects a weekday listed twice', async () => {
         const [f, ...rest] = await check('non-working h every:[sat, sat]');
         expect(rest).toEqual([]);

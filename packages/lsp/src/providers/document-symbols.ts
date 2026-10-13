@@ -16,10 +16,10 @@ import {
     isWaveDeclaration,
     type ParallelBlock,
     type RoadmapDeclaration,
-    type SwimlaneContent,
     type SwimlaneDeclaration,
     singleLine,
 } from '@nowline/core';
+import { type TrackNode, trackChildren } from '@nowline/core/internal';
 import type { AstNode, LangiumDocument, MaybePromise } from 'langium';
 import type { DocumentSymbolProvider } from 'langium/lsp';
 import type {
@@ -107,15 +107,10 @@ export class NowlineDocumentSymbolProvider implements DocumentSymbolProvider {
     }
 
     private swimlaneSymbol(lane: SwimlaneDeclaration): DocumentSymbol {
-        const sym = this.simpleSymbol(lane, SymbolKind.Namespace, true);
-        for (const child of lane.content) {
-            const sub = this.trackChildSymbol(child);
-            if (sub) sym.children!.push(sub);
-        }
-        return sym;
+        return this.withTrackChildren(this.simpleSymbol(lane, SymbolKind.Namespace, true), lane);
     }
 
-    private trackChildSymbol(child: SwimlaneContent): DocumentSymbol | undefined {
+    private trackChildSymbol(child: TrackNode): DocumentSymbol | undefined {
         if (isItemDeclaration(child)) return this.itemSymbol(child);
         if (isParallelBlock(child)) return this.parallelSymbol(child);
         if (isGroupBlock(child)) return this.groupSymbol(child);
@@ -127,17 +122,19 @@ export class NowlineDocumentSymbolProvider implements DocumentSymbolProvider {
     }
 
     private parallelSymbol(node: ParallelBlock): DocumentSymbol {
-        const sym = this.simpleSymbol(node, SymbolKind.Array, true);
-        for (const child of node.content) {
-            const sub = this.trackChildSymbol(child);
-            if (sub) sym.children!.push(sub);
-        }
-        return sym;
+        return this.withTrackChildren(this.simpleSymbol(node, SymbolKind.Array, true), node);
     }
 
     private groupSymbol(node: GroupBlock): DocumentSymbol {
-        const sym = this.simpleSymbol(node, SymbolKind.Object, true);
-        for (const child of node.content) {
+        return this.withTrackChildren(this.simpleSymbol(node, SymbolKind.Object, true), node);
+    }
+
+    // The container's track children (descriptions skipped) as nested symbols.
+    private withTrackChildren(
+        sym: DocumentSymbol,
+        container: SwimlaneDeclaration | GroupBlock | ParallelBlock,
+    ): DocumentSymbol {
+        for (const child of trackChildren(container)) {
             const sub = this.trackChildSymbol(child);
             if (sub) sym.children!.push(sub);
         }

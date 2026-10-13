@@ -40,7 +40,7 @@ import type {
 import { buildWavePlan, isGroupBlock, isItemDeclaration, isParallelBlock } from '@nowline/core';
 import { deriveItemDurationDays, resolveSizes } from './calendar.js';
 import { type ResolvedCalendar, resolveWorkingCalendar } from './calendar-resolver.js';
-import { parseDate, propValue } from './dsl-utils.js';
+import { parseIsoDate, propValue } from './dsl-utils.js';
 import { type AfterTerm, startTermsOf } from './start-terms.js';
 import { solveWaveBarriers, summarizeWaves, WavePass, waveFloorDays } from './wave-barrier.js';
 import { spanEndDate } from './working-calendar.js';
@@ -146,7 +146,7 @@ export function scheduleRoadmap(
 
     // Resolve roadmap start date — same precedence as RoadmapNode.place.
     const startRaw = propValue(file.roadmapDecl?.properties ?? [], 'start');
-    const startDate = parseDate(startRaw) ?? utcMidnight(options.today ?? new Date());
+    const startDate = parseIsoDate(startRaw) ?? utcMidnight(options.today ?? new Date());
     // Working-day index of a date, and back: a point and an exclusive end.
     const dayOf = (date: Date): number => calendar.workingIndexOf(startDate, date);
     const pointAt = (day: number): Date => calendar.dateAtWorkingIndex(startDate, day);
@@ -176,7 +176,7 @@ export function scheduleRoadmap(
     // Pre-seed named anchors (they may be referenced by item after: before we
     // walk the lanes).
     for (const [id, anchor] of resolved.content.anchors) {
-        const d = parseDate(propValue(anchor.properties, 'date'));
+        const d = parseIsoDate(propValue(anchor.properties, 'date'));
         if (d) {
             const day = dayOf(d);
             anchorEnd.set(id, day);
@@ -303,7 +303,7 @@ export function scheduleRoadmap(
         ms: MilestoneDeclaration,
         resolveAfterDay: (term: AfterTerm) => number,
     ): number | undefined => {
-        const d = parseDate(propValue(ms.properties, 'date'));
+        const d = parseIsoDate(propValue(ms.properties, 'date'));
         if (d) return dayOf(d);
         const { after } = startTermsOf(ms.properties);
         return after.length > 0 ? Math.max(0, ...after.map(resolveAfterDay)) : undefined;
@@ -319,7 +319,7 @@ export function scheduleRoadmap(
         const regionAnchorEnd = new Map<string, number>();
         const regionMilestoneEnd = new Map<string, number>();
         for (const [id, anchor] of content.anchors) {
-            const d = parseDate(propValue(anchor.properties, 'date'));
+            const d = parseIsoDate(propValue(anchor.properties, 'date'));
             if (d) {
                 const day = dayOf(d);
                 regionAnchorEnd.set(id, day);
@@ -426,7 +426,7 @@ export function scheduleRoadmap(
         if (day === undefined) continue;
         // A dated milestone keeps its own date; an after-only one is a point
         // at the latest predecessor end: the next working day.
-        const date = parseDate(propValue(ms.properties, 'date')) ?? pointAt(day);
+        const date = parseIsoDate(propValue(ms.properties, 'date')) ?? pointAt(day);
         milestoneEnd.set(id, day);
         milestoneResults.set(id, date);
         milestoneByNode.set(ms, date);

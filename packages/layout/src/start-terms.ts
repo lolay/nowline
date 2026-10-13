@@ -6,7 +6,7 @@
 // is shared. Pure: no calendar, no scale.
 
 import type { EntityProperty, WavePlan } from '@nowline/core';
-import { parseDate, propValue, propValues } from './dsl-utils.js';
+import { parseIsoDate, propValue, propValues } from './dsl-utils.js';
 
 /** One element of `after:`: an ISO date, or the id of an entity. */
 export type AfterTerm = { raw: string; date: Date } | { raw: string; ref: string };
@@ -23,14 +23,14 @@ export function startTermsOf(props: EntityProperty[]): StartTerms {
     let pin: StartTerms['pin'];
     for (const key of ['date', 'start'] as const) {
         const raw = propValue(props, key);
-        const date = parseDate(raw);
+        const date = parseIsoDate(raw);
         if (raw !== undefined && date) {
             pin = { key, raw, date };
             break;
         }
     }
     const after = propValues(props, 'after').map((raw): AfterTerm => {
-        const date = parseDate(raw);
+        const date = parseIsoDate(raw);
         return date ? { raw, date } : { raw, ref: raw };
     });
     return pin ? { pin, after } : { after };
@@ -43,5 +43,5 @@ export function startTermsOf(props: EntityProperty[]): StartTerms {
  * `workingIndexOf`, the pixel engine with `scale.forward`.
  */
 export function waveFloorDates(plan: WavePlan): Array<Date | null> {
-    return plan.floors.map((f) => (f ? parseDate(f.date) : null));
+    return plan.floors.map((f) => (f ? parseIsoDate(f.date) : null));
 }

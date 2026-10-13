@@ -1,6 +1,6 @@
 # Nowline — Core AST, Style and Calendar Utilities
 
-**Status: Accepted (design only, no code yet).** Milestone **m4.12** in [`milestones.md`](./milestones.md); decisions in the last section. This is refactor R3 from [`review-since-v086.md`](./review-since-v086.md): a small utility layer in `@nowline/core` so that the content walk, the style precedence chain, the calendar-declaration classifier and the property helpers each live once. Every `file:line` below was checked at the commit that adds this spec (source identical to 0062df3 plus the m2 fixes of the same review).
+**Status: Implemented (m4.12).** Milestone **m4.12** in [`milestones.md`](./milestones.md); decisions in the last section. Shipped as one PR, not one per step (§4), with commits per step and module. Two deviations from this text: strict dates reach the validator too (§3.5, §7 decision 5), and the branch carries one changelog fragment, `.changelog/core-ast-utilities.txt` (a `fixed` block for the dates and `every:`, a `removed` block for `effectiveWave` and `leadWave`), where §6 and §4 expected none. This is refactor R3 from [`review-since-v086.md`](./review-since-v086.md): a small utility layer in `@nowline/core` so that the content walk, the style precedence chain, the calendar-declaration classifier and the property helpers each live once. Every `file:line` below was checked at the commit that adds this spec (source identical to 0062df3 plus the m2 fixes of the same review).
 
 ## 1. Problem
 
@@ -236,13 +236,18 @@ export function classifyCalendarDeclaration(
 export function replacesPresetWeekend(
     declarations: ReadonlyArray<NonWorkingDeclaration | WorkingDeclaration>,
 ): boolean;
+
+/** One of the seven names (an own key of `WEEKDAY_INDEX`, never an inherited one such as `constructor`). */
+export function isWeekday(name: string): name is Weekday;
+/** `date`, `start`, `end`, `every`: any other key is NL.E0901. */
+export const CALENDAR_DECLARATION_KEYS: ReadonlySet<string>;
 ```
 
 - **Validator.** `checkCalendarDeclaration` keeps choosing codes from the facts; NW3/NW4 (`:2106-2173`) read `wellFormed`, `shape` and `weekdays` and use `replacesPresetWeekend`. The local helpers at `:2325-2439` go.
 - **Layout.** `declarationRule` (`calendar-resolver.ts:105-135`) maps facts to a `CalendarRule` (string dates to `Date`), and `calendarRules` uses `replacesPresetWeekend`. Its `WEEKDAY_INDEX`, `realDate` and `stripColon` go.
 - **LSP hover.** `undrawnTitleNote` (`hover.ts:136-149`) reads `shape`: a titled `bounded-recurrence` or `half-bounded-recurrence` is not drawn.
 
-The three copies agree on every shape the grammar can produce (a bracket list has at least one element, `nowline.langium:189-193`), so the switch changes no output; the facts are tested against each copy before the copies go (§5).
+The three copies agree on every shape the grammar can produce (a bracket list has at least one element, `nowline.langium:189-193`), so the switch changes no output; the facts are tested against each copy before the copies go (§5). The equivalence test found one difference: the validator read weekday names with `in` and layout with a plain object lookup, so a name `Object.prototype` holds (`every:constructor`) passed as a weekday; `isWeekday` accepts only the seven names, which makes that an `NL.E0904` (a `fixed` line in the m2.s1 fragment).
 
 ### 3.5 Property helpers, date pattern and value tables
 
@@ -268,10 +273,10 @@ export function isRealIsoDate(raw: string): boolean;
 
 and a `packages/core/src/language/value-tables.ts` with `BUILTIN_STATUSES`, `BUILTIN_CAPACITY_ICONS`, `BUILTIN_ICON_NAMES` and `NON_WORKING_DISPLAYS` (plus `WEEKDAYS` from §3.4). Layout re-exports `NON_WORKING_DISPLAYS` from core, so `@nowline/layout`'s public export and the MCP and browser code that import it are unchanged.
 
-- Every listed copy (§1.5) imports these instead. Each keeps its current semantics; where two copies differ (`export-core`'s `getProp` returns the first list element, layout's `propValue` does not), the caller keeps its own function built on `findProp`.
+- Every listed copy (§1.5) imports these instead. Each keeps its current semantics; where two copies differ (`export-core`'s `getProp` returns the first list element, layout's `propValue` does not), the caller keeps its own function. `export-core`'s `getProp`, `getProps` and `hasProp` also compare keys with `===` and never strip a `:`, which `findProp` would change, so they keep their own lookup.
 - `printer.ts` keeps its strip: it formats hand-written JSON whose keys may end in `:`. It uses `propKey`.
 - `@nowline/preview-shell` keeps its inline regex (`mount.ts:1537`): it deliberately has no engine dependency ([`architecture.md`](./architecture.md), preview-shell entry).
-- `parseIsoDate` is strict (§7, decision 4): it drops the roll-over of `dsl-utils.ts:24-30`, so layout reads `2026-02-30` as no date, the same as the validator. Only callers that skip validation can see the difference; the step that switches layout to it is marked *behaviour*, carries a `fixed` fragment, and G1 confirms no sample relies on roll-over.
+- `parseIsoDate` is strict (§7, decisions 4 and 5): it drops the roll-over of layout's old `parseDate`, so layout reads `2026-02-30` as no date. The validator was strict only inside calendar declarations, and `resolveLocalStart` and the wave rules' `isValidIsoDate` accepted `2026-02-30` (which `Date` rolls to 2026-03-02), so the same commit makes the validator strict too: `NL.E0405` fires for an impossible day on every `date:`, `start:` and `end:`, and `resolveLocalStart` and the wave start floor use `isRealIsoDate`. That commit is marked *behaviour*, carries a `fixed` fragment, and G1 and G3 confirm no sample relies on roll-over.
 
 ### 3.6 The validator split
 
@@ -396,3 +401,4 @@ Gary, 2026-10-13:
 2. **`effectiveWave` and `leadWave`.** Remove them in m3.s3, with no deprecation step: nothing outside core's own tests calls them. A `removed` fragment covers the published package.
 3. **Publishing the new helpers.** Through a `@nowline/core/internal` subpath, documented as unstable, not as supported `@nowline/core` API. Every consumer is another `@nowline/*` package in lock-step. This reverses the draft's recommendation.
 4. **Strict dates in layout.** Make `parseIsoDate` strict, so layout agrees with the validator on impossible dates (§3.5). This reverses the draft's recommendation.
+5. **Strict dates in the validator too.** Decision 4 assumed the validator already rejected impossible days everywhere; it did so only in calendar declarations. The behaviour commit of m2.s1 makes both strict: `NL.E0405` fires for `2026-02-30` on every date key, and layout reads it as no date (§3.5). One `fixed` fragment covers both.

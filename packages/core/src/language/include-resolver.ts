@@ -44,6 +44,7 @@ import {
 } from '../generated/ast.js';
 import type { MessageCode } from '../i18n/codes.js';
 import { basename, dirname, resolve as resolvePath } from '../util/posix-path.js';
+import { ISO_DATE_RE } from '../util/props.js';
 import {
     checkWaveAgreement,
     participates,
@@ -55,12 +56,10 @@ import { ownWaves } from './waves.js';
 
 export type IncludeMode = 'merge' | 'ignore' | 'isolate';
 
-const DATE_RE = /^\d{4}-\d{2}-\d{2}$/;
-
 function readStartProp(decl: RoadmapDeclaration | undefined): string | undefined {
     const prop = decl?.properties.find((p) => p.key === 'start');
     if (!prop?.value) return undefined;
-    if (!DATE_RE.test(prop.value)) return undefined;
+    if (!ISO_DATE_RE.test(prop.value)) return undefined;
     if (Number.isNaN(new Date(prop.value).getTime())) return undefined;
     return prop.value;
 }

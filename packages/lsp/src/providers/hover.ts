@@ -14,6 +14,7 @@ import {
     type WaveDeclaration,
     waveIndexMap,
 } from '@nowline/core';
+import { classifyCalendarDeclaration } from '@nowline/core/internal';
 import type { AstNode, LangiumDocument, MaybePromise } from 'langium';
 import type { HoverProvider } from 'langium/lsp';
 import type { CancellationToken, Hover, HoverParams, Range } from '../lsp-protocol.js';
@@ -127,8 +128,8 @@ const CALENDAR_SURFACED = ['date', 'every', 'start', 'end'];
 
 /**
  * Why a calendar declaration's title is never drawn, or undefined when it is
- * drawn, there is no title, or the shape is malformed (NW1, §4.1: only the
- * first of each key counts, so presence is all the shape needs). Dated,
+ * drawn, there is no title, or the shape is malformed (NW1, §4.1; core's
+ * `classifyCalendarDeclaration` reads the shape). Dated,
  * titled declarations are labelled, `non-working` or `working`; a titled
  * bounded recurrence is not (specs/working-calendar.md §7.4 "Which rules are
  * labelled"). The open-ended week is the baseline and gets no note.
@@ -136,13 +137,8 @@ const CALENDAR_SURFACED = ['date', 'every', 'start', 'end'];
 function undrawnTitleNote(entity: NamedEntity): string | undefined {
     if (!isNonWorkingDeclaration(entity) && !isWorkingDeclaration(entity)) return undefined;
     if (!entity.title) return undefined;
-    const keys = new Set(entity.properties.map((p) => propKey(p)));
-    const has = (key: string) => keys.has(key);
-    const isDated = has('date') && !has('every') && !has('start') && !has('end');
-    const isRange = !has('date') && !has('every') && has('start') && has('end');
-    const isRecurrence = !has('date') && has('every');
-    if (!isDated && !isRange && !isRecurrence) return undefined;
-    if (isRecurrence && (has('start') || has('end'))) {
+    const { shape } = classifyCalendarDeclaration(entity);
+    if (shape === 'half-bounded-recurrence' || shape === 'bounded-recurrence') {
         return 'Title not drawn on the chart: bounded recurrences are not labelled.';
     }
     return undefined;
