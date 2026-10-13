@@ -15,7 +15,6 @@ import type {
     NowlineDirective,
     NowlineFile,
     ParallelBlock,
-    PersonDeclaration,
     RoadmapDeclaration,
     RoadmapEntry,
     ScaleBlock,
@@ -30,13 +29,11 @@ import type {
 import {
     isCalendarBlock,
     isDefaultDeclaration,
-    isDescriptionDirective,
     isGroupBlock,
     isItemDeclaration,
     isLabelDeclaration,
     isNonWorkingDeclaration,
     isParallelBlock,
-    isPersonDeclaration,
     isSizeDeclaration,
     isStatusDeclaration,
     isStyleDeclaration,
@@ -57,6 +54,7 @@ import {
 } from './calendar-declarations.js';
 import type { NowlineAstType, NowlineServices } from './nowline-module.js';
 import { styleLayers } from './style-chain.js';
+import * as entities from './validator/entities.js';
 import * as properties from './validator/properties.js';
 import * as structure from './validator/structure.js';
 import {
@@ -69,28 +67,18 @@ import {
 } from './validator/support.js';
 import {
     ASCII_FALLBACK_RE,
-    BARE_DURATION_SUFFIX_RE,
     BUILTIN_CAPACITY_ICON_SET,
     BUILTIN_ICON_NAME_SET,
     BUILTIN_STATUS_SET,
     CALENDAR_FIELDS,
     DEFAULT_BANNED,
     DEFAULT_ENTITY_TYPES,
-    DURATION_RE,
     INTEGER_RE,
-    POSITIVE_DECIMAL_FRACTION_RE,
-    POSITIVE_PERCENT_RE,
     ROADMAP_ONLY_STYLE_KEYS,
     SCALE_FIELDS,
-    UTILIZATION_NONE,
 } from './validator/tables.js';
-import {
-    defaultBannedMessage,
-    describeNode,
-    displayName,
-    entityTypeLabel,
-} from './validator-utils.js';
-import { BUILTIN_CAPACITY_ICONS, BUILTIN_ICON_NAMES, BUILTIN_STATUSES } from './value-tables.js';
+import { defaultBannedMessage, displayName, entityTypeLabel } from './validator-utils.js';
+import { BUILTIN_CAPACITY_ICONS, BUILTIN_ICON_NAMES } from './value-tables.js';
 import {
     checkWaveDeclarations,
     evaluateWaveProperties,
@@ -282,102 +270,26 @@ export class NowlineValidator {
         properties.checkPropertyValues(prop, accept);
     }
 
-    // --- Rule 11: Anchor requires date: ---
     checkAnchorRequiredDate(anchor: AnchorDeclaration, accept: ValidationAcceptor): void {
-        const dateProp = anchor.properties.find((p) => propKey(p) === 'date');
-        if (!dateProp) {
-            acceptTr(accept, 'error', { node: anchor }, 'NL.E0500', { name: displayName(anchor) });
-        }
+        entities.checkAnchorRequiredDate(anchor, accept);
     }
 
-    // --- R2 + R3: anchor must not precede roadmap start; dated roadmap requires start: ---
     checkAnchorAgainstStart(anchor: AnchorDeclaration, accept: ValidationAcceptor): void {
-        const dateProp = anchor.properties.find((p) => propKey(p) === 'date');
-        if (!dateProp?.value) return;
-        const raw = dateProp.value;
-        if (!isRealIsoDate(raw)) return;
-        const anchorDate = new Date(raw);
-
-        const start = resolveLocalStart(anchor.$container);
-        switch (start.kind) {
-            case 'invalid':
-                return;
-            case 'missing':
-                acceptTr(accept, 'error', { node: dateProp, property: 'value' }, 'NL.E0501', {
-                    name: displayName(anchor),
-                });
-                return;
-            case 'valid':
-                if (anchorDate < start.date) {
-                    acceptTr(accept, 'error', { node: dateProp, property: 'value' }, 'NL.E0502', {
-                        name: displayName(anchor),
-                        date: raw,
-                        start: start.iso,
-                    });
-                }
-                return;
-        }
+        entities.checkAnchorAgainstStart(anchor, accept);
     }
 
-    // --- Rule 12: Milestone requires date: or after: ---
     checkMilestoneRequirement(milestone: MilestoneDeclaration, accept: ValidationAcceptor): void {
-        const hasDate = milestone.properties.some((p) => propKey(p) === 'date');
-        const hasAfter = milestone.properties.some((p) => propKey(p) === 'after');
-        if (!hasDate && !hasAfter) {
-            acceptTr(accept, 'error', { node: milestone }, 'NL.E0503', {
-                name: displayName(milestone),
-            });
-        }
+        entities.checkMilestoneRequirement(milestone, accept);
     }
 
-    // --- R2 + R3: dated milestone must not precede roadmap start ---
     checkMilestoneAgainstStart(milestone: MilestoneDeclaration, accept: ValidationAcceptor): void {
-        const dateProp = milestone.properties.find((p) => propKey(p) === 'date');
-        if (!dateProp?.value) return;
-        const raw = dateProp.value;
-        if (!isRealIsoDate(raw)) return;
-        const milestoneDate = new Date(raw);
-
-        const start = resolveLocalStart(milestone.$container);
-        switch (start.kind) {
-            case 'invalid':
-                return;
-            case 'missing':
-                accept(
-                    'error',
-                    `Milestone "${displayName(milestone)}" has a date but the roadmap is missing "start:". Add start:YYYY-MM-DD to the roadmap.`,
-                    {
-                        node: dateProp,
-                        property: 'value',
-                    },
-                );
-                return;
-            case 'valid':
-                if (milestoneDate < start.date) {
-                    acceptTr(accept, 'error', { node: dateProp, property: 'value' }, 'NL.E0504', {
-                        name: displayName(milestone),
-                        date: raw,
-                        start: start.iso,
-                    });
-                }
-                return;
-        }
+        entities.checkMilestoneAgainstStart(milestone, accept);
     }
 
-    // --- Rule 13: Footnote requires on ---
     checkFootnoteOn(footnote: FootnoteDeclaration, accept: ValidationAcceptor): void {
-        const hasOn = footnote.properties.some((p) => propKey(p) === 'on');
-        if (!hasOn) {
-            acceptTr(accept, 'error', { node: footnote }, 'NL.E0505');
-        }
+        entities.checkFootnoteOn(footnote, accept);
     }
 
-    // --- Rule 13a: `footnote:` is not a valid property on host entities ---
-    // The spec attaches footnotes via the `on:` property on the footnote
-    // declaration only; there is no forward `footnote:` property on the
-    // referenced item / swimlane / etc. Surface a fix-it style error so
-    // authors who reach for the (legacy, undocumented) forward form get
-    // a clear nudge toward the spec-mandated direction.
     checkNoFootnoteProperty(
         node: {
             $type: string;
@@ -387,64 +299,23 @@ export class NowlineValidator {
         },
         accept: ValidationAcceptor,
     ): void {
-        for (const prop of node.properties) {
-            if (propKey(prop) === 'footnote') {
-                accept(
-                    'error',
-                    `Property "footnote:" is not valid on ${describeNode(node)}. ` +
-                        'Footnotes attach via "on:" on the footnote declaration — ' +
-                        'declare `footnote <id> on:<target-id>` instead.',
-                    { node: prop },
-                );
-            }
-        }
+        entities.checkNoFootnoteProperty(node, accept);
     }
 
-    // --- Rule 10: Item requires either size: or duration: ---
     checkItemRequiredDuration(item: ItemDeclaration, accept: ValidationAcceptor): void {
-        const hasDuration = item.properties.some((p) => propKey(p) === 'duration');
-        const hasSize = item.properties.some((p) => propKey(p) === 'size');
-        if (!hasDuration && !hasSize) {
-            acceptTr(accept, 'error', { node: item }, 'NL.E0600', { name: displayName(item) });
-        }
+        entities.checkItemRequiredDuration(item, accept);
     }
 
-    // --- Parallel/group rule 3: size/duration/remaining/capacity not valid on parallel/group ---
     checkNoComputedProperties(node: ParallelBlock | GroupBlock, accept: ValidationAcceptor): void {
-        for (const prop of node.properties) {
-            const key = propKey(prop);
-            if (key === 'size' || key === 'duration' || key === 'remaining' || key === 'capacity') {
-                accept(
-                    'error',
-                    `"${key}" is not valid on ${node.$type === 'ParallelBlock' ? 'parallel' : 'group'} (computed from children).`,
-                    {
-                        node: prop,
-                    },
-                );
-            }
-        }
+        entities.checkNoComputedProperties(node, accept);
     }
 
-    // --- Parallel/group rule 1: Parallel requires >= 2 children ---
     checkParallelMinChildren(node: ParallelBlock, accept: ValidationAcceptor): void {
-        const children = node.content.filter((c) => !isDescriptionDirective(c));
-        if (children.length === 0) {
-            accept('error', 'Parallel block must contain at least 2 children.', { node });
-        } else if (children.length === 1) {
-            accept(
-                'warning',
-                'Parallel block has only 1 child. Use at least 2 for parallel execution.',
-                { node },
-            );
-        }
+        entities.checkParallelMinChildren(node, accept);
     }
 
-    // --- Parallel/group rule 2: Group requires >= 1 child ---
     checkGroupMinChildren(node: GroupBlock, accept: ValidationAcceptor): void {
-        const children = node.content.filter((c) => !isDescriptionDirective(c));
-        if (children.length === 0) {
-            accept('error', 'Group must contain at least 1 child.', { node });
-        }
+        entities.checkGroupMinChildren(node, accept);
     }
 
     checkNoRawStyleProperties(
@@ -479,37 +350,12 @@ export class NowlineValidator {
         properties.checkStylePropertyEnum(prop, accept);
     }
 
-    // --- Size declaration: rule 5 (effort: required), rule 4 (id format) ---
     checkSizeDeclaration(decl: SizeDeclaration, accept: ValidationAcceptor): void {
-        const effortProp = decl.properties.find((p) => propKey(p) === 'effort');
-        if (!effortProp) {
-            accept('error', `Size "${displayName(decl)}" requires an "effort:" property.`, {
-                node: decl,
-            });
-        }
-
-        if (decl.name) {
-            if (DURATION_RE.test(decl.name) || BARE_DURATION_SUFFIX_RE.test(decl.name)) {
-                accept(
-                    'error',
-                    `Size id "${decl.name}" collides with the raw duration pattern. Choose a different name (e.g. "xs", "small", "quarter").`,
-                    { node: decl, property: 'name' },
-                );
-            }
-        }
+        entities.checkSizeDeclaration(decl, accept);
     }
 
-    // --- Status declaration: id collision with built-ins ---
     checkStatusDeclaration(decl: StatusDeclaration, accept: ValidationAcceptor): void {
-        if (decl.name) {
-            if (BUILTIN_STATUS_SET.has(decl.name)) {
-                accept(
-                    'error',
-                    `Status id "${decl.name}" collides with the built-in status value. Built-ins: ${BUILTIN_STATUSES.join(', ')}.`,
-                    { node: decl, property: 'name' },
-                );
-            }
-        }
+        entities.checkStatusDeclaration(decl, accept);
     }
 
     // --- Waves (specs/waves.md §6.2): set S (WV1/WV3/WV4, wave declarations),
@@ -527,50 +373,15 @@ export class NowlineValidator {
         for (const finding of evaluateWaveOrder(scope, waves)) acceptWaveFinding(accept, finding);
     }
 
-    // --- Rule 5: Duplicate size ids ---
     checkDuplicateSizeIds(file: NowlineFile, accept: ValidationAcceptor): void {
-        const seen = new Map<string, SizeDeclaration>();
-        for (const entry of file.roadmapEntries) {
-            if (isSizeDeclaration(entry) && entry.name) {
-                const existing = seen.get(entry.name);
-                if (existing) {
-                    accept(
-                        'error',
-                        `Duplicate size id "${entry.name}". First declared at ${locationOf(existing)}.`,
-                        { node: entry, property: 'name' },
-                    );
-                } else {
-                    seen.set(entry.name, entry);
-                }
-            }
-        }
+        entities.checkDuplicateSizeIds(file, accept);
     }
 
-    // --- Rule 17d (ordering half): utilization-warn-at <= utilization-over-at ---
-    // Runs on both `SwimlaneDeclaration` and `DefaultDeclaration` (when its
-    // entityType is `swimlane`). The value-form check in checkPropertyValues
-    // has already run by the time this fires; this method only re-reads the
-    // values and compares fractions when both are numeric. `none` on either
-    // side opts that side out and skips the comparison (the spec treats the
-    // two thresholds as independent — see specs/dsl.md rule 17d).
     checkUtilizationOrdering(
         decl: SwimlaneDeclaration | DefaultDeclaration,
         accept: ValidationAcceptor,
     ): void {
-        if (isDefaultDeclaration(decl) && decl.entityType !== 'swimlane') return;
-        const warnProp = decl.properties.find((p) => propKey(p) === 'utilization-warn-at');
-        const overProp = decl.properties.find((p) => propKey(p) === 'utilization-over-at');
-        if (!warnProp || !overProp) return;
-        const warn = parseUtilizationFraction(warnProp.value);
-        const over = parseUtilizationFraction(overProp.value);
-        if (warn === null || over === null) return;
-        if (warn > over) {
-            accept(
-                'error',
-                `utilization-warn-at (${warnProp.value}) must be ≤ utilization-over-at (${overProp.value}). Warn fires below over; if both fire at the same point, the warn band collapses to zero.`,
-                { node: warnProp, property: 'value' },
-            );
-        }
+        entities.checkUtilizationOrdering(decl, accept);
     }
 
     // --- Defaults rules 21-23: entity-type whitelist, duplicate-per-entity, banned props ---
@@ -1072,45 +883,8 @@ export class NowlineValidator {
         }
     }
 
-    // --- Rules 30-32: Person declare-once + bare top-level warning ---
     checkPersonDeclarations(file: NowlineFile, accept: ValidationAcceptor): void {
-        type DeclSite = { node: PersonDeclaration; isDeclaration: boolean };
-        const sitesByName = new Map<string, DeclSite[]>();
-
-        const isRealDeclaration = (p: PersonDeclaration): boolean => {
-            return Boolean(p.title) || p.properties.length > 0 || p.description !== undefined;
-        };
-
-        const visitPerson = (p: PersonDeclaration) => {
-            if (!p.name) return;
-            const isDecl = isRealDeclaration(p);
-            if (!sitesByName.has(p.name)) sitesByName.set(p.name, []);
-            sitesByName.get(p.name)!.push({ node: p, isDeclaration: isDecl });
-            if (!isDecl && p.$container.$type === 'NowlineFile') {
-                accept(
-                    'warning',
-                    `Bare "person ${p.name}" at roadmap top level has no declaration. Either add properties (title, link, etc.) or remove the line.`,
-                    { node: p },
-                );
-            }
-        };
-
-        for (const node of declarations(file)) {
-            if (isPersonDeclaration(node)) visitPerson(node);
-        }
-
-        for (const [name, sites] of sitesByName) {
-            const decls = sites.filter((s) => s.isDeclaration);
-            if (decls.length > 1) {
-                for (let i = 1; i < decls.length; i++) {
-                    accept(
-                        'error',
-                        `Person "${name}" is declared more than once. First declaration at ${locationOf(decls[0].node)}.`,
-                        { node: decls[i].node },
-                    );
-                }
-            }
-        }
+        entities.checkPersonDeclarations(file, accept);
     }
 
     // --- Rules 17f / 17g / 17h / 17i: per-declaration symbol checks ---
@@ -1419,33 +1193,6 @@ export class NowlineValidator {
 }
 
 // --- Helpers ---
-
-/**
- * Parse a numeric utilization-threshold value into a fraction. Mirrors the
- * accepted value forms in checkPropertyValues (case `utilization-warn-at` /
- * `utilization-over-at`):
- *
- *   - `'none'` → null (opt-out; ordering check skips this side).
- *   - positive percent (`80%`) → 0.8.
- *   - positive decimal fraction (`0.8`) → 0.8 (or `1.25` → 1.25 for the
- *     intentionally-stretched-over case `utilization-over-at:125%`).
- *   - bare integer or anything else → null. Bare integers are rejected with
- *     a disambiguation hint by the value-form check before this helper runs;
- *     returning null here makes the ordering check skip that side instead of
- *     double-reporting.
- */
-function parseUtilizationFraction(val: string | undefined): number | null {
-    if (!val || val === UTILIZATION_NONE) return null;
-    if (POSITIVE_PERCENT_RE.test(val)) {
-        const n = parseFloat(val);
-        return Number.isFinite(n) && n > 0 ? n / 100 : null;
-    }
-    if (POSITIVE_DECIMAL_FRACTION_RE.test(val)) {
-        const n = parseFloat(val);
-        return Number.isFinite(n) && n > 0 ? n : null;
-    }
-    return null;
-}
 
 // --- Calendar declarations (`non-working` / `working`) ---
 
