@@ -1,7 +1,7 @@
 ```
 --- KICKOFF: begin orchestration at [deep] ---
 
-  Status: 3/5 groups done | last review: wave-3 WAIVED | current: nowline m2 s1-s3 [deep] | updated 2026-10-13 | passed unattended: gate 4, gate 2 before wave 4
+  Status: 4/5 groups done | last review: wave-4 PASS | current: nowline m2 s4 [exec] | updated 2026-10-13 | passed unattended: gate 4, gate 2 before wave 4 | over expected: ~$32 of ~$24
 
   mode: unattended | proposed unattended (harness=claude-code runner=cloud; assigned branch, CLAUDE_CODE_REMOTE=true) | guard 3x min $50 | fixups 2 | confirmed 2026-10-13 session 462f378b-01ae-572c-b81b-c39199f8207a by Kickoff prompt: Run in unattended mode.
 
@@ -156,15 +156,15 @@ Per spec m1.s4: `collectNamedEntities`, `visitProperties`, `visitAllProperties` 
 ### m2 - Shared rules
 
 --- WAVE 4 [deep] ---
-#### s1 - [deep] Property helpers and the date pattern
+#### s1 - [deep] Property helpers and the date pattern (done)
 
 Two kinds of commit. **(a) Refactor commits, byte-identical:** add `packages/core/src/util/props.ts` per spec §3.5 (`propKey`, `findProp`, `propValue`, `propValues`, `ISO_DATE_RE`, `parseIsoDate`, `isRealIsoDate`), export it via `internal.ts`, with unit tests (including `2026-02-30`, `2025-12-40`, `0000`-style edges). Replace every copy in §1.5 package by package (one commit per package is fine), plus any merged from main (decision 6). Keep each caller's semantics: `printer.ts` keeps its strip via `propKey`; `export-core`'s `getProp`/`getProps`/`hasProp` keep exact semantics (build on `findProp` only if that preserves the no-strip `===` compare, otherwise leave them and say so); `preview-shell/src/mount.ts:1537` stays (§3.5); `mcp/src/server.ts:602` (allows `-`) and the grammar terminal stay; `nowline-module.ts:39` is the parse-time strip itself and stays. Layout's `dsl-utils.ts` `propValue`/`propValues` re-export or wrap core's; layout's `parseDate` stays lenient in these commits. **(b) The behaviour commit** (`m2.s1 Read impossible dates as no date in layout and validator`, decision 2): layout's `parseDate` (all callers: `layout.ts`, `schedule.ts`, `wave-layout.ts`, `roadmap-node.ts`, `milestone-node.ts`, `anchor-node.ts`, `wave-barrier.ts`, `calendar-resolver.ts`) and `calendar-resolver.ts`'s `realDate` move to strict `parseIsoDate`; the validator's `isValidDateLiteral` becomes strict for every date key, `resolveLocalStart` and `waves.ts` `isValidIsoDate` use `isRealIsoDate`. Regression tests: a milestone `date:2026-02-30` and a roadmap `start:2026-02-30` give NL.E0405 (en and fr); layout's date parse of `2026-02-30` is null. Add `.changelog/core-ast-utilities.txt` with a `fixed` block; update `specs/dsl.md` (and `specs/rendering.md` if it describes date reading) where NL.E0405 / date validity is described, and `specs/core-ast-utilities.md` §3.5 and §7 (decision 5). G1 and G3 identical on the samples for both kinds; G2.
 
-#### s2 - [deep] The style chain
+#### s2 - [deep] The style chain (done)
 
 Per spec §3.3 and m2.s2: add `packages/core/src/language/style-chain.ts` (`StyleSources`, `StyleLayer`, `styleLayers`), exported via `internal.ts`, with tests pinning the layer order for each level, label order (first label wins) and unresolved styles and labels. Switch layout's `resolveStyle` (`style-resolution.ts:178-242`) and the validator's `checkHiddenTimelineStrip` (NL.W0704, `nowline-validator.ts:1455-1517`; silent at the first undefined `decl`/`label`). Precedence must not change (`specs/rendering.md` § Style Precedence). G1, G2, G3.
 
-#### s3 - [deep] The calendar classifier
+#### s3 - [deep] The calendar classifier (done)
 
 Per spec §3.4 and m2.s3: add `packages/core/src/language/calendar-declarations.ts` (`WEEKDAYS`, `Weekday`, `WEEKDAY_INDEX`, `CalendarShape`, `CalendarDeclarationFacts`, `classifyCalendarDeclaration`, `replacesPresetWeekend`), using `util/props.ts` for dates. First commit: the module plus a test that classifies every `non-working`/`working` declaration in the samples and the calendar test fixtures (`packages/layout/test/calendar-resolver.test.ts`, `packages/core/test/validation/non-working-declarations.test.ts` and siblings) and compares with each of the three copies. Then switch the validator (`:2106-2173`, delete `:2325-2439` helpers), `packages/layout/src/calendar-resolver.ts` (`declarationRule`, `calendarRules`; delete its `WEEKDAY_INDEX`, `realDate`, `stripColon`), and `packages/lsp/src/providers/hover.ts:136-149`; delete the equivalence test. G1, G2, G3.
 
@@ -208,6 +208,7 @@ review wave-1 (nowline m1 s1) 3fdba6c..6448ee4: PASS - ast-walk.ts matches spec 
 review wave-2 (nowline m1 s2-s3) b889c77..2286068: PASS - validator rule 2, size/status, reference checks and rule 24/25/person walks on ast-walk.ts; include-waves imports forEachDeclaredId, no validator edge; layering.test.ts per decision 5 with a mutation check; waves.ts/waves-order.ts on firstDeclarations/declarations/trackChildren, layout collectItems on trackNodes; rules 24 and 25 keep a caller-side isNestedTeam filter (old closures never entered teams, spec §6); G1+G3 identical per step; observation: no test pins isNestedTeam (carried to m3.s2); passed unattended: gate 2 - 2026-10-13
 review wave-3 (nowline m1 s4) 3cdb1ed..3b46f6d: CONCERNS - worker disclosed: Ran `npx vitest run test/references/tmp-debug.test.ts` directly in packages/lsp twice, to diagnose a fixture syntax error. It ran. It bypassed AGENTS.md's rule to use the Makefile instead of calling the tool directly. It was local to the working directory, and I deleted the temporary test file afterwards. Review PASS: LSP collectNamedEntities/visitProperties/visitAllProperties/buildEntityIndex and document-symbols descent on ast-walk via @nowline/core/internal, caller-side filters kept, last m1 equivalence test deleted, new ast-utils tests pin order and filtering, G1+G3 identical (180/120); no trace of the debug file anywhere, branch on origin unchanged, nothing pushed - 2026-10-13
 review wave-3 (nowline m1 s4) 3cdb1ed..3b46f6d: WAIVED - waive - 2026-10-13
+review wave-4 (nowline m2 s1-s3) 02f8880..8ef9df2: PASS - props.ts per §3.5 replaces every §1.5 strip and date-regex copy (keeps: nowline-module parse-time strip, mcp now regex, preview-shell mount.ts, export-core getProp/getProps/hasProp); behaviour commit 2754e83 makes layout and validator strict (NL.E0405 on every date key incl. items, en+fr tests, fixed fragment, dsl.md, working-calendar.md, spec §3.5 and §7.5); style-chain.ts used by resolveStyle and NL.W0704 (W0704 skips the inline layer, caller-side, tested); calendar-declarations.ts used by validator, layout and hover, copies deleted; m2.s3 also fixes `every:[constructor]` (now NL.E0904, no layout rule; in the fixed block and spec §3.4); G1+G3 identical per commit and 02f8880..8ef9df2 (parent re-ran); notes: inline pins `after:2026-02-30` get no E0405 and layout now ignores them, `--now 2026-02-30` still rolls over, dsl.md rule 1 omits items; passed unattended: gate 4, gate 2 - 2026-10-13
 
 ## Token log
 
@@ -230,4 +231,6 @@ tokens review-wave-2 nowline-m1-s2-s3 (claude-opus-5-5): input ~58 / cache read 
 tokens orchestrator-wave-2 nowline-m1-s2-s3 (claude-opus-5-5): input ~7 / cache read ~710k / cache write ~0 5m + ~18k 1h / output ~7.2k | ~$0.43 API-equiv
 tokens wave-3 nowline-m1-s4 (claude-sonnet-5-5): input ~38 / cache read ~1.7M / cache write ~110k / output ~19k | ~$0.79 API-equiv (output est.) session 462f378b-01ae-572c-b81b-c39199f8207a
 tokens review-wave-3 nowline-m1-s4 (claude-opus-5-5): input ~24 / cache read ~320k / cache write ~37k / output ~12k | ~$0.49 API-equiv (output est.) session 462f378b-01ae-572c-b81b-c39199f8207a
-tokens orchestrator-wave-3 nowline-m1-s4 (claude-opus-5-5): input ~6 / cache read ~380k / cache write ~0 5m + ~12k 1h / output ~1.4k | ~$0.20 API-equiv
+tokens orchestrator-wave-3 nowline-m1-s4 (claude-opus-5-5): input ~26 / cache read ~2.5M / cache write ~16k 5m + ~25k 1h / output ~18k | ~$1.14 API-equiv
+tokens wave-4 nowline-m2-s1-s3 (claude-opus-5-5): input ~320 / cache read ~33M / cache write ~320k / output ~160k | ~$11.32 API-equiv (output est.) session 462f378b-01ae-572c-b81b-c39199f8207a
+tokens review-wave-4 nowline-m2-s1-s3 (claude-opus-5-5): input ~64 / cache read ~2.7M / cache write ~120k / output ~31k | ~$1.74 API-equiv (output est.) session 462f378b-01ae-572c-b81b-c39199f8207a
