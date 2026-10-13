@@ -3,13 +3,13 @@
 - **Plan:** `specs/handoffs/plan-nowline-review-lantern.md`
 - **Branch:** `claude/ecstatic-babbage-qsrxbx` in `lolay/nowline` (task branch the cloud session was assigned; fast-forwarded from 86ac76c to origin/main 0062df3 at kickoff). One working directory: `/workspace/nowline`.
 - **Mode:** unattended, confirmed 2026-10-13 in session 8c78f794-2944-59bb-8116-4413104e9100 (`harness=claude-code runner=cloud`). Guard 3x min $50 (limit ~$63 against ~$21 expected). Fix-up cap 2 per group.
-- **Status:** kickoff written; no unit launched. Next unit: wave 1 [exec], `nowline m1 s1` (then `nowline m2 s1-s6`, wave 2 [deep] `nowline m3 s1-s3`, wave 3 [xdeep] `nowline m3 s4`).
+- **Status:** kickoff done, mode re-confirmed by Kickoff prompt after `/compact`; wave 1 launching. Next unit: wave 1 [exec], `nowline m1 s1` (then `nowline m2 s1-s6`, wave 2 [deep] `nowline m3 s1-s3`, wave 3 [xdeep] `nowline m3 s4`).
 - **Spend:** ~$8.04 of ~$21 expected. The orchestrator-kickoff line covers this session from its start, so it includes the review conversation that preceded the kickoff (the explore agents are not counted).
 - **Resume:** paste the plan's Kickoff prompt into a session on this branch.
 
 ## Pending question (verbatim)
 
-None. Gary answered the kickoff question `unattended` (2026-10-13). The run is paused for his `/compact` (his request, part of the first step); his next message resumes dispatching at wave 1 (it continues the run and approves no gate).
+None. Gary answered the kickoff question `unattended` (2026-10-13), compacted, then pasted the Kickoff prompt; mode re-confirmed by that paste. Dispatching wave 1.
 
 ## Done
 
