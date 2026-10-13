@@ -764,13 +764,28 @@ resolved relative to the
 .Pa .nowline
 file's directory.
 Forward slashes on all platforms; only local paths are accepted.
+The logo draws left of the title inside the header card, vertically
+centered, and is embedded in the output (SVG inline, raster as a
+base64 data URI).
 Asset resolution happens at render time, not parse time \(em a file
 referencing a missing logo is still a valid document.
+A missing, unsupported or unreadable logo is a warning and the chart
+renders as if no logo were declared; under
+.Fl -strict
+it is an error.
 .It Sy logo-size:
 Size preset
 .Pq Sy xs | sm | md | lg | xl ,
 default
 .Sy md .
+Sets the drawn logo height (18, 24, 36, 48 or 72 px); the width follows
+the logo's own aspect ratio, so a larger or smaller source is scaled to
+fill the same slot.
+A logo wider than 160 px at that height scales down to fit.
+A logo taller than the title and author grows the header card;
+.Sy xl
+also grows the 72 px band of
+.Sy header-position:above .
 .El
 .Pp
 Thirteen roadmap-section keywords:

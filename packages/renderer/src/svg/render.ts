@@ -10,6 +10,7 @@ import type {
     PositionedHeader,
     PositionedIncludeRegion,
     PositionedItem,
+    PositionedLogo,
     PositionedMilestone,
     PositionedNowline,
     PositionedParallel,
@@ -108,7 +109,7 @@ import {
 } from '@nowline/layout';
 import { BUILTIN_ICON_SVG, CAPACITY_ICON_SVG } from './icons.js';
 import { IdGenerator } from './ids.js';
-import { sanitizeSvg } from './sanitize.js';
+import { sanitizeSvg, svgIntrinsicSize } from './sanitize.js';
 import { allShadowDefs, shadowFilterUrl } from './shadow.js';
 import { attrs, escAttr, escText, num, tag, textTag } from './xml.js';
 
@@ -536,13 +537,17 @@ function renderHeader(
     // Title and author baselines come from `@nowline/layout`'s
     // `header-card-geometry` module so the renderer paints with the
     // exact metrics `sizeBesideHeader` sized the card to.
+    // A logo in the card shifts the text right of it (and down, to center
+    // it, when the logo made the card taller); see `h.textInset`.
+    const textX = cardX + HEADER_CARD_PADDING_X + (h.textInset?.x ?? 0);
+    const textTopY = cardY + (h.textInset?.y ?? 0);
     const titleParts: string[] = [];
     h.titleLines.forEach((line, i) => {
         titleParts.push(
             textTag(
                 {
-                    x: num(cardX + HEADER_CARD_PADDING_X),
-                    y: num(cardY + HEADER_CARD_PADDING_TOP + i * HEADER_TITLE_LINE_HEIGHT_PX),
+                    x: num(textX),
+                    y: num(textTopY + HEADER_CARD_PADDING_TOP + i * HEADER_TITLE_LINE_HEIGHT_PX),
                     'font-family': fonts[h.style.font],
                     'font-size': HEADER_TITLE_FONT_SIZE_PX,
                     'font-weight': 600,
@@ -554,7 +559,7 @@ function renderHeader(
     });
     const titleText = titleParts.join('');
     const lastTitleY =
-        cardY +
+        textTopY +
         HEADER_CARD_PADDING_TOP +
         Math.max(0, h.titleLines.length - 1) * HEADER_TITLE_LINE_HEIGHT_PX;
     const authorColor = palette.header.author;
@@ -563,7 +568,7 @@ function renderHeader(
         authorParts.push(
             textTag(
                 {
-                    x: num(cardX + HEADER_CARD_PADDING_X),
+                    x: num(textX),
                     y: num(
                         lastTitleY +
                             HEADER_TITLE_TO_AUTHOR_GAP_PX +
@@ -2324,21 +2329,23 @@ function renderAttributionMark(model: PositionedRoadmap, fonts: FontFamilies): s
     );
 }
 
+// Draws the logo into its layout box. Layout sized the box to the asset's
+// aspect ratio, so scaling the asset to the box fills it exactly whether
+// the source is larger or smaller; `meet` (fit) only matters if the two
+// disagree, and then it letterboxes rather than cropping or distorting.
 async function embedLogo(
-    logoRef: string,
-    resolver: AssetResolver | undefined,
+    logo: PositionedLogo,
+    resolver: AssetResolver,
     idPrefix: string,
     options: RenderOptions,
-    x: number,
-    y: number,
-    size: number,
 ): Promise<string> {
-    if (!resolver) return '';
+    const logoRef = logo.assetRef ?? '';
+    const { x, y, width, height } = logo.box;
     let asset: AssetBytes;
     try {
         asset = await resolver(logoRef);
     } catch (err) {
-        const msg = `logo: failed to load ${logoRef}: ${err instanceof Error ? err.message : String(err)}`;
+        const msg = `logo file not found: ${logoRef} (${err instanceof Error ? err.message : String(err)})`;
         if (options.strict) throw err;
         options.warn?.(msg);
         return '';
@@ -2346,8 +2353,28 @@ async function embedLogo(
     const mime = (asset.mime ?? '').toLowerCase();
     if (mime === 'image/svg+xml') {
         const raw = new TextDecoder().decode(asset.bytes);
-        const cleaned = sanitizeSvg(raw, { idPrefix: `${idPrefix}-logo`, onWarn: options.warn });
-        return tag('g', { transform: `translate(${num(x)} ${num(y)})` }, cleaned);
+        const intrinsic = logo.intrinsic ?? svgIntrinsicSize(raw) ?? { width, height };
+        // The root loses its own size so it fills this viewport; the
+        // viewport's viewBox then scales the asset's units to the box.
+        const cleaned = sanitizeSvg(raw, {
+            idPrefix: `${idPrefix}-logo`,
+            onWarn: options.warn,
+            stripRootSize: true,
+        });
+        return tag(
+            'svg',
+            {
+                'data-layer': 'logo',
+                x: num(x),
+                y: num(y),
+                width: num(width),
+                height: num(height),
+                viewBox: `0 0 ${num(intrinsic.width)} ${num(intrinsic.height)}`,
+                preserveAspectRatio: 'xMidYMid meet',
+                overflow: 'hidden',
+            },
+            cleaned,
+        );
     }
     if (
         mime === 'image/png' ||
@@ -2357,15 +2384,16 @@ async function embedLogo(
     ) {
         const b64 = bytesToBase64(asset.bytes);
         return tag('image', {
+            'data-layer': 'logo',
             href: `data:${mime};base64,${b64}`,
             x: num(x),
             y: num(y),
-            width: num(size),
-            height: num(size),
+            width: num(width),
+            height: num(height),
             preserveAspectRatio: 'xMidYMid meet',
         });
     }
-    const msg = `logo: unsupported mime ${mime} for ${logoRef}`;
+    const msg = `unsupported logo format: ${mime} (${logoRef})`;
     if (options.strict) throw new Error(msg);
     options.warn?.(msg);
     return '';
@@ -3101,13 +3129,10 @@ export async function renderSvg(
     // Logo (if header carries one)
     if (model.header.logo && options.assetResolver) {
         const logoSvg = await embedLogo(
-            model.header.logo.assetRef ?? '',
+            model.header.logo,
             options.assetResolver,
             idPrefix,
             options,
-            model.header.logo.box.x,
-            model.header.logo.box.y,
-            Math.max(model.header.logo.box.width, model.header.logo.box.height),
         );
         if (logoSvg) parts.push(logoSvg);
     }

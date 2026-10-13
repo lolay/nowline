@@ -874,3 +874,43 @@ describeBuilt('render: --non-working', () => {
         expect(r.stdout).toContain(LAYER);
     });
 });
+
+describeBuilt('roadmap logo: (requires `pnpm build`)', () => {
+    const logoDsl = (ref: string): string =>
+        `nowline v1\n\nroadmap r "R" logo:"${ref}" start:2026-01-05\n\nswimlane a "A"\n  item x duration:1w\n`;
+
+    it('embeds the logo scaled to logo-size, aspect ratio kept', async () => {
+        await withTempDir(async (dir) => {
+            await fs.writeFile(
+                path.join(dir, 'acme.svg'),
+                '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 300 100"><rect width="300" height="100"/></svg>',
+            );
+            await fs.writeFile(path.join(dir, 'r.nowline'), logoDsl('./acme.svg'));
+            const r = await runCliBuilt(['r.nowline', '-o', '-'], { cwd: dir });
+            expect(r.exitCode).toBe(0);
+            expect(r.stderr).toBe('');
+            expect(r.stdout).toMatch(/<svg data-layer="logo" height="36"[^>]* width="108"/);
+        });
+    });
+
+    it('warns on a missing logo and renders without it', async () => {
+        await withTempDir(async (dir) => {
+            await fs.writeFile(path.join(dir, 'r.nowline'), logoDsl('./missing.svg'));
+            const r = await runCliBuilt(['r.nowline', '-o', '-'], { cwd: dir });
+            expect(r.exitCode).toBe(0);
+            expect(r.stderr).toContain('warning: logo file not found: ./missing.svg');
+            expect(r.stdout).toContain('</svg>');
+            expect(r.stdout).not.toContain('data-layer="logo"');
+        });
+    });
+
+    it('fails a missing logo under --strict', async () => {
+        await withTempDir(async (dir) => {
+            await fs.writeFile(path.join(dir, 'r.nowline'), logoDsl('./missing.svg'));
+            const r = await runCliBuilt(['r.nowline', '-o', '-', '--strict'], { cwd: dir });
+            // An exporter pipeline failure (specs/cli.md § Exit codes).
+            expect(r.exitCode).toBe(3);
+            expect(r.stderr).toContain('logo file not found: ./missing.svg');
+        });
+    });
+});

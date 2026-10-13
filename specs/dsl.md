@@ -642,18 +642,18 @@ Renderers treat `start:` as the left edge of the timeline. A roadmap with no `st
 
 ### Roadmap `logo:` and `logo-size:`
 
-The `roadmap` declaration accepts an optional company logo. The logo renders next to the title inside the roadmap header box.
+The `roadmap` declaration accepts an optional company logo. The logo renders left of the title and author inside the roadmap header card, in both `header-position:beside` and `above`.
 
 ```nowline
 roadmap platform-2026 "Platform 2026" author:"Acme Engineering" logo:"./brand/acme.svg"
 ```
 
-- `logo:"path"` — path to the logo file, resolved relative to the `.nowline` file's directory. Forward slashes on all platforms (same rule as `include`). Only local paths are accepted; `http://`, `https://`, `file://`, and `data:` URLs are rejected by the parser. Absolute paths are discouraged but allowed for authoring tools that resolve against a known root.
-- `logo-size:<preset>` — size preset (`xs | sm | md | lg | xl`). Defaults to `md`. The rendered logo height is bounded by the roadmap header box; see `rendering.md` § Roadmap Header.
+- `logo:"path"` — path to the logo file, resolved relative to the `.nowline` file's directory. Forward slashes on all platforms (same rule as `include`). Only local paths are accepted; `http://`, `https://`, `file://`, and `data:` URLs are meant to be rejected by the parser (not enforced yet: today they fail to resolve and draw the missing-file warning). Absolute paths are discouraged but allowed for authoring tools that resolve against a known root.
+- `logo-size:<preset>` — size preset (`xs | sm | md | lg | xl`). Defaults to `md`. Sets the drawn logo height (18 to 72 px); the width follows the logo's own aspect ratio, so the logo fills its slot whether the source is larger or smaller. A logo taller than the title and author grows the header card. See `rendering.md` § Company Logo Size Presets.
 
-**Supported formats.** The renderer accepts `.svg`, `.png`, `.jpg` / `.jpeg`, and `.webp`. Format is determined by file extension; content-type is not sniffed. Any other extension is a validation error.
+**Supported formats.** The renderer accepts `.svg`, `.png`, `.jpg` / `.jpeg`, and `.webp`. Format is determined by file extension; content-type is not sniffed. Any other extension draws a render-time warning (below), not a validation error.
 
-**Asset resolution.** Logo resolution happens at render time, not at parse time, so a `.nowline` file referencing a missing logo is still a valid document (`nowline <input> --dry-run` does not require the asset to exist). At render time, when the asset is missing or has an unsupported extension the renderer emits a warning and renders the header without the logo; `nowline <input> --strict` (and the equivalent renderer option) promotes warnings to errors.
+**Asset resolution.** Logo resolution happens at render time, not at parse time, so a `.nowline` file referencing a missing logo is still a valid document (`nowline <input> --dry-run` does not require the asset to exist). At render time, when the asset is missing, has an unsupported extension, or cannot be parsed, the renderer emits a warning and renders as if no logo were declared; `nowline <input> --strict` (and the equivalent renderer option) promotes warnings to errors. See `rendering.md` § Company Logo Error Handling.
 
 **Portability.** Because `logo:` is a path, a `.nowline` file is not self-contained. To ship a self-contained artifact, inline the logo at export time (the renderer embeds SVG inline and raster formats as base64 `data:` URIs; see `rendering.md` § Roadmap Header). The DSL itself does not accept `data:` URIs to keep the text readable.
 

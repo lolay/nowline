@@ -123,7 +123,12 @@ export interface SanitizeOptions {
     idPrefix?: string;
     // Called when the sanitizer rejects a construct, for test/diagnostic use.
     onWarn?: (message: string) => void;
+    // Drop `x`, `y`, `width` and `height` from the root `<svg>` so it fills
+    // whatever viewport the host wraps it in (logo scaling).
+    stripRootSize?: boolean;
 }
+
+const ROOT_SIZE_ATTRIBUTES = new Set(['x', 'y', 'width', 'height']);
 
 interface Token {
     kind: 'open' | 'close' | 'self' | 'text' | 'cdata' | 'comment' | 'decl';
@@ -335,9 +340,11 @@ export function sanitizeSvg(input: string, options: SanitizeOptions = {}): strin
                 continue;
             }
             const parts: string[] = [`<${name}`];
+            const isRoot = name === 'svg' && stack.length === 0;
             const keys = Object.keys(t.attrs ?? {}).sort();
             for (const key of keys) {
                 const value = (t.attrs as Record<string, string>)[key];
+                if (isRoot && options.stripRootSize && ROOT_SIZE_ATTRIBUTES.has(key)) continue;
                 if (/^on/i.test(key)) {
                     warn(`sanitizer: dropping event handler ${key}`);
                     continue;
@@ -392,4 +399,38 @@ export function sanitizeSvg(input: string, options: SanitizeOptions = {}): strin
         }
     }
     return output.join('');
+}
+
+// A unitless or `px` length, else undefined (percentages and absolute units
+// carry no intrinsic pixel size).
+function parsePxLength(raw: string | undefined): number | undefined {
+    if (raw === undefined) return undefined;
+    const m = /^\s*([0-9]*\.?[0-9]+(?:e[+-]?[0-9]+)?)\s*(px)?\s*$/i.exec(raw);
+    if (!m) return undefined;
+    const n = Number(m[1]);
+    return n > 0 && Number.isFinite(n) ? n : undefined;
+}
+
+/**
+ * Intrinsic size of an SVG document from its root `<svg>`: `width` and
+ * `height` when both are plain lengths, else the `viewBox` size. Undefined
+ * when neither gives a positive size (no root, `%` sizes and no viewBox).
+ */
+export function svgIntrinsicSize(input: string): { width: number; height: number } | undefined {
+    const root = tokenize(input).find(
+        (t) => (t.kind === 'open' || t.kind === 'self') && t.name === 'svg',
+    );
+    if (!root) return undefined;
+    const attrs = root.attrs ?? {};
+    const width = parsePxLength(attrs.width);
+    const height = parsePxLength(attrs.height);
+    if (width !== undefined && height !== undefined) return { width, height };
+    const vb = (attrs.viewBox ?? '')
+        .trim()
+        .split(/[\s,]+/)
+        .map(Number);
+    if (vb.length === 4 && vb.every(Number.isFinite) && vb[2] > 0 && vb[3] > 0) {
+        return { width: vb[2], height: vb[3] };
+    }
+    return undefined;
 }

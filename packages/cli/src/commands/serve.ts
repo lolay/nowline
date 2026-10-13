@@ -7,10 +7,11 @@ import {
     type NormalizedZone,
     normalizeZone,
     resolveToday,
+    roadmapLogoRef,
     type ThemeName,
     TimezoneError,
 } from '@nowline/layout';
-import { renderSvg } from '@nowline/renderer';
+import { loadLogo, renderSvg } from '@nowline/renderer';
 import type { ParsedArgs } from '../cli/args.js';
 import { parseNonWorkingArg } from '../cli/non-working.js';
 import { resolveTheme } from '../cli/theme.js';
@@ -165,11 +166,17 @@ export async function serveHandler(options: ServeHandlerOptions): Promise<void> 
                 broadcast(clients, 'error', msg);
                 return;
             }
-            const model = layoutRoadmap(parse.ast, resolved, { theme, today, locale, nonWorking });
-            const svg = await renderSvg(model, {
-                assetResolver: createAssetResolver(assetRoot),
-                warn: (m) => log.notice(`warning: ${m}`),
+            const assetResolver = createAssetResolver(assetRoot);
+            const warn = (m: string): void => log.notice(`warning: ${m}`);
+            const logo = await loadLogo(roadmapLogoRef(parse.ast), assetResolver, warn);
+            const model = layoutRoadmap(parse.ast, resolved, {
+                theme,
+                today,
+                locale,
+                nonWorking,
+                logo,
             });
+            const svg = await renderSvg(model, { assetResolver, warn });
             lastPayload = { kind: 'svg', body: svg };
             if (fileSink) {
                 try {

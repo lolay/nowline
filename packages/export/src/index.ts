@@ -24,8 +24,13 @@ import {
     serializeToJson,
 } from '@nowline/core';
 import type { ExportInputs, ResolvedFontPair } from '@nowline/export-core';
-import { layoutRoadmap, type NonWorkingDisplay, type ThemeName } from '@nowline/layout';
-import { type AssetResolver, type FontFamilies, renderSvg } from '@nowline/renderer';
+import {
+    layoutRoadmap,
+    type NonWorkingDisplay,
+    roadmapLogoRef,
+    type ThemeName,
+} from '@nowline/layout';
+import { type AssetResolver, type FontFamilies, loadLogo, renderSvg } from '@nowline/renderer';
 import type { LangiumDocument } from 'langium';
 import { URI } from 'langium';
 
@@ -150,6 +155,12 @@ export interface RenderInputs {
      * exporter's default (stderr), as before.
      */
     onNotice?: (message: string) => void;
+    /**
+     * Receives asset warnings, such as a `logo:` file that is missing or
+     * unreadable (the render then proceeds without the logo). Under
+     * `strict` they throw instead and this is not called.
+     */
+    onWarning?: (message: string) => void;
 }
 
 // ---- Langium services singleton -----------------------------------------------
@@ -285,18 +296,30 @@ async function stageDocument(
     }
     inputs.onResolveDiagnostics?.(resolved.diagnostics.filter(isRoutedResolveDiagnostic));
 
+    const assetResolver: AssetResolver = async (ref: string) => {
+        const bytes = await host.readAsset(ref);
+        return { bytes, mime: guessMime(ref) };
+    };
+
+    // The logo's intrinsic size feeds layout; a failed load warns (throws
+    // under strict) and lays out as if no logo were declared.
+    const logoWarnings: string[] = [];
+    const logo = await loadLogo(roadmapLogoRef(ast), assetResolver, (msg) =>
+        logoWarnings.push(msg),
+    );
+    if (inputs.strict && logoWarnings.length > 0) {
+        throw new Error(`@nowline/export: render warnings (--strict): ${logoWarnings.join('; ')}`);
+    }
+    for (const msg of logoWarnings) inputs.onWarning?.(msg);
+
     const model = layoutRoadmap(ast, resolved, {
         theme: inputs.theme,
         today: inputs.today,
         width: inputs.width,
         locale: inputs.locale,
         nonWorking: inputs.nonWorking,
+        logo,
     });
-
-    const assetResolver: AssetResolver = async (ref: string) => {
-        const bytes = await host.readAsset(ref);
-        return { bytes, mime: guessMime(ref) };
-    };
 
     const renderWith = async (fontFamilies?: FontFamilies): Promise<string> => {
         const warnings: string[] = [];

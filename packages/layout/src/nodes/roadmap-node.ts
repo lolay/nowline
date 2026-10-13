@@ -22,6 +22,8 @@ import { daysBetween, resolveSizes } from '../calendar.js';
 import { resolveWorkingCalendar } from '../calendar-resolver.js';
 import { cappedPixelsPerDay } from '../canvas-width.js';
 import { parseDate, propValue, propValues } from '../dsl-utils.js';
+import { HEADER_CARD_PADDING_X, HEADER_LOGO_PAD_Y_PX } from '../header-card-geometry.js';
+import { type LogoDimensions, resolveHeaderLogo } from '../header-logo.js';
 import { localeStrings, resolveLocale } from '../i18n.js';
 import type { LayoutOptions, LayoutResult } from '../layout.js';
 import type { LayoutContext, LayoutHelpers } from '../layout-context.js';
@@ -215,7 +217,12 @@ export interface SizedHeader {
     titleLines: string[];
     authorLines: string[];
     cardWidth: number;
+    /** Card height, grown to fit the logo when it is taller than the text. */
     cardHeight: number;
+    /** Card height the title / author text alone needs. */
+    textCardHeight: number;
+    /** Width the logo takes left of the text, gap included; 0 without a logo. */
+    logoSlot: number;
     boxWidth: number;
 }
 
@@ -237,7 +244,11 @@ export interface RoadmapNodeDeps extends LayoutHelpers {
         scale: ViewPreset,
         plan: WavePlan | undefined,
     ) => { startDate: Date; endDate: Date };
-    sizeBesideHeader: (title: string, author: string | undefined) => SizedHeader;
+    sizeBesideHeader: (
+        title: string,
+        author: string | undefined,
+        logo?: LogoDimensions,
+    ) => SizedHeader;
     collectItems: (swimlanes: SwimlaneDeclaration[]) => Map<string, ItemDeclaration>;
     buildDependencies: (
         items: Map<string, ItemDeclaration>,
@@ -336,14 +347,22 @@ export class RoadmapNode {
         // geometry (full canvas width, fixed height).
         const titleStr = file.roadmapDecl?.title ?? file.roadmapDecl?.name ?? '';
         const authorStr = propValue(file.roadmapDecl?.properties ?? [], 'author');
-        const sizedHeader = deps.sizeBesideHeader(titleStr, authorStr);
+        // The company logo (when the caller loaded one) widens the card by
+        // its slot and can make it taller; see header-logo.ts.
+        const headerLogo = resolveHeaderLogo(file, options.logo);
+        const sizedHeader = deps.sizeBesideHeader(titleStr, authorStr, headerLogo);
+        // Above-mode strip: fixed height, bumped only when the logo plus
+        // its clearance is taller (`logo-size:xl`).
+        const aboveHeight = headerLogo
+            ? Math.max(HEADER_ABOVE_HEIGHT_PX, headerLogo.height + 2 * HEADER_LOGO_PAD_Y_PX)
+            : HEADER_ABOVE_HEIGHT_PX;
 
         const headerBox = isBeside
             ? { x: 0, y: 0, width: sizedHeader.boxWidth, height: 0 }
-            : { x: 0, y: 0, width: 0, height: HEADER_ABOVE_HEIGHT_PX };
+            : { x: 0, y: 0, width: 0, height: aboveHeight };
 
         const chartLeftX = isBeside ? sizedHeader.boxWidth : 0;
-        const chartTopY = isBeside ? 8 : HEADER_ABOVE_HEIGHT_PX + 8;
+        const chartTopY = isBeside ? 8 : aboveHeight + 8;
 
         // The chart sizes to natural content width (date window × ppd) plus
         // chrome padding. `options.width`, when set, is a best-effort
@@ -1012,7 +1031,27 @@ export class RoadmapNode {
                   width: sizedHeader.cardWidth,
                   height: sizedHeader.cardHeight,
               }
-            : { x: 0, y: 0, width: ctx.chartRightX, height: HEADER_ABOVE_HEIGHT_PX };
+            : { x: 0, y: 0, width: ctx.chartRightX, height: aboveHeight };
+        // Logo at the card's left padding, vertically centered; the text
+        // shifts right past it and centers in the (possibly taller) card.
+        let logo: PositionedHeader['logo'];
+        let textInset: PositionedHeader['textInset'];
+        if (headerLogo) {
+            logo = {
+                box: {
+                    x: headerBox.x + cardBox.x + HEADER_CARD_PADDING_X,
+                    y: headerBox.y + cardBox.y + (cardBox.height - headerLogo.height) / 2,
+                    width: headerLogo.width,
+                    height: headerLogo.height,
+                },
+                assetRef: headerLogo.assetRef,
+                intrinsic: headerLogo.intrinsic,
+            };
+            textInset = {
+                x: sizedHeader.logoSlot,
+                y: Math.max(0, (cardBox.height - sizedHeader.textCardHeight) / 2),
+            };
+        }
 
         // Attribution wordmark placement. Canvas grows by GUTTER_PX +
         // glyph height + GUTTER_PX so the wordmark sits in a clean bottom
@@ -1048,7 +1087,8 @@ export class RoadmapNode {
             titleLines: sizedHeader.titleLines,
             authorLines: sizedHeader.authorLines,
             cardBox,
-            logo: undefined,
+            logo,
+            ...(textInset ? { textInset } : {}),
             style: headerStyle,
             attributionBox,
         };

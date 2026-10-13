@@ -146,19 +146,19 @@ Dependencies flow downward only. No upward or sideways imports. The graph is enf
 
 The DSL allows local file references for assets rendered inside the chart — currently the roadmap `logo:` property (`dsl.md` § Roadmap `logo:` and `logo-size:`). These files must be read, sanitized, and inlined into the output artifact so the result is self-contained.
 
-To keep `@nowline/renderer` browser-safe (no `fs`, no `path`, no `process`), the renderer never reads files directly. It accepts an **`AssetResolver`** — an injectable function with the signature `(relPath: string) => Promise<AssetBytes | null>` — and the caller supplies an environment-appropriate implementation:
+To keep `@nowline/renderer` browser-safe (no `fs`, no `path`, no `process`), the renderer never reads files directly. It accepts an **`AssetResolver`** — an injectable function with the signature `(relPath: string) => Promise<AssetBytes>` that rejects when the asset cannot be read — and the caller supplies an environment-appropriate implementation:
 
 | Environment | Resolver implementation |
 |-------------|-------------------------|
-| `@nowline/cli` | Node resolver rooted at the input file's directory. Rejects paths that escape the root (no `..` traversal beyond the project root), rejects absolute paths outside an explicit `--asset-root`, and returns `null` on missing files so the renderer can emit its warning. |
+| `@nowline/cli` | Node resolver rooted at the input file's directory. Rejects paths that escape the root (no `..` traversal beyond the project root), rejects absolute paths outside an explicit `--asset-root`, and rejects on missing files so the caller can emit its warning. |
 | Browser embed (m4) | Resolver that looks up assets in an author-supplied map (inline `data:` URIs or pre-bundled bytes). No network fetches — the embed script never hits disk or remote servers for DSL-referenced assets. |
 
 Downstream consumers (e.g. a hosted editor or an MCP server) plug in their own resolvers against the same contract without adding new environment coupling to `@nowline/renderer`.
 
-Embedding format is decided by the renderer from the resolved bytes + original extension:
+The logo is resolved twice per render. Before layout, the pipeline calls `loadLogo` (in `@nowline/renderer`) to read the asset's intrinsic size from its header and passes it to `layoutRoadmap` as `LayoutOptions.logo`, so `@nowline/layout` sizes the header without ever touching asset bytes; a failed load is a warning and the render proceeds without the logo. The renderer then resolves the same path again to embed the bytes. Embedding format is decided from the original extension:
 
-- `.svg` — parsed, sanitized (strip `<script>`, strip external `href`/`src`, strip `<foreignObject>`), namespaced, and inlined as a `<g>` subtree.
-- `.png`, `.jpg` / `.jpeg`, `.webp` — wrapped in `<image href="data:image/<type>;base64,...">`. The renderer does not re-encode; it passes the raw bytes through.
+- `.svg` — parsed, sanitized (strip `<script>`, strip external `href`/`src`, strip `<foreignObject>`), namespaced, and inlined inside a nested `<svg>` viewport that scales it to the logo box.
+- `.png`, `.jpg` / `.jpeg`, `.webp` — wrapped in `<image href="data:image/<type>;base64,...">` at the logo box size. The renderer does not re-encode; it passes the raw bytes through.
 
 The resolver abstraction is reused for any future asset-bearing property (e.g. per-entity icons) without adding new environment coupling to `@nowline/renderer`.
 

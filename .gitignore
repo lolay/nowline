@@ -65,6 +65,8 @@ coverage/
 
 # Rendered tests/ harness outputs (CLI artifacts, not source)
 /tests/**/*.svg
+# ...except the logo assets the logo-* fixtures reference (source, not output)
+!/tests/assets/*.svg
 /tests/**/*.png
 /tests/**/*.pdf
 /tests/**/*.html

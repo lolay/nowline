@@ -46,3 +46,18 @@ export const HEADER_TITLE_FONT_SIZE_PX = 16;
 
 /** Font size (px) of the author text (subtitle). */
 export const HEADER_AUTHOR_FONT_SIZE_PX = 11;
+
+/** Horizontal gap (px) between a company logo and the title / author text. */
+export const HEADER_LOGO_GAP_PX = 12;
+
+/**
+ * Minimum clearance (px) above and below a company logo inside the card.
+ * A logo taller than the text block grows the card to keep it.
+ */
+export const HEADER_LOGO_PAD_Y_PX = 10;
+
+/**
+ * Widest a company logo may draw (px). A logo whose `logo-size:` height
+ * would make it wider scales down uniformly until it fits.
+ */
+export const HEADER_LOGO_MAX_WIDTH_PX = 160;
