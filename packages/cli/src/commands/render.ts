@@ -49,7 +49,12 @@ import {
     readDirectiveLocale,
     resolveLocaleOverride,
 } from '../i18n/locale.js';
-import { loadConfig, type NowlineRc } from '../io/config.js';
+import {
+    InvalidRcValueError,
+    loadConfig,
+    type NowlineRc,
+    resolveAssetRoot as resolveSharedAssetRoot,
+} from '../io/config.js';
 import { CliError, ExitCode } from '../io/exit-codes.js';
 import { readInput } from '../io/read.js';
 import { writeOutput } from '../io/write.js';
@@ -546,12 +551,17 @@ export interface ResolvedAssetRoot {
     source: '--asset-root' | '.nowlinerc assetRoot' | 'input directory';
 }
 
+const ASSET_ROOT_SOURCE_LABELS = {
+    override: '--asset-root',
+    rc: '.nowlinerc assetRoot',
+    default: 'input directory',
+} as const;
+
 /**
  * Resolve the asset root: `--asset-root` (relative to cwd), then the
  * `.nowlinerc` `assetRoot` (relative to the rc file's directory), then the
- * input file's directory. The rc value is anchored to the rc file so a
- * project's rc means the same thing from any working directory and in the
- * editor preview, which reads the same key.
+ * input file's directory. The rule lives in `@nowline/config` so the editor
+ * preview, which reads the same key, resolves it identically.
  */
 export function resolveAssetRoot(inputs: {
     flag: string | undefined;
@@ -559,19 +569,20 @@ export function resolveAssetRoot(inputs: {
     rc: LoadedRc;
     inputDir: string;
 }): ResolvedAssetRoot {
-    const { flag, cwd, rc, inputDir } = inputs;
-    if (flag) return { dir: path.resolve(cwd, flag), source: '--asset-root' };
-    const raw = rc.config?.assetRoot;
-    if (raw !== undefined && raw !== null && raw !== '' && rc.path) {
-        if (typeof raw !== 'string') {
-            throw new CliError(
-                ExitCode.InputError,
-                `nowline: invalid .nowlinerc assetRoot "${String(raw)}". Expected a directory path.`,
-            );
+    try {
+        const { dir, source } = resolveSharedAssetRoot({
+            override: inputs.flag,
+            overrideBaseDir: inputs.cwd,
+            rc: inputs.rc,
+            defaultDir: inputs.inputDir,
+        });
+        return { dir, source: ASSET_ROOT_SOURCE_LABELS[source] };
+    } catch (err) {
+        if (err instanceof InvalidRcValueError) {
+            throw new CliError(ExitCode.InputError, `nowline: ${err.message}`);
         }
-        return { dir: path.resolve(path.dirname(rc.path), raw), source: '.nowlinerc assetRoot' };
+        throw err;
     }
-    return { dir: inputDir, source: 'input directory' };
 }
 
 // Resolve the now-line date from the CLI flags.
