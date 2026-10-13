@@ -1,7 +1,7 @@
 ```
 --- KICKOFF: begin orchestration at [deep] ---
 
-  Status: 4/5 groups done | last review: wave-4 PASS | current: nowline m2 s4 [exec] | updated 2026-10-13 | passed unattended: gate 4, gate 2 before wave 4 | over expected: ~$32 of ~$24
+  Status: 4/5 groups done | last review: wave-5 PASS | current: nowline m3 s1-s3 [exec] | updated 2026-10-13 | passed unattended: gate 4 before wave 5 (m3) | over expected: ~$36 of ~$24
 
   mode: unattended | proposed unattended (harness=claude-code runner=cloud; assigned branch, CLAUDE_CODE_REMOTE=true) | guard 3x min $50 | fixups 2 | confirmed 2026-10-13 session 462f378b-01ae-572c-b81b-c39199f8207a by Kickoff prompt: Run in unattended mode.
 
@@ -169,7 +169,7 @@ Per spec §3.3 and m2.s2: add `packages/core/src/language/style-chain.ts` (`Styl
 Per spec §3.4 and m2.s3: add `packages/core/src/language/calendar-declarations.ts` (`WEEKDAYS`, `Weekday`, `WEEKDAY_INDEX`, `CalendarShape`, `CalendarDeclarationFacts`, `classifyCalendarDeclaration`, `replacesPresetWeekend`), using `util/props.ts` for dates. First commit: the module plus a test that classifies every `non-working`/`working` declaration in the samples and the calendar test fixtures (`packages/layout/test/calendar-resolver.test.ts`, `packages/core/test/validation/non-working-declarations.test.ts` and siblings) and compares with each of the three copies. Then switch the validator (`:2106-2173`, delete `:2325-2439` helpers), `packages/layout/src/calendar-resolver.ts` (`declarationRule`, `calendarRules`; delete its `WEEKDAY_INDEX`, `realDate`, `stripColon`), and `packages/lsp/src/providers/hover.ts:136-149`; delete the equivalence test. G1, G2, G3.
 
 --- WAVE 5 [exec] ---
-#### s4 - [exec] Value tables
+#### s4 - [exec] Value tables (done)
 
 Per spec m2.s4: add `packages/core/src/language/value-tables.ts` (`BUILTIN_STATUSES`, `BUILTIN_CAPACITY_ICONS`, `BUILTIN_ICON_NAMES`, `NON_WORKING_DISPLAYS`; `WEEKDAYS` stays in `calendar-declarations.ts` and is re-exported), exported via `internal.ts`. The validator (`:93`, `:130`, `:146`, `:159`), layout (`non-working-display.ts:13` re-exports core's `NON_WORKING_DISPLAYS`, so `@nowline/layout`'s public export and its MCP/browser importers are unchanged) and the LSP (`ast-utils.ts:88-128`) import them. Check the tables are identical first (the LSP's `calendar` icon was added in this review's m2.s4); a real difference is reported, not silently unioned. G1, G2, G3.
 
@@ -209,6 +209,7 @@ review wave-2 (nowline m1 s2-s3) b889c77..2286068: PASS - validator rule 2, size
 review wave-3 (nowline m1 s4) 3cdb1ed..3b46f6d: CONCERNS - worker disclosed: Ran `npx vitest run test/references/tmp-debug.test.ts` directly in packages/lsp twice, to diagnose a fixture syntax error. It ran. It bypassed AGENTS.md's rule to use the Makefile instead of calling the tool directly. It was local to the working directory, and I deleted the temporary test file afterwards. Review PASS: LSP collectNamedEntities/visitProperties/visitAllProperties/buildEntityIndex and document-symbols descent on ast-walk via @nowline/core/internal, caller-side filters kept, last m1 equivalence test deleted, new ast-utils tests pin order and filtering, G1+G3 identical (180/120); no trace of the debug file anywhere, branch on origin unchanged, nothing pushed - 2026-10-13
 review wave-3 (nowline m1 s4) 3cdb1ed..3b46f6d: WAIVED - waive - 2026-10-13
 review wave-4 (nowline m2 s1-s3) 02f8880..8ef9df2: PASS - props.ts per §3.5 replaces every §1.5 strip and date-regex copy (keeps: nowline-module parse-time strip, mcp now regex, preview-shell mount.ts, export-core getProp/getProps/hasProp); behaviour commit 2754e83 makes layout and validator strict (NL.E0405 on every date key incl. items, en+fr tests, fixed fragment, dsl.md, working-calendar.md, spec §3.5 and §7.5); style-chain.ts used by resolveStyle and NL.W0704 (W0704 skips the inline layer, caller-side, tested); calendar-declarations.ts used by validator, layout and hover, copies deleted; m2.s3 also fixes `every:[constructor]` (now NL.E0904, no layout rule; in the fixed block and spec §3.4); G1+G3 identical per commit and 02f8880..8ef9df2 (parent re-ran); notes: inline pins `after:2026-02-30` get no E0405 and layout now ignores them, `--now 2026-02-30` still rolls over, dsl.md rule 1 omits items; passed unattended: gate 4, gate 2 - 2026-10-13
+review wave-5 (nowline m2 s4) a80548c..3305f9e: PASS - value-tables.ts (statuses, capacity icons, icon names, non-working displays, WEEKDAYS re-export) via internal.ts and a layering leaf; validator, layout (non-working-display re-export, plus capacity.ts's third icon copy) and LSP (tables, WEEKDAY_NAMES) import it; tables identical before the switch; @nowline/layout exports unchanged (types narrowed to readonly tuples, all consumers type-check); G1+G3 identical (180/120); bundle 197.68 KB of 200 - 2026-10-13
 
 ## Token log
 
@@ -234,3 +235,6 @@ tokens review-wave-3 nowline-m1-s4 (claude-opus-5-5): input ~24 / cache read ~32
 tokens orchestrator-wave-3 nowline-m1-s4 (claude-opus-5-5): input ~26 / cache read ~2.5M / cache write ~16k 5m + ~25k 1h / output ~18k | ~$1.14 API-equiv
 tokens wave-4 nowline-m2-s1-s3 (claude-opus-5-5): input ~320 / cache read ~33M / cache write ~320k / output ~160k | ~$11.32 API-equiv (output est.) session 462f378b-01ae-572c-b81b-c39199f8207a
 tokens review-wave-4 nowline-m2-s1-s3 (claude-opus-5-5): input ~64 / cache read ~2.7M / cache write ~120k / output ~31k | ~$1.74 API-equiv (output est.) session 462f378b-01ae-572c-b81b-c39199f8207a
+tokens orchestrator-wave-4 nowline-m2-s1-s3 (claude-opus-5-5): input ~16 / cache read ~1.5M / cache write ~7.3k 5m + ~200k 1h / output ~12k | ~$2.19 API-equiv
+tokens wave-5 nowline-m2-s4 (claude-sonnet-5-5): input ~52 / cache read ~2.1M / cache write ~200k / output ~26k | ~$1.20 API-equiv (output est.) session 462f378b-01ae-572c-b81b-c39199f8207a
+tokens review-wave-5 nowline-m2-s4 (claude-opus-5-5): input ~22 / cache read ~310k / cache write ~37k / output ~11k | ~$0.47 API-equiv (output est.) session 462f378b-01ae-572c-b81b-c39199f8207a

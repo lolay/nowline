@@ -3,8 +3,8 @@
 - **Branch:** `claude/zealous-thompson-tur82q` (lolay/nowline), assigned by the cloud harness. Started on it at `c34804c` (= `origin/main`).
 - **Plan:** `specs/handoffs/plan-core-utilities-heron.md`. Spec: `specs/core-ast-utilities.md`.
 - **Mode:** unattended, confirmed 2026-10-13 in session 462f378b-01ae-572c-b81b-c39199f8207a (harness=claude-code runner=cloud), re-confirmed by the pasted Kickoff prompt after `/compact`.
-- **Status:** 4/5 waves done; m1 complete, m2 s1-s3 done (wave 4 PASS `02f8880..8ef9df2`). Next: wave 5 unit 1 [exec] m2.s4, then unit 2 [exec] m3.s1-s3 (gate 4, a checkpoint). Milestone handoff for m2: `specs/handoffs/handoff-m2-core-utilities.md`.
-- **Spend:** ~$32 logged against ~$24 expected (guard ~$72). Over expected: wave 4 cost ~$13 against ~$6.8 (a 45-minute [deep] run over five commits).
+- **Status:** m1 and m2 complete (wave 5 unit 1, m2.s4, PASS `a80548c..3305f9e`). Next: wave 5 unit 2 [exec] m3.s1-s3 (gate 4, a checkpoint). Milestone handoffs: `specs/handoffs/handoff-m2-core-utilities.md`, `specs/handoffs/handoff-m3-core-utilities.md`.
+- **Spend:** ~$36 logged against ~$24 expected (guard ~$72). Over expected: wave 4 cost ~$13 against ~$6.8 (a 45-minute [deep] run over five commits).
 
 ## Waves
 
@@ -14,7 +14,7 @@
 | 2 | deep | m1.s2-s3 | PASS `b889c77..2286068` (gate 2 passed unattended) |
 | 3 | exec | m1.s4 | CONCERNS then WAIVED `3cdb1ed..3b46f6d` (worker disclosed a direct `npx vitest` run; review PASS; Gary: `waive`) |
 | 4 | deep | m2.s1-s3 | PASS `02f8880..8ef9df2` (gate 4 and gate 2 passed unattended) |
-| 5 | exec | m2.s4, then m3.s1-s3 (two units) | next |
+| 5 | exec | m2.s4, then m3.s1-s3 (two units) | m2.s4 PASS `a80548c..3305f9e`; m3 unit next |
 
 Gates on the way: 2 before waves 2 and 4; 4 before wave 4 (m2) and before the m3 unit of wave 5. No canary (one working directory), no gate 7.
 
@@ -39,6 +39,7 @@ Paste the plan's Kickoff prompt (in the plan's Kickoff block). Before each unit 
 - Gary, 2026-10-13, at gate 1 on wave 3: `waive` (the recommended option: waive, and let later worker prompts allow a direct single-file `vitest run` for the inner loop, with `make pre-commit` still the gate).
 - Main moved again before wave 4: #151 (m4.13, R4) merged in `d3170ff`. R4 added a `now` option regex in `packages/config/src/surface-options.ts` (`/^(\d{4}-\d{2}-\d{2}|-)$/`, allows `-`, like the MCP one): it stays, as `mcp/src/server.ts:602` does. R4 moved option parsing (theme, width, now, page size, non-working) into `packages/config`; it added no DSL property-helper or content-walk copy. If its `now` parsing rolls over an impossible day, report it in m2.s1 and leave it (CLI input, outside decision 2).
 - review wave-4 (nowline m2 s1-s3) 02f8880..8ef9df2: PASS. `util/props.ts`, `style-chain.ts` and `calendar-declarations.ts` are in core and exported via `internal.ts`; behaviour commit `2754e83` made dates strict. Extra exports from `calendar-declarations.ts`: `isWeekday` and `CALENDAR_DECLARATION_KEYS` (spec §3.4 records them); m2.s4 re-exports `WEEKDAYS` from there and the LSP's `WEEKDAY_NAMES` should use it. NL.W0704 skips the `inline` layer of `styleLayers` (caller-side, tested). The m2.s1 refactor was one commit across all packages. `.changelog/core-ast-utilities.txt` holds one `fixed` block (strict dates, years 0000-0099 now read as written, and `every:[constructor]` now NL.E0904); m3.s3 appends the `removed` block. **m3.s3 also fixes `specs/dsl.md` rule 1 (~line 1231), which lists the roadmap, an anchor, a milestone or a calendar declaration as NL.E0405 targets but omits items, which now get it too.**
+- review wave-5 (nowline m2 s4) a80548c..3305f9e: PASS. `value-tables.ts` holds the tables; the validator builds its Sets locally from them and sorts copies only. Layout's `capacity.ts` icon Set (a third copy outside §1.5) also uses it. Left alone: export-mermaid/export-xlsx `WEEKDAY_NAMES_MONDAY_FIRST` (different shape) and the GitHub Action's display copy.
 - Follow-ups found in wave 4, outside this plan's steps, to raise with Gary at completion (not to fix in later steps): inline date pins (`after:2026-02-30`) get no NL.E0405, the validator still compares the rolled-over date for NL.E0413, and layout now ignores the pin; `--now 2026-02-30` still rolls over (`layout/src/resolve-today.ts`); the mermaid exporter's `resolveStartDate`/local `parseIsoDate` and `include-resolver`'s `readStartProp` are still lenient; the VS Code preview's own `parseIsoDate` (`preview-panel.ts`) is lenient and outside §1.5.
 
 ## Environment notes
@@ -51,6 +52,7 @@ Paste the plan's Kickoff prompt (in the plan's Kickoff block). Before each unit 
 - One PR at the end instead of one PR per spec step (Gary's instruction).
 - The parent merges `origin/main` between units when the merge is clean, outside every worker's range (plan, "Merging main").
 - After wave 1 the parent fixed the gate script (plan, Gates): G3 differed only by checkout root in one sample's logo warning. The rerun on `3fdba6c..6448ee4` reports G1+G3 identical.
+- Wave 5's m3 unit passes gate 4 (new milestone m3) as an unattended checkpoint.
 - Main moved again before wave 5: #152 (perf test only) merged clean in `d8aa0ce`.
 - Wave 4 passed gate 4 (new milestone m2) and gate 2 as unattended checkpoints; the run went over the expected total (~$32 of ~$24) there.
 - Gary waived gate 1 on wave 3 (`waive`); main merged again before wave 4.
