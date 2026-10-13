@@ -904,6 +904,21 @@ describeBuilt('roadmap logo: (requires `pnpm build`)', () => {
         });
     });
 
+    it('treats a URL as a path that does not resolve', async () => {
+        await withTempDir(async (dir) => {
+            await fs.writeFile(
+                path.join(dir, 'r.nowline'),
+                logoDsl('https://example.com/acme.svg'),
+            );
+            const r = await runCliBuilt(['r.nowline', '-o', '-'], { cwd: dir });
+            expect(r.exitCode).toBe(0);
+            expect(r.stderr).toContain(
+                'warning: logo file not found: https://example.com/acme.svg',
+            );
+            expect(r.stdout).not.toContain('data-layer="logo"');
+        });
+    });
+
     it('fails a missing logo under --strict', async () => {
         await withTempDir(async (dir) => {
             await fs.writeFile(path.join(dir, 'r.nowline'), logoDsl('./missing.svg'));

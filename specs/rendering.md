@@ -152,7 +152,7 @@ Logo resolution is a render-time concern. Each failure is a warning, and the cha
 - **Unsupported extension** (anything but `.svg`, `.png`, `.jpg`, `.jpeg`, `.webp`) — `unsupported logo format: <ext> (<path>)`. The file is not read.
 - **Missing file**, or a path the asset resolver refuses (one that escapes `--asset-root`) — `logo file not found: <path> (<reason>)`.
 - **Unreadable** — `logo could not be parsed: <path> (<reason>)`: a raster whose header does not match its extension, or an SVG with neither a `viewBox` nor a pixel `width` and `height` on its root.
-- **Non-local URL** (`http://`, `https://`, `file://`, `data:`) — `dsl.md` specifies a parser error, but the validator does not enforce it yet; such a path fails to resolve and draws the missing-file warning.
+- **URL** (`http://`, `https://`, `file://`, `data:`) — not special-cased: it is treated as a local path, fails to resolve, and draws the missing-file warning. The renderer never fetches remote assets.
 
 `nowline <input> --strict` promotes all logo warnings to errors (exit code 3, like any export pipeline failure). Without `--strict` the CLI prints them to stderr as `warning: ...`, which `-q` silences.
 
