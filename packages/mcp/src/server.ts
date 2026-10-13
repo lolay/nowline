@@ -15,6 +15,7 @@ import {
     registerAppTool,
 } from '@modelcontextprotocol/ext-apps/server';
 import { McpServer } from '@modelcontextprotocol/server';
+import type { NowPolicy, SurfaceOptions } from '@nowline/config';
 import { type NowlineFile, parseNowlineJson, printNowlineFile } from '@nowline/core';
 import {
     type ExportFormat,
@@ -23,8 +24,8 @@ import {
     IncludeResolveError,
     type RenderInputs,
 } from '@nowline/export';
-import { type PdfPageSize, resolveFonts } from '@nowline/export-core';
-import { NON_WORKING_DISPLAYS, THEME_NAMES, type ThemeName } from '@nowline/layout';
+import { resolveFonts } from '@nowline/export-core';
+import { NON_WORKING_DISPLAYS, THEME_NAMES } from '@nowline/layout';
 import { buildShareLink } from '@nowline/share-link';
 import { z } from 'zod';
 import { NOWLINE_MCP_ICONS } from './branding.js';
@@ -41,8 +42,6 @@ import {
     LAYOUT_INSIGHT_HINT,
     type McpDiagnostic,
     PathOutsideRootError,
-    parsePageSizeArg,
-    parseThemeArg,
     REVIEW_MAX_WIDTH,
     routedResolveDiagnosticsToMcp,
     toolDescriptionWithSyntax,
@@ -54,6 +53,7 @@ import {
     REFERENCE_MAN_PAGE,
 } from './generated/resources.js';
 import { PREVIEW_HTML } from './generated/ui-bundle.js';
+import { type McpResolvedOptions, resolveMcpOptions } from './options.js';
 import { registerPrompts } from './prompts.js';
 import { REFERENCE_CHEATSHEET } from './reference-cheatsheet.js';
 import { SCHEMA_VOCABULARY } from './schema-vocab.js';
@@ -199,12 +199,8 @@ function todayUtc(): Date {
     return new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate()));
 }
 
-// `-` suppresses the now-line, the same sentinel as the CLI's `--now -`.
-// Omitted means today (UTC); the schema has already checked the date shape.
-function resolveNow(now: string | undefined): Date | undefined {
-    if (now === '-') return undefined;
-    return now ? new Date(`${now}T00:00:00Z`) : todayUtc();
-}
+// An omitted `now` is today in UTC until the local default lands (m1.s6).
+const UTC_NOW_POLICY: NowPolicy = { zone: { kind: 'utc' } };
 
 function exampleShortName(fullName: string): string {
     return fullName.endsWith('.nowline') ? fullName.slice(0, -'.nowline'.length) : fullName;
@@ -589,7 +585,7 @@ export function createMcpServer(opts: McpServerOptions = {}): McpServer {
         );
 
     // A string, not an enum, so `Greyscale` and the `greyscale` alias reach
-    // `parseThemeArg`, which rejects an unknown name with the theme list.
+    // `resolveMcpOptions`, which rejects an unknown name with the theme list.
     const themeSchema = z
         .string()
         .optional()
@@ -677,12 +673,13 @@ export function createMcpServer(opts: McpServerOptions = {}): McpServer {
             // Only the filesystem touchpoints (reading the input, writing the
             // output) map to structured NL.MCP.* errors; a kernel render fault
             // bubbles unchanged so it is never mislabeled as a path/IO failure.
-            let theme: ThemeName | undefined;
+            let resolved: McpResolvedOptions;
             try {
-                theme = parseThemeArg(args.theme);
+                resolved = resolveMcpOptions(args, UTC_NOW_POLICY);
             } catch (err) {
                 return handleToolError(err);
             }
+            const { theme, options } = resolved;
             let source: string;
             let filePath: string;
             try {
@@ -695,14 +692,14 @@ export function createMcpServer(opts: McpServerOptions = {}): McpServer {
             if (!blocked.ok) return blocked.response;
 
             const format: ExportFormat = args.format ?? 'svg';
-            const today = resolveNow(args.now);
+            const today = options.today;
             const inputs: RenderInputs = {
                 sourcePath: filePath,
                 today,
                 locale: 'en-US',
-                theme: theme ?? 'light',
+                theme: options.theme,
                 width: args.width,
-                nonWorking: args.nonWorking,
+                nonWorking: options.nonWorking,
                 pngScale: args.scale,
             };
             const host = createNodeHostEnv(filePath);
@@ -739,9 +736,9 @@ export function createMcpServer(opts: McpServerOptions = {}): McpServer {
                 source,
                 filePath,
                 today,
-                theme: theme ?? 'light',
+                theme: options.theme,
                 width: args.width,
-                nonWorking: args.nonWorking,
+                nonWorking: options.nonWorking,
                 locale: 'en-US',
                 readFile: host.readSource,
                 doc: blocked.doc,
@@ -756,7 +753,7 @@ export function createMcpServer(opts: McpServerOptions = {}): McpServer {
                 theme,
                 now: args.now,
                 width: args.width,
-                nonWorking: args.nonWorking,
+                nonWorking: options.nonWorking,
                 locale: 'en-US',
             };
 
@@ -915,11 +912,9 @@ export function createMcpServer(opts: McpServerOptions = {}): McpServer {
             // Only the filesystem touchpoints (reading the input, writing the
             // output) map to structured NL.MCP.* errors; a kernel export fault
             // bubbles unchanged so it is never mislabeled as a path/IO failure.
-            let theme: ThemeName | undefined;
-            let pageSize: PdfPageSize | undefined;
+            let options: SurfaceOptions;
             try {
-                theme = parseThemeArg(args.theme);
-                pageSize = parsePageSizeArg(args.pageSize);
+                ({ options } = resolveMcpOptions(args, UTC_NOW_POLICY));
             } catch (err) {
                 return handleToolError(err);
             }
@@ -935,15 +930,14 @@ export function createMcpServer(opts: McpServerOptions = {}): McpServer {
             if (!blocked.ok) return blocked.response;
 
             const format: ExportFormat = args.format as NonRenderFormat;
-            const today = resolveNow(args.now);
             const inputs: RenderInputs = {
                 sourcePath: filePath,
-                today,
+                today: options.today,
                 locale: 'en-US',
-                theme: theme ?? 'light',
-                nonWorking: args.nonWorking,
+                theme: options.theme,
+                nonWorking: options.nonWorking,
                 pngScale: args.scale,
-                pageSize,
+                pageSize: options.pageSize,
                 orientation: args.orientation,
                 marginPt: args.marginPt,
                 msprojStart: args.msprojStart,

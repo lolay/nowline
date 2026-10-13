@@ -11,14 +11,11 @@ import {
     resolveDiagnosticCode,
     resolveIncludes,
 } from '@nowline/core';
-import { PageSizeParseError, type PdfPageSize, parsePageSize } from '@nowline/export-core';
 import {
     collectLayoutInsights,
     type LayoutInsight,
     layoutRoadmap,
     type NonWorkingDisplay,
-    normalizeThemeName,
-    THEME_NAMES,
     type ThemeName,
 } from '@nowline/layout';
 import { URI } from 'langium';
@@ -264,40 +261,6 @@ export class InputRequiredError extends Error {
     constructor(message: string) {
         super(message);
         this.name = 'InputRequiredError';
-    }
-}
-
-/**
- * Normalize a tool's `theme` argument with the same `normalizeThemeName` the
- * CLI uses, so `Greyscale` and the `greyscale` alias resolve to `grayscale`.
- * Throws `InputRequiredError` (the tool's input-error result) for an unknown
- * name; an omitted theme stays `undefined` so each caller applies its default.
- */
-export function parseThemeArg(raw: string | undefined): ThemeName | undefined {
-    if (raw === undefined) return undefined;
-    const theme = normalizeThemeName(raw);
-    if (theme === undefined) {
-        throw new InputRequiredError(
-            `Unknown theme "${raw}". Expected one of: ${THEME_NAMES.join(', ')}.`,
-        );
-    }
-    return theme;
-}
-
-/**
- * Validate a tool's `pageSize` argument with `parsePageSize`, for every export
- * format (a bad value fails the same way whether or not the format is PDF).
- * Mirrors the CLI's `parsePageSizeSetting`: an empty string means unset, and
- * the parser's detail is kept under a lead naming the argument.
- */
-export function parsePageSizeArg(raw: string | undefined): PdfPageSize | undefined {
-    if (raw === undefined || raw === '') return undefined;
-    try {
-        return parsePageSize(raw);
-    } catch (err) {
-        if (!(err instanceof PageSizeParseError)) throw err;
-        const detail = err.message.replace(/^invalid page size "[^"]*": /, '');
-        throw new InputRequiredError(`Invalid pageSize "${raw}": ${detail}`);
     }
 }
 
