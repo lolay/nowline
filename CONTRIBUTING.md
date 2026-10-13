@@ -53,8 +53,8 @@ This repo runs a **two-tier Node policy**: a low floor for what we ship to consu
 | Pin | Where | Value | Why |
 | --- | --- | --- | --- |
 | `engines.node` | every `@nowline/*` `package.json` | **`>=22`** | Node 22 is the oldest non-EOL LTS; supported through April 2027. Choosing the oldest non-EOL LTS as the floor doesn't lock out users on Node 22 LTS while still giving us modern language features. Matches the effective floor of comparable libraries (e.g. Mermaid). |
-| Node | `version:` on the `node` check in `triage.yaml` | **`>=22`** | `make doctor` fails below the floor and only warns between it and `.nvmrc`, since the repo builds and tests on the floor too. Its `recommended_from: .nvmrc` follows Tier 2 on its own. |
 | `engines.pnpm` | every `@nowline/*` `package.json` | **`>=11`** | Soft floor matching the `packageManager` pin below. |
+| `make doctor` | `version:` on the `node` and `pnpm` checks in `triage.yaml` | **`>=22`**, **`>=11`** | Triage can't read `engines`, so the floors are repeated here: `make doctor` fails below them. Node also has `recommended_from: .nvmrc`, so it only warns between the floor and Tier 2's pin, which it follows on its own. |
 | `runs.using` | `packages/nowline-action/action.yml` | **`node24`** | GitHub controls the GitHub Action runtime ladder separately. `node26` is not yet available; revisit when GitHub adds it. |
 | `engines.vscode` | `packages/vscode-extension/package.json` | **`^1.105.0`** | VS Code bundles its own Node ABI. Independent of the policy above. Tracks Cursor's embedded VS Code engine + 30-day grace; see [VS Code extension engine floor policy](#vs-code-extension-engine-floor-policy). |
 

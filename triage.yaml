@@ -8,6 +8,7 @@ default:
     recommended_from: .nvmrc
     hint: https://nodejs.org
   - tool: pnpm
+    version: ">=11"
     hint: corepack enable && corepack prepare pnpm@latest --activate
   - tool: python3
     hint: https://www.python.org
