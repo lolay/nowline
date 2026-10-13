@@ -5,7 +5,7 @@
 .\" Empreinte de la page anglaise relue pour cette traduction. Après avoir
 .\" reporté une modification de la page anglaise, remplacez-la par la ligne
 .\" qu'affiche packages/cli/test/man/translation-parity.test.ts.
-.\" translated-from: nowline.1 sha256:c721954f63ccb8eb968b55bec70c153bbfb9750f410efc205d80a232b7be9548
+.\" translated-from: nowline.1 sha256:acac95410a996ad8377859b4a92cb1787e2f45ff53f5a447fffe250e692ad0e4
 .Dd $Mdocdate$
 .Dt NOWLINE 1
 .Os
@@ -392,7 +392,10 @@ Affiche des diagnostics supplémentaires sur la sortie d'erreur standard
 décisions de repli).
 .It Fl q , -quiet
 Supprime les messages non liés aux erreurs sur la sortie d'erreur
-standard.
+standard : avertissements, notices et avertissements du rapport de
+diagnostics d'une exécution en échec.
+Les erreurs et les diagnostics JSON restent affichés, et le code de
+sortie ne change pas.
 .El
 .Sh OPTIONS STANDARD
 .Bl -tag -width Fl

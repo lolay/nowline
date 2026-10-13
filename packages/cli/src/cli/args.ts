@@ -1,6 +1,7 @@
 import { type ParseArgsConfig, parseArgs } from 'node:util';
 import { isDiagnosticFormat } from '../diagnostics/format.js';
 import { CliError, ExitCode } from '../io/exit-codes.js';
+import type { LogLevel } from '../io/log.js';
 
 export type ModeKind = 'render' | 'serve' | 'init' | 'mcp' | 'help' | 'version';
 
@@ -12,7 +13,7 @@ export interface ParsedArgs {
     /** True if `--dry-run` / `-n` was passed (only valid for render mode). */
     dryRun: boolean;
     /** Logging level. Verbose and quiet are mutually exclusive. */
-    logLevel: 'verbose' | 'quiet' | 'normal';
+    logLevel: LogLevel;
 
     // I/O
     output?: string;
@@ -248,7 +249,7 @@ export function parseArgv(argv: readonly string[]): ParsedArgs {
         );
     }
 
-    const logLevel: ParsedArgs['logLevel'] =
+    const logLevel: LogLevel =
         values.verbose === true ? 'verbose' : values.quiet === true ? 'quiet' : 'normal';
 
     return {

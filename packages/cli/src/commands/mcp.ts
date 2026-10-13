@@ -3,6 +3,7 @@ import { NodeStreamableHTTPServerTransport } from '@modelcontextprotocol/node';
 import { StdioServerTransport } from '@modelcontextprotocol/server/stdio';
 import { createMcpServer } from '@nowline/mcp/server';
 import type { ParsedArgs } from '../cli/args.js';
+import { createLog } from '../io/log.js';
 
 /**
  * `nowline --mcp` handler.
@@ -40,8 +41,8 @@ export async function mcpHandler({ args }: { args: ParsedArgs }): Promise<void> 
 
         await new Promise<void>((resolve) => {
             httpServer.listen(port, '127.0.0.1', () => {
-                process.stderr.write(
-                    `nowline: MCP Streamable HTTP listening on http://127.0.0.1:${port}\n`,
+                createLog(args.logLevel).notice(
+                    `nowline: MCP Streamable HTTP listening on http://127.0.0.1:${port}`,
                 );
             });
             httpServer.on('close', resolve);

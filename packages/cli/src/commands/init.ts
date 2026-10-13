@@ -2,6 +2,7 @@ import type { ParsedArgs } from '../cli/args.js';
 import { defaultInitOutputPath, initNameHasIncompatibleExtension } from '../cli/output-path.js';
 import { TEMPLATE_NAMES, TEMPLATES, type TemplateName } from '../generated/templates.js';
 import { CliError, ExitCode } from '../io/exit-codes.js';
+import { createLog } from '../io/log.js';
 import { writeOutput } from '../io/write.js';
 
 export interface InitHandlerOptions {
@@ -47,9 +48,7 @@ export async function initHandler(options: InitHandlerOptions): Promise<void> {
 
     await writeOutput(outputPath, rendered, 'text', { cwd });
 
-    if (args.logLevel === 'verbose') {
-        process.stderr.write(`nowline: wrote ${outputPath}\n`);
-    }
+    createLog(args.logLevel).verbose(`nowline: wrote ${outputPath}`);
 }
 
 function parseTemplateName(raw: string | undefined): TemplateName {

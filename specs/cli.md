@@ -140,6 +140,8 @@ Standard
 
 `-V` (uppercase) is `--version`; lowercase `-v` is `--verbose`. Matches curl / ssh / wget / gpg convention.
 
+`-q` drops every stderr line that is not an error: `warning:` lines (font substitution, renderer asset warnings under `--serve`), the MS Project lossy-feature summary, the `--mcp --port` listening banner, and warning-severity diagnostics from the text report of a failing run. It never changes the exit code. Errors still print, and so does machine output: the `--diagnostic-format json` document (including `--dry-run --format=json`) prints whole, warnings included, because a script asked for it. `--serve` still prints its URL to stdout. `-q` and `-v` are command-line only; `.nowlinerc` has no logging key (a `quiet` key is ignored like any unknown key), so a project file cannot silence warnings for everyone who runs it.
+
 ## Examples
 
 ```bash
