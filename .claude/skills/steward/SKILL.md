@@ -23,13 +23,9 @@ Don't call `pnpm` directly to stand in for any of these.
 
 ## Updating the branch
 
-`main` merges through a merge queue, which tests every PR against the latest `main`. A PR doesn't need to be up to date. Merge `main` in only when:
+Keep the branch current. On every wake (CI result, review, conflict notice, check-in), fetch `main`. If the branch is behind, merge `main` in, even if the merge is clean. Then run the local gate and push. The merge queue would catch drift anyway, but a current branch surfaces conflicts and man-page stamp breakage while the session that wrote the change is still around to fix it.
 
-- GitHub reports a conflict;
-- a fix you need landed on `main`;
-- the base went red and has since recovered.
-
-A bare "Merge remote-tracking branch 'origin/main'" on a clean PR re-runs CI for nothing. Use a merge commit, never a rebase. Squash-merge flattens it anyway.
+Use a merge commit, never a rebase or force-push. Squash-merge flattens the history anyway.
 
 ### Resolving conflicts
 
