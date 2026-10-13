@@ -1,7 +1,8 @@
 // @nowline/export — the shared export kernel.
 //
 // The single code path from `.nowline` source to any of the eight export
-// artifacts (parse → resolve includes → layout → renderSvg → format adapter).
+// artifacts (stageRoadmap: parse → resolve includes → load logo → layout;
+// then renderSvg → format adapter).
 // Every surface — the CLI, the `@nowline/mcp` server, the VS Code extension,
 // and the Free/Pro web apps — runs this same code with the same inputs, so
 // they all produce byte-for-byte identical output for the same source and the
@@ -10,29 +11,28 @@
 // Spec: specs/export-determinism.md (the byte-identity precedent and the
 // HostEnv / RenderInputs contract this surface implements).
 //
-// Plan: s2 implements the kernel pipeline (parse → resolve → layout →
-// renderSvg → format dispatch). s4 swaps export-png to resvg-wasm.
+// Staging is `@nowline/renderer`'s `stageRoadmap` (specs/surface-options.md
+// §3.3); `exportStaged` exports a roadmap a caller already staged.
 
 import {
-    collectDocumentDiagnostics,
     createNowlineServices,
-    isRoutedResolveDiagnostic,
     type NowlineFile,
     type NowlineServices,
+    type RawDiagnostic,
     type ResolveDiagnostic,
-    resolveIncludes,
     serializeToJson,
 } from '@nowline/core';
 import type { ExportInputs, ResolvedFontPair } from '@nowline/export-core';
+import type { NonWorkingDisplay, ThemeName } from '@nowline/layout';
 import {
-    layoutRoadmap,
-    type NonWorkingDisplay,
-    roadmapLogoRef,
-    type ThemeName,
-} from '@nowline/layout';
-import { type AssetResolver, type FontFamilies, loadLogo, renderSvg } from '@nowline/renderer';
+    type AssetResolver,
+    type FontFamilies,
+    renderSvg,
+    type StagedRoadmap,
+    type StageLayout,
+    stageRoadmap,
+} from '@nowline/renderer';
 import type { LangiumDocument } from 'langium';
-import { URI } from 'langium';
 
 export type { PdfOrientation, ResolvedFontPair } from '@nowline/export-core';
 export type { NonWorkingDisplay, ThemeName } from '@nowline/layout';
@@ -44,6 +44,7 @@ export {
     resolveToday,
     TimezoneError,
 } from '@nowline/layout';
+export type { StagedRoadmap } from '@nowline/renderer';
 
 /**
  * Thrown when include resolution reports a wave-rule error (a coded or
@@ -175,23 +176,16 @@ type Services = {
 };
 
 let cachedServices: Services | undefined;
-let docCounter = 0;
 
 function getExportServices(): Services {
     if (!cachedServices) cachedServices = createNowlineServices();
     return cachedServices;
 }
 
-function freshUri(): URI {
-    // Always mint a fresh URI — re-using one lets Langium mutate the prior
-    // document in place, causing spurious diagnostics on repeated exports.
-    return URI.parse(`memory:///kernel-${++docCounter}.nowline`);
-}
-
 // ---- JSON serializer ---------------------------------------------------------
 //
 // Delegates to core's `serializeToJson`. The one envelope difference: the
-// kernel parses from a synthetic `memory:///kernel-N.nowline` URI, so it
+// stage parses from a synthetic `memory:///stage-N.nowline` URI, so it
 // overrides `file.uri` with the raw `file://${sourcePath}` concatenation —
 // not `URI.file()`, which would percent-encode and change the bytes the
 // determinism gate hashes.
@@ -219,178 +213,16 @@ function guessMime(ref: string): string {
     return 'application/octet-stream';
 }
 
-// ---- Staged pipeline ---------------------------------------------------------
-
-interface StageResult {
-    /** SVG rendered with the portable FONT_STACK (for `svg` / `html` exports). */
-    svg: string;
-    /**
-     * Re-render the already-laid-out model with a pinned `font-family` map.
-     * Used by the raster paths (png/pdf) so the exported pixels name exactly
-     * the bundled font and match the live preview (WYSIWYG). Reuses the same
-     * asset resolver and strict/warn handling as the portable render.
-     */
-    renderWith: (fontFamilies: FontFamilies) => Promise<string>;
-    exportInputs: ExportInputs;
-    document: LangiumDocument<NowlineFile>;
-    source: string;
-}
-
-/**
- * Pin the renderer's per-role families to the resolved fonts' real family
- * names so raster/preview SVG names exactly the bundled face. `serif` maps to
- * the sans family: the resolver has no serif role and raster already falls
- * back serif->sans (resvg has no serif face loaded), so this is behavior-
- * preserving while making the SVG explicit.
- */
-function pinnedFamilies(fonts: ResolvedFontPair): FontFamilies {
-    return { sans: fonts.sans.name, serif: fonts.sans.name, mono: fonts.mono.name };
-}
-
-async function stageDocument(
-    source: string,
-    inputs: RenderInputs,
-    host: HostEnv,
-): Promise<StageResult> {
-    const services = getExportServices();
-    const uri = freshUri();
-
-    const doc = services.shared.workspace.LangiumDocumentFactory.fromString<NowlineFile>(
-        source,
-        uri,
-    );
-    await services.shared.workspace.DocumentBuilder.build([doc], { validation: true });
-
-    const errors: string[] = [];
-    for (const raw of collectDocumentDiagnostics(doc)) {
-        if (raw.origin === 'lexer') {
-            errors.push(raw.error.message);
-        } else if (raw.origin === 'parser') {
-            errors.push(raw.error.message);
-        } else if (raw.diagnostic.severity === 1 /* DiagnosticSeverity.Error */) {
-            errors.push(raw.diagnostic.message);
-        }
-    }
-    if (errors.length > 0) {
-        throw new Error(
-            `@nowline/export: validation errors in ${inputs.sourcePath}: ${errors.join('; ')}`,
-        );
-    }
-
-    const ast = doc.parseResult.value;
-
-    const resolved = await resolveIncludes(ast, inputs.sourcePath, {
-        services: services.Nowline,
-        readFile: host.readSource.bind(host),
-    });
-    // Include errors are more fundamental than wave-rule errors: any of them
-    // keeps the plain throw. Wave-rule errors alone travel on a typed error.
-    const includeError = (diag: ResolveDiagnostic): string =>
-        `@nowline/export: include error in ${inputs.sourcePath}: ${diag.message}`;
-    const resolveErrors = resolved.diagnostics.filter((d) => d.severity === 'error');
-    const legacyError = resolveErrors.find((d) => !isRoutedResolveDiagnostic(d));
-    if (legacyError) {
-        throw new Error(includeError(legacyError));
-    }
-    if (resolveErrors.length > 0) {
-        throw new IncludeResolveError(includeError(resolveErrors[0]), resolved.diagnostics);
-    }
-    inputs.onResolveDiagnostics?.(resolved.diagnostics.filter(isRoutedResolveDiagnostic));
-
-    const assetResolver: AssetResolver = async (ref: string) => {
+function hostAssetResolver(host: HostEnv): AssetResolver {
+    return async (ref: string) => {
         const bytes = await host.readAsset(ref);
         return { bytes, mime: guessMime(ref) };
     };
-
-    // The logo's intrinsic size feeds layout; a failed load warns (throws
-    // under strict) and lays out as if no logo were declared.
-    const logoWarnings: string[] = [];
-    const logo = await loadLogo(roadmapLogoRef(ast), assetResolver, (msg) =>
-        logoWarnings.push(msg),
-    );
-    if (inputs.strict && logoWarnings.length > 0) {
-        throw new Error(`@nowline/export: render warnings (--strict): ${logoWarnings.join('; ')}`);
-    }
-    for (const msg of logoWarnings) inputs.onWarning?.(msg);
-
-    const model = layoutRoadmap(ast, resolved, {
-        theme: inputs.theme,
-        today: inputs.today,
-        width: inputs.width,
-        locale: inputs.locale,
-        nonWorking: inputs.nonWorking,
-        logo: logo?.dimensions,
-    });
-
-    // `report` forwards non-strict warnings to `onWarning`; only the
-    // portable render sets it, so a raster re-render does not repeat them.
-    const renderWith = async (fontFamilies?: FontFamilies, report = false): Promise<string> => {
-        const warnings: string[] = [];
-        const svg = await renderSvg(model, {
-            assetResolver,
-            logo,
-            noLinks: inputs.noLinks ?? false,
-            strict: inputs.strict ?? false,
-            warn: (msg) => warnings.push(msg),
-            fontFamilies,
-        });
-        if (inputs.strict && warnings.length > 0) {
-            throw new Error(`@nowline/export: render warnings (--strict): ${warnings.join('; ')}`);
-        }
-        if (report) for (const msg of warnings) inputs.onWarning?.(msg);
-        return svg;
-    };
-
-    // Portable render (FONT_STACK) for the svg/html file exports.
-    const svg = await renderWith(undefined, true);
-
-    return {
-        svg,
-        renderWith: (fontFamilies: FontFamilies) => renderWith(fontFamilies),
-        exportInputs: {
-            model,
-            ast,
-            resolved,
-            sourcePath: inputs.sourcePath,
-            today: inputs.today,
-        },
-        document: doc,
-        source,
-    };
 }
 
-// ---- Text encoding -----------------------------------------------------------
+// ---- Argument checks ---------------------------------------------------------
 
-const encoder = new TextEncoder();
-
-function toUtf8(text: string): Uint8Array {
-    return encoder.encode(text);
-}
-
-// ---- Public API --------------------------------------------------------------
-
-/**
- * Produce the export artifact for `source` in `format`. This is the single
- * code path to any exported artifact — no surface re-implements a stage.
- *
- * Text formats (svg / json / html / mermaid / msproj) are returned as UTF-8
- * bytes; binary formats (png / pdf / xlsx) as their native bytes. Returning
- * Uint8Array for every format keeps the determinism gate able to `sha256` one
- * value per (fixture, format).
- *
- * Note: PNG rasterizes via @nowline/export-png (native resvg-js) until s4
- * swaps it to @resvg/resvg-wasm. The `host.loadWasm()` seam is reserved for
- * that swap and is not called here yet.
- */
-export async function exportDocument(
-    source: string,
-    format: ExportFormat,
-    inputs: RenderInputs,
-    host: HostEnv,
-): Promise<Uint8Array> {
-    if (typeof source !== 'string') {
-        throw new TypeError('@nowline/export: source must be a string.');
-    }
+function checkHostAndInputs(host: HostEnv, inputs: RenderInputs): void {
     if (
         typeof host?.readSource !== 'function' ||
         typeof host.readAsset !== 'function' ||
@@ -406,32 +238,225 @@ export async function exportDocument(
     if (typeof inputs?.sourcePath !== 'string' || inputs.sourcePath.length === 0) {
         throw new TypeError('@nowline/export: inputs.sourcePath must be a non-empty string.');
     }
+}
 
+const STAGE_LAYOUT_KEYS = ['theme', 'today', 'width', 'locale', 'nonWorking'] as const;
+
+function sameLayoutValue(a: StageLayout[keyof StageLayout], b: unknown): boolean {
+    if (a instanceof Date || b instanceof Date) {
+        return a instanceof Date && b instanceof Date && a.getTime() === b.getTime();
+    }
+    return a === b;
+}
+
+/** A stage laid out with other options would export a different chart than `inputs` asks for. */
+function checkStageMatches(stage: StagedRoadmap, inputs: RenderInputs): void {
+    for (const key of STAGE_LAYOUT_KEYS) {
+        if (!sameLayoutValue(stage.layout[key], inputs[key])) {
+            throw new Error(
+                `@nowline/export: the staged roadmap was laid out with a different ${key} than inputs.${key}.`,
+            );
+        }
+    }
+}
+
+// ---- Staging -----------------------------------------------------------------
+
+/** Lexer, parser and validator error messages, in document order. */
+function errorMessages(diagnostics: RawDiagnostic[]): string[] {
+    const errors: string[] = [];
+    for (const raw of diagnostics) {
+        if (raw.origin === 'lexer') {
+            errors.push(raw.error.message);
+        } else if (raw.origin === 'parser') {
+            errors.push(raw.error.message);
+        } else if (raw.diagnostic.severity === 1 /* DiagnosticSeverity.Error */) {
+            errors.push(raw.diagnostic.message);
+        }
+    }
+    return errors;
+}
+
+/**
+ * Stage `source` and map the result to the kernel's contract: validation and
+ * include errors throw, routed warnings reach `onResolveDiagnostics`, and logo
+ * warnings reach `onWarning` (or throw under `strict`).
+ */
+async function stageDocument(
+    source: string,
+    inputs: RenderInputs,
+    host: HostEnv,
+): Promise<StagedRoadmap> {
+    const stage = await stageRoadmap({
+        source,
+        sourcePath: inputs.sourcePath,
+        services: getExportServices(),
+        readSource: host.readSource.bind(host),
+        assetResolver: hostAssetResolver(host),
+        layout: inputs,
+    });
+
+    if (stage.kind === 'invalid') {
+        throw new Error(
+            `@nowline/export: validation errors in ${inputs.sourcePath}: ${errorMessages(stage.diagnostics).join('; ')}`,
+        );
+    }
+
+    // Include errors are more fundamental than wave-rule errors: any of them
+    // keeps the plain throw. Wave-rule errors alone travel on a typed error.
+    const includeError = (diag: ResolveDiagnostic): string =>
+        `@nowline/export: include error in ${inputs.sourcePath}: ${diag.message}`;
+    if (stage.kind === 'include-error') {
+        if (stage.legacy) throw new Error(includeError(stage.legacy));
+        const firstError = stage.routed.filter((d) => d.severity === 'error')[0];
+        throw new IncludeResolveError(includeError(firstError), stage.resolved.diagnostics);
+    }
+    inputs.onResolveDiagnostics?.(stage.routed);
+
+    // A failed logo load warns (throws under strict); the stage laid out as
+    // if no logo were declared.
+    if (inputs.strict && stage.warnings.length > 0) {
+        throw new Error(
+            `@nowline/export: render warnings (--strict): ${stage.warnings.join('; ')}`,
+        );
+    }
+    for (const msg of stage.warnings) inputs.onWarning?.(msg);
+
+    return stage;
+}
+
+// ---- Rendering ---------------------------------------------------------------
+
+/**
+ * Pin the renderer's per-role families to the resolved fonts' real family
+ * names so raster/preview SVG names exactly the bundled face. `serif` maps to
+ * the sans family: the resolver has no serif role and raster already falls
+ * back serif->sans (resvg has no serif face loaded), so this is behavior-
+ * preserving while making the SVG explicit.
+ */
+function pinnedFamilies(fonts: ResolvedFontPair): FontFamilies {
+    return { sans: fonts.sans.name, serif: fonts.sans.name, mono: fonts.mono.name };
+}
+
+/**
+ * Render the staged model. The portable render (no `fontFamilies`, the
+ * FONT_STACK) reports non-strict warnings to `onWarning`; a font-pinned
+ * raster re-render does not repeat them. Every render embeds the stage's
+ * logo bytes, so the logo is read once.
+ */
+async function renderStaged(
+    stage: StagedRoadmap,
+    inputs: RenderInputs,
+    assetResolver: AssetResolver,
+    fontFamilies?: FontFamilies,
+): Promise<string> {
+    const warnings: string[] = [];
+    const svg = await renderSvg(stage.model, {
+        assetResolver,
+        logo: stage.logo,
+        noLinks: inputs.noLinks ?? false,
+        strict: inputs.strict ?? false,
+        warn: (msg) => warnings.push(msg),
+        fontFamilies,
+    });
+    if (inputs.strict && warnings.length > 0) {
+        throw new Error(`@nowline/export: render warnings (--strict): ${warnings.join('; ')}`);
+    }
+    if (!fontFamilies) for (const msg of warnings) inputs.onWarning?.(msg);
+    return svg;
+}
+
+// ---- Text encoding -----------------------------------------------------------
+
+const encoder = new TextEncoder();
+
+function toUtf8(text: string): Uint8Array {
+    return encoder.encode(text);
+}
+
+// ---- Public API --------------------------------------------------------------
+
+/**
+ * Produce the export artifact for `source` in `format`. This is the single
+ * code path to any exported artifact — no surface re-implements a stage.
+ * It is `stageRoadmap` plus the kernel's error mapping, then `exportStaged`.
+ *
+ * Text formats (svg / json / html / mermaid / msproj) are returned as UTF-8
+ * bytes; binary formats (png / pdf / xlsx) as their native bytes. Returning
+ * Uint8Array for every format keeps the determinism gate able to `sha256` one
+ * value per (fixture, format).
+ */
+export async function exportDocument(
+    source: string,
+    format: ExportFormat,
+    inputs: RenderInputs,
+    host: HostEnv,
+): Promise<Uint8Array> {
+    if (typeof source !== 'string') {
+        throw new TypeError('@nowline/export: source must be a string.');
+    }
+    checkHostAndInputs(host, inputs);
     const stage = await stageDocument(source, inputs, host);
+    return exportStaged(stage, format, inputs, host);
+}
+
+/**
+ * Export a roadmap the caller already staged with `stageRoadmap`, so a
+ * surface that stages once (for diagnostics or layout insights) does not
+ * parse and lay out again. The stage must have been laid out with the same
+ * theme, today, width, locale and non-working display as `inputs`; a
+ * mismatch throws. The caller owns the stage's own errors and warnings
+ * (`exportDocument` maps them to the kernel's contract first); this applies
+ * `noLinks`, `strict` and `onWarning` to the render only.
+ *
+ * The SVG is rendered only for the formats that use it (svg, html, png, pdf).
+ */
+export async function exportStaged(
+    stage: StagedRoadmap,
+    format: ExportFormat,
+    inputs: RenderInputs,
+    host: HostEnv,
+): Promise<Uint8Array> {
+    checkHostAndInputs(host, inputs);
+    checkStageMatches(stage, inputs);
+
+    const assetResolver = hostAssetResolver(host);
+    const portableSvg = (): Promise<string> => renderStaged(stage, inputs, assetResolver);
+    const rasterSvg = (fonts: ResolvedFontPair): Promise<string> =>
+        renderStaged(stage, inputs, assetResolver, pinnedFamilies(fonts));
+    const exportInputs: ExportInputs = {
+        model: stage.model,
+        ast: stage.ast,
+        resolved: stage.resolved,
+        sourcePath: inputs.sourcePath,
+        today: inputs.today,
+    };
 
     if (format === 'svg') {
-        return toUtf8(stage.svg);
+        return toUtf8(await portableSvg());
     }
 
     if (format === 'json') {
-        return toUtf8(serializeDocumentToJson(stage.document, stage.source, inputs.sourcePath));
+        const source = stage.document.textDocument.getText();
+        return toUtf8(serializeDocumentToJson(stage.document, source, inputs.sourcePath));
     }
 
     if (format === 'html') {
+        const svg = await portableSvg();
         const mod = await import('@nowline/export-html');
-        const html = await mod.exportHtml(stage.exportInputs, stage.svg);
+        const html = await mod.exportHtml(exportInputs, svg);
         return toUtf8(html);
     }
 
     if (format === 'mermaid') {
         const mod = await import('@nowline/export-mermaid');
-        const md = mod.exportMermaid(stage.exportInputs);
+        const md = mod.exportMermaid(exportInputs);
         return toUtf8(md);
     }
 
     if (format === 'msproj') {
         const mod = await import('@nowline/export-msproj');
-        const xml = mod.exportMsProjXml(stage.exportInputs, {
+        const xml = mod.exportMsProjXml(exportInputs, {
             startDate: inputs.msprojStart,
             onLossy: inputs.onNotice,
         });
@@ -440,11 +465,14 @@ export async function exportDocument(
 
     if (format === 'xlsx') {
         const mod = await import('@nowline/export-xlsx');
-        const bytes = await mod.exportXlsx(stage.exportInputs, { generated: inputs.today });
+        const bytes = await mod.exportXlsx(exportInputs, { generated: inputs.today });
         return bytes;
     }
 
     if (format === 'png') {
+        // The portable render still runs first: its warnings reach
+        // `onWarning` (or throw under strict) before any raster work.
+        await portableSvg();
         if (!inputs.fonts) {
             throw new TypeError('@nowline/export: inputs.fonts is required for png format.');
         }
@@ -453,8 +481,8 @@ export async function exportDocument(
         await pngMod.initPngWasm(wasmBytes);
         // Raster with the pinned bundled family so the SVG resvg rasterizes
         // names exactly the embedded font (matches the live preview).
-        const rasterSvg = await stage.renderWith(pinnedFamilies(inputs.fonts));
-        const bytes = await pngMod.exportPng(stage.exportInputs, rasterSvg, {
+        const svg = await rasterSvg(inputs.fonts);
+        const bytes = await pngMod.exportPng(exportInputs, svg, {
             scale: inputs.pngScale ?? 2,
             fonts: inputs.fonts,
         });
@@ -462,14 +490,15 @@ export async function exportDocument(
     }
 
     if (format === 'pdf') {
+        await portableSvg();
         if (!inputs.fonts) {
             throw new TypeError('@nowline/export: inputs.fonts is required for pdf format.');
         }
         const mod = await import('@nowline/export-pdf');
         // Same pinned-family raster SVG as PNG so PDF text names the embedded
         // font explicitly and stays consistent with preview + PNG.
-        const rasterSvg = await stage.renderWith(pinnedFamilies(inputs.fonts));
-        const bytes = await mod.exportPdf(stage.exportInputs, rasterSvg, {
+        const svg = await rasterSvg(inputs.fonts);
+        const bytes = await mod.exportPdf(exportInputs, svg, {
             pageSize: inputs.pageSize,
             orientation: inputs.orientation,
             marginPt: inputs.marginPt,

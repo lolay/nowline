@@ -24,6 +24,12 @@ import { type LangiumDocument, type LangiumSharedCoreServices, URI } from 'langi
 import { type LoadedLogo, loadLogo } from './logo.js';
 import type { AssetResolver } from './svg/render.js';
 
+/** The layout options a stage reads; a staged roadmap records the values it used. */
+export type StageLayout = Pick<
+    LayoutOptions,
+    'theme' | 'today' | 'width' | 'locale' | 'nonWorking'
+>;
+
 /** Langium's `DiagnosticSeverity.Error`. */
 const SEVERITY_ERROR = 1;
 
@@ -38,7 +44,7 @@ export interface StageInputs {
     assetResolver?: AssetResolver;
     /** A document the caller already parsed and validated from `source`. */
     document?: LangiumDocument<NowlineFile>;
-    layout: Pick<LayoutOptions, 'theme' | 'today' | 'width' | 'locale' | 'nonWorking'>;
+    layout: StageLayout;
     /**
      * An include error the caller tolerates, such as the browser's
      * single-file mode skipping every include: it takes no part in the
@@ -77,7 +83,12 @@ export type StageResult =
           /** Asset warnings (missing or unreadable logo); the caller applies `strict`. */
           warnings: string[];
           model: PositionedRoadmap;
+          /** The layout options `model` was laid out with, picked from `StageInputs.layout`. */
+          layout: StageLayout;
       };
+
+/** A roadmap that staged without errors, ready to render or export. */
+export type StagedRoadmap = Extract<StageResult, { kind: 'staged' }>;
 
 let documentCounter = 0;
 
@@ -140,13 +151,7 @@ export async function stageRoadmap(inputs: StageInputs): Promise<StageResult> {
     );
     // Named keys, not a spread: a caller may pass a wider options object.
     const { theme, today, width, locale, nonWorking } = inputs.layout;
-    const model = layoutRoadmap(ast, resolved, {
-        theme,
-        today,
-        width,
-        locale,
-        nonWorking,
-        logo: logo?.dimensions,
-    });
-    return { kind: 'staged', document, ast, resolved, routed, logo, warnings, model };
+    const layout: StageLayout = { theme, today, width, locale, nonWorking };
+    const model = layoutRoadmap(ast, resolved, { ...layout, logo: logo?.dimensions });
+    return { kind: 'staged', document, ast, resolved, routed, logo, warnings, model, layout };
 }

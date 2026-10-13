@@ -155,6 +155,34 @@ describe('stageRoadmap', () => {
         expect(result.model.theme).toBe('dark');
         expect(result.resolved.processedFiles.has('/workspace/lane.nowline')).toBe(true);
         expect(result.ast).toBe(result.document.parseResult.value);
+        expect(result.layout).toStrictEqual({
+            theme: 'dark',
+            today: undefined,
+            width: 1200,
+            locale: undefined,
+            nonWorking: undefined,
+        });
+    });
+
+    it('records only the layout options it read', async (): Promise<void> => {
+        const today = new Date(Date.UTC(2026, 1, 9));
+        const wider: StageInputs['layout'] & { strict: boolean } = {
+            theme: 'grayscale',
+            today,
+            locale: 'fr-FR',
+            nonWorking: 'show',
+            strict: true,
+        };
+        const result = await stage(LOGO_ROADMAP, { layout: wider });
+        expect(result.kind).toBe('staged');
+        if (result.kind !== 'staged') return;
+        expect(result.layout).toStrictEqual({
+            theme: 'grayscale',
+            today,
+            width: undefined,
+            locale: 'fr-FR',
+            nonWorking: 'show',
+        });
     });
 
     it('reuses a document the caller already built', async (): Promise<void> => {
