@@ -61,7 +61,6 @@ import type {
     SwimlaneDeclaration,
     WavePlan,
 } from '@nowline/core';
-import { buildWavePlan } from '@nowline/core';
 import type { ExportInputs } from '@nowline/export-core';
 import { displayLabel, getProp, getProps, hasProp, roadmapTitle } from '@nowline/export-core';
 import {
@@ -143,7 +142,8 @@ interface EmitCtx {
 export function exportMermaid(inputs: ExportInputs, options: MermaidOptions = {}): string {
     const ast = inputs.ast;
     const title = roadmapTitle(ast.roadmapDecl ?? undefined);
-    const schedule = scheduleRoadmap(ast, inputs.resolved, { today: inputs.today });
+    const schedule =
+        inputs.schedule ?? scheduleRoadmap(ast, inputs.resolved, { today: inputs.today });
     const { working } = schedule.calendar;
     const startDate = formatIsoDate(
         working.dateAtWorkingIndex(parseIsoDate(resolveStartDate(inputs)), 0),
@@ -237,7 +237,7 @@ function emitWaves(
     out: string[],
     startDate: string,
 ): WaveCtx | undefined {
-    const plan = buildWavePlan(inputs.resolved);
+    const plan = schedule.plan;
     if (!plan) return undefined;
     const { working } = schedule.calendar;
     const ids = plan.waves.map((w) => w.name as string);

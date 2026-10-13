@@ -5,7 +5,6 @@ import {
     layoutRoadmap,
     type PositionedItem,
     type PositionedTrackChild,
-    scheduleRoadmap,
 } from '../src/index.js';
 import { SwimlaneNode, type SwimlaneNodeDeps } from '../src/nodes/swimlane-node.js';
 import { ITEM_INSET_PX } from '../src/themes/shared.js';
@@ -2136,14 +2135,13 @@ milestone beta "Beta" after:a
     });
 });
 
-// Engine A (pixel layout) and engines B/C (date window, schedule) resolve an
-// item's start with the same precedence: `date:` > `start:` > `after:` >
-// the track cursor. Expectations are hand-derived: `calendar:business` at
-// `scale:1w` is 8 px per working day, and Mon 2026-01-12 is 5 working days
-// past the Mon 2026-01-05 roadmap start, so 40 px from the origin.
-describe('layoutRoadmap start: pins agree with scheduleRoadmap', () => {
-    const iso = (d: Date): string => d.toISOString().slice(0, 10);
-
+// Engine A resolves an item's start with the precedence `date:` > `start:` >
+// `after:` > the track cursor; scheduleRoadmap's day tables for the same
+// sources are in schedule.test.ts. Expectations are hand-derived:
+// `calendar:business` at `scale:1w` is 8 px per working day, and Mon
+// 2026-01-12 is 5 working days past the Mon 2026-01-05 roadmap start, so 40 px
+// from the origin.
+describe('layoutRoadmap start: pins', () => {
     function findItem(
         children: readonly PositionedTrackChild[],
         id: string,
@@ -2159,20 +2157,19 @@ describe('layoutRoadmap start: pins agree with scheduleRoadmap', () => {
         return undefined;
     }
 
-    async function layAndSchedule(src: string) {
+    async function lay(src: string) {
         const { file, resolved } = await parseAndResolve(src);
         const model = layoutRoadmap(file, resolved, { theme: 'light' });
-        const sched = scheduleRoadmap(file, resolved);
         const startOffset = (id: string): number => {
             const item = findItem(model.swimlanes[0].children, id);
             expect(item, id).toBeDefined();
             return item!.box.x - ITEM_INSET_PX - model.timeline.originX;
         };
-        return { model, sched, startOffset };
+        return { model, startOffset };
     }
 
     it('honours start: on an item that is a direct parallel track', async () => {
-        const { model, sched, startOffset } = await layAndSchedule(`nowline v1
+        const { model, startOffset } = await lay(`nowline v1
 roadmap r "R" start:2026-01-05 scale:1w
 swimlane s "S"
   parallel
@@ -2182,17 +2179,15 @@ swimlane s "S"
         expect(model.timeline.pixelsPerDay).toBe(8);
         expect(startOffset('a')).toBeCloseTo(0, 6);
         expect(startOffset('b')).toBeCloseTo(40, 6);
-        expect(iso(sched.items.get('b')!.start)).toBe('2026-01-12');
     });
 
-    it('lets start: win over after: on a lane item, as the schedule does', async () => {
-        const { sched, startOffset } = await layAndSchedule(`nowline v1
+    it('lets start: win over after: on a lane item', async () => {
+        const { startOffset } = await lay(`nowline v1
 roadmap r "R" start:2026-01-05 scale:1w
 swimlane s "S"
   item a "A" duration:3w
   item b "B" duration:1w start:2026-01-12 after:a
 `);
         expect(startOffset('b')).toBeCloseTo(40, 6);
-        expect(iso(sched.items.get('b')!.start)).toBe('2026-01-12');
     });
 });

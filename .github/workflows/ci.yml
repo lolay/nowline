@@ -120,9 +120,14 @@ jobs:
       - uses: actions/checkout@v7
       - uses: ./.github/actions/setup-node-pnpm
 
-      - uses: lolay/triage-action@v0.4
+      # The same check as `make doctor MODE=ci STRICT=1`. This job runs on the
+      # .nvmrc pin, so strict turns "below the recommended version" into a
+      # failure. v0.5 installs triage 0.5.x, the first that reads
+      # recommended_from.
+      - uses: lolay/triage-action@v0.5
         with:
           profile: ci
+          strict: true
 
   build-test:
     # Docs-only skip: see the `changes` job.

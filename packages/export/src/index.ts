@@ -14,6 +14,7 @@
 // renderSvg → format dispatch). s4 swaps export-png to resvg-wasm.
 
 import {
+    buildWavePlan,
     collectDocumentDiagnostics,
     createNowlineServices,
     isRoutedResolveDiagnostic,
@@ -28,6 +29,7 @@ import {
     layoutRoadmap,
     type NonWorkingDisplay,
     roadmapLogoRef,
+    scheduleRoadmap,
     type ThemeName,
 } from '@nowline/layout';
 import { type AssetResolver, type FontFamilies, loadLogo, renderSvg } from '@nowline/renderer';
@@ -313,7 +315,13 @@ async function stageDocument(
     }
     for (const msg of logoWarnings) inputs.onWarning?.(msg);
 
+    // One wave plan and one day schedule per staging: layout reuses the
+    // schedule and the exporters read it from `ExportInputs`
+    // (specs/scheduler-unification.md §3.6).
+    const plan = buildWavePlan(resolved) ?? null;
+    const schedule = scheduleRoadmap(ast, resolved, { today: inputs.today, plan });
     const model = layoutRoadmap(ast, resolved, {
+        schedule,
         theme: inputs.theme,
         today: inputs.today,
         width: inputs.width,
@@ -350,6 +358,7 @@ async function stageDocument(
             model,
             ast,
             resolved,
+            schedule,
             sourcePath: inputs.sourcePath,
             today: inputs.today,
         },

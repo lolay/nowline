@@ -55,6 +55,10 @@ fi
 # MODE selects triage.yaml profile (default | release).
 MODE ?= default
 
+# STRICT=1 makes triage warnings fail (triage --strict). CI's triage job runs
+# that way on the .nvmrc pin; local runs stay lenient so the Node 22 floor passes.
+STRICT ?=
+
 # Maximum recent runs to fetch for gh-runs-list / gh-runs-watch / gh-runs-status.
 GH_LIMIT ?= 50
 
@@ -104,9 +108,9 @@ pre-commit: ci ## Run the local gate before committing or pushing (alias of ci)
 ci-platform: build-fast ## Slim CI gate for the OS/Node cells: build-fast + Vitest (no lint, typecheck, or render)
 	pnpm -r test
 
-doctor: ## Check required tools for this repo (read-only). MODE=default|release
+doctor: ## Check required tools for this repo (read-only). MODE=default|release STRICT=1
 	@command -v triage >/dev/null 2>&1 || { printf 'triage not found - install: brew install lolay/tap/triage\n' >&2; exit 1; }
-	@triage --profile $(MODE)
+	@triage --profile $(MODE)$(if $(filter 1,$(STRICT)), --strict)
 
 clean: ## Remove build, binary, and package artifacts (keeps node_modules)
 	rm -rf dist-bin dist-deb dist-pack dist-action dist-mcpb packages/*/dist packages/*/dist-* packages/*/tsconfig.tsbuildinfo
