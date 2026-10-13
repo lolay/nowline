@@ -24,7 +24,6 @@ import type {
     SwimlaneDeclaration,
 } from '@nowline/core';
 import { isItemDeclaration } from '@nowline/core';
-import { deriveItemDurationDays } from '../calendar.js';
 import {
     estimateCapacitySuffixWidth,
     formatCapacityNumber,
@@ -35,7 +34,7 @@ import { blockTitleRowSpillReservation } from '../container-header-geometry.js';
 import { propValue } from '../dsl-utils.js';
 import { frameTabGeometry } from '../frame-tab-geometry.js';
 import { computeLaneUtilization, resolveLaneUtilizationThresholds } from '../lane-utilization.js';
-import type { LayoutContext, TrackCursor } from '../layout-context.js';
+import { type LayoutContext, scheduledItemDays, type TrackCursor } from '../layout-context.js';
 import { RowPacker } from '../row-packer.js';
 import { resolveStyle } from '../style-resolution.js';
 import { ITEM_INSET_PX, MIN_ITEM_WIDTH } from '../themes/shared.js';
@@ -317,7 +316,7 @@ export class SwimlaneNode {
             // packages/layout/src/layout.ts).
             // Under `show` the predicted extent starts where `sequenceItem`
             // will snap the bar to; the cursor below keeps the raw start.
-            const durationDays = deriveItemDurationDays(props, ctx.sizes, ctx.cal);
+            const durationDays = scheduledItemDays(ctx, child as ItemDeclaration);
             const predictedStart = ctx.scale.startX(desiredStart);
             const naturalWidth = Math.max(
                 MIN_ITEM_WIDTH,

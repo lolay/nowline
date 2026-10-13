@@ -15,7 +15,6 @@
 
 import type { GroupBlock, ItemDeclaration, ParallelBlock } from '@nowline/core';
 import { isItemDeclaration } from '@nowline/core';
-import { deriveItemDurationDays } from '../calendar.js';
 import {
     blockTitleRowSpillReservation,
     GROUP_HEADER_TITLE_INSET_X_PX,
@@ -24,7 +23,7 @@ import {
 import { propValue, propValues } from '../dsl-utils.js';
 import { groupHasFill, groupTitleTabWidth } from '../group-title-tab-geometry.js';
 import { computeContainerInlineDatePins, pickInlineDate } from '../inline-date-pin-geometry.js';
-import type { LayoutContext, TrackCursor } from '../layout-context.js';
+import { type LayoutContext, scheduledItemDays, type TrackCursor } from '../layout-context.js';
 import { RowPacker } from '../row-packer.js';
 import { resolveStyle } from '../style-resolution.js';
 import {
@@ -198,7 +197,7 @@ export class GroupNode {
             // SwimlaneNode's pre-flight width math.
             // Under `show` the predicted extent starts where `sequenceItem`
             // will snap the bar to; the cursor below keeps the raw start.
-            const durationDays = deriveItemDurationDays(props, ctx.sizes, ctx.cal);
+            const durationDays = scheduledItemDays(ctx, child as ItemDeclaration);
             const predictedStart = ctx.scale.startX(desiredStart);
             const naturalWidth = Math.max(
                 MIN_ITEM_WIDTH,

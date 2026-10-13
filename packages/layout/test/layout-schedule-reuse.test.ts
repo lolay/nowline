@@ -1,6 +1,7 @@
+import type { ItemDeclaration } from '@nowline/core';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { layoutRoadmap } from '../src/layout.js';
-import { type RoadmapSchedule, scheduleRoadmap } from '../src/schedule.js';
+import { type RoadmapSchedule, type ScheduledItem, scheduleRoadmap } from '../src/schedule.js';
 import { parseAndResolve } from './helpers.js';
 
 // `layoutRoadmap` builds its day schedule itself unless the caller hands one
@@ -79,5 +80,38 @@ describe('LayoutOptions.schedule', () => {
 
         expect(scheduleSpy).toHaveBeenCalledTimes(1);
         expect(result.timeline.endDate).toEqual(baseline.timeline.endDate);
+    });
+});
+
+describe('item durations come from the schedule', () => {
+    it('lays an item out at the days the schedule gave it', async () => {
+        const { file, resolved } = await parseAndResolve(SOURCE);
+        const real = scheduleRoadmap(file, resolved, { today: TODAY });
+        const widthOf = (schedule: RoadmapSchedule): number => {
+            const lane = layoutRoadmap(file, resolved, { today: TODAY, schedule }).swimlanes[0];
+            const first = lane?.children[0];
+            if (first?.kind !== 'item') throw new Error('expected a leading item');
+            return first.box.width;
+        };
+
+        class DoubledDays extends WeakMap<ItemDeclaration, ScheduledItem> {
+            override get(node: ItemDeclaration): ScheduledItem | undefined {
+                const scheduled = real.byNode.get(node);
+                return scheduled && { ...scheduled, days: scheduled.days * 2 };
+            }
+        }
+        const doubled = new DoubledDays();
+
+        expect(widthOf({ ...real, byNode: doubled })).toBeGreaterThan(widthOf(real));
+    });
+
+    it('fails loudly when the schedule lacks a node the layout places', async () => {
+        const { file, resolved } = await parseAndResolve(SOURCE);
+        const real = scheduleRoadmap(file, resolved, { today: TODAY });
+        const incomplete: RoadmapSchedule = { ...real, byNode: new WeakMap() };
+
+        expect(() => layoutRoadmap(file, resolved, { today: TODAY, schedule: incomplete })).toThrow(
+            /not in the day schedule/,
+        );
     });
 });

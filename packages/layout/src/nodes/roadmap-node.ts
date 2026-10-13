@@ -549,6 +549,7 @@ export class RoadmapNode {
 
         const ctx: LayoutContext = {
             cal,
+            schedule,
             styleCtx,
             sizes,
             labels: resolved.content.labels,

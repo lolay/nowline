@@ -9,12 +9,7 @@ import type {
     SwimlaneDeclaration,
 } from '@nowline/core';
 import { buildWavePlan, isGroupBlock, isItemDeclaration, isParallelBlock } from '@nowline/core';
-import {
-    deriveItemDurationDays,
-    deriveTotalEffortDays,
-    literalToDays,
-    resolveDuration,
-} from './calendar.js';
+import { deriveTotalEffortDays, literalToDays, resolveDuration } from './calendar.js';
 import {
     estimateCapacitySuffixWidth,
     formatCapacityNumber,
@@ -66,7 +61,12 @@ import {
     packSpillChips,
 } from './item-bar-geometry.js';
 import { itemArrowSourcePort, itemArrowTargetPort } from './item-port-geometry.js';
-import { type LayoutContext, newCursor, type TrackCursor } from './layout-context.js';
+import {
+    type LayoutContext,
+    newCursor,
+    scheduledItemDays,
+    type TrackCursor,
+} from './layout-context.js';
 import { GroupNode } from './nodes/group-node.js';
 import {
     estimateItemMetaWidth,
@@ -434,7 +434,7 @@ function sequenceItem(
     // The validator requires one of the two on every item.
     const sizeRef = propValue(props, 'size');
     const sizeResolved = sizeRef ? (ctx.sizes.get(sizeRef) ?? null) : null;
-    const durationDays = deriveItemDurationDays(props, ctx.sizes, ctx.cal);
+    const durationDays = scheduledItemDays(ctx, node);
     const afterRaw = propValues(props, 'after');
     const beforeRaw = propValues(props, 'before');
 
@@ -1086,7 +1086,7 @@ function predictItemBarExtraHeight(
 ): number {
     const props = item.properties;
     const bandwidth = ctx.bandScale.bandwidth();
-    const durationDays = deriveItemDurationDays(props, ctx.sizes, ctx.cal);
+    const durationDays = scheduledItemDays(ctx, item);
     const naturalWidth = Math.max(MIN_ITEM_WIDTH, itemSpanPx(ctx, startX, durationDays));
     const visualWidth = Math.max(MIN_ITEM_WIDTH, naturalWidth - 2 * ITEM_INSET_PX);
 

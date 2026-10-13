@@ -75,6 +75,7 @@ export function buildIncludeRegions(
         const innerStartY = y + REGION_INSET_TOP;
         const childCtx: LayoutContext = {
             cal: ctx.cal,
+            schedule: ctx.schedule,
             styleCtx: {
                 theme: ctx.styleCtx.theme,
                 styles: region.config.styles,
