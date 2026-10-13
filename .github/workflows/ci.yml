@@ -122,12 +122,11 @@ jobs:
 
       # The same check as `make doctor MODE=ci STRICT=1`. This job runs on the
       # .nvmrc pin, so strict turns "below the recommended version" into a
-      # failure. triage 0.5.0 is the first release that reads recommended_from;
-      # the action's v0.4 tag still installs 0.4.0.
-      - uses: lolay/triage-action@v0.4
+      # failure. v0.5 installs triage 0.5.x, the first that reads
+      # recommended_from.
+      - uses: lolay/triage-action@v0.5
         with:
           profile: ci
-          version: 0.5.0
           strict: true
 
   build-test:
