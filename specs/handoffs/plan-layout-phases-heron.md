@@ -1,7 +1,7 @@
 ```
 --- KICKOFF: begin orchestration at [deep] ---
 
-  Status: 7/10 groups done | last review: wave-6 PASS | current: nowline m5 s1-s5 [deep] | updated 2026-10-13 | passed unattended: gate 4 before wave 6 (m4)
+  Status: 8/10 groups done | last review: wave-6 PASS | current: nowline m6 s1-s2 [deep] | updated 2026-10-13 | passed unattended: gate 4 before wave 6 (m5) | over expected: ~$49.29 of ~$46
 
   mode: unattended | proposed unattended (harness=claude-code runner=cloud; CLAUDE_CODE_REMOTE=true, assigned branch) | guard 3x min $50 | fixups 2 | confirmed 2026-10-13 session 7e027fcc-1ca6-51b0-b005-63e1163df819 by Kickoff prompt: Run in unattended mode.
 
@@ -142,23 +142,23 @@ Add `packages/layout/src/nodes/header-node.ts` with `HeaderNode` and `measure()`
 
 ## m5 - The four phases
 
-#### s1 - [deep] The date-window phase
+#### s1 - [deep] The date-window phase (done)
 
 Add `packages/layout/src/phases/date-window.ts` with `RoadmapScope`, `DateWindow`, `resolveScope` and `resolveDateWindow` (spec §3.2, with `naturalEndDate`), built on R1's `computeDateWindow(file, schedule, today, scale)`, which moves there from `layout.ts` and leaves `RoadmapNodeDeps`. `date-window.test.ts` imports it from the new module. G1, G2, G3.
 
-#### s2 - [deep] The measure phase
+#### s2 - [deep] The measure phase (done)
 
 Add `phases/measure.ts` with `measureRoadmap` returning `MeasuredRoadmap` (spec §3.3): axis, `HeaderBands` (with `estimatedMarkerRows` and `estimatedRowsBottomY`), the marker estimate through `MarkerBand`, and the timeline. The marker entry assembly and the placement-to-y conversion, written twice in `place` today, become one each in `nodes/marker-band.ts`. G1, G2, G3.
 
-#### s3 - [deep] The place phase
+#### s3 - [deep] The place phase (done)
 
 Add `phases/place.ts` with `placeChart` returning `PlacedChart` (spec §3.4): context, entity-edge seeds, footnote index, the barrier passes (P1), the corridor rerun unchanged (P2), the kept regions (P4), the milestones (P6), and the background `waveTooltip` set where the item is placed instead of by the walk in `buildWaves` (N5). The waves, wave-barrier and waves-byte-stability tests cover the passes. G1, G2, G3.
 
-#### s4 - [deep] The finalize context and the ordered pass
+#### s4 - [deep] The finalize context and the ordered pass (done)
 
 Add `phases/finalize.ts`: `FinalizeContext`, `CanvasExtent` with `grow`/`freeze`/`final`, the `finalScale()` and `markerBand()` guards, and steps f1 to f16 as a constant table with declared reads and writes (spec §3.5); f1 moves to the head of finalize. Tests: the order check (a copy of the table with f4 moved before f2 fails it); each guard throws (growing a frozen canvas, reading the canvas before f3, the final scale before f2, the marker band before f5); and the coverage register `packages/layout/test/finalize-coverage.test.ts` with a committed `finalize-coverage.json`, built through an internal trace hook on `FinalizeContext` over every sample (spec §6). Seed the JSON from the actual trace and reconcile it with spec §1.2's corpus column; list every count that differs from §1.2 in the commit body with its cause (R1's F1 changed showcase, sizing and late-row-shifts). G1, G2, G3.
 
-#### s5 - [deep] The composition root shrinks
+#### s5 - [deep] The composition root shrinks (done)
 
 `RoadmapNode.place` becomes the four calls of spec §3.1, with `sequenceOne` still injected (§8 decision 4). `collectItems` and `buildDependencies` move to `dependency-edges.ts`, `buildNowline` to `nowline-node.ts`, the start rules (`resolveChildStart` and friends) to `start-rules.ts` beside R1's `start-terms.ts`; `RoadmapNodeDeps` is deleted; `layout.ts` keeps `layoutRoadmap` and `LayoutOptions`. G1, G2, G3.
 
@@ -195,6 +195,7 @@ review wave-4 (nowline m2 s1-s2) f354568..f5a6416: PASS - reviewer re-ran the ga
 review wave-5 (nowline m3 s1-s2) bb92ae0..1dd90a6: PASS - createLayoutContext per §3.8, no LayoutContext literal left in place or buildIncludeRegions, chart fields pass through, regions get empty footnotes and marker placements; indexFootnotes pure, buildFootnotePanel built once at P19; dropped values (pre-panel with chartBottomY 0, P19 map reassignment) named; new tests fail on the base; G1/G3 empty per worker; non-blocking: specs/waves.md and m3.s3 text still say buildFootnotes (now buildFootnotePanel); passed unattended: gate 4 - 2026-10-13
 review wave-6 (nowline m3 s3) cb898b5..3112f70: PASS - reviewer re-ran the gate script vs 9c71cbb: GATES PASSED; N2 lane width 0 at placement (P9 overwrites), N4 no region fit at placement, N7 MilestonePlacement + positionMilestones at P11 with the old key order and shared slackArrows arrays; chartRightX gone from LayoutContext, private CanvasExtent grown at P3/P7/P8; buildNowline, buildWaveLegend, buildFootnotePanel take chartRightX; estimatedCenterY kept as a named stale read (§3.10 rule 4); new placement-canvas tests fail on the base; passed unattended: gate 2 - 2026-10-13
 review wave-6 (nowline m4 s1-s2) af7a82e..bc8e31d: PASS - HeaderNode/MeasuredHeader/HeaderFrame/PositionedHeaderParts per §3.7; sizeBesideHeader, HEADER_CARD_OUTER_PAD, HEADER_CARD_TOP_INSET moved verbatim; timelineY operands unchanged; provisional header box dropped (every path overwrote it, named in the body); key order kept, attributionBox added last; estimatedRowsBottomY rename for L1; header tests 69 pass, tsc clean; G1/G3 empty per worker; passed unattended: gate 4 - 2026-10-13
+review wave-6 (nowline m5 s1-s5) dad67df..56d00f7: PASS - reviewer re-ran the gate script vs 9c71cbb: GATES PASSED, layout vitest 1282 pass, lint 9 pre-existing warnings; f2-f16 match old P7-P20 at dad67df; moved bodies verbatim (diff -w) apart from export and N5; order check and four guard tests present; coverage register over 60 samples, §1.2 deltas listed in the m5.s4 body (f1 29/26, f2 7/6, f4 35/32 from R1's F1; f6 7/9 by definition); sequenceItem in nodes/sequence-item.ts to avoid an import cycle; minor: module-level setFinalizeTrace, readdir sample list, boolean FinalizeStep.run, CanvasExtent.provisional; passed unattended: gate 4 - 2026-10-13
 
 ## Token log
 
@@ -227,3 +228,6 @@ tokens review-wave-6 nowline-m3-s3 (claude-opus-5-5): input ~34 / cache read ~85
 tokens orchestrator-wave-6 nowline-m3-s3 (claude-opus-5-5): input ~12 / cache read ~1.3M / cache write ~0 5m + ~22k 1h / output ~11k | ~$0.65 API-equiv
 tokens wave-6 nowline-m4-s1-s2 (claude-opus-5-5): input ~84 / cache read ~5.5M / cache write ~170k / output ~42k | ~$2.81 API-equiv (output est.) session 7e027fcc-1ca6-51b0-b005-63e1163df819
 tokens review-wave-6 nowline-m4-s1-s2 (claude-opus-5-5): input ~20 / cache read ~350k / cache write ~52k / output ~9.2k | ~$0.52 API-equiv (output est.) session 7e027fcc-1ca6-51b0-b005-63e1163df819
+tokens orchestrator-wave-6 nowline-m4-s1-s2 (claude-opus-5-5): input ~10 / cache read ~1.1M / cache write ~0 5m + ~23k 1h / output ~12k | ~$0.64 API-equiv
+tokens wave-6 nowline-m5-s1-s5 (claude-opus-5-5): input ~240 / cache read ~33M / cache write ~1M / output ~120k | ~$14.33 API-equiv (output est.) session 7e027fcc-1ca6-51b0-b005-63e1163df819
+tokens review-wave-6 nowline-m5-s1-s5 (claude-opus-5-5): input ~76 / cache read ~3.5M / cache write ~140k / output ~36k | ~$2.12 API-equiv (output est.) session 7e027fcc-1ca6-51b0-b005-63e1163df819
