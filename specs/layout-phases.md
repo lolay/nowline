@@ -1,6 +1,6 @@
 # Nowline — Layout Phases
 
-**Status: Proposed (design only, no code yet).** Proposed milestone ID: **m4.14** (not yet entered in [`milestones.md`](./milestones.md)). This is refactor R2 from [`handoffs/review-since-v086-lantern.md`](./handoffs/review-since-v086-lantern.md): split `RoadmapNode.place` into date-window, measure, place and finalize phases, so the post-placement fixups run as one ordered pass over an explicit context. It builds on [`rendering-v2.md`](./rendering-v2.md) (m2.5c, the measure/place node model) and on [`scheduler-unification.md`](./scheduler-unification.md) (R1, one day-level scheduler). Every `file:line` below was checked at the commit that adds this spec (source identical to 0062df3 plus the m2 fixes of the same review).
+**Status: Proposed (design only, no code yet).** Proposed milestone ID: **m4.14** (not yet entered in [`milestones.md`](./milestones.md)). This is refactor R2 from [`review-since-v086.md`](./review-since-v086.md): split `RoadmapNode.place` into date-window, measure, place and finalize phases, so the post-placement fixups run as one ordered pass over an explicit context. It builds on [`rendering-v2.md`](./rendering-v2.md) (m2.5c, the measure/place node model) and on [`scheduler-unification.md`](./scheduler-unification.md) (R1, one day-level scheduler). Every `file:line` below was checked at the commit that adds this spec (source identical to 0062df3 plus the m2 fixes of the same review).
 
 ## 1. Problem
 

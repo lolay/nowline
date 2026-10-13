@@ -1,6 +1,6 @@
 # Nowline — Core AST, Style and Calendar Utilities
 
-**Status: Proposed (design only, no code yet).** Proposed milestone ID: **m4.12** (not yet entered in [`milestones.md`](./milestones.md)). This is refactor R3 from [`handoffs/review-since-v086-lantern.md`](./handoffs/review-since-v086-lantern.md): a small utility layer in `@nowline/core` so that the content walk, the style precedence chain, the calendar-declaration classifier and the property helpers each live once. Every `file:line` below was checked at the commit that adds this spec (source identical to 0062df3 plus the m2 fixes of the same review).
+**Status: Proposed (design only, no code yet).** Proposed milestone ID: **m4.12** (not yet entered in [`milestones.md`](./milestones.md)). This is refactor R3 from [`review-since-v086.md`](./review-since-v086.md): a small utility layer in `@nowline/core` so that the content walk, the style precedence chain, the calendar-declaration classifier and the property helpers each live once. Every `file:line` below was checked at the commit that adds this spec (source identical to 0062df3 plus the m2 fixes of the same review).
 
 ## 1. Problem
 

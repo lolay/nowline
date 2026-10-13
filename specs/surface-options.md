@@ -1,6 +1,6 @@
 # Nowline — Shared Surface Options and One Staging Function
 
-**Status: Proposed (design only, no code yet).** Proposed milestone ID: **m4.13** (not yet entered in [`milestones.md`](./milestones.md)). This is refactor R4 from [`handoffs/review-since-v086-lantern.md`](./handoffs/review-since-v086-lantern.md): one options schema in `@nowline/config` that every render surface reads, and one staging function (parse, resolve includes, load assets, lay out) that every pipeline calls. Every `file:line` below was checked at the commit that adds this spec (source identical to 0062df3 plus the m2 fixes of the same review).
+**Status: Proposed (design only, no code yet).** Proposed milestone ID: **m4.13** (not yet entered in [`milestones.md`](./milestones.md)). This is refactor R4 from [`review-since-v086.md`](./review-since-v086.md): one options schema in `@nowline/config` that every render surface reads, and one staging function (parse, resolve includes, load assets, lay out) that every pipeline calls. Every `file:line` below was checked at the commit that adds this spec (source identical to 0062df3 plus the m2 fixes of the same review).
 
 ## 1. Problem
 
