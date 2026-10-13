@@ -77,7 +77,7 @@ import {
 import { ParallelNode } from './nodes/parallel-node.js';
 import { RoadmapNode, type SizedHeader } from './nodes/roadmap-node.js';
 import type { NonWorkingDisplay } from './non-working-display.js';
-import type { RoadmapSchedule } from './schedule.js';
+import { type RoadmapSchedule, scheduleRoadmap } from './schedule.js';
 import { startTermsOf } from './start-terms.js';
 import { resolveLabelChipStyle, resolveStyle, type StyleContext } from './style-resolution.js';
 import { estimateTextWidth, wrapText } from './text-measure.js';
@@ -156,6 +156,17 @@ export interface LayoutOptions {
      * header then lays out as if no logo were declared.
      */
     logo?: LogoDimensions;
+    /**
+     * A day schedule the caller already built for this roadmap
+     * (`scheduleRoadmap`, with the wave plan as `schedule.plan`). Layout
+     * reuses it when `schedule.resolved` is the very `ResolveResult` passed
+     * to `layoutRoadmap`, so a staging step that builds the plan and the
+     * schedule once hands them on (specs/scheduler-unification.md §3.6).
+     * A schedule built from another `ResolveResult` is ignored and rebuilt.
+     * Build it with the same `today` as this call's `today`: the window and
+     * the default start date come from it.
+     */
+    schedule?: RoadmapSchedule;
 }
 
 export type LayoutResult = PositionedRoadmap;
@@ -1595,11 +1606,20 @@ export function layoutRoadmap(
     resolved: ResolveResult,
     options: LayoutOptions = {},
 ): LayoutResult {
-    // The wave plan is built once and shared by the day schedule (engine C,
-    // which sizes the date window) and engine A (the barrier passes);
-    // undefined without waves.
-    const plan = buildWavePlan(resolved);
-    return new RoadmapNode().place(file, resolved, options, plan, {
+    // The wave plan and the day schedule (engine C) are built once per
+    // layout, unless the caller already built them for this very
+    // `ResolveResult` (specs/scheduler-unification.md §3.6). The schedule
+    // carries the plan (`schedule.plan`, undefined without waves); engine A
+    // reads it for the barrier passes and the date window is a projection of
+    // the schedule.
+    const schedule =
+        options.schedule?.resolved === resolved
+            ? options.schedule
+            : scheduleRoadmap(file, resolved, {
+                  today: options.today,
+                  plan: buildWavePlan(resolved) ?? null,
+              });
+    return new RoadmapNode().place(file, resolved, options, schedule, {
         sequenceItem,
         sequenceOne,
         resolveChildStart,
