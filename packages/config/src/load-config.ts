@@ -83,20 +83,6 @@ export function parseConfig(contents: string, source: string): NowlineRc {
     return parsed as NowlineRc;
 }
 
-/**
- * Layer flag values on top of a parsed config. `undefined` flag values
- * leave the underlying config key untouched — useful for "missing CLI
- * flag" semantics. Returned object is a shallow merge.
- */
-export function mergeConfig<T extends NowlineRc>(config: NowlineRc, flags: Partial<T>): T {
-    const merged: NowlineRc = { ...config };
-    for (const [key, value] of Object.entries(flags)) {
-        if (value === undefined) continue;
-        merged[key] = value as unknown;
-    }
-    return merged as T;
-}
-
 function parseJsonOrYaml(contents: string, source: string): unknown {
     if (contents.startsWith('{') || contents.startsWith('[')) {
         try {

@@ -12,21 +12,8 @@ import {
     type HostEnv,
     type RenderInputs,
 } from '@nowline/export';
-import {
-    lengthToPoints,
-    PageSizeParseError,
-    type PdfPageSize,
-    parseLength,
-    parsePageSize,
-} from '@nowline/export-core';
-import {
-    type NonWorkingDisplay,
-    type NormalizedZone,
-    normalizeZone,
-    resolveToday,
-    type ThemeName,
-    TimezoneError,
-} from '@nowline/layout';
+import type { PdfPageSize } from '@nowline/export-core';
+import type { NonWorkingDisplay, ThemeName } from '@nowline/layout';
 import type { AssetResolver } from '@nowline/renderer';
 import type { ParsedArgs } from '../cli/args.js';
 import {
@@ -35,9 +22,8 @@ import {
     type OutputFormat,
     resolveFormat,
 } from '../cli/formats.js';
-import { parseNonWorkingArg } from '../cli/non-working.js';
+import { type PdfOrientation, resolveCliOptions } from '../cli/options.js';
 import { resolveRenderOutputPath } from '../cli/output-path.js';
-import { resolveTheme } from '../cli/theme.js';
 import { parseNowlineJson } from '../convert/parse-json.js';
 import { printNowlineFile } from '../convert/printer.js';
 import { serializeToJson } from '../convert/schema.js';
@@ -86,11 +72,14 @@ export async function renderHandler(options: RenderHandlerOptions): Promise<void
     const isStdoutOutput = args.output === '-';
     const log = createLog(args.logLevel);
     const config = await loadConfigFor(args.positional, cwd);
+    // Every rc-backed setting resolves flag > .nowlinerc > default; a bad
+    // value is reported by `assertValid` below, where it always has been.
+    const cliOptions = resolveCliOptions(args, config);
 
     const format = resolveFormatOrThrow({
         flag: args.format,
         outputPath: args.output,
-        configFormat: typeof config?.defaultFormat === 'string' ? config.defaultFormat : undefined,
+        configFormat: cliOptions.defaultFormat,
         isStdout: isStdoutOutput,
     });
 
@@ -112,10 +101,11 @@ export async function renderHandler(options: RenderHandlerOptions): Promise<void
     const resolved = resolveLocaleOverride({
         flag: args.locale,
         env: process.env,
-        rc: stringFromConfig(config, 'locale'),
+        rc: cliOptions.rcLocale,
     });
     const locale = resolved.tag;
     const opLocale = operatorLocale(resolved);
+    cliOptions.assertValid();
 
     const { rendered, isBinary } = await produce({
         format,
@@ -124,23 +114,23 @@ export async function renderHandler(options: RenderHandlerOptions): Promise<void
         displayPath: input.displayPath,
         absInputPath: input.isStdin ? path.resolve(cwd, 'stdin.nowline') : input.path,
         isStdin: input.isStdin,
-        // Every rc-backed setting resolves flag > .nowlinerc > default.
-        theme: resolveTheme(args.theme, config?.theme),
-        today: resolveNowCli(args),
-        width: parseWidth(pickSetting(args.width, '--width', config, 'width')),
-        nonWorking: parseNonWorkingArg(args.nonWorking),
+        theme: cliOptions.surface.theme,
+        today: cliOptions.surface.today,
+        width: cliOptions.surface.width,
+        nonWorking: cliOptions.surface.nonWorking,
         noLinks: args.noLinks,
         strict: args.strict,
         assetRoot: args.assetRoot,
         // m2c format-specific options. The PDF settings parse in `produce`,
         // after validation, for every format.
-        pageSize: pickSetting(args.pageSize, '--page-size', config, 'pdfPageSize'),
-        orientation: pickSetting(args.orientation, '--orientation', config, 'pdfOrientation'),
-        margin: pickSetting(args.margin, '--margin', config, 'pdfMargin'),
-        fontSans: args.fontSans ?? stringFromConfig(config, 'fontSans'),
-        fontMono: args.fontMono ?? stringFromConfig(config, 'fontMono'),
-        headless: args.headless || boolFromConfig(config, 'headlessFonts'),
-        useSystemFonts: args.useSystemFonts || boolFromConfig(config, 'useSystemFonts'),
+        pageSize: cliOptions.surface.pageSize,
+        orientation: cliOptions.orientation,
+        marginPt: cliOptions.margin,
+        assertPdfSettingsValid: () => cliOptions.assertPdfSettingsValid(),
+        fontSans: cliOptions.fontSans,
+        fontMono: cliOptions.fontMono,
+        headless: cliOptions.headless,
+        useSystemFonts: cliOptions.useSystemFonts,
         scale: args.scale,
         start: args.start,
         locale,
@@ -220,10 +210,12 @@ interface ProduceArgs {
     strict: boolean;
     assetRoot?: string;
     // m2c format-specific
-    /** Parsed after validation, so its error follows any diagnostics. */
-    pageSize?: Setting;
-    orientation?: Setting;
-    margin?: Setting;
+    pageSize?: PdfPageSize;
+    orientation?: PdfOrientation;
+    /** Page margin in points. */
+    marginPt?: number;
+    /** Reports a bad PDF setting; run after validation so its error follows any diagnostics. */
+    assertPdfSettingsValid: () => void;
     fontSans?: string;
     fontMono?: string;
     headless: boolean;
@@ -282,6 +274,8 @@ async function produce(args: ProduceArgs): Promise<ProduceResult> {
         fonts = await resolveNodeFonts(args);
     }
 
+    args.assertPdfSettingsValid();
+
     const kernelInputs: RenderInputs = {
         sourcePath: args.absInputPath,
         today: args.today,
@@ -292,9 +286,9 @@ async function produce(args: ProduceArgs): Promise<ProduceResult> {
         nonWorking: args.nonWorking,
         noLinks: args.noLinks,
         strict: args.strict,
-        pageSize: parsePageSizeSetting(args.pageSize),
-        orientation: parseOrientation(args.orientation),
-        marginPt: parseMargin(args.margin),
+        pageSize: args.pageSize,
+        orientation: args.orientation,
+        marginPt: args.marginPt,
         pngScale: parseScale(args.scale),
         msprojStart: args.start,
         onNotice: (message) => args.log.notice(message),
@@ -540,43 +534,6 @@ export async function loadConfigFor(inputArg: string, cwd: string): Promise<Nowl
     }
 }
 
-// Resolve the now-line date from the CLI flags.
-//
-// Precedence:
-//   1. `--now -`                           → undefined (suppress now-line)
-//   2. `--now YYYY-MM-DD`                  → floating date; zone ignored
-//   3. `--now YYYY-MM-DDTHH:MM:SS[±HH:MM]` → civil date at embedded offset; --timezone ignored
-//   4. `--now YYYY-MM-DDTHH:MM:SSZ`        → civil date in UTC; --timezone ignored
-//   5. `--now YYYY-MM-DDTHH:MM:SS`         → floating; written date part; zone ignored
-//   6. flag omitted                        → civil date of today in --timezone (default: local)
-//
-// `--timezone` is only consulted for case 6. Authored dates in the roadmap
-// (bars, milestones, axis) are floating and are never affected.
-function resolveNowCli(args: { now?: string; timezone?: string }): Date | undefined {
-    let zone: NormalizedZone | undefined;
-    if (args.timezone) {
-        try {
-            zone = normalizeZone(args.timezone);
-        } catch (err) {
-            if (err instanceof TimezoneError) {
-                throw new CliError(ExitCode.InputError, err.message);
-            }
-            throw err;
-        }
-    }
-    const result = resolveToday({ now: args.now, zone });
-    // resolveToday returns undefined for unrecognised strings; surface that as
-    // an input error so the user gets a clear message instead of a silent no-line.
-    if (result === undefined && args.now !== undefined && args.now !== '-') {
-        throw new CliError(
-            ExitCode.InputError,
-            `nowline: invalid --now "${args.now}". ` +
-                `Expected YYYY-MM-DD, YYYY-MM-DDTHH:MM:SS[Z|±HH:MM], or "-".`,
-        );
-    }
-    return result;
-}
-
 function parseScale(raw: string | undefined): number | undefined {
     if (!raw) return undefined;
     const value = Number(raw);
@@ -584,104 +541,6 @@ function parseScale(raw: string | undefined): number | undefined {
         throw new CliError(
             ExitCode.InputError,
             `nowline: invalid --scale "${raw}". Must be a positive number.`,
-        );
-    }
-    return value;
-}
-
-/**
- * A raw setting and the name to report it under: the flag when one was
- * passed, else the `.nowlinerc` key, so an error points at what the user
- * actually wrote.
- */
-interface Setting {
-    raw: unknown;
-    name: string;
-}
-
-function pickSetting(
-    flag: string | undefined,
-    flagName: string,
-    config: NowlineRc | null,
-    rcKey: string,
-): Setting | undefined {
-    if (flag !== undefined) return { raw: flag, name: flagName };
-    const raw = config?.[rcKey];
-    if (raw === undefined || raw === null) return undefined;
-    return { raw, name: `.nowlinerc ${rcKey}` };
-}
-
-function parseOrientation(
-    setting: Setting | undefined,
-): 'portrait' | 'landscape' | 'auto' | undefined {
-    if (!setting || setting.raw === '') return undefined;
-    const lower = typeof setting.raw === 'string' ? setting.raw.toLowerCase() : undefined;
-    if (lower === 'portrait' || lower === 'landscape' || lower === 'auto') return lower;
-    throw new CliError(
-        ExitCode.InputError,
-        `nowline: invalid ${setting.name} "${String(setting.raw)}". Expected portrait, landscape, or auto.`,
-    );
-}
-
-function parsePageSizeSetting(setting: Setting | undefined): PdfPageSize | undefined {
-    if (!setting || setting.raw === '') return undefined;
-    const raw = String(setting.raw);
-    try {
-        return parsePageSize(raw);
-    } catch (err) {
-        if (!(err instanceof PageSizeParseError)) throw err;
-        // The parser's message names a generic "page size"; swap that lead
-        // for the flag or rc key the value came from.
-        const detail = err.message.replace(/^invalid page size "[^"]*": /, '');
-        throw new CliError(
-            ExitCode.InputError,
-            `nowline: invalid ${setting.name} "${raw}": ${detail}`,
-        );
-    }
-}
-
-function parseMargin(setting: Setting | undefined): number | undefined {
-    if (!setting || setting.raw === '') return undefined;
-    // A bare number is points; YAML and JSON hand the rc one over as a number.
-    if (typeof setting.raw === 'number' && Number.isFinite(setting.raw) && setting.raw >= 0) {
-        return setting.raw;
-    }
-    const raw = String(setting.raw);
-    if (/^\d+(?:\.\d+)?$/.test(raw)) return Number(raw);
-    try {
-        return lengthToPoints(parseLength(raw));
-    } catch (err) {
-        const message = err instanceof Error ? err.message : String(err);
-        throw new CliError(
-            ExitCode.InputError,
-            `nowline: invalid ${setting.name} "${raw}": ${message}`,
-        );
-    }
-}
-
-function stringFromConfig(
-    config: { [key: string]: unknown } | null,
-    key: string,
-): string | undefined {
-    if (!config) return undefined;
-    const value = config[key];
-    return typeof value === 'string' ? value : undefined;
-}
-
-function boolFromConfig(config: { [key: string]: unknown } | null, key: string): boolean {
-    if (!config) return false;
-    const value = config[key];
-    return value === true;
-}
-
-function parseWidth(setting: Setting | undefined): number | undefined {
-    if (!setting || setting.raw === '') return undefined;
-    const { raw } = setting;
-    const value = typeof raw === 'number' ? raw : typeof raw === 'string' ? parseInt(raw, 10) : NaN;
-    if (!Number.isInteger(value) || value < 320) {
-        throw new CliError(
-            ExitCode.InputError,
-            `nowline: invalid ${setting.name} "${String(raw)}". Must be an integer ≥ 320.`,
         );
     }
     return value;
