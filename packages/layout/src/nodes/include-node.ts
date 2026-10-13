@@ -55,7 +55,6 @@ export function buildIncludeRegions(
                 chartTopY: innerStartY,
                 chartBottomY: innerStartY,
                 swimlaneBottomY: innerStartY,
-                chartRightX: ctx.chartRightX,
             },
             {},
         );
@@ -86,6 +85,9 @@ export function buildIncludeRegions(
             ctx.bandScale.bandwidth(),
             innerEndY - y + REGION_INSET_BOTTOM,
         );
+        // The width waits for the final canvas: `RoadmapNode` fits every
+        // kept region with `fitIncludeRegionWidth` once the canvas stops
+        // growing (P9), so placement never reads the canvas.
         const box: BoundingBox = {
             x: 0,
             y,
@@ -99,7 +101,6 @@ export function buildIncludeRegions(
             nestedSwimlanes,
             style: resolveStyle('swimlane', [], ctx.styleCtx),
         };
-        fitIncludeRegionWidth(positioned, ctx.chartRightX);
         out.push(positioned);
         y += regionHeight;
     }
@@ -111,9 +112,9 @@ export function buildIncludeRegions(
  * small right pad) instead of stretching to the full chart width. An
  * include that reaches past the timeline still gets clamped to
  * `chartRightX` so it never extends into the attribution / right-margin
- * area. Idempotent for a given `chartRightX`; `RoadmapNode` re-runs it
- * once the canvas width is final, since the clamp reads the width at
- * build time and the post-layout timeline extension can still grow it.
+ * area. `RoadmapNode` runs it once per kept region, after the canvas
+ * width is final (P9): the spill growth, the timeline extension and the
+ * marker labels can all still grow the canvas after the region is placed.
  */
 export function fitIncludeRegionWidth(region: PositionedIncludeRegion, chartRightX: number): void {
     const boxX = region.box.x;

@@ -146,10 +146,11 @@ export interface LayoutContext {
      */
     slackCorridors: SlackCorridor[];
     /**
-     * Pre-computed marker-row placement (row index + label box + side)
-     * for every anchor and date-pinned milestone. After-only milestones
-     * pack against this map at build time; date-pinned entries are
-     * snapshot upstream so their (Y, label) survives swimlane reflows.
+     * Marker-row placement (row index + label box + side). While lanes
+     * are placed it holds the pre-pack of every date-pinned anchor and
+     * milestone; `RoadmapNode` then replaces it with the unified re-pack
+     * (P10), which adds after-only milestones and the calendar runs,
+     * before milestones are positioned and anchors built.
      */
     markerRowPlacements: Map<string, MarkerRowPlacement>;
     chartTopY: number;
@@ -163,7 +164,6 @@ export interface LayoutContext {
      * to thread the entire timeline strip.
      */
     swimlaneBottomY: number;
-    chartRightX: number;
     /**
      * Monotonic counters for id-less `parallel` / `group` blocks. Each
      * swimlane-loop pass resets both to zero; blocks without an explicit
@@ -190,7 +190,8 @@ export interface ContextSource {
  * Build a `LayoutContext` for the root file or for an isolated region.
  * `chart` passes the chart extents through unchanged: the root sets
  * `chartTopY` from the timeline with both bottoms at 0, a region sets all
- * three y fields to its inner start and takes the host's `chartRightX`.
+ * three y fields to its inner start. The canvas width is not part of a
+ * context: placement never reads it (`RoadmapNode` owns the `CanvasExtent`).
  * A region passes no footnotes and no marker placements. The caller seeds
  * the wave edges.
  */
@@ -206,7 +207,7 @@ export function createLayoutContext(
         bandScale: BandScale;
         waves?: WaveLayoutState;
     },
-    chart: Pick<LayoutContext, 'chartTopY' | 'chartBottomY' | 'swimlaneBottomY' | 'chartRightX'>,
+    chart: Pick<LayoutContext, 'chartTopY' | 'chartBottomY' | 'swimlaneBottomY'>,
     init: {
         footnotes?: FootnoteIndex;
         markerRowPlacements?: Map<string, MarkerRowPlacement>;
@@ -246,7 +247,6 @@ export function createLayoutContext(
         chartTopY: chart.chartTopY,
         chartBottomY: chart.chartBottomY,
         swimlaneBottomY: chart.swimlaneBottomY,
-        chartRightX: chart.chartRightX,
         nextParallelId: 0,
         nextGroupId: 0,
         // Wave floors are dates projected with the unclamped scale

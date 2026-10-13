@@ -88,32 +88,40 @@ import {
     MARKER_ROW_CENTER_OFFSET_PX,
     MARKER_ROW_PITCH_PX,
 } from './marker-geometry.js';
-import { buildMilestones, collectSlackCorridors } from './milestone-node.js';
+import { buildMilestones, collectSlackCorridors, positionMilestones } from './milestone-node.js';
 import { SwimlaneNode } from './swimlane-node.js';
 import { buildWaveLegend, buildWaves } from './wave-node.js';
 
 const HEADER_CARD_TOP_INSET = 4;
 
 /**
- * Single mutator for the chart's right-edge extent. Every layout
- * artifact that wants to push the canvas wider passes the absolute X
- * it wants the canvas to contain, with any breathing-room margin
- * (typically `GUTTER_PX`) baked in. Concentrating growth here makes
- * it trivial to grep for every contributor — today: item caption
- * spills, the timeline extension and marker-row labels; future:
- * footnote panels wider than the chart, etc.
+ * The canvas right edge, owned by `RoadmapNode.place` and never part of
+ * a `LayoutContext`: placement does not read it. `grow` is the single
+ * mutator. Every layout artifact that wants to push the canvas wider
+ * passes the absolute X it wants the canvas to contain, with any
+ * breathing-room margin (typically `GUTTER_PX`) baked in. Concentrating
+ * growth here makes it trivial to grep for every contributor — today:
+ * item caption spills, the timeline extension and marker-row labels.
  *
- * Initial seed lives at the start of `place(...)` (the natural date
- * window with `GUTTER_PX` insets on each side); everything that
- * becomes known after the swimlane pass calls through here.
+ * The seed is the natural date window with `GUTTER_PX` insets on each
+ * side; everything that becomes known after the swimlane pass grows it.
+ * The canvas is final after the marker-label growth (P8).
  *
  * The now-pill is intentionally NOT a contributor — when the line
  * lands close to either edge, `buildNowline` switches the pill to
  * "flag" mode (squared edge against the line, rounded edge into the
  * chart), so the pill always fits inside the natural canvas.
  */
-function growChartRightX(ctx: LayoutContext, rightX: number): void {
-    if (rightX > ctx.chartRightX) ctx.chartRightX = rightX;
+class CanvasExtent {
+    constructor(private right: number) {}
+
+    grow(rightX: number): void {
+        if (rightX > this.right) this.right = rightX;
+    }
+
+    get rightX(): number {
+        return this.right;
+    }
 }
 
 /**
@@ -180,6 +188,7 @@ export interface RoadmapNodeDeps extends LayoutHelpers {
         today: Date | undefined,
         ctx: LayoutContext,
         locale: string,
+        chartRightX: number,
     ) => PositionedNowline | null;
 }
 
@@ -339,10 +348,10 @@ export class RoadmapNode {
             provisionalRunEntries.length > 0;
         // Initial canvas extent = natural date window + canonical
         // gutters. Item caption spills are unknown until the swimlane
-        // pass runs and grow the canvas via `growChartRightX`. The
+        // pass runs and grow the canvas through `canvas.grow`. The
         // now-pill doesn't contribute here — `buildNowline` flips it to
         // flag mode whenever a centered pill would clip an edge.
-        const finalChartRightX = originX + totalChartWidth + GUTTER_PX;
+        const naturalChartRightX = originX + totalChartWidth + GUTTER_PX;
 
         // Resolve each date-pinned anchor and milestone's x. Used both for
         // the marker-row pack and for `after:` resolution downstream — an
@@ -387,7 +396,7 @@ export class RoadmapNode {
         // Pack the date-pinned markers. Each entity gets a row index
         // (0 = in-row baseline, 1 = bumped down by one step, …) and a
         // label box that may be flipped to the LEFT side when the natural
-        // right-side label would overflow `finalChartRightX`. Earlier
+        // right-side label would overflow the canvas. Earlier
         // entries claim row 0; later ones drop to row 1+ when their
         // bounding box (diamond + label) overlaps an already-placed
         // entry. The renderer reads `labelBox.x/y` directly.
@@ -401,7 +410,7 @@ export class RoadmapNode {
             markerLabelsRightX(
                 preliminaryEntries,
                 chartLeftX,
-                finalChartRightX,
+                naturalChartRightX,
                 deps.estimateTextWidth,
             ),
             deps.estimateTextWidth,
@@ -486,10 +495,12 @@ export class RoadmapNode {
                 chartTopY: timelineY + timelineHeightBudget,
                 chartBottomY: 0,
                 swimlaneBottomY: 0,
-                chartRightX: finalChartRightX,
             },
             { footnotes: indexFootnotes(resolved.content.footnotes), markerRowPlacements },
         );
+        // Placement never reads the canvas; only the post-placement steps
+        // below grow and read it.
+        const canvas = new CanvasExtent(naturalChartRightX);
 
         // Seed the entity-edge maps from the date-pinned pack so item
         // `after:kickoff` references resolve before swimlanes run. Mid
@@ -626,11 +637,9 @@ export class RoadmapNode {
         // (`textSpills`). Otherwise the long captions on narrow charts —
         // e.g. `examples/minimal.svg` and `tests/text-spills-right.svg`
         // — would land outside the SVG's viewBox and clip in browsers.
-        // Markers/anchors built below see the expanded width and pick a
-        // less aggressive label side. Routed through `growChartRightX`
-        // so this contribution sits beside the now-pill reservation
-        // (made at init) in the canvas-extent ledger.
-        growChartRightX(ctx, pass.maxRightX + GUTTER_PX);
+        // The marker re-pack below sees the expanded width and picks a
+        // less aggressive label side.
+        canvas.grow(pass.maxRightX + GUTTER_PX);
 
         // Include regions under the swimlanes. Reserve the 8 px gap +
         // tab-reserve only when there's at least one isolated region —
@@ -649,11 +658,10 @@ export class RoadmapNode {
         timeline.box.height = ctx.chartBottomY - timeline.box.y;
 
         // Milestones first so anchors know which xs are occupied (for
-        // collision bumps). Date-pinned milestones consult the
-        // pre-pack; after-only milestones get a provisional row=0
-        // placement which the re-pack below overwrites once their
-        // centerX is known.
-        const milestones = buildMilestones(resolved.content.milestones, ctx);
+        // collision bumps). Placement gives each its x, slack arrows and
+        // overrun; its marker row and label box come from the re-pack
+        // below, once every centerX is known and the canvas is final.
+        const milestonePlacements = buildMilestones(resolved.content.milestones, ctx);
 
         // Post-layout timeline extension. `computeDateWindow`'s pre-pass
         // only knows about logical bar durations; caption spill,
@@ -673,8 +681,8 @@ export class RoadmapNode {
         for (const e of datePinnedEntries) {
             maxContentRightX = Math.max(maxContentRightX, e.centerX + e.radius);
         }
-        for (const m of milestones) {
-            maxContentRightX = Math.max(maxContentRightX, m.center.x + m.radius);
+        for (const m of milestonePlacements) {
+            maxContentRightX = Math.max(maxContentRightX, m.x + m.radius);
         }
         const tickDays = calendar.daysPerUnit(scale.unit);
         // Working-day counts on both sides of the comparison: under `show` x
@@ -703,7 +711,7 @@ export class RoadmapNode {
             timeline.box.width = extendedWidth;
             timeline.ticks = buildHeaderTicks(extendedScale, scale, calendar, locale);
             setCalendarRuns(timeline, extendedScale, scale.unit);
-            growChartRightX(ctx, originX + extendedWidth + GUTTER_PX);
+            canvas.grow(originX + extendedWidth + GUTTER_PX);
         }
 
         // Every marker (date-pinned anchor, date-pinned milestone,
@@ -719,11 +727,11 @@ export class RoadmapNode {
             fontSize: e.fontSize,
             bold: e.bold,
         }));
-        for (const m of milestones) {
+        for (const m of milestonePlacements) {
             if (m.fixed) continue;
             allMarkerEntries.push({
-                id: m.id ?? '',
-                centerX: m.center.x,
+                id: m.id,
+                centerX: m.x,
                 radius: m.radius,
                 title: m.title,
                 fontSize: 10,
@@ -735,29 +743,22 @@ export class RoadmapNode {
             ...workingExceptionEntries(timeline.workingExceptions),
         ];
         allMarkerEntries.push(...runEntries);
-        growChartRightX(
-            ctx,
-            markerLabelsRightX(
-                allMarkerEntries,
-                chartLeftX,
-                ctx.chartRightX,
-                deps.estimateTextWidth,
-            ),
+        canvas.grow(
+            markerLabelsRightX(allMarkerEntries, chartLeftX, canvas.rightX, deps.estimateTextWidth),
         );
 
-        // `ctx.chartRightX` is final from here on. Each swimlane band
-        // and include region read the canvas width once during its place
-        // pass, before the spill expansion and the timeline extension
-        // above. Re-stretch every band so the lane background contains
-        // its own spilled captions (text-spills-right's "1w — 50%
-        // remaining" extends 22 px past the unstretched lane edge
-        // otherwise) and reaches the extended tick panel, and re-fit
-        // each include so its right-edge clamp reads the final width.
+        // The canvas is final from here on. Placement left every width
+        // that spans it unset: stretch every band to the canvas so the
+        // lane background contains its own spilled captions
+        // (text-spills-right's "1w — 50% remaining" would otherwise sit
+        // outside it) and reaches the extended tick panel, and fit each
+        // include so its right-edge clamp reads the final width.
+        const chartRightX = canvas.rightX;
         for (const lane of swimlanes) {
-            lane.box.width = ctx.chartRightX;
+            lane.box.width = chartRightX;
         }
         for (const inc of includes) {
-            fitIncludeRegionWidth(inc, ctx.chartRightX);
+            fitIncludeRegionWidth(inc, chartRightX);
         }
 
         // Unified marker re-pack over `allMarkerEntries`, so
@@ -768,7 +769,7 @@ export class RoadmapNode {
         const repacked = packMarkerRow(
             allMarkerEntries,
             chartLeftX,
-            ctx.chartRightX,
+            chartRightX,
             deps.estimateTextWidth,
         );
 
@@ -784,16 +785,11 @@ export class RoadmapNode {
             });
         }
 
-        // Push final placements back onto already-built milestones and
-        // every marker's entityMidpoints entry (used by edge routing
-        // and slack-arrow geometry).
-        for (const m of milestones) {
-            const placement = ctx.markerRowPlacements.get(m.id ?? '');
-            if (!placement) continue;
-            m.center = { x: m.center.x, y: placement.centerY };
-            m.labelBox = placement.labelBox;
-            m.labelSide = placement.labelSide;
-        }
+        // Build the positioned milestones from their placements and the
+        // re-pack, then push the final placements onto the titled runs,
+        // the working exceptions and every marker's entityMidpoints entry
+        // (used by edge routing and slack-arrow geometry).
+        const milestones = positionMilestones(milestonePlacements, ctx.markerRowPlacements);
         for (const run of timeline.nonWorking ?? []) {
             if (run.label === undefined) continue;
             const placement = ctx.markerRowPlacements.get(nonWorkingRunMarkerId(run));
@@ -894,23 +890,34 @@ export class RoadmapNode {
         // Now-line (if today is within the window). Stops at the bottom
         // timeline panel when present, otherwise at the last swimlane —
         // see `buildNowline`. Footnote panels below do not extend it.
-        const nowline = deps.buildNowline(options.today, ctx, locale);
+        const nowline = deps.buildNowline(options.today, ctx, locale, chartRightX);
 
         // The wave legend (specs/waves.md §8.8, §9.5) sits below the chart
         // and any bottom tick panel, above the footnotes: grow the chart
         // bottom by its gap and lines before the footnote panel is placed.
         const waveLegend = builtWaves
-            ? buildWaveLegend(builtWaves, ctx, strings, ctx.chartBottomY + WAVE_LEGEND_GAP_PX)
+            ? buildWaveLegend(
+                  builtWaves,
+                  ctx,
+                  strings,
+                  ctx.chartBottomY + WAVE_LEGEND_GAP_PX,
+                  chartRightX,
+              )
             : undefined;
         if (waveLegend) ctx.chartBottomY += WAVE_LEGEND_GAP_PX + waveLegend.box.height;
 
         // Finalize footnotes at the bottom.
-        const footnotePanel = buildFootnotePanel(resolved.content.footnotes, ctx, ctx.chartBottomY);
+        const footnotePanel = buildFootnotePanel(
+            resolved.content.footnotes,
+            ctx,
+            ctx.chartBottomY,
+            chartRightX,
+        );
 
         // Header (depends on chart height in beside-mode and on the
         // final canvas width in above-mode).
         headerBox.height = headerBox.height || ctx.chartBottomY;
-        if (!isBeside) headerBox.width = ctx.chartRightX;
+        if (!isBeside) headerBox.width = chartRightX;
         // Card sub-box for beside-mode (the visible white panel inside
         // headerBox). Card BOTTOM hugs the bottom of the header rows so
         // the title block visually anchors to the chart's top edge
@@ -924,7 +931,7 @@ export class RoadmapNode {
                   width: sizedHeader.cardWidth,
                   height: sizedHeader.cardHeight,
               }
-            : { x: 0, y: 0, width: ctx.chartRightX, height: aboveHeight };
+            : { x: 0, y: 0, width: chartRightX, height: aboveHeight };
         // Logo at the card's left padding, vertically centered; the text
         // shifts right past it and centers in the (possibly taller) card.
         let logo: PositionedHeader['logo'];
@@ -965,7 +972,7 @@ export class RoadmapNode {
                 ? footnotePanel.box.y + footnotePanel.box.height
                 : ctx.chartBottomY;
         const attributionBox: BoundingBox = {
-            x: ctx.chartRightX - GUTTER_PX - ATTRIBUTION_GLYPH_WIDTH,
+            x: chartRightX - GUTTER_PX - ATTRIBUTION_GLYPH_WIDTH,
             y: contentBottomY + GUTTER_PX,
             width: ATTRIBUTION_GLYPH_WIDTH,
             height: ATTRIBUTION_GLYPH_HEIGHT,
@@ -987,7 +994,7 @@ export class RoadmapNode {
         };
 
         const model: PositionedRoadmap = {
-            width: ctx.chartRightX,
+            width: chartRightX,
             height,
             theme: themeName,
             palette: theme,
@@ -1004,7 +1011,7 @@ export class RoadmapNode {
             chartBox: {
                 x: chartLeftX,
                 y: ctx.chartTopY,
-                width: ctx.chartRightX - chartLeftX,
+                width: chartRightX - chartLeftX,
                 height: ctx.chartBottomY - ctx.chartTopY,
             },
             ...(waveSolve ? { waveSolve } : {}),

@@ -33,10 +33,12 @@ export function indexFootnotes(footnotes: Map<string, FootnoteDeclaration>): Foo
     return { index, hosts };
 }
 
+/** The panel below the chart, spanning the final canvas (`chartRightX`). */
 export function buildFootnotePanel(
     footnotes: Map<string, FootnoteDeclaration>,
     ctx: LayoutContext,
     chartBottomY: number,
+    chartRightX: number,
 ): PositionedFootnoteArea {
     const entries: PositionedFootnoteEntry[] = [];
     const ordered = [...footnotes.entries()].sort(([a], [b]) => a.localeCompare(b));
@@ -51,7 +53,7 @@ export function buildFootnotePanel(
     const box: BoundingBox = {
         x: FOOTNOTE_PANEL_PADDING_PX,
         y: chartBottomY + FOOTNOTE_PANEL_PADDING_PX,
-        width: ctx.chartRightX - 2 * FOOTNOTE_PANEL_PADDING_PX,
+        width: chartRightX - 2 * FOOTNOTE_PANEL_PADDING_PX,
         height:
             entries.length === 0
                 ? 0

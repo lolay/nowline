@@ -904,10 +904,15 @@ function buildDependencies(
     return out;
 }
 
+/**
+ * The now-line on the final scale. `chartRightX` is the final canvas right
+ * edge; a pill that would cross it flips to flag mode.
+ */
 function buildNowline(
     today: Date | undefined,
     ctx: LayoutContext,
     locale: string,
+    chartRightX: number,
 ): PositionedNowline | null {
     if (!today) return null;
     const x = ctx.scale.forwardWithinDomain(today);
@@ -943,7 +948,7 @@ function buildNowline(
         // canvas left edge — anchor the pill's LEFT side to the line
         // and let it extend right into the chart.
         pillMode = 'flag-right';
-    } else if (x + halfPill > ctx.chartRightX) {
+    } else if (x + halfPill > chartRightX) {
         // Centered pill would clip past the canvas right edge — anchor
         // the pill's RIGHT side to the line and let it extend left.
         pillMode = 'flag-left';

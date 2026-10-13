@@ -39,7 +39,7 @@ async function build(init: Parameters<typeof createLayoutContext>[3], waves?: ob
         ctx: createLayoutContext(
             resolved,
             shared as unknown as Parameters<typeof createLayoutContext>[1],
-            { chartTopY: 10, chartBottomY: 20, swimlaneBottomY: 30, chartRightX: 40 },
+            { chartTopY: 10, chartBottomY: 20, swimlaneBottomY: 30 },
             init,
         ),
     };
@@ -48,9 +48,12 @@ async function build(init: Parameters<typeof createLayoutContext>[3], waves?: ob
 describe('createLayoutContext', () => {
     it('passes the chart fields through unchanged', async () => {
         const { ctx } = await build({});
-        expect([ctx.chartTopY, ctx.chartBottomY, ctx.swimlaneBottomY, ctx.chartRightX]).toEqual([
-            10, 20, 30, 40,
-        ]);
+        expect([ctx.chartTopY, ctx.chartBottomY, ctx.swimlaneBottomY]).toEqual([10, 20, 30]);
+    });
+
+    it('carries no canvas extent, so placement cannot read the canvas', async () => {
+        const { ctx } = await build({});
+        expect('chartRightX' in ctx).toBe(false);
     });
 
     it('takes the per-file half from the source and resolves its sizes', async () => {

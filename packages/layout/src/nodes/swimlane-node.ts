@@ -240,10 +240,14 @@ export class SwimlaneNode {
         // bracket around its content, and a lane with only a chiclet
         // (no items) should still fit visibly inside that bracket.
         const usedRightX = Math.max(track.packer.usedRightX(), tabRightX);
+        // The band spans the canvas, whose width is final only after the
+        // post-placement growth: `RoadmapNode` sets a main lane's width to
+        // it (P9) and `fitIncludeRegionWidth` a region lane's to the
+        // region's. Placement never reads the canvas.
         const box: BoundingBox = {
             x: 0,
             y: origin.y,
-            width: ctx.chartRightX,
+            width: 0,
             height: bandHeight,
         };
 
