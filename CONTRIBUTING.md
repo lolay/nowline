@@ -53,6 +53,7 @@ This repo runs a **two-tier Node policy**: a low floor for what we ship to consu
 | Pin | Where | Value | Why |
 | --- | --- | --- | --- |
 | `engines.node` | every `@nowline/*` `package.json` | **`>=22`** | Node 22 is the oldest non-EOL LTS; supported through April 2027. Choosing the oldest non-EOL LTS as the floor doesn't lock out users on Node 22 LTS while still giving us modern language features. Matches the effective floor of comparable libraries (e.g. Mermaid). |
+| Node | `version:` on the `node` check in `triage.yaml` | **`>=22`** | `make doctor` fails below the floor and only warns between it and `.nvmrc`, since the repo builds and tests on the floor too. Its `recommended_from: .nvmrc` follows Tier 2 on its own. |
 | `engines.pnpm` | every `@nowline/*` `package.json` | **`>=11`** | Soft floor matching the `packageManager` pin below. |
 | `runs.using` | `packages/nowline-action/action.yml` | **`node24`** | GitHub controls the GitHub Action runtime ladder separately. `node26` is not yet available; revisit when GitHub adds it. |
 | `engines.vscode` | `packages/vscode-extension/package.json` | **`^1.105.0`** | VS Code bundles its own Node ABI. Independent of the policy above. Tracks Cursor's embedded VS Code engine + 30-day grace; see [VS Code extension engine floor policy](#vs-code-extension-engine-floor-policy). |
@@ -71,7 +72,7 @@ Tightening any of these — e.g. moving the consumer floor from `>=22` to `>=24`
 ### How to bump
 
 - **Bump the dev/CI Node version (Tier 2):** edit `.nvmrc`, then every `node-version:` in `.github/workflows/**` and `.github/actions/setup-node-pnpm/action.yml`. Run `pnpm install`, `pnpm -r build`, `pnpm -r test` locally on both the new version *and* the consumer floor (currently Node 22). The matrix in `ci.yml` will continue to test both versions on every PR; verify both cells pass before merging.
-- **Bump the consumer floor (Tier 1):** this is a **breaking change** for `@nowline/*` consumers — tighten `engines.node` on the root and all 17 `packages/*/package.json` files in one PR. Bundle into a minor (pre-1.0) or major (post-1.0) version bump of every package; update the changelog accordingly. Don't do this casually — schedule it alongside the EOL date of the floor LTS, not as a side-effect of another change.
+- **Bump the consumer floor (Tier 1):** this is a **breaking change** for `@nowline/*` consumers — tighten `engines.node` on the root and all 17 `packages/*/package.json` files, and the node `version:` in `triage.yaml`, in one PR. Bundle into a minor (pre-1.0) or major (post-1.0) version bump of every package; update the changelog accordingly. Don't do this casually — schedule it alongside the EOL date of the floor LTS, not as a side-effect of another change.
 
 ### Adjacent automation
 

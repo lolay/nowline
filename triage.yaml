@@ -4,7 +4,8 @@ default:
   - tool: gh
     hint: https://cli.github.com
   - tool: node
-    version_from: .nvmrc
+    version: ">=22"
+    recommended_from: .nvmrc
     hint: https://nodejs.org
   - tool: pnpm
     hint: corepack enable && corepack prepare pnpm@latest --activate
