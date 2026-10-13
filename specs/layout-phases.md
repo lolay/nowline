@@ -661,7 +661,7 @@ Where the implementation differs from the text above, or makes a choice the text
 
 **Header (m4)**
 
-- **`HeaderNode` takes the logo already resolved** (`ScaledLogo`, exported from `header-logo.ts`); `resolveHeaderLogo` stays with the caller. `MeasuredHeader.position` is the `HeaderPosition` type. `place` returns `PositionedHeaderParts` (`PositionedHeader` without `attributionBox`) f15 stores only those parts, f16 computes the attribution box, and `assembleModel` merges `{ ...headerParts, attributionBox }` after the finalize pass. The 8 px chart-top gap is `CHART_TOP_GAP_PX`, and the private helper keeps the name `sizeBesideHeader` because renderer comments cite it. The provisional header box (height 0 beside, width 0 above) is gone: `place` builds the final box.
+- **`HeaderNode` takes the logo already resolved** (`ScaledLogo`, exported from `header-logo.ts`); `resolveHeaderLogo` stays with the caller. `MeasuredHeader.position` is the `HeaderPosition` type. `place` returns `PositionedHeaderParts` (`PositionedHeader` without `attributionBox`). f15 stores only those parts, f16 computes the attribution box, and `assembleModel` merges `{ ...headerParts, attributionBox }` after the finalize pass. The 8 px chart-top gap is `CHART_TOP_GAP_PX`, and the private helper keeps the name `sizeBesideHeader` because renderer comments cite it. The provisional header box (height 0 beside, width 0 above) is gone: `place` builds the final box.
 
 **Open and out of scope**
 
