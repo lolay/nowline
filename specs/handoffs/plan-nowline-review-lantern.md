@@ -1,7 +1,7 @@
 ```text
 --- KICKOFF: begin orchestration at [deep] ---
 
-  Status: 3/4 groups done | last review: wave-2 CONCERNS | current: nowline m3 s1-s3 [deep] fix-up 2-fix | passed unattended: gate-4 (m2), gate-4 (m3), gate-2 | updated 2026-10-13
+  Status: 3/4 groups done | last review: wave-2-fix PASS | current: nowline m3 s4 [xdeep] | passed unattended: gate-4 (m2), gate-4 (m3), gate-2 | updated 2026-10-13
 
   mode: unattended | proposed unattended (harness=claude-code runner=cloud; CLAUDE_CODE_REMOTE=true, assigned branch) | guard 3x min $50 | fixups 2 | confirmed 2026-10-13 session 8c78f794-2944-59bb-8116-4413104e9100 by Kickoff prompt: Run in unattended mode.
 
@@ -168,6 +168,7 @@ Write `specs/layout-phases.md` for R2, building on `specs/rendering-v2.md` (m2.5
 review wave-1 (nowline m1 s1) 0357e12..c233919: PASS - review doc written; six drifted file:line refs corrected (layout.ts status tints :531, sequenceItem 410-928, calendar-resolver.ts 105-135, lsp hover.ts full path, cli render.ts loadConfigFor 520-533, style-resolution.ts 178-196); no private-repo content - 2026-10-13
 review wave-1 (nowline m2 s1-s6) aa4631f..8759cdd: PASS - all six steps as specified; four release-note:fixed fragments; make ci and changelog check green; MCP theme/pageSize via shared normalizers, malformed rc exits 2, sanitizer drops class, LSP calendar icon, docs, Renovate @nowline/** rule last; checkpoint gate-4 - 2026-10-13
 review wave-2 (nowline m3 s1-s3) ba86954..4fc1c28: CONCERNS - three specs written (R1 m4.11, R3 m4.12, R4 m4.13); (1) gate G1 in all three specs compares only make-build SVGs, so 6 samples never rendered by scripts/render-samples.mjs or render-tests.mjs (examples/continuation, examples/minimal.fr, tests/grammar-properties, grammar-properties-include, partner-multi, waves-isolate-team) are skipped, and the loop's exit status is only the last cmp's; render every sample directly on both commits and fail on any diff; (2) surface-options.md:27 cites load-config.ts mergeConfig at 99-106 and NowlineRc at 18-33, actually 91-97 and 10; (3) surface-options.md:45 says an MCP render parses three times, it parses twice (insights reuse the doc); checkpoints gate-4, gate-2 - 2026-10-13
+review wave-2-fix (nowline m3 s1-s3) 4fc1c28..f49c01a: PASS - all three findings fixed; G1 now builds both commits and renders every examples/**.nowline and tests/*.nowline sample (60 files, light/dark/grayscale) directly, diff -r over SVGs plus exit codes; make build was missing 13 samples (the 6 named plus 7 include files); refs re-checked at HEAD; minor: core-ast-utilities s3 cites waves.ts:210-267 where leadWave ends at 259 (range still covers both functions) - 2026-10-13
 
 ## Token log
 
@@ -188,3 +189,6 @@ tokens review-wave-1 nowline-m2-s1-s6 (claude-opus-5-5): input ~26 / cache read 
 tokens orchestrator-wave-1 nowline-m2-s1-s6 (claude-opus-5-5): input ~16 / cache read ~1M / cache write ~0 5m + ~23k 1h / output ~8.3k | ~$0.55 API-equiv
 tokens wave-2 nowline-m3-s1-s3 (claude-opus-5-5): input ~270 / cache read ~36M / cache write ~440k / output ~130k | ~$12.02 API-equiv (output est.) session 8c78f794-2944-59bb-8116-4413104e9100
 tokens review-wave-2 nowline-m3-s1-s3 (claude-opus-5-5): input ~56 / cache read ~2M / cache write ~100k / output ~28k | ~$1.46 API-equiv (output est.) session 8c78f794-2944-59bb-8116-4413104e9100
+tokens orchestrator-wave-2 nowline-m3-s1-s3 (claude-opus-5-5): input ~18 / cache read ~1.3M / cache write ~0 5m + ~28k 1h / output ~10k | ~$0.70 API-equiv
+tokens wave-2-fix nowline-m3-s1-s3 (claude-opus-5-5): input ~150 / cache read ~8.5M / cache write ~230k / output ~77k | ~$4.38 API-equiv (output est.) session 8c78f794-2944-59bb-8116-4413104e9100
+tokens review-wave-2-fix nowline-m3-s1-s3 (claude-opus-5-5): input ~24 / cache read ~300k / cache write ~37k / output ~12k | ~$0.48 API-equiv (output est.) session 8c78f794-2944-59bb-8116-4413104e9100
