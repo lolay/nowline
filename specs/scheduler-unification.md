@@ -1,6 +1,6 @@
 # Nowline — Scheduler Unification
 
-**Status: Proposed (design only, no code yet).** Proposed milestone ID: **m4.11** (not yet entered in [`milestones.md`](./milestones.md)). This is refactor R1 from [`review-since-v086.md`](./review-since-v086.md): one day-level scheduler instead of three hand-synced copies. Every `file:line` below was checked at the commit that adds this spec (source identical to 0062df3 plus the m2 fixes of the same review).
+**Status: Accepted (design only, no code yet).** Milestone **m4.11** in [`milestones.md`](./milestones.md); decisions in the last section. This is refactor R1 from [`review-since-v086.md`](./review-since-v086.md): one day-level scheduler instead of three hand-synced copies. Every `file:line` below was checked at the commit that adds this spec (source identical to 0062df3 plus the m2 fixes of the same review).
 
 ## 1. Problem
 
@@ -127,7 +127,7 @@ export interface ScheduleExtent {
 
 - **One walker.** C's `makeWalker` (`schedule.ts:166-255`) gains B's `reach` callback (`layout.ts:1509-1540`), which updates `extent.contentEndDay` after every lane child, so container starts that pass every child (an empty `group after:x`) still count.
 - **Isolated regions without waves.** C walks them the way B's recursion does: each region with fresh id maps, nested regions recursively, region anchors and region milestones counted in the extent only. First-level region items join `byNode` (as they already do with waves); their ids stay out of `items`. No exporter walks regions (they iterate the root AST), so their bytes do not change; m1.s2 verifies that with gate G3.
-- **Region sizes.** B's recursion resolves region items against the parent's sizes (`layout.ts:1694-1704` passes the parent `ctx`), while A and the wave-mode walks use the region's own. No sample has a region-only size (checked for this spec), so either choice renders every sample identically. This spec recommends the region's own sizes everywhere and calls the old behaviour a bug (open question 2).
+- **Region sizes.** B's recursion resolves region items against the parent's sizes (`layout.ts:1694-1704` passes the parent `ctx`), while A and the wave-mode walks use the region's own. No sample has a region-only size (checked for this spec), so either choice renders every sample identically. The region's own sizes apply everywhere and the old behaviour is a bug (§8, decision 2).
 
 ### 3.3 The date window is a projection
 
@@ -176,7 +176,7 @@ export interface StartTerms {
 }
 ```
 
-The day walker keeps `max(prevEnd, …after)`; the pixel walker keeps `max(laneLeftX, …after)`. When F1 decides divergence (a), the decision becomes a one-line change in one of the two, with a test that names it.
+The day walker keeps `max(prevEnd, …after)`; the pixel walker keeps `max(laneLeftX, …after)`. F1 settles divergence (a) in C's favour (§8, decision 3): the pixel walker's rule becomes `max(laneCursor, …after)`, a one-line change with a test that names it.
 
 ### 3.5 The wave-barrier fixpoint
 
@@ -263,7 +263,7 @@ Implement §3.2: `ScheduleOptions.plan`, `RoadmapSchedule.plan`, `.resolved`, `.
 
 #### s3 - Derive the date window from the schedule
 
-Implement §3.3: `RoadmapNode.place` schedules once and passes the schedule to `computeDateWindow`; delete `computeContentEndDay`, `literalDays` and the duplicate start-date helper. Region sizes follow open question 2 (recommended: region sizes, with a regression test and a `fixed` fragment for the window of a region with region-only sizes). G1, G2.
+Implement §3.3: `RoadmapNode.place` schedules once and passes the schedule to `computeDateWindow`; delete `computeContentEndDay`, `literalDays` and the duplicate start-date helper. Region sizes follow §8, decision 2: the region's own sizes, with a regression test and a `fixed` fragment for the window of a region with region-only sizes. G1, G2.
 
 #### s4 - Parse start terms and wave floors once
 
@@ -299,11 +299,11 @@ Split `layout.test.ts:2139-2198` and `working-day-schedule.test.ts:533-595` into
 
 ## 5. Follow-ups outside this migration
 
-Each of these changes rendered or exported bytes, so none is part of the byte-identical plan above. Each is one PR with a deliberate snapshot or golden bump, a changelog fragment, and register entries removed.
+Each of these changes rendered or exported bytes, so none is part of the byte-identical plan above. They still belong to m4.11: each lands with whichever planned step it combines with best, and that PR names the snapshot or golden bump, carries a changelog fragment, and removes its register entries.
 
 | # | Change | Changes | Evidence |
 |---|---|---|---|
-| F1 | Decide divergence (a): does `after:` on a lane item ignore the lane cursor (A) or not (C)? | the SVG of 3 samples (A adopts C) or the exports and the window of 3 samples (C adopts A) | showcase, sizing, late-row-shifts |
+| F1 | Divergence (a), decided: `after:` on a lane or group child starts at `max(previous item end, refs)`, so it only ever delays (A adopts C). [`dsl.md`](./dsl.md) gains that sentence | the SVG of 3 samples; `showcase` draws Ship on day 40, matching its exports | showcase, sizing, late-row-shifts |
 | F2 | Decide divergence (e): `after:` on a group inside a parallel | as F1 | no sample today |
 | F3 | Keep the pixel quirks (b), (c), (d), (f) out of the lane cursor, or document them as presentation | SVG of 7 samples | §1.3 |
 | F4 | After F1 and F2: floor A's starts from C, and warm-start A's barrier passes from C's `S_k` | nothing (same fixpoint); `waveSolve.passes` drops | §3.1 |
@@ -327,9 +327,11 @@ Each of these changes rendered or exported bytes, so none is part of the byte-id
 | Engine A still has its own start rule, so "one scheduler" is only true in days | stated as a non-goal; F1 to F4 close it, and R2 moves A's passes into an explicit phase |
 | The published `ExportInputs` shape changes | the new field is optional; exporters fall back to scheduling themselves |
 
-## 8. Open questions for Gary
+## 8. Decisions
 
-1. **Milestone ID.** `m4.11` for this work (R1), `m4.12` for [`core-ast-utilities.md`](./core-ast-utilities.md) (R3) and `m4.13` for [`surface-options.md`](./surface-options.md) (R4), in the review's priority order? *Recommendation:* yes; refactors are not user milestones, but the m4.x tail is where unscheduled OSS work already sits.
-2. **Region sizes in the window.** Without waves, engine B resolves an isolated region's items against the parent file's sizes, so a size declared only in the region counts as zero days in the window (A draws it correctly, and the post-placement extension partly hides the gap). *Recommendation:* use the region's own sizes in m1.s3 and ship a `fixed` fragment; no sample changes. The alternative is to reproduce the quirk in `extent` and fix it later.
-3. **Divergence (a), the meaning of `after:` on a lane item (F1).** The chart lets `ship after:integrate` start as soon as `integrate` ends, on its own row; the exports start it after the previous item in the lane. [`dsl.md`](./dsl.md) says only "starts after the referenced entity finishes". *Recommendation:* make the chart's meaning canonical (C adopts A), because the chart is what authors have looked at since m2b and the exports should agree with it; it changes the showcase and sizing exports and the sizing window. Decide before F1; R1 does not depend on the answer.
-4. **Order with R2.** R2 (layout phases) wants the date-window phase to consume a schedule. *Recommendation:* land m1 and m2 of this spec before R2's first step that touches `RoadmapNode.place`.
+Gary, 2026-10-13:
+
+1. **Milestone ID.** Yes: m4.11, with R3 as m4.12, R4 as m4.13 and R2 as m4.14.
+2. **Region sizes in the window.** Yes: m1.s3 uses the region's own sizes and ships a `fixed` fragment; no sample changes.
+3. **Divergence (a), the meaning of `after:` on a lane item (F1).** The exports' reading: an item with `after:` starts once both the previous item in its lane and every referenced item have finished, so `after:` only ever delays. Engine A adopts C's rule in F1, which changes the chart for `showcase`, `sizing` and `late-row-shifts`, and [`dsl.md`](./dsl.md) states the rule. This reverses the draft's recommendation (chart canonical).
+4. **Order with R2.** Yes: m1 and m2 land before R2's first step that touches `RoadmapNode.place`.
