@@ -14,7 +14,6 @@ import type {
     EntityProperty,
     FootnoteDeclaration,
     GroupBlock,
-    GroupContent,
     IncludeDeclaration,
     IncludeOption,
     ItemDeclaration,
@@ -23,7 +22,6 @@ import type {
     NowlineDirective,
     NowlineFile,
     ParallelBlock,
-    ParallelContent,
     PersonDeclaration,
     RoadmapDeclaration,
     RoadmapEntry,
@@ -32,26 +30,20 @@ import type {
     StatusDeclaration,
     StyleDeclaration,
     StyleProperty,
-    SwimlaneContent,
     SwimlaneDeclaration,
     SymbolDeclaration,
-    TeamDeclaration,
     WorkingDeclaration,
 } from '../generated/ast.js';
 import {
-    isAnchorDeclaration,
     isCalendarBlock,
     isDefaultDeclaration,
     isDescriptionDirective,
-    isFootnoteDeclaration,
     isGroupBlock,
     isItemDeclaration,
     isLabelDeclaration,
-    isMilestoneDeclaration,
     isNonWorkingDeclaration,
     isParallelBlock,
     isPersonDeclaration,
-    isPersonMemberRef,
     isSizeDeclaration,
     isStatusDeclaration,
     isStyleDeclaration,
@@ -63,6 +55,7 @@ import {
 } from '../generated/ast.js';
 import type { MessageArgs, MessageCode } from '../i18n/index.js';
 import { tr } from '../i18n/index.js';
+import { declarations, forEachDeclaredId, referenceableIds, visitProperties } from './ast-walk.js';
 import type { NowlineAstType, NowlineServices } from './nowline-module.js';
 import {
     DATE_RE,
@@ -705,7 +698,7 @@ export class NowlineValidator {
         }
 
         for (const entry of file.roadmapEntries) {
-            registerEntity(entry, register);
+            forEachDeclaredId(entry, register);
         }
 
         for (const entry of file.configEntries) {
@@ -1637,7 +1630,7 @@ export class NowlineValidator {
 
         for (let i = 0; i < file.roadmapEntries.length; i++) {
             const entry = file.roadmapEntries[i];
-            visitPropertiesDeep(entry, (prop) => {
+            visitProperties(entry, (prop) => {
                 if (isWaveBannedProperty(prop)) return;
                 const key = propKey(prop);
                 if (key === 'size' && prop.value) {
@@ -1691,10 +1684,10 @@ export class NowlineValidator {
     // here; their own validation (entity-type allowlist, multi-date-per-direction,
     // roadmap-start: requirements) lives in `checkInlineDatePins` below.
     checkReferenceResolution(file: NowlineFile, accept: ValidationAcceptor): void {
-        const declaredIds = collectReferenceableIds(file);
+        const declaredIds = referenceableIds(file);
 
         const visit = (entry: RoadmapEntry) => {
-            visitPropertiesDeep(entry, (prop) => {
+            visitProperties(entry, (prop) => {
                 const key = propKey(prop);
                 if (key !== 'after' && key !== 'before' && key !== 'on') return;
                 // A wave's before: is NL.E1105 only.
@@ -1791,15 +1784,11 @@ export class NowlineValidator {
                     }
                 }
             }
-
-            if (isSwimlaneDeclaration(entry)) {
-                for (const c of entry.content) visit(c);
-            } else if (isParallelBlock(entry) || isGroupBlock(entry)) {
-                for (const c of entry.content) visit(c);
-            }
         };
 
-        for (const entry of file.roadmapEntries) visit(entry);
+        for (const node of declarations(file)) {
+            if (!isNestedTeam(node)) visit(node);
+        }
     }
 
     // --- Rule 25: circular dependencies in after/before graph ---
@@ -1854,15 +1843,11 @@ export class NowlineValidator {
             const id = (entry as { name?: string }).name;
             const props = (entry as { properties?: EntityProperty[] }).properties ?? [];
             indexDependents(id, props, file);
-
-            if (isSwimlaneDeclaration(entry)) {
-                for (const c of entry.content) visitEntry(c);
-            } else if (isParallelBlock(entry) || isGroupBlock(entry)) {
-                for (const c of entry.content) visitEntry(c);
-            }
         };
 
-        for (const entry of file.roadmapEntries) visitEntry(entry);
+        for (const node of declarations(file)) {
+            if (!isNestedTeam(node)) visitEntry(node);
+        }
 
         // DFS for cycles.
         const WHITE = 0,
@@ -1903,7 +1888,7 @@ export class NowlineValidator {
     // --- Rules 30-32: Person declare-once + bare top-level warning ---
     checkPersonDeclarations(file: NowlineFile, accept: ValidationAcceptor): void {
         type DeclSite = { node: PersonDeclaration; isDeclaration: boolean };
-        const declarations = new Map<string, DeclSite[]>();
+        const sitesByName = new Map<string, DeclSite[]>();
 
         const isRealDeclaration = (p: PersonDeclaration): boolean => {
             return Boolean(p.title) || p.properties.length > 0 || p.description !== undefined;
@@ -1912,8 +1897,8 @@ export class NowlineValidator {
         const visitPerson = (p: PersonDeclaration) => {
             if (!p.name) return;
             const isDecl = isRealDeclaration(p);
-            if (!declarations.has(p.name)) declarations.set(p.name, []);
-            declarations.get(p.name)!.push({ node: p, isDeclaration: isDecl });
+            if (!sitesByName.has(p.name)) sitesByName.set(p.name, []);
+            sitesByName.get(p.name)!.push({ node: p, isDeclaration: isDecl });
             if (!isDecl && p.$container.$type === 'NowlineFile') {
                 accept(
                     'warning',
@@ -1923,19 +1908,11 @@ export class NowlineValidator {
             }
         };
 
-        const visitTeam = (t: TeamDeclaration) => {
-            for (const c of t.content) {
-                if (isPersonDeclaration(c)) visitPerson(c);
-                else if (isTeamDeclaration(c)) visitTeam(c);
-            }
-        };
-
-        for (const entry of file.roadmapEntries) {
-            if (isPersonDeclaration(entry)) visitPerson(entry);
-            else if (isTeamDeclaration(entry)) visitTeam(entry);
+        for (const node of declarations(file)) {
+            if (isPersonDeclaration(node)) visitPerson(node);
         }
 
-        for (const [name, sites] of declarations) {
+        for (const [name, sites] of sitesByName) {
             const decls = sites.filter((s) => s.isDeclaration);
             if (decls.length > 1) {
                 for (let i = 1; i < decls.length; i++) {
@@ -2446,117 +2423,8 @@ function locationOf(node: AstNode): string {
     return 'unknown location';
 }
 
-/**
- * Every explicit id a roadmap entry declares (rule 2), including items,
- * groups and parallels inside swimlanes and teams nested in teams. Shared
- * with the include resolver's cross-file wave id check (WV2).
- */
-export function registerEntity(
-    entry: RoadmapEntry,
-    register: (name: string | undefined, node: AstNode) => void,
-): void {
-    if (isSwimlaneDeclaration(entry)) {
-        register(entry.name, entry);
-        for (const child of entry.content) {
-            registerSwimlaneContent(child, register);
-        }
-    } else if (isPersonDeclaration(entry)) {
-        register(entry.name, entry);
-    } else if (isTeamDeclaration(entry)) {
-        registerTeam(entry, register);
-    } else if (isAnchorDeclaration(entry)) {
-        register(entry.name, entry);
-    } else if (isMilestoneDeclaration(entry)) {
-        register(entry.name, entry);
-    } else if (isFootnoteDeclaration(entry)) {
-        register(entry.name, entry);
-    } else if (isLabelDeclaration(entry)) {
-        register(entry.name, entry);
-    } else if (isSizeDeclaration(entry)) {
-        register(entry.name, entry);
-    } else if (isStatusDeclaration(entry)) {
-        register(entry.name, entry);
-    } else if (isWaveDeclaration(entry)) {
-        register(entry.name, entry);
-    }
-}
-
-/** @internal Kept only for the `ast-walk.ts` equivalence test; removed in m1.s2. */
-export function registerTeam(
-    team: TeamDeclaration,
-    register: (name: string | undefined, node: AstNode) => void,
-): void {
-    register(team.name, team);
-    for (const member of team.content) {
-        if (isTeamDeclaration(member)) {
-            registerTeam(member, register);
-        }
-        // PersonMemberRef and bare person <id> are references, not declarations — skip.
-    }
-}
-
-/** @internal Kept only for the `ast-walk.ts` equivalence test; removed in m1.s2. */
-export function registerSwimlaneContent(
-    child: SwimlaneContent | GroupContent | ParallelContent,
-    register: (name: string | undefined, node: AstNode) => void,
-): void {
-    if (isItemDeclaration(child)) {
-        register(child.name, child);
-    } else if (isParallelBlock(child)) {
-        register(child.name, child);
-        for (const pc of child.content) {
-            registerSwimlaneContent(pc, register);
-        }
-    } else if (isGroupBlock(child)) {
-        register(child.name, child);
-        for (const gc of child.content) {
-            registerSwimlaneContent(gc, register);
-        }
-    }
-}
-
-/** @internal Kept only for the `ast-walk.ts` equivalence test; removed in m1.s2. */
-export function visitPropertiesDeep(node: AstNode, visit: (prop: EntityProperty) => void): void {
-    const walk = (n: AstNode) => {
-        const props = (n as unknown as { properties?: EntityProperty[] }).properties;
-        if (Array.isArray(props)) {
-            for (const p of props) visit(p);
-        }
-        if (isSwimlaneDeclaration(n)) {
-            for (const c of n.content) walk(c);
-        } else if (isParallelBlock(n) || isGroupBlock(n)) {
-            for (const c of n.content) walk(c);
-        } else if (isTeamDeclaration(n)) {
-            for (const c of n.content) {
-                if (isTeamDeclaration(c) || isPersonDeclaration(c)) walk(c);
-            }
-        }
-    };
-    walk(node);
-}
-
-/** @internal Kept only for the `ast-walk.ts` equivalence test; removed in m1.s2. */
-export function collectReferenceableIds(file: NowlineFile): Set<string> {
-    const ids = new Set<string>();
-    if (file.roadmapDecl?.name) ids.add(file.roadmapDecl.name);
-
-    const addEntry = (entry: AstNode): void => {
-        const name = (entry as { name?: string }).name;
-        if (name) ids.add(name);
-        if (isSwimlaneDeclaration(entry)) {
-            for (const c of entry.content) addEntry(c);
-        } else if (isParallelBlock(entry) || isGroupBlock(entry)) {
-            for (const c of entry.content) addEntry(c);
-        } else if (isTeamDeclaration(entry)) {
-            for (const c of entry.content) {
-                if (isTeamDeclaration(c) || isPersonDeclaration(c)) addEntry(c);
-                else if (isPersonMemberRef(c)) {
-                    // Don't register member refs — they reference persons declared elsewhere.
-                }
-            }
-        }
-    };
-
-    for (const entry of file.roadmapEntries) addEntry(entry);
-    return ids;
+// The rule 24 and rule 25 walks never looked inside a team, so a team nested
+// in a team is skipped to keep their diagnostics (specs/core-ast-utilities.md §6).
+function isNestedTeam(node: AstNode): boolean {
+    return isTeamDeclaration(node) && isTeamDeclaration(node.$container);
 }
