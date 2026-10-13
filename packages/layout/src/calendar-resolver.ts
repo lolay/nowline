@@ -18,6 +18,7 @@ import type {
     ResolveResult,
     WorkingDeclaration,
 } from '@nowline/core';
+import { findProp } from '@nowline/core/internal';
 import { type CalendarConfig, resolveCalendar } from './calendar.js';
 import { formatIsoDate, parseDate, propValues } from './dsl-utils.js';
 import {
@@ -104,7 +105,7 @@ function calendarRules(
  */
 function declarationRule(decl: CalendarDeclaration): CalendarRule | undefined {
     const props = decl.properties;
-    const has = (key: string) => props.some((p) => stripColon(p.key) === key);
+    const has = (key: string) => findProp(props, key) !== undefined;
     const rule: CalendarRule = { working: decl.$type === 'WorkingDeclaration' };
     if (decl.name) rule.id = decl.name;
     if (decl.title !== undefined) rule.title = decl.title;
@@ -148,10 +149,6 @@ function singleDate(props: EntityProperty[], key: 'start' | 'end'): Date | undef
 function realDate(raw: string): Date | undefined {
     const date = parseDate(raw);
     return date && formatIsoDate(date) === raw ? date : undefined;
-}
-
-function stripColon(key: string): string {
-    return key.endsWith(':') ? key.slice(0, -1) : key;
 }
 
 /**

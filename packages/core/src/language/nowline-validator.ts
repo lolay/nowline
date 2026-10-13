@@ -55,15 +55,14 @@ import {
 } from '../generated/ast.js';
 import type { MessageArgs, MessageCode } from '../i18n/index.js';
 import { tr } from '../i18n/index.js';
+import { ISO_DATE_RE, isRealIsoDate, propKey } from '../util/props.js';
 import { declarations, forEachDeclaredId, referenceableIds, visitProperties } from './ast-walk.js';
 import type { NowlineAstType, NowlineServices } from './nowline-module.js';
 import {
-    DATE_RE,
     defaultBannedMessage,
     describeNode,
     displayName,
     entityTypeLabel,
-    propKey,
     suggestKey,
 } from './validator-utils.js';
 import {
@@ -390,7 +389,7 @@ function resolveLocalStart(file: NowlineFile | undefined): StartState {
     const prop = file?.roadmapDecl?.properties.find((p) => propKey(p) === 'start');
     if (!prop) return { kind: 'missing' };
     const raw = prop.value;
-    if (!raw || !DATE_RE.test(raw)) return { kind: 'invalid' };
+    if (!raw || !ISO_DATE_RE.test(raw)) return { kind: 'invalid' };
     const d = new Date(raw);
     if (Number.isNaN(d.getTime())) return { kind: 'invalid' };
     return { kind: 'valid', iso: raw, date: d };
@@ -747,7 +746,7 @@ export class NowlineValidator {
     checkIncludeDuplicateOptions(inc: IncludeDeclaration, accept: ValidationAcceptor): void {
         const keys = new Set<string>();
         for (const opt of inc.options) {
-            const normalized = opt.key.replace(/:$/, '');
+            const normalized = propKey(opt);
             if (keys.has(normalized)) {
                 acceptTr(accept, 'error', { node: opt }, 'NL.E0201', { key: normalized });
             }
@@ -1032,7 +1031,7 @@ export class NowlineValidator {
         const dateProp = anchor.properties.find((p) => propKey(p) === 'date');
         if (!dateProp?.value) return;
         const raw = dateProp.value;
-        if (!DATE_RE.test(raw)) return;
+        if (!ISO_DATE_RE.test(raw)) return;
         const anchorDate = new Date(raw);
         if (Number.isNaN(anchorDate.getTime())) return;
 
@@ -1073,7 +1072,7 @@ export class NowlineValidator {
         const dateProp = milestone.properties.find((p) => propKey(p) === 'date');
         if (!dateProp?.value) return;
         const raw = dateProp.value;
-        if (!DATE_RE.test(raw)) return;
+        if (!ISO_DATE_RE.test(raw)) return;
         const milestoneDate = new Date(raw);
         if (Number.isNaN(milestoneDate.getTime())) return;
 
@@ -1680,7 +1679,7 @@ export class NowlineValidator {
     //
     // Inline date literals in `after:` / `before:` (e.g. `after:2026-03-15`)
     // are intentionally NOT id references — they pin the entity directly to a
-    // calendar date without a named anchor. The DATE_RE check below skips them
+    // calendar date without a named anchor. The ISO_DATE_RE check below skips them
     // here; their own validation (entity-type allowlist, multi-date-per-direction,
     // roadmap-start: requirements) lives in `checkInlineDatePins` below.
     checkReferenceResolution(file: NowlineFile, accept: ValidationAcceptor): void {
@@ -1695,7 +1694,7 @@ export class NowlineValidator {
                 const vals = prop.value ? [prop.value] : prop.values;
                 for (const v of vals) {
                     if (!v) continue;
-                    if ((key === 'after' || key === 'before') && DATE_RE.test(v)) continue;
+                    if ((key === 'after' || key === 'before') && ISO_DATE_RE.test(v)) continue;
                     if (!declaredIds.has(v)) {
                         accept(
                             'error',
@@ -1742,7 +1741,7 @@ export class NowlineValidator {
                 if (key !== 'after' && key !== 'before') continue;
                 if (wave && key === 'before') continue;
                 const vals = prop.value ? [prop.value] : prop.values;
-                const dateVals = vals.filter((v): v is string => !!v && DATE_RE.test(v));
+                const dateVals = vals.filter((v): v is string => !!v && ISO_DATE_RE.test(v));
                 if (dateVals.length === 0) continue;
 
                 if (!allowed) {
@@ -1818,14 +1817,14 @@ export class NowlineValidator {
                         // to a calendar position, not to another entity. Skip
                         // them so they never participate in a cycle (per
                         // specs/dsl.md rule 25).
-                        if (DATE_RE.test(r)) continue;
+                        if (ISO_DATE_RE.test(r)) continue;
                         addDep(idName, r);
                     }
                 } else if (key === 'before') {
                     const refs = prop.value ? [prop.value] : prop.values;
                     for (const r of refs) {
                         if (!r) continue;
-                        if (DATE_RE.test(r)) continue;
+                        if (ISO_DATE_RE.test(r)) continue;
                         addDep(r, idName);
                     }
                 }
@@ -2359,16 +2358,8 @@ function scalarDate(prop: EntityProperty | undefined): string | undefined {
  * `Date` rolls `2026-02-30` over to March 2, which the generic checks accept.
  */
 function isValidDateLiteral(value: string, strict: boolean): boolean {
-    if (!DATE_RE.test(value) || Number.isNaN(new Date(value).getTime())) return false;
-    if (!strict) return true;
-    const [year, month, day] = value.split('-').map((part) => parseInt(part, 10));
-    const probe = new Date(0);
-    probe.setUTCFullYear(year, month - 1, day);
-    return (
-        probe.getUTCFullYear() === year &&
-        probe.getUTCMonth() === month - 1 &&
-        probe.getUTCDate() === day
-    );
+    if (strict) return isRealIsoDate(value);
+    return ISO_DATE_RE.test(value) && !Number.isNaN(new Date(value).getTime());
 }
 
 function weekdaysOf(decl: CalendarDeclaration): number[] {

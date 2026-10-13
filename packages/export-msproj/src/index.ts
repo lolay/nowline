@@ -29,6 +29,7 @@ import type {
     TeamDeclaration,
     WavePlan,
 } from '@nowline/core';
+import { ISO_DATE_RE } from '@nowline/core/internal';
 import type { ExportInputs } from '@nowline/export-core';
 import { displayLabel, getProp, getProps, hasProp, roadmapTitle } from '@nowline/export-core';
 import { calendarExceptions, type RoadmapSchedule, scheduleRoadmap } from '@nowline/layout';
@@ -416,8 +417,6 @@ function emitPredecessorLink(uid: number, lines: string[]): void {
 
 // ---------- Waves ----------
 
-const ISO_DATE_RE = /^\d{4}-\d{2}-\d{2}$/;
-
 /**
  * Waves (specs/waves.md §10). Appends one zero-duration milestone task per
  * wave, `{title} (wave end)`, after every other task (so existing UIDs and
@@ -603,7 +602,7 @@ function formatDropKey(key: keyof DropCounts): string {
 
 function resolveStartDate(option: string | undefined, today: Date | undefined): string {
     if (option) {
-        if (!/^\d{4}-\d{2}-\d{2}$/.test(option)) {
+        if (!ISO_DATE_RE.test(option)) {
             throw new Error(`invalid msproj startDate "${option}": expected YYYY-MM-DD`);
         }
         return option;

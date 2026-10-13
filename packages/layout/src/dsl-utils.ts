@@ -1,25 +1,11 @@
 // Tiny DSL utilities shared between `layout.ts` and the per-entity nodes
-// under `nodes/`. Kept intentionally trivial and pure: a `:`-trim,
-// property lookup helpers against the AST's `EntityProperty[]`, and an
+// under `nodes/`. Kept intentionally trivial and pure: property lookup
+// helpers against the AST's `EntityProperty[]` (core's, re-exported) and an
 // ISO-date parser and formatter. Anything that needs configuration or
 // non-trivial resolution (durations, calendars, styles) stays in the
 // modules that own those concerns.
 
-import type { EntityProperty } from '@nowline/core';
-
-function stripColon(key: string): string {
-    return key.endsWith(':') ? key.slice(0, -1) : key;
-}
-
-export function propValue(props: EntityProperty[], key: string): string | undefined {
-    return props.find((p) => stripColon(p.key) === key)?.value;
-}
-
-export function propValues(props: EntityProperty[], key: string): string[] {
-    const p = props.find((x) => stripColon(x.key) === key);
-    if (!p) return [];
-    return p.value !== undefined ? [p.value] : [...p.values];
-}
+export { propValue, propValues } from '@nowline/core/internal';
 
 export function parseDate(raw: string | undefined): Date | null {
     if (!raw) return null;

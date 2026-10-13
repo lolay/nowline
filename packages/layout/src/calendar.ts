@@ -5,6 +5,7 @@
 // translate into absolute days.
 
 import type { CalendarBlock, EntityProperty, NowlineFile, SizeDeclaration } from '@nowline/core';
+import { findProp } from '@nowline/core/internal';
 
 import { parseCapacityValue } from './capacity.js';
 import { propValue } from './dsl-utils.js';
@@ -40,13 +41,13 @@ export function resolveCalendar(
     file: NowlineFile,
     customBlock: CalendarBlock | undefined,
 ): CalendarConfig {
-    const calProp = file.roadmapDecl?.properties.find((p) => stripColon(p.key) === 'calendar');
+    const calProp = findProp(file.roadmapDecl?.properties ?? [], 'calendar');
     const mode: CalendarMode = (calProp?.value as CalendarMode) ?? 'business';
     if (mode === 'business') return { ...BUSINESS };
     if (mode === 'full') return { ...FULL };
     if (customBlock) {
         const get = (key: string, fallback: number): number => {
-            const p = customBlock.properties.find((x) => stripColon(x.key) === key);
+            const p = findProp(customBlock.properties, key);
             const n = p ? parseInt(p.value, 10) : NaN;
             return Number.isFinite(n) && n > 0 ? n : fallback;
         };
@@ -173,7 +174,7 @@ export function resolveSizes(
 ): Map<string, ResolvedSize> {
     const out = new Map<string, ResolvedSize>();
     for (const [name, decl] of decls) {
-        const effortProp = decl.properties.find((p) => stripColon(p.key) === 'effort');
+        const effortProp = findProp(decl.properties, 'effort');
         const effortLiteral = effortProp?.value;
         if (!effortLiteral) continue;
         const effortDays = literalToDays(effortLiteral, cal);
@@ -186,10 +187,6 @@ export function resolveSizes(
         });
     }
     return out;
-}
-
-function stripColon(key: string): string {
-    return key.endsWith(':') ? key.slice(0, -1) : key;
 }
 
 // Date arithmetic in day units. All coordinates are relative to the roadmap

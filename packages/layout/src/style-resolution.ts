@@ -5,6 +5,7 @@ import type {
     StyleDeclaration,
     StyleProperty,
 } from '@nowline/core';
+import { propKey } from '@nowline/core/internal';
 import { isNonWorkingDisplay } from './non-working-display.js';
 import { resolveColor } from './themes/index.js';
 import type { EntityStyle, Theme } from './themes/shape.js';
@@ -30,10 +31,6 @@ export interface StyleContext {
     defaults: Map<string, DefaultDeclaration>;
     // Map of label id → LabelDeclaration for resolving label styles.
     labels: Map<string, LabelDeclaration>;
-}
-
-function propKey(prop: { key: string }): string {
-    return prop.key.endsWith(':') ? prop.key.slice(0, -1) : prop.key;
 }
 
 function entityStyleToResolved(e: EntityStyle, theme: Theme): ResolvedStyle {

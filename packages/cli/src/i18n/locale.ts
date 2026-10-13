@@ -1,4 +1,5 @@
 import type { NowlineFile } from '@nowline/core';
+import { findProp } from '@nowline/core/internal';
 
 // Resolve the operator-locale override from CLI flag, environment, and
 // `.nowlinerc`. See `specs/localization.md` for the two-chain model.
@@ -100,12 +101,7 @@ export function describeContentLocaleSource(
  * absent, malformed, or omits the property.
  */
 export function readDirectiveLocale(file: NowlineFile | undefined): string | undefined {
-    const prop = file?.directive?.properties.find((p) => stripColon(p.key) === 'locale');
-    return prop?.value || undefined;
-}
-
-function stripColon(key: string): string {
-    return key.endsWith(':') ? key.slice(0, -1) : key;
+    return findProp(file?.directive?.properties ?? [], 'locale')?.value || undefined;
 }
 
 /**

@@ -33,9 +33,10 @@ import type {
     FlowRef,
     WaveContainerKind,
 } from '../i18n/wave-message-types.js';
+import { ISO_DATE_RE, propKey } from '../util/props.js';
 import { singleLine } from '../util/single-line.js';
 import { trackChildren } from './ast-walk.js';
-import { DATE_RE, displayName, lineOf, propKey } from './validator-utils.js';
+import { displayName, lineOf } from './validator-utils.js';
 import { assignWaves, type WaveFinding, type WaveRefLookup } from './waves.js';
 
 /** A layout scope for `evaluateWaveOrder`. */
@@ -168,7 +169,7 @@ function isPinned(node: Work): boolean {
     if (node.$type !== 'ItemDeclaration') return false;
     return node.properties.some((p) => {
         const key = propKey(p);
-        return (key === 'date' || key === 'start') && !!p.value && DATE_RE.test(p.value);
+        return (key === 'date' || key === 'start') && !!p.value && ISO_DATE_RE.test(p.value);
     });
 }
 
@@ -275,7 +276,7 @@ export function evaluateWaveOrder(
             const key = propKey(prop);
             if (key !== 'after' && key !== 'before') continue;
             for (const ref of refValues(prop)) {
-                if (DATE_RE.test(ref)) continue;
+                if (ISO_DATE_RE.test(ref)) continue;
                 const target = resolve(ref, v);
                 const j = target === undefined ? waveIds.get(ref) : undefined;
                 // A date: or start: pin replaces every after: term (§5.1).
@@ -352,7 +353,7 @@ export function evaluateWaveOrder(
         for (const prop of slots[v].node.properties) {
             if (propKey(prop) !== 'before') continue;
             for (const ref of refValues(prop)) {
-                if (DATE_RE.test(ref)) continue;
+                if (ISO_DATE_RE.test(ref)) continue;
                 const target = resolve(ref, v);
                 if (target !== undefined) {
                     const theirs = minW[target];
@@ -852,7 +853,7 @@ function cycleTest(
             const key = propKey(prop);
             if (key !== 'after' && key !== 'before') continue;
             for (const ref of refValues(prop)) {
-                if (DATE_RE.test(ref)) continue;
+                if (ISO_DATE_RE.test(ref)) continue;
                 if (key === 'after') addEdge(id, ref);
                 else addEdge(ref, id);
                 pending.push(ref);

@@ -16,6 +16,7 @@ import type {
     SwimlaneDeclaration,
     WavePlan,
 } from '@nowline/core';
+import { findProp } from '@nowline/core/internal';
 import { defaultRowBand } from '../band-scale.js';
 import { daysBetween, resolveSizes } from '../calendar.js';
 import { resolveWorkingCalendar } from '../calendar-resolver.js';
@@ -1307,10 +1308,5 @@ export function packMarkerRow(
 // Layout receives an already-parsed AST, so this is a cheap lookup with no
 // validation work — that's the validator's job in `@nowline/core`.
 function directiveLocale(file: NowlineFile): string | undefined {
-    const prop = file.directive?.properties.find((p) => stripColon(p.key) === 'locale');
-    return prop?.value;
-}
-
-function stripColon(key: string): string {
-    return key.endsWith(':') ? key.slice(0, -1) : key;
+    return findProp(file.directive?.properties ?? [], 'locale')?.value;
 }

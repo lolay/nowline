@@ -20,6 +20,7 @@
 // the lane badge in m7 and the overload sweep in m8).
 
 import type { SymbolDeclaration } from '@nowline/core';
+import { propKey } from '@nowline/core/internal';
 import type { ResolvedCapacityIconRef } from './types.js';
 
 /**
@@ -103,16 +104,6 @@ export function formatCapacityNumber(value: number): string {
  *     custom `symbol` declarations.
  */
 export type ResolvedCapacityIcon = ResolvedCapacityIconRef;
-
-/**
- * Read a property value off a Langium-shaped EntityProperty, normalizing the
- * trailing-colon form. Validator-side uses the same trick — the grammar
- * stores `key` as the *raw* token, including the colon for `unicode:`-style
- * property keys.
- */
-function propKey(prop: { key: string }): string {
-    return prop.key.endsWith(':') ? prop.key.slice(0, -1) : prop.key;
-}
 
 function symbolUnicode(decl: SymbolDeclaration): string | undefined {
     for (const p of decl.properties) {

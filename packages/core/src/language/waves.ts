@@ -35,6 +35,7 @@ import {
 } from '../generated/ast.js';
 import type { MessageArgs } from '../i18n/index.js';
 import type { WaveKind, WaveSuggestion } from '../i18n/wave-message-types.js';
+import { ISO_DATE_RE, propKey } from '../util/props.js';
 import { singleLine } from '../util/single-line.js';
 import {
     type DeclarationNode,
@@ -43,12 +44,10 @@ import {
     trackChildren,
 } from './ast-walk.js';
 import {
-    DATE_RE,
     defaultBannedMessage,
     displayName,
     entityTypeLabel,
     lineOf,
-    propKey,
     suggestUniqueKey,
 } from './validator-utils.js';
 
@@ -330,7 +329,7 @@ export function assignWaves(
 export type WaveRefLookup = (id: string) => AstNode | undefined;
 
 function isValidIsoDate(v: string): boolean {
-    return DATE_RE.test(v) && !Number.isNaN(new Date(v).getTime());
+    return ISO_DATE_RE.test(v) && !Number.isNaN(new Date(v).getTime());
 }
 
 function dateProp(node: AstNode): string | undefined {
@@ -364,7 +363,7 @@ export function waveFloorDate(
         for (const v of vals) {
             if (!v) continue;
             let date: string | undefined;
-            if (DATE_RE.test(v)) {
+            if (ISO_DATE_RE.test(v)) {
                 date = v;
             } else {
                 const target = lookup(v);
@@ -468,7 +467,7 @@ export function checkWaveDeclaration(wave: WaveDeclaration, lookup: WaveRefLooku
         for (const ref of vals) {
             // Dates are checked by checkInlineDatePins (E0410/E0412/E0413);
             // an id that resolves to nothing gets only "does not resolve".
-            if (!ref || DATE_RE.test(ref)) continue;
+            if (!ref || ISO_DATE_RE.test(ref)) continue;
             const target = lookup(ref);
             if (!target || isAnchorDeclaration(target)) continue;
             if (isMilestoneDeclaration(target)) {

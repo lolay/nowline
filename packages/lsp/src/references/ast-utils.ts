@@ -39,7 +39,7 @@ import {
     isWaveDeclaration,
     isWorkingDeclaration,
 } from '@nowline/core';
-import { declarations, visitProperties } from '@nowline/core/internal';
+import { declarations, propKey, visitProperties } from '@nowline/core/internal';
 import type { AstNode, CstNode, LangiumDocument } from 'langium';
 import { CstUtils, GrammarUtils } from 'langium';
 import type { Range } from '../lsp-protocol.js';
@@ -124,10 +124,8 @@ export const WEEKDAY_NAMES: readonly string[] = ['sun', 'mon', 'tue', 'wed', 'th
 /** Values of the `non-working:` display key on `default roadmap`. */
 export const NON_WORKING_DISPLAYS: readonly string[] = ['hide', 'show'];
 
-/** Strip the trailing `:` an `EntityProperty.key` carries from the grammar. */
-export function propKey(prop: { key: string }): string {
-    return prop.key.endsWith(':') ? prop.key.slice(0, -1) : prop.key;
-}
+/** `prop.key` without a trailing `:` (core's, kept as an `@nowline/lsp` export). */
+export { propKey };
 
 /**
  * Named declaration shapes we expose for navigation. All have `name?: string`,

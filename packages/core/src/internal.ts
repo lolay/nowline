@@ -3,3 +3,4 @@
 // Nothing here may import the validator.
 
 export * from './language/ast-walk.js';
+export * from './util/props.js';
