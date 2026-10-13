@@ -1,7 +1,7 @@
 ```text
---- KICKOFF: begin orchestration at [deep] ---
+--- KICKOFF: plan complete ---
 
-  Status: 4/4 groups done | last review: wave-3 CONCERNS | current: nowline m3 s4 [xdeep] fix-up 3-fix | passed unattended: gate-4 (m2), gate-4 (m3), gate-2, gate-7 | updated 2026-10-13
+  Status: 4/4 groups done | completed 2026-10-13
 
   mode: unattended | proposed unattended (harness=claude-code runner=cloud; CLAUDE_CODE_REMOTE=true, assigned branch) | guard 3x min $50 | fixups 2 | confirmed 2026-10-13 session 8c78f794-2944-59bb-8116-4413104e9100 by Kickoff prompt: Run in unattended mode.
 
@@ -29,13 +29,13 @@
 
 **Cost (API-equiv, Claude Code models)**
 
-| wave | expected tokens | expected $ |
-|---|---|---|
-| 1 [exec] nowline m1 s1, m2 s1-s6 | ~4.8M | ~$2.1 |
-| 2 [deep] nowline m3 s1-s3 | ~9.5M | ~$5.0 |
-| 3 [xdeep] nowline m3 s4 | ~11M | ~$6.8 |
-| orchestrator | ~7.8M | ~$7.1 |
-| **Total** | ~33M | ~$21 |
+| wave | expected tokens | expected $ | actual tokens | actual $ |
+|---|---|---|---|---|
+| 1 [exec] nowline m1 s1, m2 s1-s6 | ~4.8M | ~$2.1 | ~8.0M | ~$3.72 (output est.) |
+| 2 [deep] nowline m3 s1-s3 (incl. 2-fix) | ~9.5M | ~$5.0 | ~48M | ~$18.34 (output est.) |
+| 3 [xdeep] nowline m3 s4 (incl. 3-fix) | ~11M | ~$6.8 | ~46M | ~$17.46 (output est.) |
+| orchestrator | ~7.8M | ~$7.1 | ~29M | ~$12.92 |
+| **Total** | ~33M | ~$21 | ~131M | ~$52.44 (output est.) |
 
 Expected values are estimates, good to about 2-3× per wave.
 
@@ -170,6 +170,7 @@ review wave-1 (nowline m2 s1-s6) aa4631f..8759cdd: PASS - all six steps as speci
 review wave-2 (nowline m3 s1-s3) ba86954..4fc1c28: CONCERNS - three specs written (R1 m4.11, R3 m4.12, R4 m4.13); (1) gate G1 in all three specs compares only make-build SVGs, so 6 samples never rendered by scripts/render-samples.mjs or render-tests.mjs (examples/continuation, examples/minimal.fr, tests/grammar-properties, grammar-properties-include, partner-multi, waves-isolate-team) are skipped, and the loop's exit status is only the last cmp's; render every sample directly on both commits and fail on any diff; (2) surface-options.md:27 cites load-config.ts mergeConfig at 99-106 and NowlineRc at 18-33, actually 91-97 and 10; (3) surface-options.md:45 says an MCP render parses three times, it parses twice (insights reuse the doc); checkpoints gate-4, gate-2 - 2026-10-13
 review wave-2-fix (nowline m3 s1-s3) 4fc1c28..f49c01a: PASS - all three findings fixed; G1 now builds both commits and renders every examples/**.nowline and tests/*.nowline sample (60 files, light/dark/grayscale) directly, diff -r over SVGs plus exit codes; make build was missing 13 samples (the 6 named plus 7 include files); refs re-checked at HEAD; minor: core-ast-utilities s3 cites waves.ts:210-267 where leadWave ends at 259 (range still covers both functions) - 2026-10-13
 review wave-3 (nowline m3 s4) 4eef354..de36917: CONCERNS - specs/layout-phases.md (R2, proposed m4.14) complete and G1/G2 verbatim; one defect: layout-phases.md:365 cites renderable.ts:237-251 but the file has 68 lines, intended renderable.ts:45-68 (MeasureContext 45-49, Renderable 61-68); non-blocking: the 3.8 createLayoutContext sketch lacks a parameter for the chart y fields; probe found two shipping layout bugs (L1 beside header card 26px above grown marker band in 3 samples; L2 now-line drawn without its pill row when today is past the original window) listed as follow-ups; checkpoint gate-7 - 2026-10-13
+review wave-3-fix (nowline m3 s4) de36917..96f582f: PASS - renderable.ts ref now 45-68; createLayoutContext sketch gains a `chart` Pick parameter (chartTopY, both bottoms, chartRightX until m3.s3) matching roadmap-node.ts:582-585 and include-node.ts:106-109; place line count 856 to 857; every other ref re-checked at HEAD; gate-7 approved by Gary (`approve 3-fix`) - 2026-10-13
 
 ## Token log
 
@@ -196,4 +197,30 @@ tokens review-wave-2-fix nowline-m3-s1-s3 (claude-opus-5-5): input ~24 / cache r
 tokens orchestrator-wave-2-fix nowline-m3-s1-s3 (claude-opus-5-5): input ~12 / cache read ~960k / cache write ~0 5m + ~22k 1h / output ~8k | ~$0.53 API-equiv
 tokens wave-3 nowline-m3-s4 (claude-opus-5-5): input ~210 / cache read ~34M / cache write ~450k / output ~110k | ~$11.07 API-equiv (output est.) session 8c78f794-2944-59bb-8116-4413104e9100
 tokens review-wave-3 nowline-m3-s4 (claude-opus-5-5): input ~130 / cache read ~5.1M / cache write ~120k / output ~65k | ~$2.92 API-equiv (output est.) session 8c78f794-2944-59bb-8116-4413104e9100
-tokens orchestrator-wave-3 nowline-m3-s4 (claude-opus-5-5): input ~14 / cache read ~1.3M / cache write ~0 5m + ~18k 1h / output ~4.8k | ~$0.50 API-equiv
+tokens orchestrator-wave-3 nowline-m3-s4 (claude-opus-5-5): input ~26 / cache read ~2.7M / cache write ~0 5m + ~42k 1h / output ~15k | ~$1.18 API-equiv
+tokens wave-3-fix nowline-m3-s4 (claude-opus-5-5): input ~80 / cache read ~5M / cache write ~170k / output ~39k | ~$2.63 API-equiv (output est.) session 8c78f794-2944-59bb-8116-4413104e9100
+tokens review-wave-3-fix nowline-m3-s4 (claude-opus-5-5): input ~32 / cache read ~780k / cache write ~72k / output ~16k | ~$0.84 API-equiv (output est.) session 8c78f794-2944-59bb-8116-4413104e9100
+tokens orchestrator-completion plan-nowline-review-lantern (claude-opus-5-5): input ~12 / cache read ~1.3M / cache write ~0 5m + ~19k 1h / output ~2.6k | ~$0.47 API-equiv
+
+## Completion summary
+
+**Completed**: 2026-10-13
+
+**What shipped**: On `claude/ecstatic-babbage-qsrxbx`, 0062df3..96f582f. m1 wrote the public-repo review (`specs/handoffs/review-since-v086-lantern.md`). m2 landed six quick fixes with four `release-note:fixed` fragments and `make ci` green: MCP theme, pageSize and nonWorking go through the shared normalizers; a malformed `.nowlinerc` is a usage error (exit 2); `sanitizeSvg` drops `class`; LSP offers the `calendar` icon; stale comments and public docs are fixed (codes.ts, embed.md, AGENTS.md, architecture.md, triage.yaml, CONTRIBUTING); and the shared Renovate preset exempts `@nowline/**` from the release-age wait. m3 wrote four refactor specs, each with byte-identical migration steps and the same G1 gate (every sample rendered directly on both commits, in all three themes): `specs/scheduler-unification.md` (R1, proposed m4.11), `specs/core-ast-utilities.md` (R3, m4.12), `specs/surface-options.md` (R4, m4.13) and `specs/layout-phases.md` (R2, m4.14).
+
+**Deviations from plan**:
+- The run paused after the kickoff answer for Gary's `/compact` (his request) and resumed from the pasted Kickoff prompt.
+- Unattended checkpoints passed: gate-4 (entering m2), gate-4 (entering m3), gate-2 (into [deep]), gate-7 (into the planned [xdeep] wave 3).
+- Fix-up 2-fix [deep]: wave-2 review CONCERNS. Gate G1 skipped samples `make build` never renders (13 in all) and exited with only the last `cmp`'s status. Two stale `load-config.ts` refs, and MCP render said to parse three times (it's twice). Fixed, PASS.
+- Fix-up 3-fix [xdeep]: wave-3 review CONCERNS. `layout-phases.md` cited `renderable.ts:237-251` in a 68-line file. Unplanned [xdeep] work stopped at gate 7. Gary approved (`approve 3-fix`); fixed, PASS.
+- No automatic retries.
+- Cost: ~$52.44 against ~$21 expected, under the ~$63 guard. Waves 2 and 3 ran 2.5-3.7x their estimates because the workers laid out all samples to measure engine divergence and fixup frequency.
+- R1 departs from the review's "engine A floors from C". That change isn't byte-identical today, so it is deferred to follow-up F4.
+
+**Follow-ups**:
+- Before merge: the cleanup commit removes this plan and its handoff, and either removes `specs/handoffs/review-since-v086-lantern.md` or promotes it to `specs/`.
+- Add milestones m4.11-m4.14 to `specs/milestones.md` if the four specs are accepted, and answer each spec's Open questions.
+- Layout bug L1: the beside-header card sits 26 px above a grown marker band in 3 samples (`roadmap-node.ts:515` vs 1027-1033). The fix changes renders and goldens (R2 F1).
+- Layout bug L2: when today is past the original window, the now-line is drawn without its pill row, and NL.W1000 stays silent.
+- Chart vs export schedule divergence: 10 of 53 samples disagree (showcase: Ship at day 20 in the chart, day 40 in XLSX, MS Project and Mermaid). Engine C leaves isolated-region items unscheduled in 4 samples (R1 F1-F4).
+- Carried from the review, not in this plan: msproj `<StartDate>` ignores `start:`; R5 (render.ts and view-preset.ts splits); R6 (generated keyword lists and a published grammar artifact).

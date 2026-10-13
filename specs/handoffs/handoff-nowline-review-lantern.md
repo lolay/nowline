@@ -3,20 +3,20 @@
 - **Plan:** `specs/handoffs/plan-nowline-review-lantern.md`
 - **Branch:** `claude/ecstatic-babbage-qsrxbx` in `lolay/nowline` (task branch the cloud session was assigned; fast-forwarded from 86ac76c to origin/main 0062df3 at kickoff). One working directory: `/workspace/nowline`.
 - **Mode:** unattended, confirmed 2026-10-13 in session 8c78f794-2944-59bb-8116-4413104e9100 (`harness=claude-code runner=cloud`). Guard 3x min $50 (limit ~$63 against ~$21 expected). Fix-up cap 2 per group.
-- **Status:** 4/4 groups ran. Wave 3 (`nowline m3 s4`) reviewed CONCERNS (one out-of-range line ref); Gary approved fix-up 3-fix [xdeep] at gate 7. Next: 3-fix, then final completion.
-- **Spend:** ~$47.82 against ~$21 expected (wave 2 ran ~$13.5 against ~$5 planned: the worker probed all 53 samples to measure engine divergence). Guard limit ~$63, not tripped. The orchestrator-kickoff line covers this session from its start, so it includes the review conversation that preceded the kickoff (the explore agents are not counted).
-- **Resume:** paste the plan's Kickoff prompt into a session on this branch.
+- **Status:** complete 2026-10-13. 4/4 groups done, every review PASS after fix-ups 2-fix and 3-fix. Branch head 96f582f plus the completion commit. Nothing is in flight.
+- **Spend:** ~$52.44 against ~$21 expected (guard limit ~$63, not tripped). The figure includes the pre-kickoff review conversation in the orchestrator-kickoff line; the earlier explore agents are not counted.
+- **Resume:** nothing to resume. Next actions are Gary's: whether to open a PR, and the cleanup commit (see Completion summary).
 
 ## Pending question (verbatim)
 
-None. Gary approved 3-fix (gate 7) with `approve 3-fix`, 2026-10-13.
+Asked 2026-10-13 at completion: open a PR for this branch? It needs a cleanup commit first, removing the plan, this handoff and the review doc (or promoting the review doc to `specs/`).
 
 ## Done
 
 - m1.s1 (c233919): `specs/handoffs/review-since-v086-lantern.md`, the public-repo review with file:line refs re-checked at HEAD.
 - m2.s1-s6 (8e636a2..8759cdd): MCP theme/pageSize/nonWorking through shared normalizers; malformed `.nowlinerc` is a usage error (exit 2); `sanitizeSvg` drops `class`; LSP offers `calendar`; stale comments and public docs fixed; Renovate `@nowline/**` rule. Four `release-note:fixed` fragments. `make ci` green.
 - m3.s1-s3 (5583e59..4fc1c28): `specs/scheduler-unification.md` (R1, proposed m4.11), `specs/core-ast-utilities.md` (R3, m4.12), `specs/surface-options.md` (R4, m4.13). Review CONCERNS, then fix-up 2-fix (1ee9465..f49c01a) PASS: gate G1 renders every sample directly on both commits in all three themes.
-- m3.s4 (de36917): `specs/layout-phases.md` (R2, proposed m4.14). Review CONCERNS; fix-up pending.
+- m3.s4 (de36917): `specs/layout-phases.md` (R2, proposed m4.14). Review CONCERNS, then fix-up 3-fix (96f582f) PASS: `renderable.ts:45-68` ref, `createLayoutContext` chart parameter.
 
 ## Review log verdicts, fix-ups, retries, checkpoints
 
@@ -28,6 +28,8 @@ None. Gary approved 3-fix (gate 7) with `approve 3-fix`, 2026-10-13.
 - review wave-2-fix (nowline m3 s1-s3) 4fc1c28..f49c01a: PASS (1 of 2 fix-ups used).
 - gate-7 (into [xdeep], planned) passed unattended as a checkpoint.
 - review wave-3 (nowline m3 s4) 4eef354..de36917: CONCERNS: `layout-phases.md:365` cites `renderable.ts:237-251`, the file has 68 lines (intended 45-68). Non-blocking: §3.8 `createLayoutContext` sketch lacks the chart y fields. Fix-up 3-fix next.
+- gate-7 for 3-fix approved by Gary (`approve 3-fix`), 2026-10-13.
+- review wave-3-fix (nowline m3 s4) de36917..96f582f: PASS (1 of 2 fix-ups used).
 
 ## Decisions so far
 
@@ -49,3 +51,28 @@ None. Gary approved 3-fix (gate 7) with `approve 3-fix`, 2026-10-13.
 ## Deviations from plan
 
 - The run pauses after the kickoff answer for Gary's `/compact` (his request), before wave 1 launches.
+- Fix-ups 2-fix [deep] and 3-fix [xdeep] ran (reasons in the Review log); 3-fix stopped at gate 7 and ran on Gary's approval.
+- Cost ran ~2.5x the estimate (~$52 vs ~$21): the spec workers laid out every sample to measure divergence.
+
+## Completion summary
+
+**Completed**: 2026-10-13
+
+**What shipped**: On `claude/ecstatic-babbage-qsrxbx`, 0062df3..96f582f. m1 wrote the public-repo review (`specs/handoffs/review-since-v086-lantern.md`). m2 landed six quick fixes with four `release-note:fixed` fragments and `make ci` green: MCP theme, pageSize and nonWorking go through the shared normalizers; a malformed `.nowlinerc` is a usage error (exit 2); `sanitizeSvg` drops `class`; LSP offers the `calendar` icon; stale comments and public docs are fixed (codes.ts, embed.md, AGENTS.md, architecture.md, triage.yaml, CONTRIBUTING); and the shared Renovate preset exempts `@nowline/**` from the release-age wait. m3 wrote four refactor specs, each with byte-identical migration steps and the same G1 gate (every sample rendered directly on both commits, in all three themes): `specs/scheduler-unification.md` (R1, proposed m4.11), `specs/core-ast-utilities.md` (R3, m4.12), `specs/surface-options.md` (R4, m4.13) and `specs/layout-phases.md` (R2, m4.14).
+
+**Deviations from plan**:
+- The run paused after the kickoff answer for Gary's `/compact` (his request) and resumed from the pasted Kickoff prompt.
+- Unattended checkpoints passed: gate-4 (entering m2), gate-4 (entering m3), gate-2 (into [deep]), gate-7 (into the planned [xdeep] wave 3).
+- Fix-up 2-fix [deep]: wave-2 review CONCERNS. Gate G1 skipped samples `make build` never renders (13 in all) and exited with only the last `cmp`'s status. Two stale `load-config.ts` refs, and MCP render said to parse three times (it's twice). Fixed, PASS.
+- Fix-up 3-fix [xdeep]: wave-3 review CONCERNS. `layout-phases.md` cited `renderable.ts:237-251` in a 68-line file. Unplanned [xdeep] work stopped at gate 7. Gary approved (`approve 3-fix`); fixed, PASS.
+- No automatic retries.
+- Cost: ~$52.44 against ~$21 expected, under the ~$63 guard. Waves 2 and 3 ran 2.5-3.7x their estimates because the workers laid out all samples to measure engine divergence and fixup frequency.
+- R1 departs from the review's "engine A floors from C". That change isn't byte-identical today, so it is deferred to follow-up F4.
+
+**Follow-ups**:
+- Before merge: the cleanup commit removes this plan and its handoff, and either removes `specs/handoffs/review-since-v086-lantern.md` or promotes it to `specs/`.
+- Add milestones m4.11-m4.14 to `specs/milestones.md` if the four specs are accepted, and answer each spec's Open questions.
+- Layout bug L1: the beside-header card sits 26 px above a grown marker band in 3 samples (`roadmap-node.ts:515` vs 1027-1033). The fix changes renders and goldens (R2 F1).
+- Layout bug L2: when today is past the original window, the now-line is drawn without its pill row, and NL.W1000 stays silent.
+- Chart vs export schedule divergence: 10 of 53 samples disagree (showcase: Ship at day 20 in the chart, day 40 in XLSX, MS Project and Mermaid). Engine C leaves isolated-region items unscheduled in 4 samples (R1 F1-F4).
+- Carried from the review, not in this plan: msproj `<StartDate>` ignores `start:`; R5 (render.ts and view-preset.ts splits); R6 (generated keyword lists and a published grammar artifact).
