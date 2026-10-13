@@ -236,13 +236,18 @@ export function classifyCalendarDeclaration(
 export function replacesPresetWeekend(
     declarations: ReadonlyArray<NonWorkingDeclaration | WorkingDeclaration>,
 ): boolean;
+
+/** One of the seven names (an own key of `WEEKDAY_INDEX`, never an inherited one such as `constructor`). */
+export function isWeekday(name: string): name is Weekday;
+/** `date`, `start`, `end`, `every`: any other key is NL.E0901. */
+export const CALENDAR_DECLARATION_KEYS: ReadonlySet<string>;
 ```
 
 - **Validator.** `checkCalendarDeclaration` keeps choosing codes from the facts; NW3/NW4 (`:2106-2173`) read `wellFormed`, `shape` and `weekdays` and use `replacesPresetWeekend`. The local helpers at `:2325-2439` go.
 - **Layout.** `declarationRule` (`calendar-resolver.ts:105-135`) maps facts to a `CalendarRule` (string dates to `Date`), and `calendarRules` uses `replacesPresetWeekend`. Its `WEEKDAY_INDEX`, `realDate` and `stripColon` go.
 - **LSP hover.** `undrawnTitleNote` (`hover.ts:136-149`) reads `shape`: a titled `bounded-recurrence` or `half-bounded-recurrence` is not drawn.
 
-The three copies agree on every shape the grammar can produce (a bracket list has at least one element, `nowline.langium:189-193`), so the switch changes no output; the facts are tested against each copy before the copies go (§5).
+The three copies agree on every shape the grammar can produce (a bracket list has at least one element, `nowline.langium:189-193`), so the switch changes no output; the facts are tested against each copy before the copies go (§5). The equivalence test found one difference: the validator read weekday names with `in` and layout with a plain object lookup, so a name `Object.prototype` holds (`every:constructor`) passed as a weekday; `isWeekday` accepts only the seven names, which makes that an `NL.E0904` (a `fixed` line in the m2.s1 fragment).
 
 ### 3.5 Property helpers, date pattern and value tables
 

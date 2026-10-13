@@ -59,7 +59,8 @@ export interface CalendarDeclarationFacts {
     wellFormed: boolean;
 }
 
-const OWN_KEYS: ReadonlySet<string> = new Set<CalendarDeclarationKey>([
+/** The keys a declaration takes; any other is NL.E0901. */
+export const CALENDAR_DECLARATION_KEYS: ReadonlySet<string> = new Set<CalendarDeclarationKey>([
     'date',
     'start',
     'end',
@@ -73,7 +74,7 @@ export function classifyCalendarDeclaration(
     const own = new Map<CalendarDeclarationKey, EntityProperty>();
     for (const prop of decl.properties) {
         const key = propKey(prop);
-        if (OWN_KEYS.has(key) && !own.has(key as CalendarDeclarationKey)) {
+        if (CALENDAR_DECLARATION_KEYS.has(key) && !own.has(key as CalendarDeclarationKey)) {
             own.set(key as CalendarDeclarationKey, prop);
         }
     }

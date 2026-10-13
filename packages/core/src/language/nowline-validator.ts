@@ -58,6 +58,13 @@ import type { MessageArgs, MessageCode } from '../i18n/index.js';
 import { tr } from '../i18n/index.js';
 import { ISO_DATE_RE, isRealIsoDate, propKey } from '../util/props.js';
 import { declarations, forEachDeclaredId, referenceableIds, visitProperties } from './ast-walk.js';
+import {
+    CALENDAR_DECLARATION_KEYS,
+    type CalendarDeclarationFacts,
+    classifyCalendarDeclaration,
+    isWeekday,
+    replacesPresetWeekend,
+} from './calendar-declarations.js';
 import type { NowlineAstType, NowlineServices } from './nowline-module.js';
 import { styleLayers } from './style-chain.js';
 import {
@@ -1995,7 +2002,8 @@ export class NowlineValidator {
         accept: ValidationAcceptor,
     ): void {
         const kind = entityTypeLabel(decl);
-        const own = calendarOwnProps(decl);
+        const facts = classifyCalendarDeclaration(decl);
+        const { own } = facts;
 
         for (const prop of decl.properties) {
             if (!CALENDAR_DECLARATION_KEYS.has(propKey(prop))) {
@@ -2006,7 +2014,7 @@ export class NowlineValidator {
             }
         }
 
-        if (!hasCalendarShape(own)) {
+        if (facts.shape === 'malformed') {
             acceptTr(accept, 'error', { node: decl }, 'NL.E0900', { kind });
         }
 
@@ -2029,13 +2037,13 @@ export class NowlineValidator {
             });
         }
 
-        for (const key of ['start', 'end']) {
+        for (const key of ['start', 'end'] as const) {
             const prop = own.get(key);
-            if (prop && isCalendarDateList(prop)) {
+            // A one-element bracket is the single date; two or more is a list.
+            if (prop && prop.values.length > 1) {
                 acceptTr(accept, 'error', { node: prop }, 'NL.E0902', { kind, key });
             } else if (prop && prop.values.length === 1 && !isRealIsoDate(prop.values[0])) {
-                // A one-element bracket is the single date; checkPropertyValues reads `value`
-                // only, so the element is checked here.
+                // checkPropertyValues reads `value` only, so the element is checked here.
                 acceptTr(
                     accept,
                     'error',
@@ -2046,8 +2054,7 @@ export class NowlineValidator {
             }
         }
 
-        const start = scalarDate(own.get('start'));
-        const end = scalarDate(own.get('end'));
+        const { start, end } = facts;
         if (start && end && end < start) {
             acceptTr(accept, 'error', { node: own.get('end')!, property: 'value' }, 'NL.E0903', {
                 start,
@@ -2058,12 +2065,13 @@ export class NowlineValidator {
         const everyProp = own.get('every');
         if (everyProp) {
             const seen = new Set<string>();
-            calendarPropValues(everyProp).forEach((value, index) => {
+            const names = everyProp.value !== undefined ? [everyProp.value] : everyProp.values;
+            names.forEach((value, index) => {
                 const info: DiagnosticInfo =
                     everyProp.values.length > 0
                         ? { node: everyProp, property: 'values', index }
                         : { node: everyProp, property: 'value' };
-                if (!(value in WEEKDAY_INDEX)) {
+                if (!isWeekday(value)) {
                     acceptTr(accept, 'error', info, 'NL.E0904', { value });
                 } else if (seen.has(value)) {
                     acceptTr(accept, 'error', info, 'NL.E0905', { value });
@@ -2082,8 +2090,11 @@ export class NowlineValidator {
         if (!roadmap) return;
 
         const declarations = file.configEntries.filter(isCalendarDeclaration);
-        const usable = declarations.filter(isWellFormedCalendarDeclaration);
-        const openEnded = usable.filter((d) => isOpenEndedRecurrence(d));
+        const usable = declarations
+            .map((decl) => ({ decl, facts: classifyCalendarDeclaration(decl) }))
+            .filter(({ facts }) => facts.wellFormed);
+        const weekdaysOf = (facts: CalendarDeclarationFacts): number[] => facts.weekdays ?? [];
+        const openEnded = usable.filter(({ facts }) => facts.shape === 'open-recurrence');
 
         const calendarProp = roadmap.properties.find((p) => propKey(p) === 'calendar');
         const block = file.configEntries.find(isCalendarBlock);
@@ -2102,31 +2113,31 @@ export class NowlineValidator {
               : BUSINESS_DAYS_PER_WEEK;
 
         // The preset weekend, unless a non-working declaration is named `weekend`.
-        const replacesWeekend = declarations.some(
-            (d) => isNonWorkingDeclaration(d) && d.name === 'weekend',
-        );
+        const replacesWeekend = replacesPresetWeekend(declarations);
         const open = new Set<number>(!isCustom && !isFull && !replacesWeekend ? [0, 6] : []);
-        for (const decl of openEnded) {
+        for (const { decl, facts } of openEnded) {
             if (isNonWorkingDeclaration(decl)) {
-                for (const day of weekdaysOf(decl)) open.add(day);
+                for (const day of weekdaysOf(facts)) open.add(day);
             }
         }
-        for (const decl of openEnded) {
+        for (const { decl, facts } of openEnded) {
             if (isWorkingDeclaration(decl)) {
-                for (const day of weekdaysOf(decl)) open.delete(day);
+                for (const day of weekdaysOf(facts)) open.delete(day);
             }
         }
 
         if (open.size === 7) {
-            for (const decl of openEnded) {
+            for (const { decl } of openEnded) {
                 if (isNonWorkingDeclaration(decl)) {
                     acceptTr(accept, 'error', { node: decl }, 'NL.E0906');
                 }
             }
         }
-        for (const decl of usable) {
-            if (!isNonWorkingDeclaration(decl) || !isHalfBoundedRecurrence(decl)) continue;
-            const days = new Set([...open, ...weekdaysOf(decl)]);
+        for (const { decl, facts } of usable) {
+            if (!isNonWorkingDeclaration(decl) || facts.shape !== 'half-bounded-recurrence') {
+                continue;
+            }
+            const days = new Set([...open, ...weekdaysOf(facts)]);
             if (days.size === 7) acceptTr(accept, 'error', { node: decl }, 'NL.E0906');
         }
 
@@ -2140,7 +2151,7 @@ export class NowlineValidator {
             : calendarProp
               ? { node: calendarProp }
               : openEnded.length > 0
-                ? { node: openEnded[0] }
+                ? { node: openEnded[0].decl }
                 : { node: roadmap };
         acceptTr(accept, 'warning', info, 'NL.W0705', { daysPerWeek, working });
     }
@@ -2295,110 +2306,12 @@ function parseUtilizationFraction(val: string | undefined): number | null {
 
 // --- Calendar declarations (`non-working` / `working`) ---
 
-const CALENDAR_DECLARATION_KEYS = new Set(['date', 'start', 'end', 'every']);
-
-// Weekday names the `every:` key takes, as UTC weekday numbers (Sunday is 0), the same
-// numbering as `CalendarRule.every` in @nowline/layout.
-const WEEKDAY_INDEX: Record<string, number> = {
-    sun: 0,
-    mon: 1,
-    tue: 2,
-    wed: 3,
-    thu: 4,
-    fri: 5,
-    sat: 6,
-};
-
 const BUSINESS_DAYS_PER_WEEK = 5;
 
 type CalendarDeclaration = NonWorkingDeclaration | WorkingDeclaration;
 
 function isCalendarDeclaration(node: unknown): node is CalendarDeclaration {
     return isNonWorkingDeclaration(node) || isWorkingDeclaration(node);
-}
-
-/** The four own keys of a declaration, first occurrence of each. */
-/** @internal Exported for the m2.s3 equivalence test only. */
-export function calendarOwnProps(decl: CalendarDeclaration): Map<string, EntityProperty> {
-    const own = new Map<string, EntityProperty>();
-    for (const prop of decl.properties) {
-        const key = propKey(prop);
-        if (CALENDAR_DECLARATION_KEYS.has(key) && !own.has(key)) own.set(key, prop);
-    }
-    return own;
-}
-
-/** Exactly one of: `date:` alone; `start:` + `end:`; `every:` with optional `start:` / `end:`. */
-/** @internal Exported for the m2.s3 equivalence test only. */
-export function hasCalendarShape(own: ReadonlyMap<string, EntityProperty>): boolean {
-    if (own.has('date')) return !own.has('every') && !own.has('start') && !own.has('end');
-    if (own.has('every')) return true;
-    return own.has('start') && own.has('end');
-}
-
-function calendarPropValues(prop: EntityProperty): string[] {
-    return prop.value !== undefined ? [prop.value] : [...prop.values];
-}
-
-/** A `start:` / `end:` given two or more dates. A one-element bracket is the single date. */
-function isCalendarDateList(prop: EntityProperty): boolean {
-    return prop.values.length > 1;
-}
-
-/** The single, real date a `start:` / `end:` names, or undefined when absent or not one date. */
-/** @internal Exported for the m2.s3 equivalence test only. */
-export function scalarDate(prop: EntityProperty | undefined): string | undefined {
-    if (!prop || isCalendarDateList(prop)) return undefined;
-    const [value] = calendarPropValues(prop);
-    return value !== undefined && isRealIsoDate(value) ? value : undefined;
-}
-
-/** @internal Exported for the m2.s3 equivalence test only. */
-export function weekdaysOf(decl: CalendarDeclaration): number[] {
-    const every = calendarOwnProps(decl).get('every');
-    if (!every) return [];
-    return calendarPropValues(every)
-        .map((name) => WEEKDAY_INDEX[name])
-        .filter((day): day is number => day !== undefined);
-}
-
-/**
- * A declaration the calendar resolver would use: a valid shape, real single dates, weekday
- * names it knows, and an end that is not before the start. Anything else is reported by
- * `checkCalendarDeclaration` and left out of the week.
- */
-/** @internal Exported for the m2.s3 equivalence test only. */
-export function isWellFormedCalendarDeclaration(decl: CalendarDeclaration): boolean {
-    const own = calendarOwnProps(decl);
-    if (!hasCalendarShape(own)) return false;
-    const date = own.get('date');
-    if (date && !calendarPropValues(date).every((value) => isRealIsoDate(value))) {
-        return false;
-    }
-    for (const key of ['start', 'end']) {
-        const prop = own.get(key);
-        if (prop && scalarDate(prop) === undefined) return false;
-    }
-    const start = scalarDate(own.get('start'));
-    const end = scalarDate(own.get('end'));
-    if (start && end && end < start) return false;
-    const every = own.get('every');
-    if (every && !calendarPropValues(every).every((name) => name in WEEKDAY_INDEX)) return false;
-    return true;
-}
-
-/** `every:` with neither `start:` nor `end:`: it changes the week with no end date. */
-/** @internal Exported for the m2.s3 equivalence test only. */
-export function isOpenEndedRecurrence(decl: CalendarDeclaration): boolean {
-    const own = calendarOwnProps(decl);
-    return own.has('every') && !own.has('start') && !own.has('end');
-}
-
-/** `every:` with exactly one of `start:` and `end:`: unbounded on one side. */
-/** @internal Exported for the m2.s3 equivalence test only. */
-export function isHalfBoundedRecurrence(decl: CalendarDeclaration): boolean {
-    const own = calendarOwnProps(decl);
-    return own.has('every') && own.has('start') !== own.has('end');
 }
 
 function locationOf(node: AstNode): string {
