@@ -3,19 +3,16 @@ import type {
     EntityProperty,
     FootnoteDeclaration,
     GroupBlock,
-    GroupContent,
     ItemDeclaration,
     LabelDeclaration,
     MilestoneDeclaration,
     NonWorkingDeclaration,
     NowlineFile,
     ParallelBlock,
-    ParallelContent,
     PersonDeclaration,
     SizeDeclaration,
     StatusDeclaration,
     StyleDeclaration,
-    SwimlaneContent,
     SwimlaneDeclaration,
     SymbolDeclaration,
     TeamDeclaration,
@@ -33,7 +30,6 @@ import {
     isNowlineFile,
     isParallelBlock,
     isPersonDeclaration,
-    isPersonMemberRef,
     isSizeDeclaration,
     isStatusDeclaration,
     isStyleDeclaration,
@@ -43,6 +39,7 @@ import {
     isWaveDeclaration,
     isWorkingDeclaration,
 } from '@nowline/core';
+import { declarations, visitProperties } from '@nowline/core/internal';
 import type { AstNode, CstNode, LangiumDocument } from 'langium';
 import { CstUtils, GrammarUtils } from 'langium';
 import type { Range } from '../lsp-protocol.js';
@@ -177,62 +174,20 @@ export function isCalendarDeclaration(entity: AstNode): boolean {
 }
 
 /**
- * Walk the `NowlineFile` and collect every entity that owns an `id`. Covers
- * roadmap-section entities (mirrors the validator's `collectReferenceableIds`)
- * plus the named config-section declarations (`style`, `symbol`) so style and
- * symbol references navigate correctly. Anonymous config blocks (`scale`,
- * `calendar`, `default <entity>`) are skipped.
+ * Collect every entity that owns an `id`, in the order of core's declaration
+ * walk (config entries first, then roadmap entries with their track content or
+ * nested teams): the roadmap-section entities `@nowline/core`'s
+ * `referenceableIds` covers, plus the named config-section declarations
+ * (`style`, `symbol`) so style and symbol references navigate correctly.
+ * The LSP skips the roadmap line itself (not walked here) and the calendar
+ * declarations (`isCalendarDeclaration`); anonymous declarations have no id.
  */
 export function collectNamedEntities(file: NowlineFile): NamedEntity[] {
     const out: NamedEntity[] = [];
-
-    for (const entry of file.configEntries) {
-        if (isStyleDeclaration(entry) && entry.name) out.push(entry);
-        else if (isSymbolDeclaration(entry) && entry.name) out.push(entry);
+    for (const node of declarations(file, { config: true })) {
+        if (!(node as { name?: string }).name || isCalendarDeclaration(node)) continue;
+        out.push(node as NamedEntity);
     }
-
-    const visitTeam = (team: TeamDeclaration) => {
-        if (team.name) out.push(team);
-        for (const c of team.content) {
-            if (isTeamDeclaration(c)) visitTeam(c);
-            // `PersonMemberRef` and `DescriptionDirective` are references / prose,
-            // not declarations — skip.
-            else if (isPersonMemberRef(c)) {
-                /* skip */
-            }
-        }
-    };
-
-    const visitTrackChild = (child: SwimlaneContent | GroupContent | ParallelContent) => {
-        if (isItemDeclaration(child) && child.name) out.push(child);
-        else if (isParallelBlock(child)) {
-            if (child.name) out.push(child);
-            for (const sub of child.content) visitTrackChild(sub);
-        } else if (isGroupBlock(child)) {
-            if (child.name) out.push(child);
-            for (const sub of child.content) visitTrackChild(sub);
-        }
-    };
-
-    for (const entry of file.roadmapEntries) {
-        if (isSwimlaneDeclaration(entry)) {
-            if (entry.name) out.push(entry);
-            for (const c of entry.content) visitTrackChild(c);
-        } else if (isTeamDeclaration(entry)) visitTeam(entry);
-        else if (
-            isPersonDeclaration(entry) ||
-            isAnchorDeclaration(entry) ||
-            isMilestoneDeclaration(entry) ||
-            isFootnoteDeclaration(entry) ||
-            isLabelDeclaration(entry) ||
-            isSizeDeclaration(entry) ||
-            isStatusDeclaration(entry) ||
-            isWaveDeclaration(entry)
-        ) {
-            if (entry.name) out.push(entry);
-        }
-    }
-
     return out;
 }
 
@@ -251,27 +206,7 @@ export function buildEntityIndex(file: NowlineFile): Map<string, NamedEntity> {
 }
 
 /** Visit every `EntityProperty` reachable from a roadmap entry, depth-first. */
-export function visitProperties(
-    node: AstNode,
-    visit: (prop: EntityProperty, owner: AstNode) => void,
-): void {
-    const walk = (n: AstNode): void => {
-        const props = (n as { properties?: EntityProperty[] }).properties;
-        if (Array.isArray(props)) {
-            for (const p of props) visit(p, n);
-        }
-        if (isSwimlaneDeclaration(n)) {
-            for (const c of n.content) walk(c);
-        } else if (isParallelBlock(n) || isGroupBlock(n)) {
-            for (const c of n.content) walk(c);
-        } else if (isTeamDeclaration(n)) {
-            for (const c of n.content) {
-                if (isTeamDeclaration(c) || isPersonDeclaration(c)) walk(c);
-            }
-        }
-    };
-    walk(node);
-}
+export { visitProperties };
 
 /**
  * Iterate every `EntityProperty` in the file, including those on the roadmap
