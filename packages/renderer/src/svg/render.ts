@@ -2356,11 +2356,21 @@ async function embedLogo(
         const intrinsic = logo.intrinsic ?? svgIntrinsicSize(raw) ?? { width, height };
         // The root loses its own size so it fills this viewport; the
         // viewport's viewBox then scales the asset's units to the box.
+        // One warning per logo listing what the sanitizer removed, not one
+        // per attribute; editor metadata it removes silently.
+        const removed = new Set<string>();
         const cleaned = sanitizeSvg(raw, {
             idPrefix: `${idPrefix}-logo`,
-            onWarn: options.warn,
+            onWarn: (msg) => removed.add(msg.replace(/^sanitizer: dropping /, '')),
             stripRootSize: true,
         });
+        // A warning even under strict: callers promote warnings themselves
+        // (the export kernel throws, the browser pipeline returns rows).
+        if (removed.size > 0) {
+            options.warn?.(
+                `logo ${logoRef}: removed unsupported SVG content: ${[...removed].join(', ')}`,
+            );
+        }
         return tag(
             'svg',
             {

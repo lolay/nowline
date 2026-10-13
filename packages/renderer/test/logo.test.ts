@@ -220,6 +220,24 @@ swimlane a "A"
         );
     });
 
+    it('reports what the sanitizer removed in one warning per logo', async () => {
+        const model = await parseToModel(DSL, { logo: { width: 1, height: 1 } });
+        const warnings: string[] = [];
+        await renderSvg(model, {
+            warn: (m) => warnings.push(m),
+            assetResolver: async () => ({
+                bytes: bytes(
+                    '<svg viewBox="0 0 1 1" inkscape:label="x"><script>alert(1)</script>' +
+                        '<rect onclick="a()" onload="b()" width="1" height="1"/><rect onclick="c()"/></svg>',
+                ),
+                mime: 'image/svg+xml',
+            }),
+        });
+        expect(warnings).toEqual([
+            'logo ./acme.svg: removed unsupported SVG content: <script>, event handler onclick, event handler onload',
+        ]);
+    });
+
     it('shifts the title right of the logo', async () => {
         const plain = await renderSvg(await parseToModel(DSL));
         const model = await parseToModel(DSL, { logo: { width: 1, height: 1 } });

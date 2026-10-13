@@ -157,8 +157,9 @@ export interface RenderInputs {
     onNotice?: (message: string) => void;
     /**
      * Receives asset warnings, such as a `logo:` file that is missing or
-     * unreadable (the render then proceeds without the logo). Under
-     * `strict` they throw instead and this is not called.
+     * unreadable (the render then proceeds without the logo) or SVG logo
+     * content the sanitizer removed. Under `strict` they throw instead and
+     * this is not called.
      */
     onWarning?: (message: string) => void;
 }
@@ -321,7 +322,9 @@ async function stageDocument(
         logo,
     });
 
-    const renderWith = async (fontFamilies?: FontFamilies): Promise<string> => {
+    // `report` forwards non-strict warnings to `onWarning`; only the
+    // portable render sets it, so a raster re-render does not repeat them.
+    const renderWith = async (fontFamilies?: FontFamilies, report = false): Promise<string> => {
         const warnings: string[] = [];
         const svg = await renderSvg(model, {
             assetResolver,
@@ -333,11 +336,12 @@ async function stageDocument(
         if (inputs.strict && warnings.length > 0) {
             throw new Error(`@nowline/export: render warnings (--strict): ${warnings.join('; ')}`);
         }
+        if (report) for (const msg of warnings) inputs.onWarning?.(msg);
         return svg;
     };
 
     // Portable render (FONT_STACK) for the svg/html file exports.
-    const svg = await renderWith();
+    const svg = await renderWith(undefined, true);
 
     return {
         svg,

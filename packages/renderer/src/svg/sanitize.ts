@@ -89,7 +89,6 @@ const ALLOWED_ATTRIBUTES = new Set([
     'rotate',
     'letter-spacing',
     'word-spacing',
-    'style',
     'xmlns',
     'href',
     'xlink:href',
@@ -114,7 +113,128 @@ const ALLOWED_ATTRIBUTES = new Set([
     'patternContentUnits',
     'role',
     'aria-label',
+    // Presentation attributes beyond the ones above, so the same set can
+    // arrive from a `style` declaration (see PRESENTATION_PROPERTIES).
+    'display',
+    'visibility',
+    'clip-rule',
+    'color',
+    'font-variant',
+    'font-stretch',
+    'text-decoration',
+    'dominant-baseline',
+    'alignment-baseline',
+    'baseline-shift',
+    'writing-mode',
+    'paint-order',
+    'vector-effect',
+    'shape-rendering',
+    'text-rendering',
+    'image-rendering',
+    'color-interpolation',
+    'color-interpolation-filters',
 ]);
+
+// CSS properties a `style` attribute or `<style>` class rule may set. Each
+// becomes the presentation attribute of the same name, then goes through
+// the same attribute checks as one written directly. Editors (Inkscape,
+// Illustrator, Figma) put a logo's colors here, so dropping them would draw
+// the logo black.
+const PRESENTATION_PROPERTIES = new Set([
+    'fill',
+    'fill-opacity',
+    'fill-rule',
+    'stroke',
+    'stroke-width',
+    'stroke-opacity',
+    'stroke-linecap',
+    'stroke-linejoin',
+    'stroke-miterlimit',
+    'stroke-dasharray',
+    'stroke-dashoffset',
+    'opacity',
+    'clip-path',
+    'clip-rule',
+    'mask',
+    'filter',
+    'font-family',
+    'font-size',
+    'font-weight',
+    'font-style',
+    'font-variant',
+    'font-stretch',
+    'text-anchor',
+    'text-decoration',
+    'letter-spacing',
+    'word-spacing',
+    'dominant-baseline',
+    'alignment-baseline',
+    'baseline-shift',
+    'writing-mode',
+    'stop-color',
+    'stop-opacity',
+    'flood-color',
+    'flood-opacity',
+    'display',
+    'visibility',
+    'color',
+    'paint-order',
+    'vector-effect',
+    'shape-rendering',
+    'text-rendering',
+    'image-rendering',
+    'color-interpolation',
+    'color-interpolation-filters',
+]);
+
+// CSS properties dropped without a warning: they have no effect on how an
+// SVG 1.1 renderer draws the logo (editor hints, typographic settings for
+// features we do not draw, text layout that `text-anchor` already carries).
+const IGNORED_STYLE_PROPERTIES = new Set([
+    'line-height',
+    'text-align',
+    'font-variant-ligatures',
+    'font-variant-caps',
+    'font-variant-numeric',
+    'font-variant-east-asian',
+    'font-variant-position',
+    'font-variant-alternates',
+    'font-feature-settings',
+    'font-variation-settings',
+    'font-kerning',
+    'white-space',
+    'text-orientation',
+    'overflow',
+    'isolation',
+    'solid-color',
+    'solid-opacity',
+    'enable-background',
+    'color-rendering',
+]);
+
+// Values that leave an unsupported property at its default, so dropping
+// it changes nothing (`mix-blend-mode:normal`, `marker:none`).
+const NO_OP_VALUES = new Set(['none', 'normal', 'auto', 'initial', 'inherit', 'unset']);
+
+// Attributes dropped without a warning: editor and document bookkeeping
+// that never draws (`inkscape:label`, `sodipodi:docname`, `xmlns:*`,
+// `xml:space`, `data-name`, `version`).
+function isMetadataAttribute(key: string): boolean {
+    if (key === 'xlink:href') return false;
+    return (
+        key.includes(':') ||
+        key.startsWith('data-') ||
+        key === 'version' ||
+        key === 'baseProfile' ||
+        key === 'enable-background'
+    );
+}
+
+// Elements dropped without a warning: `<metadata>` and editor-namespaced
+// elements (`<sodipodi:namedview>`, `<inkscape:page>`, `<rdf:RDF>`).
+function isMetadataElement(name: string): boolean {
+    return name === 'metadata' || (name.includes(':') && !name.startsWith('svg:'));
+}
 
 export interface SanitizeOptions {
     // Rewrite internal ids under this prefix to avoid collisions with the
@@ -287,6 +407,17 @@ export function sanitizeSvg(input: string, options: SanitizeOptions = {}): strin
     const warn = options.onWarn ?? ((): void => {});
     const tokens = tokenize(input);
 
+    // Class rules from every `<style>` element, applied below as attributes.
+    // The `<style>` element itself is never emitted.
+    let sheet = '';
+    let styleDepth = 0;
+    for (const t of tokens) {
+        if (t.kind === 'open' && t.name === 'style') styleDepth++;
+        else if (t.kind === 'close' && t.name === 'style') styleDepth = Math.max(0, styleDepth - 1);
+        else if (styleDepth > 0 && (t.kind === 'text' || t.kind === 'cdata')) sheet += t.text ?? '';
+    }
+    const classRules = parseClassRules(sheet, (what) => warn(`sanitizer: dropping ${what}`));
+
     // First pass: discover ids so the second pass can rewrite references.
     const idMap = new Map<string, string>();
     let idCounter = 0;
@@ -334,6 +465,10 @@ export function sanitizeSvg(input: string, options: SanitizeOptions = {}): strin
                 if (t.kind === 'open') stack.push(false);
                 continue;
             }
+            if (name === 'style' || isMetadataElement(name)) {
+                if (t.kind === 'open') stack.push(false);
+                continue;
+            }
             if (!ALLOWED_ELEMENTS.has(name)) {
                 warn(`sanitizer: dropping unknown element <${name}>`);
                 if (t.kind === 'open') stack.push(false);
@@ -341,14 +476,16 @@ export function sanitizeSvg(input: string, options: SanitizeOptions = {}): strin
             }
             const parts: string[] = [`<${name}`];
             const isRoot = name === 'svg' && stack.length === 0;
-            const keys = Object.keys(t.attrs ?? {}).sort();
+            const merged = applyStyles(t.attrs ?? {}, classRules, warn);
+            const keys = Object.keys(merged).sort();
             for (const key of keys) {
-                const value = (t.attrs as Record<string, string>)[key];
+                const value = merged[key];
                 if (isRoot && options.stripRootSize && ROOT_SIZE_ATTRIBUTES.has(key)) continue;
                 if (/^on/i.test(key)) {
                     warn(`sanitizer: dropping event handler ${key}`);
                     continue;
                 }
+                if (isMetadataAttribute(key)) continue;
                 if (!ALLOWED_ATTRIBUTES.has(key)) {
                     warn(`sanitizer: dropping attribute ${key}`);
                     continue;
@@ -362,28 +499,31 @@ export function sanitizeSvg(input: string, options: SanitizeOptions = {}): strin
                     parts.push(` ${key}="${escAttrValue(rewritten)}"`);
                     continue;
                 }
-                if (key === 'style') {
-                    // CSS can smuggle `expression()` or url() — strip entirely.
-                    warn('sanitizer: dropping inline style');
-                    continue;
-                }
                 if (key === 'id') {
                     const mapped = idMap.get(value);
                     if (mapped) parts.push(` id="${escAttrValue(mapped)}"`);
                     continue;
                 }
+                // Reject raster data URIs, script URLs, any url() that is not
+                // a local fragment (an external fetch), and CSS escapes or
+                // constructs a style value could smuggle in. Local
+                // `url(#foo)` references are checked out of the value first.
+                const localRef = /url\(#([^)]+)\)/gi;
+                if (
+                    /data:|javascript:|vbscript:|url\(|expression\s*\(|[\\{}]/i.test(
+                        value.replace(localRef, ''),
+                    )
+                ) {
+                    warn(`sanitizer: dropping suspicious value at ${key}`);
+                    continue;
+                }
                 // Rewrite any `url(#foo)` embedded inside fill/stroke/etc.
-                if (/\burl\(#/i.test(value)) {
-                    const rewritten = value.replace(/url\(#([^)]+)\)/gi, (_m, id) => {
+                if (/url\(#/i.test(value)) {
+                    const rewritten = value.replace(localRef, (_m, id) => {
                         const mapped = idMap.get(id);
                         return mapped ? `url(#${mapped})` : 'none';
                     });
                     parts.push(` ${key}="${escAttrValue(rewritten)}"`);
-                    continue;
-                }
-                // Reject raster data URIs at non-href attributes.
-                if (/data:|javascript:|vbscript:/i.test(value)) {
-                    warn(`sanitizer: dropping suspicious value at ${key}`);
                     continue;
                 }
                 parts.push(` ${key}="${escAttrValue(value)}"`);
@@ -433,4 +573,90 @@ export function svgIntrinsicSize(input: string): { width: number; height: number
         return { width: vb[2], height: vb[3] };
     }
     return undefined;
+}
+
+interface StyleDeclaration {
+    property: string;
+    value: string;
+}
+
+// `a: b; c: d` into declarations, `!important` stripped. Malformed parts
+// (no colon) are skipped.
+function parseDeclarations(text: string): StyleDeclaration[] {
+    const out: StyleDeclaration[] = [];
+    for (const part of text.split(';')) {
+        const colon = part.indexOf(':');
+        if (colon < 0) continue;
+        const property = part.slice(0, colon).trim().toLowerCase();
+        const value = part
+            .slice(colon + 1)
+            .replace(/!\s*important\s*$/i, '')
+            .trim();
+        if (property && value) out.push({ property, value });
+    }
+    return out;
+}
+
+interface ClassRule {
+    classes: string[];
+    declarations: StyleDeclaration[];
+}
+
+// The subset of a `<style>` sheet we apply: rules whose selectors are all
+// plain class selectors (`.cls-1, .cls-2 { ... }`), the shape Illustrator
+// and Figma export. Anything else (element, id or compound selectors,
+// at-rules) is reported through `onUnsupported` and not applied.
+function parseClassRules(sheet: string, onUnsupported: (what: string) => void): ClassRule[] {
+    const rules: ClassRule[] = [];
+    const text = sheet.replace(/\/\*[\s\S]*?\*\//g, '');
+    const rulePattern = /([^{}]+)\{([^{}]*)\}/g;
+    for (const m of text.matchAll(rulePattern)) {
+        const selectorText = m[1].trim();
+        const selectors = selectorText.split(',').map((sel) => sel.trim());
+        if (
+            selectorText.startsWith('@') ||
+            !selectors.every((sel) => /^\.[A-Za-z_][\w-]*$/.test(sel))
+        ) {
+            onUnsupported(`<style> rule ${selectorText}`);
+            continue;
+        }
+        rules.push({
+            classes: selectors.map((sel) => sel.slice(1)),
+            declarations: parseDeclarations(m[2]),
+        });
+    }
+    if (/@[a-z-]+[^{;]*;/i.test(text)) onUnsupported('<style> at-rule');
+    return rules;
+}
+
+// An element's attributes with its styles folded in, in CSS cascade order:
+// presentation attributes, then matching class rules in sheet order, then
+// the inline `style`. Only PRESENTATION_PROPERTIES survive as attributes;
+// other properties are dropped, with a warning unless ignorable.
+function applyStyles(
+    attrs: Record<string, string>,
+    classRules: ClassRule[],
+    warn: (message: string) => void,
+): Record<string, string> {
+    const classes = new Set((attrs.class ?? '').split(/\s+/).filter(Boolean));
+    const declarations: StyleDeclaration[] = [];
+    for (const rule of classRules) {
+        if (rule.classes.some((c) => classes.has(c))) declarations.push(...rule.declarations);
+    }
+    if (attrs.style !== undefined) declarations.push(...parseDeclarations(attrs.style));
+    if (declarations.length === 0 && attrs.style === undefined) return attrs;
+    const merged: Record<string, string> = { ...attrs };
+    delete merged.style;
+    for (const { property, value } of declarations) {
+        if (PRESENTATION_PROPERTIES.has(property)) {
+            merged[property] = value;
+        } else if (
+            !property.startsWith('-') &&
+            !IGNORED_STYLE_PROPERTIES.has(property) &&
+            !NO_OP_VALUES.has(value.toLowerCase())
+        ) {
+            warn(`sanitizer: dropping style property ${property}`);
+        }
+    }
+    return merged;
 }

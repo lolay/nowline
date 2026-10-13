@@ -122,10 +122,18 @@ The roadmap header renders as a contained box in the top-left corner, above and 
 
 | Extension | Embedding strategy |
 |-----------|--------------------|
-| `.svg` | Sanitized (`<script>`, external `href`, foreign-object content, inline styles and event handlers stripped) with its ids namespaced (`<idPrefix>-logo-*`), then inlined inside a nested `<svg data-layer="logo">` viewport sized to the logo box. The asset's root `<svg>` loses its own `x` / `y` / `width` / `height` so it fills that viewport, and the viewport's `viewBox` (the asset's intrinsic size) scales it. |
+| `.svg` | Sanitized (see below) with its ids namespaced (`<idPrefix>-logo-*`), then inlined inside a nested `<svg data-layer="logo">` viewport sized to the logo box. The asset's root `<svg>` loses its own `x` / `y` / `width` / `height` so it fills that viewport, and the viewport's `viewBox` (the asset's intrinsic size) scales it. |
 | `.png`, `.jpg` / `.jpeg`, `.webp` | Base64-encoded and embedded as `<image data-layer="logo" href="data:image/<type>;base64,...">` at the logo box's width and height. No re-encoding. |
 
 The output artifact is self-contained and has no external references for the logo.
+
+**SVG sanitizing.** The sanitizer is an allow-list walker (`packages/renderer/src/svg/sanitize.ts`): an element or attribute it does not know is removed, never passed through. What it does with the rest:
+
+- **Removed, with a warning:** `<script>`, `<foreignObject>`, animation elements, event handlers (`on*`), any `href` or `url()` that is not a local `#fragment` (no external fetches), `data:` / `javascript:` values and CSS escapes, and unknown elements and attributes that could draw something.
+- **Styles kept as attributes:** an inline `style` and the rules of a `<style>` sheet whose selectors are plain classes (`.cls-1, .cls-2 { ... }`, as Illustrator and Figma export) become presentation attributes, in cascade order (attribute, then class rules in sheet order, then inline `style`). Only presentation properties survive (`fill`, `stroke*`, `opacity`, `font-*`, `display`, `visibility` and the like), and each value passes the same checks as an attribute. Editors keep a logo's colors here, so dropping styles would draw it black. Other selectors and at-rules are not applied and draw a warning; the `<style>` element is never emitted.
+- **Removed silently:** editor bookkeeping that never draws: `<metadata>`, namespaced elements and attributes (`inkscape:*`, `sodipodi:*`, `xmlns:*`, `xml:space`), `data-*`, `version`, vendor-prefixed style properties, typographic properties the renderer does not draw (`line-height`, `font-variant-ligatures`, ...), and any unsupported property set to `none`, `normal` or `auto`. A logo saved straight from Inkscape or Illustrator therefore draws no warning at all.
+
+The warnings for one logo collapse into a single line: `logo <path>: removed unsupported SVG content: <script>, event handler onclick`.
 
 **Load before layout.** The logo's size depends on its aspect ratio, which layout cannot read (it never touches asset bytes). So each render pipeline (the export kernel behind `nowline` render, `nowline serve`, and the browser pipeline behind the VS Code preview) loads the asset first with `loadLogo` from `@nowline/renderer`. It reads the intrinsic size from the file header (PNG `IHDR`, the JPEG start-of-frame, the WebP `VP8 ` / `VP8L` / `VP8X` chunk, or the SVG root's pixel `width` and `height`, else its `viewBox`) and passes it to `layoutRoadmap` as `LayoutOptions.logo`. A surface with no asset resolver (the embed) skips the logo silently.
 
@@ -153,6 +161,8 @@ Logo resolution is a render-time concern. Each failure is a warning, and the cha
 - **Missing file**, or a path the asset resolver refuses (one that escapes `--asset-root`) — `logo file not found: <path> (<reason>)`.
 - **Unreadable** — `logo could not be parsed: <path> (<reason>)`: a raster whose header does not match its extension, or an SVG with neither a `viewBox` nor a pixel `width` and `height` on its root.
 - **URL** (`http://`, `https://`, `file://`, `data:`) — not special-cased: it is treated as a local path, fails to resolve, and draws the missing-file warning. The renderer never fetches remote assets.
+
+- **Unsafe or unsupported SVG content** — the one-line summary above; the logo still draws, minus what was removed.
 
 `nowline <input> --strict` promotes all logo warnings to errors (exit code 3, like any export pipeline failure). Without `--strict` the CLI prints them to stderr as `warning: ...`, which `-q` silences.
 

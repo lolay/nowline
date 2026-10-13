@@ -157,7 +157,7 @@ Downstream consumers (e.g. a hosted editor or an MCP server) plug in their own r
 
 The logo is resolved twice per render. Before layout, the pipeline calls `loadLogo` (in `@nowline/renderer`) to read the asset's intrinsic size from its header and passes it to `layoutRoadmap` as `LayoutOptions.logo`, so `@nowline/layout` sizes the header without ever touching asset bytes; a failed load is a warning and the render proceeds without the logo. The renderer then resolves the same path again to embed the bytes. Embedding format is decided from the original extension:
 
-- `.svg` — parsed, sanitized (strip `<script>`, strip external `href`/`src`, strip `<foreignObject>`), namespaced, and inlined inside a nested `<svg>` viewport that scales it to the logo box.
+- `.svg` — parsed, sanitized (strip `<script>`, `<foreignObject>`, event handlers and any external `href` / `url()`; fold `style` and simple `<style>` class rules into presentation attributes; drop editor metadata silently), namespaced, and inlined inside a nested `<svg>` viewport that scales it to the logo box. See `rendering.md` § Company Logo Formats and Embedding.
 - `.png`, `.jpg` / `.jpeg`, `.webp` — wrapped in `<image href="data:image/<type>;base64,...">` at the logo box size. The renderer does not re-encode; it passes the raw bytes through.
 
 The resolver abstraction is reused for any future asset-bearing property (e.g. per-entity icons) without adding new environment coupling to `@nowline/renderer`.
