@@ -1,7 +1,7 @@
 ```
 --- KICKOFF: begin orchestration at [deep] ---
 
-  Status: 3/10 groups done | last review: wave-3 PASS | current: nowline m2 s1-s2 [deep] | updated 2026-10-13
+  Status: 4/10 groups done | last review: wave-4 PASS | current: nowline m3 s1-s2 [exec] | updated 2026-10-13 | passed unattended: gate 4, gate 2 before wave 4
 
   mode: unattended | proposed unattended (harness=claude-code runner=cloud; CLAUDE_CODE_REMOTE=true, assigned branch) | guard 3x min $50 | fixups 2 | confirmed 2026-10-13 session 7e027fcc-1ca6-51b0-b005-63e1163df819 by Kickoff prompt: Run in unattended mode.
 
@@ -104,11 +104,11 @@ Move `packMarkerRow`, `markerLabelsRightX`, the run and exception entries and th
 
 ## m2 - Items are measured once
 
-#### s1 - [deep] `measureItem` and the full `ItemNode.measure`
+#### s1 - [deep] `measureItem` and the full `ItemNode.measure` (done)
 
 Add `packages/layout/src/nodes/item-measure.ts` with `ItemMeasure` and `measureItem(node, startX, ctx)` (spec §3.6): the front half of `sequenceItem` without the start resolution and the `before:` caps, with the duration from `scheduledItemDays`, the status tint from m1.s1 (on a copy of the style) and the helpers it needs (`statusFromProp`, `resolveItemProgress`, `resolveItemMeta`, chip sampling, `computeChipBarExtra`, `collectItemFootnoteIndicators`, `resolveTitleFirstLineReserve`, `parseLinkIcon`), moved without changing arithmetic. `measureItem` reads the scope, the scale and the footnote index, never an entity edge or a placed item. `ItemNode` is built from the measure: `measure()` returns `{ width: naturalWidth, height: bandwidth + barExtra }` and `place` returns the grown box, so no caller patches its height (N6); keep today's "grow only when `barExtra > 0`" arithmetic. `predictItemBarExtraHeight` stays this step. Test: for every placed item across the corpus (every `examples/**.nowline` and `tests/*.nowline`), `ItemNode.measure().height` equals the placed box height. G1, G2, G3.
 
-#### s2 - [deep] Derive the prediction from the measure
+#### s2 - [deep] Derive the prediction from the measure (done)
 
 `sequenceRowTrack` calls `measureItem` at `ctx.scale.startX(resolveChildStart(...))`, takes the desired end (`start + naturalWidth`) and the row pitch (`step + barExtra`) from it, and hands the measure to `sequenceItem`; parallel tracks, which reach `sequenceItem` directly, measure where they place. Delete `predictItemBarExtraHeight`, its `LayoutHelpers` slot, the second `computeChipBarExtra` caller and the duplicate width math in the loop. Replace the safety-net `Math.max` row height with the pitch only if G1 stays empty: `step + barExtra` and `step + ((bandwidth + barExtra) - bandwidth)` can differ by an ulp; if a byte moves, keep the commit-time expression and assert equality in a test instead, and say so in the commit body. Verify the spec's identity claims as you go (the wave floor is idempotent through `resolveChildStart`; `!!link` equals `parseLinkIcon(link).icon !== 'none'` for every link the validator accepts) and report any that fail. Unit fixtures, because the corpus never exercises a mismatch: a wrapped title, a spilled chip column and a narrow-bar link spill, each asserting the predicted pitch equals the placed height. G1, G2, G3.
 
@@ -191,6 +191,7 @@ Out of scope: F2 (local coordinates), F3 (after R1 F3), R5 renderer status table
 review wave-1 (nowline m1 s1-s2) 0b49f7c..28771a2: PASS - gate script re-run by reviewer on 28771a2: 360 renders, 0 differing paths, compile and determinism 314/314; make pre-commit green; statusTint values match §3.9; four Deps interfaces gone, ownerOverride dropped - 2026-10-13
 review wave-2 (nowline m1 s3) b448282..7e64d9c: PASS - loops diffed: only iterated content differs, no extra parameter; RowTrackResult {children, timeCursorX, packer} per §3.8; side-effect order unchanged; G1/G3 empty, pre-commit green; SwimlaneNode never read timeCursorX at the base, so only GroupNode reads it; passed unattended: gate 2 - 2026-10-13
 review wave-3 (nowline m1 s4) 4400fbd..bbab969: PASS - pure move confirmed line by line (only export keywords, header and imports differ); marker-band.ts also carries calendarLabelEntry, MarkerEntity (exported), markerLabelWidth, PackedPlacement; collectSlackCorridors after buildMilestones; no test imported the moved symbols; G1/G3 empty per worker - 2026-10-13
+review wave-4 (nowline m2 s1-s2) f354568..f5a6416: PASS - reviewer re-ran the gate script vs 570254b: GATES PASSED; moved helpers arithmetic-identical; measureItem reads no entity edges or placed items; ItemMeasure keeps visualWidth and naturalVisualWidth by name for byte identity; safety-net Math.max replaced by the pitch (G1 empty); predictItemBarExtraHeight gone, one computeChipBarExtra caller; both identity claims hold; corpus test and three fixtures fail on the base; passed unattended: gate 4, gate 2 - 2026-10-13
 
 ## Token log
 
@@ -211,3 +212,6 @@ tokens review-wave-2 nowline-m1-s3 (claude-opus-5-5): input ~20 / cache read ~26
 tokens orchestrator-wave-2 nowline-m1-s3 (claude-opus-5-5): input ~12 / cache read ~860k / cache write ~0 5m + ~19k 1h / output ~7.9k | ~$0.48 API-equiv
 tokens wave-3 nowline-m1-s4 (claude-sonnet-5-5): input ~36 / cache read ~1.4M / cache write ~96k / output ~18k | ~$0.70 API-equiv (output est.) session 7e027fcc-1ca6-51b0-b005-63e1163df819
 tokens review-wave-3 nowline-m1-s4 (claude-opus-5-5): input ~16 / cache read ~200k / cache write ~36k / output ~7.2k | ~$0.36 API-equiv (output est.) session 7e027fcc-1ca6-51b0-b005-63e1163df819
+tokens orchestrator-wave-3 nowline-m1-s4 (claude-opus-5-5): input ~20 / cache read ~1.7M / cache write ~0 5m + ~21k 1h / output ~11k | ~$0.74 API-equiv
+tokens wave-4 nowline-m2-s1-s2 (claude-opus-5-5): input ~150 / cache read ~14M / cache write ~260k / output ~73k | ~$5.55 API-equiv (output est.) session 7e027fcc-1ca6-51b0-b005-63e1163df819
+tokens review-wave-4 nowline-m2-s1-s2 (claude-opus-5-5): input ~36 / cache read ~990k / cache write ~82k / output ~18k | ~$0.97 API-equiv (output est.) session 7e027fcc-1ca6-51b0-b005-63e1163df819
