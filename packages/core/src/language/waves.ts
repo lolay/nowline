@@ -200,27 +200,17 @@ function isWaveContainer(node: AstNode | undefined): boolean {
 }
 
 /**
- * `ew(x)` from specs/waves.md §4.4: the 1-based index of the node's
- * effective wave, or undefined for background work.
+ * `ew(x)` from specs/waves.md §4.4, one step: the 1-based index of the node's
+ * effective wave, or undefined for background work (`assignWaves` runs it
+ * down the tree).
  *
  * - A `wave:` that names a valid declared wave applies, unless an enclosing
- *   group or parallel already has an effective wave: then the container's
- *   wave wins (a WV7 conflict uses the container's wave).
+ *   group or parallel already has an effective wave (`inherited`): then the
+ *   container's wave wins (a WV7 conflict uses the container's wave).
  * - An invalid `wave:` value (WV6) makes the node background.
  * - With no `wave:`, the nearest enclosing group or parallel decides.
  *   Swimlanes never contribute.
  */
-export function effectiveWave(
-    node: AstNode,
-    waveIds: ReadonlyMap<string, number>,
-): number | undefined {
-    const parent = isWaveContainer(node.$container) ? node.$container : undefined;
-    const inherited = parent ? effectiveWave(parent as AstNode, waveIds) : undefined;
-    return effectiveWaveStep(node, inherited, waveIds, topLevel(node));
-}
-
-// One step of `ew`: the node's own `wave:` against the effective wave of its
-// enclosing group or parallel (`inherited`).
 function effectiveWaveStep(
     node: AstNode,
     inherited: number | undefined,
@@ -234,32 +224,6 @@ function effectiveWaveStep(
     return inherited ?? own.index;
 }
 
-/**
- * `lw(C)` from specs/waves.md §5.1: the wave a container's box may not open
- * before. An item's lead wave is its effective wave. A group without an
- * effective wave takes its first child's; a parallel without one takes the
- * minimum over its tracks, or background when any track is background. An
- * empty container is background.
- */
-export function leadWave(node: AstNode, waveIds: ReadonlyMap<string, number>): number | undefined {
-    const own = effectiveWave(node, waveIds);
-    if (own !== undefined || isItemDeclaration(node)) return own;
-    if (isGroupBlock(node)) {
-        const first = trackChildren(node)[0];
-        return first ? leadWave(first, waveIds) : undefined;
-    }
-    if (isParallelBlock(node)) {
-        let min: number | undefined;
-        for (const track of trackChildren(node)) {
-            const lw = leadWave(track, waveIds);
-            if (lw === undefined) return undefined;
-            min = min === undefined ? lw : Math.min(min, lw);
-        }
-        return min;
-    }
-    return undefined;
-}
-
 /** `ew` and `lw` for every item, group and parallel under a list of lanes. */
 export interface WaveAssignment {
     /** `ew(x)`, for every node with an effective wave (absent: background). */
@@ -269,12 +233,15 @@ export interface WaveAssignment {
 }
 
 /**
- * `effectiveWave` and `leadWave` for every item, group and parallel under
- * `lanes`, in one pass: `ew` top-down, `lw` bottom-up. Use this instead of
- * calling the single-node helpers per node, which re-walk the ancestors and
- * the file's entries each time. The lanes may come from several files that
- * agree on the waves (include rule 12); each `wave:` is still checked
- * against its own file's declaration order.
+ * `ew` and `lw` (specs/waves.md §4.4 and §5.1) for every item, group and
+ * parallel under `lanes`, in one pass: `ew` top-down, `lw` bottom-up. The
+ * lanes may come from several files that agree on the waves (include rule
+ * 12); each `wave:` is still checked against its own file's declaration order.
+ *
+ * `lw(C)` is the wave a container's box may not open before. An item's lead
+ * wave is its effective wave. A group without an effective wave takes its
+ * first child's; a parallel without one takes the minimum over its tracks, or
+ * background when any track is background. An empty container is background.
  */
 export function assignWaves(
     lanes: readonly SwimlaneDeclaration[],
@@ -746,7 +713,7 @@ export function evaluateWaveProperties(file: NowlineFile): WaveFinding[] {
         const finding = checkWaveValue(file, node, prop, waves, waveIds, lookup);
         if (finding) findings.push(finding);
         // WV6: a repeated `wave:` key gives the entity more than one wave.
-        // The first key still applies (`effectiveWave`); each later key is
+        // The first key still applies (`ew`); each later key is
         // reported with every value the entity names.
         if (repeated.length > 0) {
             const all = props.flatMap((p) => (p.value !== undefined ? [p.value] : p.values));

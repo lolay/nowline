@@ -1,6 +1,6 @@
 # Nowline — Core AST, Style and Calendar Utilities
 
-**Status: Accepted (design only, no code yet).** Milestone **m4.12** in [`milestones.md`](./milestones.md); decisions in the last section. This is refactor R3 from [`review-since-v086.md`](./review-since-v086.md): a small utility layer in `@nowline/core` so that the content walk, the style precedence chain, the calendar-declaration classifier and the property helpers each live once. Every `file:line` below was checked at the commit that adds this spec (source identical to 0062df3 plus the m2 fixes of the same review).
+**Status: Implemented (m4.12).** Milestone **m4.12** in [`milestones.md`](./milestones.md); decisions in the last section. Shipped as one PR, not one per step (§4), with commits per step and module. Two deviations from this text: strict dates reach the validator too (§3.5, §7 decision 5), and the branch carries one changelog fragment, `.changelog/core-ast-utilities.txt` (a `fixed` block for the dates and `every:`, a `removed` block for `effectiveWave` and `leadWave`), where §6 and §4 expected none. This is refactor R3 from [`review-since-v086.md`](./review-since-v086.md): a small utility layer in `@nowline/core` so that the content walk, the style precedence chain, the calendar-declaration classifier and the property helpers each live once. Every `file:line` below was checked at the commit that adds this spec (source identical to 0062df3 plus the m2 fixes of the same review).
 
 ## 1. Problem
 

@@ -1228,7 +1228,7 @@ The parser enforces these rules and produces clear error messages with file posi
 
 **Dates, durations, sizes, scales**
 
-1. `date:`, `start:` and `end:` values (on the roadmap, an anchor, a milestone or a calendar declaration) are ISO 8601 dates that name a real calendar day: `2026-02-30` is `NL.E0405`, not March 2, and the layout reads it as no date.
+1. `date:`, `start:` and `end:` values (on the roadmap, an anchor, a milestone, an item or a calendar declaration) are ISO 8601 dates that name a real calendar day: `2026-02-30` is `NL.E0405`, not March 2, and the layout reads it as no date.
 2. `duration:` property values must match the raw duration pattern (`\d+(\.\d+)?[dwmqy]`) — literal only, no alias name lookup. `scale:` property values use the same raw duration pattern.
 3. `size:` property values must reference a `size` declaration in the roadmap section. Forward references are an error (rule 15 applies to `size:` the same way it applied to `duration:`).
 4. A `size` declaration's id must not match the raw duration pattern `\d+(\.\d+)?[dwmqy]` and must not be a bare `d`, `w`, `m`, `q`, or `y`. This avoids ambiguity at the call site.
