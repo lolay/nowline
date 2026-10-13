@@ -1049,7 +1049,7 @@ Order never matters: the declarations in any order in the file, or merged from i
 | `NL.E0906` | error | The open-ended week leaves no working day. |
 | `NL.E0907` | error | Duplicate id within one keyword in one file. |
 | `NL.W0705` | warning | `days-per-week` differs from the working days the open-ended week leaves. |
-| `NL.E0405` | error | A date that is not a real calendar day (`2026-02-30`), on a calendar declaration as on every other entity's `date:`, `start:` or `end:`. |
+| `NL.E0405` | error | A date that is not a real calendar day (`2026-02-30`), on a calendar declaration as on every other entity's `date:`, `start:` or `end:`, and in an inline date pin (`after:2026-02-30`). |
 | `NL.W0700` | warning | `end:` or `every:` on any other entity: the key is ignored. |
 
 **Includes.** Calendar declarations follow `config:` modes (see "Include Declaration"). On `config:merge` they merge, a named child declaration is shadowed by the parent's of the same keyword and name, and unnamed ones always merge. `config:ignore` merges none. On `config:isolate` the child's declarations stay in its region's config and have no effect on the chart yet: an isolated region is laid out on the host's calendar, and per-region calendars are not part of this release. The validator reads only its own file, so a `non-working weekend` or an open-ended recurrence in an include is not counted by `NL.E0906` and `NL.W0705`; the calendar falls back to the preset if an included file closes the whole week. A malformed declaration in an include is skipped.
@@ -1177,7 +1177,7 @@ parallel rollouts before:2026-06-30
 - **At most one inline date per direction.** `after:[2026-03-15, 2026-04-01]` is a validation error — collapse to a single binding date instead. Mixing one date with any number of id references in the same list (`after:[kickoff, 2026-03-15]`) is allowed.
 - The roadmap must declare `start:` whenever the file contains any inline date (same rule as for `anchor` declarations and dated `milestone`s — see Validation Rule 27).
 - Every inline date must be on or after the roadmap's `start:` (Validation Rule 28).
-- ISO 8601 format only (`YYYY-MM-DD`); the date literal terminal already enforces this.
+- ISO 8601 format only (`YYYY-MM-DD`); the date literal terminal already enforces this. The date must also name a real calendar day: `after:2026-02-30` is `NL.E0405` (Validation Rule 1), and the layout ignores it.
 
 **Visual treatment.** Each inline-date pin renders as a small `calendar` glyph on the entity's left (`after`) or right (`before`): in an item bar's top-left / top-right decoration row, joining the existing status-dot / footnote-indicator family, and in a group's or parallel's title row, beside its title. There is no inline date caption next to the glyph and no chart-spanning vertical cut line — the lightweight form deliberately stays quiet. The ISO date is available as a tooltip and lives in the source. Authors who want a louder, chart-spanning visual should declare a real `anchor`. See [`specs/rendering.md`](./rendering.md) "Inline-date glyph" for full geometry.
 
@@ -1228,7 +1228,7 @@ The parser enforces these rules and produces clear error messages with file posi
 
 **Dates, durations, sizes, scales**
 
-1. `date:`, `start:` and `end:` values (on the roadmap, an anchor, a milestone, an item or a calendar declaration) are ISO 8601 dates that name a real calendar day: `2026-02-30` is `NL.E0405`, not March 2, and the layout reads it as no date.
+1. `date:`, `start:` and `end:` values (on the roadmap, an anchor, a milestone, an item or a calendar declaration), and inline date pins in `after:` / `before:` (on an item, group or parallel, and a wave's `after:`), are ISO 8601 dates that name a real calendar day: `2026-02-30` is `NL.E0405`, not March 2, and the layout reads it as no date. An impossible inline pin is checked by this rule only, not by Rules 27 and 28, and layout ignores it: it neither moves nor caps the entity and draws no glyph.
 2. `duration:` property values must match the raw duration pattern (`\d+(\.\d+)?[dwmqy]`) — literal only, no alias name lookup. `scale:` property values use the same raw duration pattern.
 3. `size:` property values must reference a `size` declaration in the roadmap section. Forward references are an error (rule 15 applies to `size:` the same way it applied to `duration:`).
 4. A `size` declaration's id must not match the raw duration pattern `\d+(\.\d+)?[dwmqy]` and must not be a bare `d`, `w`, `m`, `q`, or `y`. This avoids ambiguity at the call site.
