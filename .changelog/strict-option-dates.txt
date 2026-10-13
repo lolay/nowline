@@ -1,0 +1,11 @@
+```release-note:fixed
+**CLI + MCP + VS Code: an impossible `now` such as `2026-02-30` is an input error, not March 2.** `--now 2026-02-30` (and the instant forms, `2026-02-30T10:00:00Z` and the like) now exits 2 with `nowline: invalid --now "2026-02-30". Expected a real calendar date.`, and the MCP `render`, `export` and `validate` tools reject it with `Invalid now "2026-02-30": must be a real calendar date`. Before, the date rolled over and the now-line moved to March 2. `--now -` still suppresses the now-line.
+```
+
+```release-note:fixed
+**`@nowline/export-mermaid`: an impossible roadmap `start:` (`2026-02-30`, `NL.E0405`) falls back to the timeline start, as a missing `start:` does, instead of anchoring the gantt on March 2.**
+```
+
+```release-note:fixed
+**`@nowline/core`: include `start:` agreement reads an impossible `start:` (`2026-02-30`) as absent, as layout does.** The validator still reports it as `NL.E0405`; the resolver no longer compares it as though it were March 2.
+```

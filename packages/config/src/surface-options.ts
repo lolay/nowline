@@ -7,6 +7,7 @@
 
 import { PageSizeParseError, type PdfPageSize, parsePageSize } from '@nowline/export-core';
 import {
+    hasImpossibleNowDate,
     isNonWorkingDisplay,
     NON_WORKING_DISPLAYS,
     type NonWorkingDisplay,
@@ -135,6 +136,8 @@ export interface SurfaceRcValues {
 export const MIN_WIDTH = 320;
 
 const NOW_DETAIL = 'must be YYYY-MM-DD, YYYY-MM-DDTHH:MM:SS[Z|±HH:MM], or "-"';
+// `2026-02-30` has the right shape but names no day; it is an error, not March 2.
+const NOW_REAL_DAY_DETAIL = 'must be a real calendar date';
 
 function parseTheme(raw: unknown): OptionParse<ThemeName> {
     const theme = typeof raw === 'string' ? normalizeThemeName(raw) : undefined;
@@ -165,6 +168,7 @@ function parseNow(raw: unknown): OptionParse<Date | null> {
     } else if (typeof raw === 'string') {
         const today = resolveToday({ now: raw });
         if (today) return { ok: true, value: today };
+        if (hasImpossibleNowDate(raw)) return { ok: false, detail: NOW_REAL_DAY_DETAIL };
     }
     return { ok: false, detail: NOW_DETAIL };
 }

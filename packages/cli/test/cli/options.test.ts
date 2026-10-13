@@ -2,7 +2,7 @@ import * as path from 'node:path';
 import { describe, expect, it } from 'vitest';
 import { parseArgv } from '../../src/cli/args.js';
 import { formatOptionError, resolveCliOptions } from '../../src/cli/options.js';
-import { CliError } from '../../src/io/exit-codes.js';
+import { CliError, ExitCode } from '../../src/io/exit-codes.js';
 
 function resolve(argv: string[], rc: Record<string, unknown> | null = null, rcPath?: string) {
     return resolveCliOptions(parseArgv(['in.nowline', ...argv]), rc, { rcPath });
@@ -105,8 +105,18 @@ describe('resolveCliOptions errors', () => {
         expect(failure(() => resolve(['--now', 'soon']).assertValid())).toBe(
             'nowline: invalid --now "soon". Expected YYYY-MM-DD, YYYY-MM-DDTHH:MM:SS[Z|±HH:MM], or "-".',
         );
+        expect(failure(() => resolve(['--now', '2026-02-30']).assertValid())).toBe(
+            'nowline: invalid --now "2026-02-30". Expected a real calendar date.',
+        );
         expect(failure(() => resolve(['--non-working', 'maybe']).assertValid())).toBe(
             'nowline: invalid --non-working "maybe". Expected hide or show.',
+        );
+    });
+
+    it('rejects an impossible --now as an input error instead of rolling it over', () => {
+        const options = resolve(['--now', '2026-02-30']);
+        expect(() => options.assertValid()).toThrow(
+            expect.objectContaining({ exitCode: ExitCode.InputError }),
         );
     });
 

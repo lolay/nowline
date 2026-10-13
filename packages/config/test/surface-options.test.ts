@@ -90,6 +90,9 @@ const PARSE_CASES: Record<SurfaceOptionKey, ParseCase[]> = {
             detail: 'must be YYYY-MM-DD, YYYY-MM-DDTHH:MM:SS[Z|±HH:MM], or "-"',
         },
         { raw: 20260209, detail: 'must be YYYY-MM-DD, YYYY-MM-DDTHH:MM:SS[Z|±HH:MM], or "-"' },
+        // An impossible day is an error, never a roll-over to March 2.
+        { raw: '2026-02-30', detail: 'must be a real calendar date' },
+        { raw: '2026-02-30T10:00:00Z', detail: 'must be a real calendar date' },
     ],
     pageSize: [
         { raw: 'a4', value: { kind: 'preset', name: 'a4' } },

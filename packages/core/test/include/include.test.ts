@@ -284,6 +284,29 @@ describe('include resolver', () => {
             expect(mismatch).toEqual([]);
         });
 
+        // Regression: an impossible start (NL.E0405 in the validator) reads as
+        // absent, as in layout, instead of rolling over to March 2.
+        it('merge: an impossible start is treated as absent', async () => {
+            const startErrors = async (parentStart: string, childStart: string) => {
+                const files = {
+                    'main.nowline': `include "./a.nowline"\nroadmap r "R"${parentStart}\nswimlane s\n  item x duration:1w\n`,
+                    'a.nowline': `roadmap child "Child"${childStart}\n`,
+                };
+                const { Nowline } = getServices();
+                const main = await parseAtPath(files['main.nowline'], '/root/main.nowline');
+                const result = await resolveIncludes(main, '/root/main.nowline', {
+                    services: Nowline,
+                    readFile: makeFs(files),
+                });
+                return result.diagnostics
+                    .filter((d) => d.severity === 'error' && /start/i.test(d.message))
+                    .map((d) => d.message);
+            };
+            expect(await startErrors(' start:2026-02-30', '')).toEqual([]);
+            const [rolled] = await startErrors(' start:2026-02-30', ' start:2026-03-02');
+            expect(rolled).toContain('but this file has no start:');
+        });
+
         it('isolate: mismatched start dates are still an error (isolate is not exempt)', async () => {
             const files = {
                 'main.nowline': `include "./a.nowline" roadmap:isolate\nroadmap r "R" start:2026-01-01\nswimlane s\n  item x duration:1w\n`,

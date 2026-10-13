@@ -81,6 +81,23 @@ describe('exportMermaid — lossy comment', () => {
     });
 });
 
+describe('exportMermaid — roadmap start', () => {
+    const body = (start: string) =>
+        `nowline v1\n\nroadmap r "R"${start}\n\nswimlane s "S"\n  item a "A" duration:1w\n`;
+    const today = new Date(Date.UTC(2026, 0, 7));
+
+    // Regression: a local parser rolled 2026-02-30 over to March 2. An
+    // impossible start (NL.E0405) now falls back like a missing one.
+    it('falls back to the timeline start for an impossible start:', async () => {
+        const impossible = exportMermaid(
+            await buildExportInputs(body(' start:2026-02-30'), { today }),
+        );
+        const missing = exportMermaid(await buildExportInputs(body(''), { today }));
+        expect(impossible).not.toContain('2026-03-02');
+        expect(impossible).toBe(missing);
+    });
+});
+
 describe('exportMermaid — task start anchoring (regression)', () => {
     // Mermaid strips a leading status keyword then reads the remaining comma
     // fields positionally. A task that emits `status, id, duration` (no start)
