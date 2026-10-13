@@ -4,7 +4,7 @@
 ```
 --- KICKOFF: begin orchestration at [deep] ---
 
-  Status: 1/4 groups done | last review: wave-1 PASS | current: nowline m1 s4-s5 [exec] | updated 2026-10-13 | over expected: ~$17.91 of ~$16
+  Status: 2/4 groups done | last review: wave-2 CONCERNS | current: nowline m1 s4-s5 [exec] fix-up 2-fix | updated 2026-10-13 | over expected: ~$22.33 of ~$16
 
   mode: unattended | proposed unattended (harness=claude-code runner=cloud; CLAUDE_CODE_REMOTE=true, assigned branch) | guard 3x min $50 | fixups 2 | confirmed 2026-10-13 session 65f2e917-181e-5b0f-94c9-28d8d9b1c93d: unattended
 
@@ -36,6 +36,7 @@
 |---|---|---|
 | 1 [deep] m1 s1-s3 | ~9.5M | ~$5.0 |
 | 2 [exec] m1 s4 - m3 s3 (3 units, 3 reviews) | ~9.6M | ~$3.9 |
+| 2-fix [exec] nowline m1 s4-s5 | — | — |
 | orchestrator | ~8.2M | ~$7.0 |
 | **Total** | ~27M | ~$16 |
 
@@ -98,11 +99,11 @@ Spec §3.3 and §4 m1.s3. `RoadmapNode.place` calls `scheduleRoadmap(file, resol
 
 --- WAVE 2 [exec] ---
 
-#### s4 - [exec] Parse start terms and wave floors once
+#### s4 - [exec] Parse start terms and wave floors once (done)
 
 Spec §3.4 and §4 m1.s4. Add `packages/layout/src/start-terms.ts` with `startTermsOf(props): StartTerms` (shape in §3.4: `pin` = `date:` if it parses else `start:`; `after` elements in source order as `{raw, date}` or `{raw, ref}`) and `waveFloorDates(plan): Array<Date | null>`. Switch C's walker, `resolvePinnedOrSequentialStart`, `startPinOf`, `wavePinOverrideOf`, `waveFloorDays` and `createWaveLayoutState` to them; each caller keeps its own `max` rule. Unit-test `startTermsOf` and `waveFloorDates` directly. Pure refactor. Gates: G1, G2, G3.
 
-#### s5 - [exec] F1: after: on a lane child honours the lane cursor
+#### s5 - [exec] F1: after: on a lane child honours the lane cursor (done)
 
 Spec §5 F1 and §8 decision 3: the one deliberate output change of this milestone. In `resolvePinnedOrSequentialStart` (`layout.ts` ~1203-1216) the `after:` rule becomes `max(seqDefault, …refs)` instead of `max(laneLeftX, …refs)` (seed and final `max`). Drop `laneLeftX` from the function only if it becomes unused there; leave the `*Deps` threading alone (R2 merges those). Add a layout test that names the rule (lane `a` then `b after:x` where `x` ends before `a`: `b` starts at `a`'s end; and where `x` ends after `a`: `b` starts at `x`'s end), and one for a lane-level `group after:x`. Delete the register's `(a)` entries. Add to `specs/dsl.md` where item `after:` is described (~:335, and the Dependencies and Anchoring section ~:1143) the sentence: an item, group or parallel with `after:` in a swimlane or group starts once both the previous item in its lane and every referenced entity have finished, so `after:` only ever delays. Append a `release-note:changed` block to `.changelog/scheduler-unification.txt` (chart now matches the exports; `after:` never starts a lane item before its predecessor ends).
 
@@ -147,6 +148,7 @@ Per step: the gate procedure above (G1 `diff -r` empty except m1.s5's declared s
 ## Review log
 
 review wave-1 (nowline m1 s1-s3) c8caff3..8af7add: PASS - register matches the §1.3 probe (10 item roadmaps, 4 region-scope); C extent equals the frozen B oracle on 60 samples, 60 generated roadmaps and 5 scope fixtures; window projected from schedule.extent and schedule.calendar; G1/G3 trees identical; accepted deviation: nested.nowline keeps 50 region-scope entries (region anchors resolve in C, not in A); nits: stale engine-B comments in schedule.ts header, wave-barrier.ts and the register test header, left for m3.s3 - 2026-10-13
+review wave-2 (nowline m1 s4-s5) 921ce16..f2027ee: CONCERNS - m1.s4 pure refactor byte-identical; F1 G1 diff exactly showcase, sizing, late-row-shifts x3 themes, G3 unchanged, only sizing.svg snapshot and sizing render cells bumped; but showcase Ship is drawn at day 42.2, not day 40 (the (d) parallel tail gutter, F3, out of scope), so spec §5 F1 row ("showcase draws Ship on day 40, matching its exports"), the release-note:changed block ("the chart now matches them ... where the exports put it") and the register reasons must say Ship now follows the parallel and differs from the exports only by the (d) tail gutter until F3 - 2026-10-13
 
 ## Token log
 
@@ -163,3 +165,6 @@ tokens orchestrator-kickoff plan-scheduler-unification-quilt (claude-opus-5-5): 
 tokens orchestrator-kickoff plan-scheduler-unification-quilt (claude-opus-5-5): input ~38 / cache read ~1.9M / cache write ~150k / output ~22k | ~$1.59 API-equiv (output est.) session 65f2e917-181e-5b0f-94c9-28d8d9b1c93d
 tokens wave-1 nowline-m1-s1-s3 (claude-opus-5-5): input ~220 / cache read ~22M / cache write ~280k / output ~110k | ~$7.90 API-equiv (output est.) session 65f2e917-181e-5b0f-94c9-28d8d9b1c93d
 tokens review-wave-1 nowline-m1-s1-s3 (claude-opus-5-5): input ~54 / cache read ~1.7M / cache write ~93k / output ~26k | ~$1.32 API-equiv (output est.) session 65f2e917-181e-5b0f-94c9-28d8d9b1c93d
+tokens orchestrator-wave-1 nowline-m1-s1-s3 (claude-opus-5-5): input ~22 / cache read ~1.7M / cache write ~0 5m + ~45k 1h / output ~18k | ~$1.05 API-equiv
+tokens wave-2 nowline-m1-s4-s5 (claude-sonnet-5-5): input ~150 / cache read ~8.9M / cache write ~130k / output ~73k | ~$2.85 API-equiv (output est.) session 65f2e917-181e-5b0f-94c9-28d8d9b1c93d
+tokens review-wave-2 nowline-m1-s4-s5 (claude-opus-5-5): input ~22 / cache read ~400k / cache write ~45k / output ~11k | ~$0.52 API-equiv (output est.) session 65f2e917-181e-5b0f-94c9-28d8d9b1c93d
