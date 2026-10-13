@@ -81,7 +81,7 @@ import { type RoadmapSchedule, scheduleRoadmap } from './schedule.js';
 import { startTermsOf } from './start-terms.js';
 import { resolveLabelChipStyle, resolveStyle, type StyleContext } from './style-resolution.js';
 import { estimateTextWidth, wrapText } from './text-measure.js';
-import type { ThemeName } from './themes/index.js';
+import type { Theme, ThemeName } from './themes/index.js';
 import {
     GUTTER_PX,
     HEADER_BESIDE_MAX_WIDTH_PX,
@@ -110,6 +110,7 @@ import type {
     PositionedSwimlane,
     PositionedTrackChild,
     ResolvedSize,
+    ResolvedStyle,
     StatusKind,
 } from './types.js';
 import { tickBoundaryAtOrAfter, type ViewPreset } from './view-preset.js';
@@ -415,6 +416,37 @@ function resolveTitleFirstLineReserve(
     });
 }
 
+/** `StatusKind` to the key `Theme.status` and `Theme.statusTint` use. */
+const THEME_STATUS_KEY = {
+    done: 'done',
+    'in-progress': 'inProgress',
+    'at-risk': 'atRisk',
+    blocked: 'blocked',
+    planned: 'planned',
+    neutral: 'neutral',
+} as const satisfies Record<StatusKind, keyof Theme['status']>;
+
+/**
+ * Copy of an item's resolved style with the theme's status tint as `bg` when
+ * `bg` is still `entities.item.bg`, and the status color as `fg` when `fg` is
+ * still `entities.item.fg`.
+ */
+function applyStatusTheme(
+    resolved: ResolvedStyle,
+    status: StatusKind,
+    theme: Theme,
+): ResolvedStyle {
+    const key = THEME_STATUS_KEY[status];
+    const style = { ...resolved };
+    if (style.bg === theme.entities.item.bg) {
+        style.bg = theme.statusTint[key];
+    }
+    if (style.fg === theme.entities.item.fg) {
+        style.fg = theme.status[key];
+    }
+    return style;
+}
+
 // Sequence a set of nodes into a single horizontal track. `parallelInside`
 // indicates the caller is inside a ParallelBlock and each child occupies a
 // fresh sub-track (caller passes a new cursor per call).
@@ -425,7 +457,7 @@ function sequenceItem(
     ownerOverride?: string,
 ): PositionedItem {
     const props = node.properties;
-    const style = resolveStyle('item', props, ctx.styleCtx);
+    const resolvedStyle = resolveStyle('item', props, ctx.styleCtx);
     // Sizing precedence (specs/dsl.md § "Sizing precedence"):
     //   1. `duration:LITERAL` wins as the calendar duration — `size:NAME`
     //      becomes a pure annotation (chip only).
@@ -539,57 +571,12 @@ function sequenceItem(
     // Progress fraction
     const { status, progress } = resolveItemProgress(props, ctx);
 
-    // Apply the status-tinted item background when the resolved bg is still
-    // theme-default. Authors who set explicit `bg:` keep their override.
-    // Per m2d handoff Resolution 3: layout owns this so the renderer stays
-    // palette-dumb.
-    const STATUS_TINT_LIGHT: Record<StatusKind, string> = {
-        done: '#ecfdf5',
-        'in-progress': '#eff6ff',
-        'at-risk': '#fffbeb',
-        blocked: '#fee2e2',
-        planned: '#f8fafc',
-        neutral: '#f8fafc',
-    };
-    const STATUS_TINT_DARK: Record<StatusKind, string> = {
-        done: '#052e16',
-        'in-progress': '#172554',
-        'at-risk': '#422006',
-        blocked: '#7f1d1d',
-        planned: '#1e293b',
-        neutral: '#1e293b',
-    };
-    const STATUS_TINT_GREY: Record<StatusKind, string> = {
-        done: '#ebebeb',
-        'in-progress': '#e4e4e4',
-        'at-risk': '#eeeeee',
-        blocked: '#dcdcdc',
-        planned: '#f5f5f5',
-        neutral: '#f5f5f5',
-    };
-    const STATUS_BORDER: Record<StatusKind, string> = {
-        done: ctx.styleCtx.theme.status.done,
-        'in-progress': ctx.styleCtx.theme.status.inProgress,
-        'at-risk': ctx.styleCtx.theme.status.atRisk,
-        blocked: ctx.styleCtx.theme.status.blocked,
-        planned: ctx.styleCtx.theme.status.planned,
-        neutral: ctx.styleCtx.theme.status.neutral,
-    };
-    const themeName = ctx.styleCtx.theme.name;
-    const isDark = themeName === 'dark';
-    const themeDefaultBg = isDark ? '#0f172a' : '#ffffff';
-    const themeDefaultFg = themeName === 'grayscale' ? '#9e9e9e' : '#94a3b8';
-    if (style.bg === themeDefaultBg) {
-        style.bg =
-            themeName === 'grayscale'
-                ? STATUS_TINT_GREY[status]
-                : isDark
-                  ? STATUS_TINT_DARK[status]
-                  : STATUS_TINT_LIGHT[status];
-    }
-    if (style.fg === themeDefaultFg) {
-        style.fg = STATUS_BORDER[status];
-    }
+    // Apply the status-tinted item background and status border when the
+    // resolved bg / fg is still the theme default. Authors who set explicit
+    // `bg:` / `fg:` keep their override. Per m2d handoff Resolution 3: layout
+    // owns this so the renderer stays palette-dumb. The tokens live in the
+    // theme (`statusTint`, `status`); the style is copied, never mutated.
+    const style = applyStatusTheme(resolvedStyle, status, ctx.styleCtx.theme);
 
     // Pre-format the secondary line shown inside the item bar, plus the
     // capacity suffix that renders after it.

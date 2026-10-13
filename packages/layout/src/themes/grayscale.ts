@@ -222,6 +222,16 @@ export const grayscaleTheme: Theme = {
         planned: '#bdbdbd',
         neutral: '#bdbdbd',
     },
+    // Item bar fill per status, applied by layout when the item's resolved
+    // `bg` is still `entities.item.bg` (m2d Resolution 3).
+    statusTint: {
+        done: '#ebebeb',
+        inProgress: '#e4e4e4',
+        atRisk: '#eeeeee',
+        blocked: '#dcdcdc',
+        planned: '#f5f5f5',
+        neutral: '#f5f5f5',
+    },
     statusDot: {
         onLight: {
             done: '#3a3a3a',
