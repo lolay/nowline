@@ -5,7 +5,7 @@
 .\" Empreinte de la page anglaise relue pour cette traduction. Après avoir
 .\" reporté une modification de la page anglaise, remplacez-la par la ligne
 .\" qu'affiche packages/cli/test/man/translation-parity.test.ts.
-.\" translated-from: nowline.1 sha256:54414db70f005af02dc3d3ab67a486041302d83bbf9cdacf4b49a09fafb48d98
+.\" translated-from: nowline.1 sha256:0cb6f1a170027da284cf9b5aa31dccb20835d2620711e008ad21dda3771834ab
 .Dd $Mdocdate$
 .Dt NOWLINE 1
 .Os
@@ -222,6 +222,9 @@ Une date nue ou un instant sans décalage est flottant\ : la partie date
 écrite est utilisée et
 .Fl -timezone
 est ignoré.
+La partie date doit désigner un jour réel du calendrier\ :
+.Pa 2026-02-30
+est une erreur de saisie, et non le 2\~mars.
 Par défaut\ : la date civile du jour dans le fuseau de l'hôte (ou celui de
 .Fl -timezone
 s'il est indiqué).

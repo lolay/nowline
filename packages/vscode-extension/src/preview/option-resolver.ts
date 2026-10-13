@@ -9,6 +9,7 @@ import {
     resolveOptions,
     SURFACE_OPTION_SPECS,
 } from '@nowline/config';
+import { parseIsoDate } from '@nowline/core/internal';
 import {
     type NonWorkingDisplay,
     type NormalizedZone,
@@ -17,7 +18,7 @@ import {
     resolveToday,
     type ThemeName,
 } from '@nowline/layout';
-import type { PreviewSettings, ToolbarOverrides } from './preview-panel.js';
+import type { PreviewSettings, ToolbarOverrides, ViewOptionsPayload } from './preview-panel.js';
 import type { RenderOutcome } from './render-pipeline.js';
 
 /**
@@ -210,6 +211,17 @@ export function resolveTodayAnchor(
         resolveTodayWithZone(undefined, settingTimezone) ??
         null
     );
+}
+
+/**
+ * Read the toolbar's `now` from a webview message: `'today'`, `'hide'`, or a
+ * pinned `YYYY-MM-DD`. A date that names no real day (`2026-02-30`) is
+ * dropped like any malformed value, so the setting applies, instead of
+ * rolling over to March 2.
+ */
+export function parseToolbarNow(raw: ViewOptionsPayload['now']): ToolbarOverrides['now'] {
+    if (raw === 'today' || raw === 'hide') return raw;
+    return typeof raw === 'string' ? (parseIsoDate(raw) ?? undefined) : undefined;
 }
 
 /**

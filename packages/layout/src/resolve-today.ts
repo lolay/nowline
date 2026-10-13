@@ -20,7 +20,7 @@
 //    --timezone is ignored. --timezone only governs the clock-based default
 //    (when --now is omitted).
 
-import { ISO_DATE_RE } from '@nowline/core/internal';
+import { ISO_DATE_RE, isRealIsoDate, parseIsoDate } from '@nowline/core/internal';
 
 // ---- Types and errors -------------------------------------------------------
 
@@ -153,8 +153,19 @@ const ISO_WITH_OFFSET_RE =
     /^(\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(?:\.\d+)?)(Z|([+-])(\d{2})(?::?(\d{2}))?)$/;
 
 // ISO 8601 with time but no offset (floating local date-time).
-// Captures: [1] year, [2] month, [3] day
-const ISO_FLOATING_RE = /^(\d{4})-(\d{2})-(\d{2})T\d{2}:\d{2}:\d{2}(?:\.\d+)?$/;
+const ISO_FLOATING_RE = /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(?:\.\d+)?$/;
+
+/**
+ * True when `raw` has one of the `now` string shapes but its leading
+ * `YYYY-MM-DD` is not a real calendar day (`2026-02-30`). {@link resolveToday}
+ * returns undefined for such a value, as for any unrecognised string; this
+ * lets an option parser say why.
+ */
+export function hasImpossibleNowDate(raw: string): boolean {
+    const isNowShape =
+        ISO_DATE_RE.test(raw) || ISO_WITH_OFFSET_RE.test(raw) || ISO_FLOATING_RE.test(raw);
+    return isNowShape && !isRealIsoDate(raw.slice(0, 10));
+}
 
 // ---- Public API -------------------------------------------------------------
 
@@ -192,10 +203,13 @@ export interface ResolveTodayOptions {
  * Precedence (from highest to lowest):
  *  1. `now === '-'` / `null`       → `undefined` (suppress)
  *  2. `now` is a `Date` object     → returned as-is (caller must supply UTC midnight)
- *  3. `now` bare `YYYY-MM-DD`      → floating; `Date.UTC(y, m, d)` regardless of zone
+ *  3. `now` bare `YYYY-MM-DD`      → floating; UTC midnight of that day regardless of zone
  *  4. `now` ISO 8601 + Z/offset    → embedded offset wins; zone ignored
  *  5. `now` ISO 8601 without offset→ floating; written date part; zone ignored
  *  6. `now` omitted                → civil date of `clock()` in effective `zone`
+ *
+ * A string whose `YYYY-MM-DD` is not a real calendar day (`2026-02-30`) is
+ * rejected like an unrecognised one, never rolled over to the next month.
  *
  * The `zone` is ONLY consulted for case 6 (clock-based default). Authored
  * dates — item bars, milestones, anchors, the axis ticks — are floating and
@@ -213,12 +227,14 @@ export function resolveToday(opts: ResolveTodayOptions = {}): Date | undefined {
     if (now instanceof Date) return now;
 
     if (now !== undefined) {
+        // Every string form leads with a YYYY-MM-DD. `Date.UTC` and `new Date`
+        // would both roll an impossible one over (`2026-02-30` to March 2), so
+        // reject it here and let the option layer report it.
+        if (hasImpossibleNowDate(now)) return undefined;
+
         // 3. Bare YYYY-MM-DD — floating; zone ignored
-        // (`Date.UTC` rolls an impossible day over: `--now` is operator input, not DSL.)
-        if (ISO_DATE_RE.test(now)) {
-            const [year, month, day] = now.split('-').map((part) => parseInt(part, 10));
-            return new Date(Date.UTC(year, month - 1, day));
-        }
+        const bare = parseIsoDate(now);
+        if (bare) return bare;
 
         // 4. ISO 8601 instant with explicit Z or offset — embedded offset WINS
         const withOffset = ISO_WITH_OFFSET_RE.exec(now);
@@ -239,15 +255,8 @@ export function resolveToday(opts: ResolveTodayOptions = {}): Date | undefined {
         }
 
         // 5. ISO 8601 without offset — floating; use written date part; zone ignored
-        const floating = ISO_FLOATING_RE.exec(now);
-        if (floating) {
-            return new Date(
-                Date.UTC(
-                    parseInt(floating[1], 10),
-                    parseInt(floating[2], 10) - 1,
-                    parseInt(floating[3], 10),
-                ),
-            );
+        if (ISO_FLOATING_RE.test(now)) {
+            return parseIsoDate(now.slice(0, 10)) ?? undefined;
         }
 
         // Unrecognised string — caller should have validated before calling.

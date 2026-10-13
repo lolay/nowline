@@ -1,5 +1,10 @@
 import { describe, expect, it } from 'vitest';
-import { normalizeZone, resolveToday, TimezoneError } from '../src/resolve-today.js';
+import {
+    hasImpossibleNowDate,
+    normalizeZone,
+    resolveToday,
+    TimezoneError,
+} from '../src/resolve-today.js';
 
 // ---- helpers ----------------------------------------------------------------
 
@@ -306,6 +311,27 @@ describe('resolveToday', () => {
     describe('unrecognised string', () => {
         it('returns undefined for a completely invalid now string', () => {
             expect(resolveToday({ now: 'not-a-date', clock })).toBeUndefined();
+        });
+    });
+
+    describe('impossible calendar day', () => {
+        // Regression: `Date.UTC` and `new Date` rolled 2026-02-30 over to March 2.
+        it.each([
+            '2026-02-30',
+            '2026-02-30T10:00:00Z',
+            '2026-02-30T10:00:00+05:30',
+            '2026-02-30T10:00:00',
+        ])('returns undefined for %s rather than rolling over', (now) => {
+            expect(resolveToday({ now, clock })).toBeUndefined();
+            expect(hasImpossibleNowDate(now)).toBe(true);
+        });
+
+        it('accepts a leap day and does not flag real or unrecognised strings', () => {
+            expect(resolveToday({ now: '2028-02-29', clock })).toEqual(utcDate('2028-02-29'));
+            expect(hasImpossibleNowDate('2028-02-29')).toBe(false);
+            expect(hasImpossibleNowDate('2026-02-28T23:00:00-07:00')).toBe(false);
+            expect(hasImpossibleNowDate('not-a-date')).toBe(false);
+            expect(hasImpossibleNowDate('-')).toBe(false);
         });
     });
 });

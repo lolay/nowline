@@ -44,7 +44,7 @@ import {
 } from '../generated/ast.js';
 import type { MessageCode } from '../i18n/codes.js';
 import { basename, dirname, resolve as resolvePath } from '../util/posix-path.js';
-import { ISO_DATE_RE } from '../util/props.js';
+import { isRealIsoDate } from '../util/props.js';
 import {
     checkWaveAgreement,
     participates,
@@ -56,11 +56,12 @@ import { ownWaves } from './waves.js';
 
 export type IncludeMode = 'merge' | 'ignore' | 'isolate';
 
+// An impossible `start:` (`2026-02-30`) reads as absent, as it does in layout;
+// the validator reports it as NL.E0405. (`new Date` would roll it over to
+// March 2, so a parent and child could disagree on a day neither names.)
 function readStartProp(decl: RoadmapDeclaration | undefined): string | undefined {
     const prop = decl?.properties.find((p) => p.key === 'start');
-    if (!prop?.value) return undefined;
-    if (!ISO_DATE_RE.test(prop.value)) return undefined;
-    if (Number.isNaN(new Date(prop.value).getTime())) return undefined;
+    if (!prop?.value || !isRealIsoDate(prop.value)) return undefined;
     return prop.value;
 }
 

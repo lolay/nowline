@@ -61,7 +61,7 @@ import type {
     SwimlaneDeclaration,
     WavePlan,
 } from '@nowline/core';
-import { ISO_DATE_RE } from '@nowline/core/internal';
+import { parseIsoDate } from '@nowline/core/internal';
 import type { ExportInputs } from '@nowline/export-core';
 import { displayLabel, getProp, getProps, hasProp, roadmapTitle } from '@nowline/export-core';
 import {
@@ -146,9 +146,7 @@ export function exportMermaid(inputs: ExportInputs, options: MermaidOptions = {}
     const schedule =
         inputs.schedule ?? scheduleRoadmap(ast, inputs.resolved, { today: inputs.today });
     const { working } = schedule.calendar;
-    const startDate = formatIsoDate(
-        working.dateAtWorkingIndex(parseIsoDate(resolveStartDate(inputs)), 0),
-    );
+    const startDate = formatIsoDate(working.dateAtWorkingIndex(resolveStartDate(inputs), 0));
     const drops = emptyCounts();
 
     const out: string[] = [];
@@ -434,20 +432,16 @@ function previousWaveOf(item: ItemDeclaration, waves: WaveCtx | undefined): stri
 }
 
 /**
- * Absolute anchor date (`YYYY-MM-DD`) for lane leaders. Prefers the roadmap's
- * declared `start:`, falling back to the layout-computed timeline start (always
- * present) so the export renders even when the source omits `start:`.
+ * Absolute anchor date for lane leaders. Prefers the roadmap's declared
+ * `start:`, falling back to the layout-computed timeline start (always
+ * present) so the export renders even when the source omits `start:`. An
+ * impossible `start:` (`2026-02-30`, NL.E0405) falls back the same way,
+ * as layout treats it, rather than rolling over to March 2.
  */
-function resolveStartDate(inputs: ExportInputs): string {
+function resolveStartDate(inputs: ExportInputs): Date {
     const decl = inputs.ast.roadmapDecl;
     const declared = decl ? getProp(decl, 'start') : undefined;
-    if (declared && ISO_DATE_RE.test(declared.trim())) return declared.trim();
-    return formatIsoDate(inputs.model.timeline.startDate);
-}
-
-function parseIsoDate(iso: string): Date {
-    const [y, m, d] = iso.split('-').map(Number);
-    return new Date(Date.UTC(y, m - 1, d));
+    return parseIsoDate(declared?.trim()) ?? inputs.model.timeline.startDate;
 }
 
 /** Monday first, as Mermaid's docs write `excludes`. */
