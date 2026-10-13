@@ -1,7 +1,9 @@
+import { THEME_NAMES } from '@nowline/layout';
+
 // Aggregated server capabilities. Used by the `capabilities` tool and the
 // individual `list-*` projection tools. Values are hardcoded to their stable
 // registry sources and must be kept in sync with:
-//   - themes: @nowline/layout/src/themes/index.ts (ThemeName)
+//   - themes: THEME_NAMES, imported from @nowline/layout
 //   - icons: @nowline/renderer/src/svg/icons.ts (CAPACITY_ICON_SVG keys)
 //   - locales: @nowline/core/src/i18n (message bundle files)
 //   - formats: @nowline/export ExportFormat union
@@ -16,7 +18,7 @@ export interface ServerCapabilities {
 }
 
 export const CAPABILITIES: ServerCapabilities = {
-    themes: ['light', 'dark', 'grayscale'],
+    themes: THEME_NAMES,
     // Built-in `capacity-icon:` vocabulary (CAPACITY_ICON_SVG keys).
     icons: ['person', 'people', 'points', 'time'],
     locales: ['en', 'fr', 'fr-CA', 'fr-FR'],

@@ -23,7 +23,8 @@ import {
     IncludeResolveError,
     type RenderInputs,
 } from '@nowline/export';
-import { resolveFonts } from '@nowline/export-core';
+import { type PdfPageSize, resolveFonts } from '@nowline/export-core';
+import { NON_WORKING_DISPLAYS, THEME_NAMES, type ThemeName } from '@nowline/layout';
 import { buildShareLink } from '@nowline/share-link';
 import { z } from 'zod';
 import { NOWLINE_MCP_ICONS } from './branding.js';
@@ -40,6 +41,8 @@ import {
     LAYOUT_INSIGHT_HINT,
     type McpDiagnostic,
     PathOutsideRootError,
+    parsePageSizeArg,
+    parseThemeArg,
     REVIEW_MAX_WIDTH,
     routedResolveDiagnosticsToMcp,
     toolDescriptionWithSyntax,
@@ -577,12 +580,21 @@ export function createMcpServer(opts: McpServerOptions = {}): McpServer {
     );
 
     const nonWorkingSchema = z
-        .enum(['hide', 'show'])
+        .enum(NON_WORKING_DISPLAYS)
         .optional()
         .describe(
             "How a business calendar's non-working days appear: hide collapses them, " +
                 "show draws them as shaded bands. Overrides the file's `default roadmap non-working:` key; " +
                 'omit to let the key apply (then hide). The schedule exports (mermaid, msproj, xlsx) are the same either way.',
+        );
+
+    // A string, not an enum, so `Greyscale` and the `greyscale` alias reach
+    // `parseThemeArg`, which rejects an unknown name with the theme list.
+    const themeSchema = z
+        .string()
+        .optional()
+        .describe(
+            `Color theme: ${THEME_NAMES.join(', ')} ("greyscale" is accepted). Defaults to light.`,
         );
 
     const nowSchema = z
@@ -619,10 +631,7 @@ export function createMcpServer(opts: McpServerOptions = {}): McpServer {
                     .enum(['svg', 'png'])
                     .optional()
                     .describe('Output format. Defaults to svg.'),
-                theme: z
-                    .enum(['light', 'dark', 'grayscale'])
-                    .optional()
-                    .describe('Color theme. Defaults to light.'),
+                theme: themeSchema,
                 now: nowSchema,
                 width: z
                     .number()
@@ -668,6 +677,12 @@ export function createMcpServer(opts: McpServerOptions = {}): McpServer {
             // Only the filesystem touchpoints (reading the input, writing the
             // output) map to structured NL.MCP.* errors; a kernel render fault
             // bubbles unchanged so it is never mislabeled as a path/IO failure.
+            let theme: ThemeName | undefined;
+            try {
+                theme = parseThemeArg(args.theme);
+            } catch (err) {
+                return handleToolError(err);
+            }
             let source: string;
             let filePath: string;
             try {
@@ -685,7 +700,7 @@ export function createMcpServer(opts: McpServerOptions = {}): McpServer {
                 sourcePath: filePath,
                 today,
                 locale: 'en-US',
-                theme: args.theme ?? 'light',
+                theme: theme ?? 'light',
                 width: args.width,
                 nonWorking: args.nonWorking,
                 pngScale: args.scale,
@@ -724,7 +739,7 @@ export function createMcpServer(opts: McpServerOptions = {}): McpServer {
                 source,
                 filePath,
                 today,
-                theme: args.theme ?? 'light',
+                theme: theme ?? 'light',
                 width: args.width,
                 nonWorking: args.nonWorking,
                 locale: 'en-US',
@@ -738,7 +753,7 @@ export function createMcpServer(opts: McpServerOptions = {}): McpServer {
 
             const previewPayload: PreviewPayload = {
                 source,
-                theme: args.theme,
+                theme,
                 now: args.now,
                 width: args.width,
                 nonWorking: args.nonWorking,
@@ -863,10 +878,15 @@ export function createMcpServer(opts: McpServerOptions = {}): McpServer {
                             'outside the configured output folder — those do not exist on the host filesystem.',
                     ),
                 now: nowSchema,
-                theme: z.enum(['light', 'dark', 'grayscale']).optional(),
+                theme: themeSchema,
                 nonWorking: nonWorkingSchema,
                 scale: z.number().optional().describe('PNG scale factor.'),
-                pageSize: z.string().optional().describe('PDF page size.'),
+                pageSize: z
+                    .string()
+                    .optional()
+                    .describe(
+                        'PDF page size: a preset name, "content", or <W>x<H><unit> (e.g. 8.5x11in). Validated for every format.',
+                    ),
                 orientation: z
                     .enum(['portrait', 'landscape', 'auto'])
                     .optional()
@@ -895,6 +915,14 @@ export function createMcpServer(opts: McpServerOptions = {}): McpServer {
             // Only the filesystem touchpoints (reading the input, writing the
             // output) map to structured NL.MCP.* errors; a kernel export fault
             // bubbles unchanged so it is never mislabeled as a path/IO failure.
+            let theme: ThemeName | undefined;
+            let pageSize: PdfPageSize | undefined;
+            try {
+                theme = parseThemeArg(args.theme);
+                pageSize = parsePageSizeArg(args.pageSize);
+            } catch (err) {
+                return handleToolError(err);
+            }
             let source: string;
             let filePath: string;
             try {
@@ -912,10 +940,10 @@ export function createMcpServer(opts: McpServerOptions = {}): McpServer {
                 sourcePath: filePath,
                 today,
                 locale: 'en-US',
-                theme: args.theme ?? 'light',
+                theme: theme ?? 'light',
                 nonWorking: args.nonWorking,
                 pngScale: args.scale,
-                pageSize: args.pageSize,
+                pageSize,
                 orientation: args.orientation,
                 marginPt: args.marginPt,
                 msprojStart: args.msprojStart,
@@ -1195,7 +1223,7 @@ export function createMcpServer(opts: McpServerOptions = {}): McpServer {
     server.registerTool(
         'list-themes',
         {
-            description: 'List supported color themes: light, dark, grayscale.',
+            description: `List supported color themes: ${THEME_NAMES.join(', ')}.`,
             inputSchema: z.object({}),
             outputSchema: ListItemsOutputSchema,
             annotations: readOnlyTool('List Themes'),
