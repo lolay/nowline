@@ -43,6 +43,7 @@ import {
     ATTRIBUTION_GLYPH_HEIGHT,
     ATTRIBUTION_GLYPH_WIDTH,
     GUTTER_PX,
+    NOW_PILL_HEIGHT_PX,
     WAVE_LEGEND_GAP_PX,
 } from '../themes/shared.js';
 import { TimeScale } from '../time-scale.js';
@@ -59,7 +60,7 @@ import type {
 } from '../types.js';
 import { buildHeaderTicks, tickBoundaryAtOrAfter } from '../view-preset.js';
 import type { DateWindow, RoadmapScope } from './date-window.js';
-import { type MeasuredRoadmap, setCalendarRuns } from './measure.js';
+import { headerRowsTimelineY, type MeasuredRoadmap, setCalendarRuns } from './measure.js';
 import type { PlacedChart } from './place.js';
 
 /** Gap (px) between the chart bottom and a mirrored bottom tick panel. */
@@ -128,6 +129,21 @@ export interface ModelDraft {
     height?: number;
 }
 
+/**
+ * The top of the header rows on the final axis. The measure phase reserves
+ * the now-pill row only when `today` falls inside the natural window; when
+ * the axis extension (f2) brings `today` in, the pill row is reserved here
+ * (L2, specs/layout-phases.md §1.3), and the tick panel, wave strip and
+ * marker band below it move down by `shift`.
+ */
+export interface HeaderRowsTop {
+    timelineY: number;
+    pillRowHeight: number;
+    tickPanelY: number;
+    /** How far the tick panel, wave strip and marker band move down from the measure. */
+    shift: number;
+}
+
 /** Reports whether a finalize step changed something; see `setFinalizeTrace`. */
 export type FinalizeTrace = (step: string, changed: boolean) => void;
 
@@ -151,6 +167,7 @@ export class FinalizeContext {
     readonly draft: ModelDraft = {};
     private scaleIsFinal = false;
     private band: MarkerBand | undefined;
+    private rowsTop: HeaderRowsTop | undefined;
 
     constructor(
         readonly file: NowlineFile,
@@ -235,10 +252,62 @@ export class FinalizeContext {
         this.chart.ctx.markerRowPlacements = band.placements;
     }
 
+    /**
+     * The header rows' top on the final axis. It reads the final scale, so
+     * it throws before f2; f5 packs the marker band at it and f7 moves the
+     * rows to it.
+     */
+    headerRowsTop(): HeaderRowsTop {
+        if (!this.rowsTop) {
+            this.rowsTop = resolveHeaderRowsTop(
+                this.measured,
+                this.options.today,
+                this.finalScale(),
+            );
+        }
+        return this.rowsTop;
+    }
+
     /** Report a step's effect to the trace, when one is installed. */
     report(step: string, changed: boolean): void {
         finalizeTrace?.(step, changed);
     }
+}
+
+/**
+ * The header rows' top once the axis is final. When the measure phase left
+ * the pill row at 0 and `today` lies on the final axis, f2 brought it in:
+ * the rows grow by `NOW_PILL_HEIGHT_PX` above the tick panel, and the
+ * timeline y follows the beside-card rule (`headerRowsTimelineY`), so a
+ * card that already pushed the rows down absorbs some or all of the pill
+ * row instead of the rows growing by its full height.
+ */
+export function resolveHeaderRowsTop(
+    measured: MeasuredRoadmap,
+    today: Date | undefined,
+    scale: TimeScale,
+): HeaderRowsTop {
+    const { bands, header } = measured;
+    const pillRowBroughtIn =
+        bands.pillRowHeight === 0 &&
+        today !== undefined &&
+        scale.forwardWithinDomain(today) !== null;
+    if (!pillRowBroughtIn) {
+        return {
+            timelineY: bands.timelineY,
+            pillRowHeight: bands.pillRowHeight,
+            tickPanelY: bands.tickPanelY,
+            shift: 0,
+        };
+    }
+    const timelineY = headerRowsTimelineY(header, NOW_PILL_HEIGHT_PX + bands.rowsHeight);
+    const tickPanelY = timelineY + NOW_PILL_HEIGHT_PX;
+    return {
+        timelineY,
+        pillRowHeight: NOW_PILL_HEIGHT_PX,
+        tickPanelY,
+        shift: tickPanelY - bands.tickPanelY,
+    };
 }
 
 /**
@@ -561,7 +630,8 @@ function fitWidths(fx: FinalizeContext): boolean {
  * `packMarkerRow` can sort by tick and assign rows and label sides
  * bottom-first. This is the single source of the context's marker
  * placements from here on; the measure phase's pre-pack only sized the
- * band before the lanes ran.
+ * band before the lanes ran. The band sits at its final top: below a
+ * now-pill row that f7 reserves when f2 brought `today` into the axis.
  */
 function packMarkers(fx: FinalizeContext): boolean {
     const entries = need(fx.draft.markerEntries, 'the marker entries');
@@ -571,7 +641,8 @@ function packMarkers(fx: FinalizeContext): boolean {
         fx.canvas.final,
         estimateTextWidth,
     );
-    const placements = markerRowPlacements(repacked.placements, fx.measured.bands.markerRowY);
+    const markerRowY = fx.measured.bands.markerRowY + fx.headerRowsTop().shift;
+    const placements = markerRowPlacements(repacked.placements, markerRowY);
     const rowCount =
         fx.measured.markers.hasEntities || entries.calendarCount > 0
             ? Math.max(1, repacked.rowCount)
@@ -627,18 +698,41 @@ function placeMarkers(fx: FinalizeContext): boolean {
 }
 
 /**
- * f7 (was P12): when the final pack needs more rows than the estimate,
- * grow the marker band and translate every chart coordinate below it.
- * Every later step reads the grown values.
+ * f7 (was P12): grow the header rows to what the final axis and the final
+ * marker pack need, and translate every chart coordinate below them, in
+ * one shift. The rows grow at two places: the now-pill row above the tick
+ * panel, when f2 brought `today` into the axis (L2; the tick panel, wave
+ * strip and marker band move down with it, and f5 already packed the band
+ * there), and the marker band's bottom, when the final pack needs more
+ * rows than the estimate. Every later step reads the grown values.
  */
 function growHeaderRows(fx: FinalizeContext): boolean {
     const band = fx.markerBand();
-    const estimatedRows = fx.measured.bands.estimatedMarkerRows;
-    if (band.rowCount <= estimatedRows) return false;
+    const rowsTop = fx.headerRowsTop();
+    const bands = fx.measured.bands;
+    const estimatedRows = bands.estimatedMarkerRows;
     const ctx = fx.ctx;
-    const deltaY = (band.rowCount - estimatedRows) * MARKER_ROW_PITCH_PX;
-    ctx.timeline.markerRow.height = band.rowCount * MARKER_ROW_PITCH_PX;
-    ctx.timeline.box.height += deltaY;
+    const timeline = ctx.timeline;
+    let changed = false;
+    if (rowsTop.pillRowHeight !== bands.pillRowHeight) {
+        // The box keeps its bottom here; the chart shift below moves it.
+        timeline.box.height += timeline.box.y - rowsTop.timelineY;
+        timeline.box.y = rowsTop.timelineY;
+        timeline.pillRowHeight = rowsTop.pillRowHeight;
+        timeline.tickPanelY = rowsTop.tickPanelY;
+        if (timeline.waveStrip) timeline.waveStrip.y += rowsTop.shift;
+        timeline.markerRow.y += rowsTop.shift;
+        timeline.markerRow.collisionY += rowsTop.shift;
+        changed = true;
+    }
+    let deltaY = rowsTop.shift;
+    if (band.rowCount > estimatedRows) {
+        deltaY += (band.rowCount - estimatedRows) * MARKER_ROW_PITCH_PX;
+        timeline.markerRow.height = band.rowCount * MARKER_ROW_PITCH_PX;
+        changed = true;
+    }
+    if (deltaY === 0) return changed;
+    timeline.box.height += deltaY;
     fx.chartY.top += deltaY;
     fx.chartY.bottom += deltaY;
     fx.chartY.swimlaneBottom += deltaY;
@@ -848,7 +942,7 @@ export const FINALIZE_STEPS: readonly FinalizeStep[] = [
     },
     {
         name: 'packMarkers',
-        reads: ['canvas', 'markerEntries', 'headerBands'],
+        reads: ['canvas', 'markerEntries', 'headerBands', 'scale'],
         writes: ['markerBand'],
         run: packMarkers,
     },
@@ -860,7 +954,7 @@ export const FINALIZE_STEPS: readonly FinalizeStep[] = [
     },
     {
         name: 'growHeaderRows',
-        reads: ['markerBand', 'headerBands', 'milestones', 'chartTop', 'laneBottom'],
+        reads: ['markerBand', 'headerBands', 'scale', 'milestones', 'chartTop', 'laneBottom'],
         writes: ['chartTop', 'laneBottom', 'chartBottom', 'laneY', 'milestones', 'timeline'],
         run: growHeaderRows,
     },

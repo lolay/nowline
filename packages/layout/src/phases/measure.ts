@@ -62,7 +62,10 @@ export interface MeasuredRoadmap {
 /** The rows above the chart, top to bottom, and where the chart starts. */
 export interface HeaderBands {
     timelineY: number;
-    /** The now-pill row: reserved only when `today` falls inside the natural window (L2). */
+    /**
+     * The now-pill row, reserved here when `today` falls inside the natural
+     * window. When the axis extension (f2) brings `today` in, f7 reserves it.
+     */
     pillRowHeight: number;
     tickPanelY: number;
     tickPanelHeight: number;
@@ -70,6 +73,8 @@ export interface HeaderBands {
     markerRowY: number;
     /** Rows the pre-pack needed. f7 grows the band when the final pack needs more. */
     estimatedMarkerRows: number;
+    /** Height of the rows above: pill row, tick panel, wave strip, estimated marker band. */
+    rowsHeight: number;
     /** Bottom of the header rows as estimated here; the beside card hugs this today (L1). */
     estimatedRowsBottomY: number;
     chartTopY: number;
@@ -131,7 +136,7 @@ export function measureRoadmap(
         logo: resolveHeaderLogo(file, options.logo),
     });
     const measuredHeader = headerNode.measure();
-    const { chartLeftX, chartTopY } = measuredHeader;
+    const { chartLeftX } = measuredHeader;
 
     // The chart sizes to natural content width (date window × ppd) plus
     // chrome padding. `options.width`, when set, is a best-effort
@@ -229,12 +234,7 @@ export function measureRoadmap(
     const markerRowHeight = markerRowsCount * MARKER_ROW_PITCH_PX;
     const headerRowsHeight = pillRowHeight + tickPanelHeight + waveStripHeight + markerRowHeight;
     const timelineHeightBudget = headerRowsHeight + HEADER_ROWS_TO_CHART_GAP_PX;
-    // In beside-mode the header card's BOTTOM aligns with the bottom
-    // of the header rows so it visually anchors to the chart's top.
-    // When the card is taller than the natural rows + a 4 px top
-    // inset, push the timeline down so the card has room without
-    // clipping above the canvas.
-    const timelineY = Math.max(chartTopY, measuredHeader.minRowsBottomY - headerRowsHeight);
+    const timelineY = headerRowsTimelineY(measuredHeader, headerRowsHeight);
     const tickPanelY = timelineY + pillRowHeight;
     const waveStripY = tickPanelY + tickPanelHeight;
     const markerRowY = waveStripY + waveStripHeight;
@@ -282,6 +282,7 @@ export function measureRoadmap(
             waveStripY,
             markerRowY,
             estimatedMarkerRows: markerRowsCount,
+            rowsHeight: headerRowsHeight,
             estimatedRowsBottomY,
             chartTopY: timelineY + timelineHeightBudget,
             bottomTickPanelHeight: showBottomTickPanel ? tickPanelBucketHeight : 0,
@@ -297,6 +298,17 @@ export function measureRoadmap(
             hasEntities: hasMarkerEntities,
         },
     };
+}
+
+/**
+ * Where header rows `rowsHeight` tall start (the timeline y). In beside
+ * mode the header card's BOTTOM aligns with the bottom of the header rows
+ * so it visually anchors to the chart's top. When the card is taller than
+ * the rows + a 4 px top inset, push the timeline down so the card has room
+ * without clipping above the canvas.
+ */
+export function headerRowsTimelineY(header: MeasuredHeader, rowsHeight: number): number {
+    return Math.max(header.chartTopY, header.minRowsBottomY - rowsHeight);
 }
 
 /**
