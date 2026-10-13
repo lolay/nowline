@@ -3,7 +3,7 @@
 - **Plan:** `specs/handoffs/plan-layout-phases-heron.md`
 - **Branch:** `claude/vibrant-hopper-ac4s73` (harness-assigned task branch; started at ff8eb8b, fast-forwarded to `origin/main` 4498948 at kickoff, no commits of its own before this one)
 - **Mode:** unattended (confirmed 2026-10-13, session 7e027fcc-1ca6-51b0-b005-63e1163df819; harness=claude-code runner=cloud)
-- **Status:** waves 1-6 PASS (m1-m5, m6 s1-s2). Merging `main` (R3 #153, #154) before wave 7 (m6 s3).
+- **Status:** waves 1-6 PASS (m1-m5, m6 s1-s2); `main` (R3 #153, #154) merged at 7a589fc. Dispatching wave 7 (m6 s3).
 
 ## What's done
 
@@ -31,6 +31,7 @@
 - wave-6 m4 unit (nowline m4 s1-s2) af7a82e..bc8e31d: PASS. m4.s1 c87fef9 (`HeaderNode.measure`), m4.s2 bc8e31d (`HeaderNode.place`, `estimatedRowsBottomY`). G1/G3 empty vs 9c71cbb.
 - wave-6 m5 unit (nowline m5 s1-s5) dad67df..56d00f7: PASS. m5.s1 d846fa3 (`phases/date-window.ts`), m5.s2 48b8a4f (`phases/measure.ts`, one marker entry assembly), m5.s3 a8e0bf9 (`phases/place.ts`, N5), m5.s4 82b47c6 (`phases/finalize.ts`, f1-f16 table, guards, coverage register), m5.s5 56d00f7 (`RoadmapNode.place` is four calls; `RoadmapNodeDeps` gone). G1/G3 empty vs 9c71cbb.
 - wave-6 m6 unit (nowline m6 s1-s2) ab6488c..c064e10: PASS. m6.s1 18d3b1c (L2: now-pill row reserved on an extended axis; fragment created; no sample changes), m6.s2 c064e10 (F1: beside card hugs the final rows bottom; changed exactly the nine renders `examples/dependencies`, `tests/late-row-shifts`, `tests/marker-left-overflow` x light/dark/grayscale, snapshots `dependencies.svg` and `marker-left-overflow.svg`, determinism golden cells `dependencies` svg/html/png/pdf).
+- Merge of `main` 303b502 (R3 #153, #154) at 7a589fc, by a delegated subagent: conflicts in `layout.ts` and `roadmap-node.ts` kept this branch's structure; R3 hunks ported into moved code (`collectItems` on `trackNodes` in `dependency-edges.ts`; `parseIsoDate` in `sequence-item.ts`, `marker-band.ts`, `milestone-node.ts`; `findProp` in `phases/date-window.ts`, local `stripColon` removed); `sequenceRowTrack` now iterates with `trackChildren` (callers pass the container). Gates: script with `--expect .scratch/f1-expect.txt` vs 303b502 showed exactly the nine F1 paths; compile and determinism 314/314 with no golden change; `make pre-commit` green; bundle 180.20 KB (parent re-ran it).
 
 ## Milestone m5 summary (milestone handoff)
 
@@ -69,11 +70,11 @@ m1 is done: status tints are theme tokens (`Theme.statusTint`, applied by a loca
 
 ## Spend
 
-~$56.34 of ~$46 expected (over expected; guard $138) (guard 3x min $50 = $138). Wave 1 ran ~$2.85 against ~$0.75 expected (cold gate-script build, 5-minute gate runs); later waves' gate runs are warm.
+~$58.47 of ~$46 expected (over expected; guard $138) (guard 3x min $50 = $138). Wave 1 ran ~$2.85 against ~$0.75 expected (cold gate-script build, 5-minute gate runs); later waves' gate runs are warm.
 
 ## Next unit
 
-Merge `main` (R3 #153, #154), then wave 7 [exec] m6 s3.
+Wave 7 [exec] m6 s3 (spec updates), then completion.
 
 ## How to resume
 
@@ -101,6 +102,7 @@ None. Kickoff answered: "Unattended"; re-confirmed by the pasted Kickoff prompt.
 - m6.s3 follow-ups from m5: name `sequence-item.ts` and `sequence-one.ts`, `DateWindow` without `sizes`, the extra `MeasuredRoadmap` and `MarkerEstimate` fields, fix `specs/waves.md` (`buildFootnotes`), and fix the `src/schedule.ts` comments that still name `RoadmapNode.place`.
 - From Gary, relaying the m4.12 (R3) session (branch `claude/zealous-thompson-tur82q`, not yet merged): R3 adds `@nowline/core/internal` (`trackChildren`, `trackNodes`, `declarations` in `packages/core/src/language/ast-walk.ts`), rewrites layout's `collectItems` on `trackNodes`, removes the `stripColon` copy in `roadmap-node.ts`, and replaces layout's `propValue`, `propValues`, `stripColon` and `parseDate` with core's `util/props.ts` (strict `parseIsoDate`: an impossible day reads as no date); `style-resolution.ts` builds on core's `styleLayers`. When R3 lands on main first, the parent's merge resolves toward the core helpers: `sequenceRowTrack` descends with `trackChildren` (own recursion kept for inherited state), `collectItems` stays on `trackNodes` in `nodes/dependency-edges.ts`, and conflicts in `dsl-utils.ts`, `style-resolution.ts`, `calendar-resolver.ts` and the `nodes/*` date reads go toward core. If this branch lands first, R3 rebases.
 - From wave 6 m6 unit (PASS): `headerRowsTimelineY` (measure.ts) is the one beside-card rule; `resolveHeaderRowsTop` and the guarded `FinalizeContext.headerRowsTop()` (throws before f2) reserve the 16 px pill row; f7 records the final rows bottom in the `rowsBottom` slot, read through the guarded `headerRowsBottom()` by f15. `HeaderBands` gains `rowsHeight` and loses `estimatedRowsBottomY`. `finalize-coverage.json` unchanged. m6.s3 follow-ups for `specs/layout-phases.md`: §3.3 HeaderBands (drop `estimatedRowsBottomY`, add `rowsHeight`); §3.5 (f5 reads scale, f7 writes `rowsBottom`, f15 reads it); §3.7, §3.10 rule 4 and the m4.s2 text still name `estimatedRowsBottomY`; add `headerRowsTop()` and `headerRowsBottom()` to the guard list. The F1 expect file is `.scratch/f1-expect.txt` (nine `g1/...` paths).
+- From the merge of `main` (7a589fc): the gate base is now 303b502 (main's tip), so every later gate run passes `--expect .scratch/f1-expect.txt` (F1's nine renders differ from main). `sequenceRowTrack(container, origin, ctx, helpers)` takes the lane or group and iterates with core's `trackChildren`; nested blocks still recurse through `helpers.sequenceOne`. Layout reads props and dates through core's `util/props.ts` (`findProp`, `propValues`, `parseIsoDate`) and styles through `styleLayers`.
 
 ## Environment notes
 
@@ -115,7 +117,7 @@ None. Kickoff answered: "Unattended"; re-confirmed by the pasted Kickoff prompt.
 - After a merge of `main` the gate's merge-base moves and the first gate run rebuilds the base cold (~5 min).
 - In `packages/layout`, vitest is `packages/layout/node_modules/.bin/vitest`.
 - Run `make format` after edits; `make lint` flags Biome format drift (line width).
-- `make bundle-size` (CI runs it as its own job; `make pre-commit` does not) is 199.51 KB of the 200 KB gzip budget at 56d00f7 (0.49 KB headroom); main at 9c71cbb is 197.97 KB, so m1-m5 added ~1.54 KB. R3 reports 197.94 KB on its branch. Every remaining step runs `make bundle-size` before committing and must stay under budget; the parent runs it before every push. At c064e10 it is 199.86 KB (0.14 KB headroom; m6.s1 ~0.24 KB, m6.s2 ~0.11 KB).
+- `make bundle-size` (CI runs it as its own job; `make pre-commit` does not) is 199.51 KB of the 200 KB gzip budget at 56d00f7 (0.49 KB headroom); main at 9c71cbb is 197.97 KB, so m1-m5 added ~1.54 KB. R3 reports 197.94 KB on its branch. Every remaining step runs `make bundle-size` before committing and must stay under budget; the parent runs it before every push. At c064e10 it was 199.86 KB (m6.s1 ~0.24 KB, m6.s2 ~0.11 KB); after the merge of #154's narrower Langium import it is 180.20 KB (19.80 KB headroom).
 - Determinism goldens for Node only: `UPDATE_DETERMINISM_GOLDENS=1 make determinism` with `$HOME/.bun/bin` on PATH (`make determinism-update` also installs chromium). Layout snapshots: `UPDATE_LAYOUT_SNAPSHOTS=1 packages/integration-tests/node_modules/.bin/vitest run test/snapshot.test.ts` from `packages/integration-tests`.
 - After moving code, `npx biome lint --write --unsafe --only=correctness/noUnusedImports <files>` removes unused imports (without `--unsafe` Biome fixes nothing). Biome reports 9 pre-existing warnings at 56d00f7.
 - To check a new test fails on the base without `git worktree`: copy it into `.scratch/g1/base-<merge-base>/packages/layout/test/`, run that tree's `node_modules/.bin/vitest run <file>`, then delete the copy. Use the current merge-base's tree, not an older one.

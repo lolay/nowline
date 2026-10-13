@@ -1,7 +1,7 @@
 ```
 --- KICKOFF: begin orchestration at [deep] ---
 
-  Status: 9/10 groups done | last review: wave-6 PASS | current: nowline m6 s3 [exec] | updated 2026-10-13 | passed unattended: gate 4 before wave 6 (m6) | over expected: ~$56.34 of ~$46
+  Status: 9/10 groups done | last review: wave-6 PASS | current: nowline m6 s3 [exec] | updated 2026-10-13 | passed unattended: gate 4 before wave 6 (m6) | over expected: ~$58.47 of ~$46
 
   mode: unattended | proposed unattended (harness=claude-code runner=cloud; CLAUDE_CODE_REMOTE=true, assigned branch) | guard 3x min $50 | fixups 2 | confirmed 2026-10-13 session 7e027fcc-1ca6-51b0-b005-63e1163df819 by Kickoff prompt: Run in unattended mode.
 
@@ -235,3 +235,4 @@ tokens review-wave-6 nowline-m5-s1-s5 (claude-opus-5-5): input ~76 / cache read 
 tokens orchestrator-wave-6 nowline-m5-s1-s5 (claude-opus-5-5): input ~26 / cache read ~3.4M / cache write ~0 5m + ~35k 1h / output ~17k | ~$1.32 API-equiv
 tokens wave-6 nowline-m6-s1-s2 (claude-opus-5-5): input ~130 / cache read ~10M / cache write ~220k / output ~65k | ~$4.42 API-equiv (output est.) session 7e027fcc-1ca6-51b0-b005-63e1163df819
 tokens review-wave-6 nowline-m6-s1-s2 (claude-opus-5-5): input ~62 / cache read ~1.7M / cache write ~76k / output ~29k | ~$1.32 API-equiv (output est.) session 7e027fcc-1ca6-51b0-b005-63e1163df819
+tokens merge-main nowline-merge-r3 (claude-opus-5-5): input ~78 / cache read ~3.7M / cache write ~120k / output ~38k | ~$2.13 API-equiv (output est.) session 7e027fcc-1ca6-51b0-b005-63e1163df819
