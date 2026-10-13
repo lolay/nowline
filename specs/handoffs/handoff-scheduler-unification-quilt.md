@@ -7,8 +7,8 @@ Plan: [`plan-scheduler-unification-quilt.md`](./plan-scheduler-unification-quilt
 - **Branch:** `claude/eloquent-archimedes-fkbc5e` (harness-assigned task branch, cut from `origin/main` at `c34804c`, pushed). Single working directory, `lolay/nowline`.
 - **Mode:** unattended, confirmed 2026-10-13 by Gary's answer `unattended`. Kickoff prompt carries `Run in unattended mode.`
 - **Done:** wave 1 `[deep]` `nowline m1 s1-s3`, `c8caff3..8af7add` (m1.s1 `b25a2e0`, m1.s2 `1f0f970`, m1.s3 `8af7add`), review PASS. Wave 2 unit 1 `[exec]` `nowline m1 s4-s5`, `921ce16..f2027ee` (m1.s4 `e2889f5`, m1.s5 F1 `f2027ee`), review CONCERNS (showcase Ship drawn at day 42.2, not 40; docs overclaim); fix-up `2-fix` `6cc27e6` corrected the spec F1 row and changelog, review PASS. Wave 2 unit 2 `[exec]` `nowline m2 s1-s3`, `7e5ce18..2de5e41` (m2.s1 `e46d779`, m2.s2 `c699ea2`, m2.s3 `2de5e41`), review PASS. Wave 2 unit 3 `[exec]` `nowline m3 s1-s3`, `2f75d35..18d9067` (m3.s1 `773d436`, m3.s2 `d068a56`, m3.s3 `18d9067`), review CONCERNS (Example 13 fixes and Example 6 variant not asserted on C); fix-up `2-fix` `f71bd73`, `afa2fb7`, review PASS.
-- **Spend:** ~$34.0 API-equiv so far against ~$16 expected total (over expected; wave 1 ran ~$9.2 against ~$5.0 planned); guard stops past $50.
-- **Next unit:** none; completion (final verification, cleanup commit, then ask Gary about the PR).
+- **Spend:** ~$35.1 API-equiv (final) so far against ~$16 expected total (over expected; wave 1 ran ~$9.2 against ~$5.0 planned); guard stops past $50.
+- **Next unit:** none. Plan complete; final gates green on `83b00c0`. Pending: Gary's yes to open the PR (after the cleanup commit removes this file and the plan).
 
 ## How to resume
 

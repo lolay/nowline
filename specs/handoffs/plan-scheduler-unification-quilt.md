@@ -2,9 +2,9 @@
 
 
 ```
---- KICKOFF: begin orchestration at [deep] ---
+--- KICKOFF: plan complete ---
 
-  Status: 4/4 groups done | last review: wave-2-fix PASS | current: completion | updated 2026-10-13 | over expected: ~$34.03 of ~$16 | passed unattended: gate 1 (fix-up 1 of 2)
+  Status: 4/4 groups done | completed 2026-10-13 | over expected: ~$35.08 of ~$16
 
   mode: unattended | proposed unattended (harness=claude-code runner=cloud; CLAUDE_CODE_REMOTE=true, assigned branch) | guard 3x min $50 | fixups 2 | confirmed 2026-10-13 session 65f2e917-181e-5b0f-94c9-28d8d9b1c93d: unattended
 
@@ -32,14 +32,14 @@
 
 **Cost (API-equiv, Claude Code models)**
 
-| wave | expected tokens | expected $ |
-|---|---|---|
-| 1 [deep] m1 s1-s3 | ~9.5M | ~$5.0 |
-| 2 [exec] m1 s4 - m3 s3 (3 units, 3 reviews) | ~9.6M | ~$3.9 |
-| 2-fix [exec] nowline m1 s4-s5 | — | — |
-| 2-fix [exec] nowline m3 s1-s3 | — | — |
-| orchestrator | ~8.2M | ~$7.0 |
-| **Total** | ~27M | ~$16 |
+| wave | expected tokens | expected $ | actual tokens | actual $ |
+|---|---|---|---|---|
+| 1 [deep] m1 s1-s3 | ~9.5M | ~$5.0 | ~26M | ~$9.22 |
+| 2 [exec] m1 s4 - m3 s3 (3 units, 3 reviews) | ~9.6M | ~$3.9 | ~27M | ~$10.25 |
+| 2-fix [exec] nowline m1 s4-s5 | — | — | ~1.0M | ~$0.69 |
+| 2-fix [exec] nowline m3 s1-s3 | — | — | ~1.4M | ~$0.89 |
+| orchestrator | ~8.2M | ~$7.0 | ~26M | ~$14.03 |
+| **Total** | ~27M | ~$16 | ~81M | ~$35.08 |
 
 Expected values are estimates, good to about 2-3× per wave. Wave 1: s1 and s3 medium, s2 large, on Opus high, plus one Opus review. Wave 2: s4, s5, m2.s2, m2.s3, m3.s1, m3.s2 medium and m2.s1, m3.s3 small on Sonnet high, plus one Opus review per unit. Orchestrator: kickoff, four unit shares, one kickoff-answer wait, and one resume after Gary's `/compact`.
 
@@ -185,3 +185,21 @@ tokens review-wave-2 nowline-m3-s1-s3 (claude-opus-5-5): input ~58 / cache read 
 tokens orchestrator-wave-2 nowline-m3-s1-s3 (claude-opus-5-5): input ~12 / cache read ~1.5M / cache write ~0 5m + ~27k 1h / output ~8.3k | ~$0.69 API-equiv
 tokens wave-2-fix nowline-m3-s1-s3 (claude-sonnet-5-5): input ~26 / cache read ~980k / cache write ~50k / output ~13k | ~$0.45 API-equiv (output est.) session 65f2e917-181e-5b0f-94c9-28d8d9b1c93d
 tokens review-wave-2-fix nowline-m3-s1-s3 (claude-opus-5-5): input ~22 / cache read ~280k / cache write ~37k / output ~10k | ~$0.44 API-equiv (output est.) session 65f2e917-181e-5b0f-94c9-28d8d9b1c93d
+tokens orchestrator-wave-2-fix nowline-m3-s1-s3 (claude-opus-5-5): input ~17 / cache read ~2.6M / cache write ~0 5m + ~20k 1h / output ~5k | ~$0.79 API-equiv
+tokens orchestrator-final-verification plan-scheduler-unification-quilt (claude-sonnet-5-5): input ~12 / cache read ~280k / cache write ~58k / output ~6k | ~$0.26 API-equiv (output est.) session 65f2e917-181e-5b0f-94c9-28d8d9b1c93d
+
+## Completion summary
+
+All 11 steps (m1.s1-s5 including F1, m2.s1-s3, m3.s1-s3) landed and reviewed on `claude/eloquent-archimedes-fkbc5e`, `c8caff3..afa2fb7`. Final gates on `83b00c0`: `make pre-commit` green, `make changelog-check BASE=origin/main REQUIRE=1` green, `make compile TARGET=local` + `make determinism` green (314 tests), no `computeContentEndDay` left in `packages/`. Spend ~$35.08 API-equiv against ~$16 expected (guard $50 not reached).
+
+F1's deliberate output change: renders of `examples/showcase`, `examples/sizing` and `tests/late-row-shifts` (light, dark, grayscale), the `sizing.svg` layout snapshot, and the `sizing:{html,pdf (node, cli),png,svg}` determinism cells. Exporter bytes unchanged throughout.
+
+**Deviations from plan**
+- PR lolay/nowline#148, opened from the UI before any step, closed at Gary's request.
+- Merged `origin/main` once (`52dd496`, #149, Makefile/CI only) before wave 2.
+- Wave 1 accepted deviation: `examples/nested.nowline` keeps 50 `region-scope` register entries (region anchors resolve in C, not A); recorded in `specs/scheduler-unification.md` §9.
+- F1 leaves showcase Ship at 42.2 working days against the exports' 40 (the (d) parallel tail gutter, F3); spec and changelog corrected by fix-up `6cc27e6` (gate 1 checkpoint, fix-up 1 of 2).
+- Gary's answer added a `release-note:added` block for the new public API (m2.s1/m2.s2), overriding plan decision 5.
+- m3 fix-up `f71bd73`/`afa2fb7` added the missing worked-example variants on C (gate 1 checkpoint, fix-up 1 of 2).
+- Checkpoints passed unattended: gate 4 before m2 and before m3.
+- `computeContentEndDay` stays in dated records (`specs/review-since-v086.md`, handoffs m2n/m2o/m2p) as history.
