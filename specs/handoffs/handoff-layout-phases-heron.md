@@ -3,7 +3,7 @@
 - **Plan:** `specs/handoffs/plan-layout-phases-heron.md`
 - **Branch:** `claude/vibrant-hopper-ac4s73` (harness-assigned task branch; started at ff8eb8b, fast-forwarded to `origin/main` 4498948 at kickoff, no commits of its own before this one)
 - **Mode:** unattended (confirmed 2026-10-13, session 7e027fcc-1ca6-51b0-b005-63e1163df819; harness=claude-code runner=cloud)
-- **Status:** waves 1-2 done and reviewed (PASS). Dispatching wave 3.
+- **Status:** m1 complete (waves 1-3 PASS). Dispatching wave 4 (m2).
 
 ## What's done
 
@@ -24,18 +24,24 @@
 
 - wave-1 (nowline m1 s1-s2) 0b49f7c..28771a2: PASS. m1.s1 98bf1ea (gate script + `Theme.statusTint`), m1.s2 28771a2 (`LayoutHelpers` replaces the four `*Deps`). G1/G3 empty vs 4498948, `make pre-commit` green.
 - wave-2 (nowline m1 s3) b448282..7e64d9c: PASS. m1.s3 7e64d9c (`sequenceRowTrack` in `nodes/row-track.ts`). G1/G3 empty, pre-commit green.
+- wave-3 (nowline m1 s4) 4400fbd..bbab969: PASS. m1.s4 bbab969 (`nodes/marker-band.ts`; `collectSlackCorridors` into `milestone-node.ts`). Pure move.
+
+## Milestone m1 summary (milestone handoff)
+
+m1 is done: status tints are theme tokens (`Theme.statusTint`, applied by a local `applyStatusTheme` in `layout.ts`), the four node `*Deps` interfaces are `LayoutHelpers` (or a `Pick`), lanes and groups share `sequenceRowTrack` (`nodes/row-track.ts`), and the marker band helpers live in `nodes/marker-band.ts`. Every step byte-identical (G1/G3 empty vs 4498948). m2 starts from bbab969 plus the merge of `main` 570254b (R4 m4.13, renderer/CLI/extension only). The gate script is `specs/handoffs/gates-layout-phases-heron.sh`; its base moves with the merge.
 
 ## Deviations from plan
 
 - Gate 2 before wave 2 ([exec] to [deep]) passed as an unattended checkpoint.
+- Gate 4 (m1 to m2) and gate 2 before wave 4 passed as unattended checkpoints. The milestone handoff core.md asks for at gate 4 is kept as a section of this session handoff ("Milestone m1 summary") rather than a separate `handoff-m2-*.md`, since every run file is removed in the last commit.
 
 ## Spend
 
-~$10.69 of ~$46 expected (guard 3x min $50 = $138). Wave 1 ran ~$2.85 against ~$0.75 expected (cold gate-script build, 5-minute gate runs); later waves' gate runs are warm.
+~$12.23 of ~$46 expected (guard 3x min $50 = $138). Wave 1 ran ~$2.85 against ~$0.75 expected (cold gate-script build, 5-minute gate runs); later waves' gate runs are warm.
 
 ## Next unit
 
-Wave 3 [exec] nowline m1 s4.
+Wave 4 [deep] nowline m2 s1-s2, after merging `main` (570254b, R4 m4.13).
 
 ## How to resume
 

@@ -1,7 +1,7 @@
 ```
 --- KICKOFF: begin orchestration at [deep] ---
 
-  Status: 2/10 groups done | last review: wave-2 PASS | current: nowline m1 s4 [exec] | updated 2026-10-13 | passed unattended: gate 2 before wave 2
+  Status: 3/10 groups done | last review: wave-3 PASS | current: nowline m2 s1-s2 [deep] | updated 2026-10-13
 
   mode: unattended | proposed unattended (harness=claude-code runner=cloud; CLAUDE_CODE_REMOTE=true, assigned branch) | guard 3x min $50 | fixups 2 | confirmed 2026-10-13 session 7e027fcc-1ca6-51b0-b005-63e1163df819 by Kickoff prompt: Run in unattended mode.
 
@@ -96,7 +96,7 @@ Add `packages/layout/src/nodes/row-track.ts` with `sequenceRowTrack(content, ori
 
 --- WAVE 3 [exec] ---
 
-#### s4 - [exec] Marker band and corridor helpers leave `roadmap-node.ts`
+#### s4 - [exec] Marker band and corridor helpers leave `roadmap-node.ts` (done)
 
 Move `packMarkerRow`, `markerLabelsRightX`, the run and exception entries and their ids into `packages/layout/src/nodes/marker-band.ts`, and `collectSlackCorridors` into `nodes/milestone-node.ts`, beside the helpers it reuses. A pure move; the calls in `place` keep their names; tests that import these change only their import path. G1, G2, G3.
 
@@ -190,6 +190,7 @@ Out of scope: F2 (local coordinates), F3 (after R1 F3), R5 renderer status table
 
 review wave-1 (nowline m1 s1-s2) 0b49f7c..28771a2: PASS - gate script re-run by reviewer on 28771a2: 360 renders, 0 differing paths, compile and determinism 314/314; make pre-commit green; statusTint values match §3.9; four Deps interfaces gone, ownerOverride dropped - 2026-10-13
 review wave-2 (nowline m1 s3) b448282..7e64d9c: PASS - loops diffed: only iterated content differs, no extra parameter; RowTrackResult {children, timeCursorX, packer} per §3.8; side-effect order unchanged; G1/G3 empty, pre-commit green; SwimlaneNode never read timeCursorX at the base, so only GroupNode reads it; passed unattended: gate 2 - 2026-10-13
+review wave-3 (nowline m1 s4) 4400fbd..bbab969: PASS - pure move confirmed line by line (only export keywords, header and imports differ); marker-band.ts also carries calendarLabelEntry, MarkerEntity (exported), markerLabelWidth, PackedPlacement; collectSlackCorridors after buildMilestones; no test imported the moved symbols; G1/G3 empty per worker - 2026-10-13
 
 ## Token log
 
@@ -207,3 +208,6 @@ tokens review-wave-1 nowline-m1-s1-s2 (claude-opus-5-5): input ~32 / cache read 
 tokens orchestrator-wave-1 nowline-m1-s1-s2 (claude-opus-5-5): input ~14 / cache read ~1.1M / cache write ~0 5m + ~23k 1h / output ~9.8k | ~$0.60 API-equiv
 tokens wave-2 nowline-m1-s3 (claude-opus-5-5): input ~58 / cache read ~2.7M / cache write ~120k / output ~28k | ~$1.70 API-equiv (output est.) session 7e027fcc-1ca6-51b0-b005-63e1163df819
 tokens review-wave-2 nowline-m1-s3 (claude-opus-5-5): input ~20 / cache read ~260k / cache write ~34k / output ~10k | ~$0.43 API-equiv (output est.) session 7e027fcc-1ca6-51b0-b005-63e1163df819
+tokens orchestrator-wave-2 nowline-m1-s3 (claude-opus-5-5): input ~12 / cache read ~860k / cache write ~0 5m + ~19k 1h / output ~7.9k | ~$0.48 API-equiv
+tokens wave-3 nowline-m1-s4 (claude-sonnet-5-5): input ~36 / cache read ~1.4M / cache write ~96k / output ~18k | ~$0.70 API-equiv (output est.) session 7e027fcc-1ca6-51b0-b005-63e1163df819
+tokens review-wave-3 nowline-m1-s4 (claude-opus-5-5): input ~16 / cache read ~200k / cache write ~36k / output ~7.2k | ~$0.36 API-equiv (output est.) session 7e027fcc-1ca6-51b0-b005-63e1163df819
