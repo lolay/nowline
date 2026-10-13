@@ -9,8 +9,8 @@
 
 import type { ItemDeclaration, WavePlan } from '@nowline/core';
 import { addDays } from './calendar.js';
-import { parseDate, propValue } from './dsl-utils.js';
 import type { LayoutContext } from './layout-context.js';
+import { startTermsOf, waveFloorDates } from './start-terms.js';
 import type { TimeScale } from './time-scale.js';
 import type { PositionedItem } from './types.js';
 import { type WaveBarrierResult, type WaveNode, WavePass } from './wave-barrier.js';
@@ -64,10 +64,7 @@ export function createWaveLayoutState(
         plan,
         ids: plan.waves.map((w) => w.name as string),
         origin,
-        floors: plan.floors.map((f) => {
-            const d = f ? parseDate(f.date) : null;
-            return d ? scale.forward(d) : null;
-        }),
+        floors: waveFloorDates(plan).map((d) => (d ? scale.forward(d) : null)),
         S,
         E: S,
         pass: new WavePass(plan, S),
@@ -161,12 +158,9 @@ export function wavePinOverrideOf(
 ): PositionedItem['wavePinOverride'] {
     const k = ctx.waves?.plan.waveOf.get(node);
     if (!ctx.waves || k === undefined) return undefined;
-    const dateRaw = propValue(node.properties, 'date');
-    const key = parseDate(dateRaw) ? 'date' : 'start';
-    const pin = key === 'date' ? dateRaw : propValue(node.properties, 'start');
-    const pinDate = parseDate(pin);
-    if (pin === undefined || !pinDate) return undefined;
-    const pinX = ctx.scale.forwardWithinDomain(pinDate);
+    const { pin } = startTermsOf(node.properties);
+    if (!pin) return undefined;
+    const pinX = ctx.scale.forwardWithinDomain(pin.date);
     const floor = ctx.waves.pass.floor(node);
     if (pinX === null || floor === undefined || floor - pinX < WAVE_EDGE_TOLERANCE_PX) {
         return undefined;
@@ -174,8 +168,8 @@ export function wavePinOverrideOf(
     if (startX - floor > WAVE_EDGE_TOLERANCE_PX) return undefined;
     return {
         wave: ctx.waves.ids[k - 1],
-        key,
-        pin,
+        key: pin.key,
+        pin: pin.raw,
         start: dateAtX(floor, ctx).toISOString().slice(0, 10),
     };
 }

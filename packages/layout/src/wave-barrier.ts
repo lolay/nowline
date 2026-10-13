@@ -11,7 +11,7 @@
 // `floors` and `memberEnd`.
 
 import type { GroupBlock, ItemDeclaration, ParallelBlock, WavePlan } from '@nowline/core';
-import { parseDate } from './dsl-utils.js';
+import { waveFloorDates } from './start-terms.js';
 import type { WorkingCalendar } from './working-calendar.js';
 
 /** A node the walkers floor: a leaf item or a container. */
@@ -106,10 +106,7 @@ export function waveFloorDays(
     startDate: Date,
     calendar: WorkingCalendar,
 ): Array<number | null> {
-    return plan.floors.map((f) => {
-        const d = f ? parseDate(f.date) : null;
-        return d ? calendar.workingIndexOf(startDate, d) : null;
-    });
+    return waveFloorDates(plan).map((d) => (d ? calendar.workingIndexOf(startDate, d) : null));
 }
 
 /**

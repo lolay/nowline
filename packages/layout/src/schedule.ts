@@ -39,7 +39,8 @@ import type {
 import { buildWavePlan, isGroupBlock, isItemDeclaration, isParallelBlock } from '@nowline/core';
 import { deriveItemDurationDays, resolveSizes } from './calendar.js';
 import { type ResolvedCalendar, resolveWorkingCalendar } from './calendar-resolver.js';
-import { parseDate, propValue, propValues } from './dsl-utils.js';
+import { parseDate, propValue } from './dsl-utils.js';
+import { type AfterTerm, startTermsOf } from './start-terms.js';
 import { solveWaveBarriers, summarizeWaves, WavePass, waveFloorDays } from './wave-barrier.js';
 import { spanEndDate } from './working-calendar.js';
 
@@ -213,9 +214,9 @@ export function scheduleRoadmap(
         reach: (day: number) => void,
     ) => {
         // Resolve a single `after:` element to a day-offset.
-        const resolveAfterDay = (ref: string): number => {
-            const inlineDate = parseDate(ref);
-            if (inlineDate) return dayOf(inlineDate);
+        const resolveAfterDay = (term: AfterTerm): number => {
+            if ('date' in term) return dayOf(term.date);
+            const ref = term.ref;
             if (scope.itemEnd.has(ref)) return scope.itemEnd.get(ref)!;
             if (scope.anchorEnd.has(ref)) return scope.anchorEnd.get(ref)!;
             if (scope.milestoneEnd.has(ref)) return scope.milestoneEnd.get(ref)!;
@@ -242,16 +243,12 @@ export function scheduleRoadmap(
         ): number => {
             if (isItemDeclaration(node)) {
                 const dur = deriveItemDurationDays(node.properties, scope.sizes, cal);
-                const dateProp = parseDate(propValue(node.properties, 'date'));
-                const startProp = parseDate(propValue(node.properties, 'start'));
-                const afterRefs = propValues(node.properties, 'after');
+                const { pin, after } = startTermsOf(node.properties);
                 let start = prevEnd;
-                if (dateProp) {
-                    start = dayOf(dateProp);
-                } else if (startProp) {
-                    start = dayOf(startProp);
-                } else if (afterRefs.length > 0) {
-                    start = Math.max(prevEnd, ...afterRefs.map(resolveAfterDay));
+                if (pin) {
+                    start = dayOf(pin.date);
+                } else if (after.length > 0) {
+                    start = Math.max(prevEnd, ...after.map(resolveAfterDay));
                 }
                 // The barrier floor is one more term in the max; a pin
                 // becomes max(pin, F).
@@ -271,11 +268,9 @@ export function scheduleRoadmap(
                 return end;
             }
             if (isParallelBlock(node)) {
-                const afterRefs = propValues(node.properties, 'after');
+                const { after } = startTermsOf(node.properties);
                 let containerStart =
-                    afterRefs.length > 0
-                        ? Math.max(prevEnd, ...afterRefs.map(resolveAfterDay))
-                        : prevEnd;
+                    after.length > 0 ? Math.max(prevEnd, ...after.map(resolveAfterDay)) : prevEnd;
                 if (wave) containerStart = wave.apply(node, containerStart);
                 let parallelEnd = containerStart;
                 for (const child of node.content) {
@@ -289,11 +284,9 @@ export function scheduleRoadmap(
                 return parallelEnd;
             }
             if (isGroupBlock(node)) {
-                const afterRefs = propValues(node.properties, 'after');
+                const { after } = startTermsOf(node.properties);
                 let containerStart =
-                    afterRefs.length > 0
-                        ? Math.max(prevEnd, ...afterRefs.map(resolveAfterDay))
-                        : prevEnd;
+                    after.length > 0 ? Math.max(prevEnd, ...after.map(resolveAfterDay)) : prevEnd;
                 if (wave) containerStart = wave.apply(node, containerStart);
                 return walkLane(node.content as SwimlaneDeclaration['content'], containerStart);
             }
@@ -307,11 +300,11 @@ export function scheduleRoadmap(
     // Returns the day, or undefined when it has neither.
     const milestoneDay = (
         ms: MilestoneDeclaration,
-        resolveAfterDay: (ref: string) => number,
+        resolveAfterDay: (term: AfterTerm) => number,
     ): number | undefined => {
         const d = parseDate(propValue(ms.properties, 'date'));
         if (d) return dayOf(d);
-        const after = propValues(ms.properties, 'after');
+        const { after } = startTermsOf(ms.properties);
         return after.length > 0 ? Math.max(0, ...after.map(resolveAfterDay)) : undefined;
     };
 

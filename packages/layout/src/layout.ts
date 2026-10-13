@@ -78,6 +78,7 @@ import { ParallelNode } from './nodes/parallel-node.js';
 import { RoadmapNode, type SizedHeader } from './nodes/roadmap-node.js';
 import type { NonWorkingDisplay } from './non-working-display.js';
 import type { RoadmapSchedule } from './schedule.js';
+import { startTermsOf } from './start-terms.js';
 import { resolveLabelChipStyle, resolveStyle, type StyleContext } from './style-resolution.js';
 import { estimateTextWidth, wrapText } from './text-measure.js';
 import type { ThemeName } from './themes/index.js';
@@ -1192,23 +1193,20 @@ function resolvePinnedOrSequentialStart(
     laneLeftX: number,
     ctx: LayoutContext,
 ): number {
-    const explicitDate =
-        parseDate(propValue(props, 'date')) ?? parseDate(propValue(props, 'start'));
-    if (explicitDate) {
-        const xd = ctx.scale.forwardWithinDomain(explicitDate);
+    const { pin, after } = startTermsOf(props);
+    if (pin) {
+        const xd = ctx.scale.forwardWithinDomain(pin.date);
         if (xd !== null) return xd;
     }
-    const afterRefs = propValues(props, 'after');
-    if (afterRefs.length > 0) {
+    if (after.length > 0) {
         let maxEnd = laneLeftX;
-        for (const ref of afterRefs) {
-            const inlineDate = parseDate(ref);
-            if (inlineDate) {
-                const xd = ctx.scale.forwardWithinDomain(inlineDate);
+        for (const term of after) {
+            if ('date' in term) {
+                const xd = ctx.scale.forwardWithinDomain(term.date);
                 if (xd !== null) maxEnd = Math.max(maxEnd, xd);
                 continue;
             }
-            const endX = ctx.entityRightEdges.get(ref);
+            const endX = ctx.entityRightEdges.get(term.ref);
             if (endX !== undefined) maxEnd = Math.max(maxEnd, endX);
         }
         return Math.max(laneLeftX, maxEnd);
@@ -1243,14 +1241,10 @@ function nonWorkingPinOf(
 function startPinOf(
     props: EntityProperty[],
 ): { key: 'date' | 'start' | 'after'; raw: string; date: Date } | undefined {
-    for (const key of ['date', 'start'] as const) {
-        const raw = propValue(props, key);
-        const date = parseDate(raw);
-        if (raw !== undefined && date) return { key, raw, date };
-    }
-    for (const raw of propValues(props, 'after')) {
-        const date = parseDate(raw);
-        if (date) return { key: 'after', raw, date };
+    const { pin, after } = startTermsOf(props);
+    if (pin) return pin;
+    for (const term of after) {
+        if ('date' in term) return { key: 'after', raw: term.raw, date: term.date };
     }
     return undefined;
 }
