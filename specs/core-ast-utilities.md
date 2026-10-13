@@ -18,10 +18,10 @@ A roadmap's declarations form a fixed tree (`packages/core/src/language/nowline.
 | person / team walk | `nowline-validator.ts:1926-1935` | persons in teams |
 | `collectDeclarations` | `waves.ts:344-360` | first declaration of each id ("mirroring the validator's `collectReferenceableIds`", `:343`) |
 | `collectWaveHosts` | `waves.ts:530-551` | every node a `wave:` key can sit on |
-| `assignWaves`, `leadWave` | `waves.ts:241-330` | track content with inheritance |
-| wave-order slots | `waves-order.ts:225-257` | track content in layout order |
+| `assignWaves`, `leadWave` | `waves.ts:241-326` | track content with inheritance |
+| wave-order slots | `waves-order.ts:212-256` | track content in layout order |
 | `collectNamedEntities`, `visitProperties` | `packages/lsp/src/references/ast-utils.ts:186-237`, `:254-274` | LSP navigation ("mirrors the validator's `collectReferenceableIds`", `:181`) |
-| document symbols | `packages/lsp/src/providers/document-symbols.ts:111-145` | the outline tree |
+| document symbols | `packages/lsp/src/providers/document-symbols.ts:109-145` | the outline tree |
 | `collectItems` | `packages/layout/src/layout.ts:1880-1911` | every item, for dependency edges |
 
 The copies agree today by care, not by construction. They already differ in small ways: the validator's `visitPropertiesDeep` and `collectReferenceableIds` look for a `PersonDeclaration` inside a team (`:2528`, `:2548`), which the grammar does not allow (`TeamContent` is `DescriptionDirective | PersonMemberRef | TeamDeclaration`, `nowline.langium:109-110`); `registerTeam` does not look. A new container keyword (the next feature like `group` or `parallel`) would have to be added to every one.
@@ -60,7 +60,7 @@ The LSP copies say why they exist: "kept as a literal here so the LSP doesn't ha
 
 ### 1.6 The validator is one 2,558-line file
 
-`nowline-validator.ts` holds about 300 lines of tables (`:86-389`), the check registration (`:455-588`), one class of 60 checks (`:589-2257`) and the walk and calendar helpers above (`:2259-2558`). It grew from 2,138 to 2,558 lines since v0.8.6, mostly calendar and style checks added inline.
+`nowline-validator.ts` holds about 300 lines of tables (`:86-389`), the check registration (`:455-587`), one class of 46 checks (`:589-2255`) and the walk and calendar helpers above (`:2259-2558`). It grew from 2,138 to 2,558 lines since v0.8.6, mostly calendar and style checks added inline.
 
 ## 2. Goals and non-goals
 
@@ -242,7 +242,7 @@ export function replacesPresetWeekend(
 - **Layout.** `declarationRule` (`calendar-resolver.ts:105-135`) maps facts to a `CalendarRule` (string dates to `Date`), and `calendarRules` uses `replacesPresetWeekend`. Its `WEEKDAY_INDEX`, `realDate` and `stripColon` go.
 - **LSP hover.** `undrawnTitleNote` (`hover.ts:136-149`) reads `shape`: a titled `bounded-recurrence` or `half-bounded-recurrence` is not drawn.
 
-The three copies agree on every shape the grammar can produce (a bracket list has at least one element, `nowline.langium:189-191`), so the switch changes no output; the facts are tested against each copy before the copies go (§5).
+The three copies agree on every shape the grammar can produce (a bracket list has at least one element, `nowline.langium:189-193`), so the switch changes no output; the facts are tested against each copy before the copies go (§5).
 
 ### 3.5 Property helpers, date pattern and value tables
 
@@ -296,14 +296,26 @@ Each module exports plain functions `(node, accept) => void`. `NowlineValidator`
 
 Every step is one PR, independently mergeable, and passes these gates:
 
-- **G1, sample renders.** Render every `examples/` and `tests/*.nowline` sample on the base commit and on the step, and compare: no difference.
+- **G1, sample renders.** Render every `examples/**.nowline` and `tests/*.nowline` sample directly with the CLI, on the base commit and on the step, in each built-in theme with `--now 2026-02-09`, and compare every render's SVG bytes and exit status: any difference fails the gate, wherever it falls in the list.
   ```sh
-  git worktree add ../base origin/main && (cd ../base && make init build)
-  make build
-  for f in $(cd ../base && git ls-files 'examples/**.nowline' 'tests/*.nowline'); do
-      svg="${f%.nowline}.svg"; [ -f "../base/$svg" ] && cmp "../base/$svg" "$svg"
-  done
+  git worktree add ../base origin/main && (cd ../base && make init build-fast)
+  make build-fast
+  (cd ../base && git ls-files 'examples/**.nowline' 'tests/*.nowline') >../samples.txt
+  render_all() {  # $1 = checkout to render with, $2 = output directory
+      rm -rf "$2" && mkdir -p "$2"
+      while read -r f; do
+          for t in light dark grayscale; do
+              out="$2/${f%.nowline}.$t.svg"
+              mkdir -p "${out%/*}"
+              (cd "$1" && node packages/cli/dist/index.js "$f" --theme "$t" --now 2026-02-09 -o -) >"$out" 2>/dev/null
+              echo "exit $?" >"$out.status"
+          done
+      done <../samples.txt
+  }
+  render_all ../base ../g1-base && render_all . ../g1-step
+  diff -r ../g1-base ../g1-step
   ```
+  (`diff -r` exits non-zero when any SVG or exit status differs, and lists every difference rather than the last. The sample list is the base's, so a sample the step deletes or breaks fails too. The gate does not use `make build`, which renders only the slugs listed in `scripts/render-samples.mjs` and `scripts/render-tests.mjs` and so skips `examples/continuation`, `examples/minimal.fr`, `tests/grammar-properties`, `tests/grammar-properties-include`, `tests/partner-multi` and `tests/waves-isolate-team`, and renders the seven include files under `examples/nested/` and `examples/waves-program/` only through their parents. At the commit that adds this spec all 180 renders exit 0, and two runs on that commit give identical trees, in about three minutes.)
 - **G2, snapshots and suites.** `make pre-commit` passes without `UPDATE_LAYOUT_SNAPSHOTS`, including the core message and coverage suites and the LSP suites.
 - **G3, diagnostics.** For every sample, `nowline <file> --dry-run --diagnostic-format json`, and the same with `--locale fr`, print the same bytes on both commits (the gate m2o used, [`waves.md`](./waves.md) §8.9).
 
@@ -357,7 +369,7 @@ Move the check bodies into the modules of §3.6, one module per commit within th
 
 #### s3 - Deprecate the unused wave exports
 
-Mark `effectiveWave` and `leadWave` (`waves.ts:210-268`, exported at `core/src/index.ts:55` and `:59`) `@deprecated` in favour of `assignWaves`; only `packages/core/test/validation/waves.test.ts` calls them. Removal follows open question 2. G2.
+Mark `effectiveWave` and `leadWave` (`waves.ts:210-267`, exported at `core/src/index.ts:55` and `:59`) `@deprecated` in favour of `assignWaves`; only `packages/core/test/validation/waves.test.ts` calls them. Removal follows open question 2. G2.
 
 ## 5. Test strategy
 
