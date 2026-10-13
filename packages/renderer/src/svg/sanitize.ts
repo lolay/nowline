@@ -75,7 +75,6 @@ const ALLOWED_ATTRIBUTES = new Set([
     'transform',
     'points',
     'id',
-    'class',
     'clip-path',
     'mask',
     'filter',
@@ -486,6 +485,10 @@ export function sanitizeSvg(input: string, options: SanitizeOptions = {}): strin
                     continue;
                 }
                 if (isMetadataAttribute(key)) continue;
+                // `applyStyles` has folded the `<style>` rules into attributes,
+                // so `class` is spent bookkeeping. Keeping it would let CSS on
+                // the host page (another inline SVG's `.cls-1`) restyle the logo.
+                if (key === 'class') continue;
                 if (!ALLOWED_ATTRIBUTES.has(key)) {
                     warn(`sanitizer: dropping attribute ${key}`);
                     continue;
