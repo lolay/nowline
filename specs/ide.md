@@ -168,7 +168,7 @@ Locale uses two chains, mirroring the CLI's [`packages/cli/src/i18n/locale.ts`](
 | `nowline.preview.strict` | `false` | `--strict` | Promotes asset / sanitizer warnings to errors. Ships in m3d. |
 | `nowline.preview.showLinks` | `true` | inverse of `--no-links` | Toggle link icons in rendered items. Ships in m3d. |
 | `nowline.preview.nonWorking` | `file` | `--non-working` | `file` / `hide` / `show`. `file` leaves the option unset so the roadmap's own `default roadmap non-working:` key applies (then `hide`); `hide` or `show` forces that view in the preview and in every export command. Settings-only: there is no `.nowlinerc` key. |
-| `nowline.preview.width` | `0` | `--width` | Maximum canvas width ([`rendering.md` § Canvas width](./rendering.md#canvas-width)). `0` = unset (fit content); preview has zoom anyway. Ships in m3d. |
+| `nowline.preview.width` | `0` | `--width` | Maximum canvas width ([`rendering.md` § Canvas width](./rendering.md#canvas-width)). `0` = unset (fit content); preview has zoom anyway. Any other value follows the CLI's rule, an integer of at least 320; a smaller or non-integer value is reported in the preview's diagnostic table (see below) and the canvas fits its content. Ships in m3d. |
 | `nowline.preview.assetRoot` | `""` | `--asset-root` | Empty = source file's directory. Ships in m3d. |
 | `nowline.export.cliPath` | `nowline` | — | Path to the `nowline` binary; PATH lookup by default. `${workspaceFolder}` substitution supported. Ships in m3e. |
 | `nowline.export.pdf.pageSize` | `letter` | `--page-size` | Ships in m3e. |
@@ -184,7 +184,9 @@ Locale uses two chains, mirroring the CLI's [`packages/cli/src/i18n/locale.ts`](
 
 The extension reads `.nowlinerc` via the same `loadConfig` helper used by `@nowline/cli` — extracted to the shared `@nowline/config` package so both consumers stay byte-identical. A workspace `FileSystemWatcher('**/.nowlinerc')` invalidates the per-directory cache and re-renders any open preview whose source file resolves through the changed config.
 
-Honored keys for the preview: `theme`, `width`, `locale`, `assetRoot`. The export-only keys (`pdfPageSize`, `pdfOrientation`, `pdfMargin`, `fontSans`, `fontMono`, `headlessFonts`) are read by the export command only. `defaultFormat` is consulted by the export command's format picker as the pre-selected default.
+Honored keys for the preview: `theme`, `width`, `locale`, `assetRoot`. The preview reads `theme` and `width` through the shared options schema in `@nowline/config` ([`surface-options.md`](./surface-options.md)), so a value means what it means to `nowline <file>`. A `.nowlinerc` theme the schema rejects is ignored, and the preview follows the editor's color theme instead.
+
+**A bad width is reported, not dropped.** A `nowline.preview.width` setting or a `.nowlinerc` `width` that is not an integer of at least 320 adds one row to the preview's diagnostic table (a warning, code `invalid-option`, "Invalid nowline.preview.width \"100\": must be an integer ≥ 320. The preview fits its content instead.") and the canvas fits its content. The row comes after the diagram is drawn, so it does not dim it; when the roadmap has errors of its own the row is listed first. A row for a bad rc value opens the `.nowlinerc` when clicked. The setting wins over the rc value, so a bad setting hides the rc width and a valid setting hides a bad rc width. `0` stays the setting's "unset" value. The export-only keys (`pdfPageSize`, `pdfOrientation`, `pdfMargin`, `fontSans`, `fontMono`, `headlessFonts`) are read by the export command only. `defaultFormat` is consulted by the export command's format picker as the pre-selected default.
 
 #### Toolbar overrides
 

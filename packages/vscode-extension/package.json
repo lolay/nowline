@@ -160,7 +160,7 @@
                     "type": "number",
                     "default": 0,
                     "minimum": 0,
-                    "description": "Maximum canvas width in pixels for the preview render. 0 leaves it unset, so the canvas fits its content. A wider roadmap shrinks its timeline to fit (down to 1 px per day); spilled captions can still overflow. The preview's pan/zoom usually makes this irrelevant."
+                    "description": "Maximum canvas width in pixels for the preview render: an integer of at least 320. 0 leaves it unset, so the canvas fits its content; a smaller value is reported in the preview's problems table and ignored. A wider roadmap shrinks its timeline to fit (down to 1 px per day); spilled captions can still overflow. The preview's pan/zoom usually makes this irrelevant."
                 },
                 "nowline.preview.nonWorking": {
                     "type": "string",

@@ -1,6 +1,8 @@
+import type { DiagnosticRow } from '@nowline/browser';
 import {
     type NowlineRc,
-    type OptionValues,
+    type OptionError,
+    type OptionLayer,
     rcLayer,
     resolveOptions,
     SURFACE_OPTION_SPECS,
@@ -14,6 +16,7 @@ import {
     type ThemeName,
 } from '@nowline/layout';
 import type { PreviewSettings, ToolbarOverrides } from './preview-panel.js';
+import type { RenderOutcome } from './render-pipeline.js';
 
 /**
  * Render-affecting options after the precedence chain has been
@@ -40,6 +43,13 @@ export interface ResolvedRenderOptions {
     showLinks: boolean;
     strict: boolean;
     assetRoot: string | undefined;
+    /**
+     * Options whose value was rejected and replaced by the default, as rows
+     * for the preview's diagnostic table (specs/surface-options.md §7,
+     * decision 4). Today only `width`; a theme from `.nowlinerc` that the
+     * schema rejects is still ignored without a row.
+     */
+    problems: DiagnosticRow[];
 }
 
 export interface ResolveContext {
@@ -51,15 +61,55 @@ export interface ResolveContext {
     isDarkTheme: boolean;
     /** Per-panel toolbar overrides; not persisted. */
     toolbarOverrides?: ToolbarOverrides;
+    /** The `.nowlinerc` the config came from, so a bad rc value's row can open it. */
+    rcPath?: string;
 }
 
-// The `.nowlinerc` keys the preview reads through the shared schema, so a
-// value reads the same here as in `nowline <file>`. A value the schema rejects
-// is ignored (the chain moves on to the next source), never an error.
-const RC_SPECS = { theme: SURFACE_OPTION_SPECS.theme, width: SURFACE_OPTION_SPECS.width };
+// The options the preview reads through the shared schema, so a value reads
+// the same here as in `nowline <file>`. A theme the schema rejects is ignored
+// (the chain moves on to the editor theme); a bad width is reported (below).
+const SCHEMA_SPECS = { theme: SURFACE_OPTION_SPECS.theme, width: SURFACE_OPTION_SPECS.width };
+type SchemaKey = keyof typeof SCHEMA_SPECS;
 
-function parseRc(rc: NowlineRc): OptionValues<typeof RC_SPECS> {
-    return resolveOptions(RC_SPECS, [rcLayer(rc, RC_SPECS)]).values;
+const WIDTH_SETTING = 'nowline.preview.width';
+
+/**
+ * The width setting as a layer. `0` is the setting's "unset" (its default), so
+ * it is left out and the rc width can apply; any other value goes through the
+ * schema's rule, so `100` is an error rather than a silent ignore.
+ */
+function settingLayer(settings: PreviewSettings): OptionLayer<SchemaKey> {
+    return {
+        source: (key) => ({ kind: 'setting', name: `nowline.preview.${key}` }),
+        values: { width: settings.width === 0 ? undefined : settings.width },
+    };
+}
+
+/** A row for the diagnostic table; the preview still renders, so it is a warning. */
+function widthProblemRow(error: OptionError<SchemaKey>, rcPath: string | undefined): DiagnosticRow {
+    const name = error.source.kind === 'rc' ? '.nowlinerc width' : WIDTH_SETTING;
+    return {
+        severity: 'warning',
+        code: 'invalid-option',
+        message: `Invalid ${name} "${String(error.raw)}": ${error.detail}. The preview fits its content instead.`,
+        // A bad rc value opens the rc file; a setting has no file to open.
+        file: error.source.kind === 'rc' ? (rcPath ?? '') : '',
+        line: 1,
+        column: 1,
+    };
+}
+
+/**
+ * Put option problems in front of an outcome's own rows. A rendered diagram
+ * carries them as warnings, which the shell shows without dimming it.
+ */
+export function withOptionProblems(
+    outcome: RenderOutcome,
+    problems: DiagnosticRow[],
+): RenderOutcome {
+    if (problems.length === 0) return outcome;
+    if (outcome.kind === 'svg') return { ...outcome, warnings: problems };
+    return { kind: 'diagnostics', rows: [...problems, ...outcome.rows] };
 }
 
 /**
@@ -68,12 +118,15 @@ function parseRc(rc: NowlineRc): OptionValues<typeof RC_SPECS> {
  * stays trivially testable and we can re-use it from the export runner.
  */
 export function resolvePreviewOptions(ctx: ResolveContext): ResolvedRenderOptions {
-    const rc = parseRc(ctx.rc);
+    const { values, errors } = resolveOptions(SCHEMA_SPECS, [
+        settingLayer(ctx.settings),
+        rcLayer(ctx.rc, SCHEMA_SPECS),
+    ]);
     return {
-        theme: resolveTheme(ctx, rc.theme),
+        theme: resolveTheme(ctx, values.theme),
         today: resolveTodayForPreview(ctx),
         locale: resolveLocale(ctx),
-        width: resolveWidth(ctx, rc.width),
+        width: values.width,
         nonWorking: resolveNonWorkingDisplay(
             ctx.toolbarOverrides?.nonWorking,
             ctx.settings.nonWorking,
@@ -81,6 +134,9 @@ export function resolvePreviewOptions(ctx: ResolveContext): ResolvedRenderOption
         showLinks: resolveShowLinks(ctx),
         strict: ctx.settings.strict,
         assetRoot: resolveAssetRoot(ctx),
+        problems: errors
+            .filter((error) => error.key === 'width')
+            .map((error) => widthProblemRow(error, ctx.rcPath)),
     };
 }
 
@@ -182,13 +238,6 @@ function resolveLocale(ctx: ResolveContext): string | undefined {
     if (typeof fromRc === 'string' && fromRc !== '') return fromRc;
     if (nonEmpty(ctx.vscodeLanguage)) return ctx.vscodeLanguage;
     return undefined;
-}
-
-function resolveWidth(ctx: ResolveContext, rcWidth: number | undefined): number | undefined {
-    if (typeof ctx.settings.width === 'number' && ctx.settings.width > 0) {
-        return ctx.settings.width;
-    }
-    return rcWidth;
 }
 
 /**

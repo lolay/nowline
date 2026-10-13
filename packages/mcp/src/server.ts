@@ -633,7 +633,7 @@ export function createMcpServer(opts: McpServerOptions = {}): McpServer {
                     .number()
                     .optional()
                     .describe(
-                        'Maximum canvas width in px. Unset fits the content; a wider roadmap shrinks its timeline to fit.',
+                        'Maximum canvas width in px, an integer of at least 320. Unset fits the content; a wider roadmap shrinks its timeline to fit.',
                     ),
                 nonWorking: nonWorkingSchema,
                 scale: z
@@ -698,7 +698,7 @@ export function createMcpServer(opts: McpServerOptions = {}): McpServer {
                 today,
                 locale: 'en-US',
                 theme: options.theme,
-                width: args.width,
+                width: options.width,
                 nonWorking: options.nonWorking,
                 pngScale: args.scale,
             };
@@ -737,7 +737,7 @@ export function createMcpServer(opts: McpServerOptions = {}): McpServer {
                 filePath,
                 today,
                 theme: options.theme,
-                width: args.width,
+                width: options.width,
                 nonWorking: options.nonWorking,
                 locale: 'en-US',
                 readFile: host.readSource,
@@ -752,7 +752,7 @@ export function createMcpServer(opts: McpServerOptions = {}): McpServer {
                 source,
                 theme,
                 now: args.now,
-                width: args.width,
+                width: options.width,
                 nonWorking: options.nonWorking,
                 locale: 'en-US',
             };

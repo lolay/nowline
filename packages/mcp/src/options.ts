@@ -15,6 +15,7 @@ import { InputRequiredError } from './diagnostics.js';
 /** The option arguments a tool takes; each tool offers the subset it needs. */
 export interface McpOptionArguments {
     theme?: string;
+    width?: number;
     now?: string;
     nonWorking?: string;
     pageSize?: string;
@@ -39,6 +40,7 @@ export function resolveMcpOptions(
         source: (key) => ({ kind: 'argument', name: key }),
         values: {
             theme: args.theme,
+            width: args.width,
             now: args.now,
             nonWorking: args.nonWorking,
             pageSize: args.pageSize,

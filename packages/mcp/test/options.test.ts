@@ -66,4 +66,19 @@ describe('resolveMcpOptions', () => {
             'Invalid nonWorking "maybe". Expected one of: hide, show.',
         );
     });
+
+    it('accepts a width of at least 320 and leaves it unset when omitted', () => {
+        expect(resolveMcpOptions({ width: 320 }, UTC).options.width).toBe(320);
+        expect(resolveMcpOptions({ width: 1600 }, UTC).options.width).toBe(1600);
+        expect(resolveMcpOptions({}, UTC).options.width).toBeUndefined();
+    });
+
+    it('rejects a width below 320 or that is not an integer', () => {
+        for (const width of [0, 1, 319, -5, 400.5, Number.NaN]) {
+            expect(() => resolveMcpOptions({ width }, UTC)).toThrow(InputRequiredError);
+        }
+        expect(() => resolveMcpOptions({ width: 100 }, UTC)).toThrow(
+            'Invalid width "100": must be an integer ≥ 320',
+        );
+    });
 });

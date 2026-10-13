@@ -6,6 +6,7 @@ import {
     resolveNonWorkingDisplay,
     resolvePreviewOptions,
     resolveTodayAnchor,
+    withOptionProblems,
 } from './option-resolver.js';
 import { type RenderOutcome, renderDocument } from './render-pipeline.js';
 import { getShellHtml } from './shell-html.js';
@@ -214,6 +215,7 @@ export class NowlinePreview {
                 vscodeLanguage: this.vscodeLanguage,
                 isDarkTheme: isDarkColorTheme(),
                 toolbarOverrides: this.toolbarOverrides,
+                rcPath: rc.rcPath,
             });
             const outcome = await renderDocument({
                 text,
@@ -228,7 +230,7 @@ export class NowlinePreview {
                 assetRoot: resolved.assetRoot,
             });
             if (this.disposed || seq !== this.renderSeq) return;
-            this.postOutcome(outcome);
+            this.postOutcome(withOptionProblems(outcome, resolved.problems));
         } catch (err) {
             if (this.disposed || seq !== this.renderSeq) return;
             const message = err instanceof Error ? err.message : String(err);
@@ -378,6 +380,13 @@ export class NowlinePreview {
     private postOutcome(outcome: RenderOutcome): void {
         if (outcome.kind === 'svg') {
             void this.panel.webview.postMessage({ type: 'svg', body: outcome.svg });
+            // The shell shows warnings after the diagram, without dimming it.
+            if (outcome.warnings && outcome.warnings.length > 0) {
+                void this.panel.webview.postMessage({
+                    type: 'diagnostics',
+                    rows: outcome.warnings,
+                });
+            }
         } else {
             void this.panel.webview.postMessage({ type: 'diagnostics', rows: outcome.rows });
         }

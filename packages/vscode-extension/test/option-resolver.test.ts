@@ -3,7 +3,7 @@
 // schema, and a value it rejects is ignored rather than reported.
 
 import { describe, expect, it } from 'vitest';
-import { resolvePreviewOptions } from '../src/preview/option-resolver.js';
+import { resolvePreviewOptions, withOptionProblems } from '../src/preview/option-resolver.js';
 import type { PreviewSettings } from '../src/preview/preview-panel.js';
 
 const SETTINGS: PreviewSettings = {
@@ -28,6 +28,7 @@ function resolve(
         rc?: Record<string, unknown>;
         isDarkTheme?: boolean;
         toolbar?: Parameters<typeof resolvePreviewOptions>[0]['toolbarOverrides'];
+        rcPath?: string;
     } = {},
 ) {
     return resolvePreviewOptions({
@@ -36,6 +37,7 @@ function resolve(
         vscodeLanguage: 'en',
         isDarkTheme: overrides.isDarkTheme ?? false,
         toolbarOverrides: overrides.toolbar,
+        rcPath: overrides.rcPath,
     });
 }
 
@@ -90,10 +92,90 @@ describe('resolvePreviewOptions: width', () => {
         expect(resolve({ settings: { width: 900 }, rc: { width: 1200 } }).width).toBe(900);
     });
 
-    it('ignores an rc width below the 320 px floor or of the wrong type', () => {
-        expect(resolve({ rc: { width: 300 } }).width).toBeUndefined();
-        expect(resolve({ rc: { width: 'wide' } }).width).toBeUndefined();
-        expect(resolve({ rc: { width: true } }).width).toBeUndefined();
+    it('reads the rc width as the CLI does, so a numeric string works', () => {
+        expect(resolve({ rc: { width: '1200px' } }).width).toBe(1200);
+    });
+
+    it('leaves a valid width without a problem row', () => {
+        expect(resolve({ settings: { width: 900 } }).problems).toEqual([]);
+        expect(resolve({ rc: { width: 900 } }).problems).toEqual([]);
+    });
+
+    it('falls back to fit-content and reports a setting below the 320 px floor', () => {
+        const options = resolve({ settings: { width: 100 }, rc: { width: 1200 } });
+        // A bad setting is the winning value, so the rc width is not consulted.
+        expect(options.width).toBeUndefined();
+        expect(options.problems).toEqual([
+            {
+                severity: 'warning',
+                code: 'invalid-option',
+                message:
+                    'Invalid nowline.preview.width "100": must be an integer ≥ 320. The preview fits its content instead.',
+                file: '',
+                line: 1,
+                column: 1,
+            },
+        ]);
+    });
+
+    it('reports a fractional or negative setting', () => {
+        expect(resolve({ settings: { width: 400.5 } }).problems).toHaveLength(1);
+        expect(resolve({ settings: { width: -5 } }).problems).toHaveLength(1);
+    });
+
+    it('falls back to fit-content and reports an rc width the rule rejects, pointing at the rc file', () => {
+        for (const width of [300, 'wide', true]) {
+            const options = resolve({ rc: { width }, rcPath: '/repo/.nowlinerc' });
+            expect(options.width).toBeUndefined();
+            expect(options.problems).toHaveLength(1);
+            expect(options.problems[0]).toMatchObject({
+                severity: 'warning',
+                file: '/repo/.nowlinerc',
+            });
+            expect(options.problems[0]?.message).toContain(`Invalid .nowlinerc width "${width}"`);
+        }
+    });
+
+    it('does not report an rc width the setting overrides', () => {
+        const options = resolve({ settings: { width: 900 }, rc: { width: 300 } });
+        expect(options.width).toBe(900);
+        expect(options.problems).toEqual([]);
+    });
+
+    it('keeps ignoring a bad rc theme without a row', () => {
+        expect(resolve({ rc: { theme: 'sepia' } }).problems).toEqual([]);
+    });
+});
+
+describe('withOptionProblems', () => {
+    const problem = {
+        severity: 'warning' as const,
+        code: 'invalid-option',
+        message: 'bad width',
+        file: '',
+        line: 1,
+        column: 1,
+    };
+    const own = { ...problem, severity: 'error' as const, code: 'NL.E0001', message: 'own' };
+
+    it('returns the outcome untouched when there are no problems', () => {
+        const outcome = { kind: 'svg' as const, svg: '<svg/>' };
+        expect(withOptionProblems(outcome, [])).toBe(outcome);
+    });
+
+    it('carries the problems as warnings beside a rendered diagram', () => {
+        expect(withOptionProblems({ kind: 'svg', svg: '<svg/>' }, [problem])).toEqual({
+            kind: 'svg',
+            svg: '<svg/>',
+            warnings: [problem],
+        });
+    });
+
+    it("puts the problems before a diagnostics outcome's own rows", () => {
+        expect(withOptionProblems({ kind: 'diagnostics', rows: [own] }, [problem])).toEqual({
+            kind: 'diagnostics',
+            rows: [problem, own],
+        });
     });
 });
 
