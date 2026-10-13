@@ -17,22 +17,25 @@ last commit before the PR merges.
 - Plan written and approved by Gary (2026-10-13). Kickoff block, wave
   markers, Cost table, Review log and Token log written.
 - Wave 1 [deep] nowline m1 s1: a2fb3b2..5231496, review PASS.
+- Wave 2 [exec] nowline m1 s2-s7: 910085c..e27c444, review PASS. m1 complete.
 
 ## Review log verdicts, fix-ups, retries, checkpoints
 
-- wave-1 (nowline m1 s1): PASS. No fix-ups, retries or checkpoints.
+- wave-1 (nowline m1 s1): PASS.
+- wave-2 (nowline m1 s2-s7): PASS.
+- No fix-ups or retries. Checkpoints: gate 4 (new milestone m2) and gate 2 ([deep] after [exec]) passed unattended before wave 3.
 
 ## Spend
 
-~$8.89 API-equiv so far (kickoff, planning, wave 1) of ~$22 expected.
+~$19.02 API-equiv so far (kickoff, planning, waves 1-2) of ~$22 expected. Wave 2 ran ~$9.5 against ~$3.1 expected (Sonnet worker, 27M cache read over six steps), so the run will pass the expected total during m2; the guard is ~$66.
 
 ## Next unit
 
-Wave 2 [exec] nowline m1 s2-s7 (CLI, MCP and VS Code use the schema; width rule, MCP local now, rc assetRoot).
+Wave 3 [deep] nowline m2 s1 (add `stageRoadmap` to `@nowline/renderer`).
 
 ## Pending question
 
-None. Wave 2 is being dispatched.
+None. Wave 3 is being dispatched.
 
 ## How to resume
 
@@ -59,6 +62,32 @@ Paste the plan's Kickoff prompt.
   today (theme, then now, then width) to keep exit text unchanged.
   `mergeConfig` is untouched; s2 decides whether it goes.
 
+- From wave 2 (review PASS): `mergeConfig` is deleted. CLI option resolution
+  lives in `packages/cli/src/cli/options.ts`, MCP's in
+  `packages/mcp/src/options.ts` (MCP now depends on `@nowline/config`; the
+  Makefile pack/publish order puts config before mcp). `ASSET_ROOT_SPEC` is a
+  separate exported spec in `@nowline/config`, not a member of
+  `SURFACE_OPTION_SPECS`. `loadConfigFor` returns `{config, path}`. An empty
+  `--asset-root` means unset and blocks the rc value. In `--serve` only the
+  asset root goes through the new resolution (`resolveAssetRootOption`);
+  m2.s7 moves the rest. MCP `timezone` is on render, export and validate
+  (validate also gained `now`); convert takes neither and uses the local
+  default. MCP timezone error text: `Invalid timezone: <parser text without
+  the nowline: prefix>`. VS Code: setting width 0 means unset; any other bad
+  width wins, falls back to fit-content and yields a warning row (code
+  `invalid-option`), not an error row. A bad rc theme stays silently ignored.
+  The extension resolves a relative rc assetRoot against the rc directory.
+
+## Milestone handoff m1 -> m2
+
+m1 (one options schema) is complete: `@nowline/config` owns the option
+schema and every surface (CLI render, MCP, VS Code) resolves through it, with
+the three behaviour changes (one width rule, MCP local now plus `timezone`,
+rc `assetRoot`) landed with docs and fragments. m2 (one staging function)
+starts with `stageRoadmap` in `@nowline/renderer`. `--serve` still has its
+own resolution except asset root; m2.s7 moves it onto m1's resolution.
+R1 (m4.11) had not landed on main as of this wave; m2.s3 re-checks.
+
 ## Environment notes
 
 - Cloud runner: Chromium at `/opt/pw-browsers`; do not run `playwright install`.
@@ -67,10 +96,22 @@ Paste the plan's Kickoff prompt.
 - Node on this runner is v22.22.0, not `.nvmrc`'s 26.2.0; `make init` and
   `make pre-commit` pass on it. `node_modules` may be missing in a fresh
   container: run `make init` first.
-- Pre-existing type error in `packages/config/test/load-config.test.ts:64`
-  (mergeConfig's return type lacks theme); no gate catches it since the config
-  package has no typecheck script and vitest doesn't type-check.
+- `mandoc` is not installed, so `make lint-man` can't run; the French man
+  page restamp uses the sha256 the parity test computes, and that test passes.
+- New workspace dependency edges need hand edits to `pnpm-lock.yaml`;
+  `make init` (frozen lockfile) accepts them.
+- The extension's parity test imports CLI and MCP modules by relative source
+  path, since neither is a package export.
 
 ## Deviations from plan
 
-None yet.
+- Gate 4 (m1 -> m2) asks for a milestone handoff file
+  (`specs/handoffs/handoff-m{N}-{topic}.md`). This plan's m1/m2 are the
+  spec's internal migration milestones inside repo milestone m4.13, so a
+  `handoff-m2-*.md` would collide with the repo's own milestone numbering.
+  The milestone handoff is a section of this session handoff instead.
+- The parent's bookkeeping commits a2fb3b2 and 910085c put
+  `Claude-Session:` below `Assisted-by:`; later bookkeeping commits put it
+  above. Step commits are correct. Left as is: they are pushed, rewording
+  would change the worker SHAs the Review log cites, and the squash merge
+  drops them.

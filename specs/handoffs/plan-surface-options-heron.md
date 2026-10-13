@@ -1,7 +1,7 @@
 ```
 --- KICKOFF: begin orchestration at [deep] ---
 
-  Status: 1/6 groups done | last review: wave-1 PASS | current: nowline m1 s2-s7 [exec] | updated 2026-10-13
+  Status: 2/6 groups done | last review: wave-2 PASS | current: nowline m2 s1 [deep] | updated 2026-10-13 | passed unattended: gate 4, gate 2 before wave 3
 
   mode: unattended | proposed unattended (harness=claude-code runner=cloud; CLAUDE_CODE_REMOTE=true, assigned branch) | guard 3x min $50 | fixups 2 | confirmed 2026-10-13 session 3d92f75d-ed43-5e74-a58c-e29cd0970783 by Kickoff prompt: Run in unattended mode.
 
@@ -84,34 +84,34 @@ Acceptance: table-driven tests per option and per source kind, precedence, exact
 
 --- WAVE 2 [exec] ---
 
-#### s2 - [exec] Use it in CLI render
+#### s2 - [exec] Use it in CLI render (done)
 
 Replace `render.ts:127-151` and `pickSetting`/`stringFromConfig`/`boolFromConfig`/per-key parsers with one resolution over flag and rc layers; register `defaultFormat`, `pdfOrientation`, `pdfMargin`, `fontSans`, `fontMono`, `headlessFonts`, `useSystemFonts`, `locale` as CLI option specs; `resolveTheme` in `cli/src/cli/theme.ts` goes through the schema; format `OptionError` with today's exact templates. Delete `mergeConfig` (and its re-export and tests) or reimplement on layers. Keep `resolveNowCli`'s `--timezone` handling via `NowPolicy`.
 Acceptance: `cli.rc.test.ts`, `render-rc.test.ts`, `cli.render.test.ts` pass unchanged; G1, G2.
 
-#### s3 - [exec] Use it in MCP
+#### s3 - [exec] Use it in MCP (done)
 
 `theme`, `pageSize`, `nonWorking`, `now` arguments resolve through the schema (one `argument` layer); `parseThemeArg`/`parsePageSizeArg` in `mcp/src/diagnostics.ts:276-305` go; `InputRequiredError` text unchanged. `width` keeps accepting any number (until s5) and `now` keeps UTC (until s6), e.g. by passing a UTC `NowPolicy`.
 Acceptance: `option-normalizers.test.ts`, `mcp.smoke.test.ts` unchanged; G1, G2; `make pack-mcpb`.
 
-#### s4 - [exec] Use it in the VS Code extension
+#### s4 - [exec] Use it in the VS Code extension (done)
 
 `preview/option-resolver.ts` parses rc values through `rcLayer`, keeping "toolbar, setting, rc, editor theme" precedence and its silent ignore of bad rc values. Diagram-theme literal unions become `ThemeName` (spec §3.2 list: `export/in-process.ts`, `export/cli-runner.ts`, `extension.ts`, `preview/preview-panel.ts`, and `preview-shell/src/apply-result.ts`, `mount.ts` as type-only imports). Add a minimal vitest setup for the extension's pure modules, run by `make test`, with tests for `resolvePreviewOptions` precedence; this is also where s5's tests go.
 Acceptance: new resolver tests; extension smoke scripts pass; G1, G2.
 
-#### s5 - [exec] *Behaviour:* one width rule
+#### s5 - [exec] *Behaviour:* one width rule (done)
 
 Decision 4. MCP `render`'s `width` argument: integer ≥ 320 or `InputRequiredError` in MCP's existing wording style. VS Code: a bad `nowline.preview.width` setting or rc `width` is reported as a row in the preview's diagnostic table (synthetic `DiagnosticRow`, merged into the outcome before `postOutcome`) and the width falls back to fit-content. Add parity tests (spec §5): one table of option inputs through CLI, MCP and extension resolution giving the same `SurfaceOptions` for width.
 Docs: `specs/mcp.md` (width), `specs/ide.md` (preview diagnostics for bad width), extension README if it documents the setting. Fragments: `.changelog/one-width-rule.txt` (`changed`), `packages/vscode-extension/.changelog/one-width-rule.txt` (`changed`).
 Acceptance: G1, G2; `make pack-mcpb`.
 
-#### s6 - [exec] *Behaviour:* one `now` default
+#### s6 - [exec] *Behaviour:* one `now` default (done)
 
 Decision 2. MCP's omitted `now` becomes the local civil date; new optional MCP `timezone` argument accepting `--timezone`'s forms (via `normalizeZone`; bad zone is an input error in MCP wording) on every tool that takes `now` (`render`, `export`, `validate`, and any other caller of `todayUtc`, such as `convert`). `todayUtc()` (`server.ts:197-207`, `:383`, `convert`) goes. Rewrite the `now` description (`server.ts:600-608`) to drop UTC, reversing #122's wording. Parity table extends to `now`.
 Docs: `specs/mcp.md` (replace the UTC wording, document `timezone`). Fragment `.changelog/mcp-now-local.txt` (`changed`).
 Acceptance: G1, G2; `make pack-mcpb`.
 
-#### s7 - [exec] *Behaviour:* `.nowlinerc` `assetRoot`
+#### s7 - [exec] *Behaviour:* `.nowlinerc` `assetRoot` (done)
 
 Decision 5. `assetRoot` becomes an official rc key and the default for `--asset-root` in CLI render (and, via the shared resolution, `--serve` once m2.s7 lands; wire serve's resolution here too if it already reads the rc). A relative rc value resolves against the `.nowlinerc` file's directory (a flag still resolves against cwd); flag wins; a non-string value is a usage error with the existing `invalid .nowlinerc <key>` template. The VS Code extension keeps reading it through `rcLayer`.
 Docs: `specs/cli.md` `.nowlinerc` table (`:389-402`) and `--asset-root` text; `packages/cli/man/nowline.1` if it lists rc keys (plus French restamp). Fragment `.changelog/rc-asset-root.txt` (`added`).
@@ -174,6 +174,7 @@ Acceptance: `cli.serve.test.ts` tests for each flag; a served SVG equals `nowlin
 ## Review log
 
 review wave-1 (nowline m1 s1) a2fb3b2..5231496: PASS - schema, parsers, rc-key table and surface-registered spec tables match spec §3.1 and today's CLI rules; 72/72 config tests; no caller changes - 2026-10-13
+review wave-2 (nowline m1 s2-s7) 910085c..e27c444: PASS - CLI templates, error order and empty-string handling unchanged; MCP and extension through the schema; width rule, MCP local now plus timezone, rc assetRoot with docs, fragments and French man restamp; G1 tree equals ref-c34804c; make pre-commit green - 2026-10-13
 
 ## Token log
 
@@ -190,3 +191,6 @@ tokens orchestrator-kickoff explore-staging (claude-opus-5-5): input ~16 / cache
 tokens orchestrator-kickoff plan-surface-options-heron (claude-opus-5-5): input ~96 / cache read ~6.4M / cache write ~0 5m + ~370k 1h / output ~36k | ~$4.94 API-equiv
 tokens wave-1 nowline-m1-s1 (claude-opus-5-5): input ~66 / cache read ~4M / cache write ~110k / output ~33k | ~$2.02 API-equiv (output est.) session 3d92f75d-ed43-5e74-a58c-e29cd0970783
 tokens review-wave-1 nowline-m1-s1 (claude-opus-5-5): input ~28 / cache read ~620k / cache write ~63k / output ~14k | ~$0.72 API-equiv (output est.) session 3d92f75d-ed43-5e74-a58c-e29cd0970783
+tokens orchestrator-wave-1 nowline-m1-s1 (claude-opus-5-5): input ~18 / cache read ~1.2M / cache write ~0 5m + ~21k 1h / output ~10k | ~$0.61 API-equiv
+tokens wave-2 nowline-m1-s2-s7 (claude-sonnet-5-5): input ~260 / cache read ~27M / cache write ~330k / output ~130k | ~$7.55 API-equiv (output est.) session 3d92f75d-ed43-5e74-a58c-e29cd0970783
+tokens review-wave-2 nowline-m1-s2-s7 (claude-opus-5-5): input ~76 / cache read ~3.1M / cache write ~120k / output ~37k | ~$1.97 API-equiv (output est.) session 3d92f75d-ed43-5e74-a58c-e29cd0970783
