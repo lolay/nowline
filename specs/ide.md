@@ -169,7 +169,7 @@ Locale uses two chains, mirroring the CLI's [`packages/cli/src/i18n/locale.ts`](
 | `nowline.preview.showLinks` | `true` | inverse of `--no-links` | Toggle link icons in rendered items. Ships in m3d. |
 | `nowline.preview.nonWorking` | `file` | `--non-working` | `file` / `hide` / `show`. `file` leaves the option unset so the roadmap's own `default roadmap non-working:` key applies (then `hide`); `hide` or `show` forces that view in the preview and in every export command. Settings-only: there is no `.nowlinerc` key. |
 | `nowline.preview.width` | `0` | `--width` | `0` = unset; preview has zoom anyway. Ships in m3d. |
-| `nowline.preview.assetRoot` | `""` | `--asset-root` | Empty = source file's directory. Ships in m3d. |
+| `nowline.preview.assetRoot` | `""` | `--asset-root` | Empty falls through to `.nowlinerc` `assetRoot`, then the source file's directory. A relative path resolves against the source file's workspace folder (the source directory outside a workspace); `${workspaceFolder}` is substituted. A relative `.nowlinerc` `assetRoot` resolves against the rc file's directory, as `nowline` reads it. Applies to the preview and to every export. Ships in m3d. |
 | `nowline.export.cliPath` | `nowline` | — | Path to the `nowline` binary; PATH lookup by default. `${workspaceFolder}` substitution supported. Ships in m3e. |
 | `nowline.export.pdf.pageSize` | `letter` | `--page-size` | Ships in m3e. |
 | `nowline.export.pdf.orientation` | `auto` | `--orientation` | Ships in m3e. |
@@ -184,7 +184,7 @@ Locale uses two chains, mirroring the CLI's [`packages/cli/src/i18n/locale.ts`](
 
 The extension reads `.nowlinerc` via the same `loadConfig` helper used by `@nowline/cli` — extracted to the shared `@nowline/config` package so both consumers stay byte-identical. A workspace `FileSystemWatcher('**/.nowlinerc')` invalidates the per-directory cache and re-renders any open preview whose source file resolves through the changed config.
 
-Honored keys for the preview: `theme`, `width`, `locale`, `assetRoot`. The export-only keys (`pdfPageSize`, `pdfOrientation`, `pdfMargin`, `fontSans`, `fontMono`, `headlessFonts`) are read by the export command only. `defaultFormat` is consulted by the export command's format picker as the pre-selected default.
+Honored keys for the preview: `theme`, `width`, `locale`, `assetRoot`. A relative `assetRoot` resolves against the directory holding the `.nowlinerc`, through the same `@nowline/config` rule the CLI uses, so the preview, every export and `nowline` load assets from the same place. A workspace-relative anchor would not do: the CLI has no workspace, and the nearest rc is often below the workspace root. The export command resolves the asset root the same way the preview does and, for an explicit `nowline.export.cliPath`, passes it as an absolute `--asset-root` unless it is the source directory. The shadow warning for `assetRoot` compares the directories the setting and the rc key name, not their text. The export-only keys (`pdfPageSize`, `pdfOrientation`, `pdfMargin`, `fontSans`, `fontMono`, `headlessFonts`) are read by the export command only. `defaultFormat` is consulted by the export command's format picker as the pre-selected default.
 
 #### Toolbar overrides
 

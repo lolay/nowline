@@ -1,5 +1,6 @@
 import * as os from 'node:os';
 import * as path from 'node:path';
+import type { ResolvedAssetRoot } from '@nowline/config';
 import type { NonWorkingDisplay } from '@nowline/layout';
 import * as vscode from 'vscode';
 import {
@@ -13,7 +14,11 @@ import { exportInProcess, initExportRuntime } from './export/in-process.js';
 import { runNewRoadmapCommand } from './export/new-roadmap.js';
 import { DisagreementTracker } from './io/disagreement-check.js';
 import { RcConfigCache } from './io/rc-config.js';
-import { resolveNonWorkingDisplay, resolveTodayAnchor } from './preview/option-resolver.js';
+import {
+    resolveEditorAssetRoot,
+    resolveNonWorkingDisplay,
+    resolveTodayAnchor,
+} from './preview/option-resolver.js';
 import { PreviewManager } from './preview/preview-manager.js';
 import type {
     DefaultFit,
@@ -373,6 +378,32 @@ function resolveShowLinksForExport(sourceUri: vscode.Uri): boolean {
     return readPreviewSettings().showLinks;
 }
 
+/**
+ * Resolve the asset root for an export of `sourceUri` exactly as the preview
+ * does (setting, then `.nowlinerc`, then the source directory); there is no
+ * toolbar override, so an open preview has nothing to add. Shows the error
+ * and returns `undefined` for an invalid rc value so the caller aborts.
+ */
+async function resolveAssetRootForExport(
+    sourceUri: vscode.Uri,
+): Promise<ResolvedAssetRoot | undefined> {
+    const sourceDir = path.dirname(sourceUri.fsPath);
+    const rc = rcCache ? await rcCache.resolveFor(sourceDir) : { config: {}, rcPath: undefined };
+    try {
+        return resolveEditorAssetRoot({
+            setting: readPreviewSettings().assetRoot,
+            workspaceDir: vscode.workspace.getWorkspaceFolder(sourceUri)?.uri.fsPath,
+            rc: { config: rc.config, path: rc.rcPath },
+            sourceDir,
+        });
+    } catch (err) {
+        vscode.window.showErrorMessage(
+            `Nowline: ${err instanceof Error ? err.message : String(err)}`,
+        );
+        return undefined;
+    }
+}
+
 function readExportSettings(): ExportSettings {
     const cfg = vscode.workspace.getConfiguration('nowline.export');
     return {
@@ -443,6 +474,8 @@ async function handleSave(
         saveLabel: `Save ${ext.toUpperCase()}`,
     });
     if (!target) return;
+    const assetRoot = await resolveAssetRootForExport(source.sourceUri);
+    if (!assetRoot) return;
 
     let bytes: Uint8Array;
     // Use the same render options the preview is currently showing so the
@@ -454,6 +487,7 @@ async function handleSave(
         locale: source.resolvedLocale(),
         noLinks: !source.resolvedShowLinks(),
         nonWorking: source.resolvedNonWorking(),
+        assetRoot: assetRoot.dir,
     };
 
     if (format === 'png') {
@@ -509,6 +543,8 @@ async function handleSave(
 async function handleCopyPngFallback(_body: Uint8Array, source: NowlinePreview): Promise<void> {
     // Re-rasterize via the kernel (WASM) so the temp file is canonical —
     // matches "Nowline: Export... → PNG" byte-for-byte (plan s7).
+    const assetRoot = await resolveAssetRootForExport(source.sourceUri);
+    if (!assetRoot) return;
     let pngBytes: Uint8Array;
     try {
         const result = await exportInProcess(source.sourceUri.fsPath, 'png', readExportSettings(), {
@@ -517,6 +553,7 @@ async function handleCopyPngFallback(_body: Uint8Array, source: NowlinePreview):
             locale: source.resolvedLocale(),
             noLinks: !source.resolvedShowLinks(),
             nonWorking: source.resolvedNonWorking(),
+            assetRoot: assetRoot.dir,
         });
         pngBytes = result.rendered as Uint8Array;
     } catch (err) {
@@ -552,6 +589,8 @@ async function handleExport(uri: vscode.Uri | undefined): Promise<void> {
         return;
     }
     if (!exportOutputChannel) return;
+    const assetRoot = await resolveAssetRootForExport(target);
+    if (!assetRoot) return;
     await runExportCommand({
         sourceUri: target,
         settings: readExportSettings(),
@@ -561,6 +600,7 @@ async function handleExport(uri: vscode.Uri | undefined): Promise<void> {
         locale: resolveLocaleForExport(target),
         showLinks: resolveShowLinksForExport(target),
         nonWorking: resolveNonWorkingForExport(target),
+        assetRoot,
     });
 }
 

@@ -32,6 +32,15 @@
 
 ### Fixed
 
+- Asset root: a relative `.nowlinerc` `assetRoot` resolved against the editor
+  process's working directory, so the preview could not find assets the CLI
+  found. It now resolves against the rc file's directory, the same rule as
+  `nowline`. A relative `nowline.preview.assetRoot` resolves against the
+  workspace folder (and substitutes `${workspaceFolder}`). Save, copy and
+  Export now use the preview's asset root instead of always the source
+  directory, and an explicit `nowline.export.cliPath` binary gets it as
+  `--asset-root`. The setting-versus-rc warning compares the directories,
+  not the text.
 - Snippets offer only valid values: the `roadmap` snippet's `scale:` choices
   offer `1m` instead of `1mo`, and the `item` snippets no longer offer
   `backlog`, which is not a built-in status.

@@ -180,7 +180,7 @@
                 "nowline.preview.assetRoot": {
                     "type": "string",
                     "default": "",
-                    "description": "Directory from which logo / image assets may be loaded. Empty uses the source file's directory (the same default the CLI uses without --asset-root)."
+                    "description": "Directory from which logo / image assets may be loaded, relative to the workspace folder (${workspaceFolder} is substituted). Empty falls through to the .nowlinerc assetRoot (relative to the .nowlinerc file, as the CLI reads it), then the source file's directory. Applies to the preview and to every export."
                 },
                 "nowline.export.cliPath": {
                     "type": "string",
@@ -411,7 +411,7 @@
         "build": "node scripts/bundle.mjs",
         "watch": "node scripts/bundle.mjs --watch",
         "package": "node scripts/sync-grammar.mjs && node scripts/build-icon.mjs && NODE_ENV=production node scripts/bundle.mjs && vsce package --no-dependencies --out dist/nowline-vscode.vsix",
-        "test": "node scripts/smoke-server.mjs && node scripts/smoke-extension.mjs",
+        "test": "vitest run && node scripts/smoke-server.mjs && node scripts/smoke-extension.mjs",
         "typecheck": "tsc --noEmit -p tsconfig.json"
     },
     "dependencies": {
@@ -439,6 +439,7 @@
         "@types/vscode": "^1.125.0",
         "@vscode/vsce": "^4.0.0",
         "esbuild": "^0.28.2",
-        "typescript": "^7.0.2"
+        "typescript": "^7.0.2",
+        "vitest": "^5.0.2"
     }
 }

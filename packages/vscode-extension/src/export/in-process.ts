@@ -47,8 +47,8 @@ export function _resetWasmInit(): void {
 
 // ---- HostEnv ----------------------------------------------------------------
 
-function createExtensionHostEnv(sourcePath: string): HostEnv {
-    const assetRoot = path.resolve(path.dirname(sourcePath));
+function createExtensionHostEnv(sourcePath: string, assetRootDir: string | undefined): HostEnv {
+    const assetRoot = path.resolve(assetRootDir ?? path.dirname(sourcePath));
     return {
         async readSource(filePath: string): Promise<string> {
             return fs.readFile(filePath, 'utf-8');
@@ -105,6 +105,12 @@ export interface ExportOverrides {
      * `default roadmap non-working:` key (then `hide`).
      */
     nonWorking?: NonWorkingDisplay;
+    /**
+     * Absolute asset root, resolved like the preview's (setting, then
+     * `.nowlinerc`, then the source directory). Defaults to the source file's
+     * directory.
+     */
+    assetRoot?: string;
 }
 
 const BINARY_FORMATS = new Set<KernelFormat>(['png', 'pdf', 'xlsx']);
@@ -130,7 +136,7 @@ export async function exportInProcess(
 ): Promise<InProcessExportResult> {
     const source = await fs.readFile(sourcePath, 'utf-8');
 
-    const { today, theme, locale, noLinks, nonWorking } = overrides;
+    const { today, theme, locale, noLinks, nonWorking, assetRoot } = overrides;
     // `null`  → suppress the now-line (RenderInputs.today = undefined)
     // `Date`  → pin to that UTC midnight
     // missing → default to today (local civil date via resolveToday)
@@ -163,7 +169,7 @@ export async function exportInProcess(
         inputs.fonts = { sans: result.sans, mono: result.mono };
     }
 
-    const host = createExtensionHostEnv(sourcePath);
+    const host = createExtensionHostEnv(sourcePath, assetRoot);
     const bytes = await exportDocument(source, format, inputs, host);
 
     const isBinary = BINARY_FORMATS.has(format);

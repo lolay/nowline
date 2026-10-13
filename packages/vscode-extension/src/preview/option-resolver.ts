@@ -1,4 +1,4 @@
-import type { NowlineRc } from '@nowline/config';
+import { type NowlineRc, type ResolvedAssetRoot, resolveAssetRoot } from '@nowline/config';
 import {
     type NonWorkingDisplay,
     type NormalizedZone,
@@ -33,12 +33,19 @@ export interface ResolvedRenderOptions {
     nonWorking: NonWorkingDisplay | undefined;
     showLinks: boolean;
     strict: boolean;
-    assetRoot: string | undefined;
+    /** Absolute; see {@link resolveEditorAssetRoot}. */
+    assetRoot: string;
 }
 
 export interface ResolveContext {
     settings: PreviewSettings;
     rc: NowlineRc;
+    /** Absolute path of the `.nowlinerc` that `rc` came from, when one was found. */
+    rcPath: string | undefined;
+    /** Directory of the source file. */
+    sourceDir: string;
+    /** Workspace folder holding the source file, when it is in one. */
+    workspaceDir: string | undefined;
     /** `vscode.env.language`. Stand-in for the CLI's `LC_*`/`LANG` env vars. */
     vscodeLanguage: string | undefined;
     /** VS Code color theme (so `theme: 'auto'` can pick light/dark). */
@@ -64,7 +71,12 @@ export function resolvePreviewOptions(ctx: ResolveContext): ResolvedRenderOption
         ),
         showLinks: resolveShowLinks(ctx),
         strict: ctx.settings.strict,
-        assetRoot: resolveAssetRoot(ctx),
+        assetRoot: resolveEditorAssetRoot({
+            setting: ctx.settings.assetRoot,
+            workspaceDir: ctx.workspaceDir,
+            rc: { config: ctx.rc, path: ctx.rcPath },
+            sourceDir: ctx.sourceDir,
+        }).dir,
     };
 }
 
@@ -206,11 +218,29 @@ function resolveShowLinks(ctx: ResolveContext): boolean {
     return ctx.settings.showLinks;
 }
 
-function resolveAssetRoot(ctx: ResolveContext): string | undefined {
-    if (nonEmpty(ctx.settings.assetRoot)) return ctx.settings.assetRoot;
-    const rcAssetRoot = ctx.rc.assetRoot;
-    if (typeof rcAssetRoot === 'string' && rcAssetRoot !== '') return rcAssetRoot;
-    return undefined;
+/**
+ * Resolve the asset root for a preview or an export: the
+ * `nowline.preview.assetRoot` setting, then the `.nowlinerc` `assetRoot`, then
+ * the source file's directory. A relative setting resolves against the
+ * source's workspace folder (the source directory outside a workspace), like
+ * other path settings, and `${workspaceFolder}` is substituted. A relative rc
+ * value resolves against the rc file's directory, through the same
+ * `@nowline/config` rule the CLI uses, so `nowline` and the preview agree.
+ * Throws `InvalidRcValueError` for a non-string rc value.
+ */
+export function resolveEditorAssetRoot(inputs: {
+    setting: string;
+    workspaceDir: string | undefined;
+    rc: { config: NowlineRc; path?: string };
+    sourceDir: string;
+}): ResolvedAssetRoot {
+    const base = inputs.workspaceDir ?? inputs.sourceDir;
+    return resolveAssetRoot({
+        override: inputs.setting.trim().replace(/\$\{workspaceFolder\}/g, base),
+        overrideBaseDir: base,
+        rc: inputs.rc,
+        defaultDir: inputs.sourceDir,
+    });
 }
 
 function nonEmpty(value: string | undefined): value is string {

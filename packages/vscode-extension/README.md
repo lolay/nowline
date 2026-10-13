@@ -135,7 +135,7 @@ Locale uses two chains, mirroring the CLI:
 | `nowline.preview.showLinks` | `true` | inverse of `--no-links` | Show link icons inside item bars. |
 | `nowline.preview.nonWorking` | `file` | `--non-working` | How a business calendar's non-working days appear: `file` follows the roadmap's `default roadmap non-working:` key (then `hide`); `hide` collapses them; `show` draws shaded bands. Settings-only: there is no `.nowlinerc` key. Applies to the preview and to every export. |
 | `nowline.preview.width` | `0` | `--width` | Canvas width in px. `0` leaves it unset (preview has zoom anyway). |
-| `nowline.preview.assetRoot` | `""` | `--asset-root` | Asset-resolver root. Empty uses the source file's directory. |
+| `nowline.preview.assetRoot` | `""` | `--asset-root` | Asset-resolver root. Empty falls through to `.nowlinerc` `assetRoot`, then the source file's directory. A relative path resolves against the source file's workspace folder (the source directory outside a workspace); `${workspaceFolder}` is substituted. A relative `.nowlinerc` `assetRoot` resolves against the rc file's directory, as `nowline` reads it. Applies to the preview and to every export. |
 
 ### Export
 

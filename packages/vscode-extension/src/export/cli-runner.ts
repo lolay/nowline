@@ -1,6 +1,7 @@
 import { spawn } from 'node:child_process';
 import { promises as fs } from 'node:fs';
 import * as path from 'node:path';
+import type { ResolvedAssetRoot } from '@nowline/config';
 import type { NonWorkingDisplay } from '@nowline/layout';
 import * as vscode from 'vscode';
 import { type ExportFormat, exportInProcess } from './in-process.js';
@@ -57,6 +58,12 @@ export interface RunExportArgs {
      * `default roadmap non-working:` key.
      */
     nonWorking?: NonWorkingDisplay;
+    /**
+     * Resolved asset root (setting, then `.nowlinerc`, then the source
+     * directory), so the export loads the same assets as the preview.
+     * `undefined` uses the source file's directory.
+     */
+    assetRoot?: ResolvedAssetRoot;
 }
 
 /**
@@ -144,8 +151,17 @@ const EXPORT_TARGETS: ExportTarget[] = [
  * See `specs/ide.md` § Export to other formats.
  */
 export async function runExportCommand(args: RunExportArgs): Promise<void> {
-    const { sourceUri, settings, outputChannel, theme, today, locale, showLinks, nonWorking } =
-        args;
+    const {
+        sourceUri,
+        settings,
+        outputChannel,
+        theme,
+        today,
+        locale,
+        showLinks,
+        nonWorking,
+        assetRoot,
+    } = args;
     const noLinks = showLinks === undefined ? undefined : !showLinks;
 
     const target = await pickExportTarget();
@@ -175,6 +191,7 @@ export async function runExportCommand(args: RunExportArgs): Promise<void> {
             locale,
             noLinks,
             nonWorking,
+            assetRoot,
         });
         outputChannel.appendLine(`$ ${quote(cliPath)} ${cliArgs.map(quote).join(' ')}`);
         try {
@@ -203,6 +220,7 @@ export async function runExportCommand(args: RunExportArgs): Promise<void> {
                     locale,
                     noLinks,
                     nonWorking,
+                    assetRoot: assetRoot?.dir,
                 },
             );
             const bytes = result.isBinary
@@ -286,9 +304,10 @@ function buildCliArgs(
         locale?: string;
         noLinks?: boolean;
         nonWorking?: NonWorkingDisplay;
+        assetRoot?: ResolvedAssetRoot;
     } = {},
 ): string[] {
-    const { theme, today, locale, noLinks, nonWorking } = overrides;
+    const { theme, today, locale, noLinks, nonWorking, assetRoot } = overrides;
     const args: string[] = [sourcePath, '-f', target.format, '-o', destPath];
     if (theme) args.push('--theme', theme);
     // `null`  → suppress the now-line (CLI: `--now -`)
@@ -307,6 +326,10 @@ function buildCliArgs(
     // Only when set: a CLI older than the display option rejects an unknown
     // flag, and unset must let the file's own key apply.
     if (nonWorking) args.push('--non-working', nonWorking);
+    // Pass a setting- or rc-derived root as an absolute flag: it means the
+    // same thing whatever cwd the CLI runs in, and a CLI too old to read the
+    // rc key still gets it. The default (source directory) needs no flag.
+    if (assetRoot && assetRoot.source !== 'default') args.push('--asset-root', assetRoot.dir);
     // Width cap (deliberate export setting; not preview-coupled). `0`/unset
     // omits the flag so the CLI keeps its 1280 default.
     if (settings.width > 0) args.push('--width', String(settings.width));

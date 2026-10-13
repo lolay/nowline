@@ -46,7 +46,10 @@ export interface PreviewSettings {
     showLinks: boolean;
     /** Canvas width in px; `0` leaves it unset. */
     width: number;
-    /** Override asset-resolver root; empty uses source-file directory. */
+    /**
+     * Asset-resolver root, relative to the workspace folder. Empty falls
+     * through to `.nowlinerc` `assetRoot`, then the source file's directory.
+     */
     assetRoot: string;
 }
 
@@ -211,6 +214,9 @@ export class NowlinePreview {
             const resolved = resolvePreviewOptions({
                 settings: this.settings,
                 rc: rc.config,
+                rcPath: rc.rcPath,
+                sourceDir,
+                workspaceDir: vscode.workspace.getWorkspaceFolder(this.sourceUri)?.uri.fsPath,
                 vscodeLanguage: this.vscodeLanguage,
                 isDarkTheme: isDarkColorTheme(),
                 toolbarOverrides: this.toolbarOverrides,

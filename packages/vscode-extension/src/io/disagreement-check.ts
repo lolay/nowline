@@ -1,6 +1,7 @@
 import * as path from 'node:path';
 import type { NowlineRc } from '@nowline/config';
 import * as vscode from 'vscode';
+import { resolveEditorAssetRoot } from '../preview/option-resolver.js';
 
 /** Settings keys we cross-check against `.nowlinerc`. */
 const CHECKED_KEYS: ReadonlyArray<{ rcKey: string; settingPath: string; label: string }> = [
@@ -38,7 +39,11 @@ export class DisagreementTracker {
             const inspect = vscode.workspace.getConfiguration().inspect(entry.settingPath);
             const setting = explicitValue(inspect, sourceUri);
             if (setting === undefined) continue;
-            if (settingsAgree(rcValue, setting)) continue;
+            const agree =
+                entry.rcKey === 'assetRoot'
+                    ? assetRootsAgree(rcValue, rcPath, setting, sourceUri)
+                    : settingsAgree(rcValue, setting);
+            if (agree) continue;
 
             const dedupKey = `${rcPath}::${entry.rcKey}`;
             if (this.notified.has(dedupKey)) continue;
@@ -96,6 +101,29 @@ function settingsAgree(rcValue: unknown, settingValue: unknown): boolean {
     // a real disagreement.
     if (settingValue === '' || settingValue === 0 || settingValue === 'auto') return true;
     return rcValue === settingValue;
+}
+
+/**
+ * The setting resolves against the workspace folder and the rc value against
+ * the rc file, so compare the directories they name, not the strings: `brand`
+ * in a nested rc and `roadmaps/brand` in the setting can be the same place.
+ */
+function assetRootsAgree(
+    rcValue: unknown,
+    rcPath: string,
+    settingValue: unknown,
+    sourceUri: vscode.Uri,
+): boolean {
+    if (typeof settingValue !== 'string' || settingValue.trim() === '') return true;
+    if (typeof rcValue !== 'string') return false;
+    const sourceDir = path.dirname(sourceUri.fsPath);
+    const fromSetting = resolveEditorAssetRoot({
+        setting: settingValue,
+        workspaceDir: vscode.workspace.getWorkspaceFolder(sourceUri)?.uri.fsPath,
+        rc: { config: {} },
+        sourceDir,
+    }).dir;
+    return fromSetting === path.resolve(path.dirname(rcPath), rcValue);
 }
 
 function formatValue(value: unknown): string {
