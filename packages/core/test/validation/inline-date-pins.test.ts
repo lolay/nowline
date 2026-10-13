@@ -6,11 +6,13 @@
 //              anchor, footnote, person, team)
 //   NL.E0412 — inline date present but roadmap is missing start:
 //   NL.E0413 — inline date is before roadmap start:
+//   NL.E0405 — inline date is not a real calendar day (2026-02-30)
 //
 // Plus happy paths: single inline date on item / group / parallel, and
 // a mixed list (id ref + one date) on an item.
 
 import { describe, expect, it } from 'vitest';
+import { tr } from '../../src/i18n/index.js';
 import { errorMessages, parse } from '../helpers.js';
 
 function hasError(diags: ReturnType<typeof errorMessages>, pattern: RegExp): boolean {
@@ -126,6 +128,79 @@ describe('inline-date pins (after:DATE / before:DATE)', () => {
                     `  item x duration:1w after:2026-01-15\n`,
             );
             expect(hasError(errorMessages(r.diagnostics), /is before roadmap start/i)).toBe(true);
+        });
+    });
+
+    describe('NL.E0405: an impossible day', () => {
+        type Coded = { code: string; args: [{ key: string; value: string }] };
+        const coded = (diagnostics: { data?: unknown }[]) =>
+            diagnostics.map((d) => d.data as Coded | undefined);
+
+        // `Date` rolls 2026-02-30 over to 2026-03-02, after this start:, so
+        // NL.E0413 would only fire if the check read the rolled-over date.
+        it('after:2026-02-30 on an item is NL.E0405 in en and fr, not NL.E0413', async () => {
+            const r = await parse(
+                `roadmap r start:2026-03-01\n` +
+                    `swimlane s\n` +
+                    `  item x duration:1w after:2026-02-30\n`,
+            );
+            expect(errorMessages(r.diagnostics)).toEqual([
+                'Invalid after "2026-02-30". Use ISO 8601 format: YYYY-MM-DD.',
+            ]);
+            const [data] = coded(r.diagnostics);
+            expect(data?.code).toBe('NL.E0405');
+            expect(tr('fr', 'NL.E0405', ...data!.args)).toBe(
+                'after invalide «\u00A02026-02-30\u00A0». Utilisez le format ISO 8601\u00A0: AAAA-MM-JJ.',
+            );
+        });
+
+        it('an impossible day before roadmap start: is NL.E0405 only', async () => {
+            const r = await parse(
+                `roadmap r start:2026-04-01\n` +
+                    `swimlane s\n` +
+                    `  item x duration:1w before:2026-02-30\n`,
+            );
+            expect(coded(r.diagnostics).map((d) => d?.code)).toEqual(['NL.E0405']);
+        });
+
+        it('an impossible day with no roadmap start: is NL.E0405, not NL.E0412', async () => {
+            const r = await parse(`roadmap r\nswimlane s\n  item x duration:1w after:2026-02-30\n`);
+            expect(coded(r.diagnostics).map((d) => d?.code)).toEqual(['NL.E0405']);
+        });
+
+        it('flags the date element of a list, on groups, parallels and waves', async () => {
+            const r = await parse(
+                `roadmap r start:2026-01-05\n` +
+                    `wave w1 after:2026-04-31\n` +
+                    `swimlane s\n` +
+                    `  item upstream duration:1w\n` +
+                    `  item x duration:1w after:[upstream, 2026-02-29]\n` +
+                    `  group g before:2026-06-31\n` +
+                    `    item a duration:1w wave:w1\n` +
+                    `  parallel p after:2026-09-31\n` +
+                    `    item b duration:1w\n` +
+                    `    item c duration:1w\n`,
+            );
+            const findings = coded(r.diagnostics).map((d) => [d?.code, d?.args[0]]);
+            expect(findings).toEqual([
+                ['NL.E0405', { key: 'after', value: '2026-04-31' }],
+                ['NL.E0405', { key: 'after', value: '2026-02-29' }],
+                ['NL.E0405', { key: 'before', value: '2026-06-31' }],
+                ['NL.E0405', { key: 'after', value: '2026-09-31' }],
+            ]);
+            // The list form points at the date element, not the whole property.
+            expect(r.diagnostics[1].range.start.character).toBe(
+                '  item x duration:1w after:[upstream, '.length,
+            );
+        });
+
+        it('a real leap day (2028-02-29) is accepted', async () => {
+            const r = await parse(
+                `roadmap r start:2028-01-03\n` +
+                    `swimlane s\n` +
+                    `  item x duration:1w after:2028-02-29\n`,
+            );
+            expect(r.diagnostics).toEqual([]);
         });
     });
 

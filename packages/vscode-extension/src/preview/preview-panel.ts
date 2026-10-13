@@ -3,6 +3,7 @@ import type { NonWorkingDisplay, ThemeName } from '@nowline/layout';
 import * as vscode from 'vscode';
 import type { RcConfigCache } from '../io/rc-config.js';
 import {
+    parseToolbarNow,
     resolveNonWorkingDisplay,
     resolvePreviewOptions,
     resolveTodayAnchor,
@@ -350,12 +351,8 @@ export class NowlinePreview {
         const next: ToolbarOverrides = {};
         if (payload.theme) next.theme = payload.theme;
         if (payload.now !== undefined) {
-            if (payload.now === 'today' || payload.now === 'hide') {
-                next.now = payload.now;
-            } else if (typeof payload.now === 'string') {
-                const parsed = parseIsoDate(payload.now);
-                if (parsed) next.now = parsed;
-            }
+            const now = parseToolbarNow(payload.now);
+            if (now) next.now = now;
         }
         if (isNonWorkingMode(payload.nonWorking)) next.nonWorking = payload.nonWorking;
         if (payload.showLinks !== undefined) next.showLinks = payload.showLinks;
@@ -434,12 +431,6 @@ export class NowlinePreview {
 function isDarkColorTheme(): boolean {
     const kind = vscode.window.activeColorTheme?.kind;
     return kind === vscode.ColorThemeKind.Dark || kind === vscode.ColorThemeKind.HighContrast;
-}
-
-function parseIsoDate(value: string): Date | undefined {
-    const m = /^(\d{4})-(\d{2})-(\d{2})$/.exec(value);
-    if (!m) return undefined;
-    return new Date(Date.UTC(parseInt(m[1], 10), parseInt(m[2], 10) - 1, parseInt(m[3], 10)));
 }
 
 function isNonWorkingMode(value: unknown): value is NonWorkingMode {

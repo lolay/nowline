@@ -206,6 +206,9 @@ A bare date or an instant without an offset is floating: the written date
 part is used and
 .Fl -timezone
 is ignored.
+The date part must be a real calendar day:
+.Pa 2026-02-30
+is an input error, not March\~2.
 Default: today's civil date in the host zone (or
 .Fl -timezone
 if given).

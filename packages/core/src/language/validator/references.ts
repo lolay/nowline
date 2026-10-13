@@ -13,7 +13,7 @@ import {
     isTeamDeclaration,
     isWaveDeclaration,
 } from '../../generated/ast.js';
-import { ISO_DATE_RE, propKey } from '../../util/props.js';
+import { ISO_DATE_RE, isRealIsoDate, parseIsoDate, propKey } from '../../util/props.js';
 import { declarations, referenceableIds, visitProperties } from '../ast-walk.js';
 import { entityTypeLabel } from '../validator-utils.js';
 import { isWaveBannedProperty } from '../waves.js';
@@ -129,12 +129,14 @@ export function checkReferenceResolution(file: NowlineFile, accept: ValidationAc
 //   - 24b: at most one inline date per direction (per `after:` / `before:`)
 //   -  27: file with any inline date requires roadmap `start:`
 //   -  28: every inline date must be on or after roadmap `start:`
+//   -   1: every inline date names a real calendar day (NL.E0405)
 //
 // Cycle detection (`checkCircularDependencies`) skips dates entirely —
 // they are not graph nodes — so this is the only validator that touches
 // their date semantics. The grammar's DATE_LITERAL terminal already
-// enforces the YYYY-MM-DD shape; we only need to verify calendar validity
-// for the start: comparison.
+// enforces the YYYY-MM-DD shape; an impossible day such as `2026-02-30`
+// is NL.E0405 and skips rules 27 and 28, since layout reads it as no date
+// and `Date` would roll it over to March 2.
 export function checkInlineDatePins(file: NowlineFile, accept: ValidationAcceptor): void {
     const start = resolveLocalStart(file);
 
@@ -165,6 +167,22 @@ export function checkInlineDatePins(file: NowlineFile, accept: ValidationAccepto
             }
 
             for (const dateVal of dateVals) {
+                if (!isRealIsoDate(dateVal)) {
+                    acceptTr(
+                        accept,
+                        'error',
+                        prop.value !== undefined
+                            ? { node: prop, property: 'value' }
+                            : {
+                                  node: prop,
+                                  property: 'values',
+                                  index: prop.values.indexOf(dateVal),
+                              },
+                        'NL.E0405',
+                        { key, value: dateVal },
+                    );
+                    continue;
+                }
                 switch (start.kind) {
                     case 'invalid':
                         // Roadmap start: itself is malformed; the user
@@ -178,9 +196,8 @@ export function checkInlineDatePins(file: NowlineFile, accept: ValidationAccepto
                         });
                         continue;
                     case 'valid': {
-                        const d = new Date(dateVal);
-                        if (Number.isNaN(d.getTime())) continue;
-                        if (d < start.date) {
+                        const d = parseIsoDate(dateVal);
+                        if (d && d < start.date) {
                             acceptTr(accept, 'error', { node: prop }, 'NL.E0413', {
                                 key,
                                 date: dateVal,

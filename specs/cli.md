@@ -74,6 +74,9 @@ Render options
                            YYYY-MM-DDTHH:MM:SSZ         — UTC instant; embedded Z wins
                            YYYY-MM-DDTHH:MM:SS±HH:MM    — fixed-offset instant; offset wins
                            YYYY-MM-DDTHH:MM:SS          — floating datetime; date part used
+                         The date part must be a real calendar day:
+                         `2026-02-30` exits 2 (input error) rather than
+                         rolling over to March 2.
                          Default: today's local civil date (or --timezone if set).
                          Pass `--now -` to suppress the now-line entirely
                          (Unix-`-` sentinel; same convention as `-o -`).

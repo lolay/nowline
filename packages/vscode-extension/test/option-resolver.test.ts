@@ -4,7 +4,12 @@
 
 import * as path from 'node:path';
 import { describe, expect, it } from 'vitest';
-import { resolvePreviewOptions, withOptionProblems } from '../src/preview/option-resolver.js';
+import {
+    parseToolbarNow,
+    resolvePreviewOptions,
+    resolveTodayAnchor,
+    withOptionProblems,
+} from '../src/preview/option-resolver.js';
 import type { PreviewSettings } from '../src/preview/preview-panel.js';
 
 const SETTINGS: PreviewSettings = {
@@ -186,6 +191,21 @@ describe('resolvePreviewOptions: the other options', () => {
             new Date(Date.UTC(2026, 1, 9)),
         );
         expect(resolve({ settings: { now: 'none' } }).today).toBeNull();
+    });
+
+    // Regression: both paths rolled 2026-02-30 over to March 2.
+    it('drops an impossible toolbar date and falls back from an impossible setting', () => {
+        expect(parseToolbarNow('2026-02-09')).toEqual(new Date(Date.UTC(2026, 1, 9)));
+        expect(parseToolbarNow('today')).toBe('today');
+        expect(parseToolbarNow('hide')).toBe('hide');
+        expect(parseToolbarNow('2026-02-30')).toBeUndefined();
+        expect(parseToolbarNow('2026-2-9')).toBeUndefined();
+        expect(resolveTodayAnchor(undefined, '2026-02-30')).not.toEqual(
+            new Date(Date.UTC(2026, 2, 2)),
+        );
+        expect(resolveTodayAnchor(undefined, '2026-02-30')).toEqual(
+            resolveTodayAnchor(undefined, 'auto'),
+        );
     });
 
     it('lets the toolbar hide the now-line over a pinned setting', () => {

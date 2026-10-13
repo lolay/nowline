@@ -116,6 +116,7 @@ export {
 } from './non-working-display.js';
 export {
     civilDateInZone,
+    hasImpossibleNowDate,
     type NormalizedZone,
     normalizeZone,
     type ResolveTodayOptions,

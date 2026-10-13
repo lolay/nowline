@@ -353,4 +353,33 @@ swimlane s "S"
         expect(afterPins).toHaveLength(1);
         expect(afterPins[0].isoDate).toBe('2026-03-09');
     });
+
+    // NL.E0405: `Date` would roll 2026-02-30 over to 2026-03-02, but layout
+    // reads an impossible day as no date. The pin moves nothing, caps
+    // nothing and draws no glyph: the item sits where it would without it.
+    it('an impossible-day pin (2026-02-30) is ignored', async () => {
+        const layoutOf = async (pins: string) => {
+            const src = `nowline v1
+roadmap r "R" start:2026-01-05 length:14w
+swimlane s "S"
+  item first "F" duration:2w
+  item pinned "P" duration:2w${pins}
+  group g "G"${pins}
+    item a "A" duration:1w
+`;
+            const { file, resolved } = await parseAndResolve(src);
+            return layoutRoadmap(file, resolved, { theme: 'light' });
+        };
+        const bare = await layoutOf('');
+        const pinned = await layoutOf(' after:2026-02-30 before:2026-02-30');
+
+        const itemOf = (m: typeof bare) =>
+            m.swimlanes[0].children.filter(isItem).find((it) => it.id === 'pinned')!;
+        const groupOf = (m: typeof bare) => m.swimlanes[0].children.find(isGroup)!;
+        expect(itemOf(pinned).box).toEqual(itemOf(bare).box);
+        expect(itemOf(pinned).hasOverflow).toBe(false);
+        expect(itemOf(pinned).inlineDatePins ?? []).toEqual([]);
+        expect(groupOf(pinned).box).toEqual(groupOf(bare).box);
+        expect(groupOf(pinned).inlineDatePins ?? []).toEqual([]);
+    });
 });

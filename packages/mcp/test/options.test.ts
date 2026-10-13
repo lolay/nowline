@@ -52,6 +52,13 @@ describe('resolveMcpOptions', () => {
         expect(options.today).toEqual(new Date(Date.UTC(2026, 1, 9)));
     });
 
+    it('throws an input error for an impossible now rather than rolling it over', () => {
+        expect(() => resolveMcpOptions({ now: '2026-02-30' })).toThrow(InputRequiredError);
+        expect(() => resolveMcpOptions({ now: '2026-02-30' })).toThrow(
+            'Invalid now "2026-02-30": must be a real calendar date',
+        );
+    });
+
     it('throws an input error for an unknown timezone', () => {
         expect(() => resolveMcpOptions({ timezone: 'Mars/Olympus' })).toThrow(InputRequiredError);
         expect(() => resolveMcpOptions({ timezone: 'Mars/Olympus' })).toThrow(
