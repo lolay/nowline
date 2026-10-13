@@ -21,23 +21,27 @@ import type {
 } from '../generated/ast.js';
 import {
     isAnchorDeclaration,
+    isConfigEntry,
     isDefaultDeclaration,
-    isDescriptionDirective,
     isGroupBlock,
     isItemDeclaration,
     isMilestoneDeclaration,
     isNowlineFile,
     isParallelBlock,
-    isPersonDeclaration,
     isStyleDeclaration,
     isSwimlaneDeclaration,
     isSymbolDeclaration,
-    isTeamDeclaration,
     isWaveDeclaration,
 } from '../generated/ast.js';
 import type { MessageArgs } from '../i18n/index.js';
 import type { WaveKind, WaveSuggestion } from '../i18n/wave-message-types.js';
 import { singleLine } from '../util/single-line.js';
+import {
+    type DeclarationNode,
+    declarations,
+    firstDeclarations,
+    trackChildren,
+} from './ast-walk.js';
 import {
     DATE_RE,
     defaultBannedMessage,
@@ -242,13 +246,12 @@ export function leadWave(node: AstNode, waveIds: ReadonlyMap<string, number>): n
     const own = effectiveWave(node, waveIds);
     if (own !== undefined || isItemDeclaration(node)) return own;
     if (isGroupBlock(node)) {
-        const first = node.content.find((c) => !isDescriptionDirective(c));
+        const first = trackChildren(node)[0];
         return first ? leadWave(first, waveIds) : undefined;
     }
     if (isParallelBlock(node)) {
         let min: number | undefined;
-        for (const track of node.content) {
-            if (isDescriptionDirective(track)) continue;
+        for (const track of trackChildren(node)) {
             const lw = leadWave(track, waveIds);
             if (lw === undefined) return undefined;
             min = min === undefined ? lw : Math.min(min, lw);
@@ -293,9 +296,7 @@ export function assignWaves(
         let lw = ew;
         if (isGroupBlock(node) || isParallelBlock(node)) {
             const leads: Array<number | undefined> = [];
-            for (const child of node.content) {
-                if (!isDescriptionDirective(child)) leads.push(visit(child, ew, top));
-            }
+            for (const child of trackChildren(node)) leads.push(visit(child, ew, top));
             if (ew === undefined) {
                 if (isGroupBlock(node)) lw = leads[0];
                 else if (leads.length > 0 && !leads.includes(undefined)) {
@@ -318,9 +319,7 @@ export function assignWaves(
             }
             top = { file, index: (file.roadmapEntries as AstNode[]).indexOf(lane), waveDecls };
         }
-        for (const child of lane.content) {
-            if (!isDescriptionDirective(child)) visit(child, undefined, top);
-        }
+        for (const child of trackChildren(lane)) visit(child, undefined, top);
     }
     return { waveOf, leadOf };
 }
@@ -339,30 +338,11 @@ function dateProp(node: AstNode): string | undefined {
     return props.find((p) => propKey(p) === 'date')?.value;
 }
 
-// Ids that `after:`, `before:` and `on:` can name, mirroring the validator's
-// `collectReferenceableIds`. The first declaration of a repeated id wins.
-/** @internal Kept only for the `ast-walk.ts` equivalence test; removed in m1.s3. */
-export function collectDeclarations(file: NowlineFile): Map<string, AstNode> {
-    const ids = new Map<string, AstNode>();
-    const add = (node: AstNode): void => {
-        const name = (node as { name?: string }).name;
-        if (name && !ids.has(name)) ids.set(name, node);
-        if (isSwimlaneDeclaration(node) || isParallelBlock(node) || isGroupBlock(node)) {
-            for (const c of node.content) add(c);
-        } else if (isTeamDeclaration(node)) {
-            for (const c of node.content) {
-                if (isTeamDeclaration(c) || isPersonDeclaration(c)) add(c);
-            }
-        }
-    };
-    if (file.roadmapDecl) add(file.roadmapDecl);
-    for (const entry of file.roadmapEntries) add(entry);
-    return ids;
-}
-
 /** A lookup over one file's declarations (see `WaveRefLookup`). */
 export function fileRefLookup(file: NowlineFile): WaveRefLookup {
-    const ids = collectDeclarations(file);
+    // Ids that `after:`, `before:` and `on:` can name; the first declaration
+    // of a repeated id wins.
+    const ids = firstDeclarations(file);
     return (id) => ids.get(id);
 }
 
@@ -526,30 +506,12 @@ type W0702Target = MessageArgs<'NL.W0702'>[0]['target'];
 type W0702Kind = Exclude<W0702Target, { kind: 'default' }>['kind'];
 
 // Every node that can carry a `wave:` key, outside wave declarations (the S
-// rules own those): the roadmap line, roadmap entries and their content,
-// people inside teams, and `default <entity>` lines.
-/** @internal Kept only for the `ast-walk.ts` equivalence test; removed in m1.s3. */
-export function collectWaveHosts(file: NowlineFile): AstNode[] {
-    const out: AstNode[] = [];
-    const add = (node: AstNode): void => {
-        if (isWaveDeclaration(node)) return;
-        out.push(node);
-        if (isSwimlaneDeclaration(node) || isParallelBlock(node) || isGroupBlock(node)) {
-            for (const c of node.content) {
-                if (!isDescriptionDirective(c)) add(c);
-            }
-        } else if (isTeamDeclaration(node)) {
-            for (const c of node.content) {
-                if (isTeamDeclaration(c) || isPersonDeclaration(c)) add(c);
-            }
-        }
-    };
-    for (const entry of file.configEntries) {
-        if (isDefaultDeclaration(entry)) out.push(entry);
-    }
-    if (file.roadmapDecl) add(file.roadmapDecl);
-    for (const entry of file.roadmapEntries) add(entry);
-    return out;
+// rules own those): `default <entity>` lines, the roadmap line, roadmap
+// entries and their content, and teams nested in teams.
+function waveHosts(file: NowlineFile): DeclarationNode[] {
+    return [...declarations(file, { config: true, roadmap: true })].filter((node) =>
+        isConfigEntry(node) ? isDefaultDeclaration(node) : !isWaveDeclaration(node),
+    );
 }
 
 // WV6 suggestion: a wave whose title matches the value (case-insensitive),
@@ -722,7 +684,7 @@ export function evaluateWaveProperties(file: NowlineFile): WaveFinding[] {
     const lookup = fileRefLookup(file);
     const findings: WaveFinding[] = [];
 
-    for (const node of collectWaveHosts(file)) {
+    for (const node of waveHosts(file)) {
         const props = waveProps(node);
         if (props.length === 0) continue;
 

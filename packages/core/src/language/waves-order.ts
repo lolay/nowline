@@ -22,7 +22,6 @@ import type {
     WaveDeclaration,
 } from '../generated/ast.js';
 import {
-    isDescriptionDirective,
     isGroupBlock,
     isMilestoneDeclaration,
     isParallelBlock,
@@ -35,6 +34,7 @@ import type {
     WaveContainerKind,
 } from '../i18n/wave-message-types.js';
 import { singleLine } from '../util/single-line.js';
+import { trackChildren } from './ast-walk.js';
 import { DATE_RE, displayName, lineOf, propKey } from './validator-utils.js';
 import { assignWaves, type WaveFinding, type WaveRefLookup } from './waves.js';
 
@@ -232,8 +232,7 @@ export function evaluateWaveOrder(
         slots.push(slot);
         if (isGroupBlock(node) || isParallelBlock(node)) {
             let last = -1;
-            for (const child of node.content) {
-                if (isDescriptionDirective(child)) continue;
+            for (const child of trackChildren(node)) {
                 last = visit(child, lane, i, isGroupBlock(node) ? last : -1);
                 slot.children.push(last);
             }
@@ -250,9 +249,7 @@ export function evaluateWaveOrder(
     };
     lanes.forEach((lane, l) => {
         let last = -1;
-        for (const child of lane.content) {
-            if (!isDescriptionDirective(child)) last = visit(child, l, -1, last);
-        }
+        for (const child of trackChildren(lane)) last = visit(child, l, -1, last);
     });
 
     // resolve(r, v): the last node with id r that layout registered before
