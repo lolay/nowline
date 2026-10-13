@@ -1,7 +1,7 @@
 ```
 --- KICKOFF: begin orchestration at [deep] ---
 
-  Status: 3/6 groups done | last review: wave-3 PASS | current: nowline m2 s2 [exec] | updated 2026-10-13 | passed unattended: gate 4, gate 2 before wave 3 | over expected: ~$22.43 of ~$22
+  Status: 4/6 groups done | last review: wave-4 PASS | current: nowline m2 s3 [deep] | updated 2026-10-13 | over expected: ~$24.61 of ~$22
 
   mode: unattended | proposed unattended (harness=claude-code runner=cloud; CLAUDE_CODE_REMOTE=true, assigned branch) | guard 3x min $50 | fixups 2 | confirmed 2026-10-13 session 3d92f75d-ed43-5e74-a58c-e29cd0970783 by Kickoff prompt: Run in unattended mode.
 
@@ -128,7 +128,7 @@ Acceptance: tests per result kind with in-memory `readSource` and `AssetResolver
 
 --- WAVE 4 [exec] ---
 
-#### s2 - [exec] Read the logo once
+#### s2 - [exec] Read the logo once (done)
 
 `loadLogo` returns `LoadedLogo {ref, dimensions, asset}` (spec §3.4); `renderSvg` accepts `RenderOptions.logo` and embeds those bytes instead of resolving; without it, it resolves as today. Kernel portable and font-pinned renders both pass it; browser and `--serve` callers adapt to the new return type without behaviour change.
 Acceptance: a test counting resolver calls: one per kernel export, raster included; G1, G2, G3.
@@ -176,6 +176,7 @@ Acceptance: `cli.serve.test.ts` tests for each flag; a served SVG equals `nowlin
 review wave-1 (nowline m1 s1) a2fb3b2..5231496: PASS - schema, parsers, rc-key table and surface-registered spec tables match spec §3.1 and today's CLI rules; 72/72 config tests; no caller changes - 2026-10-13
 review wave-2 (nowline m1 s2-s7) 910085c..e27c444: PASS - CLI templates, error order and empty-string handling unchanged; MCP and extension through the schema; width rule, MCP local now plus timezone, rc assetRoot with docs, fragments and French man restamp; G1 tree equals ref-c34804c; make pre-commit green - 2026-10-13
 review wave-3 (nowline m2 s1) 7aaab18..d7f48cf: PASS - stageRoadmap with invalid/include-error/staged, kernel include precedence, logo once, 9 fake-backed tests, no callers changed; merged origin/main ff8eb8b (3de45e3); check_wave.py flagged only ff8eb8b ('first line ... does not start with one of m2.s1', Co-authored-by, trailers), which is origin/main's own commit reached through the mandated merge; both first-parent commits pass; passed unattended: gate 4, gate 2 - 2026-10-13
+review wave-4 (nowline m2 s2) bf004a2..ea3707d: PASS - LoadedLogo per spec §3.4; renderSvg embeds RenderOptions.logo when its ref matches, else resolves; kernel portable and font-pinned renders pass it; staged.logo widened; logo-read-once test 4/4 (svg/html/png/pdf); G1, G2, G3 reported identical - 2026-10-13
 
 ## Token log
 
@@ -198,3 +199,6 @@ tokens review-wave-2 nowline-m1-s2-s7 (claude-opus-5-5): input ~76 / cache read 
 tokens orchestrator-wave-2 nowline-m1-s2-s7 (claude-opus-5-5): input ~18 / cache read ~1.4M / cache write ~0 5m + ~27k 1h / output ~11k | ~$0.71 API-equiv
 tokens wave-3 nowline-m2-s1 (claude-opus-5-5): input ~82 / cache read ~4.1M / cache write ~130k / output ~41k | ~$2.29 API-equiv (output est.) session 3d92f75d-ed43-5e74-a58c-e29cd0970783
 tokens review-wave-3 nowline-m2-s1 (claude-opus-5-5): input ~16 / cache read ~220k / cache write ~41k / output ~8.1k | ~$0.41 API-equiv (output est.) session 3d92f75d-ed43-5e74-a58c-e29cd0970783
+tokens orchestrator-wave-3 nowline-m2-s1 (claude-opus-5-5): input ~18 / cache read ~1.6M / cache write ~0 5m + ~23k 1h / output ~11k | ~$0.72 API-equiv
+tokens wave-4 nowline-m2-s2 (claude-sonnet-5-5): input ~66 / cache read ~3M / cache write ~69k / output ~33k | ~$1.11 API-equiv (output est.) session 3d92f75d-ed43-5e74-a58c-e29cd0970783
+tokens review-wave-4 nowline-m2-s2 (claude-opus-5-5): input ~16 / cache read ~180k / cache write ~32k / output ~8k | ~$0.35 API-equiv (output est.) session 3d92f75d-ed43-5e74-a58c-e29cd0970783
