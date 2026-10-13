@@ -41,6 +41,11 @@
             "matchPackageNames": ["@types/vscode"],
             "enabled": false,
             "description": "Floor tracks Cursor's embedded VS Code engine + 30-day grace; driven by .github/workflows/vscode-extension-engine-bump.yml (weekly, opens an issue when the floor should advance) + editor-release-monitor.yml (daily, writes cursor-release-history.json), not Renovate. Renovate would otherwise bump @types/vscode past engines.vscode and break vsce package (see v0.3.0 release-run #26337633859)."
+        },
+        {
+            "matchPackageNames": ["@nowline/**"],
+            "minimumReleaseAge": "0 days",
+            "description": "Consumers should pick up a nowline release the week it ships (lockstep with the CLI), so @nowline packages skip the release-age wait. Last on purpose: it must override the major rule's 30 days."
         }
     ],
     "customManagers": [
