@@ -116,7 +116,9 @@ diff -r "$b" "$s" && echo "G1+G3 identical"
 
 ## Merging main
 
-Before each unit, the parent fetches `origin/main`. If main moved and `git merge --no-edit origin/main` is clean, the parent commits the merge (trailers as below) and pushes before the snapshot, so the merge sits outside every worker's range and the next step's gate base includes it. On a conflict the parent aborts the merge and stops to ask (resolution is plan work: it becomes a re-plan step). Listed under Deviations in the handoff.
+**Before wave 1 (Gary, 2026-10-13):** the first thing the resumed session does, before wave 1's `plan_state.py` run and snapshot, is fetch `origin/main` and merge it into this branch. At kickoff, main was two commits ahead: `ff8eb8b` (#149, env doctor) and `4498948` (#150, m4.11 scheduler unification, R1). R1 has therefore landed first, so this milestone is the one that uses R1's code (spec §7.1): every worker re-locates the spec's `file:line` references by symbol, since R1 moved layout code (`schedule.ts`, `layout.ts`, `roadmap-node.ts`), and m1.s3 and m2.s1 cover any walk, `propValue`, `propKey`/`stripColon`, date-regex or date-parser copy that R1 added or moved (decision 6). The merge commit is the parent's; wave 1's `from` is that merge.
+
+Before each later unit, the parent fetches `origin/main` again. If main moved and `git merge --no-edit origin/main` is clean, the parent commits the merge (trailers as below) and pushes before the snapshot, so the merge sits outside every worker's range and the next step's gate base includes it. On a conflict the parent aborts the merge and stops to ask (resolution is plan work: it becomes a re-plan step). Listed under Deviations in the handoff.
 
 ## Git for workers
 

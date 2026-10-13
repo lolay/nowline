@@ -24,10 +24,11 @@ None. The kickoff question was answered `unattended`. The session halted so Gary
 
 ## How to resume
 
-Paste the plan's Kickoff prompt (in the plan's Kickoff block).
+Paste the plan's Kickoff prompt (in the plan's Kickoff block). First action after the paste: merge `origin/main` (plan, "Merging main"), push, then wave 1.
 
 ## Decisions so far
 
+- Gary, 2026-10-13 (after the kickoff answer): merge `origin/main` into the branch before wave 1. Main then carried #149 and #150 (m4.11, R1), so R1 landed first and R3 uses its helpers; workers re-locate the spec's `file:line` references by symbol in layout, and m1.s3 and m2.s1 cover copies R1 added or moved.
 - Gary, 2026-10-13 (plan mode): the m2.s1 behaviour commit makes the validator strict too. NL.E0405 fires for an impossible day (`2026-02-30`) on every date key, not only in calendar declarations, and layout reads such a date as no date. Recorded in the plan's Decisions (2) and to be written into the spec as §7 decision 5.
 - The new helpers ship only through `@nowline/core/internal` (unstable, documented in `packages/core/README.md`).
 - `effectiveWave` / `leadWave` are removed outright in m3.s3 with a `removed` fragment.
