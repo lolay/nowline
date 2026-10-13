@@ -51,6 +51,7 @@ Paste the plan's Kickoff prompt (in the plan's Kickoff block). Before each unit 
 - One PR at the end instead of one PR per spec step (Gary's instruction).
 - The parent merges `origin/main` between units when the merge is clean, outside every worker's range (plan, "Merging main").
 - After wave 1 the parent fixed the gate script (plan, Gates): G3 differed only by checkout root in one sample's logo warning. The rerun on `3fdba6c..6448ee4` reports G1+G3 identical.
+- Main moved again before wave 5: #152 (perf test only) merged clean in `d8aa0ce`.
 - Wave 4 passed gate 4 (new milestone m2) and gate 2 as unattended checkpoints; the run went over the expected total (~$32 of ~$24) there.
 - Gary waived gate 1 on wave 3 (`waive`); main merged again before wave 4.
 - Wave 3 stopped at gate 1 on a worker-disclosed breach (a direct `npx vitest` run, local); unattended mode has no automatic fix-up for a disclosure.
