@@ -1,7 +1,7 @@
 ```text
 --- KICKOFF: begin orchestration at [deep] ---
 
-  Status: 4/4 groups done | last review: wave-3 CONCERNS | current: nowline m3 s4 [xdeep] fix-up 3-fix | passed unattended: gate-4 (m2), gate-4 (m3), gate-2, gate-7 | updated 2026-10-13
+  Status: 4/4 groups done | last review: wave-3 CONCERNS | current: nowline m3 s4 [xdeep] fix-up 3-fix | passed unattended: gate-4 (m2), gate-4 (m3), gate-2, gate-7 | BLOCKED at gate 7 | updated 2026-10-13
 
   mode: unattended | proposed unattended (harness=claude-code runner=cloud; CLAUDE_CODE_REMOTE=true, assigned branch) | guard 3x min $50 | fixups 2 | confirmed 2026-10-13 session 8c78f794-2944-59bb-8116-4413104e9100 by Kickoff prompt: Run in unattended mode.
 
@@ -196,3 +196,4 @@ tokens review-wave-2-fix nowline-m3-s1-s3 (claude-opus-5-5): input ~24 / cache r
 tokens orchestrator-wave-2-fix nowline-m3-s1-s3 (claude-opus-5-5): input ~12 / cache read ~960k / cache write ~0 5m + ~22k 1h / output ~8k | ~$0.53 API-equiv
 tokens wave-3 nowline-m3-s4 (claude-opus-5-5): input ~210 / cache read ~34M / cache write ~450k / output ~110k | ~$11.07 API-equiv (output est.) session 8c78f794-2944-59bb-8116-4413104e9100
 tokens review-wave-3 nowline-m3-s4 (claude-opus-5-5): input ~130 / cache read ~5.1M / cache write ~120k / output ~65k | ~$2.92 API-equiv (output est.) session 8c78f794-2944-59bb-8116-4413104e9100
+tokens orchestrator-wave-3 nowline-m3-s4 (claude-opus-5-5): input ~14 / cache read ~1.3M / cache write ~0 5m + ~18k 1h / output ~4.8k | ~$0.50 API-equiv

@@ -4,12 +4,14 @@
 - **Branch:** `claude/ecstatic-babbage-qsrxbx` in `lolay/nowline` (task branch the cloud session was assigned; fast-forwarded from 86ac76c to origin/main 0062df3 at kickoff). One working directory: `/workspace/nowline`.
 - **Mode:** unattended, confirmed 2026-10-13 in session 8c78f794-2944-59bb-8116-4413104e9100 (`harness=claude-code runner=cloud`). Guard 3x min $50 (limit ~$63 against ~$21 expected). Fix-up cap 2 per group.
 - **Status:** 4/4 groups ran. Wave 3 (`nowline m3 s4`) reviewed CONCERNS (one out-of-range line ref). Next unit: fix-up 3-fix [xdeep] on `nowline m3 s4` (1 of 2 allowed), then final completion.
-- **Spend:** ~$47.32 against ~$21 expected (wave 2 ran ~$13.5 against ~$5 planned: the worker probed all 53 samples to measure engine divergence). Guard limit ~$63, not tripped. The orchestrator-kickoff line covers this session from its start, so it includes the review conversation that preceded the kickoff (the explore agents are not counted).
+- **Spend:** ~$47.82 against ~$21 expected (wave 2 ran ~$13.5 against ~$5 planned: the worker probed all 53 samples to measure engine divergence). Guard limit ~$63, not tripped. The orchestrator-kickoff line covers this session from its start, so it includes the review conversation that preceded the kickoff (the explore agents are not counted).
 - **Resume:** paste the plan's Kickoff prompt into a session on this branch.
 
 ## Pending question (verbatim)
 
-None. Gary answered the kickoff question `unattended` (2026-10-13), compacted, then pasted the Kickoff prompt; mode re-confirmed by that paste.
+BLOCKED at gate 7 (unplanned [xdeep] work: the wave-3 fix-up). Asked 2026-10-13:
+
+> Wave 3's R2 spec (`specs/layout-phases.md`, de36917) reviewed CONCERNS on one defect: line 365 cites `renderable.ts:237-251`, a 68-line file (should be 45-68). The fix-up 3-fix runs at [xdeep] (Opus xhigh worker plus xhigh reviewer), est. ~$3-5, taking spend to ~$52 of the $63 guard. Reply `approve 3-fix` to run it, or `waive: <reason>` to accept the spec as is and go to completion.
 
 ## Done
 
