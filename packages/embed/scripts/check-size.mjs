@@ -9,6 +9,9 @@
 //   - no `node:*` literal survived in the IIFE (the
 //     `include-resolver.ts` browser-safety refactor in
 //     packages/core/src/util/node-read-file.ts must keep holding).
+//   - the LSP protocol and JSON-RPC connection layer stayed out of the
+//     IIFE (the `narrow-lsp-protocol` plugin in bundle.mjs must keep
+//     holding; without it they add ~17 KB gzipped).
 //
 // Budget rationale: the m4 plan started at 150 KB gzipped (vs.
 // Mermaid's ~200 KB). At first measurement the IIFE landed at ~163 KB
@@ -72,12 +75,12 @@ function bucketize(path) {
     if (path.includes('node_modules/chevrotain/')) return 'chevrotain';
     if (path.includes('node_modules/d3-')) return 'd3';
     if (path.includes('node_modules/vscode-')) return 'vscode-language-* (langium dep)';
-    if (path.includes('packages/core/')) return '@nowline/core';
-    if (path.includes('packages/layout/')) return '@nowline/layout';
-    if (path.includes('packages/renderer/')) return '@nowline/renderer';
-    if (path.includes('packages/embed/')) return '@nowline/embed';
+    // Workspace inputs appear relative to packages/embed (`../core/dist/...`,
+    // `src/index.ts`), not under a `packages/` prefix.
+    const workspace = /^(?:\.\.\/([^/.][^/]*)\/|(src)\/)/.exec(path);
+    if (workspace) return `@nowline/${workspace[1] ?? 'embed'}`;
     if (path.includes('node_modules/')) {
-        const m = /node_modules\/(@?[^/]+(?:\/[^/]+)?)\//.exec(path);
+        const m = /.*node_modules\/(@[^/]+\/[^/]+|[^/]+)\//.exec(path);
         return m ? m[1] : 'other (node_modules)';
     }
     return 'other';
@@ -107,6 +110,31 @@ if (nodeLeaks.length > 0) {
     process.exit(1);
 }
 
+// Modules that only reach the IIFE through Langium's import of the
+// `vscode-languageserver-protocol` barrel. A browser render never runs
+// them, so finding one means the narrowing in bundle.mjs stopped working.
+const LSP_LEAK_PATTERNS = [
+    /vscode-languageserver-protocol\//,
+    /vscode-jsonrpc\/lib\/common\/(connection|messageReader|messageWriter|api)\.js$/,
+];
+
+const meta = await loadMetafile();
+if (!meta?.inputs) {
+    console.error(`  check-size: ${META_PATH} not found. Run 'pnpm build' first.`);
+    process.exit(2);
+}
+const lspLeaks = Object.keys(meta.inputs).filter((path) =>
+    LSP_LEAK_PATTERNS.some((re) => re.test(path)),
+);
+if (lspLeaks.length > 0) {
+    console.error(`  check-size: ${lspLeaks.length} LSP protocol module(s) leaked into the IIFE:`);
+    for (const path of lspLeaks) console.error(`    ${path}`);
+    console.error(
+        '  check-size: see the narrow-lsp-protocol plugin in packages/embed/scripts/bundle.mjs.',
+    );
+    process.exit(1);
+}
+
 let ok = true;
 
 if (gz > PROD_BUDGET) {
@@ -126,7 +154,6 @@ if (gz > PROD_BUDGET) {
 }
 
 if (printAttribution) {
-    const meta = await loadMetafile();
     const buckets = attributionFromMeta(meta);
     if (buckets.length > 0) {
         console.log('\nTop contributors to prod IIFE (raw bytes):');
