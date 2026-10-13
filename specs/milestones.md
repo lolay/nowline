@@ -2,7 +2,7 @@
 
 ## Overview
 
-The OSS tooling (`lolay/nowline` and its satellite repos) ships incrementally across milestones m1–m4.10. A four-phase layout-engine refactor (m2.5a–m2.5d), a rendering-polish pass (m2i), capacity & utilization (m2j), and a dependency-arrow attach + routing pass (m2k) sit between the sample-fidelity work (m2h) and IDE support (m3). Manual pages (m2l), French localization (m2m), inline date pins (m2n), waves (m2o), and the working calendar (m2p) close out the m2 series with distribution polish and DSL refinements. The IDE work ships before the GitHub-bound rendering paths (m3.5 GitHub Action, m4 browser embed) so authors can edit `.nowline` files in VS Code / Cursor with live preview before either surface goes wide. m3.5 (action) and m4 (embed) are independent of each other and could ship in either order; the chain numbers them m3.5 → m4. m4.7 follows m4 with a browser-tooling extraction (browser pipeline, preview shell, LSP worker, showcase example) so commercial browser surfaces can stand on a shared OSS base instead of duplicating glue. m4.8 follows m4.7 with the OSS MCP server (`@nowline/mcp`), which exposes the CLI's capabilities as a typed MCP tool surface so agent harnesses get discoverability, structured I/O, and an optional in-chat live preview. Three independent post-m4 add-ons round out the chain: m4.5 expands IDE coverage (Obsidian, Neovim, JetBrains), m4.6 expands Windows install coverage (Scoop for developers, WinGet for mainstream reach) and Authenticode-signs the Windows binary so the mainstream path clears SmartScreen, and m4.10 code-signs + notarizes the macOS binaries so direct GitHub-Release downloads clear Gatekeeper. Each milestone has a clear scope and set of Apache-2.0 deliverables. Later milestones depend on earlier ones.
+The OSS tooling (`lolay/nowline` and its satellite repos) ships incrementally across milestones m1–m4.14. A four-phase layout-engine refactor (m2.5a–m2.5d), a rendering-polish pass (m2i), capacity & utilization (m2j), and a dependency-arrow attach + routing pass (m2k) sit between the sample-fidelity work (m2h) and IDE support (m3). Manual pages (m2l), French localization (m2m), inline date pins (m2n), waves (m2o), and the working calendar (m2p) close out the m2 series with distribution polish and DSL refinements. The IDE work ships before the GitHub-bound rendering paths (m3.5 GitHub Action, m4 browser embed) so authors can edit `.nowline` files in VS Code / Cursor with live preview before either surface goes wide. m3.5 (action) and m4 (embed) are independent of each other and could ship in either order; the chain numbers them m3.5 → m4. m4.7 follows m4 with a browser-tooling extraction (browser pipeline, preview shell, LSP worker, showcase example) so commercial browser surfaces can stand on a shared OSS base instead of duplicating glue. m4.8 follows m4.7 with the OSS MCP server (`@nowline/mcp`), which exposes the CLI's capabilities as a typed MCP tool surface so agent harnesses get discoverability, structured I/O, and an optional in-chat live preview. Three independent post-m4 add-ons round out the chain: m4.5 expands IDE coverage (Obsidian, Neovim, JetBrains), m4.6 expands Windows install coverage (Scoop for developers, WinGet for mainstream reach) and Authenticode-signs the Windows binary so the mainstream path clears SmartScreen, and m4.10 code-signs + notarizes the macOS binaries so direct GitHub-Release downloads clear Gatekeeper. Four internal refactors follow the v0.8.6 review ([`specs/review-since-v086.md`](./review-since-v086.md)): one scheduler (m4.11), core AST utilities (m4.12), shared surface options and one staging function (m4.13), and layout phases (m4.14). Each milestone has a clear scope and set of Apache-2.0 deliverables. Later milestones depend on earlier ones.
 
 Commercial milestones (hosted editor, free viewer, cloud MCP server, enterprise, FedRAMP) are tracked in a separate, private spec and are out of scope here.
 
@@ -46,6 +46,10 @@ Commercial milestones (hosted editor, free viewer, cloud MCP server, enterprise,
 | ~~m4.8~~ | ~~MCP server~~ | Apache 2.0 | `@nowline/mcp` — 13 tools (validate/read/create/update/delete/list/render/export/convert/capabilities/list-themes/list-icons/list-locales/list-formats/list-templates), 3 resources (`nowline://reference`, `nowline://examples`, `nowline://conversions`), 3 prompts, tool annotations + structured output, Streamable HTTP `--port`, share links on render/export, MCP Apps in-chat live preview. `@nowline/share-link` extracted as a new leaf package (canonical `fflate`-based share-link encoder; consumed by `@nowline/embed` and `@nowline/mcp`). `printNowlineFile` + `parseNowlineJson` + `TEMPLATE_NAMES` relocated from `@nowline/cli` into `@nowline/core`. See [`specs/handoffs/handoff-m4.8-mcp.md`](./handoffs/handoff-m4.8-mcp.md). |
 | m4.9 | OSS MCP marketplace distribution | Apache 2.0 | `pack-mcp-mcpb` build cell + `nowline.mcpb`; automated MCP registry publish (`io.nowline/nowline` via DNS domain auth); `publish-mcp.yml` reusable workflow + standalone re-run caller; Claude Desktop + Gemini manual submission runbook + auto-tracked maintainer issues. Depends on m4.8. See [`specs/handoffs/handoff-m4.9-mcp-marketplace.md`](./handoffs/handoff-m4.9-mcp-marketplace.md). |
 | m4.10 | macOS notarization | Apache 2.0 | Code-sign (Developer ID Application, Hardened Runtime) + notarize (`notarytool`) + staple the macOS `bun compile` binaries in `release.yml`, clearing Gatekeeper for direct GitHub-Release / non-Homebrew downloads. Apple Developer account already held; deferred on priority, not cost. Pairs with the "tarball each binary" item in [`specs/homebrew-tap.md`](./homebrew-tap.md). |
+| m4.11 | Scheduler unification (R1) | Apache 2.0 | `scheduleRoadmap` becomes the one day-level scheduler: the date window is a projection of it, the wave plan and schedule reach exporters once through `ExportInputs`, and the A=B=C agreement tests become a register plus direct tables. Byte-identical; follow-ups F1–F4 settle the chart/export divergences. See [`specs/scheduler-unification.md`](./scheduler-unification.md). |
+| m4.12 | Core AST, style and calendar utilities (R3) | Apache 2.0 | One content walk, one style-precedence chain, one calendar-declaration classifier and one set of property helpers in `@nowline/core` (via `@nowline/core/internal`); removes the include-resolver to validator import; splits the validator into per-feature modules; removes `effectiveWave` and `leadWave`. See [`specs/core-ast-utilities.md`](./core-ast-utilities.md). |
+| m4.13 | Shared surface options and one staging function (R4) | Apache 2.0 | One options schema and `.nowlinerc` merge in `@nowline/config` for the CLI, `--serve`, MCP and VS Code; one `stageRoadmap` in `@nowline/renderer` for the export kernel, browser pipeline, `--serve` and MCP insights. `--serve` honours `--width`/`--no-links`/`--strict`; MCP's `now` default becomes local. See [`specs/surface-options.md`](./surface-options.md). |
+| m4.14 | Layout phases (R2) | Apache 2.0 | `RoadmapNode.place` splits into date-window, measure, place and finalize phases with one ordered finalize pass; `HeaderNode`; one row-track loop and `LayoutContext` builder; status tints become theme tokens. Fixes the beside-card (F1) and now-pill (L2) bugs. See [`specs/layout-phases.md`](./layout-phases.md). |
 
 ## Milestone Details
 
@@ -658,6 +662,30 @@ Depends on: m2a (the release pipeline that builds and uploads the macOS binaries
 
 Spec: [`specs/homebrew-tap.md`](./homebrew-tap.md), [`specs/cli-distribution.md`](./cli-distribution.md).
 
+### m4.11 — Scheduler unification (R1)
+
+Make engine C (`scheduleRoadmap`) the one day-level scheduler. Engine B (`computeContentEndDay`) becomes a projection of C's result and is deleted; engine A keeps placing pixels but reads the window, durations, start terms and wave floor dates from shared code. The wave plan and schedule are built once per export and carried on `ExportInputs`. Every migration step is byte-identical. Follow-up F1 settles divergence (a) with the exports' meaning of `after:` (an item starts after both the previous lane item and its references), which changes three sample charts; F2 to F4 follow.
+
+Depends on: m2o, m2p. Independent of m4.12 and m4.13. Spec: [`specs/scheduler-unification.md`](./scheduler-unification.md).
+
+### m4.12 — Core AST, style and calendar utilities (R3)
+
+Add `ast-walk.ts`, `style-chain.ts`, `calendar-declarations.ts`, `props.ts` and `value-tables.ts` to `@nowline/core`, exported through an unstable `@nowline/core/internal` subpath, and move the validator, resolver, layout and LSP copies onto them. Removes the include-resolver to validator import, splits the validator into per-feature modules behind the unchanged `NowlineValidator`, makes layout's date parsing strict, and removes `effectiveWave` and `leadWave`.
+
+Depends on: m2o, m2p. Independent of m4.11 and m4.13. Spec: [`specs/core-ast-utilities.md`](./core-ast-utilities.md).
+
+### m4.13 — Shared surface options and one staging function (R4)
+
+One options schema (theme, width, now, page size, non-working, asset root) and one `.nowlinerc` merge in `@nowline/config`, read by the CLI, `--serve`, MCP and the VS Code extension; one `stageRoadmap` (parse, resolve includes, load assets, lay out) in `@nowline/renderer`, called by the export kernel, the browser pipeline, `--serve` and MCP insights. `--serve` stops ignoring `--width`, `--no-links` and `--strict`, the logo is read once, one width rule applies everywhere, and MCP's `now` default becomes the local civil date with an optional `timezone`.
+
+Depends on: m4.8 (MCP). Independent of m4.11 and m4.12. Spec: [`specs/surface-options.md`](./surface-options.md).
+
+### m4.14 — Layout phases (R2)
+
+Split `RoadmapNode.place` into date-window, measure, place and finalize phases, so the post-placement fixups become one ordered finalize pass over an explicit context. Derive the row-height predictor from `ItemNode.measure`, extract a `HeaderNode`, merge the swimlane and group child loops, the `*Deps` interfaces and the two `LayoutContext` builders, and move status tints into theme tokens. Follow-ups fix the beside-header card (F1) and reserve the now-pill row on an extended axis (L2).
+
+Depends on: m2.5c. m1 and m2 can land any time; m3 onward follows m4.11's m1 and m2. Spec: [`specs/layout-phases.md`](./layout-phases.md).
+
 ## Dependency Chain
 
 ```
@@ -668,6 +696,10 @@ m1 → m2a → m2b → m2b.5 → m2c → m2d → m2e → m2f → m2g → m2h →
                                                                                                                                                                                            m4.6 (depends on m2a + m2l; sequenced after m4.5 by numbering only — independent of m4.5 and m4.7)
                                                                                                                                                                                           ↘
                                                                                                                                                                                            m4.10 (depends on m2a; sequenced after m4.9 by numbering only — independent of m4.5 / m4.6 / m4.7)
+                                                                                                                                                                                          ↘
+                                                                                                                                                                                           m4.11, m4.12, m4.13 (refactors; independent of each other; m4.13 needs m4.8)
+                                                                                                                                                                                          ↘
+                                                                                                                                                                                           m4.14 (refactor; its m3 onward follows m4.11's m2)
 ```
 
 m3.5 (GitHub Action) and m4 (browser embed) are independent of each other — m3.5 shells out to `@nowline/cli`, m4 ships the browser bundle. The chain orders them m3.5 → m4 by numbering only; either could ship first.
@@ -684,8 +716,10 @@ m4.9 (OSS MCP marketplace distribution) depends on m4.8 — it automates registr
 
 m4.10 (macOS notarization) only needs m2a (the release pipeline that builds and uploads the macOS binaries). It is the macOS counterpart to the Windows `.exe` Authenticode signing folded into m4.6, independent of m4.5 / m4.6 / m4.7 / m4.8 / m4.9, and sequenced after m4.9 by numbering only. It pairs naturally with the "tarball each binary" future-work item in [`specs/homebrew-tap.md`](./homebrew-tap.md), since a bare binary can't be stapled.
 
+m4.11 to m4.14 are internal refactors from the v0.8.6 review. They change no user-facing feature: every migration step keeps every sample render byte-identical, and the few deliberate output changes (m4.11's F1, m4.14's F1 and L2) each land with a planned step and name their snapshot bumps. m4.11, m4.12 and m4.13 touch mostly separate packages and can run in parallel; m4.14 rewrites the same layout code as m4.11, so its steps that touch `RoadmapNode.place` wait for m4.11's m1 and m2.
+
 m1 is the critical foundation — every subsequent milestone depends on the DSL, parser, and typed AST it produces.
 
-## Beyond m4.10
+## Beyond m4.14
 
 Hosted products (pro editor, free viewer, cloud MCP server, enterprise, FedRAMP) consume these OSS packages via npm but are built in separate, proprietary repos. See the commercial roadmap for that scope.

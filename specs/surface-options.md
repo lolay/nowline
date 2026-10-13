@@ -1,6 +1,6 @@
 # Nowline — Shared Surface Options and One Staging Function
 
-**Status: Proposed (design only, no code yet).** Proposed milestone ID: **m4.13** (not yet entered in [`milestones.md`](./milestones.md)). This is refactor R4 from [`review-since-v086.md`](./review-since-v086.md): one options schema in `@nowline/config` that every render surface reads, and one staging function (parse, resolve includes, load assets, lay out) that every pipeline calls. Every `file:line` below was checked at the commit that adds this spec (source identical to 0062df3 plus the m2 fixes of the same review).
+**Status: Accepted (design only, no code yet).** Milestone **m4.13** in [`milestones.md`](./milestones.md); decisions in the last section. This is refactor R4 from [`review-since-v086.md`](./review-since-v086.md): one options schema in `@nowline/config` that every render surface reads, and one staging function (parse, resolve includes, load assets, lay out) that every pipeline calls. Every `file:line` below was checked at the commit that adds this spec (source identical to 0062df3 plus the m2 fixes of the same review).
 
 ## 1. Problem
 
@@ -57,7 +57,7 @@ The staging steps (parse and validate, resolve includes with the include-error p
 
 **Non-goals**
 
-- New options, new rc keys (except as open question 5 decides), or new flags.
+- New options, new rc keys (except `assetRoot`, §7 decision 5), or new flags.
 - Changing any error message's text. The schema returns structured errors; each surface formats them with today's templates.
 - Changing the kernel's `RenderInputs` contract (`export/src/index.ts:92-165`) or the `HostEnv` seam. Staging sits behind it.
 - Moving the VS Code extension's toolbar and settings precedence. It keeps "toolbar, then setting, then rc, then editor theme"; only the rc parsing moves.
@@ -107,7 +107,7 @@ export interface OptionError {
 }
 
 export interface NowPolicy {
-    /** Zone for "today" when no layer sets `now`; see open question 2. */
+    /** Zone for "today" when no layer sets `now`; see §7, decision 2. */
     zone?: NormalizedZone;
     clock?: () => Date;
 }
@@ -121,7 +121,7 @@ export function resolveSurfaceOptions(
 
 - **One parser per option.** `theme` uses `normalizeThemeName` and `THEME_NAMES`, `width` the CLI's integer ≥ 320 rule, `now` `resolveToday` (`-` suppresses), `pageSize` `parsePageSize`, `nonWorking` `NON_WORKING_DISPLAYS`. The first layer with a defined value wins; a bad value in a lower layer is not reported once a higher one wins ([`cli.md`](./cli.md): "A valid flag still wins over an invalid key").
 - **rc keys.** The schema records each option's rc key (`theme`, `width`, `pdfPageSize`; `now` and `nonWorking` have none today), and `rcLayer(config: NowlineRc): OptionLayer` turns a loaded `.nowlinerc` into a layer. `NowlineRc` gains the value types of the keys the schema owns.
-- **Errors stay each surface's.** The CLI formats an `OptionError` as `nowline: invalid --width "abc". Must be an integer ≥ 320.` or `nowline: invalid .nowlinerc theme "sepia". Expected light, dark, or grayscale.`; MCP as `Unknown theme "x". Expected one of: …` or `Invalid pageSize "x": …`; VS Code keeps ignoring a bad rc value (open question 4). Each surface's existing tests pin those strings.
+- **Errors stay each surface's.** The CLI formats an `OptionError` as `nowline: invalid --width "abc". Must be an integer ≥ 320.` or `nowline: invalid .nowlinerc theme "sepia". Expected light, dark, or grayscale.`; MCP as `Unknown theme "x". Expected one of: …` or `Invalid pageSize "x": …`; VS Code keeps ignoring a bad rc value until m1.s5 applies decision 4 (§7). Each surface's existing tests pin those strings.
 - **CLI-only keys share the merge.** `defaultFormat`, `pdfOrientation`, `pdfMargin`, `fontSans`, `fontMono`, `headlessFonts`, `useSystemFonts` and `locale` go through the same layer mechanism with option specs registered by the CLI, so `render.ts:127-151` becomes one call. `mergeConfig` is deleted or reimplemented on top of the layers.
 - **Dependencies.** `@nowline/config` gains `@nowline/layout` (themes, non-working displays, `resolveToday`) and `@nowline/export-core` (`parsePageSize`). Both are already dependencies of every consumer (CLI, MCP, VS Code), and neither depends on config, so there is no cycle. The loader keeps its `node:fs` default behind its injectable `readFile`.
 
@@ -189,7 +189,7 @@ export function stageRoadmap(inputs: StageInputs): Promise<StageResult>;
 
 - **What it owns.** Parse and validate (or reuse `document`), resolve includes, apply the include-error precedence once, load the logo once, lay out. With R1 ([`scheduler-unification.md`](./scheduler-unification.md)) it also builds the wave plan and the schedule once and returns them.
 - **What it does not own.** Rendering, diagnostics formatting, `strict`, layout insights. Each caller maps the result to its own shape: the kernel throws (`Error`, `IncludeResolveError`), the browser returns `DiagnosticRow`s, `--serve` broadcasts text frames, MCP returns `McpDiagnostic`s.
-- **Where it lives.** `packages/renderer/src/stage.ts`, exported from `@nowline/renderer`: the logo loader and the `AssetResolver` contract already live there, and the kernel, the browser pipeline and the CLI already depend on it. Renderer gains a direct `@nowline/core` dependency, which it already has transitively through layout, so no bundle grows (open question 3 lists the alternatives).
+- **Where it lives.** `packages/renderer/src/stage.ts`, exported from `@nowline/renderer`: the logo loader and the `AssetResolver` contract already live there, and the kernel, the browser pipeline and the CLI already depend on it. Renderer gains a direct `@nowline/core` dependency, which it already has transitively through layout, so no bundle grows; every consumer of renderer (browser, embed, export, the CLI and the VS Code extension) already depends on core and layout, so no package gains an edge. The cost is renderer's wider role (it now runs the pipeline as well as drawing it) and that a standalone renderer install loads core's Langium parser when it stages (§7, decision 3).
 
 ### 3.4 The logo is read once
 
@@ -264,11 +264,11 @@ Replace `render.ts:127-151` and its helpers with one resolution over the flag an
 
 #### s5 - *Behaviour:* one width rule
 
-Apply the integer ≥ 320 rule to MCP's `width` argument and to VS Code's setting and rc value, as open question 4 decides. Fragment `changed` (and `packages/vscode-extension/.changelog/` for the extension). G1, G2.
+Apply the integer ≥ 320 rule to MCP's `width` argument and to VS Code's setting and rc value, (§7, decision 4). Fragment `changed` (and `packages/vscode-extension/.changelog/` for the extension). G1, G2.
 
 #### s6 - *Behaviour:* one `now` default
 
-Apply the default open question 2 decides; with the recommendation, MCP's omitted `now` becomes the local civil date and MCP gains a `timezone` argument with `--timezone`'s accepted forms. Update the tool descriptions (`server.ts:600-608`) and `specs/mcp.md`. Fragment `changed`. G1, G2.
+MCP's omitted `now` becomes the local civil date, as on every other surface since the local-default decision (497de7d), and MCP gains a `timezone` argument with `--timezone`'s accepted forms (§7, decision 2). `todayUtc()` (`server.ts:197-207`, and `:383`) goes. Update the tool descriptions (`server.ts:600-608`) and `specs/mcp.md`, whose UTC wording came from #122 on the mistaken premise that it matched the CLI. Fragment `changed`. G1, G2.
 
 ### m2 - One staging function
 
@@ -318,12 +318,14 @@ Add `packages/renderer/src/stage.ts` (§3.3) with tests for each result kind: va
 | The stage's include-error precedence differs subtly from one pipeline's | each pipeline's existing include-error tests run unchanged on the stage (`waves.md` §6.1 cases) |
 | `exportStaged` lets a caller pair a stage with different `RenderInputs` | `exportStaged` checks the stage's layout inputs against `inputs` (theme, today, width, locale, non-working) and throws on a mismatch |
 | Rendering the SVG lazily changes an exporter that read it implicitly | only html, png and pdf take the SVG; G3 covers every format |
-| The behaviour steps surprise users | each is its own PR with a fragment, after the matching open question is answered |
+| The behaviour steps surprise users | each is its own PR with a fragment, after the matching decision (§7) |
 
-## 7. Open questions for Gary
+## 7. Decisions
 
-1. **Milestone ID.** `m4.13`, after `m4.11` (R1, [`scheduler-unification.md`](./scheduler-unification.md)) and `m4.12` (R3, [`core-ast-utilities.md`](./core-ast-utilities.md))? *Recommendation:* yes. If R1 has landed, m2.s3 of this spec builds the schedule inside `stageRoadmap`; if not, R1's m2.s2 adds it there later.
-2. **The `now` default.** Today the CLI, `--serve`, the VS Code extension and the browser pipeline default to the local civil date, and MCP to the UTC date. Because a roadmap without `start:` starts on that date, the two can disagree on the whole chart, not only the now-line, for part of every day. *Recommendation:* the local civil date everywhere, with an optional MCP `timezone` argument (the accepted forms of `--timezone`) for callers that want another zone. A stdio MCP server runs on the user's machine, so local is the user's date, the same one the CLI uses in the same shell; a remote `--port` server can be pinned with `timezone` or an explicit `now`. The alternative, UTC everywhere, would change the documented CLI default (`help.ts:49`) and surprise every evening user.
-3. **Where `stageRoadmap` lives.** (a) `@nowline/renderer`, which already holds the logo loader and `AssetResolver` (recommended); (b) a new `@nowline/stage` package, clearer but one more published, lock-step package; (c) `@nowline/browser`, which would make the export kernel depend on the browser package.
-4. **One width rule.** The CLI requires an integer ≥ 320 ([`cli.md`](./cli.md) `.nowlinerc` table), MCP accepts any number, and VS Code any positive number (and ignores a bad rc value). *Recommendation:* the CLI rule everywhere; MCP returns its input error and VS Code reports a bad setting or rc value in the preview's diagnostic table instead of drawing at that width.
-5. **The rc `assetRoot` key.** The VS Code extension reads `.nowlinerc` `assetRoot` (`option-resolver.ts:211-212`); the CLI and `--serve` do not, and `cli.md` does not list it. *Recommendation:* add it to the schema as the default for `--asset-root` and document it, since extension users may already rely on it; the alternative is to stop reading it in the extension.
+Gary, 2026-10-13:
+
+1. **Milestone ID.** Yes: m4.13. If R1 has landed, m2.s3 builds the schedule inside `stageRoadmap`; if not, R1's m2.s2 adds it there later.
+2. **The `now` default.** The local civil date everywhere, keeping the local-default decision of 497de7d, with an optional MCP `timezone` argument (m1.s6). MCP's UTC default, and #122's wording of it, were the exception.
+3. **Where `stageRoadmap` lives.** `@nowline/renderer` (§3). No package gains a dependency edge; the cost is renderer's wider role.
+4. **One width rule.** Yes: the CLI's integer ≥ 320 everywhere. MCP returns its input error, and VS Code reports a bad setting or rc value in the preview's diagnostic table.
+5. **The rc `assetRoot` key.** Yes: it joins the schema as the default for `--asset-root` and is documented in [`cli.md`](./cli.md).
