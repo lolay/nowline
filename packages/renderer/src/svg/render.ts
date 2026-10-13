@@ -718,12 +718,14 @@ function renderNonWorkingBands(
 }
 
 /**
- * Labels of the titled non-working runs (specs/working-calendar.md §7.4):
- * each run's text in the marker row, placed by the layout like an anchor
- * label, and under `hide` a dotted cut line at the seam from the label
- * row's centre to the timeline bottom, since the zero-width seam has no
- * band to name. Empty when no run has a label, so a roadmap without one
- * emits no bytes.
+ * Labels of the titled non-working runs and the working exceptions
+ * (specs/working-calendar.md §7.4): each one's text in the marker row,
+ * placed by the layout like an anchor label. Under `hide` a titled run
+ * also draws a dotted cut line at the seam from the label row's centre to
+ * the timeline bottom, since the zero-width seam has no band to name. A
+ * working exception is text only in either view: a working day removes no
+ * time, so it has no cut. Empty when nothing has a label, so a roadmap
+ * without one emits no bytes.
  */
 function renderNonWorkingLabels(
     t: PositionedTimelineScale,
@@ -734,13 +736,11 @@ function renderNonWorkingLabels(
     const parts: string[] = [];
     for (const run of t.nonWorking ?? []) {
         if (run.label === undefined || !run.labelBox) continue;
-        const box = run.labelBox;
-        const centerY = box.y + 4;
         if (run.cut) {
             parts.push(
                 tag('line', {
                     x1: num(run.x),
-                    y1: num(centerY),
+                    y1: num(run.labelBox.y + 4),
                     x2: num(run.x),
                     y2: num(bottomY),
                     stroke: palette.timeline.nonWorkingSeam,
@@ -749,21 +749,45 @@ function renderNonWorkingLabels(
                 }),
             );
         }
-        // Left-side labels end-anchor at the box's right edge, as anchor
-        // labels do: the box width is a pessimistic estimate.
-        const isLeft = run.labelSide === 'left';
-        const labelAttrs: Record<string, string | number | null | undefined> = {
-            x: num(isLeft ? box.x + box.width : box.x),
-            y: num(centerY + 4),
-            'font-family': fonts.sans,
-            'font-size': 10,
-            fill: palette.timeline.labelText,
-        };
-        if (isLeft) labelAttrs['text-anchor'] = 'end';
-        parts.push(textTag(labelAttrs, run.label));
+        parts.push(calendarLabelText(run.label, run.labelBox, run.labelSide, palette, fonts));
+    }
+    for (const exception of t.workingExceptions ?? []) {
+        if (!exception.labelBox) continue;
+        parts.push(
+            calendarLabelText(
+                exception.label,
+                exception.labelBox,
+                exception.labelSide,
+                palette,
+                fonts,
+            ),
+        );
     }
     if (parts.length === 0) return '';
     return tag('g', { 'data-layer': 'non-working-label' }, parts.join(''));
+}
+
+/** One calendar label's text in the marker row. */
+function calendarLabelText(
+    label: string,
+    box: BoundingBox,
+    side: 'left' | 'right' | undefined,
+    palette: Theme,
+    fonts: FontFamilies,
+): string {
+    // Left-side labels end-anchor at the box's right edge, as anchor
+    // labels do: the box width is a pessimistic estimate.
+    const isLeft = side === 'left';
+    const centerY = box.y + 4;
+    const labelAttrs: Record<string, string | number | null | undefined> = {
+        x: num(isLeft ? box.x + box.width : box.x),
+        y: num(centerY + 4),
+        'font-family': fonts.sans,
+        'font-size': 10,
+        fill: palette.timeline.labelText,
+    };
+    if (isLeft) labelAttrs['text-anchor'] = 'end';
+    return textTag(labelAttrs, label);
 }
 
 function renderTimeline(t: PositionedTimelineScale, palette: Theme, fonts: FontFamilies): string {

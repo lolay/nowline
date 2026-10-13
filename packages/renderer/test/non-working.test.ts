@@ -571,6 +571,49 @@ describe('non-working labels on the left side', () => {
     });
 });
 
+// A titled `working` declaration (specs/working-calendar.md §7.4): Example B
+// plus a working Saturday, Dec 5, which takes no time out of the axis.
+const RELEASE_CRUNCH = 'working crunch "Release crunch" date:2026-12-05';
+const EXAMPLE_B_CRUNCH = EXAMPLE_B.replace('roadmap r', `${RELEASE_CRUNCH}\n\nroadmap r`);
+
+describe('working exception labels', () => {
+    for (const [view, options] of [
+        ['hide', { theme: 'light' as const }],
+        ['show', { theme: 'light' as const, ...SHOW }],
+    ] as const) {
+        it(`draws the label as text only under ${view}, with no line at its x`, async () => {
+            const model = await parseToModel(EXAMPLE_B_CRUNCH, options);
+            const [exception] = model.timeline.workingExceptions ?? [];
+            expect(exception?.label).toBe('Release crunch · +1d');
+            const layers = labelLayers(await renderSvg(model));
+            expect(layers).toHaveLength(1);
+            // Thanksgiving's cut line under hide, nothing under show; never one for the crunch.
+            const lines = linesOf(layers[0]);
+            expect(lines).toHaveLength(view === 'hide' ? 1 : 0);
+            for (const line of lines) expect(Number(line.x1)).not.toBe(exception?.x);
+            const text = textsOf(layers[0]).find((t) => t.content === 'Release crunch · +1d');
+            expect(text).toBeDefined();
+            expect(Number(text?.attrs.x)).toBe(exception?.labelBox?.x);
+            expect(Number(text?.attrs.y)).toBe((exception?.labelBox?.y ?? 0) + 8);
+            expect(text?.attrs['font-size']).toBe('10');
+            expect(text?.attrs.fill).toBe(lightTheme.timeline.labelText);
+        });
+    }
+
+    it('emits the layer for a working exception alone: one text, no line', async () => {
+        const source = EXAMPLE_A.replace(
+            'roadmap r',
+            `config\n\nworking crunch "Crunch Saturday" date:2026-01-10\n\nroadmap r`,
+        );
+        const [layer] = labelLayers(
+            await renderSvg(await parseToModel(source, { theme: 'light' })),
+        );
+        expect(layer).toBeDefined();
+        expect(linesOf(layer ?? '')).toEqual([]);
+        expect(textsOf(layer ?? '').map((t) => t.content)).toEqual(['Crunch Saturday · +1d']);
+    });
+});
+
 describe('non-working labels: no label, no layer (guard)', () => {
     it('emits nothing for a roadmap with no titled run, in either view', async () => {
         for (const options of [{ theme: 'light' as const }, { theme: 'light' as const, ...SHOW }]) {

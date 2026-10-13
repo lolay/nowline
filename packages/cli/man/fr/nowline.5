@@ -5,7 +5,7 @@
 .\" Empreinte de la page anglaise relue pour cette traduction. Après avoir
 .\" reporté une modification de la page anglaise, remplacez-la par la ligne
 .\" qu'affiche packages/cli/test/man/translation-parity.test.ts.
-.\" translated-from: nowline.5 sha256:5f205668d1d94a52f5340930739f2540842634f3cec4dad4f716e55c853ccb03
+.\" translated-from: nowline.5 sha256:e4e70c070b97e5ae77cc5cb0cdfbdba7208505c4d0c848db151db857390545cc
 .\"
 .\" Les mots-clés du DSL (nowline, config, roadmap, swimlane, item, parallel,
 .\" group, person, team, anchor, label, size, status, wave, milestone, footnote,
@@ -644,9 +644,14 @@ Sous
 l'étiquette est posée sur un trait de coupe à la jointure, et sous
 .Sy show
 au bord gauche de la bande grisée.
-Un titre sur une récurrence ou sur une déclaration
+Une déclaration
 .Sy working
-n'est pas dessiné.
+datée qui a un titre est étiquetée aux jours qu'elle rend ouvrés, avec
+son titre et le nombre de jours qu'elle ajoute, par exemple
+.Dq Crunch Saturday \[u00B7] +1d ,
+sans trait de coupe dans aucun des deux affichages\ ; un jour de
+récupération en semaine à l'intérieur d'une fermeture datée compte.
+Un titre sur une récurrence n'est pas dessiné.
 Une déclaration accepte ces propriétés\ :
 .Bl -tag -width "every:"
 .It Sy date:

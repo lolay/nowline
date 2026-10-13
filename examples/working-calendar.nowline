@@ -8,9 +8,10 @@ nowline v1
 //   - Winter break, Dec 24 to Jan 1: seven working days, so a bar that
 //     crosses it ends seven working days later than it would without it.
 //   - Company summit, Wed Jan 13 to Fri Jan 15.
-//   - Launch prep Saturday, a working exception. It is not labelled on the
-//     chart; MS Project writes it as a working exception and Mermaid counts it
-//     in its lossy summary.
+//   - Launch prep Saturday, a working exception. The chart labels it
+//     "Launch prep Saturday · +1d", with no cut line since it removes no time;
+//     MS Project writes it as a working exception and Mermaid counts it in its
+//     lossy summary.
 //
 // Hidden by default: each closure is a labelled seam in the marker row.
 // Export it with `nowline examples/working-calendar.nowline -f msproj` to see

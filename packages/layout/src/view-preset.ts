@@ -23,11 +23,16 @@ import {
     TIMELINE_TICK_LABEL_FONT_SIZE_PX,
 } from './themes/shared.js';
 import type { TimeScale } from './time-scale.js';
-import type { PositionedNonWorkingRun, PositionedTick } from './types.js';
+import type {
+    PositionedNonWorkingRun,
+    PositionedTick,
+    PositionedWorkingException,
+} from './types.js';
 import {
     continuousDaysPerUnit,
     type NonWorkingRun,
     type WorkingCalendar,
+    type WorkingExceptionRun,
 } from './working-calendar.js';
 
 export type ScaleUnit = 'days' | 'weeks' | 'months' | 'quarters' | 'years';
@@ -449,6 +454,36 @@ export function buildNonWorkingRuns(
         if (unit === 'days' && isInside && !hasGridLineAt(x)) out.seam = true;
         return out;
     });
+}
+
+/**
+ * The window's working exceptions for the model (specs/working-calendar.md
+ * §7.4), or undefined when there are none. Each sits at its first day's x,
+ * the same under either view since a working day always has width, clamped
+ * to the window for a run that starts before it.
+ */
+export function buildWorkingExceptions(scale: TimeScale): PositionedWorkingException[] | undefined {
+    const runs = scale.calendar?.workingExceptionRuns(scale.domain[0], scale.domain[1]) ?? [];
+    if (runs.length === 0) return undefined;
+    const [left] = scale.range;
+    return runs.map((run) => ({
+        x: Math.max(left, scale.forward(run.from)),
+        from: run.from,
+        through: run.through,
+        titles: run.titles,
+        label: workingExceptionLabel(run),
+    }));
+}
+
+/**
+ * The marker-row label of a working exception: its titles joined with `, `,
+ * then ` · +Nd` for the N days it puts back, every day of the run.
+ */
+export function workingExceptionLabel(
+    run: Pick<WorkingExceptionRun, 'from' | 'through' | 'titles'>,
+): string {
+    const days = daysBetween(run.from, run.through) + 1;
+    return `${run.titles.join(', ')}${RUN_LABEL_DAY_SEPARATOR}+${days}d`;
 }
 
 /** Separator between a run's titles and its day count: U+00B7 with a space each side. */

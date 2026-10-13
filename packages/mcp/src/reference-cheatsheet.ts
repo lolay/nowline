@@ -62,7 +62,7 @@ non-working thanksgiving "Thanksgiving" start:2026-11-26 end:2026-11-27
 working crunch "Crunch Saturday" date:2026-01-10
 \`\`\`
 
-\`non-working\` takes \`date:\`, \`start:\` with \`end:\`, or \`every:\` (weekday names, \`every:[sat, sun]\`); \`working\` gives days back. Durations count working days only. \`default roadmap non-working:hide\` (the default) collapses closed days to a seam; \`show\` draws them as bands.
+\`non-working\` takes \`date:\`, \`start:\` with \`end:\`, or \`every:\` (weekday names, \`every:[sat, sun]\`); \`working\` gives days back. Durations count working days only. \`default roadmap non-working:hide\` (the default) collapses closed days to a seam; \`show\` draws them as bands. A dated declaration with a title is labelled in the marker row: a closure as \`Thanksgiving · 2d\` (working days removed), a \`working\` one as \`Crunch Saturday · +1d\` (days added, no cut line). Titles on \`every:\` recurrences are not drawn.
 
 ## Config / includes (before roadmap)
 
