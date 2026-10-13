@@ -78,3 +78,7 @@ export function locationOf(node: AstNode): string {
     }
     return 'unknown location';
 }
+
+export function isIdentifier(val: string): boolean {
+    return /^[a-zA-Z_][a-zA-Z0-9_-]*$/.test(val);
+}
