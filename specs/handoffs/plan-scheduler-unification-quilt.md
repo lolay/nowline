@@ -4,7 +4,7 @@
 ```
 --- KICKOFF: begin orchestration at [deep] ---
 
-  Status: 3/4 groups done | last review: wave-2 PASS | current: nowline m3 s1-s3 [exec] | updated 2026-10-13 | over expected: ~$27.46 of ~$16 | passed unattended: gate 4 before wave 2 (m3)
+  Status: 4/4 groups done | last review: wave-2 CONCERNS | current: nowline m3 s1-s3 [exec] fix-up | updated 2026-10-13 | over expected: ~$32.45 of ~$16 | passed unattended: gate 4 before wave 2 (m3)
 
   mode: unattended | proposed unattended (harness=claude-code runner=cloud; CLAUDE_CODE_REMOTE=true, assigned branch) | guard 3x min $50 | fixups 2 | confirmed 2026-10-13 session 65f2e917-181e-5b0f-94c9-28d8d9b1c93d: unattended
 
@@ -37,6 +37,7 @@
 | 1 [deep] m1 s1-s3 | ~9.5M | ~$5.0 |
 | 2 [exec] m1 s4 - m3 s3 (3 units, 3 reviews) | ~9.6M | ~$3.9 |
 | 2-fix [exec] nowline m1 s4-s5 | — | — |
+| 2-fix [exec] nowline m3 s1-s3 | — | — |
 | orchestrator | ~8.2M | ~$7.0 |
 | **Total** | ~27M | ~$16 |
 
@@ -125,15 +126,15 @@ Spec §3.4 and §4 m2.s3. Expose the schedule on `LayoutContext` (`layout-contex
 
 ## m3 - Tests describe behaviour, not agreement
 
-#### s1 - [exec] Assert the worked examples on each engine directly
+#### s1 - [exec] Assert the worked examples on each engine directly (done)
 
 Spec §4 m3.s1, with decision 3 above. Make sure every `specs/waves.md` §11 worked example is asserted on C in `schedule.test.ts` against the spec's numbers (add what is missing). In `waves.test.ts`, `expectTable` (`:209-215`, 27 sites) and `expectWaves` (`:1090-1104`, 8 sites) assert A against the same spec tables, and `engineCWeeks` / `engineCWaveSpans` (`:196-206`, `:1072-1084`) go. The 60-roadmap barrier theorem stays A-only. Test-only. Gates: G1, G2.
 
-#### s2 - [exec] Retire the remaining agreement tests and the oracle
+#### s2 - [exec] Retire the remaining agreement tests and the oracle (done)
 
 Spec §4 m3.s2. Split `layout.test.ts:2139-2198` and `working-day-schedule.test.ts:533-595` into a pixel expectation and a day expectation; drop "the two engines report equal wave dates" (the register covers it). Delete the frozen `computeContentEndDay` oracle from m1.s2. Rewrite `date-window.test.ts` against `computeDateWindow(file, schedule, …)` and add direct `extent` tests (the scope fixtures from m1.s2 move here as `extent` expectations). Test-only. Gates: G1, G2.
 
-#### s3 - [exec] Update the specs
+#### s3 - [exec] Update the specs (done)
 
 Spec §4 m3.s3. `specs/waves.md` §8.2, §8.5, §8.6 (engine B removed; the register replaces "avoid by construction"; fix the stale `floorAndAccumulate` name at ~:823 to `WavePass.apply`/`.accumulate`), `specs/working-calendar.md` and `specs/rendering.md` where they name engine B or `computeContentEndDay`, the `schedule.ts` header comment (no longer "mirrors computeContentEndDay"), `specs/scheduler-unification.md` status line (implemented: m1-m3 and F1; F2-F4 open) and its m3.s1 text per decision 3, and the m4.11 entry in `specs/milestones.md` if its wording claims otherwise. `grep -rn computeContentEndDay` outside the scheduler-unification spec's history must come back empty. Docs-only. Gates: G2.
 
@@ -151,6 +152,7 @@ review wave-1 (nowline m1 s1-s3) c8caff3..8af7add: PASS - register matches the �
 review wave-2 (nowline m1 s4-s5) 921ce16..f2027ee: CONCERNS - m1.s4 pure refactor byte-identical; F1 G1 diff exactly showcase, sizing, late-row-shifts x3 themes, G3 unchanged, only sizing.svg snapshot and sizing render cells bumped; but showcase Ship is drawn at day 42.2, not day 40 (the (d) parallel tail gutter, F3, out of scope), so spec §5 F1 row ("showcase draws Ship on day 40, matching its exports"), the release-note:changed block ("the chart now matches them ... where the exports put it") and the register reasons must say Ship now follows the parallel and differs from the exports only by the (d) tail gutter until F3 - 2026-10-13
 review wave-2-fix (nowline m1 s4-s5) 921ce16..6cc27e6: PASS - 6cc27e6 corrects the spec §5 F1 row (Ship at 42.2 working days against the exports' 40, the 2.2 days being the (d) tail gutter F3 closes) and the release-note:changed block; register reasons already accurate; G1/G3 unchanged against f2027ee; changelog-check green; passed unattended: gate 1 (fix-up 1 of 2) - 2026-10-13
 review wave-2 (nowline m2 s1-s3) 7e5ce18..2de5e41: PASS - layout reuses a matching schedule (rebuild/reuse test); stageDocument builds plan, schedule, layout once and xlsx/mermaid/msproj read inputs.schedule (spy test over 4 formats, with/without waves); engine A reads durations from schedule.byNode and throws on a miss (A only lays out first-level regions, so byNode covers it); added changelog block per Gary; G1 empty at every step, G3 identical, determinism green; passed unattended: gate 4 - 2026-10-13
+review wave-2 (nowline m3 s1-s3) 2f75d35..18d9067: CONCERNS - m3.s1 misses waves.md §11 Example 13's two fixes on engine C (waves.md:1735: both fixes give a2 W0-W1, a3 W1-W2, a1 W2-W4; fixtures EXAMPLE_13_FIX_MOVE / EXAMPLE_13_FIX_PARALLEL in packages/core/test/validation/wave-fixtures.ts:281,294 are used only for diagnostics); add both to schedule.test.ts (items a2 [0,1], a3 [1,2], a1 [2,4]; waves w1 [0,2], w2 [2,4]), plus Example 6's "Without the dependency" variant (waves.md:1445: w1 [W0,W2], api W2-W5, wire-up W5-W7), and correct the scheduler-unification.md §9 sentence claiming only Example 7 fix and Example 9 were missing; rest PASS (G1 empty, oracle gone, specs updated, comments-only src edits) - 2026-10-13
 
 ## Token log
 
@@ -176,3 +178,6 @@ tokens review-wave-2-fix nowline-m1-s4-s5 (claude-opus-5-5): input ~20 / cache r
 tokens orchestrator-wave-2-fix nowline-m1-s4-s5 (claude-opus-5-5): input ~14 / cache read ~1.4M / cache write ~0 5m + ~28k 1h / output ~14k | ~$0.79 API-equiv
 tokens wave-2 nowline-m2-s1-s3 (claude-sonnet-5-5): input ~100 / cache read ~5.5M / cache write ~110k / output ~50k | ~$1.86 API-equiv (output est.) session 65f2e917-181e-5b0f-94c9-28d8d9b1c93d
 tokens review-wave-2 nowline-m2-s1-s3 (claude-opus-5-5): input ~40 / cache read ~830k / cache write ~57k / output ~20k | ~$0.85 API-equiv (output est.) session 65f2e917-181e-5b0f-94c9-28d8d9b1c93d
+tokens orchestrator-wave-2 nowline-m2-s1-s3 (claude-opus-5-5): input ~9 / cache read ~1.3M / cache write ~0 5m + ~35k 1h / output ~14k | ~$0.82 API-equiv
+tokens wave-2 nowline-m3-s1-s3 (claude-sonnet-5-5): input ~110 / cache read ~8.6M / cache write ~170k / output ~57k | ~$2.72 API-equiv (output est.) session 65f2e917-181e-5b0f-94c9-28d8d9b1c93d
+tokens review-wave-2 nowline-m3-s1-s3 (claude-opus-5-5): input ~58 / cache read ~1.9M / cache write ~98k / output ~29k | ~$1.45 API-equiv (output est.) session 65f2e917-181e-5b0f-94c9-28d8d9b1c93d

@@ -6,9 +6,9 @@ Plan: [`plan-scheduler-unification-quilt.md`](./plan-scheduler-unification-quilt
 
 - **Branch:** `claude/eloquent-archimedes-fkbc5e` (harness-assigned task branch, cut from `origin/main` at `c34804c`, pushed). Single working directory, `lolay/nowline`.
 - **Mode:** unattended, confirmed 2026-10-13 by Gary's answer `unattended`. Kickoff prompt carries `Run in unattended mode.`
-- **Done:** wave 1 `[deep]` `nowline m1 s1-s3`, `c8caff3..8af7add` (m1.s1 `b25a2e0`, m1.s2 `1f0f970`, m1.s3 `8af7add`), review PASS. Wave 2 unit 1 `[exec]` `nowline m1 s4-s5`, `921ce16..f2027ee` (m1.s4 `e2889f5`, m1.s5 F1 `f2027ee`), review CONCERNS (showcase Ship drawn at day 42.2, not 40; docs overclaim); fix-up `2-fix` `6cc27e6` corrected the spec F1 row and changelog, review PASS. Wave 2 unit 2 `[exec]` `nowline m2 s1-s3`, `7e5ce18..2de5e41` (m2.s1 `e46d779`, m2.s2 `c699ea2`, m2.s3 `2de5e41`), review PASS.
-- **Spend:** ~$27.5 API-equiv so far against ~$16 expected total (over expected; wave 1 ran ~$9.2 against ~$5.0 planned); guard stops past $50.
-- **Next unit:** wave 2 `[exec]` `nowline m3 s1-s3` (gate 4 passed unattended), then completion.
+- **Done:** wave 1 `[deep]` `nowline m1 s1-s3`, `c8caff3..8af7add` (m1.s1 `b25a2e0`, m1.s2 `1f0f970`, m1.s3 `8af7add`), review PASS. Wave 2 unit 1 `[exec]` `nowline m1 s4-s5`, `921ce16..f2027ee` (m1.s4 `e2889f5`, m1.s5 F1 `f2027ee`), review CONCERNS (showcase Ship drawn at day 42.2, not 40; docs overclaim); fix-up `2-fix` `6cc27e6` corrected the spec F1 row and changelog, review PASS. Wave 2 unit 2 `[exec]` `nowline m2 s1-s3`, `7e5ce18..2de5e41` (m2.s1 `e46d779`, m2.s2 `c699ea2`, m2.s3 `2de5e41`), review PASS. Wave 2 unit 3 `[exec]` `nowline m3 s1-s3`, `2f75d35..18d9067` (m3.s1 `773d436`, m3.s2 `d068a56`, m3.s3 `18d9067`), review CONCERNS (Example 13 fixes and Example 6 variant not asserted on C).
+- **Spend:** ~$32.5 API-equiv so far against ~$16 expected total (over expected; wave 1 ran ~$9.2 against ~$5.0 planned); guard stops past $50.
+- **Next unit:** fix-up `2-fix` `[exec]` on `nowline m3 s1-s3` (automatic, 1 of 2), then completion.
 
 ## How to resume
 
@@ -22,7 +22,7 @@ None. The kickoff question was answered `unattended`.
 
 - m1 (engine B becomes a projection of C, plus F1 as m1.s5): **done**, `c8caff3..6cc27e6` (merge of main `52dd496` inside). Outcome: engine C has B's scope and `extent`; the date window is projected from the schedule (`computeContentEndDay`, `literalDays`, `defaultStartDate` gone); start terms parsed once in `start-terms.ts`; F1 landed: `after:` in a lane starts at `max(lane cursor, refs)`. F1 changed showcase, sizing, late-row-shifts renders (x3 themes), the `sizing.svg` snapshot and the `sizing:{html,pdf node+cli,png,svg}` determinism cells. Showcase Ship draws at day 42.2 vs the exports' 40 ((d) tail gutter, F3). Register keeps (b)-(f) entries plus nested.nowline's region-scope entries. Gate 4 into m2 passed unattended.
 - m2 (one plan and one schedule per staging): **done**, `7e5ce18..2de5e41`. `LayoutOptions.schedule` lets layout reuse a schedule; `stageDocument` builds plan, schedule and layout once and carries the schedule on `ExportInputs.schedule`; engine A reads item durations from `schedule.byNode` (via `scheduledItemDays`, which throws on a missing node). **m1 and m2 are done, so R2 (m4.14) steps that touch `RoadmapNode.place` may start** (they build on this branch until it merges). Gate 4 into m3 passed unattended.
-- m3 (tests describe behaviour, not agreement): not started.
+- m3 (tests describe behaviour, not agreement): s1-s3 done (`2f75d35..18d9067`); fix-up pending for the missing Example 13/6 C assertions.
 
 ## Decisions so far
 
@@ -39,6 +39,8 @@ The plan's "Decisions made while planning" (1-8) stand. Added by wave 1 (review 
 - review wave-2: milestone `after:` refs go through `startTermsOf().after`; milestone `date:` and anchors still read `date:` directly. `resolveChildStart` keeps an unused `_laneLeftX` parameter for the `*Deps` threading R2 owns; `resolvePinnedOrSequentialStart` dropped it.
 
 - review wave-2 (nowline m2 s1-s3): `scheduledItemDays` throws on a missing node unconditionally (spec "fail loudly"); engine A only lays out first-level isolated regions (`buildIncludeRegions` does not recurse), so `byNode` covers every item A places. `byNode` is a WeakMap; tests wrap it with a subclass overriding `get`. The kernel spy test lives in `packages/integration-tests/test/export-schedule-once.test.ts`. The `added` changelog block names ScheduleOptions.plan, RoadmapSchedule.plan/resolved/extent (ScheduleExtent), LayoutOptions.schedule and ExportInputs.schedule.
+
+- review wave-2 (nowline m3 s1-s3): `grep -rn computeContentEndDay` still matches dated records (specs/review-since-v086.md:18 and milestone handoffs handoff-m2n/m2o/m2p) besides scheduler-unification.md. Parent's call (conservative, per the reviewer): they are history and stay unrewritten; the Completion check treats them as "the spec's history". scheduler-unification.md gained §9 "As built" recording the nested.nowline region-scope entries and the Ship 42.2 vs 40 / F3 deviation.
 
 ## Environment notes
 
@@ -60,4 +62,6 @@ The plan's "Decisions made while planning" (1-8) stand. Added by wave 1 (review 
 - Open for completion: m1.s2 added public `@nowline/layout` API (`ScheduleOptions.plan`, `RoadmapSchedule.plan`, `.resolved`, `.extent`, `ScheduleExtent`) with no `added` changelog block, per plan decision 5. Raise with Gary at the PR ask.
 - Before wave 2: merged `origin/main` (`ff8eb8b`, #149: env doctor floor-aware, Makefile/CI only, no layout code) with merge commit `52dd496`; no conflicts. Wave 2's `from` is the merge, so its G1 base includes it.
 - Wave 2 unit 1 review CONCERNS: automatic fix-up `2-fix` (1 of 2), no gate (first CONCERNS on the group); it passed (`6cc27e6`). Checkpoint: gate 1 (fix-up 1 of 2); gate 4 before m2. The m1.s5 commit body's "as in the exports" claim stays in history (review concerns are fixed with new commits); the PR body will state the 42.2-day result.
+- Checkpoint: gate 4 before m3 (unattended).
+- m3 review CONCERNS: automatic fix-up (label `2-fix`, 1 of 2 for group `nowline m3 s1-s3`), no gate.
 - Checkpoint: gate 4 before m3 (unattended).
