@@ -56,7 +56,7 @@ So the flagship samples already show the cost of three engines: the showcase's X
 
 - **Every scheduling rule is written three times.** Date precedence (`date:` > `start:` > `after:` > cursor) is parsed in five places: `resolvePinnedOrSequentialStart` (`layout.ts:1190-1218`), `startPinOf` (`layout.ts:1244-1257`), `wavePinOverrideOf` (`wave-layout.ts:157-181`), B's `walkNode` (`layout.ts:1546-1558`) and C's `walkNode` (`schedule.ts:194-206`). Wave floor dates are parsed twice (`wave-barrier.ts:104-113` in days, `wave-layout.ts:67-70` in px). `literalDays` (`layout.ts:1437-1455`) copies `literalToDays` (`calendar.ts:67-85`), and `defaultStartDate` (`layout.ts:1432-1435`) copies `utcMidnight` (`schedule.ts:349-351`).
 - **The wave plan is built three times per schedule export.** The export kernel lays out (`packages/export/src/index.ts:316-323`, `buildWavePlan` at `layout.ts:1920`); then the XLSX exporter calls `scheduleRoadmap` (`packages/export-xlsx/src/index.ts:73`, `buildWavePlan` again at `schedule.ts:257`) and `buildWavePlan` itself (`export-xlsx/src/index.ts:76`). Mermaid (`packages/export-mermaid/src/index.ts:146`, `:240`) and MS Project (`packages/export-msproj/src/index.ts:116`, `:130`) do the same. With waves each day walk runs up to n + 1 barrier passes, so an XLSX export walks the content in days 2 × (n + 1) times on top of engine A's own passes.
-- **Every scheduling feature pays for agreement tests.** The worked examples assert A = C item by item (`expectTable`, `packages/layout/test/waves.test.ts:208-215`, 28 call sites) and wave by wave (`expectWaves`, `waves.test.ts:1086-1104`, 9 call sites), plus `layout.test.ts:2139-2197` and `working-day-schedule.test.ts:533-589`. They only pass because every example avoids the divergences "by construction" (`waves.md:838`), so they test the examples' shape as much as the engines.
+- **Every scheduling feature pays for agreement tests.** The worked examples assert A = C item by item (`expectTable`, `packages/layout/test/waves.test.ts:208-215`, 27 call sites) and wave by wave (`expectWaves`, `waves.test.ts:1086-1104`, 8 call sites), plus `layout.test.ts:2139-2198` and `working-day-schedule.test.ts:533-595`. They only pass because every example avoids the divergences "by construction" (`waves.md:838`), so they test the examples' shape as much as the engines.
 
 ## 2. Goals and non-goals
 
@@ -226,15 +226,26 @@ Per XLSX export: wave plans from 3 to 1, day walks from 2 to 1. Per SVG export: 
 
 Every step is one PR, independently mergeable, and passes these gates:
 
-- **G1, sample renders.** Render every `examples/` and `tests/*.nowline` sample on the base commit and on the step, and compare: no difference.
+- **G1, sample renders.** Render every `examples/**.nowline` and `tests/*.nowline` sample directly with the CLI, on the base commit and on the step, in each built-in theme with `--now 2026-02-09`, and compare every render's SVG bytes and exit status: any difference fails the gate, wherever it falls in the list.
   ```sh
-  git worktree add ../base origin/main && (cd ../base && make init build)
-  make build
-  for f in $(cd ../base && git ls-files 'examples/**.nowline' 'tests/*.nowline'); do
-      svg="${f%.nowline}.svg"; [ -f "../base/$svg" ] && cmp "../base/$svg" "$svg"
-  done
+  git worktree add ../base origin/main && (cd ../base && make init build-fast)
+  make build-fast
+  (cd ../base && git ls-files 'examples/**.nowline' 'tests/*.nowline') >../samples.txt
+  render_all() {  # $1 = checkout to render with, $2 = output directory
+      rm -rf "$2" && mkdir -p "$2"
+      while read -r f; do
+          for t in light dark grayscale; do
+              out="$2/${f%.nowline}.$t.svg"
+              mkdir -p "${out%/*}"
+              (cd "$1" && node packages/cli/dist/index.js "$f" --theme "$t" --now 2026-02-09 -o -) >"$out" 2>/dev/null
+              echo "exit $?" >"$out.status"
+          done
+      done <../samples.txt
+  }
+  render_all ../base ../g1-base && render_all . ../g1-step
+  diff -r ../g1-base ../g1-step
   ```
-  (`make build` renders the samples listed in `scripts/render-samples.mjs` and `scripts/render-tests.mjs`; the SVGs are gitignored, so the base worktree is the baseline.)
+  (`diff -r` exits non-zero when any SVG or exit status differs, and lists every difference rather than the last. The sample list is the base's, so a sample the step deletes or breaks fails too. The gate does not use `make build`, which renders only the slugs listed in `scripts/render-samples.mjs` and `scripts/render-tests.mjs` and so skips `examples/continuation`, `examples/minimal.fr`, `tests/grammar-properties`, `tests/grammar-properties-include`, `tests/partner-multi` and `tests/waves-isolate-team`, and renders the seven include files under `examples/nested/` and `examples/waves-program/` only through their parents. At the commit that adds this spec all 180 renders exit 0, and two runs on that commit give identical trees, in about three minutes.)
 - **G2, snapshots.** `make pre-commit` passes without `UPDATE_LAYOUT_SNAPSHOTS`.
 - **G3, exporter bytes** (steps that touch exporters or the schedule). For every sample, `nowline <file> -f xlsx`, `-f msproj` and `-f mermaid` with `--now 2026-02-09` give the same bytes on both commits, and `make determinism` passes without `UPDATE_DETERMINISM_GOLDENS`.
 
@@ -248,7 +259,7 @@ Add `packages/layout/test/engine-divergence-register.test.ts` and `engine-diverg
 
 #### s2 - Give engine C engine B's scope
 
-Implement §3.2: `ScheduleOptions.plan`, `RoadmapSchedule.plan`, `.resolved`, `.extent`; the `reach` hook; non-wave region scheduling. Add an oracle test that keeps a frozen copy of today's `computeContentEndDay` under `test/` and asserts `extent.contentEndDay` equals it for every sample, the 60 generated roadmaps of `waves.test.ts:1456-1496`, and fixtures for each scope rule (empty `group after:`, nested region, region milestone, undated anchor, waves with an empty trailing wave). The register's `region-scope` entries disappear in this step. G1, G2, G3.
+Implement §3.2: `ScheduleOptions.plan`, `RoadmapSchedule.plan`, `.resolved`, `.extent`; the `reach` hook; non-wave region scheduling. Add an oracle test that keeps a frozen copy of today's `computeContentEndDay` under `test/` and asserts `extent.contentEndDay` equals it for every sample, the 60 generated roadmaps of `waves.test.ts:1456-1491`, and fixtures for each scope rule (empty `group after:`, nested region, region milestone, undated anchor, waves with an empty trailing wave). The register's `region-scope` entries disappear in this step. G1, G2, G3.
 
 #### s3 - Derive the date window from the schedule
 
@@ -280,7 +291,7 @@ Move the §11 tables into a new `packages/layout/test/schedule-waves.test.ts` th
 
 #### s2 - Retire the remaining agreement tests and the oracle
 
-Split `layout.test.ts:2139-2197` and `working-day-schedule.test.ts:533-589` into a pixel expectation and a day expectation; drop "the two engines report equal wave dates", which the register covers. Delete the frozen `computeContentEndDay` oracle from m1.s2. Rewrite `date-window.test.ts` against `computeDateWindow(file, schedule, …)` and add direct `extent` tests. Test-only.
+Split `layout.test.ts:2139-2198` and `working-day-schedule.test.ts:533-595` into a pixel expectation and a day expectation; drop "the two engines report equal wave dates", which the register covers. Delete the frozen `computeContentEndDay` oracle from m1.s2. Rewrite `date-window.test.ts` against `computeDateWindow(file, schedule, …)` and add direct `extent` tests. Test-only.
 
 #### s3 - Update the specs
 
@@ -301,7 +312,7 @@ Each of these changes rendered or exported bytes, so none is part of the byte-id
 
 - **Register** (m1.s1): the A/C differences on the real corpus are an explicit, reviewed list. A refactor that introduces a new one fails; a fix that removes one must delete its entry.
 - **Oracle** (m1.s2 to m3.s2): the frozen engine B proves `extent.contentEndDay` is the same number on every sample, the generated corpus and scope fixtures before B is deleted, then goes away.
-- **Direct tables** (m3.s1): the §11 worked examples assert C in days and A in px against the spec's own numbers. The barrier theorem on 60 generated roadmaps (`waves.test.ts:1456-1496`) stays A-only.
+- **Direct tables** (m3.s1): the §11 worked examples assert C in days and A in px against the spec's own numbers. The barrier theorem on 60 generated roadmaps (`waves.test.ts:1456-1491`) stays A-only.
 - **Reuse** (m2.s1, m2.s2): `buildWavePlan` and `scheduleRoadmap` run once per kernel export (spy); `layoutRoadmap` rebuilds the schedule when handed one built from another `ResolveResult`; each exporter still runs without `inputs.schedule`.
 - **Gates** G1 to G3 on every step (§4).
 
