@@ -39,10 +39,10 @@ describe('measureRoadmap', () => {
         expect(b.waveStripY).toBe(b.tickPanelY + b.tickPanelHeight);
         // No waves: the wave strip takes no height.
         expect(b.markerRowY).toBe(b.waveStripY);
-        expect(b.estimatedRowsBottomY).toBe(
-            b.markerRowY + b.estimatedMarkerRows * MARKER_ROW_PITCH_PX,
+        expect(b.rowsHeight).toBe(
+            b.markerRowY + b.estimatedMarkerRows * MARKER_ROW_PITCH_PX - b.timelineY,
         );
-        expect(b.chartTopY).toBe(b.estimatedRowsBottomY + 8);
+        expect(b.chartTopY).toBe(b.markerRowY + b.estimatedMarkerRows * MARKER_ROW_PITCH_PX + 8);
         expect(measured.timeline.box.y).toBe(b.timelineY);
         expect(measured.timeline.markerRow.height).toBe(
             b.estimatedMarkerRows * MARKER_ROW_PITCH_PX,

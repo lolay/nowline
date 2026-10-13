@@ -7,10 +7,12 @@
 // The pass is a constant table. Each step declares the slots it reads and
 // writes, and `checkFinalizeOrder` checks the table against the slot
 // rules: the canvas, the scale and the marker band are final after f3, f2
-// and f5, the chart top and the lane bottom after f7, and the chart bottom
-// is a cursor that f7, f8 and f13 advance. The guards on `CanvasExtent`,
-// `finalScale()` and `markerBand()` throw when a slot is read before its
-// writer ran, so a reordering that slips past the check still fails.
+// and f5, the chart top, the header rows' bottom and the lane bottom after
+// f7, and the chart bottom is a cursor that f7, f8 and f13 advance. The
+// guards on `CanvasExtent`, `finalScale()`, `markerBand()`,
+// `headerRowsTop()` and `headerRowsBottom()` throw when a slot is read
+// before its writer ran, so a reordering that slips past the check still
+// fails.
 
 import type { NowlineFile, ResolveResult } from '@nowline/core';
 import { daysBetween } from '../calendar.js';
@@ -140,6 +142,8 @@ export interface HeaderRowsTop {
     timelineY: number;
     pillRowHeight: number;
     tickPanelY: number;
+    /** The marker band's top, where f5 packs it. */
+    markerRowY: number;
     /** How far the tick panel, wave strip and marker band move down from the measure. */
     shift: number;
 }
@@ -168,6 +172,7 @@ export class FinalizeContext {
     private scaleIsFinal = false;
     private band: MarkerBand | undefined;
     private rowsTop: HeaderRowsTop | undefined;
+    private rowsBottom: number | undefined;
 
     constructor(
         readonly file: NowlineFile,
@@ -268,6 +273,22 @@ export class FinalizeContext {
         return this.rowsTop;
     }
 
+    /** The bottom of the grown header rows, set by f7; reading it earlier throws. */
+    headerRowsBottom(): number {
+        if (this.rowsBottom === undefined) {
+            throw new Error('layout: the header rows bottom was read before the rows grew');
+        }
+        return this.rowsBottom;
+    }
+
+    /** Set the bottom of the grown header rows (f7 only). */
+    setHeaderRowsBottom(y: number): void {
+        if (this.rowsBottom !== undefined) {
+            throw new Error('layout: the header rows grew twice');
+        }
+        this.rowsBottom = y;
+    }
+
     /** Report a step's effect to the trace, when one is installed. */
     report(step: string, changed: boolean): void {
         finalizeTrace?.(step, changed);
@@ -297,16 +318,19 @@ export function resolveHeaderRowsTop(
             timelineY: bands.timelineY,
             pillRowHeight: bands.pillRowHeight,
             tickPanelY: bands.tickPanelY,
+            markerRowY: bands.markerRowY,
             shift: 0,
         };
     }
     const timelineY = headerRowsTimelineY(header, NOW_PILL_HEIGHT_PX + bands.rowsHeight);
     const tickPanelY = timelineY + NOW_PILL_HEIGHT_PX;
+    const shift = tickPanelY - bands.tickPanelY;
     return {
         timelineY,
         pillRowHeight: NOW_PILL_HEIGHT_PX,
         tickPanelY,
-        shift: tickPanelY - bands.tickPanelY,
+        markerRowY: bands.markerRowY + shift,
+        shift,
     };
 }
 
@@ -331,6 +355,7 @@ export type FinalizeSlot =
     | 'calendarLabels'
     | 'markerMidpoints'
     | 'chartTop'
+    | 'rowsBottom'
     | 'laneBottom'
     | 'chartBottom'
     | 'laneY'
@@ -366,6 +391,7 @@ export const SLOT_RULES: Readonly<Record<FinalizeSlot, SlotRule>> = {
     scale: { kind: 'final', finalAfter: 'extendTimeline' },
     markerBand: { kind: 'final', finalAfter: 'packMarkers' },
     chartTop: { kind: 'final', finalAfter: 'growHeaderRows' },
+    rowsBottom: { kind: 'final', finalAfter: 'growHeaderRows' },
     laneBottom: { kind: 'final', finalAfter: 'growHeaderRows' },
     chartBottom: {
         kind: 'cursor',
@@ -641,8 +667,7 @@ function packMarkers(fx: FinalizeContext): boolean {
         fx.canvas.final,
         estimateTextWidth,
     );
-    const markerRowY = fx.measured.bands.markerRowY + fx.headerRowsTop().shift;
-    const placements = markerRowPlacements(repacked.placements, markerRowY);
+    const placements = markerRowPlacements(repacked.placements, fx.headerRowsTop().markerRowY);
     const rowCount =
         fx.measured.markers.hasEntities || entries.calendarCount > 0
             ? Math.max(1, repacked.rowCount)
@@ -731,6 +756,8 @@ function growHeaderRows(fx: FinalizeContext): boolean {
         timeline.markerRow.height = band.rowCount * MARKER_ROW_PITCH_PX;
         changed = true;
     }
+    // The beside card hugs this bottom (f15).
+    fx.setHeaderRowsBottom(rowsTop.markerRowY + timeline.markerRow.height);
     if (deltaY === 0) return changed;
     timeline.box.height += deltaY;
     fx.chartY.top += deltaY;
@@ -870,13 +897,14 @@ function footnotePanel(fx: FinalizeContext): boolean {
 
 /**
  * f15 (was P20): the header, from the chart height in beside mode and the
- * final canvas width in above mode. The beside card hugs the estimated
- * header-rows bottom, not the grown band's (L1, until F1).
+ * final canvas width in above mode. The beside card hugs the header rows'
+ * bottom after f7 grew them (F1: before, it hugged the measure phase's
+ * estimate and missed a grown marker band or a reserved now-pill row).
  */
 function header(fx: FinalizeContext): boolean {
-    const { header: measuredHeader, headerNode, bands } = fx.measured;
+    const { header: measuredHeader, headerNode } = fx.measured;
     fx.draft.header = headerNode.place(measuredHeader, {
-        rowsBottomY: bands.estimatedRowsBottomY,
+        rowsBottomY: fx.headerRowsBottom(),
         chartBottomY: fx.chartY.bottom,
         canvasRightX: fx.canvas.final,
     });
@@ -955,7 +983,15 @@ export const FINALIZE_STEPS: readonly FinalizeStep[] = [
     {
         name: 'growHeaderRows',
         reads: ['markerBand', 'headerBands', 'scale', 'milestones', 'chartTop', 'laneBottom'],
-        writes: ['chartTop', 'laneBottom', 'chartBottom', 'laneY', 'milestones', 'timeline'],
+        writes: [
+            'chartTop',
+            'rowsBottom',
+            'laneBottom',
+            'chartBottom',
+            'laneY',
+            'milestones',
+            'timeline',
+        ],
         run: growHeaderRows,
     },
     {
@@ -1002,7 +1038,7 @@ export const FINALIZE_STEPS: readonly FinalizeStep[] = [
     },
     {
         name: 'header',
-        reads: ['chartBottom', 'canvas', 'headerBands'],
+        reads: ['chartBottom', 'canvas', 'rowsBottom'],
         writes: ['header'],
         run: header,
     },

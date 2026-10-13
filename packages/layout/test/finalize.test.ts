@@ -5,6 +5,7 @@
 import { buildWavePlan } from '@nowline/core';
 import { describe, expect, it } from 'vitest';
 import { layoutRoadmap } from '../src/layout.js';
+import { MARKER_ROW_CENTER_OFFSET_PX } from '../src/nodes/marker-geometry.js';
 import { sequenceOne } from '../src/nodes/sequence-one.js';
 import { resolveDateWindow, resolveScope } from '../src/phases/date-window.js';
 import {
@@ -168,6 +169,36 @@ describe('the finalize guards', () => {
         stepNamed('packMarkers').run(fx);
         expect(fx.markerBand().placements.has('ship')).toBe(true);
         expect(fx.ctx.markerRowPlacements).toBe(fx.markerBand().placements);
+    });
+
+    it('refuses to read the header rows top before f2', async () => {
+        const { fx } = await freshContext();
+        expect(() => fx.headerRowsTop()).toThrow('the final scale was read before');
+        stepNamed('growCanvasForSpill').run(fx);
+        stepNamed('extendTimeline').run(fx);
+        expect(fx.headerRowsTop().markerRowY).toBe(fx.measured.bands.markerRowY);
+    });
+
+    it('refuses to read the header rows bottom before f7', async () => {
+        const { fx } = await freshContext();
+        for (const name of [
+            'growCanvasForSpill',
+            'extendTimeline',
+            'growCanvasForMarkerLabels',
+            'fitWidths',
+            'packMarkers',
+            'placeMarkers',
+        ]) {
+            stepNamed(name).run(fx);
+        }
+        expect(() => fx.headerRowsBottom()).toThrow('the header rows bottom was read before');
+        stepNamed('growHeaderRows').run(fx);
+        expect(fx.headerRowsBottom()).toBe(
+            fx.ctx.timeline.markerRow.y -
+                MARKER_ROW_CENTER_OFFSET_PX +
+                fx.ctx.timeline.markerRow.height,
+        );
+        expect(() => fx.setHeaderRowsBottom(0)).toThrow('the header rows grew twice');
     });
 
     it('throws when a reordered pass reads a slot early', async () => {

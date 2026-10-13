@@ -75,8 +75,6 @@ export interface HeaderBands {
     estimatedMarkerRows: number;
     /** Height of the rows above: pill row, tick panel, wave strip, estimated marker band. */
     rowsHeight: number;
-    /** Bottom of the header rows as estimated here; the beside card hugs this today (L1). */
-    estimatedRowsBottomY: number;
     chartTopY: number;
     /** Height of the mirrored bottom tick panel (f8); 0 when there is none. */
     bottomTickPanelHeight: number;
@@ -238,10 +236,6 @@ export function measureRoadmap(
     const tickPanelY = timelineY + pillRowHeight;
     const waveStripY = tickPanelY + tickPanelHeight;
     const markerRowY = waveStripY + waveStripHeight;
-    // Bottom of the header rows from the pre-pack row count. The final
-    // marker pack can grow the band past it, but the beside card still
-    // hugs this estimate (L1, specs/layout-phases.md §1.3).
-    const estimatedRowsBottomY = markerRowY + markerRowHeight;
 
     const ticks = buildHeaderTicks(timeScale, scale, calendar, locale);
     const timeline: PositionedTimelineScale = {
@@ -283,7 +277,6 @@ export function measureRoadmap(
             markerRowY,
             estimatedMarkerRows: markerRowsCount,
             rowsHeight: headerRowsHeight,
-            estimatedRowsBottomY,
             chartTopY: timelineY + timelineHeightBudget,
             bottomTickPanelHeight: showBottomTickPanel ? tickPanelBucketHeight : 0,
         },
