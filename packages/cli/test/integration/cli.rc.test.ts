@@ -87,4 +87,42 @@ describeBuilt('.nowlinerc render keys (requires `pnpm build`)', () => {
         expect(r.exitCode).toBe(0);
         expect(r.stdout).toContain('<svg');
     });
+
+    // A rc that exists but cannot be parsed is a usage error, not an ignored
+    // file (specs/cli.md): the user would otherwise render with settings they
+    // believe they changed.
+    it('a malformed YAML .nowlinerc is a usage error naming the file and reason', async () => {
+        const r = await withTempDir(async (dir) => {
+            await fs.writeFile(path.join(dir, 'sample.nowline'), SAMPLE);
+            await fs.writeFile(path.join(dir, '.nowlinerc'), 'theme: [dark\n');
+            const result = await runCliBuilt(['sample.nowline', '-o', '-'], { cwd: dir });
+            return { ...result, rcPath: path.join(dir, '.nowlinerc') };
+        });
+        expect(r.exitCode).toBe(2);
+        expect(r.stderr).toContain('nowline: invalid .nowlinerc: Invalid YAML in');
+        expect(r.stderr).toContain(r.rcPath);
+        expect(r.stdout).toBe('');
+    });
+
+    it('a malformed JSON .nowlinerc is a usage error naming the file and reason', async () => {
+        const r = await renderWithRc('{"theme": "dark",}');
+        expect(r.exitCode).toBe(2);
+        expect(r.stderr).toContain('nowline: invalid .nowlinerc: Invalid JSON in');
+        expect(r.stderr).toContain('.nowlinerc');
+    });
+
+    it('a .nowlinerc whose top level is not an object is a usage error', async () => {
+        const r = await renderWithRc('- dark\n- light\n');
+        expect(r.exitCode).toBe(2);
+        expect(r.stderr).toContain('nowline: invalid .nowlinerc: Invalid .nowlinerc: top-level');
+    });
+
+    it('a missing .nowlinerc still renders', async () => {
+        const r = await withTempDir(async (dir) => {
+            await fs.writeFile(path.join(dir, 'sample.nowline'), SAMPLE);
+            return runCliBuilt(['sample.nowline', '-o', '-'], { cwd: dir });
+        });
+        expect(r.exitCode).toBe(0);
+        expect(r.stdout).toContain('<svg');
+    });
 });

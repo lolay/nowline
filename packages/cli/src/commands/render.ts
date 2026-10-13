@@ -517,6 +517,11 @@ async function resolveRoutedDiagnostics(
     return legacyError ? [] : diagnostics.filter(isRoutedResolveDiagnostic);
 }
 
+// Walk up from the input (or `cwd` for stdin) to the nearest `.nowlinerc`.
+// No rc file is not an error. One that exists but cannot be read or parsed is
+// a usage error (specs/cli.md, `.nowlinerc`): silently ignoring it would
+// render with settings the user believes they changed. The loader's reason
+// already names the file, so it is passed through. `--serve` shares this.
 export async function loadConfigFor(inputArg: string, cwd: string): Promise<NowlineRc | null> {
     try {
         if (inputArg === '-') {
@@ -527,8 +532,11 @@ export async function loadConfigFor(inputArg: string, cwd: string): Promise<Nowl
         const dir = path.dirname(abs);
         const { config } = await loadConfig(dir);
         return config;
-    } catch {
-        return null;
+    } catch (err) {
+        throw new CliError(
+            ExitCode.InputError,
+            `nowline: invalid .nowlinerc: ${err instanceof Error ? err.message : String(err)}`,
+        );
     }
 }
 
