@@ -8,7 +8,8 @@ last commit before the PR merges.
 
 - Repo `lolay/nowline`, branch `claude/serene-archimedes-ida865` (assigned by
   the cloud session; task branch). Started on it; nothing cut.
-- Mode: unattended, confirmed 2026-10-13 by Gary in session 3d92f75d (harness=claude-code runner=cloud).
+- Mode: unattended, confirmed 2026-10-13 by Gary in session 3d92f75d (harness=claude-code runner=cloud),
+  re-confirmed the same day by the pasted Kickoff prompt after Gary's `/compact`.
 - Guard: 3x the Cost table Total, min $50 (about $66). Fix-up cap 2 per group.
 
 ## Done
@@ -31,8 +32,7 @@ Wave 1 [deep] nowline m1 s1 (add the schema to `@nowline/config`).
 
 ## Pending question
 
-None. Kickoff answered `unattended`. Halted for Gary's `/compact` before
-any dispatch.
+None. Wave 1 is being dispatched.
 
 ## How to resume
 
