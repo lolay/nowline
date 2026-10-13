@@ -1,7 +1,7 @@
 ```text
 --- KICKOFF: begin orchestration at [deep] ---
 
-  Status: 3/4 groups done | last review: wave-2-fix PASS | current: nowline m3 s4 [xdeep] | passed unattended: gate-4 (m2), gate-4 (m3), gate-2 | updated 2026-10-13
+  Status: 4/4 groups done | last review: wave-3 CONCERNS | current: nowline m3 s4 [xdeep] fix-up 3-fix | passed unattended: gate-4 (m2), gate-4 (m3), gate-2, gate-7 | updated 2026-10-13
 
   mode: unattended | proposed unattended (harness=claude-code runner=cloud; CLAUDE_CODE_REMOTE=true, assigned branch) | guard 3x min $50 | fixups 2 | confirmed 2026-10-13 session 8c78f794-2944-59bb-8116-4413104e9100 by Kickoff prompt: Run in unattended mode.
 
@@ -159,7 +159,7 @@ Write `specs/surface-options.md` for R4: an options schema in `packages/config` 
 
 --- WAVE 3 [xdeep] ---
 
-#### s4 - [xdeep] Spec R2: layout phases
+#### s4 - [xdeep] Spec R2: layout phases (done)
 
 Write `specs/layout-phases.md` for R2, building on `specs/rendering-v2.md` (m2.5c) and on the R1 spec from s1. Inventory every post-placement mutation in `RoadmapNode.place` (`packages/layout/src/nodes/roadmap-node.ts:272-1128`), `row-packer.ts`, `swimlane-node.ts`, `group-node.ts`, `include-node.ts` and `wave-node.ts`, with its ordering dependency; design date-window, measure, place and finalize phases with an explicit finalize context so those fixups become one ordered pass; derive the item predictor from `ItemNode.measure` instead of `predictItemBarExtraHeight`; extract a `HeaderNode`; merge the swimlane/group child loop, the `*Deps` interfaces and the two `LayoutContext` builders; move status tints into theme tokens. Sequence the migration so each step stays byte-identical, and say which steps depend on R1 landing first.
 
@@ -169,6 +169,7 @@ review wave-1 (nowline m1 s1) 0357e12..c233919: PASS - review doc written; six d
 review wave-1 (nowline m2 s1-s6) aa4631f..8759cdd: PASS - all six steps as specified; four release-note:fixed fragments; make ci and changelog check green; MCP theme/pageSize via shared normalizers, malformed rc exits 2, sanitizer drops class, LSP calendar icon, docs, Renovate @nowline/** rule last; checkpoint gate-4 - 2026-10-13
 review wave-2 (nowline m3 s1-s3) ba86954..4fc1c28: CONCERNS - three specs written (R1 m4.11, R3 m4.12, R4 m4.13); (1) gate G1 in all three specs compares only make-build SVGs, so 6 samples never rendered by scripts/render-samples.mjs or render-tests.mjs (examples/continuation, examples/minimal.fr, tests/grammar-properties, grammar-properties-include, partner-multi, waves-isolate-team) are skipped, and the loop's exit status is only the last cmp's; render every sample directly on both commits and fail on any diff; (2) surface-options.md:27 cites load-config.ts mergeConfig at 99-106 and NowlineRc at 18-33, actually 91-97 and 10; (3) surface-options.md:45 says an MCP render parses three times, it parses twice (insights reuse the doc); checkpoints gate-4, gate-2 - 2026-10-13
 review wave-2-fix (nowline m3 s1-s3) 4fc1c28..f49c01a: PASS - all three findings fixed; G1 now builds both commits and renders every examples/**.nowline and tests/*.nowline sample (60 files, light/dark/grayscale) directly, diff -r over SVGs plus exit codes; make build was missing 13 samples (the 6 named plus 7 include files); refs re-checked at HEAD; minor: core-ast-utilities s3 cites waves.ts:210-267 where leadWave ends at 259 (range still covers both functions) - 2026-10-13
+review wave-3 (nowline m3 s4) 4eef354..de36917: CONCERNS - specs/layout-phases.md (R2, proposed m4.14) complete and G1/G2 verbatim; one defect: layout-phases.md:365 cites renderable.ts:237-251 but the file has 68 lines, intended renderable.ts:45-68 (MeasureContext 45-49, Renderable 61-68); non-blocking: the 3.8 createLayoutContext sketch lacks a parameter for the chart y fields; probe found two shipping layout bugs (L1 beside header card 26px above grown marker band in 3 samples; L2 now-line drawn without its pill row when today is past the original window) listed as follow-ups; checkpoint gate-7 - 2026-10-13
 
 ## Token log
 
@@ -192,3 +193,6 @@ tokens review-wave-2 nowline-m3-s1-s3 (claude-opus-5-5): input ~56 / cache read 
 tokens orchestrator-wave-2 nowline-m3-s1-s3 (claude-opus-5-5): input ~18 / cache read ~1.3M / cache write ~0 5m + ~28k 1h / output ~10k | ~$0.70 API-equiv
 tokens wave-2-fix nowline-m3-s1-s3 (claude-opus-5-5): input ~150 / cache read ~8.5M / cache write ~230k / output ~77k | ~$4.38 API-equiv (output est.) session 8c78f794-2944-59bb-8116-4413104e9100
 tokens review-wave-2-fix nowline-m3-s1-s3 (claude-opus-5-5): input ~24 / cache read ~300k / cache write ~37k / output ~12k | ~$0.48 API-equiv (output est.) session 8c78f794-2944-59bb-8116-4413104e9100
+tokens orchestrator-wave-2-fix nowline-m3-s1-s3 (claude-opus-5-5): input ~12 / cache read ~960k / cache write ~0 5m + ~22k 1h / output ~8k | ~$0.53 API-equiv
+tokens wave-3 nowline-m3-s4 (claude-opus-5-5): input ~210 / cache read ~34M / cache write ~450k / output ~110k | ~$11.07 API-equiv (output est.) session 8c78f794-2944-59bb-8116-4413104e9100
+tokens review-wave-3 nowline-m3-s4 (claude-opus-5-5): input ~130 / cache read ~5.1M / cache write ~120k / output ~65k | ~$2.92 API-equiv (output est.) session 8c78f794-2944-59bb-8116-4413104e9100

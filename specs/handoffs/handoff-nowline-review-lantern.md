@@ -3,8 +3,8 @@
 - **Plan:** `specs/handoffs/plan-nowline-review-lantern.md`
 - **Branch:** `claude/ecstatic-babbage-qsrxbx` in `lolay/nowline` (task branch the cloud session was assigned; fast-forwarded from 86ac76c to origin/main 0062df3 at kickoff). One working directory: `/workspace/nowline`.
 - **Mode:** unattended, confirmed 2026-10-13 in session 8c78f794-2944-59bb-8116-4413104e9100 (`harness=claude-code runner=cloud`). Guard 3x min $50 (limit ~$63 against ~$21 expected). Fix-up cap 2 per group.
-- **Status:** 3/4 groups done. Wave 2 (`nowline m3 s1-s3`) passed after fix-up 2-fix. Next unit: wave 3 [xdeep] `nowline m3 s4` (gate 7 passes unattended as a checkpoint; the wave was planned).
-- **Spend:** ~$32.81 against ~$21 expected (wave 2 ran ~$13.5 against ~$5 planned: the worker probed all 53 samples to measure engine divergence). Guard limit ~$63, not tripped. The orchestrator-kickoff line covers this session from its start, so it includes the review conversation that preceded the kickoff (the explore agents are not counted).
+- **Status:** 4/4 groups ran. Wave 3 (`nowline m3 s4`) reviewed CONCERNS (one out-of-range line ref). Next unit: fix-up 3-fix [xdeep] on `nowline m3 s4` (1 of 2 allowed), then final completion.
+- **Spend:** ~$47.32 against ~$21 expected (wave 2 ran ~$13.5 against ~$5 planned: the worker probed all 53 samples to measure engine divergence). Guard limit ~$63, not tripped. The orchestrator-kickoff line covers this session from its start, so it includes the review conversation that preceded the kickoff (the explore agents are not counted).
 - **Resume:** paste the plan's Kickoff prompt into a session on this branch.
 
 ## Pending question (verbatim)
@@ -16,6 +16,7 @@ None. Gary answered the kickoff question `unattended` (2026-10-13), compacted, t
 - m1.s1 (c233919): `specs/handoffs/review-since-v086-lantern.md`, the public-repo review with file:line refs re-checked at HEAD.
 - m2.s1-s6 (8e636a2..8759cdd): MCP theme/pageSize/nonWorking through shared normalizers; malformed `.nowlinerc` is a usage error (exit 2); `sanitizeSvg` drops `class`; LSP offers `calendar`; stale comments and public docs fixed; Renovate `@nowline/**` rule. Four `release-note:fixed` fragments. `make ci` green.
 - m3.s1-s3 (5583e59..4fc1c28): `specs/scheduler-unification.md` (R1, proposed m4.11), `specs/core-ast-utilities.md` (R3, m4.12), `specs/surface-options.md` (R4, m4.13). Review CONCERNS, then fix-up 2-fix (1ee9465..f49c01a) PASS: gate G1 renders every sample directly on both commits in all three themes.
+- m3.s4 (de36917): `specs/layout-phases.md` (R2, proposed m4.14). Review CONCERNS; fix-up pending.
 
 ## Review log verdicts, fix-ups, retries, checkpoints
 
@@ -25,6 +26,8 @@ None. Gary answered the kickoff question `unattended` (2026-10-13), compacted, t
 - gate-4 (entering m3) and gate-2 (into [deep]) passed unattended as checkpoints.
 - review wave-2 (nowline m3 s1-s3) ba86954..4fc1c28: CONCERNS: (1) gate G1 in all three specs skips 6 samples `make build` never renders and its loop exits with only the last `cmp`'s status; (2) `surface-options.md:27` cites stale `load-config.ts` lines; (3) `surface-options.md:45` says MCP parses three times, it's twice. Fix-up 2-fix next.
 - review wave-2-fix (nowline m3 s1-s3) 4fc1c28..f49c01a: PASS (1 of 2 fix-ups used).
+- gate-7 (into [xdeep], planned) passed unattended as a checkpoint.
+- review wave-3 (nowline m3 s4) 4eef354..de36917: CONCERNS: `layout-phases.md:365` cites `renderable.ts:237-251`, the file has 68 lines (intended 45-68). Non-blocking: §3.8 `createLayoutContext` sketch lacks the chart y fields. Fix-up 3-fix next.
 
 ## Decisions so far
 
@@ -33,6 +36,7 @@ None. Gary answered the kickoff question `unattended` (2026-10-13), compacted, t
 - wave-2 (nowline m3 s1-s3), 2026-10-13, accepted by review: proposed milestone IDs m4.11 (R1), m4.12 (R3), m4.13 (R4); R2 takes the next ID in wave 3. Engine C is the canonical day scheduler; engine B is deleted into `schedule.extent.contentEndDay`. The review's "engine A floors from C" is not byte-identical today (divergences (a) and (e) make A start earlier than C in 3 samples), so R1 defers it to follow-up F4. Behaviour-only changes no sample exercises are marked *behaviour* with a changelog fragment. Recommended home for `stageRoadmap` is `@nowline/renderer`. Line refs written after m2 use post-m2 numbers (`loadConfigFor` is now `render.ts:525-541`).
 - wave-2 probe finding, 2026-10-13: engine A and engine C disagree on 10 of 53 samples (showcase: Ship at day 20 in the chart, day 40 in XLSX/MS Project/Mermaid); engine C leaves isolated-region items unscheduled in 4 samples; engine B's window is too short in 6. `make build` renders only the slugs in `scripts/render-samples.mjs` and `scripts/render-tests.mjs`, so a byte-identical gate must render every `examples/**.nowline` and `tests/*.nowline` directly.
 - wave-2-fix, 2026-10-13, accepted by review: the shared gate G1 (in all three specs) runs `make build-fast` on base and step, takes the sample list from the base's `git ls-files 'examples/**.nowline' 'tests/*.nowline'` (60 files), renders each with `node packages/cli/dist/index.js <f> --theme <t> --now 2026-02-09 -o -` in light, dark and grayscale, stores SVG plus exit status per file, and compares the trees with `diff -r`. About 2m50s per commit. `make build` misses 13 samples (6 standalone plus 7 include files under `examples/nested/` and `examples/waves-program/`). The R2 spec should reuse this G1 verbatim.
+- wave-3 (nowline m3 s4), 2026-10-13, accepted by review: R2 is m4.14. Its m1-m2 can land before R1; m3-m4 (edits to `RoadmapNode.place`) wait for R1 m1-m2; m5.s1 on depends hard on R1 m1.s3 and m2.s1. Byte-changing fixes are follow-ups F1-F3. Probe found two shipping layout bugs: L1, the beside-header card is placed from the header-rows bottom computed before the marker re-pack (`roadmap-node.ts:515`, used at 1027-1033), so it sits 26 px above the grown marker band in dependencies, late-row-shifts and marker-left-overflow (fix F1 changes those renders and goldens); L2, the now-pill row is reserved only when today is inside the original window (397-399) while the now-line uses the extended scale, so `platform-2026.nowline` with `length:1w` and `--now 2026-03-17` draws the line with no pill row, and NL.W1000 stays silent (no sample hits it).
 
 ## Environment notes
 
