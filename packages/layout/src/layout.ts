@@ -35,13 +35,19 @@ import {
     MIN_BAR_WIDTH_FOR_FOOTNOTE_PX,
 } from './item-bar-geometry.js';
 import { itemArrowSourcePort, itemArrowTargetPort } from './item-port-geometry.js';
-import { type LayoutContext, newCursor, type TrackCursor } from './layout-context.js';
+import {
+    type LayoutContext,
+    type LayoutHelpers,
+    newCursor,
+    type TrackCursor,
+} from './layout-context.js';
 import { GroupNode } from './nodes/group-node.js';
 import { buildLabelChip, type ItemMeasure, measureItem } from './nodes/item-measure.js';
 import { ItemNode, traceItemNode } from './nodes/item-node.js';
 import { ParallelNode } from './nodes/parallel-node.js';
 import { RoadmapNode } from './nodes/roadmap-node.js';
 import type { NonWorkingDisplay } from './non-working-display.js';
+import type { FinalizeBuilders } from './phases/finalize.js';
 import { type RoadmapSchedule, scheduleRoadmap } from './schedule.js';
 import { startTermsOf } from './start-terms.js';
 import { resolveStyle } from './style-resolution.js';
@@ -876,13 +882,25 @@ export function layoutRoadmap(
                   plan: buildWavePlan(resolved) ?? null,
               });
     return new RoadmapNode().place(file, resolved, options, schedule, {
-        sequenceItem,
-        sequenceOne,
-        resolveChildStart,
-        newCursor,
-        estimateTextWidth,
-        collectItems,
-        buildDependencies,
-        buildNowline,
+        ...layoutHelpers,
+        ...finalizeBuilders,
     });
 }
+
+/**
+ * The sequencer helpers the place phase injects into the nodes. Internal:
+ * exported so tests can run the phases one at a time.
+ */
+export const layoutHelpers: LayoutHelpers = {
+    sequenceItem,
+    sequenceOne,
+    resolveChildStart,
+    newCursor,
+    estimateTextWidth,
+};
+
+/**
+ * The builders finalize takes from this module (f11, f12). Internal:
+ * exported so tests can run the phases one at a time.
+ */
+export const finalizeBuilders: FinalizeBuilders = { collectItems, buildDependencies, buildNowline };

@@ -147,10 +147,10 @@ export interface LayoutContext {
     slackCorridors: SlackCorridor[];
     /**
      * Marker-row placement (row index + label box + side). While lanes
-     * are placed it holds the pre-pack of every date-pinned anchor and
-     * milestone; `RoadmapNode` then replaces it with the unified re-pack
-     * (P10), which adds after-only milestones and the calendar runs,
-     * before milestones are positioned and anchors built.
+     * are placed it holds a copy of the measure phase's pre-pack of every
+     * date-pinned anchor and milestone; finalize then replaces it with the
+     * final pack (f5), which adds after-only milestones and the calendar
+     * runs, before milestones are positioned (f6) and anchors built (f10).
      */
     markerRowPlacements: Map<string, MarkerRowPlacement>;
     chartTopY: number;
