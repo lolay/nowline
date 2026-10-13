@@ -4,7 +4,7 @@
 
 ## 1. Problem
 
-m2.5c promised a tree of measure/place nodes with `layout.ts` collapsed "to the composition root (~300 L)" (`rendering-v2.md:201`). At HEAD `layout.ts` is 1,934 lines, `nodes/roadmap-node.ts` is 1,325, and `RoadmapNode.place` (`packages/layout/src/nodes/roadmap-node.ts:272-1128`) is one 856-line method. Only `ItemNode` implements `Renderable` (`nodes/item-node.ts:300`), and its `measure` reports the bar without the growth that wrapped titles and chip rows add (`item-node.ts:307-316`).
+m2.5c promised a tree of measure/place nodes with `layout.ts` collapsed "to the composition root (~300 L)" (`rendering-v2.md:201`). At HEAD `layout.ts` is 1,934 lines, `nodes/roadmap-node.ts` is 1,325, and `RoadmapNode.place` (`packages/layout/src/nodes/roadmap-node.ts:272-1128`) is one 857-line method. Only `ItemNode` implements `Renderable` (`nodes/item-node.ts:300`), and its `measure` reports the bar without the growth that wrapped titles and chip rows add (`item-node.ts:307-316`).
 
 ### 1.1 One method does four jobs
 
@@ -362,7 +362,7 @@ export class HeaderNode {
 }
 ```
 
-`HeaderNode` splits measure from place but does not take the `Renderable` signature, which is built around a time scale and a band (`renderable.ts:237-251`) that a header has no use for; m6.s2 updates that file's comment to say which nodes measure.
+`HeaderNode` splits measure from place but does not take the `Renderable` signature, which is built around a time scale and a band (`MeasureContext` and `Renderable`, `renderable.ts:45-68`) that a header has no use for; m6.s2 updates that file's comment to say which nodes measure.
 
 - `measure` absorbs `sizeBesideHeader` and `HEADER_CARD_OUTER_PAD` (`layout.ts:1271-1331`), the above height, `chartLeftX` and `chartTopY` (`roadmap-node.ts:348-365`) and the card's minimum (508-510 with `HEADER_CARD_TOP_INSET`). Measure-phase code turns `minRowsBottomY` into `timelineY` as today (511).
 - `place` absorbs the header box, card box, logo box and text inset (1017-1054) and the header object (1082-1094); f16 adds the attribution box.
@@ -402,11 +402,13 @@ export interface ContextSource {
 export function createLayoutContext(
     source: ContextSource,
     shared: { theme: Theme; cal: CalendarConfig; timeline: PositionedTimelineScale; scale: TimeScale; calendar: WorkingCalendar; bandScale: BandScale; waves?: WaveLayoutState },
+    /** Where this context's lanes start and end; `chartRightX` only until m3.s3 removes it from the context. */
+    chart: Pick<LayoutContext, 'chartTopY' | 'chartBottomY' | 'swimlaneBottomY' | 'chartRightX'>,
     init: { footnotes?: FootnoteIndex; markerRowPlacements?: Map<string, MarkerRowPlacement> },
 ): LayoutContext;
 ```
 
-`ResolveResult` and `IsolatedRegion` both satisfy `ContextSource`. A region passes no footnotes and no marker placements, as today (`include-node.ts:92-93`, `:105`), and the caller seeds the wave edges as today. When R1 m2.s3 adds the schedule to the context, it is one field in `shared`.
+`ResolveResult` and `IsolatedRegion` both satisfy `ContextSource`. The two literals set the chart fields differently, and `chart` passes them through unchanged: the root sets `chartTopY: timelineY + timelineHeightBudget` with both bottoms at 0 and `chartRightX: finalChartRightX` (`roadmap-node.ts:582-585`; P5 sets both bottoms after placement); a region sets all three y fields to `innerStartY` and takes the host's `chartRightX` (`include-node.ts:106-109`). A region passes no footnotes and no marker placements, as today (`include-node.ts:92-93`, `:105`), and the caller seeds the wave edges as today. When R1 m2.s3 adds the schedule to the context, it is one field in `shared`.
 
 ### 3.9 Status tints become theme tokens
 
