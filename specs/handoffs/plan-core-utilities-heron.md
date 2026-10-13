@@ -1,7 +1,7 @@
 ```
 --- KICKOFF: begin orchestration at [deep] ---
 
-  Status: 0/5 groups done | last review: — | current: nowline m1 s1 [exec] | updated 2026-10-13
+  Status: 1/5 groups done | last review: wave-1 PASS | current: nowline m1 s2-s3 [deep] | updated 2026-10-13
 
   mode: unattended | proposed unattended (harness=claude-code runner=cloud; assigned branch, CLAUDE_CODE_REMOTE=true) | guard 3x min $50 | fixups 2 | confirmed 2026-10-13 session 462f378b-01ae-572c-b81b-c39199f8207a by Kickoff prompt: Run in unattended mode.
 
@@ -90,6 +90,7 @@ render() { # $1 checkout, $2 output dir
             if [ "$l" = default ]; then loc=(); else loc=(--locale "$l"); fi
             (cd "$1" && node packages/cli/dist/index.js "$f" --dry-run --diagnostic-format json "${loc[@]}") >"$out" 2>&1
             echo "exit $?" >"$out.status"
+            sed -i "s#$1#<checkout>#g" "$out" # base renders in a worktree, the step in the root
         done
     done <"$samples"
 }
@@ -112,7 +113,7 @@ echo "renders: $(find "$b/g1" -name '*.svg' | wc -l) G1, $(find "$b/g3" -name '*
 diff -r "$b" "$s" && echo "G1+G3 identical"
 ```
 
-(`make build-fast` skips the sample render; the gate renders directly, so it covers the slugs `make build` skips, as the spec requires.)
+(Fixed after wave 1: G3 messages that quote an absolute path differed only by checkout root, so `render` now rewrites the checkout root to `<checkout>`; caches rendered before the fix were rewritten the same way. `make build-fast` skips the sample render; the gate renders directly, so it covers the slugs `make build` skips, as the spec requires.)
 
 ## Merging main
 
@@ -134,7 +135,7 @@ No `Co-authored-by`. Workers never push. TypeScript: 4 spaces, `.js` suffix on r
 ### m1 - One content walk
 
 --- WAVE 1 [exec] ---
-#### s1 - [exec] Add `ast-walk.ts`
+#### s1 - [exec] Add `ast-walk.ts` (done)
 
 Add `packages/core/src/language/ast-walk.ts` exactly per spec §3.1 (`TrackNode`, `DeclarationNode`, `WalkOptions`, `trackChildren`, `trackNodes`, `declarations`, `visitProperties`, `forEachDeclaredId`, `referenceableIds`, `firstDeclarations`), depending only on `../generated/ast.js`. Add `packages/core/src/internal.ts` re-exporting it and the `./internal` `exports` entry (decision 1), and the README note. Tests in `packages/core/test/`: direct unit tests (source order, `description` skipping, nested teams, groups in parallels in groups, `WalkOptions`), and equivalence tests that run each new function and the copy it will replace over every sample (read `examples/**` and `tests/*.nowline` from the repo root, like `packages/layout/test/waves-byte-stability.test.ts:65`) and the inline core fixtures (`test/validation/wave-fixtures.ts` `EXAMPLE_n`, plus fixtures from the validation tests that exercise ids, teams and includes), comparing ids, order and owners. Copies under test: `registerEntity`/`registerTeam`/`registerSwimlaneContent`, `visitPropertiesDeep`, `collectReferenceableIds` (`nowline-validator.ts:2454-2558`; export the private ones from the module only, marked `@internal`, removed in s2), `collectDeclarations` and `collectWaveHosts` (`waves.ts`), layout's `collectItems` (`layout.ts:1880-1911`, test in `packages/layout/test/`), LSP `collectNamedEntities`/`visitProperties` (`packages/lsp/src/references/ast-utils.ts`, test in `packages/lsp/test/`). A difference found is reported and kept as a caller-side filter (spec §6). No caller changes. G2 (G1/G3 trivially identical; run them anyway to seed the cache).
 
@@ -203,6 +204,8 @@ Per spec m3.s3 and decision 3: delete `effectiveWave` and `leadWave` (`waves.ts:
 
 ## Review log
 
+review wave-1 (nowline m1 s1) 3fdba6c..6448ee4: PASS - ast-walk.ts matches spec §3.1, imports only generated AST and langium types; @nowline/core/internal subpath and README note; equivalence tests over 60 samples and fixtures in core, layout and LSP found no difference (only dead PersonDeclaration-in-team branches, unreachable per grammar); layout collectItems moved by R1 to layout.ts:1571 and tested there; gate diff showed only the checkout-root path in tests/grammar-properties G3 (gate-script artifact, script fixed by the parent) - 2026-10-13
+
 ## Token log
 
 **Counting header (Claude Code)**
@@ -213,4 +216,8 @@ Per spec m3.s3 and decision 3: delete `effectiveWave` and `leadWave` (`waves.ts:
 - `$C` = (input x in + cache read x cached + 5m write x in x 1.25 + 1h write x in x 2.00 + output x out) / 1M.
 - In another harness, or on a model not listed here, count and price per plan-execution.md "Token accounting" and "Model price table" instead.
 
-tokens orchestrator-kickoff plan-core-utilities-heron (claude-opus-5-5): input ~110 / cache read ~7.5M / cache write ~76k 5m + ~350k 1h / output ~59k | ~$5.82 API-equiv (output est.) (combined: orchestrator-kickoff, two plan-mode Explore agents) session 462f378b-01ae-572c-b81b-c39199f8207a
+tokens orchestrator-kickoff plan-core-utilities-heron (claude-opus-5-5): input ~98 / cache read ~8.9M / cache write ~0 5m + ~430k 1h / output ~52k | ~$6.25 API-equiv
+tokens orchestrator-kickoff-explore core-package-build-and-exports (claude-opus-5-5): input ~18 / cache read ~440k / cache write ~41k / output ~10k | ~$0.50 API-equiv (output est.) session 462f378b-01ae-572c-b81b-c39199f8207a
+tokens orchestrator-kickoff-explore layout-lsp-helper-copies (claude-opus-5-5): input ~16 / cache read ~360k / cache write ~35k / output ~8k | ~$0.41 API-equiv (output est.) session 462f378b-01ae-572c-b81b-c39199f8207a
+tokens wave-1 nowline-m1-s1 (claude-sonnet-5-5): input ~74 / cache read ~4.6M / cache write ~330k / output ~38k | ~$2.11 API-equiv (output est.) session 462f378b-01ae-572c-b81b-c39199f8207a
+tokens review-wave-1 nowline-m1-s1 (claude-opus-5-5): input ~32 / cache read ~590k / cache write ~50k / output ~16k | ~$0.69 API-equiv (output est.) session 462f378b-01ae-572c-b81b-c39199f8207a

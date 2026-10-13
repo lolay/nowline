@@ -3,15 +3,15 @@
 - **Branch:** `claude/zealous-thompson-tur82q` (lolay/nowline), assigned by the cloud harness. Started on it at `c34804c` (= `origin/main`).
 - **Plan:** `specs/handoffs/plan-core-utilities-heron.md`. Spec: `specs/core-ast-utilities.md`.
 - **Mode:** unattended, confirmed 2026-10-13 in session 462f378b-01ae-572c-b81b-c39199f8207a (harness=claude-code runner=cloud), re-confirmed by the pasted Kickoff prompt after `/compact`.
-- **Status:** resumed after `/compact`; `origin/main` merged (`512265b`, clean: #149, #150). 0/5 waves done. Wave 1 launching.
-- **Spend:** ~$5.8 logged (kickoff and planning) against ~$24 expected (guard ~$72).
+- **Status:** 1/5 waves done (wave 1 PASS, `3fdba6c..6448ee4`). Next: wave 2 [deep] m1.s2-s3 (gate 2, a checkpoint unattended).
+- **Spend:** ~$10 logged against ~$24 expected (guard ~$72).
 
 ## Waves
 
 | wave | tier | steps | state |
 |---|---|---|---|
-| 1 | exec | m1.s1 | next |
-| 2 | deep | m1.s2-s3 | |
+| 1 | exec | m1.s1 | PASS `3fdba6c..6448ee4` |
+| 2 | deep | m1.s2-s3 | next |
 | 3 | exec | m1.s4 | |
 | 4 | deep | m2.s1-s3 | |
 | 5 | exec | m2.s4, then m3.s1-s3 (two units) | |
@@ -33,13 +33,15 @@ Paste the plan's Kickoff prompt (in the plan's Kickoff block). Before each unit 
 - The new helpers ship only through `@nowline/core/internal` (unstable, documented in `packages/core/README.md`).
 - `effectiveWave` / `leadWave` are removed outright in m3.s3 with a `removed` fragment.
 - One changelog file for the branch: `.changelog/core-ast-utilities.txt`.
+- review wave-1 (nowline m1 s1) 3fdba6c..6448ee4: PASS. The worker made the validator's private walk helpers (`registerTeam`, `registerSwimlaneContent`, `visitPropertiesDeep`, `collectReferenceableIds`), `waves.ts`'s `collectDeclarations`/`collectWaveHosts` and layout's `collectItems` exported and `@internal` for the equivalence tests; s2-s4 remove them with their callers. Layout's `collectItems` is now at `layout.ts:1571` (moved by R1). The inline rule 24, rule 25 and person walks in the validator were not equivalence-tested (closures, not listed in s1): s2 relies on G3 for them. No difference was found between `ast-walk.ts` and any copy; the old walks' PersonDeclaration-in-team branches are dead (grammar's TeamContent cannot hold one).
 
 ## Environment notes
 
 - Cloud runner: Node 22.22.0 is installed; `.nvmrc` pins 26.2.0. Since #149 (merged in `512265b`) `make doctor` accepts Node >=22 and passes. `make` targets are the entry point; `packages/cli/dist/` is not built at kickoff (run `make init build-fast` first).
-- Gate script lives in the plan (Gates section); workers write it to `.scratch/gates.sh`. Cached gate renders go to `.scratch/gates/`, base worktrees to `.scratch/gate-wt/` (both gitignored).
+- Gate script lives in the plan (Gates section); `.scratch/gates.sh` holds the fixed version (it rewrites the checkout root to `<checkout>` in G3 output, since `tests/grammar-properties` quotes an absolute logo path); don't overwrite it from an older copy. Cached gate renders go to `.scratch/gates/`, base worktrees to `.scratch/gate-wt/` (both gitignored).
 
 ## Deviations from plan
 
 - One PR at the end instead of one PR per spec step (Gary's instruction).
 - The parent merges `origin/main` between units when the merge is clean, outside every worker's range (plan, "Merging main").
+- After wave 1 the parent fixed the gate script (plan, Gates): G3 differed only by checkout root in one sample's logo warning. The rerun on `3fdba6c..6448ee4` reports G1+G3 identical.
