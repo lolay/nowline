@@ -118,6 +118,7 @@ export const BUILTIN_ICON_NAMES: readonly string[] = [
     'shield',
     'warning',
     'lock',
+    'calendar',
 ];
 
 /** Weekday names accepted by `every:`, Sunday first (the order of `Date#getUTCDay`). */
