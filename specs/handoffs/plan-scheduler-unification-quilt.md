@@ -4,9 +4,9 @@
 ```
 --- KICKOFF: begin orchestration at [deep] ---
 
-  Status: BLOCKED at gate mode | 0/4 groups done | last review: — | current: nowline m1 s1-s3 [deep] | updated 2026-10-13
+  Status: 0/4 groups done | last review: — | current: nowline m1 s1-s3 [deep] | updated 2026-10-13
 
-  mode: pending | proposed unattended (harness=claude-code runner=cloud; CLAUDE_CODE_REMOTE=true, assigned branch) | guard 3x min $50 | fixups 2
+  mode: unattended | proposed unattended (harness=claude-code runner=cloud; CLAUDE_CODE_REMOTE=true, assigned branch) | guard 3x min $50 | fixups 2 | confirmed 2026-10-13 session 65f2e917-181e-5b0f-94c9-28d8d9b1c93d: unattended
 
   review: every-wave (log-only)
 
@@ -17,6 +17,7 @@
   Prompt to paste into the next chat:
     In lolay/nowline, read specs/handoffs/plan-scheduler-unification-quilt.md. The plan is already tagged.
     On branch claude/eloquent-archimedes-fkbc5e (task branch): subagents commit each finished step.
+    Run in unattended mode.
     Run the personal-plan-orchestrate skill from the top: walk to
     each tier boundary, dispatch subagents per the skill's
     procedure, and pause only where the recorded mode stops. Do not

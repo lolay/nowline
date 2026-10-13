@@ -5,34 +5,18 @@ Plan: [`plan-scheduler-unification-quilt.md`](./plan-scheduler-unification-quilt
 ## State
 
 - **Branch:** `claude/eloquent-archimedes-fkbc5e` (harness-assigned task branch, cut from `origin/main` at `c34804c`, pushed). Single working directory, `lolay/nowline`.
-- **Mode:** pending (proposed unattended; runner=cloud). Waiting on the kickoff question below.
+- **Mode:** unattended, confirmed 2026-10-13 by Gary's answer `unattended`. Kickoff prompt carries `Run in unattended mode.`
 - **Done:** kickoff only (plan tagged, waves marked, Kickoff, Cost table and counting header written). No plan step has run.
 - **Spend:** ~$6.2 API-equiv so far (kickoff plus two planning Explore agents) against ~$16 expected total; guard stops past $50.
 - **Next unit:** wave 1 `[deep]`, `nowline m1 s1-s3` (one group, no canary).
 
 ## How to resume
 
-Gary runs `/compact` after the kickoff answer is recorded and pushed, then pastes the plan's Kickoff prompt. Do not dispatch before that paste.
+Gary runs `/compact`, then pastes the plan's Kickoff prompt. Do not dispatch before that paste.
 
-## Pending question (verbatim)
+## Pending question
 
-```
-Plan plan-scheduler-unification-quilt: 2 waves in 4 dispatch units, expected ~$16 API-equiv (Cost table in the plan; ~$6.2 already spent on kickoff and planning).
-  Wave 1 [deep] m1 s1-s3 (register, C gains B's scope, window from schedule).
-  Wave 2 [exec] m1 s4-s5 (start terms, F1), then m2 s1-s3, then m3 s1-s3.
-Gates it crosses: 4 before the m2 unit and before the m3 unit. No canary (one group per unit), no gate 2/3/7.
-Runner detected (CLAUDE_CODE_REMOTE=true). Proposed mode: unattended.
-  unattended: gate 4 is logged, not asked. A failed commit check or a CONCERNS gets an automatic
-    fix-up, up to 2 per group. I stop to ask for information, at a plan error, a scope breach, a
-    worker's disclosed breach, a failure after one retry, a group's third failed check or review,
-    a merge from main that conflicts, F1 moving any sample beyond showcase/sizing/late-row-shifts,
-    unplanned [xdeep] or Fable work, or projected spend past 3x expected or $50, whichever is higher ($50).
-  gated: every gate stops, and so does every failed check or repeat CONCERNS.
-Either way, after every unit I commit and push the plan and its handoff
-(specs/handoffs/handoff-scheduler-unification-quilt.md). Opening the PR waits for you.
-Per your instructions I stop after recording this answer so you can /compact, then resume from the Kickoff prompt.
-Reply unattended or gated.
-```
+None. The kickoff question was answered `unattended`.
 
 ## Milestone notes (gate 4)
 
@@ -53,4 +37,4 @@ The plan's "Decisions made while planning" (1-8) stand; none added by a unit yet
 
 ## Deviations from plan
 
-None yet.
+- A PR (lolay/nowline#148) was opened from the Claude Code UI before any step ran; Gary asked for it to go, so it is closed and unsubscribed. The milestone PR is still opened only after Gary says yes at completion (a new PR from this branch).
