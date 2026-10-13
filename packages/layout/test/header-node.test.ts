@@ -1,10 +1,11 @@
 // HeaderNode (specs/layout-phases.md §3.7): `measure` sizes the beside card
-// or the above band before the chart is laid out, and the laid-out model
-// agrees with it in both positions and at every logo size.
+// or the above band before the chart is laid out, `place` builds the header
+// from the measure and the chart's extent, and the laid-out model agrees
+// with both in both positions and at every logo size.
 
 import type { NowlineFile, ResolveResult } from '@nowline/core';
 import { describe, expect, it } from 'vitest';
-import { HEADER_LOGO_PAD_Y_PX } from '../src/header-card-geometry.js';
+import { HEADER_CARD_PADDING_X, HEADER_LOGO_PAD_Y_PX } from '../src/header-card-geometry.js';
 import { type LogoDimensions, resolveHeaderLogo } from '../src/header-logo.js';
 import { layoutRoadmap } from '../src/layout.js';
 import { HeaderNode, type MeasuredHeader } from '../src/nodes/header-node.js';
@@ -52,12 +53,23 @@ function headerNodeFor(
 async function measureAndLayout(
     src: string,
     logo?: LogoDimensions,
-): Promise<{ measured: MeasuredHeader; model: PositionedRoadmap }> {
+): Promise<{ node: HeaderNode; measured: MeasuredHeader; model: PositionedRoadmap }> {
     const { file, resolved } = await parseAndResolve(src);
-    const measured = headerNodeFor(file, resolved, logo).measure();
+    const node = headerNodeFor(file, resolved, logo);
+    const measured = node.measure();
     const model = layoutRoadmap(file, resolved, { today: TODAY, logo });
-    return { measured, model };
+    return { node, measured, model };
 }
+
+/** The laid-out header without the attribution box, which `place` leaves to finalize. */
+function headerParts(
+    model: PositionedRoadmap,
+): Omit<PositionedRoadmap['header'], 'attributionBox'> {
+    const { attributionBox: _attribution, ...parts } = model.header;
+    return parts;
+}
+
+const FRAME = { rowsBottomY: 120, chartBottomY: 400, canvasRightX: 900 };
 
 function logoProps(size: string): string {
     return `logo:"./acme.svg" logo-size:${size}`;
@@ -127,6 +139,83 @@ describe('HeaderNode.measure — above', () => {
             expect(model.header.box.height).toBe(band);
             expect(model.timeline.box.y).toBe(measured.chartTopY);
             expect(measured.logoSlot).toBe(model.header.textInset?.x);
+        });
+    }
+});
+
+describe('HeaderNode.place — beside', () => {
+    it('spans the header column to the chart bottom and hugs the rows with the card', async (): Promise<void> => {
+        const { node, measured } = await measureAndLayout(dsl(''));
+        const placed = node.place(measured, FRAME);
+        expect(placed.box).toEqual({ x: 0, y: 0, width: measured.chartLeftX, height: 400 });
+        expect(placed.cardBox).toEqual({
+            x: 6,
+            y: 120 - measured.cardHeight,
+            width: measured.cardWidth,
+            height: measured.cardHeight,
+        });
+        expect(placed.title).toBe('Platform 2026');
+        expect(placed.author).toBe('Acme Engineering');
+        expect(placed.titleLines).toBe(measured.titleLines);
+        expect('logo' in placed).toBe(true);
+        expect(placed.logo).toBeUndefined();
+        expect('textInset' in placed).toBe(false);
+        expect('attributionBox' in placed).toBe(false);
+    });
+
+    it('puts the logo at the card padding, centered, with the text past its slot', async (): Promise<void> => {
+        const { node, measured } = await measureAndLayout(dsl(logoProps('xl')), LOGO);
+        const placed = node.place(measured, FRAME);
+        const logoHeight = LOGO_SIZE_PX.xl;
+        expect(placed.logo?.box).toEqual({
+            x: 6 + HEADER_CARD_PADDING_X,
+            y: placed.cardBox.y + (measured.cardHeight - logoHeight) / 2,
+            width: 2 * logoHeight,
+            height: logoHeight,
+        });
+        expect(placed.logo?.assetRef).toBe('./acme.svg');
+        expect(placed.logo?.intrinsic).toEqual(LOGO);
+        expect(placed.textInset).toEqual({
+            x: measured.logoSlot,
+            y: (measured.cardHeight - measured.textCardHeight) / 2,
+        });
+    });
+
+    for (const size of ['none', ...LOGO_SIZES]) {
+        it(`rebuilds the laid-out header from the layout's frame (logo ${size})`, async (): Promise<void> => {
+            const src = size === 'none' ? dsl('') : dsl(logoProps(size));
+            const { node, measured, model } = await measureAndLayout(src, LOGO);
+            const placed = node.place(measured, {
+                rowsBottomY: model.header.cardBox.y + model.header.cardBox.height,
+                chartBottomY: model.header.box.height,
+                canvasRightX: model.width,
+            });
+            expect(placed).toEqual(headerParts(model));
+        });
+    }
+});
+
+describe('HeaderNode.place — above', () => {
+    it('spans the band and the card across the canvas', async (): Promise<void> => {
+        const { node, measured } = await measureAndLayout(dsl('', ABOVE));
+        const placed = node.place(measured, FRAME);
+        const band = { x: 0, y: 0, width: 900, height: HEADER_ABOVE_HEIGHT_PX };
+        expect(placed.box).toEqual(band);
+        expect(placed.cardBox).toEqual(band);
+        expect(placed.position).toBe('above');
+        expect('textInset' in placed).toBe(false);
+    });
+
+    for (const size of ['none', ...LOGO_SIZES]) {
+        it(`rebuilds the laid-out header from the layout's frame (logo ${size})`, async (): Promise<void> => {
+            const src = size === 'none' ? dsl('', ABOVE) : dsl(logoProps(size), ABOVE);
+            const { node, measured, model } = await measureAndLayout(src, LOGO);
+            const placed = node.place(measured, {
+                rowsBottomY: 0,
+                chartBottomY: 0,
+                canvasRightX: model.width,
+            });
+            expect(placed).toEqual(headerParts(model));
         });
     }
 });

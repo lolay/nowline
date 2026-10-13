@@ -27,7 +27,7 @@ import {
     HEADER_BESIDE_MAX_WIDTH_PX,
     HEADER_BESIDE_MIN_WIDTH_PX,
 } from '../themes/shared.js';
-import type { HeaderPosition, ResolvedStyle } from '../types.js';
+import type { BoundingBox, HeaderPosition, PositionedHeader, ResolvedStyle } from '../types.js';
 
 // Left margin between the canvas's left edge and the visible card. The
 // matching right-side breathing room is owned by `GUTTER_PX` (the canonical
@@ -62,6 +62,19 @@ export interface MeasuredHeader {
     chartTopY: number;
     /** Beside: the lowest the header rows may end so the card fits (card + 4 px inset). Above: 0. */
     minRowsBottomY: number;
+}
+
+/** The positioned header without its attribution box, which finalize adds last. */
+export type PositionedHeaderParts = Omit<PositionedHeader, 'attributionBox'>;
+
+/** Where the chart ended up, as far as the header needs to know. */
+export interface HeaderFrame {
+    /** Bottom of the header rows; the beside card's bottom hugs it. */
+    rowsBottomY: number;
+    /** Bottom of the chart; the beside header column runs down to it. */
+    chartBottomY: number;
+    /** The final canvas right edge; the above band spans to it. */
+    canvasRightX: number;
 }
 
 export interface HeaderNodeInput {
@@ -107,6 +120,65 @@ export class HeaderNode {
             // rows must end low enough for the card plus a 4 px top inset;
             // the measure phase pushes the timeline down when they would not.
             minRowsBottomY: isBeside ? sized.cardHeight + HEADER_CARD_TOP_INSET : 0,
+        };
+    }
+
+    /**
+     * The header box, the card, the logo box and the text inset, once the
+     * chart's extent is known. Beside: a column `chartLeftX` wide down to
+     * the chart bottom, with the card's bottom on `rowsBottomY`. Above: a
+     * band `aboveHeight` tall across the canvas, the card filling it.
+     */
+    place(measured: MeasuredHeader, frame: HeaderFrame): PositionedHeaderParts {
+        const { title, author, style } = this.input;
+        const isBeside = measured.position === 'beside';
+        const box: BoundingBox = isBeside
+            ? { x: 0, y: 0, width: measured.chartLeftX, height: frame.chartBottomY }
+            : { x: 0, y: 0, width: frame.canvasRightX, height: measured.aboveHeight };
+        // The visible card inside the box. Beside, its BOTTOM hugs the
+        // bottom of the header rows so the title block anchors to the
+        // chart's top edge whichever header rows are present; the measure
+        // phase already pushed the rows down far enough for the card to
+        // keep HEADER_CARD_TOP_INSET from the canvas top.
+        const cardBox: BoundingBox = isBeside
+            ? {
+                  x: HEADER_CARD_OUTER_PAD,
+                  y: frame.rowsBottomY - measured.cardHeight,
+                  width: measured.cardWidth,
+                  height: measured.cardHeight,
+              }
+            : { x: 0, y: 0, width: frame.canvasRightX, height: measured.aboveHeight };
+        // Logo at the card's left padding, vertically centered; the text
+        // shifts right past it and centers in the (possibly taller) card.
+        let logo: PositionedHeader['logo'];
+        let textInset: PositionedHeader['textInset'];
+        if (measured.logo) {
+            logo = {
+                box: {
+                    x: box.x + cardBox.x + HEADER_CARD_PADDING_X,
+                    y: box.y + cardBox.y + (cardBox.height - measured.logo.height) / 2,
+                    width: measured.logo.width,
+                    height: measured.logo.height,
+                },
+                assetRef: measured.logo.assetRef,
+                intrinsic: measured.logo.intrinsic,
+            };
+            textInset = {
+                x: measured.logoSlot,
+                y: Math.max(0, (cardBox.height - measured.textCardHeight) / 2),
+            };
+        }
+        return {
+            box,
+            position: style.headerPosition,
+            title,
+            author,
+            titleLines: measured.titleLines,
+            authorLines: measured.authorLines,
+            cardBox,
+            logo,
+            ...(textInset ? { textInset } : {}),
+            style,
         };
     }
 }

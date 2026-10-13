@@ -21,7 +21,6 @@ import { daysBetween } from '../calendar.js';
 import { resolveWorkingCalendar } from '../calendar-resolver.js';
 import { cappedPixelsPerDay } from '../canvas-width.js';
 import { parseDate, propValue } from '../dsl-utils.js';
-import { HEADER_CARD_PADDING_X } from '../header-card-geometry.js';
 import { resolveHeaderLogo } from '../header-logo.js';
 import { localeStrings, resolveLocale } from '../i18n.js';
 import type { LayoutOptions, LayoutResult } from '../layout.js';
@@ -215,7 +214,6 @@ export class RoadmapNode {
         // `minor-grid`) are banned on the roadmap declaration itself, so the
         // values come from the level-2 `default roadmap` line in config.
         const headerStyle = resolveStyle('roadmap', file.roadmapDecl?.properties ?? [], styleCtx);
-        const isBeside = headerStyle.headerPosition === 'beside';
         // `top` (default) keeps the legacy single-strip header; `bottom`
         // suppresses the top tick panel (now-pill and marker row stay
         // at the top because anchors / milestones live there); `both`
@@ -246,18 +244,13 @@ export class RoadmapNode {
         // make it taller; see header-logo.ts.
         const titleStr = file.roadmapDecl?.title ?? file.roadmapDecl?.name ?? '';
         const authorStr = propValue(file.roadmapDecl?.properties ?? [], 'author');
-        const headerLogo = resolveHeaderLogo(file, options.logo);
-        const measuredHeader = new HeaderNode({
+        const headerNode = new HeaderNode({
             title: titleStr,
             author: authorStr,
             style: headerStyle,
-            logo: headerLogo,
-        }).measure();
-
-        const headerBox = isBeside
-            ? { x: 0, y: 0, width: measuredHeader.chartLeftX, height: 0 }
-            : { x: 0, y: 0, width: 0, height: measuredHeader.aboveHeight };
-
+            logo: resolveHeaderLogo(file, options.logo),
+        });
+        const measuredHeader = headerNode.measure();
         const { chartLeftX, chartTopY } = measuredHeader;
 
         // The chart sizes to natural content width (date window × ppd) plus
@@ -405,7 +398,10 @@ export class RoadmapNode {
         const tickPanelY = timelineY + pillRowHeight;
         const waveStripY = tickPanelY + tickPanelHeight;
         const markerRowY = waveStripY + waveStripHeight;
-        const headerRowsBottomY = markerRowY + markerRowHeight;
+        // Bottom of the header rows from the pre-pack row count. The marker
+        // re-pack below can grow the band past it, but the beside card
+        // still hugs this estimate (L1, specs/layout-phases.md §1.3).
+        const estimatedRowsBottomY = markerRowY + markerRowHeight;
 
         const ticks = buildHeaderTicks(timeScale, scale, calendar, locale);
         const timeline: PositionedTimelineScale = {
@@ -889,42 +885,11 @@ export class RoadmapNode {
 
         // Header (depends on chart height in beside-mode and on the
         // final canvas width in above-mode).
-        headerBox.height = headerBox.height || ctx.chartBottomY;
-        if (!isBeside) headerBox.width = chartRightX;
-        // Card sub-box for beside-mode (the visible white panel inside
-        // headerBox). Card BOTTOM hugs the bottom of the header rows so
-        // the title block visually anchors to the chart's top edge
-        // regardless of which header rows are present. timelineY was
-        // already nudged down above to guarantee the card has at least
-        // HEADER_CARD_TOP_INSET clearance from the canvas top.
-        const cardBox: BoundingBox = isBeside
-            ? {
-                  x: 6,
-                  y: headerRowsBottomY - measuredHeader.cardHeight,
-                  width: measuredHeader.cardWidth,
-                  height: measuredHeader.cardHeight,
-              }
-            : { x: 0, y: 0, width: chartRightX, height: measuredHeader.aboveHeight };
-        // Logo at the card's left padding, vertically centered; the text
-        // shifts right past it and centers in the (possibly taller) card.
-        let logo: PositionedHeader['logo'];
-        let textInset: PositionedHeader['textInset'];
-        if (headerLogo) {
-            logo = {
-                box: {
-                    x: headerBox.x + cardBox.x + HEADER_CARD_PADDING_X,
-                    y: headerBox.y + cardBox.y + (cardBox.height - headerLogo.height) / 2,
-                    width: headerLogo.width,
-                    height: headerLogo.height,
-                },
-                assetRef: headerLogo.assetRef,
-                intrinsic: headerLogo.intrinsic,
-            };
-            textInset = {
-                x: measuredHeader.logoSlot,
-                y: Math.max(0, (cardBox.height - measuredHeader.textCardHeight) / 2),
-            };
-        }
+        const headerParts = headerNode.place(measuredHeader, {
+            rowsBottomY: estimatedRowsBottomY,
+            chartBottomY: ctx.chartBottomY,
+            canvasRightX: chartRightX,
+        });
 
         // Attribution wordmark placement. Canvas grows by GUTTER_PX +
         // glyph height + GUTTER_PX so the wordmark sits in a clean bottom
@@ -952,19 +917,7 @@ export class RoadmapNode {
         };
         const height = attributionBox.y + attributionBox.height + GUTTER_PX;
 
-        const header: PositionedHeader = {
-            box: headerBox,
-            position: headerStyle.headerPosition,
-            title: titleStr,
-            author: authorStr,
-            titleLines: measuredHeader.titleLines,
-            authorLines: measuredHeader.authorLines,
-            cardBox,
-            logo,
-            ...(textInset ? { textInset } : {}),
-            style: headerStyle,
-            attributionBox,
-        };
+        const header: PositionedHeader = { ...headerParts, attributionBox };
 
         const model: PositionedRoadmap = {
             width: chartRightX,
