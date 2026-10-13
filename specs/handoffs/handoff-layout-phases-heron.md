@@ -2,8 +2,8 @@
 
 - **Plan:** `specs/handoffs/plan-layout-phases-heron.md`
 - **Branch:** `claude/vibrant-hopper-ac4s73` (harness-assigned task branch; started at ff8eb8b, fast-forwarded to `origin/main` 4498948 at kickoff, no commits of its own before this one)
-- **Mode:** pending (proposed unattended; harness=claude-code runner=cloud)
-- **Status:** kicked off, waiting on the kickoff answer. No wave has run.
+- **Mode:** unattended (confirmed 2026-10-13, session 7e027fcc-1ca6-51b0-b005-63e1163df819; harness=claude-code runner=cloud)
+- **Status:** kicked off, mode confirmed. Halted for Gary's `/compact`; no wave has run.
 
 ## What's done
 
@@ -26,11 +26,11 @@ None yet.
 
 ## Spend
 
-~$3.65 (kickoff) of ~$46 expected (guard 3x min $50 = $138).
+~$3.97 (kickoff) of ~$46 expected (guard 3x min $50 = $138).
 
 ## Next unit
 
-Wave 1 [exec] nowline m1 s1-s2, after the kickoff answer.
+Wave 1 [exec] nowline m1 s1-s2, once Gary pastes the Kickoff prompt.
 
 ## How to resume
 
@@ -38,7 +38,7 @@ Paste the plan's Kickoff prompt. Per Gary's instruction, after the kickoff answe
 
 ## Pending question (verbatim)
 
-Plan plan-layout-phases-heron: 7 waves, expected ~$46 API-equiv (~76M tokens; Cost table in the plan). Reply unattended or gated. (Full text in the chat; summary: unattended logs gates 2 and 4 as checkpoints, gated stops at each.)
+None. Kickoff answered: "Unattended".
 
 ## Decisions so far
 

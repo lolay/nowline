@@ -1,9 +1,9 @@
 ```
 --- KICKOFF: begin orchestration at [deep] ---
 
-  Status: 0/10 groups done | last review: — | current: nowline m1 s1-s2 [exec] | BLOCKED at gate mode | updated 2026-10-13
+  Status: 0/10 groups done | last review: — | current: nowline m1 s1-s2 [exec] | updated 2026-10-13
 
-  mode: pending | proposed unattended (harness=claude-code runner=cloud; CLAUDE_CODE_REMOTE=true, assigned branch) | guard 3x min $50 | fixups 2
+  mode: unattended | proposed unattended (harness=claude-code runner=cloud; CLAUDE_CODE_REMOTE=true, assigned branch) | guard 3x min $50 | fixups 2 | confirmed 2026-10-13 session 7e027fcc-1ca6-51b0-b005-63e1163df819: Unattended
 
   review: every-wave (log-only)
 
@@ -14,6 +14,7 @@
   Prompt to paste into the next chat:
     In lolay/nowline, read specs/handoffs/plan-layout-phases-heron.md. The plan is already tagged.
     On branch claude/vibrant-hopper-ac4s73 (task branch): subagents commit each finished step.
+    Run in unattended mode.
     Run the personal-plan-orchestrate skill from the top: walk to
     each tier boundary, dispatch subagents per the skill's
     procedure, and pause only where the recorded mode stops. Do not
@@ -197,4 +198,4 @@ Out of scope: F2 (local coordinates), F3 (after R1 F3), R5 renderer status table
 - `$C` = (input × in + cache read × cached + 5m write × in × 1.25 + 1h write × in × 2.00 + output × out) / 1M.
 - In another harness, or on a model not listed here, count and price per plan-execution.md "Token accounting" and "Model price table" instead.
 
-tokens orchestrator-kickoff plan-layout-phases-heron (claude-opus-5-5): input ~66 / cache read ~5.5M / cache write ~0 5m + ~220k 1h / output ~40k | ~$3.65 API-equiv
+tokens orchestrator-kickoff plan-layout-phases-heron (claude-opus-5-5): input ~74 / cache read ~6.6M / cache write ~0 5m + ~220k 1h / output ~43k | ~$3.97 API-equiv
