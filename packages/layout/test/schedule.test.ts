@@ -696,6 +696,9 @@ swimlane apps
             w1: { span: [0, 4], members: 2, heldBy: 'i1' },
             w2: { span: [4, 7], members: 2, heldBy: 'i2' },
         });
+        const w1 = sched.waves?.get('w1');
+        expect(w1?.start.toISOString().slice(0, 10)).toBe('2026-01-05');
+        expect(w1?.end.toISOString().slice(0, 10)).toBe('2026-02-02');
         const w2 = sched.waves?.get('w2');
         expect(w2?.start.toISOString().slice(0, 10)).toBe('2026-02-02');
         expect(w2?.end.toISOString().slice(0, 10)).toBe('2026-02-23');
@@ -1003,6 +1006,33 @@ swimlane backend
         expectWaves(sched, BUSINESS_WEEK, {
             w1: { span: [0, 2], members: 2, heldBy: 'schema' },
             w2: { span: [2, 5], members: 2, heldBy: 'api' },
+        });
+    });
+
+    it('Example 7 fix: moving backend above frontend gives the Example 6 dates', async () => {
+        const { sched } = await buildWaveSchedule(`nowline v1
+
+roadmap lane-order "Lane order" start:2026-01-05 scale:1w
+
+wave w1 "Wave 1"
+wave w2 "Wave 2"
+
+swimlane backend
+  item schema duration:2w wave:w1
+  item api duration:3w wave:w2
+swimlane frontend
+  item mocks duration:1w wave:w1
+  item forms duration:1w wave:w1 after:schema
+  item wire-up duration:2w wave:w2 after:api
+`);
+        expectItems(sched, BUSINESS_WEEK, {
+            forms: [2, 3],
+            api: [3, 6],
+            'wire-up': [6, 8],
+        });
+        expectWaves(sched, BUSINESS_WEEK, {
+            w1: { span: [0, 3], members: 3, heldBy: 'forms' },
+            w2: { span: [3, 8], members: 2, heldBy: 'wire-up' },
         });
     });
 

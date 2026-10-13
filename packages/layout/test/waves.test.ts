@@ -22,7 +22,6 @@ import {
 import { describe, expect, it } from 'vitest';
 import { resolveCalendar } from '../src/calendar.js';
 import { type LayoutOptions, layoutRoadmap } from '../src/layout.js';
-import { scheduleRoadmap } from '../src/schedule.js';
 import { ITEM_INSET_PX, TRACK_BLOCK_TAIL_GUTTER_PX } from '../src/themes/shared.js';
 import type {
     PositionedGroup,
@@ -193,26 +192,16 @@ function placedAstItems(resolved: ResolveResult): ItemDeclaration[] {
     ];
 }
 
-/** Engine C: `[start, end]` in weeks for every placed item with an id. */
-function engineCWeeks(laid: Laid): Record<string, [number, number]> {
-    const sched = scheduleRoadmap(laid.file, laid.resolved);
-    const weeks = (d: Date): number =>
-        round(laid.calendar.workingIndexOf(sched.startDate, d) / laid.perWeek);
-    const out: Record<string, [number, number]> = {};
-    for (const node of placedAstItems(laid.resolved)) {
-        const s = sched.byNode.get(node);
-        if (node.name && s) out[node.name] = [weeks(s.start), weeks(s.end)];
-    }
-    return out;
-}
-
-/** The example table matches engine A, and engine A matches engine C. */
+/**
+ * Engine A's item spans match the spec's table. Engine C asserts the same
+ * tables in schedule.test.ts, so each example is checked on both engines
+ * against the spec's numbers, not against each other.
+ */
 function expectTable(laid: Laid, table: Record<string, [number, number]>): void {
     const a = engineAWeeks(laid);
     const picked: Record<string, [number, number]> = {};
     for (const id of Object.keys(table)) picked[id] = a[id];
     expect(picked).toEqual(table);
-    expect(a).toEqual(engineCWeeks(laid));
 }
 
 /** 1-based wave of every member item with an id. */
@@ -246,7 +235,7 @@ function expectBarriers(laid: Laid): void {
     }
 }
 
-describe('layoutRoadmap — wave barriers (§11 worked examples, engine A = engine C)', () => {
+describe('layoutRoadmap — wave barriers (§11 worked examples, engine A)', () => {
     it('Example 1: three lanes, three waves (4 passes)', async () => {
         const laid = await lay(EXAMPLE_1);
         expectTable(laid, {
@@ -1069,24 +1058,9 @@ function waveSpans(laid: Laid): Array<Record<string, unknown>> {
     }));
 }
 
-/** Engine C's `RoadmapSchedule.waves`, in the same shape. */
-function engineCWaveSpans(laid: Laid): Array<Record<string, unknown>> {
-    const sched = scheduleRoadmap(laid.file, laid.resolved);
-    expect(sched.waves).toBeDefined();
-    return [...(sched.waves ?? new Map())].map(([id, w]) => ({
-        id,
-        index: w.index - 1,
-        startDate: isoDay(w.start),
-        endDate: isoDay(w.end),
-        memberCount: w.memberCount,
-        ...(w.heldBy !== undefined ? { heldBy: w.heldBy } : {}),
-        ...(w.floorRef !== undefined ? { floorRef: w.floorRef } : {}),
-    }));
-}
-
 /**
- * `model.waves` matches `expected` (a subset of fields per wave) and engine
- * C, and its x and dates agree through the timeline.
+ * `model.waves` matches `expected` (a subset of fields per wave, from the
+ * spec's tables), and its x and dates agree through the timeline.
  */
 function expectWaves(laid: Laid, expected: Array<Record<string, unknown>>): void {
     const spans = waveSpans(laid);
@@ -1094,7 +1068,6 @@ function expectWaves(laid: Laid, expected: Array<Record<string, unknown>>): void
     expected.forEach((e, i) => {
         expect(spans[i]).toMatchObject(e);
     });
-    expect(spans).toEqual(engineCWaveSpans(laid));
     const { timeline } = laid.model;
     for (const w of laid.model.waves ?? []) {
         const days = (x: number): number => round((x - timeline.originX) / timeline.pixelsPerDay);
@@ -1104,7 +1077,7 @@ function expectWaves(laid: Laid, expected: Array<Record<string, unknown>>): void
     }
 }
 
-describe('layoutRoadmap — positioned waves (engine A = engine C)', () => {
+describe('layoutRoadmap — positioned waves (engine A)', () => {
     it('Example 1: three tiled waves, each held by its latest member', async () => {
         const laid = await lay(EXAMPLE_1);
         expectWaves(laid, [
