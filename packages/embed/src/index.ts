@@ -73,7 +73,7 @@ export interface InitializeOptions {
     selector?: string;
     /** BCP-47 locale forwarded to the layout engine for axis labels and the now-pill. */
     locale?: string;
-    /** Layout canvas width in pixels. Layout's default is 1280. */
+    /** Best-effort maximum canvas width in px. Unset fits the content. */
     width?: number;
     /**
      * How a calendar's non-working days appear on every block: `'hide'`

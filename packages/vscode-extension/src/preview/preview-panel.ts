@@ -44,7 +44,7 @@ export interface PreviewSettings {
     nonWorking: NonWorkingMode;
     strict: boolean;
     showLinks: boolean;
-    /** Canvas width in px; `0` leaves it unset. */
+    /** Maximum canvas width in px; `0` leaves it unset (fit content). */
     width: number;
     /** Override asset-resolver root; empty uses source-file directory. */
     assetRoot: string;

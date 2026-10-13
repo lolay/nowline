@@ -91,7 +91,10 @@ Render options
   --no-links             Omit link icons from output
   -s, --scale <n>        Raster scale factor (PNG only; default 1)
   --strict               Promote asset / sanitizer warnings to errors
-  -w, --width <px>       Canvas width in pixels (default: 1280)
+  -w, --width <px>       Maximum canvas width in pixels (default: fit the
+                         content). Best-effort: the timeline shrinks to fit,
+                         down to 1 px per day; spilled captions can still
+                         overflow. See rendering.md § Canvas width.
   --non-working <mode>   How a business calendar's non-working days appear:
                          `hide` (collapse them; the default) or `show` (draw
                          them as shaded bands). Overrides the file's
@@ -375,14 +378,28 @@ The CLI reads an optional `.nowlinerc` file (JSON or YAML) from the current dire
 {
   "theme": "dark",
   "defaultFormat": "svg",
-  "width": 1200,
-  "quiet": false
+  "width": 1200
 }
 ```
 
-CLI flags override config file values. The narrow exception is locale (see below): Nowline honors `LC_ALL` / `LC_MESSAGES` / `LANG` because every Unix tool author's `man` page reader, terminal, and OS already does. Other environment variables are not supported in m2 — keep it simple.
+Each recognized key is the default for one flag, resolved flag > `.nowlinerc` > built-in default:
 
-The `defaultFormat` key participates in the format-resolution chain (step 3): used when neither `-f` nor a recognized `-o` extension is present.
+| Key | Flag | Notes |
+|---|---|---|
+| `theme` | `-t, --theme` | Same names and `greyscale` alias as the flag. Also read by `--serve`. |
+| `defaultFormat` | `-f, --format` | Step 3 of the format-resolution chain: used when neither `-f` nor a recognized `-o` extension is present. |
+| `width` | `-w, --width` | Integer ≥ 320. Best-effort maximum canvas width, passed to `LayoutOptions.width` (see [`rendering.md` § Canvas width](./rendering.md#canvas-width)). |
+| `pdfPageSize` | `--page-size` | |
+| `pdfOrientation` | `--orientation` | |
+| `pdfMargin` | `--margin` | A bare number (YAML/JSON number or string) is points. |
+| `fontSans` / `fontMono` | `--font-sans` / `--font-mono` | |
+| `headlessFonts` | `--headless` | Boolean; either source turns it on. |
+| `useSystemFonts` | `--use-system-fonts` | Boolean; either source turns it on. |
+| `locale` | `--locale` | Ranks below the locale environment variables (see below). Also read by `--serve`. |
+
+An invalid rc value is a usage error (exit 2) that names the key, for example `nowline: invalid .nowlinerc theme "sepia". Expected light, dark, or grayscale.`, rather than a flag the user never passed. A valid flag still wins over an invalid key. Unknown keys are ignored.
+
+The one environment input is locale (see below): Nowline honors `LC_ALL` / `LC_MESSAGES` / `LANG` because every Unix tool author's `man` page reader, terminal, and OS already does. Other environment variables are not supported in m2 — keep it simple.
 
 ## Localization
 

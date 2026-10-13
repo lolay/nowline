@@ -31,7 +31,7 @@ import {
 } from '../cli/formats.js';
 import { parseNonWorkingArg } from '../cli/non-working.js';
 import { resolveRenderOutputPath } from '../cli/output-path.js';
-import { parseThemeArg } from '../cli/theme.js';
+import { resolveTheme } from '../cli/theme.js';
 import { parseNowlineJson } from '../convert/parse-json.js';
 import { printNowlineFile } from '../convert/printer.js';
 import { serializeToJson } from '../convert/schema.js';
@@ -49,7 +49,7 @@ import {
     readDirectiveLocale,
     resolveLocaleOverride,
 } from '../i18n/locale.js';
-import { loadConfig } from '../io/config.js';
+import { loadConfig, type NowlineRc } from '../io/config.js';
 import { CliError, ExitCode } from '../io/exit-codes.js';
 import { readInput } from '../io/read.js';
 import { writeOutput } from '../io/write.js';
@@ -118,9 +118,10 @@ export async function renderHandler(options: RenderHandlerOptions): Promise<void
         displayPath: input.displayPath,
         absInputPath: input.isStdin ? path.resolve(cwd, 'stdin.nowline') : input.path,
         isStdin: input.isStdin,
-        theme: parseThemeArg(args.theme),
+        // Every rc-backed setting resolves flag > .nowlinerc > default.
+        theme: resolveTheme(args.theme, config?.theme),
         today: resolveNowCli(args),
-        width: parseWidthArg(args.width),
+        width: parseWidth(pickSetting(args.width, '--width', config, 'width')),
         nonWorking: parseNonWorkingArg(args.nonWorking),
         noLinks: args.noLinks,
         strict: args.strict,
@@ -128,8 +129,8 @@ export async function renderHandler(options: RenderHandlerOptions): Promise<void
         // m2c format-specific options. Strings get parsed inside the format
         // dispatch; the CLI just passes them through.
         pageSize: args.pageSize ?? stringFromConfig(config, 'pdfPageSize'),
-        orientation: args.orientation ?? stringFromConfig(config, 'pdfOrientation'),
-        margin: args.margin ?? stringFromConfig(config, 'pdfMargin'),
+        orientation: pickSetting(args.orientation, '--orientation', config, 'pdfOrientation'),
+        margin: pickSetting(args.margin, '--margin', config, 'pdfMargin'),
         fontSans: args.fontSans ?? stringFromConfig(config, 'fontSans'),
         fontMono: args.fontMono ?? stringFromConfig(config, 'fontMono'),
         headless: args.headless || boolFromConfig(config, 'headlessFonts'),
@@ -216,8 +217,9 @@ interface ProduceArgs {
     assetRoot?: string;
     // m2c format-specific
     pageSize?: string;
-    orientation?: string;
-    margin?: string;
+    /** Parsed after validation, so its error follows any diagnostics. */
+    orientation?: Setting;
+    margin?: Setting;
     fontSans?: string;
     fontMono?: string;
     headless: boolean;
@@ -511,10 +513,7 @@ async function resolveRoutedDiagnostics(
     return legacyError ? [] : diagnostics.filter(isRoutedResolveDiagnostic);
 }
 
-async function loadConfigFor(
-    inputArg: string,
-    cwd: string,
-): Promise<{ defaultFormat?: string } | null> {
+export async function loadConfigFor(inputArg: string, cwd: string): Promise<NowlineRc | null> {
     try {
         if (inputArg === '-') {
             const { config } = await loadConfig(cwd);
@@ -578,24 +577,56 @@ function parseScale(raw: string | undefined): number | undefined {
     return value;
 }
 
-function parseOrientation(raw: string | undefined): 'portrait' | 'landscape' | 'auto' | undefined {
-    if (!raw) return undefined;
-    const lower = raw.toLowerCase();
+/**
+ * A raw setting and the name to report it under: the flag when one was
+ * passed, else the `.nowlinerc` key, so an error points at what the user
+ * actually wrote.
+ */
+interface Setting {
+    raw: unknown;
+    name: string;
+}
+
+function pickSetting(
+    flag: string | undefined,
+    flagName: string,
+    config: NowlineRc | null,
+    rcKey: string,
+): Setting | undefined {
+    if (flag !== undefined) return { raw: flag, name: flagName };
+    const raw = config?.[rcKey];
+    if (raw === undefined || raw === null) return undefined;
+    return { raw, name: `.nowlinerc ${rcKey}` };
+}
+
+function parseOrientation(
+    setting: Setting | undefined,
+): 'portrait' | 'landscape' | 'auto' | undefined {
+    if (!setting || setting.raw === '') return undefined;
+    const lower = typeof setting.raw === 'string' ? setting.raw.toLowerCase() : undefined;
     if (lower === 'portrait' || lower === 'landscape' || lower === 'auto') return lower;
     throw new CliError(
         ExitCode.InputError,
-        `nowline: invalid --orientation "${raw}". Expected portrait, landscape, or auto.`,
+        `nowline: invalid ${setting.name} "${String(setting.raw)}". Expected portrait, landscape, or auto.`,
     );
 }
 
-function parseMargin(raw: string | undefined): number | undefined {
-    if (!raw) return undefined;
-    if (/^\d+(?:\.\d+)?$/.test(raw)) return Number(raw); // bare number → points
+function parseMargin(setting: Setting | undefined): number | undefined {
+    if (!setting || setting.raw === '') return undefined;
+    // A bare number is points; YAML and JSON hand the rc one over as a number.
+    if (typeof setting.raw === 'number' && Number.isFinite(setting.raw) && setting.raw >= 0) {
+        return setting.raw;
+    }
+    const raw = String(setting.raw);
+    if (/^\d+(?:\.\d+)?$/.test(raw)) return Number(raw);
     try {
         return lengthToPoints(parseLength(raw));
     } catch (err) {
         const message = err instanceof Error ? err.message : String(err);
-        throw new CliError(ExitCode.InputError, `nowline: invalid --margin "${raw}": ${message}`);
+        throw new CliError(
+            ExitCode.InputError,
+            `nowline: invalid ${setting.name} "${raw}": ${message}`,
+        );
     }
 }
 
@@ -614,13 +645,14 @@ function boolFromConfig(config: { [key: string]: unknown } | null, key: string):
     return value === true;
 }
 
-function parseWidthArg(raw: string | undefined): number | undefined {
-    if (!raw) return undefined;
-    const value = parseInt(raw, 10);
-    if (!Number.isFinite(value) || value < 320) {
+function parseWidth(setting: Setting | undefined): number | undefined {
+    if (!setting || setting.raw === '') return undefined;
+    const { raw } = setting;
+    const value = typeof raw === 'number' ? raw : typeof raw === 'string' ? parseInt(raw, 10) : NaN;
+    if (!Number.isInteger(value) || value < 320) {
         throw new CliError(
             ExitCode.InputError,
-            `nowline: invalid --width "${raw}". Must be an integer ≥ 320.`,
+            `nowline: invalid ${setting.name} "${String(raw)}". Must be an integer ≥ 320.`,
         );
     }
     return value;

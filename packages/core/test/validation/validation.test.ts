@@ -1512,8 +1512,8 @@ describe('raw style and symbol codes', () => {
     }
 });
 
-// Rule 20: header-height, timeline-position, minor-grid and non-working are
-// read only from the roadmap's style. On another entity's `default` line they
+// Rule 20: header-height, header-position, timeline-position, minor-grid and
+// non-working are read only from the roadmap's style. On another entity's `default` line they
 // do nothing, so they warn (NL.W0703). Style blocks are left alone: one block
 // can serve the roadmap and other entities alike.
 describe('NL.W0703: roadmap-only style key on another default', () => {
@@ -1530,6 +1530,7 @@ describe('NL.W0703: roadmap-only style key on another default', () => {
         ['swimlane', 'non-working:show'],
         ['group', 'header-height:lg'],
         ['milestone', 'timeline-position:both'],
+        ['swimlane', 'header-position:above'],
     ])('warns on default %s %s', async (entity, prop) => {
         const key = prop.split(':')[0];
         const r = await parse(`config\ndefault ${entity} ${prop}\n${body}`);
@@ -1552,7 +1553,7 @@ describe('NL.W0703: roadmap-only style key on another default', () => {
 
     it('stays clean on default roadmap', async () => {
         const r = await parse(
-            `config\ndefault roadmap minor-grid:true non-working:show header-height:lg timeline-position:both\n${body}`,
+            `config\ndefault roadmap minor-grid:true non-working:show header-height:lg header-position:above timeline-position:both\n${body}`,
         );
         expect(errorMessages(r.diagnostics)).toEqual([]);
         expect(warningMessages(r.diagnostics)).toEqual([]);

@@ -1,6 +1,11 @@
 export type { CalendarConfig, CalendarMode } from './calendar.js';
 export { type ResolvedCalendar, resolveWorkingCalendar } from './calendar-resolver.js';
 export {
+    type CappedPixelsPerDayInput,
+    cappedPixelsPerDay,
+    MIN_PIXELS_PER_DAY,
+} from './canvas-width.js';
+export {
     estimateCapacitySuffixWidth,
     formatCapacityNumber,
     parseCapacityValue,
