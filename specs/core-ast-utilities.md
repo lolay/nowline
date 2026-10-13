@@ -1,6 +1,6 @@
 # Nowline — Core AST, Style and Calendar Utilities
 
-**Status: Proposed (design only, no code yet).** Proposed milestone ID: **m4.12** (not yet entered in [`milestones.md`](./milestones.md)). This is refactor R3 from [`review-since-v086.md`](./review-since-v086.md): a small utility layer in `@nowline/core` so that the content walk, the style precedence chain, the calendar-declaration classifier and the property helpers each live once. Every `file:line` below was checked at the commit that adds this spec (source identical to 0062df3 plus the m2 fixes of the same review).
+**Status: Accepted (design only, no code yet).** Milestone **m4.12** in [`milestones.md`](./milestones.md); decisions in the last section. This is refactor R3 from [`review-since-v086.md`](./review-since-v086.md): a small utility layer in `@nowline/core` so that the content walk, the style precedence chain, the calendar-declaration classifier and the property helpers each live once. Every `file:line` below was checked at the commit that adds this spec (source identical to 0062df3 plus the m2 fixes of the same review).
 
 ## 1. Problem
 
@@ -80,13 +80,13 @@ The LSP copies say why they exist: "kept as a literal here so the LSP doesn't ha
 - Generating the TextMate grammar or LSP completion lists from the grammar (R6). This spec only makes the tables importable.
 - Changing the AST, the grammar or the JSON schema.
 - Moving the working calendar (`WorkingCalendar`) into core. Only the declaration classifier moves.
-- Removing exports from `@nowline/core` without a decision (open question 2).
+- Removing other exports from `@nowline/core`. Only `effectiveWave` and `leadWave` go (§7, decision 2).
 
 ## 3. Design
 
 ### 3.1 `ast-walk.ts`
 
-A new `packages/core/src/language/ast-walk.ts` depends only on `../generated/ast.js`. It is exported from `@nowline/core`.
+A new `packages/core/src/language/ast-walk.ts` depends only on `../generated/ast.js`. It is exported from the `@nowline/core/internal` subpath (§7, decision 3).
 
 ```ts
 /** A node that sits on a swimlane track. */
@@ -246,7 +246,7 @@ The three copies agree on every shape the grammar can produce (a bracket list ha
 
 ### 3.5 Property helpers, date pattern and value tables
 
-A new `packages/core/src/util/props.ts`, exported from `@nowline/core`:
+A new `packages/core/src/util/props.ts`, exported from `@nowline/core/internal`:
 
 ```ts
 /** `prop.key` without a trailing `:`. Keys from the parser never carry one; hand-built ASTs may. */
@@ -260,7 +260,7 @@ export function propValues(props: readonly EntityProperty[], key: string): strin
 
 /** `YYYY-MM-DD`. */
 export const ISO_DATE_RE: RegExp;
-/** UTC midnight of `YYYY-MM-DD`, or null (layout's `parseDate`: rolls `02-30` over, as today). */
+/** UTC midnight of `YYYY-MM-DD` that names a real calendar day, or null (`02-30` is null; no roll-over). */
 export function parseIsoDate(raw: string | undefined): Date | null;
 /** `YYYY-MM-DD` that names a real calendar day (the validator's strict check). */
 export function isRealIsoDate(raw: string): boolean;
@@ -271,7 +271,7 @@ and a `packages/core/src/language/value-tables.ts` with `BUILTIN_STATUSES`, `BUI
 - Every listed copy (§1.5) imports these instead. Each keeps its current semantics; where two copies differ (`export-core`'s `getProp` returns the first list element, layout's `propValue` does not), the caller keeps its own function built on `findProp`.
 - `printer.ts` keeps its strip: it formats hand-written JSON whose keys may end in `:`. It uses `propKey`.
 - `@nowline/preview-shell` keeps its inline regex (`mount.ts:1537`): it deliberately has no engine dependency ([`architecture.md`](./architecture.md), preview-shell entry).
-- `parseIsoDate` keeps the roll-over behaviour of `dsl-utils.ts:24-30`; making it strict would move renders and is out of scope.
+- `parseIsoDate` is strict (§7, decision 4): it drops the roll-over of `dsl-utils.ts:24-30`, so layout reads `2026-02-30` as no date, the same as the validator. Only callers that skip validation can see the difference; the step that switches layout to it is marked *behaviour*, carries a `fixed` fragment, and G1 confirms no sample relies on roll-over.
 
 ### 3.6 The validator split
 
@@ -325,7 +325,7 @@ No step adds a changelog fragment: nothing observable changes.
 
 #### s1 - Add `ast-walk.ts`
 
-Add the module (§3.1) and its tests, including equivalence tests that run each new function and the copy it will replace over every sample and the core validation fixtures and compare the results (ids, order, owners). No caller changes.
+Add the `./internal` entry to `packages/core/package.json` `exports` (with `src/internal.ts` re-exporting this step's module and, in later steps, `style-chain.ts`, `calendar-declarations.ts`, `props.ts` and `value-tables.ts`; §7, decision 3). Add the module (§3.1) and its tests, including equivalence tests that run each new function and the copy it will replace over every sample and the core validation fixtures and compare the results (ids, order, owners). No caller changes.
 
 #### s2 - Move the validator and the resolver onto it
 
@@ -343,7 +343,7 @@ Switch `registerEntity`, `visitPropertiesDeep`, `collectReferenceableIds`, the r
 
 #### s1 - Property helpers and the date pattern
 
-Add `util/props.ts` (§3.5) and replace the copies listed in §1.5, package by package. G1, G2, G3.
+Add `util/props.ts` (§3.5) and replace the copies listed in §1.5, package by package. Layout's date parsing moves to the strict `parseIsoDate` in its own commit, marked *behaviour* with a `fixed` fragment. G1, G2, G3.
 
 #### s2 - The style chain
 
@@ -367,9 +367,9 @@ Move `tables.ts` and `support.ts` out of `nowline-validator.ts`. Pure move. G1, 
 
 Move the check bodies into the modules of §3.6, one module per commit within the PR; `NowlineValidator` forwards. Pure move. G1, G2, G3.
 
-#### s3 - Deprecate the unused wave exports
+#### s3 - Remove the unused wave exports
 
-Mark `effectiveWave` and `leadWave` (`waves.ts:210-267`, exported at `core/src/index.ts:55` and `:59`) `@deprecated` in favour of `assignWaves`; only `packages/core/test/validation/waves.test.ts` calls them. Removal follows open question 2. G2.
+Delete `effectiveWave` and `leadWave` (`waves.ts:210-267`, exported at `core/src/index.ts:55` and `:59`); `assignWaves` covers both. Only `packages/core/test/validation/waves.test.ts` calls them: its agreement test (`assignWaves agrees with effectiveWave and leadWave`) becomes direct expectations on `assignWaves`, and the two rows go from the helper table in [`waves.md`](./waves.md). A `removed` changelog fragment, since the package is published. G1, G2.
 
 ## 5. Test strategy
 
@@ -385,12 +385,14 @@ Mark `effectiveWave` and `leadWave` (`waves.ts:210-267`, exported at `core/src/i
 | A walk change reorders diagnostics (rule 2 duplicates, cycle reports) | the walk keeps source order; G3 compares the JSON diagnostics byte for byte, in both locales |
 | A copy had a deliberate difference that the shared function erases | the equivalence tests run before each copy is deleted; a difference found there is kept as a caller-side filter and noted in the PR |
 | The validator split breaks Langium's method binding or check order | the class keeps every method name and `registerValidationChecks` is untouched; G3 |
-| New core exports become public API that is hard to change | they are small, pure and named after what they already do; nothing observable changes, so no changelog fragment, but `packages/core/README.md` documents them |
+| New core exports become public API that is hard to change | they ship under `@nowline/core/internal`, documented in `packages/core/README.md` as unstable and for the other `@nowline/*` packages, which version in lock-step; nothing observable changes, so no changelog fragment |
 | `preview-shell`, which reaches the engine only through type-only imports, starts importing core at runtime | the exception is written down (§3.5); m2.s1 leaves `mount.ts` alone |
 
-## 7. Open questions for Gary
+## 7. Decisions
 
-1. **Milestone ID.** `m4.12`, after `m4.11` for [`scheduler-unification.md`](./scheduler-unification.md) (R1)? *Recommendation:* yes. R1 and R3 do not depend on each other; whichever lands second uses the other's helpers (R1's start-term parser uses `props.ts` when it exists).
-2. **Removing `effectiveWave` and `leadWave`.** They are public `@nowline/core` exports with no caller outside core's own tests. *Recommendation:* deprecate in m3.s3 and remove in the next minor release with a `removed` changelog fragment; nothing in this repo uses them, but the package is published.
-3. **Publishing the new helpers.** `ast-walk.ts`, `style-chain.ts`, `calendar-declarations.ts`, `props.ts` and `value-tables.ts` must be exported from `@nowline/core` for layout and the LSP to use them. *Recommendation:* export them as supported API; the alternative, a `@nowline/core/internal` subpath, adds a second surface to keep stable anyway.
-4. **Strict dates in layout.** `parseIsoDate` keeps today's roll-over (`2026-02-30` is read as 2 March) because the validator already rejects such dates for every key that matters. *Recommendation:* leave it; making it strict would change renders of invalid files only, and belongs with R6's single value-validation pass if ever.
+Gary, 2026-10-13:
+
+1. **Milestone ID.** Yes: m4.12. R1 (m4.11) and R3 do not depend on each other; whichever lands second uses the other's helpers.
+2. **`effectiveWave` and `leadWave`.** Remove them in m3.s3, with no deprecation step: nothing outside core's own tests calls them. A `removed` fragment covers the published package.
+3. **Publishing the new helpers.** Through a `@nowline/core/internal` subpath, documented as unstable, not as supported `@nowline/core` API. Every consumer is another `@nowline/*` package in lock-step. This reverses the draft's recommendation.
+4. **Strict dates in layout.** Make `parseIsoDate` strict, so layout agrees with the validator on impossible dates (§3.5). This reverses the draft's recommendation.

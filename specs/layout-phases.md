@@ -1,6 +1,6 @@
 # Nowline — Layout Phases
 
-**Status: Proposed (design only, no code yet).** Proposed milestone ID: **m4.14** (not yet entered in [`milestones.md`](./milestones.md)). This is refactor R2 from [`review-since-v086.md`](./review-since-v086.md): split `RoadmapNode.place` into date-window, measure, place and finalize phases, so the post-placement fixups run as one ordered pass over an explicit context. It builds on [`rendering-v2.md`](./rendering-v2.md) (m2.5c, the measure/place node model) and on [`scheduler-unification.md`](./scheduler-unification.md) (R1, one day-level scheduler). Every `file:line` below was checked at the commit that adds this spec (source identical to 0062df3 plus the m2 fixes of the same review).
+**Status: Accepted (design only, no code yet).** Milestone **m4.14** in [`milestones.md`](./milestones.md); decisions in the last section. This is refactor R2 from [`review-since-v086.md`](./review-since-v086.md): split `RoadmapNode.place` into date-window, measure, place and finalize phases, so the post-placement fixups run as one ordered pass over an explicit context. It builds on [`rendering-v2.md`](./rendering-v2.md) (m2.5c, the measure/place node model) and on [`scheduler-unification.md`](./scheduler-unification.md) (R1, one day-level scheduler). Every `file:line` below was checked at the commit that adds this spec (source identical to 0062df3 plus the m2 fixes of the same review).
 
 ## 1. Problem
 
@@ -389,7 +389,7 @@ export function sequenceRowTrack(
 
 `SwimlaneNode` keeps its tab and top-pad logic and `GroupNode` its chiclet, header band and box; both call `sequenceRowTrack` and read `usedHeight`, `usedRightX` and `timeCursorX` from the result.
 
-**Helpers.** m1.s2 replaces the four node `*Deps` with `LayoutHelpers` and drops `ownerOverride`. As code leaves `layout.ts`, the members become direct imports: `newCursor` (`layout-context.ts`), `estimateTextWidth` (`text-measure.ts`), `sequenceItem` (`nodes/item-node.ts`), `resolveChildStart` (a `start-rules.ts` beside R1's `start-terms.ts`), and `predictItemBarExtraHeight` goes. `RoadmapNodeDeps` goes when its five helpers move into phase modules (`date-window.ts`, `header-node.ts`, `dependency-edges.ts`, `nowline-node.ts`, `collectItems` with the edges). What remains injected is `sequenceOne`, the dispatcher that groups and parallels call for nested blocks; importing it would form a group, parallel and dispatcher cycle (open question 4).
+**Helpers.** m1.s2 replaces the four node `*Deps` with `LayoutHelpers` and drops `ownerOverride`. As code leaves `layout.ts`, the members become direct imports: `newCursor` (`layout-context.ts`), `estimateTextWidth` (`text-measure.ts`), `sequenceItem` (`nodes/item-node.ts`), `resolveChildStart` (a `start-rules.ts` beside R1's `start-terms.ts`), and `predictItemBarExtraHeight` goes. `RoadmapNodeDeps` goes when its five helpers move into phase modules (`date-window.ts`, `header-node.ts`, `dependency-edges.ts`, `nowline-node.ts`, `collectItems` with the edges). What remains injected is `sequenceOne`, the dispatcher that groups and parallels call for nested blocks; importing it would form a group, parallel and dispatcher cycle, so it stays injected (§8, decision 4).
 
 **Context builder.** Both literals become one function in `layout-context.ts`:
 
@@ -563,7 +563,7 @@ Add `phases/finalize.ts`: `FinalizeContext`, `CanvasExtent` with `freeze`, the s
 
 #### s1 - *Behaviour:* reserve the now-pill row on an extended axis
 
-f7 becomes `growHeaderRows` in full: when f2 brought `today` into the axis and the pill row is 0, the header rows grow by `NOW_PILL_HEIGHT_PX` above the tick panel, so the tick panel, wave strip, marker band and chart move down together, in the same shift as the marker-band growth; the new timeline y follows the beside-card rule of today's 511 rather than adding the height blindly (open question 2). Regression test from the L2 repro; no sample changes. Fragment `fixed`. G1, G2.
+f7 becomes `growHeaderRows` in full: when f2 brought `today` into the axis and the pill row is 0, the header rows grow by `NOW_PILL_HEIGHT_PX` above the tick panel, so the tick panel, wave strip, marker band and chart move down together, in the same shift as the marker-band growth; the new timeline y follows the beside-card rule of today's 511 rather than adding the height blindly (§8, decision 2). Regression test from the L2 repro; no sample changes. Fragment `fixed`. G1, G2.
 
 #### s2 - Update the specs
 
@@ -571,7 +571,7 @@ f7 becomes `growHeaderRows` in full: when f2 brought `today` into the axis and t
 
 ## 5. Follow-ups outside this migration
 
-Each changes rendered bytes, so none belongs to the byte-identical plan. Each is one PR with a deliberate snapshot bump and a changelog fragment.
+Each changes rendered bytes, so none belongs to the byte-identical plan. They still belong to m4.14: each lands with whichever planned step it combines with best, and that PR names the snapshot bump and carries a changelog fragment.
 
 | # | Change | Changes | Evidence |
 |---|---|---|---|
@@ -601,9 +601,11 @@ Each changes rendered bytes, so none belongs to the byte-identical plan. Each is
 | `Theme` is a published type, and a third party that builds its own `Theme` literal fails to compile | the change is additive; the DSL has no custom themes, and nothing in this repo builds a `Theme` outside the three built-ins |
 | The guards throw in production | the order is static, so a guard fires only on a code change, and every layout runs every step in the tests |
 
-## 8. Open questions for Gary
+## 8. Decisions
 
-1. **Milestone ID.** `m4.14` for this work, after `m4.11` (R1), `m4.12` (R3) and `m4.13` (R4)? *Recommendation:* yes, and schedule it after R1 m2 as the review's priority order already implies.
-2. **L2, the now-line on an extended axis.** Reserve the pill row and shift the chart (m6.s1 as written), or draw no now-line when `today` is outside the natural window and let NL.W1000 compare with the natural window too? *Recommendation:* reserve the row; the axis visibly covers today, so the line belongs there.
-3. **F1, the beside card.** Fix it after m5, changing `dependencies`, `late-row-shifts` and `marker-left-overflow` and two snapshots? *Recommendation:* yes; the code's own comment says the card hugs the header rows.
-4. **The last injected helper.** Keep `sequenceOne` injected, or import it and accept a runtime-safe ESM cycle between `group-node.ts`, `parallel-node.ts` and the dispatcher? *Recommendation:* keep it injected; one callback costs less than a cycle the next reader has to reason about.
+Gary, 2026-10-13:
+
+1. **Milestone ID.** Yes: m4.14, scheduled after R1 m2 ([`scheduler-unification.md`](./scheduler-unification.md) §8, decision 4).
+2. **L2, the now-line on an extended axis.** Reserve the pill row and shift the chart (m6.s1 as written).
+3. **F1, the beside card.** Yes: fix it after m5. It changes `dependencies`, `late-row-shifts` and `marker-left-overflow` and two snapshots, and lands with whichever planned step it combines with best; that PR names the bumps.
+4. **The last injected helper.** Keep `sequenceOne` injected.
