@@ -1,7 +1,7 @@
 ```
 --- KICKOFF: begin orchestration at [deep] ---
 
-  Status: 10/10 groups done | last review: wave-7 CONCERNS | current: nowline m6 s3 [exec] fix-up 7-fix | updated 2026-10-13 | over expected: ~$63.54 of ~$46
+  Status: 10/10 groups done | last review: wave-7-fix CONCERNS | current: nowline m6 s3 [exec] fix-up 7-fix2 | updated 2026-10-13 | passed unattended: gate 1 (fix-up 2 of 2) | over expected: ~$65.39 of ~$46
 
   mode: unattended | proposed unattended (harness=claude-code runner=cloud; CLAUDE_CODE_REMOTE=true, assigned branch) | guard 3x min $50 | fixups 2 | confirmed 2026-10-13 session 7e027fcc-1ca6-51b0-b005-63e1163df819 by Kickoff prompt: Run in unattended mode.
 
@@ -39,6 +39,7 @@
 | 6 [deep] m3 s3, m4 s1-s2, m5 s1-s5, m6 s1-s2 | ~38M | ~$20 |
 | 7 [exec] m6 s3 | ~2.0M | ~$0.89 |
 | 7-fix [exec] nowline m6 s3 | — | — |
+| 7-fix2 [exec] nowline m6 s3 | — | — |
 | orchestrator | ~21M | ~$17 |
 | **Total** | ~76M | ~$46 |
 
@@ -199,6 +200,7 @@ review wave-6 (nowline m4 s1-s2) af7a82e..bc8e31d: PASS - HeaderNode/MeasuredHea
 review wave-6 (nowline m5 s1-s5) dad67df..56d00f7: PASS - reviewer re-ran the gate script vs 9c71cbb: GATES PASSED, layout vitest 1282 pass, lint 9 pre-existing warnings; f2-f16 match old P7-P20 at dad67df; moved bodies verbatim (diff -w) apart from export and N5; order check and four guard tests present; coverage register over 60 samples, §1.2 deltas listed in the m5.s4 body (f1 29/26, f2 7/6, f4 35/32 from R1's F1; f6 7/9 by definition); sequenceItem in nodes/sequence-item.ts to avoid an import cycle; minor: module-level setFinalizeTrace, readdir sample list, boolean FinalizeStep.run, CanvasExtent.provisional; passed unattended: gate 4 - 2026-10-13
 review wave-6 (nowline m6 s1-s2) ab6488c..c064e10: PASS - L2 reproduced on the base (pillRowHeight 0, pillTopY = tickPanelY = 8) and fixed (pill row 16, rows and chart shift by 16); shared headerRowsTimelineY beside-card rule; f5 packs the marker band at its final top (deviation in mechanism, same outcome); F1: estimatedRowsBottomY gone, f15 reads the guarded rowsBottom slot; gate with --expect showed exactly the nine declared renders, snapshots dependencies.svg and marker-left-overflow.svg, dependencies svg/html/png/pdf golden cells; card bottoms 74->100 and 100->126 equal the rows bottom; layout vitest 1292 pass, snapshot 52 pass, lint 9 warnings, bundle 199.86 KB of 200; passed unattended: gate 4 - 2026-10-13
 review wave-7 (nowline m6 s3) 1a119bc..529fcc4: CONCERNS - specs/layout-phases.md:664 (§9 As built, Header bullet) says f15 builds `{ ...headerParts, attributionBox }` after f16 computes the box, but f15 runs before f16 and stores only the header parts (finalize.ts:905-911); f16 sets draft.attributionBox (finalize.ts:940) and assembleModel merges the two after the pass (finalize.ts:1078-1081); the sentence should say the model assembly merges them. Everything else checked against the code and holds; gate log GATES PASSED vs 303b502 with the nine F1 paths, pre-commit green, bundle 180.20 KB - 2026-10-13
+review wave-7-fix (nowline m6 s3) 1a119bc..0a188c7: CONCERNS - the corrected claim matches finalize.ts (f15 stores only draft.header, f16 sets draft.attributionBox, assembleModel merges them) and is not repeated elsewhere, but the fixed sentence at specs/layout-phases.md:664 is now a run-on: the closing parenthesis after `(`PositionedHeader` without `attributionBox`)` runs straight into `f15 stores only those parts`; a semicolon or period after the parenthesis fixes it; passed unattended: gate 1 (fix-up 2 of 2) - 2026-10-13
 
 ## Token log
 
@@ -241,3 +243,6 @@ tokens merge-main nowline-merge-r3 (claude-opus-5-5): input ~78 / cache read ~3.
 tokens orchestrator-wave-6 nowline-m6-s1-s2 (claude-opus-5-5): input ~38 / cache read ~5.3M / cache write ~0 5m + ~42k 1h / output ~21k | ~$1.80 API-equiv
 tokens wave-7 nowline-m6-s3 (claude-sonnet-5-5): input ~90 / cache read ~7.1M / cache write ~210k / output ~45k | ~$2.39 API-equiv (output est.) session 7e027fcc-1ca6-51b0-b005-63e1163df819
 tokens review-wave-7 nowline-m6-s3 (claude-opus-5-5): input ~36 / cache read ~910k / cache write ~71k / output ~17k | ~$0.88 API-equiv (output est.) session 7e027fcc-1ca6-51b0-b005-63e1163df819
+tokens orchestrator-wave-7 nowline-m6-s3 (claude-opus-5-5): input ~20 / cache read ~3.5M / cache write ~0 5m + ~28k 1h / output ~6.7k | ~$1.06 API-equiv
+tokens wave-7-fix nowline-m6-s3 (claude-sonnet-5-5): input ~38 / cache read ~1.3M / cache write ~34k / output ~17k | ~$0.51 API-equiv (output est.) session 7e027fcc-1ca6-51b0-b005-63e1163df819
+tokens review-wave-7-fix nowline-m6-s3 (claude-opus-5-5): input ~14 / cache read ~120k / cache write ~23k / output ~6.9k | ~$0.28 API-equiv (output est.) session 7e027fcc-1ca6-51b0-b005-63e1163df819
