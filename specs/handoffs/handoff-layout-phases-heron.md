@@ -3,7 +3,7 @@
 - **Plan:** `specs/handoffs/plan-layout-phases-heron.md`
 - **Branch:** `claude/vibrant-hopper-ac4s73` (harness-assigned task branch; started at ff8eb8b, fast-forwarded to `origin/main` 4498948 at kickoff, no commits of its own before this one)
 - **Mode:** unattended (confirmed 2026-10-13, session 7e027fcc-1ca6-51b0-b005-63e1163df819; harness=claude-code runner=cloud)
-- **Status:** waves 1-6 PASS (m1-m5, m6 s1-s2); `main` (R3 #153, #154) merged at 7a589fc. Dispatching wave 7 (m6 s3).
+- **Status:** every step done; wave 7 (m6 s3) review CONCERNS (one wrong sentence in §9). Dispatching fix-up 7-fix.
 
 ## What's done
 
@@ -32,6 +32,7 @@
 - wave-6 m5 unit (nowline m5 s1-s5) dad67df..56d00f7: PASS. m5.s1 d846fa3 (`phases/date-window.ts`), m5.s2 48b8a4f (`phases/measure.ts`, one marker entry assembly), m5.s3 a8e0bf9 (`phases/place.ts`, N5), m5.s4 82b47c6 (`phases/finalize.ts`, f1-f16 table, guards, coverage register), m5.s5 56d00f7 (`RoadmapNode.place` is four calls; `RoadmapNodeDeps` gone). G1/G3 empty vs 9c71cbb.
 - wave-6 m6 unit (nowline m6 s1-s2) ab6488c..c064e10: PASS. m6.s1 18d3b1c (L2: now-pill row reserved on an extended axis; fragment created; no sample changes), m6.s2 c064e10 (F1: beside card hugs the final rows bottom; changed exactly the nine renders `examples/dependencies`, `tests/late-row-shifts`, `tests/marker-left-overflow` x light/dark/grayscale, snapshots `dependencies.svg` and `marker-left-overflow.svg`, determinism golden cells `dependencies` svg/html/png/pdf).
 - Merge of `main` 303b502 (R3 #153, #154) at 7a589fc, by a delegated subagent: conflicts in `layout.ts` and `roadmap-node.ts` kept this branch's structure; R3 hunks ported into moved code (`collectItems` on `trackNodes` in `dependency-edges.ts`; `parseIsoDate` in `sequence-item.ts`, `marker-band.ts`, `milestone-node.ts`; `findProp` in `phases/date-window.ts`, local `stripColon` removed); `sequenceRowTrack` now iterates with `trackChildren` (callers pass the container). Gates: script with `--expect .scratch/f1-expect.txt` vs 303b502 showed exactly the nine F1 paths; compile and determinism 314/314 with no golden change; `make pre-commit` green; bundle 180.20 KB (parent re-ran it).
+- wave-7 (nowline m6 s3) 1a119bc..529fcc4: CONCERNS. m6.s3 529fcc4 (spec updates, `layout-phases.md` implemented with §9 As built). The review found one wrong sentence: §9's Header bullet says f15 merges the attribution box after f16, but `assembleModel` merges them after the pass. Fix-up 7-fix (automatic, first CONCERNS, no gate).
 
 ## Milestone m5 summary (milestone handoff)
 
@@ -63,18 +64,18 @@ m1 is done: status tints are theme tokens (`Theme.statusTint`, applied by a loca
 - Gate 4 (m4 to m5) passed as a checkpoint before wave 6's m5 unit; m4 summary kept in this handoff.
 - Gate 4 (m5 to m6) passed as a checkpoint before wave 6's m6 unit; m5 summary kept in this handoff.
 - m6.s1: f5 packs the marker band at its final header-rows top instead of f7 moving it (the band is final after f5 under the slot rules); same outcome as the spec, different mechanism. The beside-card rule applies to the pill-row part only; marker-band growth keeps today's behaviour.
-- Gary asked to merge `main` (R3 #153 and #154 landed). The merge waits for the m6 unit, then a delegated general-purpose subagent resolves it (code conflicts in `layout.ts` and `roadmap-node.ts`, plus R3's edits to code m5 moved into new modules), since the parent does no source edits; it is not a plan step and gets no Review log line, but its gate results are recorded here.
+- Gary asked to merge `main` (R3 #153 and #154 landed). Main gained #156 and #155 during wave 7; they merge after the fix-up so the fix-up's range holds no merge commit. The merge waits for the m6 unit, then a delegated general-purpose subagent resolves it (code conflicts in `layout.ts` and `roadmap-node.ts`, plus R3's edits to code m5 moved into new modules), since the parent does no source edits; it is not a plan step and gets no Review log line, but its gate results are recorded here.
 - Spend passed the Cost table's expected total (~$49.29 of ~$46) after the m5 unit (~$17.10 against the wave-6 row's ~$20 for four units); not a stop, guard is $138.
 - m5's worker probed a built 6513424 tree in `.scratch/probe/t0` (deleted) and temporarily patched the cached `.scratch/g1/base-9c71cbb19e8e` build with stderr probe lines to reconcile the coverage register with §1.2, then restored it; the cached base renders were not touched and the reviewer's gate run passed against that base.
 - m3.s3's worker briefly copied two test files into the gitignored `.scratch/g1/base-4498948` tree while checking its tests fail on the base, then removed them; inside the working directory, nothing tracked touched.
 
 ## Spend
 
-~$58.47 of ~$46 expected (over expected; guard $138) (guard 3x min $50 = $138). Wave 1 ran ~$2.85 against ~$0.75 expected (cold gate-script build, 5-minute gate runs); later waves' gate runs are warm.
+~$63.54 of ~$46 expected (over expected; guard $138) (guard 3x min $50 = $138). Wave 1 ran ~$2.85 against ~$0.75 expected (cold gate-script build, 5-minute gate runs); later waves' gate runs are warm.
 
 ## Next unit
 
-Wave 7 [exec] m6 s3 (spec updates), then completion.
+Fix-up 7-fix [exec] (the §9 Header sentence), then completion: merge `main` (64316f6 #156, 23f2644 #155, both clean, touch `resolve-today.ts` and `inline-date-pin-geometry.ts`), gates, final commit removing the run files, then ask about the PR.
 
 ## How to resume
 

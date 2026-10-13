@@ -1,7 +1,7 @@
 ```
 --- KICKOFF: begin orchestration at [deep] ---
 
-  Status: 9/10 groups done | last review: wave-6 PASS | current: nowline m6 s3 [exec] | updated 2026-10-13 | passed unattended: gate 4 before wave 6 (m6) | over expected: ~$58.47 of ~$46
+  Status: 10/10 groups done | last review: wave-7 CONCERNS | current: nowline m6 s3 [exec] fix-up 7-fix | updated 2026-10-13 | over expected: ~$63.54 of ~$46
 
   mode: unattended | proposed unattended (harness=claude-code runner=cloud; CLAUDE_CODE_REMOTE=true, assigned branch) | guard 3x min $50 | fixups 2 | confirmed 2026-10-13 session 7e027fcc-1ca6-51b0-b005-63e1163df819 by Kickoff prompt: Run in unattended mode.
 
@@ -38,6 +38,7 @@
 | 5 [exec] m3 s1-s2 | ~1.6M | ~$0.75 |
 | 6 [deep] m3 s3, m4 s1-s2, m5 s1-s5, m6 s1-s2 | ~38M | ~$20 |
 | 7 [exec] m6 s3 | ~2.0M | ~$0.89 |
+| 7-fix [exec] nowline m6 s3 | — | — |
 | orchestrator | ~21M | ~$17 |
 | **Total** | ~76M | ~$46 |
 
@@ -174,7 +175,7 @@ F1 (spec §5, §8 decision 3). f15 passes the final header-rows bottom, after f7
 
 --- WAVE 7 [exec] ---
 
-#### s3 - [exec] Update the specs
+#### s3 - [exec] Update the specs (done)
 
 Docs only. `specs/rendering-v2.md` (the phases, which nodes measure, the header answer to `rendering-v2.md:292`), `specs/rendering.md` where it describes the extension pass, `specs/waves.md` §8.4 (the pass-loop order names the finalize steps), the header comment of `packages/layout/src/nodes/renderable.ts`, `specs/layout-phases.md` status to implemented with a "§9 As built" section (deviations from the spec text found in m1-m6, in the style of `scheduler-unification.md` §9), and the `specs/milestones.md` m4.14 entry. Run the gate with `--expect` holding m6.s2's nine renders. G2.
 
@@ -197,6 +198,7 @@ review wave-6 (nowline m3 s3) cb898b5..3112f70: PASS - reviewer re-ran the gate 
 review wave-6 (nowline m4 s1-s2) af7a82e..bc8e31d: PASS - HeaderNode/MeasuredHeader/HeaderFrame/PositionedHeaderParts per §3.7; sizeBesideHeader, HEADER_CARD_OUTER_PAD, HEADER_CARD_TOP_INSET moved verbatim; timelineY operands unchanged; provisional header box dropped (every path overwrote it, named in the body); key order kept, attributionBox added last; estimatedRowsBottomY rename for L1; header tests 69 pass, tsc clean; G1/G3 empty per worker; passed unattended: gate 4 - 2026-10-13
 review wave-6 (nowline m5 s1-s5) dad67df..56d00f7: PASS - reviewer re-ran the gate script vs 9c71cbb: GATES PASSED, layout vitest 1282 pass, lint 9 pre-existing warnings; f2-f16 match old P7-P20 at dad67df; moved bodies verbatim (diff -w) apart from export and N5; order check and four guard tests present; coverage register over 60 samples, §1.2 deltas listed in the m5.s4 body (f1 29/26, f2 7/6, f4 35/32 from R1's F1; f6 7/9 by definition); sequenceItem in nodes/sequence-item.ts to avoid an import cycle; minor: module-level setFinalizeTrace, readdir sample list, boolean FinalizeStep.run, CanvasExtent.provisional; passed unattended: gate 4 - 2026-10-13
 review wave-6 (nowline m6 s1-s2) ab6488c..c064e10: PASS - L2 reproduced on the base (pillRowHeight 0, pillTopY = tickPanelY = 8) and fixed (pill row 16, rows and chart shift by 16); shared headerRowsTimelineY beside-card rule; f5 packs the marker band at its final top (deviation in mechanism, same outcome); F1: estimatedRowsBottomY gone, f15 reads the guarded rowsBottom slot; gate with --expect showed exactly the nine declared renders, snapshots dependencies.svg and marker-left-overflow.svg, dependencies svg/html/png/pdf golden cells; card bottoms 74->100 and 100->126 equal the rows bottom; layout vitest 1292 pass, snapshot 52 pass, lint 9 warnings, bundle 199.86 KB of 200; passed unattended: gate 4 - 2026-10-13
+review wave-7 (nowline m6 s3) 1a119bc..529fcc4: CONCERNS - specs/layout-phases.md:664 (§9 As built, Header bullet) says f15 builds `{ ...headerParts, attributionBox }` after f16 computes the box, but f15 runs before f16 and stores only the header parts (finalize.ts:905-911); f16 sets draft.attributionBox (finalize.ts:940) and assembleModel merges the two after the pass (finalize.ts:1078-1081); the sentence should say the model assembly merges them. Everything else checked against the code and holds; gate log GATES PASSED vs 303b502 with the nine F1 paths, pre-commit green, bundle 180.20 KB - 2026-10-13
 
 ## Token log
 
@@ -236,3 +238,6 @@ tokens orchestrator-wave-6 nowline-m5-s1-s5 (claude-opus-5-5): input ~26 / cache
 tokens wave-6 nowline-m6-s1-s2 (claude-opus-5-5): input ~130 / cache read ~10M / cache write ~220k / output ~65k | ~$4.42 API-equiv (output est.) session 7e027fcc-1ca6-51b0-b005-63e1163df819
 tokens review-wave-6 nowline-m6-s1-s2 (claude-opus-5-5): input ~62 / cache read ~1.7M / cache write ~76k / output ~29k | ~$1.32 API-equiv (output est.) session 7e027fcc-1ca6-51b0-b005-63e1163df819
 tokens merge-main nowline-merge-r3 (claude-opus-5-5): input ~78 / cache read ~3.7M / cache write ~120k / output ~38k | ~$2.13 API-equiv (output est.) session 7e027fcc-1ca6-51b0-b005-63e1163df819
+tokens orchestrator-wave-6 nowline-m6-s1-s2 (claude-opus-5-5): input ~38 / cache read ~5.3M / cache write ~0 5m + ~42k 1h / output ~21k | ~$1.80 API-equiv
+tokens wave-7 nowline-m6-s3 (claude-sonnet-5-5): input ~90 / cache read ~7.1M / cache write ~210k / output ~45k | ~$2.39 API-equiv (output est.) session 7e027fcc-1ca6-51b0-b005-63e1163df819
+tokens review-wave-7 nowline-m6-s3 (claude-opus-5-5): input ~36 / cache read ~910k / cache write ~71k / output ~17k | ~$0.88 API-equiv (output est.) session 7e027fcc-1ca6-51b0-b005-63e1163df819
