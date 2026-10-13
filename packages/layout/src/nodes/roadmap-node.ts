@@ -14,17 +14,14 @@ import type {
     NowlineFile,
     ResolveResult,
     SwimlaneDeclaration,
-    WavePlan,
 } from '@nowline/core';
 import { defaultRowBand } from '../band-scale.js';
 import { daysBetween } from '../calendar.js';
-import { cappedPixelsPerDay } from '../canvas-width.js';
-import { parseDate, propValue } from '../dsl-utils.js';
-import { resolveHeaderLogo } from '../header-logo.js';
 import { localeStrings } from '../i18n.js';
 import type { LayoutOptions, LayoutResult } from '../layout.js';
 import { createLayoutContext, type LayoutContext, type LayoutHelpers } from '../layout-context.js';
 import { resolveDateWindow, resolveScope } from '../phases/date-window.js';
+import { measureRoadmap, setCalendarRuns } from '../phases/measure.js';
 import { shiftIncludeY, shiftSwimlaneY } from '../positioned-shift.js';
 import type { RoadmapSchedule } from '../schedule.js';
 import { resolveStyle } from '../style-resolution.js';
@@ -32,31 +29,20 @@ import {
     ATTRIBUTION_GLYPH_HEIGHT,
     ATTRIBUTION_GLYPH_WIDTH,
     GUTTER_PX,
-    HEADER_HEIGHT_PX,
-    NOW_PILL_HEIGHT_PX,
     SPACING_PX,
     WAVE_LEGEND_GAP_PX,
-    WAVE_STRIP_HEIGHT_PX,
 } from '../themes/shared.js';
 import { TimeScale } from '../time-scale.js';
 import type {
     BoundingBox,
-    MarkerRowPlacement,
     PositionedDependencyEdge,
     PositionedHeader,
     PositionedIncludeRegion,
     PositionedNowline,
     PositionedRoadmap,
     PositionedSwimlane,
-    PositionedTimelineScale,
 } from '../types.js';
-import {
-    buildHeaderTicks,
-    buildNonWorkingRuns,
-    buildWorkingExceptions,
-    tickBoundaryAtOrAfter,
-    type ViewPreset,
-} from '../view-preset.js';
+import { buildHeaderTicks, tickBoundaryAtOrAfter } from '../view-preset.js';
 import { solveWaveBarriers } from '../wave-barrier.js';
 import {
     beginWavePass,
@@ -68,22 +54,17 @@ import {
 import { buildAnchors } from './anchor-node.js';
 import { maxLeafItemRightX } from './content-extent.js';
 import { buildFootnotePanel, indexFootnotes } from './footnote-node.js';
-import { HeaderNode } from './header-node.js';
 import { buildIncludeRegions, fitIncludeRegionWidth } from './include-node.js';
 import {
+    calendarMarkerEntries,
     type MarkerEntity,
     markerLabelsRightX,
-    nonWorkingRunEntries,
+    markerRowPlacements,
     nonWorkingRunMarkerId,
     packMarkerRow,
-    workingExceptionEntries,
     workingExceptionMarkerId,
 } from './marker-band.js';
-import {
-    MARKER_DIAMOND_RADIUS_PX,
-    MARKER_ROW_CENTER_OFFSET_PX,
-    MARKER_ROW_PITCH_PX,
-} from './marker-geometry.js';
+import { MARKER_ROW_PITCH_PX } from './marker-geometry.js';
 import { buildMilestones, collectSlackCorridors, positionMilestones } from './milestone-node.js';
 import { SwimlaneNode } from './swimlane-node.js';
 import { buildWaveLegend, buildWaves } from './wave-node.js';
@@ -116,28 +97,6 @@ class CanvasExtent {
     get rightX(): number {
         return this.right;
     }
-}
-
-/**
- * Set (or refresh) the timeline's non-working runs from its current ticks,
- * and its working exceptions. `nonWorkingDisplay` and `nonWorking` stay
- * omitted when the window holds no non-working day, and `workingExceptions`
- * when it holds no exception, so a calendar without either keeps its exact
- * model shape. The extension pass only grows the window, so a refresh never
- * loses an entry.
- */
-function setCalendarRuns(
-    timeline: PositionedTimelineScale,
-    scale: TimeScale,
-    unit: ViewPreset['unit'],
-): void {
-    const runs = buildNonWorkingRuns(scale, timeline.ticks, unit, timeline.minorGrid);
-    if (runs) {
-        timeline.nonWorkingDisplay = scale.showsNonWorking ? 'show' : 'hide';
-        timeline.nonWorking = runs;
-    }
-    const exceptions = buildWorkingExceptions(scale);
-    if (exceptions) timeline.workingExceptions = exceptions;
 }
 
 /**
@@ -182,240 +141,19 @@ export class RoadmapNode {
         const scope = resolveScope(file, resolved, options);
         const window = resolveDateWindow(file, resolved, options, scope, schedule);
         const { themeName, theme, locale, styleCtx } = scope;
-        const {
-            cal,
-            calendar,
-            preset: scale,
-            startDate,
-            spanDays,
-            timelineDays,
-            nonWorking,
-        } = window;
-        // The natural end: the timeline extension below may grow the axis
-        // past it, and the now-pill row is reserved against it (L2).
-        const endDate = window.naturalEndDate;
+        const { cal, calendar, preset: scale, startDate, spanDays, nonWorking } = window;
         const plan = schedule.plan;
 
-        // Header position and the timeline placement come from the
-        // `default roadmap` style.
-        const headerStyle = scope.roadmapStyle;
-        // `top` (default) keeps the legacy single-strip header; `bottom`
-        // suppresses the top tick panel (now-pill and marker row stay
-        // at the top because anchors / milestones live there); `both`
-        // mirrors the strip at the chart bottom too. See specs/dsl.md
-        // and specs/rendering.md § Timeline Scale.
-        // `header-height` sizes every tick panel (top and mirrored bottom);
-        // `none` drops them all, whatever `timeline-position` asks for.
-        const tickPanelBucketHeight =
-            HEADER_HEIGHT_PX[headerStyle.headerHeight as keyof typeof HEADER_HEIGHT_PX] ??
-            HEADER_HEIGHT_PX.md;
-        const showTopTickPanel =
-            tickPanelBucketHeight > 0 && headerStyle.timelinePosition !== 'bottom';
-        const showBottomTickPanel =
-            tickPanelBucketHeight > 0 &&
-            (headerStyle.timelinePosition === 'bottom' || headerStyle.timelinePosition === 'both');
-
-        // Measure the header: the beside card's size or the above band's
-        // height, which fix the chart's left edge and top. The company logo
-        // (when the caller loaded one) widens the card by its slot and can
-        // make it taller; see header-logo.ts.
-        const titleStr = file.roadmapDecl?.title ?? file.roadmapDecl?.name ?? '';
-        const authorStr = propValue(file.roadmapDecl?.properties ?? [], 'author');
-        const headerNode = new HeaderNode({
-            title: titleStr,
-            author: authorStr,
-            style: headerStyle,
-            logo: resolveHeaderLogo(file, options.logo),
-        });
-        const measuredHeader = headerNode.measure();
-        const { chartLeftX, chartTopY } = measuredHeader;
-
-        // The chart sizes to natural content width (date window × ppd) plus
-        // chrome padding. `options.width`, when set, is a best-effort
-        // maximum canvas width: it shrinks ppd (never below
-        // `MIN_PIXELS_PER_DAY`) so header card + gutters + timeline fit,
-        // but caption spills and run labels can still grow the canvas
-        // past it below. The two `GUTTER_PX` insets keep the header card
-        // and attribution wordmark from butting against the canvas edges.
-        const ppd = cappedPixelsPerDay({
-            naturalPixelsPerDay: scale.pixelsPerUnit / calendar.daysPerUnit(scale.unit),
-            dayCount: timelineDays,
-            chromeWidth: chartLeftX + 2 * GUTTER_PX,
-            maxWidth: options.width,
-        });
-        const naturalWidth = timelineDays * ppd;
-        const originX = chartLeftX + GUTTER_PX;
-        const totalChartWidth = naturalWidth;
-
-        // Header layout (top → bottom):
-        //   1. Now-pill row    (16 px) — only when there's a now-line
-        //   2. Tick-label panel (`header-height`, 24 px at md) — unless
-        //      `timeline-position:bottom` or `header-height:none`
-        //   3. Wave strip      (20 px) — only when the roadmap declares waves
-        //   4. Marker row       (≥26 px) — sized to the packed row count
-        //   5. 8 px gap, then the chart begins
-        const willHaveNowline =
-            options.today !== undefined && options.today >= startDate && options.today <= endDate;
-        const pillRowHeight = willHaveNowline ? NOW_PILL_HEIGHT_PX : 0;
-        // When `timeline-position:bottom` or `header-height:none` is set,
-        // the top tick panel collapses to height 0 — the now-pill and
-        // marker row stack directly without the date strip between them.
-        const tickPanelHeight = showTopTickPanel ? tickPanelBucketHeight : 0;
-        // The wave strip (specs/waves.md §8.8) has a fixed height, so the
-        // chart top is known before the barrier passes run; it sits above
-        // the marker rows, so the post-hoc marker re-pack never moves it.
-        const waveStripHeight = plan ? WAVE_STRIP_HEIGHT_PX : 0;
-
-        // Build the time scale up front — packMarkerRow needs it to
-        // resolve date-pinned entity x positions before we can size the
-        // marker row band.
-        const timeScale = new TimeScale({
-            domain: [startDate, endDate],
-            range: [originX, originX + naturalWidth],
-            calendar,
-            nonWorking,
-        });
-        // Titled non-working runs and working exceptions join the marker
-        // row (5b). These are provisional: they size the band before the
-        // timeline exists, and their ticks only decide `seam`, which the
-        // labels never read. The re-pack below reads the final ones.
-        const provisionalRunEntries = [
-            ...nonWorkingRunEntries(buildNonWorkingRuns(timeScale, [], scale.unit, false)),
-            ...workingExceptionEntries(buildWorkingExceptions(timeScale)),
-        ];
-        const hasMarkerEntities =
-            resolved.content.anchors.size + resolved.content.milestones.size > 0 ||
-            provisionalRunEntries.length > 0;
-        // Initial canvas extent = natural date window + canonical
-        // gutters. Item caption spills are unknown until the swimlane
-        // pass runs and grow the canvas through `canvas.grow`. The
-        // now-pill doesn't contribute here — `buildNowline` flips it to
-        // flag mode whenever a centered pill would clip an edge.
-        const naturalChartRightX = originX + totalChartWidth + GUTTER_PX;
-
-        // Resolve each date-pinned anchor and milestone's x. Used both for
-        // the marker-row pack and for `after:` resolution downstream — an
-        // item with `after:kickoff` would otherwise see an empty
-        // entityRightEdges entry and silently fall through to `cursor.x`
-        // (= the chart origin). After-only milestones still resolve later
-        // once their predecessors are known.
-        const datePinnedEntries: Array<MarkerEntity & { date: Date; isMilestone: boolean }> = [];
-        for (const [id, anchor] of resolved.content.anchors) {
-            const date = parseDate(propValue(anchor.properties, 'date'));
-            if (!date) continue;
-            const x = timeScale.forwardWithinDomain(date);
-            if (x === null) continue;
-            datePinnedEntries.push({
-                id,
-                centerX: x,
-                radius: MARKER_DIAMOND_RADIUS_PX,
-                title: anchor.title ?? id,
-                fontSize: 10,
-                bold: false,
-                date,
-                isMilestone: false,
-            });
-        }
-        for (const [id, milestone] of resolved.content.milestones) {
-            const date = parseDate(propValue(milestone.properties, 'date'));
-            if (!date) continue;
-            const x = timeScale.forwardWithinDomain(date);
-            if (x === null) continue;
-            datePinnedEntries.push({
-                id,
-                centerX: x,
-                radius: MARKER_DIAMOND_RADIUS_PX,
-                title: milestone.title ?? id,
-                fontSize: 10,
-                bold: true,
-                date,
-                isMilestone: true,
-            });
-        }
-
-        // Pack the date-pinned markers. Each entity gets a row index
-        // (0 = in-row baseline, 1 = bumped down by one step, …) and a
-        // label box that may be flipped to the LEFT side when the natural
-        // right-side label would overflow the canvas. Earlier
-        // entries claim row 0; later ones drop to row 1+ when their
-        // bounding box (diamond + label) overlaps an already-placed
-        // entry. The renderer reads `labelBox.x/y` directly.
-        // Titled runs and working exceptions pack after the markers. Every
-        // entry packs against
-        // the right edge the post-layout canvas growth will give its label.
-        const preliminaryEntries = [...datePinnedEntries, ...provisionalRunEntries];
-        const packed = packMarkerRow(
-            preliminaryEntries,
-            chartLeftX,
-            markerLabelsRightX(
-                preliminaryEntries,
-                chartLeftX,
-                naturalChartRightX,
-                deps.estimateTextWidth,
-            ),
-            deps.estimateTextWidth,
-        );
-        const markerRowsCount = hasMarkerEntities ? Math.max(1, packed.rowCount) : 0;
-        const markerRowHeight = markerRowsCount * MARKER_ROW_PITCH_PX;
-        const headerRowsHeight =
-            pillRowHeight + tickPanelHeight + waveStripHeight + markerRowHeight;
-        const timelineHeightBudget = headerRowsHeight + 8;
-        // In beside-mode the header card's BOTTOM aligns with the bottom
-        // of the header rows so it visually anchors to the chart's top.
-        // When the card is taller than the natural rows + a 4 px top
-        // inset, push the timeline down so the card has room without
-        // clipping above the canvas.
-        const timelineY = Math.max(chartTopY, measuredHeader.minRowsBottomY - headerRowsHeight);
-        const tickPanelY = timelineY + pillRowHeight;
-        const waveStripY = tickPanelY + tickPanelHeight;
-        const markerRowY = waveStripY + waveStripHeight;
-        // Bottom of the header rows from the pre-pack row count. The marker
-        // re-pack below can grow the band past it, but the beside card
-        // still hugs this estimate (L1, specs/layout-phases.md §1.3).
-        const estimatedRowsBottomY = markerRowY + markerRowHeight;
-
-        const ticks = buildHeaderTicks(timeScale, scale, calendar, locale);
-        const timeline: PositionedTimelineScale = {
-            box: { x: originX, y: timelineY, width: naturalWidth, height: 0 },
-            ticks,
-            pixelsPerDay: ppd,
-            originX,
-            startDate,
-            endDate,
-            labelStyle: resolveStyle('roadmap', [], styleCtx),
-            pillRowHeight,
-            tickPanelY,
-            tickPanelHeight,
-            markerRow: {
-                y: markerRowY + MARKER_ROW_CENTER_OFFSET_PX,
-                height: markerRowHeight,
-                collisionY: markerRowY - 8,
-            },
-            // `bottomTickPanelY` / `bottomTickPanelHeight` are filled in
-            // AFTER swimlanes + includes are placed (and after the marker
-            // re-pack potentially grows the chart), so the panel sits
-            // directly above the footnote area.
-            minorGrid: headerStyle.minorGrid,
-            ...(plan ? { waveStrip: { y: waveStripY, height: waveStripHeight } } : {}),
-        };
-        setCalendarRuns(timeline, timeScale, scale.unit);
-
-        // Stitch packed placements together with their final centerY now
-        // that markerRowY is known. AnchorNode + MilestoneNode read this
-        // map to recover both Y and the resolved label box; after-only
-        // milestones (not pre-positioned here) pack against this map at
-        // build time so they slot into the same rows where there's room.
-        const markerRowPlacements = new Map<string, MarkerRowPlacement>();
-        for (const [id, p] of packed.placements) {
-            const centerY =
-                markerRowY + MARKER_ROW_CENTER_OFFSET_PX + p.rowIndex * MARKER_ROW_PITCH_PX;
-            markerRowPlacements.set(id, {
-                rowIndex: p.rowIndex,
-                centerY,
-                labelBox: { ...p.labelBox, y: centerY - 4 },
-                labelSide: p.labelSide,
-            });
-        }
+        // Phase 2, measure (specs/layout-phases.md §3.3): the header, the
+        // natural axis, the header rows with the marker-band estimate, and
+        // the timeline of the natural window.
+        const measured = measureRoadmap(file, resolved, options, scope, window);
+        const { header: measuredHeader, headerNode, bands, timeline } = measured;
+        const { chartLeftX } = measuredHeader;
+        const { originX, ppd, scale: timeScale } = measured.axis;
+        const { markerRowY, estimatedMarkerRows: markerRowsCount, estimatedRowsBottomY } = bands;
+        const datePinnedEntries = measured.markers.datePinned;
+        const hasMarkerEntities = measured.markers.hasEntities;
 
         // Footnotes index must exist before sequencing items reference
         // them.
@@ -432,22 +170,27 @@ export class RoadmapNode {
                 waves: plan ? createWaveLayoutState(plan, timeScale, originX) : undefined,
             },
             {
-                chartTopY: timelineY + timelineHeightBudget,
+                chartTopY: bands.chartTopY,
                 chartBottomY: 0,
                 swimlaneBottomY: 0,
             },
-            { footnotes: indexFootnotes(resolved.content.footnotes), markerRowPlacements },
+            {
+                footnotes: indexFootnotes(resolved.content.footnotes),
+                // A copy: the final pack (P10) replaces the context's
+                // placements, and the estimate stays as measured.
+                markerRowPlacements: new Map(measured.markers.placements),
+            },
         );
         // Placement never reads the canvas; only the post-placement steps
         // below grow and read it.
-        const canvas = new CanvasExtent(naturalChartRightX);
+        const canvas = new CanvasExtent(measured.naturalChartRightX);
 
         // Seed the entity-edge maps from the date-pinned pack so item
         // `after:kickoff` references resolve before swimlanes run. Mid
         // points use the row-aware centerY so dependency arrows from the
         // anchor land on the diamond's actual row.
         for (const e of datePinnedEntries) {
-            const placement = markerRowPlacements.get(e.id);
+            const placement = ctx.markerRowPlacements.get(e.id);
             if (!placement) continue;
             ctx.entityLeftEdges.set(e.id, e.centerX);
             ctx.entityRightEdges.set(e.id, e.centerX);
@@ -678,10 +421,7 @@ export class RoadmapNode {
                 bold: true,
             });
         }
-        const runEntries = [
-            ...nonWorkingRunEntries(timeline.nonWorking),
-            ...workingExceptionEntries(timeline.workingExceptions),
-        ];
+        const runEntries = calendarMarkerEntries(timeline.nonWorking, timeline.workingExceptions);
         allMarkerEntries.push(...runEntries);
         canvas.grow(
             markerLabelsRightX(allMarkerEntries, chartLeftX, canvas.rightX, deps.estimateTextWidth),
@@ -713,17 +453,7 @@ export class RoadmapNode {
             deps.estimateTextWidth,
         );
 
-        ctx.markerRowPlacements.clear();
-        for (const [id, p] of repacked.placements) {
-            const centerY =
-                markerRowY + MARKER_ROW_CENTER_OFFSET_PX + p.rowIndex * MARKER_ROW_PITCH_PX;
-            ctx.markerRowPlacements.set(id, {
-                rowIndex: p.rowIndex,
-                centerY,
-                labelBox: { ...p.labelBox, y: centerY - 4 },
-                labelSide: p.labelSide,
-            });
-        }
+        ctx.markerRowPlacements = markerRowPlacements(repacked.placements, markerRowY);
 
         // Build the positioned milestones from their placements and the
         // re-pack, then push the final placements onto the titled runs,
@@ -799,11 +529,11 @@ export class RoadmapNode {
         // and anchor cut-lines stay anchored to `swimlaneBottomY` so
         // they never invade the bottom date strip; only the now-line
         // (and full-height major grid lines) thread through this panel.
-        if (showBottomTickPanel) {
+        if (bands.bottomTickPanelHeight > 0) {
             const gapAbovePanel = 8;
             ctx.timeline.bottomTickPanelY = ctx.chartBottomY + gapAbovePanel;
-            ctx.timeline.bottomTickPanelHeight = tickPanelBucketHeight;
-            ctx.chartBottomY += gapAbovePanel + tickPanelBucketHeight;
+            ctx.timeline.bottomTickPanelHeight = bands.bottomTickPanelHeight;
+            ctx.chartBottomY += gapAbovePanel + bands.bottomTickPanelHeight;
         }
 
         // Positioned waves (specs/waves.md §8.7): after the extent growth

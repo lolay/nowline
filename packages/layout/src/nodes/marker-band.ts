@@ -1,16 +1,110 @@
-// MarkerBand — the marker row's entries and packer. Anchors, milestones,
-// the titled non-working runs and the working exceptions all pack into one
-// band of rows above the chart; `RoadmapNode.place` builds the entries and
-// calls `packMarkerRow`, then `markerLabelsRightX` sizes the canvas for the
+// MarkerBand — the marker row's entries, packer and placements. Anchors,
+// milestones, the titled non-working runs and the working exceptions all
+// pack into one band of rows above the chart. The measure phase packs an
+// estimate to size the band before any lane is placed; finalize packs
+// every marker once the canvas is final (specs/layout-phases.md §3.3).
+// Both build their entries and turn the packed rows into y positions
+// with the helpers here; `markerLabelsRightX` sizes the canvas for the
 // labels that fit on neither side.
 
+import type { AnchorDeclaration, MilestoneDeclaration } from '@nowline/core';
+import { parseDate, propValue } from '../dsl-utils.js';
 import { GUTTER_PX } from '../themes/shared.js';
-import type { BoundingBox, PositionedNonWorkingRun, PositionedWorkingException } from '../types.js';
+import type { TimeScale } from '../time-scale.js';
+import type {
+    BoundingBox,
+    MarkerRowPlacement,
+    PositionedNonWorkingRun,
+    PositionedWorkingException,
+} from '../types.js';
 import {
     MARKER_BOLD_WIDTH_FACTOR,
+    MARKER_DIAMOND_RADIUS_PX,
     MARKER_LABEL_GAP_PX,
     MARKER_LABEL_HEIGHT_PX,
+    MARKER_ROW_CENTER_OFFSET_PX,
+    MARKER_ROW_PITCH_PX,
 } from './marker-geometry.js';
+
+/** A packed marker band: its rows and each marker's placement at the band's y. */
+export interface MarkerBand {
+    /** Rows the band holds: at least 1 when it has any marker, else 0. */
+    rowCount: number;
+    placements: Map<string, MarkerRowPlacement>;
+}
+
+/** A marker pinned by its `date:`: a dated anchor or milestone inside the window. */
+export type DatePinnedMarker = MarkerEntity & { date: Date; isMilestone: boolean };
+
+/**
+ * The date-pinned anchors, then the date-pinned milestones, each at the x
+ * of its `date:`. A marker with no date, or a date outside the window,
+ * is left out; after-only milestones are placed with the lanes.
+ */
+export function datePinnedMarkerEntries(
+    anchors: ReadonlyMap<string, AnchorDeclaration>,
+    milestones: ReadonlyMap<string, MilestoneDeclaration>,
+    scale: TimeScale,
+): DatePinnedMarker[] {
+    const entries: DatePinnedMarker[] = [];
+    const add = (
+        id: string,
+        decl: AnchorDeclaration | MilestoneDeclaration,
+        isMilestone: boolean,
+    ): void => {
+        const date = parseDate(propValue(decl.properties, 'date'));
+        if (!date) return;
+        const x = scale.forwardWithinDomain(date);
+        if (x === null) return;
+        entries.push({
+            id,
+            centerX: x,
+            radius: MARKER_DIAMOND_RADIUS_PX,
+            title: decl.title ?? id,
+            fontSize: 10,
+            bold: isMilestone,
+            date,
+            isMilestone,
+        });
+    };
+    for (const [id, anchor] of anchors) add(id, anchor, false);
+    for (const [id, milestone] of milestones) add(id, milestone, true);
+    return entries;
+}
+
+/**
+ * The calendar's marker-row entries: the titled non-working runs, then the
+ * working exceptions. Callers append them after the anchors and
+ * milestones.
+ */
+export function calendarMarkerEntries(
+    runs: ReadonlyArray<PositionedNonWorkingRun> | undefined,
+    exceptions: ReadonlyArray<PositionedWorkingException> | undefined,
+): MarkerEntity[] {
+    return [...nonWorkingRunEntries(runs), ...workingExceptionEntries(exceptions)];
+}
+
+/**
+ * Each packed placement at the band's y: row `r`'s centre sits
+ * `MARKER_ROW_CENTER_OFFSET_PX + r * MARKER_ROW_PITCH_PX` below
+ * `markerRowY`, and its label box 4 px above the centre.
+ */
+export function markerRowPlacements(
+    packed: ReadonlyMap<string, PackedPlacement>,
+    markerRowY: number,
+): Map<string, MarkerRowPlacement> {
+    const out = new Map<string, MarkerRowPlacement>();
+    for (const [id, p] of packed) {
+        const centerY = markerRowY + MARKER_ROW_CENTER_OFFSET_PX + p.rowIndex * MARKER_ROW_PITCH_PX;
+        out.set(id, {
+            rowIndex: p.rowIndex,
+            centerY,
+            labelBox: { ...p.labelBox, y: centerY - 4 },
+            labelSide: p.labelSide,
+        });
+    }
+    return out;
+}
 
 /** The marker-row id of a titled non-working run: `nonworking:<ISO from>`. */
 export function nonWorkingRunMarkerId(run: PositionedNonWorkingRun): string {
@@ -34,7 +128,7 @@ function calendarLabelEntry(id: string, x: number, label: string): MarkerEntity 
  * append them after the anchors and milestones, so the stable sort in
  * `packMarkerRow` places a marker that ties a run on x first.
  */
-export function nonWorkingRunEntries(
+function nonWorkingRunEntries(
     runs: ReadonlyArray<PositionedNonWorkingRun> | undefined,
 ): MarkerEntity[] {
     const entries: MarkerEntity[] = [];
@@ -50,7 +144,7 @@ export function nonWorkingRunEntries(
  * §7.4), packed beside the titled runs' and on the same terms: a zero-radius
  * marker at the first turned day's x.
  */
-export function workingExceptionEntries(
+function workingExceptionEntries(
     exceptions: ReadonlyArray<PositionedWorkingException> | undefined,
 ): MarkerEntity[] {
     return (exceptions ?? []).map((exception) =>
@@ -100,7 +194,7 @@ function markerLabelWidth(
     return estimateTextWidth(e.title, e.fontSize) * (e.bold ? MARKER_BOLD_WIDTH_FACTOR : 1);
 }
 
-interface PackedPlacement {
+export interface PackedPlacement {
     rowIndex: number;
     labelBox: BoundingBox;
     labelSide: 'left' | 'right';
