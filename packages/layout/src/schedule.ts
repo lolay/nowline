@@ -5,7 +5,8 @@
 // date window reads its content day from `extent`, and the exporters read the
 // dates. The pixel layout keeps its own placement and differs from it in the
 // catalogued ways of `test/engine-divergences.json`. The rules, with the
-// roadmap-start resolution of `RoadmapNode.place`:
+// roadmap-start resolution of the date-window phase (`resolveDateWindow` in
+// `phases/date-window.ts`):
 //   - date: / start:  — absolute pin (date: wins over start:)
 //   - after:[id|DATE]  — start after the maximum predecessor end
 //   - sequential default — start where the previous item in the lane ended
@@ -144,7 +145,7 @@ export function scheduleRoadmap(
     const { config: cal, working: calendar } = resolvedCalendar;
     const sizes = resolveSizes(resolved.content.sizes, cal);
 
-    // Resolve roadmap start date — same precedence as RoadmapNode.place.
+    // Resolve roadmap start date — same precedence as the date-window phase.
     const startRaw = propValue(file.roadmapDecl?.properties ?? [], 'start');
     const startDate = parseIsoDate(startRaw) ?? utcMidnight(options.today ?? new Date());
     // Working-day index of a date, and back: a point and an exclusive end.

@@ -734,7 +734,7 @@ It never goes through `forwardWithinDomain`, the seeded edge maps or `resolveAft
 
 ### 8.3 Termination and least schedule
 
-1. **Monotone.** Every start is a `max` of non-negative-offset terms, so positions are a monotone function of `(S, E)`. `RowPacker` bumps change y only (`roadmap-node.ts:456-462`).
+1. **Monotone.** Every start is a `max` of non-negative-offset terms, so positions are a monotone function of `(S, E)`. `RowPacker` bumps change y only (`row-packer.ts`).
 2. **Bounded dependencies.** For valid input (WV10 holds on every merged scope), a member of wave k depends only on constants, `S_1..S_k` and `E_1..E_{k−1}`.
 3. **At most n + 1 passes.** This is an upper bound, not an exact count. By the end of pass p, at least `E_1..E_p` are exact (floors can make later waves exact sooner), so the driver stops after at most n + 1 passes: entities that read `E_n` (`after:w_n`) are exact in pass n + 1 at the latest, and a pass that changes nothing confirms the result.
 4. **Least fixpoint.** Iteration starts from a valid lower bound and stops at the first fixpoint. By Kleene, the result is the least fixpoint: the earliest schedule that satisfies every constraint.
@@ -756,13 +756,13 @@ A warm start from day space would be wrong: divergence (a) can make pixel values
 
 **Floor application.** A helper `waveFloorX(node, ctx)` applies `max(x, S[ew(node)], S[lw(node)])` wherever a start is computed, so the row packer's prediction matches the final placement:
 
-- `resolveChildStart` (`layout.ts:972`) gains the node and applies the floor after its existing pin and `after:` logic. This covers lane items and blocks (`swimlane-node.ts:270, 292`), group children (`group-node.ts:125, 152`) and `firstChildStartX` (`swimlane-node.ts:183`).
-- `sequenceItem` (`layout.ts:239-257`) applies the floor after the pin and `after:` logic. This covers parallel tracks, which reach `sequenceItem` directly. It also records `wavePinOverride` when a `date:` or `start:` pin moved.
-- `GroupNode.place` (`group-node.ts:85`) and `ParallelNode.place` (`parallel-node.ts:45`) floor their own start by the container's own wave and by its lead wave.
+- `resolveChildStart` (`start-rules.ts`) gains the node and applies the floor after its existing pin and `after:` logic. This covers lane items and blocks and group children, which share one loop (`sequenceRowTrack` in `nodes/row-track.ts`), and `firstChildStartX`.
+- `sequenceItem` (`nodes/sequence-item.ts`) applies the floor after the pin and `after:` logic. This covers parallel tracks, which reach `sequenceItem` directly. It also records `wavePinOverride` when a `date:` or `start:` pin moved.
+- `GroupNode.place` and `ParallelNode.place` floor their own start by the container's own wave and by its lead wave.
 
 **Accumulation.** For each member, `sequenceItem` sets `memberEnd[k] = max(memberEnd[k], box.x + box.width + ITEM_INSET_PX)`.
 
-- This is the lane cursor's `itemLogicalEnd` formula (`swimlane-node.ts:322`), including the `MIN_ITEM_WIDTH` clamp.
+- This is the lane cursor's `itemLogicalEnd` formula (`sequenceRowTrack`), including the `MIN_ITEM_WIDTH` clamp.
 - Group boxes and caption spill never enter it.
 
 **Seeds.** Each pass resets the entity edge maps to the anchor and dated-milestone baseline, resets `placedItems` and `itemFlowKey`, then seeds:
@@ -780,16 +780,19 @@ Effects:
 
 `LayoutContext` has no visual-edge maps: dependency-arrow and slack-arrow ports are derived from the final item boxes in `placedItems`, so resetting `placedItems` each pass is enough.
 
-**Pass loop (wave mode only).** `RoadmapNode.place` wraps `runSwimlaneLoop` plus a region pass in `runPass`.
+**Pass loop (wave mode only).** The place phase (`placeChart`, `phases/place.ts`) wraps `runSwimlaneLoop` plus a region pass in the barrier driver's `runPass`.
 
 - The region pass runs `buildIncludeRegions` with the shared wave state and accumulates members. Every region placement made inside the loop is **discarded**.
-- The loop must finish before any of the following, which then run in this order:
+- The loop must finish before anything else. The rest of the place phase then runs in this order:
   1. the existing slack-corridor rerun, once, with `S`/`E` frozen. It resets the maps like every pass and re-seeds the wave edges. Slack corridors are collected only after convergence;
-  2. `growChartRightX`, as it does today;
-  3. the existing final region placement, **once**, frozen, without accumulating;
-  4. the post-placement extent growth: the step that measures leaf bars and markers, grows the date window to the next tick boundary and replaces `ctx.scale`;
-  5. the unified marker re-pack and its `deltaY` shift.
-- `buildWaves` (§8.7) runs after all of these.
+  2. the existing final region placement, **once**, frozen, without accumulating;
+  3. the chart bottom, and the milestones.
+- Placement never reads the canvas, so the steps that grow it run after the place phase, in the finalize pass ([`layout-phases.md`](./layout-phases.md) §3.5), in this order:
+  1. `growCanvasForSpill` (f1), which grows the canvas to the rightmost spilled caption;
+  2. `extendTimeline` (f2), the post-placement extent growth: it measures leaf bars and markers, grows the date window to the next tick boundary and replaces `ctx.scale`;
+  3. `growCanvasForMarkerLabels` (f3), after which the canvas is final, then `fitWidths` (f4);
+  4. `packMarkers` (f5), the unified marker re-pack, `placeMarkers` (f6), and `growHeaderRows` (f7), the `deltaY` shift of the lanes, regions, milestone cut lines and slack arrows.
+- `buildWaves` (§8.7) runs as `waves` (f9), after all of these and after the bottom tick panel (f8); the wave legend follows as `waveLegend` (f13).
 
 **Floor ties in pixels.** A floor `A_k` is projected from its date while `E_{k-1}` is a sum of bar widths, so the two can differ by float rounding when they fall on the same day. Engine A therefore treats a floor within 0.5 px of the value it competes with (`E_{k-1}`, or the origin for `S_1`) as a tie: the wave opens at `E_{k-1}`, no gap is drawn and no `floorRef` is set, matching the day engines.
 
@@ -884,7 +887,7 @@ export interface PositionedWaveCrossing { x: number; topY: number; bottomY: numb
 - **`waveSolve`** records the barrier driver's result. Layout insights see only the positioned model, so NL.W1002 reads `waveSolve.capped`, and tests read `passes`.
 - **NL.W1001** is collected from include-region items as well as main-lane items.
 
-`buildWaves` in a new `packages/layout/src/nodes/wave-node.ts` builds the waves, boundaries, crossings and legend. It runs **after** the marker-row `deltaY` shift (`roadmap-node.ts:596-629`), from the final `chartTopY` and `swimlaneBottomY`.
+`buildWaves` in a new `packages/layout/src/nodes/wave-node.ts` builds the waves, boundaries, crossings and legend. It runs **after** the marker-row `deltaY` shift (finalize steps f7 and f9, `phases/finalize.ts`), from the final `chartTopY` and `swimlaneBottomY`.
 
 ### 8.8 Header placement
 
@@ -898,10 +901,10 @@ export interface PositionedWaveCrossing { x: number; topY: number; bottomY: numb
 - **Geometry.**
   - `waveStrip.y = tickPanelY + tickPanelHeight`.
   - The marker-row panel moves down by 20.
-  - The strip height is added to `headerRowsHeight` (`roadmap-node.ts:299-312`) only when waves exist.
+  - The strip height is added to `HeaderBands.rowsHeight` (the measure phase, `phases/measure.ts`) only when waves exist.
 - **Why the strip never moves.** Its height is fixed, so `chartTopY` is known before the passes run. It sits above the marker rows, so the post-hoc marker re-pack growth never moves it.
 - **`timeline-position:bottom`.** The tick panel height is 0, so the strip sits directly under the now-pill row. The mirrored bottom panel carries no waves, the same as markers.
-- **Legend.** When it is shown (§9.5), it sits below the chart (and below the bottom tick panel, if any) and above the footnote panel. `ctx.chartBottomY` grows by `WAVE_LEGEND_GAP_PX` plus its line heights before `buildFootnotes` runs.
+- **Legend.** When it is shown (§9.5), it sits below the chart (and below the bottom tick panel, if any) and above the footnote panel. `ctx.chartBottomY` grows by `WAVE_LEGEND_GAP_PX` plus its line heights before `buildFootnotePanel` runs (`indexFootnotes` runs earlier, once, in the place phase).
 
 ### 8.9 Byte stability
 
