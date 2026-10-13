@@ -13,6 +13,8 @@ export const examplesDir = path.join(repoRoot, 'examples');
 export interface RunResult {
     exitCode: number;
     stdout: string;
+    /** Raw stdout, for binary formats (`-f png -o -`) that a UTF-8 decode would mangle. */
+    stdoutBytes: Buffer;
     stderr: string;
 }
 
@@ -39,17 +41,24 @@ export function runCliBuilt(args: string[], options: RunOptions = {}): Promise<R
             stdio: [stdinFd ?? 'pipe', 'pipe', 'pipe'],
         });
         if (stdinFd !== null) closeSync(stdinFd);
-        let stdout = '';
+        // Decode once at close: a multi-byte character can straddle two chunks.
+        const stdoutChunks: Buffer[] = [];
         let stderr = '';
         child.stdout.on('data', (d: Buffer) => {
-            stdout += d.toString('utf-8');
+            stdoutChunks.push(d);
         });
         child.stderr.on('data', (d: Buffer) => {
             stderr += d.toString('utf-8');
         });
         child.on('error', reject);
         child.on('close', (code) => {
-            resolve({ exitCode: code ?? 0, stdout, stderr });
+            const stdoutBytes = Buffer.concat(stdoutChunks);
+            resolve({
+                exitCode: code ?? 0,
+                stdout: stdoutBytes.toString('utf-8'),
+                stdoutBytes,
+                stderr,
+            });
         });
         if (stdinFd !== null) return;
         if (options.stdin !== undefined) {
