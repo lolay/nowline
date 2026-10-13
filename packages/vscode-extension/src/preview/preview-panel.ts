@@ -1,5 +1,5 @@
 import * as path from 'node:path';
-import type { NonWorkingDisplay } from '@nowline/layout';
+import type { NonWorkingDisplay, ThemeName } from '@nowline/layout';
 import * as vscode from 'vscode';
 import type { RcConfigCache } from '../io/rc-config.js';
 import {
@@ -14,7 +14,7 @@ export type RefreshTrigger = 'keystroke' | 'save';
 // Theme axis (the diagram render palette), distinct from the chrome Mode
 // (light/dark workbench). `'grayscale'` is a full palette; `'auto'` follows
 // the active VS Code color theme.
-export type ThemeMode = 'auto' | 'light' | 'dark' | 'grayscale';
+export type ThemeMode = 'auto' | ThemeName;
 export type DefaultFit = 'fitPage' | 'fitWidth' | 'actual';
 // Non-working-days axis. `'file'` is "no override": the roadmap's own
 // `default roadmap non-working:` key applies, then `hide`.
@@ -266,7 +266,7 @@ export class NowlinePreview {
      * the saved file matches what the preview displayed (including greyscale
      * toolbar overrides).
      */
-    resolvedTheme(): 'light' | 'dark' | 'grayscale' {
+    resolvedTheme(): ThemeName {
         // Toolbar override takes precedence over the persistent setting,
         // matching the chain in resolvePreviewOptions / resolveTheme.
         const effective = this.toolbarOverrides.theme ?? this.settings.theme;
@@ -414,7 +414,7 @@ export class NowlinePreview {
      * change" without touching the rc cache. The full chain runs inside
      * `resolvePreviewOptions` for actual rendering.
      */
-    private resolveThemeQuick(settings: PreviewSettings): 'light' | 'dark' | 'grayscale' {
+    private resolveThemeQuick(settings: PreviewSettings): ThemeName {
         if (settings.theme === 'light') return 'light';
         if (settings.theme === 'dark') return 'dark';
         if (settings.theme === 'grayscale') return 'grayscale';

@@ -12,6 +12,7 @@
 // Convention reference: specs/architecture.md § Surfaces / @nowline/preview-shell.
 
 import type { DiagnosticRow, RenderResult } from '@nowline/browser';
+import type { ThemeName } from '@nowline/layout';
 import type { NonWorkingOverride, NowOverride, PreviewHandle, ThemeOverride } from './mount.js';
 
 /**
@@ -60,7 +61,7 @@ export function applyRenderResult(handle: PreviewHandle, result: RenderResult): 
  */
 export function themeOverrideToDiagramTheme(
     theme: ThemeOverride | undefined,
-): 'light' | 'dark' | 'grayscale' | undefined {
+): ThemeName | undefined {
     switch (theme) {
         case 'light':
             return 'light';

@@ -1,4 +1,10 @@
-import type { NowlineRc } from '@nowline/config';
+import {
+    type NowlineRc,
+    type OptionValues,
+    rcLayer,
+    resolveOptions,
+    SURFACE_OPTION_SPECS,
+} from '@nowline/config';
 import {
     type NonWorkingDisplay,
     type NormalizedZone,
@@ -47,17 +53,27 @@ export interface ResolveContext {
     toolbarOverrides?: ToolbarOverrides;
 }
 
+// The `.nowlinerc` keys the preview reads through the shared schema, so a
+// value reads the same here as in `nowline <file>`. A value the schema rejects
+// is ignored (the chain moves on to the next source), never an error.
+const RC_SPECS = { theme: SURFACE_OPTION_SPECS.theme, width: SURFACE_OPTION_SPECS.width };
+
+function parseRc(rc: NowlineRc): OptionValues<typeof RC_SPECS> {
+    return resolveOptions(RC_SPECS, [rcLayer(rc, RC_SPECS)]).values;
+}
+
 /**
  * Collapse the resolution chain (toolbar > settings > rc > env > defaults)
  * into a single bag the renderer can consume. Pure function so the panel
  * stays trivially testable and we can re-use it from the export runner.
  */
 export function resolvePreviewOptions(ctx: ResolveContext): ResolvedRenderOptions {
+    const rc = parseRc(ctx.rc);
     return {
-        theme: resolveTheme(ctx),
+        theme: resolveTheme(ctx, rc.theme),
         today: resolveTodayForPreview(ctx),
         locale: resolveLocale(ctx),
-        width: resolveWidth(ctx),
+        width: resolveWidth(ctx, rc.width),
         nonWorking: resolveNonWorkingDisplay(
             ctx.toolbarOverrides?.nonWorking,
             ctx.settings.nonWorking,
@@ -68,7 +84,7 @@ export function resolvePreviewOptions(ctx: ResolveContext): ResolvedRenderOption
     };
 }
 
-function resolveTheme(ctx: ResolveContext): ThemeName {
+function resolveTheme(ctx: ResolveContext, rcTheme: ThemeName | undefined): ThemeName {
     const override = ctx.toolbarOverrides?.theme;
     const setting = override ?? ctx.settings.theme;
     // An explicit Theme token (light / dark / grayscale; `greyscale` accepted
@@ -78,13 +94,8 @@ function resolveTheme(ctx: ResolveContext): ThemeName {
         const explicit = normalizeThemeName(setting);
         if (explicit) return explicit;
     }
-    const rc = rcThemeOverride(ctx.rc);
-    if (rc) return rc;
+    if (rcTheme) return rcTheme;
     return ctx.isDarkTheme ? 'dark' : 'light';
-}
-
-function rcThemeOverride(rc: NowlineRc): ThemeName | undefined {
-    return typeof rc.theme === 'string' ? normalizeThemeName(rc.theme) : undefined;
 }
 
 /**
@@ -173,12 +184,11 @@ function resolveLocale(ctx: ResolveContext): string | undefined {
     return undefined;
 }
 
-function resolveWidth(ctx: ResolveContext): number | undefined {
+function resolveWidth(ctx: ResolveContext, rcWidth: number | undefined): number | undefined {
     if (typeof ctx.settings.width === 'number' && ctx.settings.width > 0) {
         return ctx.settings.width;
     }
-    if (typeof ctx.rc.width === 'number' && ctx.rc.width > 0) return ctx.rc.width;
-    return undefined;
+    return rcWidth;
 }
 
 /**
