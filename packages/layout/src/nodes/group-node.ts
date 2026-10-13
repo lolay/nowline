@@ -1,6 +1,6 @@
 // GroupNode — Renderable for a `group { ... }` block. Sequences
-// children inside the group's content area using the same row-pack
-// engine `SwimlaneNode` uses, so an item whose desired start collides
+// children inside the group's content area through `sequenceRowTrack`
+// (row-track.ts), the loop `SwimlaneNode` uses, so an item whose desired start collides
 // with a sibling's `rightEdge`, caption `spillX`, or a slack-arrow
 // corridor bumps to a new row inside the group. The group's reported
 // `box.height` grows with the row stack so parent containers stack
@@ -13,35 +13,22 @@
 // glyphs) in a header band it reserves above the box instead; see
 // `container-header-geometry.ts`.
 
-import type { GroupBlock, ItemDeclaration, ParallelBlock } from '@nowline/core';
-import { isItemDeclaration } from '@nowline/core';
-import {
-    blockTitleRowSpillReservation,
-    GROUP_HEADER_TITLE_INSET_X_PX,
-    groupHeaderBandPx,
-} from '../container-header-geometry.js';
+import type { GroupBlock } from '@nowline/core';
+import { GROUP_HEADER_TITLE_INSET_X_PX, groupHeaderBandPx } from '../container-header-geometry.js';
 import { propValue, propValues } from '../dsl-utils.js';
 import { groupHasFill, groupTitleTabWidth } from '../group-title-tab-geometry.js';
 import { computeContainerInlineDatePins, pickInlineDate } from '../inline-date-pin-geometry.js';
-import {
-    type LayoutContext,
-    type LayoutHelpers,
-    scheduledItemDays,
-    type TrackCursor,
-} from '../layout-context.js';
-import { RowPacker } from '../row-packer.js';
+import type { LayoutContext, LayoutHelpers, TrackCursor } from '../layout-context.js';
 import { resolveStyle } from '../style-resolution.js';
 import {
     GROUP_BOTTOM_PAD_PX,
     GROUP_TITLE_TAB_GUTTER_PX,
     GROUP_TITLE_TAB_HEIGHT_PX,
-    ITEM_INSET_PX,
-    MIN_ITEM_WIDTH,
     TRACK_BLOCK_TAIL_GUTTER_PX,
 } from '../themes/shared.js';
-import type { BoundingBox, PositionedGroup, PositionedTrackChild } from '../types.js';
+import type { BoundingBox, PositionedGroup } from '../types.js';
 import { waveFloorX } from '../wave-layout.js';
-import { itemSpanPx } from '../working-span.js';
+import { sequenceRowTrack } from './row-track.js';
 
 export class GroupNode {
     constructor(
@@ -114,122 +101,15 @@ export class GroupNode {
 
         const step = ctx.bandScale.step();
         const groupContentLeftX = startX;
-        const packer = new RowPacker({
-            laneLeftX: groupContentLeftX,
-            originY: startY + topPad,
-            minRowHeight: step,
-            slackCorridors: ctx.slackCorridors,
-        });
-        let timeCursorX = groupContentLeftX;
+        const track = sequenceRowTrack(
+            node.content,
+            { leftX: groupContentLeftX, firstRowY: startY + topPad },
+            ctx,
+            deps,
+        );
+        const { children, timeCursorX } = track;
 
-        const children: PositionedTrackChild[] = [];
-        for (const child of node.content) {
-            if (child.$type === 'DescriptionDirective') continue;
-
-            if (!isItemDeclaration(child)) {
-                const blockStart = deps.resolveChildStart(
-                    child as ParallelBlock | GroupBlock,
-                    timeCursorX,
-                    groupContentLeftX,
-                    ctx,
-                );
-                const { rowIndex, y: blockY } = packer.placeBlock();
-                const innerCursor = deps.newCursor(blockStart, blockY);
-                const positioned = deps.sequenceOne(
-                    child as ItemDeclaration | GroupBlock | ParallelBlock,
-                    innerCursor,
-                    ctx,
-                );
-                children.push(positioned);
-                const blockEnd = positioned.box.x + positioned.box.width;
-                const blockHeight = Math.max(step, innerCursor.height);
-                packer.commitBlock({
-                    rowIndex,
-                    placed: positioned,
-                    blockHeight,
-                    blockEnd,
-                    spillReservation: blockTitleRowSpillReservation(positioned),
-                });
-                timeCursorX = Math.max(timeCursorX, blockEnd);
-                continue;
-            }
-
-            const props = (child as ItemDeclaration).properties;
-            const desiredStart = deps.resolveChildStart(
-                child as ItemDeclaration,
-                timeCursorX,
-                groupContentLeftX,
-                ctx,
-            );
-            // Predict logical extent so the row-packer can bump on
-            // collision before we hand off to `sequenceItem`. Mirrors
-            // SwimlaneNode's pre-flight width math.
-            // Under `show` the predicted extent starts where `sequenceItem`
-            // will snap the bar to; the cursor below keeps the raw start.
-            const durationDays = scheduledItemDays(ctx, child as ItemDeclaration);
-            const predictedStart = ctx.scale.startX(desiredStart);
-            const naturalWidth = Math.max(
-                MIN_ITEM_WIDTH,
-                itemSpanPx(ctx, predictedStart, durationDays),
-            );
-            const desiredEnd = predictedStart + naturalWidth;
-            const childId = (child as ItemDeclaration).name ?? '';
-
-            const barExtra = deps.predictItemBarExtraHeight(
-                child as ItemDeclaration,
-                predictedStart,
-                ctx,
-            );
-            const predictedHeight = step + barExtra;
-            const { rowIndex, y: rowY } = packer.placeItem({
-                childId,
-                desiredStart: predictedStart,
-                desiredEnd,
-                // Row pitch = `step()` + extra bar height. Keeps the
-                // inter-row visible gap (= step - bandwidth) intact
-                // when a title wraps or an item's labels wrap and grow
-                // the bar.
-                predictedHeight,
-            });
-
-            const innerCursor = deps.newCursor(desiredStart, rowY);
-            const positioned = deps.sequenceItem(child as ItemDeclaration, innerCursor, ctx);
-            children.push(positioned);
-
-            const itemLogicalEnd = positioned.box.x + positioned.box.width + ITEM_INSET_PX;
-            timeCursorX = Math.max(timeCursorX, itemLogicalEnd);
-
-            let spillReservation: number | null = null;
-            const hasAnySpill =
-                positioned.textSpills ||
-                positioned.chipsOutside ||
-                positioned.dotSpills ||
-                positioned.iconSpills ||
-                positioned.footnoteSpills;
-            if (hasAnySpill) {
-                const farRight = Math.max(
-                    positioned.decorationsRightX,
-                    positioned.chipsOutside ? positioned.chipsRightX : 0,
-                );
-                spillReservation = farRight + 6;
-            }
-
-            packer.commitItem({
-                rowIndex,
-                placed: positioned,
-                logicalEnd: itemLogicalEnd,
-                spillReservation,
-                // Safety net: if the predictor under-shot (it can't see
-                // the exact meta text), the row still grows to the bar
-                // that was actually placed plus the inter-row gap.
-                rowHeight: Math.max(
-                    predictedHeight,
-                    step + (positioned.box.height - ctx.bandScale.bandwidth()),
-                ),
-            });
-        }
-
-        const innerHeight = Math.max(step, packer.usedHeight());
+        const innerHeight = Math.max(step, track.packer.usedHeight());
         // The group's painted box hugs everything its children put on
         // screen, including caption text that spills past a bar's right
         // edge. `usedRightX` is the rightmost extent any row reached —
@@ -244,7 +124,7 @@ export class GroupNode {
         // right by the spill width — including siblings on entirely
         // different rows of the parent swimlane. The painted box and
         // the logical cursor advance are intentionally decoupled here.
-        const visualRightX = Math.max(timeCursorX, packer.usedRightX());
+        const visualRightX = Math.max(timeCursorX, track.packer.usedRightX());
         // Under `show` the box opens on a working day; its children keep the
         // raw start as their cursor seed, so their pins and ties read as
         // under `hide`, and are snapped where they are placed.
