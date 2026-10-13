@@ -14,6 +14,7 @@
 // week starts, or unit starts on the working-day axis.
 
 import type { NowlineFile, ScaleBlock } from '@nowline/core';
+import { findProp } from '@nowline/core/internal';
 import { addDays, daysBetween } from './calendar.js';
 import { DEFAULT_LOCALE, localeStrings } from './i18n.js';
 import { estimateTextWidth } from './text-measure.js';
@@ -57,12 +58,8 @@ export interface ViewPreset {
 // `ViewPreset`.
 export type ScaleConfig = ViewPreset;
 
-function stripColon(key: string): string {
-    return key.endsWith(':') ? key.slice(0, -1) : key;
-}
-
 export function resolveScale(file: NowlineFile, scaleBlock: ScaleBlock | undefined): ViewPreset {
-    const scaleProp = file.roadmapDecl?.properties.find((p) => stripColon(p.key) === 'scale');
+    const scaleProp = findProp(file.roadmapDecl?.properties ?? [], 'scale');
     // `scale:` accepts a unit name (`days`/`weeks`/`months`/`quarters`/`years`)
     // OR a duration literal (`1w`, `2w`, `1m`, `1q`, `1y`). The literal form
     // is the documented default in the DSL spec; it picks the unit and uses
@@ -114,10 +111,10 @@ export function resolveScale(file: NowlineFile, scaleBlock: ScaleBlock | undefin
         labelEveryOverride === undefined && !hasLabelEvery ? { labelEveryDefault: true } : {};
 
     if (scaleBlock) {
-        const unitProp = scaleBlock.properties.find((p) => stripColon(p.key) === 'unit');
+        const unitProp = findProp(scaleBlock.properties, 'unit');
         const resolvedUnit: ScaleUnit = (unitProp?.value as ScaleUnit) ?? unit;
-        const labelProp = scaleBlock.properties.find((p) => stripColon(p.key) === 'label-every');
-        const pxProp = scaleBlock.properties.find((p) => stripColon(p.key) === 'pixels-per-unit');
+        const labelProp = findProp(scaleBlock.properties, 'label-every');
+        const pxProp = findProp(scaleBlock.properties, 'pixels-per-unit');
         const explicitLabelEvery = labelProp ? parseInt(labelProp.value, 10) || 0 : 0;
         const labelEvery =
             explicitLabelEvery !== 0 ? Math.max(1, explicitLabelEvery) : defaultLabelEvery;

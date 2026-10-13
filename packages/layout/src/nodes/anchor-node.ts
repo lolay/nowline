@@ -6,7 +6,7 @@
 // the same row stack — see `LayoutContext.markerRowPlacements`.
 
 import type { AnchorDeclaration } from '@nowline/core';
-import { formatIsoDate, parseDate, propValue } from '../dsl-utils.js';
+import { formatIsoDate, parseIsoDate, propValue } from '../dsl-utils.js';
 import type { LayoutContext } from '../layout-context.js';
 import { resolveStyle } from '../style-resolution.js';
 import type { Point, PositionedAnchor } from '../types.js';
@@ -29,7 +29,7 @@ export class AnchorNode {
      */
     place(ctx: LayoutContext, _milestoneXs: Set<number>): PositionedAnchor | null {
         const dateRaw = propValue(this.anchor.properties, 'date');
-        const date = parseDate(dateRaw);
+        const date = parseIsoDate(dateRaw);
         if (!date) return null;
         const x = ctx.scale.forwardWithinDomain(date);
         if (x === null) return null;

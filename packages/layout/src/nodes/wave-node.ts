@@ -10,6 +10,7 @@
 // pixels-per-day are unchanged), so the spans' x never move.
 
 import type { StyleProperty } from '@nowline/core';
+import { propKey } from '@nowline/core/internal';
 import { propValue } from '../dsl-utils.js';
 import { type LocaleStrings, wavesDeclaredPlaceholder } from '../i18n.js';
 import { ITEM_FOOTNOTE_INDICATOR_STEP_PX } from '../item-bar-geometry.js';
@@ -296,8 +297,7 @@ function waveStyle(
     const styleId = propValue(properties, 'style');
     const decl = styleId ? ctx.styleCtx.styles.get(styleId) : undefined;
     for (const p of (decl?.properties ?? []) as StyleProperty[]) {
-        const key = p.key.endsWith(':') ? p.key.slice(0, -1) : p.key;
-        raw.set(key, p.value);
+        raw.set(propKey(p), p.value);
     }
     const color = (key: string): string | undefined => {
         const v = raw.get(key);

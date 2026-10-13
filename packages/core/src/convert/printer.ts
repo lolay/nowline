@@ -1,3 +1,4 @@
+import { ISO_DATE_RE, propKey } from '../util/props.js';
 import type { JsonAstNode } from './schema.js';
 
 // Keyed-property canonical order. Keys not in this list sort alphabetically after.
@@ -277,8 +278,8 @@ function renderProperties(properties: JsonAstNode[]): string {
 function orderProperties(properties: JsonAstNode[]): JsonAstNode[] {
     const indexOf = new Map(KEY_ORDER.map((k, i) => [k, i] as const));
     return [...properties].sort((a, b) => {
-        const ak = normalizeKey(getString(a, 'key'));
-        const bk = normalizeKey(getString(b, 'key'));
+        const ak = propKey({ key: getString(a, 'key') });
+        const bk = propKey({ key: getString(b, 'key') });
         const ai = indexOf.get(ak);
         const bi = indexOf.get(bk);
         if (ai !== undefined && bi !== undefined) return ai - bi;
@@ -289,7 +290,7 @@ function orderProperties(properties: JsonAstNode[]): JsonAstNode[] {
 }
 
 function renderProperty(prop: JsonAstNode): string {
-    const key = normalizeKey(getString(prop, 'key'));
+    const key = propKey({ key: getString(prop, 'key') });
     const values = asStringArray(prop.values);
     const value = prop.value as string | undefined;
     if (values.length >= 2) {
@@ -307,7 +308,7 @@ function renderProperty(prop: JsonAstNode): string {
 // Block-style property (one per line, rendered as `key: value`). Used inside
 // indented blocks like `scale`, `calendar`, and `style`.
 function renderBlockProperty(prop: JsonAstNode): string {
-    const key = normalizeKey(getString(prop, 'key'));
+    const key = propKey({ key: getString(prop, 'key') });
     const values = asStringArray(prop.values);
     const value = prop.value as string | undefined;
     if (values.length >= 2) {
@@ -322,12 +323,7 @@ function renderBlockProperty(prop: JsonAstNode): string {
     return `${key}:`;
 }
 
-function normalizeKey(key: string): string {
-    return key.endsWith(':') ? key.slice(0, -1) : key;
-}
-
 const URL_RE = /^https?:\/\//;
-const DATE_RE = /^\d{4}-\d{2}-\d{2}$/;
 const DURATION_RE = /^\d+(?:\.\d+)?[dwmqy]$/;
 const PERCENTAGE_RE = /^\d+%$/;
 const HEX_COLOR_RE = /^#[0-9a-fA-F]{3,8}$/;
@@ -337,7 +333,7 @@ const ID_RE = /^[a-zA-Z_][a-zA-Z0-9_-]*$/;
 function formatAtom(atom: string): string {
     if (
         URL_RE.test(atom) ||
-        DATE_RE.test(atom) ||
+        ISO_DATE_RE.test(atom) ||
         DURATION_RE.test(atom) ||
         PERCENTAGE_RE.test(atom) ||
         HEX_COLOR_RE.test(atom) ||

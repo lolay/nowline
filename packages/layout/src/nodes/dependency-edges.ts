@@ -2,13 +2,9 @@
 // placed item becomes an arrow routed through the channel grid, its ports
 // read off the final boxes.
 
-import type {
-    GroupBlock,
-    ItemDeclaration,
-    ParallelBlock,
-    SwimlaneDeclaration,
-} from '@nowline/core';
-import { isGroupBlock, isItemDeclaration, isParallelBlock } from '@nowline/core';
+import type { ItemDeclaration, SwimlaneDeclaration } from '@nowline/core';
+import { isItemDeclaration } from '@nowline/core';
+import { trackNodes } from '@nowline/core/internal';
 import { propValues } from '../dsl-utils.js';
 import {
     ChannelGrid,
@@ -28,36 +24,13 @@ import type {
 
 import { syntheticItemKey } from './sequence-item.js';
 
-// Traverse the full content tree to build an `items` map keyed by id.
+// Every item under the lanes, keyed by id. Title-only items register under a
+// synthetic, non-referenceable handle so they still appear as dependency-edge
+// targets.
 export function collectItems(swimlanes: SwimlaneDeclaration[]): Map<string, ItemDeclaration> {
     const out = new Map<string, ItemDeclaration>();
-    const walk = (node: ItemDeclaration | GroupBlock | ParallelBlock): void => {
-        if (isItemDeclaration(node)) {
-            // Title-only items register under a synthetic, non-referenceable
-            // handle so they still appear as dependency-edge targets.
-            out.set(node.name ?? syntheticItemKey(node), node);
-            return;
-        }
-        if (isParallelBlock(node)) {
-            for (const child of node.content) {
-                if (child.$type === 'DescriptionDirective') continue;
-                walk(child as ItemDeclaration | GroupBlock);
-            }
-            return;
-        }
-        if (isGroupBlock(node)) {
-            for (const child of node.content) {
-                if (child.$type === 'DescriptionDirective') continue;
-                walk(child as ItemDeclaration | GroupBlock | ParallelBlock);
-            }
-            return;
-        }
-    };
-    for (const lane of swimlanes) {
-        for (const child of lane.content) {
-            if (child.$type === 'DescriptionDirective') continue;
-            walk(child as ItemDeclaration | GroupBlock | ParallelBlock);
-        }
+    for (const node of trackNodes(swimlanes)) {
+        if (isItemDeclaration(node)) out.set(node.name ?? syntheticItemKey(node), node);
     }
     return out;
 }

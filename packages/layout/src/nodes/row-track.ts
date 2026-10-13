@@ -8,13 +8,9 @@
 // and box. Both read the packer's used height and right edge, and the
 // compact time cursor, from the result.
 
-import type {
-    GroupBlock,
-    ItemDeclaration,
-    ParallelBlock,
-    SwimlaneDeclaration,
-} from '@nowline/core';
+import type { GroupBlock, SwimlaneDeclaration } from '@nowline/core';
 import { isItemDeclaration } from '@nowline/core';
+import { trackChildren } from '@nowline/core/internal';
 import { blockTitleRowSpillReservation } from '../container-header-geometry.js';
 import { type LayoutContext, type LayoutHelpers, newCursor } from '../layout-context.js';
 import { RowPacker } from '../row-packer.js';
@@ -40,11 +36,13 @@ export interface RowTrackResult {
 }
 
 /**
- * Sequence `content` into rows starting at `origin`. Description
- * directives are skipped; every other child is placed in DSL order.
+ * Sequence a lane's or a group's track children (core's `trackChildren`:
+ * description directives skipped) into rows starting at `origin`, in DSL
+ * order. Nested blocks recurse through `sequenceOne`, which carries the
+ * inherited state (cursor, flow key) the walk alone does not.
  */
 export function sequenceRowTrack(
-    content: SwimlaneDeclaration['content'] | GroupBlock['content'],
+    container: SwimlaneDeclaration | GroupBlock,
     origin: RowTrackOrigin,
     ctx: LayoutContext,
     helpers: LayoutHelpers,
@@ -64,22 +62,12 @@ export function sequenceRowTrack(
     let timeCursorX = leftX;
 
     const children: PositionedTrackChild[] = [];
-    for (const child of content) {
-        if (child.$type === 'DescriptionDirective') continue;
-
+    for (const child of trackChildren(container)) {
         if (!isItemDeclaration(child)) {
-            const blockStart = resolveChildStart(
-                child as ParallelBlock | GroupBlock,
-                timeCursorX,
-                ctx,
-            );
+            const blockStart = resolveChildStart(child, timeCursorX, ctx);
             const { rowIndex, y: blockY } = packer.placeBlock();
             const cursor = newCursor(blockStart, blockY);
-            const positioned = helpers.sequenceOne(
-                child as ItemDeclaration | GroupBlock | ParallelBlock,
-                cursor,
-                ctx,
-            );
+            const positioned = helpers.sequenceOne(child, cursor, ctx);
             children.push(positioned);
             const blockEnd = positioned.box.x + positioned.box.width;
             const blockHeight = Math.max(step, cursor.height);
@@ -94,7 +82,7 @@ export function sequenceRowTrack(
             continue;
         }
 
-        const item = child as ItemDeclaration;
+        const item = child;
         const desiredStart = resolveChildStart(item, timeCursorX, ctx);
         // Measure the item where `sequenceItem` will place it, so the row
         // pack can decide BEFORE handing off: the measure gives the logical

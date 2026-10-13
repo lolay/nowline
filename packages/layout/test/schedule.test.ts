@@ -283,6 +283,38 @@ swimlane s "S"
     });
 });
 
+// An impossible day is no date (specs/core-ast-utilities.md §7, decision 5):
+// `Date` would roll 2026-02-30 over to 2026-03-02.
+describe('scheduleRoadmap — impossible dates', () => {
+    const TODAY = new Date(Date.UTC(2026, 1, 2)); // 2026-02-02 Monday
+
+    it('an impossible roadmap start: falls back to today', async (): Promise<void> => {
+        const sched = await buildSchedule(
+            `nowline v1
+roadmap r "R" start:2026-02-30
+swimlane s "S"
+  item a "A" duration:1w
+`,
+            TODAY,
+        );
+        expect(sched.startDate.toISOString().slice(0, 10)).toBe('2026-02-02');
+    });
+
+    it('an impossible milestone date: leaves the milestone undated', async (): Promise<void> => {
+        const sched = await buildSchedule(
+            `nowline v1
+roadmap r "R" start:2026-02-02
+milestone m "M" date:2026-02-30
+swimlane s "S"
+  item a "A" duration:1w
+`,
+            TODAY,
+        );
+        // Rolled over, it would have been scheduled on 2026-03-02.
+        expect(sched.milestones.get('m')).toBeUndefined();
+    });
+});
+
 describe('scheduleRoadmap — anchors', () => {
     it('anchor date is recorded', async () => {
         const sched = await buildSchedule(

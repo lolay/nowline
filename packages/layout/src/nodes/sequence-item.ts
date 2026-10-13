@@ -5,7 +5,7 @@
 // then register it in the context's entity maps.
 
 import type { ItemDeclaration } from '@nowline/core';
-import { parseDate, propValue, propValues } from '../dsl-utils.js';
+import { parseIsoDate, propValue, propValues } from '../dsl-utils.js';
 import { computeItemInlineDatePins, pickInlineDate } from '../inline-date-pin-geometry.js';
 import {
     ITEM_CAPTION_INSET_X_PX,
@@ -105,7 +105,7 @@ export function sequenceItem(
         let earliestCapX: number | undefined;
         let earliestCapRef: string | undefined;
         for (const ref of beforeRaw) {
-            const inlineDate = parseDate(ref);
+            const inlineDate = parseIsoDate(ref);
             const capX = inlineDate
                 ? (ctx.scale.forwardWithinDomain(inlineDate) ?? undefined)
                 : ctx.entityLeftEdges.get(ref);

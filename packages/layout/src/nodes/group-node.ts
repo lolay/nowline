@@ -102,7 +102,7 @@ export class GroupNode {
         const step = ctx.bandScale.step();
         const groupContentLeftX = startX;
         const track = sequenceRowTrack(
-            node.content,
+            node,
             { leftX: groupContentLeftX, firstRowY: startY + topPad },
             ctx,
             helpers,

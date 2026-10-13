@@ -216,6 +216,10 @@ Open the URL in DevTools or `curl` it to confirm exactly which build is running.
 
 **≤ 200 KB gzipped.** First measurement landed at ~163 KB under a 175 KB ceiling. Waves (m2o) took the bundle to ~194 KB (about 6 KB of en/fr diagnostic text, the rest validator, barrier and strip logic), so the budget moved to 200 KB, the line the m4 plan set for a serious review. The next overage is that review (pre-bundled grammars, hand-rolled parser, etc.), not another bump; the m4 plan documents the escalation. The `bundle-size` CI job (`packages/embed/scripts/check-size.mjs`) gates every PR.
 
+After m4.11 and m4.13 the IIFE sat at ~198 KB. Most of the last stretch was not Nowline code: Langium's core imports `CancellationToken`, `Emitter`, `ResponseError` and `LSPErrorCodes` from the `vscode-languageserver-protocol` root, a CommonJS barrel esbuild cannot tree-shake, so the bundle carried the whole LSP protocol and JSON-RPC connection layer (~100 KB raw, ~20 KB gzipped) that a browser render never runs. The `narrow-lsp-protocol` plugin in `packages/embed/scripts/bundle.mjs` resolves that import to the vscode-jsonrpc modules that define those names, which brought the IIFE to ~178 KB with byte-identical output. `check-size.mjs` fails if any protocol or connection module reappears, so a Langium upgrade that routes around the shim shows up as a named leak instead of creeping toward the budget.
+
+What is left, largest first (raw bytes, `make bundle-size` prints the current list): `@nowline/core` (~174 KB: the serialized Langium grammar ~66 KB, the validator ~30 KB, en and fr diagnostic text ~35 KB), the Langium runtime (~120 KB), `@nowline/layout` (~102 KB), chevrotain and its deps (~114 KB, including lodash-es), the renderer (~46 KB), and the remaining `vscode-*` types and URI helpers Langium needs (~46 KB). All of it runs on a render or a diagnostic, so the next cuts are the structural ones the budget note above already names (pre-bundled grammars, a hand-rolled parser), plus loading the fr catalogue on demand, which would need the embed to ship more than one file.
+
 For comparison:
 - Mermaid embed: ~200KB gzipped
 - D2 WASM: ~2MB

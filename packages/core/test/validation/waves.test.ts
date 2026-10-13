@@ -8,9 +8,7 @@ import type { GroupBlock, ParallelBlock, SwimlaneDeclaration } from '../../src/g
 import { isSwimlaneDeclaration } from '../../src/generated/ast.js';
 import {
     assignWaves,
-    effectiveWave,
     fileRefLookup,
-    leadWave,
     ownWaves,
     waveFloorDate,
     waveIndexMap,
@@ -521,7 +519,7 @@ describe('waves: repeated wave: keys', () => {
         ]);
         const r = await parse(src);
         const lane = r.ast.roadmapEntries.find((e) => e.name === 's') as SwimlaneDeclaration;
-        expect(effectiveWave(lane.content[0], waveIndexMap(r.ast))).toBe(1);
+        expect(assignWaves([lane], waveIndexMap(r.ast)).waveOf.get(lane.content[0])).toBe(1);
     });
 
     it('WV6/WV7: the first key is still checked when a later key repeats it', async () => {
@@ -581,10 +579,11 @@ describe('waves: helpers', () => {
         ]);
     });
 
-    it('effectiveWave inherits, lets the container win, and drops invalid values', async () => {
+    it('assignWaves inherits, lets the container win, drops invalid values and leads containers', async () => {
         const r = await parse(src);
         const ids = waveIndexMap(r.ast);
-        const lane = r.ast.roadmapEntries.find((e) => e.name === 's') as SwimlaneDeclaration;
+        const lanes = r.ast.roadmapEntries.filter(isSwimlaneDeclaration);
+        const { waveOf, leadOf } = assignWaves(lanes, ids);
         const byName = new Map<string, unknown>();
         const walk = (nodes: readonly { name?: string; content?: unknown[] }[]) => {
             for (const n of nodes) {
@@ -592,42 +591,35 @@ describe('waves: helpers', () => {
                 if (n.content) walk(n.content as { name?: string }[]);
             }
         };
-        walk(lane.content as { name?: string }[]);
-        const ew = (name: string) => effectiveWave(byName.get(name) as GroupBlock, ids);
-        expect(ew('x')).toBeUndefined();
-        expect(ew('g')).toBe(2);
-        expect(ew('a')).toBe(2);
-        expect(ew('b')).toBe(2); // WV7 conflict: the container's wave wins
-        expect(ew('h')).toBeUndefined();
-        expect(ew('e')).toBe(1);
-        expect(ew('bad')).toBeUndefined();
+        for (const lane of lanes) walk(lane.content as { name?: string }[]);
 
-        const lw = (name: string) => leadWave(byName.get(name) as GroupBlock | ParallelBlock, ids);
-        expect(lw('g')).toBe(2);
-        expect(lw('h')).toBeUndefined(); // first child is background
-        expect(lw('k')).toBe(3);
-        expect(lw('p')).toBe(2); // min over tracks
-        expect(lw('q')).toBeUndefined(); // a background track
-        expect(lw('x')).toBeUndefined();
-    });
-
-    it('assignWaves agrees with effectiveWave and leadWave on every node', async () => {
-        const r = await parse(src);
-        const ids = waveIndexMap(r.ast);
-        const lanes = r.ast.roadmapEntries.filter(isSwimlaneDeclaration);
-        const { waveOf, leadOf } = assignWaves(lanes, ids);
-        let count = 0;
-        const walk = (nodes: readonly (GroupBlock | ParallelBlock)[]) => {
-            for (const n of nodes) {
-                if (n.$type === 'DescriptionDirective') continue;
-                count++;
-                expect(waveOf.get(n)).toBe(effectiveWave(n, ids));
-                expect(leadOf.get(n)).toBe(leadWave(n, ids));
-                if (n.content) walk(n.content as (GroupBlock | ParallelBlock)[]);
-            }
-        };
-        for (const lane of lanes) walk(lane.content as (GroupBlock | ParallelBlock)[]);
-        expect(count).toBe(16);
+        // [node, ew(node), lw(node)]: undefined is background (no entry).
+        const expected: [string, number | undefined, number | undefined][] = [
+            ['x', undefined, undefined],
+            ['g', 2, 2],
+            ['a', 2, 2], // inherits the group's wave
+            ['b', 2, 2], // WV7 conflict: the container's wave wins
+            ['h', undefined, undefined], // first child is background
+            ['c', undefined, undefined],
+            ['e', 1, 1],
+            ['k', undefined, 3], // takes its first child's wave
+            ['m', 3, 3],
+            ['p', undefined, 2], // min over tracks
+            ['n', 3, 3],
+            ['o', 2, 2],
+            ['q', undefined, undefined], // a background track
+            ['t', 3, 3],
+            ['u', undefined, undefined],
+            ['bad', undefined, undefined], // invalid wave: is background
+        ];
+        expect(byName.size).toBe(expected.length);
+        for (const [name, ew, lw] of expected) {
+            const node = byName.get(name) as GroupBlock | ParallelBlock;
+            expect([name, waveOf.get(node), leadOf.get(node)]).toEqual([name, ew, lw]);
+        }
+        // Nothing but those nodes carries a wave or a lead.
+        expect(waveOf.size).toBe(expected.filter(([, ew]) => ew !== undefined).length);
+        expect(leadOf.size).toBe(expected.filter(([, , lw]) => lw !== undefined).length);
     });
 
     it('waveFloorDate takes the latest valid element and names it', async () => {

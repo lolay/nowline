@@ -6,12 +6,6 @@
 import type { AstNode } from 'langium';
 import { singleLine } from '../util/single-line.js';
 
-export const DATE_RE = /^\d{4}-\d{2}-\d{2}$/;
-
-export function propKey(prop: { key: string }): string {
-    return prop.key.endsWith(':') ? prop.key.slice(0, -1) : prop.key;
-}
-
 // Levenshtein distance with an early-exit cap: returns `cap + 1` once the running
 // minimum exceeds the cap so we can short-circuit the matcher in the common case
 // where the typo is much further than 2 edits from any valid key. Used for the

@@ -4,6 +4,7 @@
 // (specs/scheduler-unification.md §3.3). Nothing here knows about pixels.
 
 import type { NowlineFile, ResolveResult } from '@nowline/core';
+import { findProp } from '@nowline/core/internal';
 import { type CalendarConfig, daysBetween, literalToDays } from '../calendar.js';
 import { resolveWorkingCalendar } from '../calendar-resolver.js';
 import { propValue } from '../dsl-utils.js';
@@ -186,10 +187,5 @@ export function computeDateWindow(
 // Layout receives an already-parsed AST, so this is a cheap lookup with no
 // validation work — that's the validator's job in `@nowline/core`.
 function directiveLocale(file: NowlineFile): string | undefined {
-    const prop = file.directive?.properties.find((p) => stripColon(p.key) === 'locale');
-    return prop?.value;
-}
-
-function stripColon(key: string): string {
-    return key.endsWith(':') ? key.slice(0, -1) : key;
+    return findProp(file.directive?.properties ?? [], 'locale')?.value;
 }

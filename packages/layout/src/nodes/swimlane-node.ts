@@ -211,12 +211,7 @@ export class SwimlaneNode {
 
         // The shared row-track loop (row-track.ts) packs the lane's
         // children below the tab offset chosen above.
-        const track = sequenceRowTrack(
-            lane.content,
-            { leftX: laneLeftX, firstRowY: startY },
-            ctx,
-            helpers,
-        );
+        const track = sequenceRowTrack(lane, { leftX: laneLeftX, firstRowY: startY }, ctx, helpers);
         const { children } = track;
 
         // `track.packer.usedHeight()` measures from `startY` (the first row,

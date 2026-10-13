@@ -61,6 +61,7 @@ import type {
     SwimlaneDeclaration,
     WavePlan,
 } from '@nowline/core';
+import { ISO_DATE_RE } from '@nowline/core/internal';
 import type { ExportInputs } from '@nowline/export-core';
 import { displayLabel, getProp, getProps, hasProp, roadmapTitle } from '@nowline/export-core';
 import {
@@ -440,7 +441,7 @@ function previousWaveOf(item: ItemDeclaration, waves: WaveCtx | undefined): stri
 function resolveStartDate(inputs: ExportInputs): string {
     const decl = inputs.ast.roadmapDecl;
     const declared = decl ? getProp(decl, 'start') : undefined;
-    if (declared && /^\d{4}-\d{2}-\d{2}$/.test(declared.trim())) return declared.trim();
+    if (declared && ISO_DATE_RE.test(declared.trim())) return declared.trim();
     return formatIsoDate(inputs.model.timeline.startDate);
 }
 

@@ -8,7 +8,7 @@
 // labels that fit on neither side.
 
 import type { AnchorDeclaration, MilestoneDeclaration } from '@nowline/core';
-import { parseDate, propValue } from '../dsl-utils.js';
+import { parseIsoDate, propValue } from '../dsl-utils.js';
 import { GUTTER_PX } from '../themes/shared.js';
 import type { TimeScale } from '../time-scale.js';
 import type {
@@ -52,7 +52,7 @@ export function datePinnedMarkerEntries(
         decl: AnchorDeclaration | MilestoneDeclaration,
         isMilestone: boolean,
     ): void => {
-        const date = parseDate(propValue(decl.properties, 'date'));
+        const date = parseIsoDate(propValue(decl.properties, 'date'));
         if (!date) return;
         const x = scale.forwardWithinDomain(date);
         if (x === null) return;

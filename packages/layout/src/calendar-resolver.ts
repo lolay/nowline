@@ -12,14 +12,17 @@
 // would close a value-import cycle.
 
 import type {
-    EntityProperty,
     NonWorkingDeclaration,
     NowlineFile,
     ResolveResult,
     WorkingDeclaration,
 } from '@nowline/core';
+import {
+    classifyCalendarDeclaration,
+    parseIsoDate,
+    replacesPresetWeekend,
+} from '@nowline/core/internal';
 import { type CalendarConfig, resolveCalendar } from './calendar.js';
-import { formatIsoDate, parseDate, propValues } from './dsl-utils.js';
 import {
     type CalendarRule,
     fromCalendarConfig,
@@ -66,17 +69,6 @@ export function resolveWorkingCalendar(
 
 type CalendarDeclaration = NonWorkingDeclaration | WorkingDeclaration;
 
-/** UTC weekday numbers (Sunday is 0) of the names `every:` takes. */
-const WEEKDAY_INDEX: Readonly<Record<string, number>> = {
-    sun: 0,
-    mon: 1,
-    tue: 2,
-    wed: 3,
-    thu: 4,
-    fri: 5,
-    sat: 6,
-};
-
 /**
  * The preset's rules, unless a `non-working` declaration is named `weekend`
  * (decision 14), plus one rule per well-formed declaration, in canonical
@@ -86,10 +78,7 @@ function calendarRules(
     config: CalendarConfig,
     declarations: ReadonlyArray<CalendarDeclaration>,
 ): CalendarRule[] {
-    const replacesWeekend = declarations.some(
-        (decl) => decl.$type === 'NonWorkingDeclaration' && decl.name === 'weekend',
-    );
-    const rules = replacesWeekend ? [] : presetRules(config.mode);
+    const rules = replacesPresetWeekend(declarations) ? [] : presetRules(config.mode);
     for (const decl of declarations) {
         const rule = declarationRule(decl);
         if (rule) rules.push(rule);
@@ -98,60 +87,27 @@ function calendarRules(
 }
 
 /**
- * The rule one declaration stands for, or undefined when its shape or a
- * value is malformed. Only the first `date:`, `start:`, `end:` and `every:`
- * count; any other key is the validator's NL.E0901 and changes nothing here.
+ * The rule one declaration stands for, or undefined when core's classifier
+ * finds its shape or a value malformed. Only the first `date:`, `start:`,
+ * `end:` and `every:` count; any other key is the validator's NL.E0901 and
+ * changes nothing here.
  */
 function declarationRule(decl: CalendarDeclaration): CalendarRule | undefined {
-    const props = decl.properties;
-    const has = (key: string) => props.some((p) => stripColon(p.key) === key);
+    const facts = classifyCalendarDeclaration(decl);
+    if (!facts.wellFormed) return undefined;
     const rule: CalendarRule = { working: decl.$type === 'WorkingDeclaration' };
     if (decl.name) rule.id = decl.name;
     if (decl.title !== undefined) rule.title = decl.title;
-
-    if (has('date')) {
-        if (has('every') || has('start') || has('end')) return undefined;
-        const dates = propValues(props, 'date').map(realDate);
-        if (dates.length === 0 || dates.some((date) => date === undefined)) return undefined;
-        rule.dates = dates as Date[];
-        return rule;
-    }
-    if (!has('every') && !(has('start') && has('end'))) return undefined;
-
-    for (const key of ['start', 'end'] as const) {
-        if (!has(key)) continue;
-        const date = singleDate(props, key);
-        if (!date) return undefined;
-        rule[key] = date;
-    }
-    if (rule.start && rule.end && rule.end < rule.start) return undefined;
-
-    if (has('every')) {
-        const weekdays = propValues(props, 'every').map((name) => WEEKDAY_INDEX[name]);
-        if (weekdays.length === 0 || weekdays.some((day) => day === undefined)) return undefined;
-        rule.every = new Set(weekdays);
-    }
+    if (facts.dates) rule.dates = facts.dates.map(utcDate);
+    if (facts.start) rule.start = utcDate(facts.start);
+    if (facts.end) rule.end = utcDate(facts.end);
+    if (facts.weekdays) rule.every = new Set(facts.weekdays);
     return rule;
 }
 
-/** The one date a `start:` / `end:` names; a one-element bracket is that date. */
-function singleDate(props: EntityProperty[], key: 'start' | 'end'): Date | undefined {
-    const values = propValues(props, key);
-    return values.length === 1 ? realDate(values[0]) : undefined;
-}
-
-/**
- * A `YYYY-MM-DD` that names a real calendar day, at UTC midnight. `parseDate`
- * rolls `2026-02-30` over to March 2; the validator rejects it (NL.E0405), so
- * the resolver does too.
- */
-function realDate(raw: string): Date | undefined {
-    const date = parseDate(raw);
-    return date && formatIsoDate(date) === raw ? date : undefined;
-}
-
-function stripColon(key: string): string {
-    return key.endsWith(':') ? key.slice(0, -1) : key;
+/** A real `YYYY-MM-DD` the classifier already checked, at UTC midnight. */
+function utcDate(iso: string): Date {
+    return parseIsoDate(iso) as Date;
 }
 
 /**

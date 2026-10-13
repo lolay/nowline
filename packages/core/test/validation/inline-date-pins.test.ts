@@ -196,4 +196,59 @@ describe('inline-date pins (after:DATE / before:DATE)', () => {
             ).toBe(false);
         });
     });
+
+    // The rule 24 and rule 25 walks never looked inside a team, so a team
+    // nested in a team is skipped (specs/core-ast-utilities.md §6). The
+    // shared content walk visits nested teams; the validator filters them.
+    describe('teams nested in teams', () => {
+        const codesOf = (diagnostics: { data?: unknown }[]) =>
+            diagnostics
+                .map((d) => (d.data as { code?: string } | undefined)?.code)
+                .filter((c) => c === 'NL.E0411');
+
+        it('NL.E0411 fires on a top-level team with an inline date', async () => {
+            const r = await parse(
+                `roadmap r start:2026-01-05\n` +
+                    `team outer after:2026-02-09\n` +
+                    `swimlane s\n` +
+                    `  item x duration:1w\n`,
+            );
+            expect(codesOf(r.diagnostics)).toEqual(['NL.E0411']);
+        });
+
+        it('NL.E0411 does not fire on a team nested in a team', async () => {
+            const r = await parse(
+                `roadmap r start:2026-01-05\n` +
+                    `team outer\n` +
+                    `  team inner after:2026-02-09\n` +
+                    `swimlane s\n` +
+                    `  item x duration:1w\n`,
+            );
+            expect(codesOf(r.diagnostics)).toEqual([]);
+            expect(hasError(errorMessages(r.diagnostics), /not allowed on team/i)).toBe(false);
+        });
+
+        it('a nested team after: adds no edge to the dependency graph', async () => {
+            // inner -> x and x -> inner would close a cycle if the nested
+            // team's after: were an edge.
+            const r = await parse(
+                `roadmap r start:2026-01-05\n` +
+                    `team outer\n` +
+                    `  team inner after:x\n` +
+                    `swimlane s\n` +
+                    `  item x duration:1w after:inner\n`,
+            );
+            expect(hasError(errorMessages(r.diagnostics), /Circular dependency/i)).toBe(false);
+        });
+
+        it('a top-level team after: still adds its edge to the dependency graph', async () => {
+            const r = await parse(
+                `roadmap r start:2026-01-05\n` +
+                    `team inner after:x\n` +
+                    `swimlane s\n` +
+                    `  item x duration:1w after:inner\n`,
+            );
+            expect(hasError(errorMessages(r.diagnostics), /Circular dependency/i)).toBe(true);
+        });
+    });
 });
