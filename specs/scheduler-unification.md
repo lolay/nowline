@@ -303,7 +303,7 @@ Each of these changes rendered or exported bytes, so none is part of the byte-id
 
 | # | Change | Changes | Evidence |
 |---|---|---|---|
-| F1 | Divergence (a), decided: `after:` on a lane or group child starts at `max(previous item end, refs)`, so it only ever delays (A adopts C). [`dsl.md`](./dsl.md) gains that sentence | the SVG of 3 samples; `showcase` draws Ship on day 40, matching its exports | showcase, sizing, late-row-shifts |
+| F1 | Divergence (a), decided: `after:` on a lane or group child starts at `max(previous item end, refs)`, so it only ever delays (A adopts C). [`dsl.md`](./dsl.md) gains that sentence | the SVG of 3 samples; `showcase` now draws Ship after the parallel it waits on, at 42.2 working days against the exports' 40 (the remaining 2.2 days are the (d) tail gutter, closed by F3) | showcase, sizing, late-row-shifts |
 | F2 | Decide divergence (e): `after:` on a group inside a parallel | as F1 | no sample today |
 | F3 | Keep the pixel quirks (b), (c), (d), (f) out of the lane cursor, or document them as presentation | SVG of 7 samples | §1.3 |
 | F4 | After F1 and F2: floor A's starts from C, and warm-start A's barrier passes from C's `S_k` | nothing (same fixpoint); `waveSolve.passes` drops | §3.1 |
