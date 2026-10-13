@@ -9,6 +9,7 @@ import type {
     SwimlaneDeclaration,
 } from '@nowline/core';
 import { buildWavePlan, isGroupBlock, isItemDeclaration, isParallelBlock } from '@nowline/core';
+import { trackNodes } from '@nowline/core/internal';
 import { deriveTotalEffortDays, literalToDays, resolveDuration } from './calendar.js';
 import {
     estimateCapacitySuffixWidth,
@@ -16,7 +17,7 @@ import {
     parseCapacityValue,
     resolveCapacityIcon,
 } from './capacity.js';
-import { formatIsoDate, parseDate, propValue, propValues } from './dsl-utils.js';
+import { formatIsoDate, parseIsoDate, propValue, propValues } from './dsl-utils.js';
 import {
     ChannelGrid,
     collectRoutingObstacles,
@@ -514,7 +515,7 @@ function sequenceItem(
         let earliestCapX: number | undefined;
         let earliestCapRef: string | undefined;
         for (const ref of beforeRaw) {
-            const inlineDate = parseDate(ref);
+            const inlineDate = parseIsoDate(ref);
             const capX = inlineDate
                 ? (ctx.scale.forwardWithinDomain(inlineDate) ?? undefined)
                 : ctx.entityLeftEdges.get(ref);
@@ -1567,36 +1568,13 @@ function buildNowline(
 
 // Mutable layout-time context shared across helpers.
 
-// Traverse the full content tree to build an `items` map keyed by id.
+// Every item under the lanes, keyed by id. Title-only items register under a
+// synthetic, non-referenceable handle so they still appear as dependency-edge
+// targets.
 function collectItems(swimlanes: SwimlaneDeclaration[]): Map<string, ItemDeclaration> {
     const out = new Map<string, ItemDeclaration>();
-    const walk = (node: ItemDeclaration | GroupBlock | ParallelBlock): void => {
-        if (isItemDeclaration(node)) {
-            // Title-only items register under a synthetic, non-referenceable
-            // handle so they still appear as dependency-edge targets.
-            out.set(node.name ?? syntheticItemKey(node), node);
-            return;
-        }
-        if (isParallelBlock(node)) {
-            for (const child of node.content) {
-                if (child.$type === 'DescriptionDirective') continue;
-                walk(child as ItemDeclaration | GroupBlock);
-            }
-            return;
-        }
-        if (isGroupBlock(node)) {
-            for (const child of node.content) {
-                if (child.$type === 'DescriptionDirective') continue;
-                walk(child as ItemDeclaration | GroupBlock | ParallelBlock);
-            }
-            return;
-        }
-    };
-    for (const lane of swimlanes) {
-        for (const child of lane.content) {
-            if (child.$type === 'DescriptionDirective') continue;
-            walk(child as ItemDeclaration | GroupBlock | ParallelBlock);
-        }
+    for (const node of trackNodes(swimlanes)) {
+        if (isItemDeclaration(node)) out.set(node.name ?? syntheticItemKey(node), node);
     }
     return out;
 }

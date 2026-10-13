@@ -25,10 +25,10 @@ import type { MessageArgs, MessageCode } from '../i18n/index.js';
 import { tr } from '../i18n/index.js';
 import type { WavePresentationField } from '../i18n/wave-message-types.js';
 import { basename } from '../util/posix-path.js';
+import { propKey } from '../util/props.js';
 import { singleLine } from '../util/single-line.js';
+import { forEachDeclaredId } from './ast-walk.js';
 import type { IncludeMode, ResolveDiagnostic, ResolvedContent } from './include-resolver.js';
-import { registerEntity } from './nowline-validator.js';
-import { propKey } from './validator-utils.js';
 import {
     checkWaveDeclarations,
     evaluateWaveProperties,
@@ -324,7 +324,7 @@ export function runResolverWaveChecks(input: ResolverWaveInput): ResolveDiagnost
             );
         };
         if (file.roadmapDecl) register(file.roadmapDecl.name, file.roadmapDecl);
-        for (const entry of file.roadmapEntries) registerEntity(entry, register);
+        for (const entry of file.roadmapEntries) forEachDeclaredId(entry, register);
         for (const entry of file.configEntries) {
             if (isStyleDeclaration(entry)) register(entry.name, entry);
         }

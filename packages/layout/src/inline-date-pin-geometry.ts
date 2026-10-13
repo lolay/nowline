@@ -25,6 +25,7 @@
 //   Containers don't carry status dots or footnote indicators, so the
 //   only neighbor to clear is the container's own title.
 
+import { ISO_DATE_RE } from '@nowline/core/internal';
 import {
     CONTAINER_HEADER_BAND_PX,
     containerHeaderTitleWidth,
@@ -225,7 +226,7 @@ export function computeContainerInlineDatePins(
  */
 export function pickInlineDate(values: readonly string[]): string | undefined {
     for (const v of values) {
-        if (/^\d{4}-\d{2}-\d{2}$/.test(v)) return v;
+        if (ISO_DATE_RE.test(v)) return v;
     }
     return undefined;
 }

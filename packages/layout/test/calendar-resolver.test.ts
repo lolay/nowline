@@ -245,6 +245,15 @@ describe('weekend replacement (decision 14)', () => {
         expect(await weekdaysOf(declared(['non-working fridays every:fri']))).toEqual([1, 2, 3, 4]);
     });
 
+    it('leaves out a recurrence on a name only Object.prototype holds', async () => {
+        const { file, resolved } = await parseAndResolve(
+            declared(['non-working odd every:[constructor]']),
+        );
+        const { working } = resolveWorkingCalendar(file, resolved);
+        expect(working.rules.some((rule) => rule.id === 'odd')).toBe(false);
+        expect(sorted(working.workingWeekdays)).toEqual([1, 2, 3, 4, 5]);
+    });
+
     it('replaces: business with non-working weekend every:[fri, sat] works Sunday to Thursday', async () => {
         expect(await weekdaysOf(declared(['non-working weekend every:[fri, sat]']))).toEqual([
             0, 1, 2, 3, 4,

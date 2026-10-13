@@ -21,30 +21,33 @@ import type {
 } from '../generated/ast.js';
 import {
     isAnchorDeclaration,
+    isConfigEntry,
     isDefaultDeclaration,
-    isDescriptionDirective,
     isGroupBlock,
     isItemDeclaration,
     isMilestoneDeclaration,
     isNowlineFile,
     isParallelBlock,
-    isPersonDeclaration,
     isStyleDeclaration,
     isSwimlaneDeclaration,
     isSymbolDeclaration,
-    isTeamDeclaration,
     isWaveDeclaration,
 } from '../generated/ast.js';
 import type { MessageArgs } from '../i18n/index.js';
 import type { WaveKind, WaveSuggestion } from '../i18n/wave-message-types.js';
+import { ISO_DATE_RE, isRealIsoDate, propKey } from '../util/props.js';
 import { singleLine } from '../util/single-line.js';
 import {
-    DATE_RE,
+    type DeclarationNode,
+    declarations,
+    firstDeclarations,
+    trackChildren,
+} from './ast-walk.js';
+import {
     defaultBannedMessage,
     displayName,
     entityTypeLabel,
     lineOf,
-    propKey,
     suggestUniqueKey,
 } from './validator-utils.js';
 
@@ -197,27 +200,17 @@ function isWaveContainer(node: AstNode | undefined): boolean {
 }
 
 /**
- * `ew(x)` from specs/waves.md §4.4: the 1-based index of the node's
- * effective wave, or undefined for background work.
+ * `ew(x)` from specs/waves.md §4.4, one step: the 1-based index of the node's
+ * effective wave, or undefined for background work (`assignWaves` runs it
+ * down the tree).
  *
  * - A `wave:` that names a valid declared wave applies, unless an enclosing
- *   group or parallel already has an effective wave: then the container's
- *   wave wins (a WV7 conflict uses the container's wave).
+ *   group or parallel already has an effective wave (`inherited`): then the
+ *   container's wave wins (a WV7 conflict uses the container's wave).
  * - An invalid `wave:` value (WV6) makes the node background.
  * - With no `wave:`, the nearest enclosing group or parallel decides.
  *   Swimlanes never contribute.
  */
-export function effectiveWave(
-    node: AstNode,
-    waveIds: ReadonlyMap<string, number>,
-): number | undefined {
-    const parent = isWaveContainer(node.$container) ? node.$container : undefined;
-    const inherited = parent ? effectiveWave(parent as AstNode, waveIds) : undefined;
-    return effectiveWaveStep(node, inherited, waveIds, topLevel(node));
-}
-
-// One step of `ew`: the node's own `wave:` against the effective wave of its
-// enclosing group or parallel (`inherited`).
 function effectiveWaveStep(
     node: AstNode,
     inherited: number | undefined,
@@ -231,33 +224,6 @@ function effectiveWaveStep(
     return inherited ?? own.index;
 }
 
-/**
- * `lw(C)` from specs/waves.md §5.1: the wave a container's box may not open
- * before. An item's lead wave is its effective wave. A group without an
- * effective wave takes its first child's; a parallel without one takes the
- * minimum over its tracks, or background when any track is background. An
- * empty container is background.
- */
-export function leadWave(node: AstNode, waveIds: ReadonlyMap<string, number>): number | undefined {
-    const own = effectiveWave(node, waveIds);
-    if (own !== undefined || isItemDeclaration(node)) return own;
-    if (isGroupBlock(node)) {
-        const first = node.content.find((c) => !isDescriptionDirective(c));
-        return first ? leadWave(first, waveIds) : undefined;
-    }
-    if (isParallelBlock(node)) {
-        let min: number | undefined;
-        for (const track of node.content) {
-            if (isDescriptionDirective(track)) continue;
-            const lw = leadWave(track, waveIds);
-            if (lw === undefined) return undefined;
-            min = min === undefined ? lw : Math.min(min, lw);
-        }
-        return min;
-    }
-    return undefined;
-}
-
 /** `ew` and `lw` for every item, group and parallel under a list of lanes. */
 export interface WaveAssignment {
     /** `ew(x)`, for every node with an effective wave (absent: background). */
@@ -267,12 +233,15 @@ export interface WaveAssignment {
 }
 
 /**
- * `effectiveWave` and `leadWave` for every item, group and parallel under
- * `lanes`, in one pass: `ew` top-down, `lw` bottom-up. Use this instead of
- * calling the single-node helpers per node, which re-walk the ancestors and
- * the file's entries each time. The lanes may come from several files that
- * agree on the waves (include rule 12); each `wave:` is still checked
- * against its own file's declaration order.
+ * `ew` and `lw` (specs/waves.md §4.4 and §5.1) for every item, group and
+ * parallel under `lanes`, in one pass: `ew` top-down, `lw` bottom-up. The
+ * lanes may come from several files that agree on the waves (include rule
+ * 12); each `wave:` is still checked against its own file's declaration order.
+ *
+ * `lw(C)` is the wave a container's box may not open before. An item's lead
+ * wave is its effective wave. A group without an effective wave takes its
+ * first child's; a parallel without one takes the minimum over its tracks, or
+ * background when any track is background. An empty container is background.
  */
 export function assignWaves(
     lanes: readonly SwimlaneDeclaration[],
@@ -293,9 +262,7 @@ export function assignWaves(
         let lw = ew;
         if (isGroupBlock(node) || isParallelBlock(node)) {
             const leads: Array<number | undefined> = [];
-            for (const child of node.content) {
-                if (!isDescriptionDirective(child)) leads.push(visit(child, ew, top));
-            }
+            for (const child of trackChildren(node)) leads.push(visit(child, ew, top));
             if (ew === undefined) {
                 if (isGroupBlock(node)) lw = leads[0];
                 else if (leads.length > 0 && !leads.includes(undefined)) {
@@ -318,9 +285,7 @@ export function assignWaves(
             }
             top = { file, index: (file.roadmapEntries as AstNode[]).indexOf(lane), waveDecls };
         }
-        for (const child of lane.content) {
-            if (!isDescriptionDirective(child)) visit(child, undefined, top);
-        }
+        for (const child of trackChildren(lane)) visit(child, undefined, top);
     }
     return { waveOf, leadOf };
 }
@@ -330,38 +295,16 @@ export function assignWaves(
 /** Resolves an id to its declaration. Layout and includes pass merged lookups. */
 export type WaveRefLookup = (id: string) => AstNode | undefined;
 
-function isValidIsoDate(v: string): boolean {
-    return DATE_RE.test(v) && !Number.isNaN(new Date(v).getTime());
-}
-
 function dateProp(node: AstNode): string | undefined {
     const props = (node as { properties?: EntityProperty[] }).properties ?? [];
     return props.find((p) => propKey(p) === 'date')?.value;
 }
 
-// Ids that `after:`, `before:` and `on:` can name, mirroring the validator's
-// `collectReferenceableIds`. The first declaration of a repeated id wins.
-function collectDeclarations(file: NowlineFile): Map<string, AstNode> {
-    const ids = new Map<string, AstNode>();
-    const add = (node: AstNode): void => {
-        const name = (node as { name?: string }).name;
-        if (name && !ids.has(name)) ids.set(name, node);
-        if (isSwimlaneDeclaration(node) || isParallelBlock(node) || isGroupBlock(node)) {
-            for (const c of node.content) add(c);
-        } else if (isTeamDeclaration(node)) {
-            for (const c of node.content) {
-                if (isTeamDeclaration(c) || isPersonDeclaration(c)) add(c);
-            }
-        }
-    };
-    if (file.roadmapDecl) add(file.roadmapDecl);
-    for (const entry of file.roadmapEntries) add(entry);
-    return ids;
-}
-
 /** A lookup over one file's declarations (see `WaveRefLookup`). */
 export function fileRefLookup(file: NowlineFile): WaveRefLookup {
-    const ids = collectDeclarations(file);
+    // Ids that `after:`, `before:` and `on:` can name; the first declaration
+    // of a repeated id wins.
+    const ids = firstDeclarations(file);
     return (id) => ids.get(id);
 }
 
@@ -383,7 +326,7 @@ export function waveFloorDate(
         for (const v of vals) {
             if (!v) continue;
             let date: string | undefined;
-            if (DATE_RE.test(v)) {
+            if (ISO_DATE_RE.test(v)) {
                 date = v;
             } else {
                 const target = lookup(v);
@@ -391,7 +334,7 @@ export function waveFloorDate(
                     date = dateProp(target);
                 }
             }
-            if (date === undefined || !isValidIsoDate(date)) continue;
+            if (date === undefined || !isRealIsoDate(date)) continue;
             if (best === null || date > best.date) best = { date, ref: v };
         }
     }
@@ -487,7 +430,7 @@ export function checkWaveDeclaration(wave: WaveDeclaration, lookup: WaveRefLooku
         for (const ref of vals) {
             // Dates are checked by checkInlineDatePins (E0410/E0412/E0413);
             // an id that resolves to nothing gets only "does not resolve".
-            if (!ref || DATE_RE.test(ref)) continue;
+            if (!ref || ISO_DATE_RE.test(ref)) continue;
             const target = lookup(ref);
             if (!target || isAnchorDeclaration(target)) continue;
             if (isMilestoneDeclaration(target)) {
@@ -525,29 +468,12 @@ type W0702Target = MessageArgs<'NL.W0702'>[0]['target'];
 type W0702Kind = Exclude<W0702Target, { kind: 'default' }>['kind'];
 
 // Every node that can carry a `wave:` key, outside wave declarations (the S
-// rules own those): the roadmap line, roadmap entries and their content,
-// people inside teams, and `default <entity>` lines.
-function collectWaveHosts(file: NowlineFile): AstNode[] {
-    const out: AstNode[] = [];
-    const add = (node: AstNode): void => {
-        if (isWaveDeclaration(node)) return;
-        out.push(node);
-        if (isSwimlaneDeclaration(node) || isParallelBlock(node) || isGroupBlock(node)) {
-            for (const c of node.content) {
-                if (!isDescriptionDirective(c)) add(c);
-            }
-        } else if (isTeamDeclaration(node)) {
-            for (const c of node.content) {
-                if (isTeamDeclaration(c) || isPersonDeclaration(c)) add(c);
-            }
-        }
-    };
-    for (const entry of file.configEntries) {
-        if (isDefaultDeclaration(entry)) out.push(entry);
-    }
-    if (file.roadmapDecl) add(file.roadmapDecl);
-    for (const entry of file.roadmapEntries) add(entry);
-    return out;
+// rules own those): `default <entity>` lines, the roadmap line, roadmap
+// entries and their content, and teams nested in teams.
+function waveHosts(file: NowlineFile): DeclarationNode[] {
+    return [...declarations(file, { config: true, roadmap: true })].filter((node) =>
+        isConfigEntry(node) ? isDefaultDeclaration(node) : !isWaveDeclaration(node),
+    );
 }
 
 // WV6 suggestion: a wave whose title matches the value (case-insensitive),
@@ -720,7 +646,7 @@ export function evaluateWaveProperties(file: NowlineFile): WaveFinding[] {
     const lookup = fileRefLookup(file);
     const findings: WaveFinding[] = [];
 
-    for (const node of collectWaveHosts(file)) {
+    for (const node of waveHosts(file)) {
         const props = waveProps(node);
         if (props.length === 0) continue;
 
@@ -787,7 +713,7 @@ export function evaluateWaveProperties(file: NowlineFile): WaveFinding[] {
         const finding = checkWaveValue(file, node, prop, waves, waveIds, lookup);
         if (finding) findings.push(finding);
         // WV6: a repeated `wave:` key gives the entity more than one wave.
-        // The first key still applies (`effectiveWave`); each later key is
+        // The first key still applies (`ew`); each later key is
         // reported with every value the entity names.
         if (repeated.length > 0) {
             const all = props.flatMap((p) => (p.value !== undefined ? [p.value] : p.values));

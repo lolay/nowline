@@ -20,6 +20,8 @@
 //    --timezone is ignored. --timezone only governs the clock-based default
 //    (when --now is omitted).
 
+import { ISO_DATE_RE } from '@nowline/core/internal';
+
 // ---- Types and errors -------------------------------------------------------
 
 /**
@@ -145,9 +147,6 @@ export function civilDateInZone(instant: Date, zone: NormalizedZone): Date {
 
 // ---- Now-value parsing ------------------------------------------------------
 
-// Bare YYYY-MM-DD (floating date, zone-independent)
-const BARE_DATE_RE = /^(\d{4})-(\d{2})-(\d{2})$/;
-
 // ISO 8601 instant with explicit Z or ±HH / ±HH:MM / ±HHMM offset.
 // Captures: [1] datetime part, [2] sign or Z, [3] hours, [4] minutes (optional)
 const ISO_WITH_OFFSET_RE =
@@ -215,15 +214,10 @@ export function resolveToday(opts: ResolveTodayOptions = {}): Date | undefined {
 
     if (now !== undefined) {
         // 3. Bare YYYY-MM-DD — floating; zone ignored
-        const bareMatch = BARE_DATE_RE.exec(now);
-        if (bareMatch) {
-            return new Date(
-                Date.UTC(
-                    parseInt(bareMatch[1], 10),
-                    parseInt(bareMatch[2], 10) - 1,
-                    parseInt(bareMatch[3], 10),
-                ),
-            );
+        // (`Date.UTC` rolls an impossible day over: `--now` is operator input, not DSL.)
+        if (ISO_DATE_RE.test(now)) {
+            const [year, month, day] = now.split('-').map((part) => parseInt(part, 10));
+            return new Date(Date.UTC(year, month - 1, day));
         }
 
         // 4. ISO 8601 instant with explicit Z or offset — embedded offset WINS

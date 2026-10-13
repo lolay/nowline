@@ -3,19 +3,16 @@ import type {
     EntityProperty,
     FootnoteDeclaration,
     GroupBlock,
-    GroupContent,
     ItemDeclaration,
     LabelDeclaration,
     MilestoneDeclaration,
     NonWorkingDeclaration,
     NowlineFile,
     ParallelBlock,
-    ParallelContent,
     PersonDeclaration,
     SizeDeclaration,
     StatusDeclaration,
     StyleDeclaration,
-    SwimlaneContent,
     SwimlaneDeclaration,
     SymbolDeclaration,
     TeamDeclaration,
@@ -33,7 +30,6 @@ import {
     isNowlineFile,
     isParallelBlock,
     isPersonDeclaration,
-    isPersonMemberRef,
     isSizeDeclaration,
     isStatusDeclaration,
     isStyleDeclaration,
@@ -43,6 +39,7 @@ import {
     isWaveDeclaration,
     isWorkingDeclaration,
 } from '@nowline/core';
+import { declarations, propKey, visitProperties } from '@nowline/core/internal';
 import type { AstNode, CstNode, LangiumDocument } from 'langium';
 import { CstUtils, GrammarUtils } from 'langium';
 import type { Range } from '../lsp-protocol.js';
@@ -81,56 +78,21 @@ export const REFERENCE_PROP_KEYS = new Set([
 ]);
 
 /**
- * Status value-completion source: built-in statuses ship with the renderer.
- * Mirrors `BUILTIN_STATUSES` in the validator, including the `active` and
- * `completed` aliases for `in-progress` and `done`.
+ * Value-completion sources. The vocabularies are core's (`value-tables.ts`):
+ * the validator checks values against the same lists, so the editor offers
+ * exactly what validates. Kept as `@nowline/lsp` exports. `WEEKDAY_NAMES` is
+ * the weekday names `every:` takes, Sunday first.
  */
-export const BUILTIN_STATUSES: readonly string[] = [
-    'planned',
-    'in-progress',
-    'active',
-    'done',
-    'completed',
-    'at-risk',
-    'blocked',
-];
+export {
+    BUILTIN_CAPACITY_ICONS,
+    BUILTIN_ICON_NAMES,
+    BUILTIN_STATUSES,
+    NON_WORKING_DISPLAYS,
+    WEEKDAYS as WEEKDAY_NAMES,
+} from '@nowline/core/internal';
 
-/**
- * Built-in `capacity-icon:` vocabulary. Mirrors `BUILTIN_CAPACITY_ICONS` in
- * the validator — kept as a literal here so the LSP doesn't have to import a
- * non-public symbol from `@nowline/core`.
- */
-export const BUILTIN_CAPACITY_ICONS: readonly string[] = [
-    'none',
-    'multiplier',
-    'person',
-    'people',
-    'points',
-    'time',
-];
-
-/**
- * Built-in `icon:` vocabulary. Superset of `BUILTIN_CAPACITY_ICONS` plus the
- * entity-decoration glyphs the renderer ships.
- */
-export const BUILTIN_ICON_NAMES: readonly string[] = [
-    ...BUILTIN_CAPACITY_ICONS,
-    'shield',
-    'warning',
-    'lock',
-    'calendar',
-];
-
-/** Weekday names accepted by `every:`, Sunday first (the order of `Date#getUTCDay`). */
-export const WEEKDAY_NAMES: readonly string[] = ['sun', 'mon', 'tue', 'wed', 'thu', 'fri', 'sat'];
-
-/** Values of the `non-working:` display key on `default roadmap`. */
-export const NON_WORKING_DISPLAYS: readonly string[] = ['hide', 'show'];
-
-/** Strip the trailing `:` an `EntityProperty.key` carries from the grammar. */
-export function propKey(prop: { key: string }): string {
-    return prop.key.endsWith(':') ? prop.key.slice(0, -1) : prop.key;
-}
+/** `prop.key` without a trailing `:` (core's, kept as an `@nowline/lsp` export). */
+export { propKey };
 
 /**
  * Named declaration shapes we expose for navigation. All have `name?: string`,
@@ -177,62 +139,20 @@ export function isCalendarDeclaration(entity: AstNode): boolean {
 }
 
 /**
- * Walk the `NowlineFile` and collect every entity that owns an `id`. Covers
- * roadmap-section entities (mirrors the validator's `collectReferenceableIds`)
- * plus the named config-section declarations (`style`, `symbol`) so style and
- * symbol references navigate correctly. Anonymous config blocks (`scale`,
- * `calendar`, `default <entity>`) are skipped.
+ * Collect every entity that owns an `id`, in the order of core's declaration
+ * walk (config entries first, then roadmap entries with their track content or
+ * nested teams): the roadmap-section entities `@nowline/core`'s
+ * `referenceableIds` covers, plus the named config-section declarations
+ * (`style`, `symbol`) so style and symbol references navigate correctly.
+ * The LSP skips the roadmap line itself (not walked here) and the calendar
+ * declarations (`isCalendarDeclaration`); anonymous declarations have no id.
  */
 export function collectNamedEntities(file: NowlineFile): NamedEntity[] {
     const out: NamedEntity[] = [];
-
-    for (const entry of file.configEntries) {
-        if (isStyleDeclaration(entry) && entry.name) out.push(entry);
-        else if (isSymbolDeclaration(entry) && entry.name) out.push(entry);
+    for (const node of declarations(file, { config: true })) {
+        if (!(node as { name?: string }).name || isCalendarDeclaration(node)) continue;
+        out.push(node as NamedEntity);
     }
-
-    const visitTeam = (team: TeamDeclaration) => {
-        if (team.name) out.push(team);
-        for (const c of team.content) {
-            if (isTeamDeclaration(c)) visitTeam(c);
-            // `PersonMemberRef` and `DescriptionDirective` are references / prose,
-            // not declarations — skip.
-            else if (isPersonMemberRef(c)) {
-                /* skip */
-            }
-        }
-    };
-
-    const visitTrackChild = (child: SwimlaneContent | GroupContent | ParallelContent) => {
-        if (isItemDeclaration(child) && child.name) out.push(child);
-        else if (isParallelBlock(child)) {
-            if (child.name) out.push(child);
-            for (const sub of child.content) visitTrackChild(sub);
-        } else if (isGroupBlock(child)) {
-            if (child.name) out.push(child);
-            for (const sub of child.content) visitTrackChild(sub);
-        }
-    };
-
-    for (const entry of file.roadmapEntries) {
-        if (isSwimlaneDeclaration(entry)) {
-            if (entry.name) out.push(entry);
-            for (const c of entry.content) visitTrackChild(c);
-        } else if (isTeamDeclaration(entry)) visitTeam(entry);
-        else if (
-            isPersonDeclaration(entry) ||
-            isAnchorDeclaration(entry) ||
-            isMilestoneDeclaration(entry) ||
-            isFootnoteDeclaration(entry) ||
-            isLabelDeclaration(entry) ||
-            isSizeDeclaration(entry) ||
-            isStatusDeclaration(entry) ||
-            isWaveDeclaration(entry)
-        ) {
-            if (entry.name) out.push(entry);
-        }
-    }
-
     return out;
 }
 
@@ -251,27 +171,7 @@ export function buildEntityIndex(file: NowlineFile): Map<string, NamedEntity> {
 }
 
 /** Visit every `EntityProperty` reachable from a roadmap entry, depth-first. */
-export function visitProperties(
-    node: AstNode,
-    visit: (prop: EntityProperty, owner: AstNode) => void,
-): void {
-    const walk = (n: AstNode): void => {
-        const props = (n as { properties?: EntityProperty[] }).properties;
-        if (Array.isArray(props)) {
-            for (const p of props) visit(p, n);
-        }
-        if (isSwimlaneDeclaration(n)) {
-            for (const c of n.content) walk(c);
-        } else if (isParallelBlock(n) || isGroupBlock(n)) {
-            for (const c of n.content) walk(c);
-        } else if (isTeamDeclaration(n)) {
-            for (const c of n.content) {
-                if (isTeamDeclaration(c) || isPersonDeclaration(c)) walk(c);
-            }
-        }
-    };
-    walk(node);
-}
+export { visitProperties };
 
 /**
  * Iterate every `EntityProperty` in the file, including those on the roadmap
