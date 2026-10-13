@@ -14,6 +14,7 @@ import type {
 } from '@nowline/core';
 import type { BandScale } from './band-scale.js';
 import { type resolveCalendar, resolveSizes } from './calendar.js';
+import type { FootnoteIndex } from './nodes/footnote-node.js';
 import type { ItemMeasure } from './nodes/item-measure.js';
 import type { RoadmapSchedule } from './schedule.js';
 import type { StyleContext } from './style-resolution.js';
@@ -207,6 +208,7 @@ export function createLayoutContext(
     },
     chart: Pick<LayoutContext, 'chartTopY' | 'chartBottomY' | 'swimlaneBottomY' | 'chartRightX'>,
     init: {
+        footnotes?: FootnoteIndex;
         markerRowPlacements?: Map<string, MarkerRowPlacement>;
     },
 ): LayoutContext {
@@ -227,8 +229,8 @@ export function createLayoutContext(
         teams: source.content.teams,
         persons: source.content.persons,
         symbols: source.config.symbols,
-        footnoteIndex: new Map(),
-        footnoteHosts: new Map(),
+        footnoteIndex: init.footnotes?.index ?? new Map(),
+        footnoteHosts: init.footnotes?.hosts ?? new Map(),
         timeline: shared.timeline,
         scale: shared.scale,
         calendar: shared.calendar,

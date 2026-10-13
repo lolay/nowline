@@ -1,4 +1,4 @@
-// FootnoteNode + buildFootnotes — footnote area at the bottom of the
+// FootnoteNode + indexFootnotes / buildFootnotePanel — footnote area at the bottom of the
 // chart. Each footnote gets a stable index (1-based, sorted by id) and
 // records its `on:` host references so item / swimlane sequencing can
 // emit the matching superscript indicators. The panel grows to fit:
@@ -15,27 +15,34 @@ import {
 } from '../themes/shared.js';
 import type { BoundingBox, PositionedFootnoteArea, PositionedFootnoteEntry } from '../types.js';
 
-export interface BuiltFootnotes {
-    area: PositionedFootnoteArea;
+/** Each footnote's 1-based number (sorted by id) and its `on:` host ids. */
+export interface FootnoteIndex {
     index: Map<string, number>;
     hosts: Map<string, string[]>;
 }
 
-export function buildFootnotes(
-    footnotes: Map<string, FootnoteDeclaration>,
-    ctx: LayoutContext,
-    chartBottomY: number,
-): BuiltFootnotes {
-    const entries: PositionedFootnoteEntry[] = [];
+/** Pure: depends only on the footnote declarations. */
+export function indexFootnotes(footnotes: Map<string, FootnoteDeclaration>): FootnoteIndex {
     const index = new Map<string, number>();
     const hosts = new Map<string, string[]>();
     const ordered = [...footnotes.entries()].sort(([a], [b]) => a.localeCompare(b));
     ordered.forEach(([id, f], i) => {
-        const n = i + 1;
-        index.set(id, n);
+        index.set(id, i + 1);
         hosts.set(id, propValues(f.properties, 'on'));
+    });
+    return { index, hosts };
+}
+
+export function buildFootnotePanel(
+    footnotes: Map<string, FootnoteDeclaration>,
+    ctx: LayoutContext,
+    chartBottomY: number,
+): PositionedFootnoteArea {
+    const entries: PositionedFootnoteEntry[] = [];
+    const ordered = [...footnotes.entries()].sort(([a], [b]) => a.localeCompare(b));
+    ordered.forEach(([id, f], i) => {
         entries.push({
-            number: n,
+            number: i + 1,
             title: f.title ?? id,
             description: f.description?.text,
             style: resolveStyle('footnote', f.properties, ctx.styleCtx),
@@ -52,9 +59,5 @@ export function buildFootnotes(
                   entries.length * FOOTNOTE_ROW_HEIGHT +
                   FOOTNOTE_PANEL_PADDING_PX,
     };
-    return {
-        area: { box, entries },
-        index,
-        hosts,
-    };
+    return { box, entries };
 }

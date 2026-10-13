@@ -72,7 +72,7 @@ import {
 } from '../wave-layout.js';
 import { buildAnchors } from './anchor-node.js';
 import { maxLeafItemRightX } from './content-extent.js';
-import { buildFootnotes } from './footnote-node.js';
+import { buildFootnotePanel, indexFootnotes } from './footnote-node.js';
 import { buildIncludeRegions, fitIncludeRegionWidth } from './include-node.js';
 import {
     type MarkerEntity,
@@ -468,6 +468,8 @@ export class RoadmapNode {
             });
         }
 
+        // Footnotes index must exist before sequencing items reference
+        // them.
         const ctx = createLayoutContext(
             resolved,
             {
@@ -486,14 +488,8 @@ export class RoadmapNode {
                 swimlaneBottomY: 0,
                 chartRightX: finalChartRightX,
             },
-            { markerRowPlacements },
+            { footnotes: indexFootnotes(resolved.content.footnotes), markerRowPlacements },
         );
-
-        // Footnotes index must be built before sequencing items reference
-        // them.
-        const pre = buildFootnotes(resolved.content.footnotes, ctx, 0);
-        ctx.footnoteIndex = pre.index;
-        ctx.footnoteHosts = pre.hosts;
 
         // Seed the entity-edge maps from the date-pinned pack so item
         // `after:kickoff` references resolve before swimlanes run. Mid
@@ -909,9 +905,7 @@ export class RoadmapNode {
         if (waveLegend) ctx.chartBottomY += WAVE_LEGEND_GAP_PX + waveLegend.box.height;
 
         // Finalize footnotes at the bottom.
-        const foot = buildFootnotes(resolved.content.footnotes, ctx, ctx.chartBottomY);
-        ctx.footnoteIndex = foot.index;
-        ctx.footnoteHosts = foot.hosts;
+        const footnotePanel = buildFootnotePanel(resolved.content.footnotes, ctx, ctx.chartBottomY);
 
         // Header (depends on chart height in beside-mode and on the
         // final canvas width in above-mode).
@@ -961,14 +955,14 @@ export class RoadmapNode {
         // future case, fall back to upper-right (above the timeline) and
         // then bottom-left (under the header card in beside-mode).
         //
-        // When there are no footnotes, `foot.area.box` still carries a 16 px
+        // When there are no footnotes, `footnotePanel.box` still carries a 16 px
         // top-of-panel offset; that's a placeholder for the footnote
         // header gap and shouldn't push the attribution down. Use the
         // bare `chartBottomY` in that case so the bottom margin is
         // exactly `GUTTER_PX + glyphHeight + GUTTER_PX`.
         const contentBottomY =
-            foot.area.entries.length > 0
-                ? foot.area.box.y + foot.area.box.height
+            footnotePanel.entries.length > 0
+                ? footnotePanel.box.y + footnotePanel.box.height
                 : ctx.chartBottomY;
         const attributionBox: BoundingBox = {
             x: ctx.chartRightX - GUTTER_PX - ATTRIBUTION_GLYPH_WIDTH,
@@ -1005,7 +999,7 @@ export class RoadmapNode {
             anchors,
             milestones,
             edges,
-            footnotes: foot.area,
+            footnotes: footnotePanel,
             includes,
             chartBox: {
                 x: chartLeftX,
