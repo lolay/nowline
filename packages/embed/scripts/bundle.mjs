@@ -21,6 +21,7 @@
 
 import { execSync } from 'node:child_process';
 import { readFileSync } from 'node:fs';
+import { createRequire } from 'node:module';
 import { dirname, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { build } from 'esbuild';
@@ -103,6 +104,58 @@ const stubNodeReadFile = {
     },
 };
 
+// Narrows Langium's `vscode-languageserver-protocol` imports to the
+// vscode-jsonrpc modules that define the names it uses. Langium's core
+// (`utils/cancellation`, `utils/event`, `workspace/document-builder`)
+// imports CancellationToken, CancellationTokenSource, Emitter,
+// LSPErrorCodes and ResponseError from the package root, a CommonJS
+// barrel esbuild cannot tree-shake, so without this the IIFE carries the
+// whole LSP protocol and JSON-RPC connection layer (~100 KB raw, ~17 KB
+// gzipped) that a browser render never runs. The shim re-exports the
+// same module instances the barrel would, and copies LSPErrorCodes from
+// the installed package at build time rather than hard-coding it. If a
+// Langium upgrade imports another name, the build fails with esbuild's
+// "No matching export" error; add the name here.
+const narrowLspProtocol = {
+    name: 'narrow-lsp-protocol',
+    setup(build) {
+        build.onResolve({ filter: /^vscode-languageserver-protocol$/ }, async (args) => {
+            if (args.pluginData?.narrowLspProtocol) return undefined;
+            const protocol = await build.resolve(args.path, {
+                kind: args.kind,
+                resolveDir: args.resolveDir,
+                pluginData: { narrowLspProtocol: true },
+            });
+            if (protocol.errors.length > 0) return { errors: protocol.errors };
+            const jsonrpc = await build.resolve('vscode-jsonrpc', {
+                kind: 'require-call',
+                resolveDir: dirname(protocol.path),
+            });
+            if (jsonrpc.errors.length > 0) return { errors: jsonrpc.errors };
+            return {
+                path: args.path,
+                namespace: 'narrow-lsp-protocol',
+                pluginData: { protocolPath: protocol.path, jsonrpcDir: dirname(jsonrpc.path) },
+            };
+        });
+        build.onLoad({ filter: /.*/, namespace: 'narrow-lsp-protocol' }, (args) => {
+            const { protocolPath, jsonrpcDir } = args.pluginData;
+            const { LSPErrorCodes } = createRequire(protocolPath)(protocolPath);
+            const from = (file) => JSON.stringify(resolve(jsonrpcDir, file));
+            return {
+                contents: [
+                    `export { CancellationToken, CancellationTokenSource } from ${from('cancellation.js')};`,
+                    `export { Emitter } from ${from('events.js')};`,
+                    `export { ResponseError } from ${from('messages.js')};`,
+                    `export const LSPErrorCodes = ${JSON.stringify(LSPErrorCodes)};`,
+                ].join('\n'),
+                loader: 'js',
+                resolveDir: jsonrpcDir,
+            };
+        });
+    },
+};
+
 const shared = {
     bundle: true,
     sourcemap: true,
@@ -115,7 +168,7 @@ const shared = {
         __NOWLINE_EMBED_VERSION__: JSON.stringify(version),
         __NOWLINE_EMBED_SHA__: JSON.stringify(sha),
     },
-    plugins: [stubNodeReadFile],
+    plugins: [stubNodeReadFile, narrowLspProtocol],
     logLevel: 'info',
 };
 
