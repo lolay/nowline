@@ -14,7 +14,7 @@ The m2 fixes of this review already moved MCP's `theme` and `pageSize` onto the 
 |---|---|---|---|---|
 | theme | flag > rc > `light`; bad rc value is exit 2 (`cli/src/cli/theme.ts:30-41`) | same (`serve.ts:75`) | arg > `light` via its own `parseThemeArg` (`mcp/src/diagnostics.ts:276-285`) | toolbar / setting > rc > editor light or dark; bad rc value silently ignored (`preview/option-resolver.ts:71-88`) |
 | width | flag > rc, integer ≥ 320 else exit 2 (`render.ts:677-688`) | **ignored**: never passed to layout (`serve.ts:172-178`) | `z.number()`, any number (`mcp/src/server.ts:636-641`) | setting > rc, any positive number (`option-resolver.ts:176-182`) |
-| now (no flag) | local civil date, `--timezone` (`render.ts:555-578`) | local, a copy of that function (`serve.ts:275-289`) | **UTC** (`server.ts:197-207`, and `:383` for validate insights) | local, setting timezone (`option-resolver.ts:117-160`; `export/in-process.ts:136-139`) |
+| now (no flag) | local civil date, `--timezone` (`render.ts:555-578`) | local, a copy of that function (`serve.ts:275-296`) | **UTC** (`server.ts:197-207`, and `:383` for validate insights) | local, setting timezone (`option-resolver.ts:117-160`; `export/in-process.ts:136-139`) |
 | page size | flag > rc `pdfPageSize` (`render.ts:626-641`) | n/a | its own `parsePageSizeArg` (`mcp/src/diagnostics.ts:293-305`) | `nowline.export.*` settings |
 | non-working | flag only (`render.ts:131`) | flag (`serve.ts:76`) | `z.enum(NON_WORKING_DISPLAYS)` (`server.ts:582-589`) | toolbar / setting (`option-resolver.ts:195-201`) |
 | `--no-links`, `--strict` | passed to the kernel (`render.ts:293-294`) | **ignored**: `renderSvg` gets neither (`serve.ts:179`) | not offered | settings |
@@ -24,7 +24,7 @@ So a `.nowlinerc` with `width: 300` fails the CLI, is passed to layout by the VS
 
 ### 1.2 The `.nowlinerc` merge is per field
 
-`renderHandler` resolves each rc-backed setting by hand (`packages/cli/src/commands/render.ts:127-151`), through `pickSetting` (`:597-612`), `stringFromConfig` / `boolFromConfig` (`:662-675`) and one parser per key (`:614-688`), and `--serve` repeats the subset it remembers (`serve.ts:74-84`). `@nowline/config` exports a generic `mergeConfig` (`packages/config/src/load-config.ts:99-106`) that nothing calls, and its `NowlineRc` type (`:18-33`) lists keys without their types or validation. Each new rc key is a change in two or three places, and a forgotten one is how `--serve` lost `width`.
+`renderHandler` resolves each rc-backed setting by hand (`packages/cli/src/commands/render.ts:127-151`), through `pickSetting` (`:602-612`), `stringFromConfig` / `boolFromConfig` (`:662-675`) and one parser per key (`:614-688`), and `--serve` repeats the subset it remembers (`serve.ts:74-84`). `@nowline/config` exports a generic `mergeConfig` (`packages/config/src/load-config.ts:91-98`) that nothing calls, and its `NowlineRc` type (`:10-25`) lists keys with loose types (`theme?: string`, an open index signature) and no validation. Each new rc key is a change in two or three places, and a forgotten one is how `--serve` lost `width`.
 
 ### 1.3 Four pipelines stage a roadmap
 
@@ -42,7 +42,7 @@ The staging steps (parse and validate, resolve includes with the include-error p
 ### 1.4 The same work runs more than once
 
 - **The logo is read twice per render, three times per raster export.** `loadLogo` reads the file to measure it (`packages/renderer/src/logo.ts:46-48`); `renderSvg` reads it again to embed it (`embedLogo`, `packages/renderer/src/svg/render.ts:2337-2346`); the kernel's PNG and PDF paths render a second, font-pinned SVG (`export/src/index.ts:327-341`, `:455`, `:470`), which reads it a third time.
-- **An MCP `render` call parses three times.** `diagnosticsErrorBlock` parses and validates (`server.ts:694`), `exportDocument` parses, resolves and lays out (`:721`), and `collectMcpLayoutInsights` resolves and lays out again (`:738-749`). `export` repeats the first two (`:934`, `:958`).
+- **An MCP `render` call parses twice and resolves and lays out twice.** `diagnosticsErrorBlock` parses and validates (`server.ts:694`), `exportDocument` parses again, resolves and lays out (`:721`), and `collectMcpLayoutInsights` reuses the first parse (`doc: blocked.doc`, `:747`) but resolves includes and lays out a second time (`:738-749`, `diagnostics.ts:201-221`). `export` parses twice too (`:934`, `:958`) and collects no insights.
 - **A CLI render parses twice.** `produce` validates first so diagnostics come out in the operator's locale, and the kernel re-parses ("double work accepted", `render.ts:266-271`).
 
 ## 2. Goals and non-goals
@@ -219,14 +219,26 @@ export interface LoadedLogo {
 
 Every step is one PR, independently mergeable, and passes these gates:
 
-- **G1, sample renders.** Render every `examples/` and `tests/*.nowline` sample on the base commit and on the step, and compare: no difference.
+- **G1, sample renders.** Render every `examples/**.nowline` and `tests/*.nowline` sample directly with the CLI, on the base commit and on the step, in each built-in theme with `--now 2026-02-09`, and compare every render's SVG bytes and exit status: any difference fails the gate, wherever it falls in the list.
   ```sh
-  git worktree add ../base origin/main && (cd ../base && make init build)
-  make build
-  for f in $(cd ../base && git ls-files 'examples/**.nowline' 'tests/*.nowline'); do
-      svg="${f%.nowline}.svg"; [ -f "../base/$svg" ] && cmp "../base/$svg" "$svg"
-  done
+  git worktree add ../base origin/main && (cd ../base && make init build-fast)
+  make build-fast
+  (cd ../base && git ls-files 'examples/**.nowline' 'tests/*.nowline') >../samples.txt
+  render_all() {  # $1 = checkout to render with, $2 = output directory
+      rm -rf "$2" && mkdir -p "$2"
+      while read -r f; do
+          for t in light dark grayscale; do
+              out="$2/${f%.nowline}.$t.svg"
+              mkdir -p "${out%/*}"
+              (cd "$1" && node packages/cli/dist/index.js "$f" --theme "$t" --now 2026-02-09 -o -) >"$out" 2>/dev/null
+              echo "exit $?" >"$out.status"
+          done
+      done <../samples.txt
+  }
+  render_all ../base ../g1-base && render_all . ../g1-step
+  diff -r ../g1-base ../g1-step
   ```
+  (`diff -r` exits non-zero when any SVG or exit status differs, and lists every difference rather than the last. The sample list is the base's, so a sample the step deletes or breaks fails too. The gate does not use `make build`, which renders only the slugs listed in `scripts/render-samples.mjs` and `scripts/render-tests.mjs` and so skips `examples/continuation`, `examples/minimal.fr`, `tests/grammar-properties`, `tests/grammar-properties-include`, `tests/partner-multi` and `tests/waves-isolate-team`, and renders the seven include files under `examples/nested/` and `examples/waves-program/` only through their parents. At the commit that adds this spec all 180 renders exit 0, and two runs on that commit give identical trees, in about three minutes.)
 - **G2, snapshots and suites.** `make pre-commit` passes without `UPDATE_LAYOUT_SNAPSHOTS`, including the CLI, MCP, browser and VS Code extension suites, whose message assertions pin every error string.
 - **G3, kernel bytes** (steps that touch the kernel or the renderer). `make determinism` passes without `UPDATE_DETERMINISM_GOLDENS`, and for every sample `nowline <file> --now 2026-02-09` with `-f png`, `-f pdf`, `-f html`, `-f xlsx`, `-f msproj` and `-f mermaid` gives the same bytes on both commits.
 
@@ -286,7 +298,7 @@ Add `packages/renderer/src/stage.ts` (§3.3) with tests for each result kind: va
 
 #### s7 - *Behaviour:* `--serve` on the shared path
 
-`--serve` resolves options through m1's resolution (so `--width`, the rc `width`, `--no-links` and `--strict` apply) and stages with `stageRoadmap`; `resolveNowArg` (`serve.ts:275-289`) goes. Tests for each flag; update [`cli.md`](./cli.md) where it says what `--serve` reads. Fragment `fixed`. G1, G2.
+`--serve` resolves options through m1's resolution (so `--width`, the rc `width`, `--no-links` and `--strict` apply) and stages with `stageRoadmap`; `resolveNowArg` (`serve.ts:275-296`) goes. Tests for each flag; update [`cli.md`](./cli.md) where it says what `--serve` reads. Fragment `fixed`. G1, G2.
 
 ## 5. Test strategy
 
