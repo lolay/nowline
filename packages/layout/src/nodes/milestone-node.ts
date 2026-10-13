@@ -6,7 +6,7 @@
 // would push past the date are flagged `isOverrun`.
 //
 // Marker-row placement (row + label box + left/right side) is decided
-// once by `roadmap-node.ts::packMarkerRow`. Date-pinned entities are
+// once by `marker-band.ts::packMarkerRow`. Date-pinned entities are
 // pre-packed before swimlanes run; after-only milestones get a
 // PROVISIONAL row=0 placement here at build time which the unified
 // re-pack in `RoadmapNode.place` overwrites with the final tick-order
@@ -17,7 +17,7 @@ import { formatIsoDate, parseDate, propValue, propValues } from '../dsl-utils.js
 import { itemSlackAttachY } from '../item-port-geometry.js';
 import type { LayoutContext } from '../layout-context.js';
 import { resolveStyle } from '../style-resolution.js';
-import type { BoundingBox, Point, PositionedMilestone } from '../types.js';
+import type { BoundingBox, Point, PositionedMilestone, SlackCorridor } from '../types.js';
 import { isOnWaveBoundary, WAVE_EDGE_TOLERANCE_PX } from '../wave-layout.js';
 import {
     MARKER_BOLD_WIDTH_FACTOR,
@@ -327,6 +327,71 @@ export function buildMilestones(
     for (const [id, m] of milestones) {
         const positioned = new MilestoneNode(id, m).place(ctx);
         if (positioned) out.push(positioned);
+    }
+    return out;
+}
+
+/**
+ * Collect slack-arrow corridors from the resolved milestones using the
+ * current entity-edge maps. The result mirrors what
+ * `MilestoneNode.place` would emit on `slackArrows`, so the row-packer
+ * and the renderer agree on every arrow's geometry.
+ *
+ * Each non-binding predecessor (`x < maxEnd`, `y > 0`) becomes one
+ * corridor; date-pinned milestones whose latest predecessor overruns
+ * the date contribute a single back-pointing corridor between the
+ * pinned column and the predecessor's right edge. Wave predecessors draw
+ * no slack arrow, so they never own a corridor (a floating milestone
+ * bound by a wave still sets `maxEnd`).
+ */
+export function collectSlackCorridors(
+    milestones: Map<string, import('@nowline/core').MilestoneDeclaration>,
+    ctx: LayoutContext,
+): SlackCorridor[] {
+    const out: SlackCorridor[] = [];
+    for (const [id, m] of milestones) {
+        const dateRaw = propValue(m.properties, 'date');
+        const afterRaw = propValues(m.properties, 'after');
+        const date = parseDate(dateRaw);
+        // Reuse MilestoneNode's helpers so the corridor set agrees
+        // exactly with the rendered slack-arrow set: same source x
+        // (visual edge for items / cut-line for markers), same
+        // attach y, and the same flow-dedupe rule that collapses
+        // chained predecessors to one arrow per flow.
+        const preds = collectMilestonePredecessors(afterRaw, ctx);
+        const dedupedPreds = lastPredecessorPerFlow(preds);
+
+        if (date) {
+            const milestoneX = ctx.scale.forwardWithinDomain(date);
+            if (milestoneX === null) continue;
+            // Wave references draw no arrow, so they own no corridor.
+            const maxPred = latestArrowPredecessor(dedupedPreds);
+            if (maxPred && maxPred.x > milestoneX && maxPred.y > 0) {
+                out.push({
+                    xStart: Math.min(maxPred.x, milestoneX),
+                    xEnd: Math.max(maxPred.x, milestoneX),
+                    y: maxPred.y,
+                    slackPredId: maxPred.ref,
+                    milestoneId: id,
+                });
+            }
+            continue;
+        }
+        if (dedupedPreds.length === 0) continue;
+        dedupedPreds.sort((a, b) => b.x - a.x);
+        const maxEnd = dedupedPreds[0].x;
+        for (let i = 1; i < dedupedPreds.length; i++) {
+            const p = dedupedPreds[i];
+            if (p.x < maxEnd && p.y > 0 && p.wave === undefined) {
+                out.push({
+                    xStart: p.x,
+                    xEnd: maxEnd,
+                    y: p.y,
+                    slackPredId: p.ref,
+                    milestoneId: id,
+                });
+            }
+        }
     }
     return out;
 }

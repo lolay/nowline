@@ -20,7 +20,7 @@ import { defaultRowBand } from '../band-scale.js';
 import { daysBetween, resolveSizes } from '../calendar.js';
 import { resolveWorkingCalendar } from '../calendar-resolver.js';
 import { cappedPixelsPerDay } from '../canvas-width.js';
-import { parseDate, propValue, propValues } from '../dsl-utils.js';
+import { parseDate, propValue } from '../dsl-utils.js';
 import { HEADER_CARD_PADDING_X, HEADER_LOGO_PAD_Y_PX } from '../header-card-geometry.js';
 import { type LogoDimensions, resolveHeaderLogo } from '../header-logo.js';
 import { localeStrings, resolveLocale } from '../i18n.js';
@@ -49,13 +49,10 @@ import type {
     PositionedDependencyEdge,
     PositionedHeader,
     PositionedIncludeRegion,
-    PositionedNonWorkingRun,
     PositionedNowline,
     PositionedRoadmap,
     PositionedSwimlane,
     PositionedTimelineScale,
-    PositionedWorkingException,
-    SlackCorridor,
 } from '../types.js';
 import type { ViewPreset } from '../view-preset.js';
 import {
@@ -78,19 +75,20 @@ import { maxLeafItemRightX } from './content-extent.js';
 import { buildFootnotes } from './footnote-node.js';
 import { buildIncludeRegions, fitIncludeRegionWidth } from './include-node.js';
 import {
-    MARKER_BOLD_WIDTH_FACTOR,
+    type MarkerEntity,
+    markerLabelsRightX,
+    nonWorkingRunEntries,
+    nonWorkingRunMarkerId,
+    packMarkerRow,
+    workingExceptionEntries,
+    workingExceptionMarkerId,
+} from './marker-band.js';
+import {
     MARKER_DIAMOND_RADIUS_PX,
-    MARKER_LABEL_GAP_PX,
-    MARKER_LABEL_HEIGHT_PX,
     MARKER_ROW_CENTER_OFFSET_PX,
     MARKER_ROW_PITCH_PX,
 } from './marker-geometry.js';
-import {
-    buildMilestones,
-    collectMilestonePredecessors,
-    lastPredecessorPerFlow,
-    latestArrowPredecessor,
-} from './milestone-node.js';
+import { buildMilestones, collectSlackCorridors } from './milestone-node.js';
 import { SwimlaneNode } from './swimlane-node.js';
 import { buildWaveLegend, buildWaves } from './wave-node.js';
 
@@ -116,77 +114,6 @@ const HEADER_CARD_TOP_INSET = 4;
  */
 function growChartRightX(ctx: LayoutContext, rightX: number): void {
     if (rightX > ctx.chartRightX) ctx.chartRightX = rightX;
-}
-
-/** The marker-row id of a titled non-working run: `nonworking:<ISO from>`. */
-function nonWorkingRunMarkerId(run: PositionedNonWorkingRun): string {
-    return `nonworking:${run.from.toISOString().slice(0, 10)}`;
-}
-
-/** The marker-row id of a working exception: `working:<ISO from>`. */
-function workingExceptionMarkerId(exception: PositionedWorkingException): string {
-    return `working:${exception.from.toISOString().slice(0, 10)}`;
-}
-
-/** A zero-radius marker-row entry for a calendar label at `x`. */
-function calendarLabelEntry(id: string, x: number, label: string): MarkerEntity {
-    return { id, centerX: x, radius: 0, title: label, fontSize: 10, bold: false };
-}
-
-/**
- * Marker-row entries for the titled runs (specs/working-calendar.md
- * §7.4): a zero-radius marker at the run's x (the seam under `hide`, the
- * band's left edge under `show`) whose title is the run's label. Callers
- * append them after the anchors and milestones, so the stable sort in
- * `packMarkerRow` places a marker that ties a run on x first.
- */
-function nonWorkingRunEntries(
-    runs: ReadonlyArray<PositionedNonWorkingRun> | undefined,
-): MarkerEntity[] {
-    const entries: MarkerEntity[] = [];
-    for (const run of runs ?? []) {
-        if (run.label === undefined) continue;
-        entries.push(calendarLabelEntry(nonWorkingRunMarkerId(run), run.x, run.label));
-    }
-    return entries;
-}
-
-/**
- * Marker-row entries for the working exceptions (specs/working-calendar.md
- * §7.4), packed beside the titled runs' and on the same terms: a zero-radius
- * marker at the first turned day's x.
- */
-function workingExceptionEntries(
-    exceptions: ReadonlyArray<PositionedWorkingException> | undefined,
-): MarkerEntity[] {
-    return (exceptions ?? []).map((exception) =>
-        calendarLabelEntry(workingExceptionMarkerId(exception), exception.x, exception.label),
-    );
-}
-
-/**
- * The canvas right edge the marker-row labels need. A label (anchor,
- * milestone, titled run or working exception) that fits neither right of
- * its x (against `chartRightX`) nor left of it (against `chartLeftX`)
- * would fall back to the left and draw over a beside header card, so the
- * canvas grows to hold it on the right instead.
- */
-function markerLabelsRightX(
-    entries: ReadonlyArray<MarkerEntity>,
-    chartLeftX: number,
-    chartRightX: number,
-    estimateTextWidth: (text: string, fontSize: number) => number,
-): number {
-    let rightX = chartRightX;
-    for (const e of entries) {
-        const labelWidth = markerLabelWidth(e, estimateTextWidth);
-        const rightEnd = e.centerX + e.radius + MARKER_LABEL_GAP_PX + labelWidth;
-        const leftStart = e.centerX - e.radius - MARKER_LABEL_GAP_PX - labelWidth;
-        if (rightEnd > chartRightX && leftStart < chartLeftX) {
-            rightX = Math.max(rightX, rightEnd + GUTTER_PX);
-        }
-    }
-    return rightX;
 }
 
 /**
@@ -1117,190 +1044,6 @@ export class RoadmapNode {
         };
         return model;
     }
-}
-
-/**
- * Collect slack-arrow corridors from the resolved milestones using the
- * current entity-edge maps. The result mirrors what
- * `MilestoneNode.place` would emit on `slackArrows`, so the row-packer
- * and the renderer agree on every arrow's geometry.
- *
- * Each non-binding predecessor (`x < maxEnd`, `y > 0`) becomes one
- * corridor; date-pinned milestones whose latest predecessor overruns
- * the date contribute a single back-pointing corridor between the
- * pinned column and the predecessor's right edge. Wave predecessors draw
- * no slack arrow, so they never own a corridor (a floating milestone
- * bound by a wave still sets `maxEnd`).
- */
-function collectSlackCorridors(
-    milestones: Map<string, import('@nowline/core').MilestoneDeclaration>,
-    ctx: LayoutContext,
-): SlackCorridor[] {
-    const out: SlackCorridor[] = [];
-    for (const [id, m] of milestones) {
-        const dateRaw = propValue(m.properties, 'date');
-        const afterRaw = propValues(m.properties, 'after');
-        const date = parseDate(dateRaw);
-        // Reuse MilestoneNode's helpers so the corridor set agrees
-        // exactly with the rendered slack-arrow set: same source x
-        // (visual edge for items / cut-line for markers), same
-        // attach y, and the same flow-dedupe rule that collapses
-        // chained predecessors to one arrow per flow.
-        const preds = collectMilestonePredecessors(afterRaw, ctx);
-        const dedupedPreds = lastPredecessorPerFlow(preds);
-
-        if (date) {
-            const milestoneX = ctx.scale.forwardWithinDomain(date);
-            if (milestoneX === null) continue;
-            // Wave references draw no arrow, so they own no corridor.
-            const maxPred = latestArrowPredecessor(dedupedPreds);
-            if (maxPred && maxPred.x > milestoneX && maxPred.y > 0) {
-                out.push({
-                    xStart: Math.min(maxPred.x, milestoneX),
-                    xEnd: Math.max(maxPred.x, milestoneX),
-                    y: maxPred.y,
-                    slackPredId: maxPred.ref,
-                    milestoneId: id,
-                });
-            }
-            continue;
-        }
-        if (dedupedPreds.length === 0) continue;
-        dedupedPreds.sort((a, b) => b.x - a.x);
-        const maxEnd = dedupedPreds[0].x;
-        for (let i = 1; i < dedupedPreds.length; i++) {
-            const p = dedupedPreds[i];
-            if (p.x < maxEnd && p.y > 0 && p.wave === undefined) {
-                out.push({
-                    xStart: p.x,
-                    xEnd: maxEnd,
-                    y: p.y,
-                    slackPredId: p.ref,
-                    milestoneId: id,
-                });
-            }
-        }
-    }
-    return out;
-}
-
-interface MarkerEntity {
-    id: string;
-    centerX: number;
-    radius: number;
-    title: string;
-    fontSize: number;
-    bold: boolean;
-}
-
-/** A marker label's width: bold labels widen by `MARKER_BOLD_WIDTH_FACTOR`. */
-function markerLabelWidth(
-    e: MarkerEntity,
-    estimateTextWidth: (text: string, fontSize: number) => number,
-): number {
-    return estimateTextWidth(e.title, e.fontSize) * (e.bold ? MARKER_BOLD_WIDTH_FACTOR : 1);
-}
-
-interface PackedPlacement {
-    rowIndex: number;
-    labelBox: BoundingBox;
-    labelSide: 'left' | 'right';
-}
-
-/**
- * Pack anchors + milestones into marker rows using a bottom-first
- * tick-order strategy. Markers default to the row CLOSEST to the
- * chart; conflicts push them UP toward the date ticks (the inverse of
- * swimlane items which default to the top and push down).
- *
- * Walk order is left-to-right by `centerX` (tick order, not file
- * declaration). For each marker:
- *   1. Try the bottommost existing row (highest `rowIndex`), right
- *      side first then left, working UP through the rows.
- *   2. If neither side fits at any existing row, GROW: prepend a new
- *      row at `rowIndex = 0`. Every previously-placed marker has its
- *      `rowIndex` incremented by 1 so the bottom corridor stays
- *      stable as the band expands upward toward the ticks.
- *
- * Returns row-relative placements (no centerY yet — caller fills that
- * in once `markerRowY` is known). Row indices follow the existing
- * convention: 0 = top of band (closest to ticks), `rowCount - 1` =
- * bottom of band (closest to chart). The "bottom-first" preference
- * lives entirely in the search order and grow direction; geometry
- * stays anchored to `markerRowY` at the top.
- */
-export function packMarkerRow(
-    entries: MarkerEntity[],
-    chartLeftX: number,
-    chartRightX: number,
-    estimateTextWidth: (text: string, fontSize: number) => number,
-): { placements: Map<string, PackedPlacement>; rowCount: number } {
-    const sorted = [...entries].sort((a, b) => a.centerX - b.centerX);
-    const placements = new Map<string, PackedPlacement>();
-    type Span = { left: number; right: number };
-    let rowSpans: Span[][] = [];
-
-    type Side = 'left' | 'right';
-    for (const e of sorted) {
-        const labelWidth = markerLabelWidth(e, estimateTextWidth);
-        const naturalRightX = e.centerX + e.radius + MARKER_LABEL_GAP_PX;
-        const naturalLeftX = e.centerX - e.radius - MARKER_LABEL_GAP_PX - labelWidth;
-        const fitsRightCanvas = naturalRightX + labelWidth <= chartRightX;
-        const fitsLeftCanvas = naturalLeftX >= chartLeftX;
-        const diamondLeft = e.centerX - e.radius;
-        const diamondRight = e.centerX + e.radius;
-
-        const sideXLeft = (s: Side): number => (s === 'right' ? naturalRightX : naturalLeftX);
-        const sideFitsCanvas = (s: Side): boolean =>
-            s === 'right' ? fitsRightCanvas : fitsLeftCanvas;
-        const collidesAt = (xLeft: number, row: number): boolean => {
-            const extLeft = Math.min(diamondLeft, xLeft);
-            const extRight = Math.max(diamondRight, xLeft + labelWidth);
-            return rowSpans[row].some((s) => s.left < extRight && s.right > extLeft);
-        };
-
-        let placedRow = -1;
-        let placedSide: Side = 'right';
-        let placedXLeft = naturalRightX;
-
-        // Bottom-first: try the highest existing row first, working up
-        // toward row 0 (closest to the ticks).
-        outer: for (let row = rowSpans.length - 1; row >= 0; row--) {
-            for (const side of ['right', 'left'] as const) {
-                if (!sideFitsCanvas(side)) continue;
-                const xLeft = sideXLeft(side);
-                if (collidesAt(xLeft, row)) continue;
-                placedRow = row;
-                placedSide = side;
-                placedXLeft = xLeft;
-                break outer;
-            }
-        }
-
-        if (placedRow === -1) {
-            // No existing row fits — prepend a fresh top row and shift
-            // every previous placement DOWN by one slot (rowIndex += 1)
-            // so the bottom corridor stays stable.
-            for (const [id, p] of placements) {
-                placements.set(id, { ...p, rowIndex: p.rowIndex + 1 });
-            }
-            rowSpans = [[], ...rowSpans];
-            placedRow = 0;
-            placedSide = fitsRightCanvas ? 'right' : 'left';
-            placedXLeft = sideXLeft(placedSide);
-        }
-
-        const extLeft = Math.min(diamondLeft, placedXLeft);
-        const extRight = Math.max(diamondRight, placedXLeft + labelWidth);
-        rowSpans[placedRow].push({ left: extLeft, right: extRight });
-        placements.set(e.id, {
-            rowIndex: placedRow,
-            labelBox: { x: placedXLeft, y: 0, width: labelWidth, height: MARKER_LABEL_HEIGHT_PX },
-            labelSide: placedSide,
-        });
-    }
-
-    return { placements, rowCount: rowSpans.length };
 }
 
 // Read the optional `locale:` property from the file's `nowline` directive.

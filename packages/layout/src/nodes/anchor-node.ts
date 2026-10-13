@@ -2,7 +2,7 @@
 // helper. Each anchor sits in the marker row of the timeline and emits
 // a downward cut line through the chart. Marker-row placement (row +
 // label box + left/right label side) is decided up-front in
-// `roadmap-node.ts` (`packMarkerRow`) so anchors and milestones share
+// `marker-band.ts` (`packMarkerRow`) so anchors and milestones share
 // the same row stack — see `LayoutContext.markerRowPlacements`.
 
 import type { AnchorDeclaration } from '@nowline/core';
