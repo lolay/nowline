@@ -1,7 +1,7 @@
 ```
 --- KICKOFF: begin orchestration at [deep] ---
 
-  Status: 4/10 groups done | last review: wave-4 PASS | current: nowline m3 s1-s2 [exec] | updated 2026-10-13 | passed unattended: gate 4, gate 2 before wave 4
+  Status: 5/10 groups done | last review: wave-5 PASS | current: nowline m3 s3 [deep] | updated 2026-10-13 | passed unattended: gate 4 before wave 5
 
   mode: unattended | proposed unattended (harness=claude-code runner=cloud; CLAUDE_CODE_REMOTE=true, assigned branch) | guard 3x min $50 | fixups 2 | confirmed 2026-10-13 session 7e027fcc-1ca6-51b0-b005-63e1163df819 by Kickoff prompt: Run in unattended mode.
 
@@ -116,11 +116,11 @@ Add `packages/layout/src/nodes/item-measure.ts` with `ItemMeasure` and `measureI
 
 ## m3 - Placement and its context
 
-#### s1 - [exec] One `LayoutContext` builder
+#### s1 - [exec] One `LayoutContext` builder (done)
 
 Add `createLayoutContext(source, shared, chart, init)` to `packages/layout/src/layout-context.ts` (spec §3.8, with `schedule` in `shared` since R1 already added it to the context); `RoadmapNode.place` and `buildIncludeRegions` call it instead of their literals. The chart fields pass through unchanged (root: `chartTopY` from the timeline, both bottoms 0, `chartRightX` final; region: all three y fields `innerStartY`, the host's `chartRightX`), a region gets no footnotes and no marker placements, and the caller still seeds the wave edges. G1, G2, G3.
 
-#### s2 - [exec] Footnotes indexed once
+#### s2 - [exec] Footnotes indexed once (done)
 
 Split `buildFootnotes` into a pure `indexFootnotes(footnotes)` (index and hosts) and the panel; `place` indexes once, and the panel is built once where P19 builds it today. G1, G2, G3.
 
@@ -192,6 +192,7 @@ review wave-1 (nowline m1 s1-s2) 0b49f7c..28771a2: PASS - gate script re-run by 
 review wave-2 (nowline m1 s3) b448282..7e64d9c: PASS - loops diffed: only iterated content differs, no extra parameter; RowTrackResult {children, timeCursorX, packer} per §3.8; side-effect order unchanged; G1/G3 empty, pre-commit green; SwimlaneNode never read timeCursorX at the base, so only GroupNode reads it; passed unattended: gate 2 - 2026-10-13
 review wave-3 (nowline m1 s4) 4400fbd..bbab969: PASS - pure move confirmed line by line (only export keywords, header and imports differ); marker-band.ts also carries calendarLabelEntry, MarkerEntity (exported), markerLabelWidth, PackedPlacement; collectSlackCorridors after buildMilestones; no test imported the moved symbols; G1/G3 empty per worker - 2026-10-13
 review wave-4 (nowline m2 s1-s2) f354568..f5a6416: PASS - reviewer re-ran the gate script vs 570254b: GATES PASSED; moved helpers arithmetic-identical; measureItem reads no entity edges or placed items; ItemMeasure keeps visualWidth and naturalVisualWidth by name for byte identity; safety-net Math.max replaced by the pitch (G1 empty); predictItemBarExtraHeight gone, one computeChipBarExtra caller; both identity claims hold; corpus test and three fixtures fail on the base; passed unattended: gate 4, gate 2 - 2026-10-13
+review wave-5 (nowline m3 s1-s2) bb92ae0..1dd90a6: PASS - createLayoutContext per §3.8, no LayoutContext literal left in place or buildIncludeRegions, chart fields pass through, regions get empty footnotes and marker placements; indexFootnotes pure, buildFootnotePanel built once at P19; dropped values (pre-panel with chartBottomY 0, P19 map reassignment) named; new tests fail on the base; G1/G3 empty per worker; non-blocking: specs/waves.md and m3.s3 text still say buildFootnotes (now buildFootnotePanel); passed unattended: gate 4 - 2026-10-13
 
 ## Token log
 
@@ -215,3 +216,6 @@ tokens review-wave-3 nowline-m1-s4 (claude-opus-5-5): input ~16 / cache read ~20
 tokens orchestrator-wave-3 nowline-m1-s4 (claude-opus-5-5): input ~20 / cache read ~1.7M / cache write ~0 5m + ~21k 1h / output ~11k | ~$0.74 API-equiv
 tokens wave-4 nowline-m2-s1-s2 (claude-opus-5-5): input ~150 / cache read ~14M / cache write ~260k / output ~73k | ~$5.55 API-equiv (output est.) session 7e027fcc-1ca6-51b0-b005-63e1163df819
 tokens review-wave-4 nowline-m2-s1-s2 (claude-opus-5-5): input ~36 / cache read ~990k / cache write ~82k / output ~18k | ~$0.97 API-equiv (output est.) session 7e027fcc-1ca6-51b0-b005-63e1163df819
+tokens orchestrator-wave-4 nowline-m2-s1-s2 (claude-opus-5-5): input ~16 / cache read ~1.5M / cache write ~0 5m + ~24k 1h / output ~10k | ~$0.69 API-equiv
+tokens wave-5 nowline-m3-s1-s2 (claude-sonnet-5-5): input ~48 / cache read ~1.9M / cache write ~310k / output ~24k | ~$1.39 API-equiv (output est.) session 7e027fcc-1ca6-51b0-b005-63e1163df819
+tokens review-wave-5 nowline-m3-s1-s2 (claude-opus-5-5): input ~20 / cache read ~270k / cache write ~39k / output ~10k | ~$0.45 API-equiv (output est.) session 7e027fcc-1ca6-51b0-b005-63e1163df819

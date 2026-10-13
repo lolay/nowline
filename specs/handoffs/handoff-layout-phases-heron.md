@@ -3,7 +3,7 @@
 - **Plan:** `specs/handoffs/plan-layout-phases-heron.md`
 - **Branch:** `claude/vibrant-hopper-ac4s73` (harness-assigned task branch; started at ff8eb8b, fast-forwarded to `origin/main` 4498948 at kickoff, no commits of its own before this one)
 - **Mode:** unattended (confirmed 2026-10-13, session 7e027fcc-1ca6-51b0-b005-63e1163df819; harness=claude-code runner=cloud)
-- **Status:** m1 and m2 complete (waves 1-4 PASS). Dispatching wave 5 (m3 s1-s2).
+- **Status:** waves 1-5 PASS (m1, m2, m3 s1-s2). Dispatching wave 6, unit m3 s3.
 
 ## What's done
 
@@ -26,6 +26,7 @@
 - wave-2 (nowline m1 s3) b448282..7e64d9c: PASS. m1.s3 7e64d9c (`sequenceRowTrack` in `nodes/row-track.ts`). G1/G3 empty, pre-commit green.
 - wave-3 (nowline m1 s4) 4400fbd..bbab969: PASS. m1.s4 bbab969 (`nodes/marker-band.ts`; `collectSlackCorridors` into `milestone-node.ts`). Pure move.
 - wave-4 (nowline m2 s1-s2) f354568..f5a6416: PASS. m2.s1 51c95bd (`nodes/item-measure.ts`, `ItemNode` from the measure, N6), m2.s2 f5a6416 (prediction from the measure, predictor deleted, row height = pitch). G1/G3 empty vs 570254b.
+- wave-5 (nowline m3 s1-s2) bb92ae0..1dd90a6: PASS. m3.s1 a517539 (`createLayoutContext`), m3.s2 1dd90a6 (`indexFootnotes` + `buildFootnotePanel`). G1/G3 empty vs 9c71cbb.
 
 ## Milestone m2 summary (milestone handoff)
 
@@ -39,15 +40,16 @@ m1 is done: status tints are theme tokens (`Theme.statusTint`, applied by a loca
 
 - Gate 2 before wave 2 ([exec] to [deep]) passed as an unattended checkpoint.
 - Gate 4 (m1 to m2) and gate 2 before wave 4 passed as unattended checkpoints. The milestone handoff core.md asks for at gate 4 is kept as a section of this session handoff ("Milestone m1 summary") rather than a separate `handoff-m2-*.md`, since every run file is removed in the last commit.
-- Gate 4 (m2 to m3) passes as a checkpoint before wave 5; m2 summary kept in this handoff the same way.
+- Gate 4 (m2 to m3) passed as a checkpoint before wave 5; m2 summary kept in this handoff the same way.
+- Gate 2 before wave 6 ([exec] to [deep]) passes as a checkpoint.
 
 ## Spend
 
-~$19.48 of ~$46 expected (guard 3x min $50 = $138). Wave 1 ran ~$2.85 against ~$0.75 expected (cold gate-script build, 5-minute gate runs); later waves' gate runs are warm.
+~$22.02 of ~$46 expected (guard 3x min $50 = $138). Wave 1 ran ~$2.85 against ~$0.75 expected (cold gate-script build, 5-minute gate runs); later waves' gate runs are warm.
 
 ## Next unit
 
-Wave 5 [exec] nowline m3 s1-s2, after merging `main` (9c71cbb).
+Wave 6 [deep], unit m3 s3 (then m4, m5 and m6 s1-s2 as their own units).
 
 ## How to resume
 
@@ -68,6 +70,7 @@ None. Kickoff answered: "Unattended"; re-confirmed by the pasted Kickoff prompt.
 - From wave 2 (PASS): `sequenceRowTrack(content, origin: RowTrackOrigin {leftX, firstRowY}, ctx, helpers: LayoutHelpers): RowTrackResult {children, timeCursorX, packer}`; callers read `usedHeight()`/`usedRightX()` through `result.packer`. `SwimlaneNode` never read `timeCursorX` after its loop, so only `GroupNode` reads it. Lane/group loops differed only in iterated content.
 - From wave 3 (PASS): `nodes/marker-band.ts` also holds `calendarLabelEntry`, `MarkerEntity` (exported), `markerLabelWidth` and `PackedPlacement`; `collectSlackCorridors` sits after `buildMilestones` in `milestone-node.ts`.
 - From wave 4 (PASS): `ItemNode` takes `ItemNodeGeometry` (id, naturalWidth, visualWidth, caption {leftInset, fit}, barExtra), a structural subset that `ItemMeasure` extends. `ItemMeasure` keeps two named widths for byte identity: `visualWidth` (box width, `(startX + naturalWidth) - startX`) and `naturalVisualWidth` (naturalWidth less insets, read by chip fit and first-line reserve); it also carries id, size, caption.title/leftInset/lastBaseline. `sequenceItem` throws if a handed measure's start differs from the placement start. The corpus test uses a test-only `setItemNodeTrace` hook. Moved helpers stay exported from `item-measure.ts`. The row height is now the pitch (`step + barExtra`).
+- From wave 5 (PASS): `createLayoutContext` resolves sizes itself from `source.content.sizes` under `shared.cal`; `init` has `footnotes` and `markerRowPlacements`; `waves` is spread in only when set. `buildFootnotes` is now `indexFootnotes(footnotes): FootnoteIndex` (type in `footnote-node.ts`) plus `buildFootnotePanel(...)`: PositionedFootnoteArea`; where later step text (m3.s3) says `buildFootnotes`, read `buildFootnotePanel`. `place` indexes once, before building the context, and hands the index in through `init.footnotes`.
 
 ## Environment notes
 
@@ -81,3 +84,4 @@ None. Kickoff answered: "Unattended"; re-confirmed by the pasted Kickoff prompt.
 - Biome had 11 pre-existing warnings at the base; m1.s3 removed the two unused `props`, so 9 remain; after the 570254b merge `make lint` reports 10 (cli/options.ts, export-mermaid, roadmap-node.ts:17, mcp.smoke.test.ts), none from this branch.
 - After a merge of `main` the gate's merge-base moves and the first gate run rebuilds the base cold (~5 min).
 - In `packages/layout`, vitest is `packages/layout/node_modules/.bin/vitest`.
+- Run `make format` after edits; `make lint` flags Biome format drift (line width).
