@@ -25,7 +25,7 @@
 //   Containers don't carry status dots or footnote indicators, so the
 //   only neighbor to clear is the container's own title.
 
-import { ISO_DATE_RE } from '@nowline/core/internal';
+import { parseIsoDate } from '@nowline/core/internal';
 import {
     CONTAINER_HEADER_BAND_PX,
     containerHeaderTitleWidth,
@@ -220,13 +220,15 @@ export function computeContainerInlineDatePins(
 }
 
 /**
- * Returns the first ISO date literal in `values`, or undefined when none
- * is present. The validator enforces "at most one inline date per
- * direction" so this lookup is unambiguous.
+ * Returns the first ISO date literal in `values` that names a real
+ * calendar day, or undefined when none is present. The validator enforces
+ * "at most one inline date per direction" so this lookup is unambiguous.
+ * An impossible day (`2026-02-30`, NL.E0405) is no date: the scheduler
+ * ignores it, so it gets no glyph either.
  */
 export function pickInlineDate(values: readonly string[]): string | undefined {
     for (const v of values) {
-        if (ISO_DATE_RE.test(v)) return v;
+        if (parseIsoDate(v)) return v;
     }
     return undefined;
 }
