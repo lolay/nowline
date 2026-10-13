@@ -16,9 +16,9 @@ vi.mock('@nowline/export', async (importOriginal) => {
     const actual = await importOriginal<typeof import('@nowline/export')>();
     return {
         ...actual,
-        exportDocument: (...args: Parameters<typeof actual.exportDocument>) => {
+        exportStaged: (...args: Parameters<typeof actual.exportStaged>) => {
             hosts.push(args[3]);
-            return actual.exportDocument(...args);
+            return actual.exportStaged(...args);
         },
     };
 });

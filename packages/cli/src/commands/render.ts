@@ -1,16 +1,14 @@
 import { promises as fs } from 'node:fs';
 import * as path from 'node:path';
+import type { ResolveDiagnostic } from '@nowline/core';
 import {
-    isRoutedResolveDiagnostic,
-    type NowlineFile,
-    type ResolveDiagnostic,
-    resolveIncludes,
-} from '@nowline/core';
-import {
+    acceptStagedRoadmap,
     type ExportFormat,
-    exportDocument,
+    exportStaged,
     type HostEnv,
     type RenderInputs,
+    type StageResult,
+    stageForExport,
 } from '@nowline/export';
 import type { PdfPageSize } from '@nowline/export-core';
 import type { NonWorkingDisplay, ThemeName } from '@nowline/layout';
@@ -255,18 +253,38 @@ async function produce(args: ProduceArgs): Promise<ProduceResult> {
             ? jsonToNowlineText(args.contents, args.displayPath)
             : args.contents;
 
-    // Pre-validate with locale-aware diagnostic formatting so validation
-    // errors reach the operator in their locale. The kernel will re-parse
-    // the same source below — double work accepted in exchange for faithful
-    // stderr output. Routed include-resolver diagnostics join the validator's
-    // here, so they are reported at the same point and in the same report.
-    await parseAndValidate(sourceText, args, { resolveIncludes: true });
-
     const assetRoot = args.assetRoot
         ? path.resolve(args.assetRoot)
         : path.dirname(args.absInputPath);
 
-    const host = createNodeHostEnv(assetRoot);
+    // Included files' text, kept for the code frames of routed diagnostics.
+    const included = new Map<string, string>();
+    const nodeHost = createNodeHostEnv(assetRoot);
+    const host: HostEnv = {
+        ...nodeHost,
+        readSource: async (absPath) => {
+            const text = await nodeHost.readSource(absPath);
+            included.set(absPath, text);
+            return text;
+        },
+    };
+
+    // What the stage lays out with; the export below must ask for the same.
+    const layoutInputs: RenderInputs = {
+        sourcePath: args.absInputPath,
+        today: args.today,
+        locale: args.locale ?? 'und',
+        theme: args.theme,
+        width: args.width,
+        nonWorking: args.nonWorking,
+    };
+
+    // Parse and stage once. Validation diagnostics come out in the operator's
+    // locale, and routed include-resolver diagnostics join the validator's
+    // here, so they are reported at the same point and in the same report.
+    const { stage, stageFailure } = await parseAndValidate(sourceText, args, {
+        stage: { inputs: layoutInputs, host, included },
+    });
 
     // Resolve fonts lazily — only for formats that rasterize or embed them.
     let fonts: RenderInputs['fonts'];
@@ -277,13 +295,8 @@ async function produce(args: ProduceArgs): Promise<ProduceResult> {
     args.assertPdfSettingsValid();
 
     const kernelInputs: RenderInputs = {
-        sourcePath: args.absInputPath,
-        today: args.today,
-        locale: args.locale ?? 'und',
-        theme: args.theme,
+        ...layoutInputs,
         fonts,
-        width: args.width,
-        nonWorking: args.nonWorking,
         noLinks: args.noLinks,
         strict: args.strict,
         pageSize: args.pageSize,
@@ -296,12 +309,11 @@ async function produce(args: ProduceArgs): Promise<ProduceResult> {
     };
 
     try {
-        const bytes = await exportDocument(
-            sourceText,
-            args.format as ExportFormat,
-            kernelInputs,
-            host,
-        );
+        // A stage failure or an uncoded include error was held back until
+        // here, so a bad font or PDF setting is still reported first.
+        if (!stage) throw stageFailure;
+        const staged = acceptStagedRoadmap(stage, kernelInputs);
+        const bytes = await exportStaged(staged, args.format as ExportFormat, kernelInputs, host);
         const isBinary = BINARY_FORMATS.has(args.format);
         const rendered: string | Uint8Array = isBinary
             ? bytes
@@ -438,31 +450,54 @@ function jsonToNowlineText(contents: string, displayPath: string): string {
     return printNowlineFile(ast);
 }
 
+/** What `parseAndValidate` stages with, once the source validates. */
+interface StageRequest {
+    /** The layout inputs the export that follows will ask for. */
+    inputs: RenderInputs;
+    host: HostEnv;
+    /** Collects the text of each file the stage reads, for code frames. */
+    included: Map<string, string>;
+}
+
 /**
- * Parse and validate; on errors, report them and throw. With
- * `resolveIncludes`, a file that has includes is also run through the
- * include resolver, and its routed (wave-rule) diagnostics are reported with
- * the validator's, in the same report (specs/waves.md §6.1). Every other
- * resolver diagnostic is left to the kernel, which re-resolves.
+ * Parse and validate; on errors, report them and throw. With `stage`, the
+ * validated document is also staged (include resolution, logo, layout) and a
+ * file that has includes reports the routed (wave-rule) diagnostics of that
+ * stage with the validator's, in the same report (specs/waves.md §6.1). The
+ * stage is returned for the export to reuse. Every other include error, and a
+ * stage that throws, is left for the caller to report where the kernel always
+ * did (exit 3).
  */
 async function parseAndValidate(
     contents: string,
     args: ProduceArgs,
-    options: { resolveIncludes?: boolean } = {},
+    options: { stage?: StageRequest } = {},
 ) {
     const result = await parseSource(contents, args.displayPath, { validate: true });
     const diagnostics = [...result.diagnostics];
     const sources = new Map<string, DiagnosticSource>([[args.displayPath, result.source]]);
     let failed = result.hasErrors;
-    if (!failed && options.resolveIncludes && result.ast.includes.length > 0) {
-        const included = new Map<string, string>();
-        for (const d of await resolveRoutedDiagnostics(result.ast, args, included)) {
-            const isRoot = d.sourcePath === args.absInputPath;
-            const file = isRoot ? args.displayPath : includeDisplayPath(d.sourcePath, args);
-            const text = isRoot ? result.source.contents : included.get(d.sourcePath);
-            if (text !== undefined) sources.set(file, { file, contents: text });
-            diagnostics.push(adaptResolveDiagnostic(d, file, text));
-            if (d.severity === 'error') failed = true;
+    let stage: StageResult | undefined;
+    let stageFailure: unknown;
+    if (!failed && options.stage) {
+        const { inputs, host, included } = options.stage;
+        try {
+            stage = await stageForExport(contents, inputs, host, {
+                document: result.document,
+                services: getServices(),
+            });
+        } catch (err) {
+            stageFailure = err;
+        }
+        if (stage && result.ast.includes.length > 0) {
+            for (const d of routedDiagnostics(stage)) {
+                const isRoot = d.sourcePath === args.absInputPath;
+                const file = isRoot ? args.displayPath : includeDisplayPath(d.sourcePath, args);
+                const text = isRoot ? result.source.contents : included.get(d.sourcePath);
+                if (text !== undefined) sources.set(file, { file, contents: text });
+                diagnostics.push(adaptResolveDiagnostic(d, file, text));
+                if (d.severity === 'error') failed = true;
+            }
         }
     }
     // Text mode prints only when the run fails. JSON mode prints one document
@@ -477,38 +512,19 @@ async function parseAndValidate(
     const directive = readDirectiveLocale(result.ast);
     const { tag, source } = describeContentLocaleSource(directive, args.resolvedLocale);
     args.log.verbose(`nowline: locale=${tag} (${source})`);
-    return result;
+    return { ...result, stage, stageFailure };
 }
 
 /**
- * The routed (wave-rule) diagnostics of resolving `ast`'s includes, reading
- * files as the kernel does; `included` collects each read file's text for
- * code frames. Empty when the resolver reports any other include error: that
- * one is more fundamental, and the kernel reports it as before (exit 3).
+ * The routed (wave-rule) diagnostics of a stage's include resolution. Empty
+ * when the resolver reports any other include error: that one is more
+ * fundamental, and the export reports it as before (exit 3).
  */
-async function resolveRoutedDiagnostics(
-    ast: NowlineFile,
-    args: ProduceArgs,
-    included: Map<string, string>,
-): Promise<ResolveDiagnostic[]> {
-    let diagnostics: ResolveDiagnostic[];
-    try {
-        ({ diagnostics } = await resolveIncludes(ast, args.absInputPath, {
-            services: getServices().Nowline,
-            readFile: async (absPath) => {
-                const text = await fs.readFile(absPath, 'utf-8');
-                included.set(absPath, text);
-                return text;
-            },
-        }));
-    } catch {
-        // The kernel resolves again and reports the failure.
-        return [];
+function routedDiagnostics(stage: StageResult): ResolveDiagnostic[] {
+    if (stage.kind === 'staged' || (stage.kind === 'include-error' && !stage.legacy)) {
+        return stage.routed;
     }
-    const legacyError = diagnostics.some(
-        (d) => d.severity === 'error' && !isRoutedResolveDiagnostic(d),
-    );
-    return legacyError ? [] : diagnostics.filter(isRoutedResolveDiagnostic);
+    return [];
 }
 
 // Walk up from the input (or `cwd` for stdin) to the nearest `.nowlinerc`.
