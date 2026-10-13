@@ -575,3 +575,158 @@ describeBuilt('--serve -q (requires `pnpm build`)', () => {
         });
     }, 15000);
 });
+
+// `--serve` resolves its options as render does and renders what render renders
+// (specs/surface-options.md §3.2, m2.s7): the same flags give the same SVG.
+describeBuilt('--serve shares render options (requires `pnpm build`)', () => {
+    const LOGO =
+        '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 120 40" width="120" height="40">' +
+        '<rect width="120" height="40" fill="#369"/></svg>';
+    const roadmap = (header: string): string =>
+        [
+            'nowline v1',
+            '',
+            `roadmap r "R" ${header}start:2026-01-05 scale:1w`,
+            '',
+            'swimlane a "A"',
+            '  item x "X" duration:12w link:https://example.com/x',
+            '  item y "Y" duration:12w link:https://example.com/y',
+            '',
+        ].join('\n');
+    const PLAIN = roadmap('');
+    const WITH_LOGO = roadmap('logo:"./logo.svg" ');
+    const FIXED = ['--now', '2026-01-07'];
+
+    interface Served {
+        svg: string;
+        /** The first payload event the browser gets: `update` for a render, `error` otherwise. */
+        first: { event: string; data: string };
+    }
+
+    /** Serve `files` (the first is the roadmap) with `flags`, then fetch what a browser would. */
+    async function serve(files: Record<string, string>, flags: string[]): Promise<Served> {
+        let served: Served | undefined;
+        await withTempDir(async (dir) => {
+            for (const [name, text] of Object.entries(files)) {
+                await fs.mkdir(path.dirname(path.join(dir, name)), { recursive: true });
+                await fs.writeFile(path.join(dir, name), text);
+            }
+            const port = await pickPort();
+            const child: ChildProcess = spawn(
+                process.execPath,
+                [
+                    distEntry,
+                    '--serve',
+                    path.join(dir, 'main.nowline'),
+                    '--port',
+                    String(port),
+                    ...flags,
+                ],
+                {
+                    cwd: dir,
+                    env: { ...process.env, FORCE_COLOR: '0', NO_COLOR: '1' },
+                    stdio: ['ignore', 'pipe', 'pipe'],
+                },
+            );
+            try {
+                await waitForReady(port);
+                served = {
+                    svg: await fetchText(`http://127.0.0.1:${port}/svg`),
+                    first: await fetchPayloadEvent(`http://127.0.0.1:${port}/events`),
+                };
+            } finally {
+                child.kill('SIGTERM');
+                await new Promise((r) => setTimeout(r, 150));
+                child.kill('SIGKILL');
+            }
+        });
+        if (!served) throw new Error('serve produced nothing');
+        return served;
+    }
+
+    /** What `nowline <file> -o -` writes for the same files and flags. */
+    async function rendered(files: Record<string, string>, flags: string[]): Promise<string> {
+        const { runCliBuilt } = await import('../helpers.js');
+        let svg = '';
+        await withTempDir(async (dir) => {
+            for (const [name, text] of Object.entries(files)) {
+                await fs.mkdir(path.dirname(path.join(dir, name)), { recursive: true });
+                await fs.writeFile(path.join(dir, name), text);
+            }
+            const r = await runCliBuilt([path.join(dir, 'main.nowline'), '-o', '-', ...flags], {
+                cwd: dir,
+            });
+            expect(r.exitCode).toBe(0);
+            // The CLI ends the file with a newline; the server sends the SVG as is.
+            svg = r.stdout.replace(/\n$/, '');
+        });
+        return svg;
+    }
+
+    const files = (extra: Record<string, string> = {}) => ({ 'main.nowline': PLAIN, ...extra });
+
+    it('serves the SVG nowline <file> renders for the same flags', async () => {
+        const flags = [...FIXED, '--theme', 'dark', '--width', '640', '--no-links'];
+        const served = await serve(files(), flags);
+        expect(served.svg).toBe(await rendered(files(), flags));
+    }, 30000);
+
+    it('--width caps the canvas as it does for render', async () => {
+        const wide = await serve(files(), FIXED);
+        const narrow = await serve(files(), [...FIXED, '--width', '420']);
+        expect(narrow.svg).not.toBe(wide.svg);
+        expect(narrow.svg).toBe(await rendered(files(), [...FIXED, '--width', '420']));
+    }, 30000);
+
+    it('an rc width applies, and --width overrides it', async () => {
+        const rc = { '.nowlinerc': 'width: 420\n' };
+        const viaRc = await serve(files(rc), FIXED);
+        expect(viaRc.svg).toBe(await rendered(files(), [...FIXED, '--width', '420']));
+        const flagged = await serve(files(rc), [...FIXED, '--width', '900']);
+        expect(flagged.svg).toBe(await rendered(files(), [...FIXED, '--width', '900']));
+    }, 30000);
+
+    it('--no-links drops the link anchors', async () => {
+        const linked = await serve(files(), FIXED);
+        const plain = await serve(files(), [...FIXED, '--no-links']);
+        // The attribution is always a link; the item links are what the flag drops.
+        expect(linked.svg).toContain('href="https://example.com/x"');
+        expect(plain.svg).not.toContain('href="https://example.com/');
+        expect(plain.svg).toBe(await rendered(files(), [...FIXED, '--no-links']));
+    }, 30000);
+
+    it('--strict turns a missing logo into an error instead of a render', async () => {
+        const missing = { 'main.nowline': WITH_LOGO };
+        const lax = await serve(missing, FIXED);
+        expect(lax.first.event).toBe('update');
+        const strict = await serve(missing, [...FIXED, '--strict']);
+        expect(strict.first.event).toBe('error');
+        expect(strict.first.data).toContain('render warnings (--strict)');
+        expect(strict.first.data).toContain('logo.svg');
+    }, 30000);
+
+    it('an rc assetRoot is where the logo is read from', async () => {
+        const project = {
+            'main.nowline': WITH_LOGO,
+            'brand/logo.svg': LOGO,
+            '.nowlinerc': 'assetRoot: brand\n',
+        };
+        const served = await serve(project, FIXED);
+        expect(served.svg).toContain('data-layer="logo"');
+        expect(served.svg).toBe(await rendered(project, FIXED));
+        const flagged = await serve({ ...project, 'other/logo.svg': LOGO }, [
+            ...FIXED,
+            '--asset-root',
+            'other',
+            '--strict',
+        ]);
+        expect(flagged.first.event).toBe('update');
+    }, 30000);
+
+    it('rejects an invalid --width as render does', async () => {
+        const { runCliBuilt } = await import('../helpers.js');
+        const r = await runCliBuilt(['--serve', 'foo.nowline', '--width', '100']);
+        expect(r.exitCode).toBe(2);
+        expect(r.stderr).toContain('invalid --width "100". Must be an integer ≥ 320.');
+    });
+});

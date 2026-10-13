@@ -28,12 +28,12 @@
         "test:watch": "vitest"
     },
     "dependencies": {
-        "@nowline/layout": "workspace:*"
+        "@nowline/core": "workspace:*",
+        "@nowline/layout": "workspace:*",
+        "langium": "~4.4.0"
     },
     "devDependencies": {
-        "@nowline/core": "workspace:*",
         "@types/node": "^26.6.3",
-        "langium": "~4.4.0",
         "typescript": "^7.0.2",
         "vitest": "^5.0.2"
     }

@@ -1571,13 +1571,13 @@ describe('@nowline/mcp — non-working display', () => {
 
 // ---- Now-line (`now` on render and export) ----------------------------------
 
-// `now` follows the CLI's `--now`: a YYYY-MM-DD date, omitted for today (UTC),
-// or `-` to suppress the now-line.
+// `now` follows the CLI's `--now`: a YYYY-MM-DD date, omitted for today's local
+// civil date, or `-` to suppress the now-line.
 const NOW_LAYER = 'data-layer="nowline"';
 
 function isoDaysFromToday(days: number): string {
     const now = new Date();
-    return new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate() + days))
+    return new Date(Date.UTC(now.getFullYear(), now.getMonth(), now.getDate() + days))
         .toISOString()
         .slice(0, 10);
 }
@@ -1603,7 +1603,8 @@ describe('@nowline/mcp — now-line', () => {
             const now = (tool?.inputSchema.properties as Record<string, { description?: string }>)
                 ?.now;
             expect(now?.description, `${name} now description`).toBe(
-                'Now-line date as YYYY-MM-DD (UTC). Omit to draw it at today (UTC); ' +
+                "Now-line date as YYYY-MM-DD. Omit to draw it at today's date in `timezone` " +
+                    "(the server's local zone when `timezone` is omitted too); " +
                     'pass "-" to suppress the now-line (same as the CLI\'s `--now -`).',
             );
         }

@@ -1,6 +1,6 @@
 # Nowline — Shared Surface Options and One Staging Function
 
-**Status: Accepted (design only, no code yet).** Milestone **m4.13** in [`milestones.md`](./milestones.md); decisions in the last section. This is refactor R4 from [`review-since-v086.md`](./review-since-v086.md): one options schema in `@nowline/config` that every render surface reads, and one staging function (parse, resolve includes, load assets, lay out) that every pipeline calls. Every `file:line` below was checked at the commit that adds this spec (source identical to 0062df3 plus the m2 fixes of the same review).
+**Status: Accepted, implemented as m4.13 (migration milestones m1 and m2; `stageRoadmap` also builds R1's wave plan and schedule, §7 decision 1).** Milestone **m4.13** in [`milestones.md`](./milestones.md); decisions in the last section. This is refactor R4 from [`review-since-v086.md`](./review-since-v086.md): one options schema in `@nowline/config` that every render surface reads, and one staging function (parse, resolve includes, load assets, lay out) that every pipeline calls. Every `file:line` below was checked at the commit that adds this spec (source identical to 0062df3 plus the m2 fixes of the same review).
 
 ## 1. Problem
 
@@ -146,29 +146,40 @@ export interface StageInputs {
     /** Absolute path: base for includes and assets. */
     sourcePath: string;
     /** The caller's Langium services (each pipeline keeps its own instance). */
-    services: { shared: LangiumSharedServices; Nowline: NowlineServices };
+    services: { shared: LangiumSharedCoreServices; Nowline: NowlineServices };
     readSource: (absPath: string) => Promise<string>;
     /** Omitted: no asset access (the embed), so a `logo:` lays out as if absent. */
     assetResolver?: AssetResolver;
     /** A document the caller already parsed and validated from `source`. */
     document?: LangiumDocument<NowlineFile>;
-    layout: Pick<LayoutOptions, 'theme' | 'today' | 'width' | 'locale' | 'nonWorking'>;
+    layout: StageLayout;
+    /**
+     * An include error the caller tolerates, such as the browser's single-file
+     * mode skipping every include: it takes no part in the include-error
+     * precedence and stays in `resolved.diagnostics` for the caller to report.
+     */
+    isToleratedIncludeError?: (diagnostic: ResolveDiagnostic) => boolean;
 }
+
+/** The layout options a stage reads, picked by name; a staged roadmap records the values it used. */
+export type StageLayout = Pick<LayoutOptions, 'theme' | 'today' | 'width' | 'locale' | 'nonWorking'>;
 
 export type StageResult =
     | {
           kind: 'invalid';
           document: LangiumDocument<NowlineFile>;
           /** Lexer, parser and validator diagnostics with errors among them. */
-          diagnostics: RawDocumentDiagnostic[];
+          diagnostics: RawDiagnostic[];
       }
     | {
           kind: 'include-error';
           document: LangiumDocument<NowlineFile>;
           /** The first uncoded include error, when one exists: it wins (waves.md §6.1). */
           legacy?: ResolveDiagnostic;
-          /** Routed (wave-rule) diagnostics; empty when `legacy` is set. */
+          /** Routed (wave-rule) diagnostics, errors and warnings; empty when `legacy` is set. */
           routed: ResolveDiagnostic[];
+          /** Every resolver diagnostic in order, for callers that report more than the winner. */
+          resolved: ResolveResult;
       }
     | {
           kind: 'staged';
@@ -181,13 +192,22 @@ export type StageResult =
           logo?: LoadedLogo;
           /** Asset warnings (missing or unreadable logo); the caller applies `strict`. */
           warnings: string[];
+          /** The wave plan (`buildWavePlan`); `null` when the roadmap declares no waves. */
+          plan: WavePlan | null;
+          /** The day schedule `model` was laid out with (`scheduleRoadmap`, `plan` as `schedule.plan`). */
+          schedule: RoadmapSchedule;
           model: PositionedRoadmap;
+          /** The layout options `model` was laid out with; `exportStaged` checks them against its inputs. */
+          layout: StageLayout;
       };
+
+/** A roadmap that staged without errors, ready to render or export. */
+export type StagedRoadmap = Extract<StageResult, { kind: 'staged' }>;
 
 export function stageRoadmap(inputs: StageInputs): Promise<StageResult>;
 ```
 
-- **What it owns.** Parse and validate (or reuse `document`), resolve includes, apply the include-error precedence once, load the logo once, lay out. With R1 ([`scheduler-unification.md`](./scheduler-unification.md)) it also builds the wave plan and the schedule once and returns them.
+- **What it owns.** Parse and validate (or reuse `document`), resolve includes, apply the include-error precedence once, load the logo once, build the wave plan and the day schedule once (`buildWavePlan`, then `scheduleRoadmap` with the stage's `today` and that plan; [`scheduler-unification.md`](./scheduler-unification.md) §3.6), and lay out with that schedule (`LayoutOptions.schedule`). It returns `plan` and `schedule`; `exportStaged` puts the stage's `schedule` in `ExportInputs`, so XLSX, Mermaid and MS Project reuse it, and every other caller lays out with the same schedule.
 - **What it does not own.** Rendering, diagnostics formatting, `strict`, layout insights. Each caller maps the result to its own shape: the kernel throws (`Error`, `IncludeResolveError`), the browser returns `DiagnosticRow`s, `--serve` broadcasts text frames, MCP returns `McpDiagnostic`s.
 - **Where it lives.** `packages/renderer/src/stage.ts`, exported from `@nowline/renderer`: the logo loader and the `AssetResolver` contract already live there, and the kernel, the browser pipeline and the CLI already depend on it. Renderer gains a direct `@nowline/core` dependency, which it already has transitively through layout, so no bundle grows; every consumer of renderer (browser, embed, export, the CLI and the VS Code extension) already depends on core and layout, so no package gains an edge. The cost is renderer's wider role (it now runs the pipeline as well as drawing it) and that a standalone renderer install loads core's Langium parser when it stages (§7, decision 3).
 
@@ -209,7 +229,7 @@ export interface LoadedLogo {
 
 | Pipeline | After |
 |---|---|
-| Export kernel | `stageDocument` becomes `stageRoadmap` plus the kernel's error mapping. A new `exportStaged(stage, format, inputs, host)` exports an already-staged roadmap; `exportDocument` is `stageRoadmap` + `exportStaged`, unchanged for callers. The SVG is rendered only for formats that use it (svg, html, png, pdf). |
+| Export kernel | `stageDocument` becomes `stageRoadmap` plus the kernel's error mapping. A new `exportStaged(stage, format, inputs, host)` exports an already-staged roadmap; `exportDocument` is `stageRoadmap` + `exportStaged`, unchanged for callers. The SVG is rendered only for formats that use it (svg, html, png, pdf). The kernel also exports its two halves, `stageForExport` (`stageRoadmap` with the host's source and asset reads) and `acceptStagedRoadmap` (the error mapping: validation and include errors throw, logo warnings reach `onWarning` or throw under `strict`), for a surface that stages for itself and reports some of the stage's results its own way (the CLI and MCP). |
 | Browser `renderSource` | `stageRoadmap` with the no-op include reader and the host's resolver, then layout insights and `renderSvg` as today. |
 | CLI render | stages once with the CLI's services: diagnostics come from the stage's document (still in the operator's locale), then `exportStaged`. The second parse goes. |
 | CLI `--serve` | resolves options like render (§3.2), stages, renders with `noLinks` and `strict`, honours `width`. |
@@ -324,7 +344,7 @@ Add `packages/renderer/src/stage.ts` (§3.3) with tests for each result kind: va
 
 Gary, 2026-10-13:
 
-1. **Milestone ID.** Yes: m4.13. If R1 has landed, m2.s3 builds the schedule inside `stageRoadmap`; if not, R1's m2.s2 adds it there later.
+1. **Milestone ID.** Yes: m4.13. If R1 has landed, `stageRoadmap` builds the wave plan and the schedule and returns them; if not, R1's m2.s2 adds it there later. (R1 landed first, in #150; merging it moved the kernel's plan and schedule construction into `stageRoadmap`.)
 2. **The `now` default.** The local civil date everywhere, keeping the local-default decision of 497de7d, with an optional MCP `timezone` argument (m1.s6). MCP's UTC default, and #122's wording of it, were the exception.
 3. **Where `stageRoadmap` lives.** `@nowline/renderer` (§3). No package gains a dependency edge; the cost is renderer's wider role.
 4. **One width rule.** Yes: the CLI's integer ≥ 320 everywhere. MCP returns its input error, and VS Code reports a bad setting or rc value in the preview's diagnostic table.

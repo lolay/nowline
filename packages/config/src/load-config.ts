@@ -1,18 +1,18 @@
 import { promises as fs } from 'node:fs';
 import * as path from 'node:path';
 import * as yaml from 'js-yaml';
+import type { SurfaceRcValues } from './surface-options.js';
 
 /**
- * Shape of the `.nowlinerc` file consumed by the CLI today and (post-m3d)
- * by the VS Code/Cursor extension. Keys are intentionally optional — the
- * file is sparse and any key may be absent.
+ * Shape of the `.nowlinerc` file consumed by the CLI and the VS Code/Cursor
+ * extension. Keys are intentionally optional — the file is sparse and any
+ * key may be absent. The keys the shared options schema owns (`theme`,
+ * `width`, `pdfPageSize`, `assetRoot`) take their types from
+ * `SurfaceRcValues`; nothing here is validated until a surface resolves it.
  */
-export interface NowlineRc {
+export interface NowlineRc extends SurfaceRcValues {
     format?: string;
-    theme?: string;
     defaultFormat?: string;
-    width?: number;
-    pdfPageSize?: string;
     pdfOrientation?: string;
     pdfMargin?: string;
     fontSans?: string;
@@ -81,20 +81,6 @@ export function parseConfig(contents: string, source: string): NowlineRc {
         );
     }
     return parsed as NowlineRc;
-}
-
-/**
- * Layer flag values on top of a parsed config. `undefined` flag values
- * leave the underlying config key untouched — useful for "missing CLI
- * flag" semantics. Returned object is a shallow merge.
- */
-export function mergeConfig<T extends NowlineRc>(config: NowlineRc, flags: Partial<T>): T {
-    const merged: NowlineRc = { ...config };
-    for (const [key, value] of Object.entries(flags)) {
-        if (value === undefined) continue;
-        merged[key] = value as unknown;
-    }
-    return merged as T;
 }
 
 function parseJsonOrYaml(contents: string, source: string): unknown {
