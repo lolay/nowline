@@ -29,7 +29,7 @@ last commit before the PR merges.
 
 ## Spend
 
-~$22.42 API-equiv so far (kickoff, planning, waves 1-3) of ~$22 expected: at the expected total now, with waves 4-6 to go. Wave 2 ran ~$9.5 against ~$3.1 expected (Sonnet worker, 27M cache read over six steps), so the run will pass the expected total during m2; the guard is ~$66.
+~$22.42 API-equiv so far (kickoff, planning, waves 1-3) of ~$22 expected: over the expected total now (~$22.43 of ~$22), with waves 4-6 to go; not a stop, the guard is ~$66. Wave 2 ran ~$9.5 against ~$3.1 expected (Sonnet worker, 27M cache read over six steps), so the run will pass the expected total during m2; the guard is ~$66.
 
 ## Next unit
 

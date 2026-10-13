@@ -1,7 +1,7 @@
 ```
 --- KICKOFF: begin orchestration at [deep] ---
 
-  Status: 3/6 groups done | last review: wave-3 PASS | current: nowline m2 s2 [exec] | updated 2026-10-13 | passed unattended: gate 4, gate 2 before wave 3
+  Status: 3/6 groups done | last review: wave-3 PASS | current: nowline m2 s2 [exec] | updated 2026-10-13 | passed unattended: gate 4, gate 2 before wave 3 | over expected: ~$22.43 of ~$22
 
   mode: unattended | proposed unattended (harness=claude-code runner=cloud; CLAUDE_CODE_REMOTE=true, assigned branch) | guard 3x min $50 | fixups 2 | confirmed 2026-10-13 session 3d92f75d-ed43-5e74-a58c-e29cd0970783 by Kickoff prompt: Run in unattended mode.
 
