@@ -2,7 +2,7 @@
     "$comment": [
         "Engine divergence register (specs/scheduler-unification.md §4 m1.s1, §6), checked by engine-divergence-register.test.ts.",
         "Every place where engine A (the pixel layout) and engine C (scheduleRoadmap) give a sample's named item or wave a different span, keyed by sample path, then by item id, '<include path>#<id>' for an item of a first-level isolated region, or 'wave:<id>'.",
-        "classes lists every divergence of spec §1.2 that contributes, (a) to (f), or region-scope when the engines give an isolated region a different scope (§1.2, 'Isolated regions without waves'). Fixing a divergence removes its letter, and the entry once no letter is left."
+        "classes lists every divergence of spec §1.2 that contributes, (b) to (f), or region-scope when the engines give an isolated region a different scope (§1.2, 'Isolated regions without waves'). Fixing a divergence removes its letter, and the entry once no letter is left. (a), the pixel walker starting an after: child at the lane's left edge instead of its cursor, was settled by F1 (specs/scheduler-unification.md §5), so no entry carries it."
     ],
     "divergences": {
         "examples/inline-date-pins.nowline": {
@@ -231,22 +231,20 @@
         },
         "examples/showcase.nowline": {
             "ship": {
-                "classes": ["(a)", "(b)"],
-                "reason": "after:integrate ignores the lane cursor in A (day 20 against 40), and the 1w bar is under the minimum width"
+                "classes": ["(b)", "(d)"],
+                "reason": "follows the parallel, whose box ends 8px past its last track (the tail gutter): A starts it on day 42.2 against C's 40, and the 1w bar is under the minimum width"
             },
             "brief": {
                 "classes": ["(b)"],
                 "reason": "a 1w bar at scale:1m is under the minimum bar width, so A's logical end runs past C's"
             },
+            "assets": {
+                "classes": ["(b)"],
+                "reason": "follows brief, and A's lane cursor advances to brief's minimum-width bar"
+            },
             "announce": {
-                "classes": ["(a)", "(b)"],
-                "reason": "after:ship inherits ship's early start in A, and the 1w bar is under the minimum width"
-            }
-        },
-        "examples/sizing.nowline": {
-            "search-v2": {
-                "classes": ["(a)"],
-                "reason": "after:header-refresh ignores the lane cursor in A (day 5 against 16)"
+                "classes": ["(b)", "(d)"],
+                "reason": "follows ship, which A starts and ends later than C by the parallel's tail gutter and its minimum-width bar"
             }
         },
         "examples/waves.nowline": {
@@ -256,21 +254,13 @@
             }
         },
         "tests/late-row-shifts.nowline": {
-            "c": {
-                "classes": ["(a)"],
-                "reason": "after:2026-01-25 ignores the lane cursor in A (day 15 against b's end, 20)"
-            },
-            "g1": {
-                "classes": ["(a)"],
-                "reason": "the lane-level group g has after:2026-01-19, which ignores the lane cursor in A (day 10 against 30)"
-            },
             "p1": {
-                "classes": ["(a)", "(c)"],
-                "reason": "follows group g, which A starts early by (a), and A's lane cursor advances to the Pinned group caption's edge"
+                "classes": ["(c)"],
+                "reason": "follows group g, and A's lane cursor advances to the Pinned group caption's edge"
             },
             "d": {
-                "classes": ["(a)", "(c)"],
-                "reason": "after:c ignores the lane cursor in A, and once it honours it the cursor still carries the group's caption spill"
+                "classes": ["(c)"],
+                "reason": "after:c starts at the lane cursor, which still carries the group's caption spill in A"
             }
         },
         "tests/non-working-hide.nowline": {

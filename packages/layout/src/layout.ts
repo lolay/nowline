@@ -431,7 +431,7 @@ function sequenceItem(
     // > after-chain > cursor position. A lane or group child's cursor
     // already sits at that start; a direct parallel track's cursor sits at
     // the block's start, so this is where its pin applies.
-    let startX = resolvePinnedOrSequentialStart(props, cursor.x, cursor.x, ctx);
+    let startX = resolvePinnedOrSequentialStart(props, cursor.x, ctx);
     // Wave barrier (specs/waves.md §5.1, §8.4): the floor is one more term
     // in the max, after the pin and `after:` logic, so a pin becomes
     // max(pin, F). Parallel tracks reach this function directly, so this
@@ -1177,12 +1177,14 @@ function predictItemBarExtraHeight(
 function resolveChildStart(
     child: ItemDeclaration | GroupBlock | ParallelBlock,
     seqDefault: number,
-    laneLeftX: number,
+    // Unused since F1 (`after:` starts at the lane cursor, not the lane's
+    // left edge); the `*Deps` signatures still thread it until R2 merges them.
+    _laneLeftX: number,
     ctx: LayoutContext,
 ): number {
     return waveFloorX(
         child,
-        resolvePinnedOrSequentialStart(child.properties, seqDefault, laneLeftX, ctx),
+        resolvePinnedOrSequentialStart(child.properties, seqDefault, ctx),
         ctx,
     );
 }
@@ -1190,7 +1192,6 @@ function resolveChildStart(
 function resolvePinnedOrSequentialStart(
     props: EntityProperty[],
     seqDefault: number,
-    laneLeftX: number,
     ctx: LayoutContext,
 ): number {
     const { pin, after } = startTermsOf(props);
@@ -1199,7 +1200,7 @@ function resolvePinnedOrSequentialStart(
         if (xd !== null) return xd;
     }
     if (after.length > 0) {
-        let maxEnd = laneLeftX;
+        let maxEnd = seqDefault;
         for (const term of after) {
             if ('date' in term) {
                 const xd = ctx.scale.forwardWithinDomain(term.date);
@@ -1209,7 +1210,7 @@ function resolvePinnedOrSequentialStart(
             const endX = ctx.entityRightEdges.get(term.ref);
             if (endX !== undefined) maxEnd = Math.max(maxEnd, endX);
         }
-        return Math.max(laneLeftX, maxEnd);
+        return maxEnd;
     }
     return seqDefault;
 }
