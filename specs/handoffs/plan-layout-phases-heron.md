@@ -1,7 +1,7 @@
 ```
 --- KICKOFF: begin orchestration at [deep] ---
 
-  Status: 0/10 groups done | last review: — | current: nowline m1 s1-s2 [exec] | updated 2026-10-13
+  Status: 1/10 groups done | last review: wave-1 PASS | current: nowline m1 s3 [deep] | updated 2026-10-13
 
   mode: unattended | proposed unattended (harness=claude-code runner=cloud; CLAUDE_CODE_REMOTE=true, assigned branch) | guard 3x min $50 | fixups 2 | confirmed 2026-10-13 session 7e027fcc-1ca6-51b0-b005-63e1163df819 by Kickoff prompt: Run in unattended mode.
 
@@ -78,13 +78,13 @@ Every step meets all of these unless its text says otherwise.
 
 ## m1 - Seams that need no phase
 
-#### s1 - [exec] Status tints become theme tokens
+#### s1 - [exec] Status tints become theme tokens (done)
 
 First write the gate script described under Gates and run it once on the unchanged tree: G1 and G3 must report an empty diff (it proves the harness, and two runs on one commit must agree). Commit it with this step.
 
 Then add `statusTint: { done, inProgress, atRisk, blocked, planned, neutral }` (spec §3.9 keys and values) to `Theme` in `packages/layout/src/themes/shape.ts` and to `light.ts`, `dark.ts`, `grayscale.ts`, moving the `STATUS_TINT_*` values verbatim. `sequenceItem` (`layout.ts`) applies `theme.statusTint[key]` when `style.bg === theme.entities.item.bg` and `theme.status[key]` when `style.fg === theme.entities.item.fg`, on a copy of the style; first confirm those item defaults equal today's `#0f172a`/`#ffffff`/`#94a3b8`/`#9e9e9e` per theme. Delete the three tint tables and the hard-coded defaults. Test: per theme, a default item takes each status's tint; an explicit `bg:` wins. G1, G2, G3.
 
-#### s2 - [exec] One helper interface
+#### s2 - [exec] One helper interface (done)
 
 Replace `SwimlaneNodeDeps`, `GroupNodeDeps`, `IncludeNodeDeps` and `ParallelNodeDeps` with `LayoutHelpers` (`layout-context.ts`) or a `Pick` of it; drop the never-passed `ownerOverride` from `sequenceItem`, `resolveItemMeta` and the helper types (confirm no caller passes it). `RoadmapNodeDeps` stays until m5.s5. No runtime change. G1, G2, G3.
 
@@ -188,6 +188,8 @@ Out of scope: F2 (local coordinates), F3 (after R1 F3), R5 renderer status table
 
 ## Review log
 
+review wave-1 (nowline m1 s1-s2) 0b49f7c..28771a2: PASS - gate script re-run by reviewer on 28771a2: 360 renders, 0 differing paths, compile and determinism 314/314; make pre-commit green; statusTint values match §3.9; four Deps interfaces gone, ownerOverride dropped - 2026-10-13
+
 ## Token log
 
 **Counting header (Claude Code)**
@@ -198,4 +200,6 @@ Out of scope: F2 (local coordinates), F3 (after R1 F3), R5 renderer status table
 - `$C` = (input × in + cache read × cached + 5m write × in × 1.25 + 1h write × in × 2.00 + output × out) / 1M.
 - In another harness, or on a model not listed here, count and price per plan-execution.md "Token accounting" and "Model price table" instead.
 
-tokens orchestrator-kickoff plan-layout-phases-heron (claude-opus-5-5): input ~74 / cache read ~6.6M / cache write ~0 5m + ~220k 1h / output ~43k | ~$3.97 API-equiv
+tokens orchestrator-kickoff plan-layout-phases-heron (claude-opus-5-5): input ~100 / cache read ~8.3M / cache write ~0 5m + ~300k 1h / output ~53k | ~$5.11 API-equiv
+tokens wave-1 nowline-m1-s1-s2 (claude-sonnet-5-5): input ~96 / cache read ~6.4M / cache write ~180k / output ~46k | ~$2.19 API-equiv (output est.) session 7e027fcc-1ca6-51b0-b005-63e1163df819
+tokens review-wave-1 nowline-m1-s1-s2 (claude-opus-5-5): input ~32 / cache read ~510k / cache write ~49k / output ~16k | ~$0.66 API-equiv (output est.) session 7e027fcc-1ca6-51b0-b005-63e1163df819
