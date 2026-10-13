@@ -3,7 +3,7 @@
 - **Plan:** `specs/handoffs/plan-layout-phases-heron.md`
 - **Branch:** `claude/vibrant-hopper-ac4s73` (harness-assigned task branch; started at ff8eb8b, fast-forwarded to `origin/main` 4498948 at kickoff, no commits of its own before this one)
 - **Mode:** unattended (confirmed 2026-10-13, session 7e027fcc-1ca6-51b0-b005-63e1163df819; harness=claude-code runner=cloud)
-- **Status:** every step done; fix-up 7-fix corrected the §9 claim but left a run-on sentence (CONCERNS). Dispatching fix-up 7-fix2 (the last the cap allows).
+- **Status:** complete. All steps landed and reviewed; final gates green at 3c38b7b. Waiting on Gary: cleanup commit, then whether to open the PR.
 
 ## What's done
 
@@ -34,6 +34,8 @@
 - Merge of `main` 303b502 (R3 #153, #154) at 7a589fc, by a delegated subagent: conflicts in `layout.ts` and `roadmap-node.ts` kept this branch's structure; R3 hunks ported into moved code (`collectItems` on `trackNodes` in `dependency-edges.ts`; `parseIsoDate` in `sequence-item.ts`, `marker-band.ts`, `milestone-node.ts`; `findProp` in `phases/date-window.ts`, local `stripColon` removed); `sequenceRowTrack` now iterates with `trackChildren` (callers pass the container). Gates: script with `--expect .scratch/f1-expect.txt` vs 303b502 showed exactly the nine F1 paths; compile and determinism 314/314 with no golden change; `make pre-commit` green; bundle 180.20 KB (parent re-ran it).
 - wave-7 (nowline m6 s3) 1a119bc..529fcc4: CONCERNS. m6.s3 529fcc4 (spec updates, `layout-phases.md` implemented with §9 As built). The review found one wrong sentence: §9's Header bullet says f15 merges the attribution box after f16, but `assembleModel` merges them after the pass. Fix-up 7-fix (automatic, first CONCERNS, no gate).
 - wave-7-fix (nowline m6 s3) 1a119bc..0a188c7: CONCERNS. 0a188c7 fixed the claim; the review found the sentence now runs on after the closing parenthesis. Fix-up 7-fix2 (gate 1 checkpoint, fix-up 2 of 2).
+- wave-7-fix2 (nowline m6 s3) 1a119bc..93a98cc: PASS. 93a98cc punctuates the sentence.
+- Merge of `main` 23f2644 (#155, #156) at 3c38b7b, clean. Final gates: script vs 23f2644 shows exactly the nine F1 renders; compile and determinism (314) pass; `make pre-commit` green; bundle 180.21 KB.
 
 ## Milestone m5 summary (milestone handoff)
 
@@ -72,11 +74,11 @@ m1 is done: status tints are theme tokens (`Theme.statusTint`, applied by a loca
 
 ## Spend
 
-~$65.39 of ~$46 expected (over expected; guard $138) (guard 3x min $50 = $138). Wave 1 ran ~$2.85 against ~$0.75 expected (cold gate-script build, 5-minute gate runs); later waves' gate runs are warm.
+~$66.92 of ~$46 expected (over expected; guard $138). Per-row actuals in the plan's Cost table. (guard 3x min $50 = $138). Wave 1 ran ~$2.85 against ~$0.75 expected (cold gate-script build, 5-minute gate runs); later waves' gate runs are warm.
 
 ## Next unit
 
-Fix-up 7-fix2 [exec] (punctuation in the §9 Header sentence), then completion: merge `main` (64316f6 #156, 23f2644 #155, both clean, touch `resolve-today.ts` and `inline-date-pin-geometry.ts`), gates, final commit removing the run files, then ask about the PR.
+None. Completion: the last commit removes the plan, this handoff and the gate script; then Gary decides on the PR.
 
 ## How to resume
 
@@ -84,7 +86,7 @@ Paste the plan's Kickoff prompt.
 
 ## Pending question (verbatim)
 
-None. Kickoff answered: "Unattended"; re-confirmed by the pasted Kickoff prompt.
+Open the PR? (asked after the cleanup commit)
 
 ## Decisions so far
 

@@ -1,7 +1,7 @@
 ```
---- KICKOFF: begin orchestration at [deep] ---
+--- KICKOFF: plan complete ---
 
-  Status: 10/10 groups done | last review: wave-7-fix2 PASS | current: completion | updated 2026-10-13 | passed unattended: gate 1 (fix-up 2 of 2) | over expected: ~$66.25 of ~$46
+  Status: 10/10 groups done | completed 2026-10-13
 
   mode: unattended | proposed unattended (harness=claude-code runner=cloud; CLAUDE_CODE_REMOTE=true, assigned branch) | guard 3x min $50 | fixups 2 | confirmed 2026-10-13 session 7e027fcc-1ca6-51b0-b005-63e1163df819 by Kickoff prompt: Run in unattended mode.
 
@@ -29,21 +29,21 @@
 
 **Cost (API-equiv, Claude Code models)**
 
-| wave | expected tokens | expected $ |
-|---|---|---|
-| 1 [exec] m1 s1-s2 | ~1.6M | ~$0.75 |
-| 2 [deep] m1 s3 | ~2.7M | ~$1.4 |
-| 3 [exec] m1 s4 | ~1.3M | ~$0.65 |
-| 4 [deep] m2 s1-s2 | ~7.8M | ~$4.1 |
-| 5 [exec] m3 s1-s2 | ~1.6M | ~$0.75 |
-| 6 [deep] m3 s3, m4 s1-s2, m5 s1-s5, m6 s1-s2 | ~38M | ~$20 |
-| 7 [exec] m6 s3 | ~2.0M | ~$0.89 |
-| 7-fix [exec] nowline m6 s3 | — | — |
-| 7-fix2 [exec] nowline m6 s3 | — | — |
-| orchestrator | ~21M | ~$17 |
-| **Total** | ~76M | ~$46 |
+| wave | expected tokens | expected $ | actual $ |
+|---|---|---|---|
+| 1 [exec] m1 s1-s2 | ~1.6M | ~$0.75 | ~$2.85 |
+| 2 [deep] m1 s3 | ~2.7M | ~$1.4 | ~$2.13 |
+| 3 [exec] m1 s4 | ~1.3M | ~$0.65 | ~$1.06 |
+| 4 [deep] m2 s1-s2 | ~7.8M | ~$4.1 | ~$6.52 |
+| 5 [exec] m3 s1-s2 | ~1.6M | ~$0.75 | ~$1.84 |
+| 6 [deep] m3 s3, m4 s1-s2, m5 s1-s5, m6 s1-s2 | ~38M | ~$20 | ~$30.98 |
+| 7 [exec] m6 s3 | ~2.0M | ~$0.89 | ~$3.27 |
+| 7-fix [exec] nowline m6 s3 | — | — | ~$0.79 |
+| 7-fix2 [exec] nowline m6 s3 | — | — | ~$0.33 |
+| orchestrator | ~21M | ~$17 | ~$17.15 |
+| **Total** | ~76M | ~$46 | ~$66.92 |
 
-Expected values are estimates, good to about 2-3× per wave. Sizes: m1.s1, m1.s2, m1.s4, m3.s1, m3.s2 small; m1.s3, m2.s2, m4.s1, m4.s2, m5.s1, m6.s1, m6.s2, m6.s3 medium; m2.s1, m3.s3, m5.s2-s5 large. Wave 6 runs as four units (one per milestone), each with its own review. Orchestrator: kickoff, one resume after `/compact`, ten units' bookkeeping, one gate wait (unattended).
+Actuals come from the Token log (API-equiv, subagent lines `(output est.)`); the orchestrator row includes the delegated merge of `main` (~$2.13). Expected values are estimates, good to about 2-3× per wave. Sizes: m1.s1, m1.s2, m1.s4, m3.s1, m3.s2 small; m1.s3, m2.s2, m4.s1, m4.s2, m5.s1, m6.s1, m6.s2, m6.s3 medium; m2.s1, m3.s3, m5.s2-s5 large. Wave 6 runs as four units (one per milestone), each with its own review. Orchestrator: kickoff, one resume after `/compact`, ten units' bookkeeping, one gate wait (unattended).
 
 # Plan: m4.14 layout phases (R2)
 
@@ -188,6 +188,20 @@ Docs only. `specs/rendering-v2.md` (the phases, which nodes measure, the header 
 
 Out of scope: F2 (local coordinates), F3 (after R1 F3), R5 renderer status table.
 
+## Completion summary
+
+All 19 steps landed and reviewed on `claude/vibrant-hopper-ac4s73`, in 10 groups over 7 waves plus fix-ups 7-fix and 7-fix2. Final gates at 3c38b7b (merge-base 23f2644, main's tip): the gate script compared 360 renders and exports and found exactly F1's nine declared renders differing; `make compile TARGET=local` and `make determinism` (314) passed; `make pre-commit` green; `make bundle-size` 180.21 KB of 200 KB. Spend ~$66.92 API-equiv against ~$46 expected (guard $138).
+
+What shipped: m1 status tints as `Theme.statusTint` tokens, one `LayoutHelpers` interface, `sequenceRowTrack`, `nodes/marker-band.ts`; m2 `measureItem` and the measured `ItemNode` (predictor deleted); m3 `createLayoutContext`, `indexFootnotes`/`buildFootnotePanel`, placement no longer reads the canvas; m4 `HeaderNode`; m5 the date-window, measure, place and finalize phases with the checked f1-f16 table, guards and coverage register, `RoadmapNode.place` as four calls; m6 L2 (now-pill row on an extended axis, no sample change), F1 (beside card hugs the final rows: renders `examples/dependencies`, `tests/late-row-shifts`, `tests/marker-left-overflow` x 3 themes; snapshots `dependencies.svg`, `marker-left-overflow.svg`; determinism golden cells `dependencies` svg/html/png/pdf), and the spec updates (`layout-phases.md` implemented with §9 As built).
+
+**Deviations from plan**
+- Gates passed as unattended checkpoints: gate 2 before waves 2, 4 and 6; gate 4 before waves 4, 5 and each of wave 6's m4, m5 and m6 units; gate 1 for fix-up 7-fix2 (fix-up 2 of 2). Fix-up 7-fix ran without a gate (first CONCERNS). No automatic retries.
+- Milestone handoffs at each gate 4 were kept as sections of the session handoff rather than separate `handoff-m{N}-*.md` files.
+- `main` was merged four times (570254b R4, 9c71cbb, 303b502 R3 + #154, 23f2644 #155 + #156). The R3 merge was resolved by a delegated subagent (code conflicts plus porting R3's edits into modules m5 had created; `sequenceRowTrack` moved onto core's `trackChildren`), gated with the F1 expect list.
+- As-built departures from the spec text are listed in `specs/layout-phases.md` §9 (e.g. `sequenceItem` in `nodes/sequence-item.ts`, `DateWindow` without `sizes`, f5 packing the marker band at its final top for L2, the `rowsBottom` slot with `headerRowsTop()`/`headerRowsBottom()` guards).
+- `make bundle-size` added as a per-step check after Gary relayed R3's note; it peaked at 199.86 KB before #154 freed ~20 KB.
+- Spend ran over the expected total (wave 6 ~$31 vs ~$20; wave 4 ~$6.5 vs ~$4.1; cold gate builds after each merge).
+
 ## Review log
 
 review wave-1 (nowline m1 s1-s2) 0b49f7c..28771a2: PASS - gate script re-run by reviewer on 28771a2: 360 renders, 0 differing paths, compile and determinism 314/314; make pre-commit green; statusTint values match §3.9; four Deps interfaces gone, ownerOverride dropped - 2026-10-13
@@ -250,3 +264,4 @@ tokens review-wave-7-fix nowline-m6-s3 (claude-opus-5-5): input ~14 / cache read
 tokens orchestrator-wave-7-fix nowline-m6-s3 (claude-opus-5-5): input ~8 / cache read ~1.6M / cache write ~0 5m + ~12k 1h / output ~5.4k | ~$0.53 API-equiv
 tokens wave-7-fix2 nowline-m6-s3 (claude-sonnet-5-5): input ~10 / cache read ~290k / cache write ~23k / output ~4.4k | ~$0.16 API-equiv (output est.) session 7e027fcc-1ca6-51b0-b005-63e1163df819
 tokens review-wave-7-fix2 nowline-m6-s3 (claude-opus-5-5): input ~8 / cache read ~52k / cache write ~16k / output ~4k | ~$0.17 API-equiv (output est.) session 7e027fcc-1ca6-51b0-b005-63e1163df819
+tokens orchestrator-wave-7-fix2 nowline-m6-s3 (claude-opus-5-5): input ~14 / cache read ~2.5M / cache write ~0 5m + ~13k 1h / output ~3.4k | ~$0.67 API-equiv
