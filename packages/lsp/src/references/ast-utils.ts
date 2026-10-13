@@ -78,51 +78,18 @@ export const REFERENCE_PROP_KEYS = new Set([
 ]);
 
 /**
- * Status value-completion source: built-in statuses ship with the renderer.
- * Mirrors `BUILTIN_STATUSES` in the validator, including the `active` and
- * `completed` aliases for `in-progress` and `done`.
+ * Value-completion sources. The vocabularies are core's (`value-tables.ts`):
+ * the validator checks values against the same lists, so the editor offers
+ * exactly what validates. Kept as `@nowline/lsp` exports. `WEEKDAY_NAMES` is
+ * the weekday names `every:` takes, Sunday first.
  */
-export const BUILTIN_STATUSES: readonly string[] = [
-    'planned',
-    'in-progress',
-    'active',
-    'done',
-    'completed',
-    'at-risk',
-    'blocked',
-];
-
-/**
- * Built-in `capacity-icon:` vocabulary. Mirrors `BUILTIN_CAPACITY_ICONS` in
- * the validator — kept as a literal here so the LSP doesn't have to import a
- * non-public symbol from `@nowline/core`.
- */
-export const BUILTIN_CAPACITY_ICONS: readonly string[] = [
-    'none',
-    'multiplier',
-    'person',
-    'people',
-    'points',
-    'time',
-];
-
-/**
- * Built-in `icon:` vocabulary. Superset of `BUILTIN_CAPACITY_ICONS` plus the
- * entity-decoration glyphs the renderer ships.
- */
-export const BUILTIN_ICON_NAMES: readonly string[] = [
-    ...BUILTIN_CAPACITY_ICONS,
-    'shield',
-    'warning',
-    'lock',
-    'calendar',
-];
-
-/** Weekday names accepted by `every:`, Sunday first (the order of `Date#getUTCDay`). */
-export const WEEKDAY_NAMES: readonly string[] = ['sun', 'mon', 'tue', 'wed', 'thu', 'fri', 'sat'];
-
-/** Values of the `non-working:` display key on `default roadmap`. */
-export const NON_WORKING_DISPLAYS: readonly string[] = ['hide', 'show'];
+export {
+    BUILTIN_CAPACITY_ICONS,
+    BUILTIN_ICON_NAMES,
+    BUILTIN_STATUSES,
+    NON_WORKING_DISPLAYS,
+    WEEKDAYS as WEEKDAY_NAMES,
+} from '@nowline/core/internal';
 
 /** `prop.key` without a trailing `:` (core's, kept as an `@nowline/lsp` export). */
 export { propKey };

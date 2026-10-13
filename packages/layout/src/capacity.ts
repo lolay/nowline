@@ -20,25 +20,17 @@
 // the lane badge in m7 and the overload sweep in m8).
 
 import type { SymbolDeclaration } from '@nowline/core';
-import { propKey } from '@nowline/core/internal';
+import { BUILTIN_CAPACITY_ICONS, propKey } from '@nowline/core/internal';
 import type { ResolvedCapacityIconRef } from './types.js';
 
 /**
- * Built-in `capacity-icon:` names the renderer understands directly. Stays in
- * sync with `BUILTIN_CAPACITY_ICONS` in `packages/core/.../nowline-validator.ts`
- * — the validator uses this set to decide whether a value is a known built-in;
- * the layout uses it to decide whether to forward the value as-is or
- * dereference it through the glyph map. Layout-side and validator-side can
- * diverge briefly during refactors but should converge before each release.
+ * Built-in `capacity-icon:` names the renderer understands directly
+ * (`BUILTIN_CAPACITY_ICONS` in core's `value-tables.ts`): the validator uses
+ * the list to decide whether a value is a known built-in; the layout uses it
+ * to decide whether to forward the value as-is or dereference it through the
+ * glyph map.
  */
-const BUILTIN_CAPACITY_ICONS = new Set<string>([
-    'none',
-    'multiplier',
-    'person',
-    'people',
-    'points',
-    'time',
-]);
+const BUILTIN_CAPACITY_ICON_SET: ReadonlySet<string> = new Set(BUILTIN_CAPACITY_ICONS);
 
 const POSITIVE_INT_RE = /^\d+$/;
 const POSITIVE_DECIMAL_RE = /^\d+\.\d+$/;
@@ -138,7 +130,7 @@ export function resolveCapacityIcon(
     symbols: Map<string, SymbolDeclaration>,
 ): ResolvedCapacityIcon | null {
     if (icon === 'none') return null;
-    if (BUILTIN_CAPACITY_ICONS.has(icon)) {
+    if (BUILTIN_CAPACITY_ICON_SET.has(icon)) {
         return {
             kind: 'builtin',
             name: icon as 'multiplier' | 'person' | 'people' | 'points' | 'time',

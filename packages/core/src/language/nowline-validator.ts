@@ -75,6 +75,12 @@ import {
     suggestKey,
 } from './validator-utils.js';
 import {
+    BUILTIN_CAPACITY_ICONS,
+    BUILTIN_ICON_NAMES,
+    BUILTIN_STATUSES,
+    NON_WORKING_DISPLAYS,
+} from './value-tables.js';
+import {
     checkWaveDeclarations,
     evaluateWaveProperties,
     fileRefLookup,
@@ -86,20 +92,11 @@ import { evaluateWaveOrder } from './waves-order.js';
 
 const SUPPORTED_VERSION = 'v1';
 
-// Built-in status vocabulary. `active` and `completed` are international-
-// friendly aliases for `in-progress` and `done` respectively — they
-// canonicalize at the layout boundary (see statusFromProp in layout.ts) so
-// downstream consumers see a single normalized form. Both spellings remain
-// valid input.
-const BUILTIN_STATUSES = new Set([
-    'planned',
-    'in-progress',
-    'active',
-    'done',
-    'completed',
-    'at-risk',
-    'blocked',
-]);
+// Built-in vocabularies come from value-tables.ts; the validator checks
+// membership, so it holds them as sets.
+const BUILTIN_STATUS_SET: ReadonlySet<string> = new Set(BUILTIN_STATUSES);
+const BUILTIN_CAPACITY_ICON_SET: ReadonlySet<string> = new Set(BUILTIN_CAPACITY_ICONS);
+const BUILTIN_ICON_NAME_SET: ReadonlySet<string> = new Set(BUILTIN_ICON_NAMES);
 
 const STYLE_PROP_KEYS = new Set([
     'bg',
@@ -126,9 +123,8 @@ const STYLE_PROP_KEYS = new Set([
 
 // `non-working:` values (specs/working-calendar.md §4.2). Kept out of
 // `STYLE_PROP_ENUMS` on purpose: the key reports its own coded NL.E0800,
-// and the generic enum check would add a second error (NL.E0802). Mirrors
-// `NON_WORKING_DISPLAYS` in @nowline/layout, which core cannot import.
-const NON_WORKING_VALUES = new Set(['hide', 'show']);
+// and the generic enum check would add a second error (NL.E0802).
+const NON_WORKING_VALUES: ReadonlySet<string> = new Set(NON_WORKING_DISPLAYS);
 
 // Style keys only the roadmap reads (specs/dsl.md style table). On another
 // entity's `default` line they are a silent no-op, so they warn (NL.W0703).
@@ -140,29 +136,6 @@ const ROADMAP_ONLY_STYLE_KEYS = new Set([
     'timeline-position',
     'minor-grid',
     'non-working',
-]);
-
-// Built-in capacity-icon vocabulary. Renderer-curated SVG glyphs (plus 'multiplier'
-// which renders as the U+00D7 text character and 'none' which suppresses the glyph).
-const BUILTIN_CAPACITY_ICONS = new Set([
-    'none',
-    'multiplier',
-    'person',
-    'people',
-    'points',
-    'time',
-]);
-
-// Built-in icon: vocabulary. Superset of capacity-icon names plus the entity-decoration
-// icons currently shipped by the renderer. `calendar` is the renderer-side glyph the
-// inline-date pin path (`after:DATE` / `before:DATE`) draws onto items, parallels, and
-// groups; reserving it here prevents a `symbol calendar` declaration from shadowing it.
-const BUILTIN_ICON_NAMES = new Set([
-    ...BUILTIN_CAPACITY_ICONS,
-    'shield',
-    'warning',
-    'lock',
-    'calendar',
 ]);
 
 // `utilization-warn-at:` / `utilization-over-at:` accept the literal `none`
@@ -1322,10 +1295,10 @@ export class NowlineValidator {
     // --- Status declaration: id collision with built-ins ---
     checkStatusDeclaration(decl: StatusDeclaration, accept: ValidationAcceptor): void {
         if (decl.name) {
-            if (BUILTIN_STATUSES.has(decl.name)) {
+            if (BUILTIN_STATUS_SET.has(decl.name)) {
                 accept(
                     'error',
-                    `Status id "${decl.name}" collides with the built-in status value. Built-ins: ${[...BUILTIN_STATUSES].join(', ')}.`,
+                    `Status id "${decl.name}" collides with the built-in status value. Built-ins: ${BUILTIN_STATUSES.join(', ')}.`,
                     { node: decl, property: 'name' },
                 );
             }
@@ -1658,7 +1631,7 @@ export class NowlineValidator {
                     }
                 } else if (key === 'status' && prop.value) {
                     const val = prop.value;
-                    if (BUILTIN_STATUSES.has(val)) return;
+                    if (BUILTIN_STATUS_SET.has(val)) return;
                     const declIdx = statusOrder.get(val);
                     if (declIdx === undefined) {
                         accept(
@@ -1941,7 +1914,7 @@ export class NowlineValidator {
     // so the only quoteless form an author can pass is a bare identifier like
     // `unicode:foo`, which we treat permissively (it's a single-grapheme literal).
     checkSymbolDeclaration(decl: SymbolDeclaration, accept: ValidationAcceptor): void {
-        if (decl.name && BUILTIN_ICON_NAMES.has(decl.name)) {
+        if (decl.name && BUILTIN_ICON_NAME_SET.has(decl.name)) {
             acceptTr(accept, 'error', { node: decl, property: 'name' }, 'NL.E0805', {
                 name: decl.name,
                 builtins: [...BUILTIN_ICON_NAMES].sort().join(', '),
@@ -2202,8 +2175,8 @@ export class NowlineValidator {
             // accepted as-is. Authors who genuinely want to write a literal that
             // happens to spell a real identifier should declare a symbol instead.
             if (!isIdentifier(val)) return;
-            if (key === 'capacity-icon' && BUILTIN_CAPACITY_ICONS.has(val)) return;
-            if (key === 'icon' && BUILTIN_ICON_NAMES.has(val)) return;
+            if (key === 'capacity-icon' && BUILTIN_CAPACITY_ICON_SET.has(val)) return;
+            if (key === 'icon' && BUILTIN_ICON_NAME_SET.has(val)) return;
             const declIdx = symbolOrder.get(val);
             if (declIdx === undefined) {
                 const builtins =
