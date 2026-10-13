@@ -1,7 +1,7 @@
 ```
 --- KICKOFF: begin orchestration at [deep] ---
 
-  Status: 4/6 groups done | last review: wave-4 PASS | current: nowline m2 s3 [deep] | updated 2026-10-13 | over expected: ~$24.61 of ~$22
+  Status: 5/6 groups done | last review: wave-5 PASS | current: nowline m2 s4-s7 [exec] | updated 2026-10-13 | passed unattended: gate 2 before wave 5 | over expected: ~$28.03 of ~$22
 
   mode: unattended | proposed unattended (harness=claude-code runner=cloud; CLAUDE_CODE_REMOTE=true, assigned branch) | guard 3x min $50 | fixups 2 | confirmed 2026-10-13 session 3d92f75d-ed43-5e74-a58c-e29cd0970783 by Kickoff prompt: Run in unattended mode.
 
@@ -135,7 +135,7 @@ Acceptance: a test counting resolver calls: one per kernel export, raster includ
 
 --- WAVE 5 [deep] ---
 
-#### s3 - [deep] Stage the export kernel
+#### s3 - [deep] Stage the export kernel (done)
 
 `stageDocument` becomes `stageRoadmap` plus the kernel's error mapping (plain `Error`, `IncludeResolveError`, `strict` on logo warnings, `onResolveDiagnostics`, `onWarning`). Add `exportStaged(stage, format, inputs, host)`; `exportDocument` = `stageRoadmap` + `exportStaged`, unchanged for callers. `exportStaged` throws when the stage's layout inputs (theme, today, width, locale, non-working) differ from `inputs`. Render the portable SVG only for svg/html/png/pdf. If R1 has landed on main by now, build the wave plan and schedule inside `stageRoadmap` and return them (decision 1); otherwise leave it to R1's m2.s2 and record that in the artifact.
 Acceptance: integration-tests kernel suites unchanged plus a mismatch test for `exportStaged`; G1, G2, G3.
@@ -177,6 +177,7 @@ review wave-1 (nowline m1 s1) a2fb3b2..5231496: PASS - schema, parsers, rc-key t
 review wave-2 (nowline m1 s2-s7) 910085c..e27c444: PASS - CLI templates, error order and empty-string handling unchanged; MCP and extension through the schema; width rule, MCP local now plus timezone, rc assetRoot with docs, fragments and French man restamp; G1 tree equals ref-c34804c; make pre-commit green - 2026-10-13
 review wave-3 (nowline m2 s1) 7aaab18..d7f48cf: PASS - stageRoadmap with invalid/include-error/staged, kernel include precedence, logo once, 9 fake-backed tests, no callers changed; merged origin/main ff8eb8b (3de45e3); check_wave.py flagged only ff8eb8b ('first line ... does not start with one of m2.s1', Co-authored-by, trailers), which is origin/main's own commit reached through the mandated merge; both first-parent commits pass; passed unattended: gate 4, gate 2 - 2026-10-13
 review wave-4 (nowline m2 s2) bf004a2..ea3707d: PASS - LoadedLogo per spec §3.4; renderSvg embeds RenderOptions.logo when its ref matches, else resolves; kernel portable and font-pinned renders pass it; staged.logo widened; logo-read-once test 4/4 (svg/html/png/pdf); G1, G2, G3 reported identical - 2026-10-13
+review wave-5 (nowline m2 s3) 8c735ef..e48332f: PASS - kernel stageDocument is stageRoadmap plus the old error mapping, message text kept; exportStaged with layout-mismatch check; portable SVG only for svg/html/png/pdf; kernel suites unedited, new export-staged test; R1 not on main, schedule left to R1 m2.s2 (decision 1); G1, G2, G3 reported identical; passed unattended: gate 2 - 2026-10-13
 
 ## Token log
 
@@ -202,3 +203,6 @@ tokens review-wave-3 nowline-m2-s1 (claude-opus-5-5): input ~16 / cache read ~22
 tokens orchestrator-wave-3 nowline-m2-s1 (claude-opus-5-5): input ~18 / cache read ~1.6M / cache write ~0 5m + ~23k 1h / output ~11k | ~$0.72 API-equiv
 tokens wave-4 nowline-m2-s2 (claude-sonnet-5-5): input ~66 / cache read ~3M / cache write ~69k / output ~33k | ~$1.11 API-equiv (output est.) session 3d92f75d-ed43-5e74-a58c-e29cd0970783
 tokens review-wave-4 nowline-m2-s2 (claude-opus-5-5): input ~16 / cache read ~180k / cache write ~32k / output ~8k | ~$0.35 API-equiv (output est.) session 3d92f75d-ed43-5e74-a58c-e29cd0970783
+tokens orchestrator-wave-4 nowline-m2-s2 (claude-opus-5-5): input ~12 / cache read ~1.1M / cache write ~0 5m + ~18k 1h / output ~8.6k | ~$0.53 API-equiv
+tokens wave-5 nowline-m2-s3 (claude-opus-5-5): input ~82 / cache read ~4.7M / cache write ~150k / output ~39k | ~$2.47 API-equiv (output est.) session 3d92f75d-ed43-5e74-a58c-e29cd0970783
+tokens review-wave-5 nowline-m2-s3 (claude-opus-5-5): input ~18 / cache read ~280k / cache write ~37k / output ~9k | ~$0.42 API-equiv (output est.) session 3d92f75d-ed43-5e74-a58c-e29cd0970783

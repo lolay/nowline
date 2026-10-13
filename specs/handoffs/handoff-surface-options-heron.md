@@ -20,6 +20,7 @@ last commit before the PR merges.
 - Wave 2 [exec] nowline m1 s2-s7: 910085c..e27c444, review PASS. m1 complete.
 - Wave 3 [deep] nowline m2 s1: 7aaab18..d7f48cf (merge of origin/main ff8eb8b in 3de45e3), review PASS.
 - Wave 4 [exec] nowline m2 s2: bf004a2..ea3707d, review PASS.
+- Wave 5 [deep] nowline m2 s3: 8c735ef..e48332f, review PASS.
 
 ## Review log verdicts, fix-ups, retries, checkpoints
 
@@ -27,19 +28,20 @@ last commit before the PR merges.
 - wave-2 (nowline m1 s2-s7): PASS.
 - wave-3 (nowline m2 s1): PASS (check_wave.py false positive on main's commit, see Deviations).
 - wave-4 (nowline m2 s2): PASS.
+- wave-5 (nowline m2 s3): PASS. Checkpoint: gate 2 ([deep] after [exec]) passed unattended before wave 5.
 - No fix-ups or retries. Checkpoints: gate 4 (new milestone m2) and gate 2 ([deep] after [exec]) passed unattended before wave 3.
 
 ## Spend
 
-~$24.61 API-equiv so far (kickoff, planning, waves 1-4) of ~$22 expected: over expected, with waves 5-6 to go; not a stop, the guard is ~$66. Wave 2 ran ~$9.5 against ~$3.1 expected (Sonnet worker, 27M cache read over six steps), so the run will pass the expected total during m2; the guard is ~$66.
+~$28.03 API-equiv so far (kickoff, planning, waves 1-5) of ~$22 expected: over expected, with wave 6 to go; not a stop, the guard is ~$66. Wave 2 ran ~$9.5 against ~$3.1 expected (Sonnet worker, 27M cache read over six steps), so the run will pass the expected total during m2; the guard is ~$66.
 
 ## Next unit
 
-Wave 5 [deep] nowline m2 s3 (stage the export kernel). R1 (m4.11) still not on origin/main at this point, so the schedule stays with R1.
+Wave 6 [exec] nowline m2 s4-s7 (browser, MCP, CLI render and `--serve` on `stageRoadmap`).
 
 ## Pending question
 
-None. Wave 5 is being dispatched.
+None. Wave 6 is being dispatched.
 
 ## How to resume
 
@@ -99,6 +101,23 @@ Paste the plan's Kickoff prompt.
   `logo` inside `renderWith` (portable and both font-pinned renders).
   Browser and `--serve` pass `logo.dimensions` to layout and `logo` to
   `renderSvg`. Test: `packages/integration-tests/test/logo-read-once.test.ts`.
+- From wave 5 (review PASS): R1 (m4.11) not on origin/main, so the schedule
+  and wave plan stay with R1's m2.s2 (decision 1). The staged result gains
+  `layout: StageLayout` (the five layout values, picked by name), with new
+  exported types `StageLayout` and `StagedRoadmap` (re-exported from
+  `@nowline/export`). `exportStaged(stage, format, inputs, host)` is public
+  and throws a plain Error naming the first differing key (theme, today by
+  `getTime()`, width, locale, nonWorking). `exportStaged` does not apply the
+  stage's error mapping: a caller that stages for itself owns `invalid`,
+  `include-error`, routed warnings and logo-load warnings; `exportStaged`
+  applies `noLinks`, `strict` and `onWarning` to the render only. The
+  kernel's mapping (`stageDocument`) stays internal; m2.s5 and m2.s6 decide
+  whether to export it. Mermaid, msproj, xlsx and json no longer render an
+  SVG, so render-time warnings no longer reach them (spec §6 accepts this).
+- Follow-ups for m2.s7: add all three additions to spec §3.3 (`resolved`,
+  `isToleratedIncludeError`, `layout`), and fix the stale `kernel-N` comment
+  in `packages/integration-tests/test/export-json-envelope.test.ts:3` (the
+  synthetic URI is now `memory:///stage-N.nowline`).
 
 ## Milestone handoff m1 -> m2
 
