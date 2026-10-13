@@ -91,7 +91,10 @@ Render options
   --no-links             Omit link icons from output
   -s, --scale <n>        Raster scale factor (PNG only; default 1)
   --strict               Promote asset / sanitizer warnings to errors
-  -w, --width <px>       Canvas width in pixels (default: 1280)
+  -w, --width <px>       Maximum canvas width in pixels (default: fit the
+                         content). Best-effort: the timeline shrinks to fit,
+                         down to 1 px per day; spilled captions can still
+                         overflow. See rendering.md § Canvas width.
   --non-working <mode>   How a business calendar's non-working days appear:
                          `hide` (collapse them; the default) or `show` (draw
                          them as shaded bands). Overrides the file's
@@ -385,7 +388,7 @@ Each recognized key is the default for one flag, resolved flag > `.nowlinerc` > 
 |---|---|---|
 | `theme` | `-t, --theme` | Same names and `greyscale` alias as the flag. Also read by `--serve`. |
 | `defaultFormat` | `-f, --format` | Step 3 of the format-resolution chain: used when neither `-f` nor a recognized `-o` extension is present. |
-| `width` | `-w, --width` | Integer ≥ 320. Passed to `LayoutOptions.width`, which layout does not apply yet, so it has no visible effect for now. |
+| `width` | `-w, --width` | Integer ≥ 320. Best-effort maximum canvas width, passed to `LayoutOptions.width` (see [`rendering.md` § Canvas width](./rendering.md#canvas-width)). |
 | `pdfPageSize` | `--page-size` | |
 | `pdfOrientation` | `--orientation` | |
 | `pdfMargin` | `--margin` | A bare number (YAML/JSON number or string) is points. |
