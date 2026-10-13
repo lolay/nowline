@@ -118,6 +118,35 @@ describe('core import layering', () => {
         expect(offenders).toEqual([]);
     });
 
+    it('keeps the split validator modules under language/validator/ behind nowline-validator.ts', () => {
+        const modules = files.filter((f) => f.startsWith(VALIDATOR_DIR));
+        expect(modules).toContain('language/validator/tables.ts');
+        expect(modules).toContain('language/validator/support.ts');
+        // The class imports the modules and the modules never import it back, so
+        // the check bodies stay plain functions and no import cycle forms.
+        const loadedByClass = new Set(
+            (imports.get(VALIDATOR) ?? []).map((e) => e.target).filter(Boolean),
+        );
+        for (const module of modules) {
+            expect(loadedByClass.has(module)).toBe(true);
+            const back = (imports.get(module) ?? []).filter((e) => e.target === VALIDATOR);
+            expect(back.map((e) => e.specifier)).toEqual([]);
+        }
+    });
+
+    it('lets only the validator files import a module under language/validator/', () => {
+        const offenders: string[] = [];
+        for (const [file, edges] of imports) {
+            if (isValidator(file)) continue;
+            for (const edge of edges) {
+                if (edge.target?.startsWith(VALIDATOR_DIR)) {
+                    offenders.push(`${file} imports ${edge.specifier}`);
+                }
+            }
+        }
+        expect(offenders).toEqual([]);
+    });
+
     it('keeps src/internal.ts off the validator', () => {
         const edges = imports.get('internal.ts') ?? [];
         expect(edges.filter((e) => isValidator(e.target))).toEqual([]);
