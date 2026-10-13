@@ -1,7 +1,7 @@
 ```
 --- KICKOFF: begin orchestration at [deep] ---
 
-  Status: 1/5 groups done | last review: wave-1 PASS | current: nowline m1 s2-s3 [deep] | updated 2026-10-13
+  Status: 2/5 groups done | last review: wave-2 PASS | current: nowline m1 s4 [exec] | updated 2026-10-13 | passed unattended: gate 2 before wave 2
 
   mode: unattended | proposed unattended (harness=claude-code runner=cloud; assigned branch, CLAUDE_CODE_REMOTE=true) | guard 3x min $50 | fixups 2 | confirmed 2026-10-13 session 462f378b-01ae-572c-b81b-c39199f8207a by Kickoff prompt: Run in unattended mode.
 
@@ -140,11 +140,11 @@ No `Co-authored-by`. Workers never push. TypeScript: 4 spaces, `.js` suffix on r
 Add `packages/core/src/language/ast-walk.ts` exactly per spec §3.1 (`TrackNode`, `DeclarationNode`, `WalkOptions`, `trackChildren`, `trackNodes`, `declarations`, `visitProperties`, `forEachDeclaredId`, `referenceableIds`, `firstDeclarations`), depending only on `../generated/ast.js`. Add `packages/core/src/internal.ts` re-exporting it and the `./internal` `exports` entry (decision 1), and the README note. Tests in `packages/core/test/`: direct unit tests (source order, `description` skipping, nested teams, groups in parallels in groups, `WalkOptions`), and equivalence tests that run each new function and the copy it will replace over every sample (read `examples/**` and `tests/*.nowline` from the repo root, like `packages/layout/test/waves-byte-stability.test.ts:65`) and the inline core fixtures (`test/validation/wave-fixtures.ts` `EXAMPLE_n`, plus fixtures from the validation tests that exercise ids, teams and includes), comparing ids, order and owners. Copies under test: `registerEntity`/`registerTeam`/`registerSwimlaneContent`, `visitPropertiesDeep`, `collectReferenceableIds` (`nowline-validator.ts:2454-2558`; export the private ones from the module only, marked `@internal`, removed in s2), `collectDeclarations` and `collectWaveHosts` (`waves.ts`), layout's `collectItems` (`layout.ts:1880-1911`, test in `packages/layout/test/`), LSP `collectNamedEntities`/`visitProperties` (`packages/lsp/src/references/ast-utils.ts`, test in `packages/lsp/test/`). A difference found is reported and kept as a caller-side filter (spec §6). No caller changes. G2 (G1/G3 trivially identical; run them anyway to seed the cache).
 
 --- WAVE 2 [deep] ---
-#### s2 - [deep] Move the validator and the resolver onto it
+#### s2 - [deep] Move the validator and the resolver onto it (done)
 
 Per spec m1.s2: switch `registerEntity`, `visitPropertiesDeep`, `collectReferenceableIds`, the rule 24 (`:1795-1801`), rule 25 (`:1858-1864`) and person (`:1926-1935`) walks to `ast-walk.ts`; `include-waves.ts:30` imports `forEachDeclaredId`; delete the validator's walk helpers and the `registerEntity` export, and the equivalence tests for the deleted copies. Add `packages/core/test/layering.test.ts` (decision 5). Diagnostic order must not change (rule 2 duplicates, cycles). G1, G2, G3.
 
-#### s3 - [deep] Move the wave rules and layout onto it
+#### s3 - [deep] Move the wave rules and layout onto it (done)
 
 Per spec m1.s3: `collectDeclarations` → `firstDeclarations`, `collectWaveHosts` → `declarations(...)` with a filter, the descent in `assignWaves` and `leadWave` and in `waves-order.ts:212-256` → `trackChildren` (keeping their own recursion for inherited state), layout's `collectItems` → `trackNodes` (import from `@nowline/core/internal`). Delete the replaced copies and their equivalence tests. Include any walk copy merged from main (decision 6). G1, G2, G3.
 
@@ -205,6 +205,7 @@ Per spec m3.s3 and decision 3: delete `effectiveWave` and `leadWave` (`waves.ts:
 ## Review log
 
 review wave-1 (nowline m1 s1) 3fdba6c..6448ee4: PASS - ast-walk.ts matches spec §3.1, imports only generated AST and langium types; @nowline/core/internal subpath and README note; equivalence tests over 60 samples and fixtures in core, layout and LSP found no difference (only dead PersonDeclaration-in-team branches, unreachable per grammar); layout collectItems moved by R1 to layout.ts:1571 and tested there; gate diff showed only the checkout-root path in tests/grammar-properties G3 (gate-script artifact, script fixed by the parent) - 2026-10-13
+review wave-2 (nowline m1 s2-s3) b889c77..2286068: PASS - validator rule 2, size/status, reference checks and rule 24/25/person walks on ast-walk.ts; include-waves imports forEachDeclaredId, no validator edge; layering.test.ts per decision 5 with a mutation check; waves.ts/waves-order.ts on firstDeclarations/declarations/trackChildren, layout collectItems on trackNodes; rules 24 and 25 keep a caller-side isNestedTeam filter (old closures never entered teams, spec §6); G1+G3 identical per step; observation: no test pins isNestedTeam (carried to m3.s2); passed unattended: gate 2 - 2026-10-13
 
 ## Token log
 
@@ -221,3 +222,6 @@ tokens orchestrator-kickoff-explore core-package-build-and-exports (claude-opus-
 tokens orchestrator-kickoff-explore layout-lsp-helper-copies (claude-opus-5-5): input ~16 / cache read ~360k / cache write ~35k / output ~8k | ~$0.41 API-equiv (output est.) session 462f378b-01ae-572c-b81b-c39199f8207a
 tokens wave-1 nowline-m1-s1 (claude-sonnet-5-5): input ~74 / cache read ~4.6M / cache write ~330k / output ~38k | ~$2.11 API-equiv (output est.) session 462f378b-01ae-572c-b81b-c39199f8207a
 tokens review-wave-1 nowline-m1-s1 (claude-opus-5-5): input ~32 / cache read ~590k / cache write ~50k / output ~16k | ~$0.69 API-equiv (output est.) session 462f378b-01ae-572c-b81b-c39199f8207a
+tokens orchestrator-wave-1 nowline-m1-s1 (claude-opus-5-5): input ~14 / cache read ~1.1M / cache write ~0 5m + ~24k 1h / output ~10k | ~$0.61 API-equiv
+tokens wave-2 nowline-m1-s2-s3 (claude-opus-5-5): input ~150 / cache read ~11M / cache write ~200k / output ~75k | ~$4.62 API-equiv (output est.) session 462f378b-01ae-572c-b81b-c39199f8207a
+tokens review-wave-2 nowline-m1-s2-s3 (claude-opus-5-5): input ~58 / cache read ~1.6M / cache write ~76k / output ~28k | ~$1.26 API-equiv (output est.) session 462f378b-01ae-572c-b81b-c39199f8207a
