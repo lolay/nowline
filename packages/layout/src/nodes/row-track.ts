@@ -16,11 +16,13 @@ import type {
 } from '@nowline/core';
 import { isItemDeclaration } from '@nowline/core';
 import { blockTitleRowSpillReservation } from '../container-header-geometry.js';
-import type { LayoutContext, LayoutHelpers } from '../layout-context.js';
+import { type LayoutContext, type LayoutHelpers, newCursor } from '../layout-context.js';
 import { RowPacker } from '../row-packer.js';
+import { resolveChildStart } from '../start-rules.js';
 import { ITEM_INSET_PX } from '../themes/shared.js';
 import type { PositionedTrackChild } from '../types.js';
 import { measureItem } from './item-measure.js';
+import { sequenceItem } from './sequence-item.js';
 
 export interface RowTrackOrigin {
     /** Left edge of the track: the lane's left x, or the group's content left x. */
@@ -66,14 +68,13 @@ export function sequenceRowTrack(
         if (child.$type === 'DescriptionDirective') continue;
 
         if (!isItemDeclaration(child)) {
-            const blockStart = helpers.resolveChildStart(
+            const blockStart = resolveChildStart(
                 child as ParallelBlock | GroupBlock,
                 timeCursorX,
-                leftX,
                 ctx,
             );
             const { rowIndex, y: blockY } = packer.placeBlock();
-            const cursor = helpers.newCursor(blockStart, blockY);
+            const cursor = newCursor(blockStart, blockY);
             const positioned = helpers.sequenceOne(
                 child as ItemDeclaration | GroupBlock | ParallelBlock,
                 cursor,
@@ -94,7 +95,7 @@ export function sequenceRowTrack(
         }
 
         const item = child as ItemDeclaration;
-        const desiredStart = helpers.resolveChildStart(item, timeCursorX, leftX, ctx);
+        const desiredStart = resolveChildStart(item, timeCursorX, ctx);
         // Measure the item where `sequenceItem` will place it, so the row
         // pack can decide BEFORE handing off: the measure gives the logical
         // extent and the bar's growth, and `sequenceItem` reuses it. Under
@@ -115,8 +116,8 @@ export function sequenceRowTrack(
             predictedHeight: pitch,
         });
 
-        const cursor = helpers.newCursor(desiredStart, rowY);
-        const positioned = helpers.sequenceItem(item, cursor, ctx, measure);
+        const cursor = newCursor(desiredStart, rowY);
+        const positioned = sequenceItem(item, cursor, ctx, measure);
         children.push(positioned);
 
         // Item end in LOGICAL space (one ITEM_INSET_PX past the visual

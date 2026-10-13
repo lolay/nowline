@@ -1,54 +1,19 @@
-// RoadmapNode — the m2.5c composition root. Walks the per-entity
-// Renderable nodes (ItemNode via sequenceItem, SwimlaneNode, ParallelNode
-// via sequenceOne, AnchorNode/MilestoneNode via build*, footnote/include
-// helpers) to produce the final `PositionedRoadmap` model.
-//
-// RoadmapNode does NOT import the sequencer helpers or the orchestration
-// helpers (`collectItems`, `buildDependencies`, `buildNowline`) at
-// module-init time. They live in
-// `layout.ts` and are passed in via the `deps` argument. This avoids a
-// runtime cycle while keeping the composition logic in a dedicated file.
+// RoadmapNode — the composition root (specs/layout-phases.md §3.1). It runs
+// the four phases in order: the date window (`phases/date-window.ts`),
+// measure (`phases/measure.ts`), place (`phases/place.ts`) and finalize
+// (`phases/finalize.ts`), each a module with a typed input and output.
+// `sequenceOne` is the one helper it injects: the group and parallel nodes
+// call it for their nested blocks (§8, decision 4).
 
-import type {
-    ItemDeclaration,
-    NowlineFile,
-    ResolveResult,
-    SwimlaneDeclaration,
-} from '@nowline/core';
+import type { NowlineFile, ResolveResult } from '@nowline/core';
 import type { LayoutOptions, LayoutResult } from '../layout.js';
-import type { LayoutContext, LayoutHelpers } from '../layout-context.js';
+import type { LayoutHelpers } from '../layout-context.js';
 import { resolveDateWindow, resolveScope } from '../phases/date-window.js';
 import { FinalizeContext, finalizeRoadmap } from '../phases/finalize.js';
 import { measureRoadmap } from '../phases/measure.js';
 import { placeChart } from '../phases/place.js';
 import type { RoadmapSchedule } from '../schedule.js';
-import type {
-    PositionedDependencyEdge,
-    PositionedIncludeRegion,
-    PositionedNowline,
-    PositionedSwimlane,
-} from '../types.js';
-
-/**
- * Bundle of orchestration + sequencer helpers RoadmapNode delegates to.
- * `layout.ts` builds this struct from its private helpers and passes it
- * once when calling `RoadmapNode.place(...)`.
- */
-export interface RoadmapNodeDeps extends LayoutHelpers {
-    collectItems: (swimlanes: SwimlaneDeclaration[]) => Map<string, ItemDeclaration>;
-    buildDependencies: (
-        items: Map<string, ItemDeclaration>,
-        swimlanes: PositionedSwimlane[],
-        includes: PositionedIncludeRegion[],
-        ctx: LayoutContext,
-    ) => PositionedDependencyEdge[];
-    buildNowline: (
-        today: Date | undefined,
-        ctx: LayoutContext,
-        locale: string,
-        chartRightX: number,
-    ) => PositionedNowline | null;
-}
+import { sequenceOne } from './sequence-one.js';
 
 export class RoadmapNode {
     /**
@@ -62,8 +27,8 @@ export class RoadmapNode {
         resolved: ResolveResult,
         options: LayoutOptions,
         schedule: RoadmapSchedule,
-        deps: RoadmapNodeDeps,
     ): LayoutResult {
+        const helpers: LayoutHelpers = { sequenceOne };
         // Phase 1, the date window (specs/layout-phases.md §3.2): the scope
         // (theme, locale, style context, `default roadmap` style) and the
         // natural window, a projection of the day schedule
@@ -80,13 +45,13 @@ export class RoadmapNode {
         // entity-edge seeds, the footnote index, the barrier passes (P1),
         // the corridor rerun (P2), the kept regions (P4), the chart bottom
         // (P5) and the milestones (P6). Placement never reads the canvas.
-        const chart = placeChart(resolved, scope, window, measured, deps);
+        const chart = placeChart(resolved, scope, window, measured, helpers);
 
         // Phase 4, finalize (specs/layout-phases.md §3.5): the ordered pass
         // f1 to f16 over the canvas, the axis, the marker band and the
         // chart extent, then the model.
         return finalizeRoadmap(
-            new FinalizeContext(file, resolved, options, scope, window, measured, chart, deps),
+            new FinalizeContext(file, resolved, options, scope, window, measured, chart),
         );
     }
 }

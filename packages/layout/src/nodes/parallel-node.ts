@@ -1,9 +1,8 @@
 // ParallelNode — Renderable for a `parallel { ... }` block. Stacks
 // children top-to-bottom (each child owns a fresh sub-track) and reports
 // the union bounding box. Each child is sequenced via the injected
-// `deps.sequenceOne` callback, which dispatches to the appropriate
-// per-entity Renderable (or, transitionally, the legacy sequencer
-// helpers in `layout.ts`).
+// `helpers.sequenceOne` callback (`sequence-one.ts`), which dispatches to
+// `sequenceItem`, `GroupNode` or a nested `ParallelNode`.
 
 import type { GroupBlock, ItemDeclaration, ParallelBlock } from '@nowline/core';
 import {
@@ -12,7 +11,12 @@ import {
 } from '../container-header-geometry.js';
 import { propValues } from '../dsl-utils.js';
 import { computeContainerInlineDatePins, pickInlineDate } from '../inline-date-pin-geometry.js';
-import type { LayoutContext, LayoutHelpers, TrackCursor } from '../layout-context.js';
+import {
+    type LayoutContext,
+    type LayoutHelpers,
+    newCursor,
+    type TrackCursor,
+} from '../layout-context.js';
 import { resolveStyle } from '../style-resolution.js';
 import { TRACK_BLOCK_TAIL_GUTTER_PX } from '../themes/shared.js';
 import type { BoundingBox, PositionedParallel, PositionedTrackChild } from '../types.js';
@@ -21,7 +25,7 @@ import { waveFloorX } from '../wave-layout.js';
 export class ParallelNode {
     constructor(
         public readonly node: ParallelBlock,
-        private readonly deps: Pick<LayoutHelpers, 'sequenceOne' | 'newCursor'>,
+        private readonly helpers: LayoutHelpers,
     ) {}
 
     get id(): string {
@@ -36,7 +40,7 @@ export class ParallelNode {
      */
     place(cursor: TrackCursor, ctx: LayoutContext): PositionedParallel {
         const { node } = this;
-        const { deps } = this;
+        const { helpers } = this;
         const style = resolveStyle('parallel', node.properties, ctx.styleCtx);
         // The block's own wave and its lead wave floor the shared start
         // (specs/waves.md §5.1); each track is floored again by its own
@@ -70,8 +74,8 @@ export class ParallelNode {
         for (const child of node.content) {
             if (child.$type === 'DescriptionDirective') continue;
             ctx.currentFlowKey = `${previousFlowKey}/par:${parId}#${childIndex}`;
-            const subCursor = deps.newCursor(startX, startY + accumulatedHeight);
-            const positioned = deps.sequenceOne(
+            const subCursor = newCursor(startX, startY + accumulatedHeight);
+            const positioned = helpers.sequenceOne(
                 child as ItemDeclaration | GroupBlock,
                 subCursor,
                 ctx,

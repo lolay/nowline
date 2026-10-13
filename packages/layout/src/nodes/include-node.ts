@@ -29,7 +29,7 @@ export function buildIncludeRegions(
     regions: IsolatedRegion[],
     ctx: LayoutContext,
     startY: number,
-    deps: LayoutHelpers,
+    helpers: LayoutHelpers,
 ): { regions: PositionedIncludeRegion[]; endY: number } {
     let y = startY + TAB_RESERVE;
     const out: PositionedIncludeRegion[] = [];
@@ -69,7 +69,7 @@ export function buildIncludeRegions(
         for (const lane of region.content.swimlanes.values()) {
             childCtx.nextParallelId = 0;
             childCtx.nextGroupId = 0;
-            const { positioned, usedHeight } = new SwimlaneNode({ lane, bandIndex }, deps).place(
+            const { positioned, usedHeight } = new SwimlaneNode({ lane, bandIndex }, helpers).place(
                 { x: childCtx.timeline.originX, y: cursorY },
                 childCtx,
             );

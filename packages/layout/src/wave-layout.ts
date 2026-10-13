@@ -1,6 +1,6 @@
 // Engine A (pixel layout) wave state: specs/waves.md §8.4.
 //
-// `RoadmapNode.place` runs its lane loop (plus a region pass) inside the
+// The place phase (`phases/place.ts`) runs its lane loop (plus a region pass) inside the
 // unit-agnostic barrier driver (`solveWaveBarriers`). Every pass floors
 // starts with the pass's `S` (in px) and accumulates member ends; this
 // module holds that state and the small helpers the sequencers and

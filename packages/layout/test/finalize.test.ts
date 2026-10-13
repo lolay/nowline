@@ -4,7 +4,8 @@
 
 import { buildWavePlan } from '@nowline/core';
 import { describe, expect, it } from 'vitest';
-import { finalizeBuilders, layoutHelpers, layoutRoadmap } from '../src/layout.js';
+import { layoutRoadmap } from '../src/layout.js';
+import { sequenceOne } from '../src/nodes/sequence-one.js';
 import { resolveDateWindow, resolveScope } from '../src/phases/date-window.js';
 import {
     CanvasExtent,
@@ -47,17 +48,8 @@ async function freshContext(): Promise<{
     const scope = resolveScope(file, resolved, options);
     const window = resolveDateWindow(file, resolved, options, scope, schedule);
     const measured = measureRoadmap(file, resolved, options, scope, window);
-    const chart = placeChart(resolved, scope, window, measured, layoutHelpers);
-    const fx = new FinalizeContext(
-        file,
-        resolved,
-        options,
-        scope,
-        window,
-        measured,
-        chart,
-        finalizeBuilders,
-    );
+    const chart = placeChart(resolved, scope, window, measured, { sequenceOne });
+    const fx = new FinalizeContext(file, resolved, options, scope, window, measured, chart);
     return { fx, expected: layoutRoadmap(file, resolved, options) };
 }
 

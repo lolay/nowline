@@ -4,18 +4,12 @@
 // fresh rows) and emits a `PositionedSwimlane` plus the band's used
 // height.
 //
-// Step-2 transitional shape:
-//   - Item children flow through the injected `deps.sequenceItem`. Once
-//     ItemNode's wire-in is complete (step 1 — done) the production
-//     `sequenceItem` already routes through ItemNode internally; deferring
-//     the recursive Renderable call here keeps the diff small.
-//   - Parallel + group children flow through `deps.sequenceOne` until
-//     their own nodes land in step 3.
-//   - The Renderable interface's `measure(MeasureContext)` is not yet
-//     wired through the production pipeline. The composition-root work
-//     in step 5 (`RoadmapNode`) will exercise it; meanwhile the legacy
-//     two-pass "buildSwimlane returns positioned + usedHeight" shape is
-//     preserved.
+// The lane's children go through the shared row track (`row-track.ts`):
+// items are measured and placed by `sequenceItem`, and parallel and group
+// children by the injected `helpers.sequenceOne`. A lane has no separate
+// measure pass: its height is the result of packing its rows, so
+// `place` returns the positioned lane with its used height
+// (specs/layout-phases.md §2, non-goals).
 
 import type {
     GroupBlock,
@@ -33,7 +27,9 @@ import { propValue } from '../dsl-utils.js';
 import { frameTabGeometry } from '../frame-tab-geometry.js';
 import { computeLaneUtilization, resolveLaneUtilizationThresholds } from '../lane-utilization.js';
 import type { LayoutContext, LayoutHelpers } from '../layout-context.js';
+import { resolveChildStart } from '../start-rules.js';
 import { resolveStyle } from '../style-resolution.js';
+import { estimateTextWidth } from '../text-measure.js';
 import type { BoundingBox, PositionedCapacity, PositionedSwimlane } from '../types.js';
 import { sequenceRowTrack } from './row-track.js';
 
@@ -147,15 +143,13 @@ function firstChildStartX(
     lane: SwimlaneDeclaration,
     laneLeftX: number,
     ctx: LayoutContext,
-    deps: Pick<LayoutHelpers, 'resolveChildStart'>,
 ): number | undefined {
     for (const child of lane.content) {
         if (child.$type === 'DescriptionDirective') continue;
         // Snapped like the start it predicts (a no-op under `hide`).
         return ctx.scale.startX(
-            deps.resolveChildStart(
+            resolveChildStart(
                 child as ItemDeclaration | GroupBlock | ParallelBlock,
-                laneLeftX,
                 laneLeftX,
                 ctx,
             ),
@@ -167,7 +161,7 @@ function firstChildStartX(
 export class SwimlaneNode {
     constructor(
         public readonly input: SwimlaneNodeInput,
-        private readonly deps: LayoutHelpers,
+        private readonly helpers: LayoutHelpers,
     ) {}
 
     get id(): string {
@@ -176,7 +170,7 @@ export class SwimlaneNode {
 
     place(origin: SwimlaneOrigin, ctx: LayoutContext): PlacedSwimlaneGeometry {
         const { lane, bandIndex } = this.input;
-        const { deps } = this;
+        const { helpers } = this;
         const style = resolveStyle('swimlane', lane.properties, ctx.styleCtx);
         const laneLeftX = origin.x;
         const step = ctx.bandScale.step();
@@ -201,17 +195,14 @@ export class SwimlaneNode {
         const footnoteIndicators = collectFootnoteIndicators(lane, ctx);
         const footnoteIndicatorWidthPx =
             footnoteIndicators.length > 0
-                ? deps.estimateTextWidth(
-                      footnoteIndicators.join(','),
-                      LANE_CAPACITY_BADGE_FONT_SIZE_PX,
-                  )
+                ? estimateTextWidth(footnoteIndicators.join(','), LANE_CAPACITY_BADGE_FONT_SIZE_PX)
                 : 0;
         // Title-tab geometry (mirrors the renderer; see renderSwimlane).
         const tabRightX = computeLaneTabRightX(lane, badgeWidthPx, footnoteIndicatorWidthPx);
         // First-row Y: when the first child's desired x is past the title
         // tab, top-align with the tab and reclaim ~28 px per lane.
         // Otherwise drop below the tab.
-        const firstChildDesiredX = firstChildStartX(lane, laneLeftX, ctx, deps);
+        const firstChildDesiredX = firstChildStartX(lane, laneLeftX, ctx);
         const canAlignFirstRowWithTab =
             !lane.title ||
             firstChildDesiredX === undefined ||
@@ -224,7 +215,7 @@ export class SwimlaneNode {
             lane.content,
             { leftX: laneLeftX, firstRowY: startY },
             ctx,
-            deps,
+            helpers,
         );
         const { children } = track;
 
@@ -241,9 +232,9 @@ export class SwimlaneNode {
         // (no items) should still fit visibly inside that bracket.
         const usedRightX = Math.max(track.packer.usedRightX(), tabRightX);
         // The band spans the canvas, whose width is final only after the
-        // post-placement growth: `RoadmapNode` sets a main lane's width to
-        // it (P9) and `fitIncludeRegionWidth` a region lane's to the
-        // region's. Placement never reads the canvas.
+        // post-placement growth: finalize (`fitWidths`, f4) sets a main
+        // lane's width to it and `fitIncludeRegionWidth` a region lane's to
+        // the region's. Placement never reads the canvas.
         const box: BoundingBox = {
             x: 0,
             y: origin.y,

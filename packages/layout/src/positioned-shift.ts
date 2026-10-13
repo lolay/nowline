@@ -5,9 +5,9 @@
 //   - `RowPacker`, when a row grows after the rows below it were placed
 //     (a taller item lands on an existing row), pushes every later row's
 //     children down by the growth.
-//   - `RoadmapNode`, when the unified marker re-pack needs more rows than
-//     the marker band was sized for, pushes every swimlane and include
-//     region down by the extra band height.
+//   - Finalize (`growHeaderRows`, f7), when the final marker pack needs
+//     more rows than the marker band was sized for, pushes every swimlane
+//     and include region down by the extra band height.
 //
 // Both paths go through `shiftTrackChildY`, so every absolute y the
 // positioned model carries is listed exactly once, here. A new y-bearing

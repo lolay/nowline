@@ -33,7 +33,7 @@ import { sequenceRowTrack } from './row-track.js';
 export class GroupNode {
     constructor(
         public readonly node: GroupBlock,
-        private readonly deps: LayoutHelpers,
+        private readonly helpers: LayoutHelpers,
     ) {}
 
     get id(): string {
@@ -49,7 +49,7 @@ export class GroupNode {
      */
     place(cursor: TrackCursor, ctx: LayoutContext): PositionedGroup {
         const { node } = this;
-        const { deps } = this;
+        const { helpers } = this;
         const style = resolveStyle('group', node.properties, ctx.styleCtx);
         // The group's own wave and its lead wave floor its start, so its
         // box never opens in a column before its first piece of work
@@ -105,7 +105,7 @@ export class GroupNode {
             node.content,
             { leftX: groupContentLeftX, firstRowY: startY + topPad },
             ctx,
-            deps,
+            helpers,
         );
         const { children, timeCursorX } = track;
 

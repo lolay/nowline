@@ -12,13 +12,14 @@
 // `finalScale()` and `markerBand()` throw when a slot is read before its
 // writer ran, so a reordering that slips past the check still fails.
 
-import type { ItemDeclaration, NowlineFile, ResolveResult } from '@nowline/core';
+import type { NowlineFile, ResolveResult } from '@nowline/core';
 import { daysBetween } from '../calendar.js';
 import { localeStrings } from '../i18n.js';
 import type { LayoutOptions, LayoutResult } from '../layout.js';
 import type { LayoutContext } from '../layout-context.js';
 import { buildAnchors } from '../nodes/anchor-node.js';
 import { maxLeafItemRightX } from '../nodes/content-extent.js';
+import { buildDependencies, collectItems } from '../nodes/dependency-edges.js';
 import { buildFootnotePanel } from '../nodes/footnote-node.js';
 import type { PositionedHeaderParts } from '../nodes/header-node.js';
 import { fitIncludeRegionWidth, includeRegionWidth } from '../nodes/include-node.js';
@@ -34,6 +35,7 @@ import {
 } from '../nodes/marker-band.js';
 import { MARKER_ROW_PITCH_PX } from '../nodes/marker-geometry.js';
 import { positionMilestones } from '../nodes/milestone-node.js';
+import { buildNowline } from '../nodes/nowline-node.js';
 import { type BuiltWaves, buildWaveLegend, buildWaves } from '../nodes/wave-node.js';
 import { shiftIncludeY, shiftSwimlaneY } from '../positioned-shift.js';
 import { estimateTextWidth } from '../text-measure.js';
@@ -126,26 +128,6 @@ export interface ModelDraft {
     height?: number;
 }
 
-/**
- * The orchestration helpers finalize still takes from `layout.ts`, so the
- * import stays one way until they move into modules of their own.
- */
-export interface FinalizeBuilders {
-    collectItems: (swimlanes: PlacedChart['laneEntries']) => Map<string, ItemDeclaration>;
-    buildDependencies: (
-        items: Map<string, ItemDeclaration>,
-        swimlanes: PlacedChart['swimlanes'],
-        includes: PlacedChart['includes'],
-        ctx: LayoutContext,
-    ) => PositionedDependencyEdge[];
-    buildNowline: (
-        today: Date | undefined,
-        ctx: LayoutContext,
-        locale: string,
-        chartRightX: number,
-    ) => PositionedNowline | null;
-}
-
 /** Reports whether a finalize step changed something; see `setFinalizeTrace`. */
 export type FinalizeTrace = (step: string, changed: boolean) => void;
 
@@ -178,7 +160,6 @@ export class FinalizeContext {
         readonly window: DateWindow,
         readonly measured: MeasuredRoadmap,
         readonly chart: PlacedChart,
-        readonly builders: FinalizeBuilders,
     ) {
         this.canvas = new CanvasExtent(measured.naturalChartRightX);
         // The chart extent lives on the placement context, which the node
@@ -742,13 +723,8 @@ function anchors(fx: FinalizeContext): boolean {
 
 /** f11 (was P16): dependency edges, their ports read off the final boxes. */
 function dependencyEdges(fx: FinalizeContext): boolean {
-    const itemsMap = fx.builders.collectItems(fx.chart.laneEntries);
-    const edges = fx.builders.buildDependencies(
-        itemsMap,
-        fx.chart.swimlanes,
-        fx.chart.includes,
-        fx.ctx,
-    );
+    const itemsMap = collectItems(fx.chart.laneEntries);
+    const edges = buildDependencies(itemsMap, fx.chart.swimlanes, fx.chart.includes, fx.ctx);
     fx.draft.edges = edges;
     return edges.length > 0;
 }
@@ -760,12 +736,7 @@ function dependencyEdges(fx: FinalizeContext): boolean {
  */
 function nowline(fx: FinalizeContext): boolean {
     fx.finalScale();
-    const line = fx.builders.buildNowline(
-        fx.options.today,
-        fx.ctx,
-        fx.scope.locale,
-        fx.canvas.final,
-    );
+    const line = buildNowline(fx.options.today, fx.ctx, fx.scope.locale, fx.canvas.final);
     fx.draft.nowline = line;
     return line !== null;
 }

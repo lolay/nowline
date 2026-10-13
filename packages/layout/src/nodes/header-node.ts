@@ -239,8 +239,8 @@ function sizeBesideHeader(
         : textCardHeight;
 
     // `boxWidth` only includes the LEFT outer pad — the right-side breathing
-    // room between the card and the chart is owned by `GUTTER_PX` in
-    // `RoadmapNode`. So `boxWidth` doubles as `chartLeftX` (the card's right
+    // room between the card and the chart is owned by `GUTTER_PX` in the
+    // measure phase. So `boxWidth` doubles as `chartLeftX` (the card's right
     // edge in canvas coordinates).
     const boxWidth = cardWidth + HEADER_CARD_OUTER_PAD;
     return {

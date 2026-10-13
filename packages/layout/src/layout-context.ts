@@ -1,7 +1,7 @@
-// Layout context — shared internal types used by `layout.ts` and the
-// node files under `nodes/`. Extracted so per-entity nodes (e.g.
-// `swimlane-node.ts`) can type their inputs without forcing a circular
-// import on the production composition root in `layout.ts`.
+// Layout context — shared internal types used by the layout phases
+// (`phases/`) and the node files under `nodes/`. Extracted so per-entity
+// nodes (e.g. `swimlane-node.ts`) can type their inputs without importing
+// the phases that drive them.
 
 import type {
     GroupBlock,
@@ -15,7 +15,6 @@ import type {
 import type { BandScale } from './band-scale.js';
 import { type resolveCalendar, resolveSizes } from './calendar.js';
 import type { FootnoteIndex } from './nodes/footnote-node.js';
-import type { ItemMeasure } from './nodes/item-measure.js';
 import type { RoadmapSchedule } from './schedule.js';
 import type { StyleContext } from './style-resolution.js';
 import type { Theme } from './themes/shape.js';
@@ -191,7 +190,7 @@ export interface ContextSource {
  * `chart` passes the chart extents through unchanged: the root sets
  * `chartTopY` from the timeline with both bottoms at 0, a region sets all
  * three y fields to its inner start. The canvas width is not part of a
- * context: placement never reads it (`RoadmapNode` owns the `CanvasExtent`).
+ * context: placement never reads it (finalize owns the `CanvasExtent`).
  * A region passes no footnotes and no marker placements. The caller seeds
  * the wave edges.
  */
@@ -257,35 +256,16 @@ export function createLayoutContext(
 }
 
 /**
- * Bundle of layout-internal helper callbacks injected from `layout.ts`
- * into the per-entity Renderable nodes. Keeping the helpers in
- * `layout.ts` (rather than splitting them across many tiny files) means
- * the nodes stay small and importable without a runtime cycle: they
- * receive the helpers at construction time via this struct.
+ * The helpers the place phase injects into the nodes. Everything else a
+ * node needs it imports; `sequenceOne` (`nodes/sequence-one.ts`) stays
+ * injected because it dispatches to `GroupNode` and `ParallelNode`, which
+ * call it for their nested blocks: importing it there would form a cycle
+ * (specs/layout-phases.md §3.8, §8 decision 4).
  */
 export interface LayoutHelpers {
-    /**
-     * Place an item. `measure` is the item's measure at the snapped start it
-     * will be placed at (the row track measures before it packs the row);
-     * without one, `sequenceItem` measures where it places.
-     */
-    sequenceItem: (
-        child: ItemDeclaration,
-        cursor: TrackCursor,
-        ctx: LayoutContext,
-        measure?: ItemMeasure,
-    ) => PositionedItem;
     sequenceOne: (
         child: ItemDeclaration | GroupBlock | ParallelBlock,
         cursor: TrackCursor,
         ctx: LayoutContext,
     ) => PositionedTrackChild;
-    resolveChildStart: (
-        child: ItemDeclaration | GroupBlock | ParallelBlock,
-        seqDefault: number,
-        laneLeftX: number,
-        ctx: LayoutContext,
-    ) => number;
-    newCursor: (x: number, y: number) => TrackCursor;
-    estimateTextWidth: (text: string, fontSize: number) => number;
 }

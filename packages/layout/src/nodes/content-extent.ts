@@ -9,7 +9,7 @@
 // which both fold in `spillX` (the caption's reserved column).
 //
 // Used by:
-//   - `RoadmapNode`'s post-layout timeline-extension pass, which
+//   - Finalize's timeline extension (`extendTimeline`, f2), which
 //     grows the date window to cover overflowing content boxes
 //     without letting overhanging captions drag it out too.
 //   - `buildIncludeRegions`, to size the dashed include bracket to

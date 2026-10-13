@@ -6,10 +6,11 @@
 // would push past the date are flagged `isOverrun`.
 //
 // Placement decides x, slack arrows and overrun only (`MilestonePlacement`).
-// The marker row and label box come from the unified re-pack in
-// `RoadmapNode.place` (`marker-band.ts::packMarkerRow`), which runs once
-// every centerX is known and the canvas is final; `positionMilestones`
-// then builds each `PositionedMilestone` from its placement and its row.
+// The marker row and label box come from the final marker pack in
+// finalize (`packMarkers`, f5, through `marker-band.ts::packMarkerRow`),
+// which runs once every centerX is known and the canvas is final;
+// `positionMilestones` then builds each `PositionedMilestone` from its
+// placement and its row (`placeMarkers`, f6).
 
 import type { MilestoneDeclaration } from '@nowline/core';
 import { formatIsoDate, parseDate, propValue, propValues } from '../dsl-utils.js';
@@ -167,8 +168,8 @@ export class MilestoneNode {
      * Writes the milestone's entity edges and midpoint, which later
      * milestones' `after:` references read. The midpoint's y is an
      * estimate: the pre-pack row of a dated milestone, the band's first
-     * row for an after-only one. `RoadmapNode` replaces it with the
-     * re-pack's row (P11); until then a later milestone's slack arrow from
+     * row for an after-only one. Finalize replaces it with the final
+     * pack's row (f6); until then a later milestone's slack arrow from
      * this one reads the estimate.
      */
     place(ctx: LayoutContext): MilestonePlacement | null {
