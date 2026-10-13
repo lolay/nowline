@@ -62,7 +62,7 @@ jobs:
 
           # Check 3: Assisted-by: in body (## AI assistance section)
           if ! printf '%s' "$PR_BODY" | grep -Eqi 'assisted-by:\s*\S+'; then
-            failures+=("- **Missing \`Assisted-by:\` line.** PR body must include an \`## AI assistance\` section containing an \`Assisted-by: <model>\` line (per repo \`AI_POLICY.md\`).")
+            failures+=("- **Missing \`Assisted-by:\` line.** PR body must include an \`## AI assistance\` section containing an \`Assisted-by: <tool>\` line (per repo \`AI_POLICY.md\`).")
           fi
 
           if [[ "${#failures[@]}" -eq 0 ]]; then

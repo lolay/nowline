@@ -316,7 +316,7 @@ If you're changing the spec'd behavior of the language, also update the relevant
 - **Comments.** Only write them when the code itself can't communicate the intent. No `// Increment the counter`-style narration. Explain *why*, not *what*.
 - **Error handling.** The CLI uses a `CliError` + numeric `ExitCode` scheme (`packages/cli/src/io/exit-codes.ts`). New error paths should throw `CliError` with the appropriate code so `process.exit` gets the right value.
 - **No emojis in source, commit messages, or user-facing output unless explicitly requested.**
-- **AI-assisted commits.** Every commit that materially relied on AI assistance must carry an `Assisted-by:` trailer naming the specific agent and version — e.g. `Assisted-by: Claude Opus 4.7`. The trailer is a standard Git footer (same shape as `Co-Authored-By:` / `Signed-off-by:`), so it survives squash-merge and stays grep-able in `git log`. Multiple trailers are fine if more than one agent contributed. Write `Assisted-by: None` for entirely hand-written work. See [`AI_POLICY.md`](./AI_POLICY.md) for the rationale.
+- **AI-assisted commits.** Every commit that materially relied on AI assistance must carry an `Assisted-by:` trailer naming the tool, not the model — e.g. `Assisted-by: Claude Code`. Never credit an agent with `Co-authored-by:`. The trailer is a standard Git footer (same shape as `Co-Authored-By:` / `Signed-off-by:`), so it survives squash-merge and stays grep-able in `git log`. Multiple trailers are fine if more than one tool contributed. Write `Assisted-by: None` for entirely hand-written work. See [`AI_POLICY.md`](./AI_POLICY.md) for the rationale.
 
 Formatting and lint enforcement are described in the next section.
 
@@ -433,7 +433,7 @@ WIP
 
 Nowline ships [`AGENTS.md`](./AGENTS.md) and welcomes AI-assisted PRs. Read [`AI_POLICY.md`](./AI_POLICY.md) before opening one — the short version:
 
-- Disclose the specific agent (name + version) with an `Assisted-by:` trailer on each AI-assisted commit *and* under the **AI assistance** section of the PR description. Write `Assisted-by: None` if the PR is entirely hand-written.
+- Disclose the tool (e.g. `Claude Code`, `Cursor`, `GitHub Copilot`; not the model) with an `Assisted-by:` trailer on each AI-assisted commit *and* under the **AI assistance** section of the PR description. Write `Assisted-by: None` if the PR is entirely hand-written.
 - Own every line you submit. You should be able to explain the change in your own words without re-prompting the AI.
 
 ### Changelog entries

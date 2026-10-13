@@ -8,7 +8,7 @@ This document covers what we expect when you (a human) open a PR that AI helped 
 
 Disclose AI involvement at two levels.
 
-**On each AI-assisted commit**, add an `Assisted-by:` trailer naming the specific agent and version. The trailer is a standard Git footer (same shape as `Co-Authored-By:` / `Signed-off-by:`) so it survives squash-merge and stays grep-able in `git log`.
+**On each AI-assisted commit**, add an `Assisted-by:` trailer naming the tool, not the model. The trailer is a standard Git footer (same shape as `Co-Authored-By:` / `Signed-off-by:`) so it survives squash-merge and stays grep-able in `git log`.
 
 ```
 fix round-trip printer quoting for template strings
@@ -17,12 +17,14 @@ The printer was emitting bare double quotes inside ${...} interpolations,
 which broke the JSON -> text -> JSON round-trip on examples/templated.nowline.
 Quote the inner expression with the surrounding string's delimiter instead.
 
-Assisted-by: Claude Opus 4.7
+Assisted-by: Claude Code
 ```
 
-Use the agent's own product name and version: `Claude Opus 4.7`, `Claude Sonnet 4.6`, `GPT-5.5`, `Cursor Composer 2.5`, `Codex CLI`, `Aider`, etc. Multiple trailers are fine if more than one agent contributed.
+Name the harness you worked in: `Claude Code`, `Cursor`, `Codex`, `GitHub Copilot`, `Aider`, etc. Leave the model and its version out; they change from session to session, and the tool is what a reviewer needs to calibrate against. Multiple trailers are fine if more than one tool contributed.
 
-**In the PR description**, repeat the same `Assisted-by:` line(s) under the `## AI assistance` section of the [PR template](./.github/PULL_REQUEST_TEMPLATE.md) so reviewers see the disclosure without clicking through commits. If the PR is entirely hand-written, write `Assisted-by: None`.
+Never credit an agent with `Co-authored-by:` or `Signed-off-by:`. The human who opens the PR is its author and answers for it. Commits on a PR branch may keep an agent's own identity. When GitHub squashes the PR, it appends a `Co-authored-by:` line for each branch commit author other than the PR author, and the merge queue writes that message with no chance to edit it, so a line like `Co-authored-by: Claude <noreply@anthropic.com>` can land on `main`. That line is GitHub's, and we accept it; don't add one yourself.
+
+**In the PR description**, repeat the same `Assisted-by:` line(s) under the `## AI assistance` section of the [PR template](./.github/PULL_REQUEST_TEMPLATE.md) so reviewers see the disclosure without clicking through commits. If the PR is entirely hand-written, write `Assisted-by: None`. The squash commit on `main` is the PR title and description ([`ops/branch-policies.md`](./ops/branch-policies.md)), and Git reads trailers only from a message's last paragraph, so keep that section last and the `Assisted-by:` line(s) as its final paragraph. A session link or tool footer goes above them, never after. GitHub's appended `Co-authored-by:` paragraph still lands after it, so to find assisted commits on `main`, search the message (`git log --grep='^Assisted-by:'`) rather than parsed trailers.
 
 Optional but useful: a short note on *what* the AI did (e.g. "drafted the regex and the tests; I refactored the public API and rewrote the error messages"). This helps reviewers calibrate what to scrutinize.
 
