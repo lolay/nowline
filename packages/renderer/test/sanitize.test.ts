@@ -123,6 +123,19 @@ describe('sanitizeSvg — styles', () => {
         expect(rects[2]).toContain('fill="#444"');
     });
 
+    it('folds an Illustrator-style class rule into attributes and drops the class', () => {
+        const { out, warnings } = run(
+            '<svg viewBox="0 0 10 10"><defs><style>.cls-1{fill:#123456}</style></defs>' +
+                '<rect class="cls-1" width="10" height="10"/>' +
+                '<circle class="unmatched" r="2"/></svg>',
+        );
+        // `class` is bookkeeping once inlined, so dropping it is not a warning.
+        expect(warnings).toEqual([]);
+        expect(out).toContain('<rect fill="#123456"');
+        expect(out).not.toMatch(/class=/);
+        expect(out).not.toContain('cls-1');
+    });
+
     it('reports and skips rules it cannot apply', () => {
         const { out, warnings } = run(
             '<svg><style>rect { fill: red } #x .y { fill: blue } @import url(evil.css);</style><rect width="1" height="1"/></svg>',

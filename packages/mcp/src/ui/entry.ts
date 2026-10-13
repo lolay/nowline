@@ -25,6 +25,7 @@
 declare const __MCP_VERSION__: string;
 
 import { App } from '@modelcontextprotocol/ext-apps';
+import { normalizeThemeName } from '@nowline/layout';
 import { type LivePreviewHandle, mountLivePreview } from '@nowline/preview';
 import type { NowOverride, ThemeOverride } from '@nowline/preview-shell';
 import {
@@ -47,16 +48,7 @@ function readPayload(): PreviewPayload | undefined {
 
 /** Coerce a raw theme token from the payload to the shell's ThemeOverride. */
 function toThemeOverride(theme: string | undefined): ThemeOverride {
-    switch (theme) {
-        case 'light':
-        case 'dark':
-        case 'grayscale':
-        case 'greyscale':
-        case 'auto':
-            return theme;
-        default:
-            return 'auto';
-    }
+    return (theme !== undefined ? normalizeThemeName(theme) : undefined) ?? 'auto';
 }
 
 let mounted = false;

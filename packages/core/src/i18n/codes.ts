@@ -12,7 +12,7 @@
 //   NL.E0600–E0699  item / swimlane
 //   NL.E0700–E0799  capacity / utilization
 //   NL.E0800–E0899  style / color / symbol
-//   NL.E0900–E0999  config blocks (calendar, scale, default)
+//   NL.E0900–E0999  calendar declarations (non-working / working)
 //   NL.E1100–E1199  waves
 //   NL.W0700–W0799  warnings (silently-ignored input)
 //   NL.W1000–W1099  layout warnings (author intent lost)

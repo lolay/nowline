@@ -1,0 +1,3 @@
+```release-note:fixed
+Editor completion for `icon:` now offers the built-in `calendar` icon.
+```

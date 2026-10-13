@@ -8,6 +8,8 @@ default:
     hint: https://nodejs.org
   - tool: pnpm
     hint: corepack enable && corepack prepare pnpm@latest --activate
+  - tool: python3
+    hint: https://www.python.org
 
 release:
   extends: [default]

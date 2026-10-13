@@ -401,7 +401,7 @@ Each recognized key is the default for one flag, resolved flag > `.nowlinerc` > 
 | `useSystemFonts` | `--use-system-fonts` | Boolean; either source turns it on. |
 | `locale` | `--locale` | Ranks below the locale environment variables (see below). Also read by `--serve`. |
 
-An invalid rc value is a usage error (exit 2) that names the key, for example `nowline: invalid .nowlinerc theme "sepia". Expected light, dark, or grayscale.`, rather than a flag the user never passed. A valid flag still wins over an invalid key. Unknown keys are ignored.
+An invalid rc value is a usage error (exit 2) that names the key, for example `nowline: invalid .nowlinerc theme "sepia". Expected light, dark, or grayscale.`, rather than a flag the user never passed. A valid flag still wins over an invalid key. Unknown keys are ignored. A `.nowlinerc` that cannot be parsed (malformed YAML or JSON, or a top level that is not a mapping) is the same usage error, `nowline: invalid .nowlinerc: <reason>`, with the file path in the reason; no `.nowlinerc` at all is not an error.
 
 The one environment input is locale (see below): Nowline honors `LC_ALL` / `LC_MESSAGES` / `LANG` because every Unix tool author's `man` page reader, terminal, and OS already does. Other environment variables are not supported in m2 — keep it simple.
 

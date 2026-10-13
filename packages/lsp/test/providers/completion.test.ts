@@ -98,6 +98,8 @@ swimlane backend "Backend"
         // built-ins
         expect(labels).toContain('shield');
         expect(labels).toContain('warning');
+        // the renderer's inline-date pin glyph, which the validator reserves too
+        expect(labels).toContain('calendar');
     });
 
     it('proposes built-in status values inside `status:`', async () => {

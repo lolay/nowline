@@ -39,6 +39,7 @@ You'll need:
 - **Node.js** ≥ 22 to **consume** `@nowline/*` packages (matches `engines.node` in every published `package.json`). To **develop** in this repo, install **Node 26** — `.nvmrc` pins `26.2.0` and CI runs on it. See [Toolchain & Supported Versions](#toolchain--supported-versions) for the full policy.
 - **pnpm** ≥ 11 (the repo is a pnpm workspace and pins the package manager via `packageManager: pnpm@12.8.1` in the root `package.json`). Install with `corepack enable && corepack prepare pnpm@latest --activate`.
 - **Git**.
+- **Python 3** — `scripts/changelog.py` needs it (stdlib only, nothing to install).
 - **Bun** (optional) — only required if you want to produce standalone binaries locally with `pnpm --filter @nowline/cli compile`. Skip it otherwise; nothing in the default dev loop uses Bun.
 
 No other global tooling is required.

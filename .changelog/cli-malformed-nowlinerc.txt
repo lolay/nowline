@@ -1,0 +1,3 @@
+```release-note:fixed
+A malformed `.nowlinerc` (YAML or JSON that does not parse) is now a usage error, exit 2, that names the file and the parser's reason, instead of being silently ignored. `--serve` behaves the same.
+```
