@@ -3,7 +3,7 @@
 
   Status: 0/5 groups done | last review: — | current: nowline m1 s1 [exec] | updated 2026-10-13
 
-  mode: unattended | proposed unattended (harness=claude-code runner=cloud; assigned branch, CLAUDE_CODE_REMOTE=true) | guard 3x min $50 | fixups 2 | confirmed 2026-10-13 session 462f378b-01ae-572c-b81b-c39199f8207a: unattended
+  mode: unattended | proposed unattended (harness=claude-code runner=cloud; assigned branch, CLAUDE_CODE_REMOTE=true) | guard 3x min $50 | fixups 2 | confirmed 2026-10-13 session 462f378b-01ae-572c-b81b-c39199f8207a by Kickoff prompt: Run in unattended mode.
 
   review: every-wave (log-only)
 

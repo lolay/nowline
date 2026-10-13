@@ -2,8 +2,8 @@
 
 - **Branch:** `claude/zealous-thompson-tur82q` (lolay/nowline), assigned by the cloud harness. Started on it at `c34804c` (= `origin/main`).
 - **Plan:** `specs/handoffs/plan-core-utilities-heron.md`. Spec: `specs/core-ast-utilities.md`.
-- **Mode:** unattended, confirmed 2026-10-13 in session 462f378b-01ae-572c-b81b-c39199f8207a (harness=claude-code runner=cloud).
-- **Status:** kickoff answered, nothing dispatched. 0/5 waves done. Halted for Gary's `/compact`.
+- **Mode:** unattended, confirmed 2026-10-13 in session 462f378b-01ae-572c-b81b-c39199f8207a (harness=claude-code runner=cloud), re-confirmed by the pasted Kickoff prompt after `/compact`.
+- **Status:** resumed after `/compact`; `origin/main` merged (`512265b`, clean: #149, #150). 0/5 waves done. Wave 1 launching.
 - **Spend:** ~$5.8 logged (kickoff and planning) against ~$24 expected (guard ~$72).
 
 ## Waves
@@ -20,11 +20,11 @@ Gates on the way: 2 before waves 2 and 4; 4 before wave 4 (m2) and before the m3
 
 ## Pending question (verbatim)
 
-None. The kickoff question was answered `unattended`. The session halted so Gary can run `/compact`; no wave dispatches until he pastes the plan's Kickoff prompt.
+None.
 
 ## How to resume
 
-Paste the plan's Kickoff prompt (in the plan's Kickoff block). First action after the paste: merge `origin/main` (plan, "Merging main"), push, then wave 1.
+Paste the plan's Kickoff prompt (in the plan's Kickoff block). Before each unit the parent fetches `origin/main` and merges it when clean (plan, "Merging main").
 
 ## Decisions so far
 
@@ -36,7 +36,7 @@ Paste the plan's Kickoff prompt (in the plan's Kickoff block). First action afte
 
 ## Environment notes
 
-- Cloud runner: Node 22.22.0 is installed; `.nvmrc` pins 26.2.0. `make` targets are the entry point; `packages/cli/dist/` is not built at kickoff (run `make init build-fast` first).
+- Cloud runner: Node 22.22.0 is installed; `.nvmrc` pins 26.2.0. Since #149 (merged in `512265b`) `make doctor` accepts Node >=22 and passes. `make` targets are the entry point; `packages/cli/dist/` is not built at kickoff (run `make init build-fast` first).
 - Gate script lives in the plan (Gates section); workers write it to `.scratch/gates.sh`. Cached gate renders go to `.scratch/gates/`, base worktrees to `.scratch/gate-wt/` (both gitignored).
 
 ## Deviations from plan
