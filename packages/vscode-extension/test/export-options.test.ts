@@ -33,8 +33,9 @@ describe('resolveExportAssetRoot', () => {
     });
 
     it('falls back to the rc assetRoot, relative to the rc file', () => {
+        // `path.resolve`, not `join`: on Windows the result carries the drive.
         expect(resolveExportAssetRoot('', { assetRoot: 'brand' }, rcPath)).toBe(
-            path.join(path.sep, 'proj', 'brand'),
+            path.resolve(path.dirname(rcPath), 'brand'),
         );
     });
 
