@@ -3,9 +3,8 @@
 // Layout has no font metrics, so every caption / header / marker fit
 // decision runs on one pessimistic per-character estimate. Keeping the
 // estimate and the whitespace word-wrap built on it in a single module
-// means the item-title wrap (`ItemNode`), its row-height predictor, and
-// the header-card wrap in `layout.ts` can never disagree about how wide a
-// string is.
+// means the item-title wrap (`measureItem`) and the header-card wrap in
+// `layout.ts` can never disagree about how wide a string is.
 
 /**
  * Rough px-width estimate for sans-serif text. Intentionally pessimistic

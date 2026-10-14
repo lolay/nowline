@@ -201,6 +201,19 @@ export interface Theme {
         neutral: string;
     };
     /**
+     * Item bar fill per status when the item's resolved `bg` is the theme's
+     * item default (`entities.item.bg`); an explicit `bg:` wins. Same keys as
+     * `status`, which colors the border the same way for `entities.item.fg`.
+     */
+    statusTint: {
+        done: string;
+        inProgress: string;
+        atRisk: string;
+        blocked: string;
+        planned: string;
+        neutral: string;
+    };
+    /**
      * Upper-right status-dot colors. Two palettes — the renderer
      * picks `onLight` for bars whose effective bg is light/pale and
      * `onDark` for bars whose bg is dark/saturated. This lets the

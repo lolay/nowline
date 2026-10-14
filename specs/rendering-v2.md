@@ -126,7 +126,7 @@ Lands alongside the existing `CalendarConfig` in [`calendar.ts`](../packages/lay
 
 ### Renderable
 
-Measure/place tree, one node type per entity. Each node implements two methods:
+Measure/place tree, one node type per entity. (In the production port only `ItemNode` implements the interface; see [Layout Phases](#layout-phases-m414) for which nodes measure.) Each node implements two methods:
 
 ```ts
 interface Renderable<TInput, TPositioned> {
@@ -254,6 +254,30 @@ The four phases ship as separate milestones, ordered low-risk to high-risk so ea
 
 **Risk and mitigation.** Medium — touches both packages but the change is mechanical: every renderer-side palette lookup becomes a positioned-model field read. Mitigation: byte-stable regression on light + dark output for every sample.
 
+## Layout Phases (m4.14)
+
+m2.5c built the measure/place tree for entities. The roadmap itself stayed one method, `RoadmapNode.place`, until [m4.14](./milestones.md#m414--layout-phases-r2) ([`layout-phases.md`](./layout-phases.md)) split it by *phase*. `RoadmapNode.place` is now four calls, each a module under `packages/layout/src/phases/` with a typed input and output:
+
+| Phase | Module | What it does | Never touches |
+|---|---|---|---|
+| 1. Date window | `date-window.ts` | theme, locale, style context, the `default roadmap` style (`RoadmapScope`); the natural window, a projection of the day schedule (`DateWindow`) | pixels |
+| 2. Measure | `measure.ts` | the header (`HeaderNode.measure`), pixels per day and the natural time scale, the header rows (now-pill row, tick panel, wave strip, marker band estimate), the natural timeline (`MeasuredRoadmap`) | placement state |
+| 3. Place | `place.ts` | the root context, entity-edge seeds, the footnote index, the lanes inside the wave barrier passes, the slack-corridor rerun, the kept include regions, the chart bottom and the milestones (`PlacedChart`) | the canvas |
+| 4. Finalize | `finalize.ts` | one ordered, checked pass of sixteen named steps (f1 to f16) over a `FinalizeContext`; builds the model | re-placing content |
+
+Finalize is where everything that needs final geometry runs: the canvas grows for caption spill (f1), the timeline extension grows the axis to the next tick and replaces the scale (f2), the canvas grows for marker labels and is then frozen (f3), lanes and regions are fitted to it (f4), the markers are packed once more (f5) and placed (f6), the header rows grow when the final pack needs more rows and the lanes shift with them (f7), and then the bottom tick panel, waves, anchors, dependency edges, now-line, wave legend, footnote panel, header and attribution follow (f8 to f16). Each step declares the slots it reads and writes; a unit test checks the table against the slot rules, and reading a slot before its writer ran (the final canvas, the final scale, the marker band, the header rows' bottom) throws. The order is the one table in [`layout-phases.md`](./layout-phases.md) §3.5, with the as-built differences in its §9.
+
+**Which nodes measure.**
+
+- `ItemNode` is the one node that implements `Renderable`, and its `measure` is complete: `measureItem` (`nodes/item-measure.ts`) sizes the bar once, wrapped titles and chip rows included, at the item's snapped start. The row track takes the row pitch from it and hands the measure to placement, so `ItemNode.measure().height` equals the placed box and nothing patches a height afterwards. This replaced `predictItemBarExtraHeight`, a hand-kept copy of the sequencer.
+- Lanes, groups and parallels do **not** measure. Their height is the result of row packing on x positions, so a separate measure pass would be placing them twice. They stay single-pass; the lane and group loops are one function, `sequenceRowTrack` (`nodes/row-track.ts`).
+- Anchors, milestones, include regions and the footnote panel place directly.
+- The header measures through `HeaderNode` but does not take the `Renderable` signature (§ below).
+
+**The header (the old open question).** `logo:` rendering lives in a `HeaderNode` (`nodes/header-node.ts`), not in the renderer and not in a `RoadmapHeaderNode` that implements `Renderable`. `HeaderNode.measure()` sizes the card, the logo slot and text inset, the chart's left edge and top and the lowest the header rows may end for a beside card to fit; `HeaderNode.place()` builds the header box, card, logo box and text inset from that measure and the final header rows' bottom. It does not implement `Renderable`, whose signature is built around a time scale and a band that a header has no use for. *Drawing* the logo stays in the renderer.
+
+`layout.ts` ended at `layoutRoadmap` and `LayoutOptions` (80 lines), not the ~300 lines m2.5c's text promised: the composition root is `RoadmapNode` (57 lines) plus the four phase modules, and the helpers that left `layout.ts` live in `nodes/` (`sequence-item.ts`, `sequence-one.ts`, `dependency-edges.ts`, `nowline-node.ts`, `marker-band.ts`) and in `start-rules.ts`.
+
 ## Backwards Compatibility
 
 The `PositionedRoadmap` interface stays stable across all four phases. New fields are added (m2.5d adds resolved colors), but no existing field is removed or renamed. Consequence:
@@ -289,11 +313,13 @@ These are deferred to the relevant phase's design pass and should not block plan
 - **Style resolution surfacing in `Renderable.measure`.** Today `style-resolution.ts` resolves a style upfront; v2 nodes accept `ResolvedStyle` as input. Whether `measure()` ever needs *unresolved* style input (for late-binding text-size from container context, for example) is a m2.5c open question.
 - **Edge routing eventually moving into the tree.** m2.5c keeps the existing router. If a future milestone moves orthogonal routing into the measure/place tree (e.g. via an `EdgeNode` that participates in collision detection), this spec gets a follow-up.
 - **`d3-scale` / `d3-time` bundle impact in the embed.** Estimated ~10 KB tree-shaken, but actual measurement happens in m2.5a's PR and informs whether m4's embed bundle stays under its target ceiling.
-- **`logo:` rendering inside `Renderable`.** The header is currently a special case; m2.5c decides whether the logo lives inside `RoadmapHeaderNode` or stays a renderer-side concern.
+- **`logo:` rendering inside `Renderable`.** *Answered by m4.14:* the logo slot lives in `HeaderNode` (measure and place), which does not implement `Renderable`; drawing the logo stays in the renderer. See [Layout Phases](#layout-phases-m414).
 
 ## References
 
 - [`specs/rendering.md`](./rendering.md) — public output contract (unchanged by this work)
 - [`specs/milestones.md`](./milestones.md) — milestone summary and dependency chain
 - [`specs/architecture.md`](./architecture.md) — package boundaries (unchanged)
+- [`specs/layout-phases.md`](./layout-phases.md) — the four phases and the finalize pass (m4.14)
 - [`packages/layout/src/nodes/`](../packages/layout/src/nodes/) — production measure/place tree
+- [`packages/layout/src/phases/`](../packages/layout/src/phases/) — the date-window, measure, place and finalize phases

@@ -1,6 +1,6 @@
 // Engine A (pixel layout) wave state: specs/waves.md §8.4.
 //
-// `RoadmapNode.place` runs its lane loop (plus a region pass) inside the
+// The place phase (`phases/place.ts`) runs its lane loop (plus a region pass) inside the
 // unit-agnostic barrier driver (`solveWaveBarriers`). Every pass floors
 // starts with the pass's `S` (in px) and accumulates member ends; this
 // module holds that state and the small helpers the sequencers and
@@ -51,13 +51,23 @@ export interface WaveLayoutState {
     frozen: boolean;
     /** The driver's result, set with `frozen`. */
     solve?: WaveBarrierResult;
+    /**
+     * The localized hover line of a background item
+     * (`PositionedItem.waveTooltip`), set where the item is placed: the
+     * renderer has no locale table (specs/waves.md §9.3).
+     */
+    readonly backgroundTooltip: string;
 }
 
-/** Fresh state for a roadmap with waves; `scale` maps the floor dates. */
+/**
+ * Fresh state for a roadmap with waves; `scale` maps the floor dates and
+ * `backgroundTooltip` is the locale's background-item line.
+ */
 export function createWaveLayoutState(
     plan: WavePlan,
     scale: TimeScale,
     origin: number,
+    backgroundTooltip: string,
 ): WaveLayoutState {
     const S = plan.waves.map(() => origin);
     return {
@@ -69,6 +79,7 @@ export function createWaveLayoutState(
         E: S,
         pass: new WavePass(plan, S),
         frozen: false,
+        backgroundTooltip,
     };
 }
 

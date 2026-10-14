@@ -5,18 +5,11 @@
 // reserved 18 px above the first region; subsequent regions are
 // separated by GAP_BETWEEN_REGIONS px.
 
-import type { GroupBlock, IsolatedRegion, ItemDeclaration, ParallelBlock } from '@nowline/core';
-import { resolveSizes } from '../calendar.js';
+import type { IsolatedRegion } from '@nowline/core';
 import { includeChromeGeometry } from '../include-chrome-geometry.js';
-import type { LayoutContext, TrackCursor } from '../layout-context.js';
+import { createLayoutContext, type LayoutContext, type LayoutHelpers } from '../layout-context.js';
 import { resolveStyle } from '../style-resolution.js';
-import type {
-    BoundingBox,
-    PositionedIncludeRegion,
-    PositionedItem,
-    PositionedSwimlane,
-    PositionedTrackChild,
-} from '../types.js';
+import type { BoundingBox, PositionedIncludeRegion, PositionedSwimlane } from '../types.js';
 import { seedWaveEdges } from '../wave-layout.js';
 import { maxLeafItemRightX } from './content-extent.js';
 import { SwimlaneNode } from './swimlane-node.js';
@@ -32,38 +25,11 @@ const GAP_BETWEEN_REGIONS = 16;
 // chart-width whitespace left over from full-width sizing.
 const INCLUDE_CONTENT_RIGHT_PAD_PX = 32;
 
-export interface IncludeNodeDeps {
-    sequenceItem: (
-        child: ItemDeclaration,
-        cursor: TrackCursor,
-        ctx: LayoutContext,
-        ownerOverride?: string,
-    ) => PositionedItem;
-    sequenceOne: (
-        child: ItemDeclaration | GroupBlock | ParallelBlock,
-        cursor: TrackCursor,
-        ctx: LayoutContext,
-    ) => PositionedTrackChild;
-    resolveChildStart: (
-        child: ItemDeclaration | GroupBlock | ParallelBlock,
-        seqDefault: number,
-        laneLeftX: number,
-        ctx: LayoutContext,
-    ) => number;
-    newCursor: (x: number, y: number) => TrackCursor;
-    estimateTextWidth: (text: string, fontSize: number) => number;
-    predictItemBarExtraHeight: (
-        item: ItemDeclaration,
-        startX: number,
-        ctx: LayoutContext,
-    ) => number;
-}
-
 export function buildIncludeRegions(
     regions: IsolatedRegion[],
     ctx: LayoutContext,
     startY: number,
-    deps: IncludeNodeDeps,
+    helpers: LayoutHelpers,
 ): { regions: PositionedIncludeRegion[]; endY: number } {
     let y = startY + TAB_RESERVE;
     const out: PositionedIncludeRegion[] = [];
@@ -73,48 +39,25 @@ export function buildIncludeRegions(
         isFirst = false;
         const label = region.content.roadmap?.title ?? region.sourcePath;
         const innerStartY = y + REGION_INSET_TOP;
-        const childCtx: LayoutContext = {
-            cal: ctx.cal,
-            schedule: ctx.schedule,
-            styleCtx: {
+        const childCtx = createLayoutContext(
+            region,
+            {
                 theme: ctx.styleCtx.theme,
-                styles: region.config.styles,
-                defaults: region.config.defaults,
-                labels: region.content.labels,
+                cal: ctx.cal,
+                schedule: ctx.schedule,
+                timeline: ctx.timeline,
+                scale: ctx.scale,
+                calendar: ctx.calendar,
+                bandScale: ctx.bandScale,
+                waves: ctx.waves,
             },
-            // Each include region declares its own sizes; resolve them under
-            // the parent's calendar so child sized items render at the same
-            // pixels-per-day scale as the host roadmap.
-            sizes: resolveSizes(region.content.sizes, ctx.cal),
-            labels: region.content.labels,
-            teams: region.content.teams,
-            persons: region.content.persons,
-            symbols: region.config.symbols,
-            footnoteIndex: new Map(),
-            footnoteHosts: new Map(),
-            timeline: ctx.timeline,
-            scale: ctx.scale,
-            calendar: ctx.calendar,
-            bandScale: ctx.bandScale,
-            entityLeftEdges: new Map(),
-            entityRightEdges: new Map(),
-            entityMidpoints: new Map(),
-            placedItems: new Map(),
-            itemFlowKey: new Map(),
-            currentFlowKey: '',
-            slackCorridors: [],
-            markerRowPlacements: new Map(),
-            chartTopY: innerStartY,
-            chartBottomY: innerStartY,
-            swimlaneBottomY: innerStartY,
-            chartRightX: ctx.chartRightX,
-            nextParallelId: 0,
-            nextGroupId: 0,
-            // Region lanes join the global barriers (specs/waves.md §8.4):
-            // they share the host's wave state, so they are floored and
-            // their members accumulate into the same pass.
-            ...(ctx.waves ? { waves: ctx.waves } : {}),
-        };
+            {
+                chartTopY: innerStartY,
+                chartBottomY: innerStartY,
+                swimlaneBottomY: innerStartY,
+            },
+            {},
+        );
         // Region ids stay invisible to the host, but the wave edges are
         // shared: seed them into the region's otherwise empty edge maps.
         if (ctx.waves) {
@@ -126,7 +69,7 @@ export function buildIncludeRegions(
         for (const lane of region.content.swimlanes.values()) {
             childCtx.nextParallelId = 0;
             childCtx.nextGroupId = 0;
-            const { positioned, usedHeight } = new SwimlaneNode({ lane, bandIndex }, deps).place(
+            const { positioned, usedHeight } = new SwimlaneNode({ lane, bandIndex }, helpers).place(
                 { x: childCtx.timeline.originX, y: cursorY },
                 childCtx,
             );
@@ -142,6 +85,9 @@ export function buildIncludeRegions(
             ctx.bandScale.bandwidth(),
             innerEndY - y + REGION_INSET_BOTTOM,
         );
+        // The width waits for the final canvas: finalize (f4) fits every
+        // kept region with `fitIncludeRegionWidth` once the canvas stops
+        // growing, so placement never reads the canvas.
         const box: BoundingBox = {
             x: 0,
             y,
@@ -155,7 +101,6 @@ export function buildIncludeRegions(
             nestedSwimlanes,
             style: resolveStyle('swimlane', [], ctx.styleCtx),
         };
-        fitIncludeRegionWidth(positioned, ctx.chartRightX);
         out.push(positioned);
         y += regionHeight;
     }
@@ -167,11 +112,23 @@ export function buildIncludeRegions(
  * small right pad) instead of stretching to the full chart width. An
  * include that reaches past the timeline still gets clamped to
  * `chartRightX` so it never extends into the attribution / right-margin
- * area. Idempotent for a given `chartRightX`; `RoadmapNode` re-runs it
- * once the canvas width is final, since the clamp reads the width at
- * build time and the post-layout timeline extension can still grow it.
+ * area. Finalize runs it once per kept region (f4), after the canvas
+ * width is final: the spill growth, the timeline extension and the
+ * marker labels can all still grow the canvas after the region is placed.
  */
 export function fitIncludeRegionWidth(region: PositionedIncludeRegion, chartRightX: number): void {
+    const boxWidth = includeRegionWidth(region, chartRightX);
+    region.box.width = boxWidth;
+    // Mirror the shrunk width onto each nested swimlane band so the
+    // tinted background fits inside the dashed bracket instead of
+    // bleeding past it on the right.
+    for (const lane of region.nestedSwimlanes) {
+        lane.box.width = boxWidth;
+    }
+}
+
+/** The width `fitIncludeRegionWidth` gives `region` on a canvas ending at `chartRightX`. */
+export function includeRegionWidth(region: PositionedIncludeRegion, chartRightX: number): number {
     const boxX = region.box.x;
     const { chromeRightX } = includeChromeGeometry(boxX, region.label, region.sourcePath);
     // Bars-only extent (never a spilled caption — see
@@ -180,12 +137,5 @@ export function fitIncludeRegionWidth(region: PositionedIncludeRegion, chartRigh
     // dragging it wider.
     const barsRightX = maxLeafItemRightX(region.nestedSwimlanes);
     const naturalRightX = Math.max(chromeRightX, barsRightX) + INCLUDE_CONTENT_RIGHT_PAD_PX;
-    const boxWidth = Math.min(chartRightX - boxX, naturalRightX - boxX);
-    region.box.width = boxWidth;
-    // Mirror the shrunk width onto each nested swimlane band so the
-    // tinted background fits inside the dashed bracket instead of
-    // bleeding past it on the right.
-    for (const lane of region.nestedSwimlanes) {
-        lane.box.width = boxWidth;
-    }
+    return Math.min(chartRightX - boxX, naturalRightX - boxX);
 }

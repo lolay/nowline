@@ -4,7 +4,7 @@ import { shiftSwimlaneY } from '../src/positioned-shift.js';
 import { parseAndResolve } from './helpers.js';
 
 // Both late vertical shifts (a retroactively grown row in `RowPacker`, a
-// grown marker band in `RoadmapNode`) move placed content through
+// grown marker band in finalize step f7) move placed content through
 // `shiftTrackChildY`. This pins its contract generically: after a shift,
 // EVERY property named `y` anywhere in the subtree moved by exactly `dy`
 // and every other number stayed put. A new y-bearing field on the

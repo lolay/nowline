@@ -8,7 +8,7 @@
 //     the timeline header. The marker band stacks N rows tall when
 //     anchors and milestones can't fit on a single row without colliding.
 //   - The bare `13` (= PITCH / 2) midpoint that used to sprinkle
-//     `roadmap-node.ts` is derived from this constant — bumping the
+//     the roadmap composition code is derived from this constant — bumping the
 //     pitch automatically re-centers labels.
 //
 // Diamond + label box dimensions are reused by every marker (anchor +

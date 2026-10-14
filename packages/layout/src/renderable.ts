@@ -17,6 +17,27 @@
 // `measure` cheap. The production nodes (`ItemNode`, `SwimlaneNode`,
 // etc. under `nodes/`) follow this pattern: place re-measures, but
 // measure is O(content) without I/O.
+//
+// Which nodes measure (specs/layout-phases.md, §3.6 and §3.7):
+//
+//   - `ItemNode` implements `Renderable`, and its measure is complete:
+//     `measureItem` (`nodes/item-measure.ts`) sizes the bar once, wrapped
+//     title and chip growth included, and the row track takes the row
+//     pitch from it before the item is placed. Nothing patches a placed
+//     item's height afterwards.
+//   - Lanes, groups and parallels do not measure. Their height is the
+//     result of row packing on x positions, so measuring them would be
+//     placing them twice; they stay single-pass (`sequenceRowTrack`).
+//     Anchors, milestones, include regions and the footnote panel place
+//     directly as well.
+//   - `HeaderNode` has `measure()` and `place()` of its own and does not
+//     take this signature: it has no time scale or band to measure
+//     against. Its logo slot and text inset live there; drawing the logo
+//     stays in the renderer.
+//   - The roadmap itself is split by phase, not by node: the measure
+//     phase (`phases/measure.ts`) sizes the header, the axis and the
+//     header rows before any lane is placed, and the finalize phase
+//     (`phases/finalize.ts`) runs everything that needs final geometry.
 
 import type { BandScale } from './band-scale.js';
 import type { TimeScale } from './time-scale.js';

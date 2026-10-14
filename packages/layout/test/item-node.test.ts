@@ -8,10 +8,14 @@ import { defaultRowBand } from '../src/band-scale.js';
 import { itemTitleFirstLineRightReservePx } from '../src/item-bar-geometry.js';
 import {
     fitItemCaption,
+    type ItemCaptionInput,
     ItemNode,
+    itemVisualWidth,
+    measureItemCaption,
     resolveCaptionTitleLines,
     titleBreakLines,
 } from '../src/nodes/item-node.js';
+import { MIN_ITEM_WIDTH } from '../src/themes/shared.js';
 import { TimeScale } from '../src/time-scale.js';
 import type { ResolvedStyle } from '../src/types.js';
 
@@ -30,9 +34,33 @@ function makeCtx() {
     };
 }
 
+/**
+ * An `ItemNode` for a bar spanning `logicalLeftX..logicalRightX`, built the
+ * way `measureItem` builds one: the visual width from the logical extent,
+ * the caption fit from `measureItemCaption`, and `barExtra` (default 0).
+ */
+function itemNode(
+    input: Omit<ItemCaptionInput, 'visualWidth'> & {
+        id: string;
+        logicalLeftX: number;
+        logicalRightX: number;
+        barExtra?: number;
+    },
+): ItemNode {
+    const naturalWidth = Math.max(MIN_ITEM_WIDTH, input.logicalRightX - input.logicalLeftX);
+    const visualWidth = itemVisualWidth(naturalWidth);
+    return new ItemNode({
+        id: input.id,
+        naturalWidth,
+        visualWidth,
+        caption: measureItemCaption({ ...input, visualWidth }),
+        barExtra: input.barExtra ?? 0,
+    });
+}
+
 describe('ItemNode', () => {
     it('reports the time-driven width and band-driven height in measure', () => {
-        const node = new ItemNode({
+        const node = itemNode({
             id: 'a',
             title: 'Research',
             logicalLeftX: 0,
@@ -43,8 +71,20 @@ describe('ItemNode', () => {
         expect(intrinsic.height).toBe(56);
     });
 
+    it('reports and places the grown height when the measure has a barExtra', () => {
+        const node = itemNode({
+            id: 'a',
+            title: 'Research',
+            logicalLeftX: 0,
+            logicalRightX: 120,
+            barExtra: 16,
+        });
+        expect(node.measure(makeCtx())).toEqual({ width: 120, height: 72 });
+        expect(node.place({ x: 0, y: 100 }, makeCtx()).box.height).toBe(72);
+    });
+
     it('insets the visible box by ITEM_INSET_PX on each side', () => {
-        const node = new ItemNode({
+        const node = itemNode({
             id: 'a',
             title: 'Research',
             logicalLeftX: 0,
@@ -58,7 +98,7 @@ describe('ItemNode', () => {
     });
 
     it('keeps text inside the bar when title + meta fit the inner-padded width', () => {
-        const node = new ItemNode({
+        const node = itemNode({
             id: 'a',
             title: 'OK',
             metaText: '1w',
@@ -71,7 +111,7 @@ describe('ItemNode', () => {
     });
 
     it('spills text past the bar when the title exceeds the inner-padded width', () => {
-        const node = new ItemNode({
+        const node = itemNode({
             id: 'a',
             title: 'A long title that will not fit inside the available bar',
             metaText: '1w',
@@ -92,7 +132,7 @@ describe('ItemNode', () => {
             { title: 'Build', metaText: undefined, logicalRight: 100, expected: false },
         ];
         for (const c of cases) {
-            const node = new ItemNode({
+            const node = itemNode({
                 id: 'a',
                 title: c.title,
                 metaText: c.metaText,
@@ -115,7 +155,7 @@ describe('ItemNode', () => {
             hasLinkIcon?: boolean;
             logicalRightX?: number;
         }) {
-            const node = new ItemNode({
+            const node = itemNode({
                 id: 'a',
                 logicalLeftX: 0,
                 logicalRightX: 160,
@@ -129,7 +169,7 @@ describe('ItemNode', () => {
             expect(placed.textSpills).toBe(false);
             expect(placed.titleLines).toEqual(['Technology', 'Selection']);
             expect(placed.textX).toBe(6 + 12); // boxX + caption inset, not past the bar
-            expect(placed.box.height).toBe(56); // ItemNode leaves bar growth to layout
+            expect(placed.box.height).toBe(56); // no growth without a barExtra
         });
 
         it('wraps without a meta line too', () => {
@@ -238,7 +278,7 @@ describe('ItemNode', () => {
             hasLinkIcon?: boolean;
             titleFirstLineRightReservePx?: number;
         }) {
-            const node = new ItemNode({
+            const node = itemNode({
                 id: 'a',
                 logicalLeftX: 0,
                 logicalRightX: 160,
@@ -315,7 +355,7 @@ describe('ItemNode', () => {
             // Logical 190 -> visual 178. With the 24px icon indent: inner width
             // 178 - 24 - 12 = 142, first-line width 178 - 24 - 21 = 133.
             // "Ship the new thing" (18 chars = 135.7px) fits 142 but not 133.
-            const node = new ItemNode({
+            const node = itemNode({
                 id: 'a',
                 title: 'Ship the new thing',
                 logicalLeftX: 0,
@@ -341,7 +381,7 @@ describe('ItemNode', () => {
             logicalRightX?: number;
             titleFirstLineRightReservePx?: number;
         }) {
-            const node = new ItemNode({
+            const node = itemNode({
                 id: 'a',
                 logicalLeftX: 0,
                 logicalRightX: 160,
@@ -443,7 +483,7 @@ describe('ItemNode', () => {
             hasLinkIcon?: boolean;
             logicalRightX?: number;
         }) {
-            const node = new ItemNode({
+            const node = itemNode({
                 id: 'a',
                 logicalLeftX: 0,
                 logicalRightX: 160,
@@ -474,7 +514,7 @@ describe('ItemNode', () => {
             const placed = place({ title: 'Design\nBuild\nShip', metaText: '2w' });
             expect(placed.textSpills).toBe(false);
             expect(placed.titleLines).toEqual(['Design', 'Build', 'Ship']);
-            // ItemNode leaves the bar growth (+32px with meta) to layout.
+            // The bar growth (+32px with meta) is the measure's barExtra, 0 here.
             expect(placed.box.height).toBe(56);
         });
 

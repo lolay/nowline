@@ -5,7 +5,7 @@
 import * as path from 'node:path';
 import type { NowlineFile, ResolveResult } from '@nowline/core';
 import { describe, expect, it } from 'vitest';
-import { computeDateWindow } from '../src/layout.js';
+import { computeDateWindow, resolveDateWindow, resolveScope } from '../src/phases/date-window.js';
 import { scheduleRoadmap } from '../src/schedule.js';
 import { resolveScale } from '../src/view-preset.js';
 import { parseAndResolve, parseAndResolveFiles } from './helpers.js';
@@ -255,5 +255,46 @@ swimlane a "A"
     it('does nothing before the roadmap start', async () => {
         const { file, resolved } = await parseAndResolve(roadmap(''));
         expect(window(file, resolved, BEFORE_START)).toEqual(window(file, resolved));
+    });
+});
+
+describe('resolveDateWindow', () => {
+    const source = `nowline v1
+
+roadmap r "R" start:2026-01-05 scale:1w
+
+swimlane a "A"
+  item a1 "A1" duration:2w
+`;
+
+    it('names the natural end and counts the window in working days', async () => {
+        const { file, resolved } = await parseAndResolve(source);
+        const schedule = scheduleRoadmap(file, resolved);
+        const scope = resolveScope(file, resolved, {});
+        const window = resolveDateWindow(file, resolved, {}, scope, schedule);
+        expect(isoDay(window.startDate)).toBe('2026-01-05');
+        expect(isoDay(window.naturalEndDate)).toBe('2026-01-19');
+        expect(window.spanDays).toBe(2 * 5);
+        // Under the default `non-working:hide` the axis counts working days.
+        expect(window.nonWorking).toBe('hide');
+        expect(window.timelineDays).toBe(window.spanDays);
+    });
+
+    it('counts calendar days under non-working:show', async () => {
+        const { file, resolved } = await parseAndResolve(source);
+        const schedule = scheduleRoadmap(file, resolved);
+        const options = { nonWorking: 'show' as const };
+        const scope = resolveScope(file, resolved, options);
+        const window = resolveDateWindow(file, resolved, options, scope, schedule);
+        expect(window.spanDays).toBe(2 * 5);
+        expect(window.timelineDays).toBe(14);
+    });
+
+    it('resolves the scope from the options, then the file', async () => {
+        const { file, resolved } = await parseAndResolve(source);
+        const scope = resolveScope(file, resolved, { theme: 'dark', locale: 'fr' });
+        expect(scope.themeName).toBe('dark');
+        expect(scope.locale).toBe('fr');
+        expect(scope.roadmapStyle.headerPosition).toBe('beside');
     });
 });

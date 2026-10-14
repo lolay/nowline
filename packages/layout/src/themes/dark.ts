@@ -221,6 +221,16 @@ export const darkTheme: Theme = {
         planned: '#94a3b8',
         neutral: '#94a3b8',
     },
+    // Item bar fill per status, applied by layout when the item's resolved
+    // `bg` is still `entities.item.bg` (m2d Resolution 3).
+    statusTint: {
+        done: '#052e16',
+        inProgress: '#172554',
+        atRisk: '#422006',
+        blocked: '#7f1d1d',
+        planned: '#1e293b',
+        neutral: '#1e293b',
+    },
     // Status-dot palettes — see `light.ts` for the contract. Same
     // two palettes both themes; dark-theme bars come in BOTH dark
     // (status-tint) and bright (label-driven) flavors, so a single

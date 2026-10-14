@@ -5,26 +5,27 @@
 // "slack" arrow when present. Date-pinned milestones whose predecessors
 // would push past the date are flagged `isOverrun`.
 //
-// Marker-row placement (row + label box + left/right side) is decided
-// once by `roadmap-node.ts::packMarkerRow`. Date-pinned entities are
-// pre-packed before swimlanes run; after-only milestones get a
-// PROVISIONAL row=0 placement here at build time which the unified
-// re-pack in `RoadmapNode.place` overwrites with the final tick-order
-// bottom-first slot once every centerX is known.
+// Placement decides x, slack arrows and overrun only (`MilestonePlacement`).
+// The marker row and label box come from the final marker pack in
+// finalize (`packMarkers`, f5, through `marker-band.ts::packMarkerRow`),
+// which runs once every centerX is known and the canvas is final;
+// `positionMilestones` then builds each `PositionedMilestone` from its
+// placement and its row (`placeMarkers`, f6).
 
 import type { MilestoneDeclaration } from '@nowline/core';
 import { formatIsoDate, parseIsoDate, propValue, propValues } from '../dsl-utils.js';
 import { itemSlackAttachY } from '../item-port-geometry.js';
 import type { LayoutContext } from '../layout-context.js';
 import { resolveStyle } from '../style-resolution.js';
-import type { BoundingBox, Point, PositionedMilestone } from '../types.js';
+import type {
+    MarkerRowPlacement,
+    Point,
+    PositionedMilestone,
+    ResolvedStyle,
+    SlackCorridor,
+} from '../types.js';
 import { isOnWaveBoundary, WAVE_EDGE_TOLERANCE_PX } from '../wave-layout.js';
-import {
-    MARKER_BOLD_WIDTH_FACTOR,
-    MARKER_DIAMOND_RADIUS_PX,
-    MARKER_LABEL_GAP_PX,
-    MARKER_LABEL_HEIGHT_PX,
-} from './marker-geometry.js';
+import { MARKER_DIAMOND_RADIUS_PX } from './marker-geometry.js';
 
 /**
  * One predecessor of a milestone with everything the slack-arrow
@@ -129,27 +130,28 @@ function overrunningWave(preds: MilestonePredecessor[], x: number): string | und
     return latest?.wave;
 }
 
-function decideLabelBoxForCanvas(
-    centerX: number,
-    centerY: number,
-    radius: number,
-    title: string,
-    fontSize: number,
-    bold: boolean,
-    chartLeftX: number,
-    chartRightX: number,
-): { box: BoundingBox; side: 'left' | 'right' } {
-    const labelWidth = title.length * fontSize * 0.58 * (bold ? MARKER_BOLD_WIDTH_FACTOR : 1);
-    const naturalRightX = centerX + radius + MARKER_LABEL_GAP_PX;
-    const naturalLeftX = centerX - radius - MARKER_LABEL_GAP_PX - labelWidth;
-    const fitsRight = naturalRightX + labelWidth <= chartRightX;
-    const fitsLeft = naturalLeftX >= chartLeftX;
-    const side: 'left' | 'right' = fitsRight ? 'right' : fitsLeft ? 'left' : 'right';
-    const xLeft = side === 'right' ? naturalRightX : naturalLeftX;
-    return {
-        box: { x: xLeft, y: centerY - 4, width: labelWidth, height: MARKER_LABEL_HEIGHT_PX },
-        side,
-    };
+/**
+ * A milestone as placement leaves it: its x, slack arrows, overrun and cut
+ * lines, but no marker row or label box. Those come from the unified
+ * marker re-pack, which needs every milestone's x and the final canvas;
+ * `positionMilestones` combines the two.
+ */
+export interface MilestonePlacement {
+    id: string;
+    title: string;
+    x: number;
+    radius: number;
+    /** True for a `date:` milestone, false for an after-only one. */
+    fixed: boolean;
+    slackArrows: Array<{ x: number; y: number }> | undefined;
+    isOverrun: boolean;
+    style: ResolvedStyle;
+    cutTopY: number;
+    cutBottomY: number;
+    onWaveBoundary?: true;
+    overrunByWave?: string;
+    overrunDate?: string;
+    hiddenDate?: string;
 }
 
 export class MilestoneNode {
@@ -162,8 +164,15 @@ export class MilestoneNode {
      * Returns null when the milestone is neither date-pinned nor has a
      * resolvable `after:` predecessor (skipped silently — matches the
      * legacy `buildMilestones` continue-paths).
+     *
+     * Writes the milestone's entity edges and midpoint, which later
+     * milestones' `after:` references read. The midpoint's y is an
+     * estimate: the pre-pack row of a dated milestone, the band's first
+     * row for an after-only one. Finalize replaces it with the final
+     * pack's row (f6); until then a later milestone's slack arrow from
+     * this one reads the estimate.
      */
-    place(ctx: LayoutContext): PositionedMilestone | null {
+    place(ctx: LayoutContext): MilestonePlacement | null {
         const m = this.milestone;
         const style = resolveStyle('milestone', m.properties, ctx.styleCtx);
         const dateRaw = propValue(m.properties, 'date');
@@ -174,9 +183,7 @@ export class MilestoneNode {
         const title = m.title ?? this.id;
 
         let centerX: number | null = null;
-        let centerY: number = inRowY;
-        let labelBox: BoundingBox | null = null;
-        let labelSide: 'left' | 'right' = 'right';
+        let estimatedCenterY: number = inRowY;
         let fixed = false;
         let slackArrows: Array<{ x: number; y: number }> | undefined;
         let isOverrun = false;
@@ -187,12 +194,8 @@ export class MilestoneNode {
             if (x === null) return null;
             centerX = x;
             fixed = true;
-            const placement = ctx.markerRowPlacements.get(this.id);
-            if (placement) {
-                centerY = placement.centerY;
-                labelBox = placement.labelBox;
-                labelSide = placement.labelSide;
-            }
+            const prePacked = ctx.markerRowPlacements.get(this.id);
+            if (prePacked) estimatedCenterY = prePacked.centerY;
             // Date-pinned milestones whose `after:` predecessors finish
             // past the pinned date are flagged `isOverrun`; the latest
             // last-of-flow predecessor draws a single overrun arrow
@@ -207,7 +210,7 @@ export class MilestoneNode {
                 slackArrows = [
                     {
                         x: maxPred.x,
-                        y: maxPred.y > 0 ? maxPred.y : centerY,
+                        y: maxPred.y > 0 ? maxPred.y : estimatedCenterY,
                     },
                 ];
             }
@@ -232,30 +235,6 @@ export class MilestoneNode {
             const maxEnd = dedupedPreds[0]?.x ?? ctx.timeline.originX;
             centerX = maxEnd;
             fixed = false;
-            // Provisional placement — RoadmapNode runs a unified
-            // tick-order pack across all markers (date-pinned anchors,
-            // date-pinned milestones, after-only milestones) once
-            // everyone's centerX is known. That pass overwrites the
-            // rowIndex / centerY / labelBox / labelSide we set here.
-            const provisional = decideLabelBoxForCanvas(
-                centerX,
-                inRowY,
-                radius,
-                title,
-                10,
-                true,
-                ctx.timeline.box.x,
-                ctx.chartRightX,
-            );
-            centerY = inRowY;
-            labelBox = provisional.box;
-            labelSide = provisional.side;
-            ctx.markerRowPlacements.set(this.id, {
-                rowIndex: 0,
-                centerY,
-                labelBox,
-                labelSide,
-            });
             const arrows: Array<{ x: number; y: number }> = [];
             for (let i = 1; i < dedupedPreds.length; i++) {
                 const p = dedupedPreds[i];
@@ -266,29 +245,15 @@ export class MilestoneNode {
             if (arrows.length > 0) slackArrows = arrows;
         }
         if (centerX === null) return null;
-        if (!labelBox) {
-            const fallback = decideLabelBoxForCanvas(
-                centerX,
-                centerY,
-                radius,
-                title,
-                10,
-                true,
-                ctx.timeline.box.x,
-                ctx.chartRightX,
-            );
-            labelBox = fallback.box;
-            labelSide = fallback.side;
-        }
 
-        const center: Point = { x: centerX, y: centerY };
-        ctx.entityLeftEdges.set(this.id, center.x);
-        ctx.entityRightEdges.set(this.id, center.x);
-        ctx.entityMidpoints.set(this.id, center);
-        const positioned: PositionedMilestone = {
+        const midpoint: Point = { x: centerX, y: estimatedCenterY };
+        ctx.entityLeftEdges.set(this.id, midpoint.x);
+        ctx.entityRightEdges.set(this.id, midpoint.x);
+        ctx.entityMidpoints.set(this.id, midpoint);
+        const placement: MilestonePlacement = {
             id: this.id,
             title,
-            center,
+            x: centerX,
             radius,
             fixed,
             slackArrows,
@@ -296,37 +261,137 @@ export class MilestoneNode {
             style,
             cutTopY: ctx.chartTopY,
             cutBottomY: ctx.swimlaneBottomY,
-            labelBox,
-            labelSide,
         };
         // On a wave boundary the boundary line carries the vertical. An
         // overrun milestone keeps its red cut line, so it never counts as
         // on a boundary.
-        if (ctx.waves && !isOverrun && isOnWaveBoundary(ctx.waves, center.x)) {
-            positioned.onWaveBoundary = true;
+        if (ctx.waves && !isOverrun && isOnWaveBoundary(ctx.waves, centerX)) {
+            placement.onWaveBoundary = true;
         }
         if (overrunByWave !== undefined && date) {
-            positioned.overrunByWave = overrunByWave;
-            positioned.overrunDate = formatIsoDate(date);
+            placement.overrunByWave = overrunByWave;
+            placement.overrunDate = formatIsoDate(date);
         }
         // A date the axis hides keeps its own day as a tooltip
         // (specs/working-calendar.md §7.4). Under `show` the day is drawn,
         // and the milestone sits on it.
         if (date && !ctx.scale.showsNonWorking && !ctx.calendar.isWorkingDay(date)) {
-            positioned.hiddenDate = formatIsoDate(date);
+            placement.hiddenDate = formatIsoDate(date);
         }
-        return positioned;
+        return placement;
     }
 }
 
 export function buildMilestones(
     milestones: Map<string, MilestoneDeclaration>,
     ctx: LayoutContext,
-): PositionedMilestone[] {
-    const out: PositionedMilestone[] = [];
+): MilestonePlacement[] {
+    const out: MilestonePlacement[] = [];
     for (const [id, m] of milestones) {
-        const positioned = new MilestoneNode(id, m).place(ctx);
-        if (positioned) out.push(positioned);
+        const placement = new MilestoneNode(id, m).place(ctx);
+        if (placement) out.push(placement);
+    }
+    return out;
+}
+
+/**
+ * Build the positioned milestones from their placements and the unified
+ * marker re-pack (`rows`, keyed by id). The re-pack packs every placed
+ * milestone, so a missing row is an invariant violation and throws.
+ * Optional keys stay omitted when the placement omits them.
+ */
+export function positionMilestones(
+    placements: readonly MilestonePlacement[],
+    rows: ReadonlyMap<string, MarkerRowPlacement>,
+): PositionedMilestone[] {
+    return placements.map((p) => {
+        const row = rows.get(p.id);
+        if (!row) {
+            throw new Error(`layout: milestone "${p.id}" has no marker-row placement`);
+        }
+        const positioned: PositionedMilestone = {
+            id: p.id,
+            title: p.title,
+            center: { x: p.x, y: row.centerY },
+            radius: p.radius,
+            fixed: p.fixed,
+            slackArrows: p.slackArrows,
+            isOverrun: p.isOverrun,
+            style: p.style,
+            cutTopY: p.cutTopY,
+            cutBottomY: p.cutBottomY,
+            labelBox: row.labelBox,
+            labelSide: row.labelSide,
+        };
+        if (p.onWaveBoundary) positioned.onWaveBoundary = true;
+        if (p.overrunByWave !== undefined) positioned.overrunByWave = p.overrunByWave;
+        if (p.overrunDate !== undefined) positioned.overrunDate = p.overrunDate;
+        if (p.hiddenDate !== undefined) positioned.hiddenDate = p.hiddenDate;
+        return positioned;
+    });
+}
+
+/**
+ * Collect slack-arrow corridors from the resolved milestones using the
+ * current entity-edge maps. The result mirrors what
+ * `MilestoneNode.place` would emit on `slackArrows`, so the row-packer
+ * and the renderer agree on every arrow's geometry.
+ *
+ * Each non-binding predecessor (`x < maxEnd`, `y > 0`) becomes one
+ * corridor; date-pinned milestones whose latest predecessor overruns
+ * the date contribute a single back-pointing corridor between the
+ * pinned column and the predecessor's right edge. Wave predecessors draw
+ * no slack arrow, so they never own a corridor (a floating milestone
+ * bound by a wave still sets `maxEnd`).
+ */
+export function collectSlackCorridors(
+    milestones: Map<string, import('@nowline/core').MilestoneDeclaration>,
+    ctx: LayoutContext,
+): SlackCorridor[] {
+    const out: SlackCorridor[] = [];
+    for (const [id, m] of milestones) {
+        const dateRaw = propValue(m.properties, 'date');
+        const afterRaw = propValues(m.properties, 'after');
+        const date = parseIsoDate(dateRaw);
+        // Reuse MilestoneNode's helpers so the corridor set agrees
+        // exactly with the rendered slack-arrow set: same source x
+        // (visual edge for items / cut-line for markers), same
+        // attach y, and the same flow-dedupe rule that collapses
+        // chained predecessors to one arrow per flow.
+        const preds = collectMilestonePredecessors(afterRaw, ctx);
+        const dedupedPreds = lastPredecessorPerFlow(preds);
+
+        if (date) {
+            const milestoneX = ctx.scale.forwardWithinDomain(date);
+            if (milestoneX === null) continue;
+            // Wave references draw no arrow, so they own no corridor.
+            const maxPred = latestArrowPredecessor(dedupedPreds);
+            if (maxPred && maxPred.x > milestoneX && maxPred.y > 0) {
+                out.push({
+                    xStart: Math.min(maxPred.x, milestoneX),
+                    xEnd: Math.max(maxPred.x, milestoneX),
+                    y: maxPred.y,
+                    slackPredId: maxPred.ref,
+                    milestoneId: id,
+                });
+            }
+            continue;
+        }
+        if (dedupedPreds.length === 0) continue;
+        dedupedPreds.sort((a, b) => b.x - a.x);
+        const maxEnd = dedupedPreds[0].x;
+        for (let i = 1; i < dedupedPreds.length; i++) {
+            const p = dedupedPreds[i];
+            if (p.x < maxEnd && p.y > 0 && p.wave === undefined) {
+                out.push({
+                    xStart: p.x,
+                    xEnd: maxEnd,
+                    y: p.y,
+                    slackPredId: p.ref,
+                    milestoneId: id,
+                });
+            }
+        }
     }
     return out;
 }

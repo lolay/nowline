@@ -1,6 +1,6 @@
 # Nowline — Layout Phases
 
-**Status: Accepted (design only, no code yet).** Milestone **m4.14** in [`milestones.md`](./milestones.md); decisions in the last section. This is refactor R2 from [`review-since-v086.md`](./review-since-v086.md): split `RoadmapNode.place` into date-window, measure, place and finalize phases, so the post-placement fixups run as one ordered pass over an explicit context. It builds on [`rendering-v2.md`](./rendering-v2.md) (m2.5c, the measure/place node model) and on [`scheduler-unification.md`](./scheduler-unification.md) (R1, one day-level scheduler). Every `file:line` below was checked at the commit that adds this spec (source identical to 0062df3 plus the m2 fixes of the same review).
+**Status: Implemented** (m1 to m6, including L2 and F1; F2 and F3 are open). Where the code differs from the text below, [§9 As built](#9-as-built) wins. Milestone **m4.14** in [`milestones.md`](./milestones.md); decisions in the last section. This is refactor R2 from [`review-since-v086.md`](./review-since-v086.md): split `RoadmapNode.place` into date-window, measure, place and finalize phases, so the post-placement fixups run as one ordered pass over an explicit context. It builds on [`rendering-v2.md`](./rendering-v2.md) (m2.5c, the measure/place node model) and on [`scheduler-unification.md`](./scheduler-unification.md) (R1, one day-level scheduler). Every `file:line` below was checked at the commit that added this spec (source identical to 0062df3 plus the m2 fixes of the same review); the problem sections describe that code, not the code after the migration.
 
 ## 1. Problem
 
@@ -66,7 +66,7 @@ Three fixes since v0.8.6 were ordering bugs in this list:
 - **#93** (fe59c3d): P9 ran before P7, so lane bands kept the pre-extension width and region fits read it.
 - **b82abb3**: P7 was added because a spill-inclusive lane cursor pushed bars past the last tick.
 
-The probe found two more that ship today:
+The probe found two more that shipped at the time of this spec; the migration fixes both (L2 in m6.s1, L1 as F1 in m6.s2, §9):
 
 - **L1, the beside card misses a grown marker band.** The card's bottom is placed at `headerRowsBottomY` (`roadmap-node.ts:1027-1033`), a value computed from the pre-pack row count (515). P12 grows the band but not that value, so in the three samples where the band grows, the card ends one marker row (26 px) above the header rows it is meant to hug (1021-1026): `examples/dependencies.nowline` (card bottom 74, rows bottom 100), `tests/late-row-shifts.nowline` (74, 100), `tests/marker-left-overflow.nowline` (100, 126). Fixing it changes those renders (F1, §5).
 - **L2, a now-line without its pill row.** The pill row is reserved only when `today` falls inside the natural window (397-399), but the now-line is placed on the extended scale (1002; `buildNowline`, `layout.ts:1815`). With `length:` set, engine B ignores `today`, so a `today` between the natural and the extended end draws the now-line with no row for its pill: `examples/platform-2026.nowline` with `length:1w` added and `--now 2026-03-17` lays out with `pillRowHeight` 0 and the pill on the tick panel's y. NL.W1000 compares with the extended end (`layout-insights.ts:276-281`), so it stays silent. No sample hits this (m6.s1).
@@ -190,8 +190,12 @@ export interface HeaderBands {
     markerRowY: number;
     /** Rows the pre-pack needed. f7 grows the band when the final pack needs more. */
     estimatedMarkerRows: number;
-    /** Bottom of the header rows as estimated here; the beside card hugs this today (L1). */
-    estimatedRowsBottomY: number;
+    /**
+     * Height of the rows above: pill row, tick panel, wave strip and the
+     * estimated marker band. (As built, §9: this replaces the
+     * `estimatedRowsBottomY` of the first draft, the stale read behind L1.)
+     */
+    rowsHeight: number;
     chartTopY: number;
     /** Height of the mirrored bottom tick panel (f8); 0 when there is none. */
     bottomTickPanelHeight: number;
@@ -281,9 +285,9 @@ The pass is a constant list, run in order. Its order is today's except f1, which
 | f2 `extendTimeline` | P7 | leaf bars of lanes and regions, markers, milestones, window | scale, timeline, canvas |
 | f3 `growCanvasForMarkerLabels` | P8 | every marker entry, final runs and exceptions | canvas, then freezes it |
 | f4 `fitWidths` | P9, N2, N4 | canvas (final) | lane and region widths |
-| f5 `packMarkers` | P10 | canvas (final), marker entries | marker band |
+| f5 `packMarkers` | P10 | canvas (final), marker entries, scale (final), header bands | marker band |
 | f6 `placeMarkers` | P11, N7 | marker band | milestone rows and labels, runs, exceptions, marker midpoints |
-| f7 `growHeaderRows` | P12 | marker band, header bands | chart top, lane bottom, chart bottom, lane and region y, milestone cuts and slack arrows, timeline height |
+| f7 `growHeaderRows` | P12 | marker band, header bands, scale (final) | chart top, rows bottom, lane bottom, chart bottom, lane and region y, milestone cuts and slack arrows, timeline height |
 | f8 `bottomTickPanel` | P13 | chart bottom | chart bottom, timeline |
 | f9 `waves` | P14 | scale (final), chart top, lane bottom, timeline, lanes, regions | waves, crossings |
 | f10 `anchors` | P15 | scale (final), marker band, chart top, lane bottom | anchors |
@@ -291,11 +295,11 @@ The pass is a constant list, run in order. Its order is today's except f1, which
 | f12 `nowline` | P17 | scale (final), canvas, lane bottom, timeline | now-line |
 | f13 `waveLegend` | P18 | waves, canvas, chart bottom | legend, chart bottom |
 | f14 `footnotePanel` | P19 | chart bottom, canvas | footnotes |
-| f15 `header` | P20 | chart bottom, canvas, header bands (estimated rows bottom) | header |
+| f15 `header` | P20 | chart bottom, canvas, rows bottom (f7's) | header |
 | f16 `attribution` | P20 | footnotes, chart bottom, canvas | attribution box, canvas height |
 
-- **Checked order.** Each slot has one rule. The canvas, the scale and the marker band are final after f3, f2 and f5, and the chart top and lane bottom after f7: nothing writes a final slot again, and only the step that makes a slot final may read it before then. The chart bottom is a cursor that f7, f8 and f13 advance and f14 to f16 only read. A unit test checks the table against these rules. #93 broke exactly such a rule (lanes read the canvas before the extension had finished growing it). L1 and L2 are reads of measure-phase estimates, which the check cannot see; that is why f15 names the estimate it reads, and why m6.s1 moves the pill row into f7.
-- **Guards.** `canvas.final`, `finalScale()` and `markerBand()` throw when read before their writer. The order is static, so a guard can only fire on a code change, and every layout runs every step, so the corpus tests exercise every guard.
+- **Checked order.** Each slot has one rule. The canvas, the scale and the marker band are final after f3, f2 and f5, and the chart top, the header rows' bottom and the lane bottom after f7: nothing writes a final slot again, and only the step that makes a slot final may read it before then. The chart bottom is a cursor that f7, f8 and f13 advance and f14 to f16 only read. A unit test checks the table against these rules. #93 broke exactly such a rule (lanes read the canvas before the extension had finished growing it). L1 and L2 were reads of measure-phase estimates, which the check cannot see. They are fixed by making the value a slot: f7 records the final rows' bottom (`rowsBottom`) and f15 reads it, and the pill row is reserved on the final axis (m6.s1, m6.s2; §9).
+- **Guards.** `canvas.final`, `finalScale()`, `markerBand()`, `headerRowsTop()` and `headerRowsBottom()` throw when read before their writer. The order is static, so a guard can only fire on a code change, and every layout runs every step, so the corpus tests exercise every guard.
 - **Patches stay where they must.** f6 and f7 still write into milestones, lanes and regions built earlier, because the marker rows and the chart top are only known after placement. The difference is that they are the only writers, they run once, at one place in the order, and they say what they write. Placing the chart in local coordinates and translating it once would remove f7's shift but can change bytes (F2).
 
 ### 3.6 Items are measured once
@@ -366,7 +370,7 @@ export class HeaderNode {
 
 - `measure` absorbs `sizeBesideHeader` and `HEADER_CARD_OUTER_PAD` (`layout.ts:1271-1331`), the above height, `chartLeftX` and `chartTopY` (`roadmap-node.ts:348-365`) and the card's minimum (508-510 with `HEADER_CARD_TOP_INSET`). Measure-phase code turns `minRowsBottomY` into `timelineY` as today (511).
 - `place` absorbs the header box, card box, logo box and text inset (1017-1054) and the header object (1082-1094); f16 adds the attribution box.
-- f15 passes `rowsBottomY: bands.estimatedRowsBottomY`, today's value. F1 changes it to the grown band's bottom.
+- f15 passes the final header rows' bottom, `rowsBottomY: fx.headerRowsBottom()`, the value f7 recorded after the marker band grew (F1, §9). Before F1 (m6.s2) it passed the measure phase's estimate, kept as `estimatedRowsBottomY` (§3.10 rule 4).
 - This answers m2.5c's open question (`rendering-v2.md:292`): the logo slot lives in the header node; drawing it stays in the renderer.
 
 ### 3.8 One loop, one helper interface, one context builder
@@ -434,7 +438,7 @@ statusTint: { done: string; inProgress: string; atRisk: string; blocked: string;
 1. Keep each coordinate's arithmetic as written: the same operands in the same order. The renderer rounds to two decimals (`renderer/src/svg/xml.ts:54-58`), so a regrouped sum one ulp off can flip a value that sits on a half-cent.
 2. Keep the order of side effects inside placement: entity-edge writes, flow keys, the `nextParallelId`/`nextGroupId` counters, the wave accumulator.
 3. Drop a provisional value only where every path overwrites it before the model, and name the overwrite in the PR (N2, N4, N7).
-4. Keep a stale read that the output depends on, under a name that says so (`estimatedRowsBottomY`, `naturalEndDate`), until its fix lands (F1, m6.s1).
+4. Keep a stale read that the output depends on, under a name that says so (`estimatedRowsBottomY` until F1 replaced it with the `rowsBottom` slot, `estimatedCenterY`, `naturalEndDate`), until its fix lands (F1, m6.s2).
 5. Keep the model's key set: a field omitted when absent stays omitted.
 
 ### 3.11 Relation to R1, R3 and R4
@@ -535,7 +539,7 @@ Add `nodes/header-node.ts` with `HeaderNode.measure` (§3.7); move `sizeBesideHe
 
 #### s2 - Place the header
 
-`HeaderNode.place` builds the header box, card, logo box and text inset from the measure and `estimatedRowsBottomY`. G1, G2.
+`HeaderNode.place` builds the header box, card, logo box and text inset from the measure and `estimatedRowsBottomY` (m6.s2 replaced that with the final rows bottom). G1, G2.
 
 ### m5 - The four phases
 
@@ -575,7 +579,7 @@ Each changes rendered bytes, so none belongs to the byte-identical plan. They st
 
 | # | Change | Changes | Evidence |
 |---|---|---|---|
-| F1 | f15 passes the grown band's bottom, so the beside card hugs the header rows after f7 (L1) | the three samples whose band grows; two of them have snapshots (`dependencies.svg`, `marker-left-overflow.svg`), and `dependencies` has determinism goldens | §1.3 |
+| F1 | **Done (m6.s2).** f15 passes the grown band's bottom, so the beside card hugs the header rows after f7 (L1) | the three samples whose band grows; two of them have snapshots (`dependencies.svg`, `marker-left-overflow.svg`), and `dependencies` has determinism goldens (as built: exactly these, §9) | §1.3 |
 | F2 | Place the chart in local coordinates and translate it once in finalize, so f7's conditional shift disappears | possibly any sample: a translated sum can round differently (§3.10, rule 1) | §3.5 |
 | F3 | After R1 F3 keeps pixel quirks out of the lane cursor, measure how often f2 still fires; if never on the corpus, report it as a layout insight instead of growing silently | whatever R1 F3 changes | [`scheduler-unification.md`](./scheduler-unification.md) §1.3 |
 
@@ -609,3 +613,57 @@ Gary, 2026-10-13:
 2. **L2, the now-line on an extended axis.** Reserve the pill row and shift the chart (m6.s1 as written).
 3. **F1, the beside card.** Yes: fix it after m5. It changes `dependencies`, `late-row-shifts` and `marker-left-overflow` and two snapshots, and lands with whichever planned step it combines with best; that PR names the bumps.
 4. **The last injected helper.** Keep `sequenceOne` injected.
+
+## 9. As built
+
+Where the implementation differs from the text above, or makes a choice the text left open. The plan ran as one branch with one commit per step; every step was gated against the base with G1 (60 samples, three themes, SVG bytes and exit statuses) and, although the spec scoped it to exporter and schedule steps, G3 (xlsx, msproj and mermaid bytes, `make compile`, `make determinism`) on every step, and G2 (`make pre-commit`).
+
+**Date window and measure (m5.s1, m5.s2)**
+
+- **`DateWindow` has no `sizes`.** `createLayoutContext` resolves each file's sizes itself from `source.content.sizes` under `shared.cal`, so a copy on the window would be unused. `DateWindow` also takes the start from `schedule.startDate`.
+- **`MeasuredRoadmap` has two extra fields.** `headerNode` (the node that measured the header, which f15 places) and `naturalChartRightX` (the canvas seed and the pre-pack's right edge). `MarkerEstimate` adds `hasEntities`: the band is drawn when the roadmap declares an anchor or a milestone, or the natural window holds a titled run or a working exception, and f5 needs it for the row count.
+- **`HeaderBands.rowsHeight` replaces `estimatedRowsBottomY`** (§3.3): the height of the rows above the chart, from the pill row to the estimated marker band. `headerRowsTimelineY` (`phases/measure.ts`) is the one beside-card rule that turns a header's minimum into the timeline y, used by measure and by L2.
+- **The pre-pack's placements are copied.** The context gets a copy of `MarkerEstimate.placements`; f5 installs a fresh map (`setMarkerBand`) instead of clearing and refilling the estimate's.
+
+**Items (m1.s1, m2.s1, m2.s2)**
+
+- **`Theme.statusTint`** ships without a changelog fragment, as the spec says. `applyStatusTheme` ended up in `nodes/item-measure.ts`, and a `THEME_STATUS_KEY` map converts `StatusKind` (`in-progress`) to the theme key (`inProgress`).
+- **`ItemNode` takes `ItemNodeGeometry`,** a structural subset of `ItemMeasure` (id, `naturalWidth`, `visualWidth`, caption `{ leftInset, fit }`, `barExtra`), so `item-node.ts` has no import from `item-measure.ts` and the caption-fit tests build nodes without an AST. `ItemMeasure` extends it, and adds id, `size`, `caption.title`, `caption.leftInset` and `caption.lastBaseline`.
+- **Two named widths** stay in `ItemMeasure` for byte identity (§3.10 rule 1): `visualWidth` is the box width, `(startX + naturalWidth) - startX` less the insets as `ItemNode` always computed it, and `naturalVisualWidth` is `naturalWidth` less the insets, which the inside-chip fit and the title's first-line reserve read. They are equal up to the rounding of the logical extent.
+- **`sequenceItem` throws when a handed measure's start differs from the placement start** (the spec's "equality the tests assert"), instead of re-measuring: a re-measure would size the row wrong silently now that the safety net is gone. The corpus test (`ItemNode.measure().height` equals the placed height) uses a test-only `setItemNodeTrace` hook (in `item-node.ts`). The row height is now the pitch, `step + barExtra`.
+- **The moved helpers stay exported from `item-measure.ts`** (`statusFromProp`, `parseLinkIcon`, `resolveItemMeta`, and the rest), though most have one user after m2.s2.
+
+**Row track, helpers and placement (m1.s2 to m1.s4, m3, m5.s3, m5.s5)**
+
+- **`sequenceRowTrack` takes the container, not its content,** and iterates with core's `trackChildren` (R3, merged from `main` after m4.12): `sequenceRowTrack(container, origin, ctx, helpers)`. Nested blocks still recurse through `helpers.sequenceOne`, which carries the inherited cursor and flow key the walk alone does not. `SwimlaneNode` never read `timeCursorX` after its loop, so only `GroupNode` reads it. `collectItems` stays in `nodes/dependency-edges.ts` on core's `trackNodes`, and layout reads props and dates through core's `util/props.ts` (`findProp`, `propValues`, strict `parseIsoDate`) and styles through `styleLayers`.
+- **`sequenceItem` lives in `nodes/sequence-item.ts` and the dispatcher in `nodes/sequence-one.ts`,** not in `nodes/item-node.ts` (§3.8): `item-measure.ts` imports `item-node.ts`'s caption helpers, so `sequenceItem` there would form an import cycle. `resolveChildStart` and the other start rules are in `src/start-rules.ts`; `resolveChildStart` lost its unused `laneLeftX` parameter. `LayoutHelpers` is `{ sequenceOne }`, and `ownerOverride` is gone.
+- **`nodes/marker-band.ts` holds more than the spec lists:** `calendarLabelEntry`, `MarkerEntity`, `markerLabelWidth`, `PackedPlacement`, and, from m5.s2, `MarkerBand`, `datePinnedMarkerEntries`, `calendarMarkerEntries` and `markerRowPlacements` (the entry assembly and the placement-to-y conversion, one copy each). `collectSlackCorridors` sits after `buildMilestones` in `milestone-node.ts`.
+- **`createLayoutContext`** resolves sizes itself (above); `init` carries `footnotes` and `markerRowPlacements`; `waves` is spread in only when set. Its `chart` argument lost `chartRightX` in m3.s3.
+- **`buildFootnotes` became two functions.** `indexFootnotes(footnotes): FootnoteIndex` (type in `footnote-node.ts`) and `buildFootnotePanel(...): PositionedFootnoteArea`; `placeChart` indexes once, before building the context, and hands the index through `init.footnotes`. Where m3.s3's text says `buildFootnotes`, read `buildFootnotePanel`. `buildNowline`, `buildWaveLegend` and `buildFootnotePanel` take `chartRightX` (from m5.s4, `fx.canvas.final`) as their last argument.
+- **`MilestoneNode.place` returns `MilestonePlacement`; `positionMilestones(placements, rows)` builds `PositionedMilestone` in f6** and throws on a missing re-pack row (the old code skipped one and kept its provisional values; the corpus test shows the re-pack holds every placed milestone).
+- **`estimatedCenterY` is a kept stale read** (§3.10 rule 4). `MilestoneNode.place` still writes each milestone's entity midpoint with a pre-pack y, because a later milestone's slack arrow from a milestone or anchor predecessor reads it before f6 replaces it, and a dated milestone's overrun arrow falls back to the pre-pack centre when its predecessor has no y. Dropping it could change bytes.
+- **N5, `WaveLayoutState.backgroundTooltip`.** The locale string for the background wave tooltip is the fourth argument of `createWaveLayoutState` (present only with waves) rather than a new `LayoutContext` field; `sequenceItem` sets `waveTooltip` last on the item, so key order is unchanged and `buildWaves` no longer walks for it.
+- **P5 stays in `placeChart`,** not in finalize: the milestones' cut lines (P6) read `swimlaneBottomY`. `PlacedChart.bottomY` is its result.
+
+**Finalize (m5.s4)**
+
+- **`CanvasExtent` has `provisional`,** read only by f3 (the step that freezes the canvas) before `final` is allowed, and `grow` returns whether it grew (the coverage trace uses it). It is seeded with `measured.naturalChartRightX`. `FinalizeContext` also has `settleScale()`, `setMarkerBand()`, `chartY` accessors over the placement context, and `report()`; f2 and f5 call the setters, the guards throw on a second call.
+- **Slot rules have four kinds.** `input` (nothing writes it), `final` (steps up to a named one may write it, only that step reads it earlier), `cursor` (only the named advancers write it, other readers come after the last) and `product` (one writer, readers after it). Honest extra writes are declared: f9 writes `timeline` (the strip placeholder) and f10 writes `markerMidpoints` (anchors set entity midpoints), so both are cursors. `checkFinalizeOrder` implements the check; `finalize.test.ts` moves f4 before f2 and expects it to fail.
+- **`FinalizeStep.run` returns whether it changed something** (a boolean, not `void`), for the coverage trace; the hook is the module-level `setFinalizeTrace(trace)`, internal and not exported from the package index, not a hook on `FinalizeContext`. What "changed" means: f4, a lane or region width differs from what the natural canvas would give (the provisional value m3.s3 dropped); f6, a milestone's row differs from the estimate placement wrote.
+- **Coverage register deltas from §1.2.** `finalize-coverage.json` (60 samples) matches the spec's corpus column except: f1 29 (spec 26), f2 7 (6) and f4 35 (32), all from R1's F1, which changed `examples/showcase`, `examples/sizing` and `tests/late-row-shifts` (f2 only `late-row-shifts`); f6 7 (9) by definition, since §1.2 also counted the provisional label box that N7 removed (`tests/header-height-none` and `tests/header-height-xl` moved only a label box). f10 (27), f11 (25), f12 (53) and f14 (8) have no §1.2 number ("all with anchors", "all", "see L2", "all"). A probe of the spec's own source (6513424) reproduced §1.2 exactly, and one of the merge-base reproduced the register sample for sample.
+
+**L2 (m6.s1) and F1 (m6.s2)**
+
+- **f5 packs the marker band at its final top** (`headerRowsTop()`, which reads the final scale), instead of f7 shifting the finished placements: under the slot rules the band is final after f5, so f7 may not write it. f7 still moves the rows and the chart in one shift, which is the outcome §4 describes. So f5 also reads `scale` (§3.5 table).
+- **`headerRowsTop()` and `headerRowsBottom()` are guards** (§3.5). `headerRowsTop()` (`{ timelineY, pillRowHeight, tickPanelY, markerRowY, shift }`) throws before f2; `headerRowsBottom()` throws before f7 records the final bottom of the header rows in the new `rowsBottom` slot, a `final` slot after `growHeaderRows`. `rowsBottom` replaces `estimatedRowsBottomY` (not `chartTop - 8`, which could differ by an ulp from the old estimate); for a sample whose rows do not grow it is `markerRowY` plus the estimated band height, the same operands as the old estimate, so those cards stay byte-identical.
+- **The beside-card rule applies to the pill-row part only.** When f2 brings `today` into the axis and the measure left the pill row at 0, the rows grow by `NOW_PILL_HEIGHT_PX` and the timeline y follows `headerRowsTimelineY`, so a card that already pushes the rows down absorbs some or all of it. Marker-band growth keeps today's behaviour (the timeline y does not move, the band grows downward). No sample reaches L2, so its regression is a unit test (`test/beside-card-rows.test.ts`, with the other L1 cases): `examples/platform-2026.nowline` with `length:1w` added and `--now 2026-03-17`.
+- **F1's actual changed set** equals the expected one, measured before the update against `main` at 9c71cbb: the nine renders `examples/dependencies`, `tests/late-row-shifts` and `tests/marker-left-overflow` in light, dark and grayscale (card bottom 74 to 100, 74 to 100 and 100 to 126, each now equal to the header rows' bottom); the layout snapshots `dependencies.svg` and `marker-left-overflow.svg`; and the determinism golden cells `dependencies:svg`, `dependencies:html`, `dependencies:png` and `dependencies:pdf` (Node and its pinned CLI value). No other sample, snapshot, golden cell or exporter byte changed. Regression test: `test/beside-card-rows.test.ts` (fails on the base). Changelog: two `fixed` entries in `.changelog/layout-phases.txt`, one for L2 and one for F1.
+
+**Header (m4)**
+
+- **`HeaderNode` takes the logo already resolved** (`ScaledLogo`, exported from `header-logo.ts`); `resolveHeaderLogo` stays with the caller. `MeasuredHeader.position` is the `HeaderPosition` type. `place` returns `PositionedHeaderParts` (`PositionedHeader` without `attributionBox`). f15 stores only those parts, f16 computes the attribution box, and `assembleModel` merges `{ ...headerParts, attributionBox }` after the finalize pass. The 8 px chart-top gap is `CHART_TOP_GAP_PX`, and the private helper keeps the name `sizeBesideHeader` because renderer comments cite it. The provisional header box (height 0 beside, width 0 above) is gone: `place` builds the final box.
+
+**Open and out of scope**
+
+- F2 (local coordinates) and F3 (measure how often f2 fires after R1's F3) stay open; the milestone entry says so.
+- Neither `setFinalizeTrace` nor `setItemNodeTrace` is public API. The only public addition is `Theme.statusTint`, which the pull request names.

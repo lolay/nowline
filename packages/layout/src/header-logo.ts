@@ -20,6 +20,9 @@ export interface LogoDimensions {
 
 export type LogoSizePreset = keyof typeof LOGO_SIZE_PX;
 
+/** A logo at its drawn size, with the asset path and the size it was loaded at. */
+export type ScaledLogo = LogoDimensions & { assetRef: string; intrinsic: LogoDimensions };
+
 /** The roadmap's `logo:` path as written, or undefined when it declares none. */
 export function roadmapLogoRef(file: NowlineFile): string | undefined {
     const ref = propValue(file.roadmapDecl?.properties ?? [], 'logo');
@@ -55,7 +58,7 @@ export function scaleLogo(intrinsic: LogoDimensions, preset: LogoSizePreset): Lo
 export function resolveHeaderLogo(
     file: NowlineFile,
     intrinsic: LogoDimensions | undefined,
-): (LogoDimensions & { assetRef: string; intrinsic: LogoDimensions }) | undefined {
+): ScaledLogo | undefined {
     const assetRef = roadmapLogoRef(file);
     if (!assetRef || !intrinsic) return undefined;
     if (!(intrinsic.width > 0 && intrinsic.height > 0)) return undefined;

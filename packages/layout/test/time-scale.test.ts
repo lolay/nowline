@@ -397,7 +397,7 @@ describe('buildHeaderTicks under hide (business months)', () => {
 });
 
 describe('buildHeaderTicks on calendar-aligned units', () => {
-    // Mirrors RoadmapNode: ppd = pixelsPerUnit / days-per-unit, range =
+    // Mirrors the measure phase: ppd = pixelsPerUnit / days-per-unit, range =
     // span * ppd. Only the domain and ppd matter to the generator.
     function scaleFor(
         start: Date,

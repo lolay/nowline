@@ -4,18 +4,12 @@
 // fresh rows) and emits a `PositionedSwimlane` plus the band's used
 // height.
 //
-// Step-2 transitional shape:
-//   - Item children flow through the injected `deps.sequenceItem`. Once
-//     ItemNode's wire-in is complete (step 1 — done) the production
-//     `sequenceItem` already routes through ItemNode internally; deferring
-//     the recursive Renderable call here keeps the diff small.
-//   - Parallel + group children flow through `deps.sequenceOne` until
-//     their own nodes land in step 3.
-//   - The Renderable interface's `measure(MeasureContext)` is not yet
-//     wired through the production pipeline. The composition-root work
-//     in step 5 (`RoadmapNode`) will exercise it; meanwhile the legacy
-//     two-pass "buildSwimlane returns positioned + usedHeight" shape is
-//     preserved.
+// The lane's children go through the shared row track (`row-track.ts`):
+// items are measured and placed by `sequenceItem`, and parallel and group
+// children by the injected `helpers.sequenceOne`. A lane has no separate
+// measure pass: its height is the result of packing its rows, so
+// `place` returns the positioned lane with its used height
+// (specs/layout-phases.md §2, non-goals).
 
 import type {
     GroupBlock,
@@ -23,29 +17,21 @@ import type {
     ParallelBlock,
     SwimlaneDeclaration,
 } from '@nowline/core';
-import { isItemDeclaration } from '@nowline/core';
 import {
     estimateCapacitySuffixWidth,
     formatCapacityNumber,
     parseCapacityValue,
     resolveCapacityIcon,
 } from '../capacity.js';
-import { blockTitleRowSpillReservation } from '../container-header-geometry.js';
 import { propValue } from '../dsl-utils.js';
 import { frameTabGeometry } from '../frame-tab-geometry.js';
 import { computeLaneUtilization, resolveLaneUtilizationThresholds } from '../lane-utilization.js';
-import { type LayoutContext, scheduledItemDays, type TrackCursor } from '../layout-context.js';
-import { RowPacker } from '../row-packer.js';
+import type { LayoutContext, LayoutHelpers } from '../layout-context.js';
+import { resolveChildStart } from '../start-rules.js';
 import { resolveStyle } from '../style-resolution.js';
-import { ITEM_INSET_PX, MIN_ITEM_WIDTH } from '../themes/shared.js';
-import type {
-    BoundingBox,
-    PositionedCapacity,
-    PositionedItem,
-    PositionedSwimlane,
-    PositionedTrackChild,
-} from '../types.js';
-import { itemSpanPx } from '../working-span.js';
+import { estimateTextWidth } from '../text-measure.js';
+import type { BoundingBox, PositionedCapacity, PositionedSwimlane } from '../types.js';
+import { sequenceRowTrack } from './row-track.js';
 
 /**
  * Font size (px) the renderer uses for the lane capacity badge. Mirrors
@@ -77,38 +63,6 @@ function resolveLaneCapacity(
         capacity: { value, text, icon },
         badgeWidthPx,
     };
-}
-
-/** Helpers that SwimlaneNode delegates to until the rest of m2.5c lands. */
-export interface SwimlaneNodeDeps {
-    sequenceItem: (
-        child: ItemDeclaration,
-        cursor: TrackCursor,
-        ctx: LayoutContext,
-        ownerOverride?: string,
-    ) => PositionedItem;
-    sequenceOne: (
-        child: ItemDeclaration | GroupBlock | ParallelBlock,
-        cursor: TrackCursor,
-        ctx: LayoutContext,
-    ) => PositionedTrackChild;
-    resolveChildStart: (
-        child: ItemDeclaration | GroupBlock | ParallelBlock,
-        seqDefault: number,
-        laneLeftX: number,
-        ctx: LayoutContext,
-    ) => number;
-    newCursor: (x: number, y: number) => TrackCursor;
-    estimateTextWidth: (text: string, fontSize: number) => number;
-    /** Predict the extra vertical height an item's bar will grow by
-     *  (a wrapped title over a meta line, or wrapped label-chip rows);
-     *  used to size the row-packer's row pitch ahead of the call to
-     *  `sequenceItem`. */
-    predictItemBarExtraHeight: (
-        item: ItemDeclaration,
-        startX: number,
-        ctx: LayoutContext,
-    ) => number;
 }
 
 export interface SwimlaneNodeInput {
@@ -189,15 +143,13 @@ function firstChildStartX(
     lane: SwimlaneDeclaration,
     laneLeftX: number,
     ctx: LayoutContext,
-    deps: Pick<SwimlaneNodeDeps, 'resolveChildStart'>,
 ): number | undefined {
     for (const child of lane.content) {
         if (child.$type === 'DescriptionDirective') continue;
         // Snapped like the start it predicts (a no-op under `hide`).
         return ctx.scale.startX(
-            deps.resolveChildStart(
+            resolveChildStart(
                 child as ItemDeclaration | GroupBlock | ParallelBlock,
-                laneLeftX,
                 laneLeftX,
                 ctx,
             ),
@@ -209,7 +161,7 @@ function firstChildStartX(
 export class SwimlaneNode {
     constructor(
         public readonly input: SwimlaneNodeInput,
-        private readonly deps: SwimlaneNodeDeps,
+        private readonly helpers: LayoutHelpers,
     ) {}
 
     get id(): string {
@@ -218,7 +170,7 @@ export class SwimlaneNode {
 
     place(origin: SwimlaneOrigin, ctx: LayoutContext): PlacedSwimlaneGeometry {
         const { lane, bandIndex } = this.input;
-        const { deps } = this;
+        const { helpers } = this;
         const style = resolveStyle('swimlane', lane.properties, ctx.styleCtx);
         const laneLeftX = origin.x;
         const step = ctx.bandScale.step();
@@ -243,168 +195,45 @@ export class SwimlaneNode {
         const footnoteIndicators = collectFootnoteIndicators(lane, ctx);
         const footnoteIndicatorWidthPx =
             footnoteIndicators.length > 0
-                ? deps.estimateTextWidth(
-                      footnoteIndicators.join(','),
-                      LANE_CAPACITY_BADGE_FONT_SIZE_PX,
-                  )
+                ? estimateTextWidth(footnoteIndicators.join(','), LANE_CAPACITY_BADGE_FONT_SIZE_PX)
                 : 0;
         // Title-tab geometry (mirrors the renderer; see renderSwimlane).
         const tabRightX = computeLaneTabRightX(lane, badgeWidthPx, footnoteIndicatorWidthPx);
         // First-row Y: when the first child's desired x is past the title
         // tab, top-align with the tab and reclaim ~28 px per lane.
         // Otherwise drop below the tab.
-        const firstChildDesiredX = firstChildStartX(lane, laneLeftX, ctx, deps);
+        const firstChildDesiredX = firstChildStartX(lane, laneLeftX, ctx);
         const canAlignFirstRowWithTab =
             !lane.title ||
             firstChildDesiredX === undefined ||
             firstChildDesiredX >= tabRightX + TAB_GUTTER_PX;
         const startY = origin.y + (canAlignFirstRowWithTab ? TAB_TOP_Y : TAB_BOTTOM_Y);
 
-        // Topmost-fit row pack. See `RowPacker` for the full contract.
-        // The packer owns the rows; we feed it children in DSL order and
-        // it returns each child's resolved (rowIndex, y).
-        const packer = new RowPacker({
-            laneLeftX,
-            originY: startY,
-            minRowHeight: step,
-            slackCorridors: ctx.slackCorridors,
-        });
-        let timeCursorX = laneLeftX;
+        // The shared row-track loop (row-track.ts) packs the lane's
+        // children below the tab offset chosen above.
+        const track = sequenceRowTrack(lane, { leftX: laneLeftX, firstRowY: startY }, ctx, helpers);
+        const { children } = track;
 
-        const children: PositionedTrackChild[] = [];
-        for (const child of lane.content) {
-            if (child.$type === 'DescriptionDirective') continue;
-
-            if (!isItemDeclaration(child)) {
-                const blockStart = deps.resolveChildStart(
-                    child as ParallelBlock | GroupBlock,
-                    timeCursorX,
-                    laneLeftX,
-                    ctx,
-                );
-                const { rowIndex, y: blockY } = packer.placeBlock();
-                const cursor = deps.newCursor(blockStart, blockY);
-                const positioned = deps.sequenceOne(
-                    child as ItemDeclaration | GroupBlock | ParallelBlock,
-                    cursor,
-                    ctx,
-                );
-                children.push(positioned);
-                const blockEnd = positioned.box.x + positioned.box.width;
-                const blockHeight = Math.max(step, cursor.height);
-                packer.commitBlock({
-                    rowIndex,
-                    placed: positioned,
-                    blockHeight,
-                    blockEnd,
-                    spillReservation: blockTitleRowSpillReservation(positioned),
-                });
-                timeCursorX = Math.max(timeCursorX, blockEnd);
-                continue;
-            }
-
-            const props = (child as ItemDeclaration).properties;
-            const desiredStart = deps.resolveChildStart(
-                child as ItemDeclaration,
-                timeCursorX,
-                laneLeftX,
-                ctx,
-            );
-            // Predict the item's logical extent so the row-pack can decide
-            // BEFORE handing off to sequenceItem. The arithmetic mirrors
-            // the duration → width math in `sequenceItem` (see
-            // packages/layout/src/layout.ts).
-            // Under `show` the predicted extent starts where `sequenceItem`
-            // will snap the bar to; the cursor below keeps the raw start.
-            const durationDays = scheduledItemDays(ctx, child as ItemDeclaration);
-            const predictedStart = ctx.scale.startX(desiredStart);
-            const naturalWidth = Math.max(
-                MIN_ITEM_WIDTH,
-                itemSpanPx(ctx, predictedStart, durationDays),
-            );
-            const desiredEnd = predictedStart + naturalWidth;
-            const childId = (child as ItemDeclaration).name ?? '';
-
-            const barExtra = deps.predictItemBarExtraHeight(
-                child as ItemDeclaration,
-                predictedStart,
-                ctx,
-            );
-            const predictedHeight = step + barExtra;
-            const { rowIndex, y: rowY } = packer.placeItem({
-                childId,
-                desiredStart: predictedStart,
-                desiredEnd,
-                // Row pitch = `step()` + extra bar height. Keeps the
-                // inter-row visible gap (= step - bandwidth) intact
-                // when a title wraps or an item's labels wrap and grow
-                // the bar.
-                predictedHeight,
-            });
-
-            const cursor = deps.newCursor(desiredStart, rowY);
-            const positioned = deps.sequenceItem(child as ItemDeclaration, cursor, ctx);
-            children.push(positioned);
-
-            // Item end in LOGICAL space (one ITEM_INSET_PX past the visual
-            // bar's right edge). The next chained item starts here and
-            // lands edge-to-edge in time, with a 2 × ITEM_INSET_PX visible
-            // gutter between bars.
-            const itemLogicalEnd = positioned.box.x + positioned.box.width + ITEM_INSET_PX;
-            timeCursorX = Math.max(timeCursorX, itemLogicalEnd);
-
-            let spillReservation: number | null = null;
-            const hasAnySpill =
-                positioned.textSpills ||
-                positioned.chipsOutside ||
-                positioned.dotSpills ||
-                positioned.iconSpills ||
-                positioned.footnoteSpills;
-            if (hasAnySpill) {
-                // `decorationsRightX` already aggregates the spilled
-                // dot / icon / footnote / caption right edges from
-                // `sequenceItem`; the chip column tracks separately
-                // via `chipsRightX`. Add a 6-px buffer so the next
-                // chained item's bar leaves a visible gutter past
-                // the spilled cluster instead of butting against it.
-                const farRight = Math.max(
-                    positioned.decorationsRightX,
-                    positioned.chipsOutside ? positioned.chipsRightX : 0,
-                );
-                spillReservation = farRight + 6;
-            }
-
-            packer.commitItem({
-                rowIndex,
-                placed: positioned,
-                logicalEnd: itemLogicalEnd,
-                spillReservation,
-                // Safety net: if the predictor under-shot (it can't see
-                // the exact meta text), the row still grows to the bar
-                // that was actually placed plus the inter-row gap.
-                rowHeight: Math.max(
-                    predictedHeight,
-                    step + (positioned.box.height - ctx.bandScale.bandwidth()),
-                ),
-            });
-        }
-
-        // `packer.usedHeight()` measures from `startY` (the first row,
+        // `track.packer.usedHeight()` measures from `startY` (the first row,
         // below the title tab); the swimlane band spans from `origin.y`
         // (the band top, above the tab). Add the tab offset back so the
         // band height covers everything the user sees.
         const tabOffset = startY - origin.y;
-        const bandHeight = Math.max(step + 32, tabOffset + packer.usedHeight() + 16);
+        const bandHeight = Math.max(step + 32, tabOffset + track.packer.usedHeight() + 16);
         // Include the chiclet's right edge in the lane's reported
         // right-extent so empty lanes still report a non-zero right edge
         // — `buildIncludeRegions` uses this to size the include's dashed
         // bracket around its content, and a lane with only a chiclet
         // (no items) should still fit visibly inside that bracket.
-        const usedRightX = Math.max(packer.usedRightX(), tabRightX);
+        const usedRightX = Math.max(track.packer.usedRightX(), tabRightX);
+        // The band spans the canvas, whose width is final only after the
+        // post-placement growth: finalize (`fitWidths`, f4) sets a main
+        // lane's width to it and `fitIncludeRegionWidth` a region lane's to
+        // the region's. Placement never reads the canvas.
         const box: BoundingBox = {
             x: 0,
             y: origin.y,
-            width: ctx.chartRightX,
+            width: 0,
             height: bandHeight,
         };
 

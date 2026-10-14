@@ -215,11 +215,9 @@ export function buildWaves(
 
     const boundaries = allEmpty ? [] : buildBoundaries(waves, state.origin, strip.y, ctx);
     const mainBackground = backgroundItems(swimlanes);
+    // Background items already carry their tooltip: `sequenceItem` sets it
+    // where it places them.
     const regionBackground = includes.map((inc) => backgroundItems(inc.nestedSwimlanes));
-    // The renderer has no locale table: hand it the background tooltip.
-    for (const item of [...mainBackground, ...regionBackground.flat()]) {
-        item.waveTooltip = strings.waveBackgroundItem;
-    }
     const built: BuiltWaves = {
         waves,
         boundaries,
@@ -460,13 +458,14 @@ function superscript(n: number): string {
  * names (when a label is abbreviated, a wave is empty, or a wave's
  * footnotes moved here). Lines are `WAVE_LEGEND_LINE_PX` high from `topY`
  * at the chart origin, wrapped at entry boundaries (the wave list also
- * between waves) to the canvas width less the gutter.
+ * between waves) to the canvas width (`chartRightX`, final) less the gutter.
  */
 export function buildWaveLegend(
     built: BuiltWaves,
     ctx: LayoutContext,
     strings: LocaleStrings,
     topY: number,
+    chartRightX: number,
 ): PositionedWaveLegend | undefined {
     const { waves } = built;
     const abbreviated = waves.some((w) => !w.empty && w.strip.labelKind !== 'title');
@@ -477,7 +476,7 @@ export function buildWaveLegend(
     const fontSize = WAVE_STRIP_LABEL_FONT_SIZE_PX;
     const textWidth = (text: string): number => estimateTextWidth(text, fontSize);
     const left = ctx.timeline.originX;
-    const maxRight = Math.max(left, ctx.chartRightX - GUTTER_PX);
+    const maxRight = Math.max(left, chartRightX - GUTTER_PX);
     let line = 0;
     let cursor = left;
     let lineUsed = false;

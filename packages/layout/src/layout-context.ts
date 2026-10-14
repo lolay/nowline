@@ -1,19 +1,23 @@
-// Layout context — shared internal types used by `layout.ts` and the
-// node files under `nodes/`. Extracted so per-entity nodes (e.g.
-// `swimlane-node.ts`) can type their inputs without forcing a circular
-// import on the production composition root in `layout.ts`.
+// Layout context — shared internal types used by the layout phases
+// (`phases/`) and the node files under `nodes/`. Extracted so per-entity
+// nodes (e.g. `swimlane-node.ts`) can type their inputs without importing
+// the phases that drive them.
 
 import type {
     GroupBlock,
     ItemDeclaration,
     LabelDeclaration,
     ParallelBlock,
+    ResolvedConfig,
+    ResolvedContent,
     SymbolDeclaration,
 } from '@nowline/core';
 import type { BandScale } from './band-scale.js';
-import type { resolveCalendar } from './calendar.js';
+import { type resolveCalendar, resolveSizes } from './calendar.js';
+import type { FootnoteIndex } from './nodes/footnote-node.js';
 import type { RoadmapSchedule } from './schedule.js';
 import type { StyleContext } from './style-resolution.js';
+import type { Theme } from './themes/shape.js';
 import type { TimeScale } from './time-scale.js';
 import type {
     MarkerRowPlacement,
@@ -141,10 +145,11 @@ export interface LayoutContext {
      */
     slackCorridors: SlackCorridor[];
     /**
-     * Pre-computed marker-row placement (row index + label box + side)
-     * for every anchor and date-pinned milestone. After-only milestones
-     * pack against this map at build time; date-pinned entries are
-     * snapshot upstream so their (Y, label) survives swimlane reflows.
+     * Marker-row placement (row index + label box + side). While lanes
+     * are placed it holds a copy of the measure phase's pre-pack of every
+     * date-pinned anchor and milestone; finalize then replaces it with the
+     * final pack (f5), which adds after-only milestones and the calendar
+     * runs, before milestones are positioned (f6) and anchors built (f10).
      */
     markerRowPlacements: Map<string, MarkerRowPlacement>;
     chartTopY: number;
@@ -158,7 +163,6 @@ export interface LayoutContext {
      * to thread the entire timeline strip.
      */
     swimlaneBottomY: number;
-    chartRightX: number;
     /**
      * Monotonic counters for id-less `parallel` / `group` blocks. Each
      * swimlane-loop pass resets both to zero; blocks without an explicit
@@ -175,43 +179,93 @@ export interface LayoutContext {
     waves?: WaveLayoutState;
 }
 
+/** The per-file half of a context: the root file, or an isolated region. */
+export interface ContextSource {
+    config: Pick<ResolvedConfig, 'styles' | 'defaults' | 'symbols'>;
+    content: Pick<ResolvedContent, 'sizes' | 'labels' | 'teams' | 'persons'>;
+}
+
 /**
- * Bundle of layout-internal helper callbacks injected from `layout.ts`
- * into the per-entity Renderable nodes. Keeping the helpers in
- * `layout.ts` (rather than splitting them across many tiny files) means
- * the nodes stay small and importable without a runtime cycle: they
- * receive the helpers at construction time via this struct.
+ * Build a `LayoutContext` for the root file or for an isolated region.
+ * `chart` passes the chart extents through unchanged: the root sets
+ * `chartTopY` from the timeline with both bottoms at 0, a region sets all
+ * three y fields to its inner start. The canvas width is not part of a
+ * context: placement never reads it (finalize owns the `CanvasExtent`).
+ * A region passes no footnotes and no marker placements. The caller seeds
+ * the wave edges.
+ */
+export function createLayoutContext(
+    source: ContextSource,
+    shared: {
+        theme: Theme;
+        cal: ReturnType<typeof resolveCalendar>;
+        schedule: RoadmapSchedule;
+        timeline: PositionedTimelineScale;
+        scale: TimeScale;
+        calendar: WorkingCalendar;
+        bandScale: BandScale;
+        waves?: WaveLayoutState;
+    },
+    chart: Pick<LayoutContext, 'chartTopY' | 'chartBottomY' | 'swimlaneBottomY'>,
+    init: {
+        footnotes?: FootnoteIndex;
+        markerRowPlacements?: Map<string, MarkerRowPlacement>;
+    },
+): LayoutContext {
+    return {
+        cal: shared.cal,
+        schedule: shared.schedule,
+        styleCtx: {
+            theme: shared.theme,
+            styles: source.config.styles,
+            defaults: source.config.defaults,
+            labels: source.content.labels,
+        },
+        // Each file declares its own sizes, resolved under the host's
+        // calendar so a region's sized items render at the host's
+        // pixels-per-day scale.
+        sizes: resolveSizes(source.content.sizes, shared.cal),
+        labels: source.content.labels,
+        teams: source.content.teams,
+        persons: source.content.persons,
+        symbols: source.config.symbols,
+        footnoteIndex: init.footnotes?.index ?? new Map(),
+        footnoteHosts: init.footnotes?.hosts ?? new Map(),
+        timeline: shared.timeline,
+        scale: shared.scale,
+        calendar: shared.calendar,
+        bandScale: shared.bandScale,
+        entityLeftEdges: new Map(),
+        entityRightEdges: new Map(),
+        entityMidpoints: new Map(),
+        placedItems: new Map(),
+        itemFlowKey: new Map(),
+        currentFlowKey: '',
+        slackCorridors: [],
+        markerRowPlacements: init.markerRowPlacements ?? new Map(),
+        chartTopY: chart.chartTopY,
+        chartBottomY: chart.chartBottomY,
+        swimlaneBottomY: chart.swimlaneBottomY,
+        nextParallelId: 0,
+        nextGroupId: 0,
+        // Wave floors are dates projected with the unclamped scale
+        // (specs/waves.md §5.1); a region shares the host's wave state
+        // (§8.4) so its lanes are floored and accumulate into the same pass.
+        ...(shared.waves ? { waves: shared.waves } : {}),
+    };
+}
+
+/**
+ * The helpers the place phase injects into the nodes. Everything else a
+ * node needs it imports; `sequenceOne` (`nodes/sequence-one.ts`) stays
+ * injected because it dispatches to `GroupNode` and `ParallelNode`, which
+ * call it for their nested blocks: importing it there would form a cycle
+ * (specs/layout-phases.md §3.8, §8 decision 4).
  */
 export interface LayoutHelpers {
-    sequenceItem: (
-        child: ItemDeclaration,
-        cursor: TrackCursor,
-        ctx: LayoutContext,
-        ownerOverride?: string,
-    ) => PositionedItem;
     sequenceOne: (
         child: ItemDeclaration | GroupBlock | ParallelBlock,
         cursor: TrackCursor,
         ctx: LayoutContext,
     ) => PositionedTrackChild;
-    resolveChildStart: (
-        child: ItemDeclaration | GroupBlock | ParallelBlock,
-        seqDefault: number,
-        laneLeftX: number,
-        ctx: LayoutContext,
-    ) => number;
-    newCursor: (x: number, y: number) => TrackCursor;
-    estimateTextWidth: (text: string, fontSize: number) => number;
-    /** Predict the extra height an item's bar will grow by (a wrapped
-     *  two-line title over a meta line, or wrapped label-chip rows;
-     *  whichever is larger), so callers can size the row pitch BEFORE
-     *  handing off to `sequenceItem`. Returns 0 when the title fits one
-     *  line (or wraps without needing a taller bar) and the item's
-     *  labels all fit on a single chip row. `startX` is the snapped
-     *  predicted start the bar will be placed at. */
-    predictItemBarExtraHeight: (
-        item: ItemDeclaration,
-        startX: number,
-        ctx: LayoutContext,
-    ) => number;
 }

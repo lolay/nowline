@@ -223,6 +223,16 @@ export const lightTheme: Theme = {
         planned: '#94a3b8',
         neutral: '#94a3b8',
     },
+    // Item bar fill per status, applied by layout when the item's resolved
+    // `bg` is still `entities.item.bg` (m2d Resolution 3).
+    statusTint: {
+        done: '#ecfdf5',
+        inProgress: '#eff6ff',
+        atRisk: '#fffbeb',
+        blocked: '#fee2e2',
+        planned: '#f8fafc',
+        neutral: '#f8fafc',
+    },
     // Status-dot palettes — the renderer picks one based on the
     // bar's effective bg luminance.
     //

@@ -6,7 +6,8 @@ import {
     type PositionedItem,
     type PositionedTrackChild,
 } from '../src/index.js';
-import { SwimlaneNode, type SwimlaneNodeDeps } from '../src/nodes/swimlane-node.js';
+import { measureItem } from '../src/nodes/item-measure.js';
+import { SwimlaneNode } from '../src/nodes/swimlane-node.js';
 import { ITEM_INSET_PX } from '../src/themes/shared.js';
 import { parseAndResolve } from './helpers.js';
 
@@ -1527,11 +1528,11 @@ swimlane "Platform"
         expect(below.box.y).toBe(wide.box.y + 80);
     });
 
-    it('predicts exactly the growth the spilled explicit block is placed with', async () => {
-        // Rows commit at max(predicted, placed), so an under-predicting row
-        // predictor never shows in the geometry (the test above passes with a
-        // predictor that returns 0). Hold the predictor the lane was handed to
-        // the placed bar directly: two spilled lines plus meta grow it 16px.
+    it('measures exactly the growth the spilled explicit block is placed with', async () => {
+        // The row track sizes the row from the item's measure, and
+        // `sequenceItem` places the bar from the same measure. Hold the
+        // measure of the lane's first item to the placed bar: two spilled
+        // lines plus meta grow it 16px.
         const place = vi.spyOn(SwimlaneNode.prototype, 'place');
         try {
             const { file, model } = await layout(
@@ -1539,7 +1540,6 @@ swimlane "Platform"
                     '  item wide "Internationalization of\\nthe billing service" duration:2w\n',
                 ),
             );
-            const lane = place.mock.contexts[0] as unknown as { deps: SwimlaneNodeDeps };
             const ctx = place.mock.calls[0][1];
             const decl = file.roadmapEntries
                 .filter(isSwimlaneDeclaration)
@@ -1549,8 +1549,8 @@ swimlane "Platform"
             const wide = find(items(model.swimlanes[0].children), 'wide');
             expect(wide.textSpills).toBe(true);
             expect(wide.box.height).toBe(72);
-            // `wide` is the lane's first item, so its predicted start is the origin.
-            expect(lane.deps.predictItemBarExtraHeight(decl, ctx.timeline.originX, ctx)).toBe(16);
+            // `wide` is the lane's first item, so its start is the origin.
+            expect(measureItem(decl, ctx.timeline.originX, ctx).barExtra).toBe(16);
         } finally {
             place.mockRestore();
         }
