@@ -367,7 +367,7 @@ end(x)   = start(x) + dur(x)
 - **`aft`** is the existing `after:` maximum. A wave reference `after:w_j` contributes `E_j`.
 - **`L(C)`** never moves an item. It only keeps a container's box and bracket from opening in an earlier column.
 - **Container ends** are unchanged: a group ends when its sequence ends, and a parallel ends at its latest track.
-- **Engine A** keeps its existing start rule, including the fact that `after:` is not floored by the lane cursor (§8.6 divergence (a)). The floor is one more term in the `max`, and it applies even when engine A ignores the lane cursor for an `after:`: the barrier holds whichever start term wins.
+- **Engine A** uses engine C's start rule: an `after:` is floored by the lane cursor (§8.6, divergence (a), settled by F1 of [`scheduler-unification.md`](./scheduler-unification.md)). The floor is one more term in the `max`: the barrier holds whichever start term wins.
 - **Item pins.** The undocumented `date:` and `start:` item pins still replace the `seq` and `aft` terms, as they do today. With waves, the pinned start becomes `max(pin, F(x))`. When the floor moves an item, layout emits NL.W1001.
 
 **Wave references**
@@ -741,7 +741,7 @@ It never goes through `forwardWithinDomain`, the seeded edge maps or `resolveAft
 5. **Invalid input.** Input that breaks the rules (for example, an LSP preview of a file with NL.E1103) hits the cap. The result is deterministic, and layout emits NL.W1002.
 6. **Cost.** `O((n+1)·(N + R))` for N main nodes and R region nodes. Example 1 converges in 4 passes, Example 19 in 3 and Example 16 in 2. These counts follow from running the §8.2 algorithm on each example, not from the bound in item 3.
 
-A warm start from day space would be wrong: divergence (a) can make pixel values smaller than day values.
+A warm start from day space would be wrong while divergence (e), or a pin before the roadmap start, can make pixel values smaller than day values ([`scheduler-unification.md`](./scheduler-unification.md) §3.1, follow-up F4).
 
 ### 8.4 Engine A hook points (pixels)
 

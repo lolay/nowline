@@ -104,14 +104,14 @@ nowline roadmap.nowline --headless               # bundled DejaVu fonts (determi
 
 | Flag                  | Default      | Notes                                       |
 |-----------------------|--------------|---------------------------------------------|
-| `-t, --theme <name>`  | `light`      | `light` \| `dark`.                          |
-| `--now YYYY-MM-DD`    | today (UTC)  | Override the now-line anchor date. Use `--now -` to suppress it. |
+| `-t, --theme <name>`  | `light`      | `light` \| `dark` \| `grayscale`.            |
+| `--now YYYY-MM-DD`    | today (local) | Override the now-line anchor date. Use `--now -` to suppress it. Without `--now`, today is the local civil date, or the date in `--timezone` when set. |
 | `--no-links`          | (off)        | Omit link icons from items.                 |
 | `-s, --scale <n>`     | `1`          | Raster scale (PNG only).                    |
 | `--strict`            | (off)        | Promote asset / sanitizer warnings to errors. |
 | `-w, --width <px>`    | fit content  | Maximum canvas width. The timeline shrinks to fit (down to 1 px/day); spilled captions can still overflow. |
 | `--non-working <mode>` | (file key, else `hide`) | `hide` \| `show`. How a business calendar's non-working days appear: collapsed, or drawn as shaded bands. Overrides the file's `default roadmap non-working:` key; omit it to let the key apply. Also accepted by `--serve`. |
-| `--asset-root <dir>`  | input dir    | Root for `logo:` / image refs.              |
+| `--asset-root <dir>`  | `.nowlinerc` `assetRoot`, else input dir | Root for `logo:` / image refs. |
 
 ### Format-specific options
 
@@ -132,6 +132,9 @@ nowline roadmap.nowline --headless               # bundled DejaVu fonts (determi
 | `-p, --port <n>`     | `4318`      |
 | `--host <host>`      | `127.0.0.1` |
 | `--open`             | (off)       |
+| `-w, --width <px>`   | `.nowlinerc` `width`, else fit content |
+| `--no-links`         | (off)       |
+| `--strict`           | (off)       |
 
 ### Logging (mutually exclusive)
 
@@ -202,7 +205,7 @@ Mutual exclusivity rules (all exit 2 with a message):
 
 ## Configuration: `.nowlinerc`
 
-On any operation that takes an `<input>` file, `nowline` walks up from the input file's directory looking for a `.nowlinerc` (JSON or YAML). The nearest one wins. Each key is the default for its flag: a flag on the command line wins, then the key, then the built-in default. An invalid value is a usage error that names the key. `--serve` reads `theme` and `locale`. Environment variables are not consulted, except the locale variables, which rank above the `locale` key.
+On any operation that takes an `<input>` file, `nowline` walks up from the input file's directory looking for a `.nowlinerc` (JSON or YAML). The nearest one wins. Each key is the default for its flag: a flag on the command line wins, then the key, then the built-in default. An invalid value is a usage error that names the key. `--serve` reads `theme`, `width`, `locale` and `assetRoot`. Environment variables are not consulted, except the locale variables, which rank above the `locale` key.
 
 ```yaml
 # .nowlinerc (YAML)
@@ -218,6 +221,7 @@ fontSans: sf               # --font-sans  (alias or path)
 fontMono: sf-mono          # --font-mono
 headlessFonts: false       # --headless
 useSystemFonts: false      # --use-system-fonts
+assetRoot: assets          # --asset-root (relative to this file)
 ```
 
 ```json
@@ -231,7 +235,8 @@ useSystemFonts: false      # --use-system-fonts
   "fontSans": "sf",
   "fontMono": "sf-mono",
   "headlessFonts": false,
-  "useSystemFonts": false
+  "useSystemFonts": false,
+  "assetRoot": "assets"
 }
 ```
 
