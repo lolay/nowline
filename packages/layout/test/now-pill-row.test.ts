@@ -7,7 +7,7 @@ import { readFile } from 'node:fs/promises';
 import * as path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { describe, expect, it } from 'vitest';
-import { layoutRoadmap, type PositionedRoadmap } from '../src/index.js';
+import { collectLayoutInsights, layoutRoadmap, type PositionedRoadmap } from '../src/index.js';
 import { MARKER_ROW_CENTER_OFFSET_PX, MARKER_ROW_PITCH_PX } from '../src/nodes/marker-geometry.js';
 import { NOW_PILL_HEIGHT_PX } from '../src/themes/shared.js';
 import { parseAndResolve } from './helpers.js';
@@ -61,6 +61,15 @@ describe('now-pill row on an extended axis (L2)', () => {
         expect(nowline.pillTopY).toBe(model.timeline.box.y);
         expect(nowline.pillTopY + NOW_PILL_HEIGHT_PX).toBe(model.timeline.tickPanelY);
         expect(nowline.topY).toBe(model.timeline.tickPanelY);
+    });
+
+    it('stays silent on NL.W1000, since today lies on the extended axis', async () => {
+        // NL.W1000 compares today with the axis the chart draws, extension
+        // included, so a now-line the chart shows is never reported as outside.
+        const model = await lay(await platformWithLength(), TODAY);
+        expect(model.nowline).not.toBeNull();
+        const insights = collectLayoutInsights(model, { today: TODAY, locale: 'en-US' });
+        expect(insights.some((i) => i.code === 'NL.W1000')).toBe(false);
     });
 
     it('moves the tick panel, marker band and chart down by the pill row', async () => {
