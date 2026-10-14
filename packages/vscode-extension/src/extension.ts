@@ -13,7 +13,11 @@ import { exportInProcess, initExportRuntime } from './export/in-process.js';
 import { runNewRoadmapCommand } from './export/new-roadmap.js';
 import { DisagreementTracker } from './io/disagreement-check.js';
 import { RcConfigCache } from './io/rc-config.js';
-import { resolveNonWorkingDisplay, resolveTodayAnchor } from './preview/option-resolver.js';
+import {
+    resolveExportAssetRoot,
+    resolveNonWorkingDisplay,
+    resolveTodayAnchor,
+} from './preview/option-resolver.js';
 import { PreviewManager } from './preview/preview-manager.js';
 import type {
     DefaultFit,
@@ -373,6 +377,19 @@ function resolveShowLinksForExport(sourceUri: vscode.Uri): boolean {
     return readPreviewSettings().showLinks;
 }
 
+/**
+ * Resolve the asset root for an export of `sourceUri` by the preview's chain:
+ * the `nowline.preview.assetRoot` setting, else the `.nowlinerc` `assetRoot`,
+ * else the source file's directory (`undefined`). The setting has no toolbar
+ * override, so an open preview resolves to the same value.
+ */
+async function resolveAssetRootForExport(sourceUri: vscode.Uri): Promise<string | undefined> {
+    const rc = rcCache
+        ? await rcCache.resolveFor(path.dirname(sourceUri.fsPath))
+        : { config: {}, rcPath: undefined };
+    return resolveExportAssetRoot(readPreviewSettings().assetRoot, rc.config, rc.rcPath);
+}
+
 function readExportSettings(): ExportSettings {
     const cfg = vscode.workspace.getConfiguration('nowline.export');
     return {
@@ -454,6 +471,7 @@ async function handleSave(
         locale: source.resolvedLocale(),
         noLinks: !source.resolvedShowLinks(),
         nonWorking: source.resolvedNonWorking(),
+        assetRoot: await resolveAssetRootForExport(source.sourceUri),
     };
 
     if (format === 'png') {
@@ -561,6 +579,7 @@ async function handleExport(uri: vscode.Uri | undefined): Promise<void> {
         locale: resolveLocaleForExport(target),
         showLinks: resolveShowLinksForExport(target),
         nonWorking: resolveNonWorkingForExport(target),
+        assetRoot: await resolveAssetRootForExport(target),
     });
 }
 

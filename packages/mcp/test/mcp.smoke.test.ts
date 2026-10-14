@@ -1834,6 +1834,49 @@ describe('@nowline/mcp — MCP Apps preview', () => {
             }
         }
     });
+
+    it('carries the date a timezone resolved to, since the preview cannot read the zone', async () => {
+        const { client: uiClient, cleanup } = await connectUiClient({
+            [MCP_UI_EXTENSION]: { mimeTypes: ['text/html;profile=mcp-app'] },
+        });
+        // Today in +14:00, read before and after the call so a midnight in
+        // that zone between the two can't fail the test.
+        const dateIn14 = () => new Date(Date.now() + 14 * 3_600_000).toISOString().slice(0, 10);
+        try {
+            const before = dateIn14();
+            const zoned = await uiClient.callTool({
+                name: 'render',
+                arguments: { source: MINIMAL, format: 'svg', timezone: '+14:00' },
+            });
+            const after = dateIn14();
+            const plain = await uiClient.callTool({
+                name: 'render',
+                arguments: { source: MINIMAL, format: 'svg' },
+            });
+            const previewNow = (result: typeof zoned) => {
+                const block = result.content.find(
+                    (c) =>
+                        c.type === 'text' &&
+                        'text' in c &&
+                        c.text.includes('"kind":"nowline.preview"'),
+                ) as { type: 'text'; text: string };
+                return (JSON.parse(block.text) as { now?: string }).now;
+            };
+            expect([before, after]).toContain(previewNow(zoned));
+            // No timezone: the preview keeps drawing today in the viewer's zone.
+            expect(previewNow(plain)).toBeUndefined();
+        } finally {
+            await cleanup();
+        }
+    });
+
+    it('parsePreviewFromArguments waits for the result when only a timezone is given', () => {
+        expect(parsePreviewFromArguments({ source: MINIMAL, timezone: '+14:00' })).toBeUndefined();
+        expect(
+            parsePreviewFromArguments({ source: MINIMAL, timezone: '+14:00', now: '2025-01-15' })
+                ?.now,
+        ).toBe('2025-01-15');
+    });
 });
 
 // ---- preview widget payload extraction (ontoolinput + ontoolresult) ---------

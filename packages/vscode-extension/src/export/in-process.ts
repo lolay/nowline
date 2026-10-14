@@ -26,6 +26,7 @@ import {
 } from '@nowline/export';
 import { lengthToPoints, parseLength, resolveFonts } from '@nowline/export-core';
 import type { ThemeName } from '@nowline/layout';
+import { resolveExportWidth } from '../preview/option-resolver.js';
 import type { ExportSettings } from './cli-runner.js';
 
 // ---- WASM path registration -------------------------------------------------
@@ -48,8 +49,8 @@ export function _resetWasmInit(): void {
 
 // ---- HostEnv ----------------------------------------------------------------
 
-function createExtensionHostEnv(sourcePath: string): HostEnv {
-    const assetRoot = path.resolve(path.dirname(sourcePath));
+function createExtensionHostEnv(sourcePath: string, assetRootOverride?: string): HostEnv {
+    const assetRoot = path.resolve(assetRootOverride ?? path.dirname(sourcePath));
     return {
         async readSource(filePath: string): Promise<string> {
             return fs.readFile(filePath, 'utf-8');
@@ -106,6 +107,11 @@ export interface ExportOverrides {
      * `default roadmap non-working:` key (then `hide`).
      */
     nonWorking?: NonWorkingDisplay;
+    /**
+     * Directory logo and image assets load from, resolved by the preview's
+     * chain (`resolveExportAssetRoot`). The source file's directory when omitted.
+     */
+    assetRoot?: string;
 }
 
 const BINARY_FORMATS = new Set<KernelFormat>(['png', 'pdf', 'xlsx']);
@@ -131,7 +137,7 @@ export async function exportInProcess(
 ): Promise<InProcessExportResult> {
     const source = await fs.readFile(sourcePath, 'utf-8');
 
-    const { today, theme, locale, noLinks, nonWorking } = overrides;
+    const { today, theme, locale, noLinks, nonWorking, assetRoot } = overrides;
     // `null`  → suppress the now-line (RenderInputs.today = undefined)
     // `Date`  → pin to that UTC midnight
     // missing → default to today (local civil date via resolveToday)
@@ -143,9 +149,9 @@ export async function exportInProcess(
         noLinks: noLinks ?? false,
         nonWorking,
         // Canvas width is a deliberate export setting (not preview-coupled):
-        // a best-effort *maximum* cap, no floor. `0`/unset fits the content,
-        // keeping byte-for-byte parity with the `nowline` CLI default.
-        width: settings.width > 0 ? settings.width : undefined,
+        // a best-effort *maximum* cap under the shared width rule. `0`/unset
+        // fits the content, keeping byte-for-byte parity with the CLI default.
+        width: resolveExportWidth(settings.width),
         // Font-requiring formats resolve lazily below.
         pngScale: settings.pngScale > 0 ? settings.pngScale : undefined,
         pageSize: settings.pdfPageSize || undefined,
@@ -164,7 +170,7 @@ export async function exportInProcess(
         inputs.fonts = { sans: result.sans, mono: result.mono };
     }
 
-    const host = createExtensionHostEnv(sourcePath);
+    const host = createExtensionHostEnv(sourcePath, assetRoot);
     const bytes = await exportDocument(source, format, inputs, host);
 
     const isBinary = BINARY_FORMATS.has(format);

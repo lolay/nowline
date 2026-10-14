@@ -123,6 +123,20 @@ interface PreviewPayload {
     locale?: string;
 }
 
+/**
+ * The preview payload's now-line. An explicit `now` passes through. With only a
+ * `timezone`, the payload carries the date that zone resolved to: the preview
+ * draws an omitted `now` at the viewer's own date and cannot read the zone.
+ */
+function previewNow(
+    args: { now?: string; timezone?: string },
+    today: Date | undefined,
+): string | undefined {
+    if (args.now !== undefined) return args.now;
+    if (args.timezone !== undefined && today) return today.toISOString().slice(0, 10);
+    return undefined;
+}
+
 function leanPreviewBlock(payload: PreviewPayload) {
     return {
         type: 'text' as const,
@@ -757,7 +771,7 @@ export function createMcpServer(opts: McpServerOptions = {}): McpServer {
             const previewPayload: PreviewPayload = {
                 source,
                 theme,
-                now: args.now,
+                now: previewNow(args, options.today),
                 width: options.width,
                 nonWorking: options.nonWorking,
                 locale: 'en-US',
