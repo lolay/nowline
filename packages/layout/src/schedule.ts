@@ -32,13 +32,13 @@ import type {
     ItemDeclaration,
     MilestoneDeclaration,
     NowlineFile,
-    ParallelBlock,
     ResolvedContent,
     ResolveResult,
     SwimlaneDeclaration,
     WavePlan,
 } from '@nowline/core';
 import { buildWavePlan, isGroupBlock, isItemDeclaration, isParallelBlock } from '@nowline/core';
+import { type TrackNode, trackChildren } from '@nowline/core/internal';
 import { deriveItemDurationDays, resolveSizes } from './calendar.js';
 import { type ResolvedCalendar, resolveWorkingCalendar } from './calendar-resolver.js';
 import { parseIsoDate, propValue } from './dsl-utils.js';
@@ -225,24 +225,22 @@ export function scheduleRoadmap(
             return 0;
         };
 
-        // Walk a sequential lane, returning the end-day of the last child.
+        // Walk a sequential lane or group, returning the end-day of the last
+        // child. Core's `trackChildren` says what a child is; the recursion
+        // stays here because it carries the cursor and the wave pass.
         const walkLane = (
-            children: SwimlaneDeclaration['content'],
+            container: SwimlaneDeclaration | GroupBlock,
             baselineEnd: number,
         ): number => {
             let prevEnd = baselineEnd;
-            for (const child of children) {
-                if (child.$type === 'DescriptionDirective') continue;
-                prevEnd = walkNode(child as ItemDeclaration | GroupBlock | ParallelBlock, prevEnd);
+            for (const child of trackChildren(container)) {
+                prevEnd = walkNode(child, prevEnd);
                 reach(prevEnd);
             }
             return prevEnd;
         };
 
-        const walkNode = (
-            node: ItemDeclaration | GroupBlock | ParallelBlock,
-            prevEnd: number,
-        ): number => {
+        const walkNode = (node: TrackNode, prevEnd: number): number => {
             if (isItemDeclaration(node)) {
                 const dur = deriveItemDurationDays(node.properties, scope.sizes, cal);
                 const { pin, after } = startTermsOf(node.properties);
@@ -275,13 +273,8 @@ export function scheduleRoadmap(
                     after.length > 0 ? Math.max(prevEnd, ...after.map(resolveAfterDay)) : prevEnd;
                 if (wave) containerStart = wave.apply(node, containerStart);
                 let parallelEnd = containerStart;
-                for (const child of node.content) {
-                    if (child.$type === 'DescriptionDirective') continue;
-                    const childEnd = walkNode(
-                        child as ItemDeclaration | GroupBlock,
-                        containerStart,
-                    );
-                    parallelEnd = Math.max(parallelEnd, childEnd);
+                for (const child of trackChildren(node)) {
+                    parallelEnd = Math.max(parallelEnd, walkNode(child, containerStart));
                 }
                 return parallelEnd;
             }
@@ -290,7 +283,7 @@ export function scheduleRoadmap(
                 let containerStart =
                     after.length > 0 ? Math.max(prevEnd, ...after.map(resolveAfterDay)) : prevEnd;
                 if (wave) containerStart = wave.apply(node, containerStart);
-                return walkLane(node.content as SwimlaneDeclaration['content'], containerStart);
+                return walkLane(node, containerStart);
             }
             return prevEnd;
         };
@@ -338,7 +331,7 @@ export function scheduleRoadmap(
             undefined,
             reachMax,
         );
-        for (const lane of content.swimlanes.values()) walkLane(lane.content, 0);
+        for (const lane of content.swimlanes.values()) walkLane(lane, 0);
         for (const [id, ms] of content.milestones) {
             const day = milestoneDay(ms, resolveAfterDay);
             if (day === undefined) continue;
@@ -353,7 +346,7 @@ export function scheduleRoadmap(
     if (!plan) {
         const { walkLane } = makeWalker(mainScope(), undefined, reachMax);
         for (const lane of resolved.content.swimlanes.values()) {
-            walkLane(lane.content, 0);
+            walkLane(lane, 0);
         }
     } else {
         // Wave barriers (specs/waves.md §8.5): iterate the lane walk to the
@@ -377,7 +370,7 @@ export function scheduleRoadmap(
             const pass = new WavePass(plan, S);
             const { walkLane } = makeWalker(mainScope(), pass, reachPass);
             for (const lane of resolved.content.swimlanes.values()) {
-                walkLane(lane.content, 0);
+                walkLane(lane, 0);
             }
             // Exactly one level of isolated regions, each with fresh id maps
             // seeded only with the wave edges. Region items join the barrier
@@ -397,7 +390,7 @@ export function scheduleRoadmap(
                     reachPass,
                 );
                 for (const lane of region.content.swimlanes.values()) {
-                    regionWalker.walkLane(lane.content, 0);
+                    regionWalker.walkLane(lane, 0);
                 }
             }
             finalPass = pass;
