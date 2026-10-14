@@ -1,6 +1,6 @@
 # Nowline — Scheduler Unification
 
-**Status: Implemented: m1 to m3 and F1; F2 to F4 open.** Milestone **m4.11** in [`milestones.md`](./milestones.md); decisions and as-built notes in the last two sections. Sections 1 and 3 describe the code before m1 (engine B and `computeContentEndDay` are gone); §4 says what each step did and §9 records where the build differs from this text. This is refactor R1 from [`review-since-v086.md`](./review-since-v086.md): one day-level scheduler instead of three hand-synced copies. Every `file:line` below was checked at the commit that adds this spec (source identical to 0062df3 plus the m2 fixes of the same review).
+**Status: Implemented: m1 to m3 and F1; F2 to F5 open.** Milestone **m4.11** in [`milestones.md`](./milestones.md); decisions and as-built notes in the last two sections. Sections 1 and 3 describe the code before m1 (engine B and `computeContentEndDay` are gone); §4 says what each step did and §9 records where the build differs from this text. This is refactor R1 from [`review-since-v086.md`](./review-since-v086.md): one day-level scheduler instead of three hand-synced copies. Every `file:line` below was checked at the commit that adds this spec (source identical to 0062df3 plus the m2 fixes of the same review).
 
 ## 1. Problem
 
@@ -307,6 +307,7 @@ Each of these changes rendered or exported bytes, so none is part of the byte-id
 | F2 | Decide divergence (e): `after:` on a group inside a parallel | as F1 | no sample today |
 | F3 | Keep the pixel quirks (b), (c), (d), (f) out of the lane cursor, or document them as presentation | SVG of 7 samples | §1.3 |
 | F4 | After F1 and F2: floor A's starts from C, and warm-start A's barrier passes from C's `S_k` | nothing (same fixpoint); `waveSolve.passes` drops | §3.1 |
+| F5 | Region anchors in isolated regions without waves: engine A resolves an `after:` that names a region's own anchor (`anchor kickoff` in each `examples/nested/*.nowline` region) inside that region, as C does, instead of starting at the region's day 0 | the SVG of `nested`; its 50 `region-scope` register entries go | §9; `examples/nested.nowline` |
 
 ## 6. Test strategy
 
@@ -324,7 +325,7 @@ Each of these changes rendered or exported bytes, so none is part of the byte-id
 | Region items in `byNode` change an exporter's bytes | exporters walk the root AST only; G3 on every sample |
 | A caller hands `layoutRoadmap` a stale schedule | identity check on `schedule.resolved`; a mismatch rebuilds |
 | The register becomes a rubber stamp (entries added to make CI green) | entries carry a divergence letter; only (a) to (f) and `region-scope` are valid, and adding one needs a reason in the PR |
-| Engine A still has its own start rule, so "one scheduler" is only true in days | stated as a non-goal; F1 to F4 close it, and R2 moves A's passes into an explicit phase |
+| Engine A still has its own start rule, so "one scheduler" is only true in days | stated as a non-goal; F1 to F5 close it, and R2 moves A's passes into an explicit phase |
 | The published `ExportInputs` shape changes | the new field is optional; exporters fall back to scheduling themselves |
 
 ## 8. Decisions
@@ -343,7 +344,7 @@ Where the implementation differs from the text above, or makes a choice the text
 - **F1 is `m1.s5`.** It landed right after `m1.s4`, in the one function (`resolvePinnedOrSequentialStart`) that step rewrote onto `startTermsOf`. It also moves lane-level groups and parallels with `after:`, which take the same path. Only showcase, sizing and late-row-shifts changed (G1).
 - **showcase `Ship` is not on day 40 in the chart.** Engine A draws it at 42.2 working days against the exports' 40: the lane cursor takes the parallel's box edge, which includes the 8 px track tail gutter of divergence (d). Closing that is F3. The register records showcase `ship` and `announce` as (b)+(d) and `assets` as (b).
 - **The register's `classes` is an array**, because some mismatches have two causes (showcase `ship` and `announce` were (a)+(b); late-row-shifts `p1` and `d` were (a)+(c)). F1 deleted the (a)-only entries and the letter (a) from the others.
-- **`nested.nowline` keeps its 50 `region-scope` register entries.** Each nested region declares its own `anchor kickoff` and starts lanes `after:kickoff`; C resolves it inside the region (day 1), while A has no region anchors and starts at day 0. The other three region-scope samples have no entries.
+- **`nested.nowline` keeps its 50 `region-scope` register entries (follow-up F5, §5).** Each nested region declares its own `anchor kickoff` and starts lanes `after:kickoff`; C resolves it inside the region (day 1), while A has no region anchors and starts at day 0. The other three region-scope samples have no entries.
 - **`computeDateWindow` takes its calendar from the schedule** (`schedule.calendar`), since the §3.3 sketch drops the context that `literalToDays` needs; `RoadmapNodeDeps.computeDateWindow` changed with it.
 - **Only first-level region items join `byNode`.** Deeper nested regions count in `extent` only, and `scheduledItemDays` throws on a node missing from `byNode`, which engine A never asks for because it lays out first-level regions only.
 - **Staging moved to `stageRoadmap`.** R4 ([`surface-options.md`](./surface-options.md) §3.3) replaced the kernel's `stageDocument` with `@nowline/renderer`'s `stageRoadmap`, which now builds the plan and the schedule as in §3.6, lays out with the schedule and returns both on the staged result; the kernel's `exportStaged` fills `ExportInputs.schedule` from it. The browser pipeline, `--serve` and MCP stage through it too.
