@@ -89,6 +89,35 @@ swimlane s "Subject"
     item g1 "G1" duration:1w
 `;
 
+/** Lane `s` holds a group whose second item is `q after:x`; lane `r` holds `x`. */
+const groupChildSource = (xWeeks: number): string => `nowline v1
+
+roadmap r "R" start:2026-01-05 calendar:full scale:1w
+
+swimlane r "Refs"
+  item x "X" duration:${xWeeks}w
+
+swimlane s "Subject"
+  group g "G"
+    item p "P" duration:3w
+    item q "Q" duration:1w after:x
+`;
+
+/** The same, with a lane-level parallel after `a` in place of the item. */
+const parallelSource = (xWeeks: number): string => `nowline v1
+
+roadmap r "R" start:2026-01-05 calendar:full scale:1w
+
+swimlane r "Refs"
+  item x "X" duration:${xWeeks}w
+
+swimlane s "Subject"
+  item a "A" duration:3w
+  parallel pp after:x
+    item t1 "T1" duration:1w
+    item t2 "T2" duration:2w
+`;
+
 describe('after: on a lane child honours the lane cursor', () => {
     it('item: x ends before the previous item, so b starts at a’s end', async () => {
         const { chart, schedule } = await weeksOf(itemSource(1));
@@ -128,5 +157,33 @@ swimlane s "Subject"
         const { chart, schedule } = await weeksOf(groupSource(5));
         expect(chart.g1).toEqual([5, 6]);
         expect(schedule.g1).toEqual([5, 6]);
+    });
+
+    it('group child: x ends before the previous item, so q starts at p’s end', async () => {
+        const { chart, schedule } = await weeksOf(groupChildSource(1));
+        expect(chart.p).toEqual([0, 3]);
+        expect(chart.q).toEqual([3, 4]);
+        expect(schedule.q).toEqual([3, 4]);
+    });
+
+    it('group child: x ends after the previous item, so q starts at x’s end', async () => {
+        const { chart, schedule } = await weeksOf(groupChildSource(5));
+        expect(chart.q).toEqual([5, 6]);
+        expect(schedule.q).toEqual([5, 6]);
+    });
+
+    it('parallel: x ends before the previous item, so the parallel starts at a’s end', async () => {
+        const { chart, schedule } = await weeksOf(parallelSource(1));
+        expect(chart.t1).toEqual([3, 4]);
+        expect(chart.t2).toEqual([3, 5]);
+        expect(schedule.t1).toEqual([3, 4]);
+        expect(schedule.t2).toEqual([3, 5]);
+    });
+
+    it('parallel: x ends after the previous item, so the parallel starts at x’s end', async () => {
+        const { chart, schedule } = await weeksOf(parallelSource(5));
+        expect(chart.t1).toEqual([5, 6]);
+        expect(schedule.t2).toEqual([5, 7]);
+        expect(chart.t2).toEqual([5, 7]);
     });
 });

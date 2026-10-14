@@ -292,9 +292,56 @@ function resolveAssetRoot(
     ctx: ResolveContext,
     rcAssetRoot: string | undefined,
 ): string | undefined {
-    if (nonEmpty(ctx.settings.assetRoot)) return ctx.settings.assetRoot;
+    return pickAssetRoot(ctx.settings.assetRoot, rcAssetRoot, ctx.rcPath);
+}
+
+function pickAssetRoot(
+    settingAssetRoot: string,
+    rcAssetRoot: string | undefined,
+    rcPath: string | undefined,
+): string | undefined {
+    if (nonEmpty(settingAssetRoot)) return settingAssetRoot;
     if (rcAssetRoot === undefined) return undefined;
-    return ctx.rcPath ? path.resolve(path.dirname(ctx.rcPath), rcAssetRoot) : rcAssetRoot;
+    return rcPath ? path.resolve(path.dirname(rcPath), rcAssetRoot) : rcAssetRoot;
+}
+
+const ASSET_ROOT_ONLY = { assetRoot: ASSET_ROOT_SPEC };
+
+/**
+ * The asset root an export uses, by the preview's chain: the
+ * `nowline.preview.assetRoot` setting, else the rc `assetRoot` (relative to
+ * that file), else `undefined` for the source file's directory. Sharing it
+ * means a logo the preview finds is found by every export path too.
+ */
+export function resolveExportAssetRoot(
+    settingAssetRoot: string,
+    rc: NowlineRc,
+    rcPath: string | undefined,
+): string | undefined {
+    const { values } = resolveOptions(ASSET_ROOT_ONLY, [rcLayer(rc, ASSET_ROOT_ONLY)]);
+    return pickAssetRoot(settingAssetRoot, values.assetRoot, rcPath);
+}
+
+const EXPORT_WIDTH_SETTING = 'nowline.export.width';
+const WIDTH_ONLY = { width: SURFACE_OPTION_SPECS.width };
+
+/**
+ * The `nowline.export.width` setting through the shared width rule
+ * (specs/surface-options.md §7, decision 4), so the in-process and CLI export
+ * paths accept the same values. `0` is the setting's "unset": the canvas fits
+ * its content. Any other value the rule rejects throws, naming the setting.
+ */
+export function resolveExportWidth(setting: number): number | undefined {
+    if (setting === 0) return undefined;
+    const { values, errors } = resolveOptions(WIDTH_ONLY, [
+        {
+            source: () => ({ kind: 'setting', name: EXPORT_WIDTH_SETTING }),
+            values: { width: setting },
+        },
+    ]);
+    const [error] = errors;
+    if (error) throw new Error(`Invalid ${EXPORT_WIDTH_SETTING} "${setting}": ${error.detail}.`);
+    return values.width;
 }
 
 function nonEmpty(value: string | undefined): value is string {

@@ -55,6 +55,9 @@ export function parsePreviewFromArguments(
     args: Record<string, unknown> | undefined,
 ): PreviewPayload | undefined {
     if (!args || typeof args.source !== 'string') return undefined;
+    // A `timezone` without a `now` names a date only the server can resolve;
+    // wait for the result payload, which carries it.
+    if (typeof args.timezone === 'string' && typeof args.now !== 'string') return undefined;
     return {
         source: args.source,
         theme: typeof args.theme === 'string' ? args.theme : undefined,

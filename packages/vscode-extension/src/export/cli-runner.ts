@@ -3,6 +3,7 @@ import { promises as fs } from 'node:fs';
 import * as path from 'node:path';
 import type { NonWorkingDisplay, ThemeName } from '@nowline/layout';
 import * as vscode from 'vscode';
+import { resolveExportWidth } from '../preview/option-resolver.js';
 import { type ExportFormat, exportInProcess } from './in-process.js';
 
 /** Snapshot of `nowline.export.*` settings; resolved by extension.ts. */
@@ -57,6 +58,11 @@ export interface RunExportArgs {
      * `default roadmap non-working:` key.
      */
     nonWorking?: NonWorkingDisplay;
+    /**
+     * Resolved asset root (`resolveExportAssetRoot`): the directory logo and
+     * image assets load from. `undefined` uses the source file's directory.
+     */
+    assetRoot?: string;
 }
 
 /**
@@ -144,9 +150,28 @@ const EXPORT_TARGETS: ExportTarget[] = [
  * See `specs/ide.md` § Export to other formats.
  */
 export async function runExportCommand(args: RunExportArgs): Promise<void> {
-    const { sourceUri, settings, outputChannel, theme, today, locale, showLinks, nonWorking } =
-        args;
+    const {
+        sourceUri,
+        settings,
+        outputChannel,
+        theme,
+        today,
+        locale,
+        showLinks,
+        nonWorking,
+        assetRoot,
+    } = args;
     const noLinks = showLinks === undefined ? undefined : !showLinks;
+
+    // Reject a bad width before any prompt, the same way on both export paths.
+    try {
+        resolveExportWidth(settings.width);
+    } catch (err) {
+        void vscode.window.showErrorMessage(
+            `Nowline: ${err instanceof Error ? err.message : String(err)}`,
+        );
+        return;
+    }
 
     const target = await pickExportTarget();
     if (!target) return;
@@ -175,6 +200,7 @@ export async function runExportCommand(args: RunExportArgs): Promise<void> {
             locale,
             noLinks,
             nonWorking,
+            assetRoot,
         });
         outputChannel.appendLine(`$ ${quote(cliPath)} ${cliArgs.map(quote).join(' ')}`);
         try {
@@ -203,6 +229,7 @@ export async function runExportCommand(args: RunExportArgs): Promise<void> {
                     locale,
                     noLinks,
                     nonWorking,
+                    assetRoot,
                 },
             );
             const bytes = result.isBinary
@@ -286,9 +313,10 @@ function buildCliArgs(
         locale?: string;
         noLinks?: boolean;
         nonWorking?: NonWorkingDisplay;
+        assetRoot?: string;
     } = {},
 ): string[] {
-    const { theme, today, locale, noLinks, nonWorking } = overrides;
+    const { theme, today, locale, noLinks, nonWorking, assetRoot } = overrides;
     const args: string[] = [sourcePath, '-f', target.format, '-o', destPath];
     if (theme) args.push('--theme', theme);
     // `null`  → suppress the now-line (CLI: `--now -`)
@@ -309,7 +337,9 @@ function buildCliArgs(
     if (nonWorking) args.push('--non-working', nonWorking);
     // Width cap (deliberate export setting; not preview-coupled). `0`/unset
     // omits the flag so the CLI fits the canvas to its content.
-    if (settings.width > 0) args.push('--width', String(settings.width));
+    const width = resolveExportWidth(settings.width);
+    if (width !== undefined) args.push('--width', String(width));
+    if (assetRoot) args.push('--asset-root', assetRoot);
 
     if (target.format === 'pdf') {
         args.push('--page-size', settings.pdfPageSize);

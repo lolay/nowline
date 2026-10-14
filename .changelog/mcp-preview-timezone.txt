@@ -1,0 +1,3 @@
+```release-note:fixed
+The MCP `render` tool's interactive preview draws the now-line on the date the `timezone` argument resolves to when `now` is omitted, matching the returned image, instead of on the viewer's own date.
+```

@@ -14,9 +14,8 @@
 //      Recursively places children inside this call.
 //
 // `place` may invoke `measure` again — implementations should make
-// `measure` cheap. The production nodes (`ItemNode`, `SwimlaneNode`,
-// etc. under `nodes/`) follow this pattern: place re-measures, but
-// measure is O(content) without I/O.
+// `measure` cheap: O(content), without I/O. Of the production nodes
+// only `ItemNode` implements the interface (below).
 //
 // Which nodes measure (specs/layout-phases.md, §3.6 and §3.7):
 //
