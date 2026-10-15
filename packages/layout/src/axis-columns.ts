@@ -4,9 +4,9 @@
 // would run past the axis end is capped one full column past it (past the
 // end of a partial last column, when an explicit `length:` ends the axis
 // mid-column): the item measure truncates the title to `captionCapX`, and
-// finalize step f2 (`extendTimeline`) grows the axis by that one column and
-// always labels it. Both read the same columns, so the cap and the
-// extension agree.
+// finalize step f2 (`extendTimeline`) grows the axis by that one column,
+// labelled by the axis's usual rules. Both read the same columns, so the
+// cap and the extension agree.
 
 import type { TimeScale } from './time-scale.js';
 import { type ScaleUnit, tickBoundaryAtOrAfter } from './view-preset.js';

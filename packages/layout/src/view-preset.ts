@@ -258,20 +258,6 @@ function nextWeekStart(date: Date, windowStart: Date, weekStart: number | undefi
     return weekStartAtOrAfter(addDays(date, 1), windowStart, weekStart);
 }
 
-/** Options for `buildHeaderTicks`. */
-export interface HeaderTickOptions {
-    /**
-     * Always label the last column: its opening tick is major (so its grid
-     * line draws) and carries its date label, whatever `labelEvery`, the
-     * default thinning or the narrow-column rules would do. Set by finalize
-     * f2 for the column the caption cap adds (specs/rendering.md § "Caption
-     * cap at the chart's end"). When the axis would have left that label
-     * out, a label before it whose text the forced label would overlap is
-     * dropped; its tick and grid line stay.
-     */
-    labelsLastColumn?: boolean;
-}
-
 /**
  * Build header ticks for the chart. The last tick is rendered (so the
  * chart has a closing edge) but its label is suppressed because there's
@@ -288,33 +274,13 @@ export function buildHeaderTicks(
     preset: ViewPreset,
     calendar: WorkingCalendar,
     locale: string = DEFAULT_LOCALE,
-    options: HeaderTickOptions = {},
 ): PositionedTick[] {
-    const build = (forcesLast: boolean): PositionedTick[] => {
-        if (scale.calendar?.hasNonWorkingDays) {
-            return buildHiddenDayTicks(scale, preset, scale.calendar, locale, forcesLast);
-        }
-        if (isCalendarAligned(preset.unit)) {
-            return buildCalendarAlignedTicks(scale, preset, preset.unit, locale, forcesLast);
-        }
-        return buildFixedStrideTicks(scale, preset, calendar, locale, forcesLast);
-    };
-    const ticks = build(false);
-    // A last column the axis labels anyway keeps the axis as it is.
-    if (options.labelsLastColumn !== true || ticks.at(-2)?.label !== undefined) return ticks;
-    const forced = build(true);
-    dropLabelsOverlappingLastColumn(forced);
-    return forced;
-}
-
-/** Day and week ticks without non-working days: a fixed stride from the origin. */
-function buildFixedStrideTicks(
-    scale: TimeScale,
-    preset: ViewPreset,
-    calendar: WorkingCalendar,
-    locale: string,
-    forcesLast: boolean,
-): PositionedTick[] {
+    if (scale.calendar?.hasNonWorkingDays) {
+        return buildHiddenDayTicks(scale, preset, scale.calendar, locale);
+    }
+    if (isCalendarAligned(preset.unit)) {
+        return buildCalendarAlignedTicks(scale, preset, preset.unit, locale);
+    }
     const dayPerTick = calendar.daysPerUnit(preset.unit);
     const stridePx = dayPerTick * scale.pixelsPerDay;
     const totalDays = Math.max(1, Math.round(scale.widthPx / scale.pixelsPerDay));
@@ -323,8 +289,8 @@ function buildFixedStrideTicks(
     for (let i = 0; i < tickCount; i++) {
         const days = i * dayPerTick;
         const x = scale.originX + days * scale.pixelsPerDay;
+        const isMajor = i % preset.labelEvery === 0;
         const isLast = i === tickCount - 1;
-        const isMajor = i % preset.labelEvery === 0 || (forcesLast && i === tickCount - 2);
         ticks.push({
             x,
             labelX: isLast ? undefined : x + stridePx / 2,
@@ -336,28 +302,6 @@ function buildFixedStrideTicks(
         });
     }
     return ticks;
-}
-
-/**
- * The forced label of the last column (`HeaderTickOptions.labelsLastColumn`)
- * wins over a label before it: walking left from it, every label whose
- * text would overlap the forced label's text is dropped, its tick and grid
- * line kept. Only a label the axis would otherwise have left out is forced,
- * so this never touches an axis whose labels already sit side by side.
- */
-function dropLabelsOverlappingLastColumn(ticks: PositionedTick[]): void {
-    const last = ticks.length - 2;
-    const forced = ticks[last];
-    if (forced?.label === undefined || forced.labelX === undefined) return;
-    const forcedLeftX =
-        forced.labelX - estimateTextWidth(forced.label, TIMELINE_TICK_LABEL_FONT_SIZE_PX) / 2;
-    for (let i = last - 1; i >= 0; i--) {
-        const tick = ticks[i];
-        if (tick.label === undefined || tick.labelX === undefined) continue;
-        const halfLabel = estimateTextWidth(tick.label, TIMELINE_TICK_LABEL_FONT_SIZE_PX) / 2;
-        if (tick.labelX + halfLabel <= forcedLeftX) return;
-        tick.label = undefined;
-    }
 }
 
 /**
@@ -394,7 +338,6 @@ function buildHiddenDayTicks(
     preset: ViewPreset,
     calendar: WorkingCalendar,
     locale: string,
-    forcesLast: boolean,
 ): PositionedTick[] {
     const { unit } = preset;
     const [start, end] = scale.domain;
@@ -432,15 +375,14 @@ function buildHiddenDayTicks(
 
     const columns: TickColumn[] = kept.map(({ date, x }, column) => {
         const columnPx = (column + 1 < kept.length ? kept[column + 1].x : endX) - x;
-        const isForced = forcesLast && column === kept.length - 1;
-        const major = isForced || isMajor(date, column);
+        const major = isMajor(date, column);
         const label = major ? formatTickLabel(unit, date, column, locale) : undefined;
         const labelPx =
             label === undefined ? 0 : estimateTextWidth(label, TIMELINE_TICK_LABEL_FONT_SIZE_PX);
         const isNarrowed = isCalendarAligned(unit)
             ? column === 0 || column === kept.length - 1
             : columnPx < fullUnitPx - NARROW_COLUMN_TOLERANCE_PX;
-        const isShown = label !== undefined && (isForced || !(labelPx > columnPx && isNarrowed));
+        const isShown = label !== undefined && !(labelPx > columnPx && isNarrowed);
         return { x, columnPx, major, label, labelPx, isNarrowed, isShown };
     });
     if (!isCalendarAligned(unit)) restoreLabelsInNarrowRuns(columns);
@@ -684,7 +626,6 @@ function buildCalendarAlignedTicks(
     preset: ViewPreset,
     unit: CalendarAlignedUnit,
     locale: string,
-    forcesLast: boolean,
 ): PositionedTick[] {
     const [start, end] = scale.domain;
     const dates: Date[] = [start];
@@ -696,20 +637,17 @@ function buildCalendarAlignedTicks(
     const lastIndex = dates.length - 1;
     return dates.map((date, i) => {
         const x = xs[i];
-        const isForced = forcesLast && i === lastIndex - 1;
-        const isMajor = isForced || i % preset.labelEvery === 0;
+        const isMajor = i % preset.labelEvery === 0;
         if (i === lastIndex) return { x, labelX: undefined, major: isMajor, label: undefined };
         const columnPx = xs[i + 1] - x;
         let label = isMajor ? formatTickLabel(unit, date, i, locale) : undefined;
         // A partial edge column can be a sliver (a roadmap starting Mar
         // 29, or `length:` ending just past a month start). Its centered
         // label would spill past the chart edge, so drop the label when
-        // it doesn't fit; the tick and grid line stay. A forced last
-        // column is a full unit and keeps its label.
+        // it doesn't fit; the tick and grid line stay.
         const isEdgeColumn = i === 0 || i === lastIndex - 1;
         if (
             label !== undefined &&
-            !isForced &&
             isEdgeColumn &&
             estimateTextWidth(label, TIMELINE_TICK_LABEL_FONT_SIZE_PX) > columnPx
         ) {

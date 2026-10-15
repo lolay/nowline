@@ -528,9 +528,9 @@ function growCanvasForSpill(fx: FinalizeContext): boolean {
  * CONTENT BOX edge — leaf item bars (never a spilled caption, see
  * `maxLeafItemRightX`) and marker diamonds — and grow the window to the
  * next tick boundary when content overflows it. A spilled caption past
- * that end grows it by one more full column at most, always labelled: the
- * item measure capped the caption to end inside it
- * (`AxisColumns.captionCapX`). This is driven
+ * that end grows it by one more full column at most, labelled by the
+ * same rules as any other column: the item measure capped the caption to
+ * end inside it (`AxisColumns.captionCapX`). This is driven
  * purely by boxes, never by `today`, so the `length:`-as-minimum and
  * now-line boundary behaviour is unaffected. Origin and pixels per day
  * stay, so every placed x stays valid.
@@ -562,27 +562,28 @@ function extendTimeline(fx: FinalizeContext): boolean {
             ? tickBoundaryAtOrAfter(startDate, overflowDays, scale.unit, tickDays, calendar)
             : 0;
     // A spilled caption past the axis end grows it by one column, the one
-    // the item measure capped the caption to, so that column's tick, grid
-    // line and date label draw (specs/scheduler-unification.md §8 decision
-    // 12). Under an explicit `length:` that ends mid-column the column is
-    // the full one after the partial last column. A caption the cap could
-    // not bring inside (its meta line is never truncated) still grows the
-    // axis by that one column only.
+    // the item measure capped the caption to; `label-every`, the default
+    // thinning and the narrow-column rules label it like any other column
+    // (specs/scheduler-unification.md §8 decision 12). Under an explicit
+    // `length:` that ends mid-column the column is the full one after the
+    // partial last column. A caption the cap could not bring inside (its
+    // meta line is never truncated) still grows the axis by that one column
+    // only.
     let captionRightX = maxSpilledCaptionRightX(swimlanes);
     for (const inc of includes) {
         captionRightX = Math.max(captionRightX, maxSpilledCaptionRightX(inc.nestedSwimlanes));
     }
-    let labelsLastColumn = false;
     if (captionRightX > 0) {
         const columns = new AxisColumns(fx.window, fx.scale);
         const axisDays = Math.max(spanDays, paddedDays);
         if (columns.isPast(captionRightX, axisDays)) {
-            const column = columns.captionColumn(axisDays);
-            const captionDays = Math.min(columns.boundaryAtOrAfterX(captionRightX), column.end);
-            paddedDays = Math.max(paddedDays, captionDays);
-            // The caption reaches into the added column, which closes the
-            // axis: label it even where thinning would skip it.
-            labelsLastColumn = captionDays > column.start;
+            paddedDays = Math.max(
+                paddedDays,
+                Math.min(
+                    columns.boundaryAtOrAfterX(captionRightX),
+                    columns.captionColumn(axisDays).end,
+                ),
+            );
         }
     }
     let extended = false;
@@ -600,9 +601,7 @@ function extendTimeline(fx: FinalizeContext): boolean {
         fx.extendScale(extendedScale);
         timeline.endDate = extendedEndDate;
         timeline.box.width = extendedWidth;
-        timeline.ticks = buildHeaderTicks(extendedScale, scale, calendar, fx.scope.locale, {
-            labelsLastColumn,
-        });
+        timeline.ticks = buildHeaderTicks(extendedScale, scale, calendar, fx.scope.locale);
         setCalendarRuns(timeline, extendedScale, scale.unit);
         fx.canvas.grow(originX + extendedWidth + GUTTER_PX);
         extended = true;

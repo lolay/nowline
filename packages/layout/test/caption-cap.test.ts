@@ -1,9 +1,9 @@
 // The caption cap at the chart's end (specs/rendering.md § "Caption cap at
 // the chart's end", specs/scheduler-unification.md §8 decision 12). A spilled
 // caption that would run past the axis end is truncated with `…` to end
-// within one column past it, the axis grows by exactly that column with its
-// tick and date label, and the item keeps its full title for the renderer's
-// tooltip. A caption in the middle of the chart is unchanged.
+// within one column past it, the axis grows by exactly that column (labelled
+// by the axis's usual rules), and the item keeps its full title for the
+// renderer's tooltip. A caption in the middle of the chart is unchanged.
 
 import { describe, expect, it } from 'vitest';
 import { layoutRoadmap, type PositionedItem, type PositionedRoadmap } from '../src/index.js';
@@ -145,7 +145,7 @@ describe('a caption past the axis end (F7)', () => {
     });
 });
 
-describe('the column the caption cap adds is always labelled (F7)', () => {
+describe('the column the caption cap adds follows the axis labelling rules (F7)', () => {
     /** `[x from origin, major, label]` of every tick. */
     const majorsOf = (model: PositionedRoadmap): Array<[number, boolean, string | undefined]> =>
         model.timeline.ticks.map((t) => [
@@ -154,19 +154,27 @@ describe('the column the caption cap adds is always labelled (F7)', () => {
             t.label,
         ]);
 
-    /** No `scale:`, so weeks with the default thinning: every fourth column. */
-    const thinned = (config = ''): string =>
+    /**
+     * No `scale:`, so weeks with the default thinning (every fourth column)
+     * unless `config` sets `label-every`. `a1` runs `weeks` weeks, then `z`
+     * one week: the axis ends after `weeks + 1` columns and the caption cap
+     * adds column `weeks + 1` (zero-based).
+     */
+    const thinned = (weeks: number, config = ''): string =>
         `nowline v1
 
 ${config}roadmap r "R" start:2026-01-05 calendar:full
 
 swimlane a "A"
-  item a1 "A1" duration:4w
+  item a1 "A1" duration:${weeks}w
   item z "${LONG}" duration:1w
 `;
 
-    it('under the default thinning, the added column gets its tick, grid line and date label', async () => {
-        const model = await lay(thinned());
+    const EVERY_3 = 'config\n\nscale\n  label-every: 3\n\n';
+
+    it('under the default thinning, an added column the thinning labels is labelled', async () => {
+        // The added column is the fifth (Feb 02): every fourth from Jan 05.
+        const model = await lay(thinned(3));
         expect(item(model, 'z').titleTruncated).toBe(true);
         expect(majorsOf(model)).toEqual([
             [0, true, 'Jan 05'],
@@ -174,45 +182,101 @@ swimlane a "A"
             [80, false, undefined],
             [120, false, undefined],
             [160, true, 'Feb 02'],
-            [200, true, 'Feb 09'],
+            [200, false, undefined],
+        ]);
+    });
+
+    it('under the default thinning, an added column the thinning skips has no label and no grid line', async () => {
+        // The added column is the sixth (Feb 09), between Feb 02 and Mar 02.
+        const model = await lay(thinned(4));
+        expect(item(model, 'z').titleTruncated).toBe(true);
+        expect(iso(model.timeline.endDate)).toBe('2026-02-16');
+        expect(majorsOf(model)).toEqual([
+            [0, true, 'Jan 05'],
+            [40, false, undefined],
+            [80, false, undefined],
+            [120, false, undefined],
+            [160, true, 'Feb 02'],
+            [200, false, undefined],
             [240, false, undefined],
         ]);
     });
 
-    it('under label-every, the added column gets its tick, grid line and date label', async () => {
-        const model = await lay(thinned('config\n\nscale\n  label-every: 3\n\n'));
+    it('under label-every: 3, an added column the stride labels is labelled', async () => {
+        // The added column is the seventh (Feb 16): Jan 05, Jan 26, Feb 16.
+        const model = await lay(thinned(5, EVERY_3));
+        expect(item(model, 'z').titleTruncated).toBe(true);
         expect(majorsOf(model)).toEqual([
             [0, true, 'Jan 05'],
             [40, false, undefined],
             [80, false, undefined],
             [120, true, 'Jan 26'],
             [160, false, undefined],
-            [200, true, 'Feb 09'],
+            [200, false, undefined],
+            [240, true, 'Feb 16'],
+            [280, false, undefined],
+        ]);
+    });
+
+    it('under label-every: 3, an added column the stride skips has no label and no grid line', async () => {
+        // The added column is the sixth (Feb 09): unlabelled, like any
+        // column between two labels three apart.
+        const model = await lay(thinned(4, EVERY_3));
+        expect(item(model, 'z').titleTruncated).toBe(true);
+        expect(iso(model.timeline.endDate)).toBe('2026-02-16');
+        expect(majorsOf(model)).toEqual([
+            [0, true, 'Jan 05'],
+            [40, false, undefined],
+            [80, false, undefined],
+            [120, true, 'Jan 26'],
+            [160, false, undefined],
+            [200, false, undefined],
             [240, true, undefined],
         ]);
     });
 
-    it('at the months scale, a thinned added month is labelled', async () => {
-        const model = await lay(
-            `nowline v1
+    /** Months from Jan 1: `a1` runs `days` days, then `z` 28 days. */
+    const months = (days: number): string =>
+        `nowline v1
 
 roadmap r "R" start:2026-01-01 calendar:full scale:months
 
 swimlane a "A"
-  item a1 "A1" duration:30d
+  item a1 "A1" duration:${days}d
   item z "${LONG}" duration:28d
-`,
-        );
+`;
+
+    it('on a thinned months axis, an added month the thinning skips has no label', async () => {
+        // The added column is March, between the Jan and Apr labels.
+        const model = await lay(months(30));
+        expect(item(model, 'z').titleTruncated).toBe(true);
+        expect(iso(model.timeline.endDate)).toBe('2026-04-01');
         const ticks = majorsOf(model);
-        expect(ticks.map(([, , label]) => label)).toEqual(['Jan', undefined, 'Mar', undefined]);
+        expect(ticks.map(([, , label]) => label)).toEqual(['Jan', undefined, undefined, undefined]);
+        expect(ticks.at(-2)?.[1]).toBe(false);
+    });
+
+    it('on a thinned months axis, an added month the thinning labels is labelled', async () => {
+        // The added column is April, the next label after Jan.
+        const model = await lay(months(60));
+        expect(item(model, 'z').titleTruncated).toBe(true);
+        expect(iso(model.timeline.endDate)).toBe('2026-05-01');
+        const ticks = majorsOf(model);
+        expect(ticks.map(([, , label]) => label)).toEqual([
+            'Jan',
+            undefined,
+            undefined,
+            'Apr',
+            undefined,
+        ]);
         expect(ticks.at(-2)?.[1]).toBe(true);
     });
 
-    it('under hide, a narrow added column is labelled and a label it would overlap is dropped', async () => {
+    it('under hide, a narrow added column drops its label like any narrow column', async () => {
         // A business week is 40 px under hide. The added column is the week
         // of Feb 2, where only Fri Feb 6 works: 8 px, too narrow for its
-        // label, which the narrow-column rule alone would drop. Forced, it
-        // overlaps the Jan 26 label, which gives way; that tick stays major.
+        // label, so the narrow-column rule drops it. Its tick stays major
+        // and the Jan 26 label before it stays.
         const model = await lay(
             `nowline v1
 
@@ -231,8 +295,8 @@ swimlane a "A"
             [0, true, 'Jan 05'],
             [40, true, 'Jan 12'],
             [80, true, 'Jan 19'],
-            [120, true, undefined],
-            [160, true, 'Feb 02'],
+            [120, true, 'Jan 26'],
+            [160, true, undefined],
             [168, true, undefined],
         ]);
     });
