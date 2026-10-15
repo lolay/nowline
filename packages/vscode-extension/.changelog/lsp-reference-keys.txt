@@ -1,0 +1,3 @@
+```release-note:fixed
+`depends:` and `team:` no longer offer id completions, go-to-definition or rename. Neither is a Nowline property; both draw an unknown-property warning.
+```

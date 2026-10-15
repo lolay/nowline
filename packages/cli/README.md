@@ -123,7 +123,7 @@ nowline roadmap.nowline --headless               # bundled DejaVu fonts (determi
 | `--font-sans <path\|alias>` | platform-resolved | png, pdf | TTF/OTF path, or alias `sf`, `helvetica`, `dejavu`, etc. |
 | `--font-mono <path\|alias>` | platform-resolved | png, pdf | TTF/OTF path or alias for monospace. |
 | `--headless`               | (off)        | png, pdf   | Skip platform font probe; use bundled DejaVu pair. Byte-stable across machines. |
-| `--start YYYY-MM-DD`       | `today`       | msproj    | Anchor date for relative-only roadmaps. |
+| `--start YYYY-MM-DD`       | `start:`, else today | msproj    | Project start date. Defaults to the roadmap's `start:`, else the `--now` date. |
 
 ### Serve options
 

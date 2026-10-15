@@ -18,7 +18,7 @@ import {
  * text) for cross-references, so Langium's default cross-ref-aware provider
  * has nothing to follow. We walk the AST instead: when the cursor sits on a
  * value of a reference property (`after:`, `before:`, `owner:`, `on:`,
- * `depends:[]`), look up the target id in the file-level entity index and
+ * `labels:[]`, ...), look up the target id in the file-level entity index and
  * return its declaration site.
  */
 export class NowlineDefinitionProvider implements DefinitionProvider {

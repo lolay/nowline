@@ -1,0 +1,3 @@
+```release-note:fixed
+MS Project export writes the roadmap's `start:` as the project start date when `nowline.export.msproj.start` is empty, instead of today, so the project start matches its tasks. The setting still overrides it.
+```
