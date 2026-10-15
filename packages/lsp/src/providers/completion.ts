@@ -11,12 +11,16 @@ import {
     BUILTIN_CAPACITY_ICONS,
     BUILTIN_ICON_NAMES,
     BUILTIN_STATUSES,
+    CALENDAR_MODES,
+    COLOR_NAMES,
     collectNamedEntities,
     entityKind,
     fileFromDocument,
+    INCLUDE_MODES,
     type NamedEntity,
     NON_WORKING_DISPLAYS,
     REFERENCE_PROP_KEYS,
+    STYLE_PROP_ENUMS,
     WEEKDAY_NAMES,
 } from '../references/ast-utils.js';
 
@@ -42,6 +46,12 @@ const REF_KEY_TO_KINDS: Record<string, ReadonlySet<string>> = {
     wave: new Set(['wave']),
 };
 
+/** Style keys whose value is a colour (the validator's `isColorValue` keys). */
+const COLOR_KEYS: ReadonlySet<string> = new Set(['bg', 'fg', 'text']);
+
+/** Keys on an `include` line; both take an include mode. */
+const INCLUDE_MODE_KEYS: ReadonlySet<string> = new Set(['config', 'roadmap']);
+
 /**
  * Custom completion provider. Defers to Langium's keyword + property-key
  * completion (free from the grammar) and adds:
@@ -55,6 +65,10 @@ const REF_KEY_TO_KINDS: Record<string, ReadonlySet<string>> = {
  *  - Icon / capacity-icon built-in vocabulary plus user-declared symbols.
  *  - Working-calendar values: the weekday names after `every:` and `hide` /
  *    `show` after the `non-working:` display key.
+ *  - Style values: each enumerated style key's values, and the built-in
+ *    colour names after `bg:`, `fg:` and `text:` (hex stays free-form).
+ *  - `calendar:` modes on the roadmap line and `config:` / `roadmap:` modes
+ *    on an `include` line.
  */
 export class NowlineCompletionProvider extends DefaultCompletionProvider {
     constructor(services: NowlineLspServices) {
@@ -85,56 +99,28 @@ export class NowlineCompletionProvider extends DefaultCompletionProvider {
         const file = fileFromDocument(context.document);
         if (!file) return;
 
-        if (hint.key === 'status') {
-            for (const status of BUILTIN_STATUSES) {
+        const offer = (values: readonly string[], detail: string): void => {
+            for (const value of values) {
                 acceptor(context, {
-                    label: status,
+                    label: value,
                     kind: CompletionItemKind.EnumMember,
-                    detail: 'built-in status',
-                    insertText: status,
+                    detail,
+                    insertText: value,
                 });
             }
+        };
+
+        if (hint.key === 'status') offer(BUILTIN_STATUSES, 'built-in status');
+        if (hint.key === 'every') offer(WEEKDAY_NAMES, 'weekday');
+        if (hint.key === 'non-working') offer(NON_WORKING_DISPLAYS, 'non-working display');
+        if (hint.key === 'icon') offer(BUILTIN_ICON_NAMES, 'built-in icon');
+        if (hint.key === 'capacity-icon') offer(BUILTIN_CAPACITY_ICONS, 'built-in capacity icon');
+        if (Object.hasOwn(STYLE_PROP_ENUMS, hint.key)) {
+            offer(STYLE_PROP_ENUMS[hint.key], `${hint.key} value`);
         }
-        if (hint.key === 'every') {
-            for (const day of WEEKDAY_NAMES) {
-                acceptor(context, {
-                    label: day,
-                    kind: CompletionItemKind.EnumMember,
-                    detail: 'weekday',
-                    insertText: day,
-                });
-            }
-        }
-        if (hint.key === 'non-working') {
-            for (const display of NON_WORKING_DISPLAYS) {
-                acceptor(context, {
-                    label: display,
-                    kind: CompletionItemKind.EnumMember,
-                    detail: 'non-working display',
-                    insertText: display,
-                });
-            }
-        }
-        if (hint.key === 'icon') {
-            for (const icon of BUILTIN_ICON_NAMES) {
-                acceptor(context, {
-                    label: icon,
-                    kind: CompletionItemKind.EnumMember,
-                    detail: 'built-in icon',
-                    insertText: icon,
-                });
-            }
-        }
-        if (hint.key === 'capacity-icon') {
-            for (const icon of BUILTIN_CAPACITY_ICONS) {
-                acceptor(context, {
-                    label: icon,
-                    kind: CompletionItemKind.EnumMember,
-                    detail: 'built-in capacity icon',
-                    insertText: icon,
-                });
-            }
-        }
+        if (COLOR_KEYS.has(hint.key)) offer(COLOR_NAMES, 'built-in color');
+        if (hint.key === 'calendar') offer(CALENDAR_MODES, 'calendar mode');
+        if (INCLUDE_MODE_KEYS.has(hint.key)) offer(INCLUDE_MODES, 'include mode');
 
         if (REFERENCE_PROP_KEYS.has(hint.key)) {
             const allowed = REF_KEY_TO_KINDS[hint.key];

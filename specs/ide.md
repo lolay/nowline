@@ -22,16 +22,20 @@ Ships in the OSS monorepo at `grammars/nowline.tmLanguage.json`.
 
 | Token | Scope | Example |
 |-------|-------|---------|
-| Keywords | `keyword.control.nowline` | `config`, `roadmap`, `include`, `person`, `team`, `anchor`, `swimlane`, `item`, `parallel`, `group`, `milestone`, `label`, `duration`, `status`, `wave`, `footnote`. `wave`, `non-working` and `working` are matched only at the start of a line (`^\s*(wave\|non-working\|working)(?![\w-])(?=\s)`), so `wave-1`, `non-working-team`, `item working`, `after:working`, and a style key such as `non-working:show` are not coloured as the keyword. |
+| Keywords | `keyword.control.nowline` | `config`, `roadmap`, `include`, `person`, `team`, `anchor`, `swimlane`, `item`, `parallel`, `group`, `milestone`, `label`, `status`, `wave`, `footnote`. `wave`, `non-working` and `working` are matched only at the start of a line (`^\s*(wave\|non-working\|working)(?![\w-])(?=\s)`), so `wave-1`, `non-working-team`, `item working`, `after:working`, and a style key such as `non-working:show` are not coloured as the keyword. |
 | Strings | `string.quoted.double.nowline` | `"Auth refactor"` |
-| Properties | `entity.other.attribute-name.nowline` | `status:`, `owner:`, `after:`, `before:`, `duration:`, `length:`, `remaining:`, `labels:`, `link:`, `style:`, `depends:`, `date:`, `on:`, `wave:`, `start:`, `end:`, `every:` |
-| Property values | `constant.other.nowline` | `done`, `in-progress`, `at-risk`, `blocked`, `planned`, `merge`, `ignore`, `isolate` |
-| Identifiers | `variable.other.nowline` | `auth-refactor`, `audit-log` |
-| Identifiers (references) | `entity.name.tag.nowline` | `sam`, `jen`, `platform` (in `owner:`, `on:`, `depends:`, `after:`, `before:`) |
+| Properties | `entity.other.attribute-name.nowline` | `status:`, `owner:`, `after:`, `before:`, `duration:`, `length:`, `remaining:`, `labels:`, `link:`, `style:`, `date:`, `on:`, `wave:`, `start:`, `end:`, `every:` |
+| Style properties | `entity.other.attribute-name.style.nowline` | `bg:`, `fg:`, `border:`, `shadow:`, `corner-radius:`, `non-working:` (every style key) |
+| Include-mode properties | `entity.other.attribute-name.include-mode.nowline` | `config:` and `roadmap:` when followed by an include mode |
+| Status values | `constant.language.status.nowline` | `planned`, `in-progress`, `active`, `done`, `completed`, `at-risk`, `blocked` |
+| Enum values | `constant.language.enum.nowline` | `solid`, `dashed`, `none`, `md`, `business`, `hide`, `show` (style enums, `calendar:` modes, `non-working:` displays) |
+| Include modes | `constant.language.include-mode.nowline` | `merge`, `ignore`, `isolate` after `config:` or `roadmap:` |
+| Identifiers | `variable.other.nowline` | `auth-refactor`, `audit-log`, and id references such as `sam` in `owner:sam` or `api` in `after:api` |
 | URLs | `markup.underline.link.nowline` | `https://github.com/acme/...` |
 | Comments | `comment.line.double-slash.nowline` | `// comment` |
-| Lists | `meta.structure.list.nowline` | `labels:[enterprise, security]`, `depends:[auth-refactor, audit-log]` |
+| Lists | `meta.structure.list.nowline` | `labels:[enterprise, security]`, `after:[auth-refactor, audit-log]` |
 | Dates | `constant.numeric.date.nowline` | `2026-06-01` |
+| Numbers | `constant.numeric.duration.nowline`, `constant.numeric.percentage.nowline`, `constant.numeric.color.nowline` | `2w`, `0.5d`, `60%`, `#3366ff` |
 
 ## LSP Server (m3)
 
@@ -41,7 +45,7 @@ Langium generates an LSP server from the grammar definition. The server runs as 
 
 | Feature | Description |
 |---------|-------------|
-| Autocomplete | Keyword completion (`swimlane`, `item`, `parallel`, `group`, `milestone`, `wave`, etc.), property name completion (`status:`, `owner:`, `duration:`, `wave:`, etc.), property value completion (`done`, `in-progress`, etc.), ID reference completion in `after:`, `before:`, `owner:`, `depends:[]`, `on:`, `labels:[]`. `wave:` completes the declared wave ids, and `after:`, `before:`, and `on:` also offer wave ids. In `config`, `non-working` and `working` complete as declaration keywords; `every:` completes the weekday names (`sun` to `sat`, also inside `every:[...]`), and `default roadmap non-working:` completes `hide` and `show`. |
+| Autocomplete | Keyword completion (`swimlane`, `item`, `parallel`, `group`, `milestone`, `wave`, etc.), property name completion (`status:`, `owner:`, `duration:`, `wave:`, etc.), property value completion (`done`, `in-progress`, etc.), ID reference completion in `after:`, `before:`, `on:`, `owner:`, `style:`, `size:`, `status:`, `labels:[]`, `icon:` and `capacity-icon:` (each offers only the kinds of entity that key takes). `wave:` completes the declared wave ids, and `after:`, `before:`, and `on:` also offer wave ids. In `config`, `non-working` and `working` complete as declaration keywords; `every:` completes the weekday names (`sun` to `sat`, also inside `every:[...]`), and `default roadmap non-working:` completes `hide` and `show`. In `style` blocks and on `default` lines, each enumerated style key completes its values (`border:` completes `solid`, `dashed`, `dotted`, and so on for `shadow`, `font`, `weight`, `italic`, `text-size`, `padding`, `spacing`, `header-height`, `corner-radius`, `bracket`, `header-position`, `timeline-position`, `minor-grid`), and `bg:`, `fg:` and `text:` complete the built-in color names (hex stays free-form). `calendar:` on the roadmap line completes `business`, `full`, `custom`; `config:` and `roadmap:` on an `include` line complete `merge`, `ignore`, `isolate`. Every closed value set is core's table (`value-tables.ts`), the one the validator checks against. |
 | Validation | Real-time error reporting — parse errors, unknown references, circular dependencies, invalid enum values |
 | Go-to-definition | Jump from `after:auth-refactor` to the item with `id:auth-refactor`; from `wave:build`, `after:build`, or `on:build` to `wave build` |
 | Find references | Find all usages of an `id` across the file |

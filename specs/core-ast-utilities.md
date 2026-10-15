@@ -271,7 +271,7 @@ export function parseIsoDate(raw: string | undefined): Date | null;
 export function isRealIsoDate(raw: string): boolean;
 ```
 
-and a `packages/core/src/language/value-tables.ts` with `BUILTIN_STATUSES`, `BUILTIN_CAPACITY_ICONS`, `BUILTIN_ICON_NAMES` and `NON_WORKING_DISPLAYS` (plus `WEEKDAYS` from §3.4). Layout re-exports `NON_WORKING_DISPLAYS` from core, so `@nowline/layout`'s public export and the MCP and browser code that import it are unchanged.
+and a `packages/core/src/language/value-tables.ts` with `BUILTIN_STATUSES`, `BUILTIN_CAPACITY_ICONS`, `BUILTIN_ICON_NAMES` and `NON_WORKING_DISPLAYS` (plus `WEEKDAYS` from §3.4). A follow-up moved the validator's `STYLE_PROP_ENUMS`, `COLOR_NAMES`, `CALENDAR_MODES` and `INCLUDE_MODES` here too, as readonly arrays the validator turns into sets, so the LSP can offer them as completions. Layout re-exports `NON_WORKING_DISPLAYS` from core, so `@nowline/layout`'s public export and the MCP and browser code that import it are unchanged.
 
 - Every listed copy (§1.5) imports these instead. Each keeps its current semantics; where two copies differ (`export-core`'s `getProp` returns the first list element, layout's `propValue` does not), the caller keeps its own function. `export-core`'s `getProp`, `getProps` and `hasProp` also compare keys with `===` and never strip a `:`, which `findProp` would change, so they keep their own lookup.
 - `printer.ts` keeps its strip: it formats hand-written JSON whose keys may end in `:`. It uses `propKey`.
