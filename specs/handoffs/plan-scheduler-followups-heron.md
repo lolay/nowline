@@ -1,0 +1,143 @@
+```text
+--- KICKOFF: begin orchestration at [deep] ---
+
+  Status: 0/6 groups done | last review: — | current: nowline m1 s1 [exec] | BLOCKED at gate mode | updated 2026-10-15
+
+  mode: pending | proposed unattended (harness=claude-code runner=cloud; CLAUDE_CODE_REMOTE=true, assigned branch) | guard 3x min $50 | fixups 2
+
+  review: every-wave (log-only)
+
+  Next model
+    Cursor:      claude-opus-5-5[effort=high]
+    Claude Code: /model opus                (/effort high)
+
+  Prompt to paste into the next chat:
+    In lolay/nowline, read specs/handoffs/plan-scheduler-followups-heron.md. The plan is already tagged.
+    On branch claude/friendly-babbage-qlcz6d (task branch): subagents commit each finished step.
+    Run the personal-plan-orchestrate skill from the top: walk to
+    each tier boundary, dispatch subagents per the skill's
+    procedure, and pause only where the recorded mode stops. Do not
+    execute plan work inline. Update plan progress after each wave
+    returns per the skill's procedure. The mode line above is the
+    kickoff answer. If the Status line shows BLOCKED, re-post that
+    question and wait; otherwise record the mode, print the kickoff
+    summary and begin dispatching.
+
+---
+```
+
+**Cost (API-equiv, Claude Code models)**
+
+| wave | expected tokens | expected $ |
+|---|---|---|
+| 1 [exec] m1 s1 | ~1.3M | ~$0.65 |
+| 2 [deep] m1 s2, m2 s1-s4, m3 s1-s2, m4 s1 | ~36M | ~$19 |
+| 3 [exec] m4 s2-s3 | ~2.7M | ~$1.1 |
+| orchestrator | ~12M | ~$9.9 |
+| **Total** | ~52M | ~$31 |
+
+Expected values are estimates, good to about 2-3× per wave. Wave 2 runs as four units (one per milestone), each with its own review; its steps are priced at Opus 5.5 high with the 1.35× base-context factor (m1.s2, m3.s2 and m4.s1 large, the rest medium). The orchestrator row is the kickoff, six units of bookkeeping, one wait (the kickoff answer) and one resume after `/compact`.
+
+# m4.11 follow-ups F2-F8: finish scheduler unification
+
+## Context
+
+m4.11 (scheduler unification, R1) landed m1-m3 and F1; F2-F5 are open in `specs/scheduler-unification.md` §5 (F5 arrived with #159, on main at `5da7d2a`). The pixel layout (engine A) and the exporters' scheduler (engine C, `scheduleRoadmap`) still disagree on 16 non-region register entries and 50 `nested` region entries in `packages/layout/test/engine-divergences.json`. Scratch prototypes (before/after images shown to Gary) confirmed each F2/F3 fix reproduces C's dates.
+
+Decisions taken in the planning session (Gary, 2026-10-15), recorded in spec §8 by m1.s1:
+
+5. **F2, divergence (e):** the chart honours `after:` on a group inside a parallel (A adopts C; matches dsl.md's block `after:` row and F1).
+6. **F3 (b), minimum bar width:** out of the lane cursor. The cursor advances by the duration; the bar keeps its minimum width; the row packer keeps the painted footprint, so a following bar drops a row instead of drifting. The clamped bar's own drawn width is presentation: its register entry stays, citing this decision. Following items' (b) entries go.
+7. **F3 (c), group caption spill:** out of the lane cursor. The lane cursor takes the group's compact end; the packer keeps the painted box, so a following item drops below the caption at its true date.
+8. **F3 (d), track tail gutter:** out of the lane cursor and the parallel's box (showcase Ship to day 40).
+9. **F3 (f), monotone cursor:** the lane never moves back in time (Gary: "after the latest end"; no item splitting, which `principles.md` excludes as resource levelling). Resolved by construction by F8: without item pins nothing moves either engine's cursor back, so no code change of its own.
+10. **F8, item `date:` / `start:` pins: removed, items only.** Never in the DSL (`waves.md` calls it "the undocumented fixed-start pin"); a Gantt "must start on" constraint that breaks Design Rule 6. `after:<date>` covers "not before". Roadmap `start:`, anchor and milestone `date:`, calendar declarations unchanged. Also removes A honouring a pin on a group or parallel (the validator already warned, C ignored it). The specs say pinning is not supported: it starts to require resource-level splits and conflicts with the principles; it may be revisited in the future.
+11. **F6, status dot:** inside a bar only when it has equal air both sides: bar width ≥ 24 px (2 × `ITEM_STATUS_DOT_INSET_RIGHT_PX`), else it spills outside.
+12. **F7, caption cap at the chart's end only:** a caption that would run past the axis end truncates with `…` to end within one extra column; the axis grows by that column with its date label; the full title stays as the bar's `<title>` tooltip. Mid-chart captions unchanged.
+13. **Placement:** F6 and F7 are m4.11 follow-ups in this plan (spec §5 rows), not a new milestone.
+
+F4 is planned: with F2, F5 and F8, C is a lower bound of A everywhere ((b), (c), (d) only ever make A later; F8 removes the pin-before-start case and a pin past a `length:` window).
+
+Branch: `claude/friendly-babbage-qlcz6d` (harness-assigned task branch, fast-forwarded to `origin/main` `5da7d2a` at kickoff). The milestones below are plan-local, unrelated to the spec's migration m1-m3. Each milestone's first step merges `origin/main` first and resolves conflicts per `.claude/skills/steward/SKILL.md` (m4.14 F2/F3 also touch `packages/layout`).
+
+## Rules every output-changing step follows
+
+- **G1** (spec §4) with base = the step's `from` commit: render every `examples/**.nowline` and `tests/*.nowline` in light, dark and grayscale with `--now 2026-02-09`, then `diff -r`. The diff must equal the step's declared sample list; anything else is a defect. Keep the script in `.scratch/g1.sh` (gitignored) and the base checkout in a worktree under `.scratch/`.
+- **G2:** `make pre-commit` green. Snapshot bumps (`UPDATE_LAYOUT_SNAPSHOTS=1`) only for the declared samples. **G3**, where exporters could move: xlsx, msproj and mermaid bytes per sample, and `make determinism`; golden bumps only for declared cells.
+- The commit body names every changed sample, snapshot file and determinism cell, and the register entries removed. Never bump a snapshot or golden to get green.
+- One changelog file for the branch, `.changelog/scheduler-follow-ups.txt`; each output-changing step appends its own ` ```release-note:<kind> ` block (`fixed`, `changed` or `removed`). `python3 scripts/changelog.py check` passes.
+- Register (`packages/layout/test/engine-divergences.json`): remove the entries the step closes; `engine-divergence-register.test.ts` fails on a stale or new entry.
+- A regression test that fails on the step's `from` and passes after.
+- Standards: `AGENTS.md`, `CONTRIBUTING.md`, `.changelog/README.md`, `.claude/skills/steward/SKILL.md`, and the spec sections each step names.
+
+--- WAVE 1 [exec] ---
+
+## m1 - Decisions and item pins
+
+#### s1 - [exec] Record the decisions in the spec
+`specs/scheduler-unification.md`: §8 gains decisions 5-13 above in the existing format (a "Gary, 2026-10-15:" block continuing the numbering); §5 gains rows F6 (dot), F7 (caption cap) and F8 (pin removal), and the F2 and F3 rows state their decisions, with (f) "resolved by F8". Docs-only, no fragment. Acceptance: §5 and §8 carry every decision above, wording consistent with the spec's style; no other file changes.
+
+--- WAVE 2 [deep] ---
+
+#### s2 - [deep] F8: remove item `date:` / `start:` pins
+- core: drop `date` and `start` from `ENTITY_KNOWN_PROPS.ItemDeclaration` (`packages/core/src/language/validator/tables.ts`, and its comment), so the unknown-property warning fires; add a `CONCEPT_ALIASES` hint suggesting `after:<date>` for `date`/`start` where `after` is supported.
+- layout: `startTermsOf` (`start-terms.ts`) drops `pin`; `resolvePinnedOrSequentialStart` and `startPinOf` (`start-rules.ts`), C's `walkNode` (`schedule.ts`) and `wavePinOverrideOf` (`wave-layout.ts`) lose the pin path; NL.I1008 keeps `after:<date>`.
+- Retire NL.W1001 (`packages/core/src/i18n/codes.ts`, `messages.en.ts`, `messages.fr.ts`, `wave-message-types.ts`, `packages/layout/src/layout-insights.ts`) and `PositionedItem.wavePinOverride` (`types.ts` and its renderer readers). Check man pages, LSP hover and MCP text for mentions.
+- Migrate the ~28 Vitest cases that use item pins (layout, schedule, waves, working-day-schedule, non-working-show, non-working-identity, item-measure, layout-insights tests) to `after:<date>` or an anchor, keeping each test's intent; tests of the pin itself become tests that the key is ignored with the warning and hint.
+- `tests/weekends-show.nowline` moves to `after:2026-01-07` (it gains an inline-date glyph: a declared byte change, with its snapshot `weekends-show.svg` and determinism cell if they move).
+- **"Pinning is not supported" note:** dsl.md's Item Properties section gains a short note: an item cannot be pinned to a fixed start date (`date:` / `start:`); a pin that overlaps lane order needs resource-level splits, which conflicts with `principles.md` (no resource contention or Gantt-chart scheduling); use `after:<date>` for "not before", an anchor or a milestone for a named date; it may be revisited in the future. `principles.md`'s "Not a project management tool" bullet gains fixed-date item pinning, linking that note.
+- Specs: dsl.md (the W1001 row, Validation Rule 1 wording on items), waves.md (§5.1 pin bullets, the pin variant example, §8.4), working-calendar.md (§5.1 rules 1 and 6, NW7), rendering.md (`wavePinOverride`).
+- Fragment `removed` (item pins, NL.W1001, `PositionedItem.wavePinOverride`). G1 differs only in `tests/weekends-show`; G3 identical.
+
+## m2 - Chart dates match the exports (F2, F3)
+
+#### s1 - [deep] F2: honour `after:` on a group track of a parallel
+`GroupNode.place` (`packages/layout/src/nodes/group-node.ts`) starts at `waveFloorX(node, resolvePinnedOrSequentialStart(node.properties, cursor.x, ctx), ctx)` (idempotent for lane-level groups, whose cursor already sits there). Also make the canvas grow for a caption spilled from a group track inside a parallel (the prototype clipped "Screens": `ParallelNode` reports only the compact `maxX`, so the lane's `usedRightX` misses it). Test in `after-lane-cursor.test.ts`: A = C for a group track with `after:`, the ref ending before and after the parallel's start, plus the canvas covering the caption. G1 identical. Fragment `fixed`.
+
+#### s2 - [deep] F3 (d): drop the 8 px tail gutter from the cursor
+`GroupNode` and `ParallelNode` stop adding `TRACK_BLOCK_TAIL_GUTTER_PX` to `cursor.x` and `cursor.maxX` (delete the constant if unused, and the doc comments that cite it). Expected: showcase (Ship to day 40), platform-2026, product; snapshots `platform-2026{,-dark,-grayscale}.svg`; determinism `platform-2026*`; register (d) letters go. Declare whatever G1 shows. Fragment `fixed`.
+
+#### s3 - [deep] F3 (c): group caption spill out of the lane cursor
+`sequenceRowTrack` (`packages/layout/src/nodes/row-track.ts`) advances `timeCursorX` by the block's compact end (`cursor.x` after `sequenceOne`), while `packer.commitBlock` keeps `blockEnd` (the painted box). Expected: inline-date-pins, waves (launch-page about 10.8 days earlier), late-row-shifts; snapshots `waves*.svg`; determinism `waves`; register (c) entries go. Declare whatever G1 shows. Fragment `fixed`.
+
+#### s4 - [deep] F3 (b): minimum bar width out of the lane cursor
+`sequenceRowTrack`: `timeCursorX` advances to `predictedStart + itemSpanPx(ctx, predictedStart, measure.durationDays)` (the duration end); `commitItem.logicalEnd` keeps the painted footprint. `accumulateWaveMember` (`nodes/sequence-item.ts`) takes the duration end too, and waves.md §8.4 drops "MIN_ITEM_WIDTH clamp included". Expected: showcase, non-working-hide/show, size-and-capacity; snapshots `non-working-hide.svg`, `non-working-show.svg`. Register: following-item (b) entries go; each clamped bar's own entry stays with reason "presentation: bar drawn at its minimum width (scheduler-unification §8 decision 6)". Declare whatever G1 shows. Fragment `fixed`.
+
+## m3 - Regions and the caption cap (F5, F7)
+
+#### s1 - [deep] F5: region anchors resolve inside an isolated region
+`buildIncludeRegions` (`packages/layout/src/nodes/include-node.ts`) seeds each region's dated anchors (and whatever else C's `scheduleRegion` in `schedule.ts` resolves inside the region) into the region context's edge maps via `scale.forwardWithinDomain`; nothing new is drawn. Check the with-waves region path agrees with C too. Expected: `nested`; register: all 50 `region-scope` entries go. Declare whatever G1 shows. Fragment `fixed`.
+
+#### s2 - [deep] F7: cap a caption at one column past the chart's end
+In caption measure (`packages/layout/src/nodes/item-measure.ts`), when a spilled caption would end past the axis end, truncate the title with `…` (via `estimateTextWidth`) so it ends within one column (one scale tick) past the axis end; finalize f2 (`extendTimeline`, `packages/layout/src/phases/finalize.ts`) extends the axis by that column so its tick and date label draw; the renderer emits the full title as the item's `<title>`. Mid-chart spills are unchanged. Under an explicit `length:`, follow f2's existing extension policy; if f2 never extends there, return `needs_info`. Tests: truncation, the axis gains exactly one labelled column, tooltip text. Update rendering.md. Declare whatever G1 shows. Fragment `changed`.
+
+## m4 - Warm start, status dot and close-out (F4, F6)
+
+#### s1 - [deep] F4: floor A's starts from C and warm-start A's barrier passes
+First add a test that A's start ≥ C's start (projected, within float tolerance) for every item of every sample and the 60 generated roadmaps (`packages/layout/test/generated-roadmaps.ts`): the lower-bound property. Then floor item starts with `forwardWithinDomain(schedule.byNode.get(node).start)` (skipped when null or absent), and seed A's barrier driver (`solveWaveBarriers` via `phases/place.ts`) with C's `S_k` projected to px. Gate: G1 byte-identical, G2, G3; a test asserts `waveSolve.passes` warm ≤ cold on every waves sample and generated roadmap, and < on at least the waves samples. No fragment (no observable change).
+
+--- WAVE 3 [exec] ---
+
+#### s2 - [exec] F6: status dot needs equal air both sides
+`MIN_BAR_WIDTH_FOR_DOT_PX` (`packages/layout/src/item-bar-geometry.ts`) becomes `2 * ITEM_STATUS_DOT_INSET_RIGHT_PX` (24); check every consumer (`MIN_BAR_WIDTH_FOR_LINK_AND_DOT_PX`, the item-measure spill logic, the renderer). Tests at 23 and 24 px. Declare whatever G1 shows (bars 17-23 px wide). Fragment `changed`.
+
+#### s3 - [exec] Close out m4.11
+Spec: Status line ("Implemented: m1 to m3 and F1 to F8"), §9 as-built notes for each follow-up, §1.2 pointers. `specs/milestones.md`: strike the m4.11 row and update its section. waves.md §8.6: no divergences remain beyond the recorded (b) presentation entries. Confirm the register holds only decision-6 entries. Docs-only.
+
+## Verification
+
+- Per step: G1/G2/G3 as above, `python3 scripts/changelog.py check`, and the step's new test failing on its `from`.
+- End: `make pre-commit` then `make pack-mcpb` green; `engine-divergences.json` holds only (b) clamped-bar entries citing decision 6; G1 from `5da7d2a` to HEAD lists exactly the union of the declared samples.
+- At completion the parent removes this plan and its handoff in a last commit and asks before opening a PR.
+
+## Review log
+
+## Token log
+
+**Counting header (Claude Code)**
+
+- Line, one per model a chat ran, appended below: `tokens <row> <group-id> (<model>): input ~X / cache read ~R / cache write ~W / output ~Y | ~$C API-equiv`. `<row>` is `wave-N`, `review-wave-N`, or `wave-N-fix` and `review-wave-N-fix` for a fix-up wave; `<group-id>` is the wave's group id with hyphens (`nowline-m2-s1-s4`); `<model>` is `message.model` without a date suffix. Round counts to two significant figures with `k` or `M`.
+- Usage: `~/.claude/projects/<slug>/$CLAUDE_CODE_SESSION_ID.jsonl` (`<slug>` is the working directory with every character but a letter or digit turned into `-`, matched by prefix when long; without the id, the newest `.jsonl` there), plus its subagents' `<session-id>/subagents/**/agent-*.jsonl`. Sum `message.usage` over assistant lines once per `message.id`, from the line with `stop_reason`: input `input_tokens`, cache read `cache_read_input_tokens`, cache write `cache_creation.ephemeral_5m_input_tokens` (with `ephemeral_1h_input_tokens` too, `cache write ~40k 5m + ~8k 1h`), output `output_tokens`. A call with no `stop_reason` line keeps its input-side counts, takes output as about 1,000, and its line ends `(output est.) session <id>`.
+- Rates by `<model>`, $ per Mtok input / cached / output: `claude-opus-5-5` 4.00 / 0.20 / 20.00; `claude-sonnet-5-5` 2.00 / 0.20 / 10.00.
+- `$C` = (input × in + cache read × cached + 5m write × in × 1.25 + 1h write × in × 2.00 + output × out) / 1M.
+- In another harness, or on a model not listed here, count and price per plan-execution.md "Token accounting" and "Model price table" instead.
