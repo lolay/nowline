@@ -3,9 +3,9 @@
 - **Plan:** `specs/handoffs/plan-scheduler-followups-heron.md`
 - **Branch:** `claude/friendly-babbage-qlcz6d` (harness-assigned task branch; fast-forwarded to `origin/main` `5da7d2a` and pushed at kickoff)
 - **Mode:** unattended, confirmed 2026-10-15 in session ef0db142 (dialog: "Unattended (Recommended)"; session: "This session")
-- **Status:** wave 2/m3 closed after one fix-up (PASS); wave 2 unit m4 s1 [deep] (F4) next (gate 4 passes unattended).
-- **Spend:** ~$67.0, over the ~$31 expected. Guard 3x min $50, ~$93; F4 and wave 3 may reach it, in which case the run stops and asks.
-- **Next unit:** wave 2 [deep] `nowline m4 s1` (F4); then wave 3 [exec] m4 s2-s4.
+- **Status:** wave 2 complete (F8, F2, F3, F5, F7, F4 all reviewed PASS); wave 3 [exec] m4 s2-s4 (F6, close-out, final main merge) next.
+- **Spend:** ~$73.4, over the ~$31 expected. Guard 3x min $50, ~$93.
+- **Next unit:** wave 3 [exec] `nowline m4 s2-s4`, then final completion and the PR question.
 - **Gates the plan crosses:** 2 before wave 2; 4 at m2, m3 and m4. No canary (wave 1 has one group). No `[xdeep]`.
 - **Resume:** run `/compact` if needed, then paste the plan's Kickoff prompt.
 
@@ -22,8 +22,11 @@ None.
 - fix-up 2-fix2 [deep] `nowline m2 s1-s4` 8b1b4ac..c8ecee2: PASS. Docs only: waves.md §8.6 (b) and the s4 changelog block no longer claim the exports resolve `after:<parallel>`.
 - wave 2 [deep] `nowline m3 s1-s2` 36de637..9597dc1: CONCERNS. F5 ad6beed (G1: examples/nested only; all 50 region-scope entries gone). F7 9597dc1 (G1: 22 samples gain one column, 15 with cut titles; snapshots capacity, dependencies, isolate-include, non-working-hide, sizing, waves-isolate; determinism capacity, dependencies, isolate-include, sizing). Review: the added column goes unlabelled under label thinning, and a mid-column `length:` window adds no column; fix-up 2-fix.
 - fix-up 2-fix [deep] `nowline m3 s1-s2` 36de637..08073f1: PASS. The added column is always labelled (an overlapping earlier label drops, its grid line stays); a mid-column `length:` window gains one full labelled column. G1: capacity, sizing, nested/android, nested/ios each gain one label.
+- wave 2 [deep] `nowline m4 s1` f859546..c3dd3b7: PASS. Lower-bound test (80fd829) then the floor and warm start (c3dd3b7). G1/G3 byte-identical. Barrier passes drop to 1 on most wave samples (examples/waves 4 to 1).
 
 ## Deviations from plan
+
+- m4.s1 seeded the barrier with C's `E_k` too, beyond the step's `S_k` (reviewed and accepted; output unchanged).
 
 - Wave 2/m2 used both automatic fix-ups (cap 2): 2-fix for the clamp reaching the parallel join and `after:`, 2-fix2 for two inaccurate sentences 2-fix wrote. A third CONCERNS on this group stops at gate 1.
 
@@ -32,6 +35,8 @@ None.
 - The kickoff's parent spend (~$10.78) exceeds the orchestrator row's kickoff share (~$1.0): the same session did the decision dialogs and scratch prototypes before kicking off.
 
 ## Decisions so far
+
+- m4.s1 (review PASS): the barrier driver is seeded with C's `E_k` as well as `S_k` (S_k alone left 7 of 12 wave samples at 2 passes); recorded in the spec's F4 row and waves.md §8.3. Under `show` the floor compares the snapped start. For m4.s3: scheduler-unification.md §3.1 (line ~90) still says the warm start isn't possible and points at waves.md §8.3 text F4 replaced.
 
 - m3 (F5 held; F7 closed after one fix-up): F5 seeds region anchors only without waves (C's wave-mode region walk has empty anchor maps). F7: any spilled caption ending past the axis end adds the one column, cut or not (22 samples move, 15 with cut titles; some short titles in narrow columns cut hard, e.g. dependencies "Deploy" to "Depl…": to show Gary at completion). A cut line keeps at least its first character; the meta line is never cut. The tooltip is the item's first-child `<title>`, joined with the wave tooltip when both apply. New `PositionedItem.titleTruncated`, `AxisColumns` (axis-columns.ts), `layoutSpillCluster`. scheduler-unification §9 still says nested keeps 50 region-scope entries (m4.s3 updates it). dsl.md says an isolated region's anchors and milestones render inside the region, which engine A has never done (pre-existing; to raise with Gary).
 

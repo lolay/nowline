@@ -1,7 +1,7 @@
 ```text
 --- KICKOFF: begin orchestration at [deep] ---
 
-  Status: 4/6 groups done | last review: wave-2-fix PASS | current: nowline m4 s1 [deep] | updated 2026-10-15 | over expected: ~$67.0 of ~$31
+  Status: 5/6 groups done | last review: wave-2 PASS | current: nowline m4 s2-s4 [exec] | updated 2026-10-15 | passed unattended: gate 4 before wave 2/m4 | over expected: ~$73.4 of ~$31
 
   mode: unattended | proposed unattended (harness=claude-code runner=cloud; CLAUDE_CODE_REMOTE=true, assigned branch) | guard 3x min $50 | fixups 2 | confirmed 2026-10-15 session ef0db142-6669-5058-893b-a118b7ea2d61 by Kickoff prompt: Run in unattended mode.
 
@@ -117,7 +117,7 @@ In caption measure (`packages/layout/src/nodes/item-measure.ts`), when a spilled
 
 ## m4 - Warm start, status dot and close-out (F4, F6)
 
-#### s1 - [deep] F4: floor A's starts from C and warm-start A's barrier passes
+#### s1 - [deep] F4: floor A's starts from C and warm-start A's barrier passes (done)
 First add a test that A's start ≥ C's start (projected, within float tolerance) for every item of every sample and the 60 generated roadmaps (`packages/layout/test/generated-roadmaps.ts`): the lower-bound property. Then floor item starts with `forwardWithinDomain(schedule.byNode.get(node).start)` (skipped when null or absent), and seed A's barrier driver (`solveWaveBarriers` via `phases/place.ts`) with C's `S_k` projected to px. Gate: G1 byte-identical, G2, G3; a test asserts `waveSolve.passes` warm ≤ cold on every waves sample and generated roadmap, and < on at least the waves samples. No fragment (no observable change).
 
 --- WAVE 3 [exec] ---
@@ -146,6 +146,7 @@ review wave-2-fix (nowline m2 s1-s4) 8b1b4ac..4314f48: CONCERNS - code fix corre
 review wave-2-fix2 (nowline m2 s1-s4) 8b1b4ac..c8ecee2: PASS - c8ecee2 (docs only) qualifies waves.md §8.6 (b) and the s4 changelog block: the chart starts an item `after:` a parallel at its latest track end; engine C does not yet resolve `after:` on a parallel or group (open, not in the register); no other text repeats the claim; make pre-commit green; check_wave.py flagged only db78b2e (origin/main's own commit), not fixed; passed unattended: gate 1 (fix-up 2 of 2) - 2026-10-15
 review wave-2 (nowline m3 s1-s2) 36de637..9597dc1: CONCERNS - F5 (ad6beed) holds: dated region anchors seeded without waves (matches C's scheduleRegion), all 50 region-scope entries gone, G1 only examples/nested; F7 (9597dc1) has two defects in the added column: (1) under `label-every` or automatic label thinning the added column gets no date label and no grid line (capacity, sizing, nested/android, nested/ios: label count unchanged while the timeline grows 40 px; rendering.md documents "The column is labelled like any other: `label-every` thinning and the narrow-column rules still apply to it"), against the spec "so its tick and date label draw" and Gary's "we should also show the date for the column even if it's not relevant so that it looks consistent"; (2) when an explicit `length:` window ends mid-column, captionCapX (axis-columns.ts:84-89) and f2 measure one column past the raw window end, so `nextBoundary(spanDays)` is only the end of the partial last column: `length:30d` scale:1w with a long last caption adds no column and cuts it to "Roll…" inside the existing axis; the length: tests use only week-aligned windows; passed unattended: gate 4 - 2026-10-15
 review wave-2-fix (nowline m3 s1-s2) 36de637..08073f1: PASS - 08073f1 forces the added column's tick, grid line and date label under label-every and thinning (an earlier overlapping label drops, its tick stays), and measures the extra column from the end of a partial `length:` column; 5 new tests fail at 9597dc1; G1 vs 9597dc1 only capacity, sizing, nested/android, nested/ios (one label and grid line each); snapshots capacity.svg, sizing.svg; goldens capacity and sizing svg/html/png/pdf; cosmetic: one garbled sentence in the commit body - 2026-10-15
+review wave-2 (nowline m4 s1) f859546..c3dd3b7: PASS - lower-bound test first (80fd829; held on the launch HEAD for every sample and the 60 generated roadmaps); c3dd3b7 floors item starts via `scheduleFloorX` (forwardWithinDomain of C's start, skipped when absent; under `show` compares the snapped start so NL.I1008 keeps the unsnapped Saturday date) and seeds `solveWaveBarriers` with C's S_k and E_k (E_k added: S_k alone left 7 of 12 wave samples at 2 passes; a too-high seed still converges to the cold fixpoint); passes cold to warm: waves 4 to 1, every wave sample and all 60 generated roadmaps to 1 or 2; G1/G3 byte-identical (360 files), no snapshot, golden or fragment; for m4.s3: scheduler-unification.md:90 (§3.1) still says the warm start isn't possible yet; passed unattended: gate 4 - 2026-10-15
 
 ## Token log
 
@@ -178,3 +179,6 @@ tokens review-wave-2 nowline-m3-s1-s2 (claude-opus-5-5): input ~80 / cache read 
 tokens orchestrator-wave-2 nowline-m3-s1-s2 (claude-opus-5-5): input ~12 / cache read ~1.3M / cache write ~0 5m + ~21k 1h / output ~8.9k | ~$0.61 API-equiv
 tokens wave-2-fix nowline-m3-s1-s2 (claude-opus-5-5): input ~100 / cache read ~6.4M / cache write ~170k / output ~52k | ~$3.18 API-equiv (output est.) session ef0db142-6669-5058-893b-a118b7ea2d61
 tokens review-wave-2-fix nowline-m3-s1-s2 (claude-opus-5-5): input ~44 / cache read ~870k / cache write ~54k / output ~22k | ~$0.88 API-equiv (output est.) session ef0db142-6669-5058-893b-a118b7ea2d61
+tokens orchestrator-wave-2-fix nowline-m3-s1-s2 (claude-opus-5-5): input ~10 / cache read ~1.1M / cache write ~0 5m + ~17k 1h / output ~6.3k | ~$0.49 API-equiv
+tokens wave-2 nowline-m4-s1 (claude-opus-5-5): input ~160 / cache read ~13M / cache write ~190k / output ~80k | ~$5.24 API-equiv (output est.) session ef0db142-6669-5058-893b-a118b7ea2d61
+tokens review-wave-2 nowline-m4-s1 (claude-opus-5-5): input ~28 / cache read ~490k / cache write ~48k / output ~14k | ~$0.62 API-equiv (output est.) session ef0db142-6669-5058-893b-a118b7ea2d61
