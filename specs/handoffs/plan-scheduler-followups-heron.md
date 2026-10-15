@@ -1,7 +1,7 @@
 ```text
---- KICKOFF: begin orchestration at [deep] ---
+--- KICKOFF: plan complete ---
 
-  Status: 5/6 groups done | last review: wave-2 PASS | current: nowline m4 s2-s4 [exec] | updated 2026-10-15 | passed unattended: gate 4 before wave 2/m4 | over expected: ~$73.4 of ~$31
+  Status: 6/6 groups done | completed 2026-10-15 | over expected: ~$77.8 of ~$31
 
   mode: unattended | proposed unattended (harness=claude-code runner=cloud; CLAUDE_CODE_REMOTE=true, assigned branch) | guard 3x min $50 | fixups 2 | confirmed 2026-10-15 session ef0db142-6669-5058-893b-a118b7ea2d61 by Kickoff prompt: Run in unattended mode.
 
@@ -29,16 +29,16 @@
 
 **Cost (API-equiv, Claude Code models)**
 
-| wave | expected tokens | expected $ |
-|---|---|---|
-| 1 [exec] m1 s1 | ~1.3M | ~$0.65 |
-| 2 [deep] m1 s2, m2 s1-s4, m3 s1-s2, m4 s1 | ~36M | ~$19 |
-| 3 [exec] m4 s2-s4 | ~2.7M | ~$1.1 |
-| 2-fix [deep] nowline m2 s1-s4 | — | — |
-| 2-fix2 [deep] nowline m2 s1-s4 | — | — |
-| 2-fix [deep] nowline m3 s1-s2 | — | — |
-| orchestrator | ~12M | ~$9.9 |
-| **Total** | ~52M | ~$31 |
+| wave | expected tokens | expected $ | actual tokens | actual $ |
+|---|---|---|---|---|
+| 1 [exec] m1 s1 | ~1.3M | ~$0.65 | ~0.65M | ~$0.60 |
+| 2 [deep] m1 s2, m2 s1-s4, m3 s1-s2, m4 s1 | ~36M | ~$19 | ~132M | ~$46.77 |
+| 3 [exec] m4 s2-s4 | ~2.7M | ~$1.1 | ~8.7M | ~$3.29 |
+| 2-fix [deep] nowline m2 s1-s4 | — | — | ~9.0M | ~$4.63 |
+| 2-fix2 [deep] nowline m2 s1-s4 | — | — | ~1.2M | ~$1.00 |
+| 2-fix [deep] nowline m3 s1-s2 | — | — | ~7.5M | ~$4.06 |
+| orchestrator | ~12M | ~$9.9 | ~38M | ~$17.44 |
+| **Total** | ~52M | ~$31 | ~197M | ~$77.79 |
 
 Expected values are estimates, good to about 2-3× per wave. Wave 2 runs as four units (one per milestone), each with its own review; its steps are priced at Opus 5.5 high with the 1.35× base-context factor (m1.s2, m3.s2 and m4.s1 large, the rest medium). The orchestrator row is the kickoff, six units of bookkeeping, one wait (the kickoff answer) and one resume after `/compact`.
 
@@ -122,13 +122,13 @@ First add a test that A's start ≥ C's start (projected, within float tolerance
 
 --- WAVE 3 [exec] ---
 
-#### s2 - [exec] F6: status dot needs equal air both sides
+#### s2 - [exec] F6: status dot needs equal air both sides (done)
 `MIN_BAR_WIDTH_FOR_DOT_PX` (`packages/layout/src/item-bar-geometry.ts`) becomes `2 * ITEM_STATUS_DOT_INSET_RIGHT_PX` (24); check every consumer (`MIN_BAR_WIDTH_FOR_LINK_AND_DOT_PX`, the item-measure spill logic, the renderer). Tests at 23 and 24 px. Declare whatever G1 shows (bars 17-23 px wide). Fragment `changed`.
 
-#### s3 - [exec] Close out m4.11
+#### s3 - [exec] Close out m4.11 (done)
 Spec: Status line ("Implemented: m1 to m3 and F1 to F8"), §9 as-built notes for each follow-up, §1.2 pointers. `specs/milestones.md`: strike the m4.11 row and update its section. waves.md §8.6: no divergences remain beyond the recorded (b) presentation entries. Confirm the register holds only decision-6 entries. Docs-only.
 
-#### s4 - [exec] Merge `origin/main` once more
+#### s4 - [exec] Merge `origin/main` once more (done)
 Added by Gary, 2026-10-15 ("after all is done, also, use an [exec] subagent to merge any changes from main"). `git fetch origin main` and `git merge origin/main` into the task branch (a merge commit, never a rebase); resolve conflicts per `.claude/skills/steward/SKILL.md`, regenerating lockfiles and generated files with the repo's tooling. If main brought renderer or layout changes, re-run G1 against the pre-merge HEAD merged state and declare any byte change the merge itself causes in the commit body; snapshots and goldens move only where main's own change requires it. `make pre-commit` green after the merge. If main has nothing new, an empty commit `m4.s4 Merge origin/main (already up to date)`. A conflict where both sides changed the same logic and picking either loses behaviour: return `needs_info`.
 
 ## Verification
@@ -147,6 +147,7 @@ review wave-2-fix2 (nowline m2 s1-s4) 8b1b4ac..c8ecee2: PASS - c8ecee2 (docs onl
 review wave-2 (nowline m3 s1-s2) 36de637..9597dc1: CONCERNS - F5 (ad6beed) holds: dated region anchors seeded without waves (matches C's scheduleRegion), all 50 region-scope entries gone, G1 only examples/nested; F7 (9597dc1) has two defects in the added column: (1) under `label-every` or automatic label thinning the added column gets no date label and no grid line (capacity, sizing, nested/android, nested/ios: label count unchanged while the timeline grows 40 px; rendering.md documents "The column is labelled like any other: `label-every` thinning and the narrow-column rules still apply to it"), against the spec "so its tick and date label draw" and Gary's "we should also show the date for the column even if it's not relevant so that it looks consistent"; (2) when an explicit `length:` window ends mid-column, captionCapX (axis-columns.ts:84-89) and f2 measure one column past the raw window end, so `nextBoundary(spanDays)` is only the end of the partial last column: `length:30d` scale:1w with a long last caption adds no column and cuts it to "Roll…" inside the existing axis; the length: tests use only week-aligned windows; passed unattended: gate 4 - 2026-10-15
 review wave-2-fix (nowline m3 s1-s2) 36de637..08073f1: PASS - 08073f1 forces the added column's tick, grid line and date label under label-every and thinning (an earlier overlapping label drops, its tick stays), and measures the extra column from the end of a partial `length:` column; 5 new tests fail at 9597dc1; G1 vs 9597dc1 only capacity, sizing, nested/android, nested/ios (one label and grid line each); snapshots capacity.svg, sizing.svg; goldens capacity and sizing svg/html/png/pdf; cosmetic: one garbled sentence in the commit body - 2026-10-15
 review wave-2 (nowline m4 s1) f859546..c3dd3b7: PASS - lower-bound test first (80fd829; held on the launch HEAD for every sample and the 60 generated roadmaps); c3dd3b7 floors item starts via `scheduleFloorX` (forwardWithinDomain of C's start, skipped when absent; under `show` compares the snapped start so NL.I1008 keeps the unsnapped Saturday date) and seeds `solveWaveBarriers` with C's S_k and E_k (E_k added: S_k alone left 7 of 12 wave samples at 2 passes; a too-high seed still converges to the cold fixpoint); passes cold to warm: waves 4 to 1, every wave sample and all 60 generated roadmaps to 1 or 2; G1/G3 byte-identical (360 files), no snapshot, golden or fragment; for m4.s3: scheduler-unification.md:90 (§3.1) still says the warm start isn't possible yet; passed unattended: gate 4 - 2026-10-15
+review wave-3 (nowline m4 s2-s4) 4665fcc..290c028: PASS - F6 (5f91013) sets MIN_BAR_WIDTH_FOR_DOT_PX = 24 with every consumer checked, G1/G3 byte-identical (no corpus bar is 17-23 px), only the mcp stage-once test's width cap moved (320 to 400); close-out (248abf7) updates the spec Status, §1.2-§1.4, §3.1, §5, §9 (as-built F2-F8, Known open gaps), milestones.md (m4.11 struck), waves.md §8.6, working-calendar.md; register holds six decision-6 (b) entries only; m4.s4 (290c028) empty, origin/main already merged; nit: `dotSpills` doc comment in types.ts ~444 still uses the old wording - 2026-10-15
 
 ## Token log
 
@@ -182,3 +183,22 @@ tokens review-wave-2-fix nowline-m3-s1-s2 (claude-opus-5-5): input ~44 / cache r
 tokens orchestrator-wave-2-fix nowline-m3-s1-s2 (claude-opus-5-5): input ~10 / cache read ~1.1M / cache write ~0 5m + ~17k 1h / output ~6.3k | ~$0.49 API-equiv
 tokens wave-2 nowline-m4-s1 (claude-opus-5-5): input ~160 / cache read ~13M / cache write ~190k / output ~80k | ~$5.24 API-equiv (output est.) session ef0db142-6669-5058-893b-a118b7ea2d61
 tokens review-wave-2 nowline-m4-s1 (claude-opus-5-5): input ~28 / cache read ~490k / cache write ~48k / output ~14k | ~$0.62 API-equiv (output est.) session ef0db142-6669-5058-893b-a118b7ea2d61
+tokens orchestrator-wave-2 nowline-m4-s1 (claude-opus-5-5): input ~14 / cache read ~1.8M / cache write ~0 5m + ~28k 1h / output ~13k | ~$0.84 API-equiv
+tokens wave-3 nowline-m4-s2-s4 (claude-sonnet-5-5): input ~130 / cache read ~7.9M / cache write ~170k / output ~64k | ~$2.66 API-equiv (output est.) session ef0db142-6669-5058-893b-a118b7ea2d61
+tokens review-wave-3 nowline-m4-s2-s4 (claude-opus-5-5): input ~28 / cache read ~490k / cache write ~53k / output ~13k | ~$0.63 API-equiv (output est.) session ef0db142-6669-5058-893b-a118b7ea2d61
+tokens orchestrator-wave-3 nowline-m4-s2-s4 (claude-opus-5-5): input ~6 / cache read ~650k / cache write ~0 5m + ~17k 1h / output ~1k | ~$0.29 API-equiv
+
+## Completion summary
+
+All 6 groups done on 2026-10-15, unattended, in one session (ef0db142), from 5da7d2a to 290c028 on `claude/friendly-babbage-qlcz6d`.
+
+- **Landed:** F8 (item `date:`/`start:` pins removed, NL.W1001 and `wavePinOverride` retired, "pinning is not supported" in dsl.md and principles.md), F2, F3 (b), (c), (d), F5, F7 (caption cap at the chart's end with a forced-labelled extra column), F4 (C floors A's starts and warm-starts the barrier, output unchanged), F6 (status dot needs a 24 px bar). The register holds only six decision-6 (b) clamped-bar entries. Three merges of origin/main (#160-#163), no conflicts.
+- **Declared byte changes:** tests/weekends-show (F8); minimal, platform-2026, product, showcase (F3 d); inline-date-pins, waves, late-row-shifts (F3 c); showcase, non-working-hide/show (F3 b); examples/nested (F5); 22 samples gain one labelled column, 15 with cut captions (F7), with capacity, sizing, nested/android, nested/ios also gaining the forced label in the fix-up. F2, F4, F6 changed no output.
+- **Gates:** each unit's G1/G3 against its base matched its declared list; the last `make pre-commit` (wave 3, after m4.s4) passed. `make pack-mcpb` and a single G1 sweep from 5da7d2a to HEAD were not run by the run (the end-of-plan Verification lines).
+- **Spend:** ~$77.79 API-equiv against ~$31 expected (2.5x); every [deep] unit ran ~$5-15 against ~$4.75 planned, plus three fix-ups. Guard (~$93) never tripped.
+
+**Deviations from plan**
+- Checkpoints passed unattended: gate 2 before wave 2; gate 4 at m2, m3, m4; gate 1 (fix-up 2 of 2) for m2.
+- Fix-ups: m2 2-fix (the minimum bar width still reached the parallel join and `after:`), m2 2-fix2 (two sentences wrongly said C resolves `after:<parallel>`), m3 2-fix (F7's added column unlabelled under thinning and missing under a mid-column `length:`).
+- `check_wave.py` flagged origin/main's own squash commits (3d8b606, 766bc38, 0e948e9, db78b2e) brought in by merges; logged PASS, not reworded.
+- m4.s1 seeded the barrier with C's `E_k` as well as `S_k`; m4.s4 (Gary's final merge) was added mid-run and found main already merged.

@@ -3,15 +3,15 @@
 - **Plan:** `specs/handoffs/plan-scheduler-followups-heron.md`
 - **Branch:** `claude/friendly-babbage-qlcz6d` (harness-assigned task branch; fast-forwarded to `origin/main` `5da7d2a` and pushed at kickoff)
 - **Mode:** unattended, confirmed 2026-10-15 in session ef0db142 (dialog: "Unattended (Recommended)"; session: "This session")
-- **Status:** wave 2 complete (F8, F2, F3, F5, F7, F4 all reviewed PASS); wave 3 [exec] m4 s2-s4 (F6, close-out, final main merge) next.
-- **Spend:** ~$73.4, over the ~$31 expected. Guard 3x min $50, ~$93.
-- **Next unit:** wave 3 [exec] `nowline m4 s2-s4`, then final completion and the PR question.
+- **Status:** plan complete 2026-10-15 (6/6 groups, all reviewed PASS after fix-ups). Next: the cleanup commit removing this plan and handoff, then Gary's call on the PR.
+- **Spend:** ~$77.79 API-equiv against ~$31 expected; the guard (~$93) never tripped.
+- **Next unit:** none. Pending: Gary's answer on opening the PR.
 - **Gates the plan crosses:** 2 before wave 2; 4 at m2, m3 and m4. No canary (wave 1 has one group). No `[xdeep]`.
 - **Resume:** run `/compact` if needed, then paste the plan's Kickoff prompt.
 
 ## Pending question
 
-None.
+Open the PR for `claude/friendly-babbage-qlcz6d` now, or not yet? (Asked with the Completion summary in the plan.)
 
 ## Done
 
@@ -23,6 +23,7 @@ None.
 - wave 2 [deep] `nowline m3 s1-s2` 36de637..9597dc1: CONCERNS. F5 ad6beed (G1: examples/nested only; all 50 region-scope entries gone). F7 9597dc1 (G1: 22 samples gain one column, 15 with cut titles; snapshots capacity, dependencies, isolate-include, non-working-hide, sizing, waves-isolate; determinism capacity, dependencies, isolate-include, sizing). Review: the added column goes unlabelled under label thinning, and a mid-column `length:` window adds no column; fix-up 2-fix.
 - fix-up 2-fix [deep] `nowline m3 s1-s2` 36de637..08073f1: PASS. The added column is always labelled (an overlapping earlier label drops, its grid line stays); a mid-column `length:` window gains one full labelled column. G1: capacity, sizing, nested/android, nested/ios each gain one label.
 - wave 2 [deep] `nowline m4 s1` f859546..c3dd3b7: PASS. Lower-bound test (80fd829) then the floor and warm start (c3dd3b7). G1/G3 byte-identical. Barrier passes drop to 1 on most wave samples (examples/waves 4 to 1).
+- wave 3 [exec] `nowline m4 s2-s4` 4665fcc..290c028: PASS. F6 5f91013 (no output change), close-out 248abf7, m4.s4 290c028 (main already merged).
 
 ## Deviations from plan
 
