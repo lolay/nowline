@@ -5,7 +5,7 @@
 .\" Empreinte de la page anglaise relue pour cette traduction. Après avoir
 .\" reporté une modification de la page anglaise, remplacez-la par la ligne
 .\" qu'affiche packages/cli/test/man/translation-parity.test.ts.
-.\" translated-from: nowline.1 sha256:0cb6f1a170027da284cf9b5aa31dccb20835d2620711e008ad21dda3771834ab
+.\" translated-from: nowline.1 sha256:b2961e64886fe303a2c780cea2abe391af8f64fe10cf5c29653396cd3d23067d
 .Dd $Mdocdate$
 .Dt NOWLINE 1
 .Os
@@ -373,12 +373,13 @@ Saute le sondage de polices de la plateforme et force la paire DejaVu
 intégrée.
 La sortie est stable octet par octet entre machines.
 .It Fl -start Ar date
-MS Project\ : date d'ancrage
-.Pq Pa AAAA-MM-JJ
-pour les feuilles de route uniquement relatives.
-Par défaut\ :
-.Fl -now ,
-puis repli déterministe.
+MS Project\ : date de début du projet
+.Pq Pa AAAA-MM-JJ .
+Par défaut\ : le
+.Cm start:
+de la feuille de route, sinon
+.Fl -now
+(aujourd'hui).
 .El
 .Sh OPTIONS DE SERVEUR
 .Bl -tag -width Fl

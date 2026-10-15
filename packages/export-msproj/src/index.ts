@@ -13,7 +13,8 @@
 //     appended after every other task so existing UIDs never renumber.
 //
 // Determinism: no `new Date()`. Anchoring date comes from `options.startDate`
-// or `inputs.today`; calendar UIDs are fixed; Tasks numbered sequentially.
+// or the schedule's start (the roadmap's `start:`, else `inputs.today`);
+// calendar UIDs are fixed; Tasks numbered sequentially.
 
 import type {
     AnchorDeclaration,
@@ -42,10 +43,9 @@ export interface MsProjOptions {
     /** Project name attribute. Defaults to roadmap title. */
     projectName?: string;
     /**
-     * Anchor date (YYYY-MM-DD). MS Project needs absolute Start dates;
-     * relative-only Nowline roadmaps anchor every task here. Falls back to
-     * `inputs.today` (UTC midnight) if absent; and if that is also absent,
-     * to `2026-01-05` (a deterministic Monday) so tests are stable.
+     * Project start date (YYYY-MM-DD) written to `<StartDate>`. Defaults to
+     * the schedule's start, the same anchor every task date uses: the
+     * roadmap's `start:`, else `inputs.today` (UTC midnight).
      *
      * Documented as not round-trippable.
      */
@@ -112,9 +112,9 @@ export function exportMsProjXml(inputs: ExportInputs, options: MsProjOptions = {
     const projectName = escapeXml(
         options.projectName ?? roadmapTitle(ast.roadmapDecl ?? undefined),
     );
-    const startDate = resolveStartDate(options.startDate, inputs.today);
     const schedule =
         inputs.schedule ?? scheduleRoadmap(ast, inputs.resolved, { today: inputs.today });
+    const startDate = resolveStartDate(options.startDate, schedule.startDate);
 
     // Resources
     const resources = collectResources(ast);
@@ -600,15 +600,12 @@ function formatDropKey(key: keyof DropCounts): string {
 
 // ---------- helpers ----------
 
-function resolveStartDate(option: string | undefined, today: Date | undefined): string {
+function resolveStartDate(option: string | undefined, scheduleStart: Date): string {
     if (option) {
         if (!ISO_DATE_RE.test(option)) {
             throw new Error(`invalid msproj startDate "${option}": expected YYYY-MM-DD`);
         }
         return option;
     }
-    if (today) {
-        return today.toISOString().slice(0, 10);
-    }
-    return '2026-01-05'; // a deterministic Monday for tests
+    return scheduleStart.toISOString().slice(0, 10);
 }

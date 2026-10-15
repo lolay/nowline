@@ -239,7 +239,7 @@
                     "default": "",
                     "pattern": "^$|^\\d{4}-\\d{2}-\\d{2}$",
                     "patternErrorMessage": "Must be empty or a YYYY-MM-DD date.",
-                    "description": "MS Project export anchor date for relative roadmaps. Empty uses the same fallback chain as the CLI (--now → deterministic fallback)."
+                    "description": "MS Project export start date (YYYY-MM-DD). Empty uses the roadmap's start:, else today, matching the CLI's --start default."
                 }
             }
         },
