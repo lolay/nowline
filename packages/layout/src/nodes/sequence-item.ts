@@ -26,9 +26,10 @@ import {
 import type { LayoutContext, TrackCursor } from '../layout-context.js';
 import { nonWorkingPinOf, resolvePinnedOrSequentialStart } from '../start-rules.js';
 import { estimateTextWidth } from '../text-measure.js';
-import { ITEM_INSET_PX, PROGRESS_STRIP_HEIGHT_PX } from '../themes/shared.js';
+import { PROGRESS_STRIP_HEIGHT_PX } from '../themes/shared.js';
 import type { BoundingBox, PositionedItem, PositionedLabelChip } from '../types.js';
 import { accumulateWaveMember, waveFloorX, waveRoleOf } from '../wave-layout.js';
+import { itemSpanPx } from '../working-span.js';
 import { buildLabelChip, type ItemMeasure, measureItem } from './item-measure.js';
 import { ItemNode, traceItemNode } from './item-node.js';
 
@@ -331,10 +332,14 @@ export function sequenceItem(
         ctx.entityLeftEdges.set(id, logicalLeft);
         ctx.entityRightEdges.set(id, logicalRight);
     }
-    // A member's end feeds its wave's barrier: the lane cursor's logical
-    // end (`itemLogicalEnd` in `SwimlaneNode`), MIN_ITEM_WIDTH clamp
-    // included, never a group box or caption spill (specs/waves.md §8.4).
-    accumulateWaveMember(node, itemBox.x + itemBox.width + ITEM_INSET_PX, ctx);
+    // A member's end feeds its wave's barrier: its duration end, the lane
+    // cursor's advance in `sequenceRowTrack`, never the minimum bar width,
+    // a group box or a caption spill (specs/waves.md §8.4).
+    accumulateWaveMember(
+        node,
+        placedStartX + itemSpanPx(ctx, placedStartX, measure.durationDays),
+        ctx,
+    );
     // Drawing / flow maps key on a registration handle EVERY item has: the
     // explicit id when present, else a synthetic, non-referenceable handle
     // (see `syntheticItemKey`). This lets a title-only item register its own

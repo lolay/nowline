@@ -22,6 +22,7 @@ import {
 import { describe, expect, it } from 'vitest';
 import { resolveCalendar } from '../src/calendar.js';
 import { type LayoutOptions, layoutRoadmap } from '../src/layout.js';
+import { scheduleRoadmap } from '../src/schedule.js';
 import { ITEM_INSET_PX } from '../src/themes/shared.js';
 import type {
     PositionedGroup,
@@ -1285,9 +1286,16 @@ describe('layoutRoadmap — barrier theorem on generated roadmaps', () => {
                 expect(m.it.waveRole).toBe('member');
             }
             // For each wave pair, the latest end of the earlier wave is at
-            // or before the earliest start of the later one.
+            // or before the earliest start of the later one. An end is the
+            // member's duration end: a bar drawn at its minimum width is
+            // presentation and may paint past it
+            // (specs/scheduler-unification.md §8 decision 6).
+            const days = scheduleRoadmap(file, resolved).items;
+            const durationEnd = (m: (typeof members)[number]): number =>
+                logicalStart(m.it) +
+                (days.get(m.id)?.days ?? Number.NaN) * model.timeline.pixelsPerDay;
             for (let j = 1; j <= n; j++) {
-                const ends = members.filter((m) => m.k === j).map((m) => logicalEnd(m.it));
+                const ends = members.filter((m) => m.k === j).map(durationEnd);
                 if (ends.length === 0) continue;
                 const latestEnd = Math.max(...ends);
                 for (const later of members.filter((m) => m.k > j)) {

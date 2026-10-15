@@ -339,3 +339,38 @@ swimlane s "Subject"
         expect(chart.u).toEqual(schedule.u);
     });
 });
+
+// Divergence (b) (specs/scheduler-unification.md §5 F3, §8 decision 6): the
+// minimum bar width stays out of the lane cursor. The cursor advances by the
+// duration, so the next item starts on its date, as in engine C; the clamped
+// bar keeps its width (presentation), and the row packer keeps that painted
+// footprint, so the next bar drops a row instead of overlapping it.
+describe('the minimum bar width stays out of the lane cursor', () => {
+    const source = (waves: boolean): string => `nowline v1
+
+roadmap r "R" start:2026-01-05 calendar:full scale:1w
+${waves ? '\nwave w1 "W1"\nwave w2 "W2"\n' : ''}
+swimlane s "Subject"
+  item a "A" duration:1d${waves ? ' wave:w1' : ''}
+  item b "B" duration:1w${waves ? ' wave:w2' : ''}
+`;
+
+    it('the next item starts at the clamped item’s duration end, a row lower', async () => {
+        const { model, chart, schedule } = await weeksOf(source(false));
+        // a is drawn wider than its one day: presentation.
+        expect(chart.a[1]).toBeGreaterThan(schedule.a[1]);
+        expect(chart.b).toEqual(schedule.b);
+        expect(chart.b[0]).toBeLessThan(chart.a[1]);
+        expect(findItem(model, 'b').box.y).toBeGreaterThan(findItem(model, 'a').box.y);
+    });
+
+    it('a clamped wave member closes its wave at its duration end', async () => {
+        const { model, chart, schedule } = await weeksOf(source(true));
+        expect(chart.b).toEqual(schedule.b);
+        const [w1, w2] = model.waves ?? [];
+        expect(w2.startX).toBeCloseTo(w1.endX, 6);
+        expect(w2.startX).toBeLessThan(
+            findItem(model, 'a').box.x + findItem(model, 'a').box.width + ITEM_INSET_PX,
+        );
+    });
+});

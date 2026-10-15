@@ -13,3 +13,7 @@
 ```release-note:fixed
 **A group's spilled caption no longer delays the next item in the chart.** When a group's last caption runs past its box, the item after the group now starts when the group's work ends, on the date the exports give it, and drops below the caption instead of starting later on the same row. The waves sample's Launch page now starts about 10.8 working days earlier in the chart.
 ```
+
+```release-note:fixed
+**A short bar drawn at its minimum width no longer delays the work after it.** The chart draws a bar too short to see at a minimum width, and that width used to push the next item in its lane, and the end of its wave, later than the exports. Both now follow the item's duration, so the next item starts on the date the exports give it and drops a row when it would overlap the wider bar.
+```

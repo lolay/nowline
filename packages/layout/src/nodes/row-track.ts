@@ -17,6 +17,7 @@ import { RowPacker } from '../row-packer.js';
 import { resolveChildStart } from '../start-rules.js';
 import { ITEM_INSET_PX } from '../themes/shared.js';
 import type { PositionedTrackChild } from '../types.js';
+import { itemSpanPx } from '../working-span.js';
 import { trackChildPaintedRightX } from './content-extent.js';
 import { measureItem } from './item-measure.js';
 import { sequenceItem } from './sequence-item.js';
@@ -116,12 +117,17 @@ export function sequenceRowTrack(
         const positioned = sequenceItem(item, cursor, ctx, measure);
         children.push(positioned);
 
-        // Item end in LOGICAL space (one ITEM_INSET_PX past the visual
-        // bar's right edge). The next chained item starts here and
-        // lands edge-to-edge in time, with a 2 × ITEM_INSET_PX visible
-        // gutter between bars.
+        // The painted footprint in LOGICAL space (one ITEM_INSET_PX past
+        // the visual bar's right edge), the minimum bar width included:
+        // the row packer keeps it, so a following bar that would overlap
+        // a clamped bar drops a row.
         const itemLogicalEnd = positioned.box.x + positioned.box.width + ITEM_INSET_PX;
-        timeCursorX = Math.max(timeCursorX, itemLogicalEnd);
+        // The time cursor advances by the duration only, never the
+        // minimum bar width, so the next chained item starts on its date,
+        // as in engine C (specs/scheduler-unification.md §8 decision 6).
+        // A bar wider than its duration is presentation.
+        const durationEnd = predictedStart + itemSpanPx(ctx, predictedStart, measure.durationDays);
+        timeCursorX = Math.max(timeCursorX, durationEnd);
 
         let spillReservation: number | null = null;
         const hasAnySpill =

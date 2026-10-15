@@ -758,9 +758,9 @@ A warm start from day space would be wrong while divergence (e) can make pixel v
 - `sequenceItem` (`nodes/sequence-item.ts`) applies the floor after the `after:` logic. This covers parallel tracks, which reach `sequenceItem` directly.
 - `GroupNode.place` and `ParallelNode.place` floor their own start by the container's own wave and by its lead wave.
 
-**Accumulation.** For each member, `sequenceItem` sets `memberEnd[k] = max(memberEnd[k], box.x + box.width + ITEM_INSET_PX)`.
+**Accumulation.** For each member, `sequenceItem` sets `memberEnd[k] = max(memberEnd[k], start + span(days))`, its duration end (`itemSpanPx` from the placed start).
 
-- This is the lane cursor's `itemLogicalEnd` formula (`sequenceRowTrack`), including the `MIN_ITEM_WIDTH` clamp.
+- This is how far the lane cursor advances past an item (`sequenceRowTrack`). The minimum bar width never enters it: a bar drawn wider than its duration is presentation ([`scheduler-unification.md`](./scheduler-unification.md) §8 decision 6).
 - Group boxes and caption spill never enter it.
 
 **Seeds.** Each pass resets the entity edge maps to the anchor and dated-milestone baseline, resets `placedItems` and `itemFlowKey`, then seeds:
@@ -799,7 +799,7 @@ Effects:
 - `visualRight(i) = box.x + box.width ≤ E_j − 6 ≤ S_k − 6`;
 - `visualLeft(l) = logicalLeft(l) + 6 ≥ S_k + 6`.
 
-So bars of different waves always have a gutter of at least 12 px between them (2 × `ITEM_INSET_PX`), including inside isolated regions. The boundary line sits in that gutter.
+So bars of different waves always have a gutter of at least 12 px between them (2 × `ITEM_INSET_PX`), including inside isolated regions. The boundary line sits in that gutter. The one exception is a bar drawn at its minimum width: its wave closes at its duration end, so the bar may paint past the boundary (presentation, as above).
 
 ### 8.5 Engine C (days)
 
@@ -820,7 +820,7 @@ Nested regions contribute nothing to the barrier, because engine A does not draw
 Engines A and C produce the same schedule unless one of the divergences of [`scheduler-unification.md`](./scheduler-unification.md) §1.2 triggers. The engine divergence register (`packages/layout/test/engine-divergences.json`, checked by `engine-divergence-register.test.ts` on every sample under `examples/` and `tests/`) lists each place they differ on the corpus: a new difference fails the test, and a fix has to delete its entry.
 
 - **(a)** settled by F1: an `after:` on a lane or group child starts at `max(previous item end, refs)` in both engines, so the register carries no entry for it;
-- **(b)** a short item: engine A's bar is at least `MIN_ITEM_WIDTH` wide, and the lane cursor advances past it;
+- **(b)** a short item: engine A draws the bar at least `MIN_ITEM_WIDTH` wide. Since F3 that is presentation only: the lane cursor and the wave barrier take the duration end in both engines, and the row packer keeps the painted bar, so a following bar drops a row. The register keeps an entry for each clamped bar's own drawn width, and none for the items after it;
 - **(c)** settled by F3: a group's spilled caption used to move engine A's lane cursor; the cursor now takes the group's compact end in both engines, and the row packer keeps the painted box, so a following item drops a row instead of starting later;
 - **(d)** settled by F3: a group track that binds a parallel join used to add an 8 px tail gutter in engine A; the parallel now joins on its latest track end in both engines;
 - **(e)** settled by F2: an `after:` on a group that is a track of a parallel starts it at `max(the parallel's start, refs)` in both engines;
