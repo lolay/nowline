@@ -1,0 +1,3 @@
+```release-note:fixed
+A `nowline v1 locale:fr-CA` directive line highlights again: `nowline` and `v1` lost their colour whenever the line carried a `locale:` property, and `locale:` now colours as a key. The `label:` key of a `scale` block colours like `label-every:`.
+```

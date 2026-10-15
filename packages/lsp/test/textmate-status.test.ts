@@ -1,13 +1,12 @@
 // The TextMate grammar colors built-in status values on its own, without the
 // language server, so its status pattern has to track the validator's
-// vocabulary by hand. `BUILTIN_STATUSES` here is the LSP's mirror of the
-// validator's set; `providers/completion.test.ts` fails if the two drift, and
-// this test fails if the grammar drifts from the mirror.
+// vocabulary by hand. `BUILTIN_STATUSES` is core's table, the one the
+// validator checks; this test fails if the grammar drifts from it.
 
 import { readFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
+import { BUILTIN_STATUSES } from '@nowline/core/internal';
 import { describe, expect, it } from 'vitest';
-import { BUILTIN_STATUSES } from '../src/references/ast-utils.js';
 
 const GRAMMAR = fileURLToPath(
     new URL('../../../grammars/nowline.tmLanguage.json', import.meta.url),
