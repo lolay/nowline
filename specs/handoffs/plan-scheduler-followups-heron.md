@@ -1,7 +1,7 @@
 ```text
 --- KICKOFF: begin orchestration at [deep] ---
 
-  Status: 0/6 groups done | last review: — | current: nowline m1 s1 [exec] | updated 2026-10-15
+  Status: 1/6 groups done | last review: wave-1 PASS | current: nowline m1 s2 [deep] | updated 2026-10-15
 
   mode: unattended | proposed unattended (harness=claude-code runner=cloud; CLAUDE_CODE_REMOTE=true, assigned branch) | guard 3x min $50 | fixups 2 | confirmed 2026-10-15 session ef0db142-6669-5058-893b-a118b7ea2d61 by Kickoff prompt: Run in unattended mode.
 
@@ -33,7 +33,7 @@
 |---|---|---|
 | 1 [exec] m1 s1 | ~1.3M | ~$0.65 |
 | 2 [deep] m1 s2, m2 s1-s4, m3 s1-s2, m4 s1 | ~36M | ~$19 |
-| 3 [exec] m4 s2-s3 | ~2.7M | ~$1.1 |
+| 3 [exec] m4 s2-s4 | ~2.7M | ~$1.1 |
 | orchestrator | ~12M | ~$9.9 |
 | **Total** | ~52M | ~$31 |
 
@@ -75,7 +75,7 @@ Branch: `claude/friendly-babbage-qlcz6d` (harness-assigned task branch, fast-for
 
 ## m1 - Decisions and item pins
 
-#### s1 - [exec] Record the decisions in the spec
+#### s1 - [exec] Record the decisions in the spec (done)
 `specs/scheduler-unification.md`: §8 gains decisions 5-13 above in the existing format (a "Gary, 2026-10-15:" block continuing the numbering); §5 gains rows F6 (dot), F7 (caption cap) and F8 (pin removal), and the F2 and F3 rows state their decisions, with (f) "resolved by F8". Docs-only, no fragment. Acceptance: §5 and §8 carry every decision above, wording consistent with the spec's style; no other file changes.
 
 --- WAVE 2 [deep] ---
@@ -125,6 +125,9 @@ First add a test that A's start ≥ C's start (projected, within float tolerance
 #### s3 - [exec] Close out m4.11
 Spec: Status line ("Implemented: m1 to m3 and F1 to F8"), §9 as-built notes for each follow-up, §1.2 pointers. `specs/milestones.md`: strike the m4.11 row and update its section. waves.md §8.6: no divergences remain beyond the recorded (b) presentation entries. Confirm the register holds only decision-6 entries. Docs-only.
 
+#### s4 - [exec] Merge `origin/main` once more
+Added by Gary, 2026-10-15 ("after all is done, also, use an [exec] subagent to merge any changes from main"). `git fetch origin main` and `git merge origin/main` into the task branch (a merge commit, never a rebase); resolve conflicts per `.claude/skills/steward/SKILL.md`, regenerating lockfiles and generated files with the repo's tooling. If main brought renderer or layout changes, re-run G1 against the pre-merge HEAD merged state and declare any byte change the merge itself causes in the commit body; snapshots and goldens move only where main's own change requires it. `make pre-commit` green after the merge. If main has nothing new, an empty commit `m4.s4 Merge origin/main (already up to date)`. A conflict where both sides changed the same logic and picking either loses behaviour: return `needs_info`.
+
 ## Verification
 
 - Per step: G1/G2/G3 as above, `python3 scripts/changelog.py check`, and the step's new test failing on its `from`.
@@ -132,6 +135,8 @@ Spec: Status line ("Implemented: m1 to m3 and F1 to F8"), §9 as-built notes for
 - At completion the parent removes this plan and its handoff in a last commit and asks before opening a PR.
 
 ## Review log
+
+review wave-1 (nowline m1 s1) 4e3870f..c3e5c96: PASS - spec §5/§8 carry decisions 5-13; F6-F8 rows added; tables well-formed; nothing outside the spec changed - 2026-10-15
 
 ## Token log
 
@@ -143,4 +148,6 @@ Spec: Status line ("Implemented: m1 to m3 and F1 to F8"), §9 as-built notes for
 - `$C` = (input × in + cache read × cached + 5m write × in × 1.25 + 1h write × in × 2.00 + output × out) / 1M.
 - In another harness, or on a model not listed here, count and price per plan-execution.md "Token accounting" and "Model price table" instead.
 
-tokens orchestrator-kickoff plan-scheduler-followups-heron (claude-opus-5-5): input ~210 / cache read ~23M / cache write ~0 5m + ~560k 1h / output ~83k | ~$10.78 API-equiv
+tokens orchestrator-kickoff plan-scheduler-followups-heron (claude-opus-5-5): input ~240 / cache read ~25M / cache write ~0 5m + ~670k 1h / output ~91k | ~$12.25 API-equiv
+tokens wave-1 nowline-m1-s1 (claude-sonnet-5-5): input ~14 / cache read ~480k / cache write ~92k / output ~6.6k | ~$0.39 API-equiv (output est.) session ef0db142-6669-5058-893b-a118b7ea2d61
+tokens review-wave-1 nowline-m1-s1 (claude-opus-5-5): input ~8 / cache read ~56k / cache write ~24k / output ~4k | ~$0.21 API-equiv (output est.) session ef0db142-6669-5058-893b-a118b7ea2d61
