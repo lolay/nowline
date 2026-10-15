@@ -1,0 +1,3 @@
+```release-note:fixed
+**Language server: no editor help for `depends:` and `team:`.** The LSP treated both as id-reference keys, offering completions, go-to-definition, references and rename on their values, but the validator accepts neither key and warns on both as unknown properties. A new test checks that every key the LSP treats as a reference is one the validator accepts.
+```

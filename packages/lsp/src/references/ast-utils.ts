@@ -52,7 +52,7 @@ import type { Range } from '../lsp-protocol.js';
  * Wider than the validator's `checkReferenceResolution` (which is strict only
  * for sequencing — `after` / `before` / `on`). Categorisation references
  * (`size` / `status` / `style` / `labels`), decoration references
- * (`icon` / `capacity-icon`), and ownership references (`owner` / `team`) are
+ * (`icon` / `capacity-icon`), and the ownership reference (`owner`) are
  * permissive in the validator (an undeclared id is not an error) but still
  * navigable when a declaration exists.
  *
@@ -60,14 +60,15 @@ import type { Range } from '../lsp-protocol.js';
  * form was removed in favor of the spec-mandated reverse direction.
  * Footnote association flows only from the footnote declaration's `on:`,
  * and the validator now rejects `footnote:` as a property on host entities.
+ *
+ * Every key here must be one the validator accepts; `reference-keys.test.ts`
+ * checks that.
  */
 export const REFERENCE_PROP_KEYS = new Set([
     'after',
     'before',
-    'depends',
     'on',
     'owner',
-    'team',
     'size',
     'status',
     'style',
