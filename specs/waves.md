@@ -829,8 +829,10 @@ Engines A and C produce the same schedule unless one of the divergences of [`sch
 - **(c)** settled by F3: a group's spilled caption used to move engine A's lane cursor; the cursor now takes the group's compact end in both engines, and the row packer keeps the painted box, so a following item drops a row instead of starting later;
 - **(d)** settled by F3: a group track that binds a parallel join used to add an 8 px tail gutter in engine A; the parallel now joins on its latest track end in both engines;
 - **(e)** settled by F2: an `after:` on a group that is a track of a parallel starts it at `max(the parallel's start, refs)` in both engines;
-- **(f)** engine A's lane cursor is monotone;
+- **(f)** settled by F8: engine A's lane cursor is monotone, and without item pins nothing moves a cursor back, so both engines agree by construction and the register carries no entry for it;
 - **(g)** item `date:` / `start:` pins: settled by removing them (F8 of [`scheduler-unification.md`](./scheduler-unification.md), [`dsl.md` § Pinning is not supported](./dsl.md#pinning-is-not-supported)). Both engines ignore the keys on an item, a group and a parallel, so the register carries no entry for it. (Engine A used to ignore a `start:` pin on a direct parallel track and let a lane item's `after:` push it; later both engines honoured the pin as `date:` > `start:` > `after:` > track cursor, with NL.W1001 when a wave floor moved it.)
+
+No divergence remains beyond the recorded (b) presentation entries: the register holds six, each a bar drawn at its minimum width (showcase `ship`, `brief` and `announce`, non-working-hide `qa`, non-working-show `qa`, size-and-capacity `f1`), and the open gaps that sit outside the register are listed in [`scheduler-unification.md`](./scheduler-unification.md) §9, "Known open gaps".
 
 The history of (a)–(g) is in [`handoffs/handoff-m2o-waves.md`](./handoffs/handoff-m2o-waves.md) §4.
 
