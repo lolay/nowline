@@ -340,6 +340,10 @@ These properties are specific to items. `status`, `owner`, `after`, and `before`
 | `capacity`  | number                | Concurrent capacity consumed by this item while it runs. Positive integer (`capacity:2`), decimal (`capacity:0.5`), or percent literal (`capacity:50%`) which parses to a decimal. Items only — not valid on parallel or group. See "Capacity" below. |
 | `wave`      | wave ref              | The single wave this item belongs to (`wave:build`). Must name a `wave` declared earlier in the roadmap section (Validation Rule 15). Inherited from the nearest enclosing `group` or `parallel` that carries `wave:`; never from a swimlane. An item with no effective wave is background work. See "Wave Declaration" below. |
 
+#### Pinning is not supported
+
+An item cannot be pinned to a fixed start date: `date:` and `start:` are not item properties. On an item, a group or a parallel they draw the unknown-property warning `NL.W0700` with the hint `after:<date>`, and layout ignores them. A pin that lands before the work ahead of it in its lane has finished would overlap the lane's order (Design Rule 6), and drawing that needs resource-level splits of the lane: resource contention and Gantt-chart scheduling, which [`principles.md`](./principles.md) excludes. Use `after:<date>` for "not before this date" (like every `after:`, it only ever delays), and an `anchor` or a `milestone` for a named date. Pinning may be revisited in the future.
+
 
 ### Capacity
 
@@ -1228,7 +1232,7 @@ The parser enforces these rules and produces clear error messages with file posi
 
 **Dates, durations, sizes, scales**
 
-1. `date:`, `start:` and `end:` values (on the roadmap, an anchor, a milestone, an item or a calendar declaration), and inline date pins in `after:` / `before:` (on an item, group or parallel, and a wave's `after:`), are ISO 8601 dates that name a real calendar day: `2026-02-30` is `NL.E0405`, not March 2, and the layout reads it as no date. An impossible inline pin is checked by this rule only, not by Rules 27 and 28, and layout ignores it: it neither moves nor caps the entity and draws no glyph.
+1. `date:`, `start:` and `end:` values (on the roadmap, an anchor, a milestone or a calendar declaration; on an item they are unknown keys, see "Pinning is not supported"), and inline date pins in `after:` / `before:` (on an item, group or parallel, and a wave's `after:`), are ISO 8601 dates that name a real calendar day: `2026-02-30` is `NL.E0405`, not March 2, and the layout reads it as no date. An impossible inline pin is checked by this rule only, not by Rules 27 and 28, and layout ignores it: it neither moves nor caps the entity and draws no glyph.
 2. `duration:` property values must match the raw duration pattern (`\d+(\.\d+)?[dwmqy]`) — literal only, no alias name lookup. `scale:` property values use the same raw duration pattern.
 3. `size:` property values must reference a `size` declaration in the roadmap section. Forward references are an error (rule 15 applies to `size:` the same way it applied to `duration:`).
 4. A `size` declaration's id must not match the raw duration pattern `\d+(\.\d+)?[dwmqy]` and must not be a bare `d`, `w`, `m`, `q`, or `y`. This avoids ambiguity at the call site.
@@ -1339,7 +1343,7 @@ Non-rules (intentionally not validated):
 
 ### Wave rules
 
-These rules apply to files that use `wave` or `wave:`. A roadmap *has waves* when its file declares at least one wave with a valid id. Every wave rule has a stable diagnostic code; messages are listed in [`specs/waves.md`](./waves.md) § 6.4. WV1–WV9 run per file (and, through `resolveIncludes`, on every participating included file, which is parsed without validation); WV10–WV12 run over a *layout scope* (the merged main lanes, and each isolated region), so they see `after:` edges that cross merged files; WV13–WV14 run on include edges. The WV numbers match [`specs/waves.md`](./waves.md) § 6.2, which also defines the layout insights WV15–WV18.
+These rules apply to files that use `wave` or `wave:`. A roadmap *has waves* when its file declares at least one wave with a valid id. Every wave rule has a stable diagnostic code; messages are listed in [`specs/waves.md`](./waves.md) § 6.4. WV1–WV9 run per file (and, through `resolveIncludes`, on every participating included file, which is parsed without validation); WV10–WV12 run over a *layout scope* (the merged main lanes, and each isolated region), so they see `after:` edges that cross merged files; WV13–WV14 run on include edges. The WV numbers match [`specs/waves.md`](./waves.md) § 6.2, which also defines the layout insights WV16–WV18 (WV15 is retired).
 
 | # | Rule | Severity | Code |
 | --- | --- | --- | --- |
@@ -1362,4 +1366,4 @@ WV10 reports one diagnostic per root cause, in one of five forms: `sequence` (a 
 
 **No duplicate diagnostics.** `wave` never draws the generic unknown-property warning `NL.W0700`; a wave's `before:` gets only `NL.E1105` (never `NL.E0411`); an element of a wave's `after:` that resolves to nothing gets only the existing "does not resolve" error, and one that resolves to the wrong kind gets only `NL.E1106`. An invalid `wave:` value makes the item background work for the later rules, and a container's wave wins over a conflicting descendant's.
 
-**Layout insights (WV15–WV18).** Four more codes come from layout, not validation: `NL.W1001` (a barrier moved an item's `date:`/`start:` pin), `NL.W1002` (the barrier solver hit its pass cap; unreachable for valid input), `NL.I1006` (one or more waves have no members), and `NL.I1007` (a wave overruns a dated milestone whose `after:` names it). See [`specs/rendering.md`](./rendering.md) "Waves". Outside the wave rules, layout also reports `NL.I1008` (info) when `date:`, `start:` or the date in an `after:` pins an item to a non-working day under `calendar:business`: the item starts on the next working day instead (see [`working-calendar.md` §6](./working-calendar.md)).
+**Layout insights (WV16–WV18).** Three more codes come from layout, not validation: `NL.W1002` (the barrier solver hit its pass cap; unreachable for valid input), `NL.I1006` (one or more waves have no members), and `NL.I1007` (a wave overruns a dated milestone whose `after:` names it). See [`specs/rendering.md`](./rendering.md) "Waves". `NL.W1001` (a barrier moved an item's `date:`/`start:` pin, WV15) is retired with item pins (see "Pinning is not supported"). Outside the wave rules, layout also reports `NL.I1008` (info) when the date in an item's `after:` falls on a non-working day under `calendar:business` and sets its start: the item starts on the next working day instead (see [`working-calendar.md` §6](./working-calendar.md)).

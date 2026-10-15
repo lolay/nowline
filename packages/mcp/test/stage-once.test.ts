@@ -130,8 +130,9 @@ describe('@nowline/mcp: one stage per call', () => {
 describe('@nowline/mcp: insights see the drawn header', () => {
     // A wide logo takes chrome width, so under a width cap the bars shrink and
     // each item spills its marker (NL.I1002). Insights from a logo-less layout
-    // miss that.
-    const narrow = { now: '2026-01-07', width: 320 };
+    // miss that. 400 px leaves the logo-less bars just over the 24 px a status
+    // dot needs to sit inside a bar, and the logo's bars under it.
+    const narrow = { now: '2026-01-07', width: 400 };
 
     it('render reports the spill a logo causes, which the same file without a logo lacks', async () => {
         const args = { ...narrow, format: 'svg', preview: false };

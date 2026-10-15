@@ -96,7 +96,7 @@ swimlane s "S"
         expect(a!.end.toISOString().slice(0, 10)).toBe('2026-01-17');
     });
 
-    it('date: property pins the item start absolutely', async () => {
+    it('an after: date on a Sunday starts the item on the next working day', async () => {
         // 2026-02-01 is a Sunday: rule 1 moves the start to the next working
         // day, Monday 02-02 (the end is Saturday 02-07, exclusive).
         const sched = await buildSchedule(
@@ -104,7 +104,7 @@ swimlane s "S"
 roadmap r "R" start:2026-01-05
 swimlane s "S"
   item a "A" duration:1w
-  item b "B" duration:1w date:2026-02-01
+  item b "B" duration:1w after:2026-02-01
 `,
             PINNED,
         );
@@ -114,13 +114,13 @@ swimlane s "S"
         expect(b!.end.toISOString().slice(0, 10)).toBe('2026-02-07');
     });
 
-    it('a date: pin on a working day keeps its date', async () => {
+    it('an after: date on a working day keeps its date', async () => {
         const sched = await buildSchedule(
             `nowline v1
 roadmap r "R" start:2026-01-05
 swimlane s "S"
   item a "A" duration:1w
-  item b "B" duration:1w date:2026-02-02
+  item b "B" duration:1w after:2026-02-02
 `,
             PINNED,
         );
@@ -129,18 +129,23 @@ swimlane s "S"
         expect(b!.end.toISOString().slice(0, 10)).toBe('2026-02-07');
     });
 
-    it('a start: pin on a Saturday starts the item on Monday', async () => {
+    it('ignores date: and start: on an item: it starts at the lane cursor', async () => {
+        // Work has no fixed start pin (specs/dsl.md § Item Properties): both
+        // keys are unknown on an item, so a starts at the roadmap start and
+        // b follows a, as if neither key were written.
         const sched = await buildSchedule(
             `nowline v1
 roadmap r "R" start:2026-01-05
 swimlane s "S"
   item a "A" duration:1w start:2026-01-10
+  item b "B" duration:1w date:2026-01-05
 `,
             PINNED,
         );
         const a = sched.items.get('a');
-        expect(a!.start.toISOString().slice(0, 10)).toBe('2026-01-12');
-        expect(a!.end.toISOString().slice(0, 10)).toBe('2026-01-17');
+        expect(a!.start.toISOString().slice(0, 10)).toBe('2026-01-05');
+        expect(a!.end.toISOString().slice(0, 10)).toBe('2026-01-10');
+        expect(sched.items.get('b')!.start.toISOString().slice(0, 10)).toBe('2026-01-12');
     });
 
     it('an after:DATE on a Saturday opens the dependent on the next Monday', async () => {
@@ -192,7 +197,7 @@ swimlane s "S"
 roadmap r "R" start:2026-01-05 calendar:full
 swimlane s "S"
   item a "A" duration:1w
-  item b "B" duration:1w date:2026-02-01
+  item b "B" duration:1w after:2026-02-01
 `,
             PINNED,
         );
@@ -202,9 +207,9 @@ swimlane s "S"
     });
 });
 
-describe('scheduleRoadmap — start: pins', () => {
+describe('scheduleRoadmap — no item start: pins', () => {
     // Layout's pixel expectations for the same sources are in layout.test.ts.
-    it('honours start: on an item that is a direct parallel track', async () => {
+    it('ignores start: on an item that is a direct parallel track', async () => {
         const sched = await buildSchedule(
             `nowline v1
 roadmap r "R" start:2026-01-05 scale:1w
@@ -216,10 +221,10 @@ swimlane s "S"
             PINNED,
         );
         expect(sched.items.get('a')!.start.toISOString().slice(0, 10)).toBe('2026-01-05');
-        expect(sched.items.get('b')!.start.toISOString().slice(0, 10)).toBe('2026-01-12');
+        expect(sched.items.get('b')!.start.toISOString().slice(0, 10)).toBe('2026-01-05');
     });
 
-    it('lets start: win over after: on a lane item', async () => {
+    it('ignores start: beside after: on a lane item, so after: sets the start', async () => {
         const sched = await buildSchedule(
             `nowline v1
 roadmap r "R" start:2026-01-05 scale:1w
@@ -229,7 +234,7 @@ swimlane s "S"
 `,
             PINNED,
         );
-        expect(sched.items.get('b')!.start.toISOString().slice(0, 10)).toBe('2026-01-12');
+        expect(sched.items.get('b')!.start.toISOString().slice(0, 10)).toBe('2026-01-26');
     });
 });
 
@@ -814,7 +819,7 @@ swimlane apps
         expect(w2?.end.toISOString().slice(0, 10)).toBe('2026-02-23');
     });
 
-    it('Example 9 pin variant: a date: pin becomes max(pin, F)', async () => {
+    it('Example 9 after: variant: an after: date becomes max(date, F)', async () => {
         const { sched } = await buildWaveSchedule(`nowline v1
 
 roadmap dates "Dates vs barriers" start:2026-01-05 scale:1w calendar:full
@@ -829,7 +834,7 @@ swimlane infra
   item i2 duration:2w wave:w2 after:budget
 swimlane apps
   item a1 duration:1w wave:w1
-  item a2 duration:2w wave:w2 date:2026-01-19
+  item a2 duration:2w wave:w2 after:2026-01-19
 `);
         expectItems(sched, FULL_WEEK, { a2: [4, 6] });
     });

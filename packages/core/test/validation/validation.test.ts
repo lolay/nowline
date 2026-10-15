@@ -1156,6 +1156,46 @@ swimlane s
         expect(hit).not.toMatch(/remaining:/);
     });
 
+    it('NL.W0700: date: and start: on an item warn and suggest after:<date>', async () => {
+        // Work has no fixed start pin (specs/dsl.md § Item Properties).
+        const r = await parse(
+            `roadmap r "R" start:2026-01-05\nswimlane s\n  item a duration:1w date:2026-02-02\n  item b duration:1w start:2026-02-09\n`,
+        );
+        const warnings = warningMessages(r.diagnostics).filter((m) => /Unknown property/.test(m));
+        expect(warnings).toEqual([
+            'Unknown property "date" on item "a". The renderer ignores it. Did you mean "after:<date>"?',
+            'Unknown property "start" on item "b". The renderer ignores it. Did you mean "after:<date>"?',
+        ]);
+        expect(errorMessages(r.diagnostics)).toEqual([]);
+    });
+
+    it('NL.W0700: date: on a group or parallel suggests after:<date>; on a swimlane it does not', async () => {
+        const r = await parse(
+            `${[
+                `roadmap r "R" start:2026-01-05`,
+                `swimlane s date:2026-02-02`,
+                `  group g start:2026-02-02`,
+                `    item a duration:1w`,
+                `  parallel p date:2026-02-02`,
+                `    item b duration:1w`,
+            ].join('\n')}\n`,
+        );
+        const warnings = warningMessages(r.diagnostics).filter((m) => /Unknown property/.test(m));
+        expect(warnings).toHaveLength(3);
+        // An inline date in after: is not valid on a swimlane (Validation Rule 24a).
+        expect(warnings.find((m) => /on swimlane/.test(m))).not.toMatch(/after:<date>/);
+        expect(warnings.filter((m) => /Did you mean "after:<date>"\?/.test(m))).toHaveLength(2);
+    });
+
+    it('NL.W0700: roadmap start: and anchor or milestone date: stay known', async () => {
+        const r = await parse(
+            `roadmap r "R" start:2026-01-05\nanchor k date:2026-01-12\nswimlane s\n  item a duration:1w\nmilestone m date:2026-02-02\n`,
+        );
+        expect(warningMessages(r.diagnostics).filter((m) => /Unknown property/.test(m))).toEqual(
+            [],
+        );
+    });
+
     it('NL.W0700: documented per-entity properties produce no warnings', async () => {
         const r = await parse(
             `${[

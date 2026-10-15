@@ -19,12 +19,12 @@ import { propValue, propValues } from '../dsl-utils.js';
 import { groupHasFill, groupTitleTabWidth } from '../group-title-tab-geometry.js';
 import { computeContainerInlineDatePins, pickInlineDate } from '../inline-date-pin-geometry.js';
 import type { LayoutContext, LayoutHelpers, TrackCursor } from '../layout-context.js';
+import { resolvePinnedOrSequentialStart } from '../start-rules.js';
 import { resolveStyle } from '../style-resolution.js';
 import {
     GROUP_BOTTOM_PAD_PX,
     GROUP_TITLE_TAB_GUTTER_PX,
     GROUP_TITLE_TAB_HEIGHT_PX,
-    TRACK_BLOCK_TAIL_GUTTER_PX,
 } from '../themes/shared.js';
 import type { BoundingBox, PositionedGroup } from '../types.js';
 import { waveFloorX } from '../wave-layout.js';
@@ -42,8 +42,8 @@ export class GroupNode {
 
     /**
      * Sequence children inside the group's content area, advance the
-     * parent `cursor` past the group's right edge plus
-     * `TRACK_BLOCK_TAIL_GUTTER_PX` of breathing room, and return a
+     * parent `cursor` to the group's compact end (its children's
+     * logical ends, never a caption spill or a gutter), and return a
      * `PositionedGroup` whose `box.height` covers the chiclet pad,
      * every row-packed child row, and the bottom pad.
      */
@@ -51,11 +51,18 @@ export class GroupNode {
         const { node } = this;
         const { helpers } = this;
         const style = resolveStyle('group', node.properties, ctx.styleCtx);
-        // The group's own wave and its lead wave floor its start, so its
-        // box never opens in a column before its first piece of work
-        // (specs/waves.md §5.1). A no-op without waves, and for a lane
-        // child, whose `resolveChildStart` already applied it.
-        const startX = waveFloorX(node, cursor.x, ctx);
+        // The group starts after every `after:` term, then its own wave and
+        // its lead wave floor it, so its box never opens in a column before
+        // its first piece of work (specs/waves.md §5.1). A lane child's
+        // cursor already sits there (`resolveChildStart`), so this is the
+        // identity for it; a parallel's group track starts at the parallel's
+        // start, so this is where its `after:` applies
+        // (specs/scheduler-unification.md §8 decision 5).
+        const startX = waveFloorX(
+            node,
+            resolvePinnedOrSequentialStart(node.properties, cursor.x, ctx),
+            ctx,
+        );
         // In a roadmap with waves, a group with no title, no `style:` and
         // no `labels:` that carries `wave:` only assigns membership: it
         // draws no bracket, which would otherwise sit exactly on the wave
@@ -107,7 +114,7 @@ export class GroupNode {
             ctx,
             helpers,
         );
-        const { children, timeCursorX } = track;
+        const { children, timeCursorX, barRightX } = track;
 
         const innerHeight = Math.max(step, track.packer.usedHeight());
         // The group's painted box hugs everything its children put on
@@ -138,8 +145,13 @@ export class GroupNode {
             width: boxRightX - boxLeftX,
             height: topPad + innerHeight + bottomPad,
         };
-        cursor.x = timeCursorX + TRACK_BLOCK_TAIL_GUTTER_PX;
-        cursor.maxX = Math.max(cursor.maxX, cursor.x);
+        // No tail gutter: a parallel joins on its tracks' ends, as engine
+        // C does (specs/scheduler-unification.md §8 decision 8).
+        // `cursor.x` is the time end; `cursor.maxX` the rightmost bar
+        // edge, so a parallel's bracket still encloses a bar drawn at its
+        // minimum width (specs/scheduler-unification.md §8 decision 6).
+        cursor.x = timeCursorX;
+        cursor.maxX = Math.max(cursor.maxX, barRightX, timeCursorX);
         // The painted `box.height` is the group's tight visual
         // footprint (chiclet + content + bottomPad). The cursor
         // advance, however, must include one inter-row gap

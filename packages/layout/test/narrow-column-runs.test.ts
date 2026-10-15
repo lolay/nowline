@@ -167,8 +167,11 @@ describe('narrow-column runs leave other cases unchanged', () => {
     it('keeps month and quarter labels, which use the edge-column rule', async () => {
         const months = await ticks('1m', [SUMMER_FRIDAYS]);
         expect(months.map(([, l]) => l)).toEqual(['Jun', 'Jul', 'Aug', 'Sep', undefined]);
+        // At 1q the data-migration caption spills past the Q3 axis end, so
+        // the axis gains the labelled Q4 column (rendering.md § "Caption cap
+        // at the chart's end").
         const quarters = await ticks('1q', [SUMMER_FRIDAYS]);
-        expect(quarters.map(([, l]) => l)).toEqual(['Q2 2026', 'Q3 2026', undefined]);
+        expect(quarters.map(([, l]) => l)).toEqual(['Q2 2026', 'Q3 2026', 'Q4 2026', undefined]);
     });
 
     it('does not move the ticks of a file without declarations', async () => {

@@ -149,15 +149,19 @@ describe('Example B under hide: a holiday inside a bar pushes its end out', () =
         expect(m.hiddenDate).toBe('2026-11-28');
     });
 
-    it('ticks [0, none], [24, Nov 30], [64, none]; width 64, ending 2026-12-07', async () => {
+    it('ticks [0, none], [24, Nov 30], [64, Dec 07], [104, none]; width 104, ending 2026-12-14', async () => {
         const { model } = await lay(exampleB(), 'hide');
+        // QA's caption spills past the content end at 64, so the axis gains
+        // the labelled Dec 07 column (rendering.md § "Caption cap at the
+        // chart's end").
         expect(ticksOf(model)).toEqual([
             [0, undefined],
             [24, 'Nov 30'],
-            [64, undefined],
+            [64, 'Dec 07'],
+            [104, undefined],
         ]);
-        expect(model.timeline.box.width).toBe(64);
-        expect(iso(model.timeline.endDate)).toBe('2026-12-07');
+        expect(model.timeline.box.width).toBe(104);
+        expect(iso(model.timeline.endDate)).toBe('2026-12-14');
     });
 
     it('carries the titled holiday run, and a plain weekend run with no titles key', async () => {
@@ -171,6 +175,7 @@ describe('Example B under hide: a holiday inside a bar pushes its end out', () =
                 titles: ['Thanksgiving'],
             },
             { x: 64, width: 0, from: '2026-12-05', through: '2026-12-06' },
+            { x: 104, width: 0, from: '2026-12-12', through: '2026-12-13' },
         ]);
     });
 });
@@ -189,15 +194,17 @@ describe('Example B under show: the bar crosses the holiday', () => {
         expect('hiddenDate' in m).toBe(false);
     });
 
-    it('ticks [0, Nov 23], [56, Nov 30], [112, none]; width 112, ending 2026-12-07', async () => {
+    it('ticks [0, Nov 23], [56, Nov 30], [112, Dec 07], [168, none]; width 168, ending 2026-12-14', async () => {
         const { model } = await lay(exampleB(), 'show');
+        // QA's spilled caption adds the Dec 07 column, as under hide.
         expect(ticksOf(model)).toEqual([
             [0, 'Nov 23'],
             [56, 'Nov 30'],
-            [112, undefined],
+            [112, 'Dec 07'],
+            [168, undefined],
         ]);
-        expect(model.timeline.box.width).toBe(112);
-        expect(iso(model.timeline.endDate)).toBe('2026-12-07');
+        expect(model.timeline.box.width).toBe(168);
+        expect(iso(model.timeline.endDate)).toBe('2026-12-14');
     });
 
     it('draws the titled run as a band at every scale, and the weekend as a band', async () => {
@@ -212,6 +219,7 @@ describe('Example B under show: the bar crosses the holiday', () => {
                 band: true,
             },
             { x: 96, width: 16, from: '2026-12-05', through: '2026-12-06', band: true },
+            { x: 152, width: 16, from: '2026-12-12', through: '2026-12-13', band: true },
         ]);
     });
 });
@@ -675,10 +683,10 @@ describe('Example B labels (5b)', () => {
             expect(m.center.y).toBe(model.timeline.markerRow.y);
         });
 
-        it('has a two-row marker row and keeps the 282.32 canvas', async () => {
+        it('has a two-row marker row and keeps the 312 canvas', async () => {
             const { model } = await lay(exampleB(), 'show');
             expect(model.timeline.markerRow.height).toBe(52);
-            expect(model.width).toBeCloseTo(282.32, 5);
+            expect(model.width).toBeCloseTo(312, 5);
         });
 
         it('keeps the weekend band free of label keys', async () => {
@@ -698,7 +706,7 @@ describe('Example B labels (5b)', () => {
                 through: '2026-11-29',
                 titles: ['Thanksgiving'],
             });
-            expect(model.timeline.endDate.toISOString().slice(0, 10)).toBe('2026-12-07');
+            expect(model.timeline.endDate.toISOString().slice(0, 10)).toBe('2026-12-14');
         }
     });
 
@@ -708,7 +716,7 @@ describe('Example B labels (5b)', () => {
             for (const key of LABEL_KEYS) expect(key in run, key).toBe(false);
         }
         expect(model.timeline.markerRow.height).toBe(26);
-        expect(model.width).toBeCloseTo(250.32, 5);
+        expect(model.width).toBeCloseTo(264, 5);
     });
 });
 

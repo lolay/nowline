@@ -24,21 +24,31 @@ import {
     computeTitleBarExtra,
     ITEM_CAPTION_INSET_X_PX,
     ITEM_CAPTION_META_BASELINE_OFFSET_PX,
+    ITEM_CAPTION_META_FONT_SIZE_PX,
+    ITEM_CAPTION_TITLE_FONT_SIZE_PX,
     itemCaptionLastBaselineOffset,
     itemTitleFirstLineRightReservePx,
     LABEL_CHIP_GAP_ABOVE_PROGRESS_STRIP_PX,
     LABEL_CHIP_GAP_BETWEEN_PX,
     LABEL_CHIP_HEIGHT_PX,
     LABEL_CHIP_ROW_STEP_PX,
+    layoutSpillCluster,
+    MIN_BAR_WIDTH_FOR_DOT_PX,
+    MIN_BAR_WIDTH_FOR_FOOTNOTE_PX,
     MIN_BAR_WIDTH_FOR_LINK_AND_DOT_PX,
     packSpillChips,
     type SpillChipPack,
 } from '../item-bar-geometry.js';
 import { type LayoutContext, scheduledItemDays } from '../layout-context.js';
 import { resolveLabelChipStyle, resolveStyle, type StyleContext } from '../style-resolution.js';
-import { estimateTextWidth } from '../text-measure.js';
+import { ellipsizeToWidth, estimateTextWidth } from '../text-measure.js';
 import type { Theme } from '../themes/index.js';
-import { MIN_ITEM_WIDTH, PADDING_PX, PROGRESS_STRIP_HEIGHT_PX } from '../themes/shared.js';
+import {
+    ITEM_INSET_PX,
+    MIN_ITEM_WIDTH,
+    PADDING_PX,
+    PROGRESS_STRIP_HEIGHT_PX,
+} from '../themes/shared.js';
 import type {
     LinkIconKind,
     PositionedCapacity,
@@ -107,8 +117,14 @@ export interface ItemMeasure extends ItemNodeGeometry {
         title: string;
         /** A narrow bar pushes the link icon, and with it the caption, out of the bar. */
         iconSpills: boolean;
-        /** The lines the title paints on (see `resolveCaptionTitleLines`). */
+        /**
+         * The lines the title paints on (see `resolveCaptionTitleLines`),
+         * each truncated with `…` when the spilled caption is capped at the
+         * chart's end (`capCaptionAtAxisEnd`).
+         */
         lines: string[];
+        /** True when the cap truncated a line; the full title stays the bar's tooltip. */
+        truncated: boolean;
         /** Baseline of the caption's last line, px from the bar's top. */
         lastBaseline: number;
     };
@@ -454,6 +470,70 @@ export function computeChipBarExtra(
     return Math.max(0, requiredHeight - bandwidth);
 }
 
+/** What `capCaptionAtAxisEnd` needs from the item measure. */
+interface CaptionCapInput {
+    /** The caption spills right of the bar (a forced icon spill included). */
+    textSpills: boolean;
+    iconSpills: boolean;
+    /** The bar's visual right edge, where the spill column starts. */
+    barRightX: number;
+    visualWidth: number;
+    footnoteCount: number;
+    meta: ResolvedItemMeta;
+}
+
+/**
+ * Cap a spilled caption at the chart's end (specs/scheduler-unification.md
+ * §8 decision 12). When the spill column (`layoutSpillCluster`: icon,
+ * caption, footnotes, dot) would end past `AxisColumns.captionCapX`, one
+ * column past the axis end, every title line wider than the room left is
+ * truncated with `…` so the column ends there; finalize f2 grows the axis
+ * by that column. The meta line is never truncated. A caption in the
+ * middle of the chart, or one that ends inside the extra column, keeps its
+ * lines.
+ */
+function capCaptionAtAxisEnd(
+    lines: string[],
+    input: CaptionCapInput,
+    ctx: LayoutContext,
+): { lines: string[]; truncated: boolean } {
+    const columns = ctx.axisColumns;
+    if (!input.textSpills || !columns) return { lines, truncated: false };
+    const titleWidth = Math.max(
+        0,
+        ...lines.map((line) => estimateTextWidth(line, ITEM_CAPTION_TITLE_FONT_SIZE_PX)),
+    );
+    const { metaText, capacityTrailingWidth } = input.meta;
+    const metaWidth =
+        (metaText ? estimateTextWidth(metaText, ITEM_CAPTION_META_FONT_SIZE_PX) : 0) +
+        capacityTrailingWidth;
+    const captionWidth = Math.max(titleWidth, metaWidth);
+    const spill = layoutSpillCluster({
+        barRightX: input.barRightX,
+        iconSpills: input.iconSpills,
+        captionWidth,
+        footnoteCount: input.visualWidth < MIN_BAR_WIDTH_FOR_FOOTNOTE_PX ? input.footnoteCount : 0,
+        dotSpills: input.visualWidth < MIN_BAR_WIDTH_FOR_DOT_PX,
+    });
+    const capX = columns.captionCapX(input.barRightX);
+    if (spill.rightX <= capX + CAPTION_CAP_TOLERANCE_PX || spill.captionX === null) {
+        return { lines, truncated: false };
+    }
+    // The room for a title line: up to the cap, less what trails the caption.
+    const trailing = spill.rightX - (spill.captionX + captionWidth);
+    const room = capX - spill.captionX - trailing;
+    let truncated = false;
+    const out = lines.map((line) => {
+        const fitted = ellipsizeToWidth(line, room, ITEM_CAPTION_TITLE_FONT_SIZE_PX);
+        if (fitted !== line) truncated = true;
+        return fitted;
+    });
+    return { lines: out, truncated };
+}
+
+/** Pixel float noise the caption cap ignores. */
+const CAPTION_CAP_TOLERANCE_PX = 1e-6;
+
 /**
  * Measure `node` as a bar starting at `startX`, the snapped start
  * (`ctx.scale.startX`) it will be placed at. Pure: it writes nothing to
@@ -556,7 +636,22 @@ export function measureItem(
     // out anyway, that wrap is dropped (a spilled break-free title is a
     // single line to the right). A title with explicit `\n` breaks keeps the
     // author's lines whether it stays in-bar or spills.
-    const lines = resolveCaptionTitleLines(title, captionFit.fit, iconSpills);
+    // A spilled caption that would run past the axis end is truncated to
+    // end within one column past it (specs/rendering.md § "Caption cap at
+    // the chart's end").
+    const capped = capCaptionAtAxisEnd(
+        resolveCaptionTitleLines(title, captionFit.fit, iconSpills),
+        {
+            textSpills,
+            iconSpills,
+            barRightX: startX + ITEM_INSET_PX + visualWidth,
+            visualWidth,
+            footnoteCount: footnoteIndicators.length,
+            meta,
+        },
+        ctx,
+    );
+    const lines = capped.lines;
 
     // A chip set that does not fit inside the bar moves to the spill column
     // and packs into rows capped at the bar's visual width.
@@ -600,7 +695,14 @@ export function measureItem(
             rowCount: chipRowCount,
         },
         footnoteIndicators,
-        caption: { ...captionFit, title, iconSpills, lines, lastBaseline },
+        caption: {
+            ...captionFit,
+            title,
+            iconSpills,
+            lines,
+            truncated: capped.truncated,
+            lastBaseline,
+        },
         barExtra: Math.max(titleBarExtra, chipBarExtra),
     };
 }

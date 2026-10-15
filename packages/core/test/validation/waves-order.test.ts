@@ -542,7 +542,9 @@ describe('waves order: WV10 NL.E1103 variants', () => {
         expect(ds).toEqual([]);
     });
 
-    it('a date: pin replaces the flow, so it does not order the item', async () => {
+    it('a date: on an item cuts no flow: the key is ignored, so the item is still ordered', async () => {
+        // Work has no fixed start pin (specs/dsl.md § Item Properties): b
+        // still follows a in the lane, so it comes after a later wave.
         const ds = await check(
             src(
                 'swimlane s',
@@ -550,7 +552,14 @@ describe('waves order: WV10 NL.E1103 variants', () => {
                 '  item b duration:1w wave:w1 date:2026-01-05',
             ),
         );
-        expect(ds).toEqual([]);
+        expect(ds.map((d) => [d.line, d.code, d.message])).toEqual([
+            [10, 'NL.E1103', sequenceMessage(['b'], 'w1', '"a"', 'w2', 'swimlane "s"')],
+            [
+                10,
+                'NL.W0700',
+                'Unknown property "date" on item "b". The renderer ignores it. Did you mean "after:<date>"?',
+            ],
+        ]);
     });
 
     it('cyclic after: input terminates and leaves the cycle to the cycle check', async () => {

@@ -199,7 +199,7 @@ describe('a start inside a working day keeps its fraction', () => {
 roadmap r "R" start:2026-01-05 scale:1w
 
 swimlane a "A"
-  item mid "Mid" duration:1w date:2026-01-07
+  item mid "Mid" duration:1w after:2026-01-07
 `;
 
     it('Wednesday start under show: the bar crosses the weekend, 22-66', async () => {
@@ -347,11 +347,11 @@ roadmap r "R" start:2026-01-05 scale:1w
 swimlane s "S"
 ${body}
 `;
-    const pin = { key: 'date', pin: '2026-01-10', start: '2026-01-12' };
+    const pin = { key: 'after', pin: '2026-01-10', start: '2026-01-12' };
 
-    const dated = lane('  item d "D" duration:1w date:2026-01-10');
+    const dated = lane('  item d "D" duration:1w after:2026-01-10');
 
-    it('a date: pin on a Saturday starts on Monday Jan 12, box at 62, under show', async () => {
+    it('an after: date on a Saturday starts on Monday Jan 12, box at 62, under show', async () => {
         const { model } = await lay(dated, { nonWorking: 'show' });
         expect(item(model, 'd').nonWorkingPin).toEqual(pin);
         expect(boxLeft(model, 'd')).toBe(62);
@@ -360,7 +360,7 @@ ${body}
         ]);
     });
 
-    it('a date: pin on a Saturday starts on Monday Jan 12, box at 46, under hide', async () => {
+    it('an after: date on a Saturday starts on Monday Jan 12, box at 46, under hide', async () => {
         const { model } = await lay(dated, { nonWorking: 'hide' });
         expect(item(model, 'd').nonWorkingPin).toEqual(pin);
         expect(boxLeft(model, 'd')).toBe(46);

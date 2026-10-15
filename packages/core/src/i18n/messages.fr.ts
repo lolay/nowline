@@ -28,7 +28,6 @@ import type {
     I1008Args,
     W0701Args,
     W0702Args,
-    W1001Args,
     W1002Args,
     W1100Args,
     W1101Args,
@@ -396,8 +395,6 @@ export const messages: MessageBundle = {
         `La vague ${q(a.name)} a after:${a.ref}, mais ${q(a.ref)} est ${KIND_WITH_ARTICLE[a.kind]}. Le after: d'une vague accepte seulement des ancres, des jalons datés ou une date ISO\u00A0; pour qu'une vague attende du travail, placez ce travail dans une vague antérieure.`,
 
     // Avertissements de mise en page
-    'NL.W1001': (a: W1001Args) =>
-        `L'élément ${q(a.name)} est épinglé à ${a.pin} (${a.key}:), mais la vague ${q(a.wave)} ne peut pas démarrer avant le ${a.start}\u00A0; l'élément démarre au début de la vague.`,
     'NL.W1002': (a: W1002Args) =>
         `Les barrières de vagues ne se sont pas stabilisées après ${a.passes} passes de mise en page\u00A0; le calendrier dessiné pourrait donc ne pas respecter l'ordre des vagues. La roadmap comporte probablement un conflit d'ordre que la validation n'a pas détecté.`,
 

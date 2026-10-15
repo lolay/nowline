@@ -1,6 +1,7 @@
 // The worked examples of specs/waves.md §11 that the layout wave tests lay
 // out (engine A, engine C and the positioned wave model). `A2_PIN` in
-// Example 9 is replaced per test with the pin variant under test.
+// Example 9 is replaced per test with the variant under test: an `after:`
+// date, or a `date:` / `start:` the layout ignores.
 
 export const EXAMPLE_1 = `nowline v1
 

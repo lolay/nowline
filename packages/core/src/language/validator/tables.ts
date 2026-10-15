@@ -161,10 +161,9 @@ export const ENTITY_KNOWN_PROPS: Record<string, Set<string>> = {
         'after',
         'before',
     ]),
-    // `date:` and `start:` on items are read by `packages/layout/src/layout.ts`
-    // (`resolveChildStart`, `walkNode`) to pin an item to a fixed start date. Not
-    // documented in `specs/dsl.md` yet — left allow-listed so authors don't see
-    // a spurious warning for a working code path. See plan's out-of-scope note.
+    // An item has no `date:` or `start:`: it cannot be pinned to a fixed start
+    // date (`specs/dsl.md` § Item Properties, "Pinning is not supported"), so
+    // both keys draw this warning with the `after:<date>` concept hint below.
     ItemDeclaration: new Set([
         'size',
         'duration',
@@ -174,8 +173,6 @@ export const ENTITY_KNOWN_PROPS: Record<string, Set<string>> = {
         'before',
         'remaining',
         'capacity',
-        'date',
-        'start',
     ]),
     // size/duration/remaining/capacity on parallel/group are already errors via
     // `checkNoComputedProperties`, so we don't list them here.
@@ -198,10 +195,12 @@ export const ENTITY_KNOWN_PROPS: Record<string, Set<string>> = {
 // `status:` + `remaining:` (work *left*). Levenshtein can't bridge that gap, so
 // we map the concept directly. `requires` names a key the entity must support,
 // so the hint only fires where it's actionable (e.g. on an `item`, which has
-// `remaining`, not on a `roadmap` line).
+// `remaining`, not on a `roadmap` line). `entities`, when set, narrows it
+// further to the declarations where the suggested form is valid.
 const CONCEPT_ALIASES: ReadonlyArray<{
     keys: ReadonlySet<string>;
     requires: string;
+    entities?: ReadonlySet<string>;
     suggest: string;
 }> = [
     {
@@ -209,15 +208,33 @@ const CONCEPT_ALIASES: ReadonlyArray<{
         requires: 'remaining',
         suggest: 'status: + remaining:',
     },
+    {
+        // A fixed start date is not supported on work (`specs/dsl.md` §
+        // Item Properties); `after:<date>` is "not before". An inline date
+        // in `after:` is valid on an item, parallel and group only
+        // (Validation Rule 24a), so a swimlane gets no hint.
+        keys: new Set(['date', 'start']),
+        requires: 'after',
+        entities: new Set(['ItemDeclaration', 'ParallelBlock', 'GroupBlock']),
+        suggest: 'after:<date>',
+    },
 ];
 
 // Suggest the canonical property (or combination) for a known conceptual
 // mistake, gated to entities that actually support the target key. Returns
 // undefined when no concept matches so callers fall back to `suggestKey`.
-export function suggestConcept(key: string, known: ReadonlySet<string>): string | undefined {
+export function suggestConcept(
+    key: string,
+    known: ReadonlySet<string>,
+    entityType?: string,
+): string | undefined {
     const lower = key.toLowerCase();
     for (const alias of CONCEPT_ALIASES) {
-        if (alias.keys.has(lower) && known.has(alias.requires)) return alias.suggest;
+        if (!alias.keys.has(lower) || !known.has(alias.requires)) continue;
+        if (alias.entities && (entityType === undefined || !alias.entities.has(entityType))) {
+            continue;
+        }
+        return alias.suggest;
     }
     return undefined;
 }

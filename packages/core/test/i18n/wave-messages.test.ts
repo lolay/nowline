@@ -1,7 +1,7 @@
 // Wave diagnostics (NL.E1100-E1106, NL.W1100/W1101, NL.W0702, NL.E0202,
-// NL.W0701, NL.W1001/W1002, NL.I1006/I1007, and the NL.E0411 rewrite), plus
-// NL.I1008 (a pin on a non-working day), which shares the pin-insight shape
-// of NL.W1001 and the French structure checks below.
+// NL.W0701, NL.W1002, NL.I1006/I1007, and the NL.E0411 rewrite), plus
+// NL.I1008 (an `after:` date on a non-working day), which shares the French
+// structure checks below.
 // en-US strings are asserted verbatim against specs/waves.md section 6.4 and
 // the worked examples; fr is asserted structurally (every variant renders,
 // and it follows the U+00A0 punctuation convention of messages.fr.ts).
@@ -28,7 +28,6 @@ describe('wave codes are registered', () => {
         'NL.E1104',
         'NL.E1105',
         'NL.E1106',
-        'NL.W1001',
         'NL.W1002',
         'NL.W1100',
         'NL.W1101',
@@ -663,19 +662,9 @@ describe('NL.W0701 (Example 17)', () => {
     });
 });
 
-describe('NL.W1001 / NL.W1002 (Example 9)', () => {
-    it('W1001', () => {
-        expect(
-            en('NL.W1001', {
-                name: 'a2',
-                pin: '2026-01-19',
-                key: 'date',
-                wave: 'w2',
-                start: '2026-02-02',
-            }),
-        ).toBe(
-            'Item "a2" is pinned to 2026-01-19 (date:), but wave "w2" cannot start until 2026-02-02; the item starts at the wave start.',
-        );
+describe('NL.W1002', () => {
+    it('NL.W1001 (a wave floor moved an item pin) is retired with item pins', () => {
+        expect(ALL_CODES as readonly string[]).not.toContain('NL.W1001');
     });
     it('W1002', () => {
         expect(en('NL.W1002', { passes: 12 })).toBe(
@@ -729,30 +718,6 @@ describe('NL.I1008', () => {
     it('is registered', () => {
         expect(ALL_CODES).toContain('NL.I1008');
     });
-    it('date: pin on a Saturday', () => {
-        expect(
-            en('NL.I1008', {
-                name: 'a2',
-                pin: '2026-01-10',
-                key: 'date',
-                start: '2026-01-12',
-            }),
-        ).toBe(
-            'Item "a2" is pinned to 2026-01-10 (date:), a non-working day; it starts on 2026-01-12.',
-        );
-    });
-    it('start: pin', () => {
-        expect(
-            en('NL.I1008', {
-                name: 'a2',
-                pin: '2026-01-11',
-                key: 'start',
-                start: '2026-01-12',
-            }),
-        ).toBe(
-            'Item "a2" is pinned to 2026-01-11 (start:), a non-working day; it starts on 2026-01-12.',
-        );
-    });
     it('after:DATE pin', () => {
         expect(
             en('NL.I1008', {
@@ -770,11 +735,11 @@ describe('NL.I1008', () => {
             fr('NL.I1008', {
                 name: 'a2',
                 pin: '2026-01-10',
-                key: 'date',
+                key: 'after',
                 start: '2026-01-12',
             }),
         ).toBe(
-            "L'élément «\u00A0a2\u00A0» est épinglé à 2026-01-10 (date:), un jour non ouvré\u00A0; il démarre le 2026-01-12.",
+            "L'élément «\u00A0a2\u00A0» est épinglé à 2026-01-10 (after:), un jour non ouvré\u00A0; il démarre le 2026-01-12.",
         );
     });
     it('fr-CA and fr-FR inherit the fr message', () => {
@@ -1041,20 +1006,6 @@ describe('fr bundle', () => {
                 { field: 'description', there: 'd', here: 'e' },
             ],
         });
-        push('NL.W1001', {
-            name: 'a2',
-            pin: '2026-01-19',
-            key: 'date',
-            wave: 'w2',
-            start: '2026-02-02',
-        });
-        push('NL.W1001', {
-            name: 'a2',
-            pin: '2026-01-19',
-            key: 'start',
-            wave: 'w2',
-            start: '2026-02-02',
-        });
         push('NL.W1002', { passes: 12 });
         push('NL.I1006', { reason: 'one', name: 'w2' });
         push('NL.I1006', { reason: 'many', names: ['w2', 'w3'] });
@@ -1067,8 +1018,6 @@ describe('fr bundle', () => {
             wave: 'execute',
             end: '2026-03-23',
         });
-        push('NL.I1008', { name: 'a2', pin: '2026-01-10', key: 'date', start: '2026-01-12' });
-        push('NL.I1008', { name: 'a2', pin: '2026-01-11', key: 'start', start: '2026-01-12' });
         push('NL.I1008', { name: 'a2', pin: '2026-01-17', key: 'after', start: '2026-01-19' });
         push('NL.E0411', { key: 'after', type: 'milestone' });
         return out;

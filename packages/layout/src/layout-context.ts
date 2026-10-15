@@ -12,6 +12,7 @@ import type {
     ResolvedContent,
     SymbolDeclaration,
 } from '@nowline/core';
+import type { AxisColumns } from './axis-columns.js';
 import type { BandScale } from './band-scale.js';
 import { type resolveCalendar, resolveSizes } from './calendar.js';
 import type { FootnoteIndex } from './nodes/footnote-node.js';
@@ -33,13 +34,21 @@ import type { WorkingCalendar } from './working-calendar.js';
 
 /** Slim accumulator used while sequencing items into a track. */
 export interface TrackCursor {
-    /** Left edge where the next item begins. */
+    /**
+     * Where the next item begins, in time: the last child's duration end
+     * (a block's latest track end), never the minimum bar width or a
+     * caption spill (specs/scheduler-unification.md §8 decisions 6, 7).
+     */
     x: number;
     /** Top edge of the current row. */
     y: number;
     /** Accumulated height of the track. */
     height: number;
-    /** Rightmost edge reached. */
+    /**
+     * Rightmost bar edge reached, in logical space: the painted footprint,
+     * the minimum bar width included, never a caption spill. A parallel
+     * sizes its bracket on it.
+     */
     maxX: number;
 }
 
@@ -96,6 +105,13 @@ export interface LayoutContext {
     timeline: PositionedTimelineScale;
     scale: TimeScale;
     calendar: WorkingCalendar;
+    /**
+     * The natural axis as tick columns, for the caption cap at the chart's
+     * end (`measureItem`). Shared by the main lanes and every isolated
+     * region; omitted by contexts built outside the place phase, which then
+     * cap no caption.
+     */
+    axisColumns?: AxisColumns;
     bandScale: BandScale;
     entityLeftEdges: Map<string, number>;
     entityRightEdges: Map<string, number>;
@@ -203,6 +219,7 @@ export function createLayoutContext(
         timeline: PositionedTimelineScale;
         scale: TimeScale;
         calendar: WorkingCalendar;
+        axisColumns?: AxisColumns;
         bandScale: BandScale;
         waves?: WaveLayoutState;
     },
@@ -234,6 +251,7 @@ export function createLayoutContext(
         timeline: shared.timeline,
         scale: shared.scale,
         calendar: shared.calendar,
+        ...(shared.axisColumns ? { axisColumns: shared.axisColumns } : {}),
         bandScale: shared.bandScale,
         entityLeftEdges: new Map(),
         entityRightEdges: new Map(),

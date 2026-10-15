@@ -117,7 +117,7 @@ anchor sun "Sunday anchor" date:2026-01-11
 milestone sat "Saturday gate" date:2026-01-10
 
 swimlane a "A"
-  item pinned "Pinned" duration:1w date:2026-01-10
+  item pinned "Pinned" duration:1w after:2026-01-10
   item after "After" duration:1w after:2026-01-24
 `);
         expect(nonWorkingKeyPaths(layoutRoadmap(file, resolved))).toEqual([]);
@@ -147,7 +147,7 @@ anchor sun "Sunday anchor" date:2026-01-11
 milestone sat "Saturday gate" date:2026-01-10
 
 swimlane a "A"
-  item pinned "Pinned" duration:1w date:2026-01-10
+  item pinned "Pinned" duration:1w after:2026-01-10
 `);
         const paths = nonWorkingKeyPaths(layoutRoadmap(file, resolved));
         expect(paths).toEqual(

@@ -141,18 +141,22 @@ swimlane a "A"
         expect(model.milestones[0].center.x - o).toBe(152);
     });
 
-    it('business: week ticks at 0/40/80/120/160 labelled Jan 05, Jan 12, Jan 19, Jan 26', async () => {
+    it('business: week ticks at 0/40/80/120/160/200 labelled Jan 05 to Feb 02', async () => {
         const { model } = await lay(source('business'));
+        // W4's caption spills past the axis end at 160, so the axis gains
+        // the one labelled column the caption ends in (rendering.md §
+        // "Caption cap at the chart's end").
         expect(ticksOf(model)).toEqual([
             [0, 'Jan 05'],
             [40, 'Jan 12'],
             [80, 'Jan 19'],
             [120, 'Jan 26'],
-            [160, undefined],
+            [160, 'Feb 02'],
+            [200, undefined],
         ]);
-        expect(iso(model.timeline.endDate)).toBe('2026-02-02');
+        expect(iso(model.timeline.endDate)).toBe('2026-02-09');
         expect(model.timeline.pixelsPerDay).toBe(8);
-        expect(model.timeline.box.width).toBe(160);
+        expect(model.timeline.box.width).toBe(200);
     });
 
     it('business: the model carries the hidden weekends as zero-width runs', async () => {
@@ -165,6 +169,7 @@ swimlane a "A"
             [80, 0, '2026-01-17', '2026-01-18'],
             [120, 0, '2026-01-24', '2026-01-25'],
             [160, 0, '2026-01-31', '2026-02-01'],
+            [200, 0, '2026-02-07', '2026-02-08'],
         ]);
         // Optional keys appear only when present: a plain weekend has no
         // titles, and no seam is marked at the week scale.
@@ -197,14 +202,15 @@ swimlane a "A"
             [40, 'Jan 12'],
             [80, 'Jan 19'],
             [120, 'Jan 26'],
-            [160, undefined],
+            [160, 'Feb 02'],
+            [200, undefined],
         ]);
         const w4 = laneItems(model)[3];
         expect(w4.box.x - o).toBe(126);
         expect(w4.box.width).toBe(28);
         // 25 days at 40/7 px a day.
         expect(model.milestones[0].center.x - o).toBeCloseTo(142.857, 2);
-        expect(iso(model.timeline.endDate)).toBe('2026-02-02');
+        expect(iso(model.timeline.endDate)).toBe('2026-02-09');
         expect(model.timeline.nonWorking).toBeUndefined();
         expect(model.timeline.nonWorkingDisplay).toBeUndefined();
     });
@@ -281,13 +287,15 @@ swimlane a "A"
     });
 
     it('a Wednesday-ending length: drops the closing column label, keeping its tick', async () => {
-        // length:7d ends Wed Jan 14 (index 7); the last column is 16 px.
+        // length:7d ends Wed Jan 14 (index 7); the last column is 16 px. The
+        // 2d item's spilled caption ends before it, so the cap at the
+        // chart's end does not grow the axis.
         const { model } = await lay(`nowline v1
 
 roadmap r "R" start:2026-01-05 scale:1w length:7d
 
 swimlane a "A"
-  item a1 "A1" duration:1w
+  item a1 "A1" duration:2d
 `);
         expect(iso(model.timeline.endDate)).toBe('2026-01-14');
         expect(ticksOf(model)).toEqual([
@@ -311,11 +319,13 @@ swimlane a "A"
 `,
             { locale: 'fr-CA' },
         );
+        // The fifth label is the column W4's spilled caption ends in.
         expect(model.timeline.ticks.map((t) => t.label)).toEqual([
             'janv. 05',
             'janv. 12',
             'janv. 19',
             'janv. 26',
+            'févr. 02',
             undefined,
         ]);
     });
@@ -589,7 +599,7 @@ swimlane a
     });
 });
 
-// --- NL.I1008: a pin on a non-working day ---
+// --- NL.I1008: an after: date on a non-working day ---
 
 describe('NL.I1008 and PositionedItem.nonWorkingPin', () => {
     const lanes = (body: string, props = '') => `nowline v1
@@ -598,12 +608,12 @@ roadmap r "R" start:2026-01-05 scale:1w${props}
 
 ${body}`;
 
-    it('reports a date: pin on a Saturday (Mon Jan 12)', async () => {
+    it('reports an after:DATE pin on a Saturday at the roadmap start (Mon Jan 12)', async () => {
         const { model } = await lay(
-            lanes('swimlane s "S"\n  item d "D" duration:1w date:2026-01-10\n'),
+            lanes('swimlane s "S"\n  item d "D" duration:1w after:2026-01-10\n'),
         );
         expect(laneItems(model)[0].nonWorkingPin).toEqual({
-            key: 'date',
+            key: 'after',
             pin: '2026-01-10',
             start: '2026-01-12',
         });
@@ -612,28 +622,45 @@ ${body}`;
         expect(insight.lspSeverity).toBe(3);
         expect(insight.entityId).toBe('d');
         expect(insight.message).toBe(
-            'Item "d" is pinned to 2026-01-10 (date:), a non-working day; it starts on 2026-01-12.',
+            'Item "d" is pinned to 2026-01-10 (after:), a non-working day; it starts on 2026-01-12.',
         );
         expect(insight.data.args).toEqual({
             name: 'd',
             pin: '2026-01-10',
-            key: 'date',
+            key: 'after',
             start: '2026-01-12',
         });
     });
 
-    it('reports a start: pin on a Sunday', async () => {
+    it('reports an after:DATE pin on a Sunday', async () => {
         const { model } = await lay(
-            lanes('swimlane s "S"\n  item st "St" duration:1w start:2026-01-11\n'),
+            lanes('swimlane s "S"\n  item st "St" duration:1w after:2026-01-11\n'),
         );
         expect(laneItems(model)[0].nonWorkingPin).toEqual({
-            key: 'start',
+            key: 'after',
             pin: '2026-01-11',
             start: '2026-01-12',
         });
         expect(insightsOf(model, 'NL.I1008').map((i) => i.message)).toEqual([
-            'Item "st" is pinned to 2026-01-11 (start:), a non-working day; it starts on 2026-01-12.',
+            'Item "st" is pinned to 2026-01-11 (after:), a non-working day; it starts on 2026-01-12.',
         ]);
+    });
+
+    it('says nothing for date: or start: on an item: neither pins it', async () => {
+        // Work has no fixed start pin (specs/dsl.md § Item Properties): the
+        // keys are ignored, so the item starts at the roadmap start, a
+        // working day, and nothing reports.
+        const { model } = await lay(
+            lanes(
+                'swimlane s "S"\n  item d "D" duration:1w date:2026-01-10\nswimlane t "T"\n  item st "St" duration:1w start:2026-01-11\n',
+            ),
+        );
+        for (const lane of [0, 1]) {
+            const item = laneItems(model, lane)[0];
+            expect(item.box.x - model.timeline.originX).toBe(6);
+            expect('nonWorkingPin' in item).toBe(false);
+        }
+        expect(insightsOf(model, 'NL.I1008')).toEqual([]);
     });
 
     it('reports an after:DATE pin on a Saturday that set the start (Mon Jan 19)', async () => {
@@ -652,11 +679,11 @@ ${body}`;
 
     it('translates the message into French', async () => {
         const { model } = await lay(
-            lanes('swimlane s "S"\n  item d "D" duration:1w date:2026-01-10\n'),
+            lanes('swimlane s "S"\n  item d "D" duration:1w after:2026-01-10\n'),
         );
         const [insight] = insightsOf(model, 'NL.I1008', 'fr');
         expect(insight.message).toBe(
-            "L'élément «\u00A0d\u00A0» est épinglé à 2026-01-10 (date:), un jour non ouvré\u00A0; il démarre le 2026-01-12.",
+            "L'élément «\u00A0d\u00A0» est épinglé à 2026-01-10 (after:), un jour non ouvré\u00A0; il démarre le 2026-01-12.",
         );
     });
 
@@ -692,7 +719,7 @@ ${body}`;
     it('says nothing for pins on working days', async () => {
         const { model } = await lay(
             lanes(
-                'swimlane s "S"\n  item d "D" duration:1w date:2026-01-12\nswimlane t "T"\n  item af "Af" duration:1w after:2026-01-16\n',
+                'swimlane s "S"\n  item d "D" duration:1w after:2026-01-12\nswimlane t "T"\n  item af "Af" duration:1w after:2026-01-16\n',
             ),
         );
         expect('nonWorkingPin' in laneItems(model)[0]).toBe(false);
@@ -703,7 +730,7 @@ ${body}`;
     it('says nothing under calendar:full, where Saturday is a working day', async () => {
         const { model } = await lay(
             lanes(
-                'swimlane s "S"\n  item d "D" duration:1w date:2026-01-10\n  item st "St" duration:1w start:2026-01-24\n',
+                'swimlane s "S"\n  item d "D" duration:1w after:2026-01-10\n  item st "St" duration:1w after:2026-01-24\n',
                 ' calendar:full',
             ),
         );
@@ -711,9 +738,9 @@ ${body}`;
         expect(insightsOf(model, 'NL.I1008')).toEqual([]);
     });
 
-    it('defers to NL.W1001 when a wave floor moved the pin', async () => {
-        // a2 is pinned to Saturday Jan 10 (index 5), but w2 cannot start before
-        // w1 ends (index 10, Mon Jan 19): the wave floor, not the pin, set it.
+    it('says nothing when a wave floor moved the item past its after: date', async () => {
+        // a2 waits for Saturday Jan 10 (index 5), but w2 cannot start before
+        // w1 ends (index 10, Mon Jan 19): the wave floor, not the date, set it.
         const { model } = await lay(`nowline v1
 
 roadmap r "R" start:2026-01-05 scale:1w
@@ -723,18 +750,12 @@ wave w2 "Two"
 
 swimlane a
   item a1 duration:2w wave:w1
-  item a2 duration:1w wave:w2 date:2026-01-10
+  item a2 duration:1w wave:w2 after:2026-01-10
 `);
         const a2 = laneItems(model).find((i) => i.id === 'a2')!;
-        expect(a2.wavePinOverride).toEqual({
-            wave: 'w2',
-            key: 'date',
-            pin: '2026-01-10',
-            start: '2026-01-19',
-        });
+        expect(a2.box.x - model.timeline.originX).toBe(86);
         expect('nonWorkingPin' in a2).toBe(false);
         const codes = collectLayoutInsights(model, {}).map((i) => i.code);
         expect(codes.filter((c) => c === 'NL.I1008')).toEqual([]);
-        expect(codes.filter((c) => c === 'NL.W1001')).toEqual(['NL.W1001']);
     });
 });

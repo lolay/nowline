@@ -282,7 +282,7 @@ The pass is a constant list, run in order. Its order is today's except f1, which
 | Step | Was | Reads | Writes |
 |---|---|---|---|
 | f1 `growCanvasForSpill` | P3 | `chart.maxRightX` | canvas |
-| f2 `extendTimeline` | P7 | leaf bars of lanes and regions, markers, milestones, window | scale, timeline, canvas |
+| f2 `extendTimeline` | P7 | leaf bars of lanes and regions, markers, milestones, spilled captions past the axis end (one column at most; [`rendering.md`](./rendering.md#caption-cap)), window | scale, timeline, canvas |
 | f3 `growCanvasForMarkerLabels` | P8 | every marker entry, final runs and exceptions | canvas, then freezes it |
 | f4 `fitWidths` | P9, N2, N4 | canvas (final) | lane and region widths |
 | f5 `packMarkers` | P10 | canvas (final), marker entries, scale (final), header bands | marker band |

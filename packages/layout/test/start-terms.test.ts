@@ -25,37 +25,18 @@ swimlane s
 const utc = (y: number, m: number, d: number): Date => new Date(Date.UTC(y, m - 1, d));
 
 describe('startTermsOf', () => {
-    it('returns no pin and no after for a plain item', async () => {
+    it('returns no after for a plain item', async () => {
         expect(await termsOf('item a duration:1w')).toEqual({ after: [] });
     });
 
-    it('reads a `date:` pin', async () => {
-        expect(await termsOf('item a duration:1w date:2026-02-02')).toEqual({
-            pin: { key: 'date', raw: '2026-02-02', date: utc(2026, 2, 2) },
-            after: [],
-        });
-    });
-
-    it('reads a `start:` pin', async () => {
-        expect(await termsOf('item a duration:1w start:2026-02-09')).toEqual({
-            pin: { key: 'start', raw: '2026-02-09', date: utc(2026, 2, 9) },
-            after: [],
-        });
-    });
-
-    it('lets `date:` win over `start:` when both parse', async () => {
-        const terms = await termsOf('item a duration:1w start:2026-02-09 date:2026-02-02');
-        expect(terms.pin).toEqual({ key: 'date', raw: '2026-02-02', date: utc(2026, 2, 2) });
-    });
-
-    it('falls back to `start:` when `date:` does not parse', async () => {
-        const terms = await termsOf('item a duration:1w date:soon start:2026-02-09');
-        expect(terms.pin).toEqual({ key: 'start', raw: '2026-02-09', date: utc(2026, 2, 9) });
-    });
-
-    it('returns no pin when neither `date:` nor `start:` parses', async () => {
-        const terms = await termsOf('item a duration:1w date:soon start:later');
-        expect(terms.pin).toBeUndefined();
+    it('ignores `date:` and `start:` on an item: work has no fixed start pin', async () => {
+        // specs/dsl.md § Item Properties: both keys are unknown on an item, so
+        // they set no term; the validator warns with an `after:<date>` hint.
+        expect(await termsOf('item a duration:1w date:2026-02-02')).toEqual({ after: [] });
+        expect(await termsOf('item a duration:1w start:2026-02-09')).toEqual({ after: [] });
+        expect(
+            await termsOf('item a duration:1w start:2026-02-09 date:2026-02-02 after:x'),
+        ).toEqual({ after: [{ raw: 'x', ref: 'x' }] });
     });
 
     it('keeps `after:` elements in source order, ids as refs and ISO dates as dates', async () => {
@@ -65,13 +46,6 @@ describe('startTermsOf', () => {
             { raw: '2026-03-02', date: utc(2026, 3, 2) },
             { raw: 'y', ref: 'y' },
         ]);
-        expect(terms.pin).toBeUndefined();
-    });
-
-    it('reads a single `after:` id and a pin together', async () => {
-        const terms = await termsOf('item a duration:1w date:2026-02-02 after:x');
-        expect(terms.pin?.key).toBe('date');
-        expect(terms.after).toEqual([{ raw: 'x', ref: 'x' }]);
     });
 });
 

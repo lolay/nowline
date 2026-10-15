@@ -29,7 +29,6 @@ const WAVE_KEYS = [
     'waveStrip',
     'waveRole',
     'waveTooltip',
-    'wavePinOverride',
     'onWaveBoundary',
     'overrunByWave',
     'waveOnly',

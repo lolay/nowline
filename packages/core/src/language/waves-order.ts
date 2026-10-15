@@ -83,8 +83,6 @@ interface Slot {
     reg: number;
     ew?: number;
     lw?: number;
-    /** An item pinned by `date:` or `start:`: the pin replaces flow and `after:`. */
-    pinned: boolean;
     /** `after:` edges layout resolves to placed work. */
     after: Array<{ from: number; prop: EntityProperty; ref: string }>;
     /** `after:<wave>` references: constant `j`. */
@@ -165,14 +163,6 @@ function isFloatingMilestone(node: AstNode | undefined): boolean {
     return isMilestoneDeclaration(node) && !node.properties.some((p) => propKey(p) === 'date');
 }
 
-function isPinned(node: Work): boolean {
-    if (node.$type !== 'ItemDeclaration') return false;
-    return node.properties.some((p) => {
-        const key = propKey(p);
-        return (key === 'date' || key === 'start') && !!p.value && ISO_DATE_RE.test(p.value);
-    });
-}
-
 /**
  * The G rules (WV10-WV12) over one layout scope. `waves` is the roadmap's
  * wave list in declaration order (`ownWaves`); with no waves there are no
@@ -226,7 +216,6 @@ export function evaluateWaveOrder(
             reg: -1,
             ew: waveOf.get(node),
             lw: leadOf.get(node),
-            pinned: isPinned(node),
             after: [],
             afterWaves: [],
         };
@@ -279,8 +268,7 @@ export function evaluateWaveOrder(
                 if (ISO_DATE_RE.test(ref)) continue;
                 const target = resolve(ref, v);
                 const j = target === undefined ? waveIds.get(ref) : undefined;
-                // A date: or start: pin replaces every after: term (§5.1).
-                if (key === 'after' && !slot.pinned) {
+                if (key === 'after') {
                     if (target !== undefined) slot.after.push({ from: target, prop, ref });
                     else if (j !== undefined) slot.afterWaves.push({ prop, ref, j });
                 }
@@ -387,8 +375,8 @@ export function evaluateWaveOrder(
     // --- WV10: lower bounds, relaxed to a fixpoint. ---
     const isContainer = (i: number): boolean => slots[i].node.$type !== 'ItemDeclaration';
     const hasParentEdge = (i: number): boolean => {
-        const { parent, pinned } = slots[i];
-        if (pinned || parent < 0) return false;
+        const { parent } = slots[i];
+        if (parent < 0) return false;
         return isParallelBlock(slots[parent].node) || slots[parent].children[0] === i;
     };
     const valS = new Array<number>(slots.length).fill(0);
@@ -410,7 +398,7 @@ export function evaluateWaveOrder(
         if (hasParentEdge(i)) {
             out.push({ term: { kind: 'parent', from: slot.parent }, value: valS[slot.parent] });
         }
-        if (!slot.pinned && slot.prev >= 0) {
+        if (slot.prev >= 0) {
             out.push({ term: { kind: 'seq', from: slot.prev }, value: valE[slot.prev] });
         }
         for (const a of slot.after) {
@@ -464,7 +452,7 @@ export function evaluateWaveOrder(
             .filter((t) => t.value === b)
             .map((t) => t.term);
     // E(C) is explained by the children that reach b; S(C) only when none
-    // does (a pinned first child), since the children already carry it.
+    // does (an empty container), since the children already carry it.
     const achieversE = (i: number, b: number): Term[] => {
         if (!isContainer(i)) return [{ kind: 'start' }];
         const kids: Term[] = slots[i].children
@@ -503,13 +491,12 @@ export function evaluateWaveOrder(
     };
 
     // The nearest work before x in its flow with a wave later than k:
-    // earlier siblings first, then those of each enclosing container. The
-    // walk stops at a date pin, which cuts the flow.
+    // earlier siblings first, then those of each enclosing container.
     const laterBefore = (x: number, k: number): number | undefined => {
-        for (let u = x; !slots[u].pinned; ) {
+        let u = x;
+        while (slots[u].prev >= 0 || hasParentEdge(u)) {
             const prev = slots[u].prev;
             if (prev < 0) {
-                if (!hasParentEdge(u)) return undefined;
                 u = slots[u].parent;
                 continue;
             }

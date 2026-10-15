@@ -17,6 +17,8 @@ import { RowPacker } from '../row-packer.js';
 import { resolveChildStart } from '../start-rules.js';
 import { ITEM_INSET_PX } from '../themes/shared.js';
 import type { PositionedTrackChild } from '../types.js';
+import { itemSpanPx } from '../working-span.js';
+import { trackChildPaintedRightX } from './content-extent.js';
 import { measureItem } from './item-measure.js';
 import { sequenceItem } from './sequence-item.js';
 
@@ -29,8 +31,17 @@ export interface RowTrackOrigin {
 
 export interface RowTrackResult {
     children: PositionedTrackChild[];
-    /** Compact cursor: bar logical ends and block ends only. */
+    /**
+     * Compact cursor, in time: item duration ends and blocks' compact ends
+     * only, never the minimum bar width or a caption spill.
+     */
     timeCursorX: number;
+    /**
+     * Rightmost bar edge, in logical space: item painted footprints (the
+     * minimum bar width included) and blocks' `cursor.maxX`, never a
+     * caption spill. A group reports it as its `cursor.maxX`.
+     */
+    barRightX: number;
     /** The packer the children were fed to; read `usedHeight()` and `usedRightX()` from it. */
     packer: RowPacker;
 }
@@ -60,6 +71,7 @@ export function sequenceRowTrack(
         slackCorridors: ctx.slackCorridors,
     });
     let timeCursorX = leftX;
+    let barRightX = leftX;
 
     const children: PositionedTrackChild[] = [];
     for (const child of trackChildren(container)) {
@@ -69,6 +81,12 @@ export function sequenceRowTrack(
             const cursor = newCursor(blockStart, blockY);
             const positioned = helpers.sequenceOne(child, cursor, ctx);
             children.push(positioned);
+            // The packer keeps the painted box (a group's box hugs its
+            // children's spilled captions), so a following item that would
+            // land under a caption drops a row; the time cursor takes the
+            // block's compact end (its children's logical ends), so that
+            // item still starts on its date, as in engine C
+            // (specs/scheduler-unification.md §8 decision 7).
             const blockEnd = positioned.box.x + positioned.box.width;
             const blockHeight = Math.max(step, cursor.height);
             packer.commitBlock({
@@ -77,8 +95,10 @@ export function sequenceRowTrack(
                 blockHeight,
                 blockEnd,
                 spillReservation: blockTitleRowSpillReservation(positioned),
+                paintedRight: trackChildPaintedRightX(positioned),
             });
-            timeCursorX = Math.max(timeCursorX, blockEnd);
+            timeCursorX = Math.max(timeCursorX, cursor.x);
+            barRightX = Math.max(barRightX, cursor.maxX);
             continue;
         }
 
@@ -108,12 +128,18 @@ export function sequenceRowTrack(
         const positioned = sequenceItem(item, cursor, ctx, measure);
         children.push(positioned);
 
-        // Item end in LOGICAL space (one ITEM_INSET_PX past the visual
-        // bar's right edge). The next chained item starts here and
-        // lands edge-to-edge in time, with a 2 × ITEM_INSET_PX visible
-        // gutter between bars.
+        // The painted footprint in LOGICAL space (one ITEM_INSET_PX past
+        // the visual bar's right edge), the minimum bar width included:
+        // the row packer keeps it, so a following bar that would overlap
+        // a clamped bar drops a row.
         const itemLogicalEnd = positioned.box.x + positioned.box.width + ITEM_INSET_PX;
-        timeCursorX = Math.max(timeCursorX, itemLogicalEnd);
+        // The time cursor advances by the duration only, never the
+        // minimum bar width, so the next chained item starts on its date,
+        // as in engine C (specs/scheduler-unification.md §8 decision 6).
+        // A bar wider than its duration is presentation.
+        const durationEnd = predictedStart + itemSpanPx(ctx, predictedStart, measure.durationDays);
+        timeCursorX = Math.max(timeCursorX, durationEnd);
+        barRightX = Math.max(barRightX, itemLogicalEnd, durationEnd);
 
         let spillReservation: number | null = null;
         const hasAnySpill =
@@ -145,5 +171,5 @@ export function sequenceRowTrack(
         });
     }
 
-    return { children, timeCursorX, packer };
+    return { children, timeCursorX, barRightX, packer };
 }
