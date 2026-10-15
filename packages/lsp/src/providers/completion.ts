@@ -31,10 +31,8 @@ import {
 const REF_KEY_TO_KINDS: Record<string, ReadonlySet<string>> = {
     after: new Set(['item', 'milestone', 'anchor', 'parallel', 'group', 'wave']),
     before: new Set(['item', 'milestone', 'anchor', 'parallel', 'group', 'wave']),
-    depends: new Set(['item', 'milestone', 'anchor', 'parallel', 'group']),
     on: new Set(['item', 'swimlane', 'parallel', 'group', 'milestone', 'wave']),
     owner: new Set(['person', 'team']),
-    team: new Set(['team']),
     style: new Set(['style']),
     size: new Set(['size']),
     status: new Set(['status']),
