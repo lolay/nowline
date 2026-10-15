@@ -18,7 +18,7 @@ Mermaid is the closest existing tool and the most likely "good enough" alternati
 | Owners | Not supported | `owner:sam` — person/team declarations, rendered on cards |
 | Parallel work | Not supported | `parallel`/`group` blocks for concurrent execution and sequential bundling |
 | Links | Not supported | `link:` property — URL with service icon detection |
-| Milestones | Basic `milestone` marker | Full milestone with `depends:[]` for completion tracking, overflow rendering |
+| Milestones | Basic `milestone` marker | Full milestone with `after:[...]` for completion tracking, overflow rendering |
 | Embeddable | Yes (widely) | Yes (same model — `<script>` tag) |
 | Extensibility | General-purpose | Roadmap-native — every feature serves the roadmap use case |
 
