@@ -3,9 +3,9 @@
 - **Plan:** `specs/handoffs/plan-scheduler-followups-heron.md`
 - **Branch:** `claude/friendly-babbage-qlcz6d` (harness-assigned task branch; fast-forwarded to `origin/main` `5da7d2a` and pushed at kickoff)
 - **Mode:** unattended, confirmed 2026-10-15 in session ef0db142 (dialog: "Unattended (Recommended)"; session: "This session")
-- **Status:** fix-up 2-fix landed the code fix (4314f48) but its review found two inaccurate sentences (waves.md §8.6, changelog) claiming C resolves `after:<parallel>`; automatic fix-up 2-fix2 [deep] running (fix-up 2 of 2, the cap).
-- **Spend:** ~$44.0, over the ~$31 expected. Guard 3x min $50, ~$93.
-- **Next unit:** fix-up 2-fix2 [deep] `nowline m2 s1-s4` (docs wording), then wave 2 m3 s1-s2, m4 s1; then wave 3 [exec] m4 s2-s4.
+- **Status:** wave 2/m2 closed after two fix-ups (2-fix2 PASS); wave 2 unit m3 s1-s2 [deep] next (gate 4 passes unattended).
+- **Spend:** ~$45.5, over the ~$31 expected. Guard 3x min $50, ~$93.
+- **Next unit:** wave 2 [deep] `nowline m3 s1-s2` (F5, F7), then m4 s1 (F4); then wave 3 [exec] m4 s2-s4.
 - **Gates the plan crosses:** 2 before wave 2; 4 at m2, m3 and m4. No canary (wave 1 has one group). No `[xdeep]`.
 - **Resume:** run `/compact` if needed, then paste the plan's Kickoff prompt.
 
@@ -19,6 +19,7 @@ None.
 - wave 2 [deep] `nowline m1 s2` 30a5c0e..fd989f4: PASS. Merge of origin/main (2206c8c: #160, #161, #162, no conflicts), then F8 (fd989f4). G1 differs only in tests/weekends-show; weekends-show snapshot and its determinism cells bumped (declared).
 - wave 2 [deep] `nowline m2 s1-s4` 8b1b4ac..47639f6: CONCERNS. Merge 983ffac (#163, clean); F2 96e073b (G1 identical), F3 (d) e38c414 (minimal, platform-2026, product, showcase), F3 (c) 3f9afe1 (inline-date-pins, waves, late-row-shifts), F3 (b) 47639f6 (showcase, non-working-hide/show). Review: the minimum bar width still reaches the parallel join and `after:` edges (sequence-item.ts:333, :353); fix-up 2-fix.
 - fix-up 2-fix [deep] `nowline m2 s1-s4` 8b1b4ac..4314f48: CONCERNS. 4314f48 splits time (cursor.x, entityRightEdges, wave member: duration end) from painted (maxX, bracket, packer, canvas) ends; four regression tests; G1/G3 identical. Review: waves.md:823 and the changelog s4 block wrongly say C resolves `after:<parallel>`; fix-up 2-fix2.
+- fix-up 2-fix2 [deep] `nowline m2 s1-s4` 8b1b4ac..c8ecee2: PASS. Docs only: waves.md §8.6 (b) and the s4 changelog block no longer claim the exports resolve `after:<parallel>`.
 
 ## Deviations from plan
 
