@@ -737,9 +737,14 @@ It never goes through `forwardWithinDomain`, the seeded edge maps or `resolveAft
 3. **At most n + 1 passes.** This is an upper bound, not an exact count. By the end of pass p, at least `E_1..E_p` are exact (floors can make later waves exact sooner), so the driver stops after at most n + 1 passes: entities that read `E_n` (`after:w_n`) are exact in pass n + 1 at the latest, and a pass that changes nothing confirms the result.
 4. **Least fixpoint.** Iteration starts from a valid lower bound and stops at the first fixpoint. By Kleene, the result is the least fixpoint: the earliest schedule that satisfies every constraint.
 5. **Invalid input.** Input that breaks the rules (for example, an LSP preview of a file with NL.E1103) hits the cap. The result is deterministic, and layout emits NL.W1002.
-6. **Cost.** `O((n+1)·(N + R))` for N main nodes and R region nodes. Example 1 converges in 4 passes, Example 19 in 3 and Example 16 in 2. These counts follow from running the §8.2 algorithm on each example, not from the bound in item 3.
+6. **Cost.** `O((n+1)·(N + R))` for N main nodes and R region nodes. Example 1 converges in 4 passes, Example 19 in 3 and Example 16 in 2. These counts follow from running the §8.2 algorithm on each example from the cold start above, not from the bound in item 3.
 
-A warm start from day space would be wrong while divergence (e) can make pixel values smaller than day values ([`scheduler-unification.md`](./scheduler-unification.md) §3.1, follow-up F4).
+**Warm start (engine A).** Engine C runs first, so engine A starts from its result ([`scheduler-unification.md`](./scheduler-unification.md) §5, F4):
+
+- every item start is floored by C's start, projected with `forwardWithinDomain` (`scheduleFloorX` in `start-rules.ts`; under `show` it compares the placed, snapped start, so an unsnapped `after:` date that NL.I1008 reads stays put);
+- the driver's first pass starts each `S_k` (k > 1) and `E_k` at no less than C's, projected (`seed` of `solveWaveBarriers`).
+
+C is a lower bound of A on every item and wave edge (`schedule-lower-bound.test.ts`), so the floors never move a settled bar, and for valid input the fixpoint is unique (item 2 makes each `E_k` a function of the `S` and `E` before it), so a pass can only confirm the right one. The positioned model is identical to a cold start's; only `waveSolve.passes` drops: Example 1 takes 2 passes, Examples 16 and 19 one each, and every wave sample and generated roadmap at least one fewer than cold, or one (`schedule-warm-start.test.ts`).
 
 ### 8.4 Engine A hook points (pixels)
 
@@ -1218,7 +1223,7 @@ Waves:
 - build [W3, W7], held by api-build;
 - launch [W7, W9], held by data-launch.
 
-Without waves, the roadmap would end at W7. Engine A converges in 4 passes (n + 1).
+Without waves, the roadmap would end at W7. The §8.2 algorithm converges in 4 passes (n + 1); engine A's warm start (§8.3) takes 2.
 
 ```
 wk    012|3456|78
@@ -1862,7 +1867,7 @@ The merged lane order is pmo, web, api. The inline date 2026-02-02 is W4.
 
 Waves: plan [W0, W3], held by api-design; gap [W3, W4]; execute [W4, W8], held by api-build.
 
-- **Passes.** Engine A converges in 2 passes. `comms` reads the seed `E_execute = W4` in pass 1 and W8 in pass 2, which confirms the result.
+- **Passes.** The §8.2 algorithm converges in 2 passes. `comms` reads the seed `E_execute = W4` in pass 1 and W8 in pass 2, which confirms the result. Engine A's warm start (§8.3) seeds `E_execute = W8` from engine C, so its first pass confirms it.
 - **Agreement.** σ is `[(plan, no floor), (execute, 2026-02-02)]` in all three files, so rule 12 passes. Children's waves are never merged, so there are no shadow warnings. Rule 11's `start:` check also passes.
 - **Standalone render** of `teams/web.nowline`: plan [W0, W2], gap [W2, W4], execute [W4, W7].
 
@@ -2000,7 +2005,7 @@ Waves: w1 [W0, W4], w2 [W4, W6].
 
 - **Isolation.** `pf-scale` cannot write `after:ios-offline`, but the barrier still holds it.
 - **Rendering.** Boundaries are re-emitted inside the dashed region, clipped to its painted rect.
-- **Engines.** Engine A converges in 3 passes, and the date window (engine C's `extent`) ends at W6.
+- **Engines.** The §8.2 algorithm converges in 3 passes (engine A's warm start, §8.3: 1), and the date window (engine C's `extent`) ends at W6.
 - **Standalone.** `ios.nowline` rendered on its own gives w1 [W0, W4] and w2 [W4, W5].
 
 ```

@@ -33,6 +33,12 @@ export interface WaveBarrierResult {
     capped: boolean;
 }
 
+/** A warm start for `solveWaveBarriers`: estimates of `S_k` / `E_k` from below (0-based, null: none). */
+export interface WaveBarrierSeed {
+    S: ReadonlyArray<number | null>;
+    E: ReadonlyArray<number | null>;
+}
+
 /**
  * Solve the barrier recurrence (§8.2). `floors[k - 1]` is `A_k` in the
  * caller's units, or null for no floor; `origin` is the axis origin (0 days,
@@ -50,6 +56,17 @@ export interface WaveBarrierResult {
  * sub-pixel edge tolerance: its floors are `origin + days * ppd` while
  * `E_{k-1}` is a sum of item widths, so a same-day floor can exceed the
  * prior end by an ulp and would otherwise open a phantom gap.
+ *
+ * `seed` warm-starts the solve (specs/scheduler-unification.md §5, F4):
+ * `seed.S[k - 1]` and `seed.E[k - 1]` are an estimate of `S_k` and `E_k`
+ * from below (engine A passes engine C's, projected), or null for none. The
+ * first pass starts each `S_k` (k > 1) and `E_k` at no less than its seed
+ * instead of at the floor chain alone, so the passes settle sooner on the
+ * same fixpoint: Kleene iteration from any lower bound of the least
+ * fixpoint reaches it, and for valid input (WV10) the fixpoint is unique
+ * (`S_1` is fixed, and each `E_k` then follows from `S_1..S_k` and
+ * `E_1..E_{k-1}`), so a pass can only confirm the right one. `S_1` is never
+ * seeded: the driver keeps the first pass's `S_1` to the end.
  */
 export function solveWaveBarriers(
     n: number,
@@ -57,13 +74,15 @@ export function solveWaveBarriers(
     floors: ReadonlyArray<number | null>,
     runPass: (S: readonly number[], E: readonly number[]) => WavePassResult,
     tolerance = 0,
+    seed?: WaveBarrierSeed,
 ): WaveBarrierResult {
     const A = floors.map((f) => f ?? -Infinity);
     let S: number[] = [];
     for (let i = 0; i < n; i++) {
-        S.push(floorPast(i === 0 ? origin : S[i - 1], A[i], tolerance));
+        const chained = floorPast(i === 0 ? origin : S[i - 1], A[i], tolerance);
+        S.push(i === 0 ? chained : Math.max(chained, seed?.S[i] ?? -Infinity));
     }
-    let E = [...S];
+    let E = S.map((s, i) => Math.max(s, seed?.E[i] ?? -Infinity));
     for (let pass = 1; pass <= n + 1; pass++) {
         const m = runPass(S, E).memberEnd;
         const S2: number[] = [];

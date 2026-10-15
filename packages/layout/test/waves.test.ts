@@ -23,6 +23,7 @@ import { describe, expect, it } from 'vitest';
 import { resolveCalendar } from '../src/calendar.js';
 import { type LayoutOptions, layoutRoadmap } from '../src/layout.js';
 import { scheduleRoadmap } from '../src/schedule.js';
+import { setScheduleWarmStart } from '../src/start-rules.js';
 import { ITEM_INSET_PX } from '../src/themes/shared.js';
 import type {
     PositionedGroup,
@@ -96,6 +97,20 @@ function finish(file: NowlineFile, resolved: ResolveResult): Laid {
         perWeek: config.daysPerWeek,
         calendar: fromCalendarConfig(config),
     };
+}
+
+/**
+ * The barrier solve of a cold start: no warm start from the day schedule
+ * (specs/scheduler-unification.md §5, F4), so the §8.2 algorithm's own pass
+ * count, which the spec's worked examples quote.
+ */
+function coldSolve(laid: Laid): PositionedRoadmap['waveSolve'] {
+    setScheduleWarmStart(false);
+    try {
+        return layoutRoadmap(laid.file, laid.resolved).waveSolve;
+    } finally {
+        setScheduleWarmStart(true);
+    }
 }
 
 const round = (v: number): number => Math.round(v * 1e6) / 1e6;
@@ -237,7 +252,7 @@ function expectBarriers(laid: Laid): void {
 }
 
 describe('layoutRoadmap — wave barriers (§11 worked examples, engine A)', () => {
-    it('Example 1: three lanes, three waves (4 passes)', async () => {
+    it('Example 1: three lanes, three waves (4 passes cold, 2 warm)', async () => {
         const laid = await lay(EXAMPLE_1);
         expectTable(laid, {
             'web-research': [0, 2],
@@ -250,7 +265,8 @@ describe('layoutRoadmap — wave barriers (§11 worked examples, engine A)', () 
             'api-launch': [7, 8],
             'data-launch': [7, 9],
         });
-        expect(laid.model.waveSolve).toEqual({ passes: 4, capped: false });
+        expect(laid.model.waveSolve).toEqual({ passes: 2, capped: false });
+        expect(coldSolve(laid)).toEqual({ passes: 4, capped: false });
         expectBarriers(laid);
     });
 
@@ -454,7 +470,8 @@ swimlane api
             a2: [4, 9],
             b2: [4, 11],
         });
-        expect(laid.model.waveSolve).toEqual({ passes: 2, capped: false });
+        expect(laid.model.waveSolve).toEqual({ passes: 1, capped: false });
+        expect(coldSolve(laid)).toEqual({ passes: 2, capped: false });
         expect(weeksAt(laid, milestone(laid, 'exec-done').center.x)).toBe(10);
         expectBarriers(laid);
     });
@@ -470,7 +487,7 @@ swimlane api
         expectBarriers(laid);
     });
 
-    it('Example 16: re-declared waves with a shared floor (2 passes)', async () => {
+    it('Example 16: re-declared waves with a shared floor (2 passes cold, 1 warm)', async () => {
         const laid = await layIncludes(EXAMPLE_16, 'program.nowline');
         expectTable(laid, {
             kickoff: [0, 1],
@@ -480,7 +497,8 @@ swimlane api
             'api-build': [4, 8],
             comms: [8, 10],
         });
-        expect(laid.model.waveSolve).toEqual({ passes: 2, capped: false });
+        expect(laid.model.waveSolve).toEqual({ passes: 1, capped: false });
+        expect(coldSolve(laid)).toEqual({ passes: 2, capped: false });
         // `done after:execute` sits on the closing boundary at W8.
         const done = milestone(laid, 'done');
         expect(weeksAt(laid, done.center.x)).toBe(8);
@@ -524,7 +542,7 @@ swimlane api
         expectBarriers(laid);
     });
 
-    it('Example 19: an isolated region holds the barrier (3 passes)', async () => {
+    it('Example 19: an isolated region holds the barrier (3 passes cold, 1 warm)', async () => {
         const laid = await layIncludes(EXAMPLE_19, 'portfolio.nowline');
         expectTable(laid, {
             'pf-api': [0, 2],
@@ -532,7 +550,8 @@ swimlane api
             'pf-scale': [4, 6],
             'ios-push': [4, 5],
         });
-        expect(laid.model.waveSolve).toEqual({ passes: 3, capped: false });
+        expect(laid.model.waveSolve).toEqual({ passes: 1, capped: false });
+        expect(coldSolve(laid)).toEqual({ passes: 3, capped: false });
         // The region items are members too.
         const regionItems = laneItems(laid.model.includes[0].nestedSwimlanes);
         expect(regionItems.map((it) => [it.id, it.waveRole])).toEqual([
@@ -722,7 +741,8 @@ swimlane a
   item a2 duration:1w wave:w1
 `);
         expectTable(plain, { a1: [0, 2], a2: [2, 3] });
-        expect(plain.model.waveSolve).toEqual({ passes: 2, capped: false });
+        expect(plain.model.waveSolve).toEqual({ passes: 1, capped: false });
+        expect(coldSolve(plain)).toEqual({ passes: 2, capped: false });
 
         const floored = await lay(`nowline v1
 

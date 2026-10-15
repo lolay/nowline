@@ -21,7 +21,7 @@ import {
     MIN_BAR_WIDTH_FOR_FOOTNOTE_PX,
 } from '../item-bar-geometry.js';
 import type { LayoutContext, TrackCursor } from '../layout-context.js';
-import { nonWorkingPinOf, resolvePinnedOrSequentialStart } from '../start-rules.js';
+import { nonWorkingPinOf, resolvePinnedOrSequentialStart, scheduleFloorX } from '../start-rules.js';
 import { estimateTextWidth } from '../text-measure.js';
 import { PROGRESS_STRIP_HEIGHT_PX } from '../themes/shared.js';
 import type { BoundingBox, PositionedItem, PositionedLabelChip } from '../types.js';
@@ -56,6 +56,10 @@ export function sequenceItem(
     // in the max, after the `after:` logic. Parallel tracks reach this
     // function directly, so this is where their floor applies.
     if (ctx.waves) startX = waveFloorX(node, startX, ctx);
+    // The day schedule's start is a lower bound of this one, so flooring by
+    // it settles nothing that was already right (specs/scheduler-unification.md
+    // §5, F4); a lane or group child's cursor already carries it.
+    startX = scheduleFloorX(node, startX, ctx);
     const nonWorkingPin = nonWorkingPinOf(props, startX, ctx);
 
     // Under `show` a start that lands in a non-working day moves to the next

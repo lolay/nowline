@@ -54,6 +54,75 @@ describe('solveWaveBarriers', () => {
         expect(calls[3]).toEqual({ S: [0, 3, 7], E: [3, 7, 9] });
     });
 
+    it('a warm start from the solved spans settles in one pass (F4)', () => {
+        const lanes: Lane[] = [
+            [
+                [1, 2],
+                [2, 3],
+                [3, 1],
+            ],
+            [
+                [1, 1],
+                [2, 4],
+                [3, 1],
+            ],
+            [
+                [1, 3],
+                [2, 2],
+                [3, 2],
+            ],
+        ];
+        const { runPass, calls } = lanePass(3, lanes);
+        const seed = { S: [0, 3, 7], E: [3, 7, 9] };
+        const r = solveWaveBarriers(3, 0, [null, null, null], runPass, 0, seed);
+        expect(r).toEqual({ S: [0, 3, 7], E: [3, 7, 9], passes: 1, capped: false });
+        expect(calls).toEqual([seed]);
+    });
+
+    it('a warm start from below settles on the cold fixpoint in fewer passes', () => {
+        const lanes: Lane[] = [
+            [
+                [1, 2],
+                [2, 3],
+                [3, 1],
+            ],
+            [
+                [1, 1],
+                [2, 4],
+                [3, 1],
+            ],
+        ];
+        const cold = solveWaveBarriers(3, 0, [null, null, null], lanePass(3, lanes).runPass);
+        const warm = solveWaveBarriers(3, 0, [null, null, null], lanePass(3, lanes).runPass, 0, {
+            S: [null, 2, 6],
+            E: [1, 5, null],
+        });
+        expect(warm.S).toEqual(cold.S);
+        expect(warm.E).toEqual(cold.E);
+        expect(warm.passes).toBeLessThan(cold.passes);
+    });
+
+    it('a seed past the fixpoint never confirms itself on valid input', () => {
+        // S_1 is never seeded, and each later edge is recomputed from the
+        // pass's member ends, so a seed that is too late is corrected.
+        const lanes: Lane[] = [
+            [
+                [1, 2],
+                [2, 3],
+            ],
+        ];
+        const cold = solveWaveBarriers(2, 0, [null, null], lanePass(2, lanes).runPass);
+        const warm = solveWaveBarriers(2, 0, [null, null], lanePass(2, lanes).runPass, 0, {
+            S: [5, 4],
+            E: [4, 9],
+        });
+        expect({ S: warm.S, E: warm.E, capped: warm.capped }).toEqual({
+            S: cold.S,
+            E: cold.E,
+            capped: false,
+        });
+    });
+
     it('a floor past the previous wave end opens a gap', () => {
         // Example 11 in weeks: execute is held back to W4 by its floor.
         const { runPass } = lanePass(2, [
