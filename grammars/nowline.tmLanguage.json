@@ -37,7 +37,7 @@
         "directive": {
             "patterns": [
                 {
-                    "match": "^\\s*(nowline)\\s+(v\\d+)\\s*$",
+                    "match": "^\\s*(nowline)\\s+(v\\d+)(?=\\s|$)",
                     "captures": {
                         "1": { "name": "keyword.control.directive.nowline" },
                         "2": { "name": "constant.numeric.version.nowline" }
@@ -62,7 +62,7 @@
         "properties": {
             "patterns": [
                 {
-                    "match": "(?<![\\w-])(status|owner|after|before|size|duration|remaining|labels|link|style|date|on|start|scale|calendar|effort|name|label-every|days-per-week|days-per-month|days-per-quarter|days-per-year|author|capacity|length|utilization-warn-at|utilization-over-at|logo-size|logo|unicode|ascii|wave|end|every)\\s*(:)",
+                    "match": "(?<![\\w-])(status|owner|after|before|size|duration|remaining|labels|link|style|date|on|start|scale|calendar|effort|name|label-every|label|locale|days-per-week|days-per-month|days-per-quarter|days-per-year|author|capacity|length|utilization-warn-at|utilization-over-at|logo-size|logo|unicode|ascii|wave|end|every)\\s*(:)",
                     "captures": {
                         "1": { "name": "entity.other.attribute-name.nowline" },
                         "2": { "name": "punctuation.separator.key-value.nowline" }
