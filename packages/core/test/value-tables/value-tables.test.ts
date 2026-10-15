@@ -8,7 +8,11 @@ import {
     BUILTIN_CAPACITY_ICONS,
     BUILTIN_ICON_NAMES,
     BUILTIN_STATUSES,
+    CALENDAR_MODES,
+    COLOR_NAMES,
+    INCLUDE_MODES,
     NON_WORKING_DISPLAYS,
+    STYLE_PROP_ENUMS,
     WEEKDAYS,
 } from '../../src/language/value-tables.js';
 import { errorMessages, parse } from '../helpers.js';
@@ -40,6 +44,39 @@ describe('value tables', () => {
             'calendar',
         ]);
         expect(NON_WORKING_DISPLAYS).toEqual(['hide', 'show']);
+        const scale = ['none', 'xs', 'sm', 'md', 'lg', 'xl'];
+        expect(STYLE_PROP_ENUMS).toEqual({
+            border: ['solid', 'dashed', 'dotted'],
+            shadow: ['none', 'subtle', 'soft', 'hard'],
+            font: ['sans', 'serif', 'mono'],
+            weight: ['thin', 'light', 'normal', 'bold'],
+            italic: ['true', 'false'],
+            'text-size': scale,
+            padding: scale,
+            spacing: scale,
+            'header-height': scale,
+            'corner-radius': [...scale, 'full'],
+            bracket: ['none', 'solid', 'dashed'],
+            'header-position': ['beside', 'above'],
+            'timeline-position': ['top', 'bottom', 'both'],
+            'minor-grid': ['true', 'false'],
+        });
+        expect(COLOR_NAMES).toEqual([
+            'red',
+            'blue',
+            'yellow',
+            'green',
+            'orange',
+            'purple',
+            'violet',
+            'gray',
+            'grey',
+            'navy',
+            'white',
+            'none',
+        ]);
+        expect(CALENDAR_MODES).toEqual(['business', 'full', 'custom']);
+        expect(INCLUDE_MODES).toEqual(['merge', 'ignore', 'isolate']);
     });
 
     it('re-exports the weekday names from calendar-declarations', () => {
