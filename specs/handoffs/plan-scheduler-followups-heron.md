@@ -1,7 +1,7 @@
 ```text
 --- KICKOFF: begin orchestration at [deep] ---
 
-  Status: 1/6 groups done | last review: wave-1 PASS | current: nowline m1 s2 [deep] | updated 2026-10-15
+  Status: 2/6 groups done | last review: wave-2 PASS | current: nowline m2 s1-s4 [deep] | updated 2026-10-15 | passed unattended: gate 2 before wave 2
 
   mode: unattended | proposed unattended (harness=claude-code runner=cloud; CLAUDE_CODE_REMOTE=true, assigned branch) | guard 3x min $50 | fixups 2 | confirmed 2026-10-15 session ef0db142-6669-5058-893b-a118b7ea2d61 by Kickoff prompt: Run in unattended mode.
 
@@ -80,7 +80,7 @@ Branch: `claude/friendly-babbage-qlcz6d` (harness-assigned task branch, fast-for
 
 --- WAVE 2 [deep] ---
 
-#### s2 - [deep] F8: remove item `date:` / `start:` pins
+#### s2 - [deep] F8: remove item `date:` / `start:` pins (done)
 - core: drop `date` and `start` from `ENTITY_KNOWN_PROPS.ItemDeclaration` (`packages/core/src/language/validator/tables.ts`, and its comment), so the unknown-property warning fires; add a `CONCEPT_ALIASES` hint suggesting `after:<date>` for `date`/`start` where `after` is supported.
 - layout: `startTermsOf` (`start-terms.ts`) drops `pin`; `resolvePinnedOrSequentialStart` and `startPinOf` (`start-rules.ts`), C's `walkNode` (`schedule.ts`) and `wavePinOverrideOf` (`wave-layout.ts`) lose the pin path; NL.I1008 keeps `after:<date>`.
 - Retire NL.W1001 (`packages/core/src/i18n/codes.ts`, `messages.en.ts`, `messages.fr.ts`, `wave-message-types.ts`, `packages/layout/src/layout-insights.ts`) and `PositionedItem.wavePinOverride` (`types.ts` and its renderer readers). Check man pages, LSP hover and MCP text for mentions.
@@ -137,6 +137,7 @@ Added by Gary, 2026-10-15 ("after all is done, also, use an [exec] subagent to m
 ## Review log
 
 review wave-1 (nowline m1 s1) 4e3870f..c3e5c96: PASS - spec §5/§8 carry decisions 5-13; F6-F8 rows added; tables well-formed; nothing outside the spec changed - 2026-10-15
+review wave-2 (nowline m1 s2) 30a5c0e..fd989f4: PASS - merge 2206c8c clean (#160-#162); F8 removes item pins in both engines, W1001 and wavePinOverride retired, ~40 tests migrated, specs and man pages updated; G1 only tests/weekends-show (3 themes), G3 weekends-show mermaid/xlsx declared; check_wave.py flagged only 3d8b606, 766bc38, 0e948e9 (origin/main's own squash commits brought in by the merge; the worker's 2206c8c and fd989f4 pass), not fixed: rewording main's history is wrong; passed unattended: gate 2 - 2026-10-15
 
 ## Token log
 
@@ -151,3 +152,6 @@ review wave-1 (nowline m1 s1) 4e3870f..c3e5c96: PASS - spec §5/§8 carry decisi
 tokens orchestrator-kickoff plan-scheduler-followups-heron (claude-opus-5-5): input ~240 / cache read ~25M / cache write ~0 5m + ~670k 1h / output ~91k | ~$12.25 API-equiv
 tokens wave-1 nowline-m1-s1 (claude-sonnet-5-5): input ~14 / cache read ~480k / cache write ~92k / output ~6.6k | ~$0.39 API-equiv (output est.) session ef0db142-6669-5058-893b-a118b7ea2d61
 tokens review-wave-1 nowline-m1-s1 (claude-opus-5-5): input ~8 / cache read ~56k / cache write ~24k / output ~4k | ~$0.21 API-equiv (output est.) session ef0db142-6669-5058-893b-a118b7ea2d61
+tokens orchestrator-wave-1 nowline-m1-s1 (claude-opus-5-5): input ~24 / cache read ~1.6M / cache write ~0 5m + ~19k 1h / output ~9.6k | ~$0.66 API-equiv
+tokens wave-2 nowline-m1-s2 (claude-opus-5-5): input ~370 / cache read ~41M / cache write ~340k / output ~190k | ~$13.59 API-equiv (output est.) session ef0db142-6669-5058-893b-a118b7ea2d61
+tokens review-wave-2 nowline-m1-s2 (claude-opus-5-5): input ~52 / cache read ~1.9M / cache write ~110k / output ~25k | ~$1.40 API-equiv (output est.) session ef0db142-6669-5058-893b-a118b7ea2d61
