@@ -9,3 +9,7 @@
 ```release-note:fixed
 **A `parallel` ends where its last track ends.** The chart no longer adds an 8 px gap after a group track or a parallel before the next item in the lane, so the item after a parallel starts on the date the exports give it (the showcase's Ship now starts on working day 40 in the chart too), and a parallel's box ends at its latest track. The `TRACK_BLOCK_TAIL_GUTTER_PX` export of `@nowline/layout` is removed.
 ```
+
+```release-note:fixed
+**A group's spilled caption no longer delays the next item in the chart.** When a group's last caption runs past its box, the item after the group now starts when the group's work ends, on the date the exports give it, and drops below the caption instead of starting later on the same row. The waves sample's Launch page now starts about 10.8 working days earlier in the chart.
+```

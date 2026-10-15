@@ -280,3 +280,62 @@ swimlane s "Subject"
         expect(model.width).toBeGreaterThanOrEqual(groupRight);
     });
 });
+
+/** The placed item `id`, anywhere in the lanes. */
+function findItem(model: PositionedRoadmap, id: string): PositionedItem {
+    const items: PositionedItem[] = [];
+    for (const lane of model.swimlanes) collectItems(lane.children, items);
+    const found = items.find((it) => it.id === id);
+    if (!found) throw new Error(`no item ${id}`);
+    return found;
+}
+
+// Divergence (c) (specs/scheduler-unification.md §5 F3, §8 decision 7): a
+// group's spilled caption stays out of the lane cursor. The item after the
+// group starts at the group's last child end, as in engine C, and drops
+// below the caption because the row packer keeps the group's painted box.
+describe('a group caption spill stays out of the lane cursor', () => {
+    const spill = 'Bootstrap the onboarding flow and every settings page';
+
+    it('lane-level group: the next item starts at the group’s compact end, a row lower', async () => {
+        const { model, chart, schedule } = await weeksOf(`nowline v1
+
+roadmap r "R" start:2026-01-05 calendar:full scale:1w
+
+swimlane s "Subject"
+  group g "G"
+    item a "A" duration:1w
+    item b "${spill}" duration:1w
+  item z "Z" duration:1w
+`);
+        const b = findItem(model, 'b');
+        expect(b.textSpills).toBe(true);
+        expect(chart.b).toEqual([1, 2]);
+        expect(chart.z).toEqual([2, 3]);
+        expect(chart.z).toEqual(schedule.z);
+        // The group's painted box (caption included) still owns its row.
+        const g = findGroup(model, 'g') as PositionedGroup;
+        expect(g.box.x + g.box.width).toBeGreaterThan(findItem(model, 'z').box.x);
+        expect(findItem(model, 'z').box.y).toBeGreaterThanOrEqual(g.box.y + g.box.height);
+    });
+
+    it('a parallel after the group starts its tracks at the group’s compact end', async () => {
+        const { model, chart, schedule } = await weeksOf(`nowline v1
+
+roadmap r "R" start:2026-01-05 calendar:full scale:1w
+
+swimlane s "Subject"
+  group g "G"
+    item a "A" duration:1w
+    item b "${spill}" duration:1w
+  parallel pp
+    item t "T" duration:1w
+    item u "U" duration:2w
+`);
+        expect(findItem(model, 'b').textSpills).toBe(true);
+        expect(chart.t).toEqual([2, 3]);
+        expect(chart.u).toEqual([2, 4]);
+        expect(chart.t).toEqual(schedule.t);
+        expect(chart.u).toEqual(schedule.u);
+    });
+});

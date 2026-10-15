@@ -7,7 +7,7 @@
     ],
     "steps": {
         "growCanvasForSpill": {
-            "count": 28,
+            "count": 27,
             "samples": [
                 "examples/capacity.nowline",
                 "examples/dependencies.nowline",
@@ -28,7 +28,6 @@
                 "tests/item-bumps-up.nowline",
                 "tests/large-roadmap-title.nowline",
                 "tests/large-swimlane-title.nowline",
-                "tests/late-row-shifts.nowline",
                 "tests/non-working-hide.nowline",
                 "tests/partner-multi.nowline",
                 "tests/text-spills-right.nowline",
@@ -40,14 +39,13 @@
             ]
         },
         "extendTimeline": {
-            "count": 7,
+            "count": 6,
             "samples": [
                 "examples/nested.nowline",
                 "examples/platform-2026.nowline",
                 "examples/waves.nowline",
                 "tests/header-height-none.nowline",
                 "tests/header-height-xl.nowline",
-                "tests/late-row-shifts.nowline",
                 "tests/nested-both-headers.nowline"
             ]
         },
@@ -56,7 +54,7 @@
             "samples": ["tests/marker-left-overflow.nowline"]
         },
         "fitWidths": {
-            "count": 34,
+            "count": 33,
             "samples": [
                 "examples/capacity.nowline",
                 "examples/dependencies.nowline",
@@ -81,7 +79,6 @@
                 "tests/item-bumps-up.nowline",
                 "tests/large-roadmap-title.nowline",
                 "tests/large-swimlane-title.nowline",
-                "tests/late-row-shifts.nowline",
                 "tests/marker-left-overflow.nowline",
                 "tests/nested-both-headers.nowline",
                 "tests/non-working-hide.nowline",

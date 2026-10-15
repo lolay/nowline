@@ -337,7 +337,7 @@
             "icu": false
         },
         "waves:html": {
-            "node": "1c84aad72f2538abe13ae07952abd004e591da78161affdc0fe8a0f739d75a9d",
+            "node": "3eba6cd404f441ef17d38c02916d713feea7d5b51262d76240948b1cd196b2cf",
             "icu": true
         },
         "waves:json": {
@@ -353,16 +353,16 @@
             "icu": false
         },
         "waves:pdf": {
-            "node": "60952ef1caffab02445a22068a8c4a008284527419f7fafa12854a7c3c200868",
+            "node": "10527dc4e9c7edf065401e44dd47ec8a595f783497a9b93bfcf033f5a986c8d2",
             "icu": true,
-            "cli": "a7302dd0cff6c31e7c5a015c58727818d8a25ce9841f2b17524dcda547eace7c"
+            "cli": "8ad16420a4d7f1f8f9d26309ca5d8b826cc13eebcd47ff6b802ccce916cebdb8"
         },
         "waves:png": {
-            "node": "ddd1de82ffeb205f1e7716f6030e5b0b50628dca269d426634cfddd922385e18",
+            "node": "4c21ac7f580eb6dd7ce2d9dee23e5aef140a4388ee3b73650278f7117b8b72ad",
             "icu": true
         },
         "waves:svg": {
-            "node": "41efa2a66de518165e6b6988ac62eca780bc42e98900157806a92e4a2971af58",
+            "node": "3011e38b876b68883a697096c6ad0d60a52e4eb67ba7e9519414f7686d1aa7f2",
             "icu": true
         },
         "waves:xlsx": {

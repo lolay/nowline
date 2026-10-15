@@ -30,7 +30,7 @@ export interface RowTrackOrigin {
 
 export interface RowTrackResult {
     children: PositionedTrackChild[];
-    /** Compact cursor: bar logical ends and block ends only. */
+    /** Compact cursor: bar logical ends and blocks' compact ends only, never a caption spill. */
     timeCursorX: number;
     /** The packer the children were fed to; read `usedHeight()` and `usedRightX()` from it. */
     packer: RowPacker;
@@ -70,6 +70,12 @@ export function sequenceRowTrack(
             const cursor = newCursor(blockStart, blockY);
             const positioned = helpers.sequenceOne(child, cursor, ctx);
             children.push(positioned);
+            // The packer keeps the painted box (a group's box hugs its
+            // children's spilled captions), so a following item that would
+            // land under a caption drops a row; the time cursor takes the
+            // block's compact end (its children's logical ends), so that
+            // item still starts on its date, as in engine C
+            // (specs/scheduler-unification.md §8 decision 7).
             const blockEnd = positioned.box.x + positioned.box.width;
             const blockHeight = Math.max(step, cursor.height);
             packer.commitBlock({
@@ -80,7 +86,7 @@ export function sequenceRowTrack(
                 spillReservation: blockTitleRowSpillReservation(positioned),
                 paintedRight: trackChildPaintedRightX(positioned),
             });
-            timeCursorX = Math.max(timeCursorX, blockEnd);
+            timeCursorX = Math.max(timeCursorX, cursor.x);
             continue;
         }
 

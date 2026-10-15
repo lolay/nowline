@@ -821,7 +821,7 @@ Engines A and C produce the same schedule unless one of the divergences of [`sch
 
 - **(a)** settled by F1: an `after:` on a lane or group child starts at `max(previous item end, refs)` in both engines, so the register carries no entry for it;
 - **(b)** a short item: engine A's bar is at least `MIN_ITEM_WIDTH` wide, and the lane cursor advances past it;
-- **(c)** caption spill inside a group that has a following sibling;
+- **(c)** settled by F3: a group's spilled caption used to move engine A's lane cursor; the cursor now takes the group's compact end in both engines, and the row packer keeps the painted box, so a following item drops a row instead of starting later;
 - **(d)** settled by F3: a group track that binds a parallel join used to add an 8 px tail gutter in engine A; the parallel now joins on its latest track end in both engines;
 - **(e)** settled by F2: an `after:` on a group that is a track of a parallel starts it at `max(the parallel's start, refs)` in both engines;
 - **(f)** engine A's lane cursor is monotone;

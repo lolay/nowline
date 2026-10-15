@@ -5,16 +5,6 @@
         "classes lists every divergence of spec §1.2 that contributes, (b) to (f), or region-scope when the engines give an isolated region a different scope (§1.2, 'Isolated regions without waves'). Fixing a divergence removes its letter, and the entry once no letter is left. (a), the pixel walker starting an after: child at the lane's left edge instead of its cursor, was settled by F1 (specs/scheduler-unification.md §5), so no entry carries it."
     ],
     "divergences": {
-        "examples/inline-date-pins.nowline": {
-            "us-rollout": {
-                "classes": ["(c)"],
-                "reason": "follows the api-track group, whose caption spills past its last child, and A's lane cursor advances to the group's box edge"
-            },
-            "eu-rollout": {
-                "classes": ["(c)"],
-                "reason": "a track of the same parallel as us-rollout, after the api-track group's caption spill"
-            }
-        },
         "examples/nested.nowline": {
             "./nested/platform.nowline#pf-auth-refactor": {
                 "classes": ["region-scope"],
@@ -233,22 +223,6 @@
             "announce": {
                 "classes": ["(b)"],
                 "reason": "a 1w bar at scale:1m is under the minimum bar width, so A's logical end runs past C's (both start it on day 45, after:ship)"
-            }
-        },
-        "examples/waves.nowline": {
-            "launch-page": {
-                "classes": ["(c)"],
-                "reason": "follows the wave:build group, whose box includes a11y's spilled caption, and A's lane cursor advances to that edge"
-            }
-        },
-        "tests/late-row-shifts.nowline": {
-            "p1": {
-                "classes": ["(c)"],
-                "reason": "follows group g, and A's lane cursor advances to the Pinned group caption's edge"
-            },
-            "d": {
-                "classes": ["(c)"],
-                "reason": "after:c starts at the lane cursor, which still carries the group's caption spill in A"
             }
         },
         "tests/non-working-hide.nowline": {
