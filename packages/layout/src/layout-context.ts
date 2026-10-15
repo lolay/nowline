@@ -33,13 +33,21 @@ import type { WorkingCalendar } from './working-calendar.js';
 
 /** Slim accumulator used while sequencing items into a track. */
 export interface TrackCursor {
-    /** Left edge where the next item begins. */
+    /**
+     * Where the next item begins, in time: the last child's duration end
+     * (a block's latest track end), never the minimum bar width or a
+     * caption spill (specs/scheduler-unification.md §8 decisions 6, 7).
+     */
     x: number;
     /** Top edge of the current row. */
     y: number;
     /** Accumulated height of the track. */
     height: number;
-    /** Rightmost edge reached. */
+    /**
+     * Rightmost bar edge reached, in logical space: the painted footprint,
+     * the minimum bar width included, never a caption spill. A parallel
+     * sizes its bracket on it.
+     */
     maxX: number;
 }
 

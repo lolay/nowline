@@ -114,7 +114,7 @@ export class GroupNode {
             ctx,
             helpers,
         );
-        const { children, timeCursorX } = track;
+        const { children, timeCursorX, barRightX } = track;
 
         const innerHeight = Math.max(step, track.packer.usedHeight());
         // The group's painted box hugs everything its children put on
@@ -147,8 +147,11 @@ export class GroupNode {
         };
         // No tail gutter: a parallel joins on its tracks' ends, as engine
         // C does (specs/scheduler-unification.md §8 decision 8).
+        // `cursor.x` is the time end; `cursor.maxX` the rightmost bar
+        // edge, so a parallel's bracket still encloses a bar drawn at its
+        // minimum width (specs/scheduler-unification.md §8 decision 6).
         cursor.x = timeCursorX;
-        cursor.maxX = Math.max(cursor.maxX, cursor.x);
+        cursor.maxX = Math.max(cursor.maxX, barRightX, timeCursorX);
         // The painted `box.height` is the group's tight visual
         // footprint (chiclet + content + bottomPad). The cursor
         // advance, however, must include one inter-row gap

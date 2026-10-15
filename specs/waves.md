@@ -383,7 +383,7 @@ end(x)   = start(x) + dur(x)
 - It is the member with the latest end in the engine that computes it: engine A for the positioned model and the strip tooltip, engine C for the XLSX `Waves` sheet.
 - Ties go to the first member in placement order: main lanes in order, then isolated-region lanes in include order, and document order within a lane.
 - It is omitted when no member's end equals `E_k` with `E_k > S_k`: an empty wave, or a wave whose members all end at or before its start floor.
-- On day-level ties, engines A and C can name different members: engine A compares pixel ends (including the `MIN_ITEM_WIDTH` clamp, §8.6 divergence (b)), and engine C compares day ends.
+- On day-level ties, engines A and C can name different members: engine A compares pixel duration ends (never the `MIN_ITEM_WIDTH` clamp, §8.6 divergence (b)), and engine C compares day ends.
 
 - Without floors, the columns tile `[S_1, E_n]` with no gaps and no overlap.
 - A wave opens at its barrier instant, not at its earliest member's start. A column may therefore begin with idle lanes. That idle time is the honest cost of the barrier.
@@ -820,7 +820,7 @@ Nested regions contribute nothing to the barrier, because engine A does not draw
 Engines A and C produce the same schedule unless one of the divergences of [`scheduler-unification.md`](./scheduler-unification.md) §1.2 triggers. The engine divergence register (`packages/layout/test/engine-divergences.json`, checked by `engine-divergence-register.test.ts` on every sample under `examples/` and `tests/`) lists each place they differ on the corpus: a new difference fails the test, and a fix has to delete its entry.
 
 - **(a)** settled by F1: an `after:` on a lane or group child starts at `max(previous item end, refs)` in both engines, so the register carries no entry for it;
-- **(b)** a short item: engine A draws the bar at least `MIN_ITEM_WIDTH` wide. Since F3 that is presentation only: the lane cursor and the wave barrier take the duration end in both engines, and the row packer keeps the painted bar, so a following bar drops a row. The register keeps an entry for each clamped bar's own drawn width, and none for the items after it;
+- **(b)** a short item: engine A draws the bar at least `MIN_ITEM_WIDTH` wide. Since F3 that is presentation only. Every time path takes the duration end in both engines: the lane cursor, a parallel's join, an `after:` reference to the item or to a parallel that ends with it, and the wave barrier. What is drawn keeps the painted bar: the row packer, so a following bar drops a row, and a parallel's bracket. The register keeps an entry for each clamped bar's own drawn width, and none for the items after it. No sample has a clamped bar before a parallel join or an `after:` reference, so `after-lane-cursor.test.ts` covers those two paths;
 - **(c)** settled by F3: a group's spilled caption used to move engine A's lane cursor; the cursor now takes the group's compact end in both engines, and the row packer keeps the painted box, so a following item drops a row instead of starting later;
 - **(d)** settled by F3: a group track that binds a parallel join used to add an 8 px tail gutter in engine A; the parallel now joins on its latest track end in both engines;
 - **(e)** settled by F2: an `after:` on a group that is a track of a parallel starts it at `max(the parallel's start, refs)` in both engines;

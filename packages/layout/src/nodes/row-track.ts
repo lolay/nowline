@@ -31,8 +31,17 @@ export interface RowTrackOrigin {
 
 export interface RowTrackResult {
     children: PositionedTrackChild[];
-    /** Compact cursor: bar logical ends and blocks' compact ends only, never a caption spill. */
+    /**
+     * Compact cursor, in time: item duration ends and blocks' compact ends
+     * only, never the minimum bar width or a caption spill.
+     */
     timeCursorX: number;
+    /**
+     * Rightmost bar edge, in logical space: item painted footprints (the
+     * minimum bar width included) and blocks' `cursor.maxX`, never a
+     * caption spill. A group reports it as its `cursor.maxX`.
+     */
+    barRightX: number;
     /** The packer the children were fed to; read `usedHeight()` and `usedRightX()` from it. */
     packer: RowPacker;
 }
@@ -62,6 +71,7 @@ export function sequenceRowTrack(
         slackCorridors: ctx.slackCorridors,
     });
     let timeCursorX = leftX;
+    let barRightX = leftX;
 
     const children: PositionedTrackChild[] = [];
     for (const child of trackChildren(container)) {
@@ -88,6 +98,7 @@ export function sequenceRowTrack(
                 paintedRight: trackChildPaintedRightX(positioned),
             });
             timeCursorX = Math.max(timeCursorX, cursor.x);
+            barRightX = Math.max(barRightX, cursor.maxX);
             continue;
         }
 
@@ -128,6 +139,7 @@ export function sequenceRowTrack(
         // A bar wider than its duration is presentation.
         const durationEnd = predictedStart + itemSpanPx(ctx, predictedStart, measure.durationDays);
         timeCursorX = Math.max(timeCursorX, durationEnd);
+        barRightX = Math.max(barRightX, itemLogicalEnd, durationEnd);
 
         let spillReservation: number | null = null;
         const hasAnySpill =
@@ -159,5 +171,5 @@ export function sequenceRowTrack(
         });
     }
 
-    return { children, timeCursorX, packer };
+    return { children, timeCursorX, barRightX, packer };
 }

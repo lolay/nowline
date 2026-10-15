@@ -15,5 +15,5 @@
 ```
 
 ```release-note:fixed
-**A short bar drawn at its minimum width no longer delays the work after it.** The chart draws a bar too short to see at a minimum width, and that width used to push the next item in its lane, and the end of its wave, later than the exports. Both now follow the item's duration, so the next item starts on the date the exports give it and drops a row when it would overlap the wider bar.
+**A short bar drawn at its minimum width no longer delays the work after it.** The chart draws a bar too short to see at a minimum width, and that width used to push later than the exports the next item in its lane, the item after a `parallel` the bar ends, any item that names it (or that parallel) in `after:`, and the end of its wave. All now follow the item's duration, so those items start on the date the exports give them, and the next item in the lane drops a row when it would overlap the wider bar.
 ```

@@ -56,6 +56,10 @@ export class ParallelNode {
         // raw start as its cursor seed and is snapped where it is placed.
         const boxLeftX = ctx.scale.showsNonWorking ? ctx.scale.startX(startX) : startX;
         const children: PositionedTrackChild[] = [];
+        // The latest track end in time (the join) and the rightmost bar
+        // edge (the bracket): a bar drawn at its minimum width paints past
+        // its duration end (specs/scheduler-unification.md §8 decision 6).
+        let maxTimeRight = boxLeftX;
         let maxRight = boxLeftX;
         let accumulatedHeight = 0;
 
@@ -80,7 +84,8 @@ export class ParallelNode {
             );
             children.push(positioned);
             accumulatedHeight += Math.max(ctx.bandScale.step(), subCursor.height);
-            maxRight = Math.max(maxRight, subCursor.maxX);
+            maxTimeRight = Math.max(maxTimeRight, subCursor.x);
+            maxRight = Math.max(maxRight, subCursor.maxX, subCursor.x);
             childIndex++;
         }
         ctx.currentFlowKey = previousFlowKey;
@@ -92,16 +97,19 @@ export class ParallelNode {
             height: accumulatedHeight,
         };
 
-        // No tail gutter: the parallel joins on its latest track end, as
-        // engine C does (specs/scheduler-unification.md §8 decision 8).
-        cursor.x = maxRight;
-        cursor.maxX = Math.max(cursor.maxX, cursor.x);
+        // No tail gutter: the parallel joins on its latest track end in
+        // time, as engine C does (specs/scheduler-unification.md §8
+        // decisions 6, 8).
+        cursor.x = maxTimeRight;
+        cursor.maxX = Math.max(cursor.maxX, maxRight);
         cursor.height = Math.max(cursor.height, headerBand + accumulatedHeight);
 
         const id = node.name;
+        // `after:` the parallel is a time path: its latest track end, not
+        // its bracket (decision 6).
         if (id) {
             ctx.entityLeftEdges.set(id, box.x);
-            ctx.entityRightEdges.set(id, box.x + box.width);
+            ctx.entityRightEdges.set(id, maxTimeRight);
         }
 
         const inlineDatePins = computeContainerInlineDatePins({

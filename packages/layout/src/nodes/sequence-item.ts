@@ -34,7 +34,8 @@ import { buildLabelChip, type ItemMeasure, measureItem } from './item-measure.js
 import { ItemNode, traceItemNode } from './item-node.js';
 
 /**
- * Place `node` at `cursor` and advance the cursor past its logical end.
+ * Place `node` at `cursor` and advance the cursor: `cursor.x` to its
+ * duration end, `cursor.maxX` to its painted footprint.
  * `measured` is the item's measure at the snapped start it is placed at,
  * when the caller (a lane or group row track) already took it to pack the
  * row; a parallel track's child is measured here.
@@ -81,10 +82,16 @@ export function sequenceItem(
     const hasLinkIcon = linkInfo.icon !== 'none';
     const chipSamples = measure.chips.samples;
     const chipsOutside = measure.chips.outside;
-    // Logical extent — what the item "owns" in time (used for chaining,
-    // `after:` lookups, dependency-arrow attach points).
+    // Logical extent: the bar's painted footprint, `MIN_ITEM_WIDTH` clamp
+    // included (the bar box is inset from it).
     const logicalLeft = placedStartX;
     const logicalRight = placedStartX + naturalWidth;
+    // Duration end: where the item ends in time, never the minimum bar
+    // width. The time paths take it (the cursor, `after:` references, the
+    // wave barrier), so what follows a clamped bar starts on its date, as
+    // in engine C; a bar wider than its duration is presentation
+    // (specs/scheduler-unification.md §8 decision 6).
+    const durationEndX = placedStartX + itemSpanPx(ctx, placedStartX, measure.durationDays);
 
     // Handle `before:` — item must end by the earliest cap. Each cap is
     // either an entity id (looked up in entityLeftEdges) or an inline ISO
@@ -120,9 +127,8 @@ export function sequenceItem(
         }
     }
 
-    // The bar box (grown by `measure.barExtra`) and the caption's x. Logical
-    // extent (used by chaining and `after:` lookups) stays on
-    // logicalLeft/logicalRight; the box is inset from it.
+    // The bar box (grown by `measure.barExtra`) and the caption's x, inset
+    // from the logical extent logicalLeft/logicalRight.
     const titleStr = caption.title;
     const itemNode = new ItemNode(measure);
     const placeCtx = { time: ctx.scale, bands: ctx.bandScale, style };
@@ -327,19 +333,17 @@ export function sequenceItem(
     // referenceable target. Entity edges live in LOGICAL space so chained
     // items / `after:` references sit on the column boundary, not on the
     // visually inset bar edge. The visible 12 px gutter between bars then
-    // becomes a clean attach corridor.
+    // becomes a clean attach corridor. The right edge is the duration end:
+    // `after:` is a time path (decision 6). Items attach their arrows off
+    // their final box (`placedItems`), never off this map.
     if (id) {
         ctx.entityLeftEdges.set(id, logicalLeft);
-        ctx.entityRightEdges.set(id, logicalRight);
+        ctx.entityRightEdges.set(id, durationEndX);
     }
     // A member's end feeds its wave's barrier: its duration end, the lane
     // cursor's advance in `sequenceRowTrack`, never the minimum bar width,
     // a group box or a caption spill (specs/waves.md §8.4).
-    accumulateWaveMember(
-        node,
-        placedStartX + itemSpanPx(ctx, placedStartX, measure.durationDays),
-        ctx,
-    );
+    accumulateWaveMember(node, durationEndX, ctx);
     // Drawing / flow maps key on a registration handle EVERY item has: the
     // explicit id when present, else a synthetic, non-referenceable handle
     // (see `syntheticItemKey`). This lets a title-only item register its own
@@ -350,8 +354,10 @@ export function sequenceItem(
     const drawKey = id ?? syntheticItemKey(node);
     ctx.itemFlowKey.set(drawKey, ctx.currentFlowKey);
 
-    cursor.x = logicalRight;
-    cursor.maxX = Math.max(cursor.maxX, cursor.x);
+    // A parallel track joins on `cursor.x` (time) and sizes its bracket on
+    // `cursor.maxX` (the painted bar, minimum width included).
+    cursor.x = durationEndX;
+    cursor.maxX = Math.max(cursor.maxX, logicalRight, durationEndX);
     // The next row in a parallel/group/lane starts at
     // `cursor.y + cursor.height`. Default pitch is `bandScale.step()`
     // (bandwidth + inter-row gap). When the bar grew to enclose a
