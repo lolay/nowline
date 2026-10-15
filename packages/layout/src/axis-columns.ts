@@ -1,11 +1,12 @@
 // Axis columns — the date axis as a run of tick columns, read off the
 // natural scale (specs/rendering.md § "Caption cap at the chart's end",
 // specs/scheduler-unification.md §8 decision 12). A spilled caption that
-// would run past the axis end is capped one column past it: the item
-// measure truncates the title to `captionCapX`, and finalize step f2
-// (`extendTimeline`) grows the axis by that one column so its tick and date
-// label draw. Both read the same columns, so the cap and the extension
-// agree.
+// would run past the axis end is capped one full column past it (past the
+// end of a partial last column, when an explicit `length:` ends the axis
+// mid-column): the item measure truncates the title to `captionCapX`, and
+// finalize step f2 (`extendTimeline`) grows the axis by that one column and
+// always labels it. Both read the same columns, so the cap and the
+// extension agree.
 
 import type { TimeScale } from './time-scale.js';
 import { type ScaleUnit, tickBoundaryAtOrAfter } from './view-preset.js';
@@ -50,16 +51,36 @@ export class AxisColumns {
      * (the rounding f2 applies to a content box).
      */
     boundaryAtOrAfterX(x: number): number {
+        return this.boundaryAtOrAfter(this.scale.indexAtX(x));
+    }
+
+    /**
+     * The working-day index of the first column boundary at or after the
+     * working-day index `days`: `days` itself on a boundary, else the end
+     * of the partial column it falls in (an explicit `length:` can end the
+     * drawn axis mid-column).
+     */
+    boundaryAtOrAfter(days: number): number {
         return tickBoundaryAtOrAfter(
             this.startDate,
-            this.scale.indexAtX(x),
+            days,
             this.unit,
             this.calendar.daysPerUnit(this.unit),
             this.calendar,
         );
     }
 
-    /** The column boundary one column after the boundary (or window end) `days`. */
+    /**
+     * The one column a spilled caption past the axis end `axisDays` may
+     * run into, as working-day indices: from the boundary at or after the
+     * axis end (the end of a partial last column) to the next boundary.
+     */
+    captionColumn(axisDays: number): { start: number; end: number } {
+        const start = this.boundaryAtOrAfter(axisDays);
+        return { start, end: this.nextBoundary(start) };
+    }
+
+    /** The column boundary one column after the boundary `days`. */
     nextBoundary(days: number): number {
         return tickBoundaryAtOrAfter(
             this.startDate,
@@ -77,14 +98,14 @@ export class AxisColumns {
 
     /**
      * Where a spilled caption beside a bar ending at `barRightX` may end at
-     * most: one column past the axis end. The axis end is the natural one,
-     * or the boundary f2 grows it to for this bar when the bar itself runs
-     * past it.
+     * most: one full column past the axis end (`captionColumn`). The axis
+     * end is the natural one, or the boundary f2 grows it to for this bar
+     * when the bar itself runs past it.
      */
     captionCapX(barRightX: number): number {
         const axisDays = this.isPast(barRightX, this.spanDays)
             ? Math.max(this.spanDays, this.boundaryAtOrAfterX(barRightX))
             : this.spanDays;
-        return this.xAt(this.nextBoundary(axisDays));
+        return this.xAt(this.captionColumn(axisDays).end);
     }
 }
