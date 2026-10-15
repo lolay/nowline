@@ -6,7 +6,11 @@ import {
     BUILTIN_CAPACITY_ICONS,
     BUILTIN_ICON_NAMES,
     BUILTIN_STATUSES,
+    CALENDAR_MODES as CALENDAR_MODE_LIST,
+    COLOR_NAMES as COLOR_NAME_LIST,
+    INCLUDE_MODES as INCLUDE_MODE_LIST,
     NON_WORKING_DISPLAYS,
+    STYLE_PROP_ENUMS as STYLE_PROP_ENUM_LISTS,
 } from '../value-tables.js';
 
 export const SUPPORTED_VERSION = 'v1';
@@ -63,43 +67,15 @@ export const ROADMAP_ONLY_STYLE_KEYS = new Set([
 // POSITIVE_NUMBER_RE / POSITIVE_PERCENT_RE.
 export const UTILIZATION_NONE = 'none';
 
-export const STYLE_PROP_ENUMS: Record<string, Set<string>> = {
-    border: new Set(['solid', 'dashed', 'dotted']),
-    shadow: new Set(['none', 'subtle', 'soft', 'hard']),
-    font: new Set(['sans', 'serif', 'mono']),
-    weight: new Set(['thin', 'light', 'normal', 'bold']),
-    italic: new Set(['true', 'false']),
-    'text-size': new Set(['none', 'xs', 'sm', 'md', 'lg', 'xl']),
-    padding: new Set(['none', 'xs', 'sm', 'md', 'lg', 'xl']),
-    spacing: new Set(['none', 'xs', 'sm', 'md', 'lg', 'xl']),
-    'header-height': new Set(['none', 'xs', 'sm', 'md', 'lg', 'xl']),
-    'corner-radius': new Set(['none', 'xs', 'sm', 'md', 'lg', 'xl', 'full']),
-    bracket: new Set(['none', 'solid', 'dashed']),
-    'header-position': new Set(['beside', 'above']),
-    'timeline-position': new Set(['top', 'bottom', 'both']),
-    'minor-grid': new Set(['true', 'false']),
-};
+// Style enums, colour names and calendar modes come from value-tables.ts,
+// held here as sets for the membership checks.
+export const STYLE_PROP_ENUMS: Record<string, ReadonlySet<string>> = Object.fromEntries(
+    Object.entries(STYLE_PROP_ENUM_LISTS).map(([key, values]) => [key, new Set(values)]),
+);
 
-// Built-in color vocabulary. `grey` and `violet` are international-friendly
-// aliases for `gray` and `purple` — they canonicalize at the theme
-// boundary (resolveColor in packages/layout/src/themes/index.ts) so themes
-// don't grow new fields. Both spellings remain valid input.
-export const COLOR_NAMES = new Set([
-    'red',
-    'blue',
-    'yellow',
-    'green',
-    'orange',
-    'purple',
-    'violet',
-    'gray',
-    'grey',
-    'navy',
-    'white',
-    'none',
-]);
+export const COLOR_NAMES: ReadonlySet<string> = new Set(COLOR_NAME_LIST);
 
-export const CALENDAR_MODES = new Set(['business', 'full', 'custom']);
+export const CALENDAR_MODES: ReadonlySet<string> = new Set(CALENDAR_MODE_LIST);
 
 export const CALENDAR_FIELDS = new Set([
     'days-per-week',
@@ -274,7 +250,8 @@ export const ASCII_FALLBACK_RE = /^[\x20-\x7E]{1,3}$/;
 // The runtime resolver does the actual fallback work; this regex just gates input shape.
 export const BCP47_RE = /^[a-zA-Z]{2,3}(-[a-zA-Z]{2}|-\d{3})?$/;
 
-export const INCLUDE_MODES = new Set(['merge', 'ignore', 'isolate']);
+// From value-tables.ts, held as a set for the membership check.
+export const INCLUDE_MODES: ReadonlySet<string> = new Set(INCLUDE_MODE_LIST);
 
 // Allow-listed property keys on the `nowline` directive line. The directive existed
 // historically as `nowline v1` only; properties are a forward-extension point but stay

@@ -1,0 +1,3 @@
+```release-note:added
+Completion offers the values of every enumerated style key (`border:`, `shadow:`, `font:`, `corner-radius:` and the rest), the built-in color names after `bg:`, `fg:` and `text:`, the modes after `calendar:`, and the modes after `config:` and `roadmap:` on an `include` line.
+```

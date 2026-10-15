@@ -2,7 +2,11 @@ import {
     BUILTIN_CAPACITY_ICONS,
     BUILTIN_ICON_NAMES,
     BUILTIN_STATUSES,
+    CALENDAR_MODES,
+    COLOR_NAMES,
+    INCLUDE_MODES,
     NON_WORKING_DISPLAYS,
+    STYLE_PROP_ENUMS,
     WEEKDAYS,
 } from '@nowline/core/internal';
 import { describe, expect, it } from 'vitest';
@@ -14,10 +18,14 @@ import { parseDocument, services } from '../helpers.js';
 // checks against. Driven through the provider, so a local copy, a filter or a
 // missed key in completion.ts fails here, not only a drifted re-export.
 //
-// Not offered today, so nothing to compare: the style enums
-// (STYLE_PROP_ENUMS), colour names, calendar modes and include modes.
+// Style keys are completed in both places they can be set: a `style` block
+// (`key: value`, with a space after the colon) and a `default` line
+// (`key:value`). The colour keys take hex too, which is free-form and not
+// offered.
 
 const ROADMAP = 'nowline v1\n\nroadmap r "R" start:2026-01-05 scale:1w\n\nswimlane s "S"\n';
+const STYLE_BLOCK = 'nowline v1\n\nconfig\n\nstyle s\n  ';
+const DEFAULT_LINE = 'nowline v1\n\nconfig\n\ndefault roadmap ';
 
 const CASES: { key: string; expected: readonly string[]; source: string }[] = [
     { key: 'status', expected: BUILTIN_STATUSES, source: `${ROADMAP}  item a "A" status:` },
@@ -37,6 +45,24 @@ const CASES: { key: string; expected: readonly string[]; source: string }[] = [
         expected: NON_WORKING_DISPLAYS,
         source: 'nowline v1\n\nconfig\n\ndefault roadmap non-working:',
     },
+    ...Object.entries(STYLE_PROP_ENUMS).flatMap(([key, expected]) => [
+        { key: `${key} (style block)`, expected, source: `${STYLE_BLOCK}${key}: ` },
+        { key: `${key} (default line)`, expected, source: `${DEFAULT_LINE}${key}:` },
+    ]),
+    ...['bg', 'fg', 'text'].flatMap((key) => [
+        { key: `${key} (style block)`, expected: COLOR_NAMES, source: `${STYLE_BLOCK}${key}: ` },
+        { key: `${key} (default line)`, expected: COLOR_NAMES, source: `${DEFAULT_LINE}${key}:` },
+    ]),
+    {
+        key: 'calendar',
+        expected: CALENDAR_MODES,
+        source: 'nowline v1\n\nroadmap r "R" start:2026-01-05 calendar:',
+    },
+    ...['config', 'roadmap'].map((key) => ({
+        key: `include ${key}`,
+        expected: INCLUDE_MODES,
+        source: `nowline v1\n\ninclude "shared.nowline" ${key}:`,
+    })),
 ];
 
 async function builtInValues(source: string): Promise<string[]> {
