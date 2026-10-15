@@ -1,7 +1,7 @@
 ```text
 --- KICKOFF: begin orchestration at [deep] ---
 
-  Status: 3/6 groups done | last review: wave-2-fix2 PASS | current: nowline m3 s1-s2 [deep] | updated 2026-10-15 | passed unattended: gate 1 (fix-up 2 of 2) | over expected: ~$45.5 of ~$31
+  Status: 4/6 groups done | last review: wave-2 CONCERNS | current: nowline m3 s1-s2 fix-up 2-fix [deep] | updated 2026-10-15 | passed unattended: gate 4 before wave 2/m3 | over expected: ~$62.3 of ~$31
 
   mode: unattended | proposed unattended (harness=claude-code runner=cloud; CLAUDE_CODE_REMOTE=true, assigned branch) | guard 3x min $50 | fixups 2 | confirmed 2026-10-15 session ef0db142-6669-5058-893b-a118b7ea2d61 by Kickoff prompt: Run in unattended mode.
 
@@ -36,6 +36,7 @@
 | 3 [exec] m4 s2-s4 | ~2.7M | ~$1.1 |
 | 2-fix [deep] nowline m2 s1-s4 | — | — |
 | 2-fix2 [deep] nowline m2 s1-s4 | — | — |
+| 2-fix [deep] nowline m3 s1-s2 | — | — |
 | orchestrator | ~12M | ~$9.9 |
 | **Total** | ~52M | ~$31 |
 
@@ -108,10 +109,10 @@ Branch: `claude/friendly-babbage-qlcz6d` (harness-assigned task branch, fast-for
 
 ## m3 - Regions and the caption cap (F5, F7)
 
-#### s1 - [deep] F5: region anchors resolve inside an isolated region
+#### s1 - [deep] F5: region anchors resolve inside an isolated region (done)
 `buildIncludeRegions` (`packages/layout/src/nodes/include-node.ts`) seeds each region's dated anchors (and whatever else C's `scheduleRegion` in `schedule.ts` resolves inside the region) into the region context's edge maps via `scale.forwardWithinDomain`; nothing new is drawn. Check the with-waves region path agrees with C too. Expected: `nested`; register: all 50 `region-scope` entries go. Declare whatever G1 shows. Fragment `fixed`.
 
-#### s2 - [deep] F7: cap a caption at one column past the chart's end
+#### s2 - [deep] F7: cap a caption at one column past the chart's end (done)
 In caption measure (`packages/layout/src/nodes/item-measure.ts`), when a spilled caption would end past the axis end, truncate the title with `…` (via `estimateTextWidth`) so it ends within one column (one scale tick) past the axis end; finalize f2 (`extendTimeline`, `packages/layout/src/phases/finalize.ts`) extends the axis by that column so its tick and date label draw; the renderer emits the full title as the item's `<title>`. Mid-chart spills are unchanged. Under an explicit `length:`, follow f2's existing extension policy; if f2 never extends there, return `needs_info`. Tests: truncation, the axis gains exactly one labelled column, tooltip text. Update rendering.md. Declare whatever G1 shows. Fragment `changed`.
 
 ## m4 - Warm start, status dot and close-out (F4, F6)
@@ -143,6 +144,7 @@ review wave-2 (nowline m1 s2) 30a5c0e..fd989f4: PASS - merge 2206c8c clean (#160
 review wave-2 (nowline m2 s1-s4) 8b1b4ac..47639f6: CONCERNS - m2.s4 leaves the minimum bar width in two other cursor paths, so items after a clamped bar still start late (divergence (b)): (1) a parallel join, sequenceItem sets cursor.x/cursor.maxX to logicalRight (clamp included, sequence-item.ts:353), ParallelNode joins on subCursor.maxX and row-track.ts:90 takes it, so `parallel pp / item t1 duration:1d` then `item z duration:1w` gives z A 1.40 vs C 1.00; (2) after: refs, ctx.entityRightEdges is set to logicalRight (sequence-item.ts:333), so `item b duration:1w after:a` with a 1d `a` gives b A 1.40 vs C 1.00; waves.md §8.6 and the register $comment claim (b) is fixed, and no corpus sample has either shape, so the register test stays green; also minor: s3/s4 bodies name G1 bases c2371d4/36a786e (pre-rebuild SHAs, same trees as e38c414/3f9afe1). Merge 983ffac clean (#163); check_wave.py flagged only db78b2e (origin/main's own commit via the merge; worker's commits pass), not fixed, as in wave 2/m1; passed unattended: gate 4 - 2026-10-15
 review wave-2-fix (nowline m2 s1-s4) 8b1b4ac..4314f48: CONCERNS - code fix correct (both probes match C; time and painted readers split; G1/G3 identical vs 47639f6), but two new sentences claim engine C resolves `after:` on a parallel at its track end, which it doesn't (schedule.ts walkNode registers only items in scope.itemEnd; resolveAfterDay returns 0 for a parallel): specs/waves.md:823 "Every time path takes the duration end in both engines: ... an `after:` reference to the item or to a parallel that ends with it ..." and .changelog/scheduler-follow-ups.txt:18 "... any item that names it (or that parallel) in `after:` ... All now follow the item's duration, so those items start on the date the exports give them"; qualify both (the chart starts an item `after:` a parallel at its latest track end; C does not yet resolve a parallel reference, an open divergence like `after:<group>`); check_wave.py flagged only db78b2e (origin/main's own commit), not fixed; passed unattended: gate 1 (fix-up 2 of 2) - 2026-10-15
 review wave-2-fix2 (nowline m2 s1-s4) 8b1b4ac..c8ecee2: PASS - c8ecee2 (docs only) qualifies waves.md §8.6 (b) and the s4 changelog block: the chart starts an item `after:` a parallel at its latest track end; engine C does not yet resolve `after:` on a parallel or group (open, not in the register); no other text repeats the claim; make pre-commit green; check_wave.py flagged only db78b2e (origin/main's own commit), not fixed; passed unattended: gate 1 (fix-up 2 of 2) - 2026-10-15
+review wave-2 (nowline m3 s1-s2) 36de637..9597dc1: CONCERNS - F5 (ad6beed) holds: dated region anchors seeded without waves (matches C's scheduleRegion), all 50 region-scope entries gone, G1 only examples/nested; F7 (9597dc1) has two defects in the added column: (1) under `label-every` or automatic label thinning the added column gets no date label and no grid line (capacity, sizing, nested/android, nested/ios: label count unchanged while the timeline grows 40 px; rendering.md documents "The column is labelled like any other: `label-every` thinning and the narrow-column rules still apply to it"), against the spec "so its tick and date label draw" and Gary's "we should also show the date for the column even if it's not relevant so that it looks consistent"; (2) when an explicit `length:` window ends mid-column, captionCapX (axis-columns.ts:84-89) and f2 measure one column past the raw window end, so `nextBoundary(spanDays)` is only the end of the partial last column: `length:30d` scale:1w with a long last caption adds no column and cuts it to "Roll…" inside the existing axis; the length: tests use only week-aligned windows; passed unattended: gate 4 - 2026-10-15
 
 ## Token log
 
@@ -169,3 +171,6 @@ tokens review-wave-2-fix nowline-m2-s1-s4 (claude-opus-5-5): input ~60 / cache r
 tokens orchestrator-wave-2-fix nowline-m2-s1-s4 (claude-opus-5-5): input ~10 / cache read ~900k / cache write ~0 5m + ~22k 1h / output ~8.1k | ~$0.52 API-equiv
 tokens wave-2-fix2 nowline-m2-s1-s4 (claude-opus-5-5): input ~24 / cache read ~880k / cache write ~42k / output ~12k | ~$0.62 API-equiv (output est.) session ef0db142-6669-5058-893b-a118b7ea2d61
 tokens review-wave-2-fix2 nowline-m2-s1-s4 (claude-opus-5-5): input ~18 / cache read ~200k / cache write ~32k / output ~9k | ~$0.38 API-equiv (output est.) session ef0db142-6669-5058-893b-a118b7ea2d61
+tokens orchestrator-wave-2-fix2 nowline-m2-s1-s4 (claude-opus-5-5): input ~7 / cache read ~980k / cache write ~0 5m + ~16k 1h / output ~7.2k | ~$0.47 API-equiv
+tokens wave-2 nowline-m3-s1-s2 (claude-opus-5-5): input ~380 / cache read ~46M / cache write ~320k / output ~190k | ~$14.55 API-equiv (output est.) session ef0db142-6669-5058-893b-a118b7ea2d61
+tokens review-wave-2 nowline-m3-s1-s2 (claude-opus-5-5): input ~80 / cache read ~2.7M / cache write ~100k / output ~40k | ~$1.84 API-equiv (output est.) session ef0db142-6669-5058-893b-a118b7ea2d61

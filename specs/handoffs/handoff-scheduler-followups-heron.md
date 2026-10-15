@@ -3,9 +3,9 @@
 - **Plan:** `specs/handoffs/plan-scheduler-followups-heron.md`
 - **Branch:** `claude/friendly-babbage-qlcz6d` (harness-assigned task branch; fast-forwarded to `origin/main` `5da7d2a` and pushed at kickoff)
 - **Mode:** unattended, confirmed 2026-10-15 in session ef0db142 (dialog: "Unattended (Recommended)"; session: "This session")
-- **Status:** wave 2/m2 closed after two fix-ups (2-fix2 PASS); wave 2 unit m3 s1-s2 [deep] next (gate 4 passes unattended).
-- **Spend:** ~$45.5, over the ~$31 expected. Guard 3x min $50, ~$93.
-- **Next unit:** wave 2 [deep] `nowline m3 s1-s2` (F5, F7), then m4 s1 (F4); then wave 3 [exec] m4 s2-s4.
+- **Status:** wave 2/m3 (F5, F7) done with review CONCERNS on F7's added column; automatic fix-up 2-fix [deep] for `nowline m3 s1-s2` running (fix-up 1 of 2 for this group).
+- **Spend:** ~$62.3, over the ~$31 expected (deep units have run ~$10-15 each). Guard 3x min $50, ~$93; the remaining fix-up, F4 and wave 3 may reach it, in which case the run stops and asks.
+- **Next unit:** fix-up 2-fix [deep] `nowline m3 s1-s2`, then wave 2 m4 s1 (F4); then wave 3 [exec] m4 s2-s4.
 - **Gates the plan crosses:** 2 before wave 2; 4 at m2, m3 and m4. No canary (wave 1 has one group). No `[xdeep]`.
 - **Resume:** run `/compact` if needed, then paste the plan's Kickoff prompt.
 
@@ -20,6 +20,7 @@ None.
 - wave 2 [deep] `nowline m2 s1-s4` 8b1b4ac..47639f6: CONCERNS. Merge 983ffac (#163, clean); F2 96e073b (G1 identical), F3 (d) e38c414 (minimal, platform-2026, product, showcase), F3 (c) 3f9afe1 (inline-date-pins, waves, late-row-shifts), F3 (b) 47639f6 (showcase, non-working-hide/show). Review: the minimum bar width still reaches the parallel join and `after:` edges (sequence-item.ts:333, :353); fix-up 2-fix.
 - fix-up 2-fix [deep] `nowline m2 s1-s4` 8b1b4ac..4314f48: CONCERNS. 4314f48 splits time (cursor.x, entityRightEdges, wave member: duration end) from painted (maxX, bracket, packer, canvas) ends; four regression tests; G1/G3 identical. Review: waves.md:823 and the changelog s4 block wrongly say C resolves `after:<parallel>`; fix-up 2-fix2.
 - fix-up 2-fix2 [deep] `nowline m2 s1-s4` 8b1b4ac..c8ecee2: PASS. Docs only: waves.md §8.6 (b) and the s4 changelog block no longer claim the exports resolve `after:<parallel>`.
+- wave 2 [deep] `nowline m3 s1-s2` 36de637..9597dc1: CONCERNS. F5 ad6beed (G1: examples/nested only; all 50 region-scope entries gone). F7 9597dc1 (G1: 22 samples gain one column, 15 with cut titles; snapshots capacity, dependencies, isolate-include, non-working-hide, sizing, waves-isolate; determinism capacity, dependencies, isolate-include, sizing). Review: the added column goes unlabelled under label thinning, and a mid-column `length:` window adds no column; fix-up 2-fix.
 
 ## Deviations from plan
 
@@ -30,6 +31,8 @@ None.
 - The kickoff's parent spend (~$10.78) exceeds the orchestrator row's kickoff share (~$1.0): the same session did the decision dialogs and scratch prototypes before kicking off.
 
 ## Decisions so far
+
+- m3 (F5 held; F7 under fix-up): F5 seeds region anchors only without waves (C's wave-mode region walk has empty anchor maps). F7: any spilled caption ending past the axis end adds the one column, cut or not (22 samples move, 15 with cut titles; some short titles in narrow columns cut hard, e.g. dependencies "Deploy" to "Depl…": to show Gary at completion). A cut line keeps at least its first character; the meta line is never cut. The tooltip is the item's first-child `<title>`, joined with the wave tooltip when both apply. New `PositionedItem.titleTruncated`, `AxisColumns` (axis-columns.ts), `layoutSpillCluster`. scheduler-unification §9 still says nested keeps 50 region-scope entries (m4.s3 updates it). dsl.md says an isolated region's anchors and milestones render inside the region, which engine A has never done (pre-existing; to raise with Gary).
 
 - m2 (review CONCERNS on s4 only; the rest held): the canvas fix counts every parallel track's spilled caption, not only group tracks. `TRACK_BLOCK_TAIL_GUTTER_PX` (a public `@nowline/layout` export) is deleted, noted in the s2 `fixed` fragment. `minimal` moved in s2 (its last child is a parallel of group tracks; decision 8). `size-and-capacity` did not move in s4. The barrier theorem test and waves.md §8.4 compare duration ends; a clamped bar may paint past its wave boundary (decision 6). showcase `announce` is itself a clamped bar and keeps a decision-6 register entry. `packages/layout/test/finalize-coverage.json` moves with layout changes too. Historical spec text (§1.2, §1.3, §9) left for m4.s3.
 - Open, outside m2's scope (2-fix worker and reviewer): engine C ignores `after:<parallel>` and `after:<group>` (`walkNode` registers only items in `scope.itemEnd`; `resolveAfterDay` returns 0), so A > C there. Also an after-only milestone `after:<item>` sits at the item's visual box right (a clamped bar pushes it later: A 0.35 vs C 0.14 weeks), and `before:` overflow compares `logicalRight`. All pre-existing and outside the register. To raise with Gary at completion.
@@ -46,6 +49,9 @@ The planning session's decisions 5-13 are in the plan's Context section; m1.s1 r
 - F3 (b): each clamped bar's own register entry stays as presentation (decision 6); everything else in the register goes.
 
 ## Environment notes
+
+- env: run `make lint` before `make pre-commit`; biome's JSON formatter collapses one-element arrays in hand-edited register files.
+- env: `.scratch/base-m3` is a built worktree at 9597dc1; `.scratch/g1-m3s2-head` is its G1/G3 render, `.scratch/g1-m3s1-head` the render of ad6beed.
 
 - env: a G1/G3 render of one tree took ~6 min in m2; render it in a separate built worktree (`make init && make build-fast`) so the main tree stays free.
 - env: run `make compile TARGET=local` (under 1 s) before `make determinism`; a stale binary fails the CLI-vs-kernel cells.
