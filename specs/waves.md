@@ -823,7 +823,7 @@ Engines A and C produce the same schedule unless one of the divergences of [`sch
 - **(b)** a short item: engine A's bar is at least `MIN_ITEM_WIDTH` wide, and the lane cursor advances past it;
 - **(c)** caption spill inside a group that has a following sibling;
 - **(d)** a group track that binds a parallel join adds `TRACK_BLOCK_TAIL_GUTTER_PX` (8 px);
-- **(e)** an `after:` on a group nested in a parallel: engine A ignores it;
+- **(e)** settled by F2: an `after:` on a group that is a track of a parallel starts it at `max(the parallel's start, refs)` in both engines;
 - **(f)** engine A's lane cursor is monotone;
 - **(g)** item `date:` / `start:` pins: settled by removing them (F8 of [`scheduler-unification.md`](./scheduler-unification.md), [`dsl.md` § Pinning is not supported](./dsl.md#pinning-is-not-supported)). Both engines ignore the keys on an item, a group and a parallel, so the register carries no entry for it. (Engine A used to ignore a `start:` pin on a direct parallel track and let a lane item's `after:` push it; later both engines honoured the pin as `date:` > `start:` > `after:` > track cursor, with NL.W1001 when a wave floor moved it.)
 

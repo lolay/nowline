@@ -8,6 +8,7 @@ import type { NowlineFile, ResolveResult } from '@nowline/core';
 import { describe, expect, it } from 'vitest';
 import {
     layoutRoadmap,
+    type PositionedGroup,
     type PositionedItem,
     type PositionedRoadmap,
     type PositionedTrackChild,
@@ -59,7 +60,25 @@ async function weeksOf(source: string) {
         theme: 'light',
         today: new Date(Date.UTC(2026, 0, 5)),
     });
-    return { chart: chartWeeks(model), schedule: scheduleWeeks(file, resolved) };
+    return { model, chart: chartWeeks(model), schedule: scheduleWeeks(file, resolved) };
+}
+
+/** The placed group `id`, anywhere in the lanes. */
+function findGroup(model: PositionedRoadmap, id: string): PositionedGroup | undefined {
+    const walk = (children: PositionedTrackChild[]): PositionedGroup | undefined => {
+        for (const child of children) {
+            if (child.kind === 'item') continue;
+            if (child.kind === 'group' && child.id === id) return child;
+            const found = walk(child.children);
+            if (found) return found;
+        }
+        return undefined;
+    };
+    for (const lane of model.swimlanes) {
+        const found = walk(lane.children);
+        if (found) return found;
+    }
+    return undefined;
 }
 
 /** Lane `s` holds `a` (3w) then `b after:x`; lane `r` holds `x`, placed first. */
@@ -116,6 +135,26 @@ swimlane s "Subject"
   parallel pp after:x
     item t1 "T1" duration:1w
     item t2 "T2" duration:2w
+`;
+
+/**
+ * Lane `s` holds `a`, then a parallel whose second track is the group
+ * `gg after:x`; lane `r` holds `x`.
+ */
+const groupTrackSource = (xWeeks: number): string => `nowline v1
+
+roadmap r "R" start:2026-01-05 calendar:full scale:1w
+
+swimlane r "Refs"
+  item x "X" duration:${xWeeks}w
+
+swimlane s "Subject"
+  item a "A" duration:3w
+  parallel pp
+    item t1 "T1" duration:1w
+    group gg "GG" after:x
+      item g1 "G1" duration:1w
+      item g2 "G2" duration:1w
 `;
 
 describe('after: on a lane child honours the lane cursor', () => {
@@ -185,5 +224,54 @@ swimlane s "Subject"
         expect(chart.t1).toEqual([5, 6]);
         expect(schedule.t2).toEqual([5, 7]);
         expect(chart.t2).toEqual([5, 7]);
+    });
+});
+
+// Divergence (e) (specs/scheduler-unification.md §5 F2, §8 decision 5): a
+// group track of a parallel starts at max(the parallel's start, every
+// referenced entity's end), as engine C and a lane-level group do.
+describe('after: on a group track of a parallel', () => {
+    it('x ends before the parallel starts, so the group starts with the parallel', async () => {
+        const { chart, schedule } = await weeksOf(groupTrackSource(1));
+        expect(chart.t1).toEqual([3, 4]);
+        expect(chart.g1).toEqual([3, 4]);
+        expect(chart.g2).toEqual([4, 5]);
+        for (const id of ['t1', 'g1', 'g2']) expect(chart[id], id).toEqual(schedule[id]);
+    });
+
+    it('x ends after the parallel starts, so the group starts at x’s end', async () => {
+        const { chart, schedule } = await weeksOf(groupTrackSource(5));
+        expect(chart.t1).toEqual([3, 4]);
+        expect(chart.g1).toEqual([5, 6]);
+        expect(chart.g2).toEqual([6, 7]);
+        for (const id of ['t1', 'g1', 'g2']) expect(chart[id], id).toEqual(schedule[id]);
+    });
+
+    it('the canvas covers a caption spilled from a group track at the chart’s end', async () => {
+        // The group track starts late (after:x), and its one-day item's
+        // caption spills past the bar, the group's box and the axis end.
+        const { model } = await weeksOf(`nowline v1
+
+roadmap r "R" start:2026-01-05 calendar:full scale:1w
+
+swimlane r "Refs"
+  item x "X" duration:5w
+
+swimlane s "Subject"
+  item a "A" duration:3w
+  parallel pp
+    item t1 "T1" duration:1w
+    group gg "Screens" after:x
+      item sc "Screens for the onboarding flow and the settings pages" duration:1d
+`);
+        const group = findGroup(model, 'gg');
+        expect(group).toBeDefined();
+        const [screens] = (group as PositionedGroup).children;
+        expect(screens.kind).toBe('item');
+        expect((screens as PositionedItem).textSpills).toBe(true);
+        const captionRight = (screens as PositionedItem).decorationsRightX;
+        const groupRight = (group as PositionedGroup).box.x + (group as PositionedGroup).box.width;
+        expect(groupRight).toBeGreaterThanOrEqual(captionRight);
+        expect(model.width).toBeGreaterThanOrEqual(groupRight);
     });
 });

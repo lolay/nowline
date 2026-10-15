@@ -1,9 +1,12 @@
-// content-extent — shared helper that measures the rightmost edge
+// content-extent — shared helpers that measure how far right placed
+// content reaches. `maxLeafItemRightX` measures the rightmost edge
 // reached by leaf item bars inside a set of swimlanes, recursing
-// through nested swimlanes and group/parallel `children`.
+// through nested swimlanes and group/parallel `children`;
+// `trackChildPaintedRightX` measures everything one track child paints,
+// spilled captions included.
 //
 // A `PositionedItem.box` is always the bar itself, never a spilled
-// caption (see `PositionedItem.textSpills`), so this walk is immune
+// caption (see `PositionedItem.textSpills`), so the leaf walk is immune
 // to caption spill by construction. That makes it a stricter measure
 // than `RowPacker.usedRightX()` / `SwimlaneNode`'s `usedRightX`,
 // which both fold in `spillX` (the caption's reserved column).
@@ -16,6 +19,31 @@
 //     its nested content's bars rather than a spilled caption.
 
 import type { PositionedSwimlane, PositionedTrackChild } from '../types.js';
+
+/**
+ * Rightmost x anything in a placed track child paints: an item's bar, its
+ * spilled caption, decorations and chips; a group's box, which already hugs
+ * its children's spills; a parallel's box and, recursively, its tracks. A
+ * parallel's box reports only its tracks' compact ends, so a caption one of
+ * its tracks spills past that edge shows up here and nowhere else. The row
+ * track feeds it to the packer so the canvas grows to it.
+ */
+export function trackChildPaintedRightX(child: PositionedTrackChild): number {
+    if (child.kind === 'item') {
+        return Math.max(
+            child.box.x + child.box.width,
+            child.decorationsRightX,
+            child.chipsOutside ? child.chipsRightX : Number.NEGATIVE_INFINITY,
+        );
+    }
+    let right = child.box.x + child.box.width;
+    if (child.kind === 'parallel') {
+        for (const track of child.children) {
+            right = Math.max(right, trackChildPaintedRightX(track));
+        }
+    }
+    return right;
+}
 
 /** Rightmost x reached by any leaf item bar across `swimlanes`, recursing
  *  into nested swimlanes and group/parallel children. Returns 0 when the

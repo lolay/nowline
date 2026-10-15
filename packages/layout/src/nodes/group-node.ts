@@ -19,6 +19,7 @@ import { propValue, propValues } from '../dsl-utils.js';
 import { groupHasFill, groupTitleTabWidth } from '../group-title-tab-geometry.js';
 import { computeContainerInlineDatePins, pickInlineDate } from '../inline-date-pin-geometry.js';
 import type { LayoutContext, LayoutHelpers, TrackCursor } from '../layout-context.js';
+import { resolvePinnedOrSequentialStart } from '../start-rules.js';
 import { resolveStyle } from '../style-resolution.js';
 import {
     GROUP_BOTTOM_PAD_PX,
@@ -51,11 +52,18 @@ export class GroupNode {
         const { node } = this;
         const { helpers } = this;
         const style = resolveStyle('group', node.properties, ctx.styleCtx);
-        // The group's own wave and its lead wave floor its start, so its
-        // box never opens in a column before its first piece of work
-        // (specs/waves.md §5.1). A no-op without waves, and for a lane
-        // child, whose `resolveChildStart` already applied it.
-        const startX = waveFloorX(node, cursor.x, ctx);
+        // The group starts after every `after:` term, then its own wave and
+        // its lead wave floor it, so its box never opens in a column before
+        // its first piece of work (specs/waves.md §5.1). A lane child's
+        // cursor already sits there (`resolveChildStart`), so this is the
+        // identity for it; a parallel's group track starts at the parallel's
+        // start, so this is where its `after:` applies
+        // (specs/scheduler-unification.md §8 decision 5).
+        const startX = waveFloorX(
+            node,
+            resolvePinnedOrSequentialStart(node.properties, cursor.x, ctx),
+            ctx,
+        );
         // In a roadmap with waves, a group with no title, no `style:` and
         // no `labels:` that carries `wave:` only assigns membership: it
         // draws no bracket, which would otherwise sit exactly on the wave

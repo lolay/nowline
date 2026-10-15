@@ -117,14 +117,23 @@ export interface BlockCommitInput {
      *  right edge (see `blockTitleRowSpillReservation`). Omitted or
      *  `null` resets the row's spill reservation to `laneLeftX`. */
     spillReservation?: number | null;
+    /** Rightmost x anything inside the block paints, when it can pass
+     *  `blockEnd` (see `trackChildPaintedRightX`): a parallel's box is
+     *  compact, so a caption its tracks spill is not in it. It only
+     *  widens `usedRightX()` (the canvas and an enclosing group's box),
+     *  never the row's `rightEdge` or `spillX`, so packing is unchanged. */
+    paintedRight?: number;
 }
 
 export class RowPacker {
     public readonly rows: PackedRow[];
     private readonly opts: RowPackerOptions;
+    /** Rightmost `BlockCommitInput.paintedRight` committed so far. */
+    private paintedRightX: number;
 
     constructor(opts: RowPackerOptions) {
         this.opts = opts;
+        this.paintedRightX = opts.laneLeftX;
         this.rows = [
             {
                 y: opts.originY,
@@ -192,6 +201,9 @@ export class RowPacker {
         row.rightEdge = input.blockEnd;
         row.spillX = input.spillReservation ?? this.opts.laneLeftX;
         row.placedChildren.push(input.placed);
+        if (input.paintedRight !== undefined && input.paintedRight > this.paintedRightX) {
+            this.paintedRightX = input.paintedRight;
+        }
     }
 
     /** Total vertical extent reached (last row's bottom - originY). */
@@ -201,10 +213,11 @@ export class RowPacker {
     }
 
     /** Rightmost extent reached — bar logical end OR caption spill,
-     *  whichever is wider, across every row. Empty rows contribute
-     *  `laneLeftX`. */
+     *  whichever is wider, across every row, and anything a committed
+     *  block paints past its own box (`BlockCommitInput.paintedRight`).
+     *  Empty rows contribute `laneLeftX`. */
     usedRightX(): number {
-        let x = this.opts.laneLeftX;
+        let x = this.paintedRightX;
         for (const r of this.rows) {
             if (r.rightEdge > x) x = r.rightEdge;
             if (r.spillX > x) x = r.spillX;

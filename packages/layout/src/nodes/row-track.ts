@@ -17,6 +17,7 @@ import { RowPacker } from '../row-packer.js';
 import { resolveChildStart } from '../start-rules.js';
 import { ITEM_INSET_PX } from '../themes/shared.js';
 import type { PositionedTrackChild } from '../types.js';
+import { trackChildPaintedRightX } from './content-extent.js';
 import { measureItem } from './item-measure.js';
 import { sequenceItem } from './sequence-item.js';
 
@@ -77,6 +78,7 @@ export function sequenceRowTrack(
                 blockHeight,
                 blockEnd,
                 spillReservation: blockTitleRowSpillReservation(positioned),
+                paintedRight: trackChildPaintedRightX(positioned),
             });
             timeCursorX = Math.max(timeCursorX, blockEnd);
             continue;

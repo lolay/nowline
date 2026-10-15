@@ -1,3 +1,7 @@
 ```release-note:removed
 **Item `date:` and `start:` pins.** An item can no longer be pinned to a fixed start date: neither the chart nor the exports honour `date:` or `start:` on an item, so the item keeps its place in the lane and starts after the work before it. On an item, a group or a parallel the keys draw the unknown-property warning `NL.W0700` with the hint `Did you mean "after:<date>"?`; use `after:<date>` for "not before this date", and an anchor or a milestone for a named date. The layout warning `NL.W1001` (a wave barrier moved an item's pin) is retired, and the positioned model's `PositionedItem.wavePinOverride` field and the `W1001Args` type are gone. `NL.I1008` now covers only the date in an item's `after:`. Roadmap `start:` and anchor and milestone `date:` are unchanged. See `specs/dsl.md` § "Pinning is not supported".
 ```
+
+```release-note:fixed
+**The chart honours `after:` on a group inside a `parallel`.** A group that is a track of a parallel starts once every item it names in `after:` has finished, as a lane-level group does and as the XLSX, MS Project and Mermaid exports already dated it; before, the chart started it with the parallel. The canvas also grows to a caption spilled from a parallel's track, which was clipped at the chart's right edge.
+```
