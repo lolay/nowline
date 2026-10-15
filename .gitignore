@@ -65,6 +65,9 @@ coverage/
 /examples/**/*.html
 /examples/**/*.xlsx
 
+# Local review gallery (make gallery): raw builds, history, generated site
+/.gallery/
+
 # Rendered tests/ harness outputs (CLI artifacts, not source)
 /tests/**/*.svg
 # ...except the logo assets the logo-* fixtures reference (source, not output)

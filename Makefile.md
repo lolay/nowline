@@ -18,6 +18,7 @@ graph LR
     typecheck --> ci
     test --> ci
     build_fast["build-fast"] --> ci_platform["ci-platform"]
+    build --> gallery
 
     %% dotted = consumes the left target's output but is not a hard make
     %% prerequisite: typecheck is ordered after build inside ci instead, and
@@ -34,6 +35,7 @@ graph LR
     build -.-> publish_cdn["publish-cdn"]
 
     %% standalone
+    gallery_serve["gallery-serve"]
     init
     format
     clean
@@ -72,11 +74,13 @@ pipeline that artifact is built in a separate CI job and handed over — see
 | `lint` | Static check: biome lint + format-drift + import organization, no writes (`pnpm check`) |
 | `format` | Auto-fix formatting, lint, and import order (`pnpm check:fix`) |
 | `typecheck` | Type-check the packages that opt in (`pnpm typecheck`). Needs a prior `build`: several packages resolve sibling `@nowline/*` types from `dist/` |
-| `test` | Run every package's Vitest suite (`pnpm -r test`); depends on `build` |
+| `test` | Run every package's Vitest suite (`pnpm -r test`) and the `node:test` specs for the repo scripts under `scripts/gallery/test/`; depends on `build` |
 | `doctor` | Check the tools in `triage.yaml` (read-only): errors below a floor, warns below a pin. `MODE=default\|release\|ci` picks the profile; `STRICT=1` adds `triage --strict` so warnings fail, which is how CI's `triage` job runs it on the `.nvmrc` pin |
 | `ci` | The full pre-push gate: `lint` + `build` + `typecheck` + `test`, in that order. The canonical CI cell (`ubuntu-latest`, Node 26) runs this target directly on a clean checkout |
-| `ci-platform` | Slim gate for the other build-test cells (`ubuntu-latest` Node 22, macOS, Windows): `build-fast`, then `pnpm -r test`. No lint, typecheck, or render: those have never differed by OS or Node version, while every platform bug so far was a Windows path bug that Vitest caught. Calls `pnpm -r test` itself rather than depending on `test`, so it never re-runs the full `build` |
+| `ci-platform` | Slim gate for the other build-test cells (`ubuntu-latest` Node 22, macOS, Windows): `build-fast`, then `pnpm -r test` and the script tests. No lint, typecheck, or render: those have never differed by OS or Node version, while every platform bug so far was a Windows path bug that Vitest caught. Calls `pnpm -r test` itself rather than depending on `test`, so it never re-runs the full `build` |
 | `pre-commit` | Local alias of `ci` — run before committing or pushing |
+| `gallery` | Render everything (`build`), then add this tree to the local review gallery: `scripts/gallery/collect.mjs` snapshots the SVGs, sources and commit into `$(GALLERY_DIR)/raw`, and `scripts/gallery/publish.mjs` adds it to the history in `$(GALLERY_DIR)/data` (newest `GALLERY_KEEP`, default 100) and regenerates `$(GALLERY_DIR)/site`. Each run compares against the previous one, so `make gallery` on `main` and then on a branch shows the branch's render drift. Open `.gallery/site/index.html`, or use `gallery-serve` |
+| `gallery-serve` | Serve `$(GALLERY_DIR)/site` over http on every interface at `GALLERY_PORT` (default 8080), so a phone on the same network can browse it; http also enables the pixel diff and per-item history strip, which `file://` blocks |
 | `clean` | Remove build / binary / package artifacts (keeps `node_modules`) |
 | `lint-workflows` | actionlint the GitHub Actions workflows (`pnpm lint:workflows`); fails fast without shellcheck on PATH, since actionlint would otherwise skip the `run:` script checks CI does |
 | `lint-man` | `mandoc -T lint` every man page at warning level, minus the two warnings translated pages raise for their localized `NAME` section. Needs `mandoc` on PATH (apt `mandoc`; ships with macOS). Not part of `ci`: Windows has no mandoc, so CI runs it in one Linux job |

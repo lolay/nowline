@@ -1,6 +1,8 @@
 # Build gallery: per-build QA site for examples/ and tests/
 
-Status: planned, awaiting approval. Branch: `claude/compassionate-galileo-jizy6q`. Runner scratch, to be removed or promoted before merge.
+Status: m1 (done), paused for review before m2. Branch: `claude/compassionate-galileo-jizy6q`. Runner scratch, to be removed or promoted before merge.
+
+m1 deviations: `publish.mjs` (planned as m2.s1) landed in m1, because `make gallery` runs the same collect + publish path CI will, keeping local history in `.gallery/data`, so no `GALLERY_PREV` is needed: run it on `main`, then on a branch. Added `make gallery-serve` (LAN http server) since the pixel diff and the history strip need http. In phone landscape the history strip hides (older/newer links stay) instead of sitting behind a toggle. m2 is now only `gallery.yml` plus Slack.
 
 ## Context
 
