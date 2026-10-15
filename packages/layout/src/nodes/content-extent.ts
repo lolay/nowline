@@ -17,6 +17,9 @@
 //     without letting overhanging captions drag it out too.
 //   - `buildIncludeRegions`, to size the dashed include bracket to
 //     its nested content's bars rather than a spilled caption.
+//
+// `maxSpilledCaptionRightX` is the other half of f2: a spilled caption
+// past the axis end grows the axis by the one column it was capped to.
 
 import type { PositionedSwimlane, PositionedTrackChild } from '../types.js';
 
@@ -67,6 +70,36 @@ function maxTrackChildRightX(children: PositionedTrackChild[]): number {
             max = Math.max(max, child.box.x + child.box.width);
         } else {
             max = Math.max(max, maxTrackChildRightX(child.children));
+        }
+    }
+    return max;
+}
+
+/**
+ * Rightmost x a spilled item caption reaches across `swimlanes` (its spill
+ * column: icon, caption, footnotes, dot), recursing like
+ * `maxLeafItemRightX`; 0 when no caption spills. Finalize f2 grows the
+ * axis by one column for a caption that ends past it (specs/rendering.md
+ * § "Caption cap at the chart's end").
+ */
+export function maxSpilledCaptionRightX(swimlanes: PositionedSwimlane[]): number {
+    let max = 0;
+    for (const lane of swimlanes) {
+        max = Math.max(max, maxTrackChildCaptionRightX(lane.children));
+        if (lane.nested.length > 0) {
+            max = Math.max(max, maxSpilledCaptionRightX(lane.nested));
+        }
+    }
+    return max;
+}
+
+function maxTrackChildCaptionRightX(children: PositionedTrackChild[]): number {
+    let max = 0;
+    for (const child of children) {
+        if (child.kind === 'item') {
+            if (child.textSpills) max = Math.max(max, child.decorationsRightX);
+        } else {
+            max = Math.max(max, maxTrackChildCaptionRightX(child.children));
         }
     }
     return max;

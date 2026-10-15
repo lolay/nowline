@@ -380,7 +380,8 @@ export interface PositionedItem {
      *     blank entries. An explicit title never auto-wraps.
      *
      * Omitted for a one-line title, and for a break-free title that spilled
-     * to the right (always one line). Line `n` (0-based) sits at baseline
+     * to the right (always one line), unless the caption cap at the chart's
+     * end truncated it (`titleTruncated`). Line `n` (0-based) sits at baseline
      * `ITEM_CAPTION_TITLE_BASELINE_OFFSET_PX + n * ITEM_CAPTION_TITLE_LINE_HEIGHT_PX`
      * from the bar's top, and the meta line follows at
      * `itemCaptionMetaBaselineOffset(titleLines.length)`. A multi-line
@@ -388,6 +389,14 @@ export interface PositionedItem {
      * extra line.
      */
     titleLines?: string[];
+    /**
+     * True when a spilled caption that would run past the axis end was
+     * capped one column past it: `titleLines` carries the lines truncated
+     * with `…`, and the renderer gives the bar the full `title` as its
+     * `<title>` tooltip (specs/rendering.md § "Caption cap at the chart's
+     * end"). Omitted otherwise.
+     */
+    titleTruncated?: true;
     box: BoundingBox;
     status: StatusKind;
     progressFraction: number; // 0..1; 1 == fully filled

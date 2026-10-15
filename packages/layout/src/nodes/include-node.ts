@@ -49,6 +49,7 @@ export function buildIncludeRegions(
                 timeline: ctx.timeline,
                 scale: ctx.scale,
                 calendar: ctx.calendar,
+                axisColumns: ctx.axisColumns,
                 bandScale: ctx.bandScale,
                 waves: ctx.waves,
             },

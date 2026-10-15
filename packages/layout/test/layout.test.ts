@@ -1396,6 +1396,9 @@ describe('layoutRoadmap explicit title line breaks', () => {
         return { file, model: layoutRoadmap(file, resolved, { theme: 'light' }) };
     }
 
+    /** A milestone far past every bar, so no caption reaches the axis end. */
+    const CLEAR_OF_THE_END = 'milestone later "Later" date:2026-09-07\n';
+
     function roadmap(body: string, header = ''): string {
         return `nowline v1
 
@@ -1465,7 +1468,12 @@ ${body}`;
 
     it('spills a too-wide explicit title as a multi-line block and grows the bar for its height', async () => {
         const { model } = await layout(
-            roadmap('  item wide "Internationalization of\\nthe billing service" duration:2w\n'),
+            // The milestone keeps the axis end well past the caption, so the
+            // caption cap at the chart's end leaves it whole.
+            roadmap(
+                '  item wide "Internationalization of\\nthe billing service" duration:2w\n',
+                CLEAR_OF_THE_END,
+            ),
         );
         const wide = find(items(model.swimlanes[0].children), 'wide');
         expect(wide.textSpills).toBe(true);
@@ -1476,7 +1484,12 @@ ${body}`;
 
     it('reserves the widest title line, not the raw string, as the spill width', async () => {
         const { model } = await layout(
-            roadmap('  item wide "Internationalization of\\nthe billing service" duration:2w\n'),
+            // The milestone keeps the axis end well past the caption, so the
+            // caption cap at the chart's end leaves it whole.
+            roadmap(
+                '  item wide "Internationalization of\\nthe billing service" duration:2w\n',
+                CLEAR_OF_THE_END,
+            ),
         );
         const wide = find(items(model.swimlanes[0].children), 'wide');
         const widest = 'Internationalization of'.length * 13 * 0.58; // 173.4px

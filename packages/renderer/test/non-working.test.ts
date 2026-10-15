@@ -546,9 +546,13 @@ describe('non-working labels under show', () => {
         // The band `<rect>` is what 5a drew: x 24 from the origin, 32 wide.
         const rects = rectsOf(bandLayers(svg)[0] ?? '');
         const o = model.timeline.originX;
+        // The third band is the weekend of the column QA's spilled caption
+        // adds past the content end (rendering.md § "Caption cap at the
+        // chart's end").
         expect(rects.map((r) => [Number(r.x) - o, Number(r.width)])).toEqual([
             [24, 32],
             [96, 16],
+            [152, 16],
         ]);
     });
 });

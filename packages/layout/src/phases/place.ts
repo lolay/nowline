@@ -9,6 +9,7 @@
 // finalize may extend but never re-places on.
 
 import type { ResolveResult, SwimlaneDeclaration } from '@nowline/core';
+import { AxisColumns } from '../axis-columns.js';
 import { defaultRowBand } from '../band-scale.js';
 import { localeStrings } from '../i18n.js';
 import { createLayoutContext, type LayoutContext, type LayoutHelpers } from '../layout-context.js';
@@ -76,6 +77,7 @@ export function placeChart(
             timeline,
             scale: timeScale,
             calendar,
+            axisColumns: new AxisColumns(window, timeScale),
             bandScale: defaultRowBand(),
             waves: plan
                 ? createWaveLayoutState(

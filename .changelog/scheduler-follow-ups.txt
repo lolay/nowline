@@ -21,3 +21,7 @@
 ```release-note:fixed
 **An isolated region's lanes honour its own anchors in the chart.** A `roadmap:isolate` include whose lane starts `after:` an anchor the included file declares (as each region of the `nested` example does with its `anchor kickoff`) now starts on that anchor's date in the chart, the date the scheduler that sizes the chart's date window already gave it; before, the chart could not see the region's anchors and started the lane at the roadmap start. The region's anchors are still not drawn, and in a roadmap with waves a region's lanes still see only the wave edges, as the scheduler does.
 ```
+
+```release-note:changed
+**A caption that runs past the chart's end is capped one column past it.** When an item's caption spills past the last date column, the chart now adds one column, with its tick and date label, and the caption ends inside it: a title too long for that column is cut with `…`, and hovering the bar shows the full title as its tooltip. Before, the caption ran on past the axis with no dates under it and widened the chart to fit. Captions that end inside the chart are unchanged, and so is the axis under an explicit `length:` that already covers them. The positioned model's `PositionedItem` gains `titleTruncated` (set only on a cut caption; `titleLines` holds the cut lines and `title` the full title).
+```

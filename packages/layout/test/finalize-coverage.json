@@ -3,6 +3,7 @@
         "Finalize coverage register (specs/layout-phases.md §6), checked by finalize-coverage.test.ts.",
         "For each finalize step, in order, the samples it changes something on when laid out like `nowline <file> --theme light --now 2026-02-09`: the canvas grew (growCanvasForSpill, growCanvasForMarkerLabels), the axis was extended (extendTimeline), a lane or region width differs from the natural canvas's (fitWidths), a pre-packed marker moved (packMarkers), a milestone's marker row differs from the estimate placement wrote (placeMarkers), the marker band grew (growHeaderRows), or the step built something (bottomTickPanel to footnotePanel; header counts the beside header, attribution every sample).",
         "Seeded from the trace at m5.s4 and reconciled with the Corpus column of spec §1.2: the counts differ only where R1's F1 changed examples/showcase, examples/sizing and tests/late-row-shifts (growCanvasForSpill and fitWidths +3, extendTimeline +1) and in placeMarkers, which counts a moved marker row (7) where §1.2 also counted a moved label box (9).",
+        "F7 (specs/scheduler-unification.md §8 decision 12) made extendTimeline fire on every sample whose spilled caption ends past the axis end (6 to 28), and so on tests/working-exceptions, whose extra column also moves a marker (packMarkers, placeMarkers).",
         "A sample edit that changes which samples a step fires on updates this file; a step that loses its last sample needs a fixture that keeps it covered."
     ],
     "steps": {
@@ -39,14 +40,36 @@
             ]
         },
         "extendTimeline": {
-            "count": 6,
+            "count": 28,
             "samples": [
+                "examples/capacity.nowline",
+                "examples/dependencies.nowline",
+                "examples/inline-date-pins.nowline",
+                "examples/isolate-include.nowline",
                 "examples/nested.nowline",
+                "examples/nested/android.nowline",
+                "examples/nested/data.nowline",
+                "examples/nested/ios.nowline",
+                "examples/nested/platform.nowline",
+                "examples/nested/web.nowline",
+                "examples/partner.nowline",
                 "examples/platform-2026.nowline",
+                "examples/showcase.nowline",
+                "examples/sizing.nowline",
+                "examples/waves-program.nowline",
                 "examples/waves.nowline",
                 "tests/header-height-none.nowline",
                 "tests/header-height-xl.nowline",
-                "tests/nested-both-headers.nowline"
+                "tests/isolate-include-multi.nowline",
+                "tests/item-bumps-up.nowline",
+                "tests/nested-both-headers.nowline",
+                "tests/non-working-hide.nowline",
+                "tests/partner-multi.nowline",
+                "tests/waves-gap-deadline.nowline",
+                "tests/waves-isolate-team.nowline",
+                "tests/waves-isolate.nowline",
+                "tests/waves-parallel-group.nowline",
+                "tests/working-exceptions.nowline"
             ]
         },
         "growCanvasForMarkerLabels": {
@@ -92,17 +115,18 @@
             ]
         },
         "packMarkers": {
-            "count": 5,
+            "count": 6,
             "samples": [
                 "examples/dependencies.nowline",
                 "tests/header-height-none.nowline",
                 "tests/header-height-xl.nowline",
                 "tests/late-row-shifts.nowline",
-                "tests/marker-left-overflow.nowline"
+                "tests/marker-left-overflow.nowline",
+                "tests/working-exceptions.nowline"
             ]
         },
         "placeMarkers": {
-            "count": 7,
+            "count": 8,
             "samples": [
                 "examples/long.nowline",
                 "examples/platform-2026.nowline",
@@ -110,7 +134,8 @@
                 "examples/teams.nowline",
                 "tests/late-row-shifts.nowline",
                 "tests/marker-left-overflow.nowline",
-                "tests/waves-coarse.nowline"
+                "tests/waves-coarse.nowline",
+                "tests/working-exceptions.nowline"
             ]
         },
         "growHeaderRows": {

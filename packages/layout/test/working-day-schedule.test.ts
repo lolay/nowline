@@ -141,18 +141,22 @@ swimlane a "A"
         expect(model.milestones[0].center.x - o).toBe(152);
     });
 
-    it('business: week ticks at 0/40/80/120/160 labelled Jan 05, Jan 12, Jan 19, Jan 26', async () => {
+    it('business: week ticks at 0/40/80/120/160/200 labelled Jan 05 to Feb 02', async () => {
         const { model } = await lay(source('business'));
+        // W4's caption spills past the axis end at 160, so the axis gains
+        // the one labelled column the caption ends in (rendering.md §
+        // "Caption cap at the chart's end").
         expect(ticksOf(model)).toEqual([
             [0, 'Jan 05'],
             [40, 'Jan 12'],
             [80, 'Jan 19'],
             [120, 'Jan 26'],
-            [160, undefined],
+            [160, 'Feb 02'],
+            [200, undefined],
         ]);
-        expect(iso(model.timeline.endDate)).toBe('2026-02-02');
+        expect(iso(model.timeline.endDate)).toBe('2026-02-09');
         expect(model.timeline.pixelsPerDay).toBe(8);
-        expect(model.timeline.box.width).toBe(160);
+        expect(model.timeline.box.width).toBe(200);
     });
 
     it('business: the model carries the hidden weekends as zero-width runs', async () => {
@@ -165,6 +169,7 @@ swimlane a "A"
             [80, 0, '2026-01-17', '2026-01-18'],
             [120, 0, '2026-01-24', '2026-01-25'],
             [160, 0, '2026-01-31', '2026-02-01'],
+            [200, 0, '2026-02-07', '2026-02-08'],
         ]);
         // Optional keys appear only when present: a plain weekend has no
         // titles, and no seam is marked at the week scale.
@@ -197,14 +202,15 @@ swimlane a "A"
             [40, 'Jan 12'],
             [80, 'Jan 19'],
             [120, 'Jan 26'],
-            [160, undefined],
+            [160, 'Feb 02'],
+            [200, undefined],
         ]);
         const w4 = laneItems(model)[3];
         expect(w4.box.x - o).toBe(126);
         expect(w4.box.width).toBe(28);
         // 25 days at 40/7 px a day.
         expect(model.milestones[0].center.x - o).toBeCloseTo(142.857, 2);
-        expect(iso(model.timeline.endDate)).toBe('2026-02-02');
+        expect(iso(model.timeline.endDate)).toBe('2026-02-09');
         expect(model.timeline.nonWorking).toBeUndefined();
         expect(model.timeline.nonWorkingDisplay).toBeUndefined();
     });
@@ -281,13 +287,15 @@ swimlane a "A"
     });
 
     it('a Wednesday-ending length: drops the closing column label, keeping its tick', async () => {
-        // length:7d ends Wed Jan 14 (index 7); the last column is 16 px.
+        // length:7d ends Wed Jan 14 (index 7); the last column is 16 px. The
+        // 2d item's spilled caption ends before it, so the cap at the
+        // chart's end does not grow the axis.
         const { model } = await lay(`nowline v1
 
 roadmap r "R" start:2026-01-05 scale:1w length:7d
 
 swimlane a "A"
-  item a1 "A1" duration:1w
+  item a1 "A1" duration:2d
 `);
         expect(iso(model.timeline.endDate)).toBe('2026-01-14');
         expect(ticksOf(model)).toEqual([
@@ -311,11 +319,13 @@ swimlane a "A"
 `,
             { locale: 'fr-CA' },
         );
+        // The fifth label is the column W4's spilled caption ends in.
         expect(model.timeline.ticks.map((t) => t.label)).toEqual([
             'janv. 05',
             'janv. 12',
             'janv. 19',
             'janv. 26',
+            'févr. 02',
             undefined,
         ]);
     });

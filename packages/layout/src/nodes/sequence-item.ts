@@ -12,14 +12,11 @@ import {
     ITEM_CAPTION_META_BASELINE_OFFSET_PX,
     ITEM_CAPTION_SPILL_GAP_PX,
     ITEM_CAPTION_TITLE_FONT_SIZE_PX,
-    ITEM_DECORATION_SPILL_GAP_PX,
-    ITEM_FOOTNOTE_INDICATOR_STEP_PX,
-    ITEM_LINK_ICON_TILE_SIZE_PX,
-    ITEM_STATUS_DOT_RADIUS_PX,
     LABEL_CHIP_GAP_ABOVE_PROGRESS_STRIP_PX,
     LABEL_CHIP_GAP_BETWEEN_PX,
     LABEL_CHIP_HEIGHT_PX,
     LABEL_CHIP_ROW_STEP_PX,
+    layoutSpillCluster,
     MIN_BAR_WIDTH_FOR_DOT_PX,
     MIN_BAR_WIDTH_FOR_FOOTNOTE_PX,
 } from '../item-bar-geometry.js';
@@ -280,25 +277,12 @@ export function sequenceItem(
     // glyph reaches; the row-packer uses it (alongside spilled-chip
     // width) to reserve x-extent so the next chained item bumps to
     // a fresh row instead of landing under the spilled cluster.
-    const SPILL_COLUMN_X0 = itemBox.x + itemBox.width + ITEM_CAPTION_SPILL_GAP_PX;
-    let spillCursor = SPILL_COLUMN_X0;
-    // Advance the cursor by `gap` IFF something has already been
-    // placed in the column — keeps the cluster from leaving a
-    // dangling gap past its final glyph (which would over-reserve
-    // x-extent and shift downstream items).
-    let needGap = false;
-    let iconSpillX: number | null = null;
-    if (iconSpills) {
-        if (needGap) spillCursor += ITEM_DECORATION_SPILL_GAP_PX;
-        iconSpillX = spillCursor;
-        spillCursor = iconSpillX + ITEM_LINK_ICON_TILE_SIZE_PX;
-        needGap = true;
-    }
-    let captionSpillWidth = 0;
+    let captionSpillWidth: number | null = null;
     if (textSpills) {
-        if (needGap) spillCursor += ITEM_DECORATION_SPILL_GAP_PX;
         // The widest title LINE: a multi-line spill is as wide as its
-        // longest line, not as the raw string (newlines included).
+        // longest line, not as the raw string (newlines included). A
+        // caption capped at the chart's end arrives with its lines already
+        // truncated (`measureItem`).
         const titleW = Math.max(
             ...captionLines.map((line) => estimateTextWidth(line, ITEM_CAPTION_TITLE_FONT_SIZE_PX)),
         );
@@ -308,24 +292,16 @@ export function sequenceItem(
         // without `capacity:`.
         const metaW = (metaText ? estimateTextWidth(metaText, 11) : 0) + capacityTrailingWidth;
         captionSpillWidth = Math.max(titleW, metaW);
-        spillCursor += captionSpillWidth;
-        needGap = true;
     }
-    let footnoteSpillStartX: number | null = null;
-    if (footnoteSpills) {
-        if (needGap) spillCursor += ITEM_DECORATION_SPILL_GAP_PX;
-        footnoteSpillStartX = spillCursor;
-        spillCursor += footnoteIndicators.length * ITEM_FOOTNOTE_INDICATOR_STEP_PX;
-        needGap = true;
-    }
-    let dotSpillCx: number | null = null;
-    if (dotSpills) {
-        if (needGap) spillCursor += ITEM_DECORATION_SPILL_GAP_PX;
-        dotSpillCx = spillCursor + ITEM_STATUS_DOT_RADIUS_PX;
-        spillCursor = dotSpillCx + ITEM_STATUS_DOT_RADIUS_PX;
-        needGap = true;
-    }
-    const decorationsRightX = Math.max(itemBox.x + itemBox.width, spillCursor);
+    const spill = layoutSpillCluster({
+        barRightX: itemBox.x + itemBox.width,
+        iconSpills,
+        captionWidth: captionSpillWidth,
+        footnoteCount: footnoteSpills ? footnoteIndicators.length : 0,
+        dotSpills,
+    });
+    const { iconSpillX, footnoteSpillStartX, dotSpillCx } = spill;
+    const decorationsRightX = Math.max(itemBox.x + itemBox.width, spill.rightX);
 
     const id = node.name;
     // Reference-target edges resolve `after:` / `before:` lookups, so only
@@ -417,6 +393,9 @@ export function sequenceItem(
     const waveRole = waveRoleOf(node, ctx);
     if (waveRole !== undefined) result.waveRole = waveRole;
     if (nonWorkingPin !== undefined) result.nonWorkingPin = nonWorkingPin;
+    // The caption cap at the chart's end truncated a title line; the full
+    // title stays the bar's tooltip.
+    if (caption.truncated) result.titleTruncated = true;
     // A background item carries its localized hover line from placement
     // on (specs/waves.md §9.3); members and wave-free items carry none.
     if (waveRole === 'background' && ctx.waves) {

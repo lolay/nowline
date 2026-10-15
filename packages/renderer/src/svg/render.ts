@@ -1062,8 +1062,13 @@ function renderItem(
     fonts: FontFamilies,
 ): string {
     const parts: string[] = [];
-    // Background work's hover tooltip (specs/waves.md §9.3).
-    if (i.waveTooltip !== undefined) parts.push(`<title>${escText(i.waveTooltip)}</title>`);
+    // The bar's hover tooltip: the full title when the caption cap at the
+    // chart's end truncated it (specs/rendering.md § "Caption cap at the
+    // chart's end"), then background work's line (specs/waves.md §9.3).
+    const tooltipLines: string[] = [];
+    if (i.titleTruncated) tooltipLines.push(i.title);
+    if (i.waveTooltip !== undefined) tooltipLines.push(i.waveTooltip);
+    if (tooltipLines.length > 0) parts.push(`<title>${escText(tooltipLines.join('\n'))}</title>`);
     const shadow = shadowFilterUrl(idPrefix, i.style.shadow);
     parts.push(
         rectFrame(i.box.x, i.box.y, i.box.width, i.box.height, i.style, {

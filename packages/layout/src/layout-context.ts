@@ -12,6 +12,7 @@ import type {
     ResolvedContent,
     SymbolDeclaration,
 } from '@nowline/core';
+import type { AxisColumns } from './axis-columns.js';
 import type { BandScale } from './band-scale.js';
 import { type resolveCalendar, resolveSizes } from './calendar.js';
 import type { FootnoteIndex } from './nodes/footnote-node.js';
@@ -104,6 +105,13 @@ export interface LayoutContext {
     timeline: PositionedTimelineScale;
     scale: TimeScale;
     calendar: WorkingCalendar;
+    /**
+     * The natural axis as tick columns, for the caption cap at the chart's
+     * end (`measureItem`). Shared by the main lanes and every isolated
+     * region; omitted by contexts built outside the place phase, which then
+     * cap no caption.
+     */
+    axisColumns?: AxisColumns;
     bandScale: BandScale;
     entityLeftEdges: Map<string, number>;
     entityRightEdges: Map<string, number>;
@@ -211,6 +219,7 @@ export function createLayoutContext(
         timeline: PositionedTimelineScale;
         scale: TimeScale;
         calendar: WorkingCalendar;
+        axisColumns?: AxisColumns;
         bandScale: BandScale;
         waves?: WaveLayoutState;
     },
@@ -242,6 +251,7 @@ export function createLayoutContext(
         timeline: shared.timeline,
         scale: shared.scale,
         calendar: shared.calendar,
+        ...(shared.axisColumns ? { axisColumns: shared.axisColumns } : {}),
         bandScale: shared.bandScale,
         entityLeftEdges: new Map(),
         entityRightEdges: new Map(),

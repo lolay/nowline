@@ -445,7 +445,7 @@ Schedule: W1 Jan 5–9, W2 Jan 12–16, W3 Jan 19–23, W4 Jan 26–30.
 |---|---|---|---|
 | W4 x (relative to origin) | 120–160, over Jan 20–25 | 120–160, Jan 26–30 | 168–208 |
 | Milestone x | 200 | 152 | 200 |
-| Week ticks | Jan 05, 10, 15, 20, 25, 30 | Jan 05, 12, 19, 26 | Jan 05, 12, 19, 26 (at 0, 56, 112, 168) |
+| Week ticks | Jan 05, 10, 15, 20, 25, 30 | Jan 05, 12, 19, 26, Feb 02 (W4's spilled caption passes the end at 160, so the axis gains one column to 200; see [Caption cap at the chart's end](./rendering.md#caption-cap)) | Jan 05, 12, 19, 26 (at 0, 56, 112, 168; W4's caption ends inside the axis) |
 | Shading | none | none | 40–56, 96–112, 152–168, 208–224 |
 
 ### Example B: a holiday inside a bar
@@ -473,13 +473,13 @@ Schedule: Checkout uses Mon Nov 23, Tue 24, Wed 25, Mon 30 and Tue Dec 1. QA use
 | Checkout box | 6–34 (logical 0–40) | 6–66 (logical 0–72) |
 | QA box | 46–54 (logical 40–56, minimum width) | 78–86 (logical 72–88) |
 | Milestone x | 24, `hiddenDate` `2026-11-28` | 40, no `hiddenDate` |
-| Ticks | `[0,undefined]`, `[24,'Nov 30']`, `[64,undefined]` | `[0,'Nov 23']`, `[56,'Nov 30']`, `[112,undefined]` |
-| Width, `endDate` | 64, 2026-12-07 | 112, 2026-12-07 |
-| Runs | `[24,0,'2026-11-26','2026-11-29',['Thanksgiving']]` and `[64,0,'2026-12-05','2026-12-06']` (no `titles` key) | `[24,32,…,['Thanksgiving'],band]` and `[96,16,'2026-12-05','2026-12-06',band]` |
+| Ticks | `[0,undefined]`, `[24,'Nov 30']`, `[64,'Dec 07']`, `[104,undefined]` | `[0,'Nov 23']`, `[56,'Nov 30']`, `[112,'Dec 07']`, `[168,undefined]` |
+| Width, `endDate` | 104, 2026-12-14 (the content ends at 64; QA's spilled caption adds the `Dec 07` column) | 168, 2026-12-14 (likewise from 112) |
+| Runs | `[24,0,'2026-11-26','2026-11-29',['Thanksgiving']]`, `[64,0,'2026-12-05','2026-12-06']` and `[104,0,'2026-12-12','2026-12-13']` (no `titles` key) | `[24,32,…,['Thanksgiving'],band]`, `[96,16,'2026-12-05','2026-12-06',band]` and `[152,16,'2026-12-12','2026-12-13',band]` |
 | Label of the titled run | `Thanksgiving · 2d`, `cut: true`, `labelSide` `right`, `labelBox` x 30, 98.6 wide, 12 high | `Thanksgiving · 2d`, no `cut`, `labelSide` `right`, `labelBox` x 30, 98.6 wide, 12 high |
 | Marker rows | The run on row 0 (`labelBox.y` = `markerRow.y − 4`), Launch on row 1 (`center.y` = `markerRow.y + 26`); `markerRow.height` 52 | Launch on row 0 (`center.y` = `markerRow.y`), the run on row 1 (`labelBox.y` = `markerRow.y + 22`); `markerRow.height` 52 |
 | Launch label | `labelSide` `right`, `labelBox` x 36, 36.54 wide | `labelSide` `right`, `labelBox` x 52, 36.54 wide |
-| Model `width` | 272.6 (250.32 without the label; the canvas grows so the label sits on the right) | 282.32 |
+| Model `width` | 272.6 (264 without the label; the canvas grows so the label sits on the right) | 312 |
 | Weekend run `2026-12-05` to `2026-12-06` | No `label`, `labelBox`, `labelSide` or `cut` key | Same |
 
 Runs read `[x, width, from, through, titles, band]`. The label, `labelBox`, `labelSide` and `cut` columns are positions in the marker row relative to the timeline origin, like a milestone's.

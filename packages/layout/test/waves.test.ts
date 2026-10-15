@@ -539,12 +539,14 @@ swimlane api
             ['ios-offline', 'member'],
             ['ios-push', 'member'],
         ]);
-        // The domain ends at W6: 30 working days, so Mon Feb 16.
+        // The content ends at W6; pf-scale's caption spills past it, so the
+        // axis gains one column (rendering.md § "Caption cap at the chart's
+        // end"): W7, 35 working days, Mon Feb 23.
         const { timeline } = laid.model;
         expect(laid.calendar.workingIndexOf(timeline.startDate, timeline.endDate)).toBe(
-            6 * laid.perWeek,
+            7 * laid.perWeek,
         );
-        expect(timeline.endDate.toISOString().slice(0, 10)).toBe('2026-02-16');
+        expect(timeline.endDate.toISOString().slice(0, 10)).toBe('2026-02-23');
         expectBarriers(laid);
     });
 
@@ -697,9 +699,10 @@ swimlane a
   item a1 duration:1w wave:w1
   item a2 duration:1w wave:w2
 `);
-        // length:4w is a minimum: the window runs to a2's end at W9.
+        // length:4w is a minimum: the window runs to a2's end at W9, and
+        // a2's caption, spilled past it, adds the column to W10.
         const { timeline } = laid.model;
-        expect(timeline.endDate.toISOString().slice(0, 10)).toBe('2026-03-09');
+        expect(timeline.endDate.toISOString().slice(0, 10)).toBe('2026-03-16');
         // S_2 is the floor date projected with the unclamped scale: W8.
         const a2 = item(laid, 'a2');
         expect(logicalStart(a2)).toBe(timeline.originX + 8 * 7 * timeline.pixelsPerDay);

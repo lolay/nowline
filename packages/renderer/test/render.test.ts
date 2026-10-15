@@ -541,6 +541,8 @@ describe('renderSvg — wrapped item titles', () => {
     // 148px bar with a 124px text area, so "Technology Selection" (~151px)
     // wraps to two lines instead of spilling to the right.
     const HEADER = `nowline v1\n\nroadmap r1 "R" start:2026-04-06 scale:2w\n\n`;
+    /** A milestone far past every bar, so no caption reaches the axis end. */
+    const CLEAR_OF_THE_END = 'milestone later "Later" date:2026-09-07\n\n';
 
     interface TextNode {
         x: number;
@@ -674,7 +676,9 @@ describe('renderSvg — wrapped item titles', () => {
 
     it('still spills a title with an unbreakable word as one line beside the bar', async () => {
         const model = await parseToModel(
-            `${HEADER}swimlane s "S"\n  item big "Internationalization" duration:2w\n`,
+            // The milestone keeps the axis end past the caption, so the cap
+            // at the chart's end leaves it whole.
+            `${HEADER}${CLEAR_OF_THE_END}swimlane s "S"\n  item big "Internationalization" duration:2w\n`,
         );
         const fragment = itemFragment(await renderSvg(model), 'big');
         const bar = barRect(fragment);
@@ -691,6 +695,8 @@ describe('renderSvg — explicit title line breaks', () => {
     // `scale:2w`: a `2w` item is a 148px bar. The `\\n` in a template string below is the
     // two-character DSL escape; Langium turns it into a real newline in the title.
     const HEADER = `nowline v1\n\nroadmap r1 "R" start:2026-04-06 scale:2w\n\n`;
+    /** A milestone far past every bar, so no caption reaches the axis end. */
+    const CLEAR_OF_THE_END = 'milestone later "Later" date:2026-09-07\n\n';
 
     interface TextNode {
         x: number;
@@ -758,7 +764,7 @@ describe('renderSvg — explicit title line breaks', () => {
 
     it('paints a spilled explicit block as stacked <text> lines beside the bar, meta below', async () => {
         const model = await parseToModel(
-            `${HEADER}swimlane s "S"\n  item wide "Internationalization of\\nthe billing service" duration:2w\n`,
+            `${HEADER}${CLEAR_OF_THE_END}swimlane s "S"\n  item wide "Internationalization of\\nthe billing service" duration:2w\n`,
         );
         const svg = await renderSvg(model);
         const fragment = itemFragment(svg, 'wide');
@@ -821,6 +827,35 @@ describe('renderSvg — explicit title line breaks', () => {
         );
         const svg = await renderSvg(model);
         expectNoRawNewlineInText(svg);
+    });
+});
+
+describe('renderSvg — caption cap at the chart’s end', () => {
+    const LONG = 'Rollout to every region with the support playbook and the runbook';
+    const source = (title: string) => `nowline v1
+
+roadmap r "R" start:2026-01-05 calendar:full scale:1w
+
+swimlane a "A"
+  item a1 "A1" duration:3w
+  item z "${title}" duration:1w
+`;
+
+    it('paints the truncated caption and gives the bar the full title as its tooltip', async () => {
+        const model = await parseToModel(source(LONG));
+        const svg = await renderSvg(model);
+        const z = itemGroup(svg, 'z');
+        expect(z.startsWith(`<g data-id="z" data-layer="item"><title>${LONG}</title>`)).toBe(true);
+        const painted = model.swimlanes[0].children.find((c) => c.id === 'z');
+        const line = painted?.kind === 'item' ? painted.titleLines?.[0] : undefined;
+        expect(line?.endsWith('…')).toBe(true);
+        expect(z).toContain(`>${line}</text>`);
+        expect(z).not.toContain(`>${LONG}</text>`);
+    });
+
+    it('gives an untruncated caption no tooltip', async () => {
+        const svg = await renderSvg(await parseToModel(source('Zed')));
+        expect(itemGroup(svg, 'z')).not.toContain('<title>');
     });
 });
 
@@ -1463,8 +1498,10 @@ swimlane a
 
         const fit = waveLayer(await renderSvg(await parseToModel(WAVE_FIT_SRC)), 'wave-legend');
         // The wave-name list wraps between waves, one <text> per run.
-        expect(fit).toContain('>Waves: #1 Discovery</text>');
-        expect(fit).toContain('>#4 Rollout everywhere · #5 Launch day</text>');
+        expect(fit).toContain('>Waves: #1 Discovery · #2 Implementation and build-out</text>');
+        expect(fit).toContain(
+            '>#3 Hardening and stabilisation · #4 Rollout everywhere · #5 Launch day</text>',
+        );
 
         const plain = await renderSvg(await parseToModel(WAVE_PLAIN_SRC));
         expect(plain).not.toContain('wave-legend');
