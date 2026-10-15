@@ -1,7 +1,7 @@
 ```text
 --- KICKOFF: begin orchestration at [deep] ---
 
-  Status: 2/6 groups done | last review: wave-2 PASS | current: nowline m2 s1-s4 [deep] | updated 2026-10-15 | passed unattended: gate 2 before wave 2
+  Status: 3/6 groups done | last review: wave-2 CONCERNS | current: nowline m2 s1-s4 fix-up 2-fix [deep] | updated 2026-10-15 | passed unattended: gate 4 before wave 2/m2 | over expected: ~$38.6 of ~$31
 
   mode: unattended | proposed unattended (harness=claude-code runner=cloud; CLAUDE_CODE_REMOTE=true, assigned branch) | guard 3x min $50 | fixups 2 | confirmed 2026-10-15 session ef0db142-6669-5058-893b-a118b7ea2d61 by Kickoff prompt: Run in unattended mode.
 
@@ -34,6 +34,7 @@
 | 1 [exec] m1 s1 | ~1.3M | ~$0.65 |
 | 2 [deep] m1 s2, m2 s1-s4, m3 s1-s2, m4 s1 | ~36M | ~$19 |
 | 3 [exec] m4 s2-s4 | ~2.7M | ~$1.1 |
+| 2-fix [deep] nowline m2 s1-s4 | — | — |
 | orchestrator | ~12M | ~$9.9 |
 | **Total** | ~52M | ~$31 |
 
@@ -92,16 +93,16 @@ Branch: `claude/friendly-babbage-qlcz6d` (harness-assigned task branch, fast-for
 
 ## m2 - Chart dates match the exports (F2, F3)
 
-#### s1 - [deep] F2: honour `after:` on a group track of a parallel
+#### s1 - [deep] F2: honour `after:` on a group track of a parallel (done)
 `GroupNode.place` (`packages/layout/src/nodes/group-node.ts`) starts at `waveFloorX(node, resolvePinnedOrSequentialStart(node.properties, cursor.x, ctx), ctx)` (idempotent for lane-level groups, whose cursor already sits there). Also make the canvas grow for a caption spilled from a group track inside a parallel (the prototype clipped "Screens": `ParallelNode` reports only the compact `maxX`, so the lane's `usedRightX` misses it). Test in `after-lane-cursor.test.ts`: A = C for a group track with `after:`, the ref ending before and after the parallel's start, plus the canvas covering the caption. G1 identical. Fragment `fixed`.
 
-#### s2 - [deep] F3 (d): drop the 8 px tail gutter from the cursor
+#### s2 - [deep] F3 (d): drop the 8 px tail gutter from the cursor (done)
 `GroupNode` and `ParallelNode` stop adding `TRACK_BLOCK_TAIL_GUTTER_PX` to `cursor.x` and `cursor.maxX` (delete the constant if unused, and the doc comments that cite it). Expected: showcase (Ship to day 40), platform-2026, product; snapshots `platform-2026{,-dark,-grayscale}.svg`; determinism `platform-2026*`; register (d) letters go. Declare whatever G1 shows. Fragment `fixed`.
 
-#### s3 - [deep] F3 (c): group caption spill out of the lane cursor
+#### s3 - [deep] F3 (c): group caption spill out of the lane cursor (done)
 `sequenceRowTrack` (`packages/layout/src/nodes/row-track.ts`) advances `timeCursorX` by the block's compact end (`cursor.x` after `sequenceOne`), while `packer.commitBlock` keeps `blockEnd` (the painted box). Expected: inline-date-pins, waves (launch-page about 10.8 days earlier), late-row-shifts; snapshots `waves*.svg`; determinism `waves`; register (c) entries go. Declare whatever G1 shows. Fragment `fixed`.
 
-#### s4 - [deep] F3 (b): minimum bar width out of the lane cursor
+#### s4 - [deep] F3 (b): minimum bar width out of the lane cursor (done)
 `sequenceRowTrack`: `timeCursorX` advances to `predictedStart + itemSpanPx(ctx, predictedStart, measure.durationDays)` (the duration end); `commitItem.logicalEnd` keeps the painted footprint. `accumulateWaveMember` (`nodes/sequence-item.ts`) takes the duration end too, and waves.md §8.4 drops "MIN_ITEM_WIDTH clamp included". Expected: showcase, non-working-hide/show, size-and-capacity; snapshots `non-working-hide.svg`, `non-working-show.svg`. Register: following-item (b) entries go; each clamped bar's own entry stays with reason "presentation: bar drawn at its minimum width (scheduler-unification §8 decision 6)". Declare whatever G1 shows. Fragment `fixed`.
 
 ## m3 - Regions and the caption cap (F5, F7)
@@ -138,6 +139,7 @@ Added by Gary, 2026-10-15 ("after all is done, also, use an [exec] subagent to m
 
 review wave-1 (nowline m1 s1) 4e3870f..c3e5c96: PASS - spec §5/§8 carry decisions 5-13; F6-F8 rows added; tables well-formed; nothing outside the spec changed - 2026-10-15
 review wave-2 (nowline m1 s2) 30a5c0e..fd989f4: PASS - merge 2206c8c clean (#160-#162); F8 removes item pins in both engines, W1001 and wavePinOverride retired, ~40 tests migrated, specs and man pages updated; G1 only tests/weekends-show (3 themes), G3 weekends-show mermaid/xlsx declared; check_wave.py flagged only 3d8b606, 766bc38, 0e948e9 (origin/main's own squash commits brought in by the merge; the worker's 2206c8c and fd989f4 pass), not fixed: rewording main's history is wrong; passed unattended: gate 2 - 2026-10-15
+review wave-2 (nowline m2 s1-s4) 8b1b4ac..47639f6: CONCERNS - m2.s4 leaves the minimum bar width in two other cursor paths, so items after a clamped bar still start late (divergence (b)): (1) a parallel join, sequenceItem sets cursor.x/cursor.maxX to logicalRight (clamp included, sequence-item.ts:353), ParallelNode joins on subCursor.maxX and row-track.ts:90 takes it, so `parallel pp / item t1 duration:1d` then `item z duration:1w` gives z A 1.40 vs C 1.00; (2) after: refs, ctx.entityRightEdges is set to logicalRight (sequence-item.ts:333), so `item b duration:1w after:a` with a 1d `a` gives b A 1.40 vs C 1.00; waves.md §8.6 and the register $comment claim (b) is fixed, and no corpus sample has either shape, so the register test stays green; also minor: s3/s4 bodies name G1 bases c2371d4/36a786e (pre-rebuild SHAs, same trees as e38c414/3f9afe1). Merge 983ffac clean (#163); check_wave.py flagged only db78b2e (origin/main's own commit via the merge; worker's commits pass), not fixed, as in wave 2/m1; passed unattended: gate 4 - 2026-10-15
 
 ## Token log
 
@@ -155,3 +157,6 @@ tokens review-wave-1 nowline-m1-s1 (claude-opus-5-5): input ~8 / cache read ~56k
 tokens orchestrator-wave-1 nowline-m1-s1 (claude-opus-5-5): input ~24 / cache read ~1.6M / cache write ~0 5m + ~19k 1h / output ~9.6k | ~$0.66 API-equiv
 tokens wave-2 nowline-m1-s2 (claude-opus-5-5): input ~370 / cache read ~41M / cache write ~340k / output ~190k | ~$13.59 API-equiv (output est.) session ef0db142-6669-5058-893b-a118b7ea2d61
 tokens review-wave-2 nowline-m1-s2 (claude-opus-5-5): input ~52 / cache read ~1.9M / cache write ~110k / output ~25k | ~$1.40 API-equiv (output est.) session ef0db142-6669-5058-893b-a118b7ea2d61
+tokens orchestrator-wave-2 nowline-m1-s2 (claude-opus-5-5): input ~14 / cache read ~1.1M / cache write ~0 5m + ~22k 1h / output ~9.8k | ~$0.59 API-equiv
+tokens wave-2 nowline-m2-s1-s4 (claude-opus-5-5): input ~260 / cache read ~23M / cache write ~210k / output ~130k | ~$8.12 API-equiv (output est.) session ef0db142-6669-5058-893b-a118b7ea2d61
+tokens review-wave-2 nowline-m2-s1-s4 (claude-opus-5-5): input ~62 / cache read ~1.8M / cache write ~84k / output ~31k | ~$1.41 API-equiv (output est.) session ef0db142-6669-5058-893b-a118b7ea2d61

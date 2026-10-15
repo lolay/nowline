@@ -3,9 +3,9 @@
 - **Plan:** `specs/handoffs/plan-scheduler-followups-heron.md`
 - **Branch:** `claude/friendly-babbage-qlcz6d` (harness-assigned task branch; fast-forwarded to `origin/main` `5da7d2a` and pushed at kickoff)
 - **Mode:** unattended, confirmed 2026-10-15 in session ef0db142 (dialog: "Unattended (Recommended)"; session: "This session")
-- **Status:** waves 1 and 2/m1 done and reviewed (PASS); wave 2 unit m2 s1-s4 [deep] next (gate 4 passes unattended as a checkpoint).
-- **Spend:** ~$28.50 of ~$31 expected (parent ~$12.91, wave 1 ~$0.60, wave 2/m1 ~$14.99). Wave 2/m1 alone ran ~$15 against ~$19 for all of wave 2, so the run will pass the expected total; guard ~$93.
-- **Next unit:** wave 2 [deep] `nowline m2 s1-s4` (F2, F3), then m3 s1-s2, m4 s1; then wave 3 [exec] m4 s2-s4.
+- **Status:** wave 2/m2 (F2, F3) done with review CONCERNS; automatic fix-up 2-fix [deep] running (fix-up 1 of 2).
+- **Spend:** ~$38.62, over the ~$31 expected (wave 2/m1 ran ~$15, wave 2/m2 ~$9.5 plus the parent). Guard 3x min $50, ~$93.
+- **Next unit:** fix-up 2-fix [deep] `nowline m2 s1-s4` (the clamp still reaches the parallel join and `after:` edges), then wave 2 m3 s1-s2, m4 s1; then wave 3 [exec] m4 s2-s4.
 - **Gates the plan crosses:** 2 before wave 2; 4 at m2, m3 and m4. No canary (wave 1 has one group). No `[xdeep]`.
 - **Resume:** run `/compact` if needed, then paste the plan's Kickoff prompt.
 
@@ -17,14 +17,18 @@ None.
 
 - wave 1 [exec] `nowline m1 s1` 4e3870f..c3e5c96: PASS. Spec §5/§8 carry decisions 5-13; F6, F7, F8 rows added.
 - wave 2 [deep] `nowline m1 s2` 30a5c0e..fd989f4: PASS. Merge of origin/main (2206c8c: #160, #161, #162, no conflicts), then F8 (fd989f4). G1 differs only in tests/weekends-show; weekends-show snapshot and its determinism cells bumped (declared).
+- wave 2 [deep] `nowline m2 s1-s4` 8b1b4ac..47639f6: CONCERNS. Merge 983ffac (#163, clean); F2 96e073b (G1 identical), F3 (d) e38c414 (minimal, platform-2026, product, showcase), F3 (c) 3f9afe1 (inline-date-pins, waves, late-row-shifts), F3 (b) 47639f6 (showcase, non-working-hide/show). Review: the minimum bar width still reaches the parallel join and `after:` edges (sequence-item.ts:333, :353); fix-up 2-fix.
 
 ## Deviations from plan
 
-- m1.s2 merged origin/main itself (the plan wanted each milestone's first step to; m1.s1 was docs-only and didn't). `check_wave.py` then flagged main's own commits 3d8b606, 766bc38 and 0e948e9 (subject, trailers, Co-authored-by) because the merge brings them into the range. Logged PASS rather than CONCERNS: an automatic fix-up would reword main's published history. The worker's own commits pass. Later merges of main will draw the same flag and are handled the same way.
+- m1.s2 merged origin/main itself (the plan wanted each milestone's first step to; m1.s1 was docs-only and didn't). `check_wave.py` then flagged main's own commits 3d8b606, 766bc38 and 0e948e9 (subject, trailers, Co-authored-by) because the merge brings them into the range. Logged PASS rather than CONCERNS: an automatic fix-up would reword main's published history. The worker's own commits pass. Later merges of main draw the same flag and are handled the same way (wave 2/m2: db78b2e, #163).
 
 - The kickoff's parent spend (~$10.78) exceeds the orchestrator row's kickoff share (~$1.0): the same session did the decision dialogs and scratch prototypes before kicking off.
 
 ## Decisions so far
+
+- m2 (review CONCERNS on s4 only; the rest held): the canvas fix counts every parallel track's spilled caption, not only group tracks. `TRACK_BLOCK_TAIL_GUTTER_PX` (a public `@nowline/layout` export) is deleted, noted in the s2 `fixed` fragment. `minimal` moved in s2 (its last child is a parallel of group tracks; decision 8). `size-and-capacity` did not move in s4. The barrier theorem test and waves.md §8.4 compare duration ends; a clamped bar may paint past its wave boundary (decision 6). showcase `announce` is itself a clamped bar and keeps a decision-6 register entry. `packages/layout/test/finalize-coverage.json` moves with layout changes too. Historical spec text (§1.2, §1.3, §9) left for m4.s3.
+- Open, outside m2's scope (reviewer): a group's `entityRightEdges` is still its painted box, so `item z after:g` where g's caption spills puts z at day 84.98 in A against 0 in C (C's 0 looks wrong too). Same before m2. To raise with Gary at completion unless F4's lower-bound test forces it earlier.
 
 - m1.s2 (review PASS): `resolvePinnedOrSequentialStart` keeps its name (m2.s1 cites it) though it no longer pins. The `after:<date>` hint fires on items, groups and parallels, not swimlanes (inline dates are NL.E0411 there). core `waves-order.ts` dropped pins too. Historical records (milestones.md m2o row, scheduler-unification.md §1.4/§3/§6, working-calendar.md Phase 3 known limits) were left as written for m4.s3's close-out. Determinism goldens were edited by hand for the declared cells only (`make determinism-update` regenerates everything and installs chromium).
 
@@ -37,6 +41,11 @@ The planning session's decisions 5-13 are in the plan's Context section; m1.s1 r
 - F3 (b): each clamped bar's own register entry stays as presentation (decision 6); everything else in the register goes.
 
 ## Environment notes
+
+- env: a G1/G3 render of one tree took ~6 min in m2; render it in a separate built worktree (`make init && make build-fast`) so the main tree stays free.
+- env: run `make compile TARGET=local` (under 1 s) before `make determinism`; a stale binary fails the CLI-vs-kernel cells.
+- env: to bump only the changed determinism cells, `UPDATE_DETERMINISM_GOLDENS=1 npx vitest run --config vitest.determinism.config.ts` in packages/integration-tests (Node leg only, no chromium); unchanged cells rewrite byte-identically; check `git diff` touches only declared cells.
+- env: `.scratch/base-m3` is a built worktree at 47639f6 and `.scratch/g1-m2s4-head` its G1/G3 render (stale once 2-fix lands).
 
 - env: Bun 1.4.2 is on the runner, so `make compile TARGET=local` and `make determinism` work.
 - env: a G1/G3 CLI render of one tree takes ~15 min (60 files × 6 outputs); run it in the background.
