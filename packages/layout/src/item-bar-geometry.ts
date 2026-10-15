@@ -214,12 +214,14 @@ export function itemCaptionInsetX(
 export const ITEM_DECORATION_SPILL_GAP_PX = 4;
 
 /**
- * Minimum bar width (px) needed to host the status dot inside the
- * bar with its full inset. Below this, the dot would have to
- * extend past the bar's left edge, so the dot spills into the
- * caption column to the right of the bar instead.
+ * Minimum bar width (px) at which the status dot sits INSIDE the bar:
+ * the dot's centre is `ITEM_STATUS_DOT_INSET_RIGHT_PX` from the right
+ * edge, so a bar of twice that width has the same air on both sides
+ * of it (the centre sits mid-bar). A narrower bar would crowd the
+ * dot against its left edge, so the dot spills into the caption
+ * column to the right of the bar instead.
  */
-export const MIN_BAR_WIDTH_FOR_DOT_PX = ITEM_STATUS_DOT_INSET_RIGHT_PX + ITEM_STATUS_DOT_RADIUS_PX;
+export const MIN_BAR_WIDTH_FOR_DOT_PX = 2 * ITEM_STATUS_DOT_INSET_RIGHT_PX;
 
 /**
  * Minimum bar width (px) needed to host the link-icon tile AND the
@@ -457,7 +459,7 @@ export interface ItemTitleFirstLineReserveInputs {
  * right instead, where it can't touch the title):
  *
  *   - status dot: left edge at (right - 17); absent below
- *     `MIN_BAR_WIDTH_FOR_DOT_PX`. Dot only gives 21.
+ *     `MIN_BAR_WIDTH_FOR_DOT_PX` (24). Dot only gives 21.
  *   - footnote digits: leftmost digit's left edge at
  *     (right - 22 - (n-1) * 8 - width); absent when they spill
  *     (`MIN_BAR_WIDTH_FOR_FOOTNOTE_PX`).

@@ -2220,3 +2220,47 @@ swimlane s "S"
         expect(startOffset('b')).toBeCloseTo(120, 6);
     });
 });
+
+describe('layoutRoadmap status dot spill threshold', () => {
+    // The dot sits inside a bar only with equal air on both sides: bar width
+    // >= 24px (2 x ITEM_STATUS_DOT_INSET_RIGHT_PX); a narrower bar spills it
+    // into the caption column.
+    function roadmap(scale: string, duration: string): string {
+        return `nowline v1
+
+roadmap r "R" start:2026-04-06 scale:${scale}
+
+swimlane "Platform"
+  item a "A" duration:${duration}
+`;
+    }
+
+    async function only(scale: string, duration: string): Promise<PositionedItem> {
+        const { file, resolved } = await parseAndResolve(roadmap(scale, duration));
+        const model = await layoutRoadmap(file, resolved, { theme: 'light' });
+        const item = model.swimlanes[0].children[0];
+        if (item.kind !== 'item') throw new Error('expected an item');
+        return item;
+    }
+
+    it('spills the dot from a 23px bar', async () => {
+        const item = await only('1d', '7d');
+        expect(item.box.width).toBe(23);
+        expect(item.dotSpills).toBe(true);
+        expect(item.dotSpillCx).not.toBeNull();
+    });
+
+    it('spills the dot from a 20px bar, which the old 17px floor kept inside', async () => {
+        const item = await only('2w', '2d');
+        expect(item.box.width).toBe(20);
+        expect(item.dotSpills).toBe(true);
+    });
+
+    it('keeps the dot inside a bar of 24px or more', async () => {
+        const item = await only('1m', '10d');
+        expect(item.box.width).toBeGreaterThanOrEqual(24);
+        expect(item.box.width).toBeLessThan(25);
+        expect(item.dotSpills).toBe(false);
+        expect(item.dotSpillCx).toBeNull();
+    });
+});

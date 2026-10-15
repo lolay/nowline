@@ -283,7 +283,7 @@ Each roadmap item renders as a horizontal bar. Width is determined by `duration`
 
   A missing decoration just collapses out of the row — an item with no link and a too-narrow bar gives `[bar] [title] [dot]`. The dot lives at the trailing edge in BOTH the in-bar and spilled cases; pushing it to the LEFT of the title would make it read as belonging to the next item. Thresholds (px):
 
-    - Dot spills when `bar.width < ITEM_STATUS_DOT_INSET_RIGHT_PX + ITEM_STATUS_DOT_RADIUS_PX` (≈ 17).
+    - Dot spills when `bar.width < 2 * ITEM_STATUS_DOT_INSET_RIGHT_PX` (24), so the dot sits inside a bar only with equal air on both sides of it.
     - Link icon spills when `bar.width < ITEM_LINK_ICON_INSET_PX + ITEM_LINK_ICON_TILE_SIZE_PX + ITEM_DECORATION_SPILL_GAP_PX + ITEM_STATUS_DOT_INSET_RIGHT_PX + ITEM_STATUS_DOT_RADIUS_PX` (≈ 41) so the icon clears the dot's column with breathing room.
     - Footnote spills when `bar.width < ITEM_FOOTNOTE_INDICATOR_INSET_RIGHT_PX + 1` (≈ 23).
     - Inline-date glyph spills when `bar.width < MIN_BAR_WIDTH_FOR_INLINE_DATE_PX` (40 — covers the glyph tile plus its inset and a clearance gap from the link icon / status-dot column). The `before:` glyph spills to the right of the bar in the same column the status dot uses; the `after:` glyph spills to the LEFT of the bar's leading edge so the side semantics stay readable.

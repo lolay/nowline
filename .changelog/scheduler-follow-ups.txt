@@ -25,3 +25,7 @@
 ```release-note:changed
 **A caption that runs past the chart's end is capped one column past it.** When an item's caption spills past the last date column, the chart now adds one column, always with its tick, grid line and date label (even on an axis that labels only every few columns), and the caption ends inside it: a title too long for that column is cut with `…`, and hovering the bar shows the full title as its tooltip. Before, the caption ran on past the axis with no dates under it and widened the chart to fit. Under an explicit `length:` that ends mid-column, the added column is the full one after that partial column. Captions that end inside the chart are unchanged, and so is the axis under an explicit `length:` that already covers them. The positioned model's `PositionedItem` gains `titleTruncated` (set only on a cut caption; `titleLines` holds the cut lines and `title` the full title).
 ```
+
+```release-note:changed
+**A status dot sits inside a bar only from 24 px.** The dot is drawn inside a bar only when it has equal air on both sides, a bar at least 24 px wide (twice the dot's 12 px inset from the right edge); a bar 17 to 23 px wide, which kept the dot inside and crowded against its left edge, now spills the dot into the caption column to the right of the bar, as narrower bars always have. `MIN_BAR_WIDTH_FOR_DOT_PX` of `@nowline/layout` is 24 (was 17), and the `NL.I1002` insight (decorations spilled out of a bar) now covers bars up to 23 px wide. No bundled sample has a bar of that width, so none of their charts changes.
+```
