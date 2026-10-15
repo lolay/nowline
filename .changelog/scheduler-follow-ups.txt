@@ -5,3 +5,7 @@
 ```release-note:fixed
 **The chart honours `after:` on a group inside a `parallel`.** A group that is a track of a parallel starts once every item it names in `after:` has finished, as a lane-level group does and as the XLSX, MS Project and Mermaid exports already dated it; before, the chart started it with the parallel. The canvas also grows to a caption spilled from a parallel's track, which was clipped at the chart's right edge.
 ```
+
+```release-note:fixed
+**A `parallel` ends where its last track ends.** The chart no longer adds an 8 px gap after a group track or a parallel before the next item in the lane, so the item after a parallel starts on the date the exports give it (the showcase's Ship now starts on working day 40 in the chart too), and a parallel's box ends at its latest track. The `TRACK_BLOCK_TAIL_GUTTER_PX` export of `@nowline/layout` is removed.
+```

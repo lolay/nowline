@@ -18,7 +18,6 @@ import {
     type TrackCursor,
 } from '../layout-context.js';
 import { resolveStyle } from '../style-resolution.js';
-import { TRACK_BLOCK_TAIL_GUTTER_PX } from '../themes/shared.js';
 import type { BoundingBox, PositionedParallel, PositionedTrackChild } from '../types.js';
 import { waveFloorX } from '../wave-layout.js';
 
@@ -34,9 +33,8 @@ export class ParallelNode {
 
     /**
      * Sequence children into stacked sub-tracks, advance the parent
-     * `cursor` past the parallel's right edge plus
-     * `TRACK_BLOCK_TAIL_GUTTER_PX` of breathing room, and return a
-     * `PositionedParallel`.
+     * `cursor` to the parallel's right edge (the latest track end), and
+     * return a `PositionedParallel`.
      */
     place(cursor: TrackCursor, ctx: LayoutContext): PositionedParallel {
         const { node } = this;
@@ -94,7 +92,9 @@ export class ParallelNode {
             height: accumulatedHeight,
         };
 
-        cursor.x = maxRight + TRACK_BLOCK_TAIL_GUTTER_PX;
+        // No tail gutter: the parallel joins on its latest track end, as
+        // engine C does (specs/scheduler-unification.md §8 decision 8).
+        cursor.x = maxRight;
         cursor.maxX = Math.max(cursor.maxX, cursor.x);
         cursor.height = Math.max(cursor.height, headerBand + accumulatedHeight);
 

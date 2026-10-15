@@ -25,7 +25,6 @@ import {
     GROUP_BOTTOM_PAD_PX,
     GROUP_TITLE_TAB_GUTTER_PX,
     GROUP_TITLE_TAB_HEIGHT_PX,
-    TRACK_BLOCK_TAIL_GUTTER_PX,
 } from '../themes/shared.js';
 import type { BoundingBox, PositionedGroup } from '../types.js';
 import { waveFloorX } from '../wave-layout.js';
@@ -43,8 +42,8 @@ export class GroupNode {
 
     /**
      * Sequence children inside the group's content area, advance the
-     * parent `cursor` past the group's right edge plus
-     * `TRACK_BLOCK_TAIL_GUTTER_PX` of breathing room, and return a
+     * parent `cursor` to the group's compact end (its children's
+     * logical ends, never a caption spill or a gutter), and return a
      * `PositionedGroup` whose `box.height` covers the chiclet pad,
      * every row-packed child row, and the bottom pad.
      */
@@ -146,7 +145,9 @@ export class GroupNode {
             width: boxRightX - boxLeftX,
             height: topPad + innerHeight + bottomPad,
         };
-        cursor.x = timeCursorX + TRACK_BLOCK_TAIL_GUTTER_PX;
+        // No tail gutter: a parallel joins on its tracks' ends, as engine
+        // C does (specs/scheduler-unification.md §8 decision 8).
+        cursor.x = timeCursorX;
         cursor.maxX = Math.max(cursor.maxX, cursor.x);
         // The painted `box.height` is the group's tight visual
         // footprint (chiclet + content + bottomPad). The cursor

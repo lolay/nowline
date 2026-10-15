@@ -109,15 +109,6 @@ export const TIMELINE_TICK_LABEL_BASELINE_OFFSET_PX = timelineTickLabelBaselineO
  */
 export const TIMELINE_TICK_LABEL_FONT_SIZE_PX = 10;
 
-/**
- * Horizontal breathing room (px) added to a track-block's right edge
- * after sequencing. Applied to `group { ... }` and `parallel { ... }`
- * blocks so successive blocks don't crowd each other. Items butt up
- * against their neighbors (no gutter) — only block boundaries get this
- * gutter.
- */
-export const TRACK_BLOCK_TAIL_GUTTER_PX = 8;
-
 // Frame-tab chiclet — the rounded label tab that overhangs a swimlane
 // frame and the dashed include-region border. Both surfaces share the
 // same height + label baseline so the chiclets read as siblings.

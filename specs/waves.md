@@ -822,7 +822,7 @@ Engines A and C produce the same schedule unless one of the divergences of [`sch
 - **(a)** settled by F1: an `after:` on a lane or group child starts at `max(previous item end, refs)` in both engines, so the register carries no entry for it;
 - **(b)** a short item: engine A's bar is at least `MIN_ITEM_WIDTH` wide, and the lane cursor advances past it;
 - **(c)** caption spill inside a group that has a following sibling;
-- **(d)** a group track that binds a parallel join adds `TRACK_BLOCK_TAIL_GUTTER_PX` (8 px);
+- **(d)** settled by F3: a group track that binds a parallel join used to add an 8 px tail gutter in engine A; the parallel now joins on its latest track end in both engines;
 - **(e)** settled by F2: an `after:` on a group that is a track of a parallel starts it at `max(the parallel's start, refs)` in both engines;
 - **(f)** engine A's lane cursor is monotone;
 - **(g)** item `date:` / `start:` pins: settled by removing them (F8 of [`scheduler-unification.md`](./scheduler-unification.md), [`dsl.md` § Pinning is not supported](./dsl.md#pinning-is-not-supported)). Both engines ignore the keys on an item, a group and a parallel, so the register carries no entry for it. (Engine A used to ignore a `start:` pin on a direct parallel track and let a lane item's `after:` push it; later both engines honoured the pin as `date:` > `start:` > `after:` > track cursor, with NL.W1001 when a wave floor moved it.)
@@ -832,7 +832,7 @@ The history of (a)–(g) is in [`handoffs/handoff-m2o-waves.md`](./handoffs/hand
 Consequences:
 
 - Each worked example in §11 is asserted on both engines against the spec's own numbers: on C in `schedule.test.ts`, on A in `waves.test.ts`. Neither test compares the engines with each other, so an example does not have to dodge the divergences, and the register, not the choice of examples, catches a new one.
-- A separate test pins divergence (d) with waves present.
+- A separate test checks, with waves present, that a group track binding a parallel join adds no tail gutter (divergence (d), settled).
 - Waves add **no** wave-only cursor rule. Engine A's barrier is computed from engine A's own ends, so the barrier's correctness never depends on the engines agreeing.
 
 ### 8.7 Positioned model (`packages/layout/src/types.ts`)

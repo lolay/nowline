@@ -22,7 +22,7 @@ import {
 import { describe, expect, it } from 'vitest';
 import { resolveCalendar } from '../src/calendar.js';
 import { type LayoutOptions, layoutRoadmap } from '../src/layout.js';
-import { ITEM_INSET_PX, TRACK_BLOCK_TAIL_GUTTER_PX } from '../src/themes/shared.js';
+import { ITEM_INSET_PX } from '../src/themes/shared.js';
 import type {
     PositionedGroup,
     PositionedItem,
@@ -783,7 +783,7 @@ swimlane a
         expect(itemsById(laid.model).has('deep-long')).toBe(false);
     });
 
-    it('divergence (d) stays pinned: a group track binding a parallel join adds its tail gutter', async () => {
+    it('divergence (d) is settled: a group track binding a parallel join adds no tail gutter', async () => {
         const laid = await lay(`nowline v1
 
 roadmap tail "Tail gutter" start:2026-01-05 scale:1w
@@ -803,15 +803,14 @@ swimlane b
 `);
         const { timeline } = laid.model;
         const w = (weeks: number): number => timeline.originX + weeks * 5 * timeline.pixelsPerDay;
-        // Engine A: the join is the group's end plus the 8 px tail gutter;
-        // engine C would start `next` at W2 exactly.
+        // The join is the group's end, as in engine C
+        // (specs/scheduler-unification.md §8 decision 8).
         const next = item(laid, 'next');
-        expect(logicalStart(next)).toBeCloseTo(w(2) + TRACK_BLOCK_TAIL_GUTTER_PX, 6);
-        // The barrier is computed from engine A's own ends, so w2 opens
-        // after `next` ends, gutter included, and still holds.
+        expect(logicalStart(next)).toBeCloseTo(w(2), 6);
+        // w2 opens when `next` ends and still holds.
         const b2 = item(laid, 'b2');
         expect(logicalStart(b2)).toBeCloseTo(logicalEnd(next), 6);
-        expect(logicalStart(b2)).toBeCloseTo(w(3) + TRACK_BLOCK_TAIL_GUTTER_PX, 6);
+        expect(logicalStart(b2)).toBeCloseTo(w(3), 6);
         expectBarriers(laid);
     });
 

@@ -217,22 +217,10 @@
                 "reason": "the region's lane starts after:kickoff, the region's own anchor (2026-01-06): C resolves it to day 1, A does not see region anchors and starts at day 0"
             }
         },
-        "examples/platform-2026.nowline": {
-            "platform-qa": {
-                "classes": ["(d)"],
-                "reason": "follows a parallel whose audit-track group track adds the 8 px track tail gutter in A"
-            }
-        },
-        "examples/product.nowline": {
-            "platform-qa": {
-                "classes": ["(d)"],
-                "reason": "follows a parallel whose audit-track group track adds the 8 px track tail gutter in A"
-            }
-        },
         "examples/showcase.nowline": {
             "ship": {
-                "classes": ["(b)", "(d)"],
-                "reason": "follows the parallel, whose box ends 8px past its last track (the tail gutter): A starts it on day 42.2 against C's 40, and the 1w bar is under the minimum width"
+                "classes": ["(b)"],
+                "reason": "a 1w bar at scale:1m is under the minimum bar width, so A's logical end runs past C's (both start it on day 40)"
             },
             "brief": {
                 "classes": ["(b)"],
@@ -243,8 +231,8 @@
                 "reason": "follows brief, and A's lane cursor advances to brief's minimum-width bar"
             },
             "announce": {
-                "classes": ["(b)", "(d)"],
-                "reason": "follows ship, which A starts and ends later than C by the parallel's tail gutter and its minimum-width bar"
+                "classes": ["(b)"],
+                "reason": "a 1w bar at scale:1m is under the minimum bar width, so A's logical end runs past C's (both start it on day 45, after:ship)"
             }
         },
         "examples/waves.nowline": {

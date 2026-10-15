@@ -7,13 +7,12 @@
     ],
     "steps": {
         "growCanvasForSpill": {
-            "count": 29,
+            "count": 28,
             "samples": [
                 "examples/capacity.nowline",
                 "examples/dependencies.nowline",
                 "examples/inline-date-pins.nowline",
                 "examples/isolate-include.nowline",
-                "examples/minimal.nowline",
                 "examples/nested/android.nowline",
                 "examples/nested/data.nowline",
                 "examples/nested/ios.nowline",
@@ -57,13 +56,12 @@
             "samples": ["tests/marker-left-overflow.nowline"]
         },
         "fitWidths": {
-            "count": 35,
+            "count": 34,
             "samples": [
                 "examples/capacity.nowline",
                 "examples/dependencies.nowline",
                 "examples/inline-date-pins.nowline",
                 "examples/isolate-include.nowline",
-                "examples/minimal.nowline",
                 "examples/nested.nowline",
                 "examples/nested/android.nowline",
                 "examples/nested/data.nowline",

@@ -155,6 +155,7 @@ swimlane s "Subject"
     group gg "GG" after:x
       item g1 "G1" duration:1w
       item g2 "G2" duration:1w
+  item z "Z" duration:1w
 `;
 
 describe('after: on a lane child honours the lane cursor', () => {
@@ -236,7 +237,10 @@ describe('after: on a group track of a parallel', () => {
         expect(chart.t1).toEqual([3, 4]);
         expect(chart.g1).toEqual([3, 4]);
         expect(chart.g2).toEqual([4, 5]);
-        for (const id of ['t1', 'g1', 'g2']) expect(chart[id], id).toEqual(schedule[id]);
+        // The parallel joins on the group's end, with no tail gutter
+        // (divergence (d), §8 decision 8), so the lane resumes there.
+        expect(chart.z).toEqual([5, 6]);
+        for (const id of ['t1', 'g1', 'g2', 'z']) expect(chart[id], id).toEqual(schedule[id]);
     });
 
     it('x ends after the parallel starts, so the group starts at x’s end', async () => {
@@ -244,7 +248,8 @@ describe('after: on a group track of a parallel', () => {
         expect(chart.t1).toEqual([3, 4]);
         expect(chart.g1).toEqual([5, 6]);
         expect(chart.g2).toEqual([6, 7]);
-        for (const id of ['t1', 'g1', 'g2']) expect(chart[id], id).toEqual(schedule[id]);
+        expect(chart.z).toEqual([7, 8]);
+        for (const id of ['t1', 'g1', 'g2', 'z']) expect(chart[id], id).toEqual(schedule[id]);
     });
 
     it('the canvas covers a caption spilled from a group track at the chart’s end', async () => {
