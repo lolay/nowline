@@ -8,7 +8,8 @@ nowline v1
 //
 // The lanes stress one thing each:
 //   - Chained weeks: Example A, four 1w bars with a band between each pair.
-//   - Wednesday start: a bar that starts mid-week and crosses a weekend.
+//   - Wednesday start: a bar that starts mid-week (`after:` a Wednesday) and
+//     crosses a weekend.
 //   - Group after Friday: a group that begins after a bar ends on a Friday
 //     starts on the next Monday, not inside the weekend.
 // The milestones sit on their own dates: Friday Jan 30 and Saturday Jan 31
@@ -30,7 +31,7 @@ swimlane chain "Chained weeks"
   item w4 "W4" duration:1w
 
 swimlane wed "Wednesday start"
-  item mid "Mid-week start" duration:1w date:2026-01-07
+  item mid "Mid-week start" duration:1w after:2026-01-07
 
 swimlane after "Group after Friday"
   item lead "Lead" duration:1w

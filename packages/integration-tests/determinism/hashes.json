@@ -370,15 +370,15 @@
             "icu": false
         },
         "weekends-show:html": {
-            "node": "07c479916874db45115472b1c555312e896a2f90290d808dd5e5510cb6a6d706",
+            "node": "408cab3f8a81113d6b82b9d80b480988ac66531badf212bc4b5dfdef05d6db84",
             "icu": true
         },
         "weekends-show:json": {
-            "node": "cc35a6a4e8e5fb3d37335457cd699e440857b58a2a3d51a73c365054f8868f0b",
+            "node": "fbef7054b925891a51b3197c9c1456e2bd68c684df7d6e8b81b6d37d14ac618a",
             "icu": false
         },
         "weekends-show:mermaid": {
-            "node": "0f850bd71670ce0226c2cb2eb2d9dbfa8418dab46ef86c17ec06692ebb726c6b",
+            "node": "0a0db57a04dac552376e1ac180cbfd7e3a748287d389cb0e66559427eed27dcf",
             "icu": false
         },
         "weekends-show:msproj": {
@@ -386,20 +386,20 @@
             "icu": false
         },
         "weekends-show:pdf": {
-            "node": "7c20a7975bc8e4a78bc4f61d814d1fb6b76d766970f2329064265e48e41e7340",
+            "node": "e0cbfe93fd9849e20e015dba72e7aab8edb76f0f52c9671bf3fd97a9f0dff9ac",
             "icu": true,
-            "cli": "78e593f043c046d547116b932906977ee3e96000e748c85b6537dfa92bc1bf4f"
+            "cli": "178c83ccefc296e522181fd6de0155d0c600279656dd003778ca7f2e295f7d2a"
         },
         "weekends-show:png": {
-            "node": "1e4432eb1e53bf2d646917efab0c2f892895776a66853092ab2a75f22db8b15f",
+            "node": "fbd9709d794dc316e6d206c7e09e0e128336d2ea7b4aec6c2b91d588c9aff81a",
             "icu": true
         },
         "weekends-show:svg": {
-            "node": "289757fe93f13d42a1f7d0f38bbc199dc6f246b7fb601d7d514c2333b0fd9229",
+            "node": "17786921f98954de84125c1fbf06fbacb35e61dd6101381cc7ca33218bcebe90",
             "icu": true
         },
         "weekends-show:xlsx": {
-            "node": "a9ed3dc0542227237f51f8d40cf2822a287f107c75f816f9e2a95357366554c8",
+            "node": "95490de83bc17a67f0d8245786a2e6d293097ed46937dc5997553945bd3adb3f",
             "icu": false
         },
         "working-calendar:html": {

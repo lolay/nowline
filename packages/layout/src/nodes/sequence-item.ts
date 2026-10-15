@@ -28,7 +28,7 @@ import { nonWorkingPinOf, resolvePinnedOrSequentialStart } from '../start-rules.
 import { estimateTextWidth } from '../text-measure.js';
 import { ITEM_INSET_PX, PROGRESS_STRIP_HEIGHT_PX } from '../themes/shared.js';
 import type { BoundingBox, PositionedItem, PositionedLabelChip } from '../types.js';
-import { accumulateWaveMember, waveFloorX, wavePinOverrideOf, waveRoleOf } from '../wave-layout.js';
+import { accumulateWaveMember, waveFloorX, waveRoleOf } from '../wave-layout.js';
 import { buildLabelChip, type ItemMeasure, measureItem } from './item-measure.js';
 import { ItemNode, traceItemNode } from './item-node.js';
 
@@ -48,34 +48,26 @@ export function sequenceItem(
     const afterRaw = propValues(props, 'after');
     const beforeRaw = propValues(props, 'before');
 
-    // Resolve start x with the swimlane child precedence: `date:` > `start:`
-    // > after-chain > cursor position. A lane or group child's cursor
+    // Resolve start x with the swimlane child rule: the latest of the
+    // after-chain and the cursor position. A lane or group child's cursor
     // already sits at that start; a direct parallel track's cursor sits at
-    // the block's start, so this is where its pin applies.
+    // the block's start, so this is where its `after:` applies.
     let startX = resolvePinnedOrSequentialStart(props, cursor.x, ctx);
     // Wave barrier (specs/waves.md §5.1, §8.4): the floor is one more term
-    // in the max, after the pin and `after:` logic, so a pin becomes
-    // max(pin, F). Parallel tracks reach this function directly, so this
-    // is where their floor applies.
-    let wavePinOverride: PositionedItem['wavePinOverride'];
-    if (ctx.waves) {
-        startX = waveFloorX(node, startX, ctx);
-        wavePinOverride = wavePinOverrideOf(node, startX, ctx);
-    }
-    // NL.I1008 defers to NL.W1001: a pin a wave floor moved reports there.
-    const nonWorkingPin =
-        wavePinOverride === undefined ? nonWorkingPinOf(props, startX, ctx) : undefined;
+    // in the max, after the `after:` logic. Parallel tracks reach this
+    // function directly, so this is where their floor applies.
+    if (ctx.waves) startX = waveFloorX(node, startX, ctx);
+    const nonWorkingPin = nonWorkingPinOf(props, startX, ctx);
 
     // Under `show` a start that lands in a non-working day moves to the next
-    // working day. The floor, the pin override and NL.I1008 above read the
-    // unsnapped start, so their ties and texts match `hide`; the identity
-    // under `hide`.
+    // working day. The floor and NL.I1008 above read the unsnapped start,
+    // so their ties and texts match `hide`; the identity under `hide`.
     const placedStartX = ctx.scale.startX(startX);
     // Width, style and tint, progress, meta line, chips, caption fit and
     // the bar's growth (specs/layout-phases.md §3.6). A lane or group row
     // track measured the item at this same start to size its row (the
-    // cursor sits at `resolveChildStart`, which a pin, an `after:` chain and
-    // the wave floor all return unchanged); a parallel track measures here.
+    // cursor sits at `resolveChildStart`, which an `after:` chain and the
+    // wave floor both return unchanged); a parallel track measures here.
     const measure = measured ?? measureItem(node, placedStartX, ctx);
     if (measure.startX !== placedStartX) {
         throw new Error(
@@ -413,7 +405,6 @@ export function sequenceItem(
     // undefined, so wave-free models keep their exact shape).
     const waveRole = waveRoleOf(node, ctx);
     if (waveRole !== undefined) result.waveRole = waveRole;
-    if (wavePinOverride !== undefined) result.wavePinOverride = wavePinOverride;
     if (nonWorkingPin !== undefined) result.nonWorkingPin = nonWorkingPin;
     // A background item carries its localized hover line from placement
     // on (specs/waves.md §9.3); members and wave-free items carry none.

@@ -495,23 +495,13 @@ export interface PositionedItem {
      */
     waveTooltip?: string;
     /**
-     * Present when a wave floor moved the item's `date:` / `start:` pin
-     * (NL.W1001) and the floor is what the item now starts at: `wave` is
-     * the wave id, `key` / `pin` the pin as written, and `start` the wave's
-     * start `S_k` as a whole UTC day (YYYY-MM-DD), which is also the item's
-     * start. Omitted when something else (an `after:`) pushed the item past
-     * the floor.
+     * Present when the item's `after:DATE` pin falls on a non-working day
+     * and that pin set the start (NL.I1008, specs/working-calendar.md §6):
+     * `key` / `pin` are the pin as written, `start` the working day the
+     * item starts on (YYYY-MM-DD). Omitted when a later `after:` ref, the
+     * lane cursor or a wave floor set the start.
      */
-    wavePinOverride?: { wave: string; key: 'date' | 'start'; pin: string; start: string };
-    /**
-     * Present when the item's `date:`, `start:` or `after:DATE` pin falls on
-     * a non-working day and that pin set the start (NL.I1008,
-     * specs/working-calendar.md §6): `key` / `pin` are the pin as written,
-     * `start` the working day the item starts on (YYYY-MM-DD). Omitted when
-     * a later `after:` ref, the lane cursor or a wave floor set the start,
-     * and whenever `wavePinOverride` is set.
-     */
-    nonWorkingPin?: { key: 'date' | 'start' | 'after'; pin: string; start: string };
+    nonWorkingPin?: { key: 'after'; pin: string; start: string };
 }
 
 /**

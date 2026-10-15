@@ -1,9 +1,9 @@
-// Start rules — engine A's (the pixel layout's) start precedence for a lane
-// or group child, built on the parsed terms of `start-terms.ts`: `date:` >
-// `start:` (fixed pins) > `after:` (chain after refs and inline dates) >
-// the sequential default, then the wave floor (specs/waves.md §8.4). Also
-// the pin that reports NL.I1008 when it set an item's start on a
-// non-working day (specs/working-calendar.md §6).
+// Start rules — engine A's (the pixel layout's) start rule for a lane or
+// group child, built on the parsed terms of `start-terms.ts`: the latest of
+// the sequential default and the `after:` terms (refs and inline dates),
+// then the wave floor (specs/waves.md §8.4). Also the inline `after:` date
+// that reports NL.I1008 when it set an item's start on a non-working day
+// (specs/working-calendar.md §6).
 
 import type { EntityProperty, GroupBlock, ItemDeclaration, ParallelBlock } from '@nowline/core';
 import { formatIsoDate } from './dsl-utils.js';
@@ -12,10 +12,10 @@ import { startTermsOf } from './start-terms.js';
 import type { PositionedItem } from './types.js';
 import { dateAtX, WAVE_EDGE_TOLERANCE_PX, waveFloorX } from './wave-layout.js';
 
-// Resolve the desired startX for a swimlane child, honoring `date:` (fixed
-// pin) > `start:` (fixed pin) > `after:` (chain after refs) > sequential
-// default (continue from `seqDefault`, which is the lane's rightmost time
-// cursor across all rows).
+// Resolve the desired startX for a swimlane child: the latest of the
+// sequential default (`seqDefault`, the lane's rightmost time cursor across
+// all rows) and every `after:` term. Work has no fixed start pin, so
+// `after:` only ever delays (specs/dsl.md § Item Properties).
 //
 // `after:` accepts both entity ids (looked up in `ctx.entityRightEdges`) and
 // inline ISO date literals (looked up via `ctx.scale.forwardWithinDomain`).
@@ -39,20 +39,15 @@ export function resolveChildStart(
 }
 
 /**
- * The start before the wave floor: a pin inside the window, else the
- * latest `after:` end (ids and inline dates) no earlier than `seqDefault`,
- * else `seqDefault`.
+ * The start before the wave floor: the latest `after:` end (ids and inline
+ * dates inside the window) no earlier than `seqDefault`, else `seqDefault`.
  */
 export function resolvePinnedOrSequentialStart(
     props: EntityProperty[],
     seqDefault: number,
     ctx: LayoutContext,
 ): number {
-    const { pin, after } = startTermsOf(props);
-    if (pin) {
-        const xd = ctx.scale.forwardWithinDomain(pin.date);
-        if (xd !== null) return xd;
-    }
+    const { after } = startTermsOf(props);
     if (after.length > 0) {
         let maxEnd = seqDefault;
         for (const term of after) {
@@ -70,14 +65,12 @@ export function resolvePinnedOrSequentialStart(
 }
 
 /**
- * The pin on a non-working day that set an item's start (NL.I1008,
- * specs/working-calendar.md §6), for an item placed at `startX`. The pin
- * follows the start precedence of `resolvePinnedOrSequentialStart`:
- * `date:`, then `start:`, then the inline date of `after:`. It reports only
- * when it set the start, that is when the item starts at the pin's x
- * (within the edge tolerance): a later `after:` ref, the lane cursor or a
- * wave floor that pushed the item past it never reports. A pin on a
- * working day or outside the date window reports nothing.
+ * The inline `after:` date on a non-working day that set an item's start
+ * (NL.I1008, specs/working-calendar.md §6), for an item placed at `startX`.
+ * It reports only when it set the start, that is when the item starts at
+ * the date's x (within the edge tolerance): a later `after:` ref, the lane
+ * cursor or a wave floor that pushed the item past it never reports. A date
+ * on a working day or outside the date window reports nothing.
  */
 export function nonWorkingPinOf(
     props: EntityProperty[],
@@ -92,12 +85,11 @@ export function nonWorkingPinOf(
     return { key: pin.key, pin: pin.raw, start: formatIsoDate(dateAtX(startX, ctx)) };
 }
 
-/** The dated pin that can set an item's start, by the start precedence. */
+/** The inline `after:` date that can set an item's start. */
 function startPinOf(
     props: EntityProperty[],
-): { key: 'date' | 'start' | 'after'; raw: string; date: Date } | undefined {
-    const { pin, after } = startTermsOf(props);
-    if (pin) return pin;
+): { key: 'after'; raw: string; date: Date } | undefined {
+    const { after } = startTermsOf(props);
     for (const term of after) {
         if ('date' in term) return { key: 'after', raw: term.raw, date: term.date };
     }

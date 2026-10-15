@@ -88,12 +88,13 @@ swimlane eng "Engineering"
 
 // --- Wave insights (specs/waves.md §6.2 WV15-WV18, §6.4) ---
 
-const WAVE_CODES = new Set(['NL.W1001', 'NL.W1002', 'NL.I1006', 'NL.I1007']);
+const WAVE_CODES: ReadonlySet<string> = new Set(['NL.W1002', 'NL.I1006', 'NL.I1007']);
 
 async function waveInsights(
     source: string,
     locale = 'en-US',
     files?: Record<string, string>,
+    codes: ReadonlySet<string> = WAVE_CODES,
 ): Promise<LayoutInsight[]> {
     // `files` resolves includes under `/root` from memory; `source` is then
     // the key of the main file.
@@ -108,10 +109,10 @@ async function waveInsights(
         ? await parseAndResolve(files[source], path.resolve('/root', source), readFile)
         : await parseAndResolve(source);
     const layout = layoutRoadmap(file, resolved);
-    return collectLayoutInsights(layout, { locale }).filter((i) => WAVE_CODES.has(i.code));
+    return collectLayoutInsights(layout, { locale }).filter((i) => codes.has(i.code));
 }
 
-// Example 9 with a2 pinned below the w2 floor.
+// Example 9 with an ignored `date:` on a2, below the w2 floor.
 const PINNED = `nowline v1
 
 roadmap dates "Dates vs barriers" start:2026-01-05 scale:1w calendar:full
@@ -130,65 +131,45 @@ swimlane apps
 `;
 
 describe('collectLayoutInsights — waves', () => {
-    it('reports NL.W1001 when a wave floor moves a date: pin (Example 9 pin variant)', async () => {
-        const insights = await waveInsights(PINNED);
-        expect(insights).toHaveLength(1);
-        const [w] = insights;
-        expect(w.code).toBe('NL.W1001');
-        expect(w.severity).toBe('warning');
-        expect(w.lspSeverity).toBe(2);
-        expect(w.entityId).toBe('a2');
-        expect(w.message).toBe(
-            'Item "a2" is pinned to 2026-01-19 (date:), but wave "w2" cannot start until 2026-02-02; the item starts at the wave start.',
+    it('reports nothing for a date: on an item: the key is ignored (Example 9)', async () => {
+        // Work has no fixed start pin (specs/dsl.md § Item Properties), so a
+        // wave floor has no pin to move; the validator warns on the key.
+        const { file, resolved } = await parseAndResolve(PINNED);
+        const insights = collectLayoutInsights(layoutRoadmap(file, resolved));
+        expect(insights.filter((i) => i.entityId === 'a2')).toEqual([]);
+        expect(insights.filter((i) => i.severity === 'warning')).toEqual([]);
+    });
+
+    it('reports NL.I1008 for an item inside an isolated region', async () => {
+        const insights = await waveInsights(
+            'portfolio.nowline',
+            'en-US',
+            {
+                'ios.nowline': [
+                    'nowline v1',
+                    '',
+                    'roadmap ios-app "iOS" start:2026-01-05 scale:1w',
+                    '',
+                    'swimlane ios',
+                    '  item ios-push duration:1w after:2026-01-10',
+                    '',
+                ].join('\n'),
+                'portfolio.nowline': [
+                    'nowline v1',
+                    '',
+                    'include "./ios.nowline" roadmap:isolate',
+                    '',
+                    'roadmap portfolio "Portfolio" start:2026-01-05 scale:1w',
+                    '',
+                    'swimlane platform',
+                    '  item pf-api duration:2w',
+                    '',
+                ].join('\n'),
+            },
+            new Set(['NL.I1008']),
         );
-        expect(w.data.args).toEqual({
-            name: 'a2',
-            pin: '2026-01-19',
-            key: 'date',
-            wave: 'w2',
-            start: '2026-02-02',
-        });
-    });
-
-    it('reports NL.W1001 in French', async () => {
-        const [w] = await waveInsights(PINNED, 'fr');
-        expect(w.code).toBe('NL.W1001');
-        expect(w.message).toContain('2026-01-19');
-        expect(w.message).not.toContain('is pinned to');
-    });
-
-    it('reports NL.W1001 for an item inside an isolated region', async () => {
-        const waveHeader = (id: string, title: string): string[] => [
-            `roadmap ${id} "${title}" start:2026-01-05 scale:1w calendar:full`,
-            '',
-            'wave w1 "Wave 1"',
-            'wave w2 "Wave 2"',
-            '',
-        ];
-        const insights = await waveInsights('portfolio.nowline', 'en-US', {
-            'ios.nowline': [
-                'nowline v1',
-                '',
-                ...waveHeader('ios-app', 'iOS'),
-                'swimlane ios',
-                '  item ios-offline duration:4w wave:w1',
-                '  item ios-push duration:1w wave:w2 date:2026-01-12',
-                '',
-            ].join('\n'),
-            'portfolio.nowline': [
-                'nowline v1',
-                '',
-                'include "./ios.nowline" roadmap:isolate',
-                '',
-                ...waveHeader('portfolio', 'Portfolio'),
-                'swimlane platform',
-                '  item pf-api duration:2w wave:w1',
-                '  item pf-scale duration:2w wave:w2',
-                '',
-            ].join('\n'),
-        });
         expect(insights.map((i) => i.message)).toEqual([
-            'Item "ios-push" is pinned to 2026-01-12 (date:), but wave "w2" cannot start until 2026-02-02; the item starts at the wave start.',
+            'Item "ios-push" is pinned to 2026-01-10 (after:), a non-working day; it starts on 2026-01-12.',
         ]);
         expect(insights[0].entityId).toBe('ios-push');
     });

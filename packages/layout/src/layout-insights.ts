@@ -85,27 +85,10 @@ function collectItemInsights(item: PositionedItem, locale: string, out: LayoutIn
             makeInsight(locale, 'NL.I1003', 'info', { name, anchor: item.overflowAnchorId }, name),
         );
     }
-    collectWavePinInsight(item, locale, out);
     collectNonWorkingPinInsight(item, locale, out);
 }
 
-/** NL.W1001 (specs/waves.md WV15): a wave floor moved the item's pin. */
-function collectWavePinInsight(item: PositionedItem, locale: string, out: LayoutInsight[]): void {
-    const pin = item.wavePinOverride;
-    if (!pin) return;
-    const name = itemLabel(item);
-    out.push(
-        makeInsight(
-            locale,
-            'NL.W1001',
-            'warning',
-            { name, pin: pin.pin, key: pin.key, wave: pin.wave, start: pin.start },
-            name,
-        ),
-    );
-}
-
-/** NL.I1008 (specs/working-calendar.md §6): a pin on a non-working day set the start. */
+/** NL.I1008 (specs/working-calendar.md §6): an `after:` date on a non-working day set the start. */
 function collectNonWorkingPinInsight(
     item: PositionedItem,
     locale: string,
@@ -174,21 +157,19 @@ function collectSwimlaneInsights(
 
 /**
  * Pin insights on the items of an isolated region's lanes. Region items
- * carry only the wave pin override (NL.W1001, specs/waves.md §8.7) and the
- * non-working pin (NL.I1008) here; the other item and lane insights stay
- * main-lane only, as before waves.
+ * carry only the non-working pin (NL.I1008) here; the other item and lane
+ * insights stay main-lane only.
  */
-function collectWaveItemInsights(
+function collectRegionItemInsights(
     lane: PositionedSwimlane,
     locale: string,
     out: LayoutInsight[],
 ): void {
     walkTrackChildren(lane.children, (item) => {
-        collectWavePinInsight(item, locale, out);
         collectNonWorkingPinInsight(item, locale, out);
     });
     for (const nested of lane.nested) {
-        collectWaveItemInsights(nested, locale, out);
+        collectRegionItemInsights(nested, locale, out);
     }
 }
 
@@ -266,7 +247,7 @@ export function collectLayoutInsights(
     }
     for (const region of layout.includes) {
         for (const lane of region.nestedSwimlanes) {
-            collectWaveItemInsights(lane, locale, out);
+            collectRegionItemInsights(lane, locale, out);
         }
     }
     collectWaveInsights(layout, locale, out);

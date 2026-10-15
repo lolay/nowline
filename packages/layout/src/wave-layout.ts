@@ -10,7 +10,7 @@
 import type { ItemDeclaration, WavePlan } from '@nowline/core';
 import { addDays } from './calendar.js';
 import type { LayoutContext } from './layout-context.js';
-import { startTermsOf, waveFloorDates } from './start-terms.js';
+import { waveFloorDates } from './start-terms.js';
 import type { TimeScale } from './time-scale.js';
 import type { PositionedItem } from './types.js';
 import { type WaveBarrierResult, type WaveNode, WavePass } from './wave-barrier.js';
@@ -18,9 +18,10 @@ import { spanEndDate } from './working-calendar.js';
 
 /**
  * Sub-pixel tolerance for wave edges: a milestone whose center is closer
- * than this to a boundary sits on it (specs/waves.md §9.2), and a wave or
- * a floor must move past a date by at least this much to count as an
- * overrun or a pin override. Pixel ends are float sums, so exact
+ * than this to a boundary sits on it (specs/waves.md §9.2), a wave must
+ * move past a date by at least this much to count as an overrun, and an
+ * item must start this close to its `after:` date for that date to have
+ * set its start (NL.I1008). Pixel ends are float sums, so exact
  * comparisons would flip on rounding noise.
  */
 export const WAVE_EDGE_TOLERANCE_PX = 0.5;
@@ -146,43 +147,6 @@ export function accumulateWaveMember(
 export function waveRoleOf(node: ItemDeclaration, ctx: LayoutContext): PositionedItem['waveRole'] {
     if (!ctx.waves) return undefined;
     return ctx.waves.plan.memberWave(node) !== undefined ? 'member' : 'background';
-}
-
-/**
- * The `date:` / `start:` pin a barrier floor moved (NL.W1001), for an item
- * placed at `startX` (its floored logical start). The pin is resolved with
- * `resolveChildStart`'s precedence: `date:` wins whenever it parses, and a
- * pin outside the date window is dropped (the item then never had a
- * pinned start).
- *
- * Two tests, both with the boundary tolerance:
- * - the floor lies past the pin, so the wave could have moved it. This
- *   compares the pin with the floor, not with the final start, so only a
- *   move the wave made can report;
- * - the item starts at the floor, so the floor is the binding term and
- *   NL.W1001's "the item starts at the wave start" holds.
- */
-export function wavePinOverrideOf(
-    node: ItemDeclaration,
-    startX: number,
-    ctx: LayoutContext,
-): PositionedItem['wavePinOverride'] {
-    const k = ctx.waves?.plan.waveOf.get(node);
-    if (!ctx.waves || k === undefined) return undefined;
-    const { pin } = startTermsOf(node.properties);
-    if (!pin) return undefined;
-    const pinX = ctx.scale.forwardWithinDomain(pin.date);
-    const floor = ctx.waves.pass.floor(node);
-    if (pinX === null || floor === undefined || floor - pinX < WAVE_EDGE_TOLERANCE_PX) {
-        return undefined;
-    }
-    if (startX - floor > WAVE_EDGE_TOLERANCE_PX) return undefined;
-    return {
-        wave: ctx.waves.ids[k - 1],
-        key: pin.key,
-        pin: pin.raw,
-        start: dateAtX(floor, ctx).toISOString().slice(0, 10),
-    };
 }
 
 /** True when `x` sits on a wave boundary: any `S_k` or `E_k` except the origin. */

@@ -184,12 +184,12 @@ include "holidays-us-2026.nowline" roadmap:ignore
 
 ### 5.1 Rules
 
-1. **Start.** An item starts on the first working day at or after its computed start (`date:`, `start:`, `after:`, or the lane cursor).
+1. **Start.** An item starts on the first working day at or after its computed start (`after:` or the lane cursor; an item has no `date:` or `start:` pin, see [`dsl.md` § Pinning is not supported](./dsl.md#pinning-is-not-supported)).
 2. **Consumption.** It consumes N working days, where N is its calendar duration in working days (`duration:`, or `size:` effort divided by `capacity:` as today). Durations stay in estimate units (decision 19): `1w` is `days-per-week` working days, laid on whatever the calendar leaves working. A `working` exception pulls an end in, and a `non-working` day inside a bar pushes it out.
 3. **Finish.** It finishes at the end of its Nth working day.
 4. **Successor.** A sequenced successor, or an `after:` dependent, starts on the next working day.
 5. **Calendar-bound entities keep their dates.** `date:` on milestones and anchors, `after:DATE`, `before:DATE`, `start:` on the roadmap and the now-line are calendar dates. A milestone on a Saturday is legitimate and stays on Saturday.
-6. **Snapping is reported.** When rule 1 moves an item's pinned start (`date:` or `after:DATE` on a non-working day), the layout emits an info insight naming the item, the pinned date and the date used.
+6. **Snapping is reported.** When rule 1 moves an item's pinned start (`after:DATE` on a non-working day), the layout emits an info insight naming the item, the pinned date and the date used.
 7. **`before:DATE`** keeps today's cap: the finish (rule 3) may not pass the start of the pinned day. A hidden pinned day maps to the seam like any other date.
 8. **`length:`** on the roadmap is a duration, so it counts working days like any other.
 9. **Which days work** is decided by specificity (§4.1): dated declarations over bounded recurrences over the open-ended week, `working` winning a tie, and nothing depends on declaration or include order. The rules are put in a canonical order (first date, title, id, `working`, the weekday set, start and end) before the calendar is built, because the engine breaks ties between titled runs by input order.
@@ -242,7 +242,7 @@ The `non-working` and `working` declarations share one check, and the kind in a 
 | NW4 | warning | `days-per-week` differs from the number of weekdays the open-ended week leaves working (**`NL.W0705`**). `calendar:custom` with `days-per-week: 6` and no `every:` triggers it. |
 | NW5 | error | Duplicate id within one file, per keyword (**`NL.E0907`**): `non-working x` beside `working x` is fine. Include collisions use the existing config-merge warning (§4.3). |
 | NW6 | error | `non-working:` on `default roadmap` is `hide` or `show`. Shipped as **`NL.E0800`**; it also covers a `non-working:` value inside a `style` block, one error per bad value. |
-| NW7 | info (layout insight) | An item's pinned start falls on a non-working day and moved (§5.1 rule 6). Shipped as **`NL.I1008`**; it covers `date:`, `start:` and the date in an `after:`, for main-lane and isolated-region items alike. A tie between the pin and another constraint (the lane cursor, an `after:` reference) still reports. |
+| NW7 | info (layout insight) | An item's pinned start falls on a non-working day and moved (§5.1 rule 6). Shipped as **`NL.I1008`**; it covers the date in an `after:` (item `date:` and `start:` pins, which it also covered, are removed), for main-lane and isolated-region items alike. A tie between the pin and another constraint (the lane cursor, an `after:` reference) still reports. |
 
 **The open-ended week** is the file's `non-working … every:` declarations with neither `start:` nor `end:`, plus the business preset's Saturday and Sunday unless the file declares `non-working weekend`, minus the file's open-ended `working … every:`. NW3 and NW4 both read it.
 
@@ -287,7 +287,7 @@ As built (Phase 4), the rules above resolve to these specifics, normative text i
 - **Y-range.** From `chartBox.y` to the bottom of the timeline box, the span the seam and minor-grid lines use, so a band covers the lanes and not the header or marker rows. Fill is `timeline.nonWorkingFill` (light `#64748b`, dark `#94a3b8`, grayscale `#737373`) at `fill-opacity` 0.1 (`NON_WORKING_FILL_OPACITY`, exported from `@nowline/layout`).
 - **Month-scale rule.** `fullUnitPx` counts calendar days under `show`. At month scale and above, a closing column that holds no working day is merged into the column before it. The date window ends on Monday Feb 2 after a Sunday Feb 1 boundary, and `hide` already drops that column for having zero width; without the merge `show` would draw a one-day `Feb` sliver at the right edge.
 - **Sliver merge limit.** The merge is for the closing column only. A leading sliver (a window that starts on a Sunday, so the first column holds no working day) keeps its tick, and its label is dropped by the #92 edge-column rule. This is a known limit.
-- **Snap sites.** Starts snap to a working day (`TimeScale.startX`) only where they become geometry: `sequenceItem`'s placed start (after `waveFloorX`, `wavePinOverrideOf` and `nonWorkingPinOf` have run on the pre-snap value), group and parallel box left edges (a group's width is `max(snapped, timeCursorX, usedRightX) − snapped`), and the row packer's predicted extent and `firstChildStartX`. Lane cursor seeds, wave floors and include regions are not snapped. This is a deliberate deviation from the handoff's §6 wording ("the lane cursor, wave floors go through `startX`") with the same resulting geometry: it keeps `NL.I1008`, `NL.W1001` and their tie rules identical in both views and keeps floors raw, as decision 11 requires.
+- **Snap sites.** Starts snap to a working day (`TimeScale.startX`) only where they become geometry: `sequenceItem`'s placed start (after `waveFloorX` and `nonWorkingPinOf` have run on the pre-snap value), group and parallel box left edges (a group's width is `max(snapped, timeCursorX, usedRightX) − snapped`), and the row packer's predicted extent and `firstChildStartX`. Lane cursor seeds, wave floors and include regions are not snapped. This is a deliberate deviation from the handoff's §6 wording ("the lane cursor, wave floors go through `startX`") with the same resulting geometry: it keeps `NL.I1008` and its tie rule identical in both views and keeps floors raw, as decision 11 requires.
 - **Widths.** One helper, `itemSpanPx` in `working-span.ts`, serves all four duration-to-width sites. Under `hide` it returns the legacy `days × pixelsPerDay` verbatim, so there is no float drift; under `show` it returns `advanceX(startX, days) − startX`.
 
 ### 7.4 Named non-working days
@@ -359,7 +359,7 @@ Other optional keys, each omitted when empty:
 
 - `PositionedAnchor.hiddenDate` and `PositionedMilestone.hiddenDate`: the real ISO date of a marker dated on a hidden day. The marker sits at the seam; the renderer adds it as an SVG `<title>`.
 - `PositionedMilestone.overrunDate`: the milestone's own date, so NL.I1007 no longer reads a date back off x.
-- `PositionedItem.nonWorkingPin`: `{ key: 'date' | 'start' | 'after'; pin: string; start: string }`, the source of NL.I1008.
+- `PositionedItem.nonWorkingPin`: `{ key: 'after'; pin: string; start: string }`, the source of NL.I1008.
 - `ResolvedStyle.nonWorking` (`'hide'` | `'show'`, default `'hide'`): the roadmap's resolved display setting, carried by every resolved style object in every calendar like `minorGrid` and `timelinePosition`. The render-time option replaces it when the layout is built, so `timeline.nonWorkingDisplay` is the value that was drawn.
 - `hiddenDate` is set only when the marker's date is hidden (`!showsNonWorking && !isWorkingDay`). Under `show` a marker dated on a weekend sits on its own date.
 - Theme tokens `timeline.nonWorkingSeam` (light `#a0aec0`, dark `#6b7a90`, grayscale `#9a9a9a`) and `timeline.nonWorkingFill` (light `#64748b`, dark `#94a3b8`, grayscale `#737373`, drawn at 0.1 opacity).

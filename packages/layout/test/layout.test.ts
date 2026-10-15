@@ -910,12 +910,13 @@ ${extraItems}`;
     });
 
     it('makes a lane 16px taller than the one-line version, not a whole 64px row', async () => {
-        // A pinned second item collides with the first and drops to row 1, so
+        // A one-day item's spilled caption pushes the next item to row 1, so
         // the lane's used height (not its minimum height) decides the band.
-        const pinned = '  item pinned "Pinned" duration:2w date:2026-04-06\n';
-        const wrapped = await layout(issueRoadmap('Technology Selection', pinned));
+        const extra =
+            '  item spill "Spills past its one-day bar" duration:1d\n  item next "Next" duration:2w\n';
+        const wrapped = await layout(issueRoadmap('Technology Selection', extra));
         // "Tech Selection" fits one line (105.6px < 124px): same lane, no wrap.
-        const control = await layout(issueRoadmap('Tech Selection', pinned));
+        const control = await layout(issueRoadmap('Tech Selection', extra));
         const controlTech = byTitle(items(control.swimlanes[0].children), 'Tech Selection');
         expect(controlTech.titleLines).toBeUndefined();
         expect(controlTech.box.height).toBe(56);
@@ -997,7 +998,8 @@ roadmap r "R" start:2026-04-06 scale:2w
 swimlane "Platform"
   group "Squad"
     item "Technology Selection" duration:2w
-    item below "Below" duration:2w date:2026-04-06
+    item spill "Spills past its one-day bar" duration:1d
+    item below "Below" duration:2w
 `;
         const model = await layout(src);
         const group = model.swimlanes[0].children[0];
@@ -1044,7 +1046,8 @@ roadmap r "R" start:2026-04-06 scale:2w
 
 swimlane "Platform"
   item "Technology Selection" duration:2w
-  item below "Below" duration:2w date:2026-04-06
+  item spill "Spills past its one-day bar" duration:1d
+  item below "Below" duration:2w
 `;
         const model = await layout(src);
         const all = items(model.swimlanes[0].children);
@@ -1166,7 +1169,8 @@ footnote note "Note" on:tech
 swimlane "Platform"
   group "Squad"
     item tech "Ship the thing" duration:2w
-    item below "Below" duration:2w date:2026-04-06
+    item spill "Spills past its one-day bar" duration:1d
+    item below "Below" duration:2w
 `;
         const model = await layout(src);
         const group = model.swimlanes[0].children[0];
@@ -1188,7 +1192,8 @@ roadmap r "R" start:2026-04-06 scale:2w
 swimlane "Platform"
   group "Squad"
     item tech "Ship the thing" duration:2w before:2026-06-29
-    item below "Below" duration:2w date:2026-04-06
+    item spill "Spills past its one-day bar" duration:1d
+    item below "Below" duration:2w
 `;
         const model = await layout(src);
         const group = model.swimlanes[0].children[0];
@@ -1310,7 +1315,8 @@ roadmap r "R" start:2026-04-06 scale:2w
 swimlane "Platform"
   group "Squad"
     item tech "Ship the thing" duration:2w after:2026-04-06
-    item below "Below" duration:2w date:2026-04-06
+    item spill "Spills past its one-day bar" duration:1d
+    item below "Below" duration:2w
 `;
         const model = await layout(src);
         const group = model.swimlanes[0].children[0];
@@ -1337,7 +1343,7 @@ roadmap r "R" start:2026-04-06 scale:2w
 swimlane "Platform"
   group "Squad"
     item tech "Go Internationalize" duration:2w after:2026-04-06
-    item below "Below" duration:2w date:2026-04-06
+    item below "Below" duration:2w
 `;
         const model = await layout(src);
         const group = model.swimlanes[0].children[0];
@@ -1351,8 +1357,16 @@ swimlane "Platform"
         expect(tech.box.height).toBe(56);
         expect(below.box.y).toBe(tech.box.y + 64);
 
-        // Control: the same item without the glyph wraps in-bar and grows its row.
-        const control = await layout(src.replace(' after:2026-04-06', ''));
+        // Control: the same item without the glyph wraps in-bar and grows its
+        // row; a one-day item's spilled caption drops `below` a row.
+        const control = await layout(
+            src
+                .replace(' after:2026-04-06', '')
+                .replace(
+                    '    item below',
+                    '    item spill "Spills past its one-day bar" duration:1d\n    item below',
+                ),
+        );
         const controlGroup = control.swimlanes[0].children[0];
         if (controlGroup.kind !== 'group') throw new Error('expected a group');
         const controlItems = items(controlGroup.children);
@@ -1495,7 +1509,8 @@ roadmap r "R" start:2026-04-06 scale:2w
 swimlane "Platform"
   group "Squad"
     item three "Design\\nBuild\\nShip" duration:2w
-    item below "Below" duration:2w date:2026-04-06
+    item spill "Spills past its one-day bar" duration:1d
+    item below "Below" duration:2w
 `;
         const { model } = await layout(src);
         const group = model.swimlanes[0].children[0];
@@ -1515,7 +1530,7 @@ roadmap r "R" start:2026-04-06 scale:2w
 swimlane "Platform"
   group "Squad"
     item wide "Internationalization of\\nthe billing service" duration:2w
-    item below "Below" duration:2w date:2026-04-06
+    item below "Below" duration:2w
 `;
         const { model } = await layout(src);
         const group = model.swimlanes[0].children[0];
@@ -1676,7 +1691,7 @@ roadmap gap "Gap" start:2026-01-05 length:16w
 
 swimlane s "S"
   item a "Auth refactor" duration:3w
-  item b "Next" duration:2w after:a date:2026-02-23
+  item b "Next" duration:2w after:[a, 2026-02-23]
 `;
         const model = await layout(src);
         const a = find(model, 'a');
@@ -1702,7 +1717,7 @@ roadmap gap "Gap" start:2026-01-05 length:16w
 
 swimlane s "S"
   item a "Plain" duration:3w
-  item b "Auth refactor" duration:3w after:a date:2026-02-23
+  item b "Auth refactor" duration:3w after:[a, 2026-02-23]
 `;
         const model = await layout(src);
         const a = find(model, 'a');
@@ -2135,13 +2150,13 @@ milestone beta "Beta" after:a
     });
 });
 
-// Engine A resolves an item's start with the precedence `date:` > `start:` >
-// `after:` > the track cursor; scheduleRoadmap's day tables for the same
-// sources are in schedule.test.ts. Expectations are hand-derived:
-// `calendar:business` at `scale:1w` is 8 px per working day, and Mon
-// 2026-01-12 is 5 working days past the Mon 2026-01-05 roadmap start, so 40 px
-// from the origin.
-describe('layoutRoadmap start: pins', () => {
+// Engine A resolves an item's start as the latest of `after:` and the track
+// cursor: work has no fixed start pin, so `start:` (and `date:`) on an item
+// set nothing (specs/dsl.md § Item Properties). scheduleRoadmap's day tables
+// for the same sources are in schedule.test.ts. Expectations are
+// hand-derived: `calendar:business` at `scale:1w` is 8 px per working day, so
+// the ignored Mon 2026-01-12 pin would have been 40 px from the origin.
+describe('layoutRoadmap no item start: pins', () => {
     function findItem(
         children: readonly PositionedTrackChild[],
         id: string,
@@ -2168,7 +2183,7 @@ describe('layoutRoadmap start: pins', () => {
         return { model, startOffset };
     }
 
-    it('honours start: on an item that is a direct parallel track', async () => {
+    it('ignores start: on an item that is a direct parallel track', async () => {
         const { model, startOffset } = await lay(`nowline v1
 roadmap r "R" start:2026-01-05 scale:1w
 swimlane s "S"
@@ -2178,16 +2193,17 @@ swimlane s "S"
 `);
         expect(model.timeline.pixelsPerDay).toBe(8);
         expect(startOffset('a')).toBeCloseTo(0, 6);
-        expect(startOffset('b')).toBeCloseTo(40, 6);
+        expect(startOffset('b')).toBeCloseTo(0, 6);
     });
 
-    it('lets start: win over after: on a lane item', async () => {
+    it('ignores start: beside after: on a lane item, so after: sets the start', async () => {
         const { startOffset } = await lay(`nowline v1
 roadmap r "R" start:2026-01-05 scale:1w
 swimlane s "S"
   item a "A" duration:3w
   item b "B" duration:1w start:2026-01-12 after:a
 `);
-        expect(startOffset('b')).toBeCloseTo(40, 6);
+        // a is 3w = 15 working days = 120 px; b follows it, not the 40 px pin.
+        expect(startOffset('b')).toBeCloseTo(120, 6);
     });
 });
