@@ -1,7 +1,7 @@
 ```text
 --- KICKOFF: begin orchestration at [deep] ---
 
-  Status: 3/6 groups done | last review: wave-2 CONCERNS | current: nowline m2 s1-s4 fix-up 2-fix [deep] | updated 2026-10-15 | passed unattended: gate 4 before wave 2/m2 | over expected: ~$38.6 of ~$31
+  Status: 3/6 groups done | last review: wave-2-fix CONCERNS | current: nowline m2 s1-s4 fix-up 2-fix2 [deep] | updated 2026-10-15 | passed unattended: gate 1 (fix-up 2 of 2) | over expected: ~$44.0 of ~$31
 
   mode: unattended | proposed unattended (harness=claude-code runner=cloud; CLAUDE_CODE_REMOTE=true, assigned branch) | guard 3x min $50 | fixups 2 | confirmed 2026-10-15 session ef0db142-6669-5058-893b-a118b7ea2d61 by Kickoff prompt: Run in unattended mode.
 
@@ -35,6 +35,7 @@
 | 2 [deep] m1 s2, m2 s1-s4, m3 s1-s2, m4 s1 | ~36M | ~$19 |
 | 3 [exec] m4 s2-s4 | ~2.7M | ~$1.1 |
 | 2-fix [deep] nowline m2 s1-s4 | — | — |
+| 2-fix2 [deep] nowline m2 s1-s4 | — | — |
 | orchestrator | ~12M | ~$9.9 |
 | **Total** | ~52M | ~$31 |
 
@@ -140,6 +141,7 @@ Added by Gary, 2026-10-15 ("after all is done, also, use an [exec] subagent to m
 review wave-1 (nowline m1 s1) 4e3870f..c3e5c96: PASS - spec §5/§8 carry decisions 5-13; F6-F8 rows added; tables well-formed; nothing outside the spec changed - 2026-10-15
 review wave-2 (nowline m1 s2) 30a5c0e..fd989f4: PASS - merge 2206c8c clean (#160-#162); F8 removes item pins in both engines, W1001 and wavePinOverride retired, ~40 tests migrated, specs and man pages updated; G1 only tests/weekends-show (3 themes), G3 weekends-show mermaid/xlsx declared; check_wave.py flagged only 3d8b606, 766bc38, 0e948e9 (origin/main's own squash commits brought in by the merge; the worker's 2206c8c and fd989f4 pass), not fixed: rewording main's history is wrong; passed unattended: gate 2 - 2026-10-15
 review wave-2 (nowline m2 s1-s4) 8b1b4ac..47639f6: CONCERNS - m2.s4 leaves the minimum bar width in two other cursor paths, so items after a clamped bar still start late (divergence (b)): (1) a parallel join, sequenceItem sets cursor.x/cursor.maxX to logicalRight (clamp included, sequence-item.ts:353), ParallelNode joins on subCursor.maxX and row-track.ts:90 takes it, so `parallel pp / item t1 duration:1d` then `item z duration:1w` gives z A 1.40 vs C 1.00; (2) after: refs, ctx.entityRightEdges is set to logicalRight (sequence-item.ts:333), so `item b duration:1w after:a` with a 1d `a` gives b A 1.40 vs C 1.00; waves.md §8.6 and the register $comment claim (b) is fixed, and no corpus sample has either shape, so the register test stays green; also minor: s3/s4 bodies name G1 bases c2371d4/36a786e (pre-rebuild SHAs, same trees as e38c414/3f9afe1). Merge 983ffac clean (#163); check_wave.py flagged only db78b2e (origin/main's own commit via the merge; worker's commits pass), not fixed, as in wave 2/m1; passed unattended: gate 4 - 2026-10-15
+review wave-2-fix (nowline m2 s1-s4) 8b1b4ac..4314f48: CONCERNS - code fix correct (both probes match C; time and painted readers split; G1/G3 identical vs 47639f6), but two new sentences claim engine C resolves `after:` on a parallel at its track end, which it doesn't (schedule.ts walkNode registers only items in scope.itemEnd; resolveAfterDay returns 0 for a parallel): specs/waves.md:823 "Every time path takes the duration end in both engines: ... an `after:` reference to the item or to a parallel that ends with it ..." and .changelog/scheduler-follow-ups.txt:18 "... any item that names it (or that parallel) in `after:` ... All now follow the item's duration, so those items start on the date the exports give them"; qualify both (the chart starts an item `after:` a parallel at its latest track end; C does not yet resolve a parallel reference, an open divergence like `after:<group>`); check_wave.py flagged only db78b2e (origin/main's own commit), not fixed; passed unattended: gate 1 (fix-up 2 of 2) - 2026-10-15
 
 ## Token log
 
@@ -160,3 +162,6 @@ tokens review-wave-2 nowline-m1-s2 (claude-opus-5-5): input ~52 / cache read ~1.
 tokens orchestrator-wave-2 nowline-m1-s2 (claude-opus-5-5): input ~14 / cache read ~1.1M / cache write ~0 5m + ~22k 1h / output ~9.8k | ~$0.59 API-equiv
 tokens wave-2 nowline-m2-s1-s4 (claude-opus-5-5): input ~260 / cache read ~23M / cache write ~210k / output ~130k | ~$8.12 API-equiv (output est.) session ef0db142-6669-5058-893b-a118b7ea2d61
 tokens review-wave-2 nowline-m2-s1-s4 (claude-opus-5-5): input ~62 / cache read ~1.8M / cache write ~84k / output ~31k | ~$1.41 API-equiv (output est.) session ef0db142-6669-5058-893b-a118b7ea2d61
+tokens orchestrator-wave-2 nowline-m2-s1-s4 (claude-opus-5-5): input ~16 / cache read ~1.4M / cache write ~0 5m + ~25k 1h / output ~11k | ~$0.72 API-equiv
+tokens wave-2-fix nowline-m2-s1-s4 (claude-opus-5-5): input ~100 / cache read ~7.2M / cache write ~180k / output ~52k | ~$3.37 API-equiv (output est.) session ef0db142-6669-5058-893b-a118b7ea2d61
+tokens review-wave-2-fix nowline-m2-s1-s4 (claude-opus-5-5): input ~60 / cache read ~1.5M / cache write ~72k / output ~30k | ~$1.26 API-equiv (output est.) session ef0db142-6669-5058-893b-a118b7ea2d61

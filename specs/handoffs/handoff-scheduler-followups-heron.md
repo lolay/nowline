@@ -3,9 +3,9 @@
 - **Plan:** `specs/handoffs/plan-scheduler-followups-heron.md`
 - **Branch:** `claude/friendly-babbage-qlcz6d` (harness-assigned task branch; fast-forwarded to `origin/main` `5da7d2a` and pushed at kickoff)
 - **Mode:** unattended, confirmed 2026-10-15 in session ef0db142 (dialog: "Unattended (Recommended)"; session: "This session")
-- **Status:** wave 2/m2 (F2, F3) done with review CONCERNS; automatic fix-up 2-fix [deep] running (fix-up 1 of 2).
-- **Spend:** ~$38.62, over the ~$31 expected (wave 2/m1 ran ~$15, wave 2/m2 ~$9.5 plus the parent). Guard 3x min $50, ~$93.
-- **Next unit:** fix-up 2-fix [deep] `nowline m2 s1-s4` (the clamp still reaches the parallel join and `after:` edges), then wave 2 m3 s1-s2, m4 s1; then wave 3 [exec] m4 s2-s4.
+- **Status:** fix-up 2-fix landed the code fix (4314f48) but its review found two inaccurate sentences (waves.md §8.6, changelog) claiming C resolves `after:<parallel>`; automatic fix-up 2-fix2 [deep] running (fix-up 2 of 2, the cap).
+- **Spend:** ~$44.0, over the ~$31 expected. Guard 3x min $50, ~$93.
+- **Next unit:** fix-up 2-fix2 [deep] `nowline m2 s1-s4` (docs wording), then wave 2 m3 s1-s2, m4 s1; then wave 3 [exec] m4 s2-s4.
 - **Gates the plan crosses:** 2 before wave 2; 4 at m2, m3 and m4. No canary (wave 1 has one group). No `[xdeep]`.
 - **Resume:** run `/compact` if needed, then paste the plan's Kickoff prompt.
 
@@ -18,8 +18,11 @@ None.
 - wave 1 [exec] `nowline m1 s1` 4e3870f..c3e5c96: PASS. Spec §5/§8 carry decisions 5-13; F6, F7, F8 rows added.
 - wave 2 [deep] `nowline m1 s2` 30a5c0e..fd989f4: PASS. Merge of origin/main (2206c8c: #160, #161, #162, no conflicts), then F8 (fd989f4). G1 differs only in tests/weekends-show; weekends-show snapshot and its determinism cells bumped (declared).
 - wave 2 [deep] `nowline m2 s1-s4` 8b1b4ac..47639f6: CONCERNS. Merge 983ffac (#163, clean); F2 96e073b (G1 identical), F3 (d) e38c414 (minimal, platform-2026, product, showcase), F3 (c) 3f9afe1 (inline-date-pins, waves, late-row-shifts), F3 (b) 47639f6 (showcase, non-working-hide/show). Review: the minimum bar width still reaches the parallel join and `after:` edges (sequence-item.ts:333, :353); fix-up 2-fix.
+- fix-up 2-fix [deep] `nowline m2 s1-s4` 8b1b4ac..4314f48: CONCERNS. 4314f48 splits time (cursor.x, entityRightEdges, wave member: duration end) from painted (maxX, bracket, packer, canvas) ends; four regression tests; G1/G3 identical. Review: waves.md:823 and the changelog s4 block wrongly say C resolves `after:<parallel>`; fix-up 2-fix2.
 
 ## Deviations from plan
+
+- Wave 2/m2 used both automatic fix-ups (cap 2): 2-fix for the clamp reaching the parallel join and `after:`, 2-fix2 for two inaccurate sentences 2-fix wrote. A third CONCERNS on this group stops at gate 1.
 
 - m1.s2 merged origin/main itself (the plan wanted each milestone's first step to; m1.s1 was docs-only and didn't). `check_wave.py` then flagged main's own commits 3d8b606, 766bc38 and 0e948e9 (subject, trailers, Co-authored-by) because the merge brings them into the range. Logged PASS rather than CONCERNS: an automatic fix-up would reword main's published history. The worker's own commits pass. Later merges of main draw the same flag and are handled the same way (wave 2/m2: db78b2e, #163).
 
@@ -28,6 +31,7 @@ None.
 ## Decisions so far
 
 - m2 (review CONCERNS on s4 only; the rest held): the canvas fix counts every parallel track's spilled caption, not only group tracks. `TRACK_BLOCK_TAIL_GUTTER_PX` (a public `@nowline/layout` export) is deleted, noted in the s2 `fixed` fragment. `minimal` moved in s2 (its last child is a parallel of group tracks; decision 8). `size-and-capacity` did not move in s4. The barrier theorem test and waves.md §8.4 compare duration ends; a clamped bar may paint past its wave boundary (decision 6). showcase `announce` is itself a clamped bar and keeps a decision-6 register entry. `packages/layout/test/finalize-coverage.json` moves with layout changes too. Historical spec text (§1.2, §1.3, §9) left for m4.s3.
+- Open, outside m2's scope (2-fix worker and reviewer): engine C ignores `after:<parallel>` and `after:<group>` (`walkNode` registers only items in `scope.itemEnd`; `resolveAfterDay` returns 0), so A > C there. Also an after-only milestone `after:<item>` sits at the item's visual box right (a clamped bar pushes it later: A 0.35 vs C 0.14 weeks), and `before:` overflow compares `logicalRight`. All pre-existing and outside the register. To raise with Gary at completion.
 - Open, outside m2's scope (reviewer): a group's `entityRightEdges` is still its painted box, so `item z after:g` where g's caption spills puts z at day 84.98 in A against 0 in C (C's 0 looks wrong too). Same before m2. To raise with Gary at completion unless F4's lower-bound test forces it earlier.
 
 - m1.s2 (review PASS): `resolvePinnedOrSequentialStart` keeps its name (m2.s1 cites it) though it no longer pins. The `after:<date>` hint fires on items, groups and parallels, not swimlanes (inline dates are NL.E0411 there). core `waves-order.ts` dropped pins too. Historical records (milestones.md m2o row, scheduler-unification.md §1.4/§3/§6, working-calendar.md Phase 3 known limits) were left as written for m4.s3's close-out. Determinism goldens were edited by hand for the declared cells only (`make determinism-update` regenerates everything and installs chromium).
