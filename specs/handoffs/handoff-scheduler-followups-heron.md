@@ -3,7 +3,7 @@
 - **Plan:** `specs/handoffs/plan-scheduler-followups-heron.md`
 - **Branch:** `claude/friendly-babbage-qlcz6d` (harness-assigned task branch; fast-forwarded to `origin/main` `5da7d2a` and pushed at kickoff)
 - **Mode:** unattended, confirmed 2026-10-15 in session ef0db142 (dialog: "Unattended (Recommended)"; session: "This session")
-- **Status:** kickoff answered; stopped so Gary can `/compact`. No wave has run.
+- **Status:** resumed after `/compact` from the pasted Kickoff prompt (mode re-confirmed, same session); wave 1 dispatching.
 - **Spend:** ~$10.78 of ~$31 expected (the kickoff alone, which carried the planning session's exploration and prototypes; the orchestrator row expected ~$9.9 for the whole run). Guard 3x min $50, ~$93.
 - **Next unit:** wave 1 [exec] `nowline m1 s1` (record the decisions in spec §5/§8), then wave 2 [deep] in four units (m1 s2; m2 s1-s4; m3 s1-s2; m4 s1), then wave 3 [exec] m4 s2-s3.
 - **Gates the plan crosses:** 2 before wave 2; 4 at m2, m3 and m4. No canary (wave 1 has one group). No `[xdeep]`.
@@ -11,7 +11,7 @@
 
 ## Pending question
 
-None. Next: Gary runs `/compact`, then pastes the plan's Kickoff prompt in this session.
+None.
 
 ## Done
 
