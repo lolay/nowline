@@ -3,6 +3,17 @@ import { minutesToMsProjDuration } from '../src/duration.js';
 import { exportMsProjXml } from '../src/index.js';
 import { buildExportInputs, SIMPLE_FIXTURE } from './helpers.js';
 
+const STARTED_FIXTURE = `nowline v1
+
+roadmap started "Started" start:2026-03-02
+
+swimlane build "Build"
+  item design "Design" duration:1w
+  item ship "Ship" duration:3d after:design
+
+milestone launch "Launch" date:2026-03-16 after:[ship]
+`;
+
 describe('exportMsProjXml — basic structure', () => {
     it('emits a well-formed XML prologue + Project root', async () => {
         const inputs = await buildExportInputs(SIMPLE_FIXTURE);
@@ -92,7 +103,9 @@ describe('exportMsProjXml — basic structure', () => {
 
 describe('exportMsProjXml — determinism', () => {
     it('two calls produce identical bytes', async () => {
-        const inputs = await buildExportInputs(SIMPLE_FIXTURE);
+        const inputs = await buildExportInputs(SIMPLE_FIXTURE, {
+            today: new Date('2026-01-05T00:00:00Z'),
+        });
         const a = exportMsProjXml(inputs, { onLossy: () => {} });
         const b = exportMsProjXml(inputs, { onLossy: () => {} });
         expect(a).toBe(b);
@@ -102,6 +115,32 @@ describe('exportMsProjXml — determinism', () => {
         const inputs = await buildExportInputs(SIMPLE_FIXTURE);
         const xml = exportMsProjXml(inputs, { startDate: '2026-06-15', onLossy: () => {} });
         expect(xml).toContain('<StartDate>2026-06-15T08:00:00</StartDate>');
+    });
+
+    it('defaults StartDate to the roadmap start:, the same anchor as its tasks', async () => {
+        const inputs = await buildExportInputs(STARTED_FIXTURE);
+        const xml = exportMsProjXml(inputs, { onLossy: () => {} });
+        expect(xml).toContain('<StartDate>2026-03-02T08:00:00</StartDate>');
+        const starts = [...xml.matchAll(/<Start>(\d{4}-\d{2}-\d{2})T/g)].map((m) => m[1]);
+        expect(starts.length).toBeGreaterThan(0);
+        for (const start of starts) {
+            expect(start >= '2026-03-02').toBe(true);
+        }
+    });
+
+    it('defaults StartDate to today when the roadmap has no start:', async () => {
+        const inputs = await buildExportInputs(SIMPLE_FIXTURE, {
+            today: new Date('2026-04-06T00:00:00Z'),
+        });
+        const xml = exportMsProjXml(inputs, { onLossy: () => {} });
+        expect(xml).toContain('<StartDate>2026-04-06T08:00:00</StartDate>');
+    });
+
+    it('an explicit startDate wins over the roadmap start:', async () => {
+        const inputs = await buildExportInputs(STARTED_FIXTURE);
+        const xml = exportMsProjXml(inputs, { startDate: '2026-06-15', onLossy: () => {} });
+        expect(xml).toContain('<StartDate>2026-06-15T08:00:00</StartDate>');
+        expect(xml).not.toContain('<StartDate>2026-03-02');
     });
 
     it('rejects malformed startDate', async () => {

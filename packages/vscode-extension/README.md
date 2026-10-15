@@ -149,7 +149,7 @@ Locale uses two chains, mirroring the CLI:
 | `nowline.export.fonts.mono` | `""` | `--font-mono` | Mono font for PDF/PNG. |
 | `nowline.export.fonts.headless` | `false` | `--headless` | Force the bundled DejaVu fonts for byte-stable output. |
 | `nowline.export.png.scale` | `1` | `--scale` | Raster scale factor for PNG export. |
-| `nowline.export.msproj.start` | `""` | `--start` | MS Project export anchor date for relative roadmaps. |
+| `nowline.export.msproj.start` | `""` | `--start` | MS Project export start date. Empty uses the roadmap's `start:`, else today. |
 
 ## Bundled packages
 

@@ -130,9 +130,9 @@ Format-specific options
                          resolution chain.
   --headless             Skip platform font probe; force bundled DejaVu pair.
                          Byte-stable across machines.
-  --start <date>         MS Project: anchor date (YYYY-MM-DD) for relative
-                         roadmaps. Default: --now, then deterministic
-                         fallback.
+  --start <date>         MS Project: project start date (YYYY-MM-DD).
+                         Default: the roadmap's start:, else --now
+                         (today).
 
 Logging (mutually exclusive)
   -v, --verbose          Print extra diagnostics to stderr (config path,

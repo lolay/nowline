@@ -22,7 +22,7 @@ import { exportMsProjXml } from '@nowline/export-msproj';
 
 const xml = exportMsProjXml(inputs, {
     projectName: 'Q1 2026 Plan',
-    startDate: '2026-01-06',         // YYYY-MM-DD; anchors relative roadmaps
+    startDate: '2026-01-06',         // YYYY-MM-DD; default: the roadmap's start:, else today
 });
 
 // `xml` is a UTF-8 XML string. Save as roadmap.xml.

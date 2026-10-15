@@ -353,12 +353,13 @@ Monospace font for PNG/PDF; same resolution chain as
 Skip the platform font probe and force the bundled DejaVu pair.
 Output is byte-stable across machines.
 .It Fl -start Ar date
-MS Project: anchor date
-.Pq Pa YYYY-MM-DD
-for relative-only roadmaps.
-Default:
-.Fl -now ,
-then deterministic fallback.
+MS Project: project start date
+.Pq Pa YYYY-MM-DD .
+Default: the roadmap's
+.Cm start: ,
+else
+.Fl -now
+(today).
 .El
 .Sh SERVE OPTIONS
 .Bl -tag -width Fl
