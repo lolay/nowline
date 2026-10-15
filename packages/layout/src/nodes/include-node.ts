@@ -6,6 +6,7 @@
 // separated by GAP_BETWEEN_REGIONS px.
 
 import type { IsolatedRegion } from '@nowline/core';
+import { parseIsoDate, propValue } from '../dsl-utils.js';
 import { includeChromeGeometry } from '../include-chrome-geometry.js';
 import { createLayoutContext, type LayoutContext, type LayoutHelpers } from '../layout-context.js';
 import { resolveStyle } from '../style-resolution.js';
@@ -60,8 +61,14 @@ export function buildIncludeRegions(
         );
         // Region ids stay invisible to the host, but the wave edges are
         // shared: seed them into the region's otherwise empty edge maps.
+        // Without waves, the region's own dated anchors resolve inside it
+        // instead, as engine C's `scheduleRegion` resolves them, so a lane
+        // `after:kickoff` naming the region's anchor starts on its date
+        // (specs/scheduler-unification.md §5 F5). The anchors are not drawn.
         if (ctx.waves) {
             seedWaveEdges(ctx.waves, childCtx.entityLeftEdges, childCtx.entityRightEdges);
+        } else {
+            seedRegionAnchorEdges(region, childCtx);
         }
         const nestedSwimlanes: PositionedSwimlane[] = [];
         let cursorY = innerStartY;
@@ -105,6 +112,25 @@ export function buildIncludeRegions(
         y += regionHeight;
     }
     return { regions: out, endY: y };
+}
+
+/**
+ * Seed a region's dated anchors into its context's edge maps at their x on
+ * the host's scale, the way the host seeds its own (`phases/place.ts`).
+ * Engine C resolves exactly these inside a region without waves: its
+ * milestones resolve after the region's lanes, so an item never sees them,
+ * and a wave roadmap's region walk sees only the wave edges. An anchor
+ * outside the date window is skipped, as on the host.
+ */
+function seedRegionAnchorEdges(region: IsolatedRegion, childCtx: LayoutContext): void {
+    for (const [id, anchor] of region.content.anchors) {
+        const date = parseIsoDate(propValue(anchor.properties, 'date'));
+        if (!date) continue;
+        const x = childCtx.scale.forwardWithinDomain(date);
+        if (x === null) continue;
+        childCtx.entityLeftEdges.set(id, x);
+        childCtx.entityRightEdges.set(id, x);
+    }
 }
 
 /**
