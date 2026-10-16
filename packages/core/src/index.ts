@@ -41,8 +41,10 @@ export {
     type ResolvedConfig,
     type ResolvedContent,
     type ResolveIncludesOptions,
+    type ResolveRange,
     type ResolveResult,
     resolveIncludes,
+    routedResolveCode,
 } from './language/include-resolver.js';
 export type { NowlineAddedServices, NowlineServices } from './language/nowline-module.js';
 export { createNowlineServices, NowlineModule } from './language/nowline-module.js';

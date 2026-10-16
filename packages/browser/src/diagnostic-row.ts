@@ -8,6 +8,7 @@ import {
     type ParserErrorLike,
     type ResolveDiagnostic,
     resolveDiagnosticCode,
+    routedResolveCode,
 } from '@nowline/core';
 import type { LayoutInsight } from '@nowline/layout';
 
@@ -79,17 +80,20 @@ export function fromLexerError(err: LexerErrorLike, file: string): DiagnosticRow
  * is 0-based in the resolver (it comes from a CST range) and may be
  * undefined for whole-file diagnostics like circular include — fall
  * back to line 1 so a click-to-jump still puts the cursor near the top
- * of the offending file.
+ * of the offending file. A routed diagnostic with a `range` takes its
+ * column from it, the validator's column for the same finding; without
+ * one the column is 1.
  *
  * A wave-rule diagnostic (specs/waves.md §6.1) keeps its stable code
  * (`NL.Exxxx`), and its message is rendered in `locale` when the caller
  * knows one; WV8, the uncoded wave rule, is labelled like the validator's
  * copy. An included file's syntax error is labelled like the root's
- * (`lex-error` / `parse-error`) at its column. Every other resolver
- * diagnostic is an `include` row, verbatim.
+ * (`lex-error` / `parse-error`). Every other resolver diagnostic is an
+ * `include` row, verbatim.
  */
 export function fromResolveDiagnostic(diag: ResolveDiagnostic, locale?: string): DiagnosticRow {
-    const line = diag.line !== undefined ? diag.line + 1 : 1;
+    const line = (diag.range?.start.line ?? diag.line ?? 0) + 1;
+    const column = (diag.range?.start.character ?? 0) + 1;
     if (!isRoutedResolveDiagnostic(diag)) {
         return {
             severity: diag.severity,
@@ -104,20 +108,13 @@ export function fromResolveDiagnostic(diag: ResolveDiagnostic, locale?: string):
     const suggestion = extractSuggestion(message);
     return {
         severity: diag.severity,
-        code: diag.code ?? syntaxCode(diag) ?? inferCodeFromMessage(diag.message),
+        code: routedResolveCode(diag),
         message,
         ...(suggestion === undefined ? {} : { suggestion }),
         file: diag.sourcePath,
         line,
-        column: diag.column !== undefined ? diag.column + 1 : 1,
+        column,
     };
-}
-
-// An included file's syntax error is labelled like the root's.
-function syntaxCode(diag: ResolveDiagnostic): string | undefined {
-    if (diag.rule === 'lex-error') return 'lex-error';
-    if (diag.rule === 'parse-error') return 'parse-error';
-    return undefined;
 }
 
 /**

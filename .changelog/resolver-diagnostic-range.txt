@@ -1,0 +1,3 @@
+```release-note:fixed
+Diagnostics reported inside an included file (`NL.E0302` and the wave rules) now point at the same column and underline the same span as validating that file directly, for example `child.nowline:8:41` under `after:launch` instead of `8:3` and the whole line. The CLI text and JSON output, `--serve`, the VS Code preview's diagnostics table and the MCP server all use the narrowed location.
+```

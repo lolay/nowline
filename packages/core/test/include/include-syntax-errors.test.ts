@@ -46,7 +46,12 @@ function syntax(
 ): Array<[string, string, number | undefined, number | undefined]> {
     return result.diagnostics
         .filter((d) => d.rule === 'lex-error' || d.rule === 'parse-error')
-        .map((d) => [d.rule as string, path.basename(d.sourcePath), d.line, d.column]);
+        .map((d) => [
+            d.rule as string,
+            path.basename(d.sourcePath),
+            d.line,
+            d.range?.start.character,
+        ]);
 }
 
 const host = (include: string) =>
@@ -108,6 +113,12 @@ describe('include: syntax errors in an included file', () => {
             'child.nowline': parseChild,
         });
         expect(syntax(result)).toEqual([['parse-error', 'child.nowline', 6, 0]]);
+        // The span is the offending token's, as the root's parser error gets.
+        const diag = result.diagnostics.find((d) => d.rule === 'parse-error')!;
+        expect(diag.range).toEqual({
+            start: { line: 6, character: 0 },
+            end: { line: 6, character: 'roadmap'.length },
+        });
     });
 
     it("reports a grandchild's error in the grandchild", async () => {

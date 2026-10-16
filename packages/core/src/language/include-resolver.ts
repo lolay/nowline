@@ -1,4 +1,5 @@
 import { URI } from 'langium';
+import { inferCodeFromMessage } from '../diagnostics/index.js';
 import type {
     AnchorDeclaration,
     CalendarBlock,
@@ -134,16 +135,30 @@ export interface IsolatedRegion {
     content: ResolvedContent;
 }
 
+/** A 0-based, end-exclusive source range, the shape of an LSP `Range`. */
+export interface ResolveRange {
+    start: { line: number; character: number };
+    end: { line: number; character: number };
+}
+
 export interface ResolveDiagnostic {
     severity: 'error' | 'warning';
     /** en-US text; `localizeResolveDiagnostic` renders a coded one in another locale. */
     message: string;
     /** Absolute path of the file the diagnostic points into. */
     sourcePath: string;
-    /** 0-based line in `sourcePath`. */
+    /** 0-based line in `sourcePath`; `range.start.line` when `range` is set. */
     line?: number;
-    /** 0-based column in `sourcePath`; set on a syntax diagnostic only. */
-    column?: number;
+    /**
+     * 0-based range in `sourcePath` of the node the diagnostic is about,
+     * narrowed to the property where the validator narrows its copy, so a
+     * consumer can point at the same column and span. Set on the routed
+     * diagnostics (see `isRoutedResolveDiagnostic`) whose node has a CST
+     * node, and on an included file's syntax error, at the span the root's
+     * own lexer or parser error gets; consumers fall back to the whole of
+     * `line` without it.
+     */
+    range?: ResolveRange;
     /**
      * Stable code of a coded diagnostic (the wave rules, specs/waves.md
      * §7.4, and an included file's unresolved reference, NL.E0302). Absent
@@ -171,6 +186,17 @@ export interface ResolveDiagnostic {
  */
 export function isRoutedResolveDiagnostic(d: ResolveDiagnostic): boolean {
     return d.code !== undefined || d.rule !== undefined;
+}
+
+/**
+ * The code a surface shows for a routed resolver diagnostic: its stable code,
+ * else `lex-error` / `parse-error` for an included file's syntax error (the
+ * root's label), else the validator's message heuristic (WV8).
+ */
+export function routedResolveCode(d: ResolveDiagnostic): string {
+    if (d.code !== undefined) return d.code;
+    if (d.rule === 'lex-error' || d.rule === 'parse-error') return d.rule;
+    return inferCodeFromMessage(d.message);
 }
 
 export interface ResolveResult {
@@ -432,30 +458,43 @@ function syntaxDiagnostics(file: NowlineFile, absPath: string): ResolveDiagnosti
     const result = file.$document?.parseResult;
     if (!result) return [];
     const out: ResolveDiagnostic[] = [];
-    // Chevrotain positions are 1-based; a resolver diagnostic's are 0-based.
-    // An error at end of input has no position (NaN or -1), so it has none.
-    const at = (line: number | undefined, column: number | undefined) =>
-        line === undefined || !(line >= 1)
-            ? {}
-            : {
-                  line: line - 1,
-                  ...(column !== undefined && column >= 1 ? { column: column - 1 } : {}),
-              };
+    // Chevrotain positions are 1-based, an end column inclusive; a resolver
+    // range is 0-based and end-exclusive. An error at end of input has no
+    // position (NaN or -1), so it has none.
+    const at = (
+        line: number | undefined,
+        column: number | undefined,
+        endLine: number | undefined,
+        endColumn: number | undefined,
+    ): Pick<ResolveDiagnostic, 'line' | 'range'> => {
+        if (line === undefined || !(line >= 1)) return {};
+        if (column === undefined || !(column >= 1)) return { line: line - 1 };
+        const end =
+            endLine !== undefined && endLine >= 1 && endColumn !== undefined && endColumn >= 1
+                ? { line: endLine - 1, character: endColumn }
+                : { line: line - 1, character: column };
+        return {
+            line: line - 1,
+            range: { start: { line: line - 1, character: column - 1 }, end },
+        };
+    };
     for (const err of result.lexerErrors) {
+        const length = Math.max(err.length ?? 1, 1);
         out.push({
             severity: 'error',
             message: err.message,
             sourcePath: absPath,
-            ...at(err.line, err.column),
+            ...at(err.line, err.column, err.line, (err.column ?? 0) + length - 1),
             rule: 'lex-error',
         });
     }
     for (const err of result.parserErrors) {
+        const { startLine, startColumn, endLine, endColumn } = err.token;
         out.push({
             severity: 'error',
             message: err.message,
             sourcePath: absPath,
-            ...at(err.token.startLine, err.token.startColumn),
+            ...at(startLine, startColumn, endLine, endColumn),
             rule: 'parse-error',
         });
     }

@@ -9,6 +9,7 @@ import {
     type NowlineFile,
     type ResolveDiagnostic,
     resolveDiagnosticCode,
+    routedResolveCode,
 } from '@nowline/core';
 import {
     type HostEnv,
@@ -101,18 +102,21 @@ export function collectMcpDiagnostics(
 }
 
 /**
- * A routed (wave-rule) include-resolver diagnostic (specs/waves.md §6.1) as
- * an MCP diagnostic: its stable code, the file it points into and a 1-based
- * line. WV8, the one uncoded wave rule, is labelled like the validator's copy.
+ * A routed include-resolver diagnostic (a wave rule, specs/waves.md §6.1, or
+ * an included file's NL.E0302 or syntax error) as an MCP diagnostic: its stable code, the
+ * file it points into and a 1-based line and column, the validator's for the
+ * same finding when the diagnostic carries a range (column 1 otherwise).
+ * WV8, the one uncoded wave rule, is labelled like the validator's copy, and
+ * a syntax error like the root's (`lex-error` / `parse-error`).
  */
 export function resolveDiagnosticToMcp(diag: ResolveDiagnostic): McpDiagnostic {
     const suggestion = extractSuggestion(diag.message);
     return {
         file: diag.sourcePath,
-        line: (diag.line ?? 0) + 1,
-        column: 1,
+        line: (diag.range?.start.line ?? diag.line ?? 0) + 1,
+        column: (diag.range?.start.character ?? 0) + 1,
         severity: diag.severity,
-        code: diag.code ?? inferCodeFromMessage(diag.message),
+        code: routedResolveCode(diag),
         message: diag.message,
         ...(suggestion === undefined ? {} : { suggestion }),
     };
