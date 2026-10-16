@@ -117,13 +117,14 @@ ${renderValue(body)}
 // The compare widget is built by the page script from these attributes, so
 // the build pages and the client-side range compare share one implementation.
 // Without the script, the current render still shows.
-function compareBlock({ thisSrc, thisMeta, prevSrc, prevMeta, sources = null }) {
+function compareBlock({ thisSrc, thisMeta, prevSrc, prevMeta, sources = null, note = '' }) {
     return html`<section class="compare" data-this-src="${thisSrc}" data-this-meta="${JSON.stringify(thisMeta)}"${
         prevSrc
             ? html` data-prev-src="${prevSrc}" data-prev-meta="${JSON.stringify(prevMeta)}"`
             : ''
     }>
   <a href="${thisSrc}"><img class="fallback" src="${thisSrc}" alt=""></a>
+  ${note}
   ${sources ? sourceBlock(sources) : ''}
 </section>`;
 }
@@ -146,13 +147,6 @@ export function renderEntryPage({ build, prev, item, result, nav, history, sourc
     const toRoot = '../../../';
     const toBuilds = '../../';
     const showCompare = prev && (result.status === 'changed' || result.status === 'volatile');
-    const compare = compareBlock({
-        thisSrc: `${entry.slug}.svg`,
-        thisMeta: commitMeta(build),
-        prevSrc: showCompare ? `${toBuilds}${prev.id}/${key}.svg` : '',
-        prevMeta: showCompare ? commitMeta(prev) : null,
-        sources,
-    });
     let note = '';
     if (result.status === 'unchanged') {
         note = html`<p class="note">Identical to ${shortSha(prev.sha)}.</p>`;
@@ -163,6 +157,14 @@ export function renderEntryPage({ build, prev, item, result, nav, history, sourc
     } else if (entry.volatile) {
         note = html`<p class="note">Renders against today's date, so it changes every build.</p>`;
     }
+    const compare = compareBlock({
+        thisSrc: `${entry.slug}.svg`,
+        thisMeta: commitMeta(build),
+        prevSrc: showCompare ? `${toBuilds}${prev.id}/${key}.svg` : '',
+        prevMeta: showCompare ? commitMeta(prev) : null,
+        sources,
+        note,
+    });
     const navLink = (target, label, cls) =>
         target
             ? html`<a class="${cls}" href="${entryHref(toBuilds, target, key)}">${label}</a>`
@@ -182,7 +184,6 @@ export function renderEntryPage({ build, prev, item, result, nav, history, sourc
 </header>
 <main>
   ${compare}
-  ${note}
 </main>
 <footer class="navbar" data-prev-all="${itemHref(nav.prev)}" data-next-all="${itemHref(nav.next)}" data-prev-changed="${itemHref(nav.prevChanged)}" data-next-changed="${itemHref(nav.nextChanged)}" data-index="${nav.index}" data-total="${nav.total}" data-changed-index="${nav.changedIndex}" data-changed-total="${nav.changedTotal}">
   <div class="nav-row history-row" data-history-url="${toRoot}history/${key}.json" data-entry-key="${key}">

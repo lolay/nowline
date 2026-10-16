@@ -66,8 +66,11 @@
     };
     const urlParams = new URLSearchParams(location.search);
     const readPref = (name) => {
-        const value = urlParams.get(name) ?? store.get(name);
-        return choices[name].includes(value) ? value : null;
+        // An invalid URL value doesn't shadow a valid stored one.
+        for (const value of [urlParams.get(name), store.get(name)]) {
+            if (choices[name].includes(value)) return value;
+        }
+        return null;
     };
     const prefs = {
         mode: readPref('mode') ?? 'side',
@@ -181,8 +184,9 @@
         const prevSrc = section.dataset.prevSrc || '';
         const thisMeta = JSON.parse(section.dataset.thisMeta || 'null');
         const prevMeta = JSON.parse(section.dataset.prevMeta || 'null');
-        // The server renders the source beside the fallback image; keep it.
+        // The server renders the status note and source beside the fallback image; keep them.
         const sourceRow = section.querySelector(':scope > .source-row');
+        const note = section.querySelector(':scope > .note');
         section.textContent = '';
 
         const pane = (cls, label, src, meta) =>
@@ -256,6 +260,7 @@
             prefs.src === null ? !body.classList.contains('changes-page') : prefs.src === '1';
         section.append(toolbar, panes);
         if (stage) section.append(stage.node);
+        if (note) section.append(note);
         if (sourceRow) section.append(sourceRow);
 
         // In actual size the two panes scroll together, so the same timeline
@@ -477,11 +482,12 @@
         const bar = document.querySelector('.navbar[data-prev-all]');
         if (!bar) return;
         const changedTotal = Number(bar.dataset.changedTotal);
-        // Until chosen, Changed only is on when the build has any changes.
-        if (prefs.changed === null) prefs.changed = body.dataset.hasChanges === '1' ? '1' : '0';
+        // Until the viewer chooses, Changed only is on when this build has
+        // changes. The default stays local so links don't carry it onward.
+        const defaultChanged = body.dataset.hasChanges === '1' ? '1' : '0';
         const box = bar.querySelector('.changed-only input');
         box.disabled = changedTotal === 0;
-        const changedOnly = () => changedTotal > 0 && prefs.changed === '1';
+        const changedOnly = () => changedTotal > 0 && (prefs.changed ?? defaultChanged) === '1';
 
         function apply() {
             const on = changedOnly();

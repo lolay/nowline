@@ -333,6 +333,29 @@ describe('review gallery', () => {
         await context.close();
     });
 
+    it('defaults Changed only per build and does not carry the default onward', async () => {
+        const { context, page } = await newPage();
+        // A is the baseline (no changes), so it defaults off; B has changes.
+        await page.goto(entryUrl(IDS.A, 'examples/drift'));
+        await expect(page.locator('.changed-only input').isChecked()).resolves.toBe(false);
+        await expect(page.locator('a.newer-build').getAttribute('href')).resolves.not.toContain(
+            'changed=',
+        );
+        await page.click('a.newer-build');
+        await page.waitForURL(`**/b/${IDS.B}/examples/drift.html**`);
+        await expect(page.locator('.changed-only input').isChecked()).resolves.toBe(true);
+        await expect(page.locator('.counter').innerText()).resolves.toMatch(/ changed$/);
+        await context.close();
+
+        // A bogus URL value doesn't shadow a stored one.
+        const stored = await newPage();
+        await stored.page.goto(entryUrl(IDS.C, 'examples/drift'));
+        await pick(stored.page, 'mode', 'blink');
+        await stored.page.goto(entryUrl(IDS.C, 'examples/drift', '?mode=bogus'));
+        expect((await viewState(stored.page)).mode).toBe('blink');
+        await stored.context.close();
+    });
+
     it('shows the source pair on desktop, the unified list on phones, and remembers the toggle', async () => {
         const { context, page } = await newPage({ width: 1440, height: 900 });
         await page.goto(entryUrl(IDS.C, 'examples/edit'));
