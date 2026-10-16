@@ -147,10 +147,23 @@ test('publish builds history, classifies changes and prunes to keep', async () =
     const page = await readFile(join(site, 'b/333333333333/examples/parent.html'), 'utf8');
     assert.match(page, /source edit/);
     assert.match(page, /data-prev-src="..\/..\/222222222222\/examples\/parent.svg"/);
+    assert.match(
+        page,
+        /<div class="source-col source-col-right"[^>]*>(?:(?!<\/div>).)*<span class="cell add">swimlane s &quot;S2&quot;<\/span>/s,
+    );
     assert.match(page, /<span class="line op-add">\+ swimlane s &quot;S2&quot;<\/span>/);
+    assert.doesNotMatch(page, /source-panel/, 'the old bottom Source section is gone');
+    assert.match(page, /<details class="source-file changed" open>/);
+    assert.match(page, /<div class="source-row">/);
     assert.match(page, /Commit &lt;3&gt;/);
     assert.doesNotMatch(page, /<roadmap>/, 'source text is escaped');
     assert.match(page, /class="older-build" href="..\/..\/222222222222\/examples\/parent.html"/);
+
+    const digest = await readFile(join(site, 'b/333333333333/changes.html'), 'utf8');
+    assert.match(
+        digest,
+        /<section class="compare"[^>]*>(?:(?!<\/section>).)*<div class="source-row">/s,
+    );
 
     const history = JSON.parse(await readFile(join(site, 'history/examples/parent.json'), 'utf8'));
     assert.deepEqual(

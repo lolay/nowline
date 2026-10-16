@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
-import { diffHunks, lineDiff } from '../lib/diff.mjs';
+import { diffHunks, lineDiff, sideBySideRows } from '../lib/diff.mjs';
 import { extractLeadingComment, findIncludes, roadmapTitle } from '../lib/source.mjs';
 
 test('leading comment skips the version header and joins the block', () => {
@@ -43,5 +43,43 @@ test('identical text diffs to no hunks; context bounds each hunk', () => {
     assert.deepEqual(
         hunks[0].lines.map((l) => l.text),
         ['line 0', 'line 1', 'line 2', 'LINE 2', 'line 3', 'line 4'],
+    );
+});
+
+const rows = (before, after) => sideBySideRows(lineDiff(before, after));
+
+test('side-by-side rows pair a modified line across the columns', () => {
+    assert.deepEqual(rows('a\nb\nc\n', 'a\nB\nc\n'), [
+        { left: 'a', right: 'a', kind: 'same' },
+        { left: 'b', right: 'B', kind: 'change' },
+        { left: 'c', right: 'c', kind: 'same' },
+    ]);
+});
+
+test('side-by-side rows leave a blank cell for a pure add or delete', () => {
+    assert.deepEqual(rows('a\nc\n', 'a\nb\nc\n'), [
+        { left: 'a', right: 'a', kind: 'same' },
+        { left: null, right: 'b', kind: 'add' },
+        { left: 'c', right: 'c', kind: 'same' },
+    ]);
+    assert.deepEqual(rows('a\nb\nc\n', 'a\nc\n'), [
+        { left: 'a', right: 'a', kind: 'same' },
+        { left: 'b', right: null, kind: 'del' },
+        { left: 'c', right: 'c', kind: 'same' },
+    ]);
+});
+
+test('side-by-side rows zip an uneven run and keep the rest aligned', () => {
+    assert.deepEqual(rows('a\nb\nc\n', 'a\nX\n'), [
+        { left: 'a', right: 'a', kind: 'same' },
+        { left: 'b', right: 'X', kind: 'change' },
+        { left: 'c', right: null, kind: 'del' },
+    ]);
+});
+
+test('side-by-side rows of identical text are all same', () => {
+    assert.deepEqual(
+        rows('x\ny\n', 'x\ny\n').map((r) => r.kind),
+        ['same', 'same'],
     );
 });

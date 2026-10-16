@@ -220,6 +220,16 @@ select {
     color: var(--bg);
 }
 
+.source-toggle {
+    font-size: 0.82rem;
+    padding: 0.3rem 0.6rem;
+}
+
+.source-toggle.on {
+    background: var(--accent);
+    color: var(--bg);
+}
+
 .panes {
     display: grid;
     grid-template-columns: minmax(0, 1fr);
@@ -341,7 +351,16 @@ html[data-size='actual'] .stage-scroll {
 
 /* --- Source --------------------------------------------------------------- */
 
-.source-panel summary {
+.source-row {
+    margin-top: 0.75rem;
+}
+
+.compare[data-source='closed'] > .source-row,
+body.collapsed .source-row {
+    display: none;
+}
+
+.source-file > summary {
     cursor: pointer;
     font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
     font-size: 0.85rem;
@@ -366,6 +385,68 @@ pre {
 .diff .line {
     display: block;
     white-space: pre;
+}
+
+.source-pair {
+    display: none;
+    grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+    gap: 0.5rem;
+    margin: 0.25rem 0 0.75rem;
+}
+
+.source-col {
+    min-width: 0;
+    overflow-x: auto;
+    background: var(--panel);
+    border: 1px solid var(--line);
+    border-radius: 8px;
+    padding: 0.4rem 0;
+    font:
+        0.8rem/1.45 ui-monospace,
+        SFMono-Regular,
+        Menlo,
+        monospace;
+    tab-size: 2;
+}
+
+.source-col .cell {
+    display: block;
+    width: max-content;
+    min-width: 100%;
+    min-height: 1.45em;
+    padding: 0 0.6rem;
+    white-space: pre;
+}
+
+.source-col .cell.del {
+    background: var(--del-bg);
+}
+
+.source-col .cell.add {
+    background: var(--add-bg);
+}
+
+.source-unified {
+    display: block;
+}
+
+/* Same rules as .panes: pair from 768px with layout auto, or whenever the
+   layout is Side; the unified list otherwise. */
+@media (min-width: 768px) {
+    html[data-layout='auto'] .source-pair {
+        display: grid;
+    }
+    html[data-layout='auto'] .source-unified {
+        display: none;
+    }
+}
+
+html[data-layout='side'] .source-pair {
+    display: grid;
+}
+
+html[data-layout='side'] .source-unified {
+    display: none;
 }
 
 .diff .op-add {
@@ -515,6 +596,10 @@ pre {
     html[data-size='actual'] .scroll,
     html[data-size='actual'] .stage-scroll {
         max-height: 62vh;
+    }
+    .source-row {
+        max-height: 50vh;
+        overflow: auto;
     }
 }
 

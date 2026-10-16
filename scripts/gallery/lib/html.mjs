@@ -2,7 +2,7 @@
 // which escapes anything that isn't explicitly wrapped in `raw`, so source
 // text, commit subjects and author names can never break out of the markup.
 
-import { diffHunks, lineDiff } from './diff.mjs';
+import { lineDiff, sideBySideRows } from './diff.mjs';
 import { CHANGED_STATUSES, entryKey } from './model.mjs';
 
 class Raw {
@@ -117,13 +117,14 @@ ${renderValue(body)}
 // The compare widget is built by the page script from these attributes, so
 // the build pages and the client-side range compare share one implementation.
 // Without the script, the current render still shows.
-function compareBlock({ thisSrc, thisMeta, prevSrc, prevMeta }) {
+function compareBlock({ thisSrc, thisMeta, prevSrc, prevMeta, sources = null }) {
     return html`<section class="compare" data-this-src="${thisSrc}" data-this-meta="${JSON.stringify(thisMeta)}"${
         prevSrc
             ? html` data-prev-src="${prevSrc}" data-prev-meta="${JSON.stringify(prevMeta)}"`
             : ''
     }>
   <a href="${thisSrc}"><img class="fallback" src="${thisSrc}" alt=""></a>
+  ${sources ? sourceBlock(sources) : ''}
 </section>`;
 }
 
@@ -150,6 +151,7 @@ export function renderEntryPage({ build, prev, item, result, nav, history, sourc
         thisMeta: commitMeta(build),
         prevSrc: showCompare ? `${toBuilds}${prev.id}/${key}.svg` : '',
         prevMeta: showCompare ? commitMeta(prev) : null,
+        sources,
     });
     let note = '';
     if (result.status === 'unchanged') {
@@ -181,7 +183,6 @@ export function renderEntryPage({ build, prev, item, result, nav, history, sourc
 <main>
   ${compare}
   ${note}
-  ${sourcePanel(sources, result)}
 </main>
 <footer class="navbar" data-prev-all="${itemHref(nav.prev)}" data-next-all="${itemHref(nav.next)}" data-prev-changed="${itemHref(nav.prevChanged)}" data-next-changed="${itemHref(nav.nextChanged)}" data-index="${nav.index}" data-total="${nav.total}" data-changed-index="${nav.changedIndex}" data-changed-total="${nav.changedTotal}">
   <div class="nav-row history-row" data-history-url="${toRoot}history/${key}.json" data-entry-key="${key}">
@@ -202,36 +203,52 @@ export function renderEntryPage({ build, prev, item, result, nav, history, sourc
     });
 }
 
-function sourcePanel(sources, result) {
-    const isEdit = result.status === 'changed' && result.kind === 'edit';
-    const diffs = isEdit
-        ? sources
-              .filter((s) => s.prevText !== s.text)
-              .map((s) => {
-                  const hunks = diffHunks(lineDiff(s.prevText ?? '', s.text ?? ''));
-                  return html`<div class="file-diff"><div class="file-name">${s.path}${s.prevText === null ? ' (new file)' : ''}${s.text === null ? ' (removed)' : ''}</div>
-${hunks.map(
-    (h) =>
-        html`<pre class="diff">${h.lines.map(
-            (l) =>
-                html`<span class="line op-${l.op === '+' ? 'add' : l.op === '-' ? 'del' : 'ctx'}">${l.op} ${l.text}</span>`,
-        )}</pre>`,
-)}</div>`;
-              })
-        : [];
+// The `.nowline` source behind a compare block, collapsible from the
+// block's Source button. A file that changed since the previous build gets
+// an aligned prev | this pair (wide layouts) and a unified +/- list (stacked
+// layouts); any other file is a single column. The main file is open and
+// includes are collapsed unless they changed.
+function sourceBlock(sources) {
+    const hasPrev = sources.some((s) => s.prevText !== null);
     const files = sources
-        .filter((s) => s.text !== null)
-        .map(
-            (s, i) => html`<details class="source-file"${i === 0 ? ' open' : ''}>
-  <summary>${s.path}</summary>
-  <pre class="source"><code>${s.text}</code></pre>
-</details>`,
-        );
-    return html`<section class="source-panel">
-  <h2>Source</h2>
-  ${diffs.length > 0 ? html`<details class="source-diff" open><summary>Changed since the previous build</summary>${diffs}</details>` : ''}
-  ${files}
-</section>`;
+        .filter((s) => s.text !== null || s.prevText !== null)
+        .map((s, i) => {
+            const changed = hasPrev && s.prevText !== s.text;
+            const note = !changed
+                ? ''
+                : s.prevText === null
+                  ? ' (new file)'
+                  : s.text === null
+                    ? ' (removed)'
+                    : '';
+            const diff = changed ? lineDiff(s.prevText ?? '', s.text ?? '') : [];
+            const body = changed
+                ? html`${sourcePair(diff)}${sourceUnified(diff)}`
+                : html`<pre class="source source-single"><code>${s.text}</code></pre>`;
+            return html`<details class="source-file${changed ? ' changed' : ''}"${i === 0 || changed ? ' open' : ''}>
+  <summary>${s.path}${note}</summary>
+  ${body}
+</details>`;
+        });
+    return html`<div class="source-row">${files}</div>`;
+}
+
+function sourcePair(diff) {
+    const rows = sideBySideRows(diff);
+    const cell = (text, kind) =>
+        html`<span class="cell ${text === null ? 'blank' : kind}">${text ?? ''}</span>`;
+    const side = (name, pick, changedKind) =>
+        html`<div class="source-col source-col-${name}" aria-label="${name === 'left' ? 'Previous source' : 'This build source'}">${rows.map(
+            (r) => cell(pick(r), r.kind === 'same' ? 'same' : changedKind),
+        )}</div>`;
+    return html`<div class="source-pair">${side('left', (r) => r.left, 'del')}${side('right', (r) => r.right, 'add')}</div>`;
+}
+
+function sourceUnified(diff) {
+    return html`<pre class="source-unified diff">${diff.map(
+        (l) =>
+            html`<span class="line op-${l.op === '+' ? 'add' : l.op === '-' ? 'del' : 'ctx'}">${l.op} ${l.text}</span>`,
+    )}</pre>`;
 }
 
 // --- Build index and changes digest ---------------------------------------
@@ -313,7 +330,7 @@ function removedList(comparison, prev) {
 
 const CHANGE_ORDER = { drift: 0, edit: 1, new: 2 };
 
-export function renderChangesPage({ build, prev, flat, comparison }) {
+export function renderChangesPage({ build, prev, flat, comparison, sources = new Map() }) {
     const changed = flat
         .map((f) => ({ ...f, result: comparison.statuses.get(f.key) }))
         .filter((f) => CHANGED_STATUSES.has(f.result.status))
@@ -330,6 +347,7 @@ export function renderChangesPage({ build, prev, flat, comparison }) {
       thisMeta: commitMeta(build),
       prevSrc: f.result.status === 'changed' ? `../${prev.id}/${f.key}.svg` : '',
       prevMeta: f.result.status === 'changed' ? commitMeta(prev) : null,
+      sources: sources.get(f.key) ?? null,
   })}
 </article>`,
     );

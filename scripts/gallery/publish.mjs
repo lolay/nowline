@@ -130,6 +130,7 @@ export async function renderSite({ dataDir, siteDir, ids }) {
         const prevByKey = new Map(prev ? flattenEntries(prev).map((f) => [f.key, f.entry]) : []);
         const nav = itemNavigation(flat, comparison.statuses);
         const buildDir = resolve(siteDir, 'b', build.id);
+        const sourcesByKey = new Map();
 
         for (const item of flat) {
             await cp(
@@ -137,6 +138,8 @@ export async function renderSite({ dataDir, siteDir, ids }) {
                 resolve(buildDir, `${item.key}.svg`),
             );
             const prevEntry = prevByKey.get(item.key);
+            const sources = await entrySources(dataDir, build, prev, item.entry, prevEntry);
+            sourcesByKey.set(item.key, sources);
             await write(
                 resolve(buildDir, `${item.key}.html`),
                 renderEntryPage({
@@ -146,7 +149,7 @@ export async function renderSite({ dataDir, siteDir, ids }) {
                     result: comparison.statuses.get(item.key),
                     nav: nav.get(item.key),
                     history: historyNavigation(histories.get(item.key), build.id),
-                    sources: await entrySources(dataDir, build, prev, item.entry, prevEntry),
+                    sources,
                     hasChanges: comparison.hasChanges,
                 }),
             );
@@ -164,7 +167,7 @@ export async function renderSite({ dataDir, siteDir, ids }) {
         );
         await write(
             resolve(buildDir, 'changes.html'),
-            renderChangesPage({ build, prev, flat, comparison }),
+            renderChangesPage({ build, prev, flat, comparison, sources: sourcesByKey }),
         );
         await write(resolve(buildDir, 'manifest.json'), `${JSON.stringify(build, null, 2)}\n`);
         builds.push({ manifest: build, comparison });

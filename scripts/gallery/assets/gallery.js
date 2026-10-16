@@ -106,6 +106,8 @@
         const prevSrc = section.dataset.prevSrc || '';
         const thisMeta = JSON.parse(section.dataset.thisMeta || 'null');
         const prevMeta = JSON.parse(section.dataset.prevMeta || 'null');
+        // The server renders the source beside the fallback image; keep it.
+        const sourceRow = section.querySelector(':scope > .source-row');
         section.textContent = '';
 
         const pane = (cls, label, src, meta) =>
@@ -140,6 +142,7 @@
 
         let modeSeg = null;
         let layoutSeg = null;
+        let sourceButton = null;
         if (prevSrc) {
             stage = buildStage(prevSrc, thisSrc, prevMeta, thisMeta);
             modeSeg = segmented(
@@ -173,8 +176,21 @@
             toolbar.append(modeSeg.group, layoutSeg.group);
         }
         toolbar.append(sizeSeg.group);
+        if (sourceRow) {
+            sourceButton = el('button', {
+                type: 'button',
+                className: 'source-toggle',
+                text: 'Source',
+            });
+            sourceButton.addEventListener('click', () => {
+                setSource(section, section.dataset.source === 'open' ? 'closed' : 'open');
+            });
+            toolbar.append(sourceButton);
+            section.dataset.source = body.classList.contains('changes-page') ? 'closed' : 'open';
+        }
         section.append(toolbar, panes);
         if (stage) section.append(stage.node);
+        if (sourceRow) section.append(sourceRow);
 
         // In actual size the two panes scroll together, so the same timeline
         // region stays lined up.
@@ -201,6 +217,7 @@
                 sizeSeg.mark(size);
                 layoutSeg?.mark(layout);
                 modeSeg?.mark(mode);
+                sourceButton?.classList.toggle('on', section.dataset.source === 'open');
                 section.dataset.mode = mode;
                 panes.hidden = mode !== 'side';
                 if (stage && stage.mode !== mode) stage.show(mode);
@@ -209,6 +226,11 @@
         };
         widgets.push(widget);
         widget.refresh();
+    }
+
+    function setSource(section, state) {
+        section.dataset.source = state;
+        section.querySelector('.source-toggle')?.classList.toggle('on', state === 'open');
     }
 
     function buildStage(prevSrc, thisSrc, prevMeta, thisMeta) {
@@ -628,6 +650,11 @@
         button.addEventListener('click', () => {
             const collapsed = body.classList.toggle('collapsed');
             button.textContent = collapsed ? 'Expand all' : 'Collapse all';
+            if (collapsed) {
+                for (const section of document.querySelectorAll('section.compare[data-source]')) {
+                    setSource(section, 'closed');
+                }
+            }
         });
     }
 

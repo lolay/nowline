@@ -61,6 +61,38 @@ export function diffHunks(diff, context = 3) {
     return hunks;
 }
 
+// Aligns a line diff into two columns. Each run of `-` lines is zipped with
+// the `+` lines right after it, so a modified line sits across from its
+// replacement; leftovers get an empty cell on the other side.
+// Rows are { left, right, kind } with kind same | change | del | add, and a
+// missing side is null.
+export function sideBySideRows(diff) {
+    const rows = [];
+    let i = 0;
+    while (i < diff.length) {
+        if (diff[i].op === ' ') {
+            rows.push({ left: diff[i].text, right: diff[i].text, kind: 'same' });
+            i++;
+            continue;
+        }
+        const dels = [];
+        const adds = [];
+        while (i < diff.length && diff[i].op === '-') dels.push(diff[i++].text);
+        while (i < diff.length && diff[i].op === '+') adds.push(diff[i++].text);
+        const paired = Math.min(dels.length, adds.length);
+        for (let k = 0; k < paired; k++) {
+            rows.push({ left: dels[k], right: adds[k], kind: 'change' });
+        }
+        for (let k = paired; k < dels.length; k++) {
+            rows.push({ left: dels[k], right: null, kind: 'del' });
+        }
+        for (let k = paired; k < adds.length; k++) {
+            rows.push({ left: null, right: adds[k], kind: 'add' });
+        }
+    }
+    return rows;
+}
+
 function splitLines(text) {
     if (text === '') return [];
     const lines = text.split(/\r?\n/);
