@@ -3,7 +3,7 @@
 ```text
 --- KICKOFF: begin orchestration at [deep] ---
 
-  Status: 1/3 groups done | last review: wave 1 (pending) | current: nowline m3 s1 [deep] | over expected: ~$20 of ~$11 (session before kickoff: m1 build and planning) | updated 2026-10-16
+  Status: 1/3 groups done | last review: wave 1 (1 should-fix, 3 nits) | current: nowline m3 s1 [deep] | over expected: ~$20 of ~$11 (session before kickoff: m1 build and planning) | updated 2026-10-16
 
   mode: unattended | proposed unattended (harness=claude-code runner=cloud; cloud runner, branch assigned by the harness) | guard 3x min $50 | fixups 2 | confirmed 2026-10-16 session 4adab00a-71c4-5a6e-9eb4-2d2721d1a6e6: Unattended (Recommended)
 
@@ -281,6 +281,11 @@ Once the PR is up, queue a suggested-task card for `lolay/nowline-infra`: a `CNA
 - Reused: `scripts/lib/check-dist-fresh.mjs`, `.github/actions/setup-node-pnpm`, the CLI `dist/index.js` render path (unchanged).
 
 ## Review log
+
+- wave 1 (b72b6de..0c1a82b), log-only: 0 blocking, 1 should-fix, 3 nits. Escaping, storage try/catch, link rewriting, CSS visibility rules, `gallery-e2e` target and s3 assertion coverage all clean.
+  - should-fix `scripts/gallery/assets/gallery.js:481`: `setupEntryNav` writes the per-build Changed-only default into `prefs.changed`, so links carry `changed=0` from a no-change build into a build with changes (spec: defaults on when the build has changes). Fix: keep the default local, only `setPref` on viewer choice; add an e2e check on the A to B hop. Queued as fixup with wave 3.
+  - nit `gallery.js:69`: an invalid URL param shadows a valid stored value; validate against `choices` before falling back.
+  - nit `scripts/gallery/lib/html.mjs:183`: unchanged/new status note renders below the open source; emit it above `.source-row`.
 
 ## Token log
 
