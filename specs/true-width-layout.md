@@ -119,6 +119,19 @@ As built (m2):
 
 Replace the channel-grid router for item dependencies (`dependency-edges.ts`, `edge-routing.ts`, `item-port-geometry.ts`) with §3.4, in the host and in each isolated region: day-centre ports, gap channels with offsets, dotted slack legs, the no-arrow cases. Anchor stubs and milestone slack lines follow §3.5.
 
+As built (m3):
+
+- Ports: `PositionedItem.dateSpan` records an item's dates in x at placement (nothing moves horizontally afterwards); `item-port-geometry.ts` builds each arrow end from it and the final box, and `edge-routing.ts` puts the source port at `end - min(day / 2, span / 2)` and the target port at `start + min(day / 2, span / 2)`. A group or parallel source reads its box, which spans its dates since m2, and leaves the bottom of its body.
+- Gaps: the router computes the free bands between source and target over the leg's x-range, around bars with their spills, container header bands, container body bottoms and lane and region edges (each kept 1 px clear). It takes the gap whose vertical legs keep more than 1 px from every bar and container edge, then the one whose legs cross the fewest bars and headers, then the one nearest the source. "Fewest crossings" is a deliberate reading of "the gap below the source": a leg hidden behind a row of bars reads as broken, and the first gap below the source is the answer whenever it crosses nothing. With no free gap at all the leg runs just past the source and passes behind whatever is there.
+- Lanes are 2.5 px apart, the first offset toward the source so the head keeps its leg; past a gap's room arrows share the least crowded lane. The default 8 px row gap holds three.
+- **O1, resolved: bundling.** Arrows landing in one day column share a lane in a gap, so they merge into one trunk over the target. With the crossing rule a fan-out from one source to targets starting the same day comes out as one trunk down the source's last day that branches just above each target (`tests/text-wraps-inside-bars`, API to the three SDKs), the shape O1 recommends.
+- **O6, resolved as recommended.** The renderer draws each head as a path (7 px across, 5 px along the leg) instead of a `<marker>`, narrowed to the target's painted width, and a 3 px dot below that (`headWidth`, `head` on `PositionedDependencyEdge`, which drops `kind`). The `-arrow` marker defs stay, now used only by milestone slack lines (and one unused one), so samples without arrows keep their bytes.
+- Every arrow paints behind the bars, in the host and in each region (the old under-bar layer), at 1.1 px. The horizontal leg is dotted (`3 3`) when the target waits.
+- No-arrow cases: a same-row target that starts where its source ends, and an item that starts on its anchor or `after:` milestone. That removed every arrow from 11 samples, all of them `after:kickoff` items that start on `kickoff` plus `partner`'s abutting chain; `tests/late-row-shifts` gains an "Anchor stub" lane so the corpus keeps a waiting anchor dependent.
+- Milestone slack and overrun lines start on the predecessor's end date; `MilestonePredecessor.x` is gone (its `endX` is the start). Slack corridors read the same x.
+- The channel grid (`ChannelGrid`, `collectRoutingObstacles`, the bracket nudge, the minimum stubs, the under-bar fallback) is deleted; nothing else used it.
+- `test/arrow-ports.test.ts` checks the §6 arrow invariant on every sample and the 60 generated roadmaps, from engine C's dates rather than `dateSpan`; it fails on main's router (`inline-date-pins`, `text-wraps-inside-bars` and the generated set). Focused cases come from the prototype's `five-days`, `after-container` and same-row samples.
+
 Markers needed no step of their own: lolay/nowline#167 already placed milestones and `before:` on duration ends, and m1 makes the painted edge equal the end date.
 
 ### m4 - Spec and docs
@@ -147,12 +160,12 @@ Each m-step also adds the focused cases it changes (the prototype's five stress 
 
 Each has a recommendation; none blocks m1.
 
-- **O1. Arrows landing on one day.** Recommend bundling: arrows into the same target day merge into one trunk that branches just above the targets.
+- **O1. Arrows landing on one day.** Recommend bundling: arrows into the same target day merge into one trunk that branches just above the targets. Resolved in m3 as recommended (§5 m3, as built).
 - **O2. Very long chains of short items.** Recommend no special case in m4.15; revisit with real files. Merging into runs was considered and set aside (§2).
 - **O3. Container titles wider than their span.** Recommend letting the title run past the bracket (as the prototype does) and clipping it with an ellipsis only where the next sibling's footprint begins, with the full title in the tooltip.
 - **O4. Nested shading.** Shading compounds by depth 3. Recommend alternating two tints by depth, and an outline instead of a fill below depth 2.
 - **O5. `bracket:` and `style:` on containers.** Recommend keeping both keys and their values: `bracket:` styles the header bracket, `bg` fills the body. No DSL change.
-- **O6. Arrowheads on thin bars.** A 7 px head is wider than a one-day bar at weekly scale. Recommend scaling the head to the target's width down to a 3 px dot.
+- **O6. Arrowheads on thin bars.** A 7 px head is wider than a one-day bar at weekly scale. Recommend scaling the head to the target's width down to a 3 px dot. Resolved in m3 as recommended (§5 m3, as built).
 
 ## 9. Related fixes found during design
 
