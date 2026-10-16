@@ -3,7 +3,7 @@
 ```text
 --- KICKOFF: begin orchestration at [deep] ---
 
-  Status: 2/3 groups done | last review: wave 1 (1 should-fix, 3 nits); wave 2 (1 security should-fix, 3 nits) | current: nowline m3 s2-s3 [exec] + wave 1 fixup | over expected: ~$23 of ~$11 (session before kickoff: m1 build and planning) | updated 2026-10-16
+  Status: 3/3 groups done | last review: wave 2 (1 security should-fix, 3 nits); wave 3 pending | current: fixup 2 (wave 2 review: manifest path validation) | over expected: ~$26 of ~$11 (session before kickoff: m1 build and planning) | updated 2026-10-16
 
   mode: unattended | proposed unattended (harness=claude-code runner=cloud; cloud runner, branch assigned by the harness) | guard 3x min $50 | fixups 2 | confirmed 2026-10-16 session 4adab00a-71c4-5a6e-9eb4-2d2721d1a6e6: Unattended (Recommended)
 
@@ -236,7 +236,7 @@ Acceptance (`node:test` in `scripts/gallery/test/`):
 
 --- WAVE 3 [exec] ---
 
-#### s2 - [exec] PR pages and headers
+#### s2 - [exec] [done 846dbd8] PR pages and headers
 
 - **Root index:** two sections, **Main** (the last builds, as now) and **Pull requests** (each PR line: `#<n>` linked to the PR URL, title, author, latest push's sha and local time, its counts vs main, link to its changes page).
 - `pr/<n>/index.html` redirects to the PR line's latest build; `pr/<n>/builds.html` lists the line's pushes with counts.
@@ -246,7 +246,7 @@ Acceptance (`node:test` in `scripts/gallery/test/`):
 
 Acceptance: `node:test` cases for the root page's PR section, `pr/<n>/` redirect and list, and the PR header links; `make pre-commit` green.
 
-#### s3 - [exec] Branch and PR browser tests
+#### s3 - [exec] [done c1fd456] Branch and PR browser tests
 
 Extend `packages/integration-tests/test/review-gallery.e2e.test.ts` (from m2.s3) with a fixture that has a `main` line and one PR line of two pushes. Assert: the root page lists the PR; `pr/<n>/` lands on its latest push; the PR build's statuses compare against main (an entry the PR changed shows as changed even if the previous push had the same SVG); the `vs previous push` link opens a range compare with the right counts; settings still carry across PR pages.
 
@@ -283,7 +283,7 @@ Once the PR is up, queue a suggested-task card for `lolay/nowline-infra`: a `CNA
 ## Review log
 
 - wave 1 (b72b6de..0c1a82b), log-only: 0 blocking, 1 should-fix, 3 nits. Escaping, storage try/catch, link rewriting, CSS visibility rules, `gallery-e2e` target and s3 assertion coverage all clean.
-  - should-fix `scripts/gallery/assets/gallery.js:481`: `setupEntryNav` writes the per-build Changed-only default into `prefs.changed`, so links carry `changed=0` from a no-change build into a build with changes (spec: defaults on when the build has changes). Fix: keep the default local, only `setPref` on viewer choice; add an e2e check on the A to B hop. Queued as fixup with wave 3.
+  - should-fix `scripts/gallery/assets/gallery.js:481`: `setupEntryNav` writes the per-build Changed-only default into `prefs.changed`, so links carry `changed=0` from a no-change build into a build with changes (spec: defaults on when the build has changes). Fix: keep the default local, only `setPref` on viewer choice; add an e2e check on the A to B hop. Fixed in ae13dc0 with the two nits.
   - nit `gallery.js:69`: an invalid URL param shadows a valid stored value; validate against `choices` before falling back.
   - nit `scripts/gallery/lib/html.mjs:183`: unchanged/new status note renders below the open source; emit it above `.source-row`.
 - wave 2 (7f423c9), log-only: 0 blocking, 1 should-fix (security, blocks m4), 3 nits. Migration, baseline choice, id replacement, `--open-prs` parsing, pinned-baseline release, HTML escaping and Make changes clean.
@@ -309,3 +309,7 @@ tokens orchestrator-wave-1 plan-review-gallery-heron (claude-opus-5-5): input ~1
 tokens review-wave-1 nowline-m2-s1-s3 (claude-opus-5-5): input ~28 / cache read ~1.1M / cache write ~110k / output ~1k | ~$0.79 API-equiv
 tokens wave-2 nowline-m3-s1 (claude-opus-5-5): input ~82 / cache read ~4.8M / cache write ~150k / output ~0.6k | ~$1.73 API-equiv
 tokens orchestrator-wave-2 plan-review-gallery-heron (claude-opus-5-5): input ~22 / cache read ~840k / cache write ~14k 1h / output ~6.3k | ~$0.40 API-equiv
+tokens review-wave-2 nowline-m3-s1 (claude-opus-5-5): input ~10 / cache read ~290k / cache write ~43k / output ~0.1k | ~$0.28 API-equiv
+tokens wave-3 nowline-m3-s2-s3 (claude-sonnet-5-5): input ~60 / cache read ~2.9M / cache write ~140k / output ~0.4k | ~$0.93 API-equiv (interrupted by container restart after ae13dc0)
+tokens wave-3 nowline-m3-s2-s3 (claude-sonnet-5-5): input ~38 / cache read ~1.4M / cache write ~98k / output ~0.3k | ~$0.53 API-equiv (resume)
+tokens orchestrator-wave-3 plan-review-gallery-heron (claude-opus-5-5): input ~30 / cache read ~1.5M / cache write ~23k 1h / output ~9.3k | ~$0.67 API-equiv

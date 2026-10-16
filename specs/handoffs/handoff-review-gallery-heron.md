@@ -8,7 +8,8 @@
 - **Spend:** ~$18.44 logged against ~$11 expected; almost all of it is the session before kickoff (m1 build and planning), logged as one combined orchestrator-kickoff line. Guard max(3x, $50) = $50; projected before wave 1 ~$19.8.
 - **Done this run:** wave 1 `[exec]` m2 s1-s3 in `b72b6de`, `2581435`, `0c1a82b` (`make pre-commit` green per step; `make gallery-e2e` 10/10; deliberate mode-carry break turned 3 tests red).
 - **Done this run:** wave 2 `[deep]` m3 s1 in `7f423c9` (39/39 node:test, gallery-e2e 10/10, m1 data dir migrated).
-- **Next unit:** wave 3 `[exec]` nowline m3 s2-s3, plus the wave 1 review fixup.
+- **Done this run:** wave 3 `[exec]` m3 s2-s3 in `846dbd8`, `c1fd456`, wave 1 review fixup in `ae13dc0` (42 node:test, gallery-e2e 15/15). A container restart interrupted wave 3 after `ae13dc0`; a resumed agent kept the uncommitted s2 diff.
+- **Next unit:** fixup 2, the wave 2 review's manifest path validation (must land before m4), then m4-m6 in a later run.
 - **Resume:** paste the plan's Kickoff prompt into a new session.
 - **Pending question:** none.
 
@@ -27,6 +28,8 @@
 - env: Playwright for ad-hoc scripts: `packages/integration-tests/node_modules/playwright/index.mjs`.
 
 ## Deviations
+
+- m3.s2: root index has Main, Pull requests, then Branches (local non-main lines); compare pickers grouped by line with `<optgroup>`; "since your last visit" tracks main only.
 
 - m3.s1: local branch lines retain by `--keep` (plan only named main/PR); any cross-line baseline is kept, not only main-for-PR; the just-published line is never dropped by `--open-prs`; a PR without `baseSha` compares with newest main; build ids are `pr-<n>-<head12>` and `<branch-slug>-<sha12>` for non-main lines.
 
