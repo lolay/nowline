@@ -31,7 +31,12 @@ interface GalleryModules {
         groups: unknown[];
         commit: Record<string, unknown>;
     }): Promise<unknown>;
-    publish(options: { dataDir: string; rawDir: string; siteDir: string }): Promise<unknown>;
+    publish(options: {
+        dataDir: string;
+        rawDir: string;
+        siteDir: string;
+        isAncestor?: () => boolean;
+    }): Promise<unknown>;
     createGalleryServer(siteDir: string): Server;
 }
 
@@ -60,6 +65,15 @@ async function loadGallery(): Promise<GalleryModules> {
 //   gone   in A and B, absent from C                    removed
 //   today  tests group, no fixed `now`                  volatile
 const IDS = { A: '111111111111', B: '222222222222', C: '333333333333' };
+
+// A pull request (#7) with two pushes on top of main build C. Both pushes
+// change `same` to identical SVG bytes, so the second push still differs from
+// main there even though it didn't change since the first push; only `drift`
+// moved between the pushes.
+//   P1  same changed                    vs main: 1 changed
+//   P2  same as P1, drift changed       vs main: 2 changed, vs P1: 1 changed
+const PR_IDS = { P1: 'pr-7-aaaaaaaaaaaa', P2: 'pr-7-bbbbbbbbbbbb' };
+const PR_NUMBER = 7;
 const LONG_COMMENT = `// ${'long-source-line '.repeat(30)}`;
 
 function svg(label: string, x: number): string {
@@ -86,8 +100,20 @@ async function put(file: string, text: string): Promise<void> {
     await writeFile(file, text);
 }
 
-async function buildRaw(gallery: GalleryModules, work: string, n: 1 | 2 | 3): Promise<string> {
-    const repo = path.join(work, `repo${n}`);
+interface PrPush {
+    name: string;
+    sha: string;
+    date: string;
+    svgs: Record<string, string>;
+}
+
+async function buildRaw(
+    gallery: GalleryModules,
+    work: string,
+    n: 1 | 2 | 3,
+    push?: PrPush,
+): Promise<string> {
+    const repo = path.join(work, push ? `repo-${push.name}` : `repo${n}`);
     const slugs = ['drift', 'edit', 'flip', ...(n === 3 ? ['fresh'] : []), 'same'];
     if (n < 3) slugs.push('gone');
     for (const slug of slugs) {
@@ -109,7 +135,27 @@ async function buildRaw(gallery: GalleryModules, work: string, n: 1 | 2 | 3): Pr
     await put(path.join(repo, 'examples/gone.svg'), svg('gone', 50));
     await put(path.join(repo, 'tests/today.nowline'), 'nowline v1\nroadmap t "Today"\n');
     await put(path.join(repo, 'tests/today.svg'), svg(`today ${n}`, 20 + n * 10));
-    const raw = path.join(work, `raw${n}`);
+    for (const [slug, text] of Object.entries(push?.svgs ?? {})) {
+        await put(path.join(repo, `examples/${slug}.svg`), text);
+    }
+    const raw = path.join(work, push ? `raw-${push.name}` : `raw${n}`);
+    const pushCommit = push
+        ? {
+              sha: push.sha,
+              subject: `PR push ${push.name}`,
+              date: push.date,
+              ref: 'feature/tweak',
+              line: `pr-${PR_NUMBER}`,
+              pr: {
+                  number: PR_NUMBER,
+                  title: 'Tweak the same entry',
+                  url: `https://github.com/lolay/nowline/pull/${PR_NUMBER}`,
+                  headRef: 'feature/tweak',
+                  headSha: push.sha,
+                  baseSha: '3'.repeat(40),
+              },
+          }
+        : {};
     await gallery.collect({
         repoRoot: repo,
         outDir: raw,
@@ -137,6 +183,7 @@ async function buildRaw(gallery: GalleryModules, work: string, n: 1 | 2 | 3): Pr
             runUrl: '',
             repoUrl: 'https://github.com/lolay/nowline',
             dirty: false,
+            ...pushCommit,
         },
     });
     return raw;
@@ -211,6 +258,25 @@ beforeAll(async () => {
     for (const n of [1, 2, 3] as const) {
         const raw = await buildRaw(gallery, work, n);
         await gallery.publish({ dataDir: data, rawDir: raw, siteDir: site });
+    }
+    const prSame = svg('same pr', 200);
+    const pushes: PrPush[] = [
+        { name: 'p1', sha: 'a'.repeat(40), date: '2026-03-04T10:00:00Z', svgs: { same: prSame } },
+        {
+            name: 'p2',
+            sha: 'b'.repeat(40),
+            date: '2026-03-05T10:00:00Z',
+            svgs: { same: prSame, drift: svg('drift pr', 500) },
+        },
+    ];
+    for (const push of pushes) {
+        const raw = await buildRaw(gallery, work, 3, push);
+        await gallery.publish({
+            dataDir: data,
+            rawDir: raw,
+            siteDir: site,
+            isAncestor: () => false,
+        });
     }
     server = gallery.createGalleryServer(site);
     await new Promise<void>((resolve) => server.listen(0, '127.0.0.1', resolve));
@@ -495,6 +561,101 @@ describe('review gallery', () => {
         // flip changed and changed back, so only drift, edit, fresh and gone show.
         const titles = await page.locator('.range-cards .card h2 a').allInnerTexts();
         expect(titles.sort()).toEqual(['drift', 'edit', 'fresh', 'gone']);
+        await context.close();
+    });
+
+    it('lists the PR on the root page and pr/<n>/ lands on its latest push', async () => {
+        const { context, page } = await newPage();
+        await page.goto(`${base}/index.html`);
+        const row = page.locator('.pr-row');
+        await expect(row.count()).resolves.toBe(1);
+        await expect(row.locator('a.pr-number').innerText()).resolves.toBe(`#${PR_NUMBER}`);
+        await expect(row.locator('a.pr-number').getAttribute('href')).resolves.toBe(
+            `https://github.com/lolay/nowline/pull/${PR_NUMBER}`,
+        );
+        await expect(row.innerText()).resolves.toContain('Tweak the same entry');
+        await expect(row.locator('a.build-link').getAttribute('href')).resolves.toContain(
+            `b/${PR_IDS.P2}/changes.html`,
+        );
+        await expect(row.locator('.summary .chip').allInnerTexts()).resolves.toContain(
+            '2 renderer drift',
+        );
+        await page.goto(`${base}/pr/${PR_NUMBER}/`);
+        await page.waitForURL(`**/b/${PR_IDS.P2}/**`);
+        await page.goto(`${base}/pr/${PR_NUMBER}/builds.html`);
+        await expect(page.locator('li.build-row').count()).resolves.toBe(2);
+        await context.close();
+    });
+
+    it('compares PR builds against main, not against the previous push', async () => {
+        const { context, page } = await newPage();
+        // P1 changed only `same` against main.
+        await page.goto(`${base}/b/${PR_IDS.P1}/changes.html`);
+        await expect(page.locator('.pr-line').innerText()).resolves.toContain(`PR #${PR_NUMBER}`);
+        await expect(page.locator('.pr-vs').innerText()).resolves.toContain('vs main 3333333');
+        await expect(page.locator('a.vs-push').count()).resolves.toBe(0);
+        await expect(page.locator('.card h2 a').allInnerTexts()).resolves.toEqual(['same']);
+        // P2 has the same SVG for `same` as P1, yet it still shows as changed against main.
+        await page.goto(entryUrl(PR_IDS.P2, 'examples/same'));
+        await expect(page.locator('h1 .chip').innerText()).resolves.toMatch(/drift/i);
+        await page.goto(`${base}/b/${PR_IDS.P2}/changes.html`);
+        expect((await page.locator('.card h2 a').allInnerTexts()).sort()).toEqual([
+            'drift',
+            'same',
+        ]);
+        await context.close();
+    });
+
+    it('opens a range compare from the vs previous push link', async () => {
+        const { context, page } = await newPage();
+        await page.goto(`${base}/b/${PR_IDS.P2}/changes.html`);
+        await expect(page.locator('a.vs-push').getAttribute('href')).resolves.toContain(
+            `../../compare.html?from=${PR_IDS.P1}&to=${PR_IDS.P2}`,
+        );
+        await page.click('a.vs-push');
+        await page.waitForURL('**/compare.html**');
+        await page.waitForSelector('.range-cards .card');
+        // Only `drift` moved between the pushes.
+        expect((await page.locator('.summary .chip').allInnerTexts()).sort()).toEqual([
+            '1 renderer drift',
+            '4 unchanged',
+        ]);
+        await expect(page.locator('.range-cards .card h2 a').allInnerTexts()).resolves.toEqual([
+            'drift',
+        ]);
+        await context.close();
+    });
+
+    it('carries view settings across PR pages and fits a phone', async () => {
+        const { context, page } = await newPage();
+        await page.goto(entryUrl(PR_IDS.P2, 'examples/drift'));
+        await pick(page, 'size', 'actual');
+        await pick(page, 'layout', 'side');
+        await pick(page, 'mode', 'slider');
+        await nextItem(page);
+        expect(page.url()).toContain(`/b/${PR_IDS.P2}/`);
+        expect(await viewState(page)).toMatchObject({
+            mode: 'slider',
+            layout: 'side',
+            size: 'actual',
+        });
+        await page.goto(`${base}/b/${PR_IDS.P1}/changes.html`);
+        expect(
+            await page.$$eval('section.compare', (s) =>
+                s.map((x) => (x as HTMLElement).dataset.mode),
+            ),
+        ).toEqual(['slider']);
+        await page.setViewportSize({ width: 390, height: 844 });
+        for (const p of [
+            '/index.html',
+            `/b/${PR_IDS.P2}/index.html`,
+            `/b/${PR_IDS.P2}/changes.html`,
+            `/b/${PR_IDS.P2}/examples/drift.html`,
+            `/pr/${PR_NUMBER}/builds.html`,
+        ]) {
+            await page.goto(`${base}${p}`);
+            expect(await horizontalOverflow(page), p).toBeLessThanOrEqual(0);
+        }
         await context.close();
     });
 
