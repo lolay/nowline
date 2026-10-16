@@ -51,16 +51,91 @@
 
     // --- Shared preferences ------------------------------------------------
 
-    const layouts = ['auto', 'stack', 'side'];
-    const sizes = ['fit', 'actual'];
-    let layout = layouts.includes(store.get('layout')) ? store.get('layout') : 'auto';
-    let size = sizes.includes(store.get('size')) ? store.get('size') : 'fit';
+    // Every view setting is one global preference: mode, layout, size, src
+    // (Source open) and changed (Changed only). Each is read from the URL
+    // first, then localStorage, and written back to both: to storage when
+    // picked, to the URL by rewriting every in-gallery link, so a pasted link
+    // (or a browser without storage) opens the same view. `src` and `changed`
+    // stay null until chosen, so each page can apply its own default.
+    const choices = {
+        mode: ['side', 'blink', 'slider', 'diff'],
+        layout: ['auto', 'stack', 'side'],
+        size: ['fit', 'actual'],
+        src: ['0', '1'],
+        changed: ['0', '1'],
+    };
+    const urlParams = new URLSearchParams(location.search);
+    const readPref = (name) => {
+        const value = urlParams.get(name) ?? store.get(name);
+        return choices[name].includes(value) ? value : null;
+    };
+    const prefs = {
+        mode: readPref('mode') ?? 'side',
+        layout: readPref('layout') ?? 'auto',
+        size: readPref('size') ?? 'fit',
+        src: readPref('src'),
+        changed: readPref('changed'),
+    };
     const widgets = [];
+    const hooks = [];
+
+    // Pick a value: remember it and re-apply to every widget and link.
+    function setPref(name, value) {
+        prefs[name] = value;
+        store.set(name, value);
+        applyPrefs();
+    }
+
+    // Adds the current preferences to an in-gallery link, leaving external
+    // links (commit and run URLs), raw SVGs and bare fragments alone.
+    function linkWithPrefs(href) {
+        if (!href || href.startsWith('#')) return href;
+        let url;
+        try {
+            url = new URL(href, location.href);
+        } catch {
+            return href;
+        }
+        if (url.protocol !== location.protocol || url.host !== location.host) return href;
+        if (url.pathname.endsWith('.svg')) return href;
+        const hashAt = href.indexOf('#');
+        const hash = hashAt >= 0 ? href.slice(hashAt) : '';
+        const rest = hashAt >= 0 ? href.slice(0, hashAt) : href;
+        const queryAt = rest.indexOf('?');
+        const path = queryAt >= 0 ? rest.slice(0, queryAt) : rest;
+        const query = new URLSearchParams(queryAt >= 0 ? rest.slice(queryAt + 1) : '');
+        for (const [name, value] of Object.entries(prefs)) {
+            if (value !== null) query.set(name, value);
+        }
+        const text = query.toString();
+        return `${path}${text ? `?${text}` : ''}${hash}`;
+    }
+
+    // Links keep their original target in data-orig, so rewriting is repeatable.
+    function rewriteLinks() {
+        for (const a of document.querySelectorAll('a[href]')) {
+            if (a.dataset.orig === undefined) a.dataset.orig = a.getAttribute('href');
+            a.setAttribute('href', linkWithPrefs(a.dataset.orig));
+        }
+        for (const form of document.querySelectorAll('form.range')) {
+            for (const [name, value] of Object.entries(prefs)) {
+                let input = form.querySelector(`input[data-pref="${name}"]`);
+                if (!input) {
+                    input = el('input', { type: 'hidden', name, 'data-pref': name });
+                    form.append(input);
+                }
+                input.value = value ?? '';
+                input.disabled = value === null;
+            }
+        }
+    }
 
     function applyPrefs() {
-        root.dataset.layout = layout;
-        root.dataset.size = size;
+        root.dataset.layout = prefs.layout;
+        root.dataset.size = prefs.size;
         for (const w of widgets) w.refresh();
+        for (const hook of hooks) hook();
+        rewriteLinks();
     }
 
     // --- Compare widget ----------------------------------------------------
@@ -123,7 +198,6 @@
         ]);
 
         const toolbar = el('div', { className: 'compare-toolbar' });
-        let mode = 'side';
         let stage = null;
 
         const sizeSeg = segmented(
@@ -132,12 +206,8 @@
                 ['fit', 'Fit'],
                 ['actual', 'Actual size'],
             ],
-            size,
-            (value) => {
-                size = value;
-                store.set('size', value);
-                applyPrefs();
-            },
+            prefs.size,
+            (value) => setPref('size', value),
         );
 
         let modeSeg = null;
@@ -153,11 +223,8 @@
                     ['slider', 'Slider'],
                     ['diff', 'Diff'],
                 ],
-                mode,
-                (value) => {
-                    mode = value;
-                    widget.refresh();
-                },
+                prefs.mode,
+                (value) => setPref('mode', value),
             );
             layoutSeg = segmented(
                 'layout',
@@ -166,12 +233,8 @@
                     ['stack', 'Stack'],
                     ['side', 'Side'],
                 ],
-                layout,
-                (value) => {
-                    layout = value;
-                    store.set('layout', value);
-                    applyPrefs();
-                },
+                prefs.layout,
+                (value) => setPref('layout', value),
             );
             toolbar.append(modeSeg.group, layoutSeg.group);
         }
@@ -183,11 +246,14 @@
                 text: 'Source',
             });
             sourceButton.addEventListener('click', () => {
-                setSource(section, section.dataset.source === 'open' ? 'closed' : 'open');
+                setPref('src', sourceOpen() ? '0' : '1');
             });
             toolbar.append(sourceButton);
-            section.dataset.source = body.classList.contains('changes-page') ? 'closed' : 'open';
         }
+        // Open on entry pages and collapsed on the digest, until the viewer
+        // first toggles it; after that their choice holds everywhere.
+        const sourceOpen = () =>
+            prefs.src === null ? !body.classList.contains('changes-page') : prefs.src === '1';
         section.append(toolbar, panes);
         if (stage) section.append(stage.node);
         if (sourceRow) section.append(sourceRow);
@@ -214,10 +280,14 @@
 
         const widget = {
             refresh() {
-                sizeSeg.mark(size);
-                layoutSeg?.mark(layout);
+                const mode = stage ? prefs.mode : 'side';
+                sizeSeg.mark(prefs.size);
+                layoutSeg?.mark(prefs.layout);
                 modeSeg?.mark(mode);
-                sourceButton?.classList.toggle('on', section.dataset.source === 'open');
+                if (sourceRow) {
+                    section.dataset.source = sourceOpen() ? 'open' : 'closed';
+                    sourceButton.classList.toggle('on', sourceOpen());
+                }
                 section.dataset.mode = mode;
                 panes.hidden = mode !== 'side';
                 if (stage && stage.mode !== mode) stage.show(mode);
@@ -226,11 +296,6 @@
         };
         widgets.push(widget);
         widget.refresh();
-    }
-
-    function setSource(section, state) {
-        section.dataset.source = state;
-        section.querySelector('.source-toggle')?.classList.toggle('on', state === 'open');
     }
 
     function buildStage(prevSrc, thisSrc, prevMeta, thisMeta) {
@@ -277,7 +342,7 @@
 
         function fit() {
             if (!width) return;
-            if (size === 'fit') {
+            if (prefs.size === 'fit') {
                 const scale = Math.min(1, scroller.clientWidth / width || 1);
                 layer.style.transform = `scale(${scale})`;
                 scroller.style.height = `${Math.ceil(height * scale)}px`;
@@ -411,29 +476,28 @@
     function setupEntryNav() {
         const bar = document.querySelector('.navbar[data-prev-all]');
         if (!bar) return;
-        const params = new URLSearchParams(location.search);
         const changedTotal = Number(bar.dataset.changedTotal);
-        let changedOnly =
-            changedTotal > 0 &&
-            (params.has('changed')
-                ? params.get('changed') === '1'
-                : body.dataset.hasChanges === '1');
+        // Until chosen, Changed only is on when the build has any changes.
+        if (prefs.changed === null) prefs.changed = body.dataset.hasChanges === '1' ? '1' : '0';
         const box = bar.querySelector('.changed-only input');
         box.disabled = changedTotal === 0;
-
-        const withFlag = (href) => (href ? `${href}?changed=${changedOnly ? 1 : 0}` : href);
+        const changedOnly = () => changedTotal > 0 && prefs.changed === '1';
 
         function apply() {
-            box.checked = changedOnly;
-            const prev = changedOnly ? bar.dataset.prevChanged : bar.dataset.prevAll;
-            const next = changedOnly ? bar.dataset.nextChanged : bar.dataset.nextAll;
-            bar.querySelector('.prev-item').href = withFlag(prev);
-            bar.querySelector('.next-item').href = withFlag(next);
-            for (const a of bar.querySelectorAll('.history-row a')) {
-                a.href = withFlag(a.getAttribute('href').split('?')[0]);
+            const on = changedOnly();
+            box.checked = on;
+            const prev = on ? bar.dataset.prevChanged : bar.dataset.prevAll;
+            const next = on ? bar.dataset.nextChanged : bar.dataset.nextAll;
+            for (const [selector, target] of [
+                ['.prev-item', prev],
+                ['.next-item', next],
+            ]) {
+                const a = bar.querySelector(selector);
+                a.dataset.orig = target;
+                a.setAttribute('href', target);
             }
             const counter = bar.querySelector('.counter');
-            if (changedOnly) {
+            if (on) {
                 const ci = Number(bar.dataset.changedIndex);
                 counter.textContent = `${ci >= 0 ? ci + 1 : '–'} / ${changedTotal} changed`;
             } else {
@@ -441,10 +505,9 @@
             }
         }
         box.addEventListener('change', () => {
-            changedOnly = box.checked;
-            apply();
+            setPref('changed', box.checked ? '1' : '0');
         });
-        apply();
+        hooks.push(apply);
 
         const go = (selector) => {
             const a = bar.querySelector(selector);
@@ -502,11 +565,12 @@
                     const changed = row.status === 'changed' || row.status === 'new';
                     const dot = el('a', {
                         className: `dot${changed ? ' changed' : ''}${row.id === currentId ? ' current' : ''}`,
-                        href: withFlag(`../../${row.id}/${historyRow.dataset.entryKey}.html`),
+                        href: `../../${row.id}/${historyRow.dataset.entryKey}.html`,
                         title: `${row.sha.slice(0, 7)} · ${localTime(row.date)} · ${row.author} · ${row.status}`,
                     });
                     strip.append(dot);
                 }
+                rewriteLinks();
                 strip
                     .querySelector('.current')
                     ?.scrollIntoView({ inline: 'center', block: 'nearest' });
@@ -650,22 +714,17 @@
         button.addEventListener('click', () => {
             const collapsed = body.classList.toggle('collapsed');
             button.textContent = collapsed ? 'Expand all' : 'Collapse all';
-            if (collapsed) {
-                for (const section of document.querySelectorAll('section.compare[data-source]')) {
-                    setSource(section, 'closed');
-                }
-            }
         });
     }
 
     setupComparePage();
     for (const section of document.querySelectorAll('section.compare')) buildCompare(section);
-    applyPrefs();
     localizeTimes(document);
     setupEntryNav();
     setupRoot();
     setupCollapse();
     recordVisit();
+    applyPrefs();
     window.addEventListener('resize', () => {
         for (const w of widgets) w.refresh();
     });
