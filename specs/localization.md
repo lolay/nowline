@@ -4,7 +4,7 @@
 
 Nowline localizes three surfaces:
 
-1. **Render surface** — axis tick labels, the now-pill text, the quarter prefix, footnote sort order. Affects every output format.
+1. **Render surface** — axis tick labels, the now-pill text, the quarter prefix. Affects every output format. Footnotes number in document order, so their order does not depend on the locale.
 2. **Pipeline messages** — validator strings, CLI help, error codes, runtime warnings.
 3. **Man page** — the `nowline.1` mdoc shipped through every install channel that [`specs/cli-distribution.md`](./cli-distribution.md) wires up.
 
@@ -164,7 +164,7 @@ Layout receives the resolved locale on the positioned model. The renderer:
 - Reads the quarter prefix from the locale bundle (default `'Q'` for `en`, `'T'` for `fr`).
 - Pre-computes pill geometry from the chosen string so longer locale strings don't clip. See [`specs/handoffs/`](./handoffs/) for the m-loc-c layout work.
 
-`localeCompare` calls in canonical-output paths (the printer's property sort) are pinned to `'en'` so canonical text round-trips byte-stably regardless of the user's locale. Author-visible sort orders (footnote ordering on the chart) use the resolved locale.
+`localeCompare` calls in canonical-output paths (the printer's property sort) are pinned to `'en'` so canonical text round-trips byte-stably regardless of the user's locale. The chart sorts nothing the author declared by locale: footnotes keep document order ([`rendering.md` § Footnotes](./rendering.md#footnotes)).
 
 ## Distribution: man page bundles
 
