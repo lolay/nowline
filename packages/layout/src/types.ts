@@ -804,6 +804,12 @@ export interface PositionedFootnoteArea {
 }
 
 export interface PositionedFootnoteEntry {
+    /**
+     * The title of the isolated region the footnote comes from; the
+     * renderer heads each region's run of entries with it. Omitted on the
+     * host's own footnotes.
+     */
+    region?: string;
     number: number;
     title: string;
     description?: string;

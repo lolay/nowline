@@ -2061,8 +2061,30 @@ function renderFootnotes(
     const firstEntryBaselineY = f.box.y + FOOTNOTE_HEADER_HEIGHT_PX + FOOTNOTE_PANEL_PADDING_PX;
     const numberX = f.box.x + FOOTNOTE_PANEL_PADDING_PX;
     const titleX = numberX + FOOTNOTE_PANEL_PADDING_PX;
-    f.entries.forEach((e, i) => {
-        const y = firstEntryBaselineY + i * FOOTNOTE_ROW_HEIGHT;
+    // An isolated region's footnotes follow the host's under a heading row
+    // with the region's title, so every heading takes a row of its own.
+    let row = 0;
+    let region: string | undefined;
+    for (const e of f.entries) {
+        if (e.region !== undefined && e.region !== region) {
+            region = e.region;
+            parts.push(
+                textTag(
+                    {
+                        x: num(numberX),
+                        y: num(firstEntryBaselineY + row * FOOTNOTE_ROW_HEIGHT),
+                        'font-family': fonts.sans,
+                        'font-size': 10,
+                        'font-weight': 700,
+                        fill: headerColor,
+                    },
+                    e.region,
+                ),
+            );
+            row += 1;
+        }
+        const y = firstEntryBaselineY + row * FOOTNOTE_ROW_HEIGHT;
+        row += 1;
         parts.push(
             textTag(
                 {
@@ -2103,7 +2125,7 @@ function renderFootnotes(
                 ),
             );
         }
-    });
+    }
     return tag('g', { 'data-layer': 'footnotes' }, parts.join(''));
 }
 

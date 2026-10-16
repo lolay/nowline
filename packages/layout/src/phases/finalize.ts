@@ -934,13 +934,21 @@ function waveLegend(fx: FinalizeContext): boolean {
     return true;
 }
 
-/** f14 (was P19): the footnote panel at the bottom. */
+/** f14 (was P19): the footnote panel at the bottom: the host's footnotes, then each region's. */
 function footnotePanel(fx: FinalizeContext): boolean {
+    const regions = fx.resolved.content.isolatedRegions.flatMap((region, i) => {
+        const regionCtx = fx.chart.regionContexts[i];
+        const inc = fx.chart.includes[i];
+        return regionCtx && inc
+            ? [{ title: inc.label, footnotes: region.content.footnotes, ctx: regionCtx }]
+            : [];
+    });
     const panel = buildFootnotePanel(
         fx.resolved.content.footnotes,
         fx.ctx,
         fx.chartY.bottom,
         fx.canvas.final,
+        regions,
     );
     fx.draft.footnotes = panel;
     return panel.entries.length > 0;

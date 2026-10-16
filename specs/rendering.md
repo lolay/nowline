@@ -649,12 +649,13 @@ Footnotes render in a footnote section rather than as floating callout boxes.
 - Each footnote: number + footnote title (italicized) + description text (auto-derived styling: one step smaller, normal weight, same font).
 - Footnotes are ordered sequentially by document order.
 - The footnote area respects the roadmap's `padding` for horizontal alignment with the chart above.
+- An isolated region's footnotes join the same panel after the host's. Their numbers continue after the host's, region by region in include order, and the region's superscripts carry those numbers. Each region's run of entries is headed by the region's title on a row of its own (10 px, weight 700, in the panel's header colour), so the panel grows by one row per region with footnotes.
 
 ### Included Roadmap Region (`roadmap:isolate`)<a id="include-region"></a>
 
 When a file is included with `roadmap:isolate`, all of its content renders inside a visually distinct region:
 
-- **Dashed border** — a dashed rectangle encloses all swimlanes, items, anchors, milestones, and footnotes originating from the included file.
+- **Dashed border** — a dashed rectangle encloses all swimlanes, items, anchors and milestones originating from the included file. Its footnotes' superscripts sit on its items; their text goes to the chart's footnote panel (see [Footnotes](#footnotes)).
 - **Region label** — the included roadmap's title is displayed at the top-left of the dashed border.
 - **Include badge** — an 18×18 tile rendered just to the right of the region label tab, showing a **stacked-sheets glyph** (back rectangle peeking behind a front rectangle). This is intentionally a different glyph family from item-level `link:` icons so a viewer can tell at a glance whether they are looking at a content pull (one document brings in another) versus a navigation jump. The included file's source path renders to the right of the badge.
 - **Timeline alignment** — the region shares the parent roadmap's timeline scale and axis. No separate header row is rendered for the included content.

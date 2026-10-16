@@ -207,7 +207,8 @@ export interface ContextSource {
  * `chartTopY` from the timeline with both bottoms at 0, a region sets all
  * three y fields to its inner start. The canvas width is not part of a
  * context: placement never reads it (finalize owns the `CanvasExtent`).
- * A region passes no footnotes and no marker placements. The caller seeds
+ * A region passes its own footnote index, numbered on after the host's,
+ * and no marker placements. The caller seeds
  * the wave edges.
  */
 export function createLayoutContext(

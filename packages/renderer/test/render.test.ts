@@ -1832,6 +1832,51 @@ milestone beta "Beta" after:alpha
     });
 });
 
+describe('renderSvg — isolated region footnotes', () => {
+    it("heads a region's footnotes with its title in the shared panel", async () => {
+        const model = await parseFilesToModel(
+            {
+                'host.nowline': `nowline v1
+
+include "./partner.nowline" roadmap:isolate
+
+roadmap host "Host" start:2026-01-05
+
+swimlane core "Core"
+  item api "API" duration:3w
+
+footnote vendor "Vendor dependency" on:api
+`,
+                'partner.nowline': `nowline v1
+
+roadmap partner "Partner" start:2026-01-05
+
+swimlane plugin "Plugin"
+  item alpha "Plugin alpha" duration:3w
+
+footnote legal "Legal review" on:alpha
+`,
+            },
+            'host.nowline',
+        );
+        const svg = await renderSvg(model);
+        const panel = groupsMatching(svg, /<g data-layer="footnotes">/)[0] ?? '';
+        const texts = [...panel.matchAll(/<text [^>]*>([^<]*)<\/text>/g)].map((m) => m[1]);
+        expect(texts).toEqual([
+            'Footnotes',
+            '1',
+            'Vendor dependency',
+            'Partner',
+            '2',
+            'Legal review',
+        ]);
+        // The heading takes its own row: the region's entry sits two rows
+        // below the host's.
+        const ys = [...panel.matchAll(/<text [^>]*y="([\d.]+)"/g)].map((m) => Number(m[1]));
+        expect(ys[4] - ys[1]).toBe(2 * 18);
+    });
+});
+
 describe('renderSvg — arrowhead marker ids', () => {
     // A cross-lane `after:` draws a dependency edge (`marker-end` on the
     // neutral marker); the after-only milestone over two parallels draws a

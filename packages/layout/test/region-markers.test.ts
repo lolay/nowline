@@ -139,3 +139,60 @@ describe('isolated region dependency edges', () => {
         expect('edges' in region).toBe(false);
     });
 });
+
+describe('isolated region footnotes', () => {
+    const host = `${HOST}
+footnote vendor "Vendor" on:api
+`;
+    const regionSource = (id: string, title: string) => `nowline v1
+
+roadmap ${id} "${title}" start:2026-01-05 scale:1w
+
+swimlane lane "Lane"
+  item ${id}-a "A" duration:2w
+  item ${id}-b "B" duration:1w
+
+footnote zz "Later" on:${id}-a
+footnote aa "Earlier" on:${id}-b
+`;
+
+    it('numbers each region on after the host, in include order, in the one panel', async () => {
+        const twoRegions = host.replace(
+            'include "./child.nowline" roadmap:isolate',
+            'include "./one.nowline" roadmap:isolate\ninclude "./two.nowline" roadmap:isolate',
+        );
+        const { file, resolved } = await parseAndResolve(
+            twoRegions,
+            '/virtual/test.nowline',
+            async (abs) =>
+                abs.endsWith('one.nowline')
+                    ? regionSource('one', 'Region One')
+                    : regionSource('two', 'Region Two'),
+        );
+        const model = layoutRoadmap(file, resolved, { theme: 'light' });
+        expect(model.footnotes.entries.map((e) => [e.number, e.title, e.region ?? null])).toEqual([
+            [1, 'Vendor', null],
+            [2, 'Earlier', 'Region One'],
+            [3, 'Later', 'Region One'],
+            [4, 'Earlier', 'Region Two'],
+            [5, 'Later', 'Region Two'],
+        ]);
+        // Each superscript carries the panel's number.
+        const indicators = (i: number, id: string) =>
+            model.includes[i].nestedSwimlanes[0].children.find(
+                (c) => c.kind === 'item' && c.id === id,
+            );
+        const oneA = indicators(0, 'one-a');
+        const twoB = indicators(1, 'two-b');
+        expect(oneA?.kind === 'item' && oneA.footnoteIndicators).toEqual([3]);
+        expect(twoB?.kind === 'item' && twoB.footnoteIndicators).toEqual([4]);
+        // Header, five entries and two region headings, then the padding.
+        expect(model.footnotes.box.height).toBe(28 + 7 * 18 + 16);
+    });
+
+    it('leaves the panel as it was when no region has footnotes', async () => {
+        const model = await layout(host, CHILD);
+        expect(model.footnotes.entries.map((e) => [e.number, 'region' in e])).toEqual([[1, false]]);
+        expect(model.footnotes.box.height).toBe(28 + 18 + 16);
+    });
+});

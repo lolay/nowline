@@ -13,6 +13,7 @@ import { resolveStyle } from '../style-resolution.js';
 import type { BoundingBox, PositionedIncludeRegion, PositionedSwimlane } from '../types.js';
 import { seedWaveEdges } from '../wave-layout.js';
 import { maxLeafItemRightX } from './content-extent.js';
+import { indexFootnotes } from './footnote-node.js';
 import {
     placeRegionMarkers,
     regionMarkerLabelsRightX,
@@ -42,6 +43,8 @@ export function buildIncludeRegions(
     const out: PositionedIncludeRegion[] = [];
     const contexts: LayoutContext[] = [];
     let isFirst = true;
+    // Region footnotes number on after the host's, in include order.
+    let footnotesBefore = ctx.footnoteIndex.size;
     for (const region of regions) {
         if (!isFirst) y += GAP_BETWEEN_REGIONS;
         isFirst = false;
@@ -65,8 +68,9 @@ export function buildIncludeRegions(
                 chartBottomY: innerStartY,
                 swimlaneBottomY: innerStartY,
             },
-            {},
+            { footnotes: indexFootnotes(region.content.footnotes, footnotesBefore) },
         );
+        footnotesBefore += region.content.footnotes.size;
         // Region ids stay invisible to the host, but the wave edges are
         // shared: seed them into the region's otherwise empty edge maps.
         // Without waves, the region's own dated anchors resolve inside it
