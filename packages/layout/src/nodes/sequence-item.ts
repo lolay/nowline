@@ -98,7 +98,10 @@ export function sequenceItem(
     // either an entity id (looked up in entityLeftEdges) or an inline ISO
     // date literal (resolved through the time scale). The validator enforces
     // "at most one inline date per direction" so at most one element per
-    // before-list will hit the date path.
+    // before-list will hit the date path. The cap is a time path: the item
+    // overflows when its duration end passes it, never because its bar is
+    // drawn at the minimum width; the red tail still runs to the painted end
+    // (specs/scheduler-unification.md §8 decision 6).
     let hasOverflow = false;
     let overflowBox: BoundingBox | undefined;
     let overflowAnchorId: string | undefined;
@@ -116,7 +119,7 @@ export function sequenceItem(
                 earliestCapRef = ref;
             }
         }
-        if (earliestCapX !== undefined && logicalRight > earliestCapX) {
+        if (earliestCapX !== undefined && durationEndX > earliestCapX) {
             hasOverflow = true;
             overflowBox = {
                 x: earliestCapX,
