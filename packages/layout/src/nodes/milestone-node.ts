@@ -29,26 +29,25 @@ import { MARKER_DIAMOND_RADIUS_PX } from './marker-geometry.js';
 
 /**
  * One predecessor of a milestone with everything placement and the
- * slack-arrow pipeline need: its end in time (`endX`), its arrow source x
- * (visual right edge for items, marker centerX for anchors / other
- * milestones), its attach y (bar bottom strip when text spills, nominal
- * row midline otherwise), and its flow key (used to dedupe so a
- * chained-flow's siblings collapse to the last entry).
+ * slack-arrow pipeline need: its end in time (`endX`, also where its slack
+ * or overrun line starts, specs/true-width-layout.md §3.5), its attach y
+ * (bar bottom strip when text spills, nominal row midline otherwise), and
+ * its flow key (used to dedupe so a chained-flow's siblings collapse to
+ * the last entry).
  */
 export interface MilestonePredecessor {
     ref: string;
     /**
      * Where the predecessor ends in time: an item's duration end, a
      * marker's x, a wave's `E_k`. The milestone sits on the latest one and
-     * overruns a date by it (specs/scheduler-unification.md §8 decision 6).
+     * overruns a date by it (specs/scheduler-unification.md §8 decision 6);
+     * its slack or overrun line starts here.
      */
     endX: number;
-    /** Where its slack or overrun arrow starts: the painted bar edge for an item. */
-    x: number;
     y: number;
     flowKey: string;
     /**
-     * Set when `ref` names a wave: `x` is the seeded wave end `E_k`.
+     * Set when `ref` names a wave: `endX` is the seeded wave end `E_k`.
      * Wave references draw no slack arrows (specs/waves.md §5.3).
      */
     wave?: string;
@@ -57,11 +56,10 @@ export interface MilestonePredecessor {
 /**
  * Resolve each `after:` reference into a `MilestonePredecessor`. Its
  * `endX` is the reference's right edge in time (`entityRightEdges`, an
- * item's duration end). Items use their VISUAL right edge as the arrow
- * source so the arrow leaves the painted bar instead of landing in the
- * inter-column gutter; markers (anchors / other milestones) fall back to
- * their cut-line centerX. Refs whose target is unknown drop silently —
- * matches the legacy continue path.
+ * item's duration end, a marker's cut-line x), where its slack line
+ * starts: a bar spans exactly its dates, so its end date is its edge
+ * (specs/true-width-layout.md §3.5). Refs whose target is unknown drop
+ * silently — matches the legacy continue path.
  */
 export function collectMilestonePredecessors(
     refs: string[],
@@ -74,20 +72,19 @@ export function collectMilestonePredecessors(
         const item = ctx.placedItems.get(ref);
         const endX = ctx.entityRightEdges.get(ref);
         if (endX === undefined) continue;
-        const x = item ? item.box.x + item.box.width : endX;
         const y = item
             ? itemSlackAttachY(item, ctx.bandScale.bandwidth())
             : (ctx.entityMidpoints.get(ref)?.y ?? 0);
         // A wave reads its seeded end `E_k` (logical, not inset), so a
         // milestone bound by it sits exactly on the boundary.
         if (!item && ctx.waves?.plan.index.has(ref)) {
-            out.push({ ref, endX, x, y, flowKey: `wave:${ref}`, wave: ref });
+            out.push({ ref, endX, y, flowKey: `wave:${ref}`, wave: ref });
             continue;
         }
         // Markers don't share a flow with anything, so use their id
         // as a unique flow key — every marker stands on its own.
         const flowKey = ctx.itemFlowKey.get(ref) ?? `marker:${ref}`;
-        out.push({ ref, endX, x, y, flowKey });
+        out.push({ ref, endX, y, flowKey });
     }
     return out;
 }
@@ -112,11 +109,10 @@ export function lastPredecessorPerFlow(preds: MilestonePredecessor[]): Milestone
 
 /**
  * Whether a non-binding predecessor of an after-only milestone at `maxEnd`
- * draws a slack arrow: it ends before the milestone in time and its painted
- * edge, where the arrow starts, is left of it too. A wave draws none.
+ * draws a slack arrow: it ends before the milestone. A wave draws none.
  */
 function hasSlackArrow(p: MilestonePredecessor, maxEnd: number): boolean {
-    return p.endX < maxEnd && p.x < maxEnd && p.y > 0 && p.wave === undefined;
+    return p.endX < maxEnd && p.y > 0 && p.wave === undefined;
 }
 
 /**
@@ -227,7 +223,7 @@ export class MilestoneNode {
                 isOverrun = true;
                 slackArrows = [
                     {
-                        x: maxPred.x,
+                        x: maxPred.endX,
                         y: maxPred.y > 0 ? maxPred.y : estimatedCenterY,
                     },
                 ];
@@ -257,7 +253,7 @@ export class MilestoneNode {
             for (let i = 1; i < dedupedPreds.length; i++) {
                 const p = dedupedPreds[i];
                 if (hasSlackArrow(p, maxEnd)) {
-                    arrows.push({ x: p.x, y: p.y });
+                    arrows.push({ x: p.endX, y: p.y });
                 }
             }
             if (arrows.length > 0) slackArrows = arrows;
@@ -386,8 +382,8 @@ export function collectSlackCorridors(
             const maxPred = latestArrowPredecessor(dedupedPreds);
             if (maxPred && maxPred.endX > milestoneX && maxPred.y > 0) {
                 out.push({
-                    xStart: Math.min(maxPred.x, milestoneX),
-                    xEnd: Math.max(maxPred.x, milestoneX),
+                    xStart: Math.min(maxPred.endX, milestoneX),
+                    xEnd: Math.max(maxPred.endX, milestoneX),
                     y: maxPred.y,
                     slackPredId: maxPred.ref,
                     milestoneId: id,
@@ -402,7 +398,7 @@ export function collectSlackCorridors(
             const p = dedupedPreds[i];
             if (hasSlackArrow(p, maxEnd)) {
                 out.push({
-                    xStart: p.x,
+                    xStart: p.endX,
                     xEnd: maxEnd,
                     y: p.y,
                     slackPredId: p.ref,

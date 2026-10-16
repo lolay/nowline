@@ -14,12 +14,20 @@
 // `@nowline/layout`: a regression gate that borrows the code under test
 // would pass whenever that code is wrong in the same way.
 //
-//   arrow source (item) = (box.right, box.y + 28), or (box.right,
-//                         box.bottom - 2) when the caption spilled
-//   arrow target        = (box.x, box.y + 28)
-//   arrow source (marker) starts on the target's attach y
-//   slack arrow         = (box.right, box.y + 28), or (box.right,
-//                         box.bottom - 2) when the caption spilled
+// x comes from the item's dates (`dateSpan`, its bar sits a seam inside
+// them; specs/true-width-layout.md §3.4), y from its final box:
+//
+//   arrow source (item) = (lastDay, box.bottom) or (lastDay, box.y) for a
+//                         leg to another row, where lastDay = end -
+//                         min(day / 2, span / 2); or (end, box.y + 28),
+//                         (end, box.bottom - 2) when the caption spilled,
+//                         for a dotted leg along its own row
+//   arrow target        = (firstDay, box.y) or (firstDay, box.bottom), where
+//                         firstDay = start + min(day / 2, span / 2); or
+//                         (box.x, box.y + 28) for a leg along its row
+//   arrow source (marker) starts on its cut line, on the target's y + 28
+//   slack arrow         = (end, box.y + 28), or (end, box.bottom - 2) when
+//                         the caption spilled
 //   item glyph          = top at box.y + 5, inside the bar's top half
 //   container glyph     = inside the header's title row, above the bracket
 //                         line (box.y .. box.y + 13)
@@ -89,19 +97,33 @@ function near(a: number, b: number): boolean {
     return Math.abs(a - b) <= EPSILON_PX;
 }
 
-function arrowSourceY(i: PositionedItem): number {
+/** Where a leg along an item's own row leaves it. */
+function rowExitY(i: PositionedItem): number {
     return i.textSpills
         ? i.box.y + i.box.height - PROGRESS_STRIP_HALF_PX
         : i.box.y + NOMINAL_MID_PX;
 }
 
-function arrowTargetY(i: PositionedItem): number {
+function rowY(i: PositionedItem): number {
     return i.box.y + NOMINAL_MID_PX;
 }
 
 function slackY(i: PositionedItem): number {
-    return arrowSourceY(i);
+    return rowExitY(i);
 }
+
+function lastDayMid(i: PositionedItem, day: number): number {
+    const { startX, endX } = i.dateSpan;
+    return endX - Math.min(day / 2, (endX - startX) / 2);
+}
+
+function firstDayMid(i: PositionedItem, day: number): number {
+    const { startX, endX } = i.dateSpan;
+    return startX + Math.min(day / 2, (endX - startX) / 2);
+}
+
+const at = (p: { x: number; y: number }, x: number, y: number): boolean =>
+    near(p.x, x) && near(p.y, y);
 
 interface FileScan {
     name: string;
@@ -133,6 +155,7 @@ function scan(name: string, model: PositionedRoadmap): FileScan {
     );
     const byId = new Map(hostItems.filter((i) => i.id).map((i) => [i.id, i]));
 
+    const day = model.timeline.pixelsPerDay;
     for (const edge of model.edges) {
         // An id-less target registers under a synthetic handle the model
         // does not carry; it cannot be matched to its bar here.
@@ -142,27 +165,27 @@ function scan(name: string, model: PositionedRoadmap): FileScan {
         const start = wp[0];
         const end = wp[wp.length - 1];
         const label = `${edge.fromId} -> ${edge.toId}`;
-        if (!near(end.x, to.box.x) || !near(end.y, arrowTargetY(to))) {
-            fail(
-                `${label} ends at (${end.x}, ${end.y}), ` +
-                    `bar attach is (${to.box.x}, ${arrowTargetY(to)})`,
-            );
-        }
+        const alongRow = wp.length === 2 && near(start.y, end.y);
+        const targetOk = alongRow
+            ? at(end, to.box.x, end.y) && end.y >= to.box.y && end.y <= to.box.y + to.box.height
+            : at(end, firstDayMid(to, day), to.box.y) ||
+              at(end, firstDayMid(to, day), to.box.y + to.box.height);
+        if (!targetOk) fail(`${label} ends at (${end.x}, ${end.y}), off its target's ports`);
         const from = byId.get(edge.fromId);
         if (from) {
             out.itemArrows++;
-            const x = from.box.x + from.box.width;
-            if (!near(start.x, x) || !near(start.y, arrowSourceY(from))) {
-                fail(
-                    `${label} starts at (${start.x}, ${start.y}), ` +
-                        `bar attach is (${x}, ${arrowSourceY(from)})`,
-                );
-            }
-        } else {
-            // A marker source sits on its cut line, on the target's attach y.
+            const sourceOk = alongRow
+                ? near(start.x, from.dateSpan.endX) &&
+                  (near(start.y, rowExitY(from)) || near(start.y, rowY(to)))
+                : at(start, lastDayMid(from, day), from.box.y + from.box.height) ||
+                  at(start, lastDayMid(from, day), from.box.y);
+            if (!sourceOk)
+                fail(`${label} starts at (${start.x}, ${start.y}), off its source's ports`);
+        } else if (alongRow) {
+            // A marker source sits on its cut line, on the target's row.
             out.markerArrows++;
-            if (!near(start.y, arrowTargetY(to))) {
-                fail(`${label} starts at y=${start.y}, target attach y is ${arrowTargetY(to)}`);
+            if (!near(start.y, rowY(to))) {
+                fail(`${label} starts at y=${start.y}, target row y is ${rowY(to)}`);
             }
         }
     }
@@ -170,8 +193,8 @@ function scan(name: string, model: PositionedRoadmap): FileScan {
     for (const m of model.milestones) {
         for (const arrow of m.slackArrows ?? []) {
             // The model does not name a slack arrow's source; an item one
-            // leaves a bar's right edge, a marker one does not.
-            const sources = hostItems.filter((i) => near(i.box.x + i.box.width, arrow.x));
+            // leaves its end date, a marker one does not.
+            const sources = hostItems.filter((i) => near(i.dateSpan.endX, arrow.x));
             if (sources.length === 0) continue;
             out.slackArrows++;
             if (!sources.some((i) => near(slackY(i), arrow.y))) {

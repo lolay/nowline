@@ -951,9 +951,9 @@ milestone m "M" after:[w1, b2, a2]
         const a2 = item(laid, 'a2');
         const b2 = item(laid, 'b2');
         expect(m.center.x).toBe(logicalEnd(a2));
-        // b2 (an item) gets its arrow, from its painted edge; w1 (a wave)
+        // b2 (an item) gets its arrow, from its end date; w1 (a wave)
         // does not.
-        expect(m.slackArrows?.map((a) => a.x)).toEqual([b2.box.x + b2.box.width]);
+        expect(m.slackArrows?.map((a) => a.x)).toEqual([b2.dateSpan.endX]);
     });
 
     it('a dated milestone overrun by a wave gets overrunByWave and no arrow (Example 11)', async () => {
@@ -1019,8 +1019,8 @@ swimlane b
         expect(m.overrunByWave).toBe('w1');
         expect(m.isOverrun).toBe(true);
         // The arrow comes from x, the latest item, never from the wave.
-        expect(m.slackArrows?.map((a) => a.x)).toEqual([x.box.x + x.box.width]);
-        // Its corridor runs left, from x's right edge back to W1, across z.
+        expect(m.slackArrows?.map((a) => a.x)).toEqual([x.dateSpan.endX]);
+        // Its corridor runs left, from x's end back to W1, across z.
         // Rows never move up, so z stays put and x drops below it, where the
         // path is clear (specs/true-width-layout.md §3.2).
         expect(x.box.y).toBeGreaterThan(z.box.y);

@@ -27,6 +27,8 @@ import type {
 } from '@nowline/layout';
 import {
     ACCENT_DASH_PATTERN,
+    ARROW_HEAD_LENGTH_PX,
+    ARROW_HEAD_WIDTH_PX,
     ATTRIBUTION_BAR_LOGICAL_WIDTH,
     ATTRIBUTION_BAR_LOGICAL_X,
     ATTRIBUTION_INE_LOGICAL_X,
@@ -1831,25 +1833,118 @@ function renderMilestoneCutLine(m: PositionedMilestone, idPrefix: string, palett
     return parts.join('');
 }
 
-function renderEdge(e: PositionedDependencyEdge, idPrefix: string, palette: Theme): string {
-    const color =
-        e.kind === 'overflow' ? palette.dependency.overflowStroke : palette.dependency.edgeStroke;
+/** Dash pattern of a dependency's slack leg: the dotted look of milestone slack lines. */
+const SLACK_DASH = '3 3';
+
+// A dependency arrow (specs/true-width-layout.md §3.4). It paints behind
+// the bars (see `renderRoadmap`), so a leg that crosses a bar passes behind
+// it. Vertical legs are solid; the horizontal leg is dotted when the target
+// waits. The head is drawn, not a marker, so it can shrink to a narrow
+// target and become a dot (§8 O6).
+function renderEdge(e: PositionedDependencyEdge, palette: Theme): string {
     const points = e.waypoints;
     if (points.length < 2) return '';
-    // Under-bar edges paint BEFORE item fills (see `renderRoadmap`)
-    // and use a thinner stroke so the bar stays foreground. Normal /
-    // overflow edges sit on top of items and use the standard 1.1 px
-    // stroke.
-    const strokeWidth = e.kind === 'underBar' ? 0.8 : 1.1;
-    return tag('path', {
-        d: roundedOrthogonalPath(points, EDGE_CORNER_RADIUS),
-        fill: 'none',
-        stroke: color,
-        'stroke-width': strokeWidth,
-        'stroke-dasharray': e.kind === 'overflow' ? '4 2' : null,
-        'stroke-linejoin': 'round',
-        'marker-end': `url(#${idPrefix}-arrow)`,
-    });
+    const color = palette.dependency.edgeStroke;
+    const tip = points[points.length - 1];
+    const prev = points[points.length - 2];
+    const len = Math.hypot(tip.x - prev.x, tip.y - prev.y);
+    if (len === 0) return '';
+    const ux = (tip.x - prev.x) / len;
+    const uy = (tip.y - prev.y) / len;
+    const half = e.headWidth / 2;
+    // The leg stops where the head starts, so a dotted leg never shows
+    // through it.
+    const headLength =
+        e.head === 'dot' ? half : (e.headWidth * ARROW_HEAD_LENGTH_PX) / ARROW_HEAD_WIDTH_PX;
+    // A last leg no longer than the head is all head.
+    const leg =
+        len > headLength
+            ? [...points.slice(0, -1), { x: tip.x - ux * headLength, y: tip.y - uy * headLength }]
+            : points.slice(0, -1);
+    const parts = [legPaths(leg, e.slack, color)];
+    const headFill = palette.arrowhead.neutral;
+    if (e.head === 'dot') {
+        parts.push(
+            tag('circle', {
+                cx: num(tip.x - ux * half),
+                cy: num(tip.y - uy * half),
+                r: num(half),
+                fill: headFill,
+            }),
+        );
+    } else {
+        const bx = tip.x - ux * headLength;
+        const by = tip.y - uy * headLength;
+        parts.push(
+            tag('path', {
+                d:
+                    `M${num(bx - uy * half)} ${num(by + ux * half)} ` +
+                    `L${num(tip.x)} ${num(tip.y)} ` +
+                    `L${num(bx + uy * half)} ${num(by - ux * half)} z`,
+                fill: headFill,
+            }),
+        );
+    }
+    return tag('g', { 'data-layer': 'dependency' }, parts.join(''));
+}
+
+// An arrow's legs: one rounded path, or for a slack arrow its solid
+// vertical legs and its dotted horizontal ones. Empty when the head is all
+// there is (a leg no longer than the head).
+function legPaths(leg: Point[], slack: boolean, color: string): string {
+    if (leg.length < 2) return '';
+    const stroke = { fill: 'none', stroke: color, 'stroke-width': 1.1, 'stroke-linejoin': 'round' };
+    if (!slack)
+        return tag('path', { d: roundedOrthogonalPath(leg, EDGE_CORNER_RADIUS), ...stroke });
+    const { solid, dotted } = splitSlackPath(leg, EDGE_CORNER_RADIUS);
+    return (
+        (solid ? tag('path', { d: solid, ...stroke }) : '') +
+        (dotted
+            ? tag('path', {
+                  d: dotted,
+                  ...stroke,
+                  'stroke-dasharray': SLACK_DASH,
+                  'stroke-linecap': 'round',
+              })
+            : '')
+    );
+}
+
+// A slack arrow's path in two parts: its vertical legs with the rounded
+// corners (solid) and its horizontal legs (dotted), so the dash pattern
+// marks the wait alone.
+function splitSlackPath(points: Point[], radius: number): { solid: string; dotted: string } {
+    const n = points.length;
+    const before: Point[] = [];
+    const after: Point[] = [];
+    const solid: string[] = [];
+    for (let i = 1; i < n - 1; i++) {
+        const prev = points[i - 1];
+        const cur = points[i];
+        const next = points[i + 1];
+        const inLen = Math.hypot(cur.x - prev.x, cur.y - prev.y);
+        const outLen = Math.hypot(next.x - cur.x, next.y - cur.y);
+        const r = Math.min(radius, inLen / 2, outLen / 2);
+        const dIn = { x: Math.sign(cur.x - prev.x), y: Math.sign(cur.y - prev.y) };
+        const dOut = { x: Math.sign(next.x - cur.x), y: Math.sign(next.y - cur.y) };
+        before[i] = { x: cur.x - dIn.x * r, y: cur.y - dIn.y * r };
+        after[i] = { x: cur.x + dOut.x * r, y: cur.y + dOut.y * r };
+        if (r > 0) {
+            solid.push(
+                `M${num(before[i].x)} ${num(before[i].y)} ` +
+                    `Q${num(cur.x)} ${num(cur.y)} ${num(after[i].x)} ${num(after[i].y)}`,
+            );
+        }
+    }
+    const dotted: string[] = [];
+    for (let i = 0; i < n - 1; i++) {
+        const a = i === 0 ? points[0] : after[i];
+        const b = i === n - 2 ? points[n - 1] : before[i + 1];
+        const piece = `M${num(a.x)} ${num(a.y)} L${num(b.x)} ${num(b.y)}`;
+        if (Math.abs(points[i + 1].y - points[i].y) < 1e-9) dotted.push(piece);
+        else solid.push(piece);
+    }
+    return { solid: solid.join(' '), dotted: dotted.join(' ') };
 }
 
 // Build an SVG path for a sequence of orthogonal waypoints, inserting a
@@ -2135,17 +2230,8 @@ function renderIncludeRegion(
     const nested = r.nestedSwimlanes
         .map((s) => renderSwimlane(s, options, idPrefix, palette, fonts))
         .join('');
-    // The region's own dependency edges, in the host's order: under-bar
-    // edges beneath its bars, the rest over them.
-    const regionEdges = r.edges ?? [];
-    const edgesUnder = regionEdges
-        .filter((e) => e.kind === 'underBar')
-        .map((e) => renderEdge(e, idPrefix, palette))
-        .join('');
-    const edgesOver = regionEdges
-        .filter((e) => e.kind !== 'underBar')
-        .map((e) => renderEdge(e, idPrefix, palette))
-        .join('');
+    // The region's own dependency edges, behind its bars as on the host.
+    const edges = (r.edges ?? []).map((e) => renderEdge(e, palette)).join('');
     // The region's own anchors and milestones: cut lines over its lanes,
     // then the diamonds and labels of its marker row, as on the host.
     const anchors = r.anchors ?? [];
@@ -2162,10 +2248,9 @@ function renderIncludeRegion(
         region +
             bandsUnder +
             waveUnder +
-            edgesUnder +
+            edges +
             nested +
             waveOver +
-            edgesOver +
             markers +
             tab +
             tabLabel +
@@ -3011,17 +3096,10 @@ export async function renderSvg(
     parts.push(renderWaveBoundaries(model.waveBoundaries));
     parts.push(renderWaveLabels(model, palette, fonts));
 
-    // m2g+: under-bar dependency edges go BEFORE swimlane / item
-    // content. The channel router falls back to under-bar routing when
-    // it can't find a clear vertical gutter between source and target;
-    // these edges intentionally cross item bars and need the item fills
-    // painted ON TOP so the bars stay the visual foreground. Renderer
-    // applies a thinner stroke (see `renderEdge`) to further de-emphasise
-    // the arrow body — only the head and stub at the target end stay
-    // crisply visible.
-    for (const e of model.edges) {
-        if (e.kind === 'underBar') parts.push(renderEdge(e, idPrefix, palette));
-    }
+    // Dependency arrows go BEFORE swimlane / item content: their legs
+    // pass behind the bars they cross (specs/true-width-layout.md §3.4).
+    // Each lands in a gap between rows, so its head stays in view.
+    for (const e of model.edges) parts.push(renderEdge(e, palette));
 
     // Swimlane content (frame tabs + items) on top of the grid lines.
     for (const s of model.swimlanes)
@@ -3034,12 +3112,6 @@ export async function renderSvg(
 
     // Wave crossings over the main lanes' background bars.
     parts.push(renderWaveCrossings(model.waveCrossings));
-
-    // Normal / overflow dependency edges on top of items but below
-    // cut-lines / nowline. Under-bar edges already painted above.
-    for (const e of model.edges) {
-        if (e.kind !== 'underBar') parts.push(renderEdge(e, idPrefix, palette));
-    }
 
     // Anchor + milestone cut lines drawn AFTER items so they overlay the
     // swimlane fills.

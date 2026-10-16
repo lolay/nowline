@@ -1800,6 +1800,7 @@ roadmap partner "Partner" start:2026-01-05
 anchor kickoff "Kickoff" date:2026-01-12
 
 swimlane plugin "Plugin"
+  item prep "Prep" duration:2w
   item alpha "Plugin alpha" duration:3w after:kickoff
 
 milestone beta "Beta" after:alpha
@@ -1824,11 +1825,13 @@ milestone beta "Beta" after:alpha
         // The anchor's fine dashes and the milestone's accent dashes.
         expect(cuts.map((l) => attrOf(l, 'stroke-dasharray'))).toHaveLength(2);
         expect(Number(cutBottom)).toBeLessThan(inc.box.y + inc.box.height);
-        // The anchor's stub into the item after it, drawn inside the region
-        // over its lanes and under its markers.
+        // The anchor's dotted stub into the item that waits on it, drawn
+        // inside the region behind its bars and under its markers.
         expect(inc.edges).toHaveLength(1);
-        const arrow = region.indexOf('marker-end=');
-        expect(arrow).toBeGreaterThan(region.lastIndexOf('data-layer="item"'));
+        expect(inc.edges?.[0].slack).toBe(true);
+        const arrow = region.indexOf('data-layer="dependency"');
+        expect(arrow).toBeGreaterThan(-1);
+        expect(arrow).toBeLessThan(region.indexOf('data-layer="item"'));
         expect(arrow).toBeLessThan(region.indexOf('data-id="kickoff"'));
     });
 });
@@ -1951,13 +1954,14 @@ swimlane web "Web"
         for (const id of [...idsA, ...idsB]) expect(id).not.toMatch(/^nl-arrow/);
         expect(idsA.filter((id) => idsB.includes(id))).toEqual([]);
 
-        // Every edge and slack arrow references a marker in its own document.
+        // Every slack arrow references a marker in its own document
+        // (dependency arrows draw their own heads).
         for (const [svg, ids] of [
             [svgA, idsA],
             [svgB, idsB],
         ] as const) {
             const refs = markerRefs(svg);
-            expect(refs.length).toBeGreaterThanOrEqual(2);
+            expect(refs.length).toBeGreaterThanOrEqual(1);
             for (const ref of refs) expect(ids).toContain(ref);
         }
     });
