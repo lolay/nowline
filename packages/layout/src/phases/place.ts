@@ -209,6 +209,7 @@ export function placeChart(
                         ctx,
                         last.nextY + LANES_TO_REGIONS_GAP_PX,
                         helpers,
+                        measured.naturalChartRightX,
                     );
                 }
                 return waves.pass;
@@ -252,7 +253,13 @@ export function placeChart(
     // region placement, floored with the frozen S/E.
     let includes: PositionedIncludeRegion[] = [];
     if (isolated.length > 0) {
-        const r = buildIncludeRegions(isolated, ctx, y + LANES_TO_REGIONS_GAP_PX, helpers);
+        const r = buildIncludeRegions(
+            isolated,
+            ctx,
+            y + LANES_TO_REGIONS_GAP_PX,
+            helpers,
+            measured.naturalChartRightX,
+        );
         includes = r.regions;
         y = r.endY;
     }

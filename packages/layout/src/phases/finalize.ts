@@ -39,6 +39,7 @@ import {
 import { MARKER_ROW_PITCH_PX } from '../nodes/marker-geometry.js';
 import { positionMilestones } from '../nodes/milestone-node.js';
 import { buildNowline } from '../nodes/nowline-node.js';
+import { regionMarkerCanvasRightX } from '../nodes/region-markers.js';
 import { type BuiltWaves, buildWaveLegend, buildWaves } from '../nodes/wave-node.js';
 import { shiftIncludeY, shiftSwimlaneY } from '../positioned-shift.js';
 import { estimateTextWidth } from '../text-measure.js';
@@ -642,14 +643,18 @@ function growCanvasForMarkerLabels(fx: FinalizeContext): boolean {
     const runEntries = calendarMarkerEntries(timeline.nonWorking, timeline.workingExceptions);
     all.push(...runEntries);
     fx.draft.markerEntries = { all, calendarCount: runEntries.length };
-    const grew = fx.canvas.grow(
-        markerLabelsRightX(
-            all,
-            fx.measured.header.chartLeftX,
-            fx.canvas.provisional,
-            estimateTextWidth,
-        ),
+    let rightX = markerLabelsRightX(
+        all,
+        fx.measured.header.chartLeftX,
+        fx.canvas.provisional,
+        estimateTextWidth,
     );
+    // An isolated region's own marker labels grow it the same way, inside
+    // the region's insets (placement packed them against the natural canvas).
+    for (const inc of fx.chart.includes) {
+        rightX = Math.max(rightX, regionMarkerCanvasRightX(inc, fx.canvas.provisional));
+    }
+    const grew = fx.canvas.grow(rightX);
     fx.canvas.freeze();
     return grew;
 }

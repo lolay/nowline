@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { layoutRoadmap, type PositionedTrackChild } from '../src/index.js';
-import { shiftSwimlaneY } from '../src/positioned-shift.js';
+import { shiftIncludeY, shiftSwimlaneY } from '../src/positioned-shift.js';
 import { parseAndResolve } from './helpers.js';
 
 // Both late vertical shifts (a retroactively grown row in `RowPacker`, a
@@ -55,17 +55,27 @@ function entities(children: PositionedTrackChild[]): PositionedTrackChild[] {
     return out;
 }
 
-/** Every numeric leaf of `before` vs `after`: `y` moved by `dy`, the rest equal. */
-function numericDrift(before: unknown, after: unknown, dy: number, path = ''): string[] {
+/**
+ * Every numeric leaf of `before` vs `after`: a key in `moved` (by default
+ * just `y`) shifted by `dy`, the rest equal.
+ */
+function numericDrift(
+    before: unknown,
+    after: unknown,
+    dy: number,
+    path = '',
+    moved: readonly string[] = ['y'],
+): string[] {
     if (typeof before === 'number') {
-        const expected = path.endsWith('.y') ? before + dy : before;
+        const key = path.slice(path.lastIndexOf('.') + 1);
+        const expected = moved.includes(key) ? before + dy : before;
         return after === expected ? [] : [`${path}: ${before} -> ${String(after)}`];
     }
     if (before === null || typeof before !== 'object') return [];
     const out: string[] = [];
     for (const [key, value] of Object.entries(before)) {
         const sub = Array.isArray(before) ? `${path}[${key}]` : `${path}.${key}`;
-        out.push(...numericDrift(value, (after as Record<string, unknown>)[key], dy, sub));
+        out.push(...numericDrift(value, (after as Record<string, unknown>)[key], dy, sub, moved));
     }
     return out;
 }
@@ -98,5 +108,44 @@ describe('shiftSwimlaneY / shiftTrackChildY', () => {
         const before = structuredClone(lane);
         shiftSwimlaneY(lane, 17);
         expect(numericDrift(before, lane, 17)).toEqual([]);
+    });
+});
+
+describe('shiftIncludeY', () => {
+    it("moves a region's lanes and its own markers, cut lines included, by dy", async () => {
+        const host = `nowline v1
+
+include "./child.nowline" roadmap:isolate
+
+roadmap r "R" start:2026-01-05 scale:1w
+
+swimlane core "Core"
+  item api "API" duration:6w
+`;
+        const child = `nowline v1
+
+roadmap child "Child" start:2026-01-05 scale:1w
+
+anchor kickoff "Kickoff" date:2026-01-12
+
+swimlane a "A"
+  item alpha "Alpha" duration:3w after:kickoff
+swimlane b "B"
+  item bravo "Bravo" duration:1w
+
+milestone beta "Beta" after:[alpha, bravo]
+`;
+        const { file, resolved } = await parseAndResolve(
+            host,
+            '/virtual/test.nowline',
+            async () => child,
+        );
+        const region = layoutRoadmap(file, resolved, { theme: 'light' }).includes[0];
+        expect(region.anchors).toHaveLength(1);
+        expect(region.milestones?.[0].slackArrows).toHaveLength(1);
+
+        const before = structuredClone(region);
+        shiftIncludeY(region, 17);
+        expect(numericDrift(before, region, 17, '', ['y', 'cutTopY', 'cutBottomY'])).toEqual([]);
     });
 });

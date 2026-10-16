@@ -75,7 +75,11 @@ describe('placement on the sample corpus', () => {
                     if (key in p) failures.push(`${rel}: placement of ${p.id} carries ${key}`);
                 }
             }
-            expect(model.milestones.map((m) => m.id)).toEqual(placements.map((p) => p.id));
+            // The host places its milestones last, after every isolated
+            // region placed its own (with waves, a region also places them
+            // on each barrier pass, and only the last pass is kept).
+            const host = placements.slice(placements.length - model.milestones.length);
+            expect(model.milestones.map((m) => m.id)).toEqual(host.map((p) => p.id));
             // Every positioned milestone sits on a row of the final band, its
             // label box on that row: what the re-pack gives, never a
             // provisional row computed against an earlier canvas.
@@ -89,10 +93,27 @@ describe('placement on the sample corpus', () => {
                 if (m.labelBox.y !== m.center.y - 4) {
                     failures.push(`${rel}: ${m.id} label box is not on its row`);
                 }
-                if (m.center.x !== placements[i].x) {
+                if (m.center.x !== host[i].x) {
                     failures.push(`${rel}: ${m.id} moved off its placed x`);
                 }
                 checked += 1;
+            }
+            // A region's milestones sit in its own marker row, above its
+            // lanes, at an x one of its placements gave them.
+            for (const region of model.includes) {
+                const lanesTop = region.nestedSwimlanes[0]?.box.y ?? Number.POSITIVE_INFINITY;
+                for (const m of region.milestones ?? []) {
+                    if (m.center.y <= region.box.y || m.center.y + m.radius >= lanesTop) {
+                        failures.push(`${rel}: region ${m.id} sits off its region's marker row`);
+                    }
+                    if (m.labelBox.y !== m.center.y - 4) {
+                        failures.push(`${rel}: region ${m.id} label box is not on its row`);
+                    }
+                    if (!placements.some((p) => p.id === m.id && p.x === m.center.x)) {
+                        failures.push(`${rel}: region ${m.id} moved off its placed x`);
+                    }
+                    checked += 1;
+                }
             }
         }
         expect(failures).toEqual([]);

@@ -1,0 +1,3 @@
+```release-note:added
+A `roadmap:isolate` region draws its own anchors and milestones in a marker row under its label tab, with cut lines that stop at the region's last lane. Before, they only scoped the region's `after:` references and were never drawn.
+```

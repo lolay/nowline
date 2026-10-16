@@ -2249,6 +2249,15 @@ function renderIncludeRegion(
     const nested = r.nestedSwimlanes
         .map((s) => renderSwimlane(s, options, idPrefix, palette, fonts))
         .join('');
+    // The region's own anchors and milestones: cut lines over its lanes,
+    // then the diamonds and labels of its marker row, as on the host.
+    const anchors = r.anchors ?? [];
+    const milestones = r.milestones ?? [];
+    const markers =
+        anchors.map((a) => renderAnchorCutLine(a, palette)).join('') +
+        milestones.map((m) => renderMilestoneCutLine(m, idPrefix, palette)).join('') +
+        anchors.map((a) => renderAnchor(a, palette, fonts)).join('') +
+        milestones.map((m) => renderMilestone(m, palette, fonts)).join('');
 
     return tag(
         'g',
@@ -2258,6 +2267,7 @@ function renderIncludeRegion(
             waveUnder +
             nested +
             waveOver +
+            markers +
             tab +
             tabLabel +
             badge +

@@ -1777,6 +1777,55 @@ swimlane a
     });
 });
 
+describe('renderSvg — isolated region markers', () => {
+    it("draws a region's anchors and milestones inside its group, cut lines to its last lane", async () => {
+        const model = await parseFilesToModel(
+            {
+                'host.nowline': `nowline v1
+
+include "./partner.nowline" roadmap:isolate
+
+roadmap host "Host" start:2026-01-05
+
+anchor launch "Launch" date:2026-01-05
+
+swimlane core "Core"
+  item api "API" duration:3w after:launch
+`,
+                'partner.nowline': `nowline v1
+
+roadmap partner "Partner" start:2026-01-05
+
+anchor kickoff "Kickoff" date:2026-01-12
+
+swimlane plugin "Plugin"
+  item alpha "Plugin alpha" duration:3w after:kickoff
+
+milestone beta "Beta" after:alpha
+`,
+            },
+            'host.nowline',
+        );
+        const svg = await renderSvg(model);
+        const region = groupsMatching(svg, /<g data-layer="include">/)[0] ?? '';
+        const inc = model.includes[0];
+        const anchor = groupsMatching(region, /<g data-id="kickoff" data-layer="anchor">/)[0];
+        const milestone = groupsMatching(region, /<g data-id="beta" data-layer="milestone">/)[0];
+        expect(anchor).toContain('Kickoff');
+        expect(milestone).toContain('Beta');
+        // Drawn over the region's lanes, and only inside the region.
+        expect(region.indexOf('data-id="kickoff"')).toBeGreaterThan(
+            region.lastIndexOf('data-layer="item"'),
+        );
+        expect(svg.match(/data-id="kickoff"/g)).toHaveLength(1);
+        const cutBottom = n2(inc.anchors?.[0].cutBottomY ?? -1);
+        const cuts = linesOf(region).filter((l) => attrOf(l, 'y2') === cutBottom);
+        // The anchor's fine dashes and the milestone's accent dashes.
+        expect(cuts.map((l) => attrOf(l, 'stroke-dasharray'))).toHaveLength(2);
+        expect(Number(cutBottom)).toBeLessThan(inc.box.y + inc.box.height);
+    });
+});
+
 describe('renderSvg — arrowhead marker ids', () => {
     // A cross-lane `after:` draws a dependency edge (`marker-end` on the
     // neutral marker); the after-only milestone over two parallels draws a

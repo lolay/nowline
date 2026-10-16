@@ -825,6 +825,13 @@ export interface PositionedIncludeRegion {
      * hides the global layers. Omitted when there are none.
      */
     waveCrossings?: PositionedWaveCrossing[];
+    /**
+     * The region's own anchors and milestones, in its own marker row
+     * under the label tab; their cut lines stop at its last lane. Omitted
+     * when it has none to draw.
+     */
+    anchors?: PositionedAnchor[];
+    milestones?: PositionedMilestone[];
 }
 
 /**
