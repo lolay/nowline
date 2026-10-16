@@ -3,7 +3,7 @@ import { execFileSync, spawnSync } from 'node:child_process';
 import { existsSync } from 'node:fs';
 import { cp, mkdir, mkdtemp, readdir, readFile, rm, symlink, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
-import { dirname, join, relative } from 'node:path';
+import { dirname, join, relative, sep } from 'node:path';
 import { after, before, test } from 'node:test';
 import { fileURLToPath } from 'node:url';
 import { collect, readCommit } from '../collect.mjs';
@@ -663,13 +663,13 @@ test('html escapes interpolations unless marked raw; script JSON cannot close it
 // --- Untrusted raw builds ---------------------------------------------------
 
 // Every file under `dir` with its bytes, to show a rejected publish changed
-// nothing.
+// nothing. Keys use `/` on every platform.
 async function snapshot(dir) {
     if (!existsSync(dir)) return null;
     const out = {};
     for (const entry of await readdir(dir, { recursive: true, withFileTypes: true })) {
         const path = join(entry.parentPath, entry.name);
-        out[relative(dir, path)] = entry.isFile() ? await readFile(path, 'utf8') : 'dir';
+        out[relative(dir, path).split(sep).join('/')] = entry.isFile() ? await readFile(path, 'utf8') : 'dir';
     }
     return out;
 }
