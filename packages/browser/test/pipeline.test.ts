@@ -2,6 +2,8 @@ import { type ResolveDiagnostic, tr } from '@nowline/core';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import {
     __resetBrowserPipelineForTests,
+    fromLexerError,
+    fromParserError,
     fromResolveDiagnostic,
     parseSource,
     renderSource,
@@ -342,6 +344,32 @@ describe('fromResolveDiagnostic', () => {
             line: 1,
             column: 1,
         });
+    });
+
+    it("reports an included file's syntax error as that file's own lexer row", () => {
+        const error = { message: 'unexpected character: ->"<-', line: 7, column: 10, length: 1 };
+        const row = fromResolveDiagnostic({
+            severity: 'error',
+            message: error.message,
+            sourcePath: '/child.nowline',
+            line: 6,
+            syntax: { origin: 'lexer', error },
+        });
+        expect(row).toEqual(fromLexerError(error, '/child.nowline'));
+        expect(row).toMatchObject({ code: 'lex-error', line: 7, column: 10 });
+    });
+
+    it("reports an included file's parser error as that file's own parser row", () => {
+        const error = { message: 'Expecting token', token: { startLine: 6, startColumn: 1 } };
+        const row = fromResolveDiagnostic({
+            severity: 'error',
+            message: error.message,
+            sourcePath: '/child.nowline',
+            line: 5,
+            syntax: { origin: 'parser', error },
+        });
+        expect(row).toEqual(fromParserError(error, '/child.nowline'));
+        expect(row).toMatchObject({ code: 'parse-error', line: 6, column: 1 });
     });
 });
 

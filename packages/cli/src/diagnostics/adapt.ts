@@ -97,13 +97,18 @@ function mapSeverity(severity: number | undefined): DiagnosticSeverity {
  * line: `contents` is the text of the file it points into, when known, and
  * the span covers the line's text, so the code frame still underlines the
  * declaration. A coded diagnostic keeps `{ code, args }` in `data` for
- * re-localization.
+ * re-localization. An included file's syntax error is adapted like that
+ * file's own (`lex-error` / `parse-error`).
  */
 export function adaptResolveDiagnostic(
     diag: ResolveDiagnostic,
     file: string,
     contents?: string,
 ): CliDiagnostic {
+    // An included file's syntax error reads as it does when that file is
+    // checked on its own.
+    if (diag.syntax?.origin === 'lexer') return adaptLexerError(diag.syntax.error, file);
+    if (diag.syntax?.origin === 'parser') return adaptParserError(diag.syntax.error, file);
     return {
         file,
         ...resolveLocation(diag, contents),

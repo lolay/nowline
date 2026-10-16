@@ -105,9 +105,26 @@ export function collectMcpDiagnostics(
  * an included file's NL.E0302) as an MCP diagnostic: its stable code, the
  * file it points into and a 1-based line and column, the validator's for the
  * same finding when the diagnostic carries a range (column 1 otherwise).
- * WV8, the one uncoded wave rule, is labelled like the validator's copy.
+ * WV8, the one uncoded wave rule, is labelled like the validator's copy. An
+ * included file's syntax error takes its position from the lexer or parser.
  */
 export function resolveDiagnosticToMcp(diag: ResolveDiagnostic): McpDiagnostic {
+    // An included file's syntax error, labelled like the root file's own.
+    if (diag.syntax) {
+        const column =
+            diag.syntax.origin === 'lexer'
+                ? diag.syntax.error.column
+                : diag.syntax.error.token?.startColumn;
+        return {
+            file: diag.sourcePath,
+            line: (diag.line ?? 0) + 1,
+            // An error at end of input has no position (NaN).
+            column: column !== undefined && Number.isFinite(column) ? column : 1,
+            severity: 'error',
+            code: diag.syntax.origin === 'lexer' ? 'lexing-error' : 'parsing-error',
+            message: diag.message,
+        };
+    }
     const suggestion = extractSuggestion(diag.message);
     return {
         file: diag.sourcePath,

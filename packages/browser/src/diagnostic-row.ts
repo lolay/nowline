@@ -86,9 +86,14 @@ export function fromLexerError(err: LexerErrorLike, file: string): DiagnosticRow
  * A wave-rule diagnostic (specs/waves.md §6.1) keeps its stable code
  * (`NL.Exxxx`), and its message is rendered in `locale` when the caller
  * knows one; WV8, the uncoded wave rule, is labelled like the validator's
- * copy. Every other resolver diagnostic is an `include` row, verbatim.
+ * copy. An included file's syntax error is the row that file's own check
+ * gives. Every other resolver diagnostic is an `include` row, verbatim.
  */
 export function fromResolveDiagnostic(diag: ResolveDiagnostic, locale?: string): DiagnosticRow {
+    if (diag.syntax?.origin === 'lexer') return fromLexerError(diag.syntax.error, diag.sourcePath);
+    if (diag.syntax?.origin === 'parser') {
+        return fromParserError(diag.syntax.error, diag.sourcePath);
+    }
     const line = (diag.range?.start.line ?? diag.line ?? 0) + 1;
     const column = (diag.range?.start.character ?? 0) + 1;
     if (!isRoutedResolveDiagnostic(diag)) {

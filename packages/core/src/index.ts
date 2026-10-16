@@ -34,6 +34,7 @@ export {
 } from './i18n/index.js';
 export type * from './i18n/wave-message-types.js';
 export {
+    type IncludedSyntaxError,
     type IncludeMode,
     type IsolatedRegion,
     isRoutedResolveDiagnostic,
