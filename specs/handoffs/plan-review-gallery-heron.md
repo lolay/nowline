@@ -3,7 +3,7 @@
 ```text
 --- KICKOFF: begin orchestration at [deep] ---
 
-  Status: 2/3 groups done | last review: wave 1 (1 should-fix, 3 nits); wave 2 pending | current: nowline m3 s2-s3 [exec] + wave 1 fixup | over expected: ~$23 of ~$11 (session before kickoff: m1 build and planning) | updated 2026-10-16
+  Status: 2/3 groups done | last review: wave 1 (1 should-fix, 3 nits); wave 2 (1 security should-fix, 3 nits) | current: nowline m3 s2-s3 [exec] + wave 1 fixup | over expected: ~$23 of ~$11 (session before kickoff: m1 build and planning) | updated 2026-10-16
 
   mode: unattended | proposed unattended (harness=claude-code runner=cloud; cloud runner, branch assigned by the harness) | guard 3x min $50 | fixups 2 | confirmed 2026-10-16 session 4adab00a-71c4-5a6e-9eb4-2d2721d1a6e6: Unattended (Recommended)
 
@@ -286,6 +286,11 @@ Once the PR is up, queue a suggested-task card for `lolay/nowline-infra`: a `CNA
   - should-fix `scripts/gallery/assets/gallery.js:481`: `setupEntryNav` writes the per-build Changed-only default into `prefs.changed`, so links carry `changed=0` from a no-change build into a build with changes (spec: defaults on when the build has changes). Fix: keep the default local, only `setPref` on viewer choice; add an e2e check on the A to B hop. Queued as fixup with wave 3.
   - nit `gallery.js:69`: an invalid URL param shadows a valid stored value; validate against `choices` before falling back.
   - nit `scripts/gallery/lib/html.mjs:183`: unchanged/new status note renders below the open source; emit it above `.source-row`.
+- wave 2 (7f423c9), log-only: 0 blocking, 1 should-fix (security, blocks m4), 3 nits. Migration, baseline choice, id replacement, `--open-prs` parsing, pinned-baseline release, HTML escaping and Make changes clean.
+  - should-fix `scripts/gallery/publish.mjs:116` (also `:140`, `:226`, `:233`): raw-manifest fields are trusted as paths. In m4 the privileged `workflow_run` job publishes a PR-produced artifact, so `"id": "../../x"` makes `addBuild` `rm -r` outside the data dir (reproduced); `group.id` / `entry.slug` steer writes; `entry.files` can read any runner file (e.g. `.git/config`) into the public site; `line: "main"` from a PR artifact lands on main and `latest/`. Fix: validate id/slug as `[A-Za-z0-9._-]+` (not `.`/`..`), file paths relative with no `..` and resolved inside the source root, and for PR artifacts `line === 'pr-' + pr.number`. Queued as fixup 2 after wave 3; must land before m4.
+  - nit `publish.mjs:60`, `collect.mjs:137`: shas passed to git positionally; add `--end-of-options` or require 40-hex.
+  - nit `scripts/gallery/lib/lines.mjs:95`: pinned candidates sorted by `date` string across timezone offsets; sort by `Date.parse`.
+  - nit `lines.mjs:135`: a local branch named `pr-12` is treated as a PR line; classify by the manifest's `pr` field.
 
 ## Token log
 
