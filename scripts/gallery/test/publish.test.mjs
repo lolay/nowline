@@ -669,7 +669,9 @@ async function snapshot(dir) {
     const out = {};
     for (const entry of await readdir(dir, { recursive: true, withFileTypes: true })) {
         const path = join(entry.parentPath, entry.name);
-        out[relative(dir, path).split(sep).join('/')] = entry.isFile() ? await readFile(path, 'utf8') : 'dir';
+        out[relative(dir, path).split(sep).join('/')] = entry.isFile()
+            ? await readFile(path, 'utf8')
+            : 'dir';
     }
     return out;
 }
