@@ -9,8 +9,10 @@
 - **Done this run:** wave 1 `[exec]` m2 s1-s3 in `b72b6de`, `2581435`, `0c1a82b` (`make pre-commit` green per step; `make gallery-e2e` 10/10; deliberate mode-carry break turned 3 tests red).
 - **Done this run:** wave 2 `[deep]` m3 s1 in `7f423c9` (39/39 node:test, gallery-e2e 10/10, m1 data dir migrated).
 - **Done this run:** wave 3 `[exec]` m3 s2-s3 in `846dbd8`, `c1fd456`, wave 1 review fixup in `ae13dc0` (42 node:test, gallery-e2e 15/15). A container restart interrupted wave 3 after `ae13dc0`; a resumed agent kept the uncommitted s2 diff.
-- **Done this run:** fixup 2 in `337a95e`: untrusted raw builds validated before publish (names, paths, symlinks, shas, PR line, https-only links), plus the review nits (50 node:test, gallery-e2e 15/15). Fixup 2 itself was not separately reviewed.
-- **Next unit:** m4-m6 (publish workflow, docs, DNS handoff) in a later run, after maintainer review of m2-m3; tag them first.
+- **Done this run:** fixup 2 in `337a95e`: untrusted raw builds validated before publish (names, paths, symlinks, shas, PR line, https-only links), plus the review nits (50 node:test, gallery-e2e 15/15). Reviewed after the skill became readable: wave-3-fix PASS; wave-2-fix CONCERNS (a PR artifact can reuse an existing build's id and replace main history; `--pr` optional).
+- **Group ranges:** nowline m2 s1-s3 `1511b51..0c1a82b` (+ 1-fix `ae13dc0`); nowline m3 s1 `81a3577..7f423c9` (+ 2-fix `337a95e`); nowline m3 s2-s3 `0a6d26d..c1fd456` (+ 3-fix in `337a95e`). Merged `origin/main` in `c34581f`.
+- **Bookkeeping reformatted** to the skill's grammar (step `(done)` markers, Review/Token log rows) once the skill was readable from `GaryRudolph/public`; this run's work commits don't start with step IDs.
+- **Next unit:** 2-fix2 `[deep]` nowline m3 s1 (last fix-up allowed for that group), then final completion. m4-m6 stay untagged for a later run.
 - **Resume:** paste the plan's Kickoff prompt into a new session.
 - **Pending question:** none.
 
