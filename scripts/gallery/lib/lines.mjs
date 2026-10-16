@@ -35,33 +35,55 @@ export function lineOf(manifest) {
     return manifest.line ?? MAIN_LINE;
 }
 
+// Line names come from manifests and builds.json, so the lines object has no
+// prototype: a line called `toString` or `__proto__` is just a key.
+function emptyLines() {
+    return Object.create(null);
+}
+
+// The ids `lines` lists for `line`, newest first; [] for a line it doesn't
+// have (never an inherited property).
+export function idsOf(lines, line) {
+    return Object.hasOwn(lines, line) && Array.isArray(lines[line]) ? lines[line] : [];
+}
+
 // Reads either shape of builds.json: m1's `{ builds: [ids] }` was a single
 // history of main, so it becomes the main line.
 export function normalizeIndex(index) {
+    const lines = emptyLines();
     if (index && typeof index.lines === 'object' && index.lines !== null) {
-        const lines = {};
         for (const [line, ids] of Object.entries(index.lines)) {
             if (Array.isArray(ids)) lines[line] = [...ids];
         }
-        return { lines };
+    } else if (index && Array.isArray(index.builds)) {
+        lines[MAIN_LINE] = [...index.builds];
     }
-    if (index && Array.isArray(index.builds)) return { lines: { [MAIN_LINE]: [...index.builds] } };
-    return { lines: {} };
+    return { lines };
 }
 
 function idSlug(text) {
     return text.replace(/[^A-Za-z0-9._-]+/g, '-').replace(/^-+|-+$/g, '') || 'branch';
 }
 
-// A build's id, unique per line and push. Main keeps m1's bare short sha; a
-// PR build is `pr-<n>-<head sha>` (the PR's head, not the CI merge commit),
-// so a PR build and a later main build of the same commit never collide; a
-// local branch prefixes its slug. Uncommitted local trees add a timestamp.
+// What a build's id starts with, before its short sha: nothing for main,
+// `pr-<n>-` for a pull request, the branch slug and `-` for a local branch.
+// `pr-` belongs to pull requests, so a local branch called `pr-12` gets
+// `branch-pr-12-`.
+export function idPrefix({ line = MAIN_LINE, pr = null }) {
+    if (pr) return `pr-${pr.number}-`;
+    if (line === MAIN_LINE) return '';
+    const prefix = `${idSlug(line)}-`;
+    return prefix.startsWith('pr-') ? `branch-${prefix}` : prefix;
+}
+
+// A build's id, unique per line and push: its prefix (see idPrefix), then
+// the short sha. Main keeps m1's bare short sha; a PR build uses its head
+// sha, not the CI merge commit, so a PR build and a later main build of the
+// same commit never collide. Uncommitted local trees add a timestamp.
+// lib/validate.mjs holds every published build to this shape.
 export function buildId({ sha, dirty = false, date = '', line = MAIN_LINE, pr = null }) {
-    let id = sha.slice(0, 12);
+    let id = `${idPrefix({ line, pr })}${sha.slice(0, 12)}`;
     if (dirty) id += `-dirty-${date.replace(/[-:]/g, '').slice(0, 15)}`;
-    if (pr) return `pr-${pr.number}-${id}`;
-    if (line !== MAIN_LINE) return `${idSlug(line)}-${id}`;
     return id;
 }
 
@@ -78,7 +100,7 @@ export function buildId({ sha, dirty = false, date = '', line = MAIN_LINE, pr = 
 //                the newest main build
 export async function chooseBaseline({ manifest, lines, manifests, isAncestor }) {
     const line = lineOf(manifest);
-    const own = (lines[line] ?? []).filter((id) => id !== manifest.id && manifests.has(id));
+    const own = idsOf(lines, line).filter((id) => id !== manifest.id && manifests.has(id));
     if (line === MAIN_LINE) return own[0] ?? null;
     if (manifest.pr) {
         const baseSha = manifest.pr.baseSha;
@@ -92,13 +114,13 @@ export async function chooseBaseline({ manifest, lines, manifests, isAncestor })
         return null;
     }
     if (own.length > 0) return own[0];
-    return (lines[MAIN_LINE] ?? []).find((id) => manifests.has(id)) ?? null;
+    return idsOf(lines, MAIN_LINE).find((id) => manifests.has(id)) ?? null;
 }
 
 // Every main build still on disk, newest first: the main line in order, then
 // main builds kept only as some PR's baseline, newest commit date first.
 function mainCandidates(lines, manifests, selfId) {
-    const inLine = (lines[MAIN_LINE] ?? []).filter((id) => id !== selfId && manifests.has(id));
+    const inLine = idsOf(lines, MAIN_LINE).filter((id) => id !== selfId && manifests.has(id));
     const listed = new Set(inLine);
     const pinned = [...manifests.values()]
         .filter((m) => m.id !== selfId && !listed.has(m.id) && lineOf(m) === MAIN_LINE && !m.pr)
@@ -140,7 +162,7 @@ export function retainLines({
     currentLine = null,
 }) {
     const open = openPrs ? new Set(openPrs) : null;
-    const kept = {};
+    const kept = emptyLines();
     for (const [line, ids] of Object.entries(lines)) {
         const number = linePrNumber(line, ids, manifests);
         if (number !== null && open && !open.has(number) && line !== currentLine) continue;

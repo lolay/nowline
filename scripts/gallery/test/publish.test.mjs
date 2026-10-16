@@ -1,10 +1,11 @@
 import assert from 'node:assert/strict';
-import { execFileSync } from 'node:child_process';
+import { execFileSync, spawnSync } from 'node:child_process';
 import { existsSync } from 'node:fs';
 import { cp, mkdir, mkdtemp, readdir, readFile, rm, symlink, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { dirname, join, relative } from 'node:path';
 import { after, before, test } from 'node:test';
+import { fileURLToPath } from 'node:url';
 import { collect, readCommit } from '../collect.mjs';
 import {
     escapeHtml,
@@ -141,7 +142,13 @@ test('publish builds history, classifies changes and prunes to keep', async () =
     ];
     let result;
     for (const raw of raws)
-        result = await publish({ dataDir: data, rawDir: raw, siteDir: site, keep: 2 });
+        result = await publish({
+            dataDir: data,
+            rawDir: raw,
+            siteDir: site,
+            keep: 2,
+            trust: 'main',
+        });
 
     assert.equal(result.path, 'b/333333333333/changes.html');
     const index = JSON.parse(await readFile(join(data, 'builds.json'), 'utf8'));
@@ -198,8 +205,8 @@ test('republishing the same build replaces it instead of duplicating', async () 
     const data = join(work, 'data-again');
     const site = join(work, 'site-again');
     const raw = await build(4, { parentSvg: '<svg>p4</svg>', childText: 'swimlane s "S"\n' });
-    await publish({ dataDir: data, rawDir: raw, siteDir: site });
-    const result = await publish({ dataDir: data, rawDir: raw, siteDir: site });
+    await publish({ dataDir: data, rawDir: raw, siteDir: site, trust: 'main' });
+    const result = await publish({ dataDir: data, rawDir: raw, siteDir: site, trust: 'main' });
     const index = JSON.parse(await readFile(join(data, 'builds.json'), 'utf8'));
     assert.deepEqual(index, { lines: { main: ['444444444444'] } });
     assert.equal(result.path, 'b/444444444444/');
@@ -224,7 +231,7 @@ test('an m1 data dir migrates: its flat builds.json becomes the main line', asyn
     await put(join(data, 'builds.json'), JSON.stringify({ builds: [legacy.id] }));
 
     const next = await build(6, { parentSvg: '<svg>p6</svg>', childText: 'swimlane s "S"\n' });
-    const result = await publish({ dataDir: data, rawDir: next, siteDir: site });
+    const result = await publish({ dataDir: data, rawDir: next, siteDir: site, trust: 'main' });
     assert.equal(result.path, 'b/666666666666/changes.html');
     assert.deepEqual(await readJson(join(data, 'builds.json')), {
         lines: { main: ['666666666666', '555555555555'] },
@@ -252,11 +259,13 @@ test('a local branch build compares with main and is listed in a Branches sectio
     await publish({
         dataDir: data,
         siteDir: site,
+        trust: 'main',
         rawDir: await build(6, { parentSvg: '<svg>m</svg>', childText: child, raw: 'raw-b6' }),
     });
     const result = await publish({
         dataDir: data,
         siteDir: site,
+        trust: 'local',
         rawDir: await build(6, {
             parentSvg: '<svg>branch</svg>',
             childText: child,
@@ -314,6 +323,7 @@ test("a PR build's statuses compare against main, not its own previous push", as
     const child = 'swimlane s "S"\n';
     await publish({
         ...options,
+        trust: 'main',
         rawDir: await build(7, { parentSvg: '<svg>main</svg>', childText: child }),
     });
     const head1 = 'a'.repeat(40);
@@ -321,6 +331,7 @@ test("a PR build's statuses compare against main, not its own previous push", as
     for (const head of [head1, head2]) {
         await publish({
             ...options,
+            trust: { pr: 12 },
             rawDir: await build(7, {
                 parentSvg: '<svg>pr</svg>',
                 childText: child,
@@ -361,6 +372,7 @@ async function prSite(name) {
     for (const n of [1, 2]) {
         await publish({
             ...options,
+            trust: 'main',
             rawDir: await build(n, {
                 parentSvg: `<svg>main ${n}</svg>`,
                 childText: child,
@@ -371,6 +383,7 @@ async function prSite(name) {
     for (const head of ['a', 'b']) {
         await publish({
             ...options,
+            trust: { pr: 12 },
             rawDir: await build(2, {
                 parentSvg: head === 'a' ? '<svg>pr a</svg>' : '<svg>pr b</svg>',
                 childText: child,
@@ -492,10 +505,12 @@ test('retention keeps a pruned main baseline while its PR is open', async () => 
     const child = 'swimlane s "S"\n';
     await publish({
         ...options,
+        trust: 'main',
         rawDir: await build(8, { parentSvg: '<svg>m8</svg>', childText: child, raw: 'raw-k8' }),
     });
     await publish({
         ...options,
+        trust: { pr: 3 },
         rawDir: await build(8, {
             parentSvg: '<svg>pr</svg>',
             childText: child,
@@ -505,6 +520,7 @@ test('retention keeps a pruned main baseline while its PR is open', async () => 
     });
     await publish({
         ...options,
+        trust: 'main',
         rawDir: await build(9, { parentSvg: '<svg>m9</svg>', childText: child, raw: 'raw-k9' }),
     });
     assert.deepEqual(await readJson(join(data, 'builds.json')), {
@@ -527,6 +543,7 @@ test('retention keeps a pruned main baseline while its PR is open', async () => 
     // The PR closes: its line and the baseline it pinned both go.
     await publish({
         ...options,
+        trust: 'main',
         openPrs: [],
         rawDir: await build(9, {
             parentSvg: '<svg>m10</svg>',
@@ -666,6 +683,7 @@ async function untrusted(name) {
         dataDir: data,
         siteDir: site,
         isAncestor: () => false,
+        trust: 'main',
         rawDir: await build(5, {
             parentSvg: '<svg>m</svg>',
             childText: child,
@@ -688,6 +706,7 @@ async function untrusted(name) {
                 siteDir: site,
                 rawDir: raw,
                 isAncestor: () => false,
+                trust: 'local',
                 ...options,
             }),
             pattern,
@@ -794,12 +813,12 @@ test('a PR build must be on its own pr-<n> line, and the one the workflow expect
         m.pr = null;
         m.line = 'main';
     });
-    await rejects(/expected a build of PR #12, got line main/, { expectPr: 12 });
+    await rejects(/expected a build of PR #12, got line main/, { trust: { pr: 12 } });
     await tamper((m) => {
         m.pr = prFacts(13);
         m.line = 'pr-13';
     });
-    await rejects(/expected a build of PR #12, got PR #13/, { expectPr: 12 });
+    await rejects(/expected a build of PR #12, got PR #13/, { trust: { pr: 12 } });
 });
 
 test('shas must be hex: option-shaped shas never reach git', async () => {
@@ -906,4 +925,301 @@ test('links from manifests must be https: rejected at publish, dropped at render
     assert.equal(safeUrl(evil), '');
     assert.equal(safeUrl('data:text/html,x'), '');
     assert.equal(safeUrl('https://github.com/x'), 'https://github.com/x');
+});
+
+// --- Ids, trust and what gets copied -----------------------------------------
+
+test('a PR build cannot take an existing build id: its id is pr-<n>-<head sha>', async () => {
+    const { data, tamper, rejects } = await untrusted('idreuse');
+    // The review probe: PR 12's artifact names main's build as its own id.
+    await tamper((m) => {
+        m.id = '555555555555';
+        m.line = 'pr-12';
+        m.pr = prFacts(12);
+        m.sha = m.pr.headSha;
+    });
+    await rejects(/build id "555555555555" must be pr-12-aaaaaaaaaaaa for line pr-12/, {
+        trust: { pr: 12 },
+    });
+    assert.deepEqual(await readJson(join(data, 'builds.json')), {
+        lines: { main: ['555555555555'] },
+    });
+    assert.equal((await readJson(join(data, 'b/555555555555/manifest.json'))).line, 'main');
+    // Another PR's id, or a sha that isn't the PR head, fails the same way.
+    await tamper((m) => {
+        m.id = 'pr-13-aaaaaaaaaaaa';
+    });
+    await rejects(/must be pr-12-aaaaaaaaaaaa/, { trust: { pr: 12 } });
+    await tamper((m) => {
+        m.id = 'pr-12-666666666666';
+        m.sha = '6'.repeat(40);
+    });
+    await rejects(/a PR build's sha must be its pr.headSha/, { trust: { pr: 12 } });
+    await tamper((m) => {
+        m.pr = { ...prFacts(12), headSha: undefined };
+    });
+    await rejects(/PR #12 build has no pr.headSha/, { trust: { pr: 12 } });
+});
+
+test('a build id already on another line is refused, not moved', async () => {
+    const data = join(work, 'data-owner');
+    const site = join(work, 'site-owner');
+    const child = 'swimlane s "S"\n';
+    const sha = 'e'.repeat(40);
+    await publish({
+        dataDir: data,
+        siteDir: site,
+        trust: 'local',
+        rawDir: await build(6, {
+            parentSvg: '<svg>a</svg>',
+            childText: child,
+            raw: 'raw-owner-a',
+            commit: { line: 'feat/x', ref: 'feat/x', sha },
+        }),
+    });
+    // `feat-x` slugs like `feat/x`, so the same commit would get the same id.
+    const raw = await build(6, {
+        parentSvg: '<svg>b</svg>',
+        childText: child,
+        raw: 'raw-owner-b',
+        commit: { line: 'feat-x', ref: 'feat-x', sha },
+    });
+    const before = await snapshot(data);
+    await assert.rejects(
+        publish({ dataDir: data, siteDir: site, rawDir: raw, trust: 'local' }),
+        /id feat-x-eeeeeeeeeeee already belongs to line feat\/x, not feat-x/,
+    );
+    assert.deepEqual(await snapshot(data), before, 'nothing changed');
+});
+
+test('publish needs a trust: without one nothing lands, on main or anywhere', async () => {
+    const { tamper, rejects } = await untrusted('trust');
+    await rejects(/publish needs a trust/, { trust: undefined });
+    await rejects(/publish needs a trust/, { trust: 'pr' });
+    await rejects(/publish needs a trust/, { trust: { pr: 0 } });
+    // --trusted-main admits only a main build.
+    await tamper((m) => {
+        m.line = 'feat';
+        m.id = 'feat-666666666666';
+    });
+    await rejects(/expected a main build, got line feat/, { trust: 'main' });
+    await tamper((m) => {
+        m.line = 'pr-12';
+        m.pr = prFacts(12);
+        m.sha = m.pr.headSha;
+        m.id = 'pr-12-aaaaaaaaaaaa';
+    });
+    await rejects(/expected a main build, got PR #12/, { trust: 'main' });
+});
+
+const PUBLISH = fileURLToPath(new URL('../publish.mjs', import.meta.url));
+
+function runPublish(args, env = {}) {
+    const childEnv = { ...process.env, ...env };
+    if (!('GITHUB_ACTIONS' in env)) delete childEnv.GITHUB_ACTIONS;
+    return spawnSync(process.execPath, [PUBLISH, ...args], { encoding: 'utf8', env: childEnv });
+}
+
+test('the publish CLI requires exactly one trust flag', async () => {
+    const { data, site, raw } = await untrusted('cli');
+    const dirs = ['--data', data, '--raw', raw, '--site', site];
+    const before = [await snapshot(data), await snapshot(site)];
+    for (const flags of [
+        [],
+        ['--pr', '12', '--trusted-main'],
+        ['--trusted-main', '--trusted-local'],
+    ]) {
+        const run = runPublish([...dirs, ...flags]);
+        assert.equal(run.status, 2, flags.join(' '));
+        assert.match(run.stderr, /exactly one of --pr <n>, --trusted-main, --trusted-local/);
+    }
+    const ci = runPublish([...dirs, '--trusted-local'], { GITHUB_ACTIONS: 'true' });
+    assert.equal(ci.status, 2);
+    assert.match(ci.stderr, /--trusted-local is for make gallery/);
+    // A main build is not PR 12's.
+    const pr = runPublish([...dirs, '--pr', '12']);
+    assert.equal(pr.status, 1);
+    assert.match(pr.stderr, /expected a build of PR #12, got line main/);
+    assert.deepEqual([await snapshot(data), await snapshot(site)], before, 'nothing changed');
+
+    const ok = runPublish([...dirs, '--trusted-main']);
+    assert.equal(ok.status, 0, ok.stderr);
+    assert.deepEqual((await readJson(join(data, 'builds.json'))).lines.main, [
+        '666666666666',
+        '555555555555',
+    ]);
+});
+
+test("only a PR build's id starts with pr-; a local branch called pr-12 is namespaced", async () => {
+    const { tamper, rejects } = await untrusted('prid');
+    await tamper((m) => {
+        m.id = 'pr-12-666666666666';
+    });
+    await rejects(/only a PR build's id may start with pr-/, { trust: 'main' });
+    // What a local `pr-12` branch was called before ids were bound to lines.
+    await tamper((m) => {
+        m.line = 'pr-12';
+    });
+    await rejects(/only a PR build's id may start with pr-/);
+
+    const data = join(work, 'data-prbranch');
+    const site = join(work, 'site-prbranch');
+    const raw = await build(6, {
+        parentSvg: '<svg>b</svg>',
+        childText: 'swimlane s "S"\n',
+        raw: 'raw-prbranch',
+        commit: { line: 'pr-12', ref: 'pr-12' },
+    });
+    assert.equal((await readJson(join(raw, 'manifest.json'))).id, 'branch-pr-12-666666666666');
+    await publish({ dataDir: data, siteDir: site, rawDir: raw, trust: 'local' });
+    assert.deepEqual(await readJson(join(data, 'builds.json')), {
+        lines: { 'pr-12': ['branch-pr-12-666666666666'] },
+    });
+    // A dirty local build keeps its timestamp suffix, and only when dirty.
+    const dirty = await untrusted('dirty');
+    await dirty.tamper((m) => {
+        m.id = '666666666666-dirty-20261016T010203';
+    });
+    await dirty.rejects(/must be 666666666666 for line main/);
+    await dirty.tamper((m) => {
+        m.dirty = true;
+    });
+    await publish({
+        dataDir: dirty.data,
+        siteDir: dirty.site,
+        rawDir: dirty.raw,
+        trust: 'local',
+        isAncestor: () => false,
+    });
+    assert.deepEqual((await readJson(join(dirty.data, 'builds.json'))).lines.main, [
+        '666666666666-dirty-20261016T010203',
+        '555555555555',
+    ]);
+});
+
+test('repoUrl is a github.com repository; runUrl and pr.url sit under it', async () => {
+    const { tamper, rejects } = await untrusted('repo');
+    for (const repoUrl of [
+        'https://evil.example/lolay/nowline',
+        'https://github.com/lolay',
+        'https://github.com/lolay/nowline/tree/main',
+        'https://github.com/lolay/..',
+        'https://github.com.evil.example/lolay/nowline',
+        'http://github.com/lolay/nowline',
+    ]) {
+        await tamper((m) => {
+            m.repoUrl = repoUrl;
+        });
+        await rejects(/repoUrl must be an https URL of the form https:\/\/github.com/);
+    }
+    for (const runUrl of [
+        'https://github.com/other/repo/actions/runs/1',
+        'https://github.com/lolay/nowline/actions/runs/abc',
+        'https://github.com/lolay/nowline/actions/runs/1/../../../../evil',
+        'https://evil.example/lolay/nowline/actions/runs/1',
+    ]) {
+        await tamper((m) => {
+            m.repoUrl = 'https://github.com/lolay/nowline';
+            m.runUrl = runUrl;
+        });
+        await rejects(/runUrl must be an https URL of the form <repoUrl>\/actions\/runs/);
+    }
+    // No repoUrl to pin it to: no run link either.
+    await tamper((m) => {
+        m.repoUrl = '';
+        m.runUrl = 'https://github.com/lolay/nowline/actions/runs/1';
+    });
+    await rejects(/runUrl must be an https URL/);
+    await tamper((m) => {
+        m.repoUrl = 'https://github.com/lolay/nowline';
+        m.runUrl = '';
+        m.line = 'pr-12';
+        m.pr = { ...prFacts(12), url: 'https://github.com/other/nowline/pull/12' };
+        m.sha = m.pr.headSha;
+        m.id = 'pr-12-aaaaaaaaaaaa';
+    });
+    await rejects(/pr.url must be an https URL of the form <repoUrl>\/pull\/12/);
+
+    const ok = await untrusted('repo-ok');
+    await ok.tamper((m) => {
+        m.runUrl = 'https://github.com/lolay/nowline/actions/runs/123/attempts/2';
+    });
+    await publish({
+        dataDir: ok.data,
+        siteDir: ok.site,
+        rawDir: ok.raw,
+        trust: 'main',
+        isAncestor: () => false,
+    });
+    const page = await readFile(join(ok.site, 'b/666666666666/index.html'), 'utf8');
+    assert.match(
+        page,
+        /href="https:\/\/github.com\/lolay\/nowline\/actions\/runs\/123\/attempts\/2"/,
+    );
+});
+
+test('lines named like Object.prototype members are plain lines', async () => {
+    const data = join(work, 'data-proto');
+    const site = join(work, 'site-proto');
+    const child = 'swimlane s "S"\n';
+    const names = ['toString', 'hasOwnProperty', 'valueOf'];
+    for (const [i, line] of names.entries()) {
+        const sha = `${'abc'[i]}`.repeat(40);
+        await publish({
+            dataDir: data,
+            siteDir: site,
+            trust: 'local',
+            rawDir: await build(6, {
+                parentSvg: `<svg>${line}</svg>`,
+                childText: child,
+                raw: `raw-proto-${line}`,
+                commit: { line, ref: line, sha },
+            }),
+        });
+    }
+    await publish({
+        dataDir: data,
+        siteDir: site,
+        trust: 'main',
+        rawDir: await build(6, { parentSvg: '<svg>m</svg>', childText: child, raw: 'raw-proto-m' }),
+    });
+    assert.deepEqual(await readJson(join(data, 'builds.json')), {
+        lines: {
+            toString: ['toString-aaaaaaaaaaaa'],
+            hasOwnProperty: ['hasOwnProperty-bbbbbbbbbbbb'],
+            valueOf: ['valueOf-cccccccccccc'],
+            main: ['666666666666'],
+        },
+    });
+    const root = await readFile(join(site, 'index.html'), 'utf8');
+    assert.match(root, /class="chip line-name">toString</);
+});
+
+test('only manifest.json and the files the manifest names are copied from the raw build', async () => {
+    const { data, raw } = await untrusted('extra');
+    await put(join(raw, 'extra.txt'), 'not named\n');
+    await put(join(raw, 'notes/readme.md'), 'not named\n');
+    await put(join(raw, 'svg/examples/unlisted.svg'), '<svg>unlisted</svg>');
+    await put(join(raw, 'src/examples/unlisted.nowline'), 'nowline v1\n');
+    await publish({
+        dataDir: data,
+        siteDir: join(work, 'site-extra'),
+        rawDir: raw,
+        trust: 'main',
+        isAncestor: () => false,
+    });
+    const files = Object.entries(await snapshot(join(data, 'b/666666666666')))
+        .filter(([, v]) => v !== 'dir')
+        .map(([k]) => k)
+        .sort();
+    assert.deepEqual(files, [
+        'manifest.json',
+        'src/examples/parent.nowline',
+        'src/examples/parent/child.nowline',
+        'src/examples/plain.nowline',
+        'src/tests/today.nowline',
+        'svg/examples/parent.svg',
+        'svg/examples/plain.svg',
+        'svg/tests/today.svg',
+    ]);
 });

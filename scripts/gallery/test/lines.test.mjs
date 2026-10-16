@@ -3,6 +3,7 @@ import { test } from 'node:test';
 import {
     buildId,
     chooseBaseline,
+    idsOf,
     linePrNumber,
     normalizeIndex,
     prNumberOf,
@@ -35,12 +36,17 @@ function manifestsFor(lines) {
     return byId(...manifests);
 }
 
+// The lines objects lines.mjs returns have no prototype; compare their entries.
+const plain = (lines) => ({ ...lines });
+
 test('the m1 builds.json shape reads as the main line', () => {
-    assert.deepEqual(normalizeIndex({ builds: ['b', 'a'] }), { lines: { main: ['b', 'a'] } });
-    assert.deepEqual(normalizeIndex({ lines: { main: ['a'], 'pr-3': ['p'] } }), {
-        lines: { main: ['a'], 'pr-3': ['p'] },
+    const read = (index) => plain(normalizeIndex(index).lines);
+    assert.deepEqual(read({ builds: ['b', 'a'] }), { main: ['b', 'a'] });
+    assert.deepEqual(read({ lines: { main: ['a'], 'pr-3': ['p'] } }), {
+        main: ['a'],
+        'pr-3': ['p'],
     });
-    assert.deepEqual(normalizeIndex(null), { lines: {} });
+    assert.deepEqual(read(null), {});
 });
 
 test('build ids: main keeps the short sha, PR and branch builds are namespaced', () => {
@@ -56,6 +62,10 @@ test('build ids: main keeps the short sha, PR and branch builds are namespaced',
         buildId({ sha, dirty: true, date: '2026-10-16T01:02:03.456Z', line: 'main' }),
         'abcdef012345-dirty-20261016T010203',
     );
+    // `pr-` is the PR namespace: a local branch called pr-12 (or pr) can't use it.
+    assert.equal(buildId({ sha, line: 'pr-12' }), 'branch-pr-12-abcdef012345');
+    assert.equal(buildId({ sha, line: 'pr' }), 'branch-pr-abcdef012345');
+    assert.equal(buildId({ sha, line: 'pr-12', pr: { number: 12 } }), 'pr-12-abcdef012345');
     assert.equal(prNumberOf('pr-12'), 12);
     assert.equal(prNumberOf('main'), null);
     assert.equal(prNumberOf('pr-x'), null);
@@ -206,7 +216,7 @@ test('retention keeps --keep per main and branch line and --keep-pr per PR line'
         keep: 3,
         keepPr: 2,
     });
-    assert.deepEqual(kept, {
+    assert.deepEqual(plain(kept), {
         main: ['m5', 'm4', 'm3'],
         feat: ['f3', 'f2', 'f1'],
         'pr-1': ['a3', 'a2'],
@@ -240,7 +250,7 @@ test('a main build that a retained PR build compares against stays on disk', () 
     );
     const lines = { main: ['m3', 'm2', 'm1'], 'pr-4': ['p1'], 'pr-5': ['q1'] };
     const kept = retainLines({ lines, manifests, keep: 1, keepPr: 10, openPrs: [4] });
-    assert.deepEqual(kept.lines, { main: ['m3'], 'pr-4': ['p1'] });
+    assert.deepEqual(plain(kept.lines), { main: ['m3'], 'pr-4': ['p1'] });
     assert.deepEqual(
         [...kept.onDisk].sort(),
         ['m1', 'm3', 'p1'],
@@ -274,7 +284,11 @@ test('a local branch named pr-12 is a branch line: --keep applies and --open-prs
     assert.equal(linePrNumber('pr-12', lines['pr-12'], manifests), null);
     assert.equal(linePrNumber('pr-13', lines['pr-13'], manifests), 13);
     const { lines: kept } = retainLines({ lines, manifests, keep: 3, keepPr: 1, openPrs: [13] });
-    assert.deepEqual(kept, { main: ['m2', 'm1'], 'pr-12': ['l3', 'l2', 'l1'], 'pr-13': ['p2'] });
+    assert.deepEqual(plain(kept), {
+        main: ['m2', 'm1'],
+        'pr-12': ['l3', 'l2', 'l1'],
+        'pr-13': ['p2'],
+    });
     const closed = retainLines({ lines, manifests, keep: 3, keepPr: 1, openPrs: [] });
     assert.deepEqual(Object.keys(closed.lines), ['main', 'pr-12'], 'only the real PR line closes');
 });
@@ -293,4 +307,38 @@ test('pinned main baselines are ordered by instant, not by date string', async (
         isAncestor: () => true,
     });
     assert.equal(baseId, 'est');
+});
+
+test('lines objects have no prototype: toString and __proto__ are just line names', async () => {
+    const { lines } = normalizeIndex(
+        JSON.parse('{"lines":{"__proto__":["x1"],"toString":["t1"],"main":["m1"]}}'),
+    );
+    assert.equal(Object.getPrototypeOf(lines), null);
+    assert.deepEqual(Object.keys(lines).sort(), ['__proto__', 'main', 'toString']);
+    assert.deepEqual(idsOf(lines, 'toString'), ['t1']);
+    assert.deepEqual(idsOf(lines, 'valueOf'), [], 'nothing inherited');
+    assert.deepEqual(idsOf({}, 'constructor'), []);
+    const manifests = byId(build('m1'), build('t1', { line: 'toString' }));
+    assert.equal(
+        await chooseBaseline({
+            manifest: build('t2', { line: 'toString' }),
+            lines,
+            manifests,
+            isAncestor: noAncestry,
+        }),
+        't1',
+    );
+    assert.equal(
+        await chooseBaseline({
+            manifest: build('v1', { line: 'valueOf' }),
+            lines,
+            manifests,
+            isAncestor: noAncestry,
+        }),
+        'm1',
+        'a new line named like a prototype member starts from main',
+    );
+    const kept = retainLines({ lines, manifests, keep: 5, keepPr: 5 });
+    assert.equal(Object.getPrototypeOf(kept.lines), null);
+    assert.deepEqual(idsOf(kept.lines, 'toString'), ['t1']);
 });

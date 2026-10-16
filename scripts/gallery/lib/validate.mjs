@@ -2,17 +2,21 @@
 // privileged job publishes an artifact that pull-request code produced, so
 // every manifest field and every file in the raw build is untrusted: ids,
 // group ids, slugs and source paths become filesystem paths; shas go to git;
-// URLs become links on the site. Pure apart from `checkRawTree`, which only
-// reads.
+// URLs become links on the site; the id and line decide which history a
+// build joins. Pure apart from `checkRawTree`, which only reads.
 
 import { lstat, readdir } from 'node:fs/promises';
 import { isAbsolute, relative, resolve, sep } from 'node:path';
+import { idPrefix, MAIN_LINE } from './lines.mjs';
 
 const NAME = /^[A-Za-z0-9._-]+$/;
 const SHA = /^[0-9a-f]{7,40}$/;
 // Line names are keys in builds.json and shown on the site, never paths.
 const LINE = /^[A-Za-z0-9._/-]+$/;
 const RESERVED_KEYS = new Set(['__proto__', 'constructor', 'prototype']);
+// What buildId appends for an uncommitted local tree.
+const DIRTY_SUFFIX = /^-dirty-\d{8}T\d{6}$/;
+const REPO_URL = /^https:\/\/github\.com\/([A-Za-z0-9_.-]+)\/([A-Za-z0-9_.-]+)$/;
 
 function fail(message) {
     throw new Error(`invalid gallery build: ${message}`);
@@ -61,11 +65,48 @@ export function safeUrl(value) {
     }
 }
 
-function optionalUrl(what, value, pattern = null) {
-    if (value === undefined || value === null || value === '') return;
-    if (!safeUrl(value) || (pattern && !pattern.test(value))) {
-        fail(
-            `${what} must be an https URL${pattern ? ' of the expected shape' : ''}, got ${JSON.stringify(value)}`,
+function isEmpty(value) {
+    return value === undefined || value === null || value === '';
+}
+
+// A link that must match `pattern` (built from repoUrl); with no pattern
+// (no repoUrl to pin it to) only an empty value passes.
+function pinnedUrl(what, value, pattern, shape) {
+    if (isEmpty(value)) return;
+    if (!safeUrl(value) || !pattern?.test(value)) {
+        fail(`${what} must be an https URL of the form ${shape}, got ${JSON.stringify(value)}`);
+    }
+}
+
+function escapeRegExp(text) {
+    return text.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+}
+
+// The repository links: repoUrl is a github.com repository; runUrl and the
+// PR's url sit under it.
+function checkLinks(manifest, pr) {
+    const repoUrl = isEmpty(manifest.repoUrl) ? '' : manifest.repoUrl;
+    if (repoUrl) {
+        const match = REPO_URL.exec(repoUrl);
+        if (!safeUrl(repoUrl) || !match || !isSafeName(match[1]) || !isSafeName(match[2])) {
+            fail(
+                `repoUrl must be an https URL of the form https://github.com/<owner>/<repo>, got ${JSON.stringify(repoUrl)}`,
+            );
+        }
+    }
+    const base = repoUrl ? escapeRegExp(repoUrl) : null;
+    pinnedUrl(
+        'runUrl',
+        manifest.runUrl,
+        base && new RegExp(`^${base}/actions/runs/\\d+(?:/attempts/\\d+)?$`),
+        '<repoUrl>/actions/runs/<id>',
+    );
+    if (pr) {
+        pinnedUrl(
+            'pr.url',
+            pr.url,
+            base && new RegExp(`^${base}/pull/${pr.number}$`),
+            `<repoUrl>/pull/${pr.number}`,
         );
     }
 }
@@ -75,16 +116,58 @@ function optionalSha(what, value) {
     assertSha(what, value);
 }
 
+// How far publish trusts the build it is handed, from what the publishing
+// workflow knows rather than from the build itself:
+//   { pr: n }  a pull request run: the build must be PR n's
+//   'main'     a push to main: the build must be a main build, not a PR's
+//   'local'    `make gallery` on a developer's own tree: any line
+export function assertTrust(trust) {
+    if (trust === 'main' || trust === 'local') return trust;
+    if (trust && typeof trust === 'object' && Number.isInteger(trust.pr) && trust.pr > 0) {
+        return trust;
+    }
+    throw new Error(
+        `publish needs a trust: { pr: <n> } (--pr), 'main' (--trusted-main) or 'local' (--trusted-local), got ${JSON.stringify(trust)}`,
+    );
+}
+
+function checkTrust(trust, line, pr) {
+    const got = pr ? `PR #${pr.number}` : `line ${line}`;
+    if (trust === 'main' && (pr || line !== MAIN_LINE)) fail(`expected a main build, got ${got}`);
+    if (typeof trust === 'object' && pr?.number !== trust.pr) {
+        fail(`expected a build of PR #${trust.pr}, got ${got}`);
+    }
+}
+
+// The id is bound to the build's line and commit (see buildId): a PR
+// build's is `pr-<n>-<head sha>`, so it can't name a main build or another
+// PR's; only a PR build's id starts with `pr-`.
+function checkId(manifest, line, pr) {
+    const { id, sha } = manifest;
+    if (pr) {
+        if (isEmpty(pr.headSha)) fail(`PR #${pr.number} build has no pr.headSha`);
+        if (sha !== pr.headSha) fail(`a PR build's sha must be its pr.headSha, got ${sha}`);
+    } else if (id.startsWith('pr-')) {
+        fail(`only a PR build's id may start with pr-, got ${JSON.stringify(id)}`);
+    }
+    const expected = `${idPrefix({ line, pr })}${sha.slice(0, 12)}`;
+    const rest = id.startsWith(expected) ? id.slice(expected.length) : null;
+    if (rest === '' || (rest !== null && manifest.dirty === true && DIRTY_SUFFIX.test(rest))) {
+        return;
+    }
+    fail(`build id ${JSON.stringify(id)} must be ${expected} for line ${line}`);
+}
+
 // Validates a build manifest's shape and every field that becomes a path,
-// a git argument or a link. With `expectPr` (the PR number the publishing
-// workflow knows from its trigger), the manifest must be that PR's build.
-export function validateManifest(manifest, { expectPr = null } = {}) {
+// a git argument or a link, and binds its id to its line. With `trust` (see
+// assertTrust), the build must also be one the publishing workflow expects.
+export function validateManifest(manifest, { trust = null } = {}) {
     if (!manifest || typeof manifest !== 'object' || Array.isArray(manifest)) {
         fail('manifest is not an object');
     }
     if (!isSafeName(manifest.id)) fail(`unsafe build id ${JSON.stringify(manifest.id)}`);
     assertSha('sha', manifest.sha);
-    const line = manifest.line ?? 'main';
+    const line = manifest.line ?? MAIN_LINE;
     if (typeof line !== 'string' || !LINE.test(line) || RESERVED_KEYS.has(line)) {
         fail(`unsafe line ${JSON.stringify(line)}`);
     }
@@ -99,21 +182,12 @@ export function validateManifest(manifest, { expectPr = null } = {}) {
         }
         optionalSha('pr.headSha', pr.headSha);
         optionalSha('pr.baseSha', pr.baseSha);
-        optionalUrl(
-            'pr.url',
-            pr.url,
-            new RegExp(`^https://github\\.com/[A-Za-z0-9_.-]+/[A-Za-z0-9_.-]+/pull/${pr.number}$`),
-        );
     }
-    if (expectPr !== null && pr?.number !== expectPr) {
-        fail(
-            `expected a build of PR #${expectPr}, got ${pr ? `PR #${pr.number}` : `line ${line}`}`,
-        );
-    }
+    if (trust !== null) checkTrust(assertTrust(trust), line, pr);
     // A build without `pr` on a line named like `pr-12` is a local branch of
     // that name; lib/lines.mjs classifies lines by `pr`, not by name.
-    optionalUrl('repoUrl', manifest.repoUrl);
-    optionalUrl('runUrl', manifest.runUrl);
+    checkLinks(manifest, pr);
+    checkId(manifest, line, pr);
     if (!Array.isArray(manifest.groups)) fail('groups is not an array');
     const keys = new Set();
     for (const group of manifest.groups) {
@@ -139,9 +213,23 @@ export function validateManifest(manifest, { expectPr = null } = {}) {
     return manifest;
 }
 
+// Every file a (validated) manifest names in its raw build, relative to it:
+// each entry's SVG and source files, each once.
+export function namedFiles(manifest) {
+    const files = new Set();
+    for (const group of manifest.groups) {
+        for (const entry of group.entries) {
+            files.add(`svg/${group.id}/${entry.slug}.svg`);
+            for (const file of entry.files) files.add(`src/${file}`);
+        }
+    }
+    return [...files];
+}
+
 // Walks a raw build directory and refuses anything but plain files and
 // directories (a symlink could point anywhere on the runner), then confirms
 // every SVG and source file the manifest names is a plain file in it.
+// publish.mjs copies only those files (namedFiles) into the data dir.
 export async function checkRawTree(rawDir, manifest) {
     const files = new Set();
     async function walk(dir, prefix) {
@@ -154,13 +242,7 @@ export async function checkRawTree(rawDir, manifest) {
         }
     }
     await walk(resolve(rawDir), '');
-    for (const group of manifest.groups) {
-        for (const entry of group.entries) {
-            const svg = `svg/${group.id}/${entry.slug}.svg`;
-            if (!files.has(svg)) fail(`${svg} is missing from the raw build`);
-            for (const file of entry.files) {
-                if (!files.has(`src/${file}`)) fail(`src/${file} is missing from the raw build`);
-            }
-        }
+    for (const file of namedFiles(manifest)) {
+        if (!files.has(file)) fail(`${file} is missing from the raw build`);
     }
 }

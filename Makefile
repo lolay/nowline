@@ -124,7 +124,7 @@ ci-platform: build-fast ## Slim CI gate for the OS/Node cells: build-fast + Vite
 
 gallery: build ## Add this tree's renders to the local review gallery (.gallery/site): compare each example and test against its baseline build
 	@$(MAKE) --no-print-directory gallery-collect
-	node scripts/gallery/publish.mjs --data $(GALLERY_DIR)/data --raw $(GALLERY_DIR)/raw --site $(GALLERY_DIR)/site --keep $(GALLERY_KEEP) --keep-pr $(GALLERY_KEEP_PR)
+	node scripts/gallery/publish.mjs --trusted-local --data $(GALLERY_DIR)/data --raw $(GALLERY_DIR)/raw --site $(GALLERY_DIR)/site --keep $(GALLERY_KEEP) --keep-pr $(GALLERY_KEEP_PR)
 
 gallery-collect: ## Snapshot the already-rendered examples and tests into .gallery/raw (no build first; reads GALLERY_* PR facts in CI)
 	node scripts/gallery/collect.mjs $(GALLERY_DIR)/raw

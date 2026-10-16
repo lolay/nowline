@@ -35,6 +35,7 @@ interface GalleryModules {
         dataDir: string;
         rawDir: string;
         siteDir: string;
+        trust: 'main' | 'local' | { pr: number };
         isAncestor?: () => boolean;
     }): Promise<unknown>;
     createGalleryServer(siteDir: string): Server;
@@ -257,7 +258,7 @@ beforeAll(async () => {
     const site = path.join(work, 'site');
     for (const n of [1, 2, 3] as const) {
         const raw = await buildRaw(gallery, work, n);
-        await gallery.publish({ dataDir: data, rawDir: raw, siteDir: site });
+        await gallery.publish({ dataDir: data, rawDir: raw, siteDir: site, trust: 'main' });
     }
     const prSame = svg('same pr', 200);
     const pushes: PrPush[] = [
@@ -275,6 +276,7 @@ beforeAll(async () => {
             dataDir: data,
             rawDir: raw,
             siteDir: site,
+            trust: { pr: PR_NUMBER },
             isAncestor: () => false,
         });
     }

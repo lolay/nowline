@@ -3,7 +3,8 @@
 // regenerate the whole review site from that history.
 //
 // Usage: node scripts/gallery/publish.mjs --data <dir> --raw <dir> --site <dir>
-//          [--keep 100] [--keep-pr 10] [--open-prs 12,34] [--pr 12]
+//          (--pr <n> | --trusted-main | --trusted-local)
+//          [--keep 100] [--keep-pr 10] [--open-prs 12,34]
 //
 // `--data` holds raw builds only (SVGs, sources, manifests) and builds.json,
 // which lists each line's build ids newest first (see lib/lines.mjs). Adding
@@ -19,13 +20,27 @@
 // accumulates under .gallery/.
 //
 // The raw build is untrusted (in CI, pull-request code produced it), so it is
-// validated (lib/validate.mjs) before anything on disk changes. `--pr <n>`
-// names the PR the publishing workflow knows it is handling; the raw build
-// must then be that PR's build, so it can't claim main or another PR.
+// validated (lib/validate.mjs) before anything on disk changes, and its id
+// must be the one buildId gives its line and commit. Exactly one trust flag
+// is required, from what the caller knows rather than from the build:
+// `--pr <n>` for a pull request run (the build must be PR n's),
+// `--trusted-main` for a push to main (the build must be a main build), and
+// `--trusted-local` for `make gallery` on a developer's own tree (any line;
+// refused under GitHub Actions). A build id already on another line is
+// refused, and only the files the manifest names are copied in.
 
 import { execFileSync } from 'node:child_process';
 import { existsSync } from 'node:fs';
-import { appendFile, cp, mkdir, readdir, readFile, rm, writeFile } from 'node:fs/promises';
+import {
+    appendFile,
+    copyFile,
+    cp,
+    mkdir,
+    readdir,
+    readFile,
+    rm,
+    writeFile,
+} from 'node:fs/promises';
 import { dirname, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { parseArgs } from 'node:util';
@@ -41,6 +56,7 @@ import {
 } from './lib/html.mjs';
 import {
     chooseBaseline,
+    idsOf,
     lineOf,
     linePrNumber,
     MAIN_LINE,
@@ -55,7 +71,15 @@ import {
     historyNavigation,
     itemNavigation,
 } from './lib/model.mjs';
-import { checkRawTree, inside, isSafeName, isSha, validateManifest } from './lib/validate.mjs';
+import {
+    assertTrust,
+    checkRawTree,
+    inside,
+    isSafeName,
+    isSha,
+    namedFiles,
+    validateManifest,
+} from './lib/validate.mjs';
 
 const ASSETS_DIR = resolve(dirname(fileURLToPath(import.meta.url)), 'assets');
 const REPO_ROOT = resolve(dirname(fileURLToPath(import.meta.url)), '../..');
@@ -112,37 +136,51 @@ async function loadAllManifests(dataDir) {
 
 // Adds the raw build to the data dir with its baseline, applies retention
 // and deletes raw builds nothing keeps. Returns the new index's lines and
-// the build's id. The raw build is validated first; an invalid one throws
-// with the data dir untouched.
+// the build's id. `trust` is required (see assertTrust in lib/validate.mjs).
+// The raw build is validated first; an invalid one throws with the data dir
+// untouched.
 export async function addBuild({
     dataDir,
     rawDir,
     keep = 100,
     keepPr = 10,
     openPrs = null,
-    expectPr = null,
+    trust,
     isAncestor = gitIsAncestor(),
 }) {
+    assertTrust(trust);
     const manifest = await readJson(resolve(rawDir, 'manifest.json'), null);
     if (!manifest) throw new Error(`no manifest.json in ${rawDir}`);
-    validateManifest(manifest, { expectPr });
+    validateManifest(manifest, { trust });
     await checkRawTree(rawDir, manifest);
     const target = inside(dataDir, 'b', manifest.id);
     const { lines } = normalizeIndex(await readJson(resolve(dataDir, 'builds.json'), null));
-    // Republishing an id replaces it wherever it was.
-    for (const line of Object.keys(lines)) {
-        lines[line] = lines[line].filter((id) => id !== manifest.id);
-    }
     const manifests = await loadAllManifests(dataDir);
-    manifests.delete(manifest.id);
     const line = lineOf(manifest);
+    // An id belongs to one line: republishing it replaces it there, but a
+    // build can't take over an id another line lists or stores.
+    const owners = new Set(Object.keys(lines).filter((l) => lines[l].includes(manifest.id)));
+    if (manifests.has(manifest.id)) owners.add(lineOf(manifests.get(manifest.id)));
+    owners.delete(line);
+    if (owners.size > 0) {
+        throw new Error(
+            `invalid gallery build: id ${manifest.id} already belongs to line ${[...owners].join(', ')}, not ${line}`,
+        );
+    }
+    lines[line] = idsOf(lines, line).filter((id) => id !== manifest.id);
+    manifests.delete(manifest.id);
     const baseId = await chooseBaseline({ manifest, lines, manifests, isAncestor });
     const stored = { ...manifest, line, baseId };
     await rm(target, { recursive: true, force: true });
-    await cp(rawDir, target, { recursive: true });
+    // Only the files the manifest names; anything else in the raw build stays out.
+    for (const file of namedFiles(manifest)) {
+        const to = inside(target, file);
+        await mkdir(dirname(to), { recursive: true });
+        await copyFile(inside(rawDir, file), to);
+    }
     await write(resolve(target, 'manifest.json'), `${JSON.stringify(stored, null, 2)}\n`);
     manifests.set(manifest.id, stored);
-    lines[line] = [manifest.id, ...(lines[line] ?? [])];
+    lines[line] = [manifest.id, ...lines[line]];
 
     const retained = retainLines({ lines, manifests, keep, keepPr, openPrs, currentLine: line });
     for (const id of await readdir(resolve(dataDir, 'b'))) {
@@ -292,12 +330,14 @@ export async function renderSite({ dataDir, siteDir, lines, focusId = null }) {
     }
 
     const listed = (line) =>
-        (lines[line] ?? []).filter((id) => all.has(id)).map((id) => rendered.get(id));
-    const mainIds = (lines[MAIN_LINE] ?? []).filter((id) => all.has(id));
+        idsOf(lines, line)
+            .filter((id) => all.has(id))
+            .map((id) => rendered.get(id));
+    const mainIds = idsOf(lines, MAIN_LINE).filter((id) => all.has(id));
     const main = listed(MAIN_LINE);
     // Local branches, most recently pushed first; pull requests, highest number
     // first. A line is a PR line when its builds carry `pr`, not by its name.
-    const prNumber = (line) => linePrNumber(line, lines[line], all);
+    const prNumber = (line) => linePrNumber(line, idsOf(lines, line), all);
     const pushedAt = (g) => Date.parse(g.builds[0].manifest.date) || 0;
     const branches = Object.keys(lines)
         .filter((line) => line !== MAIN_LINE && prNumber(line) === null)
@@ -367,7 +407,7 @@ export async function publish({
     keep = 100,
     keepPr = 10,
     openPrs = null,
-    expectPr = null,
+    trust,
     isAncestor = gitIsAncestor(),
 }) {
     const { id, lines } = await addBuild({
@@ -376,14 +416,14 @@ export async function publish({
         keep,
         keepPr,
         openPrs,
-        expectPr,
+        trust,
         isAncestor,
     });
     return renderSite({ dataDir, siteDir, lines, focusId: id });
 }
 
 const USAGE =
-    'usage: node scripts/gallery/publish.mjs --data <dir> --raw <dir> --site <dir> [--keep 100] [--keep-pr 10] [--open-prs 12,34] [--pr 12]';
+    'usage: node scripts/gallery/publish.mjs --data <dir> --raw <dir> --site <dir> (--pr <n> | --trusted-main | --trusted-local) [--keep 100] [--keep-pr 10] [--open-prs 12,34]';
 
 function positiveInt(name, text) {
     const value = Number(text);
@@ -404,10 +444,31 @@ async function main() {
             'keep-pr': { type: 'string', default: '10' },
             'open-prs': { type: 'string' },
             pr: { type: 'string' },
+            'trusted-main': { type: 'boolean' },
+            'trusted-local': { type: 'boolean' },
         },
     });
     if (!values.data || !values.raw || !values.site) {
         console.error(USAGE);
+        process.exit(2);
+    }
+    // Fail closed: with no trust flag a build lands nowhere.
+    const trusts = [
+        values.pr === undefined ? null : { pr: positiveInt('--pr', values.pr) },
+        values['trusted-main'] ? 'main' : null,
+        values['trusted-local'] ? 'local' : null,
+    ].filter(Boolean);
+    if (trusts.length !== 1) {
+        console.error(
+            `exactly one of --pr <n>, --trusted-main, --trusted-local is required\n${USAGE}`,
+        );
+        process.exit(2);
+    }
+    const [trust] = trusts;
+    if (trust === 'local' && process.env.GITHUB_ACTIONS) {
+        console.error(
+            '--trusted-local is for make gallery on a developer machine, not GitHub Actions',
+        );
         process.exit(2);
     }
     // Omitted keeps every PR line; an empty list means no PR is open.
@@ -426,7 +487,7 @@ async function main() {
         keep: positiveInt('--keep', values.keep),
         keepPr: positiveInt('--keep-pr', values['keep-pr']),
         openPrs,
-        expectPr: values.pr === undefined ? null : positiveInt('--pr', values.pr),
+        trust,
     });
     console.log(`published ${result.id} -> ${resolve(values.site, result.path)}`);
     if (process.env.GITHUB_OUTPUT) {
