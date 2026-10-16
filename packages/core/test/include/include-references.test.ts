@@ -106,6 +106,21 @@ describe('NL.E0302 in included files', () => {
         },
     );
 
+    it('carries the range the validator reports for the same reference', async () => {
+        const validated = (await parse(child)).diagnostics.find(
+            (d) => d.message === message('after', 'launch'),
+        );
+        const result = await resolveAt({ 'host.nowline': host('merge'), 'child.nowline': child });
+        const [d] = result.diagnostics.filter((x) => x.code === 'NL.E0302');
+        // `after:launch`, 0-based: line 7, characters 40 to 52.
+        expect(d.range).toEqual({
+            start: { line: 7, character: 40 },
+            end: { line: 7, character: 52 },
+        });
+        expect(d.range).toEqual(validated?.range);
+        expect(d.line).toBe(d.range?.start.line);
+    });
+
     it('roadmap:ignore drops the child content and stays silent', async () => {
         const result = await resolveAt({ 'host.nowline': host('ignore'), 'child.nowline': child });
         expect(result.diagnostics).toEqual([]);
