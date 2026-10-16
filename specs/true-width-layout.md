@@ -96,7 +96,7 @@ As built (m1):
 
 - Bar geometry: `naturalWidth` is the item's span in time (`itemSpanPx`), the box is inset by `itemBarInsetPx` and is `itemVisualWidth` wide; `MIN_ITEM_WIDTH` is 1 and `ITEM_SEAM_PX` is 1. `ITEM_INSET_PX` stays for the lane gutter and container headers until m2. The renderer caps a bar's corner radius at half its width and height.
 - `TrackCursor` has only `x`, the time end. A parallel's box, a group's box and `after:` all read it.
-- The row packer starts each child at the last committed child's row. An item whose own slack arrow runs left (an overrun) drops to a row that arrow can cross, since the work before it can no longer be pushed down out of its way; a corridor whose source is still to come in the track never bumps an earlier item.
+- The row packer places each child on the last row or a new row below it, so it never has rows below a growing row to shift (the retroactive row shift is gone; `tests/item-bumps-up` and `tests/late-row-shifts` keep their names and say so). An item whose own slack arrow runs left (an overrun) drops to a row that arrow can cross, since the work before it can no longer be pushed down out of its way; a corridor whose source is still to come in the track never bumps an earlier item.
 - `test/date-truth.test.ts` checks every item of every sample and of the 60 generated roadmaps. With it green, the divergence register is empty and `scheduleFloorX` is gone; `schedule-lower-bound.test.ts` still guards the barrier seed.
 - Interim: arrows still use the old router, which can route an elbow through the 2 px seam between abutting bars until m3.
 

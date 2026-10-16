@@ -268,13 +268,15 @@ function bandLayers(svg: string): string[] {
 }
 
 describe('non-working bands under show', () => {
-    it('draws one band per weekend at o+40/96/152/208, 16 wide, chart top to timeline bottom', async () => {
+    it('draws one band per weekend at o+40/96/152/208/264, 16 wide, chart top to timeline bottom', async () => {
         const model = await parseToModel(EXAMPLE_A, { theme: 'light', ...SHOW });
         const layers = bandLayers(await renderSvg(model));
         expect(layers).toHaveLength(1);
         const rects = rectsOf(layers[0]);
         const o = model.timeline.originX;
-        expect(rects.map((r) => Number(r.x) - o)).toEqual([40, 96, 152, 208]);
+        // W4's caption spills past Feb 2, so the window runs to Feb 9 and
+        // takes that week's weekend too.
+        expect(rects.map((r) => Number(r.x) - o)).toEqual([40, 96, 152, 208, 264]);
         const bottom = model.timeline.box.y + model.timeline.box.height;
         for (const r of rects) {
             expect(r.width).toBe('16');
@@ -297,7 +299,7 @@ describe('non-working bands under show', () => {
             const [layer] = bandLayers(await renderSvg(model));
             expect(layer).toBeDefined();
             const rects = rectsOf(layer ?? '');
-            expect(rects).toHaveLength(4);
+            expect(rects).toHaveLength(5);
             for (const r of rects) expect(r.fill).toBe(fills[name]);
             expect(model.palette.timeline.nonWorkingFill).toBe(fills[name]);
         });

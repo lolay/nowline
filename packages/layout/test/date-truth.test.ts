@@ -17,10 +17,10 @@ import { fileURLToPath } from 'node:url';
 import { buildWavePlan, type NowlineFile, type ResolveResult } from '@nowline/core';
 import { afterEach, describe, expect, it } from 'vitest';
 import { layoutRoadmap } from '../src/layout.js';
-import { ITEM_SEAM_PX, MIN_ITEM_WIDTH } from '../src/themes/shared.js';
 import type { ItemMeasure } from '../src/nodes/item-measure.js';
 import { setItemNodeTrace } from '../src/nodes/item-node.js';
 import { scheduleRoadmap } from '../src/schedule.js';
+import { ITEM_SEAM_PX, MIN_ITEM_WIDTH } from '../src/themes/shared.js';
 import type { TimeScale } from '../src/time-scale.js';
 import type {
     PositionedItem,
