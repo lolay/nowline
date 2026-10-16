@@ -37,9 +37,10 @@ export function buildIncludeRegions(
     startY: number,
     helpers: LayoutHelpers,
     chartRightX: number,
-): { regions: PositionedIncludeRegion[]; endY: number } {
+): { regions: PositionedIncludeRegion[]; contexts: LayoutContext[]; endY: number } {
     let y = startY + TAB_RESERVE;
     const out: PositionedIncludeRegion[] = [];
+    const contexts: LayoutContext[] = [];
     let isFirst = true;
     for (const region of regions) {
         if (!isFirst) y += GAP_BETWEEN_REGIONS;
@@ -125,9 +126,10 @@ export function buildIncludeRegions(
         if (markers.anchors.length > 0) positioned.anchors = markers.anchors;
         if (markers.milestones.length > 0) positioned.milestones = markers.milestones;
         out.push(positioned);
+        contexts.push(childCtx);
         y += regionHeight;
     }
-    return { regions: out, endY: y };
+    return { regions: out, contexts, endY: y };
 }
 
 /**

@@ -1823,6 +1823,12 @@ milestone beta "Beta" after:alpha
         // The anchor's fine dashes and the milestone's accent dashes.
         expect(cuts.map((l) => attrOf(l, 'stroke-dasharray'))).toHaveLength(2);
         expect(Number(cutBottom)).toBeLessThan(inc.box.y + inc.box.height);
+        // The anchor's stub into the item after it, drawn inside the region
+        // over its lanes and under its markers.
+        expect(inc.edges).toHaveLength(1);
+        const arrow = region.indexOf('marker-end=');
+        expect(arrow).toBeGreaterThan(region.lastIndexOf('data-layer="item"'));
+        expect(arrow).toBeLessThan(region.indexOf('data-id="kickoff"'));
     });
 });
 

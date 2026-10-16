@@ -875,12 +875,30 @@ function anchors(fx: FinalizeContext): boolean {
     return built.length > 0;
 }
 
-/** f11 (was P16): dependency edges, their ports read off the final boxes. */
+/**
+ * f11 (was P16): dependency edges, their ports read off the final boxes.
+ * Each isolated region routes its own, among its own lanes: its `after:`
+ * references resolve only inside it.
+ */
 function dependencyEdges(fx: FinalizeContext): boolean {
     const itemsMap = collectItems(fx.chart.laneEntries);
     const edges = buildDependencies(itemsMap, fx.chart.swimlanes, fx.chart.includes, fx.ctx);
     fx.draft.edges = edges;
-    return edges.length > 0;
+    let regionEdgeCount = 0;
+    fx.resolved.content.isolatedRegions.forEach((region, i) => {
+        const inc = fx.chart.includes[i];
+        const regionCtx = fx.chart.regionContexts[i];
+        if (!inc || !regionCtx) return;
+        const regionEdges = buildDependencies(
+            collectItems([...region.content.swimlanes.values()]),
+            inc.nestedSwimlanes,
+            [],
+            regionCtx,
+        );
+        if (regionEdges.length > 0) inc.edges = regionEdges;
+        regionEdgeCount += regionEdges.length;
+    });
+    return edges.length + regionEdgeCount > 0;
 }
 
 /**

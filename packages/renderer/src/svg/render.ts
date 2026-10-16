@@ -2249,6 +2249,17 @@ function renderIncludeRegion(
     const nested = r.nestedSwimlanes
         .map((s) => renderSwimlane(s, options, idPrefix, palette, fonts))
         .join('');
+    // The region's own dependency edges, in the host's order: under-bar
+    // edges beneath its bars, the rest over them.
+    const regionEdges = r.edges ?? [];
+    const edgesUnder = regionEdges
+        .filter((e) => e.kind === 'underBar')
+        .map((e) => renderEdge(e, idPrefix, palette))
+        .join('');
+    const edgesOver = regionEdges
+        .filter((e) => e.kind !== 'underBar')
+        .map((e) => renderEdge(e, idPrefix, palette))
+        .join('');
     // The region's own anchors and milestones: cut lines over its lanes,
     // then the diamonds and labels of its marker row, as on the host.
     const anchors = r.anchors ?? [];
@@ -2265,8 +2276,10 @@ function renderIncludeRegion(
         region +
             bandsUnder +
             waveUnder +
+            edgesUnder +
             nested +
             waveOver +
+            edgesOver +
             markers +
             tab +
             tabLabel +

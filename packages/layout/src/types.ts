@@ -832,6 +832,11 @@ export interface PositionedIncludeRegion {
      */
     anchors?: PositionedAnchor[];
     milestones?: PositionedMilestone[];
+    /**
+     * The region's own dependency edges, routed among its lanes. Omitted
+     * when it has none.
+     */
+    edges?: PositionedDependencyEdge[];
 }
 
 /**

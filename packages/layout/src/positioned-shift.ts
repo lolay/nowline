@@ -57,4 +57,7 @@ export function shiftIncludeY(region: PositionedIncludeRegion, dy: number): void
     for (const milestone of region.milestones ?? []) {
         for (const arrow of milestone.slackArrows ?? []) arrow.y += dy;
     }
+    for (const edge of region.edges ?? []) {
+        for (const point of edge.waypoints) point.y += dy;
+    }
 }

@@ -103,3 +103,39 @@ describe('isolated region markers', () => {
         expect(labelRight).toBeLessThanOrEqual(region.box.x + region.box.width - 8);
     });
 });
+
+describe('isolated region dependency edges', () => {
+    it("routes a region's own after: arrows among its lanes", async () => {
+        const child = CHILD.replace(
+            '  item bravo "Bravo" duration:1w',
+            '  item bravo "Bravo" duration:1w\n  item charlie "Charlie" duration:1w after:alpha',
+        );
+        const model = await layout(HOST, child);
+        const region = model.includes[0];
+        const edges = region.edges ?? [];
+        // alpha after the region's anchor (a stub off its cut line), and
+        // charlie after alpha across lanes.
+        expect(edges.map((e) => `${e.fromId}>${e.toId}`).sort()).toEqual([
+            'alpha>charlie',
+            'kickoff>alpha',
+        ]);
+        // The host routes only its own.
+        expect(model.edges.map((e) => `${e.fromId}>${e.toId}`)).toEqual(['launch>api']);
+        const kickoff = region.anchors?.[0];
+        const stub = edges.find((e) => e.fromId === 'kickoff');
+        expect(stub?.waypoints[0].x).toBe(kickoff?.center.x);
+        // Every waypoint stays inside the region box.
+        for (const e of edges) {
+            for (const p of e.waypoints) {
+                expect(p.y).toBeGreaterThan(region.box.y);
+                expect(p.y).toBeLessThan(region.box.y + region.box.height);
+            }
+        }
+    });
+
+    it('omits the key on a region with no after: references', async () => {
+        const child = CHILD.replace(' after:kickoff', '');
+        const region = (await layout(HOST, child)).includes[0];
+        expect('edges' in region).toBe(false);
+    });
+});

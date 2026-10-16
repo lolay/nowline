@@ -1,3 +1,7 @@
 ```release-note:added
 A `roadmap:isolate` region draws its own anchors and milestones in a marker row under its label tab, with cut lines that stop at the region's last lane. Before, they only scoped the region's `after:` references and were never drawn.
 ```
+
+```release-note:added
+A `roadmap:isolate` region draws its own dependency arrows: an `after:` between two of its items, and the stub from one of its anchors or milestones into the item after it. Before, only the host's arrows were drawn.
+```
