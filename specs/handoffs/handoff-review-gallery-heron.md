@@ -7,7 +7,8 @@
 - **Waves:** 1 `[exec]` m2 s1-s3 (source in the render block, persistent view settings, browser e2e); 2 `[deep]` m3 s1 (lines, baselines, retention); 3 `[exec]` m3 s2-s3 (PR pages, PR e2e). m4-m6 (publish workflow, docs, DNS handoff) are a later run.
 - **Spend:** ~$18.44 logged against ~$11 expected; almost all of it is the session before kickoff (m1 build and planning), logged as one combined orchestrator-kickoff line. Guard max(3x, $50) = $50; projected before wave 1 ~$19.8.
 - **Done this run:** wave 1 `[exec]` m2 s1-s3 in `b72b6de`, `2581435`, `0c1a82b` (`make pre-commit` green per step; `make gallery-e2e` 10/10; deliberate mode-carry break turned 3 tests red).
-- **Next unit:** wave 2 `[deep]` nowline m3 s1.
+- **Done this run:** wave 2 `[deep]` m3 s1 in `7f423c9` (39/39 node:test, gallery-e2e 10/10, m1 data dir migrated).
+- **Next unit:** wave 3 `[exec]` nowline m3 s2-s3, plus the wave 1 review fixup.
 - **Resume:** paste the plan's Kickoff prompt into a new session.
 - **Pending question:** none.
 
@@ -27,4 +28,7 @@
 
 ## Deviations
 
+- m3.s1: local branch lines retain by `--keep` (plan only named main/PR); any cross-line baseline is kept, not only main-for-PR; the just-published line is never dropped by `--open-prs`; a PR without `baseSha` compares with newest main; build ids are `pr-<n>-<head12>` and `<branch-slug>-<sha12>` for non-main lines.
+
 - m2.s1: *Collapse all* on the digest hides sources via `body.collapsed` CSS instead of writing the Source preference, so it doesn't clobber the viewer's global choice.
+- m4 note: the PR ancestor fallback needs full history (`fetch-depth: 0`) in the job running `publish.mjs`; shallow clones give PR builds no baseline.

@@ -3,7 +3,7 @@
 ```text
 --- KICKOFF: begin orchestration at [deep] ---
 
-  Status: 1/3 groups done | last review: wave 1 (1 should-fix, 3 nits) | current: nowline m3 s1 [deep] | over expected: ~$20 of ~$11 (session before kickoff: m1 build and planning) | updated 2026-10-16
+  Status: 2/3 groups done | last review: wave 1 (1 should-fix, 3 nits); wave 2 pending | current: nowline m3 s2-s3 [exec] + wave 1 fixup | over expected: ~$23 of ~$11 (session before kickoff: m1 build and planning) | updated 2026-10-16
 
   mode: unattended | proposed unattended (harness=claude-code runner=cloud; cloud runner, branch assigned by the harness) | guard 3x min $50 | fixups 2 | confirmed 2026-10-16 session 4adab00a-71c4-5a6e-9eb4-2d2721d1a6e6: Unattended (Recommended)
 
@@ -214,7 +214,7 @@ Scope: branches with an open PR in this repo, plus any local branch under `make 
 
 --- WAVE 2 [deep] ---
 
-#### s1 - [deep] Lines, baselines and retention in the data model
+#### s1 - [deep] [done 7f423c9] Lines, baselines and retention in the data model
 
 - **Lines.** Every build belongs to a line: `main`, `pr-<n>`, or locally the current git branch. `builds.json` in the data dir becomes `{ "lines": { "main": [ids], "pr-123": [ids] } }`, newest first. Read the m1 shape `{ "builds": [ids] }` as the `main` line (existing local `.gallery/data`).
 - **Manifest fields** (`collect.mjs`): `line`, and for PR builds `pr: { number, title, url, headRef, headSha, baseSha }`. In CI the checkout is the PR merge commit, so take the PR facts from environment variables the workflow will set (`GALLERY_LINE`, `GALLERY_PR_NUMBER`, `GALLERY_PR_TITLE`, `GALLERY_PR_URL`, `GALLERY_HEAD_REF`, `GALLERY_HEAD_SHA`, `GALLERY_BASE_SHA`, `GALLERY_AUTHOR`, `GALLERY_DATE`); a PR build's `sha` is the head sha and its id stays unique per push. Locally the line is `git rev-parse --abbrev-ref HEAD`, and `main` when on `main`.
@@ -301,3 +301,6 @@ tokens Explore-map-render-pipeline plan-review-gallery-heron (claude-opus-5-5): 
 tokens orchestrator-kickoff plan-review-gallery-heron (claude-opus-5-5): input ~270 / cache read ~36M / cache write ~920k 1h / output ~170k | ~$17.89 API-equiv (combined: m1 pre-run, orchestrator-kickoff)
 tokens wave-1 nowline-m2-s1-s3 (claude-sonnet-5-5): input ~76 / cache read ~4.4M / cache write ~160k / output ~1.4k | ~$1.30 API-equiv
 tokens orchestrator-wave-1 plan-review-gallery-heron (claude-opus-5-5): input ~18 / cache read ~710k / cache write ~50k 1h / output ~4.7k | ~$0.64 API-equiv
+tokens review-wave-1 nowline-m2-s1-s3 (claude-opus-5-5): input ~28 / cache read ~1.1M / cache write ~110k / output ~1k | ~$0.79 API-equiv
+tokens wave-2 nowline-m3-s1 (claude-opus-5-5): input ~82 / cache read ~4.8M / cache write ~150k / output ~0.6k | ~$1.73 API-equiv
+tokens orchestrator-wave-2 plan-review-gallery-heron (claude-opus-5-5): input ~22 / cache read ~840k / cache write ~14k 1h / output ~6.3k | ~$0.40 API-equiv
