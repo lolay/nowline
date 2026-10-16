@@ -125,60 +125,6 @@ export const FRAME_TAB_HEIGHT_PX = 22;
 /** Baseline Y of the chiclet label relative to the tab's top edge. */
 export const FRAME_TAB_LABEL_BASELINE_OFFSET_PX = 15;
 
-// Group title chiclet — the small label tab anchored flush in the upper-left
-// corner of a styled group's bounding box. Smaller than the frame-tab so it
-// reads as a "container label" rather than a sibling of the swimlane tab.
-//
-// The chiclet's top edge aligns with the group box's top edge and its left
-// edge aligns with the box's left edge (no overhang). The group reserves
-// `GROUP_TITLE_TAB_HEIGHT_PX + GROUP_TITLE_TAB_GUTTER_PX` of vertical top
-// padding inside the box before the first child row begins, so the chiclet
-// never overlaps content. Bumping the height without re-tuning
-// `GROUP_TITLE_TAB_LABEL_BASELINE_OFFSET_PX` mis-centers the label.
-
-/** Height (px) of the group-title chiclet anchored at the box's upper-left. */
-export const GROUP_TITLE_TAB_HEIGHT_PX = 16;
-
-/** Horizontal padding (px) on each side of the title text inside the chiclet. */
-export const GROUP_TITLE_TAB_PAD_X_PX = 6;
-
-/** Vertical gap (px) between the chiclet's bottom edge and the first inner row. */
-export const GROUP_TITLE_TAB_GUTTER_PX = 4;
-
-/** Baseline Y of the chiclet label relative to the chiclet's top edge.
- *  Tuned for a 9 pt bold glyph roughly vertically centered in a 16 px tab. */
-export const GROUP_TITLE_TAB_LABEL_BASELINE_OFFSET_PX = 11;
-
-/** Font size (px) of the group-title chiclet label. */
-export const GROUP_TITLE_TAB_LABEL_FONT_SIZE_PX = 9;
-
-/** Approximate per-character width factor used to size the chiclet to its
- *  title text. Mirrors the constant used in the renderer's pre-port code
- *  so the chiclet hugs short titles without clipping long ones. */
-export const GROUP_TITLE_TAB_CHAR_WIDTH_PX = 5.5;
-
-/** Padding (px) reserved on the inside-bottom of a styled group box before
- *  its lower stroke. Symmetric with the chiclet gutter so children breathe
- *  on both ends. */
-export const GROUP_BOTTOM_PAD_PX = 4;
-
-/**
- * Vertical space (px) reserved ABOVE a bracket-style (no-fill) group's
- * box to host its overhanging title label. Bracket groups paint their
- * label at `box.y - 2` (baseline) in the renderer — the glyph extent
- * lives entirely ABOVE box.y. Without an explicit reservation, that
- * overhang collides with the previous sibling's bracket-foot when two
- * bracket-titled groups stack in a parallel (the foot ends right where
- * the next label's top would render). The group shifts its own box.y
- * down by this amount so the label has clear space above it; the
- * caller advances by `bracketLabelOverhang + box.height + interRowGap`.
- *
- * Filled-style ("chiclet") groups use `GROUP_TITLE_TAB_HEIGHT_PX +
- * GROUP_TITLE_TAB_GUTTER_PX` instead — the chiclet sits INSIDE the box,
- * so they need no above-box reservation.
- */
-export const GROUP_BRACKET_LABEL_OVERHANG_PX = 12;
-
 /**
  * Dashed-accent pattern (px on / px off) used for two nowline accents
  * that read as "structural emphasis": the milestone vertical cut line
@@ -234,11 +180,6 @@ export const NOW_PILL_LABEL_INSET_X_PX = 6;
  */
 export const NOWLINE_STROKE_WIDTH_PX = 2.25;
 
-// Half the canonical content gutter, and the padding container headers keep
-// past their box. Bars no longer use it: they span their dates, inset by
-// `ITEM_SEAM_PX` (specs/true-width-layout.md §3.1).
-export const ITEM_INSET_PX = 6;
-
 // The seam a bar gives up on each side, from inside its dates, so two bars
 // that abut in time show a 2 px gap between their strokes
 // (specs/true-width-layout.md §3.1). A bar too short for both seams and the
@@ -257,7 +198,7 @@ export const ITEM_SEAM_PX = 1;
 // That's a runtime concern — the layout engine emits a static positioned
 // model and the interactive shell animates spacing on top. Keep this
 // constant as the rest-state baseline.
-export const GUTTER_PX = 2 * ITEM_INSET_PX;
+export const GUTTER_PX = 12;
 
 // Default pixel-per-day when no explicit scale is set. Calibrated so a
 // 26-week (180 day) roadmap fits a 1200 px content area.

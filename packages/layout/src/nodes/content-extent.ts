@@ -21,30 +21,31 @@
 // `maxSpilledCaptionRightX` is the other half of f2: a spilled caption
 // past the axis end grows the axis by the one column it was capped to.
 
+import { containerHeaderRightX } from '../container-header-geometry.js';
 import type { PositionedSwimlane, PositionedTrackChild } from '../types.js';
 
 /**
  * Rightmost x anything in a placed track child paints: an item's bar, its
- * spilled caption, decorations and chips; a group's box, which already hugs
- * its children's spills; a parallel's box and, recursively, its tracks. A
- * parallel's box reports only its tracks' compact ends, so a caption one of
- * its tracks spills past that edge shows up here and nowhere else. The row
+ * spilled caption, decorations and chips; a group's or parallel's box, its
+ * header (a title may run past the bracket's end) and, recursively, its
+ * children. A container's box spans only its dates, so a caption one of its
+ * children spills past that edge shows up here and nowhere else. The row
  * track feeds it to the packer so the canvas grows to it.
  */
 export function trackChildPaintedRightX(child: PositionedTrackChild): number {
     if (child.kind === 'item') {
+        // `decorationsRightX` leads the spill column even when nothing
+        // spills, so it counts only when something does.
+        const spills =
+            child.textSpills || child.dotSpills || child.iconSpills || child.footnoteSpills;
         return Math.max(
             child.box.x + child.box.width,
-            child.decorationsRightX,
+            spills ? child.decorationsRightX : Number.NEGATIVE_INFINITY,
             child.chipsOutside ? child.chipsRightX : Number.NEGATIVE_INFINITY,
         );
     }
-    let right = child.box.x + child.box.width;
-    if (child.kind === 'parallel') {
-        for (const track of child.children) {
-            right = Math.max(right, trackChildPaintedRightX(track));
-        }
-    }
+    let right = Math.max(child.box.x + child.box.width, containerHeaderRightX(child));
+    for (const sub of child.children) right = Math.max(right, trackChildPaintedRightX(sub));
     return right;
 }
 

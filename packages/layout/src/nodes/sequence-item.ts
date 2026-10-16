@@ -331,7 +331,9 @@ export function sequenceItem(
     const drawKey = id ?? syntheticItemKey(node);
     ctx.itemFlowKey.set(drawKey, ctx.currentFlowKey);
 
-    // A parallel track joins, and sizes its bracket, on `cursor.x`.
+    // A parallel track joins, and its container's bracket spans, from
+    // `cursor.startX` to `cursor.x`.
+    cursor.startX = logicalLeft;
     cursor.x = durationEndX;
     // The next row in a parallel/group/lane starts at
     // `cursor.y + cursor.height`. Default pitch is `bandScale.step()`

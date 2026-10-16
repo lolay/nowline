@@ -553,8 +553,14 @@ export interface PositionedGroup {
     kind: 'group';
     id?: string;
     title?: string;
+    /** The whole container: `box.y` is the header's top, `box.x` and
+     *  `box.width` span exactly its children's dates
+     *  (specs/true-width-layout.md §3.3). */
     box: BoundingBox;
-    // Bracket is drawn on the left edge when style.bracket != 'none'.
+    /** Header band height above the body (title, glyphs, bracket); 0 when
+     *  there is no header. The body runs from `box.y + headerHeight` to the
+     *  box's bottom. */
+    headerHeight: number;
     children: PositionedTrackChild[];
     /** Inline-date pins attached to this group (`after:DATE` / `before:DATE`).
      *  See `InlineDatePin` and specs/rendering.md "Inline-date glyph". */
@@ -563,7 +569,7 @@ export interface PositionedGroup {
     /**
      * True for an untitled group with no `style:` and no `labels:` that
      * carries `wave:`, in a roadmap with waves: it only assigns wave
-     * membership, so the renderer draws no bracket (specs/waves.md §9.7).
+     * membership, so the renderer draws nothing for it (specs/waves.md §9.7).
      * Omitted otherwise.
      */
     waveOnly?: true;
@@ -573,7 +579,10 @@ export interface PositionedParallel {
     kind: 'parallel';
     id?: string;
     title?: string;
+    /** The whole container, as `PositionedGroup.box`. */
     box: BoundingBox;
+    /** Header band height above the body, as `PositionedGroup.headerHeight`. */
+    headerHeight: number;
     children: PositionedTrackChild[]; // sub-tracks stacked vertically
     /** Inline-date pins attached to this parallel (`after:DATE` / `before:DATE`).
      *  See `InlineDatePin` and specs/rendering.md "Inline-date glyph". */

@@ -21,9 +21,8 @@
 //   slack arrow         = (box.right, box.y + 28), or (box.right,
 //                         box.bottom - 2) when the caption spilled
 //   item glyph          = top at box.y + 5, inside the bar's top half
-//   container glyph     = inside a filled group's 16px chiclet row
-//                         (box.y .. box.y + 16), else inside the 12px header
-//                         band above the box (box.y - 12 .. box.y)
+//   container glyph     = inside the header's title row, above the bracket
+//                         line (box.y .. box.y + 13)
 //
 // (28 = half the default 56px row band; 2 = half the 4px progress strip.)
 // Every `examples/*.nowline` and `tests/*.nowline` is laid out, so a new
@@ -33,7 +32,6 @@ import { promises as fs } from 'node:fs';
 import * as path from 'node:path';
 import { createNowlineServices, type NowlineFile, resolveIncludes } from '@nowline/core';
 import {
-    groupHasFill,
     layoutRoadmap,
     type PositionedItem,
     type PositionedRoadmap,
@@ -51,8 +49,7 @@ const NOMINAL_MID_PX = 28;
 const PROGRESS_STRIP_HALF_PX = 2;
 const GLYPH_INSET_TOP_PX = 5;
 const GLYPH_SIZE_PX = 12;
-const GROUP_TITLE_TAB_HEIGHT_PX = 16;
-const HEADER_BAND_PX = 12;
+const HEADER_TITLE_ROW_PX = 13;
 const EPSILON_PX = 0.01;
 
 const services = createNowlineServices();
@@ -112,8 +109,7 @@ interface FileScan {
     markerArrows: number;
     slackArrows: number;
     itemGlyphs: number;
-    chicletRowGlyphs: number;
-    headerBandGlyphs: number;
+    headerGlyphs: number;
     arrowFailures: string[];
     glyphFailures: string[];
 }
@@ -125,8 +121,7 @@ function scan(name: string, model: PositionedRoadmap): FileScan {
         markerArrows: 0,
         slackArrows: 0,
         itemGlyphs: 0,
-        chicletRowGlyphs: 0,
-        headerBandGlyphs: 0,
+        headerGlyphs: 0,
         arrowFailures: [],
         glyphFailures: [],
     };
@@ -204,12 +199,8 @@ function scan(name: string, model: PositionedRoadmap): FileScan {
                 }
                 continue;
             }
-            const chicletRow = e.kind === 'group' && groupHasFill(e.style.bg);
-            if (chicletRow) out.chicletRowGlyphs++;
-            else out.headerBandGlyphs++;
-            const [top, bottom] = chicletRow
-                ? [e.box.y, e.box.y + GROUP_TITLE_TAB_HEIGHT_PX]
-                : [e.box.y - HEADER_BAND_PX, e.box.y];
+            out.headerGlyphs++;
+            const [top, bottom] = [e.box.y, e.box.y + HEADER_TITLE_ROW_PX];
             if (y < top - EPSILON_PX || y + GLYPH_SIZE_PX > bottom + EPSILON_PX) {
                 failGlyph(`${where}: outside its glyph row ${top}..${bottom}`);
             }
@@ -243,8 +234,7 @@ describe('geometry attached to an item bar sits on its final box', () => {
         expect(total('markerArrows')).toBeGreaterThan(0);
         expect(total('slackArrows')).toBeGreaterThan(0);
         expect(total('itemGlyphs')).toBeGreaterThan(5);
-        expect(total('chicletRowGlyphs')).toBeGreaterThan(0);
-        expect(total('headerBandGlyphs')).toBeGreaterThan(0);
+        expect(total('headerGlyphs')).toBeGreaterThan(0);
     });
 
     it('ends every dependency arrow on its bars, and every slack arrow on its source bar', () => {

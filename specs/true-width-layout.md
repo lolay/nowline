@@ -105,6 +105,16 @@ As built (m1):
 
 Replace the group and parallel geometry (`group-node.ts`, `parallel-node.ts`, `container-header-geometry.ts`, `group-title-tab-geometry.ts`) and their renderer: header band, bracket, shaded body, vertical padding. Map `bg` and `bracket:` per §3.3. Inline-date glyphs on containers move into the header band beside the title.
 
+As built (m2):
+
+- Geometry: a container's `box` runs from its header's top to its body's bottom and spans exactly its children's earliest start and latest end in time (`TrackCursor.startX` carries a child's start up, as `x` carries its end). `headerHeight` (18 px, `CONTAINER_HEADER_BAND_PX`) is set when there is a title, a glyph or a visible bracket; the bracket line sits 13 px down with end ticks to the body. The body pads its content 6 px above and below; the cursor adds the inter-row gap after it, so the doubled gap a group used to leave below itself is gone.
+- `container-header-geometry.ts` holds every constant and helper both sides read (`containerChrome`, `containerHeaderTitleX`, `containerHeaderRightX`). `group-title-tab-geometry.ts`, the `GROUP_TITLE_TAB_*` constants, `GROUP_BOTTOM_PAD_PX`, `GROUP_BRACKET_LABEL_OVERHANG_PX` and `ITEM_INSET_PX` are gone (`GUTTER_PX` is now 12 on its own), and so are their exports from `@nowline/layout`.
+- Footprint: the row track reserves what a container paints past its end, its header (title and glyphs, plus 6 px) and its children's spills, recursively; the canvas grows to the same extent (`trackChildPaintedRightX`, which now counts an item's decorations only when something spills).
+- Styles: the renderer's `renderContainer` draws both kinds. The default themes set `group` and `parallel` `bg` to distinct tints, filled at 0.12; a parallel's default `bracket` is now `dashed`. The header title takes the header's ink (a group's `fg`, a parallel's bracket stroke), not `text:`, since it sits on the lane band: `platform-2026`'s `text: white`, chosen for the old chiclet, would have vanished.
+- O3: the title runs past the bracket and the packer keeps it as footprint, so nothing in its track lands under it; no ellipsis is needed in m2. O4: a body nested one level takes a half-strength tint (0.06), and below depth 2 it is outlined instead of filled; the two kinds' tints already alternate when groups and parallels nest. O5: both keys keep their values, `bracket:` styling the header bracket and `bg` the body. No DSL change.
+- A `before:` glyph keeps the 6 px inset from the container's end, so a sibling that starts on that end, level with the header, clears it (`container-glyph-clearance.test.ts` caught the flush version).
+- `test/container-span.test.ts` checks the §6 container invariant on every sample and the 60 generated roadmaps. Interim, until m3: the old router's obstacles now model only the bracket's end ticks.
+
 ### m3 - Date-port arrows
 
 Replace the channel-grid router for item dependencies (`dependency-edges.ts`, `edge-routing.ts`, `item-port-geometry.ts`) with §3.4, in the host and in each isolated region: day-centre ports, gap channels with offsets, dotted slack legs, the no-arrow cases. Anchor stubs and milestone slack lines follow §3.5.

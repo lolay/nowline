@@ -41,6 +41,12 @@ export interface TrackCursor {
      * (specs/true-width-layout.md §3.1).
      */
     x: number;
+    /**
+     * Where the child placed last begins, in time: an item's start date, a
+     * block's earliest child start. A container's bracket and body open
+     * here (specs/true-width-layout.md §3.3).
+     */
+    startX: number;
     /** Top edge of the current row. */
     y: number;
     /** Accumulated height of the track. */
@@ -48,7 +54,7 @@ export interface TrackCursor {
 }
 
 export function newCursor(x: number, y: number): TrackCursor {
-    return { x, y, height: 0 };
+    return { x, startX: x, y, height: 0 };
 }
 
 /**

@@ -36,8 +36,12 @@ import {
     ATTRIBUTION_SCALE,
     ATTRIBUTION_TEXT,
     ATTRIBUTION_WORDMARK_FONT_SIZE,
-    CONTAINER_HEADER_TITLE_BASELINE_OFFSET_PX,
+    CONTAINER_BODY_FILL_OPACITY,
+    CONTAINER_BRACKET_LINE_OFFSET_PX,
+    CONTAINER_HEADER_TITLE_BASELINE_PX,
     CONTAINER_HEADER_TITLE_FONT_SIZE_PX,
+    CONTAINER_MAX_FILLED_DEPTH,
+    CONTAINER_NESTED_BODY_FILL_OPACITY,
     CORNER_RADIUS_PX,
     containerHeaderTitleX,
     EDGE_CORNER_RADIUS,
@@ -48,14 +52,6 @@ import {
     FRAME_TAB_HEIGHT_PX,
     FRAME_TAB_LABEL_BASELINE_OFFSET_PX,
     frameTabGeometry,
-    GROUP_HEADER_TITLE_INSET_X_PX,
-    GROUP_TITLE_TAB_HEIGHT_PX,
-    GROUP_TITLE_TAB_LABEL_BASELINE_OFFSET_PX,
-    GROUP_TITLE_TAB_LABEL_FONT_SIZE_PX,
-    GROUP_TITLE_TAB_PAD_X_PX,
-    groupHasFill,
-    groupHeaderBandPx,
-    groupTitleTabWidth,
     HEADER_AUTHOR_FONT_SIZE_PX,
     HEADER_AUTHOR_LINE_HEIGHT_PX,
     HEADER_CARD_PADDING_TOP,
@@ -89,7 +85,6 @@ import {
     NOW_PILL_LABEL_FONT_SIZE_PX,
     NOW_PILL_LABEL_INSET_X_PX,
     NOWLINE_STROKE_WIDTH_PX,
-    PARALLEL_HEADER_TITLE_INSET_X_PX,
     PROGRESS_STRIP_HEIGHT_PX,
     TEXT_SIZE_PX,
     TIMELINE_TICK_LABEL_FONT_SIZE_PX,
@@ -477,10 +472,6 @@ function renderInlineDatePin(pin: InlineDatePin, color: string): string {
 function renderInlineDatePins(pins: InlineDatePin[] | undefined, color: string): string {
     if (!pins || pins.length === 0) return '';
     return pins.map((pin) => renderInlineDatePin(pin, color)).join('');
-}
-
-function hasPins(pins: InlineDatePin[] | undefined): boolean {
-    return (pins?.length ?? 0) > 0;
 }
 
 function hasAfterPin(pins: InlineDatePin[] | undefined): boolean {
@@ -1404,215 +1395,95 @@ function renderItem(
     return tag('g', { 'data-layer': 'item', 'data-id': i.id ?? null }, parts.join(''));
 }
 
-function renderGroup(
-    g: PositionedGroup,
+/**
+ * A group or parallel, drawn above and around its content
+ * (specs/true-width-layout.md §3.3): a body shaded with the container's `bg`
+ * spanning exactly its dates, a header bracket over those dates (solid for
+ * a group, dashed for a parallel by default; `bracket:` styles it), the
+ * title at the container's start with any inline-date glyphs beside it,
+ * then the children. A wave-only group draws only its children.
+ *
+ * `depth` is the container's nesting depth inside its lane, 1 for a
+ * top-level container. A nested body takes a lighter tint, and bodies deeper
+ * than `CONTAINER_MAX_FILLED_DEPTH` are outlined instead of filled, so tints
+ * never compound three deep (§8 O4).
+ */
+function renderContainer(
+    c: PositionedGroup | PositionedParallel,
+    depth: number,
     options: RenderOptions,
     idPrefix: string,
     palette: Theme,
     fonts: FontFamilies,
 ): string {
     const parts: string[] = [];
-    const hasFill = groupHasFill(g.style.bg);
-    if (hasFill) {
-        // Filled-box style with a chiclet label flush in the upper-left
-        // corner. The painted box matches the layout-reported `box` 1:1
-        // (no overhang), so parents stack against the right rectangle.
-        parts.push(
-            tag('rect', {
-                x: num(g.box.x),
-                y: num(g.box.y),
-                width: num(g.box.width),
-                height: num(g.box.height),
-                rx: 6,
-                ry: 6,
-                fill: g.style.bg,
-                stroke: g.style.fg,
-                'stroke-width': 1,
-                'fill-opacity': 0.18,
-                filter: `url(#${idPrefix}-shadow-subtle)`,
-            }),
-        );
-        if (g.title) {
-            // Layout sizes the inline-date glyph clearance off the same
-            // helper, so an `after:` glyph always lands past this edge.
-            const tabW = groupTitleTabWidth(g.title);
-            const tabX = g.box.x;
-            const tabY = g.box.y;
-            const tabH = GROUP_TITLE_TAB_HEIGHT_PX;
-            // Asymmetric corner shape: TOP-LEFT and BOTTOM-RIGHT are
-            // rounded (radius 6, matching the parent group box), while
-            // TOP-RIGHT and BOTTOM-LEFT are square. The TL roundness
-            // continues the group box's outer corner; the squared
-            // BL / TR sides "anchor" the tab into the box's left and
-            // top edges so it reads as a corner-mounted label rather
-            // than a floating pill.
-            const r = 6;
-            const tabPath =
-                `M${num(tabX + r)} ${num(tabY)}` +
-                `H${num(tabX + tabW)}` +
-                `V${num(tabY + tabH - r)}` +
-                `A${r} ${r} 0 0 1 ${num(tabX + tabW - r)} ${num(tabY + tabH)}` +
-                `H${num(tabX)}` +
-                `V${num(tabY + r)}` +
-                `A${r} ${r} 0 0 1 ${num(tabX + r)} ${num(tabY)}` +
-                `Z`;
+    const isDrawn = !(c.kind === 'group' && c.waveOnly);
+    if (isDrawn) {
+        const bodyY = c.box.y + c.headerHeight;
+        const bodyHeight = c.box.height - c.headerHeight;
+        if (c.style.bg !== 'none') {
+            const isFilled = depth <= CONTAINER_MAX_FILLED_DEPTH;
             parts.push(
-                tag('path', {
-                    d: tabPath,
-                    fill: g.style.fg,
+                tag('rect', {
+                    x: num(c.box.x),
+                    y: num(bodyY),
+                    width: num(c.box.width),
+                    height: num(bodyHeight),
+                    fill: isFilled ? c.style.bg : 'none',
+                    'fill-opacity': isFilled
+                        ? depth === 1
+                            ? CONTAINER_BODY_FILL_OPACITY
+                            : CONTAINER_NESTED_BODY_FILL_OPACITY
+                        : null,
+                    stroke: isFilled ? null : c.style.bg,
+                    'stroke-opacity': isFilled ? null : 0.6,
+                    'stroke-width': isFilled ? null : 1,
                 }),
             );
-            parts.push(
-                textTag(
-                    {
-                        x: num(tabX + GROUP_TITLE_TAB_PAD_X_PX),
-                        y: num(tabY + GROUP_TITLE_TAB_LABEL_BASELINE_OFFSET_PX),
-                        'font-family': fonts[g.style.font],
-                        'font-size': GROUP_TITLE_TAB_LABEL_FONT_SIZE_PX,
-                        'font-weight': 600,
-                        fill: '#ffffff',
-                    },
-                    g.title,
-                ),
-            );
         }
-    } else {
-        const bracketColor = g.style.fg;
-        // Same helper `GroupNode.place` reserves the band with.
-        const headerBand = groupHeaderBandPx(hasFill, Boolean(g.title), hasPins(g.inlineDatePins));
-        // A `group wave:x` that only assigns membership draws no bracket:
-        // it would sit exactly on the wave boundary (specs/waves.md §9.7).
-        if (g.style.bracket !== 'none' && !g.waveOnly) {
-            // Bracket-style groups paint a left-side `[` glyph along
-            // `box.x`. When the group has a title or inline-date glyphs
-            // the layout has reserved a header band ABOVE `box.y` (see
-            // GroupNode.place); the bracket extends up through that band
-            // and adds a top foot mirroring the bottom foot so the `[`
-            // visually wraps the title and glyphs that sit in it. Bare
-            // bracket groups keep the historical asymmetric shape
-            // (vertical bar + a single bottom foot) since there's
-            // nothing above to wrap.
-            const stub = 4;
-            const bottom = g.box.y + g.box.height;
-            const dash = g.style.bracket === 'dashed' ? '3 2' : null;
-            const bracketPath =
-                headerBand > 0
-                    ? `M${num(g.box.x + stub)} ${num(g.box.y - headerBand)}` +
-                      ` L${num(g.box.x)} ${num(g.box.y - headerBand)}` +
-                      ` L${num(g.box.x)} ${num(bottom)}` +
-                      ` L${num(g.box.x + stub)} ${num(bottom)}`
-                    : `M${num(g.box.x)} ${num(g.box.y)}` +
-                      ` L${num(g.box.x)} ${num(bottom)}` +
-                      ` L${num(g.box.x + stub)} ${num(bottom)}`;
+        // The title and the bracket share one ink, the header's: a group's
+        // `fg`, a parallel's bracket stroke. The title sits on the lane band,
+        // never on the body, so a `text:` colour chosen to read on `bg`
+        // (white on a filled chiclet, before the header) would vanish.
+        const ink = c.kind === 'group' ? c.style.fg : palette.parallel.bracketStroke;
+        if (c.headerHeight > 0 && c.style.bracket !== 'none') {
+            const lineY = c.box.y + CONTAINER_BRACKET_LINE_OFFSET_PX;
+            const x0 = c.box.x;
+            const x1 = c.box.x + c.box.width;
             parts.push(
                 tag('path', {
-                    d: bracketPath,
+                    d: `M${num(x0)} ${num(bodyY)} V${num(lineY)} H${num(x1)} V${num(bodyY)}`,
                     fill: 'none',
-                    stroke: bracketColor,
-                    'stroke-width': 1,
-                    'stroke-dasharray': dash,
+                    stroke: ink,
+                    'stroke-width': 1.2,
+                    'stroke-dasharray': c.style.bracket === 'dashed' ? '3 2' : null,
                 }),
             );
         }
-        if (g.title) {
+        if (c.title && c.headerHeight > 0) {
             parts.push(
                 textTag(
                     {
                         // Past the `after:` glyph when there is one; layout
                         // clamps the `before:` glyph past this text.
-                        x: num(
-                            containerHeaderTitleX(
-                                g.box.x,
-                                GROUP_HEADER_TITLE_INSET_X_PX,
-                                hasAfterPin(g.inlineDatePins),
-                            ),
-                        ),
-                        y: num(g.box.y - CONTAINER_HEADER_TITLE_BASELINE_OFFSET_PX),
-                        ...fontAttrs(g.style, fonts, CONTAINER_HEADER_TITLE_FONT_SIZE_PX),
-                        'fill-opacity': 0.7,
+                        x: num(containerHeaderTitleX(c.box.x, hasAfterPin(c.inlineDatePins))),
+                        y: num(c.box.y + CONTAINER_HEADER_TITLE_BASELINE_PX),
+                        ...fontAttrs(c.style, fonts, CONTAINER_HEADER_TITLE_FONT_SIZE_PX),
+                        'font-weight': 600,
+                        fill: ink,
                     },
-                    g.title,
+                    c.title,
                 ),
             );
         }
+        // The glyphs sit in the header's title row, never on a child, so
+        // painting them before the children is safe.
+        parts.push(renderInlineDatePins(c.inlineDatePins, c.style.fg));
     }
-    // Inline-date pins on the group itself (`group ... after:DATE` /
-    // `before:DATE`). They sit in the chiclet row or the header band,
-    // never on a child bar, so painting them before the children is safe.
-    parts.push(renderInlineDatePins(g.inlineDatePins, g.style.fg));
-    for (const c of g.children) {
-        parts.push(renderTrackChild(c, options, idPrefix, palette, fonts));
+    for (const child of c.children) {
+        parts.push(renderTrackChild(child, options, idPrefix, palette, fonts, depth));
     }
-    void palette;
-    return tag('g', { 'data-layer': 'group', 'data-id': g.id ?? null }, parts.join(''));
-}
-
-function renderParallel(
-    p: PositionedParallel,
-    options: RenderOptions,
-    idPrefix: string,
-    palette: Theme,
-    fonts: FontFamilies,
-): string {
-    const parts: string[] = [];
-    // `bracket: solid|dashed` parallels render explicit [ ] brackets framing
-    // the nested tracks with 12 px vertical padding above/below.
-    if (p.style.bracket === 'solid' || p.style.bracket === 'dashed') {
-        const padding = 12;
-        const stub = 4;
-        const top = p.box.y - padding;
-        const bottom = p.box.y + p.box.height + padding;
-        const lx = p.box.x;
-        const rx = p.box.x + p.box.width;
-        const stroke = palette.parallel.bracketStroke;
-        parts.push(
-            tag('path', {
-                d: `M${num(lx + stub)} ${num(top)} H${num(lx)} V${num(bottom)} H${num(lx + stub)}`,
-                fill: 'none',
-                stroke,
-                'stroke-width': 1.25,
-                'stroke-dasharray': p.style.bracket === 'dashed' ? '3 3' : null,
-                'stroke-linejoin': 'round',
-            }),
-        );
-        parts.push(
-            tag('path', {
-                d: `M${num(rx - stub)} ${num(top)} H${num(rx)} V${num(bottom)} H${num(rx - stub)}`,
-                fill: 'none',
-                stroke,
-                'stroke-width': 1.25,
-                'stroke-dasharray': p.style.bracket === 'dashed' ? '3 3' : null,
-                'stroke-linejoin': 'round',
-            }),
-        );
-    }
-    if (p.title) {
-        parts.push(
-            textTag(
-                {
-                    x: num(
-                        containerHeaderTitleX(
-                            p.box.x,
-                            PARALLEL_HEADER_TITLE_INSET_X_PX,
-                            hasAfterPin(p.inlineDatePins),
-                        ),
-                    ),
-                    y: num(p.box.y - CONTAINER_HEADER_TITLE_BASELINE_OFFSET_PX),
-                    ...fontAttrs(p.style, fonts, CONTAINER_HEADER_TITLE_FONT_SIZE_PX),
-                    'fill-opacity': 0.7,
-                },
-                p.title,
-            ),
-        );
-    }
-    // Inline-date pins on the parallel itself (`parallel ... after:DATE` /
-    // `before:DATE`). They sit in the header band the layout reserves
-    // above the first track, so painting them before children is safe.
-    parts.push(renderInlineDatePins(p.inlineDatePins, p.style.fg));
-    for (const c of p.children) {
-        parts.push(renderTrackChild(c, options, idPrefix, palette, fonts));
-    }
-    return tag('g', { 'data-layer': 'parallel', 'data-id': p.id ?? null }, parts.join(''));
+    return tag('g', { 'data-layer': c.kind, 'data-id': c.id ?? null }, parts.join(''));
 }
 
 function renderTrackChild(
@@ -1621,10 +1492,10 @@ function renderTrackChild(
     idPrefix: string,
     palette: Theme,
     fonts: FontFamilies,
+    parentDepth = 0,
 ): string {
     if (c.kind === 'item') return renderItem(c, options, idPrefix, palette, fonts);
-    if (c.kind === 'group') return renderGroup(c, options, idPrefix, palette, fonts);
-    return renderParallel(c, options, idPrefix, palette, fonts);
+    return renderContainer(c, parentDepth + 1, options, idPrefix, palette, fonts);
 }
 
 // Renders only the swimlane's background tint rect. Emitted before the

@@ -391,7 +391,7 @@ export function sequenceRowTrack(
 ): RowTrackResult;
 ```
 
-`SwimlaneNode` keeps its tab and top-pad logic and `GroupNode` its chiclet, header band and box; both call `sequenceRowTrack` and read `usedHeight`, `usedRightX` and `timeCursorX` from the result.
+`SwimlaneNode` keeps its tab and top-pad logic and `GroupNode` its header, body padding and box; both call `sequenceRowTrack` and read `usedHeight`, `usedRightX` and `timeCursorX` from the result.
 
 **Helpers.** m1.s2 replaces the four node `*Deps` with `LayoutHelpers` and drops `ownerOverride`. As code leaves `layout.ts`, the members become direct imports: `newCursor` (`layout-context.ts`), `estimateTextWidth` (`text-measure.ts`), `sequenceItem` (`nodes/item-node.ts`), `resolveChildStart` (a `start-rules.ts` beside R1's `start-terms.ts`), and `predictItemBarExtraHeight` goes. `RoadmapNodeDeps` goes when its five helpers move into phase modules (`date-window.ts`, `header-node.ts`, `dependency-edges.ts`, `nowline-node.ts`, `collectItems` with the edges). What remains injected is `sequenceOne`, the dispatcher that groups and parallels call for nested blocks; importing it would form a group, parallel and dispatcher cycle, so it stays injected (§8, decision 4).
 
