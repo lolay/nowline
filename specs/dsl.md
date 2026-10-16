@@ -779,7 +779,9 @@ swimlane platform owner:platform
 #### Scoping rules for `roadmap:isolate`
 
 - The child's content stays scoped to the child file and uses only the child's config.
-- The child's swimlanes, items, anchors, milestones, and footnotes render inside a dashed-border region labeled with the child's roadmap title.
+- The child's swimlanes, items, anchors and milestones render inside a dashed-border region labeled with the child's roadmap title. Its anchors and milestones take the region's own marker row, under the label, and their cut lines stop at the region's last lane.
+- The child's footnotes join the chart's one footnote panel, under the region's title, numbered on after the parent's (and after any isolated include before it).
+- References stay inside a file: the child's `after:` and `before:` resolve against its own ids, and the parent cannot name the child's (or the reverse).
 - The region includes an indicator (icon or badge) to distinguish it from native content.
 - Timeline scale is shared — the child's content aligns to the parent's scale/axis.
 - Waves are shared like the time axis: the child must declare the same waves (Include Rule 12), and its lanes take part in the global barriers. Its `wave:` values map to the parent's waves by id; its other ids stay invisible to the parent.

@@ -37,6 +37,12 @@ describe('indexFootnotes', () => {
         ]);
     });
 
+    it('numbers on after the footnotes that precede it', async () => {
+        const { resolved } = await parseAndResolve(SOURCE);
+        const { index } = indexFootnotes(resolved.content.footnotes, 4);
+        expect([...index.values()]).toEqual([5, 6, 7]);
+    });
+
     it('is empty for a roadmap with no footnotes', async () => {
         const { resolved } = await parseAndResolve(
             'nowline v1\n\nroadmap r "R" start:2026-01-05\n',

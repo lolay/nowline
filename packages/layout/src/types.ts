@@ -804,6 +804,12 @@ export interface PositionedFootnoteArea {
 }
 
 export interface PositionedFootnoteEntry {
+    /**
+     * The title of the isolated region the footnote comes from; the
+     * renderer heads each region's run of entries with it. Omitted on the
+     * host's own footnotes.
+     */
+    region?: string;
     number: number;
     title: string;
     description?: string;
@@ -825,6 +831,18 @@ export interface PositionedIncludeRegion {
      * hides the global layers. Omitted when there are none.
      */
     waveCrossings?: PositionedWaveCrossing[];
+    /**
+     * The region's own anchors and milestones, in its own marker row
+     * under the label tab; their cut lines stop at its last lane. Omitted
+     * when it has none to draw.
+     */
+    anchors?: PositionedAnchor[];
+    milestones?: PositionedMilestone[];
+    /**
+     * The region's own dependency edges, routed among its lanes. Omitted
+     * when it has none.
+     */
+    edges?: PositionedDependencyEdge[];
 }
 
 /**

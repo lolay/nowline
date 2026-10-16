@@ -7,7 +7,8 @@
 //     children down by the growth.
 //   - Finalize (`growHeaderRows`, f7), when the final marker pack needs
 //     more rows than the marker band was sized for, pushes every swimlane
-//     and include region down by the extra band height.
+//     and include region (with the region's own markers) down by the extra
+//     band height.
 //
 // Both paths go through `shiftTrackChildY`, so every absolute y the
 // positioned model carries is listed exactly once, here. A new y-bearing
@@ -43,8 +44,20 @@ export function shiftSwimlaneY(lane: PositionedSwimlane, dy: number): void {
     for (const nested of lane.nested) shiftSwimlaneY(nested, dy);
 }
 
-/** Move an include region and its nested lanes down by `dy`. */
+/** Move an include region, its nested lanes and its own markers down by `dy`. */
 export function shiftIncludeY(region: PositionedIncludeRegion, dy: number): void {
     region.box.y += dy;
     for (const lane of region.nestedSwimlanes) shiftSwimlaneY(lane, dy);
+    for (const marker of [...(region.anchors ?? []), ...(region.milestones ?? [])]) {
+        marker.center.y += dy;
+        marker.labelBox.y += dy;
+        marker.cutTopY += dy;
+        marker.cutBottomY += dy;
+    }
+    for (const milestone of region.milestones ?? []) {
+        for (const arrow of milestone.slackArrows ?? []) arrow.y += dy;
+    }
+    for (const edge of region.edges ?? []) {
+        for (const point of edge.waypoints) point.y += dy;
+    }
 }
