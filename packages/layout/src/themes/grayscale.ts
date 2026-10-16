@@ -63,13 +63,19 @@ export const grayscaleTheme: Theme = {
             shadow: 'subtle',
             cornerRadius: 'sm',
         },
+        // Containers shade their body with `bg` as a light tint
+        // (CONTAINER_BODY_FILL_OPACITY); groups and parallels get distinct
+        // ones, and a parallel's header bracket is dashed, a group's solid
+        // (specs/true-width-layout.md §3.3).
         parallel: {
             ...baseEntity,
-            bracket: 'none',
+            bg: '#9e9e9e',
+            bracket: 'dashed',
             padding: 'xs',
         },
         group: {
             ...baseEntity,
+            bg: '#595959',
             bracket: 'solid',
             padding: 'xs',
             fg: '#595959',

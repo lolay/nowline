@@ -108,14 +108,14 @@ export interface BlockCommitInput {
     blockHeight: number;
     /** Logical right edge of the block. */
     blockEnd: number;
-    /** Reserved spill x for block chrome that overflows the block's
-     *  right edge (see `blockTitleRowSpillReservation`). Omitted or
+    /** Reserved spill x for what the block paints past its right edge
+     *  (a header title, a caption its children spill). Omitted or
      *  `null` resets the row's spill reservation to `laneLeftX`. */
     spillReservation?: number | null;
     /** Rightmost x anything inside the block paints, when it can pass
-     *  `blockEnd` (see `trackChildPaintedRightX`): a parallel's box is
-     *  compact, so a caption its tracks spill is not in it. It widens
-     *  `usedRightX()` (the canvas and an enclosing group's box); the
+     *  `blockEnd` (see `trackChildPaintedRightX`): a container's box spans
+     *  only its dates, so a caption its children spill is not in it. It widens
+     *  `usedRightX()` (the lane's extent, and so the canvas); the
      *  caller reserves it on the row through `spillReservation`. */
     paintedRight?: number;
 }

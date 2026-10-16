@@ -4,14 +4,14 @@
 // packer can bump it to a fresh row before `sequenceItem` places it with
 // the same measure; a parallel or nested group takes a fresh row of its own through
 // `sequenceOne`. The callers keep what differs between them: the lane
-// its title tab and top-pad collapse, the group its chiclet, header band
-// and box. Both read the packer's used height and right edge, and the
-// compact time cursor, from the result.
+// its title tab and top-pad collapse, the group its header and body. Both
+// read the packer's used height and right edge, and the track's span in
+// time, from the result.
 
 import type { GroupBlock, SwimlaneDeclaration } from '@nowline/core';
 import { isItemDeclaration } from '@nowline/core';
 import { type TrackNode, trackChildren } from '@nowline/core/internal';
-import { blockTitleRowSpillReservation } from '../container-header-geometry.js';
+import { CONTAINER_HEADER_CLEARANCE_PX, containerHeaderRightX } from '../container-header-geometry.js';
 import { type LayoutContext, type LayoutHelpers, newCursor } from '../layout-context.js';
 import { RowPacker } from '../row-packer.js';
 import { resolveChildStart } from '../start-rules.js';
@@ -41,6 +41,11 @@ export interface RowTrackResult {
      * only, never a caption spill.
      */
     timeCursorX: number;
+    /**
+     * Earliest child start, in time: where a group's bracket and body open.
+     * The track's left x when it has no children.
+     */
+    timeStartX: number;
     /** The packer the children were fed to; read `usedHeight()` and `usedRightX()` from it. */
     packer: RowPacker;
 }
@@ -70,6 +75,7 @@ export function sequenceRowTrack(
         slackCorridors: ctx.slackCorridors,
     });
     let timeCursorX = leftX;
+    let timeStartX = Number.POSITIVE_INFINITY;
     // Items not yet placed in this track: an item never bumps for the slack
     // arrow of one still to come, since rows never move up and that item
     // would follow it down.
@@ -84,31 +90,26 @@ export function sequenceRowTrack(
             const cursor = newCursor(blockStart, blockY);
             const positioned = helpers.sequenceOne(child, cursor, ctx);
             children.push(positioned);
-            // The packer keeps the painted box (a group's box hugs its
-            // children's spilled captions), so a following item that would
-            // land under a caption drops a row; the time cursor takes the
-            // block's compact end (its children's logical ends), so that
-            // item still starts on its date, as in engine C
-            // (specs/scheduler-unification.md §8 decision 7).
+            // A block's box spans only its dates, so a caption its children
+            // spill and a header title that runs past its end are outside
+            // it; the row reserves them, as it does an item's spill, so the
+            // next child drops a row rather than landing on them
+            // (specs/true-width-layout.md §3.2, §3.3). The time cursor takes
+            // the block's end in time, so that child still starts on its
+            // date, as in engine C (specs/scheduler-unification.md §8
+            // decision 7).
             const blockEnd = positioned.box.x + positioned.box.width;
             const blockHeight = Math.max(step, cursor.height);
-            // A parallel's box spans only its dates, so a caption one of its
-            // tracks spills is outside it; the row reserves it, as it does an
-            // item's, so the next child drops a row rather than landing on it
-            // (specs/true-width-layout.md §3.2).
             const contentRight = reservedRightX(positioned);
-            const reservations = [
-                blockTitleRowSpillReservation(positioned),
-                contentRight > blockEnd ? contentRight : null,
-            ].filter((x): x is number => x !== null);
             packer.commitBlock({
                 rowIndex,
                 placed: positioned,
                 blockHeight,
                 blockEnd,
-                spillReservation: reservations.length > 0 ? Math.max(...reservations) : null,
+                spillReservation: contentRight > blockEnd ? contentRight : null,
                 paintedRight: trackChildPaintedRightX(positioned),
             });
+            timeStartX = Math.min(timeStartX, cursor.startX);
             timeCursorX = Math.max(timeCursorX, cursor.x);
             continue;
         }
@@ -139,6 +140,7 @@ export function sequenceRowTrack(
         const cursor = newCursor(desiredStart, rowY);
         const positioned = sequenceItem(item, cursor, ctx, measure);
         children.push(positioned);
+        timeStartX = Math.min(timeStartX, cursor.startX);
 
         // The painted footprint in LOGICAL space: the item's span, or the
         // painted box when the 1 px floor makes it wider. The row packer
@@ -161,7 +163,8 @@ export function sequenceRowTrack(
         });
     }
 
-    return { children, timeCursorX, packer };
+    if (timeStartX === Number.POSITIVE_INFINITY) timeStartX = ctx.scale.startX(leftX);
+    return { children, timeCursorX, timeStartX, packer };
 }
 
 /**
@@ -184,12 +187,17 @@ function itemSpillReservation(item: PositionedItem): number | null {
 
 /**
  * Rightmost x a placed child reserves on its row: an item's bar or spill
- * reservation, a group's box (which already holds its children's), and for
- * a parallel, whose box spans only its dates, the furthest of its tracks.
+ * reservation; for a group or parallel, whose box spans only its dates, the
+ * furthest of its header (title and glyphs, plus clearance) and its
+ * children's reservations.
  */
 function reservedRightX(child: PositionedTrackChild): number {
     const boxRight = child.box.x + child.box.width;
     if (child.kind === 'item') return Math.max(boxRight, itemSpillReservation(child) ?? boxRight);
-    if (child.kind === 'group') return boxRight;
-    return Math.max(boxRight, ...child.children.map(reservedRightX));
+    const headerRight = containerHeaderRightX(child);
+    return Math.max(
+        boxRight,
+        headerRight > boxRight ? headerRight + CONTAINER_HEADER_CLEARANCE_PX : boxRight,
+        ...child.children.map(reservedRightX),
+    );
 }

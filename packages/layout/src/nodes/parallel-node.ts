@@ -1,14 +1,13 @@
 // ParallelNode — Renderable for a `parallel { ... }` block. Stacks
-// children top-to-bottom (each child owns a fresh sub-track) and reports
-// the union bounding box. Each child is sequenced via the injected
-// `helpers.sequenceOne` callback (`sequence-one.ts`), which dispatches to
-// `sequenceItem`, `GroupNode` or a nested `ParallelNode`.
+// children top-to-bottom inside its body (each child owns a fresh
+// sub-track) under a header band, the way a group is drawn
+// (specs/true-width-layout.md §3.3; `container-header-geometry.ts`). Each
+// child is sequenced via the injected `helpers.sequenceOne` callback
+// (`sequence-one.ts`), which dispatches to `sequenceItem`, `GroupNode` or a
+// nested `ParallelNode`.
 
 import type { GroupBlock, ItemDeclaration, ParallelBlock } from '@nowline/core';
-import {
-    PARALLEL_HEADER_TITLE_INSET_X_PX,
-    parallelHeaderBandPx,
-} from '../container-header-geometry.js';
+import { containerChrome } from '../container-header-geometry.js';
 import { propValues } from '../dsl-utils.js';
 import { computeContainerInlineDatePins, pickInlineDate } from '../inline-date-pin-geometry.js';
 import {
@@ -33,7 +32,7 @@ export class ParallelNode {
 
     /**
      * Sequence children into stacked sub-tracks, advance the parent
-     * `cursor` to the parallel's right edge (the latest track end), and
+     * `cursor` to the parallel's end in time (the latest track end), and
      * return a `PositionedParallel`.
      */
     place(cursor: TrackCursor, ctx: LayoutContext): PositionedParallel {
@@ -47,18 +46,19 @@ export class ParallelNode {
         const afterDate = pickInlineDate(propValues(node.properties, 'after'));
         const beforeDate = pickInlineDate(propValues(node.properties, 'before'));
         const title = node.title ?? node.name;
-        // The first track starts flush with the box's top corners, so
-        // inline-date glyphs get a header band above the box (shared
-        // with the title) instead of sitting on the first track's bar.
-        const headerBand = parallelHeaderBandPx(Boolean(afterDate || beforeDate));
-        const startY = cursor.y + headerBand;
-        // Under `show` the box opens on a working day; each track keeps the
-        // raw start as its cursor seed and is snapped where it is placed.
-        const boxLeftX = ctx.scale.showsNonWorking ? ctx.scale.startX(startX) : startX;
+        const chrome = containerChrome({
+            drawn: true,
+            hasTitle: Boolean(title),
+            hasPins: Boolean(afterDate || beforeDate),
+            hasBracket: style.bracket !== 'none',
+        });
+        const firstTrackY = cursor.y + chrome.header + chrome.pad;
         const children: PositionedTrackChild[] = [];
-        // The latest track end in time: the join, and the bracket's end
+        // The tracks' span in time: the bracket and body open on the
+        // earliest track start and close on the latest track end, the join
         // (bars span exactly their dates, specs/true-width-layout.md §3.1).
-        let maxTimeRight = boxLeftX;
+        let minTimeLeft = Number.POSITIVE_INFINITY;
+        let maxTimeRight = Number.NEGATIVE_INFINITY;
         let accumulatedHeight = 0;
 
         // Each child of a parallel block lives on its own sub-track,
@@ -74,7 +74,7 @@ export class ParallelNode {
         for (const child of node.content) {
             if (child.$type === 'DescriptionDirective') continue;
             ctx.currentFlowKey = `${previousFlowKey}/par:${parId}#${childIndex}`;
-            const subCursor = newCursor(startX, startY + accumulatedHeight);
+            const subCursor = newCursor(startX, firstTrackY + accumulatedHeight);
             const positioned = helpers.sequenceOne(
                 child as ItemDeclaration | GroupBlock,
                 subCursor,
@@ -82,27 +82,39 @@ export class ParallelNode {
             );
             children.push(positioned);
             accumulatedHeight += Math.max(ctx.bandScale.step(), subCursor.height);
+            minTimeLeft = Math.min(minTimeLeft, subCursor.startX);
             maxTimeRight = Math.max(maxTimeRight, subCursor.x);
             childIndex++;
         }
         ctx.currentFlowKey = previousFlowKey;
+        if (children.length === 0) {
+            // Under `show` an empty box still opens on a working day.
+            minTimeLeft = ctx.scale.showsNonWorking ? ctx.scale.startX(startX) : startX;
+            maxTimeRight = minTimeLeft;
+        }
 
+        // Each track's height carries the inter-row gap below it; the body
+        // ends `pad` below the last track's painted bottom, and the cursor
+        // adds the gap back after the body.
+        const step = ctx.bandScale.step();
+        const interRowGap = step - ctx.bandScale.bandwidth();
+        const contentHeight = Math.max(step, accumulatedHeight) - interRowGap;
         const box: BoundingBox = {
-            x: boxLeftX,
-            y: startY,
-            width: maxTimeRight - boxLeftX,
-            height: accumulatedHeight,
+            x: minTimeLeft,
+            y: cursor.y,
+            width: maxTimeRight - minTimeLeft,
+            height: chrome.header + chrome.pad + contentHeight + chrome.pad,
         };
 
         // No tail gutter: the parallel joins on its latest track end in
         // time, as engine C does (specs/scheduler-unification.md §8
         // decisions 6, 8).
+        cursor.startX = box.x;
         cursor.x = maxTimeRight;
-        cursor.height = Math.max(cursor.height, headerBand + accumulatedHeight);
+        cursor.height = Math.max(cursor.height, box.height + interRowGap);
 
         const id = node.name;
-        // `after:` the parallel is a time path: its latest track end, not
-        // its bracket (decision 6).
+        // `after:` the parallel is a time path: its latest track end.
         if (id) {
             ctx.entityLeftEdges.set(id, box.x);
             ctx.entityRightEdges.set(id, maxTimeRight);
@@ -112,7 +124,7 @@ export class ParallelNode {
             box,
             afterDate,
             beforeDate,
-            row: { kind: 'header-band', title, titleInsetX: PARALLEL_HEADER_TITLE_INSET_X_PX },
+            title,
         });
 
         return {
@@ -120,6 +132,7 @@ export class ParallelNode {
             id,
             title,
             box,
+            headerHeight: chrome.header,
             children,
             style,
             inlineDatePins: inlineDatePins.length > 0 ? inlineDatePins : undefined,

@@ -18,6 +18,7 @@
 // to avoid a single intersecting bar produced unsatisfying detours
 // (see `specs/handoffs/handoff-channel-routing-design.md`).
 
+import { CONTAINER_BRACKET_LINE_OFFSET_PX } from './container-header-geometry.js';
 import type {
     BoundingBox,
     Point,
@@ -168,53 +169,18 @@ export function collectRoutingObstacles(
             itemBars.push(child.box);
             return;
         }
-        if (child.kind === 'parallel') {
-            // Parallel `bracket:solid|dashed` paints `[ ]` strokes at
-            // the box's left/right edges with 12 px vertical padding
-            // (matches `renderParallel`). The bracket has THREE
-            // strokes per side — a vertical bar at the box edge, plus
-            // top/bottom horizontal "feet" extending 4 px inward
-            // toward the parallel's center. We model the verticals as
-            // full-height bracket lines AND emit thin-Y-band entries
-            // at the foot tips so the clearance nudge sees the foot
-            // extent (otherwise an elbow nudged just past the
-            // vertical at +4 px would land squarely on the inward
-            // foot tip — see issue #2 in the channel-routing handoff).
-            if (child.style.bracket === 'solid' || child.style.bracket === 'dashed') {
-                const padding = 12;
-                const stub = 4;
-                const yTop = child.box.y - padding;
-                const yBottom = child.box.y + child.box.height + padding;
-                const lx = child.box.x;
-                const rx = child.box.x + child.box.width;
-                brackets.push({ x: lx, yTop, yBottom });
-                brackets.push({ x: rx, yTop, yBottom });
-                // Foot tips: tiny Y bands centered on each foot row
-                // so the entries only fire when the elbow's Y span
-                // actually crosses the foot line.
-                brackets.push({ x: lx + stub, yTop: yTop - 1, yBottom: yTop + 1 });
-                brackets.push({ x: lx + stub, yTop: yBottom - 1, yBottom: yBottom + 1 });
-                brackets.push({ x: rx - stub, yTop: yTop - 1, yBottom: yTop + 1 });
-                brackets.push({ x: rx - stub, yTop: yBottom - 1, yBottom: yBottom + 1 });
-            }
-            for (const sub of child.children) visitChild(sub);
-            return;
+        // A container's header bracket is a horizontal line over its dates
+        // with a short tick down to the body at each end
+        // (specs/true-width-layout.md §3.3). The ticks are the only vertical
+        // strokes it paints, so they are what an elbow must not hug.
+        const isDrawn = !(child.kind === 'group' && child.waveOnly);
+        if (isDrawn && child.headerHeight > 0 && child.style.bracket !== 'none') {
+            const yTop = child.box.y + CONTAINER_BRACKET_LINE_OFFSET_PX;
+            const yBottom = child.box.y + child.headerHeight;
+            brackets.push({ x: child.box.x, yTop, yBottom });
+            brackets.push({ x: child.box.x + child.box.width, yTop, yBottom });
         }
-        if (child.kind === 'group') {
-            // Bracket-style groups (no fill) paint a left-side `[`
-            // glyph along `box.x`. Filled-style groups have no bracket
-            // — the chiclet is the visual instead.
-            const isFilled = child.style.bg !== 'none' && child.style.bg !== '#ffffff';
-            if (!isFilled && child.style.bracket && child.style.bracket !== 'none') {
-                brackets.push({
-                    x: child.box.x,
-                    yTop: child.box.y,
-                    yBottom: child.box.y + child.box.height,
-                });
-            }
-            for (const sub of child.children) visitChild(sub);
-            return;
-        }
+        for (const sub of child.children) visitChild(sub);
     };
 
     const visitSwimlane = (lane: PositionedSwimlane): void => {

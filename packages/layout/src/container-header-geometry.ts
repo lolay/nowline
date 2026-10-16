@@ -1,128 +1,119 @@
-// Container header band geometry — the strip directly ABOVE a bracket /
-// unstyled group's or a parallel's box that carries the container's title
-// text and its inline-date glyphs. A container's first child row starts
-// at `box.y`, flush with its corners, so nothing that is painted before
-// the children may sit inside the box's top row: it would be covered.
-// The band is space the container reserves for itself, above that row.
+// Container geometry — a group or parallel is drawn above and around its
+// content, never beside it (specs/true-width-layout.md §3.3):
 //
-// Layout (the band reservation, the glyph placement) and the renderer
-// (the title text, the group bracket's top foot) both call these
-// helpers, so the painted title and the glyph clearance can't drift
-// apart. Filled ("chiclet") groups carry their title and glyphs inside
-// the box instead; see `group-title-tab-geometry.ts`.
+//   header  the title over a bracket that spans exactly the container's
+//           dates; the title starts at the container's start and may run
+//           past the bracket's end, and inline-date glyphs sit beside it.
+//   body    a shaded rectangle spanning exactly the container's dates, from
+//           the header down to below the last child, padded above and below
+//           the content, never left or right.
+//
+// A container's `box` is the whole of it: `box.y` is the header's top,
+// `box.y + headerHeight` the body's top, and `box.x` / `box.width` its dates.
+// Layout (the reservation, the glyph placement, the row footprint) and the
+// renderer (the bracket, the title, the body) both read these helpers, so the
+// painted header and the space layout keeps for it can't drift apart.
 
-import { groupHasFill, groupTitleTabWidth } from './group-title-tab-geometry.js';
 import {
     INLINE_DATE_GLYPH_GAP_PX,
-    INLINE_DATE_GLYPH_INSET_LEFT_PX,
     INLINE_DATE_GLYPH_TILE_SIZE_PX,
 } from './item-bar-geometry.js';
-import { GROUP_BRACKET_LABEL_OVERHANG_PX, ITEM_INSET_PX, TEXT_SIZE_PX } from './themes/shared.js';
+import { TEXT_SIZE_PX } from './themes/shared.js';
 import type { PositionedTrackChild } from './types.js';
 
-/** Height (px) of the header band. Same strip a bracket group's title
- *  has always overhung into, and the parallel bracket's top padding. */
-export const CONTAINER_HEADER_BAND_PX = GROUP_BRACKET_LABEL_OVERHANG_PX;
+/** Height (px) of a container's header band: title row, then the bracket. */
+export const CONTAINER_HEADER_BAND_PX = 18;
 
-/** Font size (px) of a header-band title. */
+/** The bracket's horizontal line, measured down from the header's top. Its
+ *  end ticks run from here down to the body's top. */
+export const CONTAINER_BRACKET_LINE_OFFSET_PX = 13;
+
+/** Font size (px) of a header title. */
 export const CONTAINER_HEADER_TITLE_FONT_SIZE_PX = TEXT_SIZE_PX.xs;
 
-/** Baseline of a header-band title, measured up from `box.y`. */
-export const CONTAINER_HEADER_TITLE_BASELINE_OFFSET_PX = 2;
+/** Baseline of a header title, measured down from the header's top. */
+export const CONTAINER_HEADER_TITLE_BASELINE_PX = 10;
 
-/** Title inset (px) from `box.x` for a bracket / unstyled group. */
-export const GROUP_HEADER_TITLE_INSET_X_PX = 6;
+/** Padding (px) between a container's body edge and its content, above and
+ *  below only. */
+export const CONTAINER_BODY_PAD_PX = 6;
 
-/** Title inset (px) from `box.x` for a parallel. */
-export const PARALLEL_HEADER_TITLE_INSET_X_PX = 4;
+/** Clear space (px) the row keeps past a header that runs beyond its
+ *  container's end, the same buffer an item's spilled caption keeps. */
+export const CONTAINER_HEADER_CLEARANCE_PX = 6;
 
-/**
- * Header band height (px) a group reserves above its box. Bracket and
- * unstyled groups reserve it for a title or inline-date glyphs; filled
- * groups reserve none (their chiclet row sits inside the box).
- */
-export function groupHeaderBandPx(hasFill: boolean, hasTitle: boolean, hasPins: boolean): number {
-    return !hasFill && (hasTitle || hasPins) ? CONTAINER_HEADER_BAND_PX : 0;
+/** Fill opacity of a container body directly in a lane: its `bg`, as a
+ *  light tint over the lane band. */
+export const CONTAINER_BODY_FILL_OPACITY = 0.12;
+
+/** Fill opacity of a container body nested one level, inside another
+ *  container's body: a lighter tint, so the two stack to a step darker
+ *  rather than to a new colour (specs/true-width-layout.md §8 O4). */
+export const CONTAINER_NESTED_BODY_FILL_OPACITY = 0.06;
+
+/** Nesting depth (1 for a container directly in a lane) past which a body
+ *  is outlined instead of filled, so tints never compound three deep
+ *  (specs/true-width-layout.md §8 O4). */
+export const CONTAINER_MAX_FILLED_DEPTH = 2;
+
+/** Vertical chrome a container reserves around its content. */
+export interface ContainerChrome {
+    /** Header band height: 0 when the header would be empty. */
+    header: number;
+    /** Body padding above the content, and again below it. */
+    pad: number;
 }
 
 /**
- * Header band height (px) a parallel reserves above its box. Only
- * inline-date glyphs reserve it; a title-only parallel keeps painting
- * its title in the inter-row gap above the box, as it always has.
+ * The chrome a container reserves. A wave-only group draws nothing and
+ * reserves nothing (specs/waves.md §9.7). Any other container pads its body;
+ * it keeps a header band when there is a title, an inline-date glyph or a
+ * visible bracket to put in it.
  */
-export function parallelHeaderBandPx(hasPins: boolean): number {
-    return hasPins ? CONTAINER_HEADER_BAND_PX : 0;
+export function containerChrome(opts: {
+    drawn: boolean;
+    hasTitle: boolean;
+    hasPins: boolean;
+    hasBracket: boolean;
+}): ContainerChrome {
+    if (!opts.drawn) return { header: 0, pad: 0 };
+    const hasHeader = opts.hasTitle || opts.hasPins || opts.hasBracket;
+    return { header: hasHeader ? CONTAINER_HEADER_BAND_PX : 0, pad: CONTAINER_BODY_PAD_PX };
 }
 
 /**
- * Left x of the header-band title. An `after:` glyph takes the band's
- * leftmost slot (`INLINE_DATE_GLYPH_INSET_LEFT_PX`, above the first
- * child's left edge), and the title follows one gap past it.
+ * Left x of the header title: the container's start, or one gap past an
+ * `after:` glyph, which takes the header's leftmost slot.
  */
-export function containerHeaderTitleX(
-    boxX: number,
-    titleInsetX: number,
-    hasAfterGlyph: boolean,
-): number {
-    return hasAfterGlyph
-        ? boxX +
-              INLINE_DATE_GLYPH_INSET_LEFT_PX +
-              INLINE_DATE_GLYPH_TILE_SIZE_PX +
-              INLINE_DATE_GLYPH_GAP_PX
-        : boxX + titleInsetX;
+export function containerHeaderTitleX(boxX: number, hasAfterGlyph: boolean): number {
+    return hasAfterGlyph ? boxX + INLINE_DATE_GLYPH_TILE_SIZE_PX + INLINE_DATE_GLYPH_GAP_PX : boxX;
 }
 
 /**
- * Estimated width (px) of a header-band title. Same pessimistic
- * ~0.58 em/char heuristic the caption-spill math uses, so a `before:`
- * glyph clamped past it errs toward extra air rather than overlap.
+ * Estimated width (px) of a header title. Same pessimistic ~0.58 em/char
+ * heuristic the caption-spill math uses, so the row reserves a little more
+ * than the text needs rather than less.
  */
 export function containerHeaderTitleWidth(title: string): number {
     return title.length * CONTAINER_HEADER_TITLE_FONT_SIZE_PX * 0.58;
 }
 
 /**
- * Rightmost x reached by the title row of every pinned container in
- * `block`'s subtree (the block itself and any nested group / parallel):
- * its inline-date glyphs and its title (chiclet, or header-band text at
- * its estimated width). `-Infinity` when nothing in the subtree is
- * pinned.
+ * Rightmost x a container's own header paints: its title (at its estimated
+ * width) and its inline-date glyphs. `-Infinity` for an item, or a container
+ * with neither.
  */
-function pinnedTitleRowRightX(block: PositionedTrackChild): number {
+export function containerHeaderRightX(block: PositionedTrackChild): number {
     if (block.kind === 'item') return Number.NEGATIVE_INFINITY;
     let right = Number.NEGATIVE_INFINITY;
     const pins = block.inlineDatePins ?? [];
     for (const pin of pins) right = Math.max(right, pin.glyphTopLeft.x + pin.glyphSize);
-    if (pins.length > 0 && block.title) {
-        if (block.kind === 'group' && groupHasFill(block.style.bg)) {
-            right = Math.max(right, block.box.x + groupTitleTabWidth(block.title));
-        } else {
-            const insetX =
-                block.kind === 'group'
-                    ? GROUP_HEADER_TITLE_INSET_X_PX
-                    : PARALLEL_HEADER_TITLE_INSET_X_PX;
-            const hasAfter = pins.some((pin) => pin.side === 'after');
-            right = Math.max(
-                right,
-                containerHeaderTitleX(block.box.x, insetX, hasAfter) +
-                    containerHeaderTitleWidth(block.title),
-            );
-        }
+    if (block.title && block.headerHeight > 0) {
+        const hasAfter = pins.some((pin) => pin.side === 'after');
+        right = Math.max(
+            right,
+            containerHeaderTitleX(block.box.x, hasAfter) + containerHeaderTitleWidth(block.title),
+        );
     }
-    for (const child of block.children) right = Math.max(right, pinnedTitleRowRightX(child));
     return right;
-}
-
-/**
- * Spill reservation (x) a placed block claims on its row, or null.
- * A pinned container's title row sits level with the top of the row it
- * was placed on, and a `before:` glyph clamped past a long title can run
- * past the block's right edge. A sibling chained onto the same row
- * would then be painted over it. Reserving that extent makes the row
- * packer bump such a sibling to a fresh row, the same way an item's
- * spilled caption does.
- */
-export function blockTitleRowSpillReservation(block: PositionedTrackChild): number | null {
-    const right = pinnedTitleRowRightX(block);
-    return right > block.box.x + block.box.width ? right + ITEM_INSET_PX : null;
 }
