@@ -607,7 +607,7 @@
             b.url
                 ? el('a', { href: b.url, text: b.sha.slice(0, 7) })
                 : el('span', { text: b.sha.slice(0, 7) }),
-            ` ${b.subject} · ${b.author} · ${localTime(b.date)}`,
+            ` ${b.subject} · ${b.author} · ${localTime(b.date)}${b.line && b.line !== 'main' ? ` · ${b.line}` : ''}`,
         ];
         document.querySelector('.range-from').replaceChildren(...line('From', from));
         document.querySelector('.range-to').replaceChildren(...line('To', to));
@@ -707,7 +707,8 @@
     function recordVisit() {
         const id = body.dataset.buildId;
         const date = body.dataset.buildDate;
-        if (!id || !date) return;
+        // "Since your last visit" follows main; PR and branch builds don't count.
+        if (!id || !date || (body.dataset.line && body.dataset.line !== 'main')) return;
         const seen = JSON.parse(store.get('lastSeen') || 'null');
         if (!seen || new Date(date) > new Date(seen.date)) {
             store.set('lastSeen', JSON.stringify({ id, date }));

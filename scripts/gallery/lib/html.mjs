@@ -3,6 +3,7 @@
 // text, commit subjects and author names can never break out of the markup.
 
 import { lineDiff, sideBySideRows } from './diff.mjs';
+import { lineOf, MAIN_LINE } from './lines.mjs';
 import { CHANGED_STATUSES, entryKey } from './model.mjs';
 
 class Raw {
@@ -94,6 +95,29 @@ function commitLine(manifest) {
         <span class="byline">${meta.author} · <time datetime="${meta.date}">${utcLabel(meta.date)}</time></span>`;
 }
 
+// A pull request build's header lines: which PR and branch, then (after the
+// commit line) what it is compared against. `toBuilds` and `toRoot` are the
+// relative paths from the page to b/ and to the site root.
+function prLine(build) {
+    const pr = build.pr;
+    if (!pr) return '';
+    const number = pr.url
+        ? html`<a class="pr-number" href="${pr.url}">PR #${pr.number}</a>`
+        : html`<span class="pr-number">PR #${pr.number}</span>`;
+    return html`<p class="meta pr-line">${number} · <span class="pr-title">${pr.title}</span>${pr.headRef ? html` · <span class="chip">${pr.headRef}</span>` : ''}</p>`;
+}
+
+function prVs({ build, prev, prevPushId, toBuilds, toRoot }) {
+    if (!build.pr) return '';
+    const vsMain = prev
+        ? html`vs main <a class="sha" href="${toBuilds}${prev.id}/index.html">${shortSha(prev.sha)}</a>`
+        : html`No main build to compare against.`;
+    const vsPush = prevPushId
+        ? html` · <a class="vs-push" href="${toRoot}compare.html?from=${prevPushId}&amp;to=${build.id}">vs previous push</a>`
+        : '';
+    return html`<p class="meta small pr-vs">${vsMain}${vsPush}</p>`;
+}
+
 function page({ title, depth, body, bodyAttrs = '' }) {
     const base = '../'.repeat(depth);
     return `<!doctype html>
@@ -142,7 +166,17 @@ function entryHref(fromDepthToBuild, buildId, key) {
 
 // --- Entry page -----------------------------------------------------------
 
-export function renderEntryPage({ build, prev, item, result, nav, history, sources, hasChanges }) {
+export function renderEntryPage({
+    build,
+    prev,
+    prevPushId = null,
+    item,
+    result,
+    nav,
+    history,
+    sources,
+    hasChanges,
+}) {
     const { group, entry, key } = item;
     const toRoot = '../../../';
     const toBuilds = '../../';
@@ -173,14 +207,16 @@ export function renderEntryPage({ build, prev, item, result, nav, history, sourc
     return page({
         title: `${entry.slug} · ${shortSha(build.sha)} · Nowline review`,
         depth: 3,
-        bodyAttrs: html` class="entry-page" data-has-changes="${hasChanges ? '1' : '0'}" data-build-date="${build.date}" data-build-id="${build.id}"`,
+        bodyAttrs: html` class="entry-page" data-has-changes="${hasChanges ? '1' : '0'}" data-build-date="${build.date}" data-build-id="${build.id}" data-line="${lineOf(build)}"`,
         body: html`<header class="top">
   <nav class="crumbs"><a href="${toRoot}index.html">Builds</a> / <a href="../index.html">${shortSha(build.sha)}</a> / ${group.title}</nav>
   <h1>${entry.slug} <span class="chip ${statusClass(result)}">${statusLabel(result)}</span></h1>
   ${entry.title ? html`<p class="roadmap-title">${entry.title}</p>` : ''}
   ${entry.description ? html`<p class="description">${entry.description}</p>` : ''}
   <p class="params"><span class="chip">theme: ${entry.theme}</span> <span class="chip">now: ${entry.now ?? 'today'}</span></p>
+  ${prLine(build)}
   <p class="meta">${commitLine(build)}</p>
+  ${prVs({ build, prev, prevPushId, toBuilds, toRoot })}
 </header>
 <main>
   ${compare}
@@ -261,18 +297,27 @@ function tile({ href, src, label, result, prevSrc }) {
 </a>`;
 }
 
-function buildHeader({ build, prev, comparison, toRoot, title }) {
+function buildHeader({ build, prev, prevPushId = null, comparison, toRoot, title }) {
     return html`<header class="top">
   <nav class="crumbs"><a href="${toRoot}index.html">Builds</a> / <a href="index.html">${shortSha(build.sha)}</a></nav>
   <h1>${title}</h1>
+  ${prLine(build)}
   <p class="meta">${commitLine(build)}</p>
   <p class="meta small">${build.ref ? html`<span class="chip">${build.ref}</span> ` : ''}${build.runUrl ? html`<a href="${build.runUrl}">workflow run</a>` : ''}</p>
-  ${prev ? html`<p class="meta small">vs ${commitLine(prev)}</p>` : html`<p class="meta small">First build in the history.</p>`}
+  ${build.pr ? prVs({ build, prev, prevPushId, toBuilds: '../', toRoot }) : prev ? html`<p class="meta small">vs ${commitLine(prev)}</p>` : html`<p class="meta small">First build in the history.</p>`}
   <p class="summary">${chips(comparison.counts)}</p>
 </header>`;
 }
 
-export function renderBuildIndex({ build, prev, flat, comparison, older, newer }) {
+export function renderBuildIndex({
+    build,
+    prev,
+    prevPushId = null,
+    flat,
+    comparison,
+    older,
+    newer,
+}) {
     const changedTiles = flat
         .filter((f) => CHANGED_STATUSES.has(comparison.statuses.get(f.key).status))
         .map((f) =>
@@ -304,8 +349,8 @@ export function renderBuildIndex({ build, prev, flat, comparison, older, newer }
     return page({
         title: `${shortSha(build.sha)} · Nowline review`,
         depth: 2,
-        bodyAttrs: html` class="build-page" data-build-date="${build.date}" data-build-id="${build.id}"`,
-        body: html`${buildHeader({ build, prev, comparison, toRoot: '../../', title: `Build ${shortSha(build.sha)}` })}
+        bodyAttrs: html` class="build-page" data-build-date="${build.date}" data-build-id="${build.id}" data-line="${lineOf(build)}"`,
+        body: html`${buildHeader({ build, prev, prevPushId, comparison, toRoot: '../../', title: `Build ${shortSha(build.sha)}` })}
 <main>
   ${comparison.hasChanges ? html`<p><a class="button" href="changes.html">Review changes →</a></p>` : ''}
   ${changedTiles.length > 0 ? html`<section class="group"><h2>Changed in this build</h2><div class="grid">${changedTiles}</div></section>` : ''}
@@ -331,7 +376,14 @@ function removedList(comparison, prev) {
 
 const CHANGE_ORDER = { drift: 0, edit: 1, new: 2 };
 
-export function renderChangesPage({ build, prev, flat, comparison, sources = new Map() }) {
+export function renderChangesPage({
+    build,
+    prev,
+    prevPushId = null,
+    flat,
+    comparison,
+    sources = new Map(),
+}) {
     const changed = flat
         .map((f) => ({ ...f, result: comparison.statuses.get(f.key) }))
         .filter((f) => CHANGED_STATUSES.has(f.result.status))
@@ -355,8 +407,8 @@ export function renderChangesPage({ build, prev, flat, comparison, sources = new
     return page({
         title: `Changes · ${shortSha(build.sha)} · Nowline review`,
         depth: 2,
-        bodyAttrs: html` class="changes-page" data-build-date="${build.date}" data-build-id="${build.id}"`,
-        body: html`${buildHeader({ build, prev, comparison, toRoot: '../../', title: `Changes in ${shortSha(build.sha)}` })}
+        bodyAttrs: html` class="changes-page" data-build-date="${build.date}" data-build-id="${build.id}" data-line="${lineOf(build)}"`,
+        body: html`${buildHeader({ build, prev, prevPushId, comparison, toRoot: '../../', title: `Changes in ${shortSha(build.sha)}` })}
 <main>
   <p class="toolbar"><button type="button" class="collapse-all">Collapse all</button> <a href="index.html">Full gallery</a></p>
   ${cards.length > 0 ? cards : html`<p class="note">No rendered output changed.</p>`}
@@ -367,26 +419,78 @@ export function renderChangesPage({ build, prev, flat, comparison, sources = new
 
 // --- Site root -------------------------------------------------------------
 
-export function renderRootIndex({ builds }) {
-    const rows = builds.map(
-        ({ manifest, comparison }) => html`<li class="build-row">
-  <a class="build-link" href="b/${manifest.id}/${comparison.hasChanges ? 'changes.html' : 'index.html'}">${shortSha(manifest.sha)}</a>
+// `main` is a list of { manifest, comparison } newest first; `branches` and
+// `prs` are lists of { line, number?, builds } with the same build shape.
+function buildLinks(manifest, comparison) {
+    return html`<a class="build-link" href="b/${manifest.id}/${comparison.hasChanges ? 'changes.html' : 'index.html'}">${shortSha(manifest.sha)}</a>`;
+}
+
+function byline(manifest, extra = '') {
+    return html`<span class="byline">${manifest.author} · <time datetime="${manifest.date}">${utcLabel(manifest.date)}</time>${manifest.ref ? html` · ${manifest.ref}` : ''}${extra}</span>`;
+}
+
+function mainRow({ manifest, comparison }) {
+    return html`<li class="build-row">
+  ${buildLinks(manifest, comparison)}
   <span class="subject">${manifest.subject}</span>
-  <span class="byline">${manifest.author} · <time datetime="${manifest.date}">${utcLabel(manifest.date)}</time>${manifest.ref ? html` · ${manifest.ref}` : ''}</span>
+  ${byline(manifest)}
   <span class="summary">${chips(comparison.counts)} <a href="b/${manifest.id}/index.html">gallery</a></span>
-</li>`,
+</li>`;
+}
+
+// A pull request or branch line: its newest push, with counts against the
+// line's baseline (main).
+function lineRow({ line, number = null, builds }) {
+    const { manifest, comparison } = builds[0];
+    const pr = manifest.pr;
+    const label =
+        number === null
+            ? html`<span class="chip line-name">${line}</span>`
+            : pr?.url
+              ? html`<a class="pr-number" href="${pr.url}">#${number}</a>`
+              : html`<span class="pr-number">#${number}</span>`;
+    const pushes = `${builds.length} ${builds.length === 1 ? 'push' : 'pushes'}`;
+    const pushesLink =
+        number === null
+            ? ''
+            : html` · <a class="pushes-link" href="pr/${number}/builds.html">${pushes}</a>`;
+    return html`<li class="build-row ${number === null ? 'branch-row' : 'pr-row'}">
+  <span class="subject">${label} ${number === null ? manifest.subject : pr?.title || manifest.subject}</span>
+  ${buildLinks(manifest, comparison)}
+  ${byline(manifest, pushesLink)}
+  <span class="summary">${chips(comparison.counts)} <a class="changes-link" href="b/${manifest.id}/changes.html">changes</a> <a href="b/${manifest.id}/index.html">gallery</a></span>
+</li>`;
+}
+
+export function renderRootIndex({ main, branches = [], prs = [] }) {
+    const labelOf = (group) => {
+        if (group.number === undefined || group.number === null) return `branch ${group.line}`;
+        const title = group.builds[0].manifest.pr?.title;
+        return `PR #${group.number}${title ? ` ${title}` : ''}`;
+    };
+    const pickerGroups = [
+        { label: MAIN_LINE, builds: main },
+        ...branches.map((g) => ({ label: labelOf(g), builds: g.builds })),
+        ...prs.map((g) => ({ label: labelOf(g), builds: g.builds })),
+    ].filter((g) => g.builds.length > 0);
+    const options = pickerGroups.map(
+        (g) =>
+            html`<optgroup label="${g.label}">${g.builds.map(
+                ({ manifest }) =>
+                    html`<option value="${manifest.id}">${shortSha(manifest.sha)} ${manifest.subject}</option>`,
+            )}</optgroup>`,
     );
-    const options = builds.map(
-        ({ manifest }) =>
-            html`<option value="${manifest.id}">${shortSha(manifest.sha)} ${manifest.subject}</option>`,
-    );
+    const section = (title, rows, empty = '') =>
+        rows.length > 0 || empty
+            ? html`<section class="group"><h2>${title}</h2>${rows.length > 0 ? html`<ol class="builds">${rows}</ol>` : html`<p class="note">${empty}</p>`}</section>`
+            : '';
     return page({
         title: 'Nowline review',
         depth: 0,
         bodyAttrs: ' class="root-page"',
         body: html`<header class="top">
   <h1>Nowline review</h1>
-  <p class="description">Rendered examples and tests for the last ${builds.length} builds. Each build compares against the one before it.</p>
+  <p class="description">Rendered examples and tests for the last ${main.length} builds on main. Each main build compares against the one before it; a pull request or branch compares against main.</p>
   <p><a class="button since-last-visit" hidden href="#">Changes since your last visit</a></p>
   <form class="range" action="compare.html">
     <label>From <select name="from">${options}</select></label>
@@ -394,18 +498,53 @@ export function renderRootIndex({ builds }) {
     <button type="submit">Compare</button>
   </form>
 </header>
+<main>
+  ${section('Main', main.map(mainRow), 'No builds on main yet.')}
+  ${section('Pull requests', prs.map(lineRow))}
+  ${section('Branches', branches.map(lineRow))}
+</main>`,
+    });
+}
+
+// `pr/<n>/builds.html`: every retained push of one PR, newest first, each
+// with its counts against main and a link to what changed since the push
+// before it.
+export function renderPrBuilds({ number, builds }) {
+    const { pr } = builds[0].manifest;
+    const rows = builds.map(({ manifest, comparison }, i) => {
+        const before = builds[i + 1]?.manifest;
+        return html`<li class="build-row">
+  <a class="build-link" href="../../b/${manifest.id}/${comparison.hasChanges ? 'changes.html' : 'index.html'}">${shortSha(manifest.sha)}</a>
+  <span class="subject">${manifest.subject}</span>
+  <span class="byline">${manifest.author} · <time datetime="${manifest.date}">${utcLabel(manifest.date)}</time></span>
+  <span class="summary">${chips(comparison.counts)} <a href="../../b/${manifest.id}/index.html">gallery</a>${before ? html` <a class="vs-push" href="../../compare.html?from=${before.id}&amp;to=${manifest.id}">vs previous push</a>` : ''}</span>
+</li>`;
+    });
+    return page({
+        title: `PR #${number} pushes · Nowline review`,
+        depth: 2,
+        bodyAttrs: ' class="pr-builds-page"',
+        body: html`<header class="top">
+  <nav class="crumbs"><a href="../../index.html">Builds</a> / PR #${number}</nav>
+  <h1>${pr?.url ? html`<a href="${pr.url}">PR #${number}</a>` : `PR #${number}`} ${pr?.title ?? ''}</h1>
+  <p class="meta small">${pr?.headRef ? html`<span class="chip">${pr.headRef}</span> ` : ''}${builds.length} ${builds.length === 1 ? 'push' : 'pushes'}, each compared against main.</p>
+</header>
 <main><ol class="builds">${rows}</ol></main>`,
     });
 }
 
-export function renderLatestRedirect(id) {
+export function renderRedirect(href, title) {
     return `<!doctype html>
 <html lang="en"><head><meta charset="utf-8">
 <link rel="icon" href="data:,">
-<meta http-equiv="refresh" content="0; url=../b/${escapeHtml(id)}/">
-<title>Latest build</title></head>
-<body><a href="../b/${escapeHtml(id)}/">Latest build</a></body></html>
+<meta http-equiv="refresh" content="0; url=${escapeHtml(href)}">
+<title>${escapeHtml(title)}</title></head>
+<body><a href="${escapeHtml(href)}">${escapeHtml(title)}</a></body></html>
 `;
+}
+
+export function renderLatestRedirect(id) {
+    return renderRedirect(`../b/${id}/`, 'Latest build');
 }
 
 // Range compare runs client-side over these hashes, so any two retained
@@ -415,6 +554,7 @@ export function renderComparePage({ builds, groups }) {
         groups,
         builds: builds.map(({ manifest }) => ({
             ...commitMeta(manifest),
+            line: lineOf(manifest),
             entries: Object.fromEntries(
                 manifest.groups.flatMap((g) =>
                     g.entries.map((e) => [

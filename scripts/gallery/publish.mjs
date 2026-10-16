@@ -30,6 +30,8 @@ import {
     renderComparePage,
     renderEntryPage,
     renderLatestRedirect,
+    renderPrBuilds,
+    renderRedirect,
     renderRootIndex,
 } from './lib/html.mjs';
 import {
@@ -180,8 +182,9 @@ function groupOrder(manifests) {
 // main build). Each build compares against its `baseId`; history and
 // older/newer links walk its own line. A build kept only as another line's
 // baseline gets pages (they are linked from that line) but no line links.
-// The root index, range compare and site builds.json cover main and local
-// branch lines; latest/ and history/ cover main. PR lines get pages only.
+// The root index (Main, Pull requests, Branches), range compare and site
+// builds.json cover every line; `pr/<n>/` redirects to a PR's latest push
+// and lists its pushes; latest/ and history/ cover main.
 export async function renderSite({ dataDir, siteDir, lines, focusId = null }) {
     const all = await loadAllManifests(dataDir);
     await rm(siteDir, { recursive: true, force: true });
@@ -215,6 +218,8 @@ export async function renderSite({ dataDir, siteDir, lines, focusId = null }) {
         const prev = baseId ? all.get(baseId) : null;
         const comparison = compareManifests(prev, build);
         const flat = flattenEntries(build);
+        // Within a PR line, the push before this one (its own line's neighbour).
+        const prevPushId = build.pr && at !== -1 ? (own.ids[at + 1] ?? null) : null;
         const prevByKey = new Map(prev ? flattenEntries(prev).map((f) => [f.key, f.entry]) : []);
         const nav = itemNavigation(flat, comparison.statuses);
         const lineHistory = histories.get(own.line) ?? new Map();
@@ -234,6 +239,7 @@ export async function renderSite({ dataDir, siteDir, lines, focusId = null }) {
                 renderEntryPage({
                     build,
                     prev,
+                    prevPushId,
                     item,
                     result: comparison.statuses.get(item.key),
                     nav: nav.get(item.key),
@@ -248,6 +254,7 @@ export async function renderSite({ dataDir, siteDir, lines, focusId = null }) {
             renderBuildIndex({
                 build,
                 prev,
+                prevPushId,
                 flat,
                 comparison,
                 older: at === -1 ? null : (own.ids[at + 1] ?? null),
@@ -256,33 +263,53 @@ export async function renderSite({ dataDir, siteDir, lines, focusId = null }) {
         );
         await write(
             resolve(buildDir, 'changes.html'),
-            renderChangesPage({ build, prev, flat, comparison, sources: sourcesByKey }),
+            renderChangesPage({ build, prev, prevPushId, flat, comparison, sources: sourcesByKey }),
         );
         await write(resolve(buildDir, 'manifest.json'), `${JSON.stringify(build, null, 2)}\n`);
         rendered.set(id, { manifest: build, comparison });
     }
 
-    // Until the index gets per-line sections, it lists local branch builds
-    // above main, as m1's single history did; PR lines aren't listed yet.
+    const listed = (line) =>
+        (lines[line] ?? []).filter((id) => all.has(id)).map((id) => rendered.get(id));
     const mainIds = (lines[MAIN_LINE] ?? []).filter((id) => all.has(id));
-    const branchIds = Object.entries(lines)
-        .filter(([line]) => line !== MAIN_LINE && prNumberOf(line) === null)
-        .flatMap(([, ids]) => ids.filter((id) => all.has(id)));
-    const builds = [...branchIds, ...mainIds].map((id) => rendered.get(id));
-    const listed = builds.map((b) => b.manifest);
+    const main = listed(MAIN_LINE);
+    // Local branches, most recently pushed first; pull requests, highest number first.
+    const branches = Object.keys(lines)
+        .filter((line) => line !== MAIN_LINE && prNumberOf(line) === null)
+        .map((line) => ({ line, builds: listed(line) }))
+        .filter((g) => g.builds.length > 0)
+        .sort((a, b) => b.builds[0].manifest.date.localeCompare(a.builds[0].manifest.date));
+    const prs = Object.keys(lines)
+        .filter((line) => prNumberOf(line) !== null)
+        .map((line) => ({ line, number: prNumberOf(line), builds: listed(line) }))
+        .filter((g) => g.builds.length > 0)
+        .sort((a, b) => b.number - a.number);
+    const builds = [...main, ...branches.flatMap((g) => g.builds), ...prs.flatMap((g) => g.builds)];
     for (const [key, rows] of histories.get(MAIN_LINE) ?? []) {
         await write(resolve(siteDir, 'history', `${key}.json`), JSON.stringify(rows));
     }
-    await write(resolve(siteDir, 'index.html'), renderRootIndex({ builds }));
+    for (const { number, builds: pushes } of prs) {
+        await write(
+            resolve(siteDir, 'pr', String(number), 'builds.html'),
+            renderPrBuilds({ number, builds: pushes }),
+        );
+        await write(
+            resolve(siteDir, 'pr', String(number), 'index.html'),
+            renderRedirect(`../../b/${pushes[0].manifest.id}/`, `PR #${number}, latest push`),
+        );
+    }
+    await write(resolve(siteDir, 'index.html'), renderRootIndex({ main, branches, prs }));
     await write(
         resolve(siteDir, 'compare.html'),
-        renderComparePage({ builds, groups: groupOrder(listed) }),
+        renderComparePage({ builds, groups: groupOrder(builds.map((b) => b.manifest)) }),
     );
     await write(
         resolve(siteDir, 'builds.json'),
         `${JSON.stringify(
             builds.map(({ manifest, comparison }) => ({
                 id: manifest.id,
+                line: lineOf(manifest),
+                pr: manifest.pr ?? null,
                 sha: manifest.sha,
                 subject: manifest.subject,
                 author: manifest.author,

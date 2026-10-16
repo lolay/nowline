@@ -235,7 +235,7 @@ test('an m1 data dir migrates: its flat builds.json becomes the main line', asyn
     assert.match(oldPage, /href="..\/666666666666\/index.html">newer build/);
 });
 
-test('a local branch build compares with main and is listed above it', async () => {
+test('a local branch build compares with main and is listed in a Branches section', async () => {
     const data = join(work, 'data-branch');
     const site = join(work, 'site-branch');
     const child = 'swimlane s "S"\n';
@@ -262,12 +262,21 @@ test('a local branch build compares with main and is listed above it', async () 
     assert.equal((await readJson(join(data, 'b', id, 'manifest.json'))).baseId, '666666666666');
     const builds = await readJson(join(site, 'builds.json'));
     assert.deepEqual(
-        builds.map((b) => [b.id, b.counts.drift]),
+        builds.map((b) => [b.id, b.line, b.counts.drift]),
         [
-            [id, 1],
-            ['666666666666', 0],
+            ['666666666666', 'main', 0],
+            [id, 'feat/x', 1],
         ],
     );
+    const root = await readFile(join(site, 'index.html'), 'utf8');
+    assert.match(root, /<h2>Main<\/h2>/);
+    assert.match(root, /<h2>Branches<\/h2>/);
+    assert.ok(root.indexOf('<h2>Main</h2>') < root.indexOf('<h2>Branches</h2>'));
+    const branchRow = root.slice(root.indexOf('branch-row'));
+    assert.match(branchRow, /class="chip line-name">feat\/x</);
+    assert.match(branchRow, new RegExp(`href="b/${id}/changes.html"`));
+    assert.doesNotMatch(root, /pr-number/);
+    assert.match(root, /<optgroup label="branch feat\/x">/);
     const latest = await readFile(join(site, 'latest/index.html'), 'utf8');
     assert.match(latest, /url=..\/b\/666666666666\//, 'latest stays on main');
 });
@@ -333,6 +342,139 @@ test("a PR build's statuses compare against main, not its own previous push", as
     assert.match(index, /href="..\/pr-12-aaaaaaaaaaaa\/index.html">‹ older build/);
 });
 
+// Two pushes of PR 12 over a two-build main: the PR pages and headers.
+async function prSite(name) {
+    const data = join(work, `data-${name}`);
+    const site = join(work, `site-${name}`);
+    const options = { dataDir: data, siteDir: site, isAncestor: () => false };
+    const child = 'swimlane s "S"\n';
+    for (const n of [1, 2]) {
+        await publish({
+            ...options,
+            rawDir: await build(n, {
+                parentSvg: `<svg>main ${n}</svg>`,
+                childText: child,
+                raw: `raw-${name}-m${n}`,
+            }),
+        });
+    }
+    for (const head of ['a', 'b']) {
+        await publish({
+            ...options,
+            rawDir: await build(2, {
+                parentSvg: head === 'a' ? '<svg>pr a</svg>' : '<svg>pr b</svg>',
+                childText: child,
+                raw: `raw-${name}-${head}`,
+                commit: {
+                    ...prCommit(12, head.repeat(40), '2'.repeat(40)),
+                    author: head === 'a' ? 'Ada' : 'Grace',
+                    date: `2026-03-1${head === 'a' ? 1 : 2}T10:00:00Z`,
+                },
+            }),
+        });
+    }
+    return { data, site };
+}
+
+test('the root page lists pull requests below main, with counts against main', async () => {
+    const { site } = await prSite('pr-root');
+    const root = await readFile(join(site, 'index.html'), 'utf8');
+    const main = root.indexOf('<h2>Main</h2>');
+    const prs = root.indexOf('<h2>Pull requests</h2>');
+    assert.ok(main !== -1 && prs > main, 'Pull requests follows Main');
+    assert.doesNotMatch(root, /<h2>Branches<\/h2>/);
+    const row = root.slice(root.indexOf('pr-row'), root.indexOf('</li>', root.indexOf('pr-row')));
+    assert.match(row, /href="https:\/\/github.com\/lolay\/nowline\/pull\/12">#12</);
+    assert.match(row, /Feature/);
+    assert.match(row, /Grace/, 'the latest push author');
+    assert.match(row, /bbbbbbb/, 'the latest push sha');
+    assert.match(row, /1 renderer drift/);
+    assert.match(row, /href="b\/pr-12-bbbbbbbbbbbb\/changes.html">changes</);
+    assert.match(row, /href="pr\/12\/builds.html">2 pushes</);
+    assert.match(root, /<optgroup label="PR #12 Feature">/);
+    assert.match(root, /compares against main/);
+    // Only main appears under Main.
+    assert.equal(root.slice(main, prs).match(/class="build-row"/g).length, 2);
+
+    const builds = await readJson(join(site, 'builds.json'));
+    assert.deepEqual(
+        builds.map((b) => [b.id, b.line]),
+        [
+            ['222222222222', 'main'],
+            ['111111111111', 'main'],
+            ['pr-12-bbbbbbbbbbbb', 'pr-12'],
+            ['pr-12-aaaaaaaaaaaa', 'pr-12'],
+        ],
+    );
+    assert.equal(builds[2].pr.number, 12);
+    assert.equal(builds[0].pr, null);
+    const compare = await readFile(join(site, 'compare.html'), 'utf8');
+    assert.match(compare, /"id":"pr-12-aaaaaaaaaaaa"/);
+    assert.match(compare, /"line":"pr-12"/);
+    assert.match(await readFile(join(site, 'latest/index.html'), 'utf8'), /b\/222222222222\//);
+});
+
+test('pr/<n>/ redirects to the latest push and builds.html lists the pushes', async () => {
+    const { site } = await prSite('pr-pages');
+    const redirect = await readFile(join(site, 'pr/12/index.html'), 'utf8');
+    assert.match(redirect, /url=..\/..\/b\/pr-12-bbbbbbbbbbbb\//);
+    const list = await readFile(join(site, 'pr/12/builds.html'), 'utf8');
+    assert.ok(list.indexOf('bbbbbbb') < list.indexOf('aaaaaaa'), 'newest push first');
+    assert.match(list, /href="..\/..\/b\/pr-12-bbbbbbbbbbbb\/changes.html"/);
+    assert.match(list, /1 renderer drift/);
+    assert.match(
+        list,
+        /href="..\/..\/compare.html\?from=pr-12-aaaaaaaaaaaa&amp;to=pr-12-bbbbbbbbbbbb">vs previous push/,
+    );
+    assert.equal(list.match(/vs previous push/g).length, 1, 'the first push has none');
+    assert.match(list, /href="https:\/\/github.com\/lolay\/nowline\/pull\/12">PR #12</);
+});
+
+test('a PR build header names the PR, its base on main and the previous push', async () => {
+    const { site } = await prSite('pr-header');
+    const second = 'pr-12-bbbbbbbbbbbb';
+    const first = 'pr-12-aaaaaaaaaaaa';
+    for (const [path, toBuilds, toRoot] of [
+        [`b/${second}/index.html`, '../', '../../'],
+        [`b/${second}/changes.html`, '../', '../../'],
+        [`b/${second}/examples/parent.html`, '../../', '../../../'],
+    ]) {
+        const page = await readFile(join(site, path), 'utf8');
+        assert.match(
+            page,
+            /href="https:\/\/github.com\/lolay\/nowline\/pull\/12">PR #12<\/a> · /,
+            path,
+        );
+        assert.match(
+            page,
+            /<span class="pr-title">Feature<\/span> · <span class="chip">feature<\/span>/,
+            path,
+        );
+        assert.match(
+            page,
+            new RegExp(
+                `vs main <a class="sha" href="${toBuilds}222222222222/index.html">2222222</a>`,
+            ),
+            path,
+        );
+        assert.match(
+            page,
+            new RegExp(
+                `href="${toRoot}compare.html\\?from=${first}&amp;to=${second}">vs previous push`,
+            ),
+            path,
+        );
+        assert.ok(page.indexOf('pr-line') < page.indexOf('class="commit"'), 'PR line first');
+        assert.ok(page.indexOf('class="commit"') < page.indexOf('pr-vs'), 'vs line after commit');
+    }
+    // The first push has a main base but no earlier push; main pages have no PR header.
+    const firstPage = await readFile(join(site, `b/${first}/index.html`), 'utf8');
+    assert.match(firstPage, /vs main/);
+    assert.doesNotMatch(firstPage, /vs previous push/);
+    const mainPage = await readFile(join(site, 'b/222222222222/index.html'), 'utf8');
+    assert.doesNotMatch(mainPage, /pr-line|pr-vs/);
+});
+
 test('retention keeps a pruned main baseline while its PR is open', async () => {
     const data = join(work, 'data-keep');
     const site = join(work, 'site-keep');
@@ -364,9 +506,12 @@ test('retention keeps a pruned main baseline while its PR is open', async () => 
     assert.match(prPage, /data-prev-src="..\/..\/888888888888\/examples\/parent.svg"/);
     const builds = await readJson(join(site, 'builds.json'));
     assert.deepEqual(
-        builds.map((b) => b.id),
-        ['999999999999'],
-        'the pinned build is not listed in main',
+        builds.map((b) => [b.id, b.line, b.pr?.number ?? null]),
+        [
+            ['999999999999', 'main', null],
+            ['pr-3-cccccccccccc', 'pr-3', 3],
+        ],
+        'the pinned build is not listed',
     );
 
     // The PR closes: its line and the baseline it pinned both go.

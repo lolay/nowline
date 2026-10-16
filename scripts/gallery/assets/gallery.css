@@ -715,3 +715,11 @@ body.collapsed .scroll {
     gap: 0.75rem;
     align-items: center;
 }
+
+.pr-number {
+    font-weight: 600;
+}
+
+.line-name {
+    font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+}
