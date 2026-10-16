@@ -913,11 +913,13 @@ describe('layoutRoadmap — milestones and wave references', () => {
         expect(weeksAt(laid, alphaDone.center.x)).toBe(3);
         expect(alphaDone.onWaveBoundary).toBe(true);
         expect(alphaDone.slackArrows).toBeUndefined();
-        // ga is bound by launch-event: it sits at the bar's visual right
-        // edge (6 px left of W6) and keeps its cut line.
+        // ga is bound by launch-event: it sits at that item's duration end
+        // (W6, specs/scheduler-unification.md §8 decision 6), which is no
+        // wave boundary, so it keeps its cut line.
         const ga = milestone(laid, 'ga');
         const launch = item(laid, 'launch-event');
-        expect(ga.center.x).toBe(launch.box.x + launch.box.width);
+        expect(ga.center.x).toBe(logicalEnd(launch));
+        expect(weeksAt(laid, ga.center.x)).toBe(6);
         expect('onWaveBoundary' in ga).toBe(false);
         // beta is a non-binding predecessor of ga, but waves draw no
         // slack arrows.
@@ -948,8 +950,9 @@ milestone m "M" after:[w1, b2, a2]
         const m = milestone(laid, 'm');
         const a2 = item(laid, 'a2');
         const b2 = item(laid, 'b2');
-        expect(m.center.x).toBe(a2.box.x + a2.box.width);
-        // b2 (an item) gets its arrow; w1 (a wave) does not.
+        expect(m.center.x).toBe(logicalEnd(a2));
+        // b2 (an item) gets its arrow, from its painted edge; w1 (a wave)
+        // does not.
         expect(m.slackArrows?.map((a) => a.x)).toEqual([b2.box.x + b2.box.width]);
     });
 

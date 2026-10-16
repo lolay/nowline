@@ -76,6 +76,9 @@ export function collectMilestonePredecessors(
         const endX = ctx.entityRightEdges.get(ref);
         if (endX === undefined) continue;
         const x = item ? item.box.x + item.box.width : endX;
+        const y = item
+            ? itemSlackAttachY(item, ctx.bandScale.bandwidth())
+            : (ctx.entityMidpoints.get(ref)?.y ?? 0);
         // A wave reads its seeded end `E_k` (logical, not inset), so a
         // milestone bound by it sits exactly on the boundary.
         if (!item && ctx.waves?.plan.index.has(ref)) {
