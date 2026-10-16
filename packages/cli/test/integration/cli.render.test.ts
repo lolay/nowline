@@ -921,6 +921,79 @@ describeBuilt('render: include diagnostics', () => {
     }
 });
 
+// References never cross a file boundary (specs/dsl.md, Reference rule 1): an
+// included file's unresolved `after:` is NL.E0302 at the child path and line,
+// exit 1, under merge and isolate. roadmap:ignore drops the child's content.
+describeBuilt('render: unresolved references in an included file', () => {
+    const NO_LOCALE_ENV = { LC_ALL: '', LC_MESSAGES: '', LANG: '' };
+    const host = (mode: string) =>
+        [
+            'nowline v1',
+            '',
+            `include "./child.nowline" roadmap:${mode}`,
+            '',
+            'roadmap host "Host" start:2026-01-05',
+            '',
+            'anchor launch "Launch" date:2026-01-05',
+            '',
+            'swimlane core "Core"',
+            '  item api "API" duration:3w after:launch',
+            '',
+        ].join('\n');
+    const child = [
+        'nowline v1',
+        '',
+        'roadmap child "Child" start:2026-01-05',
+        '',
+        'anchor kickoff "Kickoff" date:2026-01-12',
+        '',
+        'swimlane plugin "Plugin"',
+        '  item alpha "Plugin alpha" duration:3w after:launch',
+        '',
+    ].join('\n');
+    const message = tr('en-US', 'NL.E0302', { key: 'after', value: 'launch' });
+
+    async function run(mode: string, extra: string[] = []) {
+        let result: Awaited<ReturnType<typeof runCliBuilt>> | undefined;
+        await withTempDir(async (dir) => {
+            await fs.writeFile(path.join(dir, 'host.nowline'), host(mode));
+            await fs.writeFile(path.join(dir, 'child.nowline'), child);
+            result = await runCliBuilt(['host.nowline', '-n', ...extra], {
+                cwd: dir,
+                env: NO_LOCALE_ENV,
+            });
+        });
+        return result!;
+    }
+
+    for (const mode of ['isolate', 'merge']) {
+        it(`roadmap:${mode} fails with NL.E0302 in the child (exit 1)`, async () => {
+            const r = await run(mode);
+            expect(r.exitCode).toBe(1);
+            expect(r.stderr).toContain(`child.nowline:8:3 error: ${message}`);
+        });
+    }
+
+    it('--diagnostic-format json carries the code and the child file', async () => {
+        const r = await run('merge', ['--diagnostic-format', 'json']);
+        expect(r.exitCode).toBe(1);
+        const doc = JSON.parse(r.stderr);
+        expect(
+            doc.diagnostics.map((d: { file: string; line: number; code: string }) => [
+                d.file,
+                d.line,
+                d.code,
+            ]),
+        ).toEqual([['child.nowline', 8, 'NL.E0302']]);
+    });
+
+    it('roadmap:ignore stays silent (exit 0)', async () => {
+        const r = await run('ignore');
+        expect(r.exitCode).toBe(0);
+        expect(r.stderr).toBe('');
+    });
+});
+
 // The render-time non-working display (specs/working-calendar.md §4.2; m2p
 // phase 4). Precedence: --non-working, then the file's
 // `default roadmap non-working:` key, then hide. "Unset" is undefined, so the

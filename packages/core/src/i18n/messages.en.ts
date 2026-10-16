@@ -182,6 +182,8 @@ export const messages = {
     'NL.E0300': (a: { name: string; location: string }) =>
         `Duplicate identifier "${a.name}". First declared at ${a.location}.`,
     'NL.E0301': (a: { type: string }) => `${a.type} must have an identifier, a title, or both.`,
+    'NL.E0302': (a: { key: string; value: string }) =>
+        `${a.key}: reference "${a.value}" does not resolve to any declared entity in this file.`,
 
     // Property values
     'NL.E0400': (a: { value: string }) =>

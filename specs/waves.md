@@ -501,7 +501,7 @@ The layout emits L (WV15–WV18).
 
 - `checkUnknownEntityProperties` skips `wave` on every entity, and skips WV3's keys on a wave.
 - NL.E0411 does not fire on a wave's `before:`; NL.E1105 covers it.
-- An element of a wave's `after:` that resolves to nothing gets only the existing "does not resolve" error. One that resolves to the wrong kind gets only NL.E1106.
+- An element of a wave's `after:` that resolves to nothing gets only the "does not resolve" error (`NL.E0302`). One that resolves to the wrong kind gets only NL.E1106.
 - `default <entity> wave:[a, b]` gets only the WV8 or WV9 diagnostic.
 
 **Cascade control.**

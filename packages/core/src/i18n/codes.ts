@@ -46,6 +46,7 @@ export type MessageCode =
     // Identifier (NL.E0300–E0399)
     | 'NL.E0300' // duplicate-identifier
     | 'NL.E0301' // id-or-title-required
+    | 'NL.E0302' // unresolved-reference
 
     // Property values (NL.E0400–E0499)
     | 'NL.E0400' // invalid-duration
@@ -151,6 +152,7 @@ export const ALL_CODES: ReadonlyArray<MessageCode> = [
     'NL.E0202',
     'NL.E0300',
     'NL.E0301',
+    'NL.E0302',
     'NL.E0400',
     'NL.E0401',
     'NL.E0402',
