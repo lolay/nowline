@@ -46,6 +46,11 @@ export interface PlacedChart {
     ctx: LayoutContext;
     swimlanes: PositionedSwimlane[];
     includes: PositionedIncludeRegion[];
+    /**
+     * Each kept region's own context, in `includes` order: its placed
+     * items and marker edges, which its dependency edges read (f11).
+     */
+    regionContexts: LayoutContext[];
     /** x, slack arrows and overrun; f6 adds the row and label box and builds `PositionedMilestone`. */
     milestones: MilestonePlacement[];
     laneEntries: SwimlaneDeclaration[];
@@ -209,6 +214,7 @@ export function placeChart(
                         ctx,
                         last.nextY + LANES_TO_REGIONS_GAP_PX,
                         helpers,
+                        measured.naturalChartRightX,
                     );
                 }
                 return waves.pass;
@@ -251,9 +257,17 @@ export function placeChart(
     // last swimlane into empty space. With waves this is the one kept
     // region placement, floored with the frozen S/E.
     let includes: PositionedIncludeRegion[] = [];
+    let regionContexts: LayoutContext[] = [];
     if (isolated.length > 0) {
-        const r = buildIncludeRegions(isolated, ctx, y + LANES_TO_REGIONS_GAP_PX, helpers);
+        const r = buildIncludeRegions(
+            isolated,
+            ctx,
+            y + LANES_TO_REGIONS_GAP_PX,
+            helpers,
+            measured.naturalChartRightX,
+        );
         includes = r.regions;
+        regionContexts = r.contexts;
         y = r.endY;
     }
 
@@ -271,6 +285,7 @@ export function placeChart(
         ctx,
         swimlanes,
         includes,
+        regionContexts,
         milestones,
         laneEntries,
         maxRightX: pass.maxRightX,
