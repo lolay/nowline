@@ -3,9 +3,9 @@
 ```text
 --- KICKOFF: begin orchestration at [deep] ---
 
-  Status: 0/3 groups done | last review: — | current: nowline m2 s1-s3 [exec] | BLOCKED at gate mode | updated 2026-10-16
+  Status: 0/3 groups done | last review: — | current: nowline m2 s1-s3 [exec] | over expected: ~$18 of ~$11 (session before kickoff: m1 build and planning) | updated 2026-10-16
 
-  mode: pending | proposed unattended (harness=claude-code runner=cloud; cloud runner, branch assigned by the harness) | guard 3x min $50 | fixups 2
+  mode: unattended | proposed unattended (harness=claude-code runner=cloud; cloud runner, branch assigned by the harness) | guard 3x min $50 | fixups 2 | confirmed 2026-10-16 session 4adab00a-71c4-5a6e-9eb4-2d2721d1a6e6: Unattended (Recommended)
 
   review: every-wave (log-only)
 
@@ -16,6 +16,7 @@
   Prompt to paste into the next chat:
     In lolay/nowline, read specs/handoffs/plan-review-gallery-heron.md. The plan is already tagged.
     On branch claude/compassionate-galileo-jizy6q (task branch): subagents commit each finished step.
+    Run in unattended mode.
     Run the personal-plan-orchestrate skill from the top: walk to
     each tier boundary, dispatch subagents per the skill's procedure,
     and pause only where the recorded mode stops. Do not execute plan
@@ -35,6 +36,7 @@
 | 2 [deep] nowline m3 s1 | ~6.1M | ~$3.2 |
 | 3 [exec] nowline m3 s2-s3 | ~3.0M | ~$1.2 |
 | orchestrator | ~5.7M | ~$5.0 |
+| m1 pre-run (build and planning, before kickoff) | — | — |
 | **Total** | ~18M | ~$11 |
 
 Expected values are estimates, good to about 2-3× per wave.
@@ -289,3 +291,6 @@ Once the PR is up, queue a suggested-task card for `lolay/nowline-infra`: a `CNA
 - Rates by `<model>`, $ per Mtok input / cached / output: `claude-opus-5-5` 4.00 / 0.20 / 20.00; `claude-sonnet-5-5` 2.00 / 0.20 / 10.00.
 - `$C` = (input × in + cache read × cached + 5m write × in × 1.25 + 1h write × in × 2.00 + output × out) / 1M.
 - In another harness, or on a model not listed here, count and price per plan-execution.md "Token accounting" and "Model price table" instead.
+
+tokens Explore-map-render-pipeline plan-review-gallery-heron (claude-opus-5-5): input ~16 / cache read ~360k / cache write ~63k / output ~8k | ~$0.55 API-equiv (output est.) session 4adab00a-71c4-5a6e-9eb4-2d2721d1a6e6
+tokens orchestrator-kickoff plan-review-gallery-heron (claude-opus-5-5): input ~270 / cache read ~36M / cache write ~920k 1h / output ~170k | ~$17.89 API-equiv (combined: m1 pre-run, orchestrator-kickoff)

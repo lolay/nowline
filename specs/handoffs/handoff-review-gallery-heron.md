@@ -2,13 +2,13 @@
 
 - **Branch:** `claude/compassionate-galileo-jizy6q` (lolay/nowline), assigned by the cloud harness.
 - **Plan:** [`plan-review-gallery-heron.md`](plan-review-gallery-heron.md), orchestrated with `personal-plan-orchestrate`.
-- **Mode:** pending (proposed unattended: harness=claude-code runner=cloud).
+- **Mode:** unattended, confirmed 2026-10-16 in session 4adab00a (harness=claude-code runner=cloud). Session choice: new session, started with `create_session` on this branch.
 - **Done before this run:** m1, the local review gallery, in `8e0a60a` and `ac13df1` (pre-orchestration, reviewed by hand: `make pre-commit` and `make pack-mcpb` green, Playwright screenshots at four viewports).
 - **Waves:** 1 `[exec]` m2 s1-s3 (source in the render block, persistent view settings, browser e2e); 2 `[deep]` m3 s1 (lines, baselines, retention); 3 `[exec]` m3 s2-s3 (PR pages, PR e2e). m4-m6 (publish workflow, docs, DNS handoff) are a later run.
-- **Spend:** $0 of ~$11 expected; guard max(3x, $50) = $50.
-- **Next unit:** wave 1 `[exec]` nowline m2 s1-s3, after the kickoff answer.
+- **Spend:** ~$18.44 logged against ~$11 expected; almost all of it is the session before kickoff (m1 build and planning), logged as one combined orchestrator-kickoff line. Guard max(3x, $50) = $50; projected before wave 1 ~$19.8.
+- **Next unit:** wave 1 `[exec]` nowline m2 s1-s3 (first unit, one group: no canary).
 - **Resume:** paste the plan's Kickoff prompt into a new session.
-- **Pending question:** the kickoff question (mode and session).
+- **Pending question:** none.
 
 ## Decisions so far
 
