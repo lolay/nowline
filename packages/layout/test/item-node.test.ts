@@ -15,7 +15,6 @@ import {
     resolveCaptionTitleLines,
     titleBreakLines,
 } from '../src/nodes/item-node.js';
-import { MIN_ITEM_WIDTH } from '../src/themes/shared.js';
 import { TimeScale } from '../src/time-scale.js';
 import type { ResolvedStyle } from '../src/types.js';
 
@@ -36,7 +35,8 @@ function makeCtx() {
 
 /**
  * An `ItemNode` for a bar spanning `logicalLeftX..logicalRightX`, built the
- * way `measureItem` builds one: the visual width from the logical extent,
+ * way `measureItem` builds one: the visual width from the logical extent
+ * (its span less a 1 px seam on each side),
  * the caption fit from `measureItemCaption`, and `barExtra` (default 0).
  */
 function itemNode(
@@ -47,7 +47,7 @@ function itemNode(
         barExtra?: number;
     },
 ): ItemNode {
-    const naturalWidth = Math.max(MIN_ITEM_WIDTH, input.logicalRightX - input.logicalLeftX);
+    const naturalWidth = input.logicalRightX - input.logicalLeftX;
     const visualWidth = itemVisualWidth(naturalWidth);
     return new ItemNode({
         id: input.id,
@@ -83,7 +83,7 @@ describe('ItemNode', () => {
         expect(node.place({ x: 0, y: 100 }, makeCtx()).box.height).toBe(72);
     });
 
-    it('insets the visible box by ITEM_INSET_PX on each side', () => {
+    it('insets the visible box by the 1 px seam on each side', () => {
         const node = itemNode({
             id: 'a',
             title: 'Research',
@@ -91,9 +91,9 @@ describe('ItemNode', () => {
             logicalRightX: 120,
         });
         const placed = node.place({ x: 0, y: 100 }, makeCtx());
-        expect(placed.box.x).toBe(6);
+        expect(placed.box.x).toBe(1);
         expect(placed.box.y).toBe(100);
-        expect(placed.box.width).toBe(108); // 120 - 2*6
+        expect(placed.box.width).toBe(118); // 120 - 2*1
         expect(placed.box.height).toBe(56);
     });
 
@@ -103,11 +103,11 @@ describe('ItemNode', () => {
             title: 'OK',
             metaText: '1w',
             logicalLeftX: 0,
-            logicalRightX: 240,
+            logicalRightX: 230,
         });
         const placed = node.place({ x: 0, y: 0 }, makeCtx());
         expect(placed.textSpills).toBe(false);
-        expect(placed.textX).toBe(6 + 12); // boxX + TEXT_INSET_PX
+        expect(placed.textX).toBe(1 + 12); // boxX + TEXT_INSET_PX
     });
 
     it('spills text past the bar when the title exceeds the inner-padded width', () => {
@@ -116,7 +116,7 @@ describe('ItemNode', () => {
             title: 'A long title that will not fit inside the available bar',
             metaText: '1w',
             logicalLeftX: 0,
-            logicalRightX: 80,
+            logicalRightX: 70,
         });
         const placed = node.place({ x: 0, y: 0 }, makeCtx());
         expect(placed.textSpills).toBe(true);
@@ -127,9 +127,9 @@ describe('ItemNode', () => {
     it('matches the legacy sequenceItem textSpills decision (innerWidth = visualWidth - 24)', () => {
         // Legacy arithmetic: textSpills = title|meta width > visualWidth - 24.
         const cases = [
-            { title: 'Design', metaText: '2w - 50% remaining', logicalRight: 240, expected: false },
-            { title: 'Design', metaText: '2w - 50% remaining', logicalRight: 60, expected: true },
-            { title: 'Build', metaText: undefined, logicalRight: 100, expected: false },
+            { title: 'Design', metaText: '2w - 50% remaining', logicalRight: 230, expected: false },
+            { title: 'Design', metaText: '2w - 50% remaining', logicalRight: 50, expected: true },
+            { title: 'Build', metaText: undefined, logicalRight: 90, expected: false },
         ];
         for (const c of cases) {
             const node = itemNode({
@@ -145,7 +145,7 @@ describe('ItemNode', () => {
     });
 
     describe('title word-wrap', () => {
-        // Logical width 160 -> visual 148 -> inner width 148 - 12 - 12 = 124.
+        // Logical width 150 -> visual 148 -> inner width 148 - 12 - 12 = 124.
         // "Technology Selection" estimates at 150.8px (> 124), but wrapped it
         // is "Technology" (75.4px) over "Selection" (67.9px).
         function place(input: {
@@ -158,7 +158,7 @@ describe('ItemNode', () => {
             const node = itemNode({
                 id: 'a',
                 logicalLeftX: 0,
-                logicalRightX: 160,
+                logicalRightX: 150,
                 ...input,
             });
             return node.place({ x: 0, y: 0 }, makeCtx());
@@ -168,7 +168,7 @@ describe('ItemNode', () => {
             const placed = place({ title: 'Technology Selection', metaText: '2w' });
             expect(placed.textSpills).toBe(false);
             expect(placed.titleLines).toEqual(['Technology', 'Selection']);
-            expect(placed.textX).toBe(6 + 12); // boxX + caption inset, not past the bar
+            expect(placed.textX).toBe(1 + 12); // boxX + caption inset, not past the bar
             expect(placed.box.height).toBe(56); // no growth without a barExtra
         });
 
@@ -187,7 +187,7 @@ describe('ItemNode', () => {
         it('reports a single line for the spilled caption', () => {
             const placed = place({
                 title: 'A long title that will not fit inside',
-                logicalRightX: 80,
+                logicalRightX: 70,
             });
             expect(placed.textSpills).toBe(true);
             expect(placed.titleLines).toEqual(['A long title that will not fit inside']);
@@ -252,11 +252,11 @@ describe('ItemNode', () => {
             const placed = place({
                 title: 'Technology Selection',
                 hasLinkIcon: true,
-                logicalRightX: 190, // visual 178 -> inner 142 with the icon (< 150.8px)
+                logicalRightX: 180, // visual 178 -> inner 142 with the icon (< 150.8px)
             });
             expect(placed.textSpills).toBe(false);
             expect(placed.titleLines).toEqual(['Technology', 'Selection']);
-            expect(placed.textX).toBe(6 + 24);
+            expect(placed.textX).toBe(1 + 24);
         });
 
         it('treats a title that overflows only through repeated spaces as the legacy spill', () => {
@@ -269,7 +269,7 @@ describe('ItemNode', () => {
     });
 
     describe('first-line clearance of the top-right decorations', () => {
-        // Logical width 160 -> visual 148 -> inner width 124. The status dot
+        // Logical width 150 -> visual 148 -> inner width 124. The status dot
         // is always there, so the first line gets 148 - 12 - 21 = 115px; the
         // meta line and later title lines keep the full 124px.
         function place(input: {
@@ -281,7 +281,7 @@ describe('ItemNode', () => {
             const node = itemNode({
                 id: 'a',
                 logicalLeftX: 0,
-                logicalRightX: 160,
+                logicalRightX: 150,
                 ...input,
             });
             return node.place({ x: 0, y: 0 }, makeCtx());
@@ -352,14 +352,14 @@ describe('ItemNode', () => {
         });
 
         it('measures the first line from the link-icon indent', () => {
-            // Logical 190 -> visual 178. With the 24px icon indent: inner width
+            // Logical 180 -> visual 178. With the 24px icon indent: inner width
             // 178 - 24 - 12 = 142, first-line width 178 - 24 - 21 = 133.
             // "Ship the new thing" (18 chars = 135.7px) fits 142 but not 133.
             const node = itemNode({
                 id: 'a',
                 title: 'Ship the new thing',
                 logicalLeftX: 0,
-                logicalRightX: 190,
+                logicalRightX: 180,
                 hasLinkIcon: true,
             });
             const placed = node.place({ x: 0, y: 0 }, makeCtx());
@@ -369,7 +369,7 @@ describe('ItemNode', () => {
     });
 
     describe('caption indent past an in-bar `after:` glyph', () => {
-        // Logical width 160 -> visual 148. A plain bar leaves 124px of inner
+        // Logical width 150 -> visual 148. A plain bar leaves 124px of inner
         // width (inset 12) and a 115px first line. The `after:` glyph pushes
         // the caption in to 22px (40px beside a link tile), which narrows
         // both: inner 114 / first line 105 (no link), inner 96 / first line 87.
@@ -384,7 +384,7 @@ describe('ItemNode', () => {
             const node = itemNode({
                 id: 'a',
                 logicalLeftX: 0,
-                logicalRightX: 160,
+                logicalRightX: 150,
                 ...input,
             });
             return node.place({ x: 0, y: 0 }, makeCtx());
@@ -404,30 +404,30 @@ describe('ItemNode', () => {
             expect(placed.titleLines).toEqual(['Ship the', 'thing']);
         });
 
-        it('starts the caption at the glyph-cleared inset: 6 + 22 without a link', () => {
+        it('starts the caption at the glyph-cleared inset: 1 + 22 without a link', () => {
             const placed = place({ title: 'Ship it', hasAfterGlyph: true });
             expect(placed.textSpills).toBe(false);
-            expect(placed.textX).toBe(6 + 22);
+            expect(placed.textX).toBe(1 + 22);
         });
 
-        it('starts the caption at 6 + 40 beside a link tile', () => {
+        it('starts the caption at 1 + 40 beside a link tile', () => {
             const placed = place({ title: 'Ship it', hasAfterGlyph: true, hasLinkIcon: true });
             expect(placed.textSpills).toBe(false);
-            expect(placed.textX).toBe(6 + 40);
+            expect(placed.textX).toBe(1 + 40);
         });
 
         it('narrows the fit width further beside a link tile', () => {
-            // Logical 190 -> visual 178. "Ship the new one" is 120.6px: it fits the
+            // Logical 180 -> visual 178. "Ship the new one" is 120.6px: it fits the
             // link tile's 24px indent (first line 178 - 24 - 21 = 133px) but not
             // the 40px one the glyph adds (178 - 40 - 21 = 117px).
             const title = 'Ship the new one';
-            const withLinkOnly = place({ title, hasLinkIcon: true, logicalRightX: 190 });
+            const withLinkOnly = place({ title, hasLinkIcon: true, logicalRightX: 180 });
             expect(withLinkOnly.titleLines).toEqual([title]);
             const withBoth = place({
                 title,
                 hasLinkIcon: true,
                 hasAfterGlyph: true,
-                logicalRightX: 190,
+                logicalRightX: 180,
             });
             expect(withBoth.textSpills).toBe(false);
             expect(withBoth.titleLines).toEqual(['Ship the new', 'one']);
@@ -453,30 +453,30 @@ describe('ItemNode', () => {
         });
 
         it('adds no indent when the glyph spills out of a bar narrower than 40px', () => {
-            // Logical 50 -> visual 38. The glyph spills, so the caption keeps
+            // Logical 40 -> visual 38. The glyph spills, so the caption keeps
             // the plain 12px inset. A fixed 12px right reserve keeps the dot
             // out of the way of this tiny bar.
             const placed = place({
                 title: 'A',
                 hasAfterGlyph: true,
-                logicalRightX: 50,
+                logicalRightX: 40,
                 titleFirstLineRightReservePx: 12,
             });
             expect(placed.box.width).toBe(38);
             expect(placed.textSpills).toBe(false);
-            expect(placed.textX).toBe(6 + 12);
+            expect(placed.textX).toBe(1 + 12);
         });
 
         it('ignores the flag when no glyph is declared', () => {
             const placed = place({ title: 'Ship the thing', metaText: '2w', hasAfterGlyph: false });
             expect(placed.titleLines).toEqual(['Ship the thing']);
-            expect(placed.textX).toBe(6 + 12);
+            expect(placed.textX).toBe(1 + 12);
         });
     });
 
     describe('explicit title line breaks', () => {
-        // Logical width 160 -> visual 148 -> inner width 124, first-line width 115
-        // (dot clearance). Logical 400 -> visual 388 -> inner 364, first-line 355.
+        // Logical width 150 -> visual 148 -> inner width 124, first-line width 115
+        // (dot clearance). Logical 390 -> visual 388 -> inner 364, first-line 355.
         function place(input: {
             title: string;
             metaText?: string;
@@ -486,7 +486,7 @@ describe('ItemNode', () => {
             const node = itemNode({
                 id: 'a',
                 logicalLeftX: 0,
-                logicalRightX: 160,
+                logicalRightX: 150,
                 ...input,
             });
             return node.place({ x: 0, y: 0 }, makeCtx());
@@ -497,17 +497,17 @@ describe('ItemNode', () => {
             const control = place({
                 title: 'Technology Selection',
                 metaText: '2w',
-                logicalRightX: 400,
+                logicalRightX: 390,
             });
             expect(control.titleLines).toEqual(['Technology Selection']);
             const placed = place({
                 title: 'Technology\nSelection',
                 metaText: '2w',
-                logicalRightX: 400,
+                logicalRightX: 390,
             });
             expect(placed.textSpills).toBe(false);
             expect(placed.titleLines).toEqual(['Technology', 'Selection']);
-            expect(placed.textX).toBe(6 + 12);
+            expect(placed.textX).toBe(1 + 12);
         });
 
         it('keeps a three-line explicit title in-bar, past the two-line auto-wrap cap', () => {

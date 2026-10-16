@@ -17,7 +17,7 @@ import {
     type PositionedTrackChild,
     scheduleRoadmap,
 } from '../src/index.js';
-import { ITEM_INSET_PX } from '../src/themes/shared.js';
+import { ITEM_SEAM_PX } from '../src/themes/shared.js';
 import { parseAndResolveFiles } from './helpers.js';
 
 const TODAY = new Date(Date.UTC(2026, 0, 5));
@@ -41,8 +41,8 @@ function regionChartWeeks(model: PositionedRoadmap): Record<string, [number, num
     for (const it of items) {
         if (!it.id) continue;
         out[it.id] = [
-            weeks(it.box.x - ITEM_INSET_PX),
-            weeks(it.box.x + it.box.width + ITEM_INSET_PX),
+            weeks(it.box.x - ITEM_SEAM_PX),
+            weeks(it.box.x + it.box.width + ITEM_SEAM_PX),
         ];
     }
     return out;

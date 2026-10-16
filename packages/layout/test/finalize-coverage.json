@@ -8,7 +8,7 @@
     ],
     "steps": {
         "growCanvasForSpill": {
-            "count": 27,
+            "count": 26,
             "samples": [
                 "examples/capacity.nowline",
                 "examples/dependencies.nowline",
@@ -34,7 +34,6 @@
                 "tests/text-spills-right.nowline",
                 "tests/waves-gap-deadline.nowline",
                 "tests/waves-isolate-team.nowline",
-                "tests/waves-isolate.nowline",
                 "tests/waves-parallel-group.nowline",
                 "tests/working-exceptions.nowline"
             ]
@@ -60,6 +59,7 @@
                 "examples/waves.nowline",
                 "tests/header-height-none.nowline",
                 "tests/header-height-xl.nowline",
+                "tests/inline-date-corners.nowline",
                 "tests/isolate-include-multi.nowline",
                 "tests/item-bumps-up.nowline",
                 "tests/late-row-shifts.nowline",
@@ -69,7 +69,6 @@
                 "tests/text-wraps-inside-bars.nowline",
                 "tests/waves-gap-deadline.nowline",
                 "tests/waves-isolate-team.nowline",
-                "tests/waves-isolate.nowline",
                 "tests/waves-parallel-group.nowline",
                 "tests/working-exceptions.nowline"
             ]
@@ -79,7 +78,7 @@
             "samples": ["tests/marker-left-overflow.nowline"]
         },
         "fitWidths": {
-            "count": 35,
+            "count": 34,
             "samples": [
                 "examples/capacity.nowline",
                 "examples/dependencies.nowline",
@@ -113,7 +112,6 @@
                 "tests/text-wraps-inside-bars.nowline",
                 "tests/waves-gap-deadline.nowline",
                 "tests/waves-isolate-team.nowline",
-                "tests/waves-isolate.nowline",
                 "tests/waves-parallel-group.nowline",
                 "tests/working-exceptions.nowline"
             ]

@@ -136,10 +136,10 @@ const exampleB = (declarations: string[] = [THANKSGIVING]) =>
     withDeclarations(EXAMPLE_B_BODY, declarations);
 
 describe('Example B under hide: a holiday inside a bar pushes its end out', () => {
-    it('Checkout is 6-34 (logical 0-40) and QA 46-54, the 8 px minimum width', async () => {
+    it('Checkout is 1-39 (logical 0-40) and QA 41-55 (logical 40-56)', async () => {
         const { model } = await lay(exampleB(), 'hide');
-        expect(box(model, 'checkout')).toEqual([6, 34]);
-        expect(box(model, 'qa')).toEqual([46, 54]);
+        expect(box(model, 'checkout')).toEqual([1, 39]);
+        expect(box(model, 'qa')).toEqual([41, 55]);
     });
 
     it('puts the Saturday milestone at 24 with its hidden date', async () => {
@@ -181,10 +181,10 @@ describe('Example B under hide: a holiday inside a bar pushes its end out', () =
 });
 
 describe('Example B under show: the bar crosses the holiday', () => {
-    it('Checkout is 6-66 (logical 0-72) and QA 78-86 (logical 72-88)', async () => {
+    it('Checkout is 1-71 (logical 0-72) and QA 73-87 (logical 72-88)', async () => {
         const { model } = await lay(exampleB(), 'show');
-        expect(box(model, 'checkout')).toEqual([6, 66]);
-        expect(box(model, 'qa')).toEqual([78, 86]);
+        expect(box(model, 'checkout')).toEqual([1, 71]);
+        expect(box(model, 'qa')).toEqual([73, 87]);
     });
 
     it('puts the Saturday milestone at 40 on its own date, with no hidden date', async () => {
@@ -278,10 +278,10 @@ describe('Example B with date: in place of start: and end:', () => {
 });
 
 describe('Example B without the declaration (guard)', () => {
-    it('lays out exactly as before: Checkout 6-34, QA 46-54, a Saturday milestone with a hidden date, no titled run', async () => {
+    it('lays out exactly as before: Checkout 1-39, QA 41-55, a Saturday milestone with a hidden date, no titled run', async () => {
         const { model } = await lay(exampleB([]), 'hide');
-        expect(box(model, 'checkout')).toEqual([6, 34]);
-        expect(box(model, 'qa')).toEqual([46, 54]);
+        expect(box(model, 'checkout')).toEqual([1, 39]);
+        expect(box(model, 'qa')).toEqual([41, 55]);
         const m = milestoneX(model, 'launch');
         expect(m.hiddenDate).toBe('2026-11-28');
         expect(m.center.x - model.timeline.originX).toBe(40);
@@ -305,12 +305,12 @@ swimlane a "A"
 );
 
 describe('Example C: non-working weekend every:[fri, sat] replaces the preset weekend', () => {
-    it('hide: boxes 6-34, 46-74, 86-114', async () => {
+    it('hide: boxes 1-39, 41-79, 81-119', async () => {
         const { model } = await lay(EXAMPLE_C, 'hide');
         expect(['w1', 'w2', 'w3'].map((id) => box(model, id))).toEqual([
-            [6, 34],
-            [46, 74],
-            [86, 114],
+            [1, 39],
+            [41, 79],
+            [81, 119],
         ]);
     });
 
@@ -334,12 +334,12 @@ describe('Example C: non-working weekend every:[fri, sat] replaces the preset we
         expect(runs.some((r) => r.from === '2026-01-10')).toBe(false);
     });
 
-    it('show: boxes 6-34, 62-90, 118-146', async () => {
+    it('show: boxes 1-39, 57-95, 113-151', async () => {
         const { model } = await lay(EXAMPLE_C, 'show');
         expect(['w1', 'w2', 'w3'].map((id) => box(model, id))).toEqual([
-            [6, 34],
-            [62, 90],
-            [118, 146],
+            [1, 39],
+            [57, 95],
+            [113, 151],
         ]);
     });
 
@@ -404,10 +404,10 @@ describe('a working exception: Saturday Jan 10 works', () => {
     it('hide: the item boxes keep their x', async () => {
         const { model } = await lay(exampleA([CRUNCH]), 'hide');
         expect(['w1', 'w2', 'w3', 'w4'].map((id) => box(model, id))).toEqual([
-            [6, 34],
-            [46, 74],
-            [86, 114],
-            [126, 154],
+            [1, 39],
+            [41, 79],
+            [81, 119],
+            [121, 159],
         ]);
     });
 
@@ -436,14 +436,14 @@ describe('a working exception: Saturday Jan 10 works', () => {
         });
     });
 
-    it('show: W2 is 46-82, W3 94-138 and W4 150-194; W4 was 174-202', async () => {
+    it('show: W2 is 41-87, W3 89-143 and W4 145-199; W4 was 169-207', async () => {
         const before = await lay(exampleA(), 'show');
-        expect(box(before.model, 'w4')).toEqual([174, 202]);
+        expect(box(before.model, 'w4')).toEqual([169, 207]);
         const { model } = await lay(exampleA([CRUNCH]), 'show');
         expect(['w2', 'w3', 'w4'].map((id) => box(model, id))).toEqual([
-            [46, 82],
-            [94, 138],
-            [150, 194],
+            [41, 87],
+            [89, 143],
+            [145, 199],
         ]);
     });
 

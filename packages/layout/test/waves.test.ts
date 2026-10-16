@@ -4,7 +4,7 @@
 // Positions are converted back to week offsets from the start through the
 // timeline's `pixelsPerDay` and the calendar's days per week (5 under the
 // default `calendar:business`, 7 under `calendar:full`). An item's logical
-// extent is its bar inset by `ITEM_INSET_PX` on each side.
+// extent is its bar inset by its `ITEM_SEAM_PX` seam on each side.
 
 import * as path from 'node:path';
 import {
@@ -24,7 +24,7 @@ import { resolveCalendar } from '../src/calendar.js';
 import { type LayoutOptions, layoutRoadmap } from '../src/layout.js';
 import { scheduleRoadmap } from '../src/schedule.js';
 import { setScheduleWarmStart } from '../src/start-rules.js';
-import { ITEM_INSET_PX } from '../src/themes/shared.js';
+import { ITEM_SEAM_PX } from '../src/themes/shared.js';
 import type {
     PositionedGroup,
     PositionedItem,
@@ -121,8 +121,8 @@ function weeksAt(laid: Laid, x: number): number {
     return round((x - timeline.originX) / timeline.pixelsPerDay / laid.perWeek);
 }
 
-const logicalStart = (item: PositionedItem): number => item.box.x - ITEM_INSET_PX;
-const logicalEnd = (item: PositionedItem): number => item.box.x + item.box.width + ITEM_INSET_PX;
+const logicalStart = (item: PositionedItem): number => item.box.x - ITEM_SEAM_PX;
+const logicalEnd = (item: PositionedItem): number => item.box.x + item.box.width + ITEM_SEAM_PX;
 
 function childItems(children: PositionedTrackChild[], out: PositionedItem[]): void {
     for (const child of children) {
@@ -235,7 +235,7 @@ function memberWaves(resolved: ResolveResult): Map<string, number> {
 /**
  * The barrier theorem (§5.2) in logical px, plus the visual gutter (§8.4):
  * for waves j < k, every member of j ends at or before every member of k
- * starts, and their bars are at least 2 × ITEM_INSET_PX apart.
+ * starts, and their bars are at least 2 × ITEM_SEAM_PX apart.
  */
 function expectBarriers(laid: Laid): void {
     const waves = memberWaves(laid.resolved);
@@ -246,7 +246,7 @@ function expectBarriers(laid: Laid): void {
             if (a.k >= b.k) continue;
             expect(logicalEnd(a.it)).toBeLessThanOrEqual(logicalStart(b.it) + 1e-6);
             const visualGap = b.it.box.x - (a.it.box.x + a.it.box.width);
-            expect(visualGap).toBeGreaterThanOrEqual(2 * ITEM_INSET_PX - 1e-6);
+            expect(visualGap).toBeGreaterThanOrEqual(2 * ITEM_SEAM_PX - 1e-6);
         }
     }
 }
@@ -581,15 +581,15 @@ describe('layoutRoadmap — wave floors and gutters', () => {
         // The region's w1 holder and the main lane's w2 item meet at W4.
         const ios = item(laid, 'ios-offline');
         const pfScale = item(laid, 'pf-scale');
-        expect(pfScale.box.x - (ios.box.x + ios.box.width)).toBeCloseTo(2 * ITEM_INSET_PX, 6);
+        expect(pfScale.box.x - (ios.box.x + ios.box.width)).toBeCloseTo(2 * ITEM_SEAM_PX, 6);
         // And inside the region: ios-push opens at the same barrier.
         const push = item(laid, 'ios-push');
-        expect(push.box.x - (ios.box.x + ios.box.width)).toBeCloseTo(2 * ITEM_INSET_PX, 6);
+        expect(push.box.x - (ios.box.x + ios.box.width)).toBeCloseTo(2 * ITEM_SEAM_PX, 6);
         // Within one lane: data-audit (discover) to data-build (build).
         const one = await lay(EXAMPLE_1);
         const audit = item(one, 'data-audit');
         const build = item(one, 'data-build');
-        expect(build.box.x - (audit.box.x + audit.box.width)).toBeCloseTo(2 * ITEM_INSET_PX, 6);
+        expect(build.box.x - (audit.box.x + audit.box.width)).toBeCloseTo(2 * ITEM_SEAM_PX, 6);
     });
 
     it('a region item resolves after:<wave> through the shared wave edges', async () => {
@@ -1020,9 +1020,10 @@ swimlane b
         expect(m.isOverrun).toBe(true);
         // The arrow comes from x, the latest item, never from the wave.
         expect(m.slackArrows?.map((a) => a.x)).toEqual([x.box.x + x.box.width]);
-        // Its corridor (W1 to x's right edge, on x's row) bumped z, which
-        // would sit in the arrow's path, to a lower row.
-        expect(z.box.y).toBeGreaterThan(x.box.y);
+        // Its corridor runs left, from x's right edge back to W1, across z.
+        // Rows never move up, so z stays put and x drops below it, where the
+        // path is clear (specs/true-width-layout.md §3.2).
+        expect(x.box.y).toBeGreaterThan(z.box.y);
     });
 
     it('a milestone at the origin is not on a boundary', async () => {
@@ -1389,34 +1390,34 @@ ${extra}`;
         expect(w, `wave ${index}`).toBeDefined();
         return w as NonNullable<PositionedRoadmap['waves']>[number];
     };
-    it('show: E_a is 40, S_b is 40, z and q start at 62, the dates read as in hide', async () => {
+    it('show: E_a is 40, S_b is 40, z and q start at 57, the dates read as in hide', async () => {
         const laid = await layDisplay(fixture(), 'show');
         const o = laid.model.timeline.originX;
         expect(waveOf(laid, 0).endX - o).toBe(40);
         expect(waveOf(laid, 1).startX - o).toBe(40);
-        expect(left(laid, 'z')).toBe(62);
-        expect(left(laid, 'q')).toBe(62);
+        expect(left(laid, 'z')).toBe(57);
+        expect(left(laid, 'q')).toBe(57);
         expect(iso(waveOf(laid, 0).endDate)).toBe('2026-01-10');
         expect(iso(waveOf(laid, 1).startDate)).toBe('2026-01-12');
         expect(laid.model.waveSolve?.capped).toBe(false);
     });
 
-    it('hide: E_a is 40, S_b is 40, z and q start at 46 (guard)', async () => {
+    it('hide: E_a is 40, S_b is 40, z and q start at 41 (guard)', async () => {
         const laid = await layDisplay(fixture());
         const o = laid.model.timeline.originX;
         expect(waveOf(laid, 0).endX - o).toBe(40);
         expect(waveOf(laid, 1).startX - o).toBe(40);
-        expect(left(laid, 'z')).toBe(46);
-        expect(left(laid, 'q')).toBe(46);
+        expect(left(laid, 'z')).toBe(41);
+        expect(left(laid, 'q')).toBe(41);
         expect(iso(waveOf(laid, 0).endDate)).toBe('2026-01-10');
         expect(iso(waveOf(laid, 1).startDate)).toBe('2026-01-12');
     });
 
-    it('a floor on Sunday Jan 11: S_b is 48 under show (40 under hide), z at 62', async () => {
+    it('a floor on Sunday Jan 11: S_b is 48 under show (40 under hide), z at 57', async () => {
         const floor = fixture(' after:2026-01-11');
         const show = await layDisplay(floor, 'show');
         expect(waveOf(show, 1).startX - show.model.timeline.originX).toBe(48);
-        expect(left(show, 'z')).toBe(62);
+        expect(left(show, 'z')).toBe(57);
         const hide = await layDisplay(floor);
         expect(waveOf(hide, 1).startX - hide.model.timeline.originX).toBe(40);
     });
@@ -1436,6 +1437,6 @@ ${extra}`;
 
     it('the option beats the file key for waves too', async () => {
         const laid = await layDisplay(fixture(), 'show', 'hide');
-        expect(left(laid, 'z')).toBe(46);
+        expect(left(laid, 'z')).toBe(41);
     });
 });

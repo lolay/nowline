@@ -49,14 +49,15 @@ swimlane s "S"
         const item = model.swimlanes[0].children.find(isItem);
         expect(item).toBeDefined();
         // `after:2026-02-09` is working-day index 25 (200 px from the origin
-        // at 132): the bar opens at 338 and the after-glyph sits 6 px in.
-        // The 4w bar is 148 px wide, so the before-glyph lands at 453.
+        // at 132): the bar opens at 333, a 1 px seam in, and the after-glyph
+        // sits 6 px in. The 4w bar is 158 px wide, so the before-glyph lands
+        // at 458.
         expect(rounded(item!.inlineDatePins)).toMatchInlineSnapshot(`
           [
             {
               "glyphSize": 12,
               "glyphTopLeft": {
-                "x": 344,
+                "x": 339,
                 "y": 67,
               },
               "isoDate": "2026-02-09",
@@ -66,7 +67,7 @@ swimlane s "S"
             {
               "glyphSize": 12,
               "glyphTopLeft": {
-                "x": 453,
+                "x": 458,
                 "y": 67,
               },
               "isoDate": "2026-04-13",

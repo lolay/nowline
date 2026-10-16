@@ -32,7 +32,7 @@ import { ItemNode, traceItemNode } from './item-node.js';
 
 /**
  * Place `node` at `cursor` and advance the cursor: `cursor.x` to its
- * duration end, `cursor.maxX` to its painted footprint.
+ * duration end.
  * `measured` is the item's measure at the snapped start it is placed at,
  * when the caller (a lane or group row track) already took it to pack the
  * row; a parallel track's child is measured here.
@@ -83,8 +83,8 @@ export function sequenceItem(
     const hasLinkIcon = linkInfo.icon !== 'none';
     const chipSamples = measure.chips.samples;
     const chipsOutside = measure.chips.outside;
-    // Logical extent: the bar's painted footprint, `MIN_ITEM_WIDTH` clamp
-    // included (the bar box is inset from it).
+    // Logical extent: the item's span in time; the bar box is inset from it
+    // by its seams (specs/true-width-layout.md §3.1).
     const logicalLeft = placedStartX;
     const logicalRight = placedStartX + naturalWidth;
     // Duration end: where the item ends in time, never the minimum bar
@@ -337,10 +337,8 @@ export function sequenceItem(
     const drawKey = id ?? syntheticItemKey(node);
     ctx.itemFlowKey.set(drawKey, ctx.currentFlowKey);
 
-    // A parallel track joins on `cursor.x` (time) and sizes its bracket on
-    // `cursor.maxX` (the painted bar, minimum width included).
+    // A parallel track joins, and sizes its bracket, on `cursor.x`.
     cursor.x = durationEndX;
-    cursor.maxX = Math.max(cursor.maxX, logicalRight, durationEndX);
     // The next row in a parallel/group/lane starts at
     // `cursor.y + cursor.height`. Default pitch is `bandScale.step()`
     // (bandwidth + inter-row gap). When the bar grew to enclose a

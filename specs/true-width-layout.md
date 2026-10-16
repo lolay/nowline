@@ -8,7 +8,7 @@ The chart draws dates that are not the plan's dates. The scheduler (engine C, `s
 
 - **Bars.** A bar gives up `ITEM_INSET_PX` (6 px) on each side and is drawn at least `MIN_ITEM_WIDTH` (8 px), so nothing is narrower than 20 px. At the default weekly scale (40 px a week, 8 px a working day) that is 2.5 days: a one-day task is drawn two and a half times its length.
 - **Chains.** Consecutive short tasks overlap their widened bars, so the row packer drops each one a row. Five one-day tasks become a five-row staircase smeared across a week and a half, and their captions truncate (`Rate li…`).
-- **Markers.** An after-only milestone `after:<item>` sits at the item's painted edge, not its end date ([`scheduler-unification.md`](./scheduler-unification.md) §9). A milestone `after:<group>` lands inside a widened last bar. `before:` overflow compares the painted end.
+- **Markers.** Since lolay/nowline#167 an after-only milestone sits on its predecessor's duration end and `before:` compares the duration end ([`scheduler-unification.md`](./scheduler-unification.md) §9, decision 14), so the dates are right; but the bar is still drawn wider than its duration, so a milestone after a short task lands inside that task's bar, and a slack arrow or `before:` overflow tail still starts at the painted edge.
 - **Containers.** Group and parallel boxes take horizontal space (a chiclet, a `[` bracket, padding), so their painted edge differs from their dates. m4.11 had to split the lane cursor into a time end (`TrackCursor.x`) and a painted edge (`maxX`), and keeps six register entries for bars drawn wider than their duration ([`scheduler-unification.md`](./scheduler-unification.md) §8 decisions 6 and 7).
 
 The specs never decided this. [`rendering.md`](./rendering.md) says a bar's width "is determined by `duration`" and never mentions the minimum; [`dsl.md`](./dsl.md) says items shorter than `scale:` "may" render as "labelled annotations", which [`rendering.md`](./rendering.md) never defines. Decision 6 of the scheduler spec is the only ruling, and it calls the widened bar presentation.
@@ -59,12 +59,14 @@ Arrows are drawn only for `after:` on items, as today, and they run on the dates
 - **Sources** that are a group or a parallel leave from the bottom of their body at their end date.
 - **No arrow where position already says it**: lane order; a target on the same row that starts where its source ends; an item that starts exactly on an anchor (it touches the anchor's line). A target on the same row that waits gets a dotted horizontal leg at the row's midline.
 - **Channels.** Arrows sharing a gap take offset lanes (2.5 px apart). Arrows landing in the same day share its centre column; see §8 O1.
+- **Regions.** An isolated region routes its own arrows among its own lanes (lolay/nowline#166); the same rules apply there.
 
 ### 3.5 Markers
 
 - **Anchors** keep the cut line and diamond. An item that starts on the anchor touches the line; an item that starts later gets a dotted stub from the line to its start.
-- **Milestones** sit on the scheduler's date, `after:` ones included. That closes §9's gap "an after-only milestone `after:<item>` sits at the item's painted box right". Non-binding predecessors keep today's dotted slack line, now from their end date.
-- **`before:` overflow** compares the duration end, closing §9's gap "`before:` overflow compares the painted end".
+- **Milestones** sit on the scheduler's date, `after:` ones included (already so since lolay/nowline#167). Non-binding predecessors keep today's dotted slack line; with true-width bars its start, the painted edge, is the end date.
+- **`before:` overflow** compares the duration end (lolay/nowline#167); with true-width bars the red tail runs from the cap to the end date.
+- **Isolated regions** draw their own markers, arrows and footnotes (lolay/nowline#166) with the host's rules, so every rule here applies inside a region too.
 - **Waves** are unchanged. A bar can no longer paint past its wave's closing edge.
 
 ## 4. What this replaces
@@ -78,12 +80,13 @@ Arrows are drawn only for `after:` on items, as today, and they run on the dates
 | styled group box, title chiclet, left `[` bracket | header bracket and shaded body |
 | channel-grid routing through bar gutters (m2k) | date-port routing through row gaps |
 | [`dsl.md`](./dsl.md)'s "labelled annotations" for items finer than `scale:` | removed; short items draw at their width |
+| `MilestonePredecessor.x` (painted edge) beside `endX` (duration end), from lolay/nowline#167 | equal once bars are true width; one can go |
 
 `scheduleFloorX` (m4.11 F4) becomes an identity on every sample once nothing widens a start, and can be removed with the register.
 
 ## 5. Migration plan
 
-Each milestone renders every `examples/` and `tests/` file in light, dark and grayscale with `--now 2026-02-09` and compares the xlsx, msproj and mermaid exports, as m4.11 did. Unlike m4.11 this milestone moves nearly every sample on purpose, so each step lists the samples, snapshots and determinism cells it moves, and none is bumped without that list. The exports should not move at all: they read the schedule, which this milestone does not touch.
+Each milestone renders every `examples/` and `tests/` file in light, dark and grayscale with `--now 2026-02-09` and compares the xlsx, msproj and mermaid exports, as m4.11 did. The review gallery (`make gallery`, lolay/nowline#169) shows each moved render beside its baseline for review. Unlike m4.11 this milestone moves nearly every sample on purpose, so each step lists the samples, snapshots and determinism cells it moves, and none is bumped without that list. The exports should not move at all: they read the schedule, which this milestone does not touch.
 
 ### m1 - Bars at true width
 
@@ -95,13 +98,11 @@ Replace the group and parallel geometry (`group-node.ts`, `parallel-node.ts`, `c
 
 ### m3 - Date-port arrows
 
-Replace the channel-grid router for item dependencies (`dependency-edges.ts`, `edge-routing.ts`, `item-port-geometry.ts`) with §3.4: day-centre ports, gap channels with offsets, dotted slack legs, the no-arrow cases. Anchor stubs and milestone slack lines follow §3.5.
+Replace the channel-grid router for item dependencies (`dependency-edges.ts`, `edge-routing.ts`, `item-port-geometry.ts`) with §3.4, in the host and in each isolated region: day-centre ports, gap channels with offsets, dotted slack legs, the no-arrow cases. Anchor stubs and milestone slack lines follow §3.5.
 
-### m4 - Markers on their dates
+Markers needed no step of their own: lolay/nowline#167 already placed milestones and `before:` on duration ends, and m1 makes the painted edge equal the end date.
 
-Milestones `after:` an item or container at the scheduler's date; `before:` overflow on the duration end. Close the two §9 gaps in [`scheduler-unification.md`](./scheduler-unification.md).
-
-### m5 - Spec and docs
+### m4 - Spec and docs
 
 Rewrite [`rendering.md`](./rendering.md) "Item Bars", "Parallel and Group Rendering", "Dependency Arrows", "Milestones" and "Before Constraints" to this spec; remove the annotation sentence from [`dsl.md`](./dsl.md) and restate `bracket:`; add the changelog fragment (`changed`) naming every visible change; update the VS Code extension changelog if the preview's look is mentioned there.
 

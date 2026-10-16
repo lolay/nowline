@@ -54,8 +54,10 @@ export const LOGO_SIZE_PX: Record<'xs' | 'sm' | 'md' | 'lg' | 'xl', number> = {
 // `defaultRowBand()` keeps the legacy 64/56 split byte-stable; new
 // callers should consume `bandScale.step()` and `bandScale.bandwidth()`.
 
-// Minimum item bar width so zero-duration items remain visible.
-export const MIN_ITEM_WIDTH = 8;
+// Minimum painted bar width: a bar spans exactly its dates, so this floor
+// only keeps a sub-pixel or zero-duration item visible
+// (specs/true-width-layout.md §3.1).
+export const MIN_ITEM_WIDTH = 1;
 
 // Height (px) of the bottom progress strip drawn along the item bar's
 // bottom edge. Single source of truth used by:
@@ -237,6 +239,13 @@ export const NOWLINE_STROKE_WIDTH_PX = 2.25;
 // them, leaving room for vertical drop-lines (dependency arrows, anchor /
 // milestone cuts, the now-line) to pass between bars without crossing them.
 export const ITEM_INSET_PX = 6;
+
+// The seam a bar gives up on each side, from inside its dates, so two bars
+// that abut in time show a 2 px gap between their strokes
+// (specs/true-width-layout.md §3.1). A bar too short for both seams and the
+// `MIN_ITEM_WIDTH` floor shrinks its seams instead, staying centred in its
+// dates.
+export const ITEM_SEAM_PX = 1;
 
 // Canonical content gutter — the rest-state spacing between adjacent
 // pieces of chart content. Used for:

@@ -10,17 +10,22 @@
 
 import type { GroupBlock, SwimlaneDeclaration } from '@nowline/core';
 import { isItemDeclaration } from '@nowline/core';
-import { trackChildren } from '@nowline/core/internal';
+import { type TrackNode, trackChildren } from '@nowline/core/internal';
 import { blockTitleRowSpillReservation } from '../container-header-geometry.js';
 import { type LayoutContext, type LayoutHelpers, newCursor } from '../layout-context.js';
 import { RowPacker } from '../row-packer.js';
 import { resolveChildStart } from '../start-rules.js';
-import { ITEM_INSET_PX } from '../themes/shared.js';
 import type { PositionedTrackChild } from '../types.js';
 import { itemSpanPx } from '../working-span.js';
 import { trackChildPaintedRightX } from './content-extent.js';
 import { measureItem } from './item-measure.js';
 import { sequenceItem } from './sequence-item.js';
+
+/** Ids of every named item under `node`, `node` included. */
+function itemIdsUnder(node: TrackNode): string[] {
+    if (isItemDeclaration(node)) return node.name ? [node.name] : [];
+    return trackChildren(node).flatMap(itemIdsUnder);
+}
 
 export interface RowTrackOrigin {
     /** Left edge of the track: the lane's left x, or the group's content left x. */
@@ -33,15 +38,9 @@ export interface RowTrackResult {
     children: PositionedTrackChild[];
     /**
      * Compact cursor, in time: item duration ends and blocks' compact ends
-     * only, never the minimum bar width or a caption spill.
+     * only, never a caption spill.
      */
     timeCursorX: number;
-    /**
-     * Rightmost bar edge, in logical space: item painted footprints (the
-     * minimum bar width included) and blocks' `cursor.maxX`, never a
-     * caption spill. A group reports it as its `cursor.maxX`.
-     */
-    barRightX: number;
     /** The packer the children were fed to; read `usedHeight()` and `usedRightX()` from it. */
     packer: RowPacker;
 }
@@ -71,10 +70,14 @@ export function sequenceRowTrack(
         slackCorridors: ctx.slackCorridors,
     });
     let timeCursorX = leftX;
-    let barRightX = leftX;
+    // Items not yet placed in this track: an item never bumps for the slack
+    // arrow of one still to come, since rows never move up and that item
+    // would follow it down.
+    const pendingIds = new Set(trackChildren(container).flatMap(itemIdsUnder));
 
     const children: PositionedTrackChild[] = [];
     for (const child of trackChildren(container)) {
+        for (const id of itemIdsUnder(child)) pendingIds.delete(id);
         if (!isItemDeclaration(child)) {
             const blockStart = resolveChildStart(child, timeCursorX, ctx);
             const { rowIndex, y: blockY } = packer.placeBlock();
@@ -98,7 +101,6 @@ export function sequenceRowTrack(
                 paintedRight: trackChildPaintedRightX(positioned),
             });
             timeCursorX = Math.max(timeCursorX, cursor.x);
-            barRightX = Math.max(barRightX, cursor.maxX);
             continue;
         }
 
@@ -122,24 +124,24 @@ export function sequenceRowTrack(
             desiredStart: predictedStart,
             desiredEnd,
             predictedHeight: pitch,
+            pendingIds,
         });
 
         const cursor = newCursor(desiredStart, rowY);
         const positioned = sequenceItem(item, cursor, ctx, measure);
         children.push(positioned);
 
-        // The painted footprint in LOGICAL space (one ITEM_INSET_PX past
-        // the visual bar's right edge), the minimum bar width included:
-        // the row packer keeps it, so a following bar that would overlap
-        // a clamped bar drops a row.
-        const itemLogicalEnd = positioned.box.x + positioned.box.width + ITEM_INSET_PX;
-        // The time cursor advances by the duration only, never the
-        // minimum bar width, so the next chained item starts on its date,
-        // as in engine C (specs/scheduler-unification.md §8 decision 6).
-        // A bar wider than its duration is presentation.
+        // The painted footprint in LOGICAL space: the item's span, or the
+        // painted box when the 1 px floor makes it wider. The row packer
+        // keeps it, so a following bar never overlaps it.
+        const itemLogicalEnd = Math.max(
+            predictedStart + measure.naturalWidth,
+            positioned.box.x + positioned.box.width,
+        );
+        // The time cursor advances by the duration, so the next chained
+        // item starts on its date, as in engine C.
         const durationEnd = predictedStart + itemSpanPx(ctx, predictedStart, measure.durationDays);
         timeCursorX = Math.max(timeCursorX, durationEnd);
-        barRightX = Math.max(barRightX, itemLogicalEnd, durationEnd);
 
         let spillReservation: number | null = null;
         const hasAnySpill =
@@ -171,5 +173,5 @@ export function sequenceRowTrack(
         });
     }
 
-    return { children, timeCursorX, barRightX, packer };
+    return { children, timeCursorX, packer };
 }

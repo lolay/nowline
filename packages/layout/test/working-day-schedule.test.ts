@@ -129,14 +129,14 @@ swimlane a "A"
   item w4 "W4" duration:1w
 `;
 
-    it('business: W4 is 126-154 (logical 120-160) and the milestone is at 152', async () => {
+    it('business: W4 is 121-159 (logical 120-160) and the milestone is at 152', async () => {
         const { model } = await lay(source('business'));
         const o = model.timeline.originX;
         const items = laneItems(model);
         expect(items.map((i) => i.id)).toEqual(['w1', 'w2', 'w3', 'w4']);
         const w4 = items[3];
-        expect(w4.box.x - o).toBe(126);
-        expect(w4.box.x - o + w4.box.width).toBe(154);
+        expect(w4.box.x - o).toBe(121);
+        expect(w4.box.x - o + w4.box.width).toBe(159);
         expect(model.milestones).toHaveLength(1);
         expect(model.milestones[0].center.x - o).toBe(152);
     });
@@ -206,8 +206,8 @@ swimlane a "A"
             [200, undefined],
         ]);
         const w4 = laneItems(model)[3];
-        expect(w4.box.x - o).toBe(126);
-        expect(w4.box.width).toBe(28);
+        expect(w4.box.x - o).toBe(121);
+        expect(w4.box.width).toBe(38);
         // 25 days at 40/7 px a day.
         expect(model.milestones[0].center.x - o).toBeCloseTo(142.857, 2);
         expect(iso(model.timeline.endDate)).toBe('2026-02-09');
@@ -249,7 +249,7 @@ swimlane a "A"
         ]);
         expect(model.timeline.ticks.every((t) => t.x >= o)).toBe(true);
         expect(iso(model.timeline.endDate)).toBe('2026-01-26');
-        expect(laneItems(model)[0].box.x - o).toBe(6);
+        expect(laneItems(model)[0].box.x - o).toBe(1);
     });
 
     it('today on a Sunday puts the now-line at working-day index 25', async () => {
@@ -542,9 +542,7 @@ milestone wed "Wednesday gate" date:2026-01-14 after:w1
 
 describe('business waves: a Saturday floor opens the next wave on Monday', () => {
     // w1 holds a 3d item (last day Wed Jan 7); w2 waits for after:Saturday.
-    // a2 is a full week: a bar narrower than its insets plus MIN_ITEM_WIDTH
-    // (a 2d bar is 16 px) widens engine A's logical end (specs/waves.md
-    // §8.4), which the day schedule does not model.
+    // a2 is a full week.
     const source = `nowline v1
 
 roadmap r "R" start:2026-01-05 scale:1w
@@ -657,7 +655,7 @@ ${body}`;
         );
         for (const lane of [0, 1]) {
             const item = laneItems(model, lane)[0];
-            expect(item.box.x - model.timeline.originX).toBe(6);
+            expect(item.box.x - model.timeline.originX).toBe(1);
             expect('nonWorkingPin' in item).toBe(false);
         }
         expect(insightsOf(model, 'NL.I1008')).toEqual([]);
@@ -711,7 +709,7 @@ ${body}`;
         const parallel = model.swimlanes[0].children.find((c) => c.kind === 'parallel');
         const x = parallel?.kind === 'parallel' ? parallel.children[0] : undefined;
         expect(x?.kind === 'item' ? x.id : undefined).toBe('x');
-        expect(x && x.box.x - model.timeline.originX).toBe(86);
+        expect(x && x.box.x - model.timeline.originX).toBe(81);
         expect(x !== undefined && 'nonWorkingPin' in x).toBe(false);
         expect(insightsOf(model, 'NL.I1008')).toEqual([]);
     });
@@ -753,7 +751,7 @@ swimlane a
   item a2 duration:1w wave:w2 after:2026-01-10
 `);
         const a2 = laneItems(model).find((i) => i.id === 'a2')!;
-        expect(a2.box.x - model.timeline.originX).toBe(86);
+        expect(a2.box.x - model.timeline.originX).toBe(81);
         expect('nonWorkingPin' in a2).toBe(false);
         const codes = collectLayoutInsights(model, {}).map((i) => i.code);
         expect(codes.filter((c) => c === 'NL.I1008')).toEqual([]);

@@ -2,40 +2,7 @@
     "$comment": [
         "Engine divergence register (specs/scheduler-unification.md §4 m1.s1, §6), checked by engine-divergence-register.test.ts.",
         "Every place where engine A (the pixel layout) and engine C (scheduleRoadmap) give a sample's named item or wave a different span, keyed by sample path, then by item id, '<include path>#<id>' for an item of a first-level isolated region, or 'wave:<id>'.",
-        "classes lists every divergence of spec §1.2 that contributes, (b) to (f), or region-scope when the engines give an isolated region a different scope (§1.2, 'Isolated regions without waves'); F5 settled the last region-scope entries (nested.nowline's region anchors), so none remains. Fixing a divergence removes its letter, and the entry once no letter is left. (a), the pixel walker starting an after: child at the lane's left edge instead of its cursor, was settled by F1 (specs/scheduler-unification.md §5), so no entry carries it. F2 and F3 settled (c), (d) and (e), and moved (b) out of every time path (the lane cursor, a parallel's join, after: references and the wave barrier): a (b) entry now marks only a bar drawn at its minimum width, which is presentation (§8 decision 6)."
+        "classes lists every divergence of spec §1.2 that contributes, (b) to (f), or region-scope when the engines give an isolated region a different scope (§1.2, 'Isolated regions without waves'); F5 settled the last region-scope entries (nested.nowline's region anchors), so none remains. Fixing a divergence removes its letter, and the entry once no letter is left. (a), the pixel walker starting an after: child at the lane's left edge instead of its cursor, was settled by F1 (specs/scheduler-unification.md §5), so no entry carries it. F2 and F3 settled (c), (d) and (e), and moved (b) out of every time path (the lane cursor, a parallel's join, after: references and the wave barrier): a (b) entry now marks only a bar drawn at its minimum width, which is presentation (§8 decision 6). m4.15 m1 (specs/true-width-layout.md) draws every bar at exactly its dates, so the last (b) entries went and the register is empty: engines A and C agree on every span."
     ],
-    "divergences": {
-        "examples/showcase.nowline": {
-            "ship": {
-                "classes": ["(b)"],
-                "reason": "presentation: bar drawn at its minimum width (scheduler-unification §8 decision 6)"
-            },
-            "brief": {
-                "classes": ["(b)"],
-                "reason": "presentation: bar drawn at its minimum width (scheduler-unification §8 decision 6)"
-            },
-            "announce": {
-                "classes": ["(b)"],
-                "reason": "presentation: bar drawn at its minimum width (scheduler-unification §8 decision 6)"
-            }
-        },
-        "tests/non-working-hide.nowline": {
-            "qa": {
-                "classes": ["(b)"],
-                "reason": "presentation: bar drawn at its minimum width (scheduler-unification §8 decision 6)"
-            }
-        },
-        "tests/non-working-show.nowline": {
-            "qa": {
-                "classes": ["(b)"],
-                "reason": "presentation: bar drawn at its minimum width (scheduler-unification §8 decision 6)"
-            }
-        },
-        "tests/size-and-capacity.nowline": {
-            "f1": {
-                "classes": ["(b)"],
-                "reason": "presentation: bar drawn at its minimum width (scheduler-unification §8 decision 6)"
-            }
-        }
-    }
+    "divergences": {}
 }

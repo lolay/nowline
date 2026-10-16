@@ -1,5 +1,5 @@
 // RowPacker — the topmost-fit row-pack engine shared by `SwimlaneNode`
-// and `GroupNode`. Tracks rows of variable height (each row's height is
+// and `GroupNode`. A child never lands above the one before it. Tracks rows of variable height (each row's height is
 // the max of its placed children's heights, with a per-packer minimum)
 // and bumps a child to a new row when it would collide with a sibling's
 // `rightEdge`, caption `spillX`, or a slack-arrow corridor.
@@ -66,6 +66,10 @@ export interface ItemPlacementInput {
      *  initial height when this is the first item in a fresh row, or
      *  to grow the row when a taller item lands in an existing row. */
     predictedHeight: number;
+    /** Ids of the items still to come in this track. A slack corridor
+     *  whose arrow starts at one of them never bumps this item: rows
+     *  never move up, so that item would follow it down. */
+    pendingIds?: ReadonlySet<string>;
 }
 
 /** Result of a `placeItem` query. */
@@ -78,10 +82,9 @@ export interface ItemPlacement {
 export interface ItemCommitInput {
     rowIndex: number;
     placed: PositionedItem;
-    /** Logical right edge of the placed item. Includes the trailing
-     *  `ITEM_INSET_PX` so the next chained item butts edge-to-edge in
-     *  logical space (with a 2 × ITEM_INSET_PX visible gutter between
-     *  bars). */
+    /** Logical right edge of the placed item: its span in time, so the
+     *  next chained item butts edge-to-edge in logical space (each bar
+     *  keeps its seams inside its own dates). */
     logicalEnd: number;
     /** Reserved spill x for captions that overflow the bar's right
      *  edge. `null` resets the row's spill reservation to `laneLeftX`. */
@@ -130,6 +133,12 @@ export class RowPacker {
     private readonly opts: RowPackerOptions;
     /** Rightmost `BlockCommitInput.paintedRight` committed so far. */
     private paintedRightX: number;
+    /**
+     * Row of the last committed child. The next child never lands above it,
+     * so a track reads top to bottom in DSL order
+     * (specs/true-width-layout.md §3.2).
+     */
+    private lastRowIndex = 0;
 
     constructor(opts: RowPackerOptions) {
         this.opts = opts;
@@ -146,16 +155,18 @@ export class RowPacker {
     }
 
     /**
-     * Find the topmost row where the item's natural extent fits without
-     * colliding with sibling content or a slack corridor; appending a
-     * fresh row at the bottom when none of the existing rows fit.
+     * Find the topmost row, at or below the last committed child's, where
+     * the item's natural extent fits without colliding with sibling content
+     * or a slack corridor; appending a fresh row at the bottom when none of
+     * those rows fit.
      */
     placeItem(input: ItemPlacementInput): ItemPlacement {
-        for (let i = 0; i < this.rows.length; i += 1) {
+        for (let i = this.lastRowIndex; i < this.rows.length; i += 1) {
             const r = this.rows[i];
             if (input.desiredStart < r.rightEdge) continue;
             if (input.desiredStart < r.spillX) continue;
             if (this.rowIntersectsCorridor(r, input)) continue;
+            if (this.rowCrossesOwnCorridor(r, input)) continue;
             return { rowIndex: i, y: r.y };
         }
         const fresh = this.appendRow(Math.max(this.opts.minRowHeight, input.predictedHeight));
@@ -189,6 +200,7 @@ export class RowPacker {
         row.rightEdge = input.logicalEnd;
         row.spillX = input.spillReservation ?? this.opts.laneLeftX;
         row.placedChildren.push(input.placed);
+        this.lastRowIndex = input.rowIndex;
     }
 
     /**
@@ -201,6 +213,7 @@ export class RowPacker {
         row.rightEdge = input.blockEnd;
         row.spillX = input.spillReservation ?? this.opts.laneLeftX;
         row.placedChildren.push(input.placed);
+        this.lastRowIndex = input.rowIndex;
         if (input.paintedRight !== undefined && input.paintedRight > this.paintedRightX) {
             this.paintedRightX = input.paintedRight;
         }
@@ -232,7 +245,23 @@ export class RowPacker {
                 c.y < r.y + r.height &&
                 p.desiredStart < c.xEnd &&
                 p.desiredEnd > c.xStart &&
-                c.slackPredId !== p.childId,
+                c.slackPredId !== p.childId &&
+                !p.pendingIds?.has(c.slackPredId),
+        );
+    }
+
+    /**
+     * An overrun slack arrow runs left, from its source back to a milestone
+     * dated before the source ends. Rows never move up, so the source cannot
+     * push the work before it out of that path; it drops to a row where the
+     * path is clear instead.
+     */
+    private rowCrossesOwnCorridor(r: PackedRow, p: ItemPlacementInput): boolean {
+        return this.opts.slackCorridors.some(
+            (c) =>
+                c.slackPredId === p.childId &&
+                c.xStart < p.desiredStart &&
+                r.rightEdge > Math.max(c.xStart, this.opts.laneLeftX),
         );
     }
 
