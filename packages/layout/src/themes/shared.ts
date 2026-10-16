@@ -234,10 +234,9 @@ export const NOW_PILL_LABEL_INSET_X_PX = 6;
  */
 export const NOWLINE_STROKE_WIDTH_PX = 2.25;
 
-// Visual inset applied on each side of an item bar. Two adjacent (logically
-// chained) items therefore have a 2× ITEM_INSET_PX visible gutter between
-// them, leaving room for vertical drop-lines (dependency arrows, anchor /
-// milestone cuts, the now-line) to pass between bars without crossing them.
+// Half the canonical content gutter, and the padding container headers keep
+// past their box. Bars no longer use it: they span their dates, inset by
+// `ITEM_SEAM_PX` (specs/true-width-layout.md §3.1).
 export const ITEM_INSET_PX = 6;
 
 // The seam a bar gives up on each side, from inside its dates, so two bars
@@ -249,7 +248,6 @@ export const ITEM_SEAM_PX = 1;
 
 // Canonical content gutter — the rest-state spacing between adjacent
 // pieces of chart content. Used for:
-//   - the gap between two adjacent items in a track (= 2 × ITEM_INSET_PX),
 //   - the gap between the header card and the chart's left edge (originX
 //     offset from chartLeftX),
 //   - the bottom margin around the attribution wordmark.

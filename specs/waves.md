@@ -739,12 +739,9 @@ It never goes through `forwardWithinDomain`, the seeded edge maps or `resolveAft
 5. **Invalid input.** Input that breaks the rules (for example, an LSP preview of a file with NL.E1103) hits the cap. The result is deterministic, and layout emits NL.W1002.
 6. **Cost.** `O((n+1)·(N + R))` for N main nodes and R region nodes. Example 1 converges in 4 passes, Example 19 in 3 and Example 16 in 2. These counts follow from running the §8.2 algorithm on each example from the cold start above, not from the bound in item 3.
 
-**Warm start (engine A).** Engine C runs first, so engine A starts from its result ([`scheduler-unification.md`](./scheduler-unification.md) §5, F4):
+**Warm start (engine A).** Engine C runs first, so engine A starts from its result ([`scheduler-unification.md`](./scheduler-unification.md) §5, F4): the driver's first pass starts each `S_k` (k > 1) and `E_k` at no less than C's, projected (`seed` of `solveWaveBarriers`). F4 also floored every item start by C's (`scheduleFloorX`); m4.15 removed that floor, since every bar now spans C's dates ([`true-width-layout.md`](./true-width-layout.md) §6).
 
-- every item start is floored by C's start, projected with `forwardWithinDomain` (`scheduleFloorX` in `start-rules.ts`; under `show` it compares the placed, snapped start, so an unsnapped `after:` date that NL.I1008 reads stays put);
-- the driver's first pass starts each `S_k` (k > 1) and `E_k` at no less than C's, projected (`seed` of `solveWaveBarriers`).
-
-C is a lower bound of A on every item and wave edge (`schedule-lower-bound.test.ts`), so the floors never move a settled bar, and for valid input the fixpoint is unique (item 2 makes each `E_k` a function of the `S` and `E` before it), so a pass can only confirm the right one. The positioned model is identical to a cold start's; only `waveSolve.passes` drops: Example 1 takes 2 passes, Examples 16 and 19 one each, and every wave sample and generated roadmap at least one fewer than cold, or one (`schedule-warm-start.test.ts`).
+C is a lower bound of A on every item and wave edge (`schedule-lower-bound.test.ts`), so the seed never moves a settled bar, and for valid input the fixpoint is unique (item 2 makes each `E_k` a function of the `S` and `E` before it), so a pass can only confirm the right one. The positioned model is identical to a cold start's; only `waveSolve.passes` drops: Example 1 takes 2 passes, Examples 16 and 19 one each, and every wave sample and generated roadmap at least one fewer than cold, or one (`schedule-warm-start.test.ts`).
 
 ### 8.4 Engine A hook points (pixels)
 

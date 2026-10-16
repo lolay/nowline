@@ -29,7 +29,7 @@ Out of scope, by decision:
 ### 3.1 Bars
 
 - A bar spans exactly `[x(start), x(end)]` from the schedule. There is no minimum width and no horizontal inset that widens it; the floor is 1 px.
-- Adjacent bars on one row keep a 1 px seam, taken from inside each bar and only when the bar is at least 6 px wide, so a seam never widens a bar.
+- Each bar gives up a 1 px seam on each side, from inside its dates, so two bars that abut in time show a 2 px gap between their strokes. A bar too short for both seams and the 1 px floor shrinks its seams instead, staying centred in its dates (`itemBarInsetPx`), so a seam never widens a bar.
 - Corner radius is `min(theme radius, width / 2, height / 2)`: short bars become pills, then lines.
 - Bar height, the caption model (title line plus meta line) and the in-bar decorations are today's. Where a decoration does not fit, it spills into the caption cluster right of the bar, as today (`layoutSpillCluster`, the `MIN_BAR_WIDTH_FOR_*` thresholds). The progress strip is drawn at the bar's true width.
 
@@ -82,7 +82,7 @@ Arrows are drawn only for `after:` on items, as today, and they run on the dates
 | [`dsl.md`](./dsl.md)'s "labelled annotations" for items finer than `scale:` | removed; short items draw at their width |
 | `MilestonePredecessor.x` (painted edge) beside `endX` (duration end), from lolay/nowline#167 | equal once bars are true width; one can go |
 
-`scheduleFloorX` (m4.11 F4) becomes an identity on every sample once nothing widens a start, and can be removed with the register.
+`scheduleFloorX` (m4.11 F4) becomes an identity on every sample once nothing widens a start, and can be removed with the register. m1 removed both; the barrier seed of F4 stays.
 
 ## 5. Migration plan
 
@@ -91,6 +91,14 @@ Each milestone renders every `examples/` and `tests/` file in light, dark and gr
 ### m1 - Bars at true width
 
 Drop the `MIN_ITEM_WIDTH` clamp and the `ITEM_INSET_PX` gutter from bar geometry (`sequence-item.ts`, `item-measure.ts`, `item-bar-geometry.ts`); add the 1 px seam and the radius rule. Collapse `TrackCursor` to one end. Change the row packer to "never moves up" (`row-track.ts`). Delete the `(b)` register entries and `scheduleFloorX` once the invariant test of §6 passes. Arrows still route with the old router; their ports read the new boxes.
+
+As built (m1):
+
+- Bar geometry: `naturalWidth` is the item's span in time (`itemSpanPx`), the box is inset by `itemBarInsetPx` and is `itemVisualWidth` wide; `MIN_ITEM_WIDTH` is 1 and `ITEM_SEAM_PX` is 1. `ITEM_INSET_PX` stays for the lane gutter and container headers until m2. The renderer caps a bar's corner radius at half its width and height.
+- `TrackCursor` has only `x`, the time end. A parallel's box, a group's box and `after:` all read it.
+- The row packer starts each child at the last committed child's row. An item whose own slack arrow runs left (an overrun) drops to a row that arrow can cross, since the work before it can no longer be pushed down out of its way; a corridor whose source is still to come in the track never bumps an earlier item.
+- `test/date-truth.test.ts` checks every item of every sample and of the 60 generated roadmaps. With it green, the divergence register is empty and `scheduleFloorX` is gone; `schedule-lower-bound.test.ts` still guards the barrier seed.
+- Interim: arrows still use the old router, which can route an elbow through the 2 px seam between abutting bars until m3.
 
 ### m2 - Containers above their content
 
@@ -110,7 +118,7 @@ Rewrite [`rendering.md`](./rendering.md) "Item Bars", "Parallel and Group Render
 
 The divergence register compared A and C span by span. This milestone replaces it with invariants that hold on every sample and on the 60 generated roadmaps of `test/generated-roadmaps.ts`:
 
-- **Date truth**: every placed item's bar `[x0, x1]` equals the scheduled start and end, mapped through the time scale, within 0.5 px (seam included). Every milestone and anchor `x` equals its scheduled date.
+- **Date truth**: every placed item's bar `[x0, x1]` lies inside the scheduled start and end, mapped through the time scale, and within one seam of each (a bar under the 1 px floor may end past its end by less than a pixel). Every milestone and anchor `x` equals its scheduled date.
 - **Containers**: a group or parallel's bracket and body span exactly its children's earliest start and latest end.
 - **Rows**: in every track, each child's row is at or below the previous child's; no two bars on one row overlap.
 - **Arrows**: every dependency arrow starts in the source's last day and ends in the target's first day; no arrow leg runs along a bar edge (no vertical leg within 1 px of a bar's left or right edge over that bar's height).

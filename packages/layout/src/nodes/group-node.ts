@@ -161,9 +161,8 @@ export class GroupNode {
         cursor.height = Math.max(cursor.height, headerBand + box.height + interRowGap);
         const id = node.name;
         // `after:` the group is a time path: its last child's duration end,
-        // not its painted box, which a spilled caption or a bar drawn at its
-        // minimum width can widen (specs/scheduler-unification.md §8
-        // decisions 6, 7).
+        // not its painted box, which a spilled caption can widen
+        // (specs/scheduler-unification.md §8 decisions 6, 7).
         if (id) {
             ctx.entityLeftEdges.set(id, box.x);
             ctx.entityRightEdges.set(id, timeCursorX);

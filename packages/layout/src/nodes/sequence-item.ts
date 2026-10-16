@@ -21,7 +21,7 @@ import {
     MIN_BAR_WIDTH_FOR_FOOTNOTE_PX,
 } from '../item-bar-geometry.js';
 import type { LayoutContext, TrackCursor } from '../layout-context.js';
-import { nonWorkingPinOf, resolvePinnedOrSequentialStart, scheduleFloorX } from '../start-rules.js';
+import { nonWorkingPinOf, resolvePinnedOrSequentialStart } from '../start-rules.js';
 import { estimateTextWidth } from '../text-measure.js';
 import { PROGRESS_STRIP_HEIGHT_PX } from '../themes/shared.js';
 import type { BoundingBox, PositionedItem, PositionedLabelChip } from '../types.js';
@@ -56,10 +56,6 @@ export function sequenceItem(
     // in the max, after the `after:` logic. Parallel tracks reach this
     // function directly, so this is where their floor applies.
     if (ctx.waves) startX = waveFloorX(node, startX, ctx);
-    // The day schedule's start is a lower bound of this one, so flooring by
-    // it settles nothing that was already right (specs/scheduler-unification.md
-    // §5, F4); a lane or group child's cursor already carries it.
-    startX = scheduleFloorX(node, startX, ctx);
     const nonWorkingPin = nonWorkingPinOf(props, startX, ctx);
 
     // Under `show` a start that lands in a non-working day moves to the next
@@ -87,11 +83,10 @@ export function sequenceItem(
     // by its seams (specs/true-width-layout.md §3.1).
     const logicalLeft = placedStartX;
     const logicalRight = placedStartX + naturalWidth;
-    // Duration end: where the item ends in time, never the minimum bar
-    // width. The time paths take it (the cursor, `after:` references, the
-    // wave barrier), so what follows a clamped bar starts on its date, as
-    // in engine C; a bar wider than its duration is presentation
-    // (specs/scheduler-unification.md §8 decision 6).
+    // Duration end: where the item ends in time. The time paths take it
+    // (the cursor, `after:` references, the wave barrier), so what follows
+    // starts on its date, as in engine C; the bar is drawn inside it
+    // (specs/true-width-layout.md §3.1).
     const durationEndX = placedStartX + itemSpanPx(ctx, placedStartX, measure.durationDays);
 
     // Handle `before:` — item must end by the earliest cap. Each cap is
@@ -99,9 +94,8 @@ export function sequenceItem(
     // date literal (resolved through the time scale). The validator enforces
     // "at most one inline date per direction" so at most one element per
     // before-list will hit the date path. The cap is a time path: the item
-    // overflows when its duration end passes it, never because its bar is
-    // drawn at the minimum width; the red tail still runs to the painted end
-    // (specs/scheduler-unification.md §8 decision 6).
+    // overflows when its duration end passes it; the red tail runs to the
+    // painted end.
     let hasOverflow = false;
     let overflowBox: BoundingBox | undefined;
     let overflowAnchorId: string | undefined;
@@ -324,8 +318,8 @@ export function sequenceItem(
         ctx.entityRightEdges.set(id, durationEndX);
     }
     // A member's end feeds its wave's barrier: its duration end, the lane
-    // cursor's advance in `sequenceRowTrack`, never the minimum bar width,
-    // a group box or a caption spill (specs/waves.md §8.4).
+    // cursor's advance in `sequenceRowTrack`, never a group box or a
+    // caption spill (specs/waves.md §8.4).
     accumulateWaveMember(node, durationEndX, ctx);
     // Drawing / flow maps key on a registration handle EVERY item has: the
     // explicit id when present, else a synthetic, non-referenceable handle
