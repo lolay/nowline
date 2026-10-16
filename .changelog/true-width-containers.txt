@@ -1,0 +1,7 @@
+```release-note:changed
+Groups and parallels are now drawn above and around their items instead of beside them, and span exactly their dates. Each has a header, its title over a bracket from its first start to its last end (solid for a group, dashed for a parallel), over a lightly shaded body padded above and below its rows. The styled group's filled box and title tab and the left `[` bracket are gone: `style:` now only colours the body (`bg`) and the bracket (`fg`), and `bracket:` styles the header bracket, with `none` hiding it. A title or caption that runs past a container's end pushes the next item down a row instead of widening the container. Inline-date glyphs on a group or parallel sit in its header beside the title. The xlsx, msproj and mermaid exports do not change.
+```
+
+```release-note:removed
+`@nowline/layout` no longer exports the group title-tab and bracket-overhang constants (`GROUP_TITLE_TAB_*`, `GROUP_BOTTOM_PAD_PX`, `GROUP_BRACKET_LABEL_OVERHANG_PX`), `groupHasFill`, `groupTitleTabWidth`, `groupHeaderBandPx`, `GROUP_HEADER_TITLE_INSET_X_PX`, `PARALLEL_HEADER_TITLE_INSET_X_PX` or `CONTAINER_HEADER_TITLE_BASELINE_OFFSET_PX`. `PositionedGroup` and `PositionedParallel` gain `headerHeight`, and their `box` now runs from the header's top and spans only their dates.
+```
