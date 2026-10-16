@@ -45,6 +45,7 @@ import {
 import type { MessageCode } from '../i18n/codes.js';
 import { basename, dirname, resolve as resolvePath } from '../util/posix-path.js';
 import { isRealIsoDate } from '../util/props.js';
+import { checkIncludedReferences } from './include-references.js';
 import {
     checkWaveAgreement,
     participates,
@@ -143,7 +144,8 @@ export interface ResolveDiagnostic {
     line?: number;
     /**
      * Stable code of a coded diagnostic (the wave rules, specs/waves.md
-     * §7.4). Absent on every other resolver diagnostic.
+     * §7.4, and an included file's unresolved reference, NL.E0302). Absent
+     * on every other resolver diagnostic.
      */
     code?: MessageCode;
     /** The message arguments as a rest tuple, as `acceptTr` stores them. */
@@ -158,9 +160,9 @@ export interface ResolveDiagnostic {
 
 /**
  * True for a resolver diagnostic that consumers report like a validator
- * diagnostic (file, line, localized, exit 1): a coded one, or one from the
- * wave checks. Every other resolver diagnostic keeps the include-error path
- * (specs/waves.md §6.1).
+ * diagnostic (file, line, localized, exit 1): a coded one (the wave rules and
+ * NL.E0302), or one from the wave checks. Every other resolver diagnostic
+ * keeps the include-error path (specs/waves.md §6.1).
  */
 export function isRoutedResolveDiagnostic(d: ResolveDiagnostic): boolean {
     return d.code !== undefined || d.rule === 'wave';
@@ -256,6 +258,9 @@ export async function resolveIncludes(
             failed: ctx.failedWaves,
         }),
     );
+    // References never cross a file boundary; report each included file's
+    // unresolved ones in that file (an included file is never validated).
+    ctx.diagnostics.push(...checkIncludedReferences(absPath, ctx.edges));
     return {
         config,
         content,

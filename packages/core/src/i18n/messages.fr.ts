@@ -207,6 +207,8 @@ export const messages: MessageBundle = {
         `Identifiant en double «\u00A0${a.name}\u00A0». Première déclaration à ${a.location}.`,
     'NL.E0301': (a: { type: string }) =>
         `${a.type} doit comporter un identifiant, un titre, ou les deux.`,
+    'NL.E0302': (a: { key: string; value: string }) =>
+        `La référence «\u00A0${a.value}\u00A0» de «\u00A0${a.key}:\u00A0» ne désigne aucune entité déclarée dans ce fichier.`,
 
     // Valeurs de propriété
     'NL.E0400': (a: { value: string }) =>

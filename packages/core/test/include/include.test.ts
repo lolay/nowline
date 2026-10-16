@@ -1160,6 +1160,9 @@ swimlane platform "Backlog"
             ]);
         });
 
+        // A merged child's `after:` that names a parent id is NL.E0302 in the
+        // child; layout still resolves it through the shared edge maps, so the
+        // barrier rules keep reporting what it would do.
         it('a cross-file barrier chain reports NL.E1103 at the child', async () => {
             const result = await resolveAt({
                 'program.nowline': `include "./c.nowline"\nroadmap r "R"\n${withWaves(['swimlane a', '  item p2 duration:1w wave:w2'])}`,
@@ -1184,6 +1187,13 @@ swimlane platform "Backlog"
                         refWave: 'w2',
                     }),
                 },
+                {
+                    severity: 'error',
+                    code: 'NL.E0302',
+                    sourcePath: abs('c.nowline'),
+                    line: 4,
+                    message: tr('en-US', 'NL.E0302', { key: 'after', value: 'p2' }),
+                },
             ]);
         });
 
@@ -1202,6 +1212,7 @@ swimlane platform "Backlog"
             });
             expect(result.diagnostics.map((d) => [d.code, d.sourcePath, d.line])).toEqual([
                 ['NL.W1101', abs('program.nowline'), 5],
+                ['NL.E0302', abs('c.nowline'), 3],
             ]);
             expect(result.diagnostics[0].args).toEqual([
                 {

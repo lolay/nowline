@@ -63,7 +63,8 @@ export function resolvedContentLookup(content: ResolvedContent): WaveRefLookup {
     return (id) => content.anchors.get(id) ?? content.milestones.get(id) ?? content.waves?.get(id);
 }
 
-function hasParseErrors(file: NowlineFile): boolean {
+/** True when the file had a lexer or parser error. */
+export function hasParseErrors(file: NowlineFile): boolean {
     const result = file.$document?.parseResult;
     return !!result && (result.lexerErrors.length > 0 || result.parserErrors.length > 0);
 }

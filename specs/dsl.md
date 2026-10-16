@@ -705,7 +705,7 @@ Footnotes are numbered sequentially by document order: the file's own footnotes 
 
 | Mode                      | Behavior                                                                                                                                                                                                                                                     |
 | ------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
-| `roadmap:merge` (default) | The child's content entities are merged into the parent. On name collision, the **parent wins** and the parser emits a **warning**. If a swimlane collides, its contained items are also dropped. Merged content resolves styles from the post-merge config. |
+| `roadmap:merge` (default) | The child's content entities are merged into the parent. On name collision, the **parent wins** and the parser emits a **warning**. If a swimlane collides, its contained items are also dropped. Merged content resolves styles from the post-merge config. References still stay inside a file: the child's `after:`, `before:` and `on:` name only its own ids (Reference rule 1, `NL.E0302`). |
 | `roadmap:ignore`          | The child's content entities are dropped. Only the child's config is processed (subject to `config:` mode). Use for shared style libraries. Shared label, status, and size vocabulary — since they are all roadmap content — uses `roadmap:merge` instead. |
 | `roadmap:isolate`         | The child's content stays scoped to the child file. The child uses only the child's config. The child must contain a `roadmap` declaration (needed for the region label). The isolated content renders as a visually distinct region — see `rendering.md`.   |
 
@@ -781,7 +781,7 @@ swimlane platform owner:platform
 - The child's content stays scoped to the child file and uses only the child's config.
 - The child's swimlanes, items, anchors and milestones render inside a dashed-border region labeled with the child's roadmap title. Its anchors and milestones take the region's own marker row, under the label, and their cut lines stop at the region's last lane.
 - The child's footnotes join the chart's one footnote panel, under the region's title, numbered on after the parent's (and after any isolated include before it).
-- References stay inside a file: the child's `after:` and `before:` resolve against its own ids, and the parent cannot name the child's (or the reverse).
+- References stay inside a file: the child's `after:`, `before:` and `on:` resolve against its own ids, and the parent cannot name the child's (or the reverse). Either one is `NL.E0302` in the file that holds the reference (Reference rule 1).
 - The region includes an indicator (icon or badge) to distinguish it from native content.
 - Timeline scale is shared — the child's content aligns to the parent's scale/axis.
 - Waves are shared like the time axis: the child must declare the same waves (Include Rule 12), and its lanes take part in the global barriers. Its `wave:` values map to the parent's waves by id; its other ids stay invisible to the parent.
@@ -1227,7 +1227,7 @@ The parser enforces these rules and produces clear error messages with file posi
 
 ### Reference rules
 
-1. All elements of `after:`, `before:`, and `on:` properties (whether single or list) resolve to declared identifiers within the merged scope.
+1. All elements of `after:`, `before:`, and `on:` properties (whether single or list) resolve to identifiers declared in the same file. An element that does not is `NL.E0302`. References never cross a file boundary, in either direction and in any include mode: a parent cannot name a child's ids, a child cannot name its parent's or a sibling include's, and `roadmap:merge` does not change that, even though the merged content shares one timeline. The validator reads only its own file and an included file is parsed without validation, so `resolveIncludes` applies this rule to every file it reaches through a `merge` or `isolate` include, each file once, and reports `NL.E0302` in that file, at the reference's line, with the same message the file's own validation gives. A file reached only through `roadmap:ignore` is not checked (its content is dropped), and neither is one that failed to parse.
 2. No circular dependencies in `after`/`before` chains. Detection operates on the full dependency graph, including every element of list-form references.
 
 ### Value rules
@@ -1303,7 +1303,7 @@ Non-rules (intentionally not validated):
 
 **Dependencies**
 
-24. `after:` and `before:` on any entity accept a single identifier, a single ISO date literal, or a bracketed list mixing both. Each non-date element must resolve to a declared item, milestone, anchor, parallel, group, or wave identifier. A wave's own `after:` is narrower: see WV4.
+24. `after:` and `before:` on any entity accept a single identifier, a single ISO date literal, or a bracketed list mixing both. Each non-date element must resolve to an item, milestone, anchor, parallel, group, or wave identifier declared in the same file (`NL.E0302`, Reference rule 1). A wave's own `after:` is narrower: see WV4.
 24a. **Inline date pins are valid only on `item`, `parallel`, and `group`, and on a wave's `after:`.** An ISO date literal in `after:` or `before:` on `milestone`, `swimlane`, `anchor`, `footnote`, `person`, or `team` is a validation error (`NL.E0411`: "Allowed only on item, parallel, and group, and on a wave's after:"). A wave's `before:` is reported only by `NL.E1105`, never by `NL.E0411`.
 24b. **At most one inline date per direction.** A list with two or more ISO date literals in the same `after:` or the same `before:` property is a validation error (`NL.E0410`). Mixing one date with any number of id references in the same list is allowed.
 25. Circular dependency detection operates on the full graph across all `after:`/`before:` references (including every element of list-form references). **Inline date literals are not graph nodes** and do not participate in cycle detection. **A wave's own `after:` edges are skipped**: their targets are constants, so `wave w2 after:gate` together with `milestone gate date:… after:w2` (the wave-deadline idiom) is not a cycle. Cycles that run through wave barriers are WV10.
@@ -1345,7 +1345,7 @@ Non-rules (intentionally not validated):
 
 ### Wave rules
 
-These rules apply to files that use `wave` or `wave:`. A roadmap *has waves* when its file declares at least one wave with a valid id. Every wave rule has a stable diagnostic code; messages are listed in [`specs/waves.md`](./waves.md) § 6.4. WV1–WV9 run per file (and, through `resolveIncludes`, on every participating included file, which is parsed without validation); WV10–WV12 run over a *layout scope* (the merged main lanes, and each isolated region), so they see `after:` edges that cross merged files; WV13–WV14 run on include edges. The WV numbers match [`specs/waves.md`](./waves.md) § 6.2, which also defines the layout insights WV16–WV18 (WV15 is retired).
+These rules apply to files that use `wave` or `wave:`. A roadmap *has waves* when its file declares at least one wave with a valid id. Every wave rule has a stable diagnostic code; messages are listed in [`specs/waves.md`](./waves.md) § 6.4. WV1–WV9 run per file (and, through `resolveIncludes`, on every participating included file, which is parsed without validation); WV10–WV12 run over a *layout scope* (the merged main lanes, and each isolated region), so they see `after:` edges that cross merged files (each such edge is also `NL.E0302` in the file that holds it, Reference rule 1); WV13–WV14 run on include edges. The WV numbers match [`specs/waves.md`](./waves.md) § 6.2, which also defines the layout insights WV16–WV18 (WV15 is retired).
 
 | # | Rule | Severity | Code |
 | --- | --- | --- | --- |
@@ -1366,6 +1366,6 @@ These rules apply to files that use `wave` or `wave:`. A roadmap *has waves* whe
 
 WV10 reports one diagnostic per root cause, in one of five forms: `sequence` (a run of items placed after work in a later wave), `join` (an item after a `parallel` block with a track in a later wave), `after-item`, `after-wave`, and `chain` (a hidden route through background work, which the cycle check in rule 25 cannot see). An item with no wave never produces a diagnostic.
 
-**No duplicate diagnostics.** `wave` never draws the generic unknown-property warning `NL.W0700`; a wave's `before:` gets only `NL.E1105` (never `NL.E0411`); an element of a wave's `after:` that resolves to nothing gets only the existing "does not resolve" error, and one that resolves to the wrong kind gets only `NL.E1106`. An invalid `wave:` value makes the item background work for the later rules, and a container's wave wins over a conflicting descendant's.
+**No duplicate diagnostics.** `wave` never draws the generic unknown-property warning `NL.W0700`; a wave's `before:` gets only `NL.E1105` (never `NL.E0411`); an element of a wave's `after:` that resolves to nothing gets only the "does not resolve" error (`NL.E0302`), and one that resolves to the wrong kind gets only `NL.E1106`. An invalid `wave:` value makes the item background work for the later rules, and a container's wave wins over a conflicting descendant's.
 
 **Layout insights (WV16–WV18).** Three more codes come from layout, not validation: `NL.W1002` (the barrier solver hit its pass cap; unreachable for valid input), `NL.I1006` (one or more waves have no members), and `NL.I1007` (a wave overruns a dated milestone whose `after:` names it). See [`specs/rendering.md`](./rendering.md) "Waves". `NL.W1001` (a barrier moved an item's `date:`/`start:` pin, WV15) is retired with item pins (see "Pinning is not supported"). Outside the wave rules, layout also reports `NL.I1008` (info) when the date in an item's `after:` falls on a non-working day under `calendar:business` and sets its start: the item starts on the next working day instead (see [`working-calendar.md` §6](./working-calendar.md)).
