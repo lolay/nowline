@@ -1877,6 +1877,37 @@ footnote legal "Legal review" on:alpha
     });
 });
 
+describe('renderSvg — footnote panel wrap', () => {
+    it('draws each wrapped row where layout placed it, inside the panel', async () => {
+        const model = await parseToModel(
+            `nowline v1
+
+roadmap host "Host" start:2026-01-05
+
+swimlane core "Core"
+  item api "API" duration:3w
+
+footnote vendor "Vendor dependency" on:api
+  description "Blocked until the contract is signed"
+`,
+            { today: new Date(Date.UTC(2026, 1, 9)) },
+        );
+        const [entry] = model.footnotes.entries;
+        const lines = entry.descriptionLines ?? [];
+        expect(lines.length).toBeGreaterThan(1);
+        const svg = await renderSvg(model);
+        const panel = groupsMatching(svg, /<g data-layer="footnotes">/)[0] ?? '';
+        const texts = [
+            ...panel.matchAll(/<text [^>]*x="([\d.]+)" y="([\d.]+)">([^<]*)<\/text>/g),
+        ].map((m) => ({ x: Number(m[1]), y: Number(m[2]), text: m[3] }));
+        // Header, number, title, then one <text> per description row.
+        expect(texts.slice(3)).toEqual(lines);
+        expect(lines.map((l) => l.text).join(' ')).toBe('— Blocked until the contract is signed');
+        const right = model.footnotes.box.x + model.footnotes.box.width;
+        for (const t of texts) expect(t.x).toBeLessThan(right);
+    });
+});
+
 describe('renderSvg — arrowhead marker ids', () => {
     // A cross-lane `after:` draws a dependency edge (`marker-end` on the
     // neutral marker); the after-only milestone over two parallels draws a

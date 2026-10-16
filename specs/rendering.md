@@ -639,7 +639,7 @@ Each group inside a parallel block renders as its own horizontal sub-track. Styl
 Footnotes render in a footnote section rather than as floating callout boxes.
 
 **Footnote indicators:**
-- Each footnote gets a sequential number (1, 2, 3...) based on document order.
+- Each footnote gets a sequential number (1, 2, 3...) based on document order: the file's own footnotes as declared, then each merged include's in include order. The id plays no part, so a title-only footnote numbers where it is declared, not by its slug, and the order does not depend on the locale.
 - A small superscript number renders in the upper-right corner of every entity the footnote is attached to.
 - If an entity has multiple footnotes, multiple numbers appear (e.g., "1, 3").
 - The number uses a small, muted style — visible but not dominant.
@@ -647,9 +647,11 @@ Footnotes render in a footnote section rather than as floating callout boxes.
 **Footnote area:**
 - All footnote text renders in a footnote section below the roadmap — below all swimlanes, outside the roadmap's visual boundary.
 - Each footnote: number + footnote title (italicized) + description text (auto-derived styling: one step smaller, normal weight, same font).
-- Footnotes are ordered sequentially by document order.
+- Footnotes are ordered sequentially by document order, the same order as their numbers.
 - The footnote area respects the roadmap's `padding` for horizontal alignment with the chart above.
-- An isolated region's footnotes join the same panel after the host's. Their numbers continue after the host's, region by region in include order, and the region's superscripts carry those numbers. Each region's run of entries is headed by the region's title on a row of its own (10 px, weight 700, in the panel's header colour), so the panel grows by one row per region with footnotes.
+- An isolated region's footnotes join the same panel after the host's. Their numbers continue after the host's, region by region in include order and in document order within each region, and the region's superscripts carry those numbers. Each region's run of entries is headed by the region's title on a row of its own (10 px, weight 700, in the panel's header colour), so the panel grows by one row per region with footnotes.
+- *Wrap.* The panel spans the final canvas and never grows it. The title starts 32 px in from the panel's left edge (after the number column) and the description, led by `— `, sits on the title's row in a column `max(120, 6 × title length)` px further right. Text that would run past the panel's inner right edge (16 px in from its right edge) wraps onto more rows of 18 px, each starting at the title's x and using the whole width to that edge, measured with the same per-character estimate as every other fit (`estimateTextWidth`, 11 px). A title wider than the panel wraps the same way, and the description then starts on the row below the title's last row, as it does when its first word does not fit beside the title. A single word wider than the panel is never split. An entry that fits keeps its one row and its exact text. The panel grows by one row per wrapped row, region heading rows count as rows, and the attribution mark moves down with the panel's bottom.
+- *Geometry.* Layout places every row (`buildFootnotePanel` in [`footnote-node.ts`](../packages/layout/src/nodes/footnote-node.ts)): each `PositionedFootnoteEntry` carries `y` (its first row's baseline, where the number sits), `titleLines` and `descriptionLines` (`{ x, y, text }` per row, the description's first row already led by `— `; `descriptionLines` is omitted without a description) and, on the first entry of a region's run, `regionHeadingY`. The renderer draws them as given.
 
 ### Included Roadmap Region (`roadmap:isolate`)<a id="include-region"></a>
 

@@ -1,5 +1,5 @@
 // `indexFootnotes` is the pure half of the footnote area (specs/layout-phases.md
-// section 3.8, m3.s2): the 1-based number (sorted by id) and the `on:` hosts,
+// section 3.8, m3.s2): the 1-based number (in document order) and the `on:` hosts,
 // with no layout context. The panel is built separately, once, after the
 // chart's bottom is final.
 
@@ -22,18 +22,36 @@ footnote mid "Middle" on:x
 `;
 
 describe('indexFootnotes', () => {
-    it('numbers footnotes by sorted id and records their hosts', async () => {
+    it('numbers footnotes in document order, not by id, and records their hosts', async () => {
         const { resolved } = await parseAndResolve(SOURCE);
         const { index, hosts } = indexFootnotes(resolved.content.footnotes);
         expect([...index.entries()]).toEqual([
-            ['alpha', 1],
-            ['mid', 2],
-            ['zeta', 3],
+            ['zeta', 1],
+            ['alpha', 2],
+            ['mid', 3],
         ]);
         expect([...hosts.entries()]).toEqual([
+            ['zeta', ['y']],
             ['alpha', ['x']],
             ['mid', ['x']],
-            ['zeta', ['y']],
+        ]);
+    });
+
+    it('numbers a title-only footnote where it is declared, not by its slug', async () => {
+        const { resolved } = await parseAndResolve(`nowline v1
+
+roadmap r "R" start:2026-01-05
+
+swimlane a
+  item x "X" duration:2w
+
+footnote "Zebra crossing" on:x
+footnote alpha "Alpha" on:x
+`);
+        const { index } = indexFootnotes(resolved.content.footnotes);
+        expect([...index.entries()]).toEqual([
+            ['zebra-crossing', 1],
+            ['alpha', 2],
         ]);
     });
 
@@ -55,9 +73,16 @@ describe('indexFootnotes', () => {
         const { file, resolved } = await parseAndResolve(SOURCE);
         const model = await layoutRoadmap(file, resolved, { theme: 'light' });
         expect(model.footnotes.entries.map((e) => [e.number, e.title])).toEqual([
-            [1, 'First'],
-            [2, 'Middle'],
-            [3, 'Last'],
+            [1, 'Last'],
+            [2, 'First'],
+            [3, 'Middle'],
         ]);
+        // The superscripts carry the same numbers: x hosts alpha and mid.
+        const lane = model.swimlanes[0];
+        const item = (id: string) => lane.children.find((c) => c.kind === 'item' && c.id === id);
+        const x = item('x');
+        const y = item('y');
+        expect(x?.kind === 'item' && x.footnoteIndicators).toEqual([2, 3]);
+        expect(y?.kind === 'item' && y.footnoteIndicators).toEqual([1]);
     });
 });
