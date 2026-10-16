@@ -18,6 +18,7 @@ graph LR
     typecheck --> ci
     test --> ci
     build_fast["build-fast"] --> ci_platform["ci-platform"]
+    build --> gallery
 
     %% dotted = consumes the left target's output but is not a hard make
     %% prerequisite: typecheck is ordered after build inside ci instead, and
@@ -32,8 +33,12 @@ graph LR
     pack -.-> publish_npm["publish-npm"]
     vsix -.-> publish_vscode["publish-vscode"]
     build -.-> publish_cdn["publish-cdn"]
+    build -.-> gallery_collect["gallery-collect"]
+    gallery_collect -.-> gallery
 
     %% standalone
+    gallery_serve["gallery-serve"]
+    gallery_e2e["gallery-e2e"]
     init
     format
     clean
@@ -72,11 +77,15 @@ pipeline that artifact is built in a separate CI job and handed over — see
 | `lint` | Static check: biome lint + format-drift + import organization, no writes (`pnpm check`) |
 | `format` | Auto-fix formatting, lint, and import order (`pnpm check:fix`) |
 | `typecheck` | Type-check the packages that opt in (`pnpm typecheck`). Needs a prior `build`: several packages resolve sibling `@nowline/*` types from `dist/` |
-| `test` | Run every package's Vitest suite (`pnpm -r test`); depends on `build` |
+| `test` | Run every package's Vitest suite (`pnpm -r test`) and the `node:test` specs for the repo scripts under `scripts/gallery/test/`; depends on `build` |
 | `doctor` | Check the tools in `triage.yaml` (read-only): errors below a floor, warns below a pin. `MODE=default\|release\|ci` picks the profile; `STRICT=1` adds `triage --strict` so warnings fail, which is how CI's `triage` job runs it on the `.nvmrc` pin |
 | `ci` | The full pre-push gate: `lint` + `build` + `typecheck` + `test`, in that order. The canonical CI cell (`ubuntu-latest`, Node 26) runs this target directly on a clean checkout |
-| `ci-platform` | Slim gate for the other build-test cells (`ubuntu-latest` Node 22, macOS, Windows): `build-fast`, then `pnpm -r test`. No lint, typecheck, or render: those have never differed by OS or Node version, while every platform bug so far was a Windows path bug that Vitest caught. Calls `pnpm -r test` itself rather than depending on `test`, so it never re-runs the full `build` |
+| `ci-platform` | Slim gate for the other build-test cells (`ubuntu-latest` Node 22, macOS, Windows): `build-fast`, then `pnpm -r test` and the script tests. No lint, typecheck, or render: those have never differed by OS or Node version, while every platform bug so far was a Windows path bug that Vitest caught. Calls `pnpm -r test` itself rather than depending on `test`, so it never re-runs the full `build` |
 | `pre-commit` | Local alias of `ci` — run before committing or pushing |
+| `gallery` | Render everything (`build`), then `gallery-collect`, then `scripts/gallery/publish.mjs` adds the snapshot to the history in `$(GALLERY_DIR)/data` and regenerates `$(GALLERY_DIR)/site`. Every build belongs to a line: `main`, `pr-<n>` in CI, or locally the current git branch. A `main` build compares against the previous `main` build; a local branch's first build compares against the newest `main` build and later ones against the branch's previous build; a PR build compares against the `main` build at the PR's base sha (else the newest retained `main` ancestor of it). So `make gallery` on `main` and then on a branch shows the branch's render drift. Retention: the newest `GALLERY_KEEP` (default 100) per `main` and local branch line, `GALLERY_KEEP_PR` (default 10) per PR line. `publish.mjs` treats the raw build as untrusted and needs exactly one trust flag: `gallery` passes `--trusted-local` (your own tree, any line; refused under GitHub Actions), while a publishing workflow passes `--pr <n>` (the build must be PR n's) or `--trusted-main` (it must be a `main` build). Open `.gallery/site/index.html`, or use `gallery-serve` |
+| `gallery-collect` | Collect only, with no `build` prerequisite: `scripts/gallery/collect.mjs` snapshots the already-rendered SVGs, their sources and the commit into `$(GALLERY_DIR)/raw`. In CI the workflow sets `GALLERY_LINE`, `GALLERY_PR_NUMBER`, `GALLERY_PR_TITLE`, `GALLERY_PR_URL`, `GALLERY_HEAD_REF`, `GALLERY_HEAD_SHA`, `GALLERY_BASE_SHA`, `GALLERY_AUTHOR` and `GALLERY_DATE`, because a PR is checked out as its merge commit; the build's sha is then the PR head |
+| `gallery-serve` | Serve `$(GALLERY_DIR)/site` over http on every interface at `GALLERY_PORT` (default 8080), so a phone on the same network can browse it; http also enables the pixel diff and per-item history strip, which `file://` blocks |
+| `gallery-e2e` | Browser leg for the review gallery, next to `mcp-app-e2e`: publishes a synthetic three-build history with `scripts/gallery`, serves it with `scripts/gallery/serve.mjs`, and drives `gallery.js` in headless Chromium (view settings carried across pages, source toggle, Changed only, history links, Diff pixel count, layout and no horizontal scroll at phone and tablet sizes, range compare). Installs Chromium through Playwright unless `NOWLINE_E2E_CHROMIUM` points at an existing binary. Needs a browser, so it is not part of `make ci` or `make test` |
 | `clean` | Remove build / binary / package artifacts (keeps `node_modules`) |
 | `lint-workflows` | actionlint the GitHub Actions workflows (`pnpm lint:workflows`); fails fast without shellcheck on PATH, since actionlint would otherwise skip the `run:` script checks CI does |
 | `lint-man` | `mandoc -T lint` every man page at warning level, minus the two warnings translated pages raise for their localized `NAME` section. Needs `mandoc` on PATH (apt `mandoc`; ships with macOS). Not part of `ci`: Windows has no mandoc, so CI runs it in one Linux job |

@@ -16,7 +16,9 @@ Pair this with the byte-stable snapshot suite at [`packages/integration-tests/te
 
 ## How they're rendered
 
-`pnpm build` (or `pnpm render`) runs [`scripts/render-tests.mjs`](../scripts/render-tests.mjs) which writes a sibling `.svg` next to every entry in that script's manifest (curated list of `tests/*.nowline` sources). The SVGs are gitignored — they are CLI output, not source. To skip rendering during build (e.g. while iterating on a broken renderer) set `NOWLINE_SKIP_RENDER=1`.
+`pnpm build` (or `pnpm render`) runs [`scripts/render-tests.mjs`](../scripts/render-tests.mjs) which writes a sibling `.svg` next to every entry in the `TESTS` list of [`scripts/lib/render-manifest.mjs`](../scripts/lib/render-manifest.mjs) (curated list of `tests/*.nowline` sources). The SVGs are gitignored — they are CLI output, not source. To skip rendering during build (e.g. while iterating on a broken renderer) set `NOWLINE_SKIP_RENDER=1`.
+
+To see each fixture's source and render together, and step through them with a previous-vs-this compare, run `make gallery` (then open `.gallery/site/index.html`, or `make gallery-serve` to browse from a phone). Each run is compared against the one before it, so running it on `main` and then on your branch shows what your change moved. [`Makefile.md`](../Makefile.md) has the details.
 
 ## Starter fixtures
 
@@ -54,13 +56,13 @@ Most files are near-clones of [`examples/minimal.nowline`](../examples/minimal.n
 
 ### Multi-file fixtures
 
-A fixture that needs an `include` target (like `isolate-include-multi`) keeps its child `.nowline` **next to it in this folder**, not in `examples/`. Only the composite fixture gets a `MANIFEST` entry in [`scripts/render-tests.mjs`](../scripts/render-tests.mjs); the child is a fixture dependency, not a demo, and doesn't need standalone rendering.
+A fixture that needs an `include` target (like `isolate-include-multi`) keeps its child `.nowline` **next to it in this folder**, not in `examples/`. Only the composite fixture gets a `TESTS` entry in [`scripts/lib/render-manifest.mjs`](../scripts/lib/render-manifest.mjs); the child is a fixture dependency, not a demo, and doesn't need standalone rendering.
 
 ## Adding a new fixture
 
 1. Add `tests/<slug>.nowline` with the smallest possible body that exhibits the behavior. If it needs an `include` target, colocate the child `.nowline` in this folder too.
-2. Append an entry to the `MANIFEST` in [`scripts/render-tests.mjs`](../scripts/render-tests.mjs) with a `now` date that falls inside the fixture's timeline. Only add an entry for the composite/top-level fixture, not for every included child.
-3. Document what the fixture validates in the table above.
+2. Append an entry to `TESTS` in [`scripts/lib/render-manifest.mjs`](../scripts/lib/render-manifest.mjs) with a `now` date that falls inside the fixture's timeline. Only add an entry for the composite/top-level fixture, not for every included child.
+3. Document what the fixture validates in the table above, and in a leading `//` comment block in the fixture itself (the review gallery shows that comment as the fixture's description).
 4. Run `pnpm render` and inspect `tests/<slug>.svg`.
 
 Behaviors worth covering as the harness grows: dense-anchor collision stacking, parallel + group brackets, footnote panel placement, cross-lane dependency arrows, dark-theme palette spot check, and items with overlong owner / footnote glyphs.
