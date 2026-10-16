@@ -311,7 +311,7 @@ export interface ItemMeasure {
     /** The snapped start the bar is measured at (`ctx.scale.startX`). */
     startX: number;
     durationDays: number;
-    /** Logical width, `MIN_ITEM_WIDTH` clamp included. */
+    /** Logical width: the item's span in time. */
     naturalWidth: number;
     visualWidth: number;
     /** Resolved style with the status tint applied (a copy, never the shared object). */

@@ -228,6 +228,7 @@ swimlane platform
 - **Implicit join on dedent** — when the parallel block ends, the next sibling (`integration`) waits for all parallel children to complete.
 - Parallel with no subsequent sibling: parallel tracks float to completion independently.
 - Parallel follows the universal `[id] ["title"]` pattern (both optional).
+- **Drawing** — a parallel is drawn like a group (below), above and around its tracks, which stack top to bottom in its body; its header bracket is `dashed` by default. See `specs/rendering.md` "Parallel and Group Rendering".
 
 #### `group` — sequential item bundle
 
@@ -241,7 +242,7 @@ swimlane platform
   item deploy "Deploy" size:s
 ```
 
-- Items inside a group execute sequentially (same as swimlane behavior). The renderer uses the same row-pack engine swimlanes use, so an item whose desired start collides with a sibling's logical right edge, an upstream caption's spill reservation, or a slack-arrow corridor bumps to a new inner row inside the group's content area. The group's body grows vertically to encompass every populated row.
+- Items inside a group execute sequentially (same as swimlane behavior). The renderer uses the same row-pack engine swimlanes use, so an item whose desired start collides with a sibling's logical right edge, an upstream caption's spill reservation, or a slack-arrow corridor bumps to a new inner row inside the group's content area, never above the previous child. The group's body grows vertically to encompass every populated row.
 - Inside a swimlane (outside a parallel block), the group is sequential with respect to its siblings — `deploy` starts after `api-docs` finishes.
 - **Drawing** — a group is drawn above and around its items, never beside them: a header (its title over a bracket spanning exactly its dates) over a body shaded with its `bg`, padded above and below. `style:` changes only the colours; `bracket:` styles the header bracket (`solid` by default, `none` hides it). See `specs/rendering.md` "Parallel and Group Rendering". **Exception:** in a roadmap with waves, a group with no title (an id alone is not one), no `style:`, and no `labels:` that carries `wave:` draws nothing at all; it only assigns membership (see "Wave Declaration").
 
@@ -798,7 +799,7 @@ The optional `config` section marker must appear before `roadmap`. Config keywor
 
 **Scale** — column width and axis labels are configured in two places:
 
-1. The `roadmap` declaration sets the column width with `scale:<duration>` (e.g. `scale:2w`, `scale:1q`). This is a raw duration literal; it defaults to `1w` when omitted. Items with durations finer than `scale:` remain valid — the renderer may place them as labelled annotations alongside the main timeline row rather than as full columns (see `rendering.md`).
+1. The `roadmap` declaration sets the column width with `scale:<duration>` (e.g. `scale:2w`, `scale:1q`). This is a raw duration literal; it defaults to `1w` when omitted. Items with durations finer than `scale:` remain valid and draw at their true width inside the column, down to a 1 px floor (see `rendering.md` "Item Bars").
 2. Axis display settings live in an optional `scale` config block. Every property is optional; anything unspecified is chosen by the renderer.
 
 ```nowline
