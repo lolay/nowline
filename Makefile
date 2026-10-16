@@ -26,6 +26,7 @@ SHELL := bash
 .DEFAULT_GOAL := help
 
 .PHONY: help init build build-fast test lint format typecheck ci ci-platform pre-commit doctor clean \
+        gallery gallery-collect gallery-serve gallery-e2e \
         lint-workflows lint-man bundle-size gh-runs-list gh-runs-watch gh-runs-status \
         determinism determinism-browser determinism-update mcp-app-e2e mcp-inspector-smoke mcp-claude-e2e \
         compile smoke deb pack vsix pack-mcpb bump snapshot-version release-changelog \
@@ -40,6 +41,17 @@ SHELL := bash
 VSIX ?= packages/vscode-extension/dist/nowline-vscode.vsix
 FIREBASE_PROJECT_PATH ?= packages/embed/firebase/dev
 NPM_DIST_TAG ?= latest
+
+# Local review gallery (make gallery). GALLERY_DIR holds the raw build history
+# (data/), the latest collected build (raw/) and the generated site (site/).
+GALLERY_DIR ?= .gallery
+GALLERY_KEEP ?= 100
+GALLERY_KEEP_PR ?= 10
+GALLERY_PORT ?= 8080
+
+# The review gallery's scripts are plain Node, outside the pnpm workspace,
+# so their node:test specs run beside the Vitest suites.
+SCRIPT_TESTS := node --test "scripts/gallery/test/*.test.mjs"
 
 # $(call confirm,VAR,what-this-touches)
 #
@@ -85,8 +97,9 @@ format: ## Auto-fix formatting, lint, and import order (biome check --write)
 typecheck: ## Type-check packages that opt in (needs a prior build: resolves sibling dist/ types)
 	pnpm typecheck
 
-test: build ## Run every package's Vitest suite (build first: CLI integration tests spawn dist/)
+test: build ## Run every package's Vitest suite and the script tests (build first: CLI integration tests spawn dist/)
 	pnpm -r test
+	$(SCRIPT_TESTS)
 
 # Prerequisite order matters (make runs them left to right). `typecheck` must
 # follow `build`: packages like @nowline/browser resolve sibling @nowline/*
@@ -107,6 +120,17 @@ pre-commit: ci ## Run the local gate before committing or pushing (alias of ci)
 # `test`, whose `build` prerequisite would re-run the full build + render.
 ci-platform: build-fast ## Slim CI gate for the OS/Node cells: build-fast + Vitest (no lint, typecheck, or render)
 	pnpm -r test
+	$(SCRIPT_TESTS)
+
+gallery: build ## Add this tree's renders to the local review gallery (.gallery/site): compare each example and test against its baseline build
+	@$(MAKE) --no-print-directory gallery-collect
+	node scripts/gallery/publish.mjs --trusted-local --data $(GALLERY_DIR)/data --raw $(GALLERY_DIR)/raw --site $(GALLERY_DIR)/site --keep $(GALLERY_KEEP) --keep-pr $(GALLERY_KEEP_PR)
+
+gallery-collect: ## Snapshot the already-rendered examples and tests into .gallery/raw (no build first; reads GALLERY_* PR facts in CI)
+	node scripts/gallery/collect.mjs $(GALLERY_DIR)/raw
+
+gallery-serve: ## Serve the local review gallery over http on every interface (phone/iPad on the same network)
+	node scripts/gallery/serve.mjs $(GALLERY_DIR)/site $(GALLERY_PORT)
 
 doctor: ## Check required tools for this repo (read-only). MODE=default|release STRICT=1
 	@command -v triage >/dev/null 2>&1 || { printf 'triage not found - install: brew install lolay/tap/triage\n' >&2; exit 1; }
@@ -163,6 +187,10 @@ mcp-app-e2e: ## MCP Apps preview leg: render the widget in a Claude-like sandbox
 	pnpm --filter @nowline/mcp build
 	pnpm --filter @nowline/integration-tests exec playwright install chromium
 	pnpm --filter @nowline/integration-tests exec vitest run --config vitest.mcp-app.config.ts
+
+gallery-e2e: ## Review gallery browser leg: drive gallery.js over a fixture site (needs a browser, or NOWLINE_E2E_CHROMIUM; not in `make ci`)
+	if [ -z "$$NOWLINE_E2E_CHROMIUM" ]; then pnpm --filter @nowline/integration-tests exec playwright install chromium; fi
+	pnpm --filter @nowline/integration-tests exec vitest run --config vitest.review-gallery.config.ts
 
 mcp-inspector-smoke: ## MCP Inspector CLI smoke: cross-process stdio tools/list + validate + render (not in `make ci`)
 	pnpm --filter @nowline/mcp build
