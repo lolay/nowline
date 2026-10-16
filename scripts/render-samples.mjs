@@ -16,70 +16,13 @@ import { existsSync } from 'node:fs';
 import { dirname, relative, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { assertDistFresh } from './lib/check-dist-fresh.mjs';
+import { EXAMPLES } from './lib/render-manifest.mjs';
 
 const here = dirname(fileURLToPath(import.meta.url));
 const repoRoot = resolve(here, '..');
 const cliPath = resolve(repoRoot, 'packages/cli/dist/index.js');
 
-// One entry per render. `now` seeds the now-line so the output matches the
-// vertical line position in the corresponding `specs/samples/<slug>.svg`
-// (where one exists). All examples share `start: 2026-01-05` (Monday, week
-// 2) and `now: 2026-02-09` (Monday, ~5 weeks in) so the now-line lands at
-// the same column across every diagram and `status:done` / `in-progress` /
-// `at-risk` items are visibly distinguishable.
-const NOW = '2026-02-09';
-const MANIFEST = [
-    { slug: 'minimal', source: 'examples/minimal.nowline', theme: 'light', now: NOW },
-    { slug: 'platform-2026', source: 'examples/platform-2026.nowline', theme: 'light', now: NOW },
-    {
-        slug: 'platform-2026-dark',
-        source: 'examples/platform-2026.nowline',
-        theme: 'dark',
-        now: NOW,
-    },
-    {
-        slug: 'platform-2026-grayscale',
-        source: 'examples/platform-2026.nowline',
-        theme: 'grayscale',
-        now: NOW,
-    },
-    { slug: 'dependencies', source: 'examples/dependencies.nowline', theme: 'light', now: NOW },
-    {
-        slug: 'isolate-include',
-        source: 'examples/isolate-include.nowline',
-        theme: 'light',
-        now: NOW,
-    },
-    { slug: 'long', source: 'examples/long.nowline', theme: 'light', now: NOW },
-    { slug: 'nested', source: 'examples/nested.nowline', theme: 'light', now: NOW },
-    { slug: 'partner', source: 'examples/partner.nowline', theme: 'light', now: NOW },
-    { slug: 'product', source: 'examples/product.nowline', theme: 'light', now: NOW },
-    { slug: 'teams', source: 'examples/teams.nowline', theme: 'light', now: NOW },
-    { slug: 'capacity', source: 'examples/capacity.nowline', theme: 'light', now: NOW },
-    { slug: 'sizing', source: 'examples/sizing.nowline', theme: 'light', now: NOW },
-    {
-        slug: 'inline-date-pins',
-        source: 'examples/inline-date-pins.nowline',
-        theme: 'light',
-        now: NOW,
-    },
-    { slug: 'showcase', source: 'examples/showcase.nowline', theme: 'light', now: NOW },
-    { slug: 'waves', source: 'examples/waves.nowline', theme: 'light', now: NOW },
-    { slug: 'waves-dark', source: 'examples/waves.nowline', theme: 'dark', now: NOW },
-    {
-        slug: 'waves-grayscale',
-        source: 'examples/waves.nowline',
-        theme: 'grayscale',
-        now: NOW,
-    },
-    { slug: 'waves-program', source: 'examples/waves-program.nowline', theme: 'light', now: NOW },
-    {
-        slug: 'working-calendar',
-        source: 'examples/working-calendar.nowline',
-        theme: 'light',
-        now: NOW,
-    },
-];
+const MANIFEST = EXAMPLES;
 
 function run(cmd, args, opts = {}) {
     return new Promise((resolveRun, rejectRun) => {

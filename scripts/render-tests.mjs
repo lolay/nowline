@@ -15,65 +15,13 @@ import { existsSync } from 'node:fs';
 import { dirname, relative, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { assertDistFresh } from './lib/check-dist-fresh.mjs';
+import { TESTS } from './lib/render-manifest.mjs';
 
 const here = dirname(fileURLToPath(import.meta.url));
 const repoRoot = resolve(here, '..');
 const cliPath = resolve(repoRoot, 'packages/cli/dist/index.js');
 
-// `now` is pinned per-fixture so the now-line lands at a stable, useful spot
-// regardless of when the script runs. All starter fixtures share the same
-// canonical window as the demos in `scripts/render-samples.mjs`
-// (`start: 2026-01-05`, `now: 2026-02-09`) so a side-by-side compare lines
-// up date columns across the harness and the demos.
-//
-// `defaults-no-start-no-now` is the deliberate exception: it omits both
-// `start:` (in the source) and `now` (here) so the rendered output exercises
-// the layout's "no start \u2192 today" + renderer's "no --now \u2192 today"
-// defaults. Its rendered SVG drifts every day, so it's intentionally NOT a
-// snapshot fixture.
-const NOW = '2026-02-09';
-const MANIFEST = [
-    { slug: 'large-roadmap-title', theme: 'light', now: NOW },
-    { slug: 'large-swimlane-title', theme: 'light', now: NOW },
-    { slug: 'text-fits-inside-bars', theme: 'light', now: NOW },
-    { slug: 'text-spills-right', theme: 'light', now: NOW },
-    // Its roadmap starts 2026-04-06, so `now` is pinned inside that window
-    // (the shared NOW would sit before the timeline and hide the now-line).
-    { slug: 'text-wraps-inside-bars', theme: 'light', now: '2026-05-11' },
-    // Same window as text-wraps-inside-bars (starts 2026-04-06).
-    { slug: 'title-line-breaks', theme: 'light', now: '2026-05-11' },
-    { slug: 'item-bumps-up', theme: 'light', now: NOW },
-    { slug: 'isolate-include-multi', theme: 'light', now: NOW },
-    { slug: 'defaults-no-start-no-now', theme: 'light' },
-    { slug: 'capacity-items', theme: 'light', now: NOW },
-    { slug: 'capacity-lanes', theme: 'light', now: NOW },
-    { slug: 'size-and-capacity', theme: 'light', now: NOW },
-    { slug: 'utilization-states', theme: 'light', now: NOW },
-    { slug: 'nested-both-headers', theme: 'light', now: NOW },
-    { slug: 'header-height-xl', theme: 'light', now: NOW },
-    { slug: 'header-height-none', theme: 'light', now: NOW },
-    { slug: 'inline-date-corners', theme: 'light', now: NOW },
-    { slug: 'late-row-shifts', theme: 'light', now: NOW },
-    { slug: 'waves-empty', theme: 'light', now: NOW },
-    { slug: 'waves-parallel-group', theme: 'light', now: NOW },
-    { slug: 'waves-gap-deadline', theme: 'light', now: NOW },
-    { slug: 'waves-isolate', theme: 'light', now: NOW },
-    { slug: 'waves-coarse', theme: 'light', now: NOW },
-    // Its roadmap starts 2026-01-05 and runs to Feb 2, so `now` is pinned inside
-    // that window (the shared NOW would sit after it and hide the now-line).
-    { slug: 'weekends-show', theme: 'light', now: '2026-01-14' },
-    // Both start 2026-11-23, so `now` is pinned inside the window (m2p phase 5b).
-    { slug: 'non-working-hide', theme: 'light', now: '2026-11-25' },
-    { slug: 'non-working-show', theme: 'light', now: '2026-11-25' },
-    // Starts 2026-11-30, so `now` is pinned inside the window.
-    { slug: 'working-exceptions', theme: 'light', now: '2026-12-02' },
-    // Starts 2026-01-05 and runs one week, so `now` is pinned inside it.
-    { slug: 'marker-left-overflow', theme: 'light', now: '2026-01-07' },
-    // Starts 2026-06-01; `now` sits inside the Summer Fridays run.
-    { slug: 'non-working-recurrence', theme: 'light', now: '2026-07-15' },
-    { slug: 'logo-beside', theme: 'light', now: NOW },
-    { slug: 'logo-above-xl', theme: 'light', now: NOW },
-];
+const MANIFEST = TESTS;
 
 function run(cmd, args, opts = {}) {
     return new Promise((resolveRun, rejectRun) => {
