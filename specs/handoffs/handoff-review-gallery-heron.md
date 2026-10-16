@@ -6,7 +6,8 @@
 - **Done before this run:** m1, the local review gallery, in `8e0a60a` and `ac13df1` (pre-orchestration, reviewed by hand: `make pre-commit` and `make pack-mcpb` green, Playwright screenshots at four viewports).
 - **Waves:** 1 `[exec]` m2 s1-s3 (source in the render block, persistent view settings, browser e2e); 2 `[deep]` m3 s1 (lines, baselines, retention); 3 `[exec]` m3 s2-s3 (PR pages, PR e2e). m4-m6 (publish workflow, docs, DNS handoff) are a later run.
 - **Spend:** ~$18.44 logged against ~$11 expected; almost all of it is the session before kickoff (m1 build and planning), logged as one combined orchestrator-kickoff line. Guard max(3x, $50) = $50; projected before wave 1 ~$19.8.
-- **Next unit:** wave 1 `[exec]` nowline m2 s1-s3 (first unit, one group: no canary).
+- **Done this run:** wave 1 `[exec]` m2 s1-s3 in `b72b6de`, `2581435`, `0c1a82b` (`make pre-commit` green per step; `make gallery-e2e` 10/10; deliberate mode-carry break turned 3 tests red).
+- **Next unit:** wave 2 `[deep]` nowline m3 s1.
 - **Resume:** paste the plan's Kickoff prompt into a new session.
 - **Pending question:** none.
 
@@ -19,5 +20,11 @@
 
 - env: Node in this container is 22.22 while `.nvmrc` pins 26.2.0; `make doctor` passes and Node 22 is a supported CI cell.
 - env: Chromium is at `/opt/pw-browsers/chromium` (revision 1194, Playwright 1.56); the repo pins Playwright 1.63, so don't run `playwright install` here: launch with `executablePath` (`NOWLINE_E2E_CHROMIUM=/opt/pw-browsers/chromium`).
-- env: `make build` takes a few minutes; `make pre-commit` about 5-8 minutes. Wait on a long background command with `timeout 590 tail -f <log> | grep -m1 <marker>`, not `sleep`.
+- env: `make build` takes a few minutes; `make pre-commit` about 5-8 minutes cold, under a minute once `node_modules` and builds are warm. `make gallery-e2e` ~12s with the preinstalled Chromium. Wait on a long background command with `timeout 590 tail -f <log> | grep -m1 <marker>`, not `sleep`.
 - env: `scripts/gallery/assets/gallery.js` is linted by Biome with `nursery/noFloatingPromises` as an error: prefix fire-and-forget promises with `void`.
+- env: Biome format drift in `scripts/gallery` and `packages/integration-tests` fails the gate; run `node_modules/.bin/biome format --write <paths>` first. The 9 warnings in `packages/cli`, `export-mermaid`, `mcp` are pre-existing and don't fail.
+- env: Playwright for ad-hoc scripts: `packages/integration-tests/node_modules/playwright/index.mjs`.
+
+## Deviations
+
+- m2.s1: *Collapse all* on the digest hides sources via `body.collapsed` CSS instead of writing the Source preference, so it doesn't clobber the viewer's global choice.

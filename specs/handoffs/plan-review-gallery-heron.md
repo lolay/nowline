@@ -3,7 +3,7 @@
 ```text
 --- KICKOFF: begin orchestration at [deep] ---
 
-  Status: 0/3 groups done | last review: — | current: nowline m2 s1-s3 [exec] | over expected: ~$18 of ~$11 (session before kickoff: m1 build and planning) | updated 2026-10-16
+  Status: 1/3 groups done | last review: wave 1 (pending) | current: nowline m3 s1 [deep] | over expected: ~$20 of ~$11 (session before kickoff: m1 build and planning) | updated 2026-10-16
 
   mode: unattended | proposed unattended (harness=claude-code runner=cloud; cloud runner, branch assigned by the harness) | guard 3x min $50 | fixups 2 | confirmed 2026-10-16 session 4adab00a-71c4-5a6e-9eb4-2d2721d1a6e6: Unattended (Recommended)
 
@@ -146,7 +146,7 @@ Common to every step in m2 and m3:
 
 --- WAVE 1 [exec] ---
 
-#### s1 - [exec] Show the source inside the render block
+#### s1 - [exec] [done b72b6de] Show the source inside the render block
 
 Show the `.nowline` source within each compare block, collapsible, instead of the separate Source section at the bottom of entry pages.
 
@@ -170,7 +170,7 @@ Acceptance:
 - `scripts/gallery/test/publish.test.mjs`: entry-page assertions updated to the new markup (the `swimlane s "S2"` line appears as an added row in the right-hand column, the old bottom panel is gone), and a changes-digest card contains a `.source-row`.
 - No page has horizontal page scroll at 390x844 with the source open (long lines scroll inside their column).
 
-#### s2 - [exec] Carry view settings across pages
+#### s2 - [exec] [done 2581435] Carry view settings across pages
 
 Today *layout* and *size* persist across pages but the compare *mode* resets to side by side on every page. Make every view setting one global preference that carries from item to item, build to build, and onto the changes digest and range compare: mode (side / blink / slider / diff), layout (auto / stack / side), size (fit / actual), Source open or closed, and Changed only.
 
@@ -186,7 +186,7 @@ Implementation: in `scripts/gallery/assets/gallery.js`, one `prefs` object read 
 
 Acceptance: covered by s3's e2e assertions; s2 must leave `make pre-commit` green.
 
-#### s3 - [exec] Browser e2e for the gallery
+#### s3 - [exec] [done 0c1a82b] Browser e2e for the gallery
 
 Add an automated browser test of `gallery.js`, following the repo's existing browser legs (`make mcp-app-e2e`, `packages/integration-tests/vitest.mcp-app.config.ts`, `packages/integration-tests/test/mcp-app-preview.e2e.test.ts`).
 
@@ -294,3 +294,5 @@ Once the PR is up, queue a suggested-task card for `lolay/nowline-infra`: a `CNA
 
 tokens Explore-map-render-pipeline plan-review-gallery-heron (claude-opus-5-5): input ~16 / cache read ~360k / cache write ~63k / output ~8k | ~$0.55 API-equiv (output est.) session 4adab00a-71c4-5a6e-9eb4-2d2721d1a6e6
 tokens orchestrator-kickoff plan-review-gallery-heron (claude-opus-5-5): input ~270 / cache read ~36M / cache write ~920k 1h / output ~170k | ~$17.89 API-equiv (combined: m1 pre-run, orchestrator-kickoff)
+tokens wave-1 nowline-m2-s1-s3 (claude-sonnet-5-5): input ~76 / cache read ~4.4M / cache write ~160k / output ~1.4k | ~$1.30 API-equiv
+tokens orchestrator-wave-1 plan-review-gallery-heron (claude-opus-5-5): input ~18 / cache read ~710k / cache write ~50k 1h / output ~4.7k | ~$0.64 API-equiv
