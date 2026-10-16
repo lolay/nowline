@@ -136,14 +136,29 @@ export interface IsolatedRegion {
     content: ResolvedContent;
 }
 
+/** A 0-based, end-exclusive source range, the shape of an LSP `Range`. */
+export interface ResolveRange {
+    start: { line: number; character: number };
+    end: { line: number; character: number };
+}
+
 export interface ResolveDiagnostic {
     severity: 'error' | 'warning';
     /** en-US text; `localizeResolveDiagnostic` renders a coded one in another locale. */
     message: string;
     /** Absolute path of the file the diagnostic points into. */
     sourcePath: string;
-    /** 0-based line in `sourcePath`. */
+    /** 0-based line in `sourcePath`; `range.start.line` when `range` is set. */
     line?: number;
+    /**
+     * 0-based range in `sourcePath` of the node the diagnostic is about,
+     * narrowed to the property where the validator narrows its copy, so a
+     * consumer can point at the same column and span. Set on the routed
+     * diagnostics (see `isRoutedResolveDiagnostic`) whose node has a CST
+     * node; consumers fall back to the whole of `line` without it. An
+     * included file's syntax error has none: consumers adapt its `syntax`.
+     */
+    range?: ResolveRange;
     /**
      * Stable code of a coded diagnostic (the wave rules, specs/waves.md
      * §7.4, and an included file's unresolved reference, NL.E0302). Absent

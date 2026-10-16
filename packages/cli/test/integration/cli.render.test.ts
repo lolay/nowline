@@ -614,7 +614,7 @@ describeBuilt('render: include diagnostics', () => {
                 declared: ['w1', 'w2'],
             });
             expect(r.stderr).toContain(
-                `${path.join('teams', 'child.nowline')}:5:3 error: ${message}`,
+                `${path.join('teams', 'child.nowline')}:5:22 error: ${message}`,
             );
         });
     });
@@ -634,7 +634,7 @@ describeBuilt('render: include diagnostics', () => {
             });
             expect(r.exitCode).toBe(1);
             expect(r.stderr).toContain(
-                'child.nowline:2:1 error: "wave" cannot be set on "default item".',
+                'child.nowline:2:14 error: "wave" cannot be set on "default item".',
             );
         });
     });
@@ -922,8 +922,9 @@ describeBuilt('render: include diagnostics', () => {
 });
 
 // References never cross a file boundary (specs/dsl.md, Reference rule 1): an
-// included file's unresolved `after:` is NL.E0302 at the child path and line,
-// exit 1, under merge and isolate. roadmap:ignore drops the child's content.
+// included file's unresolved `after:` is NL.E0302 at the child path and at the
+// property the validator points at, exit 1, under merge and isolate.
+// roadmap:ignore drops the child's content.
 describeBuilt('render: unresolved references in an included file', () => {
     const NO_LOCALE_ENV = { LC_ALL: '', LC_MESSAGES: '', LANG: '' };
     const host = (mode: string) =>
@@ -953,12 +954,12 @@ describeBuilt('render: unresolved references in an included file', () => {
     ].join('\n');
     const message = tr('en-US', 'NL.E0302', { key: 'after', value: 'launch' });
 
-    async function run(mode: string, extra: string[] = []) {
+    async function run(mode: string, extra: string[] = [], input = 'host.nowline') {
         let result: Awaited<ReturnType<typeof runCliBuilt>> | undefined;
         await withTempDir(async (dir) => {
             await fs.writeFile(path.join(dir, 'host.nowline'), host(mode));
             await fs.writeFile(path.join(dir, 'child.nowline'), child);
-            result = await runCliBuilt(['host.nowline', '-n', ...extra], {
+            result = await runCliBuilt([input, '-n', ...extra], {
                 cwd: dir,
                 env: NO_LOCALE_ENV,
             });
@@ -970,9 +971,27 @@ describeBuilt('render: unresolved references in an included file', () => {
         it(`roadmap:${mode} fails with NL.E0302 in the child (exit 1)`, async () => {
             const r = await run(mode);
             expect(r.exitCode).toBe(1);
-            expect(r.stderr).toContain(`child.nowline:8:3 error: ${message}`);
+            expect(r.stderr).toContain(`child.nowline:8:41 error: ${message}`);
         });
     }
+
+    it('points at the same column and span as validating the child itself', async () => {
+        const json = ['--diagnostic-format', 'json'];
+        const routed = JSON.parse((await run('merge', json)).stderr).diagnostics;
+        const validated = JSON.parse(
+            (await run('merge', json, 'child.nowline')).stderr,
+        ).diagnostics;
+        expect(routed).toEqual(validated);
+        // The span covers `after:launch`, not the whole item line.
+        expect(routed[0].span).toEqual({
+            start: { line: 8, column: 41 },
+            end: { line: 8, column: 41 + 'after:launch'.length },
+        });
+        // The text frame underlines the same characters.
+        const text = await run('merge');
+        const frame = (await run('merge', [], 'child.nowline')).stderr;
+        expect(text.stderr).toBe(frame);
+    });
 
     it('--diagnostic-format json carries the code and the child file', async () => {
         const r = await run('merge', ['--diagnostic-format', 'json']);

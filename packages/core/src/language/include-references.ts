@@ -7,12 +7,12 @@
 
 import { tr } from '../i18n/index.js';
 import type { ResolveDiagnostic } from './include-resolver.js';
-import { hasParseErrors, type WaveIncludeEdge } from './include-waves.js';
+import { hasParseErrors, nodeLocation, type WaveIncludeEdge } from './include-waves.js';
 import { unresolvedReferences } from './references.js';
 
 /**
  * NL.E0302 for every file reachable from the root through `merge` and
- * `isolate` edges, each file once, at the reference's line in that file.
+ * `isolate` edges, each file once, at the reference's property in that file.
  * A `roadmap:ignore` child's content is dropped, so it is not checked
  * (unless another edge reaches it). A child that failed to parse is skipped:
  * a partial AST would report references to ids the parser lost.
@@ -29,13 +29,13 @@ export function checkIncludedReferences(
             seen.add(edge.childAbs);
             if (!hasParseErrors(edge.childFile)) {
                 for (const { prop, key, value } of unresolvedReferences(edge.childFile)) {
-                    const line = prop.$cstNode?.range.start.line;
                     const args: [{ key: string; value: string }] = [{ key, value }];
                     out.push({
                         severity: 'error',
                         message: tr('en-US', 'NL.E0302', ...args),
                         sourcePath: edge.childAbs,
-                        ...(line === undefined ? {} : { line }),
+                        // The validator reports NL.E0302 on the whole property.
+                        ...nodeLocation(prop),
                         code: 'NL.E0302',
                         args,
                     });

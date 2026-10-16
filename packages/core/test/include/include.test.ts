@@ -1333,6 +1333,8 @@ swimlane platform "Backlog"
                         '"wave" cannot be set on "default item". Identity-defining, sizing, sequencing, reference, and prose properties must be explicit on each entity.',
                     sourcePath: abs('c.nowline'),
                     line: 1,
+                    // `wave:w1` on the `default item` line, where the validator points.
+                    range: { start: { line: 1, character: 13 }, end: { line: 1, character: 20 } },
                     rule: 'wave',
                 },
             ]);

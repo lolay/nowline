@@ -512,6 +512,7 @@ describe('@nowline/mcp — wave-rule include diagnostics', () => {
         expect(structured.diagnostics.map(brief)).toEqual([
             ['lexing-error', 'error', path.join(tmpDir, 'waves', 'broken-child.nowline'), 4],
         ]);
+        expect((structured.diagnostics[0] as Diag & { column: number }).column).toBe(10);
     });
 
     it('validate leaves an uncoded include error out, as before', async () => {
