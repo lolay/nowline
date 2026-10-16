@@ -419,7 +419,7 @@ end(x) ≤ E_k ≤ S_{k+1} ≤ E_{k+1} ≤ … ≤ S_j ≤ start(y)
 | `after:` / `before:` a floating milestone | Ignored by layout, as today: floating milestones are placed after every lane. In a roadmap with waves this draws NL.W1101. Prefer `after:<wave>`. |
 | `after:<wave>` | `start ≥ E_k`. Use it for background work and milestones. On a member of a later wave it is redundant. On an entity whose wave is k or earlier it is NL.E1103 (Examples 8 and 14). |
 | `before:` an item, an anchor or a date | Soft; it never moves the start. A miss caused by the barrier shows the existing red overflow plus NL.I1003 (Example 10). A miss the structure guarantees also gets NL.W1100 (Example 14). |
-| Floating milestone `after:<wave>` | When a wave reference is the binding term, the diamond sits **on** the boundary at `E_k`, not 6 px left of it as for an item predecessor. Wave references draw no slack arrows (Example 8). |
+| Floating milestone `after:<wave>` | When a wave reference is the binding term, the diamond sits **on** the boundary at `E_k`, as it sits on an item predecessor's duration end. Wave references draw no slack arrows (Example 8). |
 | Dated milestone `after:<wave>` | Pinned to its date. If the wave ends after that date, the existing overrun treatment (a red cut line) applies, plus the info NL.I1007. This is the wave-deadline idiom (Example 11). |
 | Anchors | They are dates. They can floor a wave through its `after:`, and they are never members. |
 | Roadmap `start:` | It is the origin, so `S_1 ≥ 0`. An inline date on a wave requires `start:` (NL.E0412) and must be on or after it (NL.E0413). |
@@ -1533,12 +1533,12 @@ milestone ga "GA" after:[beta, launch-event]
 | press-kit | background | W3–W5 | after:alpha = E_alpha W3 (lane W2) |
 | launch-event | background | W5–W6 | after:beta = E_beta W5 |
 | alpha-done | — | W3, on the boundary | end of alpha |
-| ga | — | 6 px left of W6 | launch-event (beta ends W5) |
+| ga | — | W6 | launch-event (beta ends W5) |
 
 Waves: alpha [W0, W3], beta [W3, W5]. The canvas runs to W6.
 
 - **`alpha-done`** is bound by a wave reference, so its diamond sits exactly on the W3 boundary. It draws no cut line of its own; the boundary line carries the vertical (§9.2).
-- **`ga`** is bound by `launch-event`, so it sits at that item's visual right edge and keeps its cut line.
+- **`ga`** is bound by `launch-event`, so it sits at that item's duration end, W6. W6 is no wave boundary, so it keeps its cut line.
 - **`press-kit` and `launch-event`** are background work that starts exactly at the boundaries it waits for. They are hatched, but neither crosses a boundary line, so neither gets a crossing mark.
 - **Invalid variant.** `press-kit wave:alpha after:alpha` would be NL.E1103 (`after-wave`).
 

@@ -1,0 +1,7 @@
+```release-note:fixed
+A milestone with `after:` and no `date:` now sits on its latest predecessor's end date, the same day the xlsx, msproj and mermaid exports give it. It used to sit on the predecessor bar's painted right edge, which is up to a day early for a normal bar and late for a bar drawn at its minimum width. The slack arrows still start at the painted bar edge. A milestone on the chart's last day can now add one axis column for its diamond, as a dated milestone on that day already did.
+```
+
+```release-note:fixed
+A dated milestone is overrun, and an item misses its `before:` cap, only when the predecessor's or the item's duration runs past the date. A short bar drawn wider than its duration, at the minimum bar width, no longer turns the milestone red or paints a red overflow tail.
+```

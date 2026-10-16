@@ -40,7 +40,7 @@
             ]
         },
         "extendTimeline": {
-            "count": 28,
+            "count": 30,
             "samples": [
                 "examples/capacity.nowline",
                 "examples/dependencies.nowline",
@@ -62,9 +62,11 @@
                 "tests/header-height-xl.nowline",
                 "tests/isolate-include-multi.nowline",
                 "tests/item-bumps-up.nowline",
+                "tests/late-row-shifts.nowline",
                 "tests/nested-both-headers.nowline",
                 "tests/non-working-hide.nowline",
                 "tests/partner-multi.nowline",
+                "tests/text-wraps-inside-bars.nowline",
                 "tests/waves-gap-deadline.nowline",
                 "tests/waves-isolate-team.nowline",
                 "tests/waves-isolate.nowline",
@@ -77,7 +79,7 @@
             "samples": ["tests/marker-left-overflow.nowline"]
         },
         "fitWidths": {
-            "count": 33,
+            "count": 35,
             "samples": [
                 "examples/capacity.nowline",
                 "examples/dependencies.nowline",
@@ -102,11 +104,13 @@
                 "tests/item-bumps-up.nowline",
                 "tests/large-roadmap-title.nowline",
                 "tests/large-swimlane-title.nowline",
+                "tests/late-row-shifts.nowline",
                 "tests/marker-left-overflow.nowline",
                 "tests/nested-both-headers.nowline",
                 "tests/non-working-hide.nowline",
                 "tests/partner-multi.nowline",
                 "tests/text-spills-right.nowline",
+                "tests/text-wraps-inside-bars.nowline",
                 "tests/waves-gap-deadline.nowline",
                 "tests/waves-isolate-team.nowline",
                 "tests/waves-isolate.nowline",
