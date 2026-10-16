@@ -117,7 +117,7 @@ export type MessageCode =
 
     // Layout warnings (NL.W1000–W1099)
     | 'NL.W1000' // now-line-outside-window
-    | 'NL.W1001' // wave-pin-moved
+    // NL.W1001 (wave-pin-moved) is retired with item pins; never reuse it.
     | 'NL.W1002' // wave-barrier-cap
 
     // Wave warnings (NL.W1100–W1199)
@@ -206,7 +206,6 @@ export const ALL_CODES: ReadonlyArray<MessageCode> = [
     'NL.E1105',
     'NL.E1106',
     'NL.W1000',
-    'NL.W1001',
     'NL.W1002',
     'NL.W1100',
     'NL.W1101',

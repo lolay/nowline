@@ -16,6 +16,24 @@ export function estimateTextWidth(text: string, fontSize: number): number {
 }
 
 /**
+ * `text` when it fits `maxWidth` (in px), else its longest prefix that fits
+ * with a trailing `…`, trailing whitespace dropped before the ellipsis. It
+ * always keeps the first character, so the result can overrun `maxWidth`
+ * when even one character and the ellipsis do not fit. Counts code points,
+ * so a surrogate pair is never split.
+ */
+export function ellipsizeToWidth(text: string, maxWidth: number, fontSize: number): string {
+    if (estimateTextWidth(text, fontSize) <= maxWidth) return text;
+    const chars = Array.from(text.trimStart());
+    for (let n = chars.length - 1; n >= 1; n--) {
+        const prefix = chars.slice(0, n).join('').trimEnd();
+        const candidate = `${prefix}…`;
+        if (estimateTextWidth(candidate, fontSize) <= maxWidth) return candidate;
+    }
+    return `${chars[0] ?? ''}…`;
+}
+
+/**
  * Word-wrap `text` so that no line is wider than `maxWidth` (in px).
  * Wrap points are whitespace only: a long single word is kept on its
  * own line even if it overflows `maxWidth` — we never split a word in

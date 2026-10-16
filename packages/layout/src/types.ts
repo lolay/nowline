@@ -380,7 +380,8 @@ export interface PositionedItem {
      *     blank entries. An explicit title never auto-wraps.
      *
      * Omitted for a one-line title, and for a break-free title that spilled
-     * to the right (always one line). Line `n` (0-based) sits at baseline
+     * to the right (always one line), unless the caption cap at the chart's
+     * end truncated it (`titleTruncated`). Line `n` (0-based) sits at baseline
      * `ITEM_CAPTION_TITLE_BASELINE_OFFSET_PX + n * ITEM_CAPTION_TITLE_LINE_HEIGHT_PX`
      * from the bar's top, and the meta line follows at
      * `itemCaptionMetaBaselineOffset(titleLines.length)`. A multi-line
@@ -388,6 +389,14 @@ export interface PositionedItem {
      * extra line.
      */
     titleLines?: string[];
+    /**
+     * True when a spilled caption that would run past the axis end was
+     * capped one column past it: `titleLines` carries the lines truncated
+     * with `…`, and the renderer gives the bar the full `title` as its
+     * `<title>` tooltip (specs/rendering.md § "Caption cap at the chart's
+     * end"). Omitted otherwise.
+     */
+    titleTruncated?: true;
     box: BoundingBox;
     status: StatusKind;
     progressFraction: number; // 0..1; 1 == fully filled
@@ -495,23 +504,13 @@ export interface PositionedItem {
      */
     waveTooltip?: string;
     /**
-     * Present when a wave floor moved the item's `date:` / `start:` pin
-     * (NL.W1001) and the floor is what the item now starts at: `wave` is
-     * the wave id, `key` / `pin` the pin as written, and `start` the wave's
-     * start `S_k` as a whole UTC day (YYYY-MM-DD), which is also the item's
-     * start. Omitted when something else (an `after:`) pushed the item past
-     * the floor.
+     * Present when the item's `after:DATE` pin falls on a non-working day
+     * and that pin set the start (NL.I1008, specs/working-calendar.md §6):
+     * `key` / `pin` are the pin as written, `start` the working day the
+     * item starts on (YYYY-MM-DD). Omitted when a later `after:` ref, the
+     * lane cursor or a wave floor set the start.
      */
-    wavePinOverride?: { wave: string; key: 'date' | 'start'; pin: string; start: string };
-    /**
-     * Present when the item's `date:`, `start:` or `after:DATE` pin falls on
-     * a non-working day and that pin set the start (NL.I1008,
-     * specs/working-calendar.md §6): `key` / `pin` are the pin as written,
-     * `start` the working day the item starts on (YYYY-MM-DD). Omitted when
-     * a later `after:` ref, the lane cursor or a wave floor set the start,
-     * and whenever `wavePinOverride` is set.
-     */
-    nonWorkingPin?: { key: 'date' | 'start' | 'after'; pin: string; start: string };
+    nonWorkingPin?: { key: 'after'; pin: string; start: string };
 }
 
 /**
@@ -805,6 +804,12 @@ export interface PositionedFootnoteArea {
 }
 
 export interface PositionedFootnoteEntry {
+    /**
+     * The title of the isolated region the footnote comes from; the
+     * renderer heads each region's run of entries with it. Omitted on the
+     * host's own footnotes.
+     */
+    region?: string;
     number: number;
     title: string;
     description?: string;
@@ -826,6 +831,18 @@ export interface PositionedIncludeRegion {
      * hides the global layers. Omitted when there are none.
      */
     waveCrossings?: PositionedWaveCrossing[];
+    /**
+     * The region's own anchors and milestones, in its own marker row
+     * under the label tab; their cut lines stop at its last lane. Omitted
+     * when it has none to draw.
+     */
+    anchors?: PositionedAnchor[];
+    milestones?: PositionedMilestone[];
+    /**
+     * The region's own dependency edges, routed among its lanes. Omitted
+     * when it has none.
+     */
+    edges?: PositionedDependencyEdge[];
 }
 
 /**

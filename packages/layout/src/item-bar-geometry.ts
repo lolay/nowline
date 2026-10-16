@@ -214,12 +214,14 @@ export function itemCaptionInsetX(
 export const ITEM_DECORATION_SPILL_GAP_PX = 4;
 
 /**
- * Minimum bar width (px) needed to host the status dot inside the
- * bar with its full inset. Below this, the dot would have to
- * extend past the bar's left edge, so the dot spills into the
- * caption column to the right of the bar instead.
+ * Minimum bar width (px) at which the status dot sits INSIDE the bar:
+ * the dot's centre is `ITEM_STATUS_DOT_INSET_RIGHT_PX` from the right
+ * edge, so a bar of twice that width has the same air on both sides
+ * of it (the centre sits mid-bar). A narrower bar would crowd the
+ * dot against its left edge, so the dot spills into the caption
+ * column to the right of the bar instead.
  */
-export const MIN_BAR_WIDTH_FOR_DOT_PX = ITEM_STATUS_DOT_INSET_RIGHT_PX + ITEM_STATUS_DOT_RADIUS_PX;
+export const MIN_BAR_WIDTH_FOR_DOT_PX = 2 * ITEM_STATUS_DOT_INSET_RIGHT_PX;
 
 /**
  * Minimum bar width (px) needed to host the link-icon tile AND the
@@ -243,6 +245,71 @@ export const MIN_BAR_WIDTH_FOR_LINK_AND_DOT_PX =
  * for one digit is 8px (font-size 10, bold).
  */
 export const MIN_BAR_WIDTH_FOR_FOOTNOTE_PX = ITEM_FOOTNOTE_INDICATOR_INSET_RIGHT_PX + 1;
+
+/** What sits in a bar's spill column, in reading order. */
+export interface SpillClusterInput {
+    /** The bar's visual right edge. */
+    barRightX: number;
+    /** The link icon spilled out of the bar. */
+    iconSpills: boolean;
+    /** The spilled caption's width (its widest title line or the meta line), or null when it stays in the bar. */
+    captionWidth: number | null;
+    /** Spilled footnote indicators; 0 when they stay in the bar. */
+    footnoteCount: number;
+    /** The status dot spilled out of the bar. */
+    dotSpills: boolean;
+}
+
+/** Where each part of a spill column sits; null for a part that is not in it. */
+export interface SpillCluster {
+    iconSpillX: number | null;
+    captionX: number | null;
+    footnoteSpillStartX: number | null;
+    dotSpillCx: number | null;
+    /** Right edge of the last part, or the column's start when it is empty. */
+    rightX: number;
+}
+
+/**
+ * Lay out a bar's spill column `[icon?] [caption?] [¹²?] [dot?]` from
+ * `ITEM_CAPTION_SPILL_GAP_PX` past the bar, one `ITEM_DECORATION_SPILL_GAP_PX`
+ * between the parts that are present and none after the last. The item
+ * measure reads it to cap a caption at the chart's end, and `sequenceItem`
+ * places the parts with it.
+ */
+export function layoutSpillCluster(input: SpillClusterInput): SpillCluster {
+    let cursor = input.barRightX + ITEM_CAPTION_SPILL_GAP_PX;
+    // A gap goes in only once something is already in the column, so the
+    // cluster leaves no dangling gap past its last part.
+    let needGap = false;
+    let iconSpillX: number | null = null;
+    if (input.iconSpills) {
+        iconSpillX = cursor;
+        cursor = iconSpillX + ITEM_LINK_ICON_TILE_SIZE_PX;
+        needGap = true;
+    }
+    let captionX: number | null = null;
+    if (input.captionWidth !== null) {
+        if (needGap) cursor += ITEM_DECORATION_SPILL_GAP_PX;
+        captionX = cursor;
+        cursor += input.captionWidth;
+        needGap = true;
+    }
+    let footnoteSpillStartX: number | null = null;
+    if (input.footnoteCount > 0) {
+        if (needGap) cursor += ITEM_DECORATION_SPILL_GAP_PX;
+        footnoteSpillStartX = cursor;
+        cursor += input.footnoteCount * ITEM_FOOTNOTE_INDICATOR_STEP_PX;
+        needGap = true;
+    }
+    let dotSpillCx: number | null = null;
+    if (input.dotSpills) {
+        if (needGap) cursor += ITEM_DECORATION_SPILL_GAP_PX;
+        dotSpillCx = cursor + ITEM_STATUS_DOT_RADIUS_PX;
+        cursor = dotSpillCx + ITEM_STATUS_DOT_RADIUS_PX;
+    }
+    return { iconSpillX, captionX, footnoteSpillStartX, dotSpillCx, rightX: cursor };
+}
 
 // ---- Inline-date glyph (after:DATE / before:DATE corner badge) ---
 //
@@ -392,7 +459,7 @@ export interface ItemTitleFirstLineReserveInputs {
  * right instead, where it can't touch the title):
  *
  *   - status dot: left edge at (right - 17); absent below
- *     `MIN_BAR_WIDTH_FOR_DOT_PX`. Dot only gives 21.
+ *     `MIN_BAR_WIDTH_FOR_DOT_PX` (24). Dot only gives 21.
  *   - footnote digits: leftmost digit's left edge at
  *     (right - 22 - (n-1) * 8 - width); absent when they spill
  *     (`MIN_BAR_WIDTH_FOR_FOOTNOTE_PX`).

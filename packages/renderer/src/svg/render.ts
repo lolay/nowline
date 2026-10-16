@@ -1062,8 +1062,13 @@ function renderItem(
     fonts: FontFamilies,
 ): string {
     const parts: string[] = [];
-    // Background work's hover tooltip (specs/waves.md §9.3).
-    if (i.waveTooltip !== undefined) parts.push(`<title>${escText(i.waveTooltip)}</title>`);
+    // The bar's hover tooltip: the full title when the caption cap at the
+    // chart's end truncated it (specs/rendering.md § "Caption cap at the
+    // chart's end"), then background work's line (specs/waves.md §9.3).
+    const tooltipLines: string[] = [];
+    if (i.titleTruncated) tooltipLines.push(i.title);
+    if (i.waveTooltip !== undefined) tooltipLines.push(i.waveTooltip);
+    if (tooltipLines.length > 0) parts.push(`<title>${escText(tooltipLines.join('\n'))}</title>`);
     const shadow = shadowFilterUrl(idPrefix, i.style.shadow);
     parts.push(
         rectFrame(i.box.x, i.box.y, i.box.width, i.box.height, i.style, {
@@ -2056,8 +2061,30 @@ function renderFootnotes(
     const firstEntryBaselineY = f.box.y + FOOTNOTE_HEADER_HEIGHT_PX + FOOTNOTE_PANEL_PADDING_PX;
     const numberX = f.box.x + FOOTNOTE_PANEL_PADDING_PX;
     const titleX = numberX + FOOTNOTE_PANEL_PADDING_PX;
-    f.entries.forEach((e, i) => {
-        const y = firstEntryBaselineY + i * FOOTNOTE_ROW_HEIGHT;
+    // An isolated region's footnotes follow the host's under a heading row
+    // with the region's title, so every heading takes a row of its own.
+    let row = 0;
+    let region: string | undefined;
+    for (const e of f.entries) {
+        if (e.region !== undefined && e.region !== region) {
+            region = e.region;
+            parts.push(
+                textTag(
+                    {
+                        x: num(numberX),
+                        y: num(firstEntryBaselineY + row * FOOTNOTE_ROW_HEIGHT),
+                        'font-family': fonts.sans,
+                        'font-size': 10,
+                        'font-weight': 700,
+                        fill: headerColor,
+                    },
+                    e.region,
+                ),
+            );
+            row += 1;
+        }
+        const y = firstEntryBaselineY + row * FOOTNOTE_ROW_HEIGHT;
+        row += 1;
         parts.push(
             textTag(
                 {
@@ -2098,7 +2125,7 @@ function renderFootnotes(
                 ),
             );
         }
-    });
+    }
     return tag('g', { 'data-layer': 'footnotes' }, parts.join(''));
 }
 
@@ -2244,6 +2271,26 @@ function renderIncludeRegion(
     const nested = r.nestedSwimlanes
         .map((s) => renderSwimlane(s, options, idPrefix, palette, fonts))
         .join('');
+    // The region's own dependency edges, in the host's order: under-bar
+    // edges beneath its bars, the rest over them.
+    const regionEdges = r.edges ?? [];
+    const edgesUnder = regionEdges
+        .filter((e) => e.kind === 'underBar')
+        .map((e) => renderEdge(e, idPrefix, palette))
+        .join('');
+    const edgesOver = regionEdges
+        .filter((e) => e.kind !== 'underBar')
+        .map((e) => renderEdge(e, idPrefix, palette))
+        .join('');
+    // The region's own anchors and milestones: cut lines over its lanes,
+    // then the diamonds and labels of its marker row, as on the host.
+    const anchors = r.anchors ?? [];
+    const milestones = r.milestones ?? [];
+    const markers =
+        anchors.map((a) => renderAnchorCutLine(a, palette)).join('') +
+        milestones.map((m) => renderMilestoneCutLine(m, idPrefix, palette)).join('') +
+        anchors.map((a) => renderAnchor(a, palette, fonts)).join('') +
+        milestones.map((m) => renderMilestone(m, palette, fonts)).join('');
 
     return tag(
         'g',
@@ -2251,8 +2298,11 @@ function renderIncludeRegion(
         region +
             bandsUnder +
             waveUnder +
+            edgesUnder +
             nested +
             waveOver +
+            edgesOver +
+            markers +
             tab +
             tabLabel +
             badge +

@@ -1,8 +1,9 @@
 // The engine divergence register (specs/scheduler-unification.md §4 m1.s1,
 // §6). Engine A (the pixel layout) and engine C (`scheduleRoadmap`) place
 // the same roadmap differently in a few catalogued ways (§1.2, divergences
-// (b) to (f); (a) was settled by F1), and `region-scope` marks a region whose
-// own anchors C resolves and A does not see (nested.nowline). This test lays
+// (b) to (f); (a) was settled by F1), and `region-scope` marks an isolated
+// region the engines scope differently (F5 settled the last: a region's own
+// anchors, which both engines now resolve inside it). This test lays
 // out every sample under `examples/` and `tests/`, converts A's logical span
 // of every named item and every wave back to working days, compares it with
 // C's, and checks the mismatches against `engine-divergences.json`. A

@@ -121,17 +121,18 @@ describe('ItemNode.measure on the sample corpus', () => {
 // and `sequenceItem` places the bar from the same measure. The corpus never
 // exercised a case where an old predictor and the placed bar disagreed, so
 // these fixtures pin the cases that used to need their own prediction code.
-// In each, `first` grows its bar and `second` collides with it (same start),
-// so the packer drops `second` one row pitch below.
+// In each, `first` grows its bar and `second` follows it into a spilled
+// caption or chip column (`first`'s own, or that of a one-day item between
+// them, `between`), so the packer drops `second` one row pitch below.
 describe('row pitch from the item measure', () => {
-    function roadmap(first: string, header = ''): string {
+    function roadmap(first: string, header = '', between = ''): string {
         return `nowline v1
 
 roadmap r "R" start:2026-04-06 scale:2w
 ${header}
 swimlane "Platform"
   item first ${first}
-  item second "Second" duration:2w date:2026-04-06
+${between}  item second "Second" duration:2w
 `;
     }
 
@@ -170,7 +171,13 @@ swimlane "Platform"
     }
 
     it('reserves the grown row of a wrapped title', async (): Promise<void> => {
-        const pair = await layoutPair(roadmap('"Technology Selection" duration:2w status:done'));
+        const pair = await layoutPair(
+            roadmap(
+                '"Technology Selection" duration:2w status:done',
+                '',
+                '  item spill "Spills past its one-day bar" duration:1d\n',
+            ),
+        );
         expect(pair.first.titleLines).toEqual(['Technology', 'Selection']);
         expect(pair.first.textSpills).toBe(false);
         expectPitchMatchesPlacedBar(pair);

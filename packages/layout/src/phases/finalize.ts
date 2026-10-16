@@ -15,12 +15,13 @@
 // fails.
 
 import type { NowlineFile, ResolveResult } from '@nowline/core';
+import { AxisColumns } from '../axis-columns.js';
 import { daysBetween } from '../calendar.js';
 import { localeStrings } from '../i18n.js';
 import type { LayoutOptions, LayoutResult } from '../layout.js';
 import type { LayoutContext } from '../layout-context.js';
 import { buildAnchors } from '../nodes/anchor-node.js';
-import { maxLeafItemRightX } from '../nodes/content-extent.js';
+import { maxLeafItemRightX, maxSpilledCaptionRightX } from '../nodes/content-extent.js';
 import { buildDependencies, collectItems } from '../nodes/dependency-edges.js';
 import { buildFootnotePanel } from '../nodes/footnote-node.js';
 import type { PositionedHeaderParts } from '../nodes/header-node.js';
@@ -38,6 +39,7 @@ import {
 import { MARKER_ROW_PITCH_PX } from '../nodes/marker-geometry.js';
 import { positionMilestones } from '../nodes/milestone-node.js';
 import { buildNowline } from '../nodes/nowline-node.js';
+import { regionMarkerCanvasRightX } from '../nodes/region-markers.js';
 import { type BuiltWaves, buildWaveLegend, buildWaves } from '../nodes/wave-node.js';
 import { shiftIncludeY, shiftSwimlaneY } from '../positioned-shift.js';
 import { estimateTextWidth } from '../text-measure.js';
@@ -526,8 +528,10 @@ function growCanvasForSpill(fx: FinalizeContext): boolean {
  * right once the lanes and regions are placed. Measure the rightmost
  * CONTENT BOX edge — leaf item bars (never a spilled caption, see
  * `maxLeafItemRightX`) and marker diamonds — and grow the window to the
- * next tick boundary when content overflows it. Captions may still
- * overhang past the last column; their boxes may not. This is driven
+ * next tick boundary when content overflows it. A spilled caption past
+ * that end grows it by one more full column at most, labelled by the
+ * same rules as any other column: the item measure capped the caption to
+ * end inside it (`AxisColumns.captionCapX`). This is driven
  * purely by boxes, never by `today`, so the `length:`-as-minimum and
  * now-line boundary behaviour is unaffected. Origin and pixels per day
  * stay, so every placed x stays valid.
@@ -554,10 +558,35 @@ function extendTimeline(fx: FinalizeContext): boolean {
     const overflowDays = fx.scale.showsNonWorking
         ? fx.scale.indexAtX(maxContentRightX)
         : (maxContentRightX - originX) / ppd;
-    const paddedDays =
+    let paddedDays =
         overflowDays > 0
             ? tickBoundaryAtOrAfter(startDate, overflowDays, scale.unit, tickDays, calendar)
             : 0;
+    // A spilled caption past the axis end grows it by one column, the one
+    // the item measure capped the caption to; `label-every`, the default
+    // thinning and the narrow-column rules label it like any other column
+    // (specs/scheduler-unification.md §8 decision 12). Under an explicit
+    // `length:` that ends mid-column the column is the full one after the
+    // partial last column. A caption the cap could not bring inside (its
+    // meta line is never truncated) still grows the axis by that one column
+    // only.
+    let captionRightX = maxSpilledCaptionRightX(swimlanes);
+    for (const inc of includes) {
+        captionRightX = Math.max(captionRightX, maxSpilledCaptionRightX(inc.nestedSwimlanes));
+    }
+    if (captionRightX > 0) {
+        const columns = new AxisColumns(fx.window, fx.scale);
+        const axisDays = Math.max(spanDays, paddedDays);
+        if (columns.isPast(captionRightX, axisDays)) {
+            paddedDays = Math.max(
+                paddedDays,
+                Math.min(
+                    columns.boundaryAtOrAfterX(captionRightX),
+                    columns.captionColumn(axisDays).end,
+                ),
+            );
+        }
+    }
     let extended = false;
     if (paddedDays > spanDays) {
         const extendedEndDate = calendar.dateAtWorkingIndex(startDate, paddedDays);
@@ -614,14 +643,18 @@ function growCanvasForMarkerLabels(fx: FinalizeContext): boolean {
     const runEntries = calendarMarkerEntries(timeline.nonWorking, timeline.workingExceptions);
     all.push(...runEntries);
     fx.draft.markerEntries = { all, calendarCount: runEntries.length };
-    const grew = fx.canvas.grow(
-        markerLabelsRightX(
-            all,
-            fx.measured.header.chartLeftX,
-            fx.canvas.provisional,
-            estimateTextWidth,
-        ),
+    let rightX = markerLabelsRightX(
+        all,
+        fx.measured.header.chartLeftX,
+        fx.canvas.provisional,
+        estimateTextWidth,
     );
+    // An isolated region's own marker labels grow it the same way, inside
+    // the region's insets (placement packed them against the natural canvas).
+    for (const inc of fx.chart.includes) {
+        rightX = Math.max(rightX, regionMarkerCanvasRightX(inc, fx.canvas.provisional));
+    }
+    const grew = fx.canvas.grow(rightX);
     fx.canvas.freeze();
     return grew;
 }
@@ -842,12 +875,30 @@ function anchors(fx: FinalizeContext): boolean {
     return built.length > 0;
 }
 
-/** f11 (was P16): dependency edges, their ports read off the final boxes. */
+/**
+ * f11 (was P16): dependency edges, their ports read off the final boxes.
+ * Each isolated region routes its own, among its own lanes: its `after:`
+ * references resolve only inside it.
+ */
 function dependencyEdges(fx: FinalizeContext): boolean {
     const itemsMap = collectItems(fx.chart.laneEntries);
     const edges = buildDependencies(itemsMap, fx.chart.swimlanes, fx.chart.includes, fx.ctx);
     fx.draft.edges = edges;
-    return edges.length > 0;
+    let regionEdgeCount = 0;
+    fx.resolved.content.isolatedRegions.forEach((region, i) => {
+        const inc = fx.chart.includes[i];
+        const regionCtx = fx.chart.regionContexts[i];
+        if (!inc || !regionCtx) return;
+        const regionEdges = buildDependencies(
+            collectItems([...region.content.swimlanes.values()]),
+            inc.nestedSwimlanes,
+            [],
+            regionCtx,
+        );
+        if (regionEdges.length > 0) inc.edges = regionEdges;
+        regionEdgeCount += regionEdges.length;
+    });
+    return edges.length + regionEdgeCount > 0;
 }
 
 /**
@@ -883,13 +934,21 @@ function waveLegend(fx: FinalizeContext): boolean {
     return true;
 }
 
-/** f14 (was P19): the footnote panel at the bottom. */
+/** f14 (was P19): the footnote panel at the bottom: the host's footnotes, then each region's. */
 function footnotePanel(fx: FinalizeContext): boolean {
+    const regions = fx.resolved.content.isolatedRegions.flatMap((region, i) => {
+        const regionCtx = fx.chart.regionContexts[i];
+        const inc = fx.chart.includes[i];
+        return regionCtx && inc
+            ? [{ title: inc.label, footnotes: region.content.footnotes, ctx: regionCtx }]
+            : [];
+    });
     const panel = buildFootnotePanel(
         fx.resolved.content.footnotes,
         fx.ctx,
         fx.chartY.bottom,
         fx.canvas.final,
+        regions,
     );
     fx.draft.footnotes = panel;
     return panel.entries.length > 0;

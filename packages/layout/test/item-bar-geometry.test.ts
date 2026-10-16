@@ -16,7 +16,10 @@ import {
     itemCaptionLastBaselineOffset,
     itemCaptionMetaBaselineOffset,
     itemTitleFirstLineRightReservePx,
+    MIN_BAR_WIDTH_FOR_DOT_PX,
+    MIN_BAR_WIDTH_FOR_FOOTNOTE_PX,
     MIN_BAR_WIDTH_FOR_INLINE_DATE_PX,
+    MIN_BAR_WIDTH_FOR_LINK_AND_DOT_PX,
 } from '../src/item-bar-geometry.js';
 
 describe('wrapped-title caption constants', () => {
@@ -253,14 +256,15 @@ describe('itemTitleFirstLineRightReservePx', () => {
     });
 
     it('ignores decorations that spill out of a narrow bar', () => {
-        // 20px: the dot fits inside (>= 17) but footnotes (>= 23) spill.
+        // 23px: footnotes fit (>= 23) but the dot (>= 24) spills, so only the
+        // footnote digit sets the reserve.
         expect(
             itemTitleFirstLineRightReservePx({
-                barWidth: 20,
+                barWidth: 23,
                 footnoteLabels: ['1'],
                 hasBeforeGlyph: false,
             }),
-        ).toBe(21);
+        ).toBeCloseTo(22 + digitW + 4, 10);
         // 30px: footnotes fit, the `before:` glyph (>= 40) spills.
         expect(
             itemTitleFirstLineRightReservePx({
@@ -284,5 +288,33 @@ describe('itemTitleFirstLineRightReservePx', () => {
                 hasBeforeGlyph: true,
             }),
         ).toBe(37);
+    });
+});
+
+describe('status dot threshold', () => {
+    // The dot's centre is 12px from the bar's right edge, so it has equal air
+    // on both sides only from a bar twice that wide (decision 11 of the
+    // scheduler follow-ups): 24px. A narrower bar spills the dot.
+    it('is twice the dot inset: 24px', () => {
+        expect(MIN_BAR_WIDTH_FOR_DOT_PX).toBe(24);
+    });
+
+    it('keeps the dot in the bar at 24px and spills it at 23px', () => {
+        const reserve = (barWidth: number) =>
+            itemTitleFirstLineRightReservePx({
+                barWidth,
+                footnoteLabels: [],
+                hasBeforeGlyph: false,
+            });
+        // Inside: 17px to the dot's left edge plus the 4px gap. Spilled: the
+        // plain 12px right inset.
+        expect(reserve(24)).toBe(21);
+        expect(reserve(23)).toBe(12);
+    });
+
+    it('leaves the footnote, link-and-dot and inline-date thresholds alone', () => {
+        expect(MIN_BAR_WIDTH_FOR_FOOTNOTE_PX).toBe(23);
+        expect(MIN_BAR_WIDTH_FOR_LINK_AND_DOT_PX).toBe(41);
+        expect(MIN_BAR_WIDTH_FOR_INLINE_DATE_PX).toBe(40);
     });
 });

@@ -12,28 +12,27 @@ import {
     ITEM_CAPTION_META_BASELINE_OFFSET_PX,
     ITEM_CAPTION_SPILL_GAP_PX,
     ITEM_CAPTION_TITLE_FONT_SIZE_PX,
-    ITEM_DECORATION_SPILL_GAP_PX,
-    ITEM_FOOTNOTE_INDICATOR_STEP_PX,
-    ITEM_LINK_ICON_TILE_SIZE_PX,
-    ITEM_STATUS_DOT_RADIUS_PX,
     LABEL_CHIP_GAP_ABOVE_PROGRESS_STRIP_PX,
     LABEL_CHIP_GAP_BETWEEN_PX,
     LABEL_CHIP_HEIGHT_PX,
     LABEL_CHIP_ROW_STEP_PX,
+    layoutSpillCluster,
     MIN_BAR_WIDTH_FOR_DOT_PX,
     MIN_BAR_WIDTH_FOR_FOOTNOTE_PX,
 } from '../item-bar-geometry.js';
 import type { LayoutContext, TrackCursor } from '../layout-context.js';
-import { nonWorkingPinOf, resolvePinnedOrSequentialStart } from '../start-rules.js';
+import { nonWorkingPinOf, resolvePinnedOrSequentialStart, scheduleFloorX } from '../start-rules.js';
 import { estimateTextWidth } from '../text-measure.js';
-import { ITEM_INSET_PX, PROGRESS_STRIP_HEIGHT_PX } from '../themes/shared.js';
+import { PROGRESS_STRIP_HEIGHT_PX } from '../themes/shared.js';
 import type { BoundingBox, PositionedItem, PositionedLabelChip } from '../types.js';
-import { accumulateWaveMember, waveFloorX, wavePinOverrideOf, waveRoleOf } from '../wave-layout.js';
+import { accumulateWaveMember, waveFloorX, waveRoleOf } from '../wave-layout.js';
+import { itemSpanPx } from '../working-span.js';
 import { buildLabelChip, type ItemMeasure, measureItem } from './item-measure.js';
 import { ItemNode, traceItemNode } from './item-node.js';
 
 /**
- * Place `node` at `cursor` and advance the cursor past its logical end.
+ * Place `node` at `cursor` and advance the cursor: `cursor.x` to its
+ * duration end, `cursor.maxX` to its painted footprint.
  * `measured` is the item's measure at the snapped start it is placed at,
  * when the caller (a lane or group row track) already took it to pack the
  * row; a parallel track's child is measured here.
@@ -48,34 +47,30 @@ export function sequenceItem(
     const afterRaw = propValues(props, 'after');
     const beforeRaw = propValues(props, 'before');
 
-    // Resolve start x with the swimlane child precedence: `date:` > `start:`
-    // > after-chain > cursor position. A lane or group child's cursor
+    // Resolve start x with the swimlane child rule: the latest of the
+    // after-chain and the cursor position. A lane or group child's cursor
     // already sits at that start; a direct parallel track's cursor sits at
-    // the block's start, so this is where its pin applies.
+    // the block's start, so this is where its `after:` applies.
     let startX = resolvePinnedOrSequentialStart(props, cursor.x, ctx);
     // Wave barrier (specs/waves.md §5.1, §8.4): the floor is one more term
-    // in the max, after the pin and `after:` logic, so a pin becomes
-    // max(pin, F). Parallel tracks reach this function directly, so this
-    // is where their floor applies.
-    let wavePinOverride: PositionedItem['wavePinOverride'];
-    if (ctx.waves) {
-        startX = waveFloorX(node, startX, ctx);
-        wavePinOverride = wavePinOverrideOf(node, startX, ctx);
-    }
-    // NL.I1008 defers to NL.W1001: a pin a wave floor moved reports there.
-    const nonWorkingPin =
-        wavePinOverride === undefined ? nonWorkingPinOf(props, startX, ctx) : undefined;
+    // in the max, after the `after:` logic. Parallel tracks reach this
+    // function directly, so this is where their floor applies.
+    if (ctx.waves) startX = waveFloorX(node, startX, ctx);
+    // The day schedule's start is a lower bound of this one, so flooring by
+    // it settles nothing that was already right (specs/scheduler-unification.md
+    // §5, F4); a lane or group child's cursor already carries it.
+    startX = scheduleFloorX(node, startX, ctx);
+    const nonWorkingPin = nonWorkingPinOf(props, startX, ctx);
 
     // Under `show` a start that lands in a non-working day moves to the next
-    // working day. The floor, the pin override and NL.I1008 above read the
-    // unsnapped start, so their ties and texts match `hide`; the identity
-    // under `hide`.
+    // working day. The floor and NL.I1008 above read the unsnapped start,
+    // so their ties and texts match `hide`; the identity under `hide`.
     const placedStartX = ctx.scale.startX(startX);
     // Width, style and tint, progress, meta line, chips, caption fit and
     // the bar's growth (specs/layout-phases.md §3.6). A lane or group row
     // track measured the item at this same start to size its row (the
-    // cursor sits at `resolveChildStart`, which a pin, an `after:` chain and
-    // the wave floor all return unchanged); a parallel track measures here.
+    // cursor sits at `resolveChildStart`, which an `after:` chain and the
+    // wave floor both return unchanged); a parallel track measures here.
     const measure = measured ?? measureItem(node, placedStartX, ctx);
     if (measure.startX !== placedStartX) {
         throw new Error(
@@ -88,10 +83,16 @@ export function sequenceItem(
     const hasLinkIcon = linkInfo.icon !== 'none';
     const chipSamples = measure.chips.samples;
     const chipsOutside = measure.chips.outside;
-    // Logical extent — what the item "owns" in time (used for chaining,
-    // `after:` lookups, dependency-arrow attach points).
+    // Logical extent: the bar's painted footprint, `MIN_ITEM_WIDTH` clamp
+    // included (the bar box is inset from it).
     const logicalLeft = placedStartX;
     const logicalRight = placedStartX + naturalWidth;
+    // Duration end: where the item ends in time, never the minimum bar
+    // width. The time paths take it (the cursor, `after:` references, the
+    // wave barrier), so what follows a clamped bar starts on its date, as
+    // in engine C; a bar wider than its duration is presentation
+    // (specs/scheduler-unification.md §8 decision 6).
+    const durationEndX = placedStartX + itemSpanPx(ctx, placedStartX, measure.durationDays);
 
     // Handle `before:` — item must end by the earliest cap. Each cap is
     // either an entity id (looked up in entityLeftEdges) or an inline ISO
@@ -127,9 +128,8 @@ export function sequenceItem(
         }
     }
 
-    // The bar box (grown by `measure.barExtra`) and the caption's x. Logical
-    // extent (used by chaining and `after:` lookups) stays on
-    // logicalLeft/logicalRight; the box is inset from it.
+    // The bar box (grown by `measure.barExtra`) and the caption's x, inset
+    // from the logical extent logicalLeft/logicalRight.
     const titleStr = caption.title;
     const itemNode = new ItemNode(measure);
     const placeCtx = { time: ctx.scale, bands: ctx.bandScale, style };
@@ -281,25 +281,12 @@ export function sequenceItem(
     // glyph reaches; the row-packer uses it (alongside spilled-chip
     // width) to reserve x-extent so the next chained item bumps to
     // a fresh row instead of landing under the spilled cluster.
-    const SPILL_COLUMN_X0 = itemBox.x + itemBox.width + ITEM_CAPTION_SPILL_GAP_PX;
-    let spillCursor = SPILL_COLUMN_X0;
-    // Advance the cursor by `gap` IFF something has already been
-    // placed in the column — keeps the cluster from leaving a
-    // dangling gap past its final glyph (which would over-reserve
-    // x-extent and shift downstream items).
-    let needGap = false;
-    let iconSpillX: number | null = null;
-    if (iconSpills) {
-        if (needGap) spillCursor += ITEM_DECORATION_SPILL_GAP_PX;
-        iconSpillX = spillCursor;
-        spillCursor = iconSpillX + ITEM_LINK_ICON_TILE_SIZE_PX;
-        needGap = true;
-    }
-    let captionSpillWidth = 0;
+    let captionSpillWidth: number | null = null;
     if (textSpills) {
-        if (needGap) spillCursor += ITEM_DECORATION_SPILL_GAP_PX;
         // The widest title LINE: a multi-line spill is as wide as its
-        // longest line, not as the raw string (newlines included).
+        // longest line, not as the raw string (newlines included). A
+        // caption capped at the chart's end arrives with its lines already
+        // truncated (`measureItem`).
         const titleW = Math.max(
             ...captionLines.map((line) => estimateTextWidth(line, ITEM_CAPTION_TITLE_FONT_SIZE_PX)),
         );
@@ -309,24 +296,16 @@ export function sequenceItem(
         // without `capacity:`.
         const metaW = (metaText ? estimateTextWidth(metaText, 11) : 0) + capacityTrailingWidth;
         captionSpillWidth = Math.max(titleW, metaW);
-        spillCursor += captionSpillWidth;
-        needGap = true;
     }
-    let footnoteSpillStartX: number | null = null;
-    if (footnoteSpills) {
-        if (needGap) spillCursor += ITEM_DECORATION_SPILL_GAP_PX;
-        footnoteSpillStartX = spillCursor;
-        spillCursor += footnoteIndicators.length * ITEM_FOOTNOTE_INDICATOR_STEP_PX;
-        needGap = true;
-    }
-    let dotSpillCx: number | null = null;
-    if (dotSpills) {
-        if (needGap) spillCursor += ITEM_DECORATION_SPILL_GAP_PX;
-        dotSpillCx = spillCursor + ITEM_STATUS_DOT_RADIUS_PX;
-        spillCursor = dotSpillCx + ITEM_STATUS_DOT_RADIUS_PX;
-        needGap = true;
-    }
-    const decorationsRightX = Math.max(itemBox.x + itemBox.width, spillCursor);
+    const spill = layoutSpillCluster({
+        barRightX: itemBox.x + itemBox.width,
+        iconSpills,
+        captionWidth: captionSpillWidth,
+        footnoteCount: footnoteSpills ? footnoteIndicators.length : 0,
+        dotSpills,
+    });
+    const { iconSpillX, footnoteSpillStartX, dotSpillCx } = spill;
+    const decorationsRightX = Math.max(itemBox.x + itemBox.width, spill.rightX);
 
     const id = node.name;
     // Reference-target edges resolve `after:` / `before:` lookups, so only
@@ -334,15 +313,17 @@ export function sequenceItem(
     // referenceable target. Entity edges live in LOGICAL space so chained
     // items / `after:` references sit on the column boundary, not on the
     // visually inset bar edge. The visible 12 px gutter between bars then
-    // becomes a clean attach corridor.
+    // becomes a clean attach corridor. The right edge is the duration end:
+    // `after:` is a time path (decision 6). Items attach their arrows off
+    // their final box (`placedItems`), never off this map.
     if (id) {
         ctx.entityLeftEdges.set(id, logicalLeft);
-        ctx.entityRightEdges.set(id, logicalRight);
+        ctx.entityRightEdges.set(id, durationEndX);
     }
-    // A member's end feeds its wave's barrier: the lane cursor's logical
-    // end (`itemLogicalEnd` in `SwimlaneNode`), MIN_ITEM_WIDTH clamp
-    // included, never a group box or caption spill (specs/waves.md §8.4).
-    accumulateWaveMember(node, itemBox.x + itemBox.width + ITEM_INSET_PX, ctx);
+    // A member's end feeds its wave's barrier: its duration end, the lane
+    // cursor's advance in `sequenceRowTrack`, never the minimum bar width,
+    // a group box or a caption spill (specs/waves.md §8.4).
+    accumulateWaveMember(node, durationEndX, ctx);
     // Drawing / flow maps key on a registration handle EVERY item has: the
     // explicit id when present, else a synthetic, non-referenceable handle
     // (see `syntheticItemKey`). This lets a title-only item register its own
@@ -353,8 +334,10 @@ export function sequenceItem(
     const drawKey = id ?? syntheticItemKey(node);
     ctx.itemFlowKey.set(drawKey, ctx.currentFlowKey);
 
-    cursor.x = logicalRight;
-    cursor.maxX = Math.max(cursor.maxX, cursor.x);
+    // A parallel track joins on `cursor.x` (time) and sizes its bracket on
+    // `cursor.maxX` (the painted bar, minimum width included).
+    cursor.x = durationEndX;
+    cursor.maxX = Math.max(cursor.maxX, logicalRight, durationEndX);
     // The next row in a parallel/group/lane starts at
     // `cursor.y + cursor.height`. Default pitch is `bandScale.step()`
     // (bandwidth + inter-row gap). When the bar grew to enclose a
@@ -413,8 +396,10 @@ export function sequenceItem(
     // undefined, so wave-free models keep their exact shape).
     const waveRole = waveRoleOf(node, ctx);
     if (waveRole !== undefined) result.waveRole = waveRole;
-    if (wavePinOverride !== undefined) result.wavePinOverride = wavePinOverride;
     if (nonWorkingPin !== undefined) result.nonWorkingPin = nonWorkingPin;
+    // The caption cap at the chart's end truncated a title line; the full
+    // title stays the bar's tooltip.
+    if (caption.truncated) result.titleTruncated = true;
     // A background item carries its localized hover line from placement
     // on (specs/waves.md §9.3); members and wave-free items carry none.
     if (waveRole === 'background' && ctx.waves) {

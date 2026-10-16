@@ -2,291 +2,39 @@
     "$comment": [
         "Engine divergence register (specs/scheduler-unification.md §4 m1.s1, §6), checked by engine-divergence-register.test.ts.",
         "Every place where engine A (the pixel layout) and engine C (scheduleRoadmap) give a sample's named item or wave a different span, keyed by sample path, then by item id, '<include path>#<id>' for an item of a first-level isolated region, or 'wave:<id>'.",
-        "classes lists every divergence of spec §1.2 that contributes, (b) to (f), or region-scope when the engines give an isolated region a different scope (§1.2, 'Isolated regions without waves'). Fixing a divergence removes its letter, and the entry once no letter is left. (a), the pixel walker starting an after: child at the lane's left edge instead of its cursor, was settled by F1 (specs/scheduler-unification.md §5), so no entry carries it."
+        "classes lists every divergence of spec §1.2 that contributes, (b) to (f), or region-scope when the engines give an isolated region a different scope (§1.2, 'Isolated regions without waves'); F5 settled the last region-scope entries (nested.nowline's region anchors), so none remains. Fixing a divergence removes its letter, and the entry once no letter is left. (a), the pixel walker starting an after: child at the lane's left edge instead of its cursor, was settled by F1 (specs/scheduler-unification.md §5), so no entry carries it. F2 and F3 settled (c), (d) and (e), and moved (b) out of every time path (the lane cursor, a parallel's join, after: references and the wave barrier): a (b) entry now marks only a bar drawn at its minimum width, which is presentation (§8 decision 6)."
     ],
     "divergences": {
-        "examples/inline-date-pins.nowline": {
-            "us-rollout": {
-                "classes": ["(c)"],
-                "reason": "follows the api-track group, whose caption spills past its last child, and A's lane cursor advances to the group's box edge"
-            },
-            "eu-rollout": {
-                "classes": ["(c)"],
-                "reason": "a track of the same parallel as us-rollout, after the api-track group's caption spill"
-            }
-        },
-        "examples/nested.nowline": {
-            "./nested/platform.nowline#pf-auth-refactor": {
-                "classes": ["region-scope"],
-                "reason": "the region's lane starts after:kickoff, the region's own anchor (2026-01-06): C resolves it to day 1, A does not see region anchors and starts at day 0"
-            },
-            "./nested/platform.nowline#pf-service-mesh": {
-                "classes": ["region-scope"],
-                "reason": "the region's lane starts after:kickoff, the region's own anchor (2026-01-06): C resolves it to day 1, A does not see region anchors and starts at day 0"
-            },
-            "./nested/platform.nowline#pf-api-gateway": {
-                "classes": ["region-scope"],
-                "reason": "the region's lane starts after:kickoff, the region's own anchor (2026-01-06): C resolves it to day 1, A does not see region anchors and starts at day 0"
-            },
-            "./nested/platform.nowline#pf-events": {
-                "classes": ["region-scope"],
-                "reason": "the region's lane starts after:kickoff, the region's own anchor (2026-01-06): C resolves it to day 1, A does not see region anchors and starts at day 0"
-            },
-            "./nested/platform.nowline#pf-telemetry": {
-                "classes": ["region-scope"],
-                "reason": "the region's lane starts after:kickoff, the region's own anchor (2026-01-06): C resolves it to day 1, A does not see region anchors and starts at day 0"
-            },
-            "./nested/platform.nowline#pf-agent-runtime": {
-                "classes": ["region-scope"],
-                "reason": "the region's lane starts after:kickoff, the region's own anchor (2026-01-06): C resolves it to day 1, A does not see region anchors and starts at day 0"
-            },
-            "./nested/platform.nowline#pf-agent-sdk": {
-                "classes": ["region-scope"],
-                "reason": "the region's lane starts after:kickoff, the region's own anchor (2026-01-06): C resolves it to day 1, A does not see region anchors and starts at day 0"
-            },
-            "./nested/platform.nowline#pf-ss-catalog": {
-                "classes": ["region-scope"],
-                "reason": "the region's lane starts after:kickoff, the region's own anchor (2026-01-06): C resolves it to day 1, A does not see region anchors and starts at day 0"
-            },
-            "./nested/platform.nowline#pf-ss-onboarding": {
-                "classes": ["region-scope"],
-                "reason": "the region's lane starts after:kickoff, the region's own anchor (2026-01-06): C resolves it to day 1, A does not see region anchors and starts at day 0"
-            },
-            "./nested/platform.nowline#pf-ss-billing": {
-                "classes": ["region-scope"],
-                "reason": "the region's lane starts after:kickoff, the region's own anchor (2026-01-06): C resolves it to day 1, A does not see region anchors and starts at day 0"
-            },
-            "./nested/ios.nowline#ios-offline": {
-                "classes": ["region-scope"],
-                "reason": "the region's lane starts after:kickoff, the region's own anchor (2026-01-06): C resolves it to day 1, A does not see region anchors and starts at day 0"
-            },
-            "./nested/ios.nowline#ios-push": {
-                "classes": ["region-scope"],
-                "reason": "the region's lane starts after:kickoff, the region's own anchor (2026-01-06): C resolves it to day 1, A does not see region anchors and starts at day 0"
-            },
-            "./nested/ios.nowline#ios-widgets": {
-                "classes": ["region-scope"],
-                "reason": "the region's lane starts after:kickoff, the region's own anchor (2026-01-06): C resolves it to day 1, A does not see region anchors and starts at day 0"
-            },
-            "./nested/ios.nowline#ios-agent-surface": {
-                "classes": ["region-scope"],
-                "reason": "the region's lane starts after:kickoff, the region's own anchor (2026-01-06): C resolves it to day 1, A does not see region anchors and starts at day 0"
-            },
-            "./nested/ios.nowline#ios-agent-voice": {
-                "classes": ["region-scope"],
-                "reason": "the region's lane starts after:kickoff, the region's own anchor (2026-01-06): C resolves it to day 1, A does not see region anchors and starts at day 0"
-            },
-            "./nested/ios.nowline#ios-performance": {
-                "classes": ["region-scope"],
-                "reason": "the region's lane starts after:kickoff, the region's own anchor (2026-01-06): C resolves it to day 1, A does not see region anchors and starts at day 0"
-            },
-            "./nested/ios.nowline#ios-onboarding": {
-                "classes": ["region-scope"],
-                "reason": "the region's lane starts after:kickoff, the region's own anchor (2026-01-06): C resolves it to day 1, A does not see region anchors and starts at day 0"
-            },
-            "./nested/ios.nowline#ios-camera": {
-                "classes": ["region-scope"],
-                "reason": "the region's lane starts after:kickoff, the region's own anchor (2026-01-06): C resolves it to day 1, A does not see region anchors and starts at day 0"
-            },
-            "./nested/ios.nowline#ios-crash": {
-                "classes": ["region-scope"],
-                "reason": "the region's lane starts after:kickoff, the region's own anchor (2026-01-06): C resolves it to day 1, A does not see region anchors and starts at day 0"
-            },
-            "./nested/ios.nowline#ios-agent-chat": {
-                "classes": ["region-scope"],
-                "reason": "the region's lane starts after:kickoff, the region's own anchor (2026-01-06): C resolves it to day 1, A does not see region anchors and starts at day 0"
-            },
-            "./nested/android.nowline#and-offline": {
-                "classes": ["region-scope"],
-                "reason": "the region's lane starts after:kickoff, the region's own anchor (2026-01-06): C resolves it to day 1, A does not see region anchors and starts at day 0"
-            },
-            "./nested/android.nowline#and-push": {
-                "classes": ["region-scope"],
-                "reason": "the region's lane starts after:kickoff, the region's own anchor (2026-01-06): C resolves it to day 1, A does not see region anchors and starts at day 0"
-            },
-            "./nested/android.nowline#and-material-you": {
-                "classes": ["region-scope"],
-                "reason": "the region's lane starts after:kickoff, the region's own anchor (2026-01-06): C resolves it to day 1, A does not see region anchors and starts at day 0"
-            },
-            "./nested/android.nowline#and-performance": {
-                "classes": ["region-scope"],
-                "reason": "the region's lane starts after:kickoff, the region's own anchor (2026-01-06): C resolves it to day 1, A does not see region anchors and starts at day 0"
-            },
-            "./nested/android.nowline#and-agent-surface": {
-                "classes": ["region-scope"],
-                "reason": "the region's lane starts after:kickoff, the region's own anchor (2026-01-06): C resolves it to day 1, A does not see region anchors and starts at day 0"
-            },
-            "./nested/android.nowline#and-agent-voice": {
-                "classes": ["region-scope"],
-                "reason": "the region's lane starts after:kickoff, the region's own anchor (2026-01-06): C resolves it to day 1, A does not see region anchors and starts at day 0"
-            },
-            "./nested/android.nowline#and-onboarding": {
-                "classes": ["region-scope"],
-                "reason": "the region's lane starts after:kickoff, the region's own anchor (2026-01-06): C resolves it to day 1, A does not see region anchors and starts at day 0"
-            },
-            "./nested/android.nowline#and-camera": {
-                "classes": ["region-scope"],
-                "reason": "the region's lane starts after:kickoff, the region's own anchor (2026-01-06): C resolves it to day 1, A does not see region anchors and starts at day 0"
-            },
-            "./nested/android.nowline#and-crash": {
-                "classes": ["region-scope"],
-                "reason": "the region's lane starts after:kickoff, the region's own anchor (2026-01-06): C resolves it to day 1, A does not see region anchors and starts at day 0"
-            },
-            "./nested/android.nowline#and-agent-chat": {
-                "classes": ["region-scope"],
-                "reason": "the region's lane starts after:kickoff, the region's own anchor (2026-01-06): C resolves it to day 1, A does not see region anchors and starts at day 0"
-            },
-            "./nested/web.nowline#web-spa-upgrade": {
-                "classes": ["region-scope"],
-                "reason": "the region's lane starts after:kickoff, the region's own anchor (2026-01-06): C resolves it to day 1, A does not see region anchors and starts at day 0"
-            },
-            "./nested/web.nowline#web-design-system": {
-                "classes": ["region-scope"],
-                "reason": "the region's lane starts after:kickoff, the region's own anchor (2026-01-06): C resolves it to day 1, A does not see region anchors and starts at day 0"
-            },
-            "./nested/web.nowline#web-agent-console": {
-                "classes": ["region-scope"],
-                "reason": "the region's lane starts after:kickoff, the region's own anchor (2026-01-06): C resolves it to day 1, A does not see region anchors and starts at day 0"
-            },
-            "./nested/web.nowline#web-agent-playground": {
-                "classes": ["region-scope"],
-                "reason": "the region's lane starts after:kickoff, the region's own anchor (2026-01-06): C resolves it to day 1, A does not see region anchors and starts at day 0"
-            },
-            "./nested/web.nowline#web-ss-portal": {
-                "classes": ["region-scope"],
-                "reason": "the region's lane starts after:kickoff, the region's own anchor (2026-01-06): C resolves it to day 1, A does not see region anchors and starts at day 0"
-            },
-            "./nested/web.nowline#web-ss-docs": {
-                "classes": ["region-scope"],
-                "reason": "the region's lane starts after:kickoff, the region's own anchor (2026-01-06): C resolves it to day 1, A does not see region anchors and starts at day 0"
-            },
-            "./nested/web.nowline#web-ss-onboarding": {
-                "classes": ["region-scope"],
-                "reason": "the region's lane starts after:kickoff, the region's own anchor (2026-01-06): C resolves it to day 1, A does not see region anchors and starts at day 0"
-            },
-            "./nested/web.nowline#web-a11y": {
-                "classes": ["region-scope"],
-                "reason": "the region's lane starts after:kickoff, the region's own anchor (2026-01-06): C resolves it to day 1, A does not see region anchors and starts at day 0"
-            },
-            "./nested/web.nowline#web-perf-budget": {
-                "classes": ["region-scope"],
-                "reason": "the region's lane starts after:kickoff, the region's own anchor (2026-01-06): C resolves it to day 1, A does not see region anchors and starts at day 0"
-            },
-            "./nested/web.nowline#web-search": {
-                "classes": ["region-scope"],
-                "reason": "the region's lane starts after:kickoff, the region's own anchor (2026-01-06): C resolves it to day 1, A does not see region anchors and starts at day 0"
-            },
-            "./nested/data.nowline#data-warehouse": {
-                "classes": ["region-scope"],
-                "reason": "the region's lane starts after:kickoff, the region's own anchor (2026-01-06): C resolves it to day 1, A does not see region anchors and starts at day 0"
-            },
-            "./nested/data.nowline#data-streaming": {
-                "classes": ["region-scope"],
-                "reason": "the region's lane starts after:kickoff, the region's own anchor (2026-01-06): C resolves it to day 1, A does not see region anchors and starts at day 0"
-            },
-            "./nested/data.nowline#data-agent-features": {
-                "classes": ["region-scope"],
-                "reason": "the region's lane starts after:kickoff, the region's own anchor (2026-01-06): C resolves it to day 1, A does not see region anchors and starts at day 0"
-            },
-            "./nested/data.nowline#data-agent-eval": {
-                "classes": ["region-scope"],
-                "reason": "the region's lane starts after:kickoff, the region's own anchor (2026-01-06): C resolves it to day 1, A does not see region anchors and starts at day 0"
-            },
-            "./nested/data.nowline#data-ss-exports": {
-                "classes": ["region-scope"],
-                "reason": "the region's lane starts after:kickoff, the region's own anchor (2026-01-06): C resolves it to day 1, A does not see region anchors and starts at day 0"
-            },
-            "./nested/data.nowline#data-ss-sql": {
-                "classes": ["region-scope"],
-                "reason": "the region's lane starts after:kickoff, the region's own anchor (2026-01-06): C resolves it to day 1, A does not see region anchors and starts at day 0"
-            },
-            "./nested/data.nowline#data-catalog": {
-                "classes": ["region-scope"],
-                "reason": "the region's lane starts after:kickoff, the region's own anchor (2026-01-06): C resolves it to day 1, A does not see region anchors and starts at day 0"
-            },
-            "./nested/data.nowline#data-lineage": {
-                "classes": ["region-scope"],
-                "reason": "the region's lane starts after:kickoff, the region's own anchor (2026-01-06): C resolves it to day 1, A does not see region anchors and starts at day 0"
-            },
-            "./nested/data.nowline#data-governance": {
-                "classes": ["region-scope"],
-                "reason": "the region's lane starts after:kickoff, the region's own anchor (2026-01-06): C resolves it to day 1, A does not see region anchors and starts at day 0"
-            },
-            "./nested/data.nowline#data-pii-scan": {
-                "classes": ["region-scope"],
-                "reason": "the region's lane starts after:kickoff, the region's own anchor (2026-01-06): C resolves it to day 1, A does not see region anchors and starts at day 0"
-            }
-        },
-        "examples/platform-2026.nowline": {
-            "platform-qa": {
-                "classes": ["(d)"],
-                "reason": "follows a parallel whose audit-track group track adds the 8 px track tail gutter in A"
-            }
-        },
-        "examples/product.nowline": {
-            "platform-qa": {
-                "classes": ["(d)"],
-                "reason": "follows a parallel whose audit-track group track adds the 8 px track tail gutter in A"
-            }
-        },
         "examples/showcase.nowline": {
             "ship": {
-                "classes": ["(b)", "(d)"],
-                "reason": "follows the parallel, whose box ends 8px past its last track (the tail gutter): A starts it on day 42.2 against C's 40, and the 1w bar is under the minimum width"
+                "classes": ["(b)"],
+                "reason": "presentation: bar drawn at its minimum width (scheduler-unification §8 decision 6)"
             },
             "brief": {
                 "classes": ["(b)"],
-                "reason": "a 1w bar at scale:1m is under the minimum bar width, so A's logical end runs past C's"
-            },
-            "assets": {
-                "classes": ["(b)"],
-                "reason": "follows brief, and A's lane cursor advances to brief's minimum-width bar"
+                "reason": "presentation: bar drawn at its minimum width (scheduler-unification §8 decision 6)"
             },
             "announce": {
-                "classes": ["(b)", "(d)"],
-                "reason": "follows ship, which A starts and ends later than C by the parallel's tail gutter and its minimum-width bar"
-            }
-        },
-        "examples/waves.nowline": {
-            "launch-page": {
-                "classes": ["(c)"],
-                "reason": "follows the wave:build group, whose box includes a11y's spilled caption, and A's lane cursor advances to that edge"
-            }
-        },
-        "tests/late-row-shifts.nowline": {
-            "p1": {
-                "classes": ["(c)"],
-                "reason": "follows group g, and A's lane cursor advances to the Pinned group caption's edge"
-            },
-            "d": {
-                "classes": ["(c)"],
-                "reason": "after:c starts at the lane cursor, which still carries the group's caption spill in A"
+                "classes": ["(b)"],
+                "reason": "presentation: bar drawn at its minimum width (scheduler-unification §8 decision 6)"
             }
         },
         "tests/non-working-hide.nowline": {
             "qa": {
                 "classes": ["(b)"],
-                "reason": "a 2d bar is under the minimum bar width, so A's logical end runs past C's"
-            },
-            "rollout": {
-                "classes": ["(b)"],
-                "reason": "follows qa, and A's lane cursor advances to qa's minimum-width bar"
+                "reason": "presentation: bar drawn at its minimum width (scheduler-unification §8 decision 6)"
             }
         },
         "tests/non-working-show.nowline": {
             "qa": {
                 "classes": ["(b)"],
-                "reason": "a 2d bar is under the minimum bar width, so A's logical end runs past C's"
-            },
-            "rollout": {
-                "classes": ["(b)"],
-                "reason": "follows qa, and A's lane cursor advances to qa's minimum-width bar"
+                "reason": "presentation: bar drawn at its minimum width (scheduler-unification §8 decision 6)"
             }
         },
         "tests/size-and-capacity.nowline": {
             "f1": {
                 "classes": ["(b)"],
-                "reason": "a 1d bar (md effort over capacity 5) is under the minimum bar width"
+                "reason": "presentation: bar drawn at its minimum width (scheduler-unification §8 decision 6)"
             }
         }
     }

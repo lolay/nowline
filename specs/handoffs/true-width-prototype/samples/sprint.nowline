@@ -1,0 +1,31 @@
+nowline v1
+
+roadmap r "Two sprints of one-day tasks" start:2026-01-05 scale:1w
+
+anchor kickoff "Kickoff" date:2026-01-05
+anchor freeze "Freeze" date:2026-01-14
+
+swimlane api "API"
+  item a1 "Schema" duration:1d after:kickoff
+  item a2 "Endpoints" duration:1d
+  item a3 "Auth" duration:1d
+  item a4 "Rate limits" duration:1d
+  item a5 "API docs" duration:1d
+  item a6 "Load test" duration:1d
+  item a7 "Fixes" duration:1d
+
+swimlane web "Web"
+  item w1 "Mockups" duration:1d after:kickoff
+  item w2 "Login page" duration:1d after:a3
+  item w3 "Dashboard" duration:1d after:a2
+  item w4 "Settings" duration:1d
+  item w5 "E2E tests" duration:1d after:[a5, w4]
+  item w6 "Polish" duration:1d
+
+swimlane ops "Ops"
+  item o1 "Staging" duration:1d after:freeze
+  item o2 "Smoke test" duration:1d after:[a7, w6]
+  item o3 "Deploy" duration:1d
+
+milestone docs-done "Docs done" after:a5
+milestone beta "Beta" after:o3

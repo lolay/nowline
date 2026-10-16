@@ -9,6 +9,7 @@
 // finalize may extend but never re-places on.
 
 import type { ResolveResult, SwimlaneDeclaration } from '@nowline/core';
+import { AxisColumns } from '../axis-columns.js';
 import { defaultRowBand } from '../band-scale.js';
 import { localeStrings } from '../i18n.js';
 import { createLayoutContext, type LayoutContext, type LayoutHelpers } from '../layout-context.js';
@@ -20,10 +21,13 @@ import {
     type MilestonePlacement,
 } from '../nodes/milestone-node.js';
 import { SwimlaneNode } from '../nodes/swimlane-node.js';
+import type { RoadmapSchedule } from '../schedule.js';
+import { isScheduleWarmStart } from '../start-rules.js';
 import { resolveStyle } from '../style-resolution.js';
 import { SPACING_PX } from '../themes/shared.js';
+import type { TimeScale } from '../time-scale.js';
 import type { PositionedIncludeRegion, PositionedRoadmap, PositionedSwimlane } from '../types.js';
-import { solveWaveBarriers } from '../wave-barrier.js';
+import { solveWaveBarriers, type WaveBarrierSeed } from '../wave-barrier.js';
 import {
     beginWavePass,
     createWaveLayoutState,
@@ -42,6 +46,11 @@ export interface PlacedChart {
     ctx: LayoutContext;
     swimlanes: PositionedSwimlane[];
     includes: PositionedIncludeRegion[];
+    /**
+     * Each kept region's own context, in `includes` order: its placed
+     * items and marker edges, which its dependency edges read (f11).
+     */
+    regionContexts: LayoutContext[];
     /** x, slack arrows and overrun; f6 adds the row and label box and builds `PositionedMilestone`. */
     milestones: MilestonePlacement[];
     laneEntries: SwimlaneDeclaration[];
@@ -76,6 +85,7 @@ export function placeChart(
             timeline,
             scale: timeScale,
             calendar,
+            axisColumns: new AxisColumns(window, timeScale),
             bandScale: defaultRowBand(),
             waves: plan
                 ? createWaveLayoutState(
@@ -185,6 +195,11 @@ export function placeChart(
     const waves = ctx.waves;
     if (waves) {
         let last: ReturnType<typeof runSwimlaneLoop> | undefined;
+        // Warm start (specs/scheduler-unification.md §5, F4): engine C's
+        // `S_k` and `E_k`, projected, are a lower bound of engine A's, so
+        // the passes start from them and settle on the same fixpoint in
+        // fewer passes.
+        const seed = isScheduleWarmStart() ? waveSeed(waves.ids, schedule, timeScale) : undefined;
         const solved = solveWaveBarriers(
             waves.ids.length,
             waves.origin,
@@ -199,11 +214,13 @@ export function placeChart(
                         ctx,
                         last.nextY + LANES_TO_REGIONS_GAP_PX,
                         helpers,
+                        measured.naturalChartRightX,
                     );
                 }
                 return waves.pass;
             },
             WAVE_EDGE_TOLERANCE_PX,
+            seed,
         );
         // From here on the barrier is frozen: later placements floor
         // with the solved S/E and accumulate nothing.
@@ -240,9 +257,17 @@ export function placeChart(
     // last swimlane into empty space. With waves this is the one kept
     // region placement, floored with the frozen S/E.
     let includes: PositionedIncludeRegion[] = [];
+    let regionContexts: LayoutContext[] = [];
     if (isolated.length > 0) {
-        const r = buildIncludeRegions(isolated, ctx, y + LANES_TO_REGIONS_GAP_PX, helpers);
+        const r = buildIncludeRegions(
+            isolated,
+            ctx,
+            y + LANES_TO_REGIONS_GAP_PX,
+            helpers,
+            measured.naturalChartRightX,
+        );
         includes = r.regions;
+        regionContexts = r.contexts;
         y = r.endY;
     }
 
@@ -260,10 +285,28 @@ export function placeChart(
         ctx,
         swimlanes,
         includes,
+        regionContexts,
         milestones,
         laneEntries,
         maxRightX: pass.maxRightX,
         bottomY: y,
         ...(waveSolve ? { waveSolve } : {}),
+    };
+}
+
+/**
+ * The barrier driver's warm start: engine C's wave spans projected to px
+ * (`start` is `S_k`; the exclusive `end` projects to `E_k`). A wave C did
+ * not schedule seeds nothing.
+ */
+function waveSeed(
+    ids: readonly string[],
+    schedule: RoadmapSchedule,
+    scale: TimeScale,
+): WaveBarrierSeed {
+    const spans = ids.map((id) => schedule.waves?.get(id));
+    return {
+        S: spans.map((w) => (w ? scale.forward(w.start) : null)),
+        E: spans.map((w) => (w ? scale.forward(w.end) : null)),
     };
 }

@@ -7,7 +7,7 @@ Nowline is a **roadmap-native drawing tool** backed by a human-readable DSL. The
 ## What Nowline Is Not
 
 - **Not an issue tracker.** Nowline does not manage tickets, sprints, or backlogs. It integrates with tools that do (Jira, Linear, GitHub, Shortcut, Asana) but never replaces them.
-- **Not a project management tool.** No resource contention, critical path analysis, approval workflows, or Gantt-chart scheduling. Those are deliberate exclusions, not gaps.
+- **Not a project management tool.** No resource contention, critical path analysis, approval workflows, Gantt-chart scheduling, or fixed-date item pinning (see [`dsl.md` § Pinning is not supported](./dsl.md#pinning-is-not-supported)). Those are deliberate exclusions, not gaps.
 - **Not a whiteboard.** The DSL constrains what you can express. This is a feature — it keeps roadmaps structured and meaningful.
 
 ## Guiding Principles

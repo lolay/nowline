@@ -8,10 +8,17 @@
 import type { IsolatedRegion } from '@nowline/core';
 import { includeChromeGeometry } from '../include-chrome-geometry.js';
 import { createLayoutContext, type LayoutContext, type LayoutHelpers } from '../layout-context.js';
+import { shiftSwimlaneY } from '../positioned-shift.js';
 import { resolveStyle } from '../style-resolution.js';
 import type { BoundingBox, PositionedIncludeRegion, PositionedSwimlane } from '../types.js';
 import { seedWaveEdges } from '../wave-layout.js';
 import { maxLeafItemRightX } from './content-extent.js';
+import { indexFootnotes } from './footnote-node.js';
+import {
+    placeRegionMarkers,
+    regionMarkerLabelsRightX,
+    seedRegionAnchorEdges,
+} from './region-markers.js';
 import { SwimlaneNode } from './swimlane-node.js';
 
 const TAB_RESERVE = 18;
@@ -30,10 +37,14 @@ export function buildIncludeRegions(
     ctx: LayoutContext,
     startY: number,
     helpers: LayoutHelpers,
-): { regions: PositionedIncludeRegion[]; endY: number } {
+    chartRightX: number,
+): { regions: PositionedIncludeRegion[]; contexts: LayoutContext[]; endY: number } {
     let y = startY + TAB_RESERVE;
     const out: PositionedIncludeRegion[] = [];
+    const contexts: LayoutContext[] = [];
     let isFirst = true;
+    // Region footnotes number on after the host's, in include order.
+    let footnotesBefore = ctx.footnoteIndex.size;
     for (const region of regions) {
         if (!isFirst) y += GAP_BETWEEN_REGIONS;
         isFirst = false;
@@ -48,6 +59,7 @@ export function buildIncludeRegions(
                 timeline: ctx.timeline,
                 scale: ctx.scale,
                 calendar: ctx.calendar,
+                axisColumns: ctx.axisColumns,
                 bandScale: ctx.bandScale,
                 waves: ctx.waves,
             },
@@ -56,12 +68,19 @@ export function buildIncludeRegions(
                 chartBottomY: innerStartY,
                 swimlaneBottomY: innerStartY,
             },
-            {},
+            { footnotes: indexFootnotes(region.content.footnotes, footnotesBefore) },
         );
+        footnotesBefore += region.content.footnotes.size;
         // Region ids stay invisible to the host, but the wave edges are
         // shared: seed them into the region's otherwise empty edge maps.
+        // Without waves, the region's own dated anchors resolve inside it
+        // instead, as engine C's `scheduleRegion` resolves them, so a lane
+        // `after:kickoff` naming the region's anchor starts on its date
+        // (specs/scheduler-unification.md §5 F5).
         if (ctx.waves) {
             seedWaveEdges(ctx.waves, childCtx.entityLeftEdges, childCtx.entityRightEdges);
+        } else {
+            seedRegionAnchorEdges(region.content.anchors, childCtx);
         }
         const nestedSwimlanes: PositionedSwimlane[] = [];
         let cursorY = innerStartY;
@@ -76,6 +95,13 @@ export function buildIncludeRegions(
             nestedSwimlanes.push(positioned);
             cursorY += usedHeight;
             bandIndex++;
+        }
+        // The region's own anchors and milestones take a marker row under
+        // its label tab, and the lanes move down below it.
+        const markers = placeRegionMarkers(region, childCtx, y, innerStartY, cursorY, chartRightX);
+        if (markers.laneShift !== 0) {
+            for (const lane of nestedSwimlanes) shiftSwimlaneY(lane, markers.laneShift);
+            cursorY += markers.laneShift;
         }
         const innerEndY = cursorY;
         // Floor the region height to one row's bandwidth so an empty or
@@ -101,10 +127,13 @@ export function buildIncludeRegions(
             nestedSwimlanes,
             style: resolveStyle('swimlane', [], ctx.styleCtx),
         };
+        if (markers.anchors.length > 0) positioned.anchors = markers.anchors;
+        if (markers.milestones.length > 0) positioned.milestones = markers.milestones;
         out.push(positioned);
+        contexts.push(childCtx);
         y += regionHeight;
     }
-    return { regions: out, endY: y };
+    return { regions: out, contexts, endY: y };
 }
 
 /**
@@ -136,6 +165,8 @@ export function includeRegionWidth(region: PositionedIncludeRegion, chartRightX:
     // the include can overhang the dashed bracket instead of
     // dragging it wider.
     const barsRightX = maxLeafItemRightX(region.nestedSwimlanes);
-    const naturalRightX = Math.max(chromeRightX, barsRightX) + INCLUDE_CONTENT_RIGHT_PAD_PX;
+    const naturalRightX =
+        Math.max(chromeRightX, barsRightX, regionMarkerLabelsRightX(region)) +
+        INCLUDE_CONTENT_RIGHT_PAD_PX;
     return Math.min(chartRightX - boxX, naturalRightX - boxX);
 }

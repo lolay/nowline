@@ -22,7 +22,9 @@ import {
 import { describe, expect, it } from 'vitest';
 import { resolveCalendar } from '../src/calendar.js';
 import { type LayoutOptions, layoutRoadmap } from '../src/layout.js';
-import { ITEM_INSET_PX, TRACK_BLOCK_TAIL_GUTTER_PX } from '../src/themes/shared.js';
+import { scheduleRoadmap } from '../src/schedule.js';
+import { setScheduleWarmStart } from '../src/start-rules.js';
+import { ITEM_INSET_PX } from '../src/themes/shared.js';
 import type {
     PositionedGroup,
     PositionedItem,
@@ -95,6 +97,20 @@ function finish(file: NowlineFile, resolved: ResolveResult): Laid {
         perWeek: config.daysPerWeek,
         calendar: fromCalendarConfig(config),
     };
+}
+
+/**
+ * The barrier solve of a cold start: no warm start from the day schedule
+ * (specs/scheduler-unification.md §5, F4), so the §8.2 algorithm's own pass
+ * count, which the spec's worked examples quote.
+ */
+function coldSolve(laid: Laid): PositionedRoadmap['waveSolve'] {
+    setScheduleWarmStart(false);
+    try {
+        return layoutRoadmap(laid.file, laid.resolved).waveSolve;
+    } finally {
+        setScheduleWarmStart(true);
+    }
 }
 
 const round = (v: number): number => Math.round(v * 1e6) / 1e6;
@@ -236,7 +252,7 @@ function expectBarriers(laid: Laid): void {
 }
 
 describe('layoutRoadmap — wave barriers (§11 worked examples, engine A)', () => {
-    it('Example 1: three lanes, three waves (4 passes)', async () => {
+    it('Example 1: three lanes, three waves (4 passes cold, 2 warm)', async () => {
         const laid = await lay(EXAMPLE_1);
         expectTable(laid, {
             'web-research': [0, 2],
@@ -249,7 +265,8 @@ describe('layoutRoadmap — wave barriers (§11 worked examples, engine A)', () 
             'api-launch': [7, 8],
             'data-launch': [7, 9],
         });
-        expect(laid.model.waveSolve).toEqual({ passes: 4, capped: false });
+        expect(laid.model.waveSolve).toEqual({ passes: 2, capped: false });
+        expect(coldSolve(laid)).toEqual({ passes: 4, capped: false });
         expectBarriers(laid);
     });
 
@@ -414,7 +431,6 @@ swimlane backend
             i2: [5, 7],
             a2: [4, 6],
         });
-        expect(item(laid, 'a2').wavePinOverride).toBeUndefined();
         expectBarriers(laid);
     });
 
@@ -454,7 +470,8 @@ swimlane api
             a2: [4, 9],
             b2: [4, 11],
         });
-        expect(laid.model.waveSolve).toEqual({ passes: 2, capped: false });
+        expect(laid.model.waveSolve).toEqual({ passes: 1, capped: false });
+        expect(coldSolve(laid)).toEqual({ passes: 2, capped: false });
         expect(weeksAt(laid, milestone(laid, 'exec-done').center.x)).toBe(10);
         expectBarriers(laid);
     });
@@ -470,7 +487,7 @@ swimlane api
         expectBarriers(laid);
     });
 
-    it('Example 16: re-declared waves with a shared floor (2 passes)', async () => {
+    it('Example 16: re-declared waves with a shared floor (2 passes cold, 1 warm)', async () => {
         const laid = await layIncludes(EXAMPLE_16, 'program.nowline');
         expectTable(laid, {
             kickoff: [0, 1],
@@ -480,7 +497,8 @@ swimlane api
             'api-build': [4, 8],
             comms: [8, 10],
         });
-        expect(laid.model.waveSolve).toEqual({ passes: 2, capped: false });
+        expect(laid.model.waveSolve).toEqual({ passes: 1, capped: false });
+        expect(coldSolve(laid)).toEqual({ passes: 2, capped: false });
         // `done after:execute` sits on the closing boundary at W8.
         const done = milestone(laid, 'done');
         expect(weeksAt(laid, done.center.x)).toBe(8);
@@ -524,7 +542,7 @@ swimlane api
         expectBarriers(laid);
     });
 
-    it('Example 19: an isolated region holds the barrier (3 passes)', async () => {
+    it('Example 19: an isolated region holds the barrier (3 passes cold, 1 warm)', async () => {
         const laid = await layIncludes(EXAMPLE_19, 'portfolio.nowline');
         expectTable(laid, {
             'pf-api': [0, 2],
@@ -532,19 +550,22 @@ swimlane api
             'pf-scale': [4, 6],
             'ios-push': [4, 5],
         });
-        expect(laid.model.waveSolve).toEqual({ passes: 3, capped: false });
+        expect(laid.model.waveSolve).toEqual({ passes: 1, capped: false });
+        expect(coldSolve(laid)).toEqual({ passes: 3, capped: false });
         // The region items are members too.
         const regionItems = laneItems(laid.model.includes[0].nestedSwimlanes);
         expect(regionItems.map((it) => [it.id, it.waveRole])).toEqual([
             ['ios-offline', 'member'],
             ['ios-push', 'member'],
         ]);
-        // The domain ends at W6: 30 working days, so Mon Feb 16.
+        // The content ends at W6; pf-scale's caption spills past it, so the
+        // axis gains one column (rendering.md § "Caption cap at the chart's
+        // end"): W7, 35 working days, Mon Feb 23.
         const { timeline } = laid.model;
         expect(laid.calendar.workingIndexOf(timeline.startDate, timeline.endDate)).toBe(
-            6 * laid.perWeek,
+            7 * laid.perWeek,
         );
-        expect(timeline.endDate.toISOString().slice(0, 10)).toBe('2026-02-16');
+        expect(timeline.endDate.toISOString().slice(0, 10)).toBe('2026-02-23');
         expectBarriers(laid);
     });
 
@@ -697,9 +718,10 @@ swimlane a
   item a1 duration:1w wave:w1
   item a2 duration:1w wave:w2
 `);
-        // length:4w is a minimum: the window runs to a2's end at W9.
+        // length:4w is a minimum: the window runs to a2's end at W9, and
+        // a2's caption, spilled past it, adds the column to W10.
         const { timeline } = laid.model;
-        expect(timeline.endDate.toISOString().slice(0, 10)).toBe('2026-03-09');
+        expect(timeline.endDate.toISOString().slice(0, 10)).toBe('2026-03-16');
         // S_2 is the floor date projected with the unclamped scale: W8.
         const a2 = item(laid, 'a2');
         expect(logicalStart(a2)).toBe(timeline.originX + 8 * 7 * timeline.pixelsPerDay);
@@ -719,7 +741,8 @@ swimlane a
   item a2 duration:1w wave:w1
 `);
         expectTable(plain, { a1: [0, 2], a2: [2, 3] });
-        expect(plain.model.waveSolve).toEqual({ passes: 2, capped: false });
+        expect(plain.model.waveSolve).toEqual({ passes: 1, capped: false });
+        expect(coldSolve(plain)).toEqual({ passes: 2, capped: false });
 
         const floored = await lay(`nowline v1
 
@@ -784,7 +807,7 @@ swimlane a
         expect(itemsById(laid.model).has('deep-long')).toBe(false);
     });
 
-    it('divergence (d) stays pinned: a group track binding a parallel join adds its tail gutter', async () => {
+    it('divergence (d) is settled: a group track binding a parallel join adds no tail gutter', async () => {
         const laid = await lay(`nowline v1
 
 roadmap tail "Tail gutter" start:2026-01-05 scale:1w
@@ -804,54 +827,38 @@ swimlane b
 `);
         const { timeline } = laid.model;
         const w = (weeks: number): number => timeline.originX + weeks * 5 * timeline.pixelsPerDay;
-        // Engine A: the join is the group's end plus the 8 px tail gutter;
-        // engine C would start `next` at W2 exactly.
+        // The join is the group's end, as in engine C
+        // (specs/scheduler-unification.md §8 decision 8).
         const next = item(laid, 'next');
-        expect(logicalStart(next)).toBeCloseTo(w(2) + TRACK_BLOCK_TAIL_GUTTER_PX, 6);
-        // The barrier is computed from engine A's own ends, so w2 opens
-        // after `next` ends, gutter included, and still holds.
+        expect(logicalStart(next)).toBeCloseTo(w(2), 6);
+        // w2 opens when `next` ends and still holds.
         const b2 = item(laid, 'b2');
         expect(logicalStart(b2)).toBeCloseTo(logicalEnd(next), 6);
-        expect(logicalStart(b2)).toBeCloseTo(w(3) + TRACK_BLOCK_TAIL_GUTTER_PX, 6);
+        expect(logicalStart(b2)).toBeCloseTo(w(3), 6);
         expectBarriers(laid);
     });
 
-    it('records the pin a floor moved (Example 9 pin variant)', async () => {
-        const laid = await lay(EXAMPLE_9.replace(' A2_PIN', ' date:2026-01-19'));
-        expectTable(laid, { a2: [4, 6] });
-        expect(item(laid, 'a2').wavePinOverride).toEqual({
-            wave: 'w2',
-            key: 'date',
-            pin: '2026-01-19',
-            start: '2026-02-02',
-        });
-        // Nothing else was pinned.
-        for (const it of allItems(laid.model)) {
-            if (it.id !== 'a2') expect('wavePinOverride' in it).toBe(false);
+    it('ignores date: and start: on an item: the floor sets a2 as if neither were written', async () => {
+        // Work has no fixed start pin (specs/dsl.md § Item Properties). a2
+        // follows a1 (W1) and w2's floor is W4, so a2 runs W4-W6 whatever
+        // the ignored key names: before the floor (W2, W3), on it (W4) or
+        // past it (W5, which the old pin kept).
+        for (const pin of [
+            ' date:2026-01-19',
+            ' start:2026-01-26',
+            ' date:2026-02-02',
+            ' date:2026-02-09',
+        ]) {
+            const laid = await lay(EXAMPLE_9.replace(' A2_PIN', pin));
+            expectTable(laid, { a2: [4, 6] });
+            expectBarriers(laid);
         }
     });
 
-    it('records a start: pin a floor moved, and not a pin the floor does not reach', async () => {
-        const moved = await lay(EXAMPLE_9.replace(' A2_PIN', ' start:2026-01-26'));
-        expect(item(moved, 'a2').wavePinOverride).toEqual({
-            wave: 'w2',
-            key: 'start',
-            pin: '2026-01-26',
-            start: '2026-02-02',
-        });
-        // A pin on or after the wave start keeps the item where it is.
-        const kept = await lay(EXAMPLE_9.replace(' A2_PIN', ' date:2026-02-09'));
-        expectTable(kept, { a2: [5, 7] });
-        expect('wavePinOverride' in item(kept, 'a2')).toBe(false);
-        const onStart = await lay(EXAMPLE_9.replace(' A2_PIN', ' date:2026-02-02'));
-        expect('wavePinOverride' in item(onStart, 'a2')).toBe(false);
-    });
-
-    it('keeps a start: pin on a direct parallel track and over a lane after: (no floor, no override)', async () => {
-        // w1 has no floor, so S_1 is the origin and can move nothing. p1's
-        // `start:` pin (W1) places it ahead of the parallel's start (W3),
-        // and x's `start:` pin (W1) wins over its `after:` (W3), in both
-        // engines. Neither pin is moved, so neither reports.
+    it('ignores start: on a direct parallel track and beside a lane after:', async () => {
+        // w1 has no floor. p1's ignored `start:` (W1) leaves it at the
+        // parallel's start (W3), beside p2, and x's ignored `start:` (W1)
+        // leaves its `after:a0` (W3) in charge, in both engines.
         const laid = await lay(`nowline v1
 
 roadmap pins "Pins" start:2026-01-05 scale:1w calendar:full
@@ -866,22 +873,15 @@ swimlane a
 swimlane b
   item x duration:1w wave:w1 start:2026-01-12 after:a0
 `);
-        expectTable(laid, { a0: [0, 3], p1: [1, 2], p2: [3, 4], x: [1, 2] });
-        expect('wavePinOverride' in item(laid, 'p1')).toBe(false);
-        expect('wavePinOverride' in item(laid, 'x')).toBe(false);
+        expectTable(laid, { a0: [0, 3], p1: [3, 4], p2: [3, 4], x: [3, 4] });
     });
 
-    it('records the start: pin a floor moved even when the item also has an after:', async () => {
-        // a2's `start:` pin (W2) wins over its `after:budget` (W5), and w2's
-        // floor (W4) then moves the pin, so the floor is a2's start.
+    it('ignores start: beside after:budget: the after: sets a2 past the floor', async () => {
+        // a2's ignored `start:` (W2) no longer wins over its `after:budget`
+        // (W5), which lies past w2's floor (W4).
         const laid = await lay(EXAMPLE_9.replace(' A2_PIN', ' start:2026-01-19 after:budget'));
-        expectTable(laid, { a2: [4, 6] });
-        expect(item(laid, 'a2').wavePinOverride).toEqual({
-            wave: 'w2',
-            key: 'start',
-            pin: '2026-01-19',
-            start: '2026-02-02',
-        });
+        expectTable(laid, { a2: [5, 7] });
+        expectBarriers(laid);
     });
 
     it('hits the pass cap on input that breaks the order rule (Example 13)', async () => {
@@ -1241,7 +1241,7 @@ describe('layoutRoadmap — without waves', () => {
                 'roadmap child "Child" start:2026-01-05 scale:1w',
                 '',
                 'swimlane c',
-                '  item c1 duration:2w date:2026-01-12',
+                '  item c1 duration:2w after:2026-01-12',
                 '',
             ].join('\n'),
             'main.nowline': [
@@ -1255,7 +1255,7 @@ describe('layoutRoadmap — without waves', () => {
                 '',
                 'swimlane a',
                 '  item a1 duration:2w',
-                '  item a2 duration:1w date:2026-01-26',
+                '  item a2 duration:1w after:2026-01-26',
                 '  parallel',
                 '    item p1 duration:1w',
                 '    group',
@@ -1275,7 +1275,6 @@ describe('layoutRoadmap — without waves', () => {
         expect(items.length).toBe(6);
         for (const it of items) {
             expect('waveRole' in it).toBe(false);
-            expect('wavePinOverride' in it).toBe(false);
         }
         expect(laid.model.milestones.length).toBe(2);
         for (const m of laid.model.milestones) {
@@ -1310,9 +1309,16 @@ describe('layoutRoadmap — barrier theorem on generated roadmaps', () => {
                 expect(m.it.waveRole).toBe('member');
             }
             // For each wave pair, the latest end of the earlier wave is at
-            // or before the earliest start of the later one.
+            // or before the earliest start of the later one. An end is the
+            // member's duration end: a bar drawn at its minimum width is
+            // presentation and may paint past it
+            // (specs/scheduler-unification.md §8 decision 6).
+            const days = scheduleRoadmap(file, resolved).items;
+            const durationEnd = (m: (typeof members)[number]): number =>
+                logicalStart(m.it) +
+                (days.get(m.id)?.days ?? Number.NaN) * model.timeline.pixelsPerDay;
             for (let j = 1; j <= n; j++) {
-                const ends = members.filter((m) => m.k === j).map((m) => logicalEnd(m.it));
+                const ends = members.filter((m) => m.k === j).map(durationEnd);
                 if (ends.length === 0) continue;
                 const latestEnd = Math.max(...ends);
                 for (const later of members.filter((m) => m.k > j)) {
@@ -1348,7 +1354,7 @@ swimlane s
   item z duration:1w wave:b
 swimlane t
   item y duration:3d wave:a
-  item q duration:2d wave:b date:2026-01-07
+  item q duration:2d wave:b after:2026-01-07
 ${extra}`;
 
     /** `source` laid out with the file key (a config block) or the option. */
@@ -1380,8 +1386,6 @@ ${extra}`;
         expect(w, `wave ${index}`).toBeDefined();
         return w as NonNullable<PositionedRoadmap['waves']>[number];
     };
-    const pinned = { wave: 'b', key: 'date', pin: '2026-01-07', start: '2026-01-12' };
-
     it('show: E_a is 40, S_b is 40, z and q start at 62, the dates read as in hide', async () => {
         const laid = await layDisplay(fixture(), 'show');
         const o = laid.model.timeline.originX;
@@ -1394,12 +1398,6 @@ ${extra}`;
         expect(laid.model.waveSolve?.capped).toBe(false);
     });
 
-    it('show: NL.W1001 for q reads the same as in hide', async () => {
-        const laid = await layDisplay(fixture(), 'show');
-        expect(item(laid, 'q').wavePinOverride).toEqual(pinned);
-        expect(left(laid, 'q')).toBe(62);
-    });
-
     it('hide: E_a is 40, S_b is 40, z and q start at 46 (guard)', async () => {
         const laid = await layDisplay(fixture());
         const o = laid.model.timeline.originX;
@@ -1409,7 +1407,6 @@ ${extra}`;
         expect(left(laid, 'q')).toBe(46);
         expect(iso(waveOf(laid, 0).endDate)).toBe('2026-01-10');
         expect(iso(waveOf(laid, 1).startDate)).toBe('2026-01-12');
-        expect(item(laid, 'q').wavePinOverride).toEqual(pinned);
     });
 
     it('a floor on Sunday Jan 11: S_b is 48 under show (40 under hide), z at 62', async () => {

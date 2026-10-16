@@ -541,6 +541,8 @@ describe('renderSvg — wrapped item titles', () => {
     // 148px bar with a 124px text area, so "Technology Selection" (~151px)
     // wraps to two lines instead of spilling to the right.
     const HEADER = `nowline v1\n\nroadmap r1 "R" start:2026-04-06 scale:2w\n\n`;
+    /** A milestone far past every bar, so no caption reaches the axis end. */
+    const CLEAR_OF_THE_END = 'milestone later "Later" date:2026-09-07\n\n';
 
     interface TextNode {
         x: number;
@@ -674,7 +676,9 @@ describe('renderSvg — wrapped item titles', () => {
 
     it('still spills a title with an unbreakable word as one line beside the bar', async () => {
         const model = await parseToModel(
-            `${HEADER}swimlane s "S"\n  item big "Internationalization" duration:2w\n`,
+            // The milestone keeps the axis end past the caption, so the cap
+            // at the chart's end leaves it whole.
+            `${HEADER}${CLEAR_OF_THE_END}swimlane s "S"\n  item big "Internationalization" duration:2w\n`,
         );
         const fragment = itemFragment(await renderSvg(model), 'big');
         const bar = barRect(fragment);
@@ -691,6 +695,8 @@ describe('renderSvg — explicit title line breaks', () => {
     // `scale:2w`: a `2w` item is a 148px bar. The `\\n` in a template string below is the
     // two-character DSL escape; Langium turns it into a real newline in the title.
     const HEADER = `nowline v1\n\nroadmap r1 "R" start:2026-04-06 scale:2w\n\n`;
+    /** A milestone far past every bar, so no caption reaches the axis end. */
+    const CLEAR_OF_THE_END = 'milestone later "Later" date:2026-09-07\n\n';
 
     interface TextNode {
         x: number;
@@ -758,7 +764,7 @@ describe('renderSvg — explicit title line breaks', () => {
 
     it('paints a spilled explicit block as stacked <text> lines beside the bar, meta below', async () => {
         const model = await parseToModel(
-            `${HEADER}swimlane s "S"\n  item wide "Internationalization of\\nthe billing service" duration:2w\n`,
+            `${HEADER}${CLEAR_OF_THE_END}swimlane s "S"\n  item wide "Internationalization of\\nthe billing service" duration:2w\n`,
         );
         const svg = await renderSvg(model);
         const fragment = itemFragment(svg, 'wide');
@@ -821,6 +827,35 @@ describe('renderSvg — explicit title line breaks', () => {
         );
         const svg = await renderSvg(model);
         expectNoRawNewlineInText(svg);
+    });
+});
+
+describe('renderSvg — caption cap at the chart’s end', () => {
+    const LONG = 'Rollout to every region with the support playbook and the runbook';
+    const source = (title: string) => `nowline v1
+
+roadmap r "R" start:2026-01-05 calendar:full scale:1w
+
+swimlane a "A"
+  item a1 "A1" duration:3w
+  item z "${title}" duration:1w
+`;
+
+    it('paints the truncated caption and gives the bar the full title as its tooltip', async () => {
+        const model = await parseToModel(source(LONG));
+        const svg = await renderSvg(model);
+        const z = itemGroup(svg, 'z');
+        expect(z.startsWith(`<g data-id="z" data-layer="item"><title>${LONG}</title>`)).toBe(true);
+        const painted = model.swimlanes[0].children.find((c) => c.id === 'z');
+        const line = painted?.kind === 'item' ? painted.titleLines?.[0] : undefined;
+        expect(line?.endsWith('…')).toBe(true);
+        expect(z).toContain(`>${line}</text>`);
+        expect(z).not.toContain(`>${LONG}</text>`);
+    });
+
+    it('gives an untruncated caption no tooltip', async () => {
+        const svg = await renderSvg(await parseToModel(source('Zed')));
+        expect(itemGroup(svg, 'z')).not.toContain('<title>');
     });
 });
 
@@ -1463,8 +1498,10 @@ swimlane a
 
         const fit = waveLayer(await renderSvg(await parseToModel(WAVE_FIT_SRC)), 'wave-legend');
         // The wave-name list wraps between waves, one <text> per run.
-        expect(fit).toContain('>Waves: #1 Discovery</text>');
-        expect(fit).toContain('>#4 Rollout everywhere · #5 Launch day</text>');
+        expect(fit).toContain('>Waves: #1 Discovery · #2 Implementation and build-out</text>');
+        expect(fit).toContain(
+            '>#3 Hardening and stabilisation · #4 Rollout everywhere · #5 Launch day</text>',
+        );
 
         const plain = await renderSvg(await parseToModel(WAVE_PLAIN_SRC));
         expect(plain).not.toContain('wave-legend');
@@ -1737,6 +1774,106 @@ swimlane a
             /<pattern [^>]*id="nl-0-root-wave-hatch-light"[^>]*>.*?<\/pattern>/,
         )?.[0];
         expect(light).toContain(`stroke="${darkTheme.wave.hatchOnDark}"`);
+    });
+});
+
+describe('renderSvg — isolated region markers', () => {
+    it("draws a region's anchors and milestones inside its group, cut lines to its last lane", async () => {
+        const model = await parseFilesToModel(
+            {
+                'host.nowline': `nowline v1
+
+include "./partner.nowline" roadmap:isolate
+
+roadmap host "Host" start:2026-01-05
+
+anchor launch "Launch" date:2026-01-05
+
+swimlane core "Core"
+  item api "API" duration:3w after:launch
+`,
+                'partner.nowline': `nowline v1
+
+roadmap partner "Partner" start:2026-01-05
+
+anchor kickoff "Kickoff" date:2026-01-12
+
+swimlane plugin "Plugin"
+  item alpha "Plugin alpha" duration:3w after:kickoff
+
+milestone beta "Beta" after:alpha
+`,
+            },
+            'host.nowline',
+        );
+        const svg = await renderSvg(model);
+        const region = groupsMatching(svg, /<g data-layer="include">/)[0] ?? '';
+        const inc = model.includes[0];
+        const anchor = groupsMatching(region, /<g data-id="kickoff" data-layer="anchor">/)[0];
+        const milestone = groupsMatching(region, /<g data-id="beta" data-layer="milestone">/)[0];
+        expect(anchor).toContain('Kickoff');
+        expect(milestone).toContain('Beta');
+        // Drawn over the region's lanes, and only inside the region.
+        expect(region.indexOf('data-id="kickoff"')).toBeGreaterThan(
+            region.lastIndexOf('data-layer="item"'),
+        );
+        expect(svg.match(/data-id="kickoff"/g)).toHaveLength(1);
+        const cutBottom = n2(inc.anchors?.[0].cutBottomY ?? -1);
+        const cuts = linesOf(region).filter((l) => attrOf(l, 'y2') === cutBottom);
+        // The anchor's fine dashes and the milestone's accent dashes.
+        expect(cuts.map((l) => attrOf(l, 'stroke-dasharray'))).toHaveLength(2);
+        expect(Number(cutBottom)).toBeLessThan(inc.box.y + inc.box.height);
+        // The anchor's stub into the item after it, drawn inside the region
+        // over its lanes and under its markers.
+        expect(inc.edges).toHaveLength(1);
+        const arrow = region.indexOf('marker-end=');
+        expect(arrow).toBeGreaterThan(region.lastIndexOf('data-layer="item"'));
+        expect(arrow).toBeLessThan(region.indexOf('data-id="kickoff"'));
+    });
+});
+
+describe('renderSvg — isolated region footnotes', () => {
+    it("heads a region's footnotes with its title in the shared panel", async () => {
+        const model = await parseFilesToModel(
+            {
+                'host.nowline': `nowline v1
+
+include "./partner.nowline" roadmap:isolate
+
+roadmap host "Host" start:2026-01-05
+
+swimlane core "Core"
+  item api "API" duration:3w
+
+footnote vendor "Vendor dependency" on:api
+`,
+                'partner.nowline': `nowline v1
+
+roadmap partner "Partner" start:2026-01-05
+
+swimlane plugin "Plugin"
+  item alpha "Plugin alpha" duration:3w
+
+footnote legal "Legal review" on:alpha
+`,
+            },
+            'host.nowline',
+        );
+        const svg = await renderSvg(model);
+        const panel = groupsMatching(svg, /<g data-layer="footnotes">/)[0] ?? '';
+        const texts = [...panel.matchAll(/<text [^>]*>([^<]*)<\/text>/g)].map((m) => m[1]);
+        expect(texts).toEqual([
+            'Footnotes',
+            '1',
+            'Vendor dependency',
+            'Partner',
+            '2',
+            'Legal review',
+        ]);
+        // The heading takes its own row: the region's entry sits two rows
+        // below the host's.
+        const ys = [...panel.matchAll(/<text [^>]*y="([\d.]+)"/g)].map((m) => Number(m[1]));
+        expect(ys[4] - ys[1]).toBe(2 * 18);
     });
 });
 

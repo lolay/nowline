@@ -339,7 +339,8 @@ export function checkUnknownEntityProperties(
         if (computedBanned?.has(key)) continue;
         if (key === 'wave' || isWaveBannedProperty(prop)) continue;
         const candidates: string[] = [...known, ...UNIVERSAL_ENTITY_PROPS];
-        const suggested = suggestConcept(key, known) ?? suggestKey(key, candidates) ?? '';
+        const suggested =
+            suggestConcept(key, known, node.$type) ?? suggestKey(key, candidates) ?? '';
         acceptTr(accept, 'warning', { node: prop, property: 'key' }, 'NL.W0700', {
             key,
             entity: describeNode(node),

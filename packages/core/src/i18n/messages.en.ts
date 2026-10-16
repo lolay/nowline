@@ -29,7 +29,6 @@ import type {
     I1008Args,
     W0701Args,
     W0702Args,
-    W1001Args,
     W1002Args,
     W1100Args,
     W1101Args,
@@ -360,8 +359,6 @@ export const messages = {
     'NL.W1000': (a: { date: string; start: string; end: string }) =>
         `Now-line date ${a.date} is outside the roadmap window (${a.start} – ${a.end}); it will not be drawn.`,
 
-    'NL.W1001': (a: W1001Args) =>
-        `Item "${a.name}" is pinned to ${a.pin} (${a.key}:), but wave "${a.wave}" cannot start until ${a.start}; the item starts at the wave start.`,
     'NL.W1002': (a: W1002Args) =>
         `Wave barriers did not settle after ${a.passes} layout passes, so the drawn schedule may not respect the wave order. The roadmap probably has an ordering conflict that validation did not catch.`,
 

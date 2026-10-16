@@ -1,0 +1,31 @@
+nowline v1
+
+roadmap r "Parallels of groups of parallels" start:2026-01-05 scale:1w
+
+swimlane platform "Platform"
+  item kick "Kickoff" duration:1d
+  parallel streams "Streams"
+    group api "API track"
+      item s1 "Schema" duration:2d
+      parallel api-par "API work"
+        group rest "REST"
+          item r1 "Routes" duration:1d
+          item r2 "Handlers" duration:2d
+        group grpc "gRPC"
+          item g1 "Protos" duration:1d
+          item g2 "Stubs" duration:1d
+          item g3 "Server" duration:1d
+      item s2 "API review" duration:1d
+    group client "Client track"
+      item c1 "SDK" duration:3d
+      item c2 "Samples" duration:1d after:r1
+  item int "Integration" duration:2d
+  item rel "Release" duration:1d
+
+swimlane qa "QA"
+  item q1 "Test plan" duration:2d after:kick
+  item q2 "gRPC tests" duration:1d after:grpc
+  item q3 "Regression" duration:2d after:streams
+
+milestone api-ready "API ready" after:api
+milestone ga "GA" after:rel

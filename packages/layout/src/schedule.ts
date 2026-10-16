@@ -7,16 +7,18 @@
 // catalogued ways of `test/engine-divergences.json`. The rules, with the
 // roadmap-start resolution of the date-window phase (`resolveDateWindow` in
 // `phases/date-window.ts`):
-//   - date: / start:  — absolute pin (date: wins over start:)
-//   - after:[id|DATE]  — start after the maximum predecessor end
 //   - sequential default — start where the previous item in the lane ended
+//   - after:[id|DATE]  — start no earlier than the maximum predecessor end
+//     (work has no fixed start pin: `date:` / `start:` on an item are
+//     unknown keys, specs/dsl.md § Item Properties); a parallel ends at its
+//     latest track end, a group at its last child's end
 //   - wave barriers (roadmaps with waves only) — every start is floored by
 //     its wave's start S_k, iterated to a fixpoint by `solveWaveBarriers`
 //     (specs/waves.md §8.5)
 //
 // Offsets are working-day indices from the start (specs/working-calendar.md
-// §5): dates convert with `workingIndexOf`, so a pin on a non-working day
-// starts on the next working day. A start (and an after-only milestone) is a
+// §5): dates convert with `workingIndexOf`, so an `after:` date on a
+// non-working day starts on the next working day. A start (and an after-only milestone) is a
 // point, `dateAtWorkingIndex`; an exclusive end is `spanEndDate`, so a
 // Mon–Fri item ends on Saturday. Anchors and dated milestones keep their own
 // dates. A calendar with no non-working day keeps calendar-day arithmetic.
@@ -163,7 +165,7 @@ export function scheduleRoadmap(
     // These maps accumulate end-day offsets (from startDate) for cross-entity
     // `after:` resolution. In a roadmap with waves the item maps are rebuilt on
     // every barrier pass.
-    let itemEnd = new Map<string, number>(); // id → end day
+    let itemEnd = new Map<string, number>(); // item, group, parallel or wave id → end day
     const anchorEnd = new Map<string, number>(); // id → date day
     const milestoneEnd = new Map<string, number>(); // id → date day
 
@@ -243,15 +245,10 @@ export function scheduleRoadmap(
         const walkNode = (node: TrackNode, prevEnd: number): number => {
             if (isItemDeclaration(node)) {
                 const dur = deriveItemDurationDays(node.properties, scope.sizes, cal);
-                const { pin, after } = startTermsOf(node.properties);
-                let start = prevEnd;
-                if (pin) {
-                    start = dayOf(pin.date);
-                } else if (after.length > 0) {
-                    start = Math.max(prevEnd, ...after.map(resolveAfterDay));
-                }
-                // The barrier floor is one more term in the max; a pin
-                // becomes max(pin, F).
+                const { after } = startTermsOf(node.properties);
+                let start =
+                    after.length > 0 ? Math.max(prevEnd, ...after.map(resolveAfterDay)) : prevEnd;
+                // The barrier floor is one more term in the max.
                 if (wave) start = wave.apply(node, start);
                 const end = start + dur;
                 const scheduled: ScheduledItem = {
@@ -276,6 +273,8 @@ export function scheduleRoadmap(
                 for (const child of trackChildren(node)) {
                     parallelEnd = Math.max(parallelEnd, walkNode(child, containerStart));
                 }
+                // `after:` a parallel waits for its latest track end.
+                if (node.name) scope.itemEnd.set(node.name, parallelEnd);
                 return parallelEnd;
             }
             if (isGroupBlock(node)) {
@@ -283,7 +282,10 @@ export function scheduleRoadmap(
                 let containerStart =
                     after.length > 0 ? Math.max(prevEnd, ...after.map(resolveAfterDay)) : prevEnd;
                 if (wave) containerStart = wave.apply(node, containerStart);
-                return walkLane(node, containerStart);
+                // `after:` a group waits for its last child's end.
+                const groupEnd = walkLane(node, containerStart);
+                if (node.name) scope.itemEnd.set(node.name, groupEnd);
+                return groupEnd;
             }
             return prevEnd;
         };
