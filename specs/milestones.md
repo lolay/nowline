@@ -692,6 +692,12 @@ Status: **implemented** (m1 to m6 of the spec). `RoadmapNode.place` is four call
 
 Depends on: m2.5c. m1 and m2 can land any time; m3 onward follows m4.11's m1 and m2. Spec: [`specs/layout-phases.md`](./layout-phases.md).
 
+### m4.15 — True-width layout
+
+Draw every date-bearing mark on its date. Bars span exactly their scheduled dates (no minimum width and no gutter; the floor is 1 px), captions that do not fit sit right of the bar and push the next item down (never up), groups and parallels become a header bracket and a shaded body padded above and below instead of boxes beside their content, and dependency arrows leave the middle of the source's last day and land on the middle of the target's first day. Milestones and `before:` overflow read the scheduler's dates. Retires m4.11's decisions 6 and 7 (the bar drawn wider than its duration as presentation), the six register entries that hold them, and the two-ended lane cursor. Nearly every sample render moves on purpose; the exports do not. Status: **proposed**; a browser prototype draws every sample with the proposed rules.
+
+Depends on: m4.11, m4.14. Spec: [`specs/true-width-layout.md`](./true-width-layout.md).
+
 ## Dependency Chain
 
 ```
@@ -706,6 +712,8 @@ m1 → m2a → m2b → m2b.5 → m2c → m2d → m2e → m2f → m2g → m2h →
                                                                                                                                                                                            m4.11, m4.12, m4.13 (refactors; independent of each other; m4.13 needs m4.8)
                                                                                                                                                                                           ↘
                                                                                                                                                                                            m4.14 (refactor; its m3 onward follows m4.11's m2)
+                                                                                                                                                                                          ↘
+                                                                                                                                                                                           m4.15 (true-width layout; follows m4.11 and m4.14)
 ```
 
 m3.5 (GitHub Action) and m4 (browser embed) are independent of each other — m3.5 shells out to `@nowline/cli`, m4 ships the browser bundle. The chain orders them m3.5 → m4 by numbering only; either could ship first.
@@ -726,6 +734,6 @@ m4.11 to m4.14 are internal refactors from the v0.8.6 review. They change no use
 
 m1 is the critical foundation — every subsequent milestone depends on the DSL, parser, and typed AST it produces.
 
-## Beyond m4.14
+## Beyond m4.15
 
 Hosted products (pro editor, free viewer, cloud MCP server, enterprise, FedRAMP) consume these OSS packages via npm but are built in separate, proprietary repos. See the commercial roadmap for that scope.
