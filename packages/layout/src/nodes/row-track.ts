@@ -15,7 +15,7 @@ import { blockTitleRowSpillReservation } from '../container-header-geometry.js';
 import { type LayoutContext, type LayoutHelpers, newCursor } from '../layout-context.js';
 import { RowPacker } from '../row-packer.js';
 import { resolveChildStart } from '../start-rules.js';
-import type { PositionedTrackChild } from '../types.js';
+import type { PositionedItem, PositionedTrackChild } from '../types.js';
 import { itemSpanPx } from '../working-span.js';
 import { trackChildPaintedRightX } from './content-extent.js';
 import { measureItem } from './item-measure.js';
@@ -92,12 +92,21 @@ export function sequenceRowTrack(
             // (specs/scheduler-unification.md §8 decision 7).
             const blockEnd = positioned.box.x + positioned.box.width;
             const blockHeight = Math.max(step, cursor.height);
+            // A parallel's box spans only its dates, so a caption one of its
+            // tracks spills is outside it; the row reserves it, as it does an
+            // item's, so the next child drops a row rather than landing on it
+            // (specs/true-width-layout.md §3.2).
+            const contentRight = reservedRightX(positioned);
+            const reservations = [
+                blockTitleRowSpillReservation(positioned),
+                contentRight > blockEnd ? contentRight : null,
+            ].filter((x): x is number => x !== null);
             packer.commitBlock({
                 rowIndex,
                 placed: positioned,
                 blockHeight,
                 blockEnd,
-                spillReservation: blockTitleRowSpillReservation(positioned),
+                spillReservation: reservations.length > 0 ? Math.max(...reservations) : null,
                 paintedRight: trackChildPaintedRightX(positioned),
             });
             timeCursorX = Math.max(timeCursorX, cursor.x);
@@ -143,35 +152,44 @@ export function sequenceRowTrack(
         const durationEnd = predictedStart + itemSpanPx(ctx, predictedStart, measure.durationDays);
         timeCursorX = Math.max(timeCursorX, durationEnd);
 
-        let spillReservation: number | null = null;
-        const hasAnySpill =
-            positioned.textSpills ||
-            positioned.chipsOutside ||
-            positioned.dotSpills ||
-            positioned.iconSpills ||
-            positioned.footnoteSpills;
-        if (hasAnySpill) {
-            // `decorationsRightX` already aggregates the spilled
-            // dot / icon / footnote / caption right edges from
-            // `sequenceItem`; the chip column tracks separately
-            // via `chipsRightX`. Add a 6-px buffer so the next
-            // chained item's bar leaves a visible gutter past
-            // the spilled cluster instead of butting against it.
-            const farRight = Math.max(
-                positioned.decorationsRightX,
-                positioned.chipsOutside ? positioned.chipsRightX : 0,
-            );
-            spillReservation = farRight + 6;
-        }
-
         packer.commitItem({
             rowIndex,
             placed: positioned,
             logicalEnd: itemLogicalEnd,
-            spillReservation,
+            spillReservation: itemSpillReservation(positioned),
             rowHeight: pitch,
         });
     }
 
     return { children, timeCursorX, packer };
+}
+
+/**
+ * The row reservation an item's spill claims, or null when nothing spills.
+ * `decorationsRightX` already aggregates the spilled dot / icon / footnote /
+ * caption right edges from `sequenceItem`; the chip column tracks separately
+ * via `chipsRightX`. A 6 px buffer leaves the next chained item's bar a
+ * visible gutter past the spilled cluster instead of butting against it.
+ */
+function itemSpillReservation(item: PositionedItem): number | null {
+    const spills =
+        item.textSpills ||
+        item.chipsOutside ||
+        item.dotSpills ||
+        item.iconSpills ||
+        item.footnoteSpills;
+    if (!spills) return null;
+    return Math.max(item.decorationsRightX, item.chipsOutside ? item.chipsRightX : 0) + 6;
+}
+
+/**
+ * Rightmost x a placed child reserves on its row: an item's bar or spill
+ * reservation, a group's box (which already holds its children's), and for
+ * a parallel, whose box spans only its dates, the furthest of its tracks.
+ */
+function reservedRightX(child: PositionedTrackChild): number {
+    const boxRight = child.box.x + child.box.width;
+    if (child.kind === 'item') return Math.max(boxRight, itemSpillReservation(child) ?? boxRight);
+    if (child.kind === 'group') return boxRight;
+    return Math.max(boxRight, ...child.children.map(reservedRightX));
 }

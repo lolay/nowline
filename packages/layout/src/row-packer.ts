@@ -114,9 +114,9 @@ export interface BlockCommitInput {
     spillReservation?: number | null;
     /** Rightmost x anything inside the block paints, when it can pass
      *  `blockEnd` (see `trackChildPaintedRightX`): a parallel's box is
-     *  compact, so a caption its tracks spill is not in it. It only
-     *  widens `usedRightX()` (the canvas and an enclosing group's box),
-     *  never the row's `rightEdge` or `spillX`, so packing is unchanged. */
+     *  compact, so a caption its tracks spill is not in it. It widens
+     *  `usedRightX()` (the canvas and an enclosing group's box); the
+     *  caller reserves it on the row through `spillReservation`. */
     paintedRight?: number;
 }
 
