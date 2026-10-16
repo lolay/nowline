@@ -9,9 +9,17 @@
 - **Done this run:** wave 1 `[exec]` m2 s1-s3 in `b72b6de`, `2581435`, `0c1a82b` (`make pre-commit` green per step; `make gallery-e2e` 10/10; deliberate mode-carry break turned 3 tests red).
 - **Done this run:** wave 2 `[deep]` m3 s1 in `7f423c9` (39/39 node:test, gallery-e2e 10/10, m1 data dir migrated).
 - **Done this run:** wave 3 `[exec]` m3 s2-s3 in `846dbd8`, `c1fd456`, wave 1 review fixup in `ae13dc0` (42 node:test, gallery-e2e 15/15). A container restart interrupted wave 3 after `ae13dc0`; a resumed agent kept the uncommitted s2 diff.
-- **Next unit:** fixup 2, the wave 2 review's manifest path validation (must land before m4), then m4-m6 in a later run.
+- **Done this run:** fixup 2 in `337a95e`: untrusted raw builds validated before publish (names, paths, symlinks, shas, PR line, https-only links), plus the review nits (50 node:test, gallery-e2e 15/15). Fixup 2 itself was not separately reviewed.
+- **Next unit:** m4-m6 (publish workflow, docs, DNS handoff) in a later run, after maintainer review of m2-m3; tag them first.
 - **Resume:** paste the plan's Kickoff prompt into a new session.
 - **Pending question:** none.
+
+## m4 must-dos (from fixup 2)
+
+- Publish PR runs with `publish.mjs --pr <number>` from the `workflow_run` event; without it a PR artifact can omit `pr` and claim `line: "main"`.
+- Publish non-PR artifacts only when the triggering run was a push to `main`; skip forks; download the artifact by the triggering run id into a fresh directory.
+- `fetch-depth: 0` in the publish job for the PR ancestor fallback.
+- m5: state in `specs/ci.md` that same-repo PR SVGs are served on the gallery origin (collaborator trust model).
 
 ## Decisions so far
 
@@ -28,6 +36,8 @@
 - env: Playwright for ad-hoc scripts: `packages/integration-tests/node_modules/playwright/index.mjs`.
 
 ## Deviations
+
+- fixup 2: added `--pr <n>` / `expectPr`; stored manifests are re-validated and a malformed one fails the whole publish; PR lines classified by manifest `pr.number`, so a local `pr-12` branch is a branch line.
 
 - m3.s2: root index has Main, Pull requests, then Branches (local non-main lines); compare pickers grouped by line with `<optgroup>`; "since your last visit" tracks main only.
 
