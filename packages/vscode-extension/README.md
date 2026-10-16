@@ -112,7 +112,7 @@ The preview byte-matches `nowline render` for the same source under the same cha
 Locale uses two chains, mirroring the CLI:
 
 - **Operator chain** (validator-table messages): `nowline.preview.locale` > `.nowlinerc` `locale` > `vscode.env.language` > `en-US`.
-- **Content chain** (rendered axis labels, now-pill, footnote sort): the file's `nowline v1 locale:` directive wins outright.
+- **Content chain** (rendered axis labels, now-pill): the file's `nowline v1 locale:` directive wins outright.
 
 `vscode.env.language` plays the role the CLI's `LC_*` / `LANG` env vars play. Leaving `nowline.preview.locale` empty makes a French-installed Cursor render French previews and French diagnostics with no configuration; setting it to `en-US` overrides that.
 

@@ -272,13 +272,15 @@ export const HEADER_ABOVE_HEIGHT_PX = 72;
 //   │  Footnotes              ↑     │   header band (HEADER_HEIGHT)
 //   │                         │     │
 //   ├─────────────────────────┘     │   gap = PANEL_PADDING
-//   │  N  Title — description       │   row N (ROW_HEIGHT each)
+//   │  N  Title — description       │   row (ROW_HEIGHT each)
+//   │     that wraps at the title   │   wrapped row
 //   │  N  …                         │
 //   │                               │
 //   └───────────────────────────────┘   bottom pad = PANEL_PADDING
 //
 // Total panel height (when entries.length > 0):
-//   HEADER_HEIGHT + entries × ROW_HEIGHT + PANEL_PADDING
+//   HEADER_HEIGHT + rows × ROW_HEIGHT + PANEL_PADDING, where rows counts
+//   every entry's rows (wrapped ones included) and each region heading.
 
 /** Height (px) of the header band above the entry rows. */
 export const FOOTNOTE_HEADER_HEIGHT_PX = 28;

@@ -1,0 +1,7 @@
+```release-note:fixed
+A footnote's title or description that does not fit the chart's width no longer runs past the canvas and gets cut off: it wraps onto more rows in the footnote panel, starting under the title, and the panel grows to hold them.
+```
+
+```release-note:changed
+Footnotes are numbered in document order, as the DSL reference always said, instead of sorted by id. In an isolated region they number in document order after the host's. Roadmaps whose footnotes were not declared in id order renumber, superscripts included.
+```
