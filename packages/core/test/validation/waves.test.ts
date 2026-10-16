@@ -294,6 +294,7 @@ describe('waves: declaration rules (set S)', () => {
             {
                 line: 5,
                 severity: 'error',
+                code: 'NL.E0302',
                 message:
                     'after: reference "nope" does not resolve to any declared entity in this file.',
             },

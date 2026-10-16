@@ -3,7 +3,7 @@
 // forwards one method per check.
 
 import type { AstNode, ValidationAcceptor } from 'langium';
-import type { EntityProperty, NowlineFile, RoadmapEntry } from '../../generated/ast.js';
+import type { EntityProperty, NowlineFile } from '../../generated/ast.js';
 import {
     isGroupBlock,
     isItemDeclaration,
@@ -14,7 +14,8 @@ import {
     isWaveDeclaration,
 } from '../../generated/ast.js';
 import { ISO_DATE_RE, isRealIsoDate, parseIsoDate, propKey } from '../../util/props.js';
-import { declarations, referenceableIds, visitProperties } from '../ast-walk.js';
+import { declarations, visitProperties } from '../ast-walk.js';
+import { unresolvedReferences } from '../references.js';
 import { entityTypeLabel } from '../validator-utils.js';
 import { isWaveBannedProperty } from '../waves.js';
 import { acceptTr, resolveLocalStart } from './support.js';
@@ -87,35 +88,13 @@ export function checkForwardReferences(file: NowlineFile, accept: ValidationAcce
 //
 // Inline date literals in `after:` / `before:` (e.g. `after:2026-03-15`)
 // are intentionally NOT id references — they pin the entity directly to a
-// calendar date without a named anchor. The ISO_DATE_RE check below skips them
-// here; their own validation (entity-type allowlist, multi-date-per-direction,
-// roadmap-start: requirements) lives in `checkInlineDatePins` below.
+// calendar date without a named anchor. `unresolvedReferences` (../references.ts,
+// shared with the include resolver) skips them; their own validation
+// (entity-type allowlist, multi-date-per-direction, roadmap-start:
+// requirements) lives in `checkInlineDatePins` below.
 export function checkReferenceResolution(file: NowlineFile, accept: ValidationAcceptor): void {
-    const declaredIds = referenceableIds(file);
-
-    const visit = (entry: RoadmapEntry) => {
-        visitProperties(entry, (prop) => {
-            const key = propKey(prop);
-            if (key !== 'after' && key !== 'before' && key !== 'on') return;
-            // A wave's before: is NL.E1105 only.
-            if (isWaveBannedProperty(prop)) return;
-            const vals = prop.value ? [prop.value] : prop.values;
-            for (const v of vals) {
-                if (!v) continue;
-                if ((key === 'after' || key === 'before') && ISO_DATE_RE.test(v)) continue;
-                if (!declaredIds.has(v)) {
-                    accept(
-                        'error',
-                        `${key}: reference "${v}" does not resolve to any declared entity in this file.`,
-                        { node: prop },
-                    );
-                }
-            }
-        });
-    };
-
-    for (const entry of file.roadmapEntries) {
-        visit(entry);
+    for (const { prop, key, value } of unresolvedReferences(file)) {
+        acceptTr(accept, 'error', { node: prop }, 'NL.E0302', { key, value });
     }
 }
 
