@@ -1,0 +1,143 @@
+# True-width layout
+
+Status: **proposed** (milestone m4.15). Prototype: [`handoffs/true-width-prototype/`](./handoffs/true-width-prototype/). Handoff: [`handoffs/handoff-m4.15-true-width-layout.md`](./handoffs/handoff-m4.15-true-width-layout.md).
+
+## 1. Problem
+
+The chart draws dates that are not the plan's dates. The scheduler (engine C, `scheduleRoadmap`) and the exports agree on every start and end since m4.11, but the chart widens anything too short to draw:
+
+- **Bars.** A bar gives up `ITEM_INSET_PX` (6 px) on each side and is drawn at least `MIN_ITEM_WIDTH` (8 px), so nothing is narrower than 20 px. At the default weekly scale (40 px a week, 8 px a working day) that is 2.5 days: a one-day task is drawn two and a half times its length.
+- **Chains.** Consecutive short tasks overlap their widened bars, so the row packer drops each one a row. Five one-day tasks become a five-row staircase smeared across a week and a half, and their captions truncate (`Rate li…`).
+- **Markers.** An after-only milestone `after:<item>` sits at the item's painted edge, not its end date ([`scheduler-unification.md`](./scheduler-unification.md) §9). A milestone `after:<group>` lands inside a widened last bar. `before:` overflow compares the painted end.
+- **Containers.** Group and parallel boxes take horizontal space (a chiclet, a `[` bracket, padding), so their painted edge differs from their dates. m4.11 had to split the lane cursor into a time end (`TrackCursor.x`) and a painted edge (`maxX`), and keeps six register entries for bars drawn wider than their duration ([`scheduler-unification.md`](./scheduler-unification.md) §8 decisions 6 and 7).
+
+The specs never decided this. [`rendering.md`](./rendering.md) says a bar's width "is determined by `duration`" and never mentions the minimum; [`dsl.md`](./dsl.md) says items shorter than `scale:` "may" render as "labelled annotations", which [`rendering.md`](./rendering.md) never defines. Decision 6 of the scheduler spec is the only ruling, and it calls the widened bar presentation.
+
+## 2. Principle
+
+**Every date-bearing mark sits exactly on its date**: bar starts and ends, milestones, anchors, wave edges and the ends of dependency arrows. To get there the chart spends vertical space, never time.
+
+Out of scope, by decision:
+
+- **No variable-width items.** No minimum duration feeds back into the schedule; the chart and the exports keep one set of dates.
+- **No variable-width columns.** One pixels-per-day across the axis; equal durations look equal everywhere.
+- **No auto-zoom.** The column width stays what `scale:` gives today. A short item is short.
+- **No merging.** Each item keeps its own bar and caption; chains of short items are not collapsed into a run.
+
+## 3. Rules
+
+### 3.1 Bars
+
+- A bar spans exactly `[x(start), x(end)]` from the schedule. There is no minimum width and no horizontal inset that widens it; the floor is 1 px.
+- Adjacent bars on one row keep a 1 px seam, taken from inside each bar and only when the bar is at least 6 px wide, so a seam never widens a bar.
+- Corner radius is `min(theme radius, width / 2, height / 2)`: short bars become pills, then lines.
+- Bar height, the caption model (title line plus meta line) and the in-bar decorations are today's. Where a decoration does not fit, it spills into the caption cluster right of the bar, as today (`layoutSpillCluster`, the `MIN_BAR_WIDTH_FOR_*` thresholds). The progress strip is drawn at the bar's true width.
+
+### 3.2 Captions and rows
+
+- A caption that fits inside its bar stays inside; otherwise it sits right of the bar, as today, including the one-column cap at the chart's end (m4.11 F7).
+- **Rows never move up.** The next child of a track (lane or group) stays on the previous child's row if its bar and caption fit there, and otherwise drops to the first row below that fits. It never moves above the previous child. Today's packer is first-fit from the top, which can put an item above the work before it (`Release` above `Integration` in the prototype's nested case).
+- Collisions use the painted footprint (bar, spilled caption, container header), so a long caption pushes the next item down rather than right.
+
+### 3.3 Groups and parallels
+
+A container no longer takes horizontal space. It is drawn above and around its content, never beside it:
+
+- **Header**: the title over a bracket that spans exactly the container's dates. A group's bracket is solid, a parallel's dashed. The title starts at the container's start and may run past the bracket's end; the packer treats it as footprint.
+- **Body**: a shaded rectangle spanning exactly the container's dates, from the header down to below the last child, with padding above and below the content (6 px each). There is no left or right padding.
+- **Nesting** adds one header and its padding per level. A parallel stacks its children's tracks vertically inside its body.
+- **Styles**: the body shading takes the container's `bg`. The default themes give groups and parallels distinct light tints. The left `[` bracket, the styled group's box and title chiclet (`GROUP_TITLE_TAB_*`) and `GROUP_BRACKET_LABEL_OVERHANG_PX` retire. `bracket:` keeps its values and now styles the header bracket (`none` hides it); see §8 O5.
+- A wave-only group (no title, no `style:`, no `labels:`, carries `wave:`) still draws nothing.
+
+### 3.4 Dependencies
+
+Arrows are drawn only for `after:` on items, as today, and they run on the dates:
+
+- **Ports.** An arrow leaves the **middle of the source's last day** through its bottom edge (top edge when the target is above) and lands, arrowhead first, on the **middle of the target's first day** on its top edge (bottom edge when the source is below). When a bar is shorter than a day, the port is the bar's middle. Day centres, not date lines: in a chain the source's successor starts exactly on the source's end date, so a leg on the date line runs down the successor's edge and points at the wrong item.
+- **Route.** Vertical from the source port to the gap between rows below (or above) the source, horizontal in that gap to the target's port column, vertical to the target. Legs pass behind bars, crossing them at right angles, never along an edge.
+- **Slack.** The horizontal leg is dotted when the target waits (its length is the slack) and solid when the target starts the day the source ends.
+- **Sources** that are a group or a parallel leave from the bottom of their body at their end date.
+- **No arrow where position already says it**: lane order; a target on the same row that starts where its source ends; an item that starts exactly on an anchor (it touches the anchor's line). A target on the same row that waits gets a dotted horizontal leg at the row's midline.
+- **Channels.** Arrows sharing a gap take offset lanes (2.5 px apart). Arrows landing in the same day share its centre column; see §8 O1.
+
+### 3.5 Markers
+
+- **Anchors** keep the cut line and diamond. An item that starts on the anchor touches the line; an item that starts later gets a dotted stub from the line to its start.
+- **Milestones** sit on the scheduler's date, `after:` ones included. That closes §9's gap "an after-only milestone `after:<item>` sits at the item's painted box right". Non-binding predecessors keep today's dotted slack line, now from their end date.
+- **`before:` overflow** compares the duration end, closing §9's gap "`before:` overflow compares the painted end".
+- **Waves** are unchanged. A bar can no longer paint past its wave's closing edge.
+
+## 4. What this replaces
+
+| Today | After |
+|---|---|
+| `MIN_ITEM_WIDTH` clamp and `ITEM_INSET_PX` gutter on bars | true width, 1 px floor, 1 px seam |
+| [`scheduler-unification.md`](./scheduler-unification.md) §8 decisions 6 and 7 | superseded: nothing drawn wider than its dates |
+| `TrackCursor.x` (time) and `maxX` (painted) | one end; the painted footprint lives only in the row packer |
+| six `(b)` entries in `test/engine-divergences.json` | none; the register can be replaced by the invariant tests of §6 |
+| styled group box, title chiclet, left `[` bracket | header bracket and shaded body |
+| channel-grid routing through bar gutters (m2k) | date-port routing through row gaps |
+| [`dsl.md`](./dsl.md)'s "labelled annotations" for items finer than `scale:` | removed; short items draw at their width |
+
+`scheduleFloorX` (m4.11 F4) becomes an identity on every sample once nothing widens a start, and can be removed with the register.
+
+## 5. Migration plan
+
+Each milestone renders every `examples/` and `tests/` file in light, dark and grayscale with `--now 2026-02-09` and compares the xlsx, msproj and mermaid exports, as m4.11 did. Unlike m4.11 this milestone moves nearly every sample on purpose, so each step lists the samples, snapshots and determinism cells it moves, and none is bumped without that list. The exports should not move at all: they read the schedule, which this milestone does not touch.
+
+### m1 - Bars at true width
+
+Drop the `MIN_ITEM_WIDTH` clamp and the `ITEM_INSET_PX` gutter from bar geometry (`sequence-item.ts`, `item-measure.ts`, `item-bar-geometry.ts`); add the 1 px seam and the radius rule. Collapse `TrackCursor` to one end. Change the row packer to "never moves up" (`row-track.ts`). Delete the `(b)` register entries and `scheduleFloorX` once the invariant test of §6 passes. Arrows still route with the old router; their ports read the new boxes.
+
+### m2 - Containers above their content
+
+Replace the group and parallel geometry (`group-node.ts`, `parallel-node.ts`, `container-header-geometry.ts`, `group-title-tab-geometry.ts`) and their renderer: header band, bracket, shaded body, vertical padding. Map `bg` and `bracket:` per §3.3. Inline-date glyphs on containers move into the header band beside the title.
+
+### m3 - Date-port arrows
+
+Replace the channel-grid router for item dependencies (`dependency-edges.ts`, `edge-routing.ts`, `item-port-geometry.ts`) with §3.4: day-centre ports, gap channels with offsets, dotted slack legs, the no-arrow cases. Anchor stubs and milestone slack lines follow §3.5.
+
+### m4 - Markers on their dates
+
+Milestones `after:` an item or container at the scheduler's date; `before:` overflow on the duration end. Close the two §9 gaps in [`scheduler-unification.md`](./scheduler-unification.md).
+
+### m5 - Spec and docs
+
+Rewrite [`rendering.md`](./rendering.md) "Item Bars", "Parallel and Group Rendering", "Dependency Arrows", "Milestones" and "Before Constraints" to this spec; remove the annotation sentence from [`dsl.md`](./dsl.md) and restate `bracket:`; add the changelog fragment (`changed`) naming every visible change; update the VS Code extension changelog if the preview's look is mentioned there.
+
+## 6. Test strategy
+
+The divergence register compared A and C span by span. This milestone replaces it with invariants that hold on every sample and on the 60 generated roadmaps of `test/generated-roadmaps.ts`:
+
+- **Date truth**: every placed item's bar `[x0, x1]` equals the scheduled start and end, mapped through the time scale, within 0.5 px (seam included). Every milestone and anchor `x` equals its scheduled date.
+- **Containers**: a group or parallel's bracket and body span exactly its children's earliest start and latest end.
+- **Rows**: in every track, each child's row is at or below the previous child's; no two bars on one row overlap.
+- **Arrows**: every dependency arrow starts in the source's last day and ends in the target's first day; no arrow leg runs along a bar edge (no vertical leg within 1 px of a bar's left or right edge over that bar's height).
+
+Each m-step also adds the focused cases it changes (the prototype's five stress files are good seeds), and keeps `schedule-lower-bound.test.ts` green until m1 removes the floor.
+
+## 7. Risks
+
+- **Height.** Chains of tasks shorter than their caption cost one row each. Accepted: vertical space is the budget. §8 O2 covers very long chains.
+- **Every chart changes.** Users who know today's look will notice. The changelog has to say why (dates are now exact) and show what moved.
+- **Arrow density.** At weekly scale a day is 8 px; more than about three arrows landing on one day crowd its column (§8 O1).
+- **Readability of thin bars.** A 1 px bar is a line. Its caption and tooltip carry its identity; colour carries status.
+
+## 8. Open questions
+
+Each has a recommendation; none blocks m1.
+
+- **O1. Arrows landing on one day.** Recommend bundling: arrows into the same target day merge into one trunk that branches just above the targets.
+- **O2. Very long chains of short items.** Recommend no special case in m4.15; revisit with real files. Merging into runs was considered and set aside (§2).
+- **O3. Container titles wider than their span.** Recommend letting the title run past the bracket (as the prototype does) and clipping it with an ellipsis only where the next sibling's footprint begins, with the full title in the tooltip.
+- **O4. Nested shading.** Shading compounds by depth 3. Recommend alternating two tints by depth, and an outline instead of a fill below depth 2.
+- **O5. `bracket:` and `style:` on containers.** Recommend keeping both keys and their values: `bracket:` styles the header bracket, `bg` fills the body. No DSL change.
+- **O6. Arrowheads on thin bars.** A 7 px head is wider than a one-day bar at weekly scale. Recommend scaling the head to the target's width down to a 3 px dot.
+
+## 9. Related fixes found during design
+
+Separate from this milestone, each its own change:
+
+- `scale:1d` defaults to 5 px a day, narrower than a day inside a weekly column (8 px).
+- The `scale` block's `pixels-per-unit` is read by the layout (`view-preset.ts`) but rejected by the validator.
+- The MS Project export writes no link for `after:` a parallel, and the Mermaid export names group and parallel ids it never declares ([`scheduler-unification.md`](./scheduler-unification.md) §9).
