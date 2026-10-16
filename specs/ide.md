@@ -152,7 +152,7 @@ This keeps the in-panel preview byte-stable with `nowline render` for the same s
 Locale uses two chains, mirroring the CLI's [`packages/cli/src/i18n/locale.ts`](../packages/cli/src/i18n/locale.ts):
 
 - **Operator chain** (validator-table messages): `nowline.preview.locale` > `.nowlinerc` `locale` > `vscode.env.language` > `en-US`.
-- **Content chain** (rendered axis labels, now-pill, footnote sort): the file's `nowline v1 locale:` directive wins outright; the operator chain only takes over when no directive is present.
+- **Content chain** (rendered axis labels, now-pill): the file's `nowline v1 locale:` directive wins outright; the operator chain only takes over when no directive is present.
 
 `vscode.env.language` plays the role the CLI's `LC_ALL`/`LC_MESSAGES`/`LANG` env vars play — it reflects Cursor's display language (set via Cursor's "Configure Display Language" command; defaults to the OS locale on first install). A French-installed Cursor therefore renders a French preview and French diagnostics with `nowline.preview.locale` left at its empty default. A power user who wants English output despite a French Cursor sets `nowline.preview.locale` to `en-US`. Locale is deliberately not exposed as a toolbar override — Cursor-locale auto-detection plus directive precedence covers the cases a per-panel toggle would address.
 

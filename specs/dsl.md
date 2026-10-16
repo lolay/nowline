@@ -675,7 +675,7 @@ footnote capacity-risk "Team capacity risk" on:[mobile, platform]
 
 The `on:` property is required and references one or more identifiers (item, swimlane, anchor, milestone, wave, person, team). When referencing multiple entities, use bracket notation: `on:[id1, id2]`. Footnotes follow the universal `[id] ["title"]` pattern — a footnote with an id can itself be referenced.
 
-Footnotes are numbered sequentially by document order. A superscript number appears in the upper-right corner of every entity the footnote is attached to. The full footnote text renders in a footnote section below the roadmap. See `rendering.md` for visual treatment.
+Footnotes are numbered sequentially by document order: the file's own footnotes as declared, then each merged include's in include order (an isolated include's continue after those; see [Include Declaration](#include-declaration)). The id does not affect the number. A superscript number appears in the upper-right corner of every entity the footnote is attached to. The full footnote text renders in a footnote section below the roadmap. See `rendering.md` for visual treatment.
 
 ### Include Declaration
 
