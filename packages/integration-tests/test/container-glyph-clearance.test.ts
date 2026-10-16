@@ -1,17 +1,13 @@
 // Gate-level regression check for container inline-date glyph overlap.
 // Container glyphs (`after:DATE` / `before:DATE` on a group or parallel)
-// used to sit at the box's top corners with the standard inset. Those
-// corners belong to other things:
+// sit in the header's title row, beside the title
+// (specs/true-width-layout.md §3.3). Children paint after the container's
+// own chrome, so a glyph that lands on a bar is hidden under it, and one
+// that lands on the title cuts through it.
 //
-//   - a styled group's title chiclet owns the top-left corner, so the
-//     `after` glyph cut through the title text;
-//   - every other container's first child bar starts flush with the
-//     box's top edge (no top pad), and children paint after the
-//     container's own chrome, so the bar covered the glyph completely.
-//
-// The glyphs must clear the chiclet, the container's own title text, each
-// other (a chiclet or title wider than its box pushes the `before:` glyph
-// right), and every item bar on the chart.
+// The glyphs must clear the container's own title text, each other (a
+// title wider than the container pushes the `before:` glyph right), and
+// every item bar on the chart.
 //
 // Everything is read off the SVG the renderer actually paints, not the
 // layout model: a regression gate that borrows the geometry under test
@@ -19,11 +15,7 @@
 // exception is a title's width, which only a browser can measure; it is
 // bounded by the layout's pessimistic 0.58 em/char text estimate.
 //
-//   chiclet = first filled <path> among a group's own chrome, whose `d`
-//             is `M{x+r} {top} H{right} V… A… {x+w-r} {bottom} H{left} …`
-//   title   = first <text> among a bracket / unstyled group's or a
-//             parallel's own chrome (a chiclet's text is inside the
-//             chiclet, which the chiclet check already covers)
+//   title   = first <text> among a container's own chrome
 //   glyph   = <svg x y width height> inside each
 //             <g data-layer="inline-date-pin"> of the same container
 //   bar     = first <rect> of every <g data-layer="item"> on the chart
@@ -31,8 +23,8 @@
 //             the two horizontally
 //
 // A container's own chrome is everything painted before its first child
-// entity (`renderGroup` / `renderParallel` paint the box, chiclet or
-// bracket, title and glyphs first), so a nested container's chrome is
+// entity (`renderContainer` paints the body, bracket, title and glyphs
+// first), so a nested container's chrome is
 // never attributed to its parent. Every `examples/*.nowline` and
 // `tests/*.nowline` is laid out and rendered, so a new fixture is covered
 // for free.
@@ -70,8 +62,7 @@ interface Rect {
 interface PaintedContainer {
     kind: 'group' | 'parallel';
     id: string;
-    chiclet: Rect | undefined;
-    /** Header-band title text, with its width bounded by the estimate. */
+    /** Header title text, with its width bounded by the estimate. */
     title: (Rect & { text: string }) | undefined;
     glyphs: { side: string; rect: Rect }[];
 }
@@ -96,15 +87,6 @@ async function renderFile(absSource: string, tag: string): Promise<string> {
 
 function attr(el: string, name: string): number {
     return Number(el.match(new RegExp(`(?:^|\\s)${name}="([^"]+)"`))?.[1]);
-}
-
-/** Bounds of a chiclet path (`M… H{right} V… A… {x} {bottom} H{left} …`). */
-function chicletRect(d: string): Rect | undefined {
-    const m = d.match(
-        /^M[\d.-]+ ([\d.-]+)H([\d.-]+)V[\d.-]+A[\d.]+ [\d.]+ 0 0 1 [\d.-]+ ([\d.-]+)H([\d.-]+)/,
-    );
-    if (!m) return undefined;
-    return { top: Number(m[1]), right: Number(m[2]), bottom: Number(m[3]), left: Number(m[4]) };
 }
 
 /** Box of a `<text>` from its `x`, baseline `y`, and `font-size`, spanning
@@ -144,13 +126,7 @@ function paintedContainers(svg: string): PaintedContainer[] {
             }
         }
         const own = rest.slice(0, firstChild >= 0 ? Math.min(firstChild, end) : end);
-        const chicletPath =
-            kind === 'group'
-                ? [...own.matchAll(/<path [^>]*>/g)]
-                      .map((m) => m[0])
-                      .find((p) => !/\sfill="none"/.test(p))
-                : undefined;
-        const titleText = chicletPath ? undefined : own.match(/(<text [^>]*>)([^<]*)<\/text>/);
+        const titleText = own.match(/(<text [^>]*>)([^<]*)<\/text>/);
         const glyphs = [
             ...own.matchAll(
                 /<g [^>]*data-layer="inline-date-pin" data-side="(after|before)"[^>]*>(?:<title>[^<]*<\/title>)?(<svg [^>]*>)/g,
@@ -171,9 +147,6 @@ function paintedContainers(svg: string): PaintedContainer[] {
         out.push({
             kind,
             id: open[1] ?? '(anonymous)',
-            chiclet: chicletPath
-                ? chicletRect(chicletPath.match(/\sd="([^"]+)"/)?.[1] ?? '')
-                : undefined,
             title: titleText ? titleRect(titleText[1], titleText[2]) : undefined,
             glyphs,
         });
@@ -226,11 +199,11 @@ describe('container inline-date glyph clearance', () => {
         // that nothing matches, the fixture sweeps below would pass
         // vacuously instead of checking anything.
         const svg =
-            '<g data-id="g" data-layer="group"><rect x="10" y="20" width="200" height="80"/>' +
-            '<path d="M16 20H70V30A6 6 0 0 1 64 36H10V26A6 6 0 0 1 16 20Z" fill="#475569"/>' +
-            '<text x="16" y="31">Title</text>' +
+            '<g data-id="g" data-layer="group"><rect x="10" y="38" width="200" height="62"/>' +
+            '<path d="M10 38 V33 H210 V38" fill="none" stroke="#475569"/>' +
+            '<text font-size="10" x="26" y="30">Title</text>' +
             '<g data-date="2026-02-09" data-layer="inline-date-pin" data-side="after">' +
-            '<title>2026-02-09</title><svg x="74" y="22" width="12" height="12"></svg></g>' +
+            '<title>2026-02-09</title><svg x="10" y="20.5" width="12" height="12"></svg></g>' +
             '<g data-id="a" data-layer="item"><rect x="16" y="40" width="50" height="56"/>' +
             '<path d="M0 0H1V1A1 1 0 0 1 0 1H0Z" fill="red"/></g></g>' +
             '<g data-id="p" data-layer="parallel">' +
@@ -242,14 +215,20 @@ describe('container inline-date glyph clearance', () => {
             {
                 kind: 'group',
                 id: 'g',
-                chiclet: { left: 10, top: 20, right: 70, bottom: 36 },
-                title: undefined,
-                glyphs: [{ side: 'after', rect: { left: 74, top: 22, right: 86, bottom: 34 } }],
+                title: {
+                    text: 'Title',
+                    left: 26,
+                    top: 20,
+                    right: 26 + 5 * 10 * 0.58,
+                    bottom: 32.5,
+                },
+                glyphs: [
+                    { side: 'after', rect: { left: 10, top: 20.5, right: 22, bottom: 32.5 } },
+                ],
             },
             {
                 kind: 'parallel',
                 id: 'p',
-                chiclet: undefined,
                 title: {
                     text: 'Par',
                     left: 104,
@@ -270,22 +249,12 @@ describe('container inline-date glyph clearance', () => {
 
     it('every container glyph clears its own chrome and the other glyph', async () => {
         const failures: string[] = [];
-        let chicletGlyphsChecked = 0;
         let titleGlyphsChecked = 0;
         for (const { dir, name } of await sources()) {
             const svg = await renderFile(path.join(REPO_ROOT, dir, name), `${dir}-${name}`);
             for (const c of paintedContainers(svg)) {
                 const where = `${dir}/${name} ${c.kind} ${c.id}`;
                 for (const glyph of c.glyphs) {
-                    if (c.chiclet) {
-                        chicletGlyphsChecked++;
-                        if (!clears(glyph.rect, c.chiclet)) {
-                            failures.push(
-                                `${where}: ${glyph.side} glyph x=${glyph.rect.left}..${glyph.rect.right} ` +
-                                    `overlaps chiclet x=${c.chiclet.left}..${c.chiclet.right}`,
-                            );
-                        }
-                    }
                     if (c.title) {
                         titleGlyphsChecked++;
                         if (!clears(glyph.rect, c.title)) {
@@ -305,10 +274,9 @@ describe('container inline-date glyph clearance', () => {
                 }
             }
         }
-        // `tests/inline-date-corners.nowline` carries pinned styled groups
-        // and pinned titled bracket groups / parallels; if none are found
-        // the sweep is not testing anything.
-        expect(chicletGlyphsChecked).toBeGreaterThan(0);
+        // `tests/inline-date-corners.nowline` carries pinned titled groups
+        // and parallels; if none are found the sweep is not testing
+        // anything.
         expect(titleGlyphsChecked).toBeGreaterThan(0);
         expect(failures).toEqual([]);
     }, 60_000);

@@ -294,10 +294,12 @@ swimlane s "Subject"
         const [screens] = (group as PositionedGroup).children;
         expect(screens.kind).toBe('item');
         expect((screens as PositionedItem).textSpills).toBe(true);
+        // The group's box spans only its dates; the caption runs past it and
+        // the canvas still grows to cover it (specs/true-width-layout.md §3.3).
         const captionRight = (screens as PositionedItem).decorationsRightX;
         const groupRight = (group as PositionedGroup).box.x + (group as PositionedGroup).box.width;
-        expect(groupRight).toBeGreaterThanOrEqual(captionRight);
-        expect(model.width).toBeGreaterThanOrEqual(groupRight);
+        expect(captionRight).toBeGreaterThan(groupRight);
+        expect(model.width).toBeGreaterThanOrEqual(captionRight);
     });
 });
 
@@ -313,7 +315,7 @@ function findItem(model: PositionedRoadmap, id: string): PositionedItem {
 // Divergence (c) (specs/scheduler-unification.md §5 F3, §8 decision 7): a
 // group's spilled caption stays out of the lane cursor. The item after the
 // group starts at the group's last child end, as in engine C, and drops
-// below the caption because the row packer keeps the group's painted box.
+// below the caption because the row packer keeps it as the group's footprint.
 describe('a group caption spill stays out of the lane cursor', () => {
     const spill = 'Bootstrap the onboarding flow and every settings page';
 
@@ -333,9 +335,12 @@ swimlane s "Subject"
         expect(chart.b).toEqual([1, 2]);
         expect(chart.z).toEqual([2, 3]);
         expect(chart.z).toEqual(schedule.z);
-        // The group's painted box (caption included) still owns its row.
+        // The group's box spans only its dates, but its caption is footprint
+        // the row keeps, so z drops below the group rather than under it
+        // (specs/true-width-layout.md §3.3).
         const g = findGroup(model, 'g') as PositionedGroup;
-        expect(g.box.x + g.box.width).toBeGreaterThan(findItem(model, 'z').box.x);
+        expect(g.box.x + g.box.width).toBeCloseTo(xOfWeeks(model, 2), 6);
+        expect(b.decorationsRightX).toBeGreaterThan(findItem(model, 'z').box.x);
         expect(findItem(model, 'z').box.y).toBeGreaterThanOrEqual(g.box.y + g.box.height);
     });
 
@@ -560,9 +565,10 @@ milestone m "Done" after:g
             source('Write the onboarding guide and every settings page reference'),
         );
         expect(findItem(model, 'last').textSpills).toBe(true);
-        // The group's painted box runs past its work: the caption it owns.
+        // The group's box ends on its work's end; the caption runs past it.
         const g = findGroup(model, 'g') as PositionedGroup;
-        expect(g.box.x + g.box.width).toBeGreaterThan(xOfWeeks(model, 6) + 1);
+        expect(g.box.x + g.box.width).toBeCloseTo(xOfWeeks(model, 6), 6);
+        expect(findItem(model, 'last').decorationsRightX).toBeGreaterThan(xOfWeeks(model, 6) + 1);
         expect(schedule.z2).toEqual([6, 7]);
         expect(chart.z2).toEqual(schedule.z2);
         expect(milestones.m).toEqual(6);

@@ -1,7 +1,6 @@
 import { isItemDeclaration, isSwimlaneDeclaration, type NowlineFile } from '@nowline/core';
 import { describe, expect, it, vi } from 'vitest';
 import {
-    groupHasFill,
     layoutRoadmap,
     type PositionedItem,
     type PositionedTrackChild,
@@ -1038,7 +1037,9 @@ swimlane "Platform"
         expect(tech.box.height).toBe(72);
         expect(below.box.y).toBeGreaterThanOrEqual(tech.box.y + tech.box.height);
         expect(below.box.y).toBe(tech.box.y + 80);
-        expect(parallel.box.height).toBe(80 + 64);
+        // Header (18) and body pads (6 above, 6 below) around the two
+        // tracks, less the inter-row gap (8) below the last one.
+        expect(parallel.box.height).toBe(18 + 6 + (80 + 64 - 8) + 6);
     });
 
     it('bumps a colliding swimlane item below a wrapped bar by the grown row pitch', async () => {
@@ -1910,8 +1911,7 @@ describe('layoutRoadmap geometry after a late vertical shift', () => {
     const PROGRESS_STRIP_HALF_PX = 2;
     const GLYPH_INSET_TOP_PX = 5;
     const GLYPH_SIZE_PX = 12;
-    const GROUP_TITLE_TAB_HEIGHT_PX = 16;
-    const HEADER_BAND_PX = 12;
+    const HEADER_TITLE_ROW_PX = 13;
 
     type Model = ReturnType<typeof layoutRoadmap>;
 
@@ -2014,12 +2014,8 @@ describe('layoutRoadmap geometry after a late vertical shift', () => {
                     }
                     continue;
                 }
-                // A filled group's chiclet row inside the box top; every
-                // other container's header band above the box.
-                const [top, bottom] =
-                    e.kind === 'group' && groupHasFill(e.style.bg)
-                        ? [e.box.y, e.box.y + GROUP_TITLE_TAB_HEIGHT_PX]
-                        : [e.box.y - HEADER_BAND_PX, e.box.y];
+                // A container's header title row, above its bracket line.
+                const [top, bottom] = [e.box.y, e.box.y + HEADER_TITLE_ROW_PX];
                 if (y < top || y + GLYPH_SIZE_PX > bottom) {
                     out.push(`${where}, glyph row ${top}..${bottom}`);
                 }

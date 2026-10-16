@@ -31,6 +31,7 @@ import {
 } from './container-header-geometry.js';
 import {
     INLINE_DATE_GLYPH_GAP_PX,
+    INLINE_DATE_GLYPH_INSET_RIGHT_PX,
     INLINE_DATE_GLYPH_INSET_TOP_PX,
     INLINE_DATE_GLYPH_TILE_SIZE_PX,
     ITEM_CAPTION_SPILL_GAP_PX,
@@ -131,10 +132,11 @@ export interface ContainerInlineDatePinInputs {
  *
  *   - `after` takes the row's leftmost slot, on the container's start; the
  *     title follows one gap past it (`containerHeaderTitleX`).
- *   - `before` sits flush with the container's end, but never slides left
- *     onto the title (estimated width) or the `after` glyph: when those run
- *     past its slot, it sits one gap past whichever ends last, beyond the
- *     bracket's end.
+ *   - `before` sits the standard inset short of the container's end (a
+ *     sibling may start on that end, level with the header), but never
+ *     slides left onto the title (estimated width) or the `after` glyph:
+ *     when those run past its slot, it sits one gap past whichever ends
+ *     last, beyond the bracket's end, and the row reserves it.
  */
 export function computeContainerInlineDatePins(
     opts: ContainerInlineDatePinInputs,
@@ -162,7 +164,7 @@ export function computeContainerInlineDatePins(
     }
 
     if (beforeDate) {
-        const flushRightX = box.x + box.width - tileSize;
+        const flushRightX = box.x + box.width - INLINE_DATE_GLYPH_INSET_RIGHT_PX - tileSize;
         const clearX = leftClearX > box.x ? leftClearX + INLINE_DATE_GLYPH_GAP_PX : box.x;
         pins.push({
             side: 'before',
